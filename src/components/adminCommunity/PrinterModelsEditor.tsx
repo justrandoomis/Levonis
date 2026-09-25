@@ -252,7 +252,7 @@ export default function PrinterModelsEditor({ t }: { t: T }) {
                 type="button"
                 disabled={!dirty || saving === m.id}
                 onClick={() => void save(m)}
-                className="inline-flex items-center gap-1.5 px-4 min-h-[44px] rounded-2xl bg-gold text-black text-[12.5px] font-bold disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 px-4 min-h-[44px] rounded-2xl bg-gold text-accent-contrast text-[12.5px] font-bold disabled:opacity-40"
                 data-printer-save={m.id}
               >
                 {saving === m.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}

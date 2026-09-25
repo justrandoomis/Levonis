@@ -240,7 +240,7 @@ export function ClaimThreadOverlay({
               <div
                 key={msg.id}
                 className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-                  msg.mine ? 'bg-[#BAA369]/15 border border-[#BAA369]/20 text-zinc-100 ms-auto' : 'bg-zinc-800/70 text-zinc-200'
+                  msg.mine ? 'bg-gold/15 border border-gold/20 text-zinc-100 ms-auto' : 'bg-zinc-800/70 text-zinc-200'
                 }`}
               >
                 {msg.body && <p className="whitespace-pre-wrap break-words">{msg.body}</p>}
@@ -271,7 +271,7 @@ export function ClaimThreadOverlay({
         <div className="flex items-center gap-2">
           <label
             htmlFor="warranty-thread-file"
-            className={`p-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white cursor-pointer transition-colors shrink-0 focus-within:ring-2 focus-within:ring-[#BAA369] ${
+            className={`p-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white cursor-pointer transition-colors shrink-0 focus-within:ring-2 focus-within:ring-gold ${
               replyBusy ? 'opacity-50 pointer-events-none' : ''
             }`}
           >
@@ -307,7 +307,7 @@ export function ClaimThreadOverlay({
             type="button"
             onClick={send}
             disabled={replyBusy || !replyText.trim()}
-            className={`p-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center bg-[#BAA369]/15 text-[#BAA369] border border-[#BAA369]/30 rounded-xl hover:bg-[#BAA369]/25 disabled:opacity-40 transition-colors shrink-0 ${FOCUS}`}
+            className={`p-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center bg-gold/15 text-gold border border-gold/30 rounded-xl hover:bg-gold/25 disabled:opacity-40 transition-colors shrink-0 ${FOCUS}`}
             aria-label={s.send}
           >
             <Send aria-hidden="true" className={`w-4 h-4 ${lang === 'en' ? '' : '-scale-x-100'}`} />

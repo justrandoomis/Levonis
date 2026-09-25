@@ -141,7 +141,7 @@ export default function GiniReceiptPanel({
       </p>
 
       {error && (
-        <p role="alert" className="mt-2 rounded-lg border border-[#B03142]/40 bg-[#B03142]/10 p-2 text-[11.5px] text-[#e4899a]">
+        <p role="alert" className="mt-2 rounded-lg border border-crimson/40 bg-crimson/10 p-2 text-[11.5px] text-blush">
           {error}
         </p>
       )}

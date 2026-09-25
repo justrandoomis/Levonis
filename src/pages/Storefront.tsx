@@ -321,7 +321,7 @@ export default function Storefront({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-gold animate-spin" />
       </div>
     );
@@ -329,7 +329,7 @@ export default function Storefront({
 
   if (notFound || !store || !live) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-6">
+      <div className="min-h-screen bg-black flex items-center justify-center px-6">
         <div className="text-center max-w-sm">
           <PackageX className="w-10 h-10 text-zinc-600 mx-auto mb-4" />
           <h1 className="text-gold font-bold text-lg mb-2">
@@ -345,7 +345,7 @@ export default function Storefront({
           <a
             href={MAIN_SITE ? `${MAIN_SITE}/` : '/'}
             translate="no"
-            className="inline-flex items-center gap-2 min-h-[44px] px-5 rounded-2xl bg-olive text-white font-bold text-[13px]"
+            className="inline-flex items-center gap-2 min-h-[44px] px-5 rounded-2xl bg-olive text-snow font-bold text-[13px]"
           >
             LEVONIS
           </a>
@@ -458,7 +458,7 @@ function LiveServiceDoors({ accepts }: { accepts: boolean }) {
         {quotes && (
           <a
             href={requestsHref}
-            className="relative lv-hit h-10 rounded-xl bg-olive text-white font-bold text-[12px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            className="relative lv-hit h-10 rounded-xl bg-olive text-snow font-bold text-[12px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             <Hammer className="w-3.5 h-3.5" />
             {loc('اطلب عرض سعر', 'Request a quote', 'داوای نرخ بکە')}

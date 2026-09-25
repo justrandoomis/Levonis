@@ -300,7 +300,7 @@ export default function Referrals() {
           type="button"
           onClick={() => navigate(-1)}
           aria-label={s.back}
-          className="w-11 h-11 -ms-2 flex items-center justify-center rounded-full text-zinc-300 hover:text-white hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          className="w-11 h-11 -ms-2 flex items-center justify-center rounded-full text-zinc-300 hover:text-white hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         >
           <Back className="w-5 h-5" aria-hidden="true" />
         </button>
@@ -323,7 +323,7 @@ export default function Referrals() {
         ) : (
           <>
             {/* ---------------------------------------------- handle + link */}
-            <section className="bg-[#0a0a0a] border border-zinc-900 rounded-2xl p-4">
+            <section className="bg-black border border-zinc-900 rounded-2xl p-4">
               <p className="text-[12px] text-zinc-500 mb-1">{s.handle}</p>
               {handle ? (
                 <>
@@ -337,7 +337,7 @@ export default function Referrals() {
                       <button
                         type="button"
                         onClick={() => copy(inviteLink)}
-                        className="min-h-[44px] px-3 rounded-lg bg-[#ef233c] text-white text-[13px] font-bold flex items-center gap-1.5 hover:bg-[#d90429] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                        className="min-h-[44px] px-3 rounded-lg bg-[#ef233c] text-snow text-[13px] font-bold flex items-center gap-1.5 hover:bg-[#d90429] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                       >
                         {copied ? <Check className="w-4 h-4" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
                         {copied ? s.copied : s.copy}
@@ -345,7 +345,7 @@ export default function Referrals() {
                       <button
                         type="button"
                         onClick={share}
-                        className="min-h-[44px] px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 text-[13px] font-bold flex items-center gap-1.5 hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                        className="min-h-[44px] px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 text-[13px] font-bold flex items-center gap-1.5 hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                       >
                         <Share2 className="w-4 h-4" aria-hidden="true" />
                         {s.share}
@@ -370,7 +370,7 @@ export default function Referrals() {
                   <button
                     type="button"
                     onClick={() => navigate('/edit-profile')}
-                    className="min-h-[44px] px-4 rounded-lg bg-[#ef233c] text-white text-[13px] font-bold hover:bg-[#d90429] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                    className="min-h-[44px] px-4 rounded-lg bg-[#ef233c] text-snow text-[13px] font-bold hover:bg-[#d90429] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                   >
                     {s.setHandle}
                   </button>
@@ -379,9 +379,9 @@ export default function Referrals() {
             </section>
 
             {/* ------------------------------------- invite vs support code */}
-            <section className="bg-[#0a0a0a] border border-zinc-900 rounded-2xl p-4">
+            <section className="bg-black border border-zinc-900 rounded-2xl p-4">
               <h2 className="text-white font-bold text-[15px] mb-3 flex items-center gap-2">
-                <Info className="w-4 h-4 text-[#BAA369]" aria-hidden="true" />
+                <Info className="w-4 h-4 text-gold" aria-hidden="true" />
                 {s.diffTitle}
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -415,9 +415,9 @@ export default function Referrals() {
             </section>
 
             {/* ------------------------------------------------- gift claims */}
-            <section className="bg-[#0a0a0a] border border-zinc-900 rounded-2xl p-4">
+            <section className="bg-black border border-zinc-900 rounded-2xl p-4">
               <h2 className="text-white font-bold text-[15px] mb-1 flex items-center gap-2">
-                <Gift className="w-4 h-4 text-[#ef233c]" aria-hidden="true" />
+                <Gift className="w-4 h-4 text-scarlet" aria-hidden="true" />
                 {s.giftsTitle}
               </h2>
               <p className="text-[12.5px] text-zinc-400 leading-relaxed mb-3">{s.giftsDesc}</p>
@@ -469,7 +469,7 @@ export default function Referrals() {
             </section>
 
             {/* --------------------------------- the separate legacy program */}
-            <section className="bg-[#0a0a0a] border border-zinc-900 rounded-2xl p-4">
+            <section className="bg-black border border-zinc-900 rounded-2xl p-4">
               <h2 className="text-white font-bold text-[15px] mb-1">{s.rewardsTitle}</h2>
               <p className="text-[12.5px] text-zinc-400 leading-relaxed mb-3">{s.rewardsDesc}</p>
               {data.signup_rewards.length === 0 ? (

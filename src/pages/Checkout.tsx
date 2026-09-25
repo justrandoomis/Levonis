@@ -1655,7 +1655,7 @@ export default function Checkout() {
 
   const consentBlock =
     requiredPolicies.length > 0 ? (
-      <div className="mt-4 mb-4 p-4 rounded-xl bg-[#050505] border border-white/10 space-y-3">
+      <div className="mt-4 mb-4 p-4 rounded-xl bg-black border border-white/10 space-y-3">
         <div className="text-xs uppercase tracking-widest text-zinc-500">{S.policyTitle}</div>
         <label className="flex items-start gap-3 cursor-pointer select-none">
           <input
@@ -1774,7 +1774,7 @@ export default function Checkout() {
           </motion.p>
 
           <motion.div
-            className="bg-[#0a0a0a] border border-white/5 rounded-xl p-6 max-w-xs w-full mb-10 shadow-xl"
+            className="bg-black border border-white/5 rounded-xl p-6 max-w-xs w-full mb-10 shadow-xl"
             initial={{ opacity: 0, y: m.travel(12) }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...m.spring('ui'), delay: m.reduced ? 0 : 0.12 }}
@@ -2092,7 +2092,7 @@ export default function Checkout() {
                             rel="noopener noreferrer"
                             data-pickup-map
                             onClick={(e) => e.stopPropagation()}
-                            className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+                            className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
                           >
                             <MapPin aria-hidden="true" className="w-3.5 h-3.5" />
                             {loc('عرض مكان المخزن على الخريطة', 'See the pickup location on the map', 'شوێنی وەرگرتن لەسەر نەخشە ببینە')}
@@ -2147,10 +2147,10 @@ export default function Checkout() {
               })}
             </div>
             {quote?.priority_delivery?.eligible && (
-              <div className="mt-3 rounded-xl border border-[#d6b866]/35 bg-gradient-to-r from-[#d6b866]/10 to-[#b03142]/10 p-3 flex items-start gap-3">
-                <Sparkles className="w-5 h-5 text-[#e8c97a] shrink-0 mt-0.5" />
+              <div className="mt-3 rounded-xl border border-gold/35 bg-gradient-to-r from-gold/10 to-crimson/10 p-3 flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-wheat shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-semibold text-[#f2ddb0]">
+                  <p className="text-sm font-semibold text-wheat">
                     {loc('توصيل أولوية PRO خلال 12 ساعة', 'PRO priority delivery within 12 hours', 'گەیاندنی پێشینەیی PRO لە ١٢ کاتژمێردا')}
                   </p>
                   <p className="text-xs text-zinc-400 mt-0.5">
@@ -2212,7 +2212,7 @@ export default function Checkout() {
                         would be the wrong hierarchy.
                       */}
                       {codSurchargeIqd > 0 && method.id === 'cash' && (
-                        <p data-cod-surcharge className="text-xs text-[#e8c97a] mt-1 font-normal tabular-nums">
+                        <p data-cod-surcharge className="text-xs text-wheat mt-1 font-normal tabular-nums">
                           {S.payCodMore(codSurchargeIqd.toLocaleString('en-US'))}
                         </p>
                       )}
@@ -2600,7 +2600,7 @@ export default function Checkout() {
               >
                 <input
                   type="checkbox"
-                  className="mt-1 shrink-0 accent-[#ef233c]"
+                  className="mt-1 shrink-0 accent-scarlet"
                   checked={protectedDelivery}
                   onChange={(e) => {
                     customerQuote.mark();
@@ -2863,7 +2863,7 @@ export default function Checkout() {
                     }}
                   />
                   {couponError && (
-                    <p role="alert" className="text-[#e4899a] text-[11px] mt-2">
+                    <p role="alert" className="text-blush text-[11px] mt-2">
                       {couponError}
                     </p>
                   )}
@@ -2875,7 +2875,7 @@ export default function Checkout() {
                   aria-expanded={false}
                   aria-controls="checkout-promo-field"
                   data-checkout-promo-toggle
-                  className="inline-flex items-center gap-2 text-[13px] font-light text-zinc-500 hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                  className="inline-flex items-center gap-2 text-[13px] font-light text-zinc-500 hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                 >
                   <Tag className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
                   {loc('استخدام كود خاص', 'Use a special code')}

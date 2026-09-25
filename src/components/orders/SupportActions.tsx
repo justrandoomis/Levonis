@@ -65,7 +65,7 @@ const STRINGS = {
 } as const;
 
 const ROW =
-  'w-full flex items-center gap-3 min-h-[56px] px-4 py-2 text-start rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-60';
+  'w-full flex items-center gap-3 min-h-[56px] px-4 py-2 text-start rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-60';
 
 export default function SupportActions({
   order,
@@ -99,7 +99,7 @@ export default function SupportActions({
   return (
     <div className="flex flex-col gap-2" data-support-actions>
       <button type="button" onClick={openChat} disabled={opening} className={ROW} data-open-order-chat>
-        <span className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0 text-[#BAA369]">
+        <span className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0 text-gold">
           {opening ? <Spinner size="sm" delayMs={0} decorative /> : <MessageCircle className="w-5 h-5" aria-hidden />}
         </span>
         <span className="min-w-0 flex-1">

@@ -940,7 +940,7 @@ export default function Wallet() {
   return (
     <div dir={dir} className="w-full bg-black min-h-screen font-sans flex flex-col pb-24">
       {/* ---------------------------------------------------------- header */}
-      <div className="bg-gradient-to-b from-olive to-olive-dark rounded-b-[32px] pt-12 pb-5 px-4 sm:px-8 flex flex-col items-center relative border-b border-gold/10">
+      <div data-theme="dark" className="bg-gradient-to-b from-olive to-olive-dark rounded-b-[32px] pt-12 pb-5 px-4 sm:px-8 flex flex-col items-center relative border-b border-gold/10">
         <button
           onClick={() => navigate(-1)}
           aria-label={s.back}
@@ -1084,7 +1084,7 @@ export default function Wallet() {
         </button>
         <button
           onClick={() => openRequest('deposit')}
-          className="flex-1 max-w-[240px] min-h-12 bg-gold hover:bg-gold-light transition-colors text-black rounded-2xl flex items-center justify-center gap-2 font-black text-[15px]"
+          className="flex-1 max-w-[240px] min-h-12 bg-gold hover:bg-gold-light transition-colors text-accent-contrast rounded-2xl flex items-center justify-center gap-2 font-black text-[15px]"
         >
           <ArrowDown className="w-4 h-4" strokeWidth={3} />
           {s.addFunds}
@@ -1092,12 +1092,12 @@ export default function Wallet() {
       </div>
 
       {banner && (
-        <div role="status" className="mx-5 mb-4 bg-[#59A846]/10 border border-[#59A846]/40 text-[#9fd58f] text-xs font-medium rounded-2xl p-3 text-center">
+        <div role="status" className="mx-5 mb-4 bg-leaf/10 border border-leaf/40 text-sprout text-xs font-medium rounded-2xl p-3 text-center">
           {banner}
         </div>
       )}
       {actionError && (
-        <div role="alert" className="mx-5 mb-4 bg-[#B03142]/10 border border-[#B03142]/40 text-[#e4899a] text-xs font-medium rounded-2xl p-3 text-center">
+        <div role="alert" className="mx-5 mb-4 bg-crimson/10 border border-crimson/40 text-blush text-xs font-medium rounded-2xl p-3 text-center">
           {actionError}
         </div>
       )}
@@ -1242,9 +1242,9 @@ export default function Wallet() {
                       text: stateLabel(w.state),
                       tone:
                         w.state === 'paid'
-                          ? 'bg-[#59A846]/15 text-[#8fd07c]'
+                          ? 'bg-leaf/15 text-sprout'
                           : w.state === 'rejected' || w.state === 'failed' || w.state === 'cancelled'
-                            ? 'bg-[#B03142]/15 text-[#e4899a]'
+                            ? 'bg-crimson/15 text-blush'
                             : 'bg-yellow-500/15 text-yellow-400',
                     }
                   : {
@@ -1258,8 +1258,8 @@ export default function Wallet() {
                         tx?.status === 'pending'
                           ? 'bg-yellow-500/15 text-yellow-400'
                           : tx?.status === 'approved'
-                            ? 'bg-[#59A846]/15 text-[#8fd07c]'
-                            : 'bg-[#B03142]/15 text-[#e4899a]',
+                            ? 'bg-leaf/15 text-sprout'
+                            : 'bg-crimson/15 text-blush',
                     };
                 return (
                   <div key={op.key} data-wallet-operation className="bg-zinc-900/60 rounded-2xl p-4 border border-zinc-800">
@@ -1267,13 +1267,13 @@ export default function Wallet() {
                       <div className="flex items-start gap-3 min-w-0">
                         <div
                           className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                            isDeposit ? 'bg-[#59A846]/15' : 'bg-[#B03142]/15'
+                            isDeposit ? 'bg-leaf/15' : 'bg-crimson/15'
                           }`}
                         >
                           {isDeposit ? (
-                            <ArrowDownLeft className="w-5 h-5 text-[#8fd07c]" />
+                            <ArrowDownLeft className="w-5 h-5 text-sprout" />
                           ) : (
-                            <ArrowUp className="w-5 h-5 text-[#e4899a]" />
+                            <ArrowUp className="w-5 h-5 text-blush" />
                           )}
                         </div>
                         <div className="min-w-0">
@@ -1335,7 +1335,7 @@ export default function Wallet() {
                         </div>
                       </div>
                       <div className="text-end shrink-0">
-                        <span dir="ltr" className={`font-bold text-[16px] ${isDeposit ? 'text-[#8fd07c]' : 'text-[#e4899a]'}`}>
+                        <span dir="ltr" className={`font-bold text-[16px] ${isDeposit ? 'text-sprout' : 'text-blush'}`}>
                           {isDeposit ? '+' : '-'}
                           {fmtOperation(op)}
                         </span>
@@ -1344,7 +1344,7 @@ export default function Wallet() {
                             <button
                               onClick={() => onCancelWithdrawal(w.id)}
                               disabled={cancellingId === w.id}
-                              className="text-[10px] font-bold text-[#e4899a] hover:text-white border border-[#B03142]/40 rounded-lg px-2.5 py-1.5 disabled:opacity-60"
+                              className="text-[10px] font-bold text-blush hover:text-white border border-crimson/40 rounded-lg px-2.5 py-1.5 disabled:opacity-60"
                             >
                               {cancellingId === w.id ? s.cancelling : s.cancelRequest}
                             </button>
@@ -1843,7 +1843,7 @@ function RequestModal({
               <span
                 className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors ${
                   step === i + 1
-                    ? 'bg-gold text-black'
+                    ? 'bg-gold text-accent-contrast'
                     : step > i + 1
                       ? 'bg-zinc-800 text-zinc-300'
                       : 'bg-zinc-900 text-zinc-600'
@@ -1858,7 +1858,7 @@ function RequestModal({
 
         <form onSubmit={submit} className="space-y-4">
           {error && (
-            <div role="alert" className="bg-[#B03142]/10 border border-[#B03142]/40 text-[#e4899a] text-xs font-medium rounded-2xl p-3 text-center">
+            <div role="alert" className="bg-crimson/10 border border-crimson/40 text-blush text-xs font-medium rounded-2xl p-3 text-center">
               {error}
             </div>
           )}
@@ -1899,7 +1899,7 @@ function RequestModal({
                   </button>
                 ))
               )}
-              {copied && <p className="text-[#8fd07c] text-[11px] font-bold text-center">{s.copyDone}</p>}
+              {copied && <p className="text-sprout text-[11px] font-bold text-center">{s.copyDone}</p>}
             </div>
           )}
 
@@ -1994,7 +1994,7 @@ function RequestModal({
                   {/* Moved here from the page header: this form is the one
                       place a customer might expect points to become cash. */}
                   <p className="text-zinc-500 text-[10px] leading-snug">{s.pointsNote}</p>
-                  {overBalance && <p className="text-[#e4899a] text-[11px] font-bold">{s.insufficient}</p>}
+                  {overBalance && <p className="text-blush text-[11px] font-bold">{s.insufficient}</p>}
                 </div>
               )}
             </div>
@@ -2025,7 +2025,7 @@ function RequestModal({
                       </div>
                     ) : receiptKey ? (
                       <div className="flex flex-col items-center gap-2">
-                        <CheckCircle className="w-6 h-6 text-[#8fd07c]" />
+                        <CheckCircle className="w-6 h-6 text-sprout" />
                         <span className="text-xs font-bold text-white">{s.receiptUploaded}</span>
                       </div>
                     ) : (
@@ -2100,7 +2100,7 @@ function RequestModal({
               <button
                 type="button"
                 onClick={goNext}
-                className="flex-[2] bg-gold hover:bg-gold-light text-black font-black text-sm py-3.5 rounded-2xl transition-colors"
+                className="flex-[2] bg-gold hover:bg-gold-light text-accent-contrast font-black text-sm py-3.5 rounded-2xl transition-colors"
               >
                 {s.next}
               </button>
@@ -2108,7 +2108,7 @@ function RequestModal({
               <button
                 type="submit"
                 disabled={submitting || uploading}
-                className="flex-[2] bg-gold hover:bg-gold-light text-black font-black text-sm py-3.5 rounded-2xl disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                className="flex-[2] bg-gold hover:bg-gold-light text-accent-contrast font-black text-sm py-3.5 rounded-2xl disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
               >
                 {submitting ? (
                   <span className="flex items-center justify-center gap-2">
@@ -2210,7 +2210,7 @@ function ReviewModal({
         </p>
         <form onSubmit={submit} className="space-y-4">
           {error && (
-            <div role="alert" className="bg-[#B03142]/10 border border-[#B03142]/40 text-[#e4899a] text-xs rounded-2xl p-3 text-center">
+            <div role="alert" className="bg-crimson/10 border border-crimson/40 text-blush text-xs rounded-2xl p-3 text-center">
               {error}
             </div>
           )}
@@ -2228,7 +2228,7 @@ function ReviewModal({
             <button
               type="submit"
               disabled={submitting}
-              className="flex-[2] bg-gold hover:bg-gold-light text-black font-black text-sm py-3 rounded-2xl disabled:opacity-70 transition-colors"
+              className="flex-[2] bg-gold hover:bg-gold-light text-accent-contrast font-black text-sm py-3 rounded-2xl disabled:opacity-70 transition-colors"
             >
               {submitting ? (
                 <span className="flex items-center justify-center gap-2">

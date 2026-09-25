@@ -244,7 +244,7 @@ export default function Welcome() {
               if (u && u !== (user?.username ?? '')) patch.username = u;
               void saveAndAdvance(patch, 1);
             }}
-            className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-gold px-5 text-[14px] font-bold text-black transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
+            className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-gold px-5 text-[14px] font-bold text-accent-contrast transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
             {saving ? s.saving : s.continue}
@@ -330,7 +330,7 @@ export default function Welcome() {
               if (country !== (user?.country ?? '')) patch.country = country;
               void saveAndAdvance(patch, 2);
             }}
-            className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-gold px-5 text-[14px] font-bold text-black transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
+            className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-gold px-5 text-[14px] font-bold text-accent-contrast transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
             {saving ? s.saving : s.continue}
@@ -359,7 +359,7 @@ export default function Welcome() {
           type="button"
           onClick={() => finish('done')}
           disabled={saving}
-          className="mt-6 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-gold px-5 text-[14px] font-bold text-black transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
+          className="mt-6 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-gold px-5 text-[14px] font-bold text-accent-contrast transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
           {s.finish}

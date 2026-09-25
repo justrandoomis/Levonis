@@ -189,7 +189,7 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
                         setSelected(m.id);
                       }}
                       aria-label={`${s.openMember}: ${m.name || m.username || m.email}`}
-                      className="-mx-2 w-full rounded-xl px-2 py-1 text-start transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60"
+                      className="-mx-2 w-full rounded-xl px-2 py-1 text-start transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gilt/60"
                     >
                       <span dir="auto" className="block truncate text-sm font-bold leading-5 text-white">
                         {m.name || m.username || '—'}
@@ -493,7 +493,7 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
   }
 
   const inputCls =
-    'min-h-[36px] w-32 rounded-lg bg-zinc-800 border border-zinc-700 px-2 text-white text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]';
+    'min-h-[36px] w-32 rounded-lg bg-zinc-800 border border-zinc-700 px-2 text-white text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-gold';
 
   return (
     <div className="space-y-6">
@@ -573,7 +573,7 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
                             type="button"
                             onClick={() => savePrice(p)}
                             disabled={busy}
-                            className="min-h-[36px] px-3 rounded-lg bg-[#BAA369] text-black text-xs font-bold disabled:opacity-40"
+                            className="min-h-[36px] px-3 rounded-lg bg-gold text-accent-contrast text-xs font-bold disabled:opacity-40"
                           >
                             {busy ? ps.working : ps.save}
                           </button>
@@ -649,7 +649,7 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
           // used to be unreachable once the launch was on.
           disabled={!launch || (launch.activated && prepaidCount === 0)}
           aria-haspopup="dialog"
-          className="min-h-[40px] px-4 rounded-xl bg-[#B03142] text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+          className="min-h-[40px] px-4 rounded-xl bg-[#B03142] text-snow text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {launch?.activated ? ps.sweep(prepaidCount) : ps.activate}
         </button>
@@ -675,7 +675,7 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
       >
         <div className="p-5 sm:p-6">
           <h2 id="activate-launch-title" className="text-white font-bold text-lg flex items-center gap-2">
-            <Rocket className="w-5 h-5 text-[#e06070]" aria-hidden /> {launch?.activated ? ps.sweepTitle : ps.activateTitle}
+            <Rocket className="w-5 h-5 text-coral" aria-hidden /> {launch?.activated ? ps.sweepTitle : ps.activateTitle}
           </h2>
           <p className="text-zinc-300 text-sm mt-2 leading-relaxed">{launch?.activated ? ps.sweepBody : ps.activateBody}</p>
           <input
@@ -689,7 +689,7 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
             spellCheck={false}
             placeholder={ps.typeHere}
             aria-label={ps.typeHere}
-            className="mt-4 w-full min-h-[44px] rounded-xl bg-zinc-900 border border-zinc-700 px-3 text-white font-mono tracking-widest outline-none focus-visible:ring-2 focus-visible:ring-[#B03142]"
+            className="mt-4 w-full min-h-[44px] rounded-xl bg-zinc-900 border border-zinc-700 px-3 text-white font-mono tracking-widest outline-none focus-visible:ring-2 focus-visible:ring-crimson"
           />
           <div className="mt-5 flex flex-col-reverse sm:flex-row gap-2.5">
             <button
@@ -704,7 +704,7 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
               type="button"
               onClick={activateLaunch}
               disabled={confirmText !== 'ACTIVATE' || activating}
-              className="flex-1 min-h-[48px] rounded-2xl bg-[#B03142] text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex-1 min-h-[48px] rounded-2xl bg-[#B03142] text-snow font-bold disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {activating ? ps.working : ps.confirm}
             </button>

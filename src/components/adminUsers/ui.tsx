@@ -88,7 +88,7 @@ export function Stat({
   sub?: string;
   tone?: 'plain' | 'money' | 'warn';
 }) {
-  const color = tone === 'money' ? 'text-[#2CE59B]' : tone === 'warn' ? 'text-[#D4AF37]' : 'text-white';
+  const color = tone === 'money' ? 'text-mint' : tone === 'warn' ? 'text-gilt' : 'text-white';
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3 py-2.5">
       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{label}</div>
@@ -104,9 +104,9 @@ export type PillTone = 'zinc' | 'violet' | 'gold' | 'green' | 'red' | 'blue';
 
 const PILL: Record<PillTone, string> = {
   zinc: 'bg-zinc-800 text-zinc-300 border-zinc-700',
-  violet: 'bg-[#6B46FF]/10 text-[#6B46FF] border-[#6B46FF]/30',
-  gold: 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30',
-  green: 'bg-[#2CE59B]/10 text-[#2CE59B] border-[#2CE59B]/30',
+  violet: 'bg-iris/10 text-iris border-iris/30',
+  gold: 'bg-gilt/10 text-gilt border-gilt/30',
+  green: 'bg-mint/10 text-mint border-mint/30',
   red: 'bg-red-500/10 text-red-400 border-red-500/30',
   blue: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
 };

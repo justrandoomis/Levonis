@@ -178,7 +178,7 @@ export default function InstallAppSheet({ open, onClose }: InstallAppSheetProps)
             <button
               type="button"
               onClick={install}
-              className="min-h-[48px] rounded-xl bg-gold px-5 text-[14px] font-bold text-black transition-opacity duration-200 hover:opacity-90 inline-flex items-center justify-center gap-2"
+              className="min-h-[48px] rounded-xl bg-gold px-5 text-[14px] font-bold text-accent-contrast transition-opacity duration-200 hover:opacity-90 inline-flex items-center justify-center gap-2"
             >
               <Download aria-hidden="true" className="w-4 h-4" />
               {t('pwaInstallNow')}

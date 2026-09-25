@@ -159,7 +159,7 @@ export default function PrinterFarm() {
   if (loading && !state) return <FarmSkeleton />;
   if (!state) {
     return (
-      <div dir={dir} className="w-full flex-1 min-h-0 flex flex-col bg-[#0a0a0a] text-zinc-300 overflow-hidden">
+      <div dir={dir} className="w-full flex-1 min-h-0 flex flex-col bg-black text-zinc-300 overflow-hidden">
         <GamesHeader title={s.title} backLabel={s.back} fallback="/games" />
         <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="p-4 max-w-2xl mx-auto">
@@ -202,7 +202,7 @@ export default function PrinterFarm() {
   };
 
   return (
-    <div dir={dir} className="w-full flex-1 min-h-0 flex flex-col bg-[#0a0a0a] text-zinc-300 overflow-hidden" data-farm-page>
+    <div dir={dir} className="w-full flex-1 min-h-0 flex flex-col bg-black text-zinc-300 overflow-hidden" data-farm-page>
       <GamesHeader
         title={profile.farm_name}
         backLabel={s.back}
@@ -215,7 +215,7 @@ export default function PrinterFarm() {
             ·
           </span>
           <Stars stars={profile.stars} s={s} />
-          {profile.state === 'recovery' && <Chip className="border-[#E4B363]/40 text-[#E4B363] bg-[#E4B363]/10">{s.recovery}</Chip>}
+          {profile.state === 'recovery' && <Chip className="border-honey/40 text-honey bg-honey/10">{s.recovery}</Chip>}
           {/* The daily cap, as the server counts it — both numbers are its own. */}
           {today && (
             <>
@@ -231,7 +231,7 @@ export default function PrinterFarm() {
       </GamesHeader>
 
       {notice && (
-        <div role="alert" className="shrink-0 mx-4 mt-3 flex items-center gap-2 rounded-xl border border-[#E06070]/30 bg-[#E06070]/10 ps-3 pe-1 py-1 text-[12.5px] text-[#f2b3bb] max-w-2xl sm:mx-auto sm:w-full" data-farm-notice>
+        <div role="alert" className="shrink-0 mx-4 mt-3 flex items-center gap-2 rounded-xl border border-coral/30 bg-coral/10 ps-3 pe-1 py-1 text-[12.5px] text-petal max-w-2xl sm:mx-auto sm:w-full" data-farm-notice>
           <span className="flex-1 min-w-0 py-1 leading-snug">{notice}</span>
           <button type="button" aria-label={s.close} onClick={() => setNotice(null)} className={`shrink-0 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg hover:bg-white/5 ${FOCUS}`}>
             <X aria-hidden="true" className="w-4 h-4" />

@@ -216,9 +216,9 @@ export default function PromoCodeField({
         </p>
       )}
       {applied ? (
-        <div className="flex items-center justify-between gap-3 bg-[#59A846]/10 border border-[#59A846]/40 rounded-lg px-3 py-2.5">
+        <div className="flex items-center justify-between gap-3 bg-leaf/10 border border-leaf/40 rounded-lg px-3 py-2.5">
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[#8fd07c] font-bold text-sm">
+            <div className="flex items-center gap-1.5 text-sprout font-bold text-sm">
               <Check className="w-4 h-4 shrink-0" aria-hidden />
               <span dir="ltr" className="truncate">{applied.code}</span>
             </div>
@@ -251,7 +251,7 @@ export default function PromoCodeField({
               }
             }}
             placeholder={s.placeholder}
-            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-white outline-none focus:border-[#BAA369] transition-colors text-sm"
+            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-white outline-none focus:border-gold transition-colors text-sm"
           />
           <button
             type="button"
@@ -265,7 +265,7 @@ export default function PromoCodeField({
         </div>
       )}
       {error && (
-        <p role="alert" className="text-[#e4899a] text-[11px] mt-2">
+        <p role="alert" className="text-blush text-[11px] mt-2">
           {error}
         </p>
       )}

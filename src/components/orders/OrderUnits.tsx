@@ -133,7 +133,7 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
                   onClick={() => register(u)}
                   disabled={busyId !== null}
                   data-register-unit={u.unit_id}
-                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border border-[#BAA369]/40 text-[#BAA369] text-[12px] font-bold hover:bg-[#BAA369]/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border border-gold/40 text-gold text-[12px] font-bold hover:bg-gold/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
                 >
                   {busyId === u.unit_id ? <Spinner size="xs" delayMs={0} decorative /> : <Link2 className="w-3.5 h-3.5" aria-hidden />}
                   {busyId === u.unit_id ? s.registering : s.register}
@@ -155,7 +155,7 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
               {u.receipt_no && (
                 <Link
                   to={`/warranty/${encodeURIComponent(u.receipt_no)}`}
-                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border border-zinc-800 text-zinc-300 text-[12px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border border-zinc-800 text-zinc-300 text-[12px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                 >
                   <FileText className="w-3.5 h-3.5" aria-hidden />
                   {s.receipt} <span dir="ltr" className="font-mono font-normal text-zinc-500">{u.receipt_no}</span>

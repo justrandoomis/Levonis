@@ -79,7 +79,7 @@ export function ProBadge({ order }: { order: AdminOrderRow }) {
   return (
     <span
       data-order-pro={order.fulfillment_service === 'pro_priority_12h' ? '12h' : 'priority'}
-      className="inline-flex items-center rounded-md border border-[#B03142]/35 bg-[#B03142]/10 px-1.5 py-0.5 text-[10px] leading-[1.4] font-black text-[#f3bdc5]"
+      className="inline-flex items-center rounded-md border border-crimson/35 bg-crimson/10 px-1.5 py-0.5 text-[10px] leading-[1.4] font-black text-petal"
     >
       {order.fulfillment_service === 'pro_priority_12h' ? 'PRO · 12H' : 'PRO'}
     </span>

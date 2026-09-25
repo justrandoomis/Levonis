@@ -149,7 +149,7 @@ export default function QrCodeModal({
       // Geometry and the opaque ground the QR needs; the padding that used to
       // sit on this box has moved inside, where the primitive's rounding and
       // shadow cannot be fought over.
-      panelClassName="w-full max-w-xs bg-[#1a1a1a] text-white"
+      panelClassName="w-full max-w-xs bg-zinc-900 text-white"
     >
       <div className="p-5">
         <div className="flex items-center justify-between mb-3">
@@ -162,7 +162,7 @@ export default function QrCodeModal({
             type="button"
             onClick={close}
             aria-label={s.close}
-            className="w-11 h-11 -me-2 flex items-center justify-center rounded-full text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-colors hover:text-white hover:bg-white/10"
+            className="w-11 h-11 -me-2 flex items-center justify-center rounded-full text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors hover:text-white hover:bg-white/10"
           >
             <X className="w-5 h-5" />
           </button>
@@ -170,7 +170,7 @@ export default function QrCodeModal({
 
         {qr && link ? (
           <>
-            <div className="bg-white rounded-xl p-3 mx-auto w-fit border border-black/10" role="img" aria-label={s.qrAlt}>
+            <div className="bg-snow rounded-xl p-3 mx-auto w-fit border border-onyx/10" role="img" aria-label={s.qrAlt}>
               {/* QR modules must stay dark-on-light in both themes to scan. */}
               <svg
                 viewBox={`0 0 ${qr.viewBox} ${qr.viewBox}`}
@@ -189,7 +189,7 @@ export default function QrCodeModal({
             <button
               type="button"
               onClick={copyLink}
-              className="mt-3 w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl bg-olive text-[#BAA369] text-[13px] font-bold hover:opacity-90 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-opacity"
+              className="mt-3 w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl bg-olive text-gold-muted text-[13px] font-bold hover:opacity-90 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-opacity"
             >
               {copied ? <Check className="w-4 h-4" strokeWidth={3} /> : <Copy className="w-4 h-4" strokeWidth={2} />}
               {copied ? s.copied : s.copy}

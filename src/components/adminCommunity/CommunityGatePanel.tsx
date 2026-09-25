@@ -177,7 +177,7 @@ export default function CommunityGatePanel({ t }: { t: T }) {
               type="button"
               onClick={() => void apply(!draftOpen, members)}
               disabled={busy}
-              className={`${btn} bg-gold text-black`}
+              className={`${btn} bg-gold text-accent-contrast`}
               data-community-gate-toggle
             >
               {draftOpen ? t('أغلق المجتمع', 'Close the community') : t('افتح المجتمع', 'Open the community')}

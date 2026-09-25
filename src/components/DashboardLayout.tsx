@@ -271,10 +271,10 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
     // h-dvh (not h-screen): on iPad Safari the browser chrome makes 100vh
     // taller than the visible area, which is what pushed the bottom of the
     // content column — and any footer inside it — off screen.
-    <div className="flex h-dvh w-full bg-[#18181b] overflow-hidden font-sans" dir={dir}>
+    <div className="flex h-dvh w-full bg-zinc-900 overflow-hidden font-sans" dir={dir}>
       {/* ------------------------------------------------ desktop sidebar */}
       <aside
-        className={`hidden lg:flex flex-col shrink-0 bg-[#09090b] text-zinc-300 shadow-[4px_0_24px_rgba(0,0,0,0.3)] z-20 border-e border-zinc-800 transition-[width] duration-200 ${
+        className={`hidden lg:flex flex-col shrink-0 bg-black text-zinc-300 shadow-[4px_0_24px_rgba(0,0,0,0.3)] z-20 border-e border-zinc-800 transition-[width] duration-200 ${
           collapsed ? 'w-[4.5rem]' : 'w-[13.5rem] xl:w-[15.5rem]'
         }`}
       >
@@ -284,7 +284,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
             onClick={() => navigate('/')}
             className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-80 transition-opacity text-start"
           >
-            <span className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-tr from-[#708238] to-[#9fae63] flex items-center justify-center font-bold text-base text-white shadow-lg">
+            <span className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-tr from-[#708238] to-[#9fae63] flex items-center justify-center font-bold text-base text-snow shadow-lg">
               L
             </span>
             {!collapsed && (
@@ -330,14 +330,14 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                       collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
                     } ${
                       activeTab === item.id
-                        ? 'bg-[#708238] text-white shadow-[0_4px_15px_rgba(112,130,56,0.3)]'
+                        ? 'bg-[#708238] text-snow shadow-[0_4px_15px_rgba(112,130,56,0.3)]'
                         : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
                     }`}
                   >
                     <span className="relative shrink-0">
                       <item.icon className="w-5 h-5 shrink-0" />
                       {collapsed && !!item.badge && (
-                        <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-sky-400 ring-2 ring-[#18181b]" aria-hidden="true" />
+                        <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-sky-400 ring-2 ring-zinc-900" aria-hidden="true" />
                       )}
                     </span>
                     {!collapsed && <span className="text-[13px] truncate min-w-0">{item.label}</span>}
@@ -358,11 +358,11 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
             type="button"
             onClick={goToMyStore}
             title={myStoreId ? t.viewPage : t.setupPage}
-            className={`w-full rounded-2xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 shadow-lg flex flex-col items-center justify-center group hover:border-[#D4AF37] transition-all ${
+            className={`w-full rounded-2xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 shadow-lg flex flex-col items-center justify-center group hover:border-gilt transition-all ${
               collapsed ? 'p-2.5' : 'p-4'
             }`}
           >
-            <User className={`text-[#D4AF37] group-hover:scale-110 transition-transform ${collapsed ? 'w-5 h-5' : 'w-8 h-8 mb-2'}`} />
+            <User className={`text-gilt group-hover:scale-110 transition-transform ${collapsed ? 'w-5 h-5' : 'w-8 h-8 mb-2'}`} />
             {!collapsed && (
               <span className="text-[11px] font-bold text-white text-center leading-snug">
                 {myStoreId ? t.viewPage : t.setupPage}
@@ -388,9 +388,9 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
       {/* ---------------------------------------------------- content column */}
       {/* `relative` with NO z-index: a z-index here would open a stacking
           context and trap every dialog rendered inside the page. */}
-      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden relative bg-[#18181b]">
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden relative bg-zinc-900">
         {/* Topbar — above the sidebar so its dropdowns are never clipped by it. */}
-        <header className="h-14 sm:h-16 flex items-center gap-3 px-3 sm:px-5 shrink-0 z-30 w-full bg-[#18181b]/95 backdrop-blur-md border-b border-zinc-800/50">
+        <header className="h-14 sm:h-16 flex items-center gap-3 px-3 sm:px-5 shrink-0 z-30 w-full bg-zinc-900/95 backdrop-blur-md border-b border-zinc-800/50">
           <button
             ref={drawerButtonRef}
             data-action="open-sidebar"
@@ -419,7 +419,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                 {t.community}
               </button>
               )}
-              <span className="text-white font-bold border-b-2 border-[#D4AF37] py-1 whitespace-nowrap">
+              <span className="text-white font-bold border-b-2 border-gilt py-1 whitespace-nowrap">
                 {t.dashboard}
               </span>
             </div>
@@ -432,7 +432,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                 onClick={() => setShowLangMenu(!showLangMenu)}
                 aria-label={t.language}
                 aria-expanded={showLangMenu}
-                className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5 min-h-11 px-1"
+                className="hover:text-gilt transition-colors flex items-center gap-1.5 min-h-11 px-1"
               >
                 <Globe className="w-5 h-5 stroke-[2]" />
                 <span className="text-xs font-bold uppercase hidden sm:block">{lang}</span>
@@ -443,7 +443,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                     <button
                       key={l}
                       onClick={() => { setLang(l); setShowLangMenu(false); }}
-                      className={`w-full text-start px-3 py-2 text-sm hover:bg-zinc-800 ${lang === l ? 'text-[#D4AF37] font-bold' : 'text-zinc-400'}`}
+                      className={`w-full text-start px-3 py-2 text-sm hover:bg-zinc-800 ${lang === l ? 'text-gilt font-bold' : 'text-zinc-400'}`}
                     >
                       {l === 'en' ? 'English' : l === 'ar' ? 'العربية' : 'کوردی'}
                     </button>
@@ -458,7 +458,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                 onClick={() => setShowNotifications(!showNotifications)}
                 aria-label={t.notifications}
                 aria-expanded={showNotifications}
-                className="hover:text-[#D4AF37] transition-colors min-h-11 px-1 flex items-center"
+                className="hover:text-gilt transition-colors min-h-11 px-1 flex items-center"
               >
                 <Bell className="w-5 h-5 stroke-[2]" />
               </button>
@@ -476,7 +476,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 aria-label={t.myStore}
                 aria-expanded={showUserMenu}
-                className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden shadow-sm border border-zinc-600 hover:border-[#D4AF37] transition-colors"
+                className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden shadow-sm border border-zinc-600 hover:border-gilt transition-colors"
               >
                 <User className="w-5 h-5 text-zinc-400" />
               </button>
@@ -602,7 +602,7 @@ function MobileDrawer({
       exit={{ opacity: 0 }}
       transition={m.spring('quick')}
     >
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
+      <div className="lv-scrim absolute inset-0 backdrop-blur-sm" aria-hidden="true" />
       <motion.div
         ref={panelRef}
         role="dialog"
@@ -612,12 +612,12 @@ function MobileDrawer({
         animate={{ x: 0 }}
         exit={{ x: m.travel(m.inline(-288)) }}
         transition={m.spring('sheet')}
-        className="absolute inset-y-0 start-0 w-72 max-w-[85%] bg-[#09090b] text-zinc-300 flex flex-col border-e border-zinc-800 shadow-2xl p-4"
+        className="absolute inset-y-0 start-0 w-72 max-w-[85%] bg-black text-zinc-300 flex flex-col border-e border-zinc-800 shadow-2xl p-4"
         style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
       >
         <div className="flex items-center justify-between gap-2 mb-4 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-tr from-[#708238] to-[#9fae63] flex items-center justify-center font-bold text-base text-white">
+            <span className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-tr from-[#708238] to-[#9fae63] flex items-center justify-center font-bold text-base text-snow">
               L
             </span>
             <span className="font-bold text-sm uppercase text-white truncate">{title}</span>
@@ -647,7 +647,7 @@ function MobileDrawer({
                     onClick={() => onSelect(item.id)}
                     aria-current={activeTab === item.id ? 'page' : undefined}
                     className={`w-full flex items-center gap-3 min-h-11 px-3 py-2.5 rounded-xl font-medium transition-colors text-start ${
-                      activeTab === item.id ? 'bg-[#708238] text-white' : 'text-zinc-400 hover:bg-zinc-800'
+                      activeTab === item.id ? 'bg-[#708238] text-snow' : 'text-zinc-400 hover:bg-zinc-800'
                     }`}
                   >
                     <item.icon className="w-5 h-5 shrink-0" />

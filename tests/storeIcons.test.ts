@@ -119,12 +119,13 @@ test('the ground: every preset the server allows is covered, and today every one
   const presets = [...allowed.matchAll(/'([^']+)'/g)].map((m) => m[1]);
   assert.ok(presets.length >= 7);
   assert.deepEqual([...STORE_SURFACE_PRESETS].sort(), [...presets].sort(), 'a preset the server accepts has no ground here');
-  const shell = readFileSync(repo('index.html'), 'utf8');
-  const themeColor = /<meta name="theme-color" content="([^"]+)"/.exec(shell)?.[1];
+  // A storefront renders dark whatever the app's theme (`[data-store-theme]`
+  // is a dark island in src/index.css), so every store splash stays black.
+  const css = readFileSync(repo('src/index.css'), 'utf8');
+  assert.match(css, /\[data-theme='dark'\],\[data-store-theme\]\{color-scheme:dark;/, 'the storefront is no longer a dark island');
   for (const accent of presets) {
     assert.deepEqual(storeSurface({ accent }), { background: '#000000', theme: '#000000' }, accent);
   }
-  assert.equal(themeColor, '#000000', 'the splash must match the document the app opens on');
   // An unknown or hostile value is the black, never an error and never echoed.
   for (const accent of ['nope', 'red; background:url(x)', undefined, null, 5]) {
     assert.equal(storeSurface({ accent }).background, '#000000');

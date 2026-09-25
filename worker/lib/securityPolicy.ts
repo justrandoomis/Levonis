@@ -79,6 +79,22 @@ export const AUTO_PRINT_SCRIPT =
 export const AUTO_PRINT_SCRIPT_HASH = 'sha256-gn9n97Z5Dr3GoujCS/3qgP8CfP2OXYrMB9UIoJccUsw=';
 
 /**
+ * The ONE inline script the SPA document carries (index.html): it sets
+ * `data-theme` before the first paint from the stored appearance choice
+ * (src/lib/theme.ts owns the same logic afterwards), so a light page never
+ * flashes dark and a dark one never flashes ivory. It cannot be an external
+ * file without a render-blocking request, and it cannot wait for the bundle —
+ * that IS the flash. So it is allowed by hash, like AUTO_PRINT_SCRIPT, and the
+ * policy still admits no other inline code. tests/themeSystem.test.ts holds
+ * this string to index.html and to the built dist/index.html byte for byte.
+ */
+export const THEME_BOOT_SCRIPT =
+  `(function(){var p,d,t,r=document.documentElement,m,b;try{p=localStorage.getItem('levonis.theme.v1')}catch(e){}d=p==='dark'||(p==='system'&&!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);t=d?'dark':'light';r.setAttribute('data-theme',t);r.style.colorScheme=t;m=document.querySelector('meta[name="theme-color"]');b=document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');if(m)m.setAttribute('content',d?'#0b0c0f':'#f3f0ea');if(b)b.setAttribute('content',d?'black':'default')})()`;
+
+/** sha256 of THEME_BOOT_SCRIPT, base64. Recomputed by the test — edit both or neither. */
+export const THEME_BOOT_SCRIPT_HASH = 'sha256-vXjQOhoD66tMh84jxZLg6dOGLXcd3AeXZQwZ1CIo90s=';
+
+/**
  * One year, and every subdomain: the apex, every merchant storefront and
  * studio are all served over TLS at the Cloudflare edge. No `preload` — that
  * is a registry submission for the owner to make, not a header to slip in.
@@ -110,7 +126,7 @@ export const STATIC_SECURITY_HEADERS: Readonly<Record<string, string>> = {
 export function spaCsp(): string {
   return policy([
     ['default-src', ["'self'"]],
-    ['script-src', ["'self'", GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_SCRIPT]],
+    ['script-src', ["'self'", `'${THEME_BOOT_SCRIPT_HASH}'`, GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_SCRIPT]],
     ['style-src', ["'self'", "'unsafe-inline'", GOOGLE_FONTS_CSS, GOOGLE_SIGNIN_ORIGIN]],
     ['font-src', ["'self'", 'data:', GOOGLE_FONTS_FILES]],
     ['img-src', ["'self'", 'data:', 'blob:', 'https:']],

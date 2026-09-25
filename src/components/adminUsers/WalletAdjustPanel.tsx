@@ -183,7 +183,7 @@ export function WalletAdjustPanel({
             <p className="text-xs font-medium text-zinc-500">{s.adjReasonShort}</p>
           )}
           {done && (
-            <p className="flex items-center gap-1.5 text-xs font-bold text-[#2CE59B]" role="status">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-mint" role="status">
               <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> {done}
             </p>
           )}
@@ -215,7 +215,7 @@ export function WalletAdjustPanel({
             <div className="min-w-0 text-end">
               <div className="text-[11px] font-bold text-zinc-500">{s.adjAfter}</div>
               <div
-                className={`text-lg font-black tabular-nums ${direction === 'credit' ? 'text-[#2CE59B]' : 'text-white'}`}
+                className={`text-lg font-black tabular-nums ${direction === 'credit' ? 'text-mint' : 'text-white'}`}
                 data-adjust-after
               >
                 {after !== null ? fmt(after) : ''}
@@ -244,7 +244,7 @@ export function WalletAdjustPanel({
               disabled={busy}
               onClick={() => void submit()}
               className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors disabled:opacity-40 ${
-                direction === 'debit' ? 'bg-red-500 text-white hover:bg-red-400' : 'bg-white text-black hover:bg-zinc-200'
+                direction === 'debit' ? 'bg-red-500 text-snow hover:bg-red-400' : 'bg-white text-black hover:bg-zinc-200'
               }`}
             >
               {busy ? s.adjWorking : s.adjConfirm}

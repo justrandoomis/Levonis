@@ -76,8 +76,8 @@ export default function SummaryInfo({
             // A 24px target inside a 13px row. The height comes back out as
             // negative margin so asking the question never makes the row
             // taller than the rows around it.
-            className={`-my-1 ms-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full align-middle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] ${
-              open ? 'text-[#BAA369]' : 'text-zinc-600 hover:text-zinc-300'
+            className={`-my-1 ms-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full align-middle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
+              open ? 'text-gold' : 'text-zinc-600 hover:text-zinc-300'
             }`}
           >
             {/*
@@ -107,7 +107,7 @@ export default function SummaryInfo({
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="block pt-0.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            className="block pt-0.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
           >
             {loc('إخفاء', 'Hide', 'شاردنەوە')}
           </button>

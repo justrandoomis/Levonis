@@ -664,7 +664,7 @@ export default function Tools() {
           }}
           className={`rounded-2xl border transition-colors duration-300 motion-reduce:transition-none ${
             dragging
-              ? 'border-[#BAA369] bg-[#BAA369]/5'
+              ? 'border-gold bg-gold/5'
               : justAccepted
                 ? 'border-emerald-500/60 bg-emerald-500/[0.04]'
                 : 'border-zinc-800 bg-zinc-950'
@@ -688,14 +688,14 @@ export default function Tools() {
               <span
                 className={`w-10 h-10 rounded-xl border grid place-items-center shrink-0 transition-colors duration-300 motion-reduce:transition-none ${
                   uploading
-                    ? 'bg-[#BAA369]/10 border-[#BAA369]/40'
+                    ? 'bg-gold/10 border-gold/40'
                     : analysisId
                       ? 'bg-emerald-500/10 border-emerald-500/40'
                       : 'bg-zinc-900 border-zinc-800'
                 }`}
               >
                 {uploading ? (
-                  <Loader2 className="w-5 h-5 text-[#BAA369] animate-spin motion-reduce:animate-none" aria-hidden />
+                  <Loader2 className="w-5 h-5 text-gold animate-spin motion-reduce:animate-none" aria-hidden />
                 ) : analysisId ? (
                   <Check
                     className={`w-5 h-5 text-emerald-400 transition-transform duration-300 motion-reduce:transition-none ${
@@ -704,7 +704,7 @@ export default function Tools() {
                     aria-hidden
                   />
                 ) : (
-                  <Box className="w-5 h-5 text-[#BAA369]" aria-hidden />
+                  <Box className="w-5 h-5 text-gold" aria-hidden />
                 )}
               </span>
               <div className="min-w-0 flex-1">
@@ -714,7 +714,7 @@ export default function Tools() {
                     on the Calculate button, which is not rendered yet while the
                     first upload is still going. */}
                 {uploading ? (
-                  <p className="text-[#BAA369] text-[11px]">{s.uploading}</p>
+                  <p className="text-gold text-[11px]">{s.uploading}</p>
                 ) : (
                   <p className="text-zinc-500 text-[11px] tabular-nums" dir="ltr">
                     {(file.size / 1024 / 1024).toFixed(1)} MB
@@ -738,7 +738,7 @@ export default function Tools() {
               className="w-full p-8 flex flex-col items-center gap-2 text-center disabled:opacity-50"
             >
               <span className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 grid place-items-center">
-                <FileUp className="w-5 h-5 text-[#BAA369]" aria-hidden />
+                <FileUp className="w-5 h-5 text-gold" aria-hidden />
               </span>
               <span className="text-white text-[14px] font-medium mt-1">{s.pick}</span>
               <span className="text-zinc-500 text-[11px]">{s.formats}</span>
@@ -758,7 +758,7 @@ export default function Tools() {
         {!file && (
           <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 space-y-3" data-link-door>
             <label htmlFor="tools-link" className="flex items-center gap-2 text-[13px] text-zinc-300">
-              <Link2 className="w-4 h-4 text-[#BAA369]" aria-hidden />
+              <Link2 className="w-4 h-4 text-gold" aria-hidden />
               {s.linkLabel}
             </label>
             <div className="flex gap-2">
@@ -781,13 +781,13 @@ export default function Tools() {
                   }
                 }}
                 placeholder="https://makerworld.com/…"
-                className="min-w-0 flex-1 h-11 bg-zinc-900 border border-zinc-800 rounded-xl px-3 text-white text-[13px] focus:outline-none focus:border-[#BAA369] transition-colors"
+                className="min-w-0 flex-1 h-11 bg-zinc-900 border border-zinc-800 rounded-xl px-3 text-white text-[13px] focus:outline-none focus:border-gold transition-colors"
               />
               <button
                 type="button"
                 onClick={() => void checkLink()}
                 disabled={linkBusy || !linkUrl.trim()}
-                className="shrink-0 h-11 px-4 rounded-xl bg-[#BAA369] text-black text-[13px] font-semibold flex items-center gap-1.5 disabled:opacity-40 active:scale-[0.98] transition-transform"
+                className="shrink-0 h-11 px-4 rounded-xl bg-gold text-accent-contrast text-[13px] font-semibold flex items-center gap-1.5 disabled:opacity-40 active:scale-[0.98] transition-transform"
               >
                 {linkBusy ? <Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
                 {linkBusy ? s.pricing : s.calculate}
@@ -809,7 +809,7 @@ export default function Tools() {
                     rel="noopener noreferrer nofollow"
                     className="h-11 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-white text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
                   >
-                    <ExternalLink className="w-4 h-4 text-[#BAA369]" aria-hidden />
+                    <ExternalLink className="w-4 h-4 text-gold" aria-hidden />
                     {s.linkDownload}
                   </a>
                   <button
@@ -817,7 +817,7 @@ export default function Tools() {
                     onClick={() => fileInput.current?.click()}
                     className="h-11 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-white text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
                   >
-                    <FileUp className="w-4 h-4 text-[#BAA369]" aria-hidden />
+                    <FileUp className="w-4 h-4 text-gold" aria-hidden />
                     {s.linkThenUpload}
                   </button>
                   {!requestsClosed && (
@@ -827,7 +827,7 @@ export default function Tools() {
                       className="h-11 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-white text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
                       data-link-as-request
                     >
-                      <Users className="w-4 h-4 text-[#BAA369]" aria-hidden />
+                      <Users className="w-4 h-4 text-gold" aria-hidden />
                       {s.sendRequest}
                     </button>
                   )}
@@ -859,7 +859,7 @@ export default function Tools() {
                 {linkResult.quote.confidence === 'insufficient' ? (
                   <Notice tone="warn">{s.insufficient}</Notice>
                 ) : (
-                  <div className="rounded-xl border border-[#BAA369]/30 bg-[#BAA369]/[0.06] p-4">
+                  <div className="rounded-xl border border-gold/30 bg-gold/[0.06] p-4">
                     <p className="text-[11px] text-zinc-500">
                       {s.linkFromSite}: <span dir="ltr" className="tabular-nums text-zinc-300">{formatGrams(linkResult.grams_total ?? 0)}</span>
                     </p>
@@ -877,7 +877,7 @@ export default function Tools() {
                     type="button"
                     onClick={() => void checkLink()}
                     disabled={linkBusy}
-                    className="w-full h-11 rounded-xl bg-[#BAA369] text-black text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+                    className="w-full h-11 rounded-xl bg-gold text-accent-contrast text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
                   >
                     <RefreshCw className="w-4 h-4" aria-hidden />
                     {s.recalc}
@@ -1025,7 +1025,7 @@ export default function Tools() {
             type="button"
             onClick={() => void calculate()}
             disabled={busy || !printerId || !materialId}
-            className="w-full h-12 rounded-2xl bg-[#BAA369] text-black font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.99] transition-transform"
+            className="w-full h-12 rounded-2xl bg-gold text-accent-contrast font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.99] transition-transform"
           >
             {busy ? (
               <>
@@ -1109,7 +1109,7 @@ export default function Tools() {
         {quote && quote.confidence === 'insufficient' && <Notice tone="warn">{s.insufficient}</Notice>}
 
         {quote && quote.confidence !== 'insufficient' && (
-          <section className="rounded-2xl border border-[#BAA369]/30 bg-gradient-to-b from-[#BAA369]/[0.07] to-transparent p-5">
+          <section className="rounded-2xl border border-gold/30 bg-gradient-to-b from-gold/[0.07] to-transparent p-5">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">{s.price}</p>
             <p className="text-white font-bold text-[30px] leading-tight mt-1 tabular-nums" dir="ltr" data-quote-price>
               {money(quote.price_iqd)}
@@ -1155,7 +1155,7 @@ export default function Tools() {
               onClick={() => navigate('/requests')}
               className="w-full h-11 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-white text-[14px] font-medium flex items-center justify-center gap-2 transition-colors"
             >
-              <Users className="w-4 h-4 text-[#BAA369]" aria-hidden />
+              <Users className="w-4 h-4 text-gold" aria-hidden />
               {s.sendRequest}
             </button>
             <p className="text-zinc-500 text-[11px] leading-relaxed mt-2.5 text-center">{s.sendNote}</p>
@@ -1206,7 +1206,7 @@ function Select({
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
-      className="max-w-[16rem] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[13px] focus:outline-none focus:border-[#BAA369] disabled:opacity-40 transition-colors truncate"
+      className="max-w-[16rem] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[13px] focus:outline-none focus:border-gold disabled:opacity-40 transition-colors truncate"
     >
       {options.map((o) => (
         <option key={String(o.value)} value={o.value}>
@@ -1273,7 +1273,7 @@ function Stepper({ sign, onClick, disabled }: { sign: string; onClick: () => voi
 function Notice({ tone, children }: { tone: 'error' | 'warn'; children: React.ReactNode }) {
   const styles =
     tone === 'error'
-      ? 'text-[#e4899a] bg-[#B03142]/10 border-[#B03142]/40'
+      ? 'text-blush bg-crimson/10 border-crimson/40'
       : 'text-amber-300/90 bg-amber-500/10 border-amber-500/25';
   return (
     <p role="alert" className={`text-[12px] leading-relaxed rounded-2xl p-3.5 border flex items-start gap-2 ${styles}`}>

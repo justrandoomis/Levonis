@@ -114,17 +114,17 @@ export default function JobsView({ state, now, lang, s, busy, run, onError, onAs
 function Terms({ job, s, lang }: { job: FarmJob; s: FarmStrings; lang: string }) {
   return (
     <ul className="flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-zinc-400">
-      <li className="inline-flex items-center gap-1 text-[#BAA369] font-bold">
+      <li className="inline-flex items-center gap-1 text-gold font-bold">
         <Coins aria-hidden="true" className="w-3.5 h-3.5" />
         <span className="tabular-nums" dir="ltr">
           {formatCoins(job.reward_coins, lang)}
         </span>
       </li>
-      <li className="inline-flex items-center gap-1 text-[#A6B283]">
+      <li className="inline-flex items-center gap-1 text-sage">
         <Star aria-hidden="true" className="w-3.5 h-3.5" />
         <span className="tabular-nums">{s.reputationGain(starsDelta(reputationGainBp(job)))}</span>
       </li>
-      {job.late_penalty_bp > 0 && <li className="tabular-nums text-[#E4B363]">{s.latePenalty(starsDelta(job.late_penalty_bp))}</li>}
+      {job.late_penalty_bp > 0 && <li className="tabular-nums text-honey">{s.latePenalty(starsDelta(job.late_penalty_bp))}</li>}
       {job.cancel_penalty_bp > 0 && <li className="tabular-nums">{s.cancelPenaltyBp(starsDelta(job.cancel_penalty_bp))}</li>}
       {job.cancel_penalty_coins > 0 && <li className="tabular-nums">{s.cancelPenaltyCoins(formatCoins(job.cancel_penalty_coins, lang))}</li>}
     </ul>
@@ -219,7 +219,7 @@ function OfferCard({
       <Terms job={job} s={s} lang={lang} />
 
       <div className="flex items-center justify-between gap-3 pt-1">
-        <span className={`text-[11px] tabular-nums ${expired ? 'text-[#E06070]' : 'text-zinc-500'}`}>
+        <span className={`text-[11px] tabular-nums ${expired ? 'text-coral' : 'text-zinc-500'}`}>
           {expires === null ? '' : expired ? s.offerExpired : s.offerExpiresIn(countdown(expires - now, lang))}
         </span>
         <div className="flex items-center gap-2">
@@ -296,7 +296,7 @@ function ActiveCard({
       </div>
 
       <Spec job={job} state={state} s={s} lang={lang} />
-      {job.payout_deferred_day && <p className="text-[11.5px] text-[#E4B363]">{s.payoutPendingBody}</p>}
+      {job.payout_deferred_day && <p className="text-[11.5px] text-honey">{s.payoutPendingBody}</p>}
 
       <div className="space-y-1">
         <div className="flex items-baseline justify-between gap-3 text-[11.5px]">
@@ -304,7 +304,7 @@ function ActiveCard({
             {assigned !== null ? s.assignedOf(assigned, job.qty) : ''}
             {printersOn > 0 && <span className="text-zinc-500"> · {s.printingOn(printersOn)}</span>}
           </span>
-          <span className={`font-bold tabular-nums ${deadline !== null && deadline <= now ? 'text-[#E4B363]' : 'text-zinc-200'}`} data-farm-duration="deadline">
+          <span className={`font-bold tabular-nums ${deadline !== null && deadline <= now ? 'text-honey' : 'text-zinc-200'}`} data-farm-duration="deadline">
             {deadline === null ? '' : deadline <= now ? s.deadlinePassed : s.deadlineIn(countdown(deadline - now, lang))}
           </span>
         </div>
@@ -322,7 +322,7 @@ function ActiveCard({
             </span>
           </button>
         )}
-        {remaining > 0 && <span className="text-[11px] text-[#E4B363]">{s.unassigned(remaining)}</span>}
+        {remaining > 0 && <span className="text-[11px] text-honey">{s.unassigned(remaining)}</span>}
         {canCancel && (
           <button ref={cancelRef} type="button" disabled={disabled} onClick={() => setConfirm(true)} className={`${BTN_SECONDARY} ms-auto`} data-farm-action="cancel-job">
             {s.cancelJob}

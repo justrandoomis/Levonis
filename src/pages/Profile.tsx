@@ -320,7 +320,7 @@ export default function Profile() {
   if (!isLoaded) {
     return (
       <div className="w-full min-h-screen flex items-center justify-center bg-canvas" role="status" aria-busy="true">
-        <div className="w-7 h-7 border-2 border-[#BAA369]/20 border-t-[#BAA369] rounded-full animate-spin" />
+        <div className="w-7 h-7 border-2 border-gold/20 border-t-gold rounded-full animate-spin" />
       </div>
     );
   }
@@ -330,10 +330,10 @@ export default function Profile() {
 
       {/* A restrained warm wash keeps Levonis' identity without competing
           with the actual profile information. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[180px] bg-gradient-to-b from-[#1c1711] to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[180px] bg-gradient-to-b from-gold/10 to-transparent" />
 
       {/* Sticky Header */}
-      <div className={`fixed top-0 left-0 right-0 z-[110] transition-all duration-300 flex items-center justify-between ${scrolled ? 'shadow-md py-1 px-3 opacity-100 pointer-events-auto bg-[#2a1a10]' : 'bg-transparent py-3 px-3 opacity-0 pointer-events-none'}`}>
+      <div className={`fixed top-0 left-0 right-0 z-[110] transition-all duration-300 flex items-center justify-between ${scrolled ? 'shadow-md py-1 px-3 opacity-100 pointer-events-auto bg-surface-raised/95 backdrop-blur-md' : 'bg-transparent py-3 px-3 opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-2 min-w-0">
            <div className="w-7 h-7 rounded-full bg-white overflow-hidden border border-black/10 shrink-0 flex items-center justify-center">
              {avatarUrl ? (
@@ -353,7 +353,7 @@ export default function Profile() {
             of squeezing mixed-direction usernames into only their suffix. */}
         <section data-profile-header className="mb-4 flex min-w-0 flex-col gap-2">
           <div className="flex w-full min-w-0 items-center gap-3">
-            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 bg-[#25271e] ring-white/10">
+            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 bg-zinc-800 ring-white/10">
               {avatarUrl ? (
                 <img referrerPolicy="no-referrer" src={avatarUrl} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -422,10 +422,10 @@ export default function Profile() {
 
         {/* First Card: Membership Center — members only (real ledger data). */}
         {isAuthenticated && (
-        <div className="rounded-xl p-3 mb-3 shadow-sm bg-[#1a1a1a]">
+        <div className="rounded-xl p-3 mb-3 shadow-sm bg-zinc-900">
           {/* Top section of the card */}
           <div className="flex justify-between items-center mb-3 pb-3 border-b overflow-hidden border-white/5">
-            <button type="button" className="flex items-center gap-1 shrink-0 min-h-[44px] rounded-lg px-1 -mx-1 hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]" onClick={() => navigate('/subscription')}>
+            <button type="button" className="flex items-center gap-1 shrink-0 min-h-[44px] rounded-lg px-1 -mx-1 hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold" onClick={() => navigate('/subscription')}>
               <span className="font-bold text-[10px] whitespace-nowrap text-white">
                 {loc('الخطة الحالية', 'Current plan', 'پلانی ئێستا')}
               </span>
@@ -440,12 +440,12 @@ export default function Profile() {
               {dir === 'rtl' ? <ChevronLeft className="w-3 h-3 text-zinc-400 shrink-0" aria-hidden="true" /> : <ChevronRight className="w-3 h-3 text-zinc-400 shrink-0" aria-hidden="true" />}
             </button>
             <div className="flex gap-2 shrink-0">
-              <button type="button" onClick={() => navigate('/subscription')} className="flex flex-col items-center justify-center relative rtl:pl-2 ltr:pr-2 min-h-[44px] after:content-[''] after:absolute rtl:after:left-0 ltr:after:right-0 after:top-1/2 after:-translate-y-1/2 after:w-[1px] after:h-4 after:bg-zinc-700 hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-lg">
-                <span className="text-[#ff5000] font-bold text-[9px] whitespace-nowrap">{loc('مركز الأعضاء', 'Member Center', 'ناوەندی ئەندامان')}</span>
+              <button type="button" onClick={() => navigate('/subscription')} className="flex flex-col items-center justify-center relative rtl:pl-2 ltr:pr-2 min-h-[44px] after:content-[''] after:absolute rtl:after:left-0 ltr:after:right-0 after:top-1/2 after:-translate-y-1/2 after:w-[1px] after:h-4 after:bg-zinc-700 hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded-lg">
+                <span className="text-flame font-bold text-[9px] whitespace-nowrap">{loc('مركز الأعضاء', 'Member Center', 'ناوەندی ئەندامان')}</span>
                 <span className="text-[8px] text-zinc-500 whitespace-nowrap">{loc('استكشف المزايا', 'Explore benefits', 'سوودەکان ببینە')}</span>
               </button>
-              <button type="button" onClick={() => navigate('/points')} className="flex flex-col items-center justify-center shrink-0 min-h-[44px] hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-lg px-1">
-                <span className="text-[#ff5000] font-bold text-[9px] whitespace-nowrap">{loc('المكافآت', 'Rewards', 'خەڵاتەکان')}</span>
+              <button type="button" onClick={() => navigate('/points')} className="flex flex-col items-center justify-center shrink-0 min-h-[44px] hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded-lg px-1">
+                <span className="text-flame font-bold text-[9px] whitespace-nowrap">{loc('المكافآت', 'Rewards', 'خەڵاتەکان')}</span>
                 <span className="text-[8px] text-zinc-500 whitespace-nowrap">{loc('اكسب النقاط', 'Earn points', 'خاڵ بەدەست بهێنە')}</span>
               </button>
             </div>
@@ -454,15 +454,15 @@ export default function Profile() {
           {/* Middle row: Stats — REAL wallet/points values; the protection
               cell opens the warranty center (linked printers, coverage, claims). */}
           <div className="grid grid-cols-3 mb-3 text-white">
-            <button type="button" className="flex flex-col items-center justify-center min-h-[48px] border-e hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-s-lg border-zinc-700" onClick={() => navigate('/points')}>
+            <button type="button" className="flex flex-col items-center justify-center min-h-[48px] border-e hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded-s-lg border-zinc-700" onClick={() => navigate('/points')}>
               <span className="text-[11px] font-medium mb-1 whitespace-nowrap">{loc('النقاط', 'Points', 'خاڵەکان')}</span>
               <span className="text-[12px] font-bold font-mono">{pointBalance || 0}</span>
             </button>
-            <button type="button" className="flex flex-col items-center justify-center min-h-[48px] border-e hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] border-zinc-700" onClick={() => navigate('/wallet')}>
+            <button type="button" className="flex flex-col items-center justify-center min-h-[48px] border-e hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold border-zinc-700" onClick={() => navigate('/wallet')}>
               <span className="text-[11px] font-medium mb-1 whitespace-nowrap">{loc('الرصيد', 'Balance', 'باڵانس')}</span>
               <span className="text-[12px] font-bold font-mono">{dir === 'rtl' ? 'د.ع' : 'IQD'} {balanceIqd.toLocaleString()}</span>
             </button>
-            <button type="button" className="flex flex-col items-center justify-center min-h-[48px] hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-e-lg" onClick={() => navigate('/warranty')}>
+            <button type="button" className="flex flex-col items-center justify-center min-h-[48px] hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded-e-lg" onClick={() => navigate('/warranty')}>
                <span className="text-[11px] font-medium mb-1 whitespace-nowrap">{loc('الحماية', 'Protection', 'پاراستن')}</span>
                <span className="text-[10px] font-bold whitespace-nowrap flex items-center gap-0.5 text-zinc-500"><Shield className="w-3 h-3" aria-hidden="true" /> {loc('حماية المشتري', 'Buyer protection', 'پاراستنی کڕیار')}</span>
             </button>
@@ -498,9 +498,9 @@ export default function Profile() {
               type="button"
               data-profile-referrals
               onClick={() => navigate('/referrals')}
-              className="min-w-0 rounded-xl p-3 shadow-sm flex items-center gap-2.5 min-h-[56px] text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] bg-[#1a1a1a] text-white"
+              className="min-w-0 rounded-xl p-3 shadow-sm flex items-center gap-2.5 min-h-[56px] text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold bg-zinc-900 text-white"
             >
-              <Gift className="w-5 h-5 text-[#ff5000] shrink-0" strokeWidth={2} aria-hidden="true" />
+              <Gift className="w-5 h-5 text-flame shrink-0" strokeWidth={2} aria-hidden="true" />
               <span className="flex-1 min-w-0">
                 <span className="block font-bold text-[13px] leading-4 truncate">{t('referralProgram')}</span>
                 {mine?.referral?.code ? (
@@ -521,9 +521,9 @@ export default function Profile() {
               type="button"
               data-profile-stock-alerts
               onClick={() => navigate('/stock-alerts')}
-              className="min-w-0 rounded-xl p-3 shadow-sm flex items-center gap-2.5 min-h-[56px] text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] bg-[#1a1a1a] text-white"
+              className="min-w-0 rounded-xl p-3 shadow-sm flex items-center gap-2.5 min-h-[56px] text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold bg-zinc-900 text-white"
             >
-              <BellRing className="w-5 h-5 text-[#BAA369] shrink-0" strokeWidth={2} aria-hidden="true" />
+              <BellRing className="w-5 h-5 text-gold shrink-0" strokeWidth={2} aria-hidden="true" />
               <span className="flex-1 min-w-0">
                 <span className="block font-bold text-[13px] leading-4 truncate">
                   {loc('تنبيهاتي', 'My alerts', 'ئاگادارکردنەوەکانم')}
@@ -536,7 +536,7 @@ export default function Profile() {
         {/* Second Card: quick actions. Real destinations; guests are routed
             through /auth with the destination preserved. Aligned like the
             header grid: fixed icon box + consistent label area. */}
-        <div className="rounded-xl px-2 py-3 mb-3 shadow-sm grid grid-flow-col auto-cols-fr items-start bg-[#1a1a1a] text-white">
+        <div className="rounded-xl px-2 py-3 mb-3 shadow-sm grid grid-flow-col auto-cols-fr items-start bg-zinc-900 text-white">
           {[
             { key: 'shipping', icon: Package, label: loc('الشحن', 'Shipping', 'گەیاندن'), onClick: () => go('/orders?status=to_ship') },
             { key: 'favorites', icon: Star, label: loc('المفضلة', 'Favorites', 'دڵخوازەکان'), onClick: showFavoritesTab },
@@ -552,7 +552,7 @@ export default function Profile() {
               key={a.key}
               type="button"
               onClick={a.onClick}
-              className="flex flex-col items-center min-h-[56px] px-1 py-1 rounded-lg active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-transform hover:bg-white/10"
+              className="flex flex-col items-center min-h-[56px] px-1 py-1 rounded-lg active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-transform hover:bg-white/10"
             >
               <span className="h-7 w-7 flex items-center justify-center shrink-0" aria-hidden="true">
                 <a.icon className="w-6 h-6" strokeWidth={1.5} />
@@ -565,21 +565,21 @@ export default function Profile() {
         {/* Third Card: My Orders — members only (real counts; a guest has
             no orders and must never see fabricated ones). */}
         {isAuthenticated && (
-        <div className="rounded-xl p-3 mb-3 shadow-sm bg-[#1a1a1a] text-white">
+        <div className="rounded-xl p-3 mb-3 shadow-sm bg-zinc-900 text-white">
           <div className="flex justify-between items-center mb-3">
             <h2 className="font-bold text-[14px]">{loc('طلباتي', 'My Orders', 'داواکارییەکانم')}</h2>
-            <button type="button" className="flex items-center text-[11px] text-zinc-500 min-h-[44px] px-2 -mx-2 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-lg hover:text-zinc-300" onClick={() => navigate('/orders')}>
+            <button type="button" className="flex items-center text-[11px] text-zinc-500 min-h-[44px] px-2 -mx-2 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded-lg hover:text-zinc-300" onClick={() => navigate('/orders')}>
               {loc('الكل', 'All', 'هەموو')}
               {dir === 'rtl' ? <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />}
             </button>
           </div>
           <div className="grid grid-flow-col auto-cols-fr items-start pt-1 pb-1 overflow-hidden">
             {orderChips.map((item) => (
-              <button key={item.key} type="button" onClick={() => navigate(`/orders?status=${item.status}`)} className="flex flex-col items-center min-h-[56px] px-0.5 py-1 rounded-lg active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-transform relative hover:bg-white/10">
+              <button key={item.key} type="button" onClick={() => navigate(`/orders?status=${item.status}`)} className="flex flex-col items-center min-h-[56px] px-0.5 py-1 rounded-lg active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-transform relative hover:bg-white/10">
                 <span className="relative h-7 w-7 flex items-center justify-center shrink-0">
                   <item.icon className="w-[24px] h-[24px]" strokeWidth={1.5} aria-hidden="true" />
                   {item.badge > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-[#ff5000] text-white text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center border-2 border-[#1a1a1a]">
+                    <span className="absolute -top-1 -right-1 bg-[#ff5000] text-snow text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center border-2 border-zinc-900">
                       {item.badge}
                     </span>
                   )}
@@ -590,7 +590,7 @@ export default function Profile() {
           </div>
           {/* Order Status Banner — only when a real order exists */}
           {latestOrder && latestOrder.items.length > 0 && (
-            <button type="button" onClick={() => navigate('/orders')} className="w-full rounded-lg p-2.5 mt-2 flex items-center gap-2 text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] bg-[#222] hover:bg-[#2a2a2a]">
+            <button type="button" onClick={() => navigate('/orders')} className="w-full rounded-lg p-2.5 mt-2 flex items-center gap-2 text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold bg-zinc-800 hover:bg-zinc-800">
               <div className="w-8 h-8 rounded shrink-0 overflow-hidden bg-zinc-800">
                 {latestOrder.items[0].image && (
                   <img referrerPolicy="no-referrer" src={latestOrder.items[0].image} alt={latestOrder.items[0].name} className="w-full h-full object-cover" />
@@ -608,7 +608,7 @@ export default function Profile() {
         {/* Fourth Card: Quick Tiles — members only (all targets need auth;
             every tile leads to a real page). */}
         {isAuthenticated && (
-        <div className="rounded-xl p-4 mb-3 shadow-sm overflow-hidden relative bg-[#1a1a1a]">
+        <div className="rounded-xl p-4 mb-3 shadow-sm overflow-hidden relative bg-zinc-900">
           {/*
             WHY THE LABELS USED TO COLLIDE.
 
@@ -652,7 +652,7 @@ export default function Profile() {
                 onClick={() => { if (!game.soon) navigate(game.to); }}
                 aria-disabled={game.soon || undefined}
                 title={game.soon ? `${game.label} — ${t('comingSoon')}` : undefined}
-                className={`group flex w-[74px] shrink-0 flex-col items-center gap-2 rounded-lg py-1 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] ${
+                className={`group flex w-[74px] shrink-0 flex-col items-center gap-2 rounded-lg py-1 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
                   game.soon ? 'cursor-default' : 'press-scale sm:hover:scale-105'
                 }`}
               >
@@ -668,7 +668,7 @@ export default function Profile() {
                     {game.label}
                   </span>
                   {game.soon && (
-                    <span className="text-[9px] font-bold leading-none px-1.5 py-[3px] rounded-full bg-[#BAA369]/15 text-[#BAA369] whitespace-nowrap">
+                    <span className="text-[9px] font-bold leading-none px-1.5 py-[3px] rounded-full bg-gold/15 text-gold whitespace-nowrap">
                       {t('comingSoon')}
                     </span>
                   )}
@@ -681,17 +681,17 @@ export default function Profile() {
 
         {/* Fifth Card: member bundles (PLUS/PRIME/PRO — server-gated) */}
         {planActive && (
-          <div className="rounded-xl p-3 mb-3 shadow-sm bg-[#1a1a1a] text-white">
+          <div className="rounded-xl p-3 mb-3 shadow-sm bg-zinc-900 text-white">
             <div className="flex justify-between items-center mb-3">
-              <h2 className="font-bold text-[14px] flex items-center gap-1 text-[#ff0036]">
+              <h2 className="font-bold text-[14px] flex items-center gap-1 text-scarlet">
                 <span className="italic font-black text-base">BUNDLES</span>
                 <span className="ml-1 text-[13px] text-white">{loc('مركز الخصومات الحصرية', 'Exclusive Discounts', 'داشکاندنە تایبەتەکان')}</span>
               </h2>
-              <button type="button" className="text-[11px] text-zinc-500 min-h-[44px] px-2 -mx-2 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-lg hover:text-zinc-300" onClick={() => navigate('/bundles')}>{loc('المزيد', 'More', 'زیاتر')} {dir === 'rtl' ? '‹' : '›'}</button>
+              <button type="button" className="text-[11px] text-zinc-500 min-h-[44px] px-2 -mx-2 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded-lg hover:text-zinc-300" onClick={() => navigate('/bundles')}>{loc('المزيد', 'More', 'زیاتر')} {dir === 'rtl' ? '‹' : '›'}</button>
             </div>
             <div className="flex gap-2.5 overflow-x-auto hide-scrollbar pb-1">
               {bundles.length > 0 ? bundles.map((bundle) => (
-                <button key={bundle.id} type="button" onClick={() => navigate(bundle.product_slug ? `/bundles/${bundle.product_slug}` : '/bundles')} className="min-w-[85px] w-[85px] border rounded-lg p-1.5 flex flex-col shrink-0 text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] bg-[#331118] border-[#801a2c]">
+                <button key={bundle.id} type="button" onClick={() => navigate(bundle.product_slug ? `/bundles/${bundle.product_slug}` : '/bundles')} className="min-w-[85px] w-[85px] border rounded-lg p-1.5 flex flex-col shrink-0 text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold bg-red-950 border-red-900">
                   <div className="w-full aspect-square rounded mb-1.5 overflow-hidden bg-zinc-800">
                     {bundle.image && (
                       <img referrerPolicy="no-referrer" src={bundle.image} alt={bundle.name} className="w-full h-full object-cover" />
@@ -699,7 +699,7 @@ export default function Profile() {
                   </div>
                   <span className="text-[9px] font-bold line-clamp-2 leading-tight mb-1 text-white">{bundle.name}</span>
                   {bundleShelfPrice(bundle) !== null && (
-                    <div className="text-[#ff0036] font-bold flex items-baseline gap-0.5 mt-auto">
+                    <div className="text-scarlet font-bold flex items-baseline gap-0.5 mt-auto">
                       <span className="text-[12px] leading-none">{money(bundleShelfPrice(bundle)!)}</span>
                     </div>
                   )}
@@ -726,7 +726,7 @@ export default function Profile() {
               role="tab"
               aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`font-bold text-[14px] relative transition-colors min-h-[44px] px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-lg ${activeTab === tab.id ? 'text-[#ff5000]' : 'text-white'}`}
+              className={`font-bold text-[14px] relative transition-colors min-h-[44px] px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded-lg ${activeTab === tab.id ? 'text-flame' : 'text-white'}`}
             >
               {tab.label}
               {activeTab === tab.id && (
@@ -750,7 +750,7 @@ export default function Profile() {
               const name = p.name;
 
               return (
-                <button type="button" onClick={() => navigate('/product/' + p.slug)} key={p.id} className="relative rounded-[10px] overflow-hidden flex flex-col text-start border shadow-sm pb-2 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] bg-[#1a1a1a] border-white/5">
+                <button type="button" onClick={() => navigate('/product/' + p.slug)} key={p.id} className="relative rounded-[10px] overflow-hidden flex flex-col text-start border shadow-sm pb-2 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold bg-zinc-900 border-white/5">
                   <div className="relative aspect-square overflow-hidden w-full bg-zinc-800">
                     {firstImage && <img referrerPolicy="no-referrer" src={firstImage} alt={name} className="w-full h-full object-cover" />}
                   </div>
@@ -758,7 +758,7 @@ export default function Profile() {
                     <h3 className="font-medium text-[13px] line-clamp-2 mb-2 leading-[1.3]">{name}</h3>
 
                     <div className="mt-auto flex items-baseline justify-between">
-                       <span className="text-[#ff5000] font-bold text-[15px] flex items-baseline gap-0.5">
+                       <span className="text-flame font-bold text-[15px] flex items-baseline gap-0.5">
                          {money(p.price_iqd || 0)}
                        </span>
                        {p.display_regular_iqd != null && p.display_regular_iqd > (p.display_price_iqd ?? p.price_iqd) && (
@@ -783,14 +783,14 @@ export default function Profile() {
                  <button
                    type="button"
                    onClick={() => navigate('/auth?next=%2Fprofile')}
-                   className="min-h-[44px] px-6 rounded-xl bg-olive text-[#BAA369] text-[13px] font-bold hover:opacity-90 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                   className="min-h-[44px] px-6 rounded-xl bg-olive text-gold-muted text-[13px] font-bold hover:opacity-90 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                  >
                    {loc('تسجيل الدخول', 'Sign in', 'چوونەژوورەوە')}
                  </button>
                </div>
              ) : !favoritesLoaded ? (
                <div className="flex justify-center py-12" role="status" aria-busy="true">
-                 <div className="w-7 h-7 border-2 border-[#ff5000]/20 border-t-[#ff5000] rounded-full animate-spin" />
+                 <div className="w-7 h-7 border-2 border-flame/20 border-t-flame rounded-full animate-spin" />
                </div>
              ) : favorites.length === 0 ? (
                <div className="text-center py-12 text-zinc-500">
@@ -803,7 +803,7 @@ export default function Profile() {
                    // §3/§12: the product name is English in every language and is never translated.
                    const name = item.name;
                    return (
-                     <button type="button" key={item.id} onClick={() => navigate(`/product/${item.slug}`)} className="rounded-[10px] p-2.5 flex gap-3 shadow-sm border relative text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] bg-[#1a1a1a] border-white/5">
+                     <button type="button" key={item.id} onClick={() => navigate(`/product/${item.slug}`)} className="rounded-[10px] p-2.5 flex gap-3 shadow-sm border relative text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold bg-zinc-900 border-white/5">
                        <div className="w-[110px] h-[110px] rounded-lg overflow-hidden shrink-0 bg-zinc-800">
                          {item.image && <img referrerPolicy="no-referrer" src={item.image} alt={name} className="w-full h-full object-cover" />}
                        </div>
@@ -812,7 +812,7 @@ export default function Profile() {
                            {name}
                          </h3>
 
-                         <div className="flex items-baseline gap-1.5 text-[#ff0036] font-bold mb-1.5 mt-auto">
+                         <div className="flex items-baseline gap-1.5 text-scarlet font-bold mb-1.5 mt-auto">
                            <span className="text-[15px] leading-none">{money(item.price_iqd || 0)}</span>
                          </div>
 

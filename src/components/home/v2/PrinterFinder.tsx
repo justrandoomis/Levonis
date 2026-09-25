@@ -32,6 +32,7 @@ export default function PrinterFinder() {
   return (
     <section
       data-home-section="printer_finder"
+      data-theme="dark"
       aria-labelledby="home-finder-title"
       className="lv-finder-texture relative overflow-hidden rounded-2xl bg-charcoal px-3 py-4 ring-1 ring-inset ring-white/[0.05] lg:flex lg:items-center lg:justify-between lg:gap-10 lg:rounded-[20px] lg:px-10 lg:py-8"
     >
@@ -40,7 +41,7 @@ export default function PrinterFinder() {
         <h2 id="home-finder-title" className="text-[16px] font-bold leading-6 text-ivory lg:text-[24px] lg:leading-9">
           {loc('محتار أي طابعة تناسبك؟', 'Not sure which printer suits you?')}
         </h2>
-        <p className="mt-0.5 text-[12px] leading-5 text-[#a9acb3] lg:mt-1 lg:text-[15px] lg:leading-6">
+        <p className="mt-0.5 text-[12px] leading-5 text-text-secondary lg:mt-1 lg:text-[15px] lg:leading-6">
           {loc(
             'أجب على بعض الأسئلة البسيطة وسنرشح لك أفضل الخيارات.',
             'Answer a few simple questions and we will suggest the best options.'

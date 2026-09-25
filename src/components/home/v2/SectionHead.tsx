@@ -26,13 +26,13 @@ export default function SectionHead({
   const { t } = useLanguage();
   return (
     <div className="flex items-center justify-between gap-3 mb-3 lg:mb-5">
-      <h2 id={id} className="min-w-0 truncate text-[17px] leading-7 font-bold text-ink lg:text-[22px] lg:leading-8">
+      <h2 id={id} className="min-w-0 truncate text-[17px] leading-7 font-bold text-text-primary lg:text-[22px] lg:leading-8">
         {title}
       </h2>
       {to ? (
         <Link
           to={to}
-          className="-me-2 inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-ink-2 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted"
+          className="-me-2 inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <span>{linkLabel ?? t('seeAll')}</span>
           <ArrowGlyph />

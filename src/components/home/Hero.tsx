@@ -86,6 +86,7 @@ export default function Hero({ banners, loading }: { banners: HomeBanner[]; load
   return (
     <section
       data-hero="banners"
+      data-theme="dark"
       aria-roledescription="carousel"
       aria-label={t('heroTitle')}
       className="relative w-full h-[380px] md:h-[460px] overflow-hidden bg-olive-dark"
@@ -265,6 +266,7 @@ function DefaultHero() {
   const { t, dir } = useLanguage();
   return (
     <section
+      data-theme="dark"
       data-hero="default"
       className="relative w-full overflow-hidden bg-gradient-to-br from-olive-dark via-olive to-olive-light"
     >

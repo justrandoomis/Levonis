@@ -131,7 +131,7 @@ function Row({ label, value, strong = false, muted = false, negative = false }: 
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
       <dt className={`text-[13px] min-w-0 ${strong ? 'text-white font-bold' : muted ? 'text-zinc-500' : 'text-zinc-400'}`}>{label}</dt>
-      <dd className={`text-[13px] tabular-nums shrink-0 ${strong ? 'text-[#BAA369] font-bold text-[15px]' : negative ? 'text-emerald-300' : 'text-zinc-200'}`}>
+      <dd className={`text-[13px] tabular-nums shrink-0 ${strong ? 'text-gold font-bold text-[15px]' : negative ? 'text-emerald-300' : 'text-zinc-200'}`}>
         {negative ? '- ' : ''}
         {value}
       </dd>
@@ -149,7 +149,7 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
     f.payment_state === 'paid'
       ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
       : f.payment_state === 'bnpl_due'
-        ? 'bg-[#B03142]/15 text-[#f3bdc5] border-[#B03142]/35'
+        ? 'bg-crimson/15 text-petal border-crimson/35'
       : f.payment_state === 'partial'
         ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
         : 'bg-zinc-800 text-zinc-300 border-zinc-700';
@@ -206,7 +206,7 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
       </dl>
 
       {f.payment_state === 'bnpl_due' && f.bnpl_due_at && (
-        <p className="mt-2 text-[11.5px] font-medium text-[#f3bdc5]">
+        <p className="mt-2 text-[11.5px] font-medium text-petal">
           {s.bnplDueAt(formatDate(f.bnpl_due_at, lang))}
         </p>
       )}
@@ -218,7 +218,7 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
       {showEarned && points && (
         <div className="mt-4 rounded-xl border border-zinc-800 bg-black/30 p-3" data-points-state={points.state}>
           <p className="text-[12px] font-bold text-zinc-300 inline-flex items-center gap-1.5">
-            <Coins className="w-4 h-4 text-[#BAA369]" aria-hidden />
+            <Coins className="w-4 h-4 text-gold" aria-hidden />
             {s.earned}
           </p>
           <div className="mt-1.5 flex flex-col gap-1 text-[12.5px]">

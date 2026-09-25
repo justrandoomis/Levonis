@@ -126,7 +126,7 @@ export default function OrderStagePanel({
       </div>
 
       {error && (
-        <p role="alert" className="text-[#e4899a] text-xs bg-[#B03142]/10 border border-[#B03142]/40 rounded-xl p-2.5">
+        <p role="alert" className="text-blush text-xs bg-crimson/10 border border-crimson/40 rounded-xl p-2.5">
           {error}
         </p>
       )}
@@ -141,7 +141,7 @@ export default function OrderStagePanel({
                 <span
                   className={`w-5 h-5 rounded-full flex items-center justify-center border ${
                     step.current
-                      ? 'bg-olive border-olive text-white'
+                      ? 'bg-olive border-olive text-snow'
                       : step.reached
                         ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-400'
                         : 'bg-transparent border-zinc-700 text-zinc-700'
@@ -183,7 +183,7 @@ export default function OrderStagePanel({
           {/* A sync failure is SHOWN, not swallowed: the order did not move
               because we could not reach them, and an admin needs to know
               that rather than assume nothing happened. */}
-          {d.error && <p className="text-[#e4899a]">{ar ? 'خطأ المزامنة' : 'Sync error'}: {d.error}</p>}
+          {d.error && <p className="text-blush">{ar ? 'خطأ المزامنة' : 'Sync error'}: {d.error}</p>}
         </div>
       )}
 
@@ -223,7 +223,7 @@ export default function OrderStagePanel({
                 }
                 className={`inline-flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-xl border text-[13px] font-bold transition-colors disabled:opacity-60 ${
                   m.stage === 'cancelled'
-                    ? 'border-[#B03142]/50 text-[#e4899a] hover:bg-[#B03142]/10'
+                    ? 'border-crimson/50 text-blush hover:bg-crimson/10'
                     : isCourier
                       ? 'border-zinc-700 border-dashed text-zinc-300 hover:bg-zinc-800'
                       : 'border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800'

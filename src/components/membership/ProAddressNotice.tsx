@@ -21,15 +21,15 @@ export default function ProAddressNotice({ className = '' }: { className?: strin
   return (
     <p
       data-pro-address-notice
-      className={`flex items-start gap-2 rounded-xl border border-[#B03142]/30 bg-[#B03142]/10 px-3 py-2 text-[12.5px] leading-relaxed text-text-secondary ${className}`}
+      className={`flex items-start gap-2 rounded-xl border border-crimson/30 bg-crimson/10 px-3 py-2 text-[12.5px] leading-relaxed text-text-secondary ${className}`}
     >
-      <Sparkles aria-hidden className="mt-[3px] h-3.5 w-3.5 shrink-0 text-[#e06070]" />
+      <Sparkles aria-hidden className="mt-[3px] h-3.5 w-3.5 shrink-0 text-coral" />
       <span>
         {loc(
           'سعر PRO والتوصيل المجاني يُطبَّقان على عنوانك المعتمد فقط.',
           'PRO prices and free delivery apply at your approved address only.'
         )}{' '}
-        <Link to="/addresses" className="font-bold text-[#e06070] underline underline-offset-2">
+        <Link to="/addresses" className="font-bold text-coral underline underline-offset-2">
           {loc('اعتمد عنوانك', 'Get your address approved')}
         </Link>
       </span>

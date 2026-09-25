@@ -182,8 +182,8 @@ export default function MerchantDashboard() {
           )}
           <SoftCard>
             <div className="flex flex-col items-center text-center mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-[#708238]/15 flex items-center justify-center mb-4">
-                <Store className="w-8 h-8 text-[#708238]" />
+              <div className="w-16 h-16 rounded-2xl bg-moss/15 flex items-center justify-center mb-4">
+                <Store className="w-8 h-8 text-moss" />
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">
                 {dir === 'rtl' ? 'أنشئ متجرك في مجتمع ليفو' : 'Set up your Levo Community store'}
@@ -200,7 +200,7 @@ export default function MerchantDashboard() {
                   value={storeName}
                   onChange={e => { setStoreName(e.target.value); setStoreSaveState('idle'); }}
                   placeholder={dir === 'rtl' ? 'مثال: متجر ليفو' : 'e.g. My Levo Shop'}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-gilt"
                 />
               </div>
               <div>
@@ -209,7 +209,7 @@ export default function MerchantDashboard() {
                   value={storeBio}
                   onChange={e => { setStoreBio(e.target.value); setStoreSaveState('idle'); }}
                   rows={3}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-gilt"
                 />
               </div>
               {storeSaveState === 'error' && (
@@ -220,7 +220,7 @@ export default function MerchantDashboard() {
               <button
                 onClick={saveStore}
                 disabled={storeSaveState === 'saving' || !storeName.trim()}
-                className="w-full flex items-center justify-center gap-2 bg-[#708238] hover:bg-[#859846] text-white px-6 py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-[#708238] hover:bg-[#859846] text-snow px-6 py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
               >
                 <Store className="w-4 h-4" />
                 {storeSaveState === 'saving' ? (dir === 'rtl' ? 'جارٍ الإنشاء...' : 'Creating...') : dir === 'rtl' ? 'إنشاء المتجر' : 'Create Store'}
@@ -251,8 +251,8 @@ export default function MerchantDashboard() {
           {/* Real, simple counts — no fabricated KPIs */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <SoftCard className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#708238]/15 flex items-center justify-center shrink-0">
-                <Package className="w-6 h-6 text-[#708238]" />
+              <div className="w-12 h-12 rounded-2xl bg-moss/15 flex items-center justify-center shrink-0">
+                <Package className="w-6 h-6 text-moss" />
               </div>
               <div>
                 <div className="text-zinc-400 text-[11px] font-semibold mb-1">{dir === 'rtl' ? 'المنتجات' : 'Products'}</div>
@@ -260,8 +260,8 @@ export default function MerchantDashboard() {
               </div>
             </SoftCard>
             <SoftCard className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#D4AF37]/15 flex items-center justify-center shrink-0">
-                <Users className="w-6 h-6 text-[#D4AF37]" />
+              <div className="w-12 h-12 rounded-2xl bg-gilt/15 flex items-center justify-center shrink-0">
+                <Users className="w-6 h-6 text-gilt" />
               </div>
               <div>
                 <div className="text-zinc-400 text-[11px] font-semibold mb-1">{dir === 'rtl' ? 'المتابعون' : 'Followers'}</div>
@@ -298,7 +298,7 @@ export default function MerchantDashboard() {
                   <div className="text-sm font-bold text-white">{dir === 'rtl' ? 'إدارة المنتجات' : 'Manage Products'}</div>
                   <div className="text-xs text-zinc-500 mt-1">{dir === 'rtl' ? 'إضافة وحذف منتجات متجرك' : 'Add and remove your store products'}</div>
                 </div>
-                <ShoppingBag className="w-6 h-6 text-[#708238]" />
+                <ShoppingBag className="w-6 h-6 text-moss" />
               </div>
             </SoftCard>
             {storeHref && (
@@ -308,7 +308,7 @@ export default function MerchantDashboard() {
                   <div className="text-sm font-bold text-white">{dir === 'rtl' ? 'زيارة صفحة المتجر' : 'Visit Store Page'}</div>
                   <div className="text-xs text-zinc-500 mt-1">{dir === 'rtl' ? 'شاهد متجرك كما يراه الزوار' : 'See your store as visitors do'}</div>
                 </div>
-                <Store className="w-6 h-6 text-[#D4AF37]" />
+                <Store className="w-6 h-6 text-gilt" />
               </div>
             </SoftCard>
             )}
@@ -331,7 +331,7 @@ export default function MerchantDashboard() {
                     type="text"
                     value={storeName}
                     onChange={e => { setStoreName(e.target.value); setStoreSaveState('idle'); }}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-gilt"
                   />
                 </div>
                 <div>
@@ -340,7 +340,7 @@ export default function MerchantDashboard() {
                     value={storeBio}
                     onChange={e => { setStoreBio(e.target.value); setStoreSaveState('idle'); }}
                     rows={3}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-gilt"
                   ></textarea>
                 </div>
                 {storeSaveState === 'error' && (
@@ -352,13 +352,13 @@ export default function MerchantDashboard() {
                   <button
                     onClick={saveStore}
                     disabled={storeSaveState === 'saving' || !storeName.trim()}
-                    className="flex items-center gap-2 bg-[#708238] hover:bg-[#859846] text-white px-6 py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 bg-[#708238] hover:bg-[#859846] text-snow px-6 py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
                   >
                     <Save className="w-4 h-4" />
                     {storeSaveState === 'saving' ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : dir === 'rtl' ? 'حفظ التغييرات' : 'Save Changes'}
                   </button>
                   {storeSaveState === 'saved' && (
-                    <span className="text-sm font-bold text-[#2CE59B] flex items-center gap-1">
+                    <span className="text-sm font-bold text-mint flex items-center gap-1">
                       <Check className="w-4 h-4" /> {dir === 'rtl' ? 'تم الحفظ' : 'Saved'}
                     </span>
                   )}
@@ -370,7 +370,7 @@ export default function MerchantDashboard() {
               <h3 className="text-lg font-bold text-white mb-4">{dir === 'rtl' ? 'رابط الصفحة' : 'Page Link'}</h3>
               <p className="text-sm text-zinc-400 mb-4">{dir === 'rtl' ? 'هذا هو الرابط الخاص بمتجرك في مجتمع ليفو' : 'This is your store link in the Levo community'}</p>
               <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
-                <code className="w-full sm:flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-[#D4AF37] text-sm overflow-x-auto" dir="ltr">
+                <code className="w-full sm:flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-gilt text-sm overflow-x-auto" dir="ltr">
                   {storeHref ?? `/community/store/${merchant.id}`}
                 </code>
                 {storeHref && (
@@ -389,13 +389,13 @@ export default function MerchantDashboard() {
         <div className="mt-6 max-w-5xl">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-white">{dir === 'rtl' ? 'إدارة المنتجات' : 'Manage Products'}</h2>
-            <button onClick={() => setShowAddProduct(true)} className="bg-[#D4AF37] hover:bg-[#ebd074] transition-colors text-[#0a0a0a] px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2">
+            <button onClick={() => setShowAddProduct(true)} className="bg-[#D4AF37] hover:bg-[#ebd074] transition-colors text-onyx px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2">
               <Plus className="w-4 h-4" /> {dir === 'rtl' ? 'إضافة منتج' : 'Add Product'}
             </button>
           </div>
 
           {showAddProduct && (
-            <SoftCard className="mb-6 border-[#D4AF37]">
+            <SoftCard className="mb-6 border-gilt">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-white">{dir === 'rtl' ? 'إضافة منتج جديد' : 'Add New Product'}</h3>
                 <button onClick={() => setShowAddProduct(false)} className="text-zinc-400 hover:text-white">
@@ -409,7 +409,7 @@ export default function MerchantDashboard() {
                     type="text"
                     value={newName}
                     onChange={e => { setNewName(e.target.value); setProductSaveState('idle'); }}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[#D4AF37]"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-gilt"
                     placeholder="e.g. Vintage T-Shirt"
                   />
                 </div>
@@ -420,7 +420,7 @@ export default function MerchantDashboard() {
                     value={newNameAr}
                     onChange={e => setNewNameAr(e.target.value)}
                     dir="rtl"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[#D4AF37]"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-gilt"
                     placeholder="اسم المنتج"
                   />
                 </div>
@@ -430,7 +430,7 @@ export default function MerchantDashboard() {
                     type="number"
                     value={newPrice}
                     onChange={e => { setNewPrice(e.target.value); setProductSaveState('idle'); }}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[#D4AF37]"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-gilt"
                     placeholder="25000"
                     min={0}
                   />
@@ -474,7 +474,7 @@ export default function MerchantDashboard() {
               <button
                 onClick={addProduct}
                 disabled={productSaveState === 'saving' || uploadingImage}
-                className="bg-[#708238] hover:bg-[#859846] text-white px-6 py-2 rounded-xl font-bold transition-colors disabled:opacity-50"
+                className="bg-[#708238] hover:bg-[#859846] text-snow px-6 py-2 rounded-xl font-bold transition-colors disabled:opacity-50"
               >
                 {productSaveState === 'saving' ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : dir === 'rtl' ? 'حفظ المنتج' : 'Save Product'}
               </button>
@@ -584,15 +584,15 @@ export default function MerchantDashboard() {
                 </p>
                 <div className="space-y-3 opacity-50">
                   <label className="flex items-center gap-3 cursor-not-allowed">
-                    <input type="checkbox" disabled className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 accent-[#D4AF37]" />
+                    <input type="checkbox" disabled className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 accent-gilt" />
                     <span className="text-zinc-300">{dir === 'rtl' ? 'إشعارات الطلبات الجديدة' : 'New order notifications'}</span>
                   </label>
                   <label className="flex items-center gap-3 cursor-not-allowed">
-                    <input type="checkbox" disabled className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 accent-[#D4AF37]" />
+                    <input type="checkbox" disabled className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 accent-gilt" />
                     <span className="text-zinc-300">{dir === 'rtl' ? 'إشعارات مجتمع ليفو' : 'Levo Community notifications'}</span>
                   </label>
                   <label className="flex items-center gap-3 cursor-not-allowed">
-                    <input type="checkbox" disabled className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 accent-[#D4AF37]" />
+                    <input type="checkbox" disabled className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 accent-gilt" />
                     <span className="text-zinc-300">{dir === 'rtl' ? 'رسائل البريد الإلكتروني الترويجية' : 'Promotional emails'}</span>
                   </label>
                 </div>

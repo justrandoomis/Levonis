@@ -198,7 +198,7 @@ export default function CompleteProfileSheet() {
           <button
             type="button"
             onClick={complete}
-            className="min-h-[48px] rounded-xl bg-gold px-5 text-[14px] font-bold text-black transition-opacity duration-200 hover:opacity-90"
+            className="min-h-[48px] rounded-xl bg-gold px-5 text-[14px] font-bold text-accent-contrast transition-opacity duration-200 hover:opacity-90"
           >
             {s.completeNow}
           </button>

@@ -340,7 +340,7 @@ export default function GramsQuotePanel({
                 setAutoRecalc(true);
               }
             }}
-            className="max-w-[16rem] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[13px] leading-snug focus:outline-none focus:border-[#BAA369] disabled:opacity-40 transition-colors truncate"
+            className="max-w-[16rem] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[13px] leading-snug focus:outline-none focus:border-gold disabled:opacity-40 transition-colors truncate"
           >
             {printers.map((p) => (
               <option key={p.id} value={p.id}>
@@ -385,7 +385,7 @@ export default function GramsQuotePanel({
                     value={r.materialId}
                     disabled={busy}
                     onChange={(e) => patchRow(r.key, { materialId: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[13px] leading-snug focus:outline-none focus:border-[#BAA369] disabled:opacity-40 transition-colors truncate"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[13px] leading-snug focus:outline-none focus:border-gold disabled:opacity-40 transition-colors truncate"
                   >
                     {usable.map((m) => (
                       <option key={m.id} value={m.id}>
@@ -420,7 +420,7 @@ export default function GramsQuotePanel({
                     onClick={() => removeRow(r.key)}
                     disabled={busy}
                     aria-label={t.remove}
-                    className="h-[42px] w-11 shrink-0 grid place-items-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-[#e4899a] hover:border-[#B03142]/40 disabled:opacity-30 transition-colors"
+                    className="h-[42px] w-11 shrink-0 grid place-items-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-blush hover:border-crimson/40 disabled:opacity-30 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" aria-hidden />
                   </button>
@@ -444,7 +444,7 @@ export default function GramsQuotePanel({
                     value={r.grams}
                     disabled={busy}
                     onChange={(e) => patchRow(r.key, { grams: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 pe-12 text-white text-[14px] leading-snug tabular-nums focus:outline-none focus:border-[#BAA369] disabled:opacity-40 transition-colors"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 pe-12 text-white text-[14px] leading-snug tabular-nums focus:outline-none focus:border-gold disabled:opacity-40 transition-colors"
                   />
                   <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-zinc-500 text-[12px] leading-snug">
                     g
@@ -460,7 +460,7 @@ export default function GramsQuotePanel({
             type="button"
             onClick={addRow}
             disabled={busy}
-            className="w-full px-4 py-3 border-t border-zinc-800/70 text-[13px] leading-snug text-[#BAA369] flex items-center justify-center gap-2 hover:bg-zinc-900/60 disabled:opacity-40 transition-colors"
+            className="w-full px-4 py-3 border-t border-zinc-800/70 text-[13px] leading-snug text-gold flex items-center justify-center gap-2 hover:bg-zinc-900/60 disabled:opacity-40 transition-colors"
           >
             <Plus className="w-4 h-4" aria-hidden />
             {t.addColour}
@@ -514,7 +514,7 @@ export default function GramsQuotePanel({
                   setHours(e.target.value);
                   invalidate();
                 }}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[14px] leading-snug tabular-nums focus:outline-none focus:border-[#BAA369] disabled:opacity-40 transition-colors"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[14px] leading-snug tabular-nums focus:outline-none focus:border-gold disabled:opacity-40 transition-colors"
               />
             </div>
             <div className="flex-1">
@@ -536,7 +536,7 @@ export default function GramsQuotePanel({
                   setMinutes(e.target.value);
                   invalidate();
                 }}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[14px] leading-snug tabular-nums focus:outline-none focus:border-[#BAA369] disabled:opacity-40 transition-colors"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[14px] leading-snug tabular-nums focus:outline-none focus:border-gold disabled:opacity-40 transition-colors"
               />
             </div>
           </div>
@@ -562,7 +562,7 @@ export default function GramsQuotePanel({
       />
 
       {error && (
-        <p role="alert" className="text-[12px] leading-relaxed rounded-2xl p-3.5 border flex items-start gap-2 text-[#e4899a] bg-[#B03142]/10 border-[#B03142]/40">
+        <p role="alert" className="text-[12px] leading-relaxed rounded-2xl p-3.5 border flex items-start gap-2 text-blush bg-crimson/10 border-crimson/40">
           <AlertCircle className="w-4 h-4 shrink-0 mt-px" aria-hidden />
           <span>{error}</span>
         </p>
@@ -572,7 +572,7 @@ export default function GramsQuotePanel({
         type="button"
         onClick={() => void submit()}
         disabled={!canSubmit}
-        className="w-full h-12 rounded-2xl bg-[#BAA369] text-black font-semibold text-[15px] leading-snug flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.99] transition-transform"
+        className="w-full h-12 rounded-2xl bg-gold text-accent-contrast font-semibold text-[15px] leading-snug flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.99] transition-transform"
       >
         {busy ? (
           <>
@@ -596,7 +596,7 @@ export default function GramsQuotePanel({
       )}
 
       {result && result.quote.confidence !== 'insufficient' && (
-        <section className="rounded-2xl border border-[#BAA369]/30 bg-gradient-to-b from-[#BAA369]/[0.07] to-transparent p-5">
+        <section className="rounded-2xl border border-gold/30 bg-gradient-to-b from-gold/[0.07] to-transparent p-5">
           <p className="text-[11px] leading-snug font-semibold uppercase tracking-wider text-zinc-500">{t.price}</p>
           <p className="text-white font-bold text-[30px] leading-tight mt-1 tabular-nums" dir="ltr" data-grams-price>
             {money(result.quote.price_iqd)}

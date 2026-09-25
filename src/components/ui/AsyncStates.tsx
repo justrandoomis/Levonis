@@ -361,7 +361,7 @@ export function UnauthorizedState({
     >
       <Link
         to={authPathWithSupportRef(dest)}
-        className="mt-1 min-h-[44px] px-6 rounded-xl bg-gold text-black text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all"
+        className="mt-1 min-h-[44px] px-6 rounded-xl bg-gold text-accent-contrast text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all"
       >
         <LogIn aria-hidden="true" className="w-4 h-4" />
         {s.signIn}

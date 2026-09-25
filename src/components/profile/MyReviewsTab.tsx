@@ -126,7 +126,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
         <button
           type="button"
           onClick={() => navigate('/auth?next=%2Fprofile')}
-          className="min-h-[44px] px-6 rounded-xl bg-olive text-[#BAA369] text-[13px] font-bold hover:opacity-90 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          className="min-h-[44px] px-6 rounded-xl bg-olive text-gold-muted text-[13px] font-bold hover:opacity-90 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         >
           {s.signInCta}
         </button>
@@ -137,7 +137,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
   if (loading) {
     return (
       <div className="flex justify-center py-12" role="status" aria-busy="true">
-        <div className="w-7 h-7 border-2 border-[#BAA369]/20 border-t-[#BAA369] rounded-full animate-spin" />
+        <div className="w-7 h-7 border-2 border-gold/20 border-t-gold rounded-full animate-spin" />
       </div>
     );
   }
@@ -149,7 +149,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
         <button
           type="button"
           onClick={load}
-          className="min-h-[44px] px-6 inline-flex items-center gap-1.5 rounded-xl border text-[13px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] border-white/15 text-zinc-300 hover:bg-white/5"
+          className="min-h-[44px] px-6 inline-flex items-center gap-1.5 rounded-xl border text-[13px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold border-white/15 text-zinc-300 hover:bg-white/5"
         >
           <RefreshCw className="w-4 h-4" aria-hidden="true" />
           {s.retry}
@@ -180,7 +180,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
             onClick={() => {
               if (r.product_slug) navigate(`/product/${r.product_slug}`);
             }}
-            className="rounded-[10px] p-3 text-start shadow-sm border active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] bg-[#1a1a1a] border-white/5 text-white hover:bg-white/[0.03]"
+            className="rounded-[10px] p-3 text-start shadow-sm border active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold bg-zinc-900 border-white/5 text-white hover:bg-white/[0.03]"
           >
             <div className="flex items-center justify-between gap-2 mb-1">
               <span className="font-bold text-[13px] truncate">{name}</span>
@@ -192,7 +192,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
               {[1, 2, 3, 4, 5].map((i) => (
                 <Star
                   key={i}
-                  className={`w-3.5 h-3.5 ${i <= r.stars ? 'text-[#BAA369] fill-[#BAA369]' : 'text-zinc-700'}`}
+                  className={`w-3.5 h-3.5 ${i <= r.stars ? 'text-gold fill-gold' : 'text-zinc-700'}`}
                   aria-hidden="true"
                 />
               ))}

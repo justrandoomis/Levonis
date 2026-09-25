@@ -98,8 +98,8 @@ function memberWalletIqd(f: { wallet_iqd?: number; wallet_usd_cents: number }, e
 }
 
 const ROLE_ICON: Record<string, React.ReactNode> = {
-  admin: <Shield className="h-5 w-5 text-[#6B46FF]" />,
-  merchant: <Store className="h-5 w-5 text-[#D4AF37]" />,
+  admin: <Shield className="h-5 w-5 text-iris" />,
+  merchant: <Store className="h-5 w-5 text-gilt" />,
   customer: <User className="h-5 w-5 text-zinc-400" />,
 };
 
@@ -323,7 +323,7 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                   title={s.secMoney}
                   icon={<Wallet className="h-3.5 w-3.5" />}
                   note={s.lifetimeNote}
-                  className="border-[#2CE59B]/20 bg-[#2CE59B]/[0.04]"
+                  className="border-mint/20 bg-mint/[0.04]"
                   testId="financial"
                 >
                   <Row label={s.fLifetime} value={formatIqd(view.financial.lifetime_value_iqd)} mono />
@@ -337,7 +337,7 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                     label={s.fWalletPoints}
                     value={
                       <span className="inline-flex items-center gap-1.5">
-                        <Coins className="h-3.5 w-3.5 text-[#D4AF37]" />
+                        <Coins className="h-3.5 w-3.5 text-gilt" />
                         {view.financial.wallet_points.toLocaleString()}
                       </span>
                     }

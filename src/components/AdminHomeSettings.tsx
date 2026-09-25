@@ -47,7 +47,7 @@ function LocalizedField({
     { key: 'ckb', label: 'کوردی', dir: 'rtl' },
   ];
   const cls =
-    'w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-[#6B46FF] outline-none min-h-[44px]';
+    'w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-iris outline-none min-h-[44px]';
   return (
     <div>
       <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{label}</label>
@@ -161,7 +161,7 @@ function mergeSections(saved: HomeSection[]): HomeSection[] {
 function SaveStatusLabel({ state, error, dir }: { state: SaveState; error: string | null; dir: string }) {
   if (state === 'saved') {
     return (
-      <span className="text-xs font-bold text-[#2CE59B] flex items-center gap-1">
+      <span className="text-xs font-bold text-mint flex items-center gap-1">
         <Check className="w-3.5 h-3.5" /> {dir === 'rtl' ? 'تم الحفظ' : 'Saved'}
       </span>
     );
@@ -187,7 +187,7 @@ function ImageField({ value, onChange, dir }: { value: string; onChange: (url: s
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-[#6B46FF] outline-none"
+          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-iris outline-none"
           placeholder="https://..."
         />
         <label className={`flex items-center justify-center gap-1.5 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg cursor-pointer transition-colors border border-zinc-700 text-xs font-bold ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -357,7 +357,7 @@ export default function AdminHomeSettings() {
           <button
             onClick={() => setActiveTab('layout')}
             className={`flex items-center gap-2 whitespace-nowrap px-4 py-2.5 rounded-xl font-bold transition-all shrink-0 ${
-              activeTab === 'layout' ? 'bg-[#6B46FF] text-white shadow-lg' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+              activeTab === 'layout' ? 'bg-[#6B46FF] text-snow shadow-lg' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
             }`}
           >
             <LayoutTemplate className="w-4 h-4" />
@@ -367,7 +367,7 @@ export default function AdminHomeSettings() {
           <button
             onClick={() => setActiveTab('site-media')}
             className={`flex items-center gap-2 whitespace-nowrap px-4 py-2.5 rounded-xl font-bold transition-all shrink-0 ${
-              activeTab === 'site-media' ? 'bg-[#6B46FF] text-white shadow-lg' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+              activeTab === 'site-media' ? 'bg-[#6B46FF] text-snow shadow-lg' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
             }`}
           >
             <ImageIcon className="w-4 h-4" />
@@ -381,7 +381,7 @@ export default function AdminHomeSettings() {
                 key={section.id}
                 onClick={() => setActiveTab(section.id)}
                 className={`flex items-center gap-2 whitespace-nowrap px-4 py-2.5 rounded-xl font-bold transition-all shrink-0 ${
-                  activeTab === section.id ? 'bg-[#6B46FF] text-white shadow-lg' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+                  activeTab === section.id ? 'bg-[#6B46FF] text-snow shadow-lg' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -408,7 +408,7 @@ export default function AdminHomeSettings() {
                 <button
                   onClick={saveLayout}
                   disabled={layoutState === 'saving'}
-                  className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-[#09090b] px-5 py-2.5 rounded-xl transition-all font-bold shadow-lg disabled:opacity-50"
+                  className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-5 py-2.5 rounded-xl transition-all font-bold shadow-lg disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   {layoutState === 'saving' ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : dir === 'rtl' ? 'حفظ الترتيب' : 'Save Layout'}
@@ -457,12 +457,12 @@ export default function AdminHomeSettings() {
                     </button>
                     <button
                       onClick={() => toggleVisibility(section.id)}
-                      className={`p-2 rounded-xl transition-colors ${section.isVisible ? 'text-[#2CE59B] hover:bg-[#2CE59B]/10' : 'text-zinc-500 hover:bg-zinc-700'}`}
+                      className={`p-2 rounded-xl transition-colors ${section.isVisible ? 'text-mint hover:bg-mint/10' : 'text-zinc-500 hover:bg-zinc-700'}`}
                       title={section.isVisible ? 'Hide section' : 'Show section'}
                     >
                       {section.isVisible ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                     </button>
-                    <button onClick={() => setActiveTab(section.id)} className="p-2 text-zinc-400 hover:text-[#6B46FF] hover:bg-[#6B46FF]/10 rounded-xl transition-colors">
+                    <button onClick={() => setActiveTab(section.id)} className="p-2 text-zinc-400 hover:text-iris hover:bg-iris/10 rounded-xl transition-colors">
                       <Settings className="w-5 h-5" />
                     </button>
                   </div>
@@ -866,7 +866,7 @@ function BannerSettings({ titleEn, titleAr, banners, onChange, onSave, saveState
           <button onClick={add} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl transition-colors font-bold">
             <Plus className="w-4 h-4" /> {dir === 'rtl' ? 'إضافة بانر' : 'Add Banner'}
           </button>
-          <button onClick={onSave} disabled={saveState === 'saving'} className="flex items-center gap-2 bg-[#6B46FF] hover:bg-[#5A38E6] text-white px-4 py-2 rounded-xl transition-all font-bold disabled:opacity-50">
+          <button onClick={onSave} disabled={saveState === 'saving'} className="flex items-center gap-2 bg-[#6B46FF] hover:bg-iris-deep text-snow px-4 py-2 rounded-xl transition-all font-bold disabled:opacity-50">
             <Save className="w-4 h-4" /> {saveState === 'saving' ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : dir === 'rtl' ? 'حفظ' : 'Save'}
           </button>
         </div>
@@ -903,7 +903,7 @@ function BannerSettings({ titleEn, titleAr, banners, onChange, onSave, saveState
                     const nb = banners.map((x, xi) => xi === i ? { ...x, link: e.target.value } : x);
                     onChange(nb);
                   }}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-[#6B46FF] outline-none min-h-[44px]"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-iris outline-none min-h-[44px]"
                   placeholder="/products?category=cat_printers"
                 />
                 <p className="text-[11px] text-zinc-500 mt-1">
@@ -986,7 +986,7 @@ function GenericSectionSettings({ titleEn, titleAr, items, onChange, onSave, sav
           <button onClick={add} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl transition-colors font-bold">
             <Plus className="w-4 h-4" /> {dir === 'rtl' ? 'إضافة عنصر' : 'Add Item'}
           </button>
-          <button onClick={onSave} disabled={saveState === 'saving'} className="flex items-center gap-2 bg-[#6B46FF] hover:bg-[#5A38E6] text-white px-4 py-2 rounded-xl transition-all font-bold disabled:opacity-50">
+          <button onClick={onSave} disabled={saveState === 'saving'} className="flex items-center gap-2 bg-[#6B46FF] hover:bg-iris-deep text-snow px-4 py-2 rounded-xl transition-all font-bold disabled:opacity-50">
             <Save className="w-4 h-4" /> {saveState === 'saving' ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : dir === 'rtl' ? 'حفظ' : 'Save'}
           </button>
         </div>
@@ -1011,7 +1011,7 @@ function GenericSectionSettings({ titleEn, titleAr, items, onChange, onSave, sav
                   onChange={(e) => {
                     onChange(items.map((x, xi) => xi === i ? { ...x, title: e.target.value } : x));
                   }}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-[#6B46FF] outline-none"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-iris outline-none"
                   placeholder="Title..."
                 />
               </div>
@@ -1023,7 +1023,7 @@ function GenericSectionSettings({ titleEn, titleAr, items, onChange, onSave, sav
                   onChange={(e) => {
                     onChange(items.map((x, xi) => xi === i ? { ...x, subtitle: e.target.value } : x));
                   }}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-[#6B46FF] outline-none"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-iris outline-none"
                   placeholder="Subtitle..."
                 />
               </div>
@@ -1045,7 +1045,7 @@ function GenericSectionSettings({ titleEn, titleAr, items, onChange, onSave, sav
                   onChange={(e) => {
                     onChange(items.map((x, xi) => xi === i ? { ...x, link: e.target.value } : x));
                   }}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-[#6B46FF] outline-none"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-iris outline-none"
                   placeholder="/product/..."
                 />
               </div>

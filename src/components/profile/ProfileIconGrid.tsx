@@ -30,7 +30,7 @@ export default function ProfileIconGrid({
             type="button"
             onClick={item.onClick}
             aria-label={item.label}
-            className="w-11 h-11 flex items-center justify-center rounded-full active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-transform text-white hover:bg-white/10"
+            className="w-11 h-11 flex items-center justify-center rounded-full active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-transform text-white hover:bg-white/10"
           >
             <item.icon className="h-[18px] w-[18px]" strokeWidth={1.7} aria-hidden="true" />
           </button>

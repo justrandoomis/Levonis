@@ -94,7 +94,7 @@ export default class ChunkBoundary extends React.Component<Props, State> {
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="mt-5 min-h-[44px] px-5 rounded-xl bg-gold text-black font-bold text-[14px]"
+            className="mt-5 min-h-[44px] px-5 rounded-xl bg-gold text-accent-contrast font-bold text-[14px]"
           >
             {s.retry}
           </button>

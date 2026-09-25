@@ -407,7 +407,7 @@ export default function ChannelNudge({ context, active }: ChannelNudgeProps) {
               key={action.href + action.label}
               to={action.href}
               onClick={close}
-              className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-gold px-5 text-[14px] leading-snug font-bold text-black transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-gold px-5 text-[14px] leading-snug font-bold text-accent-contrast transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               {loc(...CHANNEL_NUDGE_ACTION_LABEL[action.label])}
             </Link>

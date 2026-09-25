@@ -156,7 +156,7 @@ export default function PricePreview({
                 type="button"
                 onClick={() => setTier(t)}
                 className={`flex-1 py-3 text-sm font-bold transition-colors ${
-                  tier === t ? 'bg-[#6B46FF] text-white' : 'bg-zinc-800/40 text-zinc-400 hover:text-white'
+                  tier === t ? 'bg-[#6B46FF] text-snow' : 'bg-zinc-800/40 text-zinc-400 hover:text-white'
                 }`}
               >
                 {t === 'free' ? 'عادي' : t === 'prime' ? 'PRIME' : 'PRO'}

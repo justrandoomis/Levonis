@@ -24,7 +24,7 @@ export function ProgressBar({
   const pct = Math.max(0, Math.min(1, fraction)) * 100;
   const fill =
     tone === 'gold'
-      ? 'bg-[#BAA369]'
+      ? 'bg-gold'
       : tone === 'good'
         ? HEALTH_BAR.good
         : tone === 'warn'
@@ -80,7 +80,7 @@ export function CoinsChip({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border border-[#BAA369]/30 bg-[#BAA369]/10 text-[#BAA369] ${
+      className={`inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 text-gold ${
         size === 'lg' ? 'px-3.5 py-1.5' : 'px-2.5 py-1'
       } ${className}`}
       aria-label={`${formatCoins(coins, lang)} ${s.coins}`}
@@ -107,7 +107,7 @@ export function Stars({ stars, s, className = '' }: { stars: number; s: FarmStri
           return (
             <span key={i} className="relative w-3.5 h-3.5 text-zinc-700">
               <Star className="absolute inset-0 w-3.5 h-3.5" fill="currentColor" stroke="none" />
-              <span className="absolute inset-0 overflow-hidden text-[#BAA369]" style={{ width: `${fill * 100}%` }}>
+              <span className="absolute inset-0 overflow-hidden text-gold" style={{ width: `${fill * 100}%` }}>
                 <Star className="w-3.5 h-3.5" fill="currentColor" stroke="none" />
               </span>
             </span>

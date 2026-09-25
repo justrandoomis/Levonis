@@ -36,12 +36,12 @@ export default function GiftsEntry({ className = '' }: { className?: string }) {
     <Link
       to="/gifts"
       data-gifts-entry
-      className={`flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/40 px-4 min-h-[52px] hover:bg-zinc-800/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] ${className}`}
+      className={`flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/40 px-4 min-h-[52px] hover:bg-zinc-800/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${className}`}
     >
-      <Gift className="w-4 h-4 text-[#BAA369] shrink-0" aria-hidden />
+      <Gift className="w-4 h-4 text-gold shrink-0" aria-hidden />
       <span className="flex-1 min-w-0 text-[13px] text-zinc-300 truncate">{s.title}</span>
       {count !== null && count > 0 && (
-        <span className="text-[11px] font-bold text-[#BAA369] tabular-nums shrink-0" data-gifts-count={count}>
+        <span className="text-[11px] font-bold text-gold tabular-nums shrink-0" data-gifts-count={count}>
           {s.available(count)}
         </span>
       )}

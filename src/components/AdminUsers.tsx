@@ -35,8 +35,8 @@ interface AdminUserRow {
 type UsersView = 'members' | 'assistant' | 'telegram';
 
 const ROLE_STYLES: Record<string, string> = {
-  admin: 'bg-[#6B46FF]/10 text-[#6B46FF] border-[#6B46FF]/20',
-  merchant: 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20',
+  admin: 'bg-iris/10 text-iris border-iris/20',
+  merchant: 'bg-gilt/10 text-gilt border-gilt/20',
   customer: 'bg-zinc-800 text-zinc-400 border-zinc-700',
 };
 
@@ -177,7 +177,7 @@ export default function AdminUsers() {
               placeholder={s.searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 text-white pl-10 pr-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/50"
+              className="w-full bg-zinc-900 border border-zinc-700 text-white pl-10 pr-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-iris/50"
             />
             <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
           </div>
@@ -271,10 +271,10 @@ export default function AdminUsers() {
                         setDetailUserId(u.id);
                       }}
                       aria-label={`${s.openMember}: ${u.name || u.username || u.email}`}
-                      className="flex w-full items-center gap-3 text-start rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-zinc-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6B46FF]/60"
+                      className="flex w-full items-center gap-3 text-start rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-zinc-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-iris/60"
                     >
                       <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center shrink-0 border border-zinc-700">
-                        {u.role === 'admin' ? <Shield className="w-5 h-5 text-[#6B46FF]" /> : u.role === 'merchant' ? <Store className="w-5 h-5 text-[#D4AF37]" /> : <User className="w-5 h-5 text-zinc-400" />}
+                        {u.role === 'admin' ? <Shield className="w-5 h-5 text-iris" /> : u.role === 'merchant' ? <Store className="w-5 h-5 text-gilt" /> : <User className="w-5 h-5 text-zinc-400" />}
                       </div>
                       <div className="min-w-0">
                         <div dir="auto" className="font-bold text-zinc-200 truncate">{u.name || u.username || 'Unnamed User'}</div>
@@ -300,8 +300,8 @@ export default function AdminUsers() {
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
                             u.admin_scope === 'assistant'
-                              ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30'
-                              : 'bg-[#6B46FF]/10 text-[#6B46FF] border-[#6B46FF]/25'
+                              ? 'bg-gilt/10 text-gilt border-gilt/30'
+                              : 'bg-iris/10 text-iris border-iris/25'
                           }`}
                         >
                           {u.admin_scope === 'assistant' && <Lock className="w-3 h-3" />}
@@ -318,7 +318,7 @@ export default function AdminUsers() {
                   </td>
                   <td className="py-4 px-6">
                     {u.is_investor ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-[#2CE59B]">
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-mint">
                         <TrendingUp className="w-3.5 h-3.5" /> Yes
                       </span>
                     ) : (
@@ -458,13 +458,13 @@ export default function AdminUsers() {
                   </button>
                   <button
                     onClick={() => setEditingUser({...editorUser, role: 'merchant'})}
-                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'merchant' ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/50' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
+                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'merchant' ? 'bg-gilt/20 text-gilt border-gilt/50' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
                   >
                     <Store className="w-4 h-4" /> Merchant
                   </button>
                   <button
                     onClick={() => setEditingUser({...editorUser, role: 'admin'})}
-                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'admin' ? 'bg-[#6B46FF]/20 text-[#6B46FF] border-[#6B46FF]/50' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
+                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'admin' ? 'bg-iris/20 text-iris border-iris/50' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
                   >
                     <Shield className="w-4 h-4" /> Admin
                   </button>
@@ -476,7 +476,7 @@ export default function AdminUsers() {
                 <select
                   value={editorUser.membership_tier || 'free'}
                   onChange={(e) => setEditingUser({...editorUser, membership_tier: e.target.value as AdminUserRow['membership_tier']})}
-                  className="w-full bg-zinc-800 border border-zinc-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/50 appearance-none font-medium capitalize"
+                  className="w-full bg-zinc-800 border border-zinc-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-iris/50 appearance-none font-medium capitalize"
                 >
                   <option value="free">Free Plan</option>
                   <option value="plus">Plus Plan</option>
@@ -490,10 +490,10 @@ export default function AdminUsers() {
                   type="checkbox"
                   checked={!!editorUser.is_investor}
                   onChange={(e) => setEditingUser({...editorUser, is_investor: e.target.checked ? 1 : 0})}
-                  className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 accent-[#2CE59B]"
+                  className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 accent-mint"
                 />
                 <span className="text-white font-medium flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-[#2CE59B]" /> Investor
+                  <TrendingUp className="w-4 h-4 text-mint" /> Investor
                 </span>
               </label>
 

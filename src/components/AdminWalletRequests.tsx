@@ -204,11 +204,11 @@ export default function AdminWalletRequests() {
     const wd = t.type === 'withdrawal' ? t.withdrawal : null;
     const state = wd ? wd.state : t.status;
     const cls =
-      state === 'pending' || state === 'requested' ? 'bg-[#FFD166]/20 text-[#FFB703]' :
-      state === 'approved' && wd ? 'bg-[#6B46FF]/20 text-[#8B6BFF]' :
-      state === 'processing' ? 'bg-[#6B46FF]/20 text-[#8B6BFF]' :
-      state === 'approved' || state === 'paid' ? 'bg-[#2CE59B]/20 text-[#06D6A0]' :
-      'bg-[#FF6B6B]/20 text-[#EF476F]';
+      state === 'pending' || state === 'requested' ? 'bg-wheat/20 text-apricot' :
+      state === 'approved' && wd ? 'bg-iris/20 text-iris' :
+      state === 'processing' ? 'bg-iris/20 text-iris' :
+      state === 'approved' || state === 'paid' ? 'bg-mint/20 text-aqua' :
+      'bg-red-400/20 text-scarlet';
     return { text: wd?.needs_reconciliation ? `${state} · needs reconciliation` : state, cls };
   };
 
@@ -221,7 +221,7 @@ export default function AdminWalletRequests() {
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-black text-white">Wallet Requests</h2>
           {pendingCount > 0 && (
-            <span className="bg-[#FF6B6B] text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm">{pendingCount} Pending</span>
+            <span className="bg-red-400 text-snow px-3 py-1 rounded-full text-xs font-bold shadow-sm">{pendingCount} Pending</span>
           )}
           <button
             onClick={fetchTransactions}
@@ -257,9 +257,9 @@ export default function AdminWalletRequests() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-inner shrink-0 ${
-                  t.type === 'deposit' ? 'bg-[#2CE59B]/10 border-[#2CE59B]/20' : 'bg-[#FF6B9E]/10 border-[#FF6B9E]/20'
+                  t.type === 'deposit' ? 'bg-mint/10 border-mint/20' : 'bg-pink-400/10 border-pink-400/20'
                 }`}>
-                  <Wallet className={`w-5 h-5 ${t.type === 'deposit' ? 'text-[#2CE59B]' : 'text-[#FF6B9E]'}`} />
+                  <Wallet className={`w-5 h-5 ${t.type === 'deposit' ? 'text-mint' : 'text-pink-400'}`} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -296,7 +296,7 @@ export default function AdminWalletRequests() {
                       href={t.receiptUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-[#6B46FF] hover:text-[#8B6BFF] transition-colors"
+                      className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-iris hover:text-iris transition-colors"
                     >
                       <FileImage className="w-3.5 h-3.5" /> View receipt
                     </a>
@@ -396,7 +396,7 @@ export default function AdminWalletRequests() {
                         onClick={() => { setActionError(null); setDecision({ id: t.id, step: b.step, note: '' }); }}
                         disabled={!!loadingAction}
                         className={b.primary
-                          ? 'flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-[0_4px_10px_rgba(44,229,155,0.4)] hover:scale-105 disabled:opacity-50'
+                          ? 'flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-snow px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-[0_4px_10px_rgba(44,229,155,0.4)] hover:scale-105 disabled:opacity-50'
                           : 'flex items-center gap-1 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800/50 text-zinc-300 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm hover:scale-105 disabled:opacity-50'}
                       >
                         {b.icon === 'check' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />} {b.label}
@@ -440,7 +440,7 @@ export default function AdminWalletRequests() {
                           : decision.step.action === 'fail' ? 'e.g. Channel refused the transfer'
                           : 'No note needed for this step'
                       }
-                      className="w-full bg-zinc-800 border border-zinc-700 text-white px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/50"
+                      className="w-full bg-zinc-800 border border-zinc-700 text-white px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-iris/50"
                       autoFocus
                     />
                   </div>
@@ -450,8 +450,8 @@ export default function AdminWalletRequests() {
                       disabled={!!loadingAction}
                       className={`px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${
                         isPositive(decision.step)
-                          ? 'bg-[#2CE59B] hover:bg-[#06D6A0] text-black'
-                          : 'bg-red-500/90 hover:bg-red-500 text-white'
+                          ? 'bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx'
+                          : 'bg-red-500/90 hover:bg-red-500 text-snow'
                       }`}
                     >
                       {loadingAction ? 'Working...' : confirmLabel(decision.step)}

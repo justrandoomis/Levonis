@@ -48,9 +48,15 @@
  *    state is shown as what it is; permission is never presented as
  *    "notifications enabled".
  *
- * REMOVED: the old "Appearance" (System/Light/Dark) row wrote localStorage
- * and NOTHING read it — a control with no effect — and the "All elements" /
- * "Setup extension" placeholders. Preferences that are real live below.
+ * REMOVED: the "All elements" / "Setup extension" placeholders.
+ *
+ * «المظهر» IS BACK, AND THIS TIME IT DOES SOMETHING. The old Appearance row
+ * wrote localStorage and nothing read it; the app had one dark theme. There
+ * are now two complete themes (src/index.css, THE TWO THEMES), and this row
+ * drives src/lib/theme.ts: applied on the tap, kept in this browser, set
+ * before the first paint on the next visit by the script in index.html. A
+ * device preference like the currency — there is no user-preferences API to
+ * sync it to, and none is invented for it.
  *
  * Data safety: no PATCH from this page can touch role, balance or verified
  * flags — those fields are not accepted by /api/profile, and every write is
@@ -59,7 +65,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldCheck, Mail, KeyRound, Link2, FileText, LifeBuoy, Loader2, Check, Coins, CheckCircle2, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldCheck, Mail, KeyRound, Link2, FileText, LifeBuoy, Loader2, Check, Coins, CheckCircle2, Download, Sun, Moon, SunMoon } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useMoney } from '../CurrencyContext';
 import { useLanguage } from '../LanguageContext';
@@ -69,6 +75,8 @@ import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { useInstallApp } from '../hooks/useInstallApp';
 import InstallAppButton from '../components/pwa/InstallAppButton';
+import { Segmented } from '../components/ui/Segmented';
+import { setThemePreference, useTheme, type ThemePreference } from '../lib/theme';
 
 const PASSWORD_MIN = 8; // mirrors worker/routes/auth.ts checkPassword
 const USERNAME_COOLDOWN_DAYS = 14; // mirrors worker/routes/profile.ts
@@ -659,7 +667,8 @@ export default function Settings() {
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
   const { currency, setCurrency, rate, converted } = useMoney();
-  const { lang, setLang, dir, t } = useLanguage();
+  const { lang, setLang, dir, t, loc } = useLanguage();
+  const { preference: themePref, theme } = useTheme();
   const s = STRINGS[lang];
   const rtl = dir === 'rtl';
 
@@ -1037,6 +1046,38 @@ export default function Settings() {
                 {langBusy ? <p className="mt-1 text-[12px] text-zinc-400">{s.saving}</p> : null}
                 {langMsg ? <p className="mt-1 text-[12px] text-emerald-300">{langMsg}</p> : null}
                 {langError ? <p className="mt-1 text-[12px] text-amber-300">{langError}</p> : null}
+              </div>
+              {/*
+                «المظهر» — light, dark, or whatever the device is set to. One
+                tap applies it to every page at once (no reload, no save
+                button): the choice is the preview. «حسب الجهاز» names the
+                theme it resolved to, so the row never hides what is on screen.
+              */}
+              <div className="px-4 py-3" data-settings-appearance>
+                {/* OWNER: Sorani to be written by hand (the four appearance strings below). */}
+                <p id="settings-appearance" className="font-bold text-[15px] mb-2 flex items-center gap-2">
+                  <SunMoon aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+                  {loc('المظهر', 'Appearance')}
+                </p>
+                <Segmented
+                  group="appearance"
+                  label={loc('المظهر', 'Appearance')}
+                  value={themePref}
+                  onChange={(id) => setThemePreference(id as ThemePreference)}
+                  dataAttr="data-theme-choice"
+                  items={[
+                    { id: 'light', label: loc('فاتح', 'Light'), icon: <Sun aria-hidden="true" className="hidden w-4 h-4 shrink-0 sm:block" /> },
+                    { id: 'dark', label: loc('داكن', 'Dark'), icon: <Moon aria-hidden="true" className="hidden w-4 h-4 shrink-0 sm:block" /> },
+                    { id: 'system', label: loc('حسب الجهاز', 'Device'), icon: <SunMoon aria-hidden="true" className="hidden w-4 h-4 shrink-0 sm:block" /> },
+                  ]}
+                />
+                <p className="mt-2 text-[12px] text-zinc-500 leading-relaxed">
+                  {themePref === 'system'
+                    ? theme === 'dark'
+                      ? loc('يتبع إعداد جهازك — داكن الآن.', 'Follows your device — dark right now.')
+                      : loc('يتبع إعداد جهازك — فاتح الآن.', 'Follows your device — light right now.')
+                    : loc('يُطبَّق على كل الصفحات ويُحفظ على هذا الجهاز.', 'Applies to every page and is kept on this device.')}
+                </p>
               </div>
               {/*
                 «تغيير العملة … في لوحة الإدارة يكون سعر الدولار يساوي 1400

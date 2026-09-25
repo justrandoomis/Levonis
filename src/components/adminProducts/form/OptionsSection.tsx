@@ -732,7 +732,7 @@ export function OptionsSection({
                                 onClick={() => toggleLink(c.id, v.id)}
                                 className={`h-8 px-2.5 rounded-md border text-[12px] font-medium transition-colors max-w-full truncate ${
                                   on
-                                    ? 'bg-[#6B46FF]/20 border-[#6B46FF]/60 text-white'
+                                    ? 'bg-iris/20 border-iris/60 text-white'
                                     : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-600'
                                 }`}
                               >

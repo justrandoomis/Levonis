@@ -134,7 +134,7 @@ export default function StoreReceipt({
               type="button"
               onClick={close}
               disabled={busy}
-              className="flex-1 min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-50"
+              className="flex-1 min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
             >
               {loc('ليس الآن', 'Not now', 'ئێستا نا')}
             </button>
@@ -143,7 +143,7 @@ export default function StoreReceipt({
               onClick={confirm}
               disabled={busy}
               data-confirm-receipt
-              className="flex-1 min-h-[44px] rounded-xl bg-olive text-white text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+              className="flex-1 min-h-[44px] rounded-xl bg-olive text-snow text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
             >
               {busy && <Spinner size="sm" delayMs={0} decorative className="text-white" />}
               {busy ? loc('جارٍ التأكيد…', 'Confirming…') : loc('نعم، استلمته', 'Yes, I received it')}

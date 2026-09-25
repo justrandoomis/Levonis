@@ -69,7 +69,7 @@ export default function FarmTabBar({
 }) {
   const m = useMotion();
   return (
-    <div className="shrink-0 px-2 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-[#0a0a0a]" data-farm-tabbar>
+    <div className="shrink-0 px-2 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-black" data-farm-tabbar>
       <nav
         role="tablist"
         aria-label={s.tabsLabel}
@@ -94,8 +94,8 @@ export default function FarmTabBar({
                 if (lock) onLocked?.(tab, lock);
                 else onChange(tab);
               }}
-              className={`relative flex-1 min-w-0 min-h-[52px] px-0.5 py-1 rounded-full flex flex-col items-center justify-center gap-0.5 press-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]/70 ${
-                lock ? 'text-zinc-600 cursor-help' : active ? 'text-[#BAA369]' : 'text-zinc-500 hover:text-zinc-300'
+              className={`relative flex-1 min-w-0 min-h-[52px] px-0.5 py-1 rounded-full flex flex-col items-center justify-center gap-0.5 press-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/70 ${
+                lock ? 'text-zinc-600 cursor-help' : active ? 'text-gold' : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
               {active && (
@@ -103,7 +103,7 @@ export default function FarmTabBar({
                   layoutId="farm-tab-indicator"
                   data-farm-tab-indicator
                   aria-hidden="true"
-                  className="absolute inset-0 rounded-full bg-[#BAA369]/10 border border-[#BAA369]/25"
+                  className="absolute inset-0 rounded-full bg-gold/10 border border-gold/25"
                   transition={m.reduced ? { duration: 0 } : m.spring('move')}
                 />
               )}
@@ -111,7 +111,7 @@ export default function FarmTabBar({
                 {lock ? <Lock aria-hidden="true" className="w-[18px] h-[18px]" /> : <Icon aria-hidden="true" className="w-5 h-5" />}
                 {badge !== undefined && badge > 0 && !lock && (
                   <span
-                    className="absolute -top-1.5 -end-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#BAA369] text-black text-[9.5px] font-black leading-4 text-center tabular-nums"
+                    className="absolute -top-1.5 -end-2.5 min-w-[16px] h-4 px-1 rounded-full bg-gold text-accent-contrast text-[9.5px] font-black leading-4 text-center tabular-nums"
                     dir="ltr"
                   >
                     {badge > 9 ? '9+' : badge}

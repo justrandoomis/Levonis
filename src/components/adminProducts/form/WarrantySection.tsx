@@ -123,9 +123,9 @@ export function WarrantySection({
   const foreign = plans.filter((p) => p.duration_kind !== 'extension' || !(PRINTER_EXTENSION_MONTHS as readonly number[]).includes(p.duration_months));
 
   return (
-    <div className="mb-3 min-w-0 rounded-xl border border-[#BAA369]/25 bg-[#BAA369]/[0.04] p-3" data-form="extended-warranty">
+    <div className="mb-3 min-w-0 rounded-xl border border-gold/25 bg-gold/[0.04] p-3" data-form="extended-warranty">
       <div className="flex items-start gap-2 mb-2.5 min-w-0">
-        <ShieldCheck className="w-4 h-4 text-[#BAA369] shrink-0 mt-0.5" aria-hidden="true" />
+        <ShieldCheck className="w-4 h-4 text-gold shrink-0 mt-0.5" aria-hidden="true" />
         <div className="min-w-0">
           <h4 className="text-[12.5px] font-bold text-white">
             الضمان الممدد <span className="text-[10px] font-medium text-zinc-500">Extended warranty · printers only</span>
@@ -173,7 +173,7 @@ export function WarrantySection({
               key={ext}
               data-form={`warranty-plan-${ext}`}
               className={`rounded-lg border p-2.5 min-w-0 ${
-                on ? 'bg-[#BAA369]/[0.08] border-[#BAA369]/40' : 'bg-zinc-800/30 border-zinc-700'
+                on ? 'bg-gold/[0.08] border-gold/40' : 'bg-zinc-800/30 border-zinc-700'
               }`}
             >
               <Toggle

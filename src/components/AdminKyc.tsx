@@ -525,7 +525,7 @@ export default function AdminKyc() {
         z={60}
         solid
         testId="kyc-case-detail"
-        panelClassName={`w-full max-w-xl max-h-[88dvh] overflow-y-auto bg-[#0a0a0a] border border-zinc-800 !rounded-t-[28px] sm:!rounded-[28px]${detail ? '' : ' pointer-events-none'}`}
+        panelClassName={`w-full max-w-xl max-h-[88dvh] overflow-y-auto bg-black border border-zinc-800 !rounded-t-[28px] sm:!rounded-[28px]${detail ? '' : ' pointer-events-none'}`}
       >
           <div className="p-5">
             <div className="flex items-center justify-between mb-1">

@@ -120,7 +120,7 @@ export default function StoreCta() {
             </div>
             <Link
               to="/merchant"
-              className="w-full min-h-[48px] rounded-2xl bg-olive text-white font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+              className="w-full min-h-[48px] rounded-2xl bg-olive text-snow font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
             >
               {loc('لوحة تحكم المتجر', 'Store dashboard', 'داشبۆردی فرۆشگا')}
               <ArrowRight className="w-4 h-4 rtl:rotate-180" />
@@ -129,7 +129,7 @@ export default function StoreCta() {
         ) : (
           <Link
             to="/merchant/start"
-            className="w-full min-h-[48px] rounded-2xl bg-olive text-white font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            className="w-full min-h-[48px] rounded-2xl bg-olive text-snow font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
           >
             {loc('أنشئ متجرك', 'Create your store', 'فرۆشگاکەت دروست بکە')}
             <ArrowRight className="w-4 h-4 rtl:rotate-180" />

@@ -212,7 +212,7 @@ export default function OrderCard({
         </header>
 
         {order.priority === 1 && (
-          <p data-pro-priority className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#B03142]/35 bg-[#B03142]/12 px-2.5 py-1 text-[10.5px] font-bold text-[#f3bdc5]">
+          <p data-pro-priority className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-crimson/35 bg-crimson/12 px-2.5 py-1 text-[10.5px] font-bold text-petal">
             <Truck className="h-3 w-3" aria-hidden="true" />
             {order.fulfillment_service === 'pro_priority_12h' ? s.priority12h : s.priority}
           </p>
@@ -228,14 +228,14 @@ export default function OrderCard({
         <div className="mt-3 flex items-end justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] text-zinc-500">{s.total}</p>
-            <p className="text-[#BAA369] font-bold text-[15px] tabular-nums">{money(order.total_iqd)}</p>
+            <p className="text-gold font-bold text-[15px] tabular-nums">{money(order.total_iqd)}</p>
             {due > 0 && (
               <p className="text-[11.5px] text-zinc-400 tabular-nums">
                 {s.due}: {money(due)}
               </p>
             )}
             {bnplDue > 0 && (
-              <p className="text-[11.5px] text-[#f3bdc5] tabular-nums">
+              <p className="text-[11.5px] text-petal tabular-nums">
                 {s.bnplDue}: {money(bnplDue)}
               </p>
             )}

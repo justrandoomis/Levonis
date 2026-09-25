@@ -256,7 +256,7 @@ export function DeviceClaimOverlay({
             <label
               htmlFor="warranty-claim-files"
               aria-describedby="warranty-claim-attachments-label"
-              className={`inline-flex items-center gap-2 min-h-[44px] bg-zinc-900 border border-zinc-800 rounded-xl px-3 text-zinc-300 text-sm cursor-pointer hover:border-zinc-700 transition-colors focus-within:ring-2 focus-within:ring-[#BAA369] ${
+              className={`inline-flex items-center gap-2 min-h-[44px] bg-zinc-900 border border-zinc-800 rounded-xl px-3 text-zinc-300 text-sm cursor-pointer hover:border-zinc-700 transition-colors focus-within:ring-2 focus-within:ring-gold ${
                 uploadBusy || attachments.length >= MAX_ATTACHMENTS ? 'opacity-60 pointer-events-none' : ''
               }`}
             >

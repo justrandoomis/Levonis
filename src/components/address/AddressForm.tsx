@@ -393,7 +393,7 @@ export default function AddressForm({
           type="button"
           onClick={save}
           disabled={busy}
-          className="flex-1 min-h-[48px] rounded-xl bg-gold text-black font-black text-[15px] flex items-center justify-center gap-2 hover:brightness-110 disabled:opacity-45 transition-[filter,opacity] duration-150 active:scale-[0.99] [touch-action:manipulation]"
+          className="flex-1 min-h-[48px] rounded-xl bg-gold text-accent-contrast font-black text-[15px] flex items-center justify-center gap-2 hover:brightness-110 disabled:opacity-45 transition-[filter,opacity] duration-150 active:scale-[0.99] [touch-action:manipulation]"
         >
           {busy ? (
             <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" />

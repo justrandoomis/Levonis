@@ -32,7 +32,7 @@ export function ClaimProgress({ stage, s, className = '' }: { stage: string; s: 
       <span aria-hidden="true" className="absolute top-[5px] h-px bg-zinc-800" style={{ insetInlineStart: '10%', insetInlineEnd: '10%' }} />
       <span
         aria-hidden="true"
-        className={`absolute top-[5px] h-px ${rejected ? 'bg-zinc-500' : 'bg-[#BAA369]'}`}
+        className={`absolute top-[5px] h-px ${rejected ? 'bg-zinc-500' : 'bg-gold'}`}
         style={{ insetInlineStart: '10%', width: fill }}
       />
       {labels.map((label, i) => {
@@ -47,11 +47,11 @@ export function ClaimProgress({ stage, s, className = '' }: { stage: string; s: 
                 isCurrent
                   ? rejected
                     ? 'bg-zinc-400 border-zinc-400 ring-4 ring-zinc-400/15'
-                    : 'bg-[#BAA369] border-[#BAA369] ring-4 ring-[#BAA369]/20'
+                    : 'bg-gold border-gold ring-4 ring-gold/20'
                   : done
                     ? rejected
                       ? 'bg-zinc-500 border-zinc-500'
-                      : 'bg-[#BAA369] border-[#BAA369]'
+                      : 'bg-gold border-gold'
                     : 'bg-zinc-900 border-zinc-700'
               }`}
             />
@@ -71,7 +71,7 @@ export function ClaimProgress({ stage, s, className = '' }: { stage: string; s: 
 
 export function PriorityBadge({ s }: { s: WarrantyStrings }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-[#BAA369]/40 bg-[#BAA369]/10 text-[#BAA369] text-[10px] font-bold whitespace-nowrap">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-gold/40 bg-gold/10 text-gold text-[10px] font-bold whitespace-nowrap">
       <Crown aria-hidden="true" className="w-3 h-3" />
       {s.priorityBadge}
     </span>
@@ -107,7 +107,7 @@ export function ClaimCard({
       type="button"
       onClick={(e) => onOpen(claim, e.currentTarget)}
       className={`w-full text-start ${CARD} p-4 hover:border-zinc-700 transition-colors ${FOCUS} ${
-        unread ? 'border-[#BAA369]/50' : ''
+        unread ? 'border-gold/50' : ''
       }`}
       data-claim-id={claim.id}
       data-claim-unread={unread ? '1' : '0'}
@@ -144,15 +144,15 @@ export function ClaimCard({
       )}
 
       <span className="mt-3 pt-3 border-t border-zinc-800/80 flex items-center gap-2 min-h-[28px]" data-claim-open-thread={claim.id}>
-        <MessageSquare aria-hidden="true" className="w-4 h-4 text-[#BAA369] shrink-0" />
-        <span className="text-[13px] font-bold text-[#BAA369] whitespace-nowrap">{s.openThread}</span>
+        <MessageSquare aria-hidden="true" className="w-4 h-4 text-gold shrink-0" />
+        <span className="text-[13px] font-bold text-gold whitespace-nowrap">{s.openThread}</span>
         {claim.message_count !== undefined && (
           <span className="text-[12px] text-zinc-500 tabular-nums truncate">· {s.messagesCount(count, fmtInt(count, lang))}</span>
         )}
         <span className="ms-auto flex items-center gap-2 shrink-0">
           {unread && (
             <span
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#BAA369] text-black text-[11px] font-bold whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-gold text-accent-contrast text-[11px] font-bold whitespace-nowrap"
               data-claim-new-reply={claim.id}
             >
               <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-black/70" />

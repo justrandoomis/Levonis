@@ -200,8 +200,8 @@ export default function Home() {
      * `overflow-x: clip` lets a rail run to both screen edges without a
      * horizontal scrollbar — CLIP, not hidden: hidden would make this a
      * scroll container and silently kill `position: sticky` inside the page.
-     * `data-home-v2` is what lets the bottom bar's fade take the ivory ground
-     * (src/index.css).
+     * `data-home-v2` marks the page for the browser harness
+     * (scripts/e2e-home-v2-shots.mjs).
      */
     <div data-home-v2 className="w-full overflow-x-clip bg-black text-zinc-300">
       <Hero banners={heroBanners} loading={initialLoading} />
@@ -226,26 +226,27 @@ export default function Home() {
           <div aria-hidden="true" className="h-4" />
         )}
 
-        {/* THE WARM LIGHT HALF. An ivory sheet that rises over the black one
-            with the same corner radius, so the change of ground reads as a
-            second surface arriving rather than as a colour switch. */}
-        <div className="rounded-t-[24px] bg-ivory pb-8 pt-5 text-ink lg:rounded-t-[32px] lg:pt-10">
+        {/* The sections below the ticker sit on the page's own ground — ivory
+            in the light theme, black in the dark one (src/index.css, THE TWO
+            THEMES). Homepage v2 forced ivory here inside an otherwise black
+            app; the owner asked for one theme everywhere instead. */}
+        <div className="rounded-t-[24px] bg-canvas pb-8 pt-5 text-text-primary lg:rounded-t-[32px] lg:pt-10">
           <div className="mx-auto flex max-w-[1200px] flex-col gap-8 px-4 sm:px-6 lg:gap-14 lg:px-8">
             {initialLoading ? (
               <div aria-hidden="true" className="flex flex-col gap-8">
-                <div className="h-[188px] rounded-2xl bg-[#e8e3da] animate-pulse motion-reduce:animate-none sm:h-[240px] lg:h-[380px]" />
-                <div className="h-[128px] rounded-2xl bg-[#e8e3da] animate-pulse motion-reduce:animate-none" />
+                <div className="h-[188px] rounded-2xl bg-zinc-800 animate-pulse motion-reduce:animate-none sm:h-[240px] lg:h-[380px]" />
+                <div className="h-[128px] rounded-2xl bg-zinc-800 animate-pulse motion-reduce:animate-none" />
               </div>
             ) : null}
 
             {!initialLoading && loadError != null ? (
-              <div className="rounded-2xl bg-charcoal">
+              <div className="rounded-2xl bg-surface">
                 <ErrorState error={loadError} onRetry={fetchHome} />
               </div>
             ) : null}
 
             {catalogueEmpty ? (
-              <div className="rounded-2xl bg-charcoal">
+              <div className="rounded-2xl bg-surface">
                 <EmptyState
                   icon={<PackageSearch aria-hidden="true" className="w-6 h-6" />}
                   title={loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا هیچ بەرهەمێک نییە')}

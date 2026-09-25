@@ -1,21 +1,19 @@
 #!/usr/bin/env node
 /**
- * THE PAGES STAY DARK WHEN THE PHONE IS SET TO LIGHT.
+ * THE PAGE FOLLOWS THE APP'S THEME, NOT THE PHONE'S.
  *
  * «صفحة المحادثات + صفحة الحساب بال light mode حل المشكلة.»
  *
- * There is no light theme in this app — `html` is pinned `color-scheme: dark`
- * and `#0b0c0f`, and every shared component is tokenised for that one ground.
- * /chats and /profile were the only two pages written as a hand-rolled
- * light/dark PAIR, and Tailwind v4 with no config compiles `dark:` to
- * `@media (prefers-color-scheme: dark)`. On a phone set to LIGHT the dark half
- * evaporated: the two pages repainted themselves cream inside a black app,
- * with every shared component still painting dark on top of them.
+ * The original defect: /chats followed the OS (`dark:` compiles to
+ * `@media (prefers-color-scheme: dark)`) inside an app that did not, so a
+ * phone set to light painted a cream page inside a black app. The app now has
+ * two themes chosen in Settings → «المظهر» and switched by `data-theme`
+ * (src/index.css, THE TWO THEMES). This renders the page under all four
+ * combinations of OS setting and chosen theme and proves the ground, the text
+ * and every large surface follow the CHOSEN theme.
  *
  * WHY THE BROWSER. A source test can prove no `dark:` class survives. Only a
- * render under an EMULATED light preference proves the page is dark for the
- * person holding the phone — and that emulation is the entire defect, so a
- * test that cannot set it cannot see the bug.
+ * render under an EMULATED preference proves the page ignores it.
  *
  * Run: node scripts/e2e-light-mode.mjs   (a vite dev server on :4178)
  */
@@ -49,36 +47,50 @@ const luminance = (rgb) => {
   return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
 };
 
-async function run(scheme) {
+async function run(scheme, theme) {
   const browser = await chromium.launch();
   const page = await browser.newPage({
     viewport: { width: 390, height: 844 },
     colorScheme: scheme,
     deviceScaleFactor: 2,
   });
-  await page.goto(base, { waitUntil: 'networkidle' });
+  await page.goto(`${base}?theme=${theme}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-page="chats"]');
   await page.waitForTimeout(150);
 
-  await check(`${scheme}: the page ground is dark, not cream`, async () => {
-    const bg = await page.$eval('[data-page="chats"] > div', (el) => getComputedStyle(el).backgroundColor);
+  const dark = theme === 'dark';
+  const tag = `OS ${scheme}, theme ${theme}`;
+  await check(`${tag}: the page ground is the chosen theme's`, async () => {
+    const bg = await page.$eval('[data-page="chats"] > div', (el) => {
+      const ctx = document.createElement('canvas').getContext('2d');
+      ctx.fillStyle = getComputedStyle(el).backgroundColor;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+      return `rgb(${r}, ${g}, ${b})`;
+    });
     const l = luminance(bg);
     assert.ok(
-      l < 0.08,
-      `the /chats ground is ${bg} (luminance ${l.toFixed(3)}) — a light page inside a black app is the defect`
+      dark ? l < 0.08 : l > 0.7,
+      `the /chats ground is ${bg} (luminance ${l.toFixed(3)}) under ${tag} — it followed something other than the choice`
     );
-    notes.push(`     ${scheme}: ground ${bg}, luminance ${l.toFixed(3)}`);
+    notes.push(`     ${tag}: ground ${bg}, luminance ${l.toFixed(3)}`);
   });
 
-  await check(`${scheme}: the text on it is light, so it can be read`, async () => {
+  await check(`${tag}: the text on it can be read`, async () => {
     const heading = await page.$('[data-page="chats"] h1');
     assert.ok(heading, 'the page still has its heading');
-    const colour = await heading.evaluate((el) => getComputedStyle(el).color);
+    const colour = await heading.evaluate((el) => {
+      const ctx = document.createElement('canvas').getContext('2d');
+      ctx.fillStyle = getComputedStyle(el).color;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+      return `rgb(${r}, ${g}, ${b})`;
+    });
     const l = luminance(colour);
-    assert.ok(l > 0.5, `the heading is ${colour} (luminance ${l.toFixed(3)}) — dark text on a dark ground`);
+    assert.ok(dark ? l > 0.5 : l < 0.05, `the heading is ${colour} (luminance ${l.toFixed(3)}) under ${tag}`);
   });
 
-  await check(`${scheme}: no large SURFACE on the page is light`, async () => {
+  await check(`${tag}: no large SURFACE belongs to the other theme`, async () => {
     // The grey block in the owner's screenshot was a shared, tokenised
     // component landing on a page that had repainted itself cream, so it is
     // not enough for the ROOT to be dark: nothing drawn on it may be a light
@@ -88,12 +100,23 @@ async function run(scheme) {
     // gold CTA with black text is this site's primary button on every screen
     // and a brand accent is not the defect. The defect was pages and panels
     // painting cream.
-    const light = await page.$$eval('[data-page="chats"] *', (els) =>
-      els
+    const light = await page.$$eval('[data-page="chats"] *', (els, isDark) => {
+      // Computed colours come back as oklab()/color-mix() for the tokens, so
+      // each is painted on a 1px canvas and read back as sRGB.
+      const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+      const toRgba = (c) => {
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = '#000';
+        ctx.fillStyle = c;
+        ctx.fillRect(0, 0, 1, 1);
+        const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+        return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
+      };
+      return els
         .map((el) => {
           const r = el.getBoundingClientRect();
           return {
-            bg: getComputedStyle(el).backgroundColor,
+            bg: toRgba(getComputedStyle(el).backgroundColor),
             area: r.width * r.height,
             // A CONTROL IS NOT A GROUND. The site's primary button is gold
             // with black text on every screen; flagging it would be flagging
@@ -109,20 +132,23 @@ async function run(scheme) {
           if (!m) return false;
           const [r, g, b, a = '1'] = m.map(Number);
           if (a < 0.5) return false; // a wash over a dark ground stays dark
-          return 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255) > 0.45;
+          const l = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
+          return isDark ? l > 0.45 : l < 0.3;
         })
-        .map(({ cls, bg }) => `${bg}  ${cls.slice(0, 80)}`)
-    );
-    assert.deepEqual(light, [], `light surfaces painted on a dark page:\n${light.join('\n')}`);
+        .map(({ cls, bg }) => `${bg}  ${cls.slice(0, 80)}`);
+    }, dark);
+    assert.deepEqual(light, [], `surfaces of the other theme painted on the page (${tag}):\n${light.join('\n')}`);
   });
 
-  await page.screenshot({ path: `${out}/chats-${scheme}.png`, fullPage: true });
+  await page.screenshot({ path: `${out}/chats-os-${scheme}-theme-${theme}.png`, fullPage: true });
   await browser.close();
 }
 
-// LIGHT FIRST — it is the broken case, so it fails fastest.
-await run('light');
-await run('dark');
+// The OS disagreeing with the choice first — that is the original defect.
+await run('light', 'dark');
+await run('dark', 'light');
+await run('light', 'light');
+await run('dark', 'dark');
 
 await writeFile(`${out}/proof.txt`, notes.join('\n') + '\n');
 console.log(`\n${cases} checks passed. Screenshots and notes in ${out}`);

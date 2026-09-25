@@ -1377,7 +1377,7 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
             className={`w-11 h-[26px] rounded-full shrink-0 relative transition-colors ${f.paused ? 'bg-amber-500' : 'bg-white/10'}`}
           >
             <span
-              className={`absolute top-[3px] w-5 h-5 rounded-full bg-white transition-all ${f.paused ? 'start-[23px]' : 'start-[3px]'}`}
+              className={`absolute top-[3px] w-5 h-5 rounded-full bg-snow shadow-1 transition-all ${f.paused ? 'start-[23px]' : 'start-[3px]'}`}
             />
           </span>
           <span className="min-w-0">

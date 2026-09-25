@@ -157,7 +157,7 @@ export function CommunityClosedCard({ onRecheck }: { onRecheck?: () => void } = 
             <button
               type="button"
               onClick={() => navigate(`/auth?next=${encodeURIComponent(next)}`)}
-              className="min-h-[44px] rounded-full bg-gold px-5 text-[13px] font-bold text-black active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="min-h-[44px] rounded-full bg-gold px-5 text-[13px] font-bold text-accent-contrast active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               data-community-closed-signin
             >
               {t('signIn')}

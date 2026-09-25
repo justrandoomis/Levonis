@@ -23,7 +23,7 @@ export default function StatusHairline({
     <div aria-hidden="true" data-status-hairline className="absolute inset-x-0 top-0 flex h-px bg-zinc-800/70">
       <span
         className={`block h-full transition-[width] duration-500 ease-out motion-reduce:transition-none ${
-          cancelled ? 'bg-red-500/45' : 'bg-[#BAA369]'
+          cancelled ? 'bg-red-500/45' : 'bg-gold'
         }`}
         style={{ width: `${pct}%` }}
       />

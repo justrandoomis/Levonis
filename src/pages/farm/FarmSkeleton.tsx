@@ -8,7 +8,7 @@ import { Skeleton, SkeletonGroup } from '../../components/ui/Skeleton';
  */
 export default function FarmSkeleton() {
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col bg-[#0a0a0a]" data-farm-skeleton>
+    <div className="w-full flex-1 min-h-0 flex flex-col bg-black" data-farm-skeleton>
       <SkeletonGroup className="flex-1 min-h-0 flex flex-col">
         <div className="h-[56px] px-4 flex items-center gap-3 border-b border-zinc-900" aria-hidden="true">
           <Skeleton className="w-9 h-9 rounded-full" />
@@ -32,7 +32,7 @@ export default function FarmSkeleton() {
 /** The hub / leaderboard / profile pages while their chunk loads. */
 export function GamesPageSkeleton() {
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col bg-[#0a0a0a]">
+    <div className="w-full flex-1 min-h-0 flex flex-col bg-black">
       <SkeletonGroup>
         <div className="h-[56px] px-4 flex items-center gap-3 border-b border-zinc-900" aria-hidden="true">
           <Skeleton className="w-9 h-9 rounded-full" />

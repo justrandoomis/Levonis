@@ -152,7 +152,7 @@ export default function RoundingDriftTool() {
         </p>
       )}
       {done && (
-        <p className="mt-4 flex items-center gap-2 text-sm font-bold text-[#2CE59B]" role="status">
+        <p className="mt-4 flex items-center gap-2 text-sm font-bold text-mint" role="status">
           <CheckCircle2 className="h-4 w-4" /> {done}
         </p>
       )}
@@ -209,7 +209,7 @@ export default function RoundingDriftTool() {
                       </td>
                       <td className="py-2 pe-3 tabular-nums text-zinc-300">{formatIqd(m.balance_iqd)}</td>
                       <td className="py-2 tabular-nums">
-                        <span className={`font-black ${m.apply_iqd > 0 ? 'text-[#2CE59B]' : m.apply_iqd < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+                        <span className={`font-black ${m.apply_iqd > 0 ? 'text-mint' : m.apply_iqd < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
                           {signed(m.apply_iqd)}
                         </span>
                         {m.capped && (

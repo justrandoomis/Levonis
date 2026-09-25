@@ -76,7 +76,7 @@ export default function AdminAds() {
         </h2>
         <div className="flex items-center gap-3">
           {saveState === 'saved' && (
-            <span className="text-xs font-bold text-[#2CE59B] flex items-center gap-1">
+            <span className="text-xs font-bold text-mint flex items-center gap-1">
               <Check className="w-3.5 h-3.5" /> {dir === 'rtl' ? 'تم الحفظ' : 'Saved'}
             </span>
           )}
@@ -91,7 +91,7 @@ export default function AdminAds() {
           <button
             onClick={handleSave}
             disabled={saveState === 'saving'}
-            className="flex items-center gap-2 bg-[#6B46FF] hover:bg-[#5A38E6] text-white px-5 py-2.5 rounded-full transition-all font-bold shadow-[0_4px_12px_rgba(107,70,255,0.4)] hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+            className="flex items-center gap-2 bg-[#6B46FF] hover:bg-iris-deep text-snow px-5 py-2.5 rounded-full transition-all font-bold shadow-[0_4px_12px_rgba(107,70,255,0.4)] hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
           >
             <Save className="w-4 h-4" /> {saveState === 'saving' ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : dir === 'rtl' ? 'حفظ' : 'Save'}
           </button>
@@ -116,13 +116,13 @@ export default function AdminAds() {
                 type="text"
                 value={ad.text}
                 onChange={(e) => updateAd(ad.id, 'text', e.target.value)}
-                className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:border-[#6B46FF] outline-none"
+                className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:border-iris outline-none"
                 placeholder={dir === 'rtl' ? 'النص...' : 'Text...'}
               />
               <select
                 value={ad.animation}
                 onChange={(e) => updateAd(ad.id, 'animation', e.target.value)}
-                className="bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:border-[#6B46FF] outline-none"
+                className="bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:border-iris outline-none"
               >
                 <option value="true_focus">True Focus</option>
               </select>

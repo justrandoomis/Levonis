@@ -437,7 +437,7 @@ export function MediaPicker({
                   >
                     <MediaThumb value={m.key} kind={kind} className="h-full w-full" />
                     {on && (
-                      <span className="absolute end-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-black">
+                      <span className="absolute end-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-accent-contrast">
                         <Check className="h-3.5 w-3.5" aria-hidden="true" />
                       </span>
                     )}

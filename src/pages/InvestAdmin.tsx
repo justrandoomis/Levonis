@@ -111,7 +111,7 @@ export default function InvestAdmin() {
               <div>
                 <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
                   {u.name || u.username || u.email}
-                  {!!u.is_investor && <span className="bg-gold text-black text-xs px-2 py-1 rounded font-bold">Investor</span>}
+                  {!!u.is_investor && <span className="bg-gold text-accent-contrast text-xs px-2 py-1 rounded font-bold">Investor</span>}
                 </h2>
                 <p className="text-zinc-400">{u.email}</p>
               </div>
@@ -254,7 +254,7 @@ function AdminInvestments({ user, investments, items, loadData }: {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Investments for {user.name || user.username || user.email}</h2>
-        <button onClick={() => setShowAdd(true)} className="bg-gold text-black px-4 py-2 rounded-lg font-bold flex items-center">
+        <button onClick={() => setShowAdd(true)} className="bg-gold text-accent-contrast px-4 py-2 rounded-lg font-bold flex items-center">
           <Plus className="w-5 h-5 mr-1" /> New Investment
         </button>
       </div>
@@ -274,7 +274,7 @@ function AdminInvestments({ user, investments, items, loadData }: {
             <input type="number" min="1" value={duration} onChange={e => setDuration(e.target.value)} className="w-full bg-zinc-900 p-3 rounded-lg text-white" />
           </div>
           <div className="flex items-end gap-2">
-            <button onClick={handleAdd} disabled={busy} className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-6 py-3 rounded-lg font-bold flex-1">Save</button>
+            <button onClick={handleAdd} disabled={busy} className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-snow px-6 py-3 rounded-lg font-bold flex-1">Save</button>
             <button onClick={() => setShowAdd(false)} className="bg-zinc-700 hover:bg-zinc-600 text-white px-6 py-3 rounded-lg font-bold">Cancel</button>
           </div>
         </div>
@@ -424,7 +424,7 @@ function AdminInvestmentDetails({ inv, items, onBack, loadData }: {
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
-          <button onClick={updateInvestment} disabled={busy} className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-6 py-3 rounded-lg font-bold col-span-2">Save Changes</button>
+          <button onClick={updateInvestment} disabled={busy} className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-snow px-6 py-3 rounded-lg font-bold col-span-2">Save Changes</button>
         </div>
       ) : (
         <div className="bg-zinc-800 p-6 rounded-xl mb-6 flex gap-8 flex-wrap">
@@ -461,7 +461,7 @@ function AdminInvestmentDetails({ inv, items, onBack, loadData }: {
           <label className="block text-sm text-zinc-400 mb-1">Image URL (optional)</label>
           <input type="text" value={image} onChange={e => setImage(e.target.value)} className="w-full bg-zinc-900 p-3 rounded-lg text-white" />
         </div>
-        <button onClick={addItem} disabled={busy} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-3 rounded-lg font-bold col-span-2">Add Item</button>
+        <button onClick={addItem} disabled={busy} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-snow px-6 py-3 rounded-lg font-bold col-span-2">Add Item</button>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -512,7 +512,7 @@ function AdminChat({ user, messages, loadData }: {
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
         {messages.length === 0 && <div className="self-center text-xs text-zinc-500 my-2">No messages yet.</div>}
         {messages.map(m => (
-          <div key={m.id} className={`max-w-[80%] p-3 rounded-2xl ${m.sender === 'admin' ? 'bg-gold text-black self-end rounded-tr-sm' : 'bg-zinc-800 text-white self-start rounded-tl-sm'}`}>
+          <div key={m.id} className={`max-w-[80%] p-3 rounded-2xl ${m.sender === 'admin' ? 'bg-gold text-accent-contrast self-end rounded-tr-sm' : 'bg-zinc-800 text-white self-start rounded-tl-sm'}`}>
             {m.message}
           </div>
         ))}
@@ -526,7 +526,7 @@ function AdminChat({ user, messages, loadData }: {
           onChange={e => setText(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && send()}
         />
-        <button onClick={send} disabled={sending || !text.trim()} className="bg-gold text-black px-6 font-bold rounded-lg disabled:opacity-50">Send</button>
+        <button onClick={send} disabled={sending || !text.trim()} className="bg-gold text-accent-contrast px-6 font-bold rounded-lg disabled:opacity-50">Send</button>
       </div>
     </div>
   );

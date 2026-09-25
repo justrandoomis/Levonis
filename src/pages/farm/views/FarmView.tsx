@@ -86,9 +86,9 @@ export default function FarmView({
       </section>
 
       {showIntro && (
-        <section className={`${PANEL} p-4 space-y-3 border-[#BAA369]/30`} data-farm-intro aria-labelledby="farm-intro-title">
+        <section className={`${PANEL} p-4 space-y-3 border-gold/30`} data-farm-intro aria-labelledby="farm-intro-title">
           <h2 id="farm-intro-title" className="flex items-center gap-2 text-white font-bold text-[15px]">
-            <Sparkles aria-hidden="true" className="w-4 h-4 text-[#BAA369]" />
+            <Sparkles aria-hidden="true" className="w-4 h-4 text-gold" />
             {s.title}
           </h2>
           <ol className="space-y-1.5 text-[13px] text-zinc-300 leading-relaxed list-none">
@@ -162,7 +162,7 @@ function MachineCard({
   let timeline: React.ReactNode = null;
   if (failedBatch && current) {
     timeline = (
-      <div className="text-[12px] text-[#E06070] font-bold">
+      <div className="text-[12px] text-coral font-bold">
         {s.batchFailed(current.failure_kind ? s.failureKinds[current.failure_kind] ?? current.failure_kind : s.failures)}
       </div>
     );
@@ -178,7 +178,7 @@ function MachineCard({
             </span>{' '}
             {nameOf(current.title, lang)}
           </span>
-          <span className="text-[#BAA369] font-bold tabular-nums shrink-0" data-farm-duration="countdown">
+          <span className="text-gold font-bold tabular-nums shrink-0" data-farm-duration="countdown">
             {end === null ? '' : countdown(end - now, lang)}
           </span>
         </div>
@@ -189,8 +189,8 @@ function MachineCard({
     const end = ms(p.state_until);
     timeline = (
       <div className="flex items-baseline justify-between gap-3 text-[12px]">
-        <span className="text-[#E4B363]">{s.underMaintenance}</span>
-        <span className="text-[#E4B363] font-bold tabular-nums" data-farm-duration="countdown">
+        <span className="text-honey">{s.underMaintenance}</span>
+        <span className="text-honey font-bold tabular-nums" data-farm-duration="countdown">
           {end === null ? '' : countdown(end - now, lang)}
         </span>
       </div>
@@ -204,11 +204,11 @@ function MachineCard({
           </span>{' '}
           {nameOf(current.title, lang)}
         </span>
-        <span className="text-[#A6B283] font-bold shrink-0">{s.readyToCollect}</span>
+        <span className="text-sage font-bold shrink-0">{s.readyToCollect}</span>
       </div>
     );
   } else if (p.state === 'broken') {
-    timeline = <div className="text-[12px] text-[#E06070] font-bold">{s.awaitingRepair}</div>;
+    timeline = <div className="text-[12px] text-coral font-bold">{s.awaitingRepair}</div>;
   }
 
   // The one primary action a machine offers from the card.
@@ -270,7 +270,7 @@ function MachineCard({
           </span>
         </div>
         <HealthBar health={p.health} label={s.healthPct(Math.round(p.health))} />
-        {recommend && <p className="text-[11px] text-[#E4B363]">{s.maintenanceRecommended}</p>}
+        {recommend && <p className="text-[11px] text-honey">{s.maintenanceRecommended}</p>}
       </div>
 
       <div className="flex items-baseline justify-between gap-3 text-[11px]">

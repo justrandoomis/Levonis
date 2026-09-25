@@ -41,7 +41,7 @@ const EMPTY: ConditionEntry = {
 };
 
 const INPUT =
-  'w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-[#6B46FF] outline-none min-h-[44px]';
+  'w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-iris outline-none min-h-[44px]';
 
 export function ConditionSection({
   condition,

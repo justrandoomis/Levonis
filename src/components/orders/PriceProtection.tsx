@@ -137,7 +137,7 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
   return (
     <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4" aria-labelledby="pp-title" data-price-protection>
       <h3 id="pp-title" className="text-white font-bold text-[14px] inline-flex items-center gap-1.5">
-        <ShieldCheck className="w-4 h-4 text-[#BAA369]" aria-hidden />
+        <ShieldCheck className="w-4 h-4 text-gold" aria-hidden />
         {s.title}
       </h3>
       <p className="text-zinc-500 text-[12px] mt-1 leading-relaxed">{s.intro}</p>
@@ -155,7 +155,7 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
         {loadState === 'failed' && (
           <p className="text-red-400 text-[12px]">
             {s.loadError}{' '}
-            <button type="button" onClick={load} className="underline font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded">
+            <button type="button" onClick={load} className="underline font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded">
               {s.retry}
             </button>
           </p>
@@ -208,7 +208,7 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
                     onClick={() => claimFor(it.id)}
                     disabled={busyItem !== null || !it.product_id}
                     data-pp-claim-item={it.id}
-                    className="shrink-0 inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border border-zinc-700 text-zinc-200 text-[12px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-50"
+                    className="shrink-0 inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border border-zinc-700 text-zinc-200 text-[12px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
                   >
                     {busyItem === it.id && <Spinner size="xs" delayMs={0} decorative />}
                     {busyItem === it.id ? s.claiming : s.claim}

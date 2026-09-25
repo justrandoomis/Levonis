@@ -120,8 +120,8 @@ export default function LatestProducts({
                 className="group inline-flex min-h-11 shrink-0 items-center focus-visible:outline-none"
               >
                 <span
-                  className={`inline-flex h-8 items-center rounded-full px-3.5 text-[12.5px] font-semibold transition-colors group-focus-visible:ring-2 group-focus-visible:ring-gold-muted ${
-                    on ? 'bg-ink text-ivory' : 'border border-hairline bg-paper text-ink-2 group-hover:border-[#cfc8bb] group-hover:text-ink'
+                  className={`inline-flex h-8 items-center rounded-full px-3.5 text-[12.5px] font-semibold transition-colors group-focus-visible:ring-2 group-focus-visible:ring-focus ${
+                    on ? 'bg-white text-black' : 'border border-border-subtle bg-surface text-text-secondary group-hover:border-zinc-700 group-hover:text-text-primary'
                   }`}
                 >
                   {label[c.id]}
@@ -152,14 +152,14 @@ export default function LatestProducts({
             ))}
       </div>
       {!waiting && products.length === 0 ? (
-        <div className="flex flex-col items-center gap-1 py-5 text-center text-[13px] text-ink-2">
+        <div className="flex flex-col items-center gap-1 py-5 text-center text-[13px] text-text-secondary">
           {failed[active] ? (
             <>
               <p>{loc('تعذر تحميل هذا القسم الآن.', 'This section could not be loaded right now.')}</p>
               <button
                 type="button"
                 onClick={() => setFailed((prev) => ({ ...prev, [active]: false }))}
-                className="min-h-11 rounded-lg px-3 font-semibold text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted"
+                className="min-h-11 rounded-lg px-3 font-semibold text-text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 {loc('إعادة المحاولة', 'Retry', 'دووبارە هەوڵ بدەوە')}
               </button>

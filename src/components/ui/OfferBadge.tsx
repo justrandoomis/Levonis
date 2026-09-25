@@ -34,7 +34,7 @@ export default function OfferBadge({
   const latin = LATIN_ONLY.test(text);
 
   const tones: Record<string, string> = {
-    sale: 'bg-rose-600/95 text-white',
+    sale: 'bg-rose-600/95 text-snow',
     saving: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
     member: 'bg-gold/15 text-gold border border-gold/30',
   };

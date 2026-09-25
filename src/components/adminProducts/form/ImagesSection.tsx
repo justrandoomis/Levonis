@@ -616,7 +616,7 @@ export function ImagesSection({
                 dragFrom.current = null;
               }}
               className={`min-w-0 rounded-lg border overflow-hidden ${
-                img.is_primary ? 'border-[#6B46FF]' : 'border-zinc-800'
+                img.is_primary ? 'border-iris' : 'border-zinc-800'
               } bg-zinc-900/60`}
             >
               <div className="relative aspect-square bg-black/40">
@@ -640,7 +640,7 @@ export function ImagesSection({
                   onStatus={(st) => noteStatus(img.id, st)}
                 />
                 {img.is_primary && (
-                  <span className="absolute top-1 start-1 bg-[#6B46FF] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                  <span className="absolute top-1 start-1 bg-[#6B46FF] text-snow text-[10px] font-bold px-1.5 py-0.5 rounded">
                     رئيسية
                   </span>
                 )}
@@ -663,7 +663,7 @@ export function ImagesSection({
                     aria-label="اجعلها رئيسية"
                     title="اجعلها رئيسية"
                   >
-                    <Star className={`w-4 h-4 ${img.is_primary ? 'fill-[#6B46FF] text-[#6B46FF]' : ''}`} />
+                    <Star className={`w-4 h-4 ${img.is_primary ? 'fill-iris text-iris' : ''}`} />
                   </button>
                   <button type="button" onClick={() => move(idx, idx - 1)} className={iconBtn} aria-label="للأعلى">
                     <ArrowUp className="w-4 h-4" />

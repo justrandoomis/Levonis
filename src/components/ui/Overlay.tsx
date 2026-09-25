@@ -199,7 +199,7 @@ function Scrim({ onClose, label, visible }: { onClose?: () => void; label: strin
       tabIndex={-1}
       onClick={onClose}
       data-overlay-scrim
-      className="no-press absolute inset-0 bg-black/70 backdrop-blur-[3px] cursor-default"
+      className="no-press lv-scrim absolute inset-0 backdrop-blur-[3px] cursor-default"
       initial={{ opacity: 0 }}
       animate={{ opacity: visible ? 1 : 0 }}
       exit={{ opacity: 0 }}

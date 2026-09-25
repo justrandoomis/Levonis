@@ -54,7 +54,7 @@ const TILE =
 function LargeTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
   const { loc } = useLanguage();
   return (
-    <Link to={tile.to} data-bento-tile={tile.id} className={`${TILE} h-full`}>
+    <Link to={tile.to} data-bento-tile={tile.id} data-theme="dark" className={`${TILE} h-full`}>
       <PromoPhoto
         src={tile.image}
         crop={isProductPhoto(tile)}
@@ -78,7 +78,7 @@ function LargeTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
 
 function WideTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
   return (
-    <Link to={tile.to} data-bento-tile={tile.id} className={`${TILE} h-full`}>
+    <Link to={tile.to} data-bento-tile={tile.id} data-theme="dark" className={`${TILE} h-full`}>
       <PromoPhoto
         src={tile.image}
         crop={isProductPhoto(tile)}
@@ -89,7 +89,7 @@ function WideTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
       <div className="relative flex h-full max-w-[58%] flex-col justify-start p-2.5 lg:p-5">
         <h3 className="text-[13px] font-bold leading-5 text-ivory lg:text-[19px] lg:leading-7">{copy.title}</h3>
         {copy.caption ? (
-          <p className="text-[11px] leading-4 text-[#a9acb3] lg:mt-0.5 lg:text-[13px] lg:leading-5">{copy.caption}</p>
+          <p className="text-[11px] leading-4 text-text-secondary lg:mt-0.5 lg:text-[13px] lg:leading-5">{copy.caption}</p>
         ) : null}
       </div>
     </Link>
@@ -98,7 +98,7 @@ function WideTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
 
 function CompactTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
   return (
-    <Link to={tile.to} data-bento-tile={tile.id} className={`${TILE} h-full`}>
+    <Link to={tile.to} data-bento-tile={tile.id} data-theme="dark" className={`${TILE} h-full`}>
       <PromoPhoto
         src={tile.image}
         crop={isProductPhoto(tile)}

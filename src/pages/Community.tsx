@@ -488,7 +488,7 @@ export default function Community() {
               <button
                 onClick={submitNewRequest}
                 disabled={reqTitle.trim().length < 3 || reqSubmitting}
-                className="w-full bg-olive text-black font-bold py-3 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                className="w-full bg-olive text-snow font-bold py-3 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
               >
                 {reqSubmitting ? (dir === 'rtl' ? 'جارٍ الإرسال...' : 'Submitting...') : (dir === 'rtl' ? 'إرسال الطلب' : 'Submit Request')}
               </button>

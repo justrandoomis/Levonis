@@ -524,7 +524,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                           data-warranty-serial={u.id}
                           onChange={(e) => setDraft(u.id, { serial: e.target.value })}
                           placeholder={t.serialPlaceholder}
-                          className="flex-1 min-w-0 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white font-mono focus:border-[#6B46FF] focus:outline-none"
+                          className="flex-1 min-w-0 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white font-mono focus:border-iris focus:outline-none"
                         />
                         <button
                           type="button"
@@ -551,7 +551,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                             value={d.months}
                             data-warranty-months={u.id}
                             onChange={(e) => setDraft(u.id, { months: e.target.value })}
-                            className="w-20 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-[#6B46FF] focus:outline-none"
+                            className="w-20 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-iris focus:outline-none"
                           />
                         </label>
                         <label className="block">
@@ -562,7 +562,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                             value={d.start}
                             data-warranty-start={u.id}
                             onChange={(e) => setDraft(u.id, { start: e.target.value })}
-                            className="min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-[#6B46FF] focus:outline-none"
+                            className="min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-iris focus:outline-none"
                           />
                         </label>
                         <button
@@ -571,7 +571,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                           disabled={!u.serial || busy(`gen:${u.id}`)}
                           title={!u.serial ? t.needSerial : undefined}
                           data-warranty-generate={u.id}
-                          className="self-end inline-flex items-center gap-1.5 min-h-10 px-3.5 rounded-lg bg-[#6B46FF] hover:bg-[#5a3ae0] text-white text-[12px] font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="self-end inline-flex items-center gap-1.5 min-h-10 px-3.5 rounded-lg bg-[#6B46FF] hover:bg-iris-deep text-snow text-[12px] font-bold disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {busy(`gen:${u.id}`) ? (
                             <RefreshCw className="w-4 h-4 animate-spin" aria-hidden />
@@ -673,7 +673,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                             value={duration.base}
                             data-warranty-base={u.id}
                             onChange={(e) => setDuration((d) => ({ ...d, base: e.target.value }))}
-                            className="w-24 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-[#6B46FF] focus:outline-none"
+                            className="w-24 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-iris focus:outline-none"
                           />
                         </label>
                         <label className="block">
@@ -686,7 +686,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                             value={duration.ext}
                             data-warranty-ext={u.id}
                             onChange={(e) => setDuration((d) => ({ ...d, ext: e.target.value }))}
-                            className="w-24 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-[#6B46FF] focus:outline-none"
+                            className="w-24 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-iris focus:outline-none"
                           />
                         </label>
                       </div>
@@ -699,7 +699,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                           value={duration.reason}
                           data-warranty-reason={u.id}
                           onChange={(e) => setDuration((d) => ({ ...d, reason: e.target.value }))}
-                          className="w-full bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 py-2 text-[13px] text-white focus:border-[#6B46FF] focus:outline-none resize-none"
+                          className="w-full bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 py-2 text-[13px] text-white focus:border-iris focus:outline-none resize-none"
                         />
                       </label>
                       {duration.shorter && (
@@ -713,7 +713,7 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                           onClick={() => void saveDuration(u)}
                           disabled={busy(`dur:${u.id}`)}
                           data-warranty-save-duration={u.id}
-                          className="inline-flex items-center gap-1.5 min-h-10 px-3.5 rounded-lg bg-[#6B46FF] hover:bg-[#5a3ae0] text-white text-[12px] font-bold disabled:opacity-40"
+                          className="inline-flex items-center gap-1.5 min-h-10 px-3.5 rounded-lg bg-[#6B46FF] hover:bg-iris-deep text-snow text-[12px] font-bold disabled:opacity-40"
                         >
                           {busy(`dur:${u.id}`) ? <RefreshCw className="w-4 h-4 animate-spin" aria-hidden /> : <ShieldCheck className="w-4 h-4" aria-hidden />}
                           {duration.shorter ? t.shorterConfirm : t.saveDuration}

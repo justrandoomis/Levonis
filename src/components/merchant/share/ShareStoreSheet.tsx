@@ -38,7 +38,7 @@ export default function ShareStoreSheet({
       solid
       z={210}
       testId="share-store"
-      panelClassName="w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-[#141518] text-white border border-white/10"
+      panelClassName="w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-zinc-900 text-white border border-white/10"
     >
       <div className="p-4">
         <div className="flex items-center justify-between gap-2 mb-1">
@@ -47,7 +47,7 @@ export default function ShareStoreSheet({
             type="button"
             onClick={onClose}
             aria-label={s.close}
-            className="w-11 h-11 -me-2 flex items-center justify-center rounded-full text-zinc-400 transition-colors hover:text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d2c392]"
+            className="w-11 h-11 -me-2 flex items-center justify-center rounded-full text-zinc-400 transition-colors hover:text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             <X className="w-5 h-5" aria-hidden />
           </button>

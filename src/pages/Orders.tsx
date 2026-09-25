@@ -417,7 +417,7 @@ export default function Orders() {
             type="button"
             onClick={goBack}
             aria-label={s.back}
-            className="w-11 h-11 shrink-0 flex items-center justify-center bg-zinc-900 rounded-full hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-colors"
+            className="w-11 h-11 shrink-0 flex items-center justify-center bg-zinc-900 rounded-full hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
           >
             {dir === 'rtl' ? <ArrowRight className="w-5 h-5" aria-hidden="true" /> : <ArrowLeft className="w-5 h-5" aria-hidden="true" />}
           </button>
@@ -435,14 +435,14 @@ export default function Orders() {
               placeholder={s.searchPlaceholder}
               autoComplete="off"
               data-orders-search
-              className="w-full min-h-[40px] bg-zinc-900 border border-zinc-800 rounded-xl ps-9 pe-10 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#BAA369]/60 focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+              className="w-full min-h-[40px] bg-zinc-900 border border-zinc-800 rounded-xl ps-9 pe-10 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-gold/60 focus-visible:ring-2 focus-visible:ring-gold"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch('')}
                 aria-label={s.clearSearch}
-                className="absolute end-1 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                className="absolute end-1 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
               >
                 <X className="w-4 h-4" aria-hidden="true" />
               </button>
@@ -458,8 +458,8 @@ export default function Orders() {
             onChange={(id) => setFilter(id as Filter)}
             group="orders-status"
             fill={false}
-            indicatorClassName="bg-[#BAA369]"
-            activeClassName="text-[#BAA369] font-bold"
+            indicatorClassName="bg-gold"
+            activeClassName="text-gold font-bold"
             idleClassName="text-zinc-400 hover:text-zinc-200"
             label={s.filterLabel}
             className="min-w-max"
@@ -487,7 +487,7 @@ export default function Orders() {
               type="button"
               onClick={showAllDelivered}
               data-show-all-delivered
-              className="font-bold text-[#BAA369] underline underline-offset-2 hover:text-[#d4c089] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+              className="font-bold text-gold underline underline-offset-2 hover:text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
             >
               {s.showAllDelivered}
             </button>
@@ -497,7 +497,7 @@ export default function Orders() {
         {/* Honest explanation of the returns view: it IS the delivered list. */}
         {filter === 'returns' && !loading && !error && (
           <div className="flex items-start gap-2 bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-3 mb-4 text-xs text-zinc-400 leading-relaxed">
-            <Info className="w-4 h-4 text-[#BAA369] shrink-0 mt-0.5" aria-hidden="true" />
+            <Info className="w-4 h-4 text-gold shrink-0 mt-0.5" aria-hidden="true" />
             <p>{s.returnsNote}</p>
           </div>
         )}
@@ -528,7 +528,7 @@ export default function Orders() {
                     onClick={loadMore}
                     disabled={loadingMore}
                     data-load-more
-                    className="min-h-[44px] px-4 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                    className="min-h-[44px] px-4 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-60 inline-flex items-center justify-center gap-2"
                   >
                     {loadingMore && <Spinner size="sm" delayMs={0} decorative />}
                     {loadingMore ? s.loadingMore : s.loadMore}
@@ -538,7 +538,7 @@ export default function Orders() {
                   type="button"
                   onClick={showAllDelivered}
                   data-show-all-delivered
-                  className="min-h-[44px] px-4 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                  className="min-h-[44px] px-4 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                 >
                   {s.showAllDelivered}
                 </button>
@@ -575,7 +575,7 @@ export default function Orders() {
                 onClick={loadMore}
                 disabled={loadingMore}
                 data-load-more
-                className="min-h-[44px] rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                className="min-h-[44px] rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-60 inline-flex items-center justify-center gap-2"
               >
                 {loadingMore && <Spinner size="sm" delayMs={0} decorative />}
                 {loadingMore ? s.loadingMore : s.loadMore}

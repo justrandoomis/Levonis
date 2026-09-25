@@ -224,7 +224,7 @@ export default function ReorderButton({ items, className = '' }: { items: ApiOrd
         onClick={() => run(false)}
         disabled={busy || items.length === 0}
         data-buy-again
-        className="w-full min-h-[46px] rounded-xl bg-[#ef233c] text-white text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+        className="w-full min-h-[46px] rounded-xl bg-[#ef233c] text-snow text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
       >
         {busy ? <Spinner size="sm" delayMs={0} decorative className="text-white" /> : <RotateCcw className="w-4 h-4" aria-hidden />}
         {busy ? s.adding : s.buyAgain}
@@ -248,7 +248,7 @@ export default function ReorderButton({ items, className = '' }: { items: ApiOrd
               <button
                 type="button"
                 onClick={() => setConflict(null)}
-                className="flex-1 min-h-[40px] rounded-lg border border-zinc-700 text-zinc-200 text-[12.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                className="flex-1 min-h-[40px] rounded-lg border border-zinc-700 text-zinc-200 text-[12.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
               >
                 {s.keep}
               </button>
@@ -277,7 +277,7 @@ export default function ReorderButton({ items, className = '' }: { items: ApiOrd
             {addedAny && (
               <Link
                 to="/cart"
-                className="mt-3 inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg border border-zinc-700 text-zinc-200 text-[12.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                className="mt-3 inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg border border-zinc-700 text-zinc-200 text-[12.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
               >
                 <ShoppingCart className="w-3.5 h-3.5" aria-hidden />
                 {s.goCart}

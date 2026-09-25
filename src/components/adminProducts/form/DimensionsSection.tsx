@@ -9,7 +9,7 @@ import {
 import { Field, Grid, btnGhost } from './formUi';
 
 const INPUT =
-  'w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-[#6B46FF] outline-none min-h-[44px]';
+  'w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-iris outline-none min-h-[44px]';
 
 /** Format a canonical integer without floating-point arithmetic. */
 export function formatScaledInteger(value: number | null, scale: 10 | 1000): string {
@@ -210,7 +210,7 @@ export function DimensionsSection({
           {label ?? 'الأبعاد والوزن / Dimensions & weight'}
         </span>
         <span
-          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${customCount > 0 ? 'border-[#6B46FF]/50 bg-[#6B46FF]/10 text-violet-200' : 'border-zinc-700 bg-zinc-900 text-zinc-500'}`}
+          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${customCount > 0 ? 'border-iris/50 bg-iris/10 text-violet-200' : 'border-zinc-700 bg-zinc-900 text-zinc-500'}`}
           data-dimensions-mode={customCount > 0 ? 'custom' : 'inherit'}
         >
           {customCount > 0 ? `مخصص ${customCount} / custom` : 'موروث / inherit'}

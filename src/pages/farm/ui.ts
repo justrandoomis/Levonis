@@ -15,7 +15,7 @@ export const AMBER_TEXT = '#E4B363';
 export const RED_TEXT = '#E06070';
 
 /** Section panel: hairline rule, no glass. */
-export const PANEL = 'rounded-2xl border border-zinc-800/80 bg-[#101012]';
+export const PANEL = 'rounded-2xl border border-zinc-800/80 bg-black';
 /** Sub-row inside a panel. */
 export const ROW = 'rounded-xl border border-zinc-800/60 bg-zinc-900/40';
 /** Small status chip. */
@@ -27,32 +27,32 @@ export const ICON_BTN = 'inline-flex items-center justify-center min-w-[44px] mi
 
 export const STATE_TEXT: Record<string, string> = {
   idle: 'text-zinc-400',
-  printing: 'text-[#BAA369]',
-  done: 'text-[#A6B283]',
-  maintenance: 'text-[#E4B363]',
-  broken: 'text-[#E06070]',
+  printing: 'text-gold',
+  done: 'text-sage',
+  maintenance: 'text-honey',
+  broken: 'text-coral',
 };
 
 export const STATE_CHIP: Record<string, string> = {
   idle: 'border-zinc-700 text-zinc-300 bg-zinc-800/60',
-  printing: 'border-[#BAA369]/40 text-[#BAA369] bg-[#BAA369]/10',
-  done: 'border-[#A6B283]/40 text-[#A6B283] bg-[#A6B283]/10',
-  maintenance: 'border-[#E4B363]/40 text-[#E4B363] bg-[#E4B363]/10',
-  broken: 'border-[#E06070]/40 text-[#E06070] bg-[#E06070]/10',
+  printing: 'border-gold/40 text-gold bg-gold/10',
+  done: 'border-sage/40 text-sage bg-sage/10',
+  maintenance: 'border-honey/40 text-honey bg-honey/10',
+  broken: 'border-coral/40 text-coral bg-coral/10',
 };
 
 export const JOB_CHIP: Record<string, string> = {
   accepted: 'border-zinc-700 text-zinc-300 bg-zinc-800/60',
-  printing: 'border-[#BAA369]/40 text-[#BAA369] bg-[#BAA369]/10',
-  ready: 'border-[#A6B283]/40 text-[#A6B283] bg-[#A6B283]/10',
-  delivered: 'border-[#A6B283]/40 text-[#A6B283] bg-[#A6B283]/10',
-  late: 'border-[#E4B363]/40 text-[#E4B363] bg-[#E4B363]/10',
-  cancelled: 'border-[#E06070]/40 text-[#E06070] bg-[#E06070]/10',
+  printing: 'border-gold/40 text-gold bg-gold/10',
+  ready: 'border-sage/40 text-sage bg-sage/10',
+  delivered: 'border-sage/40 text-sage bg-sage/10',
+  late: 'border-honey/40 text-honey bg-honey/10',
+  cancelled: 'border-coral/40 text-coral bg-coral/10',
 };
 
 export const URGENCY_CHIP: Record<string, string> = {
-  urgent: 'border-[#E06070]/40 text-[#E06070] bg-[#E06070]/10',
-  tight: 'border-[#E4B363]/40 text-[#E4B363] bg-[#E4B363]/10',
+  urgent: 'border-coral/40 text-coral bg-coral/10',
+  tight: 'border-honey/40 text-honey bg-honey/10',
   relaxed: 'border-zinc-700 text-zinc-400 bg-zinc-800/60',
 };
 

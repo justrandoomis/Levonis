@@ -136,7 +136,7 @@ export default function MerchantStart() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-gold animate-spin" />
       </div>
     );
@@ -171,7 +171,7 @@ export default function MerchantStart() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-32">
+    <div className="min-h-screen bg-black text-zinc-300 pb-32">
       <div className="fixed top-[15%] left-1/2 -translate-x-1/2 w-full max-w-lg h-[500px] bg-olive/15 rounded-full blur-[120px] pointer-events-none z-0" />
 
       <motion.div
@@ -271,7 +271,7 @@ export default function MerchantStart() {
           >
             <option value="">{loc('اختر', 'Select', 'هەڵبژێرە')}</option>
             {GOVERNORATES.map((g) => (
-              <option key={g.id} value={g.id} className="bg-[#0a0a0a]">
+              <option key={g.id} value={g.id} className="bg-black">
                 {lang === 'ar' ? g.ar : lang === 'ckb' ? g.ckb : g.en}
               </option>
             ))}
@@ -297,7 +297,7 @@ export default function MerchantStart() {
         <button
           onClick={submit}
           disabled={!canSubmit}
-          className="w-full min-h-[52px] rounded-2xl bg-olive text-white font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
+          className="w-full min-h-[52px] rounded-2xl bg-olive text-snow font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
         >
           {submitting ? (
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -338,7 +338,7 @@ function Field({
 
 function Gate({ title, body, to, label }: { title: string; body?: string; to: string; label: string }) {
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-6">
+    <div className="min-h-screen bg-black flex items-center justify-center px-6">
       <div className="max-w-sm w-full text-center">
         <div className="w-14 h-14 rounded-2xl bg-olive/30 border border-gold/20 flex items-center justify-center mx-auto mb-5">
           <Store className="w-6 h-6 text-gold" />
@@ -347,7 +347,7 @@ function Gate({ title, body, to, label }: { title: string; body?: string; to: st
         {body && <p className="text-zinc-400 text-[13px] leading-relaxed mb-6">{body}</p>}
         <Link
           to={to}
-          className="inline-flex items-center justify-center gap-2 min-h-[48px] px-6 rounded-2xl bg-olive text-white font-bold text-[14px] active:scale-[0.98] transition-transform"
+          className="inline-flex items-center justify-center gap-2 min-h-[48px] px-6 rounded-2xl bg-olive text-snow font-bold text-[14px] active:scale-[0.98] transition-transform"
         >
           {label}
           <ArrowRight className="w-4 h-4 rtl:rotate-180" />

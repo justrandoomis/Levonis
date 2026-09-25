@@ -1,24 +1,18 @@
 /**
- * THE TWO PAGES THE OWNER PHOTOGRAPHED, RENDERED WITH THE OS SET TO LIGHT.
+ * /chats — THE PAGE THE OWNER PHOTOGRAPHED — RENDERED UNDER BOTH OS SETTINGS
+ * AND BOTH APP THEMES.
  *
- * «صفحة المحادثات + صفحة الحساب بال light mode حل المشكلة.»
+ * «صفحة المحادثات + صفحة الحساب بال light mode حل المشكلة.» The defect was a
+ * page that followed the PHONE (`dark:` compiles to prefers-color-scheme)
+ * while the rest of the app did not. The app now has two themes, chosen in
+ * Settings → «المظهر» and switched by `data-theme` on <html> (src/index.css,
+ * THE TWO THEMES). This fixture takes `?theme=light|dark` and sets that
+ * attribute the way index.html's pre-paint script does, so
+ * scripts/e2e-light-mode.mjs can prove the page follows the CHOSEN theme at
+ * every OS setting — cream never inside black, black never inside cream.
  *
- * This app has no light theme: `html` is pinned `color-scheme: dark` and
- * `#0b0c0f`, and every shared component is tokenised for that one ground. But
- * /chats and /profile were written as a hand-rolled light/dark PAIR, and
- * Tailwind v4 with no config file compiles `dark:` to
- * `@media (prefers-color-scheme: dark)`. So on a phone set to LIGHT the dark
- * half evaporated and these two pages repainted themselves cream inside a
- * permanently black app — with every shared component still painting dark on
- * top of them. That is the grey-on-grey in the screenshots.
- *
- * A source test can assert that no `dark:` class survives. Only a render under
- * an EMULATED light preference proves the page is actually dark for the person
- * holding the phone, which is the thing that was broken.
- *
- * The pages are mounted whole, with the API stubbed empty — an empty account
- * is the state that shows the most chrome and the least data, so it is the
- * strictest ground to measure.
+ * The API is stubbed empty — an empty account shows the most chrome and the
+ * least data, so it is the strictest ground to measure.
  */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -27,6 +21,11 @@ import { LanguageProvider } from '../../src/LanguageContext';
 import { AuthProvider } from '../../src/AuthContext';
 import Chats from '../../src/pages/Chats';
 import '../../src/index.css';
+
+document.documentElement.setAttribute(
+  'data-theme',
+  new URLSearchParams(location.search).get('theme') === 'light' ? 'light' : 'dark'
+);
 
 const realFetch = window.fetch.bind(window);
 window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {

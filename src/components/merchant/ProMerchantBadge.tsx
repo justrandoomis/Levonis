@@ -15,7 +15,7 @@ export default function ProMerchantBadge({ compact = false }: { compact?: boolea
       data-pro-merchant-badge
       title={label}
       aria-label={label}
-      className={`inline-flex shrink-0 items-center rounded-full border border-[#f0c86a]/55 bg-gradient-to-r from-[#7f1d2d] via-[#b03142] to-[#7a5a19] text-[#fff4cf] shadow-[0_0_18px_rgba(176,49,66,0.24)] ${
+      className={`inline-flex shrink-0 items-center rounded-full border border-gold-muted/55 bg-gradient-to-r from-[#7f1d2d] via-[#b03142] to-[#7a5a19] text-cream shadow-[0_0_18px_rgba(176,49,66,0.24)] ${
         compact ? 'gap-1 px-1.5 py-0.5 text-[9px]' : 'gap-1.5 px-2.5 py-1 text-[10px]'
       } font-black tracking-[0.13em]`}
     >

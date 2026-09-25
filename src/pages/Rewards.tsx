@@ -364,7 +364,7 @@ export default function Rewards() {
         <MotionCharacterHome kind="top-header" compact />
         {/* The tier badge is the server's answer, never a local guess. */}
         {multiplier && multiplier.active ? (
-          <span className="p-1 px-3 text-[12px] font-bold rounded-full bg-gold text-black uppercase">
+          <span className="p-1 px-3 text-[12px] font-bold rounded-full bg-gold text-accent-contrast uppercase">
             {multiplier.tier === 'prime' ? 'PREMIUM' : multiplier.tier}
           </span>
         ) : (
@@ -379,7 +379,7 @@ export default function Rewards() {
             <p className="text-zinc-300 font-medium mb-4">
               {loc('سجّل الدخول لجمع النقاط ومتابعتها', 'Sign in to earn and track your points')}
             </p>
-            <button onClick={signIn} className="px-6 py-2.5 bg-gold text-black rounded-full font-bold text-sm">
+            <button onClick={signIn} className="px-6 py-2.5 bg-gold text-accent-contrast rounded-full font-bold text-sm">
               {loc('تسجيل الدخول', 'Sign in')}
             </button>
           </div>
@@ -415,7 +415,7 @@ export default function Rewards() {
               <div className="relative right-2">
                 <div className="w-24 h-24 rounded-full relative z-10 transform -rotate-12">
                   <div className="absolute inset-0 rounded-full bg-[#6b5f3c] transform translate-x-[3px] translate-y-[4px]"></div>
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#BAA369] to-[#ffe55c] border-[4px] border-[#ffe55c] flex items-center justify-center shadow-[inset_-3px_-3px_12px_rgba(0,0,0,0.15)]">
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#BAA369] to-[#ffe55c] border-[4px] border-gold-light flex items-center justify-center shadow-[inset_-3px_-3px_12px_rgba(0,0,0,0.15)]">
                     <div className="text-black drop-shadow-[1px_2px_2px_rgba(0,0,0,0.25)] relative top-[-1px]">
                       <svg viewBox="0 0 24 24" fill="white" className="w-[44px] h-[44px] transform rotate-12">
                         <path d="M12 0C12 6.627 17.373 12 24 12C17.373 12 12 17.373 12 24C12 17.373 6.627 12 0 12C6.627 12 12 6.627 12 0Z" />
@@ -437,7 +437,7 @@ export default function Rewards() {
               <div
                 data-testid="rewards-multiplier"
                 className={`rounded-[20px] p-4 mb-6 border ${
-                  boosted ? 'bg-gold/10 border-gold/30' : 'bg-[#18181b] border-white/5'
+                  boosted ? 'bg-gold/10 border-gold/30' : 'bg-zinc-900 border-white/5'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
@@ -472,8 +472,8 @@ export default function Rewards() {
 
             {/* Check-in card */}
             <div className="relative mb-6 mx-1">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#18181b] to-[#27272a] rounded-[28px] transform -rotate-[2deg] translate-y-1 -translate-x-1 shadow-sm"></div>
-              <div className="bg-[#111113] rounded-[24px] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.06)] relative z-10">
+              <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 to-zinc-800 rounded-[28px] transform -rotate-[2deg] translate-y-1 -translate-x-1 shadow-sm"></div>
+              <div className="bg-black rounded-[24px] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.06)] relative z-10">
                 <div className="absolute top-5 bottom-5 left-2 flex flex-col justify-between opacity-50">
                   {[...Array(12)].map((_, i) => (
                     <div key={i} className="w-1.5 h-1.5 rounded-full bg-black/50 shadow-inner"></div>
@@ -503,14 +503,14 @@ export default function Rewards() {
                         key={d.day}
                         className={`flex flex-col items-center flex-shrink-0 relative ${
                           d.status === 'today'
-                            ? 'w-[48px] pb-1.5 border border-gold rounded-[14px] shadow-[0_4px_12px_rgba(186,163,105,0.15)] bg-[#27272a] transform -translate-y-1 overflow-hidden animate-day-pop'
+                            ? 'w-[48px] pb-1.5 border border-gold rounded-[14px] shadow-[0_4px_12px_rgba(186,163,105,0.15)] bg-zinc-800 transform -translate-y-1 overflow-hidden animate-day-pop'
                             : d.status === 'checked'
-                              ? 'w-[42px] pt-1 pb-1.5 bg-gradient-to-b from-[#18181b] to-[#27272a] rounded-[14px]'
-                              : 'w-[42px] pt-1 pb-1.5 bg-[#18181b] rounded-[14px]'
+                              ? 'w-[42px] pt-1 pb-1.5 bg-gradient-to-b from-zinc-900 to-zinc-800 rounded-[14px]'
+                              : 'w-[42px] pt-1 pb-1.5 bg-zinc-900 rounded-[14px]'
                         }`}
                       >
                         {d.status === 'today' ? (
-                          <div className="w-full bg-gold text-black text-[9px] font-bold text-center py-1 mb-1.5 tracking-wide">
+                          <div className="w-full bg-gold text-accent-contrast text-[9px] font-bold text-center py-1 mb-1.5 tracking-wide">
                             {loc('اليوم', 'Today')}
                           </div>
                         ) : (
@@ -558,7 +558,7 @@ export default function Rewards() {
                     onClick={handleCheckIn}
                     disabled={!data || data.checked_in_today || isCheckingIn}
                     className={`w-full min-h-[48px] py-3.5 rounded-[20px] font-bold text-[15px] transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold
-                ${!data || data.checked_in_today ? 'bg-[#18181b] text-zinc-400' : 'bg-gold text-black'}`}
+                ${!data || data.checked_in_today ? 'bg-zinc-900 text-zinc-400' : 'bg-gold text-accent-contrast'}`}
                   >
                     {isCheckingIn ? (
                       <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin mx-auto" />
@@ -592,7 +592,7 @@ export default function Rewards() {
                     type="button"
                     onClick={handlePushMission}
                     disabled={loadingMission === 'push' || !missions.push.available}
-                    className="w-full text-start bg-[#18181b] rounded-[20px] p-4 flex items-center justify-between shadow-sm hover:bg-[#27272a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-60 transition-colors"
+                    className="w-full text-start bg-zinc-900 rounded-[20px] p-4 flex items-center justify-between shadow-sm hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-60 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
@@ -629,8 +629,8 @@ export default function Rewards() {
                     ref={videoTriggerRef}
                     onClick={handleVideoMission}
                     disabled={!missions.video.available || loadingMission === 'video'}
-                    className={`w-full text-start bg-[#18181b] rounded-[20px] p-4 flex items-center justify-between shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors ${
-                      missions.video.available ? 'hover:bg-[#27272a]' : 'opacity-60 cursor-not-allowed'
+                    className={`w-full text-start bg-zinc-900 rounded-[20px] p-4 flex items-center justify-between shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors ${
+                      missions.video.available ? 'hover:bg-zinc-800' : 'opacity-60 cursor-not-allowed'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -672,7 +672,7 @@ export default function Rewards() {
                     type="button"
                     onClick={handleBrowseMission}
                     disabled={loadingMission === 'browse' || !missions.browse.available}
-                    className="w-full text-start bg-[#18181b] rounded-[20px] p-4 flex items-center justify-between shadow-sm hover:bg-[#27272a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-60 transition-colors"
+                    className="w-full text-start bg-zinc-900 rounded-[20px] p-4 flex items-center justify-between shadow-sm hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-60 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
@@ -726,7 +726,7 @@ export default function Rewards() {
                 {data?.history.map((h, i) => {
                   const spend = h.direction === 'spend';
                   return (
-                  <div key={`${h.mission}-${h.day}-${h.awarded_at ?? ''}-${i}`} className="bg-[#18181b] rounded-[20px] p-4 flex items-center justify-between shadow-sm">
+                  <div key={`${h.mission}-${h.day}-${h.awarded_at ?? ''}-${i}`} className="bg-zinc-900 rounded-[20px] p-4 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${spend ? 'bg-rose-400/10' : 'bg-gold/10'}`}>
                         {spend ? (
@@ -804,7 +804,7 @@ export default function Rewards() {
 
           {isVideoFinished && adWait <= 0 ? (
             <button
-              className="w-full py-3.5 rounded-xl font-bold bg-gold text-black hover:bg-gold/90 transition-colors"
+              className="w-full py-3.5 rounded-xl font-bold bg-gold text-accent-contrast hover:bg-gold/90 transition-colors"
               onClick={handleVideoClaim}
               disabled={loadingMission === 'video_claim'}
             >

@@ -363,7 +363,9 @@ test('it takes no modal lock — that lock hid the character and reflowed the pa
 
 test('no full-screen backdrop blur — the most expensive pixel in the app, spent on a wait', () => {
   assert.ok(!/backdrop-blur|backdropFilter|backdrop-filter/.test(stripComments(appBusy)));
-  assert.match(appBusy, /bg-black\/70/);
+  // `onyx`, not `black`: in the light theme `black` is the ivory page, and a
+  // busy scrim is a darkening in both themes (src/index.css, THE TWO THEMES).
+  assert.match(appBusy, /bg-onyx\/70/);
 });
 
 test('after an order the scrim is simply gone — it does not fade over the celebration', () => {

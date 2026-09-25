@@ -30,7 +30,7 @@ export default function StoreUnavailable() {
   return (
     <main
       data-store-unavailable
-      className="min-h-[100dvh] bg-[#0a0a0a] flex items-center justify-center px-6 py-12"
+      className="min-h-[100dvh] bg-black flex items-center justify-center px-6 py-12"
     >
       <div className="w-full max-w-sm text-center">
         <div className="mx-auto mb-5 w-14 h-14 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center">

@@ -159,7 +159,7 @@ export function AddDevicePanel({
         onChange={(id) => setTab(id as AddTab)}
         group="warranty-add"
         label={s.addTitle}
-        indicatorClassName="bg-[#BAA369]"
+        indicatorClassName="bg-gold"
         className="mt-2 border-b border-zinc-800"
       />
       <TabPanels value={tab} order={TAB_ORDER} className="p-4">

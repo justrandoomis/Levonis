@@ -310,7 +310,7 @@ export default function SerialScanner({
           type="button"
           onClick={onClose}
           aria-label={s.close}
-          className="p-2 -me-2 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          className="p-2 -me-2 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         >
           <X aria-hidden="true" className="w-5 h-5" />
         </button>
@@ -343,7 +343,7 @@ export default function SerialScanner({
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
             <div className={`relative w-[64%] max-w-[260px] aspect-square ${scanning && !m.reduced ? 'animate-pulse' : ''}`}>
               {CORNERS.map((c) => (
-                <span key={c} className={`absolute w-6 h-6 border-[#BAA369] ${c}`} />
+                <span key={c} className={`absolute w-6 h-6 border-gold ${c}`} />
               ))}
             </div>
           </div>
@@ -364,7 +364,7 @@ export default function SerialScanner({
         <div className="flex items-center gap-3 flex-wrap">
           <label
             htmlFor="warranty-scanner-photo"
-            className={`inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl border border-zinc-700/70 bg-zinc-800/70 hover:bg-zinc-800 text-zinc-100 text-[13px] font-bold cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-[#BAA369] ${
+            className={`inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl border border-zinc-700/70 bg-zinc-800/70 hover:bg-zinc-800 text-zinc-100 text-[13px] font-bold cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-gold ${
               photo === 'decoding' ? 'opacity-60 pointer-events-none' : ''
             }`}
           >

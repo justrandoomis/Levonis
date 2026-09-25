@@ -1904,7 +1904,7 @@ export default function Cart() {
                     aria-hidden="true"
                     className="relative shrink-0 w-[46px] h-[28px] rounded-full bg-zinc-700 transition-colors duration-200 peer-checked:bg-gold peer-checked:[&>span]:start-[21px] peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-black"
                   >
-                    <span className="absolute top-[3px] start-[3px] w-[22px] h-[22px] rounded-full bg-white transition-[inset-inline-start] duration-200 ease-out" />
+                    <span className="absolute top-[3px] start-[3px] w-[22px] h-[22px] rounded-full bg-snow shadow-1 transition-[inset-inline-start] duration-200 ease-out" />
                   </span>
                 </label>
               </div>
@@ -1927,7 +1927,7 @@ export default function Cart() {
             onClick={() => setSupportOpen((v) => !v)}
             aria-expanded={supportOpen}
             aria-controls="support-code-panel"
-            className="px-4 py-3 flex items-center justify-between text-start hover:bg-zinc-900/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            className="px-4 py-3 flex items-center justify-between text-start hover:bg-zinc-900/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
           >
             <div className="flex items-center gap-2 min-w-0">
               <HeartHandshake className="w-5 h-5 text-zinc-400 shrink-0" aria-hidden="true" />
@@ -1966,7 +1966,7 @@ export default function Cart() {
                         type="button"
                         onClick={() => pickSupportRef(ref)}
                         disabled={!!err}
-                        className="flex items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg border border-zinc-700 bg-zinc-900/60 text-start text-zinc-200 hover:border-zinc-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                        className="flex items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg border border-zinc-700 bg-zinc-900/60 text-start text-zinc-200 hover:border-zinc-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                       >
                         <span dir="ltr" className="font-mono text-[13px] truncate">@{info?.username || ref}</span>
                         <span className="text-[11px] text-zinc-500 truncate">
@@ -2003,7 +2003,7 @@ export default function Cart() {
                       <button
                         type="button"
                         onClick={() => retrySupportRef(currentRef)}
-                        className="min-h-[36px] px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 text-[12px] font-bold hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                        className="min-h-[36px] px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 text-[12px] font-bold hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                       >
                         {sc.retry}
                       </button>
@@ -2031,7 +2031,7 @@ export default function Cart() {
                   <button
                     type="button"
                     onClick={dropSupportRef}
-                    className="min-h-[36px] px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-[12px] font-bold hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                    className="min-h-[36px] px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-[12px] font-bold hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                   >
                     {sc.remove}
                   </button>
@@ -2060,13 +2060,13 @@ export default function Cart() {
                 placeholder={sc.manualPlaceholder}
                 aria-invalid={!!manualError}
                 aria-describedby={manualError ? 'support-code-error' : undefined}
-                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-lg px-3 min-h-[44px] text-white outline-none focus:border-[#BAA369] transition-colors text-sm font-mono text-start"
+                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-lg px-3 min-h-[44px] text-white outline-none focus:border-gold transition-colors text-sm font-mono text-start"
               />
               <button
                 type="button"
                 onClick={applyManualRef}
                 disabled={supportResolving}
-                className="bg-zinc-800 border border-zinc-700 text-zinc-100 font-bold px-4 min-h-[44px] rounded-lg text-sm hover:bg-zinc-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                className="bg-zinc-800 border border-zinc-700 text-zinc-100 font-bold px-4 min-h-[44px] rounded-lg text-sm hover:bg-zinc-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
               >
                 {sc.apply}
               </button>
@@ -2461,7 +2461,7 @@ export default function Cart() {
             <div className="flex items-start justify-between">
               <div className="flex gap-4">
                 {variantView.image ? (
-                  <img referrerPolicy="no-referrer" src={variantView.image} alt="" className="w-20 h-20 rounded-lg object-cover bg-white" />
+                  <img referrerPolicy="no-referrer" src={variantView.image} alt="" className="w-20 h-20 rounded-lg object-cover bg-snow" />
                 ) : (
                   <div className="w-20 h-20 rounded-lg bg-zinc-800" />
                 )}

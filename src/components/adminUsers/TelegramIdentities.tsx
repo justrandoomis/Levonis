@@ -178,7 +178,7 @@ export default function TelegramIdentities() {
     <div className="space-y-4">
       <Section title={s.tgTitle} icon={<Shield className="h-3.5 w-3.5" />} note={s.tgIntro} testId="tg-intro">
         {!mayBind ? (
-          <p className="flex items-start gap-2 rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 p-3 text-xs font-medium leading-relaxed text-[#D4AF37]">
+          <p className="flex items-start gap-2 rounded-xl border border-gilt/30 bg-gilt/10 p-3 text-xs font-medium leading-relaxed text-gilt">
             <Lock className="mt-0.5 h-4 w-4 shrink-0" />
             {s.tgNeedFinancial}
           </p>
@@ -197,7 +197,7 @@ export default function TelegramIdentities() {
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
             placeholder="admin@example.com"
-            className="min-h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/50"
+            className="min-h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-iris/50"
           />
           <button
             type="submit"
@@ -219,7 +219,7 @@ export default function TelegramIdentities() {
         </p>
       )}
       {notice && (
-        <p className="rounded-xl border border-[#2CE59B]/30 bg-[#2CE59B]/10 p-3 text-sm font-bold text-[#2CE59B]">
+        <p className="rounded-xl border border-mint/30 bg-mint/10 p-3 text-sm font-bold text-mint">
           {notice}
         </p>
       )}
@@ -259,7 +259,7 @@ export default function TelegramIdentities() {
                   aria-describedby={tgIdLooksLikeUsername ? 'tg-numeric-id-error' : undefined}
                   placeholder="123456789"
                   className={`min-h-11 w-full rounded-xl border bg-zinc-900 px-4 py-2 tabular-nums text-white focus:outline-none focus:ring-2 ${
-                    tgIdLooksLikeUsername ? 'border-red-500/60 focus:ring-red-500/40' : 'border-zinc-700 focus:ring-[#6B46FF]/50'
+                    tgIdLooksLikeUsername ? 'border-red-500/60 focus:ring-red-500/40' : 'border-zinc-700 focus:ring-iris/50'
                   }`}
                 />
                 {tgIdLooksLikeUsername && (
@@ -280,13 +280,13 @@ export default function TelegramIdentities() {
                   onChange={(e) => setLabel(e.target.value)}
                   maxLength={80}
                   placeholder={s.tgLabelPlaceholder}
-                  className="min-h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/50"
+                  className="min-h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-iris/50"
                 />
               </div>
               <button
                 type="submit"
                 disabled={adding || !tgIdValid}
-                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#6B46FF] px-4 text-sm font-bold text-white transition-colors hover:bg-[#5a38e0] disabled:opacity-50"
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#6B46FF] px-4 text-sm font-bold text-snow transition-colors hover:bg-iris-deep disabled:opacity-50"
               >
                 <Send className="h-4 w-4" /> {adding ? s.saving : s.tgAdd}
               </button>

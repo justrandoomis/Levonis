@@ -307,7 +307,7 @@ export default function ReviewSheet({
   };
 
   const rowBase =
-    'flex items-center gap-3 rounded-xl border px-3 py-2.5 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]';
+    'flex items-center gap-3 rounded-xl border px-3 py-2.5 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold';
 
   return (
     <Sheet
@@ -358,7 +358,7 @@ export default function ReviewSheet({
               type="button"
               onClick={() => void fetchOrder(initialItemId)}
               data-review-retry
-              className="mt-3 min-h-[44px] px-4 inline-flex items-center gap-2 rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+              className="mt-3 min-h-[44px] px-4 inline-flex items-center gap-2 rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
             >
               <RotateCw className="w-4 h-4" aria-hidden />
               {s.retry}
@@ -394,7 +394,7 @@ export default function ReviewSheet({
               </p>
             ) : openCount === 0 && !justDone ? (
               <div data-review-empty className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 flex items-start gap-2.5">
-                <PackageOpen className="w-5 h-5 text-[#BAA369] shrink-0" aria-hidden />
+                <PackageOpen className="w-5 h-5 text-gold shrink-0" aria-hidden />
                 <p className="text-zinc-300 text-[13px]">{s.allReviewed}</p>
               </div>
             ) : null}
@@ -422,7 +422,7 @@ export default function ReviewSheet({
                       data-review-state={l.state}
                       className={`${rowBase} ${
                         selected
-                          ? 'border-[#BAA369]/60 bg-[#BAA369]/10'
+                          ? 'border-gold/60 bg-gold/10'
                           : isOpen(l)
                             ? 'border-zinc-800 hover:bg-zinc-800/60'
                             : 'border-zinc-800/60 opacity-70'
@@ -457,7 +457,7 @@ export default function ReviewSheet({
                         </span>
                       ) : (
                         isOpen(l) && (
-                          <span className="shrink-0 rounded-full border border-[#BAA369]/35 px-2 py-0.5 text-[10px] font-bold text-[#BAA369]">
+                          <span className="shrink-0 rounded-full border border-gold/35 px-2 py-0.5 text-[10px] font-bold text-gold">
                             {s.chipTodo}
                           </span>
                         )
@@ -477,7 +477,7 @@ export default function ReviewSheet({
                 <p className="mt-3 text-[12.5px] min-h-[1.25em]">
                   {active.is_printer ? (
                     <span className="inline-flex items-start gap-1.5 text-zinc-300">
-                      <Gift className="w-4 h-4 text-[#BAA369] shrink-0 mt-px" aria-hidden /> {s.giftHint}
+                      <Gift className="w-4 h-4 text-gold shrink-0 mt-px" aria-hidden /> {s.giftHint}
                     </span>
                   ) : typeof data?.review_points === 'number' && data.review_points > 0 ? (
                     <span className="text-zinc-300">{s.pointsHint(data.review_points)}</span>
@@ -499,10 +499,10 @@ export default function ReviewSheet({
                         data-star={n}
                         disabled={busy}
                         onClick={() => setStars(n)}
-                        className="w-11 h-11 inline-flex items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-50"
+                        className="w-11 h-11 inline-flex items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
                       >
                         <Star
-                          className={`w-7 h-7 transition-colors ${n <= stars ? 'text-[#BAA369]' : 'text-zinc-700'}`}
+                          className={`w-7 h-7 transition-colors ${n <= stars ? 'text-gold' : 'text-zinc-700'}`}
                           fill={n <= stars ? 'currentColor' : 'none'}
                           aria-hidden
                         />
@@ -523,7 +523,7 @@ export default function ReviewSheet({
                     maxLength={MAX_BODY}
                     disabled={busy}
                     data-review-body
-                    className="w-full bg-black/60 border border-zinc-800 rounded-xl px-3 py-2.5 text-[13px] text-white placeholder:text-zinc-600 resize-y focus:outline-none focus:border-[#BAA369]/60 disabled:opacity-60"
+                    className="w-full bg-black/60 border border-zinc-800 rounded-xl px-3 py-2.5 text-[13px] text-white placeholder:text-zinc-600 resize-y focus:outline-none focus:border-gold/60 disabled:opacity-60"
                   />
                   <span className="block text-end text-[10.5px] text-zinc-600 tabular-nums mt-0.5">
                     {body.length}/{MAX_BODY}
@@ -540,7 +540,7 @@ export default function ReviewSheet({
                     type="button"
                     onClick={close}
                     disabled={busy}
-                    className="min-h-[44px] px-4 rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-50"
+                    className="min-h-[44px] px-4 rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
                   >
                     {s.close}
                   </button>
@@ -552,7 +552,7 @@ export default function ReviewSheet({
                     title={stars < 1 ? s.starsRequired : undefined}
                     data-submit-review
                     data-mascot="review"
-                    className="flex-1 min-h-[44px] rounded-xl bg-[#ef233c] text-white text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                    className="flex-1 min-h-[44px] rounded-xl bg-[#ef233c] text-snow text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-50 inline-flex items-center justify-center gap-2"
                   >
                     {busy && <Spinner size="sm" delayMs={0} decorative className="text-white" />}
                     {busy ? s.submitting : s.submit}
@@ -568,7 +568,7 @@ export default function ReviewSheet({
               <button
                 type="button"
                 onClick={close}
-                className="mt-4 w-full min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                className="mt-4 w-full min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
               >
                 {s.close}
               </button>

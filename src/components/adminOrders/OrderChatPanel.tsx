@@ -290,7 +290,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
             <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
               <div
                 className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
-                  mine ? 'bg-olive text-white' : 'bg-zinc-800 text-zinc-100'
+                  mine ? 'bg-olive text-snow' : 'bg-zinc-800 text-zinc-100'
                 }`}
               >
                 {isAttachmentKind(m.kind) && m.fileUrl ? (
@@ -348,7 +348,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
               onClick={sendVoice}
               data-order-chat-voice-send
               aria-label={loc('إرسال الرسالة الصوتية', 'Send the voice message')}
-              className="w-11 h-11 shrink-0 rounded-xl bg-olive text-white flex items-center justify-center hover:bg-olive-light transition-colors"
+              className="w-11 h-11 shrink-0 rounded-xl bg-olive text-snow flex items-center justify-center hover:bg-olive-light transition-colors"
             >
               <Send className="w-4 h-4 rtl:-scale-x-100" aria-hidden />
             </button>
@@ -439,7 +439,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
             type="submit"
             disabled={!draft.trim() || sending}
             data-order-chat-send
-            className="w-11 h-11 shrink-0 rounded-xl bg-olive text-white flex items-center justify-center disabled:opacity-40 hover:bg-olive-light transition-colors"
+            className="w-11 h-11 shrink-0 rounded-xl bg-olive text-snow flex items-center justify-center disabled:opacity-40 hover:bg-olive-light transition-colors"
             aria-label={loc('إرسال', 'Send', 'ناردن')}
           >
             {sending ? <Spinner size="sm" /> : <Send className="w-4 h-4" />}

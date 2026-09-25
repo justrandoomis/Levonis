@@ -676,7 +676,7 @@ export default function Chat() {
               onClick={sendVoice}
               aria-label={dir === 'rtl' ? 'إرسال الرسالة الصوتية' : 'Send the voice message'}
               data-mascot="send"
-              className="min-w-11 min-h-11 inline-flex items-center justify-center text-[#101114] bg-[#ece8dc] rounded-md hover:bg-[#fffaf0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="min-w-11 min-h-11 inline-flex items-center justify-center text-canvas bg-primary-fill rounded-md hover:bg-primary-fill-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <Send className="w-4 h-4 rtl:-scale-x-100" strokeWidth={2.2} />
             </button>
@@ -730,7 +730,7 @@ export default function Chat() {
                type="button"
                aria-label={dir === 'rtl' ? 'إرسال الرسالة' : 'Send message'}
                data-mascot="send"
-               className="min-w-11 min-h-11 inline-flex items-center justify-center text-[#101114] bg-[#ece8dc] rounded-md hover:bg-[#fffaf0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+               className="min-w-11 min-h-11 inline-flex items-center justify-center text-canvas bg-primary-fill rounded-md hover:bg-primary-fill-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                onClick={handleSendMessage}
              >
                <Send className="w-4 h-4 rtl:-scale-x-100" strokeWidth={2.2} />

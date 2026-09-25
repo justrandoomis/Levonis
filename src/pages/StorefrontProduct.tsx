@@ -157,7 +157,7 @@ export default function StorefrontProduct() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-gold animate-spin" />
       </div>
     );
@@ -165,7 +165,7 @@ export default function StorefrontProduct() {
 
   if (!product || !store) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-6">
+      <div className="min-h-screen bg-black flex items-center justify-center px-6">
         <div className="text-center">
           <PackageX className="w-10 h-10 text-zinc-600 mx-auto mb-4" />
           <p className="text-zinc-400 text-[13px]">
@@ -299,7 +299,7 @@ export default function StorefrontProduct() {
       </div>
 
       {/* Buy bar */}
-      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl px-4 sm:px-6 py-3">
+      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black/95 backdrop-blur-xl px-4 sm:px-6 py-3">
         {/* The refusal sits beside the button that caused it: in the page body
             it could be scrolled away under this fixed bar and never seen. */}
         <p
@@ -332,7 +332,7 @@ export default function StorefrontProduct() {
             whileTap={sellable ? { scale: 0.98 } : undefined}
             onClick={() => addToCart(false)}
             disabled={!sellable || adding}
-            className="flex-1 min-h-[48px] rounded-2xl bg-olive text-white font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 min-h-[48px] rounded-2xl bg-olive text-snow font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {adding ? (
               <Loader2 className="w-4 h-4 animate-spin" />

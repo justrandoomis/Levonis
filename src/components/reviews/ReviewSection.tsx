@@ -414,7 +414,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
         {isAuthenticated && (canCreate || canEdit) && (
           <button
             onClick={openForm}
-            className="flex items-center gap-2 bg-[#6B46FF] hover:bg-[#5A38E6] text-white text-sm font-bold px-4 py-2 rounded-full transition-colors"
+            className="flex items-center gap-2 bg-[#6B46FF] hover:bg-iris-deep text-snow text-sm font-bold px-4 py-2 rounded-full transition-colors"
           >
             {canEdit ? <Pencil className="w-4 h-4" /> : <Star className="w-4 h-4" />}
             {canEdit ? S.edit : S.write}
@@ -428,7 +428,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
       {/* Program notice — honest states, no invented values */}
       {eligibility && (canCreate || canEdit) && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 text-[12px] text-zinc-400 flex gap-2">
-          <Gift className="w-4 h-4 text-[#6B46FF] shrink-0 mt-0.5" />
+          <Gift className="w-4 h-4 text-iris shrink-0 mt-0.5" />
           <span>
             {eligibility.is_printer
               ? S.printerNotice
@@ -501,7 +501,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
               <select
                 value={orderId}
                 onChange={(e) => setOrderId(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-[#6B46FF] outline-none"
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-iris outline-none"
               >
                 {eligibility!.eligible_orders.map((o) => (
                   <option key={o.id} value={o.id}>
@@ -525,7 +525,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
               rows={4}
               maxLength={4000}
               placeholder={S.bodyPlaceholder}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-[#6B46FF] outline-none resize-y"
+              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-iris outline-none resize-y"
               required
             />
           </div>
@@ -577,7 +577,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
             <label className="block text-[12px] font-bold text-zinc-400 mb-1">{S.videoLabel}</label>
             {video ? (
               <div className="flex items-center gap-2 text-[12px] text-zinc-300">
-                <Video className="w-4 h-4 text-[#6B46FF]" />
+                <Video className="w-4 h-4 text-iris" />
                 <span className="truncate max-w-[200px]">{video.key.split('/').pop()}</span>
                 <button type="button" onClick={() => setVideo(null)} className="text-red-400 text-[11px] font-bold">
                   {S.remove}
@@ -617,7 +617,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
                 onChange={(e) => setIgLink(e.target.value)}
                 placeholder={S.igLink}
                 dir="ltr"
-                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-[#6B46FF] outline-none"
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-iris outline-none"
               />
               <div className="flex items-center gap-2">
                 {igShot ? (
@@ -661,7 +661,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
             <button
               type="submit"
               disabled={submitting || uploadingWhat !== '' || stars < 1 || !body.trim() || !orderId}
-              className="flex-1 bg-[#6B46FF] hover:bg-[#5A38E6] disabled:opacity-50 text-white text-sm font-bold py-2.5 rounded-full transition-colors"
+              className="flex-1 bg-[#6B46FF] hover:bg-iris-deep disabled:opacity-50 text-snow text-sm font-bold py-2.5 rounded-full transition-colors"
             >
               {submitting ? S.submitting : canEdit ? S.saveEdit : S.submit}
             </button>
@@ -697,7 +697,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
                   </span>
                 )}
                 {r.incentivized && (
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-[#a78bfa] bg-[#6B46FF]/10 border border-[#6B46FF]/30 px-2 py-0.5 rounded-full">
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-violet-400 bg-iris/10 border border-iris/30 px-2 py-0.5 rounded-full">
                     <ShieldCheck className="w-3 h-3" /> {S.incentivized}
                   </span>
                 )}

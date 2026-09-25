@@ -92,7 +92,7 @@ export default function SellerConflictDialog({
             {/* The safe option first, and visually primary. */}
             <Link
               to="/cart"
-              className="w-full min-h-[48px] rounded-2xl bg-olive text-white font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+              className="w-full min-h-[48px] rounded-2xl bg-olive text-snow font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
             >
               <ShoppingBag className="w-4 h-4" />
               {loc('العودة إلى السلة الحالية', 'Back to my current cart', 'گەڕانەوە بۆ سەبەتەکەم')}

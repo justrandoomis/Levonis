@@ -258,10 +258,10 @@ export default function Warranty() {
         <section className="space-y-3">
           <p className="text-zinc-400 text-[13px] leading-relaxed">{s.intro}</p>
           {priority ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-[#BAA369]/30 bg-[#BAA369]/10 px-4 py-3" data-testid="warranty-pro-strip">
-              <Crown aria-hidden="true" className="w-5 h-5 text-[#BAA369] shrink-0" />
+            <div className="flex items-center gap-3 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3" data-testid="warranty-pro-strip">
+              <Crown aria-hidden="true" className="w-5 h-5 text-gold shrink-0" />
               <p className="text-[13px] text-zinc-100 flex-1 min-w-0 leading-snug">{s.proStrip}</p>
-              <Link to="/subscription" className={`text-[12px] font-bold text-[#BAA369] whitespace-nowrap hover:underline underline-offset-2 rounded ${FOCUS}`}>
+              <Link to="/subscription" className={`text-[12px] font-bold text-gold whitespace-nowrap hover:underline underline-offset-2 rounded ${FOCUS}`}>
                 {s.proStripLink}
               </Link>
             </div>
@@ -340,7 +340,7 @@ export default function Warranty() {
               «لا يوجد هنالك توضيح … أن عند الضغط على مطالباتي تفتح المحادثة». */}
           {claims.length > 0 && (
             <p className="text-zinc-400 text-[12px] leading-relaxed flex items-start gap-1.5" data-claims-hint>
-              <MessageSquare aria-hidden="true" className="w-3.5 h-3.5 mt-0.5 text-[#BAA369] shrink-0" />
+              <MessageSquare aria-hidden="true" className="w-3.5 h-3.5 mt-0.5 text-gold shrink-0" />
               <span>{s.claimsHint}</span>
             </p>
           )}

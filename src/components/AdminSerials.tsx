@@ -912,7 +912,7 @@ export default function AdminSerials() {
                       type="button"
                       onClick={() => editWarranty(u)}
                       disabled={busyUnit === u.unit_id}
-                      className="inline-flex items-center gap-1 mt-1 text-[11px] text-zinc-400 hover:text-white transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+                      className="inline-flex items-center gap-1 mt-1 text-[11px] text-zinc-400 hover:text-white transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
                     >
                       <ShieldCheck className="w-3 h-3" aria-hidden="true" />{s.editWarranty}
                     </button>
@@ -960,7 +960,7 @@ export default function AdminSerials() {
                         type="button"
                         onClick={() => openUnlink(u)}
                         disabled={busyUnit === u.unit_id}
-                        className="inline-flex items-center gap-1 text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/30 rounded-lg px-2.5 py-1.5 hover:bg-red-500/20 disabled:opacity-40 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                        className="inline-flex items-center gap-1 text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/30 rounded-lg px-2.5 py-1.5 hover:bg-red-500/20 disabled:opacity-40 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                       >
                         <Unlink className="w-3 h-3" aria-hidden="true" />{s.unlink}
                       </button>
@@ -970,7 +970,7 @@ export default function AdminSerials() {
                       onClick={() => setHistoryOpen((h) => ({ ...h, [u.unit_id]: !h[u.unit_id] }))}
                       aria-expanded={!!historyOpen[u.unit_id]}
                       data-unit-history-toggle={u.unit_id}
-                      className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+                      className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
                     >
                       <History className="w-3 h-3" aria-hidden="true" />
                       {historyOpen[u.unit_id] ? s.hideHistory : s.history}
@@ -1048,9 +1048,9 @@ export default function AdminSerials() {
                 autoComplete="off"
                 spellCheck={false}
                 dir="ltr"
-                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm font-mono outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm font-mono outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-gold"
               />
-              <button type="submit" className="inline-flex items-center gap-1.5 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-xl px-4 text-sm font-bold hover:bg-zinc-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
+              <button type="submit" className="inline-flex items-center gap-1.5 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-xl px-4 text-sm font-bold hover:bg-zinc-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
                 <Barcode className="w-4 h-4" aria-hidden="true" />{s.load}
               </button>
             </form>
@@ -1061,7 +1061,7 @@ export default function AdminSerials() {
               type="button"
               onClick={() => void backfillAll()}
               disabled={backfillAllBusy}
-              className="inline-flex items-center gap-1.5 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold hover:bg-zinc-700 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+              className="inline-flex items-center gap-1.5 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold hover:bg-zinc-700 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
             >
               <PackageCheck className="w-4 h-4" aria-hidden="true" />{backfillAllBusy ? s.loading : s.backfillAll}
             </button>
@@ -1129,7 +1129,7 @@ export default function AdminSerials() {
             onClick={() => setUnlinkTarget(null)}
             disabled={unlinkBusy}
             aria-label={s.close}
-            className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
           >
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -1155,7 +1155,7 @@ export default function AdminSerials() {
               rows={3}
               required
               disabled={unlinkBusy}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369] resize-none"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-gold resize-none"
             />
           </div>
           {unlinkError && (
@@ -1166,7 +1166,7 @@ export default function AdminSerials() {
               type="button"
               onClick={() => setUnlinkTarget(null)}
               disabled={unlinkBusy}
-              className="min-h-[44px] rounded-xl bg-zinc-800 text-zinc-200 border border-zinc-700 text-sm font-bold hover:bg-zinc-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+              className="min-h-[44px] rounded-xl bg-zinc-800 text-zinc-200 border border-zinc-700 text-sm font-bold hover:bg-zinc-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
             >
               {s.cancel}
             </button>
@@ -1174,7 +1174,7 @@ export default function AdminSerials() {
               type="button"
               onClick={confirmUnlink}
               disabled={unlinkBusy || unlinkReason.trim().length < 5}
-              className="min-h-[44px] rounded-xl bg-[#ef233c] text-white text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-[filter,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+              className="min-h-[44px] rounded-xl bg-[#ef233c] text-snow text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-[filter,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
             >
               {unlinkBusy ? s.unlinking : s.confirmUnlink}
             </button>
@@ -1202,7 +1202,7 @@ export default function AdminSerials() {
             onClick={() => setPending(null)}
             disabled={pendingBusy}
             aria-label={s.close}
-            className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
           >
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -1253,7 +1253,7 @@ export default function AdminSerials() {
                 spellCheck={false}
                 dir="ltr"
                 disabled={pendingBusy}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm font-mono outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm font-mono outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-gold"
               />
             </div>
           )}
@@ -1272,7 +1272,7 @@ export default function AdminSerials() {
                     value={pendingBase}
                     onChange={(e) => setPendingBase(e.target.value)}
                     disabled={pendingBusy}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-gold"
                   />
                 </div>
                 <div>
@@ -1287,7 +1287,7 @@ export default function AdminSerials() {
                     value={pendingExt}
                     onChange={(e) => setPendingExt(e.target.value)}
                     disabled={pendingBusy}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-gold"
                   />
                 </div>
               </div>
@@ -1314,7 +1314,7 @@ export default function AdminSerials() {
               rows={3}
               required
               disabled={pendingBusy}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369] resize-none"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-gold resize-none"
             />
           </div>
           {pendingError && (
@@ -1325,7 +1325,7 @@ export default function AdminSerials() {
               type="button"
               onClick={() => setPending(null)}
               disabled={pendingBusy}
-              className="min-h-[44px] rounded-xl bg-zinc-800 text-zinc-200 border border-zinc-700 text-sm font-bold hover:bg-zinc-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+              className="min-h-[44px] rounded-xl bg-zinc-800 text-zinc-200 border border-zinc-700 text-sm font-bold hover:bg-zinc-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
             >
               {s.cancel}
             </button>
@@ -1333,7 +1333,7 @@ export default function AdminSerials() {
               type="button"
               onClick={confirmPending}
               disabled={pendingBusy || pendingReason.trim().length < 5}
-              className="min-h-[44px] rounded-xl bg-[#ef233c] text-white text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-[filter,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+              className="min-h-[44px] rounded-xl bg-[#ef233c] text-snow text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-[filter,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
             >
               {pendingBusy
                 ? s.working
@@ -1404,7 +1404,7 @@ export default function AdminSerials() {
                     {cl.priority && (
                       <span
                         title={s.priorityHint}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-[#BAA369]/40 bg-[#BAA369]/10 text-[#BAA369] text-[11px] font-bold whitespace-nowrap"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-gold/40 bg-gold/10 text-gold text-[11px] font-bold whitespace-nowrap"
                       >
                         <Crown aria-hidden="true" className="w-3 h-3" />
                         {s.priorityBadge}

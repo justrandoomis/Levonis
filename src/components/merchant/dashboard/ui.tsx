@@ -200,7 +200,7 @@ export function Toggle({
         <span className="text-zinc-300 text-[12.5px] text-start">{label}</span>
         <span className={`w-10 h-[22px] rounded-full shrink-0 relative transition-colors ${on ? 'bg-olive' : 'bg-white/10'}`}>
           <span
-            className={`absolute top-[2px] w-[18px] h-[18px] rounded-full bg-white transition-all ${on ? 'start-[20px]' : 'start-[2px]'}`}
+            className={`absolute top-[2px] w-[18px] h-[18px] rounded-full bg-snow shadow-1 transition-all ${on ? 'start-[20px]' : 'start-[2px]'}`}
           />
         </span>
       </button>
@@ -229,7 +229,7 @@ export function Btn({
 }) {
   const style =
     kind === 'primary'
-      ? 'bg-olive text-white border-olive'
+      ? 'bg-olive text-snow border-olive'
       : kind === 'gold'
         ? 'bg-gold/15 text-gold border-gold/30'
         : kind === 'danger'
@@ -268,7 +268,7 @@ export function Chip({
       disabled={disabled}
       aria-pressed={active}
       className={`relative h-8 px-3 rounded-xl text-[11.5px] font-semibold border transition-colors disabled:opacity-40 after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-        active ? 'bg-olive text-white border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
+        active ? 'bg-olive text-snow border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
       }`}
     >
       {label}

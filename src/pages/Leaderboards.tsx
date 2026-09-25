@@ -71,7 +71,7 @@ export default function Leaderboards() {
           items={LEADERBOARD_BOARDS.map((b) => ({
             id: b,
             label: boardLabel(b, s),
-            accent: { indicator: 'bg-[#BAA369]/10 border-[#BAA369]/40', text: 'text-[#BAA369]' },
+            accent: { indicator: 'bg-gold/10 border-gold/40', text: 'text-gold' },
           }))}
         />
 
@@ -95,9 +95,9 @@ export default function Leaderboards() {
                   key={`${row.username ?? row.farm_name}-${rank}`}
                   data-lb-row={rank}
                   data-lb-mine={mine || undefined}
-                  className={`${PANEL} flex items-center gap-3 px-3 py-2.5 ${mine ? 'border-[#BAA369]/50 bg-[#BAA369]/[0.06]' : ''}`}
+                  className={`${PANEL} flex items-center gap-3 px-3 py-2.5 ${mine ? 'border-gold/50 bg-gold/[0.06]' : ''}`}
                 >
-                  <span className={`w-7 text-center font-black tabular-nums text-[14px] ${rank <= 3 ? 'text-[#BAA369]' : 'text-zinc-500'}`} dir="ltr" aria-label={s.lbRank(rank)}>
+                  <span className={`w-7 text-center font-black tabular-nums text-[14px] ${rank <= 3 ? 'text-gold' : 'text-zinc-500'}`} dir="ltr" aria-label={s.lbRank(rank)}>
                     {rank}
                   </span>
                   <span className="w-9 h-9 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shrink-0 flex items-center justify-center text-zinc-300 font-bold text-[13px]">
@@ -106,7 +106,7 @@ export default function Leaderboards() {
                   <span className="min-w-0 flex-1">
                     <span className="block text-white font-bold text-[13.5px] truncate">
                       {row.farm_name}
-                      {mine && <span className="ms-2 text-[10px] font-bold text-[#BAA369] align-middle">{s.lbYou}</span>}
+                      {mine && <span className="ms-2 text-[10px] font-bold text-gold align-middle">{s.lbYou}</span>}
                     </span>
                     {row.username && (
                       <span className="block text-[11px] text-zinc-500 truncate" dir="ltr">
@@ -115,7 +115,7 @@ export default function Leaderboards() {
                     )}
                   </span>
                   {/* The reputation score is the server's basis points, always — see leaderboardScore. */}
-                  <span className="text-[#BAA369] font-black tabular-nums text-[14px] shrink-0" dir="ltr">
+                  <span className="text-gold font-black tabular-nums text-[14px] shrink-0" dir="ltr">
                     {leaderboardScore(board, row.score, lang, s)}
                   </span>
                 </li>

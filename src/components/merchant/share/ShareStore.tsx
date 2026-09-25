@@ -241,7 +241,7 @@ function ShareBody({ kit, s, qrOpen }: { kit: StoreShareKit; s: ShareStrings; qr
               <div className="flex flex-col items-center gap-3 @md:flex-row @md:items-start">
                 {/* The modules stay true black on true white in every theme, or a
                     camera cannot read them — the one surface here with its own ground. */}
-                <div className="shrink-0 rounded-xl bg-white p-2.5" role="img" aria-label={`${s.qrAlt}: ${address}`}>
+                <div className="shrink-0 rounded-xl bg-snow p-2.5" role="img" aria-label={`${s.qrAlt}: ${address}`}>
                   <svg
                     viewBox={`0 0 ${qr.viewBox} ${qr.viewBox}`}
                     className="block w-[168px] h-[168px]"
@@ -290,7 +290,7 @@ function LinkPreview({ card, address, caption, note }: { card: StoreShareCard; a
   return (
     <figure>
       <div className="flex items-stretch gap-3 rounded-xl border border-white/10 bg-black/30 p-2.5">
-        <div className="w-16 h-16 shrink-0 overflow-hidden rounded-lg bg-[#0a0a0a] flex items-center justify-center">
+        <div className="w-16 h-16 shrink-0 overflow-hidden rounded-lg bg-black flex items-center justify-center">
           {card.image && !broken ? (
             <img
               src={card.image}

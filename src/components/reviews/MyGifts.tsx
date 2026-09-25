@@ -212,7 +212,7 @@ export default function MyGifts() {
 
   const stateBadge = (g: GiftEntitlement) => {
     const map = {
-      available: { label: S.stateAvailable, cls: 'bg-[#6B46FF]/10 text-[#a78bfa] border-[#6B46FF]/30', Icon: Gift },
+      available: { label: S.stateAvailable, cls: 'bg-iris/10 text-violet-400 border-iris/30', Icon: Gift },
       selected: { label: S.stateSelected, cls: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30', Icon: Truck },
       fulfilled: { label: S.stateFulfilled, cls: 'bg-green-500/10 text-green-400 border-green-500/30', Icon: CheckCircle },
       cancelled: { label: S.stateCancelled, cls: 'bg-red-500/10 text-red-400 border-red-500/30', Icon: XCircle },
@@ -229,7 +229,7 @@ export default function MyGifts() {
     <div dir={dir} className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-black text-white flex items-center gap-2">
-          <Gift className="w-5 h-5 text-[#6B46FF]" /> {S.title}
+          <Gift className="w-5 h-5 text-iris" /> {S.title}
         </h2>
         <button
           onClick={load}
@@ -297,7 +297,7 @@ export default function MyGifts() {
                         }}
                         className={`w-full text-start rounded-xl border p-3 transition-colors ${
                           selected
-                            ? 'border-[#6B46FF] bg-[#6B46FF]/10'
+                            ? 'border-iris bg-iris/10'
                             : lv.available
                               ? 'border-zinc-700 bg-zinc-950 hover:border-zinc-500'
                               : 'border-zinc-800 bg-zinc-950/50 opacity-60'
@@ -334,7 +334,7 @@ export default function MyGifts() {
                     <select
                       value={pickedSize[gift.id] ?? ''}
                       onChange={(e) => setPickedSize((m) => ({ ...m, [gift.id]: e.target.value }))}
-                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-[#6B46FF] outline-none"
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-iris outline-none"
                     >
                       <option value="">{S.chooseSize}</option>
                       {chosenInfo.nozzle_sizes.map((s) => (
@@ -351,7 +351,7 @@ export default function MyGifts() {
                     <select
                       value={pickedPlate[gift.id] ?? ''}
                       onChange={(e) => setPickedPlate((m) => ({ ...m, [gift.id]: e.target.value }))}
-                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-[#6B46FF] outline-none"
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-iris outline-none"
                     >
                       <option value="">{S.choosePlate}</option>
                       {chosenInfo.plates.map((p) => (
@@ -375,7 +375,7 @@ export default function MyGifts() {
                 <button
                   onClick={() => redeem(gift)}
                   disabled={!readyToRedeem || redeemingId === gift.id}
-                  className="w-full bg-[#6B46FF] hover:bg-[#5A38E6] disabled:opacity-40 text-white text-sm font-bold py-2.5 rounded-full transition-colors"
+                  className="w-full bg-[#6B46FF] hover:bg-iris-deep disabled:opacity-40 text-snow text-sm font-bold py-2.5 rounded-full transition-colors"
                 >
                   {redeemingId === gift.id ? S.redeeming : S.redeem}
                 </button>
@@ -390,7 +390,7 @@ export default function MyGifts() {
                 <ul className="space-y-1">
                   {gift.contents.map((it) => (
                     <li key={it.item_id} className="flex items-center gap-2 text-[13px] text-zinc-200">
-                      <Gift className="w-3.5 h-3.5 text-[#6B46FF] shrink-0" />
+                      <Gift className="w-3.5 h-3.5 text-iris shrink-0" />
                       {itemLabel(it)}
                     </li>
                   ))}

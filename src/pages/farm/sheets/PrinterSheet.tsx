@@ -174,14 +174,14 @@ export default function PrinterSheet({
                 {nameOf(current.title, lang)}
               </span>
               {!canCollect && end !== null && (
-                <span className="text-[#BAA369] font-bold tabular-nums shrink-0" data-farm-duration="countdown">
+                <span className="text-gold font-bold tabular-nums shrink-0" data-farm-duration="countdown">
                   {countdown(end - now, lang)}
                 </span>
               )}
-              {canCollect && !failedBatch && <span className="text-[#A6B283] font-bold shrink-0">{s.readyToCollect}</span>}
+              {canCollect && !failedBatch && <span className="text-sage font-bold shrink-0">{s.readyToCollect}</span>}
             </div>
             {failedBatch && (
-              <p className="text-[12px] text-[#E06070] font-bold">
+              <p className="text-[12px] text-coral font-bold">
                 {s.batchFailed(current.failure_kind ? s.failureKinds[current.failure_kind] ?? current.failure_kind : s.failures)}
               </p>
             )}
@@ -190,8 +190,8 @@ export default function PrinterSheet({
         )}
         {p.state === 'maintenance' && (
           <div className={`${ROW} p-3 flex items-baseline justify-between gap-3 text-[12.5px]`}>
-            <span className="text-[#E4B363]">{s.underMaintenance}</span>
-            <span className="text-[#E4B363] font-bold tabular-nums" data-farm-duration="countdown">
+            <span className="text-honey">{s.underMaintenance}</span>
+            <span className="text-honey font-bold tabular-nums" data-farm-duration="countdown">
               {end === null ? '' : countdown(end - now, lang)}
             </span>
           </div>
@@ -206,7 +206,7 @@ export default function PrinterSheet({
             </span>
           </div>
           <HealthBar health={p.health} label={s.healthPct(Math.round(p.health))} />
-          {recommend && <p className="text-[11px] text-[#E4B363]">{s.maintenanceRecommended}</p>}
+          {recommend && <p className="text-[11px] text-honey">{s.maintenanceRecommended}</p>}
         </div>
 
         <dl className="grid grid-cols-3 gap-2 text-[11px]">
@@ -289,7 +289,7 @@ export default function PrinterSheet({
             <div className="flex items-center justify-between gap-3">
               <div className="text-[11px] text-zinc-400 tabular-nums">
                 {s.repairCost(formatCoins(rep.cost, lang), rep.minutes)}
-                {!canRepair && <p className="text-[#E4B363]">{s.notEnoughCoins}</p>}
+                {!canRepair && <p className="text-honey">{s.notEnoughCoins}</p>}
               </div>
               <button type="button" disabled={anyBusy || !canRepair} onClick={() => act(`repair:${p.id}`, (k) => farmApi.repair(p.id, k))} className={BTN_PRIMARY} data-farm-action="repair">
                 {s.repair}
@@ -302,7 +302,7 @@ export default function PrinterSheet({
                 {s.maintainCost(formatCoins(maint.cost, lang), maint.minutes)}
                 {!maintenanceUnlocked && maintLevel !== null && <p className="text-zinc-500">{s.maintenanceLocked(maintLevel)}</p>}
                 {maintenanceUnlocked && !(p.state === 'idle' || p.state === 'done') && <p className="text-zinc-500">{s.onlyWhenIdle}</p>}
-                {maintenanceUnlocked && (p.state === 'idle' || p.state === 'done') && maint.cost > coins && <p className="text-[#E4B363]">{s.notEnoughCoins}</p>}
+                {maintenanceUnlocked && (p.state === 'idle' || p.state === 'done') && maint.cost > coins && <p className="text-honey">{s.notEnoughCoins}</p>}
               </div>
               <button type="button" disabled={anyBusy || !canMaintain} onClick={() => act(`maintain:${p.id}`, (k) => farmApi.maintain(p.id, k))} className={BTN_SECONDARY} data-farm-action="maintain">
                 {s.maintain}

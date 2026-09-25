@@ -529,7 +529,7 @@ export default function BundleDetail() {
             )}
             <Link
               to={bundle.viewer_tier?.tier ? '/subscription' : '/auth?next=/bundles'}
-              className="inline-flex items-center justify-center min-h-11 px-5 rounded-xl bg-gold text-black text-sm font-black hover:brightness-110 transition-all"
+              className="inline-flex items-center justify-center min-h-11 px-5 rounded-xl bg-gold text-accent-contrast text-sm font-black hover:brightness-110 transition-all"
             >
               {bundle.viewer_tier?.tier && bundle.viewer_tier.tier !== 'free' ? s.lockedCta : s.signIn}
             </Link>
@@ -819,7 +819,7 @@ export default function BundleDetail() {
                   type="button"
                   onClick={addToCart}
                   disabled={adding || quoting}
-                  className="w-full min-h-12 rounded-xl bg-gold text-black text-sm font-black hover:brightness-110 transition-all disabled:opacity-60"
+                  className="w-full min-h-12 rounded-xl bg-gold text-accent-contrast text-sm font-black hover:brightness-110 transition-all disabled:opacity-60"
                 >
                   {adding ? s.adding : isAuthenticated ? s.add : s.signInToBuy}
                 </button>

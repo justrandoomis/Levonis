@@ -1113,7 +1113,7 @@ export default function AdminBundles() {
                       key={t}
                       type="button"
                       aria-pressed={on}
-                      className={`${T.chip} ${on ? 'bg-[#6B46FF]/15 border-[#6B46FF]/50 text-white' : ''}`}
+                      className={`${T.chip} ${on ? 'bg-iris/15 border-iris/50 text-white' : ''}`}
                       onClick={() =>
                         setOffer({
                           required_tiers: on ? offer.required_tiers.filter((x) => x !== t) : [...offer.required_tiers, t],

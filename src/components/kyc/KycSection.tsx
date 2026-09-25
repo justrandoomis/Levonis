@@ -556,7 +556,7 @@ export default function KycSection() {
                 <button
                   onClick={submitIdentity}
                   disabled={isSubmitting || isUploading || !phoneLinked || evidenceKeys.length === 0}
-                  className="w-full py-3.5 rounded-2xl bg-olive hover:bg-olive-light font-bold text-[14px] disabled:opacity-40 transition-colors"
+                  className="w-full py-3.5 rounded-2xl bg-olive hover:bg-olive-light text-snow font-bold text-[14px] disabled:opacity-40 transition-colors"
                 >
                   {isSubmitting ? t.submitting : t.submit}
                 </button>

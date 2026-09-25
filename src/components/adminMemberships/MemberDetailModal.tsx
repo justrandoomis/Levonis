@@ -280,7 +280,7 @@ export default function MemberDetailModal({
     >
       <header className="flex items-start gap-3 border-b border-zinc-800 p-4 sm:p-5">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800">
-          <CreditCard className="h-5 w-5 text-[#D4AF37]" aria-hidden />
+          <CreditCard className="h-5 w-5 text-gilt" aria-hidden />
         </div>
         <div className="min-w-0 flex-1">
           <h3 id={TITLE_ID} className="truncate text-lg font-black leading-6 text-white" dir="auto">
@@ -461,7 +461,7 @@ export default function MemberDetailModal({
                   }`}
                 />
                 {view.benefit_context.gated_benefit_flags.length === 0 ? (
-                  <p className="pt-2 text-xs leading-5 text-[#2CE59B]">{s.benefitNoneGated}</p>
+                  <p className="pt-2 text-xs leading-5 text-mint">{s.benefitNoneGated}</p>
                 ) : (
                   <div className="mt-2">
                     <p className="mb-1.5 text-[11px] leading-4 text-zinc-500">{s.benefitGated}</p>
@@ -474,7 +474,7 @@ export default function MemberDetailModal({
                     </div>
                   </div>
                 )}
-                <p className="mt-2 text-[11px] leading-relaxed text-[#D4AF37]/80">{s.gatingScopeNote}</p>
+                <p className="mt-2 text-[11px] leading-relaxed text-gilt/80">{s.gatingScopeNote}</p>
               </Section>
 
               <Section title={s.secAddresses} icon={<MapPin className="h-3.5 w-3.5" />} testId="address">
@@ -515,7 +515,7 @@ export default function MemberDetailModal({
                 title={s.secDebt}
                 icon={<Wallet className="h-3.5 w-3.5" />}
                 note={s.bnplStatus}
-                className="border-[#2CE59B]/20 bg-[#2CE59B]/[0.04]"
+                className="border-mint/20 bg-mint/[0.04]"
                 testId="debt"
               >
                 <div className="mb-2 flex flex-wrap gap-1.5">
@@ -566,7 +566,7 @@ export default function MemberDetailModal({
                         type="button"
                         disabled={bnplBusy}
                         onClick={() => void updateBnpl('approved', storedLimit)}
-                        className="min-h-10 rounded-xl bg-gold px-3 text-[12px] font-black leading-4 text-black disabled:opacity-50"
+                        className="min-h-10 rounded-xl bg-gold px-3 text-[12px] font-black leading-4 text-accent-contrast disabled:opacity-50"
                       >
                         {s.approveBnpl}
                       </button>
@@ -584,7 +584,7 @@ export default function MemberDetailModal({
                 {bnplNote && (
                   <p
                     role={bnplNote.ok ? 'status' : 'alert'}
-                    className={`mt-2 text-[12px] leading-5 ${bnplNote.ok ? 'text-[#2CE59B]' : 'text-red-300'}`}
+                    className={`mt-2 text-[12px] leading-5 ${bnplNote.ok ? 'text-mint' : 'text-red-300'}`}
                   >
                     {bnplNote.text}
                   </p>
@@ -692,7 +692,7 @@ export default function MemberDetailModal({
                             type="button"
                             onClick={() => setResumeTarget(rc)}
                             disabled={rowBusy === rc.id || resumeTarget?.id === rc.id}
-                            className="mt-2 rounded-lg border border-[#2CE59B]/30 bg-[#2CE59B]/10 px-3 py-1.5 text-xs font-bold leading-4 text-[#2CE59B] disabled:opacity-50"
+                            className="mt-2 rounded-lg border border-mint/30 bg-mint/10 px-3 py-1.5 text-xs font-bold leading-4 text-mint disabled:opacity-50"
                           >
                             {rowBusy === rc.id ? s.creating : s.resume}
                           </button>

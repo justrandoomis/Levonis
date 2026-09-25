@@ -60,7 +60,7 @@ export default function FlashDealsBoard({ products }: { products: ApiProduct[] }
                 aspect="auto"
                 className="w-full h-full group-hover:scale-[1.04] transition-transform duration-500 motion-reduce:transition-none"
               />
-              <span className="absolute top-2 start-2 inline-flex items-center gap-1 rounded-md bg-rose-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              <span className="absolute top-2 start-2 inline-flex items-center gap-1 rounded-md bg-rose-500/90 px-1.5 py-0.5 text-[10px] font-bold text-snow">
                 <Zap aria-hidden className="w-3 h-3" />
                 {t('homeFlashDeals')}
               </span>

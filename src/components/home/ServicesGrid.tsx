@@ -57,9 +57,9 @@ import { useCommunityAccess } from '../../pages/community/access';
    line, which is how a long name like «مستعمل ومجدّد و Open Box» stays on
    one or two lines instead of being clipped. */
 const TILE =
-  'group flex min-h-[80px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[14px] border border-hairline bg-paper px-1 py-2.5 text-center transition-colors hover:border-[#cfc8bb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted lg:min-h-[64px] lg:flex-row lg:justify-start lg:gap-3 lg:rounded-2xl lg:px-4 lg:text-start';
-const ICON = 'h-5 w-5 shrink-0 text-ink lg:h-[22px] lg:w-[22px]';
-const TITLE = 'line-clamp-3 text-[11px] font-semibold leading-[1.3] text-ink lg:text-[13.5px] lg:leading-5';
+  'group flex min-h-[80px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[14px] border border-border-subtle bg-surface px-1 py-2.5 text-center transition-colors hover:border-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:min-h-[64px] lg:flex-row lg:justify-start lg:gap-3 lg:rounded-2xl lg:px-4 lg:text-start';
+const ICON = 'h-5 w-5 shrink-0 text-text-primary lg:h-[22px] lg:w-[22px]';
+const TITLE = 'line-clamp-3 text-[11px] font-semibold leading-[1.3] text-text-primary lg:text-[13.5px] lg:leading-5';
 
 export default function ServicesGrid() {
   const { t, loc } = useLanguage();

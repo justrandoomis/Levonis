@@ -17,7 +17,9 @@
  *
  *   node scripts/e2e-home-v2-shots.mjs
  *
- * Env: HOME_SHOTS_ORIGIN (default https://levonis-iq.com),
+ * Env: HOME_SHOTS_THEME (light | dark, default light — the app's two themes;
+ *      scripts/e2e-theme-shots.mjs photographs every screen in both),
+ *      HOME_SHOTS_ORIGIN (default https://levonis-iq.com),
  *      HOME_SHOTS_DIR (default /tmp/claude-0/shots/home-v2),
  *      HOME_SHOTS_URL (reuse a running Vite instead of starting one on :4181).
  *
@@ -36,6 +38,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ORIGIN = process.env.HOME_SHOTS_ORIGIN || 'https://levonis-iq.com';
 const OUT = process.env.HOME_SHOTS_DIR || '/tmp/claude-0/shots/home-v2';
 const PORT = 4181;
+const THEME = process.env.HOME_SHOTS_THEME === 'dark' ? 'dark' : 'light';
 let BASE = process.env.HOME_SHOTS_URL || '';
 
 let chromium;
@@ -101,14 +104,15 @@ async function shoot(browser, { width, lang }) {
     colorScheme: 'dark',
     locale: lang === 'en' ? 'en-US' : 'ar-IQ',
   });
-  await context.addInitScript((l) => {
+  await context.addInitScript(([l, theme]) => {
     try {
+      localStorage.setItem('levonis.theme.v1', theme);
       localStorage.setItem('levo_lang', l);
       localStorage.setItem('levonis.displayCurrency.v1', 'IQD');
     } catch {
       /* private mode */
     }
-  }, lang);
+  }, [lang, THEME]);
   const page = await context.newPage();
   page.on('pageerror', (e) => console.log(`  page error: ${e.message}`));
   await page.route('**/files/**', async (route) => {
@@ -140,7 +144,7 @@ async function shoot(browser, { width, lang }) {
     }, null, { timeout: 20000 })
     .catch(() => {});
   await page.waitForTimeout(1500);
-  const name = `home-${width}-${lang}`;
+  const name = `home-${width}-${lang}-${THEME}`;
 
   const facts = await page.evaluate(() => {
     const main = document.getElementById('main-scroll-container');

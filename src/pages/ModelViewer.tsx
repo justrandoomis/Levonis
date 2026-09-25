@@ -782,7 +782,7 @@ export default function ModelViewer() {
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-hidden bg-[#050506] text-white"
+      className="fixed inset-0 z-50 overflow-hidden bg-black text-white"
       dir={dir}
       data-page="model-viewer"
     >
@@ -795,7 +795,7 @@ export default function ModelViewer() {
       )}
 
       {showLoader && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#050506]">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black">
           <Loader2 className="h-7 w-7 animate-spin text-gold" aria-hidden />
           <p className="text-sm text-zinc-400">{t.loading}</p>
         </div>

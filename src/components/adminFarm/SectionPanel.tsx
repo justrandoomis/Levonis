@@ -107,7 +107,7 @@ export function SectionPanel({
       >
         <span
           className={`shrink-0 w-6 h-6 rounded-md grid place-items-center text-[10px] font-black tabular-nums ${
-            open ? 'bg-gold text-black' : 'bg-zinc-800 text-zinc-400'
+            open ? 'bg-gold text-accent-contrast' : 'bg-zinc-800 text-zinc-400'
           }`}
         >
           {n}

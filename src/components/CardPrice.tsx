@@ -65,7 +65,7 @@ export default function CardPrice({ p, compact = false }: { p: ApiProduct; compa
         <span
           className={`font-bold ${compact ? 'text-[13px]' : 'text-[15px]'} ${
             pro
-              ? 'text-[#e06070] font-extrabold inline-flex items-center gap-1'
+              ? 'text-coral font-extrabold inline-flex items-center gap-1'
               : memberPrice
                 ? 'text-gold font-extrabold inline-flex items-center gap-1'
                 : 'text-white'

@@ -102,7 +102,7 @@ export default function MerchantCartView() {
 
   if (!cart) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-6">
+      <div className="min-h-screen bg-black flex items-center justify-center px-6">
         {loadFailed ? (
           <div role="alert" className="text-center">
             <p className="text-zinc-400 text-[13px] mb-3">
@@ -136,8 +136,8 @@ export default function MerchantCartView() {
     cart.items.filter((i) => i.product_id === productId).reduce((n, i) => n + i.qty, 0);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-36">
-      <div className="sticky top-0 z-30 bg-[#0a0a0a]/95 backdrop-blur border-b border-white/5 px-4 py-3 flex items-center gap-3">
+    <div className="min-h-screen bg-black text-zinc-300 pb-36">
+      <div className="sticky top-0 z-30 bg-black/95 backdrop-blur border-b border-white/5 px-4 py-3 flex items-center gap-3">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -240,7 +240,7 @@ export default function MerchantCartView() {
       </div>
 
       {cart.items.length > 0 && (
-        <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl px-4 sm:px-6 py-3">
+        <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black/95 backdrop-blur-xl px-4 sm:px-6 py-3">
           <div className="max-w-2xl mx-auto flex items-center gap-3">
             <div className="min-w-0">
               <p className="text-zinc-500 text-[10.5px]">{loc('المجموع', 'Subtotal', 'کۆ')}</p>
@@ -251,7 +251,7 @@ export default function MerchantCartView() {
               onClick={() => navigate('/store-checkout')}
               disabled={!allAvailable}
               aria-describedby={allAvailable ? undefined : 'merchant-cart-blocked'}
-              className="flex-1 h-12 rounded-2xl bg-olive text-white font-bold text-[14px] disabled:opacity-40 active:scale-[0.99] transition-transform"
+              className="flex-1 h-12 rounded-2xl bg-olive text-snow font-bold text-[14px] disabled:opacity-40 active:scale-[0.99] transition-transform"
             >
               {loc('إتمام الطلب', 'Checkout', 'تەواوکردن')}
             </button>

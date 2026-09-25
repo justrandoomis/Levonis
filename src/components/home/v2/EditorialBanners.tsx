@@ -66,7 +66,7 @@ function Banner({ card }: { card: EditorialCard }) {
           </h3>
         ) : null}
         {subtitle ? (
-          <p className="mt-1 max-w-[20ch] text-[11px] lg:max-w-none leading-4 text-[#b7bbc3] lg:mt-2 lg:text-[14px] lg:leading-6">
+          <p className="mt-1 max-w-[20ch] text-[11px] lg:max-w-none leading-4 text-text-secondary lg:mt-2 lg:text-[14px] lg:leading-6">
             {subtitle}
           </p>
         ) : null}
@@ -84,20 +84,20 @@ function Banner({ card }: { card: EditorialCard }) {
     'group relative isolate block h-[168px] min-w-0 overflow-hidden rounded-2xl bg-charcoal ring-1 ring-inset ring-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted sm:h-[180px] lg:h-[260px] lg:rounded-[20px]';
   if (card.to.startsWith('/')) {
     return (
-      <Link to={card.to} data-editorial={card.key} className={cls}>
+      <Link to={card.to} data-editorial={card.key} data-theme="dark" className={cls}>
         {body}
       </Link>
     );
   }
   if (/^https?:\/\//.test(card.to)) {
     return (
-      <a href={card.to} target="_blank" rel="noopener noreferrer" data-editorial={card.key} className={cls}>
+      <a href={card.to} target="_blank" rel="noopener noreferrer" data-editorial={card.key} data-theme="dark" className={cls}>
         {body}
       </a>
     );
   }
   return (
-    <div data-editorial={card.key} className={cls}>
+    <div data-editorial={card.key} data-theme="dark" className={cls}>
       {body}
     </div>
   );

@@ -68,7 +68,7 @@ export default function BundleContents({
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
-        className="w-full min-h-[36px] px-2.5 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 hover:border-zinc-600 flex items-center gap-2 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+        className="w-full min-h-[36px] px-2.5 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 hover:border-zinc-600 flex items-center gap-2 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
       >
         <span className="min-w-0 flex-1 text-[12px] text-zinc-300">
           {/* The count is rendered HERE, from the list the payload carries —
@@ -76,7 +76,7 @@ export default function BundleContents({
           {loc(`${count} قطعة داخل الحزمة`, `${count} items in this bundle`, `${count} پارچە لەم پاکێجەدا`)}
         </span>
         {savingPercent !== null && savingPercent > 0 && (
-          <span className="shrink-0 text-[11px] text-[#ef233c] tabular-nums">
+          <span className="shrink-0 text-[11px] text-scarlet tabular-nums">
             {loc(`وفّر ${savingPercent}٪`, `Save ${savingPercent}%`, `${savingPercent}٪ پاشەکەوت`)}
           </span>
         )}

@@ -109,7 +109,7 @@ export default function Header() {
         {/* Left: Profile/Brand Pill + Admin Button */}
         <div className="flex items-center gap-2">
           <Link to={isAuthenticated ? "/profile" : "/auth"} className="flex min-w-0 shrink items-center gap-2.5 rounded-xl bg-surface/95 p-1.5 pe-3.5 text-text-primary transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-            <div className="w-8 h-8 rounded-full shrink-0 bg-olive flex items-center justify-center text-white font-bold text-sm shadow-inner overflow-hidden">
+            <div className="w-8 h-8 rounded-full shrink-0 bg-olive flex items-center justify-center text-snow font-bold text-sm shadow-inner overflow-hidden">
               {isAuthenticated ? (
                  <img
                    referrerPolicy="no-referrer"
@@ -132,7 +132,7 @@ export default function Header() {
           {isAdminUser && (
             <Link 
               to="/admin" 
-              className="flex items-center gap-1.5 bg-gradient-to-r from-[#6B46FF] to-[#A855F7] text-white px-3.5 py-1.5 rounded-full text-xs font-black shadow-lg shadow-[#6B46FF]/30 border border-white/20 hover:brightness-110 transition-all hover:scale-105 active:scale-95 shrink-0"
+              className="flex items-center gap-1.5 bg-gradient-to-r from-[#6B46FF] to-[#A855F7] text-snow px-3.5 py-1.5 rounded-full text-xs font-black shadow-lg shadow-iris/30 border border-white/20 hover:brightness-110 transition-all hover:scale-105 active:scale-95 shrink-0"
               title={dir === 'rtl' ? 'لوحة التحكم بالإدارة' : 'Admin Dashboard'}
             >
               <ShieldCheck className="w-4 h-4 text-white animate-pulse" />

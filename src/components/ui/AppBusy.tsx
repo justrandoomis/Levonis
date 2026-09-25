@@ -265,7 +265,7 @@ export default function AppBusy() {
           // page is loading or the character is moving — which on a weak phone
           // is the most expensive pixel in the app spent on a wait. The 70%
           // black already says «not now»; the blur added nothing but frames.
-          className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 cursor-progress"
+          className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-onyx/70 cursor-progress"
           // Above `UI_LAYERS.overlay`, so an open sheet is covered too, and
           // above `.lv-app-intro` (z-index 121) so the character cannot be
           // tapped into a journey while the page is unavailable.

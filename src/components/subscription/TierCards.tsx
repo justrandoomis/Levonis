@@ -327,6 +327,7 @@ export function TierCards({
               <div
                 dir="ltr"
                 className="relative flex aspect-[1.586/1] flex-col justify-between overflow-hidden rounded-[22px] border p-4 sm:p-5 text-white"
+                data-theme="dark"
                 style={cardMaterial(tier)}
               >
                 <div className="flex items-start justify-between gap-3">

@@ -7,8 +7,10 @@
  * it defines itself (src/components/storefront/theme.css, theme.ts). Nothing
  * a merchant types can reach a stylesheet, a `style` attribute or a class.
  *
- * The app is dark by decision (tests/darkOnlyTheme.test.ts), so every surface
- * is a dark ground; themes differ in tone, shape, rhythm and type weight.
+ * Store themes are dark grounds by decision, and stay dark when the app itself
+ * is in its light theme: `[data-store-theme]` restores the dark tokens for the
+ * whole storefront (src/index.css, THE TWO THEMES; tests/themeSystem.test.ts).
+ * Themes differ in tone, shape, rhythm and type weight.
  * Typography presets vary weight and scale of Cairo — the one family the app
  * already loads — and never letter-spacing, which breaks Arabic joining.
  */

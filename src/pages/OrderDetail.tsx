@@ -194,7 +194,7 @@ function DetailSkeleton() {
 }
 
 const TILE =
-  'flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 px-4 min-h-[52px] hover:bg-zinc-800/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]';
+  'flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 px-4 min-h-[52px] hover:bg-zinc-800/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold';
 
 export default function OrderDetail() {
   const { money } = useMoney();
@@ -389,7 +389,7 @@ export default function OrderDetail() {
             type="button"
             onClick={goBack}
             aria-label={s.back}
-            className="w-11 h-11 shrink-0 flex items-center justify-center bg-zinc-900 rounded-full hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-colors"
+            className="w-11 h-11 shrink-0 flex items-center justify-center bg-zinc-900 rounded-full hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
           >
             {dir === 'rtl' ? <ArrowRight className="w-5 h-5" aria-hidden="true" /> : <ArrowLeft className="w-5 h-5" aria-hidden="true" />}
           </button>
@@ -442,7 +442,7 @@ export default function OrderDetail() {
               <div className="mt-3 flex items-end justify-between gap-3">
                 <div>
                   <p className="text-[11px] text-zinc-500">{s.total}</p>
-                  <p className="text-[#BAA369] font-bold text-[17px] tabular-nums">{money(order.total_iqd)}</p>
+                  <p className="text-gold font-bold text-[17px] tabular-nums">{money(order.total_iqd)}</p>
                 </div>
                 <p className="text-[12px] text-zinc-500 text-end">
                   {itemCountLabel(countItems(order.items, order.item_count), lang)}
@@ -504,11 +504,11 @@ export default function OrderDetail() {
                 </div>
               )}
               {order.priority === 1 && (
-                <div data-pro-priority className="mt-3 flex items-start gap-2 rounded-xl border border-[#B03142]/35 bg-[#B03142]/10 px-3 py-2 text-[12px] font-bold text-[#f3bdc5]">
+                <div data-pro-priority className="mt-3 flex items-start gap-2 rounded-xl border border-crimson/35 bg-crimson/10 px-3 py-2 text-[12px] font-bold text-petal">
                   <Truck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>
                     {order.fulfillment_service === 'pro_priority_12h' ? s.priority12h : s.priority}
-                    {order.priority_due_at && <time dateTime={order.priority_due_at} className="mt-0.5 block font-normal text-[#f3bdc5]/75">{new Date(order.priority_due_at).toLocaleString()}</time>}
+                    {order.priority_due_at && <time dateTime={order.priority_due_at} className="mt-0.5 block font-normal text-petal/75">{new Date(order.priority_due_at).toLocaleString()}</time>}
                   </span>
                 </div>
               )}
@@ -528,8 +528,8 @@ export default function OrderDetail() {
               value={tab}
               onChange={(t) => setTab(t as Tab)}
               group="order-detail"
-              indicatorClassName="bg-[#BAA369]"
-              activeClassName="text-[#BAA369] font-bold"
+              indicatorClassName="bg-gold"
+              activeClassName="text-gold font-bold"
               idleClassName="text-zinc-400 hover:text-zinc-200"
               label={s.tabsLabel}
               className="border-b border-zinc-800"
@@ -617,7 +617,7 @@ export default function OrderDetail() {
                               {it.product_slug ? (
                                 <Link
                                   to={`/product/${encodeURIComponent(it.product_slug)}`}
-                                  className="text-white text-[13.5px] font-bold line-clamp-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+                                  className="text-white text-[13.5px] font-bold line-clamp-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
                                 >
                                   {it.name}
                                 </Link>
@@ -682,7 +682,7 @@ export default function OrderDetail() {
                                     setReviewItem(it.id);
                                     setReviewOpen(true);
                                   }}
-                                  className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-[#BAA369]/40 text-[#BAA369] text-[12.5px] font-bold hover:bg-[#BAA369]/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                                  className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-gold/40 text-gold text-[12.5px] font-bold hover:bg-gold/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                                 >
                                   <Star className="w-3.5 h-3.5" aria-hidden />
                                   {s.rate}
@@ -709,12 +709,12 @@ export default function OrderDetail() {
                       className={TILE}
                       data-order-claim={cl.id}
                     >
-                      <MessageSquare className="w-4 h-4 text-[#BAA369] shrink-0" aria-hidden />
+                      <MessageSquare className="w-4 h-4 text-gold shrink-0" aria-hidden />
                       <span className="flex-1 min-w-0 text-[13px] text-zinc-300 truncate">
                         {s.claimThread}: <span className="text-white">{cl.subject}</span>
                       </span>
                       {cl.unread && (
-                        <span className="shrink-0 px-2 py-0.5 rounded-full bg-[#BAA369] text-black text-[11px] font-bold whitespace-nowrap">
+                        <span className="shrink-0 px-2 py-0.5 rounded-full bg-gold text-accent-contrast text-[11px] font-bold whitespace-nowrap">
                           {s.claimNewReply}
                         </span>
                       )}
@@ -723,7 +723,7 @@ export default function OrderDetail() {
                   ))}
                   {units && units.length > 0 && (
                     <Link to="/warranty" className={TILE} data-warranty-centre>
-                      <ShieldCheck className="w-4 h-4 text-[#BAA369] shrink-0" aria-hidden />
+                      <ShieldCheck className="w-4 h-4 text-gold shrink-0" aria-hidden />
                       <span className="flex-1 min-w-0 text-[13px] text-zinc-300 truncate">{s.warrantyCentre}</span>
                       <ChevronRight className="w-4 h-4 text-zinc-600 rtl:rotate-180 shrink-0" aria-hidden />
                     </Link>
@@ -747,7 +747,7 @@ export default function OrderDetail() {
                       className={TILE}
                       data-view-invoice={order.invoice.invoice_no}
                     >
-                      <FileText className="w-4 h-4 text-[#BAA369] shrink-0" aria-hidden />
+                      <FileText className="w-4 h-4 text-gold shrink-0" aria-hidden />
                       <span className="flex-1 min-w-0 text-[13px] text-zinc-300 truncate">
                         {s.invoice} <span dir="ltr" className="font-mono text-zinc-500">{order.invoice.invoice_no}</span>
                       </span>

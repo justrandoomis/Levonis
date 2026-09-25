@@ -616,7 +616,7 @@ export default function AdminReviews() {
                       <span className="flex items-center gap-1 text-[11px] text-yellow-400">
                         <Star className="w-3.5 h-3.5 fill-yellow-400" /> {row.stars}/5
                       </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#6B46FF]/10 text-[#a78bfa] border border-[#6B46FF]/30">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-iris/10 text-violet-400 border border-iris/30">
                         {S.kinds[row.kind]}
                       </span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">
@@ -689,12 +689,12 @@ export default function AdminReviews() {
                       {row.instagram ? (
                         <div className="flex items-center gap-3 text-[12px]">
                           {row.instagram.link && (
-                            <a href={row.instagram.link} target="_blank" rel="noreferrer" className="text-[#a78bfa] underline flex items-center gap-1" dir="ltr">
+                            <a href={row.instagram.link} target="_blank" rel="noreferrer" className="text-violet-400 underline flex items-center gap-1" dir="ltr">
                               {row.instagram.link} <ExternalLink className="w-3 h-3" />
                             </a>
                           )}
                           {row.instagram.file_url && (
-                            <a href={row.instagram.file_url} target="_blank" rel="noreferrer" className="text-[#a78bfa] underline flex items-center gap-1">
+                            <a href={row.instagram.file_url} target="_blank" rel="noreferrer" className="text-violet-400 underline flex items-center gap-1">
                               {S.evidenceFile} <ExternalLink className="w-3 h-3" />
                             </a>
                           )}
@@ -774,7 +774,7 @@ export default function AdminReviews() {
                                     onClick={() => setScoreDraft((m) => ({ ...m, [row.review_id]: n }))}
                                     className={`w-9 h-9 rounded-lg border text-sm font-black transition-colors ${
                                       selectedTier === n
-                                        ? 'bg-[#6B46FF] border-[#6B46FF] text-white'
+                                        ? 'bg-[#6B46FF] border-iris text-snow'
                                         : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500'
                                     }`}
                                   >
@@ -791,7 +791,7 @@ export default function AdminReviews() {
                               onChange={(e) => setRubricDraft((m) => ({ ...m, [row.review_id]: e.target.value }))}
                               rows={2}
                               placeholder={S.rubricPlaceholder}
-                              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-[13px] text-white focus:border-[#6B46FF] outline-none"
+                              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-[13px] text-white focus:border-iris outline-none"
                             />
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -803,7 +803,7 @@ export default function AdminReviews() {
                                   (rubricDraft[row.review_id]?.trim().length ?? 0) < 10
                                 }
                                 onClick={() => decideReward(row, 'approve')}
-                                className="text-[12px] font-bold bg-[#6B46FF] hover:bg-[#5A38E6] disabled:opacity-40 px-4 py-1.5 rounded-full"
+                                className="text-[12px] font-bold bg-[#6B46FF] hover:bg-iris-deep disabled:opacity-40 px-4 py-1.5 rounded-full"
                               >
                                 {busyId === row.review_id ? S.working : S.approveGift}
                               </button>
@@ -811,7 +811,7 @@ export default function AdminReviews() {
                               <button
                                 disabled={busyId === row.review_id || (rubricDraft[row.review_id]?.trim().length ?? 0) < 3}
                                 onClick={() => decideReward(row, 'approve')}
-                                className="text-[12px] font-bold bg-[#6B46FF] hover:bg-[#5A38E6] disabled:opacity-40 px-4 py-1.5 rounded-full"
+                                className="text-[12px] font-bold bg-[#6B46FF] hover:bg-iris-deep disabled:opacity-40 px-4 py-1.5 rounded-full"
                               >
                                 {busyId === row.review_id ? S.working : S.approvePoints(pointsConfigured)}
                               </button>
@@ -865,7 +865,7 @@ export default function AdminReviews() {
               </button>
               <button
                 onClick={() => openPoolForm()}
-                className="flex items-center gap-2 bg-[#6B46FF] hover:bg-[#5A38E6] text-white text-sm font-bold px-4 py-2 rounded-full transition-colors"
+                className="flex items-center gap-2 bg-[#6B46FF] hover:bg-iris-deep text-snow text-sm font-bold px-4 py-2 rounded-full transition-colors"
               >
                 <Plus className="w-4 h-4" /> {S.addItem}
               </button>
@@ -998,7 +998,7 @@ export default function AdminReviews() {
                 <button
                   type="submit"
                   disabled={poolSaving}
-                  className="bg-[#6B46FF] hover:bg-[#5A38E6] disabled:opacity-50 text-white text-sm font-bold px-6 py-2 rounded-full transition-colors"
+                  className="bg-[#6B46FF] hover:bg-iris-deep disabled:opacity-50 text-snow text-sm font-bold px-6 py-2 rounded-full transition-colors"
                 >
                   {poolSaving ? S.working : S.save}
                 </button>

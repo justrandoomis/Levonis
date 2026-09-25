@@ -325,7 +325,7 @@ export default function Chats() {
           action={
             <Link
               to={`/auth?next=${encodeURIComponent('/chats')}`}
-              className="mt-1 min-h-[44px] px-5 rounded-xl bg-gold text-black text-sm font-bold flex items-center"
+              className="mt-1 min-h-[44px] px-5 rounded-xl bg-gold text-accent-contrast text-sm font-bold flex items-center"
             >
               {s.signIn}
             </Link>
@@ -375,7 +375,7 @@ export default function Chats() {
                   <span className="text-lg font-bold text-white">{name.charAt(0).toUpperCase()}</span>
                 </div>
                 {chat.unread > 0 && (
-                  <span className="absolute top-0 end-0 bg-[#ff5000] text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-canvas">
+                  <span className="absolute top-0 end-0 bg-[#ff5000] text-snow text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-canvas">
                     {chat.unread > 99 ? '99+' : chat.unread}
                   </span>
                 )}
@@ -395,12 +395,11 @@ export default function Chats() {
   }
 
   /*
-    THIS PAGE IS DARK, FULL STOP — «صفحة المحادثات + صفحة الحساب بال light
-    mode حل المشكلة».
+    THIS PAGE FOLLOWS THE APP'S THEME, NOT THE PHONE'S — «صفحة المحادثات +
+    صفحة الحساب بال light mode حل المشكلة».
 
-    The app has no light theme and no theme switch: `html` is pinned
-    `color-scheme: dark` and `#0b0c0f`, and every shared component is
-    tokenised for that one ground. But this page and /profile were written
+    History, kept because it is why the rule exists: when the app had one
+    dark theme, this page and /profile were written
     as a hand-rolled light/dark PAIR — `bg-[#f2f2f2] dark:bg-[#000000]` —
     and Tailwind v4 with no config compiles `dark:` to
     `@media (prefers-color-scheme: dark)`. On a phone set to LIGHT the dark
@@ -408,10 +407,11 @@ export default function Chats() {
     inside a permanently black app, with every shared component still
     painting dark on top. That is the grey-on-grey the owner photographed.
 
-    The light half is gone rather than completed. There is no light theme
-    to complete it into, and inventing one would be a new feature rather
-    than a fix — so these pages now use the same tokens as the shell they
-    live in, and read identically at every OS setting.
+    The light half was deleted, and these pages use the shell's own tokens.
+    The app now HAS a light theme (Settings → «المظهر», src/index.css THE
+    TWO THEMES), and because it is chosen in the app and switched by
+    `data-theme` — never by `dark:` — this page follows it with every other
+    page, whatever the OS is set to (tests/themeSystem.test.ts).
   */
   return (
     <div
@@ -443,7 +443,7 @@ export default function Chats() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder={s.search}
             aria-label={s.search}
-            className="w-full min-h-[44px] border rounded-full py-2 px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-gold bg-[#1a1a1a] border-white/10 text-white"
+            className="w-full min-h-[44px] border rounded-full py-2 px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-gold bg-zinc-900 border-white/10 text-white"
           />
         </div>
       )}
@@ -575,7 +575,7 @@ export default function Chats() {
                   type="button"
                   onClick={submitSupport}
                   disabled={submitting}
-                  className="mt-3 w-full min-h-[48px] rounded-2xl bg-gold text-black font-black text-[15px] flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+                  className="mt-3 w-full min-h-[48px] rounded-2xl bg-gold text-accent-contrast font-black text-[15px] flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
                 >
                   {submitting ? (
                     <Loader2 aria-hidden="true" className="w-5 h-5 animate-spin" />

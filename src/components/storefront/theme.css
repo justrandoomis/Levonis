@@ -10,7 +10,8 @@
  * class. `classic` is the storefront as it was before themes, value for value
  * (#0a0a0a ground, white/3 % cards, 10 px product tiles, the accent glow).
  *
- * Dark grounds only: the app has no light theme (tests/darkOnlyTheme.test.ts).
+ * Dark grounds only, whatever the app's own theme: `[data-store-theme]` is a
+ * dark island (src/index.css, THE TWO THEMES; tests/themeSystem.test.ts).
  */
 
 [data-store-theme] {

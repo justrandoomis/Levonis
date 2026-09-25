@@ -77,7 +77,7 @@ export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
             onClick={() => setSection(s.id)}
             className={`shrink-0 flex items-center gap-2 px-4 min-h-[42px] rounded-2xl text-[13px] font-semibold border transition-colors ${
               section === s.id
-                ? 'bg-olive text-white border-olive'
+                ? 'bg-olive text-snow border-olive'
                 : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
             }`}
           >
@@ -575,7 +575,7 @@ function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t
               setPaying(true);
             }}
             disabled={fin.balance.available_iqd <= 0}
-            className="w-full min-h-[46px] rounded-2xl bg-olive text-white font-bold text-[13.5px] flex items-center justify-center gap-2 disabled:opacity-40"
+            className="w-full min-h-[46px] rounded-2xl bg-olive text-snow font-bold text-[13.5px] flex items-center justify-center gap-2 disabled:opacity-40"
           >
             <Wallet className="w-4 h-4" aria-hidden="true" />
             {t('تسجيل تحويل للتاجر', 'Record a payout')}
@@ -816,7 +816,7 @@ function Board({ t }: { t: T }) {
             onClick={() => setState(s)}
             className={`shrink-0 min-h-[34px] px-3 rounded-xl text-[12px] font-semibold border transition-colors ${
               state === s
-                ? 'bg-olive text-white border-olive'
+                ? 'bg-olive text-snow border-olive'
                 : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
             }`}
           >
@@ -1149,7 +1149,7 @@ function Reputation({ t }: { t: T }) {
             key={f.v || 'all'}
             onClick={() => setHidden(f.v)}
             className={`min-h-[34px] px-3 rounded-xl text-[12px] font-semibold border transition-colors ${
-              hidden === f.v ? 'bg-olive text-white border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+              hidden === f.v ? 'bg-olive text-snow border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
             }`}
           >
             {f.label}
@@ -1161,7 +1161,7 @@ function Reputation({ t }: { t: T }) {
             key={n}
             onClick={() => setMaxRating(n)}
             className={`min-h-[34px] px-3 rounded-xl text-[12px] font-semibold border transition-colors ${
-              maxRating === n ? 'bg-olive text-white border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+              maxRating === n ? 'bg-olive text-snow border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
             }`}
           >
             {n === 5 ? t('كل التقييمات', 'Any rating') : t(`${n} نجوم فأقل`, `${n}★ and below`)}
@@ -1460,7 +1460,7 @@ function Disputes({ t }: { t: T }) {
             key={s || 'all'}
             onClick={() => setFilter(s)}
             className={`shrink-0 px-3.5 min-h-[36px] rounded-xl text-[12px] font-semibold border transition-colors ${
-              filter === s ? 'bg-olive text-white border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+              filter === s ? 'bg-olive text-snow border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
             }`}
           >
             {s ? complaintStatusLabel(s, t) : t('الكل', 'All')}
@@ -1851,7 +1851,7 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
             type="button"
             onClick={() => setInternal(false)}
             className={`px-3.5 min-h-[36px] rounded-xl text-[12px] font-semibold border transition-colors ${
-              !internal ? 'bg-olive text-white border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+              !internal ? 'bg-olive text-snow border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
             }`}
           >
             {t('رد يراه صاحب الشكوى', 'Reply the reporter sees')}
@@ -1883,7 +1883,7 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
             type="button"
             onClick={send}
             disabled={busy || uploading || !reply.trim()}
-            className="px-5 min-h-[40px] rounded-2xl bg-olive text-white font-bold text-[13px] disabled:opacity-40"
+            className="px-5 min-h-[40px] rounded-2xl bg-olive text-snow font-bold text-[13px] disabled:opacity-40"
           >
             {t('إرسال', 'Send')}
           </button>
@@ -1917,7 +1917,7 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
               <button
                 onClick={() => settle('release')}
                 disabled={busy}
-                className="w-full min-h-[46px] rounded-2xl bg-olive text-white font-bold text-[13px] disabled:opacity-40"
+                className="w-full min-h-[46px] rounded-2xl bg-olive text-snow font-bold text-[13px] disabled:opacity-40"
               >
                 {t('تحرير المبلغ للتاجر', 'Release to the merchant')}
               </button>
@@ -2351,7 +2351,7 @@ function SettingsSection({ t }: { t: T }) {
       <button
         onClick={save}
         disabled={saving}
-        className="w-full min-h-[48px] rounded-2xl bg-olive text-white font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-40"
+        className="w-full min-h-[48px] rounded-2xl bg-olive text-snow font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-40"
       >
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : null}
         {saved ? t('تم الحفظ', 'Saved') : t('حفظ الإعدادات', 'Save settings')}

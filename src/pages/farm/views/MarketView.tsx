@@ -113,9 +113,9 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
                     dir="ltr"
                   >
                     <span
-                      className={`inline-flex items-center gap-1 h-9 px-3 rounded-full border text-[12px] font-bold group-focus-visible:ring-2 group-focus-visible:ring-[#BAA369] ${
+                      className={`inline-flex items-center gap-1 h-9 px-3 rounded-full border text-[12px] font-bold group-focus-visible:ring-2 group-focus-visible:ring-gold ${
                         checked
-                          ? 'border-[#BAA369]/50 bg-[#BAA369]/10 text-[#BAA369]'
+                          ? 'border-gold/50 bg-gold/10 text-gold'
                           : locked
                             ? 'border-zinc-800 text-zinc-600'
                             : 'border-zinc-800 text-zinc-300 group-hover:text-white'
@@ -128,7 +128,7 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
                 );
               })}
             </div>
-            {materialLocked && matDef && <p className="text-[11px] text-[#E4B363]">{s.materialLocked(matDef.min_level)}</p>}
+            {materialLocked && matDef && <p className="text-[11px] text-honey">{s.materialLocked(matDef.min_level)}</p>}
           </div>
 
           <div className="space-y-2">
@@ -148,7 +148,7 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
                     data-farm-color={c}
                     onClick={() => setColor(c)}
                     className={`w-11 h-11 rounded-xl border flex items-center justify-center press-scale ${FOCUS} ${
-                      checked ? 'border-[#BAA369] bg-[#BAA369]/10' : 'border-zinc-800 hover:border-zinc-600'
+                      checked ? 'border-gold bg-gold/10' : 'border-zinc-800 hover:border-zinc-600'
                     }`}
                   >
                     <Swatch color={swatchFor(config, c)} size="md" />
@@ -180,7 +180,7 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
                       {s.spoolSize(g)}
                     </span>
                   ),
-                  accent: { indicator: 'bg-[#BAA369]/10 border-[#BAA369]/40', text: 'text-[#BAA369]' },
+                  accent: { indicator: 'bg-gold/10 border-gold/40', text: 'text-gold' },
                 }))}
               />
             </div>
@@ -189,19 +189,19 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
           <dl className="grid grid-cols-2 gap-3 text-[12px] border-t border-zinc-800/70 pt-3">
             <div>
               <dt className="text-zinc-500">{s.price}</dt>
-              <dd className="text-[#BAA369] font-black tabular-nums text-[16px]" dir="ltr">
+              <dd className="text-gold font-black tabular-nums text-[16px]" dir="ltr">
                 {formatCoins(price, lang)}
               </dd>
               {matDef && <dd className="text-zinc-500 tabular-nums text-[11px]">{s.pricePerGram(String(matDef.price_per_gram))}</dd>}
             </div>
             <div>
               <dt className="text-zinc-500">{s.inventory}</dt>
-              <dd className={`tabular-nums ${storageOk ? 'text-zinc-200' : 'text-[#E4B363]'}`}>{s.storageLeft(storageFree, storageTotal)}</dd>
+              <dd className={`tabular-nums ${storageOk ? 'text-zinc-200' : 'text-honey'}`}>{s.storageLeft(storageFree, storageTotal)}</dd>
             </div>
           </dl>
 
-          {!storageOk && <p className="text-[11px] text-[#E4B363]">{s.storageFull}</p>}
-          {matDef && price > coins && <p className="text-[11px] text-[#E4B363]">{s.notEnoughCoins}</p>}
+          {!storageOk && <p className="text-[11px] text-honey">{s.storageFull}</p>}
+          {matDef && price > coins && <p className="text-[11px] text-honey">{s.notEnoughCoins}</p>}
 
           <button
             ref={filamentBtn}
@@ -227,7 +227,7 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
             </span>
           }
         />
-        {freeSlots <= 0 && <p className="text-[12px] text-[#E4B363]">{s.noFreeSlot}</p>}
+        {freeSlots <= 0 && <p className="text-[12px] text-honey">{s.noFreeSlot}</p>}
         <div className="grid gap-3 sm:grid-cols-2">
           {catalog.map(({ key, model }) => {
             const locked = model.min_level > level;
@@ -252,7 +252,7 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
                       {s.lockedLevel(model.min_level)}
                     </Chip>
                   ) : (
-                    <Chip className="border-[#BAA369]/40 text-[#BAA369] bg-[#BAA369]/10 text-[12px]">
+                    <Chip className="border-gold/40 text-gold bg-gold/10 text-[12px]">
                       <span dir="ltr">{formatCoins(model.price, lang)}</span>
                     </Chip>
                   )}

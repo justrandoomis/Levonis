@@ -59,7 +59,7 @@ export default function LedgerSheet({
           <h3 id={titleId} className="text-white font-bold text-[16px]">
             {s.ledger}
           </h3>
-          <span className="text-[#BAA369] font-black tabular-nums" dir="ltr">
+          <span className="text-gold font-black tabular-nums" dir="ltr">
             {currentCoins}
           </span>
         </div>
@@ -86,7 +86,7 @@ export default function LedgerSheet({
                   </p>
                 </div>
                 <div className="text-end shrink-0">
-                  <p className={`text-[13px] font-black tabular-nums ${e.amount >= 0 ? 'text-[#BAA369]' : 'text-[#E06070]'}`} dir="ltr">
+                  <p className={`text-[13px] font-black tabular-nums ${e.amount >= 0 ? 'text-gold' : 'text-coral'}`} dir="ltr">
                     {formatSignedCoins(e.amount, lang)}
                   </p>
                   <p className="text-[10.5px] text-zinc-500 tabular-nums">{s.balanceAfter(formatCoins(e.balance_after, lang))}</p>

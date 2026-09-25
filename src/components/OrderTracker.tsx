@@ -107,7 +107,7 @@ export default function OrderTracker({
                 <span
                   className={`w-5 h-5 rounded-full flex items-center justify-center border ${
                     step.current
-                      ? 'bg-[#BAA369] border-[#BAA369] text-black'
+                      ? 'bg-gold border-gold text-accent-contrast'
                       : step.reached
                         ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-400'
                         : 'bg-transparent border-zinc-700 text-zinc-700'

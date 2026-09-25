@@ -44,6 +44,47 @@
   --ap-shadow-menu: 0 12px 40px -12px rgb(0 0 0 / 0.75), 0 0 0 1px rgb(255 255 255 / 0.07);
 }
 
+
+/* The light theme (src/index.css, THE TWO THEMES): the same editor on the
+   ivory system — paper surfaces, ink hairlines, the violet accent deepened to
+   read on paper (5.9:1), status inks at 4.5:1 or better. */
+[data-theme='light'] .ap {
+  color-scheme: light;
+  --ap-bg-0: #f3f0ea;
+  --ap-surface-1: #fbfaf7;
+  --ap-surface-2: #f4f1ea;
+  --ap-surface-3: #ece8df;
+  --ap-surface-4: #e3ded3;
+  --ap-hairline: rgb(22 24 27 / 0.07);
+  --ap-border: rgb(22 24 27 / 0.1);
+  --ap-border-strong: rgb(22 24 27 / 0.16);
+  --ap-border-hover: rgb(22 24 27 / 0.24);
+  --ap-text-1: #16181b;
+  --ap-text-2: #45484e;
+  --ap-text-3: #5f6268;
+  --ap-accent: #5a4dd2;
+  --ap-accent-hover: #5044c4;
+  --ap-accent-active: #463ab4;
+  --ap-accent-text: #4a3fc0;
+  --ap-accent-soft: rgb(90 77 210 / 0.1);
+  --ap-accent-border: rgb(90 77 210 / 0.4);
+  --ap-ring: #5a4dd2;
+  --ap-success: #1b7046;
+  --ap-success-bg: rgb(27 112 70 / 0.1);
+  --ap-success-border: rgb(27 112 70 / 0.3);
+  --ap-warning: #92590c;
+  --ap-warning-bg: rgb(146 89 12 / 0.1);
+  --ap-warning-border: rgb(146 89 12 / 0.3);
+  --ap-danger: #b3343a;
+  --ap-danger-bg: rgb(179 52 58 / 0.08);
+  --ap-danger-border: rgb(179 52 58 / 0.3);
+  --ap-danger-bg-hover: rgb(179 52 58 / 0.14);
+  --ap-info: #2d5f9a;
+  --ap-info-bg: rgb(45 95 154 / 0.1);
+  --ap-info-border: rgb(45 95 154 / 0.3);
+  --ap-shadow-1: 0 1px 2px rgb(22 24 27 / 0.06), 0 10px 30px -14px rgb(22 24 27 / 0.14);
+  --ap-shadow-menu: 0 12px 40px -12px rgb(22 24 27 / 0.22), 0 0 0 1px rgb(22 24 27 / 0.08);
+}
 .ap select.ap-select {
   appearance: none;
   -webkit-appearance: none;
@@ -56,7 +97,7 @@
 }
 .ap:where([dir='rtl'], [dir='rtl'] *) select.ap-select { background-position: left 12px center; }
 .ap select.ap-select.ap-select--icon { padding-inline-end: 56px; }
-.ap select.ap-select option { background: #26262c; color: #eceef2; }
+.ap select.ap-select option { background: var(--ap-surface-2); color: var(--ap-text-1); }
 
 /* Quick Price is a focused workspace rather than a stack of outlined boxes.
    Translucency is restrained to the shell; editable surfaces stay opaque. */
@@ -66,7 +107,7 @@
     var(--ap-surface-1);
 }
 .ap .ap-quick-scroll {
-  scrollbar-color: rgb(255 255 255 / 0.16) transparent;
+  scrollbar-color: var(--ap-border-strong) transparent;
   scrollbar-width: thin;
 }
 

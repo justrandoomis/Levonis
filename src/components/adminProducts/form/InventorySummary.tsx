@@ -67,7 +67,7 @@ export function InventorySummary({ productId }: { productId: string }) {
           <li
             key={l.id}
             className={`flex items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-[12.5px] ${
-              i === 0 ? 'bg-[#6B46FF]/12 text-white' : 'text-zinc-300'
+              i === 0 ? 'bg-iris/12 text-white' : 'text-zinc-300'
             }`}
           >
             <span className="flex items-center gap-2 min-w-0">

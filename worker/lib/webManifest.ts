@@ -110,16 +110,20 @@ export const PLATFORM_DESCRIPTION =
   '\u2068Levonis\u2069 — متجر الطباعة ثلاثية الأبعاد: طابعات، خيوط، قطع جاهزة وطلبات طباعة حسب الطلب.';
 
 /**
- * THE DOCUMENT'S BLACK, NOT THE THEME TOKEN'S.
+ * THE SPLASH IS THE GROUND THE APP OPENS ON.
  *
- * `index.html` paints `#000000` — the page background, the `theme-color` meta
- * and the pre-CSS inline style all agree on it. Tailwind's `@theme` block in
- * `src/index.css` deliberately SOFTENS `--color-canvas` to `#0b0c0f`, so
- * `bg-black` in a class name is not this colour. The splash screen the
- * launcher paints from `background_color` sits next to the real document, not
- * next to a Tailwind surface, so it must be the document's black or the app
- * flashes a lighter rectangle on every cold start.
+ * The app has two themes (src/index.css, THE TWO THEMES), and a manifest is
+ * one file per HOST, not per reader — it cannot know which one a reader chose.
+ * So each host's splash is the ground its first screen most often has:
+ *
+ *  - THE PLATFORM: the light theme's ivory, `#f3f0ea` — the default for every
+ *    reader who has not chosen dark, and exactly what index.html's theme-color
+ *    meta and pre-CSS inline style paint before the theme script runs.
+ *  - A MERCHANT'S STORE: the document black. A storefront stays dark whatever
+ *    the app's theme (`[data-store-theme]` is a dark island), so a store's
+ *    launcher keeps the black it always had (worker/lib/storeIcons.ts).
  */
+const IVORY = '#f3f0ea';
 const BLACK = '#000000';
 
 /**
@@ -479,16 +483,16 @@ export function buildWebManifest(identity?: ManifestIdentity | null): WebManifes
   let tagline = '';
   let logo: WebManifestIcon | null = null;
   let renditions: WebManifestIcon[] | null = null;
-  let background = BLACK;
-  let theme = BLACK;
+  let background = IVORY;
+  let theme = IVORY;
   try {
     name = cleanText(identity?.name, NAME_MAX);
     tagline = cleanText(identity?.tagline, DESCRIPTION_MAX);
     renditions = name ? storeRenditionIcons(identity?.icons) : null;
     // The raw logo is the fallback FOR the renditions, never beside them.
     logo = name && !renditions ? storeLogoIcon(identity?.logoKey) : null;
-    // The store's own ground, from its preset; the platform keeps the
-    // document's black whatever an identity says.
+    // The store's own ground, from its preset (dark: storefronts stay dark);
+    // the platform keeps its ivory whatever an identity says.
     if (name) {
       background = colourOr(identity?.backgroundColor, BLACK);
       theme = colourOr(identity?.themeColor, BLACK);
@@ -502,8 +506,8 @@ export function buildWebManifest(identity?: ManifestIdentity | null): WebManifes
     tagline = '';
     logo = null;
     renditions = null;
-    background = BLACK;
-    theme = BLACK;
+    background = IVORY;
+    theme = IVORY;
   }
 
   const isStore = name.length > 0;

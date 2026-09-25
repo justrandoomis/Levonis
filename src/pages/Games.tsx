@@ -118,7 +118,7 @@ export default function Games() {
         {/* An admin is inside a game the players cannot open: say so plainly,
             and say where the switch that closed it lives. */}
         {shelved && (
-          <p className="text-[12px] text-[#E4B363] leading-relaxed" data-hub-farm-admin-note>
+          <p className="text-[12px] text-honey leading-relaxed" data-hub-farm-admin-note>
             {s.shelved.adminBody}
           </p>
         )}
@@ -163,13 +163,13 @@ export default function Games() {
             </p>
             <div className="flex items-start justify-between gap-3">
               <h2 id="hub-farm-title" className="flex items-center gap-2 text-white font-black text-[22px] leading-7 min-w-0">
-                <Printer aria-hidden="true" className="w-6 h-6 text-[#BAA369] shrink-0" />
+                <Printer aria-hidden="true" className="w-6 h-6 text-gold shrink-0" />
                 {s.title}
               </h2>
               {/* The owner's word, on the card that keeps the game's place. An
                   admin's copy names who the door is shut to instead. */}
               {shelved && (
-                <span className={`${CHIP} border-[#E4B363]/40 text-[#E4B363] bg-[#E4B363]/10 shrink-0`} data-hub-shelved-badge>
+                <span className={`${CHIP} border-honey/40 text-honey bg-honey/10 shrink-0`} data-hub-shelved-badge>
                   <Wrench aria-hidden="true" className="w-3 h-3" />
                   {mayPlay ? s.shelved.adminBadge : s.shelved.badge}
                 </span>
@@ -191,7 +191,7 @@ export default function Games() {
                 data-hub-link={l.id}
                 className={`${PANEL} flex items-center gap-3 px-4 py-3 min-h-[56px] hover:border-zinc-700 transition-colors press-scale ${FOCUS}`}
               >
-                <span className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[#BAA369] shrink-0">
+                <span className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-gold shrink-0">
                   <l.icon aria-hidden="true" className="w-4.5 h-4.5" />
                 </span>
                 <span className="min-w-0 flex-1">

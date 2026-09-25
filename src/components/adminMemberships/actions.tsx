@@ -92,7 +92,7 @@ export function ReasonPrompt({
           rows={3}
           disabled={busy}
           dir="auto"
-          className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-[13px] leading-5 text-white outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-[13px] leading-5 text-white outline-none focus-visible:ring-2 focus-visible:ring-gold"
         />
       </label>
       {error && (
@@ -105,7 +105,7 @@ export function ReasonPrompt({
           type="button"
           onClick={onCancel}
           disabled={busy}
-          className="min-h-10 rounded-xl bg-zinc-800 px-4 text-[13px] font-bold leading-5 text-zinc-200 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          className="min-h-10 rounded-xl bg-zinc-800 px-4 text-[13px] font-bold leading-5 text-zinc-200 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         >
           {loc('إلغاء', 'Cancel', 'پاشگەزبوونەوە')}
         </button>
@@ -113,7 +113,7 @@ export function ReasonPrompt({
           type="button"
           onClick={() => ready && onConfirm(reason.trim())}
           disabled={!ready}
-          className="min-h-10 rounded-xl bg-olive px-4 text-[13px] font-bold leading-5 text-white disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          className="min-h-10 rounded-xl bg-olive px-4 text-[13px] font-bold leading-5 text-snow disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         >
           {busy ? loc('جارٍ…', 'Working…', 'خەریکە…') : confirmLabel}
         </button>
@@ -204,7 +204,7 @@ export function GrantMembership({ userId, onGranted }: { userId: string; onGrant
           type="button"
           onClick={() => setAskOpen(true)}
           disabled={busy || !planId || askOpen}
-          className="min-h-[34px] rounded-lg bg-olive px-3 text-[12px] font-bold leading-4 text-white disabled:opacity-40"
+          className="min-h-[34px] rounded-lg bg-olive px-3 text-[12px] font-bold leading-4 text-snow disabled:opacity-40"
         >
           {busy
             ? loc('جارٍ…', 'Working…', 'خەریکە…')

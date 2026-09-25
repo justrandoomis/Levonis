@@ -73,7 +73,7 @@ const ORDER_STATUS_COLORS: Record<string, string> = {
   confirmed: 'bg-blue-500/20 text-blue-300',
   processing: 'bg-purple-500/20 text-purple-300',
   shipped: 'bg-cyan-500/20 text-cyan-300',
-  delivered: 'bg-[#2CE59B]/20 text-[#2CE59B]',
+  delivered: 'bg-mint/20 text-mint',
   cancelled: 'bg-red-500/20 text-red-400',
 };
 
@@ -178,7 +178,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
   ) => (
     <div
       onClick={onClick}
-      className={`bg-[#18181b]/80 backdrop-blur-xl border border-white/5 rounded-xl p-3 shadow-[0_4px_16px_rgba(0,0,0,0.25)] flex items-center gap-2.5 ${onClick ? 'cursor-pointer hover:border-white/15 transition-colors' : ''}`}
+      className={`bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-xl p-3 shadow-[0_4px_16px_rgba(0,0,0,0.25)] flex items-center gap-2.5 ${onClick ? 'cursor-pointer hover:border-white/15 transition-colors' : ''}`}
     >
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${accent}`}>{icon}</div>
       <div className="min-w-0">
@@ -194,7 +194,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
       {/* Top Bar */}
       <div className="flex flex-col lg:flex-row items-center justify-between gap-3 bg-zinc-900/90 border border-zinc-800 p-3 rounded-2xl shadow-xl backdrop-blur-xl">
         <div className="flex items-center gap-3 w-full lg:w-auto">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#c5a059] via-[#e6c27a] to-[#708238] flex items-center justify-center shadow-lg shadow-[#c5a059]/30 shrink-0 font-black text-sm text-white">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#c5a059] via-[#e6c27a] to-[#708238] flex items-center justify-center shadow-lg shadow-gold/30 shrink-0 font-black text-sm text-snow">
             L
           </div>
           <div>
@@ -214,7 +214,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
             className="flex items-center gap-1.5 px-3 py-1.5 min-h-9 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-zinc-300 hover:text-white transition-all shadow-sm active:scale-95 disabled:opacity-50 text-[11px] font-bold"
             title={dir === 'rtl' ? 'تحديث البيانات' : 'Refresh Data'}
           >
-            <Zap className="w-4 h-4 text-[#708238]" />
+            <Zap className="w-4 h-4 text-moss" />
             {loading ? (dir === 'rtl' ? 'جارٍ التحديث...' : 'Refreshing...') : dir === 'rtl' ? 'تحديث' : 'Refresh'}
           </button>
         </div>
@@ -233,14 +233,14 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         {statCard(
           dir === 'rtl' ? 'إجمالي الإيرادات' : 'Total Revenue',
           formatIqd(stats.revenue_iqd),
-          <TrendingUp className="w-5 h-5 text-[#c5a059]" />,
-          'bg-[#c5a059]/10'
+          <TrendingUp className="w-5 h-5 text-gold" />,
+          'bg-gold/10'
         )}
         {statCard(
           dir === 'rtl' ? 'إجمالي الطلبات' : 'Total Orders',
           stats.orders_total.toLocaleString(),
-          <ShoppingCart className="w-5 h-5 text-[#708238]" />,
-          'bg-[#708238]/10',
+          <ShoppingCart className="w-5 h-5 text-moss" />,
+          'bg-moss/10',
           onNavigateTab ? () => onNavigateTab('orders') : undefined
         )}
         {statCard(
@@ -253,8 +253,8 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         {statCard(
           dir === 'rtl' ? 'طلبات مكتملة' : 'Delivered Orders',
           stats.orders_delivered.toLocaleString(),
-          <CheckCircle2 className="w-5 h-5 text-[#2CE59B]" />,
-          'bg-[#2CE59B]/10'
+          <CheckCircle2 className="w-5 h-5 text-mint" />,
+          'bg-mint/10'
         )}
         {statCard(
           dir === 'rtl' ? 'المستخدمون' : 'Total Users',
@@ -266,26 +266,26 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         {statCard(
           dir === 'rtl' ? 'مشتركو Pro / Plus' : 'Pro / Plus Subscribers',
           `${stats.pro_subscribers.toLocaleString()} / ${stats.plus_subscribers.toLocaleString()}`,
-          <Crown className="w-5 h-5 text-[#e6c27a]" />,
-          'bg-[#e6c27a]/10'
+          <Crown className="w-5 h-5 text-wheat" />,
+          'bg-wheat/10'
         )}
         {statCard(
           dir === 'rtl' ? 'تعبئة المحفظة (الموافق عليها)' : 'Wallet Top-ups (approved)',
           formatWalletIqd(stats.incoming_usd_cents, exchangeRate),
-          <ArrowUpRight className="w-5 h-5 text-[#2CE59B]" />,
-          'bg-[#2CE59B]/10'
+          <ArrowUpRight className="w-5 h-5 text-mint" />,
+          'bg-mint/10'
         )}
         {statCard(
           dir === 'rtl' ? 'السحوبات (الموافق عليها)' : 'Wallet Payouts (approved)',
           formatWalletIqd(stats.outgoing_usd_cents, exchangeRate),
-          <ArrowDownRight className="w-5 h-5 text-[#FF6B9E]" />,
-          'bg-[#FF6B9E]/10'
+          <ArrowDownRight className="w-5 h-5 text-pink-400" />,
+          'bg-pink-400/10'
         )}
         {statCard(
           dir === 'rtl' ? 'طلبات المحفظة المعلقة' : 'Pending Wallet Requests',
           stats.pending_wallet_requests.toLocaleString(),
-          <Wallet className="w-5 h-5 text-[#c5a059]" />,
-          'bg-[#c5a059]/10',
+          <Wallet className="w-5 h-5 text-gold" />,
+          'bg-gold/10',
           onNavigateTab ? () => onNavigateTab('wallet_requests') : undefined
         )}
         {/* THE SUPPORT QUEUE, on the first screen. «الدعم والتذاكر» shipped as a
@@ -316,15 +316,15 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         {statCard(
           dir === 'rtl' ? 'المستثمرون' : 'Investors',
           stats.investors.toLocaleString(),
-          <Users className="w-5 h-5 text-[#708238]" />,
-          'bg-[#708238]/10'
+          <Users className="w-5 h-5 text-moss" />,
+          'bg-moss/10'
         )}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
 
         {/* Pending wallet requests — real list with working actions */}
-        <div className="bg-[#18181b]/80 backdrop-blur-xl border border-white/5 rounded-xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
+        <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[12px] font-black uppercase tracking-wider text-zinc-300">
               {dir === 'rtl' ? 'طلبات المحفظة المعلقة' : 'Pending Wallet Requests'}
@@ -332,7 +332,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
             {onNavigateTab && (
               <button
                 onClick={() => onNavigateTab('wallet_requests')}
-                className="text-[11px] font-bold text-[#c5a059] hover:text-[#e6c27a] transition-colors"
+                className="text-[11px] font-bold text-gold hover:text-wheat transition-colors"
               >
                 {dir === 'rtl' ? 'عرض الكل' : 'View all'}
               </button>
@@ -365,7 +365,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                         THE TWO STAT CARDS ABOVE KEEP CONVERTING, on purpose.
                         They are aggregates, and a sum of many deposits has no
                         typed figure — none may be invented for it. */}
-                        <span className="text-[#c5a059]">
+                        <span className="text-gold">
                           {req.withdrawal?.declared_amount_iqd
                             ? formatIqd(req.withdrawal.declared_amount_iqd)
                             : req.deposit?.declared_amount_iqd
@@ -392,7 +392,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                         // next step needs a payout reference — Wallet Requests.
                         <button
                           onClick={() => onNavigateTab?.('wallet_requests')}
-                          className="text-[11px] font-bold text-[#c5a059] hover:text-[#e6c27a] transition-colors capitalize"
+                          className="text-[11px] font-bold text-gold hover:text-wheat transition-colors capitalize"
                           title={req.withdrawal.state}
                         >
                           {req.withdrawal.state} →
@@ -402,7 +402,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                       <button
                         onClick={() => decideWallet(req, 'approved')}
                         disabled={!!loadingActionId}
-                        className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#8a9a49] to-[#708238] text-white flex items-center justify-center shadow-[0_4px_12px_rgba(112,130,56,0.4)] hover:scale-105 active:scale-95 transition-transform disabled:opacity-50"
+                        className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#8a9a49] to-[#708238] text-snow flex items-center justify-center shadow-[0_4px_12px_rgba(112,130,56,0.4)] hover:scale-105 active:scale-95 transition-transform disabled:opacity-50"
                         title={req.type === 'withdrawal' && req.withdrawal
                           ? (dir === 'rtl' ? 'موافقة للمعالجة (لا يُدفع هنا)' : 'Approve for processing (no payout here)')
                           : (dir === 'rtl' ? 'موافقة' : 'Approve')}
@@ -431,7 +431,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         </div>
 
         {/* Recent orders — real list */}
-        <div className="bg-[#18181b]/80 backdrop-blur-xl border border-white/5 rounded-xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
+        <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[12px] font-black uppercase tracking-wider text-zinc-300">
               {dir === 'rtl' ? 'أحدث الطلبات' : 'Recent Orders'}
@@ -439,7 +439,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
             {onNavigateTab && (
               <button
                 onClick={() => onNavigateTab('orders')}
-                className="text-[11px] font-bold text-[#c5a059] hover:text-[#e6c27a] transition-colors"
+                className="text-[11px] font-bold text-gold hover:text-wheat transition-colors"
               >
                 {dir === 'rtl' ? 'عرض الكل' : 'View all'}
               </button>

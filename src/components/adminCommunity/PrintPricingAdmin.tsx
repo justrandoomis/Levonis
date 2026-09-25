@@ -635,7 +635,7 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
             onClick={() => setTab(s.id)}
             className={`shrink-0 flex items-center gap-2 px-4 min-h-[42px] rounded-2xl text-[13px] font-semibold border transition-colors ${
               tab === s.id
-                ? 'bg-olive text-white border-olive'
+                ? 'bg-olive text-snow border-olive'
                 : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
             }`}
           >
@@ -1009,7 +1009,7 @@ function MaterialsPanel({
             key={k}
             onClick={() => setFilter(k)}
             className={`min-h-[34px] px-3 rounded-xl border text-[12px] font-semibold ${
-              filter === k ? 'bg-olive text-white border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+              filter === k ? 'bg-olive text-snow border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
             }`}
           >
             {k === 'all' ? t('الكل', 'All') : processLabel(k, t)}
@@ -1474,7 +1474,7 @@ function ProvidersPanel({
 function SaveBar({ t, section, dirty, saving, errors, onSave, onReset }: BarProps & { errors: string[] }) {
   const blocked = errors.length > 0;
   return (
-    <div className="sticky top-0 z-10 -mx-1 px-1 py-2 bg-[#18181b]/95 backdrop-blur-sm">
+    <div className="sticky top-0 z-10 -mx-1 px-1 py-2 bg-zinc-900/95 backdrop-blur-sm">
       {blocked && (
         <ul className="mb-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-3 py-2 space-y-0.5 max-h-40 overflow-y-auto">
           {errors.map((e, i) => (
@@ -1487,7 +1487,7 @@ function SaveBar({ t, section, dirty, saving, errors, onSave, onReset }: BarProp
           data-print-admin-save={section}
           onClick={onSave}
           disabled={!dirty || saving || blocked}
-          className="flex-1 min-h-[46px] rounded-2xl bg-olive text-white font-bold text-[13.5px] flex items-center justify-center gap-2 disabled:opacity-40"
+          className="flex-1 min-h-[46px] rounded-2xl bg-olive text-snow font-bold text-[13.5px] flex items-center justify-center gap-2 disabled:opacity-40"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
           {dirty ? t('حفظ هذا القسم', 'Save this section') : t('لا تغييرات', 'No changes')}
@@ -1690,7 +1690,7 @@ function Toggle({
   const lit =
     tone === 'match'
       ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
-      : 'bg-olive border-olive text-white';
+      : 'bg-olive border-olive text-snow';
   return (
     <button
       type="button"

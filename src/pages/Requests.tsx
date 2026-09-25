@@ -236,7 +236,7 @@ export default function Requests() {
           }}
         />
       ) : (
-        <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-28">
+        <div className="min-h-screen bg-black text-zinc-300 pb-28">
           <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[380px] bg-olive/15 rounded-full blur-[120px] pointer-events-none z-0" />
 
           <div className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 pt-6">
@@ -270,7 +270,7 @@ export default function Requests() {
                   key={v}
                   onClick={() => setView(v)}
                   className={`shrink-0 px-4 min-h-11 rounded-2xl text-[12.5px] font-semibold border transition-colors ${
-                    view === v ? 'bg-olive text-white border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
+                    view === v ? 'bg-olive text-snow border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
                   }`}
                 >
                   {label}
@@ -279,7 +279,7 @@ export default function Requests() {
               {(
                 <button
                   onClick={() => (user ? setView('new') : signIn())}
-                  className="ms-auto shrink-0 px-4 min-h-[40px] rounded-2xl bg-olive text-white text-[12.5px] font-semibold flex items-center gap-1.5"
+                  className="ms-auto shrink-0 px-4 min-h-[40px] rounded-2xl bg-olive text-snow text-[12.5px] font-semibold flex items-center gap-1.5"
                 >
                   <Plus className="w-4 h-4" />
                   {loc('طلب جديد', 'New', 'نوێ')}
@@ -473,7 +473,7 @@ function AllRequests({
           onClick={loadMore}
           disabled={more}
           data-requests-more
-          className="w-full min-h-[44px] rounded-2xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[13px] font-semibold disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          className="w-full min-h-[44px] rounded-2xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[13px] font-semibold disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         >
           {more ? loc('جارٍ التحميل…', 'Loading…') : loc('المزيد', 'Load more')}
         </button>
@@ -590,7 +590,7 @@ function RequestDetail({
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-28">
+    <div className="min-h-screen bg-black text-zinc-300 pb-28">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-6">
         <button onClick={onBack} className="inline-flex items-center gap-1.5 text-zinc-400 text-[13px] mb-4">
           <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
@@ -638,7 +638,7 @@ function RequestDetail({
               type="button"
               onClick={() => onEdit(current.id)}
               data-request="edit"
-              className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl text-[13px] font-semibold text-gold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+              className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl text-[13px] font-semibold text-gold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
             >
               <PencilLine className="w-4 h-4" aria-hidden="true" />
               {loc('عدّل الطلب', 'Edit request')}
@@ -668,7 +668,7 @@ function RequestDetail({
                 type="button"
                 onClick={() => onEdit(current.id)}
                 data-requests="continue-draft"
-                className="mt-3 w-full min-h-[44px] rounded-xl border border-white/10 bg-white/[0.03] text-white text-[13px] font-bold hover:bg-white/[0.06] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                className="mt-3 w-full min-h-[44px] rounded-xl border border-white/10 bg-white/[0.03] text-white text-[13px] font-bold hover:bg-white/[0.06] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
               >
                 {loc('أكمل التعديل', 'Continue editing')}
               </button>
@@ -681,7 +681,7 @@ function RequestDetail({
                   setDiscardOpen(true);
                 }}
                 disabled={publishing}
-                className="flex-1 min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-50"
+                className="flex-1 min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
               >
                 {/* OWNER: Sorani to be written by hand. */}
                 {loc('إلغاء المسودة', 'Discard draft')}
@@ -691,7 +691,7 @@ function RequestDetail({
                 onClick={publishDraft}
                 disabled={publishing}
                 data-requests="publish-draft"
-                className="flex-1 min-h-[44px] rounded-xl bg-olive text-white text-[13px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                className="flex-1 min-h-[44px] rounded-xl bg-olive text-snow text-[13px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
               >
                 {publishing && <Spinner size="sm" delayMs={0} decorative className="text-white" />}
                 {loc('نشر', 'Publish', 'بڵاوکردنەوە')}
@@ -971,7 +971,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
               request's conversation (W5-A, §4.7). */}
           {['funded', 'in_progress', 'merchant_marked_delivered', 'disputed'].includes(o.state) && (
             <details className="mb-2 group" data-community-order-contact={o.id}>
-              <summary className="min-h-[44px] flex items-center cursor-pointer text-[12.5px] font-semibold text-gold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
+              <summary className="min-h-[44px] flex items-center cursor-pointer text-[12.5px] font-semibold text-gold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
                 {loc('التواصل مع التاجر', 'Contact the merchant')}
               </summary>
               <OrderContactCard orderId={o.id} compact />
@@ -984,7 +984,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
                 type="button"
                 onClick={() => begin('confirm', o)}
                 data-community-order-confirm={o.id}
-                className="w-full min-h-[44px] rounded-xl bg-olive text-white font-bold text-[13px] hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                className="w-full min-h-[44px] rounded-xl bg-olive text-snow font-bold text-[13px] hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
               >
                 {loc('استلمت العمل — حوّل المبلغ للتاجر', 'I received it — release the funds', 'وەرمگرت — پارەکە بدە')}
               </button>
@@ -1086,7 +1086,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
           rows={4}
           maxLength={4000}
           autoComplete="off"
-          className="mt-2 w-full rounded-xl bg-black/40 border border-white/10 px-3.5 py-3 text-white text-[14px] leading-relaxed outline-none focus-visible:border-gold/40 focus-visible:ring-2 focus-visible:ring-[#BAA369]/40 resize-none"
+          className="mt-2 w-full rounded-xl bg-black/40 border border-white/10 px-3.5 py-3 text-white text-[14px] leading-relaxed outline-none focus-visible:border-gold/40 focus-visible:ring-2 focus-visible:ring-gold/40 resize-none"
         />
         <p className="mt-1 text-text-muted text-[11px] tabular-nums" dir="ltr" aria-live="polite">
           {description.trim().length} / 10+

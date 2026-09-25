@@ -66,11 +66,11 @@ export function CoverageBar({
     <div className={className}>
       <div className="flex items-baseline justify-between gap-3 min-w-0">
         <span className={`inline-flex items-center gap-1.5 text-[12px] font-bold min-w-0 ${active ? 'text-zinc-200' : 'text-zinc-400'}`}>
-          <Icon aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-[#BAA369]' : ''}`} />
+          <Icon aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-gold' : ''}`} />
           <span className="truncate">{label}</span>
         </span>
         {active && remaining !== null && (
-          <span className="text-[12px] font-bold text-[#BAA369] tabular-nums whitespace-nowrap shrink-0">
+          <span className="text-[12px] font-bold text-gold tabular-nums whitespace-nowrap shrink-0">
             {s.daysLeft(remaining, fmtInt(remaining, lang))}
           </span>
         )}
@@ -87,7 +87,7 @@ export function CoverageBar({
         {(active || expired) && (
           <div
             className={`absolute start-0 top-1/2 -translate-y-1/2 h-[2px] rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none ${
-              active ? 'bg-[#BAA369]' : 'bg-zinc-600'
+              active ? 'bg-gold' : 'bg-zinc-600'
             }`}
             style={{ width: pct }}
           />
@@ -99,12 +99,12 @@ export function CoverageBar({
         {active && (
           <>
             <span
-              className="absolute top-0 h-3 w-px bg-[#BAA369] transition-[inset-inline-start] duration-700 ease-out motion-reduce:transition-none"
+              className="absolute top-0 h-3 w-px bg-gold transition-[inset-inline-start] duration-700 ease-out motion-reduce:transition-none"
               style={{ insetInlineStart: pct }}
             />
             {showTodayLabel && (
               <span
-                className="absolute -top-3.5 text-[9px] uppercase tracking-wide text-[#BAA369]/80 -translate-x-1/2 rtl:translate-x-1/2 whitespace-nowrap"
+                className="absolute -top-3.5 text-[9px] uppercase tracking-wide text-gold/80 -translate-x-1/2 rtl:translate-x-1/2 whitespace-nowrap"
                 style={{ insetInlineStart: pct }}
               >
                 {s.today}
@@ -128,7 +128,7 @@ export function CoverageBar({
           className="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-400 tabular-nums min-w-0"
           data-coverage-split={`${baseMonths}+${extMonths}`}
         >
-          <ShieldPlus aria-hidden="true" className="w-3 h-3 shrink-0 text-[#BAA369]" />
+          <ShieldPlus aria-hidden="true" className="w-3 h-3 shrink-0 text-gold" />
           <span className="truncate">{s.coverageSplit(monthsLabel(baseMonths, lang), monthsLabel(extMonths, lang))}</span>
         </p>
       )}

@@ -40,9 +40,9 @@ export type NoteTone = 'gold' | 'amber' | 'zinc';
  */
 const TONES: Record<NoteTone, { box: string; icon: string; edge: string }> = {
   gold: {
-    box: 'border-transparent bg-[#BAA369]/[0.06] text-zinc-200',
-    icon: 'text-[#BAA369]',
-    edge: 'border-s-[#BAA369]/70',
+    box: 'border-transparent bg-gold/[0.06] text-zinc-200',
+    icon: 'text-gold',
+    edge: 'border-s-gold/70',
   },
   amber: {
     box: 'border-transparent bg-amber-500/[0.07] text-amber-100/90',

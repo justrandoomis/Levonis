@@ -39,7 +39,7 @@ function SaveStatus({ state, error }: { state: SaveState; error?: string | null 
   if (state === 'saved') {
     return (
       <div className="text-xs font-semibold text-zinc-500 flex items-center gap-1 mt-2">
-        <Check className="w-3 h-3 text-[#2CE59B]" /> Saved
+        <Check className="w-3 h-3 text-mint" /> Saved
       </div>
     );
   }
@@ -357,14 +357,14 @@ export default function AdminWalletSettings() {
                   value={rateInput}
                   onChange={(e) => { setRateInput(e.target.value); setRateState('dirty'); }}
                   disabled={!isLoaded}
-                  className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-[#6B46FF]/50 disabled:opacity-50"
+                  className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-iris/50 disabled:opacity-50"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">IQD</span>
               </div>
               <button
                 onClick={handleSaveRate}
                 disabled={rateState === 'saving' || !isLoaded}
-                className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-black px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
               >
                 <Save className="w-4 h-4" /> Save
               </button>
@@ -400,7 +400,7 @@ export default function AdminWalletSettings() {
                     value={codPerInput}
                     onChange={(e) => { setCodPerInput(e.target.value); setCodState('dirty'); }}
                     disabled={!isLoaded}
-                    className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-[#6B46FF]/50 disabled:opacity-50"
+                    className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-iris/50 disabled:opacity-50"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">IQD</span>
                 </div>
@@ -413,7 +413,7 @@ export default function AdminWalletSettings() {
                     value={codBlockInput}
                     onChange={(e) => { setCodBlockInput(e.target.value); setCodState('dirty'); }}
                     disabled={!isLoaded}
-                    className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-[#6B46FF]/50 disabled:opacity-50"
+                    className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-iris/50 disabled:opacity-50"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">IQD</span>
                 </div>
@@ -422,7 +422,7 @@ export default function AdminWalletSettings() {
             <button
               onClick={handleSaveCodTax}
               disabled={codState === 'saving' || !isLoaded}
-              className="w-full flex items-center justify-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-black px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
             >
               <Save className="w-4 h-4" /> Save
             </button>
@@ -456,14 +456,14 @@ export default function AdminWalletSettings() {
                   inputMode="decimal"
                   value={feePctInput}
                   onChange={(e) => { setFeePctInput(e.target.value); setFeeState('dirty'); }}
-                  className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-[#6B46FF]/50"
+                  className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-iris/50"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">%</span>
               </div>
               <button
                 onClick={handleSaveFee}
                 disabled={feeState === 'saving'}
-                className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-black px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
               >
                 <Save className="w-4 h-4" /> Save
               </button>
@@ -497,12 +497,12 @@ export default function AdminWalletSettings() {
                 onChange={(e) => { setUrlInput(e.target.value); setUrlState('dirty'); }}
                 disabled={!isLoaded}
                 placeholder="e.g. https://www.w3schools.com/html/mov_bbb.mp4"
-                className="flex-1 bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-medium focus:ring-2 focus:ring-[#6B46FF]/50 disabled:opacity-50"
+                className="flex-1 bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-medium focus:ring-2 focus:ring-iris/50 disabled:opacity-50"
               />
               <button
                 onClick={handleSaveUrl}
                 disabled={urlState === 'saving' || !isLoaded}
-                className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-black px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
               >
                 <Save className="w-4 h-4" /> Save
               </button>
@@ -538,7 +538,7 @@ export default function AdminWalletSettings() {
             <button
               onClick={() => savePayouts(payouts)}
               disabled={payoutState === 'saving' || !isLoaded || payoutState === 'idle' || payoutState === 'saved'}
-              className="flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-black px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+              className="flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
             >
               <Save className="w-4 h-4" /> Save
             </button>
@@ -564,7 +564,7 @@ export default function AdminWalletSettings() {
                   type="checkbox"
                   checked={p.requires_account}
                   onChange={(e) => updatePayout(p.id, { requires_account: e.target.checked })}
-                  className="w-4 h-4 accent-[#2CE59B]"
+                  className="w-4 h-4 accent-mint"
                 />
                 Needs the customer&apos;s account / card number
               </label>
@@ -603,7 +603,7 @@ export default function AdminWalletSettings() {
             {methodsState === 'dirty' && (
               <button
                 onClick={() => saveMethods(methods)}
-                className="flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-black px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                className="flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-4 py-2 rounded-xl text-sm font-bold transition-all"
               >
                 <Save className="w-4 h-4" /> Save All
               </button>
@@ -649,7 +649,7 @@ export default function AdminWalletSettings() {
                     <button
                       onClick={() => saveMethods(methods)}
                       disabled={methodsState === 'saving'}
-                      className="bg-[#2CE59B] text-black px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 hover:bg-[#06D6A0] disabled:opacity-50"
+                      className="bg-[#2CE59B] text-onyx px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 hover:bg-[#06D6A0] disabled:opacity-50"
                     >
                       <Check className="w-4 h-4" /> {methodsState === 'saving' ? 'Saving...' : 'Save'}
                     </button>

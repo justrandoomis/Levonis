@@ -410,7 +410,7 @@ export function OrdersTab({
               type="button"
               onClick={() => setCancelId('')}
               disabled={cancelling}
-              className="flex-1 min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-50"
+              className="flex-1 min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
             >
               {loc('الإبقاء على الطلب', 'Keep order', 'هێشتنەوەی داواکاری')}
             </button>
@@ -419,7 +419,7 @@ export function OrdersTab({
               onClick={() => void move(cancelId, 'cancelled')}
               disabled={cancelling}
               data-confirm-merchant-cancel
-              className="flex-1 min-h-[44px] rounded-xl bg-[#ef233c] text-white text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+              className="flex-1 min-h-[44px] rounded-xl bg-[#ef233c] text-snow text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
             >
               {cancelling && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
               {cancelling
@@ -672,7 +672,7 @@ export function CustomOrdersTab({ focusOrderId = null }: { focusOrderId?: string
               acceptance, and the request's conversation. */}
           {['funded', 'in_progress', 'merchant_marked_delivered', 'disputed'].includes(o.state) && (
             <details className="mb-2" data-custom-order-contact={o.id}>
-              <summary className="min-h-[44px] flex items-center cursor-pointer text-[12px] font-semibold text-gold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
+              <summary className="min-h-[44px] flex items-center cursor-pointer text-[12px] font-semibold text-gold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
                 {loc('بيانات الزبون والتسليم', 'Customer and delivery details')}
               </summary>
               <OrderContactCard orderId={o.id} compact />

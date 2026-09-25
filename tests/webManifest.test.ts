@@ -46,22 +46,22 @@ test('with no identity at all it is the platform, and it is a valid manifest', (
     assert.equal(m.display, 'standalone');
     assert.equal(m.lang, 'ar');
     assert.equal(m.dir, 'rtl');
-    assert.equal(m.background_color, '#000000');
-    assert.equal(m.theme_color, '#000000');
+    assert.equal(m.background_color, '#f3f0ea');
+    assert.equal(m.theme_color, '#f3f0ea');
     assert.deepEqual(m.categories, ['shopping']);
     assert.ok(m.description.length > 0);
   }
 });
 
-test('the black is the document’s #000000, never the softened Tailwind canvas', () => {
-  // `src/index.css` redefines --color-canvas to #0b0c0f on purpose, so a
-  // manifest copied from a Tailwind token would paint a lighter splash screen
-  // than the page it launches. index.html's theme-color is the reference.
+test('the platform splash is the light theme’s ivory — the ground index.html paints first', () => {
+  // The app's default theme is light (src/index.css, THE TWO THEMES), and
+  // index.html's theme-color and pre-CSS inline style paint #f3f0ea before
+  // the theme script runs. A merchant's store keeps its black (storeIcons).
   const shell = readFileSync(repo('index.html'), 'utf8');
-  assert.match(shell, /<meta name="theme-color" content="#000000"/);
+  assert.match(shell, /<meta name="theme-color" content="#f3f0ea"/);
   const m = buildWebManifest();
-  assert.equal(m.theme_color, '#000000');
-  assert.equal(m.background_color, '#000000');
+  assert.equal(m.theme_color, '#f3f0ea');
+  assert.equal(m.background_color, '#f3f0ea');
 });
 
 test('no orientation is declared, because the app has a desktop layout too', () => {
@@ -577,7 +577,7 @@ test('a partial, mislabelled or foreign rendition set is no set: the raw logo an
   assert.ok(platform.icons.every((i) => i.src.startsWith('/icons/')));
 });
 
-test('the ground comes from the store identity, validated; the platform keeps the document black', () => {
+test('the ground comes from the store identity, validated; the platform keeps its ivory (the default light theme)', () => {
   const m = buildWebManifest({ name: 'Ali 3D', backgroundColor: '#0A0B0C', themeColor: '#111111' });
   assert.equal(m.background_color, '#0a0b0c');
   assert.equal(m.theme_color, '#111111');
@@ -587,7 +587,7 @@ test('the ground comes from the store identity, validated; the platform keeps th
     assert.equal(w.theme_color, '#000000', String(bad));
   }
   const platform = buildWebManifest({ name: '', backgroundColor: '#ffffff', themeColor: '#ffffff' });
-  assert.equal(platform.background_color, '#000000');
+  assert.equal(platform.background_color, '#f3f0ea');
 });
 
 /** Store + a committed rendition set, cut through the stubbed binding. */

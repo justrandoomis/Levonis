@@ -41,12 +41,12 @@ export default function AwaySheet({
   const titleId = useId();
   const g = groupEvents(events);
   const rows: Array<{ key: string; icon: React.ReactNode; text: string; tone: string }> = [];
-  if (g.finished) rows.push({ key: 'ok', icon: <CheckCircle2 aria-hidden="true" className="w-4 h-4" />, text: s.awayFinished(g.finished), tone: 'text-[#A6B283]' });
-  if (g.failed) rows.push({ key: 'f', icon: <TriangleAlert aria-hidden="true" className="w-4 h-4" />, text: s.awayFailed(g.failed), tone: 'text-[#E06070]' });
-  if (g.late) rows.push({ key: 'l', icon: <Clock aria-hidden="true" className="w-4 h-4" />, text: s.awayLate(g.late), tone: 'text-[#E4B363]' });
-  if (g.cancelled) rows.push({ key: 'c', icon: <Ban aria-hidden="true" className="w-4 h-4" />, text: s.awayCancelled(g.cancelled), tone: 'text-[#E4B363]' });
-  if (g.maintenance) rows.push({ key: 'm', icon: <Wrench aria-hidden="true" className="w-4 h-4" />, text: s.awayMaintenance(g.maintenance), tone: 'text-[#E4B363]' });
-  if (g.levelUp) rows.push({ key: 'u', icon: <TrendingUp aria-hidden="true" className="w-4 h-4" />, text: s.awayLevelUp(g.levelUp), tone: 'text-[#BAA369]' });
+  if (g.finished) rows.push({ key: 'ok', icon: <CheckCircle2 aria-hidden="true" className="w-4 h-4" />, text: s.awayFinished(g.finished), tone: 'text-sage' });
+  if (g.failed) rows.push({ key: 'f', icon: <TriangleAlert aria-hidden="true" className="w-4 h-4" />, text: s.awayFailed(g.failed), tone: 'text-coral' });
+  if (g.late) rows.push({ key: 'l', icon: <Clock aria-hidden="true" className="w-4 h-4" />, text: s.awayLate(g.late), tone: 'text-honey' });
+  if (g.cancelled) rows.push({ key: 'c', icon: <Ban aria-hidden="true" className="w-4 h-4" />, text: s.awayCancelled(g.cancelled), tone: 'text-honey' });
+  if (g.maintenance) rows.push({ key: 'm', icon: <Wrench aria-hidden="true" className="w-4 h-4" />, text: s.awayMaintenance(g.maintenance), tone: 'text-honey' });
+  if (g.levelUp) rows.push({ key: 'u', icon: <TrendingUp aria-hidden="true" className="w-4 h-4" />, text: s.awayLevelUp(g.levelUp), tone: 'text-gold' });
   if (g.other) rows.push({ key: 'o', icon: <Info aria-hidden="true" className="w-4 h-4" />, text: s.awayOther(g.other), tone: 'text-zinc-300' });
 
   const acknowledge = async () => {
@@ -84,10 +84,10 @@ export default function AwaySheet({
           {g.coins !== null && (
             <li className={`${ROW} px-3 py-2.5 flex items-center justify-between gap-2.5 text-[13px]`}>
               <span className="inline-flex items-center gap-2.5 text-zinc-100">
-                <Coins aria-hidden="true" className="w-4 h-4 text-[#BAA369]" />
+                <Coins aria-hidden="true" className="w-4 h-4 text-gold" />
                 {s.awayCoins}
               </span>
-              <span className={`font-black tabular-nums ${g.coins >= 0 ? 'text-[#BAA369]' : 'text-[#E06070]'}`} dir="ltr">
+              <span className={`font-black tabular-nums ${g.coins >= 0 ? 'text-gold' : 'text-coral'}`} dir="ltr">
                 {formatSignedCoins(g.coins, lang)}
               </span>
             </li>

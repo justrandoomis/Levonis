@@ -45,6 +45,8 @@
   --lv-focus-ring: #c9ad6a;
   --lv-cta-ink: #14120a;
   --lv-cta-base: #1b1e19;
+  /* the ink the grid, the wells and the hover washes are drawn in, as r g b */
+  --lv-ink-rgb: 241 240 234;
   /* names older recipes still read */
   --lv-void: var(--lv-ground);
   --lv-carbon: var(--lv-panel);
@@ -62,6 +64,44 @@
   -webkit-font-smoothing: antialiased;
 }
 
+
+/* THE LIGHT THEME (src/index.css, THE TWO THEMES): the same blueprint drawn on
+   drafting paper — ivory ground, ink grid, the olive and gold deepened until
+   they read on it (4.5:1 for every text token). The gold FILL of the sign-in
+   button stays the brand's bright gold with dark ink on it, as in dark. */
+[data-theme='light'] .lv-auth {
+  --lv-ground: #f3f0ea;
+  --lv-ground-2: #ebe7de;
+  --lv-panel: #fbfaf7;
+  --lv-panel-line: #e0dace;
+  --lv-line-strong: #cfc8ba;
+  --lv-line-hover: #b3ab9b;
+  --lv-olive: #5d6a3a;
+  --lv-olive-deep: #c7cfae;
+  --lv-olive-text: #56623a;
+  --lv-olive-soft: #eef0e4;
+  --lv-olive-line: #d5dbc2;
+  --lv-gold: #bca36b;
+  --lv-gold-deep: #7a6331;
+  --lv-gold-text: #7a6331;
+  --lv-gold-soft: rgba(122, 99, 49, 0.08);
+  --lv-red: #a4443a;
+  --lv-red-text: #9d3a30;
+  --lv-red-soft: #f7e6e2;
+  --lv-red-line: #e5c2bb;
+  --lv-text-1: #16181b;
+  --lv-text-2: #45484e;
+  --lv-text-3: #5f6268;
+  --lv-placeholder: #75777c;
+  --lv-focus-ring: #7a6331;
+  --lv-cta-ink: #14120a;
+  --lv-cta-base: #ebe6dc;
+  --lv-ink-rgb: 22 24 27;
+  color-scheme: light;
+}
+[data-theme='light'] .lv-auth .lv-card {
+  box-shadow: 0 1px 2px rgb(22 24 27 / 0.06), 0 10px 30px -18px rgb(22 24 27 / 0.18);
+}
 .lv-mono {
   font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-feature-settings: 'tnum' 1;
@@ -98,8 +138,8 @@
   position: absolute;
   inset: -120px;
   background-image:
-    linear-gradient(to right, rgba(241, 240, 234, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(241, 240, 234, 0.03) 1px, transparent 1px),
+    linear-gradient(to right, rgb(var(--lv-ink-rgb) / 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--lv-ink-rgb) / 0.03) 1px, transparent 1px),
     linear-gradient(to right, rgba(166, 178, 131, 0.085) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(166, 178, 131, 0.085) 1px, transparent 1px);
   background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
@@ -370,7 +410,7 @@
   padding: 2px;
   border: 1px solid var(--lv-panel-line);
   border-radius: 8px;
-  background: rgba(22, 24, 21, 0.85);
+  background: color-mix(in srgb, var(--lv-panel) 85%, transparent);
   direction: ltr;
 }
 .lv-lang__btn {
@@ -797,7 +837,7 @@
 .lv-field__reveal svg { width: 17px; height: 17px; }
 .lv-field__reveal:hover {
   color: var(--lv-text-1);
-  background: rgba(241, 240, 234, 0.04);
+  background: rgb(var(--lv-ink-rgb) / 0.04);
 }
 .lv-field__reveal:focus-visible {
   outline: 2px solid var(--lv-focus-ring);
@@ -903,16 +943,16 @@
 .lv-auth input:-webkit-autofill:hover,
 .lv-auth input:-webkit-autofill:focus,
 .lv-auth input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px #101210 inset !important;
-  box-shadow: 0 0 0 1000px #101210 inset !important;
-  -webkit-text-fill-color: #f1f0ea !important;
-  caret-color: #f1f0ea;
+  -webkit-box-shadow: 0 0 0 1000px var(--lv-ground-2) inset !important;
+  box-shadow: 0 0 0 1000px var(--lv-ground-2) inset !important;
+  -webkit-text-fill-color: var(--lv-text-1) !important;
+  caret-color: var(--lv-text-1);
   transition: background-color 9999999s ease-out;
 }
 .lv-auth input:autofill {
-  box-shadow: 0 0 0 1000px #101210 inset;
-  -webkit-text-fill-color: #f1f0ea;
-  caret-color: #f1f0ea;
+  box-shadow: 0 0 0 1000px var(--lv-ground-2) inset;
+  -webkit-text-fill-color: var(--lv-text-1);
+  caret-color: var(--lv-text-1);
 }
 
 /* =====================================================================
@@ -1111,7 +1151,7 @@
 .lv-btn-quiet svg { width: 16px; height: 16px; flex: none; color: var(--lv-gold-text); }
 .lv-btn-quiet:hover:not(:disabled) {
   border-color: var(--lv-line-hover);
-  background: rgba(241, 240, 234, 0.025);
+  background: rgb(var(--lv-ink-rgb) / 0.025);
 }
 .lv-btn-quiet:active:not(:disabled) { transform: translateY(1px); }
 .lv-btn-quiet:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -1165,7 +1205,7 @@
 }
 .lv-social:hover:not(:disabled) {
   border-color: var(--lv-line-hover);
-  background: rgba(241, 240, 234, 0.025);
+  background: rgb(var(--lv-ink-rgb) / 0.025);
 }
 .lv-social:active:not(:disabled) {
   transform: translateY(1px);

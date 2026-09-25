@@ -46,7 +46,7 @@ const BLANK = {
 };
 
 const input =
-  'w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#BAA369] transition-colors';
+  'w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-gold transition-colors';
 const label = 'block text-zinc-400 text-[10px] font-bold mb-1.5 uppercase tracking-wider';
 
 export default function AdminCoupons({ dir }: { dir: 'rtl' | 'ltr' }) {
@@ -140,7 +140,7 @@ export default function AdminCoupons({ dir }: { dir: 'rtl' | 'ltr' }) {
     <div className="space-y-6" data-admin-coupons>
       <div>
         <h2 className="text-white font-bold text-lg flex items-center gap-2">
-          <Ticket className="w-5 h-5 text-[#BAA369]" aria-hidden />
+          <Ticket className="w-5 h-5 text-gold" aria-hidden />
           {ar ? 'أكواد الخصم' : 'Promo codes'}
         </h2>
         <p className="text-zinc-400 text-xs mt-1">
@@ -151,12 +151,12 @@ export default function AdminCoupons({ dir }: { dir: 'rtl' | 'ltr' }) {
       </div>
 
       {error && (
-        <div role="alert" className="bg-[#B03142]/10 border border-[#B03142]/40 text-[#e4899a] text-xs rounded-2xl p-3">
+        <div role="alert" className="bg-crimson/10 border border-crimson/40 text-blush text-xs rounded-2xl p-3">
           {error}
         </div>
       )}
       {notice && (
-        <div role="status" className="bg-[#59A846]/10 border border-[#59A846]/40 text-[#8fd07c] text-xs rounded-2xl p-3 flex items-center gap-2">
+        <div role="status" className="bg-leaf/10 border border-leaf/40 text-sprout text-xs rounded-2xl p-3 flex items-center gap-2">
           <Check className="w-4 h-4" aria-hidden /> {notice}
         </div>
       )}
@@ -224,7 +224,7 @@ export default function AdminCoupons({ dir }: { dir: 'rtl' | 'ltr' }) {
         </div>
         <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
           <button type="submit" disabled={saving || !form.code.trim()}
-            className="bg-[#BAA369] hover:bg-[#ffe55c] text-black font-bold text-sm px-5 py-3 rounded-xl flex items-center gap-2 disabled:opacity-60 transition-colors">
+            className="bg-gold hover:bg-gold-light text-accent-contrast font-bold text-sm px-5 py-3 rounded-xl flex items-center gap-2 disabled:opacity-60 transition-colors">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Plus className="w-4 h-4" aria-hidden />}
             {ar ? 'إنشاء الكود' : 'Create coupon'}
           </button>
@@ -265,7 +265,7 @@ export default function AdminCoupons({ dir }: { dir: 'rtl' | 'ltr' }) {
                     {r.max_global !== null ? ` / ${r.max_global}` : ''}
                   </td>
                   <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${r.active ? 'bg-[#59A846]/15 text-[#8fd07c]' : 'bg-zinc-800 text-zinc-400'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${r.active ? 'bg-leaf/15 text-sprout' : 'bg-zinc-800 text-zinc-400'}`}>
                       {r.active ? (ar ? 'مفعّل' : 'Active') : (ar ? 'معطّل' : 'Off')}
                     </span>
                   </td>

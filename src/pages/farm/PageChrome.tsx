@@ -53,7 +53,7 @@ export function GamesHeader({
 /** The dark page frame: fills the full-screen shell and owns its own scroll. */
 export function GamesPage({ dir, children, testId }: { dir: 'ltr' | 'rtl'; children: React.ReactNode; testId?: string }) {
   return (
-    <div dir={dir} className="w-full flex-1 min-h-0 flex flex-col bg-[#0a0a0a] text-zinc-300 overflow-hidden" data-games-page={testId ?? true}>
+    <div dir={dir} className="w-full flex-1 min-h-0 flex flex-col bg-black text-zinc-300 overflow-hidden" data-games-page={testId ?? true}>
       {children}
     </div>
   );

@@ -24,7 +24,7 @@ function Badge({ icon: Icon, tone = 'zinc', children }: { icon: React.ElementTyp
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold whitespace-nowrap ${
-        tone === 'gold' ? 'border-[#BAA369]/40 bg-[#BAA369]/10 text-[#BAA369]' : 'border-zinc-700 bg-zinc-800/60 text-zinc-300'
+        tone === 'gold' ? 'border-gold/40 bg-gold/10 text-gold' : 'border-zinc-700 bg-zinc-800/60 text-zinc-300'
       }`}
     >
       <Icon aria-hidden="true" className="w-3 h-3" />

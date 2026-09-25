@@ -110,7 +110,7 @@ export function UsageGuideSection({
               <div className="flex items-center gap-2 min-w-0 mb-2">
                 <span
                   className={`shrink-0 w-6 h-6 rounded-md grid place-items-center text-[10px] font-black ${
-                    st.kind === 'setup' ? 'bg-amber-500/15 text-amber-300' : 'bg-[#6B46FF]/15 text-[#b9a5ff]'
+                    st.kind === 'setup' ? 'bg-amber-500/15 text-amber-300' : 'bg-iris/15 text-violet-300'
                   }`}
                 >
                   {i + 1}
@@ -122,7 +122,7 @@ export function UsageGuideSection({
                       type="button"
                       onClick={() => patch(st.id, { kind: k.id })}
                       className={`h-8 px-2 text-[11px] font-bold transition-colors ${
-                        st.kind === k.id ? 'bg-[#6B46FF]/20 text-white' : 'bg-zinc-800/40 text-zinc-500 hover:text-zinc-300'
+                        st.kind === k.id ? 'bg-iris/20 text-white' : 'bg-zinc-800/40 text-zinc-500 hover:text-zinc-300'
                       }`}
                     >
                       {k.ar}

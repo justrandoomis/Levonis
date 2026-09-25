@@ -177,8 +177,8 @@ export default function JobSheet({
             </p>
             <p className="text-[12px] text-zinc-500 mt-1">{s.assignIntro}</p>
             {job.payout_deferred_day && (
-              <p className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-[#E4B363]">
-                <Chip className="border-[#E4B363]/40 text-[#E4B363] bg-[#E4B363]/10" data-farm-payout-pending={job.id}>
+              <p className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-honey">
+                <Chip className="border-honey/40 text-honey bg-honey/10" data-farm-payout-pending={job.id}>
                   {s.payoutPending}
                 </Chip>
                 <span>{s.payoutPendingBody}</span>
@@ -197,7 +197,7 @@ export default function JobSheet({
               items={PRINT_QUALITIES.map((q) => ({
                 id: q,
                 label: qualityLabel(q, s),
-                accent: { indicator: 'bg-[#BAA369]/10 border-[#BAA369]/40', text: 'text-[#BAA369]' },
+                accent: { indicator: 'bg-gold/10 border-gold/40', text: 'text-gold' },
               }))}
             />
           </div>
@@ -205,7 +205,7 @@ export default function JobSheet({
           <div className="space-y-2">
             <div className="flex items-baseline justify-between">
               <p className="text-[11px] font-semibold text-zinc-500">{s.printersLabel}</p>
-              <p className={`text-[11px] tabular-nums ${tooMany ? 'text-[#E06070]' : 'text-zinc-400'}`}>{s.allocated(total, remaining)}</p>
+              <p className={`text-[11px] tabular-nums ${tooMany ? 'text-coral' : 'text-zinc-400'}`}>{s.allocated(total, remaining)}</p>
             </div>
             {rows.map(({ p, fit, qty, grams, spool, gramsOk, own, wait, finishAt }) => {
               const model = printerModel(config, p.model_key);
@@ -251,7 +251,7 @@ export default function JobSheet({
                           {s.spoolLabel} · <span className="tabular-nums">{s.gramsNeeded(grams)}</span>
                         </label>
                         {spools.length === 0 ? (
-                          <p className="text-[12px] text-[#E4B363]">{s.noCompatibleSpool}</p>
+                          <p className="text-[12px] text-honey">{s.noCompatibleSpool}</p>
                         ) : (
                           <select
                             id={`spool-${p.id}`}
@@ -268,7 +268,7 @@ export default function JobSheet({
                             ))}
                           </select>
                         )}
-                        {spool && !gramsOk && <p className="text-[11px] text-[#E06070]">{s.insufficientGrams}</p>}
+                        {spool && !gramsOk && <p className="text-[11px] text-coral">{s.insufficientGrams}</p>}
                       </div>
                       <p className="text-[11px] text-zinc-400 tabular-nums" data-farm-duration="estimate">
                         ≈ {gameDuration(own, lang)}
@@ -301,10 +301,10 @@ export default function JobSheet({
                     <Chip
                       className={
                         risk === 'on_time'
-                          ? 'border-[#A6B283]/40 text-[#A6B283] bg-[#A6B283]/10'
+                          ? 'border-sage/40 text-sage bg-sage/10'
                           : risk === 'tight'
-                            ? 'border-[#E4B363]/40 text-[#E4B363] bg-[#E4B363]/10'
-                            : 'border-[#E06070]/40 text-[#E06070] bg-[#E06070]/10'
+                            ? 'border-honey/40 text-honey bg-honey/10'
+                            : 'border-coral/40 text-coral bg-coral/10'
                       }
                     >
                       {risk === 'on_time' ? s.riskOnTime : risk === 'tight' ? s.riskTight : s.riskLate}

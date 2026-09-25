@@ -441,7 +441,7 @@ export default function NotificationBell() {
             data-notif="badge"
             dir="ltr"
             aria-hidden="true"
-            className="absolute -top-1 -end-1 min-w-[18px] rounded-full bg-gold px-1 text-center text-[10px] font-bold leading-[18px] text-black"
+            className="absolute -top-1 -end-1 min-w-[18px] rounded-full bg-gold px-1 text-center text-[10px] font-bold leading-[18px] text-accent-contrast"
           >
             {unread > 99 ? '99+' : unread}
           </span>

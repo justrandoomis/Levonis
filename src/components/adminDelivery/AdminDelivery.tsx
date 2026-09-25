@@ -132,7 +132,7 @@ export default function AdminDelivery({ dir }: { dir: 'rtl' | 'ltr' }) {
     <div className="space-y-6" data-admin-delivery>
       <div>
         <h2 className="text-white font-bold text-lg flex items-center gap-2">
-          <Truck className="w-5 h-5 text-[#BAA369]" aria-hidden />
+          <Truck className="w-5 h-5 text-gold" aria-hidden />
           {ar ? 'التوصيل المحلي' : 'Local delivery'}
         </h2>
         <p className="text-zinc-400 text-xs mt-1 leading-relaxed">
@@ -143,12 +143,12 @@ export default function AdminDelivery({ dir }: { dir: 'rtl' | 'ltr' }) {
       </div>
 
       {error && (
-        <div role="alert" className="bg-[#B03142]/10 border border-[#B03142]/40 text-[#e4899a] text-xs rounded-2xl p-3">
+        <div role="alert" className="bg-crimson/10 border border-crimson/40 text-blush text-xs rounded-2xl p-3">
           {error}
         </div>
       )}
       {notice && (
-        <div role="status" className="bg-[#59A846]/10 border border-[#59A846]/40 text-[#8fd07c] text-xs rounded-2xl p-3 flex items-center gap-2">
+        <div role="status" className="bg-leaf/10 border border-leaf/40 text-sprout text-xs rounded-2xl p-3 flex items-center gap-2">
           <Check className="w-4 h-4" aria-hidden /> {notice}
         </div>
       )}
@@ -160,7 +160,7 @@ export default function AdminDelivery({ dir }: { dir: 'rtl' | 'ltr' }) {
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-2 text-sm">
             <div className="flex items-center justify-between gap-3">
               <span className="text-zinc-400">{ar ? 'بيانات الدخول' : 'Credentials'}</span>
-              <span className={config?.credentials_configured ? 'text-[#8fd07c] font-bold' : 'text-amber-400 font-bold'}>
+              <span className={config?.credentials_configured ? 'text-sprout font-bold' : 'text-amber-400 font-bold'}>
                 {config?.credentials_configured ? (ar ? 'مهيأة' : 'Configured') : (ar ? 'غير مهيأة' : 'Not configured')}
               </span>
             </div>
@@ -196,7 +196,7 @@ export default function AdminDelivery({ dir }: { dir: 'rtl' | 'ltr' }) {
               type="button"
               onClick={() => void syncAll()}
               disabled={!!busy}
-              className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl bg-[#BAA369] hover:bg-[#ffe55c] text-black text-[13px] font-bold disabled:opacity-60 transition-colors"
+              className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl bg-gold hover:bg-gold-light text-accent-contrast text-[13px] font-bold disabled:opacity-60 transition-colors"
             >
               {busy === 'sync' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Truck className="w-4 h-4" aria-hidden />}
               {ar ? 'مزامنة حالة الوسيط' : 'Sync courier statuses'}

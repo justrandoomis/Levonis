@@ -102,7 +102,7 @@ export type { BundleCard };
 
 const CHIP =
   'shrink-0 min-h-[36px] px-3 rounded-full border text-[12px] font-bold transition-colors inline-flex items-center';
-const CHIP_ON = 'bg-olive text-black border-olive';
+const CHIP_ON = 'bg-olive text-snow border-olive';
 const CHIP_OFF = 'bg-zinc-900/60 text-zinc-300 border-zinc-800 hover:border-zinc-600';
 
 export default function Bundles() {
@@ -407,7 +407,7 @@ export default function Bundles() {
             </p>
             <Link
               to={data.signed_in ? '/subscription' : '/auth?next=/bundles'}
-              className="inline-flex items-center justify-center min-h-11 px-5 rounded-xl bg-gold text-black text-sm font-black hover:brightness-110 transition-all"
+              className="inline-flex items-center justify-center min-h-11 px-5 rounded-xl bg-gold text-accent-contrast text-sm font-black hover:brightness-110 transition-all"
             >
               {data.signed_in ? s.lockedCta : s.signIn}
             </Link>

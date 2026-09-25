@@ -60,6 +60,7 @@ export function CardArt({ tier, size = 'sm', className = '' }: { tier: PaidTier;
       aria-hidden
       data-card-art={tier}
       className={`relative block shrink-0 overflow-hidden border ${ART_SIZE[size]} ${className}`}
+      data-theme="dark"
       style={cardMaterial(tier)}
     >
       <meta.Icon className={`absolute ${big ? 'top-3 start-3 w-5 h-5' : 'top-[18%] start-[12%] w-[26%] h-[40%]'}`} style={{ color: meta.hex }} />
@@ -91,6 +92,7 @@ export function LevoCard({ user, tier }: LevoCardProps) {
     <div
       data-levo-card={tier}
       className="relative shrink-0 w-[10.5rem] sm:w-[15.5rem] aspect-[1.586/1] rounded-[14px] sm:rounded-[18px] border p-3 sm:p-3.5 flex flex-col justify-between overflow-hidden"
+      data-theme="dark"
       style={cardMaterial(tier)}
     >
       <div className="flex items-start justify-between gap-2">

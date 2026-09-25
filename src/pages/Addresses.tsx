@@ -359,7 +359,7 @@ export default function Addresses() {
                               setApproveStep(1);
                               setApproveId(addr.id);
                             }}
-                            className="lv-button lv-button-ghost min-h-[40px] px-2.5 text-[12px] font-bold text-[#e06070] hover:text-[#f07a88] disabled:opacity-40 [touch-action:manipulation]"
+                            className="lv-button lv-button-ghost min-h-[40px] px-2.5 text-[12px] font-bold text-coral hover:text-coral disabled:opacity-40 [touch-action:manipulation]"
                           >
                             <ShieldCheck aria-hidden="true" className="w-3.5 h-3.5" />
                             {loc('اعتمد العنوان', 'Approve address')}
@@ -460,7 +460,7 @@ export default function Addresses() {
       >
         <div className="p-6" data-approve-step={approveStep}>
           <h2 id="approve-address-title" className="text-xl font-bold mb-2 flex items-center gap-2">
-            <ShieldCheck aria-hidden="true" className="w-5 h-5 text-[#e06070]" />
+            <ShieldCheck aria-hidden="true" className="w-5 h-5 text-coral" />
             {approveStep === 1 ? loc('اعتماد العنوان', 'Approve this address') : loc('هل أنت متأكد؟', 'Are you sure?')}
           </h2>
           {approveStep === 1 ? (

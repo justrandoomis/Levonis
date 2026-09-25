@@ -199,7 +199,7 @@ export default function BottomNav() {
             <span
               aria-hidden="true"
               data-nav-badge={item.path === '/cart' ? 'cart' : item.path === '/chats' ? 'messages' : undefined}
-              className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-white text-[10px] font-black leading-[16px] text-center tabular-nums"
+              className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-snow text-[10px] font-black leading-[16px] text-center tabular-nums"
             >
               {badge > 99 ? '99+' : badge}
             </span>

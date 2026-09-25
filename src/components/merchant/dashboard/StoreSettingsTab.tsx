@@ -28,7 +28,7 @@ const DeliverySettingsEditor = lazy(() => import('../delivery/DeliverySettingsEd
 /** The accent presets, with an honest swatch for each. Classes only — the
  *  merchant picks a NAME; no colour value they type can reach a style rule. */
 const ACCENT_SWATCHES: Array<{ id: string; cls: string; ar: string; en: string }> = [
-  { id: 'default', cls: 'bg-[#BAA369]', ar: 'Levonis', en: 'Levonis' },
+  { id: 'default', cls: 'bg-gold', ar: 'Levonis', en: 'Levonis' },
   { id: 'olive', cls: 'bg-[#6b7d43]', ar: 'زيتوني', en: 'Olive' },
   { id: 'gold', cls: 'bg-yellow-500', ar: 'ذهبي', en: 'Gold' },
   { id: 'slate', cls: 'bg-slate-400', ar: 'رمادي', en: 'Slate' },

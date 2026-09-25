@@ -160,14 +160,14 @@ export default function EditProfile() {
     .toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white w-full font-sans pb-16">
+    <div className="min-h-screen bg-black text-white w-full font-sans pb-16">
       {/* THE STORE LIVES IN ONE PLACE (audit 01 B10). This used to be a
           «Merchant Mode» toggle that swapped this page for a second, legacy
           store editor writing products through /api/community/my-store —
           store-less, entitlement-free, any image URL, hard deletes. That API
           now hands every write to the store API, and this is the way there. */}
       {canMerchant && (
-        <div className="flex justify-center pt-8 px-4 bg-[#0a0a0a]">
+        <div className="flex justify-center pt-8 px-4 bg-black">
           <Link
             to="/merchant"
             data-edit-profile-store-link
@@ -190,7 +190,7 @@ export default function EditProfile() {
           The character anchor is what stops the shell printing a SECOND strip
           above this bar: MotionCharacterFallbackHeader suppresses itself as
           soon as a page registers an anchor of its own. */}
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 p-4 pt-4 bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-10 border-b border-zinc-800/50">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 p-4 pt-4 bg-black/80 backdrop-blur-md sticky top-0 z-10 border-b border-zinc-800/50">
         <button
           onClick={() => navigate(-1)}
           aria-label="Back"

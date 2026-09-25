@@ -4,6 +4,7 @@ import App from './App.tsx';
 import './index.css';
 import { startInstallPromptCapture } from './hooks/useInstallApp';
 import { watchForUpdates } from './components/pwa/UpdateReadyToast';
+import { initTheme } from './lib/theme';
 
 /**
  * NO GOOGLE PROVIDER HERE ANY MORE.
@@ -33,6 +34,10 @@ import { watchForUpdates } from './components/pwa/UpdateReadyToast';
  * The call is idempotent, so importing the store from anywhere else is safe.
  */
 startInstallPromptCapture();
+
+// The theme the inline script in index.html painted is re-asserted here and
+// kept in step with the device and other tabs from now on (src/lib/theme.ts).
+initTheme();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

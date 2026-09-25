@@ -186,20 +186,27 @@ test('NO apple-mobile-web-app-title — it would name every merchant shop LEVONI
   );
 });
 
-test('the status bar is opaque black, and that is a decision rather than a default', () => {
+test('the status bar is opaque — never translucent — and it takes the theme’s ground', () => {
   // `black-translucent` extends the web view UNDER the clock and leaves the
   // page to pad itself with env(safe-area-inset-top). The main header does
   // that; the full-screen shells (Settings, both checkouts, admin) draw their
   // own sticky bar with no top inset, so translucency would slide them under
-  // the status bar on every notched iPhone.
-  assert.equal(meta('apple-mobile-web-app-status-bar-style'), 'black');
+  // the status bar on every notched iPhone. The app has two themes now
+  // (src/index.css): the markup ships `default` (the light theme is the
+  // default) and the pre-paint theme script rewrites it to `black` for a
+  // reader who chose dark, before iOS reads it.
+  assert.equal(meta('apple-mobile-web-app-status-bar-style'), 'default');
+  assert.ok(!/black-translucent/.test(MARKUP.replace(/<!--[\s\S]*?-->/g, '')));
+  assert.match(MARKUP, /apple-mobile-web-app-status-bar-style"\]'\);if\(m\)[^<]*if\(b\)b\.setAttribute\('content',d\?'black':'default'\)/);
 });
 
-test('the page is still black, and the manifest must agree with it', () => {
-  // The document's real black is #000000 — the Tailwind token `--color-black`
-  // is a softened #0b0c0f and is NOT what the browser chrome is painted.
-  assert.equal(meta('theme-color'), '#000000');
-  assert.match(MARKUP, /background-color: #000/);
+test('the first frame is painted in the theme’s own ground, and the browser chrome agrees', () => {
+  // Light (#f3f0ea, ivory) unless the reader chose dark (#0b0c0f); the inline
+  // theme script rewrites theme-color before anything paints
+  // (tests/themeSystem.test.ts pins that script and its CSP hash).
+  assert.equal(meta('theme-color'), '#f3f0ea');
+  assert.match(MARKUP, /html, body \{ background-color: #f3f0ea; margin: 0; \}/);
+  assert.match(MARKUP, /html\[data-theme="dark"\], html\[data-theme="dark"\] body \{ background-color: #0b0c0f; \}/);
   assert.match(MARKUP, /<html lang="ar" dir="rtl"/);
   assert.match(MARKUP, /viewport-fit=cover/);
 });
@@ -208,7 +215,7 @@ test('no iOS splash-screen links, deliberately', () => {
   // iOS matches `apple-touch-startup-image` by exact device resolution and
   // orientation, so covering the phones people own means ~30 links and ~30
   // generated PNGs that go stale with every new iPhone. Without them iOS
-  // paints the manifest's background_color, which is the same #000000 this
+  // paints the manifest's background_color, which is the same ground (ivory, #f3f0ea) this
   // page already paints. The correct splash screen is the free one.
   assert.ok(
     !/apple-touch-startup-image/i.test(MARKUP),

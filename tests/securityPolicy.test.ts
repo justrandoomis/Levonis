@@ -32,6 +32,7 @@ import {
   ASSET_CACHE_CONTROL,
   documentCsp,
   spaCsp,
+  THEME_BOOT_SCRIPT_HASH,
 } from '../worker/lib/securityPolicy';
 import { renderWarrantyDoc, type WarrantyDocData } from '../worker/lib/warrantyDoc';
 import { renderPurchaseReceipt, type PurchaseReceiptData } from '../worker/lib/receipts';
@@ -58,7 +59,12 @@ test('an injected inline or eval script is refused — the lock that holds when 
   assert.ok(!script.includes("'unsafe-inline'"), 'no inline script');
   assert.ok(!script.includes("'unsafe-eval'"), 'no eval');
   assert.ok(!script.includes('*') && !script.includes('https:'), 'no wildcard script origin');
-  assert.deepEqual(script, ["'self'", GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_SCRIPT]);
+  // The one inline script the SPA carries is admitted by its HASH (the pre-paint
+  // theme script, index.html) — a hash admits those exact bytes and nothing
+  // else, so an injected script is still refused. tests/themeSystem.test.ts
+  // holds the hash to the script.
+  assert.deepEqual(script, ["'self'", `'${THEME_BOOT_SCRIPT_HASH}'`, GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_SCRIPT]);
+  assert.match(THEME_BOOT_SCRIPT_HASH, /^sha256-[A-Za-z0-9+/]{43}=$/);
 });
 
 test("Cloudflare's edge-injected analytics beacon may load and report — found refused by the first live run", () => {

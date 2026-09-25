@@ -206,7 +206,7 @@ export function TextBox({
 }
 
 /** The panel's primary action: the house gold on black, never the product form's purple. */
-export const btnGold = `${btn} bg-gold hover:bg-[#c9b57a] text-black`;
+export const btnGold = `${btn} bg-gold hover:bg-gold text-accent-contrast`;
 
 /** A boolean as a switch, in the panel's gold. `label` is the state word (on / off) the admin reads. */
 export function Switch({
@@ -240,7 +240,7 @@ export function Switch({
         className={`relative w-9 h-5 rounded-full shrink-0 transition-colors motion-reduce:transition-none ${checked ? 'bg-gold' : 'bg-zinc-600'}`}
       >
         <span
-          className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all motion-reduce:transition-none ${checked ? 'start-[18px]' : 'start-0.5'}`}
+          className={`absolute top-0.5 w-4 h-4 rounded-full bg-snow shadow-1 transition-all motion-reduce:transition-none ${checked ? 'start-[18px]' : 'start-0.5'}`}
         />
       </span>
     </button>

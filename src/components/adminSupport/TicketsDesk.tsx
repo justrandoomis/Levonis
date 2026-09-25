@@ -388,7 +388,7 @@ export default function TicketsDesk() {
               <div key={m.id} className={`flex ${m.is_staff ? 'justify-end' : 'justify-start'}`}>
                 <div
                   className={`max-w-[85%] whitespace-pre-wrap break-words rounded-xl px-3 py-2 text-sm ${
-                    m.is_staff ? 'border border-[#6B46FF]/30 bg-[#6B46FF]/10 text-zinc-100' : 'border border-zinc-800 bg-zinc-900 text-zinc-200'
+                    m.is_staff ? 'border border-iris/30 bg-iris/10 text-zinc-100' : 'border border-zinc-800 bg-zinc-900 text-zinc-200'
                   } ${m.pending ? 'opacity-60' : ''}`}
                 >
                   <div className="mb-0.5 text-[10px] text-zinc-500">
@@ -437,7 +437,7 @@ export default function TicketsDesk() {
               <button
                 onClick={sendReply}
                 disabled={busy || uploading || reply.trim().length === 0}
-                className="min-h-11 shrink-0 rounded-xl bg-[#2CE59B] px-4 text-sm font-black text-black disabled:opacity-50"
+                className="min-h-11 shrink-0 rounded-xl bg-[#2CE59B] px-4 text-sm font-black text-onyx disabled:opacity-50"
               >
                 {s.reply}
               </button>

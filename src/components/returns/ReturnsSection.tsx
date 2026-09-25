@@ -355,12 +355,12 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
   const stateIndex = (s: string) => (STATES as readonly string[]).indexOf(s);
 
   return (
-    <div dir={dir} className="mt-3 rounded-xl border border-white/10 bg-[#0a0a0a] overflow-hidden">
+    <div dir={dir} className="mt-3 rounded-xl border border-white/10 bg-black overflow-hidden">
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-start hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-start hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
       >
         <span className="flex items-center gap-2 text-sm text-white font-normal">
           <RotateCcw className="w-4 h-4 text-zinc-400" strokeWidth={1.5} />
@@ -410,7 +410,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                 const idx = stateIndex(c.state);
                 const rejected = c.state === 'rejected';
                 return (
-                  <div key={c.id} className="rounded-lg bg-[#050505] border border-white/5 p-3 space-y-3">
+                  <div key={c.id} className="rounded-lg bg-black border border-white/5 p-3 space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-xs text-white font-normal truncate">
@@ -482,7 +482,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                 // component id, and the carve-out would be unreachable.
                 const parts = w.state !== 'closed' ? (it.bundle?.components ?? []) : [];
                 return (
-                  <div key={it.id} data-return-item={it.id} data-return-item-window={w.state} className="rounded-lg bg-[#050505] border border-white/5 p-3">
+                  <div key={it.id} data-return-item={it.id} data-return-item-window={w.state} className="rounded-lg bg-black border border-white/5 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex items-center gap-3">
                         {it.image ? (
@@ -503,7 +503,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                         <button
                           type="button"
                           onClick={() => startForm(it.id)}
-                          className="text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-white px-3 py-1.5 rounded-lg shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                          className="text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-white px-3 py-1.5 rounded-lg shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                         >
                           {S.request}
                         </button>
@@ -522,7 +522,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                             <button
                               type="button"
                               onClick={() => startForm(k.order_item_id, true)}
-                              className="text-[11px] text-zinc-300 hover:text-white border border-white/10 hover:border-white/20 px-2 py-1 rounded-md shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                              className="text-[11px] text-zinc-300 hover:text-white border border-white/10 hover:border-white/20 px-2 py-1 rounded-md shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                             >
                               {S.reportFault}
                             </button>
@@ -538,7 +538,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
 
           {/* Request form */}
           {form && (
-            <div className="rounded-lg bg-[#050505] border border-white/10 p-3 space-y-3">
+            <div className="rounded-lg bg-black border border-white/10 p-3 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-[11px] text-zinc-500 block mb-1">{S.qty}</span>
@@ -593,7 +593,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                       <button
                         type="button"
                         onClick={() => setForm({ ...form, evidence: form.evidence.filter((x) => x !== k) })}
-                        className="text-zinc-500 hover:text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                        className="text-zinc-500 hover:text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                         aria-label={S.removePhoto}
                       >
                         <X className="w-3 h-3" strokeWidth={1.5} />

@@ -177,7 +177,7 @@ export default function WarrantyVerify() {
             type="submit"
             disabled={loading}
             data-warranty-verify
-            className="inline-flex items-center gap-2 min-h-12 px-5 rounded-xl bg-olive hover:bg-olive-light text-white font-bold disabled:opacity-50"
+            className="inline-flex items-center gap-2 min-h-12 px-5 rounded-xl bg-olive hover:bg-olive-light text-snow font-bold disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Search className="w-4 h-4" aria-hidden />}
             {loading ? t.checking : t.check}

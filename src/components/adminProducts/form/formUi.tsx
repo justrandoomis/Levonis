@@ -26,19 +26,19 @@ import SafeImage from '../../ui/SafeImage';
 /** 40px control (the §12 floor), 13px text, never wider than its track. */
 export const field =
   'w-full min-w-0 h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white ' +
-  'placeholder:text-zinc-600 focus:border-[#6B46FF] focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none ' +
+  'placeholder:text-zinc-600 focus:border-iris focus:ring-1 focus:ring-iris/50 focus:outline-none ' +
   'transition-colors disabled:opacity-50';
 
 /** Same, for a multi-line value that must not grow without bound. */
 export const area =
   'w-full min-w-0 min-h-[88px] max-h-[240px] overflow-y-auto bg-zinc-800/40 border border-zinc-700 rounded-lg ' +
-  'px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-zinc-600 focus:border-[#6B46FF] ' +
-  'focus:ring-1 focus:ring-[#6B46FF]/50 focus:outline-none transition-colors resize-y';
+  'px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-zinc-600 focus:border-iris ' +
+  'focus:ring-1 focus:ring-iris/50 focus:outline-none transition-colors resize-y';
 
 export const btn =
   'inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-bold transition-colors ' +
   'disabled:opacity-50 disabled:cursor-not-allowed shrink-0';
-export const btnPrimary = `${btn} bg-[#6B46FF] hover:bg-[#5a3ae0] text-white`;
+export const btnPrimary = `${btn} bg-[#6B46FF] hover:bg-iris-deep text-snow`;
 export const btnGhost = `${btn} bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700`;
 export const btnDanger = `${btn} bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30`;
 /** A small square icon button, matched to the 36px button row. */
@@ -404,7 +404,7 @@ export function TierPriceDisclosure({
         className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-h-9 max-w-full min-w-0 py-1 rounded
                    text-[11px] leading-snug font-medium text-zinc-400 text-start
                    underline-offset-4 hover:text-zinc-200 hover:underline transition-colors
-                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6B46FF]"
+                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iris"
       >
         {/* A ChevronDown that only ever rotates 180° — vertical, so it is
             direction-neutral and cannot point the wrong way in RTL the way a
@@ -606,7 +606,7 @@ export function Toggle({
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`flex items-center justify-between gap-3 w-full min-w-0 h-10 px-2.5 rounded-lg border text-[13px] text-start transition-colors ${
-        checked ? 'bg-[#6B46FF]/10 border-[#6B46FF]/50 text-white' : 'bg-zinc-800/40 border-zinc-700 text-zinc-300'
+        checked ? 'bg-iris/10 border-iris/50 text-white' : 'bg-zinc-800/40 border-zinc-700 text-zinc-300'
       }`}
     >
       <span className="min-w-0 truncate">
@@ -617,7 +617,7 @@ export function Toggle({
         className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${checked ? 'bg-[#6B46FF]' : 'bg-zinc-600'}`}
       >
         <span
-          className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${checked ? 'start-[18px]' : 'start-0.5'}`}
+          className={`absolute top-0.5 w-4 h-4 rounded-full bg-snow shadow-1 transition-all ${checked ? 'start-[18px]' : 'start-0.5'}`}
         />
       </span>
     </button>
@@ -651,14 +651,14 @@ export function CheckCard({
         disabled ? 'opacity-70 cursor-default' : ''
       } ${
         checked
-          ? 'bg-[#6B46FF]/10 border-[#6B46FF]/60'
+          ? 'bg-iris/10 border-iris/60'
           : `bg-zinc-800/30 border-zinc-700 ${disabled ? '' : 'hover:border-zinc-600'}`
       }`}
     >
       <span className="flex items-center gap-2 min-w-0">
         <span
           className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${
-            checked ? 'bg-[#6B46FF] border-[#6B46FF]' : 'border-zinc-600'
+            checked ? 'bg-[#6B46FF] border-iris' : 'border-zinc-600'
           }`}
         >
           {checked && (
@@ -720,7 +720,7 @@ export function SectionCard({
       >
         <span
           className={`shrink-0 w-5 h-5 rounded-md grid place-items-center text-[10px] font-black ${
-            open ? 'bg-[#6B46FF] text-white' : 'bg-zinc-800 text-zinc-400'
+            open ? 'bg-[#6B46FF] text-snow' : 'bg-zinc-800 text-zinc-400'
           }`}
         >
           {n}

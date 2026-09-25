@@ -2395,7 +2395,7 @@ export default function Product() {
             <span
               aria-busy={priceIsPending || undefined}
               data-pro-price={appliedMemberTier === 'pro' || undefined}
-              className={`${appliedMemberTier === 'pro' ? 'text-[#e06070]' : 'text-white'} font-black text-2xl sm:text-3xl tabular-nums transition-opacity duration-200 ${
+              className={`${appliedMemberTier === 'pro' ? 'text-coral' : 'text-white'} font-black text-2xl sm:text-3xl tabular-nums transition-opacity duration-200 ${
                 priceIsPending ? 'opacity-55' : 'opacity-100'
               }`}
             >
@@ -2407,7 +2407,7 @@ export default function Product() {
                 data-testid="product-applied-tier"
                 data-tier={appliedMemberTier}
                 className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${
-                  appliedMemberTier === 'pro' ? 'bg-[#B03142]/15 text-[#e06070]' : 'bg-gold/10 text-gold'
+                  appliedMemberTier === 'pro' ? 'bg-crimson/15 text-coral' : 'bg-gold/10 text-gold'
                 }`}
               >
                 {/* PRO is red across the shop — the tier's own colour (tierMeta). */}
@@ -2433,7 +2433,7 @@ export default function Product() {
               {memberSavingIqd !== null ? (
                 <span
                   data-testid="product-member-saving"
-                  className={`${appliedMemberTier === 'pro' ? 'text-[#e06070]' : 'text-gold'} text-[12.5px] font-bold tabular-nums`}
+                  className={`${appliedMemberTier === 'pro' ? 'text-coral' : 'text-gold'} text-[12.5px] font-bold tabular-nums`}
                 >
                   {s.savedWithTier(money(memberSavingIqd), appliedMemberLabel)}
                 </span>
@@ -3235,7 +3235,7 @@ export default function Product() {
               </div>
               <Link
                 to="/policies/extended_warranty"
-                className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+                className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
                 data-warranty-policy-link
               >
                 <FileText aria-hidden="true" className="w-3.5 h-3.5" />
@@ -3270,7 +3270,7 @@ export default function Product() {
         <span className="tabular-nums">{s.inCart(inCartQty)}</span>
         <Link
           to="/cart"
-          className="shrink-0 font-medium text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+          className="shrink-0 font-medium text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
         >
           {s.viewCart}
         </Link>
@@ -3628,7 +3628,7 @@ export default function Product() {
                     aria-label={s.ratingAria(rating.average.toFixed(1), rating.count)}
                     className="inline-flex items-center gap-1.5 border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] leading-normal text-zinc-300"
                   >
-                    <Star aria-hidden="true" className="w-3.5 h-3.5 text-[#BAA369]" fill="currentColor" strokeWidth={0} />
+                    <Star aria-hidden="true" className="w-3.5 h-3.5 text-gold" fill="currentColor" strokeWidth={0} />
                     {/* Tabular figures so a 4.0 and a 4.8 occupy the same
                         width and the row does not shift as products change. */}
                     <span className="font-bold tabular-nums" dir="ltr">{rating.average.toFixed(1)}</span>

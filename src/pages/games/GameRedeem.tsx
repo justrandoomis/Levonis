@@ -107,7 +107,7 @@ export default function GameRedeem() {
       <GamesBody>
         <section className={`${PANEL} p-5 space-y-2`}>
           <h2 className="flex items-center gap-2 text-white font-bold text-[16px]">
-            <Coins aria-hidden="true" className="w-5 h-5 text-[#BAA369]" />
+            <Coins aria-hidden="true" className="w-5 h-5 text-gold" />
             {s.redeemTitle}
           </h2>
           <p className="text-[13px] text-zinc-400 leading-relaxed">{s.redeemIntro}</p>

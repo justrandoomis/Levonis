@@ -178,11 +178,11 @@ export interface StoreSurface {
 }
 
 /**
- * THE DOCUMENT'S BLACK. `index.html` paints `#000000` before a byte of React
- * (its inline style and its `theme-color` meta agree), so the splash a
- * launcher paints from `background_color` must be the same black or the app
- * flashes a different rectangle on every cold start — the reasoning
- * worker/lib/webManifest.ts gives for the platform's own colour.
+ * THE DOCUMENT'S BLACK. A storefront renders dark whatever the app's theme
+ * (`[data-store-theme]` is a dark island — src/index.css, THE TWO THEMES), so
+ * the splash a store's launcher paints from `background_color` stays the black
+ * it always was. The PLATFORM's splash follows the app's default light theme
+ * instead (worker/lib/webManifest.ts).
  */
 const DOCUMENT_BLACK: StoreSurface = Object.freeze({ background: '#000000', theme: '#000000' });
 
@@ -201,9 +201,8 @@ const DOCUMENT_BLACK: StoreSurface = Object.freeze({ background: '#000000', them
  * graphite, carbon, midnight) is dark by decision — every surface is a dark
  * ground — and the colour asked for here is the one a launcher paints BEFORE
  * the page: the splash (`background_color`) and the margin of the maskable
- * icon. The page's own first paint is `index.html`'s inline #000000, on every
- * host and under every theme; a splash in a theme's lighter grey would flash
- * grey → black → grey on every cold start. A theme with a light ground would
+ * icon; a splash in a theme's lighter grey would flash grey → black → grey on
+ * every cold start. A theme with a light ground would
  * be the day to add a row here — keyed by that preset — not a code path.
  */
 const STORE_SURFACES: Readonly<Record<string, StoreSurface>> = Object.freeze({

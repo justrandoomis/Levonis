@@ -163,7 +163,7 @@ export default function UpdateReadyToast() {
                 type="button"
                 onClick={apply}
                 disabled={busy}
-                className="min-h-[36px] rounded-lg bg-gold px-3 text-[12px] font-bold text-black transition-opacity hover:opacity-90 disabled:opacity-60"
+                className="min-h-[36px] rounded-lg bg-gold px-3 text-[12px] font-bold text-accent-contrast transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 {busy ? t('pwaUpdateApplying') : t('pwaUpdateAction')}
               </button>

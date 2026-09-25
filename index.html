@@ -15,18 +15,24 @@
                        Latin font fallbacks for Arabic text, and a screen
                        reader announced the page in the wrong language.
 
-  color-scheme: dark   Tells the browser the page is dark BEFORE any CSS
-                       loads, so the scrollbar, the form controls and the
-                       canvas start dark instead of flashing white.
+  the theme script     The app has two themes, light (the default) and dark,
+                       chosen in Settings → «المظهر». The one inline script
+                       below reads that choice and writes `data-theme`,
+                       `color-scheme` and the two browser-chrome metas BEFORE
+                       anything paints, so a light page never flashes black
+                       and a dark one never flashes ivory. The CSP allows it
+                       by hash and nothing else inline (THEME_BOOT_SCRIPT in
+                       worker/lib/securityPolicy.ts — edit both or neither;
+                       tests/themeSystem.test.ts holds them together).
 
   theme-color          Paints the mobile browser's own chrome — the address
-                       bar and the status area — the same near-black as the
-                       page, so the app does not sit in a light frame.
+                       bar and the status area — in the page's own ground, so
+                       the app does not sit in a frame of the other colour.
 
   the inline background  The one style rule that must not wait for a
                        stylesheet. `index.css` is a separate request; until it
-                       arrives the page is whatever the browser decided, and
-                       on a dark site that is a full-screen white flash.
+                       arrives the page is whatever the browser decided — so
+                       the ground is painted here, per theme.
 
   THE FONT IS FETCHED FROM HERE, NOT FROM `@import` INSIDE index.css.
   A CSS `@import` of a remote stylesheet is discovered only AFTER index.css has
@@ -36,11 +42,11 @@
   starts in the same instant as the stylesheet's, and `preconnect` warms the
   TLS handshake to the font host while that is still in flight.
 -->
-<html lang="ar" dir="rtl" style="color-scheme: dark">
+<html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#f3f0ea" />
     <title>LEVONIS — متجر الطباعة ثلاثية الأبعاد في العراق</title>
 
     <!--
@@ -213,8 +219,9 @@
       admin console draw their own sticky top bar with no top inset, so
       translucency would slide the shop's name and its back arrow underneath
       the status bar on every notched iPhone. `black` gives an opaque status
-      bar in the page's own #000000, which is seamless against this document,
-      and the web view starts below it. `viewport-fit=cover` above is still
+      bar in the page's own ground (`black` in the dark theme, `default` — ivory
+      with dark glyphs — in the light one; the theme script below rewrites the
+      content before iOS reads it), and the web view starts below it. `viewport-fit=cover` above is still
       right and still needed: it is the BOTTOM inset (the home indicator) that
       every sheet in the app already pads for.
 
@@ -223,8 +230,9 @@
       orientation, so covering the phones people actually own means roughly
       thirty <link> tags and thirty generated PNGs that go stale with every
       new iPhone. Without them iOS paints the manifest's `background_color`,
-      which is #000000 — the same black this page already paints. The correct
-      splash screen is therefore the one we get for free. Do not add them.
+      which is the ground this page paints first (ivory on the platform, black
+      on a merchant's dark store). The correct splash screen is therefore the
+      one we get for free. Do not add them.
     -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -251,7 +259,8 @@
       `short_name` is LEVONIS and <title> is LEVONIS, which is what this tag
       was saying in the first place.
     -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script>(function(){var p,d,t,r=document.documentElement,m,b;try{p=localStorage.getItem('levonis.theme.v1')}catch(e){}d=p==='dark'||(p==='system'&&!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);t=d?'dark':'light';r.setAttribute('data-theme',t);r.style.colorScheme=t;m=document.querySelector('meta[name="theme-color"]');b=document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');if(m)m.setAttribute('content',d?'#0b0c0f':'#f3f0ea');if(b)b.setAttribute('content',d?'black':'default')})()</script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -274,10 +283,11 @@
     />
 
     <style>
-      /* Before the stylesheet, before React. Kills the white flash. */
-      html, body { background-color: #000; margin: 0; }
-      /* The shell's own placeholder: a black page, not a blank white one. */
-      #root { min-height: 100dvh; background-color: #000; }
+      /* Before the stylesheet, before React: the ground of the theme the
+         script above chose, so the first frame is already the right colour. */
+      html, body { background-color: #f3f0ea; margin: 0; }
+      html[data-theme="dark"], html[data-theme="dark"] body { background-color: #0b0c0f; }
+      #root { min-height: 100dvh; background-color: inherit; }
     </style>
   </head>
   <body>

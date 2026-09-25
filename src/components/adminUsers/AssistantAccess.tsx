@@ -131,8 +131,8 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
             they agree to it. A permission granted without its consequences
             spelled out is granted by accident. */}
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-[#2CE59B]/20 bg-[#2CE59B]/[0.05] p-3">
-            <h5 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#2CE59B]">
+          <div className="rounded-xl border border-mint/20 bg-mint/[0.05] p-3">
+            <h5 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-mint">
               <ShieldCheck className="h-3.5 w-3.5" /> {s.canDo}
             </h5>
             <ul className="mt-2 space-y-1.5">
@@ -159,7 +159,7 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
       </Section>
 
       {!mayGrant && (
-        <p className="flex items-start gap-2 rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 p-3 text-xs font-medium leading-relaxed text-[#D4AF37]">
+        <p className="flex items-start gap-2 rounded-xl border border-gilt/30 bg-gilt/10 p-3 text-xs font-medium leading-relaxed text-gilt">
           <Lock className="mt-0.5 h-4 w-4 shrink-0" />
           {s.needFinancial}
         </p>
@@ -179,7 +179,7 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
             placeholder="name@example.com"
-            className="min-h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/50"
+            className="min-h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-iris/50"
           />
           <button
             type="submit"
@@ -198,7 +198,7 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
         </p>
       )}
       {notice && (
-        <p className="rounded-xl border border-[#2CE59B]/30 bg-[#2CE59B]/10 p-3 text-sm font-bold text-[#2CE59B]">
+        <p className="rounded-xl border border-mint/30 bg-mint/10 p-3 text-sm font-bold text-mint">
           {notice}
         </p>
       )}
@@ -303,14 +303,14 @@ function ActionButton({
 }) {
   const styles =
     tone === 'primary'
-      ? 'bg-[#6B46FF] text-white hover:bg-[#5a38e0]'
+      ? 'bg-[#6B46FF] text-snow hover:bg-iris-deep'
       : tone === 'warn'
-        ? 'bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/40 hover:bg-[#D4AF37]/25'
+        ? 'bg-gilt/15 text-gilt border border-gilt/40 hover:bg-gilt/25'
         : 'bg-red-500/15 text-red-400 border border-red-500/40 hover:bg-red-500/25';
   return (
     <div>
       {confirm && (
-        <p className="mb-2 flex items-start gap-2 rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 p-3 text-xs font-bold leading-relaxed text-[#D4AF37]">
+        <p className="mb-2 flex items-start gap-2 rounded-xl border border-gilt/30 bg-gilt/10 p-3 text-xs font-bold leading-relaxed text-gilt">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
           {confirm}
         </p>
