@@ -4,25 +4,30 @@
  * A browser fixture (served only by a local `vite`) for screenshots of the
  * wizard and the offers in Arabic and English at a phone and a desktop width:
  *
- *   /tests/browser/print-requests-v2.html?lang=ar|en&view=wizard|new|offers|merchant|mine
+ *   /tests/browser/print-requests-v2.html?lang=ar|en|ckb&view=wizard|new|offers|merchant|mine|viewer|viewer-full
+ *
+ * `viewer` is /model-viewer/<token> with the grant a board merchant gets
+ * ('preview' — the «معاينة مبسّطة» label); `viewer-full` the customer's.
  *
  * `fetch` is answered with the shapes worker/routes/printRequests.ts and
  * marketplace.ts return; the components themselves are untouched.
  */
 import { createRoot } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { AuthProvider } from '../../src/AuthContext';
 import { LanguageProvider } from '../../src/LanguageContext';
 import { Toaster } from '../../src/components/ui/Toast';
 import RequestWizard from '../../src/components/community/requests/RequestWizard';
 import OfferCompare from '../../src/components/community/offers/OfferCompare';
 import MerchantOfferPanel from '../../src/components/community/offers/MerchantOfferPanel';
+import ModelViewer from '../../src/pages/ModelViewer';
 import MyOffersList from '../../src/components/community/offers/MyOffersList';
 import type { OfferV2 } from '../../src/components/community/offers/types';
 import type { CatalogMaterial } from '../../src/components/community/requests/api';
 import '../../src/index.css';
 
 const params = new URLSearchParams(location.search);
-const lang = params.get('lang') === 'en' ? 'en' : 'ar';
+const lang = params.get('lang') === 'en' ? 'en' : params.get('lang') === 'ckb' ? 'ckb' : 'ar';
 const view = params.get('view') ?? 'wizard';
 localStorage.setItem('levo_lang', lang);
 document.documentElement.lang = lang;
@@ -63,6 +68,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(String(input), location.origin);
   const p = url.pathname;
   const m = init?.method ?? 'GET';
+  if (p === '/api/marketplace/print/viewer/tok_1') return json({ format: 'stl', dimensions_mm: { x: 82.4, y: 64, z: 41.2 }, volume_mm3: 38000, triangle_count: 12840, shell_count: 1, expires_at: day(1), grant: view === 'viewer' ? 'preview' : 'full' });
   if (p === '/api/marketplace/print/catalog') return json({ materials, qualities: [], min_job_iqd: 0 });
   if (p.endsWith('/draft')) return json({ draft: view === 'edit' ? { ...draft, state: 'receiving_offers', live_offers: 2 } : draft });
   if (p === '/api/marketplace/print/quote') return json({ quote: { priced: true, price_iqd: 21000, price_low_iqd: 14000, price_high_iqd: 29000, confidence: 'low', range_basis: 'materials' } });
@@ -75,6 +81,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 };
 
 function Page() {
+  if (view === 'viewer' || view === 'viewer-full') {
+    return (
+      <Routes>
+        <Route path="/model-viewer/:token" element={<ModelViewer />} />
+      </Routes>
+    );
+  }
   return (
     <div className="min-h-screen bg-canvas px-4 py-5 text-text-primary sm:px-6">
       <div className="mx-auto max-w-2xl lg:max-w-5xl">
@@ -102,11 +115,14 @@ function Page() {
   );
 }
 
+// AuthProvider as in src/App: the offer cards' «زيارة المتجر» link reads the session (signed out here: /api/auth/me is a 404).
 createRoot(document.getElementById('root')!).render(
+  <AuthProvider>
   <LanguageProvider>
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[view.startsWith('viewer') ? '/model-viewer/tok_1' : '/']}>
       <Page />
       <Toaster />
     </MemoryRouter>
   </LanguageProvider>
+  </AuthProvider>
 );

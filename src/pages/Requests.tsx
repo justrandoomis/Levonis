@@ -243,7 +243,7 @@ export default function Requests() {
             <h1 className="text-gold font-bold text-lg mb-1">
               {loc('طلبات العملاء', 'Customer requests', 'داواکاری کڕیاران')}
             </h1>
-            <p className="text-zinc-500 text-[12.5px] mb-5">
+            <p className="text-text-muted text-[12.5px] mb-5">
               {loc(
                 'اطلب شيئًا مخصصًا، واستقبل عروضًا من التجار.',
                 'Ask for something custom, and receive offers from merchants.',
@@ -269,7 +269,7 @@ export default function Requests() {
                 <button
                   key={v}
                   onClick={() => setView(v)}
-                  className={`shrink-0 px-4 min-h-[40px] rounded-2xl text-[12.5px] font-semibold border transition-colors ${
+                  className={`shrink-0 px-4 min-h-11 rounded-2xl text-[12.5px] font-semibold border transition-colors ${
                     view === v ? 'bg-olive text-white border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
                   }`}
                 >
@@ -425,7 +425,7 @@ function AllRequests({
   if (!rows.length) {
     return (
       <div className="py-14 text-center">
-        <PackageSearch className="w-9 h-9 text-zinc-600 mx-auto mb-3" />
+        <PackageSearch className="w-9 h-9 text-text-muted mx-auto mb-3" />
         <p className="text-zinc-400 text-[13px]">
           {loc('لا توجد طلبات مفتوحة', 'No open requests', 'هیچ داواکارییەکی کراوە نییە')}
         </p>
@@ -447,7 +447,7 @@ function AllRequests({
           </div>
           <p className="text-zinc-400 text-[12.5px] line-clamp-2 leading-relaxed mb-2.5">{r.description}</p>
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11.5px] text-zinc-500">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11.5px] text-text-muted">
             {r.budget_iqd !== null && (
               <span className="text-gold font-semibold" dir="ltr">
                 {loc('الميزانية', 'Budget', 'بودجە')}: {iqd(r.budget_iqd)}
@@ -629,7 +629,7 @@ function RequestDetail({
           </div>
           {current.customer_notes && (
             <div className="mt-3 rounded-xl bg-black/30 border border-white/5 px-3 py-2.5" data-request="customer-notes">
-              <p className="text-zinc-500 text-[11px] mb-0.5">{loc('ملاحظات للتجار', 'Notes for merchants')}</p>
+              <p className="text-text-muted text-[11px] mb-0.5">{loc('ملاحظات للتجار', 'Notes for merchants')}</p>
               <p dir="auto" className="text-zinc-200 text-[12.5px] leading-relaxed whitespace-pre-wrap break-words">{current.customer_notes}</p>
             </div>
           )}
@@ -805,7 +805,7 @@ function RequestDetail({
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-black/30 border border-white/5 px-3 py-2">
-      <p className="text-zinc-600 text-[10.5px] mb-0.5">{label}</p>
+      <p className="text-text-muted text-[10.5px] mb-0.5">{label}</p>
       <p className="text-zinc-200 text-[12px] font-semibold" dir="auto">{value}</p>
     </div>
   );
@@ -912,7 +912,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
         <p className="text-zinc-400 text-[13px]">
           {loc('لا توجد طلبات قيد التنفيذ', 'No custom orders in progress', 'هیچ داواکاریەکی تایبەت نییە')}
         </p>
-        <p className="text-zinc-600 text-[11.5px] mt-1.5">
+        <p className="text-text-muted text-[11.5px] mt-1.5">
           {loc(
             'عندما تقبل عرض تاجر على طلبك، يظهر تنفيذه هنا خطوة بخطوة.',
             'When you accept a merchant’s offer, its progress shows here step by step.',
@@ -961,7 +961,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
               {stateLabel(o.state)}
             </span>
           </div>
-          <p className="text-zinc-500 text-[11.5px] mb-2">
+          <p className="text-text-muted text-[11.5px] mb-2">
             {o.merchant_name} · <span className="text-white font-semibold tabular-nums" dir="ltr">{iqd(o.price_iqd)}</span>
             {' '}
             {loc('(محجوز لدى Levonis)', '(held by Levonis)', '(لای LEVONIS پارێزراوە)')}
@@ -989,7 +989,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
                 {loc('استلمت العمل — حوّل المبلغ للتاجر', 'I received it — release the funds', 'وەرمگرت — پارەکە بدە')}
               </button>
               {o.auto_complete_at && (
-                <p className="text-zinc-600 text-[10.5px] text-center">
+                <p className="text-text-muted text-[10.5px] text-center">
                   {loc('يتأكد تلقائيًا في', 'Auto-confirms on', 'خۆکارانە لە')}{' '}
                   <span className="tabular-nums">{formatDate(o.auto_complete_at, lang)}</span>
                 </p>
@@ -1088,7 +1088,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
           autoComplete="off"
           className="mt-2 w-full rounded-xl bg-black/40 border border-white/10 px-3.5 py-3 text-white text-[14px] leading-relaxed outline-none focus-visible:border-gold/40 focus-visible:ring-2 focus-visible:ring-[#BAA369]/40 resize-none"
         />
-        <p className="mt-1 text-zinc-600 text-[11px] tabular-nums" dir="ltr" aria-live="polite">
+        <p className="mt-1 text-text-muted text-[11px] tabular-nums" dir="ltr" aria-live="polite">
           {description.trim().length} / 10+
         </p>
       </ConfirmSheet>

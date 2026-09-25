@@ -94,7 +94,7 @@ export function TabStrip({
   group,
   indicatorClassName = 'bg-olive',
   activeClassName = 'text-white',
-  idleClassName = 'text-zinc-500 hover:text-zinc-300',
+  idleClassName = 'text-text-muted hover:text-zinc-300',
   className = '',
   fill = true,
   label,
@@ -113,9 +113,13 @@ export function TabStrip({
       0,
       refs.current.findIndex((el) => el === document.activeElement)
     );
-    // "Forward" is the writing direction: ArrowRight goes back in Arabic.
-    const forward = dir === 'rtl' ? 'ArrowLeft' : 'ArrowRight';
-    const back = dir === 'rtl' ? 'ArrowRight' : 'ArrowLeft';
+    // "Forward" is the strip's own direction: ArrowRight goes back in Arabic.
+    // Read from the strip, not the language (W6): the classic storefront draws
+    // its strip right-to-left in English too, and the keys must follow what
+    // the reader sees.
+    const rtl = (getComputedStyle(e.currentTarget).direction || dir) === 'rtl';
+    const forward = rtl ? 'ArrowLeft' : 'ArrowRight';
+    const back = rtl ? 'ArrowRight' : 'ArrowLeft';
     let next = -1;
     if (e.key === forward) next = (at + 1) % count;
     else if (e.key === back) next = (at - 1 + count) % count;
@@ -130,7 +134,7 @@ export function TabStrip({
 
   const strip = shown.map((t, i) => {
     const active = t.id === value;
-    const classes = `relative ${fill ? 'flex-1' : 'shrink-0 px-3'} py-3 text-sm font-medium text-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus ${
+    const classes = `relative ${fill ? 'flex-1 px-2' : 'shrink-0 px-3'} py-3 text-sm font-medium text-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus ${
       active ? activeClassName : idleClassName
     }`;
     const inner = (

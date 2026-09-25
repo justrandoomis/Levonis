@@ -4,8 +4,8 @@
  * their links are the server's (worker/lib/merchantNotify.ts).
  */
 import {
-  AlertTriangle, Banknote, Bell, CircleCheck, MessageCircle, PackageMinus, Printer, RefreshCw,
-  ShieldAlert, ShoppingBag, Star, Store, Tag, Wallet, XCircle, type LucideIcon,
+  AlertTriangle, Banknote, Bell, CircleCheck, Gavel, MessageCircle, PackageMinus, Printer, RefreshCw,
+  ShieldAlert, ShoppingBag, Star, Store, Tag, TrendingDown, Wallet, WalletCards, XCircle, type LucideIcon,
 } from 'lucide-react';
 
 export type Loc = (ar: string, en: string, ckb?: string) => string;
@@ -46,6 +46,10 @@ const ICONS: Record<string, LucideIcon> = {
   dispute_opened: ShieldAlert,
   payout_available: Wallet,
   payout_paid: Banknote,
+  // Review F11 / F4: a failed transfer, a balance a claw-back left negative, a decided dispute.
+  payout_failed: WalletCards,
+  balance_reversed: TrendingDown,
+  dispute_resolved: Gavel,
   coupon_ending: Tag,
   store_status_changed: Store,
 };
@@ -56,7 +60,7 @@ export function kindIcon(kind: string): LucideIcon {
 }
 
 /** Kinds that ask the merchant to act, drawn in the warning tone. */
-export const ATTENTION_KINDS = new Set(['order_needs_action', 'dispute_opened', 'store_status_changed', 'low_stock']);
+export const ATTENTION_KINDS = new Set(['order_needs_action', 'dispute_opened', 'store_status_changed', 'low_stock', 'payout_failed', 'balance_reversed']);
 
 function arCount(n: number, one: string, two: string, few: string): string {
   if (n === 1) return one;

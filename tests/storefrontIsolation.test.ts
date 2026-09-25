@@ -91,7 +91,13 @@ test('the browser never decides which store a hostname is', () => {
   // system hosts. A second answer in the browser is a second answer that can
   // disagree.
   const ctx = code(read('src/StoreContext.tsx'));
-  assert.match(ctx, /storefrontApi\s*\n?\s*\.resolve\(\)/, 'StoreContext must ask the server');
+  // Since W6 the call is spelled out (`api.get('/api/storefront/resolve')`) so
+  // the merchant API module stays out of the entry chunk; either form asks the server.
+  assert.match(
+    ctx,
+    /storefrontApi\s*\n?\s*\.resolve\(\)|\.get<[\s\S]*?>\(\s*'\/api\/storefront\/resolve'\s*\)/,
+    'StoreContext must ask the server'
+  );
   assert.equal(
     /location\.hostname|window\.location\.host\b/.test(ctx),
     false,

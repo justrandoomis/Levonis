@@ -19,13 +19,21 @@
  * meaning is one disagreement away from nobody knowing which one is real.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { Check, ChevronDown, Loader2, Palette, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { AlertCircle, Check, ChevronDown, Palette, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { api, ApiError } from '../../../lib/api';
 import { iqd } from '../../../lib/merchant';
 import { GOVERNORATES } from '../../../lib/governorates';
-import { Btn, Card, Chip, Empty, Input, Notice, Spinner, Toggle, type Loc } from './ui';
+import type { Loc } from './ui';
+import { Button, IconButton } from '../../ui/Button';
+import { Card } from '../../ui/Card';
+import { Field, Input } from '../../ui/Field';
+import { Switch } from '../../ui/Switch';
+import Note from '../../ui/Note';
+import Spinner from '../../ui/Spinner';
+import { EmptyState } from '../../ui/AsyncStates';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { merchantRefusal } from '../shell/refusal';
 // Eligibility as data (W5-B): canonical machines, the stock shelf, and the reasons' words.
@@ -136,7 +144,7 @@ interface MatchRow {
  * The matcher compares a job's `color_hex` to this shop's list as exact
  * strings, so a merchant picking from a different set of swatches than the
  * wizard offers would filter themselves out of every request without ever
- * seeing why. These eight are the wizard's eight (PrintRequestWizard).
+ * seeing why. These eight are the wizard's eight (community/requests/RequestWizard).
  */
 const SWATCHES: Array<{ hex: string; ar: string; en: string }> = [
   { hex: '#1a1a1a', ar: 'أسود', en: 'Black' },
@@ -301,65 +309,160 @@ function reasonText(code: string, loc: Loc): string {
   }
 }
 
-/**
- * A button with a `data-*` hook. The shared `Btn` forwards no DOM attributes,
- * and the three controls a probe drives this screen by need one — so those
- * three carry their own button with `Btn`'s exact shape and nothing else.
+/*
+ * THIS SCREEN ON THE SHARED KIT (W6). It was the last workspace screen on the
+ * dashboard's own kit (`./ui`: 32–36px buttons, a Toggle with no switch role,
+ * labels that named nothing). The pieces below are the shared primitives
+ * (src/components/ui/**) arranged for this screen, never a parallel kit.
  */
-function HookBtn({
-  children,
-  onClick,
-  attrs,
-  kind = 'primary',
-  disabled,
-  full,
-  small,
+
+/** A labelled text/number field: the shared Field + Input, string in, string out. */
+function TextField({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  placeholder,
+  hint,
+  ltr,
 }: {
-  children: React.ReactNode;
-  onClick: () => void;
-  attrs: Record<string, string>;
-  kind?: 'primary' | 'gold' | 'ghost';
-  disabled?: boolean;
-  full?: boolean;
-  small?: boolean;
+  label?: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  placeholder?: string;
+  hint?: string;
+  ltr?: boolean;
 }) {
-  const style =
-    kind === 'primary'
-      ? 'bg-olive text-white border-olive'
-      : kind === 'gold'
-        ? 'bg-gold/15 text-gold border-gold/30'
-        : 'bg-white/[0.03] text-zinc-300 border-white/10';
+  const input = (
+    <Input
+      type={type}
+      value={value}
+      placeholder={placeholder}
+      ltr={ltr}
+      inputMode={type === 'number' ? 'decimal' : undefined}
+      // A field without a visible label (X / Y / Z, min / max) is named by its group and its placeholder.
+      aria-label={label ? undefined : placeholder}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+  return label ? (
+    <Field label={label} hint={hint}>
+      {input}
+    </Field>
+  ) : (
+    input
+  );
+}
+
+/** One choice among chips: a real toggle (`aria-pressed`), a 44px target around a compact pill. */
+function Chip({ label, active, onClick, disabled }: { label: React.ReactNode; active: boolean; onClick: () => void; disabled?: boolean }) {
   return (
     <button
       type="button"
-      {...attrs}
       onClick={onClick}
       disabled={disabled}
-      className={`${full ? 'w-full' : ''} ${small ? 'h-8 px-2.5 text-[11.5px]' : 'h-9 px-3.5 text-[12.5px]'} rounded-xl border font-bold inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-40 active:scale-[0.98] ${style}`}
+      aria-pressed={active}
+      className="group inline-flex min-h-11 items-center rounded-xl focus-visible:outline-none disabled:opacity-40"
     >
-      {children}
+      <span
+        className={`inline-flex h-8 items-center gap-1 rounded-xl border px-3 text-[12.5px] font-semibold transition-colors group-focus-visible:ring-2 group-focus-visible:ring-focus ${
+          active ? 'border-gold/50 bg-gold/10 text-text-primary' : 'border-border-subtle bg-white/[0.03] text-text-secondary'
+        }`}
+      >
+        {active && <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-gold" />}
+        {label}
+      </span>
     </button>
   );
 }
 
-/** A titled group of multi-select chips, with the hint that keeps merchants
- *  from over-filtering themselves into silence. */
+/** A titled group of controls: the title names the group for a screen reader too. */
 function Group({
   label,
   hint,
   children,
+  wrap = true,
 }: {
   label: string;
-  hint: string;
+  hint?: string;
   children: React.ReactNode;
+  wrap?: boolean;
 }) {
+  const id = `grp-${label.replace(/\s+/g, '-')}`;
   return (
-    <div>
-      <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">{label}</label>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
-      <p className="text-zinc-600 text-[10.5px] mt-1.5">{hint}</p>
+    <div role="group" aria-labelledby={id}>
+      <p id={id} className="mb-1 text-[13px] font-semibold text-text-secondary">{label}</p>
+      {wrap ? <div className="flex flex-wrap gap-x-1.5">{children}</div> : children}
+      {hint && <p className="mt-1 text-[12px] leading-relaxed text-text-muted">{hint}</p>}
     </div>
   );
+}
+
+/** Something to weigh before going on: the shared Note, amber. */
+function Warn({ text }: { text: string }) {
+  return (
+    <Note tone="amber" icon={<AlertCircle className="h-4 w-4" />} animate={false}>
+      {text}
+    </Note>
+  );
+}
+
+function Loading() {
+  return (
+    <div className="flex justify-center py-10">
+      <Spinner size="md" />
+    </div>
+  );
+}
+
+/**
+ * «#stock» / «#preferences» from a verdict's fix link. The browser scrolls to
+ * a hash once, at load, before this lazy screen and its data exist, so it
+ * never found them. Anchor here instead: when the target appears, and again
+ * while the sections above it finish loading and push it down — until the
+ * merchant scrolls on their own, or a few seconds pass.
+ */
+function useHashAnchor(root: React.RefObject<HTMLDivElement | null>) {
+  const { hash: routed } = useLocation();
+  const hash = routed || (typeof window !== 'undefined' ? window.location.hash : '');
+  useEffect(() => {
+    const id = decodeURIComponent(hash.replace(/^#/, ''));
+    const host = root.current;
+    if (!id || !host) return;
+    let moved = false;
+    let focused = false;
+    const stopByUser = () => {
+      moved = true;
+    };
+    const anchor = () => {
+      if (moved) return;
+      const el = host.querySelector<HTMLElement>(`[id="${CSS.escape(id)}"]`);
+      if (!el) return;
+      el.scrollIntoView({ block: 'start' });
+      if (!focused) {
+        focused = true;
+        // Keyboard and screen-reader users land where the link said, too.
+        if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
+        el.focus({ preventScroll: true });
+      }
+    };
+    const observer = new MutationObserver(anchor);
+    observer.observe(host, { childList: true, subtree: true });
+    anchor();
+    const opts = { passive: true } as const;
+    window.addEventListener('wheel', stopByUser, opts);
+    window.addEventListener('touchstart', stopByUser, opts);
+    window.addEventListener('keydown', stopByUser);
+    const stop = window.setTimeout(() => observer.disconnect(), 4000);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(stop);
+      window.removeEventListener('wheel', stopByUser);
+      window.removeEventListener('touchstart', stopByUser);
+      window.removeEventListener('keydown', stopByUser);
+    };
+  }, [hash, root]);
 }
 
 /** Toggle one id in a list — the only edit any chip group ever performs. */
@@ -370,11 +473,13 @@ function toggleIn(list: string[], id: string): string[] {
 // -------------------------------------------------------------------- the tab
 
 export function PrintersTab({ canSell = true }: { canSell?: boolean }) {
+  const root = useRef<HTMLDivElement>(null);
+  useHashAnchor(root);
   return (
-    <div className="space-y-3">
+    <div ref={root} className="space-y-3">
       <PrintersSection />
       <MaterialStockSection />
-      <div id="preferences">
+      <div id="preferences" className="scroll-mt-4 focus:outline-none">
         <RequestPrefsSection canSell={canSell} />
       </div>
       <MatchesPanel />
@@ -581,23 +686,23 @@ function PrintersSection() {
       title={loc('طابعاتي', 'My printers', 'چاپکەرەکانم')}
       action={
         data && !draft ? (
-          <HookBtn
-            attrs={{ 'data-printers': 'add' }}
-            kind="gold"
-            small
+          <Button
+            data-printers="add"
+            variant="secondary"
+            size="sm"
+            icon={<Plus aria-hidden="true" className="h-4 w-4" />}
             onClick={() => {
               setError('');
               setDraft({ ...NEW_DRAFT, sort_order: data.printers.length });
             }}
           >
-            <Plus className="w-3.5 h-3.5" />
             {loc('أضف طابعة', 'Add printer', 'زیادکردن')}
-          </HookBtn>
+          </Button>
         ) : undefined
       }
     >
       {data === null ? (
-        <Spinner />
+        <Loading />
       ) : draft ? (
         <PrinterForm
           value={draft}
@@ -615,9 +720,10 @@ function PrintersSection() {
           }}
         />
       ) : !data.printers.length ? (
-        <Empty
-          text={loc('لم تُضِف أي طابعة بعد', 'No printers added yet', 'هێشتا چاپکەر زیاد نەکراوە')}
-          hint={loc(
+        <EmptyState
+          compact
+          title={loc('لم تُضِف أي طابعة بعد', 'No printers added yet', 'هێشتا چاپکەر زیاد نەکراوە')}
+          description={loc(
             'بدون طابعة واحدة على الأقل لن يُطابَق متجرك مع أي طلب طباعة — المطابقة تقرأ مقاسات طابعاتك وخاماتها الحقيقية، لا وصفًا نصيًا.',
             'Without at least one printer your shop is never matched to a print request — matching reads your machines’ real dimensions and materials, not a description.',
             'بەبێ چاپکەر هیچ داواکارییەک ناگاتە فرۆشگاکەت.'
@@ -641,7 +747,7 @@ function PrintersSection() {
         </div>
       )}
 
-      {error && !draft && <p className="text-red-400 text-[11.5px] mt-2">{error}</p>}
+      {error && !draft && <p role="alert" className="lv-field-error mt-2">{error}</p>}
       {confirmDialog}
     </Card>
   );
@@ -650,7 +756,7 @@ function PrintersSection() {
 const AVAILABILITY_STYLE: Record<string, string> = {
   available: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   busy: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  offline: 'bg-white/[0.05] text-zinc-500 border-white/10',
+  offline: 'bg-white/[0.05] text-text-muted border-white/10',
 };
 
 function PrinterRow({
@@ -674,36 +780,36 @@ function PrinterRow({
 
   return (
     <div data-printer={p.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+      {/* The name wraps rather than truncates: two 44px actions beside a
+          one-line name left «Bam…» at 320px (W6). The state sits under it. */}
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <div className="min-w-0">
-          <p className="text-white text-[13px] font-semibold truncate">{p.name}</p>
-          <p className="text-zinc-500 text-[11px] truncate">
+          <p className="text-white text-[13px] font-semibold break-words">{p.name}</p>
+          <p className="text-zinc-400 text-[11.5px] break-words">
             {techLabel(p.technology, loc)}
             {(p.brand || p.model) && ` · ${[p.brand, p.model].filter(Boolean).join(' ')}`}
             {` · ${qualityLabel(p.quality_max, loc)}`}
           </p>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
           <span
-            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${AVAILABILITY_STYLE[p.availability] ?? AVAILABILITY_STYLE.offline}`}
+            className={`mt-1 inline-block text-[10.5px] font-bold px-2 py-0.5 rounded-full border ${AVAILABILITY_STYLE[p.availability] ?? AVAILABILITY_STYLE.offline}`}
           >
             {availabilityLabel(p.availability, loc)}
           </span>
-          <button
+        </div>
+        <div className="flex items-center shrink-0">
+          <IconButton
             onClick={onEdit}
-            className="w-8 h-8 rounded-lg border border-white/10 text-zinc-400 flex items-center justify-center"
-            aria-label={loc('تعديل', 'Edit', 'دەستکاری')}
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button
+            variant="secondary"
+            label={`${loc('تعديل', 'Edit', 'دەستکاری')}: ${p.name}`}
+            icon={<Pencil className="h-4 w-4" />}
+          />
+          <IconButton
             onClick={onDelete}
-            disabled={busy}
-            className="w-8 h-8 rounded-lg border border-red-500/30 text-red-300 disabled:opacity-40 flex items-center justify-center"
-            aria-label={loc('حذف', 'Delete', 'سڕینەوە')}
-          >
-            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-          </button>
+            variant="danger"
+            loading={busy}
+            label={`${loc('حذف', 'Delete', 'سڕینەوە')}: ${p.name}`}
+            icon={<Trash2 className="h-4 w-4" />}
+          />
         </div>
       </div>
 
@@ -764,7 +870,7 @@ function PrinterRow({
 
 function Tagline({ text }: { text: string }) {
   return (
-    <span className="text-[10px] text-zinc-500 px-2 py-0.5 rounded-full border border-white/10">{text}</span>
+    <span className="text-[10.5px] text-zinc-400 px-2 py-0.5 rounded-full border border-white/10">{text}</span>
   );
 }
 
@@ -811,18 +917,15 @@ function PrinterForm({
   return (
     <div data-printer-form className="space-y-3.5">
       {models.length > 0 && <PrinterModelPicker models={models} value={d.model_id} onPick={(m) => onChange(applyModel(d, m))} />}
-      <Input
+      <TextField
         label={loc('اسم الطابعة', 'Printer name', 'ناوی چاپکەر')}
         value={d.name}
         onChange={(name) => onChange({ ...d, name })}
         placeholder={loc('مثال: Bambu Lab P1S', 'e.g. Bambu Lab P1S', 'Bambu Lab P1S')}
       />
 
-      <div>
-        <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
-          {loc('التقنية', 'Technology', 'تەکنەلۆژیا')}
-        </label>
-        <div className="flex flex-wrap gap-1.5">
+      <Group label={loc('التقنية', 'Technology', 'تەکنەلۆژیا')} wrap={false}>
+        <div className="flex flex-wrap gap-x-1.5">
           {technologies.filter((t) => !canonical || t === canonical.technology).map((t) => (
             <Chip
               key={t}
@@ -841,18 +944,18 @@ function PrinterForm({
             />
           ))}
         </div>
-      </div>
+      </Group>
 
       {!canonical && (
         <>
       <div className="grid grid-cols-2 gap-2">
-        <Input
+        <TextField
           label={loc('الماركة', 'Brand', 'براند')}
           value={d.brand}
           onChange={(brand) => onChange({ ...d, brand })}
           ltr
         />
-        <Input
+        <TextField
           label={loc('الموديل', 'Model', 'مۆدێل')}
           value={d.model}
           onChange={(model) => onChange({ ...d, model })}
@@ -860,42 +963,36 @@ function PrinterForm({
         />
       </div>
 
-      <div>
-        <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
-          {loc('مساحة الطباعة (مم)', 'Build volume (mm)', 'قەبارەی چاپ (مم)')}
-        </label>
+      <Group label={loc('مساحة الطباعة (مم)', 'Build volume (mm)', 'قەبارەی چاپ (مم)')} wrap={false}>
         <div className="grid grid-cols-3 gap-2">
-          <Input value={d.x} onChange={(x) => onChange({ ...d, x })} type="number" placeholder="X" ltr />
-          <Input value={d.y} onChange={(y) => onChange({ ...d, y })} type="number" placeholder="Y" ltr />
-          <Input value={d.z} onChange={(z) => onChange({ ...d, z })} type="number" placeholder="Z" ltr />
+          <TextField value={d.x} onChange={(x) => onChange({ ...d, x })} type="number" placeholder="X" ltr />
+          <TextField value={d.y} onChange={(y) => onChange({ ...d, y })} type="number" placeholder="Y" ltr />
+          <TextField value={d.z} onChange={(z) => onChange({ ...d, z })} type="number" placeholder="Z" ltr />
         </div>
-        <p className="text-zinc-600 text-[10.5px] mt-1">
+        <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
           {loc(
             'مطلوب. المطابقة تُجرّب قلب القطعة على كل الاتجاهات لترى إن كانت تدخل — بدون هذه الأرقام لا تستطيع أن تقرّر شيئًا، ولهذا يرفض الخادم حفظ طابعة بلا مساحة طباعة.',
             'Required. Matching tries every orientation to see whether a part fits — without these numbers it cannot decide anything, which is why the server refuses to save a printer with no build volume.',
             'پێویستە — بەبێ ئەم ژمارانە مامەڵەکردن ناکرێت.'
           )}
         </p>
-      </div>
+      </Group>
 
         </>
       )}
 
       {canonical ? (
         canonical.technology === 'fdm' && canonical.nozzle_sizes_mm.length > 0 && (
-          <div>
-            <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
-              {loc('الفوهة المركّبة (مم)', 'Nozzle fitted (mm)')}
-            </label>
-            <div className="flex flex-wrap gap-1.5">
+          <Group label={loc('الفوهة المركّبة (مم)', 'Nozzle fitted (mm)')} wrap={false}>
+            <div className="flex flex-wrap gap-x-1.5">
               {canonical.nozzle_sizes_mm.map((n) => (
                 <Chip key={n} label={String(n)} active={Number(d.nozzle) === n} onClick={() => onChange({ ...d, nozzle: String(n) })} />
               ))}
             </div>
-          </div>
+          </Group>
         )
       ) : (
-      <Input
+      <TextField
         label={loc('قطر الفوهة (مم)', 'Nozzle diameter (mm)', 'تیرەی لوولە (مم)')}
         value={d.nozzle}
         onChange={(nozzle) => onChange({ ...d, nozzle })}
@@ -913,7 +1010,7 @@ function PrinterForm({
         )}
       >
         {forProcess.length === 0 ? (
-          <p className="text-zinc-600 text-[11px]">
+          <p className="text-text-muted text-[12px]">
             {loc('لا توجد خامات في الكتالوج لهذه التقنية.', 'No catalogue materials for this technology.')}
           </p>
         ) : (
@@ -929,7 +1026,7 @@ function PrinterForm({
       </Group>
 
       {blocked.length > 0 && (
-        <Notice
+        <Warn
           text={loc(
             `اخترت ${blocked.map((m) => m.name_en).join('، ')} — هذه الخامات تحتاج حجرة مغلقة أو فوهة مقوّاة، وبدون تفعيلها أدناه لن تصلك طلباتها.`,
             `You picked ${blocked.map((m) => m.name_en).join(', ')} — these need an enclosure or a hardened nozzle, and without the switches below their requests will never reach you.`
@@ -937,10 +1034,7 @@ function PrinterForm({
         />
       )}
 
-      <div>
-        <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
-          {loc('الألوان المتوفرة', 'Colours you stock', 'ڕەنگە بەردەستەکان')}
-        </label>
+      <Group label={loc('الألوان المتوفرة', 'Colours you stock', 'ڕەنگە بەردەستەکان')} wrap={false}>
         <div className="flex flex-wrap items-center gap-2">
           {SWATCHES.map((c) => (
             <button
@@ -950,7 +1044,7 @@ function PrinterForm({
               title={loc(c.ar, c.en)}
               aria-label={loc(c.ar, c.en)}
               aria-pressed={d.colors.includes(c.hex)}
-              className={`w-9 h-9 rounded-full border-2 transition-transform ${
+              className={`relative w-9 h-9 rounded-full border-2 transition-transform before:absolute before:-inset-[5px] before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                 d.colors.includes(c.hex) ? 'border-gold scale-110' : 'border-white/15'
               }`}
               style={{ backgroundColor: c.hex }}
@@ -958,7 +1052,7 @@ function PrinterForm({
           ))}
           {/* A native colour well, because a hex field is a keyboard task and
               this is a phone. */}
-          <label className="w-9 h-9 rounded-full border-2 border-dashed border-white/25 flex items-center justify-center cursor-pointer relative overflow-hidden">
+          <label className="w-11 h-11 rounded-full border-2 border-dashed border-white/25 flex items-center justify-center cursor-pointer relative overflow-hidden focus-within:ring-2 focus-within:ring-focus">
             <Palette className="w-4 h-4 text-zinc-400" />
             <input
               type="color"
@@ -976,50 +1070,51 @@ function PrinterForm({
                 key={hex}
                 type="button"
                 onClick={() => onChange({ ...d, colors: d.colors.filter((x) => x !== hex) })}
-                className="inline-flex items-center gap-1.5 h-7 ps-2 pe-2 rounded-lg bg-white/[0.05] border border-white/10 text-zinc-300 text-[11px]"
+                aria-label={`${loc('إزالة', 'Remove')} ${hex}`}
+                className="relative inline-flex items-center gap-1.5 h-8 ps-2 pe-2 rounded-lg bg-white/[0.05] border border-white/10 text-zinc-300 text-[12px] before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 <span className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: hex }} />
                 <span dir="ltr">{hex}</span>
-                <span className="text-zinc-500">×</span>
+                <span className="text-text-muted">×</span>
               </button>
             ))}
           </div>
         )}
-        <p className="text-zinc-600 text-[10.5px] mt-1.5">
+        <p className="text-text-muted text-[12px] leading-relaxed mt-1.5">
           {loc(
             'اتركها فارغة لتصلك الطلبات بكل الألوان — اللون شيء يُشترى، لا حدّ للطابعة.',
             'Leave empty to hear about every colour — a colour is something you buy, not a limit of the machine.',
             'بەتاڵ = هەموو ڕەنگەکان.'
           )}
         </p>
-      </div>
+      </Group>
 
       <div className="space-y-2.5">
-        {(!canonical || canonical.max_colors > 1) && <Toggle
+        {(!canonical || canonical.max_colors > 1) && <Switch
           label={loc('طباعة متعددة الألوان', 'Multicolour printing', 'چاپی فرەڕەنگ')}
-          on={d.multicolor}
+          checked={d.multicolor}
           onChange={(multicolor) => onChange({ ...d, multicolor })}
-          hint={loc(
+          description={loc(
             'يفتح الطلبات التي تحتاج أكثر من لون داخل القطعة الواحدة.',
             'Unlocks jobs that need more than one colour inside a single part.',
             'داواکاری فرەڕەنگ دەکاتەوە.'
           )}
         />}
-        {!canonical && <Toggle
+        {!canonical && <Switch
           label={loc('حجرة مغلقة', 'Enclosed chamber', 'ژووری داخراو')}
-          on={d.enclosed}
+          checked={d.enclosed}
           onChange={(enclosed) => onChange({ ...d, enclosed })}
-          hint={loc(
+          description={loc(
             'يفتح ABS و ASA و PC و PA — بدونها تُستبعد هذه الخامات من طابعتك.',
             'Unlocks ABS, ASA, PC and PA — without it those materials are refused for this printer.',
             'ABS و ASA و PC و PA دەکاتەوە.'
           )}
         />}
-        {(!canonical || (canonical.technology === 'fdm' && canonical.hardened_nozzle_available)) && <Toggle
+        {(!canonical || (canonical.technology === 'fdm' && canonical.hardened_nozzle_available)) && <Switch
           label={loc('فوهة مقوّاة', 'Hardened nozzle', 'لوولەی بەهێزکراو')}
-          on={d.hardened_nozzle}
+          checked={d.hardened_nozzle}
           onChange={(hardened_nozzle) => onChange({ ...d, hardened_nozzle })}
-          hint={loc(
+          description={loc(
             'يفتح الخامات الكاشطة والمقوّاة بالكربون (CF).',
             'Unlocks abrasive and carbon-filled (CF) materials.',
             'کەرەستەی کاربۆن دەکاتەوە.'
@@ -1027,11 +1122,8 @@ function PrinterForm({
         />}
       </div>
 
-      <div>
-        <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
-          {loc('أعلى دقة تستطيعها', 'Best quality you can do', 'باشترین وردی')}
-        </label>
-        <div className="flex flex-wrap gap-1.5">
+      <Group label={loc('أعلى دقة تستطيعها', 'Best quality you can do', 'باشترین وردی')} wrap={false}>
+        <div className="flex flex-wrap gap-x-1.5">
           {qualities.map((q) => (
             <Chip
               key={q}
@@ -1041,9 +1133,9 @@ function PrinterForm({
             />
           ))}
         </div>
-      </div>
+      </Group>
 
-      <Input
+      <TextField
         label={loc('سعر ساعة التشغيل (د.ع)', 'Machine hour price (IQD)', 'نرخی کاتژمێر (IQD)')}
         value={d.machine_hour_iqd}
         onChange={(machine_hour_iqd) => onChange({ ...d, machine_hour_iqd })}
@@ -1060,7 +1152,7 @@ function PrinterForm({
         <summary className="min-h-11 flex items-center cursor-pointer text-zinc-300 text-[12.5px] font-semibold">
           {loc('اقتصاديات الطابعة — لحساب التكلفة', 'Machine economics — for costing')}
         </summary>
-        <p className="text-zinc-500 text-[11px] mb-2">
+        <p className="text-text-muted text-[11px] mb-2">
           {loc(
             'اختيارية. ما تدخله هنا هو ما يحسبه «احسب التكلفة» بدل أرقام المنصة، ولا يراه أحد غيرك.',
             'Optional. What you enter here is what «Cost it» charges instead of the platform’s figures, and nobody else sees it.'
@@ -1068,7 +1160,7 @@ function PrinterForm({
         </p>
         <div className="grid grid-cols-1 gap-2 pb-3 sm:grid-cols-2">
           {ECONOMICS.map((k) => (
-            <Input
+            <TextField
               key={k}
               label={
                 k === 'purchase_iqd'
@@ -1090,11 +1182,8 @@ function PrinterForm({
         </div>
       </details>
 
-      <div>
-        <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
-          {loc('حالة الطابعة الآن', 'Availability right now', 'دۆخی ئێستا')}
-        </label>
-        <div className="flex flex-wrap gap-1.5">
+      <Group label={loc('حالة الطابعة الآن', 'Availability right now', 'دۆخی ئێستا')} wrap={false}>
+        <div className="flex flex-wrap gap-x-1.5">
           {AVAILABILITIES.map((a) => (
             <Chip
               key={a}
@@ -1104,34 +1193,36 @@ function PrinterForm({
             />
           ))}
         </div>
-      </div>
+      </Group>
 
-      <Toggle
+      <Switch
         label={loc('مفعّلة ضمن المطابقة', 'Active in matching', 'چالاک لە مامەڵەکردن')}
-        on={d.active}
+        checked={d.active}
         onChange={(active) => onChange({ ...d, active })}
-        hint={loc(
+        description={loc(
           'طابعة غير مفعّلة تُتجاهل تمامًا — استخدمها للطابعات المُعارة أو المعطّلة بدل حذفها.',
           'An inactive printer is ignored entirely — use it for a lent-out or broken machine instead of deleting it.',
           'چاپکەری ناچالاک پشتگوێ دەخرێت.'
         )}
       />
 
-      {error && <p className="text-red-400 text-[11.5px]">{error}</p>}
+      {error && <p role="alert" className="lv-field-error">{error}</p>}
 
       <div className="flex gap-2">
-        <HookBtn
-          attrs={{ 'data-printer': 'save' }}
+        <Button
+          data-printer="save"
+          variant="primary"
+          className="flex-1"
           onClick={onSave}
-          disabled={saving || d.name.trim().length < 1}
-          full
+          loading={saving}
+          disabled={d.name.trim().length < 1}
+          icon={<Check aria-hidden="true" className="h-4 w-4" />}
         >
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
           {loc('حفظ الطابعة', 'Save printer', 'پاشەکەوتکردن')}
-        </HookBtn>
-        <Btn kind="ghost" onClick={onCancel}>
+        </Button>
+        <Button variant="ghost" onClick={onCancel}>
           {loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}
-        </Btn>
+        </Button>
       </div>
     </div>
   );
@@ -1226,7 +1317,7 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
     return (
       <Card title={loc('إشعارات طلبات الطباعة', 'Print request notifications', 'ئاگادارکردنەوەی داواکاری')}>
         {loadFailed ? (
-          <Notice
+          <Warn
             text={loc(
               'تعذّر تحميل تفضيلاتك. حدّث الصفحة وحاول مرة أخرى.',
               'Could not load your preferences. Refresh the page and try again.',
@@ -1234,7 +1325,7 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
             )}
           />
         ) : (
-          <Spinner />
+          <Loading />
         )}
       </Card>
     );
@@ -1253,7 +1344,7 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
   return (
     <Card title={loc('إشعارات طلبات الطباعة', 'Print request notifications', 'ئاگادارکردنەوەی داواکاری')}>
       <div data-prefs="form" className="space-y-3.5">
-        <p className="text-zinc-500 text-[11.5px] leading-relaxed">
+        <p className="text-text-muted text-[11.5px] leading-relaxed">
           {loc(
             'المفتاح الرئيسي «فرص طلبات العملاء» يعيش في تبويب الإشعارات. هذه الشاشة تُضيّق ما يصلك فقط — لا تستطيع أن توسّعه، ولا أن تجعل طابعتك تقبل عملًا لا تستطيعه.',
             'The master switch, “Customer request opportunities”, lives in the Notifications tab. This screen only narrows what reaches you — it can never widen it, and never make a printer accept work it cannot do.',
@@ -1262,7 +1353,7 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
         </p>
 
         {!canSell && (
-          <Notice
+          <Warn
             text={loc(
               'البيع متوقّف حاليًا، وبينما هو كذلك تُستبعد ورشتك من المطابقة مهما كانت هذه الإعدادات.',
               'Selling is paused, and while it is your workshop is excluded from matching whatever these settings say.',
@@ -1295,7 +1386,7 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
                 ? loc('استقبال الطلبات موقوف', 'Request notifications paused', 'ڕاگیراوە')
                 : loc('أوقِف استقبال الطلبات مؤقتًا', 'Pause request notifications', 'ڕایبگرە')}
             </span>
-            <span className="block text-zinc-500 text-[11px] mt-0.5">
+            <span className="block text-text-muted text-[11px] mt-0.5">
               {loc(
                 'إيقاف مؤقت لا يمسّ متجرك ولا طلباتك الجارية — يمنع وصول طلبات جديدة فقط.',
                 'A pause touches neither your store nor your live orders — it only stops new requests reaching you.',
@@ -1306,7 +1397,7 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
         </button>
 
         {f.paused && (
-          <Input
+          <TextField
             label={loc('حتى تاريخ (اختياري)', 'Until (optional)', 'تا بەروار')}
             value={f.paused_until}
             onChange={(paused_until) => set({ paused_until })}
@@ -1360,10 +1451,7 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
           ))}
         </Group>
 
-        <div>
-          <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
-            {loc('الألوان', 'Colours', 'ڕەنگەکان')}
-          </label>
+        <Group label={loc('الألوان', 'Colours', 'ڕەنگەکان')} wrap={false}>
           <div className="flex flex-wrap items-center gap-2">
             {SWATCHES.map((c) => (
               <button
@@ -1373,15 +1461,15 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
                 title={loc(c.ar, c.en)}
                 aria-label={loc(c.ar, c.en)}
                 aria-pressed={f.colors.includes(c.hex)}
-                className={`w-9 h-9 rounded-full border-2 transition-transform ${
+                className={`relative w-9 h-9 rounded-full border-2 transition-transform before:absolute before:-inset-[5px] before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                   f.colors.includes(c.hex) ? 'border-gold scale-110' : 'border-white/15'
                 }`}
                 style={{ backgroundColor: c.hex }}
               />
             ))}
           </div>
-          <p className="text-zinc-600 text-[10.5px] mt-1.5">{emptyHint}</p>
-        </div>
+          <p className="text-text-muted text-[12px] leading-relaxed mt-1.5">{emptyHint}</p>
+        </Group>
 
         <Group
           label={loc('المحافظات', 'Governorates', 'پارێزگاکان')}
@@ -1412,19 +1500,16 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
           ))}
         </Group>
 
-        <div>
-          <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
-            {loc('قيمة الطلب (د.ع)', 'Job value (IQD)', 'نرخی کار (IQD)')}
-          </label>
+        <Group label={loc('قيمة الطلب (د.ع)', 'Job value (IQD)', 'نرخی کار (IQD)')} wrap={false}>
           <div className="grid grid-cols-2 gap-2">
-            <Input
+            <TextField
               value={f.min_job_iqd}
               onChange={(min_job_iqd) => set({ min_job_iqd })}
               type="number"
               ltr
               placeholder={loc('الأدنى', 'Minimum', 'کەمترین')}
             />
-            <Input
+            <TextField
               value={f.max_job_iqd}
               onChange={(max_job_iqd) => set({ max_job_iqd })}
               type="number"
@@ -1432,28 +1517,25 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
               placeholder={loc('الأعلى', 'Maximum', 'زۆرترین')}
             />
           </div>
-          <p className="text-zinc-600 text-[10.5px] mt-1">
+          <p className="text-text-muted text-[12px] leading-relaxed mt-1">
             {loc(
               'يُقارَن بتقدير المنصة لقيمة العمل. اتركه فارغًا لعدم وجود حد.',
               'Compared against the platform’s estimate of the job. Leave empty for no limit.',
               'بەتاڵ = بێ سنوور.'
             )}
           </p>
-        </div>
+        </Group>
 
-        <div>
-          <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
-            {loc('مقاس القطعة — أطول ضلع (مم)', 'Part size — longest edge (mm)', 'قەبارە — درێژترین لا (مم)')}
-          </label>
+        <Group label={loc('مقاس القطعة — أطول ضلع (مم)', 'Part size — longest edge (mm)', 'قەبارە — درێژترین لا (مم)')} wrap={false}>
           <div className="grid grid-cols-2 gap-2">
-            <Input
+            <TextField
               value={f.min_size_mm}
               onChange={(min_size_mm) => set({ min_size_mm })}
               type="number"
               ltr
               placeholder={loc('الأدنى', 'Minimum', 'کەمترین')}
             />
-            <Input
+            <TextField
               value={f.max_size_mm}
               onChange={(max_size_mm) => set({ max_size_mm })}
               type="number"
@@ -1461,50 +1543,54 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
               placeholder={loc('الأعلى', 'Maximum', 'زۆرترین')}
             />
           </div>
-          <p className="text-zinc-600 text-[10.5px] mt-1">
+          <p className="text-text-muted text-[12px] leading-relaxed mt-1">
             {loc(
               'حدٌّ تختاره أنت، فوق حدود طابعاتك الفعلية. اتركه فارغًا لعدم وجود حد.',
               'A limit you choose, on top of what your printers physically allow. Leave empty for no limit.',
               'بەتاڵ = بێ سنوور.'
             )}
           </p>
-        </div>
+        </Group>
 
-        <div>
-          <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
-            {loc('ضغط العمل عندك الآن', 'How busy you are now', 'قەبارەی کار')}
-          </label>
+        <Group label={loc('ضغط العمل عندك الآن', 'How busy you are now', 'قەبارەی کار')} wrap={false}>
           <div className="grid grid-cols-4 gap-1.5">
             {vocab.workloads.map((w) => (
               <button
                 key={w}
                 type="button"
                 onClick={() => set({ workload: w })}
-                className={`h-9 rounded-xl text-[11.5px] font-semibold border transition-colors ${
-                  f.workload === w ? 'bg-olive text-white border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
+                aria-pressed={f.workload === w}
+                className={`min-h-11 min-w-0 rounded-xl px-1 text-[12px] font-semibold border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                  f.workload === w ? 'border-gold/50 bg-gold/10 text-text-primary' : 'border-border-subtle bg-white/[0.03] text-text-secondary'
                 }`}
               >
                 {workloadLabel(w, loc)}
               </button>
             ))}
           </div>
-          <p className="text-zinc-600 text-[10.5px] mt-1.5">
+          <p className="text-text-muted text-[12px] leading-relaxed mt-1.5">
             {loc(
               'لا يمنع وصول الطلبات — يُرتّبك أدنى في القائمة حين تكون مشغولًا، ليصل العمل لمن يستطيع البدء فورًا.',
               'It blocks nothing — it just ranks you lower while you are busy, so work reaches whoever can start now.',
               'ڕیزبەندیت دەگۆڕێت، نەک ئەوەی داواکاری ڕابگرێت.'
             )}
           </p>
-        </div>
+        </Group>
 
-        {error && <p className="text-red-400 text-[11.5px]">{error}</p>}
+        {error && <p role="alert" className="lv-field-error">{error}</p>}
 
-        <HookBtn attrs={{ 'data-prefs': 'save' }} onClick={save} disabled={saving} full>
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saved ? <Check className="w-3.5 h-3.5" /> : null}
+        <Button
+          data-prefs="save"
+          variant="primary"
+          block
+          onClick={save}
+          loading={saving}
+          icon={saved ? <Check aria-hidden="true" className="h-4 w-4" /> : undefined}
+        >
           {saved
             ? loc('تم الحفظ', 'Saved', 'پاشەکەوت کرا')
             : loc('حفظ التفضيلات', 'Save preferences', 'پاشەکەوتکردن')}
-        </HookBtn>
+        </Button>
       </div>
     </Card>
   );
@@ -1529,18 +1615,18 @@ function MatchesPanel() {
   }, [open, rows]);
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03]">
+    <section className="lv-surface min-w-0">
       <button
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="w-full flex items-center justify-between gap-3 p-3.5 text-start"
+        className="w-full flex items-center justify-between gap-3 p-4 text-start rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         <span className="min-w-0">
-          <span className="block text-gold font-bold text-[12.5px]">
+          <span className="block text-[15px] font-bold leading-snug text-text-primary">
             {loc('لماذا لم يصلني طلب؟', 'Why didn’t I get a request?', 'بۆچی داواکاریم بۆ نەهات؟')}
           </span>
-          <span className="block text-zinc-500 text-[11px] mt-0.5">
+          <span className="block mt-0.5 text-[13px] leading-relaxed text-text-muted">
             {loc(
               'آخر قرارات المطابقة الخاصة بورشتك، وسببها بالحرف.',
               'The matcher’s most recent decisions about your workshop, and the reason for each.',
@@ -1548,17 +1634,18 @@ function MatchesPanel() {
             )}
           </span>
         </span>
-        <ChevronDown className={`w-4 h-4 text-zinc-600 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-text-muted shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="px-3.5 pb-3.5">
+        <div className="px-4 pb-4">
           {rows === null ? (
-            <Spinner />
+            <Loading />
           ) : !rows.length ? (
-            <Empty
-              text={loc('لا توجد قرارات بعد', 'No decisions yet', 'هێشتا بڕیار نییە')}
-              hint={loc(
+            <EmptyState
+              compact
+              title={loc('لا توجد قرارات بعد', 'No decisions yet', 'هێشتا بڕیار نییە')}
+              description={loc(
                 'يظهر هنا كل طلب مرّ على المطابقة منذ أن أضفت طابعتك.',
                 'Every request the matcher weighed you for since you added a printer shows up here.',
                 'هەموو داواکارییەک لێرە دەردەکەوێت.'
@@ -1582,7 +1669,7 @@ function MatchesPanel() {
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
                         m.notified
                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                          : 'bg-white/[0.05] text-zinc-500 border-white/10'
+                          : 'bg-white/[0.05] text-text-muted border-white/10'
                       }`}
                     >
                       {m.notified
@@ -1590,7 +1677,7 @@ function MatchesPanel() {
                         : loc('لم يصلك', 'Not notified', 'ئاگادار نەکرایت')}
                     </span>
                   </div>
-                  <p className="text-zinc-500 text-[11px] leading-relaxed">
+                  <p className="text-text-muted text-[11px] leading-relaxed">
                     {m.eligible
                       ? loc(
                           'كنت مؤهلًا لهذا الطلب.',
@@ -1601,12 +1688,12 @@ function MatchesPanel() {
                         ? m.reasons.map((code) => verdictReasonText(code, loc)).join(' ')
                         : reasonText(m.reject_reason, loc)}
                     {m.current === false && (
-                      <span className="block text-zinc-600">
+                      <span className="block text-text-muted">
                         {loc('عدّل العميل الطلب بعد هذا القرار.', 'The customer changed the request after this decision.')}
                       </span>
                     )}
                   </p>
-                  <p className="text-zinc-700 text-[10px] mt-1" dir="ltr">
+                  <p className="text-text-muted text-[11px] mt-1" dir="ltr">
                     {new Date(m.created_at).toLocaleDateString('en-GB')}
                   </p>
                 </div>
@@ -1615,6 +1702,6 @@ function MatchesPanel() {
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }

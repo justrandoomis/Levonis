@@ -40,6 +40,8 @@ export interface OfferV2 {
   history?: OfferHistoryEntry[];
   /** The order this offer became (the winning offer only). */
   order_id?: string | null;
+  /** The workshop can no longer make this job as it stands (review F2); it cannot be accepted. */
+  workshop_unable?: boolean;
   merchant: {
     id: string;
     name: string;

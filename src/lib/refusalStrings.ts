@@ -921,6 +921,55 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The same material and colour appear twice.',
     ckb: 'الخامة واللون نفسهما مكرران في المخزون.',
   },
+  // Review of the live merchant platform (F12): the coupon form's refusals,
+  // the custom order's lifecycle doors and a customer's cancel after the
+  // order moved on. The ckb column carries the Arabic.
+  // OWNER: Sorani to be written by hand.
+  BAD_COUPON_CODE: {
+    ar: 'رمز الكوبون من 3 إلى 30 حرفًا: أحرف إنجليزية وأرقام وشرطات فقط.',
+    en: 'A coupon code is 3–30 characters: letters, numbers and hyphens only.',
+    ckb: 'رمز الكوبون من 3 إلى 30 حرفًا: أحرف إنجليزية وأرقام وشرطات فقط.',
+  },
+  COUPON_CODE_TAKEN: {
+    ar: 'لديك كوبون بهذا الرمز بالفعل. اختر رمزًا آخر.',
+    en: 'You already have a coupon with this code. Choose another code.',
+    ckb: 'لديك كوبون بهذا الرمز بالفعل. اختر رمزًا آخر.',
+  },
+  CUSTOM_ORDER_CANNOT_START: {
+    ar: 'لا يمكن بدء العمل على هذا الطلب في حالته الحالية. حدّث الصفحة.',
+    en: 'Work cannot start on this order in its current state. Refresh the page.',
+    ckb: 'لا يمكن بدء العمل على هذا الطلب في حالته الحالية. حدّث الصفحة.',
+  },
+  CUSTOM_ORDER_CANNOT_DELIVER: {
+    ar: 'لا يمكن تسجيل تسليم هذا الطلب في حالته الحالية. حدّث الصفحة.',
+    en: 'This order cannot be marked delivered in its current state. Refresh the page.',
+    ckb: 'لا يمكن تسجيل تسليم هذا الطلب في حالته الحالية. حدّث الصفحة.',
+  },
+  CUSTOM_ORDER_CANNOT_CONFIRM: {
+    ar: 'لا يمكن تأكيد استلام هذا الطلب الآن — لم تسلّمه الورشة بعد أو تغيّرت حالته. حدّث الصفحة.',
+    en: 'This order cannot be confirmed now — the workshop has not delivered it, or it changed. Refresh the page.',
+    ckb: 'لا يمكن تأكيد استلام هذا الطلب الآن — لم تسلّمه الورشة بعد أو تغيّرت حالته. حدّث الصفحة.',
+  },
+  CUSTOM_ORDER_NO_ESCROW: {
+    ar: 'لا يوجد مبلغ محجوز لهذا الطلب. تواصل مع الدعم.',
+    en: 'There is no held payment for this order. Contact support.',
+    ckb: 'لا يوجد مبلغ محجوز لهذا الطلب. تواصل مع الدعم.',
+  },
+  CUSTOM_ORDER_CANCEL_NEEDS_DISPUTE: {
+    ar: 'بدأ العمل على هذا الطلب، فلا يُلغى مباشرة. افتح نزاعًا وستقرّر Levonis.',
+    en: 'Work on this order has started, so it cannot simply be cancelled. Open a dispute and Levonis will decide.',
+    ckb: 'بدأ العمل على هذا الطلب، فلا يُلغى مباشرة. افتح نزاعًا وستقرّر Levonis.',
+  },
+  CUSTOM_ORDER_CANNOT_CANCEL: {
+    ar: 'لا يمكن إلغاء هذا الطلب في حالته الحالية. حدّث الصفحة.',
+    en: 'This order cannot be cancelled in its current state. Refresh the page.',
+    ckb: 'لا يمكن إلغاء هذا الطلب في حالته الحالية. حدّث الصفحة.',
+  },
+  ORDER_NOT_CANCELLABLE: {
+    ar: 'يمكن إلغاء الطلب بنفسك ما دام بانتظار التأكيد فقط. بعد ذلك تواصل مع الدعم.',
+    en: 'You can cancel an order yourself only while it is waiting for confirmation. After that, contact support.',
+    ckb: 'يمكن إلغاء الطلب بنفسك ما دام بانتظار التأكيد فقط. بعد ذلك تواصل مع الدعم.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

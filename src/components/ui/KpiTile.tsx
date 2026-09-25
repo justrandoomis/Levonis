@@ -89,7 +89,9 @@ export function KpiTile({ label, value, delta, trend, hint, icon, loading = fals
         </div>
       ) : (
         <>
-          <div className="mt-1.5 text-ui-xl font-bold tabular-nums text-text-primary">{value ?? '—'}</div>
+          {/* A figure may break between the number and its currency rather than
+              run out of a half-width tile on a 320px phone (W6: «399,500 IQD»). */}
+          <div className="mt-1.5 min-w-0 break-words text-ui-xl font-bold tabular-nums text-text-primary [&_[data-money]]:whitespace-normal">{value ?? '—'}</div>
           {delta && (
             <p className={`mt-1 flex flex-wrap items-center gap-x-1.5 text-[12px] ${tone}`}>
               <Arrow aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />

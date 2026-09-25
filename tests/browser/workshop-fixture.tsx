@@ -19,7 +19,7 @@ import { PrintersTab } from '../../src/components/merchant/dashboard/PrintersTab
 import '../../src/index.css';
 
 const params = new URLSearchParams(location.search);
-const lang = params.get('lang') === 'en' ? 'en' : 'ar';
+const lang = params.get('lang') === 'en' ? 'en' : params.get('lang') === 'ckb' ? 'ckb' : 'ar';
 const view = params.get('view') ?? 'board';
 localStorage.setItem('levo_lang', lang);
 document.documentElement.lang = lang;

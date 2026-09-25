@@ -108,6 +108,12 @@ export type NotificationKind =
   | 'dispute_opened'
   | 'payout_available'
   | 'payout_paid'
+  /** «تعذّر تحويل طلب السحب» — an admin failed a payout; the amount is back in «متاح» (review F11). */
+  | 'payout_failed'
+  /** «رصيدك سالب» — a claw-back left the merchant's available balance below zero (review F11). */
+  | 'balance_reversed'
+  /** «قرّرت Levonis النزاع» — an admin decided a disputed custom order's escrow (review F4). */
+  | 'dispute_resolved'
   | 'coupon_ending'
   | 'store_status_changed';
 

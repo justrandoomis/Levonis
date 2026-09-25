@@ -134,7 +134,8 @@ export function Segmented({ items, value, onChange, label, group, className = ''
             onClick={() => onChange(it.id)}
             {...stamp}
             className={`relative min-w-0 px-2 flex items-center justify-center gap-1.5 press-scale transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/70 disabled:opacity-40 ${
-              size === 'sm' ? 'h-full rounded-[10px] text-[12px] font-bold' : 'min-h-11 rounded-xl text-[13px] font-black'
+              // `sm` DRAWS 30px and HITS 44px: a transparent ::after reaches 7px past the track above and below (W6).
+              size === 'sm' ? "h-full rounded-[10px] text-[12px] font-bold after:absolute after:inset-x-0 after:-inset-y-[7px] after:content-['']" : 'min-h-11 rounded-xl text-[13px] font-black'
             } ${
               checked ? accent.text : 'text-zinc-400 hover:text-white'
             }`}

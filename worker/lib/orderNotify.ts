@@ -177,6 +177,24 @@ interface OrderRow extends NotifyLangRow {
   locale_stated: number | null;
   total_iqd: number;
   due_on_delivery_iqd: number;
+  /** 'merchant' for a community store's order (review F7). */
+  seller_type?: string | null;
+}
+
+/**
+ * A STORE ORDER'S DELIVERED LINE (review F7). A community store's order earns
+ * no Levonis review points, and its money waits for the customer's «استلمت
+ * طلبي» (or three days) — so the line asks for THAT, promises nothing, and
+ * opens the order itself. Sorani: the Arabic, until the owner writes it by
+ * hand (DECISIONS row 11). OWNER: Sorani to be written by hand.
+ */
+const STORE_DELIVERED = {
+  ar: { line: (order: string) => `وصل طلبك ${order}. استلمت طلبك؟ أكّد الاستلام.`, cta: 'أكّد الاستلام' },
+  en: { line: (order: string) => `Order ${order} was delivered. Got your order? Confirm receipt.`, cta: 'Confirm receipt' },
+} as const;
+
+function storeOrderPath(orderId: string): string {
+  return `/orders/${encodeURIComponent(orderId)}`;
 }
 
 /**
@@ -195,7 +213,7 @@ interface OrderRow extends NotifyLangRow {
  */
 async function loadOrderRow(env: Env, orderId: string): Promise<OrderRow | null> {
   return env.DB.prepare(
-    `SELECT o.id, o.user_id, o.total_iqd, o.due_on_delivery_iqd, ${NOTIFY_LANG_SELECT}
+    `SELECT o.id, o.user_id, o.total_iqd, o.due_on_delivery_iqd, o.seller_type, ${NOTIFY_LANG_SELECT}
        FROM orders o JOIN users u ON u.id = o.user_id
       WHERE o.id = ?`
   )
@@ -370,6 +388,28 @@ export async function notifyOrderDelivered(env: Env, orderId: string): Promise<v
     if (!row) return;
     const t = COPY[notificationLang(row)];
     const eventKey = `order.status.delivered:${row.id}`;
+    if (row.seller_type === 'merchant') {
+      const lang = notificationLang(row);
+      const copy = lang === 'en' ? STORE_DELIVERED.en : STORE_DELIVERED.ar;
+      const path = storeOrderPath(row.id);
+      const origin = (env.APP_ORIGIN || '').trim().replace(/\/+$/, '');
+      await notify(env.DB, {
+        userId: row.user_id,
+        kind: 'order_update',
+        title_ar: STORE_DELIVERED.ar.line(row.id),
+        title_en: STORE_DELIVERED.en.line(row.id),
+        link: path,
+        entity_type: 'order',
+        entity_id: row.id,
+        eventKey,
+      });
+      await notifyCustomer(env, row.user_id, eventKey, {
+        subject: t.statusSubject(row.id),
+        body: copy.line(row.id),
+        ...(origin.startsWith('https://') ? { cta: { label: copy.cta, url: `${origin}${path}` } } : {}),
+      });
+      return;
+    }
     const url = reviewLandingUrl(env);
 
     // THE FLOOR. `link` is a PATH, never an absolute URL — the column's own

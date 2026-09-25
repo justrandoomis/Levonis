@@ -191,8 +191,8 @@ export async function catalogsArePrinter(db: D1Database, catalogIds: Iterable<st
   const ids = [...new Set([...catalogIds].filter((x) => typeof x === 'string' && x !== ''))];
   if (ids.length === 0) return false;
   const row = await db
-    .prepare(`SELECT 1 AS x FROM catalogs WHERE is_printer_catalog = 1 AND id IN (${ids.map(() => '?').join(',')}) LIMIT 1`)
-    .bind(...ids)
+    .prepare(`SELECT 1 AS x FROM catalogs WHERE is_printer_catalog = 1 AND id IN (SELECT value FROM json_each(?)) LIMIT 1`)
+    .bind(JSON.stringify(ids))
     .first();
   return !!row;
 }

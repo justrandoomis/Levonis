@@ -161,15 +161,19 @@ export async function usersWithEntitlement(
   const entitled = new Set<string>();
   if (ids.length === 0) return entitled;
 
-  const placeholders = ids.map(() => '?').join(',');
+  // ONE bound parameter for the whole list (json_each), not one per id: the
+  // live D1 refuses a statement over 100 bound parameters, and a followed-shops
+  // list or a community page can name more users than that (review F1).
+  const idsJson = JSON.stringify(ids);
+  const inIds = `(SELECT value FROM json_each(?))`;
   const nowIso = new Date().toISOString();
   await db
     .prepare(
       `UPDATE memberships SET state = 'expired'
         WHERE state = 'active' AND expires_at IS NOT NULL AND expires_at < ?
-          AND user_id IN (${placeholders})`
+          AND user_id IN ${inIds}`
     )
-    .bind(nowIso, ...ids)
+    .bind(nowIso, idsJson)
     .run();
 
   const [{ results: memberships }, { results: restrictions }] = await Promise.all([
@@ -177,13 +181,13 @@ export async function usersWithEntitlement(
       .prepare(
         `SELECT user_id, tier, expires_at FROM memberships
           WHERE state = 'active' AND (expires_at IS NULL OR expires_at >= ?)
-            AND user_id IN (${placeholders})`
+            AND user_id IN ${inIds}`
       )
-      .bind(nowIso, ...ids)
+      .bind(nowIso, idsJson)
       .all<{ user_id: string; tier: Exclude<Tier, 'free'>; expires_at: string | null }>(),
     db
-      .prepare(`SELECT user_id, benefit_flags FROM restriction_cases WHERE state = 'active' AND user_id IN (${placeholders})`)
-      .bind(...ids)
+      .prepare(`SELECT user_id, benefit_flags FROM restriction_cases WHERE state = 'active' AND user_id IN ${inIds}`)
+      .bind(idsJson)
       .all<{ user_id: string; benefit_flags: string }>(),
   ]);
 

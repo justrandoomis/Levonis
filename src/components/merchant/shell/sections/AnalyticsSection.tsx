@@ -254,7 +254,8 @@ function Report({ data, lang, customerHref }: { data: AnalyticsReport; lang: Lan
             <KpiTile label={loc('بدأوا الدفع', 'Checkouts started')} value={n(t.totals.checkout_started)} delta={delta(t.totals.checkout_started, prevT?.checkout_started)} />
           </>
         )}
-        <KpiTile className="col-span-2 sm:col-span-1" label={loc('المبيعات', 'Revenue')} value={<Money iqd={totals.gross_iqd} />} delta={delta(totals.gross_iqd, prevO?.gross_iqd)} hint={
+        {/* Review F6: not the Money page's «مبيعات مسجّلة» — defined in the basis line below. */}
+        <KpiTile className="col-span-2 sm:col-span-1" label={loc('إجمالي المدفوع', 'Total paid')} value={<Money iqd={totals.gross_iqd} />} delta={delta(totals.gross_iqd, prevO?.gross_iqd)} hint={
           totals.average_order_iqd !== undefined ? <>{loc('متوسط الطلب', 'Average order', 'ناوەندی داواکاری')} <Money iqd={totals.average_order_iqd} /></> : undefined
         } />
         <KpiTile label={loc('الطلبات', 'Orders', 'داواکاری')} value={n(totals.orders)} delta={delta(totals.orders, prevO?.orders)} />
@@ -268,7 +269,11 @@ function Report({ data, lang, customerHref }: { data: AnalyticsReport; lang: Lan
         )}
       </div>
       <p className="px-0.5 text-[11.5px] leading-relaxed text-text-muted" data-analytics-basis>
-        {loc('المبيعات والطلبات من الطلبات غير الملغاة فقط.', 'Revenue and orders count only orders that were not cancelled.')}
+        {/* OWNER: Sorani to be written by hand. */}
+        {loc(
+          '«إجمالي المدفوع» ما دفعه الزبائن: مجموع الطلبات مع التوصيل وبعد الخصم، دون الملغاة — لذلك يختلف عن «مبيعات مسجّلة» في الأرباح.',
+          '“Total paid” is what customers paid: order totals including delivery, after coupons, excluding cancelled orders — so it differs from “Recorded sales” under Earnings.'
+        )}
         {totals.cancelled > 0 && <> {loc(`(${n(totals.cancelled)} ملغاة لم تُحتسب)`, `(${n(totals.cancelled)} cancelled, not counted)`)}</>}{' '}
         {t
           ? loc('كل زائر يُحسب مرة في اليوم؛ لا تُحسب زياراتك لمتجرك ولا الزواحف الآلية.', 'Each visitor counts once a day; your own visits and crawlers are not counted.')
@@ -352,11 +357,11 @@ function Report({ data, lang, customerHref }: { data: AnalyticsReport; lang: Lan
         <ChartCard
           id="top-products"
           title={loc('الأكثر مبيعًا', 'Best sellers')}
-          description={loc('بالمبيعات في الفترة', 'By revenue in the range')}
+          description={loc('بالمبيعات قبل الخصم في الفترة', 'By revenue before coupons in the range')}
           table={
             <DataTable
               caption={loc('الأكثر مبيعًا', 'Best sellers')}
-              columns={[{ label: loc('المنتج', 'Product') }, { label: loc('القطع', 'Units'), numeric: true }, { label: loc('الطلبات', 'Orders', 'داواکاری'), numeric: true }, { label: loc('المبيعات', 'Revenue'), numeric: true }]}
+              columns={[{ label: loc('المنتج', 'Product') }, { label: loc('القطع', 'Units'), numeric: true }, { label: loc('الطلبات', 'Orders', 'داواکاری'), numeric: true }, { label: loc('المبيعات قبل الخصم', 'Revenue before coupons'), numeric: true }]}
               rows={data.products.top.map((p) => [p.name || '—', n(p.units), n(p.orders), money(p.revenue_iqd)])}
             />
           }

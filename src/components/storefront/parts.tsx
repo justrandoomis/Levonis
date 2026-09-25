@@ -131,14 +131,18 @@ export function ProductCard({ product, storeOpen, legacyLink = false }: { produc
             e.stopPropagation();
             rt.toggleSave(product.id);
           }}
-          className="absolute top-1.5 left-1.5 w-[22px] h-[22px] rounded-full bg-[#10161f]/85 flex items-center justify-center"
+          // A 44px target in the corner; the 22px disc is drawn where it always was (W6:
+          // a ::after slop is clipped by the image frame, so the button itself is the target).
+          className="group absolute top-0 left-0 w-11 h-11 p-1.5 flex items-start justify-start focus-visible:outline-none"
           aria-label={saved ? loc('إزالة من المحفوظات', 'Remove from saved', 'لابردن') : loc('حفظ المنتج', 'Save product', 'پاشەکەوتکردن')}
           aria-pressed={saved}
         >
-          <Heart className={`w-3 h-3 ${saved ? 'text-rose-500 fill-rose-500' : 'text-white'}`} strokeWidth={2} aria-hidden="true" />
+          <span className="w-[22px] h-[22px] rounded-full bg-[#10161f]/85 flex items-center justify-center group-focus-visible:ring-2 group-focus-visible:ring-focus">
+            <Heart className={`w-3 h-3 ${saved ? 'text-rose-500 fill-rose-500' : 'text-white'}`} strokeWidth={2} aria-hidden="true" />
+          </span>
         </button>
         {discounted && (
-          <span className="absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/85 text-white" dir="ltr">
+          <span className="absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-600/90 text-white" dir="ltr">
             −{Math.round((1 - product.price_iqd / (product.original_price_iqd as number)) * 100)}%
           </span>
         )}

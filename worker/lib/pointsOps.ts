@@ -1038,14 +1038,14 @@ export async function getOrderPointsSnapshots(
   const out = new Map<string, OrderPointsSnapshot>();
   const ids = orderIds.filter((id) => typeof id === 'string' && id).slice(0, 200);
   if (ids.length === 0) return out;
-  const placeholders = ids.map(() => '?').join(',');
+  // One bound parameter for the list (json_each): the live D1 refuses > 100 (review F1).
 
   const { results: accruals } = await env.DB.prepare(
     `SELECT order_id, kind, points, eligible_iqd, state, purchase_at, available_at, settled_at,
             iqd_per_point, rule_version
-       FROM points_accruals WHERE order_id IN (${placeholders})`
+       FROM points_accruals WHERE order_id IN (SELECT value FROM json_each(?))`
   )
-    .bind(...ids)
+    .bind(JSON.stringify(ids))
     .all<{
       order_id: string; kind: string; points: number; eligible_iqd: number; state: string;
       purchase_at: string; available_at: string; settled_at: string | null;
@@ -1074,9 +1074,9 @@ export async function getOrderPointsSnapshots(
 
   const { results: settlements } = await env.DB.prepare(
     `SELECT order_id, COALESCE(SUM(amount_iqd), 0) AS collected
-       FROM order_payment_settlements WHERE order_id IN (${placeholders}) GROUP BY order_id`
+       FROM order_payment_settlements WHERE order_id IN (SELECT value FROM json_each(?)) GROUP BY order_id`
   )
-    .bind(...ids)
+    .bind(JSON.stringify(ids))
     .all<{ order_id: string; collected: number }>();
   for (const s of settlements) {
     const snap = out.get(s.order_id);
@@ -1091,9 +1091,9 @@ export async function getOrderPointsSnapshots(
   }
 
   const { results: reservations } = await env.DB.prepare(
-    `SELECT order_id, points, state FROM points_reservations WHERE order_id IN (${placeholders})`
+    `SELECT order_id, points, state FROM points_reservations WHERE order_id IN (SELECT value FROM json_each(?))`
   )
-    .bind(...ids)
+    .bind(JSON.stringify(ids))
     .all<{ order_id: string; points: number; state: string }>();
   for (const r of reservations) {
     const snap = out.get(r.order_id) ?? {

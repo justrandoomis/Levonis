@@ -494,7 +494,7 @@ function TopBar({
         aria-label={statusName}
         title={status.key === 'open' ? statusText : status.reason(loc)}
         data-store-status={status.key}
-        className={`hidden min-h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:inline-flex ${collapsed ? '' : 'lg:hidden'} ${TONE[status.tone]}`}
+        className={`lv-hit relative hidden min-h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:inline-flex ${collapsed ? '' : 'lg:hidden'} ${TONE[status.tone]}`}
       >
         <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${DOT[status.tone]}`} />
         {statusText}

@@ -109,7 +109,7 @@ export default function ReviewsSection() {
                   setReplying(id);
                   setText('');
                 }}
-                className="min-h-11 rounded-lg px-1 text-gold text-[12px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                className="min-h-11 min-w-11 rounded-lg px-2 text-gold text-[12px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 {loc('رد', 'Reply', 'وەڵام')}
               </button>

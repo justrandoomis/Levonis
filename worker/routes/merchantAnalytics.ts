@@ -50,6 +50,7 @@ import { requireStoreOwner } from '../lib/merchantAuth';
 import { getTierStatus, benefits } from '../lib/entitlements';
 import { addDays, baghdadDay } from '../lib/baghdadTime';
 import { BAGHDAD_SQL_SHIFT, previousRangeOf, resolveRange, utcWindowFor } from '../lib/financeReport';
+import { CUSTOM_ORDER_EARNED_AT_SQL, CUSTOM_ORDER_EARNED_SQL, CUSTOM_ORDER_KEPT_RECEIVABLE_SQL } from '../lib/communityStates';
 
 export const merchantAnalyticsRoutes = new Hono<AppContext>();
 merchantAnalyticsRoutes.use('*', requireAuth);
@@ -201,9 +202,11 @@ merchantAnalyticsRoutes.get('/report', async (c) => {
       .first<{ sent: number; accepted: number }>(),
     db
       .prepare(
-        `SELECT COUNT(*) AS completed, COALESCE(SUM(merchant_receivable_iqd), 0) AS receivable
-           FROM community_orders
-          WHERE merchant_id = ? AND state = 'completed' AND completed_at >= ? AND completed_at < ?`
+        `SELECT COUNT(*) AS completed, COALESCE(SUM(${CUSTOM_ORDER_KEPT_RECEIVABLE_SQL}), 0) AS receivable
+           FROM community_orders o
+           LEFT JOIN community_escrows e ON e.community_order_id = o.id
+          WHERE o.merchant_id = ? AND ${CUSTOM_ORDER_EARNED_SQL}
+            AND ${CUSTOM_ORDER_EARNED_AT_SQL} >= ? AND ${CUSTOM_ORDER_EARNED_AT_SQL} < ?`
       )
       .bind(merchantId, startIso, endIso)
       .first<{ completed: number; receivable: number }>(),

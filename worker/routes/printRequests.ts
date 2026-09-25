@@ -549,8 +549,8 @@ const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE
 /**
  * Quality in the words the CUSTOMER pressed, not the pricing engine's enum.
  *
- * The ar/en wording is copied from the wizard's own QUALITY_COPY
- * (src/components/print/PrintRequestWizard.tsx) on purpose: the merchant must
+ * The ar/en wording is the wizard's own quality choices
+ * (src/components/community/requests/RequestWizard.tsx) on purpose: the merchant must
  * read the same word the customer chose, or the two halves of one job are
  * describing it differently and the offer that comes back answers a question
  * nobody asked. 'draft' is «سريعة» / "Quick" and never "Draft", because the

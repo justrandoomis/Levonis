@@ -263,8 +263,10 @@ test('a partial refund nets to exactly what the merchant receives: full debit, t
   assert.equal(credits.length, 1);
   assert.equal(credits[0].amount, 2500, '35,000 IQD / 1,400 = 2,500 cents comes back');
   assert.equal(spendable(raw, 'cust'), DEP - 2500, 'net: the customer paid for the kept half only');
-  // The merchant earns on the kept half — 35,000 IQD, capped by the receivable.
-  assert.equal((await merchantBalance(db, 'm1')).available_iqd, 35_000);
+  // The merchant earns on the kept half, less the platform's commission on it
+  // (owner decision, DECISIONS row 137): this order's rate is 10%, so
+  // 35,000 − 3,500 = 31,500.
+  assert.equal((await merchantBalance(db, 'm1')).available_iqd, 31_500);
 });
 
 test('a full refund releases the hold: no debit, no credit, no merchant row, balance untouched', async () => {

@@ -82,6 +82,33 @@ export const bucketSumSql = (m: string, bucket: LedgerBucket) =>
  */
 export const merchantAvailableSql = (m: string) => bucketSumSql(m, 'available');
 
+/**
+ * THE MERCHANT OR ITS STORE IS SUSPENDED BY LEVONIS (owner decision,
+ * DECISIONS row 137). While it holds, orders may still reach «delivered» —
+ * the customer gets their goods — but NO money moves to the merchant: the
+ * customer's receipt and confirmation are recorded, the three-day sweep and
+ * the auto-confirm skip, escrow stays held, and payout requests are refused.
+ * When the suspension lifts, the sweeps release what is due. `m` is the SQL
+ * for the merchant id.
+ */
+export const merchantSuspendedSql = (m: string) => `(
+  EXISTS (SELECT 1 FROM community_merchants sm WHERE sm.id = ${m} AND sm.status = 'suspended')
+  OR EXISTS (SELECT 1 FROM merchant_stores ss WHERE ss.merchant_id = ${m} AND ss.status = 'suspended'))`;
+
+/** Which suspension answers, or null: `MERCHANT_SUSPENDED` before `STORE_SUSPENDED`. */
+export async function merchantSuspension(db: D1Database, merchantId: string): Promise<'MERCHANT_SUSPENDED' | 'STORE_SUSPENDED' | null> {
+  const r = await db
+    .prepare(
+      `SELECT (SELECT status FROM community_merchants WHERE id = ?1) AS m,
+              EXISTS (SELECT 1 FROM merchant_stores WHERE merchant_id = ?1 AND status = 'suspended') AS s`
+    )
+    .bind(merchantId)
+    .first<{ m: string | null; s: number }>();
+  if (r?.m === 'suspended') return 'MERCHANT_SUSPENDED';
+  if (Number(r?.s)) return 'STORE_SUSPENDED';
+  return null;
+}
+
 export interface Buckets {
   pending: number;
   available: number;

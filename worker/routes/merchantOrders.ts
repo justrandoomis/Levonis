@@ -144,16 +144,19 @@ export function buildOrderTimeline(input: TimelineInput): TimelineEvent[] {
   }
   // The admin's status dropdown writes the audit row only.
   for (const a of input.adminMoves) {
-    const d = safeParse<{ to?: unknown }>(a.detail, {});
+    const d = safeParse<{ to?: unknown; stage?: unknown; stage_recorded?: unknown }>(a.detail, {});
     const to = typeof d.to === 'string' ? d.to : '';
     if (!STATUSES.has(to)) continue;
+    // The stage door already wrote this move's history row (review F13): one
+    // walk-back is one event, and it is the history row, stage and all.
+    if (d.stage_recorded === true && to !== 'cancelled') continue;
     if (to === 'cancelled') {
       // A store order's cancel goes through the one operation, which writes the
       // anchor — only an anchor-less cancellation is taken from the audit row.
       if (!out.some((e) => e.kind === 'cancelled')) out.push({ kind: 'cancelled', at: a.created_at, actor: 'levonis' });
       continue;
     }
-    out.push({ kind: 'status', at: a.created_at, status: to, stage: '', actor: 'levonis' });
+    out.push({ kind: 'status', at: a.created_at, status: to, stage: typeof d.stage === 'string' ? d.stage : '', actor: 'levonis' });
   }
 
   if (input.refundAt) out.push({ kind: 'refunded', at: input.refundAt, actor: 'system' });

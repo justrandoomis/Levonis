@@ -169,3 +169,26 @@ export function cancellationPolicy(state: CommunityOrderState): {
       return { allowed: false, by: [], refund: 'none' };
   }
 }
+
+/**
+ * CUSTOM ORDERS THAT EARNED THE MERCHANT MONEY, AND HOW MUCH (review F9) —
+ * for the analytics, over `community_orders o LEFT JOIN community_escrows e
+ * ON e.community_order_id = o.id`.
+ *
+ * A dispute an admin settles by a PARTIAL refund is a completed job whose
+ * escrow reads `partially_refunded` (the flag — no new column). Before the
+ * fix the order was left `refunded`, and those legacy rows count too when
+ * their escrow says part was kept. The receivable is the part the merchant
+ * KEPT — the same figure `refundEscrow` credits (the kept gross less the
+ * order's commission on it, `partialRefundCommission`), not the order's
+ * original receivable.
+ */
+export const CUSTOM_ORDER_EARNED_SQL = `(o.state = 'completed' OR (o.state = 'refunded' AND e.state = 'partially_refunded'))`;
+export const CUSTOM_ORDER_KEPT_RECEIVABLE_SQL = `CASE WHEN e.state = 'partially_refunded'
+  THEN (e.gross_iqd - e.refunded_iqd) - MIN(e.gross_iqd - e.refunded_iqd, MAX(0, CAST(ROUND(
+         CASE WHEN o.commission_percent_x100 > 0
+              THEN (e.gross_iqd - e.refunded_iqd) * o.commission_percent_x100 / 10000.0
+              ELSE (e.gross_iqd - e.refunded_iqd) * 1.0 * e.platform_fee_iqd / e.gross_iqd END) AS INTEGER)))
+  ELSE o.merchant_receivable_iqd END`;
+/** When it earned: completion, or for a legacy partial row the refund's stamp. */
+export const CUSTOM_ORDER_EARNED_AT_SQL = `COALESCE(o.completed_at, e.refunded_at)`;

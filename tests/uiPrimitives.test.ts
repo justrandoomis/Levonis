@@ -265,7 +265,9 @@ test('Menu: a real menu-button keyboard — arrows, Home/End, typeahead, focus b
 test('Tabs: one Tab stop, arrows in the writing direction, tabpanel wiring, and a link mode', () => {
   const t = code(`${UI}/Tabs.tsx`);
   assert.match(t, /tabIndex=\{active \? 0 : -1\}/);
-  assert.match(t, /const forward = dir === 'rtl' \? 'ArrowLeft' : 'ArrowRight';/);
+  // W6: the direction is the strip's own (a strip drawn RTL in an English page), the language's as the fallback.
+  assert.match(t, /const rtl = \(getComputedStyle\(e\.currentTarget\)\.direction \|\| dir\) === 'rtl';/);
+  assert.match(t, /const forward = rtl \? 'ArrowLeft' : 'ArrowRight';/);
   assert.match(t, /aria-controls=\{panels && active \? panelId\(group, t\.id\) : undefined\}/);
   assert.match(t, /role: 'tabpanel', id: panelId\(group, value\), 'aria-labelledby': tabId\(group, value\)/);
   assert.match(t, /aria-current=\{active \? 'page' : undefined\}/);

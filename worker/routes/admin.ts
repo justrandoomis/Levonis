@@ -1575,7 +1575,47 @@ adminRoutes.post('/wallet/credit', async (c) => {
  *   scope=delivered  «الطلبات التي تم توصيلها يتم عزلها»
  *   scope=cancelled  «الطلبات الملغية … يتم عزلها»
  */
-const BOARD_SCOPES = ['open', 'preorder', 'all', 'delivered', 'cancelled'] as const;
+const BOARD_SCOPES = ['open', 'preorder', 'all', 'prepare', 'delivered', 'cancelled'] as const;
+
+/**
+ * «يجب تجهيزها» — scope=prepare. Owner, 2026-09-25: «فلترة جديدة يجمع في
+ * الطلبات التي تكون في قيد التجهيز سواء كان البيع المباشر عند الضغط على تم
+ * تأكيد الطلب … أو طلب مسبق في جار التوصيل المحلي».
+ *
+ * THE BOXES THAT HAVE TO BE PACKED HERE, whatever their journey:
+ *   direct     stage `confirmed` («تم تأكيد الطلب») or `preparing` («جارٍ تجهيز
+ *              الطلب», which the clock reaches minutes after confirmation) —
+ *              confirmed and not yet out for delivery. (`orders.stage` is NOT
+ *              NULL and 0028 backfilled it from the status, so the stage is
+ *              always there to decide — as it does for the row's button.)
+ *   pre-order  stage `local_delivery_prep` («جارٍ تجهيز التوصيل المحلي») — the
+ *              container is in and the parcel is being made up for the last
+ *              mile. Earlier pre-order stages are the supplier's or the
+ *              carrier's work, not a box on this shelf.
+ *
+ * It is a SUBSET of the live set, so the route pushes the partial index's own
+ * WHERE verbatim first; every term here carries a leading `+` for the reason
+ * the `+o.shipping_type` note below gives — `idx_orders_stage` and
+ * `idx_orders_shipping_type` must not lure the planner off
+ * `idx_orders_board_open`. `PREPARE_FACET_SQL` is the same predicate without
+ * the `+` (it is a value inside a SUM there, not a filter), and
+ * `needsPreparation` is its TypeScript twin, pinned against it by
+ * tests/orderBoardPrepareFilter.test.ts.
+ */
+export const PREPARE_DIRECT_STAGES = ['confirmed', 'preparing'] as const;
+export const PREPARE_PREORDER_STAGE = 'local_delivery_prep';
+const prepareSql = (p: string) =>
+  `(${p}o.shipping_type = 'direct' AND ${p}o.stage IN ('confirmed','preparing'))` +
+  ` OR (${p}o.shipping_type <> 'direct' AND ${p}o.stage = 'local_delivery_prep')`;
+export const PREPARE_WHERE_SQL = prepareSql('+');
+const PREPARE_FACET_SQL = prepareSql('');
+
+/** Whether an order belongs under «يجب تجهيزها» — the SQL above, in TypeScript. */
+export function needsPreparation(shippingType: string, stage: string, status: string): boolean {
+  if (status === 'delivered' || status === 'cancelled') return false;
+  if (shippingType === 'direct') return (PREPARE_DIRECT_STAGES as readonly string[]).includes(stage);
+  return stage === PREPARE_PREORDER_STAGE;
+}
 const BOARD_DUE = ['today', 'tomorrow', 'week', 'later', 'unscheduled'] as const;
 const BOARD_TYPES = ['direct', 'preorder_air', 'preorder_sea', 'preorder_land'] as const;
 
@@ -1768,7 +1808,7 @@ adminRoutes.get('/orders', async (c) => {
     } else {
       facetClauses.push("o.status NOT IN ('delivered','cancelled')");
     }
-    if (scope === 'open' || scope === 'preorder' || scope === 'all') {
+    if (scope === 'open' || scope === 'preorder' || scope === 'all' || scope === 'prepare') {
       // ######################################################################
       // #  THIS STRING IS VERBATIM FROM idx_orders_board_open. DO NOT REWRITE #
       // ######################################################################
@@ -1806,7 +1846,10 @@ adminRoutes.get('/orders', async (c) => {
       // AND `all` PUSHES NEITHER. «الكل» is the index's own WHERE with nothing
       // added — the one shape of this query that needs no `+` at all, because
       // there is no equality for the planner to be tempted by.
-      if (scope !== 'all') {
+      if (scope === 'prepare') {
+        // «يجب تجهيزها» — both journeys, narrowed by stage. See PREPARE_WHERE_SQL.
+        clauses.push(PREPARE_WHERE_SQL);
+      } else if (scope !== 'all') {
         clauses.push(scope === 'open' ? "+o.shipping_type = 'direct'" : "+o.shipping_type <> 'direct'");
       }
     } else {
@@ -1958,7 +2001,8 @@ adminRoutes.get('/orders', async (c) => {
     pierces
       ? Promise.resolve({ results: [] as Array<Record<string, unknown>> })
       : c.env.DB.prepare(
-          `SELECT o.shipping_type AS t, o.status AS s, COUNT(*) AS n
+          `SELECT o.shipping_type AS t, o.status AS s, COUNT(*) AS n,
+                  SUM(CASE WHEN ${PREPARE_FACET_SQL} THEN 1 ELSE 0 END) AS p
              ${FROM}${facetWhere}
             GROUP BY o.shipping_type, o.status`
         )
@@ -1975,14 +2019,18 @@ adminRoutes.get('/orders', async (c) => {
    * route's header gives for everything else on this screen: the board renders
    * decisions, it does not make them.
    */
-  const matrix = (facetRows?.results ?? []) as Array<{ t?: unknown; s?: unknown; n?: unknown }>;
-  const sumWhere = (keep: (t: string, st: string) => boolean): number => {
+  const matrix = (facetRows?.results ?? []) as Array<{ t?: unknown; s?: unknown; n?: unknown; p?: unknown }>;
+  /** `field` 'p' counts only the «يجب تجهيزها» rows of each cell. */
+  const sumWhere = (keep: (t: string, st: string) => boolean, field: 'n' | 'p' = 'n'): number => {
     let n = 0;
     for (const r of matrix) {
-      if (keep(String(r.t ?? ''), String(r.s ?? ''))) n += Number(r.n) || 0;
+      if (keep(String(r.t ?? ''), String(r.s ?? ''))) n += Number(r[field]) || 0;
     }
     return n;
   };
+  // Under scope=prepare the status select counts the prepare rows only, so
+  // «قيد التجهيز ٣» beside a board of three says the same thing.
+  const statusField: 'n' | 'p' = scope === 'prepare' ? 'p' : 'n';
   // `status` is the live selects' second dimension; in the archive that role is
   // played by the SCOPE, because «تم التسليم» and «ملغاة» are the two options
   // the second select offers there.
@@ -2009,6 +2057,9 @@ adminRoutes.get('/orders', async (c) => {
         /** The journey select, «الكل» included — it is the sum, not a query. */
         type: {
           all: sumWhere((_t, st) => statusMatches(st)),
+          /** «يجب تجهيزها». Only meaningful on the live half; 0 in the archive. */
+          prepare:
+            scope === 'delivered' || scope === 'cancelled' ? 0 : sumWhere((_t, st) => statusMatches(st), 'p'),
           direct: sumWhere((t, st) => t === 'direct' && statusMatches(st)),
           preorder_air: sumWhere((t, st) => t === 'preorder_air' && statusMatches(st)),
           preorder_sea: sumWhere((t, st) => t === 'preorder_sea' && statusMatches(st)),
@@ -2017,13 +2068,13 @@ adminRoutes.get('/orders', async (c) => {
         /** The status select. `any` is «كل الحالات»; the archive reads the
          *  `delivered` / `cancelled` pair instead. */
         status: {
-          any: sumWhere((t) => typeMatches(t)),
-          pending: sumWhere((t, st) => st === 'pending' && typeMatches(t)),
-          confirmed: sumWhere((t, st) => st === 'confirmed' && typeMatches(t)),
-          processing: sumWhere((t, st) => st === 'processing' && typeMatches(t)),
-          shipped: sumWhere((t, st) => st === 'shipped' && typeMatches(t)),
-          delivered: sumWhere((t, st) => st === 'delivered' && typeMatches(t)),
-          cancelled: sumWhere((t, st) => st === 'cancelled' && typeMatches(t)),
+          any: sumWhere((t) => typeMatches(t), statusField),
+          pending: sumWhere((t, st) => st === 'pending' && typeMatches(t), statusField),
+          confirmed: sumWhere((t, st) => st === 'confirmed' && typeMatches(t), statusField),
+          processing: sumWhere((t, st) => st === 'processing' && typeMatches(t), statusField),
+          shipped: sumWhere((t, st) => st === 'shipped' && typeMatches(t), statusField),
+          delivered: sumWhere((t, st) => st === 'delivered' && typeMatches(t), statusField),
+          cancelled: sumWhere((t, st) => st === 'cancelled' && typeMatches(t), statusField),
         },
       };
 
@@ -2772,9 +2823,11 @@ adminRoutes.get('/labels', async (c) => {
   const NEW_STAGES = ['received', 'confirmed'];
   const placeholders = NEW_STAGES.map(() => '?').join(',');
   const sql = ids.length
-    ? `SELECT * FROM orders WHERE stage IN (${placeholders}) AND id IN (${ids.map(() => '?').join(',')}) ORDER BY created_at`
+    ? `SELECT * FROM orders WHERE stage IN (${placeholders}) AND id IN (SELECT value FROM json_each(?)) ORDER BY created_at`
     : `SELECT * FROM orders WHERE stage IN (${placeholders}) ORDER BY created_at LIMIT ? OFFSET ?`;
-  const binds = ids.length ? [...NEW_STAGES, ...ids] : [...NEW_STAGES, limit, offset];
+  // The ids travel as ONE json_each parameter: 2 stages + 100 ids would pass the
+  // live D1's 100-parameter cap (review F1).
+  const binds = ids.length ? [...NEW_STAGES, JSON.stringify(ids)] : [...NEW_STAGES, limit, offset];
   const { results } = await c.env.DB.prepare(sql).bind(...binds).all<Record<string, unknown>>();
 
   // The whole undispatched queue, counted separately: the page cannot report
@@ -2792,9 +2845,9 @@ adminRoutes.get('/labels', async (c) => {
       // A bundle counts ONCE — its component rows are the physical truth behind
       // it, not four more things on the label (docs/BUNDLES_MYSTERY.md §6.3).
       `SELECT order_id, SUM(qty) AS n FROM order_items
-        WHERE order_id IN (${orderIds.map(() => '?').join(',')}) AND bundle_parent_item_id IS NULL
+        WHERE order_id IN (SELECT value FROM json_each(?)) AND bundle_parent_item_id IS NULL
         GROUP BY order_id`
-    ).bind(...orderIds).all<{ order_id: string; n: number }>();
+    ).bind(JSON.stringify(orderIds)).all<{ order_id: string; n: number }>();
     for (const r of rows ?? []) counts.set(String(r.order_id), Number(r.n) || 0);
   }
 
@@ -3448,12 +3501,19 @@ adminRoutes.patch('/orders/:id', async (c) => {
   // order to "shipped" must not tell the customer it already reached Iraq —
   // and the schedule is re-armed from now, which is what cancels whatever
   // automatic transition was pending.
+  // The stage this move left the order at, and whether the stage door wrote
+  // its own history row for it — the audit row below carries both, so the
+  // merchant's timeline shows the stage (review F13) and never counts one
+  // walk-back twice.
+  let syncedStage: string | null = null;
+  let stageRecorded = false;
   try {
     const shippingType = asShippingType(order.shipping_type);
     const targetStage = stageForLegacyStatus(next, shippingType);
     const currentStage = String(order.stage || 'received') as OrderStage;
+    syncedStage = targetStage;
     if (targetStage !== currentStage) {
-      await moveOrderStage(c.env, {
+      const moved = await moveOrderStage(c.env, {
         orderId: id,
         to: targetStage,
         source: 'manual',
@@ -3464,6 +3524,7 @@ adminRoutes.patch('/orders/:id', async (c) => {
         // would reject corrections the admin is entitled to make.
         force: true,
       });
+      stageRecorded = moved.moved;
     }
   } catch (e) {
     console.error('stage sync failed for order', id, e);
@@ -3472,6 +3533,8 @@ adminRoutes.patch('/orders/:id', async (c) => {
   await audit(c.env.DB, adminUser.id, 'order.status', id, {
     from,
     to: next,
+    stage: syncedStage,
+    stage_recorded: stageRecorded,
     stock: stockNote,
     reversal: reversalNote,
   });

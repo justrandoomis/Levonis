@@ -32,6 +32,9 @@ function seed() {
     INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','owner','Ali 3D'), ('m2','owner2','Omar 3D');
     INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES
       ('s1','m1','owner','ali3d','Ali 3D'), ('s2','m2','owner2','omar3d','Omar 3D');
+    -- Since the e2e review (F2) acceptance asks the workshop's live verdict: it must be able to make the job.
+    INSERT INTO merchant_printers (id,merchant_id,store_id,name,technology,build_x_mm,build_y_mm,build_z_mm) VALUES
+      ('p1','m1','s1','P1S','fdm',256,256,250), ('p2','m2','s2','P1S','fdm',256,256,250);
     -- Acceptance asks what making an offer asks (review S2): the owner's plan too.
     INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at) VALUES
       ('mem1','owner','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z'),

@@ -40,8 +40,9 @@ import { newId } from './crypto';
 import { audit, auditStatements } from './audit';
 import { cancelledOrderRefundStatements } from './orderCancelOps';
 import { sellingVerdict, type StoreContext } from './merchantAuth';
-import { notifyMerchant, storeOrderNotice } from './merchantNotify';
+import { notifyBalanceIfNegative, notifyMerchant, storeOrderNotice } from './merchantNotify';
 import {
+  merchantSuspendedSql,
   orderCredit,
   orderCreditStateSql,
   releaseOrderCreditStatements,
@@ -480,6 +481,11 @@ export async function cancelStoreOrder(env: Env, p: CancelStoreOrderInput): Prom
     if (again && again.status !== from) return { ok: false, reason: 'RACED' };
     throw e;
   }
+  // A claw-back can leave the merchant owing (review F11): they are told the
+  // debt and how it is paid, once per order.
+  if (creditOutcome === 'clawed_back') {
+    await notifyBalanceIfNegative(env, { merchantId, sourceKey: `store_order:${id}`, orderId: id });
+  }
   return {
     ok: true,
     orderId: id,
@@ -536,7 +542,16 @@ export async function confirmStoreOrderReceipt(
       note: 'the customer confirmed receipt',
       ts: now,
       condition: {
-        sql: `EXISTS (SELECT 1 FROM orders ro WHERE ro.id = ?3 AND ro.status = 'delivered' AND ro.receipt_confirmed_at = ?7)
+        // …and never while a complaint or ticket is open on it (review F8):
+        // the receipt is recorded, the money stays frozen for the human who
+        // decides — the sweep's own rule, so the three days release it once
+        // the complaint closes.
+        // …nor while the merchant or its store is suspended (owner decision,
+        // DECISIONS row 137): the receipt stands, the credit stays pending,
+        // and the three-day sweep releases it once the suspension lifts.
+        sql: `EXISTS (SELECT 1 FROM orders ro WHERE ro.id = ?3 AND ro.status = 'delivered' AND ro.receipt_confirmed_at = ?7
+                        AND NOT ${openDisputeSql('ro')})
+              AND NOT ${merchantSuspendedSql('?2')}
               AND NOT ${refundedStoreOrderSql('?3')}`,
         binds: [now],
       },
@@ -609,13 +624,16 @@ export async function releaseDueStoreCredits(
        ${due}
         AND NOT ${openDisputeSql('o')}
         AND NOT ${refundedStoreOrderSql('o.id')}
+        AND NOT ${merchantSuspendedSql('o.merchant_id')}
       ORDER BY o.delivered_at
       LIMIT ?2`
   )
     .bind(cutoff, limit)
     .all<{ order_id: string; merchant_id: string }>();
   const held = await env.DB.prepare(
-    `SELECT COALESCE(SUM(CASE WHEN ${openDisputeSql('o')} THEN 1 ELSE 0 END), 0) AS frozen,
+    // Frozen: an open complaint or ticket, or a suspended merchant or store
+    // (DECISIONS row 137) — released by a later run once that ends.
+    `SELECT COALESCE(SUM(CASE WHEN ${openDisputeSql('o')} OR ${merchantSuspendedSql('o.merchant_id')} THEN 1 ELSE 0 END), 0) AS frozen,
             COALESCE(SUM(CASE WHEN ${refundedStoreOrderSql('o.id')} THEN 1 ELSE 0 END), 0) AS refunded
        ${due}`
   )
@@ -640,6 +658,7 @@ export async function releaseDueStoreCredits(
                          WHERE o.id = ?3 AND o.status = 'delivered'
                            AND o.delivered_at IS NOT NULL AND o.delivered_at <> '' AND o.delivered_at <= ?7
                            AND NOT ${openDisputeSql('o')})
+                AND NOT ${merchantSuspendedSql('?2')}
                 AND NOT ${refundedStoreOrderSql('?3')}`,
           binds: [cutoff],
         },
@@ -1041,6 +1060,9 @@ export async function reconcileReverseCredit(
     const now = await db.prepare('SELECT status FROM orders WHERE id = ?').bind(o.id).first<{ status: string }>();
     if (now?.status === 'cancelled') return { ok: false, reason: 'NOT_APPLICABLE', detail: 'cancelled' };
     throw e;
+  }
+  if (credit.state === 'available' && o.merchant_id) {
+    await notifyBalanceIfNegative(env, { merchantId: o.merchant_id, sourceKey: `store_order:${o.id}`, orderId: o.id });
   }
   return { ok: true, replayed: false, orderId: o.id };
 }

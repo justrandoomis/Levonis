@@ -99,8 +99,16 @@ export default function MyOffersList({ requestHref }: { requestHref: (requestId:
                       <Money iqd={o.price_iqd} /> · {loc(`نسخة ${o.revision}`, `v${o.revision}`)}
                       {until && o.state === 'pending' ? <> · {loc(`حتى ${until}`, `until ${until}`)}</> : null}
                     </span>
+                    {/* On a phone the state goes under the figures: beside them, a long
+                        state («Awaiting re-confirmation») squeezed the title to «C.» and
+                        sat on the price at 320px (W6). */}
+                    <span className="mt-1.5 block sm:hidden">
+                      <StatusChip tone={st.tone}>{st.text}</StatusChip>
+                    </span>
                   </span>
-                  <StatusChip tone={st.tone}>{st.text}</StatusChip>
+                  <span className="hidden shrink-0 sm:inline-flex">
+                    <StatusChip tone={st.tone}>{st.text}</StatusChip>
+                  </span>
                   <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted rtl:-scale-x-100" />
                 </a>
               </li>

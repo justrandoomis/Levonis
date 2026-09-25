@@ -254,7 +254,8 @@ export default function RequestBoard({
                           </>
                         ) : null}
                       </span>
-                      <span className="flex items-center gap-2">
+                      {/* Wraps: «Re-confirm your offer» + «5 offers» ran out of the card at 320px (W6). */}
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         {r.my_offer && (
                           <StatusChip tone={r.my_offer === 'superseded' ? 'warning' : r.my_offer === 'accepted' ? 'success' : 'info'} className="whitespace-nowrap">
                             {r.my_offer === 'superseded'

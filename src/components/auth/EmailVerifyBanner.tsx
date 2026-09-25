@@ -186,7 +186,8 @@ export default function EmailVerifyBanner() {
   const loadStatus = useCallback(() => {
     api
       .get<VerifyStatus>('/api/auth/verify-email/status')
-      .then((data) => setStatus({ email: data.email, verified: data.verified, emailConfigured: data.emailConfigured }))
+      // An answer without an address is no answer (W6: a partial body blank-screened every page this banner sits on).
+      .then((data) => setStatus(typeof data?.email === 'string' ? { email: data.email, verified: data.verified, emailConfigured: data.emailConfigured } : null))
       .catch(() => setStatus(null));
   }, []);
 

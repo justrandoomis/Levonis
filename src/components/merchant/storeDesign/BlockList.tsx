@@ -157,7 +157,7 @@ function Row({
       <button
         ref={grip}
         type="button"
-        className="sd-grip flex h-11 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        className="sd-grip flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         aria-label={loc(`نقل «${name}» — الموضع ${index + 1} من ${count}. استخدم السهمين للأعلى والأسفل`, `Move «${name}» — position ${index + 1} of ${count}. Use the up and down arrows`)}
         onPointerDown={(e) => {
           e.preventDefault();

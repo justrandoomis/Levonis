@@ -75,6 +75,54 @@ export interface ShippingItem {
    * product's authoritative allow-list for standard/personal delivery.
    */
   delivery?: ProductDeliveryOptions;
+  /**
+   * The catalog sections this line is filed under, NEAREST FIRST: the
+   * sub-section, its parents, then the main section and its parents (the
+   * worker builds it with `ancestryFor`). Only read to find a category-level
+   * delivery rule; omitted by legacy callers, which then never meet one.
+   */
+  category_path?: string[];
+}
+
+/**
+ * A CATEGORY-LEVEL QUANTITY DELIVERY RULE (migration 0135).
+ *
+ * Owner, 2026-09-25: «أي فلمنت من أي نوع بغض النظر عن نوع المنتج او الخيار او
+ * اللون … التوصيل خمسة آلاف لكل خمسة عشر بكرة». The per-product rule counts
+ * each cart line on its own, so three colours of one filament paid three
+ * started blocks. A category rule POOLS every unit filed under the section (or
+ * any of its sub-sections) across the whole order and charges
+ * ceil(total units / quantity_step) × fee_iqd — the same formula, and the same
+ * "the first block is charged" semantics, as `productDeliveryFeeIqd`.
+ */
+export interface CategoryDeliveryRule {
+  catalog_id: string;
+  method: ProductDeliveryMethod;
+  enabled: boolean;
+  /** Units covered by one fee block. Integer >= 1. */
+  quantity_step: number;
+  /** Integer IQD charged for each started block. */
+  fee_iqd: number;
+}
+
+/**
+ * The category rule that prices this line for `method`, or null.
+ *
+ * NEAREST SECTION WINS: a rule on the sub-section beats one on its main
+ * section, so an owner can price «PETG» apart from the rest of «FDM filament».
+ * Every line resolved to the same rule shares one pool.
+ */
+export function categoryRuleFor(
+  item: Pick<ShippingItem, 'category_path'>,
+  rules: readonly CategoryDeliveryRule[] | undefined,
+  method: ProductDeliveryMethod | undefined
+): CategoryDeliveryRule | null {
+  if (!method || !rules || rules.length === 0 || !item.category_path) return null;
+  for (const id of item.category_path) {
+    const hit = rules.find((r) => r.enabled && r.method === method && r.catalog_id === id);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 export type ProductDeliveryMethod = 'standard' | 'personal';
@@ -93,13 +141,17 @@ export interface ProductDeliveryOptions {
 }
 
 export interface ShippingComponent {
-  kind: 'ordinary' | 'product' | 'protected' | 'printer_small' | 'printer_large' | 'carton';
+  kind: 'ordinary' | 'product' | 'category' | 'protected' | 'printer_small' | 'printer_large' | 'carton';
   fee_iqd: number;
   waived: boolean;
   units: number;
   advance_required: boolean;
   /** Present only for a product-owned delivery component. */
   product_id?: string;
+  /** Present only for a category rule component: the section whose rule
+   *  priced the pool, and the products that were counted in it. */
+  catalog_id?: string;
+  product_ids?: string[];
   method?: ProductDeliveryMethod;
   quantity_step?: number;
   fee_per_step_iqd?: number;
@@ -215,6 +267,13 @@ export function quoteShipping(input: {
    * historical quote exactly.
    */
   membershipShipping?: MembershipShippingDecision;
+  /**
+   * Admin-configured category rules (migration 0135). A line whose
+   * `category_path` meets an enabled rule for `deliveryMethod` is priced by
+   * the pooled category fee INSTEAD of its product rule, the ordinary flat fee,
+   * the printer freight and the carton count — never on top of them.
+   */
+  categoryRules?: CategoryDeliveryRule[];
   config: ShippingConfig;
 }): ShippingQuote {
   const { config } = input;
@@ -226,8 +285,28 @@ export function quoteShipping(input: {
   const printers = { printer_small: 0, printer_large: 0 };
   let ordinaryUnits = 0;
   let spoolUnits = 0;
+  /**
+   * Lines priced by a category rule, keyed by that rule's section. A line
+   * whose product disables the chosen method stays OUT of the pool: the
+   * product's allow-list still decides availability (and the checkout refuses
+   * it), a category rule only decides the price.
+   */
+  const categoryPools = new Map<string, { rule: CategoryDeliveryRule; units: number; products: string[] }>();
+  const pooled = new Set<ShippingItem>();
+  for (const it of input.items) {
+    const catRule = categoryRuleFor(it, input.categoryRules, input.deliveryMethod);
+    if (!catRule || it.qty <= 0) continue;
+    if (it.delivery !== undefined && input.deliveryMethod && it.delivery[input.deliveryMethod]?.enabled !== true) continue;
+    const pool = categoryPools.get(catRule.catalog_id) ?? { rule: catRule, units: 0, products: [] };
+    pool.units += Math.max(0, Math.trunc(it.qty));
+    if (!pool.products.includes(it.product_id)) pool.products.push(it.product_id);
+    categoryPools.set(catRule.catalog_id, pool);
+    pooled.add(it);
+  }
   for (const it of input.items) {
     const qty = Math.max(0, Math.trunc(it.qty));
+    // A pooled line is priced by its category rule alone.
+    if (pooled.has(it)) continue;
     // A product with explicit delivery options is priced below by its own
     // rule. It must never also enter the legacy ordinary/printer tariff.
     if (it.delivery === undefined) {
@@ -296,12 +375,26 @@ export function quoteShipping(input: {
     assumptions.push('prime_waiver_covers=all (owner has not extended PRIME beyond ordinary delivery)');
   }
   const independent = input.independentFreeDelivery === true;
+  /**
+   * The waiver a product- or category-rule fee gets. PREMIUM covers standard
+   * delivery only; PRO covers a personal rule only when the owner's policy
+   * says "all". A membership rule ALREADY tested the method
+   * (`method_not_covered` above), so a rule-driven waiver needs no second
+   * opinion about which method it covers.
+   */
+  const ruleFeeWaived =
+    independent ||
+    (rule
+      ? waiverOrdinary
+      : input.deliveryMethod === 'standard'
+        ? waiverOrdinary
+        : proEligible && config.pro_waiver_covers === 'all');
 
   // Product-owned fees. The server supplies deliveryMethod from the selected
   // checkout method; callers that omit it keep the historical quote exactly.
   if (input.deliveryMethod) {
     for (const item of input.items) {
-      if (item.delivery === undefined || item.qty <= 0) continue;
+      if (item.delivery === undefined || item.qty <= 0 || pooled.has(item)) continue;
       /**
        * NAMED `methodRule`, NOT `rule`. It used to be `rule`, which shadowed
        * the membership decision declared above — and the waiver below asks
@@ -319,18 +412,7 @@ export function quoteShipping(input: {
         continue;
       }
       const fee = productDeliveryFeeIqd(item.qty, methodRule);
-      // PREMIUM covers standard delivery only. PRO can cover a personal rule
-      // only when the owner's existing policy explicitly says "all".
-      // The membership rule ALREADY tested the method (`method_not_covered`
-      // above), so a rule-driven waiver needs no second opinion about which
-      // method it covers. Without a rule the historical constant still applies.
-      const waived =
-        independent ||
-        (rule
-          ? waiverOrdinary
-          : input.deliveryMethod === 'standard'
-            ? waiverOrdinary
-            : proEligible && config.pro_waiver_covers === 'all');
+      const waived = ruleFeeWaived;
       components.push({
         kind: 'product',
         product_id: item.product_id,
@@ -340,6 +422,26 @@ export function quoteShipping(input: {
         fee_iqd: fee,
         waived,
         units: Math.max(0, Math.trunc(item.qty)),
+        advance_required: false,
+      });
+    }
+  }
+
+  // Category-rule pools: one component per section, over the whole order.
+  if (input.deliveryMethod) {
+    for (const pool of categoryPools.values()) {
+      const step = Math.max(1, Math.trunc(pool.rule.quantity_step));
+      const perStep = Math.max(0, Math.trunc(pool.rule.fee_iqd));
+      components.push({
+        kind: 'category',
+        catalog_id: pool.rule.catalog_id,
+        product_ids: pool.products,
+        method: input.deliveryMethod,
+        quantity_step: step,
+        fee_per_step_iqd: perStep,
+        fee_iqd: productDeliveryFeeIqd(pool.units, { enabled: true, quantity_step: step, fee_iqd: perStep }),
+        waived: ruleFeeWaived,
+        units: pool.units,
         advance_required: false,
       });
     }

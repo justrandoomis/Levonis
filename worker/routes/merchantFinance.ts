@@ -39,6 +39,7 @@ import {
   ledgerPage,
   merchantBalance,
   merchantBuckets,
+  merchantSuspension,
   payoutPublic,
   payoutsPage,
   requestPayout,
@@ -121,6 +122,16 @@ merchantPayoutRoutes.post('/', async (c) => {
   await rateLimit(c, 'merchant-payout', 10, 3600);
   const ctx = await requireStoreOwner(c);
   const user = c.get('user')!;
+  // NO MONEY LEAVES WHILE THE MERCHANT OR ITS STORE IS SUSPENDED (owner
+  // decision, DECISIONS row 137). The balance stays theirs and is shown; the
+  // request waits until the suspension lifts.
+  const suspension = await merchantSuspension(c.env.DB, ctx.merchant.id);
+  if (suspension === 'MERCHANT_SUSPENDED') {
+    throw new HttpError(409, 'This merchant account is suspended — payouts wait until Levonis lifts it', 'MERCHANT_SUSPENDED');
+  }
+  if (suspension === 'STORE_SUSPENDED') {
+    throw new HttpError(409, 'This store is suspended — payouts wait until Levonis lifts it', 'STORE_SUSPENDED');
+  }
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
 
   const amount = Number(body.amount_iqd);

@@ -320,6 +320,18 @@ html {
     border-block-end: 0;
   }
 
+  /* A COMPACT CONTROL THAT HITS 44px (W6). The storefront's hero draws its
+     buttons at 30px and its heart at 22px, as designed; this keeps the
+     drawing and grows only the target — a transparent ::after, centred on
+     the control, never smaller than the control itself. The control must be
+     positioned (`relative`, or already `absolute`). */
+  .lv-hit::after {
+    content: '';
+    position: absolute;
+    inset-block: min(0px, calc((100% - 44px) / 2));
+    inset-inline: min(0px, calc((100% - 44px) / 2));
+  }
+
   .lv-choice {
     position: relative;
     min-block-size: 44px;
@@ -349,6 +361,15 @@ html {
   [dir='rtl'] .lv-choice[aria-checked='true'],
   [dir='rtl'] .lv-choice[data-selected='true'] {
     box-shadow: inset -2px 0 0 var(--color-gold);
+  }
+
+  /* Keyboard focus on a CHOSEN option. The start-edge bar above is a
+     box-shadow, and in RTL its selector outranks the `ring` utility, so a
+     selected option in Arabic showed no focus at all (W6). An outline does
+     not compete with the bar. */
+  .lv-choice:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
   }
 
   .lv-choice-mark {

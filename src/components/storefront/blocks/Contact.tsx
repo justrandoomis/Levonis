@@ -29,7 +29,7 @@ export default function ContactBlock({ block, store }: BlockProps<'contact'>) {
           </p>
         )}
         {phone && (
-          <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} className="flex items-center gap-2 text-gold text-[13px] font-semibold min-h-[32px]">
+          <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} className="flex items-center gap-2 text-gold text-[13px] font-semibold min-h-11 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
             <Phone className="w-4 h-4 shrink-0" aria-hidden="true" />
             <span dir="ltr">{phone}</span>
           </a>

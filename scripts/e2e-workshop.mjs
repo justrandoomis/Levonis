@@ -5,7 +5,9 @@
  * costing sheet with a result, and the printers screen with its canonical
  * picker and stock shelf; at 360 and 1280, Arabic and English. Screenshots go
  * to /tmp/claude-0/shots/w5b/, and each page is checked for a horizontal
- * scroll and for raw reason codes reaching the reader.
+ * scroll and for raw reason codes reaching the reader. W6: a verdict's fix
+ * link to «#stock» / «#preferences» scrolls to (and focuses) its section once
+ * the screen has loaded.
  *
  * Run: npx vite --port 4193 &  PLAYWRIGHT_MODULE=/opt/node22/lib/node_modules/playwright node scripts/e2e-workshop.mjs
  */
@@ -70,6 +72,27 @@ for (const lang of ['ar', 'en']) {
     await page.close();
   }
 }
+// W6: a fix link («#stock», «#preferences») lands on its section once the
+// lazy screen and the sections above it have loaded — not at the top.
+for (const lang of ['ar', 'en']) {
+  for (const width of [360, 1280]) {
+    for (const anchor of ['stock', 'preferences']) {
+      const page = await browser.newPage({ viewport: { width, height: 800 }, deviceScaleFactor: 1 });
+      await page.goto(`${BASE}/tests/browser/workshop.html?lang=${lang}&view=printers#${anchor}`);
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(900);
+      const at = await page.evaluate((id) => {
+        const el = document.getElementById(id);
+        return el ? { top: Math.round(el.getBoundingClientRect().top), focused: document.activeElement === el, y: Math.round(window.scrollY) } : null;
+      }, anchor);
+      check(!!at && at.top >= -2 && at.top <= 120 && at.y > 0, `${lang} ${width} #${anchor}: scrolled to its section (${JSON.stringify(at)})`);
+      check(!!at && at.focused, `${lang} ${width} #${anchor}: focus moved to the section`);
+      await page.screenshot({ path: `${OUT}/anchor-${anchor}-${lang}-${width}.png` });
+      await page.close();
+    }
+  }
+}
+
 await browser.close();
 console.log(`${checks - failures}/${checks} checks passed; screenshots in ${OUT}`);
 process.exit(failures ? 1 : 0);

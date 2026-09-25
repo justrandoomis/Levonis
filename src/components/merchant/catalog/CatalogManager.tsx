@@ -335,7 +335,7 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
           <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" aria-hidden="true" />
           <Input type="search" value={qLive} onChange={(e) => setQLive(e.target.value)} placeholder={s.search} aria-label={s.search} className="ps-9" enterKeyHint="search" />
         </div>
-        <div className="-mx-1 overflow-x-auto px-1 hide-scrollbar">
+        <div className="-mx-1 -mt-2 overflow-x-auto px-1 py-2 hide-scrollbar">
           <Segmented items={stateItems} value={state} onChange={(id) => setState(id as StateFilter)} label={s.stateFilter} group="catalog-state" size="sm" className="min-w-max sm:min-w-0" />
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

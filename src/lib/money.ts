@@ -8,7 +8,7 @@
  * three ways on one screen.
  *
  * THE RULE, and it is the rule the app already applies wherever it has both
- * languages in hand (PrintRequestWizard's English pane, the admin unit
+ * languages in hand (the request wizard's English pane, the admin unit
  * labels `loc('د.ع', 'IQD')`): Arabic and Sorani read «د.ع», English reads
  * «IQD». Sorani takes the Arabic abbreviation because it is a currency sign,
  * not a sentence — nothing here is written in Kurdish.

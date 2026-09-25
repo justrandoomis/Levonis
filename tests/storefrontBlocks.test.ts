@@ -193,6 +193,8 @@ const ALLOWED_IMPORTS = [
   /^packages\/storeLayout\/src\/[a-z]+$/,
   /^src\/LanguageContext$/,
   /^src\/lib\/merchant$/,
+  // W6: the four visitor values split out of lib/merchant so a store visit does not download the merchant clients.
+  /^src\/lib\/storefrontApi$/,
   /^src\/lib\/governorates$/,
   /^src\/components\/ui\/Tabs$/,
   /^src\/components\/merchant\/profileIcons$/,

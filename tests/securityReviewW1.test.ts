@@ -98,6 +98,8 @@ function seedRequest() {
       ('mem1','owner','plus_12mo','plus','active',12,29000,'2026-01-01T00:00:00.000Z','${FUTURE}');
     INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','owner','Ali 3D');
     INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s1','m1','owner','ali3d','Ali 3D');
+    -- Since the e2e review (F2) acceptance asks the workshop's live verdict: it must be able to make the job.
+    INSERT INTO merchant_printers (id,merchant_id,store_id,name,technology,build_x_mm,build_y_mm,build_z_mm) VALUES ('p1','m1','s1','P1S','fdm',256,256,250);
     INSERT INTO community_requests (id,customer_id,title,description,state,status,visibility,offer_count,expires_at) VALUES
       ('r1','buyer','Print a bracket','I need a bracket printed','receiving_offers','open','public',1,'${FUTURE}'),
       ('r2','buyer','Print a vase','A tall vase','open','open','public',0,'${FUTURE}');

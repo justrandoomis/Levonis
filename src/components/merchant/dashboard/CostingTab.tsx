@@ -244,6 +244,9 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
           type="file"
           accept=".stl,.3mf,.obj,.step,.stp,.amf,.glb,.gltf"
           className="sr-only"
+          // The visible «choose» button opens it; as a Tab stop it was an invisible, nameless field (W6).
+          tabIndex={-1}
+          aria-hidden="true"
           onChange={(e) => {
             const chosen = e.target.files?.[0];
             e.target.value = '';
@@ -257,7 +260,7 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-white text-[12.5px] truncate">{file.name}</p>
-              <p className="text-zinc-500 text-[11px] tabular-nums" dir="ltr">
+              <p className="text-text-muted text-[11px] tabular-nums" dir="ltr">
                 {(file.size / 1024 / 1024).toFixed(1)} MB
               </p>
             </div>
@@ -274,7 +277,7 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
           >
             <FileUp className="w-5 h-5 text-gold" />
             <span className="text-white text-[12.5px]">{loc('ارفع ملف المجسم', 'Upload a model file')}</span>
-            <span className="text-zinc-600 text-[11px]">STL · 3MF · OBJ · STEP</span>
+            <span className="text-text-muted text-[11px]">STL · 3MF · OBJ · STEP</span>
           </button>
         )}
       </Card>
@@ -337,7 +340,7 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
             </Labelled>
           </div>
           {/* §21 in one sentence, where the number is entered. */}
-          <p className="text-zinc-600 text-[10.5px] mt-2 leading-relaxed">
+          <p className="text-text-muted text-[10.5px] mt-2 leading-relaxed">
             {loc(
               'الهامش حصة من السعر لا زيادة على الكلفة: السعر = الكلفة ÷ (١ − الهامش).',
               'Margin is a share of the PRICE, not a markup on cost: price = cost ÷ (1 − margin).'
@@ -382,7 +385,7 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
             <Fact label={loc('الألواح', 'Plates')}>{analysis.plate_count}</Fact>
             <Fact label={loc('لكل لوح', 'Per plate')}>{analysis.pieces_per_plate}</Fact>
           </div>
-          <p className="text-zinc-600 text-[10.5px] mt-2.5">
+          <p className="text-text-muted text-[10.5px] mt-2.5">
             {analysis.provenance === 'measured'
               ? loc('من تقطيع حقيقي.', 'From a real slice.')
               : loc(
@@ -417,10 +420,10 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
           <ul className="space-y-2">
             {refused.map((r) => (
               <li key={r.merchant_printer_id} className="flex items-start gap-2">
-                <AlertCircle className="w-3.5 h-3.5 text-zinc-600 shrink-0 mt-0.5" />
+                <AlertCircle className="w-3.5 h-3.5 text-text-muted shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <p className="text-zinc-300 text-[12px]">{r.name}</p>
-                  <p className="text-zinc-600 text-[11px] leading-relaxed">
+                  <p className="text-text-muted text-[11px] leading-relaxed">
                     {(r.reasons ?? []).map((code) => reasonLabel(code, en)).join(' · ')}
                   </p>
                 </div>
@@ -441,7 +444,7 @@ const SELECT =
 function Labelled({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-zinc-500 text-[10px] uppercase tracking-wider mb-1.5">{label}</span>
+      <span className="block text-text-muted text-[10px] uppercase tracking-wider mb-1.5">{label}</span>
       {children}
     </label>
   );
@@ -450,7 +453,7 @@ function Labelled({ label, children }: { label: string; children: React.ReactNod
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="rounded-xl bg-zinc-900/60 border border-zinc-800 px-3 py-2">
-      <p className="text-zinc-500 text-[10px] uppercase tracking-wider">{label}</p>
+      <p className="text-text-muted text-[10px] uppercase tracking-wider">{label}</p>
       <p className="text-white text-[12.5px] font-medium mt-0.5 tabular-nums" dir="ltr">
         {children}
       </p>
@@ -494,7 +497,7 @@ function PrinterCard({
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-white text-[13px] font-medium truncate">{row.name}</p>
-            <p className="text-zinc-500 text-[11px] truncate">{row.model}</p>
+            <p className="text-text-muted text-[11px] truncate">{row.model}</p>
           </div>
           {cheapest && (
             <span className="text-[10px] text-gold border border-gold/30 bg-gold/10 rounded-full px-2 py-0.5 shrink-0">
@@ -517,7 +520,7 @@ function PrinterCard({
               <Money label={loc('السعر المقترح', 'Suggested price')} value={row.price_iqd} tone="gold" />
               <Money label={loc('الربح', 'Profit')} value={row.profit_iqd} tone="good" />
             </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2.5 text-[11px] text-zinc-500 tabular-nums" dir="ltr">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2.5 text-[11px] text-text-muted tabular-nums" dir="ltr">
               <span>{loc('هامش', 'Margin')} {row.margin_percent}%</span>
               <span>·</span>
               <span>{loc('زيادة', 'Markup')} {row.markup_percent}%</span>
@@ -556,7 +559,7 @@ function PrinterCard({
                   {COMPONENT_LABEL[line.component]?.[en ? 1 : 0] ?? line.component}
                 </p>
                 {line.detail && (
-                  <p className="text-zinc-600 text-[10.5px] truncate" dir="ltr">
+                  <p className="text-text-muted text-[10.5px] truncate" dir="ltr">
                     {line.detail}
                   </p>
                 )}
@@ -565,7 +568,7 @@ function PrinterCard({
                 <p className="text-white text-[12px] tabular-nums" dir="ltr">
                   {formatIqd(line.iqd)}
                 </p>
-                <p className="text-zinc-600 text-[10px]">{PROVENANCE_LABEL[line.from]?.[en ? 1 : 0] ?? line.from}</p>
+                <p className="text-text-muted text-[10px]">{PROVENANCE_LABEL[line.from]?.[en ? 1 : 0] ?? line.from}</p>
               </div>
             </div>
           ))}
@@ -577,7 +580,7 @@ function PrinterCard({
             <Sum label={loc('نقطة التعادل', 'Break-even')} value={row.break_even_iqd} strong />
           </div>
           {row.because && (
-            <p className="px-3.5 py-2 text-zinc-600 text-[10.5px] leading-relaxed" dir="ltr">
+            <p className="px-3.5 py-2 text-text-muted text-[10.5px] leading-relaxed" dir="ltr">
               {row.because.plates} plates · {row.because.machine_hours.toFixed(2)} h ·{' '}
               {formatIqd(row.because.machine_iqd_per_hour)}/h · {formatGrams(row.because.waste_grams)}{' '}
               {loc('هدر', 'waste')}
@@ -593,7 +596,7 @@ function Money({ label, value, tone }: { label: string; value?: number; tone: 'n
   const color = tone === 'gold' ? 'text-gold' : tone === 'good' ? 'text-emerald-400' : 'text-white';
   return (
     <div className="rounded-xl bg-zinc-900/60 border border-zinc-800 px-2.5 py-2">
-      <p className="text-zinc-500 text-[10px] uppercase tracking-wider truncate">{label}</p>
+      <p className="text-text-muted text-[10px] uppercase tracking-wider truncate">{label}</p>
       <p className={`text-[13px] font-semibold mt-0.5 tabular-nums ${color}`} dir="ltr">
         {value === undefined ? '—' : formatIqd(value)}
       </p>

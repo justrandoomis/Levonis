@@ -16,7 +16,7 @@ import { BadgeCheck, Star, Store } from 'lucide-react';
 import ProMerchantBadge from '../../merchant/ProMerchantBadge';
 import { WidgetIcon } from '../../merchant/profileIcons';
 import { useLanguage } from '../../../LanguageContext';
-import { badgeLabel } from '../../../lib/merchant';
+import { badgeLabel } from '../../../lib/storefrontApi';
 import { mediaSrc } from '../../../../packages/storeLayout/src/refs';
 import { isBlank } from '../../../../packages/storeLayout/src/text';
 import { useStorefrontRuntime } from '../runtime';
@@ -176,7 +176,7 @@ export function ProfileRows({ block, store, bio }: { block: HeroProps['block']; 
               href={w.url}
               target="_blank"
               rel="noopener noreferrer nofollow"
-              className="h-7 rounded-full border border-white/15 bg-transparent flex items-center justify-center gap-1.5 px-2.5 text-zinc-200 active:scale-[0.98] transition-transform min-w-0"
+              className="relative lv-hit h-7 rounded-full border border-white/15 bg-transparent flex items-center justify-center gap-1.5 px-2.5 text-zinc-200 active:scale-[0.98] transition-transform min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <WidgetIcon name={w.icon} className="w-3 h-3 shrink-0 text-zinc-400" />
               <span className="text-[12px] font-medium truncate" dir="auto">

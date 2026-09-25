@@ -41,7 +41,13 @@ export function financeStrings(loc: Loc) {
 
     statement: loc('كشف الأرباح', 'Earnings statement'), // OWNER: Sorani to be written by hand.
     statementNote: loc('كل رقم هنا مجموع حركات السجل أدناه.', 'Every figure here is a sum of the ledger below.'), // OWNER: Sorani to be written by hand.
-    gross: loc('المبيعات', 'Sales'), // OWNER: Sorani to be written by hand.
+    // Review F6: a DIFFERENT figure from Analytics «إجمالي المدفوع» — named
+    // apart and defined under the row (tests/merchantFiguresRelation.test.ts pins how they relate).
+    gross: loc('مبيعات مسجّلة', 'Recorded sales'), // OWNER: Sorani to be written by hand.
+    grossMeans: loc(
+      'قيمة البضاعة بعد الخصم ودون أجرة التوصيل، وتشمل الطلبات الملغاة — ما أُعيد للزبائن في سطره أدناه.',
+      'Goods after coupons, excluding delivery, including cancelled orders — what went back to customers is on its own line below.'
+    ), // OWNER: Sorani to be written by hand.
     grossBreakdown: (store: string, custom: string) =>
       loc(`المتجر ${store} · الطلبات المخصصة ${custom}`, `Store ${store} · Custom orders ${custom}`), // OWNER: Sorani to be written by hand.
     commission: loc('عمولة المنصة', 'Platform commission', 'کۆمیشن'),

@@ -7,14 +7,17 @@
  * a local `vite` dev server.
  *
  *   /tests/browser/store-builder.html?lang=ar|en&api=http://127.0.0.1:8792
+ *        [&host=store&path=/]   the PUBLIC storefront as the store's own host
+ *                               serves it (W6 sweep), from the real routes
  */
 import { createRoot } from 'react-dom/client';
 import App from '../../src/App';
 import '../../src/index.css';
 
 const params = new URLSearchParams(location.search);
-const lang = params.get('lang') === 'en' ? 'en' : 'ar';
+const lang = params.get('lang') === 'en' ? 'en' : params.get('lang') === 'ckb' ? 'ckb' : 'ar';
 const API = params.get('api') ?? 'http://127.0.0.1:8792';
+const onStore = params.get('host') === 'store';
 try {
   localStorage.setItem('levo_lang', lang);
 } catch {
@@ -28,7 +31,7 @@ const REAL = /^\/api\/(merchant\/(me|store\/layout(\/.*)?|products(\/.*)?|sectio
 function answer(p: string): { status: number; body: Record<string, unknown> } {
   const ok = (b: Record<string, unknown> = {}) => ({ status: 200, body: { success: true, ...b } });
   if (p === '/api/auth/me') return ok({ user: { id: 'owner', email: 'owner@x.co', username: 'ali', name: 'Ali', role: 'merchant', isAdmin: false, is_investor: false, subscription_plan: 'plus', membership_tier: 'plus', locale: lang, email_verified: true, phone_verified: true } });
-  if (p === '/api/storefront/resolve') return ok({ kind: 'main', store: null });
+  if (p === '/api/storefront/resolve' && !onStore) return ok({ kind: 'main', store: null });
   if (p === '/api/community/access') return ok({ closed: false, admin: false, may_enter: true });
   if (p === '/api/merchant/attention') return ok({ generated_at: new Date().toISOString(), attention: { store: { problems: [] } } });
   if (p === '/api/merchant/notifications/unread-count') return ok({ unread: 0, unread_by_kind: {} });
@@ -40,6 +43,11 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   const u = new URL(url, location.origin);
   if (!u.pathname.startsWith('/api/') || u.origin !== location.origin) return realFetch(input, init);
+  if (onStore && u.pathname === '/api/storefront/resolve') {
+    // The store's own host: resolve answers with the real store row.
+    const r = await (await realFetch(`${API}/api/storefront/raf3d`, { credentials: 'omit' })).json();
+    return new Response(JSON.stringify({ success: true, kind: 'store', store: r.store, root_domain: 'levonis-iq.com' }), { headers: { 'content-type': 'application/json' } });
+  }
   if (REAL.test(u.pathname)) return realFetch(`${API}${u.pathname}${u.search}`, { ...init, credentials: 'omit' });
   const r = answer(u.pathname);
   await new Promise((res) => setTimeout(res, 30));

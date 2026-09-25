@@ -234,7 +234,8 @@ export function OrdersTab({
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar -mx-4 px-4 pb-0.5">
+      {/* The scroller clips what overflows it, so it leaves room for the chips' 44px hit slop (W6). */}
+      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar -mx-4 px-4 -my-2 py-2">
         {STATUS_FILTERS.map((s) => (
           <span key={s || 'all'} className="shrink-0">
             <Chip
@@ -295,24 +296,24 @@ export function OrdersTab({
                 <div className="flex items-start justify-between gap-3 mb-1.5">
                   <div className="min-w-0">
                     <p className="text-white text-[12.5px] font-semibold truncate" dir="ltr">{id}</p>
-                    <p className="text-zinc-500 text-[11px]">
+                    <p className="text-text-muted text-[11px]">
                       {String(o.customer_name)} · {String(o.item_count)} {loc('منتج', 'items', 'بەرهەم')}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <StatusChip status={status} />
-                    <ChevronDown className={`w-4 h-4 text-zinc-600 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    <ChevronDown className={`w-4 h-4 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-[11.5px]">
-                  <span className="text-zinc-500">
+                  <span className="text-text-muted">
                     {loc('الإجمالي', 'Total', 'کۆ')}: <span className="text-white font-semibold" dir="ltr">{iqd(Number(o.total_iqd))}</span>
                   </span>
-                  <span className="text-zinc-500">
+                  <span className="text-text-muted">
                     {loc('لك', 'You get', 'بۆ تۆ')}: <span className="text-gold font-semibold" dir="ltr">{iqd(Number(o.merchant_receivable_iqd))}</span>
                   </span>
                 </div>
-                {credit && <p className="text-zinc-500 text-[10.5px] mt-1 leading-relaxed" data-credit-state={String(o.credit_state ?? '')}>{credit}</p>}
+                {credit && <p className="text-text-muted text-[10.5px] mt-1 leading-relaxed" data-credit-state={String(o.credit_state ?? '')}>{credit}</p>}
               </button>
 
               {/* Keyed on the status, so a move re-reads the sheet's money rows. */}
@@ -350,7 +351,7 @@ export function OrdersTab({
                     ))}
                   </div>
                   {next.includes('delivered') && (
-                    <p className="text-zinc-600 text-[10.5px] leading-relaxed">
+                    <p className="text-text-muted text-[10.5px] leading-relaxed">
                       {/* OWNER: Sorani to be written by hand. */}
                       {loc(
                         'بعد «تم التسليم» يصلك المبلغ حين يؤكد الزبون الاستلام، أو تلقائيًا بعد 3 أيام ما لم تُفتح شكوى.',
@@ -486,7 +487,7 @@ function OrderDetail({ id }: { id: string }) {
             </span>
             <button
               onClick={() => navigator.clipboard?.writeText(phone).catch(() => {})}
-              className="text-zinc-500 p-1"
+              className="text-text-muted p-1"
               aria-label={loc('نسخ', 'Copy', 'کۆپی')}
             >
               <Copy className="w-3.5 h-3.5" />
@@ -496,12 +497,12 @@ function OrderDetail({ id }: { id: string }) {
         {addrText && (
           <div className="flex items-start justify-between gap-2 text-[12px]">
             <span className="text-zinc-300 flex items-start gap-1.5">
-              <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-zinc-500" />
+              <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-text-muted" />
               {addrText}
             </span>
             <button
               onClick={() => navigator.clipboard?.writeText(addrText).catch(() => {})}
-              className="text-zinc-500 p-1 shrink-0"
+              className="text-text-muted p-1 shrink-0"
               aria-label={loc('نسخ', 'Copy', 'کۆپی')}
             >
               <Copy className="w-3.5 h-3.5" />
@@ -518,9 +519,9 @@ function OrderDetail({ id }: { id: string }) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-zinc-200 truncate">{String(it.name_snapshot)}</p>
-              {!!it.option_snapshot && <p className="text-zinc-600 text-[10.5px]" dir="auto">{String(it.option_snapshot)}</p>}
+              {!!it.option_snapshot && <p className="text-text-muted text-[10.5px]" dir="auto">{String(it.option_snapshot)}</p>}
             </div>
-            <span className="text-zinc-500 shrink-0" dir="ltr">×{String(it.qty)}</span>
+            <span className="text-text-muted shrink-0" dir="ltr">×{String(it.qty)}</span>
             <span className="text-zinc-300 font-semibold shrink-0" dir="ltr">{iqd(Number(it.line_total_iqd))}</span>
           </div>
         ))}
@@ -553,7 +554,7 @@ function OrderDetail({ id }: { id: string }) {
 function Row({ label, value, strong, gold }: { label: string; value: string; strong?: boolean; gold?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-zinc-500">{label}</span>
+      <span className="text-text-muted">{label}</span>
       <span className={`${gold ? 'text-gold font-bold' : strong ? 'text-white font-bold' : 'text-zinc-300'}`} dir="ltr">
         {value}
       </span>
@@ -582,7 +583,12 @@ function communityStateLabel(k: string, loc: Loc): string {
  * delivering are the merchant's moves, but only the customer's confirmation
  * releases the funds — the buttons say exactly that.
  */
-export function CustomOrdersTab() {
+/**
+ * `focusOrderId` (review F10): the custom order a workspace address names
+ * (`/merchant/custom_orders/<id>` — the link every custom-order notification
+ * carries). Its card is scrolled to, focused and ringed once the list loads.
+ */
+export function CustomOrdersTab({ focusOrderId = null }: { focusOrderId?: string | null } = {}) {
   const { loc, lang } = useLanguage();
   const [confirm, confirmDialog] = useConfirm();
   const toast = useToast();
@@ -604,6 +610,13 @@ export function CustomOrdersTab() {
       .catch(() => setOrders([]));
   }, []);
   useEffect(load, [load]);
+  const focusRow = useRef<HTMLDivElement | null>(null);
+  const focusReady = orders !== null && !!focusOrderId && orders.some((o) => o.id === focusOrderId);
+  useEffect(() => {
+    if (!focusReady) return;
+    focusRow.current?.scrollIntoView({ block: 'center' });
+    focusRow.current?.focus({ preventScroll: true });
+  }, [focusReady, focusOrderId]);
 
   if (orders === null) return <Spinner />;
 
@@ -612,7 +625,7 @@ export function CustomOrdersTab() {
       {communityAccess?.may_enter !== false && (
         <a
           href={mainHref('/requests')}
-          className="w-full h-10 rounded-xl border border-gold/30 bg-gold/10 text-gold font-bold text-[12.5px] flex items-center justify-center gap-2"
+          className="w-full min-h-11 rounded-xl border border-gold/30 bg-gold/10 text-gold font-bold text-[12.5px] flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <Hammer className="w-4 h-4" />
           {loc('تصفح طلبات الزبائن وقدّم عروضك', 'Browse customer requests and make offers', 'داواکاریەکان ببینە و ئۆفەر بدە')}
@@ -632,7 +645,14 @@ export function CustomOrdersTab() {
       )}
 
       {orders.map((o) => (
-        <div key={o.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+        <div
+          key={o.id}
+          ref={o.id === focusOrderId ? focusRow : undefined}
+          tabIndex={o.id === focusOrderId ? -1 : undefined}
+          data-custom-order={o.id}
+          data-focused={o.id === focusOrderId ? 'true' : undefined}
+          className={`rounded-2xl border bg-white/[0.03] p-3 focus-visible:outline-none ${o.id === focusOrderId ? 'border-gold/50 ring-1 ring-gold/40' : 'border-white/10'}`}
+        >
           <div className="flex items-start justify-between gap-2 mb-1.5">
             <p className="text-white text-[12.5px] font-semibold flex-1 min-w-0 truncate">{o.request_title}</p>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 shrink-0">
@@ -640,10 +660,10 @@ export function CustomOrdersTab() {
             </span>
           </div>
           <div className="flex items-center justify-between text-[11.5px] mb-2">
-            <span className="text-zinc-500">
+            <span className="text-text-muted">
               {loc('قيمة الاتفاق', 'Deal value', 'بەهای ڕێککەوتن')}: <span className="text-white font-semibold" dir="ltr">{iqd(o.price_iqd)}</span>
             </span>
-            <span className="text-zinc-500">
+            <span className="text-text-muted">
               {loc('لك', 'You get', 'بۆ تۆ')}: <span className="text-gold font-semibold" dir="ltr">{iqd(o.merchant_receivable_iqd)}</span>
             </span>
           </div>
@@ -716,7 +736,7 @@ export function CustomOrdersTab() {
             </Btn>
           )}
           {o.state === 'merchant_marked_delivered' && (
-            <p className="text-zinc-500 text-[11px]">
+            <p className="text-text-muted text-[11px]">
               {loc(
                 'المبلغ يُحوَّل لك فور تأكيد الزبون.',
                 'The funds are released to you the moment the customer confirms.',
@@ -739,8 +759,11 @@ export function CouponsTab({
   canSell,
   startCreating = false,
   onCreateHandled,
+  focusCouponId = null,
 }: {
   canSell: boolean;
+  /** The coupon a workspace address names (`/merchant/coupons/<id>`, review F10): scrolled to, focused and ringed. */
+  focusCouponId?: string | null;
   /** Open with the «new coupon» form showing — the workspace's quick create (`?new=1`, W3-A). */
   startCreating?: boolean;
   /** Told once the form was opened for `startCreating`, so the address can drop `?new=1`. */
@@ -758,6 +781,13 @@ export function CouponsTab({
     if (canSell) setCreating(true);
     handled.current?.();
   }, [startCreating, canSell]);
+  const focusCoupon = useRef<HTMLDivElement | null>(null);
+  const couponReady = !!items && !!focusCouponId && items.some((cp) => cp.id === focusCouponId);
+  useEffect(() => {
+    if (!couponReady) return;
+    focusCoupon.current?.scrollIntoView({ block: 'center' });
+    focusCoupon.current?.focus({ preventScroll: true });
+  }, [couponReady, focusCouponId]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [f, setF] = useState({ code: '', kind: 'percent' as 'percent' | 'fixed_iqd', value: '', min: '', maxUses: '' });
@@ -848,14 +878,21 @@ export function CouponsTab({
       )}
 
       {items.map((cp) => (
-        <div key={cp.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+        <div
+          key={cp.id}
+          ref={cp.id === focusCouponId ? focusCoupon : undefined}
+          tabIndex={cp.id === focusCouponId ? -1 : undefined}
+          data-coupon={cp.id}
+          data-focused={cp.id === focusCouponId ? 'true' : undefined}
+          className={`rounded-2xl border bg-white/[0.03] p-3 focus-visible:outline-none ${cp.id === focusCouponId ? 'border-gold/50 ring-1 ring-gold/40' : 'border-white/10'}`}
+        >
           <div className="flex items-center justify-between gap-2 mb-1">
             <span className="text-white font-bold text-[13px] tracking-wide" dir="ltr">{cp.code}</span>
             <span className="text-gold font-bold text-[12.5px]" dir="ltr">
               {cp.kind === 'percent' ? `${cp.value}%` : iqd(cp.value)}
             </span>
           </div>
-          <p className="text-zinc-500 text-[11px] mb-2">
+          <p className="text-text-muted text-[11px] mb-2">
             {cp.min_total_iqd > 0 && `${loc('حد أدنى', 'Min', 'کەمترین')} ${iqd(cp.min_total_iqd)} · `}
             {loc('استُخدم', 'Used', 'بەکارهاتووە')} {cp.used_count}
             {cp.max_uses !== null && ` / ${cp.max_uses}`}

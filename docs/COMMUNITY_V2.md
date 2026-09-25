@@ -114,7 +114,7 @@ caller's right on every request rather than baking it into a link:
 |---|---|
 | The customer | always |
 | Any signed-in caller | while the request is **on the board** — public, taking offers and **not expired** — and Levo Community lets them in (otherwise `503 COMMUNITY_CLOSED`, as the board answers); a merchant cannot quote a model they may not look at |
-| The engaged merchant | after acceptance, for as long as the order lives |
+| The engaged merchant | after acceptance, while the order is live or completed — a customer's cancel or a full refund takes it back (review F3; a completed job keeps it, DECISIONS row 135) |
 | An admin | always, for moderation |
 | Anyone else | 404 |
 
@@ -176,7 +176,11 @@ UPDATE community_requests
    AND revision=? AND (expires_at IS NULL OR expires_at > now)
 ```
 
-Whoever wins that conditional update owns the acceptance. **Since wave 1 the
+Whoever wins that conditional update owns the acceptance. Before anything,
+the workshop's **live eligibility verdict** is asked (review F2): a workshop
+that can no longer make the job — its printer gone or offline, the job revised
+past it — is refused `409 OFFER_NOT_ELIGIBLE`, and the customer's offer list
+marks such an offer `workshop_unable`. **Since wave 1 the
 money is reserved first** (a wallet hold, nothing else written — a customer who
 cannot pay has nothing to undo), and then the request's move, the freeze of the
 **exact offer version the customer confirmed** (`expected_price_iqd` +
@@ -325,7 +329,15 @@ freezes the escrow** — which is the entire reason the money was held rather
 than paid.
 
 An admin resolves it as `release`, `refund` or `partial_refund`, with a
-required reason. Every decision appends escrow events and ledger rows and
+required reason. A `partial_refund` leaves the order **`completed`** (review
+F9): the escrow's `partially_refunded` state is the flag, and the analytics
+count the part the merchant kept. The platform takes the order's commission
+rate on the KEPT gross, rounded to the dinar, as its own ledger line (owner
+decision F5, DECISIONS row 137). While the merchant or its store is
+suspended, no customer or system release moves an escrow: a confirmation is
+recorded as `customer_confirmed` and the auto-confirm sweep releases it once
+the suspension lifts. Both parties are notified of the decision,
+and the merchant of any money it released (review F4). Every decision appends escrow events and ledger rows and
 **never rewrites amounts**, so an admin can be asked months later exactly what
 they decided and on what day, and the answer comes from the data (§45).
 

@@ -234,9 +234,9 @@ export async function generateEntries(db: D1Database, req: GenerateRequest): Pro
   if (ids.length === 0) throw badRequest('product_ids must be a non-empty array', 'VALIDATION');
   const { results } = await db
     .prepare(
-      `SELECT id, inventory_mode, status, composition, name FROM products WHERE id IN (${ids.map(() => '?').join(', ')})`
+      `SELECT id, inventory_mode, status, composition, name FROM products WHERE id IN (SELECT value FROM json_each(?))`
     )
-    .bind(...ids)
+    .bind(JSON.stringify(ids))
     .all<ProductShapeRow>();
 
   const views = await loadRelationsViews(

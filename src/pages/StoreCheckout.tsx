@@ -428,7 +428,7 @@ export default function StoreCheckout() {
           <h1 className="text-white font-bold text-[17px] mb-1.5">
             {loc('تم استلام طلبك', 'Your order is in', 'داواکاریەکەت وەرگیرا')}
           </h1>
-          <p className="text-zinc-500 text-[12.5px] mb-1" dir="ltr">{done}</p>
+          <p className="text-text-muted text-[12.5px] mb-1" dir="ltr">{done}</p>
           <p className="text-zinc-400 text-[12.5px] mb-6">
             {loc(
               'المتجر استلم طلبك وسيبدأ بتجهيزه. تابع حالته من طلباتك.',
@@ -499,9 +499,9 @@ export default function StoreCheckout() {
                     <div className="flex-1 min-w-0">
                       <p className="text-zinc-200 truncate">{l.name}</p>
                       {/* The option the store will prepare, in the store's own words. */}
-                      {l.variant && <p className="text-zinc-500 text-[11px] truncate">{l.variant}</p>}
+                      {l.variant && <p className="text-text-muted text-[11px] truncate">{l.variant}</p>}
                     </div>
-                    <span className="text-zinc-500 shrink-0" dir="ltr">×{l.qty}</span>
+                    <span className="text-text-muted shrink-0" dir="ltr">×{l.qty}</span>
                     <span className="text-zinc-200 font-semibold shrink-0" dir="ltr">{iqd(l.line_total_iqd)}</span>
                   </div>
                 ))}
@@ -557,7 +557,7 @@ export default function StoreCheckout() {
                   }}
                 />
               ) : !addresses.length ? (
-                <p className="text-zinc-500 text-[12px]">
+                <p className="text-text-muted text-[12px]">
                   {loc('أضف عنوانك الأول لإتمام الطلب.', 'Add your first address to finish the order.', 'ناونیشانێک زیاد بکە.')}
                 </p>
               ) : (
@@ -580,7 +580,7 @@ export default function StoreCheckout() {
                             <Check className="w-3 h-3" aria-hidden="true" />
                           </span>
                           <span className="text-white text-[12.5px] font-semibold truncate">{a.label || a.name}</span>
-                          <span className="text-zinc-500 text-[11px] shrink-0" dir="ltr">{a.phone}</span>
+                          <span className="text-text-muted text-[11px] shrink-0" dir="ltr">{a.phone}</span>
                         </div>
                         <p className="text-zinc-400 text-[11.5px] mt-1 ps-6 break-words">
                           {gov ? <span className="text-text-secondary">{governorateText(gov, lang)}</span> : null}

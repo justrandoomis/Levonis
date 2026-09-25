@@ -17,7 +17,7 @@ import { emptyBlockData } from '../../packages/storeLayout/src/data';
 import '../../src/index.css';
 
 const params = new URLSearchParams(location.search);
-const lang = params.get('lang') === 'en' ? 'en' : 'ar';
+const lang = params.get('lang') === 'en' ? 'en' : params.get('lang') === 'ckb' ? 'ckb' : 'ar';
 const onStore = params.get('host') === 'store';
 const state = params.get('state') ?? 'busy';
 try {
@@ -166,6 +166,7 @@ const NOTES = [
 function answer(p: string, q: URLSearchParams, method: string): { status: number; body: Record<string, unknown> } {
   const ok = (b: Record<string, unknown> = {}) => ({ status: 200, body: { success: true, ...b } });
   if (p === '/api/auth/me') return ok({ user: { id: 'owner', email: 'ali@x.co', username: 'ali', name: 'Ali Hassan', role: 'merchant', isAdmin: false, is_investor: false, subscription_plan: 'plus', membership_tier: 'plus', locale: lang, email_verified: true, phone_verified: true } });
+  if (p === '/api/auth/verify-email/status') return ok({ email: 'ali@x.co', verified: true, emailConfigured: true });
   if (p === '/api/storefront/resolve') {
     if (onStore) return ok({ kind: 'store', store: state === 'other' ? { ...STORE, id: 's2', slug: 'zahra', name: 'Zahra Prints' } : STORE });
     return ok({ kind: 'main', store: null });
@@ -243,6 +244,24 @@ function answer(p: string, q: URLSearchParams, method: string): { status: number
   if (p === '/api/merchant/finance/summary') return ok({ summary: { gross: 412_000, store_gross: 362_000, custom_gross: 50_000, commission: 20_600, delivery_fees: 24_000, refunds: 16_000, adjustments: 0, receivable: 399_400, pending: 61_300, pending_frozen: 15_300, available: 182_100, reserved: 60_000, paid_out: 96_000, escrow_held: 47_500, open_payouts: 1 }, buckets: {} });
   if (p === '/api/merchant/finance/ledger') return ok({ entries: [], next_cursor: null });
   if (p === '/api/merchant/payouts') return ok({ buckets: {}, methods: [], payouts: [], next_cursor: null });
+  // The request board, both views (W6 sweep): /requests «كل الطلبات» and «مناسب لي».
+  if (p === '/api/marketplace/requests' || p === '/api/merchant/workshop/board') {
+    const req = (id: string, title: string, o: Record<string, unknown> = {}) => ({
+      id, title, description: '', category: 'print', quantity: 1, material: '', color: '', dimensions: '', budget_iqd: null, deadline: null,
+      governorate: 'baghdad', delivery_pref: 'delivery', state: 'open', offer_count: 2, created_at: ago(1), expires_at: ago(-20), customer_name: null,
+      revision: 1, customer_notes: '', process: 'fdm', material_id: 'pla', estimate_low_iqd: 9000, estimate_high_iqd: 14000,
+      file_count: 1, thumb_url: null, has_preview: true, my_offer: null, ...o,
+    });
+    return ok({
+      requests: [
+        req('req_1', en ? 'Car phone holder, clips onto the vent' : 'حامل هاتف للسيارة يثبت على فتحة المكيف', { quantity: 2, budget_iqd: 25000 }),
+        req('req_2', en ? 'Replacement gear for a kitchen mixer' : 'ترس بديل لخلاط المطبخ', { governorate: 'basra', my_offer: 'pending' }),
+        req('req_3', en ? 'Cosplay helmet, painted' : 'خوذة كوسبلاي مطلية', { budget_iqd: 120000, offer_count: 5, has_preview: false }),
+      ],
+      next_cursor: null,
+    });
+  }
+  if (p === '/api/marketplace/print/catalog') return ok({ materials: [{ id: 'pla', process: 'fdm', name_en: 'PLA', name_ar: 'PLA', needs_enclosure: false, abrasive: false }], qualities: [], min_job_iqd: 0 });
   if (p === '/api/merchant/store/share') return ok({ store_id: 's1', url: STORE.url, host: 'ali3d.levonis-iq.com', card: { title: STORE.name, description: '', image: '', site_name: 'Levonis', url: STORE.url }, app_icon: { state: 'none', reason: null, icon: null, maskable: null, name: STORE.name, short_name: 'Ali 3D', background: '#0b0c0f' }, suspended: false });
   return ok({});
 }

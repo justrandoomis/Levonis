@@ -17,7 +17,7 @@ import '../../src/index.css';
 
 const params = new URLSearchParams(location.search);
 try {
-  localStorage.setItem('levo_lang', params.get('lang') === 'en' ? 'en' : 'ar');
+  localStorage.setItem('levo_lang', params.get('lang') === 'en' ? 'en' : params.get('lang') === 'ckb' ? 'ckb' : 'ar');
 } catch {
   /* Arabic, the default */
 }

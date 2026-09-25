@@ -164,6 +164,7 @@ import type { PointsRule, OrderPointsSnapshot } from '../lib/pointsOps';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { quoteShipping } from '../lib/shipping';
+import { activeCategoryDeliveryRules } from '../lib/categoryDelivery';
 import { productDeliveryMethodAvailable } from '../lib/shipping';
 import type { ProductDeliveryMethod, ShippingConfig, ShippingItem, ShippingQuote } from '../lib/shipping';
 import { codDeliveryTaxIqd } from '../lib/codTax';
@@ -996,8 +997,16 @@ function persistedItemRef(l: ComputedLine, all: ComputedLine[]) {
   };
 }
 
-/** products.ops_policy facts the shipping engine needs (explicit config only). */
-function shippingFactsFrom(opsPolicyRaw: unknown): Pick<ShippingItem, 'size_class' | 'is_spool' | 'delivery'> {
+/**
+ * products.ops_policy facts the shipping engine needs (explicit config only),
+ * plus the line's RAW sections (sub-section first) for the category delivery
+ * rules (0135). They are expanded to the full ancestry by
+ * `expandCategoryPath` in `computeCheckout`, where the section tree is read.
+ */
+function shippingFactsFrom(
+  opsPolicyRaw: unknown,
+  sections?: { category_id?: unknown; sub_category_id?: unknown }
+): Pick<ShippingItem, 'size_class' | 'is_spool' | 'delivery' | 'category_path'> {
   const o = safeParse<Record<string, unknown>>(
     typeof opsPolicyRaw === 'string' ? opsPolicyRaw : JSON.stringify(opsPolicyRaw ?? {}),
     {}
@@ -1007,7 +1016,17 @@ function shippingFactsFrom(opsPolicyRaw: unknown): Pick<ShippingItem, 'size_clas
     size_class: sc === 'printer_small' || sc === 'printer_large' || sc === 'ordinary' ? sc : null,
     is_spool: o.is_spool === true,
     delivery: readProductDeliveryOptions(o) ?? undefined,
+    category_path: [sections?.sub_category_id, sections?.category_id].filter(
+      (id): id is string => typeof id === 'string' && id !== ''
+    ),
   };
+}
+
+/** A line's raw sections → every section above them, nearest first. */
+function expandCategoryPath(index: Map<string, string[]> | null, raw: string[] | undefined): string[] {
+  const out = new Set<string>();
+  for (const id of raw ?? []) for (const step of index?.get(id) ?? [id]) out.add(step);
+  return [...out];
 }
 
 /**
@@ -1343,7 +1362,7 @@ function priceCompositionLine(
     // a printer reaches the printer freight branch and twelve spools reach the
     // carton threshold inside the existing `quoteShipping` — a bundle judged on
     // its own (empty) ops_policy would be quoted as one ordinary parcel.
-    const facts = shippingFactsFrom(k.doc.ops_policy);
+    const facts = shippingFactsFrom(k.doc.ops_policy, k.doc);
     shippingItems.push({
       product_id: k.member_product_id,
       qty: componentQty,
@@ -1945,7 +1964,7 @@ async function computeCheckout(
   // approved default PRO address, and an active restriction case on
   // 'proPricing' / 'noPreorderCommission' pauses the whole pricing context.
   // 'freeDelivery' gates only the shipping waiver below.
-  const [{ tierStatus, atApprovedDefault, proContext, pricingTierActive }, benefitRules, benefitAncestry] = await Promise.all([
+  const [{ tierStatus, atApprovedDefault, proContext, pricingTierActive }, benefitRules, benefitAncestry, categoryDeliveryRules] = await Promise.all([
     pricingTierContext(c.env.DB, user.id, address),
     /**
      * THE CONFIGURED MEMBERSHIP BENEFITS (migration 0074), read ONCE for the
@@ -1960,6 +1979,13 @@ async function computeCheckout(
     // The section tree, so a rule on "Printers" reaches a product filed under
     // a sub-section of it (`catalogAncestry`).
     catalogAncestry(c.env.DB),
+    /**
+     * Category-level quantity delivery rules (0135), read ONCE here so every
+     * pass — the quote and the placement alike — pools the same units under
+     * the same rows. The same section tree above resolves which rule a line
+     * falls under.
+     */
+    activeCategoryDeliveryRules(c.env.DB),
   ]);
   /**
    * The rules the ORDER was priced with, frozen at this instant. Every pass
@@ -1985,8 +2011,10 @@ async function computeCheckout(
   // its own migration's DEFAULT rather than degraded away.
   const params: unknown[] = [user.id];
   const filter =
-    input.itemIds.length > 0 ? ` AND ci.id IN (${input.itemIds.map(() => '?').join(',')})` : '';
-  if (input.itemIds.length > 0) params.push(...input.itemIds);
+    input.itemIds.length > 0 ? ` AND ci.id IN (SELECT value FROM json_each(?))` : '';
+  // One json_each parameter, not one per line: the user id + 100 item ids
+  // would pass the live D1's 100-parameter cap (review F1).
+  if (input.itemIds.length > 0) params.push(JSON.stringify(input.itemIds));
   const rows = await cartLineSelect(
     c.env.DB,
     (projection) =>
@@ -2491,7 +2519,7 @@ async function computeCheckout(
       subtotal += line;
       merchandise += resolved.applied_iqd * qty;
       productIds.push(String(row.id));
-      const facts = shippingFactsFrom(row.ops_policy);
+      const facts = shippingFactsFrom(row.ops_policy, row);
       shippingItems.push({ product_id: String(row.id), qty, ...facts });
       // Persisted resolver snapshot: cost fields must NEVER be stored on the
       // order (it is served back to the buyer). It carries `direct.waived`,
@@ -2848,9 +2876,13 @@ async function computeCheckout(
      * card instead of a base rate that ignores the cart. It is a pure
      * function over figures already in hand, so N methods cost no queries.
      */
+    const quoteItems: ShippingItem[] = categoryDeliveryRules.length
+      ? shippingItems.map((it) => ({ ...it, category_path: expandCategoryPath(benefitAncestry, it.category_path) }))
+      : shippingItems;
     const runQuote = (basisIqd: number, primeBasisIqd?: number, methodId: string = delivery.id): ShippingQuote =>
       quoteShipping({
-        items: shippingItems,
+        items: quoteItems,
+        categoryRules: categoryDeliveryRules,
         deliveryMethod:
           methodId === 'standard' || methodId === 'personal' ? (methodId as ProductDeliveryMethod) : undefined,
         merchandiseIqd: basisIqd,
@@ -5076,7 +5108,7 @@ orderRoutes.post('/:id/cancel', async (c) => {
   const data = await loadOrder(c.env.DB, id);
   if (!data || data.order.user_id !== user.id) throw notFound('Order not found');
   if (data.order.status !== 'pending') {
-    throw badRequest('Only pending orders can be cancelled — please contact support');
+    throw badRequest('Only pending orders can be cancelled — please contact support', 'ORDER_NOT_CANCELLABLE', { status: data.order.status });
   }
   /**
    * A REVEALED MYSTERY ORDER CANNOT BE SELF-CANCELLED (§7.3, §15.3).
@@ -5098,7 +5130,7 @@ orderRoutes.post('/:id/cancel', async (c) => {
    */
   if (String(data.order.seller_type ?? '') === 'merchant') {
     const res = await cancelStoreOrder(c.env, { order: data.order, actor: 'customer', actorUserId: user.id });
-    if (!res.ok) throw badRequest('This order was already cancelled or has progressed');
+    if (!res.ok) throw badRequest('This order was already cancelled or has progressed', 'ORDER_NOT_CANCELLABLE');
     const tell = notifyMerchantOfStoreOrder(c.env, {
       merchantId: String(data.order.merchant_id ?? ''),
       orderId: id,

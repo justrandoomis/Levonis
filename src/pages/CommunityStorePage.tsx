@@ -21,7 +21,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
-import { storefrontApi, type MerchantStore as StoreShape, type MerchantProduct } from '../lib/merchant';
+import { storefrontApi } from '../lib/storefrontApi';
+import type { MerchantStore as StoreShape, MerchantProduct } from '../lib/merchant';
 import Storefront from './Storefront';
 import MerchantStore from './MerchantStore';
 

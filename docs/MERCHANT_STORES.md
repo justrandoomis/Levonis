@@ -360,7 +360,11 @@ only) — is visible as "coming" without being spendable before the customer has
 the goods (§77). **The merchant's own «تم التسليم» releases nothing** (owner
 decision 2026-09-24): it stamps `delivered_at`, writes the stage and the
 customer's tracker history, and starts the clock. The customer's «استلمت
-طلبي» (`POST /api/orders/:id/confirm-receipt`) releases at once; otherwise the
+طلبي» (`POST /api/orders/:id/confirm-receipt`) releases at once — unless a
+complaint or ticket is open, when the receipt is recorded and the money stays
+frozen (review F8), and likewise while the store or its merchant is
+suspended — when payout requests are refused too, and the sweep releases
+what is due once the suspension lifts (DECISIONS row 137); otherwise the
 scheduled sweep (`worker/lib/storeOrderOps.ts`, `releaseDueStoreCredits`)
 releases three days after `delivered_at` — idempotent and audited — unless a
 complaint or support ticket on the order is open, which freezes it. Returns

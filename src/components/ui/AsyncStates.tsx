@@ -177,7 +177,7 @@ function StateShell({
       </div>
       <p className="text-white font-bold text-[15px]">{title}</p>
       {description ? (
-        <p className="text-zinc-500 text-sm max-w-xs leading-relaxed">{description}</p>
+        <p className="text-text-muted text-sm max-w-xs leading-relaxed">{description}</p>
       ) : null}
       {children}
     </div>

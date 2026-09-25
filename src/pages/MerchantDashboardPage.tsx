@@ -29,7 +29,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Store } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
-import { merchantApi, type MerchantMe } from '../lib/merchant';
+// `/api/merchant/me` is spelled out: a value import of lib/merchant made the
+// whole merchant client module part of the workspace FRAME's closure (W6).
+import type { MerchantMe } from '../lib/merchant';
+import { api } from '../lib/api';
 import { useStore } from '../StoreContext';
 import MerchantShell from '../components/merchant/shell/MerchantShell';
 import { onOwnHost } from '../components/merchant/shell/ownHost';
@@ -41,8 +44,8 @@ export default function MerchantDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(() => {
-    merchantApi
-      .me()
+    api
+      .get<{ success: true } & MerchantMe>('/api/merchant/me')
       .then(setMe)
       .catch(() => setMe(null))
       .finally(() => setLoading(false));

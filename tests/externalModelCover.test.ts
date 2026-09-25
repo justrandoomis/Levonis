@@ -16,9 +16,10 @@
  * What that costs is that the URL points at another host, so it must be an
  * absolute https one — `http` is blocked on an https page, and a relative or
  * `data:` string out of somebody else's API is not a picture of anything. The
- * rule is applied on the worker (which decides what is STORED) and again in the
- * component (which decides what is DRAWN), because those are two different
- * decisions and one of them must not rely on the other having been careful.
+ * rule is applied on the worker (which decides what is STORED). The component
+ * half of these tests read the three-step PrintRequestWizard, which the v2
+ * wizard replaced and W6 deleted (nothing imported it); what it drew is gone,
+ * what the worker stores and the resolver refuses is still pinned here.
  *
  * Run: npx tsx --test tests/externalModelCover.test.ts
  */
@@ -29,37 +30,19 @@ import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
 
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
-const WIZARD = 'src/components/print/PrintRequestWizard.tsx';
 const ROUTE = 'worker/routes/printRequests.ts';
 const RESOLVER = 'worker/lib/externalModels.ts';
 
-test('the wizard shows the cover the source named', () => {
-  const wizard = read(WIZARD);
-  assert.match(wizard, /data-wizard="link-cover"/);
-  assert.match(wizard, /src=\{linkCover\}/);
-  assert.match(wizard, /const linkCover = \(\) =>|const linkCover = \(\(\) => \{/);
-  assert.match(wizard, /link\?\.info\.images\?\.\[0\]/, 'from the resolved images, not from a second lookup');
-});
-
 test('it is a link and never a copy', () => {
-  const wizard = read(WIZARD);
   const route = read(ROUTE);
   // A re-host would mean an upload call on this path. There is none, and the
   // absence is the feature.
-  assert.doesNotMatch(wizard, /putMediaObject|uploadImage|ingestImage/);
   assert.doesNotMatch(route, /ingestRemoteImage|putMediaObject\([^)]*image_url/);
   assert.match(
     route,
     /never downloaded,\s*\n \* never re-hosted and never written to R2/,
     'and the reason is written where the rule lives'
   );
-});
-
-test('only an absolute https URL is drawn, and only one that size', () => {
-  const wizard = read(WIZARD);
-  assert.match(wizard, /\/\^https:\\\/\\\/\/i\.test\(first\)/, 'the component decides what it draws');
-  assert.match(wizard, /referrerPolicy="no-referrer"/, 'the source learns nothing about who is looking');
-  assert.match(wizard, /loading="lazy"/);
 });
 
 test('only an absolute https URL is stored, and the blob is typed rather than free-form', () => {
@@ -80,16 +63,6 @@ test('only an absolute https URL is stored, and the blob is typed rather than fr
   assert.match(body, /raw\.resolved === true/, 'and a truthy string cannot claim the model was resolved');
 });
 
-test('a broken cover loses the thumbnail and nothing else', () => {
-  const wizard = read(WIZARD);
-  assert.match(wizard, /onError=\{\(\) => setCoverFailed\(true\)\}/);
-  assert.match(wizard, /\{linkCover && !coverFailed &&/, 'a broken frame would look like a broken request');
-  // The latch must clear, or one bad link poisons every later one in the
-  // same session.
-  assert.match(wizard, /setLink\(d\);\s*\n\s*setCoverFailed\(false\);/);
-  assert.match(wizard, /setLink\(null\); setCoverFailed\(false\);/);
-});
-
 test('the resolver still refuses to scrape, and still refuses a non-https image', () => {
   const resolver = read(RESOLVER);
   assert.match(resolver, /this module NEVER parses HTML/);
@@ -100,11 +73,3 @@ test('the resolver still refuses to scrape, and still refuses a non-https image'
   );
 });
 
-test('an unresolved link still publishes, with no picture and no invented numbers', () => {
-  const wizard = read(WIZARD);
-  // The honest-degradation path is the one most likely to be broken by adding
-  // a picture to the happy one.
-  assert.match(wizard, /!link\.info\.resolved &&/);
-  assert.match(wizard, /ولم نستطع قراءة تفاصيل المجسم من الموقع/);
-  assert.match(wizard, /طلبك يعمل بشكل طبيعي؛ التقدير فقط سيكون أقل دقة/);
-});

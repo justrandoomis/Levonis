@@ -204,13 +204,14 @@ export function StoreSettingsTab({
             <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
               {loc('لون المتجر', 'Store colour', 'ڕەنگی فرۆشگا')}
             </label>
-            <div className="flex gap-1.5 flex-wrap">
+            <div className="flex gap-x-1.5 gap-y-2 flex-wrap">
               {ACCENT_SWATCHES.map((a) => (
                 <button
                   key={a.id}
                   type="button"
+                  aria-pressed={f.accent === a.id}
                   onClick={() => setF({ ...f, accent: a.id })}
-                  className={`h-9 ps-2 pe-3 rounded-xl border text-[11.5px] font-semibold inline-flex items-center gap-1.5 transition-colors ${
+                  className={`relative lv-hit h-9 ps-2 pe-3 rounded-xl border text-[11.5px] font-semibold inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                     f.accent === a.id ? 'border-gold/60 bg-white/[0.06] text-white' : 'border-white/10 bg-white/[0.02] text-zinc-400'
                   }`}
                 >
@@ -224,7 +225,7 @@ export function StoreSettingsTab({
       </Card>
 
       <Card title={loc('واجهة المتجر — الروابط والبطاقات', 'Profile — links & info cards', 'ڕووکاری فرۆشگا')}>
-        <p className="text-zinc-600 text-[10.5px] mb-3">
+        <p className="text-text-muted text-[10.5px] mb-3">
           {loc(
             'ستة عناصر تظهر أعلى صفحة متجرك: ثلاثة روابط (موقعك، إنستغرام…) وثلاث بطاقات معلومات (الموقع، وقت التجهيز، الشحن…). لكل عنصر أيقونة وعنوان وقيمة، ويمكنك إخفاؤه أو إعادة ترتيبه.',
             'Six items at the top of your shop page: three links (your site, Instagram…) and three info cards (location, prep time, shipping…). Each has an icon, a title and a value, and can be hidden or reordered.',
@@ -266,6 +267,7 @@ export function StoreSettingsTab({
               {loc('المحافظة', 'Governorate', 'پارێزگا')}
             </label>
             <select
+              aria-label={loc('المحافظة', 'Governorate', 'پارێزگا')}
               value={f.governorate}
               onChange={(e) => setF({ ...f, governorate: e.target.value })}
               className="w-full h-10 rounded-xl bg-black/40 border border-white/10 px-3 text-white text-[13px] outline-none focus:border-gold/40"
@@ -378,7 +380,7 @@ export function StoreSettingsTab({
               <button
                 type="button"
                 onClick={() => setF({ ...f, business_hours: f.business_hours.filter((_, j) => j !== i) })}
-                className="w-8 h-8 rounded-lg text-zinc-500 hover:text-red-300 shrink-0"
+                className="w-8 h-8 rounded-lg text-text-muted hover:text-red-300 shrink-0"
               >
                 ×
               </button>
@@ -432,7 +434,7 @@ export function StoreSettingsTab({
                 <button
                   type="button"
                   onClick={() => setF({ ...f, policies: f.policies.filter((_, j) => j !== i) })}
-                  className="w-8 h-8 rounded-lg text-zinc-500 hover:text-red-300 shrink-0"
+                  className="w-8 h-8 rounded-lg text-text-muted hover:text-red-300 shrink-0"
                 >
                   ×
                 </button>
@@ -481,7 +483,7 @@ export function StoreSettingsTab({
               <button
                 type="button"
                 onClick={() => setF({ ...f, social_links: f.social_links.filter((_, j) => j !== i) })}
-                className="w-8 h-8 rounded-lg text-zinc-500 hover:text-red-300 shrink-0"
+                className="w-8 h-8 rounded-lg text-text-muted hover:text-red-300 shrink-0"
               >
                 ×
               </button>
@@ -490,7 +492,7 @@ export function StoreSettingsTab({
           <Btn kind="ghost" small onClick={() => setF({ ...f, social_links: [...f.social_links, ['Instagram', '']] })}>
             + {loc('إضافة رابط', 'Add link', 'بەستەر زیاد بکە')}
           </Btn>
-          <p className="text-zinc-600 text-[10.5px]">
+          <p className="text-text-muted text-[10.5px]">
             {loc('روابط http/https فقط — أي شيء آخر يُهمل.', 'http/https links only — anything else is dropped.', 'تەنها http/https.')}
           </p>
         </div>
@@ -667,7 +669,7 @@ function WidgetGroupEditor({
                 : { icon: items.length === 0 ? 'map-pin' : items.length === 1 ? 'clock' : 'truck', title: '', subtitle: '', visible: true },
             ])
           }
-          className="mt-2 h-8 px-3 rounded-lg border border-dashed border-white/15 text-zinc-400 text-[11.5px] font-semibold inline-flex items-center gap-1"
+          className="relative lv-hit mt-2 h-8 px-3 rounded-lg border border-dashed border-white/15 text-zinc-400 text-[11.5px] font-semibold inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <Plus className="w-3 h-3" />
           {loc('إضافة عنصر', 'Add item', 'زیادکردن')} ({items.length}/3)
@@ -728,7 +730,7 @@ function SlugCard({ currentSlug, url, onChanged }: { currentSlug: string; url: s
 
   return (
     <Card title={loc('عنوان المتجر', 'Store address', 'ناونیشانی فرۆشگا')}>
-      <p className="text-zinc-500 text-[11.5px] mb-2 flex items-center gap-1.5" dir="ltr">
+      <p className="text-text-muted text-[11.5px] mb-2 flex items-center gap-1.5" dir="ltr">
         <Globe className="w-3.5 h-3.5 shrink-0" />
         <span className="truncate">{url.replace(/^https?:\/\//, '')}</span>
       </p>

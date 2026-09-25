@@ -23,6 +23,7 @@ import { communityMayEnter, readCommunityGate } from './communityGate';
 import { storeForUser } from './merchantAuth';
 import { benefits, getTierStatus } from './entitlements';
 import { escrowForOrder, releaseEscrow, releaseEscrowReservation } from './escrowOps';
+import { merchantSuspendedSql } from './merchantLedger';
 import { notifyStatement } from './notifications';
 import { merchantNotificationStatement, offerAcceptedNotice } from './merchantNotify';
 import { merchantHref } from '@levonis/contracts/merchantRoutes';
@@ -66,13 +67,25 @@ export function onPublicBoard(r: RequestForAccess, now: string = nowIso()): bool
   );
 }
 
-/** Is this user the merchant whose offer on this request was accepted? */
+/**
+ * Is this user the merchant whose offer on this request was accepted — AND is
+ * the job it became still live or completed (review F3)? A customer who
+ * cancels, or an order refunded in full, takes the original file back: the
+ * merchant is no longer doing the job, so they no longer hold its design. A
+ * COMPLETED job keeps the access (docs/DECISIONS.md: the merchant may need
+ * the file for a warranty remake or a question after delivery).
+ */
 export async function isEngagedMerchant(db: D1Database, requestId: string, userId: string): Promise<boolean> {
   const row = await db
     .prepare(
       `SELECT 1 AS x FROM community_offers o
          JOIN community_merchants m ON m.id = o.merchant_id
-        WHERE o.request_id = ? AND m.user_id = ? AND o.state = 'accepted'`
+        WHERE o.request_id = ? AND m.user_id = ? AND o.state = 'accepted'
+          AND (EXISTS (SELECT 1 FROM community_orders co
+                        WHERE co.offer_id = o.id AND co.state NOT IN ('cancelled','refunded'))
+               -- An accepted offer from before orders existed has no order row
+               -- to ask: it keeps the access it always had.
+               OR NOT EXISTS (SELECT 1 FROM community_orders co WHERE co.offer_id = o.id))`
     )
     .bind(requestId, userId)
     .first();
@@ -241,7 +254,7 @@ export function completionStatements(
             SET state = 'completed',
                 confirmed_at = CASE WHEN ?2 = 1 THEN ?3 ELSE confirmed_at END,
                 completed_at = ?3, updated_at = ?3
-          WHERE id = ?1 AND state = 'merchant_marked_delivered'`
+          WHERE id = ?1 AND state IN ('merchant_marked_delivered','customer_confirmed')`
       )
       .bind(order.id, opts.confirmedByCustomer ? 1 : 0, ts),
     db
@@ -467,20 +480,27 @@ export async function sweepCommunityAutoComplete(
   limit: number,
   report: CommunitySweepReport
 ): Promise<void> {
+  // A SUSPENDED merchant is not paid by the clock (DECISIONS row 137); its
+  // due orders wait, counted as skipped. A customer who confirmed while it
+  // was suspended left the order `customer_confirmed` over a held escrow:
+  // the first run after the suspension lifts releases it here.
   const settleable = `EXISTS (SELECT 1 FROM community_escrows e
-                              WHERE e.community_order_id = o.id AND e.state IN ('held','released'))`;
+                              WHERE e.community_order_id = o.id AND e.state IN ('held','released'))
+                      AND NOT ${merchantSuspendedSql('o.merchant_id')}`;
+  const due = `((o.state = 'merchant_marked_delivered' AND o.auto_complete_at IS NOT NULL AND o.auto_complete_at <= ?1)
+                OR o.state = 'customer_confirmed')`;
   const { results } = await env.DB.prepare(
-    `SELECT o.id, o.request_id, o.merchant_id, o.customer_id, o.auto_complete_at FROM community_orders o
-      WHERE o.state = 'merchant_marked_delivered' AND o.auto_complete_at IS NOT NULL AND o.auto_complete_at <= ?1
+    `SELECT o.id, o.request_id, o.merchant_id, o.customer_id, o.auto_complete_at, o.state FROM community_orders o
+      WHERE ${due}
         AND ${settleable}
-      ORDER BY o.auto_complete_at LIMIT ?2`
+      ORDER BY COALESCE(o.confirmed_at, o.auto_complete_at) LIMIT ?2`
   )
     .bind(now, limit)
-    .all<{ id: string; request_id: string; merchant_id: string; customer_id: string; auto_complete_at: string }>();
+    .all<{ id: string; request_id: string; merchant_id: string; customer_id: string; auto_complete_at: string | null; state: string }>();
   const stuck = await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM community_orders o
-      WHERE o.state = 'merchant_marked_delivered' AND o.auto_complete_at IS NOT NULL AND o.auto_complete_at <= ?1
-        AND NOT ${settleable}`
+      WHERE ${due}
+        AND NOT (${settleable})`
   )
     .bind(now)
     .first<{ n: number }>();
@@ -497,9 +517,12 @@ export async function sweepCommunityAutoComplete(
         escrowId: esc.id,
         actorId: null,
         actorRole: 'system',
-        reason: `auto-confirmed: no confirmation or dispute by ${o.auto_complete_at}`,
+        reason:
+          o.state === 'customer_confirmed'
+            ? 'confirmed by the customer while the merchant was suspended; released after it lifted'
+            : `auto-confirmed: no confirmation or dispute by ${o.auto_complete_at}`,
         idempotencyKey: `confirm:${o.id}`,
-        orderStates: ['merchant_marked_delivered'],
+        orderStates: [o.state === 'customer_confirmed' ? 'customer_confirmed' : 'merchant_marked_delivered'],
       });
       if (!released.ok) {
         report.auto_complete_skipped += 1;

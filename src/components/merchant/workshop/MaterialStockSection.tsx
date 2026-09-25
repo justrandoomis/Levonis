@@ -169,7 +169,8 @@ export default function MaterialStockSection() {
                   }}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              {/* Two columns while each keeps 8.5rem (a colour name, «2,750 g»); stacked below that (W6: 320px clipped both). */}
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] gap-2">
                 <div className="min-w-0">
                   <Select
                     aria-label={loc('اللون', 'Colour')}

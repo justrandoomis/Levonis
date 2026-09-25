@@ -134,7 +134,7 @@ export default function PayoutQueue({ t }: { t: T }) {
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-white font-bold text-[14px]">{t('طلبات تحويل أرباح التجار', 'Merchant payout requests')}</h3>
       </div>
-      <div className="overflow-x-auto hide-scrollbar">
+      <div className="-my-2 overflow-x-auto py-2 hide-scrollbar">
         <Segmented
           items={[
             { id: 'open', label: t('مفتوحة', 'Open') },
@@ -162,7 +162,7 @@ export default function PayoutQueue({ t }: { t: T }) {
       ) : !rows ? (
         <div className="h-24 rounded-2xl bg-white/[0.04] animate-pulse" aria-hidden="true" />
       ) : rows.length === 0 ? (
-        <p className="text-zinc-500 text-[12.5px]" data-queue-empty>
+        <p className="text-text-muted text-[12.5px]" data-queue-empty>
           {state === 'open' ? t('لا توجد طلبات تنتظر.', 'No requests are waiting.') : t('لا شيء هنا.', 'Nothing here.')}
         </p>
       ) : (
@@ -172,7 +172,7 @@ export default function PayoutQueue({ t }: { t: T }) {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-white text-[13.5px] font-semibold truncate">{p.merchant.store_name || p.merchant.name}</p>
-                  <p className="text-zinc-500 text-[11.5px]">{date(p.created_at)}{p.source !== 'merchant' ? ` · ${t('سجّلته الإدارة', 'recorded by an admin')}` : ''}</p>
+                  <p className="text-text-muted text-[11.5px]">{date(p.created_at)}{p.source !== 'merchant' ? ` · ${t('سجّلته الإدارة', 'recorded by an admin')}` : ''}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
                   <span className="text-white text-[16px] font-bold"><Money iqd={p.amount_iqd} /></span>
@@ -180,15 +180,15 @@ export default function PayoutQueue({ t }: { t: T }) {
                 </div>
               </div>
               <dl className="mt-2.5 grid grid-cols-1 gap-1 text-[12px] sm:grid-cols-2">
-                <div className="flex gap-1.5"><dt className="text-zinc-500">{t('القناة:', 'Channel:')}</dt><dd className="text-zinc-200">{p.method.label || p.method.channel}</dd></div>
+                <div className="flex gap-1.5"><dt className="text-text-muted">{t('القناة:', 'Channel:')}</dt><dd className="text-zinc-200">{p.method.label || p.method.channel}</dd></div>
                 {p.method.account && (
-                  <div className="flex gap-1.5"><dt className="text-zinc-500">{t('الحساب:', 'Account:')}</dt><dd className="text-zinc-200 select-all" dir="ltr">{p.method.account}</dd></div>
+                  <div className="flex gap-1.5"><dt className="text-text-muted">{t('الحساب:', 'Account:')}</dt><dd className="text-zinc-200 select-all" dir="ltr">{p.method.account}</dd></div>
                 )}
                 {p.method.holder && (
-                  <div className="flex gap-1.5"><dt className="text-zinc-500">{t('صاحب الحساب:', 'Holder:')}</dt><dd className="text-zinc-200">{p.method.holder}</dd></div>
+                  <div className="flex gap-1.5"><dt className="text-text-muted">{t('صاحب الحساب:', 'Holder:')}</dt><dd className="text-zinc-200">{p.method.holder}</dd></div>
                 )}
                 <div className="flex gap-1.5">
-                  <dt className="text-zinc-500">{t('رصيد التاجر:', 'Merchant balance:')}</dt>
+                  <dt className="text-text-muted">{t('رصيد التاجر:', 'Merchant balance:')}</dt>
                   <dd className="text-zinc-200">
                     {t('متاح', 'available')} <Money iqd={p.merchant.available_iqd} /> · {t('محجوز', 'reserved')} <Money iqd={p.merchant.reserved_iqd} />
                   </dd>

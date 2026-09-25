@@ -61,7 +61,7 @@ export default function OfferCompare({
   };
 
   const sorted = useMemo(() => {
-    const live = (o: OfferV2) => (o.state === 'accepted' ? 0 : o.state === 'pending' && !o.stale && !o.expired ? 1 : 2);
+    const live = (o: OfferV2) => (o.state === 'accepted' ? 0 : o.state === 'pending' && !o.stale && !o.expired && !o.workshop_unable ? 1 : 2);
     const key = (o: OfferV2) =>
       sort === 'price' ? o.price_iqd : sort === 'time' ? o.completion_days || 9999 : -(o.merchant?.rating ?? 0);
     return [...offers].sort((a, b) => live(a) - live(b) || key(a) - key(b));
@@ -127,7 +127,7 @@ export default function OfferCompare({
             loc={loc}
             lang={lang}
             matName={matName}
-            canAct={takingOffers && o.state === 'pending' && !o.stale && !o.expired}
+            canAct={takingOffers && o.state === 'pending' && !o.stale && !o.expired && !o.workshop_unable}
             onAccept={() => setAccepting(o)}
             onDecline={() => decline(o)}
             onChat={() => chat(o)}
@@ -228,6 +228,14 @@ function OfferColumn({
         </p>
       )}
 
+      {o.workshop_unable && o.state === 'pending' && (
+        <p className="mt-2 flex items-start gap-2 text-[12px] leading-relaxed text-warning" data-offer-unable>
+          <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {/* OWNER: Sorani to be written by hand. */}
+          {loc('هذه الورشة لم تعد قادرة على تنفيذ الطلب', 'This workshop can no longer make this request')}
+        </p>
+      )}
+
       <div className="mt-auto pt-3">
         {o.state === 'accepted' && o.order_id ? (
           <OrderContactCard orderId={o.order_id} compact />
@@ -310,7 +318,13 @@ function AcceptSheet({ offer, onClose, onAccepted }: { offer: OfferV2 | null; on
         setShown({ ...o, ...fresh, merchant: o.merchant });
         setChanged(true);
       } else {
-        setError(e instanceof ApiError ? apiRefusal(e, L, e.message) : loc('تعذّر قبول العرض', 'Could not accept the offer'));
+        // OFFER_NOT_ELIGIBLE is the workshop's own refusal elsewhere («ورشتك…»);
+        // at acceptance the customer reads it about THIS workshop (review F2).
+        setError(
+          e instanceof ApiError && e.code === 'OFFER_NOT_ELIGIBLE'
+            ? loc('هذه الورشة لم تعد قادرة على تنفيذ الطلب — اختر عرضًا آخر.', 'This workshop can no longer make this request — choose another offer.')
+            : e instanceof ApiError ? apiRefusal(e, L, e.message) : loc('تعذّر قبول العرض', 'Could not accept the offer')
+        );
         setNeedsTopUp(e instanceof ApiError && e.code === 'INSUFFICIENT_FUNDS');
       }
     }

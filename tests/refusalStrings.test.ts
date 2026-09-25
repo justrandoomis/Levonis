@@ -341,3 +341,41 @@ test('the cart door refusal names the remainder in all three languages, never in
   assert.equal(apiRefusal({ code: 'QTY_UNAVAILABLE', message: 'Only 2 left' }, 'ar', 'x'), REFUSAL_STRINGS.QTY_UNAVAILABLE.ar);
   assert.equal(stockRefusal({ code: 'QTY_UNAVAILABLE', message: 'Only 2 left' }, 'ar'), null);
 });
+
+/**
+ * THE CODES THE END-TO-END REVIEW OF THE LIVE MERCHANT PLATFORM ADDED (F12):
+ * the coupon form's two refusals, the custom order's lifecycle doors and a
+ * customer's cancel after the order moved on. Each used to reach its screen as
+ * the server's English sentence (or no code at all). Merchant- and
+ * customer-facing alike, each has an Arabic and an English sentence that says
+ * what to do; the ckb column carries the Arabic until the owner writes the
+ * Sorani by hand (DECISIONS row 11), so it is only required to be present.
+ */
+const REVIEW_E2E_CODES = [
+  'BAD_COUPON_CODE',
+  'COUPON_CODE_TAKEN',
+  'CUSTOM_ORDER_CANNOT_START',
+  'CUSTOM_ORDER_CANNOT_DELIVER',
+  'CUSTOM_ORDER_CANNOT_CONFIRM',
+  'CUSTOM_ORDER_NO_ESCROW',
+  'CUSTOM_ORDER_CANCEL_NEEDS_DISPUTE',
+  'CUSTOM_ORDER_CANNOT_CANCEL',
+  'ORDER_NOT_CANCELLABLE',
+] as const;
+
+test('the review codes (F12) are translated, and each is emitted by its route', () => {
+  const emitters: Record<string, string> = {
+    BAD_COUPON_CODE: 'worker/routes/merchant.ts',
+    COUPON_CODE_TAKEN: 'worker/routes/merchant.ts',
+    ORDER_NOT_CANCELLABLE: 'worker/routes/orders.ts',
+  };
+  for (const code of REVIEW_E2E_CODES) {
+    const e = REFUSAL_STRINGS[code];
+    assert.ok(e, `${code} has no sentence`);
+    for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(e[lang]?.trim(), `${code}.${lang} is empty`);
+    assert.notEqual(e.ar, e.en);
+    assert.ok(!/[A-Z]{3,}_[A-Z]/.test(e.ar + e.en), `${code}: a machine code leaked into the sentence`);
+    const file = emitters[code] ?? 'worker/routes/marketplace.ts';
+    assert.ok(readFileSync(join(ROOT, file), 'utf8').includes(`'${code}'`), `${file} does not emit ${code}`);
+  }
+});

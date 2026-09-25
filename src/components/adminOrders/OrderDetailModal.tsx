@@ -9,6 +9,7 @@ import Spinner from '../ui/Spinner';
 import { Overlay } from '../ui/Overlay';
 import { ErrorState } from '../ui/AsyncStates';
 import CopyField from './CopyField';
+import { collectOnDeliveryIqd } from './collectAmount';
 import MysteryReveal from '../offers/MysteryReveal';
 import OrderChatPanel from './OrderChatPanel';
 import OrderStagePanel from './OrderStagePanel';
@@ -91,6 +92,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   const govId = String(addr.governorate ?? '');
   const govLabel = govId ? GOVERNORATE_LABELS[govId]?.[lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar'] ?? govId : '';
   const fin = detail?.financial;
+  const collectIqd = collectOnDeliveryIqd(fin, detail?.total_iqd);
 
   // WHY `Overlay` AND NOT `Sheet`, AND WHY IT STILL RISES FROM THE BOTTOM EDGE.
   //
@@ -237,18 +239,27 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
               <h3 className="text-[13px] font-bold text-zinc-400 mb-2">
                 {loc('المبلغ النهائي للوصل', 'Final amount for the receipt', 'کۆی کۆتایی بۆ پسوولە')}
               </h3>
+              {/* THE FIGURE THE COURIER COLLECTS, not the order total (owner,
+                  2026-09-25: «يجب أن يكون 1732992 بدلا من 1783000»). The total
+                  still counts what the wallet (or Gini) already paid, so
+                  copying it onto the receipt over-collected every part-prepaid
+                  order. `due_on_delivery_iqd` is the stored door amount the
+                  sticker, the receipt and the Telegram card already print; it
+                  does not move when a collection is recorded, so the sheet
+                  still reads right after delivery. Orders loaded without the
+                  financial block fall back to the total. */}
               <CopyField
-                label={loc('الإجمالي بعد كل الخصومات', 'Total after every discount', 'کۆی گشتی دوای هەموو داشکاندنێک')}
-                value={String(detail.total_iqd)}
+                label={loc('المتبقي عند التسليم', 'Outstanding on delivery', 'ماوە لە گەیاندن')}
+                value={String(collectIqd)}
                 emphasis
                 mono
               />
-              <p className="text-[12px] text-zinc-500 mt-1.5">
-                {formatIqd(detail.total_iqd)}
-                {fin && fin.due_on_delivery_iqd !== detail.total_iqd && (
+              <p data-collect-note className="text-[12px] text-zinc-500 mt-1.5">
+                {formatIqd(collectIqd)}
+                {collectIqd !== detail.total_iqd && (
                   <>
                     {' · '}
-                    {loc('يُحصَّل عند التسليم', 'due on delivery', 'لە کاتی گەیاندن')}: {formatIqd(fin.due_on_delivery_iqd)}
+                    {loc('الإجمالي', 'Total', 'کۆی گشتی')}: {formatIqd(detail.total_iqd)}
                   </>
                 )}
                 {fin && (fin.bnpl_due_iqd ?? 0) > 0 && (

@@ -356,7 +356,6 @@ GET                 /api/merchant/request-matches
 | --- | --- |
 | `src/components/community/requests/RequestWizard.tsx` | المعالج v2 (W5-A): أربع خطوات — ماذا (ملف · رابط · صور · وصف فقط) · كيف («لست متأكدًا» للطريقة والمادة، مقاس مكتوب، ملاحظات للتجار) · أين ومتى (موعد بتاريخ، ميزانية) · مراجعة؛ «احفظ كمسودة» و«انشر»، ويعدّل الطلب المنشور |
 | `src/components/community/offers/*` | العروض v2: مقارنة جنبًا إلى جنب وقبول بتأكيد (الزبون)، إنشاء وتعديل وسحب وتأكيد (التاجر)، «عروضي» في مساحة التاجر، والتواصل بعد القبول |
-| `src/components/print/PrintRequestWizard.tsx` | المعالج القديم بثلاث خطوات — لم يعد مركّبًا في `/requests` |
 | `src/components/print/PrintSummary.tsx` | ما قرأناه من الملف، على صفحة الطلب، للطرفين |
 | `src/components/print/MyRequestsList.tsx` | «طلباتي» بالتقدير والتاجر المختار و«إعادة الطلب» |
 | `src/pages/ModelViewer.tsx` | `/model-viewer/:token` — مشهد مستقل، `ogl` وحدها، شبكة مشتقّة لا الملف |

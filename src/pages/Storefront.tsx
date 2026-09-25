@@ -29,7 +29,8 @@ import { ArrowLeft, Check, Hammer, Link2, Loader2, MessageCircle, MessageCircleM
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
-import { storefrontApi, communityFavoritesApi, type MerchantProduct } from '../lib/merchant';
+import { storefrontApi, communityFavoritesApi } from '../lib/storefrontApi';
+import type { MerchantProduct } from '../lib/merchant';
 import { useStore } from '../StoreContext';
 import { trackStoreEvent } from '../lib/storeBeacon';
 import { useCommunityAccess } from './community/access';
@@ -373,7 +374,7 @@ function LiveBack() {
   const { onHost, backTo } = useLive();
   const { loc } = useLanguage();
   const MAIN_SITE = useMainSite();
-  const cls = 'w-9 h-9 flex items-center justify-center text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]';
+  const cls = 'relative lv-hit w-9 h-9 rounded-full flex items-center justify-center text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
   return onHost ? (
     <a href={`${MAIN_SITE}${backTo}`} className={cls} aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}>
       <ArrowLeft className="w-5 h-5" strokeWidth={2} />
@@ -457,7 +458,7 @@ function LiveServiceDoors({ accepts }: { accepts: boolean }) {
         {quotes && (
           <a
             href={requestsHref}
-            className="h-10 rounded-xl bg-olive text-white font-bold text-[12px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+            className="relative lv-hit h-10 rounded-xl bg-olive text-white font-bold text-[12px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             <Hammer className="w-3.5 h-3.5" />
             {loc('اطلب عرض سعر', 'Request a quote', 'داوای نرخ بکە')}
@@ -465,7 +466,7 @@ function LiveServiceDoors({ accepts }: { accepts: boolean }) {
         )}
         <button
           onClick={openChat}
-          className={`h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-200 font-bold text-[12px] flex items-center justify-center gap-1.5 ${quotes ? '' : 'col-span-2'}`}
+          className={`relative lv-hit h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-200 font-bold text-[12px] flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${quotes ? '' : 'col-span-2'}`}
         >
           <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />
           {loc('مراسلة المتجر', 'Message the store', 'نامە بۆ فرۆشگا')}
@@ -605,7 +606,7 @@ function FollowButton({
     <button
       onClick={toggle}
       disabled={busy || closed}
-      className={`w-full h-[30px] rounded-full font-medium text-[13px] flex items-center justify-center gap-1.5 px-9 active:scale-[0.98] transition-all disabled:opacity-50 ${
+      className={`relative lv-hit w-full h-[30px] rounded-full font-medium text-[13px] flex items-center justify-center gap-1.5 px-9 active:scale-[0.98] transition-all disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
         following ? accentChip : 'border border-white/15 bg-transparent text-zinc-200'
       }`}
     >
@@ -670,7 +671,7 @@ function ContactButton({
     <button
       onClick={open}
       disabled={busy}
-      className={`flex-1 h-[30px] rounded-xl font-semibold text-[13px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50 ${accentBtn}`}
+      className={`relative lv-hit flex-1 h-[30px] rounded-xl font-semibold text-[13px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${accentBtn}`}
     >
       {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <MessageCircleMore className="w-3.5 h-3.5" strokeWidth={1.75} aria-hidden="true" />}
       {/* A profile with no store behind it is a person to talk to, and the
@@ -722,7 +723,7 @@ function SharePin({ url, name, loc }: { url: string; name: string; loc: Loc }) {
   return (
     <button
       onClick={share}
-      className="absolute left-0 top-0 h-[30px] w-9 rounded-full flex items-center justify-center text-zinc-300 active:scale-[0.9] transition-transform"
+      className="absolute lv-hit left-0 top-0 h-[30px] w-9 rounded-full flex items-center justify-center text-zinc-300 active:scale-[0.9] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       aria-label={loc('مشاركة المتجر', 'Share the store', 'هاوبەشکردن')}
     >
       {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.75} /> : <Link2 className="w-3.5 h-3.5" strokeWidth={1.75} />}
@@ -778,7 +779,7 @@ function StoreMenu({
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-[30px] h-[30px] rounded-full border border-white/20 bg-white/5 backdrop-blur flex items-center justify-center text-white"
+        className="relative lv-hit w-[30px] h-[30px] rounded-full border border-white/20 bg-white/5 backdrop-blur flex items-center justify-center text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         aria-label={loc('خيارات المتجر', 'Store options', 'هەڵبژاردەکان')}
         aria-expanded={open}
       >

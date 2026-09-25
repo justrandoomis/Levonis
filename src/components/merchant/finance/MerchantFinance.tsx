@@ -203,7 +203,7 @@ function Statement({ sum }: { sum: FinanceSummary }) {
   const s = financeStrings(loc);
   const money = (iqd: number) => formatMoney(iqd, lang);
   const rows: Array<{ label: string; value: number; sign: '+' | '−' | '±'; sub?: string }> = [
-    { label: s.gross, value: sum.gross, sign: '+', sub: sum.custom_gross > 0 ? s.grossBreakdown(money(sum.store_gross), money(sum.custom_gross)) : undefined },
+    { label: s.gross, value: sum.gross, sign: '+', sub: sum.custom_gross > 0 ? `${s.grossMeans} ${s.grossBreakdown(money(sum.store_gross), money(sum.custom_gross))}` : s.grossMeans },
     { label: s.commission, value: sum.commission, sign: '−' },
     { label: s.deliveryFees, value: sum.delivery_fees, sign: '+' },
     { label: s.refunds, value: sum.refunds, sign: '−' },

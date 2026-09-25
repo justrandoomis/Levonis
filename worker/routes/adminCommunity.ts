@@ -21,7 +21,8 @@
 
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
-import { notifyPayoutPaidById, notifyStoreStatusChanged } from '../lib/merchantNotify';
+import { notifyPayoutFailed, notifyPayoutPaidById, notifyStoreStatusChanged } from '../lib/merchantNotify';
+import { notifyEscrowResolved } from '../lib/customOrderNotify';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, str, int, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
@@ -1267,7 +1268,16 @@ adminCommunityRoutes.post('/escrows/:id/resolve', requireFinancialScope, async (
    *   - the request's preview links stop working.
    */
   const ts = nowIso();
-  const orderState = decision === 'release' ? 'completed' : 'refunded';
+  /**
+   * A PARTIAL REFUND IS A COMPLETED JOB (review F9). It used to leave the
+   * order `refunded`, which every «finished work» figure excludes — the
+   * merchant's analytics showed 0 for a job they were paid part of, and
+   * `isEngagedMerchant` took their file away as if the job had been undone.
+   * The order is now `completed`; the escrow's own `partially_refunded` state
+   * is the flag that says part went back (no new column), and the analytics
+   * count the part the merchant kept (CUSTOM_ORDER_KEPT_RECEIVABLE_SQL).
+   */
+  const orderState = decision === 'refund' ? 'refunded' : 'completed';
   const requestState = decision === 'refund' ? 'cancelled' : 'completed';
   const outcome = decision === 'release' ? 'dispute_won' : 'dispute_lost';
   await c.env.DB.batch([
@@ -1302,6 +1312,15 @@ adminCommunityRoutes.post('/escrows/:id/resolve', requireFinancialScope, async (
       amount: body.amount_iqd ?? esc.gross_iqd,
     });
   }
+  // Both parties are told, and the merchant hears when money reached their
+  // balance (review F4). Keyed on the order and the decision: a replay is silent.
+  const settled = await getEscrow(c.env.DB, escrowId);
+  await notifyEscrowResolved(c.env, {
+    orderId: esc.community_order_id,
+    escrowId,
+    decision,
+    refundedIqd: Number(settled?.refunded_iqd ?? 0),
+  });
   return c.json({ success: true, decision, replayed });
 });
 
@@ -1489,6 +1508,8 @@ adminCommunityRoutes.post('/payouts/:id/fail', requireFinancialScope, async (c) 
   if (reason.length < 3 || reason.length > 300) throw badRequest('Say why the payout failed', 'REASON_REQUIRED');
   const res = await failPayout(c.env.DB, { payoutId: id, actorId: admin.id, reason });
   if (!res.ok) throw payoutRefusal(res);
+  // The merchant is told, with the admin's reason in-app (review F11; once per payout).
+  await notifyPayoutFailed(c.env, { merchantId: res.payout.merchant_id, payoutId: id, amountIqd: res.payout.amount_iqd, reason });
   return c.json({ success: true, replayed: res.replayed, payout: payoutPublic(res.payout) });
 });
 

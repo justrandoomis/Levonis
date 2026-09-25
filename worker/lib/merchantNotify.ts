@@ -45,7 +45,7 @@ import type { Env } from './types';
 import { notifyStatement, type NotificationInput, type NotificationKind } from './notifications';
 import { planNotifyCustomer, reachFor, type CustomerChannel, type CustomerMessage } from './customerNotify';
 import { merchantHref } from '@levonis/contracts/merchantRoutes';
-import { orderCredit, payoutFacts } from './merchantLedger';
+import { merchantBuckets, orderCredit, payoutFacts } from './merchantLedger';
 
 // ---------------------------------------------------------------- the kinds
 
@@ -68,6 +68,9 @@ export const MERCHANT_KINDS = [
   'dispute_opened',
   'payout_available',
   'payout_paid',
+  'payout_failed',
+  'balance_reversed',
+  'dispute_resolved',
   'coupon_ending',
   'store_status_changed',
 ] as const satisfies readonly NotificationKind[];
@@ -122,6 +125,11 @@ export const KIND_PREF: Readonly<Record<MerchantKind, NotificationPrefKey>> = {
   dispute_opened: 'complaints',
   payout_available: 'payouts',
   payout_paid: 'payouts',
+  // Review F11: a failed transfer and a balance a claw-back left negative.
+  payout_failed: 'payouts',
+  balance_reversed: 'payouts',
+  // Review F4: the admin's decision on a dispute — forced on, like the dispute itself.
+  dispute_resolved: 'complaints',
   // The merchant's own marketing tools: a coupon about to end.
   coupon_ending: 'marketing',
   store_status_changed: 'system_alerts',
@@ -667,6 +675,70 @@ export async function notifyOrderCreditAvailable(env: Env, orderId: string): Pro
     });
   } catch (e) {
     console.error('credit-available notice failed', orderId, e instanceof Error ? e.message : String(e));
+    return { written: false, outbound: [] };
+  }
+}
+
+/**
+ * «تعذّر تحويل طلب السحب» — an admin failed a payout (review F11); its amount
+ * went back to «متاح». The admin's reason is in-app only (it can name the
+ * merchant's account); the outside channels say only that it failed.
+ */
+export async function notifyPayoutFailed(
+  env: Env | D1Database,
+  p: { merchantId: string; payoutId: string; amountIqd: number; reason?: string }
+): Promise<MerchantNotifyResult> {
+  const amount = money(p.amountIqd);
+  const why = String(p.reason ?? '').trim().slice(0, 200);
+  return notifyMerchant(env, { merchantId: p.merchantId }, {
+    kind: 'payout_failed',
+    title_ar: `تعذّر تحويل ${iso(amount)} د.ع إليك`,
+    title_en: `Your payout of ${amount} IQD could not be made`,
+    body_ar: `${why ? `السبب: ${why}. ` : ''}أُعيد المبلغ إلى رصيدك المتاح؛ راجع بيانات التحويل واطلبه من جديد من «الأرباح».`,
+    body_en: `${why ? `Reason: ${why}. ` : ''}The amount is back in your available balance — check your payout details and request it again under Earnings.`,
+    link: merchantHref.money(),
+    entity_type: 'payout',
+    entity_id: p.payoutId,
+    meta: { amount_iqd: Math.trunc(Number(p.amountIqd) || 0) },
+    eventKey: `payout_failed:${p.payoutId}`,
+    outbound_ar: `تعذّر تحويل ${amount} د.ع إليك وأُعيد المبلغ إلى رصيدك. افتح «الأرباح» للتفاصيل.`,
+    outbound_en: `Your payout of ${amount} IQD could not be made and is back in your balance. Open Earnings for the details.`,
+  });
+}
+
+/**
+ * «رصيدك سالب N — ستُخصم من مبيعاتك القادمة» (review F11). Called after a
+ * claw-back committed (a released store order cancelled or its credit taken
+ * back): when the merchant's AVAILABLE is now below zero, they are told the
+ * debt and how it is paid. `sourceKey` names the claw-back (one per order), so
+ * a retried cancel tells them once. Never throws.
+ */
+export async function notifyBalanceIfNegative(
+  env: Env,
+  p: { merchantId: string; sourceKey: string; orderId?: string }
+): Promise<MerchantNotifyResult> {
+  try {
+    const b = await merchantBuckets(env.DB, p.merchantId);
+    if (b.available >= 0) return { written: false, outbound: [] };
+    const owed = money(-b.available);
+    return await notifyMerchant(env, { merchantId: p.merchantId }, {
+      kind: 'balance_reversed',
+      title_ar: `رصيدك سالب ${iso(owed)} د.ع — ستُخصم من مبيعاتك القادمة`,
+      title_en: `Your balance is negative by ${owed} IQD — it will come out of your next sales`,
+      body_ar: p.orderId
+        ? `استُرد مبلغ الطلب ${iso(p.orderId)} بعد أن صار متاحًا لك. لا يمكن طلب سحب حتى يعود الرصيد فوق الصفر.`
+        : 'استُرد مبلغ بعد أن صار متاحًا لك. لا يمكن طلب سحب حتى يعود الرصيد فوق الصفر.',
+      body_en: p.orderId
+        ? `Order ${p.orderId} was refunded after its money became available to you. Payouts wait until your balance is above zero again.`
+        : 'A credit was taken back after it became available to you. Payouts wait until your balance is above zero again.',
+      link: merchantHref.money(),
+      entity_type: p.orderId ? 'order' : 'payout',
+      entity_id: p.orderId ?? p.sourceKey,
+      meta: { available_iqd: b.available },
+      eventKey: `balance_reversed:${p.sourceKey}`,
+    });
+  } catch (e) {
+    console.error('negative-balance notice failed', p.merchantId, e instanceof Error ? e.message : String(e));
     return { written: false, outbound: [] };
   }
 }

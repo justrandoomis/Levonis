@@ -49,11 +49,18 @@ import {
   type HoldEscrowInput,
 } from '../lib/escrowOps';
 import { assertHoldStateStatement, isConstraintAbort } from '../lib/walletOps';
+import { merchantSuspension } from '../lib/merchantLedger';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 // Levo Community's maintenance switch, on the routes that START trade here
 // (the owner closed /requests with the community — docs/DECISIONS.md).
 import { communityClosedRefusal, requireCommunityOpen } from '../lib/communityGate';
 import { notifyOfferReceived } from '../lib/engagementNotify';
+import {
+  notifyCustomOrderCancelledByCustomer,
+  notifyCustomOrderDelivered,
+  notifyCustomOrderDisputedByMerchant,
+  notifyCustomOrderStarted,
+} from '../lib/customOrderNotify';
 import { deleteMediaObject, getMediaObject, headMediaObject, isSafeMediaKey, putMediaObject } from '../lib/mediaStorage';
 import {
   REQUEST_OPEN_STATES,
@@ -97,7 +104,7 @@ import {
 import { getSetting } from '../lib/settings';
 import { notifyStatement } from '../lib/notifications';
 // Eligibility as data (W5-B): the offer gate, the file matrix and the re-match.
-import { assertMayOffer, eligibleVerdictSql, rematchNow } from '../lib/printMatchingStore';
+import { assertMayOffer, eligibleVerdictSql, liveVerdict, rematchNow } from '../lib/printMatchingStore';
 import { fileClass, fileReadStatement, fileReader, mayReadBytes, previewGrantFor } from '../lib/requestFilePolicy';
 
 export const marketplaceRoutes = new Hono<AppContext>();
@@ -824,11 +831,13 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
             m.badge_override AS m_badge_override, m.rating_avg_x100 AS m_rating,
             m.rating_count AS m_rating_count, m.completed_orders AS m_completed,
             s.slug AS s_slug, r.revision AS r_revision, r.community_order_id AS r_order_id,
-            r.accepted_offer_id AS r_accepted_offer_id
+            r.accepted_offer_id AS r_accepted_offer_id, vm.eligible AS vm_eligible
        FROM community_offers o
        JOIN community_requests r ON r.id = o.request_id
        JOIN community_merchants m ON m.id = o.merchant_id
        LEFT JOIN merchant_stores s ON s.id = o.store_id
+       LEFT JOIN community_request_matches vm
+              ON vm.request_id = r.id AND vm.merchant_id = o.merchant_id AND vm.revision = r.revision
       WHERE o.request_id = ?
         AND (? = 1 OR o.merchant_id = ?)
       ORDER BY o.created_at ASC`
@@ -870,6 +879,15 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
       history: history.get(String(row.id)) ?? [],
       // The order this offer became — only the winning offer, only to its two parties.
       order_id: row.state === 'accepted' && row.r_accepted_offer_id === row.id ? (row.r_order_id ?? null) : null,
+      /**
+       * THE WORKSHOP CAN NO LONGER MAKE THIS JOB (review F2): the stored
+       * verdict for the request's CURRENT revision says ineligible — its
+       * printer went, or the job moved past it. Only on an open offer; the
+       * customer's card says «هذه الورشة لم تعد قادرة على تنفيذ الطلب» and
+       * acceptance refuses `OFFER_NOT_ELIGIBLE`. No reasons: those are between
+       * the workshop and Levonis.
+       */
+      workshop_unable: row.state === 'pending' && row.vm_eligible !== null && row.vm_eligible !== undefined && Number(row.vm_eligible) === 0,
     })),
     is_customer: isCustomer,
   });
@@ -1283,13 +1301,27 @@ marketplaceRoutes.get('/my-offers', requireAuth, async (c) => {
 
 // ------------------------------------------------------------- acceptance
 
-/** Whether the merchant behind this offer row may take on new work now (review S2). */
-function offerMerchantTakesWork(db: D1Database, offer: Record<string, unknown>): Promise<boolean> {
-  return merchantTakesNewWork(db, {
+/**
+ * WHERE THE MERCHANT BEHIND THIS OFFER STANDS NOW: taking new work at all
+ * (review S2), and — for a pending offer — still ABLE to make this job as it
+ * stands (review F2). An offer made while the workshop could make the job
+ * outlives the printer that qualified it: a printer deleted, set offline, or
+ * the request revised past what it can do. The customer must not fund a job
+ * the workshop can no longer make, so acceptance asks the LIVE verdict
+ * (`liveVerdict`, which also writes it back to the verdict row the offers list
+ * reads) before any money is reserved.
+ */
+type OfferStanding = 'ok' | 'unavailable' | 'ineligible';
+async function offerMerchantStanding(env: Env, offer: Record<string, unknown>): Promise<OfferStanding> {
+  const takesWork = await merchantTakesNewWork(env.DB, {
     merchantStatus: offer.m_status,
     storeStatus: offer.s_status,
     ownerUserId: String(offer.m_user_id ?? ''),
   });
+  if (!takesWork) return 'unavailable';
+  if (offer.state !== 'pending') return 'ok';
+  const live = await liveVerdict(env, String(offer.req_id ?? offer.request_id), String(offer.merchant_id));
+  return live && !live.verdict.eligible ? 'ineligible' : 'ok';
 }
 
 /** The offer, its request and its merchant — everything acceptance decides on. */
@@ -1322,7 +1354,7 @@ function acceptanceRefusal(
   offer: Record<string, unknown>,
   expected: { price: number; revision: number },
   now: string,
-  merchantTakesWork: boolean
+  standing: OfferStanding
 ): HttpError | null {
   const fresh = { offer: offerShape(offer) };
   // Superseded by the customer's own change to the job (W5-A): the same
@@ -1350,8 +1382,13 @@ function acceptanceRefusal(
   // caller before any money is reserved. The customer is told the merchant is
   // not taking work, never why: a paused shop, a lapsed plan and a sanction are
   // between the merchant and Levonis.
-  if (!merchantTakesWork) {
+  if (standing === 'unavailable') {
     return conflict('This merchant is not taking new work right now — choose another offer', 'MERCHANT_UNAVAILABLE');
+  }
+  // The workshop can no longer make this job (review F2): its printer went, or
+  // the job moved past it. The customer is told plainly and chooses another.
+  if (standing === 'ineligible') {
+    return conflict('This workshop can no longer make this request — choose another offer', 'OFFER_NOT_ELIGIBLE');
   }
   if (Number(offer.request_revision ?? 1) < Number(offer.r_revision ?? 1)) {
     return new HttpError(
@@ -1416,7 +1453,7 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
   const offer = await offerForAcceptance(c.env.DB, offerId);
   if (!offer) throw notFound('Offer not found');
   if (offer.customer_id !== user.id) throw forbidden('This request is not yours');
-  const refusal = acceptanceRefusal(offer, expected, nowIso(), await offerMerchantTakesWork(c.env.DB, offer));
+  const refusal = acceptanceRefusal(offer, expected, nowIso(), await offerMerchantStanding(c.env, offer));
   if (refusal) throw refusal;
 
   const requestId = String(offer.req_id);
@@ -1590,7 +1627,7 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
       if (!isConstraintAbort(e)) throw e;
       const fresh = await offerForAcceptance(db, offerId);
       const why = fresh
-        ? acceptanceRefusal(fresh, expected, nowIso(), await offerMerchantTakesWork(db, fresh))
+        ? acceptanceRefusal(fresh, expected, nowIso(), await offerMerchantStanding(c.env, fresh))
         : notFound('Offer not found');
       throw why ?? conflict('This request changed while you were accepting — reload it and try again', 'ACCEPT_CONFLICT');
     }
@@ -1662,7 +1699,15 @@ marketplaceRoutes.get('/orders/:id', requireAuth, async (c) => {
      * the merchant's. An order accepted before 0130 has none (`null`) — the
      * request thread below is how those two talk.
      */
-    contact: contactFor(isCustomer ? 'customer' : 'merchant', row.contact_snapshot),
+    //
+    // CLOSED WITHOUT THE JOB (review F3): once the order is cancelled or
+    // refunded the merchant no longer holds the customer's phone and address —
+    // the same rule that takes the original file away (`isEngagedMerchant`).
+    // A completed job keeps it (docs/DECISIONS.md).
+    contact:
+      !isCustomer && (row.state === 'cancelled' || row.state === 'refunded')
+        ? null
+        : contactFor(isCustomer ? 'customer' : 'merchant', row.contact_snapshot),
     /** Both parties may open the request's thread (POST /api/chats/open { requestId, merchantId }). */
     thread: { request_id: row.request_id, merchant_id: row.merchant_id },
     // Both parties may see the state of the money. Neither may move it here.
@@ -1697,7 +1742,7 @@ marketplaceRoutes.post('/orders/:id/start', requireAuth, async (c) => {
   const { row, isMerchant } = await loadOrderForParty(c, orderId);
   if (!isMerchant) throw forbidden('Only the merchant can start this work');
   if (!canMoveCommunityOrder(String(row.state) as CommunityOrderState, 'in_progress')) {
-    throw conflict(`An order that is ${row.state} cannot be started`);
+    throw new HttpError(409, `An order that is ${row.state} cannot be started`, 'CUSTOM_ORDER_CANNOT_START', { state: row.state });
   }
   /**
    * WORK STARTS ONLY ON MONEY THAT IS STILL HELD (review F2). The flip used to
@@ -1727,6 +1772,8 @@ marketplaceRoutes.post('/orders/:id/start', requireAuth, async (c) => {
     throw conflict('This order changed — reload it', 'ORDER_CHANGED');
   }
   await audit(c.env.DB, c.get('user')!.id, 'community.order_started', orderId, {});
+  // The customer hears work began (review F4; keyed on the order, once).
+  await notifyCustomOrderStarted(c.env, orderId);
   return c.json({ success: true });
 });
 
@@ -1743,7 +1790,7 @@ marketplaceRoutes.post('/orders/:id/delivered', requireAuth, async (c) => {
   const { row, isMerchant } = await loadOrderForParty(c, orderId);
   if (!isMerchant) throw forbidden('Only the merchant can mark this delivered');
   if (!canMoveCommunityOrder(String(row.state) as CommunityOrderState, 'merchant_marked_delivered')) {
-    throw conflict(`An order that is ${row.state} cannot be marked delivered`);
+    throw new HttpError(409, `An order that is ${row.state} cannot be marked delivered`, 'CUSTOM_ORDER_CANNOT_DELIVER', { state: row.state });
   }
 
   const days = await autoCompleteDays(c.env.DB);
@@ -1759,6 +1806,8 @@ marketplaceRoutes.post('/orders/:id/delivered', requireAuth, async (c) => {
   ).bind(ts, autoAt, ts, orderId).run();
 
   await audit(c.env.DB, c.get('user')!.id, 'community.order_delivered', orderId, { auto_complete_at: autoAt });
+  // «أكّد الاستلام», with the auto-complete date if the owner set one (review F4).
+  await notifyCustomOrderDelivered(c.env, orderId);
   return c.json({ success: true, auto_complete_at: autoAt });
 });
 
@@ -1771,12 +1820,35 @@ marketplaceRoutes.post('/orders/:id/confirm', requireAuth, async (c) => {
   const orderId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const { row, isCustomer } = await loadOrderForParty(c, orderId);
   if (!isCustomer) throw forbidden('Only the customer can confirm this order');
+  // Already confirmed while the merchant was suspended: the confirmation
+  // stands and the money waits in escrow (DECISIONS row 137).
+  if (row.state === 'customer_confirmed') return c.json({ success: true, replayed: true, released: false, held: true });
   if (!canMoveCommunityOrder(String(row.state) as CommunityOrderState, 'customer_confirmed')) {
-    throw conflict(`An order that is ${row.state} cannot be confirmed`);
+    throw new HttpError(409, `An order that is ${row.state} cannot be confirmed`, 'CUSTOM_ORDER_CANNOT_CONFIRM', { state: row.state });
   }
 
   const escrow = await escrowForOrder(c.env.DB, orderId);
-  if (!escrow) throw conflict('This order has no escrow to release');
+  if (!escrow) throw conflict('This order has no escrow to release', 'CUSTOM_ORDER_NO_ESCROW');
+
+  /**
+   * THE MERCHANT OR ITS STORE IS SUSPENDED (owner decision, DECISIONS row
+   * 136): the customer's confirmation is RECORDED — the order reads
+   * `customer_confirmed` and cannot be disputed or auto-confirmed any more —
+   * and the money stays in escrow. The auto-confirm sweep releases it the
+   * first run after the suspension lifts. `releaseEscrow` asks the same
+   * question inside its own flip, so a suspension landing after this read
+   * holds the money too.
+   */
+  const holdForSuspension = async () => {
+    const ts = nowIso();
+    await c.env.DB.prepare(
+      `UPDATE community_orders SET state = 'customer_confirmed', confirmed_at = ?1, updated_at = ?1
+        WHERE id = ?2 AND state = 'merchant_marked_delivered'`
+    ).bind(ts, orderId).run();
+    await audit(c.env.DB, user.id, 'community.order_confirmed_held', orderId, { escrow: escrow.id, reason: 'merchant suspended' });
+    return c.json({ success: true, released: false, held: true });
+  };
+  if (await merchantSuspension(c.env.DB, String(row.merchant_id))) return holdForSuspension();
 
   const released = await releaseEscrow(c.env.DB, {
     escrowId: escrow.id,
@@ -1794,6 +1866,7 @@ marketplaceRoutes.post('/orders/:id/confirm', requireAuth, async (c) => {
   if (!released.ok) {
     const reason = (released as { reason: string }).reason;
     if (reason === 'ORDER_CHANGED') throw conflict('This order changed — reload it', 'ORDER_CHANGED');
+    if (reason === 'MERCHANT_SUSPENDED') return holdForSuspension();
     throw new HttpError(409, `The funds could not be released (${reason})`, 'ESCROW_RELEASE_FAILED', { reason });
   }
 
@@ -1890,6 +1963,8 @@ marketplaceRoutes.post('/orders/:id/dispute', requireAuth, async (c) => {
   await audit(c.env.DB, user.id, 'community.order_disputed', orderId, { complaint: complaintId });
   // The merchant is told the money is frozen and why (W2-E; forced on, §61).
   if (isCustomer) await notifyDisputeOpened(c.env, { communityOrderId: orderId, complaintId, merchantId: String(row.merchant_id) });
+  // …and the customer when the MERCHANT raised it (review F4).
+  else await notifyCustomOrderDisputedByMerchant(c.env, orderId, complaintId);
   /**
    * MONEY IS NOW FROZEN AND A HUMAN HAS TO DECIDE — SO A HUMAN IS TOLD.
    *
@@ -1933,11 +2008,9 @@ marketplaceRoutes.post('/orders/:id/cancel', requireAuth, async (c) => {
   const role = isCustomer ? 'customer' : 'merchant';
 
   if (!policy.allowed || !policy.by.includes(role)) {
-    throw conflict(
-      policy.by.includes('admin')
-        ? 'Work has already started — open a dispute and Levonis will decide'
-        : `An order that is ${state} cannot be cancelled`
-    );
+    throw policy.by.includes('admin')
+      ? conflict('Work has already started — open a dispute and Levonis will decide', 'CUSTOM_ORDER_CANCEL_NEEDS_DISPUTE')
+      : new HttpError(409, `An order that is ${state} cannot be cancelled`, 'CUSTOM_ORDER_CANNOT_CANCEL', { state });
   }
 
   /**
@@ -2019,6 +2092,8 @@ marketplaceRoutes.post('/orders/:id/cancel', requireAuth, async (c) => {
   }
 
   await audit(c.env.DB, user.id, 'community.order_cancelled', orderId, { by: role, state });
+  // The workshop is told not to start (review F4; keyed on the order, once).
+  if (isCustomer) await notifyCustomOrderCancelledByCustomer(c.env, orderId);
   return c.json({ success: true, refunded: !!escrow });
 });
 

@@ -125,12 +125,12 @@ export function ServicesTab({ canSell }: { canSell: boolean }) {
               {s.imageUrl ? (
                 <img src={s.imageUrl} alt="" className="w-full h-full object-cover" />
               ) : (
-                <Hammer className="w-4 h-4 text-zinc-600" />
+                <Hammer className="w-4 h-4 text-text-muted" />
               )}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-white text-[13px] font-semibold truncate">{s.title}</p>
-              <p className="text-zinc-500 text-[11px]">
+              <p className="text-text-muted text-[11px]">
                 {kindLabel(s.kind)}
                 {!s.active && ` · ${loc('موقوفة', 'paused', 'ڕاگیراوە')}`}
               </p>
@@ -168,6 +168,7 @@ export function ServicesTab({ canSell }: { canSell: boolean }) {
             <Btn
               kind="danger"
               small
+              label={loc('حذف', 'Delete', 'سڕینەوە')}
               disabled={busy === s.id}
               onClick={async () => {
                 const ok = await confirm({
@@ -373,7 +374,8 @@ export function ShowcaseTab() {
   return (
     <div className="space-y-3">
       <Card title={loc('أضف إلى معرض ورشتك', 'Add to your workshop showcase', 'زیادکردن بۆ پیشانگا')}>
-        <div className="flex gap-1.5 mb-3">
+        {/* Wraps: the three kinds in Sorani are wider than a 320px card (W6). */}
+        <div className="flex flex-wrap gap-x-1.5 gap-y-4 mb-3">
           {SHOWCASE_KINDS.map((k) => (
             <Chip
               key={k.id}
@@ -403,6 +405,7 @@ export function ShowcaseTab() {
           <TextArea
             value={details}
             onChange={setDetails}
+            ariaLabel={loc('التفاصيل', 'Details')}
             rows={2}
             hint={loc('تفاصيل قصيرة تظهر للزبون', 'A short caption visitors see', 'وردەکاری کورت')}
           />
@@ -443,7 +446,7 @@ export function ShowcaseTab() {
                   </div>
                   <div className="p-2">
                     <p className="text-white text-[12px] font-semibold truncate">{it.title}</p>
-                    {it.details && <p className="text-zinc-500 text-[10.5px] line-clamp-2">{it.details}</p>}
+                    {it.details && <p className="text-text-muted text-[10.5px] line-clamp-2">{it.details}</p>}
                     <button
                       onClick={async () => {
                         const ok = await confirm({

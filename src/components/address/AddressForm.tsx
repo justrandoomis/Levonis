@@ -257,7 +257,7 @@ export default function AddressForm({
             {fieldErrors.phone}
           </p>
         ) : (
-          <p id="addr-phone-hint" className="mt-1 text-[11.5px] text-zinc-500">
+          <p id="addr-phone-hint" className="mt-1 text-[11.5px] text-text-muted">
             {loc('الرقم الذي سيتصل به المندوب', 'The number the courier will call', 'ئەو ژمارەیەی گەیێنەر پەیوەندی پێوە دەکات')}
           </p>
         )}

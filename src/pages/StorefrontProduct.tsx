@@ -35,7 +35,8 @@ import {
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
-import { storefrontApi, iqd, type MerchantProduct, type MerchantStore } from '../lib/merchant';
+import { storefrontApi, iqd } from '../lib/storefrontApi';
+import type { MerchantProduct, MerchantStore } from '../lib/merchant';
 import SellerConflictDialog, { type SellerConflict } from '../components/merchant/SellerConflictDialog';
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 import StoreUnavailable from '../components/merchant/StoreUnavailable';
@@ -196,7 +197,7 @@ export default function StorefrontProduct() {
     <StoreTheme tokens={themeTokens ?? null} storeAccent={store.accent} className="min-h-screen text-zinc-300 pb-32">
       <div className="max-w-2xl mx-auto">
         <div className="px-4 sm:px-6 pt-4">
-          <Link to={storeHome} className="inline-flex items-center gap-1.5 text-zinc-400 text-[13px] mb-4">
+          <Link to={storeHome} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg text-zinc-400 text-[13px] mb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
             <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
             {store.name}
           </Link>

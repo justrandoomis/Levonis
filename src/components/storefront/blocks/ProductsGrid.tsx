@@ -131,7 +131,7 @@ export function ProductsView({
       <div dir="rtl" className="flex items-center justify-between mb-3">
         {sectionFilter ? chip : <h2 className="sf-title text-white">{loc('أحدث المنتجات', 'Latest products', 'نوێترین بەرهەمەکان')}</h2>}
         {!sectionFilter && (sorted.length > previewCount || state.cursor) && (
-          <button type="button" onClick={() => setShowAll((v) => !v)} className={`text-[13px] font-medium ${accent.text}`}>
+          <button type="button" onClick={() => setShowAll((v) => !v)} className={`relative lv-hit rounded-md text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${accent.text}`}>
             {showAll ? loc('عرض أقل', 'Show less', 'کەمتر') : loc('عرض الكل', 'View all', 'هەموو ببینە')}
           </button>
         )}

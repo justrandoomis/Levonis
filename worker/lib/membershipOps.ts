@@ -480,12 +480,12 @@ export async function orderHasSupportEligibleLine(db: D1Database, orderId: strin
 export async function supportEligibleProductIds(db: D1Database, productIds: string[]): Promise<Set<string>> {
   const ids = [...new Set(productIds.filter((p) => typeof p === 'string' && p !== ''))].slice(0, 200);
   if (ids.length === 0) return new Set();
-  const placeholders = ids.map(() => '?').join(',');
+  // One bound parameter for the list (json_each): the live D1 refuses > 100 (review F1).
   const { results } = await db
     .prepare(
       `SELECT p.id AS id
          FROM products p
-        WHERE p.id IN (${placeholders})
+        WHERE p.id IN (SELECT value FROM json_each(?))
           AND COALESCE(
                 p.support_gift_eligible,
                 CASE WHEN EXISTS (SELECT 1
@@ -494,7 +494,7 @@ export async function supportEligibleProductIds(db: D1Database, productIds: stri
                                    WHERE pc.product_id = p.id)
                      THEN 1 ELSE 0 END) = 1`
     )
-    .bind(...ids)
+    .bind(JSON.stringify(ids))
     .all<{ id: string }>();
   return new Set(results.map((r) => r.id));
 }

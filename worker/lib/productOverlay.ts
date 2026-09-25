@@ -252,11 +252,11 @@ export async function loadRelationsViews(
   const out = new Map<string, ProductRelationsView>();
   if (rows.length === 0) return out;
   const ids = rows.map((r) => r.id);
-  const ph = ids.map(() => '?').join(', ');
+  // One bound parameter for the list (json_each): the live D1 refuses > 100 (review F1).
 
   const [groups, values, colors, links, variants, images, fulfillments, optionTransports] = await Promise.all([
     softAll<OptionGroupRow>('groups', () =>
-      db.prepare(`SELECT * FROM product_option_groups WHERE product_id IN (${ph}) ORDER BY sort, name_en`).bind(...ids).all<OptionGroupRow>()
+      db.prepare(`SELECT * FROM product_option_groups WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY sort, name_en`).bind(JSON.stringify(ids)).all<OptionGroupRow>()
     ),
     // Group by group, then value sort — the same order loadProductRelations
     // reads, so a listing and a product page never disagree about it.
@@ -265,14 +265,14 @@ export async function loadRelationsViews(
         .prepare(
           `SELECT v.* FROM product_option_values v
              LEFT JOIN product_option_groups g ON g.id = v.group_id
-            WHERE v.product_id IN (${ph})
+            WHERE v.product_id IN (SELECT value FROM json_each(?))
             ORDER BY COALESCE(g.sort, 0), COALESCE(g.name_en, ''), v.sort, v.name_en`
         )
-        .bind(...ids)
+        .bind(JSON.stringify(ids))
         .all<OptionValueRow>()
     ),
     softAll<ColorRow>('colors', () =>
-      db.prepare(`SELECT * FROM product_colors WHERE product_id IN (${ph}) ORDER BY sort, name_en`).bind(...ids).all<ColorRow>()
+      db.prepare(`SELECT * FROM product_colors WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY sort, name_en`).bind(JSON.stringify(ids)).all<ColorRow>()
     ),
     softAll<ColorLinkRow & { product_id: string }>('links', () =>
       db
@@ -280,27 +280,27 @@ export async function loadRelationsViews(
           `SELECT c.product_id, l.color_id, l.option_value_id, l.group_id
              FROM product_color_option_links l
              JOIN product_colors c ON c.id = l.color_id
-            WHERE c.product_id IN (${ph})`
+            WHERE c.product_id IN (SELECT value FROM json_each(?))`
         )
-        .bind(...ids)
+        .bind(JSON.stringify(ids))
         .all<ColorLinkRow & { product_id: string }>()
     ),
     softAll<VariantRow>('variants', () =>
-      db.prepare(`SELECT * FROM product_variants WHERE product_id IN (${ph}) ORDER BY combo_key`).bind(...ids).all<VariantRow>()
+      db.prepare(`SELECT * FROM product_variants WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY combo_key`).bind(JSON.stringify(ids)).all<VariantRow>()
     ),
     softAll<ImageRow>('images', () =>
-      db.prepare(`SELECT * FROM product_images WHERE product_id IN (${ph}) ORDER BY sort_order, id`).bind(...ids).all<ImageRow>()
+      db.prepare(`SELECT * FROM product_images WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY sort_order, id`).bind(JSON.stringify(ids)).all<ImageRow>()
     ),
     softAll<OptionFulfillmentRow>('fulfillments', () =>
       db
-        .prepare(`SELECT * FROM product_option_fulfillment WHERE product_id IN (${ph}) ORDER BY sort, id`)
-        .bind(...ids)
+        .prepare(`SELECT * FROM product_option_fulfillment WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY sort, id`)
+        .bind(JSON.stringify(ids))
         .all<OptionFulfillmentRow>()
     ),
     softAll<OptionTransportRow>('option transports', () =>
       db
-        .prepare(`SELECT * FROM product_option_transports WHERE product_id IN (${ph}) ORDER BY sort, id`)
-        .bind(...ids)
+        .prepare(`SELECT * FROM product_option_transports WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY sort, id`)
+        .bind(JSON.stringify(ids))
         .all<OptionTransportRow>()
     ),
   ]);

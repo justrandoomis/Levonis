@@ -32,7 +32,7 @@
  */
 
 import { newId } from './crypto';
-import { escrowCreditStatements } from './merchantLedger';
+import { escrowCreditStatements, merchantSuspendedSql } from './merchantLedger';
 import {
   assertHoldStateStatement,
   availableUsdSql,
@@ -86,7 +86,9 @@ export type EscrowFailure =
   | 'ORDER_CHANGED'
   | 'AMOUNT_EXCEEDS_HELD'
   | 'INVALID_AMOUNT'
-  | 'WALLET_ERROR';
+  | 'WALLET_ERROR'
+  /** The merchant or its store is suspended: only an admin moves the money (DECISIONS row 137). */
+  | 'MERCHANT_SUSPENDED';
 
 export type EscrowResult<T = { escrowId: string }> =
   | ({ ok: true; replayed: boolean } & T)
@@ -553,6 +555,10 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
   const debitTx = holdDebitTxId(esc.hold_id);
   const debitDinars = await settlementDinars(db, esc, esc.gross_iqd);
   const orderStates = p.orderStates?.length ? p.orderStates : null;
+  // A SUSPENDED merchant is paid by nobody's click but an admin's (owner
+  // decision, DECISIONS row 137): the customer's confirmation and the
+  // auto-confirm keep the money in escrow, asked inside the flip itself.
+  const unlessSuspended = p.actorRole === 'admin' ? '' : ` AND NOT ${merchantSuspendedSql('community_escrows.merchant_id')}`;
   const statements = [
     // Conditional on the state THIS actor may settle from (a dispute froze it
     // for everyone but an admin) and, when asked, on the order's state.
@@ -560,7 +566,7 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
       .prepare(
         `UPDATE community_escrows
             SET state = 'released', released_iqd = gross_iqd, released_at = ?1
-          WHERE id = ?2 AND state IN (SELECT value FROM json_each(?3))${orderStates ? orderStateGuardSql(4) : ''}`
+          WHERE id = ?2 AND state IN (SELECT value FROM json_each(?3))${orderStates ? orderStateGuardSql(4) : ''}${unlessSuspended}`
       )
       .bind(ts, esc.id, JSON.stringify(from), ...(orderStates ? [JSON.stringify(orderStates)] : [])),
     escrowMovedFence(db, esc.id, 'released', 'released_at', ts),
@@ -616,10 +622,34 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
     // guard propagates.
     if (!isConstraintAbort(e)) throw e;
   }
-  return classifySettleFailure(db, esc, 'released', orderStates ?? undefined);
+  const failed = await classifySettleFailure(db, esc, 'released', orderStates ?? undefined);
+  // The flip matched nothing although the escrow and the order are as read:
+  // for anyone but an admin that is the suspension fence (DECISIONS row 137).
+  if (!failed.ok && p.actorRole !== 'admin' && (failed.reason === 'INSUFFICIENT_FUNDS' || failed.reason === 'WALLET_ERROR')) {
+    const suspended = await db.prepare(`SELECT 1 AS x WHERE ${merchantSuspendedSql('?1')}`).bind(esc.merchant_id).first();
+    if (suspended) return { ok: false, reason: 'MERCHANT_SUSPENDED' };
+  }
+  return failed;
 }
 
 // ----------------------------------------------------------------- refund
+
+/**
+ * The platform's commission on the gross a merchant KEEPS after a partial
+ * refund (owner decision F5): `round(keptGross × percentX100 / 10000)`,
+ * or — for an order with no stored rate — the order's fee in proportion.
+ * Never below 0 nor above the kept gross.
+ */
+export function partialRefundCommission(keptGross: number, percentX100: number, orderFeeIqd: number, orderGrossIqd: number): number {
+  const kept = Math.max(0, Math.floor(keptGross));
+  const raw =
+    percentX100 > 0
+      ? Math.round((kept * percentX100) / 10_000)
+      : orderGrossIqd > 0
+        ? Math.round((kept * Math.max(0, orderFeeIqd)) / orderGrossIqd)
+        : 0;
+  return Math.min(kept, Math.max(0, raw));
+}
 
 export interface RefundInput extends SettleInput {
   /** Omit for a full refund. */
@@ -704,7 +734,21 @@ export async function refundEscrow(db: D1Database, p: RefundInput): Promise<Escr
   } else {
     const debitTx = holdDebitTxId(esc.hold_id);
     const keptGross = esc.gross_iqd - amount;
-    const keptReceivable = Math.max(0, Math.min(esc.merchant_receivable_iqd, keptGross));
+    /**
+     * THE COMMISSION ON THE PART THE MERCHANT KEEPS (owner decision F5,
+     * DECISIONS row 137): the order's own rate on the kept gross, rounded to
+     * the dinar — `round(keptGross × commission_percent_x100 / 10000)` — and
+     * the merchant keeps the rest. It used to be `min(receivable, keptGross)`,
+     * which took no commission at all whenever the refund was large enough.
+     * An order with no stored rate (before 0031's column was filled) is
+     * charged at its own fee's proportion of the gross, the same rate.
+     */
+    const pctRow = await db
+      .prepare('SELECT commission_percent_x100 AS pct FROM community_orders WHERE id = ?')
+      .bind(esc.community_order_id)
+      .first<{ pct: number | null }>();
+    const keptCommission = partialRefundCommission(keptGross, Number(pctRow?.pct) || 0, esc.platform_fee_iqd, esc.gross_iqd);
+    const keptReceivable = keptGross - keptCommission;
     const debitDinars = await settlementDinars(db, esc, esc.gross_iqd);
     /**
      * THE RETURNED PART, IN THE DINARS THAT WERE RETURNED.

@@ -22,7 +22,11 @@
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { storefrontApi, type MerchantStore } from './lib/merchant';
+// Type-only: `lib/merchant` (the merchant API clients, ~8 KB) is shared with
+// lazy screens, so a VALUE import here pulled all of it into the entry chunk
+// for one GET (W6). The resolve call is spelled out below instead.
+import type { MerchantStore } from './lib/merchant';
+import { api } from './lib/api';
 
 interface StoreContextValue {
   /** The store this hostname belongs to, or null for the main site. */
@@ -93,8 +97,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let alive = true;
-    storefrontApi
-      .resolve()
+    api
+      .get<{ kind: string; store: MerchantStore | null; root_domain?: string | null }>('/api/storefront/resolve')
       .then((d) => {
         if (!alive) return;
         setState({

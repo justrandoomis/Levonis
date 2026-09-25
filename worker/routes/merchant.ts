@@ -56,6 +56,7 @@ import {
   saveDeliveryStatements,
 } from '../lib/merchantDelivery';
 import { deliveryCoverage, validateDeliveryConfig } from '@levonis/shipping/merchantDelivery';
+import { CUSTOM_ORDER_EARNED_SQL, CUSTOM_ORDER_KEPT_RECEIVABLE_SQL } from '../lib/communityStates';
 
 export const merchantRoutes = new Hono<AppContext>();
 
@@ -405,7 +406,10 @@ merchantRoutes.patch('/store', async (c) => {
     const legacyFee = Number(sanitizeDelivery(body.delivery_settings).fee_iqd ?? 0);
     const maxFee = await merchantDeliveryFeeMax(c.env.DB);
     if (legacyFee > maxFee) {
-      throw badRequest(`A delivery fee may be at most ${maxFee} IQD`, 'DELIVERY_FEE_ABOVE_MAX', { max_fee_iqd: maxFee });
+      throw badRequest(`A delivery fee may be at most ${maxFee} IQD`, 'DELIVERY_FEE_ABOVE_MAX', {
+        max_fee_iqd: maxFee,
+        offending: [{ scope: 'profile', governorate_id: null, field: 'fee_iqd', fee_iqd: legacyFee }],
+      });
     }
   }
   const legacyDelivery =
@@ -448,6 +452,38 @@ merchantRoutes.patch('/store', async (c) => {
 // every save bumps the profile's version, which the checkout's quote
 // fingerprint binds.
 
+/**
+ * The fees a save put above the platform's cap, named (review F13): the
+ * profile's default (`scope: 'profile'`) or one governorate's rule, with the
+ * fee that was sent. Read from the validator's own issue paths —
+ * `profile.<field>` / `rules.<governorate>.<field>` (`rules[<i>]` unnamed).
+ */
+function feesAboveMax(
+  issues: ReadonlyArray<{ path: string; code: string }>,
+  body: { profile?: unknown; rules?: unknown }
+): Array<{ scope: 'profile' | 'rule'; governorate_id: string | null; field: string; fee_iqd: number | null }> {
+  const profile = (body.profile && typeof body.profile === 'object' ? body.profile : {}) as Record<string, unknown>;
+  const rules = Array.isArray(body.rules) ? (body.rules as Array<Record<string, unknown>>) : [];
+  const fee = (v: unknown) => (Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : null);
+  return issues
+    .filter((i) => i.code === 'fee_above_max')
+    .map((i) => {
+      const named = /^rules\.([^.[\]]+)\.(\w+)$/.exec(i.path);
+      if (named) {
+        const rule = rules.find((r) => r && r.governorate_id === named[1]);
+        return { scope: 'rule' as const, governorate_id: named[1], field: named[2], fee_iqd: fee(rule?.[named[2]]) };
+      }
+      const indexed = /^rules\[(\d+)\]\.?(\w*)$/.exec(i.path);
+      if (indexed) {
+        const rule = rules[Number(indexed[1])];
+        const field = indexed[2] || 'fee_iqd';
+        return { scope: 'rule' as const, governorate_id: null, field, fee_iqd: fee(rule?.[field]) };
+      }
+      const field = i.path.replace(/^profile\./, '');
+      return { scope: 'profile' as const, governorate_id: null, field, fee_iqd: fee(profile[field]) };
+    });
+}
+
 merchantRoutes.get('/delivery', async (c) => {
   const ctx = await requireStoreOwner(c);
   const cfg = await loadDeliveryConfig(c.env.DB, ctx.store);
@@ -482,6 +518,9 @@ merchantRoutes.put('/delivery', async (c) => {
       throw badRequest(`A delivery fee may be at most ${maxFee} IQD`, 'DELIVERY_FEE_ABOVE_MAX', {
         max_fee_iqd: maxFee,
         issues: checked.issues,
+        // WHICH fee is over the cap (review F13): the default, or the rule for
+        // a named governorate — so the editor can point at the row to lower.
+        offending: feesAboveMax(checked.issues, body),
       });
     }
     throw badRequest('The delivery settings are not valid', 'DELIVERY_INVALID', { issues: checked.issues });
@@ -1307,10 +1346,13 @@ merchantRoutes.get('/analytics', async (c) => {
   ).bind(ctx.merchant.id).all();
 
   // Custom (request) orders are a second, separate series: finished work only
-  // — a cancelled or refunded one earned the merchant nothing to report.
+  // — a cancelled or fully refunded one earned the merchant nothing to report;
+  // one settled by a partial refund counts at the part they kept (review F9).
   const custom = await c.env.DB.prepare(
-    `SELECT COUNT(*) AS completed, COALESCE(SUM(merchant_receivable_iqd), 0) AS receivable
-       FROM community_orders WHERE merchant_id = ? AND state = 'completed'`
+    `SELECT COUNT(*) AS completed, COALESCE(SUM(${CUSTOM_ORDER_KEPT_RECEIVABLE_SQL}), 0) AS receivable
+       FROM community_orders o
+       LEFT JOIN community_escrows e ON e.community_order_id = o.id
+      WHERE o.merchant_id = ? AND ${CUSTOM_ORDER_EARNED_SQL}`
   ).bind(ctx.merchant.id).first<Record<string, number>>();
 
   const offers = await c.env.DB.prepare(
@@ -1650,7 +1692,7 @@ merchantRoutes.post('/coupons', async (c) => {
       dates.starts_at, dates.ends_at, ts, ts
     ).run();
   } catch (e) {
-    if (String(e).includes('UNIQUE')) throw conflict('You already have a coupon with that code');
+    if (String(e).includes('UNIQUE')) throw conflict('You already have a coupon with that code', 'COUPON_CODE_TAKEN');
     throw e;
   }
   await audit(c.env.DB, ctx.store.user_id, 'merchant.coupon_created', id, { code, kind, value });

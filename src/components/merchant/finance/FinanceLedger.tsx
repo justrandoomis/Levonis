@@ -83,7 +83,7 @@ export default function FinanceLedger({
 
   return (
     <Card title={s.ledger} padding="none">
-      <div className="px-4 pb-3 overflow-x-auto hide-scrollbar">
+      <div className="-mt-2 px-4 pt-2 pb-3 overflow-x-auto hide-scrollbar">
         <Segmented
           items={LEDGER_FILTERS.map((f) => ({ id: f.id, label: filterLabels[f.id] }))}
           value={filter}

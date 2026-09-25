@@ -6,7 +6,7 @@
 import { Hammer, Layers, Printer } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useLanguage } from '../../../LanguageContext';
-import { iqd } from '../../../lib/merchant';
+import { iqd } from '../../../lib/storefrontApi';
 import type { ServiceData } from '../../../../packages/storeLayout/src/data';
 import { useStorefrontRuntime } from '../runtime';
 import { BlockHeading, Column, Loading, useText } from '../parts';

@@ -1236,7 +1236,8 @@ export interface AdminOrdersResponse {
    * mean a GROUP BY over every order ever placed for a screen showing one row.
    */
   options: {
-    type: { all: number; direct: number; preorder_air: number; preorder_sea: number; preorder_land: number };
+    /** `prepare` = «يجب تجهيزها» (scope=prepare); absent on an older server. */
+    type: { all: number; prepare?: number; direct: number; preorder_air: number; preorder_sea: number; preorder_land: number };
     status: {
       any: number;
       pending: number;

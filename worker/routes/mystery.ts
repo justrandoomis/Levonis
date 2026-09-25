@@ -480,8 +480,8 @@ adminMysteryRoutes.put('/pools/:id/entries', async (c) => {
   const ids = [...new Set(entries.map((e) => e.product_id))];
   if (ids.length > 0) {
     const { results } = await c.env.DB
-      .prepare(`SELECT id, composition, name FROM products WHERE id IN (${ids.map(() => '?').join(', ')})`)
-      .bind(...ids)
+      .prepare(`SELECT id, composition, name FROM products WHERE id IN (SELECT value FROM json_each(?))`)
+      .bind(JSON.stringify(ids))
       .all<{ id: string; composition: string; name: string }>();
     const found = new Map(results.map((r) => [r.id, r]));
     const bad = ids

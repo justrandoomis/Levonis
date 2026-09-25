@@ -128,7 +128,7 @@ export function ImagePicker({
               type="button"
               onClick={() => input.current?.click()}
               disabled={busy || disabled}
-              className="min-h-[36px] px-3 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-40"
+              className="relative lv-hit min-h-[36px] px-3 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               {value ? <RefreshCw className="w-3.5 h-3.5" /> : <ImagePlus className="w-3.5 h-3.5" />}
               {value
@@ -147,7 +147,7 @@ export function ImagePicker({
               </button>
             )}
           </div>
-          {hint && !error && <p className="text-zinc-600 text-[11px] mt-2">{hint}</p>}
+          {hint && !error && <p className="text-text-muted text-[11px] mt-2">{hint}</p>}
           {error && <p className="text-red-400 text-[11.5px] mt-2">{error}</p>}
         </div>
       </div>
@@ -276,7 +276,7 @@ export function ImageGallery({
         )}
       </div>
 
-      {hint && !error && <p className="text-zinc-600 text-[11px] mt-2">{hint}</p>}
+      {hint && !error && <p className="text-text-muted text-[11px] mt-2">{hint}</p>}
       {error && <p className="text-red-400 text-[11.5px] mt-2">{error}</p>}
 
       <input

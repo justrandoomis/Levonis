@@ -38,6 +38,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // Catalogue aggregate: the checkpoint commits in the same batch as the
     // product rows it says were applied.
     'product_imports', 'product_import_items', 'price_history', 'inventory_ledger', 'catalogs', 'brands', 'facets', 'hashtags', 'bundles', 'bundle_items',
+    // 0135 — a section's pooled quantity delivery rule is an attribute of the
+    // section, written on the taxonomy screen beside it.
+    'category_delivery_rules',
     /**
      * 0098 — THE COST LAYERS UNDER THE STOCK COUNTERS.
      *

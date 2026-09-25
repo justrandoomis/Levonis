@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { Check, Copy, TicketPercent } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
-import { iqd } from '../../../lib/merchant';
+import { iqd } from '../../../lib/storefrontApi';
 import { useStorefrontRuntime } from '../runtime';
 import { useStoreTheme } from '../StoreTheme';
 import { Column, useText } from '../parts';

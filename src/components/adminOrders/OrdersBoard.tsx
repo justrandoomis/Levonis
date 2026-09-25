@@ -108,7 +108,7 @@ const PAGE_SIZE = 30;
 
 /** The four journeys, as the server's `type` values, plus «الكل» — which is
  *  the ABSENCE of a journey rather than one of them. See the header note. */
-type Journey = 'all' | 'direct' | 'preorder_air' | 'preorder_sea' | 'preorder_land';
+type Journey = 'all' | 'prepare' | 'direct' | 'preorder_air' | 'preorder_sea' | 'preorder_land';
 
 /**
  * ONE WORD EACH, AND THE SEPARATION CARRIED BY AN `<optgroup>`.
@@ -242,7 +242,13 @@ export default function OrdersBoard() {
       // direct. «الكل» sends NO `type`, which is the one spelling of "any
       // journey" this half understands; see the header note.
       params.set('scope', archiveScope);
-      if (journey !== 'all') params.set('type', journey);
+      if (journey !== 'all' && journey !== 'prepare') params.set('type', journey);
+    } else if (journey === 'prepare') {
+      // «يجب تجهيزها» — direct orders from «تم تأكيد الطلب» until they leave,
+      // and pre-orders in «جارٍ تجهيز التوصيل المحلي». Its own server scope
+      // (worker/routes/admin.ts PREPARE_WHERE_SQL), not a client filter.
+      params.set('scope', 'prepare');
+      if (status) params.set('status', status);
     } else if (journey === 'all') {
       // The live set with no `shipping_type` clause at all — the partial
       // index's own WHERE, and the cheapest of the three live scopes.
@@ -483,6 +489,12 @@ export default function OrdersBoard() {
           className="lv-input min-w-0 px-2 text-[14px] leading-[1.4] font-bold"
         >
           <option value="all">{opt(loc('الكل', 'All', 'هەموو'), typeOpts?.all)}</option>
+          {/* «يجب تجهيزها» — every box to pack now, direct or pre-order. The
+              archive has nothing left to prepare, so it is offered live only.
+              OWNER: Sorani to be written by hand. */}
+          {!archive && (
+            <option value="prepare">{opt(loc('يجب تجهيزها', 'To prepare'), typeOpts?.prepare)}</option>
+          )}
           <option value="direct">{opt(loc('مباشر', 'Direct', 'ڕاستەوخۆ'), typeOpts?.direct)}</option>
           <optgroup label={loc('الطلبات المسبقة', 'Pre-orders', 'داواکارییە پێشوەختەکان')}>
             {PREORDER_JOURNEYS.map((j) => (
@@ -533,6 +545,8 @@ export default function OrdersBoard() {
           aria-pressed={archive}
           onClick={() => {
             setArchive((v) => !v);
+            // «يجب تجهيزها» has no archive half; fall back to «الكل».
+            if (!archive && journey === 'prepare') setJourney('all');
             setPage(0);
           }}
           className="lv-choice press-scale flex min-w-0 items-center justify-center gap-1.5 px-2 text-[13px] leading-[1.4] font-bold"

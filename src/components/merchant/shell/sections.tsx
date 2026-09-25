@@ -44,12 +44,16 @@ export const SECTIONS: Readonly<Record<MerchantSection, Section>> = {
   // `/orders` is the list; `/orders/<id>` is the order's own screen (W3-B),
   // its own chunk — the list does not download it, nor it the list.
   orders: lazy(() => import('./sections/OrdersSection')),
-  custom_orders: section(() => import('../dashboard/SalesTabs'), (m) => <m.CustomOrdersTab />),
+  // `/custom_orders/<id>` and `/coupons/<id>` open on that row (review F10) —
+  // the address every custom-order and coupon notification carries.
+  custom_orders: section(() => import('../dashboard/SalesTabs'), (m, { id }) => <m.CustomOrdersTab focusOrderId={id ?? null} />),
   requests: lazy(() => import('./sections/RequestsSection')),
   customers: lazy(() => import('./sections/CustomersSection')),
   coupons: section(
     () => import('../dashboard/SalesTabs'),
-    (m, _p, ws) => <m.CouponsTab canSell={ws.canSell} startCreating={ws.query.create} onCreateHandled={ws.clearQuery} />
+    (m, { id }, ws) => (
+      <m.CouponsTab canSell={ws.canSell} startCreating={ws.query.create} onCreateHandled={ws.clearQuery} focusCouponId={id ?? null} />
+    )
   ),
 
   products: section(

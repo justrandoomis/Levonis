@@ -60,7 +60,7 @@ export default function CollectionsBlock({ block, data }: BlockProps<'collection
             <Link
               key={s.id}
               to={rt.collectionHref(s.id)}
-              className="inline-flex items-center min-h-[40px] px-4 rounded-full border border-white/15 text-zinc-100 text-[12.5px] font-medium active:scale-[0.98] transition-transform"
+              className="inline-flex items-center min-h-11 px-4 rounded-full border border-white/15 text-zinc-100 text-[12.5px] font-medium active:scale-[0.98] transition-transform"
             >
               <span dir="auto">{collectionName(s, lang)}</span>
             </Link>

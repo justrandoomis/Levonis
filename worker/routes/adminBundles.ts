@@ -287,9 +287,9 @@ adminBundlesRoutes.get('/', async (c) => {
   const configs = ids.length
     ? (
         await c.env.DB.prepare(
-          `SELECT * FROM bundle_config WHERE product_id IN (${ids.map(() => '?').join(', ')})`
+          `SELECT * FROM bundle_config WHERE product_id IN (SELECT value FROM json_each(?))`
         )
-          .bind(...ids)
+          .bind(JSON.stringify(ids))
           .all<ConfigRow>()
       ).results
     : [];

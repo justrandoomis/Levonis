@@ -54,6 +54,8 @@ interface ViewerMeta {
   triangle_count: number | null;
   shell_count: number | null;
   expires_at: string;
+  /** 'preview' = the coarse mesh a merchant quoting on the board is sent (worker/routes/printRequests.ts). */
+  grant?: 'full' | 'preview';
 }
 
 /** The decoded LVM1 payload, already in the shape the GPU wants. */
@@ -132,6 +134,8 @@ const STR = {
   ar: {
     loading: 'جارٍ تحميل المجسم',
     title: 'معاينة المجسم',
+    simplified: 'معاينة مبسّطة',
+    simplifiedHint: 'شكل مبسّط من المجسم للتسعير، والملف الأصلي أدق تفصيلًا.',
     gone: 'هذا الرابط لم يعد صالحًا',
     goneHint: 'اطلب رابط عرض جديدًا ممن أرسله إليك.',
     failed: 'تعذّر فتح العارض',
@@ -156,6 +160,8 @@ const STR = {
   en: {
     loading: 'Loading the model',
     title: 'Model preview',
+    simplified: 'Simplified preview',
+    simplifiedHint: 'A simplified shape of the model for quoting; the original file is more detailed.',
     gone: 'This link is no longer valid',
     goneHint: 'Ask whoever sent it for a fresh viewing link.',
     failed: 'The viewer could not be opened',
@@ -815,10 +821,24 @@ export default function ModelViewer() {
               canvas so the model keeps the whole viewport. */}
           <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start gap-2 p-3">
             <div className="pointer-events-auto min-w-0 flex-1 rounded-xl border border-white/10 bg-zinc-950/70 px-3 py-2 backdrop-blur-md">
-              <p className="truncate text-sm font-bold">{t.title}</p>
+              <div className="flex min-w-0 items-center gap-2">
+                <p className="truncate text-sm font-bold">{t.title}</p>
+                {/* The board's merchant is sent a coarse mesh, never the file:
+                    say so, or a rough shape reads as a rough print. */}
+                {meta?.grant === 'preview' && (
+                  <span
+                    data-viewer="simplified"
+                    title={t.simplifiedHint}
+                    className="shrink-0 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[11px] font-bold text-amber-200"
+                  >
+                    {t.simplified}
+                    <span className="sr-only"> — {t.simplifiedHint}</span>
+                  </span>
+                )}
+              </div>
               {meta?.format && (
                 <p
-                  className="text-[11px] uppercase tracking-wide text-zinc-500"
+                  className="text-[11px] uppercase tracking-wide text-zinc-400"
                   dir="ltr"
                   aria-label={t.format}
                 >

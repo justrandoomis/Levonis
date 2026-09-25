@@ -47,8 +47,8 @@ function setup(balanceIqd = 1_000_000) {
     INSERT INTO community_requests (id,customer_id,title) VALUES ('r1','buyer','Print');
     INSERT INTO community_offers (id,request_id,merchant_id,price_iqd) VALUES ('o1','r1','m1',50000);
     INSERT INTO community_orders
-      (id,request_id,offer_id,customer_id,merchant_id,price_iqd,platform_fee_iqd,merchant_receivable_iqd)
-      VALUES ('co1','r1','o1','buyer','m1',50000,5000,45000);
+      (id,request_id,offer_id,customer_id,merchant_id,price_iqd,commission_percent_x100,platform_fee_iqd,merchant_receivable_iqd)
+      VALUES ('co1','r1','o1','buyer','m1',50000,1000,5000,45000);
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
   `);
   // Fund the customer's wallet with an approved deposit, the way a real
@@ -226,8 +226,17 @@ test('a partial refund splits correctly and leaves both movements visible', asyn
   assert.equal(esc.state, 'partially_refunded');
   assert.equal(esc.refunded_iqd, 20_000);
 
-  // The merchant keeps their share of what was NOT refunded.
-  assert.equal((await merchantBalance(db, 'm1')).available_iqd, 30_000);
+  // The merchant keeps what was NOT refunded, less the order's commission ON
+  // THAT PART (owner decision F5): 30,000 kept at 10% → 3,000 to Levonis,
+  // written as its own `commission` line; 27,000 to the merchant.
+  assert.equal((await merchantBalance(db, 'm1')).available_iqd, 27_000);
+  const lines = raw
+    .prepare("SELECT kind, amount_iqd FROM merchant_ledger_entries WHERE escrow_id = ? ORDER BY kind")
+    .all(escrowId) as Array<{ kind: string; amount_iqd: number }>;
+  assert.deepEqual(lines.map((l) => ({ ...l })), [
+    { kind: 'commission', amount_iqd: -3_000 },
+    { kind: 'escrow_release', amount_iqd: 30_000 },
+  ]);
 
   // The hold is committed and the refunded part comes back as its own credit,
   // so an auditor sees two movements rather than a quietly shrunk hold.

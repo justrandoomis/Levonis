@@ -280,7 +280,8 @@ export async function loadMaterialPrices(
 ): Promise<MaterialPriceSources> {
   const sources: MaterialPriceSources = {};
   if (!materialIds.length) return sources;
-  const placeholders = materialIds.map(() => '?').join(',');
+  // One json_each parameter for the list: the live D1 refuses > 100 bound (review F1).
+  const materialsJson = JSON.stringify(materialIds);
 
   if (merchantId) {
     const { results } = await db
@@ -288,9 +289,9 @@ export async function loadMaterialPrices(
         `SELECT id, material_id, purchase_iqd, original_grams
            FROM merchant_spools
           WHERE merchant_id = ? AND active = 1 AND original_grams > 0 AND purchase_iqd > 0
-            AND material_id IN (${placeholders})`
+            AND material_id IN (SELECT value FROM json_each(?))`
       )
-      .bind(merchantId, ...materialIds)
+      .bind(merchantId, materialsJson)
       .all<Row>();
     const spool: NonNullable<MaterialPriceSources['spool']> = {};
     for (const row of results ?? []) {
@@ -311,9 +312,9 @@ export async function loadMaterialPrices(
       `SELECT m.id, m.material_type, m.default_iqd_per_kg, p.price_iqd, p.spec_fields
          FROM print_materials m
          LEFT JOIN products p ON p.id = m.product_id AND p.status = 'active'
-        WHERE m.active = 1 AND m.id IN (${placeholders})`
+        WHERE m.active = 1 AND m.id IN (SELECT value FROM json_each(?))`
     )
-    .bind(...materialIds)
+    .bind(materialsJson)
     .all<Row>();
 
   const catalogue: Record<string, number> = {};
@@ -443,9 +444,9 @@ export async function loadMaterialPhysics(
   const { results } = await db
     .prepare(
       `SELECT id, material_type, density_g_cm3, diameter_mm, needs_enclosure, abrasive
-         FROM print_materials WHERE id IN (${materialIds.map(() => '?').join(',')})`
+         FROM print_materials WHERE id IN (SELECT value FROM json_each(?))`
     )
-    .bind(...materialIds)
+    .bind(JSON.stringify(materialIds))
     .all<Row>();
   const out: Record<string, { densityGPerCm3: number; diameterMm: number; materialType: string; needsEnclosure: boolean; abrasive: boolean }> = {};
   for (const row of results ?? []) {

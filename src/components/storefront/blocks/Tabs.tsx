@@ -69,7 +69,9 @@ export default function TabsBlock({ block, store, data }: BlockProps<'tabs'>) {
   return (
     <Column>
       {/* Spread across the width, white when active over an accent-coloured
-          indicator that travels as one element. */}
+          indicator that travels as one element. Right-to-left in every
+          language, as the rest of the classic page is drawn; the strip's arrow
+          keys follow the strip's own direction (components/ui/Tabs, W6). */}
       <div dir="rtl" className="border-b border-white/10 mb-4 overflow-x-auto hide-scrollbar">
         <TabStrip
           group="storefront"

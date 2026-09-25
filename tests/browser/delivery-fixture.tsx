@@ -20,7 +20,7 @@ import { Toaster } from '../../src/components/ui/Toast';
 import '../../src/index.css';
 
 const params = new URLSearchParams(location.search);
-const lang = params.get('lang') === 'en' ? 'en' : 'ar';
+const lang = params.get('lang') === 'en' ? 'en' : params.get('lang') === 'ckb' ? 'ckb' : 'ar';
 try {
   localStorage.setItem('levo_lang', lang);
 } catch {
