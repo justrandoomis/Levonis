@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<meta name="shot" content="full=1">
+<title>كل الفئات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@300..900&display=swap">
+<!-- Levonis UX mockup. Light theme tokens from src/index.css (THEME TOKENS, light).
+     Product data and photographs: the live public API, GET only. -->
+<style>
+:root{
+  --canvas:#f3f0ea; --surface:#fbfaf7; --raised:#ffffff; --selected:#ebe6dc; --line:#e0dace; --line-2:#d3ccbf;
+  --ink:#16181b; --ink-2:#45484e; --muted:#5f6268; --faint:#8b8d92;
+  --gold:#7a6331; --gold-fill:#bca36b; --gold-ink:#111214;
+  --charcoal:#0e1013; --charcoal-2:#14171c; --ivory:#f3f0ea;
+  --ok:#1b7046; --ok-soft:#e3efe7; --warn:#92590c; --warn-soft:#f5ead6; --danger:#b3343a; --pro:#bb3e52;
+  --focus:#7a6331;
+  --shadow-2:0 12px 32px -16px rgb(22 24 27/.22); --shadow-3:0 28px 70px -28px rgb(22 24 27/.34);
+  --r-card:14px; --gut:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--canvas)}
+body{font-family:'Cairo',system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 0;line-height:1.5}
+.screen{width:390px;min-height:844px;margin:0 auto;position:relative;overflow:hidden;background:var(--canvas)}
+.num{unicode-bidi:isolate;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"lnum" 1}
+.ltr{direction:ltr;unicode-bidi:isolate}
+.ic{display:block;flex:none}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0}
+
+/* ---------- top bar */
+.topbar{position:sticky;top:0;z-index:20;height:56px;display:flex;align-items:center;gap:10px;padding:0 var(--gut);
+  background:rgb(243 240 234/.88);backdrop-filter:blur(18px) saturate(160%);border-bottom:1px solid transparent}
+.topbar.edge{border-bottom-color:var(--line)}
+.iconbtn{width:40px;height:40px;border-radius:999px;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line);color:var(--ink);position:relative;flex:none}
+.iconbtn.bare{background:transparent;border-color:transparent}
+.topbar .title{flex:1;min-width:0}
+.topbar .title b{display:block;font-size:16px;font-weight:800;line-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .title small{display:block;font-size:11.5px;color:var(--muted);line-height:16px}
+.dotbadge{position:absolute;top:-3px;inset-inline-end:-3px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--ink);color:var(--canvas);font-size:10.5px;font-weight:800;display:grid;place-items:center;border:2px solid var(--canvas)}
+
+/* ---------- section heads */
+.sec{padding:0 var(--gut)}
+.sechead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.sechead h2{font-size:17px;line-height:26px;font-weight:800}
+.sechead h2 small{font-size:12px;color:var(--muted);font-weight:600;margin-inline-start:6px}
+.seeall{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:var(--ink-2);min-height:44px;padding:0 2px}
+
+/* ---------- chips */
+.chips{display:flex;gap:6px;overflow:hidden;padding:0 var(--gut)}
+.chip{height:32px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:12.5px;font-weight:700;color:var(--ink-2);display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:none}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--canvas)}
+.chip .c{font-weight:600;color:var(--muted)}
+.chip.on .c{color:rgb(243 240 234/.7)}
+.chip.x{background:var(--selected);border-color:transparent;color:var(--ink);padding-inline-end:8px}
+
+/* ---------- PRODUCT CARD (compact) */
+.pc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden;display:flex;flex-direction:column;min-width:0;position:relative}
+.pc-media{position:relative;aspect-ratio:6/5;background:var(--charcoal);overflow:hidden}
+.pc-media img{width:100%;height:100%;object-fit:cover;object-position:50% 4%;display:block}
+.pc-cmp{position:absolute;top:6px;inset-inline-start:6px;width:30px;height:30px;border-radius:999px;display:grid;place-items:center;
+  background:rgb(14 16 19/.52);backdrop-filter:blur(8px);color:#f3f0ea;border:1px solid rgb(255 255 255/.14)}
+.pc-cmp.on{background:#f3f0ea;color:var(--ink);border-color:#f3f0ea}
+.pc-sale{position:absolute;top:8px;inset-inline-end:8px;height:18px;padding:0 6px;border-radius:5px;background:var(--danger);color:#fff;font-size:10px;font-weight:800;letter-spacing:.04em;display:grid;place-items:center}
+.pc-body{padding:9px 10px 10px;display:flex;flex-direction:column;flex:1;min-width:0}
+.pc-name{font-size:12.5px;line-height:17px;font-weight:600;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px;text-align:right}
+.pc-price{margin-top:6px;display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;min-width:0}
+.pc-price .from{font-size:10px;color:var(--muted);font-weight:600}
+.pc-price .amt{font-size:15px;font-weight:800;letter-spacing:-.01em;line-height:20px}
+.pc-price .cur{font-size:10.5px;font-weight:700;color:var(--ink-2)}
+.pc-member{display:flex;align-items:center;gap:4px;font-size:10.5px;line-height:15px;color:var(--ink-2);margin-top:1px;white-space:nowrap;overflow:hidden}
+.pc-member b{color:var(--pro);font-weight:800;letter-spacing:.02em}
+.pc-member .ic{color:var(--pro)}
+.pc-avail{margin-top:auto;padding-top:7px;display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;line-height:15px;font-weight:700}
+.av{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.av i{width:6px;height:6px;border-radius:9px;display:block;flex:none}
+.av.ok{color:var(--ok)} .av.ok i{background:var(--ok);box-shadow:0 0 0 3px rgb(27 112 70/.14)}
+.av.pre{color:var(--warn)} .av.pre i{border:1.5px solid var(--warn);width:7px;height:7px}
+.av.off{color:var(--muted)} .av.off i{background:var(--faint)}
+.pc-avail .qty{font-size:10.5px;color:var(--muted);font-weight:600}
+.pc-avail .qty.low{color:var(--warn)}
+
+.rail{display:flex;gap:10px;padding:0 var(--gut);overflow:hidden}
+.rail .pc{width:148px;flex:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 var(--gut)}
+
+/* ---------- buttons */
+.btn{height:44px;border-radius:12px;padding:0 16px;font-size:14px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.btn.primary{background:var(--ink);color:var(--canvas)}
+.btn.gold{background:var(--gold-fill);color:var(--gold-ink)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.btn.ghost-dark{border:1px solid rgb(243 240 234/.22);color:#f3f0ea}
+.btn.sm{height:36px;border-radius:10px;font-size:12.5px;padding:0 12px}
+.btn.block{width:100%}
+
+/* ---------- bottom nav (the current floating bar) */
+.bnav{direction:ltr;position:absolute;inset-inline:10px;bottom:14px;height:66px;display:flex;align-items:center;justify-content:space-between;z-index:30}
+.bnav .pill{width:142px;height:62px;border-radius:20px;background:#1b1e23;color:#c9ccd2;display:flex;align-items:center;justify-content:space-around;box-shadow:0 10px 30px -12px rgb(0 0 0/.5)}
+.bnav .pill div{display:flex;flex-direction:column;align-items:center;font-size:10.5px;gap:1px}
+.bnav .blob{width:70px;height:70px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#6f7a46,#3b4629 70%);box-shadow:0 10px 26px -8px rgb(59 70 41/.7);display:grid;place-items:center;margin-top:-4px}
+.bnav .blob span{display:flex;gap:9px}
+.bnav .blob span i{width:9px;height:17px;border-radius:9px;background:#f3f0ea;display:block}
+
+/* ---------- misc */
+.hair{height:1px;background:var(--line);margin:0 var(--gut)}
+.muted{color:var(--muted)}
+.cap{font-size:12px;color:var(--muted);line-height:18px}
+.field{height:44px;border-radius:12px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--muted);font-size:13.5px}
+.seg{display:flex;background:var(--selected);border-radius:10px;padding:3px;gap:2px}
+.seg span{flex:1;height:30px;border-radius:8px;display:grid;place-items:center;font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.seg span.on{background:var(--raised);color:var(--ink);box-shadow:0 1px 2px rgb(22 24 27/.1)}
+.switch{width:44px;height:26px;border-radius:13px;background:var(--line-2);position:relative;flex:none}
+.switch::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0/.2)}
+.switch.on{background:var(--ok)}
+.switch.on::after{inset-inline-start:auto;inset-inline-end:3px}
+.dark{background:var(--charcoal);color:var(--ivory)}
+
+.ph{padding:6px var(--gut) 0}
+.ph h1{font-size:27px;line-height:38px;font-weight:800;letter-spacing:-.01em}
+.ph p{font-size:13px;color:var(--muted);line-height:20px}
+.ban{display:block;margin:12px var(--gut) 0;border-radius:20px;background:var(--charcoal);color:var(--ivory);position:relative;overflow:hidden;isolation:isolate;height:150px}
+.ban.lead{height:208px}
+.ban .bp{position:absolute;top:0;bottom:0;left:0;width:54%;z-index:-1;overflow:hidden;
+  -webkit-mask-image:linear-gradient(to right,#000 40%,transparent 100%);mask-image:linear-gradient(to right,#000 40%,transparent 100%)}
+.ban .bp img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 57%;transform:scale(1.45)}
+.ban.lead .bp img{transform:scale(1.75)}
+.ban .in{position:absolute;inset:0;inset-inline-end:auto;width:60%;padding:16px;display:flex;flex-direction:column}
+.ban h2{font-size:19px;line-height:27px;font-weight:800}
+.ban.lead h2{font-size:23px;line-height:32px}
+.ban p{font-size:12px;line-height:18px;color:rgb(243 240 234/.72);margin-top:3px}
+.ban .meta{margin-top:auto;display:flex;align-items:center;gap:8px;font-size:11.5px;color:rgb(243 240 234/.78)}
+.ban .meta .pill{height:24px;border-radius:12px;padding:0 9px;background:rgb(243 240 234/.1);display:inline-flex;align-items:center;gap:5px;font-weight:700}
+.ban .meta .pill i{width:6px;height:6px;border-radius:9px;background:#4fbf86;display:block}
+.ban .go{position:absolute;bottom:14px;left:14px;width:40px;height:40px;border-radius:50%;background:var(--gold-fill);color:var(--gold-ink);display:grid;place-items:center}
+.subs{display:flex;gap:6px;padding:8px var(--gut) 0;overflow:hidden}
+.subs .chip{height:30px;font-size:12px}
+.foot{margin:26px var(--gut) 0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.foot a{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:13px;display:flex;flex-direction:column;gap:6px;min-height:104px}
+.foot .g{width:34px;height:34px;border-radius:10px;background:var(--selected);display:grid;place-items:center;color:var(--ink)}
+.foot b{font-size:13.5px;font-weight:800;line-height:19px}
+.foot span{font-size:11.5px;color:var(--muted);line-height:16px}
+</style>
+
+</head>
+<body>
+<div class="screen" style="padding-bottom:110px">
+<header class="topbar">
+  <button class="iconbtn" aria-label="رجوع"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+  <div class="title"></div>
+  <button class="iconbtn" aria-label="بحث"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
+</header>
+<div class="ph"><h1>كل الفئات</h1><p>أربع فئات و14 منتجًا. اختر فئة لتتصفح أقسامها.</p></div>
+
+<a class="ban lead" href="/categories/printers">
+  <div class="bp" aria-hidden="true"><img src="https://levonis-iq.com/files/products/catalog/gallery/eb339906c2ff133970abad3a7198b71128ef935a9d5c2ba4e35b56b7bfac727f.webp" alt=""></div>
+  <div class="in"><h2>الطابعات ثلاثية الأبعاد</h2><p>من أول طابعة في البيت إلى خط إنتاج صغير.</p>
+    <div class="meta"><span class="pill num">10 طابعات</span><span class="pill"><i></i><span class="num">4</span> متوفرة الآن</span></div></div>
+  <span class="go"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M10 7l-5 5 5 5"/></svg></span>
+</a>
+<div class="subs"><span class="chip">طابعات FDM <span class="c num">10</span></span></div>
+
+<a class="ban" href="/categories/printing-materials">
+  <div class="bp" aria-hidden="true"><img src="https://levonis-iq.com/files/products/catalog/gallery/0ce8105fe0981f25437a34aa7c3bb97373ce0328f154c1f3e384795624ad7481.webp" alt=""></div>
+  <div class="in"><h2>مواد الطباعة</h2><p>خيوط PLA وغيرها بألوان وخامات مختلفة.</p>
+    <div class="meta"><span class="pill num">منتج واحد</span><span class="pill"><i></i>متوفر</span></div></div>
+  <span class="go"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M10 7l-5 5 5 5"/></svg></span>
+</a>
+
+<a class="ban" href="/categories/printer-accessories">
+  <div class="bp" aria-hidden="true"><img src="https://levonis-iq.com/files/products/catalog/gallery/bfdd1ff6fc51edca9fb92d5cd9ca22bcaf480d23d140347a8b2d787298197072.webp" alt=""></div>
+  <div class="in"><h2>ملحقات الطابعات</h2><p>هوت إند ونوزلات وقطع للصيانة والترقية.</p>
+    <div class="meta"><span class="pill num">منتج واحد</span><span class="pill"><i></i>متوفر</span></div></div>
+  <span class="go"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M10 7l-5 5 5 5"/></svg></span>
+</a>
+
+<a class="ban" href="/categories/makers-supply">
+  <div class="bp" aria-hidden="true"><img src="https://levonis-iq.com/files/products/catalog/gallery/245d532b7474db2fa0e51119b80059de74d563b70a25578ba338e9c9a6f05e42.webp" alt=""></div>
+  <div class="in"><h2>مستلزمات Maker</h2><p>حلقات مفاتيح وسويتشات وقطع لمشاريعك.</p>
+    <div class="meta"><span class="pill num">منتجان</span><span class="pill"><i></i>متوفرة</span></div></div>
+  <span class="go"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M10 7l-5 5 5 5"/></svg></span>
+</a>
+<div class="subs"><span class="chip">منتجات جديدة <span class="c num">1</span></span><span class="chip">أدوات Maker <span class="c num">1</span></span></div>
+
+<div class="foot">
+  <a href="/printer-finder"><span class="g"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19L15 9M14 5v2M18 9h2M17.5 5.5l-1.3 1.3M19 13l-1.3-1.3"/></svg></span><b>ساعدني أختار طابعة</b><span>ستة أسئلة ونرشّح لك ثلاثًا.</span></a>
+  <a href="/compare"><span class="g"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 005 0L5 8zM19 8l-2.5 6a3 3 0 005 0L19 8z"/><path d="M12 4l-1.5 2h3z"/></svg></span><b>قارن الطابعات</b><span>حتى أربع طابعات جنبًا إلى جنب.</span></a>
+</div>
+<nav class="bnav" aria-label="التنقل">
+  <div class="pill"><div><svg class="ic " width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0114 0"/></svg>الحساب</div><div><svg class="ic " width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6.5a3 3 0 016 0V8"/></svg>السلة</div></div>
+  <div class="blob"><span><i></i><i></i></span></div>
+  <div class="pill"><div><svg class="ic " width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 18l1.2-3.3A7 7 0 1119 12a7 7 0 01-10.3 6.2z"/><path d="M9 12h.01M12 12h.01M15 12h.01"/></svg>المحادثات</div></div>
+</nav>
+</div>
+</body>
+</html>

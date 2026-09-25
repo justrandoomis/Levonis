@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<meta name="shot" content="full=1">
+<title>مرشد الطابعات: النتائج</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@300..900&display=swap">
+<!-- Levonis UX mockup. Light theme tokens from src/index.css (THEME TOKENS, light).
+     Product data and photographs: the live public API, GET only. -->
+<style>
+:root{
+  --canvas:#f3f0ea; --surface:#fbfaf7; --raised:#ffffff; --selected:#ebe6dc; --line:#e0dace; --line-2:#d3ccbf;
+  --ink:#16181b; --ink-2:#45484e; --muted:#5f6268; --faint:#8b8d92;
+  --gold:#7a6331; --gold-fill:#bca36b; --gold-ink:#111214;
+  --charcoal:#0e1013; --charcoal-2:#14171c; --ivory:#f3f0ea;
+  --ok:#1b7046; --ok-soft:#e3efe7; --warn:#92590c; --warn-soft:#f5ead6; --danger:#b3343a; --pro:#bb3e52;
+  --focus:#7a6331;
+  --shadow-2:0 12px 32px -16px rgb(22 24 27/.22); --shadow-3:0 28px 70px -28px rgb(22 24 27/.34);
+  --r-card:14px; --gut:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--canvas)}
+body{font-family:'Cairo',system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 0;line-height:1.5}
+.screen{width:390px;min-height:844px;margin:0 auto;position:relative;overflow:hidden;background:var(--canvas)}
+.num{unicode-bidi:isolate;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"lnum" 1}
+.ltr{direction:ltr;unicode-bidi:isolate}
+.ic{display:block;flex:none}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0}
+
+/* ---------- top bar */
+.topbar{position:sticky;top:0;z-index:20;height:56px;display:flex;align-items:center;gap:10px;padding:0 var(--gut);
+  background:rgb(243 240 234/.88);backdrop-filter:blur(18px) saturate(160%);border-bottom:1px solid transparent}
+.topbar.edge{border-bottom-color:var(--line)}
+.iconbtn{width:40px;height:40px;border-radius:999px;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line);color:var(--ink);position:relative;flex:none}
+.iconbtn.bare{background:transparent;border-color:transparent}
+.topbar .title{flex:1;min-width:0}
+.topbar .title b{display:block;font-size:16px;font-weight:800;line-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .title small{display:block;font-size:11.5px;color:var(--muted);line-height:16px}
+.dotbadge{position:absolute;top:-3px;inset-inline-end:-3px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--ink);color:var(--canvas);font-size:10.5px;font-weight:800;display:grid;place-items:center;border:2px solid var(--canvas)}
+
+/* ---------- section heads */
+.sec{padding:0 var(--gut)}
+.sechead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.sechead h2{font-size:17px;line-height:26px;font-weight:800}
+.sechead h2 small{font-size:12px;color:var(--muted);font-weight:600;margin-inline-start:6px}
+.seeall{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:var(--ink-2);min-height:44px;padding:0 2px}
+
+/* ---------- chips */
+.chips{display:flex;gap:6px;overflow:hidden;padding:0 var(--gut)}
+.chip{height:32px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:12.5px;font-weight:700;color:var(--ink-2);display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:none}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--canvas)}
+.chip .c{font-weight:600;color:var(--muted)}
+.chip.on .c{color:rgb(243 240 234/.7)}
+.chip.x{background:var(--selected);border-color:transparent;color:var(--ink);padding-inline-end:8px}
+
+/* ---------- PRODUCT CARD (compact) */
+.pc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden;display:flex;flex-direction:column;min-width:0;position:relative}
+.pc-media{position:relative;aspect-ratio:6/5;background:var(--charcoal);overflow:hidden}
+.pc-media img{width:100%;height:100%;object-fit:cover;object-position:50% 4%;display:block}
+.pc-cmp{position:absolute;top:6px;inset-inline-start:6px;width:30px;height:30px;border-radius:999px;display:grid;place-items:center;
+  background:rgb(14 16 19/.52);backdrop-filter:blur(8px);color:#f3f0ea;border:1px solid rgb(255 255 255/.14)}
+.pc-cmp.on{background:#f3f0ea;color:var(--ink);border-color:#f3f0ea}
+.pc-sale{position:absolute;top:8px;inset-inline-end:8px;height:18px;padding:0 6px;border-radius:5px;background:var(--danger);color:#fff;font-size:10px;font-weight:800;letter-spacing:.04em;display:grid;place-items:center}
+.pc-body{padding:9px 10px 10px;display:flex;flex-direction:column;flex:1;min-width:0}
+.pc-name{font-size:12.5px;line-height:17px;font-weight:600;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px;text-align:right}
+.pc-price{margin-top:6px;display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;min-width:0}
+.pc-price .from{font-size:10px;color:var(--muted);font-weight:600}
+.pc-price .amt{font-size:15px;font-weight:800;letter-spacing:-.01em;line-height:20px}
+.pc-price .cur{font-size:10.5px;font-weight:700;color:var(--ink-2)}
+.pc-member{display:flex;align-items:center;gap:4px;font-size:10.5px;line-height:15px;color:var(--ink-2);margin-top:1px;white-space:nowrap;overflow:hidden}
+.pc-member b{color:var(--pro);font-weight:800;letter-spacing:.02em}
+.pc-member .ic{color:var(--pro)}
+.pc-avail{margin-top:auto;padding-top:7px;display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;line-height:15px;font-weight:700}
+.av{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.av i{width:6px;height:6px;border-radius:9px;display:block;flex:none}
+.av.ok{color:var(--ok)} .av.ok i{background:var(--ok);box-shadow:0 0 0 3px rgb(27 112 70/.14)}
+.av.pre{color:var(--warn)} .av.pre i{border:1.5px solid var(--warn);width:7px;height:7px}
+.av.off{color:var(--muted)} .av.off i{background:var(--faint)}
+.pc-avail .qty{font-size:10.5px;color:var(--muted);font-weight:600}
+.pc-avail .qty.low{color:var(--warn)}
+
+.rail{display:flex;gap:10px;padding:0 var(--gut);overflow:hidden}
+.rail .pc{width:148px;flex:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 var(--gut)}
+
+/* ---------- buttons */
+.btn{height:44px;border-radius:12px;padding:0 16px;font-size:14px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.btn.primary{background:var(--ink);color:var(--canvas)}
+.btn.gold{background:var(--gold-fill);color:var(--gold-ink)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.btn.ghost-dark{border:1px solid rgb(243 240 234/.22);color:#f3f0ea}
+.btn.sm{height:36px;border-radius:10px;font-size:12.5px;padding:0 12px}
+.btn.block{width:100%}
+
+/* ---------- bottom nav (the current floating bar) */
+.bnav{direction:ltr;position:absolute;inset-inline:10px;bottom:14px;height:66px;display:flex;align-items:center;justify-content:space-between;z-index:30}
+.bnav .pill{width:142px;height:62px;border-radius:20px;background:#1b1e23;color:#c9ccd2;display:flex;align-items:center;justify-content:space-around;box-shadow:0 10px 30px -12px rgb(0 0 0/.5)}
+.bnav .pill div{display:flex;flex-direction:column;align-items:center;font-size:10.5px;gap:1px}
+.bnav .blob{width:70px;height:70px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#6f7a46,#3b4629 70%);box-shadow:0 10px 26px -8px rgb(59 70 41/.7);display:grid;place-items:center;margin-top:-4px}
+.bnav .blob span{display:flex;gap:9px}
+.bnav .blob span i{width:9px;height:17px;border-radius:9px;background:#f3f0ea;display:block}
+
+/* ---------- misc */
+.hair{height:1px;background:var(--line);margin:0 var(--gut)}
+.muted{color:var(--muted)}
+.cap{font-size:12px;color:var(--muted);line-height:18px}
+.field{height:44px;border-radius:12px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--muted);font-size:13.5px}
+.seg{display:flex;background:var(--selected);border-radius:10px;padding:3px;gap:2px}
+.seg span{flex:1;height:30px;border-radius:8px;display:grid;place-items:center;font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.seg span.on{background:var(--raised);color:var(--ink);box-shadow:0 1px 2px rgb(22 24 27/.1)}
+.switch{width:44px;height:26px;border-radius:13px;background:var(--line-2);position:relative;flex:none}
+.switch::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0/.2)}
+.switch.on{background:var(--ok)}
+.switch.on::after{inset-inline-start:auto;inset-inline-end:3px}
+.dark{background:var(--charcoal);color:var(--ivory)}
+
+.fbar{display:flex;align-items:center;gap:10px;padding:8px var(--gut) 0;height:56px}
+.fbar .p{flex:1;text-align:center;font-size:12px;font-weight:700;color:var(--muted)}
+.fbar a{font-size:13px;font-weight:700;color:var(--ink-2);min-width:40px;text-align:start;min-height:44px;display:grid;place-items:center}
+.prog{display:flex;gap:4px;padding:6px var(--gut) 0}
+.prog i{flex:1;height:4px;border-radius:2px;background:var(--line);display:block}
+.prog i.done{background:var(--ink)}
+.prog i.cur{background:linear-gradient(to left,var(--ink) 45%,var(--line) 45%)}
+.q{padding:22px var(--gut) 0}
+.q h1{font-size:25px;line-height:36px;font-weight:800;letter-spacing:-.01em}
+.q p{font-size:13px;color:var(--muted);line-height:20px;margin-top:4px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:18px var(--gut) 0}
+.tile{text-align:start;position:relative;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:13px 12px 12px;min-height:118px;display:flex;flex-direction:column;gap:8px}
+.tile .g{width:36px;height:36px;border-radius:11px;background:var(--selected);display:grid;place-items:center;color:var(--ink)}
+.tile b{font-size:14px;line-height:20px;font-weight:800}
+.tile span{font-size:11.5px;line-height:16px;color:var(--muted)}
+.tile.on{background:var(--raised);border-color:var(--ink);box-shadow:var(--shadow-2)}
+.tile.on .g{background:var(--ink);color:var(--canvas)}
+.tile .ck{position:absolute;top:10px;left:10px;width:22px;height:22px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center}
+.tile.wide{grid-column:1/-1;min-height:0;flex-direction:row;align-items:center;gap:12px}
+.ffoot{position:absolute;inset-inline:0;bottom:0;padding:12px var(--gut) 26px;display:flex;gap:10px;background:linear-gradient(to top,var(--canvas) 70%,rgb(243 240 234/0))}
+.answers{display:flex;flex-wrap:wrap;gap:6px;padding:14px var(--gut) 0}
+.answers .a{height:28px;border-radius:14px;padding:0 10px;background:var(--selected);font-size:11.5px;font-weight:700;color:var(--ink-2);display:inline-flex;align-items:center}
+.rows{padding:14px var(--gut) 0;display:flex;flex-direction:column;gap:8px}
+.orow{text-align:start;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 12px;min-height:64px}
+.orow .g{width:38px;height:38px;border-radius:11px;background:var(--selected);display:grid;place-items:center;color:var(--ink);flex:none}
+.orow .t{flex:1}
+.orow b{display:block;font-size:14px;font-weight:800;line-height:20px}
+.orow span{display:block;font-size:11.5px;color:var(--muted);line-height:16px}
+.orow .rk{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line-2);flex:none;display:grid;place-items:center;font-size:11.5px;font-weight:800}
+.orow.on{background:var(--raised);border-color:var(--ink)}
+.orow.on .g{background:var(--ink);color:var(--canvas)}
+.orow.on .rk{background:var(--ink);border-color:var(--ink);color:#fff}
+.limit{padding:10px var(--gut) 0;font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
+
+.rh{padding:6px var(--gut) 0}
+.rh h1{font-size:25px;line-height:36px;font-weight:800}
+.rh p{font-size:12.5px;color:var(--muted);line-height:19px}
+.top .av,.alt .av{font-size:12px}
+.edit{font-size:12px;font-weight:800;color:var(--gold);display:inline-flex;align-items:center;min-height:28px;padding:0 4px}
+.top{margin:16px var(--gut) 0;background:var(--surface);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.top .m{position:relative;aspect-ratio:16/10;background:var(--charcoal);overflow:hidden}
+.top .m img{width:100%;height:100%;object-fit:cover;object-position:50% 58%;transform:scale(1.25)}
+.badge1{position:absolute;top:12px;right:12px;height:26px;border-radius:13px;padding:0 10px;background:var(--gold-fill);color:var(--gold-ink);font-size:12px;font-weight:800;display:inline-flex;align-items:center;gap:5px}
+.top .b{padding:14px}
+.top h2{font-size:17px;line-height:24px;font-weight:800;text-align:right}
+.pr{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.pr .amt{font-size:18px;font-weight:800}
+.pr .cur{font-size:11.5px;font-weight:700;color:var(--ink-2)}
+.why{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.why h3{font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px}
+.why li{list-style:none;display:flex;gap:8px;font-size:13px;line-height:20px;padding:3px 0}
+.why li .ic{color:var(--ok);margin-top:2px}
+.why li.warn .ic{color:var(--warn)}
+.why li small{color:var(--muted);font-size:11.5px}
+.acts{display:flex;gap:8px;margin-top:14px}
+.acts .iconbtn{width:44px;height:44px;border-radius:12px}
+.alt{margin:10px var(--gut) 0;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:12px;display:grid;grid-template-columns:92px 1fr;gap:12px}
+.alt .m{width:92px;height:92px;border-radius:12px;overflow:hidden;background:var(--charcoal);position:relative}
+.alt .m img{width:100%;height:100%;object-fit:cover;object-position:50% 58%;transform:scale(1.3)}
+.alt .rk{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:rgb(243 240 234/.92);color:var(--ink);font-size:11.5px;font-weight:800;display:grid;place-items:center}
+.alt h2{font-size:14px;line-height:20px;font-weight:800;text-align:right}
+.alt .pr .amt{font-size:15px}
+.alt .why{margin-top:6px;padding-top:0;border-top:0}
+.alt .why li{font-size:12px;line-height:18px;padding:1px 0}
+.alt .acts2{grid-column:1/-1;display:flex;gap:8px}
+.excl{margin:12px var(--gut) 0;border-radius:14px;border:1px dashed var(--line-2);padding:12px;display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--ink-2)}
+.excl b{font-weight:800;color:var(--ink)}
+.human{margin:18px var(--gut) 0;border-radius:20px;background:var(--charcoal);color:var(--ivory);padding:16px;display:flex;gap:12px;align-items:center}
+.human .g{width:44px;height:44px;border-radius:14px;background:rgb(243 240 234/.08);display:grid;place-items:center;color:var(--gold-fill);flex:none}
+.human b{display:block;font-size:14.5px;font-weight:800;line-height:21px}
+.human span{display:block;font-size:12px;color:rgb(243 240 234/.7);line-height:18px}
+</style>
+
+</head>
+<body>
+<div class="screen" style="padding-bottom:40px">
+<div class="fbar"><button class="iconbtn" aria-label="إغلاق"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button><div class="p">النتائج</div><a href="#" style="display:inline-flex;gap:4px;align-items:center"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 8a7.5 7.5 0 10.9 6"/><path d="M19.5 4v4.5H15"/></svg>من جديد</a></div>
+<div class="rh"><h1>أفضل 3 طابعات لك</h1><p>رتّبناها من ورقة مواصفات كل طابعة وسعرها الحالي وتوفرها، ولم نفترض أي رقم غير مكتوب.</p></div>
+<div class="answers"><span class="a">مشروع تجاري</span><span class="a">Filament</span><span class="a num">1.25 – 2.5 مليون</span><span class="a">لا مانع من الطلب المسبق</span><span class="a">السرعة، ثم تعدد الألوان</span><span class="a">متوسط</span><a class="edit" href="#">تعديل</a></div>
+
+<article class="top" aria-labelledby="r1">
+  <div class="m"><img src="https://levonis-iq.com/files/products/catalog/gallery/eb339906c2ff133970abad3a7198b71128ef935a9d5c2ba4e35b56b7bfac727f.webp" alt=""><span class="badge1"><svg class="ic " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.3L12 16l-4.9 2.6 1.1-5.3-4-3.7 5.4-.6z"/></svg>الأنسب لك</span></div>
+  <div class="b">
+    <h2 id="r1" dir="ltr">Bambu Lab X2D / X2D Combo</h2>
+    <div class="pr"><span><span class="muted" style="font-size:11px">يبدأ من </span><span class="amt num">1,575,000</span> <span class="cur">د.ع</span></span><span class="av ok"><i></i>متوفر الآن — بقي 2</span></div>
+    <div class="why"><h3>لماذا نرشّحها</h3><ul>
+      <li><svg class="ic " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>سرعة طباعة حتى <b class="num" dir="ltr">1,000 mm/s</b> <small>— الأعلى بين الخيارات</small></span></li>
+      <li><svg class="ic " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>حتى <b class="num">25</b> لونًا مع وحدات AMS</span></li>
+      <li><svg class="ic " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>هيكل مغلق مع تنقية <span class="ltr">HEPA</span> للتشغيل الطويل</span></li>
+      <li class="warn"><svg class="ic " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg><span>حجم الطباعة <span class="num ltr" dir="ltr">256 × 256 × 260</span> مم، أصغر من H2S</span></li>
+    </ul></div>
+    <div class="acts"><a class="btn primary" style="flex:1" href="#">عرض المنتج</a><button class="iconbtn" aria-pressed="true" aria-label="في المقارنة" style="background:var(--ink);color:var(--canvas);border-color:var(--ink)"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 005 0L5 8zM19 8l-2.5 6a3 3 0 005 0L19 8z"/><path d="M12 4l-1.5 2h3z"/></svg></button><button class="iconbtn" aria-label="حفظ"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.6-7 10-7 10z"/></svg></button></div>
+  </div>
+</article>
+
+<article class="alt" aria-labelledby="r2">
+  <div class="m"><img src="https://levonis-iq.com/files/products/catalog/gallery/dfac20332f2ef9632ef496a548f2e7c253e7f999e7cd8367c38a6a9a154afc05.webp" alt=""><span class="rk num">2</span></div>
+  <div><h2 id="r2" dir="ltr">Bambu Lab H2S</h2>
+    <div class="pr"><span><span class="amt num">2,450,000</span> <span class="cur">د.ع</span></span></div>
+    <div style="margin-top:2px"><span class="av ok"><i></i>متوفر الآن — بقي 1</span></div>
+    <div class="why"><ul>
+      <li><svg class="ic " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>أكبر حجم طباعة: <span class="num ltr" dir="ltr">340 × 320 × 340</span></span></li>
+      <li class="warn"><svg class="ic " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg><span>في أعلى ميزانيتك</span></li>
+    </ul></div>
+  </div>
+  <div class="acts2"><a class="btn ghost sm" style="flex:1" href="#">عرض المنتج</a><button class="btn sm" style="background:var(--ink);color:var(--canvas)"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>في المقارنة</button></div>
+</article>
+
+<article class="alt" aria-labelledby="r3">
+  <div class="m"><img src="https://levonis-iq.com/files/products/catalog/gallery/8aa8900e7ed83398493d2bfc90adcda95e97ef2ee28c9a2131dc28cc183b2e0a.webp" alt=""><span class="rk num">3</span></div>
+  <div><h2 id="r3" dir="ltr">Bambu Lab P2S / P2S Combo</h2>
+    <div class="pr"><span><span class="muted" style="font-size:11px">يبدأ من </span><span class="amt num">1,329,000</span> <span class="cur">د.ع</span></span></div>
+    <div style="margin-top:2px"><span class="av pre"><i></i>طلب مسبق</span></div>
+    <div class="why"><ul>
+      <li><svg class="ic " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>هيكل مغلق وحتى <span class="num">20</span> لونًا</span></li>
+      <li class="warn"><svg class="ic " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg><span>سرعة <span class="num ltr" dir="ltr">600 mm/s</span></span></li>
+    </ul></div>
+  </div>
+  <div class="acts2"><a class="btn ghost sm" style="flex:1" href="#">عرض المنتج</a><button class="btn ghost sm"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 005 0L5 8zM19 8l-2.5 6a3 3 0 005 0L19 8z"/><path d="M12 4l-1.5 2h3z"/></svg>قارن</button></div>
+</article>
+
+<div style="padding:12px var(--gut) 0"><a class="btn ghost block" href="/compare?ids=x2d,h2s,p2s"><svg class="ic " width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 005 0L5 8zM19 8l-2.5 6a3 3 0 005 0L19 8z"/><path d="M12 4l-1.5 2h3z"/></svg>قارن الطابعات الثلاث</a></div>
+<div class="excl"><span><b class="num">7</b> طابعات أخرى: <span class="num">6</span> خارج ميزانيتك، و<span dir="ltr">Snapmaker U1</span> رابعة لأنها تطبع <span class="num">4</span> ألوان فقط</span><svg class="ic " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div>
+
+<div class="human"><span class="g"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 14v-2a7 7 0 0114 0v2"/><rect x="4" y="13.5" width="3.5" height="5.5" rx="1.5"/><rect x="16.5" y="13.5" width="3.5" height="5.5" rx="1.5"/><path d="M18 19c0 1.2-1.5 2-4 2"/></svg></span><span style="flex:1"><b>هل تريد مساعدة بشرية؟</b><span>نرسل إجاباتك لفريق ليفونيس ويكمل معك من حيث توقفت.</span></span><a class="btn gold sm" href="/support?ask=choose_printer">تحدث معنا</a></div>
+</div>
+</body>
+</html>

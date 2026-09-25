@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<meta name="shot" content="full=1">
+<title>صفحة الفئة: الطابعات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@300..900&display=swap">
+<!-- Levonis UX mockup. Light theme tokens from src/index.css (THEME TOKENS, light).
+     Product data and photographs: the live public API, GET only. -->
+<style>
+:root{
+  --canvas:#f3f0ea; --surface:#fbfaf7; --raised:#ffffff; --selected:#ebe6dc; --line:#e0dace; --line-2:#d3ccbf;
+  --ink:#16181b; --ink-2:#45484e; --muted:#5f6268; --faint:#8b8d92;
+  --gold:#7a6331; --gold-fill:#bca36b; --gold-ink:#111214;
+  --charcoal:#0e1013; --charcoal-2:#14171c; --ivory:#f3f0ea;
+  --ok:#1b7046; --ok-soft:#e3efe7; --warn:#92590c; --warn-soft:#f5ead6; --danger:#b3343a; --pro:#bb3e52;
+  --focus:#7a6331;
+  --shadow-2:0 12px 32px -16px rgb(22 24 27/.22); --shadow-3:0 28px 70px -28px rgb(22 24 27/.34);
+  --r-card:14px; --gut:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--canvas)}
+body{font-family:'Cairo',system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 0;line-height:1.5}
+.screen{width:390px;min-height:844px;margin:0 auto;position:relative;overflow:hidden;background:var(--canvas)}
+.num{unicode-bidi:isolate;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"lnum" 1}
+.ltr{direction:ltr;unicode-bidi:isolate}
+.ic{display:block;flex:none}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0}
+
+/* ---------- top bar */
+.topbar{position:sticky;top:0;z-index:20;height:56px;display:flex;align-items:center;gap:10px;padding:0 var(--gut);
+  background:rgb(243 240 234/.88);backdrop-filter:blur(18px) saturate(160%);border-bottom:1px solid transparent}
+.topbar.edge{border-bottom-color:var(--line)}
+.iconbtn{width:40px;height:40px;border-radius:999px;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line);color:var(--ink);position:relative;flex:none}
+.iconbtn.bare{background:transparent;border-color:transparent}
+.topbar .title{flex:1;min-width:0}
+.topbar .title b{display:block;font-size:16px;font-weight:800;line-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .title small{display:block;font-size:11.5px;color:var(--muted);line-height:16px}
+.dotbadge{position:absolute;top:-3px;inset-inline-end:-3px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--ink);color:var(--canvas);font-size:10.5px;font-weight:800;display:grid;place-items:center;border:2px solid var(--canvas)}
+
+/* ---------- section heads */
+.sec{padding:0 var(--gut)}
+.sechead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.sechead h2{font-size:17px;line-height:26px;font-weight:800}
+.sechead h2 small{font-size:12px;color:var(--muted);font-weight:600;margin-inline-start:6px}
+.seeall{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:var(--ink-2);min-height:44px;padding:0 2px}
+
+/* ---------- chips */
+.chips{display:flex;gap:6px;overflow:hidden;padding:0 var(--gut)}
+.chip{height:32px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:12.5px;font-weight:700;color:var(--ink-2);display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:none}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--canvas)}
+.chip .c{font-weight:600;color:var(--muted)}
+.chip.on .c{color:rgb(243 240 234/.7)}
+.chip.x{background:var(--selected);border-color:transparent;color:var(--ink);padding-inline-end:8px}
+
+/* ---------- PRODUCT CARD (compact) */
+.pc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden;display:flex;flex-direction:column;min-width:0;position:relative}
+.pc-media{position:relative;aspect-ratio:6/5;background:var(--charcoal);overflow:hidden}
+.pc-media img{width:100%;height:100%;object-fit:cover;object-position:50% 4%;display:block}
+.pc-cmp{position:absolute;top:6px;inset-inline-start:6px;width:30px;height:30px;border-radius:999px;display:grid;place-items:center;
+  background:rgb(14 16 19/.52);backdrop-filter:blur(8px);color:#f3f0ea;border:1px solid rgb(255 255 255/.14)}
+.pc-cmp.on{background:#f3f0ea;color:var(--ink);border-color:#f3f0ea}
+.pc-sale{position:absolute;top:8px;inset-inline-end:8px;height:18px;padding:0 6px;border-radius:5px;background:var(--danger);color:#fff;font-size:10px;font-weight:800;letter-spacing:.04em;display:grid;place-items:center}
+.pc-body{padding:9px 10px 10px;display:flex;flex-direction:column;flex:1;min-width:0}
+.pc-name{font-size:12.5px;line-height:17px;font-weight:600;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px;text-align:right}
+.pc-price{margin-top:6px;display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;min-width:0}
+.pc-price .from{font-size:10px;color:var(--muted);font-weight:600}
+.pc-price .amt{font-size:15px;font-weight:800;letter-spacing:-.01em;line-height:20px}
+.pc-price .cur{font-size:10.5px;font-weight:700;color:var(--ink-2)}
+.pc-member{display:flex;align-items:center;gap:4px;font-size:10.5px;line-height:15px;color:var(--ink-2);margin-top:1px;white-space:nowrap;overflow:hidden}
+.pc-member b{color:var(--pro);font-weight:800;letter-spacing:.02em}
+.pc-member .ic{color:var(--pro)}
+.pc-avail{margin-top:auto;padding-top:7px;display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;line-height:15px;font-weight:700}
+.av{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.av i{width:6px;height:6px;border-radius:9px;display:block;flex:none}
+.av.ok{color:var(--ok)} .av.ok i{background:var(--ok);box-shadow:0 0 0 3px rgb(27 112 70/.14)}
+.av.pre{color:var(--warn)} .av.pre i{border:1.5px solid var(--warn);width:7px;height:7px}
+.av.off{color:var(--muted)} .av.off i{background:var(--faint)}
+.pc-avail .qty{font-size:10.5px;color:var(--muted);font-weight:600}
+.pc-avail .qty.low{color:var(--warn)}
+
+.rail{display:flex;gap:10px;padding:0 var(--gut);overflow:hidden}
+.rail .pc{width:148px;flex:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 var(--gut)}
+
+/* ---------- buttons */
+.btn{height:44px;border-radius:12px;padding:0 16px;font-size:14px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.btn.primary{background:var(--ink);color:var(--canvas)}
+.btn.gold{background:var(--gold-fill);color:var(--gold-ink)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.btn.ghost-dark{border:1px solid rgb(243 240 234/.22);color:#f3f0ea}
+.btn.sm{height:36px;border-radius:10px;font-size:12.5px;padding:0 12px}
+.btn.block{width:100%}
+
+/* ---------- bottom nav (the current floating bar) */
+.bnav{direction:ltr;position:absolute;inset-inline:10px;bottom:14px;height:66px;display:flex;align-items:center;justify-content:space-between;z-index:30}
+.bnav .pill{width:142px;height:62px;border-radius:20px;background:#1b1e23;color:#c9ccd2;display:flex;align-items:center;justify-content:space-around;box-shadow:0 10px 30px -12px rgb(0 0 0/.5)}
+.bnav .pill div{display:flex;flex-direction:column;align-items:center;font-size:10.5px;gap:1px}
+.bnav .blob{width:70px;height:70px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#6f7a46,#3b4629 70%);box-shadow:0 10px 26px -8px rgb(59 70 41/.7);display:grid;place-items:center;margin-top:-4px}
+.bnav .blob span{display:flex;gap:9px}
+.bnav .blob span i{width:9px;height:17px;border-radius:9px;background:#f3f0ea;display:block}
+
+/* ---------- misc */
+.hair{height:1px;background:var(--line);margin:0 var(--gut)}
+.muted{color:var(--muted)}
+.cap{font-size:12px;color:var(--muted);line-height:18px}
+.field{height:44px;border-radius:12px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--muted);font-size:13.5px}
+.seg{display:flex;background:var(--selected);border-radius:10px;padding:3px;gap:2px}
+.seg span{flex:1;height:30px;border-radius:8px;display:grid;place-items:center;font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.seg span.on{background:var(--raised);color:var(--ink);box-shadow:0 1px 2px rgb(22 24 27/.1)}
+.switch{width:44px;height:26px;border-radius:13px;background:var(--line-2);position:relative;flex:none}
+.switch::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0/.2)}
+.switch.on{background:var(--ok)}
+.switch.on::after{inset-inline-start:auto;inset-inline-end:3px}
+.dark{background:var(--charcoal);color:var(--ivory)}
+
+.hero{margin:6px var(--gut) 0;border-radius:22px;background:var(--charcoal);color:var(--ivory);position:relative;overflow:hidden;isolation:isolate}
+.hero .hp{position:absolute;left:0;bottom:0;width:54%;height:74%;z-index:-1;overflow:hidden;
+  -webkit-mask-image:linear-gradient(to right,#000 45%,transparent 100%),linear-gradient(to bottom,transparent 0%,#000 40%);-webkit-mask-composite:source-in;
+  mask-image:linear-gradient(to right,#000 45%,transparent 100%),linear-gradient(to bottom,transparent 0%,#000 40%);mask-composite:intersect}
+.hero .hp img{position:absolute;width:170%;left:-36%;top:-50%;max-width:none}
+.hero .in{padding:18px 18px 18px;display:flex;flex-direction:column;min-height:252px;max-width:66%}
+.crumbs{font-size:11.5px;color:rgb(243 240 234/.6);display:flex;gap:6px;align-items:center}
+.hero h1{font-size:24px;line-height:33px;font-weight:800;margin-top:6px;letter-spacing:-.01em}
+.hero p{font-size:12.5px;line-height:20px;color:rgb(243 240 234/.74);margin-top:6px}
+.stats{display:flex;gap:16px;margin-top:14px}
+.stats div{display:flex;flex-direction:column}
+.stats b{font-size:18px;line-height:22px;font-weight:800}
+.stats span{font-size:11px;color:rgb(243 240 234/.62);display:flex;align-items:center;gap:5px}
+.stats span i{width:6px;height:6px;border-radius:9px;background:#4fbf86;display:block}
+.hero .ctas{margin-top:auto;padding-top:16px;display:flex;gap:8px}
+.jump{position:sticky;top:56px;z-index:15;background:rgb(243 240 234/.92);backdrop-filter:blur(14px);padding:10px 0}
+.shelf{margin-top:22px}
+.shelf .sub{font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:10px;padding:0 var(--gut)}
+.brands{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 var(--gut)}
+.brand{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;align-items:center;justify-content:space-between;min-height:72px}
+.brand b{font-size:16px;font-weight:800;display:block;line-height:22px}
+.brand span{font-size:11.5px;color:var(--muted)}
+.brand .go{width:30px;height:30px;border-radius:50%;background:var(--selected);display:grid;place-items:center;color:var(--ink)}
+.finder{margin:24px var(--gut) 0;border-radius:18px;background:var(--surface);border:1px solid var(--line);padding:14px;display:flex;gap:12px;align-items:center}
+.finder .g{width:44px;height:44px;border-radius:12px;background:var(--charcoal);color:var(--gold-fill);display:grid;place-items:center;flex:none}
+.finder b{font-size:14px;font-weight:800;display:block;line-height:20px}
+.finder span{font-size:12px;color:var(--muted);line-height:17px;display:block}
+.minis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 var(--gut)}
+.mini{border-radius:14px;background:var(--charcoal);overflow:hidden;position:relative;height:118px;color:var(--ivory)}
+.mini img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 70%;transform:scale(1.45);transform-origin:50% 75%;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 34%,#000 72%);mask-image:linear-gradient(to bottom,transparent 34%,#000 72%)}
+.mini b{position:relative;display:block;padding:9px 10px;font-size:12px;font-weight:800;line-height:17px}
+</style>
+
+</head>
+<body>
+<div class="screen" style="padding-bottom:110px">
+<header class="topbar">
+  <button class="iconbtn" aria-label="رجوع"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+  <div class="title"></div>
+  <button class="iconbtn" aria-label="بحث"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
+  <button class="iconbtn" aria-label="المقارنة (2)"><svg class="ic " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 005 0L5 8zM19 8l-2.5 6a3 3 0 005 0L19 8z"/><path d="M12 4l-1.5 2h3z"/></svg><span class="dotbadge num">2</span></button>
+</header>
+
+<section class="hero" aria-labelledby="cat-title">
+  <div class="hp" aria-hidden="true"><img src="https://levonis-iq.com/files/products/catalog/gallery/dfac20332f2ef9632ef496a548f2e7c253e7f999e7cd8367c38a6a9a154afc05.webp" alt=""></div>
+  <div class="in">
+    <nav class="crumbs" aria-label="المسار"><span>الفئات</span><svg class="ic " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>الطابعات</span></nav>
+    <h1 id="cat-title">الطابعات ثلاثية الأبعاد</h1>
+    <p>للبيت والعمل، من أول طابعة إلى خط إنتاج صغير.</p>
+    <div class="stats">
+      <div><b class="num">10</b><span>طابعات</span></div>
+      <div><b class="num">4</b><span><i></i>متوفرة الآن</span></div>
+    </div>
+    <div class="ctas"><a class="btn gold sm" href="/printer-finder"><svg class="ic " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19L15 9M14 5v2M18 9h2M17.5 5.5l-1.3 1.3M19 13l-1.3-1.3"/></svg>ساعدني أختار</a><a class="btn ghost-dark sm" href="/compare">قارن الطابعات</a></div>
+  </div>
+</section>
+
+<div class="jump"><div class="chips"><span class="chip on">طابعات FDM <span class="c num">10</span></span><span class="chip">متوفرة الآن <span class="c num">4</span></span><span class="chip">متعددة الألوان</span><span class="chip">حسب العلامة</span></div></div>
+
+<section class="shelf" style="margin-top:8px" aria-labelledby="s1">
+  <div class="sec sechead"><h2 id="s1">طابعات FDM <small class="num">10</small></h2><a class="seeall" href="/categories/printers/fdm-printers">عرض الكل <svg class="ic " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M10 7l-5 5 5 5"/></svg></a></div>
+  <p class="sub">تطبع بخيوط البلاستيك. الأكثر استعمالًا للبيت والعمل.</p>
+  <div class="rail"><a class="pc" href="/product/bambu-lab-a1"><div class="pc-media"><img src="https://levonis-iq.com/files/products/catalog/gallery/59b367652ba8aac4a63cdc0b3cd27783853aace532dd6fea58f080d0bc04c887.webp" alt="Bambu Lab A1 / A1 Combo 3D Printer" loading="lazy"><button class="pc-cmp" aria-pressed="false" aria-label="أضف Bambu Lab A1 / A1 Combo 3D Printer إلى المقارنة"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 005 0L5 8zM19 8l-2.5 6a3 3 0 005 0L19 8z"/><path d="M12 4l-1.5 2h3z"/></svg></button></div><div class="pc-body"><h3 class="pc-name" dir="ltr">Bambu Lab A1 / A1 Combo 3D Printer</h3><div class="pc-price"><span class="from">يبدأ من</span><span class="amt num">749,000</span><span class="cur">د.ع</span></div><div class="pc-member"><svg class="ic " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="num">674,100</span><span>لأعضاء</span><b>PRO</b></div><div class="pc-avail"><span class="av ok"><i></i>متوفر الآن</span><span class="qty num">5 قطع</span></div></div></a><a class="pc" href="/product/bambu-lab-x2d"><div class="pc-media"><img src="https://levonis-iq.com/files/products/catalog/gallery/eb339906c2ff133970abad3a7198b71128ef935a9d5c2ba4e35b56b7bfac727f.webp" alt="Bambu Lab X2D / X2D Combo / X2D Print More Bundle 3D Printer" loading="lazy"><button class="pc-cmp on" aria-pressed="true" aria-label="أضف Bambu Lab X2D / X2D Combo / X2D Print More Bundle 3D Printer إلى المقارنة"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg></button></div><div class="pc-body"><h3 class="pc-name" dir="ltr">Bambu Lab X2D / X2D Combo / X2D Print More Bundle 3D Printer</h3><div class="pc-price"><span class="from">يبدأ من</span><span class="amt num">1,575,000</span><span class="cur">د.ع</span></div><div class="pc-member"><svg class="ic " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="num">1,475,000</span><span>لأعضاء</span><b>PRO</b></div><div class="pc-avail"><span class="av ok"><i></i>متوفر الآن</span><span class="qty low num">بقي 2</span></div></div></a><a class="pc" href="/product/snapmaker-u1"><div class="pc-media"><img src="https://levonis-iq.com/files/products/catalog/gallery/db534adde2b890e7862a7012a8d818cd5caf33bf71379b21256e11527e2e49fe.webp" alt="Snapmaker U1 3D Printer" loading="lazy"><button class="pc-cmp" aria-pressed="false" aria-label="أضف Snapmaker U1 3D Printer إلى المقارنة"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 005 0L5 8zM19 8l-2.5 6a3 3 0 005 0L19 8z"/><path d="M12 4l-1.5 2h3z"/></svg></button></div><div class="pc-body"><h3 class="pc-name" dir="ltr">Snapmaker U1 3D Printer</h3><div class="pc-price"><span class="from">يبدأ من</span><span class="amt num">1,579,000</span><span class="cur">د.ع</span></div><div class="pc-member"><svg class="ic " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="num">1,479,000</span><span>لأعضاء</span><b>PRO</b></div><div class="pc-avail"><span class="av ok"><i></i>متوفر الآن</span><span class="qty num">5 قطع</span></div></div></a><a class="pc" href="/product/bambu-lab-h2s"><div class="pc-media"><img src="https://levonis-iq.com/files/products/catalog/gallery/dfac20332f2ef9632ef496a548f2e7c253e7f999e7cd8367c38a6a9a154afc05.webp" alt="Bambu Lab H2S / H2S AMS Combo / H2S Laser Full Combo 10W" loading="lazy"><button class="pc-cmp" aria-pressed="false" aria-label="أضف Bambu Lab H2S / H2S AMS Combo / H2S Laser Full Combo 10W إلى المقارنة"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 005 0L5 8zM19 8l-2.5 6a3 3 0 005 0L19 8z"/><path d="M12 4l-1.5 2h3z"/></svg></button></div><div class="pc-body"><h3 class="pc-name" dir="ltr">Bambu Lab H2S / H2S AMS Combo / H2S Laser Full Combo 10W</h3><div class="pc-price"><span class="from">يبدأ من</span><span class="amt num">2,450,000</span><span class="cur">د.ع</span></div><div class="pc-member"><svg class="ic " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="num">2,350,000</span><span>لأعضاء</span><b>PRO</b></div><div class="pc-avail"><span class="av ok"><i></i>متوفر الآن</span><span class="qty low num">بقي 1</span></div></div></a></div>
+</section>
+
+<section class="shelf" aria-labelledby="s2">
+  <div class="sec sechead"><h2 id="s2">جاهزة للتسليم الآن <small class="num">4</small></h2><a class="seeall" href="#">عرض الكل <svg class="ic " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M10 7l-5 5 5 5"/></svg></a></div>
+  <p class="sub">بيع مباشر من مخزون ليفونيس في العراق.</p>
+  <div class="rail"><a class="pc" href="/product/snapmaker-u1"><div class="pc-media"><img src="https://levonis-iq.com/files/products/catalog/gallery/db534adde2b890e7862a7012a8d818cd5caf33bf71379b21256e11527e2e49fe.webp" alt="Snapmaker U1 3D Printer" loading="lazy"><button class="pc-cmp" aria-pressed="false" aria-label="أضف Snapmaker U1 3D Printer إلى المقارنة"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 005 0L5 8zM19 8l-2.5 6a3 3 0 005 0L19 8z"/><path d="M12 4l-1.5 2h3z"/></svg></button></div><div class="pc-body"><h3 class="pc-name" dir="ltr">Snapmaker U1 3D Printer</h3><div class="pc-price"><span class="from">يبدأ من</span><span class="amt num">1,579,000</span><span class="cur">د.ع</span></div><div class="pc-member"><svg class="ic " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="num">1,479,000</span><span>لأعضاء</span><b>PRO</b></div><div class="pc-avail"><span class="av ok"><i></i>متوفر الآن</span><span class="qty num">5 قطع</span></div></div></a><a class="pc" href="/product/bambu-lab-a1"><div class="pc-media"><img src="https://levonis-iq.com/files/products/catalog/gallery/59b367652ba8aac4a63cdc0b3cd27783853aace532dd6fea58f080d0bc04c887.webp" alt="Bambu Lab A1 / A1 Combo 3D Printer" loading="lazy"><button class="pc-cmp" aria-pressed="false" aria-label="أضف Bambu Lab A1 / A1 Combo 3D Printer إلى المقارنة"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 005 0L5 8zM19 8l-2.5 6a3 3 0 005 0L19 8z"/><path d="M12 4l-1.5 2h3z"/></svg></button></div><div class="pc-body"><h3 class="pc-name" dir="ltr">Bambu Lab A1 / A1 Combo 3D Printer</h3><div class="pc-price"><span class="from">يبدأ من</span><span class="amt num">749,000</span><span class="cur">د.ع</span></div><div class="pc-member"><svg class="ic " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="num">674,100</span><span>لأعضاء</span><b>PRO</b></div><div class="pc-avail"><span class="av ok"><i></i>متوفر الآن</span><span class="qty num">5 قطع</span></div></div></a><a class="pc" href="/product/bambu-lab-x2d"><div class="pc-media"><img src="https://levonis-iq.com/files/products/catalog/gallery/eb339906c2ff133970abad3a7198b71128ef935a9d5c2ba4e35b56b7bfac727f.webp" alt="Bambu Lab X2D / X2D Combo / X2D Print More Bundle 3D Printer" loading="lazy"><button class="pc-cmp on" aria-pressed="true" aria-label="أضف Bambu Lab X2D / X2D Combo / X2D Print More Bundle 3D Printer إلى المقارنة"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg></button></div><div class="pc-body"><h3 class="pc-name" dir="ltr">Bambu Lab X2D / X2D Combo / X2D Print More Bundle 3D Printer</h3><div class="pc-price"><span class="from">يبدأ من</span><span class="amt num">1,575,000</span><span class="cur">د.ع</span></div><div class="pc-member"><svg class="ic " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="num">1,475,000</span><span>لأعضاء</span><b>PRO</b></div><div class="pc-avail"><span class="av ok"><i></i>متوفر الآن</span><span class="qty low num">بقي 2</span></div></div></a><a class="pc" href="/product/bambu-lab-h2s"><div class="pc-media"><img src="https://levonis-iq.com/files/products/catalog/gallery/dfac20332f2ef9632ef496a548f2e7c253e7f999e7cd8367c38a6a9a154afc05.webp" alt="Bambu Lab H2S / H2S AMS Combo / H2S Laser Full Combo 10W" loading="lazy"><button class="pc-cmp on" aria-pressed="true" aria-label="أضف Bambu Lab H2S / H2S AMS Combo / H2S Laser Full Combo 10W إلى المقارنة"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg></button></div><div class="pc-body"><h3 class="pc-name" dir="ltr">Bambu Lab H2S / H2S AMS Combo / H2S Laser Full Combo 10W</h3><div class="pc-price"><span class="from">يبدأ من</span><span class="amt num">2,450,000</span><span class="cur">د.ع</span></div><div class="pc-member"><svg class="ic " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="num">2,350,000</span><span>لأعضاء</span><b>PRO</b></div><div class="pc-avail"><span class="av ok"><i></i>متوفر الآن</span><span class="qty low num">بقي 1</span></div></div></a></div>
+</section>
+
+<section class="shelf" aria-labelledby="s3">
+  <div class="sec sechead"><h2 id="s3">للطباعة بأكثر من لون</h2><a class="seeall" href="#">عرض الكل <svg class="ic " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M10 7l-5 5 5 5"/></svg></a></div>
+  <p class="sub">16 لونًا فأكثر في الطبعة الواحدة، حسب ورقة مواصفات كل طابعة.</p>
+  <div class="rail"><a class="pc" href="/product/bambu-lab-x2d"><div class="pc-media"><img src="https://levonis-iq.com/files/products/catalog/gallery/eb339906c2ff133970abad3a7198b71128ef935a9d5c2ba4e35b56b7bfac727f.webp" alt="Bambu Lab X2D / X2D Combo / X2D Print More Bundle 3D Printer" loading="lazy"><button class="pc-cmp on" aria-pressed="true" aria-label="أضف Bambu Lab X2D / X2D Combo / X2D Print More Bundle 3D Printer إلى المقارنة"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg></button></div><div class="pc-body"><h3 class="pc-name" dir="ltr">Bambu Lab X2D / X2D Combo / X2D Print More Bundle 3D Printer</h3><div class="pc-price"><span class="from">يبدأ من</span><span class="amt num">1,575,000</span><span class="cur">د.ع</span></div><div class="pc-member"><svg class="ic " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="num">1,475,000</span><span>لأعضاء</span><b>PRO</b></div><div class="pc-avail"><span class="av ok"><i></i>متوفر الآن</span><span class="qty low num">بقي 2</span></div></div></a><a class="pc" href="/product/bambu-lab-h2s"><div class="pc-media"><img src="https://levonis-iq.com/files/products/catalog/gallery/dfac20332f2ef9632ef496a548f2e7c253e7f999e7cd8367c38a6a9a154afc05.webp" alt="Bambu Lab H2S / H2S AMS Combo / H2S Laser Full Combo 10W" loading="lazy"><button class="pc-cmp on" aria-pressed="true" aria-label="أضف Bambu Lab H2S / H2S AMS Combo / H2S Laser Full Combo 10W إلى المقارنة"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg></button></div><div class="pc-body"><h3 class="pc-name" dir="ltr">Bambu Lab H2S / H2S AMS Combo / H2S Laser Full Combo 10W</h3><div class="pc-price"><span class="from">يبدأ من</span><span class="amt num">2,450,000</span><span class="cur">د.ع</span></div><div class="pc-member"><svg class="ic " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="num">2,350,000</span><span>لأعضاء</span><b>PRO</b></div><div class="pc-avail"><span class="av ok"><i></i>متوفر الآن</span><span class="qty low num">بقي 1</span></div></div></a><a class="pc" href="/product/bambu-lab-p2s"><div class="pc-media"><img src="https://levonis-iq.com/files/products/catalog/gallery/8aa8900e7ed83398493d2bfc90adcda95e97ef2ee28c9a2131dc28cc183b2e0a.webp" alt="Bambu Lab P2S / P2S Combo 3D Printer" loading="lazy"><button class="pc-cmp" aria-pressed="false" aria-label="أضف Bambu Lab P2S / P2S Combo 3D Printer إلى المقارنة"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 005 0L5 8zM19 8l-2.5 6a3 3 0 005 0L19 8z"/><path d="M12 4l-1.5 2h3z"/></svg></button></div><div class="pc-body"><h3 class="pc-name" dir="ltr">Bambu Lab P2S / P2S Combo 3D Printer</h3><div class="pc-price"><span class="from">يبدأ من</span><span class="amt num">1,329,000</span><span class="cur">د.ع</span></div><div class="pc-member"><svg class="ic " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="num">1,229,000</span><span>لأعضاء</span><b>PRO</b></div><div class="pc-avail"><span class="av pre"><i></i>طلب مسبق</span></div></div></a><a class="pc" href="/product/bambu-lab-a2l"><div class="pc-media"><img src="https://levonis-iq.com/files/products/catalog/gallery/418a6cd1c0215aeb1aa51ffc9045f1628bc7e014e1fa11119990736beca2e43e.webp" alt="Bambu Lab A2L / A2L Combo / A2L Cutting Full Combo 3D Printer" loading="lazy"><button class="pc-cmp" aria-pressed="false" aria-label="أضف Bambu Lab A2L / A2L Combo / A2L Cutting Full Combo 3D Printer إلى المقارنة"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 005 0L5 8zM19 8l-2.5 6a3 3 0 005 0L19 8z"/><path d="M12 4l-1.5 2h3z"/></svg></button></div><div class="pc-body"><h3 class="pc-name" dir="ltr">Bambu Lab A2L / A2L Combo / A2L Cutting Full Combo 3D Printer</h3><div class="pc-price"><span class="from">يبدأ من</span><span class="amt num">1,024,000</span><span class="cur">د.ع</span></div><div class="pc-member"><svg class="ic " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="num">924,000</span><span>لأعضاء</span><b>PRO</b></div><div class="pc-avail"><span class="av pre"><i></i>طلب مسبق</span></div></div></a></div>
+</section>
+
+<section class="shelf" aria-labelledby="s4">
+  <div class="sec sechead"><h2 id="s4">حسب العلامة التجارية</h2></div>
+  <div class="brands">
+    <a class="brand" href="#"><div><b class="ltr">Bambu Lab</b><span class="num">9 طابعات</span></div><span class="go"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></span></a>
+    <a class="brand" href="#"><div><b class="ltr">Snapmaker</b><span class="num">طابعة واحدة</span></div><span class="go"><svg class="ic " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></span></a>
+  </div>
+</section>
+
+<a class="finder" href="/printer-finder"><span class="g"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19L15 9M14 5v2M18 9h2M17.5 5.5l-1.3 1.3M19 13l-1.3-1.3"/></svg></span><span style="flex:1"><b>لست متأكدًا أيها يناسبك؟</b><span>ستة أسئلة قصيرة، ونرشّح لك أفضل ثلاث طابعات مع السبب.</span></span><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></a>
+
+<section class="shelf" aria-labelledby="s5">
+  <div class="sec sechead"><h2 id="s5">يكمّل طابعتك</h2></div>
+  <div class="minis">
+    <a class="mini" href="#"><img src="https://levonis-iq.com/files/products/catalog/gallery/0ce8105fe0981f25437a34aa7c3bb97373ce0328f154c1f3e384795624ad7481.webp" alt=""><b>مواد الطباعة</b></a>
+    <a class="mini" href="#"><img src="https://levonis-iq.com/files/products/catalog/gallery/bfdd1ff6fc51edca9fb92d5cd9ca22bcaf480d23d140347a8b2d787298197072.webp" alt=""><b>ملحقات الطابعات</b></a>
+    <a class="mini" href="#"><img src="https://levonis-iq.com/files/products/catalog/gallery/245d532b7474db2fa0e51119b80059de74d563b70a25578ba338e9c9a6f05e42.webp" alt=""><b>مستلزمات Maker</b></a>
+  </div>
+</section>
+<nav class="bnav" aria-label="التنقل">
+  <div class="pill"><div><svg class="ic " width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0114 0"/></svg>الحساب</div><div><svg class="ic " width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6.5a3 3 0 016 0V8"/></svg>السلة</div></div>
+  <div class="blob"><span><i></i><i></i></span></div>
+  <div class="pill"><div><svg class="ic " width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 18l1.2-3.3A7 7 0 1119 12a7 7 0 01-10.3 6.2z"/><path d="M9 12h.01M12 12h.01M15 12h.01"/></svg>المحادثات</div></div>
+</nav>
+</div>
+</body>
+</html>
