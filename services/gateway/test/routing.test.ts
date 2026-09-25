@@ -83,6 +83,8 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/merchant/attention': 'MARKETPLACE',
   '/api/merchant/search': 'MARKETPLACE',
   '/api/merchant/customers': 'MARKETPLACE',
+  // W5-B: the workshop's «مناسب لي» board, live eligibility verdicts and private request costing.
+  '/api/merchant/workshop': 'MARKETPLACE',
   '/api/merchant/orders': 'MARKETPLACE',
   '/api/storefront/events': 'MARKETPLACE',
   '/api/storefront': 'MARKETPLACE',

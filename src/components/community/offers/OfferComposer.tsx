@@ -31,11 +31,18 @@ export default function OfferComposer({
   materials,
   onClose,
   onSaved,
+  prefill = null,
 }: {
   open: boolean;
   requestId: string;
   /** Present when editing. */
   offer?: OfferV2 | null;
+  /**
+   * «استخدم هذا كعرضي» (W5-B): the price of the workshop's own private costing,
+   * and its quote id. It only fills the form — nothing is sent until the
+   * merchant sends it, and then the quote is marked `offered`.
+   */
+  prefill?: { price_iqd: number; quote_id: string } | null;
   /** The catalogue, already narrowed to what the job can be made in. */
   materials: CatalogMaterial[];
   onClose: () => void;
@@ -60,7 +67,7 @@ export default function OfferComposer({
     if (!open) return;
     setError('');
     setInvalid({});
-    setPrice(offer?.price_iqd ?? null);
+    setPrice(prefill?.price_iqd ?? offer?.price_iqd ?? null);
     setDays(offer?.completion_days || null);
     setDelivery((['pickup', 'merchant_delivery', 'courier'].includes(offer?.delivery_method ?? '') ? offer!.delivery_method : 'merchant_delivery') as OfferDeliveryMethod);
     setPicked(offer?.material_ids ?? []);
@@ -68,7 +75,7 @@ export default function OfferComposer({
     setWarranty(offer?.warranty_terms ?? '');
     setMessage(offer?.message ?? '');
     setValid(7);
-  }, [open, offer]);
+  }, [open, offer, prefill]);
 
   async function submit() {
     const bad: typeof invalid = {};
@@ -86,6 +93,7 @@ export default function OfferComposer({
       warranty_terms: warranty.trim(),
       valid_days: valid,
       message: message.trim(),
+      ...(prefill && !editing ? { quote_id: prefill.quote_id } : {}),
     };
     try {
       const d = editing ? await offersApi.edit(offer!.id, terms) : await offersApi.create(requestId, terms);

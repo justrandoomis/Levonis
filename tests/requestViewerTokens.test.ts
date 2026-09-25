@@ -58,6 +58,9 @@ function seed(opts: { gate?: string } = {}) {
     INSERT INTO community_requests (id,customer_id,title,description,state,status,visibility,offer_count,expires_at)
       VALUES ('r1','buyer','A crown','A dental crown model','receiving_offers','open','public',1,'2099-01-01T00:00:00.000Z');
     INSERT INTO community_offers (id,request_id,merchant_id,store_id,price_iqd,state) VALUES ('o1','r1','m1','s1',50000,'pending');
+    -- Since W5-B the board part of the preview is the ELIGIBILITY verdict: each shop has a printer that can make a crown.
+    INSERT INTO merchant_printers (id,merchant_id,store_id,name,technology,build_x_mm,build_y_mm,build_z_mm) VALUES
+      ('p1','m1','s1','P1S','fdm',256,256,250), ('p2','m2','s2','P1S','fdm',256,256,250), ('p3','m3','s3','P1S','fdm',256,256,250);
     INSERT INTO community_request_files (id,request_id,file_key,file_name,content_type,size_bytes,kind,analysis,model_format,preview_key)
       VALUES ('f1','r1','requests/buyer/x.stl','Sara_Ahmed_dental_crown.stl','model/stl',84,'model',
               '{"dimensions_mm":{"x":10,"y":10,"z":10},"volume_mm3":1000}','stl','request-previews/r1/f1.lvm');
@@ -66,7 +69,10 @@ function seed(opts: { gate?: string } = {}) {
   raw.prepare("INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate', ?)").run(opts.gate ?? '{"open":true}');
   const bucket = new MemoryBucket();
   void bucket.put('requests/buyer/x.stl', new Uint8Array(84));
-  void bucket.put('request-previews/r1/f1.lvm', new Uint8Array([0x4c, 0x56, 0x4d, 0x31, 0, 0, 0, 0]));
+  // An LVM1 header (magic, zero triangles, the box) — enough for the coarse preview to derive from.
+  const lvm = new Uint8Array(32);
+  lvm.set([0x4c, 0x56, 0x4d, 0x31], 0);
+  void bucket.put('request-previews/r1/f1.lvm', lvm);
   return { raw, bucket };
 }
 
@@ -107,13 +113,15 @@ test('F: the link lives minutes, not days — whatever the caller asks for', asy
 test('F: the viewer never tells a link-holder the customer\'s file name', async () => {
   const { raw, bucket } = seed();
   const { token } = await json(await mint(raw, bucket, 'owner2'));
-  const meta = await get(as(raw, bucket, null), `/api/marketplace/print/viewer/${token}`);
+  // The link is bound to the account that minted it (W5-B): it opens for Omar, and for nobody else.
+  assert.equal((await get(as(raw, bucket, null), `/api/marketplace/print/viewer/${token}`)).status, 404);
+  const meta = await get(as(raw, bucket, 'owner2'), `/api/marketplace/print/viewer/${token}`);
   assert.equal(meta.status, 200);
   const text = await meta.text();
   assert.ok(!text.includes('Sara_Ahmed'), text);
   assert.ok(!('name' in JSON.parse(text)), text);
   assert.equal(JSON.parse(text).format, 'stl');
-  const mesh = await get(as(raw, bucket, null), `/api/marketplace/print/viewer/${token}/mesh`);
+  const mesh = await get(as(raw, bucket, 'owner2'), `/api/marketplace/print/viewer/${token}/mesh`);
   assert.equal(mesh.status, 200);
 });
 
@@ -121,8 +129,8 @@ test('F: cancelling the request kills its links, and no new one can be minted', 
   const { raw, bucket } = seed();
   const { token } = await json(await mint(raw, bucket, 'owner2'));
   assert.equal((await post(as(raw, bucket, 'buyer'), '/api/marketplace/requests/r1/cancel')).status, 200);
-  assert.equal((await get(as(raw, bucket, null), `/api/marketplace/print/viewer/${token}`)).status, 404);
-  assert.equal((await get(as(raw, bucket, null), `/api/marketplace/print/viewer/${token}/mesh`)).status, 404);
+  assert.equal((await get(as(raw, bucket, 'owner2'), `/api/marketplace/print/viewer/${token}`)).status, 404);
+  assert.equal((await get(as(raw, bucket, 'owner2'), `/api/marketplace/print/viewer/${token}/mesh`)).status, 404);
   const again = await mint(raw, bucket, 'buyer');
   assert.equal(again.status, 409);
   assert.equal((await json(again)).code, 'REQUEST_CLOSED');
@@ -133,7 +141,7 @@ test('F: a closed request refuses its links at use time even if nothing revoked 
   const { token } = await json(await mint(raw, bucket, 'buyer'));
   raw.exec("UPDATE community_requests SET state = 'expired', status = 'closed' WHERE id = 'r1'");
   assert.equal(row<{ revoked_at: string | null }>(raw, 'SELECT revoked_at FROM model_view_tokens')?.revoked_at, null);
-  assert.equal((await get(as(raw, bucket, null), `/api/marketplace/print/viewer/${token}`)).status, 404);
+  assert.equal((await get(as(raw, bucket, 'buyer'), `/api/marketplace/print/viewer/${token}`)).status, 404);
 });
 
 test('F: acceptance revokes the losing merchants\' links; the customer\'s and the winner\'s keep working', async () => {
@@ -145,11 +153,12 @@ test('F: acceptance revokes the losing merchants\' links; the customer\'s and th
   const mine = (await json(await mint(raw, bucket, 'buyer'))).token;
   const acc = await post(as(raw, bucket, 'buyer'), '/api/marketplace/offers/o1/accept', { expected_price_iqd: 50_000, offer_revision: 1 });
   assert.equal(acc.status, 201);
-  assert.equal((await get(as(raw, bucket, null), `/api/marketplace/print/viewer/${loser}`)).status, 404);
-  assert.equal((await get(as(raw, bucket, null), `/api/marketplace/print/viewer/${winner}`)).status, 200);
-  assert.equal((await get(as(raw, bucket, null), `/api/marketplace/print/viewer/${mine}`)).status, 200);
+  assert.equal((await get(as(raw, bucket, 'owner2'), `/api/marketplace/print/viewer/${loser}`)).status, 404);
+  assert.equal((await get(as(raw, bucket, 'owner'), `/api/marketplace/print/viewer/${winner}`)).status, 200);
+  assert.equal((await get(as(raw, bucket, 'buyer'), `/api/marketplace/print/viewer/${mine}`)).status, 200);
   // And a merchant who lost cannot mint a fresh one either.
-  assert.equal((await mint(raw, bucket, 'owner2')).status, 403);
+  // (The request left the board, so to the losing shop it is not there at all.)
+  assert.equal((await mint(raw, bucket, 'owner2')).status, 404);
   assert.equal((await mint(raw, bucket, 'owner')).status, 200, 'the engaged merchant keeps the preview');
 });
 
@@ -171,7 +180,11 @@ test('G: while Levo Community is shut, the original file answers like the board 
 
 test('G: a tester on the allow-list is let through, and the engaged merchant keeps the file with the wall up', async () => {
   const { raw, bucket } = seed({ gate: '{"open":false,"allowed_user_ids":["owner2"]}' });
-  assert.equal((await get(as(raw, bucket, 'owner2'), '/api/marketplace/requests/r1/files/f1')).status, 200);
+  // Let through the wall — but the ORIGINAL model is not a quoting merchant's (W5-B's matrix): they preview it.
+  const tester = await get(as(raw, bucket, 'owner2'), '/api/marketplace/requests/r1/files/f1');
+  assert.equal(tester.status, 403);
+  assert.equal((await json(tester)).code, 'FILE_ORIGINAL_RESTRICTED');
+  assert.equal((await mint(raw, bucket, 'owner2')).status, 200, 'the preview is theirs');
   raw.exec(`UPDATE community_offers SET state = 'accepted' WHERE id = 'o1';
             UPDATE community_requests SET state = 'in_progress', status = 'closed' WHERE id = 'r1';`);
   assert.equal((await get(as(raw, bucket, 'owner'), '/api/marketplace/requests/r1/files/f1')).status, 200);

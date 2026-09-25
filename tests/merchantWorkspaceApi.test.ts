@@ -43,8 +43,9 @@ function world(): DatabaseSync {
       ('r1','buyer','Bracket','Print a bracket','receiving_offers','open','public',0,'2099-01-01T00:00:00.000Z'),
       ('r2','buyer','Hinge','Print a hinge','receiving_offers','open','public',1,'2099-01-01T00:00:00.000Z'),
       ('r3','buyer','Gear','Closed one','closed','closed','public',0,'2099-01-01T00:00:00.000Z');
-    INSERT INTO community_request_matches (id,request_id,merchant_id,eligible) VALUES
-      ('mt1','r1','m1',1), ('mt2','r2','m1',1), ('mt3','r3','m1',1), ('mt4','r1','m2',1), ('mt5','r2','m2',0);
+    -- Verdicts for each request's current revision (1): since W5-B an older revision's verdict counts for nothing.
+    INSERT INTO community_request_matches (id,request_id,merchant_id,eligible,revision) VALUES
+      ('mt1','r1','m1',1,1), ('mt2','r2','m1',1,1), ('mt3','r3','m1',1,1), ('mt4','r1','m2',1,1), ('mt5','r2','m2',0,1);
     INSERT INTO community_offers (id,request_id,merchant_id,store_id,price_iqd,state) VALUES
       ('of1','r2','m1','s1',9000,'pending'), ('of9','r1','m2','s2',9000,'pending');
     INSERT INTO community_orders (id,request_id,offer_id,customer_id,merchant_id,store_id,state,price_iqd,platform_fee_iqd,merchant_receivable_iqd) VALUES
@@ -204,7 +205,13 @@ test('search: customers by name or phone — only people who ordered here, no id
   assert.equal(parseMerchantPath(byName.customers[0].link)?.section, 'orders');
   assert.deepEqual(Object.keys(byName.customers[0]).sort(), ['last_order_at', 'link', 'name', 'order_count']);
 
-  // The account phone, written the national way with Arabic-Indic digits.
+  // The phone the customer GAVE this store on an order (the address
+  // snapshot), written the national way with Arabic-Indic digits. The
+  // ACCOUNT phone is never matched (review W2-5 p7): before the order carries
+  // it, the same search finds nobody.
+  assert.deepEqual((await json(await search(raw, '٠٧٨٠٩٩٩'))).customers, []);
+  raw.exec(`UPDATE orders SET address_snapshot = json_set(CASE WHEN json_valid(address_snapshot) THEN address_snapshot ELSE '{}' END, '$.phone', '0780 999 8877')
+             WHERE user_id = 'buyer2' AND merchant_id = 'm1'`);
   const byPhone = await json(await search(raw, '٠٧٨٠٩٩٩'));
   assert.deepEqual(byPhone.customers.map((c: { name: string }) => c.name), ['Omar Najm']);
   // B's customers are not A's: Omar never bought from Zahra.

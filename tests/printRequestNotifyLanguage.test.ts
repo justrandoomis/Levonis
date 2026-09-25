@@ -212,12 +212,21 @@ test('a bare request still composes a usable body in all three languages', () =>
  * database, a materials catalogue, a merchant and a printer to observe it.
  */
 test('the publish handler assigns no single variable to both language slots', () => {
-  const src = readFileSync(new URL('../worker/routes/printRequests.ts', import.meta.url), 'utf8');
+  // Since W5-B the publish hands the composed text to the matcher's store
+  // (worker/lib/printMatchingStore.ts), which writes each notice through
+  // `matchingRequestNotice` — so the slots are assigned THERE, and that is the
+  // call site pinned. The handler must still pass the composed text on.
+  const handler = readFileSync(new URL('../worker/routes/printRequests.ts', import.meta.url), 'utf8');
+  assert.match(handler, /const text = printMatchNotification\(/);
+  assert.match(handler, /matchRequest\(env, requestId, \{[^}]*\btext,?/);
+  const notify = readFileSync(new URL('../worker/lib/merchantNotify.ts', import.meta.url), 'utf8');
+  const from = notify.indexOf('export function matchingRequestNotice');
+  const src = notify.slice(from, notify.indexOf('\nexport ', from + 10));
 
   const pair = (a: string, b: string) => {
     const get = (field: string) => {
       const m = src.match(new RegExp(`\\n\\s*${field}:\\s*([^,\\n]+),`));
-      assert.ok(m, `${field} is no longer assigned in printRequests.ts`);
+      assert.ok(m, `${field} is no longer assigned in matchingRequestNotice`);
       return m![1].trim();
     };
     assert.notEqual(get(a), get(b), `${a} and ${b} are fed from the same expression`);

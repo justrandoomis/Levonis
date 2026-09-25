@@ -62,6 +62,8 @@ export interface OfferTermsInput {
   warranty_terms: string;
   valid_days: number;
   message: string;
+  /** The workshop's private costing this offer came from («استخدم هذا كعرضي», W5-B); marks it `offered`. */
+  quote_id?: string;
 }
 
 export interface MyOfferRow extends OfferV2 {

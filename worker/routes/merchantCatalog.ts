@@ -50,6 +50,8 @@ import {
   productInvalid,
   productShape,
   publishableModel,
+  priceMissing,
+  PRICE_MISSING_SQL,
   readExistingModel,
   readProductDetail,
   readProductInput,
@@ -86,6 +88,10 @@ function hiddenByAdmin(reason: string): HttpError {
     { reason }
   );
 }
+
+/** 409 PRODUCT_PRICE_REQUIRED — a published product, and each active variant, must cost more than 0 (owner decision 2026-09-25). */
+const priceRequired = () =>
+  new HttpError(409, 'A published product needs a price above 0 — and so does every variant on sale.', 'PRODUCT_PRICE_REQUIRED');
 
 const notPublishable = () =>
   new HttpError(409, 'A product with variants needs at least one active variant to be published.', 'PRODUCT_NOT_PUBLISHABLE');
@@ -587,6 +593,7 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
   const { results: rows } = await db
     .prepare(
       `SELECT p.id, p.name, p.stock, p.low_stock_threshold, p.publish_state, p.variant_mode, p.admin_hidden_at, p.admin_hidden_reason, p.store_id,
+              ${PRICE_MISSING_SQL('p')} AS price_missing,
               (SELECT COUNT(*) FROM community_product_variants v WHERE v.product_id = p.id AND v.active = 1) AS active_variants,
               (SELECT COUNT(*) FROM order_items i WHERE i.community_product_id = p.id) AS ordered
          FROM community_products p WHERE p.merchant_id = ?1 AND p.id IN (SELECT value FROM json_each(?2))`
@@ -605,6 +612,12 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
     if (action === 'publish') {
       if (r.admin_hidden_at) { results.push({ id, ok: false, code: 'PRODUCT_HIDDEN_BY_ADMIN' }); continue; }
       if (r.variant_mode === 'variants' && Number(r.active_variants) === 0) { results.push({ id, ok: false, code: 'PRODUCT_NOT_PUBLISHABLE' }); continue; }
+      if (Number(r.price_missing)) { results.push({ id, ok: false, code: 'PRODUCT_PRICE_REQUIRED' }); continue; }
+    }
+    // A published product is never set to 0 (owner decision 2026-09-25).
+    if (action === 'set_price' && Number(body.price_iqd) === 0 && stateOf(r) === 'published') {
+      results.push({ id, ok: false, code: 'PRODUCT_PRICE_REQUIRED' });
+      continue;
     }
     if (action === 'set_stock' && r.variant_mode === 'variants') { results.push({ id, ok: false, code: 'VARIANTS_HAVE_OWN_STOCK' }); continue; }
     if (action === 'delete' && Number(r.ordered) > 0) { results.push({ id, ok: false, code: 'PRODUCT_HAS_ORDERS' }); continue; }
@@ -625,7 +638,8 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
           setState(
             'published',
             ` AND admin_hidden_at IS NULL AND (variant_mode <> 'variants'
-               OR EXISTS (SELECT 1 FROM community_product_variants v WHERE v.product_id = community_products.id AND v.active = 1))`
+               OR EXISTS (SELECT 1 FROM community_product_variants v WHERE v.product_id = community_products.id AND v.active = 1))
+               AND NOT ${PRICE_MISSING_SQL('community_products')}`
           ),
         ];
         break;
@@ -644,7 +658,11 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
         break;
       case 'set_price': {
         const price = int(body.price_iqd, 'price_iqd', { min: 0, max: 1_000_000_000 });
-        stmts = [db.prepare(`UPDATE community_products SET price_iqd = ?3, updated_at = ?4 WHERE ${own}`).bind(ej, ctx.merchant.id, price, ts)];
+        stmts = [
+          db
+            .prepare(`UPDATE community_products SET price_iqd = ?3, updated_at = ?4 WHERE ${own} AND (?3 > 0 OR publish_state <> 'published')`)
+            .bind(ej, ctx.merchant.id, price, ts),
+        ];
         break;
       }
       case 'set_stock': {
@@ -768,6 +786,7 @@ merchantCatalogRoutes.post('/products', async (c) => {
   await verifyProductRefs(c, ctx, input);
   const state = input.state ?? 'published';
   if (state === 'published' && !publishableModel(input.variantModel, 0, 'simple')) throw notPublishable();
+  if (state === 'published' && priceMissing(Number(input.fields.price_iqd ?? 0), input.variantModel)) throw priceRequired();
   const id = newId('cp');
   const ts = nowIso();
   await c.env.DB.batch(
@@ -802,8 +821,10 @@ merchantCatalogRoutes.patch('/products/:id', async (c) => {
   const current = await db
     .prepare(
       `SELECT p.id, p.name, p.publish_state, p.lifecycle, p.variant_mode, p.admin_hidden_at, p.admin_hidden_reason, p.stock,
-              p.track_stock, p.low_stock_threshold, p.images,
+              p.track_stock, p.low_stock_threshold, p.images, p.price_iqd,
               (SELECT COUNT(*) FROM community_product_variants v WHERE v.product_id = p.id AND v.active = 1) AS active_variants,
+              (SELECT COUNT(*) FROM community_product_variants v WHERE v.product_id = p.id AND v.active = 1
+                  AND v.price_iqd IS NOT NULL AND v.price_iqd <= 0) AS zero_variants,
               (SELECT json_group_array(media_key) FROM community_product_media m WHERE m.product_id = p.id AND m.kind = 'image') AS image_keys
          FROM community_products p WHERE p.id = ? AND p.merchant_id = ?`
     )
@@ -823,6 +844,17 @@ merchantCatalogRoutes.patch('/products/:id', async (c) => {
   const targetState = input.state ?? currentState;
   if (targetState === 'published' && !publishableModel(input.variantModel, Number(current.active_variants), String(current.variant_mode))) {
     throw notPublishable();
+  }
+  // Publishing — or editing what stays published — needs a price (owner decision 2026-09-25).
+  if (
+    targetState === 'published' &&
+    priceMissing(
+      Number(input.fields.price_iqd ?? current.price_iqd ?? 0),
+      input.variantModel,
+      String(current.variant_mode) === 'variants' ? Number(current.zero_variants ?? 0) : 0
+    )
+  ) {
+    throw priceRequired();
   }
   if (input.variantModel?.groups.length === 0 && input.fields.stock === undefined && String(current.variant_mode) === 'variants') {
     // Leaving variants: the product's own stock must be stated, never inherited from the sum.

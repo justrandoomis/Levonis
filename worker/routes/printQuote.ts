@@ -111,7 +111,8 @@ const GUEST_RETENTION_HOURS = 48;
  *  reported as `platform` so the panel can say the figure is not the shop's. */
 const PLATFORM_ELECTRICITY_IQD_PER_KWH = 120;
 const PLATFORM_LABOR_IQD_PER_HOUR = 6_000;
-const PLATFORM_TARGET_MARGIN_PERCENT = 35;
+/** Exported for the request costing route (W5-B, worker/routes/merchantWorkshop.ts) — one margin, one engine. */
+export const PLATFORM_TARGET_MARGIN_PERCENT = 35;
 
 /**
  * THE OWNER'S MINIMUM JOB CHARGE — WHICH IS NOW ZERO, BY THEIR DECISION.
@@ -186,7 +187,7 @@ function readAccessories(raw: unknown): AccessorySelection[] {
   return out;
 }
 
-async function platformMinimumJobIqd(db: D1Database): Promise<number> {
+export async function platformMinimumJobIqd(db: D1Database): Promise<number> {
   try {
     const cfg = await getSetting(db, 'printPricingConfig');
     const value = Number((cfg as { min_job_iqd?: unknown } | null)?.min_job_iqd);
@@ -241,7 +242,7 @@ async function platformMinimumJobIqd(db: D1Database): Promise<number> {
  * for the last rung — a printer that carries real purchase economics is priced
  * from them, and this never overrides anybody.
  */
-async function platformMachineHourIqd(db: D1Database, technology: 'fdm' | 'resin'): Promise<number> {
+export async function platformMachineHourIqd(db: D1Database, technology: 'fdm' | 'resin'): Promise<number> {
   try {
     const cfg = await getSetting(db, 'printPricingConfig');
     const table = (cfg as { machine_hour_iqd?: unknown } | null)?.machine_hour_iqd;
@@ -1506,7 +1507,7 @@ printQuoteRoutes.post('/analyses/:id/compare', requireAuth, async (c) => {
 
 // ------------------------------------------------------------------- internals
 
-interface PriceForPrinterInput {
+export interface PriceForPrinterInput {
   analysis: PrintAnalysis;
   printer: PrinterModel;
   merchantId: string | null;
@@ -1531,7 +1532,7 @@ interface PriceForPrinterInput {
 
 /** Assembles the frozen input set and hands it to the pure engine. Everything
  *  that reads the database happens HERE; `priceJob` never sees a connection. */
-async function priceForPrinter(
+export async function priceForPrinter(
   c: Context<AppContext>,
   input: PriceForPrinterInput
 ): Promise<{ result: QuoteResult; snapshot: Record<string, unknown> }> {
@@ -1672,7 +1673,7 @@ function publicQuote(r: QuoteResult) {
 }
 
 /** What a merchant may see: all of it. */
-function merchantQuote(r: QuoteResult) {
+export function merchantQuote(r: QuoteResult) {
   return {
     confidence: r.confidence,
     lines: r.lines,

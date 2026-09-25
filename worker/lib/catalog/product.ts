@@ -115,6 +115,15 @@ export function productShape(p: Record<string, unknown>) {
     status: p.status,
     /** Derived, never stored: published-or-not, it has nothing left to sell. */
     sold_out: isSoldOut({ track_stock: tracked, stock }),
+    /**
+     * Published but not for sale: no price (owner decision 2026-09-25). A
+     * product left at 0 from before the rule stays published and is refused at
+     * checkout until the merchant prices it — never silently unpublished.
+     */
+    price_required:
+      state === 'published' &&
+      (!(Number(p.price_iqd) > 0) ||
+        (mode === 'variants' && p.variant_price_min !== null && p.variant_price_min !== undefined && !(Number(p.variant_price_min) > 0))),
     low_stock:
       tracked &&
       (mode === 'variants' ? Number(p.variants_low ?? 0) > 0 || isLowStock(stock, threshold) : isLowStock(stock, threshold)),
@@ -688,6 +697,24 @@ export function variantModelStatements(
 }
 
 /** Whether a product with this model may be published: a variant product needs one active variant. */
+/**
+ * A PUBLISHED PRODUCT COSTS SOMETHING (owner decision 2026-09-25, review W2-5
+ * finding 2): its price above 0, and every ACTIVE variant's price — its own
+ * override, or the product's it inherits — above 0. Commission is on the
+ * goods, so a 0-priced product sold with a delivery fee paid none.
+ * `zeroOwnActiveVariants`: the stored active variants whose own price is 0,
+ * for an edit that does not replace the variant model.
+ */
+export function priceMissing(productPrice: number, model: VariantModel | undefined, zeroOwnActiveVariants = 0): boolean {
+  if (!(Number(productPrice) > 0)) return true;
+  if (model) return model.groups.length > 0 && model.variants.some((v) => v.active && v.price_iqd !== null && !(v.price_iqd > 0));
+  return zeroOwnActiveVariants > 0;
+}
+
+/** SQL: a product row `p` that is NOT sellable for want of a price (the same rule, in the database). */
+export const PRICE_MISSING_SQL = (p: string) => `(${p}.price_iqd <= 0 OR (${p}.variant_mode = 'variants' AND EXISTS (
+  SELECT 1 FROM community_product_variants zv WHERE zv.product_id = ${p}.id AND zv.active = 1 AND COALESCE(zv.price_iqd, ${p}.price_iqd) <= 0)))`;
+
 export function publishableModel(model: VariantModel | undefined, currentActiveVariants: number, currentMode: string): boolean {
   if (model) return model.groups.length === 0 || model.variants.some((v) => v.active);
   return currentMode !== 'variants' || currentActiveVariants > 0;

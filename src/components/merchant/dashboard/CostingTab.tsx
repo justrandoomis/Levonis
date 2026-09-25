@@ -33,6 +33,7 @@ import {
   type QuotePrinter,
 } from '../../../lib/printQuote';
 import { Btn, Card, Empty, Notice, Spinner } from './ui';
+import RequestsToCost from '../workshop/RequestsToCost';
 
 /** One cost component, exactly as the engine emitted it. */
 interface CostLineView {
@@ -127,7 +128,12 @@ function reasonLabel(code: string, en: boolean): string {
   return label ? label[en ? 1 : 0] : code;
 }
 
-export function CostingTab() {
+/**
+ * `requestHref` (W5-B): the address of a customer request's page with its
+ * costing sheet open. Given, the screen leads with the requests this workshop
+ * can cost straight from the customer's file (no re-upload).
+ */
+export function CostingTab({ requestHref }: { requestHref?: (requestId: string) => string } = {}) {
   const { lang, loc } = useLanguage();
   const en = lang === 'en';
 
@@ -231,6 +237,7 @@ export function CostingTab() {
 
   return (
     <div className="space-y-3">
+      {requestHref && <RequestsToCost requestHref={requestHref} />}
       <Card title={loc('الملف', 'The file')}>
         <input
           ref={fileInput}

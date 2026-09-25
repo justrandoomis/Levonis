@@ -403,8 +403,14 @@ test('a superseded offer cannot be accepted — OFFER_STALE — until its mercha
   assert.equal((await post(as(raw, 'buyer'), `/api/marketplace/offers/${made.id}/accept`, { expected_price_iqd: 160_000, offer_revision: o.revision })).status, 201);
 });
 
+/** Since W5-B an offer needs a workshop that can make the job: Omar gets an FDM machine for the PLA jobs below. */
+const omarPrintsFdm = (raw: DatabaseSync) =>
+  raw.exec(`INSERT INTO merchant_printers (id,merchant_id,store_id,name,technology,build_x_mm,build_y_mm,build_z_mm,materials,quality_max)
+            VALUES ('p3','m2','s2','FDM too','fdm',256,256,256,'[]','fine')`);
+
 test('withdraw and decline: a merchant withdraws a superseded offer; the customer declines one and its merchant is told', async () => {
   const raw = seed();
+  omarPrintsFdm(raw);
   const id = await newPublished(raw);
   const a = (await json(await post(as(raw, 'owner'), `/api/marketplace/requests/${id}/offers`, { price_iqd: 40_000 }))).offer;
   const b = (await json(await post(as(raw, 'owner2'), `/api/marketplace/requests/${id}/offers`, { price_iqd: 45_000 }))).offer;
@@ -423,6 +429,7 @@ test('withdraw and decline: a merchant withdraws a superseded offer; the custome
 
 test('contact is revealed by acceptance and not before: the order carries the accepted revision, the merchant gets the delivery contact, the customer the merchant\'s', async () => {
   const raw = seed();
+  omarPrintsFdm(raw);
   fund(raw, 'buyer', 500_000);
   const id = await newPublished(raw);
   const a = (await json(await post(as(raw, 'owner'), `/api/marketplace/requests/${id}/offers`, { price_iqd: 40_000, delivery_method: 'merchant_delivery' }))).offer;
@@ -454,7 +461,9 @@ test('contact is revealed by acceptance and not before: the order carries the ac
   assert.equal(asMerchant.order.contact_snapshot, undefined, 'never the raw pair');
   assert.deepEqual(asMerchant.thread, { request_id: id, merchant_id: 'm1' });
   const asCustomer = await json(await get(as(raw, 'buyer'), `/api/marketplace/orders/${orderId}`));
-  assert.equal(asCustomer.contact.phone, '+9647511111111');
+  // s1 publishes no contact phone: none is revealed — never the merchant
+  // account's private one (review W2-5 #7).
+  assert.equal(asCustomer.contact.phone, '');
   assert.equal(asCustomer.contact.store_slug, 'ali3d');
   assert.equal(asCustomer.contact.address, undefined, 'the customer is shown the merchant, not their own address');
   assert.equal((await get(as(raw, 'owner2'), `/api/marketplace/orders/${orderId}`)).status, 404, 'the losing merchant sees no order');

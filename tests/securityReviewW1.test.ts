@@ -159,6 +159,7 @@ function seedPreview(raw: DatabaseSync) {
       ('mem2','owner2','plus_12mo','plus','active',12,29000,'2026-01-01T00:00:00.000Z','${FUTURE}');
     INSERT INTO community_merchants (id,user_id,name,status) VALUES ('m2','owner2','Omar 3D','active');
     INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s2','m2','owner2','omar3d','Omar 3D');
+    INSERT INTO merchant_printers (id,merchant_id,store_id,name,technology,build_x_mm,build_y_mm,build_z_mm) VALUES ('p2','m2','s2','P1S','fdm',256,256,250);
     INSERT INTO community_request_files (id,request_id,file_key,file_name,content_type,size_bytes,kind,analysis,model_format,preview_key)
       VALUES ('f1','r1','requests/buyer/x.stl','x.stl','model/stl',84,'model','{}','stl','request-previews/r1/f1.lvm');
   `);
@@ -185,14 +186,17 @@ test('S8: a preview link grants no more than its creator still has — it stops 
   const mint = await post(app, '/api/marketplace/print/requests/r1/files/f1/viewer-token');
   assert.equal(mint.status, 200, JSON.stringify(await json(mint.clone())));
   const { token } = await json(mint);
-  const viewer = mp(raw, 'someone-else');
+  // Since W5-B a link opens only for the account that minted it.
+  assert.equal((await get(mp(raw, 'someone-else'), `/api/marketplace/print/viewer/${token}`)).status, 404, 'a link is not a bearer ticket');
+  const viewer = mp(raw, 'owner2');
   assert.equal((await get(viewer, `/api/marketplace/print/viewer/${token}`)).status, 200, 'the link works while its creator may quote');
   raw.exec("UPDATE community_merchants SET status = 'restricted' WHERE id = 'm2'");
   assert.equal((await get(viewer, `/api/marketplace/print/viewer/${token}`)).status, 404, 'and stops with the access it stood on');
   // The request's own customer keeps a link of their own.
-  const own = await post(mp(raw, 'buyer', { BUCKET: new MemoryBucket() }), '/api/marketplace/print/requests/r1/files/f1/viewer-token');
+  const buyer = mp(raw, 'buyer', { BUCKET: new MemoryBucket() });
+  const own = await post(buyer, '/api/marketplace/print/requests/r1/files/f1/viewer-token');
   assert.equal(own.status, 200);
-  assert.equal((await get(viewer, `/api/marketplace/print/viewer/${(await json(own)).token}`)).status, 200);
+  assert.equal((await get(buyer, `/api/marketplace/print/viewer/${(await json(own)).token}`)).status, 200);
 });
 
 test('S8: a link minted under the week-long rule is dead after 60 minutes, whatever its expires_at says', async () => {

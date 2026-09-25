@@ -2264,6 +2264,7 @@ function SettingsSection({ t }: { t: T }) {
         communityFeeMinIqd: num('communityFeeMinIqd'),
         communityAutoCompleteDays: num('communityAutoCompleteDays'),
         communityRequestExpiryDays: num('communityRequestExpiryDays'),
+        merchantDeliveryFeeMaxIqd: num('merchantDeliveryFeeMaxIqd'),
       });
       setSaved(true);
     } catch (e) {
@@ -2296,6 +2297,20 @@ function SettingsSection({ t }: { t: T }) {
             value={num('communityFeeMinIqd')}
             onChange={(v) => set('communityFeeMinIqd', String(v))}
           />
+        </div>
+        <div className="mt-4 space-y-2">
+          {/* The platform's maximum merchant delivery fee (owner decision 2026-09-25). */}
+          <NumField
+            label={t('أعلى أجرة توصيل يحددها التاجر (د.ع)', 'Maximum merchant delivery fee (IQD)')}
+            value={num('merchantDeliveryFeeMaxIqd')}
+            onChange={(v) => set('merchantDeliveryFeeMaxIqd', String(v))}
+          />
+          <p className="text-zinc-500 text-[11.5px] leading-relaxed">
+            {t(
+              'العمولة على البضاعة لا على التوصيل، فالحد يمنع نقل السعر إلى أجرة التوصيل. أي أجرة محفوظة أعلى منه تُحسب عند الدفع بقيمة الحد.',
+              'Commission is on the goods, not the delivery, so this cap stops the price moving into the delivery fee. Any saved fee above it is charged at the cap.'
+            )}
+          </p>
         </div>
         <p className="text-amber-300/80 text-[11.5px] mt-4 leading-relaxed">
           {t(

@@ -20,6 +20,8 @@
  */
 import {
   FULFILMENTS,
+  DEFAULT_MERCHANT_DELIVERY_FEE_MAX_IQD,
+  DELIVERY_LIMITS,
   canonicalLegacySettings,
   deliveryCoverage,
   deliveryTable,
@@ -38,6 +40,7 @@ import {
 import { normalizeGovernorate } from './iraqGovernorates';
 import { badRequest, HttpError } from './http';
 import { isSchemaMissing } from './membershipBenefits';
+import { getSetting } from './settings';
 
 export interface StoredDeliveryConfig {
   profile: MerchantDeliveryProfile;
@@ -46,6 +49,22 @@ export interface StoredDeliveryConfig {
   stored: boolean;
   /** The tables exist (false: a database a migration behind — no version fence is possible). */
   schema: boolean;
+  /**
+   * The platform's maximum delivery fee NOW (`merchantDeliveryFeeMaxIqd`,
+   * owner decision 2026-09-25). Every fee this store charges or shows is
+   * clamped to it; the stored rows keep what the merchant saved.
+   */
+  fee_cap_iqd: number;
+}
+
+/** The platform's current maximum merchant delivery fee — the admin setting, or its default. */
+export async function merchantDeliveryFeeMax(db: D1Database): Promise<number> {
+  try {
+    const v = Number(await getSetting(db, 'merchantDeliveryFeeMaxIqd'));
+    return Number.isSafeInteger(v) && v >= 0 ? Math.min(v, DELIVERY_LIMITS.fee_iqd) : DEFAULT_MERCHANT_DELIVERY_FEE_MAX_IQD;
+  } catch {
+    return DEFAULT_MERCHANT_DELIVERY_FEE_MAX_IQD;
+  }
 }
 
 /** The store's delivery configuration: two reads, run together. */
@@ -53,19 +72,21 @@ export async function loadDeliveryConfig(
   db: D1Database,
   store: { id: string; delivery_settings?: unknown }
 ): Promise<StoredDeliveryConfig> {
+  const cap = merchantDeliveryFeeMax(db);
   try {
-    const [profileRow, ruleRows] = await Promise.all([
+    const [profileRow, ruleRows, fee_cap_iqd] = await Promise.all([
       db.prepare('SELECT * FROM merchant_delivery_profiles WHERE store_id = ?').bind(store.id).first<Record<string, unknown>>(),
       db.prepare('SELECT * FROM merchant_delivery_rules WHERE store_id = ?').bind(store.id).all<Record<string, unknown>>(),
+      cap,
     ]);
     const rules = (ruleRows.results ?? [])
       .map(normalizeStoredRule)
       .filter((r): r is MerchantDeliveryRule => r !== null);
-    if (!profileRow) return { profile: profileFromLegacySettings(store.delivery_settings), rules, stored: false, schema: true };
-    return { profile: normalizeStoredProfile(profileRow), rules, stored: true, schema: true };
+    if (!profileRow) return { profile: profileFromLegacySettings(store.delivery_settings), rules, stored: false, schema: true, fee_cap_iqd };
+    return { profile: normalizeStoredProfile(profileRow), rules, stored: true, schema: true, fee_cap_iqd };
   } catch (e) {
     if (!isSchemaMissing(e)) throw e;
-    return { profile: profileFromLegacySettings(store.delivery_settings), rules: [], stored: false, schema: false };
+    return { profile: profileFromLegacySettings(store.delivery_settings), rules: [], stored: false, schema: false, fee_cap_iqd: await cap };
   }
 }
 
@@ -79,6 +100,8 @@ export function deliveryConfigShape(cfg: StoredDeliveryConfig, storeOpen: boolea
     configured: cfg.stored,
     store_open: storeOpen,
     coverage,
+    /** The platform's maximum fee: the editor shows it and refuses a fee above it (DELIVERY_FEE_ABOVE_MAX). */
+    max_fee_iqd: cfg.fee_cap_iqd,
   };
 }
 
@@ -322,7 +345,9 @@ export async function checkoutDelivery(
   }
   const addressId = String(where.address.id);
   const governorate = normalizeGovernorate(where.address.governorate);
-  const r = resolveMerchantDelivery(cfg.profile, cfg.rules, governorate, merchandiseIqd, where.fulfilment);
+  // A stored fee above the platform's current cap is charged AT the cap — the
+  // snapshot, the public quote and the fingerprint all carry the clamped fee.
+  const r = resolveMerchantDelivery(cfg.profile, cfg.rules, governorate, merchandiseIqd, where.fulfilment, cfg.fee_cap_iqd);
   if (!r.available) {
     const legacy = r.reason === 'governorate_required';
     return {
@@ -354,6 +379,7 @@ export async function checkoutDelivery(
     pickup: where.fulfilment === 'pickup' ? offer.pickup : null,
     applied_rule: where.fulfilment === 'pickup' ? null : rule,
     default: { mode: cfg.profile.default_mode, fee_iqd: cfg.profile.default_fee_iqd },
+    fee_cap_iqd: cfg.fee_cap_iqd,
     profile_version: r.profile_version,
     profile_source: cfg.stored ? 'profile' : 'legacy',
   };
@@ -406,7 +432,7 @@ export const isDeliveryFenceAbort = (msg: string) => /NOT NULL constraint failed
 
 /** The store's delivery as a visitor may read it: where it delivers and for how much. No version, no editor state. */
 export function publicDeliverySummary(cfg: StoredDeliveryConfig) {
-  const table = deliveryTable(cfg.profile, cfg.rules);
+  const table = deliveryTable(cfg.profile, cfg.rules, cfg.fee_cap_iqd);
   return {
     areas: table
       .filter((g) => g.mode !== 'disabled')
@@ -420,7 +446,7 @@ export function publicDeliverySummary(cfg: StoredDeliveryConfig) {
 
 /** One governorate's answer, for the storefront's «التوصيل إلى …» line. Merchandise 0: the fee below any threshold. */
 export function deliveryToGovernorate(cfg: StoredDeliveryConfig, governorate: string) {
-  const r = resolveMerchantDelivery(cfg.profile, cfg.rules, governorate, 0, 'delivery');
+  const r = resolveMerchantDelivery(cfg.profile, cfg.rules, governorate, 0, 'delivery', cfg.fee_cap_iqd);
   return {
     governorate: r.governorate || governorate,
     available: r.available,

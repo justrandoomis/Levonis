@@ -34,6 +34,10 @@ export function builderRefusal(e: unknown, loc: Loc): string {
       return loc('تعديلات كثيرة في وقت قصير — انتظر قليلًا ثم تابع.', 'Many edits in a short time — wait a moment and continue.');
     case 'VIDEO_UNSUPPORTED':
       return loc('لا يعمل هذا الفيديو في المتصفح — ارفع MP4 أو WebM.', 'This video cannot play in a browser — upload an MP4 or WebM.');
+    case 'STORE_REQUIRED':
+      return loc('افتح متجرك أولًا — صور المتجر وفيديوهاته تخصّ متجرًا.', 'Open your store first — store pictures and videos belong to a store.');
+    case 'VIDEO_QUOTA_EXCEEDED':
+      return loc('بلغ متجرك حدّ مساحة الفيديو (1 غيغابايت). احذف فيديو لم تعد تستخدمه ثم أعد المحاولة.', 'Your store has reached its video storage limit (1 GB). Remove a video you no longer use and try again.');
     case 'IMAGE_HEIC_UNSUPPORTED':
       return loc('صور HEIC غير مدعومة — صدّرها بصيغة JPEG ثم ارفعها.', 'HEIC photos are not supported — export as JPEG and upload.');
     case 'IMAGE_TOO_LARGE_TO_CONVERT':

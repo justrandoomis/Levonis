@@ -33,6 +33,8 @@ export interface CatalogProduct {
   state: PublishState;
   lifecycle: string;
   sold_out: boolean;
+  /** Published but unpurchasable: no price above 0 (owner decision 2026-09-25); absent from an older server. */
+  price_required?: boolean;
   low_stock: boolean;
   low_stock_threshold: number | null;
   variant_mode: 'simple' | 'variants' | 'legacy';

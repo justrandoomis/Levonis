@@ -28,6 +28,11 @@ import { GOVERNORATES } from '../../../lib/governorates';
 import { Btn, Card, Chip, Empty, Input, Notice, Spinner, Toggle, type Loc } from './ui';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { merchantRefusal } from '../shell/refusal';
+// Eligibility as data (W5-B): canonical machines, the stock shelf, and the reasons' words.
+import MaterialStockSection from '../workshop/MaterialStockSection';
+import PrinterModelPicker from '../workshop/PrinterModelPicker';
+import { reasonText as verdictReasonText } from '../workshop/reasons';
+import type { PrinterModelOption } from '../workshop/api';
 
 // ------------------------------------------------------------- the vocabulary
 
@@ -65,7 +70,15 @@ interface Printer {
   availability: Availability;
   active: boolean;
   sort_order: number;
+  /** The canonical machine (W5-B); null = physics the merchant typed. */
+  model_id?: string | null;
+  canonical?: boolean;
+  economics?: Record<EconomicsKey, number | null>;
 }
+
+/** The merchant's own economics of a machine — what the costing engine charges for it. */
+type EconomicsKey = 'purchase_iqd' | 'useful_print_hours' | 'electricity_iqd_per_kwh' | 'labor_iqd_per_hour' | 'maintenance_iqd_per_hour';
+const ECONOMICS: EconomicsKey[] = ['purchase_iqd', 'useful_print_hours', 'electricity_iqd_per_kwh', 'labor_iqd_per_hour', 'maintenance_iqd_per_hour'];
 
 /** The endpoint echoes the vocabulary it validates against, so typing these as
  *  the unions is a statement of fact rather than a cast. */
@@ -74,6 +87,8 @@ interface PrintersResponse {
   materials: MaterialOption[];
   technologies: Technology[];
   qualities: Quality[];
+  /** The canonical machines a printer can be tied to (W5-B). */
+  models?: PrinterModelOption[];
 }
 
 interface PrefsResponse {
@@ -107,6 +122,10 @@ interface MatchRow {
   state: string;
   eligible: boolean;
   reject_reason: string;
+  /** Every failing reason, in the W5-B codes (empty for a verdict from before W5-B). */
+  reasons?: string[];
+  /** Decided for the request as it now is. */
+  current?: boolean;
   notified: boolean;
   created_at: string;
 }
@@ -354,7 +373,10 @@ export function PrintersTab({ canSell = true }: { canSell?: boolean }) {
   return (
     <div className="space-y-3">
       <PrintersSection />
-      <RequestPrefsSection canSell={canSell} />
+      <MaterialStockSection />
+      <div id="preferences">
+        <RequestPrefsSection canSell={canSell} />
+      </div>
       <MatchesPanel />
     </div>
   );
@@ -384,7 +406,13 @@ interface Draft {
   availability: Availability;
   active: boolean;
   sort_order: number;
+  model_id: string | null;
+  economics: Record<EconomicsKey, string>;
 }
+
+const NO_ECONOMICS: Record<EconomicsKey, string> = {
+  purchase_iqd: '', useful_print_hours: '', electricity_iqd_per_kwh: '', labor_iqd_per_hour: '', maintenance_iqd_per_hour: '',
+};
 
 const NEW_DRAFT: Draft = {
   id: '',
@@ -406,6 +434,8 @@ const NEW_DRAFT: Draft = {
   availability: 'available',
   active: true,
   sort_order: 0,
+  model_id: null,
+  economics: NO_ECONOMICS,
 };
 
 function toDraft(p: Printer): Draft {
@@ -429,6 +459,32 @@ function toDraft(p: Printer): Draft {
     availability: p.availability,
     active: p.active,
     sort_order: p.sort_order,
+    model_id: p.model_id ?? null,
+    economics: Object.fromEntries(
+      ECONOMICS.map((k) => [k, p.economics?.[k] === null || p.economics?.[k] === undefined ? '' : String(p.economics[k])])
+    ) as Record<EconomicsKey, string>,
+  };
+}
+
+/** Tie the draft to a canonical machine: its physics replace what was typed (the server does the same). */
+function applyModel(d: Draft, m: PrinterModelOption | null): Draft {
+  if (!m) return { ...d, model_id: null };
+  const nozzle = m.technology === 'resin' ? '0' : String(m.nozzle_sizes_mm.includes(Number(d.nozzle)) ? d.nozzle : m.default_nozzle_mm);
+  return {
+    ...d,
+    model_id: m.id,
+    name: d.name || `${m.manufacturer} ${m.model}`,
+    technology: m.technology,
+    brand: m.manufacturer,
+    model: m.model,
+    x: String(m.build_mm.x),
+    y: String(m.build_mm.y),
+    z: String(m.build_mm.z),
+    nozzle,
+    enclosed: m.enclosed,
+    hardened_nozzle: d.hardened_nozzle && m.hardened_nozzle_available,
+    multicolor: d.multicolor && m.max_colors > 1,
+    materials: d.technology === m.technology ? d.materials : [],
   };
 }
 
@@ -494,6 +550,8 @@ function PrintersSection() {
       availability: d.availability,
       active: d.active,
       sort_order: d.sort_order,
+      model_id: d.model_id,
+      economics: Object.fromEntries(ECONOMICS.map((k) => [k, d.economics[k] === '' ? null : Number(d.economics[k]) || 0])),
     };
     try {
       if (d.id) await api.put(`/api/merchant/printers/${d.id}`, body);
@@ -511,7 +569,7 @@ function PrintersSection() {
           )
         );
       } else {
-        setError(e instanceof ApiError ? e.message : loc('تعذّر الحفظ', 'Could not save', 'پاشەکەوت نەکرا'));
+        setError(merchantRefusal(e, lang, loc('تعذّر الحفظ', 'Could not save', 'پاشەکەوت نەکرا')));
       }
     } finally {
       setBusy('');
@@ -547,6 +605,7 @@ function PrintersSection() {
           materials={data.materials}
           technologies={data.technologies}
           qualities={data.qualities}
+          models={data.models ?? []}
           saving={busy === 'save'}
           error={error}
           onSave={() => save(draft)}
@@ -717,6 +776,7 @@ function PrinterForm({
   materials,
   technologies,
   qualities,
+  models,
   saving,
   error,
   onSave,
@@ -727,6 +787,7 @@ function PrinterForm({
   materials: MaterialOption[];
   technologies: Technology[];
   qualities: Quality[];
+  models: PrinterModelOption[];
   saving: boolean;
   error: string;
   onSave: () => void;
@@ -734,6 +795,8 @@ function PrinterForm({
 }) {
   const { loc } = useLanguage();
   const forProcess = materials.filter((m) => m.process === d.technology);
+  // A printer tied to a canonical machine: its physics are the manufacturer's (W5-B).
+  const canonical = models.find((m) => m.id === d.model_id) ?? null;
 
   // Materials this machine is claimed to run but the matcher will always
   // refuse, because the hardware toggles below say otherwise. Naming them here
@@ -747,6 +810,7 @@ function PrinterForm({
 
   return (
     <div data-printer-form className="space-y-3.5">
+      {models.length > 0 && <PrinterModelPicker models={models} value={d.model_id} onPick={(m) => onChange(applyModel(d, m))} />}
       <Input
         label={loc('اسم الطابعة', 'Printer name', 'ناوی چاپکەر')}
         value={d.name}
@@ -759,12 +823,13 @@ function PrinterForm({
           {loc('التقنية', 'Technology', 'تەکنەلۆژیا')}
         </label>
         <div className="flex flex-wrap gap-1.5">
-          {technologies.map((t) => (
+          {technologies.filter((t) => !canonical || t === canonical.technology).map((t) => (
             <Chip
               key={t}
               label={techLabel(t, loc)}
               active={d.technology === t}
               onClick={() =>
+                canonical ? undefined :
                 // Materials belong to a process. Keeping a PETG id on a resin
                 // machine would look selected and match nothing, so they go.
                 onChange({
@@ -778,6 +843,8 @@ function PrinterForm({
         </div>
       </div>
 
+      {!canonical && (
+        <>
       <div className="grid grid-cols-2 gap-2">
         <Input
           label={loc('الماركة', 'Brand', 'براند')}
@@ -811,6 +878,23 @@ function PrinterForm({
         </p>
       </div>
 
+        </>
+      )}
+
+      {canonical ? (
+        canonical.technology === 'fdm' && canonical.nozzle_sizes_mm.length > 0 && (
+          <div>
+            <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
+              {loc('الفوهة المركّبة (مم)', 'Nozzle fitted (mm)')}
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {canonical.nozzle_sizes_mm.map((n) => (
+                <Chip key={n} label={String(n)} active={Number(d.nozzle) === n} onClick={() => onChange({ ...d, nozzle: String(n) })} />
+              ))}
+            </div>
+          </div>
+        )
+      ) : (
       <Input
         label={loc('قطر الفوهة (مم)', 'Nozzle diameter (mm)', 'تیرەی لوولە (مم)')}
         value={d.nozzle}
@@ -818,6 +902,7 @@ function PrinterForm({
         type="number"
         ltr
       />
+      )}
 
       <Group
         label={loc('الخامات المتوفرة لديك', 'Materials you stock', 'کەرەستەکانت')}
@@ -910,7 +995,7 @@ function PrinterForm({
       </div>
 
       <div className="space-y-2.5">
-        <Toggle
+        {(!canonical || canonical.max_colors > 1) && <Toggle
           label={loc('طباعة متعددة الألوان', 'Multicolour printing', 'چاپی فرەڕەنگ')}
           on={d.multicolor}
           onChange={(multicolor) => onChange({ ...d, multicolor })}
@@ -919,8 +1004,8 @@ function PrinterForm({
             'Unlocks jobs that need more than one colour inside a single part.',
             'داواکاری فرەڕەنگ دەکاتەوە.'
           )}
-        />
-        <Toggle
+        />}
+        {!canonical && <Toggle
           label={loc('حجرة مغلقة', 'Enclosed chamber', 'ژووری داخراو')}
           on={d.enclosed}
           onChange={(enclosed) => onChange({ ...d, enclosed })}
@@ -929,8 +1014,8 @@ function PrinterForm({
             'Unlocks ABS, ASA, PC and PA — without it those materials are refused for this printer.',
             'ABS و ASA و PC و PA دەکاتەوە.'
           )}
-        />
-        <Toggle
+        />}
+        {(!canonical || (canonical.technology === 'fdm' && canonical.hardened_nozzle_available)) && <Toggle
           label={loc('فوهة مقوّاة', 'Hardened nozzle', 'لوولەی بەهێزکراو')}
           on={d.hardened_nozzle}
           onChange={(hardened_nozzle) => onChange({ ...d, hardened_nozzle })}
@@ -939,7 +1024,7 @@ function PrinterForm({
             'Unlocks abrasive and carbon-filled (CF) materials.',
             'کەرەستەی کاربۆن دەکاتەوە.'
           )}
-        />
+        />}
       </div>
 
       <div>
@@ -970,6 +1055,40 @@ function PrinterForm({
           'ئارەزوومەندانە — بەتاڵ = نرخی بنەڕەتی.'
         )}
       />
+
+      <details className="rounded-xl border border-white/10 bg-white/[0.02] px-3" data-printer-economics>
+        <summary className="min-h-11 flex items-center cursor-pointer text-zinc-300 text-[12.5px] font-semibold">
+          {loc('اقتصاديات الطابعة — لحساب التكلفة', 'Machine economics — for costing')}
+        </summary>
+        <p className="text-zinc-500 text-[11px] mb-2">
+          {loc(
+            'اختيارية. ما تدخله هنا هو ما يحسبه «احسب التكلفة» بدل أرقام المنصة، ولا يراه أحد غيرك.',
+            'Optional. What you enter here is what «Cost it» charges instead of the platform’s figures, and nobody else sees it.'
+          )}
+        </p>
+        <div className="grid grid-cols-1 gap-2 pb-3 sm:grid-cols-2">
+          {ECONOMICS.map((k) => (
+            <Input
+              key={k}
+              label={
+                k === 'purchase_iqd'
+                  ? loc('سعر الشراء (د.ع)', 'Purchase price (IQD)')
+                  : k === 'useful_print_hours'
+                    ? loc('عمرها بساعات الطباعة', 'Useful life (print hours)')
+                    : k === 'electricity_iqd_per_kwh'
+                      ? loc('الكهرباء (د.ع لكل كيلوواط ساعة)', 'Electricity (IQD per kWh)')
+                      : k === 'labor_iqd_per_hour'
+                        ? loc('أجر العمل (د.ع للساعة)', 'Labour (IQD per hour)')
+                        : loc('الصيانة (د.ع للساعة)', 'Maintenance (IQD per hour)')
+              }
+              value={d.economics[k]}
+              onChange={(v) => onChange({ ...d, economics: { ...d.economics, [k]: v.replace(/[^\d]/g, '') } })}
+              type="number"
+              ltr
+            />
+          ))}
+        </div>
+      </details>
 
       <div>
         <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
@@ -1453,7 +1572,12 @@ function MatchesPanel() {
                   className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5"
                 >
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <p className="text-zinc-200 text-[12px] font-semibold truncate">{m.title}</p>
+                    <a
+                      href={`/requests?request=${encodeURIComponent(m.request_id)}`}
+                      className="text-zinc-200 text-[12px] font-semibold truncate underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                    >
+                      {m.title}
+                    </a>
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
                         m.notified
@@ -1473,7 +1597,14 @@ function MatchesPanel() {
                           'You qualified for this request.',
                           'شایستەی ئەم داواکارییە بوویت.'
                         )
-                      : reasonText(m.reject_reason, loc)}
+                      : m.reasons && m.reasons.length
+                        ? m.reasons.map((code) => verdictReasonText(code, loc)).join(' ')
+                        : reasonText(m.reject_reason, loc)}
+                    {m.current === false && (
+                      <span className="block text-zinc-600">
+                        {loc('عدّل العميل الطلب بعد هذا القرار.', 'The customer changed the request after this decision.')}
+                      </span>
+                    )}
                   </p>
                   <p className="text-zinc-700 text-[10px] mt-1" dir="ltr">
                     {new Date(m.created_at).toLocaleDateString('en-GB')}

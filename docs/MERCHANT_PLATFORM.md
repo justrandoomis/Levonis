@@ -204,6 +204,12 @@ never trusts an id from the client for ownership.
   capability (technology, build volume, materials, colours, features) ∩ material
   stock ∩ preferences (default ALL, narrowing only) ∩ location/delivery. Manual
   browsing of the public board stays open to any eligible merchant.
+  **Built (W5-B, DECISIONS 134):** one pure `evaluateEligibility`
+  (`worker/lib/eligibility.ts`), persisted per request revision, is the single
+  authority for the «مناسب لي» board, offer permission (`OFFER_NOT_ELIGIBLE`),
+  notification, the file matrix (originals to customer/admin/accepted merchant;
+  pictures and a coarse bound preview to eligible merchants) and private costing;
+  re-matched on revisions and on printer/stock/preference/delivery changes.
 - Offers carry price, completion time, delivery method, materials, inclusions,
   message and warranty terms; the customer accepts exactly the version they saw;
   only one acceptance can ever win (server guard).

@@ -131,6 +131,13 @@ floor = max( priceForMargin(cost, min_margin_percent),
 ثم: هل تريد أن تسمع؟ المفتاح الرئيسي `request_opportunities`، ثم الإيقاف
 المؤقت، ثم مرشحاتها المعلنة.
 
+> **منذ W5-B (DECISIONS 134) الأهلية حكم واحد بخمسة أبعاد** — التجارة، القدرة
+> (بفيزياء طراز الطابعة القانوني)، المخزون، الوصول بالتوصيل، التفضيلات — في
+> `worker/lib/eligibility.ts`، محفوظ لكل نسخة من الطلب، وهو وحده إذن العرض
+> (`OFFER_NOT_ELIGIBLE`) والإشعار والصور والمعاينة والتكلفة الخاصة. المفتاح
+> الرئيسي والإيقاف المؤقت يمنعان **الإشعار** فقط لا التقديم. وتُعاد المطابقة
+> عند كل نسخة وعند تغيّر طابعات الورشة أو مخزونها أو تفضيلاتها أو توصيلها.
+
 ### المرحلة الثانية: الترتيب
 
 | الإشارة | الوزن |
@@ -268,7 +275,7 @@ GET  /api/marketplace/print/viewer/:token/mesh
 POST /api/marketplace/print/requests/:id/repeat                      (ينسخ إلى مسودة فقط؛ النشر يمرّ بالمطابقة)
 PUT  /api/marketplace/print/requests/:id/draft                       (يحفظ إجابات المعالج على المسودة؛ REQUEST_NOT_DRAFT بعد النشر)
 GET  /api/marketplace/print/requests/:id/draft                       (لصاحب الطلب: لإكمال مسودة أو تعديل طلب منشور)
-GET  /api/marketplace/print/requests/:id/revisions                   (نُسخ الطلب وما تغيّر في كل منها)
+GET  /api/marketplace/print/requests/:id/revisions                   (نُسخ الطلب وما تغيّر في كل منها — السابقة لصاحب الطلب والمسؤول ومن قدّم عرضًا فقط؛ غيرهم الحالية فقط، `history: false`)
 
 POST /api/marketplace/requests                  → مسودة (`draft`)، لا تظهر ولا تُعرض عليها عروض
 POST /api/marketplace/requests/:id/offers       { price_iqd, completion_days, delivery_method: pickup|merchant_delivery|courier,

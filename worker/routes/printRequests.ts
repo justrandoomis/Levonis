@@ -19,29 +19,26 @@ import {
   type PrintQuality,
   type QuoteInput,
 } from '../lib/printPricing';
+import { CAPABILITIES, requiredCapabilities } from '../lib/printMatching';
+// Eligibility as data (W5-B): one verdict per workshop × revision, kept and re-matched.
+import { matchRequest } from '../lib/printMatchingStore';
 import {
-  matchMerchants,
-  CAPABILITIES,
-  requiredCapabilities,
-  type MatchRequest,
-  type MerchantCandidate,
-  type MerchantPrefs,
-  type MerchantPrinter,
-} from '../lib/printMatching';
+  coarsePreviewMesh,
+  fileReadStatement,
+  fileReader,
+  previewGrantFor,
+  type FileReader,
+  type PreviewGrant,
+} from '../lib/requestFilePolicy';
 import { resolveModelLink, parseModelLink } from '../lib/externalModels';
 import { governorateName, normalizeGovernorate } from '../lib/iraqGovernorates';
-import { notifyStatement } from '../lib/notifications';
-import { fanOutMerchantNotice, matchingRequestNotice } from '../lib/merchantNotify';
-import { merchantHref } from '@levonis/contracts/merchantRoutes';
 import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
 import { communityClosedRefusal, communityMayEnter, readCommunityGate, requireCommunityOpen } from '../lib/communityGate';
 import {
   isEngagedMerchant,
   isPast,
-  mayQuoteOnBoard,
   offerCountStatement,
   onPublicBoard,
-  requestFileAccess,
   staleOfferNotifications,
   type RequestForAccess,
 } from '../lib/communityRequests';
@@ -67,7 +64,6 @@ import {
   type RevisionFile,
   type SourceType,
 } from '../lib/requestRevisions';
-import type { MatchDecision, MatchWeights } from '../lib/printMatching';
 import type { Quote } from '../lib/printPricing';
 
 /**
@@ -1012,41 +1008,6 @@ function printRowStatement(
   );
 }
 
-/**
- * MATCHING FOR A CUSTOMER WHO IS NOT SURE OF THE PROCESS — at the call site
- * (capability matching v2 is a later stream). The matcher asks one process;
- * an open process is asked both ways and each merchant keeps their better
- * answer: eligible beats rejected, and between two eligible answers the
- * higher score. A material left open is already "any material" to the
- * matcher (`printerFits` skips the check for an empty id).
- */
-function matchForChoices(
-  candidates: MerchantCandidate[],
-  req: MatchRequest,
-  material: PrintMaterial | null,
-  weights: MatchWeights,
-  now: number,
-  limit: number,
-  processUnsure: boolean
-): { decisions: MatchDecision[]; notify: MatchDecision[] } {
-  if (!processUnsure) return matchMerchants(candidates, req, material, weights, now, limit);
-  const everyone = Math.max(1, candidates.length);
-  const fdm = matchMerchants(candidates, { ...req, process: 'fdm' }, null, weights, now, everyone).decisions;
-  const resin = matchMerchants(candidates, { ...req, process: 'resin' }, null, weights, now, everyone).decisions;
-  const byId = new Map(resin.map((d) => [d.merchant_id, d]));
-  const decisions = fdm.map((a) => {
-    const b = byId.get(a.merchant_id);
-    if (!b) return a;
-    if (a.eligible !== b.eligible) return a.eligible ? a : b;
-    return b.score > a.score ? b : a;
-  });
-  const notify = decisions
-    .filter((d) => d.eligible)
-    .sort((a, b) => b.score - a.score || a.merchant_id.localeCompare(b.merchant_id))
-    .slice(0, limit);
-  return { decisions, notify };
-}
-
 export interface PublishOutcome {
   quote: Record<string, unknown>;
   completeness: number;
@@ -1106,10 +1067,9 @@ export async function publishRequest(
   const stored = await env.DB.prepare('SELECT * FROM community_print_requests WHERE request_id = ?')
     .bind(requestId)
     .first<Record<string, unknown>>();
-  const [mats, cfg, weights, notifyLimit, accs] = await Promise.all([
+  const [mats, cfg, notifyLimit, accs] = await Promise.all([
     materials(env),
     pricingConfig(env),
-    getSetting(env.DB, 'printMatchWeights'),
     getSetting(env.DB, 'printMatchNotifyLimit'),
     accessories(env),
   ]);
@@ -1257,34 +1217,14 @@ export async function publishRequest(
     };
   }
 
-  // ---- who can make it ----------------------------------------------------
-  const matchReq: MatchRequest = {
-    id: requestId,
-    process: spec.process,
-    material_id: choices.materialUnsure ? '' : spec.material_id,
-    color_hex: spec.color_hex,
-    quality: spec.quality,
-    colors_count: spec.colors_count,
-    // Measured geometry first; the customer's typed size when there is none.
-    dimensions_mm: dimsFrom ?? { x: 0, y: 0, z: 0 },
-    governorate: String(forMatching?.governorate ?? request.governorate ?? ''),
-    delivery_pref: String(forMatching?.delivery_pref ?? request.delivery_pref ?? ''),
-    // A range across materials nobody chose is not a job value to filter on.
-    estimate_iqd: quote.priced && !choices.materialUnsure && !choices.processUnsure ? quote.price_iqd : null,
-    quantity: spec.quantity,
-  };
-  const candidates = await loadCandidates(env);
-  const { decisions, notify } = matchForChoices(
-    candidates,
-    matchReq,
-    choices.materialUnsure ? null : material,
-    weights,
-    Date.now(),
-    Math.max(1, Number(notifyLimit) || 25),
-    choices.processUnsure
-  );
-
-  // ---- tell them. ONE notification each, and nothing else ------------------
+  // ---- who can make it, and who is told (W5-B) ---------------------------
+  //
+  // ONE AUTHORITY. Every active workshop is decided by `evaluateEligibility`
+  // (worker/lib/eligibility.ts) — printers, stock, delivery reach, plan and
+  // preferences — through `matchRequest`, which records every verdict for
+  // this revision and tells the best `printMatchNotifyLimit` of those who are
+  // eligible and want to hear, once per request. «لست متأكدًا» is part of the
+  // job the eligibility reads (a null process or material), not a second pass.
   //
   // THE MESSAGE IS COMPOSED, NEVER COPIED. `printMatchNotification` builds each
   // language out of the structured fields and quotes the customer's own words
@@ -1299,79 +1239,26 @@ export async function publishRequest(
     material_id: choices.materialUnsure ? '' : spec.material_id,
     color_hex: spec.color_hex,
     dimensions: dimsLabel,
-    governorate: matchReq.governorate,
+    governorate: String(forMatching?.governorate ?? request.governorate ?? ''),
     deadline: String(forMatching?.deadline ?? ''),
     budget_iqd: typeof forMatching?.budget_iqd === 'number' ? forMatching.budget_iqd : null,
   });
-  const stmts: D1PreparedStatement[] = [];
-  const notified = new Map<string, string>();
-  for (const d of notify) {
-    const { id, stmt } = notifyStatement(env.DB, {
-      userId: d.user_id,
-      kind: 'matching_request',
-      title_ar: text.title.ar,
-      title_en: text.title.en,
-      body_ar: text.body.ar,
-      body_en: text.body.en,
-      // The link is the request itself, at its workspace address (W2-E).
-      link: merchantHref.request(requestId),
-      entity_type: 'request',
-      entity_id: requestId,
-      meta: {
-        score: d.score,
-        printer_id: d.printer_id,
-        /**
-         * THE KURDISH TEXT HAS NOWHERE ELSE TO GO. `user_notifications` (0045)
-         * has title_ar/title_en and body_ar/body_en and no ckb column at all,
-         * so the composed Sorani rides in `meta`, which is already free-form
-         * JSON — the text EXISTS, so finishing the job is a read-path change.
-         */
-        title_ckb: text.title.ckb,
-        body_ckb: text.body.ckb,
-      },
-      // Same merchant + same request = the same message. The unique index
-      // makes a repeated publish a no-op instead of a second buzz.
-      eventKey: `print_request_match:${requestId}`,
-    });
-    notified.set(d.merchant_id, id);
-    stmts.push(stmt);
-  }
-
-  // Every decision is recorded, rejections included: this table is the answer
-  // to "why did my shop never see this job?". A merchant told once STAYS told,
-  // with the id of the notification that really reached them: on a re-publish
-  // the INSERT OR IGNORE above writes nothing for them, so its fresh id must
-  // not overwrite the real one (audit 03 §10 U).
-  for (const d of decisions) {
-    stmts.push(
-      env.DB.prepare(
-        `INSERT INTO community_request_matches
-           (id, request_id, merchant_id, eligible, reject_reason, score, score_detail, notified, notification_id)
-         VALUES (?,?,?,?,?,?,?,?,?)
-         ON CONFLICT (request_id, merchant_id) DO UPDATE SET
-           eligible=excluded.eligible, reject_reason=excluded.reject_reason,
-           score=excluded.score, score_detail=excluded.score_detail,
-           notification_id = CASE WHEN community_request_matches.notified = 1
-                                  THEN community_request_matches.notification_id
-                                  ELSE excluded.notification_id END,
-           notified = MAX(community_request_matches.notified, excluded.notified)`
-      ).bind(
-        newId('mch'), requestId, d.merchant_id, d.eligible ? 1 : 0, d.reject_reason,
-        d.score, JSON.stringify(d.detail),
-        notified.has(d.merchant_id) ? 1 : 0, notified.get(d.merchant_id) ?? null
-      )
-    );
-  }
+  const matched = await matchRequest(env, requestId, {
+    notify: true,
+    limit: Math.max(1, Number(notifyLimit) || 25),
+    text,
+  });
   // The merchants whose offers the change superseded hear about it.
-  if (revised) stmts.push(...(await staleOfferNotifications(env.DB, requestId, revision)));
-  // D1 caps a batch's statements, not a chunk of them: send in slices.
-  for (let i = 0; i < stmts.length; i += 90) await env.DB.batch(stmts.slice(i, i + 90));
-  // …and on their outside channels, per each merchant's `request_opportunities` switch (W2-E).
-  await Promise.all(notify.map((d) => fanOutMerchantNotice(env, { merchant_id: d.merchant_id, user_id: d.user_id }, matchingRequestNotice(requestId, text))));
+  if (revised) {
+    const stale = await staleOfferNotifications(env.DB, requestId, revision);
+    for (let i = 0; i < stale.length; i += 90) await env.DB.batch(stale.slice(i, i + 90));
+  }
+  const decisions = { length: matched.considered, eligible: matched.eligible };
+  const notify = { length: matched.notified };
 
   await audit(env.DB, userId, firstPublish ? 'print.request_published' : 'print.request_republished', requestId, {
     considered: decisions.length,
-    eligible: decisions.filter((d) => d.eligible).length,
+    eligible: decisions.eligible,
     notified: notify.length,
     confidence: quote.confidence,
     revision,
@@ -1385,7 +1272,7 @@ export async function publishRequest(
     completeness,
     matching: {
       considered: decisions.length,
-      eligible: decisions.filter((d) => d.eligible).length,
+      eligible: decisions.eligible,
       notified: notify.length,
     },
     revised,
@@ -1573,11 +1460,30 @@ printRequestRoutes.get('/requests/:id/revisions', async (c) => {
     const engaged = user ? await isEngagedMerchant(c.env.DB, requestId, user.id) : false;
     if (!engaged) throw boardShut ? communityClosedRefusal() : notFound('Request not found');
   }
+  /**
+   * PAST REVISIONS ARE NOT PUBLIC (review W2-5 #6). What a request USED to say
+   * — an earlier title, description, notes or source link the customer took
+   * back — is for the customer, an admin, and a merchant who made an offer on
+   * it (any state: the superseded offer is exactly why they need the diff).
+   * Anyone else the board lets in gets the CURRENT revision only, which says
+   * nothing the board does not already show; `history: false` tells the
+   * client why there is one entry.
+   */
+  const fullHistory =
+    isOwner ||
+    user?.role === 'admin' ||
+    (!!user &&
+      !!(await c.env.DB.prepare(
+        `SELECT 1 AS x FROM community_offers o JOIN community_merchants m ON m.id = o.merchant_id
+          WHERE o.request_id = ? AND m.user_id = ? LIMIT 1`
+      )
+        .bind(requestId, user.id)
+        .first()));
   const { results } = await c.env.DB.prepare(
     `SELECT revision, spec, files, estimate, hash, reason, created_at FROM community_request_revisions
-      WHERE request_id = ? ORDER BY revision ASC LIMIT 100`
+      WHERE request_id = ?1 AND (?2 = 1 OR revision = ?3) ORDER BY revision ASC LIMIT 100`
   )
-    .bind(requestId)
+    .bind(requestId, fullHistory ? 1 : 0, Number(request.revision ?? 1))
     .all<Record<string, unknown>>();
   let prev: Record<string, unknown> | null = null;
   const revisions = (results ?? []).map((row) => {
@@ -1597,7 +1503,7 @@ printRequestRoutes.get('/requests/:id/revisions', async (c) => {
       changes,
     };
   });
-  return c.json({ success: true, current: Number(request.revision ?? 1), revisions });
+  return c.json({ success: true, current: Number(request.revision ?? 1), history: fullHistory, revisions });
 });
 
 /**
@@ -1624,107 +1530,6 @@ function completenessOf(
   if (analysis?.watertight) score += 5;
   if (spec.post_processing_minutes > 0) score += 5;
   return Math.min(100, score);
-}
-
-/**
- * Every merchant the matcher might consider, with their machines and their
- * stated preferences, in three queries rather than N+1.
- */
-async function loadCandidates(env: Env): Promise<MerchantCandidate[]> {
-  const [merchants, printers, prefs] = await Promise.all([
-    env.DB.prepare(
-      `SELECT m.id, m.user_id, m.status, m.governorate, m.rating_avg_x100, m.rating_count,
-              m.completed_orders,
-              s.id AS store_id, s.status AS store_status, s.accepts_custom_requests,
-              s.governorate AS store_governorate,
-              COALESCE(p.request_opportunities, 1) AS request_opportunities
-         FROM community_merchants m
-         LEFT JOIN merchant_stores s ON s.merchant_id = m.id
-         LEFT JOIN merchant_notification_preferences p ON p.merchant_id = m.id
-        WHERE m.status = 'active'`
-    ).all<Record<string, unknown>>(),
-    env.DB.prepare('SELECT * FROM merchant_printers WHERE active = 1').all<Record<string, unknown>>(),
-    env.DB.prepare('SELECT * FROM merchant_request_prefs').all<Record<string, unknown>>(),
-  ]);
-
-  const printersBy = new Map<string, MerchantPrinter[]>();
-  for (const p of printers.results ?? []) {
-    const list = printersBy.get(String(p.merchant_id)) ?? [];
-    list.push({
-      id: String(p.id),
-      technology: (p.technology === 'resin' ? 'resin' : 'fdm') as PrintProcess,
-      build_x_mm: Number(p.build_x_mm ?? 0),
-      build_y_mm: Number(p.build_y_mm ?? 0),
-      build_z_mm: Number(p.build_z_mm ?? 0),
-      nozzle_mm: Number(p.nozzle_mm ?? 0.4),
-      materials: parseJson<string[]>(p.materials, []),
-      colors: parseJson<string[]>(p.colors, []).map((x) => String(x).toLowerCase()),
-      multicolor: !!p.multicolor,
-      enclosed: !!p.enclosed,
-      hardened_nozzle: !!p.hardened_nozzle,
-      quality_max: (QUALITIES.includes(p.quality_max as PrintQuality) ? p.quality_max : 'fine') as PrintQuality,
-      machine_hour_iqd: p.machine_hour_iqd === null || p.machine_hour_iqd === undefined ? null : Number(p.machine_hour_iqd),
-      availability: (['available', 'busy', 'offline'].includes(String(p.availability))
-        ? p.availability
-        : 'available') as MerchantPrinter['availability'],
-      active: true,
-    });
-    printersBy.set(String(p.merchant_id), list);
-  }
-
-  const prefsBy = new Map<string, MerchantPrefs>();
-  for (const p of prefs.results ?? []) {
-    prefsBy.set(String(p.merchant_id), {
-      processes: parseJson<string[]>(p.processes, []),
-      materials: parseJson<string[]>(p.materials, []),
-      colors: parseJson<string[]>(p.colors, []).map((x) => String(x).toLowerCase()),
-      capabilities: parseJson<string[]>(p.capabilities, []),
-      governorates: parseJson<string[]>(p.governorates, []),
-      delivery: parseJson<string[]>(p.delivery, []),
-      min_job_iqd: Number(p.min_job_iqd ?? 0),
-      max_job_iqd: p.max_job_iqd === null || p.max_job_iqd === undefined ? null : Number(p.max_job_iqd),
-      min_size_mm: Number(p.min_size_mm ?? 0),
-      max_size_mm: p.max_size_mm === null || p.max_size_mm === undefined ? null : Number(p.max_size_mm),
-      workload: (['light', 'normal', 'busy', 'full'].includes(String(p.workload))
-        ? p.workload
-        : 'normal') as MerchantPrefs['workload'],
-      paused: !!p.paused,
-      paused_until: (p.paused_until as string | null) ?? null,
-    });
-  }
-
-  const EMPTY_PREFS: MerchantPrefs = {
-    processes: [], materials: [], colors: [], capabilities: [], governorates: [], delivery: [],
-    min_job_iqd: 0, max_job_iqd: null, min_size_mm: 0, max_size_mm: null,
-    workload: 'normal', paused: false, paused_until: null,
-  };
-
-  return (merchants.results ?? []).map((m) => ({
-    merchant_id: String(m.id),
-    user_id: String(m.user_id),
-    status: String(m.status ?? ''),
-    store_status: String(m.store_status ?? ''),
-    store_id: (m.store_id as string | null) ?? null,
-    // A merchant with no store row has not opted out of anything — the default
-    // for the column is 1, and the absence of a store is handled by the
-    // STORE_UNAVAILABLE check rather than silently here.
-    accepts_custom_requests: m.accepts_custom_requests === undefined || m.accepts_custom_requests === null
-      ? true
-      : !!m.accepts_custom_requests,
-    governorate: String(m.store_governorate || m.governorate || ''),
-    request_opportunities: !!Number(m.request_opportunities ?? 1),
-    printers: printersBy.get(String(m.id)) ?? [],
-    prefs: prefsBy.get(String(m.id)) ?? EMPTY_PREFS,
-    rating_avg_x100: Number(m.rating_avg_x100 ?? 0),
-    rating_count: Number(m.rating_count ?? 0),
-    completed_orders: Number(m.completed_orders ?? 0),
-    // Not yet measured anywhere in the platform. `null` is the honest value and
-    // the matcher reads it as "no history", which sits mid-table — it does not
-    // invent a response time and does not punish a merchant for our gap.
-    response_minutes: null,
-    trouble_rate: 0,
-    pro: false,
-  }));
 }
 
 // ------------------------------------------------------- 6. reading it back
@@ -1851,15 +1656,21 @@ const VIEWER_CLOSED_STATES = ['cancelled', 'expired'];
  * Mint a link to the 3D preview.
  *
  * The token is random, stored HASHED (so the table is useless to whoever reads
- * it), expires after `VIEWER_TOKEN_TTL_MINUTES`, and grants the DERIVED mesh —
+ * it), expires after `VIEWER_TOKEN_TTL_MINUTES`, and grants a DERIVED mesh —
  * never the uploaded file.
  *
- * WHO MAY MINT (audit 03 §10 F): the request's customer; the merchant whose
- * offer was accepted; and, while the request is ON THE BOARD (public, taking
- * offers, not expired) and Levo Community lets them in, a merchant who could
- * quote on it right now (`mayQuoteOnBoard`). It used to be "anyone signed in
- * while the request is open" — a plain customer account could mint a week-long
- * anonymous link to somebody else's model.
+ * WHO MAY MINT, AND WHAT THEY GET (W5-B, worker/lib/requestFilePolicy.ts):
+ * the customer and the merchant whose offer was accepted get the stored
+ * preview (`full`); a merchant whose LIVE ELIGIBILITY VERDICT says they can
+ * make the job — the verdict that lets them offer — gets the coarse preview
+ * derived from it (`preview`: decimated and snapped to a grid). Nobody else:
+ * not a plain account on the board, not a merchant the job does not fit.
+ *
+ * THE LINK IS BOUND to the account that minted it and to the request revision
+ * it was minted for: another account holding it is refused, and a new revision
+ * retires it. It also stops when the request closes (wave 1) and when its
+ * minter loses the access it stood on. Minting is counted with every other
+ * read of the file.
  */
 printRequestRoutes.post('/requests/:id/files/:fileId/viewer-token', requireAuth, async (c) => {
   await rateLimit(c, 'viewer-token', 60, 3600);
@@ -1868,22 +1679,29 @@ printRequestRoutes.post('/requests/:id/files/:fileId/viewer-token', requireAuth,
   const fileId = str(c.req.param('fileId'), 'fileId', { min: 1, max: 60 });
 
   const file = await c.env.DB.prepare(
-    `SELECT f.id AS file_id, f.preview_key, r.id, r.customer_id, r.state, r.visibility, r.expires_at
+    `SELECT f.id AS file_id, f.preview_key, r.id, r.customer_id, r.state, r.visibility, r.expires_at, r.revision
        FROM community_request_files f
        JOIN community_requests r ON r.id = f.request_id
       WHERE f.id = ? AND f.request_id = ?`
   )
     .bind(fileId, requestId)
-    .first<{ file_id: string; preview_key: string } & RequestForAccess>();
+    .first<{ file_id: string; preview_key: string; revision: number } & RequestForAccess>();
   if (!file) throw notFound('File not found');
   if (VIEWER_CLOSED_STATES.includes(file.state)) {
     throw conflict('This request is closed, so its model can no longer be previewed', 'REQUEST_CLOSED');
   }
 
-  const { access, gateClosed } = await requestFileAccess(c.env, file, user, { allowAdmin: false });
+  const { reader, gateClosed, verdict, visible } = await fileReader(c.env, file, user, { allowAdmin: false });
   if (gateClosed) throw communityClosedRefusal();
-  if (!access || (access === 'board' && !(await mayQuoteOnBoard(c.env.DB, user.id)))) {
-    throw new HttpError(403, 'Only merchants who can quote on this request may preview its model', 'VIEWER_NOT_ALLOWED');
+  if (!visible) throw notFound('File not found');
+  const grant = previewGrantFor(reader);
+  if (!grant) {
+    throw new HttpError(
+      403,
+      'Only merchants who can make this request may preview its model',
+      'VIEWER_NOT_ALLOWED',
+      verdict ? { reason: verdict.reason, reasons: verdict.reasons } : undefined
+    );
   }
   if (!file.preview_key) throw conflict('This file has no 3D preview', 'NO_PREVIEW');
 
@@ -1891,31 +1709,35 @@ printRequestRoutes.post('/requests/:id/files/:fileId/viewer-token', requireAuth,
   // thing standing between a stranger and someone's model preview.
   const token = randomToken(32);
   const hash = await sha256Hex(token);
+  const ts = new Date().toISOString();
   const expires = new Date(Date.now() + VIEWER_TOKEN_TTL_MINUTES * 60_000).toISOString();
-  await c.env.DB.prepare(
-    'INSERT INTO model_view_tokens (token_hash, file_id, request_id, created_by, expires_at) VALUES (?,?,?,?,?)'
-  )
-    .bind(hash, fileId, requestId, user.id, expires)
-    .run();
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO model_view_tokens (token_hash, file_id, request_id, created_by, expires_at, revision, grant_level, bound_user)
+       VALUES (?,?,?,?,?,?,?,1)`
+    ).bind(hash, fileId, requestId, user.id, expires, Number(file.revision ?? 1), grant),
+    fileReadStatement(c.env.DB, {
+      requestId, fileId, userId: user.id, reader: reader!, what: 'preview_link', revision: Number(file.revision ?? 1),
+    }, ts),
+  ]);
 
-  return c.json({ success: true, token, url: `/model-viewer/${token}`, expires_at: expires });
+  return c.json({ success: true, token, url: `/model-viewer/${token}`, expires_at: expires, grant });
 });
 
 /**
  * What the viewer page needs to draw its labels. No file, no key, no owner —
  * and NO FILE NAME (audit 03 §10 F): the name a customer saved their model
- * under is theirs («Sara_Ahmed_dental_crown.stl» was the audit's example), and
- * this answer reaches anyone holding the link, signed in or not. The format
- * and the measured size say what the page needs to say.
+ * under is theirs. The format and the measured size say what the page needs.
  */
 printRequestRoutes.get('/viewer/:token', async (c) => {
-  const row = await viewerToken(c.env, c.req.param('token'));
+  const row = await viewerToken(c.env, c.req.param('token'), c.get('user'));
   const file = await c.env.DB.prepare(
     'SELECT analysis, model_format FROM community_request_files WHERE id = ?'
   )
     .bind(row.file_id)
     .first<{ analysis: string; model_format: string }>();
   const analysis = parseJson<ModelAnalysis | null>(file?.analysis, null);
+  await countViewerRead(c.env.DB, row, 'preview_meta');
   return c.json({
     success: true,
     format: file?.model_format ?? '',
@@ -1924,12 +1746,14 @@ printRequestRoutes.get('/viewer/:token', async (c) => {
     triangle_count: analysis?.triangle_count ?? null,
     shell_count: analysis?.shell_count ?? null,
     expires_at: row.expires_at,
+    /** 'preview' = the coarse mesh a merchant quoting on the board sees. */
+    grant: row.grant,
   });
 });
 
 /** The derived mesh. Bytes only — the original file is never served here. */
 printRequestRoutes.get('/viewer/:token/mesh', async (c) => {
-  const row = await viewerToken(c.env, c.req.param('token'));
+  const row = await viewerToken(c.env, c.req.param('token'), c.get('user'));
   const file = await c.env.DB.prepare('SELECT preview_key FROM community_request_files WHERE id = ?')
     .bind(row.file_id)
     .first<{ preview_key: string }>();
@@ -1937,13 +1761,24 @@ printRequestRoutes.get('/viewer/:token/mesh', async (c) => {
   const object = await getMediaObject(c.env, 'private', file.preview_key);
   if (!object) throw notFound('No preview available');
 
-  await c.env.DB.prepare(
-    `UPDATE model_view_tokens
-        SET uses = uses + 1, last_used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-      WHERE token_hash = ?`
-  ).bind(row.token_hash).run();
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE model_view_tokens
+          SET uses = uses + 1, last_used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        WHERE token_hash = ?`
+    ).bind(row.token_hash),
+    viewerReadStatement(c.env.DB, row, 'preview_mesh'),
+  ]);
 
-  return new Response(object.body, {
+  // A merchant quoting on the board gets the coarse mesh, derived here from
+  // the stored preview — the stored one is not sent to them at all.
+  let body: BodyInit = object.body;
+  if (row.grant === 'preview') {
+    const coarse = coarsePreviewMesh(new Uint8Array(await new Response(object.body).arrayBuffer()));
+    if (!coarse) throw notFound('No preview available');
+    body = coarse;
+  }
+  return new Response(body, {
     headers: {
       'Content-Type': 'application/octet-stream',
       'Cache-Control': 'private, max-age=0, no-store',
@@ -1952,13 +1787,36 @@ printRequestRoutes.get('/viewer/:token/mesh', async (c) => {
   });
 });
 
-async function viewerToken(env: Env, raw: string | undefined) {
+interface ViewerRow {
+  token_hash: string;
+  file_id: string;
+  request_id: string;
+  expires_at: string;
+  created_by: string;
+  revision: number;
+  /** What the link grants NOW: its minted grant, never more than the minter's current access. */
+  grant: PreviewGrant;
+  reader: FileReader;
+}
+
+function viewerReadStatement(db: D1Database, row: ViewerRow, what: 'preview_meta' | 'preview_mesh'): D1PreparedStatement {
+  return fileReadStatement(db, {
+    requestId: row.request_id, fileId: row.file_id, userId: row.created_by, reader: row.reader, what, revision: row.revision,
+  });
+}
+
+async function countViewerRead(db: D1Database, row: ViewerRow, what: 'preview_meta' | 'preview_mesh'): Promise<void> {
+  await viewerReadStatement(db, row, what).run().catch((e) => console.error('viewer read not counted', e instanceof Error ? e.message : String(e)));
+}
+
+async function viewerToken(env: Env, raw: string | undefined, viewer: SessionUser | null | undefined): Promise<ViewerRow> {
   const token = str(raw, 'token', { min: 20, max: 120 });
   const hash = await sha256Hex(token);
   const row = await env.DB.prepare(
     `SELECT t.token_hash, t.file_id, t.request_id, t.expires_at, t.revoked_at, t.created_at, t.created_by,
+            t.revision AS token_revision, t.grant_level, t.bound_user,
             r.state AS request_state, r.customer_id, r.visibility, r.expires_at AS request_expires_at,
-            u.role AS creator_role
+            r.revision AS request_revision, u.role AS creator_role
        FROM model_view_tokens t
        JOIN community_requests r ON r.id = t.request_id
        LEFT JOIN users u ON u.id = t.created_by
@@ -1967,15 +1825,15 @@ async function viewerToken(env: Env, raw: string | undefined) {
     .bind(hash)
     .first<{
       token_hash: string; file_id: string; request_id: string; expires_at: string;
-      revoked_at: string | null; created_at: string; created_by: string; request_state: string;
-      customer_id: string; visibility: string; request_expires_at: string | null; creator_role: string | null;
+      revoked_at: string | null; created_at: string; created_by: string;
+      token_revision: number | null; grant_level: string; bound_user: number;
+      request_state: string; customer_id: string; visibility: string; request_expires_at: string | null;
+      request_revision: number; creator_role: string | null;
     }>();
   const invalid = () => notFound('This link is no longer valid');
-  // One answer for "wrong", "expired", "revoked" and "the request is closed":
-  // a viewer link that has stopped working must not tell a stranger which of
-  // them it was. The request's state is re-read on every use as well as the
-  // revocation written when it closed — the second guard does not depend on
-  // the first having run.
+  // One answer for "wrong", "expired", "revoked", "not yours", "an older
+  // revision" and "the request is closed": a viewer link that has stopped
+  // working must not tell a stranger which of them it was.
   if (
     !row ||
     row.revoked_at ||
@@ -1984,22 +1842,26 @@ async function viewerToken(env: Env, raw: string | undefined) {
   ) {
     throw invalid();
   }
+  // BOUND TO THE PERSON (W5-B): only the account that minted it opens it. The
+  // viewer page is opened from the app, in the same browser, signed in.
+  if (Number(row.bound_user) !== 1 || !viewer || viewer.id !== row.created_by) throw invalid();
+  // AND TO THE REVISION: the customer changed the job, the preview of the old
+  // one is not what anyone should be quoting from.
+  if (Number(row.token_revision ?? 0) !== Number(row.request_revision ?? 1)) throw invalid();
   /**
    * A LINK MINTED BEFORE THE 60-MINUTE RULE KEEPS NONE OF ITS WEEK (review
-   * S8). The mint used to accept `hours` up to 168; migration 0119 revokes
-   * every such link it finds, and this refuses any that slipped past it (one
-   * minted between the migration and the deploy): whatever `expires_at`
-   * says, a link lives `VIEWER_TOKEN_TTL_MINUTES` from its own minting.
+   * S8): whatever `expires_at` says, a link lives `VIEWER_TOKEN_TTL_MINUTES`
+   * from its own minting.
    */
   const minted = Date.parse(row.created_at);
   if (!(Number.isFinite(minted) && minted + VIEWER_TOKEN_TTL_MINUTES * 60_000 > Date.now())) throw invalid();
   /**
-   * AND IT GRANTS NO MORE THAN ITS CREATOR STILL HAS (review S8). A link is
-   * the creator's access, handed on — re-derived here on every use by the same
-   * rule the mint applied: the request's owner, the engaged merchant, or a
-   * merchant who could quote on it right now. A merchant Levonis has since
-   * restricted, a request that left the board, a plan that lapsed: the link
-   * stops with the access it stood on.
+   * AND IT GRANTS NO MORE THAN ITS CREATOR STILL HAS (review S8, W5-B). Re-
+   * derived on every use by the rule the mint applied: the customer, the
+   * accepted merchant, or a merchant still eligible right now. A restricted
+   * merchant, a lapsed plan, a printer sold, a request that left the board:
+   * the link stops with the access it stood on — and a merchant who was
+   * accepted later never gets more than the grant they minted.
    */
   const creator = { id: row.created_by, role: row.creator_role ?? 'customer' } as SessionUser;
   const request: RequestForAccess = {
@@ -2009,9 +1871,20 @@ async function viewerToken(env: Env, raw: string | undefined) {
     visibility: row.visibility,
     expires_at: row.request_expires_at,
   };
-  const { access } = await requestFileAccess(env, request, creator, { allowAdmin: false });
-  if (!access || (access === 'board' && !(await mayQuoteOnBoard(env.DB, row.created_by)))) throw invalid();
-  return row;
+  const { reader } = await fileReader(env, request, creator, { allowAdmin: false });
+  const now = previewGrantFor(reader);
+  if (!now || !reader) throw invalid();
+  const grant: PreviewGrant = row.grant_level === 'full' && now === 'full' ? 'full' : 'preview';
+  return {
+    token_hash: row.token_hash,
+    file_id: row.file_id,
+    request_id: row.request_id,
+    expires_at: row.expires_at,
+    created_by: row.created_by,
+    revision: Number(row.request_revision ?? 1),
+    grant,
+    reader,
+  };
 }
 
 // -------------------------------------------------------- 8. repeat a request

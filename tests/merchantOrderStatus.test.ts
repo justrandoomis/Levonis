@@ -18,11 +18,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, failingD1, asD1, stubApp, post, get, json, pending, count } from './fixtures/app';
+import { legacyLedgerWrite } from './fixtures/legacyLedger';
 import { merchantRoutes } from '../worker/routes/merchant';
 
 function seed(status: string): DatabaseSync {
   const raw = freshDb();
-  raw.exec(`
+  legacyLedgerWrite(raw, `
     INSERT INTO users (id,name,email,password_hash,role,email_verified_at,locale) VALUES
       ('buyer','Sara','buyer@x.co','h','customer','2026-01-01T00:00:00.000Z','ar'),
       ('ali','Ali','ali@x.co','h','merchant',NULL,'ar');
@@ -75,7 +76,7 @@ test('THE DOUBLE TAP — the tap that LOST the race adds no completion and no re
   failing.beforeBatch = (stmts) => {
     if (raced || !stmts.some((s) => /UPDATE orders SET status/.test(s.sql))) return;
     raced = true;
-    raw.exec(`
+    legacyLedgerWrite(raw, `
       UPDATE orders SET status = 'delivered' WHERE id = 'ORD-M1';
       UPDATE merchant_payout_ledger SET state = 'available' WHERE id = 'pl1';
       INSERT INTO merchant_reputation_events (id,merchant_id,kind,points,order_id) VALUES ('rep_w','m_ali','order_completed',10,'ORD-M1');

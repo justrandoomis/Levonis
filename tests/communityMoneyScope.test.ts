@@ -15,6 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { freshDb, asD1, stubApp, post, patch, get, json, count, row, type StubUser } from './fixtures/app';
+import { legacyLedgerWrite } from './fixtures/legacyLedger';
 import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
 import { adminRoutes } from '../worker/routes/admin';
 import { requireFinancialScope } from '../worker/lib/walletAdjust';
@@ -26,7 +27,7 @@ const OWNER_AS_ASSISTANT: StubUser = { id: 'boss', role: 'admin', email: 'boss@x
 
 function seed() {
   const raw = freshDb();
-  raw.exec(`
+  legacyLedgerWrite(raw, `
     INSERT INTO users (id,name,email,password_hash,role) VALUES
       ('buyer','Sara','buyer@x.co','h','customer'), ('owner','Ali','ali@x.co','h','merchant'),
       ('aide','Aide','aide@x.co','h','admin'), ('fin','Fin','fin@x.co','h','admin'), ('boss','Boss','boss@x.co','h','admin');
@@ -279,7 +280,7 @@ const ADMIN_ASSISTANT: StubUser = { id: 'aide', role: 'admin', email: 'aide@x.co
 
 function seedStoreOrder() {
   const raw = freshDb();
-  raw.exec(`
+  legacyLedgerWrite(raw, `
     INSERT INTO users (id,name,email,password_hash,role,admin_scope) VALUES
       ('buyer','Sara','buyer@x.co','h','customer',NULL), ('owner','Ali','ali@x.co','h','merchant',NULL),
       ('aide','Aide','aide@x.co','h','admin','assistant');

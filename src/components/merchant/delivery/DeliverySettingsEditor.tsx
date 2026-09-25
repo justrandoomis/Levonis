@@ -54,13 +54,16 @@ import {
   type RowMode,
   type RuleDraft,
 } from './deliveryEditorModel';
-import { DELIVERY_LIMITS, type DeliveryIssue } from '../../../../packages/shipping/src/merchantDelivery';
+import { DEFAULT_MERCHANT_DELIVERY_FEE_MAX_IQD, DELIVERY_LIMITS, type DeliveryIssue } from '../../../../packages/shipping/src/merchantDelivery';
 
 type Loc = (ar: string, en: string, ckb?: string) => string;
 
 /** A field's problem, in the merchant's language — the validator's code, never its path. */
-function issueText(code: DeliveryIssue['code'], loc: Loc): string {
+function issueText(code: DeliveryIssue['code'], loc: Loc, maxFee: number): string {
   switch (code) {
+    case 'fee_above_max':
+      // OWNER: Sorani to be written by hand.
+      return loc(`أعلى أجرة توصيل تسمح بها Levonis هي ${maxFee.toLocaleString('en-US')} د.ع.`, `Levonis allows a delivery fee of at most ${maxFee.toLocaleString('en-US')} IQD.`);
     case 'fee_required':
       // OWNER: Sorani to be written by hand.
       return loc('اكتب أجرة التوصيل.', 'Enter the delivery fee.');
@@ -137,13 +140,16 @@ export default function DeliverySettingsEditor({ storeGovernorate = '', onSaved 
   }, [load]);
 
   const dirty = !!draft && draftKey(draft) !== baseline;
-  const issues = useMemo(() => (draft ? draftIssues(draft) : []), [draft]);
+  // The platform's maximum fee (owner decision 2026-09-25): shown on every fee field, checked like the server.
+  const maxFee = loaded?.max_fee_iqd ?? DEFAULT_MERCHANT_DELIVERY_FEE_MAX_IQD;
+  const feeHint = loc(`الحد الأعلى ${maxFee.toLocaleString('en-US')} د.ع`, `At most ${maxFee.toLocaleString('en-US')} IQD`); // OWNER: Sorani to be written by hand.
+  const issues = useMemo(() => (draft ? draftIssues(draft, maxFee) : []), [draft, maxFee]);
   const coverage = useMemo(() => (draft ? draftCoverage(draft) : null), [draft]);
   const noCoverage = !!loaded?.store_open && !!coverage && !coverage.serviceable;
   const issueAt = (path: string) => issues.find((i) => i.path === path);
   const errorAt = (path: string) => {
     const i = issueAt(path);
-    return i ? issueText(i.code, loc) : undefined;
+    return i ? issueText(i.code, loc, maxFee) : undefined;
   };
   const canSave = dirty && !saving && issues.length === 0 && unreadable.size === 0 && !noCoverage;
 
@@ -189,6 +195,10 @@ export default function DeliverySettingsEditor({ storeGovernorate = '', onSaved 
       } else if (code === 'DELIVERY_NO_COVERAGE') {
         // OWNER: Sorani to be written by hand.
         setSaveError(loc('المتجر مفتوح: اختر محافظة واحدة على الأقل للتوصيل، أو فعّل الاستلام من المتجر.', 'Your store is open: deliver to at least one governorate, or offer pickup.'));
+      } else if (code === 'DELIVERY_FEE_ABOVE_MAX') {
+        const max = Number((e as ApiError).details?.max_fee_iqd ?? maxFee);
+        // OWNER: Sorani to be written by hand.
+        setSaveError(loc(`أعلى أجرة توصيل تسمح بها Levonis هي ${max.toLocaleString('en-US')} د.ع. خفّض الأجور المعلَّمة.`, `Levonis allows a delivery fee of at most ${max.toLocaleString('en-US')} IQD. Lower the marked fees.`));
       } else if (code === 'DELIVERY_INVALID') {
         // OWNER: Sorani to be written by hand.
         setSaveError(loc('بعض القيم غير مقبولة. راجع الحقول المعلَّمة.', 'Some values are not accepted. Check the marked fields.'));
@@ -279,7 +289,7 @@ export default function DeliverySettingsEditor({ storeGovernorate = '', onSaved 
             items={modeItems}
           />
           {draft.default_mode === 'fee' && (
-            <Field label={loc('أجرة التوصيل', 'Delivery fee', 'کرێی گەیاندن')} error={errorAt('profile.default_fee_iqd')} required>
+            <Field label={loc('أجرة التوصيل', 'Delivery fee', 'کرێی گەیاندن')} hint={feeHint} error={errorAt('profile.default_fee_iqd')} required>
               <NumberInput
                 kind="money"
                 max={DELIVERY_LIMITS.fee_iqd}
@@ -401,7 +411,7 @@ export default function DeliverySettingsEditor({ storeGovernorate = '', onSaved 
                         ]}
                       />
                       {rule.mode === 'fee' && (
-                        <Field label={loc('أجرة هذه المحافظة', 'Fee for this governorate')} error={errorAt(`rules.${g.id}.fee_iqd`)} required>
+                        <Field label={loc('أجرة هذه المحافظة', 'Fee for this governorate')} hint={feeHint} error={errorAt(`rules.${g.id}.fee_iqd`)} required>
                           <NumberInput
                             kind="money"
                             max={DELIVERY_LIMITS.fee_iqd}

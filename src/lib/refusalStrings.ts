@@ -759,6 +759,168 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The search is too long — at most 60 characters.',
     ckb: 'نص البحث طويل جدًا — 60 حرفًا على الأكثر.',
   },
+  // Review W2-5 (admin payout queue): approve / paid refused while a claw-back
+  // left the merchant owing the platform. Admin-facing; the ckb column carries
+  // the Arabic until the owner writes the Sorani by hand (DECISIONS row 11).
+  // OWNER: Sorani to be written by hand.
+  // Review W2-5 p3: public store media (uploads purpose=community). Merchant-
+  // facing; ckb carries the Arabic. OWNER: Sorani to be written by hand.
+  STORE_REQUIRED: {
+    ar: 'افتح متجرك أولًا — صور المتجر وفيديوهاته تخصّ متجرًا.',
+    en: 'Open your store first — store pictures and videos belong to a store.',
+    ckb: 'افتح متجرك أولًا — صور المتجر وفيديوهاته تخصّ متجرًا.',
+  },
+  VIDEO_QUOTA_EXCEEDED: {
+    ar: 'بلغ متجرك حدّ مساحة الفيديو (1 غيغابايت). احذف فيديو لم تعد تستخدمه ثم أعد المحاولة.',
+    en: 'Your store has reached its video storage limit (1 GB). Remove a video you no longer use and try again.',
+    ckb: 'بلغ متجرك حدّ مساحة الفيديو (1 غيغابايت). احذف فيديو لم تعد تستخدمه ثم أعد المحاولة.',
+  },
+  // Owner decision 2026-09-25 (review W2-5 finding 2): a published product
+  // costs something, and a store's delivery fee has a platform maximum.
+  // PRODUCT_PRICE_REQUIRED reaches a customer at checkout (a product left at
+  // 0 IQD is not for sale) and a merchant in the editor. The ckb column
+  // carries the Arabic. OWNER: Sorani to be written by hand.
+  PRODUCT_PRICE_REQUIRED: {
+    ar: 'هذا المنتج بلا سعر حاليًا فلا يمكن شراؤه. أزله من السلة للمتابعة.',
+    en: 'This product has no price right now, so it cannot be bought. Remove it from the cart to continue.',
+    ckb: 'هذا المنتج بلا سعر حاليًا فلا يمكن شراؤه. أزله من السلة للمتابعة.',
+  },
+  DELIVERY_FEE_ABOVE_MAX: {
+    ar: 'أجرة التوصيل أعلى من الحد الذي تسمح به Levonis. خفّضها ثم احفظ.',
+    en: 'The delivery fee is above the maximum Levonis allows. Lower it, then save.',
+    ckb: 'أجرة التوصيل أعلى من الحد الذي تسمح به Levonis. خفّضها ثم احفظ.',
+  },
+  MERCHANT_IN_DEBT: {
+    ar: 'على هذا التاجر دين للمنصة (استُرد مبلغ بعد تحويله إلى رصيده). لا يُوافَق على التحويل ولا يُسجَّل حتى يُغطّى الدين — أو ارفض الطلب ليعود المبلغ إلى رصيده.',
+    en: 'This merchant owes the platform (a credit was clawed back). The payout cannot be approved or recorded until the debt is covered — or fail it to return the amount to their balance.',
+    ckb: 'على هذا التاجر دين للمنصة (استُرد مبلغ بعد تحويله إلى رصيده). لا يُوافَق على التحويل ولا يُسجَّل حتى يُغطّى الدين — أو ارفض الطلب ليعود المبلغ إلى رصيده.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  OFFER_NOT_ELIGIBLE: {
+    ar: 'ورشتك لا تستطيع تنفيذ هذا الطلب كما هو الآن — راجع الأسباب في بطاقة «ورشتك».',
+    en: 'Your workshop cannot make this request as it stands — see the reasons on the “Your workshop” card.',
+    ckb: 'ورشتك لا تستطيع تنفيذ هذا الطلب كما هو الآن — راجع الأسباب في بطاقة «ورشتك».',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  FILE_ORIGINAL_RESTRICTED: {
+    ar: 'الملف الأصلي يصلك بعد قبول عرضك. قبل ذلك تستطيع معاينة المجسم.',
+    en: 'The original file is yours once your offer is accepted. Until then you can preview the model.',
+    ckb: 'الملف الأصلي يصلك بعد قبول عرضك. قبل ذلك تستطيع معاينة المجسم.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  FILE_NOT_ALLOWED: {
+    ar: 'هذا الملف للعميل وللورش التي تستطيع تنفيذ الطلب فقط.',
+    en: 'This file is only for the customer and the workshops that can make the request.',
+    ckb: 'هذا الملف للعميل وللورش التي تستطيع تنفيذ الطلب فقط.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  COSTING_NOT_ELIGIBLE: {
+    ar: 'تحسب الورشة تكلفة طلب تستطيع تنفيذه فقط.',
+    en: 'A workshop can only cost a request it can make.',
+    ckb: 'تحسب الورشة تكلفة طلب تستطيع تنفيذه فقط.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  COSTING_NO_MODEL: {
+    ar: 'لا يوجد مجسم ثلاثي الأبعاد في هذا الطلب لحساب تكلفته.',
+    en: 'This request has no 3D model to cost.',
+    ckb: 'لا يوجد مجسم ثلاثي الأبعاد في هذا الطلب لحساب تكلفته.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  COSTING_NO_PRINTER: {
+    ar: 'أضف طابعة أولًا لتحسب التكلفة عليها.',
+    en: 'Add a printer first to cost on it.',
+    ckb: 'أضف طابعة أولًا لتحسب التكلفة عليها.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  COSTING_RESIN_UNSUPPORTED: {
+    ar: 'حساب تكلفة الريزن من الملف غير متاح بعد — اختر طابعة FDM.',
+    en: 'Costing resin from the file is not available yet — pick an FDM printer.',
+    ckb: 'حساب تكلفة الريزن من الملف غير متاح بعد — اختر طابعة FDM.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  COSTING_MATERIAL_REQUIRED: {
+    ar: 'اختر الخامة التي ستطبع بها لتُحسب التكلفة.',
+    en: 'Choose the material you will print it in to cost it.',
+    ckb: 'اختر الخامة التي ستطبع بها لتُحسب التكلفة.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  PRINTER_MODEL_UNKNOWN: {
+    ar: 'هذه الطابعة غير موجودة في القائمة.',
+    en: 'That printer is not in the list.',
+    ckb: 'هذه الطابعة غير موجودة في القائمة.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  PRINTER_NOZZLE_INVALID: {
+    ar: 'هذه الفوهة لا تركب على هذه الطابعة.',
+    en: 'That nozzle does not fit this printer.',
+    ckb: 'هذه الفوهة لا تركب على هذه الطابعة.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  PRINTER_HARDENED_UNAVAILABLE: {
+    ar: 'هذه الطابعة لا تقبل فوهة مقوّاة.',
+    en: 'This printer cannot take a hardened nozzle.',
+    ckb: 'هذه الطابعة لا تقبل فوهة مقوّاة.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  PRINTER_MULTICOLOR_UNAVAILABLE: {
+    ar: 'هذه الطابعة لا تطبع أكثر من خامة في المرة.',
+    en: 'This printer cannot print several materials at once.',
+    ckb: 'هذه الطابعة لا تطبع أكثر من خامة في المرة.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  PRINTER_MATERIAL_INVALID: {
+    ar: 'إحدى الخامات لا تناسب تقنية هذه الطابعة.',
+    en: 'One of the materials does not suit this printer’s technology.',
+    ckb: 'إحدى الخامات لا تناسب تقنية هذه الطابعة.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  PRINTER_DATE_INVALID: {
+    ar: 'اكتب تاريخ الشراء بصيغة تاريخ.',
+    en: 'Enter the purchase date as a date.',
+    ckb: 'اكتب تاريخ الشراء بصيغة تاريخ.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  STOCK_INVALID: {
+    ar: 'تعذّر قراءة أسطر المخزون.',
+    en: 'The stock lines could not be read.',
+    ckb: 'تعذّر قراءة أسطر المخزون.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  STOCK_TOO_MANY: {
+    ar: 'عدد أسطر المخزون أكثر من المسموح.',
+    en: 'There are more stock lines than allowed.',
+    ckb: 'عدد أسطر المخزون أكثر من المسموح.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  STOCK_UNTRACK_CONFIRM: {
+    ar: 'تفريغ المخزون يوقف تتبّعه — أكّد ذلك أولًا.',
+    en: 'Emptying the stock stops tracking it — confirm that first.',
+    ckb: 'تفريغ المخزون يوقف تتبّعه — أكّد ذلك أولًا.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  STOCK_MATERIAL_INVALID: {
+    ar: 'خامة غير معروفة في المخزون.',
+    en: 'An unknown material in the stock.',
+    ckb: 'خامة غير معروفة في المخزون.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  STOCK_COLOR_INVALID: {
+    ar: 'لون غير صالح في المخزون.',
+    en: 'An invalid colour in the stock.',
+    ckb: 'لون غير صالح في المخزون.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  STOCK_GRAMS_INVALID: {
+    ar: 'الغرامات يجب أن تكون عددًا صحيحًا.',
+    en: 'Grams must be a whole number.',
+    ckb: 'الغرامات يجب أن تكون عددًا صحيحًا.',
+  },
+  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
+  STOCK_DUPLICATE: {
+    ar: 'الخامة واللون نفسهما مكرران في المخزون.',
+    en: 'The same material and colour appear twice.',
+    ckb: 'الخامة واللون نفسهما مكرران في المخزون.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

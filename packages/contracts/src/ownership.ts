@@ -139,6 +139,8 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'community_print_requests', 'community_request_matches', 'model_view_tokens', 'community_escrows', 'community_escrow_events',
     // 0130 — what each published revision of a request said, and each offer's terms over time (print requests v2).
     'community_request_revisions', 'community_offer_revisions',
+    // 0132 — eligibility as data (W5-B): the workshop's material stock, the re-match queue, and every read of a request file.
+    'merchant_material_stock', 'community_match_queue', 'request_file_reads',
     'merchant_payout_ledger', 'community_merchants', 'merchant_stores', 'merchant_store_slugs', 'reserved_slugs',
     'merchant_notification_preferences', 'community_products', 'merchant_store_sections', 'merchant_services', 'merchant_showcase',
     'merchant_coupons', 'merchant_reviews', 'merchant_reputation_events',

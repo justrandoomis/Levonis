@@ -25,6 +25,7 @@ import { Field, Input } from '../ui/Field';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { useToast } from '../ui/Toast';
 import ReasonSheet, { type ReasonRequest } from './ReasonSheet';
+import { refusalText } from '../../lib/refusalStrings';
 
 type T = (ar: string, en: string) => string;
 type QueueState = 'open' | 'paid' | 'failed' | 'cancelled';
@@ -39,7 +40,7 @@ export interface QueuePayout {
   reference: string;
   decision_reason: string;
   created_at: string;
-  merchant: { id: string; name: string; status: string; store_name: string; store_slug: string; available_iqd: number; reserved_iqd: number };
+  merchant: { id: string; name: string; status: string; store_name: string; store_slug: string; available_iqd: number; reserved_iqd: number; debt_iqd?: number };
 }
 
 export const payoutQueueApi = {
@@ -57,6 +58,8 @@ export const payoutQueueApi = {
 /** The queue routes' refusals in the panel's words — never the code or the English. */
 export function queueRefusal(e: unknown, t: T): string {
   const code = e instanceof ApiError ? e.code : '';
+  // A claw-back left the merchant owing the platform: approve/paid wait for the debt (review W2-5 p4).
+  if (code === 'MERCHANT_IN_DEBT') return refusalText(code, t('ar', 'en') === 'ar' ? 'ar' : 'en');
   if (code === 'PAYOUT_STATE_CONFLICT') return t('تغيّر هذا الطلب منذ تحميل القائمة — حدّثها.', 'This request changed since the list loaded — refresh it.');
   if (code === 'PAYOUT_REFERENCE_REQUIRED') return t('اكتب مرجع التحويل (3 أحرف على الأقل).', 'Write the transfer reference (at least 3 characters).');
   if (code === 'REASON_REQUIRED') return t('اكتب السبب.', 'Write the reason.');
@@ -190,6 +193,12 @@ export default function PayoutQueue({ t }: { t: T }) {
                     {t('متاح', 'available')} <Money iqd={p.merchant.available_iqd} /> · {t('محجوز', 'reserved')} <Money iqd={p.merchant.reserved_iqd} />
                   </dd>
                 </div>
+                {(p.merchant.debt_iqd ?? 0) > 0 && (p.state === 'requested' || p.state === 'approved') && (
+                  <div className="sm:col-span-2 space-y-1" data-merchant-debt={p.merchant.debt_iqd}>
+                    <StatusChip tone="danger">{t('دين على التاجر:', 'Merchant owes:')} <Money iqd={p.merchant.debt_iqd ?? 0} /></StatusChip>
+                    <p className="text-red-300">{refusalText('MERCHANT_IN_DEBT', lang)}</p>
+                  </div>
+                )}
                 {p.merchant.status && p.merchant.status !== 'active' && (
                   <div className="sm:col-span-2"><StatusChip tone="danger">{p.merchant.status === 'suspended' ? t('حساب التاجر موقوف', 'Merchant suspended') : p.merchant.status === 'restricted' ? t('حساب التاجر مقيّد', 'Merchant restricted') : t('حساب التاجر ليس نشطًا', 'Merchant not active')}</StatusChip></div>
                 )}
@@ -200,11 +209,11 @@ export default function PayoutQueue({ t }: { t: T }) {
               {(p.state === 'requested' || p.state === 'approved') && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {p.state === 'requested' ? (
-                    <Button variant="primary" size="sm" icon={<Check aria-hidden="true" className="h-4 w-4" />} onClick={() => approve(p)} data-approve-payout>
+                    <Button variant="primary" size="sm" icon={<Check aria-hidden="true" className="h-4 w-4" />} onClick={() => approve(p)} disabled={(p.merchant.debt_iqd ?? 0) > 0} data-approve-payout>
                       {t('موافقة', 'Approve')}
                     </Button>
                   ) : (
-                    <Button variant="primary" size="sm" icon={<Send aria-hidden="true" className="h-4 w-4" />} onClick={() => setPaying(p)} data-mark-paid>
+                    <Button variant="primary" size="sm" icon={<Send aria-hidden="true" className="h-4 w-4" />} onClick={() => setPaying(p)} disabled={(p.merchant.debt_iqd ?? 0) > 0} data-mark-paid>
                       {t('سجّل التحويل', 'Record transfer')}
                     </Button>
                   )}

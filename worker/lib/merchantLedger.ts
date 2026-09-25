@@ -394,6 +394,17 @@ function fence(db: D1Database, merchantId: string, condition: string, binds: unk
     .bind(merchantId, ...binds);
 }
 
+/**
+ * THE DEBT FENCE (review W2-5 p4): aborts the batch while the merchant owes the
+ * platform — «available» below zero after a claw-back. The decisions that SEND
+ * money (approve, paid) carry it as their FIRST statement, so a payout reserved
+ * before the claw-back cannot leave while the debt lasts; fail/cancel do not
+ * (they return the reservation to «available», which reduces the debt).
+ */
+function debtFence(db: D1Database, merchantId: string): D1PreparedStatement {
+  return fence(db, merchantId, `${merchantAvailableSql('?1')} >= 0`);
+}
+
 const isFenceAbort = (e: unknown) => /CHECK constraint failed/i.test(e instanceof Error ? e.message : String(e));
 const isOverdraw = (e: unknown) => /LEDGER_BUCKET_OVERDRAWN/.test(e instanceof Error ? e.message : String(e));
 
@@ -437,11 +448,13 @@ export type PayoutFailure =
   | 'INSUFFICIENT_BALANCE'
   | 'IDEMPOTENCY_KEY_REUSED'
   | 'NOT_FOUND'
-  | 'STATE_CONFLICT';
+  | 'STATE_CONFLICT'
+  /** Approve / paid refused: the merchant's «available» is below zero (a claw-back). */
+  | 'MERCHANT_IN_DEBT';
 
 export type PayoutResult =
   | { ok: true; payout: PayoutRow; replayed: boolean }
-  | { ok: false; reason: PayoutFailure; availableIqd?: number; state?: PayoutState };
+  | { ok: false; reason: PayoutFailure; availableIqd?: number; state?: PayoutState; debtIqd?: number };
 
 export function getPayout(db: D1Database, id: string): Promise<PayoutRow | null> {
   return db.prepare('SELECT * FROM merchant_payouts WHERE id = ?').bind(id).first<PayoutRow>();
@@ -637,7 +650,8 @@ async function decide(
   build: (payout: PayoutRow, ts: string) => Promise<D1PreparedStatement[]>,
   allowedFrom: PayoutState[],
   scope?: { merchantId: string },
-  ts = NOW()
+  ts = NOW(),
+  debtFenced = false
 ): Promise<PayoutResult> {
   const payout = await getPayout(db, id);
   if (!payout || (scope && payout.merchant_id !== scope.merchantId)) return { ok: false, reason: 'NOT_FOUND' };
@@ -647,6 +661,15 @@ async function decide(
     await db.batch(await build(payout, ts));
   } catch (e) {
     if (!isFenceAbort(e) && !/PAYOUT_STATE_TRANSITION/.test(e instanceof Error ? e.message : String(e))) throw e;
+    if (debtFenced) {
+      // The debt fence aborted the batch: say so, with the debt, while the row
+      // is still where the decision found it (otherwise the state answers).
+      const now = await getPayout(db, id);
+      if (now && allowedFrom.includes(now.state)) {
+        const b = await merchantBuckets(db, now.merchant_id);
+        if (b.available < 0) return { ok: false, reason: 'MERCHANT_IN_DEBT', debtIqd: -b.available, availableIqd: b.available, state: now.state };
+      }
+    }
     return stateAnswer(db, id, wanted);
   }
   const after = await getPayout(db, id);
@@ -683,6 +706,7 @@ export function approvePayout(db: D1Database, p: DecideInput): Promise<PayoutRes
     p.payoutId,
     'approved',
     async (payout, ts) => [
+      debtFence(db, payout.merchant_id),
       db
         .prepare(
           `UPDATE merchant_payouts SET state = 'approved', approved_at = ?1, updated_at = ?1, decided_by = ?2
@@ -694,7 +718,8 @@ export function approvePayout(db: D1Database, p: DecideInput): Promise<PayoutRes
     ],
     ['requested'],
     undefined,
-    p.ts
+    p.ts,
+    true
   );
 }
 
@@ -706,6 +731,7 @@ export function markPayoutPaid(db: D1Database, p: DecideInput & { reference: str
     p.payoutId,
     'paid',
     async (payout, ts) => [
+      debtFence(db, payout.merchant_id),
       db
         .prepare(
           `UPDATE merchant_payouts SET state = 'paid', paid_at = ?1, updated_at = ?1, decided_by = ?2, reference = ?3
@@ -722,7 +748,8 @@ export function markPayoutPaid(db: D1Database, p: DecideInput & { reference: str
     ],
     ['approved'],
     undefined,
-    p.ts
+    p.ts,
+    true
   );
 }
 
@@ -1124,6 +1151,8 @@ export async function adminPayoutQueue(
         store_slug: String(r.store_slug ?? ''),
         available_iqd: Number(r.merchant_available) || 0,
         reserved_iqd: Number(r.merchant_reserved) || 0,
+        /** What the merchant owes the platform (0 when «available» ≥ 0): approve/paid refuse while > 0. */
+        debt_iqd: Math.max(0, -(Number(r.merchant_available) || 0)),
       },
     })),
     next_cursor: rows.length === limit && last ? `${last.created_at}|${last.id}` : null,

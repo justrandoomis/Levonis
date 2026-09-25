@@ -41,6 +41,16 @@ import MerchantOfferPanel from '../components/community/offers/MerchantOfferPane
 import OrderContactCard from '../components/community/offers/OrderContactCard';
 import type { OfferV2 } from '../components/community/offers/types';
 /**
+ * ELIGIBILITY AS DATA (stream W5-B): «مناسب لي» — the requests this workshop
+ * can make, by the server's own verdict — and, on a request's page, the
+ * workshop's verdict with its reasons and its private costing.
+ */
+import RequestBoard from '../components/merchant/workshop/RequestBoard';
+import WorkshopRequestCard from '../components/merchant/workshop/WorkshopRequestCard';
+import type { OfferPrefill } from '../components/merchant/workshop/api';
+import { Segmented } from '../components/ui/Segmented';
+import { merchantHref } from '../lib/merchantRoutes';
+/**
  * A PUBLISHED REQUEST IS A PROMISE OF OFFERS, and offers arrive hours later
  * from merchants the customer has never met. For an account with no outbound
  * channel every one of them lands only in the in-app inbox, so the request the
@@ -304,7 +314,7 @@ export default function Requests() {
             ) : view === 'mine' ? (
               <MyRequestsList onOpen={openRequestId} />
             ) : (
-              <RequestList onOpen={openRequest} />
+              <RequestList onOpen={openRequest} canOffer={!!me?.can.offers} />
             )}
           </div>
         </div>
@@ -320,17 +330,89 @@ export default function Requests() {
  * route carrying the estimate and the chosen merchant — data this component
  * deliberately never receives.
  */
-function RequestList({ onOpen }: { onOpen: (r: RequestRow) => void }) {
+function RequestList({ onOpen, canOffer = false }: { onOpen: (r: RequestRow) => void; canOffer?: boolean }) {
   const { loc, lang } = useLanguage();
+  // A workshop that can offer lands on the requests it can MAKE; the whole
+  // board stays one tap away (docs/MERCHANT_PLATFORM.md §2 decision 5).
+  const [scope, setScope] = useState<'mine' | 'all'>(canOffer ? 'mine' : 'all');
+  useEffect(() => setScope(canOffer ? 'mine' : 'all'), [canOffer]);
+  const [materials, setMaterials] = useState<CatalogMaterial[]>([]);
+  useEffect(() => {
+    if (!canOffer) return;
+    requestsApi.catalog().then((c) => setMaterials(c.materials)).catch(() => setMaterials([]));
+  }, [canOffer]);
+
+  return (
+    <>
+      {canOffer && (
+        <Segmented
+          group="requests-scope"
+          size="sm"
+          className="mb-4"
+          label={loc('أي الطلبات', 'Which requests')}
+          value={scope}
+          onChange={(id) => setScope(id as 'mine' | 'all')}
+          dataAttr="data-requests-scope"
+          items={[
+            // OWNER: Sorani to be written by hand.
+            { id: 'mine', label: loc('مناسب لي', 'Fits my workshop') },
+            { id: 'all', label: loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان') },
+          ]}
+        />
+      )}
+      {scope === 'mine' && canOffer ? (
+        <RequestBoard
+          materials={materials}
+          workshopHref={merchantHref.printers()}
+          onOpen={(r) => onOpen({ ...r, customer_name: null } as unknown as RequestRow)}
+        />
+      ) : (
+        <AllRequests onOpen={onOpen} loc={loc} lang={lang} />
+      )}
+    </>
+  );
+}
+
+/** Every request on the public board, newest first, a page at a time. */
+function AllRequests({
+  onOpen,
+  loc,
+  lang,
+}: {
+  onOpen: (r: RequestRow) => void;
+  loc: ReturnType<typeof useLanguage>['loc'];
+  lang: ReturnType<typeof useLanguage>['lang'];
+}) {
   const [rows, setRows] = useState<RequestRow[] | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
 
   useEffect(() => {
     setRows(null);
     api
-      .get<{ requests: RequestRow[] }>('/api/marketplace/requests')
-      .then((d) => setRows(d.requests))
+      .get<{ requests: RequestRow[]; next_cursor: string | null }>('/api/marketplace/requests')
+      .then((d) => {
+        setRows(d.requests);
+        setCursor(d.next_cursor ?? null);
+      })
       .catch(() => setRows([]));
   }, []);
+
+  async function loadMore() {
+    if (!cursor) return;
+    setMore(true);
+    try {
+      const d = await api.get<{ requests: RequestRow[]; next_cursor: string | null }>(
+        `/api/marketplace/requests?cursor=${encodeURIComponent(cursor)}`
+      );
+      setRows((r) => [...(r ?? []), ...d.requests.filter((x) => !(r ?? []).some((y) => y.id === x.id))]);
+      setCursor(d.next_cursor ?? null);
+    } catch {
+      setCursor(null);
+    } finally {
+      setMore(false);
+    }
+  }
 
   if (rows === null) {
     return (
@@ -385,9 +467,21 @@ function RequestList({ onOpen }: { onOpen: (r: RequestRow) => void }) {
           </div>
         </button>
       ))}
+      {cursor && (
+        <button
+          type="button"
+          onClick={loadMore}
+          disabled={more}
+          data-requests-more
+          className="w-full min-h-[44px] rounded-2xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[13px] font-semibold disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+        >
+          {more ? loc('جارٍ التحميل…', 'Loading…') : loc('المزيد', 'Load more')}
+        </button>
+      )}
     </div>
   );
 }
+
 
 // --------------------------------------------------------------- detail
 
@@ -422,6 +516,10 @@ function RequestDetail({
   const [discardError, setDiscardError] = useState('');
 
   useEffect(() => setCurrent(request), [request]);
+  // «استخدم هذا كعرضي»: a private costing handed to the offer composer (W5-B).
+  const [prefill, setPrefill] = useState<OfferPrefill | null>(null);
+  const [searchParams] = useSearchParams();
+  const openCosting = searchParams.get('cost') === '1';
 
   const load = useCallback(() => {
     api
@@ -626,6 +724,18 @@ function RequestDetail({
           </div>
         )}
 
+        {/* The workshop's own verdict on this request, with the reasons and the
+            screen that fixes each, and its private costing (W5-B). Only for a
+            merchant looking at somebody else's published request. */}
+        {me && !isCustomer && !isOwner && current.state !== 'draft' && (
+          <WorkshopRequestCard
+            requestId={current.id}
+            takingOffers={open}
+            openCosting={openCosting}
+            onUseAsOffer={setPrefill}
+          />
+        )}
+
         {/* A draft cannot be offered on, so there is no "no offers yet" to
             wait for — the draft card above already says what happens next. */}
         {current.state !== 'draft' && (
@@ -659,6 +769,8 @@ function RequestDetail({
                 takingOffers={open}
                 materials={materials}
                 onChanged={load}
+                prefill={prefill}
+                onPrefillDone={() => setPrefill(null)}
               />
             )}
           </>

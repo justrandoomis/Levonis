@@ -383,6 +383,8 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'order_item_inventory_allocations.idempotency_key': 'request de-duplication token',
   'merchant_payout_ledger.idempotency_key': 'request de-duplication token',
   'merchant_ledger_entries.event_key': 'ledger idempotency key (0121)',
+  'community_request_matches.reasons': 'eligibility reason codes, JSON array of fixed codes (0132)',
+  'request_file_reads.file_id': 'a community_request_files row id, not a storage key (0132)',
   'merchant_payouts.event_key': 'payout idempotency key (0121)',
   'merchant_payouts.method_snapshot': 'payout channel and account as requested — JSON, no media (0121)',
   'orders.idempotency_key': 'request de-duplication token',

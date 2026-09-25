@@ -59,6 +59,10 @@ function database(): { raw: DatabaseSync; db: D1Database } {
    */
   raw.exec("INSERT INTO chats (id) VALUES ('chat_1')");
   raw.exec("INSERT INTO chat_participants (chat_id,user_id) VALUES ('chat_1','admin')");
+  // purpose=community is public store media and needs a store the uploader
+  // owns (review W2-5 p3) — the session user has one, as every merchant does.
+  raw.exec("INSERT INTO community_merchants (id,user_id,name) VALUES ('m_admin','admin','Admin 3D')");
+  raw.exec("INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('s_admin','m_admin','admin','admin3d','Admin 3D')");
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 

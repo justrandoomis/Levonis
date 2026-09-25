@@ -1,12 +1,13 @@
 import { IMAGES_MAX_INPUT_BYTES, convertToWebp, extensionFor, isConvertibleToWebp } from '../lib/imageConvert';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAuth, badRequest, forbidden, notFound, oneOf, str, unavailable } from '../lib/http';
+import { HttpError, requireAuth, badRequest, forbidden, notFound, oneOf, str, unavailable } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { assertMayWriteInThread, recordStaffChatFileRead } from './chats';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { sniffVideo } from '../lib/videoSniff';
+import { storeForUser } from '../lib/merchantAuth';
 import {
   buildMediaKey,
   getMediaObject,
@@ -34,6 +35,15 @@ import {
 
 const IMAGE_MAX = 8 * 1024 * 1024;
 const VIDEO_MAX = 40 * 1024 * 1024;
+/**
+ * THE PUBLIC-VIDEO QUOTA OF ONE STORE OWNER (review W2-5 p3): the live
+ * (`deleted_at IS NULL`) videos they stored under purpose=community may total
+ * at most 1 GiB — about 25 videos at the 40 MB ceiling. Unreferenced uploads
+ * are dated deleted by the media sweep and free the quota again. It is a soft
+ * cap (two uploads racing may both pass once), which is enough to stop one
+ * account filling the public bucket.
+ */
+export const MERCHANT_PUBLIC_VIDEO_QUOTA_BYTES = 1024 * 1024 * 1024;
 
 /**
  * THE MAJOR BRAND OF AN ISO-BMFF FILE, OR NULL IF IT IS NOT ONE.
@@ -263,6 +273,18 @@ uploadRoutes.post('/', async (c) => {
   }
 
   /**
+   * PUBLIC MERCHANT MEDIA NEEDS A STORE (review W2-5 p3). purpose=community
+   * files are PUBLIC and served from the merchant prefix; any signed-in account
+   * could store 40 MB videos there. Every client caller (the catalogue
+   * editor's MediaEditor and ImagePicker, the store builder's media picker,
+   * store settings, the dashboard's product form) runs inside a store the
+   * caller owns, so the rule costs no merchant flow anything.
+   */
+  if (purpose === 'community' && !(await storeForUser(c.env.DB, user.id))) {
+    throw new HttpError(403, 'Open your store first — store pictures and videos belong to a store', 'STORE_REQUIRED');
+  }
+
+  /**
    * A CONVERSATION CARRIES VIDEO TOO.
    *
    * `purpose === 'product'` was the whole rule, so a customer trying to send a
@@ -314,6 +336,20 @@ uploadRoutes.post('/', async (c) => {
       );
     }
     kind = { ext: video.ext, mime: video.mime };
+    const used = await c.env.DB
+      .prepare(
+        `SELECT COALESCE(SUM(byte_size), 0) AS bytes FROM file_objects
+          WHERE owner_id = ? AND domain = 'merchants' AND visibility = 'public' AND mime_type LIKE 'video/%' AND deleted_at IS NULL`
+      )
+      .bind(user.id)
+      .first<{ bytes: number }>();
+    const usedBytes = Number(used?.bytes) || 0;
+    if (usedBytes + buf.byteLength > MERCHANT_PUBLIC_VIDEO_QUOTA_BYTES) {
+      throw badRequest('Your store has reached its video storage limit — remove a video you no longer use', 'VIDEO_QUOTA_EXCEEDED', {
+        limit_bytes: MERCHANT_PUBLIC_VIDEO_QUOTA_BYTES,
+        used_bytes: usedBytes,
+      });
+    }
   }
   /**
    * NAME THE FORMAT BEFORE SAYING "UNSUPPORTED".

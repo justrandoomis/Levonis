@@ -395,7 +395,7 @@ export async function contactSnapshot(
           .first<Record<string, unknown>>(),
     db
       .prepare(
-        `SELECT m.name, m.phone, m.governorate, s.name AS store_name, s.slug, s.contact_phone, s.governorate AS store_governorate
+        `SELECT m.name, m.governorate, s.name AS store_name, s.slug, s.contact_phone, s.governorate AS store_governorate
            FROM community_merchants m LEFT JOIN merchant_stores s ON s.merchant_id = m.id
           WHERE m.id = ?`
       )
@@ -419,7 +419,10 @@ export async function contactSnapshot(
       name: String(merchant?.name ?? ''),
       store_name: String(merchant?.store_name ?? merchant?.name ?? ''),
       store_slug: String(merchant?.slug ?? ''),
-      phone: String(merchant?.contact_phone || merchant?.phone || ''),
+      // Only the store's PUBLISHED contact phone — never the merchant account's
+      // private phone (review W2-5 #7). None published → none shown; the
+      // request thread is how the two sides talk.
+      phone: String(merchant?.contact_phone || ''),
       governorate: String(merchant?.store_governorate || merchant?.governorate || ''),
     },
     delivery_method: p.deliveryMethod,

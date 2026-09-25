@@ -111,12 +111,13 @@ export function payloadFromDraft(d: DeliveryDraft): { profile: DeliveryConfigInp
 }
 
 /** The server's own check, run on the draft — issues keyed by path for the fields. */
-export function draftIssues(d: DeliveryDraft): DeliveryIssue[] {
+export function draftIssues(d: DeliveryDraft, maxFeeIqd?: number | null): DeliveryIssue[] {
   const payload = payloadFromDraft(d);
   const issues: DeliveryIssue[] = [];
   if (d.default_mode === 'fee' && d.default_fee_iqd === null) issues.push({ path: 'profile.default_fee_iqd', code: 'fee_required' });
   if (d.free_over_on && d.free_over_iqd === null) issues.push({ path: 'profile.free_over_iqd', code: 'free_over_range' });
-  const v = validateDeliveryConfig(payload);
+  // The platform's maximum fee, as the server checks it (DELIVERY_FEE_ABOVE_MAX).
+  const v = validateDeliveryConfig(payload, { maxFeeIqd });
   if ('issues' in v) for (const i of v.issues) if (!issues.some((x) => x.path === i.path)) issues.push(i);
   return issues;
 }

@@ -59,12 +59,13 @@ export function Disclosure({
   );
 }
 
-export function StateChip({ p, s }: { p: Pick<CatalogProduct, 'state' | 'moderation' | 'sold_out' | 'track_stock'>; s: CatalogStrings }) {
+export function StateChip({ p, s }: { p: Pick<CatalogProduct, 'state' | 'moderation' | 'sold_out' | 'track_stock' | 'price_required'>; s: CatalogStrings }) {
   const admin = !!p.moderation?.hidden_by_admin;
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       <StatusChip tone={stateTone(p.state, admin)}>{admin ? s.hiddenByAdmin : s.state(p.state)}</StatusChip>
       {p.state === 'published' && !admin && p.sold_out && <StatusChip tone="warning">{s.soldOut}</StatusChip>}
+      {p.state === 'published' && !admin && p.price_required && <StatusChip tone="danger">{s.priceRequired}</StatusChip>}
     </span>
   );
 }

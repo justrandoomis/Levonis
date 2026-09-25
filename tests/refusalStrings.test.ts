@@ -151,6 +151,15 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/routes/merchantOrders.ts',
     'worker/routes/merchantCustomers.ts',
     'worker/routes/merchantWorkspace.ts',
+    // Review W2-5 (W5-C): public store media needs a store and has a video
+    // quota; a payout is not approved or paid while the merchant is in debt.
+    'worker/routes/uploads.ts',
+    'worker/routes/adminCommunity.ts',
+    // Eligibility as data (W5-B): the offer gate, the printer and stock routes,
+    // and the private request costing.
+    'worker/lib/printMatchingStore.ts',
+    'worker/routes/merchantPrinters.ts',
+    'worker/routes/merchantWorkshop.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

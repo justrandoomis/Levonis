@@ -201,7 +201,16 @@ test('K: re-publishing a different job revises it — standing offers go stale, 
     1
   );
 
-  // The merchant stands by it for the new job; now it can be accepted.
+  // An FDM shop cannot stand by an offer for what is now a resin job (W5-B):
+  // re-confirming is a new promise, and eligibility is its permission.
+  const refused = await post(as(raw, 'owner'), `/api/marketplace/offers/${offerId}/reconfirm`);
+  assert.equal(refused.status, 403);
+  const why = await json(refused);
+  assert.deepEqual([why.code, why.details?.reason], ['OFFER_NOT_ELIGIBLE', 'PROCESS']);
+  raw.exec(`INSERT INTO merchant_printers (id,merchant_id,store_id,name,technology,build_x_mm,build_y_mm,build_z_mm,materials,quality_max)
+            VALUES ('p_resin','m1','s1','Resin','resin',200,200,200,'[]','ultra')`);
+
+  // The merchant, now with a resin machine, stands by it for the new job; now it can be accepted.
   const re = await post(as(raw, 'owner'), `/api/marketplace/offers/${offerId}/reconfirm`);
   assert.equal(re.status, 200);
   const fresh = (await json(re)).offer;

@@ -63,6 +63,8 @@ export default function MerchantOfferPanel({
   takingOffers,
   materials,
   onChanged,
+  prefill = null,
+  onPrefillDone,
 }: {
   requestId: string;
   /** This merchant's offers on the request (the server sends only theirs). */
@@ -72,6 +74,10 @@ export default function MerchantOfferPanel({
   takingOffers: boolean;
   materials: CatalogMaterial[];
   onChanged: () => void;
+  /** «استخدم هذا كعرضي» (W5-B): open the composer filled with this private price. */
+  prefill?: { price_iqd: number; quote_id: string } | null;
+  /** The composer that took the prefill closed. */
+  onPrefillDone?: () => void;
 }) {
   const { loc, lang } = useLanguage();
   const toast = useToast();
@@ -83,6 +89,13 @@ export default function MerchantOfferPanel({
   const live = offers.find((o) => o.state === 'pending' || o.state === 'superseded' || o.state === 'accepted') ?? null;
   const latest = live ?? offers[offers.length - 1] ?? null;
   const stale = !!live && (live.state === 'superseded' || live.stale);
+
+  // A costing handed over as «my offer»: a new offer, or a new version of the standing one.
+  useEffect(() => {
+    if (!prefill || !takingOffers) return;
+    if (live && (live.state === 'pending' || live.state === 'superseded')) setComposing('edit');
+    else if (!live && canOffer) setComposing('new');
+  }, [prefill, takingOffers, canOffer, live]);
 
   useEffect(() => {
     if (!stale) return;
@@ -146,9 +159,14 @@ export default function MerchantOfferPanel({
       requestId={requestId}
       offer={composing === 'edit' ? live : null}
       materials={materials}
-      onClose={() => setComposing('')}
+      prefill={prefill}
+      onClose={() => {
+        setComposing('');
+        onPrefillDone?.();
+      }}
       onSaved={() => {
         setComposing('');
+        onPrefillDone?.();
         onChanged();
       }}
     />

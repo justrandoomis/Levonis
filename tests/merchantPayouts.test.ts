@@ -15,12 +15,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, post, get, json, count } from './fixtures/app';
+import { legacyLedgerWrite } from './fixtures/legacyLedger';
 import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
 import { merchantPayoutRoutes } from '../worker/routes/merchantFinance';
 import { merchantBalance } from '../worker/lib/escrowOps';
 
 function seed(raw: DatabaseSync) {
-  raw.exec(`
+  legacyLedgerWrite(raw, `
     INSERT INTO users (id,name,email,password_hash,role) VALUES
       ('ali','Ali','ali@x.co','h','merchant'),
       ('zain','Zain','zain@x.co','h','merchant'),
@@ -57,7 +58,7 @@ test('B3 a payout lowers «available», so the same balance cannot be paid out t
   assert.equal(payouts(raw), 1, 'one payout of one balance');
 
   // A partial payout leaves exactly the rest.
-  raw.exec(`INSERT INTO merchant_payout_ledger (id,merchant_id,kind,amount_iqd,state,order_id,idempotency_key)
+  legacyLedgerWrite(raw, `INSERT INTO merchant_payout_ledger (id,merchant_id,kind,amount_iqd,state,order_id,idempotency_key)
             VALUES ('pl2','m_ali','sale_credit',7000,'available','ORD-Y','sale:ORD-Y')`);
   const part = await json(await payout(raw, { amount_iqd: 3000, idempotencyKey: 'payout-key-3' }));
   assert.equal(part.balance.available_iqd, 4000);
@@ -78,7 +79,7 @@ test('B14 the SAME payout replays; the same key for anything else is 409; any ot
   assert.equal(otherAmount.status, 409);
   assert.equal((await json(otherAmount)).code, 'IDEMPOTENCY_KEY_REUSED');
 
-  raw.exec(`INSERT INTO merchant_payout_ledger (id,merchant_id,kind,amount_iqd,state,order_id,idempotency_key)
+  legacyLedgerWrite(raw, `INSERT INTO merchant_payout_ledger (id,merchant_id,kind,amount_iqd,state,order_id,idempotency_key)
             VALUES ('plz','m_zain','sale_credit',9000,'available','ORD-Z','sale:ORD-Z')`);
   // Keys are namespaced per merchant (server-minted `admin:<merchant>:<key>`, the 0064 lesson): the same
   // client key for ANOTHER merchant is that merchant's own payout — never a false «already recorded».
@@ -108,7 +109,7 @@ test('B20 «paid out» counts payouts only — never the platform’s commission
   const raw = freshDb();
   seed(raw);
   // What an escrow release writes: the receivable, and the commission as `paid`.
-  raw.exec(`INSERT INTO merchant_payout_ledger (id,merchant_id,kind,amount_iqd,state,community_order_id,idempotency_key) VALUES
+  legacyLedgerWrite(raw, `INSERT INTO merchant_payout_ledger (id,merchant_id,kind,amount_iqd,state,community_order_id,idempotency_key) VALUES
       ('esc_c','m_ali','community_order_credit',45000,'available',NULL,'credit:e1'),
       ('esc_f','m_ali','commission',-5000,'paid',NULL,'fee:e1')`);
   const db = asD1(raw);

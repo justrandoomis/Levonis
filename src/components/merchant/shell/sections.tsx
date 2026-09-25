@@ -75,7 +75,11 @@ export const SECTIONS: Readonly<Record<MerchantSection, Section>> = {
   showcase: section(() => import('../dashboard/CatalogTabs'), (m) => <m.ShowcaseTab />),
 
   printers: section(() => import('../dashboard/PrintersTab'), (m, _p, ws) => <m.PrintersTab canSell={ws.canSell} />),
-  costing: section(() => import('../dashboard/CostingTab'), (m) => <m.CostingTab />),
+  costing: section(
+    () => import('../dashboard/CostingTab'),
+    // W5-B: a request's page with its costing sheet open — the board is on the main site.
+    (m, _p, ws) => <m.CostingTab requestHref={(id) => ws.mainHref(`/requests?request=${encodeURIComponent(id)}&cost=1`)} />
+  ),
 
   store_design: lazy(() => import('../storeDesign/StoreDesignPanel')),
   store_settings: section(

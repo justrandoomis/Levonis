@@ -334,13 +334,15 @@ test('a customer gets a real number WITHOUT a slicer, and it never claims to be 
  * him as row 100 of docs/DECISIONS.md.
  */
 test('machines the seed cannot tell apart quote the same — by construction, not by accident', () => {
+  // The CALCULATOR's catalogue (`active = 1`). 0132 (W5-B) adds merchant-only
+  // machines seeded `active = 0`, which the customer calculator never lists.
   const raw = freshDb();
   const rows = raw
     .prepare(
       `SELECT id, max_volumetric_flow_mm3_s f, sustained_flow_fraction sf,
               layer_overhead_seconds lo, warmup_minutes wm,
               purchase_iqd, useful_print_hours
-         FROM printer_models WHERE technology = 'fdm' ORDER BY id`
+         FROM printer_models WHERE technology = 'fdm' AND active = 1 ORDER BY id`
     )
     .all() as Array<Record<string, number | string | null>>;
 

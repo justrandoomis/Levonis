@@ -23,7 +23,7 @@
 import { Hono } from 'hono';
 import { fanOutMerchantNotice, notifyDisputeOpened, notifyPayoutAvailable, offerAcceptedNotice } from '../lib/merchantNotify';
 import type { Context } from 'hono';
-import type { AppContext } from '../lib/types';
+import type { AppContext, Env } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
@@ -75,7 +75,6 @@ import {
   offerAcceptedNotification,
   offerCountStatement,
   onPublicBoard,
-  requestFileAccess,
   requestMovedFence,
   revokeViewerTokensStatement,
   staleOfferNotifications,
@@ -89,6 +88,7 @@ import {
   composeSnapshot,
   contactFor,
   contactSnapshot,
+  publicEstimate,
   recordOfferRevisionStatement,
   recordRevisionStatement,
   reviseIfOfferedStatement,
@@ -96,6 +96,9 @@ import {
 } from '../lib/requestRevisions';
 import { getSetting } from '../lib/settings';
 import { notifyStatement } from '../lib/notifications';
+// Eligibility as data (W5-B): the offer gate, the file matrix and the re-match.
+import { assertMayOffer, eligibleVerdictSql, rematchNow } from '../lib/printMatchingStore';
+import { fileClass, fileReadStatement, fileReader, mayReadBytes, previewGrantFor } from '../lib/requestFilePolicy';
 
 export const marketplaceRoutes = new Hono<AppContext>();
 
@@ -257,8 +260,15 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
   }
 
   const files = await c.env.DB.prepare(
-    'SELECT id, file_name, content_type, size_bytes, kind FROM community_request_files WHERE request_id = ?'
+    'SELECT id, file_name, content_type, size_bytes, kind, preview_key FROM community_request_files WHERE request_id = ?'
   ).bind(id).all<Record<string, unknown>>();
+  // WHAT THIS CALLER MAY DO WITH EACH FILE (W5-B's matrix, worker/lib/
+  // requestFilePolicy.ts): the list is the request's, the bytes are not. A
+  // file this caller may not read carries no URL; a model an eligible
+  // merchant may only preview says so. Asked only when there are files.
+  const { reader } = files.results.length && user
+    ? await fileReader(c.env, r as unknown as RequestForAccess, user, { allowAdmin: true })
+    : { reader: null };
 
   return c.json({
     success: true,
@@ -266,11 +276,17 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
     // R2 keys are NEVER returned. What a caller gets is a route on this
     // worker, which re-derives their right to the file on every read — so a
     // link shared after the request closes simply stops working.
-    files: files.results.map((f) => ({
-      ...f,
-      inline: String(f.content_type ?? '').startsWith('image/'),
-      url: `/api/marketplace/requests/${id}/files/${f.id}`,
-    })),
+    files: files.results.map(({ preview_key, ...f }) => {
+      const cls = fileClass(String(f.kind ?? ''), String(f.content_type ?? ''));
+      const readable = mayReadBytes(reader, cls);
+      return {
+        ...f,
+        inline: String(f.content_type ?? '').startsWith('image/'),
+        url: readable ? `/api/marketplace/requests/${id}/files/${f.id}` : null,
+        /** download (the original) | view (a picture or a drawing) | preview (the 3D preview only) | none */
+        access: readable ? (cls === 'model' ? 'download' : 'view') : cls === 'model' && preview_key && previewGrantFor(reader) ? 'preview' : 'none',
+      };
+    }),
     is_owner: isOwner,
   });
 });
@@ -348,6 +364,20 @@ async function afterFilesChanged(db: D1Database, requestId: string, userId: stri
   } catch (e) {
     console.error('revision after a file change not recorded for', requestId, e instanceof Error ? e.message : String(e));
   }
+}
+
+/**
+ * A PUBLISHED JOB'S FILES CHANGED: its verdicts are decided again (W5-B) — a
+ * new model may be bigger than it was, and a new revision retires the old
+ * verdicts. Inline and bounded, with a queue row the sweep finishes if this
+ * pass cannot; never throws.
+ */
+async function rematchAfterFiles(env: Env, requestId: string): Promise<void> {
+  const row = await env.DB.prepare(`SELECT 1 AS x FROM community_requests WHERE id = ? AND state IN ('open','receiving_offers')`)
+    .bind(requestId)
+    .first()
+    .catch(() => null);
+  if (row) await rematchNow(env, 'request', requestId, 'files');
 }
 
 marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
@@ -431,6 +461,7 @@ marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
     throw e;
   }
   await afterFilesChanged(c.env.DB, id, user.id);
+  await rematchAfterFiles(c.env, id);
 
   return c.json({
     success: true,
@@ -460,25 +491,43 @@ marketplaceRoutes.get('/requests/:id/files/:fileId', requireAuth, async (c) => {
 
   const row = await c.env.DB.prepare(
     `SELECT f.file_key, f.file_name, f.content_type, f.kind,
-            r.id, r.customer_id, r.state, r.visibility, r.expires_at
+            r.id, r.customer_id, r.state, r.visibility, r.expires_at, r.revision
        FROM community_request_files f
        JOIN community_requests r ON r.id = f.request_id
       WHERE f.id = ? AND f.request_id = ?`
   ).bind(fileId, id).first<{
-    file_key: string; file_name: string; content_type: string; kind: string;
+    file_key: string; file_name: string; content_type: string; kind: string; revision: number;
   } & RequestForAccess>();
   if (!row) throw notFound('File not found');
 
   // ONE policy for every door onto a request's files (worker/lib/
-  // communityRequests.ts): the customer, an admin, the engaged merchant — and
-  // the board, which means NOT EXPIRED and Levo Community letting this caller
-  // in (audit 03 §10 G: the board answered 503 while this answered 200).
-  const { access, gateClosed } = await requestFileAccess(c.env, row, user, { allowAdmin: true });
+  // requestFilePolicy.ts, W5-B): the customer, an admin and the accepted
+  // merchant read everything; a merchant whose live verdict is ELIGIBLE reads
+  // the pictures and drawings — never the original model, which it previews
+  // instead; anyone else nothing. The board part still means NOT EXPIRED and
+  // Levo Community letting this caller in (audit 03 §10 G).
+  const { reader, gateClosed, visible } = await fileReader(c.env, row, user, { allowAdmin: true });
   if (gateClosed) throw communityClosedRefusal();
-  if (!access) throw notFound('File not found');
+  // A request this caller cannot see at all (a draft, a closed or private one)
+  // has no files as far as they know.
+  if (!visible) throw notFound('File not found');
+  const cls = fileClass(row.kind, row.content_type);
+  if (!mayReadBytes(reader, cls)) {
+    // The request (and its file list) may well be visible to this caller, so
+    // a 404 would lie; the refusal says which kind of «no» it is.
+    throw new HttpError(
+      403,
+      'You may not open this file',
+      reader === 'eligible' ? 'FILE_ORIGINAL_RESTRICTED' : 'FILE_NOT_ALLOWED'
+    );
+  }
 
   const obj = await getMediaObject(c.env, 'private', row.file_key);
   if (!obj) throw notFound('File not found');
+  // Every read is counted (0132 `request_file_reads`). Never blocks the file.
+  await fileReadStatement(c.env.DB, {
+    requestId: id, fileId, userId: user.id, reader: reader!, what: cls === 'model' ? 'original' : 'inline', revision: row.revision,
+  }).run().catch((e) => console.error('file read not counted', fileId, e instanceof Error ? e.message : String(e)));
 
   // Pictures may render in place; a model or a document is handed over as a
   // download. Even for a picture the response is sandboxed with `nosniff`, so
@@ -521,6 +570,7 @@ marketplaceRoutes.delete('/requests/:id/files/:fileId', requireAuth, async (c) =
   ]);
   await deleteMediaObject(c.env, 'private', row.file_key).catch(() => {});
   await afterFilesChanged(c.env.DB, id, user.id);
+  await rematchAfterFiles(c.env, id);
 
   return c.json({ success: true });
 });
@@ -851,6 +901,18 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
 
   const body = await c.req.json().catch(() => ({}));
   const t = await readOfferTerms(c.env.DB, body as Record<string, unknown>, ts, { partial: false });
+  /**
+   * ELIGIBILITY IS THE PERMISSION (W5-B; audit 03 §9 G7). A plan used to be
+   * enough to bid on anything; now the workshop must be able to make THIS job
+   * — printers, stock, delivery reach, preferences — by the one verdict the
+   * board and the notifications read (worker/lib/eligibility.ts). Refused with
+   * `403 OFFER_NOT_ELIGIBLE` and the reasons; the INSERT below fences on the
+   * verdict row this call just wrote, so a revision landing in between cannot
+   * slip an offer onto a job it was not judged against.
+   */
+  await assertMayOffer(c.env, requestId, ctx.merchant.id);
+  // «استخدم هذا كعرضي» (costing v2): the private quote this offer came from.
+  const quoteId = str((body as Record<string, unknown>).quote_id, 'quote_id', { max: 60, required: false }) || '';
 
   const id = newId('off');
   let inserted = 0;
@@ -868,7 +930,8 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
            FROM community_requests r
           WHERE r.id = ?13 AND r.state IN ('open','receiving_offers') AND r.visibility = 'public'
             AND r.customer_id <> ?14
-            AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?12)`
+            AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?12)
+            AND ${eligibleVerdictSql('r', '?2')}`
       ).bind(
         id, ctx.merchant.id, ctx.store.id, t.price_iqd!,
         t.completion_days ?? 0, t.delivery_method ?? '', t.message ?? '', t.materials ?? '',
@@ -896,11 +959,24 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
     throw conflict('You already have an active offer on this request', 'OFFER_EXISTS');
   }
   if (!inserted) {
-    // The request left the board between the read above and the write.
+    // The request left the board between the read above and the write — or
+    // it was revised, and the verdict the fence read is for the old revision.
+    const still = await c.env.DB.prepare(
+      `SELECT 1 AS x FROM community_requests WHERE id = ? AND state IN ('open','receiving_offers')`
+    ).bind(requestId).first();
+    if (still) throw conflict('The request changed while you were offering — check it and try again', 'REQUEST_CHANGED');
     throw conflict('This request is no longer accepting offers', 'REQUEST_NOT_OPEN');
   }
+  if (quoteId) {
+    // The quote is now an offer. Only this merchant's own draft quote OF THIS
+    // request moves; its price stayed private until this offer was sent.
+    await c.env.DB.prepare(
+      `UPDATE print_quotes SET state = 'offered', updated_at = ?
+        WHERE id = ? AND merchant_id = ? AND request_id = ? AND state = 'draft'`
+    ).bind(ts, quoteId, ctx.merchant.id, requestId).run();
+  }
 
-  await audit(c.env.DB, user.id, 'community.offer_created', id, { request: requestId, price: t.price_iqd });
+  await audit(c.env.DB, user.id, 'community.offer_created', id, { request: requestId, price: t.price_iqd, quote: quoteId || null });
   /**
    * THE CUSTOMER WHOSE REQUEST THIS IS HEARS THAT AN OFFER ARRIVED — outside
    * the batch: a failed notification must never roll back a merchant's bid;
@@ -1014,6 +1090,11 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
       WHERE o.id = ? AND o.merchant_id = ?`
   ).bind(offerId, ctx.merchant.id).first<Record<string, unknown>>();
   if (!before) throw notFound('Offer not found');
+  // An edit prices the job AS IT NOW IS: a new promise, so the same bar as a
+  // new offer (W5-B) — a workshop the revised job no longer fits cannot re-price it.
+  if (before.state === 'pending' || before.state === 'superseded') {
+    await assertMayOffer(c.env, String(before.request_id), ctx.merchant.id);
+  }
 
   // `state IN (pending, superseded)` is in the WHERE clause, so an accepted
   // offer cannot be edited even by a request that tries; and only while its
@@ -1074,6 +1155,12 @@ marketplaceRoutes.post('/offers/:id/reconfirm', requireCommunityOpen, requireAut
   const ctx = await requireOfferPrivileges(c);
   const offerId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const ts = nowIso();
+  // Standing by an offer for the job as it NOW is — only if the workshop can
+  // still make it (W5-B). A revision that outgrew the printer is not re-confirmable.
+  const standing = await c.env.DB.prepare(
+    `SELECT request_id FROM community_offers WHERE id = ? AND merchant_id = ? AND state IN ('pending','superseded')`
+  ).bind(offerId, ctx.merchant.id).first<{ request_id: string }>();
+  if (standing) await assertMayOffer(c.env, standing.request_id, ctx.merchant.id);
   let changes = 0;
   try {
     const res = await c.env.DB.batch([
@@ -1280,6 +1367,12 @@ function acceptanceRefusal(
   return null;
 }
 
+/** A stored order's request snapshot, its estimate stripped to what the parties may read. */
+function publicSnapshot(raw: unknown): Record<string, unknown> {
+  const snap = safeParse<Record<string, unknown>>(raw, {}) ?? {};
+  return snap.estimate === undefined ? snap : { ...snap, estimate: publicEstimate(JSON.stringify(snap.estimate)) };
+}
+
 /**
  * Accept one offer. The single most important transaction in the marketplace.
  *
@@ -1359,7 +1452,9 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
         hash: String(revRow.hash ?? ''),
         spec: safeParse(revRow.spec, {}),
         files: safeParse(revRow.files, []),
-        estimate: safeParse(revRow.estimate, {}),
+        // Never the cost lines, cost, floor or margin (review W2-5 p6): a
+        // revision backfilled by 0130 held the RAW estimate.
+        estimate: publicEstimate(revRow.estimate),
       }
     : { revision: Number(offer.r_revision ?? 1), ...((await composeSnapshot(c.env.DB, requestId)) ?? {}), source: 'live' };
   const merchantUserId = String(offer.m_user_id);
@@ -1555,7 +1650,8 @@ marketplaceRoutes.get('/orders/:id', requireAuth, async (c) => {
       offer_snapshot: safeParse(row.offer_snapshot, {}),
       // The job revision this order was accepted on (0130) — both sides see
       // the same job; neither can rewrite it.
-      request_snapshot: safeParse(row.request_snapshot, {}),
+      // Its estimate as the parties may read it, whatever an old row holds (review W2-5 p6).
+      request_snapshot: publicSnapshot(row.request_snapshot),
       // Never the raw pair: each side gets the OTHER side's contact, below.
       contact_snapshot: undefined,
     },

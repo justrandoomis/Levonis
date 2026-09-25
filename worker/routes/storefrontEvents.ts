@@ -37,6 +37,44 @@ import {
   type StorefrontEvent,
 } from '../lib/storefrontAnalytics';
 
+/**
+ * THE NETWORK A CLIENT ADDRESS BELONGS TO (review W2-5 p2): an IPv4 address
+ * as it is, an IPv6 address as its /64 — one subscriber is routinely handed a
+ * whole /64, so keyed on the full address one phone rotating its privacy
+ * address is an unlimited number of «networks». IPv4-mapped IPv6
+ * (`::ffff:1.2.3.4`) is the IPv4 address. Anything unparseable is kept as is.
+ */
+export function networkOf(ip: string): string {
+  const raw = ip.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/%.*$/, '');
+  if (!raw.includes(':')) return raw;
+  const halves = raw.split('::');
+  if (halves.length > 2) return raw;
+  const parse = (part: string): string[] | null => {
+    if (!part) return [];
+    const out: string[] = [];
+    for (const g of part.split(':')) {
+      const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(g);
+      if (v4) {
+        const [a, b, c, d] = v4.slice(1).map(Number);
+        if ([a, b, c, d].some((n) => n > 255)) return null;
+        out.push(((a << 8) | b).toString(16), ((c << 8) | d).toString(16));
+      } else if (/^[0-9a-f]{1,4}$/.test(g)) out.push(g);
+      else return null;
+    }
+    return out;
+  };
+  const head = parse(halves[0]);
+  const tail = halves.length === 2 ? parse(halves[1]) : [];
+  if (!head || !tail) return raw;
+  const missing = 8 - head.length - tail.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return raw;
+  const groups = [...head, ...new Array<string>(halves.length === 2 ? missing : 0).fill('0'), ...tail].map((g) => parseInt(g, 16));
+  if (groups.slice(0, 5).every((g) => g === 0) && groups[5] === 0xffff) {
+    return [groups[6] >> 8, groups[6] & 255, groups[7] >> 8, groups[7] & 255].join('.');
+  }
+  return `${groups.slice(0, 4).map((g) => g.toString(16)).join(':')}::/64`;
+}
+
 export const storefrontEventRoutes = new Hono<AppContext>();
 
 /** The largest body a beacon may carry. */
@@ -78,8 +116,10 @@ storefrontEventRoutes.post('/', async (c) => {
 
   const user = c.get('user');
   const ip = c.req.header('CF-Connecting-IP') || '';
+  // IPv4 as is, IPv6 as its /64 (review W2-5 p2) — for the rate limit AND the per-network cap below.
+  const network = networkOf(ip);
   // Per minute, by account or by network — the network hashed, never stored raw.
-  await rateLimit(c, 'storefront-events', 240, 60, user ? undefined : (await sha256Hex(`net\n${ip}`)).slice(0, 24));
+  await rateLimit(c, 'storefront-events', 240, 60, user ? undefined : (await sha256Hex(`net\n${network}`)).slice(0, 24));
 
   const store = await c.env.DB.prepare(
     `SELECT s.id, s.slug, s.user_id, s.status, m.status AS merchant_status,
@@ -105,7 +145,7 @@ storefrontEventRoutes.post('/', async (c) => {
   // The seed never leaves this function: only its salted hash is stored.
   const seed = user ? `u:${user.id}` : anon ? `a:${anon}` : `n:${ip}\n${ua}`;
   const visitor = await saltedHash(salt, store.id, seed);
-  const net = user ? '' : await saltedHash(salt, 'net', ip);
+  const net = user ? '' : await saltedHash(salt, 'net', network);
   const root = rootDomainFrom(c.env);
   const source = classifyReferrer(body.ref, root ? `${store.slug}.${root}` : '');
 

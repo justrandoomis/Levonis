@@ -391,6 +391,12 @@ export const SETTING_DEFAULTS = {
   // when a human says so.
   communityAutoCompleteDays: 7,
   communityRequestExpiryDays: 30,
+  // The platform's maximum merchant delivery fee, in IQD (owner decision
+  // 2026-09-25, review W2-5 finding 2): commission is on the goods, so an
+  // uncapped delivery fee was a way around it. Bounds every fee a store saves
+  // and every fee a checkout charges (a stored fee above it is charged at it).
+  // Mirrors DEFAULT_MERCHANT_DELIVERY_FEE_MAX_IQD in packages/shipping.
+  merchantDeliveryFeeMaxIqd: 25_000,
   // Owner-configured launch event for memberships (mandate §8.1). LIVE by
   // default — the site is running, and a default of `false` sold every card as
   // a reservation that granted nothing (see DEFAULT_LAUNCH in entitlements.ts,

@@ -14,6 +14,7 @@
 import { useId, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, ImagePlus, Film, Loader2, Play, X } from 'lucide-react';
 import { ApiError, uploadFile } from '../../../lib/api';
+import { refusalText } from '../../../lib/refusalStrings';
 import { useLanguage } from '../../../LanguageContext';
 import { Button, IconButton } from '../../ui/Button';
 import { Field, Input } from '../../ui/Field';
@@ -68,6 +69,7 @@ export function MediaEditor({
       }
     } catch (e) {
       if (e instanceof ApiError && e.code === 'VIDEO_UNSUPPORTED') setError(s.videoTypeWrong);
+      else if (e instanceof ApiError && (e.code === 'STORE_REQUIRED' || e.code === 'VIDEO_QUOTA_EXCEEDED')) setError(refusalText(e.code, lang));
       else setError(e instanceof Error && e.message ? e.message : s.uploadFailed);
     } finally {
       setBusy('');

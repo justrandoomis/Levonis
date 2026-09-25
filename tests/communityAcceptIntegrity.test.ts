@@ -40,6 +40,9 @@ function seed() {
               '2099-01-01T00:00:00.000Z');
     INSERT INTO community_offers (id,request_id,merchant_id,store_id,price_iqd,state) VALUES
       ('o1','r1','m1','s1',50000,'pending'), ('o2','r1','m2','s2',60000,'pending');
+    -- Since W5-B an offer (and its edit) needs a workshop that can make the job.
+    INSERT INTO merchant_printers (id,merchant_id,store_id,name,technology,build_x_mm,build_y_mm,build_z_mm) VALUES
+      ('p1','m1','s1','P1S','fdm',256,256,250), ('p2','m2','s2','P1S','fdm',256,256,250);
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','${RATE}');
     INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','{"open":true}');
   `);

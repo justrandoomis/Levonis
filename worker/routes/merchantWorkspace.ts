@@ -183,7 +183,7 @@ merchantAttentionRoutes.get('/', async (c) => {
           `SELECT COUNT(*) AS n
              FROM community_request_matches m
              JOIN community_requests r ON r.id = m.request_id
-            WHERE m.merchant_id = ?1 AND m.eligible = 1
+            WHERE m.merchant_id = ?1 AND m.eligible = 1 AND m.revision = r.revision
               AND r.state IN ('open','receiving_offers') AND r.visibility = 'public'
               AND (r.expires_at IS NULL OR r.expires_at > ?2)
               AND NOT EXISTS (SELECT 1 FROM community_offers o WHERE o.request_id = r.id AND o.merchant_id = ?1)`
@@ -330,6 +330,10 @@ merchantSearchRoutes.get('/', async (c) => {
     // Only people who have ordered from THIS store (never a user directory,
     // §60); each leads to their latest order with this store. No user id and
     // no phone number leave the server — the phone is matched, not returned.
+    // Only the phones this store was already GIVEN on its own orders (the
+    // address snapshot): the ACCOUNT phone (users.phone_e164) is never matched,
+    // or a merchant could rebuild it digit by digit from the result list
+    // (review W2-5 p7).
     db
       .prepare(
         `SELECT u.name AS name, COUNT(o.id) AS order_count, MAX(o.created_at) AS last_order_at,
@@ -338,9 +342,8 @@ merchantSearchRoutes.get('/', async (c) => {
            FROM orders o JOIN users u ON u.id = o.user_id
           WHERE o.merchant_id = ?1
             AND (${sqlLikeClause(['u.name'], '?2')}
-                 OR (?3 <> '' AND (
-                   ${sqlLikeClause(['u.phone_e164'], '?3')}
-                   OR ${sqlLikeClause(["replace(replace(replace(CASE WHEN json_valid(o.address_snapshot) THEN COALESCE(json_extract(o.address_snapshot, '$.phone'), '') ELSE '' END, ' ', ''), '-', ''), '+', '')"], '?3')})))
+                 OR (?3 <> '' AND
+                   ${sqlLikeClause(["replace(replace(replace(CASE WHEN json_valid(o.address_snapshot) THEN COALESCE(json_extract(o.address_snapshot, '$.phone'), '') ELSE '' END, ' ', ''), '-', ''), '+', '')"], '?3')}))
           GROUP BY u.id, u.name
           ORDER BY last_order_at DESC LIMIT ?4`
       )

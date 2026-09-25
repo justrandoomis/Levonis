@@ -160,6 +160,9 @@ const FEE_KEYS = [
   'communityFeeMinIqd',
   'communityAutoCompleteDays',
   'communityRequestExpiryDays',
+  // The platform's maximum merchant delivery fee (owner decision 2026-09-25):
+  // financial scope + audit like the rest; bounded 0..1,000,000 below.
+  'merchantDeliveryFeeMaxIqd',
 ] as const;
 
 adminCommunityRoutes.get('/settings', async (c) => {
@@ -1427,6 +1430,13 @@ adminCommunityRoutes.post('/merchants/:id/payout', requireFinancialScope, async 
 /** A payout decision's refusals, as stable codes. */
 function payoutRefusal(res: Extract<PayoutResult, { ok: false }>): HttpError {
   if (res.reason === 'NOT_FOUND') return notFound('Payout request not found');
+  if (res.reason === 'MERCHANT_IN_DEBT') {
+    // A claw-back left the merchant owing the platform: nothing leaves until it is covered (review W2-5 p4).
+    return new HttpError(409, 'The merchant owes the platform — this payout cannot be approved or paid until the debt is covered', 'MERCHANT_IN_DEBT', {
+      debt_iqd: res.debtIqd ?? 0,
+      state: res.state ?? null,
+    });
+  }
   return new HttpError(409, 'This request is not in a state that allows that — reload the queue', 'PAYOUT_STATE_CONFLICT', {
     state: res.state ?? null,
   });

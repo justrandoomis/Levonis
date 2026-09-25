@@ -23,6 +23,7 @@ import {
   freshDb, asD1, stubApp, post, patch, get, json, count, row, pending, spendable, holds, ledger, failingD1,
   type StubUser,
 } from './fixtures/app';
+import { legacyLedgerWrite } from './fixtures/legacyLedger';
 import { serialD1 } from './fixtures/serialD1';
 import { cartRoutes } from '../worker/routes/cart';
 import { storeOrderRoutes } from '../worker/routes/storeOrders';
@@ -133,15 +134,16 @@ test('F3 (probe P1 inverted): a hundred frozen credits at the head of the queue 
   const ins = raw.prepare(`INSERT INTO orders (id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,
       payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,seller_type,merchant_id,store_id,origin,delivered_at)
     VALUES (?, 'buyer','delivered','{}','merchant','{}','wallet',1000,1400,1000,0,'merchant','m_ali','s_ali','store_product',?)`);
-  const led = raw.prepare(`INSERT INTO merchant_payout_ledger (id,merchant_id,kind,amount_iqd,state,order_id,idempotency_key)
-    VALUES (?, 'm_ali','sale_credit',950,'pending',?,?)`);
+  // Legacy credits (the old ledger is sealed since 0134 — written the way 0121 carried them).
+  const legacy: string[] = [];
   const tkt = raw.prepare(`INSERT INTO support_tickets (id,user_id,subject,order_id,state) VALUES (?, 'buyer','question',?,'waiting_customer')`);
   for (let i = 0; i < 100; i++) {
     const id = `ORD-OLD${String(i).padStart(4, '0')}`;
     ins.run(id, new Date(Date.now() - 10 * DAY + i * 1000).toISOString());
-    led.run(`pay_old_${i}`, id, `sale:${id}`);
+    legacy.push(`('pay_old_${i}','m_ali','sale_credit',950,'pending','${id}','sale:${id}')`);
     tkt.run(`t_old_${i}`, id);
   }
+  legacyLedgerWrite(raw, `INSERT INTO merchant_payout_ledger (id,merchant_id,kind,amount_iqd,state,order_id,idempotency_key) VALUES ${legacy.join(',')}`);
   const r = await runStoreOrderSweeps(env(asD1(raw)), new Date().toISOString());
   assert.equal(r.released, 1, JSON.stringify(r));
   assert.equal(r.frozen, 100, 'the frozen rows are counted, not selected');

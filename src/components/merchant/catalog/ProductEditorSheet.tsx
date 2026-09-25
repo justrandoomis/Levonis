@@ -315,6 +315,13 @@ export default function ProductEditorSheet({
             </div>
           )}
 
+          {original?.price_required && !hiddenByAdmin && (
+            <div role="note" className="flex gap-2 rounded-xl border border-danger/30 bg-danger/10 p-3 text-[12.5px] leading-relaxed text-text-primary" data-price-required>
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden="true" />
+              <span>{s.priceRequiredHint}</span>
+            </div>
+          )}
+
           <MediaEditor value={form.media} onChange={(m) => set('media', m)} s={s} disabled={busy} />
           {errors.media && <p className="lv-field-error">{errors.media}</p>}
 

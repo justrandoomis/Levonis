@@ -108,6 +108,8 @@ export interface MerchantDeliveryConfig {
   configured: boolean;
   store_open: boolean;
   coverage: { served: string[]; pickup: boolean; serviceable: boolean };
+  /** The platform's maximum delivery fee (owner decision 2026-09-25); absent from an older server. */
+  max_fee_iqd?: number;
 }
 export type { DeliveryIssue, Fulfilment, MerchantDeliveryProfile, MerchantDeliveryRule };
 

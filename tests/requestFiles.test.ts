@@ -228,14 +228,29 @@ test('the customer can read their own attachment', async () => {
   assert.match(res.headers.get('content-security-policy') ?? '', /sandbox/);
 });
 
-test('any signed-in merchant may read a public, open request — they have to quote it', async () => {
+test('a merchant who CAN MAKE the request reads its pictures — one who cannot, and a plain account, do not (W5-B)', async () => {
   const { db, bucket, raw } = setup();
   await upload(app(db, bucket, { id: 'buyer' }), 'r1');
   const id = await uploadedFileId(raw);
 
-  const res = await app(db, bucket, { id: 'owner' })
-    .request(`/api/marketplace/requests/r1/files/${id}`);
+  // Signed in, a merchant, but no plan and no printer: not eligible, so no file.
+  const before = await app(db, bucket, { id: 'owner' }).request(`/api/marketplace/requests/r1/files/${id}`);
+  assert.equal(before.status, 403);
+  assert.equal((await json(before)).code, 'FILE_NOT_ALLOWED');
+  assert.equal((await app(db, bucket, { id: 'stranger' }).request(`/api/marketplace/requests/r1/files/${id}`)).status, 403);
+
+  // A plan and a printer: the live verdict says eligible, and a picture is theirs to read.
+  raw.exec(`
+    INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,price_paid_iqd,starts_at,expires_at)
+      VALUES ('mem1','owner','plus_12mo','plus','active',12,29000,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
+    INSERT INTO merchant_printers (id,merchant_id,store_id,name,technology,build_x_mm,build_y_mm,build_z_mm)
+      VALUES ('p1','m1','s1','P1S','fdm',256,256,250);
+  `);
+  const res = await app(db, bucket, { id: 'owner' }).request(`/api/marketplace/requests/r1/files/${id}`);
   assert.equal(res.status, 200);
+  // …and every read is counted.
+  const reads = raw.prepare('SELECT access, what, count FROM request_file_reads WHERE file_id = ?').all(id);
+  assert.deepEqual(JSON.parse(JSON.stringify(reads)), [{ access: 'eligible', what: 'inline', count: 1 }]);
 });
 
 test('when the request closes, the general permission closes with it', async () => {

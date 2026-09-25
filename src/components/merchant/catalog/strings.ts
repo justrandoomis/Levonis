@@ -77,6 +77,12 @@ export function catalogStrings(loc: Loc) {
           : s === 'hidden' ? loc('أُخفي من المتجر؛ رابطه لا يعمل للزبائن.', 'Off the storefront; its link does not open for customers.') // OWNER: Sorani to be written by hand.
             : loc('خارج المتجر ومحفوظ لسجل الطلبات.', 'Off the storefront, kept for order history.'), // OWNER: Sorani to be written by hand.
     soldOut: loc('نفد', 'Sold out', 'تەواو بوو'),
+    // Owner decision 2026-09-25: a published product at 0 IQD is not for sale.
+    priceRequired: loc('بلا سعر — لا يُباع', 'No price — not for sale'), // OWNER: Sorani to be written by hand.
+    priceRequiredHint: loc(
+      'هذا المنتج منشور لكن سعره (أو سعر أحد أنواعه المفعّلة) صفر، فلا يمكن للزبائن شراؤه. اكتب سعرًا أكبر من صفر ثم احفظ.',
+      'This product is published but its price (or an active variant’s) is 0, so customers cannot buy it. Enter a price above 0, then save.'
+    ), // OWNER: Sorani to be written by hand.
     hiddenByAdmin: loc('أخفته Levonis', 'Hidden by Levonis'), // OWNER: Sorani to be written by hand.
     hiddenByAdminHint: (reason: string) =>
       loc(
@@ -305,6 +311,7 @@ export function catalogRefusalText(code: string | undefined, loc: Loc, fallback:
   switch (code) {
     case 'PRODUCT_HIDDEN_BY_ADMIN': return loc('أخفته Levonis؛ لا يمكن نشره حتى تُرفع المراجعة.', 'Hidden by Levonis — it cannot be published until the review is lifted.'); // OWNER: Sorani to be written by hand.
     case 'PRODUCT_NOT_PUBLISHABLE': return loc('لا يوجد نوع مفعّل للبيع؛ فعّل نوعًا ثم انشر.', 'No variant is switched on for sale — switch one on, then publish.'); // OWNER: Sorani to be written by hand.
+    case 'PRODUCT_PRICE_REQUIRED': return loc('المنتج المنشور يحتاج سعرًا أكبر من صفر، وكذلك كل نوع مفعّل.', 'A published product needs a price above 0 — and so does every active variant.'); // OWNER: Sorani to be written by hand.
     case 'VARIANTS_HAVE_OWN_STOCK': return loc('له أنواع بمخزون خاص؛ عدّله من المنتج.', 'It has variants with their own stock — edit it in the product.'); // OWNER: Sorani to be written by hand.
     case 'PRODUCT_HAS_ORDERS': return loc('له طلبات سابقة؛ أرشفه بدل الحذف.', 'It has past orders — archive it instead.'); // OWNER: Sorani to be written by hand.
     case 'NOT_FOUND': return loc('لم يعد موجودًا.', 'It no longer exists.'); // OWNER: Sorani to be written by hand.

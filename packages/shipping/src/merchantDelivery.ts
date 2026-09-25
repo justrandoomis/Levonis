@@ -67,6 +67,26 @@ export const DELIVERY_LIMITS = {
   rule_note: 120,
 } as const;
 
+/**
+ * THE PLATFORM'S MAXIMUM MERCHANT DELIVERY FEE (owner decision 2026-09-25,
+ * review W2-5 finding 2). Commission is taken on the goods, not the delivery,
+ * so an uncapped fee let a store sell at 0 IQD and charge the price as
+ * «delivery». The owner sets the cap in the community admin
+ * (`merchantDeliveryFeeMaxIqd`); this is its default. It bounds every fee a
+ * store may SAVE (the validator's `maxFeeIqd`) and every fee a checkout
+ * CHARGES (the resolver clamps a stored fee above the current cap to it).
+ */
+export const DEFAULT_MERCHANT_DELIVERY_FEE_MAX_IQD = 25_000;
+
+/** A cap as the resolver applies it: a whole, non-negative number, or none. */
+function capOf(max: number | null | undefined): number | null {
+  return typeof max === 'number' && Number.isFinite(max) && max >= 0 ? Math.floor(max) : null;
+}
+const clampFee = (fee: number, max: number | null | undefined): number => {
+  const cap = capOf(max);
+  return cap === null ? fee : Math.min(fee, cap);
+};
+
 /** The eighteen ids, in the government's order. */
 export const GOVERNORATE_IDS: readonly string[] = IRAQ_GOVERNORATES.map((g) => g.id);
 const IDS = new Set(GOVERNORATE_IDS);
@@ -279,7 +299,9 @@ export function resolveMerchantDelivery(
   rules: readonly MerchantDeliveryRule[],
   governorateId: unknown,
   merchandiseIqd: number,
-  fulfilment: Fulfilment = 'delivery'
+  fulfilment: Fulfilment = 'delivery',
+  /** The platform's current maximum fee: a stored fee above it is charged AT it, never above. */
+  maxFeeIqd?: number | null
 ): MerchantDeliveryResolution {
   const version = whole(profile.version);
   const merchandise = whole(merchandiseIqd);
@@ -325,10 +347,10 @@ export function resolveMerchantDelivery(
     baseFee = 0;
   } else if (rule) {
     kind = 'override';
-    baseFee = whole(rule.fee_iqd);
+    baseFee = clampFee(whole(rule.fee_iqd), maxFeeIqd);
   } else {
     kind = 'default';
-    baseFee = whole(profile.default_fee_iqd);
+    baseFee = clampFee(whole(profile.default_fee_iqd), maxFeeIqd);
   }
   const threshold = rule && rule.free_over_iqd !== null ? positiveOrNull(rule.free_over_iqd) : positiveOrNull(profile.free_over_iqd);
   let fee = baseFee;
@@ -364,11 +386,16 @@ export interface GovernorateDelivery {
   custom: boolean;
 }
 
-export function deliveryTable(p: MerchantDeliveryProfile, rules: readonly MerchantDeliveryRule[]): GovernorateDelivery[] {
+export function deliveryTable(
+  p: MerchantDeliveryProfile,
+  rules: readonly MerchantDeliveryRule[],
+  /** The platform's maximum fee, as the resolver applies it. */
+  maxFeeIqd?: number | null
+): GovernorateDelivery[] {
   return GOVERNORATE_IDS.map((gov) => {
     const rule = ruleFor(rules, gov);
     const mode = effectiveMode(p, rules, gov);
-    const fee = mode === 'fee' ? whole(rule ? rule.fee_iqd : p.default_fee_iqd) : 0;
+    const fee = mode === 'fee' ? clampFee(whole(rule ? rule.fee_iqd : p.default_fee_iqd), maxFeeIqd) : 0;
     const threshold = rule && rule.free_over_iqd !== null ? rule.free_over_iqd : p.free_over_iqd;
     return {
       governorate: gov,
@@ -407,7 +434,9 @@ export type DeliveryIssueCode =
   | 'governorate_duplicate'
   | 'too_long'
   | 'pickup_governorate_required'
-  | 'too_many_rules';
+  | 'too_many_rules'
+  /** Above the platform's maximum delivery fee (`maxFeeIqd`). */
+  | 'fee_above_max';
 
 export interface DeliveryIssue {
   /** `profile.<field>` or `rules.<governorate id>.<field>` (`rules[<i>]` when the entry names none). */
@@ -429,9 +458,14 @@ export type DeliveryValidation =
  * issue with its path. Unknown keys are ignored (the output is built field by
  * field from this allow-list).
  */
-export function validateDeliveryConfig(input: { profile?: unknown; rules?: unknown }): DeliveryValidation {
+export function validateDeliveryConfig(
+  input: { profile?: unknown; rules?: unknown },
+  /** `maxFeeIqd`: the platform's maximum delivery fee — a fee above it is `fee_above_max`. */
+  opts: { maxFeeIqd?: number | null } = {}
+): DeliveryValidation {
   const issues: DeliveryIssue[] = [];
   const add = (path: string, code: DeliveryIssueCode) => issues.push({ path, code });
+  const cap = capOf(opts.maxFeeIqd);
 
   const intIn = (v: unknown, path: string, min: number, max: number, codeRange: DeliveryIssueCode): number | null => {
     if (typeof v !== 'number' || !Number.isFinite(v) || !Number.isInteger(v)) {
@@ -443,6 +477,15 @@ export function validateDeliveryConfig(input: { profile?: unknown; rules?: unkno
       return null;
     }
     return v;
+  };
+  /** A fee in range, and under the platform's cap when one is given. */
+  const feeIn = (v: unknown, path: string): number | null => {
+    const fee = intIn(v, path, 0, DELIVERY_LIMITS.fee_iqd, 'fee_range');
+    if (fee !== null && cap !== null && fee > cap) {
+      add(path, 'fee_above_max');
+      return null;
+    }
+    return fee;
   };
   const text = (v: unknown, path: string, max: number): string => {
     if (v === undefined || v === null) return '';
@@ -468,7 +511,7 @@ export function validateDeliveryConfig(input: { profile?: unknown; rules?: unkno
   if (p.default_fee_iqd === undefined || p.default_fee_iqd === null) {
     if (mode === 'fee') add('profile.default_fee_iqd', 'fee_required');
   } else {
-    defaultFee = intIn(p.default_fee_iqd, 'profile.default_fee_iqd', 0, DELIVERY_LIMITS.fee_iqd, 'fee_range') ?? 0;
+    defaultFee = feeIn(p.default_fee_iqd, 'profile.default_fee_iqd') ?? 0;
   }
   const freeOver = optionalInt(p.free_over_iqd, 'profile.free_over_iqd', 1, DELIVERY_LIMITS.free_over_iqd, 'free_over_range');
   if (p.free_over_basis !== undefined && p.free_over_basis !== FREE_OVER_BASIS) add('profile.free_over_basis', 'invalid');
@@ -519,7 +562,7 @@ export function validateDeliveryConfig(input: { profile?: unknown; rules?: unkno
       let fee: number | null = null;
       if (rMode === 'fee') {
         if (r.fee_iqd === undefined || r.fee_iqd === null) add(`${at}.fee_iqd`, 'fee_required');
-        else fee = intIn(r.fee_iqd, `${at}.fee_iqd`, 0, DELIVERY_LIMITS.fee_iqd, 'fee_range');
+        else fee = feeIn(r.fee_iqd, `${at}.fee_iqd`);
       }
       const fo = rMode === 'disabled' ? null : optionalInt(r.free_over_iqd, `${at}.free_over_iqd`, 1, DELIVERY_LIMITS.free_over_iqd, 'free_over_range');
       const rPrep = optionalInt(r.prep_days, `${at}.prep_days`, 0, DELIVERY_LIMITS.prep_days, 'prep_days_range');

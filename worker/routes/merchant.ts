@@ -15,6 +15,7 @@
  */
 
 import { Hono } from 'hono';
+import { rematchNow } from '../lib/printMatchingStore';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
@@ -51,6 +52,7 @@ import {
   isDeliveryVersionAbort,
   legacyDoorStatements,
   loadDeliveryConfig,
+  merchantDeliveryFeeMax,
   saveDeliveryStatements,
 } from '../lib/merchantDelivery';
 import { deliveryCoverage, validateDeliveryConfig } from '@levonis/shipping/merchantDelivery';
@@ -398,6 +400,14 @@ merchantRoutes.patch('/store', async (c) => {
   // THE WAVE-1 DELIVERY FIELD, FROM A CACHED BUILD OF THIS FORM (W2-A): an
   // unchanged echo moves nothing; a real edit reaches the delivery profile in
   // the same batch (worker/lib/merchantDelivery.ts `legacyDoorStatements`).
+  // The legacy door honours the platform's maximum fee too (owner decision 2026-09-25).
+  if (body.delivery_settings !== undefined) {
+    const legacyFee = Number(sanitizeDelivery(body.delivery_settings).fee_iqd ?? 0);
+    const maxFee = await merchantDeliveryFeeMax(c.env.DB);
+    if (legacyFee > maxFee) {
+      throw badRequest(`A delivery fee may be at most ${maxFee} IQD`, 'DELIVERY_FEE_ABOVE_MAX', { max_fee_iqd: maxFee });
+    }
+  }
   const legacyDelivery =
     body.delivery_settings !== undefined
       ? legacyDoorStatements(c.env.DB, {
@@ -463,8 +473,19 @@ merchantRoutes.put('/delivery', async (c) => {
   if (typeof expected !== 'number' || !Number.isInteger(expected) || expected < 0) {
     throw badRequest('Send the version you loaded', 'DELIVERY_INVALID', { issues: [{ path: 'version', code: 'not_integer' }] });
   }
-  const checked = validateDeliveryConfig({ profile: body?.profile, rules: body?.rules });
-  if (!checked.ok) throw badRequest('The delivery settings are not valid', 'DELIVERY_INVALID', { issues: checked.issues });
+  // The platform's maximum fee (owner decision 2026-09-25): the SAME validator,
+  // given the cap, names every fee above it; such a save is refused whole.
+  const maxFee = await merchantDeliveryFeeMax(c.env.DB);
+  const checked = validateDeliveryConfig({ profile: body?.profile, rules: body?.rules }, { maxFeeIqd: maxFee });
+  if (!checked.ok) {
+    if (checked.issues.some((i) => i.code === 'fee_above_max')) {
+      throw badRequest(`A delivery fee may be at most ${maxFee} IQD`, 'DELIVERY_FEE_ABOVE_MAX', {
+        max_fee_iqd: maxFee,
+        issues: checked.issues,
+      });
+    }
+    throw badRequest('The delivery settings are not valid', 'DELIVERY_INVALID', { issues: checked.issues });
+  }
 
   const open = ctx.store.status === 'active';
   if (open && !deliveryCoverage({ ...checked.profile, version: expected }, checked.rules).serviceable) {
@@ -506,6 +527,8 @@ merchantRoutes.put('/delivery', async (c) => {
     });
   }
   const fresh = await loadDeliveryConfig(db, ctx.store);
+  // Delivery reach is a dimension of request eligibility (W5-B): re-match this workshop.
+  await rematchNow(c.env, 'merchant', ctx.merchant.id, 'delivery');
   return c.json({ success: true, ...deliveryConfigShape(fresh, open) });
 });
 
@@ -1214,31 +1237,9 @@ merchantRoutes.post('/reviews/:id/reply', async (c) => {
 });
 
 // -------------------------------------------------------------- customers
-
-/**
- * The people who have actually bought from THIS store (§60).
- *
- * Not a user directory: it is built from this merchant's own orders, so a
- * merchant can only ever see someone they have traded with, and only the
- * totals of that trading relationship.
- */
-merchantRoutes.get('/customers', async (c) => {
-  const ctx = await requireStoreOwner(c);
-  // A cancelled order is refunded money, not a customer's spend (audit 04 #12,
-  // audit 01 B12): «2 orders / 100,000» for one real 10,000 sale was the old
-  // answer. Someone whose only order was cancelled never bought anything.
-  const { results } = await c.env.DB.prepare(
-    `SELECT u.id, u.name,
-            COUNT(o.id) AS order_count,
-            COALESCE(SUM(o.total_iqd), 0) AS lifetime_iqd,
-            MAX(o.created_at) AS last_order_at
-       FROM orders o JOIN users u ON u.id = o.user_id
-      WHERE o.merchant_id = ? AND ${COUNTED_STORE_ORDER}
-      GROUP BY u.id, u.name
-      ORDER BY last_order_at DESC LIMIT 100`
-  ).bind(ctx.merchant.id).all();
-  return c.json({ success: true, customers: results });
-});
+// The store's customers are served by worker/routes/merchantCustomers.ts
+// (W3-B: paged, searchable, mounted at /api/merchant/customers). The old
+// unpaged handler that lived here is gone (review W2-5 #8).
 
 /**
  * WHICH STORE ORDERS ARE SALES — one predicate for every figure below.

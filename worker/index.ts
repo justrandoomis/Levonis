@@ -50,6 +50,7 @@ import { stockAlertRoutes } from './routes/stockAlerts';
 import { compareRoutes } from './routes/compare';
 import { priceReportRoutes, adminPriceReportRoutes } from './routes/priceReports';
 import { merchantPrinterRoutes } from './routes/merchantPrinters';
+import { merchantWorkshopRoutes } from './routes/merchantWorkshop';
 import { merchantCatalogRoutes } from './routes/merchantCatalog';
 import { adminPrintQuoteRoutes, printQuoteRoutes } from './routes/printQuote';
 import { membershipsRoutes } from './routes/memberships';
@@ -371,10 +372,12 @@ app.route('/api/referrals', referralRoutes);
 app.route('/api/studio', studioRoutes);
 // Merchant store administration. Scoped to the caller's OWN store on every
 // route — deliberately not under /api/admin, which is the platform's.
-// The store's customers (W3-B): mounted BEFORE merchantRoutes so its paged,
-// searchable list answers GET /api/merchant/customers (the older unpaged
-// handler in merchant.ts stays for the routers mounted alone in tests).
+// The store's customers (W3-B): the paged, searchable list at
+// GET /api/merchant/customers (the older unpaged handler in merchant.ts was
+// removed, review W2-5 #8).
 app.route('/api/merchant/customers', merchantCustomerRoutes);
+// The workshop's board «مناسب لي», live verdicts and private request costing (W5-B).
+app.route('/api/merchant/workshop', merchantWorkshopRoutes);
 app.route('/api/merchant', merchantRoutes);
 // Printers and request-notification preferences: what a shop can make, and
 // which of those jobs it wants to hear about.

@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { freshDb, asD1, stubApp, get, json, type StubUser } from './fixtures/app';
 import { merchantRoutes } from '../worker/routes/merchant';
+import { merchantCustomerRoutes } from '../worker/routes/merchantCustomers';
 
 const OWNER: StubUser = { id: 'owner', role: 'merchant', email: 'owner@x.co' };
 const COLS = `(id,user_id,status,total_iqd,merchant_id,store_id,seller_type,origin,platform_fee_iqd,merchant_receivable_iqd,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,due_on_delivery_iqd)`;
@@ -39,7 +40,12 @@ function seed() {
   return raw;
 }
 
-const app = (raw: ReturnType<typeof freshDb>) => stubApp(asD1(raw), OWNER, (a) => a.route('/api/merchant', merchantRoutes));
+// Mounted as worker/index.ts mounts them: the customers list is its own router (W3-B).
+const app = (raw: ReturnType<typeof freshDb>) =>
+  stubApp(asD1(raw), OWNER, (a) => {
+    a.route('/api/merchant/customers', merchantCustomerRoutes);
+    a.route('/api/merchant', merchantRoutes);
+  });
 
 test('gross, earnings, fees and the average count only sales; the cancelled count is still reported', async () => {
   const raw = seed();
@@ -71,8 +77,8 @@ test('the customer list is people who BOUGHT, with what they spent', async () =>
   const raw = seed();
   const { customers } = await json(await get(app(raw), '/api/merchant/customers'));
   assert.deepEqual(
-    customers.map((c: { id: string; order_count: number; lifetime_iqd: number }) => [c.id, c.order_count, c.lifetime_iqd]),
-    [['buyer', 1, 10000]],
+    customers.map((c: { name: string; order_count: number; spent_iqd: number }) => [c.name, c.order_count, c.spent_iqd]),
+    [['Sara', 1, 10000]],
     'a cancelled order is refunded money, and someone with only a cancelled order never bought'
   );
 });
@@ -88,4 +94,10 @@ test('custom (request) orders are their own series: completed work only', async 
   `);
   const { custom_orders } = await json(await get(app(raw), '/api/merchant/analytics'));
   assert.deepEqual(custom_orders, { completed: 1, receivable_iqd: 19000 });
+});
+
+test('the old unpaged customers handler is gone from merchant.ts — one customers route (review W2-5 #8)', async () => {
+  const raw = seed();
+  const alone = stubApp(asD1(raw), OWNER, (a) => a.route('/api/merchant', merchantRoutes));
+  assert.equal((await get(alone, '/api/merchant/customers')).status, 404);
 });

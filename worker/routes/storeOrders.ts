@@ -323,6 +323,12 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode: string, whe
     }
     const qty = Math.max(1, Math.trunc(Number(r.qty) || 1));
     const unit = variant.unit;
+    // A line at 0 IQD is not sold (owner decision 2026-09-25): commission is
+    // on the goods, so a free product with a delivery fee was a sale with no
+    // commission. A product left at 0 from before the rule is unpurchasable.
+    if (!(unit > 0)) {
+      throw refuse(`"${r.name}" has no price and cannot be bought right now`, 'PRODUCT_PRICE_REQUIRED', { product_id: productId });
+    }
     if (variant.variantId) {
       const vagg = perVariant.get(variant.variantId) ?? {
         product_id: productId, qty: 0, stock: variant.stock, tracked: !!Number(r.track_stock),
