@@ -1449,6 +1449,27 @@ export default function Support() {
     [busy, lang, isAuthenticated, s.netError]
   );
 
+  /**
+   * `/support?ask=choose_printer` — «ساعدني أختار» on the home page opens the
+   * assistant already asking the printer question, exactly as if the chip had
+   * been tapped. ALLOW-LISTED: a link can start only a question that needs no
+   * account and changes nothing, never an arbitrary intent from a URL.
+   * Keyed on the navigation, so the same link tapped again asks again.
+   */
+  const qAsk = searchParams.get('ask');
+  const askedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (qAsk !== 'choose_printer') return;
+    const key = `${qAsk}:${locationKey}`;
+    if (askedRef.current === key) return;
+    askedRef.current = key;
+    setTab('assistant');
+    const item = s.menu.find((m) => m.intent === qAsk);
+    if (item) void send({ intent: item.intent }, item.label);
+    // `send` and the strings are read at the moment of the navigation only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qAsk, locationKey]);
+
   const sendText = () => {
     const q = input.trim();
     if (!q) return;

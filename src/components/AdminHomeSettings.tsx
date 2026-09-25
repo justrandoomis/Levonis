@@ -86,6 +86,7 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
   ads_panel: Megaphone,
   first_banner: ImageIcon,
   second_banner: ImageIcon,
+  editorial_banners: ImageIcon,
   coupons_offers: Ticket,
   categories: LayoutTemplate,
   discounts_offers: Tag,
@@ -103,6 +104,14 @@ const INITIAL_SECTIONS: HomeSection[] = [
   { id: 'ads_panel', titleEn: 'Ads Panel', titleAr: 'لوحة الاعلانات', isVisible: true },
   { id: 'first_banner', titleEn: 'First Banner', titleAr: 'الشريط الاول', isVisible: true },
   { id: 'second_banner', titleEn: 'Second Banner', titleAr: 'الشريط الثاني', isVisible: true },
+  /**
+   * THE TWO EDITORIAL BANNERS of the home page (homepage v2), drawn side by
+   * side under «أحدث المنتجات». The first two banners here — picture, copy in
+   * each language, link — replace the page's built-in pair; with none, the
+   * page draws the built-in pair over real product photographs
+   * (src/lib/homeLayout.ts `resolveEditorial`, slot `editorial_banners`).
+   */
+  { id: 'editorial_banners', titleEn: 'Editorial banners (two, side by side)', titleAr: 'البانرات التحريرية (اثنان جنبًا إلى جنب)', isVisible: true },
   { id: 'coupons_offers', titleEn: 'Coupons & Offers Section', titleAr: 'القسم الذي يحتوي على كوبونات وعروض', isVisible: true },
   { id: 'categories', titleEn: 'Main & Sub Categories', titleAr: 'الأقسام الرئيسية والفرعية', isVisible: true },
   { id: 'discounts_offers', titleEn: 'Discounts & Offers under categories', titleAr: 'القسم لخصومات المنتجات والعروض تحت الأقسام', isVisible: true },
@@ -467,11 +476,15 @@ export default function AdminHomeSettings() {
           <AdminAds />
         )}
 
-        {(activeTab === 'first_banner' || activeTab === 'second_banner') && (
+        {(activeTab === 'first_banner' || activeTab === 'second_banner' || activeTab === 'editorial_banners') && (
           <BannerSettings
             id={activeTab}
-            titleEn={activeTab === 'first_banner' ? 'First Banner' : 'Second Banner'}
-            titleAr={activeTab === 'first_banner' ? 'الشريط الاول' : 'الشريط الثاني'}
+            titleEn={
+              activeTab === 'first_banner' ? 'First Banner' : activeTab === 'second_banner' ? 'Second Banner' : 'Editorial banners — the first two are shown'
+            }
+            titleAr={
+              activeTab === 'first_banner' ? 'الشريط الاول' : activeTab === 'second_banner' ? 'الشريط الثاني' : 'البانرات التحريرية — يظهر أول اثنين'
+            }
             banners={banners[activeTab] || []}
             onChange={(list) => { setBanners(prev => ({ ...prev, [activeTab]: list })); setBannersState('idle'); }}
             onSave={() => saveBanners(banners)}

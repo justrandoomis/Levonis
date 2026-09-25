@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, MessageCircle, ShoppingCart, User } from 'lucide-react';
+import { AccountIcon, BagIcon, ChatsIcon, CommunityIcon } from './nav/NavIcons';
 import { useLanguage } from '../LanguageContext';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
@@ -138,8 +138,8 @@ export default function BottomNav() {
   }, [isAuthenticated, location.pathname]);
 
   const leftItems = [
-    { icon: User, label: t('profile'), path: '/profile' },
-    { icon: ShoppingCart, label: t('cart'), path: '/cart' },
+    { icon: AccountIcon, label: t('profile'), path: '/profile' },
+    { icon: BagIcon, label: t('cart'), path: '/cart' },
   ];
   /**
    * THE COMMUNITY TAB DISAPPEARS WHEN THE SERVER SAYS THE COMMUNITY IS SHUT.
@@ -154,8 +154,8 @@ export default function BottomNav() {
   const { access: communityAccess } = useCommunityAccess();
   const communityShut = communityAccess?.may_enter === false;
   const rightItems = [
-    { icon: MessageCircle, label: t('webCenter'), path: '/chats' },
-    ...(communityShut ? [] : [{ icon: Users, label: t('community'), path: '/community' }]),
+    { icon: ChatsIcon, label: t('webCenter'), path: '/chats' },
+    ...(communityShut ? [] : [{ icon: CommunityIcon, label: t('community'), path: '/community' }]),
   ];
   type NavItem = (typeof leftItems)[number];
 
@@ -191,11 +191,7 @@ export default function BottomNav() {
           />
         )}
         <span className="relative">
-          <item.icon
-            className="h-5 w-5 sm:h-[22px] sm:w-[22px]"
-            strokeWidth={isActive ? 2.5 : 2}
-            aria-hidden="true"
-          />
+          <item.icon className="h-[22px] w-[22px] sm:h-6 sm:w-6" strokeWidth={isActive ? 1.9 : 1.55} />
           {badge > 0 ? (
             // Absolutely positioned so appearing and changing never moves the
             // tab, and the label is already on the link — the pill itself is
@@ -229,6 +225,7 @@ export default function BottomNav() {
           takes no pointer events, and is decorative. */}
       <div
         aria-hidden="true"
+        data-nav-scrim
         className="pointer-events-none absolute inset-x-0 bottom-[calc(-1*max(0.625rem,env(safe-area-inset-bottom)))] sm:bottom-[calc(-1*max(1rem,env(safe-area-inset-bottom)))] h-[calc(100%+max(0.625rem,env(safe-area-inset-bottom))+20px)] -z-10 bg-gradient-to-t from-black via-black/94 to-transparent"
       />
 

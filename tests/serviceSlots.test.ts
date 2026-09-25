@@ -178,7 +178,12 @@ test('ServicesGrid renders a card for every slot, pointing where the slot says',
   // the list IS the id in the attribute. That single binding is asserted here;
   // asserting a literal per card would only pin a shape the file does not have.
   assert.match(grid, /inApp\.map\(\(s\) => \([\s\S]{0,300}data-service=\{s\.id\}/);
-  assert.match(grid, /siteMedia\.find\(\(m\) => m\.group === 'service' && m\.slot === `service-\$\{id\}`\)/);
+  // HOMEPAGE V2 (docs/DECISIONS.md): the grid draws one line icon per tile on
+  // the ivory ground, as the owner asked, and no longer the uploaded
+  // gold-on-dark `service-*` artwork. The slot table still names every
+  // service and its destination, which is what the loop below holds.
+  assert.doesNotMatch(code('src/components/home/ServicesGrid.tsx'), /siteMedia/, 'the light grid does not draw the dark uploaded tiles');
+  assert.match(grid, /<s\.icon aria-hidden="true" strokeWidth=\{1\.5\}/, 'one line icon per tile');
 
   for (const slot of SERVICE_SLOTS) {
     const id = slot.slot.replace(/^service-/, '');

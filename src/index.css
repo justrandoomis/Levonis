@@ -1344,3 +1344,130 @@ html[data-lang-swap='ltr'] main {
     animation: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   THE HOME PAGE'S WARM LIGHT SECTION (homepage v2, the owner's brief).
+
+   From the categories down, the storefront's home switches to a warm ivory
+   ground with charcoal ink — and ONLY there. The tokens are scoped names
+   (`ivory`, `ink`, `hairline`, `charcoal`), never a redefinition of `white`
+   or `canvas`, so the dark app shell, the dark product card and every other
+   page are untouched. Contrast, measured: ink on ivory 15.6:1, ink-2 on
+   ivory 6.0:1 (and 6.5:1 on paper), gold-ink on the gold CTA 7.7:1, ivory on
+   charcoal 16.2:1.
+
+   Shadows are the one thing this palette has almost none of: a light ground
+   shows a drop shadow five times as loudly as the dark one does, so depth
+   here comes from surface contrast and a 1px hairline.
+   --------------------------------------------------------------------------- */
+@theme {
+  --color-ivory: #f3f0ea;
+  --color-paper: #fbfaf7;
+  --color-ink: #16181b;
+  --color-ink-2: #585b61;
+  --color-hairline: #e2ddd3;
+  --color-charcoal: #0e1013;
+  --color-charcoal-raised: #14171c;
+  --color-gold-muted: #bca36b;
+  --color-gold-ink: #111214;
+  --color-olive-deep: #3b4629;
+  --color-avail: #27704a;
+}
+
+/* The bottom bar's fade is black because the page under it is black. On the
+   home page the page under it is ivory from the first screen down, and a
+   black fade there reads as a smudge rather than as depth — so the fade takes
+   the colour of the ground it sits on. The pills themselves stay dark. */
+body:has([data-home-v2]) [data-nav-scrim] {
+  --tw-gradient-from: color-mix(in srgb, var(--color-ivory) 100%, transparent);
+  --tw-gradient-via: color-mix(in srgb, var(--color-ivory) 88%, transparent);
+  background-image: linear-gradient(
+    to top,
+    var(--color-ivory) 0%,
+    color-mix(in srgb, var(--color-ivory) 86%, transparent) 45%,
+    transparent 100%
+  );
+}
+
+/* The app's clearance spacer under every page is black; under the home page
+   it continues the ivory ground instead of ending the page in a black band. */
+body:has([data-home-v2]) [data-nav-clearance] {
+  background-color: var(--color-ivory);
+}
+
+/* A catalogue photograph inside a tile (src/components/home/v2/PromoPhoto).
+   The shop's product photographs are squares with the product in the band
+   between ~24% and ~86% of their height, the product name lettered above it
+   and the address below. With `data-crop`, the square is sized so that band
+   covers the zone (62% of its height fills the zone's height, 86% of its
+   width at least fills the zone's width) and is centred on the band's middle
+   (55% down). Where container units are not supported it falls back to a
+   plain cover crop. */
+.lv-promo-zone {
+  container-type: size;
+  overflow: hidden;
+}
+.lv-promo-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+@supports (width: 1cqw) {
+  .lv-promo-photo[data-crop] {
+    --lv-s: max(calc(100cqh / 0.53), calc(100cqw / 0.86));
+    inset: auto;
+    width: var(--lv-s);
+    height: var(--lv-s);
+    max-width: none;
+    top: calc(50cqh - var(--lv-s) * 0.535);
+    left: calc(50cqw - var(--lv-s) / 2);
+  }
+}
+
+/* Soft edges where a photograph meets its tile: the photograph's own dark
+   ground dissolves into the tile's instead of ending on a seam. Logical —
+   "start" is the reading side, so the fade flips with the language. */
+.lv-fade-top {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 42%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 42%);
+}
+.lv-fade-start {
+  -webkit-mask-image: linear-gradient(to left, #000 50%, transparent 100%);
+  mask-image: linear-gradient(to left, #000 50%, transparent 100%);
+}
+[dir='rtl'] .lv-fade-start {
+  -webkit-mask-image: linear-gradient(to right, #000 50%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 50%, transparent 100%);
+}
+
+/* A photograph tucked into the bottom-end corner of a small banner: it
+   fades out toward the top and toward the reading side at once. */
+.lv-fade-corner {
+  -webkit-mask-image: radial-gradient(130% 120% at 100% 100%, #000 55%, transparent 88%);
+  mask-image: radial-gradient(130% 120% at 100% 100%, #000 55%, transparent 88%);
+}
+[dir='rtl'] .lv-fade-corner {
+  -webkit-mask-image: radial-gradient(130% 120% at 0% 100%, #000 55%, transparent 88%);
+  mask-image: radial-gradient(130% 120% at 0% 100%, #000 55%, transparent 88%);
+}
+@media (min-width: 1024px) {
+  .lv-fade-corner,
+  [dir='rtl'] .lv-fade-corner {
+    -webkit-mask-image: linear-gradient(to left, #000 50%, transparent 100%);
+    mask-image: linear-gradient(to left, #000 50%, transparent 100%);
+  }
+  [dir='rtl'] .lv-fade-corner {
+    -webkit-mask-image: linear-gradient(to right, #000 50%, transparent 100%);
+    mask-image: linear-gradient(to right, #000 50%, transparent 100%);
+  }
+}
+
+/* The finder band's texture: an olive hairline grid at a few percent, the
+   kind of thing a printed plate has — felt more than seen. */
+.lv-finder-texture {
+  background-image:
+    repeating-linear-gradient(0deg, rgb(59 70 41 / 0.22) 0 1px, transparent 1px 7px),
+    radial-gradient(120% 140% at 100% 0%, rgb(59 70 41 / 0.35), transparent 60%);
+}
