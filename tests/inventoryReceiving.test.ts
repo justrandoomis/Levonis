@@ -241,7 +241,9 @@ test('two partial receipts make two cost layers, and the purchase closes exactly
   assert.equal(incomingRow(raw).status, 'received');
 
   const lots = all<{ qty_received: number; unit_cost_iqd: number }>(
-    raw, 'SELECT qty_received, unit_cost_iqd FROM inventory_lots ORDER BY received_at, id'
+    // By size, not by arrival: two receipts can share a millisecond, and the
+    // random lot id would then decide which comes first.
+    raw, 'SELECT qty_received, unit_cost_iqd FROM inventory_lots ORDER BY qty_received'
   );
   assert.equal(lots.length, 2);
   assert.equal(lots[0].qty_received, 4);
@@ -360,6 +362,10 @@ test('a negative adjustment lowers the shelf, eats the OLDEST lots and records w
   await post(a, '/api/admin/inventory/incoming/incA/receive', { receipt_id: 'rA', qty: 10 });
   await post(a, '/api/admin/inventory/incoming/incB/receive', { receipt_id: 'rB', qty: 10 });
   assert.equal(row<{ stock: number }>(raw, `SELECT stock FROM products WHERE id='p1'`)!.stock, 20);
+  // The two receipts above can land in the same millisecond, where the lot id
+  // (random) breaks the tie — correct for the code, but then «oldest» is not
+  // incA. Say what the test means: incA arrived first.
+  raw.prepare(`UPDATE inventory_lots SET received_at = '2026-01-01T00:00:00.000Z' WHERE incoming_id = 'incA'`).run();
 
   const res = await post(a, '/api/admin/inventory/adjustments', {
     product_id: 'p1', scope: 'base', scope_id: '', delta: -3, reason: 'damaged', note: 'تلف بالنقل',
