@@ -1,0 +1,104 @@
+/*
+ * CATALOG DISCOVERY — the few rules a utility class cannot express
+ * (docs/ux/IMPLEMENTATION_PLAN.md ground rules: new utilities live here, never
+ * in src/index.css, and only the lazy listing imports this file).
+ *
+ * THE TWO-KNOB PRICE RANGE. Two native range inputs share one track, so each
+ * knob keeps a real slider's keyboard, screen-reader and RTL behaviour (in an
+ * Arabic page the low end is on the right, as the design asks). The inputs
+ * themselves let clicks through; only their knobs take the pointer, so the
+ * lower knob never blocks the upper one. Colours are theme roles.
+ */
+.lv-range {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.lv-range:focus {
+  outline: none;
+}
+.lv-range::-webkit-slider-runnable-track {
+  height: 44px;
+  background: transparent;
+}
+.lv-range::-moz-range-track {
+  height: 44px;
+  background: transparent;
+}
+.lv-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  width: 24px;
+  height: 24px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  border: 1.5px solid var(--color-text-primary);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  cursor: grab;
+}
+.lv-range::-moz-range-thumb {
+  pointer-events: auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  border: 1.5px solid var(--color-text-primary);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  cursor: grab;
+}
+.lv-range:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.lv-range:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.lv-range:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.08);
+}
+
+/* Long result grids: rows off screen skip layout and paint until they come
+   near (§12). The intrinsic size is the compact card's fixed 262 px. */
+.lv-cv {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 262px;
+}
+.lv-cv-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 118px;
+}
+
+/* The category hero's photograph (§6 item 2): tucked in the bottom far
+   corner, it fades toward the words AND toward the top at once — the design's
+   two masks intersected — so neither of its inner edges draws a seam. */
+.lv-fade-hero {
+  -webkit-mask-image: linear-gradient(to left, #000 48%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 42%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to left, #000 48%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 42%);
+  mask-composite: intersect;
+}
+[dir='rtl'] .lv-fade-hero {
+  -webkit-mask-image: linear-gradient(to right, #000 48%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 42%);
+  mask-image: linear-gradient(to right, #000 48%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 42%);
+}
+@media (min-width: 1024px) {
+  .lv-fade-hero {
+    -webkit-mask-image: linear-gradient(to left, #000 55%, transparent 100%);
+    mask-image: linear-gradient(to left, #000 55%, transparent 100%);
+  }
+  [dir='rtl'] .lv-fade-hero {
+    -webkit-mask-image: linear-gradient(to right, #000 55%, transparent 100%);
+    mask-image: linear-gradient(to right, #000 55%, transparent 100%);
+  }
+}

@@ -1,4 +1,5 @@
 import { api, type RequestOptions } from './api';
+import type { CompareLens, CompareLensId } from '../../packages/catalog/src/discoveryTypes';
 
 /**
  * THE COMPARISON, AS THE BROWSER SEES IT — the wire shapes and the two calls.
@@ -103,6 +104,12 @@ export interface CompareResult {
   verdict: CompareVerdict;
   /** Normalised 0..1, `series[productIndex][axisIndex]`, always further = better. */
   chart: { axes: CompareAxis[]; series: number[][] };
+  /**
+   * «أفضل لـ» — one verdict per buyer's question, printers and lasers only,
+   * computed by the server (worker/lib/compareLenses.ts). Absent or empty for
+   * anything else (a filament comparison has no lens row).
+   */
+  lenses?: CompareLens[];
 }
 
 export interface CompareProductCard {
@@ -412,4 +419,111 @@ export function leaders(verdict: CompareVerdict): number[] {
   const best = Math.max(...verdict.scores, 0);
   if (best <= 0) return [];
   return verdict.scores.flatMap((s, i) => (s === best ? [i] : []));
+}
+
+// ---------------------------------------------------- «أفضل لـ» and the table
+
+export type { CompareLens, CompareLensId };
+
+/** The lens order the page draws (the server's LENS_ORDER). */
+export const LENS_IDS: readonly CompareLensId[] = ['business', 'beginners', 'value', 'multicolor', 'precision'];
+
+/** `?lens=` → a lens id, or null for «الكل» / anything unknown. */
+export function readLens(search: URLSearchParams | string): CompareLensId | null {
+  const raw = typeof search === 'string' ? search : search.get('lens') ?? '';
+  return (LENS_IDS as readonly string[]).includes(raw) ? (raw as CompareLensId) : null;
+}
+
+/**
+ * THE ROWS EACH LENS WEIGHS — the fields worker/lib/compareLenses.ts reads, so
+ * choosing «للأعمال» tints the rows its verdict rests on. This is a pointer to
+ * the evidence, not a rule: the page scores nothing (see the file header).
+ */
+export const LENS_FIELDS: Readonly<Record<CompareLensId, readonly string[]>> = {
+  business: ['print_speed', 'max_acceleration', 'build_volume', 'enclosed', 'print_failure_detection', 'air_filtration', 'warranty'],
+  beginners: ['skill_level', 'assembly', 'auto_leveling', 'filament_sensor', 'power_loss_recovery', 'camera'],
+  value: ['price_iqd'],
+  multicolor: ['max_colors', 'extruders'],
+  precision: ['min_layer_height', 'z_accuracy', 'xy_resolution'],
+};
+
+/** «الفروقات فقط» starts ON for three or more columns (CATALOG_DISCOVERY §10.1). */
+export const diffOnlyByDefault = (columns: number): boolean => columns >= 3;
+
+/** How many spec rows «الفروقات فقط» hides: every value the same. The price row is never counted. */
+export function identicalRowCount(result: CompareResult): number {
+  return specGroups(result).reduce((n, g) => n + g.rows.filter((r) => !rowDiffers(r)).length, 0);
+}
+
+/**
+ * THE LENGTH OF A ROW'S BAR for column `i`, 0..1, or null when the row gets no
+ * bar. Only rows the server SCORES in a direction get one (`number` and
+ * `dimensions` with `better` higher or lower), and only a column with a
+ * reading: a missing value draws no bar at all (never a zero-length "loss").
+ *
+ *   higher is better → value / max
+ *   lower is better  → min / value   (the finest reading is the full bar)
+ *
+ * Computed from `row.values[i].num` — the numbers the cells are printed from —
+ * so a bar can never disagree with its label.
+ */
+export function barRatio(row: CompareRow, i: number): number | null {
+  if (row.parse !== 'number' && row.parse !== 'dimensions') return null;
+  // A year is a name, not a quantity: 2025 is not «99.95% of» 2026.
+  if (NO_BAR_FIELDS.has(row.field_id)) return null;
+  if (row.better !== 'higher' && row.better !== 'lower') return null;
+  const nums = row.values.map((v) => (v.missing || v.num === null || !(v.num > 0) ? null : v.num));
+  const mine = nums[i];
+  if (mine === null || mine === undefined) return null;
+  const known = nums.filter((n): n is number => n !== null);
+  if (known.length < 2) return null;
+  if (row.better === 'higher') return mine / Math.max(...known);
+  return Math.min(...known) / mine;
+}
+
+/** Numeric rows that are labels rather than magnitudes. */
+const NO_BAR_FIELDS = new Set(['release_year']);
+
+/** Whether a row draws bars at all (two or more columns have a reading). */
+export const rowHasBars = (row: CompareRow): boolean => row.values.some((_, i) => barRatio(row, i) !== null);
+
+/** A `dimensions` reading in mm with three axes → litres, for the sub-line («37.0 لتر»). */
+export function litres(row: CompareRow, i: number): number | null {
+  if (row.parse !== 'dimensions') return null;
+  const v = row.values[i];
+  if (!v || v.missing || !v.axes || v.axes.length !== 3 || row.unit.trim().toLowerCase() !== 'mm') return null;
+  const [a, b, c] = v.axes;
+  const l = (a * b * c) / 1_000_000;
+  return Number.isFinite(l) && l > 0 ? Math.round(l * 10) / 10 : null;
+}
+
+export type RowHint = 'higher' | 'lower' | 'informational' | 'unscored';
+
+/**
+ * The direction hint under a row label — «الأعلى أفضل», «الأقل أفضل», «للمعلومة،
+ * لا يُحتسب», or «لا يُحتسب: قيمة غير مذكورة» — from the server's own fields.
+ */
+export function rowHint(row: CompareRow): RowHint {
+  const scoring = rowScoring(row);
+  if (scoring === 'informational') return 'informational';
+  if (scoring === 'unscored') return 'unscored';
+  return row.better === 'lower' ? 'lower' : 'higher';
+}
+
+/**
+ * REORDER: move column `from` by `delta` (−1 toward the start, +1 toward the
+ * end), clamped. Returns a new list; the same list when nothing moves.
+ */
+export function moveColumn(ids: readonly string[], from: number, delta: -1 | 1): string[] {
+  const to = from + delta;
+  if (from < 0 || from >= ids.length || to < 0 || to >= ids.length) return [...ids];
+  const next = [...ids];
+  [next[from], next[to]] = [next[to], next[from]];
+  return next;
+}
+
+/** The lens with this id, when the comparison carries it. */
+export function lensById(result: CompareResult | null, id: CompareLensId | null): CompareLens | null {
+  if (!result || !id) return null;
+  return (result.lenses ?? []).find((l) => l.id === id) ?? null;
 }

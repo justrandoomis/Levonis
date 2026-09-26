@@ -296,6 +296,17 @@ const Support = React.lazy(() => import('./pages/Support'));
  * asked for; `tests/bundleBudget.test.ts` measures exactly that closure.
  */
 const Compare = React.lazy(() => import('./pages/Compare'));
+// «مرشد الطابعات» (catalog discovery S6b): a focused full-screen flow, its own chunk.
+const PrinterFinder = React.lazy(() => import('./pages/PrinterFinder'));
+/**
+ * CATALOG DISCOVERY (docs/ux/CATALOG_DISCOVERY.md §2): the explorer, a
+ * department's page and a section's listing. Each is its own lazy chunk;
+ * banners, shelves and «عرض الكل» links prefetch the next one on
+ * pointerdown (src/lib/catalog/prefetch.ts).
+ */
+const CategoriesExplorer = React.lazy(() => import('./pages/CategoriesExplorer'));
+const CategoryPage = React.lazy(() => import('./pages/CategoryPage'));
+const CategoryListing = React.lazy(() => import('./pages/CategoryListing'));
 /**
  * THE TWO SERVICES THE HOME RAIL NAMES AND THE ROUTER DID NOT SERVE.
  *
@@ -542,7 +553,7 @@ function AppContent() {
   // `/merchant` is the merchant workspace (W3-A): its own full-screen frame, out
   // of the customer shell. `/merchant/start` — onboarding — stays where it was.
   const isMerchantStart = pathForShell === '/merchant/start' || pathForShell.startsWith('/merchant/start/');
-  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support', '/chat', '/model-viewer', '/merchant'].some(p => pathForShell === p || pathForShell.startsWith(p + '/')) && !isMerchantStart;
+  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support', '/chat', '/model-viewer', '/merchant', '/printer-finder'].some(p => pathForShell === p || pathForShell.startsWith(p + '/')) && !isMerchantStart;
 
   if (isFullScreenRoute) {
     return (
@@ -638,6 +649,9 @@ function AppContent() {
               }
             />
             <Route path="/support" element={<Support />} />
+            {/* The finder draws its own chrome; the tray gate rides along so a
+                refused compare add still gets its toast or dialog here. */}
+            <Route path="/printer-finder" element={<><PrinterFinder /><CompareTrayGate /></>} />
             {/* A conversation owns the mobile viewport: its message list is
                 the one scroll region and its composer stays in normal flex
                 flow above the keyboard/safe area. Keeping it in the regular
@@ -790,6 +804,9 @@ function AppContent() {
           <Route path="/chats" element={<Chats />} />
           <Route path="/product/:slug" element={<Product />} />
           <Route path="/products" element={<Products />} />
+          <Route path="/categories" element={<CategoriesExplorer />} />
+          <Route path="/categories/:categorySlug" element={<CategoryPage />} />
+          <Route path="/categories/:categorySlug/:subCategorySlug" element={<CategoryListing />} />
           {/* The ids live in the query, not the path, so a comparison is one
               route and one link: /compare, /compare?ids=a, /compare?ids=a,b. */}
           <Route path="/compare" element={<Compare />} />

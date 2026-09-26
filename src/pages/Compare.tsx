@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Plus, Scale, Store } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronDown, Plus, Share2, Store } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useGoBack } from '../lib/useGoBack';
 import { readRecentlyViewed } from '../lib/recentlyViewed';
@@ -15,6 +15,11 @@ import {
   readIds,
   columnName,
   writeIds,
+  readLens,
+  moveColumn,
+  diffOnlyByDefault,
+  tri,
+  type CompareLensId,
   type CompareLang,
   type CompareProductCard,
   type CompareResult,
@@ -24,11 +29,16 @@ import { compareStrings } from '../components/compare/strings';
 import VerdictBand from '../components/compare/VerdictBand';
 import BasisNote from '../components/compare/BasisNote';
 import SpecChart from '../components/compare/SpecChart';
-import PriceRow from '../components/compare/PriceRow';
 import SpecTable from '../components/compare/SpecTable';
 import CompareSlots from '../components/compare/CompareSlots';
 import ProductPicker, { CandidateGrid } from '../components/compare/ProductPicker';
 import PowerBlock from '../components/compare/PowerBlock';
+import StickyColumns from '../components/compare/StickyColumns';
+import LensBar from '../components/compare/LensBar';
+import BestForSummary from '../components/compare/BestForSummary';
+import { lensStrings } from '../components/compare/lensStrings';
+import { useIsWide } from '../components/compare/useIsWide';
+import { compareTray } from '../lib/compareTray';
 
 /**
  * «المقارنة» — THE PAGE.
@@ -130,15 +140,30 @@ export default function Compare() {
    */
   const [attempt, setAttempt] = useState(0);
 
-  /** Replace `?ids=` and push, so the back button undoes exactly this change. */
+  /** Replace `?ids=` and push, so the back button undoes exactly this change.
+   *  The chosen lens rides along: it is part of what a shared link shows. */
+  const lens = useMemo(() => readLens(params), [params]);
   const setIds = useCallback(
     (next: string[]) => {
       const value = writeIds(next);
       const query = new URLSearchParams();
       if (value) query.set('ids', value);
+      if (lens && value) query.set('lens', lens);
       setParams(query);
     },
-    [setParams]
+    [setParams, lens]
+  );
+
+  /** «أفضل لـ»: `?lens=` is REPLACED, not pushed — reading through the lenses
+   *  should not fill the back stack; back still undoes the last column change. */
+  const setLens = useCallback(
+    (next: CompareLensId | null) => {
+      const query = new URLSearchParams(params);
+      if (next) query.set('lens', next);
+      else query.delete('lens');
+      setParams(query, { replace: true });
+    },
+    [params, setParams]
   );
 
   // ------------------------------------------------------------- the fetch
@@ -237,13 +262,84 @@ export default function Compare() {
 
   const removeId = useCallback((id: string) => setIds(ids.filter((v) => v !== id)), [ids, setIds]);
 
-  const moveToStart = useCallback(
-    (index: number) => setIds([ids[index], ...ids.filter((_, i) => i !== index)]),
+  /** «انقل يمينًا / يسارًا»: one place toward the start (−1) or the end (+1). */
+  const moveBy = useCallback(
+    (index: number, delta: -1 | 1) => setIds(moveColumn(ids, index, delta)),
     [ids, setIds]
   );
 
+  // ------------------------------------------------- the tray, both ways
+
+  /**
+   * THE URL WINS ON THIS PAGE (CATALOG_DISCOVERY §10.4). Opened bare while the
+   * tray holds products, the page opens the tray's comparison (a replace, so
+   * back still leaves). From then on every comparison the page shows is written
+   * back into the tray — removing a column here removes it there — by PRODUCT
+   * (a slot key `product:option` is one product in the tray).
+   */
+  const adoptedTray = useRef(false);
+  useEffect(() => {
+    if (adoptedTray.current) return;
+    adoptedTray.current = true;
+    if (ids.length > 0) return;
+    const tray = compareTray.getSnapshot();
+    if (tray.items.length > 0) {
+      const query = new URLSearchParams();
+      query.set('ids', tray.items.map((item) => item.id).join(','));
+      setParams(query, { replace: true });
+    }
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const hadColumns = useRef(false);
+  useEffect(() => {
+    if (loading || error) return;
+    if (idsKey === '') {
+      if (hadColumns.current) compareTray.replaceAll([], null);
+      return;
+    }
+    if (products.length === 0) return;
+    hadColumns.current = true;
+    const type = products.find((p) => p.product_type)?.product_type ?? null;
+    if (type !== 'printer' && type !== 'laser' && type !== 'filament') return;
+    const seen = new Set<string>();
+    const items = products.flatMap((p) => {
+      const id = p.product_id ?? p.id;
+      if (seen.has(id)) return [];
+      seen.add(id);
+      return [{ id, slug: p.slug, name: columnName({ ...p, option: null }, 'en').split(' / ')[0], image: p.image ?? '' }];
+    });
+    compareTray.replaceAll(items, type);
+  }, [products, idsKey, loading, error]);
+
+  // ------------------------------------------------ «الفروقات فقط», share
+  const ls = lensStrings(lang);
+  const wide = useIsWide();
+  /** null = the default for this many columns (ON from three). */
+  const [diffPref, setDiffPref] = useState<boolean | null>(null);
+  const diffOnly = diffPref ?? diffOnlyByDefault(products.length);
+  const [copied, setCopied] = useState(false);
+  const share = useCallback(async () => {
+    const url = window.location.href;
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share({ title: s.pageTitle, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* dismissed, or no clipboard: the address bar still has the link */
+    }
+  }, [s.pageTitle]);
+
   const labels = useMemo(() => (comparison ? labelIndex(comparison) : new Map()), [comparison]);
   const price = comparison ? priceRow(comparison) : null;
+  const lenses = comparison?.lenses ?? [];
+  const printers = products.length > 0 && products.every((p) => p.product_type === 'printer');
+  const basis = comparison ? tri(comparison.basis_label, lang as CompareLang) : '';
   const blamed = blamedIds(error);
   /** A 400 is the server refusing this exact request; only transport and
    *  server-side failures can be answered by asking again. */
@@ -264,10 +360,23 @@ export default function Compare() {
         >
           <BackIcon aria-hidden="true" className="h-5 w-5" />
         </button>
-        <h1 className="flex flex-1 items-center gap-2 text-base font-bold text-[var(--color-text-primary)]">
-          <Scale aria-hidden="true" className="h-4 w-4 text-[var(--color-text-muted)]" />
-          {s.pageTitle}
-        </h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[20px] font-extrabold leading-7 tracking-[-0.01em] text-[var(--color-text-primary)]">{s.pageTitle}</h1>
+          {products.length >= 2 && basis ? (
+            <p className="truncate text-[12px] font-semibold text-[var(--color-text-muted)]">{ls.subtitle(products.length, basis)}</p>
+          ) : null}
+        </div>
+        {ids.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => void share()}
+            aria-label={copied ? ls.copied : ls.share}
+            title={ls.share}
+            className="lv-button lv-button-ghost min-h-[44px] min-w-[44px] px-0"
+          >
+            <Share2 aria-hidden="true" className="h-5 w-5" />
+          </button>
+        ) : null}
         {/*
           AVAILABLE WITH NOTHING PLACED TOO. The gate used to be
           `ids.length > 0`, so on the one screen where the visitor has
@@ -410,13 +519,54 @@ export default function Compare() {
       {/* --------------------------------------------------- the comparison */}
       {!error && comparison && products.length >= 2 ? (
         <>
-          <VerdictBand products={products} result={comparison} labels={labels} />
-          <div className="lv-section">
-            <BasisNote result={comparison} />
-          </div>
-          <SpecChart products={products} result={comparison} />
-          {price ? <PriceRow products={products} row={price} /> : null}
-          <SpecTable products={products} result={comparison} />
+          {/* THE ORDER OF THE UPGRADED PAGE (CATALOG_DISCOVERY §10.3): the
+              columns, then «أفضل لـ» (the answer to the buyer's question), then
+              the full scoring folded away, then the table the answers rest on. */}
+          <StickyColumns
+            products={products}
+            prices={products.map((_, i) => {
+              // The price row's own figure, without the unit: the column is narrow and the row below says «IQD».
+              const n = price?.values[i]?.num;
+              return typeof n === 'number' && n > 0 ? n.toLocaleString('en-US') : '';
+            })}
+            wide={wide}
+            onRemove={(i) => removeId(ids[i])}
+            onMove={moveBy}
+          />
+          {copied ? (
+            <p role="status" className="mt-2 text-center text-[12px] font-semibold text-[var(--color-text-muted)]">
+              {ls.copied}
+            </p>
+          ) : null}
+
+          {lenses.length > 0 ? (
+            <div className="lv-section space-y-3">
+              <LensBar lenses={lenses} value={lens} onChange={setLens} />
+              <BestForSummary lenses={lenses} products={products} value={lens} onChange={setLens} />
+            </div>
+          ) : null}
+
+          <details className="lv-section group rounded-[20px] border border-[var(--color-border-subtle)] bg-[var(--color-surface)] [&_summary::-webkit-details-marker]:hidden">
+            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 text-[14px] font-bold text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] rounded-[20px]">
+              {ls.details}
+              <ChevronDown aria-hidden="true" className="h-5 w-5 text-[var(--color-text-muted)] transition-transform group-open:rotate-180 motion-reduce:transition-none" />
+            </summary>
+            <div className="px-3 pb-4">
+              <VerdictBand products={products} result={comparison} labels={labels} />
+              <div className="lv-section">
+                <BasisNote result={comparison} />
+              </div>
+              <SpecChart products={products} result={comparison} />
+            </div>
+          </details>
+
+          <SpecTable
+            products={products}
+            result={comparison}
+            diffOnly={diffOnly}
+            onDiffOnly={(next) => setDiffPref(next)}
+            lens={lens}
+          />
         </>
       ) : null}
 
@@ -433,8 +583,9 @@ export default function Compare() {
           products={products}
           onRemove={(i) => removeId(ids[i])}
           onReplace={(i) => setPicking(i)}
-          onMoveToStart={moveToStart}
+          onMove={moveBy}
           onAdd={() => setPicking(-1)}
+          addLabel={printers ? ls.addNth(products.length + 1) : undefined}
         />
       ) : null}
 
