@@ -69,6 +69,13 @@ export interface CompareTrayStore {
   getSnapshot(): TrayState;
   subscribe(listener: () => void): () => void;
   has(id: string): boolean;
+  /**
+   * The product is in the tray under ANY configuration: its bare id, or a
+   * `product:option` slot the compare page wrote back («A1 Combo»).
+   */
+  hasProduct(productId: string): boolean;
+  /** Remove every configuration of the product. */
+  removeProduct(productId: string): void;
   add(item: TrayItem, type: string): AddResult;
   /** `add`, and on refusal publish the notice the tray UI answers. */
   request(item: TrayItem, type: string): AddResult;
@@ -86,6 +93,12 @@ export interface CompareTrayStore {
   consumeNotice(seq: number): void;
   /** Bumped when something asks the tray to show itself expanded. */
   getExpandSeq(): number;
+}
+
+/** A tray id is a product id or a compare slot `product:option`; this is the product. */
+export function trayProductId(id: string): string {
+  const cut = id.indexOf(':');
+  return cut < 0 ? id : id.slice(0, cut);
 }
 
 const EMPTY: TrayState = Object.freeze({ v: 1, type: null, items: [], at: 0 }) as TrayState;
@@ -189,6 +202,11 @@ export function createCompareTray(opts: { storage?: TrayStorage | null; now?: ()
       return () => listeners.delete(listener);
     },
     has: (id) => state.items.some((i) => i.id === id),
+    hasProduct: (productId) => state.items.some((i) => trayProductId(i.id) === productId),
+    removeProduct(productId) {
+      if (!store.hasProduct(productId)) return;
+      commit({ ...state, items: state.items.filter((i) => trayProductId(i.id) !== productId), at: now() });
+    },
     add(item, type) {
       if (!item.id || !type) return { ok: true, added: false };
       if (store.has(item.id)) return { ok: true, added: false };

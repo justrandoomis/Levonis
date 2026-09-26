@@ -190,10 +190,12 @@ test('REORDER and REMOVE: one place at a time, clamped, through the URL', () => 
   assert.match(page, /setParams\(query, \{ replace: true \}\);/);
 });
 
-test('TWO-WAY TRAY SYNC: the URL wins on /compare and is written back by product', () => {
+test('TWO-WAY TRAY SYNC: the URL wins on /compare and is written back by CONFIGURATION', () => {
   const page = read('src/pages/Compare.tsx');
   assert.match(page, /compareTray\.replaceAll\(items, type\)/);
-  assert.match(page, /const id = p\.product_id \?\? p\.id;/, 'a slot key is one product in the tray');
+  // Owner round 11: «A1» and «A1 Combo» are two machines, so a chosen
+  // configuration stays its own tray entry; the base one stays a bare id.
+  assert.match(page, /const id = p\.default_option \? \(p\.product_id \?\? p\.id\) : p\.id;/);
   assert.match(page, /const tray = compareTray\.getSnapshot\(\);/, 'a bare /compare opens the tray’s comparison');
 });
 

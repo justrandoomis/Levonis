@@ -770,6 +770,22 @@ fileRoutes.get('/*', async (c) => {
           .first();
         if (!own) throw forbidden('Not your file');
       }
+    } else if (key.startsWith('trade-in/')) {
+      /**
+       * IS THIS YOUR TRADE-IN — the ticket question, one table over.
+       *
+       * The key names the request (`trade-in/<request id>/photos/…`), the
+       * photographs are written only by worker/routes/tradeIn.ts after the
+       * same ownership check, and the admin who inspects the device reads
+       * every one of them. Nobody else can name a request they do not own.
+       */
+      const requestId = key.split('/')[1] ?? '';
+      if (user.role !== 'admin') {
+        const own = await c.env.DB.prepare('SELECT 1 AS x FROM trade_in_requests WHERE id = ? AND user_id = ? LIMIT 1')
+          .bind(requestId, user.id)
+          .first();
+        if (!own) throw forbidden('Not your file');
+      }
     } else {
       throw notFound();
     }

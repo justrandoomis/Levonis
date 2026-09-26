@@ -77,7 +77,7 @@ test('the money column runs: goods → arrival → notes → settlement', () => 
     ['ملاحظة أساس التسعير', 'data-checkout-pricing-basis'],
     ['ملاحظة الطابعة', 'testId="checkout-printer-note"'],
     ['استخدام كود خاص', 'data-checkout-promo-toggle'],
-    ['استخدام المحفظة', "loc('استخدام المحفظة', 'Use Wallet')"],
+    ['استخدام رصيد المحفظة', 'data-checkout-wallet className'],
     ['استخدام النقاط', "loc('استخدام النقاط', 'Use points', 'بەکارهێنانی خاڵ')"],
     ['إجمالي الطلب', 'data-testid="checkout-order-total"'],
     ['إجمالي عند الاستلام', 'data-testid="checkout-due-on-delivery"'],
@@ -105,7 +105,7 @@ test('every control sits BELOW every note, so the price is read before it is pai
   const lastNote = at(CHECKOUT, 'testId="checkout-printer-note"');
   for (const control of [
     'data-checkout-promo-toggle',
-    "loc('استخدام المحفظة', 'Use Wallet')",
+    'data-checkout-wallet className',
     "loc('استخدام النقاط', 'Use points', 'بەکارهێنانی خاڵ')",
   ]) {
     assert.ok(at(CHECKOUT, control) > lastNote, `the control ${control} climbed back above the notes`);
@@ -235,7 +235,11 @@ test('the wallet balance is stated twice, not three times', () => {
   // and the settlement line under the total.
   assert.ok(!CHECKOUT.includes("'رصيد مستخدم' : 'Used Balance'"), 'the duplicate wallet row is back');
   assert.ok(CHECKOUT.includes("loc('مدفوع من المحفظة', 'Paid from your wallet', 'لە جزدان درا')"));
-  assert.ok(CHECKOUT.includes('`خصم ${walletDiscount.toLocaleString()} د.ع`'));
+  // The toggle's own feedback is now the server's deduction AND remainder
+  // («−20,000 / المتبقي 80,000»), in the viewer's currency — not a bare
+  // «خصم N د.ع» that named neither what was left nor how it is paid.
+  assert.ok(CHECKOUT.includes('data-testid="checkout-wallet-applied"'));
+  assert.ok(!CHECKOUT.includes('`خصم ${walletDiscount.toLocaleString()} د.ع`'), 'the dinar-only deduction note is back');
 });
 
 test('no money label in the column decides its LANGUAGE from the text DIRECTION', () => {

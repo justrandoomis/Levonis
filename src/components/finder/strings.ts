@@ -23,13 +23,14 @@
  */
 import type {
   FinderBudget,
+  FinderColorNeed,
   FinderLevel,
   FinderPriority,
   FinderSale,
   FinderTech,
   FinderUse,
 } from '../../../packages/catalog/src/discovery';
-import type { FinderCaveat, FinderCriterion, FinderReason, FinderRelaxation } from '../../../packages/catalog/src/discoveryTypes';
+import type { FinderCaveat, FinderCriterion, FinderReason, FinderRelaxation, FinderWhy } from '../../../packages/catalog/src/discoveryTypes';
 
 export type FinderLang = 'ar' | 'en' | 'ckb';
 
@@ -307,6 +308,10 @@ export interface ResultsUi {
   bestBadge: string;
   rank: (n: number) => string;
   why: string;
+  /** «لماذا هذه؟» — the lead-in of the answer-driven sentence. */
+  whyThis: string;
+  /** «الأنسب من 3 خيارات» — the configuration was chosen among the printer's options. */
+  bestOf: (n: number) => string;
   watch: string;
   viewProduct: string;
   compare: string;
@@ -347,6 +352,8 @@ const RESULTS_AR: ResultsUi = {
   bestBadge: 'الأنسب لك',
   rank: (n) => `المرتبة ${n}`,
   why: 'لماذا نرشّحها',
+  whyThis: 'لماذا هذه؟',
+  bestOf: (n) => (n === 2 ? 'الأنسب من خيارين' : n <= 10 ? `الأنسب من ${n} خيارات` : `الأنسب من ${n} خيارًا`),
   watch: 'انتبه',
   viewProduct: 'عرض المنتج',
   compare: 'قارن',
@@ -388,6 +395,8 @@ const RESULTS_EN: ResultsUi = {
   bestBadge: 'Best for you',
   rank: (n) => `Rank ${n}`,
   why: 'Why we suggest it',
+  whyThis: 'Why this one?',
+  bestOf: (n) => `the best fit of ${n} options`,
   watch: 'Note',
   viewProduct: 'View product',
   compare: 'Compare',
@@ -429,7 +438,11 @@ export function resultsUi(lang: FinderLang): ResultsUi {
 const FIELD_LABEL: Record<string, { ar: string; en: string }> = {
   print_speed: { ar: 'سرعة الطباعة', en: 'Print speed' },
   max_acceleration: { ar: 'التسارع', en: 'Acceleration' },
-  max_colors: { ar: 'عدد الألوان', en: 'Number of colours' },
+  max_colors: { ar: 'عدد الألوان مع AMS', en: 'Colours with AMS' },
+  max_colors_native: { ar: 'الألوان بلا تبديل فلامنت', en: 'Colours without filament swaps' },
+  purge_waste: { ar: 'هدر الفلامنت', en: 'Purge waste' },
+  multicolor_method: { ar: 'طريقة تعدد الألوان', en: 'Multi-colour method' },
+  colors_out_of_box: { ar: 'الألوان كما تُباع', en: 'Colours as sold' },
   extruders: { ar: 'عدد رؤوس الطباعة', en: 'Number of extruders' },
   min_layer_height: { ar: 'أقل ارتفاع طبقة', en: 'Minimum layer height' },
   xy_resolution: { ar: 'دقة XY', en: 'XY resolution' },
@@ -465,6 +478,15 @@ const ENUM: Record<string, { ar: string; en: string }> = {
   kit: { ar: 'تُجمَّع بنفسك', en: 'Kit' },
   yes: { ar: 'نعم', en: 'Yes' },
   no: { ar: 'لا', en: 'No' },
+  // multicolor_method / purge_waste (worker/lib/templateFamilies.ts)
+  none: { ar: 'لا يوجد', en: 'None' },
+  'single nozzle + ams': { ar: 'نوزل واحد + AMS', en: 'Single nozzle + AMS' },
+  'dual nozzle': { ar: 'نوزلان', en: 'Dual nozzle' },
+  'tool changer': { ar: 'رؤوس طباعة مستقلة', en: 'Tool changer' },
+  'multi-nozzle (hotend changer)': { ar: 'عدة نوزلات (تبديل الهوت إند)', en: 'Multi-nozzle (hotend changer)' },
+  'near zero': { ar: 'شبه معدوم', en: 'Near zero' },
+  low: { ar: 'قليل', en: 'Low' },
+  high: { ar: 'عالٍ', en: 'High' },
 };
 
 /** A spec value as the reader should see it: a known option translated, anything else as typed. */
@@ -504,8 +526,25 @@ const REASONS: Record<string, ReasonTable> = {
   colors: {
     max_colors: (v) => {
       const n = Number.parseInt(v, 10);
-      const ar = Number.isFinite(n) && n >= 3 && n <= 10 ? 'تطبع حتى {v} ألوان' : 'تطبع حتى {v} لونًا';
-      return { ar, en: 'Prints up to {v} colours', showValue: true };
+      const ar = Number.isFinite(n) && n >= 3 && n <= 10 ? 'تطبع حتى {v} ألوان مع وحدات AMS' : 'تطبع حتى {v} لونًا مع وحدات AMS';
+      return { ar, en: 'Prints up to {v} colours with AMS units', showValue: true };
+    },
+    max_colors_native: (v) => {
+      const n = Number.parseInt(v, 10);
+      if (!Number.isFinite(n) || n < 2) return null;
+      if (n === 2) return { ar: 'تطبع لونين بلا تبديل فلامنت', en: 'Prints 2 colours with no filament swaps', showValue: false };
+      return { ar: n <= 10 ? 'تطبع {v} ألوان بلا تبديل فلامنت' : 'تطبع {v} لونًا بلا تبديل فلامنت', en: 'Prints {v} colours with no filament swaps', showValue: true };
+    },
+    purge_waste: (v) => {
+      const k = v.trim().toLowerCase();
+      if (k === 'near zero') return { ar: 'هدر فلامنت شبه معدوم عند تغيير اللون', en: 'Near-zero purge waste on colour changes', showValue: false };
+      if (k === 'low') return { ar: 'هدر فلامنت قليل عند تغيير اللون', en: 'Little purge waste on colour changes', showValue: false };
+      return null;
+    },
+    colors_out_of_box: (v) => {
+      const n = Number.parseInt(v, 10);
+      if (!Number.isFinite(n) || n < 2) return null;
+      return { ar: 'تطبع {v} ألوان كما تُباع', en: 'Prints {v} colours as sold', showValue: true };
     },
   },
   quality: {
@@ -585,7 +624,7 @@ export const REASON_CODES: Array<FinderCriterion | 'in_stock' | 'in_budget'> = [
 /** The field each criterion's reason may be quoted from (REASON_FIELDS in the engine). */
 export const REASON_FIELDS_BY_CODE: Record<FinderCriterion, string[]> = {
   speed: ['print_speed', 'max_acceleration'],
-  colors: ['max_colors'],
+  colors: ['max_colors_native', 'purge_waste', 'colors_out_of_box', 'max_colors'],
   quality: ['min_layer_height', 'xy_resolution'],
   quiet: ['noise_level'],
   ease: ['skill_level', 'assembly', 'auto_leveling'],
@@ -632,7 +671,10 @@ export function caveatCopy(caveat: FinderCaveat, lang: FinderLang): { text: stri
       return { text: pick(lang, `${label} غير مذكور لهذه الطابعة`, `${label} is not listed for this printer`), value: null };
     }
     case 'weak': {
-      const noun = CRITERION_NOUN[caveat.criterion];
+      // Colour is several facts: «عدد الألوان: 1» about a printer that prints
+      // 20 with an AMS would be false. The fact itself is named instead.
+      const field = caveat.criterion === 'colors' ? FIELD_LABEL[caveat.field_id] : undefined;
+      const noun = field ?? CRITERION_NOUN[caveat.criterion];
       const v = String(caveat.value_text ?? '').trim();
       if (!noun || !v) return null;
       return {
@@ -679,4 +721,85 @@ export function answerChipLabel(
     default:
       return null;
   }
+}
+
+// ------------------------------------------------ «لماذا هذه؟» and colour need
+
+/**
+ * «ألوان متعددة» — WHICH multi-colour. The follow-up the finder asks when colour
+ * matters (packages/catalog discovery `mc`): a tool changer and a single nozzle
+ * with an AMS both «print in colour», and only this answer tells them apart.
+ */
+export const COLOR_NEED_COPY: Record<FinderColorNeed, { ar: OptionCopy; en: OptionCopy }> = {
+  few: {
+    ar: { title: 'لونان إلى أربعة، بلا هدر', sub: 'رؤوس أو نوزلات مستقلة — فلامنت أقل في سلة المهملات' },
+    en: { title: '2–4 colours, no waste', sub: 'Independent heads or nozzles — less filament in the bin' },
+  },
+  many: {
+    ar: { title: 'ألوان كثيرة', sub: 'حتى 16 لونًا وأكثر مع AMS — مع هدر عند كل تبديل' },
+    en: { title: 'Many colours', sub: 'Up to 16 and more with AMS — with purge on every swap' },
+  },
+};
+
+export function colorNeedQuestion(lang: FinderLang): QuestionCopy {
+  return lang === 'en'
+    ? { title: 'Which kind of multicolour?', helper: 'Few colours cleanly, or as many as possible.' }
+    : { title: 'أي نوع من تعدد الألوان؟', helper: 'ألوان قليلة بنظافة، أم أكبر عدد ممكن.' };
+}
+
+const arColours = (n: number): string => (n === 2 ? 'لونين' : n >= 3 && n <= 10 ? `${n} ألوان` : `${n} لونًا`);
+
+/**
+ * One «لماذا هذه؟» code as a short clause. Null for an unknown code — the
+ * sentence is built only from what the server actually sent.
+ */
+export function whyClause(w: FinderWhy, lang: FinderLang): string | null {
+  switch (w.code) {
+    case 'colors_native': {
+      const how = w.method === 'tool_changer'
+        ? pick(lang, 'برؤوس طباعة مستقلة', 'from independent toolheads')
+        : w.method === 'multi_nozzle'
+          ? pick(lang, 'بعدة نوزلات', 'from separate nozzles')
+          : pick(lang, 'بنوزلين', 'from two nozzles');
+      const waste = w.waste === 'near_zero'
+        ? pick(lang, 'وهدر شبه معدوم', 'with near-zero waste')
+        : w.waste === 'low'
+          ? pick(lang, 'وهدر قليل', 'with little waste')
+          : '';
+      return lang === 'en'
+        ? `prints ${w.colors} colours ${how}${waste ? ` ${waste}` : ''}`
+        : `تطبع ${arColours(w.colors)} ${how}${waste ? ` ${waste}` : ''}`;
+    }
+    case 'colors_ams':
+      return lang === 'en'
+        ? `up to ${w.colors} colours with AMS${w.out_of_box !== null && w.out_of_box > 1 ? ` (${w.out_of_box} as sold)` : ''}, with purge waste`
+        : `حتى ${arColours(w.colors)} مع AMS${w.out_of_box !== null && w.out_of_box > 1 ? ` (${arColours(w.out_of_box)} كما تُباع)` : ''}، مع هدر عند التبديل`;
+    case 'use_listed': {
+      const use = (USE_COPY as Record<string, { ar: OptionCopy; en: OptionCopy }>)[w.use];
+      if (!use) return null;
+      return lang === 'en' ? `recommended for ${use.en.title.toLowerCase()}` : `مرشّحة لـ${use.ar.title}`;
+    }
+    case 'budget':
+      return lang === 'en'
+        ? `${w.price_iqd.toLocaleString('en-US')} IQD, within your budget`
+        : `${w.price_iqd.toLocaleString('en-US')} د.ع ضمن ميزانيتك`;
+    case 'direct':
+      return pick(lang, 'متوفرة الآن للبيع المباشر', 'in stock for direct sale now');
+    case 'beginner':
+      return pick(lang, 'مصنّفة للمبتدئين', 'rated for beginners');
+    case 'laser':
+      return w.watts
+        ? lang === 'en' ? `comes with a ${w.watts} W laser module` : `معها وحدة ليزر ${w.watts} واط`
+        : pick(lang, 'معها وحدة ليزر', 'comes with a laser module');
+    default:
+      return null;
+  }
+}
+
+/** The «لماذا هذه؟» line: the clauses joined in the customer's own answer order. */
+export function whySentence(why: readonly FinderWhy[] | undefined, lang: FinderLang): string | null {
+  const parts = (why ?? []).map((w) => whyClause(w, lang)).filter((x): x is string => !!x);
+  if (parts.length === 0) return null;
+  const body = parts.join(lang === 'en' ? '; ' : '، ');
+  return lang === 'en' ? `${body[0].toUpperCase()}${body.slice(1)}.` : `${body}.`;
 }

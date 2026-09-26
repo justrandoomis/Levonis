@@ -142,10 +142,19 @@ export default function FinderResults({
         .filter((r) => compareTypeOf(r.card as CardProduct) === type)
         .map((r) => {
           const p = r.card as CardProduct;
-          return { id: p.id, slug: p.slug || p.id, name: cardName(p), image: productPrimaryImage(p) || '' };
+          // The CONFIGURATION the finder chose («A1 Combo»), so the comparison
+          // opens on the machines it recommended, at the prices it quoted.
+          const v = r.variant ?? null;
+          const label = v ? (lang === 'en' ? v.label.en : v.label.ar || v.label.en) : '';
+          return {
+            id: v ? `${p.id}:${v.option_id}` : p.id,
+            slug: p.slug || p.id,
+            name: label ? `${cardName(p)} · ${label}` : cardName(p),
+            image: productPrimaryImage(p) || '',
+          };
         }),
     };
-  }, [results]);
+  }, [results, lang]);
   const compareAll = () => {
     if (!comparable.type || comparable.items.length < 2) return;
     compareTray.replaceAll(comparable.items, comparable.type);

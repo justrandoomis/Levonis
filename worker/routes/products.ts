@@ -1899,10 +1899,21 @@ export function communityAvailability(): SaleAvailability {
  * shown the surcharge here, exactly as the door will charge it.
  */
 export async function pricingCtx(c: Context<AppContext>): Promise<PricingCtx> {
-  const user = c.get('user');
+  return pricingCtxForUser(c.env.DB, c.get('user')?.id ?? null);
+}
+
+/**
+ * THE SAME CONTEXT FOR A NAMED CUSTOMER, when the request is not theirs.
+ *
+ * A trade-in's new device is priced for the CUSTOMER who will buy it — at an
+ * admin's approval and at the customer's Telegram «موافق» alike, neither of
+ * which is a request the customer's session made (worker/lib/tradeIn.ts).
+ * `pricingCtx` is this with the session's user, so there is one construction.
+ */
+export async function pricingCtxForUser(db: D1Database, userId: string | null): Promise<PricingCtx> {
   const [tierInfo, settings] = await Promise.all([
-    user ? pricingTierContext(c.env.DB, user.id) : Promise.resolve(null),
-    getSettings(c.env.DB, ['proPricingPolicy', 'preorderTransportDefaults']).catch(() => ({}) as Record<string, unknown>),
+    userId ? pricingTierContext(db, userId) : Promise.resolve(null),
+    getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults']).catch(() => ({}) as Record<string, unknown>),
   ]);
   const s = settings as Record<string, unknown>;
   /**
@@ -1912,7 +1923,7 @@ export async function pricingCtx(c: Context<AppContext>): Promise<PricingCtx> {
    * the hardcoded promise this whole system exists to remove. Both tables are
    * a few rows.
    */
-  const [benefitRules, ancestry] = await Promise.all([activeBenefitRules(c.env.DB), catalogAncestry(c.env.DB)]);
+  const [benefitRules, ancestry] = await Promise.all([activeBenefitRules(db), catalogAncestry(db)]);
   return {
     benefitRules,
     catalogAncestry: ancestry,
@@ -2246,7 +2257,7 @@ const MAX_LEVELS = 240;
  * warranty totals only (packages/pricing/src/pricing.ts:721) and cannot move a
  * unit price, and no level here carries a warranty plan.
  */
-function levelPrice(
+export function levelPrice(
   doc: ProductDoc,
   ctx: PricingCtx,
   offer: OfferView | null | undefined,
@@ -2311,6 +2322,63 @@ export function priceLevels(
   if (complete) for (const [o, c] of pairs) combo[`${o}|${c}`] = at(o, c);
 
   return { base: at(null, null), option, color, combo, complete };
+}
+
+/**
+ * «كل خيار آلة مختلفة» — THE PRICE OF EVERY WAY TO BUY A MACHINE, for the
+ * comparison and the printer finder, from the SAME resolver the product page
+ * paints `price_levels` with (`levelPrice`: per-field inheritance, the
+ * model's direct-sale cell, PRO policy, PRIME clamps, a live offer). Neither
+ * caller may do this arithmetic itself: a comparison that disagreed with the
+ * product page by one dinar would be a page whose whole job is «أي وحدة أشتري»
+ * quoting a price the cart does not charge.
+ *
+ * `rows` must be full `products` rows (SELECT *): the ladder reads the member
+ * and cost columns. Nothing from them is returned but prices and the options'
+ * public facts.
+ */
+export interface VariantPricing {
+  doc: ProductDoc;
+  /** The product priced with no option chosen. */
+  base: PriceLevel;
+  /** Every ACTIVE option, priced alone, in the admin's order. */
+  options: Array<{ option: ProductDoc['options'][number]; level: PriceLevel; available: number | null }>;
+}
+
+export async function resolveVariantPricing(
+  db: D1Database,
+  rows: Record<string, unknown>[],
+  ctx: PricingCtx
+): Promise<Map<string, VariantPricing>> {
+  const out = new Map<string, VariantPricing>();
+  if (rows.length === 0) return out;
+  const ids = rows.map((r) => String(r.id));
+  const [views, offers] = await Promise.all([
+    loadRelationsViews(db, rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))),
+    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(db, ids.map((id) => subjectOf(id))), EMPTY_OFFERS()),
+  ]);
+  const now = Date.now();
+  for (const r of rows) {
+    const id = String(r.id);
+    const view = views.get(id);
+    const doc = view ? applyRelations(parseProductRow(r), view) : parseProductRow(r);
+    const offer = offers.get(offerKey(subjectOf(id)));
+    const snap = view
+      ? snapshotFrom(view, { stock: doc.stock, reserved: Number(r.stock_reserved ?? 0), low_stock_threshold: null })
+      : null;
+    const options = doc.options
+      .filter((o) => o.active !== false)
+      .map((option) => {
+        const stock = snap ? resolveStock(snap, { option_value_ids: [option.id], color_id: null }) : null;
+        return {
+          option,
+          level: levelPrice(doc, ctx, offer, option.id, null, now),
+          available: stock && stock.tracked && stock.available !== null ? Math.max(0, stock.available) : null,
+        };
+      });
+    out.set(id, { doc, base: levelPrice(doc, ctx, offer, null, null, now), options });
+  }
+  return out;
 }
 
 /**

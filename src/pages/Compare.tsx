@@ -262,6 +262,22 @@ export default function Compare() {
 
   const removeId = useCallback((id: string) => setIds(ids.filter((v) => v !== id)), [ids, setIds]);
 
+  /**
+   * «بدون AMS / كومبو / ليزر» — the same machine in another configuration, in
+   * the same column. The slot key changes (`product:option`), so it is a push
+   * like every other change and back undoes it.
+   */
+  const switchVariant = useCallback(
+    (index: number, optionId: string) => {
+      const card = products[index];
+      if (!card) return;
+      const next = [...ids];
+      next[index] = slotKey(card.product_id ?? card.id, optionId);
+      setIds(next);
+    },
+    [ids, products, setIds]
+  );
+
   /** «انقل يمينًا / يسارًا»: one place toward the start (−1) or the end (+1). */
   const moveBy = useCallback(
     (index: number, delta: -1 | 1) => setIds(moveColumn(ids, index, delta)),
@@ -303,12 +319,18 @@ export default function Compare() {
     hadColumns.current = true;
     const type = products.find((p) => p.product_type)?.product_type ?? null;
     if (type !== 'printer' && type !== 'laser' && type !== 'filament') return;
+    // BY COLUMN, configuration included: «A1» and «A1 Combo» are two tray
+    // entries because they are two machines. A column that is the base
+    // configuration only because the URL named none stays a bare product id,
+    // so the product page's «قارن» toggle still recognises it.
     const seen = new Set<string>();
     const items = products.flatMap((p) => {
-      const id = p.product_id ?? p.id;
+      const id = p.default_option ? (p.product_id ?? p.id) : p.id;
       if (seen.has(id)) return [];
       seen.add(id);
-      return [{ id, slug: p.slug, name: columnName({ ...p, option: null }, 'en').split(' / ')[0], image: p.image ?? '' }];
+      const base = tri(p.name, 'en').split(' / ')[0];
+      const variant = p.option ? tri(p.option.label, 'en') : '';
+      return [{ id, slug: p.slug, name: variant && variant !== base ? `${base} · ${variant}` : base, image: p.image ?? '' }];
     });
     compareTray.replaceAll(items, type);
   }, [products, idsKey, loading, error]);
@@ -350,7 +372,12 @@ export default function Compare() {
     // 16px side gutters, and no bottom-nav padding: the shell already reserves
     // `.nav-clearance` after every route that renders the floating nav, and a
     // second reservation here would leave a dead band under the last section.
-    <div className="mx-auto w-full max-w-4xl px-4 pb-6" aria-busy={loading}>
+    // `overflow-x-clip`, not `hidden`: nothing on this page may widen the
+    // scroller (#main-scroll-container is `overflow-y: auto`, which makes its
+    // x-axis scrollable too, so a few pixels of overflow become a page that
+    // pans sideways — «إزاحة الكانفاس»). `clip` creates no scroll container,
+    // so the sticky header inside keeps sticking.
+    <div className="mx-auto w-full min-w-0 max-w-4xl overflow-x-clip px-4 pb-6" aria-busy={loading}>
       <header className="flex items-center gap-2 py-3">
         <button
           type="button"
@@ -532,6 +559,7 @@ export default function Compare() {
             wide={wide}
             onRemove={(i) => removeId(ids[i])}
             onMove={moveBy}
+            onVariant={switchVariant}
           />
           {copied ? (
             <p role="status" className="mt-2 text-center text-[12px] font-semibold text-[var(--color-text-muted)]">
@@ -546,12 +574,17 @@ export default function Compare() {
             </div>
           ) : null}
 
-          <details className="lv-section group rounded-[20px] border border-[var(--color-border-subtle)] bg-[var(--color-surface)] [&_summary::-webkit-details-marker]:hidden">
+          {/*
+            THE PANEL CLIPS ITS OWN CONTENT (`overflow-clip`, rounded) and sets
+            the bleed its rail may use to exactly its padding (0.75rem), so
+            opening it can never draw outside its frame or widen the page.
+          */}
+          <details data-compare-details className="lv-section group min-w-0 overflow-clip rounded-[20px] border border-[var(--color-border-subtle)] bg-[var(--color-surface)] [&_summary::-webkit-details-marker]:hidden">
             <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 text-[14px] font-bold text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] rounded-[20px]">
               {ls.details}
               <ChevronDown aria-hidden="true" className="h-5 w-5 text-[var(--color-text-muted)] transition-transform group-open:rotate-180 motion-reduce:transition-none" />
             </summary>
-            <div className="px-3 pb-4">
+            <div className="min-w-0 px-3 pb-4 [--rail-bleed:0.75rem]">
               <VerdictBand products={products} result={comparison} labels={labels} />
               <div className="lv-section">
                 <BasisNote result={comparison} />

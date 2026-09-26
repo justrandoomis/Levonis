@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check, Globe, ShieldCheck } from 'lucide-react';
+import { Check, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { tierLabel, tierMetaFor } from './subscription/tierMeta';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { Anchored } from './ui/Overlay';
+import LangThemeButton from './LangThemeSheet';
 import NotificationBell from './notifications/NotificationBell';
 import LiveSearch from './search/LiveSearch';
 
 export default function Header() {
-  const { lang, setLang, t, dir } = useLanguage();
+  const { t, dir } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,13 +32,8 @@ export default function Header() {
   const tierMeta = tierMetaFor(subTier);
 
 
-  const [isLangOpen, setIsLangOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // The language menu grows out of THIS button, so the primitive needs a handle
-  // on it: it reads the trigger's box once, on open, to point the panel's
-  // transform-origin at the control the person actually pressed.
-  const langButtonRef = useRef<HTMLButtonElement>(null);
   const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -152,84 +147,10 @@ export default function Header() {
               so it sits closest to the content it refers to. */}
           <NotificationBell />
 
-          {/* Language Toggle */}
-          <div>
-            <button
-              ref={langButtonRef}
-              type="button"
-              onClick={() => setIsLangOpen(!isLangOpen)}
-              aria-label={dir === 'rtl' ? 'تغيير اللغة' : 'Change language'}
-              aria-expanded={isLangOpen}
-              aria-haspopup="menu"
-              className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/95 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            >
-              <Globe className="w-5 h-5" strokeWidth={2} aria-hidden="true" />
-            </button>
-
-            {/* THE LANGUAGE MENU. It used to be a hand-rolled motion.div that
-                animated its own HEIGHT from 0 with an eased 200ms tween — an
-                unfolding blind, not a window, and a tween cannot be caught: a
-                second tap during the 200ms restarts from the top instead of
-                continuing from where the panel actually is.
-
-                `Anchored` is the right primitive here rather than `Overlay`.
-                This is not a task that takes the page over — it is three
-                radio-ish choices that belong to the globe button, so it must
-                stay welded to that button: no scrim and no page dimming. The
-                shared primitive portals past header/search clipping while it
-                still scales OUT OF the trigger (`anchor`), so the
-                relationship between the control and what it produced is
-                visible. Routing it through `Overlay` would have centred it in
-                the viewport and dimmed the store behind it, which is a much
-                heavier promise than picking a language deserves.
-
-                RTL: the old code branched on `dir` to pick left-0 vs right-0.
-                `align="end"` says the same thing logically — the menu hangs
-                from the trigger's trailing edge — and mirrors itself, so there
-                is no second rule to keep in sync for Arabic and Kurdish.
-
-                The primitive owns Escape and outside-mousedown dismissal, which
-                this menu never had; the geometry it does not own (its 8rem
-                width, and the overflow clip that keeps the first and last rows
-                inside the corner radius) stays here in className. */}
-            <Anchored
-              open={isLangOpen}
-              onClose={() => setIsLangOpen(false)}
-              anchor={langButtonRef}
-              align="end"
-              label={dir === 'rtl' ? 'تغيير اللغة' : 'Change language'}
-              testId="header-language-menu"
-              className="w-36 p-1"
-            >
-              {/* role=menuitem to match the role=menu the primitive supplies —
-                  the trigger already advertised aria-haspopup="menu", so this
-                  finishes a pairing the old markup only half-declared. */}
-              {([
-                ['en', 'English'],
-                ['ar', 'العربية'],
-                ['ckb', 'کوردی'],
-              ] as const).map(([code, label]) => {
-                const selected = lang === code;
-                return (
-                  <button
-                    key={code}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={selected}
-                    onClick={() => { setLang(code); setIsLangOpen(false); }}
-                    className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 text-start text-sm transition-colors ${
-                      selected
-                        ? 'bg-white/[0.07] font-bold text-text-primary'
-                        : 'text-text-secondary hover:bg-white/[0.04] hover:text-text-primary'
-                    }`}
-                  >
-                    <span>{label}</span>
-                    <Check className={`h-4 w-4 text-gold transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
-                  </button>
-                );
-              })}
-            </Anchored>
-          </div>
+          {/* «اللغة والمظهر» — the globe opens one bottom sheet with two rows,
+              the language and the appearance (src/components/LangThemeSheet.tsx).
+              It replaced a language-only dropdown. */}
+          <LangThemeButton variant="home" />
 
           {/* Subscription Button — the plans page is browsable signed out now,
               so a guest goes straight to it. Sending them through /auth first

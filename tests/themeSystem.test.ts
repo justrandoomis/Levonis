@@ -39,7 +39,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildBlock, currentBlock, contrast, parseColor, rgbToOklch, SEMANTIC, TONES, IVORY, PAPER } from '../scripts/theme-tokens.mjs';
 import { THEME_BOOT_SCRIPT, THEME_BOOT_SCRIPT_HASH, spaCsp } from '../worker/lib/securityPolicy';
-import { THEME_STORAGE_KEY, THEME_COLOR, DEFAULT_THEME_PREFERENCE, resolveTheme } from '../src/lib/theme';
+import { THEME_STORAGE_KEY, THEME_COLOR, DEFAULT_THEME_PREFERENCE, resolveTheme, initTheme, setThemePreference, CENTER_REVEAL_MS } from '../src/lib/theme';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -226,4 +226,121 @@ test('a merchant storefront keeps its own theme inside a light app', () => {
   assert.match(block, /\[data-store-theme\]\{color-scheme:dark;/, 'the storefront is not restored to its dark values');
   const sf = read('src/components/storefront/theme.css');
   assert.match(sf, /\[data-store-theme\]\s*\{/);
+});
+
+/**
+ * «عند اختيار مظهر فاتح يتم إنزال النافذة بشكل سلس للأسفل وبعدها يظهر التغيير
+ *  السلس بهدوء من منتصف الشاشة كبقعة وتتمدد كدائرة شيئا فشيئا».
+ *
+ * The header sheet asks for `{ origin: 'center' }`. Driven here against a
+ * stubbed document, so what is pinned is the behaviour, not the spelling:
+ * never on the first paint, never under reduced motion, a circle from the
+ * middle of the viewport at the calm duration, and nothing at all when the
+ * choice paints the theme already on screen.
+ */
+test('the centre reveal: after the first paint, not under reduced motion, from the middle, calm', async () => {
+  const g = globalThis as Record<string, unknown>;
+  const saved = { window: g.window, document: g.document, requestAnimationFrame: g.requestAnimationFrame };
+  const attrs = new Map<string, string>([['data-theme', 'light']]);
+  const classes = new Set<string>();
+  const animations: Array<{ kf: Record<string, string[]>; opts: Record<string, unknown> }> = [];
+  let transitions = 0;
+  let reduce = false;
+  let deviceDark = false;
+  const frames: Array<() => void> = [];
+  const root = {
+    getAttribute: (k: string) => attrs.get(k) ?? null,
+    setAttribute: (k: string, v: string) => void attrs.set(k, v),
+    style: {} as Record<string, string>,
+    classList: {
+      add: (...c: string[]) => c.forEach((x) => classes.add(x)),
+      remove: (...c: string[]) => c.forEach((x) => classes.delete(x)),
+    },
+    animate: (kf: Record<string, string[]>, opts: Record<string, unknown>) => void animations.push({ kf, opts }),
+  };
+  g.window = {
+    matchMedia: (q: string) => ({
+      matches: q.includes('reduced-motion') ? reduce : q.includes('dark') ? deviceDark : false,
+      addEventListener() {},
+    }),
+    localStorage: { getItem: () => null, setItem() {} },
+    addEventListener() {},
+    innerWidth: 1000,
+    innerHeight: 800,
+    setTimeout: (fn: () => void) => setTimeout(fn, 0),
+  };
+  g.document = {
+    documentElement: root,
+    querySelector: () => null,
+    visibilityState: 'visible',
+    activeElement: null,
+    body: {},
+    startViewTransition: (update: () => void) => {
+      transitions++;
+      update();
+      return { ready: Promise.resolve(), finished: Promise.resolve() };
+    },
+  };
+  g.requestAnimationFrame = (cb: () => void) => void frames.push(cb);
+  const tick = () => frames.splice(0).forEach((f) => f());
+  try {
+    initTheme();
+    // FIRST PAINT: a change before two frames have painted is applied plainly.
+    setThemePreference('dark', { origin: 'center', duration: CENTER_REVEAL_MS });
+    assert.equal(attrs.get('data-theme'), 'dark');
+    assert.equal(transitions, 0, 'animated before the first paint');
+    tick();
+    tick();
+
+    // REDUCED MOTION: instant.
+    reduce = true;
+    setThemePreference('light', { origin: 'center' });
+    assert.equal(attrs.get('data-theme'), 'light');
+    assert.equal(transitions, 0, 'animated under reduced motion');
+    reduce = false;
+
+    // THE CENTRE: a circle from the middle of the viewport, 800ms, ease-in-out.
+    setThemePreference('dark', { origin: 'center', duration: CENTER_REVEAL_MS });
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(transitions, 1);
+    assert.equal(attrs.get('data-theme'), 'dark');
+    const reveal = animations.at(-1)!;
+    const radius = Math.hypot(500, 400);
+    assert.deepEqual(reveal.kf.clipPath, ['circle(0px at 500px 400px)', `circle(${radius}px at 500px 400px)`]);
+    assert.equal(reveal.opts.duration, CENTER_REVEAL_MS);
+    assert.ok(CENTER_REVEAL_MS >= 700 && CENTER_REVEAL_MS <= 900, 'the owner asked for a calm reveal');
+    assert.match(String(reveal.opts.easing), /cubic-bezier\(0\.65, 0, 0\.35, 1\)/, 'the centre reveal is ease-in-out');
+    assert.equal(reveal.opts.pseudoElement, '::view-transition-new(root)');
+
+    // «حسب الجهاز» that resolves to the theme on screen: nothing moves.
+    deviceDark = true;
+    setThemePreference('system', { origin: 'center' });
+    assert.equal(transitions, 1, 'a same-theme choice animated');
+
+    // A TAP keeps its origin and the quick reveal (Settings).
+    setThemePreference('light', { x: 10, y: 20 });
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(transitions, 2);
+    const tap = animations.at(-1)!;
+    assert.equal(tap.kf.clipPath[0], 'circle(0px at 10px 20px)');
+    assert.equal(tap.opts.duration, 480);
+
+    // A HIDDEN TAB: instant.
+    (g.document as { visibilityState: string }).visibilityState = 'hidden';
+    setThemePreference('dark', { origin: 'center' });
+    assert.equal(transitions, 2, 'animated in a hidden tab');
+  } finally {
+    g.window = saved.window;
+    g.document = saved.document;
+    g.requestAnimationFrame = saved.requestAnimationFrame;
+  }
+});
+
+test('the centre reveal has a calm cross-fade without View Transitions, and nothing under reduced motion', () => {
+  const src = read('src/lib/theme.ts');
+  assert.match(src, /export interface ThemeSwitchOptions \{[\s\S]{0,120}origin\?: ThemeOrigin \| 'center' \| null;[\s\S]{0,40}duration\?: number;/);
+  assert.match(src, /lv-theme-fading--calm/);
+  const css = read('src/index.css');
+  assert.match(css, /html\.lv-theme-fading--calm,/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*html\.lv-theme-fading,/);
 });

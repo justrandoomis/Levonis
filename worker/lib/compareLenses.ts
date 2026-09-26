@@ -28,6 +28,7 @@
 import type { CompareLens, CompareLensId } from '@levonis/catalog/discoveryTypes';
 import { compareProducts, readBoolean, readNumber, type CompareInputProduct, type CompareResult } from './compareSpecs';
 import { easeRaw, techGroup, valueText, volumeOf } from './printerFinder';
+import { colorFit, multicolorProfile } from './multicolor';
 
 export const LENS_MARGIN = 0.05;
 export const LENS_ORDER: CompareLensId[] = ['business', 'beginners', 'value', 'multicolor', 'precision'];
@@ -186,9 +187,22 @@ export function compareLenses(products: CompareInputProduct[], result: Pick<Comp
     return { code: 'value', field_id: 'price_iqd', value_text: `${price.toLocaleString('en-US')} IQD` };
   };
 
-  // multicolor — max colours, extruders settle a near tie.
-  const colors = specs.map((s) => num(s, 'max_colors'));
-  const extruders = specs.map((s) => num(s, 'extruders'));
+  // multicolor — colour as three facts (worker/lib/multicolor.ts): colours
+  // without filament swaps, the purge waste, and the AMS ceiling. The ceiling
+  // alone crowned 25 swaps through one nozzle over four independent toolheads;
+  // the balanced fit ranks the machine that prints several colours cleanly
+  // first, and the AMS ceiling settles a near tie.
+  const profiles = specs.map((s) => multicolorProfile(s));
+  const colors = profiles.map((p) => colorFit(p, null));
+  const ceiling = profiles.map((p) => p.with_ams);
+  const colorReason = (i: number): CompareLens['reason'] => {
+    const p = profiles[i];
+    const multiHead = p.method === 'dual_nozzle' || p.method === 'tool_changer' || p.method === 'multi_nozzle';
+    if (multiHead && p.native !== null && p.native >= 2) {
+      return claim(specs[i], 'colors', ['max_colors_native', 'max_colors']);
+    }
+    return claim(specs[i], 'colors', ['max_colors', 'colors_out_of_box']);
+  };
 
   // precision — finest layer and Z accuracy (resin: XY), as ratios to the finest.
   const isResin = products.map((p, i) => techGroup({ productType: p.product_type === 'laser' ? 'laser' : 'printer', specs: specs[i], sectionSlugs: p.section_slugs ?? [] }) === 'resin');
@@ -201,7 +215,7 @@ export function compareLenses(products: CompareInputProduct[], result: Pick<Comp
     business: lens('business', business, businessReason),
     beginners,
     value: lens('value', perDinar, valueReason),
-    multicolor: lens('multicolor', colors, (i) => claim(specs[i], 'colors', ['max_colors']), extruders),
+    multicolor: lens('multicolor', colors, colorReason, ceiling),
     precision: lens('precision', precision, (i) => claim(specs[i], 'quality', isResin[i] ? ['xy_resolution', 'z_accuracy'] : ['min_layer_height', 'z_accuracy'])),
   };
   return LENS_ORDER.map((id) => all[id]);

@@ -277,18 +277,23 @@ test('the two new pages exist, are routed, and state their own empty cases', () 
   assert.match(used, /<EmptyState/);
   assert.match(used, /data-used-printers-page/);
 
-  const trade = read('src/pages/TradeIn.tsx');
+  const trade = read('src/pages/TradeIn.tsx') + read('src/components/tradeIn/TradeInWizard.tsx');
   /**
    * THE FORM MUST REACH SOMETHING REAL. A trade-in page whose submit button
-   * resolves to a toast is worse than one that says «قريبًا», so the POST and
-   * the server's required confirmation flag are pinned here: if the endpoint
-   * is ever removed from the call, this fails rather than the customer finding
-   * out months later that nobody ever received their request.
+   * resolves to a toast is worse than one that says «قريبًا». It used to file
+   * a support ticket because no trade-in endpoint existed; migration 0143 and
+   * worker/routes/tradeIn.ts are that endpoint now, so the draft, the submit
+   * and the device list are pinned here: if any of them is dropped from the
+   * wizard, this fails rather than the customer finding out months later that
+   * nobody ever received their request.
    */
-  assert.match(trade, /api\.post<[^>]*>\('\/api\/support\/tickets'/);
-  assert.match(trade, /confirm: true/);
+  assert.match(trade, /api\.post<[^>]*>\('\/api\/trade-in\/requests'/);
+  assert.match(trade, /\/api\/trade-in\/requests\/\$\{req\.id\}\/submit/);
+  assert.match(trade, /\/api\/trade-in\/eligible/);
   assert.match(trade, /data-trade-in-form/);
   assert.match(trade, /data-trade-in-review/);
+  // The estimate is never presented as the price.
+  assert.match(trade, /تقدير أولي — القيمة النهائية بعد الفحص/);
 });
 
 test('resolve gives every service slot a url and its link', () => {

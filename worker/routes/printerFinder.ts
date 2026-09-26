@@ -32,7 +32,8 @@ import { FINDER_BUDGETS, encodePairs, finderParamPairs, parseFinderParams } from
 import type { FinderMeta, FinderResponse } from '@levonis/catalog/discoveryTypes';
 import { catalogIndexFor, productTypeOf } from '../lib/catalogPresentation';
 import { hasLaserModule, runFinder, techGroup, type FinderCandidate } from '../lib/printerFinder';
-import { pricingCtx, resolveProductCards } from './products';
+import { pricingCtx, resolveProductCards, resolveVariantPricing } from './products';
+import { multicolorBadge, multicolorProfile, variantSheet } from '../lib/multicolor';
 import { hasAnySpec } from './compare';
 
 export const printerFinderRoutes = new Hono<AppContext>();
@@ -73,45 +74,93 @@ async function loadCandidates(c: Context<AppContext>): Promise<Loaded> {
     if (!specs || typeof specs !== 'object' || Array.isArray(specs) || !hasAnySpec(specs)) continue;
     machines.push({ row, type, specs });
   }
-  const cards = await resolveProductCards(db, machines.map((m) => m.row), ctx, idx);
+  const machineRows = machines.map((m) => m.row);
+  const [cards, pricing] = await Promise.all([
+    resolveProductCards(db, machineRows, ctx, idx),
+    resolveVariantPricing(db, machineRows, ctx),
+  ]);
   const regular = new Map<string, number>();
-  const candidates = machines.map((m, rank) => {
+  /**
+   * EVERY WAY TO BUY A MACHINE IS A CANDIDATE. «A1» (one colour) and «A1
+   * Combo» (four, with the AMS lite in the box) are two machines at two
+   * prices, and a budget or a colour answer can be met by one and not the
+   * other. Each configuration carries its own sheet (`variantSheet`: the
+   * product's, then the option's allow-listed differences) and its own price
+   * from the product page's resolver; `runFinder` then shows the best one per
+   * printer. A product with no options is one candidate, as before.
+   */
+  const candidates: FinderCandidate<Record<string, unknown>>[] = [];
+  machines.forEach((m, rank) => {
     const id = String(m.row.id);
     const card = cards.get(id) ?? {};
-    const price = Number(card.display_price_iqd ?? m.row.price_iqd) || 0;
-    regular.set(id, Number(card.display_regular_iqd ?? m.row.price_iqd) || 0);
+    const productAvailable = Math.max(0, Number(card.direct_stock_available ?? 0) || 0);
     const leaf = String(m.row.sub_category_id || m.row.category_id || '');
-    return {
-      id,
-      card,
-      productType: m.type,
-      price,
-      available: Math.max(0, Number(card.direct_stock_available ?? 0) || 0),
-      sectionSlugs: leaf ? idx.branch(leaf).map((n) => n.slug) : [],
-      specs: m.specs,
-      rank,
-    };
+    const sectionSlugs = leaf ? idx.branch(leaf).map((n) => n.slug) : [];
+    const variants = pricing.get(id)?.options ?? [];
+    if (variants.length === 0) {
+      const price = Number(card.display_price_iqd ?? m.row.price_iqd) || 0;
+      regular.set(id, Number(card.display_regular_iqd ?? m.row.price_iqd) || 0);
+      const specs = variantSheet(m.specs, null);
+      candidates.push({ id, productId: id, card: withMulticolor(card, specs), productType: m.type, price, available: productAvailable, sectionSlugs, specs, rank, variant: null });
+      return;
+    }
+    for (const v of variants) {
+      const key = `${id}:${v.option.id}`;
+      const specs = variantSheet(m.specs, v.option);
+      // The viewer-independent figure for /meta: the regular rung plus the
+      // same direct-sale premium the applied price carries.
+      regular.set(key, v.level.regular_iqd + (v.level.unit_subtotal_iqd - v.level.applied_iqd));
+      candidates.push({
+        id: key,
+        productId: id,
+        card: withMulticolor(card, specs),
+        productType: m.type,
+        price: v.level.unit_subtotal_iqd,
+        // The model's own shelf when it is tracked; the product's otherwise.
+        available: productAvailable > 0 ? (v.available ?? productAvailable) : 0,
+        sectionSlugs,
+        specs,
+        rank,
+        variant: {
+          option_id: v.option.id,
+          label: {
+            ar: v.option.name_ar || v.option.name_en,
+            en: v.option.name_en || v.option.name_ar,
+            ckb: v.option.name_ckb || v.option.name_ar || v.option.name_en,
+          },
+          price_iqd: v.level.unit_subtotal_iqd,
+          others: variants.length - 1,
+        },
+      });
+    }
   });
   return { candidates, regular };
+}
+
+/** The card plus what its configuration does with colour, as codes (the page writes the words). */
+function withMulticolor(card: Record<string, unknown>, specs: Record<string, unknown>): Record<string, unknown> {
+  return { ...card, multicolor: multicolorBadge(multicolorProfile(specs)) };
 }
 
 printerFinderRoutes.get('/meta', async (c) => {
   await rateLimit(c, 'finder-read', 120, 60);
   const { candidates, regular } = await loadCandidates(c);
   const printers = candidates.filter((x) => x.productType === 'printer');
+  // Counted per PRINTER: a product counts once when any configuration of it matches.
+  const products = (list: typeof candidates) => new Set(list.map((x) => x.productId ?? x.id)).size;
   const techs = {
-    fdm: printers.filter((x) => techGroup(x) === 'fdm').length,
-    resin: printers.filter((x) => techGroup(x) === 'resin').length,
-    laser: candidates.filter((x) => x.productType === 'laser' || hasLaserModule(x.specs)).length,
+    fdm: products(printers.filter((x) => techGroup(x) === 'fdm')),
+    resin: products(printers.filter((x) => techGroup(x) === 'resin')),
+    laser: products(candidates.filter((x) => x.productType === 'laser' || hasLaserModule(x.specs))),
   };
   const budgets = Object.entries(FINDER_BUDGETS).map(([range, r]) => ({
     range,
-    count: printers.filter((x) => {
+    count: products(printers.filter((x) => {
       const p = regular.get(x.id) ?? x.price;
       return p >= r.min && (r.max === null || p <= r.max);
-    }).length,
+    })),
   }));
-  const body: FinderMeta = { success: true, techs, budgets, total: printers.length };
+  const body: FinderMeta = { success: true, techs, budgets, total: products(printers) };
   const res = c.json(body);
   // Regular prices only, so every viewer sees the same numbers.
   res.headers.set('Cache-Control', 'public, max-age=60, s-maxage=300');

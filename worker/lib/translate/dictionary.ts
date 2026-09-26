@@ -592,6 +592,29 @@ export const PHRASES: Record<string, TermEntry> = {
   'multicolour': { ar: 'متعدد الألوان' },
   'education': { ar: 'تعليم' },
 
+  // ------------------------------------------------- owner round 11
+  // The printer's colour facts and the per-option ones (worker/lib/multicolor.ts).
+  // ARABIC ONLY, by the same honesty rule: no Sorani is recorded, so these stay
+  // English and `review_needed` for ckb until a native speaker writes them.
+  // OWNER: Sorani to be written by hand.
+  'maximum colours (with ams units)': { ar: 'أقصى عدد ألوان (مع وحدات AMS)' },
+  'multi-colour method': { ar: 'طريقة تعدد الألوان' },
+  'single nozzle + ams': { ar: 'نوزل واحد + AMS' },
+  'dual nozzle': { ar: 'نوزلان' },
+  'tool changer': { ar: 'رؤوس طباعة مستقلة' },
+  'multi-nozzle (hotend changer)': { ar: 'عدة نوزلات (تبديل الهوت إند)' },
+  'colours without filament swaps': { ar: 'ألوان بلا تبديل فلامنت' },
+  'purge waste on colour change': { ar: 'هدر الفلامنت عند تغيير اللون' },
+  'near zero': { ar: 'شبه معدوم' },
+  'low': { ar: 'قليل' },
+  'high': { ar: 'عالٍ' },
+  'multi-material in one print': { ar: 'مواد مختلفة في طبعة واحدة' },
+  'colours as sold': { ar: 'ألوان جاهزة كما تُباع' },
+  'ams units in the box': { ar: 'وحدات AMS في العلبة' },
+  'included laser module': { ar: 'وحدة الليزر المرفقة' },
+  'cutting / pen module': { ar: 'وحدة القص والقلم' },
+  'per-option spec differences': { ar: 'مواصفات تختلف حسب الخيار' },
+
   // ---------------------------------------------------------------- 0102
   // THE LASER LINE'S VOCABULARY. «إضافة قسم جديد وهو قسم الليزر بجانب طابعات
   // الفلامنت والرزن … وكذلك اضافه مواد الطباعه بجانب الفلمنت والرزن … مواد

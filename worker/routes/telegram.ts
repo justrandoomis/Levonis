@@ -15,6 +15,7 @@ import {
 } from '../lib/http';
 import { sha256Hex, randomToken, timingSafeEqual } from '../lib/crypto';
 import { handlePriceAdjustCallback, isPriceCallbackData, type PriceCallback } from '../lib/orderPriceAdjust';
+import { handleTradeInCallback, isTradeInCallbackData, type TradeInCallback } from '../lib/tradeIn';
 import { normalizePhone, phonesMatch, maskPhone } from '../lib/phone';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
@@ -546,6 +547,12 @@ async function handleUpdate(env: Env, update: TgUpdate): Promise<void> {
     // Owner binding and replay safety live in worker/lib/orderPriceAdjust.ts.
     if (isPriceCallbackData(cb.data)) {
       await handlePriceAdjustCallback(env, cb as PriceCallback);
+      return;
+    }
+    // «أوافق على القيمة» / «أرفض» on a trade-in whose value an admin changed
+    // (0143). Owner binding and the offer number live in worker/lib/tradeIn.ts.
+    if (isTradeInCallbackData(cb.data)) {
+      await handleTradeInCallback(env, cb as TradeInCallback);
       return;
     }
     await handleAdminActionCallback(env, cb as CallbackQueryInput);

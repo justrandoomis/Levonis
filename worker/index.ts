@@ -33,6 +33,7 @@ import { robotsRoute, sitemapRoute } from './routes/seo';
 import { miscRoutes } from './routes/misc';
 import { adminRoutes } from './routes/admin';
 import { adminOrderPriceRoutes, orderPriceRoutes } from './routes/orderPriceAdjust';
+import { adminTradeInRoutes, tradeInRoutes } from './routes/tradeIn';
 import { adminProductsRoutes } from './routes/adminProducts';
 import { templateRoutes } from './routes/template';
 import { mediaRoutes } from './routes/media';
@@ -273,6 +274,10 @@ app.route('/api/orders', orderRoutes);
 // proposal on one order's price. Their own routers, beside their siblings.
 app.route('/api/orders', orderPriceRoutes);
 app.route('/api/admin/orders', adminOrderPriceRoutes);
+// «الاستبدال» (0143): a delivered LEVONIS device traded against a new one —
+// the customer's wizard and requests, and the admin's review and rules.
+app.route('/api/trade-in', tradeInRoutes);
+app.route('/api/admin/trade-in', adminTradeInRoutes);
 app.route('/api/addresses', addressRoutes);
 app.route('/api/wallet', walletRoutes);
 app.route('/api/rewards', rewardRoutes);

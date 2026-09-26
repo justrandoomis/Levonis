@@ -273,6 +273,7 @@ interface CouponRow {
   max_global: number | null;
   max_per_user: number;
   active: number;
+  assigned_user_id: string | null;
 }
 
 /**
@@ -289,6 +290,12 @@ export async function validateCoupon(env: Env, userId: string, code: string, tot
     .bind(normalized)
     .first<CouponRow>();
   if (!coupon) return { ok: false, reason: 'CODE_NOT_FOUND' };
+  // A PERSONAL COUPON IS SOMEONE ELSE'S CODE TO EVERYONE ELSE. 0077 added
+  // `assigned_user_id` ("one named customer") and nothing redeemed against it;
+  // the first coupons to set it are the trade-in credits (0143), each worth a
+  // used printer. Answered exactly as an unknown code, so a prober learns
+  // nothing about whose it is.
+  if (coupon.assigned_user_id && coupon.assigned_user_id !== userId) return { ok: false, reason: 'CODE_NOT_FOUND' };
   if (!coupon.active) return { ok: false, reason: 'INACTIVE' };
 
   const nowMs = Date.now();

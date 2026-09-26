@@ -1,8 +1,10 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useEffect, useRef } from 'react';
 import { FINDER_LEVELS, FINDER_PRIORITIES, FINDER_SALES, FINDER_USES } from '../../lib/finder/answers';
+import { Leaf, Palette } from 'lucide-react';
 import type {
   FinderAnswers,
   FinderBudget,
+  FinderColorNeed,
   FinderLevel,
   FinderPriority,
   FinderSale,
@@ -15,6 +17,8 @@ import ChoiceRows, { type RowOption } from './ChoiceRows';
 import BudgetOptions from './BudgetOptions';
 import { LEVEL_ICON, PRIORITY_ICON, SALE_ICON, TECH_ICON, USE_ICON } from './icons';
 import {
+  COLOR_NEED_COPY,
+  colorNeedQuestion,
   LEVEL_COPY,
   PRIORITY_COPY,
   SALE_COPY,
@@ -66,11 +70,59 @@ interface Props {
   onSingle: (key: StepKey, value: string, viaPointer: boolean) => void;
   onPriority: (p: FinderPriority) => void;
   priorityRefused: boolean;
+  /** The «أي نوع من تعدد الألوان؟» follow-up. */
+  onColorNeed?: (need: FinderColorNeed, viaPointer: boolean) => void;
+}
+
+/**
+ * «ألوان متعددة» — WHICH multi-colour, asked right under the answer that made
+ * colour matter (the «طباعة متعددة الألوان» tile, or «تعدد الألوان» among the
+ * priorities). A tool changer and a single nozzle with an AMS both print in
+ * colour; only this answer tells the ranking which the customer means.
+ */
+function ColorNeedFollowUp({
+  value,
+  lang,
+  onChoose,
+}: {
+  value: FinderColorNeed | null;
+  lang: FinderLang;
+  onChoose: (need: FinderColorNeed, viaPointer: boolean) => void;
+}) {
+  const q = colorNeedQuestion(lang);
+  // Revealed by a tap on the tile above: bring it into view, or on a phone it
+  // opens below the fold and the finder looks stuck.
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    box.current?.scrollIntoView?.({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  }, []);
+  return (
+    <div ref={box} data-finder-followup="mc" className="mt-5 rounded-[20px] border border-border-subtle bg-surface-raised p-3.5 sm:p-4">
+      <h2 id="finder-q-mc" className="text-[16px] font-extrabold leading-[22px] text-text-primary">
+        {q.title}
+      </h2>
+      <p className="mt-1 text-[12.5px] leading-5 text-text-secondary">{q.helper}</p>
+      <div className="mt-3">
+        <ChoiceRows<FinderColorNeed>
+          labelledBy="finder-q-mc"
+          mode="single"
+          selected={value ? [value] : []}
+          onChoose={(v, p) => onChoose(v, p)}
+          options={(['few', 'many'] as FinderColorNeed[]).map((k) => ({
+            value: k,
+            ...optionCopy(COLOR_NEED_COPY, k, lang),
+            Icon: k === 'few' ? Leaf : Palette,
+          }))}
+        />
+      </div>
+    </div>
+  );
 }
 
 /** One question: its title (focus lands here), helper, and options. */
 const FinderStep = forwardRef<HTMLHeadingElement, Props>(function FinderStep(
-  { stepKey, answers, meta, lang, onSingle, onPriority, priorityRefused },
+  { stepKey, answers, meta, lang, onSingle, onPriority, priorityRefused, onColorNeed },
   headingRef
 ) {
   const q = question(stepKey, lang);
@@ -79,14 +131,20 @@ const FinderStep = forwardRef<HTMLHeadingElement, Props>(function FinderStep(
   const helperId = `finder-h-${stepKey}`;
 
   let body: React.ReactNode = null;
+  const followUp = onColorNeed ? (
+    <ColorNeedFollowUp value={answers.mc ?? null} lang={lang} onChoose={onColorNeed} />
+  ) : null;
   if (stepKey === 'use') {
     body = (
-      <ChoiceTiles<FinderUse>
-        labelledBy={headingId}
-        value={answers.use}
-        onChoose={(v, p) => onSingle('use', v, p)}
-        options={FINDER_USES.map((u) => ({ value: u, ...optionCopy(USE_COPY, u, lang), Icon: USE_ICON[u], wide: u === 'unsure' }))}
-      />
+      <>
+        <ChoiceTiles<FinderUse>
+          labelledBy={headingId}
+          value={answers.use}
+          onChoose={(v, p) => onSingle('use', v, p)}
+          options={FINDER_USES.map((u) => ({ value: u, ...optionCopy(USE_COPY, u, lang), Icon: USE_ICON[u], wide: u === 'unsure' }))}
+        />
+        {answers.use === 'multicolor' ? followUp : null}
+      </>
     );
   } else if (stepKey === 'tech') {
     body = (
@@ -131,6 +189,7 @@ const FinderStep = forwardRef<HTMLHeadingElement, Props>(function FinderStep(
         >
           {(answers.prio?.length ?? 0) >= 2 ? ui.priorityFull : ''}
         </p>
+        {(answers.prio ?? []).includes('colors') && answers.use !== 'multicolor' ? followUp : null}
       </>
     );
   } else if (stepKey === 'level') {

@@ -8,6 +8,7 @@ import {
   fetchCandidates,
   tri,
   type CompareLang,
+  type CompareOptionChoice,
   type CompareProductCard,
 } from '../../lib/compare';
 import { compareStrings, type CompareStrings } from './strings';
@@ -98,31 +99,35 @@ function OptionSheet({
           </div>
           <p className="mt-1 text-[12px] leading-5 text-[var(--color-text-secondary)]">{s.optionBody}</p>
 
+          {/*
+            EVERY CONFIGURATION, PRICED, the base one first and marked. The
+            base is the cheapest way to buy (the shop's rule), and choosing it
+            adds the bare product — which the page resolves to that same
+            configuration — so a tray entry from a listing and one from here
+            are the same column.
+          */}
           <ul className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto">
-            <li>
-              <button
-                type="button"
-                onClick={() => onPick(null)}
-                className="lv-choice w-full p-3 text-start"
-              >
-                <span className="block text-[13px] font-bold text-[var(--color-text-primary)]">
-                  {s.optionBase}
-                </span>
-                <span className="mt-0.5 block text-[11px] text-[var(--color-text-muted)]">
-                  {s.optionBaseNote}
-                </span>
-              </button>
-            </li>
-            {options.map((option) => (
+            {orderedOptions(options).map((option, i) => (
               <li key={option.id}>
                 <button
                   type="button"
-                  onClick={() => onPick(option.id)}
-                  className="lv-choice w-full p-3 text-start"
+                  data-option-choice={option.id}
+                  onClick={() => onPick(i === 0 ? null : option.id)}
+                  className="lv-choice flex w-full items-center justify-between gap-3 p-3 text-start"
                 >
-                  <span className="block text-[13px] font-bold text-[var(--color-text-primary)]">
-                    {tri(option.label, l)}
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-bold text-[var(--color-text-primary)] [overflow-wrap:anywhere]">
+                      {tri(option.label, l)}
+                    </span>
+                    {i === 0 ? (
+                      <span className="mt-0.5 block text-[11px] text-[var(--color-text-muted)]">{s.optionBase}</span>
+                    ) : null}
                   </span>
+                  {typeof option.price_iqd === 'number' && option.price_iqd > 0 ? (
+                    <bdi dir="ltr" className="shrink-0 text-[13px] font-extrabold tabular-nums text-[var(--color-text-primary)]">
+                      {option.price_iqd.toLocaleString('en-US')}
+                    </bdi>
+                  ) : null}
                 </button>
               </li>
             ))}
@@ -131,6 +136,16 @@ function OptionSheet({
       ) : null}
     </Sheet>
   );
+}
+
+/** The base (cheapest) configuration first, then the admin's order — the same rule the page resolves a bare id with. */
+function orderedOptions(options: CompareOptionChoice[]): CompareOptionChoice[] {
+  let base = 0;
+  options.forEach((o, i) => {
+    const p = o.price_iqd ?? Infinity;
+    if (p < (options[base].price_iqd ?? Infinity)) base = i;
+  });
+  return options.length ? [options[base], ...options.filter((_, i) => i !== base)] : options;
 }
 
 /**

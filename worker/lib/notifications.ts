@@ -91,6 +91,12 @@ export type NotificationKind =
    */
   | 'chat_message'
   /**
+   * «الاستبدال» — a trade-in request moved (submitted, valued, a new value
+   * waiting for the customer's decision, ready to pay, completed, cancelled).
+   * worker/lib/tradeIn.ts; the link opens the request at /trade-in.
+   */
+  | 'trade_in'
+  /**
    * THE MERCHANT'S KINDS (docs/MERCHANT_PLATFORM.md §4.8, stream W2-E). Each
    * is written by worker/lib/merchantNotify.ts from the real event it names,
    * links to its object's workspace address (packages/contracts/src/
@@ -141,6 +147,8 @@ export interface NotificationInput {
     | 'request' | 'offer' | 'order' | 'review' | 'product' | 'ticket' | 'complaint' | 'claim' | 'chat'
     // The merchant kinds' objects (W2-E): a custom order, a coupon, a payout, the store itself.
     | 'custom_order' | 'coupon' | 'payout' | 'store'
+    // 0143 — a trade-in request, with 'trade_in' above.
+    | 'trade_in'
     | '';
   entity_id?: string;
   meta?: Record<string, unknown>;

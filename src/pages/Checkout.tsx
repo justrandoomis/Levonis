@@ -9,7 +9,7 @@ import {
   ArrowLeft, ArrowRight, Truck, Store,
   CreditCard, Wallet, Banknote,
   Check, Sparkles, MapPin, AlertCircle,
-  Lock, CheckCircle2, Plus, Receipt, ShoppingCart, CalendarClock, Tag
+  Lock, CheckCircle2, Plus, Receipt, ShoppingCart, CalendarClock, Tag, Info
 } from 'lucide-react';
 import ProAddressNotice from '../components/membership/ProAddressNotice';
 import { useWallet } from '../WalletContext';
@@ -1403,6 +1403,19 @@ export default function Checkout() {
     if (isGiniMethod && !giniOrderNoValid) return S.giniOrderNoBlock;
     if (shippingNeedsConfig) return S.needsConfig;
     if (!consentSatisfied) return S.policyRequired;
+    /**
+     * The full-advance method with a short balance is not the printer-advance
+     * refusal (`S.blockAdvance` sends the customer to store pickup). It is the
+     * owner's own case — «لديه في الرصيد عشرين ألف» — and the answer is the
+     * partial path: cash on delivery with the wallet switch on.
+     */
+    if (!isBalanceSufficient && isPrepaidMethod && filteredPaymentMethods.some((m) => m.id === 'cash')) {
+      // OWNER: Sorani to be written by hand.
+      return loc(
+        'رصيدك لا يغطي كامل المبلغ — اختر الدفع عند الاستلام مع «استخدام رصيد المحفظة» ليُخصم رصيدك ويُدفع الباقي عند الاستلام.',
+        'Your balance does not cover the full amount — choose cash on delivery with «Use wallet balance» to deduct your balance and pay the rest on delivery.'
+      );
+    }
     if (!isBalanceSufficient) return S.blockAdvance;
     if (!serverAllows) return S.blockQuote;
     /**
@@ -1472,6 +1485,33 @@ export default function Checkout() {
   const bnplFinancedIqd = isBnplMethod
     ? quote?.bnpl?.financed_iqd ?? Math.max(0, orderTotal - walletDiscount)
     : 0;
+
+  /**
+   * THE WALLET ROW'S STATE, in one place (see the row's own comment).
+   *
+   * Locked on a Gini order (the server applies 0 there), on the full-advance
+   * method (the wallet already pays everything, so the switch is forced on),
+   * and on an empty balance. `walletLockReason` is the sentence printed beside
+   * a locked switch; the full-advance case has its own note (short or not),
+   * so it carries none here.
+   */
+  const walletSwitchOn = isWalletActive && !isGiniMethod;
+  const walletSwitchLocked = isGiniMethod || isAdvanceRequired || walletBalanceShown === 0;
+  // OWNER: Sorani to be written by hand.
+  const walletLockReason: string | null = isGiniMethod
+    ? loc(
+        'لا يُستخدم رصيد المحفظة مع جني: قيمة المنتج تُموَّل داخل تطبيق جني، ويُدفع رسم التوصيل فقط عند الاستلام.',
+        'Your wallet balance cannot be used with Gini: the purchase is financed inside the Gini app, and only the delivery fee is paid on delivery.'
+      )
+    : !isAdvanceRequired && walletBalanceShown === 0
+      ? loc('لا يوجد رصيد في محفظتك لاستخدامه.', 'Your wallet has no balance to use.')
+      : null;
+  /** Where «use part of the balance, pay the rest at the door» sends a
+   *  customer whose balance is short of the full-advance method: cash, when
+   *  the server offers it on this cart. */
+  const partialWalletMethodId = filteredPaymentMethods.some((m) => m.id === 'cash') ? 'cash' : null;
+  /** What is left after the wallet — the SERVER's figure for the chosen method. */
+  const walletRemainderIqd = isBnplMethod ? bnplFinancedIqd : amountRemainingOnDelivery;
 
   const placeOrder = async () => {
     if (!canCompleteOrder) return;
@@ -2884,26 +2924,49 @@ export default function Checkout() {
             </div>
 
             {/*
-              THE WALLET IS NOT OFFERED ON A GINI ORDER, because it cannot be
-              applied to one. The goods were settled inside the Gini app, so
-              the server forces the applied balance to 0 — leaving a live
-              toggle here would offer a deduction that will never appear, and
-              the customer would read the unchanged total as a bug in the
-              switch rather than as the rule it is.
+              «استخدام الرصيد ليخصم من المبلغ» — THE WALLET PART-PAYS ANY ORDER.
+
+              The server has always taken `min(balance, payable)` when this
+              switch is on (worker/routes/orders.ts, `walletApplied`), so a
+              100,000 order with 20,000 in the wallet was always a 20,000
+              deduction and 80,000 at the door. The owner still experienced the
+              wallet as all-or-nothing, because this screen said so: the
+              payment method called «المحفظة» reads «الدفع مقدمًا بالكامل من
+              محفظتك» and refuses a short balance, and this switch — the real
+              partial path — was a bare «استخدام المحفظة» whose only feedback
+              was a green «خصم N د.ع» that never named what was left to pay or
+              how. The row now carries the balance in its own label, and once
+              on, it prints the server's two figures: what the wallet takes and
+              what remains, and by which method the remainder is paid.
+
+              EVERY FIGURE HERE IS THE QUOTE'S. `quote.wallet.applied_iqd` is
+              the deduction and `due_on_delivery_iqd` (or the BNPL financed
+              amount) is the remainder; nothing is subtracted on this side.
+              Until the first quote lands the breakdown is simply not drawn.
+
+              ON A GINI ORDER THE ROW IS SHOWN LOCKED, WITH THE REASON. The
+              goods are financed inside the Gini app and the server forces the
+              applied balance to 0 there, so a live switch would offer a
+              deduction that never appears. It used to vanish outright, which
+              left a customer who had seen it a moment ago with no idea why.
             */}
-            {isGiniMethod ? null : (
-            <div className={`mt-4 pt-4 border-t border-white/5 transition-all`}>
+            <div data-checkout-wallet className="mt-4 pt-4 border-t border-white/5 transition-all">
                 <div className="flex items-center justify-between gap-4 mb-2">
-                    <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isWalletActive ? 'bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.2)]' : 'bg-zinc-900 text-zinc-400'}`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${walletSwitchOn ? 'bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.2)]' : 'bg-zinc-900 text-zinc-400'}`}>
                             <Wallet className="w-4 h-4" strokeWidth={1.5} />
                         </div>
-                        <div>
-                            <span className="font-normal text-white block text-sm">
-                                {loc('استخدام المحفظة', 'Use Wallet')}
+                        <div className="min-w-0">
+                            <span id="checkout-wallet-label" className="font-normal text-white block text-sm">
+                                {/* OWNER: Sorani to be written by hand. */}
+                                {loc(
+                                  `استخدام رصيد المحفظة (${money(walletBalanceShown)})`,
+                                  `Use wallet balance (${money(walletBalanceShown)})`
+                                )}
                             </span>
                             <span className="text-xs text-zinc-500 font-light block">
-                                {loc('الرصيد:', 'Balance:')} <span className="text-zinc-300">{money(walletBalanceShown)}</span>
+                                {/* OWNER: Sorani to be written by hand. */}
+                                {loc('يُخصم من إجمالي الطلب، والباقي بطريقة الدفع التي اخترتها', 'Deducted from the order total; the rest is paid by the method you chose')}
                             </span>
                         </div>
                     </div>
@@ -2911,44 +2974,101 @@ export default function Checkout() {
                     <button
                         type="button"
                         role="switch"
-                        aria-checked={isWalletActive}
-                        disabled={isAdvanceRequired || walletBalanceShown === 0}
+                        aria-checked={walletSwitchOn}
+                        aria-labelledby="checkout-wallet-label"
+                        data-checkout-wallet-switch
+                        disabled={walletSwitchLocked}
                         onClick={() => {
                             customerQuote.mark();
                             setUseWalletBalance(!useWalletBalance);
                         }}
                         className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                            isWalletActive ? 'bg-white' : 'bg-zinc-800'
-                        } ${(isAdvanceRequired || walletBalanceShown === 0) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                            walletSwitchOn ? 'bg-white' : 'bg-zinc-800'
+                        } ${walletSwitchLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${
-                            isWalletActive ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : (dir === 'rtl' ? '-translate-x-1' : 'translate-x-1')
-                        } ${!isWalletActive && 'bg-zinc-400'}`} />
+                            walletSwitchOn ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : (dir === 'rtl' ? '-translate-x-1' : 'translate-x-1')
+                        } ${!walletSwitchOn && 'bg-zinc-400'}`} />
                     </button>
                 </div>
 
+                {/* Why the switch cannot be moved — said beside the switch. */}
+                {walletLockReason && (
+                    <p data-checkout-wallet-locked className="mt-2 text-xs leading-relaxed font-light text-zinc-500 flex items-start gap-2">
+                        <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" strokeWidth={1.5} aria-hidden="true" />
+                        <span>{walletLockReason}</span>
+                    </p>
+                )}
+
+                {/*
+                  «الرصيد غير كافٍ» ALONE WAS A DEAD END. The method that pays
+                  the WHOLE total from the wallet is selected and the balance is
+                  short — which is exactly the customer the owner described. So
+                  the note names the partial path and takes them there in one
+                  tap: cash on delivery with this switch on.
+                */}
                 {isAdvanceRequired && !isBalanceSufficient && (
-                    <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex gap-2 text-red-400">
+                    <div data-checkout-wallet-short className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex gap-2 text-red-400">
                         <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
-                        <p className="text-xs leading-relaxed font-light">
-                            {loc('الرصيد غير كافٍ للدفع المقدم.', 'Insufficient balance for advance.')}
-                        </p>
+                        <div className="text-xs leading-relaxed font-light">
+                            <p>
+                                {/* OWNER: Sorani to be written by hand. */}
+                                {loc(
+                                  `رصيدك (${money(walletBalanceShown)}) لا يغطي كامل المبلغ (${money(orderTotal)}) للدفع المقدم بالكامل.`,
+                                  `Your balance (${money(walletBalanceShown)}) does not cover the full ${money(orderTotal)} for paying everything in advance.`
+                                )}
+                            </p>
+                            {partialWalletMethodId && walletBalanceShown > 0 && (
+                                <button
+                                    type="button"
+                                    data-checkout-wallet-partial
+                                    onClick={() => {
+                                        paymentPickedRef.current = true;
+                                        customerQuote.mark();
+                                        setUseWalletBalance(true);
+                                        setPaymentMethod(partialWalletMethodId);
+                                    }}
+                                    className="mt-2 inline-flex items-center rounded-md border border-red-400/40 px-2.5 py-1 font-medium text-red-300 hover:text-white hover:border-white/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                                >
+                                    {/* OWNER: Sorani to be written by hand. */}
+                                    {loc(
+                                      `استخدم ${money(walletBalanceShown)} من الرصيد وادفع الباقي عند الاستلام`,
+                                      `Use ${money(walletBalanceShown)} from the balance and pay the rest on delivery`
+                                    )}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
 
-                {!isAdvanceRequired && isWalletActive && walletDiscount > 0 && (
-                     <div className="mt-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex gap-2 text-emerald-400">
-                        <Sparkles className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
-                        <p className="text-xs leading-relaxed font-light">
-                            {loc(
-                                `خصم ${walletDiscount.toLocaleString()} د.ع`,
-                                `-${walletDiscount.toLocaleString()} IQD deduction`
-                            )}
-                        </p>
-                    </div>
+                {/*
+                  THE DEDUCTION AND THE REMAINDER, from the quote only. Drawn
+                  whenever the wallet actually pays something on a method that
+                  leaves a remainder to someone else — i.e. not the full-advance
+                  method, whose remainder is 0 by definition and whose
+                  shortfall is the red note above.
+                */}
+                {quote && walletSwitchOn && !isAdvanceRequired && quote.wallet.applied_iqd > 0 && (
+                    <dl data-checkout-wallet-breakdown className="mt-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs space-y-1.5">
+                        <div className="flex justify-between items-center gap-3 text-emerald-300">
+                            {/* OWNER: Sorani to be written by hand. */}
+                            <dt>{loc('يُخصم من المحفظة', 'Deducted from your wallet')}</dt>
+                            <dd data-testid="checkout-wallet-applied" className="tabular-nums font-medium">−{money(quote.wallet.applied_iqd)}</dd>
+                        </div>
+                        <div className="flex justify-between items-center gap-3 text-white">
+                            {/* OWNER: Sorani to be written by hand. */}
+                            <dt>
+                                {walletRemainderIqd === 0
+                                  ? loc('المتبقي — مدفوع بالكامل من المحفظة', 'Remaining — paid in full from your wallet')
+                                  : isBnplMethod
+                                    ? loc('المتبقي — يُموَّل عبر BNPL', 'Remaining — financed with BNPL')
+                                    : loc('المتبقي — يُدفع عند الاستلام', 'Remaining — paid on delivery')}
+                            </dt>
+                            <dd data-testid="checkout-wallet-remaining" className="tabular-nums font-bold">{money(walletRemainderIqd)}</dd>
+                        </div>
+                    </dl>
                 )}
             </div>
-            )}
 
             {/*
               POINTS, AS A QUIET LINE — «واسفله بسطر ناعم وهو استخدام النقاط».

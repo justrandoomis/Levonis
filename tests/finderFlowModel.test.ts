@@ -155,7 +155,9 @@ test('the chips above a question are the answers before it; the ✕ asks only af
 test('the page: URL replace per answer, keyboard presses do not auto-advance, focus moves to the question', () => {
   const page = read('src/pages/PrinterFinder.tsx');
   assert.match(page, /\{ replace: true, state: location\.state \}/, 'each answer replaces the query string');
-  assert.match(page, /if \(viaPointer && AUTO_ADVANCE\[key\]\)/);
+  assert.match(page, /if \(viaPointer && AUTO_ADVANCE\[key\] && !waitsForFollowUp\)/);
+  // «طباعة متعددة الألوان» waits for its «أي نوع؟» follow-up (owner round 11).
+  assert.match(page, /const waitsForFollowUp = key === 'use' && value === 'multicolor' && !answers\.mc;/);
   assert.match(page, /heading\.current\?\.focus\(\{ preventScroll: true \}\)/);
   assert.match(read('src/components/finder/choiceKeys.ts'), /e\.detail > 0/);
   // A screen reader hears the step label change and the progress.

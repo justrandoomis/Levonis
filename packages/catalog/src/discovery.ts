@@ -293,6 +293,17 @@ export const FINDER_LEVELS = ['beginner', 'intermediate', 'pro'] as const;
 export type FinderLevel = (typeof FINDER_LEVELS)[number];
 
 /**
+ * «ألوان متعددة» — WHICH multi-colour. A follow-up asked only when colour
+ * matters (use = multicolor, or colour among the priorities), and optional:
+ * it is not one of the six steps, so an old link without it still opens on
+ * its results.
+ *   few   2–4 colours, as little filament waste as possible
+ *   many  as many colours as possible, purge waste accepted
+ */
+export const FINDER_COLOR_NEEDS = ['few', 'many'] as const;
+export type FinderColorNeed = (typeof FINDER_COLOR_NEEDS)[number];
+
+/**
  * The six answers. `null` = not answered yet. A SKIPPED step is an answer:
  * `tech: 'any'`, `budget: 'any'`, and `prio: []` (serialised `prio=none`) — so
  * a refresh after a skip does not ask the same question again.
@@ -305,6 +316,8 @@ export interface FinderAnswers {
   /** Ordered, at most two, distinct. The first counts more. */
   prio: FinderPriority[] | null;
   level: FinderLevel | null;
+  /** Optional follow-up to a colour answer; absent = not asked or not answered. */
+  mc?: FinderColorNeed | null;
 }
 
 export const EMPTY_FINDER: FinderAnswers = Object.freeze({
@@ -339,6 +352,9 @@ export function parseFinderParams(get: (key: string) => string | null | undefine
     sale: oneOf(FINDER_SALES, get('sale')),
     prio,
     level: oneOf(FINDER_LEVELS, get('level')),
+    // Present only when stated, so an answer set without it compares equal to
+    // one written before the follow-up existed.
+    ...(oneOf(FINDER_COLOR_NEEDS, get('mc')) ? { mc: oneOf(FINDER_COLOR_NEEDS, get('mc')) } : {}),
   };
 }
 
@@ -350,6 +366,7 @@ export function finderParamPairs(a: FinderAnswers): Array<[string, string]> {
   if (a.sale) out.push(['sale', a.sale]);
   if (a.prio) out.push(['prio', a.prio.length ? a.prio.slice(0, MAX_FINDER_PRIORITIES).join(',') : 'none']);
   if (a.level) out.push(['level', a.level]);
+  if (a.mc) out.push(['mc', a.mc]);
   return out;
 }
 

@@ -140,6 +140,7 @@ import {
 } from '../lib/bnpl';
 import { priorityDeliveryVerdict, type PriorityDeliveryVerdict } from '../lib/priorityDelivery';
 import { validateCoupon } from '../lib/membershipOps';
+import { TradeInError, tradeInCouponCap } from '../lib/tradeIn';
 import {
   getAvailableBalances,
   readWalletDust,
@@ -2954,6 +2955,17 @@ async function computeCheckout(
       }
       couponId = check.coupon_id;
       couponDiscount = Math.max(0, Math.min(Math.floor(Number(check.discount_iqd) || 0), couponBasis));
+      // ---- TRADE-IN CREDIT (0143) — the only trade-in code in this function.
+      // A trade-in credit is a personal coupon bound to one request. The guard
+      // refuses it unless this customer's cart holds the target line bought
+      // directly, and caps it at ONE unit of that line: «cap the credit at the
+      // new product's price». Ordinary coupons get null and are untouched.
+      const tradeInCap = await tradeInCouponCap(c.env.DB, user.id, check.coupon_id, p.lines).catch((e: unknown) => {
+        if (e instanceof TradeInError) throw badRequest(e.message, e.code);
+        throw e;
+      });
+      if (tradeInCap !== null) couponDiscount = Math.min(couponDiscount, tradeInCap);
+      // ---- end TRADE-IN CREDIT
       couponSnapshot = JSON.stringify({
         coupon_id: check.coupon_id,
         code: check.code ?? input.couponCode.toUpperCase(),

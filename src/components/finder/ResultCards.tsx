@@ -10,7 +10,9 @@ import { cardHref, cardName, compareTypeOf, type CardProduct } from '../../lib/p
 import type { FinderResult } from '../../lib/catalog/types';
 import ReasonList from './ReasonList';
 import { CompareButton, SaveButton } from './ResultActions';
-import { resultsUi, type FinderLang } from './strings';
+import { resultsUi, whySentence, type FinderLang } from './strings';
+import MulticolorBadge from '../compare/MulticolorBadge';
+import type { MulticolorBadgeInfo } from '../../lib/compare';
 
 export interface ResultCardProps {
   result: FinderResult;
@@ -20,14 +22,52 @@ export interface ResultCardProps {
   onSave: (() => void) | null;
 }
 
-function useCardBits(result: FinderResult) {
-  const p = result.card as CardProduct;
-  const name = cardName(p);
+/**
+ * THE CONFIGURATION IS THE RESULT. «A1 Combo» at its own price, not «A1» at the
+ * product's «from» price: the finder weighed every configuration and this is
+ * the one that matched, so the card shows its name, its direct-sale price
+ * (the product page's resolver, sent as `variant.price_iqd`) and what it does
+ * with colour. «قارن» adds exactly this configuration (`product:option`).
+ */
+function useCardBits(result: FinderResult, lang: FinderLang) {
+  const base = result.card as CardProduct;
+  const variant = result.variant ?? null;
+  const p: CardProduct = variant
+    ? ({
+        ...base,
+        display_price_iqd: variant.price_iqd,
+        display_regular_iqd: variant.price_iqd,
+        display_prime_iqd: null,
+        display_pro_iqd: null,
+        display_applied_tier: 'regular',
+        display_from: false,
+      } as CardProduct)
+    : base;
+  const name = cardName(base);
+  const variantLabel = variant ? (lang === 'en' ? variant.label.en : variant.label.ar || variant.label.en) : '';
   const { theme } = useTheme();
-  const image = productMainImage(p, theme);
-  const type = compareTypeOf(p);
-  const item = { id: p.id, slug: p.slug || p.id, name, image: productPrimaryImage(p) || '' };
-  return { p, name, image, type, item, href: cardHref(p) };
+  const image = productMainImage(base, theme);
+  const type = compareTypeOf(base);
+  const item = {
+    id: variant ? `${base.id}:${variant.option_id}` : base.id,
+    slug: base.slug || base.id,
+    name: variantLabel ? `${name} · ${variantLabel}` : name,
+    image: productPrimaryImage(base) || '',
+  };
+  const multicolor = (base as unknown as { multicolor?: MulticolorBadgeInfo }).multicolor ?? null;
+  return { p, name, variantLabel, multicolor, image, type, item, href: cardHref(base) };
+}
+
+/** «لماذا هذه؟» — one sentence from the customer's own answers (the server's `why` codes). */
+function WhyLine({ result, lang, dense = false }: { result: FinderResult; lang: FinderLang; dense?: boolean }) {
+  const text = whySentence(result.why, lang);
+  if (!text) return null;
+  return (
+    <p data-finder-why className={`text-text-secondary ${dense ? 'text-[12.5px] leading-[19px]' : 'text-[13.5px] leading-[21px]'}`}>
+      <span className="font-bold text-text-primary">{resultsUi(lang).whyThis} </span>
+      {text}
+    </p>
+  );
 }
 
 /**
@@ -38,7 +78,7 @@ function useCardBits(result: FinderResult) {
  */
 export function ResultHero({ result, lang, saved, saveBusy, onSave }: ResultCardProps) {
   const t = resultsUi(lang);
-  const { p, name, image, type, item, href } = useCardBits(result);
+  const { p, name, variantLabel, multicolor, image, type, item, href } = useCardBits(result, lang);
   const headingId = `finder-r-${p.id}`;
   return (
     <article
@@ -68,12 +108,15 @@ export function ResultHero({ result, lang, saved, saveBusy, onSave }: ResultCard
             {name}
           </Link>
         </h2>
+        {variantLabel && (result.variant?.others ?? 0) > 0 ? <VariantLine label={variantLabel} others={result.variant?.others ?? 0} lang={lang} /> : null}
         <div className="mt-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-1.5">
           <CardPrice p={p} density="compact" />
           <AvailabilityLine product={p} className="min-w-[132px]" />
         </div>
+        {multicolor ? <MulticolorBadge badge={multicolor} lang={lang} className="mt-3" /> : null}
         <div className="mt-4 border-t border-border-subtle pt-4">
-          <h3 className="text-[12.5px] font-bold text-text-muted">{t.why}</h3>
+          <WhyLine result={result} lang={lang} />
+          <h3 className="mt-3 text-[12.5px] font-bold text-text-muted">{t.why}</h3>
           <div className="mt-2">
             <ReasonList reasons={result.reasons} caveats={result.caveats} lang={lang} maxReasons={3} maxCaveats={1} watchLabel={t.watch} />
           </div>
@@ -107,7 +150,7 @@ export function ResultHero({ result, lang, saved, saveBusy, onSave }: ResultCard
  */
 export function ResultRow({ result, lang, saved, saveBusy, onSave }: ResultCardProps) {
   const t = resultsUi(lang);
-  const { p, name, image, type, item, href } = useCardBits(result);
+  const { p, name, variantLabel, multicolor, image, type, item, href } = useCardBits(result, lang);
   const headingId = `finder-r-${p.id}`;
   return (
     <article
@@ -132,13 +175,16 @@ export function ResultRow({ result, lang, saved, saveBusy, onSave }: ResultCardP
               {name}
             </Link>
           </h2>
+          {variantLabel && (result.variant?.others ?? 0) > 0 ? <VariantLine label={variantLabel} others={result.variant?.others ?? 0} lang={lang} dense /> : null}
           <div className="mt-1.5">
             <CardPrice p={p} density="compact" />
           </div>
           <AvailabilityLine product={p} className="mt-1" />
         </div>
       </div>
-      <div className="mt-3">
+      {multicolor ? <MulticolorBadge badge={multicolor} lang={lang} size="sm" className="mt-3" /> : null}
+      <div className="mt-3 space-y-2">
+        <WhyLine result={result} lang={lang} dense />
         <ReasonList reasons={result.reasons} caveats={result.caveats} lang={lang} maxReasons={1} maxCaveats={1} dense specFirst watchLabel={t.watch} />
       </div>
       <div className="mt-3 flex items-stretch gap-2">
@@ -151,6 +197,17 @@ export function ResultRow({ result, lang, saved, saveBusy, onSave }: ResultCardP
         {onSave ? <SaveButton saved={saved} busy={saveBusy} onToggle={onSave} label={saved ? t.unsave(name) : t.save(name)} /> : null}
       </div>
     </article>
+  );
+}
+
+/** The configuration line: «A1 Combo · الأنسب من 2 خيارات». */
+function VariantLine({ label, others, lang, dense = false }: { label: string; others: number; lang: FinderLang; dense?: boolean }) {
+  const t = resultsUi(lang);
+  return (
+    <p className={`mt-1 flex min-w-0 flex-wrap items-baseline gap-x-1.5 ${dense ? 'text-[12px]' : 'text-[13px]'} leading-5`}>
+      <bdi dir="ltr" className="font-bold text-text-primary">{label}</bdi>
+      {others > 0 ? <span className="text-text-muted">· {t.bestOf(others + 1)}</span> : null}
+    </p>
   );
 }
 

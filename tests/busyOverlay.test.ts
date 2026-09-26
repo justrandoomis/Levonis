@@ -541,13 +541,16 @@ test('only a RE-quote the CUSTOMER asked for blocks — not the first, not one t
     ['protected delivery', /customerQuote\.mark\(\);\s*setProtectedDelivery\(e\.target\.checked\);/],
     ['wallet switch', /customerQuote\.mark\(\);\s*setUseWalletBalance\(!useWalletBalance\);/],
     ['points switch', /customerQuote\.mark\(\);\s*setUsePoints\(\(v\) => !v\);/],
+    // «استخدم الرصيد وادفع الباقي عند الاستلام» — moves a short full-advance
+    // order to cash with the wallet on, which always changes the method.
+    ['partial wallet', /paymentPickedRef\.current = true;\s*customerQuote\.mark\(\);\s*setUseWalletBalance\(true\);\s*setPaymentMethod\(partialWalletMethodId\);/],
     ['coupon', /if \(code !== couponCode\) customerQuote\.mark\(\);\s*setCouponCode\(code\);/],
   ] as const) {
     assert.match(code, setter, `${control} does not mark the re-quote it causes`);
   }
   // …and nothing else does: the forced-wallet and payment-default effects,
   // the price refresh and the coupon auto-drop all stay silent.
-  assert.equal((code.match(/customerQuote\.mark\(\)/g) ?? []).length, 9);
+  assert.equal((code.match(/customerQuote\.mark\(\)/g) ?? []).length, 10);
 });
 
 test('the store checkout re-quote is a real wait: Place refuses it and the customer\'s holds the screen', () => {

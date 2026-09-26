@@ -34,13 +34,19 @@ export default function CompareToggle({
   const { loc } = useLanguage();
   const on = useSyncExternalStore(
     compareTray.subscribe,
-    () => compareTray.has(item.id),
+    // Any configuration of this product counts: the compare page writes
+    // «A1 Combo» back as `product:option`.
+    () => compareTray.hasProduct(item.id),
     () => false
   );
   const onClick = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      if (compareTray.hasProduct(item.id) && !compareTray.has(item.id)) {
+        compareTray.removeProduct(item.id);
+        return;
+      }
       compareTray.toggle(item, type);
     },
     [item, type]

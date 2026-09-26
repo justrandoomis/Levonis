@@ -79,25 +79,33 @@ test('an option that is not this product’s, or is inactive, is refused — not
   // Silently falling back to the base product would make a SHARED LINK change
   // which configuration it compares without saying so.
   assert.match(src, /'COMPARE_OPTION_NOT_FOUND'/);
-  assert.match(src, /if \(!option \|\| option\.active === false\) \{/);
+  // The options are the ACTIVE ones the resolver priced; an id outside them is refused.
+  assert.match(src, /const hit = variants\.find\(\(v\) => v\.option\.id === slot\.optionId\);/);
+  assert.match(src, /if \(!hit\) \{/);
   // Blamed in the shape COMPARE_NO_SPECS already uses, so the page's existing
   // "drop that column" affordance works on it unchanged.
   assert.match(src, /\{ product_id: slot\.productId, option_id: slot\.optionId \}/);
 });
 
-test('the options come off the row through the one parser, not a second query', () => {
+test('the options come from the TABLES, through the product page’s resolver', () => {
   const src = route();
-  assert.match(src, /parseProductRow\(byId\.get\(id\) as unknown as Record<string, unknown>\)/);
-  assert.match(src, /docById\.get\(slot\.productId\)\?\.options\.find\(\(o\) => o\.id === slot\.optionId\)/);
+  // Owner round 11: `options` is not a PRODUCT_COLUMNS column and the options
+  // live in product_option_values, so parsing them off the row answered «no
+  // options» for every printer and refused every `product:option` link.
+  assert.match(src, /const pricing = await resolveVariantPricing\(c\.env\.DB, full, ctx\);/);
+  assert.ok(!/parseProductRow\(byId\.get\(id\)/.test(src), 'the options are being read off the row again');
 });
 
 // --------------------------------------------------------- the price
 
-test('the configured price comes from buildGrid, never from arithmetic here', () => {
+test('the configured price is the product page’s, never arithmetic here', () => {
   const src = route();
-  assert.match(src, /import \{ buildGrid \} from '\.\.\/lib\/priceGrid';/);
-  assert.match(src, /const line = grid\.find\(\(g\) => g\.level === 'option' && g\.id === option\.id\);/);
-  assert.match(src, /return line\?\.cells\.regular\.effective \?\? base;/);
+  // `levelPrice` (worker/routes/products.ts) is what paints `price_levels` on
+  // the product page — the model's direct-sale cell included, which the grid
+  // this used to call knew nothing about (A1 Combo: 965,000, not 915,000).
+  assert.match(src, /import \{ pricingCtx, resolveVariantPricing, type PricingCtx \} from '\.\/products';/);
+  assert.match(src, /return level \? level\.unit_subtotal_iqd : Number\(rows\[index\]\.price_iqd\) \|\| 0;/);
+  assert.ok(!/buildGrid/.test(src), 'a second pricing path is back');
   // The two things a second implementation would look like.
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   assert.ok(!/base \+ Number\(option\./.test(code), 'the surcharge is being added by hand');
@@ -150,13 +158,14 @@ test('the card IS the slot, and still knows which product it is', () => {
   // product page — which knows nothing about slots — would break.
   assert.match(src, /id: slots\[i\]\.key,\s*product_id: product\.row\.id,/);
   assert.match(src, /price_iqd: priceOf\(i\),/);
-  assert.match(src, /option: option\s*\?\s*\{ id: option\.id, label: tri\(option\.name_ar, option\.name_en, option\.name_ckb\) \}\s*:\s*null,/);
+  assert.match(src, /option: variant \? optionLabel\(variant\.option\) : null,/);
+  assert.match(src, /return \{ id: o\.id, label: tri\(o\.name_ar, o\.name_en, o\.name_ckb\) \};/);
 });
 
 test('a picker card offers its options only when there are at least two', () => {
   const src = route();
-  assert.match(src, /function withOptions\(card: CompareProductCard, row: ProductRow\): CompareProductCard \{/);
-  assert.match(src, /if \(active\.length < 2\) return card;/);
+  assert.match(src, /async function withOptions\(\n {2}db: D1Database,\n {2}cards: CompareProductCard\[\],\n {2}ctx: PricingCtx \| null\n\): Promise<CompareProductCard\[\]> \{/);
+  assert.match(src, /return options\.length >= 2 \? \{ \.\.\.card, options \} : card;/);
   // Absent, not empty: the client's test is "is there a list".
   assert.ok(!/options: \[\]/.test(src), 'an empty list would open a popup with nothing in it');
   // Inactive options are never offered — a tap that cannot be honoured.
@@ -176,7 +185,10 @@ test('the grid asks before it adds, in ONE place', () => {
 
 test('the option sheet offers the base price first, and is guarded outside its body', () => {
   const picker = read('src/components/compare/ProductPicker.tsx');
-  assert.match(picker, /onClick=\{\(\) => onPick\(null\)\}[\s\S]{0,300}\{s\.optionBase\}/);
+  // The base (cheapest) configuration first, marked, and added as the bare
+  // product — which the page resolves to that same configuration.
+  assert.match(picker, /onClick=\{\(\) => onPick\(i === 0 \? null : option\.id\)\}/);
+  assert.match(picker, /\{i === 0 \? \([\s\S]{0,200}\{s\.optionBase\}/);
   // JSX children are an ordinary eager argument: a body reading `card.` would
   // be built, and would throw, before the Sheet decided it was closed. This is
   // the AdminKyc black screen, and it is guarded the same way.
@@ -206,7 +218,7 @@ test('a card is excluded by its PRODUCT, so the second option is still offerable
 test('one column name, so the page cannot label the same column three ways', () => {
   const lib = read('src/lib/compare.ts');
   assert.match(lib, /export function columnName\(card: CompareProductCard, lang: CompareLang\): string \{/);
-  assert.match(lib, /return card\.option \? `\$\{base\} · \$\{tri\(card\.option\.label, lang\)\}` : base;/);
+  assert.match(lib, /return `\$\{head\} · \$\{option\}`;/);
   for (const file of [
     'src/components/compare/CompareSlots.tsx',
     'src/components/compare/PowerBlock.tsx',

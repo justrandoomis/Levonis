@@ -43,8 +43,9 @@ export function tri(value: Trilingual | undefined, lang: CompareLang): string {
   return value.ar || value.en;
 }
 
-export type SpecParse = 'number' | 'dimensions' | 'range' | 'boolean' | 'list' | 'text';
-export type SpecBetter = 'higher' | 'lower' | 'none';
+export type SpecParse = 'number' | 'dimensions' | 'range' | 'boolean' | 'list' | 'text' | 'ordinal';
+/** `yes` is the Yes/No direction (worker/lib/templateFamilies.ts SpecCompare). */
+export type SpecBetter = 'higher' | 'lower' | 'yes' | 'none';
 export type CompareBasis = 'same_section' | 'same_type' | 'mixed';
 
 export interface CompareValue {
@@ -137,7 +138,46 @@ export interface CompareProductCard {
   /** ON A PICKER CARD ONLY, and only when there are at least two: what this
    *  product can be added AS. «خاصه الطابعات التي تحمل ليزر او كومبو فيه جهاز
    *  ams فهذا يفرق.» */
-  options?: Array<{ id: string; label: Trilingual }>;
+  options?: CompareOptionChoice[];
+  /** ON A COMPARISON COLUMN: the URL named no option, so this is the base configuration. */
+  default_option?: boolean;
+  /** ON A COMPARISON COLUMN: what this configuration does with colour (worker/lib/multicolor.ts). */
+  multicolor?: MulticolorInfo;
+  /** ON A COMPARISON COLUMN: the laser module this configuration ships with (W), or null. */
+  laser_module_w?: number | null;
+}
+
+/** One way to buy the same machine, as the picker and the column switcher offer it. */
+export interface CompareOptionChoice {
+  id: string;
+  label: Trilingual;
+  /** The configuration's price from the product page's resolver; absent when not priced. */
+  price_iqd?: number;
+  available?: number | null;
+}
+
+export type MulticolorMethod = 'none' | 'ams_single_nozzle' | 'dual_nozzle' | 'tool_changer' | 'multi_nozzle';
+export type PurgeWaste = 'near_zero' | 'low' | 'high';
+
+/** The badge's codes — the page writes the words (src/components/compare/MulticolorBadge.tsx). */
+export interface MulticolorBadgeInfo {
+  kind: 'native' | 'ams' | 'single' | 'unknown';
+  colors: number | null;
+  waste: PurgeWaste | null;
+  method: MulticolorMethod | null;
+  with_ams: number | null;
+  out_of_box: number | null;
+}
+
+export interface MulticolorInfo {
+  method: MulticolorMethod | null;
+  native: number | null;
+  with_ams: number | null;
+  waste: PurgeWaste | null;
+  multi_material: boolean | null;
+  out_of_box: number | null;
+  ams_units: number | null;
+  badge: MulticolorBadgeInfo;
 }
 
 /**
@@ -293,7 +333,17 @@ export function writeIds(ids: string[]): string {
  */
 export function columnName(card: CompareProductCard, lang: CompareLang): string {
   const base = tri(card.name, lang);
-  return card.option ? `${base} · ${tri(card.option.label, lang)}` : base;
+  // A product sold ONE way has nothing to disambiguate: «Snapmaker U1 ·
+  // Snapmaker U1» says the name twice. With a choice, the product part is its
+  // first segment — the catalogue lists every configuration in the name
+  // («A1 / A1 Combo»), and the option already says which one this is.
+  const choice = card.option && (card.options === undefined || card.options.length >= 2) && !(card.default_option && !card.options);
+  if (!choice || !card.option) return base;
+  const head = base.split(' / ')[0].trim();
+  const option = tri(card.option.label, lang).trim();
+  // «Bambu Lab X2D · X2D» says the model twice: the head already ends in it.
+  if (option && head.toLowerCase().endsWith(option.toLowerCase())) return head;
+  return `${head} · ${option}`;
 }
 
 /**
@@ -445,7 +495,7 @@ export const LENS_FIELDS: Readonly<Record<CompareLensId, readonly string[]>> = {
   business: ['print_speed', 'max_acceleration', 'build_volume', 'enclosed', 'print_failure_detection', 'air_filtration', 'warranty'],
   beginners: ['skill_level', 'assembly', 'auto_leveling', 'filament_sensor', 'power_loss_recovery', 'camera'],
   value: ['price_iqd'],
-  multicolor: ['max_colors', 'extruders'],
+  multicolor: ['max_colors_native', 'purge_waste', 'multicolor_method', 'max_colors', 'colors_out_of_box', 'multi_material'],
   precision: ['min_layer_height', 'z_accuracy', 'xy_resolution'],
 };
 
@@ -499,7 +549,7 @@ export function litres(row: CompareRow, i: number): number | null {
   return Number.isFinite(l) && l > 0 ? Math.round(l * 10) / 10 : null;
 }
 
-export type RowHint = 'higher' | 'lower' | 'informational' | 'unscored';
+export type RowHint = 'higher' | 'lower' | 'yes' | 'informational' | 'unscored';
 
 /**
  * The direction hint under a row label — «الأعلى أفضل», «الأقل أفضل», «للمعلومة،
@@ -509,6 +559,7 @@ export function rowHint(row: CompareRow): RowHint {
   const scoring = rowScoring(row);
   if (scoring === 'informational') return 'informational';
   if (scoring === 'unscored') return 'unscored';
+  if (row.better === 'yes') return 'yes';
   return row.better === 'lower' ? 'lower' : 'higher';
 }
 

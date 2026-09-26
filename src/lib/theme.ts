@@ -27,6 +27,10 @@
  * THE CHANGE IS ANIMATED, never the first paint. A tap on a theme control
  * reveals the new theme as a circle growing from the finger (View Transitions);
  * a change nobody tapped for — the device flipping at sunset — cross-fades.
+ * The header's «اللغة والمظهر» sheet asks for `{ origin: 'center' }`: it
+ * closes first, and only then does the new theme open as a spot in the middle
+ * of the screen that widens calmly until it fills it (the owner: «يظهر التغيير
+ * السلس بهدوء من منتصف الشاشة كبقعة وتتمدد كدائرة شيئا فشيئا»).
  * Without View Transitions it is a short colour transition on the page, and
  * under reduced motion it is instant. The CSS for all three is in
  * src/index.css, THE THEME SWITCH.
@@ -99,6 +103,22 @@ export interface ThemeOrigin {
   y: number;
 }
 
+/**
+ * How a change is shown.
+ *  - `origin`: a point, `'center'` (the middle of the viewport, measured when
+ *    the reveal starts — after whatever closed before it), `null` for a plain
+ *    cross-fade, or left out for the control just tapped.
+ *  - `duration`: the reveal's length in ms (default 480; the centre reveal
+ *    from the header sheet asks for a calmer 800).
+ */
+export interface ThemeSwitchOptions {
+  origin?: ThemeOrigin | 'center' | null;
+  duration?: number;
+}
+
+/** What `paintTheme` grows from: a point, the centre, or nothing (a fade). */
+type RevealFrom = ThemeOrigin | 'center' | null;
+
 type ViewTransitionLike = { ready: Promise<void>; finished: Promise<void> };
 type DocumentWithViewTransition = Document & {
   startViewTransition?: (update: () => void) => ViewTransitionLike;
@@ -108,7 +128,14 @@ type DocumentWithViewTransition = Document & {
 let animationsReady = false;
 let lastPointer: (ThemeOrigin & { t: number }) | null = null;
 const REVEAL_MS = 480;
+/** The centre reveal: a spot that widens «شيئا فشيئا», not a flash. */
+export const CENTER_REVEAL_MS = 800;
 const FADE_MS = 300;
+/** The fallback cross-fade for a calm (centre) change, without View Transitions. */
+const CALM_FADE_MS = 600;
+/** Tap reveal: fast out of the finger. Centre reveal: ease-in-out, calm at both ends. */
+const TAP_EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+const CENTER_EASING = 'cubic-bezier(0.65, 0, 0.35, 1)';
 
 function reducedMotion(): boolean {
   try {
@@ -143,7 +170,7 @@ function guessOrigin(): ThemeOrigin | null {
  * the Web Animations API are used — no style is written into the document, so
  * the CSP is exactly what it was.
  */
-function paintTheme(theme: Theme, origin: ThemeOrigin | null): void {
+function paintTheme(theme: Theme, from: RevealFrom, duration: number = REVEAL_MS): void {
   const root = document.documentElement;
   const onScreen: Theme = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
   if (onScreen === theme || !animationsReady || reducedMotion() || document.visibilityState === 'hidden') {
@@ -152,7 +179,7 @@ function paintTheme(theme: Theme, origin: ThemeOrigin | null): void {
   }
   const doc = document as DocumentWithViewTransition;
   if (typeof doc.startViewTransition === 'function') {
-    const mode = origin ? 'lv-theme-reveal' : 'lv-theme-fade';
+    const mode = from ? 'lv-theme-reveal' : 'lv-theme-fade';
     root.classList.add(mode);
     let vt: ViewTransitionLike;
     try {
@@ -167,16 +194,24 @@ function paintTheme(theme: Theme, origin: ThemeOrigin | null): void {
       applyTheme(theme);
       return;
     }
-    if (origin) {
+    if (from) {
       vt.ready
         .then(() => {
           const w = window.innerWidth;
           const h = window.innerHeight;
+          // The centre is read NOW, not when the change was asked for: the
+          // viewport may have rotated or resized while the sheet was closing.
+          const origin = from === 'center' ? { x: w / 2, y: h / 2 } : from;
           const radius = Math.hypot(Math.max(origin.x, w - origin.x), Math.max(origin.y, h - origin.y));
           const at = `at ${origin.x}px ${origin.y}px`;
           root.animate(
             { clipPath: [`circle(0px ${at})`, `circle(${radius}px ${at})`] },
-            { duration: REVEAL_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', pseudoElement: '::view-transition-new(root)' }
+            {
+              duration,
+              easing: from === 'center' ? CENTER_EASING : TAP_EASING,
+              fill: 'both',
+              pseudoElement: '::view-transition-new(root)',
+            }
           );
         })
         .catch(() => {
@@ -186,10 +221,13 @@ function paintTheme(theme: Theme, origin: ThemeOrigin | null): void {
     vt.finished.finally(() => root.classList.remove(mode)).catch(() => {});
     return;
   }
-  // No View Transitions (older Safari): the colours ease instead of snapping.
-  root.classList.add('lv-theme-fading');
+  // No View Transitions (older Safari): the colours ease instead of snapping —
+  // and for the calm centre change, ease a little longer.
+  const calm = from === 'center';
+  const classes = calm ? ['lv-theme-fading', 'lv-theme-fading--calm'] : ['lv-theme-fading'];
+  root.classList.add(...classes);
   applyTheme(theme);
-  window.setTimeout(() => root.classList.remove('lv-theme-fading'), FADE_MS + 40);
+  window.setTimeout(() => root.classList.remove(...classes), (calm ? CALM_FADE_MS : FADE_MS) + 40);
 }
 
 // ------------------------------------------------------------ the store
@@ -240,18 +278,36 @@ export function initTheme(): void {
   });
 }
 
+function isOrigin(v: unknown): v is ThemeOrigin {
+  return !!v && typeof v === 'object' && typeof (v as ThemeOrigin).x === 'number' && typeof (v as ThemeOrigin).y === 'number';
+}
+
 /**
- * Choose, store and show. `origin` is where the reveal grows from; left out,
- * it is the control just tapped (or focused).
+ * Choose, store and show. The second argument is where the reveal grows from —
+ * a point, or `null` for a cross-fade — or the options `{ origin, duration }`
+ * (`origin: 'center'` for the header sheet). Left out, it is the control just
+ * tapped (or focused).
+ *
+ * A choice that resolves to the theme already on screen («حسب الجهاز» on a
+ * device that is already in that mode) is stored and nothing moves.
  */
-export function setThemePreference(next: ThemePreference, origin?: ThemeOrigin | null): void {
+export function setThemePreference(next: ThemePreference, how?: ThemeOrigin | null | ThemeSwitchOptions): void {
   preference = next;
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, next);
   } catch {
     /* private mode: the choice holds for this visit */
   }
-  paintTheme(resolveTheme(next), origin === undefined ? guessOrigin() : origin);
+  let from: RevealFrom;
+  let duration = REVEAL_MS;
+  if (how === undefined) from = guessOrigin();
+  else if (how === null) from = null;
+  else if (isOrigin(how)) from = { x: how.x, y: how.y };
+  else {
+    from = how.origin === undefined ? guessOrigin() : how.origin;
+    if (typeof how.duration === 'number' && how.duration > 0) duration = how.duration;
+  }
+  paintTheme(resolveTheme(next), from, duration);
   notify();
 }
 

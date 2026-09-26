@@ -188,6 +188,11 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/admin/delivery', hosts: 'main', owner: 'FULFILMENT', flipPhase: 7, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/labels', hosts: 'main', owner: 'FULFILMENT', flipPhase: 7, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/coupons', hosts: 'main', owner: 'COMMERCE', flipPhase: 7, requires: 'admin', rateClass: 'admin-write' },
+  // 0143 «الاستبدال» — a delivered LEVONIS device traded against a new one. The
+  // customer's door carries the photographs too (multipart), hence `upload`;
+  // its money is a credit spent at this deployable's own checkout.
+  { prefix: '/api/trade-in', hosts: 'main', owner: 'COMMERCE', flipPhase: 7, requires: 'auth', rateClass: 'user' },
+  { prefix: '/api/admin/trade-in', hosts: 'main', owner: 'COMMERCE', flipPhase: 7, requires: 'admin', rateClass: 'admin-write' },
 
   // ------------------------------------------------------------------ money
   { prefix: '/api/wallet/admin', hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'admin:full', rateClass: 'admin-write' },

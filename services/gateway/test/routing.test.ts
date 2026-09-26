@@ -71,6 +71,8 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/reviews': 'REVIEWS',
   '/api/returns': 'COMMERCE',
   '/api/price-protection': 'COMMERCE',
+  '/api/trade-in': 'COMMERCE',
+  '/api/admin/trade-in': 'COMMERCE',
   '/api/policies': 'POLICIES',
   '/api/kyc': 'KYC',
   '/api/support': 'SUPPORT',

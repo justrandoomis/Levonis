@@ -23,10 +23,11 @@ import React, { ReactNode, useState, useRef, useEffect, useCallback } from 'reac
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import {
-  Bell, Menu, User, ArrowLeft, ArrowRight, Globe, LogOut, X,
+  Bell, Menu, User, ArrowLeft, ArrowRight, LogOut, X,
   Settings as SettingsIcon, ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
+import LangThemeButton from './LangThemeSheet';
 import { useMotion } from '../lib/motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
@@ -138,20 +139,18 @@ function readCollapsed(): boolean {
 }
 
 export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTab, onTabChange, children, topbarSlot }: DashboardLayoutProps) {
-  const { dir, lang, setLang } = useLanguage();
+  const { dir, lang } = useLanguage();
   const t = STRINGS[lang] ?? STRINGS.ar;
   const navigate = useNavigate();
   const { isAuthenticated, logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showLangMenu, setShowLangMenu] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [myStoreId, setMyStoreId] = useState<string | null>(null);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
-  const langRef = useRef<HTMLDivElement>(null);
   const drawerButtonRef = useRef<HTMLButtonElement>(null);
 
   // The user-menu "Settings" entry only makes sense when this shell actually
@@ -169,9 +168,6 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
       }
-      if (langRef.current && !langRef.current.contains(event.target as Node)) {
-        setShowLangMenu(false);
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -183,7 +179,6 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
       if (e.key !== 'Escape') return;
       setShowUserMenu(false);
       setShowNotifications(false);
-      setShowLangMenu(false);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -426,31 +421,9 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
           )}
 
           <div className="flex items-center gap-2 sm:gap-4 ms-auto text-zinc-400 shrink-0">
-            {/* Language */}
-            <div className="relative" ref={langRef}>
-              <button
-                onClick={() => setShowLangMenu(!showLangMenu)}
-                aria-label={t.language}
-                aria-expanded={showLangMenu}
-                className="hover:text-gilt transition-colors flex items-center gap-1.5 min-h-11 px-1"
-              >
-                <Globe className="w-5 h-5 stroke-[2]" />
-                <span className="text-xs font-bold uppercase hidden sm:block">{lang}</span>
-              </button>
-              {showLangMenu && (
-                <div className="absolute top-11 end-0 w-32 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl py-1.5 z-50">
-                  {(['en', 'ar', 'ckb'] as const).map((l) => (
-                    <button
-                      key={l}
-                      onClick={() => { setLang(l); setShowLangMenu(false); }}
-                      className={`w-full text-start px-3 py-2 text-sm hover:bg-zinc-800 ${lang === l ? 'text-gilt font-bold' : 'text-zinc-400'}`}
-                    >
-                      {l === 'en' ? 'English' : l === 'ar' ? 'العربية' : 'کوردی'}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* «اللغة والمظهر» — the same globe and sheet as the home header
+                (src/components/LangThemeSheet.tsx). */}
+            <LangThemeButton variant="dash" />
 
             {/* Notifications — no notification backend exists, so no fake badge */}
             <div className="relative" ref={notifRef}>

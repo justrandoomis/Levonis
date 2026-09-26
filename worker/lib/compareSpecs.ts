@@ -533,6 +533,13 @@ export function readCompareValue(field: TemplateField, raw: string): CompareValu
       // «Yes» is shown, and that decision belongs to the surface, not here.
       return { raw: trimmed, num: n, text: trimmed, missing: false };
     }
+    case 'ordinal': {
+      // Position on the field's own scale (lowest first); `better` decides
+      // which end wins. An answer off the scale is shown and never ranked.
+      const key = foldDigits(trimmed).toLowerCase();
+      const at = (cmp.scale ?? []).findIndex((step) => step.toLowerCase() === key);
+      return { raw: trimmed, num: at < 0 ? null : at, text: trimmed, missing: false };
+    }
     case 'list': {
       const items = readList(trimmed);
       return {
@@ -696,6 +703,7 @@ const AXIS_KIND_RANK: Record<SpecCompare['parse'], number> = {
   dimensions: 0,
   range: 0,
   boolean: 1,
+  ordinal: 1,
   list: 2,
   text: 3,
 };
@@ -712,7 +720,9 @@ function normaliseAxis(nums: number[], better: SpecCompare['better'], parse: Spe
   if (parse === 'boolean') return nums.map((n) => clamp01(n));
   const max = Math.max(...nums);
   const min = Math.min(...nums);
-  if (min > 0 && max > 0) {
+  // An ordinal is a POSITION, not a quantity — «High» is not twice «Low» —
+  // so it is spread over the span rather than taken as a ratio.
+  if (min > 0 && max > 0 && parse !== 'ordinal') {
     return better === 'lower' ? nums.map((n) => clamp01(min / n)) : nums.map((n) => clamp01(n / max));
   }
   // Zero or negative readings (a temperature range, a 0 dB typo) have no
@@ -781,6 +791,8 @@ export function compareProducts(input: { products: CompareInputProduct[] }): Com
     const rows: CompareRow[] = [];
     for (const f of g.fields) {
       if (claimed.has(f.id)) continue;
+      // An instruction to the engine (`variant_specs`), never a row.
+      if (f.compare?.hidden) continue;
       const raws = products.map((p) => rawOf(p.spec_fields, f.id));
       // A row nobody filled teaches nothing; it is not shown as two «غير مذكور».
       if (raws.every((r) => r === '')) continue;

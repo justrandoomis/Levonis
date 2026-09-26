@@ -818,3 +818,124 @@ test('two identical quotes produce an identical consent signature', async () => 
     'the required policy versions must not move between two identical quotes'
   );
 });
+
+// ------------------ «استخدام الرصيد ليخصم من المبلغ» — the wallet PART-PAYS
+
+/**
+ * The owner's example, run through the real quote and order doors: a total
+ * larger than the balance gives a deduction of exactly the balance and a
+ * remainder at the door; a balance larger than the total covers it; an empty
+ * wallet applies nothing; Gini is refused; the COD printer advance is what it
+ * always was; and the order debits exactly the applied amount, which a cancel
+ * returns.
+ *
+ * 'thin' holds $50 = 70,000 IQD at the fixture's 1,400 rate; a direct p_a1
+ * line is 150,000 on cash, so the balance is short of the total.
+ */
+test('partial wallet: a balance smaller than the total is deducted in full and the rest is due on delivery', async () => {
+  const { db, raw } = setup();
+  cartLine(raw, 'ci1', 'thin', 'p_a1', '');
+  const a = appAs(db, 'thin');
+
+  const off = (await json(await post(a, '/api/orders/quote', quoteBody('addr_t', 'cash')))).quote;
+  assert.equal(off.wallet.balance_iqd, 70_000);
+  assert.equal(off.wallet.applied_iqd, 0, 'the switch off takes nothing');
+  assert.equal(off.wallet.required_advance_iqd, 0);
+  assert.equal(off.due_on_delivery_iqd, off.total_iqd);
+
+  const on = (await json(await post(a, '/api/orders/quote', quoteBody('addr_t', 'cash', { useWallet: true })))).quote;
+  assert.ok(on.total_iqd > 70_000, 'the fixture must put the total above the balance');
+  assert.equal(on.wallet.applied_iqd, 70_000, 'the WHOLE balance, not nothing');
+  assert.equal(on.due_on_delivery_iqd, on.total_iqd - 70_000, 'the remainder is collected at the door');
+  assert.equal(on.can_checkout, true, 'a cash order is never blocked by a short wallet');
+  assert.equal(on.prepaid_by_wallet, false);
+
+  const placed = await json(await post(a, '/api/orders', orderBody('addr_t', 'cash', { useWallet: true })));
+  assert.equal(placed.success, true, JSON.stringify(placed));
+  assert.equal(placed.order.wallet_applied_iqd, 70_000);
+  assert.equal(placed.order.due_on_delivery_iqd, on.due_on_delivery_iqd);
+  assert.equal(placed.order.total_iqd, on.total_iqd);
+  assert.equal(placed.order.financial.outstanding_iqd, on.due_on_delivery_iqd);
+
+  // EXACTLY the applied amount left the wallet, in one row, in the order batch.
+  const debits = raw
+    .prepare("SELECT amount, amount_iqd FROM wallet_transactions WHERE user_id='thin' AND ref=? AND type='withdrawal' AND currency='USD'")
+    .all(placed.order.id) as Array<{ amount: number; amount_iqd: number | null }>;
+  assert.equal(debits.length, 1, 'one debit for the order');
+  assert.equal(debits[0].amount, 5000, 'the whole $50 — the cents the 70,000 was quoted from');
+  if (debits[0].amount_iqd !== null) assert.equal(debits[0].amount_iqd, 70_000);
+
+  cartLine(raw, 'ci2', 'thin', 'p_pla', '');
+  const after = (await json(await post(a, '/api/orders/quote', quoteBody('addr_t', 'cash', { useWallet: true })))).quote;
+  assert.equal(after.wallet.balance_iqd, 0, 'the balance fell by exactly what was applied');
+  assert.equal(after.wallet.applied_iqd, 0);
+
+  // A cancel returns exactly the wallet portion.
+  const cancelled = await json(await post(a, `/api/orders/${placed.order.id}/cancel`, {}));
+  assert.equal(cancelled.success, true, JSON.stringify(cancelled));
+  const back = (await json(await post(a, '/api/orders/quote', quoteBody('addr_t', 'cash', { useWallet: true })))).quote;
+  assert.equal(back.wallet.balance_iqd, 70_000, 'the partial wallet payment came back whole');
+  await Promise.allSettled(pending);
+});
+
+test('partial wallet: a balance larger than the total covers it, and nothing is due at the door', async () => {
+  const { db, raw } = setup();
+  cartLine(raw, 'ci1', 'buyer', 'p_a1', '');
+  const a = appAs(db, 'buyer');
+  const on = (await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'cash', { useWallet: true })))).quote;
+  assert.ok(on.wallet.balance_iqd > on.total_iqd);
+  assert.equal(on.wallet.applied_iqd, on.total_iqd, 'capped at the payable, never the whole balance');
+  assert.equal(on.due_on_delivery_iqd, 0);
+
+  const placed = await json(await post(a, '/api/orders', orderBody('addr_b', 'cash', { useWallet: true })));
+  assert.equal(placed.success, true, JSON.stringify(placed));
+  assert.equal(placed.order.wallet_applied_iqd, on.total_iqd);
+  assert.equal(placed.order.due_on_delivery_iqd, 0);
+  await Promise.allSettled(pending);
+});
+
+test('partial wallet: an empty wallet applies nothing even with the switch on', async () => {
+  const { db, raw } = setup();
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash,role) VALUES ('empty','Zain','z@x.co','h','customer');
+    INSERT INTO addresses (id,user_id,label,name,phone,address,landmark,is_default)
+      VALUES ('addr_e','empty','Home','Zain','+9647707778889','Najaf, Kufa 2','',1);
+  `);
+  cartLine(raw, 'ci1', 'empty', 'p_a1', '');
+  const on = (await json(await post(appAs(db, 'empty'), '/api/orders/quote', quoteBody('addr_e', 'cash', { useWallet: true })))).quote;
+  assert.equal(on.wallet.balance_iqd, 0, 'the screen locks its switch on this figure');
+  assert.equal(on.wallet.applied_iqd, 0);
+  assert.equal(on.due_on_delivery_iqd, on.total_iqd);
+});
+
+test('partial wallet: Gini is refused — the wallet never part-pays a financed Gini order', async () => {
+  const { db, raw } = setup();
+  cartLine(raw, 'ci1', 'thin', 'p_a1', '');
+  const res = await json(await post(appAs(db, 'thin'), '/api/orders/quote', quoteBody('addr_t', 'gini', { useWallet: true })));
+  assert.ok(res.quote, JSON.stringify(res));
+  assert.equal(res.quote.wallet.applied_iqd, 0, 'the server forces the applied balance to 0 on Gini');
+  assert.equal(res.quote.wallet.required_advance_iqd, 0);
+});
+
+test('partial wallet: the full-advance method with a short balance is still reported as not covered', async () => {
+  const { db, raw } = setup();
+  cartLine(raw, 'ci1', 'thin', 'p_a1', '');
+  const q = (await json(await post(appAs(db, 'thin'), '/api/orders/quote', quoteBody('addr_t', 'wallet', { useWallet: true })))).quote;
+  assert.equal(q.wallet.required_advance_iqd, q.total_iqd, 'the wallet METHOD still means the whole total');
+  assert.equal(q.wallet.applied_iqd, 70_000);
+  assert.equal(q.can_checkout, false, 'and the screen sends the customer to the partial path instead');
+});
+
+test('partial wallet: the COD printer advance is unchanged — the switch off takes the advance, on takes the balance', async () => {
+  const { db, raw } = setup();
+  cartLine(raw, 'ci1', 'thin', 'p_x1', '');
+  const a = appAs(db, 'thin');
+  const off = (await json(await post(a, '/api/orders/quote', quoteBody('addr_t', 'cash')))).quote;
+  assert.equal(off.wallet.required_advance_iqd, 50_000);
+  assert.equal(off.wallet.applied_iqd, 50_000, 'an advance takes the advance, not the whole wallet');
+  assert.equal(off.due_on_delivery_iqd, off.total_iqd - 50_000);
+  const on = (await json(await post(a, '/api/orders/quote', quoteBody('addr_t', 'cash', { useWallet: true })))).quote;
+  assert.equal(on.wallet.required_advance_iqd, 50_000);
+  assert.equal(on.wallet.applied_iqd, 70_000, 'the switch on spends the whole balance toward the total');
+  assert.equal(on.due_on_delivery_iqd, on.total_iqd - 70_000);
+});

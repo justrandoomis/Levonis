@@ -51,7 +51,7 @@ test('product variants and availability modes share the restrained accessible ch
   assert.doesNotMatch(product, /border-gold\s+bg-gold\/15\s+text-gold/);
 });
 
-test('language popover and modal layers use portals and one documented stack', () => {
+test('language sheet and modal layers use portals and one documented stack', () => {
   const overlay = read('src/components/ui/Overlay.tsx');
   const header = read('src/components/Header.tsx');
   assert.match(overlay, /UI_LAYERS/);
@@ -59,7 +59,10 @@ test('language popover and modal layers use portals and one documented stack', (
   assert.match(overlay, /visualViewport/);
   assert.match(overlay, /document\.getElementById\('main-scroll-container'\)/);
   assert.match(overlay, /createPortal\([\s\S]+document\.body/);
-  assert.match(header, /<Anchored[\s\S]{0,300}testId="header-language-menu"/);
+  // The globe opens the «اللغة والمظهر» sheet now (tests/langThemeSheet.test.ts);
+  // that sheet is the same portal-and-stack primitive.
+  assert.match(header, /<LangThemeButton\b/);
+  assert.match(read('src/components/LangThemeSheet.tsx'), /<Sheet[\s\S]{0,300}testId="lang-theme-sheet"/);
 });
 
 test('a modal hides the persistent nav and every legacy sheet is lifted above app chrome', () => {

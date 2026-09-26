@@ -26,7 +26,7 @@ import { specValue } from '../finder/strings';
 import { compareStrings, type CompareStrings } from './strings';
 import { lensStrings, type LensStrings } from './lensStrings';
 import RowBar from './RowBars';
-import { columnsTemplate } from './grid';
+import { columnGap, columnsTemplate } from './grid';
 import { useIsWide } from './useIsWide';
 
 /**
@@ -86,7 +86,7 @@ const isNumeric = (row: CompareRow) => row.parse === 'number' || row.parse === '
 
 function ValueText({ row, value, lang }: { row: CompareRow; value: CompareValue; lang: CompareLang }) {
   if (isNumeric(row)) return <bdi dir="ltr">{value.text}</bdi>;
-  const shown = row.parse === 'boolean' || row.parse === 'text' ? specValue(value.text, lang) : value.text;
+  const shown = row.parse === 'boolean' || row.parse === 'text' || row.parse === 'ordinal' ? specValue(value.text, lang) : value.text;
   // A Latin value (an English option, a model name) is an LTR island inside Arabic.
   return /[A-Za-z]/.test(shown) && !/[؀-ۿ]/.test(shown) ? <bdi dir="ltr">{shown}</bdi> : <>{shown}</>;
 }
@@ -147,7 +147,7 @@ function Cell({
 
 function hintText(row: CompareRow, ls: LensStrings): string {
   const h = rowHint(row);
-  return h === 'higher' ? ls.hintHigher : h === 'lower' ? ls.hintLower : h === 'informational' ? ls.hintInfo : ls.hintUnscored;
+  return h === 'higher' ? ls.hintHigher : h === 'lower' ? ls.hintLower : h === 'yes' ? ls.hintYes : h === 'informational' ? ls.hintInfo : ls.hintUnscored;
 }
 
 function Row({
@@ -180,7 +180,7 @@ function Row({
       role="row"
       data-field={row.field_id}
       data-lens-row={tinted || undefined}
-      className={`grid gap-x-3 gap-y-2 border-b border-border-subtle py-3.5 ps-3 pe-1 transition-colors ${
+      className={`grid ${columnGap(products.length, wide)} gap-y-2 border-b border-border-subtle py-3.5 ps-3 pe-1 transition-colors ${
         tinted ? 'border-s-[3px] border-s-gold bg-[color-mix(in_oklab,var(--color-gold)_7%,transparent)]' : 'border-s-[3px] border-s-transparent'
       }`}
       style={{ gridTemplateColumns: columnsTemplate(products.length, wide) }}

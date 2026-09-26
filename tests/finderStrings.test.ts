@@ -58,6 +58,11 @@ const SAMPLE: Record<string, string> = {
   print_speed: '1,000 mm/s',
   max_acceleration: '20,000 mm/s²',
   max_colors: '25',
+  // Owner round 11: colour is quoted from the facts that separate a tool
+  // changer from a single nozzle (worker/lib/multicolor.ts).
+  max_colors_native: '4',
+  purge_waste: 'Near zero',
+  colors_out_of_box: '4',
   min_layer_height: '0.04 mm',
   xy_resolution: '19 µm',
   noise_level: '48 dB',
@@ -224,4 +229,13 @@ test('SORANI IS NEVER MACHINE-WRITTEN: ckb reads the Arabic, and the files say s
   for (const f of ['src/components/finder/strings.ts', 'src/components/compare/lensStrings.ts']) {
     assert.match(read(f), /OWNER: Sorani to be written by hand\./, `${f} lacks the OWNER marker`);
   }
+});
+
+test('colour reasons: a purge is never praised, and a single colour is never a multicolour reason', () => {
+  const colour = (field_id: string, value_text: string) => reasonCopy({ code: 'colors', field_id, value_text }, 'ar');
+  assert.equal(colour('purge_waste', 'High'), null, '«High» waste is not a reason to buy');
+  assert.equal(colour('max_colors_native', '1'), null, 'one colour without swaps is not a colour claim');
+  assert.match(colour('max_colors_native', '2')!.text, /لونين/);
+  assert.match(colour('purge_waste', 'Low')!.text, /قليل/);
+  assert.match(colour('max_colors', '16')!.text, /AMS/, 'the AMS ceiling always says it is WITH AMS');
 });

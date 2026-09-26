@@ -92,6 +92,13 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'coupon_redemptions', 'return_cases', 'price_protection_claims',
     // 0140 — an admin's proposed new final total and the customer's decision on it.
     'order_price_adjustments',
+    // 0143 — «استبدال الجهاز». A delivered LEVONIS line exchanged against a new
+    // device. Commerce's and not Devices': the unit and its warranty are only
+    // READ (to date the usage and the cover left); what this feature writes is
+    // a valuation and a credit, and the credit is spent at Commerce's own
+    // checkout through a coupon the request mints (`coupons.trade_in_id`).
+    'trade_in_rule_sets', 'trade_in_rules', 'trade_in_requests', 'trade_in_components',
+    'trade_in_photos', 'trade_in_events', 'trade_in_claims',
     // The buyer's choices behind one bundle cart line, and the fence that makes a
     // partial inventory movement impossible inside the order's own batch (§1.5, §1.7).
     'cart_bundle_choices', 'order_reservation_fence',

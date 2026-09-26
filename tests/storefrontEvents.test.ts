@@ -141,7 +141,11 @@ test('one network cannot mint visitors without limit: at most the cap of anonymo
   assert.equal(storeDay(raw)!.visitors, ANON_VISITORS_PER_NETWORK + 2, 'the capped network, another network, a signed-in account');
 });
 
-test('the per-minute limit answers 429 to a flood from one network', async () => {
+test('the per-minute limit answers 429 to a flood from one network', async (t) => {
+  // The limiter's windows are aligned to the clock (60 s); 245 calls on a slow
+  // runner could straddle a minute boundary and start a fresh window, so the
+  // clock is held a second into one.
+  t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 0, 1, 0, 0, 1) });
   const raw = seedW2E();
   let limited = 0;
   for (let i = 0; i < 245; i++) {

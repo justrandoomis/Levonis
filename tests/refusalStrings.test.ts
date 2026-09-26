@@ -167,6 +167,9 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/lib/orderPriceAdjust.ts',
     'worker/routes/orderPriceAdjust.ts',
     'packages/pricing/src/priceAdjustment.ts',
+    // «الاستبدال» (0143): eligibility, the draft, the photos, the value, the credit.
+    'worker/lib/tradeIn.ts',
+    'worker/routes/tradeIn.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

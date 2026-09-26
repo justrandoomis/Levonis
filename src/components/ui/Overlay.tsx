@@ -297,8 +297,12 @@ export interface OverlayProps {
   anchor?: React.RefObject<HTMLElement | null>;
   /** Extra classes for the panel. Geometry only — the material is provided. */
   panelClassName?: string;
-  /** Where the panel sits in the viewport. */
-  placement?: 'center' | 'bottom' | 'top';
+  /**
+   * Where the panel sits in the viewport. `dock` is a bottom sheet at EVERY
+   * width (a phone and an iPad alike): it slides up from the bottom edge and
+   * slides back down, where `bottom` becomes a centred card from `sm` up.
+   */
+  placement?: 'center' | 'bottom' | 'top' | 'dock';
   /** Escape closes by default; pass false for a window that must be answered. */
   dismissOnEscape?: boolean;
   /** Tapping the scrim closes by default; same exception. */
@@ -332,12 +336,19 @@ export interface OverlayProps {
    * caller supplies the background in `panelClassName`.
    */
   solid?: boolean;
+  /**
+   * Called once the window has fully left the screen (its exit animation
+   * finished). For a caller that must act only after the window is gone — the
+   * header sheet applies a theme or a language only once it has slid away.
+   */
+  onExited?: () => void;
 }
 
 const PLACEMENT: Record<NonNullable<OverlayProps['placement']>, string> = {
   center: 'items-center justify-center p-4',
   bottom: 'items-end justify-center p-0 sm:items-center sm:p-4',
   top: 'items-start justify-center p-4',
+  dock: 'items-end justify-center p-0',
 };
 
 /** transform-origin that points at the trigger, in the panel's own box. */
@@ -373,6 +384,7 @@ export function Overlay({
   testId,
   panelMotion,
   solid = false,
+  onExited,
 }: OverlayProps) {
   const m = useMotion();
   const { dir, lang } = useLanguage();
@@ -547,13 +559,20 @@ export function Overlay({
     };
   }, [open]);
 
-  const travel = placement === 'bottom' ? m.travel(28) : m.travel(14);
-  const scaleFrom = m.reduced ? 1 : anchor ? 0.9 : 0.96;
-  const blurFrom = m.reduced ? 0 : 8;
+  const dock = placement === 'dock';
+  // A docked sheet travels its whole height: it rises from the bottom edge and
+  // is lowered back below it («إنزال النافذة بشكل سلس للأسفل»). It does not
+  // scale or blur — a sheet slides, it does not materialize — and it stays
+  // opaque while it moves, except under reduced motion, where the slide is a
+  // cross-fade.
+  const travel: number | string = dock ? (m.reduced ? 0 : '100%') : placement === 'bottom' ? m.travel(28) : m.travel(14);
+  const scaleFrom = m.reduced || dock ? 1 : anchor ? 0.9 : 0.96;
+  const blurFrom = m.reduced || dock ? 0 : 8;
+  const fadeFrom = dock && !m.reduced ? 1 : 0;
   const callerStyle = panelMotionRest.style as React.CSSProperties | undefined;
 
   return createPortal(
-    <AnimatePresence>
+    <AnimatePresence onExitComplete={onExited}>
       {open && (
         <div
           ref={layerRef}
@@ -578,14 +597,14 @@ export function Overlay({
             data-overlay-panel
             // ENTER AND EXIT ARE THE SAME OBJECT, so they cannot disagree. The
             // blur travels with the scale: the surface materializes.
-            initial={{ opacity: 0, scale: scaleFrom, y: travel, filter: `blur(${blurFrom}px)` }}
+            initial={{ opacity: fadeFrom, scale: scaleFrom, y: travel, filter: `blur(${blurFrom}px)` }}
             animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, scale: scaleFrom, y: travel, filter: `blur(${blurFrom}px)` }}
-            transition={m.spring(placement === 'bottom' ? 'sheet' : 'ui')}
+            exit={{ opacity: fadeFrom, scale: scaleFrom, y: travel, filter: `blur(${blurFrom}px)` }}
+            transition={m.spring(placement === 'bottom' || dock ? 'sheet' : 'ui')}
             {...panelMotionRest}
             style={{ transformOrigin: originRef.current, outline: 'none', ...callerStyle }}
             className={`relative min-w-0 ${solid ? 'shadow-2xl' : 'bg-surface-raised border border-border-subtle shadow-2xl'} ${
-              placement === 'bottom' ? 'rounded-t-xl sm:rounded-xl' : 'rounded-xl'
+              dock ? 'rounded-t-xl' : placement === 'bottom' ? 'rounded-t-xl sm:rounded-xl' : 'rounded-xl'
             } ${panelClassName}`}
           >
             {typeof children === 'function' ? children({ close: requestClose }) : children}
@@ -613,6 +632,12 @@ export interface SheetProps extends Omit<OverlayProps, 'placement' | 'anchor'> {
   /** Rough panel height in px, used for the rubber-band scale and the
    *  dismissal threshold. Measured when omitted. */
   height?: number;
+  /**
+   * Stay a bottom sheet at every width (see `placement: 'dock'`) instead of
+   * becoming a centred card from `sm` up. The safe-area padding then applies
+   * at every width too.
+   */
+  docked?: boolean;
 }
 
 /**
@@ -629,7 +654,7 @@ export interface SheetProps extends Omit<OverlayProps, 'placement' | 'anchor'> {
  * separate module on purpose: this file is in every visitor's first load
  * (the header's menus use `Anchored`), and the v2 gesture code is not.
  */
-export function Sheet({ open, onClose, children, height, panelClassName = '', ...rest }: SheetProps) {
+export function Sheet({ open, onClose, children, height, docked = false, panelClassName = '', ...rest }: SheetProps) {
   const m = useMotion();
   const measured = useRef(0);
   // Stable, so the merged panel ref in Overlay is not re-attached every render.
@@ -671,8 +696,8 @@ export function Sheet({ open, onClose, children, height, panelClassName = '', ..
     <Overlay
       open={open}
       onClose={onClose}
-      placement="bottom"
-      panelClassName={`pb-[env(safe-area-inset-bottom)] sm:pb-0 ${panelClassName}`}
+      placement={docked ? 'dock' : 'bottom'}
+      panelClassName={`pb-[env(safe-area-inset-bottom)] ${docked ? '' : 'sm:pb-0 '}${panelClassName}`}
       panelMotion={panelMotion}
       {...rest}
     >

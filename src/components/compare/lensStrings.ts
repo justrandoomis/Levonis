@@ -28,6 +28,8 @@ export interface LensStrings {
   hintHigher: string;
   hintLower: string;
   hintInfo: string;
+  /** A Yes/No row: «نعم» wins. */
+  hintYes: string;
   hintUnscored: string;
   priceHint: string;
   cheapest: string;
@@ -44,6 +46,14 @@ export interface LensStrings {
   more: string;
   less: string;
   lensTinted: (lens: string) => string;
+  /** The column's configuration switcher. */
+  variant: string;
+  variantOf: (name: string) => string;
+  baseVariant: string;
+  /** «A1 Combo» and «A1» are two machines — the note under a switched column. */
+  priceAsSold: string;
+  /** «ليزر 10W» — the configuration ships with a laser module. */
+  laser: (watts: number) => string;
 }
 
 const ORDINAL_AR = ['', 'أولى', 'ثانية', 'ثالثة', 'رابعة'];
@@ -64,6 +74,7 @@ const AR: LensStrings = {
   hintHigher: 'الأعلى أفضل',
   hintLower: 'الأقل أفضل',
   hintInfo: 'للمعلومة، لا يُحتسب',
+  hintYes: 'وجودها أفضل',
   hintUnscored: 'لا يُحتسب: قيمة غير مذكورة',
   priceHint: 'مفاضلة، لا يدخل في النتيجة',
   cheapest: 'الأقل',
@@ -81,6 +92,11 @@ const AR: LensStrings = {
   more: 'المزيد',
   less: 'أقل',
   lensTinted: (lens) => `صفوف «${lens}» مظللة`,
+  variant: 'الخيار',
+  variantOf: (name) => `اختر خيار ${name}`,
+  baseVariant: 'الأساسي',
+  priceAsSold: 'سعر البيع المباشر لهذا الخيار',
+  laser: (w) => `ليزر ${w} واط`,
 };
 
 const EN: LensStrings = {
@@ -99,6 +115,7 @@ const EN: LensStrings = {
   hintHigher: 'Higher is better',
   hintLower: 'Lower is better',
   hintInfo: 'For information, not scored',
+  hintYes: 'Having it is better',
   hintUnscored: 'Not scored: a value is missing',
   priceHint: 'A trade-off, not scored',
   cheapest: 'Lowest',
@@ -115,6 +132,11 @@ const EN: LensStrings = {
   more: 'More',
   less: 'Less',
   lensTinted: (lens) => `«${lens}» rows highlighted`,
+  variant: 'Option',
+  variantOf: (name) => `Choose the ${name} option`,
+  baseVariant: 'Base',
+  priceAsSold: 'Direct-sale price of this option',
+  laser: (w) => `${w} W laser`,
 };
 
 export function lensStrings(lang: Lang | string): LensStrings {

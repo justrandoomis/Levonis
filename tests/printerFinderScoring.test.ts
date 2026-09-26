@@ -14,6 +14,8 @@ import { runFinder, finderWeights, AVAILABLE_NOW_BONUS } from '../worker/lib/pri
 import { parseFinderParams } from '../packages/catalog/src/discovery';
 import { P } from './fixtures/liveCatalog';
 import { liveCandidates } from './fixtures/finderCandidates';
+import { liveColourFacts } from './fixtures/livePrinterOptions';
+import { variantSheet } from '../worker/lib/multicolor';
 
 const answers = (q: string) => {
   const p = new URLSearchParams(q);
@@ -21,21 +23,35 @@ const answers = (q: string) => {
 };
 const ids = (r: { results: Array<{ card: { id: string } }> }) => r.results.map((x) => x.card.id);
 
-test('ACCEPTANCE: business · FDM · 1.25–2.5M · any sale · [speed, colors] · intermediate → X2D, H2S, P2S; U1 ranked lower', () => {
-  const out = runFinder(liveCandidates(), answers('use=business&tech=fdm&budget=1250000-2500000&sale=any&prio=speed,colors&level=intermediate'));
-  assert.deepEqual(ids(out), [P.X2D, P.H2S, P.P2S]);
-  assert.deepEqual(out.excluded.ranked_lower, [P.U1]);
+test('ACCEPTANCE: business · FDM · 1.25–2.5M · any sale · [speed, colors] · intermediate → X2D, H2S, then the U1 on its four clean colours', () => {
+  // The live sheets WITH the 0144 colour facts (the state the owner's shop is
+  // in). Owner round 11: «U1 ranked lower» was the defect — colour was read
+  // as the AMS ceiling alone, so four independent toolheads lost to 20 swaps
+  // through one nozzle. Now the U1 is third on its native colours, and the
+  // P2S (within 0.02) joins as the fourth.
+  const facts = liveColourFacts();
+  const cands = liveCandidates((p) => ({ spec_fields: variantSheet({ ...p.spec_fields, ...(facts.get(p.id) ?? {}) }, null) as Record<string, string> }));
+  const out = runFinder(cands, answers('use=business&tech=fdm&budget=1250000-2500000&sale=any&prio=speed,colors&level=intermediate'));
+  assert.deepEqual(ids(out), [P.X2D, P.H2S, P.U1, P.P2S]);
+  assert.deepEqual(out.excluded.ranked_lower, []);
   assert.equal(out.excluded.budget.length, 6, '«6 خارج ميزانيتك»');
   assert.equal(out.total, 10);
   assert.equal(out.tech_matches, 10);
   assert.ok(out.results.every((r) => r.relaxed.length === 0));
-  const [x2d, h2s] = out.results;
-  assert.deepEqual(x2d.reasons.map((r) => r.code), ['in_stock', 'speed', 'colors']);
+  const [x2d, h2s, u1] = out.results;
+  assert.deepEqual(x2d.reasons.map((r) => r.code), ['in_stock', 'speed', 'reliability']);
   assert.equal(x2d.reasons[0].units, 2);
   assert.deepEqual(x2d.reasons[1], { code: 'speed', field_id: 'print_speed', value_text: '1,000 mm/s', top: true });
-  assert.deepEqual(x2d.reasons[2], { code: 'colors', field_id: 'max_colors', value_text: '25', top: true });
-  assert.equal(h2s.reasons[2].top, false, 'H2S has 24 colours — not the most');
-  assert.deepEqual(out.results[2].caveats, [{ code: 'weak', criterion: 'speed', field_id: 'print_speed', value_text: '600 mm/s' }]);
+  assert.deepEqual(u1.reasons[1], { code: 'colors', field_id: 'max_colors_native', value_text: '4', top: true });
+  // One nozzle: its colours come from swaps, and the caveat says so.
+  assert.deepEqual(h2s.caveats, [{ code: 'weak', criterion: 'colors', field_id: 'max_colors_native', value_text: '1' }]);
+});
+
+test('a weak colour SCORE built from missing facts is a gap, never «25 colours, behind the others»', () => {
+  // The sheets as they were before 0144: the X2D states only its AMS ceiling.
+  const out = runFinder(liveCandidates(), answers('use=business&tech=fdm&budget=1250000-2500000&sale=any&prio=speed,colors&level=intermediate'));
+  const x2d = out.results.find((r) => r.card.id === P.X2D)!;
+  assert.deepEqual(x2d.caveats, [{ code: 'missing', criterion: 'colors', field_id: 'max_colors_native' }]);
 });
 
 test('DIRECT-ONLY under 750k relaxes, one step at a time, and labels what it relaxed', () => {

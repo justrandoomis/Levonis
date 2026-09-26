@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy } from 'lucide-react';
+import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supportTotal, useSupportCounts } from '../components/adminSupport/supportCounts';
 import { useAuth } from '../AuthContext';
@@ -98,6 +98,13 @@ const PriceReportsPanel = React.lazy(() => import('../components/adminPriceRepor
 // and a taxonomy reader nobody else on this page needs.
 const AdminBenefits = React.lazy(() => import('../components/adminBenefits/AdminBenefits'));
 const AdminFarmConfig = React.lazy(() => import('../components/adminFarm/AdminFarmConfig'));
+/**
+ * «الاستبدال (Trade-in)» — the review desk for trade-in requests and the
+ * editor of the rules that value them (migration 0143). Its own chunk: the
+ * rules editor carries the valuation engine and a calculator nobody else on
+ * this page needs.
+ */
+const AdminTradeIn = React.lazy(() => import('../components/adminTradeIn/AdminTradeIn'));
 
 /**
  * What a tab shows while its chunk arrives. Deliberately the panel's own empty
@@ -118,6 +125,7 @@ type AdminTab =
   | 'finance'
   | 'inventory'
   | 'orders'
+  | 'trade_in'
   | 'products'
   | 'bundles'
   | 'mystery'
@@ -151,7 +159,7 @@ type AdminTab =
  * (`?tab=wallet_requests&op=…`). Read once, for the first render only; anything
  * else, or nothing, opens the overview exactly as before.
  */
-const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests'];
+const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in'];
 
 function initialAdminTab(): AdminTab {
   try {
@@ -184,6 +192,11 @@ export default function Admin() {
   const sidebarItems = [
     { id: 'overview', icon: LayoutDashboard, label: loc('نظرة عامة', 'Overview', 'پێداچوونەوە'), ...section('operations', 'التشغيل', 'Operations', 'بەڕێوەبردن') },
     { id: 'orders', icon: ClipboardList, label: loc('الطلبات', 'Orders', 'داواکارییەکان'), ...section('operations', 'التشغيل', 'Operations') },
+    // «الاستبدال (Trade-in)» — under Operations beside the orders it turns
+    // into: a request the desk reviews, inspects and values. The Kurdish label
+    // is the owner's to write by hand; a Kurdish-reading admin gets the Arabic.
+    // OWNER: Sorani to be written by hand.
+    { id: 'trade_in', icon: Repeat, label: loc('الاستبدال (Trade-in)', 'Trade-in'), ...section('operations', 'التشغيل', 'Operations') },
     ...(canSeeFinance
       ? [{ id: 'finance', icon: TrendingUp, label: loc('الأرباح والتكاليف', 'Profit & costs', 'قازانج و تێچوون'), ...section('operations', 'التشغيل', 'Operations') }]
       : []),
@@ -246,7 +259,7 @@ export default function Admin() {
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
       <Toaster />
-      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'serials' || activeTab === 'membership_benefits' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
+      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'serials' || activeTab === 'membership_benefits' || activeTab === 'trade_in' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
         <React.Suspense fallback={<PanelFallback dir={dir} />}>
 
         {activeTab === 'overview' && (
@@ -256,6 +269,8 @@ export default function Admin() {
         {activeTab === 'orders' && (
           <OrdersBoard />
         )}
+
+        {activeTab === 'trade_in' && <AdminTradeIn />}
 
         {activeTab === 'finance' && canSeeFinance && (
           <AdminFinance />

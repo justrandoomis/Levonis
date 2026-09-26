@@ -193,6 +193,30 @@ export type FinderCaveat =
   | { code: 'relaxed'; relaxation: FinderRelaxation }
   | { code: 'professional' };
 
+/**
+ * «لماذا هذه الطابعة؟» — the answers this machine meets, as CODES in the order
+ * the customer gave them. The client writes one short sentence from them; the
+ * numbers are the shop's own (the sheet, the resolved price), never invented.
+ */
+export type FinderWhy =
+  | { code: 'colors_native'; colors: number; waste: 'near_zero' | 'low' | 'high' | null; method: 'dual_nozzle' | 'tool_changer' | 'multi_nozzle' }
+  | { code: 'colors_ams'; colors: number; out_of_box: number | null }
+  | { code: 'use_listed'; use: string }
+  | { code: 'budget'; price_iqd: number }
+  | { code: 'direct'; units: number }
+  | { code: 'beginner' }
+  | { code: 'laser'; watts: number | null };
+
+/** The configuration a result is — «A1 Combo» rather than «A1» — when the product has options. */
+export interface FinderVariant {
+  option_id: string;
+  label: Trilingual;
+  /** The configuration's direct-sale price, from the product page's resolver. */
+  price_iqd: number;
+  /** How many other configurations of the same printer were weighed. */
+  others: number;
+}
+
 export interface FinderResult<Card = unknown> {
   card: Card;
   rank: number;
@@ -201,6 +225,8 @@ export interface FinderResult<Card = unknown> {
   relaxed: FinderRelaxation[];
   reasons: FinderReason[];
   caveats: FinderCaveat[];
+  why?: FinderWhy[];
+  variant?: FinderVariant | null;
 }
 
 export interface FinderExcluded {

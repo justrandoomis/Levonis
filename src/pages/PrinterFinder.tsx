@@ -6,7 +6,7 @@ import { useGoBack } from '../lib/useGoBack';
 import { useMotion } from '../lib/motion';
 import { useConfirm } from '../components/ui/ConfirmDialog';
 import { emptyAnswers } from '../lib/finder/answers';
-import type { FinderAnswers, FinderPriority } from '../../packages/catalog/src/discovery';
+import type { FinderAnswers, FinderColorNeed, FinderPriority } from '../../packages/catalog/src/discovery';
 import type { FinderMeta } from '../../packages/catalog/src/discoveryTypes';
 import FinderChrome, { ChromeTextButton } from '../components/finder/FinderChrome';
 import AnsweredChips from '../components/finder/AnsweredChips';
@@ -123,7 +123,10 @@ export default function PrinterFinder() {
       cancelAdvance();
       // The choice is in the URL at once (a refresh keeps it), the move follows.
       write(next, { kind: 'step', index: STEPS.indexOf(key) });
-      if (viaPointer && AUTO_ADVANCE[key]) {
+      // «طباعة متعددة الألوان» waits for its follow-up («أي نوع؟») unless it
+      // is already answered: advancing would hide the question it just opened.
+      const waitsForFollowUp = key === 'use' && value === 'multicolor' && !answers.mc;
+      if (viaPointer && AUTO_ADVANCE[key] && !waitsForFollowUp) {
         timer.current = window.setTimeout(() => {
           timer.current = null;
           setTravel(1);
@@ -146,6 +149,24 @@ export default function PrinterFinder() {
     [answers, write]
   );
   useEffect(() => setRefused(false), [stepIndex]);
+
+  /** The colour follow-up: stored at once; on the first question it also advances, like any tile. */
+  const onColorNeed = useCallback(
+    (need: FinderColorNeed, viaPointer: boolean) => {
+      const next: FinderAnswers = { ...answers, mc: need };
+      const index = stepIndex;
+      cancelAdvance();
+      write(next, { kind: 'step', index });
+      if (viaPointer && STEPS[index] === 'use') {
+        timer.current = window.setTimeout(() => {
+          timer.current = null;
+          setTravel(1);
+          write(next, nextView(next, index));
+        }, AUTO_ADVANCE_MS);
+      }
+    },
+    [answers, stepIndex, write]
+  );
 
   const onNext = () => {
     if (!stepKey) return;
@@ -234,6 +255,7 @@ export default function PrinterFinder() {
                 onSingle={onSingle}
                 onPriority={onPriority}
                 priorityRefused={refused}
+                onColorNeed={onColorNeed}
               />
             </>
           ) : (

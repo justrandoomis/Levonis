@@ -10,3 +10,12 @@ export function columnsTemplate(columns: number, wide: boolean): string {
   const cols = `repeat(${Math.max(1, columns)}, minmax(0, 1fr))`;
   return wide ? `minmax(150px, 200px) ${cols}` : cols;
 }
+
+/**
+ * The gutter between columns, shared by the header and every row so a value
+ * stays under its photograph. Four columns on a phone leave ~75 px each; the
+ * 12 px gutter would spend 36 px of the screen on air, so it tightens to 8.
+ */
+export function columnGap(columns: number, wide: boolean): string {
+  return !wide && columns >= 4 ? 'gap-x-2' : 'gap-x-3';
+}

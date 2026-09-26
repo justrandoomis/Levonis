@@ -125,10 +125,25 @@ export default function VerdictBand({
         <p className="mt-2 text-[12px] leading-5 text-[var(--color-text-muted)]">{s.tiedNote}</p>
       ) : null}
 
+      {/*
+        THE RAIL BLEEDS EXACTLY AS FAR AS ITS CONTAINER'S PADDING, NO FURTHER.
+
+        «إزاحة الكانفاس عند الضغط على التفاصيل الكاملة للنتيجة في الأجهزة
+        الصغيرة». This rail was written for the page column (`px-4`) and bled
+        16 px with `-mx-4 px-4`; it now lives inside the «التفاصيل الكاملة»
+        panel, whose padding is 12 px, so the scroller reached 4 px PAST the
+        panel's border on both sides: the cards were drawn outside the card
+        they belong to, and on a phone a sideways drag moved content that
+        sat outside the frame. The bleed is now the container's own padding
+        (`--rail-bleed`, set by whoever hosts the rail; 1rem on the page),
+        and a card's cap is a share of the RAIL (82%), not of the viewport —
+        `vw` does not know it is inside a padded panel.
+      */}
       <div
         ref={rail.ref}
         className="
-          mt-3 flex gap-3 overflow-x-auto pb-1 -mx-4 px-4
+          mt-3 flex gap-3 overflow-x-auto overscroll-x-contain pb-1
+          -mx-[var(--rail-bleed,1rem)] px-[var(--rail-bleed,1rem)]
           [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
           sm:mx-0 sm:px-0 sm:overflow-visible sm:grid sm:gap-3
           sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))]
@@ -143,7 +158,7 @@ export default function VerdictBand({
             <article
               key={product.id}
               data-verdict-card
-              className="lv-surface-raised shrink-0 w-[15rem] max-w-[82vw] p-3 sm:w-auto sm:max-w-none"
+              className="lv-surface-raised shrink-0 w-[15rem] max-w-[82%] p-3 sm:w-auto sm:max-w-none"
               style={{ borderColor: tone.edge }}
             >
               <div className="flex items-start gap-3">

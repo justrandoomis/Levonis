@@ -51,7 +51,7 @@ export type FieldType = 'text' | 'number' | 'select' | 'multiline' | 'hex';
  */
 export interface SpecCompare {
   /** How to read the stored string as something comparable. */
-  parse: 'number' | 'dimensions' | 'boolean' | 'list' | 'range' | 'text';
+  parse: 'number' | 'dimensions' | 'boolean' | 'list' | 'range' | 'text' | 'ordinal';
   /** Which direction wins. 'none' = shown, never scored. */
   better: 'higher' | 'lower' | 'yes' | 'none';
   /** Relative weight in the headline verdict. Omitted or 0 = not scored. */
@@ -62,6 +62,18 @@ export interface SpecCompare {
    * compare page printed the second; docs/ux/CATALOG_DISCOVERY.md §0).
    */
   plain?: boolean;
+  /**
+   * `parse: 'ordinal'` only: the field's option strings from LOWEST to HIGHEST,
+   * read case-insensitively. The value's position is its number, and `better`
+   * says which end wins — `purge_waste` is ['Near zero', 'Low', 'High'] with
+   * `better: 'lower'`, so «less waste is better» is one annotation, not code.
+   */
+  scale?: readonly string[];
+  /**
+   * Never a comparison row and never a product-page row: an instruction to the
+   * engine rather than a spec (`variant_specs`, read by worker/lib/multicolor.ts).
+   */
+  hidden?: boolean;
 }
 
 export interface TemplateField {
@@ -374,8 +386,60 @@ export const DEVICES: TemplateFamilyDef = {
         t('chamber_temp_max', 'أقصى حرارة الغرفة', 'Max chamber temperature', 'number', {
           unit: '°C', compare: { parse: 'number', better: 'higher', weight: 2 }, hint_ar: 'للغرفة المُسخّنة فعليًا فقط — مثال: 60. اتركه فارغًا إذا الهيكل مغلق بلا تسخين',
         }),
-        t('max_colors', 'أقصى عدد ألوان', 'Maximum colours', 'number', {
-          compare: { parse: 'number', better: 'higher', weight: 1 }, hint_ar: 'أقصى عدد ألوان في طبعة واحدة — مثال: 16',
+        /* THE CEILING WITH EVERY AMS / EXPANSION UNIT — not what the machine
+           does out of the box, and not what it does without waste. Those are
+           `colors_out_of_box` and `max_colors_native` below; ranking on this
+           one alone told a buyer that 25 swaps through one nozzle beat four
+           independent toolheads (worker/lib/multicolor.ts). */
+        t('max_colors', 'أقصى عدد ألوان (مع وحدات AMS)', 'Maximum colours (with AMS units)', 'number', {
+          compare: { parse: 'number', better: 'higher', weight: 1 }, hint_ar: 'أقصى عدد ألوان في طبعة واحدة مع أقصى عدد من وحدات AMS/التوسعة — مثال: 16',
+        }),
+        /* HOW the colours are made — the fact every other colour row depends
+           on. Shown, not scored: `max_colors_native` and `purge_waste` already
+           carry what the method means for the buyer. */
+        t('multicolor_method', 'طريقة تعدد الألوان', 'Multi-colour method', 'select', {
+          options: ['None', 'Single nozzle + AMS', 'Dual nozzle', 'Tool changer', 'Multi-nozzle (hotend changer)'],
+          compare: { parse: 'text', better: 'none' },
+          hint_ar: 'Single nozzle + AMS لطابعات النوزل الواحد (A1/P1S/P2S/H2S) — Dual nozzle لـ H2D/X2D — Tool changer لـ Snapmaker U1 — Multi-nozzle لـ H2C',
+        }),
+        t('max_colors_native', 'ألوان بلا تبديل فلامنت', 'Colours without filament swaps', 'number', {
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+          hint_ar: 'كم لونًا تطبع دون تبديل الفلامنت داخل نوزل واحد — 1 للنوزل الواحد، 2 للنوزل المزدوج، 4 لـ U1',
+        }),
+        t('purge_waste', 'هدر الفلامنت عند تغيير اللون', 'Purge waste on colour change', 'select', {
+          options: ['Near zero', 'Low', 'High'],
+          compare: { parse: 'ordinal', better: 'lower', weight: 2, scale: ['Near zero', 'Low', 'High'] },
+          hint_ar: 'ضمن الألوان بلا تبديل — High لطابعات النوزل الواحد مع AMS',
+        }),
+        t('multi_material', 'مواد مختلفة في طبعة واحدة', 'Multi-material in one print', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
+          hint_ar: 'مثال: PLA مع دعامات PETG أو TPU بلا تنازلات — Yes للرؤوس/النوزلات المستقلة',
+        }),
+        /* WHAT CHANGES WITH THE OPTION. Filled here for a printer with no
+           options, and per option through `variant_specs` below. */
+        t('colors_out_of_box', 'ألوان جاهزة كما تُباع', 'Colours as sold', 'number', {
+          compare: { parse: 'number', better: 'higher', weight: 1 },
+          hint_ar: 'كم لونًا تطبع بهذا الخيار دون شراء أي إضافة — مثال: 4 لـ A1 Combo و1 لـ A1',
+        }),
+        t('ams_units_included', 'وحدات AMS في العلبة', 'AMS units in the box', 'number', {
+          compare: { parse: 'number', better: 'none' },
+          hint_ar: 'مثال: 0 للطابعة وحدها، 1 للكومبو',
+        }),
+        t('laser_module_power', 'وحدة الليزر المرفقة', 'Included laser module', 'number', {
+          unit: 'W',
+          compare: { parse: 'number', better: 'none' },
+          hint_ar: 'قدرة وحدة الليزر في هذا الخيار — مثال: 10 أو 40. فارغ = بلا ليزر',
+        }),
+        t('cutting_module', 'وحدة القص والقلم', 'Cutting / pen module', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'none' },
+        }),
+        /* ONE LINE PER OPTION, and the only place per-option specs live. Read
+           by worker/lib/multicolor.ts `variantSheet`; never shown as a row. */
+        t('variant_specs', 'مواصفات تختلف حسب الخيار', 'Per-option spec differences', 'multiline', {
+          compare: { parse: 'text', better: 'none', hidden: true },
+          hint_ar: 'سطر لكل خيار بمفتاحه: a1-combo: ams_units_included=1, colors_out_of_box=4 — المسموح: ams_units_included, colors_out_of_box, laser_module_power, cutting_module',
         }),
         t('thermal_runaway_protection', 'الحماية من الانفلات الحراري', 'Thermal runaway protection', 'select', {
           options: ['Yes', 'No'], compare: { parse: 'boolean', better: 'yes', weight: 2 }, hint_ar: 'مثال: Yes',
@@ -1731,7 +1795,7 @@ export function allTemplateGroups(): TemplateGroup[] {
 
 export function specGroupsFromFields(
   values: Record<string, string> | null | undefined,
-  exclude: readonly string[] = ['in_the_box']
+  exclude: readonly string[] = ['in_the_box', 'variant_specs']
 ): DerivedSpecGroup[] {
   if (!values) return [];
   const skip = new Set(exclude);

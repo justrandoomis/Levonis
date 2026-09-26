@@ -40,9 +40,12 @@ import type {
   FinderReason,
   FinderRelaxation,
   FinderResult,
+  FinderVariant,
+  FinderWhy,
 } from '@levonis/catalog/discoveryTypes';
 import { readBoolean, readCompareValue, readDimensions, readList, readNumber } from './compareSpecs';
 import { allTemplateGroups, type TemplateField } from './templateFamilies';
+import { COLOR_PART_WEIGHTS, colorParts, multicolorProfile, type ColorNeed } from './multicolor';
 
 // ---------------------------------------------------------------- the inputs
 
@@ -60,6 +63,15 @@ export interface FinderCandidate<Card = Record<string, unknown>> {
   specs: Record<string, unknown>;
   /** A stable tie-break (the catalogue order). */
   rank: number;
+  /**
+   * The PRODUCT this candidate is a configuration of. «A1» and «A1 Combo» are
+   * two candidates (two prices, two sheets) and one product: the results show
+   * the best-matching configuration once, never the same printer twice.
+   * Absent = the candidate is its own product.
+   */
+  productId?: string;
+  /** The configuration, when the product has options. */
+  variant?: FinderVariant | null;
 }
 
 export type FinderTechGroup = 'fdm' | 'resin' | 'laser' | null;
@@ -205,7 +217,14 @@ const PARTS: Record<Exclude<FinderCriterion, 'quality' | 'use_fit' | 'ease'>, Pa
     { field: 'print_speed', weight: 0.7, read: num('print_speed', 'mm/s') },
     { field: 'max_acceleration', weight: 0.3, read: num('max_acceleration', 'mm/s²') },
   ],
-  colors: [{ field: 'max_colors', weight: 1, read: (s) => { const n = num('max_colors')(s); return n !== null && n > 0 ? Math.log2(n) : null; } }],
+  /*
+   * COLOUR IS THREE FACTS, NOT ONE NUMBER (worker/lib/multicolor.ts). The
+   * AMS ceiling alone ranked 25 filament swaps through one nozzle above four
+   * independent toolheads. Every part is on an ABSOLUTE scale, so a need for
+   * «few colours, no waste» means the same thing whichever printers survive.
+   * The weights are replaced per answer in `colorParts`.
+   */
+  colors: [],
   quiet: [{ field: 'noise_level', weight: 1, read: num('noise_level', 'dB'), lower: true }],
   size: [
     { field: 'build_volume', weight: 0.6, read: (s) => volumeOf(s)?.longest ?? null },
@@ -226,13 +245,36 @@ const PARTS: Record<Exclude<FinderCriterion, 'quality' | 'use_fit' | 'ease'>, Pa
   ],
 };
 
+/**
+ * The colour parts for a stated need (`answers.mc`): «few» — native colours and
+ * low waste lead; «many» — the AMS ceiling leads; none — a balance. Absolute
+ * 0..1 scales, the same ones `colorFit` uses for the compare lens.
+ */
+function colorPartsFor(need: ColorNeed | null): Part[] {
+  const w = COLOR_PART_WEIGHTS[need ?? 'none'];
+  // The same four absolute scales the compare lens uses (`colorParts`); the
+  // fourth — colours AS SOLD — is what tells «P2S» (one colour until an AMS is
+  // bought) from «P2S Combo» (four). Without it the cheaper bare machine won
+  // every colour answer on price alone.
+  const at = (k: number) => (s: Record<string, unknown>) => colorParts(multicolorProfile(s))[k];
+  return [
+    { field: 'max_colors_native', weight: w[0], absolute: true, read: at(0) },
+    { field: 'purge_waste', weight: w[1], absolute: true, read: at(1) },
+    { field: 'max_colors', weight: w[2], absolute: true, read: at(2) },
+    { field: 'colors_out_of_box', weight: w[3], absolute: true, read: at(3) },
+  ];
+}
+
+/** A stated colour need is an explicit answer: it counts this much more on the colour criterion. */
+export const COLOR_NEED_BONUS = 1.5;
+
 const QUALITY_FDM: Part[] = [{ field: 'min_layer_height', weight: 1, read: num('min_layer_height', 'mm'), lower: true }];
 const QUALITY_RESIN: Part[] = [{ field: 'xy_resolution', weight: 1, read: num('xy_resolution', 'µm'), lower: true }];
 
 /** The field a claim about each criterion is quoted from, in preference order. */
 const REASON_FIELDS: Record<FinderCriterion, string[]> = {
   speed: ['print_speed', 'max_acceleration'],
-  colors: ['max_colors'],
+  colors: ['max_colors_native', 'purge_waste', 'colors_out_of_box', 'max_colors'],
   quality: ['min_layer_height', 'xy_resolution'],
   quiet: ['noise_level'],
   ease: ['skill_level', 'assembly', 'auto_leveling'],
@@ -321,11 +363,12 @@ function useFit(s: Record<string, unknown>, use: FinderUse): number | null {
 }
 
 /** The weights for these answers (§9.4 then the priority and experience rules). */
-export function finderWeights(answers: Pick<FinderAnswers, 'use' | 'prio' | 'level'>): Record<FinderCriterion, number> {
+export function finderWeights(answers: Pick<FinderAnswers, 'use' | 'prio' | 'level' | 'mc'>): Record<FinderCriterion, number> {
   const w = { ...BASE_WEIGHTS[answers.use ?? 'unsure'] };
   const prio = answers.prio ?? [];
   if (prio[0]) w[prio[0]] += 3;
   if (prio[1]) w[prio[1]] += 2;
+  if (answers.mc) w.colors += COLOR_NEED_BONUS;
   const level: FinderLevel | null = answers.level;
   if (level === 'beginner') w.ease += 2;
   else if (level === 'intermediate') w.ease += 0.5;
@@ -421,14 +464,7 @@ export function runFinder<Card>(candidates: FinderCandidate<Card>[], answers: Fi
   const claims = Object.fromEntries(CRITERIA.map((k) => [k, [] as Contributions])) as Record<FinderCriterion, Contributions>;
   const cols: Record<FinderCriterion, Array<number | null>> = {
     speed: criterionFromParts(specs, PARTS.speed, claims.speed),
-    colors: (() => {
-      const base = criterionFromParts(specs, PARTS.colors, claims.colors);
-      return base.map((v, i) => {
-        if (v === null) return null;
-        const extruders = readNumber(raw(specs[i], 'extruders'));
-        return Math.min(1, v + (extruders !== null && extruders >= 2 ? 0.1 : 0));
-      });
-    })(),
+    colors: criterionFromParts(specs, colorPartsFor(answers.mc ?? null), claims.colors),
     quality: (() => {
       const fdmClaims: Contributions = [];
       const resinClaims: Contributions = [];
@@ -476,9 +512,21 @@ export function runFinder<Card>(candidates: FinderCandidate<Card>[], answers: Fi
     (a, b) =>
       Number(a.relaxed.length > 0) - Number(b.relaxed.length > 0) || b.total - a.total || a.c.rank - b.c.rank
   );
-  let take = Math.min(3, scored.length);
-  if (scored.length > 3 && scored[2].total - scored[3].total <= FOURTH_WITHIN && scored[3].relaxed.length === scored[2].relaxed.length) take = 4;
-  const shown = scored.slice(0, take);
+  // ONE CONFIGURATION PER PRINTER: the best-matching one. The others stay in
+  // the normalisation above (they are real machines at real prices) but a
+  // results page listing «A1» and «A1 Combo» as two recommendations would be
+  // recommending one printer twice.
+  const productOf = (c: FinderCandidate<Card>) => c.productId ?? c.id;
+  const firstPerProduct = new Set<string>();
+  const ranked = scored.filter((x) => {
+    const key = productOf(x.c);
+    if (firstPerProduct.has(key)) return false;
+    firstPerProduct.add(key);
+    return true;
+  });
+  let take = Math.min(3, ranked.length);
+  if (ranked.length > 3 && ranked[2].total - ranked[3].total <= FOURTH_WITHIN && ranked[3].relaxed.length === ranked[2].relaxed.length) take = 4;
+  const shown = ranked.slice(0, take);
 
   // ---- reasons and caveats
   const best: Record<FinderCriterion, number> = Object.fromEntries(
@@ -491,7 +539,7 @@ export function runFinder<Card>(candidates: FinderCandidate<Card>[], answers: Fi
    * reason and the weakest for a caveat; preference order breaks ties. A field
    * with no display text is never quoted.
    */
-  const claimFor = (x: Scored<Card>, k: FinderCriterion, want: 'strong' | 'weak'): { field: string; text: string } | null => {
+  const claimFor = (x: Scored<Card>, k: FinderCriterion, want: 'strong' | 'weak'): { field: string; text: string; part: number } | null => {
     const parts = claims[k][claimIndex.get(x.c.id) ?? -1] ?? new Map<string, number>();
     const pos = (field: string) => {
       const i = REASON_FIELDS[k].indexOf(field);
@@ -501,7 +549,7 @@ export function runFinder<Card>(candidates: FinderCandidate<Card>[], answers: Fi
       .filter(([field]) => valueText(x.c.specs, field) !== null)
       .sort((a, b) => (want === 'strong' ? b[1] - a[1] : a[1] - b[1]) || pos(a[0]) - pos(b[0]));
     const hit = ranked[0];
-    return hit ? { field: hit[0], text: valueText(x.c.specs, hit[0]) as string } : null;
+    return hit ? { field: hit[0], text: valueText(x.c.specs, hit[0]) as string, part: hit[1] } : null;
   };
   const reasonFor = (x: Scored<Card>, k: FinderCriterion): FinderReason | null => {
     const c = claimFor(x, k, 'strong');
@@ -540,38 +588,110 @@ export function runFinder<Card>(candidates: FinderCandidate<Card>[], answers: Fi
         }
         if (v <= CAVEAT_MAX && v < pickScore) {
           const w = claimFor(x, p, 'weak');
-          if (w) {
+          // A weak SCORE built from a strong reading plus missing parts is a
+          // data gap, not a weakness: «25 colours, behind the others» would be
+          // false. Only a reading that is itself weak is quoted as one.
+          if (w && w.part <= CAVEAT_MAX) {
             pick = { code: 'weak', criterion: p, field_id: w.field, value_text: w.text };
             pickScore = v;
+          } else if (w) {
+            const known = claims[p][claimIndex.get(x.c.id) ?? -1] ?? new Map<string, number>();
+            const gap = REASON_FIELDS[p].find((f) => !known.has(f));
+            if (gap) {
+              pick = { code: 'missing', criterion: p, field_id: gap };
+              pickScore = v;
+            }
           }
         }
       }
       if (pick) caveats.push(pick);
     }
-    return { card: x.c.card, rank: i + 1, score: Math.round(x.total * 10000) / 10000, relaxed: x.relaxed, reasons, caveats };
+    return {
+      card: x.c.card,
+      rank: i + 1,
+      score: Math.round(x.total * 10000) / 10000,
+      relaxed: x.relaxed,
+      reasons,
+      caveats,
+      why: whyFor(x.c, answers, budget),
+      variant: x.c.variant ?? null,
+    };
   });
 
-  // ---- what was left out, and why (the first ORIGINAL filter it fails)
-  const shownIds = new Set(shown.map((x) => x.c.id));
-  const considered = new Set(survivors.map((c) => c.id));
+  // ---- what was left out, and why (the first ORIGINAL filter it fails),
+  // per PRINTER: a product is left out only when none of its configurations
+  // was shown, and its reason is its best configuration's.
+  const shownProducts = new Set(shown.map((x) => productOf(x.c)));
+  const considered = new Set(survivors.map((c) => productOf(c)));
   const excluded: FinderExcluded = { budget: [], tech: [], sale: [], ranked_lower: [] };
-  for (const c of universe) {
-    if (shownIds.has(c.id)) continue;
+  const reasonOf = (c: FinderCandidate<Card>): keyof FinderExcluded => {
     // Considered and scored (possibly after a relaxation), just not in the top:
     // the honest reason is the ranking, not a filter that was lifted.
-    if (considered.has(c.id)) excluded.ranked_lower.push(c.id);
-    else if (!techOk(c, tech)) excluded.tech.push(c.id);
-    else if (budget && !inBudget(c, budget.min, budget.max)) excluded.budget.push(c.id);
-    else if (wantDirect && !(c.available > 0)) excluded.sale.push(c.id);
-    else excluded.ranked_lower.push(c.id);
+    if (considered.has(productOf(c))) return 'ranked_lower';
+    if (!techOk(c, tech)) return 'tech';
+    if (budget && !inBudget(c, budget.min, budget.max)) return 'budget';
+    if (wantDirect && !(c.available > 0)) return 'sale';
+    return 'ranked_lower';
+  };
+  const ORDER: Array<keyof FinderExcluded> = ['ranked_lower', 'sale', 'budget', 'tech'];
+  const byProduct = new Map<string, keyof FinderExcluded>();
+  for (const c of universe) {
+    const key = productOf(c);
+    if (shownProducts.has(key)) continue;
+    const r = reasonOf(c);
+    const prev = byProduct.get(key);
+    // The configuration that got FURTHEST decides: one that was scored beats
+    // one that only failed a filter.
+    if (!prev || ORDER.indexOf(r) < ORDER.indexOf(prev)) byProduct.set(key, r);
   }
+  for (const [key, r] of byProduct) excluded[r].push(key);
 
+  const productCount = (list: Array<{ c: FinderCandidate<Card> }> | FinderCandidate<Card>[]) =>
+    new Set(list.map((x) => ('c' in x ? productOf(x.c) : productOf(x)))).size;
   const coverage: FinderCoverage[] = (answers.prio ?? []).map((p) => ({
     criterion: p,
     field_id: PRIORITY_FIELD[p],
-    known: scored.filter((x) => x.s[p] !== null).length,
-    total: scored.length,
+    known: productCount(ranked.filter((x) => x.s[p] !== null)),
+    total: ranked.length,
   }));
 
-  return { total: universe.length, tech_matches: techMatches.length, results, excluded, coverage };
+  return { total: productCount(universe), tech_matches: productCount(techMatches), results, excluded, coverage };
+}
+
+/**
+ * «لماذا هذه الطابعة؟» — the answers this configuration meets, in the order the
+ * customer gave them, at most three. Every code carries the shop's own number
+ * (the sheet, the resolved price); a code whose number is unknown is not sent.
+ */
+export function whyFor(
+  c: Pick<FinderCandidate<unknown>, 'specs' | 'price' | 'available'>,
+  answers: FinderAnswers,
+  budget: { min: number; max: number | null } | null
+): FinderWhy[] {
+  const out: FinderWhy[] = [];
+  const wantsColour = answers.use === 'multicolor' || (answers.prio ?? []).includes('colors') || !!answers.mc;
+  if (wantsColour) {
+    const p = multicolorProfile(c.specs);
+    const multiHead = p.method === 'dual_nozzle' || p.method === 'tool_changer' || p.method === 'multi_nozzle';
+    if (multiHead && p.native !== null && p.native >= 2 && answers.mc !== 'many') {
+      out.push({ code: 'colors_native', colors: p.native, waste: p.waste, method: p.method as 'dual_nozzle' | 'tool_changer' | 'multi_nozzle' });
+    } else if (p.with_ams !== null && p.with_ams > 1) {
+      out.push({ code: 'colors_ams', colors: p.with_ams, out_of_box: p.out_of_box });
+    } else if (multiHead && p.native !== null && p.native >= 2) {
+      out.push({ code: 'colors_native', colors: p.native, waste: p.waste, method: p.method as 'dual_nozzle' | 'tool_changer' | 'multi_nozzle' });
+    }
+  }
+  if (answers.tech === 'laser') {
+    const w = readNumber(raw(c.specs, 'laser_module_power'), 'W') ?? readNumber(raw(c.specs, 'laser_power'), 'W');
+    if (w !== null && w > 0) out.push({ code: 'laser', watts: w });
+  }
+  if (answers.use && answers.use !== 'unsure' && answers.use !== 'multicolor' && useFit(c.specs, answers.use) === 1) {
+    out.push({ code: 'use_listed', use: answers.use });
+  }
+  if (budget && c.price > 0 && inBudget(c as FinderCandidate<unknown>, budget.min, budget.max)) {
+    out.push({ code: 'budget', price_iqd: c.price });
+  }
+  if (answers.sale === 'direct' && c.available > 0) out.push({ code: 'direct', units: c.available });
+  if (answers.level === 'beginner' && raw(c.specs, 'skill_level').toLowerCase() === 'beginner') out.push({ code: 'beginner' });
+  return out.slice(0, 3);
 }

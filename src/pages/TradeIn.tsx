@@ -1,435 +1,260 @@
 /**
- * «استبدل القديمة بجديدة» — trade an old printer in against a new one.
+ * «استبدل جهازك» — trade a device bought from LEVONIS against a new one.
  *
- * THIS IS A REQUEST, NOT A CATALOGUE. Nothing here has a price, because the
- * price is the answer: the customer describes the machine they own, the shop
- * looks at it and says what it is worth against a new one. Modelling it as a
- * listing would mean inventing a valuation the shop has not made.
+ * THIS REPLACES THE SUPPORT-TICKET FORM THAT STOOD HERE, and keeps its rules.
+ * That form filed a ticket because there was no trade-in endpoint, and it said
+ * so: a prettier form posting to nothing, with a «تم الإرسال» toast, was the
+ * one outcome the page must not have. The endpoint now exists
+ * (worker/routes/tradeIn.ts, migration 0143) with a valuation state machine,
+ * photographs of the unit and a value the customer accepts — exactly the
+ * «proper next step» the old header named — so the page is the real thing.
  *
- * ─── WHERE THE REQUEST ACTUALLY GOES, AND WHY THAT MATTERS MOST ───
+ * THE HONEST-UX PRINCIPLES IT KEEPS:
  *
- * There is no trade-in endpoint. `worker/routes/printRequests.ts` is the
- * closest existing shape — a customer describes a job, the shop answers — but
- * a print request is a JOB FOR A MERCHANT: it has a model file, a material, a
- * quantity, a budget and a marketplace of offers, and filing a trade-in as one
- * would put a customer's old printer on a public board for merchants to bid
- * on. That is a different transaction with different money in it, so it is not
- * reused.
+ *   ONLY WHAT IS TRUE IS PROMISED. The estimate is labelled «تقدير أولي —
+ *   القيمة النهائية بعد الفحص» wherever it appears, because it is: the shop
+ *   inspects the machine and may change the value, and the customer then
+ *   accepts or declines. The credit is a credit against the new device, never
+ *   cash, and a value above the new device's price is said to be capped
+ *   BEFORE the customer sends the request.
  *
- * What this page submits instead is a SUPPORT TICKET — the shop's own inbox,
- * `POST /api/support/tickets`, which already exists, already belongs to the
- * customer's account, already notifies the shop's «‼️ Support» topic the
- * moment it is filed, and already gives the customer a thread at /support
- * where the answer arrives and can be replied to. Every field below is
- * composed into that ticket's first message as plain labelled lines.
+ *   ONLY LEVONIS DEVICES. The first step lists the customer's own delivered
+ *   LEVONIS device lines, from the server — there is no field to type a model
+ *   the shop never sold. «لا نقبل أي جهاز من خارج LEVONIS» is a list, not a
+ *   warning.
  *
- * THE ALTERNATIVE WAS WORSE. A prettier form posting to an endpoint that does
- * not exist — or to nothing at all, with a «تم الإرسال» toast — is the one
- * outcome this page must not have: the customer believes the shop has their
- * request, the shop never hears of it, and nobody finds out until the customer
- * gives up. A real ticket in a real inbox is worth more than a bespoke form.
- * A dedicated trade-in route (with a valuation state machine, photos of the
- * unit, and an offer the customer can accept) is the proper next step and
- * needs a Worker change this page deliberately does not fake.
+ *   THE SERVER DECIDES EVERY FIGURE. The price paid, the dates, the warranty
+ *   left, the new device's direct-sale price and the estimate all come from
+ *   the Worker; the live preview runs the same engine over the same rules.
  *
- * THE CONFIRMATION STEP IS THE SERVER'S RULE, NOT DECORATION. `POST
- * /api/support/tickets` refuses anything without `confirm: true` precisely so
- * an accidental tap cannot open a ticket, so the customer reads back exactly
- * what will be sent before it is sent. The server also rate-limits ticket
- * creation to five an hour; that refusal is surfaced in the customer's own
- * language rather than swallowed.
+ *   SIGNING IN IS ASKED FOR AT THE DOOR OF THE FORM, NOT OF THE PAGE. How a
+ *   trade-in works is what someone came to read, so it is visible to everyone;
+ *   the device list needs an account because it IS the account's orders.
  *
- * SIGNING IN IS REQUIRED TO SEND, AND ONLY TO SEND. The ticket has to belong
- * to an account or there is nowhere to put the answer. But the explanation of
- * how a trade-in works is what someone came here to read, so it is visible to
- * everyone and the sign-in is asked for at the form, not at the door.
+ * Reachable at /trade-in; `?request=<id>` opens one request (the notification
+ * links), `?item=<order item>&unit=<n>` starts the wizard on that device (the
+ * order page's «استبدل هذا الجهاز»), `?new=1` starts it on the device list.
+ *
+ * OWNER: Sorani to be written by hand (every loc() in this file without a
+ * third argument).
  */
-
-import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, CheckCircle2, LifeBuoy, Repeat } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Camera, ClipboardCheck, PackageSearch, Repeat, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
 import { api, failureText } from '../lib/api';
-import { GOVERNORATES } from '../lib/governorates';
+import { Button } from '../components/ui/Button';
+import { Money } from '../components/ui/Money';
 import Note from '../components/ui/Note';
+import SafeImage from '../components/ui/SafeImage';
 import Spinner from '../components/ui/Spinner';
+import TradeInWizard from '../components/tradeIn/TradeInWizard';
+import TradeInRequest from '../components/tradeIn/TradeInRequest';
+import type { RequestSummary, RequestView } from '../components/tradeIn/model';
+import { dateText } from '../components/tradeIn/model';
 
-/** What the customer says about the machine they own. Plain words, not the
- *  catalogue's grades: `ConditionKind` describes a unit the SHOP has inspected
- *  and priced, and borrowing its vocabulary here would imply the shop has
- *  already graded a printer it has not seen. */
-type Working = 'working' | 'partly' | 'not_working';
+type Mode = { kind: 'home' } | { kind: 'wizard'; unitKey: string | null; resume: RequestView | null } | { kind: 'request'; id: string };
 
-const WORKING: readonly Working[] = ['working', 'partly', 'not_working'];
+const REQ_ID = /^tin_[0-9a-f]{20}$/;
 
-/** Mirrors the server's own bounds so a refusal is prevented, not translated:
- *  `body` is validated at 5..4000 characters and `subject` at 3..200. */
-const MAX_BODY = 4000;
+function modeFromParams(p: URLSearchParams): Mode {
+  const id = p.get('request') ?? '';
+  if (REQ_ID.test(id)) return { kind: 'request', id };
+  const item = p.get('item');
+  if (item) return { kind: 'wizard', unitKey: `${item}:${Number(p.get('unit')) || 1}`, resume: null };
+  if (p.get('new') === '1') return { kind: 'wizard', unitKey: null, resume: null };
+  return { kind: 'home' };
+}
 
 export default function TradeIn() {
   const { loc, lang, dir } = useLanguage();
+  const L = (ar: string, en: string) => loc(ar, en);
   const { isAuthenticated } = useAuth();
   const { signIn } = useSignInPrompt();
   const navigate = useNavigate();
-
-  const [model, setModel] = useState('');
-  const [working, setWorking] = useState<Working>('working');
-  const [hours, setHours] = useState('');
-  const [governorate, setGovernorate] = useState('');
-  const [wanted, setWanted] = useState('');
-  const [notes, setNotes] = useState('');
-
-  const [step, setStep] = useState<'form' | 'review'>('form');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [modelError, setModelError] = useState('');
-  const [sentId, setSentId] = useState('');
+  const [params, setParams] = useSearchParams();
+  const [mode, setMode] = useState<Mode>(() => modeFromParams(params));
+  const [mine, setMine] = useState<RequestSummary[] | null>(null);
+  const [mineError, setMineError] = useState('');
 
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
+  const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight;
 
-  const workingLabel = (w: Working): string =>
-    w === 'working'
-      ? loc('تعمل بشكل طبيعي', 'Works normally', 'بە ئاسایی کار دەکات')
-      : w === 'partly'
-        ? loc('تعمل مع مشاكل', 'Works with problems', 'کار دەکات بەڵام کێشەی هەیە')
-        : loc('لا تعمل', 'Does not work', 'کار ناکات');
+  // The URL is the source of truth for which screen is open (a notification
+  // link, the back button), and the screen writes it back when it moves.
+  useEffect(() => {
+    setMode((cur) => {
+      const next = modeFromParams(params);
+      if (cur.kind === 'wizard' && cur.resume && next.kind === 'request' && next.id === cur.resume.id) return cur;
+      return next;
+    });
+  }, [params]);
 
-  const govLabel = (id: string): string => {
-    const g = GOVERNORATES.find((x) => x.id === id);
-    if (!g) return '';
-    return lang === 'en' ? g.en : lang === 'ckb' ? g.ckb : g.ar;
-  };
-
-  /**
-   * THE TICKET'S FIRST MESSAGE, composed once and shown to the customer
-   * verbatim on the review step. Labels are bilingual because the person
-   * reading it in the admin console is the shop, while the person confirming
-   * it is the customer — and a body that only one of them can read is a body
-   * that gets misunderstood by the other.
-   */
-  const body = useMemo(() => {
-    const lines = [
-      'طلب استبدال طابعة قديمة بجديدة / Trade-in request',
-      `الطابعة الحالية / Current printer: ${model.trim()}`,
-      `الحالة / State: ${workingLabel(working)}`,
-    ];
-    if (hours.trim()) lines.push(`ساعات التشغيل / Hours: ${hours.trim()}`);
-    if (governorate) lines.push(`المحافظة / Governorate: ${govLabel(governorate)}`);
-    if (wanted.trim()) lines.push(`المطلوب / Wanted: ${wanted.trim()}`);
-    if (notes.trim()) lines.push(`ملاحظات / Notes: ${notes.trim()}`);
-    return lines.join('\n').slice(0, MAX_BODY);
-    // `workingLabel` and `govLabel` close over `lang`, which is in the deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model, working, hours, governorate, wanted, notes, lang]);
-
-  const subject = useMemo(
-    () => `استبدال طابعة / Trade-in — ${model.trim()}`.slice(0, 200),
-    [model]
-  );
-
-  const toReview = () => {
-    const name = model.trim();
-    if (name.length < 2) {
-      setModelError(
-        loc(
-          'اكتب اسم أو موديل الطابعة التي لديك.',
-          'Write the name or model of the printer you have.',
-          'ناو یان مۆدێلی ئەو پرینتەرەی هەتە بنووسە.'
-        )
-      );
-      return;
-    }
-    setModelError('');
-    setError('');
-    if (!isAuthenticated) {
-      signIn();
-      return;
-    }
-    setStep('review');
-  };
-
-  const send = async () => {
-    setBusy(true);
-    setError('');
+  const loadMine = useCallback(async () => {
+    setMineError('');
     try {
-      const data = await api.post<{ ticket: { id: string } }>('/api/support/tickets', {
-        // The server refuses without this. It is set HERE, on the send that
-        // follows the review screen, and never on the first tap.
-        confirm: true,
-        subject,
-        body,
-        // 'manual' and not 'assistant': a person filled this in, no assistant
-        // handed it over. The admin console shows that column.
-        source: 'manual',
-      });
-      setSentId(data.ticket?.id || '');
+      const d = await api.get<{ requests: RequestSummary[] }>('/api/trade-in/requests');
+      setMine(d.requests);
     } catch (e) {
-      // The server's own sentence — the rate-limit refusal («خمسة في الساعة»)
-      // and every validation refusal say something the customer can act on,
-      // and replacing them with a generic failure removes the only useful
-      // part.
-      setError(
-        failureText(
-          e,
-          loc('تعذّر الإرسال. حاول مرة أخرى.', 'Could not send. Try again.', 'نەنێردرا. دووبارە هەوڵ بدە.')
-        )
-      );
-    } finally {
-      setBusy(false);
+      setMineError(failureText(e, loc('تعذّر تحميل طلباتك.', 'Could not load your requests.')));
     }
+  }, [loc]);
+
+  useEffect(() => {
+    if (isAuthenticated && mode.kind === 'home') void loadMine();
+  }, [isAuthenticated, mode.kind, loadMine]);
+
+  // Both the URL and the screen: a resumed draft is already at ?request=<id>,
+  // and setting the same params again would leave the wizard on screen.
+  const openRequest = (id: string) => {
+    setMode({ kind: 'request', id });
+    setParams({ request: id });
   };
+  const goHome = () => {
+    setMode({ kind: 'home' });
+    setParams({});
+  };
+  const start = () => (isAuthenticated ? setParams({ new: '1' }) : signIn());
 
   const goBack = () => {
+    if (mode.kind !== 'home') {
+      goHome();
+      return;
+    }
     const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
     if (idx > 0) navigate(-1);
     else navigate('/');
   };
 
   return (
-    <div className="w-full min-h-screen bg-canvas text-zinc-300 font-sans pb-24" data-trade-in-page>
+    <div className="w-full min-h-screen bg-canvas text-zinc-300 font-sans pb-28" data-trade-in-page>
       <header className="sticky top-0 z-40 material material-thin px-4 py-3 flex items-center gap-3">
         <button
           type="button"
           onClick={goBack}
-          aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          aria-label={L('رجوع', 'Back')}
           className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-surface-raised text-white hover:bg-surface-selected active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
         >
           <Back aria-hidden="true" className="w-5 h-5" />
         </button>
         <h1 className="text-white font-bold text-lg leading-6 flex-1 min-w-0 truncate">
-          {loc('استبدل القديمة بجديدة', 'Trade in your old printer', 'کۆنەکەت بگۆڕەوە بە نوێ')}
+          {mode.kind === 'request' ? L('طلب الاستبدال', 'Trade-in request') : L('استبدل جهازك بجديد', 'Trade in your device')}
         </h1>
       </header>
 
-      <div className="p-4 max-w-2xl mx-auto space-y-5">
-        {/* THE PROMISE IS SIZED TO THE PLUMBING BEHIND IT.
-            «يقيّمها فريق ليفو ويخبرك بقيمتها» is an SLA sentence, and the only
-            thing standing behind it today is somebody noticing a Telegram
-            «‼️ Support» message: this form files a support TICKET, which has no
-            valuation record, no state machine, no queue and no admin surface,
-            so nothing in the system can say how many valuations are
-            outstanding or how old the oldest is. What IS true is that a reply
-            comes back in the support thread, and that is what the sentence now
-            says. When the trade-in route exists — submitted / valued / offered
-            / accepted / declined, with photos and a quoted figure — the
-            stronger sentence can come back with it. */}
-        <p className="text-[12px] leading-5 text-zinc-500">
-          {loc(
-            'أرسل وصف طابعتك الحالية ونرد عليك في محادثة الدعم بتقدير لقيمتها عند شراء جهاز جديد. لا يكلفك شيئاً ولا يلزمك بالشراء.',
-            'Describe the printer you own and we will come back to you in the support thread with an estimate of what it is worth against a new machine. It costs you nothing and commits you to nothing.',
-            'باسی ئەو پرینتەرە بکە کە هەتە و لە گفتوگۆی پشتگیریدا خەمڵاندنێکت بۆ دەگەڕێنینەوە لەسەر ئەوەی چەندە دەبێت بەرامبەر ئامێرێکی نوێ. هیچ تێچوونێکی نییە و ناچارت ناکات بە کڕین.'
-          )}
-        </p>
-
-        {/* WHERE THIS GOES, said before it is sent and not after. A customer
-            who does not know their request became a support thread will not
-            think to look for the answer in one. */}
-        <Note tone="zinc" compact animate={false}>
-          {loc(
-            'يُفتح طلبك كمحادثة في «الدعم»، ويصلك الرد هناك.',
-            'Your request opens as a thread in Support, and the reply arrives there.',
-            'داواکارییەکەت وەک گفتوگۆیەک لە «پشتگیری» دەکرێتەوە و وەڵامەکە لەوێ دێت.'
-          )}
-        </Note>
-
-        {sentId ? (
-          /* SENT — the ticket id is shown because it is the customer's handle
-             on this request, and the way to the thread is a link and not a
-             sentence telling them to go and find it. */
-          <div className="lv-surface p-4 space-y-3 text-center" data-trade-in-sent>
-            <CheckCircle2 aria-hidden="true" className="mx-auto h-8 w-8 text-success" />
-            <h2 className="text-white font-bold text-base leading-6">
-              {loc('وصلنا طلبك', 'We have your request', 'داواکارییەکەت پێگەیشت')}
-            </h2>
-            <p className="text-[13px] leading-5 text-text-secondary">
-              {loc(
-                'سيراجعه فريق ليفو ويرد عليك في محادثة الدعم.',
-                'The LEVONIS team will review it and reply in your support thread.',
-                'تیمی Levonis پێداچوونەوەی بۆ دەکات و لە گفتوگۆی پشتگیری وەڵامت دەداتەوە.'
-              )}
-            </p>
-            <p className="text-[12px] leading-5 text-zinc-500">
-              <span className="me-1">{loc('رقم الطلب', 'Request number', 'ژمارەی داواکاری')}</span>
-              <span dir="ltr" className="tabular-nums text-zinc-300">
-                {sentId}
-              </span>
-            </p>
-            <Link to="/support" className="lv-button lv-button-primary px-4 inline-flex">
-              <LifeBuoy aria-hidden="true" className="w-4 h-4 me-1.5" />
-              {loc('افتح المحادثة', 'Open the thread', 'گفتوگۆکە بکەرەوە')}
-            </Link>
-          </div>
-        ) : step === 'review' ? (
-          <div className="lv-surface p-4 space-y-4" data-trade-in-review>
-            <h2 className="text-white font-bold text-sm leading-5">
-              {loc('راجع ما سيُرسل', 'Review what will be sent', 'پێداچوونەوە بەوەی دەنێردرێت')}
-            </h2>
-            {/* The exact text, not a summary of it. */}
-            <pre
-              dir="auto"
-              className="whitespace-pre-wrap break-words rounded-lg bg-surface-raised p-3 text-[13px] leading-6 text-zinc-300"
-            >
-              {body}
-            </pre>
-            {error ? (
-              <p role="alert" className="text-[13px] leading-5 text-danger">
-                {error}
-              </p>
-            ) : null}
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={send}
-                disabled={busy}
-                className="lv-button lv-button-primary px-4 inline-flex items-center gap-2"
-              >
-                {busy ? <Spinner size="xs" delayMs={0} /> : <Repeat aria-hidden="true" className="w-4 h-4" />}
-                {loc('أرسل الطلب', 'Send the request', 'داواکارییەکە بنێرە')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep('form')}
-                disabled={busy}
-                className="lv-button lv-button-secondary px-4"
-              >
-                {loc('تعديل', 'Edit', 'دەستکاری')}
-              </button>
-            </div>
-          </div>
+      <div className="px-4 pt-4 max-w-2xl lg:max-w-[1120px] mx-auto">
+        {mode.kind === 'wizard' && isAuthenticated ? (
+          <TradeInWizard
+            key={mode.resume?.id ?? mode.unitKey ?? 'new'}
+            initialUnitKey={mode.unitKey}
+            resume={mode.resume}
+            onDone={(id) => openRequest(id)}
+            onExit={goHome}
+          />
+        ) : mode.kind === 'request' && isAuthenticated ? (
+          <TradeInRequest id={mode.id} onBack={goHome} onResume={(r) => setMode({ kind: 'wizard', unitKey: null, resume: r })} />
         ) : (
-          <form
-            className="lv-surface p-4 space-y-4"
-            data-trade-in-form
-            onSubmit={(e) => {
-              e.preventDefault();
-              toReview();
-            }}
-          >
-            <div className="space-y-1.5">
-              <label htmlFor="trade-in-model" className="block text-[13px] leading-5 font-medium text-white">
-                {loc('الطابعة التي لديك', 'The printer you have', 'ئەو پرینتەرەی هەتە')}
-              </label>
-              <input
-                id="trade-in-model"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                dir="auto"
-                autoComplete="off"
-                placeholder={loc('مثال: Ender 3 V2', 'e.g. Ender 3 V2', 'نموونە: Ender 3 V2')}
-                aria-invalid={modelError ? true : undefined}
-                aria-describedby={modelError ? 'trade-in-model-error' : undefined}
-                className="lv-input w-full"
-              />
-              {modelError ? (
-                <p id="trade-in-model-error" role="alert" className="text-[12px] leading-4 text-danger">
-                  {modelError}
-                </p>
-              ) : null}
-            </div>
-
-            <fieldset className="space-y-1.5">
-              <legend className="block text-[13px] leading-5 font-medium text-white mb-1.5">
-                {loc('حالة الطابعة', 'Its state', 'حاڵەتی ئامێرەکە')}
-              </legend>
-              <div className="flex flex-wrap gap-2">
-                {WORKING.map((w) => (
-                  <button
-                    key={w}
-                    type="button"
-                    aria-pressed={working === w}
-                    onClick={() => setWorking(w)}
-                    className="lv-choice px-3 py-2 text-[13px] leading-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                  >
-                    {workingLabel(w)}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <div className="space-y-1.5">
-              <label htmlFor="trade-in-hours" className="block text-[13px] leading-5 font-medium text-white">
-                {loc('ساعات التشغيل (اختياري)', 'Hours on the clock (optional)', 'کاتژمێری کارکردن (ئارەزوومەندانە)')}
-              </label>
-              <input
-                id="trade-in-hours"
-                value={hours}
-                onChange={(e) => setHours(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
-                inputMode="numeric"
-                dir="ltr"
-                autoComplete="off"
-                className="lv-input w-full tabular-nums"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="trade-in-governorate" className="block text-[13px] leading-5 font-medium text-white">
-                {loc('المحافظة (اختياري)', 'Governorate (optional)', 'پارێزگا (ئارەزوومەندانە)')}
-              </label>
-              <select
-                id="trade-in-governorate"
-                value={governorate}
-                onChange={(e) => setGovernorate(e.target.value)}
-                className="lv-input w-full"
-              >
-                <option value="">{loc('— اختر —', '— Choose —', '— هەڵبژێرە —')}</option>
-                {GOVERNORATES.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {govLabel(g.id)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="trade-in-wanted" className="block text-[13px] leading-5 font-medium text-white">
-                {loc('الطابعة التي تريدها (اختياري)', 'The printer you want (optional)', 'ئەو پرینتەرەی دەتەوێت (ئارەزوومەندانە)')}
-              </label>
-              <input
-                id="trade-in-wanted"
-                value={wanted}
-                onChange={(e) => setWanted(e.target.value)}
-                dir="auto"
-                autoComplete="off"
-                className="lv-input w-full"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="trade-in-notes" className="block text-[13px] leading-5 font-medium text-white">
-                {loc('ملاحظات (اختياري)', 'Notes (optional)', 'تێبینی (ئارەزوومەندانە)')}
-              </label>
-              <textarea
-                id="trade-in-notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value.slice(0, 1500))}
-                dir="auto"
-                rows={4}
-                placeholder={loc(
-                  'الأعطال، القطع المرفقة، أي تعديلات…',
-                  'Faults, what is included, any modifications…',
-                  'کێشەکان، ئەو شتانەی لەگەڵدایە، هەر گۆڕانکارییەک…'
+          <div className="space-y-5 lg:max-w-2xl lg:mx-auto">
+            {/* WHAT THIS IS, in four steps a customer can hold in their head. */}
+            <section className="rounded-3xl border border-zinc-800 bg-zinc-900/60 p-5" data-trade-in-intro>
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gold/10 text-gold">
+                <Repeat className="w-5 h-5" aria-hidden />
+              </span>
+              <h2 className="text-white text-[22px] font-black leading-8 mt-3">{L('جهازك من LEVONIS يصبح رصيداً لجهاز جديد', 'Your LEVONIS device becomes credit for a new one')}</h2>
+              <p className="text-[13.5px] leading-6 text-zinc-400 mt-1">
+                {L(
+                  'للطابعات (FDM و Resin) وأجهزة الليزر وأنظمة الكومبو ووحدات AMS المشتراة من LEVONIS فقط. لا نقبل أجهزة من خارج المتجر.',
+                  'For printers (FDM and Resin), lasers, Combo systems and AMS units bought from LEVONIS only. We do not accept devices bought elsewhere.'
                 )}
-                className="lv-input w-full"
-              />
-            </div>
+              </p>
+              <ol className="mt-4 space-y-3">
+                {[
+                  { icon: PackageSearch, t: L('اختر الجهاز من طلباتك السابقة', 'Pick the device from your past orders'), d: L('نملأ السعر والتاريخ والضمان تلقائياً.', 'We fill in the price, dates and warranty.') },
+                  { icon: Camera, t: L('صف حالته وصوّره', 'Describe and photograph it'), d: L('كل جزء بمفرده — الطابعة والـ AMS.', 'Each part on its own — the printer and the AMS.') },
+                  { icon: ClipboardCheck, t: L('اختر الجهاز الجديد وشاهد التقدير', 'Choose the new device and see the estimate'), d: L('بقواعد تقييم معلنة وشفافة.', 'With published, transparent rules.') },
+                  { icon: ShieldCheck, t: L('نفحصه ونثبّت القيمة، وتدفع الفرق', 'We inspect, fix the value, you pay the difference'), d: L('إن تغيّرت القيمة نطلب موافقتك أولاً.', 'If the value changes, we ask you first.') },
+                ].map((s, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="h-9 w-9 shrink-0 rounded-xl bg-zinc-800 text-zinc-200 flex items-center justify-center">
+                      <s.icon className="w-4 h-4" aria-hidden />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-white text-[14px] font-bold leading-5">{s.t}</span>
+                      <span className="block text-[12.5px] text-zinc-500 leading-5">{s.d}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <Button variant="accent" block className="mt-5" onClick={start} data-trade-in-start>
+                {isAuthenticated ? L('ابدأ الاستبدال', 'Start a trade-in') : L('سجّل الدخول للبدء', 'Sign in to start')}
+              </Button>
+            </section>
 
-            {/* The sign-in is named on the button itself for a guest, so the
-                tap does not turn into an unexplained redirect. */}
-            <button type="submit" className="lv-button lv-button-primary px-4 w-full sm:w-auto">
-              {isAuthenticated
-                ? loc('راجع وأرسل', 'Review and send', 'پێداچوونەوە و ناردن')
-                : loc('سجّل الدخول للمتابعة', 'Sign in to continue', 'بۆ بەردەوامبوون بچۆ ژوورەوە')}
-            </button>
+            {isAuthenticated ? (
+              <section aria-labelledby="ti-mine">
+                <h2 id="ti-mine" className="text-white text-[17px] font-bold mb-2">
+                  {L('طلباتي للاستبدال', 'My trade-ins')}
+                </h2>
+                {mineError ? (
+                  <div className="rounded-2xl border border-zinc-800 p-4">
+                    <p className="text-[13px] text-rose-300">{mineError}</p>
+                    <Button variant="secondary" className="mt-2" onClick={loadMine}>
+                      {L('إعادة المحاولة', 'Try again')}
+                    </Button>
+                  </div>
+                ) : mine === null ? (
+                  <div className="flex justify-center py-6">
+                    <Spinner />
+                  </div>
+                ) : mine.length === 0 ? (
+                  <p className="text-[13px] text-zinc-500 rounded-2xl border border-dashed border-zinc-800 p-4">
+                    {L('لا توجد طلبات استبدال بعد.', 'No trade-in requests yet.')}
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {mine.map((r) => {
+                      const value = r.final_value_iqd ?? r.admin_value_iqd ?? r.estimated_iqd;
+                      const waiting = r.status === 'value_changed' || r.status === 'awaiting_payment' || r.status === 'draft';
+                      return (
+                        <li key={r.id}>
+                          <button
+                            type="button"
+                            onClick={() => openRequest(r.id)}
+                            data-request={r.id}
+                            className="w-full text-start flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 hover:border-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                          >
+                            <SafeImage src={r.image} alt="" aspect="square" className="w-12 h-12 rounded-xl shrink-0" bgClassName="bg-zinc-950" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-white text-[14px] font-bold leading-5 truncate">{r.name}</span>
+                              <span className={`block text-[12px] font-semibold ${waiting ? 'text-gold' : 'text-zinc-500'}`}>
+                                {loc(r.status_label.ar, r.status_label.en)}
+                              </span>
+                              <span className="block text-[11.5px] text-zinc-500">{dateText(r.created_at, lang)}</span>
+                            </span>
+                            {value !== null ? (
+                              <span className="text-[13px] font-bold text-white shrink-0">
+                                <Money iqd={value} />
+                              </span>
+                            ) : null}
+                            <Chevron className="w-4 h-4 text-zinc-600 shrink-0" aria-hidden />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            ) : null}
 
-            <p className="text-[12px] leading-5 text-zinc-500">
-              {loc('تفضّل السؤال مباشرة؟', 'Would you rather just ask?', 'دەتەوێت ڕاستەوخۆ بپرسیت؟')}{' '}
-              <Link to="/support" className="text-gold underline underline-offset-2 hover:text-gold-light">
-                {loc('تواصل مع الدعم', 'Contact support', 'پەیوەندی بە پشتگیرییەوە بکە')}
-              </Link>
-            </p>
-          </form>
+            <Note tone="zinc" compact animate={false}>
+              {L(
+                'قيمة الاستبدال رصيد يُخصم من سعر الجهاز الجديد عند الطلب، وليست مبلغاً نقدياً. إذا زادت قيمة جهازك عن سعر الجهاز الجديد يُحتسب منها سعر الجهاز الجديد فقط.',
+                'The trade-in value is credit taken off the new device’s price at checkout, not cash. If your device is worth more than the new one, only the new device’s price is credited.'
+              )}
+            </Note>
+          </div>
         )}
       </div>
     </div>

@@ -343,6 +343,10 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   { table: 'support_ticket_messages', column: 'file_key', kind: 'text', why: 'a support-ticket attachment' },
   { table: 'warranty_claims', column: 'evidence', kind: 'json', why: 'private evidence keys' },
   { table: 'return_cases', column: 'evidence', kind: 'json', why: 'private evidence keys' },
+  // 0143 — the photographs a customer takes of the device they are trading in,
+  // private under `trade-in/<request id>/…`. The inspection and the value rest
+  // on them, so they must outlive the request's decision.
+  { table: 'trade_in_photos', column: 'file_key', kind: 'text', why: 'a trade-in photograph (0143)' },
   { table: 'restriction_cases', column: 'evidence', kind: 'json', why: 'private evidence keys' },
   { table: 'kyc_cases', column: 'evidence_keys', kind: 'json', why: 'identity documents under the private kyc/ prefix' },
   { table: 'kyc_cases', column: 'payload', kind: 'json', why: 'the case payload references the same documents' },
@@ -399,6 +403,19 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   // token its deciding batch writes. Neither is a path.
   'order_price_adjustments.idempotency_key': 'request de-duplication token (0140)',
   'order_price_adjustments.decision_token': 'batch fence token (0140)',
+  // 0143 — trade-in. Rules, answers, estimates and frozen facts about an order
+  // line and a target product: numbers, ids and labels. The photographs live in
+  // `trade_in_photos.file_key`, registered as a source above.
+  'trade_in_rules.config_json': 'a valuation factor’s bands and weights — integers and labels (0143)',
+  'trade_in_requests.source_snapshot_json': 'the traded line as it was bought: name, order id, dates, prices (0143)',
+  'trade_in_requests.target_snapshot_json': 'the new product’s name, slug and model labels (0143)',
+  'trade_in_requests.target_option_value_ids': 'product_option_values ids, not paths (0143)',
+  'trade_in_requests.estimate_json': 'the valuation breakdown — factor ids, basis points, dinars (0143)',
+  'trade_in_requests.rule_versions_json': 'which rule-set version priced each family (0143)',
+  'trade_in_components.inputs_json': 'the customer’s condition answers — scores, ids, notes (0143)',
+  'trade_in_components.estimate_json': 'one component’s valuation breakdown (0143)',
+  'trade_in_events.detail_json': 'an audit event’s figures and reasons (0143)',
+  'trade_in_requests.decision_token': 'batch fence token (0143)',
   'reward_claims.idempotency_key': 'request de-duplication token',
   'order_payment_settlements.event_key': 'event identity, e.g. cod:<ref>',
   'outbox.event_key': 'event identity, e.g. invoice:ORD-X:1',

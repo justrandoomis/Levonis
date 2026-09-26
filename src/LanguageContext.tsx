@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, ReactNod
 import { Language, translations } from './translations';
 import { useOptionalAuth } from './AuthContext';
 import { api } from './lib/api';
+import { languageSwapMode, runLanguageSwap, type LangSwapMode } from './lib/langSwap';
 
 interface LanguageContextType {
   lang: Language;
@@ -93,9 +94,25 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const signedInRef = useRef(signedIn);
   signedInRef.current = signedIn;
 
+  /**
+   * How the change being committed is played: 'vt' (a View Transition, run by
+   * src/lib/langSwap.ts), 'css' (the `data-lang-swap` fallback below) or
+   * 'instant'. Read once by the effect below, then reset.
+   */
+  const swapModeRef = useRef<LangSwapMode>('instant');
+
   const setLang = (next: Language) => {
-    currentLang = next;
-    setLangState(next);
+    const fromDir = lang === 'ar' || lang === 'ckb' ? 'rtl' : 'ltr';
+    const toDir = next === 'ar' || next === 'ckb' ? 'rtl' : 'ltr';
+    const mode: LangSwapMode = next === lang ? 'instant' : languageSwapMode();
+    swapModeRef.current = mode;
+    runLanguageSwap(mode, fromDir, toDir, () => {
+      currentLang = next;
+      setLangState(next);
+      // Inside a View Transition the new snapshot is taken right after this:
+      // the attribute that picks the font (`lang`) must already be the new one.
+      if (mode === 'vt') document.documentElement.lang = next;
+    });
     try {
       localStorage.setItem(LANG_KEY, next);
     } catch {
@@ -142,19 +159,35 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
    * THE FIRST RUN IS SKIPPED. A page load is not a language change, and
    * animating it would put a flicker on every cold start.
    *
+   * WHERE VIEW TRANSITIONS EXIST THIS IS NOT THE ANIMATION. `setLang` hands
+   * the commit to src/lib/langSwap.ts, which plays the whole page out and the
+   * new language in (index.css, THE LANGUAGE ARRIVING); this attribute is the
+   * fallback for browsers without them, and is skipped under reduced motion.
+   * Arabic ↔ Sorani share a direction, so there it is `fade`: nothing travels.
+   *
    * THE ATTRIBUTE ALWAYS COMES OFF. `animationend` is the normal path; the
    * timer is the one that matters — a hidden tab does not run animations, so
    * without it a language changed in the background would leave the marker on
    * and the next paint would replay it.
    */
   const firstLangRun = useRef(true);
+  const prevDirRef = useRef(dir);
   useEffect(() => {
     if (firstLangRun.current) {
       firstLangRun.current = false;
       return;
     }
+    const wasDir = prevDirRef.current;
+    prevDirRef.current = dir;
+    // Only the fallback path plays `main` in: a View Transition already
+    // animated this change, and reduced motion wants none.
+    const mode = swapModeRef.current;
+    swapModeRef.current = 'instant';
+    if (mode !== 'css') return;
     const root = document.documentElement;
-    root.setAttribute('data-lang-swap', dir);
+    const sameDir = wasDir === dir;
+    // Arabic ↔ Sorani read the same way: nothing travels, the page only fades.
+    root.setAttribute('data-lang-swap', sameDir ? 'fade' : dir);
     const clear = () => root.removeAttribute('data-lang-swap');
     const timer = window.setTimeout(clear, 400);
     const main = document.querySelector('main');

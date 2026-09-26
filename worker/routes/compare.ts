@@ -66,12 +66,14 @@ import {
   type ProductTypeId,
   type SectionRef,
 } from '../lib/templateFamilies';
-import { type CompareResult } from '../lib/compareSpecs';
+import { readNumber, type CompareResult } from '../lib/compareSpecs';
 import { compareWithLenses } from '../lib/compareLenses';
 import { adviseFromSpecs, type PowerAdvice } from '../lib/powerAdvice';
 import { loadAuthoritativeProductImages, loadLightProductImages } from '../lib/productSelectionImage';
 import { parseProductRow } from '../lib/productModel';
-import { buildGrid } from '../lib/priceGrid';
+import { applyRelations, loadRelationsViews } from '../lib/productOverlay';
+import { multicolorBadge, multicolorProfile, variantSheet, type MulticolorBadge, type MulticolorProfile } from '../lib/multicolor';
+import { pricingCtx, resolveVariantPricing, type PricingCtx } from './products';
 
 export const compareRoutes = new Hono<AppContext>();
 
@@ -185,7 +187,17 @@ export interface CompareProductCard {
    * this product can be added as, so the picker can ask «أي خيار؟» before it
    * adds. Absent — not empty — when there is nothing to ask.
    */
-  options?: Array<{ id: string; label: Trilingual }>;
+  options?: Array<{ id: string; label: Trilingual; price_iqd?: number; available?: number | null }>;
+  /** ON A COMPARISON COLUMN ONLY: the URL named no option, so this is the base configuration. */
+  default_option?: boolean;
+  /**
+   * ON A COMPARISON COLUMN ONLY: what this configuration does with colour
+   * (worker/lib/multicolor.ts) — the facts and the badge's codes. The page
+   * writes the words; nothing here is a sentence.
+   */
+  multicolor?: MulticolorProfile & { badge: MulticolorBadge };
+  /** ON A COMPARISON COLUMN ONLY: the laser module this configuration ships with (W), or null. */
+  laser_module_w?: number | null;
 }
 
 const tri = (ar: string, en: string, ckb: string): Trilingual => ({
@@ -500,22 +512,35 @@ compareRoutes.get('/', async (c) => {
     );
   }
 
-  const [catalogRows, images] = await Promise.all([
+  const [catalogRows, images, ctx, full] = await Promise.all([
     loadCatalogs(c.env.DB),
     loadCompareImages(c.env.DB, ids),
+    pricingCtx(c),
+    // THE FULL ROWS, for the price ladder only (member and cost columns). They
+    // never reach the response: every card below is built field by field.
+    c.env.DB.prepare(`SELECT * FROM products WHERE id IN (${placeholders})`)
+      .bind(...ids)
+      .all<Record<string, unknown>>()
+      .then((r) => r.results ?? []),
   ]);
   /**
-   * THE OPTIONS COME OFF THE ROW, not out of a second query. `options` is a
-   * PRODUCT_COLUMNS column, and `parseProductRow` is the one parser for it —
-   * the same one the product page and the admin form read, so an option that
-   * was upgraded or renumbered cannot mean one thing here and another there.
+   * THE OPTIONS AND THEIR PRICES COME FROM THE TABLES, through the product
+   * page's own resolver (`resolveVariantPricing` → `levelPrice`).
+   *
+   * This used to read `options` off the row through `parseProductRow` — but
+   * `options` is not a PRODUCT_COLUMNS column and the options live in
+   * `product_option_values` (0022), so every product parsed to NO options:
+   * every `?ids=product:option` link was refused as COMPARE_OPTION_NOT_FOUND,
+   * the picker never offered a choice, and an option's price came from a grid
+   * that knew nothing of the model's direct-sale cell. The figure a column
+   * shows is now the figure the product page shows for that option.
    */
-  const docById = new Map(ids.map((id) => [id, parseProductRow(byId.get(id) as unknown as Record<string, unknown>)]));
+  const pricing = await resolveVariantPricing(c.env.DB, full, ctx);
   const tax = taxonomy(catalogRows);
   const placed = rows.map((row) => place(row, tax));
 
   /**
-   * THE OPTION EACH COLUMN IS PRICED AS, resolved before anything is drawn.
+   * THE OPTION EACH COLUMN IS, resolved before anything is drawn.
    *
    * An option id that is not this product's, or is not active any more, is
    * REFUSED BY NAME rather than quietly falling back to the base product: a
@@ -523,11 +548,18 @@ compareRoutes.get('/', async (c) => {
    * than one that says the configuration is gone. The shape blames one
    * `product_id`, the same shape `COMPARE_NO_SPECS` uses, so the page's "drop
    * that column" affordance works on it unchanged.
+   *
+   * A BARE PRODUCT ID IS ITS BASE CONFIGURATION. «A1» and «A1 Combo» are two
+   * machines at two prices; a column that said «A1» and priced nothing in
+   * particular compared neither. With no option in the slot the column is the
+   * cheapest active option — the shop's own rule that the base price is the
+   * cheapest way to buy (packages/pricing/src/cheapestBase.ts) — and says so.
    */
   const picked = slots.map((slot) => {
-    if (!slot.optionId) return null;
-    const option = docById.get(slot.productId)?.options.find((o) => o.id === slot.optionId);
-    if (!option || option.active === false) {
+    const variants = pricing.get(slot.productId)?.options ?? [];
+    if (!slot.optionId) return defaultVariant(variants);
+    const hit = variants.find((v) => v.option.id === slot.optionId);
+    if (!hit) {
       const row = byId.get(slot.productId)!;
       throw badRequest(
         `الخيار المطلوب من «${label(row)}» ما عاد موجود. / ` +
@@ -536,39 +568,18 @@ compareRoutes.get('/', async (c) => {
         { product_id: slot.productId, option_id: slot.optionId }
       );
     }
-    return option;
+    return hit;
   });
 
-  /**
-   * THE PRICE OF A CHOSEN OPTION COMES FROM `buildGrid`, never from arithmetic
-   * written here.
-   *
-   * An option's regular price is a LADDER — an absolute override, or an
-   * adjustment measured from the product's own price, clamped against the
-   * member tiers — and packages/pricing/src/priceGrid.ts is the one
-   * implementation of it, the same one the admin grid and the TXT export read.
-   * A second copy in this file would start agreeing and end disagreeing, and
-   * the number it disagreed about would be a price on a page whose whole job
-   * is telling someone which machine to buy.
-   */
+  /** The price of a column: the chosen option's, else the product's — both from the resolver. */
   const priceOf = (index: number): number => {
-    const option = picked[index];
-    const doc = docById.get(slots[index].productId)!;
-    const base = Number(doc.price_iqd) || 0;
-    if (!option) return base;
-    const grid = buildGrid({
-      price_iqd: base,
-      prime_price_iqd: doc.prime_price_iqd,
-      pro_price_iqd: doc.pro_price_iqd,
-      product_cost_iqd: doc.product_cost_iqd,
-      selling_type: doc.selling_type,
-      sale_types: doc.sale_types,
-      options: doc.options,
-      colors: doc.colors,
-    });
-    const line = grid.find((g) => g.level === 'option' && g.id === option.id);
-    return line?.cells.regular.effective ?? base;
+    const variant = picked[index];
+    const level = variant ? variant.level : pricing.get(slots[index].productId)?.base;
+    return level ? level.unit_subtotal_iqd : Number(rows[index].price_iqd) || 0;
   };
+
+  /** The spec sheet of the CONFIGURATION: the product's, then the option's allow-listed differences. */
+  const sheets = placed.map((p, i) => variantSheet(p.specs, picked[i]?.option ?? null));
 
   /**
    * «في المقارنة … يجب أن يكون الفيلمنت مقابل الفيلمنت الطابعة مقابل الطابعة».
@@ -644,18 +655,26 @@ compareRoutes.get('/', async (c) => {
    * يختلف» round-trip: two columns of one printer are two ids, and closing
    * either one closes the right column. The option travels beside it so the
    * column can be labelled «X1C · كومبو» rather than showing the same name
-   * twice with two different prices and no explanation.
+   * twice with two different prices and no explanation — and `options` lists
+   * every other way to buy the same machine, priced, so the column header can
+   * switch configuration in place.
    */
   const cards = placed.map((product, i) => {
-    const option = picked[i];
+    const variant = picked[i];
+    const variants = pricing.get(product.row.id)?.options ?? [];
+    const profile = multicolorProfile(sheets[i]);
     return {
       ...cardOf(product, images.get(product.row.id)),
       id: slots[i].key,
       product_id: product.row.id,
       price_iqd: priceOf(i),
-      option: option
-        ? { id: option.id, label: tri(option.name_ar, option.name_en, option.name_ckb) }
-        : null,
+      option: variant ? optionLabel(variant.option) : null,
+      /** True when the URL named no option and the column is the base configuration. */
+      default_option: !!variant && !slots[i].optionId,
+      ...(variants.length >= 2 ? { options: variants.map(pricedOption) } : {}),
+      multicolor: { ...profile, badge: multicolorBadge(profile) },
+      /** The laser module THIS configuration ships with, in watts; null = none stated. */
+      laser_module_w: laserWatts(sheets[i]),
     };
   });
   /**
@@ -682,16 +701,47 @@ compareRoutes.get('/', async (c) => {
       id: slots[i].key,
       product_type: p.productType,
       section_slugs: p.branch.map((b) => b.slug),
-      spec_fields: p.specs,
-      // The price of the CONFIGURATION, from buildGrid — see priceOf above.
-      // The spec sheet is the product's; the price is the option's, and the
-      // price row is the one line where the two columns genuinely differ.
+      // The CONFIGURATION's sheet: «A1» and «A1 Combo» differ in colours as
+      // sold and AMS in the box, and the table must say so.
+      spec_fields: sheets[i],
+      // The price of the CONFIGURATION, from the product page's resolver.
       price_iqd: priceOf(i),
     })),
   });
 
   return c.json({ success: true, products: cards, power, comparison });
 });
+
+/** «ليزر 10W» — the configuration's laser module, read off its own sheet. */
+function laserWatts(sheet: Record<string, unknown>): number | null {
+  const raw = sheet.laser_module_power;
+  if (raw === null || raw === undefined || typeof raw === 'object') return null;
+  const n = readNumber(String(raw), 'W');
+  return n !== null && n > 0 ? n : null;
+}
+
+/** One option as the page names it. */
+function optionLabel(o: { id: string; name_ar: string; name_en: string; name_ckb: string }) {
+  return { id: o.id, label: tri(o.name_ar, o.name_en, o.name_ckb) };
+}
+
+/** One option as the page OFFERS it: named, priced by the resolver, stock when tracked. */
+function pricedOption(v: { option: { id: string; name_ar: string; name_en: string; name_ckb: string }; level: { unit_subtotal_iqd: number }; available: number | null }) {
+  return { ...optionLabel(v.option), price_iqd: v.level.unit_subtotal_iqd, available: v.available };
+}
+
+/**
+ * The base configuration: the cheapest active option (the shop's rule that the
+ * base price is the cheapest way to buy), the admin's order breaking a tie.
+ * Null for a product with no options — the product IS the configuration.
+ */
+export function defaultVariant<T extends { level: { unit_subtotal_iqd: number } }>(variants: readonly T[]): T | null {
+  let best: T | null = null;
+  for (const v of variants) {
+    if (!best || v.level.unit_subtotal_iqd < best.level.unit_subtotal_iqd) best = v;
+  }
+  return best;
+}
 
 // ------------------------------------------------------------- the second slot
 
@@ -721,7 +771,8 @@ export async function rankCompareCandidates(
   anchorPlaced: Placed,
   tax: Taxonomy,
   q: string,
-  limit: number
+  limit: number,
+  ctx: PricingCtx | null = null
 ): Promise<CompareProductCard[]> {
   const anchorSections = new Set(anchorPlaced.branch.map((b) => b.id));
   const anchorLeaf = anchorPlaced.branch[0]?.id ?? '';
@@ -816,8 +867,10 @@ export async function rankCompareCandidates(
     db,
     selected.map((candidate) => candidate.row.id)
   );
-  return selected.map((candidate) =>
-    withOptions(cardOf(candidate, images.get(candidate.row.id)), candidate.row)
+  return withOptions(
+    db,
+    selected.map((candidate) => cardOf(candidate, images.get(candidate.row.id))),
+    ctx
   );
 }
 
@@ -837,14 +890,43 @@ export async function rankCompareCandidates(
  * same parser the product page uses, so the names in the popup are the names
  * on the product page.
  */
-function withOptions(card: CompareProductCard, row: ProductRow): CompareProductCard {
-  const doc = parseProductRow(row as unknown as Record<string, unknown>);
-  const active = doc.options.filter((o) => o.active !== false);
-  if (active.length < 2) return card;
-  return {
-    ...card,
-    options: active.map((o) => ({ id: o.id, label: tri(o.name_ar, o.name_en, o.name_ckb) })),
-  };
+async function withOptions(
+  db: D1Database,
+  cards: CompareProductCard[],
+  ctx: PricingCtx | null
+): Promise<CompareProductCard[]> {
+  if (cards.length === 0) return cards;
+  const ids = cards.map((card) => card.id);
+  const marks = ids.map(() => '?').join(',');
+  /**
+   * FROM THE TABLES, not the row. `options` is not a PRODUCT_COLUMNS column
+   * and the options live in `product_option_values`, so reading them off the
+   * row answered «no options» for every printer and the popup this function
+   * exists for never opened. With a viewer context the choices are priced by
+   * the product page's resolver; without one (the support assistant) they are
+   * named only.
+   */
+  const labelled = new Map<string, NonNullable<CompareProductCard['options']>>();
+  if (ctx) {
+    const { results } = await db.prepare(`SELECT * FROM products WHERE id IN (${marks})`).bind(...ids).all<Record<string, unknown>>();
+    const pricing = await resolveVariantPricing(db, results ?? [], ctx);
+    for (const [id, p] of pricing) labelled.set(id, p.options.map(pricedOption));
+  } else {
+    const { results } = await db
+      .prepare(`SELECT ${PRODUCT_COLUMNS}, inventory_mode FROM products WHERE id IN (${marks})`)
+      .bind(...ids)
+      .all<Record<string, unknown>>();
+    const views = await loadRelationsViews(db, (results ?? []).map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode })));
+    for (const r of results ?? []) {
+      const view = views.get(String(r.id));
+      const doc = view ? applyRelations(parseProductRow(r), view) : parseProductRow(r);
+      labelled.set(String(r.id), doc.options.filter((o) => o.active !== false).map(optionLabel));
+    }
+  }
+  return cards.map((card) => {
+    const options = labelled.get(card.id) ?? [];
+    return options.length >= 2 ? { ...card, options } : card;
+  });
 }
 
 /**
@@ -860,7 +942,8 @@ export async function browseCompareCandidates(
   db: D1Database,
   tax: Taxonomy,
   q: string,
-  limit: number
+  limit: number,
+  ctx: PricingCtx | null = null
 ): Promise<CompareProductCard[]> {
   // Through `likePattern`, never `'%' + q + '%'` — D1 refuses a LIKE pattern
   // over 50 BYTES and Arabic is two bytes a letter. See the long note in
@@ -888,8 +971,10 @@ export async function browseCompareCandidates(
     .slice(0, limit);
 
   const images = await loadCompareImages(db, placed.map((candidate) => candidate.row.id));
-  return placed.map((candidate) =>
-    withOptions(cardOf(candidate, images.get(candidate.row.id)), candidate.row)
+  return withOptions(
+    db,
+    placed.map((candidate) => cardOf(candidate, images.get(candidate.row.id))),
+    ctx
   );
 }
 
@@ -929,11 +1014,11 @@ compareRoutes.get('/candidates', async (c) => {
   // still have read an unpublished product's name and price into memory on a
   // public route — and one `if` away from returning it.
   if (!anchorId) {
-    const tax = taxonomy(await loadCatalogs(c.env.DB));
+    const [catalogRows, ctx] = await Promise.all([loadCatalogs(c.env.DB), pricingCtx(c)]);
     return c.json({
       success: true,
       for: null,
-      products: await browseCompareCandidates(c.env.DB, tax, q, MAX_CANDIDATES),
+      products: await browseCompareCandidates(c.env.DB, taxonomy(catalogRows), q, MAX_CANDIDATES, ctx),
     });
   }
 
@@ -943,16 +1028,18 @@ compareRoutes.get('/candidates', async (c) => {
     .first<ProductRow>();
   if (!anchor) throw notFound('Product not found');
 
-  const [catalogRows, images] = await Promise.all([
+  const [catalogRows, images, ctx] = await Promise.all([
     loadCatalogs(c.env.DB),
     loadCompareImages(c.env.DB, [anchor.id]),
+    pricingCtx(c),
   ]);
   const tax = taxonomy(catalogRows);
   const anchorPlaced = place(anchor, tax);
+  const [forCard] = await withOptions(c.env.DB, [cardOf(anchorPlaced, images.get(anchor.id))], ctx);
 
   return c.json({
     success: true,
-    for: withOptions(cardOf(anchorPlaced, images.get(anchor.id)), anchor),
-    products: await rankCompareCandidates(c.env.DB, anchorPlaced, tax, q, MAX_CANDIDATES),
+    for: forCard,
+    products: await rankCompareCandidates(c.env.DB, anchorPlaced, tax, q, MAX_CANDIDATES, ctx),
   });
 });

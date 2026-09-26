@@ -24,7 +24,10 @@ export type MediaDomain =
   | 'services'
   | 'kyc'
   | 'requests'
-  | 'print-requests';
+  | 'print-requests'
+  /** 0143 — a trade-in's photographs: `trade-in/<request id>/photos/…`,
+   *  private, read through the gate in worker/routes/uploads.ts. */
+  | 'trade-in';
 
 export interface MediaKeyInput {
   visibility: MediaVisibility;

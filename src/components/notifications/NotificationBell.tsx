@@ -12,6 +12,7 @@ import {
   RotateCw,
   ShieldCheck,
   Tag,
+  Repeat,
 } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
@@ -132,6 +133,10 @@ function kindIcon(kind: string) {
     case 'warranty_reply':
     case 'warranty_stage':
       return ShieldCheck;
+    // A trade-in moved (worker/lib/tradeIn.ts): the same exchange glyph as the
+    // /trade-in page and its home tile.
+    case 'trade_in':
+      return Repeat;
     default:
       return Bell;
   }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Info, Search, X } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Info, Repeat, Search, X } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { api } from '../lib/api';
 import type { ApiOrder } from '../lib/api';
@@ -218,7 +218,7 @@ function fullyReviewed(order: ApiOrder, reviewed: ReadonlySet<string> | null): b
 
 export default function Orders() {
   const navigate = useNavigate();
-  const { dir, lang } = useLanguage();
+  const { dir, lang, loc } = useLanguage();
   const location = useLocation();
   const s = STRINGS[asLang(lang)];
 
@@ -422,6 +422,17 @@ export default function Orders() {
             {dir === 'rtl' ? <ArrowRight className="w-5 h-5" aria-hidden="true" /> : <ArrowLeft className="w-5 h-5" aria-hidden="true" />}
           </button>
           <h1 className="text-white font-bold text-lg min-w-0 truncate flex-1">{s.title}</h1>
+          {/* «الاستبدال» — a delivered LEVONIS device can be traded against a
+              new one; its requests and its wizard live at /trade-in.
+              OWNER: Sorani to be written by hand. */}
+          <Link
+            to="/trade-in"
+            data-orders-trade-in
+            className="shrink-0 inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-full bg-zinc-900 text-zinc-200 text-[12.5px] font-bold hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
+          >
+            <Repeat className="w-4 h-4" aria-hidden="true" />
+            {loc('الاستبدال', 'Trade-in')}
+          </Link>
         </div>
 
         <div className="px-4 pb-2">

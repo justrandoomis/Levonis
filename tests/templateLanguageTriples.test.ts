@@ -64,6 +64,11 @@ test('every exported repeatable text family exposes ar, en and ckb slots', () =>
 const SORANI_PENDING = new Set([
   'Suitable for', 'Laser module option',
   'Hobby', 'Business', 'Figures', 'Functional parts', 'Products to sell', 'Multicolour', 'Education',
+  // Owner round 11 — the colour facts and the per-option ones (OWNER: Sorani to be written by hand).
+  'Maximum colours (with AMS units)', 'Multi-colour method', 'Single nozzle + AMS', 'Dual nozzle', 'Tool changer',
+  'Multi-nozzle (hotend changer)', 'Colours without filament swaps', 'Purge waste on colour change', 'Near zero',
+  'Low', 'High', 'Multi-material in one print', 'Colours as sold', 'AMS units in the box', 'Included laser module',
+  'Cutting / pen module', 'Per-option spec differences',
 ]);
 
 test('the deterministic dictionary covers every built-in template label and choice', () => {

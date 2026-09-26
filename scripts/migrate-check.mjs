@@ -84,6 +84,10 @@ const SNAPSHOT_TABLES = [
   'product_option_groups',
   'product_images',
   'admin_settings',
+  // 0144 is the first migration to fill SPEC VALUES on existing products
+  // (`json_set(spec_fields, …)` guarded by «only where empty»), so its re-run
+  // is measured against the products table rather than assumed.
+  'products',
 ];
 
 /** True when the statement's only target table is one this harness snapshots,

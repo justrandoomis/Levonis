@@ -1037,6 +1037,119 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The order changed before your decision was saved. Refresh and try again.',
     ckb: 'تغيّر الطلب قبل حفظ القرار. حدّث الصفحة وحاول مرة أخرى.',
   },
+  // «الاستبدال» (migration 0143, worker/lib/tradeIn.ts). The ckb column carries
+  // the Arabic until the owner writes the Sorani by hand (DECISIONS row 11).
+  // OWNER: Sorani to be written by hand.
+  TRADE_IN_NOT_DELIVERED: {
+    ar: 'يمكن استبدال الأجهزة من الطلبات المستلَمة فقط.',
+    en: 'Only devices from delivered orders can be traded in.',
+    ckb: 'يمكن استبدال الأجهزة من الطلبات المستلَمة فقط.',
+  },
+  TRADE_IN_NOT_ELIGIBLE: {
+    ar: 'هذا المنتج غير مشمول بالاستبدال. الاستبدال للطابعات وأجهزة الليزر وAMS والملحقات المشتراة من LEVONIS.',
+    en: 'This item is not eligible. Trade-in covers printers, lasers, AMS units and accessories bought from LEVONIS.',
+    ckb: 'هذا المنتج غير مشمول بالاستبدال. الاستبدال للطابعات وأجهزة الليزر وAMS والملحقات المشتراة من LEVONIS.',
+  },
+  TRADE_IN_ALREADY_CLAIMED: {
+    ar: 'هذا الجهاز ضمن طلب استبدال آخر. افتح طلباتك للاستبدال لمتابعته.',
+    en: 'This device is already part of a trade-in. Open your trade-in requests to follow it.',
+    ckb: 'هذا الجهاز ضمن طلب استبدال آخر. افتح طلباتك للاستبدال لمتابعته.',
+  },
+  TRADE_IN_RETURN_OPEN: {
+    ar: 'على هذا المنتج طلب إرجاع، فلا يمكن استبداله.',
+    en: 'This item has a return case, so it cannot be traded in.',
+    ckb: 'على هذا المنتج طلب إرجاع، فلا يمكن استبداله.',
+  },
+  TRADE_IN_BELOW_MINIMUM: {
+    ar: 'قيمة هذا المنتج أقل من الحد الأدنى للاستبدال.',
+    en: 'This item is below the minimum value for a trade-in.',
+    ckb: 'قيمة هذا المنتج أقل من الحد الأدنى للاستبدال.',
+  },
+  TRADE_IN_SCOPE_UNAVAILABLE: {
+    ar: 'لا يمكن استبدال هذا الجزء وحده لهذا الجهاز. اختر «الجهاز كاملاً».',
+    en: 'This part cannot be traded on its own for this device. Choose “the whole device”.',
+    ckb: 'لا يمكن استبدال هذا الجزء وحده لهذا الجهاز. اختر «الجهاز كاملاً».',
+  },
+  TRADE_IN_DRAFT_LIMIT: {
+    ar: 'لديك طلبات استبدال غير مكتملة كثيرة. أكمل أحدها أو ألغه أولاً.',
+    en: 'You have too many unfinished trade-in requests. Finish or cancel one first.',
+    ckb: 'لديك طلبات استبدال غير مكتملة كثيرة. أكمل أحدها أو ألغه أولاً.',
+  },
+  TRADE_IN_NOT_EDITABLE: {
+    ar: 'أُرسل هذا الطلب ولا يمكن تعديله الآن.',
+    en: 'This request was already sent and can no longer be edited.',
+    ckb: 'أُرسل هذا الطلب ولا يمكن تعديله الآن.',
+  },
+  TRADE_IN_INPUTS_INVALID: {
+    ar: 'بعض إجابات حالة الجهاز ناقصة أو غير صحيحة. راجعها ثم أعد المحاولة.',
+    en: 'Some answers about the device are missing or invalid. Check them and try again.',
+    ckb: 'بعض إجابات حالة الجهاز ناقصة أو غير صحيحة. راجعها ثم أعد المحاولة.',
+  },
+  TRADE_IN_PHOTOS_MISSING: {
+    ar: 'بعض الصور الإلزامية ناقصة. ارفع كل الزوايا المطلوبة.',
+    en: 'Some required photos are missing. Upload every required angle.',
+    ckb: 'بعض الصور الإلزامية ناقصة. ارفع كل الزوايا المطلوبة.',
+  },
+  TRADE_IN_PHOTO_LIMIT: {
+    ar: 'وصلت للحد الأقصى من الصور لهذه الزاوية أو لهذا الطلب. احذف صورة لتضيف غيرها.',
+    en: 'You reached the photo limit for this angle or request. Remove one to add another.',
+    ckb: 'وصلت للحد الأقصى من الصور لهذه الزاوية أو لهذا الطلب. احذف صورة لتضيف غيرها.',
+  },
+  TRADE_IN_PHOTO_ANGLE: {
+    ar: 'هذه الزاوية لا تخص هذا الجهاز.',
+    en: 'That photo angle does not apply to this device.',
+    ckb: 'هذه الزاوية لا تخص هذا الجهاز.',
+  },
+  TRADE_IN_TARGET_REQUIRED: {
+    ar: 'اختر الجهاز الجديد أولاً.',
+    en: 'Choose the new device first.',
+    ckb: 'اختر الجهاز الجديد أولاً.',
+  },
+  TRADE_IN_TARGET_UNAVAILABLE: {
+    ar: 'الجهاز الجديد الذي اخترته غير متاح للبيع المباشر الآن. اختر موديلاً أو جهازاً آخر.',
+    en: 'The new device you chose is not available for direct sale right now. Choose another model or device.',
+    ckb: 'الجهاز الجديد الذي اخترته غير متاح للبيع المباشر الآن. اختر موديلاً أو جهازاً آخر.',
+  },
+  TRADE_IN_BAD_STATE: {
+    ar: 'حالة الطلب لا تسمح بهذا الإجراء. حدّث الصفحة.',
+    en: 'This request’s status does not allow this action. Refresh the page.',
+    ckb: 'حالة الطلب لا تسمح بهذا الإجراء. حدّث الصفحة.',
+  },
+  TRADE_IN_OFFER_STALE: {
+    ar: 'تغيّرت القيمة منذ فتحت هذه الصفحة. حدّثها ثم قرّر من جديد.',
+    en: 'The value changed since this screen was opened. Refresh and decide again.',
+    ckb: 'تغيّرت القيمة منذ فتحت هذه الصفحة. حدّثها ثم قرّر من جديد.',
+  },
+  TRADE_IN_ORDER_ACTIVE: {
+    ar: 'استُخدم رصيد هذا الاستبدال في طلب شراء قائم. ألغِ ذلك الطلب أولاً.',
+    en: 'An order already used this trade-in credit. Cancel that order first.',
+    ckb: 'استُخدم رصيد هذا الاستبدال في طلب شراء قائم. ألغِ ذلك الطلب أولاً.',
+  },
+  TRADE_IN_NO_ORDER: {
+    ar: 'لم يُنشئ الزبون طلب شراء الجهاز الجديد بعد.',
+    en: 'The customer has not placed the order for the new device yet.',
+    ckb: 'لم يُنشئ الزبون طلب شراء الجهاز الجديد بعد.',
+  },
+  TRADE_IN_INVALID_VALUE: {
+    ar: 'أدخل قيمة صحيحة بالدينار.',
+    en: 'Enter a whole number of dinars.',
+    ckb: 'أدخل قيمة صحيحة بالدينار.',
+  },
+  TRADE_IN_RULES_INVALID: {
+    ar: 'بعض قيم القواعد غير صحيحة. راجع الحقول المعلَّمة.',
+    en: 'Some rule values are invalid. Check the highlighted fields.',
+    ckb: 'بعض قيم القواعد غير صحيحة. راجع الحقول المعلَّمة.',
+  },
+  TRADE_IN_COUPON_MISMATCH: {
+    ar: 'رصيد الاستبدال يُطبَّق فقط على الجهاز الجديد المختار، بالبيع المباشر، ولصاحب الطلب. تأكد أنه في سلتك.',
+    en: 'This trade-in credit applies only to the chosen new device, bought directly, by its owner. Make sure it is in your cart.',
+    ckb: 'رصيد الاستبدال يُطبَّق فقط على الجهاز الجديد المختار، بالبيع المباشر، ولصاحب الطلب. تأكد أنه في سلتك.',
+  },
+  TRADE_IN_STALE: {
+    ar: 'تغيّر الطلب أثناء عملك عليه. حدّث الصفحة وحاول مرة أخرى.',
+    en: 'The request changed while you were working on it. Refresh and try again.',
+    ckb: 'تغيّر الطلب أثناء عملك عليه. حدّث الصفحة وحاول مرة أخرى.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

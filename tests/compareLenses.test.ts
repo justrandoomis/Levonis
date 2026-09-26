@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { asD1, freshDb, get, json, stubApp } from './fixtures/app';
 import { LIVE_PRODUCTS, P, seedLiveCatalog } from './fixtures/liveCatalog';
+import { seedLivePrinterOptions } from './fixtures/livePrinterOptions';
 import { compareRoutes } from '../worker/routes/compare';
 import { compareLenses, compareWithLenses, LENS_MARGIN } from '../worker/lib/compareLenses';
 import type { CompareInputProduct } from '../worker/lib/compareSpecs';
@@ -24,6 +25,9 @@ const input = (id: string, over: Partial<CompareInputProduct> = {}): CompareInpu
 test('ACCEPTANCE over HTTP: X2D / H2S / P2S → business H2S, beginners P2S, value X2D, multicolor X2D, precision X2D', async () => {
   const raw = freshDb();
   seedLiveCatalog(raw);
+  // The live options and the 0145 colour facts: each bare id is its base
+  // configuration (X2D, H2S, P2S) at the product page's direct-sale price.
+  seedLivePrinterOptions(raw);
   const app = stubApp(asD1(raw), null, (a) => a.route('/api/compare', compareRoutes));
   const b = await json(await get(app, `/api/compare?ids=${P.X2D},${P.H2S},${P.P2S}`));
   const lenses = b.comparison.lenses as Array<{ id: string; state: string; winner: number | null; reason: { code: string; field_id: string; value_text: string } | null }>;
@@ -40,25 +44,30 @@ test('ACCEPTANCE over HTTP: X2D / H2S / P2S → business H2S, beginners P2S, val
   );
   const by = Object.fromEntries(lenses.map((l) => [l.id, l.reason]));
   assert.deepEqual(by.beginners, { code: 'ease', field_id: 'skill_level', value_text: 'Beginner' });
-  assert.deepEqual(by.multicolor, { code: 'colors', field_id: 'max_colors', value_text: '25' });
+  // The X2D wins colour on its TWO NOZZLES (two colours without a filament
+  // swap, low waste) — not on the 25-colour AMS ceiling the H2S nearly
+  // matches with one nozzle and a purge on every swap (worker/lib/multicolor.ts).
+  assert.deepEqual(by.multicolor, { code: 'colors', field_id: 'max_colors_native', value_text: '2' });
   assert.deepEqual(by.precision, { code: 'quality', field_id: 'min_layer_height', value_text: '0.04 mm' });
-  assert.deepEqual(by.value, { code: 'value', field_id: 'price_iqd', value_text: '1,575,000 IQD' });
+  // The base configuration's direct-sale price, as the product page shows it.
+  assert.deepEqual(by.value, { code: 'value', field_id: 'price_iqd', value_text: '1,649,000 IQD' });
   assert.equal(by.business!.code, 'size', 'the H2S leads on its 340 mm volume');
 });
 
-test('the 5% rule: a lead under 5% is a tie; extruders settle a near tie on colours', () => {
-  const a = input(P.X2D);
-  const b = input(P.H2S);
-  // 25 vs 24 colours is a 4% lead. The X2D has 2 extruders to the H2S's 1.
+test('the 5% rule: a lead under 5% is a tie; the AMS ceiling settles a near tie on colours', () => {
+  const dual = { multicolor_method: 'Dual nozzle', max_colors_native: '2', purge_waste: 'Low' };
+  const a = input(P.X2D, { spec_fields: { ...input(P.X2D).spec_fields, ...dual } });
+  // The same machine with a 24-colour ceiling instead of 25: a sub-5% lead.
+  const b = input(P.X2D, { id: 'b', spec_fields: { ...input(P.X2D).spec_fields, ...dual, max_colors: '24' } });
   const lens = compareWithLenses({ products: [a, b] }).lenses!.find((l) => l.id === 'multicolor')!;
   assert.equal(lens.state, 'winner');
   assert.equal(lens.winner, 0);
-  const sameExtruders = compareWithLenses({
-    products: [a, { ...b, spec_fields: { ...b.spec_fields, extruders: '2' } }],
+  const same = compareWithLenses({
+    products: [a, { ...b, spec_fields: { ...b.spec_fields, max_colors: '25' } }],
   }).lenses!.find((l) => l.id === 'multicolor')!;
-  assert.equal(sameExtruders.state, 'tie', 'no tie-break left → «متقاربة», never an invented winner');
-  assert.equal(sameExtruders.winner, null);
-  assert.equal(sameExtruders.reason, null);
+  assert.equal(same.state, 'tie', 'no tie-break left → «متقاربة», never an invented winner');
+  assert.equal(same.winner, null);
+  assert.equal(same.reason, null);
   assert.equal(LENS_MARGIN, 0.05);
 });
 

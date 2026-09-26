@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck, MessageSquare } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck, MessageSquare, Repeat } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
 import { api } from '../lib/api';
@@ -202,7 +202,7 @@ export default function OrderDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { lang, dir } = useLanguage();
+  const { lang, dir, loc } = useLanguage();
   const s = STRINGS[asLang(lang)];
   // The printer home-delivery note amount, the owner's setting. null = no
   // note; the figure is never invented and never enters a total.
@@ -284,6 +284,30 @@ export default function OrderDetail() {
       .get<{ reviews: Array<{ product_id: string | null }> }>('/api/reviews/mine')
       .then((r) => alive && setReviewed(new Set((r.reviews || []).map((x) => x.product_id).filter((x): x is string => !!x))))
       .catch(() => alive && setReviewed(null));
+    return () => {
+      alive = false;
+    };
+  }, [delivered]);
+
+  /**
+   * «استبدل هذا الجهاز» — only on a line the SERVER says can be traded in
+   * (a delivered LEVONIS device of this customer, not already traded, no return
+   * case). The list is the trade-in wizard's own first step, so the link opens
+   * it on exactly this unit; a failed fetch shows no link rather than a guess.
+   */
+  const [tradeable, setTradeable] = useState<ReadonlyMap<string, number>>(new Map());
+  useEffect(() => {
+    if (!delivered) return;
+    let alive = true;
+    api
+      .get<{ units: Array<{ order_item_id: string; unit_index: number; available: boolean }> }>('/api/trade-in/eligible')
+      .then((r) => {
+        if (!alive) return;
+        const m = new Map<string, number>();
+        for (const u of r.units || []) if (u.available && !m.has(u.order_item_id)) m.set(u.order_item_id, u.unit_index);
+        setTradeable(m);
+      })
+      .catch(() => alive && setTradeable(new Map()));
     return () => {
       alive = false;
     };
@@ -699,6 +723,18 @@ export default function OrderDetail() {
                                 </button>
                               )}
                             </div>
+                          )}
+
+                          {tradeable.has(it.id) && (
+                            <Link
+                              to={`/trade-in?item=${encodeURIComponent(it.id)}&unit=${tradeable.get(it.id)}`}
+                              data-trade-in-item={it.id}
+                              className="mt-2 inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-zinc-700 text-zinc-200 text-[12.5px] font-bold hover:border-zinc-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                            >
+                              <Repeat className="w-3.5 h-3.5" aria-hidden />
+                              {/* OWNER: Sorani to be written by hand. */}
+                              {loc('استبدل هذا الجهاز', 'Trade in this device')}
+                            </Link>
                           )}
 
                           {itemUnits.length > 0 && <OrderUnits units={itemUnits} onLinked={markLinked} />}

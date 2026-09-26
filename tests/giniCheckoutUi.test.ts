@@ -236,12 +236,14 @@ test('the two Gini amounts are the server’s, with no local fallback', () => {
   );
 });
 
-test('the wallet is not offered on a Gini order', () => {
+test('the wallet is not offered on a Gini order — the row is locked and says why', () => {
   assert.ok(
-    checkout.includes('{isGiniMethod ? null : ('),
-    'the wallet block is suppressed — the server forces the applied balance to 0, '
+    checkout.includes('const walletSwitchLocked = isGiniMethod ||'),
+    'the switch is locked on Gini — the server forces the applied balance to 0, '
       + 'so a live toggle would offer a deduction that never appears'
   );
+  assert.ok(checkout.includes('const walletSwitchOn = isWalletActive && !isGiniMethod;'), 'and it never reads as on');
+  assert.ok(/walletLockReason[^;]*= isGiniMethod/.test(checkout), 'the reason is printed beside the locked switch');
 });
 
 test('the customer is told the order is not confirmed until the barcode is scanned', () => {
