@@ -52,8 +52,8 @@
   color-scheme: light;
   /* The cream of the store's light theme (owner, 2026-09-26: «كريمي او off
      white وليس ابيض بحت») — no near-white large surface. */
-  --ap-bg-0: #ece6da;
-  --ap-surface-1: #f4efe5;
+  --ap-bg-0: #e3dacb;
+  --ap-surface-1: #ebe4d6;
   --ap-surface-2: #efe9de;
   --ap-surface-3: #e6dfd2;
   --ap-surface-4: #ddd5c6;

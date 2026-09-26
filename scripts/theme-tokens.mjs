@@ -97,12 +97,12 @@ const toHex = (rgb) => `#${rgb.map((c) => Math.round(c * 255).toString(16).padSt
  * CREAM, NOT BRIGHT (owner, 2026-09-26: «اجعل المظهر الفاتح يكون كريمي او off
  * white وليس ابيض بحت وساطع، بحيث يكون الثيم مريح للعين»). The page was
  * #f3f0ea with #fbfaf7 cards and pure #ffffff menus — near-white at 96–100%
- * lightness. The page is now a warm cream at OKLCH L≈0.93 and a card is one
+ * lightness. The page is a warm cream (#e3dacb, darkened again after «ليس أبيض ساطع … كريمي أو أغمق قليلاً») and a card is one
  * step lighter (L≈0.95); nothing large is white. The names stay IVORY/PAPER
  * because every rule below is written against them.
  */
-export const IVORY = '#ece6da';
-export const PAPER = '#f4efe5';
+export const IVORY = '#e3dacb';
+export const PAPER = '#ebe4d6';
 
 /**
  * The semantic slots. Dark values are the ones @theme in src/index.css
@@ -115,9 +115,9 @@ export const SEMANTIC = {
   'white':               ['#f2f3f5', '#16181b'],
   'canvas':              ['#0b0c0f', IVORY],
   'surface':             ['#131519', PAPER],
-  'surface-raised':      ['#191c21', '#f8f4ec'],
-  'surface-selected':    ['#20242a', '#e3dccd'],
-  'border-subtle':       ['#2a2e35', '#d9d1c2'],
+  'surface-raised':      ['#191c21', '#f0eadf'],
+  'surface-selected':    ['#20242a', '#d8cfbd'],
+  'border-subtle':       ['#2a2e35', '#cfc5b2'],
   'text-primary':        ['#f2f3f5', '#16181b'],
   'text-secondary':      ['#b7bbc3', '#45484e'],
   'text-muted':          ['#858b95', '#595c62'],
@@ -143,11 +143,11 @@ export const NEUTRAL_LIGHT = {
   200: '#2a2c30',
   300: '#3a3d42',
   400: '#505359',
-  500: '#5c5f65',
+  500: '#55585e',
   // The dim ink of placeholders, captions and quiet glyphs (172 call sites use
   // `text-zinc-600` as TEXT): 4.5:1 on the cream page and 5:1 on a card, where
-  // the old #8b8d92 read at 2.9.
-  600: '#606268',
+  // the old #8b8d92 read at 2.9 (darkened with the page, 2026-09-26).
+  600: '#55585e',
   700: '#cdc4b3',
   800: '#e2dbcd',
   900: PAPER,

@@ -172,3 +172,33 @@ test('/categories/:cat/:sub resolves by the last segment, with canonical redirec
   assert.equal(resolveListingRoute(tree.roots, 'fdm-printers', 'all')!.canonical, '/categories/printers/fdm-printers');
   assert.equal(resolveListingRoute(tree.roots, 'printers', 'resin-printers'), null, 'unknown here — the page asks the category route');
 });
+
+test('a third level (مواد الطباعة ‹ مواد FDM ‹ فيلمنت PLA) is nested in the tree, lives at /categories/<root>/<slug> and lists its products', async () => {
+  const raw = freshDb();
+  seedLiveCatalog(raw);
+  raw.exec(`INSERT INTO catalogs (id, parent_id, slug, name_ar, name_en, sort) VALUES ('cat_pla', 'cat_materials_fdm', 'pla', 'فيلمنت PLA', 'PLA filament', 1);
+            UPDATE products SET sub_category_id = 'cat_pla' WHERE sub_category_id = 'cat_materials_fdm';`);
+  const a = stubApp(asD1(raw), null, (x) => {
+    x.route('/api/catalog', catalogRoutes);
+    x.route('/api/products', productRoutes);
+  });
+  const tree = (await json(await a.request('/api/catalog/tree'))) as CatalogTreeResponse;
+  const fdm = tree.roots.find((r) => r.slug === 'printing-materials')!.children[0];
+  assert.equal(fdm.slug, 'fdm-materials');
+  assert.deepEqual(fdm.children.map((c) => [c.slug, c.path, c.product_count]), [['pla', '/categories/printing-materials/pla', 1]]);
+
+  // The sub-section page (/categories/printing-materials/fdm-materials) draws
+  // its child's banner; the banner's link resolves, canonically, to PLA.
+  const pla = resolveListingRoute(tree.roots, 'printing-materials', 'pla')!;
+  assert.equal(pla.node.id, 'cat_pla');
+  assert.equal(pla.canonical, '/categories/printing-materials/pla');
+  assert.equal(resolveListingRoute(tree.roots, 'fdm-materials', 'pla')!.canonical, '/categories/printing-materials/pla', 'a wrong parent is corrected, not a 404');
+  const parent = resolveListingRoute(tree.roots, 'printing-materials', 'fdm-materials')!;
+  assert.equal(parent.all, false);
+  assert.deepEqual(parent.node.children.map((c) => c.slug), ['pla']);
+
+  const list = (await json(await a.request(`/api/products?${listingApiQuery(emptyListing(), { category: 'cat_pla', limit: 24, facets: true })}`))) as { total: number };
+  assert.equal(list.total, 1);
+  const page = await a.request('/api/catalog/pla');
+  assert.equal(page.status, 200, 'the category route knows it too (a leaf → its listing)');
+});

@@ -82,12 +82,19 @@ export default function ListingView({
   scope,
   ownTopBar = true,
   hero,
+  sections,
 }: {
   scope: ListingScope;
   /** False when the page around it (a category page) draws its own top bar. */
   ownTopBar?: boolean;
   /** A compact hero drawn above the search, for a category that is its own listing. */
   hero?: React.ReactNode;
+  /**
+   * The section's own sub-sections as banner rows
+   * (src/components/catalog/CategoryRowBanners), drawn under the hero and the
+   * description, above the search: the doors further in come before the list.
+   */
+  sections?: React.ReactNode;
 }) {
   const { lang, loc } = useLanguage();
   const { state, commit, data, loading, error, retry, loadMore, more } = useListing(scope.category);
@@ -222,6 +229,7 @@ export default function ListingView({
         {ownTopBar && scope.description ? (
           <p className="line-clamp-2 pt-1 text-[12.5px] leading-[19px] text-text-muted lg:max-w-[70ch] lg:text-[14px] lg:leading-6">{scope.description}</p>
         ) : null}
+        {sections ? <div className="pt-4 lg:pt-6">{sections}</div> : null}
 
         <div className="pt-3">
           <ScopedSearch value={state.q} placeholder={placeholder} onChange={(q) => commit({ ...state, q })} />

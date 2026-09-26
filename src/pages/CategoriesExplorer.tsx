@@ -7,27 +7,28 @@ import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
 import PageTopBar from '../components/catalog/PageTopBar';
 import TopBarSearch from '../components/catalog/TopBarSearch';
-import CategoryBanner from '../components/catalog/CategoryBanner';
-import SubCategoryChips from '../components/catalog/SubCategoryChips';
+import CategoryRowBanners, { CategoryRowBanner } from '../components/catalog/CategoryRowBanners';
+import { useBannerPhotos } from '../components/catalog/useBannerPhotos';
 import DiscoveryFooterTiles from '../components/catalog/DiscoveryFooterTiles';
 import { useScrolledPast } from '../components/catalog/useScrolledPast';
-import { cachedTree, loadPhotoPool, loadSectionPhotos, loadTree } from '../lib/catalog/data';
-import { explorerBanners, photoOf, rootsWithoutPhoto, type BannerPhoto, type PhotoCandidate } from '../lib/catalog/explorerModel';
-import { nodeDescription, nodeName } from '../lib/catalog/categoryPageModel';
-import { availableLabel, countNoun, explorerSubline, nounKindFor } from '../lib/catalog/copy';
+import { cachedTree, loadPhotoPool, loadTree } from '../lib/catalog/data';
+import { bannerRows, photoOf, type BannerPhoto, type PhotoCandidate } from '../lib/catalog/explorerModel';
+import { countNoun, explorerSubline } from '../lib/catalog/copy';
 import type { CatalogTreeResponse } from '../lib/catalog/types';
 
 /**
  * «كل الفئات» — THE CATEGORY EXPLORER (docs/ux/CATALOG_DISCOVERY.md §5,
- * mockup 04). The owner: «Category Explorer Page وليست مجرد صفحة روابط» — a
- * horizontal banner per category with a strong photograph, its name, a short
- * description and an arrow.
+ * mockup 04). The owner: «Category Explorer Page وليست مجرد صفحة روابط», and
+ * on 2026-09-26: «تظهر الفئات بشكل مستطيل مثل الهيرو بانر … في سطر واحد لكل
+ * فئة» — a wide hero banner per category, ONE PER ROW, with a strong
+ * photograph, its name, its counts and a «استكشف ←» pill
+ * (src/components/catalog/CategoryRowBanners).
  *
  * WHAT IS DRAWN COMES FROM THE LIVE TREE (`GET /api/catalog/tree`): one banner
- * per root that holds products, in the admin's order, the printers root as the
- * large lead; sub-section chips only where they open something the banner does
- * not; «المستعمل» and «الباقات» only while they have stock (owner default Q10).
- * Nothing empty is ever drawn.
+ * per root that holds products, in the admin's order. A root's sub-sections
+ * are its own page's banners, not chips here. «المستعمل» and «الباقات» join
+ * the stack only while they have stock (owner default Q10). Nothing empty is
+ * ever drawn.
  *
  * PHOTOGRAPHS ARRIVE SECOND. The tree carries the admin's own pictures; a
  * section without one borrows a product photograph (available now first, never
@@ -36,7 +37,7 @@ import type { CatalogTreeResponse } from '../lib/catalog/types';
  * counts and all — before any photograph lands, and each picture fades into a
  * box whose size never changes.
  *
- * STATES: banner-shaped skeletons (208 / 150 / 150) while the tree loads; the
+ * STATES: banner-shaped skeletons (one per row) while the tree loads; the
  * last snapshot with a quiet note if a refresh fails; `ErrorState` with retry
  * when there is nothing to show; «لا توجد فئات بعد» with a way to every product
  * when the shop has no stocked section at all.
@@ -88,29 +89,9 @@ export default function CategoriesExplorer() {
   }, []);
 
   const roots = useMemo(() => tree?.roots ?? [], [tree]);
-  const banners = useMemo(() => explorerBanners(roots, pool), [roots, pool]);
-
+  const baseRows = useMemo(() => bannerRows(roots, pool), [roots, pool]);
   // A section the shared pool did not cover asks for its own photographs.
-  const [own, setOwn] = useState<Record<string, BannerPhoto | null>>({});
-  const missing = useMemo(() => rootsWithoutPhoto(banners).map((n) => n.id).join(','), [banners]);
-  useEffect(() => {
-    if (!missing || !poolSettled) return;
-    let alive = true;
-    for (const id of missing.split(',')) {
-      if (id in own) continue;
-      loadSectionPhotos(id)
-        .then((list) => {
-          const pick = list.find((p) => Number(p.direct_stock_available ?? 0) > 0 && photoOf(p)) ?? list.find((p) => photoOf(p));
-          if (alive) setOwn((o) => ({ ...o, [id]: pick ? { src: photoOf(pick), productPhoto: true, productId: pick.id } : null }));
-        })
-        .catch(() => alive && setOwn((o) => ({ ...o, [id]: null })));
-    }
-    return () => {
-      alive = false;
-    };
-    // `own` is read to skip sections already asked; re-running on it would loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missing, poolSettled]);
+  const rows = useBannerPhotos(baseRows, poolSettled);
 
   const title = loc('كل الفئات', 'All categories');
   // OWNER: Sorani to be written by hand (every loc() in this page without a third argument).
@@ -161,7 +142,7 @@ export default function CategoriesExplorer() {
           <ExplorerSkeleton />
         ) : error ? (
           <ErrorState error={error} onRetry={load} className="mt-6" />
-        ) : banners.length === 0 ? (
+        ) : rows.length === 0 ? (
           <EmptyState
             className="mt-6"
             icon={<LayoutGrid aria-hidden="true" className="size-6" />}
@@ -176,39 +157,29 @@ export default function CategoriesExplorer() {
             }
           />
         ) : (
-          <div className="mt-3 grid grid-cols-1 gap-3 lg:mt-4 lg:grid-flow-dense lg:grid-cols-2 lg:gap-5">
-            {banners.map((b, i) => {
-              const kind = nounKindFor(b.node.product_type, b.node.is_printer_catalog);
-              const name = nodeName(b.node, lang);
-              return (
-                <section
-                  key={b.node.id}
-                  aria-label={name}
-                  className={b.variant === 'lead' ? 'lg:col-span-2' : undefined}
-                >
-                  <CategoryBanner
-                    to={b.node.path}
-                    title={name}
-                    description={nodeDescription(b.node, lang)}
-                    count={countNoun(b.node.product_count, kind, lang)}
-                    available={availableLabel(b.node.available_count, b.node.product_count, lang)}
-                    photo={b.photo ?? own[b.node.id] ?? null}
-                    variant={b.variant}
-                    eager={i === 0}
-                  />
-                  <SubCategoryChips nodes={b.subs} label={loc(`أقسام ${name}`, `${name} sections`)} />
-                </section>
-              );
-            })}
-            {extraBanners.map((x) => (
-              <section key={x.id} aria-label={x.title}>
-                <CategoryBanner to={x.to} title={x.title} description={x.description} count={x.count} available={null} photo={x.photo} />
-              </section>
-            ))}
+          <div className="mt-3 flex flex-col gap-2.5 lg:mt-4 lg:gap-4">
+            <CategoryRowBanners rows={rows} label={title} eagerFirst />
+            {extraBanners.length ? (
+              <ul className="flex flex-col gap-2.5 lg:gap-4">
+                {extraBanners.map((x) => (
+                  <li key={x.id}>
+                    <CategoryRowBanner
+                      to={x.to}
+                      title={x.title}
+                      line={x.count}
+                      detail={x.description}
+                      cta={loc('تسوق الآن', 'Shop now')}
+                      photo={x.photo}
+                      rowKey={x.id}
+                    />
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         )}
 
-        {tree && banners.length > 0 ? (
+        {tree && rows.length > 0 ? (
           <div className="mt-7 lg:mt-12">
             <DiscoveryFooterTiles />
           </div>
@@ -220,10 +191,10 @@ export default function CategoriesExplorer() {
 
 function ExplorerSkeleton() {
   return (
-    <SkeletonGroup className="mt-3 grid grid-cols-1 gap-3 lg:mt-4 lg:grid-cols-2 lg:gap-5">
-      <Skeleton className="h-[208px] rounded-[20px] sm:h-[240px] lg:col-span-2 lg:h-[280px]" />
-      <Skeleton className="h-[150px] rounded-[20px] sm:h-[170px] lg:h-[200px]" />
-      <Skeleton className="h-[150px] rounded-[20px] sm:h-[170px] lg:h-[200px]" />
+    <SkeletonGroup className="mt-3 flex flex-col gap-2.5 lg:mt-4 lg:gap-4">
+      {[0, 1, 2, 3].map((i) => (
+        <Skeleton key={i} className="aspect-[8/3] max-h-[150px] min-h-[112px] w-full rounded-2xl sm:aspect-[4/1] sm:max-h-[170px] lg:aspect-[5/1] lg:max-h-[200px] lg:rounded-[20px]" />
+      ))}
     </SkeletonGroup>
   );
 }

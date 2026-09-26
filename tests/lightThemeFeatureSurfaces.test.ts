@@ -73,7 +73,7 @@ test('feature surfaces follow the theme: no dark island left on the home page or
     'src/components/home/v2/CategoryBento.tsx',
     'src/components/home/v2/PrinterFinder.tsx',
     'src/components/home/v2/EditorialBanners.tsx',
-    'src/components/catalog/CategoryBanner.tsx',
+    'src/components/catalog/CategoryRowBanners.tsx',
     'src/components/catalog/CategoryHero.tsx',
     'src/components/catalog/RelatedCategories.tsx',
     'src/components/catalog/FinderBand.tsx',
@@ -133,14 +133,20 @@ test('the bars are clean on the light theme: no black scrim, no black shadow, no
   assert.doesNotMatch(community, /--material-tint:#000/, 'the community bars were a black strip on ivory');
 });
 
-test('wide screens use the width; phones get a square printers tile and proportioned banners', () => {
+test('wide screens use the width; phones keep the desktop bento and the banners share one row', () => {
   const home = read('src/pages/Home.tsx');
   assert.match(home, /max-w-\[1920px\] flex-col gap-8 px-4 sm:px-6/, 'the home column runs to 1920 px with small gutters');
   assert.doesNotMatch(home, /max-w-\[1200px\]/);
+  // Owner, 2026-09-26: printers the large tile on the LEFT at every width, two
+  // wide tiles above and the compact ones below beside it — no phone flow.
   const bento = read('src/components/home/v2/CategoryBento.tsx');
-  assert.match(bento, /aspect-square sm:aspect-auto sm:h-full/, 'the printers tile is square on a phone');
-  assert.match(bento, /square \? 'aspect-square' : 'aspect-\[5\/4\]'/, 'the tile beside it is square too');
+  assert.doesNotMatch(bento, /contents/, 'the phone two-column flow is gone');
+  assert.match(bento, /\{side\}\s*\{large \?/, 'the side column comes first, so printers land on the left in Arabic');
+  assert.match(bento, /grid-cols-\[58fr_42fr\] sm:grid-cols-\[56fr_44fr\] lg:grid-cols-\[7fr_5fr\]/);
+  assert.match(bento, /h-\[200px\]/, 'the phone bento has a fixed, short height');
+  // The two editorial banners share ONE row on a phone, each a landscape rectangle.
   const editorial = read('src/components/home/v2/EditorialBanners.tsx');
-  assert.match(editorial, /aspect-\[7\/3\][^']*sm:aspect-\[16\/9\] lg:aspect-\[12\/5\]/, 'banners keep a proportion at every width');
+  assert.match(editorial, /cards\.length > 1 \? 'grid-cols-2' : 'grid-cols-1'/);
+  assert.match(editorial, /aspect-\[16\/10\][^']*sm:aspect-\[16\/9\] lg:aspect-\[12\/5\]/, 'banners keep a proportion at every width');
   assert.doesNotMatch(editorial, /h-\[168px\]/);
 });

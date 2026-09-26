@@ -29,7 +29,7 @@ export const THEME_STORAGE_KEY = 'levonis.theme.v1';
 export const DEFAULT_THEME_PREFERENCE: ThemePreference = 'light';
 
 /** The browser chrome (address bar, status area) takes the page's own ground. */
-export const THEME_COLOR: Record<Theme, string> = { light: '#ece6da', dark: '#0b0c0f' };
+export const THEME_COLOR: Record<Theme, string> = { light: '#e3dacb', dark: '#0b0c0f' };
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 

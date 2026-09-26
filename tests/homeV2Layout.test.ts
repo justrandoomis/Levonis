@@ -102,10 +102,10 @@ test('the bento draws only sections the shop stocks, and maps accessories to the
   assert.deepEqual(
     tiles.map((t) => [t.id, t.to]),
     [
-      ['printers', '/products?category=cat_printers'],
-      ['filament', '/products?category=cat_materials_fdm'],
-      ['parts', '/products?category=cat_pacc'],
-      ['accessories', '/products?category=cat_makers_tools'],
+      ['printers', '/categories/printers'],
+      ['filament', '/categories/printing-materials/fdm-materials'],
+      ['parts', '/categories/printer-accessories'],
+      ['accessories', '/categories/makers-supply/maker-tools'],
     ],
     'no Resin tile over an empty listing, no «المستعمل» tile with no graded stock'
   );
@@ -119,7 +119,7 @@ test('the bento draws only sections the shop stocks, and maps accessories to the
 test('an accessories section that stocks something wins over the Maker-tools fallback', () => {
   const tree = [...LIVE_TREE, node('cat_accessories', 'accessories')];
   const tiles = resolveBento(tree, [], []);
-  assert.equal(tiles.find((t) => t.id === 'accessories')?.to, '/products?category=cat_accessories');
+  assert.equal(tiles.find((t) => t.id === 'accessories')?.to, '/categories/accessories');
 });
 
 test('the used tile appears with graded stock and opens the used page', () => {
@@ -200,8 +200,8 @@ test('without owner banners, the spec pair is drawn over real photographs from t
   assert.deepEqual(
     cards.map((c) => [c.preset, c.to, c.productPhoto]),
     [
-      ['multicolor', '/products?category=cat_printers', true],
-      ['materials', '/products?category=cat_materials', true],
+      ['multicolor', '/categories/printers', true],
+      ['materials', '/categories/printing-materials', true],
     ]
   );
   assert.equal(cards[0].image, '/files/products/a1-combo.webp', 'a multi-material machine for «اطبع بأكثر من لون»');

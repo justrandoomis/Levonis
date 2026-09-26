@@ -32,7 +32,7 @@ const ACCEPT = 'image/jpeg,image/png,image/webp';
  *  `--color-text-secondary`, `--color-border-subtle` under
  *  `[data-theme='light']`), FIXED here: the preview shows the light theme
  *  whatever theme the admin panel itself is in. */
-const LIGHT_PREVIEW = { background: '#f4efe5', borderColor: '#d9d1c2', color: '#45484e' } as const;
+const LIGHT_PREVIEW = { background: '#ebe4d6', borderColor: '#cfc5b2', color: '#45484e' } as const;
 
 /** The storefront keeps only a processed, owned product image (`/files/….webp`). */
 export function isStorableLightImage(url: string): boolean {

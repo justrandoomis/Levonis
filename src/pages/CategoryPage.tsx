@@ -13,6 +13,8 @@ import ProductShelf from '../components/catalog/ProductShelf';
 import BrandShelf from '../components/catalog/BrandShelf';
 import FinderBand from '../components/catalog/FinderBand';
 import RelatedCategories from '../components/catalog/RelatedCategories';
+import CategoryRowBanners from '../components/catalog/CategoryRowBanners';
+import { useBannerPhotos } from '../components/catalog/useBannerPhotos';
 import { useScrolledPast } from '../components/catalog/useScrolledPast';
 import ListingView from '../components/listing/ListingView';
 import { cachedCategory, loadCategory } from '../lib/catalog/data';
@@ -28,6 +30,7 @@ import {
   shelfSubline,
   shelfTitle,
 } from '../lib/catalog/categoryPageModel';
+import { bannerRows, type PhotoCandidate } from '../lib/catalog/explorerModel';
 import { nounKindFor } from '../lib/catalog/copy';
 import { sectionTypeOf } from '../lib/catalog/listingModel';
 import type { CategoryPayload } from '../lib/catalog/types';
@@ -41,7 +44,10 @@ import '../styles/catalog.css';
  *
  * ONE REQUEST. `GET /api/catalog/:slug` returns the section, its path, its
  * non-empty children and the shelves already grouped from one product read,
- * priced for this viewer. The page draws, in order: the hero; the sticky shelf
+ * priced for this viewer. The page draws, in order: the hero; the section's
+ * children as hero banners, ONE PER ROW (owner, 2026-09-26: «عند الضغط على
+ * فيلمنت … تظهر فئات فرعية مثل فيلمنت PLA، PETG، ASA … بشكل هيرو بانر بسطر
+ * واحد مستطيل» — src/components/catalog/CategoryRowBanners); the sticky shelf
  * index (with ≥ 2 shelves); one shelf per non-empty child; the smart shelves
  * the server found worth drawing («جاهزة للتسليم الآن», «للطباعة بأكثر من
  * لون», «حسب المادة»); the brands; the finder band (printers); and the other
@@ -49,8 +55,9 @@ import '../styles/catalog.css';
  * frame waits for products that are not there.
  *
  * A DEPARTMENT WITH NO SUB-SECTIONS IS ITS OWN LISTING (§6, §15.2): ≤ 1
- * non-empty child and fewer than 8 products → a compact hero over the full
- * listing (search, filters, sort) of the whole department.
+ * non-empty child and fewer than 8 products → a compact hero, its child's
+ * banner, then the full listing (search, filters, sort) of the whole
+ * department.
  *
  * REDIRECTS, NEVER DEAD ENDS: an old slug (renamed in the admin) replaces to
  * the canonical path; a leaf section replaces to its listing.
@@ -77,6 +84,15 @@ export default function CategoryPage() {
   useEffect(load, [load]);
 
   const chips = useMemo(() => (payload ? jumpChips(payload.shelves, lang) : []), [payload, lang]);
+  // The children's banners borrow photographs from the page's own shelves,
+  // never the product the hero already shows while another will do.
+  const childRows = useMemo(() => {
+    if (!payload) return [];
+    const hero = heroPhoto(payload)?.productId;
+    const cards = payload.shelves.flatMap((s) => (s.products ?? []) as PhotoCandidate[]);
+    return bannerRows(payload.children, cards, new Set(hero ? [hero] : []));
+  }, [payload]);
+  const rows = useBannerPhotos(childRows);
 
   // OWNER: Sorani to be written by hand (every loc() in this page without a third argument).
   if (error) {
@@ -114,6 +130,7 @@ export default function CategoryPage() {
   const name = nodeName(node, lang);
   const kind = nounKindFor(node.product_type, node.is_printer_catalog);
   const photo = heroPhoto(payload);
+  const sectionsHeading = loc(`أقسام ${name}`, `${name} sections`);
   const topBar = (
     <PageTopBar
       title={name}
@@ -136,6 +153,7 @@ export default function CategoryPage() {
           key={node.id}
           ownTopBar={false}
           hero={<CategoryHero ref={setHeroEl} payload={payload} photo={photo} compact />}
+          sections={rows.length ? <CategoryRowBanners rows={rows} heading={sectionsHeading} label={sectionsHeading} /> : undefined}
           scope={{
             category: node.id,
             title: name,
@@ -157,6 +175,8 @@ export default function CategoryPage() {
         <div className="pt-1.5">
           <CategoryHero ref={setHeroEl} payload={payload} photo={photo} />
         </div>
+
+        <CategoryRowBanners rows={rows} heading={sectionsHeading} label={sectionsHeading} className="mt-5 lg:mt-8" />
 
         <div className="mt-2">
           <ShelfJumpChips chips={chips} label={loc(`أقسام ${name}`, `${name} sections`)} />

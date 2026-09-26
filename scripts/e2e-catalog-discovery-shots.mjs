@@ -104,7 +104,7 @@ const check = (label, ok, detail = '') => {
 
 /** The scenes: a path, what to wait for, and what to do before the picture. */
 const SCENES = [
-  { id: 'explorer', path: '/categories', wait: '[data-category-banner]', photos: true },
+  { id: 'explorer', path: '/categories', wait: '[data-category-row]', photos: true },
   { id: 'category-printers', path: '/categories/printers', wait: '[data-shelf]', photos: true },
   { id: 'category-materials', path: '/categories/printing-materials', wait: '[data-product-grid]', photos: true },
   { id: 'listing-fdm', path: '/categories/printers/fdm-printers', wait: '[data-product-grid]', photos: true },

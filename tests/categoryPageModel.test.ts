@@ -5,6 +5,8 @@
  *   - /categories/printers draws an FDM shelf (10), «جاهزة للتسليم الآن» (4),
  *     «للطباعة بأكثر من لون» (≥ 3) and the brands (2), with a jump chip each;
  *   - /categories/printing-materials renders as a listing (compact hero);
+ *   - under the hero, the section's children as hero-banner rows, one per line
+ *     (owner, 2026-09-26) — on the shelves page and on the listing page alike;
  *   - no Resin or Laser frame is drawn;
  *   - a leaf slug and a renamed slug replace to the canonical path;
  *   - the hero says only what the data says (no description → no line), offers
@@ -32,6 +34,8 @@ import {
   shelfSubline,
   shelfTitle,
 } from '../src/lib/catalog/categoryPageModel';
+import { bannerRows, type PhotoCandidate } from '../src/lib/catalog/explorerModel';
+import CategoryRowBanners from '../src/components/catalog/CategoryRowBanners';
 import { LanguageProvider } from '../src/LanguageContext';
 import CategoryHero from '../src/components/catalog/CategoryHero';
 import type { CategoryPayload } from '../src/lib/catalog/types';
@@ -155,4 +159,37 @@ test('any other hero: one «تصفّح الكل», and no description line when 
   assert.match(html, /href="\/categories\/makers-supply\/all"/);
   assert.doesNotMatch(html, /printer-finder/);
   assert.doesNotMatch(html, /line-clamp-3/, 'no empty description paragraph is drawn');
+});
+
+test('the children as hero-banner rows under the hero: printers (shelves) and printing-materials (listing)', async () => {
+  const photos = `UPDATE products SET images = json_array('/files/products/' || slug || '.webp')`;
+  const printers = (await page('printers', photos)).body;
+  const hero = heroPhoto(printers)!.productId!;
+  const cards = printers.shelves.flatMap((s) => (s.products ?? []) as PhotoCandidate[]);
+  const rows = bannerRows(printers.children, cards, new Set([hero]));
+  assert.deepEqual(rows.map((r) => r.node.slug), ['fdm-printers']);
+  assert.ok(rows[0].photo?.productPhoto && rows[0].photo.productId !== hero, 'not the hero’s own product');
+
+  const materials = (await page('printing-materials', photos)).body;
+  assert.equal(materials.layout, 'listing');
+  const mRows = bannerRows(materials.children, materials.shelves.flatMap((s) => (s.products ?? []) as PhotoCandidate[]));
+  assert.deepEqual(mRows.map((r) => r.node.path), ['/categories/printing-materials/fdm-materials']);
+  assert.ok(mRows[0].photo, 'the only product lends its photograph rather than leave the row bare');
+
+  const html = renderToStaticMarkup(
+    createElement(LanguageProvider, {
+      children: createElement(MemoryRouter, null, createElement(CategoryRowBanners, { rows: mRows, label: 'x', heading: 'أقسام مواد الطباعة' })),
+    })
+  );
+  assert.match(html, /<h2[^>]*>أقسام مواد الطباعة<\/h2>/);
+  assert.match(html, /href="\/categories\/printing-materials\/fdm-materials"/);
+  assert.match(html, /تسوق الآن/, 'a list is shopped, not explored');
+  assert.equal((html.match(/<a /g) ?? []).length, 1);
+});
+
+test('a section with no children draws no banner section', () => {
+  const html = renderToStaticMarkup(
+    createElement(LanguageProvider, { children: createElement(MemoryRouter, null, createElement(CategoryRowBanners, { rows: [], label: 'x', heading: 'y' })) })
+  );
+  assert.equal(html, '');
 });

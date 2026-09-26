@@ -285,7 +285,7 @@ async function shootSpa(browser, spec, combo) {
   if (spec.settle) await page.waitForTimeout(spec.settle);
   const f = await facts(page);
   check(`${name}: <html data-theme> is ${theme} from the first frame`, first === theme && f.theme === theme, `first=${first} now=${f.theme}`);
-  check(`${name}: browser chrome follows (${f.meta}, ${f.scheme})`, f.meta === (theme === 'light' ? '#ece6da' : '#0b0c0f') && f.scheme === theme);
+  check(`${name}: browser chrome follows (${f.meta}, ${f.scheme})`, f.meta === (theme === 'light' ? '#e3dacb' : '#0b0c0f') && f.scheme === theme);
   const l = lum(f.bodyBg);
   check(`${name}: the page ground is ${theme}`, theme === 'light' ? l > 0.7 : l < 0.05, f.bodyBg);
   check(`${name}: no horizontal scroll`, f.overflow <= 1, `${f.overflow}px`);

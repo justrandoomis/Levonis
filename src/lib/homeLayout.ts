@@ -65,6 +65,21 @@ function flatten(tree: readonly HomeTaxon[]): HomeTaxon[] {
 }
 
 /**
+ * The category's own page (`/categories/<root>` or `/categories/<root>/<child>`,
+ * the paths worker/lib/catalogPresentation.ts `path()` builds), so a home tile
+ * opens the category gateway rather than the old flat `/products?category=`
+ * list. A node the tree does not hold falls back to that old link.
+ */
+export function categoryHref(tree: readonly HomeTaxon[], node: HomeTaxon): string {
+  const enc = encodeURIComponent;
+  for (const root of tree) {
+    if (root.id === node.id) return `/categories/${enc(root.slug)}`;
+    if ((root.children ?? []).some((c) => c.id === node.id)) return `/categories/${enc(root.slug)}/${enc(node.slug)}`;
+  }
+  return `/products?category=${enc(node.id)}`;
+}
+
+/**
  * The first node the matcher names that the tree actually holds. The home
  * tree only carries sections WITH products (worker/lib/catalogMembership.ts
  * `homeCategoryTree`), so a match here is also a promise that the listing the
@@ -151,7 +166,7 @@ export function representative(
 
 export interface BentoTile {
   id: BentoTileId;
-  /** An in-app route: `/products?category=<id>` or `/used-printers`. */
+  /** An in-app route: the category page (`categoryHref`) or `/used-printers`. */
   to: string;
   /** The category the tile opens, or null for the graded-stock page. */
   category: HomeTaxon | null;
@@ -204,7 +219,7 @@ export function resolveBento(
     if (product) used.add(product.id);
     tiles.push({
       id,
-      to: `/products?category=${encodeURIComponent(node.id)}`,
+      to: categoryHref(tree, node),
       category: node,
       image: authored || (product ? productPrimaryImage(product) : ''),
       lightImage: authored ? '' : lightOf(product),
@@ -348,7 +363,7 @@ export function resolveEditorial(input: {
         title: null,
         subtitle: null,
         cta: null,
-        to: `/products?category=${encodeURIComponent(printers.id)}`,
+        to: categoryHref(input.tree, printers),
         preset: 'multicolor',
         productPhoto: !own,
       });
@@ -375,7 +390,7 @@ export function resolveEditorial(input: {
         title: null,
         subtitle: null,
         cta: null,
-        to: `/products?category=${encodeURIComponent(materials.id)}`,
+        to: categoryHref(input.tree, materials),
         preset: 'materials',
         productPhoto: !own,
       });

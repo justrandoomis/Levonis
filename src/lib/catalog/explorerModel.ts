@@ -6,15 +6,16 @@
  * photographs from; every rule the design states lives here, where a test can
  * hold it:
  *
- *   - one banner per root, in the admin's `sort` order;
- *   - the LEAD banner is the printers root (`is_printer_catalog`), else the
- *     root with the most products;
+ *   - one full-width banner ROW per section that holds products, in the
+ *     admin's `sort` order — the explorer's roots, and on a category page (or
+ *     a sub-section with sections of its own) that node's children. The owner,
+ *     2026-09-26: «يظهر فئات الفرعية بشكل هيرو بانر بسطر واحد مستطيل» — no
+ *     chips, no grid of tiles;
  *   - the photograph is the admin's hero, else the section's tile cover, else
  *     a representative product — available now first, never the same product
- *     on two banners;
- *   - sub-category chips only under a root whose own page would show shelves
- *     (≥ 2 non-empty children, or 1 child and ≥ 8 products). Under a root that
- *     renders as a listing the chip would lead to the same list twice.
+ *     on two rows;
+ *   - the call to action is «استكشف» where the section opens onto sections of
+ *     its own, «تسوق الآن» where it is a list.
  */
 import type { CatalogTreeNode } from './types';
 
@@ -40,14 +41,6 @@ export interface BannerPhoto {
   /** A catalogue photograph (crop to its product band) vs a picture the owner uploaded (shown whole). */
   productPhoto: boolean;
   productId: string | null;
-}
-
-export interface ExplorerBanner {
-  node: CatalogTreeNode;
-  variant: 'lead' | 'regular';
-  photo: BannerPhoto | null;
-  /** Chips under the banner — empty when none should be drawn. */
-  subs: CatalogTreeNode[];
 }
 
 /** The first image a card shows (primary media, else the published list). */
@@ -107,52 +100,52 @@ export function authoredPhoto(node: Pick<CatalogTreeNode, 'hero_image_url' | 'im
   return src ? { src, productPhoto: false, productId: null } : null;
 }
 
-/** The lead root: printers, else the most products (ties keep `sort` order). */
-export function leadRootId(roots: readonly CatalogTreeNode[]): string | null {
-  const printers = roots.find((r) => r.is_printer_catalog);
-  if (printers) return printers.id;
-  let best: CatalogTreeNode | null = null;
-  for (const r of roots) if (!best || r.product_count > best.product_count) best = r;
-  return best?.id ?? null;
-}
-
 /** Would `/categories/<node>` draw shelves (true) or be the listing itself (false)? */
 export function drawsShelves(node: Pick<CatalogTreeNode, 'children' | 'product_count'>): boolean {
   const kids = (node.children ?? []).filter((c) => c.product_count > 0).length;
   return !(kids <= 1 && node.product_count < LISTING_LAYOUT_BELOW);
 }
 
-/** The chips under a banner: its non-empty children, only where they add a door. */
-export function subChipsFor(node: CatalogTreeNode): CatalogTreeNode[] {
-  const kids = (node.children ?? []).filter((c) => c.product_count > 0);
-  return kids.length > 0 && drawsShelves(node) ? kids : [];
+/** One banner row: a section and the photograph it shows (null until one is found). */
+export interface BannerRow {
+  node: CatalogTreeNode;
+  photo: BannerPhoto | null;
 }
 
-export function explorerBanners(roots: readonly CatalogTreeNode[], pool: readonly PhotoCandidate[]): ExplorerBanner[] {
-  const lead = leadRootId(roots);
+/**
+ * The banner rows for a list of sections — the explorer's roots, a category's
+ * children, a sub-section's own children. Only sections that hold products, in
+ * the order given (the admin's `sort`). The admin's picture wins; else a
+ * product photograph from `pool`, available now first and never the same
+ * product on two rows. `avoid` names products already on screen (the page
+ * hero's): skipped while another candidate exists, used rather than leave a
+ * row bare.
+ */
+export function bannerRows(
+  nodes: readonly CatalogTreeNode[],
+  pool: readonly PhotoCandidate[],
+  avoid: ReadonlySet<string> = new Set()
+): BannerRow[] {
+  const shown = nodes.filter((n) => n.product_count > 0);
   const used = new Set<string>();
-  const shown = roots.filter((r) => r.product_count > 0);
   // Authored pictures first, so a product photograph is never borrowed for a
-  // banner that already has its own.
-  const photos = new Map<string, BannerPhoto | null>();
-  for (const r of shown) photos.set(r.id, authoredPhoto(r));
-  // The lead banner picks first: it is the largest photograph on the page.
-  const order = [...shown].sort((a, b) => Number(b.id === lead) - Number(a.id === lead));
-  for (const r of order) {
-    if (photos.get(r.id)) continue;
-    const photo = representativePhoto(r, pool, used);
+  // row that already has its own.
+  const photos = new Map<string, BannerPhoto | null>(shown.map((n) => [n.id, authoredPhoto(n)]));
+  for (const n of shown) {
+    if (photos.get(n.id)) continue;
+    const photo = representativePhoto(n, pool, new Set([...used, ...avoid])) ?? representativePhoto(n, pool, used);
     if (photo?.productId) used.add(photo.productId);
-    photos.set(r.id, photo);
+    photos.set(n.id, photo);
   }
-  return shown.map((node) => ({
-    node,
-    variant: node.id === lead ? 'lead' : 'regular',
-    photo: photos.get(node.id) ?? null,
-    subs: subChipsFor(node),
-  }));
+  return shown.map((node) => ({ node, photo: photos.get(node.id) ?? null }));
 }
 
-/** Roots whose banner still has no photograph — the page asks the listing for these. */
-export function rootsWithoutPhoto(banners: readonly ExplorerBanner[]): CatalogTreeNode[] {
-  return banners.filter((b) => !b.photo).map((b) => b.node);
+/** Rows still without a photograph — the page asks the listing for these. */
+export function rowsWithoutPhoto(rows: readonly BannerRow[]): CatalogTreeNode[] {
+  return rows.filter((r) => !r.photo).map((r) => r.node);
+}
+
+/** «استكشف» for a section with sections of its own to open, «تسوق الآن» for one that is a list. */
+export function bannerCta(node: Pick<CatalogTreeNode, 'children'>): 'explore' | 'shop' {
+  return (node.children ?? []).some((c) => c.product_count > 0) ? 'explore' : 'shop';
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { ApiError } from '../lib/api';
@@ -6,10 +6,13 @@ import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { ProductGridSkeleton, Skeleton } from '../components/ui/Skeleton';
 import ListingView, { type ListingScope } from '../components/listing/ListingView';
 import PageTopBar from '../components/catalog/PageTopBar';
+import CategoryRowBanners from '../components/catalog/CategoryRowBanners';
+import { useBannerPhotos } from '../components/catalog/useBannerPhotos';
 import { cachedTree, loadCategory, loadTree } from '../lib/catalog/data';
 import { resolveListingRoute } from '../lib/catalog/listingModel';
 import { nodeDescription, nodeName } from '../lib/catalog/categoryPageModel';
 import { nounKindFor } from '../lib/catalog/copy';
+import { bannerRows } from '../lib/catalog/explorerModel';
 import { sectionTypeOf } from '../lib/catalog/listingModel';
 import type { CatalogTreeNode, CatalogTreeResponse } from '../lib/catalog/types';
 
@@ -25,6 +28,14 @@ import type { CatalogTreeNode, CatalogTreeResponse } from '../lib/catalog/types'
  * canonical path with the query kept, never a 404. A slug the tree does not
  * know is asked of the category route, which also knows renamed slugs (owner
  * default Q11); only a slug nobody knows is «هذه الفئة غير موجودة».
+ *
+ * A SECTION WITH SECTIONS OF ITS OWN (a third level — the admin allows any
+ * depth: «مواد الطباعة ‹ فيلمنت FDM ‹ فيلمنت PLA»): its children are drawn as
+ * hero banners, one per row, above its list (owner, 2026-09-26 — the category
+ * page's rule, src/components/catalog/CategoryRowBanners). A grandchild's URL
+ * is `/categories/<root>/<slug>` like any sub-section's
+ * (worker/lib/catalogPresentation.ts `path`), resolved here by its slug. Not on
+ * a root's «all»: that is the whole list, asked for as such.
  */
 export default function CategoryListing() {
   const { categorySlug = '', subCategorySlug = '' } = useParams();
@@ -47,6 +58,8 @@ export default function CategoryListing() {
   useEffect(load, [load]);
 
   const route = tree ? resolveListingRoute(tree.roots, categorySlug, subCategorySlug) : null;
+  const shown = route ? (route.all ? null : route.node) : fallback && fallback !== 'missing' && !fallback.root ? fallback.node : null;
+  const rows = useBannerPhotos(useMemo(() => bannerRows(shown?.children ?? [], []), [shown]));
 
   // Not in the tree: an inactive section that still has products, or an old slug.
   const lookup = subCategorySlug === 'all' ? categorySlug : subCategorySlug;
@@ -124,7 +137,15 @@ export default function CategoryListing() {
   // Keyed by section: another section is another list, not a refinement of this one.
   return (
     <div data-page="category-listing" className="min-h-full w-full bg-canvas pb-10 text-text-primary">
-      <ListingView key={node.id} scope={scope} />
+      <ListingView
+        key={node.id}
+        scope={scope}
+        sections={
+          rows.length ? (
+            <CategoryRowBanners rows={rows} heading={loc(`أقسام ${scope.title}`, `${scope.title} sections`)} label={scope.title} />
+          ) : undefined
+        }
+      />
     </div>
   );
 }

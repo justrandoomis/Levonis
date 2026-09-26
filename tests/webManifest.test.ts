@@ -46,8 +46,8 @@ test('with no identity at all it is the platform, and it is a valid manifest', (
     assert.equal(m.display, 'standalone');
     assert.equal(m.lang, 'ar');
     assert.equal(m.dir, 'rtl');
-    assert.equal(m.background_color, '#ece6da');
-    assert.equal(m.theme_color, '#ece6da');
+    assert.equal(m.background_color, '#e3dacb');
+    assert.equal(m.theme_color, '#e3dacb');
     assert.deepEqual(m.categories, ['shopping']);
     assert.ok(m.description.length > 0);
   }
@@ -55,13 +55,13 @@ test('with no identity at all it is the platform, and it is a valid manifest', (
 
 test('the platform splash is the light theme’s ivory — the ground index.html paints first', () => {
   // The app's default theme is light (src/index.css, THE TWO THEMES), and
-  // index.html's theme-color and pre-CSS inline style paint #ece6da before
+  // index.html's theme-color and pre-CSS inline style paint #e3dacb before
   // the theme script runs. A merchant's store keeps its black (storeIcons).
   const shell = readFileSync(repo('index.html'), 'utf8');
-  assert.match(shell, /<meta name="theme-color" content="#ece6da"/);
+  assert.match(shell, /<meta name="theme-color" content="#e3dacb"/);
   const m = buildWebManifest();
-  assert.equal(m.theme_color, '#ece6da');
-  assert.equal(m.background_color, '#ece6da');
+  assert.equal(m.theme_color, '#e3dacb');
+  assert.equal(m.background_color, '#e3dacb');
 });
 
 test('no orientation is declared, because the app has a desktop layout too', () => {
@@ -587,7 +587,7 @@ test('the ground comes from the store identity, validated; the platform keeps it
     assert.equal(w.theme_color, '#000000', String(bad));
   }
   const platform = buildWebManifest({ name: '', backgroundColor: '#ffffff', themeColor: '#ffffff' });
-  assert.equal(platform.background_color, '#ece6da');
+  assert.equal(platform.background_color, '#e3dacb');
 });
 
 /** Store + a committed rendition set, cut through the stubbed binding. */

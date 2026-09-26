@@ -89,10 +89,10 @@ export const AUTO_PRINT_SCRIPT_HASH = 'sha256-gn9n97Z5Dr3GoujCS/3qgP8CfP2OXYrMB9
  * this string to index.html and to the built dist/index.html byte for byte.
  */
 export const THEME_BOOT_SCRIPT =
-  `(function(){var p,d,t,r=document.documentElement,m,b;try{p=localStorage.getItem('levonis.theme.v1')}catch(e){}d=p==='dark'||(p==='system'&&!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);t=d?'dark':'light';r.setAttribute('data-theme',t);r.style.colorScheme=t;m=document.querySelector('meta[name="theme-color"]');b=document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');if(m)m.setAttribute('content',d?'#0b0c0f':'#ece6da');if(b)b.setAttribute('content',d?'black':'default')})()`;
+  `(function(){var p,d,t,r=document.documentElement,m,b;try{p=localStorage.getItem('levonis.theme.v1')}catch(e){}d=p==='dark'||(p==='system'&&!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);t=d?'dark':'light';r.setAttribute('data-theme',t);r.style.colorScheme=t;m=document.querySelector('meta[name="theme-color"]');b=document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');if(m)m.setAttribute('content',d?'#0b0c0f':'#e3dacb');if(b)b.setAttribute('content',d?'black':'default')})()`;
 
 /** sha256 of THEME_BOOT_SCRIPT, base64. Recomputed by the test — edit both or neither. */
-export const THEME_BOOT_SCRIPT_HASH = 'sha256-qCKAwv/jBlcTyuLTBaTbgrFCUph50pjhsBruOdgU1r8=';
+export const THEME_BOOT_SCRIPT_HASH = 'sha256-qF6x2Krjgs6lUlhJW5nq3esFVREVFcUGRlDMt6Tysb8=';
 
 /**
  * One year, and every subdomain: the apex, every merchant storefront and
