@@ -1,0 +1,23 @@
+-- ============================================================================
+--  0142 — CATALOG BANNER IMAGES: one picture per theme
+-- ============================================================================
+-- The owner, 2026-09-26: «صورتين تناسب الثيم الفاتح والثيم الداكن» — every
+-- section, main or sub, carries a banner picture for each theme, set from the
+-- admin sections screen.
+--
+-- THE DARK ONE ALREADY EXISTS. `hero_image_key` (0136) is the banner/hero
+-- photo the storefront has drawn on its charcoal surfaces since it landed, and
+-- the admin copy asked for "a dark background". It stays the DARK picture, so
+-- every hero an admin has already uploaded keeps showing, unchanged. This
+-- file adds only its light-theme twin.
+--
+-- Same storage rules as 0100/0136 (UiUx/MainPage/, WebP, re-validated on the
+-- way out by worker/lib/siteMedia.ts catalogImageUrl); registered with the
+-- media sweeper in worker/lib/mediaRefs.ts.
+--
+-- Storefront order for a banner or a hero (src/lib/catalog/explorerModel.ts
+-- authoredPhoto): this theme's picture → the other theme's → the home tile's
+-- cover (image_key) → a product photograph.
+--
+-- NONDESTRUCTIVE: one column with a default. No existing value changes.
+ALTER TABLE catalogs ADD COLUMN hero_light_image_key TEXT NOT NULL DEFAULT '';

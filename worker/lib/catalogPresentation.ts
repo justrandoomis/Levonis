@@ -44,6 +44,8 @@ export interface CatalogRecord {
   description_ckb: string;
   image_key: string;
   hero_image_key: string;
+  /** The light-theme banner (0142); `hero_image_key` is the dark one. '' on a pre-0142 database. */
+  hero_light_image_key: string;
   sort: number;
   active: boolean;
   is_printer_catalog: boolean;
@@ -72,6 +74,7 @@ export async function loadCatalogRecords(db: D1Database): Promise<CatalogRecord[
     description_ckb: text(r.description_ckb),
     image_key: text(r.image_key),
     hero_image_key: text(r.hero_image_key),
+    hero_light_image_key: text(r.hero_light_image_key),
     sort: Number(r.sort) || 0,
     active: Number(r.active ?? 1) === 1,
     is_printer_catalog: Number(r.is_printer_catalog ?? 0) === 1,
@@ -270,6 +273,7 @@ export function treeNode(
     description_ckb: r.description_ckb,
     image_url: catalogImageUrl(r.image_key),
     hero_image_url: catalogImageUrl(r.hero_image_key),
+    hero_light_image_url: catalogImageUrl(r.hero_light_image_key),
     product_count: c.products,
     available_count: availableKnown ? c.available : null,
     is_printer_catalog: r.is_printer_catalog,

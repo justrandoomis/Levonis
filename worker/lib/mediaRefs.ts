@@ -191,6 +191,8 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   { table: 'catalogs', column: 'image_key', kind: 'text', why: 'the cover an admin set for a section on the home page (0100)' },
   /** The category page's hero / explorer banner photo (0136) — same rules as `image_key`, including not narrowing by `active`. */
   { table: 'catalogs', column: 'hero_image_key', kind: 'text', why: 'the hero photo an admin set for a section\'s category page (0136)' },
+  /** Its light-theme twin (0142) — `hero_image_key` is the dark one. Same rules again. */
+  { table: 'catalogs', column: 'hero_light_image_key', kind: 'text', why: 'the light-theme banner photo an admin set for a section (0142)' },
   { table: 'product_images', column: 'r2_key', kind: 'text', why: 'the canonical product image key (0048)' },
   { table: 'product_images', column: 'url', kind: 'text', why: 'the delivery path for the same image; older rows have only this' },
   { table: 'product_option_values', column: 'image', kind: 'text', why: 'per-option swatch' },

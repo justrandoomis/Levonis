@@ -79,6 +79,8 @@ export interface CatalogRow {
   description_en?: string;
   description_ckb?: string;
   hero_image_key?: string;
+  /** Migration 0142: the light-theme banner; `hero_image_key` is the dark one. */
+  hero_light_image_key?: string;
 }
 
 /**
@@ -292,6 +294,7 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
         // can be put in an `src`, and it re-validates while it is there.
         image_url: catalogImageUrl(r.image_key),
         hero_image_url: catalogImageUrl(r.hero_image_key ?? ''),
+        hero_light_image_url: catalogImageUrl(r.hero_light_image_key ?? ''),
         effective_template_family: family,
         product_type: type,
         product_count: countById.get(r.id) ?? 0,
@@ -502,6 +505,52 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
 });
 
 /**
+ * THE ORDER OF A LEVEL (owner, 2026-09-26: «يقرر ترتيب الفئات في (كل الفئات)
+ * مثلا الطابعة رقم واحد ملحقات الطابعة رقم اثنين مواد الطباعه رقم ثلاثة»).
+ *
+ * `{ parent_id, ids }` — `parent_id` null for the main sections, else the
+ * parent whose sub-sections these are; `ids` the WHOLE level in its new order.
+ * The whole level, not a pair to swap: a list is what the admin sees, and a
+ * request that names every sibling cannot leave two of them on the same
+ * `sort` (the old edit dialog's number field could, and the tie then fell to
+ * the English name). Anything that is not exactly that level — a missing
+ * sibling, a stranger, a repeat — is refused and nothing moves.
+ *
+ * Written as 10, 20, 30 … in ONE batch, so the edit dialog's number field still
+ * has room between two rows. The storefront reads `sort` then the name
+ * (catalogPresentation `bySort`, and this file's own list).
+ */
+adminTaxonomyRoutes.post('/catalogs/order', async (c) => {
+  const admin = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const parentId = body.parent_id === null || body.parent_id === undefined || body.parent_id === '' ? null : body.parent_id;
+  if (parentId !== null && typeof parentId !== 'string') throw badRequest('parent_id must be a string or null', 'CATALOG_ORDER_INVALID');
+  const ids = body.ids;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500 || !ids.every((x) => typeof x === 'string' && x)) {
+    throw badRequest('ids must be the list of section ids in their new order', 'CATALOG_ORDER_INVALID');
+  }
+  const { results } = await c.env.DB.prepare('SELECT id, parent_id FROM catalogs').all<{ id: string; parent_id: string | null }>();
+  const known = new Set(results.map((r) => r.id));
+  // A root is a section with no parent, or one whose parent is gone — the
+  // admin screen's own rule, so the level it draws is the level it can send.
+  const level = results
+    .filter((r) => (parentId === null ? !r.parent_id || !known.has(r.parent_id) : r.parent_id === parentId))
+    .map((r) => r.id);
+  const wanted = ids as string[];
+  const same = new Set(wanted).size === wanted.length && wanted.length === level.length && level.every((id) => wanted.includes(id));
+  if (!same) {
+    throw badRequest(
+      'الترتيب لا يطابق أقسام هذا المستوى — أعد تحميل الصفحة / The order does not match this level\'s sections — reload and try again',
+      'CATALOG_ORDER_MISMATCH'
+    );
+  }
+  await c.env.DB.batch(wanted.map((id, i) => c.env.DB.prepare('UPDATE catalogs SET sort = ? WHERE id = ?').bind((i + 1) * 10, id)));
+  await audit(c.env.DB, admin.id, 'catalog.reorder', parentId ?? 'root', { ids: wanted });
+  await afterTaxonomyWrite(c);
+  return c.json({ success: true, order: wanted.map((id, i) => ({ id, sort: (i + 1) * 10 })) });
+});
+
+/**
  * Deactivate, never destroy. A section with products or children still has
  * meaning in order history and in existing links, so the endpoint refuses a
  * hard delete and says exactly what is in the way.
@@ -640,15 +689,25 @@ adminTaxonomyRoutes.delete('/catalogs/:id/delivery-rules/:method', async (c) => 
 });
 
 /**
- * THE TWO PICTURES A SECTION CAN CARRY, one upload path for both:
- *   image       the home tile's cover (0100)            → catalogs.image_key
- *   hero-image  the category page's hero / banner (0136) → catalogs.hero_image_key
- * Same rules for both — WebP only, magic bytes, the size cap, R2 before the
- * pointer moves — because they are the same kind of site artwork.
+ * THE PICTURES A SECTION CAN CARRY, one upload path for all of them:
+ *   image             the home tile's cover (0100)                → catalogs.image_key
+ *   hero-image        the banner / hero, DARK theme (0136)         → catalogs.hero_image_key
+ *   hero-light-image  the banner / hero, LIGHT theme (0142)        → catalogs.hero_light_image_key
+ * Same rules for all — WebP only, magic bytes, the size cap, R2 before the
+ * pointer moves — because they are the same kind of site artwork. Every
+ * section, main or sub, takes all three (owner, 2026-09-26: «من قسم اعدادات
+ * الأقسام الرئيسية و الفئات الفرعيه»).
  */
 const CATALOG_PICTURES = {
-  image: { column: 'image_key', token: '', set: 'catalog.image_set', cleared: 'catalog.image_cleared' },
-  'hero-image': { column: 'hero_image_key', token: 'hero', set: 'catalog.hero_image_set', cleared: 'catalog.hero_image_cleared' },
+  image: { column: 'image_key', url: 'image_url', token: '', set: 'catalog.image_set', cleared: 'catalog.image_cleared' },
+  'hero-image': { column: 'hero_image_key', url: 'hero_image_url', token: 'hero', set: 'catalog.hero_image_set', cleared: 'catalog.hero_image_cleared' },
+  'hero-light-image': {
+    column: 'hero_light_image_key',
+    url: 'hero_light_image_url',
+    token: 'light',
+    set: 'catalog.hero_light_image_set',
+    cleared: 'catalog.hero_light_image_cleared',
+  },
 } as const;
 
 for (const [segment, pic] of Object.entries(CATALOG_PICTURES)) {
@@ -715,7 +774,7 @@ adminTaxonomyRoutes.post(`/catalogs/:id/${segment}`, async (c) => {
   await audit(c.env.DB, admin.id, pic.set, id, { key, previous, bytes: buf.byteLength });
   await afterTaxonomyWrite(c);
 
-  return c.json({ success: true, [pic.column]: key, [segment === 'image' ? 'image_url' : 'hero_image_url']: catalogImageUrl(key) });
+  return c.json({ success: true, [pic.column]: key, [pic.url]: catalogImageUrl(key) });
 });
 
 /**
@@ -731,7 +790,7 @@ adminTaxonomyRoutes.delete(`/catalogs/:id/${segment}`, async (c) => {
   await c.env.DB.prepare(`UPDATE catalogs SET ${pic.column} = '' WHERE id = ?`).bind(id).run();
   await audit(c.env.DB, admin.id, pic.cleared, id, { previous });
   await afterTaxonomyWrite(c);
-  return c.json({ success: true, [pic.column]: '', [segment === 'image' ? 'image_url' : 'hero_image_url']: '' });
+  return c.json({ success: true, [pic.column]: '', [pic.url]: '' });
 });
 }
 

@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, WandSparkles } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import CropPhoto from './CropPhoto';
-import { useTheme } from '../../lib/theme';
 import { compareHref, compareTray } from '../../lib/compareTray';
 import { isPrinterNode, nodeDescription, nodeName } from '../../lib/catalog/categoryPageModel';
 import { countWord, nounKindFor } from '../../lib/catalog/copy';
@@ -11,26 +10,29 @@ import type { BannerPhoto } from '../../lib/catalog/explorerModel';
 import type { CategoryPayload } from '../../lib/catalog/types';
 
 /**
- * THE CATEGORY'S HERO (docs/ux/CATALOG_DISCOVERY.md §6 item 2, mockup 02).
+ * THE CATEGORY'S HERO (docs/ux/CATALOG_DISCOVERY.md §6 item 2).
  *
- * A feature surface (`data-feature`, src/index.css FEATURE SURFACES) —
- * charcoal on the dark theme, a cream card with ink type on the light one,
- * where a dark product photograph with no light-theme twin (migration 0138)
- * is framed in the far top corner instead of faded under the words: the breadcrumb, the name, the
- * admin's description (omitted, never invented, when there is none), two
- * live stats, and the doors that fit this department — for printers the gold
- * «ساعدني أختار» and a ghost «قارن الطابعات»; for everything else one ghost
- * «تصفّح الكل». A photograph fills the bottom far corner and fades toward the
- * words and the top.
+ * PART OF THE PAGE, NOT A CARD ON IT (owner, 2026-09-26: «كانها مدموجه في
+ * الأعلى بدون حدود المستطيل الذي يحيط بها … أقل عرض وسمك ومناسبة مع جميع
+ * الشاشات وخاصة الصغيرة»). No surface, no border, no ring, no rounded box: the
+ * words stand on the page's own canvas in the page's own ink, and the picture
+ * dissolves into that canvas on every edge (`.lv-hero-blend`,
+ * src/styles/catalog.css), so nothing draws a rectangle in either theme.
+ *
+ * It carries the breadcrumb, the name, the admin's description on one line
+ * (omitted, never invented, when there is none), the live counts on one line
+ * («10 طابعات · 4 متوفرة الآن») and the doors that fit this department — for
+ * printers the primary «ساعدني أختار» and «قارن الطابعات»; for everything
+ * else «تصفّح الكل». About 145 px on a phone, 210 px from 1024 px.
+ *
+ * THE PICTURE. The admin's banner for the theme on screen (0136/0142, see
+ * explorerModel `authoredSrc`) is a full-width band behind the words, faded to
+ * nothing on the reading side and at the top and bottom edges. A borrowed
+ * product photograph is a compact visual on the far side, faded the same way
+ * (its light-theme twin, 0138, on the light theme when it has one).
  *
  * `compact` is the hero of a department whose page IS its listing (§6, «A
- * category with no sub-sections»): 180 px, the same words, no photograph
- * competition with the grid below.
- *
- * The photograph's mask (`.lv-fade-hero`) lives in src/styles/catalog.css,
- * imported by the page that draws this hero (CategoryPage).
- *
- * Desktop: two columns, the words 5fr and the photograph 7fr, 320 px.
+ * category with no sub-sections»): the same words without the doors.
  */
 const CategoryHero = forwardRef<HTMLElement, {
   payload: Pick<CategoryPayload, 'node' | 'path'>;
@@ -40,54 +42,47 @@ const CategoryHero = forwardRef<HTMLElement, {
   const { lang, loc, dir } = useLanguage();
   const { node } = payload;
   const name = nodeName(node, lang);
-  const description = nodeDescription(node, lang);
+  const description = nodeDescription(node, lang).split('\n')[0];
   const printers = isPrinterNode(node);
   const kind = nounKindFor(node.product_type, node.is_printer_catalog);
   const tray = useSyncExternalStore(compareTray.subscribe, compareTray.getSnapshot, compareTray.getSnapshot);
   const compareTo = tray.type === 'printer' && tray.items.length ? compareHref(tray) : '/compare';
   const Sep = dir === 'rtl' ? ChevronLeft : ChevronRight;
   const avail = node.available_count;
-  const { theme } = useTheme();
-  const framed = !!photo?.productPhoto && theme === 'light' && !photo.lightSrc;
+  const band = !!photo && !photo.productPhoto;
 
   // OWNER: Sorani to be written by hand (every loc() in this file without a third argument).
-  const ghost =
-    'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-ivory/[0.22] bg-charcoal/60 px-4 backdrop-blur-md text-[13px] font-bold text-ivory transition-colors hover:border-ivory/40 hover:bg-ivory/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted lg:min-h-12 lg:px-6 lg:text-[14px]';
+  const door =
+    'lv-hit relative inline-flex h-9 items-center justify-center gap-1.5 rounded-full px-3.5 text-[12.5px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none lg:h-11 lg:px-5 lg:text-[14px]';
+  const ghost = `${door} border border-border-subtle bg-surface/70 text-text-primary backdrop-blur-sm hover:border-text-muted`;
 
   return (
     <section
       ref={ref}
-      data-feature=""
       data-category-hero={compact ? 'compact' : 'full'}
+      data-hero-photo={photo ? (band ? 'band' : 'product') : 'none'}
       aria-labelledby="category-title"
-      className={`group relative isolate overflow-hidden rounded-[22px] bg-charcoal text-ivory ring-1 ring-inset ring-white/[0.05] lg:grid lg:grid-cols-[5fr_7fr] lg:rounded-[28px] ${
-        compact ? 'min-h-[180px] lg:min-h-[220px]' : 'min-h-[252px] lg:min-h-[320px]'
-      }`}
+      className="group relative isolate text-text-primary"
     >
       {photo ? (
         <CropPhoto
           src={photo.src}
           lightSrc={photo.lightSrc}
           crop={photo.productPhoto}
-          size={compact ? 420 : 640}
+          frame={false}
+          size={band ? 1200 : 480}
           eager
-          className={
-            framed
-              ? compact
-                ? 'inset-y-0 end-0 w-[30%] lg:w-[46%]'
-                : 'end-0 top-0 h-[56%] w-[32%] lg:inset-y-0 lg:h-auto lg:w-[56%]'
-              : compact
-                ? 'lv-fade-start inset-y-0 end-0 w-[46%] lg:w-[52%]'
-                : 'lv-fade-hero bottom-0 end-0 h-[74%] w-[58%] lg:h-full lg:w-[60%]'
-          }
+          className={`lv-hero-blend -z-10 ${
+            band ? 'inset-y-0 -inset-x-4 sm:-inset-x-6 lg:inset-x-0' : 'inset-y-0 -end-4 w-[42%] sm:-end-6 sm:w-[38%] lg:end-0 lg:w-[34%]'
+          }`}
         />
       ) : null}
-      <div className={`relative flex flex-col p-[18px] lg:p-9 ${compact ? '' : 'min-h-[252px] lg:min-h-[320px]'}`}>
-        <div className={compact ? 'max-w-[70%] lg:max-w-none' : 'max-w-[68%] lg:max-w-none'}>
+      <div className="flex min-w-0 flex-col py-2 lg:py-5">
+        <div className={`flex min-w-0 flex-col ${photo ? 'max-w-[62%] sm:max-w-[60%] lg:max-w-[58%]' : ''}`}>
         <nav aria-label={loc('مسار التصفح', 'Breadcrumb')}>
-          <ol className="flex flex-wrap items-center gap-1 text-[11.5px] text-ivory/[0.68] lg:text-[13px]">
+          <ol className="flex flex-wrap items-center gap-1 text-[11.5px] leading-4 text-text-muted lg:text-[13px] lg:leading-5">
             <li>
-              <Link to="/categories" className="lv-hit relative -mx-1 inline-flex min-h-6 items-center rounded px-1 hover:text-ivory focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted">
+              <Link to="/categories" className="lv-hit relative -mx-1 inline-flex items-center rounded px-1 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                 {loc('الفئات', 'Categories')}
               </Link>
             </li>
@@ -99,7 +94,7 @@ const CategoryHero = forwardRef<HTMLElement, {
                   {last ? (
                     <span aria-current="page">{nodeName(p, lang)}</span>
                   ) : (
-                    <Link to={p.path} className="lv-hit relative -mx-1 rounded px-1 hover:text-ivory focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted">
+                    <Link to={p.path} className="lv-hit relative -mx-1 rounded px-1 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                       {nodeName(p, lang)}
                     </Link>
                   )}
@@ -108,38 +103,39 @@ const CategoryHero = forwardRef<HTMLElement, {
             })}
           </ol>
         </nav>
-        <h1 id="category-title" className="mt-1.5 text-[24px] font-extrabold leading-[33px] tracking-[-0.01em] lg:mt-3 lg:text-[40px] lg:leading-[50px]">
+        <h1 id="category-title" className="mt-0.5 text-[22px] font-extrabold leading-[30px] tracking-[-0.01em] lg:mt-1 lg:text-[32px] lg:leading-[42px]">
           {name}
         </h1>
         {description ? (
-          <p className={`mt-1.5 text-[12.5px] leading-5 text-ivory/[0.74] lg:mt-3 lg:max-w-[36ch] lg:text-[15px] lg:leading-7 ${compact ? 'line-clamp-2' : 'line-clamp-3'}`}>
+          <p data-hero-description="" className="line-clamp-1 text-[12.5px] leading-[18px] text-text-secondary lg:text-[15px] lg:leading-6">
             {description}
           </p>
         ) : null}
-        <dl className="mt-3.5 flex gap-5 lg:mt-6 lg:gap-8">
-          <div className="flex flex-col-reverse">
-            <dt className="text-[11px] text-ivory/[0.62] lg:text-[12.5px]">{countWord(node.product_count, kind, lang)}</dt>
-            <dd className="text-[18px] font-extrabold tabular-nums leading-[22px] lg:text-[26px] lg:leading-8">{node.product_count}</dd>
+        <dl className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] leading-[18px] text-text-secondary lg:mt-1 lg:text-[14px] lg:leading-5">
+          <div className="flex items-baseline gap-1">
+            <dt className="sr-only">{loc('عدد المنتجات', 'Products')}</dt>
+            <dd className="font-bold tabular-nums text-text-primary">{node.product_count}</dd>
+            <dd>{countWord(node.product_count, kind, lang)}</dd>
           </div>
           {avail !== null && avail > 0 ? (
-            <div className="flex flex-col-reverse">
-              <dt className="flex items-center gap-1.5 text-[11px] text-ivory/[0.62] lg:text-[12.5px]">
-                <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
-                {loc('متوفرة الآن', 'Available now')}
-              </dt>
-              <dd className="text-[18px] font-extrabold tabular-nums leading-[22px] lg:text-[26px] lg:leading-8">{avail}</dd>
+            <div className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="text-text-muted">·</span>
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
+              <dt className="sr-only">{loc('متوفرة الآن', 'Available now')}</dt>
+              <dd className="font-bold tabular-nums text-text-primary">{avail}</dd>
+              <dd aria-hidden="true">{loc('متوفرة الآن', 'available now')}</dd>
             </div>
           ) : null}
         </dl>
         </div>
         {!compact ? (
-          <div className="mt-auto flex flex-wrap gap-2 pt-4 lg:pt-8">
+          <div className="mt-2.5 flex flex-wrap gap-2 lg:mt-4">
             {printers ? (
               <>
                 <Link
                   to="/printer-finder"
                   data-hero-cta="finder"
-                  className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-gold-muted px-4 text-[13px] font-extrabold text-gold-ink transition-[filter] hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ivory lg:min-h-12 lg:px-6 lg:text-[14px]"
+                  className={`${door} bg-primary-fill text-canvas hover:bg-primary-fill-hover`}
                 >
                   <WandSparkles aria-hidden="true" className="size-4" />
                   {loc('ساعدني أختار', 'Help me choose')}

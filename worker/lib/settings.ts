@@ -1,3 +1,4 @@
+import { normalizeHomeBento, type HomeBento } from './homeBento';
 import { safeParse } from './types';
 import { DEFAULT_WARRANTY_CONFIG, type WarrantyConfig } from './warrantyConfig';
 import { DEFAULT_PRICING, DEFAULT_MATERIALS, type PrintPricingConfig, type PrintMaterial } from './printPricing';
@@ -355,6 +356,12 @@ export const SETTING_DEFAULTS = {
    * of overwriting one.
    */
   mainPageMedia: {} as Record<string, string>,
+  /**
+   * Which section sits in which square of the home bento, and the owner's
+   * title for it — worker/lib/homeBento.ts. Empty means every square keeps the
+   * automatic matching. Validated on write by PUT /api/admin/settings/homeBento.
+   */
+  homeBento: {} as HomeBento,
   // PRO pricing fallback when no explicit PRO price exists on a product/option/color.
   // 'explicit_only' = no fabricated discount (default until the owner approves a rule).
   proPricingPolicy: { mode: 'explicit_only', percent: null } as { mode: 'explicit_only' | 'global_percent'; percent: number | null },
@@ -637,6 +644,9 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // Brand marks and service icons on the first screen a signed-out visitor
   // sees. Public by nature; the bytes themselves are already anonymous.
   'mainPageMedia',
+  // Which section each square of «تسوق حسب الفئة» opens — the storefront
+  // draws the bento from it on the first screen.
+  'homeBento',
   // The calculator is a public tool; the rates on it are a published price
   // list, not internal policy.
   'printServicePricing',
@@ -658,6 +668,9 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
 ];
 
 function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeof SETTING_DEFAULTS)[K] {
+  if (key === 'homeBento') {
+    return normalizeHomeBento(value) as (typeof SETTING_DEFAULTS)[K];
+  }
   if (key === 'checkoutPaymentMethods') {
     /**
      * THE STORED ARRAY IS A WHOLE ANSWER, NOT A PATCH — which is why a method

@@ -277,6 +277,12 @@ export interface CategoryTreeOptions {
   maxRoots?: number;
   /** Sub-sections shown under each root. Default 8. */
   maxChildrenPerRoot?: number;
+  /**
+   * Sections that must survive the caps when they hold something — the ones
+   * the owner assigned to a square of the home bento (worker/lib/homeBento.ts),
+   * which would otherwise vanish from the page for being the ninth child.
+   */
+  keep?: ReadonlySet<string>;
 }
 
 /**
@@ -295,8 +301,14 @@ export async function homeCategoryTree(
   const maxChildren = opts.maxChildrenPerRoot ?? 8;
   const rows = await catalogTreeWithCounts(db);
 
+  const keep = opts.keep ?? new Set<string>();
   const withProducts = rows.filter((r) => r.product_count > 0);
-  const roots = dedupeByName(withProducts.filter((r) => r.parent_id === null)).slice(0, maxRoots);
+  // Cap, then put back any kept section the cap cut off.
+  const capped = (list: CatalogCountRow[], max: number): CatalogCountRow[] => {
+    const head = list.slice(0, max);
+    return [...head, ...list.slice(max).filter((r) => keep.has(r.id))];
+  };
+  const roots = capped(dedupeByName(withProducts.filter((r) => r.parent_id === null)), maxRoots);
 
   // A child is anything whose ancestor chain reaches this root — not only a
   // direct child — so a three-level taxonomy still puts its leaves on the page
@@ -315,9 +327,10 @@ export async function homeCategoryTree(
 
   return roots.map((root) => ({
     ...root,
-    children: dedupeByName(
-      withProducts.filter((r) => r.parent_id !== null && rootOf(r) === root.id)
-    ).slice(0, maxChildren),
+    children: capped(
+      dedupeByName(withProducts.filter((r) => r.parent_id !== null && rootOf(r) === root.id)),
+      maxChildren
+    ),
   }));
 }
 

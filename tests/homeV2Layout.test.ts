@@ -229,18 +229,27 @@ function stripComments(src: string): string {
 }
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('the sections render in the owner’s order, with nothing between the ticker and the categories', () => {
+test('the page draws its sections from the admin list, in the list’s order, hero and ticker first', () => {
   const home = stripComments(read('src/pages/Home.tsx'));
   const at = (needle: string) => {
     const i = home.indexOf(needle);
     assert.ok(i > 0, `${needle} is not rendered`);
     return i;
   };
-  const order = ['<Hero ', '<Marquee', '<CategoryBento', '<PrinterFinder', '<LatestProducts', '<EditorialBanners', '<ServicesGrid'];
-  const positions = order.map(at);
-  assert.deepEqual([...positions].sort((a, b) => a - b), positions, order.join(' → '));
-  // The old home page opened the light-coloured half with the services rail;
-  // the owner asked for nothing between the hero and the categories.
+  // The hero and the ticker are fixed at the top; everything else is drawn by
+  // walking `layout` (src/lib/homeSections.ts), so the admin's order applies.
+  assert.ok(at('<Hero ') < at('<Marquee'), 'the hero, then the ticker');
+  assert.match(home, /normalizeHomeSections\(settings\?\.homeSections\)/);
+  assert.match(home, /layout\.map\(\(section\) => \{\s*if \(!section\.isVisible\) return null;/);
+  for (const [id, el] of [
+    ['categories', '<CategoryBento'],
+    ['printer_finder', '<PrinterFinder'],
+    ['latest_products', '<LatestProducts'],
+    ['editorial_banners', '<EditorialBanners'],
+    ['services', '<ServicesGrid'],
+  ]) {
+    assert.match(home, new RegExp(`${id}: \\(\\) =>[\\s\\S]*?${el}`), `${id} renders ${el}`);
+  }
   assert.equal(home.match(/<ServicesGrid/g)?.length, 1);
 });
 
@@ -255,8 +264,8 @@ test('everything below the first screen is its own lazy chunk', () => {
 test('the editorial banners are the owner’s to edit, under a registered admin section', () => {
   const admin = read('src/components/AdminHomeSettings.tsx');
   assert.equal(EDITORIAL_SLOT, 'editorial_banners');
-  assert.match(admin, /\{ id: 'editorial_banners',[^}]*isVisible: true \}/, 'registered, so it can be hidden and appears in the tab bar');
-  assert.match(admin, /activeTab === 'editorial_banners'\) && \(\s*<BannerSettings/);
+  assert.match(read('src/lib/homeSections.ts'), /\{ id: 'editorial_banners', titleAr: 'البانرات التحريرية'/, 'a registered section, so it can be hidden and moved');
+  assert.match(admin, /activeTab === 'editorial_banners' && \([\s\S]*?<BannerSettings\s+id="editorial_banners"/);
 });
 
 test('«ساعدني أختار» opens the real printer advisor, and a link can start only that question', () => {

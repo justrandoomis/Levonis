@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../../LanguageContext';
+import { pickText, type BentoPosition } from '../../../lib/api';
 import { isProductPhoto, type BentoTile, type BentoTileId } from '../../../lib/homeLayout';
 import PromoPhoto from './PromoPhoto';
 import SectionHead, { ArrowGlyph } from './SectionHead';
@@ -13,12 +14,16 @@ import SectionHead, { ArrowGlyph } from './SectionHead';
  * three compact ones below. It is the one visual moment of the light half of
  * the page, so every other section around it stays quiet.
  *
- * THE TILES FOLLOW THE THEME (`data-feature`, src/index.css FEATURE SURFACES).
- * Dark: charcoal tiles, where the studio photograph's own near-black becomes
- * the tile's and a soft mask dissolves the seam. Light: cream tiles with ink
- * type and a charcoal pill; a product's light-theme image (migration 0138)
- * fades in the same way, and a dark photograph with no light twin is framed
- * as an inset window rather than smudged into the cream.
+ * THE PHOTOGRAPH FILLS THE TILE (owner, 2026-09-26: «اجعل الصورة تملأ
+ * البطاقة وليس أن تكون الاسم للفئة فوق أو على الجانب»). Every tile is one
+ * picture, edge to edge, with its name ON it over a dark scrim from the
+ * bottom corner on the reading side (`.lv-bleed-scrim`, src/index.css). The
+ * words and the scrim are the same in both themes — light on dark — because
+ * they sit on a photograph, not on the page; the tile under a missing picture
+ * is a dark plate for the same reason. The picture is the admin's light/dark
+ * pair when there is one (src/lib/homeLayout.ts `ownerPhoto`), else the
+ * section's cover, else a real product photograph cropped to its middle band.
+ * The earlier label zone above or beside a framed photo window is gone.
  *
  * ONE LAYOUT AT EVERY WIDTH (owner, 2026-09-26, with the reference shot:
  * «الطابعات ثلاثية الأبعاد على اليسار بشكل مربع ويكون على اليمين اثنين
@@ -27,6 +32,12 @@ import SectionHead, { ArrowGlyph } from './SectionHead';
  * side in Arabic, so it follows the side column in the DOM), the wide
  * material tiles above and the compact ones below on the reading side. The
  * earlier two-column phone flow is gone.
+ *
+ * THE OWNER PICKS WHAT GOES WHERE (owner, 2026-09-26: «يقرر ماذا يضع على
+ * اليسار في المربع الكبير وماذا يضع في المربعات الخمسة على اليمين»). Each tile
+ * carries its SQUARE (`position`); the admin's «تسوق حسب الفئة» assignment
+ * decides which section fills it and may name it, and an unassigned square
+ * keeps the built-in section (src/lib/homeLayout.ts `resolveBento`).
  *
  * THE LAYOUT FOLLOWS THE DATA. A tile is drawn only for a section the shop
  * stocks (src/lib/homeLayout.ts `resolveBento`), so the rows take whatever
@@ -53,32 +64,43 @@ function useTileCopy(): Record<BentoTileId, Copy> {
 }
 
 const TILE =
-  'group relative isolate block overflow-hidden rounded-[14px] bg-charcoal ring-1 ring-inset ring-white/[0.06] transition-transform duration-150 active:scale-[0.985] motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted lg:rounded-[18px]';
+  'group relative isolate block h-full overflow-hidden rounded-[14px] lv-bleed-ground ring-1 ring-inset ring-white/[0.06] transition-transform duration-150 active:scale-[0.985] motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:rounded-[18px]';
 
 /**
- * Where the photograph sits in each tile. The label always has a zone of its
- * own — the photograph never runs under the words — and the photograph's
- * edge facing the label dissolves into the tile (`lv-fade-*`).
+ * The photograph over the whole tile and the scrim over it. `size` is only the
+ * intrinsic size hint for the browser; the crop is CSS (PromoPhoto).
  */
-function LargeTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
-  const { loc } = useLanguage();
+function TilePhoto({ tile, size }: { tile: BentoTile; size: number }) {
+  if (!tile.image) return null;
   return (
-    <Link to={tile.to} data-bento-tile={tile.id} data-feature="" className={`${TILE} h-full`}>
+    <>
       <PromoPhoto
         src={tile.image}
         lightSrc={tile.lightImage}
         crop={isProductPhoto(tile)}
-        width={480}
-        height={480}
-        className="lv-fade-top inset-x-0 bottom-0 top-[30%] lg:top-[18%]"
+        bleed
+        width={size}
+        height={size}
+        className="inset-0"
       />
-      <div className="relative flex h-full flex-col justify-between p-3 lg:p-6">
-        <h3 className="max-w-[12ch] text-[15px] font-bold leading-[1.35] text-ivory sm:text-[16px] lg:max-w-none lg:text-[26px] lg:leading-tight">
+      <div aria-hidden="true" className="lv-bleed-scrim pointer-events-none absolute inset-0" />
+    </>
+  );
+}
+
+/** Printers — the near-square tile: the name and the pill in the bottom corner. */
+function LargeTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
+  const { loc } = useLanguage();
+  return (
+    <Link to={tile.to} data-bento-tile={tile.id ?? tile.category?.id ?? tile.position} data-bento-position={tile.position} data-feature="" className={TILE}>
+      <TilePhoto tile={tile} size={560} />
+      <div className="relative flex h-full flex-col items-start justify-end gap-2 p-3 lg:gap-3 lg:p-6">
+        <h3 className="max-w-[12ch] text-[15px] font-bold leading-[1.4] text-snow [text-shadow:0_1px_8px_rgb(0_0_0/0.35)] sm:text-[17px] lg:max-w-none lg:text-[28px] lg:leading-[1.3]">
           {copy.title}
         </h3>
-        <span className="inline-flex h-8 w-fit items-center gap-1.5 whitespace-nowrap rounded-full bg-gold-muted px-3 text-[12px] font-bold text-gold-ink shadow-1 lg:h-10 lg:px-4 lg:text-[14px]">
+        <span className="inline-flex h-8 w-fit items-center gap-1.5 whitespace-nowrap rounded-full bg-snow px-3 text-[12px] font-bold text-onyx shadow-1 lg:h-10 lg:px-4 lg:text-[14px]">
           {/* OWNER: Sorani to be written by hand. */}
-          {loc('تسوق الطابعات', 'Shop printers')}
+          {tile.id === 'printers' ? loc('تسوق الطابعات', 'Shop printers') : loc('تسوق الآن', 'Shop now')}
           <ArrowGlyph className="h-3 w-3 lg:h-3.5 lg:w-3.5" />
         </span>
       </div>
@@ -86,26 +108,17 @@ function LargeTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
   );
 }
 
-/**
- * The material tiles. On a phone the first of them sits beside the printers
- * as a square, so its photograph takes the lower part like a compact tile's;
- * from 640 px it is the wide tile with the photograph on the far side.
- */
+/** The two material tiles: the name and its caption in the bottom corner. */
 function WideTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
   return (
-    <Link to={tile.to} data-bento-tile={tile.id} data-feature="" className={`${TILE} h-full`}>
-      <PromoPhoto
-        src={tile.image}
-        lightSrc={tile.lightImage}
-        crop={isProductPhoto(tile)}
-        width={240}
-        height={240}
-        className="lv-bento-wide-photo"
-      />
-      <div className="relative flex h-full max-w-[58%] flex-col justify-start p-2 sm:p-2.5 lg:p-5">
-        <h3 className="text-[12px] font-bold leading-4 text-ivory sm:text-[13px] sm:leading-5 lg:text-[19px] lg:leading-7">{copy.title}</h3>
+    <Link to={tile.to} data-bento-tile={tile.id ?? tile.category?.id ?? tile.position} data-bento-position={tile.position} data-feature="" className={TILE}>
+      <TilePhoto tile={tile} size={400} />
+      <div className="relative flex h-full flex-col justify-end p-2 sm:p-2.5 lg:p-5">
+        <h3 className="text-[12px] font-bold leading-[1.4] text-snow [text-shadow:0_1px_6px_rgb(0_0_0/0.35)] sm:text-[13px] lg:text-[20px] lg:leading-[1.35]">
+          {copy.title}
+        </h3>
         {copy.caption ? (
-          <p className="text-[10px] leading-[14px] text-text-secondary sm:text-[11px] sm:leading-4 lg:mt-0.5 lg:text-[13px] lg:leading-5">{copy.caption}</p>
+          <p className="text-[10px] leading-[1.45] text-snow/80 sm:text-[11px] lg:mt-0.5 lg:text-[13px]">{copy.caption}</p>
         ) : null}
       </div>
     </Link>
@@ -114,32 +127,36 @@ function WideTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
 
 function CompactTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
   return (
-    <Link to={tile.to} data-bento-tile={tile.id} data-feature="" className={`${TILE} h-full`}>
-      <PromoPhoto
-        src={tile.image}
-        lightSrc={tile.lightImage}
-        crop={isProductPhoto(tile)}
-        width={160}
-        height={160}
-        className="lv-fade-top inset-x-0 bottom-0 top-[32%] lg:top-[24%]"
-      />
-      <h3 className="relative p-2 text-[10.5px] font-bold leading-[1.3] text-ivory sm:text-[11px] lg:p-4 lg:text-[15px] lg:leading-6">
-        {copy.title}
-      </h3>
+    <Link to={tile.to} data-bento-tile={tile.id ?? tile.category?.id ?? tile.position} data-bento-position={tile.position} data-feature="" className={TILE}>
+      <TilePhoto tile={tile} size={240} />
+      <div className="relative flex h-full flex-col justify-end p-2 lg:p-4">
+        <h3 className="text-[10.5px] font-bold leading-[1.4] text-snow [text-shadow:0_1px_6px_rgb(0_0_0/0.35)] sm:text-[11px] lg:text-[15px] lg:leading-[1.45]">
+          {copy.title}
+        </h3>
+      </div>
     </Link>
   );
 }
 
-const TOP: BentoTileId[] = ['filament', 'resin'];
-const BOTTOM: BentoTileId[] = ['parts', 'accessories', 'used'];
+const TOP: BentoPosition[] = ['top-1', 'top-2'];
+const BOTTOM: BentoPosition[] = ['bottom-1', 'bottom-2', 'bottom-3'];
 const COLS: Record<number, string> = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' };
 
 export default function CategoryBento({ tiles }: { tiles: BentoTile[] }) {
-  const { loc } = useLanguage();
-  const copy = useTileCopy();
-  const large = tiles.find((t) => t.id === 'printers');
-  const top = tiles.filter((t) => TOP.includes(t.id));
-  const bottom = tiles.filter((t) => BOTTOM.includes(t.id));
+  const { loc, lang } = useLanguage();
+  const presets = useTileCopy();
+  /** The owner's title, else the built-in copy, else the section's own name. */
+  const copyOf = (t: BentoTile): Copy => {
+    const own = t.title ? pickText(t.title, lang) : '';
+    const preset = t.id ? presets[t.id] : null;
+    if (own) return { title: own, caption: undefined };
+    if (preset) return preset;
+    const c = t.category;
+    return { title: c ? (lang === 'en' ? c.name_en : lang === 'ckb' ? c.name_ckb : c.name_ar) || c.name_ar || c.name_en : '' };
+  };
+  const large = tiles.find((t) => t.position === 'large');
+  const top = tiles.filter((t) => TOP.includes(t.position));
+  const bottom = tiles.filter((t) => BOTTOM.includes(t.position));
   if (tiles.length === 0) return null;
 
   const side = top.length + bottom.length > 0 ? (
@@ -147,14 +164,14 @@ export default function CategoryBento({ tiles }: { tiles: BentoTile[] }) {
       {top.length > 0 && (
         <div className={`grid min-h-0 gap-2 lg:gap-3 ${COLS[top.length]}`}>
           {top.map((t) => (
-            <WideTile key={t.id} tile={t} copy={copy[t.id]} />
+            <WideTile key={t.position} tile={t} copy={copyOf(t)} />
           ))}
         </div>
       )}
       {bottom.length > 0 && (
         <div className={`grid min-h-0 gap-2 lg:gap-3 ${COLS[bottom.length]}`}>
           {bottom.map((t) => (
-            <CompactTile key={t.id} tile={t} copy={copy[t.id]} />
+            <CompactTile key={t.position} tile={t} copy={copyOf(t)} />
           ))}
         </div>
       )}
@@ -178,7 +195,7 @@ export default function CategoryBento({ tiles }: { tiles: BentoTile[] }) {
         {/* The side column first: in Arabic the grid starts on the right, so
             the printers tile lands on the LEFT, as in the owner's reference. */}
         {side}
-        {large ? <LargeTile tile={large} copy={copy.printers} /> : null}
+        {large ? <LargeTile tile={large} copy={copyOf(large)} /> : null}
       </div>
     </section>
   );

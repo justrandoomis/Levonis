@@ -452,11 +452,17 @@ function CoverageBadge({ device, s }: { device: AdminDevice; s: (typeof STRINGS)
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[11px] font-bold whitespace-nowrap ${cls}`}>{label}</span>;
 }
 
-export default function AdminSerials() {
+/**
+ * Also mounted as two views of the merged «الضمانات والأجهزة» tab
+ * (AdminWarranties): given `view`, that view is shown alone, without this
+ * page's own title and switcher.
+ */
+export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {}) {
   const { lang } = useLanguage();
   const s = STRINGS[lang];
 
-  const [tab, setTab] = useState<'units' | 'claims'>('units');
+  const [tabState, setTab] = useState<'units' | 'claims'>(view ?? 'units');
+  const tab = view ?? tabState;
 
   // ------------------------------------------------------------- units tab
   const [orderQuery, setOrderQuery] = useState('');
@@ -998,7 +1004,7 @@ export default function AdminSerials() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {!view && <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-2xl font-black text-white flex items-center gap-2"><Barcode className="w-6 h-6 text-olive" />{s.title}</h2>
         <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl">
           {(['units', 'claims'] as const).map((tb) => (
@@ -1011,7 +1017,7 @@ export default function AdminSerials() {
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {tab === 'units' && (
         <div className="space-y-4">

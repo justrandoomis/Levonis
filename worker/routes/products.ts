@@ -96,6 +96,7 @@ import { activePoolProductIds } from '../lib/mysteryDraw';
 import { applyOfferToResolved, loadOffers, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
 import { isPrinterProduct } from '../lib/printerIdentity';
 import { resolveSiteMedia } from '../lib/siteMedia';
+import { normalizeHomeBento } from '../lib/homeBento';
 import { conditionSaving, parseConditionDoc } from '../lib/condition';
 import { salesBadgeFor } from '../lib/salesBadge';
 import { pricedPlans, WARRANTY_NOT_PRINTER } from '../lib/warrantyPlans';
@@ -3977,8 +3978,9 @@ homeRoutes.get('/', async (c) => {
    * route already performed; nothing new is read.
    */
   const ctxPromise = pricingCtx(c);
+  const settingsPromise = getSettings(c.env.DB, PUBLIC_SETTING_KEYS);
   const [settings, discounted, latest, openBoxRows, categories, brands, ctx] = await Promise.all([
-    getSettings(c.env.DB, PUBLIC_SETTING_KEYS),
+    settingsPromise,
     /**
      * THE DISCOUNTS STRIP SELECTED ON A RETIRED CONCEPT, so it was always empty.
      *
@@ -4041,7 +4043,13 @@ homeRoutes.get('/', async (c) => {
      * relation over both, with counts that roll up from descendants, lives in
      * worker/lib/catalogMembership.ts along with the whole story.
      */
-    homeCategoryTree(c.env.DB),
+    // The sections the owner put in a bento square survive the tree's caps
+    // (worker/lib/homeBento.ts), so an assignment is never cut off the page.
+    settingsPromise.then((s) =>
+      homeCategoryTree(c.env.DB, {
+        keep: new Set(Object.values(normalizeHomeBento((s as Record<string, unknown>).homeBento)).map((a) => a!.category)),
+      })
+    ),
     c.env.DB.prepare(
       `WITH counted AS (
          SELECT b.id, b.slug, b.name_ar, b.name_en, b.name_ckb,

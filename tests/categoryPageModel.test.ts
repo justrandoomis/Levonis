@@ -158,7 +158,7 @@ test('any other hero: one «تصفّح الكل», and no description line when 
   const html = renderHero(body);
   assert.match(html, /href="\/categories\/makers-supply\/all"/);
   assert.doesNotMatch(html, /printer-finder/);
-  assert.doesNotMatch(html, /line-clamp-3/, 'no empty description paragraph is drawn');
+  assert.doesNotMatch(html, /data-hero-description/, 'no empty description paragraph is drawn');
 });
 
 test('the children as hero-banner rows under the hero: printers (shelves) and printing-materials (listing)', async () => {
@@ -192,4 +192,41 @@ test('a section with no children draws no banner section', () => {
     createElement(LanguageProvider, { children: createElement(MemoryRouter, null, createElement(CategoryRowBanners, { rows: [], label: 'x', heading: 'y' })) })
   );
   assert.equal(html, '');
+});
+
+test('the hero is part of the page: no card, no border, no ring — breadcrumb, name, one line each, the doors', async () => {
+  const { body } = await page('printers');
+  const html = renderHero(body);
+  const section = html.match(/<section[^>]*>/)![0];
+  // Owner, 2026-09-26: «بدون حدود المستطيل الذي يحيط بها (مدموجه في الصفحه)».
+  assert.doesNotMatch(section, /rounded|ring-|border|bg-|min-h-/, 'the section draws no box');
+  assert.doesNotMatch(section, /data-feature/, 'it stands on the page, not on a feature surface');
+  assert.match(html, /line-clamp-1/, 'the description is one line');
+  assert.match(html, />10<\/dd><dd>طابعات<\/dd>/, 'the counts are one inline line');
+  assert.match(html, /data-hero-cta="finder"/);
+});
+
+test('the hero shows the admin’s banner for the theme on screen as a band that fades into the page', async () => {
+  const { body } = await page(
+    'printers',
+    `UPDATE catalogs SET hero_image_key = 'UiUx/MainPage/PrintersDark.webp', hero_light_image_key = 'UiUx/MainPage/PrintersLight.webp' WHERE id = 'cat_printers'`
+  );
+  assert.equal(body.node.hero_light_image_url, '/files/UiUx/MainPage/PrintersLight.webp', 'GET /api/catalog/:slug exposes the light banner');
+  const photo = heroPhoto(body)!;
+  assert.deepEqual(photo, {
+    src: '/files/UiUx/MainPage/PrintersDark.webp',
+    lightSrc: '/files/UiUx/MainPage/PrintersLight.webp',
+    productPhoto: false,
+    productId: null,
+  });
+  const html = renderToStaticMarkup(
+    createElement(LanguageProvider, { children: createElement(MemoryRouter, null, createElement(CategoryHero, { payload: body, photo })) })
+  );
+  assert.match(html, /data-hero-photo="band"/);
+  assert.match(html, /lv-hero-blend/, 'faded on the reading side and at both edges');
+  assert.doesNotMatch(html, /data-ground="dark"/, 'never a framed window');
+  assert.match(html, /PrintersLight\.webp/, 'the light theme gets the light banner');
+  // Only the light one uploaded: the dark theme falls back to it.
+  const light = await page('printers', `UPDATE catalogs SET hero_light_image_key = 'UiUx/MainPage/PrintersLight.webp' WHERE id = 'cat_printers'`);
+  assert.equal(heroPhoto(light.body)!.src, '/files/UiUx/MainPage/PrintersLight.webp');
 });

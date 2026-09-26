@@ -40,7 +40,7 @@ export const MAIN_PAGE_PREFIX = 'UiUx/MainPage/';
 export const SITE_MEDIA_MIME = 'image/webp';
 export const SITE_MEDIA_MAX_BYTES = 2 * 1024 * 1024;
 
-export type SiteMediaGroup = 'brand' | 'service' | 'banner';
+export type SiteMediaGroup = 'brand' | 'service' | 'banner' | 'home';
 
 export interface SiteMediaSlot {
   /** Stable id. Also the filename stem an upload is minted under. */
@@ -78,6 +78,13 @@ export interface SiteMediaSlot {
    * the destination is data here instead of a string buried in a component.
    */
   link?: string;
+  /**
+   * `home` slots only: the home picture this is one half of (`hero`,
+   * `bento-printers`, `editorial-materials`, …) and which theme it is for.
+   * See HOME_PHOTO_SLOTS.
+   */
+  target?: HomePhotoTarget;
+  theme?: 'light' | 'dark';
 }
 
 /**
@@ -184,10 +191,67 @@ export const BANNER_SLOTS: readonly SiteMediaSlot[] = [
   { slot: 'banner-3', group: 'banner', label: 'Main page image 3', defaultObject: '' },
 ] as const;
 
+/**
+ * THE HOME PAGE'S OWN PHOTOGRAPHS — ONE FOR EACH THEME.
+ *
+ * The owner (2026-09-26): «أجعل الصورة يمكن تغييرها من قسم تعديل اللوحة
+ * الرئيسية للأدمن حيث يضع صورتين تناسب الثيم الفاتح والثيم الداكن». Every
+ * picture the home page draws full-bleed — the hero's visual, the six bento
+ * tiles, the two editorial banners — gets a PAIR of slots here, `-light` and
+ * `-dark`, in the same `mainPageMedia` map as the brand marks. No new store and
+ * no migration: the map is already a slot → object pointer, the sweeper in
+ * worker/lib/mediaRefs.ts already walks every value of it, and the slot table
+ * below is the allow-list the upload route checks a slot name against.
+ *
+ * The storefront resolves a pair in src/lib/homeLayout.ts `ownerPhoto`: the
+ * current theme's picture, else the other one for both themes, else the
+ * automatic product photograph it drew before. An empty default means exactly
+ * that fallback, so nothing changes until the owner uploads.
+ *
+ * Unlike a brand mark these are photographs, so an upload may arrive as PNG
+ * or JPEG and is converted to WebP on the server (`convertToWebp`); the owner's
+ * WebP rule still holds for what is STORED.
+ */
+export const HOME_PHOTO_TARGETS = [
+  { target: 'hero', label: 'الواجهة الرئيسية (الهيرو)' },
+  // The bento's six squares by POSITION, not by section — the owner decides
+  // which section each one opens (worker/lib/homeBento.ts), and the picture
+  // belongs to the square.
+  { target: 'bento-large', label: 'تسوق حسب الفئة — المربع الكبير' },
+  { target: 'bento-top-1', label: 'تسوق حسب الفئة — المستطيل العلوي الأول' },
+  { target: 'bento-top-2', label: 'تسوق حسب الفئة — المستطيل العلوي الثاني' },
+  { target: 'bento-bottom-1', label: 'تسوق حسب الفئة — المربع السفلي الأول' },
+  { target: 'bento-bottom-2', label: 'تسوق حسب الفئة — المربع السفلي الثاني' },
+  { target: 'bento-bottom-3', label: 'تسوق حسب الفئة — المربع السفلي الثالث' },
+  { target: 'editorial-multicolor', label: 'بانر «اطبع بأكثر من لون»' },
+  { target: 'editorial-materials', label: 'بانر «مواد الطباعة»' },
+] as const;
+
+export type HomePhotoTarget = (typeof HOME_PHOTO_TARGETS)[number]['target'];
+
+export const HOME_PHOTO_SLOTS: readonly SiteMediaSlot[] = HOME_PHOTO_TARGETS.flatMap(({ target, label }) =>
+  (['light', 'dark'] as const).map(
+    (theme): SiteMediaSlot => ({
+      slot: `home-${target}-${theme}`,
+      group: 'home',
+      label: `${label} — ${theme === 'light' ? 'الثيم الفاتح' : 'الثيم الداكن'}`,
+      defaultObject: '',
+      target,
+      theme,
+    })
+  )
+);
+
+/** A photograph slot may take a PNG or JPEG and have it converted; this caps the SOURCE. */
+export const HOME_PHOTO_MAX_SOURCE_BYTES = 12 * 1024 * 1024;
+/** …and this the WebP that is actually stored. */
+export const HOME_PHOTO_MAX_BYTES = 4 * 1024 * 1024;
+
 export const SITE_MEDIA_SLOTS: readonly SiteMediaSlot[] = [
   ...BRAND_SLOTS,
   ...SERVICE_SLOTS,
   ...BANNER_SLOTS,
+  ...HOME_PHOTO_SLOTS,
 ] as const;
 
 const BY_SLOT = new Map(SITE_MEDIA_SLOTS.map((s) => [s.slot, s]));
@@ -237,6 +301,9 @@ export interface ResolvedSiteMedia {
   url: string;
   /** True when the URL comes from an admin upload rather than the seeded default. */
   custom: boolean;
+  /** `home` slots only — see HOME_PHOTO_SLOTS. */
+  target?: string;
+  theme?: 'light' | 'dark';
 }
 
 /** The stored shape of the `mainPageMedia` setting: slot id → object name. */
@@ -267,6 +334,7 @@ export function resolveSiteMedia(stored: unknown): ResolvedSiteMedia[] {
       link: s.link ?? '',
       url: object ? `/files/${siteMediaKey(object)}` : '',
       custom: Boolean(map[s.slot]),
+      ...(s.target ? { target: s.target, theme: s.theme } : {}),
     };
   });
 }

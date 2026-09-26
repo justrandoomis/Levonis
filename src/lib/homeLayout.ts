@@ -12,7 +12,7 @@
  * Kept free of React and of the DOM so tests/homeV2Layout.test.ts can hold the
  * mapping and the ordering directly.
  */
-import type { ApiProduct, HomeBanner, HomeTaxon, SiteMediaEntry } from './api';
+import type { ApiProduct, BentoPosition, HomeBanner, HomeTaxon, LocalizedText, SiteMediaEntry } from './api';
 import { productPrimaryImage } from './productImage';
 
 // ------------------------------------------------------------- the taxonomy
@@ -144,6 +144,30 @@ function hasImage(p: ApiProduct): boolean {
 }
 
 /**
+ * THE OWNER'S PAIR FOR ONE HOME PICTURE (admin «صور وأيقونات الصفحة الرئيسية»,
+ * site-media slots `home-<target>-light` / `home-<target>-dark`, see
+ * worker/lib/siteMedia.ts HOME_PHOTO_SLOTS).
+ *
+ * Returned in the shape every home picture already takes — `image` is what the
+ * DARK theme draws and `lightImage` what the LIGHT one draws when set
+ * (src/lib/productImage.ts `themedImage`) — so the resolution is:
+ *   - the current theme's picture;
+ *   - only one uploaded: that one, for both themes;
+ *   - neither: null, and the caller keeps its automatic product photograph.
+ */
+export function ownerPhoto(
+  siteMedia: readonly SiteMediaEntry[],
+  target: string
+): { image: string; lightImage: string } | null {
+  const url = (theme: 'light' | 'dark') =>
+    siteMedia.find((m) => m.group === 'home' && m.target === target && m.theme === theme && m.url)?.url || '';
+  const light = url('light');
+  const dark = url('dark');
+  if (!light && !dark) return null;
+  return { image: dark || light, lightImage: light };
+}
+
+/**
  * A representative photograph for a section: a product IN the section that
  * has a picture, preferring one that can be bought right now, never one of
  * `avoid` (so two tiles do not show the same photo). Returns null rather than
@@ -164,18 +188,49 @@ export function representative(
 
 // ------------------------------------------------------------- the bento
 
+/**
+ * The six SQUARES, and the section each one shows when the owner has not
+ * assigned it (admin «إعدادات الصفحة الرئيسية» → «تسوق حسب الفئة»,
+ * worker/lib/homeBento.ts). `large` is the near-square tile — on the LEFT in
+ * Arabic — `top-*` the two wide tiles above, `bottom-*` the three below.
+ */
+export const BENTO_POSITIONS: readonly BentoPosition[] = ['large', 'top-1', 'top-2', 'bottom-1', 'bottom-2', 'bottom-3'];
+
+export const BENTO_DEFAULTS: Readonly<Record<BentoPosition, BentoTileId>> = {
+  large: 'printers',
+  'top-1': 'filament',
+  'top-2': 'resin',
+  'bottom-1': 'parts',
+  'bottom-2': 'accessories',
+  'bottom-3': 'used',
+};
+
+/** The owner's assignment, as `/api/home` sends it (`settings.homeBento`). */
+export type BentoAssignments = Partial<Record<BentoPosition, { category: string; title?: LocalizedText | null }>>;
+
 export interface BentoTile {
-  id: BentoTileId;
+  /** The square it fills. */
+  position: BentoPosition;
+  /**
+   * Which built-in section this is — it picks the tile's default copy and the
+   * «أحدث المنتجات» chip it feeds — or null for a section the owner assigned
+   * that none of the built-in matchers names (the tile then shows the
+   * section's own name).
+   */
+  id: BentoTileId | null;
   /** An in-app route: the category page (`categoryHref`) or `/used-printers`. */
   to: string;
   /** The category the tile opens, or null for the graded-stock page. */
   category: HomeTaxon | null;
-  /** The owner's picture for the section, else a product photograph, else ''. */
+  /** The owner's title for the square, when they wrote one. */
+  title: LocalizedText | null;
+  /** The owner's picture for the square, else the section's, else a product photograph, else ''. */
   image: string;
   /**
-   * The borrowed product's light-theme main image (migration 0138), '' when it
-   * has none or the picture is the owner's own. The tile shows it on the light
-   * theme and `image` on the dark one (src/lib/productImage.ts `themedImage`).
+   * The light-theme picture: the owner's light upload, or the borrowed
+   * product's light-theme main image (migration 0138); '' when there is none.
+   * The tile shows it on the light theme and `image` on the dark one
+   * (src/lib/productImage.ts `themedImage`).
    */
   lightImage: string;
   /** The product whose photograph was borrowed, for `avoid` bookkeeping. */
@@ -195,46 +250,108 @@ export function isProductPhoto(card: { imageProductId?: string | null; productPh
   return card.productPhoto ?? !!card.imageProductId;
 }
 
+const USED = 'used';
+
+/** The built-in section this node is, if a matcher names it. */
+function presetOf(tree: readonly HomeTaxon[], node: HomeTaxon): BentoTileId | null {
+  for (const id of Object.keys(BENTO_MATCHERS) as Array<Exclude<BentoTileId, 'used'>>) {
+    if (findCategory(tree, BENTO_MATCHERS[id])?.id === node.id) return id;
+  }
+  return null;
+}
+
 /**
- * The six tiles, resolved against the live tree. A tile is returned only when
- * its section has products (or, for «المستعمل», when the graded shelf has
- * units) — the layout adapts to the tiles it gets.
+ * The six tiles, resolved against the live tree, one per square.
  *
- * `openBox` is the server's graded shelf (`open_box`); the «المنتجات
- * المستعملة» tile opens /used-printers, the page built on the same selection.
+ * 1. A square the owner ASSIGNED shows that section (or the graded shelf,
+ *    `used`) with their title — found by id anywhere in the tree.
+ * 2. An unassigned square keeps the automatic matching (`BENTO_DEFAULTS` +
+ *    `BENTO_MATCHERS`), skipping a section already shown by another square.
+ *
+ * Either way a tile is returned only when its section has products — the tree
+ * `/api/home` sends carries only stocked sections — or, for the graded shelf,
+ * when it has units. No square ever opens an empty listing; the layout adapts
+ * to the tiles it gets.
  */
 export function resolveBento(
   tree: readonly HomeTaxon[],
   pool: readonly ApiProduct[],
-  openBox: readonly ApiProduct[]
+  openBox: readonly ApiProduct[],
+  siteMedia: readonly SiteMediaEntry[] = [],
+  assignments: BentoAssignments | null | undefined = {}
 ): BentoTile[] {
-  const used = new Set<string>();
+  const nodes = flatten(tree);
+  const assigned = assignments ?? {};
+  type Target = { node: HomeTaxon | null; used: boolean; title: LocalizedText | null };
+  /** An assigned square's section — null when it is not stocked (not in the tree). */
+  const assignedTarget = (a: { category: string; title?: LocalizedText | null }): Target | null => {
+    const title = a.title && (a.title.ar || a.title.en || a.title.ckb) ? a.title : null;
+    if (a.category === USED) return openBox.length > 0 ? { node: null, used: true, title } : null;
+    const node = nodes.find((n) => n.id === a.category);
+    return node ? { node, used: false, title } : null;
+  };
+
+  // Pass 1: the owner's squares. Pass 2: the automatic ones, around them.
+  const chosen = new Map<BentoPosition, Target>();
+  const taken = new Set<string>();
+  for (const position of BENTO_POSITIONS) {
+    const a = assigned[position];
+    if (!a || typeof a.category !== 'string') continue;
+    const t = assignedTarget(a);
+    if (!t) continue;
+    chosen.set(position, t);
+    taken.add(t.used ? USED : t.node!.id);
+  }
+  for (const position of BENTO_POSITIONS) {
+    if (typeof assigned[position]?.category === 'string') continue;
+    const preset = BENTO_DEFAULTS[position];
+    if (preset === 'used') {
+      if (openBox.length > 0 && !taken.has(USED)) chosen.set(position, { node: null, used: true, title: null });
+      continue;
+    }
+    const node = findCategory(tree, BENTO_MATCHERS[preset]);
+    if (node && !taken.has(node.id)) {
+      chosen.set(position, { node, used: false, title: null });
+      taken.add(node.id);
+    }
+  }
+
+  const avoid = new Set<string>();
   const tiles: BentoTile[] = [];
-  const order: Array<Exclude<BentoTileId, 'used'>> = ['printers', 'filament', 'resin', 'parts', 'accessories'];
-  for (const id of order) {
-    const node = findCategory(tree, BENTO_MATCHERS[id]);
-    if (!node) continue;
-    const authored = node.image_url || '';
-    const product = authored ? null : representative(pool, subtreeIds(node), used);
-    if (product) used.add(product.id);
+  for (const position of BENTO_POSITIONS) {
+    const t = chosen.get(position);
+    if (!t) continue;
+    // The admin's light/dark pair for the square first, then the section's
+    // own cover from the taxonomy, then a borrowed product photograph.
+    const own = ownerPhoto(siteMedia, `bento-${position}`);
+    if (t.used) {
+      const photo = own ? null : openBox.find((p) => hasImage(p) && !avoid.has(p.id)) ?? openBox.find(hasImage) ?? null;
+      if (photo) avoid.add(photo.id);
+      tiles.push({
+        position,
+        id: 'used',
+        to: '/used-printers',
+        category: null,
+        title: t.title,
+        image: own?.image || (photo ? productPrimaryImage(photo) : ''),
+        lightImage: own ? own.lightImage : lightOf(photo),
+        imageProductId: photo?.id ?? null,
+      });
+      continue;
+    }
+    const node = t.node!;
+    const authored = own ? '' : node.image_url || '';
+    const product = own || authored ? null : representative(pool, subtreeIds(node), avoid);
+    if (product) avoid.add(product.id);
     tiles.push({
-      id,
+      position,
+      id: presetOf(tree, node),
       to: categoryHref(tree, node),
       category: node,
-      image: authored || (product ? productPrimaryImage(product) : ''),
-      lightImage: authored ? '' : lightOf(product),
+      title: t.title,
+      image: own?.image || authored || (product ? productPrimaryImage(product) : ''),
+      lightImage: own ? own.lightImage : authored ? '' : lightOf(product),
       imageProductId: product?.id ?? null,
-    });
-  }
-  if (openBox.length > 0) {
-    const photo = openBox.find((p) => hasImage(p) && !used.has(p.id)) ?? openBox.find(hasImage) ?? null;
-    tiles.push({
-      id: 'used',
-      to: '/used-printers',
-      category: null,
-      image: photo ? productPrimaryImage(photo) : '',
-      lightImage: lightOf(photo),
-      imageProductId: photo?.id ?? null,
     });
   }
   return tiles;
@@ -305,8 +422,10 @@ const MULTICOLOR = /\b(AMS|combo|multi[- ]?colou?r)\b/i;
  * 1. WHAT THE OWNER AUTHORED in the admin's «البانرات التحريرية» slot — image,
  *    copy in their own words and a link — up to two, in their order.
  * 2. Otherwise the two banners of the spec, each with a picture that exists:
- *    the site-media banner image the owner uploaded (`banner-1`, `banner-2`),
- *    else a real product photograph from the section the banner opens — a
+ *    the owner's light/dark pair for that banner (`ownerPhoto`, targets
+ *    `editorial-multicolor` / `editorial-materials`), else the older single
+ *    site-media image (`banner-1`, `banner-2`), else a real product
+ *    photograph from the section the banner opens — a
  *    multi-material machine (AMS / Combo) for «اطبع بأكثر من لون», a
  *    materials product for «مواد الطباعة». A default banner with no real
  *    picture and no real destination is not drawn.
@@ -335,16 +454,22 @@ export function resolveEditorial(input: {
     }));
   }
 
-  const uploaded = (slot: string) => input.siteMedia.find((m) => m.group === 'banner' && m.slot === slot)?.url || '';
+  const legacy = (slot: string) => input.siteMedia.find((m) => m.group === 'banner' && m.slot === slot)?.url || '';
+  const uploaded = (target: string, slot: string) => {
+    const pair = ownerPhoto(input.siteMedia, target);
+    if (pair) return pair;
+    const one = legacy(slot);
+    return one ? { image: one, lightImage: '' } : null;
+  };
   const avoid = new Set(input.avoid);
   const cards: EditorialCard[] = [];
 
   const printers = findCategory(input.tree, BENTO_MATCHERS.printers);
   if (printers) {
-    const own = uploaded('banner-1');
-    let light = '';
+    const own = uploaded('editorial-multicolor', 'banner-1');
+    let light = own?.lightImage ?? '';
     const photo =
-      own ||
+      own?.image ||
       (() => {
         const ids = subtreeIds(printers);
         const multi = (x: ApiProduct) => MULTICOLOR.test(x.name);
@@ -372,10 +497,10 @@ export function resolveEditorial(input: {
 
   const materials = findCategory(input.tree, MATERIALS_MATCHER) ?? findCategory(input.tree, BENTO_MATCHERS.filament);
   if (materials) {
-    const own = uploaded('banner-2');
-    let light = '';
+    const own = uploaded('editorial-materials', 'banner-2');
+    let light = own?.lightImage ?? '';
     const photo =
-      own ||
+      own?.image ||
       (() => {
         const ids = subtreeIds(materials);
         const p = representative(input.pool, ids, avoid) ?? representative(input.pool, ids);
@@ -397,4 +522,46 @@ export function resolveEditorial(input: {
     }
   }
   return cards;
+}
+
+// ------------------------------------------------------------- the hero
+
+export interface HeroVisual {
+  /** The dark-theme picture (also the light one when `lightImage` is ''). */
+  image: string;
+  lightImage: string;
+  /** True for a borrowed catalogue photograph (cropped to its middle band). */
+  productPhoto: boolean;
+  /** Where tapping the visual goes: the product, or '' for the owner's picture. */
+  to: string;
+  /** The product's name, as the picture's accessible label; '' for the owner's. */
+  alt: string;
+}
+
+/**
+ * The picture on the far side of the brand hero (owner, 2026-09-26: «يبدو كله
+ * على اليمين» — the left half was empty). The admin's light/dark pair
+ * (target `hero`) first; otherwise a real printer the shop sells — a featured
+ * one if there is one, one that can be bought now before one that cannot.
+ * Null when there is neither: the hero then keeps its text-only composition.
+ */
+export function resolveHeroVisual(input: {
+  siteMedia: readonly SiteMediaEntry[];
+  tree: readonly HomeTaxon[];
+  pool: readonly ApiProduct[];
+}): HeroVisual | null {
+  const own = ownerPhoto(input.siteMedia, 'hero');
+  if (own) return { ...own, productPhoto: false, to: '', alt: '' };
+  const printers = findCategory(input.tree, BENTO_MATCHERS.printers);
+  if (!printers) return null;
+  const featured = (p: ApiProduct) => Boolean(p.is_featured);
+  const p = representative(input.pool, subtreeIds(printers), new Set(), featured);
+  if (!p) return null;
+  return {
+    image: productPrimaryImage(p),
+    lightImage: lightOf(p),
+    productPhoto: true,
+    to: `/product/${encodeURIComponent(p.slug || p.id)}`,
+    alt: p.name,
+  };
 }

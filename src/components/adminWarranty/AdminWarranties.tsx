@@ -161,21 +161,28 @@ const shortDate = (iso: string | null): string => (iso ? iso.slice(0, 10) : '—
 
 // The serial inventory (0139) — the second view of this tab, its own chunk.
 const SerialInventoryPanel = React.lazy(() => import('./serialInventory/SerialInventoryPanel'));
+// «الأجهزة والتسلسلات» (order units, warranty claims), merged into this tab.
+const AdminSerials = React.lazy(() => import('../AdminSerials'));
 
-type WarrantyView = 'receipts' | 'serials';
+type WarrantyView = 'receipts' | 'serials' | 'units' | 'claims';
+const VIEWS: readonly WarrantyView[] = ['receipts', 'serials', 'units', 'claims'];
 const VIEW_KEY = 'levonis.admin.warrantyView';
 
 /**
- * «الضمانات» — two views under one tab: the receipts issued, and the serial
- * inventory the owner asked for (2026-09-26: «في لوحة الادارة في الضمان أضف
- * زر أو خانة يمكن للأدمن إضافة السيريال نمبر»). The chosen view is
- * remembered per browser, a convenience only.
+ * «الضمانات والأجهزة» — ONE tab (owner, 2026-09-26: «أبقي الأرقام التسلسلية
+ * في داخل الضمانات وأدمج قسم الضمانات مع قسم الأجهزة والتسلسلات»), four
+ * views: the receipts issued, the serial inventory (bulk add, camera scan),
+ * the units of each order, and warranty claims. The last two are the former
+ * «الأجهزة والتسلسلات» tab (src/components/AdminSerials), whose old tab id
+ * now opens here. The chosen view is remembered per browser, a convenience only.
  */
-export default function AdminWarranties() {
+export default function AdminWarranties({ initialView }: { initialView?: WarrantyView } = {}) {
   const { lang, dir } = useLanguage();
   const [view, setView] = useState<WarrantyView>(() => {
+    if (initialView) return initialView;
     try {
-      return window.localStorage.getItem(VIEW_KEY) === 'serials' ? 'serials' : 'receipts';
+      const saved = window.localStorage.getItem(VIEW_KEY) as WarrantyView | null;
+      return saved && VIEWS.includes(saved) ? saved : 'receipts';
     } catch {
       return 'receipts';
     }
@@ -191,8 +198,8 @@ export default function AdminWarranties() {
   const label = (ar: string, en: string) => (lang === 'en' ? en : ar);
   return (
     <div className={`${T.AP} space-y-4`} dir={dir}>
-      <div role="group" aria-label={label('الضمانات', 'Warranties')} className="inline-flex items-center gap-1 p-1 rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-2)] border border-[var(--ap-border)]">
-        {(['receipts', 'serials'] as const).map((v) => (
+      <div role="group" aria-label={label('الضمانات والأجهزة', 'Warranties & devices')} className="inline-flex max-w-full flex-wrap items-center gap-1 p-1 rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-2)] border border-[var(--ap-border)]">
+        {VIEWS.map((v) => (
           <button
             key={v}
             type="button"
@@ -203,7 +210,13 @@ export default function AdminWarranties() {
               view === v ? 'bg-[var(--ap-surface-4)] text-[var(--ap-text-1)] shadow-[0_1px_2px_rgb(0_0_0_/_0.25)]' : 'text-[var(--ap-text-3)] hover:text-[var(--ap-text-2)]'
             }`}
           >
-            {v === 'receipts' ? label('وصولات الضمان', 'Warranty receipts') : label('الأرقام التسلسلية', 'Serial numbers')}
+            {v === 'receipts'
+              ? label('وصولات الضمان', 'Warranty receipts')
+              : v === 'serials'
+                ? label('الأرقام التسلسلية', 'Serial numbers')
+                : v === 'units'
+                  ? label('أجهزة الطلبات', 'Order units')
+                  : label('مطالبات الضمان', 'Warranty claims')}
           </button>
         ))}
       </div>
@@ -211,7 +224,7 @@ export default function AdminWarranties() {
         <WarrantyReceipts />
       ) : (
         <React.Suspense fallback={<div className={`${T.surface} p-8 text-center text-[13px] text-[var(--ap-text-3)]`}>{label('جارٍ التحميل…', 'Loading…')}</div>}>
-          <SerialInventoryPanel />
+          {view === 'serials' ? <SerialInventoryPanel /> : <AdminSerials view={view} />}
         </React.Suspense>
       )}
     </div>

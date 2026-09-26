@@ -16,6 +16,10 @@ import { themedImage } from '../../lib/productImage';
  * (`data-ground="dark"`, src/index.css FEATURE SURFACES). Only the file for
  * the theme on screen is requested.
  *
+ * `frame={false}` — the caller draws its own dark ground under the
+ * photograph in both themes (the category row banners), so the light-theme
+ * window would only be a card inside a card.
+ *
  * A failed load removes the picture; the banner under it is already a
  * designed surface.
  */
@@ -26,6 +30,7 @@ export default function CropPhoto({
   className,
   size,
   eager = false,
+  frame = true,
 }: {
   src: string;
   lightSrc?: string;
@@ -35,6 +40,8 @@ export default function CropPhoto({
   /** The intrinsic square the photograph is decoded at. */
   size: number;
   eager?: boolean;
+  /** Frame a dark catalogue photograph on the light theme (default), or not. */
+  frame?: boolean;
 }) {
   const { theme } = useTheme();
   const shown = themedImage(src, lightSrc, theme);
@@ -42,7 +49,7 @@ export default function CropPhoto({
   if (!shown || failed === shown) return null;
   // Only a catalogue photograph is known to be a dark studio shot; an owner's
   // own picture keeps the edge fade it was designed with.
-  const ground = crop && theme === 'light' && shown !== lightSrc ? 'dark' : undefined;
+  const ground = frame && crop && theme === 'light' && shown !== lightSrc ? 'dark' : undefined;
   return (
     <div aria-hidden="true" data-ground={ground} className={`lv-promo-zone absolute ${className}`}>
       <img

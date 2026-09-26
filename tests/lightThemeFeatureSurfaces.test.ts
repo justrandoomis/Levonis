@@ -74,7 +74,6 @@ test('feature surfaces follow the theme: no dark island left on the home page or
     'src/components/home/v2/PrinterFinder.tsx',
     'src/components/home/v2/EditorialBanners.tsx',
     'src/components/catalog/CategoryRowBanners.tsx',
-    'src/components/catalog/CategoryHero.tsx',
     'src/components/catalog/RelatedCategories.tsx',
     'src/components/catalog/FinderBand.tsx',
     'src/components/finder/HumanHelpBand.tsx',
@@ -87,6 +86,11 @@ test('feature surfaces follow the theme: no dark island left on the home page or
   const hero = read('src/components/home/Hero.tsx');
   assert.equal((hero.match(/data-theme="dark"/g) ?? []).length, 1, 'only the photo carousel stays dark');
   for (const f of FEATURES.slice(1)) assert.doesNotMatch(read(f), /data-theme="dark"/, `${f} is still a dark island`);
+  // The category hero is no surface at all (owner, 2026-09-26: «مدموجه في
+  // الصفحه»): page ink on the page's canvas, and never a dark island.
+  const categoryHero = read('src/components/catalog/CategoryHero.tsx');
+  assert.doesNotMatch(categoryHero, /data-theme="dark"|bg-charcoal|ring-inset/, 'the category hero is part of the page');
+  assert.match(categoryHero, /text-text-primary/);
 });
 
 test('inside a feature surface the light theme re-points the four fixed colours, at readable contrast', () => {

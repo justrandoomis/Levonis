@@ -19,19 +19,19 @@ import PromoPhoto from './PromoPhoto';
  * Each banner is ONE link; the «اكتشف الآن» pill is its label, not a second
  * target inside it.
  *
- * THEME: `data-feature` (src/index.css FEATURE SURFACES) — charcoal on the
- * dark theme, a cream card with ink type on the light one, where a dark
- * product photograph with no light-theme twin (migration 0138) is framed in
- * the far corner instead of faded into the cream.
+ * THE PHOTOGRAPH FILLS THE BANNER (owner, 2026-09-26: «اجعل الصورة تملأ
+ * البطاقة»): edge to edge, with the copy on it in the bottom corner on the
+ * reading side over a dark scrim (`.lv-bleed-scrim`) — light words on a dark
+ * scrim in both themes, since they sit on a photograph. The picture is the
+ * admin's light/dark pair for the banner when there is one (targets
+ * `editorial-multicolor` / `editorial-materials`), else a real product
+ * photograph cropped to its middle band (src/lib/homeLayout.ts).
  *
  * ONE ROW, SIDE BY SIDE, AT EVERY WIDTH (owner, 2026-09-26, with the
  * reference shot: «يكون في شريط أفقي واحد بشكل مستطيل»). The two banners
  * share one horizontal row on a phone too, each a landscape rectangle by
- * aspect ratio (16:10 on a phone, 16:9 on a tablet, 12:5 from 1024 px). The
- * photograph holds the far side and fades toward the words; it is never
- * framed as a separate window, so the banner reads as one picture with its
- * copy on it. On a phone the sub-line is dropped to keep the title and the
- * pill clear.
+ * aspect ratio (16:10 on a phone, 16:9 on a tablet, 12:5 from 1024 px). On a
+ * phone the sub-line is dropped to keep the title and the pill clear.
  */
 function Banner({ card }: { card: EditorialCard }) {
   const { loc } = useLanguage();
@@ -57,36 +57,33 @@ function Banner({ card }: { card: EditorialCard }) {
 
   const body = (
     <>
-      <PromoPhoto
-        src={card.image}
-        lightSrc={card.lightImage}
-        crop={card.productPhoto}
-        width={360}
-        height={360}
-        className={
-          !card.productPhoto
-            ? 'inset-0'
-            : 'lv-fade-corner top-0 bottom-0 end-0 w-[48%] sm:top-auto sm:h-[78%] sm:w-[70%] lg:top-0 lg:h-full lg:w-[58%]'
-        }
-      />
-      {card.productPhoto ? null : (
-        // An uploaded picture fills the banner; a scrim from the reading side
-        // keeps the owner's copy legible over whatever they chose.
-        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-l from-transparent via-charcoal/40 to-charcoal/85 rtl:bg-gradient-to-r" />
-      )}
-      <div className="relative flex h-full max-w-[60%] flex-col items-start p-2.5 sm:max-w-none sm:p-3 lg:max-w-[52%] lg:p-7 2xl:p-9">
+      {card.image ? (
+        <>
+          <PromoPhoto
+            src={card.image}
+            lightSrc={card.lightImage}
+            crop={card.productPhoto}
+            bleed
+            width={720}
+            height={720}
+            className="inset-0"
+          />
+          <div aria-hidden="true" className="lv-bleed-scrim-deep pointer-events-none absolute inset-0" />
+        </>
+      ) : null}
+      <div className="relative flex h-full flex-col items-start justify-end p-2.5 sm:p-4 lg:max-w-[50%] lg:p-7 2xl:p-9">
         {title ? (
-          <h3 className="text-[12.5px] font-bold leading-[1.3] text-ivory sm:text-[17px] sm:leading-[1.35] lg:text-[24px] lg:leading-tight 2xl:text-[28px]">
+          <h3 className="text-[12.5px] font-bold leading-[1.4] text-snow [text-shadow:0_1px_8px_rgb(0_0_0/0.35)] sm:text-[17px] lg:text-[24px] lg:leading-[1.35] 2xl:text-[28px]">
             {title}
           </h3>
         ) : null}
         {subtitle ? (
-          <p className="mt-1 hidden max-w-[28ch] text-[12px] leading-[18px] text-text-secondary sm:block lg:mt-2 lg:max-w-none lg:text-[14px] lg:leading-6 2xl:text-[15px]">
+          <p className="mt-1 hidden max-w-[34ch] text-[12px] leading-[1.5] text-snow/80 sm:block lg:mt-1.5 lg:text-[14px] 2xl:text-[15px]">
             {subtitle}
           </p>
         ) : null}
         {cta ? (
-          <span className="mt-auto inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-full border border-white/20 bg-charcoal px-2 text-[10.5px] font-semibold text-ivory transition-colors group-hover:border-white/45 sm:h-9 sm:px-3.5 sm:text-[13px] lg:h-10 lg:px-4 lg:text-[14px]">
+          <span className="mt-2 inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-full bg-snow px-2.5 text-[10.5px] font-bold text-onyx transition-colors group-hover:bg-paper sm:mt-3 sm:h-9 sm:px-3.5 sm:text-[13px] lg:mt-4 lg:h-10 lg:px-4 lg:text-[14px]">
             {cta}
             <ArrowGlyph className="h-3 w-3" />
           </span>
@@ -96,7 +93,7 @@ function Banner({ card }: { card: EditorialCard }) {
   );
 
   const cls =
-    'group relative isolate block aspect-[16/10] min-w-0 overflow-hidden rounded-2xl bg-charcoal ring-1 ring-inset ring-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted sm:aspect-[16/9] lg:aspect-[12/5] lg:rounded-[20px]';
+    'group relative isolate block aspect-[16/10] min-w-0 overflow-hidden rounded-2xl lv-bleed-ground ring-1 ring-inset ring-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:aspect-[16/9] lg:aspect-[12/5] lg:rounded-[20px]';
   if (card.to.startsWith('/')) {
     return (
       <Link to={card.to} data-editorial={card.key} data-feature="" className={cls}>

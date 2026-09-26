@@ -36,10 +36,12 @@ export interface CatalogNode {
    */
   image_url: string;
   /**
-   * The category page's hero / explorer banner photo (migration 0136), as a
-   * URL, or ''. Absent on a server older than 0136.
+   * The category page's hero / explorer banner photo for the DARK theme
+   * (migration 0136), as a URL, or ''. Absent on a server older than 0136.
    */
   hero_image_url?: string;
+  /** Its light-theme twin (migration 0142); `hero_image_url` is the dark one. Absent before 0142. */
+  hero_light_image_url?: string;
   /** One or two lines under the name on the category page (0136). '' = none. */
   description_ar?: string;
   description_en?: string;

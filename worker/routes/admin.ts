@@ -20,15 +20,19 @@ import { canViewFinancials, isOwner, normalizeAdminScope, userPatchRefusal } fro
 import { degradeIfSchemaMissing, isSchemaMissing } from '../lib/membershipBenefits';
 import { normalizeText } from '../lib/search/normalize';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
+import { validateHomeBento } from '../lib/homeBento';
 import {
   findSiteMediaSlot,
   mintSiteMediaObject,
   normalizeSiteMedia,
   resolveSiteMedia,
   siteMediaKey,
+  HOME_PHOTO_MAX_BYTES,
+  HOME_PHOTO_MAX_SOURCE_BYTES,
   SITE_MEDIA_MAX_BYTES,
   SITE_MEDIA_MIME,
 } from '../lib/siteMedia';
+import { convertToWebp, isConvertibleToWebp } from '../lib/imageConvert';
 import { putMediaObject } from '../lib/mediaStorage';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { sniff } from './uploads';
@@ -3717,8 +3721,11 @@ adminRoutes.get('/settings', async (c) => {
 
 // ------------------------------------------------------- main page media
 //
-// Brand marks and service icons on the home page. The owner's rule is that
-// these are WebP, so this route ENFORCES it rather than converting: the sniff
+// Brand marks and service icons on the home page, and the home page's own
+// light/dark photograph pairs (`group: 'home'`, worker/lib/siteMedia.ts
+// HOME_PHOTO_SLOTS — those alone are converted to WebP when they arrive as
+// PNG/JPEG). For marks and icons the owner's rule is that they are WebP, so
+// this route ENFORCES it rather than converting: the sniff
 // below reads magic bytes, and anything that is not a RIFF/WEBP container is
 // refused by name. `/api/uploads` cannot serve this purpose — its key builder
 // produces owner-scoped four-segment keys and its purpose list is closed, and
@@ -3739,21 +3746,43 @@ adminRoutes.post('/site-media/:slot', async (c) => {
   if (!form) throw badRequest('Expected multipart form data');
   const file = form.get('file');
   if (!(file instanceof File)) throw badRequest('No file uploaded');
-  if (file.size > SITE_MEDIA_MAX_BYTES) {
-    throw badRequest(
-      `الصورة أكبر من الحد (${Math.round(SITE_MEDIA_MAX_BYTES / 1024 / 1024)} ميغابايت) / Image is larger than ${Math.round(SITE_MEDIA_MAX_BYTES / 1024 / 1024)} MB`,
+  // A home PHOTOGRAPH (hero, bento, editorial — `group: 'home'`) may arrive as
+  // a PNG or JPEG and is converted here; a brand mark or a service icon keeps
+  // the owner's WebP-only rule. Either way, what is stored is WebP.
+  const photo = slot.group === 'home';
+  const sourceCap = photo ? HOME_PHOTO_MAX_SOURCE_BYTES : SITE_MEDIA_MAX_BYTES;
+  const storedCap = photo ? HOME_PHOTO_MAX_BYTES : SITE_MEDIA_MAX_BYTES;
+  const tooLarge = (cap: number) =>
+    badRequest(
+      `الصورة أكبر من الحد (${Math.round(cap / 1024 / 1024)} ميغابايت) / Image is larger than ${Math.round(cap / 1024 / 1024)} MB`,
       'SITE_MEDIA_TOO_LARGE'
     );
-  }
+  if (file.size > sourceCap) throw tooLarge(sourceCap);
 
-  const buf = new Uint8Array(await file.arrayBuffer());
-  const kind = sniff(buf);
+  let buf = new Uint8Array(await file.arrayBuffer());
+  let kind = sniff(buf);
+  if (photo && kind && kind.mime !== SITE_MEDIA_MIME && isConvertibleToWebp(kind.mime)) {
+    const out = await convertToWebp(c.env, buf, kind.mime);
+    if (!out.ok) {
+      throw badRequest(
+        out.reason === 'unavailable'
+          ? 'التحويل إلى WebP غير متاح الآن — ارفع الصورة بصيغة WebP / WebP conversion is unavailable; upload a WebP'
+          : 'تعذّر تحويل الصورة إلى WebP / The image could not be converted to WebP',
+        'SITE_MEDIA_CONVERT_FAILED'
+      );
+    }
+    buf = out.bytes;
+    kind = sniff(buf);
+  }
   if (!kind || kind.mime !== SITE_MEDIA_MIME) {
     throw badRequest(
-      'صور الصفحة الرئيسية يجب أن تكون WebP فقط / Main page media must be a WebP image',
+      photo
+        ? 'الصيغة غير مدعومة — ارفع صورة WebP أو PNG أو JPEG / Upload a WebP, PNG or JPEG image'
+        : 'صور الصفحة الرئيسية يجب أن تكون WebP فقط / Main page media must be a WebP image',
       'SITE_MEDIA_NOT_WEBP'
     );
   }
+  if (buf.byteLength > storedCap) throw tooLarge(storedCap);
   const dimensions = rasterDimensions(buf, kind.mime);
   if (!validRasterDimensions(dimensions)) {
     throw badRequest('The image has invalid or unsupported dimensions', 'BAD_IMAGE_DIMENSIONS');
@@ -3867,6 +3896,21 @@ adminRoutes.put('/settings/:key', async (c) => {
       throw badRequest('Keep at least one payout channel, each with a name', 'PAYOUT_METHODS_EMPTY');
     }
     value = methods;
+  } else if (key === 'homeBento') {
+    // Known squares only, and a section that is an ACTIVE catalog (or the
+    // graded shelf) — worker/lib/homeBento.ts. Refused by name, not trimmed.
+    const checked = await validateHomeBento(value, async (id) =>
+      Boolean(await c.env.DB.prepare('SELECT 1 AS ok FROM catalogs WHERE id = ? AND active = 1').bind(id).first())
+    );
+    if (!checked.ok) {
+      throw badRequest(
+        checked.refusal.code === 'BENTO_UNKNOWN_POSITION'
+          ? `مربع غير معروف في «تسوق حسب الفئة» / Unknown bento square: ${checked.refusal.detail}`
+          : `القسم غير موجود أو غير مفعّل / Unknown or inactive section: ${checked.refusal.detail}`,
+        checked.refusal.code
+      );
+    }
+    value = checked.value;
   } else if (key === 'homeBanners' || key === 'homeSectionItems') {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) throw badRequest(`${key} must be an object`);
     if (JSON.stringify(value).length > 100_000) throw badRequest(`${key} is too large`);

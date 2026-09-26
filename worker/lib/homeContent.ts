@@ -77,7 +77,7 @@ function text(raw: unknown, max: number): string {
   return typeof raw === 'string' ? raw.trim().slice(0, max) : '';
 }
 
-function localized(raw: unknown, max = MAX_TEXT): LocalizedText {
+export function localized(raw: unknown, max = MAX_TEXT): LocalizedText {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   return { ar: text(o.ar, max), en: text(o.en, max), ckb: text(o.ckb, max) };
 }

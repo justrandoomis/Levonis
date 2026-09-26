@@ -34,8 +34,14 @@ export interface CatalogTreeNode {
   description_ckb: string;
   /** The home-tile cover (0100) as a URL, or ''. */
   image_url: string;
-  /** The banner/hero photo (0136) as a URL, or ''. The client falls back to `image_url`, then a product photo. */
+  /**
+   * The banner/hero photo for the DARK theme (0136) as a URL, or ''.
+   * The client resolves: this theme's banner → the other theme's → `image_url`
+   * → a product photo (src/lib/catalog/explorerModel.ts authoredPhoto).
+   */
   hero_image_url: string;
+  /** Its light-theme twin (0142) as a URL, or ''. */
+  hero_light_image_url: string;
   /** Active, non-composition products here or anywhere below. */
   product_count: number;
   /** Of those, how many sell direct with units available now. `null` when the

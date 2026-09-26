@@ -102,3 +102,21 @@
     mask-image: linear-gradient(to right, #000 55%, transparent 100%);
   }
 }
+
+/* THE CATEGORY HERO'S PICTURE (src/components/catalog/CategoryHero.tsx):
+   part of the page, never a box. It dissolves into the page's canvas on the
+   reading side AND at the top and the bottom — two masks intersected — so no
+   edge of the photograph draws a rectangle in either theme. Opaque from 55%
+   toward the far side; "start" is the reading side, so it flips with the
+   language. */
+.lv-hero-blend {
+  -webkit-mask-image: linear-gradient(to left, #000 40%, transparent 92%), linear-gradient(to bottom, transparent 0%, #000 34%, #000 66%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to left, #000 40%, transparent 92%), linear-gradient(to bottom, transparent 0%, #000 34%, #000 66%, transparent 100%);
+  mask-composite: intersect;
+}
+[dir='rtl'] .lv-hero-blend {
+  -webkit-mask-image: linear-gradient(to right, #000 40%, transparent 92%), linear-gradient(to bottom, transparent 0%, #000 34%, #000 66%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 40%, transparent 92%), linear-gradient(to bottom, transparent 0%, #000 34%, #000 66%, transparent 100%);
+}
+

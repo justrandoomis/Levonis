@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy } from 'lucide-react';
+import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supportTotal, useSupportCounts } from '../components/adminSupport/supportCounts';
 import { useAuth } from '../AuthContext';
@@ -72,7 +72,6 @@ const AdminWalletRequests = React.lazy(() => import('../components/AdminWalletRe
 const AdminWalletSettings = React.lazy(() => import('../components/AdminWalletSettings'));
 const AdminStoreSettings = React.lazy(() => import('../components/AdminStoreSettings'));
 const AdminChannels = React.lazy(() => import('../components/AdminChannels'));
-const AdminSerials = React.lazy(() => import('../components/AdminSerials'));
 const AdminReviews = React.lazy(() => import('../components/AdminReviews'));
 const AdminKyc = React.lazy(() => import('../components/AdminKyc'));
 const AdminMemberships = React.lazy(() => import('../components/AdminMemberships'));
@@ -200,7 +199,7 @@ export default function Admin() {
     { id: 'mystery', icon: Dice5, label: loc('العروض العشوائية', 'Mystery offers', 'ئۆفەرە نهێنییەکان'), ...section('catalog', 'الكتالوج', 'Catalog') },
     { id: 'mystery_pools', icon: Layers, label: loc('مجموعات السحب', 'Mystery pools', 'کۆمەڵەکانی هەڵبژاردن'), ...section('catalog', 'الكتالوج', 'Catalog') },
     { id: 'taxonomy', icon: Tag, label: loc('التصنيفات', 'Taxonomy'), ...section('catalog', 'الكتالوج', 'Catalog') },
-    { id: 'warranties', icon: ShieldCheck, label: loc('الضمانات', 'Warranties'), ...section('catalog', 'الكتالوج', 'Catalog') },
+    { id: 'warranties', icon: ShieldCheck, label: loc('الضمانات والأجهزة', 'Warranties & devices'), ...section('catalog', 'الكتالوج', 'Catalog') },
     { id: 'memberships', icon: Crown, label: loc('الأعضاء والدعم', 'Members & support'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
     { id: 'membership_benefits', icon: BadgePercent, label: loc('مزايا العضوية', 'Membership benefits'), ...section('growth', 'العضويات والتسويق', 'Growth') },
     { id: 'coupons', icon: Ticket, label: loc('أكواد الخصم', 'Promo codes'), ...section('growth', 'العضويات والتسويق', 'Growth') },
@@ -218,7 +217,6 @@ export default function Admin() {
     { id: 'support', icon: LifeBuoy, label: loc('الدعم والرسائل', 'Support inbox', 'ڕیزی پشتگیری'), badge: supportWaiting, ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     { id: 'users', icon: Users, label: t('adminUsers'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     { id: 'kyc', icon: ShieldCheck, label: loc('التحقق والعناوين', 'KYC & addresses'), ...section('administration', 'الإدارة', 'Administration') },
-    { id: 'serials', icon: Barcode, label: loc('الأجهزة والتسلسلات', 'Serials & devices'), ...section('administration', 'الإدارة', 'Administration') },
     { id: 'reviews', icon: Star, label: loc('المراجعات والهدايا', 'Reviews & gifts'), ...section('administration', 'الإدارة', 'Administration') },
     /* «شكاوى الأسعار». /api/admin/price-reports has existed with a full list,
        a computed gap and an audited decision, and NOTHING in src/ called it —
@@ -248,7 +246,7 @@ export default function Admin() {
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
       <Toaster />
-      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'membership_benefits' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
+      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'serials' || activeTab === 'membership_benefits' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
         <React.Suspense fallback={<PanelFallback dir={dir} />}>
 
         {activeTab === 'overview' && (
@@ -305,9 +303,9 @@ export default function Admin() {
            <AdminChannels />
         )}
 
-        {activeTab === 'serials' && (
-           <AdminSerials />
-        )}
+        {/* «الأجهزة والتسلسلات» is merged into «الضمانات والأجهزة»; an old
+            link to it opens that tab on its order-units view. */}
+        {activeTab === 'serials' && <AdminWarranties initialView="units" />}
 
         {activeTab === 'reviews' && (
            <AdminReviews />

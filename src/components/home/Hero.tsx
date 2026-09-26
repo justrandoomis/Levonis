@@ -4,7 +4,9 @@ import { ChevronLeft, ChevronRight, Pause, Play, Layers, ShoppingBag } from 'luc
 import { useLanguage } from '../../LanguageContext';
 import { STUDIO_URL } from '../../translations';
 import { pickText, type HomeBanner } from '../../lib/api';
+import type { HeroVisual } from '../../lib/homeLayout';
 import SafeImage from '../ui/SafeImage';
+import PromoPhoto from './v2/PromoPhoto';
 
 /**
  * The home hero.
@@ -25,7 +27,16 @@ import SafeImage from '../ui/SafeImage';
  * — no iframe, no prefetch, no Studio code in this bundle (docs/STUDIO_PLAN.md
  * decision 6, pinned by tests/store-isolation.test.ts).
  */
-export default function Hero({ banners, loading }: { banners: HomeBanner[]; loading: boolean }) {
+export default function Hero({
+  banners,
+  visual = null,
+  loading,
+}: {
+  banners: HomeBanner[];
+  /** The brand hero's picture (src/lib/homeLayout.ts `resolveHeroVisual`). */
+  visual?: HeroVisual | null;
+  loading: boolean;
+}) {
   const { t, dir, lang, loc } = useLanguage();
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -81,7 +92,7 @@ export default function Hero({ banners, loading }: { banners: HomeBanner[]; load
     );
   }
 
-  if (count === 0) return <DefaultHero />;
+  if (count === 0) return <DefaultHero visual={visual} />;
 
   return (
     <section
@@ -263,53 +274,62 @@ function BannerSlide({
  * new visitor goes. It disappears the moment a real banner is uploaded.
  *
  * IT FOLLOWS THE THEME (owner, 2026-09-26: «في hero banner … تكون بلون أسود
- * وبأزرار سوداء او ذهبيه بالرغم هو الثيم فاتح»). It is no longer a dark island:
- * its type and buttons are roles (`text-white` is the ink, `bg-white` the
- * primary fill), so on the light theme it is ink on cream with a charcoal
- * primary and an outlined secondary, and on the dark theme exactly what it
- * was. Only the ground and the layer lines need a light version, and those
- * live in src/index.css (`lv-hero-ground`, `lv-hero-lines`, `lv-hero-veil`).
+ * وبأزرار سوداء او ذهبيه بالرغم هو الثيم فاتح»). Its type and buttons are
+ * roles (`text-white` is the ink, `bg-white` the primary fill), so on the light
+ * theme it is ink on cream with a charcoal primary, and on the dark theme
+ * light on olive.
+ *
+ * A PANEL, WITH A PICTURE (owner, 2026-09-26: «النص يبدو متداخل مع بعضه ويبدو
+ * كله على اليمين، كما أن الهيرو بانر أبيض لا يمكن فرزه بالعين عن القسم»):
+ *   - the headline's leading is 1.35+, because Arabic at 48–60 px needs room
+ *     for its ascenders (ا ل ط) and descenders (ي ج) — at 1.1 the two lines
+ *     touched;
+ *   - text on the reading side, a picture on the other (`HeroVisual`: the
+ *     owner's light/dark pair, else a real printer), stacked on a phone;
+ *   - its own surface: a rounded panel a step warmer and deeper than the page,
+ *     with a hairline and a soft lift (`.lv-hero-panel`, src/index.css), so on
+ *     the cream theme it reads as a block and not as more page.
  */
-function DefaultHero() {
+function DefaultHero({ visual }: { visual: HeroVisual | null }) {
   const { t, dir } = useLanguage();
   return (
     <section
       data-hero="default"
       data-feature=""
-      className="lv-hero-ground relative w-full overflow-hidden bg-gradient-to-br from-olive-dark via-olive to-olive-light"
+      // HEADER_CLEARANCE: the site header is `fixed` and paints over the top
+      // of every page (Header.tsx) — roughly 124 px unscrolled — so the panel
+      // starts below it. The bottom padding is where the ticker's cap
+      // (Home.tsx, `-mt-7`) overlaps, so it never cuts into the panel.
+      className="relative w-full px-4 pb-12 pt-[128px] sm:px-6 sm:pt-[146px] lg:px-8 lg:pb-14"
     >
-      {/* A quiet layer grid — a nod to what the machine actually does. No
-          image request, so it costs nothing and cannot 404. */}
-      <div aria-hidden="true" className="lv-hero-lines absolute inset-0 opacity-[0.18]" />
       <div
-        aria-hidden="true"
-        className="lv-hero-veil absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30"
-      />
-      {/* HEADER_CLEARANCE: the site header is `fixed` and paints over the top
-          of every page (Header.tsx). Unscrolled it is roughly 124px tall — two
-          rows plus the search field — so hero copy starts below it. The
-          background still runs full-bleed to the top; only the text moves. */}
-      <div className="relative max-w-[1920px] mx-auto px-5 sm:px-6 lg:px-8 pt-[132px] pb-14 sm:pt-[150px] sm:pb-20 md:pb-24">
-        <div className="max-w-2xl min-w-0">
-          <span className="inline-block text-olive-light bg-black/40 border border-white/15 rounded-full px-3 py-1 text-[11px] sm:text-xs font-bold tracking-widest mb-4">
+        className={`lv-hero-panel relative mx-auto grid max-w-[1920px] overflow-hidden rounded-[22px] lg:rounded-[32px] ${
+          visual ? 'md:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)]' : ''
+        }`}
+      >
+        {/* A quiet layer grid — a nod to what the machine actually does. No
+            image request, so it costs nothing and cannot 404. */}
+        <div aria-hidden="true" className="lv-hero-lines pointer-events-none absolute inset-0 opacity-[0.14]" />
+        <div className="relative flex min-w-0 flex-col justify-center px-5 py-7 sm:px-8 sm:py-10 lg:px-12 lg:py-14 xl:px-16">
+          <span className="mb-4 inline-block w-fit rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-[11px] font-bold tracking-widest text-gold sm:text-xs">
             LEVONIS
           </span>
           <h1
             data-hero-title
-            className="text-white font-black tracking-tight text-3xl sm:text-5xl md:text-6xl leading-[1.1] mb-3 sm:mb-4"
+            className="mb-3 text-[28px] font-black leading-[1.4] text-white [text-wrap:balance] min-[400px]:text-[32px] sm:mb-4 sm:text-[40px] sm:leading-[1.35] lg:text-[52px] xl:text-[60px]"
           >
             {t('heroTitle')}
           </h1>
-          <p className="text-zinc-200 text-sm sm:text-lg leading-relaxed mb-7 max-w-xl">{t('heroSubtitle')}</p>
+          <p className="mb-7 max-w-xl text-sm leading-relaxed text-zinc-200 sm:text-base lg:text-lg">{t('heroSubtitle')}</p>
           <div className="flex flex-wrap items-center gap-3">
             <Link
               to="/products"
               data-hero-cta="shop"
-              className="inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full bg-white text-black text-sm sm:text-base font-bold hover:bg-zinc-200 transition-colors shadow-xl"
+              className="inline-flex min-h-[48px] items-center gap-2 rounded-full bg-white px-6 text-sm font-bold text-black shadow-xl transition-colors hover:bg-zinc-200 sm:text-base"
             >
-              <ShoppingBag aria-hidden="true" className="w-4 h-4" />
+              <ShoppingBag aria-hidden="true" className="h-4 w-4" />
               {t('heroShop')}
-              {dir === 'rtl' ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              {dir === 'rtl' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </Link>
             {/* A new tab: the Studio is a separate app on a separate
                 subdomain, and taking the store's tab costs the visitor their
@@ -319,14 +339,51 @@ function DefaultHero() {
               target="_blank"
               rel="noopener noreferrer"
               data-hero-cta="studio"
-              className="inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full bg-black/45 backdrop-blur border border-white/25 text-white text-sm sm:text-base font-bold hover:bg-black/65 transition-colors"
+              className="inline-flex min-h-[48px] items-center gap-2 rounded-full border border-white/25 bg-black/45 px-6 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-black/65 sm:text-base"
             >
-              <Layers aria-hidden="true" className="w-4 h-4" />
+              <Layers aria-hidden="true" className="h-4 w-4" />
               {t('heroStudio')}
             </a>
           </div>
         </div>
+        {visual ? <HeroPicture visual={visual} /> : null}
       </div>
     </section>
+  );
+}
+
+/**
+ * The hero's picture, in a rounded frame inset in the panel — the same frame
+ * in both themes, so a dark studio photograph reads as a mounted print on the
+ * cream panel rather than a smudge fading into it. A product photograph is
+ * cropped to its middle band (`crop`) and opens its product; the owner's own
+ * picture fills the frame whole.
+ */
+function HeroPicture({ visual }: { visual: HeroVisual }) {
+  const frame = (
+    <PromoPhoto
+      src={visual.image}
+      lightSrc={visual.lightImage}
+      crop={visual.productPhoto}
+      bleed
+      eager
+      width={720}
+      height={720}
+      className="inset-0"
+    />
+  );
+  const cls =
+    'group relative isolate mx-4 mb-4 block aspect-[16/10] overflow-hidden rounded-[16px] bg-onyx min-[480px]:aspect-[2/1] sm:mx-8 sm:mb-8 md:m-3 md:aspect-auto md:min-h-[320px] lg:m-4 lg:min-h-[400px] lg:rounded-[22px] xl:min-h-[440px]';
+  if (visual.to) {
+    return (
+      <Link to={visual.to} data-hero-visual="product" aria-label={visual.alt} className={`${cls} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}>
+        {frame}
+      </Link>
+    );
+  }
+  return (
+    <div data-hero-visual="owner" className={cls}>
+      {frame}
+    </div>
   );
 }

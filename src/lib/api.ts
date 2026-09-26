@@ -1454,6 +1454,12 @@ export interface PublicSettings {
   homeBanners: Record<string, HomeBanner[]>;
   homeSectionItems: Record<string, HomeSectionItem[]>;
   homeAds: Array<{ id: string; text: string; animation: string }>;
+  /**
+   * Which section each square of «تسوق حسب الفئة» opens, and the owner's
+   * title for it (worker/lib/homeBento.ts). Absent on an older server, and a
+   * square with no entry keeps the automatic matching.
+   */
+  homeBento?: Partial<Record<BentoPosition, { category: string; title: LocalizedText }>>;
   /** The printer home-delivery NOTE amount — informational, never a fee, and
    *  rendered only when the server sent a positive integer. */
   printerHomeDeliveryNoteIqd?: number | null;
@@ -1497,6 +1503,9 @@ export interface PublicSettings {
 
 /** Owner-authored copy, one string per language. Never machine-translated —
  *  an empty language falls back to one the owner actually wrote. */
+/** The six squares of the home bento — worker/lib/homeBento.ts `BENTO_POSITIONS`. */
+export type BentoPosition = 'large' | 'top-1' | 'top-2' | 'bottom-1' | 'bottom-2' | 'bottom-3';
+
 export interface LocalizedText {
   ar: string;
   en: string;
@@ -1744,11 +1753,18 @@ export interface StockAlertListResponse {
  */
 export interface SiteMediaEntry {
   slot: string;
-  group: 'brand' | 'service' | 'banner';
+  group: 'brand' | 'service' | 'banner' | 'home';
   label: string;
   link: string;
   url: string;
   custom: boolean;
+  /**
+   * `home` slots only: which home picture this is half of (`hero`,
+   * `bento-printers`, `editorial-materials`, …) and the theme it is for. The
+   * storefront pairs the two in src/lib/homeLayout.ts `ownerPhoto`.
+   */
+  target?: string;
+  theme?: 'light' | 'dark';
 }
 
 /**

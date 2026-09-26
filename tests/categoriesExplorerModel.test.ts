@@ -30,6 +30,8 @@ import {
   representativePhoto,
   rowsWithoutPhoto,
   type PhotoCandidate,
+  authoredPhoto,
+  authoredSrc,
 } from '../src/lib/catalog/explorerModel';
 import { availableLabel, categoriesCount, countNoun, countWord, explorerSubline, resultCountLabel, showCountLabel } from '../src/lib/catalog/copy';
 import { LanguageProvider } from '../src/LanguageContext';
@@ -105,6 +107,7 @@ test('an authored picture wins, and a banner with no photograph is reported for 
   const rows = bannerRows(tree.roots, []);
   assert.equal(rows[0].photo?.productPhoto, false, 'the owner’s own picture is shown whole');
   assert.match(rows[0].photo!.src, /PrintersHero\.webp$/);
+  assert.equal(rows[0].photo!.lightSrc, undefined, 'one picture for both themes until a light one is uploaded');
   assert.deepEqual(
     rowsWithoutPhoto(rows).map((n) => n.slug),
     ['printer-accessories', 'printing-materials', 'makers-supply']
@@ -176,15 +179,79 @@ test('each row is ONE full-width link — name, counts and the pill; no control 
   assert.doesNotMatch(html, /data-sub-chip|grid-cols/, 'no chips, no grid of tiles');
   assert.match(html, /<ul class="flex flex-col/, 'a stack: one banner per line');
   assert.match(html, /href="\/categories\/printers"/);
-  assert.match(html, /aspect-\[8\/3\][^"]*max-h-\[150px\][^"]*min-h-\[112px\]/, 'a strip on a phone, never a tower');
-  assert.match(html, /lg:aspect-\[5\/1\][^"]*lg:max-h-\[200px\]/, 'a wide banner on a desktop');
-  // Owner, 2026-09-26: no dark blocks on the light theme — the banner follows
-  // the page (`data-feature`, src/index.css FEATURE SURFACES) and a dark
-  // catalogue photograph with no light twin is framed rather than faded.
-  assert.match(html, /data-feature=""/, 'a feature surface that follows the theme');
+  // Owner, 2026-09-26: «اجعل الشريط المستطيلي انحف» — thin by proportion at
+  // every width: 15:4 (88–96 px) on a phone, 7:1 from 640, 8:1 from 1024,
+  // never taller than 144 px.
+  assert.match(html, /aspect-\[15\/4\] min-h-\[88px\] max-h-\[96px\]/, 'a thin strip on a phone');
+  assert.match(html, /sm:aspect-\[7\/1\][^"]*sm:max-h-\[140px\]/);
+  assert.match(html, /lg:aspect-\[8\/1\][^"]*lg:min-h-\[120px\] lg:max-h-\[144px\]/, 'a thin banner on an iPad and a desktop');
+  assert.doesNotMatch(html, /max-h-\[(1[5-9]\d|[2-9]\d\d)px\]/, 'never a wall');
+  // «اجعل الصورة تملأ البطاقة»: the picture is the banner, the words sit on
+  // it over a dark scrim — never a framed window on a cream card.
+  assert.match(html, /data-feature=""/, 'still marked a feature surface');
   assert.doesNotMatch(html, /data-theme="dark"/, 'no dark island on the light theme');
-  assert.match(html, /data-ground="dark"/, 'the dark photograph is framed on the light theme');
+  assert.doesNotMatch(html, /data-ground="dark"/, 'no framed window on the light theme');
+  assert.match(html, /\[--color-ivory:#f3efe6\]/, 'the words are light ink on the scrim in both themes');
+  assert.match(html, /to-\[rgb\(11_12_15\/0\.9\)\]/, 'a dark scrim from the reading side');
   assert.match(html, /10 طابعات · 4 متوفرة الآن/);
   assert.match(html, /استكشف/);
   assert.match(html, /<img[^>]+alt=""/, 'the photograph is decorative');
+});
+
+test('an uploaded banner fills the row under the scrim; the light and dark files are both carried', async () => {
+  const tree = await liveTree(
+    `UPDATE catalogs SET hero_image_key = 'UiUx/MainPage/PrintersDark.webp', hero_light_image_key = 'UiUx/MainPage/PrintersLight.webp' WHERE id = 'cat_printers'`
+  );
+  assert.equal(tree.roots[0].hero_light_image_url, '/files/UiUx/MainPage/PrintersLight.webp', 'the tree exposes the light banner');
+  const rows = bannerRows(tree.roots, pool);
+  assert.deepEqual(rows[0].photo, {
+    src: '/files/UiUx/MainPage/PrintersDark.webp',
+    lightSrc: '/files/UiUx/MainPage/PrintersLight.webp',
+    productPhoto: false,
+    productId: null,
+  });
+  const html = renderToStaticMarkup(
+    createElement(LanguageProvider, {
+      children: createElement(MemoryRouter, null, createElement(CategoryRowBanners, { rows: rows.slice(0, 1), label: 'x' })),
+    })
+  );
+  assert.match(html, /data-row-photo="cover"/);
+  assert.match(html, /lv-promo-zone absolute inset-0/, 'the picture fills the whole banner');
+  // The test renderer's theme is light: the light file is the one requested.
+  assert.match(html, /src="\/files\/UiUx\/MainPage\/PrintersLight\.webp"/);
+  assert.doesNotMatch(html, /PrintersDark\.webp/, 'only the file for the theme on screen is requested');
+});
+
+test('the order of the rows is the admin’s `sort`, then the name', async () => {
+  const tree = await liveTree(
+    `UPDATE catalogs SET sort = 30 WHERE id = 'cat_printers'; UPDATE catalogs SET sort = 10 WHERE id = 'cat_materials'; UPDATE catalogs SET sort = 20 WHERE id = 'cat_pacc'; UPDATE catalogs SET sort = 20 WHERE id = 'cat_makers';`
+  );
+  // cat_makers and cat_pacc tie on 20: the English name breaks it.
+  const order = bannerRows(tree.roots, pool).map((r) => r.node.id);
+  const tied = ['cat_makers', 'cat_pacc'].sort((a, b) => {
+    const n = (id: string) => tree.roots.find((r) => r.id === id)!.name_en;
+    return n(a).localeCompare(n(b));
+  });
+  assert.deepEqual(order, ['cat_materials', ...tied, 'cat_printers']);
+});
+
+test('the banner picture for a theme: this theme’s → the other theme’s → the tile cover → none', () => {
+  const n = (dark: string, light: string, cover: string) => ({ hero_image_url: dark, hero_light_image_url: light, image_url: cover });
+  // Both themes set: each theme gets its own.
+  assert.equal(authoredSrc(n('/d', '/l', '/c'), 'dark'), '/d');
+  assert.equal(authoredSrc(n('/d', '/l', '/c'), 'light'), '/l');
+  // One missing: the other theme's banner, before the cover.
+  assert.equal(authoredSrc(n('', '/l', '/c'), 'dark'), '/l');
+  assert.equal(authoredSrc(n('/d', '', '/c'), 'light'), '/d');
+  // Neither banner: the home tile's cover, in both.
+  assert.equal(authoredSrc(n('', '', '/c'), 'light'), '/c');
+  assert.equal(authoredSrc(n('', '', '/c'), 'dark'), '/c');
+  assert.equal(authoredSrc(n('', '', ''), 'dark'), '', 'nothing authored — the caller borrows a product photograph');
+  // A Worker older than 0142 sends no light field at all.
+  assert.equal(authoredSrc({ hero_image_url: '/d', image_url: '' }, 'light'), '/d');
+  // authoredPhoto carries both files, and the light one only when it differs.
+  assert.deepEqual(authoredPhoto(n('/d', '/l', '')), { src: '/d', lightSrc: '/l', productPhoto: false, productId: null });
+  assert.deepEqual(authoredPhoto(n('', '/l', '')), { src: '/l', productPhoto: false, productId: null });
+  assert.deepEqual(authoredPhoto(n('', '', '/c')), { src: '/c', productPhoto: false, productId: null });
+  assert.equal(authoredPhoto(n('', '', '')), null);
 });

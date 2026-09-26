@@ -11,9 +11,10 @@
  *     a sub-section with sections of its own) that node's children. The owner,
  *     2026-09-26: «يظهر فئات الفرعية بشكل هيرو بانر بسطر واحد مستطيل» — no
  *     chips, no grid of tiles;
- *   - the photograph is the admin's hero, else the section's tile cover, else
- *     a representative product — available now first, never the same product
- *     on two rows;
+ *   - the photograph is the admin's banner for the theme on screen, else the
+ *     other theme's, else the section's tile cover, else a representative
+ *     product — available now first, never the same product on two rows
+ *     (`authoredSrc`);
  *   - the call to action is «استكشف» where the section opens onto sections of
  *     its own, «تسوق الآن» where it is a list.
  */
@@ -36,7 +37,11 @@ export interface PhotoCandidate {
 
 export interface BannerPhoto {
   src: string;
-  /** The product's light-theme main image (0138), only when it has one. */
+  /**
+   * The picture for the light theme, only when it differs from `src`: a
+   * product's light-theme main image (0138), or the section's light banner
+   * (0142).
+   */
   lightSrc?: string;
   /** A catalogue photograph (crop to its product band) vs a picture the owner uploaded (shown whole). */
   productPhoto: boolean;
@@ -94,10 +99,34 @@ export function productBannerPhoto(p: PhotoCandidate): BannerPhoto {
   return { src: photoOf(p), productPhoto: true, productId: p.id, ...(light ? { lightSrc: light } : {}) };
 }
 
-/** The admin's own picture for a section, when there is one. */
-export function authoredPhoto(node: Pick<CatalogTreeNode, 'hero_image_url' | 'image_url'>): BannerPhoto | null {
-  const src = node.hero_image_url || node.image_url;
-  return src ? { src, productPhoto: false, productId: null } : null;
+/** The admin's pictures for a section, as the storefront reads them. */
+type AuthoredPictures = Pick<CatalogTreeNode, 'hero_image_url' | 'image_url'> &
+  // Optional: a Worker older than migration 0142 does not send it.
+  Partial<Pick<CatalogTreeNode, 'hero_light_image_url'>>;
+
+/**
+ * THE BANNER PICTURE FOR ONE THEME (owner, 2026-09-26: «صورتين تناسب الثيم
+ * الفاتح والثيم الداكن»). In order: this theme's banner → the other theme's
+ * banner → the home tile's cover → '' (the caller then borrows a product
+ * photograph). `hero_image_url` IS the dark banner (0136, kept so every hero
+ * already uploaded still shows); `hero_light_image_url` its light twin (0142).
+ */
+export function authoredSrc(node: AuthoredPictures, theme: 'light' | 'dark'): string {
+  const dark = node.hero_image_url || '';
+  const light = node.hero_light_image_url || '';
+  const chain = theme === 'light' ? [light, dark] : [dark, light];
+  return chain.find(Boolean) || node.image_url || '';
+}
+
+/**
+ * The admin's own picture for a section, when there is one — both themes'
+ * files, so `CropPhoto` requests only the one on screen (`themedImage`).
+ */
+export function authoredPhoto(node: AuthoredPictures): BannerPhoto | null {
+  const src = authoredSrc(node, 'dark');
+  if (!src) return null;
+  const light = authoredSrc(node, 'light');
+  return { src, productPhoto: false, productId: null, ...(light !== src ? { lightSrc: light } : {}) };
 }
 
 /** Would `/categories/<node>` draw shelves (true) or be the listing itself (false)? */

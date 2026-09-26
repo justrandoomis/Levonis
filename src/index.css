@@ -1550,23 +1550,106 @@ html[data-lang-swap='ltr'] main {
   border-color: var(--color-zinc-700);
 }
 
-/* THE HOME HERO'S GROUND (src/components/home/Hero.tsx DefaultHero). Dark:
-   the olive plate the utilities draw. Light: warm cream with a faint gold
-   bloom, and the layer lines in ink rather than white. */
+/* THE HOME HERO'S PANEL (src/components/home/Hero.tsx DefaultHero). The owner:
+   «الهيرو بانر أبيض لا يمكن فرزه بالعين عن القسم» — on the cream theme the
+   hero was the page's own cream and read as more page. It is now a rounded
+   panel with its own ground, a hairline and a soft lift, in both themes:
+   dark, an olive-to-charcoal plate; light, a warm sand a clear step deeper
+   than the page (#e3dacb) with a gold bloom — ink reads at 10:1 or better on
+   every stop of it (tests/lightThemeFeatureSurfaces.test.ts). The page tokens
+   are untouched. The layer lines are ink rather than white on the light one. */
 .lv-hero-lines {
   background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.6) 0px, rgba(255, 255, 255, 0.6) 1px, transparent 1px, transparent 14px);
 }
 [data-theme='light'] .lv-hero-lines {
   background-image: repeating-linear-gradient(0deg, rgb(22 24 27 / 0.2) 0px, rgb(22 24 27 / 0.2) 1px, transparent 1px, transparent 14px);
 }
-[data-theme='light'] .lv-hero-ground {
+.lv-hero-panel {
   background-image:
-    radial-gradient(70% 90% at 88% 8%, rgb(188 163 107 / 0.2), transparent 62%),
-    radial-gradient(60% 80% at 8% 100%, rgb(112 130 56 / 0.1), transparent 60%),
-    linear-gradient(to bottom, #f3eee4, var(--color-canvas));
+    radial-gradient(70% 90% at 100% 0%, rgb(188 163 107 / 0.16), transparent 62%),
+    linear-gradient(150deg, #262e1b 0%, #161a12 55%, #0e1013 100%);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  box-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.9);
 }
-[data-theme='light'] .lv-hero-veil {
-  background-image: none;
+[data-theme='light'] .lv-hero-panel {
+  background-image:
+    radial-gradient(70% 90% at 100% 0%, rgb(255 248 230 / 0.55), transparent 60%),
+    linear-gradient(150deg, #ecdfc4 0%, #dfcca7 58%, #d5bf96 100%);
+  border-color: rgb(58 46 28 / 0.16);
+  box-shadow:
+    0 1px 2px rgb(58 46 28 / 0.08),
+    0 28px 60px -30px rgb(58 46 28 / 0.42);
+}
+
+/* THE SCRIM UNDER WORDS ON A FULL-BLEED PHOTOGRAPH (the bento tiles and the
+   editorial banners, src/components/home/v2). Dark in BOTH themes, because
+   the words on a photograph are light in both: strongest in the bottom
+   corner on the reading side, where the words are, and gone by the far top
+   corner, so most of the photograph is shown as it was taken. */
+.lv-bleed-scrim {
+  background-image:
+    linear-gradient(to top, rgb(8 9 11 / 0.88) 0%, rgb(8 9 11 / 0.62) 30%, rgb(8 9 11 / 0.22) 56%, rgb(8 9 11 / 0) 78%),
+    linear-gradient(to left, rgb(8 9 11 / 0) 35%, rgb(8 9 11 / 0.45) 100%);
+}
+[dir='rtl'] .lv-bleed-scrim {
+  background-image:
+    linear-gradient(to top, rgb(8 9 11 / 0.88) 0%, rgb(8 9 11 / 0.62) 30%, rgb(8 9 11 / 0.22) 56%, rgb(8 9 11 / 0) 78%),
+    linear-gradient(to right, rgb(8 9 11 / 0) 35%, rgb(8 9 11 / 0.45) 100%);
+}
+/* The ground under a full-bleed tile whose picture is missing or still
+   loading: dark in both themes, like the scrim, because the words on the tile
+   are light in both. */
+.lv-bleed-ground {
+  background-image: linear-gradient(135deg, #2a2f36 0%, #0b0c0f 100%);
+}
+
+/* The admin's light/dark preview plates (AdminHomeSettings HomePhotoPairs):
+   the page grounds of each theme, FIXED, because each cell shows how a picture
+   will look on that theme whatever theme the admin panel is in. */
+.lv-preview-plate[data-plate='light'] {
+  background-color: #e3dacb;
+  border-color: #cfc5b2;
+  color: #45484e;
+}
+.lv-preview-plate[data-plate='dark'] {
+  background-color: #0b0c0f;
+  border-color: #2a2e35;
+  color: #b7bbc3;
+}
+.lv-preview-plate[data-plate='light'] .lv-preview-tag {
+  background-color: #f0eadf;
+  color: #16181b;
+}
+.lv-preview-plate[data-plate='dark'] .lv-preview-tag {
+  background-color: #20242a;
+  color: #f2f3f5;
+}
+
+/* The editorial banners carry three lines of copy and a pill over a busy
+   photograph — on a phone, most of a 16:10 banner — so their scrim reaches
+   higher and never quite lets go. */
+.lv-bleed-scrim-deep {
+  background-image:
+    linear-gradient(to top, rgb(8 9 11 / 0.9) 0%, rgb(8 9 11 / 0.72) 40%, rgb(8 9 11 / 0.4) 70%, rgb(8 9 11 / 0.18) 100%),
+    linear-gradient(to left, rgb(8 9 11 / 0) 30%, rgb(8 9 11 / 0.5) 100%);
+}
+[dir='rtl'] .lv-bleed-scrim-deep {
+  background-image:
+    linear-gradient(to top, rgb(8 9 11 / 0.9) 0%, rgb(8 9 11 / 0.72) 40%, rgb(8 9 11 / 0.4) 70%, rgb(8 9 11 / 0.18) 100%),
+    linear-gradient(to right, rgb(8 9 11 / 0) 30%, rgb(8 9 11 / 0.5) 100%);
+}
+@media (min-width: 1024px) {
+  /* Wide 12:5 banners: the copy holds the reading half, the far half is picture. */
+  .lv-bleed-scrim-deep {
+    background-image:
+      linear-gradient(to top, rgb(8 9 11 / 0.7) 0%, rgb(8 9 11 / 0) 60%),
+      linear-gradient(to left, rgb(8 9 11 / 0) 12%, rgb(8 9 11 / 0.62) 50%, rgb(8 9 11 / 0.9) 100%);
+  }
+  [dir='rtl'] .lv-bleed-scrim-deep {
+    background-image:
+      linear-gradient(to top, rgb(8 9 11 / 0.7) 0%, rgb(8 9 11 / 0) 60%),
+      linear-gradient(to right, rgb(8 9 11 / 0) 12%, rgb(8 9 11 / 0.62) 50%, rgb(8 9 11 / 0.9) 100%);
+  }
 }
 
 /* The finder band's plate texture, in ink on cream rather than olive on black. */
@@ -1652,67 +1735,26 @@ html[data-lang-swap='ltr'] main {
   mask-image: linear-gradient(to right, #000 50%, transparent 100%);
 }
 
-/* A photograph in an editorial banner (src/components/home/v2/EditorialBanners).
-   On a phone the banner is a strip and the photograph holds the far side, so
-   it fades toward the reading side; from 640 px it is tucked into the
-   bottom-end corner and fades toward the top and the reading side at once;
-   from 1024 px it holds the far side again. */
-.lv-fade-corner {
-  -webkit-mask-image: linear-gradient(to left, #000 50%, transparent 100%);
-  mask-image: linear-gradient(to left, #000 50%, transparent 100%);
-}
-[dir='rtl'] .lv-fade-corner {
-  -webkit-mask-image: linear-gradient(to right, #000 50%, transparent 100%);
-  mask-image: linear-gradient(to right, #000 50%, transparent 100%);
-}
-@media (min-width: 640px) {
-  .lv-fade-corner {
-    -webkit-mask-image: radial-gradient(130% 120% at 100% 100%, #000 55%, transparent 88%);
-    mask-image: radial-gradient(130% 120% at 100% 100%, #000 55%, transparent 88%);
-  }
-  [dir='rtl'] .lv-fade-corner {
-    -webkit-mask-image: radial-gradient(130% 120% at 0% 100%, #000 55%, transparent 88%);
-    mask-image: radial-gradient(130% 120% at 0% 100%, #000 55%, transparent 88%);
-  }
-}
-@media (min-width: 1024px) {
-  .lv-fade-corner,
-  [dir='rtl'] .lv-fade-corner {
-    -webkit-mask-image: linear-gradient(to left, #000 50%, transparent 100%);
-    mask-image: linear-gradient(to left, #000 50%, transparent 100%);
-  }
-  [dir='rtl'] .lv-fade-corner {
-    -webkit-mask-image: linear-gradient(to right, #000 50%, transparent 100%);
-    mask-image: linear-gradient(to right, #000 50%, transparent 100%);
-  }
-}
-
-/* The bento's material tile photograph (src/components/home/v2/CategoryBento):
-   the tile is wide at every width, so the photograph holds the far side and
-   fades toward the label on the reading side. */
-.lv-bento-wide-photo {
-  inset-inline-start: auto;
-  inset-inline-end: 0;
-  top: 0;
-  bottom: 0;
-  width: 58%;
-  -webkit-mask-image: linear-gradient(to left, #000 50%, transparent 100%);
-  mask-image: linear-gradient(to left, #000 50%, transparent 100%);
-}
-[dir='rtl'] .lv-bento-wide-photo {
-  -webkit-mask-image: linear-gradient(to right, #000 50%, transparent 100%);
-  mask-image: linear-gradient(to right, #000 50%, transparent 100%);
-}
-@media (min-width: 1024px) {
-  .lv-bento-wide-photo {
-    width: 55%;
-  }
-}
-
 /* The finder band's texture: an olive hairline grid at a few percent, the
    kind of thing a printed plate has — felt more than seen. */
 .lv-finder-texture {
   background-image:
     repeating-linear-gradient(0deg, rgb(59 70 41 / 0.22) 0 1px, transparent 1px 7px),
     radial-gradient(120% 140% at 100% 0%, rgb(59 70 41 / 0.35), transparent 60%);
+}
+
+/* The row banner's ground (src/components/catalog/CategoryRowBanners): the
+   photograph fills it and the words sit on a dark scrim, so it is near-black
+   in BOTH themes on purpose — never a theme role. */
+.lv-row-banner-ground {
+  background-color: #0e1013;
+}
+/* The admin banner previews (src/components/adminTaxonomy/SectionsTab): each
+   plate shows a slot on the ground of the theme it is for, whatever theme
+   the admin panel itself is in. */
+.lv-plate-dark {
+  background-color: #0e1013;
+}
+.lv-plate-light {
+  background-color: #ebe4d6;
 }

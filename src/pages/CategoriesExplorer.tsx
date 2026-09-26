@@ -7,7 +7,7 @@ import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
 import PageTopBar from '../components/catalog/PageTopBar';
 import TopBarSearch from '../components/catalog/TopBarSearch';
-import CategoryRowBanners, { CategoryRowBanner } from '../components/catalog/CategoryRowBanners';
+import CategoryRowBanners, { CategoryRowBanner, ROW_BANNER_SIZE } from '../components/catalog/CategoryRowBanners';
 import { useBannerPhotos } from '../components/catalog/useBannerPhotos';
 import DiscoveryFooterTiles from '../components/catalog/DiscoveryFooterTiles';
 import { useScrolledPast } from '../components/catalog/useScrolledPast';
@@ -193,7 +193,7 @@ function ExplorerSkeleton() {
   return (
     <SkeletonGroup className="mt-3 flex flex-col gap-2.5 lg:mt-4 lg:gap-4">
       {[0, 1, 2, 3].map((i) => (
-        <Skeleton key={i} className="aspect-[8/3] max-h-[150px] min-h-[112px] w-full rounded-2xl sm:aspect-[4/1] sm:max-h-[170px] lg:aspect-[5/1] lg:max-h-[200px] lg:rounded-[20px]" />
+        <Skeleton key={i} className={`w-full ${ROW_BANNER_SIZE}`} />
       ))}
     </SkeletonGroup>
   );

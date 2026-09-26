@@ -6,7 +6,8 @@ import Hero from '../components/home/Hero';
 import Marquee from '../components/home/Marquee';
 import CategoryBento from '../components/home/v2/CategoryBento';
 import PrinterFinder from '../components/home/v2/PrinterFinder';
-import { EDITORIAL_SLOT, latestChips, resolveBento, resolveEditorial } from '../lib/homeLayout';
+import { EDITORIAL_SLOT, latestChips, resolveBento, resolveEditorial, resolveHeroVisual } from '../lib/homeLayout';
+import { normalizeHomeSections, slideGroupVisible, type HomeSectionId } from '../lib/homeSections';
 /**
  * HOMEPAGE V2 — the owner's spec board (docs/design/home-v2-*.png), in this
  * exact order: top controls → search → hero → ticker → «تسوق حسب الفئة» →
@@ -144,16 +145,17 @@ export default function Home() {
     if (!initialLoading) markHomeCriticalReady();
   }, [initialLoading]);
 
-  // The admin's visibility switches still apply to the sections that have
-  // one; the ORDER is the owner's spec and no longer a setting.
-  const layout = settings?.homeSections ?? [];
-  const sectionVisible = (id: string) => {
-    const s = layout.find((x) => x.id === id);
-    return s ? s.isVisible : true;
-  };
-  const bannersFor = (slot: string) => (sectionVisible(slot) ? settings?.homeBanners?.[slot] ?? [] : []);
-  // The hero takes the first banner slot the owner filled, then the second.
-  const heroBanners = [...bannersFor('first_banner'), ...bannersFor('second_banner')];
+  /**
+   * «ترتيب وإظهار الأقسام» APPLIES: the admin's list is read as the sections
+   * this page draws (src/lib/homeSections.ts), for both their visibility and
+   * — below the pinned hero and ticker — their order.
+   */
+  const layout = useMemo(() => normalizeHomeSections(settings?.homeSections), [settings?.homeSections]);
+  const sectionVisible = (id: HomeSectionId) => layout.find((x) => x.id === id)?.isVisible ?? true;
+  const slides = (group: 'first_banner' | 'second_banner') =>
+    slideGroupVisible(settings?.homeSections, group) ? settings?.homeBanners?.[group] ?? [] : [];
+  // The hero takes the first slide group the owner filled, then the second.
+  const heroBanners = [...slides('first_banner'), ...slides('second_banner')];
   const homeAds = sectionVisible('ads_panel') ? settings?.homeAds ?? [] : [];
 
   /**
@@ -165,7 +167,14 @@ export default function Home() {
     () => [...newProducts, ...discountedProducts, ...openBox],
     [newProducts, discountedProducts, openBox]
   );
-  const bento = useMemo(() => resolveBento(categories, homePool, openBox), [categories, homePool, openBox]);
+  const bento = useMemo(
+    () => resolveBento(categories, homePool, openBox, siteMedia, settings?.homeBento),
+    [categories, homePool, openBox, siteMedia, settings?.homeBento]
+  );
+  const heroVisual = useMemo(
+    () => resolveHeroVisual({ siteMedia, tree: categories, pool: homePool }),
+    [siteMedia, categories, homePool]
+  );
   const chips = useMemo(() => latestChips(bento), [bento]);
   const chipPool = useMemo(
     () => [
@@ -176,7 +185,7 @@ export default function Home() {
     ],
     [homePool, shelves]
   );
-  const editorialOwner = sectionVisible(EDITORIAL_SLOT) ? settings?.homeBanners?.[EDITORIAL_SLOT] : undefined;
+  const editorialOwner = settings?.homeBanners?.[EDITORIAL_SLOT];
   const editorial = useMemo(
     () =>
       resolveEditorial({
@@ -190,7 +199,30 @@ export default function Home() {
       }),
     [editorialOwner, lang, siteMedia, categories, homePool, bento]
   );
-  const showEditorial = sectionVisible(EDITORIAL_SLOT);
+
+  /** The movable sections, by id — drawn in the order `layout` gives. */
+  const renderSection: Partial<Record<HomeSectionId, () => React.ReactNode>> = {
+    categories: () => (!initialLoading ? <CategoryBento tiles={bento} /> : null),
+    printer_finder: () => (!initialLoading && loadError == null ? <PrinterFinder /> : null),
+    latest_products: () =>
+      newProducts.length > 0 ? (
+        <Suspense fallback={<div aria-hidden="true" className="h-[330px]" />}>
+          <LatestProducts latest={newProducts} pool={chipPool} chips={chips} />
+        </Suspense>
+      ) : null,
+    editorial_banners: () =>
+      editorial.length > 0 ? (
+        <Suspense fallback={<div aria-hidden="true" className="aspect-[7/6] sm:aspect-[32/9] lg:aspect-[24/5]" />}>
+          <EditorialBanners cards={editorial} />
+        </Suspense>
+      ) : null,
+    services: () =>
+      !initialLoading ? (
+        <Suspense fallback={null}>
+          <ServicesGrid />
+        </Suspense>
+      ) : null,
+  };
 
   const catalogueEmpty =
     !initialLoading && loadError == null && newProducts.length === 0 && discountedProducts.length === 0;
@@ -204,7 +236,12 @@ export default function Home() {
      * (scripts/e2e-home-v2-shots.mjs).
      */
     <div data-home-v2 className="w-full overflow-x-clip bg-black text-zinc-300">
-      <Hero banners={heroBanners} loading={initialLoading} />
+      {/* A hidden hero still leaves the fixed header its clearance. */}
+      {sectionVisible('hero') ? (
+        <Hero banners={heroBanners} visual={heroVisual} loading={initialLoading} />
+      ) : (
+        <div aria-hidden="true" className="h-[132px] sm:h-[150px]" />
+      )}
 
       {/* The black cap over the hero: the ticker, flush with its top edge and
           running the whole width of the screen — unchanged. */}
@@ -261,27 +298,11 @@ export default function Home() {
               </div>
             ) : null}
 
-            {!initialLoading && sectionVisible('categories') ? <CategoryBento tiles={bento} /> : null}
-
-            {!initialLoading && loadError == null ? <PrinterFinder /> : null}
-
-            {newProducts.length > 0 ? (
-              <Suspense fallback={<div aria-hidden="true" className="h-[330px]" />}>
-                <LatestProducts latest={newProducts} pool={chipPool} chips={chips} />
-              </Suspense>
-            ) : null}
-
-            {showEditorial && editorial.length > 0 ? (
-              <Suspense fallback={<div aria-hidden="true" className="aspect-[7/6] sm:aspect-[32/9] lg:aspect-[24/5]" />}>
-                <EditorialBanners cards={editorial} />
-              </Suspense>
-            ) : null}
-
-            {!initialLoading ? (
-              <Suspense fallback={null}>
-                <ServicesGrid />
-              </Suspense>
-            ) : null}
+            {layout.map((section) => {
+              if (!section.isVisible) return null;
+              const body = renderSection[section.id]?.();
+              return body ? <React.Fragment key={section.id}>{body}</React.Fragment> : null;
+            })}
           </div>
         </div>
       </div>

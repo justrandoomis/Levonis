@@ -6,7 +6,7 @@
  * or sub-sections still use it, and says so).
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Plus, Pencil, Trash2, Power, CornerDownRight, Printer, Image as ImageIcon, Upload, RefreshCw, Truck, GalleryHorizontal } from 'lucide-react';
+import { Plus, Pencil, Trash2, Power, CornerDownRight, Printer, Image as ImageIcon, Upload, RefreshCw, Truck, GalleryHorizontal, ArrowUp, ArrowDown } from 'lucide-react';
 import { SectionDeliveryDialog, deliveryRuleSummary } from './SectionDeliveryDialog';
 import * as T from '../adminProducts/theme';
 import { ApiError, api } from '../../lib/api';
@@ -46,8 +46,12 @@ interface Props {
 const DESCRIPTION_MAX = 280;
 const DESC_CLASS = `${T.input} w-full h-auto min-h-[64px] py-2 leading-relaxed resize-y`;
 
-/** Which of the section's two pictures a dialog edits (worker CATALOG_PICTURES). */
-type PictureKind = 'image' | 'hero-image';
+/**
+ * Which pictures a dialog edits (worker CATALOG_PICTURES): the home tile's
+ * cover, or the banner — one per theme, `hero-image` (dark, 0136) and
+ * `hero-light-image` (light, 0142) side by side.
+ */
+type PictureKind = 'image' | 'banner';
 
 interface EditState {
   node: CatalogNode | null;
@@ -99,6 +103,34 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
     }
   };
 
+  /**
+   * THE ORDER THE SHOP SHOWS (owner, 2026-09-26: «الطابعة رقم واحد ملحقات
+   * الطابعة رقم اثنين مواد الطباعه رقم ثلاثة»). Up / down move a section one
+   * place among its siblings — main sections among main sections, a
+   * sub-section under its own parent — and the whole level is saved at once
+   * (worker POST /catalogs/order). Buttons, not a drag: they work the same
+   * with a finger on the owner's iPad, a mouse and a keyboard.
+   */
+  const siblingsOf = (c: CatalogNode) => (!c.parent_id || !byId.has(c.parent_id) ? roots : childrenOf(c.parent_id));
+  const move = async (c: CatalogNode, delta: -1 | 1) => {
+    const level = siblingsOf(c).map((x) => x.id);
+    const from = level.indexOf(c.id);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= level.length) return;
+    [level[from], level[to]] = [level[to], level[from]];
+    setBusyId(c.id);
+    try {
+      await api.post('/api/admin/taxonomy/catalogs/order', { parent_id: !c.parent_id || !byId.has(c.parent_id) ? null : c.parent_id, ids: level });
+      await reload();
+      // OWNER: Sorani to be written by hand.
+      notify('ok', loc(`«${nameOf(c, lang)}» الآن رقم ${to + 1}.`, `"${nameOf(c, lang)}" is now number ${to + 1}.`));
+    } catch (e) {
+      notify('bad', errMsg(e));
+    } finally {
+      setBusyId('');
+    }
+  };
+
   const familyCell = (c: CatalogNode) => {
     if (c.template_family) return <Badge tone="accent">{isEn ? FAMILY_LABEL[c.template_family].en : FAMILY_LABEL[c.template_family].ar}</Badge>;
     if (c.effective_template_family) {
@@ -134,7 +166,10 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
                 <Printer className="inline w-3.5 h-3.5 ms-1.5 text-[var(--ap-text-3)] align-[-2px]" aria-label={loc('قسم طابعات', 'Printer section')} />
               )}
             </div>
-            <div className="text-[11.5px] text-[var(--ap-text-3)] truncate">{altNames(c, lang)}</div>
+            <div className="text-[11.5px] text-[var(--ap-text-3)] truncate">
+              <span className="tabular-nums" data-tax-position>{`#${siblingsOf(c).findIndex((x) => x.id === c.id) + 1}`}</span>
+              {altNames(c, lang) ? ` · ${altNames(c, lang)}` : ''}
+            </div>
             {deliveryRuleSummary(c.delivery_rules, loc) && (
               <div className="text-[11.5px] text-[var(--ap-accent)] truncate" data-tax-delivery-summary>
                 <Truck className="inline w-3.5 h-3.5 me-1 align-[-2px]" aria-hidden />
@@ -156,6 +191,37 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
       </td>
       <td className={cell}>
         <Actions>
+          {(() => {
+            const level = siblingsOf(c);
+            const at = level.findIndex((x) => x.id === c.id);
+            // OWNER: Sorani to be written by hand (both labels).
+            return (
+              <>
+                <button
+                  type="button"
+                  className={T.btnIcon}
+                  onClick={() => void move(c, -1)}
+                  disabled={at <= 0 || busyId === c.id}
+                  aria-label={loc(`تقديم «${nameOf(c, lang)}» مكانًا واحدًا`, `Move "${nameOf(c, lang)}" up one place`)}
+                  title={loc('تقديم (يظهر قبل)', 'Move up (shown earlier)')}
+                  data-tax-action="move-up"
+                >
+                  <ArrowUp className="w-4 h-4" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className={T.btnIcon}
+                  onClick={() => void move(c, 1)}
+                  disabled={at < 0 || at >= level.length - 1 || busyId === c.id}
+                  aria-label={loc(`تأخير «${nameOf(c, lang)}» مكانًا واحدًا`, `Move "${nameOf(c, lang)}" down one place`)}
+                  title={loc('تأخير (يظهر بعد)', 'Move down (shown later)')}
+                  data-tax-action="move-down"
+                >
+                  <ArrowDown className="w-4 h-4" aria-hidden />
+                </button>
+              </>
+            );
+          })()}
           {depth === 0 && (
             <button type="button" className={T.btnIcon} onClick={() => setEdit({ node: null, parentId: c.id })} aria-label={loc('إضافة قسم فرعي', 'Add sub-section', 'بەشی لاوەکی زیادبکە')} title={loc('إضافة قسم فرعي', 'Add sub-section', 'بەشی لاوەکی زیادبکە')} data-tax-action="add-sub">
               <Plus className="w-4 h-4" aria-hidden />
@@ -178,10 +244,10 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
           <button
             type="button"
             className={T.btnIcon}
-            onClick={() => setPicture({ node: c, kind: 'hero-image' })}
-            aria-label={loc('صورة واجهة صفحة القسم', 'Category page hero photo')}
-            title={loc('الصورة الكبيرة أعلى صفحة القسم وفي «كل الفئات»', 'The large photo at the top of the category page and in «All categories»')}
-            data-tax-action="hero-image"
+            onClick={() => setPicture({ node: c, kind: 'banner' })}
+            aria-label={loc('صور بانر القسم (فاتح وداكن)', 'Section banner pictures (light and dark)')}
+            title={loc('صورة البانر للثيم الفاتح وللثيم الداكن: شريط القسم في «كل الفئات» وأعلى صفحته', 'The banner picture for the light and the dark theme: the section’s row in «All categories» and the top of its page')}
+            data-tax-action="banner"
           >
             <GalleryHorizontal className="w-4 h-4" aria-hidden />
           </button>
@@ -226,8 +292,8 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
       </Toolbar>
       <p className="mb-3 text-[12px] text-[var(--ap-text-3)]">
         {loc(
-          'القسم الرئيسي يحدد القالب (أجهزة أو مواد)، والأقسام الفرعية ترثه. القالب يقرر حقول المواصفات في نموذج المنتج وأعمدة ملف الاستيراد.',
-          'The main section declares the template family (devices or materials) and sub-sections inherit it. The family decides the spec fields in the product form and the columns of the import file.'
+          'القسم الرئيسي يحدد القالب (أجهزة أو مواد)، والأقسام الفرعية ترثه. القالب يقرر حقول المواصفات في نموذج المنتج وأعمدة ملف الاستيراد. سهما الترتيب يقرران ترتيب الأقسام في «كل الفئات» وترتيب الأقسام الفرعية داخل صفحة قسمها.',
+          'The main section declares the template family (devices or materials) and sub-sections inherit it. The family decides the spec fields in the product form and the columns of the import file. The order arrows decide the order of the sections in «All categories» and of the sub-sections on their section’s page.'
         )}
       </p>
 
@@ -538,63 +604,23 @@ function SectionImageDialog({
   onChanged,
 }: {
   node: CatalogNode;
-  /** `image` = the home tile's cover; `hero-image` = the category page's hero (0136). */
+  /** `image` = the home tile's cover; `banner` = the banner/hero, one picture per theme (0136 + 0142). */
   kind?: PictureKind;
   onClose: () => void;
   /** `removed` distinguishes a cleared picture from a newly uploaded one. */
   onChanged: (removed: boolean) => Promise<void>;
 }) {
   const { loc, lang } = useLoc();
-  // The dialog owns what it is SHOWING. `node` is a snapshot from the table
-  // and the table only re-reads after the parent's reload resolves, so
-  // rendering `node.image_url` would leave the old picture on screen for as
-  // long as that round trip takes — directly under the words "saved".
-  const hero = kind === 'hero-image';
-  const [url, setUrl] = useState((hero ? node.hero_image_url : node.image_url) || '');
-  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const fileRef = useRef<HTMLInputElement>(null);
-  const base = `/api/admin/taxonomy/catalogs/${encodeURIComponent(node.id)}/${kind}`;
-
-  const upload = async (file: File) => {
-    setBusy(true);
-    setErr('');
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('originalName', file.name);
-      const res = await api.post<{ image_url?: string; hero_image_url?: string }>(base, form);
-      setUrl((hero ? res.hero_image_url : res.image_url) || '');
-      await onChanged(false);
-    } catch (e) {
-      setErr(e instanceof ApiError ? e.message : errMsg(e));
-    } finally {
-      setBusy(false);
-      // A failed upload must not leave the same file "already chosen": the
-      // input fires no change event for an identical selection, so retrying
-      // the very same file would do nothing at all.
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  };
-
-  const remove = async () => {
-    setBusy(true);
-    setErr('');
-    try {
-      await api.delete(base);
-      setUrl('');
-      await onChanged(true);
-    } catch (e) {
-      setErr(e instanceof ApiError ? e.message : errMsg(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const [busy, setBusy] = useState(false);
+  const banner = kind === 'banner';
+  const name = nameOf(node, lang);
 
   return (
     <Modal
-      titleAr={hero ? `صورة واجهة «${nameOf(node, lang)}»` : `صورة «${nameOf(node, lang)}»`}
-      titleEn={hero ? `Hero photo for "${nameOf(node, lang)}"` : `Picture for "${nameOf(node, lang)}"`}
+      // OWNER: Sorani to be written by hand (the banner title and copy below).
+      titleAr={banner ? `صور بانر «${name}»` : `صورة «${name}»`}
+      titleEn={banner ? `Banner pictures for "${name}"` : `Picture for "${name}"`}
       onClose={onClose}
       footer={
         <div className={`${T.AP} flex items-center justify-end gap-2`} data-tax-dialog="section-image">
@@ -609,32 +635,163 @@ function SectionImageDialog({
         </div>
       }
     >
-      <div className={`${T.AP} grid gap-3.5`} data-tax-dialog-body="section-image">
-        <div className="flex items-start gap-3">
-          {/* 4:3, the shape SubCard actually draws — a square preview would
-              promise a framing the home page does not use, and the owner
-              would only find out after uploading. */}
-          <span className={`${hero ? 'w-36 aspect-[16/9]' : 'w-28 aspect-[4/3]'} shrink-0 rounded-xl bg-black border border-[var(--ap-border)] grid place-items-center overflow-hidden`}>
-            {url ? (
-              <img src={url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <ImageIcon className="w-6 h-6 text-[var(--ap-text-3)]" aria-hidden />
-            )}
-          </span>
-          <div className="min-w-0 grid gap-2">
+      <div className={`${T.AP} grid gap-3.5`} data-tax-dialog-body={banner ? 'section-banner' : 'section-image'}>
+        {banner ? (
+          <>
             <p className="text-[12px] text-[var(--ap-text-3)] leading-relaxed">
-              {hero
-                ? // OWNER: Sorani to be written by hand.
-                  loc(
-                    'تظهر هذه الصورة كبيرة أعلى صفحة القسم وعلى بطاقته في «كل الفئات». الصيغة WebP فقط، وبحد أقصى ٢ ميغابايت. الأفضل صورة عرضية للجهاز على خلفية داكنة.',
-                    'This photo is shown large at the top of the category page and on its banner in «All categories». WebP only, 2 MB at most. A landscape shot of the machine on a dark background fits best.'
-                  )
-                : loc(
-                    'تظهر هذه الصورة على بطاقة القسم في الصفحة الرئيسية. الصيغة WebP فقط، وبحد أقصى ٢ ميغابايت. الأفضل صورة عرضية بنسبة ٤:٣.',
-                    'This picture is shown on the section’s card on the home page. WebP only, 2 MB at most. A landscape 4:3 image fits best.',
-                    'ئەم وێنەیە لە کارتی بەش لە پەڕەی سەرەکی دەردەکەوێت. تەنها WebP، زۆرترین ٢ مێگابایت. وێنەی ٤:٣ باشترینە.'
-                  )}
+              {loc(
+                'تملأ هذه الصورة شريط القسم في «كل الفئات» وفي صفحة القسم الأعلى منه، وتظهر كبيرة أعلى صفحة القسم نفسه. ارفع صورة لكل ثيم: يعرض المتجر صورة الثيم الظاهر، وإن غابت يعرض صورة الثيم الآخر، ثم صورة القسم، ثم صورة أحد منتجاته. الاسم والعدد والزر يُكتبان فوق الجهة اليمنى من الصورة على تظليل داكن، فاترك تلك الجهة هادئة. الصيغة WebP فقط، ٢ ميغابايت كحد أقصى، والأنسب صورة عريضة جدًا (نحو ٨:١، مثل ٢٤٠٠×٣٠٠).',
+                'This picture fills the section’s banner row in «All categories» and on its parent’s page, and is shown large at the top of the section’s own page. Upload one per theme: the shop shows the picture for the theme on screen, else the other theme’s, else the section’s picture, else a product photo. The name, the counts and the button are written over the reading side of the picture on a dark scrim, so keep that side calm. WebP only, 2 MB at most; a very wide picture fits best (about 8:1, e.g. 2400×300).'
+              )}
             </p>
+            <PictureSlot
+              node={node}
+              segment="hero-image"
+              field="hero_image_url"
+              initial={node.hero_image_url || ''}
+              plate="dark"
+              label={loc('للثيم الداكن', 'Dark theme')}
+              onBusy={setBusy}
+              onError={setErr}
+              onChanged={onChanged}
+            />
+            <PictureSlot
+              node={node}
+              segment="hero-light-image"
+              field="hero_light_image_url"
+              initial={node.hero_light_image_url || ''}
+              plate="light"
+              label={loc('للثيم الفاتح', 'Light theme')}
+              onBusy={setBusy}
+              onError={setErr}
+              onChanged={onChanged}
+            />
+          </>
+        ) : (
+          <PictureSlot
+            node={node}
+            segment="image"
+            field="image_url"
+            initial={node.image_url || ''}
+            plate="dark"
+            onBusy={setBusy}
+            onError={setErr}
+            onChanged={onChanged}
+            note={loc(
+              'تظهر هذه الصورة على بطاقة القسم في الصفحة الرئيسية. الصيغة WebP فقط، وبحد أقصى ٢ ميغابايت. الأفضل صورة عرضية بنسبة ٤:٣.',
+              'This picture is shown on the section’s card on the home page. WebP only, 2 MB at most. A landscape 4:3 image fits best.',
+              'ئەم وێنەیە لە کارتی بەش لە پەڕەی سەرەکی دەردەکەوێت. تەنها WebP، زۆرترین ٢ مێگابایت. وێنەی ٤:٣ باشترینە.'
+            )}
+          />
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * ONE PICTURE OF A SECTION: preview, upload/replace, remove — acting at once
+ * (see SectionImageDialog). The slot owns what it is SHOWING: `node` is a
+ * snapshot from the table and the table only re-reads after the parent's
+ * reload resolves, so rendering `node.image_url` would leave the old picture
+ * on screen for as long as that round trip takes — directly under the words
+ * "saved".
+ *
+ * `plate` is the ground the preview sits on: the dark theme's near-black, or
+ * the light theme's cream — a picture exported on the wrong matte shows up
+ * here, not on the shop.
+ */
+function PictureSlot({
+  node,
+  segment,
+  field,
+  initial,
+  plate,
+  label,
+  note,
+  onBusy,
+  onError,
+  onChanged,
+}: {
+  node: CatalogNode;
+  /** The worker's CATALOG_PICTURES segment. */
+  segment: 'image' | 'hero-image' | 'hero-light-image';
+  /** The URL field the worker answers with. */
+  field: 'image_url' | 'hero_image_url' | 'hero_light_image_url';
+  initial: string;
+  plate: 'dark' | 'light';
+  label?: string;
+  note?: string;
+  onBusy: (busy: boolean) => void;
+  onError: (message: string) => void;
+  onChanged: (removed: boolean) => Promise<void>;
+}) {
+  const { loc } = useLoc();
+  const [url, setUrl] = useState(initial);
+  const [busy, setBusyState] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const base = `/api/admin/taxonomy/catalogs/${encodeURIComponent(node.id)}/${segment}`;
+  const wide = segment !== 'image';
+  const setBusy = (b: boolean) => {
+    setBusyState(b);
+    onBusy(b);
+  };
+
+  const upload = async (file: File) => {
+    setBusy(true);
+    onError('');
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('originalName', file.name);
+      const res = await api.post<Partial<Record<typeof field, string>>>(base, form);
+      setUrl(res[field] || '');
+      await onChanged(false);
+    } catch (e) {
+      onError(e instanceof ApiError ? e.message : errMsg(e));
+    } finally {
+      setBusy(false);
+      // A failed upload must not leave the same file "already chosen": the
+      // input fires no change event for an identical selection, so retrying
+      // the very same file would do nothing at all.
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    onError('');
+    try {
+      await api.delete(base);
+      setUrl('');
+      await onChanged(true);
+    } catch (e) {
+      onError(e instanceof ApiError ? e.message : errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={`grid gap-2 ${wide ? 'rounded-xl border border-[var(--ap-border)] p-3' : ''}`} data-tax-picture={segment}>
+      {label ? <div className="text-[13px] font-semibold text-[var(--ap-text-1)]">{label}</div> : null}
+      <div className={wide ? 'grid gap-2' : 'flex items-start gap-3'}>
+        {/* The shape the storefront draws: 4:3 for the home tile (SubCard), a
+            thin strip for the banner (CategoryRowBanners, 8:1 on a desktop). */}
+        <span
+          className={`${wide ? 'w-full aspect-[8/1] min-h-[56px]' : 'w-28 aspect-[4/3]'} shrink-0 rounded-xl border border-[var(--ap-border)] grid place-items-center overflow-hidden ${
+            plate === 'dark' ? 'lv-plate-dark' : 'lv-plate-light'
+          }`}
+        >
+          {url ? (
+            <img src={url} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <ImageIcon className="w-6 h-6 text-[var(--ap-text-3)]" aria-hidden />
+          )}
+        </span>
+        <div className="min-w-0 grid gap-2">
+          {note ? <p className="text-[12px] text-[var(--ap-text-3)] leading-relaxed">{note}</p> : null}
+          {!wide ? (
             <p className="text-[12px] text-[var(--ap-text-3)] leading-relaxed">
               {url
                 ? loc(
@@ -648,37 +805,37 @@ function SectionImageDialog({
                     'هێشتا وێنە نییە — ئێستا وێنەی یەکێک لە بەرهەمەکانی دەبات.'
                   )}
             </p>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* `sr-only`, NOT `hidden`. `display: none` takes a file input out of
+                the focus order, and a <label> is not focusable either, so the
+                whole control would be unreachable by keyboard. */}
+            <label className={`${T.btnPrimary} cursor-pointer`}>
+              {busy ? <RefreshCw className="w-4 h-4 animate-spin" aria-hidden /> : <Upload className="w-4 h-4" aria-hidden />}
+              {url ? loc('استبدال الصورة', 'Replace image', 'وێنە بگۆڕە') : loc('رفع صورة WebP', 'Upload a WebP', 'وێنەی WebP باربکە')}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/webp"
+                className="sr-only"
+                disabled={busy}
+                aria-label={label}
+                data-tax-image-input={`${node.id}:${segment}`}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void upload(file);
+                }}
+              />
+            </label>
+            {url && (
+              <button type="button" className={T.btnDanger} onClick={() => void remove()} disabled={busy} data-tax-image-remove={`${node.id}:${segment}`}>
+                <Trash2 className="w-4 h-4" aria-hidden />
+                {loc('إزالة الصورة', 'Remove image', 'وێنە لاببە')}
+              </button>
+            )}
           </div>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {/* `sr-only`, NOT `hidden`. `display: none` takes a file input out of
-              the focus order, and a <label> is not focusable either, so the
-              whole control would be unreachable by keyboard. */}
-          <label className={`${T.btnPrimary} cursor-pointer`}>
-            {busy ? <RefreshCw className="w-4 h-4 animate-spin" aria-hidden /> : <Upload className="w-4 h-4" aria-hidden />}
-            {url ? loc('استبدال الصورة', 'Replace image', 'وێنە بگۆڕە') : loc('رفع صورة WebP', 'Upload a WebP', 'وێنەی WebP باربکە')}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/webp"
-              className="sr-only"
-              disabled={busy}
-              data-tax-image-input={node.id}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void upload(file);
-              }}
-            />
-          </label>
-          {url && (
-            <button type="button" className={T.btnDanger} onClick={() => void remove()} disabled={busy} data-tax-image-remove={node.id}>
-              <Trash2 className="w-4 h-4" aria-hidden />
-              {loc('إزالة الصورة', 'Remove image', 'وێنە لاببە')}
-            </button>
-          )}
-        </div>
       </div>
-    </Modal>
+    </div>
   );
 }
