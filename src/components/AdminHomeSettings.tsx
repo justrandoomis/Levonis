@@ -444,9 +444,8 @@ export default function AdminHomeSettings() {
           <div className="space-y-6">
             <InfoPanel
               dir={dir}
-              ar="بدون شرائح، تظهر الواجهة الرئيسية بعنوان المتجر وزرّين وصورة على الجانب الآخر: الصورة التي ترفعها (للثيم الفاتح والداكن) من تبويب الصور، وإلا صورة طابعة من المتجر. أضف شرائح هنا لتظهر بدلها كعرض متحرك."
-              en="With no slides, the hero shows the shop's headline, two buttons and a picture on the other side: the one you upload (light and dark) in the images tab, else a printer from the shop. Add slides here to show a carousel instead."
-              action={{ ar: 'صورة الواجهة الرئيسية', en: 'Hero picture', onClick: () => setActiveTab('site-media') }}
+              ar="بدون شرائح، تظهر الواجهة الرئيسية بعنوان المتجر وزرّين. أضف شرائح هنا لتظهر بدلها كعرض متحرك."
+              en="With no slides, the hero shows the shop's headline and two buttons. Add slides here to show a carousel instead."
             />
             {HERO_SLIDE_GROUPS.map((group, i) => (
               <div key={group} className="space-y-3">
@@ -786,7 +785,7 @@ const HOME_PHOTO_EDGE = 2_400;
  * THE HOME PAGE'S PICTURES, ONE PAIR PER PICTURE (owner, 2026-09-26: «يضع
  * صورتين تناسب الثيم الفاتح والثيم الداكن»).
  *
- * One row per picture the page draws full-bleed — the hero, the six squares
+ * One row per picture the page draws full-bleed — the six squares
  * of «تسوق حسب الفئة» and the two editorial banners — each with a light-theme
  * and a dark-theme cell: a live preview, an upload and a clear. The slots are
  * the server's allow-list (worker/lib/siteMedia.ts HOME_PHOTO_SLOTS), so this

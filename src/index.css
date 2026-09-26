@@ -1550,35 +1550,23 @@ html[data-lang-swap='ltr'] main {
   border-color: var(--color-zinc-700);
 }
 
-/* THE HOME HERO'S PANEL (src/components/home/Hero.tsx DefaultHero). The owner:
-   «الهيرو بانر أبيض لا يمكن فرزه بالعين عن القسم» — on the cream theme the
-   hero was the page's own cream and read as more page. It is now a rounded
-   panel with its own ground, a hairline and a soft lift, in both themes:
-   dark, an olive-to-charcoal plate; light, a warm sand a clear step deeper
-   than the page (#e3dacb) with a gold bloom — ink reads at 10:1 or better on
-   every stop of it (tests/lightThemeFeatureSurfaces.test.ts). The page tokens
-   are untouched. The layer lines are ink rather than white on the light one. */
+/* THE HOME HERO'S GROUND (src/components/home/Hero.tsx DefaultHero). Dark:
+   the olive plate the utilities draw. Light: warm cream with a faint gold
+   bloom, and the layer lines in ink rather than white. */
 .lv-hero-lines {
   background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.6) 0px, rgba(255, 255, 255, 0.6) 1px, transparent 1px, transparent 14px);
 }
 [data-theme='light'] .lv-hero-lines {
   background-image: repeating-linear-gradient(0deg, rgb(22 24 27 / 0.2) 0px, rgb(22 24 27 / 0.2) 1px, transparent 1px, transparent 14px);
 }
-.lv-hero-panel {
+[data-theme='light'] .lv-hero-ground {
   background-image:
-    radial-gradient(70% 90% at 100% 0%, rgb(188 163 107 / 0.16), transparent 62%),
-    linear-gradient(150deg, #262e1b 0%, #161a12 55%, #0e1013 100%);
-  border: 1px solid rgb(255 255 255 / 0.08);
-  box-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.9);
+    radial-gradient(70% 90% at 88% 8%, rgb(188 163 107 / 0.2), transparent 62%),
+    radial-gradient(60% 80% at 8% 100%, rgb(112 130 56 / 0.1), transparent 60%),
+    linear-gradient(to bottom, #f3eee4, var(--color-canvas));
 }
-[data-theme='light'] .lv-hero-panel {
-  background-image:
-    radial-gradient(70% 90% at 100% 0%, rgb(255 248 230 / 0.55), transparent 60%),
-    linear-gradient(150deg, #ecdfc4 0%, #dfcca7 58%, #d5bf96 100%);
-  border-color: rgb(58 46 28 / 0.16);
-  box-shadow:
-    0 1px 2px rgb(58 46 28 / 0.08),
-    0 28px 60px -30px rgb(58 46 28 / 0.42);
+[data-theme='light'] .lv-hero-veil {
+  background-image: none;
 }
 
 /* THE SCRIM UNDER WORDS ON A FULL-BLEED PHOTOGRAPH (the bento tiles and the

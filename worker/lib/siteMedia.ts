@@ -213,7 +213,6 @@ export const BANNER_SLOTS: readonly SiteMediaSlot[] = [
  * WebP rule still holds for what is STORED.
  */
 export const HOME_PHOTO_TARGETS = [
-  { target: 'hero', label: 'الواجهة الرئيسية (الهيرو)' },
   // The bento's six squares by POSITION, not by section — the owner decides
   // which section each one opens (worker/lib/homeBento.ts), and the picture
   // belongs to the square.

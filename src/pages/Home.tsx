@@ -6,7 +6,7 @@ import Hero from '../components/home/Hero';
 import Marquee from '../components/home/Marquee';
 import CategoryBento from '../components/home/v2/CategoryBento';
 import PrinterFinder from '../components/home/v2/PrinterFinder';
-import { EDITORIAL_SLOT, latestChips, resolveBento, resolveEditorial, resolveHeroVisual } from '../lib/homeLayout';
+import { EDITORIAL_SLOT, latestChips, resolveBento, resolveEditorial } from '../lib/homeLayout';
 import { normalizeHomeSections, slideGroupVisible, type HomeSectionId } from '../lib/homeSections';
 /**
  * HOMEPAGE V2 — the owner's spec board (docs/design/home-v2-*.png), in this
@@ -171,10 +171,6 @@ export default function Home() {
     () => resolveBento(categories, homePool, openBox, siteMedia, settings?.homeBento),
     [categories, homePool, openBox, siteMedia, settings?.homeBento]
   );
-  const heroVisual = useMemo(
-    () => resolveHeroVisual({ siteMedia, tree: categories, pool: homePool }),
-    [siteMedia, categories, homePool]
-  );
   const chips = useMemo(() => latestChips(bento), [bento]);
   const chipPool = useMemo(
     () => [
@@ -238,7 +234,7 @@ export default function Home() {
     <div data-home-v2 className="w-full overflow-x-clip bg-black text-zinc-300">
       {/* A hidden hero still leaves the fixed header its clearance. */}
       {sectionVisible('hero') ? (
-        <Hero banners={heroBanners} visual={heroVisual} loading={initialLoading} />
+        <Hero banners={heroBanners} loading={initialLoading} />
       ) : (
         <div aria-hidden="true" className="h-[132px] sm:h-[150px]" />
       )}

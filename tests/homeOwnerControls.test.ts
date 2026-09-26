@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { ApiProduct, HomeTaxon, SiteMediaEntry } from '../src/lib/api';
-import { ownerPhoto, resolveBento, resolveEditorial, resolveHeroVisual } from '../src/lib/homeLayout';
+import { ownerPhoto, resolveBento, resolveEditorial } from '../src/lib/homeLayout';
 import { HOME_SECTIONS, normalizeHomeSections, serializeHomeSections, slideGroupVisible } from '../src/lib/homeSections';
 import {
   HOME_PHOTO_SLOTS,
@@ -72,7 +72,6 @@ const media = (uploads: Record<string, string>): SiteMediaEntry[] =>
 
 test('every home picture has exactly a light and a dark slot, and nothing else is a home slot', () => {
   const targets = [
-    'hero',
     'bento-large', 'bento-top-1', 'bento-top-2', 'bento-bottom-1', 'bento-bottom-2', 'bento-bottom-3',
     'editorial-multicolor', 'editorial-materials',
   ];
@@ -88,19 +87,19 @@ test('every home picture has exactly a light and a dark slot, and nothing else i
 });
 
 test('a slot name that is not on the list is refused, whatever it looks like', () => {
-  for (const bad of ['home-evil-light', 'home-hero', 'home-hero-light ', '../home-hero-light', 'HOME-HERO-LIGHT', '', null, 42, {}]) {
+  for (const bad of ['home-evil-light', 'home-editorial-multicolor', 'home-editorial-multicolor-light ', '../home-editorial-multicolor-light', 'HOME-EDITORIAL-MULTICOLOR-LIGHT', '', null, 42, {}]) {
     assert.equal(findSiteMediaSlot(bad), null, String(bad));
   }
   // A stored map is re-checked on the way out: unknown slots and anything that
   // is not a bare .webp name are dropped, so no URL or path can be injected.
   assert.deepEqual(
     normalizeSiteMedia({
-      'home-hero-light': 'home-hero-light-abc.webp',
-      'home-hero-dark': 'https://evil.example/x.webp',
+      'home-editorial-multicolor-light': 'home-editorial-multicolor-light-abc.webp',
+      'home-editorial-multicolor-dark': 'https://evil.example/x.webp',
       'home-nope-light': 'a.webp',
       'home-bento-large-dark': '../../secret.webp',
     }),
-    { 'home-hero-light': 'home-hero-light-abc.webp' }
+    { 'home-editorial-multicolor-light': 'home-editorial-multicolor-light-abc.webp' }
   );
   assert.ok(isSiteMediaObject(mintSiteMediaObject('home-editorial-materials-dark', 'Tok_123')));
 });
@@ -118,20 +117,20 @@ test('the upload route converts a home photograph, keeps WebP-only for logos, an
 // --------------------------------------------------- light / dark resolution
 
 test('the current theme’s picture; one picture for both themes; none → the automatic photograph', () => {
-  const both = media({ 'home-hero-light': 'home-hero-light-a.webp', 'home-hero-dark': 'home-hero-dark-b.webp' });
-  assert.deepEqual(ownerPhoto(both, 'hero'), {
-    image: '/files/UiUx/MainPage/home-hero-dark-b.webp',
-    lightImage: '/files/UiUx/MainPage/home-hero-light-a.webp',
+  const both = media({ 'home-editorial-multicolor-light': 'home-editorial-multicolor-light-a.webp', 'home-editorial-multicolor-dark': 'home-editorial-multicolor-dark-b.webp' });
+  assert.deepEqual(ownerPhoto(both, 'editorial-multicolor'), {
+    image: '/files/UiUx/MainPage/home-editorial-multicolor-dark-b.webp',
+    lightImage: '/files/UiUx/MainPage/home-editorial-multicolor-light-a.webp',
   });
-  const onlyLight = media({ 'home-hero-light': 'home-hero-light-a.webp' });
-  assert.deepEqual(ownerPhoto(onlyLight, 'hero'), {
-    image: '/files/UiUx/MainPage/home-hero-light-a.webp',
-    lightImage: '/files/UiUx/MainPage/home-hero-light-a.webp',
+  const onlyLight = media({ 'home-editorial-multicolor-light': 'home-editorial-multicolor-light-a.webp' });
+  assert.deepEqual(ownerPhoto(onlyLight, 'editorial-multicolor'), {
+    image: '/files/UiUx/MainPage/home-editorial-multicolor-light-a.webp',
+    lightImage: '/files/UiUx/MainPage/home-editorial-multicolor-light-a.webp',
   }, 'the light one serves the dark theme too');
-  const onlyDark = media({ 'home-hero-dark': 'home-hero-dark-b.webp' });
-  assert.deepEqual(ownerPhoto(onlyDark, 'hero'), { image: '/files/UiUx/MainPage/home-hero-dark-b.webp', lightImage: '' },
+  const onlyDark = media({ 'home-editorial-multicolor-dark': 'home-editorial-multicolor-dark-b.webp' });
+  assert.deepEqual(ownerPhoto(onlyDark, 'editorial-multicolor'), { image: '/files/UiUx/MainPage/home-editorial-multicolor-dark-b.webp', lightImage: '' },
     'lightImage empty → themedImage shows the dark one on the light theme');
-  assert.equal(ownerPhoto(media({}), 'hero'), null);
+  assert.equal(ownerPhoto(media({}), 'editorial-multicolor'), null);
 });
 
 test('a square’s pair outranks the section cover and the borrowed product photograph', () => {
@@ -154,20 +153,6 @@ test('an editorial pair outranks the old single banner image, which still outran
   const [card] = resolveEditorial({ ...common, siteMedia: pair });
   assert.equal(card.image, '/files/UiUx/MainPage/home-editorial-multicolor-dark-n.webp');
   assert.equal(card.productPhoto, false);
-});
-
-test('the hero’s picture: the owner’s pair, else a featured printer, else none', () => {
-  const pool = [
-    product({ id: 'p1', category_id: 'cat_printers', direct_stock_available: 3 }),
-    product({ id: 'p2', slug: 'bambu-h2s', category_id: 'cat_printers', direct_stock_available: 1, is_featured: true }),
-    product({ id: 'pla', category_id: 'cat_materials' }),
-  ];
-  const auto = resolveHeroVisual({ siteMedia: media({}), tree: TREE, pool });
-  assert.equal(auto?.productPhoto, true);
-  assert.equal(auto?.to, '/product/bambu-h2s', 'the featured printer, linked to its page');
-  const own = resolveHeroVisual({ siteMedia: media({ 'home-hero-dark': 'home-hero-dark-z.webp' }), tree: TREE, pool });
-  assert.deepEqual([own?.image, own?.productPhoto, own?.to], ['/files/UiUx/MainPage/home-hero-dark-z.webp', false, '']);
-  assert.equal(resolveHeroVisual({ siteMedia: [], tree: TREE, pool: [] }), null);
 });
 
 // ------------------------------------------------------- the bento squares
@@ -335,14 +320,3 @@ test('the bento tiles and the banners are full-bleed: picture everywhere, light 
   assert.doesNotMatch(css, /\.lv-bento-wide-photo|\.lv-fade-corner/, 'the old label-beside-photo zones are gone');
 });
 
-test('the hero: roomy Arabic leading, a picture on the far side, its own panel in both themes', () => {
-  const hero = read('src/components/home/Hero.tsx');
-  const title = hero.match(/data-hero-title\s+className="([^"]+)"/g)?.pop() ?? '';
-  assert.match(title, /leading-\[1\.4\]/, 'at 1.1 the two Arabic lines touched');
-  assert.doesNotMatch(title, /leading-\[1\.1\]|leading-tight/);
-  assert.match(hero, /md:grid-cols-\[minmax\(0,1\.08fr\)_minmax\(0,1fr\)\]/, 'text on the reading side, picture on the other');
-  assert.match(hero, /\{visual \? <HeroPicture visual=\{visual\} \/> : null\}/);
-  const css = read('src/index.css');
-  assert.match(css, /\[data-theme='light'\] \.lv-hero-panel \{[^}]*border-color: rgb\(58 46 28/, 'a hairline on the cream theme');
-  assert.match(css, /\[data-theme='light'\] \.lv-hero-panel \{[^}]*box-shadow/, 'and a soft lift');
-});
