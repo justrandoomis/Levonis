@@ -30,6 +30,16 @@ import { freshDb, asD1, stubApp, post, get, json, row, all, count, type StubUser
 
 const OWNER: StubUser = { id: 'boss', role: 'admin', email: 'boss@x.co', admin_scope: null };
 
+/**
+ * FIFO orders lots by `received_at, id` (worker/lib/inventoryLots.ts). Two
+ * receipts posted back to back can land in the same millisecond on a fast CI
+ * runner, and then the random lot id decides — so each scenario pins the
+ * arrival order it describes: lots in the order they were received.
+ */
+function pinArrivalOrder(raw: DatabaseSync) {
+  raw.exec(`UPDATE inventory_lots SET received_at = printf('2026-01-01T00:00:%02d.000Z', rowid % 60)`);
+}
+
 function seed(raw: DatabaseSync) {
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role) VALUES
@@ -94,6 +104,7 @@ test('A — two purchases, one sale of twelve: the shelf, the layers and the COG
   purchase(raw, 'incB', 10, 500_000, 500_000, 100_000);
   await post(a, '/api/admin/inventory/incoming/incA/receive', { receipt_id: 'rA', qty: 10 });
   await post(a, '/api/admin/inventory/incoming/incB/receive', { receipt_id: 'rB', qty: 10 });
+  pinArrivalOrder(raw);
 
   assert.equal(shelf(raw), 20);
   assert.deepEqual(lots(raw), [
@@ -133,6 +144,7 @@ test('B — a return credits the layers it took from, not the newest one', async
   purchase(raw, 'incB', 10, 560_000, 0, 0);
   await post(a, '/api/admin/inventory/incoming/incA/receive', { receipt_id: 'rA', qty: 2 });
   await post(a, '/api/admin/inventory/incoming/incB/receive', { receipt_id: 'rB', qty: 10 });
+  pinArrivalOrder(raw);
 
   const oid = order(raw, 'o1', [{ item: 'i1', qty: 3 }]);
   await asD1(raw).batch((await planLotConsumption(asD1(raw), oid, [move('i1', 3)])).statements);
@@ -164,6 +176,7 @@ test('C — a write-off eats the oldest layer, and the next sale is costed from 
   purchase(raw, 'incB', 5, 600_000, 0, 0);
   await post(a, '/api/admin/inventory/incoming/incA/receive', { receipt_id: 'rA', qty: 5 });
   await post(a, '/api/admin/inventory/incoming/incB/receive', { receipt_id: 'rB', qty: 5 });
+  pinArrivalOrder(raw);
 
   // Three boxes crushed in transit.
   const adj = await post(a, '/api/admin/inventory/adjustments', {
@@ -214,6 +227,7 @@ test('D — buy, receive, sell, return, count, sell: the counter and the layers 
   purchase(raw, 'incB', 10, 560_000, 0, 0);
   await post(a, '/api/admin/inventory/incoming/incA/receive', { receipt_id: 'rA', qty: 10 });
   await post(a, '/api/admin/inventory/incoming/incB/receive', { receipt_id: 'rB', qty: 10 });
+  pinArrivalOrder(raw);
   assert.equal(shelf(raw), 20);
   agree('receiving');
 
@@ -294,6 +308,7 @@ test('E — each stock identity has its own FIFO queue', async () => {
   ).run();
   await post(a, '/api/admin/inventory/incoming/incA/receive', { receipt_id: 'rA', qty: 5 });
   await post(a, '/api/admin/inventory/incoming/incC/receive', { receipt_id: 'rC', qty: 5 });
+  pinArrivalOrder(raw);
 
   assert.equal(shelf(raw), 5);
   assert.equal(row<{ stock: number }>(raw, `SELECT stock FROM products WHERE id='p2'`)!.stock, 5);
