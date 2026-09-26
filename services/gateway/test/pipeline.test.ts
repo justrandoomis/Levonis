@@ -197,7 +197,11 @@ test('a same-origin mutation from a merchant storefront still works — that is 
   assert.equal(core.calls[0].headers['x-levonis-host'], 'merchant;ali3d');
 });
 
-test('the rate limiter refuses with the core\'s own 429 body, and refuses to run at all without a counter', async () => {
+test('the rate limiter refuses with the core\'s own 429 body, and refuses to run at all without a counter', async (t) => {
+  // The counter's windows are aligned to the clock (60 s). 602 calls on a slow
+  // runner could straddle a minute boundary and start a fresh window, so the
+  // clock is held a second into one.
+  t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 0, 1, 0, 0, 1) });
   const { call } = appWith({ RATE_LIMIT_MODE: 'memory', RATE_LIMIT_ENFORCE: 'public-read' });
   let last = new Response();
   for (let i = 0; i < 602; i++) last = await call(req(`${APEX}/api/products`, { headers: { 'CF-Connecting-IP': '5.5.5.5' } }));
