@@ -98,6 +98,7 @@ import { DimensionsSection } from './form/DimensionsSection';
 import { InventorySummary } from './form/InventorySummary';
 import PricePreview from './PricePreview';
 import MembershipDiscountSection from './form/MembershipDiscountSection';
+import { SpecMultiPick } from './form/SpecMultiPick';
 import { ImagesSection } from './form/ImagesSection';
 import { QuickAddDialog, type QuickAddKind, type QuickAddResult } from './form/QuickAdd';
 
@@ -108,6 +109,8 @@ interface TemplateField {
   type: 'text' | 'number' | 'select' | 'multiline' | 'hex';
   unit?: string;
   options?: string[];
+  /** A list drawn from `options` (templateFamilies `multiple`) — rendered as toggles. */
+  multiple?: boolean;
   hint_ar?: string;
 }
 interface TemplateGroup {
@@ -1563,7 +1566,17 @@ export default function ProductForm({
                       hint={f.hint_ar}
                       span={f.type === 'multiline'}
                     >
-                      {f.type === 'select' ? (
+                      {f.multiple && f.options?.length ? (
+                        <SpecMultiPick
+                          id={f.id}
+                          label={f.label_ar}
+                          options={f.options}
+                          value={doc.spec_fields?.[f.id] ?? ''}
+                          onChange={(next) =>
+                            setDoc((d) => ({ ...d, spec_fields: { ...d.spec_fields, [f.id]: next } }))
+                          }
+                        />
+                      ) : f.type === 'select' ? (
                         <Select
                           value={doc.spec_fields?.[f.id] ?? ''}
                           onChange={(e) =>

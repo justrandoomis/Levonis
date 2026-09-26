@@ -219,10 +219,17 @@ test('the direct-stock card edge overlays every product-card surface without cha
   assert.match(edge, /data-direct-stock-edge/);
   assert.doesNotMatch(edge, /rounded-/);
 
-  for (const path of [HOME_CARD, PRODUCTS, PROFILE]) {
+  // The regular card and the profile's cards keep the edge. The COMPACT card
+  // (docs/ux/CATALOG_DISCOVERY.md §4.1) replaces it with a legible
+  // availability line — «an 8 px strip that nobody can read on a phone» —
+  // and the /products grid now renders that compact card instead of its own
+  // copy, so the direct-stock fact reaches both surfaces in words.
+  for (const path of [HOME_CARD, PROFILE]) {
     const card = read(path);
     assert.match(card, /DirectStockEdge/);
     assert.match(card, /\brelative\b/);
     assert.match(card, /overflow-hidden/);
   }
+  assert.match(read(HOME_CARD), /<AvailabilityLine product=\{p\}/);
+  assert.match(read(PRODUCTS), /<ProductCard p=\{p\} density="compact"/);
 });

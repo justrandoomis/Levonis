@@ -48,10 +48,45 @@ export function SkeletonGroup({
 }
 
 /**
- * Mirrors the storefront product card (Products.tsx / Home.tsx renderProductCard):
- * square image, two title lines, one price line.
+ * Mirrors the storefront product card (src/components/home/ProductCard.tsx).
+ * `regular`: square image, two title lines, one price line. `compact`: the
+ * compact card's exact geometry — 6:5 photo, 34 px name box, the price row,
+ * the member row and the availability row — so the real card replaces it
+ * without a single pixel of shift (262 px tall at 174 px wide).
  */
-export function ProductCardSkeleton({ className = '' }: { className?: string }) {
+export function ProductCardSkeleton({
+  className = '',
+  density = 'regular',
+}: {
+  className?: string;
+  density?: 'regular' | 'compact';
+}) {
+  if (density === 'compact') {
+    return (
+      <div
+        aria-hidden="true"
+        data-product-card-skeleton="compact"
+        className={`flex flex-col overflow-hidden rounded-[14px] border border-border-subtle bg-surface ${className}`}
+      >
+        <div className="aspect-[6/5] bg-zinc-800/60 animate-pulse motion-reduce:animate-none" />
+        <div className="flex flex-1 flex-col px-2.5 pb-2.5 pt-[9px]">
+          <div className="flex h-[34px] flex-col justify-center gap-1.5">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+          <div className="mt-1.5 flex h-5 items-center">
+            <Skeleton className="h-3.5 w-24" />
+          </div>
+          <div className="mt-px flex h-[15px] items-center">
+            <Skeleton className="h-2.5 w-20" />
+          </div>
+          <div className="mt-auto flex h-[22px] items-end">
+            <Skeleton className="h-3 w-16" />
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       aria-hidden="true"
@@ -73,14 +108,16 @@ export function ProductCardSkeleton({ className = '' }: { className?: string }) 
 export function ProductGridSkeleton({
   count = 8,
   className = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4',
+  density = 'regular',
 }: {
   count?: number;
   className?: string;
+  density?: 'regular' | 'compact';
 }) {
   return (
     <SkeletonGroup className={className}>
       {Array.from({ length: count }, (_, i) => (
-        <ProductCardSkeleton key={i} />
+        <ProductCardSkeleton key={i} density={density} />
       ))}
     </SkeletonGroup>
   );

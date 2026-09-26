@@ -28,6 +28,9 @@ import { normalizeText } from '../lib/search/normalize';
 import { backfillSearchIndex, planSearchRestamp, searchIndexInstalled } from '../lib/search/store';
 import { degradeIfSchemaMissing } from '../lib/membershipBenefits';
 import { allCategoryDeliveryRules, parseCategoryRuleInput } from '../lib/categoryDelivery';
+import { forgetCatalogIndex } from '../lib/catalogPresentation';
+import { isSchemaMissing } from '../lib/membershipBenefits';
+import { purgeCatalogTreeCache } from './catalog';
 
 /**
  * Database-managed category tree, facets and brands — mandate §4 and §9:
@@ -71,6 +74,31 @@ export interface CatalogRow {
    * rather than the bare object name the brand and service slots store.
    */
   image_key: string;
+  /** Migration 0136 (catalog discovery): the page's description and hero photo. */
+  description_ar?: string;
+  description_en?: string;
+  description_ckb?: string;
+  hero_image_key?: string;
+}
+
+/**
+ * THE SLUG THE LISTING RESERVES. `/categories/<root>/all` is «كل منتجات القسم»
+ * (docs/ux/CATALOG_DISCOVERY.md §2); a section called `all` would make that URL
+ * mean two things, and whichever the router picked, the other link would break.
+ */
+export const RESERVED_CATALOG_SLUGS = ['all'] as const;
+
+/** A description is one or two lines on a banner; longer is an article. */
+export const CATALOG_DESCRIPTION_MAX = 280;
+
+/**
+ * After ANY taxonomy write: the storefront's cached tree and this isolate's
+ * taxonomy index must not keep describing the old tree. Best-effort by design
+ * (the cache expires in 300 s either way) — a purge failure never fails a save.
+ */
+async function afterTaxonomyWrite(c: { env: { DB: D1Database }; req: { url: string } }): Promise<void> {
+  forgetCatalogIndex(c.env.DB);
+  await purgeCatalogTreeCache(c.req.url);
 }
 
 /** URL-safe slug from an English name; Arabic/Kurdish names fall back to the
@@ -263,6 +291,7 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
         // storefront does: one place turns a stored key into something that
         // can be put in an `src`, and it re-validates while it is there.
         image_url: catalogImageUrl(r.image_key),
+        hero_image_url: catalogImageUrl(r.hero_image_key ?? ''),
         effective_template_family: family,
         product_type: type,
         product_count: countById.get(r.id) ?? 0,
@@ -388,7 +417,29 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
       : existing
         ? existing.slug
         : slugify(nameEn || nameAr, id);
+  if ((RESERVED_CATALOG_SLUGS as readonly string[]).includes(wantedSlug)) {
+    throw badRequest(
+      'الرابط «all» محجوز لصفحة «كل المنتجات» داخل القسم. / The slug "all" is reserved for a section\'s "all products" page.',
+      'CATALOG_SLUG_RESERVED'
+    );
+  }
   const slug = await uniqueSlug(c.env.DB, 'catalogs', wantedSlug, existing ? id : null);
+
+  /**
+   * THE DESCRIPTION (0136). ABSENT keeps what is stored — a partial update (an
+   * active toggle) sends none — and an EMPTY string clears it, which is how the
+   * page is told "no description" (it then omits the line, never invents one).
+   * Only the fields the request carries are written, so a save that does not
+   * touch them works on a database 0136 has not reached yet.
+   */
+  const descriptions: Array<[string, string]> = [];
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const key = `description_${lang}`;
+    if (body[key] === undefined) continue;
+    descriptions.push([key, str(body[key], key, { max: CATALOG_DESCRIPTION_MAX, required: false })]);
+  }
+  const descSet = descriptions.map(([k]) => `, ${k} = ?`).join('');
+  const descValues = descriptions.map(([, v]) => v);
 
   if (existing) {
     await renameAndReindex(
@@ -396,10 +447,10 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
       c.env.DB
         .prepare(
           `UPDATE catalogs SET parent_id = ?, slug = ?, name_ar = ?, name_en = ?, name_ckb = ?,
-                  sort = ?, is_printer_catalog = ?, active = ?, template_family = ?
+                  sort = ?, is_printer_catalog = ?, active = ?, template_family = ?${descSet}
             WHERE id = ?`
         )
-        .bind(parentId, slug, nameAr, nameEn, nameCkb, sort, isPrinter, active, family, id),
+        .bind(parentId, slug, nameAr, nameEn, nameCkb, sort, isPrinter, active, family, ...descValues, id),
       namesChanged(existing, { name_ar: nameAr, name_en: nameEn, name_ckb: nameCkb }),
       // The two columns the index reads a section name through
       // (`searchDocsForRows`): the main section and the sub-section.
@@ -408,12 +459,37 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
   } else {
     await c.env.DB
       .prepare(
-        `INSERT INTO catalogs (id, parent_id, slug, name_ar, name_en, name_ckb, sort, is_printer_catalog, active, template_family)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO catalogs (id, parent_id, slug, name_ar, name_en, name_ckb, sort, is_printer_catalog, active, template_family${descriptions.map(([k]) => `, ${k}`).join('')})
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?${descriptions.map(() => ', ?').join('')})`
       )
-      .bind(id, parentId, slug, nameAr, nameEn, nameCkb, sort, isPrinter, active, family)
+      .bind(id, parentId, slug, nameAr, nameEn, nameCkb, sort, isPrinter, active, family, ...descValues)
       .run();
   }
+
+  /**
+   * OLD LINKS KEEP WORKING (owner Q11). A slug renamed AWAY from is remembered,
+   * so `/categories/<old>` resolves to this section and the page replaces to the
+   * new path; a slug that is live again is no longer history. Best-effort on a
+   * database 0136 has not reached: the rename itself has already committed.
+   */
+  try {
+    const retire: D1PreparedStatement[] = [
+      c.env.DB.prepare('DELETE FROM catalog_slug_history WHERE slug = ?').bind(slug),
+    ];
+    if (existing && existing.slug !== slug) {
+      retire.push(
+        c.env.DB.prepare(
+          `INSERT INTO catalog_slug_history (slug, catalog_id) VALUES (?, ?)
+           ON CONFLICT(slug) DO UPDATE SET catalog_id = excluded.catalog_id,
+             retired_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`
+        ).bind(existing.slug, id)
+      );
+    }
+    await c.env.DB.batch(retire);
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+  }
+  await afterTaxonomyWrite(c);
 
   await audit(c.env.DB, admin.id, existing ? 'catalog.update' : 'catalog.create', id, {
     slug,
@@ -455,6 +531,7 @@ adminTaxonomyRoutes.delete('/catalogs/:id', async (c) => {
       products: products?.n ?? 0,
       placements: placements?.n ?? 0,
     });
+    await afterTaxonomyWrite(c);
     return c.json({
       success: true,
       deleted: false,
@@ -473,6 +550,7 @@ adminTaxonomyRoutes.delete('/catalogs/:id', async (c) => {
   );
   await c.env.DB.prepare('DELETE FROM catalogs WHERE id = ?').bind(id).run();
   await audit(c.env.DB, admin.id, 'catalog.delete', id, { slug: row.slug });
+  await afterTaxonomyWrite(c);
   return c.json({ success: true, deleted: true, deactivated: false });
 });
 
@@ -561,7 +639,20 @@ adminTaxonomyRoutes.delete('/catalogs/:id/delivery-rules/:method', async (c) => 
   return c.json({ success: true, removed });
 });
 
-adminTaxonomyRoutes.post('/catalogs/:id/image', async (c) => {
+/**
+ * THE TWO PICTURES A SECTION CAN CARRY, one upload path for both:
+ *   image       the home tile's cover (0100)            → catalogs.image_key
+ *   hero-image  the category page's hero / banner (0136) → catalogs.hero_image_key
+ * Same rules for both — WebP only, magic bytes, the size cap, R2 before the
+ * pointer moves — because they are the same kind of site artwork.
+ */
+const CATALOG_PICTURES = {
+  image: { column: 'image_key', token: '', set: 'catalog.image_set', cleared: 'catalog.image_cleared' },
+  'hero-image': { column: 'hero_image_key', token: 'hero', set: 'catalog.hero_image_set', cleared: 'catalog.hero_image_cleared' },
+} as const;
+
+for (const [segment, pic] of Object.entries(CATALOG_PICTURES)) {
+adminTaxonomyRoutes.post(`/catalogs/:id/${segment}`, async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');
   const row = await catalogOr404(c.env.DB, id);
@@ -594,7 +685,7 @@ adminTaxonomyRoutes.post('/catalogs/:id/image', async (c) => {
     throw badRequest('The image has invalid or unsupported dimensions', 'BAD_IMAGE_DIMENSIONS');
   }
 
-  const object = mintCatalogImageObject(id, newId());
+  const object = mintCatalogImageObject(id, `${pic.token}${newId()}`);
   const key = siteMediaKey(object);
   // The R2 write happens BEFORE the pointer moves. The other order would let a
   // failed upload leave `image_key` naming an object that was never stored —
@@ -619,11 +710,12 @@ adminTaxonomyRoutes.post('/catalogs/:id/image', async (c) => {
     { httpMetadata: { contentType: kind.mime, cacheControl: 'public, max-age=31536000, immutable' } }
   );
 
-  const previous = String(row.image_key ?? '');
-  await c.env.DB.prepare('UPDATE catalogs SET image_key = ? WHERE id = ?').bind(key, id).run();
-  await audit(c.env.DB, admin.id, 'catalog.image_set', id, { key, previous, bytes: buf.byteLength });
+  const previous = String((row as unknown as Record<string, unknown>)[pic.column] ?? '');
+  await c.env.DB.prepare(`UPDATE catalogs SET ${pic.column} = ? WHERE id = ?`).bind(key, id).run();
+  await audit(c.env.DB, admin.id, pic.set, id, { key, previous, bytes: buf.byteLength });
+  await afterTaxonomyWrite(c);
 
-  return c.json({ success: true, image_key: key, image_url: catalogImageUrl(key) });
+  return c.json({ success: true, [pic.column]: key, [segment === 'image' ? 'image_url' : 'hero_image_url']: catalogImageUrl(key) });
 });
 
 /**
@@ -631,15 +723,17 @@ adminTaxonomyRoutes.post('/catalogs/:id/image', async (c) => {
  * sweeper owns deletion, and it is the only thing that can see whether some
  * other row still points at the same bytes.
  */
-adminTaxonomyRoutes.delete('/catalogs/:id/image', async (c) => {
+adminTaxonomyRoutes.delete(`/catalogs/:id/${segment}`, async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');
   const row = await catalogOr404(c.env.DB, id);
-  const previous = String(row.image_key ?? '');
-  await c.env.DB.prepare("UPDATE catalogs SET image_key = '' WHERE id = ?").bind(id).run();
-  await audit(c.env.DB, admin.id, 'catalog.image_cleared', id, { previous });
-  return c.json({ success: true, image_key: '', image_url: '' });
+  const previous = String((row as unknown as Record<string, unknown>)[pic.column] ?? '');
+  await c.env.DB.prepare(`UPDATE catalogs SET ${pic.column} = '' WHERE id = ?`).bind(id).run();
+  await audit(c.env.DB, admin.id, pic.cleared, id, { previous });
+  await afterTaxonomyWrite(c);
+  return c.json({ success: true, [pic.column]: '', [segment === 'image' ? 'image_url' : 'hero_image_url']: '' });
 });
+}
 
 // -------------------------------------------------------------------- facets
 

@@ -54,6 +54,18 @@ test('every exported repeatable text family exposes ar, en and ckb slots', () =>
   }
 });
 
+/**
+ * Labels and choices whose Sorani is NOT recorded yet, deliberately: the
+ * catalog-discovery printer fields (`use_cases`, `has_laser_module`, 2026-09-26).
+ * Sorani is never machine-written (DECISIONS row 11), so until the owner writes
+ * these by hand they stay English for a Sorani reader and are flagged for
+ * review — the dictionary's own honesty rule. OWNER: Sorani to be written by hand.
+ */
+const SORANI_PENDING = new Set([
+  'Suitable for', 'Laser module option',
+  'Hobby', 'Business', 'Figures', 'Functional parts', 'Products to sell', 'Multicolour', 'Education',
+]);
+
 test('the deterministic dictionary covers every built-in template label and choice', () => {
   const vocabulary = new Set<string>();
   for (const type of PRODUCT_TYPES) {
@@ -66,6 +78,11 @@ test('the deterministic dictionary covers every built-in template label and choi
   }
   for (const phrase of vocabulary) {
     assert.equal(translateText(phrase, 'ar').status, 'machine', `Arabic dictionary gap: ${phrase}`);
+    if (SORANI_PENDING.has(phrase)) {
+      // Honest, and pinned: kept in English and flagged, never guessed.
+      assert.equal(translateText(phrase, 'ckb').status, 'review_needed', `${phrase} now has Sorani — drop it from SORANI_PENDING`);
+      continue;
+    }
     assert.equal(translateText(phrase, 'ckb').status, 'machine', `Sorani dictionary gap: ${phrase}`);
   }
 });

@@ -423,3 +423,26 @@ test('the stylesheets stay under their budget', () => {
   console.log(`bundle: css ${kb(total)} gzip over ${css.length} file(s) — ${each.map((x) => `${x.f} ${kb(x.bytes)}`).join(', ')}`);
   assert.ok(total <= CSS_BUDGET, `the stylesheets total ${kb(total)} gzip, over ${kb(CSS_BUDGET)}`);
 });
+
+/**
+ * THE COMPARE TRAY STAYS OUT OF THE FIRST BYTE (docs/ux/IMPLEMENTATION_PLAN.md
+ * S3, CATALOG_DISCOVERY §12). The entry imports only the tray's store
+ * (src/lib/compareTray.ts) and its gate; the tray itself — the bar, the undo
+ * toast's Toaster, the conflict dialog — is its own chunk, downloaded the
+ * first time the tray holds a product. Measured at S3: the store + gate added
+ * 1.24 KB gzip to the entry (68.35 → 69.62 KB built from HEAD with only S3's
+ * entry files), inside the plan's ≤ 1.5 KB; the entry budget itself is
+ * unchanged. The tray chunk measured 2.6 KB gzip.
+ */
+const COMPARE_TRAY_CHUNK_BUDGET = 8 * KB;
+
+test('the compare tray is a lazy chunk of its own, never in the initial payload', () => {
+  const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
+  const tray = files.find((f) => f.startsWith('CompareTray-'));
+  assert.ok(tray, 'the compare tray has no chunk of its own — it was made eager');
+  const initial = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
+  assert.equal(initial.has(tray!), false, 'the compare tray is in the initial payload');
+  const own = gz(join(ASSETS, tray!));
+  console.log(`bundle: compare tray ${kb(own)} gzip`);
+  assert.ok(own <= COMPARE_TRAY_CHUNK_BUDGET, `the compare tray chunk is ${kb(own)} gzip, over ${kb(COMPARE_TRAY_CHUNK_BUDGET)}`);
+});

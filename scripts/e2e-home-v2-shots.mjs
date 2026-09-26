@@ -154,6 +154,13 @@ async function shoot(browser, { width, lang }) {
       sections,
       links,
       overflow: Math.max(document.documentElement.scrollWidth - window.innerWidth, main ? main.scrollWidth - main.clientWidth : 0),
+      // The compact product card (CATALOG_DISCOVERY §4): width and height of
+      // each one, and whether any of them nests a button inside its link.
+      cards: [...document.querySelectorAll('[data-product-card="compact"]')].map((c) => {
+        const r = c.getBoundingClientRect();
+        return [r.width, r.height];
+      }),
+      nestedButtons: [...document.querySelectorAll('[data-product-card] a')].filter((a) => a.querySelector('button')).length,
       height: main ? main.scrollHeight : document.documentElement.scrollHeight,
     };
   });
@@ -162,6 +169,16 @@ async function shoot(browser, { width, lang }) {
   check(`${name}: sections in the owner's order`, JSON.stringify(seen) === JSON.stringify(expected), seen.join(' → '));
   check(`${name}: no «features» strip between hero and categories`, !facts.sections.includes('services') || facts.sections.indexOf('services') > facts.sections.indexOf('categories_bento'));
   check(`${name}: no horizontal scroll`, facts.overflow <= 1, `overflow ${facts.overflow}px`);
+  // THE COMPACT CARD'S HEIGHT IS FIXED: a 6:5 photograph plus a 119 px body
+  // (262 px at 174 px wide, 242 px on the 148 px rail), whatever the name's
+  // length and whether a member line is drawn — so a rail never stairsteps.
+  const offBy = facts.cards.map(([w, h]) => Math.abs(h - (w * 5) / 6 - 119));
+  check(
+    `${name}: every compact card is 6:5 photo + 119 px (±4)`,
+    facts.cards.length > 0 && offBy.every((d) => d <= 4),
+    facts.cards.map(([w, h]) => `${w.toFixed(1)}×${h.toFixed(1)}`).join(', ')
+  );
+  check(`${name}: no button inside a card's link`, facts.nestedButtons === 0, `${facts.nestedButtons}`);
   const bad = facts.links.filter((h) => !(h.startsWith('/') || h.startsWith('https://studio.levonis-iq.com')));
   check(`${name}: every link is in-app or the Studio`, bad.length === 0, bad.join(', '));
 

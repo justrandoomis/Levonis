@@ -3,6 +3,7 @@ import { Sparkles, Star } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { type ApiProduct } from '../lib/api';
 import { useMoney } from '../CurrencyContext';
+import { memberLine, splitMoney } from '../lib/productCard';
 
 /**
  * The ONE price block every product card renders (home rails, /products grid,
@@ -27,7 +28,22 @@ import { useMoney } from '../CurrencyContext';
  * verdict, not a client guess. `display_from` marks genuinely differing
  * variant prices, so «يبدأ من» is honest, never decorative.
  */
-export default function CardPrice({ p, compact = false }: { p: ApiProduct; compact?: boolean }) {
+export default function CardPrice({
+  p,
+  compact = false,
+  density = 'regular',
+}: {
+  p: ApiProduct;
+  /** Smaller type for list rows (search suggestions, bundle tiles). */
+  compact?: boolean;
+  /** 'compact' is the compact product card's price block (see CompactPrice). */
+  density?: 'regular' | 'compact';
+}) {
+  if (density === 'compact') return <CompactPrice p={p} />;
+  return <RegularPrice p={p} compact={compact} />;
+}
+
+function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
   const { money } = useMoney();
   const { loc } = useLanguage();
 
@@ -91,6 +107,74 @@ export default function CardPrice({ p, compact = false }: { p: ApiProduct; compa
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * THE COMPACT CARD'S PRICE (docs/ux/CATALOG_DISCOVERY.md §4.1) — two fixed
+ * rows, so a grid of cards keeps one height whatever the viewer's tier:
+ *
+ *   row 1   «يبدأ من» 10 muted · the amount 15/20 800 tabular · «د.ع» 10.5
+ *   row 2   ONE member line — the cheapest rung below what this viewer pays
+ *           (src/lib/productCard.ts `memberLine`): ✧ 674,100 لأعضاء PRO.
+ *           When there is no cheaper rung but the viewer's own price is below
+ *           the regular one (a member, or a live offer), the struck regular
+ *           price takes the row instead. Otherwise the row stays empty.
+ *
+ * The main amount keeps CardPrice's colour rule: PRO's red for a PRO viewer,
+ * gold for PRIME and PLUS, the foreground for everyone else. Same fields,
+ * same server verdict — nothing here computes a price.
+ */
+function CompactPrice({ p }: { p: ApiProduct }) {
+  const { money } = useMoney();
+  const { loc } = useLanguage();
+
+  const main = p.display_price_iqd ?? p.price_iqd;
+  const regular = p.display_regular_iqd ?? p.price_iqd;
+  const applied = p.display_applied_tier ?? 'regular';
+  const [amount, unit] = splitMoney(money(main));
+  const line = memberLine(p);
+  const struck = !line && main < regular ? regular : null;
+  const amountTone =
+    applied === 'pro' ? 'text-coral' : applied === 'regular' ? 'text-text-primary' : 'text-gold';
+
+  return (
+    <div data-card-price="compact" className="min-w-0">
+      <div className="flex h-5 min-w-0 items-baseline gap-1 overflow-hidden whitespace-nowrap">
+        {p.display_from ? (
+          <span className="shrink-0 text-[10px] font-semibold text-text-muted">{loc('يبدأ من', 'from', 'لە')}</span>
+        ) : null}
+        <bdi
+          dir="ltr"
+          data-pro-price={applied === 'pro' || undefined}
+          className={`text-[15px] font-extrabold leading-5 tracking-[-0.01em] tabular-nums ${amountTone}`}
+        >
+          {amount}
+        </bdi>
+        {unit ? <span className="shrink-0 text-[10.5px] font-bold text-text-secondary">{unit}</span> : null}
+      </div>
+      <div className="mt-px flex h-[15px] min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap text-[10.5px] leading-[15px] text-text-secondary">
+        {line ? (
+          <>
+            {line.tier === 'PRO' ? (
+              <Sparkles aria-hidden className="size-2.5 shrink-0 text-coral" />
+            ) : (
+              <Star aria-hidden className="size-2.5 shrink-0 fill-current text-gold" />
+            )}
+            <bdi dir="ltr" className="font-semibold tabular-nums">{splitMoney(money(line.price))[0]}</bdi>
+            {/* OWNER: Sorani to be written by hand («لأعضاء» before a tier name). */}
+            <span className="truncate">{loc('لأعضاء', 'for')}</span>
+            <b className={`font-extrabold tracking-[0.02em] ${line.tier === 'PRO' ? 'text-coral' : 'text-gold'}`}>{line.tier}</b>
+          </>
+        ) : struck !== null ? (
+          <>
+            {/* OWNER: Sorani to be written by hand («بدل» — instead of). */}
+            <span className="sr-only">{loc('بدل', 'instead of')} </span>
+            <bdi dir="ltr" className="text-text-muted line-through tabular-nums">{splitMoney(money(struck))[0]}</bdi>
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }

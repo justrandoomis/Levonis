@@ -20,9 +20,10 @@ import SectionHead from './SectionHead';
  * then everything else, each group newest-first (src/lib/homeLayout.ts
  * `orderLatest`).
  *
- * THE CARD IS THE SHOP'S PRODUCT CARD, unchanged — the dark card on its own
- * dark panel, as the owner asked. On a phone the list is a rail (a row of
- * cards costs one card's height); on a wide screen it becomes a grid.
+ * THE CARD IS THE SHOP'S COMPACT PRODUCT CARD (CATALOG_DISCOVERY §4), with
+ * the compare toggle. On a phone the list is a rail of 148 px cards — two and
+ * a half visible, which invites the swipe; on a wide screen it becomes a
+ * grid.
  */
 const LIMIT = 10;
 
@@ -143,11 +144,11 @@ export default function LatestProducts({
       >
         {waiting
           ? Array.from({ length: 4 }, (_, i) => (
-              <ProductCardSkeleton key={i} className="w-[156px] shrink-0 lg:w-auto" />
+              <ProductCardSkeleton key={i} density="compact" className="w-[148px] shrink-0 lg:w-auto" />
             ))
           : products.map((p) => (
               <div key={p.id} className="flex shrink-0 snap-start">
-                <ProductCard p={p} widthClass="w-[156px] sm:w-[176px] lg:w-full" />
+                <ProductCard p={p} density="compact" compareToggle widthClass="w-[148px] shrink-0 lg:w-full" />
               </div>
             ))}
       </div>

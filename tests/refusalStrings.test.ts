@@ -160,6 +160,9 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/lib/printMatchingStore.ts',
     'worker/routes/merchantPrinters.ts',
     'worker/routes/merchantWorkshop.ts',
+    // Catalog discovery: a category with no products, the reserved slug.
+    'worker/routes/catalog.ts',
+    'worker/routes/adminTaxonomy.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

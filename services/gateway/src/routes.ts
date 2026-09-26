@@ -107,6 +107,14 @@ export const ROUTES: readonly RouteRule[] = [
   // is keyed by an arbitrary set of ids, so an edge entry would be a near-miss
   // for every visitor and earn nothing for the risk of getting the key wrong.
   { prefix: '/api/compare', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'none', rateClass: 'public-read' },
+  // Catalog discovery (docs/ux/CATALOG_DISCOVERY.md §11). The category map and
+  // one category as a page: catalogue data end to end, public. NOT marked
+  // cacheable here: the Worker caches the viewer-independent tree itself (and
+  // purges it on a taxonomy write), and a category page is tier-priced.
+  { prefix: '/api/catalog', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'none', rateClass: 'public-read' },
+  // «مرشد الطابعات»: printers scored on the shop's own spec sheets. Keyed by six
+  // answers, so an edge entry is a near-miss like /api/compare's.
+  { prefix: '/api/printer-finder', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'none', rateClass: 'public-read' },
   // «خبرني لما يرجع». A standing request against ONE product's stock, armed
   // and refused by what the catalogue knows about that product
   // (worker/lib/stockAlertResolve.ts). It is delivered through Notifications

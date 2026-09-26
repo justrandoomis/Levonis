@@ -66,7 +66,8 @@ import {
   type ProductTypeId,
   type SectionRef,
 } from '../lib/templateFamilies';
-import { compareProducts, type CompareResult } from '../lib/compareSpecs';
+import { type CompareResult } from '../lib/compareSpecs';
+import { compareWithLenses } from '../lib/compareLenses';
 import { adviseFromSpecs, type PowerAdvice } from '../lib/powerAdvice';
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 import { parseProductRow } from '../lib/productModel';
@@ -656,7 +657,8 @@ compareRoutes.get('/', async (c) => {
   const power = placed.map(powerOf);
   if (placed.length < 2) return c.json({ success: true, products: cards, power, comparison: null });
 
-  const comparison: CompareResult = compareProducts({
+  // With the «أفضل لـ» lenses (worker/lib/compareLenses.ts) — printers and lasers only.
+  const comparison: CompareResult = compareWithLenses({
     products: placed.map((p, i) => ({
       // The SLOT id, so a comparison of one printer against itself under two
       // options has two distinguishable columns rather than one id twice.

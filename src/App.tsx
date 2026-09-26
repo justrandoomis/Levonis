@@ -280,6 +280,9 @@ import { FarmGate } from './pages/farm/shelved';
 // FarmGate is: it wraps lazy routes, so it must exist before they load.
 import { CommunityGate } from './pages/community/access';
 import BrowseMissionTimer from './components/BrowseMissionTimer';
+// The compare tray's door: renders and downloads nothing until the tray
+// holds a product (src/components/compare/CompareTrayGate.tsx).
+import CompareTrayGate from './components/compare/CompareTrayGate';
 const Policies = React.lazy(() => import('./pages/Policies'));
 const Support = React.lazy(() => import('./pages/Support'));
 /**
@@ -824,6 +827,8 @@ function AppContent() {
         </Routes>
         </Suspense>
         </ChunkBoundary>
+
+        <CompareTrayGate />
 
         {/* Clearance for the floating BottomNav: its bottom offset plus its
             height plus a small visual gap. `shrink-0` so a flex column cannot

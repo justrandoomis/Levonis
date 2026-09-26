@@ -87,6 +87,7 @@ import { conditionKindLabel, type ConditionEntry } from '../lib/condition';
 import { resolveOrderType, resolveTransport, routeIsUsable } from '../lib/productSelection';
 import { useMoney } from '../CurrencyContext';
 import { CommunityStoreLink } from './community/access';
+import CompareBadge from '../components/compare/CompareBadge';
 
 // ------------------------------------------------------------------ strings
 
@@ -3462,6 +3463,10 @@ export default function Product() {
         </button>
         <MotionCharacterHome />
         <div className="flex items-center gap-2">
+          {/* The compare tray, as a top-bar badge: the floating tray is not
+              drawn here, where it would cover the purchase bar (owner Q8).
+              Nothing is drawn while the tray is empty. */}
+          <CompareBadge className="bg-zinc-900/60 text-zinc-300 hover:text-white hover:bg-zinc-800" />
           <button
             type="button"
             onClick={handleShare}

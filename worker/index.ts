@@ -48,6 +48,8 @@ import { printRequestRoutes } from './routes/printRequests';
 import { notificationRoutes } from './routes/notifications';
 import { stockAlertRoutes } from './routes/stockAlerts';
 import { compareRoutes } from './routes/compare';
+import { catalogRoutes } from './routes/catalog';
+import { printerFinderRoutes } from './routes/printerFinder';
 import { priceReportRoutes, adminPriceReportRoutes } from './routes/priceReports';
 import { merchantPrinterRoutes } from './routes/merchantPrinters';
 import { merchantWorkshopRoutes } from './routes/merchantWorkshop';
@@ -289,6 +291,9 @@ app.route('/api/print-quote', printQuoteRoutes);
 // shop, and a sign-in wall in front of the page that answers «أي وحدة أشتري؟»
 // turns it into a page that asks for an email address instead.
 app.route('/api/compare', compareRoutes);
+// Catalog discovery (docs/ux/CATALOG_DISCOVERY.md §11): the category map and the printer finder.
+app.route('/api/catalog', catalogRoutes);
+app.route('/api/printer-finder', printerFinderRoutes);
 // «لكيتها بمكان أرخص» — the customer's competitor-price report (0093). Its own
 // prefix rather than a branch of /api/products, and every route inside is
 // behind its own requireAuth: an anonymous form that writes a row the owner

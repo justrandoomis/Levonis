@@ -970,6 +970,20 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'You can cancel an order yourself only while it is waiting for confirmation. After that, contact support.',
     ckb: 'يمكن إلغاء الطلب بنفسك ما دام بانتظار التأكيد فقط. بعد ذلك تواصل مع الدعم.',
   },
+  // Catalog discovery (docs/ux/CATALOG_DISCOVERY.md §6, §2): a category link
+  // that names no section holding products, and the admin choosing the slug
+  // the listing reserves. The ckb column carries the Arabic until the owner
+  // writes the Sorani by hand (DECISIONS row 11). OWNER: Sorani to be written by hand.
+  CATALOG_NOT_FOUND: {
+    ar: 'هذه الفئة غير موجودة أو لا تحتوي منتجات حاليًا. تصفّح كل الفئات.',
+    en: 'This category does not exist or has no products right now. Browse all categories.',
+    ckb: 'هذه الفئة غير موجودة أو لا تحتوي منتجات حاليًا. تصفّح كل الفئات.',
+  },
+  CATALOG_SLUG_RESERVED: {
+    ar: 'الرابط «all» محجوز لصفحة «كل المنتجات» داخل القسم. اختر رابطًا آخر.',
+    en: 'The slug “all” is reserved for a section’s “all products” page. Choose another slug.',
+    ckb: 'الرابط «all» محجوز لصفحة «كل المنتجات» داخل القسم. اختر رابطًا آخر.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

@@ -404,7 +404,17 @@ export interface ApiProduct {
   options: Array<{ id: string; name?: string; name_ar?: string; image?: string; price_iqd?: number; prime_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;
   colors: Array<{ id: string; name?: string; name_ar?: string; hex?: string; gradient?: string; image?: string; option_id?: string; linked_option_ids?: string[]; price_iqd?: number; prime_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;
   selling_type: 'direct_sale' | 'pre_order' | 'bundle';
+  /** On a CARD too since catalog discovery (S1): «طلب مسبق» can be said on
+   *  the card, and the listing's «البيع المباشر أولًا» sorts on it. */
   sale_types?: Array<'direct_sale' | 'pre_order' | 'bundle'>;
+  /**
+   * The comparison type this product resolves to from its catalogue branch
+   * (`printer`, `laser`, `filament`, `parts`, `accessory`, `laser_material`),
+   * or absent when the branch names none. The compare toggle is offered only
+   * for `printer`, `laser` and `filament`, and the tray locks on it.
+   * Carried by the `/api/products` and `/api/catalog/*` cards.
+   */
+  compare_type?: 'printer' | 'parts' | 'filament' | 'accessory' | 'laser' | 'laser_material';
   shipping_methods: Array<{ id: string; method?: string; delivery_time?: string; price_iqd?: number }>;
   /** null on legacy products that still use the global delivery tariff. */
   delivery_options?: {
@@ -1546,6 +1556,12 @@ export interface ResolvedCategory {
   name_ar: string;
   name_en: string;
   name_ckb: string;
+  /**
+   * The canonical storefront path of this catalog —
+   * `/categories/printers/fdm-printers` — so an old `/products?category=`
+   * link can `replace` to it (catalog discovery S1).
+   */
+  path?: string;
 }
 
 /**
@@ -1558,6 +1574,15 @@ export interface ResolvedCategory {
 export interface ProductsListResponse {
   products: ApiProduct[];
   category?: ResolvedCategory | null;
+  /**
+   * PRESENT ONLY when the request used a listing parameter (`sort`, `avail`,
+   * `sale`, `price`, `brand`, `offer`, `member`, `f.*`, `facets`) — see
+   * `ListingMeta` in src/lib/catalog/types.ts. The plain listing is unchanged.
+   */
+  total?: number;
+  truncated?: boolean;
+  sort?: import('./catalog/types').ListingSort;
+  facets?: import('./catalog/types').FacetSet;
 }
 
 // ----------------------------------------------- «خبرني لما يرجع» (0092)

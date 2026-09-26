@@ -56,6 +56,12 @@ export interface SpecCompare {
   better: 'higher' | 'lower' | 'yes' | 'none';
   /** Relative weight in the headline verdict. Omitted or 0 = not scored. */
   weight?: number;
+  /**
+   * A number that NAMES something rather than counts it — a year. Shown as
+   * typed, with no thousands separator: «2025», never «2,025» (the live
+   * compare page printed the second; docs/ux/CATALOG_DISCOVERY.md §0).
+   */
+  plain?: boolean;
 }
 
 export interface TemplateField {
@@ -67,6 +73,13 @@ export interface TemplateField {
   unit?: string;
   /** For type 'select'; values are stored verbatim. */
   options?: string[];
+  /**
+   * A 'text' field whose value is a LIST drawn from `options` — stored as
+   * «Business, Products to sell» (comma-separated, each item one of the
+   * options, verbatim). The admin form renders toggles and the import checks
+   * each item. Only `use_cases` uses it.
+   */
+  multiple?: boolean;
   /** A required field blocks PUBLISHING, never saving a draft. */
   required?: boolean;
   /** Short helper line; long prose belongs in a tooltip, never in the form. */
@@ -100,6 +113,21 @@ const t = (
   extra: Partial<TemplateField> = {}
 ): TemplateField => ({ id, label_ar, label_en, type, ...extra });
 
+/**
+ * The values `use_cases` may hold, in the order the admin form offers them.
+ * English by house rule (§3), and readable as they stand on the product page.
+ * The printer finder maps its first question onto these (worker/lib/printerFinder.ts).
+ */
+export const PRINTER_USE_CASES = [
+  'Hobby',
+  'Business',
+  'Figures',
+  'Functional parts',
+  'Products to sell',
+  'Multicolour',
+  'Education',
+] as const;
+
 export const DEVICES: TemplateFamilyDef = {
   id: 'devices',
   label_ar: 'الأجهزة',
@@ -112,10 +140,33 @@ export const DEVICES: TemplateFamilyDef = {
       t('technology', 'التقنية', 'Technology', 'select', { options: ['FDM', 'Resin (MSLA)', 'SLA', 'DLP', 'Other'] }),
       t('model', 'الموديل', 'Model'),
       t('release_year', 'سنة الإصدار', 'Release year', 'number', {
-        compare: { parse: 'number', better: 'higher', weight: 1 }, hint_ar: 'مثال: 2024',
+        compare: { parse: 'number', better: 'higher', weight: 1, plain: true }, hint_ar: 'مثال: 2024',
       }),
       t('skill_level', 'مستوى الخبرة المطلوب', 'Required skill level', 'select', {
         options: ['Beginner', 'Intermediate', 'Advanced', 'Professional'], compare: { parse: 'text', better: 'none' }, hint_ar: 'لمن صُممت الطابعة — مثال: Beginner',
+      }),
+      /*
+       * «مناسبة لـ» — THE ONE OPINION FIELD, and it is the owner's opinion,
+       * recorded (docs/ux/CATALOG_DISCOVERY.md §9.3, §9.6). The printer finder
+       * reads it as `use_fit`; a printer with nothing ticked here is simply not
+       * scored on it (weight 0 while no printer has it), never assumed to fit.
+       * Shown, never scored, in a comparison: it is a recommendation, not a
+       * measurement.
+       */
+      t('use_cases', 'مناسبة لـ', 'Suitable for', 'text', {
+        options: [...PRINTER_USE_CASES],
+        multiple: true,
+        hint_ar: 'اختر الاستخدامات التي تنصح بها لهذه الطابعة',
+        compare: { parse: 'list', better: 'none' },
+      }),
+      /* Owner Q3: «Laser» in the finder means a printer sold with a laser
+         module option (H2D / H2S / H2C «Laser Full Combo») plus the laser
+         machines' own section. A fact about what the shop sells, so it is a
+         Yes/No and never read out of the product name. Shown, not scored. */
+      t('has_laser_module', 'يدعم وحدة ليزر', 'Laser module option', 'select', {
+        options: ['Yes', 'No'],
+        compare: { parse: 'boolean', better: 'none' },
+        hint_ar: 'هل تُباع هذه الطابعة بخيار وحدة ليزر؟ مثال: Yes لـ Laser Full Combo',
       }),
       t('build_volume', 'حجم الطباعة', 'Build volume', 'text', {
         unit: 'mm',

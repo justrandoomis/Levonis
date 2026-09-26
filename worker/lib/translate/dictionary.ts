@@ -576,6 +576,22 @@ export const PHRASES: Record<string, TermEntry> = {
   'voltage regulator': { ar: 'منظّم جهد', ckb: 'ڕێکخەری ڤۆڵتاژ' },
   'power cut': { ar: 'انقطاع الكهرباء', ckb: 'بڕانی کارەبا' },
 
+  // ------------------------------------------------- catalog discovery
+  // «مناسبة لـ» (`use_cases`) and «يدعم وحدة ليزر» (`has_laser_module`),
+  // printer-only fields the finder reads (docs/ux/CATALOG_DISCOVERY.md §9.6).
+  // ARABIC ONLY, by the honesty rule at the top of this file: no Sorani is
+  // recorded, so these stay English and `review_needed` for ckb until a native
+  // speaker writes them. OWNER: Sorani to be written by hand.
+  'suitable for': { ar: 'مناسبة لـ' },
+  'laser module option': { ar: 'خيار وحدة الليزر' },
+  'hobby': { ar: 'هواية' },
+  'business': { ar: 'مشروع تجاري' },
+  'figures': { ar: 'مجسمات' },
+  'functional parts': { ar: 'قطع عملية' },
+  'products to sell': { ar: 'منتجات للبيع' },
+  'multicolour': { ar: 'متعدد الألوان' },
+  'education': { ar: 'تعليم' },
+
   // ---------------------------------------------------------------- 0102
   // THE LASER LINE'S VOCABULARY. «إضافة قسم جديد وهو قسم الليزر بجانب طابعات
   // الفلامنت والرزن … وكذلك اضافه مواد الطباعه بجانب الفلمنت والرزن … مواد

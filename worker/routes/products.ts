@@ -28,6 +28,14 @@ import { pricingTierContext } from '../lib/entitlements';
 import { activeBenefitRules, ancestryFor, catalogAncestry, degradeIfSchemaMissing, fallbackFor } from '../lib/membershipBenefits';
 import { isConditionColumnMissing } from '../lib/conditionProjection';
 import { catalogSubtreeFilter, homeCategoryTree } from '../lib/catalogMembership';
+import { FACET_FIELD_IDS, parseListingParams } from '@levonis/catalog/discovery';
+import { runListing, type BrandInfo, type ListingItem } from '../lib/listingFacets';
+import {
+  catalogIdForRetiredSlug,
+  catalogIndexFor,
+  productTypeOf,
+  type CatalogIndex,
+} from '../lib/catalogPresentation';
 import { searchProducts } from '../lib/search/store';
 import { suggestCompletion } from '../lib/search/complete';
 import {
@@ -2782,6 +2790,22 @@ const CARD_FIELDS = [
    */
   'sub_category_id',
   'brand_id',
+  /*
+   * CATALOG DISCOVERY (docs/ux/CATALOG_DISCOVERY.md §0, §4, §11). A card could
+   * not say «طلب مسبق» because the listing never told it, and the compare
+   * toggle cannot be offered only on comparable types without the type. Three
+   * short values; the heavy fields stay out.
+   *   sale_types   — ['direct_sale', 'pre_order', …], the product's own list.
+   *   created_at   — «الأحدث», and the «جديد» the card may one day draw.
+   *   compare_type — the product type its branch resolves to (`printer`,
+   *                  `laser`, `filament`, …), set by `withCompareType` where
+   *                  the taxonomy is at hand; absent when nothing names one.
+   * (No `card_name`: owner answer Q2 — the card shows the part of the name
+   * before the first « / », derived on the client; no new column.)
+   */
+  'sale_types',
+  'created_at',
+  'compare_type',
 ] as const;
 
 export function cardShape(out: Record<string, unknown>): Record<string, unknown> {
@@ -2794,6 +2818,103 @@ export function cardShape(out: Record<string, unknown>): Record<string, unknown>
 
 export function compositionCard(b: ResolvedBundle, ctx: PricingCtx): Record<string, unknown> {
   return bundleCard(b, publicWithDisplayPrice(b.row, ctx, b.view, displayOverride(b)));
+}
+
+/**
+ * `compare_type` on an ordinary product card, from the product ROW (its
+ * classification and `template_family`) and the taxonomy index — the compare
+ * page's own rule (`productTypeOf`), so a card never offers a comparison the
+ * page would refuse as a type mismatch. Never set on a composition card.
+ */
+export function withCompareType(
+  card: Record<string, unknown>,
+  row: Record<string, unknown>,
+  idx: CatalogIndex | null
+): Record<string, unknown> {
+  if (!idx) return card;
+  const t = productTypeOf(row, idx);
+  if (t) card.compare_type = t;
+  return card;
+}
+
+/**
+ * ORDINARY product rows → cards, through the ONE pricing path every listing
+ * uses: batched relations, batched offers, the mystery-pool coarse rule, then
+ * `publicWithDisplayPrice` and the card projection. Composition rows are the
+ * caller's (they have their own builder). Exported for the catalog pages and
+ * the printer finder, so neither can quote a price the product page does not.
+ */
+export async function resolveProductCards(
+  db: D1Database,
+  rows: Record<string, unknown>[],
+  ctx: PricingCtx,
+  idx: CatalogIndex | null
+): Promise<Map<string, Record<string, unknown>>> {
+  const out = new Map<string, Record<string, unknown>>();
+  if (rows.length === 0) return out;
+  const ids = rows.map((r) => String(r.id));
+  const [views, offers, pooled] = await Promise.all([
+    loadRelationsViews(db, rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))),
+    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(db, ids.map((id) => subjectOf(id))), EMPTY_OFFERS()),
+    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(db, ids), new Set<string>()),
+  ]);
+  for (const r of rows) {
+    const id = String(r.id);
+    const card = cardShape(
+      publicWithDisplayPrice(r, ctx, views.get(id), undefined, offers.get(offerKey(subjectOf(id))), pooled.has(id))
+    );
+    out.set(id, withCompareType(card, r, idx));
+  }
+  return out;
+}
+
+/**
+ * The parameters that turn `/api/products` into the specialised listing
+ * (docs/ux/CATALOG_DISCOVERY.md §11). A request carrying NONE of them takes the
+ * old path — same SQL, same ORDER BY, same paging — so every existing caller
+ * (the home rails, search, «عرض المزيد», saved links) is untouched.
+ */
+const LISTING_PARAM_KEYS = [
+  'sort', 'avail', 'sale', 'price', 'brand', 'offer', 'member', 'facets',
+  ...FACET_FIELD_IDS.map((f) => `f.${f}`),
+];
+
+/**
+ * How many candidates the listing resolves in memory. The price a filter or a
+ * sort reads is the VIEWER'S resolved price, which SQL does not hold, so the
+ * route narrows in SQL by what it can (section, search, brand), resolves at
+ * most this many through the pricing path, and says `truncated: true` when the
+ * section held more. 300 is ~12 pages of 24 and one bounded request.
+ */
+export const LISTING_CANDIDATE_CAP = 300;
+
+const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/** A resolved card (ordinary or composition) → what the listing filters read. */
+function listingItemOf(row: Record<string, unknown>, card: Record<string, unknown>, rank: number, brandSlug: string | null): ListingItem {
+  const price = numOrNull(card.display_price_iqd) ?? numOrNull(card.price_iqd) ?? (Number(row.price_iqd) || 0);
+  const saleTypes = Array.isArray(card.sale_types)
+    ? (card.sale_types as unknown[]).map(String)
+    : safeParse<unknown[]>(String(row.sale_types ?? '[]'), []).map(String);
+  const offer = card.offer as { schedule_state?: string } | null | undefined;
+  const specs = safeParse<Record<string, unknown>>(String(row.spec_fields ?? '{}'), {});
+  return {
+    id: String(row.id),
+    card,
+    name: String(card.name ?? row.name ?? ''),
+    price,
+    regular: numOrNull(card.display_regular_iqd) ?? price,
+    prime: numOrNull(card.display_prime_iqd),
+    pro: numOrNull(card.display_pro_iqd),
+    available: Math.max(0, numOrNull(card.direct_stock_available) ?? 0),
+    saleTypes: saleTypes.length ? saleTypes : [String(row.selling_type || 'direct_sale')],
+    brandId: row.brand_id ? String(row.brand_id) : null,
+    brandSlug,
+    createdAt: String(row.created_at ?? ''),
+    rank,
+    scheduledOffer: !!offer && (offer.schedule_state === 'live' || offer.schedule_state === 'upcoming'),
+    specs: specs && typeof specs === 'object' && !Array.isArray(specs) ? specs : {},
+  };
 }
 
 export { cover as compositionCover };
@@ -2879,6 +3000,8 @@ interface ResolvedCategoryRow {
   name_ar: string;
   name_en: string;
   name_ckb: string;
+  /** The canonical storefront path (catalog discovery); absent when unknown. */
+  path?: string;
 }
 
 productRoutes.get('/', async (c) => {
@@ -2888,6 +3011,20 @@ productRoutes.get('/', async (c) => {
   const type = str(q.type, 'type', { max: 20, required: false }); // 'bundle' | 'discounted' | 'featured'
   const limit = int(q.limit, 'limit', { min: 1, max: 50, def: 20 });
   const offset = int(q.offset, 'offset', { min: 0, max: 10_000, def: 0 });
+
+  /**
+   * THE SPECIALISED LISTING (catalog discovery S1). Parsed by the one grammar
+   * the page writes its URL with (@levonis/catalog/discovery); an unknown value
+   * is dropped there, never thrown. `listing` is false for every request that
+   * existed before it, and those keep the exact path below.
+   */
+  const listing = LISTING_PARAM_KEYS.some((k) => q[k] !== undefined);
+  const listingState = parseListingParams((k) => (k === 'search' ? search : q[k]), 'api');
+  const wantsFacets = q.facets === '1';
+  // The taxonomy index: card `compare_type` and the category's `path`. Memoised
+  // per isolate (catalogPresentation.ts), so this is usually free.
+  const idxPromise = catalogIndexFor(c.env.DB);
+  idxPromise.catch(() => {});
 
   /**
    * STARTED HERE, at the top, because `type=discounted` now BUILDS ITS WHERE
@@ -2951,6 +3088,27 @@ productRoutes.get('/', async (c) => {
       )
         .bind(category)
         .first<ResolvedCategoryRow>()) ?? null;
+    // A SLUG THE ADMIN RENAMED AWAY FROM (0136, owner Q11) still names its
+    // section, so an old shared link keeps listing and can be replaced to the
+    // new path. Only consulted when nothing live matched.
+    if (!categoryRef) {
+      const retired = await catalogIdForRetiredSlug(c.env.DB, category);
+      if (retired) {
+        categoryRef =
+          (await c.env.DB.prepare('SELECT id, slug, name_ar, name_en, name_ckb FROM catalogs WHERE id = ?')
+            .bind(retired)
+            .first<ResolvedCategoryRow>()) ?? null;
+      }
+    }
+    /**
+     * WHERE THIS CATALOG LIVES NOW — `/categories/printers/fdm-printers` — so
+     * the storefront can `replace` an old `/products?category=` link with the
+     * canonical category URL (docs/ux/CATALOG_DISCOVERY.md §2 «Routes»).
+     */
+    if (categoryRef) {
+      const idx = await idxPromise.catch(() => null);
+      if (idx?.byId.has(categoryRef.id)) categoryRef = { ...categoryRef, path: idx.path(categoryRef.id) };
+    }
   }
   /**
    * ABSENT vs NULL, because they are different facts and the heading renders
@@ -3017,7 +3175,12 @@ productRoutes.get('/', async (c) => {
       params.push(like, like, like, like);
     } else if (hits.ids.length === 0) {
       // The category block rides this exit as well — see the note above.
-      return c.json({ success: true, products: [], ...categoryField });
+      return c.json({
+        success: true,
+        products: [],
+        ...categoryField,
+        ...(listing ? { total: 0, truncated: false, sort: listingState.sort } : {}),
+      });
     } else {
       /**
        * ONE BOUND PARAMETER FOR THE WHOLE HIT LIST — and the same again for
@@ -3102,6 +3265,18 @@ productRoutes.get('/', async (c) => {
   }
   if (type === 'featured') sql += ' AND is_featured = 1';
   /**
+   * BRAND NARROWS IN SQL — as ONE bound parameter however many brands are
+   * ticked (json_each), so the statement stays far under D1's 100 — but only
+   * when no facet counts were asked for: the brand facet's own counts must see
+   * the other brands (disjunctive), so with `facets=1` the brand filter is
+   * applied in memory like every other one. Memory always re-applies it, so the
+   * two paths cannot disagree.
+   */
+  if (listing && !wantsFacets && listingState.brands.length) {
+    sql += ' AND brand_id IN (SELECT b.id FROM brands b WHERE b.slug IN (SELECT value FROM json_each(?)))';
+    params.push(JSON.stringify(listingState.brands));
+  }
+  /**
    * A SEARCH RESULT IS ORDERED BY RELEVANCE, NOT BY THE SHELF ORDER.
    *
    * `IN (...)` has no order at all, and `display_order` is the merchandiser's
@@ -3118,12 +3293,19 @@ productRoutes.get('/', async (c) => {
   } else {
     sql += ' ORDER BY display_order ASC, created_at DESC LIMIT ? OFFSET ?';
   }
-  params.push(limit, offset);
+  // The listing pages in MEMORY, after the viewer's prices are known, so SQL
+  // hands back the whole capped candidate set in its natural order (+1 row to
+  // learn whether the cap bit).
+  if (listing) params.push(LISTING_CANDIDATE_CAP + 1, 0);
+  else params.push(limit, offset);
 
-  const [{ results }, ctx] = await Promise.all([
+  const [{ results: fetched }, ctx, idx] = await Promise.all([
     c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>(),
     ctxPromise,
+    idxPromise.catch(() => null),
   ]);
+  const truncated = listing && fetched.length > LISTING_CANDIDATE_CAP;
+  const results = truncated ? fetched.slice(0, LISTING_CANDIDATE_CAP) : fetched;
   // One batched read for the whole page rather than N+1 per card — and one
   // chunked read of every scheduled offer on it, so a special offer costs the
   // listing one query, not one per card (§14).
@@ -3177,16 +3359,13 @@ productRoutes.get('/', async (c) => {
           : null,
       }
     : {};
-  return c.json({
-    success: true,
-    ...categoryField,
-    ...suggestion,
-    products: results.map((p) => {
-      const b = compositions.get(String(p.id));
-      // A composition card has its own narrow shape, and a LOCKED one has its
-      // member prices stripped in there. `cardShape` must not touch it.
-      if (b) return compositionCard(b, ctx);
-      return cardShape(
+  const cards = results.map((p) => {
+    const b = compositions.get(String(p.id));
+    // A composition card has its own narrow shape, and a LOCKED one has its
+    // member prices stripped in there. `cardShape` must not touch it.
+    if (b) return compositionCard(b, ctx);
+    return withCompareType(
+      cardShape(
         publicWithDisplayPrice(
           p,
           ctx,
@@ -3195,8 +3374,49 @@ productRoutes.get('/', async (c) => {
           offers.get(offerKey(subjectOf(String(p.id)))),
           pooled.has(String(p.id))
         )
-      );
-    }),
+      ),
+      p,
+      idx
+    );
+  });
+  if (!listing) {
+    return c.json({
+      success: true,
+      ...categoryField,
+      ...suggestion,
+      products: cards,
+    });
+  }
+
+  /**
+   * THE LISTING STEP: filter, sort and count over the resolved candidates
+   * (worker/lib/listingFacets.ts), then page. The brand names for the facet
+   * come from ONE read keyed by a json_each list.
+   */
+  const brandIds = [...new Set(results.map((r) => String(r.brand_id ?? '')).filter(Boolean))];
+  const brandRows = brandIds.length
+    ? ((
+        await c.env.DB.prepare(
+          'SELECT id, slug, name_ar, name_en, name_ckb FROM brands WHERE id IN (SELECT value FROM json_each(?))'
+        )
+          .bind(JSON.stringify(brandIds))
+          .all<BrandInfo>()
+      ).results ?? [])
+    : [];
+  const brands = new Map(brandRows.map((b) => [b.id, b]));
+  const items = results.map((row, i) =>
+    listingItemOf(row, cards[i], i, brands.get(String(row.brand_id ?? ''))?.slug ?? null)
+  );
+  const run = runListing(items, listingState, { facets: wantsFacets, brands });
+  return c.json({
+    success: true,
+    ...categoryField,
+    ...suggestion,
+    products: run.items.slice(offset, offset + limit).map((i) => i.card),
+    total: run.items.length,
+    truncated,
+    sort: listingState.sort,
+    ...(run.facets ? { facets: run.facets } : {}),
   });
 });
 

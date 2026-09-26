@@ -54,6 +54,8 @@ import {
   type TemplateField,
 } from './templateFamilies';
 
+import type { CompareLens } from '@levonis/catalog/discoveryTypes';
+
 export type CompareBasis = 'same_section' | 'same_type' | 'mixed';
 
 export interface Trilingual {
@@ -140,6 +142,12 @@ export interface CompareResult {
    * ever has to contradict the shape the reader is looking at.
    */
   chart: { axes: CompareAxis[]; series: number[][] };
+  /**
+   * «أفضل لـ» — one verdict per buyer's question, printers and lasers only
+   * (docs/ux/CATALOG_DISCOVERY.md §10.2). Added by worker/lib/compareLenses.ts
+   * (`compareWithLenses`); absent from a result built by `compareProducts` alone.
+   */
+  lenses?: CompareLens[];
 }
 
 export interface CompareInputProduct {
@@ -285,6 +293,49 @@ export interface DimensionReading {
   axes: number[];
   /** Area for two axes, volume for three — the one number a row can rank on. */
   magnitude: number;
+  /**
+   * The label of the segment read, when the value listed several
+   * («Main nozzle: 256 × 256 × 260 mm; Auxiliary nozzle: …»). Absent for a
+   * plain «256 × 256 × 256».
+   */
+  segment?: string;
+}
+
+/**
+ * THE MULTI-NOZZLE VOLUME (docs/ux/CATALOG_DISCOVERY.md §0, §9.6).
+ *
+ * The X2D, H2D and H2C quote one volume per nozzle configuration —
+ * «Main nozzle: 256 × 256 × 260 mm; Auxiliary nozzle: 235.5 × 256 × 256 mm;
+ * Dual-nozzle intersection: …; Dual-nozzle union: …» — and the reader used to
+ * refuse the whole string, so those machines were never scored on size and a
+ * finder answer of «حجم الطباعة» silently lost them.
+ *
+ * The volume a buyer gets on an ordinary print is the MAIN (or SINGLE) nozzle's,
+ * so that segment is read; failing a label that says so, the FIRST segment that
+ * reads (the vendor lists the primary configuration first — «Left nozzle» on the
+ * H2C). A union or an intersection is never preferred: the union is a volume no
+ * single print can use, and choosing it would flatter exactly these machines.
+ * Every segment must be `label: dimensions`; anything else is not this shape and
+ * stays unread, as before.
+ */
+const PRIMARY_SEGMENT = /\b(?:main|single|primary|standard)\b/i;
+
+function readSegmentedDimensions(raw: string, unit: string): DimensionReading | null {
+  const pieces = foldDigits(raw).split(/\s*[;\n|]\s*/).filter((p) => p.trim() !== '');
+  if (pieces.length < 2) return null;
+  const segments: Array<{ label: string; reading: DimensionReading | null }> = [];
+  for (const piece of pieces) {
+    const m = /^([^:]{1,60}):\s*(.+)$/.exec(piece.trim());
+    if (!m) return null;
+    const reading = readDimensions(m[2], unit);
+    segments.push({ label: m[1].trim(), reading: reading && reading.axes.length === 3 ? reading : null });
+  }
+  // A segment LABELLED primary decides, readable or not: reading the auxiliary
+  // nozzle because the main one was mistyped would quote the wrong machine.
+  const primary = segments.find((s) => PRIMARY_SEGMENT.test(s.label));
+  const chosen = primary ?? segments.find((s) => s.reading !== null);
+  if (!chosen || !chosen.reading) return null;
+  return { ...chosen.reading, segment: chosen.label };
 }
 
 /**
@@ -297,6 +348,7 @@ export interface DimensionReading {
  * consistently is scored.
  */
 export function readDimensions(raw: string, unit = ''): DimensionReading | null {
+  if (/[:;]/.test(raw)) return readSegmentedDimensions(raw, unit);
   let s = foldDigits(raw).toLowerCase().replace(/[×✕✖х*·]/g, 'x').replace(/[⌀ø]/g, '');
   s = stripUnit(s, unit);
   const lines = /^(\d{3,5})\s*p$/.exec(s);
@@ -385,10 +437,11 @@ export function readRange(raw: string, unit = ''): RangeReading | null {
 
 // ----------------------------------------------------------------- formatting
 
-function formatNumber(n: number): string {
+function formatNumber(n: number, plain = false): string {
   const rounded = Math.round(n * 1000) / 1000;
   const [whole, fraction] = String(rounded).split('.');
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  // A year is a name, not a quantity: `plain` fields keep «2025» (SpecCompare.plain).
+  const grouped = plain ? whole : whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return fraction ? `${grouped}.${fraction}` : grouped;
 }
 
@@ -444,17 +497,20 @@ export function readCompareValue(field: TemplateField, raw: string): CompareValu
       return {
         raw: trimmed,
         num: n,
-        text: n === null ? withUnit(trimmed, unit) : withUnit(formatNumber(n), unit),
+        text: n === null ? withUnit(trimmed, unit) : withUnit(formatNumber(n, cmp.plain === true), unit),
         missing: false,
       };
     }
     case 'dimensions': {
       const d = readDimensions(trimmed, unit);
       if (!d) return { raw: trimmed, num: null, text: withUnit(trimmed, unit), missing: false };
+      const shown = withUnit(d.axes.map((a) => formatNumber(a)).join(' × '), unit);
       return {
         raw: trimmed,
         num: d.magnitude,
-        text: withUnit(d.axes.map(formatNumber).join(' × '), unit),
+        // The segment a multi-nozzle value was read from is SAID, so «256 × 256
+        // × 260 mm» is never mistaken for the whole of what the vendor quoted.
+        text: d.segment ? `${shown} (${d.segment})` : shown,
         missing: false,
         axes: d.axes,
       };

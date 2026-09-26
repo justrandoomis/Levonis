@@ -41,6 +41,8 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // 0135 — a section's pooled quantity delivery rule is an attribute of the
     // section, written on the taxonomy screen beside it.
     'category_delivery_rules',
+    // 0136 — a slug a section was renamed away from, so old links resolve.
+    'catalog_slug_history',
     /**
      * 0098 — THE COST LAYERS UNDER THE STOCK COUNTERS.
      *

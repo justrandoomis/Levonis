@@ -189,6 +189,8 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
    * two kilobytes; the re-upload is the expensive thing.
    */
   { table: 'catalogs', column: 'image_key', kind: 'text', why: 'the cover an admin set for a section on the home page (0100)' },
+  /** The category page's hero / explorer banner photo (0136) — same rules as `image_key`, including not narrowing by `active`. */
+  { table: 'catalogs', column: 'hero_image_key', kind: 'text', why: 'the hero photo an admin set for a section\'s category page (0136)' },
   { table: 'product_images', column: 'r2_key', kind: 'text', why: 'the canonical product image key (0048)' },
   { table: 'product_images', column: 'url', kind: 'text', why: 'the delivery path for the same image; older rows have only this' },
   { table: 'product_option_values', column: 'image', kind: 'text', why: 'per-option swatch' },

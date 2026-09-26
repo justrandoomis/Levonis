@@ -1046,6 +1046,26 @@ function checkSpecCell(f: TemplateField, raw: string, line: number, issues: RowI
   const v = raw.trim();
   if (v === '') return '';
   const col = `${SPEC_PREFIX}${f.id}`;
+  // A LIST drawn from the options (`use_cases`): every item must be one of
+  // them, and the cell is stored in the canonical spelling and order.
+  if (f.multiple && f.options && f.options.length) {
+    const picked: string[] = [];
+    for (const piece of v.split(/[,،;]/)) {
+      const item = piece.trim();
+      if (item === '') continue;
+      const hit = f.options.find((o) => o.toLowerCase() === item.toLowerCase());
+      if (!hit) {
+        issues.push({
+          line,
+          severity: 'error',
+          message: `${col}: "${item}" غير مقبول — القيم المتاحة: ${f.options.join(' / ')}`,
+        });
+        return '';
+      }
+      if (!picked.includes(hit)) picked.push(hit);
+    }
+    return f.options.filter((o) => picked.includes(o)).join(', ');
+  }
   if (f.options && f.options.length) {
     const hit = f.options.find((o) => o.toLowerCase() === v.toLowerCase());
     if (!hit) {

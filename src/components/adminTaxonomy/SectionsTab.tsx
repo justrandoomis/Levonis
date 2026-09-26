@@ -6,7 +6,7 @@
  * or sub-sections still use it, and says so).
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Plus, Pencil, Trash2, Power, CornerDownRight, Printer, Image as ImageIcon, Upload, RefreshCw, Truck } from 'lucide-react';
+import { Plus, Pencil, Trash2, Power, CornerDownRight, Printer, Image as ImageIcon, Upload, RefreshCw, Truck, GalleryHorizontal } from 'lucide-react';
 import { SectionDeliveryDialog, deliveryRuleSummary } from './SectionDeliveryDialog';
 import * as T from '../adminProducts/theme';
 import { ApiError, api } from '../../lib/api';
@@ -42,6 +42,13 @@ interface Props {
   notify: (tone: NoticeState['tone'], text: string) => void;
 }
 
+/** Mirrors worker/routes/adminTaxonomy.ts CATALOG_DESCRIPTION_MAX. */
+const DESCRIPTION_MAX = 280;
+const DESC_CLASS = `${T.input} w-full h-auto min-h-[64px] py-2 leading-relaxed resize-y`;
+
+/** Which of the section's two pictures a dialog edits (worker CATALOG_PICTURES). */
+type PictureKind = 'image' | 'hero-image';
+
 interface EditState {
   node: CatalogNode | null;
   parentId: string | null;
@@ -52,7 +59,7 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
   const [q, setQ] = useState('');
   const [edit, setEdit] = useState<EditState | null>(null);
   const [del, setDel] = useState<CatalogNode | null>(null);
-  const [picture, setPicture] = useState<CatalogNode | null>(null);
+  const [picture, setPicture] = useState<{ node: CatalogNode; kind: PictureKind } | null>(null);
   const [deliveryFor, setDeliveryFor] = useState<CatalogNode | null>(null);
   const [busyId, setBusyId] = useState('');
   // The button a dialog would restore focus to is inside the row it deletes,
@@ -160,12 +167,23 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
           <button
             type="button"
             className={T.btnIcon}
-            onClick={() => setPicture(c)}
+            onClick={() => setPicture({ node: c, kind: 'image' })}
             aria-label={loc('صورة القسم', 'Section image', 'وێنەی بەش')}
             title={loc('صورة القسم في الواجهة الرئيسية', 'The section’s picture on the home page')}
             data-tax-action="image"
           >
             <ImageIcon className="w-4 h-4" aria-hidden />
+          </button>
+          {/* OWNER: Sorani to be written by hand. */}
+          <button
+            type="button"
+            className={T.btnIcon}
+            onClick={() => setPicture({ node: c, kind: 'hero-image' })}
+            aria-label={loc('صورة واجهة صفحة القسم', 'Category page hero photo')}
+            title={loc('الصورة الكبيرة أعلى صفحة القسم وفي «كل الفئات»', 'The large photo at the top of the category page and in «All categories»')}
+            data-tax-action="hero-image"
+          >
+            <GalleryHorizontal className="w-4 h-4" aria-hidden />
           </button>
           <button
             type="button"
@@ -255,7 +273,8 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
 
       {picture && (
         <SectionImageDialog
-          node={picture}
+          node={picture.node}
+          kind={picture.kind}
           onClose={() => {
             setPicture(null);
             restoreFocus();
@@ -265,8 +284,8 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
             notify(
               'ok',
               removed
-                ? loc(`أُزيلت صورة «${nameOf(picture, lang)}».`, `The picture on "${nameOf(picture, lang)}" was removed.`)
-                : loc(`حُفظت صورة «${nameOf(picture, lang)}».`, `The picture on "${nameOf(picture, lang)}" was saved.`)
+                ? loc(`أُزيلت صورة «${nameOf(picture.node, lang)}».`, `The picture on "${nameOf(picture.node, lang)}" was removed.`)
+                : loc(`حُفظت صورة «${nameOf(picture.node, lang)}».`, `The picture on "${nameOf(picture.node, lang)}" was saved.`)
             );
           }}
         />
@@ -339,6 +358,11 @@ function SectionDialog({
   const [sort, setSort] = useState(String(node?.sort ?? 0));
   const [printer, setPrinter] = useState(node?.is_printer_catalog ?? false);
   const [active, setActiveState] = useState(node?.active ?? true);
+  // The category page's description (0136). Written by hand in each language;
+  // an empty one is simply not shown — the page never invents a line.
+  const [descAr, setDescAr] = useState(node?.description_ar ?? '');
+  const [descEn, setDescEn] = useState(node?.description_en ?? '');
+  const [descCkb, setDescCkb] = useState(node?.description_ckb ?? '');
 
   const parentNode = parent ? roots.find((r) => r.id === parent) : undefined;
   const isSub = !!parent;
@@ -355,7 +379,10 @@ function SectionDialog({
     family !== (node?.template_family ?? '') ||
     sort !== String(node?.sort ?? 0) ||
     printer !== (node?.is_printer_catalog ?? false) ||
-    active !== (node?.active ?? true);
+    active !== (node?.active ?? true) ||
+    descAr !== (node?.description_ar ?? '') ||
+    descEn !== (node?.description_en ?? '') ||
+    descCkb !== (node?.description_ckb ?? '');
 
   const title = node
     ? { ar: 'تعديل قسم', en: 'Edit section' }
@@ -382,6 +409,9 @@ function SectionDialog({
           sort: Number(sort) || 0,
           is_printer_catalog: printer,
           active,
+          description_ar: descAr.trim(),
+          description_en: descEn.trim(),
+          description_ckb: descCkb.trim(),
         };
         if (slug.trim()) body.slug = slug.trim();
         const res = await api.post<{ created: boolean; catalog: { name_ar: string; name_en: string } }>('/api/admin/taxonomy/catalogs', body);
@@ -458,6 +488,25 @@ function SectionDialog({
           <Check id="sec-printer" label={loc('قسم طابعات', 'Printer section')} hint={loc('يُستخدم في صفحات الطابعات والملحقات', 'Used by the printers and accessories pages')} checked={printer} onChange={setPrinter} />
           <Check id="sec-active" label={loc('مفعّل', 'Active')} hint={loc('القسم المعطّل لا يظهر في النموذج ولا في القالب', 'An inactive section is offered neither by the form nor by the template')} checked={active} onChange={setActiveState} />
         </div>
+        {/* OWNER: Sorani to be written by hand (the labels below carry ar/en only). */}
+        <div className="sm:col-span-2 grid gap-3.5" data-tax-descriptions>
+          <FieldRow
+            id="sec-desc-ar"
+            label={loc('الوصف بالعربية', 'Arabic description')}
+            hint={loc(
+              `سطر أو سطران تحت اسم القسم في صفحته وفي «كل الفئات». اتركه فارغًا ليُخفى. حتى ${DESCRIPTION_MAX} حرفًا.`,
+              `One or two lines under the section's name on its page and in «All categories». Leave empty to hide it. Up to ${DESCRIPTION_MAX} characters.`
+            )}
+          >
+            <textarea id="sec-desc-ar" className={DESC_CLASS} rows={2} maxLength={DESCRIPTION_MAX} value={descAr} onChange={(e) => setDescAr(e.target.value)} dir="rtl" />
+          </FieldRow>
+          <FieldRow id="sec-desc-en" label={loc('الوصف بالإنجليزية', 'English description')} ltr>
+            <textarea id="sec-desc-en" className={DESC_CLASS} rows={2} maxLength={DESCRIPTION_MAX} value={descEn} onChange={(e) => setDescEn(e.target.value)} />
+          </FieldRow>
+          <FieldRow id="sec-desc-ckb" label={loc('الوصف بالكردية', 'Kurdish description')} hint={loc('يُكتب يدويًا، ولا يُترجم آليًا.', 'Written by hand, never machine-translated.')}>
+            <textarea id="sec-desc-ckb" className={DESC_CLASS} rows={2} maxLength={DESCRIPTION_MAX} value={descCkb} onChange={(e) => setDescCkb(e.target.value)} dir="rtl" />
+          </FieldRow>
+        </div>
       </div>
     </Dialog>
   );
@@ -484,10 +533,13 @@ function SectionDialog({
  */
 function SectionImageDialog({
   node,
+  kind = 'image',
   onClose,
   onChanged,
 }: {
   node: CatalogNode;
+  /** `image` = the home tile's cover; `hero-image` = the category page's hero (0136). */
+  kind?: PictureKind;
   onClose: () => void;
   /** `removed` distinguishes a cleared picture from a newly uploaded one. */
   onChanged: (removed: boolean) => Promise<void>;
@@ -497,11 +549,12 @@ function SectionImageDialog({
   // and the table only re-reads after the parent's reload resolves, so
   // rendering `node.image_url` would leave the old picture on screen for as
   // long as that round trip takes — directly under the words "saved".
-  const [url, setUrl] = useState(node.image_url || '');
+  const hero = kind === 'hero-image';
+  const [url, setUrl] = useState((hero ? node.hero_image_url : node.image_url) || '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
-  const base = `/api/admin/taxonomy/catalogs/${encodeURIComponent(node.id)}/image`;
+  const base = `/api/admin/taxonomy/catalogs/${encodeURIComponent(node.id)}/${kind}`;
 
   const upload = async (file: File) => {
     setBusy(true);
@@ -510,8 +563,8 @@ function SectionImageDialog({
       const form = new FormData();
       form.append('file', file);
       form.append('originalName', file.name);
-      const res = await api.post<{ image_url: string }>(base, form);
-      setUrl(res.image_url || '');
+      const res = await api.post<{ image_url?: string; hero_image_url?: string }>(base, form);
+      setUrl((hero ? res.hero_image_url : res.image_url) || '');
       await onChanged(false);
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : errMsg(e));
@@ -540,8 +593,8 @@ function SectionImageDialog({
 
   return (
     <Modal
-      titleAr={`صورة «${nameOf(node, lang)}»`}
-      titleEn={`Picture for "${nameOf(node, lang)}"`}
+      titleAr={hero ? `صورة واجهة «${nameOf(node, lang)}»` : `صورة «${nameOf(node, lang)}»`}
+      titleEn={hero ? `Hero photo for "${nameOf(node, lang)}"` : `Picture for "${nameOf(node, lang)}"`}
       onClose={onClose}
       footer={
         <div className={`${T.AP} flex items-center justify-end gap-2`} data-tax-dialog="section-image">
@@ -561,7 +614,7 @@ function SectionImageDialog({
           {/* 4:3, the shape SubCard actually draws — a square preview would
               promise a framing the home page does not use, and the owner
               would only find out after uploading. */}
-          <span className="w-28 aspect-[4/3] shrink-0 rounded-xl bg-black border border-[var(--ap-border)] grid place-items-center overflow-hidden">
+          <span className={`${hero ? 'w-36 aspect-[16/9]' : 'w-28 aspect-[4/3]'} shrink-0 rounded-xl bg-black border border-[var(--ap-border)] grid place-items-center overflow-hidden`}>
             {url ? (
               <img src={url} alt="" className="w-full h-full object-cover" />
             ) : (
@@ -570,11 +623,17 @@ function SectionImageDialog({
           </span>
           <div className="min-w-0 grid gap-2">
             <p className="text-[12px] text-[var(--ap-text-3)] leading-relaxed">
-              {loc(
-                'تظهر هذه الصورة على بطاقة القسم في الصفحة الرئيسية. الصيغة WebP فقط، وبحد أقصى ٢ ميغابايت. الأفضل صورة عرضية بنسبة ٤:٣.',
-                'This picture is shown on the section’s card on the home page. WebP only, 2 MB at most. A landscape 4:3 image fits best.',
-                'ئەم وێنەیە لە کارتی بەش لە پەڕەی سەرەکی دەردەکەوێت. تەنها WebP، زۆرترین ٢ مێگابایت. وێنەی ٤:٣ باشترینە.'
-              )}
+              {hero
+                ? // OWNER: Sorani to be written by hand.
+                  loc(
+                    'تظهر هذه الصورة كبيرة أعلى صفحة القسم وعلى بطاقته في «كل الفئات». الصيغة WebP فقط، وبحد أقصى ٢ ميغابايت. الأفضل صورة عرضية للجهاز على خلفية داكنة.',
+                    'This photo is shown large at the top of the category page and on its banner in «All categories». WebP only, 2 MB at most. A landscape shot of the machine on a dark background fits best.'
+                  )
+                : loc(
+                    'تظهر هذه الصورة على بطاقة القسم في الصفحة الرئيسية. الصيغة WebP فقط، وبحد أقصى ٢ ميغابايت. الأفضل صورة عرضية بنسبة ٤:٣.',
+                    'This picture is shown on the section’s card on the home page. WebP only, 2 MB at most. A landscape 4:3 image fits best.',
+                    'ئەم وێنەیە لە کارتی بەش لە پەڕەی سەرەکی دەردەکەوێت. تەنها WebP، زۆرترین ٢ مێگابایت. وێنەی ٤:٣ باشترینە.'
+                  )}
             </p>
             <p className="text-[12px] text-[var(--ap-text-3)] leading-relaxed">
               {url

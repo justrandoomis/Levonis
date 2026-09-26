@@ -1,18 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { ArrowRight, ArrowLeft, PackageSearch } from 'lucide-react';
 import { api, ApiProduct, ResolvedCategory, ProductsListResponse } from '../lib/api';
 import Spinner from '../components/ui/Spinner';
-import SafeImage from '../components/ui/SafeImage';
 import { Skeleton, ProductGridSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
-import CardPrice from '../components/CardPrice';
-import OfferBadge from '../components/ui/OfferBadge';
-import Countdown from '../components/ui/Countdown';
-import { productPrimaryImage } from '../lib/productImage';
 import { readPageCache, writePageCache } from '../lib/pageCache';
-import DirectStockEdge from '../components/DirectStockEdge';
+import ProductCard from '../components/home/ProductCard';
+import { availableFirst, cardAvailability } from '../lib/productCard';
 import LiveSearch from '../components/search/LiveSearch';
 
 /** One page of the listing. The route's own ceiling (`limit` max 50). */
@@ -166,6 +162,19 @@ export default function Products() {
       loc('كل المنتجات', 'All products', 'هەموو بەرهەمەکان');
   const headingPending = !!category && !search && categoryRef === undefined;
 
+  /**
+   * «الأولوية بصريًا لمنتجات البيع المباشر والمتوفرة». Outside search (where
+   * the server's relevance ranking is the order), what can be bought for
+   * direct sale today comes first — a STABLE partition, so each group keeps
+   * the shop's own order — and a quiet divider names the second group.
+   */
+  const ordered = search ? { items: products, splitAt: -1 } : availableFirst(products);
+  const laterLabel =
+    ordered.splitAt > 0 && ordered.items.slice(ordered.splitAt).every((p) => cardAvailability(p).state === 'preorder')
+      ? loc('بطلب مسبق', 'Pre-order')
+      : loc('ليست في المخزون الآن', 'Not in stock right now');
+  // OWNER: Sorani to be written by hand (the two divider labels above).
+
   return (
     <div className="w-full pb-24 text-zinc-300 min-h-screen">
       <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-2.5 flex items-center gap-3">
@@ -219,7 +228,7 @@ export default function Products() {
 
       <div className="p-4">
         {loading && products.length === 0 ? (
-          <ProductGridSkeleton count={8} />
+          <ProductGridSkeleton count={8} density="compact" className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5" />
         ) : error != null ? (
           <ErrorState error={error} onRetry={fetchProducts} />
         ) : !loading && products.length === 0 ? (
@@ -243,70 +252,25 @@ export default function Products() {
             )}
           <div
             aria-busy={loading}
-            className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 transition-opacity ${loading ? 'opacity-50 pointer-events-none' : ''}`}
+            className={`grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5 transition-opacity ${loading ? 'opacity-50 pointer-events-none' : ''}`}
           >
-            {products.map(p => {
-              const firstImage = productPrimaryImage(p);
-              // §3/§12: the product name is English in every language and is never translated.
-              const name = p.name;
-              // §4: compare-at is gone; the SALE badge appears only when the
-              // server's tier-resolved display price genuinely undercuts the
-              // regular one. Price rendering itself is CardPrice — one block
-              // shared with the home rails and the bundles grid.
-              const displayPrice = p.display_price_iqd ?? p.price_iqd;
-              const regularPrice = p.display_regular_iqd ?? p.price_iqd;
-              const hasSale = displayPrice < regularPrice;
-
-              return (
-                // A COMPOSITION ROW LINKS TO WHERE IT CAN BE BOUGHT (§10).
-                // `worker/routes/products.ts` deliberately keeps bundles in the
-                // SEARCH branch, and its own comment says "the card links to
-                // /bundles/<slug>". It did not: every card pointed at the
-                // ordinary product renderer, which for a bundle has no
-                // component list, no saving line, no state chip, `stock: null`
-                // and a purchase control whose selection state is meaningless.
-                <Link
-                  to={p.product_slug ? `/bundles/${p.product_slug}` : `/product/${p.slug || p.id}`}
-                  key={p.id}
-                  className="relative bg-surface border border-border-subtle rounded-xl overflow-hidden flex flex-col group hover:bg-surface-raised transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                >
-                  <div className="relative aspect-square overflow-hidden bg-black">
-                    <SafeImage
-                      src={firstImage}
-                      alt={name}
-                      aspect="auto"
-                      className="w-full h-full group-hover:scale-105 transition-transform duration-500"
-                    />
-                    {/* ONE badge for one meaning (§13.2). The second,
-                        differently styled SALE pill that used to live here is
-                        retired: a product card, a bundle card and a bundle page
-                        now wear the same one, and its letter-spacing is
-                        conditional on latin content so «وفّر ٢٤٪» is not
-                        rendered as disconnected glyphs. */}
-                    {hasSale && <OfferBadge className="absolute top-2 end-2">SALE</OfferBadge>}
-                    {/* A scheduled special offer, on an ordinary card (§12).
-                        Decoration only — the API still refuses an expired
-                        offer — and one shared 1 Hz ticker drives the grid. */}
-                    {p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
-                      <span className="absolute bottom-2 start-2 rounded-md bg-black/70 px-1.5 py-0.5 backdrop-blur-sm">
-                        <Countdown
-                          target={p.offer.schedule_state === 'upcoming' ? p.offer.starts_at : p.offer.ends_at}
-                          kind={p.offer.schedule_state === 'upcoming' ? 'opens' : 'ends'}
-                          className="text-[10px] text-zinc-200"
-                        />
-                      </span>
-                    )}
+            {/* ONE CARD (CATALOG_DISCOVERY §4): the grid renders the shop's
+                compact ProductCard — two to a row on a phone — instead of a
+                second copy of it. The card links a composition row to where
+                it can be bought (§10, /bundles/<slug>) and every
+                other row to its product page (src/lib/productCard.ts). */}
+            {ordered.items.map((p, i) => (
+              <React.Fragment key={p.id}>
+                {i === ordered.splitAt && (
+                  <div role="separator" className="col-span-full flex items-center gap-3 pb-0.5 pt-2 text-[12px] font-bold text-text-muted">
+                    <span className="h-px flex-1 bg-border-subtle" />
+                    <span>{laterLabel}</span>
+                    <span className="h-px flex-1 bg-border-subtle" />
                   </div>
-                  <div className="p-3 flex flex-col flex-1">
-                    <h3 className="text-white font-medium text-sm line-clamp-2 mb-1">{name}</h3>
-                    <div className="mt-auto pt-2">
-                      <CardPrice p={p} />
-                    </div>
-                  </div>
-                  <DirectStockEdge product={p} />
-                </Link>
-              );
-            })}
+                )}
+                <ProductCard p={p} density="compact" compareToggle eager={i < 4} />
+              </React.Fragment>
+            ))}
           </div>
           {!exhausted && !loading && (
             <div className="mt-5 flex justify-center">

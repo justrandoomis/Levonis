@@ -82,14 +82,17 @@ const RESIN_BRANCH: SectionRef[] = [
 
 // ------------------------------------------------------------------- test 5
 
-test('5 — an FDM printer gets device-common + FDM only: 62 fields, no Resin', () => {
+// Catalog discovery (2026-09-26) added two printer-only fields to device-common
+// — `use_cases` «مناسبة لـ» and `has_laser_module` — so every printer count here
+// grew by exactly two, deliberately (docs/ux/CATALOG_DISCOVERY.md §9.6).
+test('5 — an FDM printer gets device-common + FDM only: 64 fields, no Resin', () => {
   const groups = groupsForSection('devices', FDM_BRANCH);
   assert.deepEqual(
     groups.map((g) => `${g.id}:${g.fields.length}`),
-    ['device_core:24', 'device_env:8', 'fdm:21', 'fdm_extrusion:4', 'fdm_motion:3', 'fdm_control:2'],
+    ['device_core:26', 'device_env:8', 'fdm:21', 'fdm_extrusion:4', 'fdm_motion:3', 'fdm_control:2'],
     'exactly the two groups an FDM machine should be asked about'
   );
-  assert.equal(flatFields(groups).length, 62);
+  assert.equal(flatFields(groups).length, 64);
 
   const shown = ids(FDM_BRANCH);
   for (const f of RESIN_FIELDS) {
@@ -101,10 +104,10 @@ test('5 — an FDM printer gets device-common + FDM only: 62 fields, no Resin', 
 
 // ------------------------------------------------------------------- test 6
 
-test('6 — a Resin printer gets device-common + Resin only: 46 fields, no FDM', () => {
+test('6 — a Resin printer gets device-common + Resin only: 48 fields, no FDM', () => {
   const groups = groupsForSection('devices', RESIN_BRANCH);
-  assert.deepEqual(groups.map((g) => `${g.id}:${g.fields.length}`), ['device_core:24', 'device_env:8', 'resin:10', 'resin_motion:4']);
-  assert.equal(flatFields(groups).length, 46);
+  assert.deepEqual(groups.map((g) => `${g.id}:${g.fields.length}`), ['device_core:26', 'device_env:8', 'resin:10', 'resin_motion:4']);
+  assert.equal(flatFields(groups).length, 48);
 
   const shown = ids(RESIN_BRANCH);
   for (const f of RESIN_FIELDS) assert.ok(shown.includes(f), `"${f}" went missing from a Resin printer`);
@@ -120,7 +123,7 @@ test('a renamed slug does not widen the form back to the full union', () => {
     { id: 'cat_printers_fdm', slug: 'bambu-machines' },
     { id: 'cat_printers', slug: 'printers' },
   ];
-  assert.equal(flatFields(groupsForSection('devices', renamed)).length, 62);
+  assert.equal(flatFields(groupsForSection('devices', renamed)).length, 64);
   assert.equal(productTypeForBranch('devices', renamed), 'printer', 'and it is still a printer');
 });
 
@@ -128,7 +131,7 @@ test("0018's slug fallbacks are recognised, because a colliding store gets them"
   // 0018: `fdm-printers` taken → `fdm-printers-levo`; that taken too → the id.
   for (const slug of ['fdm-printers', 'fdm-printers-levo', 'cat_printers_fdm']) {
     const branch: SectionRef[] = [{ id: 'unknown', slug }];
-    assert.equal(flatFields(groupsForSection('devices', branch)).length, 62, `slug "${slug}" was not recognised`);
+    assert.equal(flatFields(groupsForSection('devices', branch)).length, 64, `slug "${slug}" was not recognised`);
   }
 });
 
@@ -136,14 +139,14 @@ test("0018's slug fallbacks are recognised, because a colliding store gets them"
 
 test('a product filed directly under «الطابعات» keeps both, because the section has not said', () => {
   const groups = groupsForSection('devices', [{ id: 'cat_printers', slug: 'printers' }]);
-  assert.equal(flatFields(groups).length, 76, 'the union is the honest answer when the branch names no technology');
+  assert.equal(flatFields(groups).length, 78, 'the union is the honest answer when the branch names no technology');
   assert.deepEqual(groups.map((g) => g.id), ['device_core', 'device_env', 'fdm', 'fdm_extrusion', 'fdm_motion', 'fdm_control', 'resin', 'resin_motion']);
 });
 
 test('a section nobody seeded still gets its type, never an empty form', () => {
   const invented: SectionRef[] = [{ id: 'cat_9f3a', slug: 'my-new-printers' }];
   assert.equal(productTypeForBranch('devices', invented), 'printer');
-  assert.equal(flatFields(groupsForSection('devices', invented)).length, 76);
+  assert.equal(flatFields(groupsForSection('devices', invented)).length, 78);
 });
 
 // ------------------------------------------------------------ the other axes
@@ -231,8 +234,8 @@ test('the import sheet narrows exactly as the form does', () => {
 
 test('a sheet asked for by TYPE alone keeps the union — no section was chosen', () => {
   const shape = templateShape('printer');
-  assert.equal(shape.specFields.length, 76);
-  assert.equal(flatFields(groupsForType('printer')).length, 76);
+  assert.equal(shape.specFields.length, 78);
+  assert.equal(flatFields(groupsForType('printer')).length, 78);
 });
 
 test('a section narrows within an explicitly requested type, and never overrules it', () => {
@@ -267,9 +270,9 @@ test('a section narrows within an explicitly requested type, and never overrules
 // ------------------------------------------------- the legacy slug-only entry
 
 test('the slug-only `fieldsFor` narrows too, so no caller is left on the old behaviour', () => {
-  assert.equal(flatFields(fieldsFor('devices', ['fdm-printers', 'printers'])).length, 62);
-  assert.equal(flatFields(fieldsFor('devices', ['resin-printers', 'printers'])).length, 46);
-  assert.equal(flatFields(fieldsFor('devices', ['printers'])).length, 76);
+  assert.equal(flatFields(fieldsFor('devices', ['fdm-printers', 'printers'])).length, 64);
+  assert.equal(flatFields(fieldsFor('devices', ['resin-printers', 'printers'])).length, 48);
+  assert.equal(flatFields(fieldsFor('devices', ['printers'])).length, 78);
 });
 
 
@@ -305,7 +308,7 @@ test('the endpoint ProductForm calls returns the FDM field set for the seeded FD
   assert.equal(body.product_type, 'printer');
   assert.deepEqual(body.groups.map((g) => g.id), ['device_core', 'device_env', 'fdm', 'fdm_extrusion', 'fdm_motion', 'fdm_control']);
   const fields = body.groups.flatMap((g) => g.fields.map((f) => f.id));
-  assert.equal(fields.length, 62);
+  assert.equal(fields.length, 64);
   for (const f of RESIN_FIELDS) assert.ok(!fields.includes(f), `the form would still render "${f}"`);
   // Leaf first — the narrowing depends on it.
   assert.deepEqual(body.section_ids, ['cat_printers_fdm', 'cat_printers']);
@@ -315,7 +318,7 @@ test('and the Resin field set for the seeded Resin section, with no FDM fields',
   const body = await templateFor('cat_printers_resin');
   assert.deepEqual(body.groups.map((g) => g.id), ['device_core', 'device_env', 'resin', 'resin_motion']);
   const fields = body.groups.flatMap((g) => g.fields.map((f) => f.id));
-  assert.equal(fields.length, 46);
+  assert.equal(fields.length, 48);
   for (const f of FDM_FIELDS) assert.ok(!fields.includes(f));
 });
 
