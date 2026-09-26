@@ -192,21 +192,24 @@ test('the status bar is opaque — never translucent — and it takes the theme�
   // that; the full-screen shells (Settings, both checkouts, admin) draw their
   // own sticky bar with no top inset, so translucency would slide them under
   // the status bar on every notched iPhone. The app has two themes now
-  // (src/index.css): the markup ships `default` (the light theme is the
-  // default) and the pre-paint theme script rewrites it to `black` for a
-  // reader who chose dark, before iOS reads it.
+  // (src/index.css): the markup ships `default` (the light theme's bar) and
+  // the pre-paint theme script rewrites it to `black` for a reader who chose
+  // dark — or whose device is dark, the default — before iOS reads it.
   assert.equal(meta('apple-mobile-web-app-status-bar-style'), 'default');
   assert.ok(!/black-translucent/.test(MARKUP.replace(/<!--[\s\S]*?-->/g, '')));
   assert.match(MARKUP, /apple-mobile-web-app-status-bar-style"\]'\);if\(m\)[^<]*if\(b\)b\.setAttribute\('content',d\?'black':'default'\)/);
 });
 
 test('the first frame is painted in the theme’s own ground, and the browser chrome agrees', () => {
-  // Light (#e3dacb, ivory) unless the reader chose dark (#0b0c0f); the inline
-  // theme script rewrites theme-color before anything paints
-  // (tests/themeSystem.test.ts pins that script and its CSP hash).
+  // Light (#e3dacb, ivory) or dark (#0b0c0f), as the reader chose or — with
+  // no choice — as the device is set; the inline theme script rewrites
+  // theme-color before anything paints (tests/themeSystem.test.ts pins that
+  // script and its CSP hash).
   assert.equal(meta('theme-color'), '#e3dacb');
   assert.match(MARKUP, /html, body \{ background-color: #e3dacb; margin: 0; \}/);
   assert.match(MARKUP, /html\[data-theme="dark"\], html\[data-theme="dark"\] body \{ background-color: #0b0c0f; \}/);
+  // With the script blocked there is no data-theme: a dark device still gets a dark frame.
+  assert.match(MARKUP, /@media \(prefers-color-scheme: dark\) \{\s*html:not\(\[data-theme\]\), html:not\(\[data-theme\]\) body \{ background-color: #0b0c0f; \}/);
   assert.match(MARKUP, /<html lang="ar" dir="rtl"/);
   assert.match(MARKUP, /viewport-fit=cover/);
 });

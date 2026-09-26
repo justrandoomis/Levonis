@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { X, UserRound } from 'lucide-react';
 import { api } from '../../lib/api';
@@ -6,29 +6,37 @@ import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import { Sheet } from '../ui/Overlay';
 import { onboardingStrings, missingLabel } from '../onboarding/strings';
+import { isQuietRoute, setProfileStep } from '../../lib/firstRun';
 
 /**
- * "Complete your profile" — once, then progressively less often.
+ * "Complete your profile" — ONCE, right after the account is created.
  *
- * THE FAILURE MODE THIS IS DESIGNED AGAINST is the one everybody has seen: a
- * prompt that reappears on every page load until it is filled in. Three
- * things prevent it here.
+ * The owner: «اجعل اكمال الملف الشخصي تظهر بعد انشاء الحساب لمره واحده (سواء
+ * كان عبر كوكل او رقم او تلي او اي وسيله)». It used to be a reminder on a
+ * widening schedule that skipped every account still in the signup wizard —
+ * and only some signups ever reached the wizard, so a phone, Telegram or
+ * sign-in-view Google account was never asked at all. Now:
  *
- *   1. WHETHER TO ASK IS DECIDED BY THE SERVER. `shouldPrompt` comes from a
- *      timestamp on the user row, so dismissing on a phone also dismisses on
- *      a laptop, and clearing site data does not restart the nagging. A
- *      localStorage flag would have been per-device and per-browser.
- *   2. THE INTERVAL WIDENS. Three days, then a week, then a month, then
- *      ninety days. Somebody who has said "later" four times has answered.
- *   3. IT ASKS ONCE PER SESSION AT MOST, and never during checkout — a modal
- *      over a payment step is how a sale is lost.
+ *   1. EVERY SIGNUP LANDS HERE. Auth no longer sends a new account to
+ *      /welcome; whatever the method, the account arrives as
+ *      `onboarding === 'new'` and this sheet is what greets it. «أكمل الآن»
+ *      opens the /welcome wizard, which is still the place the fields are
+ *      filled in.
+ *   2. WHETHER TO ASK IS DECIDED BY THE SERVER, from the user row
+ *      (`shouldPromptCompletion`), so it holds on every device and survives
+ *      clearing site data.
+ *   3. IT IS STAMPED THE MOMENT IT IS SHOWN (POST /completion/seen), not when
+ *      it is answered — a sheet the person walked away from does not come
+ *      back. Closing it moves the account to 'skipped' (POST
+ *      /completion/dismiss); the wizard's own finish moves it to 'done'.
+ *   4. It never shows on a route where an interruption costs something
+ *      (checkout, the cart, the wizard itself); it waits for the next page.
  *
- * It is also never shown to somebody still in the signup wizard: that is
- * already asking the same questions.
+ * WHAT COMES NEXT. Closing it, either way, hands over to the theme sheet
+ * (src/components/profile/ThemeIntroSheet.tsx) through src/lib/firstRun.ts,
+ * which owns the order: the theme sheet never opens before this one has had
+ * its turn.
  */
-
-/** Routes where an interruption costs the person something. */
-const NEVER_ON = ['/auth', '/welcome', '/checkout', '/cart', '/edit-profile'];
 
 interface CompletionResponse {
   percent: number;
@@ -38,7 +46,7 @@ interface CompletionResponse {
 }
 
 export default function CompleteProfileSheet() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { lang } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
@@ -46,48 +54,76 @@ export default function CompleteProfileSheet() {
 
   const [data, setData] = useState<CompletionResponse | null>(null);
   const [open, setOpen] = useState(false);
-  /** Asked already in THIS tab — independent of the server's schedule. */
-  const [askedThisSession, setAskedThisSession] = useState(false);
+  /** The account this tab already asked the server about. */
+  const askedFor = useRef<string | null>(null);
+  const stamped = useRef(false);
+
+  const userId = user?.id ?? null;
+  const firstRun = user?.onboarding === 'new';
 
   useEffect(() => {
-    if (!user || askedThisSession) return;
-    if (user.onboarding === 'new') return; // the wizard is asking
-    let alive = true;
+    if (!userId || askedFor.current === userId) return;
+    askedFor.current = userId;
+    // An account past its first run never pays for the request.
+    if (!firstRun) {
+      setProfileStep(userId, 'none');
+      return;
+    }
+    // No cancel-on-cleanup: the guard above means a re-run (StrictMode, a
+    // refreshed user object) does not ask again, so the one answer must land.
+    // It is dropped only if the account changed while it was in flight.
     api
       .get<{ success: true } & CompletionResponse>('/api/profile/completion')
       .then((r) => {
-        if (!alive) return;
+        if (askedFor.current !== userId) return;
         setData(r);
-        // Marked ASKED whether or not it opened: the question was put to the
-        // server once for this tab, and asking again on every user-object
-        // change would be a request per navigation for an answer that only
-        // moves on a timescale of days.
-        setAskedThisSession(true);
-        if (r.shouldPrompt && !r.complete) setOpen(true);
+        if (r.shouldPrompt && !r.complete) {
+          setOpen(true);
+          setProfileStep(userId, 'open');
+        } else {
+          setProfileStep(userId, 'none');
+        }
       })
       .catch(() => {
-        /* A prompt that cannot load is a prompt that is not shown. */
+        // A prompt that cannot load is not shown — and the step stays
+        // 'pending', so the theme sheet does not jump the queue either.
+        if (askedFor.current === userId) askedFor.current = null;
       });
-    return () => {
-      alive = false;
-    };
-  }, [user, askedThisSession]);
+  }, [userId, firstRun]);
 
-  const suppressed = NEVER_ON.some((p) => location.pathname === p || location.pathname.startsWith(`${p}/`));
+  const suppressed = isQuietRoute(location.pathname);
   const visible = open && !!data && !suppressed;
 
-  const dismiss = async () => {
+  // Stamped on SCREEN, once: from here on the server never asks again.
+  useEffect(() => {
+    if (!visible || stamped.current) return;
+    stamped.current = true;
+    api.post('/api/profile/completion/seen', {}).catch(() => {
+      /* the close below stamps it too */
+    });
+  }, [visible]);
+
+  const close = () => {
     setOpen(false);
+    if (userId) setProfileStep(userId, 'closed');
+  };
+
+  const dismiss = async () => {
+    close();
     try {
       await api.post('/api/profile/completion/dismiss', {});
+      await refreshUser();
     } catch {
-      // The next load simply asks again — better than blocking the close.
+      // Already stamped as seen on arrival; the server will not ask again.
     }
   };
 
   const complete = () => {
-    setOpen(false);
-    navigate('/edit-profile');
+    close();
+    // The wizard is the fill-in-the-fields flow for a new account; it carries
+    // the person back to the page they were on when they finish or skip it.
+    const here = `${location.pathname}${location.search}`;
+    navigate(`/welcome?next=${encodeURIComponent(here)}`);
   };
 
   // At most four lines. A list of seven things to do reads as a chore.

@@ -386,8 +386,8 @@ async function main() {
     `status ${reservedSignup.status} code=${reservedSignup.json?.code}`);
 
   // Profile completion: computed from the fields on every read, and the
-  // decision to PROMPT is the server's so a dismissal follows the person
-  // across devices.
+  // decision to PROMPT is the server's — once per account, right after it is
+  // created, whatever the signup method — so it holds across devices.
   const completion = await shopper.req('GET', APEX, '/api/profile/completion');
   check('the account reports what its profile is missing', completion.status === 200 && Array.isArray(completion.json?.missing),
     `status ${completion.status}`);
@@ -395,26 +395,20 @@ async function main() {
     check('a brand-new account is not complete, and says which pieces are missing',
       completion.json.complete === false && completion.json.missing.length > 0,
       `percent=${completion.json.percent} missing=${JSON.stringify(completion.json.missing)}`);
-    // Straight after signup the wizard is asking, so the prompt must not.
-    check('the completion prompt does not fire on top of the signup wizard',
-      completion.json.shouldPrompt === false,
+    check('a brand-new account IS asked, once',
+      completion.json.shouldPrompt === true,
       `onboarding=${completion.json.onboarding} shouldPrompt=${completion.json.shouldPrompt}`);
   }
 
-  const skipped = await shopper.req('POST', APEX, '/api/profile/onboarding', { state: 'skipped' });
-  check('the signup wizard can be skipped, and the account stays usable',
-    skipped.status === 200 && skipped.json?.user?.onboarding === 'skipped',
-    `status ${skipped.status} onboarding=${skipped.json?.user?.onboarding}`);
-
-  const afterSkip = await shopper.req('GET', APEX, '/api/profile/completion');
-  check('skipping does not put the prompt on the very next page',
-    afterSkip.json?.shouldPrompt === false,
-    `shouldPrompt=${afterSkip.json?.shouldPrompt}`);
-
   const dismissed = await shopper.req('POST', APEX, '/api/profile/completion/dismiss', {});
-  check('"maybe later" is recorded on the SERVER, with a date it may ask again',
-    dismissed.status === 200 && typeof dismissed.json?.nextPromptAt === 'string',
-    `status ${dismissed.status} next=${dismissed.json?.nextPromptAt}`);
+  check('closing the sheet is recorded on the SERVER and ends the first run',
+    dismissed.status === 200 && dismissed.json?.user?.onboarding === 'skipped',
+    `status ${dismissed.status} onboarding=${dismissed.json?.user?.onboarding}`);
+
+  const afterClose = await shopper.req('GET', APEX, '/api/profile/completion');
+  check('the sheet is never asked for again',
+    afterClose.json?.shouldPrompt === false,
+    `shouldPrompt=${afterClose.json?.shouldPrompt}`);
 
   section('5. one cart, wherever they are shopping');
   const catalog = await anon.req('GET', APEX, '/api/products?limit=25');

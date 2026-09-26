@@ -15,8 +15,9 @@
                        Latin font fallbacks for Arabic text, and a screen
                        reader announced the page in the wrong language.
 
-  the theme script     The app has two themes, light (the default) and dark,
-                       chosen in Settings → «المظهر». The one inline script
+  the theme script     The app has two themes, light and dark, chosen in
+                       Settings → «المظهر»; with no choice made it follows
+                       the device («حسب الجهاز»). The one inline script
                        below reads that choice and writes `data-theme`,
                        `color-scheme` and the two browser-chrome metas BEFORE
                        anything paints, so a light page never flashes black
@@ -260,7 +261,7 @@
       was saying in the first place.
     -->
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <script>(function(){var p,d,t,r=document.documentElement,m,b;try{p=localStorage.getItem('levonis.theme.v1')}catch(e){}d=p==='dark'||(p==='system'&&!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);t=d?'dark':'light';r.setAttribute('data-theme',t);r.style.colorScheme=t;m=document.querySelector('meta[name="theme-color"]');b=document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');if(m)m.setAttribute('content',d?'#0b0c0f':'#e3dacb');if(b)b.setAttribute('content',d?'black':'default')})()</script>
+    <script>(function(){var p,d,t,r=document.documentElement,m,b;try{p=localStorage.getItem('levonis.theme.v1')}catch(e){}d=p==='dark'||(p!=='light'&&!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);t=d?'dark':'light';r.setAttribute('data-theme',t);r.style.colorScheme=t;m=document.querySelector('meta[name="theme-color"]');b=document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');if(m)m.setAttribute('content',d?'#0b0c0f':'#e3dacb');if(b)b.setAttribute('content',d?'black':'default')})()</script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -287,6 +288,11 @@
          script above chose, so the first frame is already the right colour. */
       html, body { background-color: #e3dacb; margin: 0; }
       html[data-theme="dark"], html[data-theme="dark"] body { background-color: #0b0c0f; }
+      /* The script did not run (blocked, or a very old browser): the default
+         is the device's theme, so a dark phone must not get an ivory frame. */
+      @media (prefers-color-scheme: dark) {
+        html:not([data-theme]), html:not([data-theme]) body { background-color: #0b0c0f; }
+      }
       #root { min-height: 100dvh; background-color: inherit; }
     </style>
   </head>

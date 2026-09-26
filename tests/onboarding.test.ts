@@ -13,9 +13,9 @@
  *   stale; this one is computed from the fields on every read, so the test is
  *   that it tracks the fields rather than that it was set correctly once.
  *
- *   A PROMPT THAT NEVER STOPS. The interval widens, the decision is made
- *   server-side so a dismissal follows the person across devices, and
- *   somebody still in the signup wizard is never asked twice at once.
+ *   A PROMPT THAT NEVER STOPS. «أكمل ملفك الشخصي» is asked ONCE, right after
+ *   the account is created — whatever the signup method — and the decision
+ *   is made server-side, so a close follows the person across devices.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,7 +36,6 @@ import {
 } from '../worker/lib/usernames';
 import {
   computeCompletion,
-  nextPromptAt,
   shouldPromptCompletion,
   isPlaceholderEmail,
 } from '../worker/lib/profileCompletion';
@@ -259,43 +258,31 @@ test('a one-character name is not a name', () => {
 
 // ------------------------------------------------------- asking, and stopping
 
-const NOW = new Date('2026-03-01T12:00:00Z');
 
 test('a complete profile is never prompted', () => {
-  assert.equal(shouldPromptCompletion(FULL, NOW), false);
+  assert.equal(shouldPromptCompletion({ ...FULL, onboarding_state: 'new' }), false);
 });
 
-test('somebody still IN the signup wizard is not prompted on top of it', () => {
-  const c = { ...FULL, avatar_key: null, onboarding_state: 'new' };
-  assert.equal(shouldPromptCompletion(c, NOW), false);
+test('a brand-new account that has never been shown the sheet IS prompted', () => {
+  assert.equal(shouldPromptCompletion({ ...FULL, avatar_key: null, onboarding_state: 'new' }), true);
 });
 
-test('an incomplete profile that has never been asked IS prompted', () => {
-  assert.equal(shouldPromptCompletion({ ...FULL, avatar_key: null, onboarding_state: 'done' }, NOW), true);
+test('once shown, never again — whether it was closed, completed, or walked away from', () => {
+  const shown = { ...FULL, avatar_key: null, onboarding_state: 'new', profile_prompt_at: '2026-03-01T12:00:00Z' };
+  assert.equal(shouldPromptCompletion(shown), false);
+  for (const state of ['skipped', 'done']) {
+    assert.equal(shouldPromptCompletion({ ...FULL, avatar_key: null, onboarding_state: state }), false, state);
+  }
 });
 
-test('a dismissal holds until its time is up, then asks again', () => {
-  const base = { ...FULL, avatar_key: null, onboarding_state: 'done' };
-  const soon = new Date(NOW.getTime() + 86_400_000).toISOString(); // tomorrow
-  assert.equal(shouldPromptCompletion({ ...base, profile_prompt_at: soon }, NOW), false);
-  const past = new Date(NOW.getTime() - 1000).toISOString();
-  assert.equal(shouldPromptCompletion({ ...base, profile_prompt_at: past }, NOW), true);
-});
-
-test('the interval WIDENS — four "later"s is an answer', () => {
-  const days = [0, 1, 2, 3, 4, 10].map((n) => {
-    const at = Date.parse(nextPromptAt(n, NOW));
-    return Math.round((at - NOW.getTime()) / 86_400_000);
-  });
-  assert.deepEqual(days, [3, 7, 30, 90, 90, 90]);
-  // Strictly non-decreasing: a later dismissal can never bring the prompt
-  // back sooner than an earlier one.
-  for (let i = 1; i < days.length; i++) assert.ok(days[i] >= days[i - 1]);
-});
-
-test('an unreadable stored timestamp asks rather than going silent forever', () => {
-  const base = { ...FULL, avatar_key: null, onboarding_state: 'done', profile_prompt_at: 'not-a-date' };
-  assert.equal(shouldPromptCompletion(base, NOW), true);
+test('an account from before the question existed is not asked, however incomplete', () => {
+  // Migration 0033 moved every account that existed then to 'existing'; the
+  // old widening reminder is gone, so none of them is asked again.
+  assert.equal(shouldPromptCompletion({ onboarding_state: 'existing', email: 'a@b.co' }), false);
+  assert.equal(
+    shouldPromptCompletion({ ...FULL, avatar_key: null, onboarding_state: 'done', profile_prompt_at: 'not-a-date' }),
+    false
+  );
 });
 
 // ------------------------------------------------------------- the endpoints
@@ -314,47 +301,86 @@ test('the completion endpoint reports the same answer the library computes', asy
   const body = (await res.json()) as Record<string, unknown>;
   assert.equal(res.status, 200);
   assert.equal(body.complete, false);
-  assert.equal(body.shouldPrompt, true);
+  // An 'existing' account is past its first run: nothing is asked.
+  assert.equal(body.shouldPrompt, false);
   assert.ok(Array.isArray(body.missing));
   assert.ok((body.missing as string[]).includes('username'));
 });
 
-test('dismissing is remembered ON THE SERVER, so another device is not asked again', async () => {
-  const { raw, d1 } = db();
-  await seedUser(raw);
-  const a = app(d1, 'u1');
-  const first = await a.request('/api/profile/completion');
-  assert.equal(((await first.json()) as Record<string, unknown>).shouldPrompt, true);
+function newUser(raw: DatabaseSync, id: string, email: string) {
+  // No onboarding_state: the column default, exactly what every signup route inserts.
+  raw.prepare('INSERT INTO users (id,email,name) VALUES (?,?,?)').run(id, email, 'Sara');
+}
+const promptOf = async (d1: D1Database, id: string) =>
+  ((await (await app(d1, id).request('/api/profile/completion')).json()) as Record<string, unknown>).shouldPrompt;
 
-  await a.request('/api/profile/completion/dismiss', json({}));
-
-  // A DIFFERENT app instance — a different browser, as far as the server is
-  // concerned. Nothing about the dismissal lived in that browser.
-  const second = await app(d1, 'u1').request('/api/profile/completion');
-  const body = (await second.json()) as Record<string, unknown>;
-  assert.equal(body.shouldPrompt, false);
-  assert.equal(body.promptCount, 1);
+test('every signup route inserts a first-run account — the sheet is not tied to one method', () => {
+  // The email, Google, phone/WhatsApp and Telegram routes all INSERT without
+  // naming onboarding_state, so each new row takes the DEFAULT 'new'. A route
+  // that set it would opt its signups out of the sheet.
+  const auth = readFileSync(join(ROOT, 'worker/routes/auth.ts'), 'utf8');
+  const inserts = auth.match(/INSERT INTO users \([^)]*\)/g) ?? [];
+  assert.ok(inserts.length >= 5, `expected the five signup inserts, found ${inserts.length}`);
+  for (const ins of inserts) assert.doesNotMatch(ins, /onboarding_state|profile_prompt_at/, ins);
+  const { raw } = db();
+  newUser(raw, 'u9', 'n@x.co');
+  const row = raw.prepare('SELECT onboarding_state, profile_prompt_at FROM users WHERE id = ?').get('u9') as
+    { onboarding_state: string; profile_prompt_at: string | null };
+  assert.equal(row.onboarding_state, 'new');
+  assert.equal(row.profile_prompt_at, null);
 });
 
-test('repeated dismissals push the next prompt further out', async () => {
+test('shown once: the stamp is on the SERVER, so another device is not asked again', async () => {
   const { raw, d1 } = db();
-  await seedUser(raw);
-  const a = app(d1, 'u1');
-  const at: number[] = [];
-  for (let i = 0; i < 3; i++) {
-    const r = (await (await a.request('/api/profile/completion/dismiss', json({}))).json()) as
-      Record<string, unknown>;
-    at.push(Date.parse(String(r.nextPromptAt)));
-  }
-  assert.ok(at[1] > at[0], 'the second dismissal did not push further out');
-  assert.ok(at[2] > at[1], 'the third dismissal did not push further out');
+  newUser(raw, 'u1', 'sara@example.com');
+  assert.equal(await promptOf(d1, 'u1'), true);
+  const seen = await app(d1, 'u1').request('/api/profile/completion/seen', json({}));
+  assert.equal(seen.status, 200);
+  // A DIFFERENT app instance — a different browser, as far as the server is concerned.
+  assert.equal(await promptOf(d1, 'u1'), false);
+  // Idempotent: a second stamp keeps the first.
+  const first = (raw.prepare('SELECT profile_prompt_at FROM users WHERE id = ?').get('u1') as { profile_prompt_at: string }).profile_prompt_at;
+  await app(d1, 'u1').request('/api/profile/completion/seen', json({}));
+  const again = raw.prepare('SELECT profile_prompt_at, profile_prompt_count FROM users WHERE id = ?').get('u1') as
+    { profile_prompt_at: string; profile_prompt_count: number };
+  assert.equal(again.profile_prompt_at, first);
+  assert.equal(again.profile_prompt_count, 1);
 });
 
-test('finishing the wizard records "done"; skipping records "skipped" and delays the prompt', async () => {
+test('closing the sheet ends the first run ("skipped"), and never overwrites a "done"', async () => {
   const { raw, d1 } = db();
-  await seedUser(raw);
-  raw.prepare("UPDATE users SET onboarding_state = 'new' WHERE id = 'u1'").run();
+  newUser(raw, 'u1', 'sara@example.com');
+  const res = await app(d1, 'u1').request('/api/profile/completion/dismiss', json({}));
+  const body = (await res.json()) as { user: Record<string, unknown> };
+  assert.equal(res.status, 200);
+  assert.equal(body.user.onboarding, 'skipped');
+  assert.equal(await promptOf(d1, 'u1'), false);
 
+  newUser(raw, 'u2', 'b@example.com');
+  raw.prepare("UPDATE users SET onboarding_state = 'done' WHERE id = 'u2'").run();
+  await app(d1, 'u2').request('/api/profile/completion/dismiss', json({}));
+  assert.equal((raw.prepare('SELECT onboarding_state FROM users WHERE id = ?').get('u2') as { onboarding_state: string }).onboarding_state, 'done');
+});
+
+test('a person can only stamp their OWN row — an id in the body is ignored', async () => {
+  const { raw, d1 } = db();
+  newUser(raw, 'u1', 'a@example.com');
+  newUser(raw, 'u2', 'b@example.com');
+  await app(d1, 'u1').request('/api/profile/completion/seen', json({ userId: 'u2', id: 'u2' }));
+  await app(d1, 'u1').request('/api/profile/completion/dismiss', json({ userId: 'u2', id: 'u2' }));
+  const other = raw.prepare('SELECT onboarding_state, profile_prompt_at FROM users WHERE id = ?').get('u2') as
+    { onboarding_state: string; profile_prompt_at: string | null };
+  assert.equal(other.onboarding_state, 'new');
+  assert.equal(other.profile_prompt_at, null);
+  assert.equal(await promptOf(d1, 'u2'), true);
+  // Signed out, the routes are closed.
+  const anon = await app(d1).request('/api/profile/completion/seen', json({}));
+  assert.equal(anon.status, 401);
+});
+
+test('finishing the wizard records "done"; skipping records "skipped"; either one ends the sheet', async () => {
+  const { raw, d1 } = db();
+  newUser(raw, 'u1', 'sara@example.com');
   const done = await app(d1, 'u1').request('/api/profile/onboarding', json({ state: 'done' }));
   assert.equal(done.status, 200);
   assert.equal(
@@ -362,16 +388,15 @@ test('finishing the wizard records "done"; skipping records "skipped" and delays
       .onboarding_state,
     'done'
   );
+  assert.equal(await promptOf(d1, 'u1'), false);
 
-  raw.prepare("UPDATE users SET onboarding_state = 'new', profile_prompt_at = NULL WHERE id = 'u1'").run();
-  await app(d1, 'u1').request('/api/profile/onboarding', json({ state: 'skipped' }));
-  const row = raw.prepare('SELECT onboarding_state, profile_prompt_at FROM users WHERE id = ?').get('u1') as
+  newUser(raw, 'u2', 'b@example.com');
+  await app(d1, 'u2').request('/api/profile/onboarding', json({ state: 'skipped' }));
+  const row = raw.prepare('SELECT onboarding_state, profile_prompt_at FROM users WHERE id = ?').get('u2') as
     { onboarding_state: string; profile_prompt_at: string | null };
   assert.equal(row.onboarding_state, 'skipped');
-  // Skipping the wizard must not be followed by the same request one page
-  // later — that is the exact behaviour this whole feature avoids.
-  assert.ok(row.profile_prompt_at, 'skipping the wizard left the prompt due immediately');
-  assert.ok(Date.parse(row.profile_prompt_at) > Date.now());
+  assert.ok(row.profile_prompt_at, 'the wizard did not stamp the sheet as asked');
+  assert.equal(await promptOf(d1, 'u2'), false);
 });
 
 test('a state the wizard never sends is refused', async () => {

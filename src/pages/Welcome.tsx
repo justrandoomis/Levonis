@@ -23,7 +23,8 @@ import { COUNTRIES, countryNames, flagOf, COMMON_ISO } from '../components/auth/
  * between a person and an account. Three of them are things most people are
  * happy to give once they are already inside, and none of them is needed to
  * create the account. So signup asks for what it needs and this asks for the
- * rest — later, and never twice.
+ * rest — later, and never twice. It is reached from the one-time «أكمل ملفك
+ * الشخصي» sheet (CompleteProfileSheet), which every signup method lands on.
  *
  * WHY THE PHONE IS ONLY MENTIONED HERE. A typed phone number proves nothing.
  * Ownership is proven by Telegram answering on it, which is a flow with its
@@ -63,8 +64,9 @@ export default function Welcome() {
     setAvatarUrl((a) => a ?? (user.avatar_key ? `/files/${user.avatar_key}` : null));
   }, [user]);
 
-  // Somebody who already finished (or skipped) setup has answered this. The
-  // gentler completion prompt is what follows up, not this wizard again.
+  // Somebody who already finished (or skipped) setup — or closed the
+  // first-run sheet that leads here — has answered this. It is never asked
+  // twice; the account page is where the fields live from then on.
   useEffect(() => {
     if (user && user.onboarding !== 'new') navigate(dest, { replace: true });
   }, [user, dest, navigate]);

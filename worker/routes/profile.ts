@@ -6,7 +6,7 @@ import { assertDecent } from '../lib/decency';
 import { newId, sha256Hex } from '../lib/crypto';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { allCountries } from '../lib/phone';
-import { computeCompletion, nextPromptAt, shouldPromptCompletion } from '../lib/profileCompletion';
+import { computeCompletion, shouldPromptCompletion } from '../lib/profileCompletion';
 import { rateLimit } from '../lib/ratelimit';
 import { isSafeMediaKey } from '../lib/mediaStorage';
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
@@ -201,7 +201,7 @@ profileRoutes.patch('/', async (c) => {
 //
 // Nothing in either is required to browse, buy or hold an account.
 
-/** What is missing, and whether it is time to ask about it. */
+/** What is missing, and whether this is the one time to ask about it. */
 profileRoutes.get('/completion', async (c) => {
   const user = c.get('user')!;
   const row = await c.env.DB.prepare(
@@ -218,33 +218,55 @@ profileRoutes.get('/completion', async (c) => {
   return c.json({
     success: true,
     ...completion,
-    // The ONE thing the client must not decide for itself. A dismissal kept
-    // in the browser is per-device and per-browser: the same person gets
-    // asked again on their phone, and again after clearing site data.
-    shouldPrompt: shouldPromptCompletion(row as never, new Date()),
+    // The ONE thing the client must not decide for itself. A "shown" flag
+    // kept in the browser is per-device and per-browser: the same person
+    // would be asked again on their phone, and again after clearing site data.
+    shouldPrompt: shouldPromptCompletion(row as never),
     promptCount: Number((row as { profile_prompt_count?: number }).profile_prompt_count ?? 0),
   });
 });
 
 /**
- * "Maybe later". Records the dismissal and schedules the next one further
- * out, so a person who keeps saying later is asked less and less rather than
- * the same amount forever.
+ * The sheet is on screen: stamp it, so it is never shown again — whatever
+ * happens next (a close, «أكمل الآن», the tab simply closed on it). Only the
+ * signed-in person's own row: there is no id to pass, so no way to set it for
+ * somebody else. Idempotent — a second call keeps the first stamp.
+ */
+profileRoutes.post('/completion/seen', async (c) => {
+  await rateLimit(c, 'completion-seen', 20, 3600);
+  const user = c.get('user')!;
+  await c.env.DB.prepare(
+    `UPDATE users SET profile_prompt_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                      profile_prompt_count = profile_prompt_count + 1
+      WHERE id = ? AND profile_prompt_at IS NULL`
+  )
+    .bind(user.id)
+    .run();
+  return c.json({ success: true });
+});
+
+/**
+ * "Later" — the sheet was closed without completing. That is an answer: the
+ * account leaves 'new' for 'skipped' (the wizard's own word for the same
+ * outcome), and the sheet is stamped as shown if it was not already.
+ * `WHERE onboarding_state = 'new'` so a close can never overwrite a 'done'.
  */
 profileRoutes.post('/completion/dismiss', async (c) => {
   await rateLimit(c, 'completion-dismiss', 20, 3600);
   const user = c.get('user')!;
-  const row = await c.env.DB.prepare('SELECT profile_prompt_count FROM users WHERE id = ?')
-    .bind(user.id)
-    .first<{ profile_prompt_count: number }>();
-  const count = Number(row?.profile_prompt_count ?? 0);
-  const at = nextPromptAt(count, new Date());
-  await c.env.DB.prepare(
-    'UPDATE users SET profile_prompt_count = ?, profile_prompt_at = ? WHERE id = ?'
-  )
-    .bind(count + 1, at, user.id)
-    .run();
-  return c.json({ success: true, nextPromptAt: at, promptCount: count + 1 });
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE users SET profile_prompt_at = COALESCE(profile_prompt_at, strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+                        profile_prompt_count = CASE WHEN profile_prompt_at IS NULL THEN profile_prompt_count + 1 ELSE profile_prompt_count END
+        WHERE id = ?`
+    ).bind(user.id),
+    c.env.DB.prepare(
+      `UPDATE users SET onboarding_state = 'skipped', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        WHERE id = ? AND onboarding_state = 'new'`
+    ).bind(user.id),
+  ]);
+  const updated = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(user.id).first();
+  return c.json({ success: true, user: publicUser(updated as never) });
 });
 
 /**
@@ -252,8 +274,8 @@ profileRoutes.post('/completion/dismiss', async (c) => {
  *
  * SKIPPING IS A REAL OUTCOME, not a failure to complete: the account is
  * already created and fully usable by the time this is called. All this does
- * is stop the wizard from reappearing and let the gentler completion prompt
- * take over. `state` is the only required field for exactly that reason.
+ * is stop the wizard (and the first-run sheet) from reappearing. `state` is
+ * the only required field for exactly that reason.
  *
  * Profile fields are NOT saved here — PATCH /api/profile already does that,
  * with the avatar ownership check, the username cooldown and the reserved
@@ -272,15 +294,13 @@ profileRoutes.post('/onboarding', async (c) => {
     .bind(state, user.id)
     .run();
 
-  // Somebody who just walked through the wizard has been asked already;
-  // reappearing with the same request on the next page load is the exact
-  // behaviour this whole feature is meant to avoid. The first completion
-  // prompt therefore waits out the same interval a dismissal would earn.
-  if (state === 'skipped') {
-    await c.env.DB.prepare('UPDATE users SET profile_prompt_at = ? WHERE id = ? AND profile_prompt_at IS NULL')
-      .bind(nextPromptAt(0, new Date()), user.id)
-      .run();
-  }
+  // Somebody who walked through the wizard has been asked: the first-run
+  // sheet is stamped as shown too, so it cannot follow on the next page.
+  await c.env.DB.prepare(
+    "UPDATE users SET profile_prompt_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND profile_prompt_at IS NULL"
+  )
+    .bind(user.id)
+    .run();
 
   const updated = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(user.id).first();
   return c.json({ success: true, user: publicUser(updated as never) });

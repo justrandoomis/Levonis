@@ -254,6 +254,7 @@ const Settings = React.lazy(() => import('./pages/Settings'));
 const Subscription = React.lazy(() => import('./pages/Subscription'));
 const Welcome = React.lazy(() => import('./pages/Welcome'));
 import CompleteProfileSheet from './components/profile/CompleteProfileSheet';
+import ThemeIntroSheet from './components/profile/ThemeIntroSheet';
 /**
  * THE GAMES SURFACE IS ITS OWN CHUNK. The Printer Farm (its isometric room,
  * sheets and trilingual strings) is reached from /games, not from browsing
@@ -718,9 +719,12 @@ function AppContent() {
           corner near the nav — removed at the source, not covered up. */}
       <main id="main-scroll-container" className="flex-1 flex flex-col overflow-y-auto bg-black">
         <EmailVerifyBanner />
-        {/* Asks once, on the server's schedule, never on the routes where an
+        {/* The first run, each once and in this order (src/lib/firstRun.ts):
+            «أكمل ملفك الشخصي» right after the account is created, then
+            «اختر المظهر» once it has closed — never on the routes where an
             interruption costs the person something. */}
         <CompleteProfileSheet />
+        <ThemeIntroSheet />
         <ChunkBoundary>
         <Suspense fallback={<RouteFallback />}>
         <Routes>

@@ -54,9 +54,10 @@ test('with no identity at all it is the platform, and it is a valid manifest', (
 });
 
 test('the platform splash is the light theme’s ivory — the ground index.html paints first', () => {
-  // The app's default theme is light (src/index.css, THE TWO THEMES), and
-  // index.html's theme-color and pre-CSS inline style paint #e3dacb before
-  // the theme script runs. A merchant's store keeps its black (storeIcons).
+  // The app follows the device by default (src/lib/theme.ts), but a manifest
+  // is static and cannot ask the device: it keeps the light theme's ivory,
+  // the same #e3dacb index.html's markup carries before the theme script
+  // rewrites it. A merchant's store keeps its black (storeIcons).
   const shell = readFileSync(repo('index.html'), 'utf8');
   assert.match(shell, /<meta name="theme-color" content="#e3dacb"/);
   const m = buildWebManifest();

@@ -727,16 +727,12 @@ export default function Auth() {
     return err instanceof Error && err.message ? err.message : s.genericError;
   };
 
-  const finishAuth = (createdAccount = false) => {
-    // A brand-new account goes through setup first, carrying the intended
-    // destination with it so the person still lands where they were going.
-    // Signing IN never does — asking an existing customer to "set up their
-    // account" every time they log in is the behaviour this whole feature is
-    // meant to avoid.
-    if (createdAccount && !dest.startsWith('/api/')) {
-      navigate(`/welcome?next=${encodeURIComponent(dest)}`, { replace: true });
-      return;
-    }
+  // `createdAccount` is kept for the callers' sake but no longer changes the
+  // route: a brand-new account — by email, Google, phone or Telegram alike —
+  // lands where it was going, and the one-time «أكمل ملفك الشخصي» sheet
+  // (CompleteProfileSheet) greets it there. Sending only SOME signup methods
+  // to /welcome is how phone and Telegram accounts were never asked at all.
+  const finishAuth = (_createdAccount = false) => {
     // The Studio sign-in resume leg is a WORKER route, not an SPA page:
     // react-router would only render the catch-all for it. A full navigation
     // lets the worker mint the single-use handoff code and 302 onward to the
@@ -1054,10 +1050,9 @@ export default function Auth() {
         await loginWithGoogle(credential);
       }
       setSucceeded(true);
-      // The register/login distinction is the server's; the view only says
-      // which onboarding the person expected. Google can create an account
-      // on the sign-in view too, in which case the worker's response is the
-      // authority and /welcome self-skips for existing accounts.
+      // The register/login distinction is the server's: Google can create an
+      // account on the sign-in view too, and either way the account's own
+      // `onboarding` state decides whether the first-run sheet shows.
       finishAuth(view === 'signup');
     } catch (err) {
       if (err instanceof ApiError && (err.status === 503 || err.code === 'GOOGLE_NOT_CONFIGURED')) {

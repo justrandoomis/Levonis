@@ -1746,3 +1746,48 @@ html[data-lang-swap='ltr'] main {
 .lv-plate-light {
   background-color: #ebe4d6;
 }
+
+/* ---------------------------------------------------------------------------
+   THE THEME SWITCH (src/lib/theme.ts, paintTheme).
+
+   The owner: «واضف انميشن عند التبديل بين الثيم الفاتح والداكن». Three ways,
+   picked by what the browser can do and what the reader asked for:
+
+   - A TAP (Settings → «المظهر», the first-run sheet): View Transitions, with
+     the new theme revealed as a circle growing from the finger. The circle is
+     a Web Animation on `::view-transition-new(root)`; here the browser's own
+     cross-fade is switched off so the old page stays whole under it.
+   - NO TAP (the device flipped at sunset, another tab): the browser's
+     cross-fade, a little quicker than its default.
+   - NO VIEW TRANSITIONS (older Safari): `lv-theme-fading` eases the colours
+     for 300ms and is removed. Colour properties only — nothing that moves or
+     resizes, so nothing reflows.
+
+   Reduced motion never gets here: the script applies the theme instantly.
+   --------------------------------------------------------------------------- */
+html.lv-theme-reveal::view-transition-old(root),
+html.lv-theme-reveal::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html.lv-theme-fade::view-transition-old(root),
+html.lv-theme-fade::view-transition-new(root) {
+  animation-duration: 0.3s;
+}
+html.lv-theme-fading,
+html.lv-theme-fading *,
+html.lv-theme-fading *::before,
+html.lv-theme-fading *::after {
+  transition-property: background-color, border-color, color, fill, stroke, outline-color, text-decoration-color !important;
+  transition-duration: 0.3s !important;
+  transition-timing-function: ease !important;
+  transition-delay: 0s !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.lv-theme-fading,
+  html.lv-theme-fading *,
+  html.lv-theme-fading *::before,
+  html.lv-theme-fading *::after {
+    transition: none !important;
+  }
+}

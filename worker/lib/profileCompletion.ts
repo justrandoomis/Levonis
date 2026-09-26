@@ -106,38 +106,30 @@ export function computeCompletion(u: ProfileInput): ProfileCompletion {
 }
 
 /**
- * How long before the completion prompt may appear again, given how many
- * times it has already been dismissed. Widening rather than repeating: a
- * person who has said "later" four times has answered the question.
- * The last value repeats forever — the prompt never disappears entirely,
- * because the profile page is not somewhere people go unprompted, but at
- * ninety-day spacing it is a reminder rather than an obstacle.
- */
-const REMIND_AFTER_DAYS = [3, 7, 30, 90];
-
-export function nextPromptAt(dismissCount: number, now: Date): string {
-  const idx = Math.min(Math.max(dismissCount, 0), REMIND_AFTER_DAYS.length - 1);
-  const days = REMIND_AFTER_DAYS[idx];
-  return new Date(now.getTime() + days * 86_400_000).toISOString();
-}
-
-/**
- * Should the completion prompt be shown right now?
+ * Should the «أكمل ملفك الشخصي» sheet be shown right now?
  *
- * Four things must all be true, and each rules out a way of being annoying:
- * there is something left to complete; the account is past onboarding (a
- * person still IN the signup wizard is already being asked); the cooling-off
- * period from the last dismissal has passed; and — the one that matters most
- * — this is decided from a server-side timestamp, so dismissing on a phone
- * also dismisses on a laptop, and clearing site data does not restart the
- * nagging.
+ * ONCE PER ACCOUNT, RIGHT AFTER IT IS CREATED. The owner: «اجعل اكمال الملف
+ * الشخصي تظهر بعد انشاء الحساب لمره واحده (سواء كان عبر كوكل او رقم او تلي او
+ * اي وسيله)». It used to be a reminder on a widening schedule (3, 7, 30, 90
+ * days, forever) that skipped every account still in the signup wizard — and
+ * only an email or on-the-signup-view Google signup ever reached the wizard,
+ * so an account made by phone, Telegram, or Google from the sign-in view sat
+ * at 'new' and was never asked at all. Now every signup path lands on the
+ * same sheet, and the sheet asks once:
+ *
+ *  - `onboarding_state = 'new'`: the column's DEFAULT, so every INSERT into
+ *    users — whichever route made it — starts here, and migration 0033 moved
+ *    every account that existed then to 'existing'. Leaving 'new' (the sheet
+ *    closed, the wizard finished or skipped) is forever.
+ *  - `profile_prompt_at IS NULL`: stamped the moment the sheet is SHOWN
+ *    (POST /completion/seen), so a sheet the person walked away from — the tab
+ *    closed on it, «أكمل الآن» into a wizard they then abandoned — does not
+ *    come back either. Server-side, so it holds on every device.
+ *  - something is actually missing: a sheet reading 100% asks for nothing.
  */
-export function shouldPromptCompletion(u: ProfileInput, now: Date): boolean {
+export function shouldPromptCompletion(u: ProfileInput): boolean {
   const c = computeCompletion(u);
   if (c.complete) return false;
-  if (c.onboarding === 'new') return false; // the wizard is asking already
-  const at = u.profile_prompt_at;
-  if (!at) return true; // never asked
-  const t = Date.parse(at);
-  return Number.isNaN(t) ? true : t <= now.getTime();
+  if (c.onboarding !== 'new') return false; // answered, or an account from before the question existed
+  return !u.profile_prompt_at;
 }
