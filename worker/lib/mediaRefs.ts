@@ -196,6 +196,8 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   { table: 'product_option_values', column: 'image', kind: 'text', why: 'per-option swatch' },
   { table: 'product_colors', column: 'image', kind: 'text', why: 'per-colour swatch' },
   { table: 'products', column: 'images', kind: 'json', why: 'the JSON mirror of the gallery; pre-0018 products have ONLY this' },
+  /** «الصورة الرئيسية للوضع الفاتح» (0138): the light-theme main image, a `/files/….webp` path. */
+  { table: 'products', column: 'light_image', kind: 'text', why: 'the light-theme main image of a product (0138)' },
   { table: 'products', column: 'description_images', kind: 'json', why: 'long-description artwork' },
   { table: 'products', column: 'description_videos', kind: 'json', why: 'long-description video objects' },
   { table: 'products', column: 'options', kind: 'json', why: 'legacy embedded options, each with its own image' },
@@ -391,6 +393,10 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'merchant_payouts.method_snapshot': 'payout channel and account as requested — JSON, no media (0121)',
   'orders.idempotency_key': 'request de-duplication token',
   'orders.client_idempotency_key': 'request de-duplication token',
+  // 0140 — an admin's price proposal: its de-duplication token and the random
+  // token its deciding batch writes. Neither is a path.
+  'order_price_adjustments.idempotency_key': 'request de-duplication token (0140)',
+  'order_price_adjustments.decision_token': 'batch fence token (0140)',
   'reward_claims.idempotency_key': 'request de-duplication token',
   'order_payment_settlements.event_key': 'event identity, e.g. cod:<ref>',
   'outbox.event_key': 'event identity, e.g. invoice:ORD-X:1',

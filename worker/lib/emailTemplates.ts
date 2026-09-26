@@ -48,6 +48,11 @@ function iqd(amount: number): string {
   return `${Math.trunc(amount).toLocaleString('en-US')} IQD`;
 }
 
+/** A signed adjustment: «+25,000 IQD» / «-10,000 IQD». */
+function signedIqd(amount: number): string {
+  return `${amount < 0 ? '-' : '+'}${iqd(Math.abs(amount))}`;
+}
+
 // ------------------------------------------------------------------ copy
 
 interface Copy {
@@ -107,6 +112,8 @@ interface Copy {
   membershipDiscountLabel: string;
   couponLabel: string;
   pointsLabel: string;
+  /** «تعديل السعر» — the signed total of approved price adjustments (0140). */
+  priceAdjustmentLabel: string;
   walletLabel: string;
   totalLabel: string;
   paidLabel: string;
@@ -177,6 +184,7 @@ const COPY_AR: Copy = {
   membershipDiscountLabel: 'خصم العضوية',
   couponLabel: 'خصم الكوبون',
   pointsLabel: 'نقاط مستخدمة',
+  priceAdjustmentLabel: 'تعديل السعر (بموافقتك)',
   walletLabel: 'مدفوع من المحفظة',
   totalLabel: 'الإجمالي النهائي',
   paidLabel: 'المبلغ المدفوع',
@@ -255,6 +263,7 @@ const COPY_EN: Copy = {
   membershipDiscountLabel: 'Membership discount',
   couponLabel: 'Coupon discount',
   pointsLabel: 'Points applied',
+  priceAdjustmentLabel: 'Price adjustment (approved by you)',
   walletLabel: 'Paid from wallet',
   totalLabel: 'Grand total',
   paidLabel: 'Amount paid',
@@ -335,6 +344,8 @@ const COPY_CKB: Copy = {
   membershipDiscountLabel: 'داشکاندنی ئەندامێتی',
   couponLabel: 'داشکاندنی کۆپۆن',
   pointsLabel: 'خاڵی بەکارهێنراو',
+  // OWNER: Sorani to be written by hand (the ckb slot carries the Arabic).
+  priceAdjustmentLabel: 'تعديل السعر (بموافقتك)',
   walletLabel: 'لە جزدانەوە دراوە',
   totalLabel: 'کۆی گشتی',
   paidLabel: 'بڕی دراو',
@@ -560,6 +571,8 @@ export interface InvoiceEmailData {
   delivery_waived: boolean;
   coupon_discount_iqd: number;
   points_applied_iqd: number;
+  /** Signed: + when the customer approved a higher total, − for a lower one. Absent before 0140. */
+  price_adjustment_iqd?: number;
   wallet_applied_iqd: number;
   total_iqd: number;
   amount_paid_iqd: number;
@@ -660,6 +673,7 @@ function invoiceTotalsHtml(t: Copy, inv: InvoiceEmailData): string {
   }
   if (inv.coupon_discount_iqd > 0) rows += row(t.couponLabel, `-${iqd(inv.coupon_discount_iqd)}`);
   if (inv.points_applied_iqd > 0) rows += row(t.pointsLabel, `-${iqd(inv.points_applied_iqd)}`);
+  if (inv.price_adjustment_iqd) rows += row(t.priceAdjustmentLabel, signedIqd(inv.price_adjustment_iqd));
   rows += row(t.totalLabel, iqd(inv.total_iqd), { bold: true });
   if (inv.wallet_applied_iqd > 0) rows += row(t.walletLabel, iqd(inv.wallet_applied_iqd));
   rows += row(t.paidLabel, iqd(inv.amount_paid_iqd));
@@ -693,6 +707,7 @@ function invoiceText(t: Copy, inv: InvoiceEmailData): string {
   }
   if (inv.coupon_discount_iqd > 0) out.push(`${t.couponLabel}: -${iqd(inv.coupon_discount_iqd)}`);
   if (inv.points_applied_iqd > 0) out.push(`${t.pointsLabel}: -${iqd(inv.points_applied_iqd)}`);
+  if (inv.price_adjustment_iqd) out.push(`${t.priceAdjustmentLabel}: ${signedIqd(inv.price_adjustment_iqd)}`);
   out.push(`${t.totalLabel}: ${iqd(inv.total_iqd)}`);
   if (inv.wallet_applied_iqd > 0) out.push(`${t.walletLabel}: ${iqd(inv.wallet_applied_iqd)}`);
   out.push(`${t.paidLabel}: ${iqd(inv.amount_paid_iqd)}`);
@@ -793,6 +808,7 @@ export function renderInvoiceHtmlDocument(lang: EmailLang, inv: InvoiceEmailData
   }
   if (inv.coupon_discount_iqd > 0) totals += totalRow(t.couponLabel, `-${iqd(inv.coupon_discount_iqd)}`);
   if (inv.points_applied_iqd > 0) totals += totalRow(t.pointsLabel, `-${iqd(inv.points_applied_iqd)}`);
+  if (inv.price_adjustment_iqd) totals += totalRow(t.priceAdjustmentLabel, signedIqd(inv.price_adjustment_iqd));
   totals += totalRow(t.totalLabel, iqd(inv.total_iqd), 'grand');
   if (inv.wallet_applied_iqd > 0) totals += totalRow(t.walletLabel, iqd(inv.wallet_applied_iqd));
   totals += totalRow(t.paidLabel, iqd(inv.amount_paid_iqd));

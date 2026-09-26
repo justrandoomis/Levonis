@@ -228,6 +228,13 @@ export const HISTORY_TABLES: HistoryTable[] = [
    */
   { table: 'inventory_lots', columns: ['product_id'] },
   { table: 'incoming_inventory', columns: ['product_id'] },
+  /**
+   * 0139 — a box serial the shop recorded before the sale. The serial is a
+   * physical fact about a box on a shelf (or in a customer's home); the
+   * catalogue product it was filed under is a pointer that can end. The row
+   * keeps its model code and name, so it stays legible without the product.
+   */
+  { table: 'serial_inventory', columns: ['product_id', 'variant_id'] },
 ];
 
 /**

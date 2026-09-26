@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Send, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Loader2, ShieldCheck } from 'lucide-react';
 import { api, ApiError, isNotConfigured } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { prefersAppScheme, telegramOpenLinks } from '../../lib/telegramDeepLink';
 
 /**
  * Telegram phone-ownership linking card (final-phase §2), embedded on the
@@ -137,7 +138,7 @@ function storeDeepLink(v: { deep_link: string; expires_at: string } | null) {
 }
 
 export default function TelegramLink() {
-  const { lang } = useLanguage();
+  const { lang, loc } = useLanguage();
   const s = STRINGS[lang] || STRINGS.ar;
 
   const [status, setStatus] = useState<StatusResp | null>(null);
@@ -213,6 +214,8 @@ export default function TelegramLink() {
       if (document.visibilityState === 'visible') fetchStatus();
     };
     window.addEventListener('focus', onWake);
+    // iPhone back from t.me in the same tab = a bfcache restore (pageshow).
+    window.addEventListener('pageshow', onWake);
     document.addEventListener('visibilitychange', onWake);
     if (shouldPoll) {
       pollRef.current = window.setInterval(() => {
@@ -222,6 +225,7 @@ export default function TelegramLink() {
     return () => {
       clear();
       window.removeEventListener('focus', onWake);
+      window.removeEventListener('pageshow', onWake);
       document.removeEventListener('visibilitychange', onWake);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -419,14 +423,43 @@ export default function TelegramLink() {
           {(challenge.state === 'pending' || challenge.state === 'contact_received') && (
             <>
               {deepLink ? (
-                <a
-                  href={deepLink.deep_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="lv-button lv-button-primary w-full"
-                >
-                  <ExternalLink className="w-4 h-4" /> {s.openTelegram}
-                </a>
+                (() => {
+                  // Phones: the tg:// app link in the same tab (iOS hands it
+                  // straight to Telegram); t.me stays as the visible fallback,
+                  // and `/start <code>` can be pasted into the bot chat when
+                  // START does not show (the bot accepts it).
+                  const links = telegramOpenLinks(deepLink.deep_link);
+                  const mobile = prefersAppScheme(navigator.userAgent, navigator.maxTouchPoints || 0);
+                  return (
+                    <>
+                      <a
+                        href={links && mobile ? links.app : deepLink.deep_link}
+                        target={mobile ? undefined : '_blank'}
+                        rel="noopener noreferrer"
+                        className="lv-button lv-button-primary w-full"
+                      >
+                        <ExternalLink className="w-4 h-4" /> {s.openTelegram}
+                      </a>
+                      {links && (
+                        <p className="mt-2 text-[12px] text-zinc-400 leading-relaxed">
+                          {/* OWNER: Sorani to be written by hand. */}
+                          {mobile && (
+                            <>
+                              <a href={links.web} className="underline underline-offset-2">
+                                {loc('لم يفتح؟ افتح عبر t.me', "Didn't open? Open via t.me")}
+                              </a>
+                              {' · '}
+                            </>
+                          )}
+                          {loc('إن لم يظهر زر «ابدأ»، أرسل هذا الأمر إلى البوت:', 'No Start button? Send this command to the bot:')}{' '}
+                          <code dir="ltr" translate="no" className="select-all break-all text-zinc-300">
+                            {links.command}
+                          </code>
+                        </p>
+                      )}
+                    </>
+                  );
+                })()
               ) : null}
               <p className="mt-3 text-[13px] text-zinc-400">{s.openHint}</p>
 

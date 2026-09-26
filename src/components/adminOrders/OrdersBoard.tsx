@@ -195,6 +195,8 @@ export default function OrdersBoard() {
   const [advancing, setAdvancing] = useState<string | null>(null);
   const [status, setStatus] = useState<'' | OrderStatus>('');
   const [archive, setArchive] = useState(false);
+  /** «بانتظار موافقة الزبون على السعر» (0140) — narrows whatever else is chosen. */
+  const [priceHold, setPriceHold] = useState(false);
   const [archiveScope, setArchiveScope] = useState<ArchiveScope>('delivered');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
@@ -270,6 +272,7 @@ export default function OrdersBoard() {
       if (status) params.set('status', status);
     }
     if (query) params.set('q', query);
+    if (priceHold && !archive) params.set('price_hold', '1');
     try {
       setData(await api.get<AdminOrdersResponse>(`/api/admin/orders?${params}`));
     } catch (e) {
@@ -281,7 +284,7 @@ export default function OrdersBoard() {
     } finally {
       setLoading(false);
     }
-  }, [archive, archiveScope, journey, status, query, page, lang]);
+  }, [archive, archiveScope, journey, status, query, page, lang, priceHold]);
 
   useEffect(() => {
     loadOrders();
@@ -555,6 +558,26 @@ export default function OrdersBoard() {
           <span className="truncate">{loc('المكتملة', 'Completed', 'تەواوبووەکان')}</span>
         </button>
       </div>
+
+      {/* «بانتظار موافقة الزبون على السعر» — shown only while some order is
+          held (or the filter is on), with the board-wide count beside it.
+          OWNER: Sorani to be written by hand. */}
+      {!archive && (priceHold || (data?.price_hold_count ?? 0) > 0) && (
+        <button
+          type="button"
+          data-order-filter="price-hold"
+          aria-pressed={priceHold}
+          onClick={() => {
+            setPriceHold((v) => !v);
+            setPage(0);
+          }}
+          className="lv-choice press-scale inline-flex min-h-[44px] items-center gap-2 self-start px-3 text-[13px] leading-[1.4] font-bold"
+        >
+          <span className="h-2 w-2 shrink-0 rounded-full bg-warning" aria-hidden />
+          {loc('بانتظار موافقة الزبون على السعر', 'Waiting for the customer to approve a price')}
+          <span className="tabular-nums text-text-secondary">{countText(data?.price_hold_count ?? 0, latin)}</span>
+        </button>
+      )}
 
       {error && (
         <p role="alert" className="lv-alert lv-alert-danger text-[13px] leading-[1.6] text-text-primary">

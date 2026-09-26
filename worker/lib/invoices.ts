@@ -49,6 +49,8 @@ interface OrderRow {
   /** What the membership took off the merchandise on this order. */
   membership_discount_iqd?: number | null;
   points_discount_iqd: number;
+  /** Signed sum of customer-approved price adjustments (migration 0140). */
+  price_adjustment_iqd?: number | null;
   wallet_applied_iqd: number;
   exchange_rate: number;
   total_iqd: number;
@@ -118,6 +120,8 @@ export interface InvoiceSnapshotV1 {
     coupon_code: string;
     coupon_discount_iqd: number;
     points_applied_iqd: number;
+    /** Added in migration 0140; absent on older snapshots. */
+    price_adjustment_iqd?: number;
     wallet_applied_iqd: number;
     total_iqd: number;
     amount_paid_iqd: number;
@@ -283,6 +287,7 @@ function buildSnapshot(order: OrderRow, items: OrderItemRow[], owner: OwnerRow):
       coupon_code: coupon?.code || '',
       coupon_discount_iqd: coupon ? Number(coupon.discount_iqd) || 0 : 0,
       points_applied_iqd: Number(order.points_discount_iqd) || 0,
+      price_adjustment_iqd: Math.trunc(Number(order.price_adjustment_iqd) || 0),
       wallet_applied_iqd: Number(order.wallet_applied_iqd) || 0,
       total_iqd: Number(order.total_iqd) || 0,
       amount_paid_iqd: paid,
@@ -316,6 +321,7 @@ export function invoiceEmailData(
     delivery_waived: snapshot.totals.delivery_waived,
     coupon_discount_iqd: snapshot.totals.coupon_discount_iqd,
     points_applied_iqd: snapshot.totals.points_applied_iqd,
+    price_adjustment_iqd: snapshot.totals.price_adjustment_iqd ?? 0,
     wallet_applied_iqd: snapshot.totals.wallet_applied_iqd,
     total_iqd: snapshot.totals.total_iqd,
     amount_paid_iqd: snapshot.totals.amount_paid_iqd,

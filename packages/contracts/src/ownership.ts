@@ -90,6 +90,8 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ...owned('commerce', [
     'cart_items', 'orders', 'order_items', 'order_payment_settlements', 'checkout_sagas', 'checkout_saga_steps', 'coupons',
     'coupon_redemptions', 'return_cases', 'price_protection_claims',
+    // 0140 — an admin's proposed new final total and the customer's decision on it.
+    'order_price_adjustments',
     // The buyer's choices behind one bundle cart line, and the fence that makes a
     // partial inventory movement impossible inside the order's own batch (§1.5, §1.7).
     'cart_bundle_choices', 'order_reservation_fence',
@@ -180,7 +182,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'print_actuals', 'print_failures', 'printer_calibration_stats',
   ]),
   ...owned('reviews', ['reviews', 'review_rewards', 'gift_entitlements', 'gift_pool_items', 'gift_redemptions', 'gift_pools', 'review_media']),
-  ...owned('devices', ['order_item_units', 'device_serials', 'device_registrations', 'warranty_claims', 'claim_messages', 'warranty_receipts']),
+  ...owned('devices', ['order_item_units', 'device_serials', 'device_registrations', 'warranty_claims', 'claim_messages', 'warranty_receipts', 'serial_inventory']),
   ...owned('chat', ['chats', 'chat_participants', 'chat_messages', 'chat_typing_presence']),
   ...owned('notifications', [
     'outbox', 'user_notifications', 'telegram_updates', 'tg_admin_notifications', 'tg_admin_actions', 'notification_preferences',

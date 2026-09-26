@@ -325,6 +325,13 @@ export interface ProductDoc {
    * a public page.
    */
   gini_url: string;
+  /**
+   * 0138 — «الصورة الرئيسية للوضع الفاتح». The light-theme counterpart of the
+   * primary image (which stays THE main image and is what the dark theme
+   * shows). An owned product-media path (`/files/….webp`) or '' for none —
+   * `canonicalProductMediaUrl` both ways, so nothing else reaches an <img>.
+   */
+  light_image: string;
   hashtags: string[];
   how_to_use: string;
   /**
@@ -926,6 +933,7 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     // before `safeLink` guarded this column, or edited around the admin, must
     // not reach an href unfiltered.
     gini_url: safeLink(row.gini_url),
+    light_image: canonicalProductMediaUrl(row.light_image),
     hashtags: safeParse<string[]>(row.hashtags, []),
     how_to_use: s(row.how_to_use, 20000),
     how_to_use_ar: s(row.how_to_use_ar, 20000),
@@ -1415,6 +1423,9 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     // rather than escaped, which is what every other admin-supplied link on a
     // public page does (worker/lib/homeContent.ts).
     gini_url: safeLink(body.gini_url),
+    // Only an owned, processed product image (the upload pipeline's WebP) —
+    // an arbitrary address is dropped, the same rule the gallery follows.
+    light_image: canonicalProductMediaUrl(body.light_image),
     // Normalized on the way in, so what a product carries, what the managed
     // vocabulary lists and what the import sheet round-trips are one spelling.
     hashtags: Array.isArray(body.hashtags)
@@ -1494,6 +1505,7 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     display_order: doc.display_order,
     payment_options: JSON.stringify(doc.payment_options),
     gini_url: doc.gini_url,
+    light_image: doc.light_image ?? '',
     hashtags: JSON.stringify(doc.hashtags),
     how_to_use: doc.how_to_use,
     how_to_use_ar: doc.how_to_use_ar,
@@ -1658,6 +1670,9 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     payment_options: doc.payment_options,
     /** Public by nature: it is the link the «تريدها اقساط ؟» popup opens. */
     gini_url: doc.gini_url,
+    // The light-theme main image, ONLY when there is one: '' would add a key
+    // to every card of every listing for a picture most products never get.
+    ...(doc.light_image ? { light_image: doc.light_image } : {}),
     hashtags: doc.hashtags,
     how_to_use: doc.how_to_use,
     how_to_use_ar: doc.how_to_use_ar,
@@ -1681,6 +1696,9 @@ export const PRODUCT_COLUMNS = [
   // statement and silently dropped at HTTP 200. Never NULL — the column is
   // NOT NULL and `safeLink` returns '' for anything it refuses.
   'gini_url',
+  // «الصورة الرئيسية للوضع الفاتح» (migration 0138) — the same rule again:
+  // bound on every save, so productPersistence probes for the column first.
+  'light_image',
   // OPEN BOX / USED / REFURBISHED (migration 0085). THIS LIST IS THE WRITE
   // PATH: `serializeDoc` above has emitted `condition_doc` since the feature
   // was added, but both writers bind only the columns named here

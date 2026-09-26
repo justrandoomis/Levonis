@@ -24,6 +24,7 @@ const STRINGS = {
     pointsUsed: 'نقاط مستخدمة',
     shipping: 'التوصيل',
     codTax: 'ضريبة الدفع عند الاستلام',
+    priceAdjustment: 'تعديل السعر (بموافقتك)',
     free: 'مجانًا',
     waived: 'معفى',
     total: 'المجموع',
@@ -54,6 +55,7 @@ const STRINGS = {
     pointsUsed: 'Points used',
     shipping: 'Delivery',
     codTax: 'Cash on Delivery Tax',
+    priceAdjustment: 'Price adjustment (you approved)',
     free: 'Free',
     waived: 'waived',
     total: 'Total',
@@ -83,6 +85,8 @@ const STRINGS = {
     pointsUsed: 'خاڵی بەکارهاتوو',
     shipping: 'گەیاندن',
     codTax: 'باجی پارەدان لە کاتی گەیاندن',
+    // OWNER: Sorani to be written by hand (the ckb slot carries the Arabic).
+    priceAdjustment: 'تعديل السعر (بموافقتك)',
     free: 'بەخۆڕایی',
     waived: 'لێخۆشبوو',
     total: 'کۆی گشتی',
@@ -179,6 +183,10 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
           value={f.shipping_iqd === 0 ? (f.delivery_waived ? `${s.free} · ${s.waived}` : s.free) : money(f.shipping_iqd)}
         />
         {f.cod_tax_iqd > 0 && <Row label={s.codTax} value={money(f.cod_tax_iqd)} />}
+        {/* A customer-approved price change (0140): a line of its own, so the
+            rows above still add up to the total. */}
+        {(f.price_adjustment_iqd ?? 0) > 0 && <Row label={s.priceAdjustment} value={`+ ${money(f.price_adjustment_iqd ?? 0)}`} />}
+        {(f.price_adjustment_iqd ?? 0) < 0 && <Row label={s.priceAdjustment} value={money(-(f.price_adjustment_iqd ?? 0))} negative />}
         {/* THE CHARGE, IN THE CURRENCY IT WAS MADE IN. The lines above follow
             the customer's chosen currency; the total keeps the dinar, because
             this is a record of money that already moved and the figure has to

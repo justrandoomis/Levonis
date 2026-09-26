@@ -45,6 +45,7 @@ import {
   OTP_RESEND_COOLDOWN_SECONDS,
   type TgAuthPurpose,
   type AuthChallengeRow,
+  startDeepLink,
 } from '../lib/telegram';
 import { resolveSupportRef, type SupportRef } from '../lib/supportCode';
 import { emailConfigured, sendEmailNow } from '../lib/emailSend';
@@ -1460,7 +1461,7 @@ authRoutes.post('/telegram/start', async (c) => {
 
   return c.json({
     success: true,
-    deep_link: `https://t.me/${botUsername}?start=${nonce}`,
+    deep_link: startDeepLink(botUsername, nonce),
     bot_username: botUsername,
     continuation_token: continuationToken,
     expires_at: expiresAt,

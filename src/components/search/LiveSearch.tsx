@@ -4,7 +4,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, PackageSearch, RotateCcw, Search, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { api, ApiError, type ApiProduct, type ProductsListResponse } from '../../lib/api';
-import { productPrimaryImage } from '../../lib/productImage';
+import { productMainImage } from '../../lib/productImage';
+import { useTheme } from '../../lib/theme';
 import { CROSS_FADE, useMotion } from '../../lib/motion';
 import SafeImage from '../ui/SafeImage';
 import { Skeleton } from '../ui/Skeleton';
@@ -112,6 +113,7 @@ export default function LiveSearch({
   className = '',
 }: LiveSearchProps) {
   const { t, loc, dir: pageDir } = useLanguage();
+  const { theme } = useTheme();
   const m = useMotion();
   const location = useLocation();
   const uid = useId();
@@ -469,7 +471,7 @@ export default function LiveSearch({
                         }`}
                       >
                         <SafeImage
-                          src={productPrimaryImage(p)}
+                          src={productMainImage(p, theme)}
                           alt=""
                           aspect="auto"
                           className="h-12 w-12 shrink-0 overflow-hidden rounded-lg"

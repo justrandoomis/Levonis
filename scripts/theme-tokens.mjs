@@ -91,9 +91,18 @@ export function parseColor(v) {
 const toHex = (rgb) => `#${rgb.map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('')}`;
 
 // ------------------------------------------------------------------ the data
-/** The two grounds every light value is measured against. */
-export const IVORY = '#f3f0ea';
-export const PAPER = '#fbfaf7';
+/**
+ * The two grounds every light value is measured against.
+ *
+ * CREAM, NOT BRIGHT (owner, 2026-09-26: «اجعل المظهر الفاتح يكون كريمي او off
+ * white وليس ابيض بحت وساطع، بحيث يكون الثيم مريح للعين»). The page was
+ * #f3f0ea with #fbfaf7 cards and pure #ffffff menus — near-white at 96–100%
+ * lightness. The page is now a warm cream at OKLCH L≈0.93 and a card is one
+ * step lighter (L≈0.95); nothing large is white. The names stay IVORY/PAPER
+ * because every rule below is written against them.
+ */
+export const IVORY = '#ece6da';
+export const PAPER = '#f4efe5';
 
 /**
  * The semantic slots. Dark values are the ones @theme in src/index.css
@@ -106,24 +115,24 @@ export const SEMANTIC = {
   'white':               ['#f2f3f5', '#16181b'],
   'canvas':              ['#0b0c0f', IVORY],
   'surface':             ['#131519', PAPER],
-  'surface-raised':      ['#191c21', '#ffffff'],
-  'surface-selected':    ['#20242a', '#ebe6dc'],
-  'border-subtle':       ['#2a2e35', '#e0dace'],
+  'surface-raised':      ['#191c21', '#f8f4ec'],
+  'surface-selected':    ['#20242a', '#e3dccd'],
+  'border-subtle':       ['#2a2e35', '#d9d1c2'],
   'text-primary':        ['#f2f3f5', '#16181b'],
   'text-secondary':      ['#b7bbc3', '#45484e'],
-  'text-muted':          ['#858b95', '#5f6268'],
-  'success':             ['#42b77a', '#1b7046'],
-  'warning':             ['#d79b45', '#92590c'],
-  'danger':              ['#dc6363', '#b3343a'],
+  'text-muted':          ['#858b95', '#595c62'],
+  'success':             ['#42b77a', '#1a6a43'],
+  'warning':             ['#d79b45', '#87520a'],
+  'danger':              ['#dc6363', '#ad3037'],
   'info':                ['#6f9bd1', '#2d5f9a'],
-  'focus':               ['#d2c392', '#7a6331'],
-  'gold':                ['#BAA369', '#7a6331'],
-  'gold-light':          ['#ffe55c', '#7c5f00'],
+  'focus':               ['#d2c392', '#6f592b'],
+  'gold':                ['#BAA369', '#6f592b'],
+  'gold-light':          ['#ffe55c', '#735800'],
   'primary-fill':        ['#ece8dc', '#16181b'],
   'primary-fill-hover':  ['#fffaf0', '#2a2c30'],
   'danger-ink':          ['#ffdada', '#8f2328'],
-  'error-ink':           ['#f2a4a4', '#b3343a'],
-  'accent':              ['#BAA369', '#7a6331'],
+  'error-ink':           ['#f2a4a4', '#ad3037'],
+  'accent':              ['#BAA369', '#6f592b'],
   'accent-contrast':     ['#101114', PAPER],
 };
 
@@ -133,13 +142,16 @@ export const NEUTRAL_LIGHT = {
   100: '#1f2124',
   200: '#2a2c30',
   300: '#3a3d42',
-  400: '#54575d',
-  500: '#62656b',
-  600: '#8b8d92',
-  700: '#d3ccbf',
-  800: '#e6e1d6',
+  400: '#505359',
+  500: '#5c5f65',
+  // The dim ink of placeholders, captions and quiet glyphs (172 call sites use
+  // `text-zinc-600` as TEXT): 4.5:1 on the cream page and 5:1 on a card, where
+  // the old #8b8d92 read at 2.9.
+  600: '#606268',
+  700: '#cdc4b3',
+  800: '#e2dbcd',
   900: PAPER,
-  950: '#efebe3',
+  950: '#e7e0d3',
 };
 const NEUTRALS = ['zinc', 'gray', 'slate', 'neutral', 'stone'];
 const HUES = ['red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'];
@@ -255,12 +267,19 @@ export function buildBlock() {
     dark.push(`--color-${k}:${palette[k]}`);
     light.push(`--color-${k}:${NEUTRALS.includes(fam) ? NEUTRAL_LIGHT[shade] : chromaticLight(palette, fam, +shade)}`);
   }
+  // Light shadows are a WARM ink at low strength: a black shadow on cream is
+  // the grey smudge the owner saw under the bars («غواش»). `--lv-shadow-soft`
+  // and `--lv-shadow-deep` are the colours Tailwind's own `shadow-sm…2xl`
+  // draw with (src/index.css, THE SHADOW UTILITIES FOLLOW THE THEME); their
+  // dark values are Tailwind's own, so the dark theme does not move.
   const lightShadows = [
-    '--shadow-1:0 1px 2px rgb(22 24 27/.08)',
-    '--shadow-2:0 12px 32px -16px rgb(22 24 27/.22)',
-    '--shadow-3:0 28px 70px -28px rgb(22 24 27/.3)',
-    '--lv-shadow-ink:22 24 27',
-    '--lv-shadow-strength:.14',
+    '--shadow-1:0 1px 2px rgb(58 46 28/.07)',
+    '--shadow-2:0 12px 32px -16px rgb(58 46 28/.2)',
+    '--shadow-3:0 28px 70px -28px rgb(58 46 28/.26)',
+    '--lv-shadow-ink:58 46 28',
+    '--lv-shadow-strength:.12',
+    '--lv-shadow-soft:rgb(58 46 28/.07)',
+    '--lv-shadow-deep:rgb(58 46 28/.14)',
   ];
   const darkShadows = [
     '--shadow-1:0 1px 2px rgb(0 0 0/.35)',
@@ -268,6 +287,8 @@ export function buildBlock() {
     '--shadow-3:0 28px 70px -28px rgb(0 0 0/.9)',
     '--lv-shadow-ink:0 0 0',
     '--lv-shadow-strength:.9',
+    '--lv-shadow-soft:#0000001a',
+    '--lv-shadow-deep:#00000040',
   ];
   return [
     BEGIN,

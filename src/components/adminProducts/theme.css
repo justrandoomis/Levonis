@@ -50,11 +50,13 @@
    read on paper (5.9:1), status inks at 4.5:1 or better. */
 [data-theme='light'] .ap {
   color-scheme: light;
-  --ap-bg-0: #f3f0ea;
-  --ap-surface-1: #fbfaf7;
-  --ap-surface-2: #f4f1ea;
-  --ap-surface-3: #ece8df;
-  --ap-surface-4: #e3ded3;
+  /* The cream of the store's light theme (owner, 2026-09-26: «كريمي او off
+     white وليس ابيض بحت») — no near-white large surface. */
+  --ap-bg-0: #ece6da;
+  --ap-surface-1: #f4efe5;
+  --ap-surface-2: #efe9de;
+  --ap-surface-3: #e6dfd2;
+  --ap-surface-4: #ddd5c6;
   --ap-hairline: rgb(22 24 27 / 0.07);
   --ap-border: rgb(22 24 27 / 0.1);
   --ap-border-strong: rgb(22 24 27 / 0.16);

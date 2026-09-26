@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import {
-  ArrowLeft, ArrowRight, ChevronRight, Check, Minus, Plus, X, ShoppingCart, HeartHandshake, Info, Truck,
+  ArrowLeft, ArrowRight, ChevronRight, Check, X, ShoppingCart, HeartHandshake, Info, Truck,
   ShieldCheck, FileText, Sparkles,
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
@@ -12,6 +12,8 @@ import type { CartWarrantyPlan } from '../lib/api';
 import { shippingTypeLabel, type ShippingType } from '../lib/shippingType';
 import { asLang, monthsLabel } from '../components/orders/format';
 import Note from '../components/ui/Note';
+import { QuantityInput } from '../components/ui/QuantityInput';
+import { LINE_QTY_MAX, clampQuantity, quantityLimit } from '../../packages/pricing/src/quantity';
 import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField from '../components/PromoCodeField';
 import Spinner from '../components/ui/Spinner';
@@ -213,6 +215,9 @@ function typeForTransport(method: unknown): ShippingType {
 
 /** A composition line in one of these states cannot be sold; recreated per
  *  render before, which defeated every memo below it. */
+/** How long a changed quantity waits for the next change before it is saved. */
+const QTY_DEBOUNCE_MS = 450;
+
 const BLOCKING_STATES = new Set(['sold_out', 'ended', 'upcoming', 'locked', 'unconfigured']);
 
 /**
@@ -800,39 +805,63 @@ export default function Cart() {
     // column a bundle deliberately does not have (§2.4). An ordinary line is
     // bounded by the ceiling the server published for the counter it consumes
     // (0075), which is the same number the + button disables on.
-    Math.max(1, Math.min(99, Math.min(q, lineCap(item) ?? 99)));
+    clampQuantity(q, Math.min(LINE_QTY_MAX, lineCap(item) ?? LINE_QTY_MAX)).value;
 
-  const updateQuantity = async (item: CartItem, delta: number) => {
-    if (item.qty + delta < 1) {
-      deleteItem(item);
-      return;
-    }
-    const newQty = clampQty(item, item.qty + delta);
-    if (newQty === item.qty) return;
+  /**
+   * ONE REQUEST PER DECISION, NOT PER TAP.
+   *
+   * The number is now typed (QuantityInput commits once, on blur / Enter), and
+   * − / + may be held. Both reach here; the line changes on screen at once and
+   * the PATCH waits `QTY_DEBOUNCE_MS` for the buyer to stop, so «+ + + + +» is
+   * one write of the final figure. A pending write counts as a busy action
+   * (no background reload lands over it) and is flushed before checkout and
+   * when the page goes away, so a change is never lost to a quick tap on
+   * «إتمام الشراء». The per-line ticket still discards a stale answer.
+   */
+  const qtyPendingRef = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; run: () => Promise<void> }>());
+
+  const setLineQuantity = (item: CartItem, requested: number) => {
+    const newQty = clampQty(item, requested);
     // §11. Reported before the request, because the character is reacting to
-    // what the USER did — and at the stock ceiling there is no request at all
-    // (the line above returns), so waiting for one would make the escalation
-    // stop working exactly where a large quantity becomes interesting.
+    // what the USER did.
     mascot.quantity(newQty, item.qty);
     // Optimistic update, reconciled with the server's returned cart.
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, qty: newQty } : i)));
     const seq = (qtySeqRef.current.get(item.id) ?? 0) + 1;
     qtySeqRef.current.set(item.id, seq);
-    actionBusyRef.current += 1;
-    try {
-      const data = await api.patch<CartWriteResponse>(`/api/cart/items/${item.id}`, { qty: newQty });
-      // A response that a newer tap has already superseded is thrown away
-      // rather than allowed to rewrite the line backwards.
-      if (qtySeqRef.current.get(item.id) !== seq) return;
-      applyCartWrite(data);
-    } catch (err) {
-      if (qtySeqRef.current.get(item.id) !== seq) return;
-      setError(cartRefusal(err, 'Failed to update quantity'));
-      loadCart();
-    } finally {
-      actionBusyRef.current -= 1;
-    }
+    const pending = qtyPendingRef.current.get(item.id);
+    if (pending) clearTimeout(pending.timer);
+    else actionBusyRef.current += 1;
+    const run = async () => {
+      qtyPendingRef.current.delete(item.id);
+      try {
+        const data = await api.patch<CartWriteResponse>(`/api/cart/items/${item.id}`, { qty: newQty });
+        // A response that a newer change has already superseded is thrown
+        // away rather than allowed to rewrite the line backwards.
+        if (qtySeqRef.current.get(item.id) !== seq) return;
+        applyCartWrite(data);
+      } catch (err) {
+        if (qtySeqRef.current.get(item.id) !== seq) return;
+        setError(cartRefusal(err, 'Failed to update quantity'));
+        loadCart();
+      } finally {
+        actionBusyRef.current -= 1;
+      }
+    };
+    qtyPendingRef.current.set(item.id, { timer: setTimeout(run, QTY_DEBOUNCE_MS), run });
   };
+
+  /** Send every waiting quantity now, and wait for the answers. */
+  const flushQuantities = () =>
+    Promise.all(
+      [...qtyPendingRef.current.values()].map((p) => {
+        clearTimeout(p.timer);
+        return p.run();
+      })
+    );
+  const flushRef = useRef(flushQuantities);
+  flushRef.current = flushQuantities;
+  useEffect(() => () => void flushRef.current(), []);
 
   const deleteItem = async (item: CartItem) => {
     actionBusyRef.current += 1;
@@ -1636,7 +1665,7 @@ export default function Cart() {
                           fire for a bundle however scarce its blocking
                           component was — and tapping '+' at `max_qty` silently
                           did nothing at all, because `clampQty` clamped to the
-                          same number and `updateQuantity` returned when the
+                          same number and the old stepper returned when the
                           clamp changed nothing. `BUNDLE_QTY_LIMIT` is
                           translated and wired, and could never be reached from
                           the UI. */}
@@ -1645,34 +1674,14 @@ export default function Cart() {
                           places. The minus no longer doubles as a delete: the
                           Delete button beside it is the one removal path, so a
                           mis-tap at qty 1 can no longer empty a line. */}
-                      <div className="flex items-center rounded-lg bg-surface-raised overflow-hidden">
-                        <button
-                          type="button"
-                          aria-label={loc('إنقاص الكمية', 'Decrease quantity', 'کەمکردنەوەی بڕ')}
-                          data-mascot="qty-dec"
-                          onClick={() => updateQuantity(item, -1)}
-                          disabled={item.qty <= 1}
-                          className="w-11 h-11 flex items-center justify-center text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                        >
-                          <Minus aria-hidden="true" className="w-4 h-4" />
-                        </button>
-                        <span
-                          aria-live="polite"
-                          className="w-9 h-11 flex items-center justify-center text-[15px] font-bold text-white tabular-nums border-x border-border-subtle"
-                        >
-                          {item.qty}
-                        </span>
-                        <button
-                          type="button"
-                          aria-label={loc('زيادة الكمية', 'Increase quantity', 'زیادکردنی بڕ')}
-                          data-mascot="qty-inc"
-                          onClick={() => updateQuantity(item, 1)}
-                          disabled={lineCap(item) !== null && item.qty >= (lineCap(item) as number)}
-                          className="w-11 h-11 flex items-center justify-center text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                        >
-                          <Plus aria-hidden="true" className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <QuantityInput
+                        size="sm"
+                        hintPlacement="above"
+                        value={item.qty}
+                        max={Math.min(LINE_QTY_MAX, lineCap(item) ?? LINE_QTY_MAX)}
+                        limitKind={item.composition ? 'per_order' : quantityLimit(item.availability).kind}
+                        onChange={(next) => setLineQuantity(item, next)}
+                      />
                       {item.composition ? (
                         item.qty >= item.composition.max_qty && (
                           <span className="text-amber-300/90 text-[12px]">
@@ -2283,15 +2292,18 @@ export default function Cart() {
             <button
               data-testid="cart-checkout"
               type="button"
-              onClick={() =>
+              onClick={async () => {
+                // A quantity still waiting to be saved is saved first, so the
+                // checkout reads the figure the customer is looking at.
+                await flushQuantities();
                 navigate('/checkout', {
                   // supportRef is an ATTRIBUTION, not a price input: checkout
                   // forwards it as `supportCode`, the server resolves it and
                   // freezes it into orders.support_snapshot. Only a code the
                   // server already resolved for this buyer is carried.
                   state: { itemIds: [...selectedIds], usePoints, supportRef: activeSupportRef || undefined },
-                })
-              }
+                });
+              }}
               className="lv-button lv-button-primary col-span-2 w-full min-h-[48px] px-5 text-[15px] tabular-nums shrink-0 whitespace-nowrap active:scale-[0.985] [touch-action:manipulation] sm:col-auto sm:w-auto"
               disabled={
                 selectedCount === 0 ||

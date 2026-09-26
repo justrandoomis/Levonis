@@ -946,6 +946,9 @@ export function resolveProduct(
      * it never carried) and '' is "the cell is blank", which clears it.
      */
     gini_url: p.gini_url === null ? ((existing?.doc.gini_url as string | undefined) ?? '') : p.gini_url,
+    // 0138, the same null-means-preserve rule: a sheet without the column
+    // must not strip a light-theme image somebody uploaded in the editor.
+    light_image: p.light_image === null ? ((existing?.doc.light_image as string | undefined) ?? '') : p.light_image,
     preorder_transports: transports,
     spec_groups: specGroups,
     labels,

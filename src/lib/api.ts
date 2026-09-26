@@ -476,6 +476,10 @@ export interface ApiProduct {
    *  there. The product page draws «تريدها أقساط؟» only when it is a real
    *  http(s) link (src/components/product/GiniInstalmentsSheet.tsx). */
   gini_url?: string;
+  /** «الصورة الرئيسية للوضع الفاتح» (migration 0138): the light-theme main
+   *  image, present only when the product has one (src/lib/productImage.ts
+   *  `productMainImage`). */
+  light_image?: string;
   stock: number | null;
   created_at: string;
   merchant?: { id: string; name: string; verified: boolean };
@@ -933,6 +937,9 @@ export interface ApiOrder {
   cod_tax_iqd: number;
   points_discount_iqd: number;
   wallet_applied_iqd: number;
+  /** The open price proposal while the order waits for the customer's
+   *  decision on a new price (migration 0140), else null. */
+  price_hold_id?: string | null;
   total_iqd: number;
   due_on_delivery_iqd: number;
   created_at: string;
@@ -1053,6 +1060,8 @@ export interface OrderFinancial {
   /** Server-calculated and snapshotted; clients must never recompute it. */
   cod_tax_iqd: number;
   delivery_waived: boolean;
+  /** Signed sum of customer-approved price adjustments (0140); 0 when none. */
+  price_adjustment_iqd?: number;
   total_iqd: number;
   wallet_applied_iqd: number;
   due_on_delivery_iqd: number;
@@ -1233,6 +1242,9 @@ export interface AdminOrdersResponse {
     later: number;
     unscheduled: number;
   };
+  /** «بانتظار موافقة الزبون على السعر» (0140): the filter's state and its board-wide count. */
+  price_hold?: boolean;
+  price_hold_count?: number;
   /**
    * «عدد بجانب كل خيار» — how many rows each filter option would return.
    *

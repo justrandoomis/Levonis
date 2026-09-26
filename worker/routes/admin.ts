@@ -77,6 +77,7 @@ import {
   giniStateOf,
 } from '../lib/gini';
 import { moveOrderStage, stagePath, stageRowFrom, sweepDueStages } from '../lib/orderStageOps';
+import { isPriceHeld, PRICE_APPROVAL_PENDING_MESSAGE } from '../lib/priceHold';
 import { ALWASEET, alwaseetDriver, resolveWire } from '../lib/delivery/alwaseet';
 import {
   escposReceipt,
@@ -1948,6 +1949,10 @@ adminRoutes.get('/orders', async (c) => {
     }
   }
 
+  // «بانتظار موافقة الزبون على السعر» (0140) — narrows whatever else is chosen.
+  const priceHoldOnly = c.req.query('price_hold') === '1';
+  if (priceHoldOnly) clauses.push('o.price_hold_id IS NOT NULL');
+
   const where = clauses.length > 0 ? ` WHERE ${clauses.map((x) => `(${x})`).join(' AND ')}` : '';
   const facetWhere = facetClauses.length > 0 ? ` WHERE ${facetClauses.map((x) => `(${x})`).join(' AND ')}` : '';
 
@@ -1964,7 +1969,7 @@ adminRoutes.get('/orders', async (c) => {
    */
   const FROM = 'FROM orders o LEFT JOIN users u ON u.id = o.user_id';
 
-  const [{ results }, countRow, facetRows] = await Promise.all([
+  const [{ results }, countRow, facetRows, heldRow] = await Promise.all([
     c.env.DB.prepare(
       `SELECT o.*, u.email, u.username, u.name AS user_name, u.phone_e164 AS user_phone
          ${FROM}${where}
@@ -2008,6 +2013,12 @@ adminRoutes.get('/orders', async (c) => {
         )
           .bind(...facetParams)
           .all<Record<string, unknown>>(),
+    // THE HELD COUNT IS BOARD-WIDE, not scoped: the badge on the filter says how
+    // many orders are waiting on a customer's price decision anywhere, which is
+    // the number an admin acts on. One seek on idx_orders_price_hold.
+    c.env.DB.prepare('SELECT COUNT(*) AS n FROM orders WHERE price_hold_id IS NOT NULL')
+      .first<{ n: number }>()
+      .catch(() => ({ n: 0 })),
   ]);
 
   /**
@@ -2177,6 +2188,9 @@ adminRoutes.get('/orders', async (c) => {
       later: Number(countRow?.due_later ?? 0),
       unscheduled: Number(countRow?.unscheduled ?? 0),
     },
+    /** «بانتظار موافقة الزبون على السعر» (0140): the filter's state and its board-wide count. */
+    price_hold: priceHoldOnly,
+    price_hold_count: Number(heldRow?.n ?? 0),
   });
 });
 
@@ -2501,6 +2515,11 @@ async function adminStoreOrderMove(
   return true;
 }
 
+/** 409 for every admin door that would move a price-held order (0140). */
+function priceHeldRefusal(orderId: string): HttpError {
+  return new HttpError(409, PRICE_APPROVAL_PENDING_MESSAGE, 'PRICE_APPROVAL_PENDING', { order_id: orderId });
+}
+
 const ORDER_TRANSITIONS: Record<string, string[]> = {
   pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
   confirmed: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
@@ -2648,6 +2667,10 @@ async function receiptDataFor(c: Context<AppContext>, id: string) {
         // add up, and a customer looking at it cannot see why they are being
         // asked for 5,000 on a 904,000 order.
         { label_ar: 'مدفوع عبر تطبيق جني', label_en: 'Paid via Gini', amount_iqd: Number(o.gini_paid_iqd) || 0, negative: true },
+        // The customer-approved price adjustment (0140), signed, so the lines
+        // above the total still add up to it.
+        { label_ar: 'تعديل السعر', label_en: 'Price adjustment',
+          amount_iqd: Math.abs(Math.trunc(Number(o.price_adjustment_iqd) || 0)), negative: (Number(o.price_adjustment_iqd) || 0) < 0 },
       ],
       subtotal_iqd: Number(o.subtotal_iqd) || 0,
       shipping_iqd: Number(o.shipping_iqd) || 0,
@@ -2995,6 +3018,9 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
 
   const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<Record<string, unknown>>();
   if (!order) throw notFound('Order not found');
+  // A courier shipment copies the door amount — never while that amount is
+  // waiting on the customer's price decision (0140).
+  if (isPriceHeld(order)) throw priceHeldRefusal(id);
   if (order.delivery_remote_id) {
     throw badRequest('This order already has a delivery shipment.', 'SHIPMENT_EXISTS', {
       remote_id: order.delivery_remote_id,
@@ -3265,6 +3291,8 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
   if (!res.moved) {
     if (res.reason === 'NOT_FOUND') throw notFound('Order not found');
     if (res.reason === 'RACED') throw badRequest('The order changed while you were editing — reload and retry');
+    // «بانتظار موافقة الزبون على السعر» (0140): withdraw the proposal or wait.
+    if (res.reason === 'PRICE_APPROVAL_PENDING') throw priceHeldRefusal(id);
     // The re-claim trigger refused (§17 decision 4). The transition itself is
     // legal, so ILLEGAL_STAGE_MOVE would send staff hunting a nonexistent
     // transition bug — and the sibling status route already answers this exact
@@ -3317,6 +3345,9 @@ adminRoutes.patch('/orders/:id', async (c) => {
 
   const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<Record<string, unknown>>();
   if (!order) throw notFound('Order not found');
+  // Held for the customer's price decision (0140) — cancelling included: the
+  // admin withdraws the proposal first, then uses this door.
+  if (isPriceHeld(order)) throw priceHeldRefusal(id);
   const from = String(order.status);
   if (!ORDER_TRANSITIONS[from]?.includes(next)) {
     throw badRequest(`Cannot move an order from "${from}" to "${next}"`);

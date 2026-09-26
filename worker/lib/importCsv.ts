@@ -71,7 +71,7 @@ import { AVAILABILITY_TYPES, normalizeAvailability, variantKeyFrom, variantLabel
 import type { Lookups } from './lookups';
 import { parseFeePercent } from './warrantyPlans';
 import type { ProductDeliveryOptions } from './shipping';
-import { DIMENSION_FIELDS, EMPTY_DIMENSIONS, type ProductDimensions } from './productModel';
+import { DIMENSION_FIELDS, EMPTY_DIMENSIONS, canonicalProductMediaUrl, type ProductDimensions } from './productModel';
 
 export type RowType =
   | 'product'
@@ -86,6 +86,27 @@ export type RowType =
   | 'warranty'
   | 'content'
   | 'guide';
+
+/**
+ * «الصورة الرئيسية للوضع الفاتح» (0138). Only a picture the shop already holds
+ * (the product media pipeline's `/files/….webp`) — the column has no upload of
+ * its own. Anything else is REFUSED with a line number rather than dropped
+ * silently by the model: a cell that says a light image and stores none is the
+ * failure this importer's comments keep recording.
+ */
+function lightImageCell(raw: string, line: number, issues: RowIssue[]): string {
+  const v = raw.trim();
+  if (!v) return '';
+  const ok = canonicalProductMediaUrl(v);
+  if (!ok) {
+    issues.push({
+      line,
+      severity: 'error',
+      message: `light_image: "${v}" ليس مسار صورة مرفوعة للمنتج (/files/….webp) — ارفع الصورة من محرر المنتج أولًا`,
+    });
+  }
+  return ok;
+}
 
 // ------------------------------------------------------------------- CSV IO
 
@@ -303,6 +324,10 @@ export const BASE_COLUMNS = [
   // the TXT template already carries it, and a column in one importer and not
   // the other is how the two drift.
   'gini_url',
+  // 0138 — the light-theme main image: the stored path of a picture already
+  // uploaded through the product media pipeline (`/files/….webp`). Exported so
+  // an export → edit → re-import round trip keeps it.
+  'light_image',
   // ---- child-row columns
   'group',
   'value',
@@ -577,6 +602,7 @@ export function labelRow(shape: TemplateShape): string[] {
     how_to_use: 'طريقة الاستخدام (نص)',
     usage_url: 'رابط الدليل الرسمي',
     gini_url: 'رابط المنتج في تطبيق جني',
+    light_image: 'الصورة الرئيسية للوضع الفاتح (مسار صورة مرفوعة /files/…webp؛ فارغ = بلا صورة)',
     group: 'مجموعة الخيار / عنوان مجموعة المواصفات',
     value: 'قيمة الخيار / اسم اللون / العنوان',
     label: 'اسم المواصفة (سطر spec)',
@@ -685,6 +711,8 @@ export interface ParsedProduct {
   how_to_use: string | null;
   usage_url: string | null;
   gini_url: string | null;
+  /** null = the sheet has no such column (keep what is stored); '' clears. */
+  light_image: string | null;
   /** null when the sheet has no hashtags column at all, so an older file
    *  leaves a product's stored tags alone instead of clearing them. */
   hashtags: string[] | null;
@@ -1513,6 +1541,7 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         how_to_use: index.has('how_to_use') ? cell(r, 'how_to_use') : null,
         usage_url: index.has('usage_url') ? cell(r, 'usage_url') : null,
         gini_url: index.has('gini_url') ? cell(r, 'gini_url') : null,
+        light_image: index.has('light_image') ? lightImageCell(cell(r, 'light_image'), line, issues) : null,
         hashtags: index.has('hashtags') ? splitList(cell(r, 'hashtags')) : null,
         membership_rules: membershipRulesFrom((name) => cell(r, name), (name) => index.has(name), line, issues),
         spec_fields: spec,
@@ -2166,6 +2195,8 @@ export interface ExportProduct {
   how_to_use: string;
   usage_url: string;
   gini_url: string;
+  /** Optional so an export built before 0138 still type-checks; written as ''. */
+  light_image?: string;
   hashtags: string[];
   /**
    * §18 — the product-scoped membership discount rules this product has, at
@@ -2267,6 +2298,7 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
       how_to_use: p.how_to_use,
       usage_url: p.usage_url,
       gini_url: p.gini_url,
+      light_image: p.light_image ?? '',
       hashtags: p.hashtags.join('|'),
       ...membershipCells(p.membership_rules),
       ...spec,
@@ -2965,7 +2997,7 @@ ${def.hint_ar}
 أنواع الأسطر
 ------------
 ${[
-    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, standard_delivery_enabled, standard_delivery_quantity_step, standard_delivery_fee_iqd, personal_delivery_enabled, personal_delivery_quantity_step, personal_delivery_fee_iqd, warranty_base_months, serialized, payment_options, how_to_use, usage_url, gini_url, membership.*, spec.*'),
+    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, standard_delivery_enabled, standard_delivery_quantity_step, standard_delivery_fee_iqd, personal_delivery_enabled, personal_delivery_quantity_step, personal_delivery_fee_iqd, warranty_base_months, serialized, payment_options, how_to_use, usage_url, gini_url, light_image, membership.*, spec.*'),
     rowType('option', 'قيمة واحدة من مجموعة خيارات — نسخة المنتج ونوع توفرها معًا', 'group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, availability_type, lead_time_text, lead_time_min_days, lead_time_max_days, variant_key, variant_label'),
     rowType('color', 'لون واحد وروابطه بالخيارات', 'value (اسم اللون), hex, sku_part, image, links, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
     rowType('variant', 'توليفة مخزون واحدة (خيارات + لون)', 'links (Group:Value|Group:Value|color:Name), sku_part, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),

@@ -6,7 +6,10 @@
  *   POST /register { serial }        non-enumerating registration by serial,
  *                                    receipt number or the receipt's QR link —
  *                                    a never-linked device only by its BUYER;
- *                                    anyone else only after a release (transfer)
+ *                                    anyone else only after a release (transfer);
+ *                                    a serial (or box SN) known only to the
+ *                                    serial inventory (0139) is attached to the
+ *                                    caller's own delivered unit of its product
  *   GET  /eligible                   the caller's delivered units not yet linked
  *   POST /units/:unitId/register     link one of those without typing a serial
  *   DELETE /units/:unitId/registration  unlink (the step before a transfer)
@@ -37,6 +40,7 @@
  *   GET   /admin/claims?stage=&after=      the queue, filtered in SQL, keyset-paged
  *   PATCH /admin/claims/:id                 claim workflow decisions (notifies the claimant)
  *   POST  /admin/products/:id/ops-policy    explicit serialization config
+ *   *     /admin/serial-inventory/...       the pre-sale serial store (routes/serialInventory.ts)
  *
  * A serial is an identifier, not an authentication secret. ONE ACCOUNT PER
  * DEVICE: device_registrations.unit_id is the primary key, so a unit can be
@@ -103,6 +107,8 @@ import {
   type UnitRow,
   type WarrantySnapshotLite,
 } from '../lib/deviceOps';
+import { linkFromInventory } from '../lib/serialInventory';
+import { serialInventoryRoutes } from './serialInventory';
 
 export const deviceRoutes = new Hono<AppContext>();
 deviceRoutes.use('*', requireAuth);
@@ -110,6 +116,8 @@ deviceRoutes.use('*', requireAuth);
 // guard in worker/index.ts — so they carry their own: main host only, then
 // admin. A merchant subdomain never serves them, even with the shared cookie.
 deviceRoutes.use('/admin/*', requireMainHost, requireAdmin);
+// The serial inventory (0139): serials the shop holds before a sale.
+deviceRoutes.route('/admin/serial-inventory', serialInventoryRoutes);
 
 // The one non-enumerating answer — unknown, undelivered, replaced, or linked
 // to another account all read the same. Never reveals whether the serial
@@ -500,6 +508,7 @@ deviceRoutes.post('/register', async (c) => {
   // unit through its LIVE receipt; anything else is read as a serial.
   const receiptNo = receiptNoFrom(input);
   let unitId: string | null = null;
+  let inventoryLinked = false;
   if (receiptNo) {
     const rec = await c.env.DB.prepare("SELECT unit_id FROM warranty_receipts WHERE receipt_no = ? AND status = 'active'")
       .bind(receiptNo)
@@ -510,6 +519,23 @@ deviceRoutes.post('/register', async (c) => {
     if (norm.length < 4) throw SERIAL_NO_MATCH();
     const ser = await c.env.DB.prepare('SELECT unit_id FROM device_serials WHERE serial_norm = ?').bind(norm).first<{ unit_id: string }>();
     unitId = ser?.unit_id ?? null;
+    if (!unitId) {
+      // Not on any unit yet: the serial inventory (0139) may know it — the
+      // box the shop recorded before the sale. It attaches the serial to the
+      // CALLER'S OWN delivered unit of that product, or refuses; a box SN
+      // resolves to its product serial. Every refusal reads as the one answer
+      // below; the reason is kept for the manual review the page offers.
+      const inv = await linkFromInventory(c.env.DB, user.id, norm);
+      if (inv.kind === 'attached') {
+        inventoryLinked = true;
+        unitId = inv.unit_id;
+        await audit(c.env.DB, user.id, 'device.serial_assign', inv.unit_id, { by: 'inventory', serial_norm: inv.serial_norm });
+      } else if (inv.kind === 'resolved') {
+        unitId = inv.unit_id;
+      } else if (inv.serial_norm) {
+        await audit(c.env.DB, user.id, 'serial_inventory.link_refused', inv.serial_norm, { reason: inv.reason });
+      }
+    }
   }
   // The same database work whether or not a unit matched, so a foreign serial
   // that exists and one that does not take the same time to refuse.
@@ -538,7 +564,7 @@ deviceRoutes.post('/register', async (c) => {
   if (!reg || reg.user_id !== user.id || reg.revoked_at) throw SERIAL_NO_MATCH();
   if (!alreadyMine) {
     await audit(c.env.DB, user.id, 'device.register', row.id, {
-      by: receiptNo ? 'receipt' : 'serial',
+      by: receiptNo ? 'receipt' : inventoryLinked ? 'inventory' : 'serial',
       transferred: row.owner_user_id !== user.id,
     });
   }

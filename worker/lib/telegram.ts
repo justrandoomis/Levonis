@@ -353,6 +353,49 @@ export async function verifyOtp(
   return { ok: true };
 }
 
+// ------------------------------------------------ deep-link start payload
+//
+// Telegram accepts a start parameter of A–Z a–z 0–9 _ - up to 64 characters;
+// anything else makes the START button send a bare "/start" (or nothing). The
+// nonce is randomToken(32) — 43 base64url characters — and startDeepLink()
+// refuses to build a link from anything outside the rule, so a future change
+// to the nonce cannot silently produce links Telegram drops.
+
+export const START_PAYLOAD_RE = /^[A-Za-z0-9_-]{16,64}$/;
+
+export function startDeepLink(botUsername: string, payload: string): string {
+  if (!START_PAYLOAD_RE.test(payload)) throw new Error('startDeepLink: payload outside Telegram start-parameter rules');
+  if (!/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(botUsername)) throw new Error('startDeepLink: invalid bot username');
+  return `https://t.me/${botUsername}?start=${payload}`;
+}
+
+export type StartPayloadKind = 'start' | 'link' | 'bare' | 'none';
+
+/**
+ * Where a private-chat message carries a start payload. iPhone users whose
+ * chat shows no START button are told to paste `/start <code>`; people also
+ * paste the whole t.me link, or just the code. All three reach the same
+ * challenge binding as the START button.
+ *  - 'start': "/start", "/start@Bot", "/start <payload>" (payload null when
+ *    missing or malformed)
+ *  - 'link' : a t.me / telegram.me link with ?start=<payload>
+ *  - 'bare' : the message IS a nonce-shaped token (≥32 chars — ordinary words
+ *    never reach that length with this alphabet)
+ *  - 'none' : anything else
+ */
+export function extractStartPayload(text: string): { kind: StartPayloadKind; payload: string | null } {
+  const t = (typeof text === 'string' ? text : '').trim();
+  const cmd = /^\/start(?:@[A-Za-z0-9_]+)?(?=\s|$)(?:\s+(\S+))?/i.exec(t);
+  if (cmd) {
+    const p = cmd[1] ?? '';
+    return { kind: 'start', payload: START_PAYLOAD_RE.test(p) ? p : null };
+  }
+  const link = /(?:t\.me|telegram\.me)\/[A-Za-z0-9_]+\?(?:[^\s#]*&)?start=([A-Za-z0-9_-]{16,64})(?![A-Za-z0-9_-])/i.exec(t);
+  if (link) return { kind: 'link', payload: link[1] };
+  if (/^[A-Za-z0-9_-]{32,64}$/.test(t)) return { kind: 'bare', payload: t };
+  return { kind: 'none', payload: null };
+}
+
 // ---------------------------------------- anonymous auth challenges (§4)
 //
 // Telegram-first registration & sign-in reuse the link_challenges machinery

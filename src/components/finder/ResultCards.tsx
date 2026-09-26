@@ -4,7 +4,8 @@ import { Star } from 'lucide-react';
 import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
 import AvailabilityLine from '../product/AvailabilityLine';
-import { productPrimaryImage } from '../../lib/productImage';
+import { productMainImage, productPrimaryImage } from '../../lib/productImage';
+import { useTheme } from '../../lib/theme';
 import { cardHref, cardName, compareTypeOf, type CardProduct } from '../../lib/productCard';
 import type { FinderResult } from '../../lib/catalog/types';
 import ReasonList from './ReasonList';
@@ -22,9 +23,10 @@ export interface ResultCardProps {
 function useCardBits(result: FinderResult) {
   const p = result.card as CardProduct;
   const name = cardName(p);
-  const image = productPrimaryImage(p);
+  const { theme } = useTheme();
+  const image = productMainImage(p, theme);
   const type = compareTypeOf(p);
-  const item = { id: p.id, slug: p.slug || p.id, name, image: image || '' };
+  const item = { id: p.id, slug: p.slug || p.id, name, image: productPrimaryImage(p) || '' };
   return { p, name, image, type, item, href: cardHref(p) };
 }
 

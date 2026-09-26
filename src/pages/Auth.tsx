@@ -17,6 +17,8 @@ import SocialAuthButton, { TelegramIcon } from '../components/auth/SocialAuthBut
 import CodeAuth from '../components/auth/CodeAuth';
 import TelegramAuth from '../components/auth/TelegramAuth';
 import { sanitizeNextPath } from '../components/auth/nextPath';
+import InAppBrowserNotice from '../components/auth/InAppBrowserNotice';
+import { detectInAppBrowser } from '../lib/inAppBrowser';
 import FillButton, {
   type FillButtonStatus,
   clamp01,
@@ -611,6 +613,19 @@ export default function Auth() {
   const caps = useCapabilities();
   const googleConfigured = !!caps?.google;
   const googleClientId = caps?.googleClientId ?? '';
+  // Instagram / Messenger / TikTok … embedded browsers: Google answers
+  // «403 disallowed_useragent», so its button is replaced by a way out to a
+  // real browser (InAppBrowserNotice). Read once — the UA does not change.
+  const [inApp] = useState(() =>
+    detectInAppBrowser(typeof navigator !== 'undefined' ? navigator.userAgent : '', {
+      standalone:
+        typeof window !== 'undefined' &&
+        ((navigator as Navigator & { standalone?: boolean }).standalone === true ||
+          (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches)),
+      maxTouchPoints: typeof navigator !== 'undefined' ? navigator.maxTouchPoints : 0,
+    })
+  );
+  const googleUsable = googleConfigured && !inApp.inApp;
   const resetConfigured = caps?.passwordReset ?? false;
   const telegramConfigured = caps?.telegram ?? false;
   const emailCodeConfigured = caps?.emailOtp ?? false;
@@ -1301,7 +1316,7 @@ export default function Auth() {
         <div className="lv-provider-row">
           <AuthDivider label={s.orLabel} />
           <div className="lv-providers">
-            {googleConfigured && (
+            {googleUsable && (
               <div>
                 <GoogleAuthButton
                   view={view === 'signup' ? 'signup' : 'signin'}
@@ -1360,7 +1375,10 @@ export default function Auth() {
             )}
           </div>
         </div>
-        {googleConfigured && <p className="lv-note-google">{s.googleNote}</p>}
+        {googleUsable && <p className="lv-note-google">{s.googleNote}</p>}
+        {googleConfigured && inApp.inApp && (
+          <InAppBrowserNotice info={inApp} next={dest} referralCode={referralCode} />
+        )}
       </>
     ) : null;
 

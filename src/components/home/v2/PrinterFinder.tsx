@@ -17,9 +17,11 @@ import { useCommunityAccess } from '../../../pages/community/access';
  *  - «اسأل مجتمع Levo» → /community, hidden while the server says the
  *                        community is shut (the same gate as the bottom bar).
  *
- * A dark charcoal band with an olive hairline texture: the light half of the
- * page needs one dark beat between the bento and the product rail, and this
- * is the section whose job is to stop the scroll for a moment.
+ * A band with a hairline plate texture, the one beat between the bento and
+ * the product rail whose job is to stop the scroll for a moment. It follows
+ * the theme (`data-feature`, src/index.css FEATURE SURFACES): charcoal with
+ * olive hairlines and the muted-gold primary on the dark theme; a cream card
+ * with ink type, a charcoal primary and an outlined secondary on the light.
  */
 export default function PrinterFinder() {
   const { loc } = useLanguage();
@@ -32,7 +34,7 @@ export default function PrinterFinder() {
   return (
     <section
       data-home-section="printer_finder"
-      data-theme="dark"
+      data-feature=""
       aria-labelledby="home-finder-title"
       className="lv-finder-texture relative overflow-hidden rounded-2xl bg-charcoal px-3 py-4 ring-1 ring-inset ring-white/[0.05] lg:flex lg:items-center lg:justify-between lg:gap-10 lg:rounded-[20px] lg:px-10 lg:py-8"
     >

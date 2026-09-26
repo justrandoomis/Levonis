@@ -101,7 +101,10 @@ export default function Header() {
 
   return (
     <header ref={headerRef} className={`fixed top-0 inset-x-0 z-[100] flex flex-col pointer-events-none transition-all duration-500 px-4 ${
-      isScrolled ? 'material material-thin pt-2.5 pb-2.5 shadow-lg' : 'bg-gradient-to-b from-black/88 via-black/48 to-transparent pt-4 pb-2'
+      // `lv-topbar-*` (src/index.css, THE TOP AND BOTTOM BARS): on the dark
+      // theme exactly these utilities; on the light one a clean ivory bar with
+      // a hairline, and no scrim over the hero at all.
+      isScrolled ? 'lv-topbar-solid material material-thin pt-2.5 pb-2.5 shadow-lg' : 'lv-topbar-scrim bg-gradient-to-b from-black/88 via-black/48 to-transparent pt-4 pb-2'
     }`}>
       <div className={`flex items-center justify-between pointer-events-auto transition-all duration-500 ease-in-out origin-top ${
         isScrolled ? 'h-0 opacity-0 mb-0 scale-95 overflow-hidden' : 'h-11 opacity-100 mb-3 scale-100'

@@ -7,6 +7,8 @@ import { columnName, type CompareLang, type CompareProductCard } from '../../lib
 import { lensStrings } from './lensStrings';
 import { productTone } from './tones';
 import { columnsTemplate } from './grid';
+import { useTheme } from '../../lib/theme';
+import { themedImage } from '../../lib/productImage';
 
 /**
  * THE PRODUCT COLUMNS (CATALOG_DISCOVERY §10.3.2; mockup 8).
@@ -57,6 +59,9 @@ export default function StickyColumns({
   onMove: (index: number, delta: -1 | 1) => void;
 }) {
   const { lang, dir } = useLanguage();
+  const { theme } = useTheme();
+  // The main image for the theme on screen (migration 0138).
+  const imageOf = (p: CompareProductCard) => themedImage(p.image ?? '', p.light_image, theme);
   const l = lang as CompareLang;
   const ls = lensStrings(lang);
   const cards = useRef<HTMLDivElement>(null);
@@ -95,7 +100,7 @@ export default function StickyColumns({
             {wide ? <span /> : null}
             {products.map((p, i) => (
               <div key={p.id} className="flex min-w-0 items-center gap-2">
-                <SafeImage src={p.image} alt="" aspect="square" fit="cover" className="w-8 shrink-0 overflow-hidden rounded-lg" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" />
+                <SafeImage src={imageOf(p)} alt="" aspect="square" fit="cover" className="w-8 shrink-0 overflow-hidden rounded-lg" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" />
                 <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: productTone(i).color }} />
                 <span dir="ltr" className="min-w-0 truncate text-[12px] font-bold text-text-primary">
                   {stripShort[i]}
@@ -115,7 +120,7 @@ export default function StickyColumns({
             <div key={p.id} data-compare-column={i} className="relative flex min-w-0 flex-col rounded-[16px] border border-border-subtle bg-surface p-1.5 pb-1">
               <div className="relative overflow-hidden rounded-[12px] bg-charcoal">
                 <Link to={`/product/${p.slug}`} tabIndex={-1} aria-hidden="true" className="block aspect-[6/5]">
-                  <SafeImage src={p.image} alt="" aspect="auto" className="h-full w-full" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" imgClassName="object-[50%_8%]" />
+                  <SafeImage src={imageOf(p)} alt="" aspect="auto" className="h-full w-full" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" imgClassName="object-[50%_8%]" />
                 </Link>
                 <button
                   type="button"

@@ -535,6 +535,7 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
   const optionById = new Map(live.map((v) => [v.id, v] as const));
   const variantById = new Map((variants.results ?? []).map((v) => [v.id, v] as const));
   const stockStatements: D1PreparedStatement[] = [];
+  const stockNotices: Array<{ scope: string; id: string; requested: number; stored: number; reserved: number }> = [];
   const submittedStock = new Set<string>();
   for (const [i, raw] of directStockRaw.entries()) {
     const where = `direct_stock[${i}]`;
@@ -563,17 +564,17 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
     if (stock === null) {
       throw badRequest(`${where}.stock is required for an enabled direct sale`, 'DIRECT_STOCK_REQUIRED');
     }
+    // A figure below what live orders already hold is not refused: the admin
+    // means "nothing more to sell", so the row keeps exactly the held units
+    // (available = 0). MAX() in SQL uses the reserved count at write time.
     const reserved = Number(stored.reserved ?? 0);
     if (reserved > 0 && stock < reserved) {
-      throw badRequest(
-        `${where}.stock cannot be below ${reserved}; those units are reserved by live direct-sale orders`,
-        'STOCK_BELOW_RESERVED'
-      );
+      stockNotices.push({ scope, id, requested: stock, stored: reserved, reserved });
     }
     const table = scope === 'option' ? 'product_option_values' : 'product_variants';
     stockStatements.push(
       c.env.DB
-        .prepare(`UPDATE ${table} SET stock = ?, low_stock_threshold = ? WHERE id = ? AND product_id = ?`)
+        .prepare(`UPDATE ${table} SET stock = MAX(?, COALESCE(reserved, 0)), low_stock_threshold = ? WHERE id = ? AND product_id = ?`)
         .bind(stock, low, id, productId)
     );
   }
@@ -739,6 +740,7 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
     projectForAdmin(c.env, admin, {
       success: true,
       sale_types: saleTypes,
+      stock_notices: stockNotices,
       updated_at: token?.updated_at ? String(token.updated_at) : undefined,
       fulfillments: after.fulfillments.map((f) => ({ ...f, transports: byFulfillment.get(f.id) ?? [] })),
     })

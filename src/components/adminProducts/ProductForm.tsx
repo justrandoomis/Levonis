@@ -100,6 +100,7 @@ import PricePreview from './PricePreview';
 import MembershipDiscountSection from './form/MembershipDiscountSection';
 import { SpecMultiPick } from './form/SpecMultiPick';
 import { ImagesSection } from './form/ImagesSection';
+import { MainImagesPair } from './form/MainImagesPair';
 import { QuickAddDialog, type QuickAddKind, type QuickAddResult } from './form/QuickAdd';
 
 interface TemplateField {
@@ -1520,6 +1521,11 @@ export default function ProductForm({
         error={showErrors && !!errors.images}
         {...section(6)}
       >
+        <MainImagesPair
+          darkUrl={(rel.images.find((i) => i.is_primary) ?? rel.images[0])?.url ?? ''}
+          lightUrl={doc.light_image ?? ''}
+          onLightChange={(url) => setDoc((d) => ({ ...d, light_image: url }))}
+        />
         <ImagesSection rel={rel} setRel={setRel} errors={showErrors ? errors : {}} />
       </SectionCard>
 

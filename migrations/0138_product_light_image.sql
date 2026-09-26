@@ -1,0 +1,29 @@
+-- ============================================================================
+--  0138 — «الصورة الرئيسية للوضع الفاتح»: a second main image per product.
+-- ============================================================================
+-- The owner: «في صور المنتجات اجعل للادمن في تفاصيل صفحة المنتج (تعديل /
+-- اضافة) خيار يمكن وضع الصورة الرئيسية للوضع الداكن والصورة الرئيسية للوضع
+-- الفاتح يعني يكون هنالك صورتين حسب المظهر».
+--
+-- The shop's catalogue photographs are studio shots on near-black. They are
+-- right on the dark theme and read as dark stickers on the light one. The
+-- existing primary image (the `product_images` row with is_primary = 1, and
+-- its mirror in `products.images`) stays THE main image and is what the dark
+-- theme shows; this column is the optional light-theme counterpart.
+--
+-- A COLUMN, NOT A GALLERY ROW. The light image is not one more picture in the
+-- gallery (it must never appear as a thumbnail next to its dark twin on the
+-- product page) and it binds to nothing (no option, colour or variant). One
+-- value per product is exactly a column, and every reader that does
+-- `SELECT * FROM products` receives it with no join.
+--
+-- WHAT IT HOLDS: the delivery path the product-media upload returns
+-- (`/files/products/…`), or an http(s) address. Written through `safeImage`
+-- (worker/lib/homeContent.ts) in productModel, so a `javascript:` or `data:`
+-- value is dropped, never stored. Registered in worker/lib/mediaRefs.ts so the
+-- orphan sweep never deletes a file only this column points at.
+--
+-- NONDESTRUCTIVE: one ADD COLUMN with a '' default, no backfill. '' means "no
+-- light image" and every surface falls back to the main (dark) image — which
+-- is exactly what every product showed before this migration.
+ALTER TABLE products ADD COLUMN light_image TEXT NOT NULL DEFAULT '';

@@ -141,3 +141,22 @@ export function DayChip({
     </span>
   );
 }
+
+/**
+ * «بانتظار موافقة الزبون على السعر» (migration 0140). The order is frozen
+ * until the customer approves or rejects a new price: no stage moves, no
+ * courier shipment. Amber — pending, not an error — and in words, never colour
+ * alone. OWNER: Sorani to be written by hand.
+ */
+export function PriceHoldBadge({ order, loc }: { order: AdminOrderRow; loc: Loc }) {
+  if (!order.price_hold_id) return null;
+  return (
+    <span
+      data-order-price-hold
+      className="inline-flex items-center gap-1 rounded-md border border-warning/35 bg-warning/10 px-1.5 py-0.5 text-[11px] leading-[1.4] font-bold text-warning"
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />
+      {loc('بانتظار موافقة السعر', 'Awaiting price approval')}
+    </span>
+  );
+}

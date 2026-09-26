@@ -231,10 +231,17 @@ export default function Home() {
             THEMES). Homepage v2 forced ivory here inside an otherwise black
             app; the owner asked for one theme everywhere instead. */}
         <div className="rounded-t-[24px] bg-canvas pb-8 pt-5 text-text-primary lg:rounded-t-[32px] lg:pt-10">
-          <div className="mx-auto flex max-w-[1200px] flex-col gap-8 px-4 sm:px-6 lg:gap-14 lg:px-8">
+          {/* WIDE SCREENS USE THE WIDTH (owner, 2026-09-26: «في الشاشات الكبيرة
+              يظهر هنالك فراغ كبير … اجعل الفراغ قليل جدا»). The column was capped
+              at 1200 px, which left 360 px of empty cream on each side of a
+              1920 px screen. Now it runs to 1920 px with 16/24/32 px gutters;
+              the sections size themselves by proportion (bento rows, 12:5
+              banners, more cards per rail), and the few text blocks keep their
+              own measure. */}
+          <div className="mx-auto flex max-w-[1920px] flex-col gap-8 px-4 sm:px-6 lg:gap-14 lg:px-8">
             {initialLoading ? (
               <div aria-hidden="true" className="flex flex-col gap-8">
-                <div className="h-[188px] rounded-2xl bg-zinc-800 animate-pulse motion-reduce:animate-none sm:h-[240px] lg:h-[380px]" />
+                <div className="aspect-[2/1.1] rounded-2xl bg-zinc-800 animate-pulse motion-reduce:animate-none sm:aspect-auto sm:h-[240px] lg:h-[380px] xl:h-[420px] 2xl:h-[480px]" />
                 <div className="h-[128px] rounded-2xl bg-zinc-800 animate-pulse motion-reduce:animate-none" />
               </div>
             ) : null}
@@ -265,7 +272,7 @@ export default function Home() {
             ) : null}
 
             {showEditorial && editorial.length > 0 ? (
-              <Suspense fallback={<div aria-hidden="true" className="h-[168px] sm:h-[180px] lg:h-[260px]" />}>
+              <Suspense fallback={<div aria-hidden="true" className="aspect-[7/6] sm:aspect-[32/9] lg:aspect-[24/5]" />}>
                 <EditorialBanners cards={editorial} />
               </Suspense>
             ) : null}

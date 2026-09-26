@@ -159,7 +159,66 @@ type Filter = (typeof FILTERS)[number];
 
 const shortDate = (iso: string | null): string => (iso ? iso.slice(0, 10) : '—');
 
+// The serial inventory (0139) — the second view of this tab, its own chunk.
+const SerialInventoryPanel = React.lazy(() => import('./serialInventory/SerialInventoryPanel'));
+
+type WarrantyView = 'receipts' | 'serials';
+const VIEW_KEY = 'levonis.admin.warrantyView';
+
+/**
+ * «الضمانات» — two views under one tab: the receipts issued, and the serial
+ * inventory the owner asked for (2026-09-26: «في لوحة الادارة في الضمان أضف
+ * زر أو خانة يمكن للأدمن إضافة السيريال نمبر»). The chosen view is
+ * remembered per browser, a convenience only.
+ */
 export default function AdminWarranties() {
+  const { lang, dir } = useLanguage();
+  const [view, setView] = useState<WarrantyView>(() => {
+    try {
+      return window.localStorage.getItem(VIEW_KEY) === 'serials' ? 'serials' : 'receipts';
+    } catch {
+      return 'receipts';
+    }
+  });
+  const choose = (v: WarrantyView) => {
+    setView(v);
+    try {
+      window.localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* private mode: the view is simply not remembered */
+    }
+  };
+  const label = (ar: string, en: string) => (lang === 'en' ? en : ar);
+  return (
+    <div className={`${T.AP} space-y-4`} dir={dir}>
+      <div role="group" aria-label={label('الضمانات', 'Warranties')} className="inline-flex items-center gap-1 p-1 rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-2)] border border-[var(--ap-border)]">
+        {(['receipts', 'serials'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            aria-pressed={view === v}
+            onClick={() => choose(v)}
+            data-warranty-view={v}
+            className={`min-h-[40px] px-4 rounded-[7px] text-[13px] font-semibold transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ap-ring)] ${
+              view === v ? 'bg-[var(--ap-surface-4)] text-[var(--ap-text-1)] shadow-[0_1px_2px_rgb(0_0_0_/_0.25)]' : 'text-[var(--ap-text-3)] hover:text-[var(--ap-text-2)]'
+            }`}
+          >
+            {v === 'receipts' ? label('وصولات الضمان', 'Warranty receipts') : label('الأرقام التسلسلية', 'Serial numbers')}
+          </button>
+        ))}
+      </div>
+      {view === 'receipts' ? (
+        <WarrantyReceipts />
+      ) : (
+        <React.Suspense fallback={<div className={`${T.surface} p-8 text-center text-[13px] text-[var(--ap-text-3)]`}>{label('جارٍ التحميل…', 'Loading…')}</div>}>
+          <SerialInventoryPanel />
+        </React.Suspense>
+      )}
+    </div>
+  );
+}
+
+function WarrantyReceipts() {
   const { lang, dir } = useLanguage();
   const t = lang === 'en' ? STR.en : STR.ar;
   const [rows, setRows] = useState<ReceiptRow[]>([]);

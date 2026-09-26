@@ -108,6 +108,7 @@ import { CheckoutStartedV1 } from '@levonis/contracts/events/v1/CheckoutStarted'
 import { OrderCreatedV1 } from '@levonis/contracts/events/v1/OrderCreated';
 import { planOrderReturn } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
+import { voidPendingPriceAdjustmentStatement } from '../lib/orderPriceAdjust';
 import {
   cancelStoreOrder,
   confirmStoreOrderReceipt,
@@ -301,6 +302,8 @@ function financialSnapshot(
     shipping_iqd: Number(o.shipping_iqd) || 0,
     cod_tax_iqd: codTax,
     delivery_waived: !!o.delivery_waived,
+    /** Signed sum of customer-approved price adjustments (migration 0140) — a line, never folded into the items. */
+    price_adjustment_iqd: Math.trunc(Number(o.price_adjustment_iqd) || 0),
     total_iqd: total,
     // Payment means, with its ledger reference.
     wallet_applied_iqd: walletIqd,
@@ -757,6 +760,12 @@ export function orderPublic(
     wallet_applied_iqd: o.wallet_applied_iqd,
     total_iqd: o.total_iqd,
     due_on_delivery_iqd: o.due_on_delivery_iqd,
+    /**
+     * «بانتظار موافقة الزبون على السعر» — the open price proposal's id while the
+     * order is held for the customer's decision (migration 0140), else null.
+     * The proposal itself is read from /api/orders/:id/price-adjustment.
+     */
+    price_hold_id: (o.price_hold_id as string | null | undefined) ?? null,
     delivered_at: o.delivered_at ?? null,
     created_at: o.created_at,
     updated_at: o.updated_at,
@@ -5172,13 +5181,18 @@ orderRoutes.post('/:id/cancel', async (c) => {
   // the same request can simply be sent again.
   try {
     await c.env.DB.batch([
+      // `price_hold_id = NULL` IN THE SAME WRITE (0140): a customer asked to
+      // approve a new price may simply cancel instead, where the ordinary
+      // «pending only» rule allows it; the hold trigger lets exactly this
+      // statement through, and the open proposal is voided beside it.
       c.env.DB.prepare(
-        `UPDATE orders SET status = 'cancelled', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        `UPDATE orders SET status = 'cancelled', price_hold_id = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
           WHERE id = ? AND status = 'pending'`
       ).bind(id),
       ...(stock.plan?.statements ?? []),
       ...(await cancelledOrderRefundStatements(c.env, data.order, 'system', now)),
       bnplCancellationStatement(c.env.DB, user.id, id, now),
+      voidPendingPriceAdjustmentStatement(c.env.DB, id, user.id, now),
     ]);
   } catch (e) {
     // The fence aborts the batch when the flip matched no row — a concurrent

@@ -54,11 +54,11 @@ export default function RelatedCategories({ nodes }: { nodes: CatalogTreeNode[] 
             <Link
               to={n.path}
               {...prefetchProps(n.path)}
-              data-theme="dark"
+              data-feature=""
               data-related={n.slug}
               className="group relative isolate block h-[118px] overflow-hidden rounded-[14px] bg-charcoal text-ivory ring-1 ring-inset ring-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted lg:h-[168px] lg:rounded-[18px]"
             >
-              {photo ? <CropPhoto src={photo.src} crop={photo.productPhoto} size={240} className="lv-fade-top inset-x-0 bottom-0 top-[30%]" /> : null}
+              {photo ? <CropPhoto src={photo.src} lightSrc={photo.lightSrc} crop={photo.productPhoto} size={240} className="lv-fade-top inset-x-0 bottom-0 top-[30%]" /> : null}
               <span className="relative block p-2.5 text-[12px] font-extrabold leading-[17px] lg:p-4 lg:text-[15px] lg:leading-6">{nodeName(n, lang)}</span>
             </Link>
           </li>

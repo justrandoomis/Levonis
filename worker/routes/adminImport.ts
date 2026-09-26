@@ -510,6 +510,7 @@ async function exportProducts(
       how_to_use: doc.how_to_use,
       usage_url: doc.usage_guide?.official_url ?? '',
       gini_url: doc.gini_url ?? '',
+      light_image: doc.light_image ?? '',
       hashtags: doc.hashtags,
       // §18. A tier with no product rule contributes NO entry, and
       // `serializeProducts` then writes six empty cells for it — never

@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Barcode, Camera, Link2, Package, ScanLine } from 'lucide-react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Barcode, Camera, LifeBuoy, Link2, Package, ScanLine } from 'lucide-react';
 import type { Language } from '../../translations';
 import { api, ApiError } from '../../lib/api';
 import { TabPanels, TabStrip } from '../ui/Tabs';
@@ -7,11 +8,17 @@ import { Overlay } from '../ui/Overlay';
 import SafeImage from '../ui/SafeImage';
 import { Skeleton, SkeletonGroup } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/AsyncStates';
-import SerialScanner from './SerialScanner';
+import Spinner from '../ui/Spinner';
+import { primeScannerAudio } from '../scanner/feedback';
+import type { ScanRead } from '../scanner/BarcodeScanner';
 import type { Device, EligibleUnit, RegisterResponse } from './types';
 import { fmtDate, productName } from './types';
 import type { WarrantyStrings } from './strings';
-import { BTN_PRIMARY, CARD, ERROR_BOX, INPUT, OK_BOX } from './ui';
+import { BTN_PRIMARY, BTN_SECONDARY, CARD, ERROR_BOX, INPUT, LINK_QUIET, OK_BOX } from './ui';
+
+// The camera scanner and its barcode reader are their own lazy chunks: a
+// customer who types the serial never downloads either.
+const BarcodeScanner = React.lazy(() => import('../scanner/BarcodeScanner'));
 
 /**
  * "Add a printer" — three ways in, one outcome. The serial form and the
@@ -22,7 +29,14 @@ import { BTN_PRIMARY, CARD, ERROR_BOX, INPUT, OK_BOX } from './ui';
  * The 404 from the serial endpoint is shown as ONE fixed sentence in every
  * language. The server deliberately does not say whether the number is
  * unknown, undelivered, replaced or held by someone else, and this panel must
- * not try to guess on its behalf.
+ * not try to guess on its behalf. What it CAN do is offer the way forward:
+ * «اطلب مراجعة يدوية» opens a support ticket naming the number, and the
+ * warranty team — who can see the serial inventory — links it by hand.
+ *
+ * The serial may also be one the shop recorded BEFORE the sale (the serial
+ * inventory, 0139): the server then attaches it to the customer's own
+ * delivered printer of that model. The scanner reads the box label's
+ * «Product SN» barcode for exactly that.
  */
 
 type AddTab = 'serial' | 'orders' | 'scan';
@@ -32,12 +46,16 @@ interface Notice {
   kind: 'ok' | 'error';
   text: string;
   hint?: string;
+  /** The number to name in a manual-review ticket. */
+  review?: string;
 }
 
-function registerErrorNotice(e: unknown, s: WarrantyStrings): Notice {
+function registerErrorNotice(e: unknown, s: WarrantyStrings, tried = ''): Notice {
   if (e instanceof ApiError) {
     if (e.status === 429) return { kind: 'error', text: s.rateLimited };
-    if (e.status === 404 || e.code === 'SERIAL_NOT_FOUND_OR_IN_USE') return { kind: 'error', text: s.notFound, hint: s.notFoundNext };
+    if (e.status === 404 || e.code === 'SERIAL_NOT_FOUND_OR_IN_USE') {
+      return { kind: 'error', text: s.notFound, hint: s.notFoundNext, review: tried || undefined };
+    }
     if (e.code === 'LINKED_ELSEWHERE') return { kind: 'error', text: s.linkedElsewhere };
     if (e.message) return { kind: 'error', text: e.message };
   }
@@ -101,7 +119,7 @@ export function AddDevicePanel({
       onLinked(res.device, res.already_registered);
       if (eligible) loadEligible();
     } catch (e) {
-      setNotice(registerErrorNotice(e, s));
+      setNotice(registerErrorNotice(e, s, value));
     } finally {
       setBusy(false);
     }
@@ -128,9 +146,27 @@ export function AddDevicePanel({
     }
   };
 
-  const onScanned = (text: string) => {
+  const openScanner = () => {
+    // Inside the tap: iOS lets the scanner beep only from a gesture.
+    primeScannerAudio();
+    setNotice(null);
+    setScannerOpen(true);
+  };
+
+  /** A receipt QR first, then the device serial, then (after a pause) a box SN — the server maps each. */
+  const onScanned = (read: ScanRead) => {
+    const text = read.receipt ?? read.productSn ?? read.boxSn ?? '';
+    setScannerOpen(false);
+    if (!text) return;
+    setScanned(text);
+    if (tab === 'serial') setSerial(text);
+    register(text);
+  };
+
+  const onTypedInScanner = (text: string) => {
     setScannerOpen(false);
     setScanned(text);
+    if (tab === 'serial') setSerial(text);
     register(text);
   };
 
@@ -196,6 +232,11 @@ export function AddDevicePanel({
                 </button>
               </div>
             </div>
+            <button ref={tab === 'serial' ? scanButton : undefined} type="button" onClick={openScanner} disabled={busy} className={`${BTN_SECONDARY} w-full sm:w-auto`} data-warranty-scan-serial>
+              <ScanLine aria-hidden="true" className="w-4 h-4" />
+              {s.scanBarcode}
+            </button>
+            <p className="text-zinc-500 text-[11px] leading-relaxed">{s.inventoryHint}</p>
             <p className="text-zinc-500 text-[11px]">{s.registerHint}</p>
           </form>
         )}
@@ -276,7 +317,7 @@ export function AddDevicePanel({
         {tab === 'scan' && (
           <div className="space-y-3">
             <p className="text-zinc-400 text-[13px]">{s.scanIntro}</p>
-            <button ref={scanButton} type="button" onClick={() => setScannerOpen(true)} disabled={busy} className={BTN_PRIMARY}>
+            <button ref={tab === 'scan' ? scanButton : undefined} type="button" onClick={openScanner} disabled={busy} className={BTN_PRIMARY}>
               <Camera aria-hidden="true" className="w-4 h-4" />
               {busy ? s.linking : s.scanCta}
             </button>
@@ -296,6 +337,15 @@ export function AddDevicePanel({
             {notice.text}
             {notice.hint && <div className="text-[11px] opacity-80 mt-1">{notice.hint}</div>}
           </div>
+          {notice.review && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1" data-warranty-review>
+              <Link to="/support" state={{ subject: s.reviewSubject(notice.review) }} className={LINK_QUIET.replace('min-h-[32px]', 'min-h-[44px]')}>
+                <LifeBuoy aria-hidden="true" className="w-3.5 h-3.5" />
+                {s.requestReview}
+              </Link>
+              <span className="text-zinc-500 text-[11px] leading-snug">{s.reviewHint}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -311,7 +361,24 @@ export function AddDevicePanel({
         testId="warranty-scanner"
         panelClassName="w-full max-w-md bg-zinc-950 border border-zinc-800 overflow-hidden"
       >
-        <SerialScanner onDetected={onScanned} onClose={() => setScannerOpen(false)} />
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center py-16">
+              <Spinner size="md" delayMs={150} decorative />
+            </div>
+          }
+        >
+          <BarcodeScanner
+            mode="single"
+            qr
+            frame="strip"
+            titleId="warranty-scanner-title"
+            title={s.scanTitle}
+            onRead={onScanned}
+            onManual={onTypedInScanner}
+            onClose={() => setScannerOpen(false)}
+          />
+        </Suspense>
       </Overlay>
     </section>
   );

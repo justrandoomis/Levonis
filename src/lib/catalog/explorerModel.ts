@@ -29,10 +29,14 @@ export interface PhotoCandidate {
   direct_stock_available?: number | null;
   images?: readonly string[] | null;
   media?: readonly { url?: string | null; primary?: boolean | null }[] | null;
+  /** «الصورة الرئيسية للوضع الفاتح» (migration 0138). */
+  light_image?: string | null;
 }
 
 export interface BannerPhoto {
   src: string;
+  /** The product's light-theme main image (0138), only when it has one. */
+  lightSrc?: string;
   /** A catalogue photograph (crop to its product band) vs a picture the owner uploaded (shown whole). */
   productPhoto: boolean;
   productId: string | null;
@@ -88,7 +92,13 @@ export function representativePhoto(
       bestRank = rank;
     }
   }
-  return best ? { src: photoOf(best), productPhoto: true, productId: best.id } : null;
+  return best ? productBannerPhoto(best) : null;
+}
+
+/** A product's photograph for a banner: its primary, and its light-theme twin when it has one. */
+export function productBannerPhoto(p: PhotoCandidate): BannerPhoto {
+  const light = typeof p.light_image === 'string' ? p.light_image.trim() : '';
+  return { src: photoOf(p), productPhoto: true, productId: p.id, ...(light ? { lightSrc: light } : {}) };
 }
 
 /** The admin's own picture for a section, when there is one. */

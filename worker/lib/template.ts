@@ -359,6 +359,9 @@ const SCALAR_FIELDS: FieldSpec[] = [
   // productModel refuses anything that is not http(s) or a relative path, so
   // a bad value in a file is dropped rather than carried to an href.
   f('gini_url', 'string', 'usage', 'رابط المنتج في تطبيق جني (التقسيط) — this product\'s page in the Gini instalments app; فارغ = لا يوجد رابط خاص بالمنتج'),
+  // 0138 — the light-theme main image. A path the product media pipeline
+  // already stored (`/files/….webp`); the model keeps nothing else.
+  f('light_image', 'string', 'media', 'الصورة الرئيسية للوضع الفاتح — مسار صورة مرفوعة للمنتج (/files/….webp)؛ فارغ = تُعرض الصورة الرئيسية في الوضعين — the light-theme main image, an uploaded product image path'),
 ];
 
 const GROUP_SPECS: GroupSpec[] = [
@@ -1982,6 +1985,7 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   // so «يملأ جميع الحقول» was structurally impossible for it.
   push('usage_official_url', doc.usage_guide?.official_url ?? '');
   push('gini_url', doc.gini_url ?? '');
+  push('light_image', doc.light_image ?? '');
   sorted(doc.usage_guide?.steps ?? []).forEach((st, i) => {
     const p = `usage_steps.${i + 1}`;
     push(`${p}.id`, st.id);
@@ -2949,6 +2953,7 @@ export function toDocBody(
         // Carried for the same reason: a file that says nothing about the
         // Gini link must not erase one somebody pasted in the admin.
         gini_url: existing.gini_url,
+        light_image: existing.light_image,
         price_iqd: existing.price_iqd,
         pro_price_iqd: existing.pro_price_iqd,
         prime_price_iqd: existing.prime_price_iqd,
@@ -3061,6 +3066,9 @@ export function toDocBody(
         break;
       case 'gini_url':
         body.gini_url = typeof pf.value === 'string' ? pf.value : '';
+        break;
+      case 'light_image':
+        body.light_image = typeof pf.value === 'string' ? pf.value : '';
         break;
       case 'standard_delivery_enabled':
       case 'standard_delivery_quantity_step':

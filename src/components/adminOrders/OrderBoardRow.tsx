@@ -42,7 +42,7 @@
 import { ChevronsRight, Loader2, Trash2 } from 'lucide-react';
 import { formatIqd, type AdminOrderRow, type OrderStatus } from '../../lib/api';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
-import { DayChip, ProBadge, TypeBadge, countText } from './OrderBoardBadges';
+import { DayChip, PriceHoldBadge, ProBadge, TypeBadge, countText } from './OrderBoardBadges';
 
 /**
  * «يظهر بشكل صغير سطر بجانب رقم الطلب المنتجات التي طلبها» — WHAT IS IN THE
@@ -131,6 +131,7 @@ export default function OrderBoardRow({
             loc={loc}
           />
           <ProBadge order={order} />
+          <PriceHoldBadge order={order} loc={loc} />
         </div>
 
         <p className="truncate text-[14px] leading-[1.45] font-bold text-text-primary" dir="auto">
@@ -230,7 +231,9 @@ export default function OrderBoardRow({
           see that they are doing by hand what Al-Waseet or the sweep would
           otherwise do, and the title says so in words.
         */}
-        {order.quick_next && (
+        {/* A price-held order does not move (0140) — the server would refuse
+            with PRICE_APPROVAL_PENDING, so the button is not offered. */}
+        {order.quick_next && !order.price_hold_id && (
           <button
             type="button"
             data-action="quick-advance"

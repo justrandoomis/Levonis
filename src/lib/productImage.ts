@@ -12,6 +12,8 @@ export { productSelectionComboKey, productVariantIdForSelection } from '../../pa
 
 export interface PrimaryImageProduct {
   images?: readonly string[] | null;
+  /** «الصورة الرئيسية للوضع الفاتح» (0138) — absent when the product has none. */
+  light_image?: string | null;
   media?: readonly {
     url?: string | null;
     primary?: boolean | null;
@@ -105,4 +107,30 @@ export function productPrimaryImage(product: PrimaryImageProduct): string {
   return [...media]
     .filter((item) => !!item?.url)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))[0]?.url ?? '';
+}
+
+/**
+ * THE MAIN IMAGE FOR THE THEME ON SCREEN (migration 0138).
+ *
+ * The owner: «يكون هنالك صورتين حسب المظهر». The gallery primary is the main
+ * image and is what the dark theme shows; a product may also carry a
+ * light-theme main image, which the light theme shows instead. With none, both
+ * themes show the primary — every product looked like that before 0138.
+ *
+ * Pass the theme from `useTheme()` (src/lib/theme.ts): the attribute on <html>
+ * is set before the first paint, so the first render already asks for the
+ * right file and only that file is downloaded; a theme switch re-renders and
+ * swaps the `src` at once.
+ */
+export function productMainImage(product: PrimaryImageProduct, theme: 'light' | 'dark'): string {
+  if (theme === 'light') {
+    const light = typeof product.light_image === 'string' ? product.light_image.trim() : '';
+    if (light) return light;
+  }
+  return productPrimaryImage(product);
+}
+
+/** The same choice for a picture that is not a product (a tile, a banner). */
+export function themedImage(dark: string, light: string | null | undefined, theme: 'light' | 'dark'): string {
+  return theme === 'light' && light ? light : dark;
 }

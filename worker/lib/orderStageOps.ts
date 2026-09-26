@@ -57,6 +57,7 @@ import { reachedMilestones, revealStampStatement } from './mysteryReveal';
 import { reclaimOrderRedemptionsStatement } from './offers';
 import { notifyOrderStatus } from './orderNotify';
 import { runOrderDeliveredEffects } from './orderDeliveredEffects';
+import { isPriceHeld, isPriceHoldAbort } from './priceHold';
 
 /** Mirrors STOCK_DEDUCTED_STATES in the admin route — the same four statuses. */
 const STOCK_DEDUCTED_STATES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
@@ -109,7 +110,7 @@ export interface MoveResult {
   /** Honest partial outcomes — the move happened, something beside it did not. */
   notes: string[];
   /** Why a move was refused, when moved === false. */
-  reason?: 'ILLEGAL_MOVE' | 'RACED' | 'NOT_FOUND' | 'OFFER_LIMIT_REACHED';
+  reason?: 'ILLEGAL_MOVE' | 'RACED' | 'NOT_FOUND' | 'OFFER_LIMIT_REACHED' | 'PRICE_APPROVAL_PENDING';
 }
 
 export interface MoveOptions {
@@ -305,6 +306,13 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   if (!opts.force && !canMoveStage(from, opts.to, order.shipping_type)) {
     return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'ILLEGAL_MOVE' };
   }
+  // «يبقى الطلب معلقا إلى أن يوافق الزبون» (0140): an order held for the
+  // customer's price decision does not move — not even forced, not by the
+  // sweep. The trigger `trg_orders_price_hold_freeze` enforces the same rule
+  // inside the flip for a hold that lands after this read.
+  if (isPriceHeld(row)) {
+    return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'PRICE_APPROVAL_PENDING' };
+  }
   /*
    * A COMMUNITY-STORE ORDER NEVER ENTERS OR LEAVES `cancelled` HERE — not even
    * forced. A stage move into `cancelled` refunds nothing (see below), and a
@@ -405,6 +413,12 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
       return {
         moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
         next_stage: null, next_stage_at: null, notes: [], reason: 'OFFER_LIMIT_REACHED',
+      };
+    }
+    if (isPriceHoldAbort(e)) {
+      return {
+        moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'PRICE_APPROVAL_PENDING',
       };
     }
     throw e;

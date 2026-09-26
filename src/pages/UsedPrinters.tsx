@@ -50,7 +50,8 @@ import {
 import SafeImage from '../components/ui/SafeImage';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { ProductGridSkeleton } from '../components/ui/Skeleton';
-import { productPrimaryImage } from '../lib/productImage';
+import { productMainImage } from '../lib/productImage';
+import { useTheme } from '../lib/theme';
 import { readPageCache, writePageCache } from '../lib/pageCache';
 import { useMoney } from '../CurrencyContext';
 
@@ -288,6 +289,7 @@ export default function UsedPrinters() {
  * sale. It is only ever shown when the SERVER found an honest saving.
  */
 function GradedCard({ p, lang }: { p: GradedProduct; lang: string }) {
+  const { theme } = useTheme();
   const { money } = useMoney();
   /** `lang` stays a prop because conditionKindLabel/conditionGradeLabel take
    *  it, but the card's OWN sentences go through `loc(ar, en, ckb)` — three
@@ -305,7 +307,7 @@ function GradedCard({ p, lang }: { p: GradedProduct; lang: string }) {
       className="relative flex h-full flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus min-w-0"
     >
       <div className="relative aspect-square overflow-hidden bg-black">
-        <SafeImage src={productPrimaryImage(p)} alt={p.name} aspect="square" className="w-full h-full" />
+        <SafeImage src={productMainImage(p, theme)} alt={p.name} aspect="square" className="w-full h-full" />
         {condition ? (
           /* The ONE tinted element on the card, because the grade is the whole
              reason this row is not an ordinary listing. */

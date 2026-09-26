@@ -116,14 +116,14 @@ export const PLATFORM_DESCRIPTION =
  * one file per HOST, not per reader — it cannot know which one a reader chose.
  * So each host's splash is the ground its first screen most often has:
  *
- *  - THE PLATFORM: the light theme's ivory, `#f3f0ea` — the default for every
+ *  - THE PLATFORM: the light theme's cream, `#ece6da` — the default for every
  *    reader who has not chosen dark, and exactly what index.html's theme-color
  *    meta and pre-CSS inline style paint before the theme script runs.
  *  - A MERCHANT'S STORE: the document black. A storefront stays dark whatever
  *    the app's theme (`[data-store-theme]` is a dark island), so a store's
  *    launcher keeps the black it always had (worker/lib/storeIcons.ts).
  */
-const IVORY = '#f3f0ea';
+const IVORY = '#ece6da';
 const BLACK = '#000000';
 
 /**

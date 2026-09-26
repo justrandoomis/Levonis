@@ -57,6 +57,12 @@ export interface WarrantyStrings {
   scanDecoding: string;
   choosePhoto: string;
   scanHint: string;
+  /** Serial inventory (0139): scanning the box label's Product SN barcode. */
+  scanBarcode: string;
+  inventoryHint: string;
+  requestReview: string;
+  reviewHint: string;
+  reviewSubject: (serial: string) => string;
 
   // my printers
   myPrinters: string;
@@ -182,6 +188,11 @@ const ar: WarrantyStrings = {
   scanDecoding: 'جارٍ قراءة الصورة…',
   choosePhoto: 'اختر صورة',
   scanHint: 'يُقبل رمز QR الخاص بالإيصال والباركود المطبوع على ملصق الجهاز.',
+  scanBarcode: 'امسح الباركود',
+  inventoryHint: 'اشتريت طابعتك من Levonis؟ امسح باركود «Product SN» على ملصق العلبة أو اكتب الرقم — تُربط تلقائيًا بطابعتك المُسلَّمة.',
+  requestReview: 'اطلب مراجعة يدوية',
+  reviewHint: 'الرقم صحيح والجهاز اشتريته من Levonis؟ أرسله لفريق الدعم ليتحقق منه ويربطه لك.',
+  reviewSubject: (serial) => `مراجعة رقم تسلسلي: ${serial}`,
 
   myPrinters: 'طابعاتي',
   devicesEmpty: 'لا توجد طابعات مرتبطة بعد.',
@@ -315,6 +326,11 @@ const en: WarrantyStrings = {
   scanDecoding: 'Reading the photo…',
   choosePhoto: 'Choose a photo',
   scanHint: 'The receipt’s QR code and the barcode printed on the device label are both accepted.',
+  scanBarcode: 'Scan the barcode',
+  inventoryHint: 'Bought your printer from Levonis? Scan the “Product SN” barcode on the box label or type the number — it links to your delivered printer automatically.',
+  requestReview: 'Request a manual review',
+  reviewHint: 'The number is right and you bought the device from Levonis? Send it to support to check and link it for you.',
+  reviewSubject: (serial) => `Serial review: ${serial}`,
 
   myPrinters: 'My printers',
   devicesEmpty: 'No printers linked yet.',
@@ -437,6 +453,14 @@ const ckb: WarrantyStrings = {
   scanDecoding: 'وێنەکە دەخوێنرێتەوە…',
   choosePhoto: 'وێنەیەک هەڵبژێرە',
   scanHint: 'کۆدی QR ی پسووڵە و بارکۆدی سەر لەیبڵی ئامێر هەردووکیان قبووڵ دەکرێن.',
+  // «سکانکردنی کۆد» is this file's own hand-written Sorani (scanTitle), reused.
+  scanBarcode: 'سکانکردنی کۆد',
+  // OWNER: the four lines below carry the ARABIC text on purpose — Sorani to
+  // be written by hand.
+  inventoryHint: 'اشتريت طابعتك من Levonis؟ امسح باركود «Product SN» على ملصق العلبة أو اكتب الرقم — تُربط تلقائيًا بطابعتك المُسلَّمة.',
+  requestReview: 'اطلب مراجعة يدوية',
+  reviewHint: 'الرقم صحيح والجهاز اشتريته من Levonis؟ أرسله لفريق الدعم ليتحقق منه ويربطه لك.',
+  reviewSubject: (serial) => `مراجعة رقم تسلسلي: ${serial}`,
 
   myPrinters: 'پرینتەرەکانم',
   devicesEmpty: 'هێشتا هیچ پرینتەرێک نەبەستراوە.',

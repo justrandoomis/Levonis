@@ -21,7 +21,10 @@
  *      scripts/e2e-theme-shots.mjs photographs every screen in both),
  *      HOME_SHOTS_ORIGIN (default https://levonis-iq.com),
  *      HOME_SHOTS_DIR (default /tmp/claude-0/shots/home-v2),
- *      HOME_SHOTS_URL (reuse a running Vite instead of starting one on :4181).
+ *      HOME_SHOTS_URL (reuse a running Vite instead of starting one on :4181),
+ *      HOME_SHOTS_WIDTHS (comma-separated, e.g. `320,390,768,1280,1920`; every
+ *      width is photographed in Arabic — default 390 and 1440 in Arabic plus
+ *      390 in English).
  *
  * Besides the pictures it asserts what a picture cannot show at a glance: the
  * section order the owner fixed, no horizontal scroll, and that every link in
@@ -156,10 +159,13 @@ async function shoot(browser, { width, lang }) {
       overflow: Math.max(document.documentElement.scrollWidth - window.innerWidth, main ? main.scrollWidth - main.clientWidth : 0),
       // The compact product card (CATALOG_DISCOVERY §4): width and height of
       // each one, and whether any of them nests a button inside its link.
-      cards: [...document.querySelectorAll('[data-product-card="compact"]')].map((c) => {
-        const r = c.getBoundingClientRect();
-        return [r.width, r.height];
-      }),
+      cards: [...document.querySelectorAll('[data-product-card="compact"]')]
+        .map((c) => {
+          const r = c.getBoundingClientRect();
+          return [r.width, r.height];
+        })
+        // A card hidden at this width (the rail's 11th and 12th below 1536 px) has no box.
+        .filter(([w]) => w > 0),
       nestedButtons: [...document.querySelectorAll('[data-product-card] a')].filter((a) => a.querySelector('button')).length,
       height: main ? main.scrollHeight : document.documentElement.scrollHeight,
     };
@@ -182,6 +188,17 @@ async function shoot(browser, { width, lang }) {
   const bad = facts.links.filter((h) => !(h.startsWith('/') || h.startsWith('https://studio.levonis-iq.com')));
   check(`${name}: every link is in-app or the Studio`, bad.length === 0, bad.join(', '));
 
+  // The first screen as the shopper sees it — the header over the hero, the
+  // bottom bar over the page — before the viewport is grown.
+  await page.screenshot({ path: join(OUT, `${name}-top.png`) });
+  await page.evaluate(() => {
+    const main = document.getElementById('main-scroll-container');
+    const bento = document.querySelector('[data-home-section="categories_bento"]');
+    if (main && bento) main.scrollTop = Math.max(0, bento.getBoundingClientRect().top + main.scrollTop - 140);
+  });
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: join(OUT, `${name}-scrolled.png`) });
+
   // Full length: the app scrolls inside #main-scroll-container, so the page
   // is photographed by growing the viewport to the content rather than by
   // Playwright's fullPage (which only sees the window).
@@ -197,11 +214,15 @@ async function main() {
   const browser = await chromium.launch();
   try {
     const only = process.env.HOME_SHOTS_ONLY;
-    for (const combo of [
-      { width: 390, lang: 'ar' },
-      { width: 1440, lang: 'ar' },
-      { width: 390, lang: 'en' },
-    ]) {
+    const widths = (process.env.HOME_SHOTS_WIDTHS || '').split(',').map(Number).filter((w) => w > 0);
+    const combos = widths.length
+      ? widths.map((width) => ({ width, lang: 'ar' }))
+      : [
+          { width: 390, lang: 'ar' },
+          { width: 1440, lang: 'ar' },
+          { width: 390, lang: 'en' },
+        ];
+    for (const combo of combos) {
       if (only && only !== `${combo.width}-${combo.lang}`) continue;
       console.log(`\n${combo.width} ${combo.lang}`);
       await shoot(browser, combo);

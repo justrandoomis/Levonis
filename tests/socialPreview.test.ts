@@ -239,7 +239,7 @@ test('the shop keeps everything that is not the identity of the shared thing', (
   assert.match(html, /<html lang="ar" dir="rtl"/);
   // The anti-flash rules, the pre-paint theme script (its CSP hash covers
   // these exact bytes) and the font links are untouched.
-  assert.match(html, /background-color: #f3f0ea/);
+  assert.match(html, /background-color: #ece6da/);
   assert.ok(html.includes(`<script>${THEME_BOOT_SCRIPT}</script>`), 'the theme script was rewritten, so its hash no longer matches');
   assert.match(html, /fonts\.googleapis\.com/);
 });

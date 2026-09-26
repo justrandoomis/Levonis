@@ -964,26 +964,31 @@ export async function planRelationsWriteFrom(
     }
   }
   // ---- a stock figure below what is already held for orders --------------
-  // Reserved units are promised to customers; a count that cannot cover them
-  // is not a correction but an oversell waiting to happen.
+  // Reserved units are promised to customers, so the row can never drop below
+  // them. A lower figure means "nothing more to sell": it is raised to the
+  // held count (available = 0) and the admin is told, instead of refused.
   for (const v of valueInputs) {
     const reserved = reservedOfValue.get(v.id) ?? 0;
     if (v.stock !== null && v.stock < reserved) {
-      errors.push(`Option "${v.name_en}": stock ${v.stock} is below the ${reserved} unit(s) reserved for live orders`);
+      warnings.push(`Option "${v.name_en}": stock ${v.stock} — kept at ${reserved} (held for live orders), so nothing more is on sale`);
+      v.stock = reserved;
     }
   }
   for (const col of colorInputs) {
     const reserved = reservedOfColor.get(col.id) ?? 0;
     if (col.stock !== null && col.stock < reserved) {
-      errors.push(`Colour "${col.name_en}": stock ${col.stock} is below the ${reserved} unit(s) reserved for live orders`);
+      warnings.push(`Colour "${col.name_en}": stock ${col.stock} — kept at ${reserved} (held for live orders), so nothing more is on sale`);
+      col.stock = reserved;
     }
   }
   for (const v of variantInputs) {
     const reserved = reservedOfVariant.get(v.id) ?? 0;
     if (v.stock !== null && v.stock < reserved) {
-      errors.push(`Combination "${v.combo_key}": stock ${v.stock} is below the ${reserved} unit(s) reserved for live orders`);
+      warnings.push(`Combination "${v.combo_key}": stock ${v.stock} — kept at ${reserved} (held for live orders), so nothing more is on sale`);
+      v.stock = reserved;
     }
   }
+
 
   // ---- a row an open order names is never deleted ------------------------
   // The order's line still points at that combination, that option value and
@@ -2589,7 +2594,9 @@ export async function planProductSave(
       .first<{ stock_reserved: number | null; rows_n: number | null }>();
     const reserved = Number(row?.stock_reserved ?? 0);
     if (doc.stock !== null && doc.stock < reserved) {
-      throw badRequest(`stock: ${doc.stock} is below the ${reserved} unit(s) reserved for live orders`, 'RELATIONS_VALIDATION');
+      // Same rule as the option rows: raised to the held units, not refused.
+      warnings.push(`stock: ${doc.stock} — kept at ${reserved} (held for live orders), so nothing more is on sale`);
+      doc.stock = reserved;
     }
     if (Number(row?.rows_n ?? 0) > 0) {
       doc.options = prev.options;
@@ -2610,7 +2617,7 @@ export async function planProductSave(
      * See worker/lib/conditionProjection.ts for why this one asks first rather
      * than repairing on failure like the reads do.
      */
-    const [hasCondition, dimensionPresence, hasGiniUrl] = await Promise.all([
+    const [hasCondition, dimensionPresence, hasGiniUrl, hasLightImage] = await Promise.all([
       productsHaveConditionDoc(db),
       Promise.all(DIMENSION_FIELDS.map((field) => productsHaveColumn(db, field))),
       // 0104, and the same minute-long window: `gini_url` joined
@@ -2620,6 +2627,8 @@ export async function planProductSave(
       // to every product save until the migration landed — an ordinary edit
       // to an ordinary product, 500ing for a field nobody had touched.
       productsHaveColumn(db, 'gini_url'),
+      // 0138, the same window for the light-theme main image.
+      productsHaveColumn(db, 'light_image'),
     ]);
     /**
      * A price-only save may cross the minute before 0098 reaches the database,
@@ -2663,6 +2672,19 @@ export async function planProductSave(
         );
       }
       dropped.add('gini_url');
+    }
+    /** «الصورة الرئيسية للوضع الفاتح» — under the Gini rule: empty crosses the
+     *  deploy window untouched, a chosen picture names the migration. */
+    if (!hasLightImage) {
+      if (String(doc.light_image ?? '') !== '') {
+        throw new HttpError(
+          503,
+          'تعذّر حفظ الصورة الرئيسية للوضع الفاتح قبل تطبيق ترحيل قاعدة البيانات 0138 / the light-theme main image requires database migration 0138',
+          'LIGHT_IMAGE_MIGRATION_REQUIRED',
+          { errors: ['light_image: column is not installed'] }
+        );
+      }
+      dropped.add('light_image');
     }
     const writable = dropped.size === 0 ? PRODUCT_COLUMNS : PRODUCT_COLUMNS.filter((k) => !dropped.has(k));
     if (intent.mode === 'create') {

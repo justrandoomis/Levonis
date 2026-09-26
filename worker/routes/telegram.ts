@@ -14,6 +14,7 @@ import {
   oneOf,
 } from '../lib/http';
 import { sha256Hex, randomToken, timingSafeEqual } from '../lib/crypto';
+import { handlePriceAdjustCallback, isPriceCallbackData, type PriceCallback } from '../lib/orderPriceAdjust';
 import { normalizePhone, phonesMatch, maskPhone } from '../lib/phone';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
@@ -27,6 +28,8 @@ import {
   botToken,
   OTP_PURPOSES,
   type OtpPurpose,
+  extractStartPayload,
+  startDeepLink,
 } from '../lib/telegram';
 import { setPrimaryChannelStatements } from '../lib/channelReadiness';
 import { canViewFinancials } from '../lib/adminScope';
@@ -143,6 +146,17 @@ const TXT_PHONE_VERIFIED_AUTH =
   'Your phone number is verified. If a verification code arrives here, enter it on the LEVONIS website; otherwise return to the site and follow the instructions.\n' +
   'ژمارەی تەلەفۆنەکەت پشتڕاستکرایەوە. ئەگەر کۆدی پشتڕاستکردنەوە لێرە گەیشت، لە ماڵپەڕی LEVONIS بینووسە؛ ئەگەرنا بگەڕێوە بۆ ماڵپەڕەکە و ڕێنماییەکان جێبەجێبکە.';
 
+// A plain "/start" (the chat's START/RESTART button without a payload) or any
+// other message from a chat that has no request bound to it. It used to get
+// «هذا الرابط غير صالح» — which, to someone whose iPhone just opened the chat
+// without the START payload, reads as "the site is broken". It now says what
+// to do: go back and tap the button again, or paste the command shown there.
+// OWNER: Sorani to be written by hand.
+const TXT_START_HELP =
+  'LEVONIS\n' +
+  'أهلًا بك. لتسجيل الدخول أو توثيق رقمك: ارجع إلى موقع LEVONIS واضغط «فتح البوت في تيليغرام» مرة أخرى، أو انسخ الأمر الظاهر في الموقع (يبدأ بـ /start) وأرسله هنا كرسالة.\n\n' +
+  "Welcome. To sign in or verify your number: go back to the LEVONIS website and tap 'Open the bot in Telegram' again, or copy the command shown there (it starts with /start) and send it here as a message.";
+
 const TXT_LINKED_DONE =
   'LEVONIS ✅\n' +
   'تم ربط حسابك في تيليغرام بحساب LEVONIS بنجاح.\n' +
@@ -209,7 +223,7 @@ telegramRoutes.post('/link/start', requireAuth, async (c) => {
 
   return c.json({
     success: true,
-    deep_link: `https://t.me/${botUsername}?start=${nonce}`,
+    deep_link: startDeepLink(botUsername, nonce),
     bot_username: botUsername,
     expires_at: expiresAt,
     phone_masked: maskPhone(phone),
@@ -528,6 +542,12 @@ async function handleUpdate(env: Env, update: TgUpdate): Promise<void> {
       await handleOrderConfirmCallback(env, cb as OrderConfirmCallback, 'customer');
       return;
     }
+    // «موافق على السعر الجديد» / «رفض» in a CUSTOMER's private chat (0140).
+    // Owner binding and replay safety live in worker/lib/orderPriceAdjust.ts.
+    if (isPriceCallbackData(cb.data)) {
+      await handlePriceAdjustCallback(env, cb as PriceCallback);
+      return;
+    }
     await handleAdminActionCallback(env, cb as CallbackQueryInput);
     return;
   }
@@ -542,18 +562,61 @@ async function handleUpdate(env: Env, update: TgUpdate): Promise<void> {
     await handleContact(env, msg);
     return;
   }
-  if (typeof msg.text === 'string' && msg.text.startsWith('/start')) {
-    await handleStart(env, msg);
+  if (typeof msg.text === 'string') {
+    await handleText(env, msg);
   }
 }
 
-async function handleStart(env: Env, msg: TgMessage): Promise<void> {
+/** The site's own sign-in page, as an inline button under the help text. */
+function openSiteKeyboard(env: Env): Record<string, unknown> {
+  const origin = (env.APP_ORIGIN || '').trim().replace(/\/+$/, '');
+  if (!origin.startsWith('https://')) return {};
+  return {
+    reply_markup: {
+      inline_keyboard: [[{ text: '🌐 فتح LEVONIS / Open LEVONIS', url: `${origin}/auth` }]],
+    },
+  };
+}
+
+/**
+ * Every private text message. «عند الضغط على start … لا يفتح ولا يضغط الزر،
+ * هذا في الايفون»: on iPhone the START button does not always carry the
+ * payload (an existing chat, an in-app browser that swallowed the tg:// hop),
+ * so the challenge can also be bound by pasting `/start <code>`, the t.me
+ * link, or the bare code — the same nonce, the same single conditional UPDATE,
+ * no new secret. A payload-less /start or any other text from a chat that
+ * already has a live request re-shows the share-contact keyboard (it may have
+ * been dismissed); from a chat with none it gets instructions, never silence.
+ */
+async function handleText(env: Env, msg: TgMessage): Promise<void> {
   const chatId = msg.chat!.id;
-  const payload = (msg.text || '').split(/\s+/)[1] || '';
-  if (!payload || !/^[A-Za-z0-9_-]{16,64}$/.test(payload)) {
-    await sendToChat(env, chatId, TXT_UNKNOWN_START);
+  const { kind, payload } = extractStartPayload(msg.text || '');
+  if (payload) {
+    await handleStart(env, msg, payload);
     return;
   }
+  const live = await env.DB.prepare(
+    `SELECT id FROM link_challenges
+      WHERE chat_id = ? AND consumed_at IS NULL AND state IN ('pending','contact_received') AND expires_at > ?
+      LIMIT 1`
+  )
+    .bind(chatId, nowIso())
+    .first<{ id: string }>();
+  if (live) {
+    await sendToChat(env, chatId, TXT_CONTACT_PROMPT, CONTACT_KEYBOARD);
+    return;
+  }
+  const typed = (msg.text || '').trim();
+  if (kind === 'start' && /^\/start(?:@\S+)?\s+\S/i.test(typed)) {
+    // A payload was sent but it is not one of ours (truncated, edited).
+    await sendToChat(env, chatId, TXT_UNKNOWN_START, openSiteKeyboard(env));
+    return;
+  }
+  await sendToChat(env, chatId, TXT_START_HELP, openSiteKeyboard(env));
+}
+
+async function handleStart(env: Env, msg: TgMessage, payload: string): Promise<void> {
+  const chatId = msg.chat!.id;
 
   const id = await sha256Hex(payload);
   const now = nowIso();
@@ -568,7 +631,7 @@ async function handleStart(env: Env, msg: TgMessage): Promise<void> {
     .run();
 
   if (!res.meta || res.meta.changes === 0) {
-    await sendToChat(env, chatId, TXT_UNKNOWN_START);
+    await sendToChat(env, chatId, TXT_UNKNOWN_START, openSiteKeyboard(env));
     return;
   }
   await sendToChat(env, chatId, TXT_CONTACT_PROMPT, CONTACT_KEYBOARD);

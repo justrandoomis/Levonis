@@ -25,7 +25,11 @@ import SectionHead from './SectionHead';
  * a half visible, which invites the swipe; on a wide screen it becomes a
  * grid.
  */
-const LIMIT = 10;
+// Two full rows at every grid width: 5 + 5 from 1024 px, 6 + 6 from 1536 px
+// (the two extra cards are hidden below that — see the rail). A phone's rail
+// scrolls, so it simply holds all twelve.
+const LIMIT = 12;
+const ROWS_OF_FIVE = 10;
 
 export default function LatestProducts({
   latest,
@@ -140,14 +144,14 @@ export default function LatestProducts({
         ref={setRail}
         aria-live="polite"
         aria-busy={waiting || undefined}
-        className="-mx-4 flex snap-x gap-2.5 overflow-x-auto overscroll-x-contain px-4 pb-1 hide-scrollbar sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-5 lg:gap-4 lg:overflow-visible lg:px-0"
+        className="-mx-4 flex snap-x gap-2.5 overflow-x-auto overscroll-x-contain px-4 pb-1 hide-scrollbar sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-5 lg:gap-4 lg:overflow-visible lg:px-0 2xl:grid-cols-6 2xl:gap-5"
       >
         {waiting
           ? Array.from({ length: 4 }, (_, i) => (
               <ProductCardSkeleton key={i} density="compact" className="w-[148px] shrink-0 lg:w-auto" />
             ))
-          : products.map((p) => (
-              <div key={p.id} className="flex shrink-0 snap-start">
+          : products.map((p, i) => (
+              <div key={p.id} className={`flex shrink-0 snap-start ${i >= ROWS_OF_FIVE ? 'lg:hidden 2xl:flex' : ''}`}>
                 <ProductCard p={p} density="compact" compareToggle widthClass="w-[148px] shrink-0 lg:w-full" />
               </div>
             ))}

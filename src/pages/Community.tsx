@@ -176,7 +176,7 @@ export default function Community() {
           to end in a 1px border, which is a line the design never asked for —
           what it was trying to say is "there is more below". A short gradient
           says that, and only where the overlap is real (`.scroll-edge`). */}
-      <div className="material scroll-edge sticky top-0 z-40 [--material-tint:#000] px-4 py-3 flex items-center gap-3">
+      <div className="material scroll-edge sticky top-0 z-40 px-4 py-3 flex items-center gap-3">
         <button
           type="button"
           aria-label={dir === 'rtl' ? 'رجوع' : 'Back'}
@@ -208,21 +208,21 @@ export default function Community() {
         <div className="grid grid-cols-4 gap-2">
            <button type="button" className="press-scale flex flex-col items-center gap-2 group" onClick={() => navigate('/chats')}>
              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center group-hover:border-olive/50 transition-colors">
-               <MessageSquare className="w-5 h-5 text-zinc-400 group-hover:text-olive transition-colors" />
+               <MessageSquare className="w-5 h-5 text-zinc-400 group-hover:text-sage transition-colors" />
              </div>
              <span className="text-[10px] font-medium text-zinc-400">{dir === 'rtl' ? 'الرسائل' : 'Messages'}</span>
            </button>
            <button type="button" className="press-scale flex flex-col items-center gap-2 group" onClick={() => navigate('/community?tab=requests')}>
              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center group-hover:border-olive/50 transition-colors">
-               <Box className="w-5 h-5 text-zinc-400 group-hover:text-olive transition-colors" />
+               <Box className="w-5 h-5 text-zinc-400 group-hover:text-sage transition-colors" />
              </div>
              <span className="text-[10px] font-medium text-zinc-400">{dir === 'rtl' ? 'الطلبات' : 'Requests'}</span>
            </button>
            <button type="button" className="press-scale flex flex-col items-center gap-2 group" onClick={openNewRequest}>
              <div className="w-12 h-12 rounded-2xl bg-olive/10 border border-olive/30 flex items-center justify-center group-hover:bg-olive/20 transition-colors">
-               <Plus className="w-5 h-5 text-olive" />
+               <Plus className="w-5 h-5 text-sage" />
              </div>
-             <span className="text-[10px] font-medium text-olive">{dir === 'rtl' ? 'طلب جديد' : 'New Order'}</span>
+             <span className="text-[10px] font-medium text-sage">{dir === 'rtl' ? 'طلب جديد' : 'New Order'}</span>
            </button>
            <button type="button" className="press-scale flex flex-col items-center gap-2 group" onClick={() => navigate('/profile')}>
              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
@@ -251,33 +251,33 @@ export default function Community() {
              data-testid="community-studio-link"
              rel="noopener noreferrer"
              aria-label={`${t('studioCardTitle')} — ${t('studioOpen')}`}
-             className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-olive/25 to-black border border-olive/50 p-4 flex flex-col justify-center snap-start relative overflow-hidden hover:border-olive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
+             className="lv-community-tile shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-olive/25 to-black border border-olive/50 p-4 flex flex-col justify-center snap-start relative overflow-hidden hover:border-olive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
            >
-             <div className="absolute right-2 bottom-0 opacity-20">
+             <div aria-hidden="true" className="absolute end-2 bottom-0 opacity-20">
                <Box aria-hidden="true" className="w-20 h-20 text-olive" />
              </div>
              <h3 className="text-white font-bold text-sm mb-1">{t('studioCardTitle')}</h3>
-             <p className="text-xs text-olive font-medium">{t('studioOpen')}</p>
+             <p className="text-xs text-sage font-medium">{t('studioOpen')}</p>
            </a>
            {/* Was a dead card. The calculator is real now — it prices from
                the shop's own filament, not from invented numbers. */}
            <button
              type="button"
              onClick={() => navigate('/tools')}
-             className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-zinc-800 to-zinc-900 border border-zinc-700 p-4 flex flex-col justify-center snap-start relative overflow-hidden text-start hover:border-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
+             className="lv-community-tile shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-zinc-800 to-zinc-900 border border-zinc-700 p-4 flex flex-col justify-center snap-start relative overflow-hidden text-start hover:border-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
            >
-             <div className="absolute right-2 bottom-0 opacity-20">
+             <div aria-hidden="true" className="absolute end-2 bottom-0 opacity-20">
                <Calculator className="w-20 h-20" />
              </div>
              <h3 className="text-white font-bold text-sm mb-1">{dir === 'rtl' ? 'احسب سعر طباعتك' : 'Calculate Print Price'}</h3>
              <p className="text-xs text-zinc-300">{dir === 'rtl' ? 'افتح الحاسبة' : 'Open the calculator'}</p>
            </button>
-           <div className="shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-olive/20 to-black border border-olive/30 p-4 flex flex-col justify-center snap-start relative overflow-hidden opacity-70" aria-disabled="true">
-             <div className="absolute right-2 bottom-0 opacity-20">
+           <div className="lv-community-tile shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-olive/20 to-black border border-olive/30 p-4 flex flex-col justify-center snap-start relative overflow-hidden opacity-70" aria-disabled="true">
+             <div aria-hidden="true" className="absolute end-2 bottom-0 opacity-20">
                <Box className="w-20 h-20 text-olive" />
              </div>
              <h3 className="text-white font-bold text-sm mb-1">{dir === 'rtl' ? 'مكتبة ملفات الطباعة' : '3D Models Library'}</h3>
-             <p className="text-xs text-olive/70">{comingSoon}</p>
+             <p className="text-xs text-text-muted">{comingSoon}</p>
            </div>
         </div>
 
@@ -285,7 +285,7 @@ export default function Community() {
             between them (TabStrip's shared-layout indicator) instead of three
             conditional divs that blink in and out — so the row reads as one
             row a person moved along, which is the whole job of an indicator. */}
-        <div className="material material-thin scroll-edge sticky top-[60px] z-30 [--material-tint:#000]">
+        <div className="material material-thin scroll-edge sticky top-[60px] z-30">
           <TabStrip
             group="community"
             label={dir === 'rtl' ? 'أقسام المجتمع' : 'Community sections'}
@@ -407,7 +407,7 @@ export default function Community() {
                     <Box className="w-12 h-12 mb-3 opacity-40" />
                     <p className="text-sm">{q ? (dir === 'rtl' ? 'لا توجد نتائج' : 'No results') : (dir === 'rtl' ? 'لا توجد طلبات بعد' : 'No requests yet')}</p>
                     {!q && (
-                      <button onClick={openNewRequest} className="mt-4 text-olive text-sm font-medium hover:text-olive/80">
+                      <button onClick={openNewRequest} className="mt-4 text-sage text-sm font-medium hover:underline">
                         {dir === 'rtl' ? 'أنشئ أول طلب' : 'Post the first request'}
                       </button>
                     )}

@@ -32,6 +32,7 @@ import { storeIconRoute, webManifestRoute } from './routes/manifest';
 import { robotsRoute, sitemapRoute } from './routes/seo';
 import { miscRoutes } from './routes/misc';
 import { adminRoutes } from './routes/admin';
+import { adminOrderPriceRoutes, orderPriceRoutes } from './routes/orderPriceAdjust';
 import { adminProductsRoutes } from './routes/adminProducts';
 import { templateRoutes } from './routes/template';
 import { mediaRoutes } from './routes/media';
@@ -268,6 +269,10 @@ app.route('/api/admin/analytics', adminCompositionAnalyticsRoutes);
 app.route('/api/home', homeRoutes);
 app.route('/api/cart', cartRoutes);
 app.route('/api/orders', orderRoutes);
+// «تعديل السعر النهائي» (0140): the customer's decision and the admin's
+// proposal on one order's price. Their own routers, beside their siblings.
+app.route('/api/orders', orderPriceRoutes);
+app.route('/api/admin/orders', adminOrderPriceRoutes);
 app.route('/api/addresses', addressRoutes);
 app.route('/api/wallet', walletRoutes);
 app.route('/api/rewards', rewardRoutes);

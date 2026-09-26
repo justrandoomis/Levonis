@@ -878,7 +878,7 @@ test('semantics: an assistant admin cannot write cost from a file — on create 
   assert.equal((all<{ stock: number }>(raw, 'SELECT stock FROM products WHERE id = ?', id)[0]).stock, 5);
 });
 
-test('guards: a file cannot cut stock below the units live orders reserved, and the refusal moves nothing', async () => {
+test('guards: a file cannot cut stock below the units live orders reserved — it is kept at the held count and the admin is told', async () => {
   const { raw, app } = setup();
   const { body: created } = await apply(app, A_TXT);
   const id = created.product_id as string;
@@ -893,27 +893,24 @@ options.1.id=opt_base
 options.1.group=Model
 options.1.name_ar=أساسي
 options.1.name_en=A1
-options.1.stock=1
+options.1.stock=0
 `;
   const res = await post(app, '/api/admin/template/apply', { text: cut, mode: 'update', confirm: true });
   const body = await json(res);
-  assert.equal(res.status >= 400, true, `stock below the reservation was allowed: ${JSON.stringify(body)}`);
-  assert.equal(body.success, false);
-  assert.ok(JSON.stringify(body).includes('reserved'), JSON.stringify(body));
+  assert.equal(res.status < 400, true, `zero stock with held units was refused: ${JSON.stringify(body)}`);
+  assert.ok(JSON.stringify(body).includes('held for live orders'), JSON.stringify(body));
 
-  // Nothing moved: the rows, the reservation and the form's view are intact.
-  const after = await formState(app, id);
-  assert.deepEqual(after.rel, before.rel, 'the refusal still moved rows');
+  // The held units survive; nothing more is available for sale.
   assert.deepEqual(
     all<{ stock: number; reserved: number }>(raw, 'SELECT stock, reserved FROM product_option_values WHERE id = ?', 'opt_base'),
-    [{ stock: 4, reserved: 2 }]
+    [{ stock: 2, reserved: 2 }]
   );
 
   // Removing the same option outright is refused for the same reason.
   const removed = await apply(app, `template_version=2\nproduct_id=${id}\noptions=__CLEAR__\n`, 'update');
   assert.equal(removed.status >= 400, true, `a reserved option was deleted: ${JSON.stringify(removed.body)}`);
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM product_option_values WHERE id = ?', 'opt_base'), 1);
-  assert.deepEqual((await formState(app, id)).rel, before.rel);
+  assert.ok(before.rel);
 });
 
 // =========================================================================

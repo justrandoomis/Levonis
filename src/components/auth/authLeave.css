@@ -1,0 +1,160 @@
+/*
+ * Two small panels on the /auth screen, kept in their own file so the
+ * shared auth.css stays untouched by this change:
+ *  - .lv-leave  the in-app-browser banner that replaces the Google button
+ *               inside Instagram/Messenger/TikTok… (InAppBrowserNotice.tsx)
+ *  - .lv-tgopen the Telegram "open the bot" block with its fallbacks
+ *               (TelegramOpen.tsx)
+ * Colours are the auth theme roles only (--lv-*), defined for both themes in
+ * auth.css — nothing here belongs to one theme.
+ */
+
+.lv-leave {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--lv-panel-line);
+  background: var(--lv-ground-2);
+  color: var(--lv-text-2);
+}
+.lv-leave__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.lv-leave__mark {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--lv-panel-line);
+  background: var(--lv-panel);
+  color: var(--lv-gold-text);
+}
+.lv-leave__mark svg { width: 16px; height: 16px; }
+.lv-leave__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--lv-text-1);
+  text-wrap: balance;
+}
+.lv-leave__why {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--lv-text-2);
+}
+.lv-leave__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.lv-leave__actions .lv-btn-quiet { height: 44px; font-size: 13px; }
+.lv-leave__steps {
+  margin: 12px 0 0;
+  padding-inline-start: 20px;
+  list-style: decimal;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--lv-text-2);
+}
+.lv-leave__steps li::marker { color: var(--lv-text-3); font-variant-numeric: tabular-nums; }
+.lv-leave__steps b { color: var(--lv-text-1); font-weight: 600; }
+.lv-leave__alt {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--lv-text-3);
+}
+.lv-leave__alt a {
+  color: var(--lv-gold-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* A read-only value the person can long-press to copy, with a copy button. */
+.lv-copyrow {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 8px;
+  min-width: 0;
+}
+.lv-copyrow__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-panel-line);
+  background: var(--lv-panel);
+  color: var(--lv-text-1);
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  direction: ltr;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+.lv-copyrow__value:focus-visible {
+  outline: 2px solid var(--lv-focus-ring);
+  outline-offset: 1px;
+}
+.lv-copyrow__btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-line-strong);
+  background: transparent;
+  color: var(--lv-text-1);
+  font-size: 13px;
+  font-weight: 500;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.lv-copyrow__btn svg { width: 15px; height: 15px; color: var(--lv-gold-text); }
+.lv-copyrow__btn:hover { border-color: var(--lv-line-hover); }
+.lv-copyrow__btn:focus-visible {
+  outline: 2px solid var(--lv-focus-ring);
+  outline-offset: 1px;
+}
+.lv-copyrow__btn.is-done svg { color: var(--lv-olive-text); }
+
+.lv-tgopen .lv-btn-quiet { touch-action: manipulation; }
+.lv-tgopen__fallback {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--lv-panel-line);
+}
+.lv-tgopen__label {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--lv-text-2);
+}
+.lv-tgopen__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 4px;
+}
+.lv-tgopen__links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--lv-gold-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

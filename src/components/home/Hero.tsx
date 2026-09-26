@@ -194,7 +194,7 @@ function BannerSlide({
             // Same clearance as the default hero. On a phone the copy is
             // bottom-aligned and already well clear of the fixed header; from
             // `sm` up it centres, so the padding shifts the centring box down.
-            className="w-full max-w-7xl mx-auto px-5 sm:px-10 pb-16 sm:pb-0 sm:pt-[130px]"
+            className="w-full max-w-[1920px] mx-auto px-5 sm:px-6 lg:px-8 pb-16 sm:pb-0 sm:pt-[130px]"
           >
             <div className="max-w-xl min-w-0">
               {title && (
@@ -261,34 +261,35 @@ function BannerSlide({
  * Shown when the owner has configured no banner at all. Not a placeholder and
  * not filler: it states what the store sells and links to the two places a
  * new visitor goes. It disappears the moment a real banner is uploaded.
+ *
+ * IT FOLLOWS THE THEME (owner, 2026-09-26: «في hero banner … تكون بلون أسود
+ * وبأزرار سوداء او ذهبيه بالرغم هو الثيم فاتح»). It is no longer a dark island:
+ * its type and buttons are roles (`text-white` is the ink, `bg-white` the
+ * primary fill), so on the light theme it is ink on cream with a charcoal
+ * primary and an outlined secondary, and on the dark theme exactly what it
+ * was. Only the ground and the layer lines need a light version, and those
+ * live in src/index.css (`lv-hero-ground`, `lv-hero-lines`, `lv-hero-veil`).
  */
 function DefaultHero() {
   const { t, dir } = useLanguage();
   return (
     <section
-      data-theme="dark"
       data-hero="default"
-      className="relative w-full overflow-hidden bg-gradient-to-br from-olive-dark via-olive to-olive-light"
+      data-feature=""
+      className="lv-hero-ground relative w-full overflow-hidden bg-gradient-to-br from-olive-dark via-olive to-olive-light"
     >
       {/* A quiet layer grid — a nod to what the machine actually does. No
           image request, so it costs nothing and cannot 404. */}
+      <div aria-hidden="true" className="lv-hero-lines absolute inset-0 opacity-[0.18]" />
       <div
         aria-hidden="true"
-        className="absolute inset-0 opacity-[0.18]"
-        style={{
-          backgroundImage:
-            'repeating-linear-gradient(0deg, rgba(255,255,255,.6) 0px, rgba(255,255,255,.6) 1px, transparent 1px, transparent 14px)',
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30"
+        className="lv-hero-veil absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30"
       />
       {/* HEADER_CLEARANCE: the site header is `fixed` and paints over the top
           of every page (Header.tsx). Unscrolled it is roughly 124px tall — two
           rows plus the search field — so hero copy starts below it. The
           background still runs full-bleed to the top; only the text moves. */}
-      <div className="relative max-w-7xl mx-auto px-5 sm:px-10 pt-[132px] pb-14 sm:pt-[150px] sm:pb-20 md:pb-24">
+      <div className="relative max-w-[1920px] mx-auto px-5 sm:px-6 lg:px-8 pt-[132px] pb-14 sm:pt-[150px] sm:pb-20 md:pb-24">
         <div className="max-w-2xl min-w-0">
           <span className="inline-block text-olive-light bg-black/40 border border-white/15 rounded-full px-3 py-1 text-[11px] sm:text-xs font-bold tracking-widest mb-4">
             LEVONIS

@@ -32,7 +32,9 @@ function db() {
   // Release A schema: 0082 expand is present and 0083 contract is deliberately
   // a separate deployment. Most route SQL must remain valid in this dual-index
   // state; contract-only behaviour is tested in cartIdentityContract.test.ts.
-  for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql') && !x.startsWith('0083')).sort()) {
+  // 0141 rebuilds cart_items in its post-0083 shape (qty ceiling 9999), so it
+  // belongs to the contract side and is skipped here with 0083.
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql') && !x.startsWith('0083') && !x.startsWith('0141')).sort()) {
     raw.exec(readFileSync(join(dir, f), 'utf8'));
   }
   raw.exec(`

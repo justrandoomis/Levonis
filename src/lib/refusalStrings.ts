@@ -984,6 +984,59 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The slug “all” is reserved for a section’s “all products” page. Choose another slug.',
     ckb: 'الرابط «all» محجوز لصفحة «كل المنتجات» داخل القسم. اختر رابطًا آخر.',
   },
+  // «تعديل السعر النهائي» (migration 0140, worker/lib/orderPriceAdjust.ts). The
+  // ckb column carries the Arabic until the owner writes the Sorani by hand
+  // (DECISIONS row 11). OWNER: Sorani to be written by hand.
+  PRICE_APPROVAL_PENDING: {
+    ar: 'الطلب بانتظار موافقة الزبون على السعر الجديد. اسحب الاقتراح أو انتظر قرار الزبون.',
+    en: 'This order is waiting for the customer to approve a new price. Withdraw the proposal or wait for their decision.',
+    ckb: 'الطلب بانتظار موافقة الزبون على السعر الجديد. اسحب الاقتراح أو انتظر قرار الزبون.',
+  },
+  PRICE_ADJUST_STAGE: {
+    ar: 'يمكن تعديل السعر قبل شحن الطلب فقط.',
+    en: 'The price can only be changed before the order ships.',
+    ckb: 'يمكن تعديل السعر قبل شحن الطلب فقط.',
+  },
+  PRICE_ADJUST_FINANCED: {
+    ar: 'لا يمكن تعديل سعر طلب بالأقساط (BNPL أو جني).',
+    en: 'An instalment order (BNPL or Gini) cannot be re-priced.',
+    ckb: 'لا يمكن تعديل سعر طلب بالأقساط (BNPL أو جني).',
+  },
+  PRICE_ADJUST_STORE_ORDER: {
+    ar: 'هذا طلب من متجر مجتمعي ويسعّره التاجر.',
+    en: 'This is a community store order; its merchant sets the price.',
+    ckb: 'هذا طلب من متجر مجتمعي ويسعّره التاجر.',
+  },
+  PRICE_ADJUST_COURIER_BOOKED: {
+    ar: 'أُنشئت شحنة التوصيل بمبلغها. ألغِ الشحنة أولًا ثم عدّل السعر.',
+    en: 'A courier shipment already carries the amount. Cancel the shipment first, then change the price.',
+    ckb: 'أُنشئت شحنة التوصيل بمبلغها. ألغِ الشحنة أولًا ثم عدّل السعر.',
+  },
+  PRICE_ADJUST_INVALID_TOTAL: {
+    ar: 'أدخل مبلغًا صحيحًا بالدينار أكبر من صفر.',
+    en: 'Enter a whole number of dinars above zero.',
+    ckb: 'أدخل مبلغًا صحيحًا بالدينار أكبر من صفر.',
+  },
+  PRICE_ADJUST_SAME_TOTAL: {
+    ar: 'السعر الجديد يساوي السعر الحالي.',
+    en: 'The new price is the same as the current one.',
+    ckb: 'السعر الجديد يساوي السعر الحالي.',
+  },
+  PRICE_ADJUST_UNSUPPORTED_PAYMENT: {
+    ar: 'طريقة دفع هذا الطلب لا تسمح بتعديل تلقائي للسعر.',
+    en: 'This order’s payment split cannot be re-priced automatically.',
+    ckb: 'طريقة دفع هذا الطلب لا تسمح بتعديل تلقائي للسعر.',
+  },
+  PRICE_ADJUST_NOT_PENDING: {
+    ar: 'حُسم اقتراح السعر هذا أو سُحب. حدّث الصفحة.',
+    en: 'This price proposal was already decided or withdrawn. Refresh the page.',
+    ckb: 'حُسم اقتراح السعر هذا أو سُحب. حدّث الصفحة.',
+  },
+  PRICE_ADJUST_STALE: {
+    ar: 'تغيّر الطلب قبل حفظ القرار. حدّث الصفحة وحاول مرة أخرى.',
+    en: 'The order changed before your decision was saved. Refresh and try again.',
+    ckb: 'تغيّر الطلب قبل حفظ القرار. حدّث الصفحة وحاول مرة أخرى.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

@@ -25,6 +25,7 @@ import CancelOrderSheet from '../components/orders/CancelOrderSheet';
 import ReviewSheet from '../components/orders/ReviewSheet';
 import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
 import StoreReceipt from '../components/orders/StoreReceipt';
+import PriceApprovalCard from '../components/orders/PriceApprovalCard';
 import { apiRefusal } from '../lib/refusalStrings';
 import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, statusLabel, statusStyle } from '../components/orders/format';
 import { useMoney } from '../CurrencyContext';
@@ -419,6 +420,15 @@ export default function OrderDetail() {
           <ErrorState error={orderError} onRetry={load} />
         ) : order ? (
           <>
+            {/* «مطلوب موافقتك على السعر الجديد» (0140) — first, because nothing
+                else about the order moves until it is answered. */}
+            <PriceApprovalCard
+              order={order}
+              onDecided={async (msg) => {
+                setNotice(msg);
+                await load({ quiet: true });
+              }}
+            />
             {/* Summary */}
             <section
               data-order-summary={order.id}

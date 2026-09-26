@@ -178,7 +178,12 @@ test('the banner is ONE link — name, counts and the drawn arrow; no control in
   assert.equal((html.match(/<a /g) ?? []).length, 1);
   assert.doesNotMatch(html, /<button/);
   assert.match(html, /href="\/categories\/printers"/);
-  assert.match(html, /data-theme="dark"/, 'a deliberate dark island in both themes');
+  // Owner, 2026-09-26: no dark blocks on the light theme — the banner follows
+  // the page (`data-feature`, src/index.css FEATURE SURFACES) and a dark
+  // catalogue photograph with no light twin is framed rather than faded.
+  assert.match(html, /data-feature=""/, 'a feature surface that follows the theme');
+  assert.doesNotMatch(html, /data-theme="dark"/, 'no dark island on the light theme');
+  assert.match(html, /data-ground="dark"/, 'the dark photograph is framed on the light theme');
   assert.match(html, /10 طابعات[\s\S]*4 متوفرة الآن/);
   assert.match(html, /<img[^>]+alt=""/, 'the photograph is decorative');
 });

@@ -317,6 +317,9 @@ export interface ProductDocV2 {
    * way in and out, and the storefront refuses anything that is not http(s).
    */
   gini_url: string;
+  /** «الصورة الرئيسية للوضع الفاتح» (migration 0138): an uploaded product
+   *  image path (`/files/….webp`), '' = the gallery primary in both themes. */
+  light_image?: string;
   hashtags: string[];
   how_to_use: string;
   /** 0079. The Arabic and Sorani of `how_to_use`; '' = read the English. */

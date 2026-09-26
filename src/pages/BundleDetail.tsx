@@ -14,6 +14,8 @@ import BundleSavingLine from '../components/bundles/BundleSavingLine';
 import { BundleDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState } from '../components/ui/AsyncStates';
 import Note from '../components/ui/Note';
+import { QuantityInput } from '../components/ui/QuantityInput';
+import { quantityLimit } from '../../packages/pricing/src/quantity';
 import { tierLabel } from '../components/subscription/tierMeta';
 import { StateChip, type BundleCard } from '../components/bundles/BundleTile';
 import { authPathWithSupportRef } from '../lib/supportRef';
@@ -763,31 +765,18 @@ export default function BundleDetail() {
               <>
                 <div className="flex items-center gap-3">
                   <span className="text-[12px] text-zinc-400">{s.qty}</span>
-                  <div className="inline-flex items-center rounded-xl border border-zinc-700 overflow-hidden">
-                    <button
-                      type="button"
-                      aria-label="-"
-                      disabled={qty <= 1}
-                      onClick={() => setQty((q) => Math.max(1, q - 1))}
-                      className="min-w-11 min-h-11 text-white disabled:opacity-40"
-                    >
-                      −
-                    </button>
-                    <span className="min-w-11 text-center tabular-nums text-white font-bold">{qty}</span>
-                    <button
-                      type="button"
-                      aria-label="+"
-                      // §10: the composition availability exposes `max_qty`, so
-                      // the stepper disables AT the limit rather than the door
-                      // refusing a tap that looked available.
-                      disabled={qty >= maxQty}
-                      aria-disabled={qty >= maxQty}
-                      onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
-                      className="min-w-11 min-h-11 text-white disabled:opacity-40"
-                    >
-                      +
-                    </button>
-                  </div>
+                  {/* §10: the composition availability exposes `max_qty`, so
+                      + disables AT the limit and a typed figure above it
+                      becomes it, rather than the door refusing a tap that
+                      looked available. */}
+                  <QuantityInput
+                    value={qty}
+                    max={maxQty}
+                    limitKind={quantityLimit(bundle.availability).kind}
+                    autoClamp
+                    label={s.qty}
+                    onChange={(next) => setQty(next)}
+                  />
                   {qty >= maxQty && (
                     <span className="text-[11px] text-zinc-500">
                       {s.maxReached}: <span className="tabular-nums">{maxQty}</span>

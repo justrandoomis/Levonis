@@ -2,7 +2,7 @@ import {
   productImageForSelection as resolveProductImageForSelection,
   productVariantIdForSelection,
 } from '@levonis/pricing/productSelectionMedia';
-import { primaryMediaFirst, type ProductDoc } from './productModel';
+import { canonicalProductMediaUrl, primaryMediaFirst, type ProductDoc } from './productModel';
 import {
   isActiveProductImageRow,
   type ImageRow,
@@ -130,4 +130,38 @@ export function productImageForSelection(
     colorId: selection.colorId,
     variantId,
   })?.url ?? '';
+}
+
+/**
+ * «الصورة الرئيسية للوضع الفاتح» (0138) for a set of products, for the readers
+ * that select explicit product columns (the compare page) rather than `*`.
+ * Only products that HAVE one are in the map. A database still before 0138
+ * answers "no such column", which is read as "no light images yet" — the
+ * cards then show the main image in both themes, exactly as before.
+ */
+export async function loadLightProductImages(
+  db: D1Database,
+  productIds: readonly string[]
+): Promise<Map<string, string>> {
+  const ids = [...new Set(productIds.map(String).filter(Boolean))];
+  const result = new Map<string, string>();
+  for (let offset = 0; offset < ids.length; offset += PRODUCT_IMAGE_BATCH) {
+    const chunk = ids.slice(offset, offset + PRODUCT_IMAGE_BATCH);
+    try {
+      const { results } = await db
+        .prepare(
+          `SELECT id, light_image FROM products
+            WHERE light_image <> '' AND id IN (${chunk.map(() => '?').join(', ')})`
+        )
+        .bind(...chunk)
+        .all<{ id: string; light_image: string }>();
+      for (const row of results ?? []) {
+        const url = canonicalProductMediaUrl(row.light_image);
+        if (url) result.set(String(row.id), url);
+      }
+    } catch {
+      return result;
+    }
+  }
+  return result;
 }

@@ -41,6 +41,7 @@ export const ORDER_OWNED_TABLES: Owned[] = [
   { table: 'order_payment_settlements' },
   { table: 'support_gift_entitlements' },
   { table: 'order_status_history' },
+  { table: 'order_price_adjustments' },
   { table: 'warranty_receipts' },
   { table: 'order_reservation_fence' },
   { table: 'offer_redemptions' },

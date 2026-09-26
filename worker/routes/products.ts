@@ -48,6 +48,7 @@ import {
   shuffleSeed,
 } from '../lib/homeShelves';
 import { isUnitExpressible, withinWindow } from '@levonis/pricing/membershipBenefits';
+import { LINE_QTY_MAX, QTY_INPUT_MAX } from '@levonis/pricing/quantity';
 import type { BenefitRule } from '@levonis/pricing/membershipBenefits';
 import type { TierStatus } from '../lib/entitlements';
 import { rateLimit } from '../lib/ratelimit';
@@ -511,7 +512,8 @@ type AvailabilityDoc = Pick<
   'selling_type' | 'stock' | 'options' | 'colors' | 'preorder_transports'
 > & { sale_types?: string[]; composition?: string };
 
-const QTY_CEILING = 99; // matches the cart/checkout per-line cap
+/** The per-line storage ceiling (`cart_items.qty <= 99`), one constant for every door. */
+const QTY_CEILING = LINE_QTY_MAX;
 
 /** The per-line cap a product in an ACTIVE mystery pool is sold under, so its
  *  exact remaining stock is never published as a quantity limit (§8.2 row 18). */
@@ -2744,6 +2746,10 @@ const CARD_FIELDS = [
   // published `images` list, so a card needs both.
   'media',
   'images',
+  // «الصورة الرئيسية للوضع الفاتح» (0138): the light-theme main image, present
+  // only when the product has one — the card shows it on the light theme and
+  // the gallery primary on the dark one.
+  'light_image',
   'price_iqd',
   'display_price_iqd',
   'display_regular_iqd',
@@ -3724,7 +3730,9 @@ productRoutes.post('/:slug/quote', async (c) => {
   if (!row) throw notFound('Product not found');
 
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const qty = int(body.qty, 'qty', { min: 1, max: 99, def: 1 });
+  // Read up to what the quantity field can hold; above the ceiling the answer
+  // is `availability.qty_ok: false` with `max_qty`, never a VALIDATION error.
+  const qty = int(body.qty, 'qty', { min: 1, max: QTY_INPUT_MAX, def: 1 });
 
   /**
    * A COMPOSITION ROW IS QUOTED BY THE COMPOSITION BUILDER (§10, §9).

@@ -1226,6 +1226,9 @@ adminProductsRoutes.post('/', async (c) => {
   // it. Omitting the key keeps what is stored; sending `condition: null`
   // explicitly is how a listing is deliberately un-graded.
   if (prev && !('condition' in body)) doc.condition = prev.condition;
+  // «الصورة الرئيسية للوضع الفاتح» (0138), the same rule: a client that never
+  // heard of the field keeps the stored picture; `light_image: ''` removes it.
+  if (prev && !('light_image' in body)) doc.light_image = prev.light_image ?? '';
 
   // EXTENDED WARRANTY IS FOR PRINTERS (owner mandate). The catalog placement
   // this save states — or, when it states none, the stored one — decides:

@@ -30,7 +30,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
-  ShoppingBag, Store, ChevronLeft, Loader2, PackageX, Minus, Plus, Check, Clock, BadgeCheck, Truck,
+  ShoppingBag, Store, ChevronLeft, Loader2, PackageX, Check, Clock, BadgeCheck, Truck,
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
@@ -50,6 +50,8 @@ import { VariantPicker } from '../components/catalog/VariantPicker';
 import { ProductGallery, type GalleryItem } from '../components/catalog/ProductGallery';
 import { ProductFacts } from '../components/catalog/ProductFacts';
 import { findVariant, initialSelection, priceRange } from '../../packages/catalog/src/variants';
+import { QuantityInput } from '../components/ui/QuantityInput';
+import { LINE_QTY_MAX } from '../../packages/pricing/src/quantity';
 
 export default function StorefrontProduct() {
   const { slug: routeSlug, productSlug } = useParams<{ slug: string; productSlug: string }>();
@@ -68,6 +70,14 @@ export default function StorefrontProduct() {
   const [loading, setLoading] = useState(!hostUnknown && !hostUnavailable);
   const [unavailable, setUnavailable] = useState(false);
   const [qty, setQty] = useState(1);
+  /**
+   * A STORE'S PUBLIC PRODUCT NAMES NO COUNT (only `in_stock`), so the ceiling
+   * is the per-line one until the door answers: an add refused with
+   * `OUT_OF_STOCK` carries `details.available`, and from then on that is the
+   * ceiling — the quantity steps down to it on its own (QuantityInput's
+   * `autoClamp`) and says «الحد الأقصى المتوفر: n». Reset with the choice.
+   */
+  const [knownMax, setKnownMax] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
   const [error, setError] = useState('');
@@ -133,6 +143,15 @@ export default function StorefrontProduct() {
       trackStoreEvent(store?.id, 'add_to_cart', product.id); // W2-E analytics beacon
       setTimeout(() => setAdded(false), 2500);
     } catch (e) {
+      const left =
+        e instanceof ApiError && (e.code === 'OUT_OF_STOCK' || e.code === 'QTY_UNAVAILABLE')
+          ? Number(e.details?.available ?? e.details?.max_qty)
+          : NaN;
+      if (Number.isInteger(left) && left >= 1 && left < qty) {
+        // Not an error to read: the quantity becomes what there is.
+        setKnownMax(left);
+        return;
+      }
       if (e instanceof ApiError && e.code === 'CART_SELLER_CONFLICT') {
         // The server named both shops in `details`; the dialogue uses them.
         setConflict((e.details ?? {}) as unknown as SellerConflict);
@@ -229,6 +248,7 @@ export default function StorefrontProduct() {
                 selection={selection}
                 onChange={(next) => {
                   setSelection(next);
+                  setKnownMax(null);
                   setError('');
                 }}
                 lang={lang}
@@ -310,23 +330,16 @@ export default function StorefrontProduct() {
           {error}
         </p>
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <div className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/[0.03] shrink-0">
-            <button
-              onClick={() => setQty((q) => Math.max(1, q - 1))}
-              className="w-11 h-11 flex items-center justify-center text-zinc-400"
-              aria-label={loc('أقل', 'Less', 'کەمتر')}
-            >
-              <Minus className="w-4 h-4" />
-            </button>
-            <span className="w-8 text-center text-white font-bold text-[14px]">{qty}</span>
-            <button
-              onClick={() => setQty((q) => Math.min(99, q + 1))}
-              className="w-11 h-11 flex items-center justify-center text-zinc-400"
-              aria-label={loc('أكثر', 'More', 'زیاتر')}
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
+          <QuantityInput
+            className="shrink-0"
+            size="sm"
+            hintPlacement="above"
+            value={qty}
+            max={knownMax ?? LINE_QTY_MAX}
+            limitKind={knownMax === null ? 'per_order' : 'stock'}
+            autoClamp
+            onChange={(next) => setQty(next)}
+          />
 
           <motion.button
             whileTap={sellable ? { scale: 0.98 } : undefined}

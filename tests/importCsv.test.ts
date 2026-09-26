@@ -1195,6 +1195,8 @@ test('every field of the product form is expressible in the sheet', () => {
     spec_fields: 'spec.*',
     // 0104 — the product's page in the Qi Card instalments app.
     gini_url: 'gini_url',
+    // 0138 — «الصورة الرئيسية للوضع الفاتح», an uploaded product image path.
+    light_image: 'light_image',
     // device coverage (products.ops_policy) — the base the extended warranty adds to
     warranty_base_months: 'warranty_base_months', serialized: 'serialized',
     // Open box / used / refurbished. One doc field, a BLOCK of columns — the

@@ -119,6 +119,11 @@ export function orderLatest<T extends Pick<ApiProduct, 'id' | 'direct_stock_avai
 
 // ------------------------------------------------------------- the pictures
 
+/** A product's light-theme main image (0138), or '' — never the primary. */
+function lightOf(p: ApiProduct | null | undefined): string {
+  return typeof p?.light_image === 'string' ? p.light_image.trim() : '';
+}
+
 function hasImage(p: ApiProduct): boolean {
   return productPrimaryImage(p) !== '';
 }
@@ -152,6 +157,12 @@ export interface BentoTile {
   category: HomeTaxon | null;
   /** The owner's picture for the section, else a product photograph, else ''. */
   image: string;
+  /**
+   * The borrowed product's light-theme main image (migration 0138), '' when it
+   * has none or the picture is the owner's own. The tile shows it on the light
+   * theme and `image` on the dark one (src/lib/productImage.ts `themedImage`).
+   */
+  lightImage: string;
   /** The product whose photograph was borrowed, for `avoid` bookkeeping. */
   imageProductId: string | null;
 }
@@ -196,6 +207,7 @@ export function resolveBento(
       to: `/products?category=${encodeURIComponent(node.id)}`,
       category: node,
       image: authored || (product ? productPrimaryImage(product) : ''),
+      lightImage: authored ? '' : lightOf(product),
       imageProductId: product?.id ?? null,
     });
   }
@@ -206,6 +218,7 @@ export function resolveBento(
       to: '/used-printers',
       category: null,
       image: photo ? productPrimaryImage(photo) : '',
+      lightImage: lightOf(photo),
       imageProductId: photo?.id ?? null,
     });
   }
@@ -262,6 +275,8 @@ export interface EditorialCard {
   preset: 'multicolor' | 'materials' | 'owner';
   /** True when `image` is a borrowed catalogue photograph (see isProductPhoto). */
   productPhoto: boolean;
+  /** The borrowed product's light-theme main image (0138), else ''. */
+  lightImage: string;
 }
 
 /** The owner's editable slot for the two editorial banners (AdminHomeSettings). */
@@ -301,6 +316,7 @@ export function resolveEditorial(input: {
       to: b.link || '',
       preset: 'owner' as const,
       productPhoto: false,
+      lightImage: '',
     }));
   }
 
@@ -311,6 +327,7 @@ export function resolveEditorial(input: {
   const printers = findCategory(input.tree, BENTO_MATCHERS.printers);
   if (printers) {
     const own = uploaded('banner-1');
+    let light = '';
     const photo =
       own ||
       (() => {
@@ -320,12 +337,14 @@ export function resolveEditorial(input: {
         // same one rather than none when it does not.
         const p = representative(input.pool, ids, avoid, multi) ?? representative(input.pool, ids, new Set(), multi);
         if (p) avoid.add(p.id);
+        light = lightOf(p);
         return p ? productPrimaryImage(p) : '';
       })();
     if (photo) {
       cards.push({
         key: 'multicolor',
         image: photo,
+        lightImage: light,
         title: null,
         subtitle: null,
         cta: null,
@@ -339,17 +358,20 @@ export function resolveEditorial(input: {
   const materials = findCategory(input.tree, MATERIALS_MATCHER) ?? findCategory(input.tree, BENTO_MATCHERS.filament);
   if (materials) {
     const own = uploaded('banner-2');
+    let light = '';
     const photo =
       own ||
       (() => {
         const ids = subtreeIds(materials);
         const p = representative(input.pool, ids, avoid) ?? representative(input.pool, ids);
+        light = lightOf(p);
         return p ? productPrimaryImage(p) : '';
       })();
     if (photo) {
       cards.push({
         key: 'materials',
         image: photo,
+        lightImage: light,
         title: null,
         subtitle: null,
         cta: null,

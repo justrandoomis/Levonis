@@ -930,3 +930,88 @@ images.1.fetch_url=https://vendor.example/staged.png
     globalThis.fetch = originalFetch;
   }
 });
+
+test('a 404 image link falls back to the matching colour image on its product page (source_url)', async () => {
+  const raw = freshDb();
+  const bucket = new MemoryBucket();
+  const app = mountWithMedia(asD1(raw), bucket, imagesBinding());
+  const page = `<html><head><meta property="og:image" content="https://cdn.vendor.example/hero.jpg"/></head><body>
+<script type="application/ld+json">{"@context":"https://schema.org/","@type":"ProductGroup","name":"PLA Basic",
+"hasVariant":[{"@type":"Product","name":"PLA Basic - Blue Grey (10602) / Refill / 1kg","image":"https://cdn.vendor.example/blue-grey.jpg"},
+{"@type":"Product","name":"PLA Basic - Blue (10601) / Refill / 1kg","image":"https://cdn.vendor.example/blue.jpg"}]}</script></body></html>`;
+  const fetched: string[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    fetched.push(url);
+    if (url.startsWith('https://vendor.example/cdn/')) return new Response('missing', { status: 404 });
+    if (url === 'https://vendor.example/products/pla-basic') return new Response(page, { headers: { 'content-type': 'text/html' } });
+    if (url === 'https://cdn.vendor.example/hero.jpg') return new Response(jpeg(11));
+    if (url === 'https://cdn.vendor.example/blue.jpg') return new Response(jpeg(12));
+    if (url === 'https://cdn.vendor.example/blue-grey.jpg') return new Response(jpeg(13));
+    throw new Error(`unexpected ${url}`);
+  }) as typeof fetch;
+  try {
+    const result = await apply(app, `template_version=2
+slug=pla-basic-fallback
+name_en=PLA Basic
+price_iqd=25000
+colors.1.id=blue-10601
+colors.1.name_en=Blue
+colors.1.hex=#0000ff
+colors.1.active=true
+images.1.id=main
+images.1.fetch_url=https://vendor.example/cdn/PLABasic_1200x.jpg
+images.1.primary=true
+images.1.source_url=https://vendor.example/products/pla-basic
+images.2.id=blue
+images.2.fetch_url=https://vendor.example/cdn/Blue_720x.jpg
+images.2.color_id=blue-10601
+images.2.source_url=https://vendor.example/products/pla-basic
+`);
+    assert.equal(result.response.status, 200, JSON.stringify(result.body));
+    assert.equal(fetched.filter((u) => u === 'https://vendor.example/products/pla-basic').length, 1, 'the page is read once');
+    assert.ok(fetched.includes('https://cdn.vendor.example/blue.jpg'), 'the colour code picked Blue, not Blue Grey');
+    assert.ok(!fetched.includes('https://cdn.vendor.example/blue-grey.jpg'));
+    assert.ok(fetched.includes('https://cdn.vendor.example/hero.jpg'), 'the product image came from og:image');
+    const stored = all<{ id: string; color_id: string | null; source_url: string | null }>(
+      raw,
+      'SELECT id, color_id, source_url FROM product_images ORDER BY id'
+    );
+    assert.equal(stored.length, 2);
+    assert.equal(stored.find((r) => r.id === 'blue')?.color_id, 'blue-10601');
+    assert.ok(JSON.stringify(result.body).includes('used the matching image from the product page'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('a 404 link with no matching page image still fails with the exact field', async () => {
+  const raw = freshDb();
+  const app = mountWithMedia(asD1(raw), new MemoryBucket(), imagesBinding());
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    if (url === 'https://vendor.example/products/x') return new Response('<html><body>no data</body></html>');
+    return new Response('missing', { status: 404 });
+  }) as typeof fetch;
+  try {
+    const result = await apply(app, `template_version=2
+slug=no-fallback
+name_en=No fallback
+price_iqd=1000
+colors.1.id=red-10200
+colors.1.name_en=Red
+colors.1.hex=#ff0000
+colors.1.active=true
+images.1.fetch_url=https://vendor.example/cdn/Red.jpg
+images.1.color_id=red-10200
+images.1.source_url=https://vendor.example/products/x
+`);
+    assert.equal(result.response.status, 400);
+    assert.equal(result.body.errors[0].key, 'images.1.fetch_url');
+    assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM products'), 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

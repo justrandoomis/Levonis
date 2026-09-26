@@ -132,6 +132,12 @@ const SPA = [
   { name: 'support', path: '/support' },
   { name: 'requests', path: '/requests' },
   { name: 'compare', path: '/compare' },
+  // The owner's screenshot 7 (2026-09-26): the community page on the light
+  // theme — faint tab labels on a black strip. And the category explorer,
+  // whose banners were dark islands.
+  { name: 'community', path: '/community', as: 'customer' },
+  { name: 'categories', path: '/categories' },
+  { name: 'printer-finder', path: '/printer-finder' },
   { name: 'tools', path: '/tools' },
   { name: 'rewards', path: '/rewards', as: 'customer' },
   { name: 'games', path: '/games', as: 'customer' },
@@ -209,7 +215,12 @@ async function wire(page, as) {
     const p = url.pathname;
     if (p === '/api/auth/me') return json({ success: true, user: as ? USER(as) : null });
     if (p === '/api/storefront/resolve') return json({ success: true, kind: 'main', store: null });
-    if (p === '/api/community/access') return json({ success: true, may_enter: true });
+    if (p === '/api/community/access') return json({ success: true, closed: false, admin: false, may_enter: true });
+    // The community lists as a signed-in member sees them, with nothing in them
+    // (the live shop answers a visitor 503 while the community is shut).
+    if (p === '/api/community/products') return json({ success: true, products: [] });
+    if (p === '/api/community/merchants') return json({ success: true, merchants: [] });
+    if (p === '/api/community/requests') return json({ success: true, requests: [] });
     if (as === 'admin' && p === '/api/admin/orders') return json({ success: true, ...ORDERS });
     if (as && p === '/api/orders') return json({ success: true, orders: [], total: 0 });
     if (as && p === '/api/cart') return json({ success: true, items: [], cart: { items: [] } });
@@ -274,7 +285,7 @@ async function shootSpa(browser, spec, combo) {
   if (spec.settle) await page.waitForTimeout(spec.settle);
   const f = await facts(page);
   check(`${name}: <html data-theme> is ${theme} from the first frame`, first === theme && f.theme === theme, `first=${first} now=${f.theme}`);
-  check(`${name}: browser chrome follows (${f.meta}, ${f.scheme})`, f.meta === (theme === 'light' ? '#f3f0ea' : '#0b0c0f') && f.scheme === theme);
+  check(`${name}: browser chrome follows (${f.meta}, ${f.scheme})`, f.meta === (theme === 'light' ? '#ece6da' : '#0b0c0f') && f.scheme === theme);
   const l = lum(f.bodyBg);
   check(`${name}: the page ground is ${theme}`, theme === 'light' ? l > 0.7 : l < 0.05, f.bodyBg);
   check(`${name}: no horizontal scroll`, f.overflow <= 1, `${f.overflow}px`);

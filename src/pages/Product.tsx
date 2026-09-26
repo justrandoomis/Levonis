@@ -44,7 +44,7 @@ import { useAuth } from '../AuthContext';
 import { useWallet } from '../WalletContext';
 import {
   ArrowRight, ArrowLeft, ShoppingCart, Star, Sparkles, Check, Share2, Heart, Clock, Package,
-  ChevronDown, Minus, Plus, X, FileText, Settings2, ShieldCheck, Truck,
+  ChevronDown, X, FileText, Settings2, ShieldCheck, Truck,
   AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench, TrendingUp, PackageOpen,
 } from 'lucide-react';
 import ProAddressNotice from '../components/membership/ProAddressNotice';
@@ -58,6 +58,8 @@ import CheaperElsewhereSheet from '../components/product/CheaperElsewhereSheet';
 import GiniInstalmentsSheet, { giniLinkOf } from '../components/product/GiniInstalmentsSheet';
 import SafeImage from '../components/ui/SafeImage';
 import Note from '../components/ui/Note';
+import { QuantityInput } from '../components/ui/QuantityInput';
+import { quantityLimit } from '../../packages/pricing/src/quantity';
 import { Overlay } from '../components/ui/Overlay';
 import { ProductDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
@@ -65,6 +67,7 @@ import { monthsLabel } from '../components/orders/format';
 import { authPathWithSupportRef, captureSupportRefFromSearch } from '../lib/supportRef';
 import { refusalText, stockRefusal } from '../lib/refusalStrings';
 import { productGalleryForSelection, productVariantIdForSelection } from '../lib/productImage';
+import { useTheme } from '../lib/theme';
 import {
   formatPhysicalMeasurement,
   hasProductDimensions,
@@ -401,6 +404,8 @@ interface ProductDetail {
    *  can open. Empty (or absent on an older worker) means the shop has not
    *  listed this product there, and the note is not drawn at all. */
   gini_url?: string;
+  /** «الصورة الرئيسية للوضع الفاتح» (migration 0138), only when there is one. */
+  light_image?: string;
   /** The CHEAPEST way to buy this product, resolved at the viewer's tier —
    *  the same number the card showed. Never `price_iqd`, which is the base
    *  row and may be a price nobody is charged. */
@@ -770,6 +775,7 @@ export default function Product() {
    *  has no history to pop, and «رجوع» must take them INTO the shop. */
   const goBack = useGoBack('/products');
   const { lang, dir } = useLanguage();
+  const { theme } = useTheme();
   const { isAuthenticated } = useAuth();
   const [cheaperOpen, setCheaperOpen] = useState(false);
   const [giniOpen, setGiniOpen] = useState(false);
@@ -1351,6 +1357,8 @@ export default function Product() {
   // before availability arrived the + button was dead while the effect would
   // have allowed 99.
   const maxQty = Math.max(1, availability?.stock.max_qty ?? 1);
+  /** Whose ceiling `maxQty` is — the shelf, the pre-order quota or the per-line cap. */
+  const qtyLimit = quantityLimit(availability);
   useEffect(() => {
     setQty((q) => Math.min(Math.max(1, q), maxQty));
   }, [maxQty]);
@@ -1658,6 +1666,13 @@ export default function Product() {
          */
         const code = err instanceof ApiError ? err.code ?? '' : '';
         const counted = stockRefusal(err, lang);
+        // The door's ceiling moved under the page (another buyer took units):
+        // the quantity follows it down on its own, and the ceiling is re-read.
+        const left = err instanceof ApiError ? Number(err.details?.available ?? err.details?.max_qty) : NaN;
+        if (code === 'QTY_UNAVAILABLE' && Number.isInteger(left) && left >= 1 && left < qty) {
+          setQty(left);
+          setQuoteToken((n) => n + 1);
+        }
         const said = code ? reasonText(s, code) : '';
         const raw = err instanceof Error ? err.message : 'Failed to add to cart';
         setActionError(
@@ -1827,12 +1842,18 @@ export default function Product() {
   ];
   const gallery = (() => {
     const base = galleryOf(product);
-    return productGalleryForSelection(base, mediaBindings, {
+    const ordered = productGalleryForSelection(base, mediaBindings, {
       optionId,
       optionValueIds,
       colorId,
       variantId: selectedVariantId,
     });
+    // THE MAIN IMAGE FOR THE THEME ON SCREEN (migration 0138): on the light
+    // theme the primary's slot shows the light-theme main image, wherever the
+    // selection has moved it; every other picture is the same in both themes.
+    const primaryUrl = base[0]?.url;
+    const light = theme === 'light' ? (product.light_image ?? '').trim() : '';
+    return light && primaryUrl ? ordered.map((m) => (m.url === primaryUrl ? { ...m, url: light } : m)) : ordered;
   })();
   const optionImage = (id: string): string =>
     mediaBindings.find((image) => image.option_value_id === id)?.url ?? '';
@@ -3278,34 +3299,33 @@ export default function Product() {
       </div>
     ) : null;
 
+  /**
+   * ONE QUANTITY CONTROL, TWO PLACES (the desktop panel and the phone bar).
+   * The number is typed; above the server's ceiling for this selection it
+   * becomes the ceiling and says why (src/components/ui/QuantityInput.tsx).
+   * `autoClamp` re-applies the rule when the sale type or the option changes
+   * the ceiling — except while the selection is not sellable at all, where
+   * the ceiling is a placeholder and «الحد الأقصى المتوفر: 1» would be false.
+   */
+  const qtyInput = (size: 'md' | 'sm', hintPlacement: 'above' | 'start') => (
+    <QuantityInput
+      value={qty}
+      max={maxQty}
+      limitKind={qtyLimit.kind}
+      size={size}
+      hintPlacement={hintPlacement}
+      autoClamp={mode !== 'unavailable'}
+      label={s.qty}
+      onChange={(next) => stepQty(() => next)}
+    />
+  );
+
   const qtyControl = (
     <div>
       {inCartNote}
     <div className="flex items-center justify-between gap-3">
       <span className="text-zinc-300 text-sm font-bold">{s.qty}</span>
-      <div className="flex items-center gap-1 rounded-lg bg-surface-raised p-1">
-        <button
-          type="button"
-          aria-label={s.decrease}
-          data-mascot="qty-dec"
-          onClick={() => stepQty((q) => Math.max(1, q - 1))}
-          disabled={qty <= 1}
-          className="w-10 h-10 flex items-center justify-center rounded-md text-text-secondary hover:bg-white/[0.06] disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          <Minus aria-hidden="true" className="w-4 h-4" />
-        </button>
-        <span className="min-w-[2.5rem] text-center text-white font-bold tabular-nums" aria-live="polite">{qty}</span>
-        <button
-          type="button"
-          aria-label={s.increase}
-          data-mascot="qty-inc"
-          onClick={() => stepQty((q) => Math.min(maxQty, q + 1))}
-          disabled={qty >= maxQty}
-          className="w-10 h-10 flex items-center justify-center rounded-md text-text-secondary hover:bg-white/[0.06] disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          <Plus aria-hidden="true" className="w-4 h-4" />
-        </button>
-      </div>
+      {qtyInput('md', 'start')}
     </div>
     </div>
   );
@@ -3323,34 +3343,7 @@ export default function Product() {
    * decision is actually made, and it is reachable from anywhere on the page
    * without scrolling back up.
    */
-  const barStepper =
-    maxQty > 1 ? (
-      <div className="flex shrink-0 items-center rounded-lg bg-surface">
-        <button
-          type="button"
-          aria-label={s.decrease}
-          data-mascot="qty-dec"
-          onClick={() => stepQty((q) => Math.max(1, q - 1))}
-          disabled={qty <= 1}
-          className="w-11 h-11 flex items-center justify-center rounded-s-lg text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          <Minus aria-hidden="true" className="w-4 h-4" />
-        </button>
-        <span className="w-8 text-center text-white font-bold text-sm tabular-nums" aria-live="polite">
-          {qty}
-        </span>
-        <button
-          type="button"
-          aria-label={s.increase}
-          data-mascot="qty-inc"
-          onClick={() => stepQty((q) => Math.min(maxQty, q + 1))}
-          disabled={qty >= maxQty}
-          className="w-11 h-11 flex items-center justify-center rounded-e-lg text-text-secondary disabled:opacity-35 active:bg-white/[0.06] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          <Plus aria-hidden="true" className="w-4 h-4" />
-        </button>
-      </div>
-    ) : null;
+  const barStepper = maxQty > 1 ? <div className="shrink-0">{qtyInput('sm', 'above')}</div> : null;
 
   const statusMessages = (
     <div className="space-y-2" aria-live="polite">

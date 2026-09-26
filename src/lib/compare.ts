@@ -117,6 +117,8 @@ export interface CompareProductCard {
   slug: string;
   name: Trilingual;
   image: string | null;
+  /** «الصورة الرئيسية للوضع الفاتح» (migration 0138), only when the product has one. */
+  light_image?: string;
   /** The BASE price — the cheapest way to buy it. A «يبدأ من» figure. */
   price_iqd: number;
   /** Mirrors `ProductTypeId` in worker/lib/templateFamilies.ts — the laser

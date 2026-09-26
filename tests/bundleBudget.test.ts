@@ -285,8 +285,14 @@ test('the split really happened: every page and panel §10 names has a chunk of 
  * «…» menu. The closure measured 40.7 KB after it (StorefrontProduct 6.8 KB
  * with the variant UI inside it); the budget is that plus ~4 KB, so re-eagering
  * either lazy piece (8.8 / 2.3 KB) fails the same day.
+ *
+ * THE TYPED QUANTITY (owner, 2026-09-26: «يضغط على الرقم ويكتب الكمية»). The
+ * buy bar's stepper became the shared `QuantityInput` (2.6 KB with its rules,
+ * packages/pricing/src/quantity.ts), the same control as the Levonis product
+ * page and both carts. The closure measured 45.5 KB with it; 47 keeps the
+ * guarantee above — re-eagering the smaller lazy piece (2.3 KB) still fails.
  */
-const STOREFRONT_BUDGET = 44 * KB;
+const STOREFRONT_BUDGET = 47 * KB;
 
 function staticClosure(start: string): Set<string> {
   const seen = new Set<string>();
@@ -300,7 +306,7 @@ function staticClosure(start: string): Set<string> {
   return seen;
 }
 
-test('the storefront pages add at most 44 KB gzip beyond the initial payload, and the other blocks stay lazy', () => {
+test('the storefront pages add at most 47 KB gzip beyond the initial payload, and the other blocks stay lazy', () => {
   const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
   const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
   const initial = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);

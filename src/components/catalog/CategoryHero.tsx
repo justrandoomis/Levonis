@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, WandSparkles } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import CropPhoto from './CropPhoto';
+import { useTheme } from '../../lib/theme';
 import { compareHref, compareTray } from '../../lib/compareTray';
 import { isPrinterNode, nodeDescription, nodeName } from '../../lib/catalog/categoryPageModel';
 import { countWord, nounKindFor } from '../../lib/catalog/copy';
@@ -12,7 +13,10 @@ import type { CategoryPayload } from '../../lib/catalog/types';
 /**
  * THE CATEGORY'S HERO (docs/ux/CATALOG_DISCOVERY.md §6 item 2, mockup 02).
  *
- * A charcoal island (`data-theme="dark"`): the breadcrumb, the name, the
+ * A feature surface (`data-feature`, src/index.css FEATURE SURFACES) —
+ * charcoal on the dark theme, a cream card with ink type on the light one,
+ * where a dark product photograph with no light-theme twin (migration 0138)
+ * is framed in the far top corner instead of faded under the words: the breadcrumb, the name, the
  * admin's description (omitted, never invented, when there is none), two
  * live stats, and the doors that fit this department — for printers the gold
  * «ساعدني أختار» and a ghost «قارن الطابعات»; for everything else one ghost
@@ -43,6 +47,8 @@ const CategoryHero = forwardRef<HTMLElement, {
   const compareTo = tray.type === 'printer' && tray.items.length ? compareHref(tray) : '/compare';
   const Sep = dir === 'rtl' ? ChevronLeft : ChevronRight;
   const avail = node.available_count;
+  const { theme } = useTheme();
+  const framed = !!photo?.productPhoto && theme === 'light' && !photo.lightSrc;
 
   // OWNER: Sorani to be written by hand (every loc() in this file without a third argument).
   const ghost =
@@ -51,7 +57,7 @@ const CategoryHero = forwardRef<HTMLElement, {
   return (
     <section
       ref={ref}
-      data-theme="dark"
+      data-feature=""
       data-category-hero={compact ? 'compact' : 'full'}
       aria-labelledby="category-title"
       className={`group relative isolate overflow-hidden rounded-[22px] bg-charcoal text-ivory ring-1 ring-inset ring-white/[0.05] lg:grid lg:grid-cols-[5fr_7fr] lg:rounded-[28px] ${
@@ -61,20 +67,25 @@ const CategoryHero = forwardRef<HTMLElement, {
       {photo ? (
         <CropPhoto
           src={photo.src}
+          lightSrc={photo.lightSrc}
           crop={photo.productPhoto}
           size={compact ? 420 : 640}
           eager
           className={
-            compact
-              ? 'lv-fade-start inset-y-0 end-0 w-[46%] lg:w-[52%]'
-              : 'lv-fade-hero bottom-0 end-0 h-[74%] w-[58%] lg:h-full lg:w-[60%]'
+            framed
+              ? compact
+                ? 'inset-y-0 end-0 w-[30%] lg:w-[46%]'
+                : 'end-0 top-0 h-[56%] w-[32%] lg:inset-y-0 lg:h-auto lg:w-[56%]'
+              : compact
+                ? 'lv-fade-start inset-y-0 end-0 w-[46%] lg:w-[52%]'
+                : 'lv-fade-hero bottom-0 end-0 h-[74%] w-[58%] lg:h-full lg:w-[60%]'
           }
         />
       ) : null}
       <div className={`relative flex flex-col p-[18px] lg:p-9 ${compact ? '' : 'min-h-[252px] lg:min-h-[320px]'}`}>
         <div className={compact ? 'max-w-[70%] lg:max-w-none' : 'max-w-[68%] lg:max-w-none'}>
         <nav aria-label={loc('مسار التصفح', 'Breadcrumb')}>
-          <ol className="flex flex-wrap items-center gap-1 text-[11.5px] text-ivory/60 lg:text-[13px]">
+          <ol className="flex flex-wrap items-center gap-1 text-[11.5px] text-ivory/[0.68] lg:text-[13px]">
             <li>
               <Link to="/categories" className="lv-hit relative -mx-1 inline-flex min-h-6 items-center rounded px-1 hover:text-ivory focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted">
                 {loc('الفئات', 'Categories')}

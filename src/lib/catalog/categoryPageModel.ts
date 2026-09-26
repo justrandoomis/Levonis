@@ -9,7 +9,7 @@
  * redirects, and the related-sections heading.
  */
 import type { CatalogTreeNode, CategoryPayload, Shelf, ShelfKind } from './types';
-import { authoredPhoto, photoOf, type BannerPhoto, type PhotoCandidate } from './explorerModel';
+import { authoredPhoto, photoOf, productBannerPhoto, type BannerPhoto, type PhotoCandidate } from './explorerModel';
 import type { CatalogLang } from './copy';
 
 type Named = Pick<CatalogTreeNode, 'name_ar' | 'name_en' | 'name_ckb'>;
@@ -102,7 +102,7 @@ export function heroPhoto(payload: Pick<CategoryPayload, 'node' | 'shelves'>): B
   const cards = payload.shelves.flatMap((s) => (s.products ?? []) as PhotoCandidate[]);
   const withPhoto = cards.filter((c) => photoOf(c));
   const pick = withPhoto.find((c) => Number(c.direct_stock_available ?? 0) > 0) ?? withPhoto[0];
-  return pick ? { src: photoOf(pick), productPhoto: true, productId: pick.id } : null;
+  return pick ? productBannerPhoto(pick) : null;
 }
 
 /**

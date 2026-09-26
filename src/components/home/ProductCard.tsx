@@ -5,7 +5,8 @@ import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
 import OfferBadge from '../ui/OfferBadge';
 import Countdown from '../ui/Countdown';
-import { productPrimaryImage } from '../../lib/productImage';
+import { productMainImage, productPrimaryImage } from '../../lib/productImage';
+import { useTheme } from '../../lib/theme';
 import DirectStockEdge from '../DirectStockEdge';
 import AvailabilityLine from '../product/AvailabilityLine';
 import CompareToggle from '../compare/CompareToggle';
@@ -89,7 +90,11 @@ function CompactCard({
   eager: boolean;
 }) {
   const { lang } = useLanguage();
-  const image = productPrimaryImage(p);
+  const { theme } = useTheme();
+  // The main image for the theme on screen (0138); the compare tray keeps the
+  // primary, which is the product's identity rather than a theme's picture.
+  const image = productMainImage(p, theme);
+  const lightShown = image !== '' && image === p.light_image;
   const name = cardName(p);
   const shortened = name !== (p.name ?? '').trim();
   const displayPrice = p.display_price_iqd ?? p.price_iqd;
@@ -103,14 +108,14 @@ function CompactCard({
       data-product-card="compact"
       className={`${widthClass} group relative flex min-w-0 flex-col overflow-hidden rounded-[14px] border border-border-subtle bg-surface transition-colors hover:bg-surface-raised has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus`}
     >
-      <div className="relative aspect-[6/5] overflow-hidden bg-charcoal">
+      <div className={`relative aspect-[6/5] overflow-hidden ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
         <SafeImage
           src={image}
           alt=""
           aspect="auto"
           eager={eager}
           className="h-full w-full"
-          bgClassName="bg-charcoal"
+          bgClassName={lightShown ? 'bg-surface-selected' : 'bg-charcoal'}
           fallbackClassName="text-snow/35"
           imgClassName="object-[50%_4%] transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none"
         />
@@ -154,7 +159,7 @@ function CompactCard({
 
       {type && (
         <CompareToggle
-          item={{ id: p.id, slug: p.slug || p.id, name, image: image || '' }}
+          item={{ id: p.id, slug: p.slug || p.id, name, image: productPrimaryImage(p) || '' }}
           type={type}
           className="absolute top-1.5 start-1.5 z-[2]"
         />
@@ -164,7 +169,9 @@ function CompactCard({
 }
 
 function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
-  const firstImage = productPrimaryImage(p);
+  const { theme } = useTheme();
+  const firstImage = productMainImage(p, theme);
+  const lightShown = firstImage !== '' && firstImage === p.light_image;
   const name = p.name;
 
   const displayPrice = p.display_price_iqd ?? p.price_iqd;
@@ -176,7 +183,7 @@ function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
       to={cardHref(p)}
       className={`${widthClass} relative shrink-0 overflow-hidden flex flex-col group bg-surface rounded-xl border border-border-subtle hover:bg-surface-raised transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
     >
-      <div className="relative aspect-square overflow-hidden bg-charcoal">
+      <div className={`relative aspect-square overflow-hidden ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
         <SafeImage
           src={firstImage}
           alt={name}

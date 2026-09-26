@@ -37,6 +37,7 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/home': 'CATALOG',
   '/api/cart': 'COMMERCE',
   '/api/orders': 'COMMERCE',
+  '/api/admin/orders': 'COMMERCE',
   '/api/addresses': 'IDENTITY',
   '/api/wallet': 'LEDGER',
   '/api/rewards': 'LEDGER',

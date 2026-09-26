@@ -65,6 +65,7 @@ import { cancelledOrderRefundStatements } from './orderCancelOps';
 import { newHistoryId } from './orderStageOps';
 import { orderExpiryActive, type OrderExpiryConfig } from './orderExpiry';
 import { audit } from './audit';
+import { isPriceHeld } from './priceHold';
 
 export interface OrderExpiryReport {
   configured: boolean;
@@ -118,6 +119,12 @@ export async function sweepExpiredOrders(
 
   for (const order of rows) {
     const id = String(order.id);
+    // Held for the customer's decision on a new price (0140): the shop asked
+    // them a question, and an unanswered question is not an abandoned order.
+    if (isPriceHeld(order)) {
+      out.skipped += 1;
+      continue;
+    }
     try {
       // Planned per order (reads only), executed in that order's own batch —
       // one order's problem never takes another order's release with it.

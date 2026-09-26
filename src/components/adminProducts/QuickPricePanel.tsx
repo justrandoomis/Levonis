@@ -179,6 +179,7 @@ const STRINGS = {
     cancel: 'تراجع عن التعديلات',
     pending: (n: number) => `${n} تعديل غير محفوظ`,
     saved: (n: number) => `تم حفظ ${n} تعديل`,
+    heldByOrders: (n: number) => `بقيت ${n} قطعة محجوزة لطلبات قائمة، والمتاح للبيع الآن صفر`,
     nothing: 'لا يوجد تغيير',
     undo: 'تراجع عن آخر حفظ',
     undone: 'تم التراجع',
@@ -265,6 +266,7 @@ const STRINGS = {
     cancel: 'Discard changes',
     pending: (n: number) => `${n} unsaved change${n === 1 ? '' : 's'}`,
     saved: (n: number) => `Saved ${n} change${n === 1 ? '' : 's'}`,
+    heldByOrders: (n: number) => `${n} unit(s) stay held for live orders; nothing more is on sale`,
     nothing: 'Nothing changed',
     undo: 'Undo the last save',
     undone: 'Undone',
@@ -634,7 +636,7 @@ export default function QuickPricePanel({
             low_stock_threshold: v.low_stock_threshold,
           }));
       const inventoryMode = exact.length > 0 ? 'VARIANT_COMBINATION' : 'OPTION';
-      await api.put(`/api/admin/products/${productId}/fulfillment`, {
+      const saved = await api.put<{ stock_notices?: Array<{ requested: number; stored: number }> }>(`/api/admin/products/${productId}/fulfillment`, {
         fulfillments,
         direct_stock: directStock,
         ...(directStock.length > 0 ? { inventory_mode: inventoryMode } : {}),
@@ -650,7 +652,8 @@ export default function QuickPricePanel({
           v.fulfillments.filter((f) => f.enabled).map((f) => f.fulfillment_type)
         )),
       ])) } } : d);
-      setToast(t.saved(1));
+      const held = (saved?.stock_notices ?? []).reduce((n, row) => n + row.stored, 0);
+      setToast(held > 0 ? `${t.saved(1)} — ${t.heldByOrders(held)}` : t.saved(1));
       onChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'error');

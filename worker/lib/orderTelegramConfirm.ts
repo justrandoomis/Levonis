@@ -299,6 +299,11 @@ export async function handleOrderConfirmCallback(
       await answerCallbackQuery(env, cb.id, 'الطلب غير موجود — ربما حُذف.', true, bot);
       return 'not_found';
     }
+    if (res.reason === 'PRICE_APPROVAL_PENDING') {
+      // The button stays: once the customer decides, the same press is right.
+      await answerCallbackQuery(env, cb.id, 'الطلب بانتظار موافقة الزبون على السعر الجديد — لا يمكن تأكيده الآن.', true, bot);
+      return 'refused';
+    }
     await answerCallbackQuery(env, cb.id, 'لا يمكن تأكيد الطلب من مرحلته الحالية — أكمل من لوحة الإدارة.', true, bot);
     await auditAdminBot(env.DB, actor.userId, 'telegram.order_confirm.refused', orderId, fromId, {
       reason: res.reason ?? 'unknown',

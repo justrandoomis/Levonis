@@ -787,7 +787,7 @@ images=__CLEAR__
   assert.equal(afterNull.direct_surcharge_iqd, null);
 });
 
-test('reserved stock is never written away, and the refusal leaves every row intact', async () => {
+test('reserved stock is never written away: a removal is refused, a lower figure is kept at the held units', async () => {
   const { raw, app } = setup();
   const id = (await apply(app, FULL)).body.product_id as string;
   raw.prepare('UPDATE product_option_values SET reserved = 2 WHERE id = ?').run('opt_combo');
@@ -803,11 +803,13 @@ options=__CLEAR__
   assert.equal(body.section, 'relations');
   assert.equal(tableCounts(raw, id).values, 3, 'a reserved option value was removed anyway');
 
-  // And a base stock below the reservation is refused the same way.
+  // A base stock below the reservation is not refused: it means "nothing
+  // more to sell", so the row keeps exactly the held units and says so.
   raw.prepare('UPDATE products SET stock_reserved = 5 WHERE id = ?').run(id);
   const low = await apply(app, `template_version=2\nproduct_id=${id}\nstock=1\n`, 'update');
-  assert.equal(low.status, 400, JSON.stringify(low.body));
-  assert.equal(row<{ stock: number }>(raw, 'SELECT stock FROM products WHERE id = ?', id)!.stock, 7);
+  assert.equal(low.status, 200, JSON.stringify(low.body));
+  assert.ok(JSON.stringify(low.body).includes('held for live orders'), JSON.stringify(low.body));
+  assert.equal(row<{ stock: number }>(raw, 'SELECT stock FROM products WHERE id = ?', id)!.stock, 5);
 });
 
 test('a variant an open order still names is deactivated by the TXT path, never deleted', async () => {

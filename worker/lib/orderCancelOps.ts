@@ -94,9 +94,18 @@ export async function cancelledOrderRefundStatements(
    * recorded (the dinars themselves are SUMmed, not derived from the rate).
    */
   if (walletCents > 0) {
-    const refundDinarsSql = `(SELECT SUM(d.amount_iqd) FROM wallet_transactions d
+    // MINUS what a customer-approved price cut already handed back (0140,
+    // worker/lib/orderPriceAdjust.ts): those rows carry their own ref
+    // (`order-price:<id>`) and `wallet_applied_usd_cents` already fell by
+    // their cents, so the cancel returns the REST in both units — never the
+    // same dinars twice.
+    const refundDinarsSql = `((SELECT SUM(d.amount_iqd) FROM wallet_transactions d
             WHERE d.ref = ?2 AND d.user_id = ?3 AND d.currency = 'USD' AND d.type = 'withdrawal'
-              AND d.amount_iqd > 0 AND d.exchange_rate_snapshot > 0)`;
+              AND d.amount_iqd > 0 AND d.exchange_rate_snapshot > 0)
+          - (SELECT COALESCE(SUM(CASE WHEN p.type = 'deposit' THEN p.amount_iqd ELSE -p.amount_iqd END), 0)
+               FROM wallet_transactions p
+              WHERE p.ref = 'order-price:' || ?2 AND p.user_id = ?3 AND p.currency = 'USD'
+                AND p.status = 'approved' AND p.amount_iqd > 0))`;
     const refundRateSql = `(SELECT MAX(d.exchange_rate_snapshot) FROM wallet_transactions d
             WHERE d.ref = ?2 AND d.user_id = ?3 AND d.currency = 'USD' AND d.type = 'withdrawal'
               AND d.amount_iqd > 0 AND d.exchange_rate_snapshot > 0)`;

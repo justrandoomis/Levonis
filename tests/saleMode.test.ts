@@ -14,6 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { saleAvailability, communityAvailability } from '../worker/routes/products';
+import { LINE_QTY_MAX } from '../packages/pricing/src/quantity';
 import type { OptionV2, ColorV2, TransportOffer } from '../worker/lib/pricing';
 
 type Doc = Parameters<typeof saleAvailability>[0];
@@ -102,7 +103,7 @@ test('admin-enabled pre-order with a configured commission is the default and ig
   assert.equal(a.reason, null);
   assert.equal(a.preorder.usable, true);
   assert.deepEqual(a.preorder.transports, [{ method: 'air', commission_iqd: 7500, configured: true }]);
-  assert.equal(a.stock.max_qty, 99);
+  assert.equal(a.stock.max_qty, LINE_QTY_MAX);
 });
 
 test('pre-order inherits an unconfigured commission from the admin defaults', () => {
@@ -123,7 +124,7 @@ test('pre-order with no configured increase remains available at zero increase',
   assert.equal(a.preorder.enabled, true);
   assert.equal(a.preorder.usable, true);
   assert.equal(a.preorder.transports[0].commission_iqd, 0);
-  assert.equal(a.stock.max_qty, 99);
+  assert.equal(a.stock.max_qty, LINE_QTY_MAX);
 });
 
 test('pre-order with no transport offer at all reports NO_TRANSPORT_OFFERED', () => {

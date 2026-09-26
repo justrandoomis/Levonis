@@ -201,11 +201,11 @@ test('the status bar is opaque — never translucent — and it takes the theme�
 });
 
 test('the first frame is painted in the theme’s own ground, and the browser chrome agrees', () => {
-  // Light (#f3f0ea, ivory) unless the reader chose dark (#0b0c0f); the inline
+  // Light (#ece6da, ivory) unless the reader chose dark (#0b0c0f); the inline
   // theme script rewrites theme-color before anything paints
   // (tests/themeSystem.test.ts pins that script and its CSP hash).
-  assert.equal(meta('theme-color'), '#f3f0ea');
-  assert.match(MARKUP, /html, body \{ background-color: #f3f0ea; margin: 0; \}/);
+  assert.equal(meta('theme-color'), '#ece6da');
+  assert.match(MARKUP, /html, body \{ background-color: #ece6da; margin: 0; \}/);
   assert.match(MARKUP, /html\[data-theme="dark"\], html\[data-theme="dark"\] body \{ background-color: #0b0c0f; \}/);
   assert.match(MARKUP, /<html lang="ar" dir="rtl"/);
   assert.match(MARKUP, /viewport-fit=cover/);
@@ -215,7 +215,7 @@ test('no iOS splash-screen links, deliberately', () => {
   // iOS matches `apple-touch-startup-image` by exact device resolution and
   // orientation, so covering the phones people own means ~30 links and ~30
   // generated PNGs that go stale with every new iPhone. Without them iOS
-  // paints the manifest's background_color, which is the same ground (ivory, #f3f0ea) this
+  // paints the manifest's background_color, which is the same ground (ivory, #ece6da) this
   // page already paints. The correct splash screen is the free one.
   assert.ok(
     !/apple-touch-startup-image/i.test(MARKUP),

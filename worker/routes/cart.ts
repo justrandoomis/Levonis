@@ -82,6 +82,7 @@ import {
 import type { BenefitLineInput } from '../lib/membershipBenefits';
 import type { BenefitRule } from '@levonis/pricing/membershipBenefits';
 import type { MemberFallback } from '@levonis/pricing/pricing';
+import { LINE_QTY_MAX, QTY_INPUT_MAX } from '@levonis/pricing/quantity';
 
 import { compositionKey, loadBundleComponents, type BundleComponentRow } from '../lib/bundleComposition';
 import {
@@ -1422,7 +1423,7 @@ async function addCompositionLine(
         `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
                                  shipping_method_id, transport_method, warranty_plan_id, qty, draw_salt)
          VALUES (?, ?, ?, ?, ?, '', '', ?, '', ?, ?)
-         ON CONFLICT DO UPDATE SET qty = MIN(99, qty + excluded.qty),
+         ON CONFLICT DO UPDATE SET qty = MIN(${LINE_QTY_MAX}, qty + excluded.qty),
                        transport_method = excluded.transport_method`
       ).bind(lineId, user.id, productId, key, identityJson, method, qty, salt),
       ...cartChoiceStatements(c.env.DB, user.id, productId, key, identityIds, choices),
@@ -1541,6 +1542,17 @@ export function statedAvailability(
  *                   product whose shelf may be untouched. Same reason the
  *                   remainder above is read from `preorder.capacity`.
  */
+/**
+ * ABOVE THE PER-LINE CEILING, with enough stock to cover it: the same code a
+ * short shelf gets, naming the number to set instead (`details.max_qty`), so
+ * the client sets it rather than showing a generic VALIDATION error. The
+ * platform doors reach this through `availability.qty_ok` / `refuseQty`; the
+ * store doors, which have no availability block, through here.
+ */
+function lineCeilingRefusal() {
+  return badRequest(`At most ${LINE_QTY_MAX} per order`, 'QTY_UNAVAILABLE', { max_qty: LINE_QTY_MAX, preorder: false });
+}
+
 function refuseQty(availability: SaleAvailability) {
   const preorder = availability.mode === 'preorder';
   const remaining = preorder ? availability.preorder.capacity.available : availability.stock.available;
@@ -1555,7 +1567,7 @@ cartRoutes.post('/items', async (c) => {
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
   const productId = str(body.productId, 'productId', { min: 1, max: 60 });
-  const qty = int(body.qty, 'qty', { min: 1, max: 99, def: 1 });
+  const qty = int(body.qty, 'qty', { min: 1, max: QTY_INPUT_MAX, def: 1 });
   const legacyOptionId = str(body.optionId, 'optionId', { max: 60, required: false });
   // §7: one value per option group. The legacy single `optionId` is folded in
   // so an older client keeps working unchanged.
@@ -1804,7 +1816,7 @@ cartRoutes.post('/items', async (c) => {
         `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
                                  shipping_method_id, transport_method, fulfillment_type, warranty_plan_id, qty)
          VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
-         ON CONFLICT DO UPDATE SET qty = MIN(99, qty + excluded.qty),
+         ON CONFLICT DO UPDATE SET qty = MIN(?, qty + excluded.qty),
                        option_value_ids = excluded.option_value_ids,
                        transport_method = excluded.transport_method,
                        fulfillment_type = excluded.fulfillment_type,
@@ -1813,7 +1825,14 @@ cartRoutes.post('/items', async (c) => {
                                                ELSE excluded.warranty_plan_id END`
       ).bind(
         newId('ci'), user.id, productId, primaryOption, canonicalJson, colorId,
-        transportMethod, fulfillmentType, warrantyPlanId, qty
+        transportMethod, fulfillmentType, warrantyPlanId, qty,
+        // A SECOND ADD OF THE SAME LINE IS HELD TO THE SAME CEILING. The door
+        // judged `qty` alone against `max_qty`; the merge adds what the line
+        // already holds, and used to stop only at the storage limit — so two
+        // adds of 600 on a shelf of 1,000 left a line the checkout refuses.
+        // The merged line becomes the most this selection sells (the owner's
+        // rule: set the most, never say no), never less than this add.
+        Math.max(qty, Math.min(LINE_QTY_MAX, availability.stock.max_qty))
       ),
     ]);
   } catch (e) {
@@ -1879,7 +1898,7 @@ async function patchCompositionLine(
   const id = String(existing.id);
   const productId = String(product.id);
   const label = String(product.name_ar || product.name || productId);
-  const qty = body.qty !== undefined ? int(body.qty, 'qty', { min: 1, max: 99 }) : Number(existing.qty) || 1;
+  const qty = body.qty !== undefined ? int(body.qty, 'qty', { min: 1, max: QTY_INPUT_MAX }) : Number(existing.qty) || 1;
 
   // §7.5 / §15.1 rule 9 — the same per-user bound as the add and the quote.
   await rateLimit(c, 'composition_quote', 60, 300);
@@ -1949,7 +1968,7 @@ async function patchCompositionLine(
       // The same bundle with the same choices is the same line. The two are
       // merged rather than left as two rows that render identically, and the
       // merged quantity is judged against the cap like any other add.
-      const total = Math.min(99, (Number(twin.qty) || 0) + qty);
+      const total = Math.min(LINE_QTY_MAX, (Number(twin.qty) || 0) + qty);
       refuseComposition(b, total, label);
       mergedInto = twin.id;
       await c.env.DB.batch([
@@ -2011,7 +2030,7 @@ cartRoutes.patch('/items/:id', async (c) => {
     return await patchCompositionLine(c, existing, lineProduct, body);
   }
 
-  const qty = body.qty !== undefined ? int(body.qty, 'qty', { min: 1, max: 99 }) : (existing.qty as number);
+  const qty = body.qty !== undefined ? int(body.qty, 'qty', { min: 1, max: QTY_INPUT_MAX }) : (existing.qty as number);
   const submittedOptionId =
     body.optionId !== undefined ? str(body.optionId, 'optionId', { max: 60, required: false }) : null;
   const patchRawIds: unknown[] = Array.isArray(body.optionValueIds) ? body.optionValueIds : [];
@@ -2259,7 +2278,7 @@ cartRoutes.post('/merchant-items', async (c) => {
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
   const productId = str(body.productId, 'productId', { min: 1, max: 60 });
-  const qty = int(body.qty, 'qty', { min: 1, max: 99, def: 1 });
+  const qty = int(body.qty, 'qty', { min: 1, max: QTY_INPUT_MAX, def: 1 });
   let optionId = str(body.optionId, 'optionId', { max: 60, required: false });
   let colorId = str(body.colorId, 'colorId', { max: 60, required: false });
   const variantId = str(body.variantId, 'variantId', { max: 64, required: false });
@@ -2341,6 +2360,8 @@ cartRoutes.post('/merchant-items', async (c) => {
     }
   }
 
+  if (qty > LINE_QTY_MAX) throw lineCeilingRefusal();
+
   // VALIDATED FIRST, EMPTIED IN THE SAME BATCH AS THE ADD (B15). The confirmed
   // "empty the cart and shop here" used to delete the cart before the stock
   // check above, so a refused add left the customer with no cart at all —
@@ -2355,7 +2376,7 @@ cartRoutes.post('/merchant-items', async (c) => {
          VALUES (?, ?, 'merchant', ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (user_id, community_product_id, option_id, color_id)
            WHERE community_product_id IS NOT NULL
-         DO UPDATE SET qty = MIN(99, cart_items.qty + excluded.qty)`
+         DO UPDATE SET qty = MIN(${LINE_QTY_MAX}, cart_items.qty + excluded.qty)`
       ).bind(id, user.id, product.m_id, product.s_id, productId, optionId, colorId, qty, variantStock !== null ? variantId : null),
     ]);
   } catch (e) {
@@ -2532,7 +2553,7 @@ cartRoutes.patch('/merchant-items/:id', async (c) => {
   const user = c.get('user')!;
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
-  const qty = int(body.qty, 'qty', { min: 1, max: 99 });
+  const qty = int(body.qty, 'qty', { min: 1, max: QTY_INPUT_MAX });
 
   const line = await c.env.DB.prepare(
     `SELECT ci.id, ci.community_product_id, p.stock, p.track_stock, p.lifecycle, p.status,
@@ -2566,6 +2587,8 @@ cartRoutes.patch('/merchant-items/:id', async (c) => {
       throw badRequest('Not enough stock for that quantity', 'OUT_OF_STOCK', { available: Math.max(0, Number(line.v_stock)) });
     }
   }
+
+  if (qty > LINE_QTY_MAX) throw lineCeilingRefusal();
 
   await c.env.DB.prepare('UPDATE cart_items SET qty = ? WHERE id = ? AND user_id = ?')
     .bind(qty, id, user.id).run();

@@ -69,7 +69,7 @@ import {
 import { type CompareResult } from '../lib/compareSpecs';
 import { compareWithLenses } from '../lib/compareLenses';
 import { adviseFromSpecs, type PowerAdvice } from '../lib/powerAdvice';
-import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
+import { loadAuthoritativeProductImages, loadLightProductImages } from '../lib/productSelectionImage';
 import { parseProductRow } from '../lib/productModel';
 import { buildGrid } from '../lib/priceGrid';
 
@@ -151,6 +151,8 @@ export interface CompareProductCard {
   slug: string;
   name: Trilingual;
   image: string | null;
+  /** «الصورة الرئيسية للوضع الفاتح» (0138) — present only when the product has one. */
+  light_image?: string;
   /**
    * The BASE price, which by this shop's own rule («سعر المنتج يوضع الأرخص
    * ليكون الخيارات والألوان والتوفر عبارة عن زيادة», see
@@ -324,13 +326,28 @@ export function powerOf(p: Placed): PowerAdvice {
   return adviseFromSpecs(p.specs);
 }
 
-export function cardOf(p: Placed, image: string | null = null): CompareProductCard {
+/** A card's two main images: the gallery primary (dark theme) and 0138's light one. */
+interface CardImages {
+  get(id: string): { image: string | null; light: string } | undefined;
+}
+
+/** Both reads at once, so the compare page never pays a second round trip for the light image. */
+async function loadCompareImages(db: D1Database, ids: readonly string[]): Promise<CardImages> {
+  const [images, light] = await Promise.all([
+    loadAuthoritativeProductImages(db, ids),
+    loadLightProductImages(db, ids),
+  ]);
+  return { get: (id) => ({ image: images.get(id) || null, light: light.get(id) ?? '' }) };
+}
+
+export function cardOf(p: Placed, pics?: { image: string | null; light: string }): CompareProductCard {
   const leaf = p.branch[0];
   return {
     id: p.row.id,
     slug: p.row.slug,
     name: tri(p.row.name_ar, p.row.name, p.row.name_ku),
-    image,
+    image: pics?.image ?? null,
+    ...(pics?.light ? { light_image: pics.light } : {}),
     price_iqd: Number(p.row.price_iqd) || 0,
     product_type: p.productType,
     section: leaf
@@ -485,7 +502,7 @@ compareRoutes.get('/', async (c) => {
 
   const [catalogRows, images] = await Promise.all([
     loadCatalogs(c.env.DB),
-    loadAuthoritativeProductImages(c.env.DB, ids),
+    loadCompareImages(c.env.DB, ids),
   ]);
   /**
    * THE OPTIONS COME OFF THE ROW, not out of a second query. `options` is a
@@ -632,7 +649,7 @@ compareRoutes.get('/', async (c) => {
   const cards = placed.map((product, i) => {
     const option = picked[i];
     return {
-      ...cardOf(product, images.get(product.row.id) || null),
+      ...cardOf(product, images.get(product.row.id)),
       id: slots[i].key,
       product_id: product.row.id,
       price_iqd: priceOf(i),
@@ -795,12 +812,12 @@ export async function rankCompareCandidates(
       (Number(a.placed.row.price_iqd) || 0) - (Number(b.placed.row.price_iqd) || 0)
   );
   const selected = scored.slice(0, limit).map((candidate) => candidate.placed);
-  const images = await loadAuthoritativeProductImages(
+  const images = await loadCompareImages(
     db,
     selected.map((candidate) => candidate.row.id)
   );
   return selected.map((candidate) =>
-    withOptions(cardOf(candidate, images.get(candidate.row.id) || null), candidate.row)
+    withOptions(cardOf(candidate, images.get(candidate.row.id)), candidate.row)
   );
 }
 
@@ -870,9 +887,9 @@ export async function browseCompareCandidates(
     .filter((candidate) => hasAnySpec(candidate.specs))
     .slice(0, limit);
 
-  const images = await loadAuthoritativeProductImages(db, placed.map((candidate) => candidate.row.id));
+  const images = await loadCompareImages(db, placed.map((candidate) => candidate.row.id));
   return placed.map((candidate) =>
-    withOptions(cardOf(candidate, images.get(candidate.row.id) || null), candidate.row)
+    withOptions(cardOf(candidate, images.get(candidate.row.id)), candidate.row)
   );
 }
 
@@ -928,14 +945,14 @@ compareRoutes.get('/candidates', async (c) => {
 
   const [catalogRows, images] = await Promise.all([
     loadCatalogs(c.env.DB),
-    loadAuthoritativeProductImages(c.env.DB, [anchor.id]),
+    loadCompareImages(c.env.DB, [anchor.id]),
   ]);
   const tax = taxonomy(catalogRows);
   const anchorPlaced = place(anchor, tax);
 
   return c.json({
     success: true,
-    for: withOptions(cardOf(anchorPlaced, images.get(anchor.id) || null), anchor),
+    for: withOptions(cardOf(anchorPlaced, images.get(anchor.id)), anchor),
     products: await rankCompareCandidates(c.env.DB, anchorPlaced, tax, q, MAX_CANDIDATES),
   });
 });

@@ -13,10 +13,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Minus, Plus, RotateCw, ShoppingCart, Store, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, RotateCw, ShoppingCart, Store } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { storeCheckoutApi, iqd, type MerchantCartData, type MerchantCartLine } from '../../lib/merchant';
 import { apiRefusal } from '../../lib/refusalStrings';
+import { ApiError } from '../../lib/api';
+import { QuantityInput } from '../ui/QuantityInput';
+import { LINE_QTY_MAX } from '../../../packages/pricing/src/quantity';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 
 export default function MerchantCartView() {
@@ -52,6 +55,21 @@ export default function MerchantCartView() {
       const d = await storeCheckoutApi.setQty(id, qty);
       setCart(d);
     } catch (e) {
+      // Fewer left than asked for: the line takes what there is, on its own
+      // (the owner's rule — set the most, never just say no).
+      const left =
+        e instanceof ApiError && (e.code === 'OUT_OF_STOCK' || e.code === 'QTY_UNAVAILABLE')
+          ? Number(e.details?.available ?? e.details?.max_qty)
+          : NaN;
+      if (Number.isInteger(left) && left >= 1 && left < qty) {
+        try {
+          setCart(await storeCheckoutApi.setQty(id, left));
+          setError(apiRefusal(e, lang, ''));
+          return;
+        } catch {
+          /* fall through to the ordinary refusal */
+        }
+      }
       // The refusal's code in the customer's language — «only 2 left» with the
       // number — never the server's English sentence.
       setError(apiRefusal(e, lang, loc('تعذّر التحديث', 'Could not update', 'نەتوانرا')));
@@ -193,27 +211,22 @@ export default function MerchantCartView() {
                     )}
 
                     <div className="flex items-center justify-between mt-auto pt-1.5">
-                      <div className="flex items-center rounded-xl border border-white/10 bg-black/30">
-                        <button
-                          type="button"
-                          onClick={() => (l.qty <= 1 ? remove(l.cart_item_id) : setQty(l.cart_item_id, l.qty - 1))}
-                          disabled={busy === l.cart_item_id}
-                          aria-label={l.qty <= 1 ? loc('حذف', 'Remove', 'سڕینەوە') : loc('إنقاص الكمية', 'Decrease quantity')}
-                          className="w-10 h-10 flex items-center justify-center text-zinc-400 disabled:opacity-40"
-                        >
-                          {l.qty <= 1 ? <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> : <Minus className="w-3.5 h-3.5" aria-hidden="true" />}
-                        </button>
-                        <span className="w-7 text-center text-white text-[12.5px] font-bold tabular-nums" aria-live="polite">{l.qty}</span>
-                        <button
-                          type="button"
-                          onClick={() => setQty(l.cart_item_id, Math.min(99, l.qty + 1))}
-                          disabled={busy === l.cart_item_id || (l.stock !== null && unitsOf(l.product_id) >= l.stock)}
-                          aria-label={loc('زيادة الكمية', 'Increase quantity')}
-                          className="w-10 h-10 flex items-center justify-center text-zinc-400 disabled:opacity-40"
-                        >
-                          <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-                        </button>
-                      </div>
+                      {/* The line's ceiling: its stock less what the product's
+                          other lines already hold (the server judges the same
+                          sum, B5). − stops at 1; «حذف» beside it removes. */}
+                      <QuantityInput
+                        size="sm"
+                        hintPlacement="above"
+                        value={l.qty}
+                        max={
+                          l.stock === null
+                            ? LINE_QTY_MAX
+                            : Math.min(LINE_QTY_MAX, Math.max(1, l.stock - (unitsOf(l.product_id) - l.qty)))
+                        }
+                        limitKind={l.stock === null ? 'per_order' : 'stock'}
+                        disabled={busy === l.cart_item_id}
+                        onChange={(next) => setQty(l.cart_item_id, next)}
+                      />
                       <button
                         type="button"
                         onClick={() => remove(l.cart_item_id)}

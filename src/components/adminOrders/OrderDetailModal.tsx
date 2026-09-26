@@ -15,6 +15,7 @@ import OrderChatPanel from './OrderChatPanel';
 import OrderStagePanel from './OrderStagePanel';
 import GiniReceiptPanel from './GiniReceiptPanel';
 import OrderStatusCorrection from './OrderStatusCorrection';
+import PriceAdjustPanel from './PriceAdjustPanel';
 
 /**
  * The order fulfilment screen.
@@ -191,6 +192,18 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 buttons below would simply keep answering GINI_RECEIPT_REQUIRED
                 until the barcode is recorded here. Null on every other payment
                 method, so an ordinary order sees nothing extra. */}
+            {/* THE PRICE HOLD, above the path it freezes (0140): every move
+                below answers PRICE_APPROVAL_PENDING until the customer decides
+                or the proposal is withdrawn from the «معلومات الطلب» tab.
+                OWNER: Sorani to be written by hand. */}
+            {detail.price_hold_id ? (
+              <p data-price-hold-note role="status" className="rounded-xl border border-warning/35 bg-warning/10 px-3 py-2 text-[12.5px] font-bold text-warning">
+                {loc(
+                  'الطلب بانتظار موافقة الزبون على السعر الجديد — لا يمكن نقله حتى يقرر أو يُسحب الاقتراح.',
+                  'This order is waiting for the customer to approve a new price — it cannot move until they decide or the proposal is withdrawn.'
+                )}
+              </p>
+            ) : null}
             {detail.gini ? (
               <GiniReceiptPanel orderId={orderId} gini={detail.gini} dir={dir} onScanned={load} />
             ) : null}
@@ -313,6 +326,12 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                         label={loc('التوصيل', 'Delivery', 'گەیاندن')}
                         value={fin.delivery_waived ? loc('مجاني', 'waived', 'بەخۆڕایی') : formatIqd(fin.shipping_iqd)}
                       />
+                      {(fin.price_adjustment_iqd ?? 0) !== 0 && (
+                        <Row
+                          label={loc('تعديل السعر (بموافقة الزبون)', 'Price adjustment (customer-approved)')}
+                          value={`${(fin.price_adjustment_iqd ?? 0) > 0 ? '+' : '−'} ${formatIqd(Math.abs(fin.price_adjustment_iqd ?? 0))}`}
+                        />
+                      )}
                       {fin.cod_tax_iqd > 0 && (
                         <Row
                           label={loc('ضريبة الدفع عند الاستلام', 'Cash on Delivery Tax', 'باجی پارەدان لە کاتی گەیاندن')}
@@ -343,6 +362,11 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 </>
               )}
             </section>
+
+            {/* «تعديل السعر النهائي» (0140): propose a new total the customer
+                must approve, or see / withdraw the open proposal. Reloads the
+                detail on change, because the hold freezes the stage panel. */}
+            <PriceAdjustPanel orderId={orderId} onChanged={load} />
 
             {/* -------------------------------------------------- the customer */}
             <section>

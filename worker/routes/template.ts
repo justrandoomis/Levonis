@@ -33,6 +33,7 @@
  * timed-out response, the same file twice in one ZIP) resolves to ONE write.
  */
 
+import { fetchPageImages, pickPageImage, type PageImages } from '../lib/productPageImages';
 import { Hono, type Context } from 'hono';
 import { unzipSync } from 'fflate';
 import type { AppContext, Env } from '../lib/types';
@@ -2332,18 +2333,84 @@ async function stageTemplateMedia(
       failed.set(source, error);
     }
   }
-  const results = [...bySource.values()];
+  const rawMediaEarly = Array.isArray(a.merge.body.media)
+    ? (a.merge.body.media as Array<Record<string, unknown>>)
+    : [];
+  const rawColorsEarly = Array.isArray(a.merge.body.colors)
+    ? (a.merge.body.colors as Array<Record<string, unknown>>)
+    : [];
+
+  /**
+   * A failed image link is retried through the product page it came from
+   * (`images.N.source_url`, or the link itself when it IS a page): the page's
+   * JSON-LD / og:image names the real image for that colour. Only a row the
+   * page clearly identifies is filled; everything else keeps its error.
+   */
+  const recovered = new Map<TemplateMediaFetchIntent, ProductMediaIngestResult>();
+  const fallbackWarnings: string[] = [];
   if (failed.size > 0) {
+    const pageBudget = { fetches: 48, bytes: 96 * 1024 * 1024 };
+    const pages = new Map<string, PageImages | null>();
+    const byImage = new Map<string, ProductMediaIngestResult | null>();
+    for (const intent of intents) {
+      if (!failed.has(intent.source_url)) continue;
+      const item = (a.parsed.groups[intent.group] ?? []).find((g) => g.index === intent.index);
+      const declared = intent.group === 'images' && typeof item?.fields.source_url?.value === 'string'
+        ? item.fields.source_url.value.trim()
+        : '';
+      const pageUrl = /^https?:\/\//i.test(declared) ? declared : intent.source_url;
+      if (!pages.has(pageUrl)) {
+        try {
+          pages.set(pageUrl, await fetchPageImages(pageUrl, { budget: pageBudget }));
+        } catch {
+          pages.set(pageUrl, null);
+        }
+      }
+      const page = pages.get(pageUrl);
+      if (!page) continue;
+      const raw = intent.group === 'images'
+        ? rawMediaEarly[(a.parsed.groups.images ?? []).findIndex((g) => g.index === intent.index)]
+        : undefined;
+      const bindingId = intent.target_type === 'product'
+        ? ''
+        : intent.target_id || (typeof raw?.color_id === 'string' ? raw.color_id : '') ||
+          (typeof raw?.option_value_id === 'string' ? raw.option_value_id : '');
+      const colour = rawColorsEarly.find((c) => c.id === bindingId);
+      const labels = [colour?.name_en, raw?.alt_en].filter((x): x is string => typeof x === 'string' && !!x);
+      const imageUrl = pickPageImage(page, { bindingId, labels });
+      if (!imageUrl) continue;
+      if (!byImage.has(imageUrl)) {
+        try {
+          const stored = await ingestProductMediaUrl(env, imageUrl, {
+            budget: pageBudget,
+            cleanup_grace_minutes: PRODUCT_MEDIA_CLEANUP_GRACE_MINUTES,
+          });
+          resultSink.push(stored);
+          byImage.set(imageUrl, stored);
+        } catch {
+          byImage.set(imageUrl, null);
+        }
+      }
+      const stored = byImage.get(imageUrl);
+      if (!stored) continue;
+      recovered.set(intent, stored);
+      fallbackWarnings.push(
+        `${intent.field}: the link failed (${mediaFailureMessage(failed.get(intent.source_url))}); used the matching image from the product page instead`
+      );
+    }
+  }
+  const results = [...bySource.values(), ...new Set(recovered.values())];
+  const unresolved = intents.filter((intent) => failed.has(intent.source_url) && !recovered.has(intent));
+  if (unresolved.length > 0) {
     return {
       results,
       warnings: [],
-      errors: intents
-        .filter((intent) => failed.has(intent.source_url))
-        .map((intent) => ({
-          line: intent.line,
-          key: intent.field,
-          message: `could not import image from ${intent.source_host}: ${mediaFailureMessage(failed.get(intent.source_url))}`,
-        })),
+      errors: unresolved.map((intent) => ({
+        line: intent.line,
+        key: intent.field,
+        message: `could not import image from ${intent.source_host}: ${mediaFailureMessage(failed.get(intent.source_url))}` +
+          ' — the product page in source_url did not give a matching image either',
+      })),
     };
   }
 
@@ -2357,7 +2424,7 @@ async function stageTemplateMedia(
     ? (a.merge.body.colors as Array<Record<string, unknown>>)
     : [];
   const media = a.doc.media.map((item) => ({ ...item } as Record<string, unknown>));
-  const warnings: string[] = [];
+  const warnings: string[] = [...fallbackWarnings];
 
   const atTemplatePosition = (
     group: 'images' | 'options' | 'colors',
@@ -2375,7 +2442,7 @@ async function stageTemplateMedia(
   };
 
   for (const intent of intents) {
-    const stored = bySource.get(intent.source_url)!;
+    const stored = recovered.get(intent) ?? bySource.get(intent.source_url)!;
     const raw = intent.group === 'images'
       ? atTemplatePosition('images', intent.index, rawMedia)
       : intent.group === 'options'

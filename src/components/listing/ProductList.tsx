@@ -4,7 +4,8 @@ import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
 import AvailabilityLine from '../product/AvailabilityLine';
 import CompareToggle from '../compare/CompareToggle';
-import { productPrimaryImage } from '../../lib/productImage';
+import { productMainImage, productPrimaryImage } from '../../lib/productImage';
+import { useTheme } from '../../lib/theme';
 import { cardHref, cardName, compareTypeOf, type CardProduct } from '../../lib/productCard';
 import type { ApiProduct } from '../../lib/api';
 import '../../styles/catalog.css';
@@ -18,11 +19,13 @@ import '../../styles/catalog.css';
  * photograph, never nested inside it.
  */
 export default function ProductList({ products }: { products: ApiProduct[] }) {
+  const { theme } = useTheme();
   return (
     <ul data-product-list className="grid grid-cols-1 gap-2 lg:grid-cols-2 lg:gap-3">
       {products.map((raw, i) => {
         const p = raw as CardProduct;
-        const image = productPrimaryImage(p);
+        const image = productMainImage(p, theme);
+        const lightShown = image !== '' && image === p.light_image;
         const name = cardName(p);
         const type = compareTypeOf(p);
         return (
@@ -31,7 +34,7 @@ export default function ProductList({ products }: { products: ApiProduct[] }) {
               data-product-row
               className="group relative flex min-w-0 gap-3 rounded-[14px] border border-border-subtle bg-surface p-2.5 transition-colors hover:bg-surface-raised has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus"
             >
-              <div className="relative size-24 shrink-0 overflow-hidden rounded-[10px] bg-charcoal">
+              <div className={`relative size-24 shrink-0 overflow-hidden rounded-[10px] ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
                 <SafeImage
                   src={image}
                   alt=""
@@ -61,7 +64,7 @@ export default function ProductList({ products }: { products: ApiProduct[] }) {
               </Link>
               {type ? (
                 <CompareToggle
-                  item={{ id: p.id, slug: p.slug || p.id, name, image: image || '' }}
+                  item={{ id: p.id, slug: p.slug || p.id, name, image: productPrimaryImage(p) || '' }}
                   type={type}
                   className="absolute start-3.5 top-3.5 z-[2]"
                 />

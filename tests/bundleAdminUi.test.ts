@@ -128,7 +128,10 @@ test('§5.2: the storefront produces the composition request body', () => {
 
 test('§10: the stepper disables at the server’s max_qty rather than silently no-opping', () => {
   const detail = read('src/pages/BundleDetail.tsx');
-  assert.match(detail, /disabled=\{qty >= maxQty\}/, 'the bundle page’s + button never disables');
+  // The shared QuantityInput disables + at `max` (and turns a typed figure
+  // above it into it); the page must hand it the server's cap.
+  assert.match(detail, /<QuantityInput[\s\S]*?max=\{maxQty\}/, 'the bundle page’s + button never disables');
+  assert.match(read('src/components/ui/QuantityInput.tsx'), /disabled=\{disabled \|\| atMax\}/);
   const cart = read('src/pages/Cart.tsx');
   assert.match(cart, /lineCap\(item\)/, 'the cart’s + button ignores the composition cap');
   assert.match(cart, /lineBlocked/, 'the cart never blocks checkout on a composition availability state');

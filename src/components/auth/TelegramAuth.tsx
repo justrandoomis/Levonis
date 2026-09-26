@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { Send, CheckCircle2, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { api, ApiError, isNotConfigured } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import OtpBoxes from './OtpBoxes';
 import PhoneField, { emptyPhoneValue, type PhoneValue } from './PhoneField';
 import FillButton, { combineFillProgress, lengthProgress } from './FillButton';
+import TelegramOpen from './TelegramOpen';
 
 /**
  * Telegram-verified phone + OTP registration & sign-in (§4), embedded by the
@@ -404,6 +405,9 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
 
   // Poll while Telegram-side steps are pending; pause when hidden and resume
   // immediately on focus/visibility (iPad Safari → Telegram → Safari).
+  // `pageshow` covers the iPhone case the other two miss: coming BACK to this
+  // page from t.me in the same tab restores it from the back/forward cache,
+  // which fires neither focus nor visibilitychange reliably.
   useEffect(() => {
     const shouldPoll = phase === 'waiting' && !!flow;
     let id: number | null = null;
@@ -413,6 +417,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
       }
     };
     window.addEventListener('focus', onWake);
+    window.addEventListener('pageshow', onWake);
     document.addEventListener('visibilitychange', onWake);
     if (shouldPoll) {
       id = window.setInterval(() => {
@@ -422,6 +427,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
     return () => {
       if (id !== null) window.clearInterval(id);
       window.removeEventListener('focus', onWake);
+      window.removeEventListener('pageshow', onWake);
       document.removeEventListener('visibilitychange', onWake);
     };
   }, [phase, flow, fetchStatus]);
@@ -616,32 +622,26 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
           <p className="lv-tg__masked" dir="ltr">
             {flow.phone_masked}
           </p>
-          <a
-            href={flow.deep_link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="lv-btn-quiet"
-          >
-            <ExternalLink /> {s.openTelegram}
-          </a>
-          <p className="lv-tg__hint">{s.openHint}</p>
+          <TelegramOpen deepLink={flow.deep_link}>
+            <p className="lv-tg__hint">{s.openHint}</p>
 
-          {serverState === 'contact_received' ? (
-            <div className="lv-notice lv-notice--warn lv-notice--tight" role="status">
-              <AlertCircle />
-              <p>{s.mismatchRetry}</p>
-            </div>
-          ) : serverState === 'send_failed' ? (
-            <div className="lv-notice lv-notice--warn lv-notice--tight" role="status">
-              <AlertCircle />
-              <p>{s.sendFailed}</p>
-            </div>
-          ) : (
-            <div className="lv-tg__waiting" role="status" aria-live="polite">
-              <span className="lv-dots" aria-hidden />
-              <span>{s.waitingShare}</span>
-            </div>
-          )}
+            {serverState === 'contact_received' ? (
+              <div className="lv-notice lv-notice--warn lv-notice--tight" role="status">
+                <AlertCircle />
+                <p>{s.mismatchRetry}</p>
+              </div>
+            ) : serverState === 'send_failed' ? (
+              <div className="lv-notice lv-notice--warn lv-notice--tight" role="status">
+                <AlertCircle />
+                <p>{s.sendFailed}</p>
+              </div>
+            ) : (
+              <div className="lv-tg__waiting" role="status" aria-live="polite">
+                <span className="lv-dots" aria-hidden />
+                <span>{s.waitingShare}</span>
+              </div>
+            )}
+          </TelegramOpen>
 
           <button
             type="button"

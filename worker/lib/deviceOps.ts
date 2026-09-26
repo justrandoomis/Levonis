@@ -158,10 +158,11 @@ export function coverageState(
 /**
  * Lookup normalization only (0003: upper-case, spaces/dashes removed). The
  * EXACT entered value is preserved separately in device_serials.serial_raw.
+ * ONE definition, shared with the serial inventory (0139) and the scanner, so
+ * `device_serials.serial_norm` and `serial_inventory.serial_norm` join on
+ * equality (packages/catalog/src/deviceSerials.ts).
  */
-export function normalizeSerial(input: string): string {
-  return input.trim().toUpperCase().replace(/[\s-]+/g, '');
-}
+export { normalizeSerial } from '@levonis/catalog/deviceSerials';
 
 /** Masked display for customers: last 4 characters visible. */
 export function maskSerial(raw: string): string {

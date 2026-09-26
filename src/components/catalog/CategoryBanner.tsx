@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import CropPhoto from './CropPhoto';
+import { useTheme } from '../../lib/theme';
 import { ArrowGlyph } from '../home/v2/SectionHead';
 import { prefetchProps } from '../../lib/catalog/prefetch';
 import type { BannerPhoto } from '../../lib/catalog/explorerModel';
@@ -18,8 +19,11 @@ import type { BannerPhoto } from '../../lib/catalog/explorerModel';
  * same target — the arrow is drawn, not a second control. The link's name is
  * the section's name plus its counts, in reading order.
  *
- * `data-theme="dark"` keeps the island dark in the light theme, so the tokens
- * inside (the availability dot, the focus ring) read on charcoal.
+ * IT FOLLOWS THE THEME (`data-feature`, src/index.css FEATURE SURFACES): the
+ * charcoal banner on the dark theme; on the light one a cream card with ink
+ * type and a charcoal arrow, the product's light-theme photograph (migration
+ * 0138) faded in the same way, or — a dark photograph with no light twin —
+ * framed as a window on the far side, narrower so the words keep their zone.
  */
 export default function CategoryBanner({
   to,
@@ -43,10 +47,12 @@ export default function CategoryBanner({
   eager?: boolean;
 }) {
   const lead = variant === 'lead';
+  const { theme } = useTheme();
+  const framed = !!photo?.productPhoto && theme === 'light' && !photo.lightSrc;
   return (
     <Link
       to={to}
-      data-theme="dark"
+      data-feature=""
       data-category-banner={lead ? 'lead' : 'regular'}
       {...prefetchProps(to)}
       className={`group relative isolate block overflow-hidden rounded-[20px] bg-charcoal ring-1 ring-inset ring-white/[0.06] transition-transform duration-150 active:scale-[0.99] motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted ${
@@ -56,10 +62,15 @@ export default function CategoryBanner({
       {photo ? (
         <CropPhoto
           src={photo.src}
+          lightSrc={photo.lightSrc}
           crop={photo.productPhoto}
           size={lead ? 560 : 360}
           eager={eager}
-          className={`lv-fade-start inset-y-0 end-0 ${lead ? 'w-[56%] lg:w-[58%]' : 'w-[54%]'}`}
+          className={
+            framed
+              ? `inset-y-0 end-0 ${lead ? 'w-[36%] lg:w-[50%]' : 'w-[36%] lg:w-[42%]'}`
+              : `lv-fade-start inset-y-0 end-0 ${lead ? 'w-[56%] lg:w-[58%]' : 'w-[54%]'}`
+          }
         />
       ) : (
         <span aria-hidden="true" className="absolute inset-y-0 end-0 w-[54%] bg-[radial-gradient(120%_90%_at_100%_100%,rgb(188_163_107/0.16),transparent_60%)] rtl:bg-[radial-gradient(120%_90%_at_0%_100%,rgb(188_163_107/0.16),transparent_60%)]" />
