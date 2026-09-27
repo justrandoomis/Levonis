@@ -22,6 +22,7 @@ import { normalizeCheapestBase } from './cheapestBase';
 import { splitUrlList } from './urlList';
 import { buildGrid, COLUMN_OF, FIELDS, type Field } from './priceGrid';
 import { isOwnedMediaUrl } from './mediaStorage';
+import { scopedRelationId } from './relationIdScope';
 import type {
   ProductDoc,
   TranslationMeta,
@@ -2922,12 +2923,95 @@ function canonicalizeLegacyBoundMedia(
  * The returned body still goes through validateProductDoc — this function
  * performs merging, not final validation.
  */
+/**
+ * THE FILE'S KEYS, AS THIS PRODUCT STORES THEM (worker/lib/relationIdScope.ts).
+ *
+ * A key another product already owned was saved here under a scoped id —
+ * «refill-1kg» became «refill-1kg-<tag>». The owner's ORIGINAL file still
+ * says «refill-1kg», so without this the merge-by-id would read it as a NEW
+ * option beside the stored one and refuse the pair as one model listed twice.
+ * Each option, colour or combination id the product does not hold, but holds
+ * in scoped form, is read as that row — and every link in the file that names
+ * it follows: a colour's options, a combination's options and colour, a
+ * picture's binding. A key the product holds as written is never touched.
+ */
+export function withScopedKeys(
+  parsed: ParsedTemplate,
+  existing: ProductDoc,
+  /** The product's stored combinations — they live in the relational view, not the doc. */
+  storedVariants: ReadonlyArray<{ id?: unknown }> = []
+): ParsedTemplate {
+  const productId = existing.id;
+  if (!productId) return parsed;
+  const held = (items: ReadonlyArray<{ id?: unknown }> | undefined) =>
+    new Set((items ?? []).map((x) => String(x.id ?? '')).filter(Boolean));
+  const stored = {
+    options: held(existing.options as Array<{ id?: unknown }>),
+    colors: held(existing.colors as Array<{ id?: unknown }>),
+    variants: held(storedVariants),
+  };
+  const idOf = (it: ParsedGroupItem) =>
+    typeof it.fields.id?.value === 'string' ? (it.fields.id.value as string).trim() : '';
+  const mapFor = (group: 'options' | 'colors' | 'variants') => {
+    const map = new Map<string, string>();
+    for (const it of parsed.groups[group] ?? []) {
+      const id = idOf(it);
+      if (!id || stored[group].has(id)) continue;
+      const scoped = scopedRelationId(id, productId);
+      if (stored[group].has(scoped)) map.set(id, scoped);
+    }
+    return map;
+  };
+  const maps = { options: mapFor('options'), colors: mapFor('colors'), variants: mapFor('variants') };
+  if (maps.options.size + maps.colors.size + maps.variants.size === 0) return parsed;
+
+  const one = (map: Map<string, string>, f: ParsedField | undefined): ParsedField | undefined =>
+    f && typeof f.value === 'string' && map.has(f.value.trim()) ? { ...f, value: map.get(f.value.trim())! } : f;
+  const many = (map: Map<string, string>, f: ParsedField | undefined): ParsedField | undefined =>
+    f && Array.isArray(f.value)
+      ? { ...f, value: (f.value as unknown[]).map((x) => (typeof x === 'string' && map.has(x.trim()) ? map.get(x.trim())! : x)) }
+      : one(map, f);
+  const rewrite = (items: ParsedGroupItem[] | undefined, fn: (fields: Record<string, ParsedField>) => Record<string, ParsedField | undefined>) =>
+    (items ?? []).map((it) => {
+      const changed = fn(it.fields);
+      const fields = { ...it.fields };
+      for (const [k, v] of Object.entries(changed)) if (v) fields[k] = v;
+      return { ...it, fields };
+    });
+  const groups = { ...parsed.groups };
+  if (groups.options) groups.options = rewrite(groups.options, (f) => ({ id: one(maps.options, f.id) }));
+  if (groups.colors) {
+    groups.colors = rewrite(groups.colors, (f) => ({
+      id: one(maps.colors, f.id),
+      option_id: one(maps.options, f.option_id),
+      option_ids: many(maps.options, f.option_ids),
+    }));
+  }
+  if (groups.variants) {
+    groups.variants = rewrite(groups.variants, (f) => ({
+      id: one(maps.variants, f.id),
+      option_value_ids: many(maps.options, f.option_value_ids),
+      color_id: one(maps.colors, f.color_id),
+    }));
+  }
+  if (groups.images) {
+    // A picture keeps its own id (images are never scoped); its binding follows.
+    groups.images = rewrite(groups.images, (f) => ({
+      option_value_id: one(maps.options, f.option_value_id),
+      color_id: one(maps.colors, f.color_id),
+      variant_id: one(maps.variants, f.variant_id),
+    }));
+  }
+  return { ...parsed, groups };
+}
+
 export function toDocBody(
   parsed: ParsedTemplate,
   existing?: ProductDoc | null,
   resolved?: ResolvedRefs,
   context: TemplateMergeContext = {}
 ): ToDocResult {
+  if (existing) parsed = withScopedKeys(parsed, existing, context.variants ?? []);
   const result: ToDocResult = {
     body: {},
     applied_fields: [],

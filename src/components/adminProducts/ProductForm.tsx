@@ -38,7 +38,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus, FileUp } from 'lucide-react';
 import { api, ApiError, failureText, formatIqd } from '../../lib/api';
 import { refusalIssues } from './applyResult';
 import { useLanguage } from '../../LanguageContext';
@@ -58,6 +58,8 @@ import {
 } from './types';
 import PinnedPriceNotice from './PinnedPriceNotice';
 const TranslationsSheet = React.lazy(() => import('./form/TranslationsSheet'));
+// «تحديث البيانات» — its own lazy chunk too; only a saved product opens it.
+const SectionUpdateSheet = React.lazy(() => import('./form/SectionUpdateSheet'));
 // Types only — no runtime import, so the sheet stays in its own lazy chunk.
 import type { ReviewItem, TranslationOverrides } from './form/TranslationsSheet';
 import { repriceRow, pinnedRows, type RepriceMode } from '../../../worker/lib/pinnedPrices';
@@ -259,6 +261,9 @@ export default function ProductForm({
   const [staleSave, setStaleSave] = useState<'draft' | 'active' | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  /** «تحديث البيانات»: the sheet, and what its last save did (shown until the next edit). */
+  const [sectionUpdateOpen, setSectionUpdateOpen] = useState(false);
+  const [fileUpdateNote, setFileUpdateNote] = useState<string | null>(null);
 
   // ------------------------------------------------------------- loading
 
@@ -356,6 +361,43 @@ export default function ProductForm({
     }
   }, []);
 
+  /**
+   * AFTER «تحديث البيانات» SAVED: the product is read back, and the admin's
+   * unsaved edits OUTSIDE «المواصفات والمحتوى الإضافي» are laid back on top —
+   * that section now holds what the file wrote; nothing else the admin typed
+   * is lost. The form stays dirty for those edits, as it should.
+   */
+  const docRef = useRef(doc);
+  docRef.current = doc;
+  const relRef = useRef(rel);
+  relRef.current = rel;
+  const baselineRef = useRef(baseline);
+  baselineRef.current = baseline;
+  const reloadKeepingEdits = useCallback(
+    async (id: string) => {
+      const before = baselineRef.current ? (JSON.parse(baselineRef.current) as { d: EditorDoc; rs: RelationsState }) : null;
+      const mine = docRef.current;
+      const myRel = relRef.current;
+      const section = new Set<string>(['spec_fields', 'spec_groups', 'labels', 'content_blocks', 'usage_guide', 'how_to_use', 'how_to_use_ar', 'how_to_use_ckb']);
+      const edited = before
+        ? (Object.keys(mine) as Array<keyof EditorDoc>).filter(
+            (k) => !section.has(k as string) && JSON.stringify(mine[k]) !== JSON.stringify(before.d[k])
+          )
+        : [];
+      const relEdited = !!before && JSON.stringify(myRel) !== JSON.stringify(before.rs);
+      await loadProduct(id);
+      if (edited.length > 0) {
+        setDoc((d) => {
+          const next = { ...d } as Record<string, unknown>;
+          for (const k of edited) next[k as string] = mine[k];
+          return next as unknown as EditorDoc;
+        });
+      }
+      if (relEdited) setRel(myRel);
+    },
+    [loadProduct]
+  );
+
   useEffect(() => {
     if (productId) void loadProduct(productId);
     else {
@@ -432,6 +474,10 @@ export default function ProductForm({
   }, [brands, brandSearch, doc.brand_id]);
 
   const dirty = baseline !== '' && JSON.stringify({ d: doc, rs: rel }) !== baseline;
+  // The note of a file update stands until the next edit.
+  useEffect(() => {
+    if (dirty) setFileUpdateNote(null);
+  }, [dirty]);
 
   /**
    * Filed under «المستعمل» (migration 0147): the section's main section is
@@ -1790,10 +1836,23 @@ export default function ProductForm({
               <span className="text-amber-300">تغييرات غير محفوظة</span>
             ) : (
               <span className="text-emerald-300 inline-flex items-center gap-1">
-                <Check className="w-3.5 h-3.5 shrink-0" /> محفوظ
+                <Check className="w-3.5 h-3.5 shrink-0" /> {fileUpdateNote ?? 'محفوظ'}
               </span>
             )}
           </span>
+          {productId && (
+            <button
+              type="button"
+              data-action="update-data"
+              className={`${btnGhost} h-10`}
+              disabled={saving}
+              onClick={() => setSectionUpdateOpen(true)}
+              aria-haspopup="dialog"
+              title="تحديث المواصفات والمحتوى الإضافي من ملف"
+            >
+              <FileUp className="w-4 h-4" /> تحديث البيانات
+            </button>
+          )}
           <button
             type="button"
             data-action="save-draft"
@@ -1814,6 +1873,21 @@ export default function ProductForm({
           </button>
         </div>
       </div>
+
+      {sectionUpdateOpen && productId && (
+        <React.Suspense fallback={null}>
+          <SectionUpdateSheet
+            productId={productId}
+            specs={tplGroups.flatMap((g) => g.fields.map((f) => ({ id: f.id, label_ar: f.label_ar, unit: f.unit })))}
+            formDirty={dirty}
+            onClose={() => setSectionUpdateOpen(false)}
+            onSaved={(note) => {
+              setFileUpdateNote(note);
+              void reloadKeepingEdits(productId);
+            }}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 }
