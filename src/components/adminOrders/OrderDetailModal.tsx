@@ -10,6 +10,7 @@ import { Overlay } from '../ui/Overlay';
 import { ErrorState } from '../ui/AsyncStates';
 import CopyField from './CopyField';
 import { collectOnDeliveryIqd } from './collectAmount';
+import { DeliveryMethodBadge } from './deliveryMethod';
 import MysteryReveal from '../offers/MysteryReveal';
 import OrderChatPanel from './OrderChatPanel';
 import OrderStagePanel from './OrderStagePanel';
@@ -261,9 +262,13 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                   does not move when a collection is recorded, so the sheet
                   still reads right after delivery. Orders loaded without the
                   financial block fall back to the total. */}
+              {/* The method rides beside the label (owner: «المتبقي عند التسليم
+                  (توصيل عادي)» / «(توصيل شخصي)») — the courier company and the
+                  shop's own driver collect on different sheets. */}
               <CopyField
                 label={loc('المتبقي عند التسليم', 'Outstanding on delivery', 'ماوە لە گەیاندن')}
                 value={String(collectIqd)}
+                hint={<DeliveryMethodBadge method={detail.delivery_method} lang={lang} />}
                 emphasis
                 mono
               />

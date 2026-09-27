@@ -179,6 +179,7 @@ export const ENTITLEMENT_LABELS: Record<string, { ar: string; en: string; ckb: s
   verifiedMerchant: { ar: 'شارة التاجر PRO', en: 'PRO merchant badge', ckb: 'نیشانەی بازرگانی PRO' },
   proMerchantBadge: { ar: 'شارة التاجر PRO', en: 'PRO merchant badge', ckb: 'نیشانەی بازرگانی PRO' },
   primeDeliveryEligible: { ar: 'توصيل PREMIUM المجاني', en: 'PREMIUM free delivery', ckb: 'گەیاندنی بێبەرامبەری PREMIUM' },
+  premiumBadge: { ar: 'شارة PREMIUM في مجتمع ليفو', en: 'PREMIUM badge in the Levo community', ckb: 'نیشانەی PREMIUM لە کۆمەڵگەی لیڤۆ' },
   premiumDelivery: { ar: 'توصيل PREMIUM المجاني', en: 'PREMIUM free delivery', ckb: 'گەیاندنی بێبەرامبەری PREMIUM' },
   bnpl: { ar: 'اشترِ الآن وادفع لاحقًا', en: 'Buy now, pay later', ckb: 'ئێستا بکڕە و دواتر بدە' },
   priorityDelivery12h: { ar: 'تجهيز وتوصيل خلال 12 ساعة', en: '12-hour preparation and delivery', ckb: 'خزمەتی ١٢ کاتژمێر' },
@@ -224,4 +225,46 @@ export function pickDefaultTier(tiers: PaidTier[], current: AnyTier, onSale: (ti
     );
   }
   return byRank.find(onSale) ?? byRank[0];
+}
+
+/**
+ * PRO, PAUSED (migration 0145) — the page's words, in one place, so the card,
+ * the checkout bar and the member header can never say it three ways.
+ *
+ *  - `soon` stands where the PRO price, its benefit list and every button
+ *    were: «قريبًا… يتم العمل على تطوير النظام».
+ *  - `maintenance` is what a member whose PRO card is frozen reads — the
+ *    owner's own sentence.
+ */
+export const PRO_PAUSE_WORDS = {
+  soon: {
+    ar: 'قريبًا… يتم العمل على تطوير النظام',
+    en: 'Coming soon — the system is being developed',
+    ckb: 'بەم زووانە… کار لەسەر پەرەپێدانی سیستەمەکە دەکرێت',
+  },
+  soonShort: { ar: 'قريبًا', en: 'Coming soon', ckb: 'بەم زووانە' },
+  developing: {
+    ar: 'يتم العمل على تطوير النظام',
+    en: 'The system is being developed',
+    ckb: 'کار لەسەر پەرەپێدانی سیستەمەکە دەکرێت',
+  },
+  maintenance: {
+    ar: 'صيانة في اشتراك البرو، لا تقلق لم يتم استقطاع أيامك من الاشتراك',
+    en: 'PRO is under maintenance — don’t worry, no days have been deducted from your subscription',
+    ckb: 'PRO لە چاککردنەوەدایە — نیگەران مەبە، هیچ ڕۆژێک لە بەشداریکردنەکەت کەم نەکراوەتەوە',
+  },
+  meanwhile: {
+    ar: 'وخلال الصيانة تبقى لك مزايا PREMIUM',
+    en: 'Meanwhile you keep the PREMIUM benefits',
+    ckb: 'لەو ماوەیەدا سوودەکانی PREMIUM بۆت دەمێننەوە',
+  },
+} as const;
+
+/** «٣٠ يومًا محفوظة لك» — Arabic counts its days: يوم واحد، يومان، 3–10 أيام، 11+ يومًا. */
+export function daysKeptLabel(days: number, lang: string): string {
+  const n = days.toLocaleString();
+  if (lang === 'en') return `${n} ${days === 1 ? 'day' : 'days'} kept for you`;
+  if (lang === 'ckb') return `${n} ڕۆژ بۆت پارێزراوە`;
+  const word = days === 1 ? 'يوم واحد' : days === 2 ? 'يومان' : days >= 3 && days <= 10 ? `${n} أيام` : `${n} يومًا`;
+  return `${word} محفوظة لك`;
 }

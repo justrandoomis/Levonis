@@ -12,13 +12,14 @@
  * fit 390px, and a table that scrolls sideways hides its own actions.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Ban, Download, History, Pencil, Plus, RefreshCw, RotateCcw, Search } from 'lucide-react';
+import { Ban, Download, History, Link2, Pencil, Plus, RefreshCw, RotateCcw, Search } from 'lucide-react';
 import * as T from '../../adminProducts/theme';
 import { useLanguage } from '../../../LanguageContext';
 import { useToast } from '../../ui/Toast';
 import { usePrompt } from '../../ui/PromptDialog';
 import AddSerialsPanel, { ICON_BTN_44 } from './AddSerialsPanel';
 import EditSerialDialog from './EditSerialDialog';
+import LinkProductDialog, { type LinkTarget } from './LinkProductDialog';
 import {
   INVENTORY_BASE,
   STR,
@@ -114,6 +115,7 @@ export default function SerialInventoryPanel() {
   const [err, setErr] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<InventoryRow | null>(null);
+  const [linking, setLinking] = useState<LinkTarget | null>(null);
   const [openHistory, setOpenHistory] = useState<string | null>(null);
 
   const params = useCallback(
@@ -227,6 +229,34 @@ export default function SerialInventoryPanel() {
   const productLabel = (row: InventoryRow) =>
     row.product ? (lang === 'en' ? row.product.name || row.product.name_ar : row.product.name_ar || row.product.name) : t.noProduct;
 
+  /**
+   * «بلا منتج» is a question with an answer, so it carries the way to answer
+   * it: one tap files this serial — and, with an EAN, every unlinked serial of
+   * that EAN, which also teaches the camera the box for next time.
+   */
+  const linkButton = (row: InventoryRow) =>
+    row.product || row.status === 'void' ? null : (
+      <button
+        type="button"
+        className={`${T.btnSecondary} h-8 min-h-[32px] px-2.5 text-[12px]`}
+        onClick={() => setLinking({ ean: row.ean, serialNorm: row.serial_norm, serial: row.serial, hint: row.model_name || row.model_hint })}
+        data-serial-link={row.serial_norm}
+      >
+        <Link2 className="w-3.5 h-3.5" aria-hidden />
+        {t.linkBtn}
+      </button>
+    );
+
+  /** The model as typed, else what the label says — marked as such, never passed off as typed. */
+  const modelLabel = (row: InventoryRow) =>
+    row.model_name ? (
+      row.model_name
+    ) : row.model_hint ? (
+      <span className="text-[var(--ap-text-2)]" title={t.hintFromLabel}>
+        {row.model_hint}
+      </span>
+    ) : null;
+
   return (
     <div className="space-y-4" dir={dir} data-panel="serial-inventory">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -243,16 +273,21 @@ export default function SerialInventoryPanel() {
           <button type="button" className={`${T.btnSecondary} min-h-[44px] w-11 px-0`} onClick={() => void load()} aria-label={t.refresh} title={t.refresh}>
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} aria-hidden />
           </button>
-          {!adding && (
-            <button type="button" className={`${T.btnPrimary} min-h-[44px]`} onClick={() => setAdding(true)} data-serial-add-open>
-              <Plus className="w-4 h-4" aria-hidden />
-              {t.add}
-            </button>
-          )}
+          <button
+            type="button"
+            className={`${T.btnPrimary} min-h-[44px]`}
+            onClick={() => setAdding(true)}
+            aria-haspopup="dialog"
+            aria-expanded={adding}
+            data-serial-add-open
+          >
+            <Plus className="w-4 h-4" aria-hidden />
+            {t.add}
+          </button>
         </div>
       </header>
 
-      {adding && <AddSerialsPanel t={t} onClose={() => setAdding(false)} onSaved={() => void load()} />}
+      <AddSerialsPanel t={t} open={adding} onClose={() => setAdding(false)} onSaved={() => void load()} />
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[220px]">
@@ -299,7 +334,7 @@ export default function SerialInventoryPanel() {
                       {row.serial}
                     </div>
                     <div className="mt-0.5 text-[12px] text-[var(--ap-text-2)] truncate" dir="auto">
-                      {row.model_name || productLabel(row)}
+                      {row.product ? productLabel(row) : modelLabel(row) ?? t.noProduct}
                       {row.model_code && (
                         <span className="text-[var(--ap-text-3)]" dir="ltr">
                           {' '}
@@ -321,7 +356,10 @@ export default function SerialInventoryPanel() {
                     {t.added} {shortDate(row.created_at)} · {t.sources[row.source]}
                   </div>
                 </div>
-                <div className="mt-1 -mb-1 -me-1">{actions(row)}</div>
+                <div className="mt-1 -mb-1 -me-1 flex items-center justify-between gap-2">
+                  <div className="min-w-0">{!row.product && linkButton(row)}</div>
+                  {actions(row)}
+                </div>
                 {openHistory === row.serial_norm && (
                   <div className="mt-2 border-t border-[var(--ap-hairline)] pt-2">
                     <HistoryList serialNorm={row.serial_norm} t={t} />
@@ -359,16 +397,23 @@ export default function SerialInventoryPanel() {
                       </td>
                       <td className="px-3 py-2 text-[12.5px]">
                         <span className="block text-[var(--ap-text-1)] truncate max-w-[20ch]" dir="auto">
-                          {row.model_name || '—'}
+                          {modelLabel(row) ?? '—'}
                         </span>
                         <span className="block text-[11px] text-[var(--ap-text-3)] font-mono" dir="ltr">
                           {row.model_code}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-[12.5px] text-[var(--ap-text-2)]">
-                        <span className="block truncate max-w-[24ch]" dir="auto">
-                          {productLabel(row)}
-                        </span>
+                        {row.product ? (
+                          <span className="block truncate max-w-[24ch]" dir="auto">
+                            {productLabel(row)}
+                          </span>
+                        ) : (
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[var(--ap-warning)]">{t.noProduct}</span>
+                            {linkButton(row)}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         <StatusBadge row={row} t={t} />
@@ -403,6 +448,17 @@ export default function SerialInventoryPanel() {
           )}
         </>
       )}
+
+      <LinkProductDialog
+        t={t}
+        target={linking}
+        onClose={() => setLinking(null)}
+        onLinked={({ linked, productName }) => {
+          setLinking(null);
+          toast.success(linked > 0 ? t.linked(linked, productName) : t.linkedNone);
+          void load();
+        }}
+      />
 
       {editing && (
         <EditSerialDialog

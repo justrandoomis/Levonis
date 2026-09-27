@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
-import { asD1, freshDb, get, json, stubApp } from './fixtures/app';
+import { asD1, freshDb, get, json, proOnSale, stubApp } from './fixtures/app';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
 import { productRoutes } from '../worker/routes/products';
 
@@ -43,15 +43,36 @@ function withoutNewFields(body: Record<string, any>) {
   return out;
 }
 
+/**
+ * ONE DELIBERATE CHANGE SINCE THE BASELINE, applied to it rather than
+ * regenerated over it: PREMIUM carries no member price since migration 0145
+ * («اشتراك البريميوم لا يحمل خصومات»), so every card's PREMIUM teaser is null.
+ * Everything else — PRO's teaser included, with PRO on sale — is still held
+ * to the captured answer.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withoutPremiumTeasers(body: any): any {
+  if (!body || typeof body !== 'object') return body;
+  const out = { ...body };
+  if (Array.isArray(out.products)) {
+    out.products = out.products.map((p: Record<string, unknown>) =>
+      'display_prime_iqd' in p ? { ...p, display_prime_iqd: null } : p
+    );
+  }
+  return out;
+}
+
 test('every plain listing request answers what it answered before, minus the new card fields', async () => {
   const baseline = JSON.parse(readFileSync(join(ROOT, 'tests/fixtures/snapshots/productsListing.baseline.json'), 'utf8')) as Record<string, unknown>;
-  const raw = freshDb();
+  // The PRO teaser is compared as it reads while PRO is sold; the pause that
+  // hides it is proven in tests/proPause.test.ts and tierPriceDisclosure.
+  const raw = proOnSale(freshDb());
   seedLiveCatalog(raw);
   const app = stubApp(asD1(raw), null, (a) => a.route('/api/products', productRoutes));
   assert.ok(Object.keys(baseline).length >= 6);
   for (const [path, expected] of Object.entries(baseline)) {
     const body = await json(await get(app, path));
-    assert.deepEqual(withoutNewFields(body), expected, path);
+    assert.deepEqual(withoutNewFields(body), withoutPremiumTeasers(expected), path);
   }
 });
 

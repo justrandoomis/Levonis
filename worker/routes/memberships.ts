@@ -33,6 +33,13 @@ import { audit } from '../lib/audit';
 import { emitEvent, eventsEnabled } from '../lib/eventBus';
 import { SubscriptionChangedV1 } from '@levonis/contracts/events/v1/SubscriptionChanged';
 import { rateLimit } from '../lib/ratelimit';
+import {
+  PRO_PAUSE_KEY,
+  getProPause,
+  pauseProMemberships,
+  resumeProMemberships,
+  type ProPauseConfig,
+} from '../lib/tierPause';
 
 export const membershipsRoutes = new Hono<AppContext>();
 
@@ -56,18 +63,33 @@ export function tierLabel(tier: string): string {
 
 const tierRank = (tier: string): number => TIER_RANK[tier as keyof typeof TIER_RANK] ?? 0;
 
-function planPublic(p: PlanRow) {
+function planPublic(p: PlanRow, pause?: ProPauseConfig) {
+  // PRO, PAUSED (0145): the card stays on the page as «قريبًا», but no PRO
+  // price leaves the server while it is paused — not in the list, not in a
+  // quote's refusal.
+  const paused = p.tier === 'pro' && !!pause?.paused;
+  const price = paused ? null : p.price_iqd;
   return {
     id: p.id,
     tier: p.tier,
     duration_months: p.duration_months,
-    price_iqd: p.price_iqd, // null = unpriced (honest: not purchasable yet)
-    purchasable: p.price_iqd !== null,
+    price_iqd: price, // null = unpriced (honest: not purchasable yet)
+    purchasable: price !== null,
     // The per-month figure the cards show, computed HERE so nothing shown as
     // a number is worked out in the browser (null while unpriced).
-    per_month_iqd: p.price_iqd === null ? null : Math.round(p.price_iqd / Math.max(1, p.duration_months)),
+    per_month_iqd: price === null ? null : Math.round(price / Math.max(1, p.duration_months)),
     sort: p.sort,
+    /** «قريبًا — يتم العمل على تطوير النظام»: this tier is paused, not merely unpriced. */
+    paused,
   };
+}
+
+/** The refusal every PRO sale meets while PRO is paused. */
+function proPausedRefusal(): HttpError {
+  return badRequest(
+    'اشتراك PRO قريبًا — يتم العمل على تطوير النظام / PRO is coming soon — the system is being developed',
+    'PRO_PAUSED'
+  );
 }
 
 interface MembershipDbRow extends Record<string, unknown> {
@@ -187,6 +209,8 @@ function membershipPublic(m: Record<string, unknown>) {
     starts_at: m.starts_at,
     expires_at: m.expires_at,
     source: m.source,
+    /** Set while this PRO membership is frozen by the pause (0145). */
+    paused_at: m.paused_at ?? null,
   };
 }
 
@@ -308,6 +332,7 @@ export async function quotePurchase(
   nowIso: string
 ): Promise<PurchaseQuote> {
   if (!plan.active || plan.price_iqd === null) throw planUnpurchasable();
+  if (plan.tier === 'pro' && (await getProPause(db)).paused) throw proPausedRefusal();
 
   // Lazily expire overdue rows, then load the current ledger state.
   await getTierStatus(db, user.id);
@@ -853,7 +878,7 @@ function entitlementsForTier(tier: PaidTier) {
  */
 membershipsRoutes.get('/plans', async (c) => {
   const db = c.env.DB;
-  const [{ results }, launch, preorderGift, shippingPolicy, benefits] = await Promise.all([
+  const [{ results }, launch, preorderGift, shippingPolicy, benefits, proPause] = await Promise.all([
     db.prepare(
       'SELECT id, tier, duration_months, price_iqd, active, sort FROM membership_plans WHERE active = 1 ORDER BY sort, duration_months'
     ).all<PlanRow>(),
@@ -861,13 +886,20 @@ membershipsRoutes.get('/plans', async (c) => {
     getSetting(db, 'preorderGiftConfig'),
     getSetting(db, 'shippingPolicy'),
     publicBenefitSummary(db, new Date().toISOString()),
+    getProPause(db),
   ]);
 
   const policy = (shippingPolicy && typeof shippingPolicy === 'object' ? shippingPolicy : {}) as Record<string, unknown>;
 
   return c.json({
     success: true,
-    plans: results.map(planPublic),
+    plans: results.map((p) => planPublic(p, proPause)),
+    /**
+     * PRO, PAUSED (0145). The page shows the PRO card as «قريبًا» with no
+     * price, no benefit list and no button; a member whose PRO card is frozen
+     * reads their own state from GET /mine (`status.paused`).
+     */
+    pro_pause: { paused: proPause.paused, since: proPause.since },
     launch: { launch_at: launch.launch_at, activated: launch.activated },
     features: {
       /**
@@ -892,8 +924,9 @@ membershipsRoutes.get('/plans', async (c) => {
      * A percentage written into a React string is a promise nobody can keep:
      * the owner lowers it in the admin, the page keeps advertising the old
      * number, and the customer discovers the difference at the checkout.
+     * PRO's are withheld while PRO is paused: «إخفاء المميزات وكتابة فقط قريبًا».
      */
-    benefits,
+    benefits: proPause.paused ? { ...benefits, pro: null } : benefits,
     entitlement_contract: {
       minimum_tier: ENTITLEMENT_MINIMUM_TIER,
       tiers: {
@@ -941,7 +974,7 @@ membershipsRoutes.get('/quote', requireAuth, async (c) => {
     if (e instanceof HttpError && e.status === 400) {
       return c.json({
         success: true,
-        quote: { ok: false, code: e.code ?? 'REFUSED', message: e.message, plan: planPublic(plan) },
+        quote: { ok: false, code: e.code ?? 'REFUSED', message: e.message, plan: planPublic(plan, await getProPause(db)) },
       });
     }
     throw e;
@@ -1314,14 +1347,20 @@ membershipsRoutes.get('/admin/list', async (c) => {
 
 /** Every plan, active or not, for the admin Memberships panel. */
 membershipsRoutes.get('/admin/plans', async (c) => {
-  const [{ results }, launch, reservations] = await Promise.all([
+  const [{ results }, launch, reservations, proPause, frozen] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM membership_plans ORDER BY sort, duration_months').all<PlanRow>(),
     getLaunchConfig(c.env.DB),
     countLaunchReservations(c.env.DB),
+    getProPause(c.env.DB),
+    c.env.DB
+      .prepare(`SELECT COUNT(*) AS n FROM memberships WHERE tier = 'pro' AND state = 'active' AND paused_at IS NOT NULL`)
+      .first<{ n: number }>(),
   ]);
   return c.json({
     success: true,
-    plans: results.map((p) => ({ ...planPublic(p), active: !!p.active })),
+    // The admin sees the stored PRO price even while the storefront hides it.
+    plans: results.map((p) => ({ ...planPublic(p), active: !!p.active, paused: p.tier === 'pro' && proPause.paused })),
+    pro_pause: { paused: proPause.paused, since: proPause.since, frozen_count: Number(frozen?.n ?? 0) },
     launch,
     // Reservations still waiting. After the launch they are converted as each
     // account is read; this is what the panel's leftover sweep would start.
@@ -1377,6 +1416,40 @@ membershipsRoutes.patch('/admin/plans/:id', async (c) => {
       sort: updated.sort,
     },
   });
+});
+
+/**
+ * «إيقاف PRO» / «استئناف PRO» — the owner's switch (worker/lib/tierPause.ts).
+ *
+ * Pausing stops the sale and freezes every running PRO membership in one
+ * step; resuming thaws each one forward by exactly the time it was frozen and
+ * reopens the sale. Both are typed confirmations (`PAUSE` / `RESUME`), both
+ * are audited with the number of memberships they moved, and both are
+ * idempotent: pausing a paused tier freezes only what is not frozen yet.
+ */
+membershipsRoutes.post('/admin/pro-pause', async (c) => {
+  const admin = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const pause = body.paused === true;
+  if (body.paused !== true && body.paused !== false) throw badRequest('paused must be a boolean');
+  if (body.confirm !== (pause ? 'PAUSE' : 'RESUME')) {
+    throw badRequest(pause ? 'Type PAUSE to confirm' : 'Type RESUME to confirm', 'CONFIRMATION_REQUIRED');
+  }
+  const db = c.env.DB;
+  const nowIso = new Date().toISOString();
+  const before = await getProPause(db);
+  const value: ProPauseConfig = pause ? { paused: true, since: before.paused ? before.since ?? nowIso : nowIso } : { paused: false, since: null };
+  await db
+    .prepare(`INSERT INTO admin_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+    .bind(PRO_PAUSE_KEY, JSON.stringify(value))
+    .run();
+  const moved = pause ? await pauseProMemberships(db, nowIso) : await resumeProMemberships(db, nowIso);
+  await audit(db, admin.id, pause ? 'membership.pro_pause' : 'membership.pro_resume', 'pro', {
+    before,
+    after: value,
+    memberships: moved,
+  });
+  return c.json({ success: true, pro_pause: value, memberships: moved });
 });
 
 /**
@@ -1495,6 +1568,8 @@ membershipsRoutes.post('/admin/grant', async (c) => {
     .bind(planId)
     .first<{ id: string; tier: 'plus' | 'pro' | 'prime'; duration_months: number }>();
   if (!plan) throw notFound('Plan not found');
+  // A granted PRO card would run while every paid one is frozen.
+  if (plan.tier === 'pro' && (await getProPause(db)).paused) throw proPausedRefusal();
 
   const launch = await getLaunchConfig(db);
   const nowIso = new Date().toISOString();

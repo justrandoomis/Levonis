@@ -13,6 +13,7 @@
  * import resolves — an inactive brand in the list would be a value that fails.
  */
 import { isTemplateFamily } from './templateFamilies';
+import { sectionPath, sectionTreeOrder } from '@levonis/catalog/sectionTree';
 
 export interface LookupSection {
   id: string;
@@ -24,6 +25,14 @@ export interface LookupSection {
   parent_slug: string | null;
   family: 'devices' | 'materials' | null;
   is_printer_catalog: boolean;
+  /** 0 for a main section, 1 for a sub-section — the list is in TREE order.
+   *  Optional so a hand-built lookup (a test, an older caller) still types. */
+  depth?: number;
+  /** The main section this one files under (itself, for a main section). */
+  root_id?: string;
+  /** «الطابعات › طابعات FDM» / «Printers › FDM Printers». */
+  path_ar?: string;
+  path_en?: string;
 }
 
 export interface LookupBrand {
@@ -79,9 +88,13 @@ export async function loadLookups(db: D1Database): Promise<Lookups> {
     }
     return null;
   };
-  const sections: LookupSection[] = catalogs
-    .filter((r) => r.active)
-    .map((r) => {
+  // TREE ORDER, not `sort` across the whole table: every main section is
+  // followed by its own sub-sections (packages/catalog/src/sectionTree.ts), so
+  // the template's list and the import panel's read the way the tree does.
+  const sections: LookupSection[] = sectionTreeOrder(catalogs)
+    .filter((p) => p.row.active)
+    .map((p) => {
+      const r = p.row;
       const parent = r.parent_id ? byId.get(r.parent_id) : undefined;
       return {
         id: r.id,
@@ -93,6 +106,10 @@ export async function loadLookups(db: D1Database): Promise<Lookups> {
         parent_slug: parent ? parent.slug : null,
         family: familyOf(r),
         is_printer_catalog: !!r.is_printer_catalog,
+        depth: p.depth,
+        root_id: p.root.id,
+        path_ar: sectionPath(p, (x) => x.name_ar || x.name_en || x.slug),
+        path_en: sectionPath(p, (x) => x.name_en || x.name_ar || x.slug),
       };
     });
 

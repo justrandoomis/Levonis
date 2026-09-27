@@ -54,6 +54,7 @@ import {
   type RelationsResponse,
   type RelationsState,
 } from './form/model';
+import { useProPaused } from '../../lib/proPause';
 
 // ------------------------------------------------------------------- types
 
@@ -483,10 +484,15 @@ export default function QuickPricePanel({
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const fields: Field[] = useMemo(
-    () => (data?.can_view_cost ? ['cost', 'regular', 'prime', 'pro'] : ['regular', 'prime', 'pro']),
-    [data?.can_view_cost]
-  );
+  /**
+   * The columns. PREMIUM has none since 2026-09-27 (0145: no PREMIUM price or
+   * discount), and PRO's is hidden while PRO is paused — «إخفاء سعر البرو».
+   */
+  const proPaused = useProPaused();
+  const fields: Field[] = useMemo(() => {
+    const member: Field[] = proPaused ? [] : ['pro'];
+    return data?.can_view_cost ? ['cost', 'regular', ...member] : ['regular', ...member];
+  }, [data?.can_view_cost, proPaused]);
 
   // ---------------------------------------------------------------- saving
 
@@ -1706,7 +1712,7 @@ function CopyTab({
   const choices = data.variants.map((v) => ({ id: `variant:${v.key}`, label: v.label }));
   const [from, setFrom] = useState(choices[0]?.id ?? '');
   const [to, setTo] = useState(choices[1]?.id ?? '');
-  const [chosen, setChosen] = useState<Field[]>(['regular', 'prime', 'pro']);
+  const [chosen, setChosen] = useState<Field[]>(() => fields.filter((f) => f !== 'cost'));
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');

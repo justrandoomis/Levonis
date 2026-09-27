@@ -331,7 +331,7 @@ interface CartWriteResponse {
  * The tier the non-member line invites the viewer to. PRO is the highest tier,
  * and the name comes from the one table that owns the customer-facing names.
  */
-const PRO_LABEL = tierLabel('pro');
+const PREMIUM_LABEL = tierLabel('prime');
 
 export default function Cart() {
   const { money } = useMoney();
@@ -2195,12 +2195,15 @@ export default function Cart() {
           {/* A signed-in customer with no membership on this cart: ONE line
               and a link, in the quiet colour the rest of the summary's notes
               use. It names no percentage, no threshold and no amount — the
-              subscription page states those, from these very rules. */}
+              subscription page states those, from these very rules. It speaks
+              of PREMIUM's free delivery: PRO is paused and PREMIUM carries no
+              discount since 2026-09-27 (migration 0145). */}
           {!activeMembership && (
             <p className="-mt-1 text-[12px] leading-relaxed text-text-muted" data-cart-member-teaser>
               {loc(
-                `عضوية ${PRO_LABEL} توفّر على مشترياتك.`,
-                `A ${PRO_LABEL} membership saves on what you buy.`
+                `توصيل مجاني مع عضوية ${PREMIUM_LABEL}.`,
+                `Free delivery with a ${PREMIUM_LABEL} membership.`,
+                `گەیاندنی بێبەرامبەر لەگەڵ ئەندامێتی ${PREMIUM_LABEL}.`
               )}{' '}
               <Link
                 to="/subscription"

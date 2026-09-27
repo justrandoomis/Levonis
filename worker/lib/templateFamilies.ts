@@ -700,6 +700,190 @@ export const DEVICES: TemplateFamilyDef = {
       })],
     },
     /*
+     * FDM ACCESSORIES, BY WHAT THEY ARE — «أضف حقول عند الحاجة في الأقسام
+     * الفرعية، خاصة … الـAMS وملحقات الطابعات» (owner, 2026-09-27).
+     *
+     * «ملحقات طابعات FDM» asked nothing of its own, so an AMS and a nozzle were
+     * compared on «الخامة» and «الاستخدام» and nothing else. Three groups now,
+     * one per kind of thing that shelf holds. A section that says which kind it
+     * is — a hand-made «AMS» or «ألواح الطباعة» under it — is narrowed to that
+     * group by the words in its slug (`KIND_AXIS` below); the shelf itself, which
+     * has not said, keeps all three.
+     *
+     * DISTINCT IDS FROM THE PRINTER'S OWN, on purpose: the product page and the
+     * comparison give a field id to the FIRST group that declares it, and the
+     * printer groups come first — an AMS's «الفلامنتات المدعومة» filed under
+     * «خاص بطابعات FDM» would be a heading lying about the product.
+     */
+    'fdm-ams': {
+      id: 'acc_ams',
+      label_ar: 'وحدة AMS وتعدد المواد',
+      label_en: 'AMS & multi-material unit',
+      fields: [
+        t('ams_slots', 'عدد الخانات', 'Slots', 'number', {
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+          hint_ar: 'عدد البكرات التي تحملها الوحدة — مثال: 4',
+        }),
+        t('ams_max_units', 'أقصى عدد وحدات متصلة', 'Max chained units', 'number', {
+          compare: { parse: 'number', better: 'higher', weight: 1 },
+          hint_ar: 'كم وحدة تُربط بطابعة واحدة — مثال: 4 (أي 16 لونًا)',
+        }),
+        t('filament_drying', 'تجفيف الفلامنت', 'Filament drying', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 2 },
+        }),
+        t('drying_temp_max', 'أقصى حرارة تجفيف', 'Max drying temperature', 'number', {
+          unit: '°C',
+          compare: { parse: 'number', better: 'higher', weight: 1 },
+        }),
+        t('humidity_sensor', 'حساس الرطوبة', 'Humidity sensor', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
+        }),
+        t('rfid_reading', 'قراءة بيانات البكرة (RFID)', 'RFID spool reading', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
+          hint_ar: 'تتعرّف على نوع الفلامنت ولونه تلقائيًا',
+        }),
+        t('ams_filaments', 'الفلامنتات المدعومة', 'Supported filaments', 'text', {
+          compare: { parse: 'list', better: 'higher', weight: 1 },
+          hint_ar: 'افصل بفاصلة — مثال: PLA, PETG, ABS, ASA',
+        }),
+        /* Said, never scored: what a unit refuses is the row a buyer of TPU
+           reads first, and a count of refusals is not a grade. */
+        t('ams_unsupported', 'فلامنتات غير مدعومة', 'Unsupported filaments', 'text', {
+          compare: { parse: 'list', better: 'none' },
+          hint_ar: 'مثال: TPU, PLA-CF',
+        }),
+        t('spool_sizes', 'مقاسات البكرات المدعومة', 'Supported spool sizes', 'text', {
+          compare: { parse: 'list', better: 'none' },
+          hint_ar: 'مثال: 1 kg, 0.5 kg, Cardboard',
+        }),
+      ],
+    },
+    'fdm-hotend': {
+      id: 'acc_hotend',
+      label_ar: 'الهوت إند والنوزل',
+      label_en: 'Hotend & nozzle',
+      fields: [
+        /* 0.2 prints finer and 0.8 prints faster: a size, not a grade. */
+        t('nozzle_diameter', 'قطر النوزل', 'Nozzle diameter', 'text', {
+          unit: 'mm',
+          compare: { parse: 'number', better: 'none' },
+          hint_ar: 'مثال: 0.4',
+        }),
+        t('hotend_nozzle_material', 'خامة النوزل', 'Nozzle material', 'select', {
+          options: ['Brass', 'Stainless steel', 'Hardened steel', 'Tungsten carbide', 'Copper alloy'],
+          compare: { parse: 'text', better: 'none' },
+        }),
+        t('hotend_max_temp', 'أقصى حرارة', 'Max temperature', 'number', {
+          unit: '°C',
+          compare: { parse: 'number', better: 'higher', weight: 1 },
+        }),
+        t('flow_type', 'نوع التدفق', 'Flow type', 'select', {
+          options: ['Standard flow', 'High flow'],
+          compare: { parse: 'text', better: 'none' },
+        }),
+        t('abrasive_ready', 'يدعم المواد الكاشطة', 'Abrasive filaments', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
+          hint_ar: 'مثل الفلامنت المدعّم بالكربون أو الزجاج',
+        }),
+        t('quick_swap', 'تبديل سريع', 'Quick swap', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
+        }),
+      ],
+    },
+    'fdm-plate': {
+      id: 'acc_plate',
+      label_ar: 'ألواح الطباعة',
+      label_en: 'Build plate',
+      fields: [
+        t('plate_size', 'مقاس اللوح', 'Plate size', 'text', {
+          unit: 'mm',
+          compare: { parse: 'dimensions', better: 'none' },
+          hint_ar: 'مثال: 257 x 257',
+        }),
+        t('plate_surface', 'سطح اللوح', 'Plate surface', 'select', {
+          options: ['Textured PEI', 'Smooth PEI', 'Cool plate', 'Engineering plate', 'High temperature plate', 'Other'],
+          compare: { parse: 'text', better: 'none' },
+        }),
+        t('double_sided', 'وجهان', 'Double-sided', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
+        }),
+        t('plate_max_temp', 'أقصى حرارة للوح', 'Max plate temperature', 'number', {
+          unit: '°C',
+          compare: { parse: 'number', better: 'higher', weight: 1 },
+        }),
+      ],
+    },
+    /*
+     * «المستعمل» — USED PRINTERS AND USED PRINTER ACCESSORIES (owner,
+     * 2026-09-27: «حقول مختلفة في قسم المستعمل للطابعات أو ملحقات الطابعات حيث
+     * عند المقارنة يتم المقارنة بشكل احترافي»).
+     *
+     * ONLY THE USED BRANCH IS ASKED THESE (`BRANCH_ONLY` below): a new printer
+     * has no «مدة الاستخدام». What a used unit already states elsewhere is NOT
+     * asked twice — its grade, its running hours, its Levo warranty, its fault
+     * and repair live in `products.condition_doc` (worker/lib/condition.ts) and
+     * the comparison reads them from there (worker/lib/compareSpecs.ts,
+     * «الحالة»). These are the facts that document does not hold.
+     */
+    'used-devices': {
+      id: 'used_state',
+      label_ar: 'حالة المنتج المستعمل',
+      label_en: 'Used condition',
+      fields: [
+        t('usage_age', 'مدة الاستخدام', 'Time in use', 'number', {
+          unit: 'months',
+          compare: { parse: 'number', better: 'lower', weight: 2 },
+          hint_ar: 'منذ متى استُخدم، بالأشهر — مثال: 6',
+        }),
+        t('cosmetic_condition', 'الحالة الشكلية', 'Cosmetic condition', 'select', {
+          options: ['No marks', 'Light marks', 'Visible marks'],
+          compare: { parse: 'ordinal', better: 'higher', weight: 1, scale: ['Visible marks', 'Light marks', 'No marks'] },
+        }),
+        t('functional_check', 'فحص التشغيل', 'Functional check', 'select', {
+          options: ['Full test passed', 'Basic test passed', 'Not tested'],
+          compare: { parse: 'ordinal', better: 'higher', weight: 2, scale: ['Not tested', 'Basic test passed', 'Full test passed'] },
+          hint_ar: 'نتيجة فحص ليفو قبل البيع',
+        }),
+        t('original_box', 'العلبة الأصلية', 'Original box', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
+        }),
+        t('replaced_parts', 'قطع مستبدلة', 'Replaced parts', 'text', {
+          compare: { parse: 'list', better: 'none' },
+          hint_ar: 'افصل بفاصلة — مثال: Nozzle, Build plate',
+        }),
+      ],
+    },
+    'used-printers': {
+      id: 'used_printer',
+      label_ar: 'سجل استخدام الطابعة',
+      label_en: 'Printer usage record',
+      fields: [
+        t('filament_used_kg', 'الفلامنت المستهلك', 'Filament used', 'number', {
+          unit: 'kg',
+          compare: { parse: 'number', better: 'lower', weight: 1 },
+          hint_ar: 'من سجل الطابعة إن توفر — مثال: 12',
+        }),
+        t('nozzle_condition', 'حالة النوزل', 'Nozzle condition', 'select', {
+          options: ['New', 'Good', 'Worn'],
+          compare: { parse: 'ordinal', better: 'higher', weight: 1, scale: ['Worn', 'Good', 'New'] },
+        }),
+        t('calibrated', 'معايرة بعد الفحص', 'Calibrated after inspection', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
+        }),
+        t('firmware_version', 'نسخة البرنامج الثابت', 'Firmware version', 'text', {
+          compare: { parse: 'text', better: 'none' },
+        }),
+      ],
+    },
+    /*
      * THE LASER IS A DEVICE, AND THAT IS THE WHOLE ARGUMENT FOR IT LIVING HERE.
      *
      * «إضافة قسم جديد وهو قسم الليزر بجانب طابعات الفلامنت والرزن». A cutter is
@@ -975,6 +1159,73 @@ export const MATERIALS: TemplateFamilyDef = {
         t('density', 'الكثافة', 'Density', 'text', {
           unit: 'g/cm³',
           compare: { parse: 'number', better: 'none' },
+        }),
+        /* The question a Bambu owner asks before any other: will this spool
+           run through the AMS, and will the machine know what it is? */
+        t('ams_compatible', 'متوافق مع AMS', 'AMS compatible', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
+        }),
+        t('rfid_tag', 'شريحة RFID', 'RFID tag', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
+          hint_ar: 'تتعرّف الطابعة على نوع الفلامنت ولونه تلقائيًا',
+        }),
+        t('spool_weight', 'وزن البكرة الفارغة', 'Empty spool weight', 'text', {
+          unit: 'g',
+          compare: { parse: 'number', better: 'none' },
+        }),
+        t('filament_length', 'طول الفلامنت', 'Filament length', 'text', {
+          unit: 'm',
+          compare: { parse: 'number', better: 'none' },
+        }),
+      ],
+    },
+    /*
+     * HOW A FILAMENT BEHAVES — «أضف حقول عند الحاجة في الأقسام الفرعية، خاصة
+     * الفلامنت» (owner, 2026-09-27). Its own group, beside «خاص بمواد FDM», so
+     * the form reads as two short lists rather than one long one; both belong
+     * to the FDM leaf and leave the form together for a resin bottle.
+     */
+    'fdm-materials-performance': {
+      id: 'fdm_mat_perf',
+      label_ar: 'الأداء والخصائص',
+      label_en: 'Performance & properties',
+      fields: [
+        t('max_print_speed', 'أقصى سرعة طباعة موصى بها', 'Max recommended print speed', 'number', {
+          unit: 'mm/s',
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+        }),
+        t('tensile_strength', 'مقاومة الشد', 'Tensile strength', 'number', {
+          unit: 'MPa',
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+        }),
+        t('heat_deflection', 'مقاومة الحرارة (HDT)', 'Heat deflection temperature', 'number', {
+          unit: '°C',
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+        }),
+        /* Stretch is a character, not a grade: a flexible part wants it and a
+           rigid bracket does not. */
+        t('elongation', 'الاستطالة عند الكسر', 'Elongation at break', 'number', {
+          unit: '%',
+          compare: { parse: 'number', better: 'none' },
+        }),
+        t('shore_hardness', 'صلابة شور', 'Shore hardness', 'text', {
+          compare: { parse: 'text', better: 'none' },
+          hint_ar: 'للفلامنت المرن — مثال: 95A',
+        }),
+        t('enclosure_required', 'يحتاج حجرة مغلقة', 'Enclosure needed', 'select', {
+          options: ['Yes', 'Recommended', 'No'],
+          compare: { parse: 'text', better: 'none' },
+        }),
+        t('hardened_nozzle', 'يحتاج نوزل مقوّى', 'Hardened nozzle needed', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'text', better: 'none' },
+        }),
+        t('fan_speed', 'تبريد القطعة', 'Part cooling', 'text', {
+          unit: '%',
+          compare: { parse: 'range', better: 'none' },
+          hint_ar: 'مثال: 50-100',
         }),
       ],
     },
@@ -1352,10 +1603,26 @@ export const PRODUCT_TYPES: ProductTypeDef[] = [
     label_ar: 'طابعة',
     label_en: 'Printer',
     family: 'devices',
-    hint_ar: 'الطابعات ثلاثية الأبعاد بكل أنواعها — FDM و Resin.',
-    sectionSlugs: ['fdm-printers', 'resin-printers', 'printers'],
+    hint_ar: 'الطابعات ثلاثية الأبعاد بكل أنواعها — FDM و Resin، الجديدة والمستعملة.',
+    sectionSlugs: [
+      'fdm-printers',
+      'resin-printers',
+      'printers',
+      // «المستعمل» (0147): its root and «طابعات مستعملة», in every form 0147
+      // can write — `<slug>`, `<slug>-levo`, the id.
+      'used-printers',
+      'used-printers-levo',
+      'cat_used_printers',
+      'used',
+      'used-levo',
+      'cat_used',
+    ],
     groups: [
       DEVICES.common,
+      // Asked only in the used branch (BRANCH_ONLY): a new printer has no
+      // «مدة الاستخدام».
+      ...g(DEVICES, 'used-devices'),
+      ...g(DEVICES, 'used-printers'),
       ...g(DEVICES, 'device-environment'),
       ...g(DEVICES, 'fdm-printers'),
       ...g(DEVICES, 'fdm-extrusion'),
@@ -1385,9 +1652,23 @@ export const PRODUCT_TYPES: ProductTypeDef[] = [
       'laser-accessories',
       'laser-accessories-levo',
       'cat_laser_acc',
+      // «قطع ومكونات» under MakerWorld: parts, not filament — without it the
+      // branch fell through to the materials family's headline type and a
+      // bearing was asked its printing temperature.
+      'parts-components',
+      'parts-components-levo',
+      'cat_makers_parts',
+      // «ملحقات طابعات مستعملة» (0147).
+      'used-printer-accessories',
+      'used-printer-accessories-levo',
+      'cat_used_pacc',
     ],
     groups: [
       ...g(DEVICES, 'printer-accessories'),
+      ...g(DEVICES, 'used-devices'),
+      ...g(DEVICES, 'fdm-ams'),
+      ...g(DEVICES, 'fdm-hotend'),
+      ...g(DEVICES, 'fdm-plate'),
       ...g(DEVICES, 'resin-printer-accessories'),
       ...g(DEVICES, 'laser-accessories'),
       ...g(MATERIALS, 'electronics'),
@@ -1402,7 +1683,12 @@ export const PRODUCT_TYPES: ProductTypeDef[] = [
     family: 'materials',
     hint_ar: 'كل ما يُطبع به أو يُستهلك: فلمنت، راتنج، مواد ليزر وقص.',
     sectionSlugs: ['fdm-materials', 'resin-materials', 'materials', 'filament'],
-    groups: [MATERIALS.common, ...g(MATERIALS, 'fdm-materials'), ...g(MATERIALS, 'resin-materials')],
+    groups: [
+      MATERIALS.common,
+      ...g(MATERIALS, 'fdm-materials'),
+      ...g(MATERIALS, 'fdm-materials-performance'),
+      ...g(MATERIALS, 'resin-materials'),
+    ],
   },
   {
     id: 'accessory',
@@ -1410,7 +1696,28 @@ export const PRODUCT_TYPES: ProductTypeDef[] = [
     label_en: 'Accessory',
     family: 'materials',
     hint_ar: 'ما يُباع بجانب الطابعة ولا يُركَّب فيها: أدوات، حوامل، أطقم مجسمات، CyberBrick.',
-    sectionSlugs: ['accessories', 'model-kits', 'cyberbrick-rc'],
+    sectionSlugs: [
+      'accessories',
+      'model-kits',
+      'cyberbrick-rc',
+      /*
+       * THE REST OF «مواد MakerWorld». Named nowhere, these fell through to the
+       * materials family's headline type — FILAMENT — so «أدوات Maker»,
+       * «أطقم مميزة» and «أخرى» were each handed the spool form, and the
+       * import panel listed them under «فلمنت ومواد» beside the real
+       * filaments: the owner's «أقسام فرعية متداخلة مع أقسام أخرى». Each slug
+       * in every form 0018 can write.
+       */
+      'makers-supply', 'makers-supply-levo', 'cat_makers',
+      'new-products', 'new-products-levo', 'cat_makers_new',
+      'maker-tools', 'maker-tools-levo', 'cat_makers_tools',
+      'makerlab-accessories', 'makerlab-accessories-levo', 'cat_makers_lab',
+      'premium-model-kits', 'premium-model-kits-levo', 'cat_makers_premium',
+      'others', 'others-levo', 'cat_makers_other',
+      'maker-combo-kits', 'maker-combo-kits-levo', 'cat_makers_combo',
+      'model-kits-levo', 'cat_makers_kits',
+      'cyberbrick-rc-levo', 'cat_makers_cyber',
+    ],
     groups: [
       ...g(MATERIALS, 'accessories'),
       ...g(MATERIALS, 'model-kits'),
@@ -1529,7 +1836,7 @@ const AXES: Record<string, SeededLeaf[]> = {
     { id: 'cat_printers_resin', slug: 'resin-printers', groups: ['resin', 'resin_motion'] },
   ],
   'material-technology': [
-    { id: 'cat_materials_fdm', slug: 'fdm-materials', groups: ['fdm_mat'] },
+    { id: 'cat_materials_fdm', slug: 'fdm-materials', groups: ['fdm_mat', 'fdm_mat_perf'] },
     { id: 'cat_materials_resin', slug: 'resin-materials', groups: ['resin_mat'] },
   ],
   // A BEAM AND A BLADE ARE NOT THE SAME CONSUMABLE, and the `laser_material`
@@ -1565,11 +1872,45 @@ const AXES: Record<string, SeededLeaf[]> = {
   // electronics sheet from asking a focal length, a rotary-axis diameter and a
   // wash-station capacity.
   'accessory-technology': [
-    { id: 'cat_pacc_fdm', slug: 'fdm-printer-accessories', groups: [] },
+    // The FDM shelf's three kinds (AMS, hotend, plate) are its own groups now;
+    // a used printer accessory is asked the same three — a used AMS is still
+    // an AMS — and none of the Resin or laser ones.
+    { id: 'cat_pacc_fdm', slug: 'fdm-printer-accessories', groups: ['acc_ams', 'acc_hotend', 'acc_plate'] },
+    { id: 'cat_used_pacc', slug: 'used-printer-accessories', groups: ['acc_ams', 'acc_hotend', 'acc_plate'] },
     { id: 'cat_pacc_resin', slug: 'resin-printer-accessories', groups: ['acc_resin'] },
     { id: 'cat_laser_acc', slug: 'laser-accessories', groups: ['laser_acc'] },
     { id: 'cat_makers_elec', slug: 'electronics', groups: [] },
     { id: 'cat_makers_hw', slug: 'hardware-parts', groups: [] },
+    // «قطع ومكونات» under MakerWorld, for the same reason as the two above: a
+    // bearing is not a printer accessory of any technology.
+    { id: 'cat_makers_parts', slug: 'parts-components', groups: [] },
+  ],
+};
+
+/**
+ * AN AXIS AN ADMIN'S OWN SECTIONS CAN NAME — by what their slug says.
+ *
+ * The seeded axes above match a section by the id and slug 0018 wrote. A
+ * section the owner made by hand — «AMS» or «ألواح الطباعة» under «ملحقات
+ * طابعات FDM» — has an id nothing here has seen, so it would keep all three
+ * FDM accessory groups and an AMS would be asked its plate surface. Its slug
+ * (slugify of its English name, worker/routes/adminTaxonomy.ts) is what says
+ * what it is, so these leaves are matched on whole slug WORDS: `ams-lite`
+ * names the AMS leaf, `parts-components` names nothing.
+ *
+ * Narrowing only, never widening: a word can drop a sibling's group from a
+ * branch that already carries it, and cannot add a group a type lacks.
+ */
+interface KeywordLeaf {
+  words: readonly string[];
+  groups: string[];
+}
+
+const KIND_AXES: Record<string, KeywordLeaf[]> = {
+  'fdm-accessory-kind': [
+    { words: ['ams', 'mmu', 'cfs', 'multimaterial', 'multi-material'], groups: ['acc_ams'] },
+    { words: ['hotend', 'hotends', 'hot-end', 'nozzle', 'nozzles', 'extruder', 'extruders'], groups: ['acc_hotend'] },
+    { words: ['plate', 'plates', 'bed', 'beds', 'buildplate', 'buildplates'], groups: ['acc_plate'] },
   ],
 };
 
@@ -1580,28 +1921,74 @@ export interface SectionRef {
 }
 
 /** Every string 0018 could have written as this leaf's slug. */
-const slugForms = (leaf: SeededLeaf): string[] => [leaf.slug, `${leaf.slug}-levo`, leaf.id];
+const slugForms = (leaf: { id: string; slug: string }): string[] => [leaf.slug, `${leaf.slug}-levo`, leaf.id];
 
-const namesLeaf = (branch: SectionRef[], leaf: SeededLeaf): boolean =>
+const namesLeaf = (branch: SectionRef[], leaf: { id: string; slug: string }): boolean =>
   branch.some((s) => s.id === leaf.id || slugForms(leaf).includes(s.slug));
+
+const slugWords = (slug: string): string[] => {
+  const words = String(slug ?? '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  // `multi-material` and `hot-end` are one word to a reader and two to split().
+  const pairs = words.slice(1).map((w, i) => `${words[i]}-${w}`);
+  return [...words, ...pairs];
+};
+
+const namesKind = (branch: SectionRef[], leaf: KeywordLeaf): boolean =>
+  branch.some((s) => slugWords(s.slug).some((w) => leaf.words.includes(w)));
 
 /**
  * The group ids this branch EXCLUDES. Empty when the branch names no leaf of
  * any axis — an unnarrowed section keeps the whole type, as it did before.
+ *
+ * A group two leaves declare (the FDM shelf and the used shelf both ask the
+ * AMS questions) is kept whenever EITHER is named: excluding it for the leaf
+ * that was not named would take it from the one that was.
  */
 function excludedGroups(branch: SectionRef[]): Set<string> {
   const out = new Set<string>();
-  for (const leaves of Object.values(AXES)) {
-    const named = leaves.filter((l) => namesLeaf(branch, l));
+  const exclude = (leaves: Array<{ groups: string[] }>, named: Array<{ groups: string[] }>) => {
     // Nothing named → no opinion. Everything named (a branch that somehow
     // walks through both) → also no opinion, rather than an empty form.
-    if (named.length === 0 || named.length === leaves.length) continue;
+    if (named.length === 0 || named.length === leaves.length) return;
+    const kept = new Set(named.flatMap((l) => l.groups));
     for (const l of leaves) {
       if (named.includes(l)) continue;
-      for (const gid of l.groups) out.add(gid);
+      for (const gid of l.groups) if (!kept.has(gid)) out.add(gid);
     }
-  }
+  };
+  for (const leaves of Object.values(AXES)) exclude(leaves, leaves.filter((l) => namesLeaf(branch, l)));
+  for (const leaves of Object.values(KIND_AXES)) exclude(leaves, leaves.filter((l) => namesKind(branch, l)));
   return out;
+}
+
+/**
+ * GROUPS ONLY ONE BRANCH IS ASKED — «المستعمل» (migration 0147).
+ *
+ * The axes above NARROW: a branch that names nothing keeps everything. That
+ * is right for a technology and wrong here, because a printer filed nowhere in
+ * particular is a NEW printer, and asking it «مدة الاستخدام» would be asking a
+ * new machine how long it has been used. So these groups are the opposite: in
+ * a form, a template or a comparison only when the branch names one of their
+ * sections — and never in a type's own unnarrowed list (`groupsForType`).
+ */
+const USED_ROOT = { id: 'cat_used', slug: 'used' };
+const USED_PRINTERS = { id: 'cat_used_printers', slug: 'used-printers' };
+const USED_PACC = { id: 'cat_used_pacc', slug: 'used-printer-accessories' };
+
+const BRANCH_ONLY: Record<string, Array<{ id: string; slug: string }>> = {
+  used_state: [USED_ROOT, USED_PRINTERS, USED_PACC],
+  used_printer: [USED_PRINTERS],
+};
+
+/** True when a branch-only group's branch is this one (and always for any other group). */
+function branchAsks(groupId: string, branch: SectionRef[]): boolean {
+  const leaves = BRANCH_ONLY[groupId];
+  return !leaves || leaves.some((leaf) => namesLeaf(branch, leaf));
+}
+
+/** True when this branch sits in «المستعمل» — the comparison's and the form's cue. */
+export function isUsedBranch(branch: SectionRef[]): boolean {
+  return BRANCH_ONLY.used_state.some((leaf) => namesLeaf(branch, leaf));
 }
 
 export function isProductType(v: unknown): v is ProductTypeId {
@@ -1666,7 +2053,8 @@ function dedupeFields(groups: TemplateGroup[]): TemplateGroup[] {
 }
 
 export function groupsForType(id: ProductTypeId): TemplateGroup[] {
-  return dedupeFields(productType(id).groups);
+  // A branch-only group («المستعمل») belongs to no unnarrowed list.
+  return dedupeFields(productType(id).groups.filter((g) => !BRANCH_ONLY[g.id]));
 }
 
 /**
@@ -1702,7 +2090,7 @@ export function groupsForSection(
  */
 export function narrowGroups(type: ProductTypeId, branch: SectionRef[]): TemplateGroup[] {
   const excluded = excludedGroups(branch);
-  return dedupeFields(productType(type).groups.filter((g) => !excluded.has(g.id)));
+  return dedupeFields(productType(type).groups.filter((g) => !excluded.has(g.id) && branchAsks(g.id, branch)));
 }
 
 /**

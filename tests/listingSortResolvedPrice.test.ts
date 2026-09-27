@@ -9,11 +9,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { asD1, freshDb, get, json, stubApp } from './fixtures/app';
+import { asD1, freshDb, get, json, stubApp, proOnSale } from './fixtures/app';
 import { productRoutes } from '../worker/routes/products';
 
 function world() {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role) VALUES ('promem','Omar','o@x.co','h','customer');
     INSERT INTO addresses (id,user_id,label,name,phone,address,landmark,is_default) VALUES

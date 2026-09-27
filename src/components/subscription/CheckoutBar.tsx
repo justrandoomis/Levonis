@@ -22,14 +22,14 @@
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Wallet } from 'lucide-react';
+import { Hourglass, Wallet } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useMoney } from '../../CurrencyContext';
 import { formatUsdCents } from '../../lib/api';
 import { formatDate } from '../orders/format';
 import Spinner from '../ui/Spinner';
 import { CardArt } from './LevoCard';
-import { TIER_META, durationLabel, durationSep, tierLabel } from './tierMeta';
+import { PRO_PAUSE_WORDS, TIER_META, durationLabel, durationSep, tierLabel } from './tierMeta';
 import type { ApiPlan, PurchaseQuote } from './types';
 import type { TierStanding } from './TierCards';
 import { purchaseErrorText } from './purchaseErrors';
@@ -81,6 +81,38 @@ export function CheckoutBar({
   if (!plan) return null;
 
   const meta = TIER_META[plan.tier];
+  const barClass =
+    'fixed inset-x-3 sm:inset-x-0 sm:mx-auto sm:w-[min(36rem,calc(100%-1.5rem))] bottom-[calc(var(--nav-stack)+0.25rem)] z-[130] material rounded-2xl border border-border-subtle p-3 shadow-[0_18px_40px_-18px_rgb(0_0_0/0.9)] lg:sticky lg:mx-0 lg:w-auto lg:bottom-auto lg:top-6 lg:z-auto lg:p-5 lg:rounded-[20px]';
+
+  /**
+   * A PAUSED TIER (PRO, migration 0145): «قريبًا… يتم العمل على تطوير
+   * النظام» stands exactly where «سجّل الدخول للاشتراك» / «اشترك الآن» /
+   * «اشحن محفظتك» were — no price, no button, nothing that looks tappable.
+   */
+  if (standing === 'soon') {
+    const soon = loc(PRO_PAUSE_WORDS.soon.ar, PRO_PAUSE_WORDS.soon.en, PRO_PAUSE_WORDS.soon.ckb);
+    return (
+      <aside data-checkout-bar data-plan-summary data-tier-soon aria-label={t('yourSelection')} className={barClass}>
+        <p className="hidden lg:block mb-3 text-[12px] font-semibold text-text-muted">{t('yourSelection')}</p>
+        <div className="flex items-center gap-3">
+          <CardArt tier={plan.tier} size="xs" className="lg:w-14 lg:h-[35px] lg:rounded-[7px] opacity-80" />
+          <p className="min-w-0 flex-1 text-[13.5px] font-bold">
+            <span className={meta.text} dir="ltr">
+              {meta.label}
+            </span>
+          </p>
+        </div>
+        <p
+          role="status"
+          data-soon-cta
+          className="mt-2.5 lg:mt-4 flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border-subtle bg-surface px-3 text-center text-[14px] font-bold text-text-secondary"
+        >
+          <Hourglass className="h-4 w-4 shrink-0" aria-hidden />
+          {soon}
+        </p>
+      </aside>
+    );
+  }
   const priced = plan.price_iqd !== null; // null = unpriced; 0 is a real price
   // A quote for a different plan is the previous selection's: never show it here.
   const q = quote && quote.plan?.id === plan.id ? quote : null;
@@ -154,7 +186,7 @@ export function CheckoutBar({
       data-checkout-bar
       data-plan-summary
       aria-label={t('yourSelection')}
-      className="fixed inset-x-3 sm:inset-x-0 sm:mx-auto sm:w-[min(36rem,calc(100%-1.5rem))] bottom-[calc(var(--nav-stack)+0.25rem)] z-[130] material rounded-2xl border border-border-subtle p-3 shadow-[0_18px_40px_-18px_rgb(0_0_0/0.9)] lg:sticky lg:mx-0 lg:w-auto lg:bottom-auto lg:top-6 lg:z-auto lg:p-5 lg:rounded-[20px]"
+      className={barClass}
     >
       <p className="hidden lg:block mb-3 text-[12px] font-semibold text-text-muted">{t('yourSelection')}</p>
       <div className="flex items-center gap-3">

@@ -474,21 +474,28 @@ test('every fact is trilingual, used by the corpus, and carries no token of its 
  * the old figure is the cash-on-delivery-tax regression over again.
  */
 test('the membership free-delivery thresholds are the seeded rules, and terms 8.4 is back', () => {
-  const seed = readFileSync(join(ROOT, 'migrations/0074_membership_benefit_rules.sql'), 'utf8');
+  // The rules AS THEY STAND after every migration — 0074 seeded them and 0145
+  // moved PREMIUM's to 75,000 — not one file's first value.
+  const raw = freshDb();
   const threshold = (id: string) => {
-    const m = seed.match(new RegExp(`'${id}',\\s*'\\w+',\\s*'free_shipping',\\s*'global',\\s*(\\d+)`));
-    assert.ok(m, `seed ${id} not found`);
-    return Number(m![1]);
+    const row = raw.prepare('SELECT free_shipping_threshold_iqd AS t FROM membership_benefit_rules WHERE id = ?').get(id) as
+      | { t: number }
+      | undefined;
+    assert.ok(row, `seed ${id} not found`);
+    return Number(row!.t);
   };
   assert.equal(PRO_FREE_DELIVERY_MIN_IQD, threshold('seed-pro-free-shipping'));
   assert.equal(PREMIUM_FREE_DELIVERY_MIN_IQD, threshold('seed-premium-free-shipping'));
   assert.equal(PRO_FREE_DELIVERY_MIN_IQD, SETTING_DEFAULTS.shippingPolicy.pro_threshold_iqd);
+  assert.equal(PREMIUM_FREE_DELIVERY_MIN_IQD, SETTING_DEFAULTS.shippingPolicy.prime_threshold_iqd);
 
   // The exception 8.3 points at is published, with its figures, so the Terms
   // no longer say that every delivery cost falls on every customer.
+  const pro = PRO_FREE_DELIVERY_MIN_IQD.toLocaleString('en-US');
+  const premium = PREMIUM_FREE_DELIVERY_MIN_IQD.toLocaleString('en-US');
   const terms = published('terms');
-  assert.match(terms.body.ar, /### 8\.4 [^\n]*\n[^\n]*75,000 دينار[^\n]*100,000 دينار/);
-  assert.match(terms.body.en, /### 8\.4 [^\n]*\n[^\n]*above 75,000 IQD[^\n]*above 100,000 IQD/);
+  assert.match(terms.body.ar, new RegExp(`### 8\\.4 [^\\n]*\\n[^\\n]*PRO[^\\n]*${pro} دينار[^\\n]*PREMIUM[^\\n]*${premium} دينار`));
+  assert.match(terms.body.en, new RegExp(`### 8\\.4 [^\\n]*\\n[^\\n]*PRO[^\\n]*above ${pro} IQD[^\\n]*PREMIUM[^\\n]*above ${premium} IQD`));
   assert.match(published('delivery').body.ckb, /### 3\.17 /);
 });
 
@@ -582,21 +589,36 @@ test('memberships are active on purchase, and the PLUS printer gift is granted b
  * to the PRO tier: the tier named nearest before it, on its own line, is PRO.
  */
 test('the PRO threshold is never attached to PREMIUM — returns, purchase and every other document', () => {
-  const pro = PRO_FREE_DELIVERY_MIN_IQD.toLocaleString('en-US');
   const premium = PREMIUM_FREE_DELIVERY_MIN_IQD.toLocaleString('en-US');
+  /*
+   * READ ON THE SOURCE, BY TOKEN. Since 0145 both tiers' thresholds are
+   * 75,000, so the published figure can no longer tell them apart; the token
+   * each line was written with still can. Every `{{PRO_FREE_DELIVERY_MIN_IQD}}`
+   * must follow the name PRO on its line, and every PREMIUM token the name
+   * PREMIUM — a swap would still be a wrong document the day the owner moves
+   * one figure again.
+   */
   const TIER = /\bPRO\b|PREMIUM|Premium|PRIME|المميزة|ئەندامێتی تایبەت/g;
+  const tokens: Array<[string, string]> = [
+    ['{{PRO_FREE_DELIVERY_MIN_IQD}}', 'PRO'],
+    ['{{PREMIUM_FREE_DELIVERY_MIN_IQD}}', 'PREMIUM'],
+    ['{{PRIME_FREE_DELIVERY_MIN_IQD}}', 'PREMIUM'],
+  ];
   let checked = 0;
-  for (const key of POLICY_KEYS) {
+  for (const doc of POLICY_SOURCE_DOCUMENTS) {
     for (const lang of POLICY_LANGS) {
-      for (const line of published(key).body[lang].split('\n')) {
-        let at = line.indexOf(pro);
-        while (at >= 0) {
-          const names = line.slice(0, at).match(TIER);
-          if (names) {
-            checked++;
-            assert.equal(names[names.length - 1], 'PRO', `${key}/${lang}: ${pro} is given to ${names[names.length - 1]}: ${line}`);
+      for (const line of doc.body[lang].split('\n')) {
+        for (const [token, tier] of tokens) {
+          let at = line.indexOf(token);
+          while (at >= 0) {
+            const names = line.slice(0, at).match(TIER);
+            if (names) {
+              checked++;
+              const named = names[names.length - 1] === 'Premium' ? 'PREMIUM' : names[names.length - 1];
+              assert.equal(named, tier, `${doc.key}/${lang}: ${token} is given to ${named}: ${line}`);
+            }
+            at = line.indexOf(token, at + 1);
           }
-          at = line.indexOf(pro, at + 1);
         }
       }
     }
@@ -620,7 +642,10 @@ test('the middle tier is LEVO PREMIUM to the customer — PRIME appears only in 
       }
     }
   }
-  assert.match(published('purchase').body.en, /LEVO PREMIUM is waived the ordinary delivery fee alone where the value is strictly more than 100,000 dinars/);
+  assert.match(
+    published('purchase').body.en,
+    new RegExp(`LEVO PREMIUM is waived the ordinary delivery fee alone where the value is strictly more than ${PREMIUM_FREE_DELIVERY_MIN_IQD.toLocaleString('en-US')} dinars`)
+  );
 });
 
 test('membership no longer defines a state reserved pending the launch', () => {

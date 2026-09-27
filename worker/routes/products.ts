@@ -25,6 +25,7 @@ import type { ProductDoc } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY, type MemberFallback } from '../lib/pricing';
 import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
 import { pricingTierContext } from '../lib/entitlements';
+import { getProPause } from '../lib/tierPause';
 import { activeBenefitRules, ancestryFor, catalogAncestry, degradeIfSchemaMissing, fallbackFor } from '../lib/membershipBenefits';
 import { isConditionColumnMissing } from '../lib/conditionProjection';
 import { catalogSubtreeFilter, homeCategoryTree } from '../lib/catalogMembership';
@@ -186,6 +187,12 @@ export interface PricingCtx {
   /** Frozen per request so two quotes in one response cannot disagree about
    *  whether a dated rule was live. */
   benefitNowIso: string;
+  /**
+   * PRO, PAUSED (migration 0145, worker/lib/tierPause.ts): no PRO price is
+   * published — not on a card's teaser, not in the product page's «سعر أعضاء
+   * PRO». Absent = not paused (older callers and tests).
+   */
+  proPaused?: boolean;
 }
 
 /** The rule that applies to ONE product for this viewer, in the shape
@@ -1923,8 +1930,9 @@ export async function pricingCtxForUser(db: D1Database, userId: string | null): 
    * the hardcoded promise this whole system exists to remove. Both tables are
    * a few rows.
    */
-  const [benefitRules, ancestry] = await Promise.all([activeBenefitRules(db), catalogAncestry(db)]);
+  const [benefitRules, ancestry, proPause] = await Promise.all([activeBenefitRules(db), catalogAncestry(db), getProPause(db)]);
   return {
+    proPaused: proPause.paused,
     benefitRules,
     catalogAncestry: ancestry,
     benefitNowIso: new Date().toISOString(),
@@ -1962,6 +1970,9 @@ function viewerTier(ctx: PricingCtx) {
  * `null` for a tier means there is nothing to promise: no explicit member
  * price on the line and no rule that fits in a unit price. Nothing here
  * invents an "up to" number.
+ *
+ * PREMIUM IS ALWAYS NULL since 2026-09-27 — «اشتراك البريميوم لا يحمل خصومات»
+ * (migration 0145) — and PRO is null while PRO is paused.
  */
 export interface MembershipPreviewTier {
   unit_iqd: number;
@@ -2009,7 +2020,7 @@ export function membershipPreview(
       rule_id: tier === 'pro' ? r.member_rule.pro : r.member_rule.prime,
     };
   };
-  return { prime: forTier('prime'), pro: forTier('pro') };
+  return { prime: null, pro: ctx.proPaused ? null : forTier('pro') };
 }
 
 /** Resolver output for public consumers — cost stripped, everything else kept. */
@@ -2620,13 +2631,22 @@ export function publicWithDisplayPrice(
   // §4: no compare-at. The regular price is exposed so a member can see what
   // their membership saved — a real comparison, not a fabricated one.
   out.display_regular_iqd = resolved.regular_iqd;
-  out.display_prime_iqd = primeMin;
-  out.display_pro_iqd = proMin;
+  // The card's faint member teasers: never PREMIUM (it carries no discount
+  // since 0145), and no PRO while PRO is paused — «إخفاء السعر البرو في بطاقة
+  // المنتجات».
+  void primeMin;
+  out.display_prime_iqd = null;
+  out.display_pro_iqd = ctx.proPaused ? null : proMin;
   // True when variants genuinely differ in price — the card may say «يبدأ من».
   out.display_from = maxApplied > resolved.applied_iqd;
   // A composition row's block is OVERWRITTEN, never merged: the freshly derived
   // figures and the offer-scoped PLUS rung replace the cached ladder entirely.
-  if (composition && (doc.composition ?? '') !== '') Object.assign(out, composition);
+  if (composition && (doc.composition ?? '') !== '') {
+    Object.assign(out, composition);
+    // The same two rules for a bundle's own ladder.
+    out.display_prime_iqd = null;
+    if (ctx.proPaused) out.display_pro_iqd = null;
+  }
   return out;
 }
 

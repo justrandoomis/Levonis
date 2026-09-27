@@ -10,6 +10,7 @@ import { api, ApiError } from '../lib/api';
 import { storeHref } from '../lib/merchant';
 import { useRail } from '../lib/useRail';
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
+import PremiumMemberBadge from '../components/merchant/PremiumMemberBadge';
 import {
   ArrowLeft, ArrowRight, Search, Box, Calculator,
   MessageSquare, Plus, Store,
@@ -37,6 +38,7 @@ interface CommunityMerchant {
   avatarUrl: string | null;
   verified: boolean;
   pro_badge?: boolean;
+  premium_badge?: boolean;
   created_at: string;
   store_slug?: string | null;
   /** The shop's own address — a card click is a full navigation there. */
@@ -385,6 +387,7 @@ export default function Community() {
                                 <h3 className="text-white font-bold text-sm">{m.name}</h3>
                                 {m.verified && <BadgeCheck className="w-4 h-4 text-gold" />}
                                 {m.pro_badge && <ProMerchantBadge compact />}
+                                {m.premium_badge && <PremiumMemberBadge compact />}
                               </div>
                               {m.bio && <div className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{m.bio}</div>}
                             </div>

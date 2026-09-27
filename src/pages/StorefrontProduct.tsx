@@ -39,6 +39,7 @@ import { storefrontApi, iqd } from '../lib/storefrontApi';
 import type { MerchantProduct, MerchantStore } from '../lib/merchant';
 import SellerConflictDialog, { type SellerConflict } from '../components/merchant/SellerConflictDialog';
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
+import PremiumMemberBadge from '../components/merchant/PremiumMemberBadge';
 import StoreUnavailable from '../components/merchant/StoreUnavailable';
 import { useStore } from '../StoreContext';
 import { trackStoreEvent } from '../lib/storeBeacon';
@@ -278,6 +279,7 @@ export default function StorefrontProduct() {
                 <span className="text-white text-[13px] font-semibold truncate">{store.name}</span>
                 {store.merchant.verified && <BadgeCheck className="w-3.5 h-3.5 text-gold shrink-0" />}
                 {store.merchant.pro_badge && <ProMerchantBadge compact />}
+                {store.merchant.premium_badge && <PremiumMemberBadge compact />}
               </div>
               {store.merchant.rating !== null && (
                 <span className="text-zinc-500 text-[11.5px]">

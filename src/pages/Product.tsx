@@ -101,7 +101,7 @@ const STRINGS = {
     unfavorite: 'إزالة من المفضلة', gallery: 'صور المنتج', noImages: 'لا توجد صور لهذا المنتج',
     imageOf: 'صورة {n} من {total}', zoom: 'تكبير الصورة', close: 'إغلاق',
     officialStore: 'المتجر الرسمي', communityStore: 'متجر مجتمع', visitStore: 'زيارة المتجر',
-    price: 'السعر', from: 'يبدأ من', regularPrice: 'السعر العادي',
+    price: 'السعر', from: 'يبدأ من', regularPrice: 'السعر',
     /**
      * NO TIER NAME IS TYPED ON THIS PAGE. It used to spell «PRIME» in all
      * three languages while the one table that owns the customer-facing names
@@ -180,7 +180,7 @@ const STRINGS = {
     unfavorite: 'Remove from favourites', gallery: 'Product images', noImages: 'This product has no images yet',
     imageOf: 'Image {n} of {total}', zoom: 'Zoom image', close: 'Close',
     officialStore: 'Official store', communityStore: 'Community store', visitStore: 'Visit store',
-    price: 'Price', from: 'From', regularPrice: 'Regular price',
+    price: 'Price', from: 'From', regularPrice: 'Price',
     appliedPriceOf: (tier: string) => `${tier} price`,
     memberPriceOf: (tier: string) => `${tier} member price`,
     savedWithTier: (amount: string, tier: string) => `Saved ${amount} with ${tier} membership`,
@@ -246,7 +246,7 @@ const STRINGS = {
     unfavorite: 'لابردن لە دڵخوازەکان', gallery: 'وێنەکانی بەرهەم', noImages: 'ئەم بەرهەمە هێشتا وێنەی نییە',
     imageOf: 'وێنەی {n} لە {total}', zoom: 'گەورەکردنی وێنە', close: 'داخستن',
     officialStore: 'فرۆشگای فەرمی', communityStore: 'فرۆشگای کۆمەڵگا', visitStore: 'سەردانی فرۆشگا',
-    price: 'نرخ', from: 'دەست پێدەکات لە', regularPrice: 'نرخی ئاسایی',
+    price: 'نرخ', from: 'دەست پێدەکات لە', regularPrice: 'نرخ',
     /*
      * The Kurdish below is the store's OWN wording, reused — nothing here was
      * translated. «نرخی ئەندامانی …» and «نرخی PRO …» were already in this

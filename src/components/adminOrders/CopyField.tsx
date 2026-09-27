@@ -24,6 +24,7 @@ export default function CopyField({
   mono,
   emphasis,
   multiline,
+  hint,
 }: {
   label: string;
   value: string;
@@ -31,6 +32,11 @@ export default function CopyField({
   /** The one value on the screen that gets written on the receipt. */
   emphasis?: boolean;
   multiline?: boolean;
+  /**
+   * A small qualifier drawn after the label — «المتبقي عند التسليم» then
+   * «توصيل عادي». It qualifies the value; it is never copied with it.
+   */
+  hint?: React.ReactNode;
 }) {
   const { loc } = useLanguage();
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -72,7 +78,14 @@ export default function CopyField({
     >
       <div className="flex items-start justify-between gap-2 min-w-0">
         <div className="min-w-0 flex-1">
-          <span className="block text-[11px] font-bold text-zinc-500 mb-0.5">{label}</span>
+          {hint ? (
+            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mb-1">
+              <span className="text-[11px] font-bold text-zinc-500">{label}</span>
+              {hint}
+            </span>
+          ) : (
+            <span className="block text-[11px] font-bold text-zinc-500 mb-0.5">{label}</span>
+          )}
           {empty ? (
             // Never an empty box the admin has to interpret: say it is not set.
             <span className="text-[13px] text-zinc-600 italic">

@@ -32,7 +32,9 @@ import { chunk } from './inventory';
 import {
   BULK_MAX_LINES,
   buildBulkRow,
+  labelModelHint,
   markDuplicates,
+  modelMatchesProductName,
   normalizeEan,
   normalizeModelCode,
   normalizeModelName,
@@ -40,6 +42,7 @@ import {
   parseSerialList,
   type BulkFields,
   type BulkRow,
+  type ModelHint,
 } from '@levonis/catalog/deviceSerials';
 import { printerProductIds } from './printerIdentity';
 import { effectiveDevicePolicy } from './warrantyPlans';
@@ -118,6 +121,12 @@ export function inventoryRowPublic(r: ListRow) {
     serial_norm: r.serial_norm,
     model_code: r.model_code,
     model_name: r.model_name,
+    /**
+     * What the label itself says when nobody typed a model: the box's known
+     * EAN, else the serial's family prefix («Bambu Lab A1»). A HINT for the
+     * «الموديل» column and the product search — never a filing.
+     */
+    model_hint: r.model_name ? null : labelModelHint({ serial: r.serial_norm, ean: r.ean })?.label ?? null,
     product: r.product_id ? { id: r.product_id, name: r.p_name ?? '', name_ar: r.p_name_ar ?? '' } : null,
     variant_id: r.variant_id,
     box_sn: r.box_sn,
@@ -518,9 +527,10 @@ export async function setVoid(db: D1Database, serialNorm: string, voided: boolea
  *   2. the last inventory row with this model code;
  *   3. a product or catalogue variant whose SKU is this EAN or model code.
  */
-export async function resolveLabelProduct(db: D1Database, ean: string, modelCode: string) {
+export async function resolveLabelProduct(db: D1Database, ean: string, modelCode: string, modelName = '') {
   const e = normalizeEan(ean) || '';
   const m = normalizeModelCode(modelCode);
+  const typedName = normalizeModelName(modelName);
   type Hit = { product_id: string; variant_id: string | null; model_code: string; model_name: string };
   let hit: (Hit & { via: string }) | null = null;
   if (e) {
@@ -558,6 +568,24 @@ export async function resolveLabelProduct(db: D1Database, ean: string, modelCode
       }
     }
   }
+  if (!hit) {
+    // 4. The model the box names — a known EAN's own label, the model name
+    //    typed with this very serial, or one typed on an earlier box with this
+    //    EAN — matched to exactly ONE catalogue product by name
+    //    (`modelMatchesProductName`: «A1 Combo» is never «A1» and never
+    //    «A1 mini»). Two candidates, or none, and the product stays the
+    //    owner's choice.
+    let model = (e ? labelModelHint({ ean: e })?.model : '') || typedName;
+    if (!model && e) {
+      const typed = await db
+        .prepare(`SELECT model_name FROM serial_inventory WHERE ean = ? AND model_name <> '' ORDER BY created_at DESC LIMIT 1`)
+        .bind(e)
+        .first<{ model_name: string }>();
+      model = typed?.model_name ?? '';
+    }
+    const byName = model ? await productForModel(db, model) : null;
+    if (byName) hit = { product_id: byName, variant_id: null, model_code: m, model_name: model, via: 'model_name' };
+  }
   if (!hit) return null;
   const p = await db
     .prepare('SELECT id, name, name_ar, sku, price_iqd, status FROM products WHERE id = ?')
@@ -571,6 +599,69 @@ export async function resolveLabelProduct(db: D1Database, ean: string, modelCode
     model_code: hit.model_code || m,
     model_name: hit.model_name,
   };
+}
+
+/**
+ * The one catalogue product whose name IS this model, or null when none or
+ * more than one is. Drafts, bundles and mystery offers are never a box's
+ * product. One indexed-free read bounded to 60 rows by the model's longest
+ * word; the exact test is `modelMatchesProductName`.
+ */
+export async function productForModel(db: D1Database, model: string): Promise<string | null> {
+  const anchor = model
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w && !['bambu', 'lab', 'bambulab', '3d', 'printer'].includes(w))
+    .sort((a, b) => b.length - a.length)[0];
+  if (!anchor) return null;
+  const { results } = await db
+    .prepare(
+      `SELECT id, name, name_ar FROM products
+        WHERE status <> 'draft' AND (composition = '' OR composition = 'single')
+          AND (lower(name) LIKE ? ESCAPE '\\' OR lower(COALESCE(name_ar, '')) LIKE ? ESCAPE '\\')
+        LIMIT 60`
+    )
+    .bind(likeArg(anchor), likeArg(anchor))
+    .all<{ id: string; name: string; name_ar: string | null }>();
+  const hits = results.filter((p) => modelMatchesProductName(model, p.name) || (!!p.name_ar && modelMatchesProductName(model, p.name_ar)));
+  return hits.length === 1 ? hits[0].id : null;
+}
+
+/** A scanned label → its product (when the store can know it) and what the box says. */
+export async function identifyLabel(
+  db: D1Database,
+  label: { ean?: string; model_code?: string; serial?: string; model_name?: string }
+): Promise<{ match: Awaited<ReturnType<typeof resolveLabelProduct>>; hint: ModelHint | null }> {
+  const match = await resolveLabelProduct(db, label.ean ?? '', label.model_code ?? '', label.model_name ?? '');
+  const hint = labelModelHint({ serial: label.serial ?? '', ean: label.ean ?? '' });
+  return { match, hint };
+}
+
+/**
+ * «ربط بمنتج» for a whole EAN at once: every serial carrying this EAN that no
+ * product holds yet is filed under `choice` — which is also how the store
+ * LEARNS the EAN (`resolveLabelProduct` step 1): the next box with it files
+ * itself. A void row stays as it is (void is inert), and a row already filed
+ * under a product is never re-filed by this door; the per-serial edit does
+ * that, one serial at a time, with its own audit line.
+ */
+export async function linkEanToProduct(db: D1Database, ean: string, choice: ProductChoice): Promise<{ linked: number; serials: string[] }> {
+  const { results } = await db
+    .prepare(`SELECT serial_norm FROM serial_inventory WHERE ean = ? AND product_id IS NULL AND voided_at IS NULL LIMIT 1000`)
+    .bind(ean)
+    .all<{ serial_norm: string }>();
+  if (!results.length) return { linked: 0, serials: [] };
+  const res = await db
+    .prepare(
+      `UPDATE serial_inventory
+          SET product_id = ?, variant_id = ?,
+              model_name = CASE WHEN model_name = '' THEN ? ELSE model_name END,
+              updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        WHERE ean = ? AND product_id IS NULL AND voided_at IS NULL`
+    )
+    .bind(choice.product_id, choice.variant_id, choice.name.slice(0, 120), ean)
+    .run();
+  return { linked: Number(res.meta.changes ?? 0), serials: results.map((r) => r.serial_norm) };
 }
 
 // --------------------------------------------------- the customer's link

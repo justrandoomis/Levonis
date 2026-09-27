@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Check } from 'lucide-react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Check, ChevronDown } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import {
   LENS_FIELDS,
@@ -66,6 +66,15 @@ import { useIsWide } from './useIsWide';
  *
  * A chosen «أفضل لـ» lens tints the rows it rests on (a gold edge at the
  * inline start and a faint wash), so the reader can check the verdict.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * SECTIONS YOU CAN SEE THE SHAPE OF (owner, 2026-09-27: «سهلة للعين وأكثر
+ * نظامًا»). A printer comparison runs to seventy rows, and a flat list of
+ * them read as one wall. Each section is now a card — a grouped inset list —
+ * whose header says how many of its rows actually differ («٣ فروقات» or
+ * «متطابقة») and folds the section away; a rail above the table names every
+ * section and jumps to it. The order is the server's: the compared products'
+ * own form order (worker/lib/compareSpecs.ts), so the rail reads like the form.
  */
 
 function WinnerMark({ s }: { s: CompareStrings }) {
@@ -86,7 +95,10 @@ const isNumeric = (row: CompareRow) => row.parse === 'number' || row.parse === '
 
 function ValueText({ row, value, lang }: { row: CompareRow; value: CompareValue; lang: CompareLang }) {
   if (isNumeric(row)) return <bdi dir="ltr">{value.text}</bdi>;
-  const shown = row.parse === 'boolean' || row.parse === 'text' || row.parse === 'ordinal' ? specValue(value.text, lang) : value.text;
+  // The server's own reading in this language when its dictionary holds all
+  // of the value (CompareValue.i18n); the finder's few options otherwise.
+  const own = lang === 'ar' || lang === 'ckb' ? value.i18n?.[lang] : undefined;
+  const shown = own ?? (row.parse === 'boolean' || row.parse === 'text' || row.parse === 'ordinal' ? specValue(value.text, lang) : value.text);
   // A Latin value (an English option, a model name) is an LTR island inside Arabic.
   return /[A-Za-z]/.test(shown) && !/[؀-ۿ]/.test(shown) ? <bdi dir="ltr">{shown}</bdi> : <>{shown}</>;
 }
@@ -159,6 +171,7 @@ function Row({
   lang,
   tinted,
   isPrice = false,
+  inCard = false,
 }: {
   row: CompareRow;
   products: CompareProductCard[];
@@ -168,6 +181,8 @@ function Row({
   lang: CompareLang;
   tinted: boolean;
   isPrice?: boolean;
+  /** Inside a section card: a hairline ABOVE each row, under the card's header. */
+  inCard?: boolean;
 }) {
   const bars = !isPrice && rowHasBars(row);
   const deltas = isPrice ? priceDeltas(row) : null;
@@ -180,7 +195,7 @@ function Row({
       role="row"
       data-field={row.field_id}
       data-lens-row={tinted || undefined}
-      className={`grid ${columnGap(products.length, wide)} gap-y-2 border-b border-border-subtle py-3.5 ps-3 pe-1 transition-colors ${
+      className={`grid ${columnGap(products.length, wide)} gap-y-2 ${inCard ? 'border-t' : 'border-b'} border-border-subtle py-3.5 ps-3 pe-1 transition-colors ${
         tinted ? 'border-s-[3px] border-s-gold bg-[color-mix(in_oklab,var(--color-gold)_7%,transparent)]' : 'border-s-[3px] border-s-transparent'
       }`}
       style={{ gridTemplateColumns: columnsTemplate(products.length, wide) }}
@@ -235,10 +250,38 @@ export default function SpecTable({
   const visible = useMemo(
     () =>
       groups
-        .map((group) => ({ group, rows: diffOnly ? group.rows.filter(rowDiffers) : group.rows }))
+        .map((group) => ({
+          group,
+          rows: diffOnly ? group.rows.filter(rowDiffers) : group.rows,
+          diffs: group.rows.filter(rowDiffers).length,
+        }))
         .filter((entry) => entry.rows.length > 0),
     [groups, diffOnly]
   );
+
+  // Folded sections, by id — survives a column being added, like the switch.
+  const [folded, setFolded] = useState<Set<string>>(() => new Set());
+  const toggle = useCallback((id: string) => {
+    setFolded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const jump = useCallback((id: string) => {
+    setFolded((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    // After the unfold has rendered, so the card lands where it will stay.
+    requestAnimationFrame(() =>
+      document.getElementById(`lv-compare-group-${id}`)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+    );
+  }, []);
 
   return (
     <section aria-labelledby="lv-compare-specs" data-compare-specs className="lv-section">
@@ -250,6 +293,25 @@ export default function SpecTable({
           <Switch checked={diffOnly} onChange={onDiffOnly} label={ls.onlyDiffs} />
         </div>
       </div>
+
+      {/* The sections, named, one tap from each — the table's table of contents. */}
+      {visible.length >= 3 ? (
+        <nav aria-label={s.jumpTo} data-compare-rail className="mt-3 -mx-1 flex gap-1.5 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {visible.map(({ group, diffs }) => (
+            <button
+              key={group.id}
+              type="button"
+              onClick={() => jump(group.id)}
+              className="lv-hit relative inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3 text-[12px] font-bold text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              {tri(group.label, l)}
+              {diffs > 0 ? (
+                <span className="rounded-full bg-surface-selected px-1.5 text-[10.5px] tabular-nums text-text-primary">{diffs}</span>
+              ) : null}
+            </button>
+          ))}
+        </nav>
+      ) : null}
 
       <div role="table" aria-labelledby="lv-compare-specs" className="mt-2">
         {/* The column headers the cells are read against; the sticky photo
@@ -272,24 +334,55 @@ export default function SpecTable({
         {visible.length === 0 ? (
           <p className="mt-3 text-[12.5px] leading-5 text-text-muted">{s.diffOnlyNone}</p>
         ) : (
-          visible.map(({ group, rows }) => (
-            <div key={group.id} role="rowgroup" className="mt-5">
-              <div role="row" className="flex flex-wrap items-baseline gap-2 pb-1 ps-3">
-                <h3 role="columnheader" className="text-[13px] font-extrabold text-gold">
-                  {tri(group.label, l)}
-                </h3>
-                {group.shared ? null : (
-                  <span className="rounded-full bg-[color-mix(in_oklab,var(--color-warning)_14%,var(--color-surface))] px-2 py-0.5 text-[10.5px] font-bold text-warning">
-                    {s.narrowGroup}
-                  </span>
-                )}
+          visible.map(({ group, rows, diffs }) => {
+            const open = !folded.has(group.id);
+            const bodyId = `lv-compare-group-${group.id}-rows`;
+            return (
+              <div
+                key={group.id}
+                id={`lv-compare-group-${group.id}`}
+                role="rowgroup"
+                data-compare-group={group.id}
+                // The rail's jump lands the card below the sticky product strip.
+                style={{ scrollMarginTop: '6rem' }}
+                className="mt-4 overflow-hidden rounded-[18px] border border-border-subtle bg-surface-raised/40"
+              >
+                <div role="row" className="flex">
+                  <h3 role="columnheader" className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      aria-controls={bodyId}
+                      onClick={() => toggle(group.id)}
+                      className="flex min-h-12 w-full items-center gap-2 px-3 text-start transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+                    >
+                      <span className="min-w-0 truncate text-[14px] font-extrabold text-text-primary">{tri(group.label, l)}</span>
+                      {group.shared ? null : (
+                        <span className="shrink-0 rounded-full bg-[color-mix(in_oklab,var(--color-warning)_14%,var(--color-surface))] px-2 py-0.5 text-[10.5px] font-bold text-warning">
+                          {s.narrowGroup}
+                        </span>
+                      )}
+                      <span className={`ms-auto shrink-0 text-[11.5px] font-semibold tabular-nums ${diffs > 0 ? 'text-text-secondary' : 'text-text-muted'}`}>
+                        {diffs > 0 ? s.groupDiffs(diffs) : s.groupSame}
+                      </span>
+                      <ChevronDown
+                        aria-hidden="true"
+                        className={`size-4 shrink-0 text-text-muted transition-transform duration-200 motion-reduce:transition-none ${open ? '' : '-rotate-90 rtl:rotate-90'}`}
+                      />
+                    </button>
+                  </h3>
+                </div>
+                {open ? (
+                  <div id={bodyId}>
+                    {group.shared ? null : <p className="px-3 pb-2 text-[11.5px] leading-5 text-text-muted">{s.narrowGroupNote}</p>}
+                    {rows.map((row) => (
+                      <Row key={row.field_id} row={row} products={products} wide={wide} s={s} ls={ls} lang={l} tinted={lensFields.includes(row.field_id)} inCard />
+                    ))}
+                  </div>
+                ) : null}
               </div>
-              {group.shared ? null : <p className="ps-3 text-[11.5px] leading-5 text-text-muted">{s.narrowGroupNote}</p>}
-              {rows.map((row) => (
-                <Row key={row.field_id} row={row} products={products} wide={wide} s={s} ls={ls} lang={l} tinted={lensFields.includes(row.field_id)} />
-              ))}
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

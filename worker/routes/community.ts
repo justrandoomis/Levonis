@@ -4,7 +4,7 @@ import { safeParse } from '../lib/types';
 import { requireAuth, notFound, forbidden, str, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
-import { getTierStatus, benefits, usersWithEntitlement } from '../lib/entitlements';
+import { getTierStatus, benefits, membershipBadges } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { communityAdminDoor, communityClosedRefusal, communityGate, communityMayEnter, readCommunityGate } from '../lib/communityGate';
@@ -23,9 +23,11 @@ export const communityRoutes = new Hono<AppContext>();
  *
  * Resolved for a whole page of merchants in two queries rather than one
  * getTierStatus per row, but through the SAME `benefits.proMerchantBadge`
- * check so the rule cannot drift from entitlements.ts.
+ * check so the rule cannot drift from entitlements.ts. `premium_badge` is
+ * PREMIUM's own mark («شارة مميزة في مجتمع ليفو», migration 0145), resolved in
+ * the same pass (`membershipBadges`): one badge per person, the highest held.
  */
-function merchantPublic(m: Record<string, unknown>, proBadges: Set<string>) {
+function merchantPublic(m: Record<string, unknown>, badges: { pro: Set<string>; premium: Set<string> }) {
   return {
     id: m.id,
     // The account behind the store, so a customer can open a conversation
@@ -37,7 +39,9 @@ function merchantPublic(m: Record<string, unknown>, proBadges: Set<string>) {
     bio: m.bio,
     avatarUrl: m.avatar_key ? `/files/${m.avatar_key}` : null,
     verified: !!m.verified,
-    pro_badge: proBadges.has(String(m.user_id)),
+    pro_badge: badges.pro.has(String(m.user_id)),
+    /** PREMIUM's own mark in the community (0145) — never beside a PRO badge. */
+    premium_badge: badges.premium.has(String(m.user_id)),
     created_at: m.created_at,
   };
 }
@@ -126,11 +130,11 @@ communityRoutes.get('/merchants', async (c) => {
       WHERE cm.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
       ORDER BY cm.created_at DESC LIMIT 20`
   ).all<Record<string, unknown>>();
-  const proBadges = await usersWithEntitlement(c.env.DB, results.map((m) => m.user_id), 'proMerchantBadge');
+  const badges = await membershipBadges(c.env.DB, results.map((m) => m.user_id));
   return c.json({
     success: true,
     merchants: results.map((m) => ({
-      ...merchantPublic(m, proBadges),
+      ...merchantPublic(m, badges),
       store_slug: m.store_slug ?? null,
       // A suspended store — or a suspended merchant's store — is not
       // advertised as a destination; the card falls back to the in-site page.
@@ -249,10 +253,10 @@ communityRoutes.get('/store/:id', async (c) => {
       .first();
     following = !!f;
   }
-  const proBadges = await usersWithEntitlement(c.env.DB, [merchant.user_id], 'proMerchantBadge');
+  const badges = await membershipBadges(c.env.DB, [merchant.user_id]);
   return c.json({
     success: true,
-    merchant: merchantPublic(merchant, proBadges),
+    merchant: merchantPublic(merchant, badges),
     products: products.map(communityProductPublic),
     followers: followers?.n ?? 0,
     following,
@@ -292,7 +296,7 @@ communityRoutes.get('/followed', requireAuth, async (c) => {
   )
     .bind(user.id)
     .all<Record<string, unknown>>();
-  const proBadges = await usersWithEntitlement(c.env.DB, results.map((m) => m.user_id), 'proMerchantBadge');
+  const badges = await membershipBadges(c.env.DB, results.map((m) => m.user_id));
   return c.json({
     success: true,
     merchants: results.map((m) =>
@@ -308,12 +312,13 @@ communityRoutes.get('/followed', requireAuth, async (c) => {
             avatarUrl: null,
             verified: false,
             pro_badge: false,
+            premium_badge: false,
             created_at: m.created_at,
             store_slug: null,
             store_url: null,
           }
         : {
-            ...merchantPublic(m, proBadges),
+            ...merchantPublic(m, badges),
             unavailable: false,
             store_slug: m.store_slug ?? null,
             store_url: m.store_slug ? storeUrl(String(m.store_slug), root, String(m.store_id)) : null,
@@ -336,8 +341,8 @@ communityRoutes.get('/my-store', requireAuth, async (c) => {
   )
     .bind(merchant.id)
     .all();
-  const proBadges = await usersWithEntitlement(c.env.DB, [user.id], 'proMerchantBadge');
-  return c.json({ success: true, merchant: merchantPublic(merchant, proBadges), products: products.map(communityProductPublic) });
+  const badges = await membershipBadges(c.env.DB, [user.id]);
+  return c.json({ success: true, merchant: merchantPublic(merchant, badges), products: products.map(communityProductPublic) });
 });
 
 communityRoutes.post('/my-store', requireAuth, async (c) => {

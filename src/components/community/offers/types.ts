@@ -47,6 +47,7 @@ export interface OfferV2 {
     name: string;
     verified: boolean;
     pro_badge?: boolean;
+    premium_badge?: boolean;
     badge: string;
     rating: number | null;
     rating_count: number;

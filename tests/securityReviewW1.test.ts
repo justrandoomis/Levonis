@@ -357,6 +357,8 @@ test('S5 (probe P7 inverted): the directory serves nothing of a sanctioned shop;
     const card = (followed.merchants as Array<Record<string, unknown>>).find((m) => m.id === 'm_ali')!;
     assert.deepEqual(card, {
       id: 'm_ali', unavailable: true, name: null, bio: null, avatarUrl: null, verified: false, pro_badge: false,
+      // PREMIUM's mark (0145) is withheld exactly like PRO's.
+      premium_badge: false,
       created_at: card.created_at, store_slug: null, store_url: null,
     });
     const healthy = (followed.merchants as Array<Record<string, unknown>>).find((m) => m.id === 'm_omar')!;

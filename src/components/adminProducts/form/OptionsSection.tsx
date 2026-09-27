@@ -69,6 +69,7 @@ import {
 import { ADJUST_OF, type PriceFields } from '../../../../worker/lib/pricing';
 import { emptyDimensions, type ProductDimensionsV2 } from '../../../lib/productTypes';
 import { DimensionsSection } from './DimensionsSection';
+import { useProPaused } from '../../../lib/proPause';
 
 export function OptionsSection({
   rel,
@@ -1002,7 +1003,8 @@ export function tierPriceMarks(
   cells: ReturnType<typeof rowCells>,
   charges: ReturnType<typeof rowCharges>,
 ): TierPriceMark[] {
-  return ([['PRIME', 'prime'], ['PRO', 'pro']] as const)
+  // PRO alone: PREMIUM carries no member price since 2026-09-27 (0145).
+  return ([['PRO', 'pro']] as const)
     .filter(([, f]) => cells[f].mode !== 'inherit')
     .map(([label, f]) => ({ label, iqd: charges[f].viaRegular ? null : charges[f].charged }));
 }
@@ -1051,6 +1053,8 @@ function PriceCells({
   });
   const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const memberMarks = tierPriceMarks(cells, charges);
+  // PRO's cell is hidden while PRO is paused (src/lib/proPause.ts).
+  const proPaused = useProPaused();
   return (
     <>
       {/*
@@ -1082,12 +1086,13 @@ function PriceCells({
         two boxes stay under «السعر» instead of re-dividing the band into
         halves.
       */}
-      <TierPriceDisclosure scope={level} marks={memberMarks}>
-        <Grid cols={3}>
-          <PriceCell label_ar="PRIME" label_en="PRIME" {...cellProps('prime')} />
-          <PriceCell label_ar="PRO" label_en="PRO" {...cellProps('pro')} />
-        </Grid>
-      </TierPriceDisclosure>
+      {!proPaused && (
+        <TierPriceDisclosure scope={level} marks={memberMarks}>
+          <Grid cols={3}>
+            <PriceCell label_ar="PRO" label_en="PRO" {...cellProps('pro')} />
+          </Grid>
+        </TierPriceDisclosure>
+      )}
       {canSeeCost && (
         <PriceCell
           label_ar="التكلفة"

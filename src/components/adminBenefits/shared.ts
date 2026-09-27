@@ -72,6 +72,8 @@ export interface SchemaDeliveryMethod {
 /** The vocabularies and units the server publishes so the screen never guesses. */
 export interface BenefitSchema {
   tiers: string[];
+  /** The tiers a discount rule may name (PRO only since 0145); absent on an older server. */
+  discount_tiers?: string[];
   benefit_types: BenefitType[];
   scopes: BenefitScope[];
   discount_modes: DiscountMode[];

@@ -52,7 +52,10 @@ import {
   type ProductTypeId,
   type SpecCompare,
   type TemplateField,
+  type TemplateGroup,
 } from './templateFamilies';
+import type { ConditionDoc } from './condition';
+import { translateText } from './translate/index';
 
 import type { CompareLens } from '@levonis/catalog/discoveryTypes';
 
@@ -81,6 +84,15 @@ export interface CompareValue {
   axes?: number[];
   /** The items of a `list` reading. Additive, for the same reason as `axes`. */
   items?: string[];
+  /**
+   * The value as an Arabic or Sorani reader should see it — «PEI محبب» rather
+   * than «Textured PEI» — when the store's own deterministic dictionary
+   * (worker/lib/translate) translates ALL of it. Absent when it does not, and
+   * never set for a quantity: «256 × 256 × 256 mm» reads the same in every
+   * language. The product page shows its values translated; a comparison of
+   * the same products should not switch the reader to English.
+   */
+  i18n?: { ar?: string; ckb?: string };
 }
 
 export interface CompareRow {
@@ -156,6 +168,13 @@ export interface CompareInputProduct {
   section_slugs: string[];
   spec_fields: Record<string, unknown>;
   price_iqd: number;
+  /**
+   * The unit's condition document (worker/lib/condition.ts), null or absent
+   * for a NEW product. When any column carries one, the comparison opens with
+   * «الحالة»: new against open box, used or refurbished, the grade and the
+   * running hours — the first thing a buyer of a used machine compares.
+   */
+  condition?: ConditionDoc | null;
 }
 
 /** A field nobody annotated: shown, read as text, never scored. */
@@ -613,6 +632,8 @@ interface Resolved {
   type: ProductTypeId | null;
   /** Field ids this product's own template declares, or null when unknown. */
   declares: Set<string> | null;
+  /** This product's own groups, in its type's order (the form's order). */
+  groups: TemplateGroup[];
   tech: Tech;
 }
 
@@ -638,11 +659,12 @@ function resolveProduct(p: CompareInputProduct): Resolved {
     type = asDevice === asMaterial ? asDevice : null;
   }
   let declares: Set<string> | null = null;
+  const groups = type ? narrowGroups(type, branch) : [];
   if (type) {
     declares = new Set<string>();
-    for (const g of narrowGroups(type, branch)) for (const f of g.fields) declares.add(f.id);
+    for (const g of groups) for (const f of g.fields) declares.add(f.id);
   }
-  return { type, declares, tech: resolveTech(p) };
+  return { type, declares, groups, tech: resolveTech(p) };
 }
 
 function resolveTech(p: CompareInputProduct): Tech {
@@ -734,6 +756,112 @@ function normaliseAxis(nums: number[], better: SpecCompare['better'], parse: Spe
 
 const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
 
+// ---------------------------------------------------------- the reader's words
+
+const TRANSLATED_PARSES = new Set<SpecCompare['parse']>(['text', 'boolean', 'ordinal', 'list']);
+
+/** A phrase in the store's own dictionary, or null when any part of it is not. */
+function translated(phrase: string, lang: 'ar' | 'ckb'): string | null {
+  const r = translateText(phrase, lang);
+  return r.status === 'machine' && r.text.trim() !== '' ? r.text : null;
+}
+
+/**
+ * The value, with its Arabic and Sorani readings when the dictionary holds
+ * ALL of it (`CompareValue.i18n`). A list is translated item by item and kept
+ * only when every item is, so a cell is never half English.
+ */
+function withTranslation(value: CompareValue, parse: SpecCompare['parse']): CompareValue {
+  if (value.missing || !TRANSLATED_PARSES.has(parse)) return value;
+  const out: { ar?: string; ckb?: string } = {};
+  for (const lang of ['ar', 'ckb'] as const) {
+    let text: string | null;
+    if (parse === 'list' && value.items && value.items.length > 0) {
+      const each = value.items.map((item) => translated(item, lang));
+      text = each.every((t): t is string => t !== null) ? each.join('، ') : null;
+    } else {
+      text = translated(value.text, lang);
+    }
+    if (text !== null && text !== value.text) out[lang] = text;
+  }
+  return out.ar || out.ckb ? { ...value, i18n: out } : value;
+}
+
+// ------------------------------------------------------------------ «الحالة»
+
+const CONDITION_LABEL: Trilingual = { ar: 'الحالة', en: 'Condition', ckb: 'Condition' };
+
+/** The kind, as the English option the dictionary translates. */
+const KIND_TEXT: Record<string, string> = { open_box: 'Open box', used: 'Used', refurbished: 'Refurbished' };
+const GRADE_TEXT: Record<string, string> = { like_new: 'Like new', excellent: 'Excellent', good: 'Good', fair: 'Fair' };
+
+/** Worst to best: a NEW unit tops the scale, a fair one is its floor. */
+const GRADE_SCALE = ['Fair', 'Good', 'Excellent', 'Like new', 'New'] as const;
+
+const conditionField = (id: string, ar: string, en: string, compare: SpecCompare, unit?: string): TemplateField => ({
+  id,
+  label_ar: ar,
+  label_en: en,
+  type: 'text',
+  unit,
+  compare,
+});
+
+const CONDITION_FIELDS = {
+  kind: conditionField('condition_kind', 'حالة المنتج', 'Condition', { parse: 'text', better: 'none' }),
+  grade: conditionField('condition_grade', 'درجة الحالة', 'Condition grade', {
+    parse: 'ordinal', better: 'higher', weight: 3, scale: GRADE_SCALE,
+  }),
+  hours: conditionField('condition_usage_hours', 'ساعات التشغيل', 'Running hours', {
+    parse: 'number', better: 'lower', weight: 2,
+  }, 'h'),
+};
+
+/**
+ * NEW AGAINST USED, SAID FIRST (0147, «المستعمل»).
+ *
+ * A used machine's grade and hours live in its condition document, not in its
+ * spec sheet (worker/lib/condition.ts), so the table never showed them — two
+ * X1Cs, one new and one with 900 hours, compared as identical machines with
+ * different prices. This group is built only when a column IS a condition
+ * listing, and a NEW column answers it honestly: condition «جديد», the top of
+ * the grade scale, and no running hours. Hours the owner did not record stay
+ * «غير مذكور» and are never scored against the new machine's zero.
+ */
+function conditionGroup(products: CompareInputProduct[]): CompareGroup | null {
+  if (products.length === 0 || !products.some((p) => p.condition)) return null;
+  const row = (field: TemplateField, raws: string[]): CompareRow => {
+    const cmp = field.compare ?? SHOWN_ONLY;
+    const values = raws.map((raw) => withTranslation(readCompareValue(field, raw), cmp.parse));
+    const { winners, losers } = rankRow(cmp.better, cmp.parse, values);
+    return {
+      field_id: field.id,
+      label: fieldLabel(field),
+      unit: field.unit ?? '',
+      parse: cmp.parse,
+      better: cmp.better,
+      values,
+      winners,
+      losers,
+      weight: cmp.better === 'none' ? 0 : cmp.weight ?? 0,
+      decisive: values.every((v) => !v.missing) && readingsDiffer(values),
+    };
+  };
+  const kinds = products.map((p) => (p.condition ? KIND_TEXT[p.condition.kind] ?? '' : 'New'));
+  const grades = products.map((p) => (p.condition ? GRADE_TEXT[p.condition.grade] ?? '' : 'New'));
+  const hours = products.map((p) => {
+    if (!p.condition) return '0';
+    const h = p.condition.usage_hours;
+    return typeof h === 'number' && Number.isFinite(h) && h >= 0 ? String(h) : '';
+  });
+  return {
+    id: 'condition',
+    label: CONDITION_LABEL,
+    shared: true,
+    rows: [row(CONDITION_FIELDS.kind, kinds), row(CONDITION_FIELDS.grade, grades), row(CONDITION_FIELDS.hours, hours)],
+  };
+}
+
 // -------------------------------------------------------------------- public
 
 /**
@@ -782,12 +910,37 @@ export function compareProducts(input: { products: CompareInputProduct[] }): Com
     });
   }
 
-  // The SAME walk specGroupsFromFields makes — every group of both families in
-  // definition order, a field id claimed by the first group that declares it —
-  // so a row sits where the product page already taught the reader to look for
-  // it, and an id that moved between families cannot appear twice.
+  // «الحالة» — new against used, before any specification (see `conditionGroup`).
+  const condition = conditionGroup(products);
+  if (condition) groups.push(condition);
+
+  /*
+   * THE WALK, IN THE COMPARED PRODUCTS' OWN ORDER FIRST. Every group of the
+   * columns' own types comes first, in the order their form and template ask
+   * them — «مواصفات الجهاز», then the mains, then FDM, extrusion, motion… for
+   * printers; «بيانات الملحق», then the AMS or the plate questions for an
+   * accessory — and every other group of both families after, in definition
+   * order, as before. A field id is still claimed by the first group that
+   * declares it, so it appears once; what changed is WHICH group that is.
+   * Walking the families alone filed a filament's «التوافق» and «الأبعاد»
+   * under «مواصفات الجهاز», because the devices family is declared first — a
+   * heading that was wrong about the product it sat over.
+   */
+  // The TYPE's order, not the first column's: a new printer beside a used
+  // one would otherwise put «حالة المنتج المستعمل» after every FDM group,
+  // because the new column's list has no such group to place it by.
+  const own = new Set(resolved.flatMap((r) => r.groups.map((g) => g.id)));
+  const types = [...new Set(resolved.map((r) => r.type).filter((t): t is ProductTypeId => t !== null))];
+  const typeOrder = types.flatMap((t) => productType(t).groups).filter((g) => own.has(g.id));
+  const walk: TemplateGroup[] = [];
+  const walked = new Set<string>();
+  for (const g of [...typeOrder, ...resolved.flatMap((r) => r.groups), ...allTemplateGroups()]) {
+    if (walked.has(g.id)) continue;
+    walked.add(g.id);
+    walk.push(g);
+  }
   const claimed = new Set<string>();
-  for (const g of allTemplateGroups()) {
+  for (const g of walk) {
     const rows: CompareRow[] = [];
     for (const f of g.fields) {
       if (claimed.has(f.id)) continue;
@@ -798,7 +951,7 @@ export function compareProducts(input: { products: CompareInputProduct[] }): Com
       if (raws.every((r) => r === '')) continue;
       claimed.add(f.id);
       const cmp = f.compare ?? SHOWN_ONLY;
-      const values = raws.map((raw) => readCompareValue(f, raw));
+      const values = raws.map((raw) => withTranslation(readCompareValue(f, raw), cmp.parse));
       const { winners, losers } = rankRow(cmp.better, cmp.parse, values);
       const weight = cmp.better === 'none' ? 0 : cmp.weight ?? 0;
       rows.push({

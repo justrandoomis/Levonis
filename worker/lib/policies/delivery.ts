@@ -74,11 +74,19 @@ import type { PolicyDocument } from './types';
  *   * NO REFERRAL WAIVER. 3.16 no longer lists "a referral" beside a
  *     promotion as an exception to the customer paying delivery — a referral
  *     earns the referred account nothing (rewards 10.4).
+ *
+ * VERSION 5 — WHY IT MOVED (owner, 2026-09-27; migration 0145). The archive
+ * keeps version 4 byte for byte. PREMIUM's free standard delivery now starts
+ * above {{PREMIUM_FREE_DELIVERY_MIN_IQD}} = 75,000 dinars, the figure PRO has, and
+ * ./facts.ts fills both tokens from the seeded rules — so the published text
+ * of every article that states the PREMIUM threshold changed, and a changed
+ * text is a new version. PRO's own articles stand; while PRO is paused they
+ * apply to nobody (membership 6.15).
  */
 export const delivery: PolicyDocument = {
   key: 'delivery',
-  version: 4,
-  effective_at: '2026-09-23',
+  version: 5,
+  effective_at: '2026-09-27',
   title: {
     ar: 'سياسة التوصيل والشحن والرسوم',
     en: 'Delivery, Shipping and Fees Policy',

@@ -227,12 +227,16 @@ test('card price: the CHEAPEST variant wins, honestly labelled «يبدأ من»
   assert.equal(out.display_price_iqd, 80_000); // option A1, not the 100k base
   assert.equal(out.display_regular_iqd, 80_000); // the SAME level's regular
   assert.equal(out.display_from, true); // 80k..120k genuinely differ
-  // The cheapest explicit PRIME anywhere feeds the faint teaser line.
-  assert.equal(out.display_prime_iqd, 90_000);
+  // PREMIUM carries no member price since 0145 («اشتراك البريميوم لا يحمل
+  // خصومات»), so a PRIME number left on a variant is never a card teaser.
+  assert.equal(out.display_prime_iqd, null);
   // No PRO price is stated anywhere, but a PRO member never pays more than a
   // PRIME member (pricing.ts clampMemberLadder) — so the PRO teaser truthfully
-  // shows the PRIME figure they would actually pay.
+  // shows the PRIME figure they would actually pay (PRO on sale: this context
+  // is not paused).
   assert.equal(out.display_pro_iqd, 90_000);
+  // While PRO is paused the card names no PRO price either.
+  assert.equal(publicWithDisplayPrice(row(), { ...freeCtx, proPaused: true }).display_pro_iqd, null);
 });
 
 test('card price: a PRIME viewer\'s minimum uses their tier level by level', () => {

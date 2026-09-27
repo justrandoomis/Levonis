@@ -16,6 +16,8 @@ export interface InventoryRow {
   serial_norm: string;
   model_code: string;
   model_name: string;
+  /** What the label says when no model was typed: a known EAN's model, else the serial's family. */
+  model_hint: string | null;
   product: { id: string; name: string; name_ar: string } | null;
   variant_id: string | null;
   box_sn: string;
@@ -81,6 +83,20 @@ export interface Filing {
   model_name: string;
 }
 
+/** POST /scan — one label, registered at once. */
+export type ScanOutcome = 'added' | 'added_assigned' | 'exists' | 'invalid';
+
+export interface ScanResponse {
+  outcome: ScanOutcome;
+  row: InventoryRow | null;
+  problem?: string | null;
+  /** How the product was found: chosen, ean, model_code, sku, model_name — or null. */
+  via?: string | null;
+  hint?: { brand: string; model: string; label: string; model_code: string; source: string } | null;
+  needs_product?: boolean;
+  serialized?: boolean | null;
+}
+
 export interface ScanRowInput {
   serial: string;
   box_sn?: string;
@@ -105,6 +121,19 @@ export const inventoryApi = {
     api.post<CommitResponse>(`${INVENTORY_BASE}/commit`, { text, source: 'bulk', ...body(filing) }),
   commitRows: (rows: ScanRowInput[], filing: Filing, source: 'manual' | 'scan') =>
     api.post<CommitResponse>(`${INVENTORY_BASE}/commit`, { rows, source, ...body(filing) }),
+  scan: (row: ScanRowInput, filing: Pick<Filing, 'product_id' | 'variant_id'>, source: 'scan' | 'manual' = 'scan') =>
+    api.post<ScanResponse>(`${INVENTORY_BASE}/scan`, {
+      ...row,
+      source,
+      product_id: filing.product_id || undefined,
+      variant_id: filing.variant_id || undefined,
+    }),
+  linkEan: (ean: string, productId: string, variantId = '') =>
+    api.post<{ linked: number; product: { id: string; name: string; serialized: boolean } }>(`${INVENTORY_BASE}/link-ean`, {
+      ean,
+      product_id: productId,
+      variant_id: variantId || undefined,
+    }),
   resolve: (ean: string, modelCode = '') =>
     api.get<{
       match: {
@@ -209,6 +238,8 @@ export const STR = {
     commitAll: (n: number) => `حفظ الكل (${n})`,
     committing: 'جارٍ الحفظ…',
     committed: (n: number) => `أُضيف ${n} رقمًا إلى المخزون.`,
+    addedUnder: (name: string) => `سُجّلت الطابعة تحت «${name}».`,
+    addedNoProduct: 'سُجّلت الطابعة بلا منتج — اربطها بمنتجها من القائمة.',
     committedSome: (n: number, skipped: number) => `أُضيف ${n} رقمًا؛ ${skipped} أضافه شخص آخر في اللحظة نفسها.`,
     line: 'السطر',
     outcome: 'النتيجة',
@@ -243,6 +274,44 @@ export const STR = {
     discard: 'تجاهل القائمة',
     unsavedTitle: 'في القائمة أرقام لم تُحفظ',
     closeScanner: 'إنهاء المسح',
+    // the add sheet
+    chooseTitle: 'إضافة أرقام تسلسلية',
+    chooseBody: 'كيف تريد إضافة الأجهزة؟',
+    optCamera: 'الكاميرا',
+    optCameraHint: 'امسح ملصق العلبة — تُسجَّل كل طابعة فور قراءتها',
+    optManual: 'إدخال يدوي',
+    optManualHint: 'اكتب رقمًا واحدًا أو الصق قائمة',
+    done: 'تم',
+    fileAuto: 'تلقائي من الملصق',
+    fileAutoHint: 'يُعرف المنتج من EAN العلبة؛ ما لا نعرفه تحدده مرة واحدة.',
+    fileChosen: 'منتج محدد',
+    scanRegistered: 'سُجّلت الطابعة',
+    alreadyRegistered: 'مسجّلة مسبقًا',
+    alreadyInSession: 'مسجّلة مسبقًا — مُسحت قبل قليل',
+    alreadyAt: (date: string, by: string) => (by ? `أُضيفت في ${date} بواسطة ${by}` : `أُضيفت في ${date}`),
+    notASerial: 'ليس رقمًا تسلسليًا',
+    scanFailed: 'تعذّر التسجيل — تحقق من الاتصال وأعد المسح',
+    unknownProduct: 'المنتج غير معروف لهذا EAN',
+    pickForEan: 'حدّد المنتج',
+    linkedVia: {
+      chosen: 'المنتج المختار',
+      ean: 'عُرف من EAN',
+      model_code: 'عُرف من رمز الموديل',
+      sku: 'عُرف من SKU',
+      model_name: 'عُرف من اسم الموديل',
+    } as Record<string, string>,
+    sessionTitle: 'في هذه الجلسة',
+    sessionCounts: (added: number, dup: number) => `سُجّل ${added}${dup ? ` · مكرر ${dup}` : ''}`,
+    sessionEmpty: 'وجّه الكاميرا إلى ملصق العلبة — ستسمع نغمة نجاح لكل طابعة جديدة، ونغمة خطأ مع اهتزاز لكل طابعة مسجّلة مسبقًا.',
+    manualTitle: 'إدخال يدوي',
+    linkTitle: 'ربط بمنتج',
+    linkBtn: 'ربط',
+    linkEanBody: (ean: string) => `سيُربط هذا الرقم وكل رقم آخر يحمل EAN ${ean} ولم يُربط بعد، ثم تتعرف الكاميرا على هذا EAN تلقائيًا في كل علبة قادمة.`,
+    linkOneBody: 'هذا الرقم بلا EAN، فيُربط وحده.',
+    linkConfirm: 'ربط',
+    linked: (n: number, name: string) => `رُبط ${n} رقمًا بـ ${name}`,
+    linkedNone: 'لا أرقام غير مربوطة بهذا EAN.',
+    hintFromLabel: 'من الملصق',
     editTitle: 'تعديل الرقم التسلسلي',
     note: 'ملاحظة',
     save: 'حفظ',
@@ -272,6 +341,7 @@ export const STR = {
       EAN_INVALID: 'EAN غير صحيح.',
       NOTHING_TO_CHANGE: 'لا تغيير للحفظ.',
       REASON_REQUIRED: 'السبب مطلوب.',
+      SERIAL_PRODUCT_REQUIRED: 'اختر المنتج أولًا.',
     } as Record<string, string>,
     genericError: 'تعذّر إكمال العملية. حاول مجددًا.',
   },
@@ -351,6 +421,8 @@ export const STR = {
     commitAll: (n: number) => `Save all (${n})`,
     committing: 'Saving…',
     committed: (n: number) => `${n} serial${n === 1 ? '' : 's'} added to the inventory.`,
+    addedUnder: (name: string) => `Printer registered under “${name}”.`,
+    addedNoProduct: 'Printer registered without a product — link it from the list.',
     committedSome: (n: number, skipped: number) => `${n} added; ${skipped} were added by someone else at the same moment.`,
     line: 'Line',
     outcome: 'Result',
@@ -385,6 +457,43 @@ export const STR = {
     discard: 'Discard the list',
     unsavedTitle: 'The list has unsaved serials',
     closeScanner: 'Finish scanning',
+    chooseTitle: 'Add serial numbers',
+    chooseBody: 'How would you like to add devices?',
+    optCamera: 'Camera',
+    optCameraHint: 'Scan the box label — each printer is registered as it is read',
+    optManual: 'Manual entry',
+    optManualHint: 'Type one serial or paste a list',
+    done: 'Done',
+    fileAuto: 'Automatic from the label',
+    fileAutoHint: 'The product is recognised from the box EAN; an unknown one you choose once.',
+    fileChosen: 'A specific product',
+    scanRegistered: 'Printer registered',
+    alreadyRegistered: 'Already registered',
+    alreadyInSession: 'Already registered — scanned a moment ago',
+    alreadyAt: (date: string, by: string) => (by ? `Added on ${date} by ${by}` : `Added on ${date}`),
+    notASerial: 'Not a serial number',
+    scanFailed: 'Could not register — check the connection and scan again',
+    unknownProduct: 'Unknown product for this EAN',
+    pickForEan: 'Choose product',
+    linkedVia: {
+      chosen: 'Chosen product',
+      ean: 'Recognised from the EAN',
+      model_code: 'Recognised from the model code',
+      sku: 'Recognised from the SKU',
+      model_name: 'Recognised from the model name',
+    } as Record<string, string>,
+    sessionTitle: 'This session',
+    sessionCounts: (added: number, dup: number) => `${added} registered${dup ? ` · ${dup} duplicate` : ''}`,
+    sessionEmpty: 'Point the camera at a box label — a success chime for every new printer, an error tone and a buzz for one already registered.',
+    manualTitle: 'Manual entry',
+    linkTitle: 'Link to a product',
+    linkBtn: 'Link',
+    linkEanBody: (ean: string) => `This serial and every other unlinked serial with EAN ${ean} will be linked, and the camera will recognise this EAN on every box after.`,
+    linkOneBody: 'This serial has no EAN, so it is linked on its own.',
+    linkConfirm: 'Link',
+    linked: (n: number, name: string) => `${n} serial${n === 1 ? '' : 's'} linked to ${name}`,
+    linkedNone: 'No unlinked serials carry this EAN.',
+    hintFromLabel: 'from the label',
     editTitle: 'Edit serial number',
     note: 'Note',
     save: 'Save',
@@ -414,6 +523,7 @@ export const STR = {
       EAN_INVALID: 'Invalid EAN.',
       NOTHING_TO_CHANGE: 'Nothing to save.',
       REASON_REQUIRED: 'A reason is required.',
+      SERIAL_PRODUCT_REQUIRED: 'Choose the product first.',
     } as Record<string, string>,
     genericError: 'Could not complete that. Try again.',
   },

@@ -161,25 +161,32 @@ test('the same narrowing applies to materials and to printer accessories', () =>
     { id: 'cat_materials_fdm', slug: 'fdm-materials' },
     { id: 'cat_materials', slug: 'printing-materials' },
   ]);
-  assert.deepEqual(fdmMat.map((g) => g.id), ['material_core', 'fdm_mat']);
+  // «الأداء والخصائص» (0147) sits beside «خاص بمواد FDM» on the same leaf.
+  assert.deepEqual(fdmMat.map((g) => g.id), ['material_core', 'fdm_mat', 'fdm_mat_perf']);
   assert.ok(!flatFields(fdmMat).some((f) => f.id === 'wavelength'), 'a filament spool asked for a UV wavelength');
 
   const resinMat = groupsForSection('materials', [{ id: 'cat_materials_resin', slug: 'resin-materials' }]);
   assert.deepEqual(resinMat.map((g) => g.id), ['material_core', 'resin_mat']);
   assert.ok(!flatFields(resinMat).some((f) => f.id === 'spool_type'), 'a bottle of resin asked for a spool type');
+  assert.ok(!flatFields(resinMat).some((f) => f.id === 'tensile_strength'), 'a bottle of resin asked a filament’s tensile strength');
 
-  // «ملحقات طابعات FDM» declares no group of its own, but naming it is still
-  // the statement "not a Resin accessory" — so the wash-station capacity goes.
+  // «ملحقات طابعات FDM» asks its own three kinds now (AMS, hotend, plate), and
+  // naming it is still the statement "not a Resin accessory" — so the
+  // wash-station capacity goes.
   const fdmAcc = groupsForSection('devices', [
     { id: 'cat_pacc_fdm', slug: 'fdm-printer-accessories' },
     { id: 'cat_pacc', slug: 'printer-accessories' },
   ]);
   assert.ok(!flatFields(fdmAcc).some((f) => f.id === 'capacity'), 'an FDM accessory asked for a resin-tank capacity');
+  for (const id of ['ams_slots', 'hotend_max_temp', 'plate_surface']) {
+    assert.ok(flatFields(fdmAcc).some((f) => f.id === id), `the FDM shelf asks ${id}`);
+  }
   const resinAcc = groupsForSection('devices', [
     { id: 'cat_pacc_resin', slug: 'resin-printer-accessories' },
     { id: 'cat_pacc', slug: 'printer-accessories' },
   ]);
   assert.ok(flatFields(resinAcc).some((f) => f.id === 'capacity'));
+  assert.ok(!flatFields(resinAcc).some((f) => f.id === 'ams_slots'), 'a resin wash station asked how many AMS slots it has');
 });
 
 /** The five fields «ملحقات الليزر» adds to the `parts` type. */

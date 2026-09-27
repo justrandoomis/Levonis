@@ -44,6 +44,9 @@ function setup(launched = true) {
       launched ? '{"activated":true}' : '{"activated":false}'
     }')`
   );
+  // Grant mechanics with PRO on sale; 0145's pause refuses a PRO grant, which
+  // tests/proPause.test.ts proves.
+  raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 

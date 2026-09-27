@@ -42,11 +42,19 @@ import type { PolicyDocument } from './types';
  *     so the clauses that carried them are published instead of withheld.
  *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
  *     by number, an article of this document that is itself withheld.
+ *
+ * VERSION 4 — WHY IT MOVED (owner, 2026-09-27; migration 0145). The archive
+ * keeps version 3 byte for byte. PREMIUM's free standard delivery now starts
+ * above {{PREMIUM_FREE_DELIVERY_MIN_IQD}} = 75,000 dinars, the figure PRO has, and
+ * ./facts.ts fills both tokens from the seeded rules — so the published text
+ * of every article that states the PREMIUM threshold changed, and a changed
+ * text is a new version. PRO's own articles stand; while PRO is paused they
+ * apply to nobody (membership 6.15).
  */
 export const terms: PolicyDocument = {
   key: 'terms',
-  version: 3,
-  effective_at: '2026-09-23',
+  version: 4,
+  effective_at: '2026-09-27',
   title: {
     ar: 'الشروط والأحكام العامة',
     en: 'General Terms and Conditions',

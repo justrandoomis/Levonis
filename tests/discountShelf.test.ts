@@ -47,7 +47,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { APEX, asD1, ctx, freshDb, json, stubApp } from './fixtures/app';
+import { APEX, asD1, ctx, freshDb, json, stubApp, proOnSale } from './fixtures/app';
 import { discountedWhere, homeRoutes, productRoutes, shelfDiscountRules } from '../worker/routes/products';
 import type { PricingCtx } from '../worker/routes/products';
 
@@ -167,7 +167,7 @@ async function shelves(raw: Raw): Promise<{ home: string[]; listing: string[] }>
 /* ====================================================================== */
 
 test('a discount that exists ONLY as a benefit rule reaches both shelves', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   // Exactly the live shape: no typed tier price anywhere on the row.
   product(raw, 'bambu-lab-a1');
   rule(raw, 'pro-10pct', { tier: 'pro', scope: 'global', percent: 10 });
@@ -178,7 +178,7 @@ test('a discount that exists ONLY as a benefit rule reaches both shelves', async
 });
 
 test('with no rule and no typed price the shelves stay empty — the fix invents nothing', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   product(raw, 'plain');
 
   const { home, listing } = await shelves(raw);
@@ -191,7 +191,7 @@ test('with no rule and no typed price the shelves stay empty — the fix invents
 /* ====================================================================== */
 
 test('a TYPED tier price below the regular one keeps its badge with no rules at all', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   // The owner's own number on one product — it outranks any rule and must
   // never have been traded away for them.
   product(raw, 'typed-pro', { price: 100_000, pro: 90_000 });
@@ -204,7 +204,7 @@ test('a TYPED tier price below the regular one keeps its badge with no rules at 
 });
 
 test('the predicate is a UNION — typed prices and rules both land on the shelf', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   catalog(raw, 't_printers', null);
   catalog(raw, 't_toys', null);
   product(raw, 'typed', { price: 100_000, pro: 90_000 });
@@ -222,7 +222,7 @@ test('the predicate is a UNION — typed prices and rules both land on the shelf
 /* ====================================================================== */
 
 test('a rule that has ended is not a discount today, and one that has not started is not one yet', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   product(raw, 'expired-only');
   product(raw, 'future-only');
   product(raw, 'live-only');
@@ -236,7 +236,7 @@ test('a rule that has ended is not a discount today, and one that has not starte
 });
 
 test('a disabled rule badges nothing', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   product(raw, 'p1');
   rule(raw, 'off', { scope: 'product', product_id: 'p1', enabled: 0 });
 
@@ -248,7 +248,7 @@ test('a disabled rule badges nothing', async () => {
 /* ====================================================================== */
 
 test('a rule on a main section reaches a product filed under a sub-section of it', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   // «الطابعات ← FDM ← Bambu» — the depth an admin can build and a flat
   // `category_id = ?` test would silently skip.
   catalog(raw, 't_printers', null);
@@ -267,7 +267,7 @@ test('a rule on a main section reaches a product filed under a sub-section of it
 });
 
 test('a sub-section rule does not reach its siblings', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   catalog(raw, 't_printers', null);
   catalog(raw, 't_fdm', 't_printers');
   catalog(raw, 't_resin', 't_printers');
@@ -279,7 +279,7 @@ test('a sub-section rule does not reach its siblings', async () => {
 });
 
 test('a product-scoped rule badges that product and nothing else', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   product(raw, 'chosen');
   product(raw, 'other');
   rule(raw, 'one', { scope: 'product', product_id: 'chosen' });
@@ -292,7 +292,7 @@ test('a product-scoped rule badges that product and nothing else', async () => {
 /* ====================================================================== */
 
 test('a signed-out visitor is shown the MEMBERSHIP prices, not a member price of their own', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   product(raw, 'a1', { price: 675_000 });
   // The live shape: PREMIUM a flat 15,000 off, PRO 10% — neither typed on the
   // product, both stated once as a rule.
@@ -309,13 +309,15 @@ test('a signed-out visitor is shown the MEMBERSHIP prices, not a member price of
 
   // WHAT THE MEMBERSHIP IS WORTH, labelled as the tier's and equal to what the
   // resolver would charge that member — the same figures
-  // `/api/products/:slug` already publishes as `membership_preview`.
-  assert.equal(card.display_prime_iqd, 660_000);
+  // `/api/products/:slug` already publishes as `membership_preview`. PREMIUM
+  // carries no member price since 0145 («اشتراك البريميوم لا يحمل خصومات»):
+  // a PREMIUM rule left in the table is never quoted as one.
+  assert.equal(card.display_prime_iqd, null);
   assert.equal(card.display_pro_iqd, 607_500);
 });
 
 test('the card and the product page quote the SAME membership numbers', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   product(raw, 'a1', { price: 675_000 });
   rule(raw, 'prime-fixed', { tier: 'prime', scope: 'global', mode: 'fixed', percent: null, fixed: 15_000 });
   rule(raw, 'pro-pct', { tier: 'pro', scope: 'global', mode: 'percent', percent: 10 });
@@ -324,12 +326,14 @@ test('the card and the product page quote the SAME membership numbers', async ()
   const card = (await json(await get(a, '/api/home'))).discounted[0] as Record<string, unknown>;
   const page = await json(await get(a, '/api/products/a1'));
 
-  assert.equal(page.membership_preview.prime.unit_iqd, card.display_prime_iqd);
+  // Neither door names a PREMIUM price (0145); both name the same PRO one.
+  assert.equal(page.membership_preview.prime, null);
+  assert.equal(card.display_prime_iqd, null);
   assert.equal(page.membership_preview.pro.unit_iqd, card.display_pro_iqd);
 });
 
 test('a TYPED member price is never overwritten by a rule-derived teaser', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   // The owner typed 600,000 for PRO on this product. A global 10% rule would
   // compute 607,500 — the typed number wins, here as in `memberPrice`.
   product(raw, 'a1', { price: 675_000, pro: 600_000 });
@@ -340,7 +344,7 @@ test('a TYPED member price is never overwritten by a rule-derived teaser', async
 });
 
 test('an order-conditional rule cannot badge a product, because no card could quote it', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   // «خصم 10% على الطلبات فوق 500,000» is a real benefit and a real discount,
   // but `isUnitExpressible` keeps it out of the unit price on purpose, so the
   // card has no number to print. A badge over an unchanged price is the same
@@ -354,7 +358,7 @@ test('an order-conditional rule cannot badge a product, because no card could qu
 });
 
 test('a rule configured to zero is not a discount', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   product(raw, 'zero-pct');
   product(raw, 'zero-fixed');
   rule(raw, 'zp', { scope: 'product', product_id: 'zero-pct', percent: 0 });
@@ -375,7 +379,7 @@ test('a rule configured to zero is not a discount', async () => {
  * member it affected; it is now published store-wide, so it is guarded here.
  */
 test('a rule that would zero a product prints no free price', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   product(raw, 'cheap', { price: 20_000 });
   rule(raw, 'toobig', { tier: 'pro', scope: 'global', mode: 'fixed', percent: null, fixed: 50_000 });
 
@@ -387,7 +391,7 @@ test('a rule that would zero a product prints no free price', async () => {
 });
 
 test("a PLUS rule shows nothing, because no ordinary product's card has a PLUS rung", async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   product(raw, 'p1');
   rule(raw, 'plus', { tier: 'plus', scope: 'product', product_id: 'p1' });
 
@@ -416,7 +420,7 @@ function counting(raw: Raw): { db: unknown; n: () => number } {
 
 test('the shelf costs the same number of statements with twelve products as with one', async () => {
   const build = (count: number) => {
-    const raw = freshDb();
+    const raw = proOnSale(freshDb());
     catalog(raw, 't_printers', null);
     rule(raw, 'printers', { scope: 'category', category_id: 't_printers', percent: 10 });
     for (let i = 0; i < count; i += 1) product(raw, `p${i}`, { category: 't_printers' });
@@ -548,7 +552,7 @@ test('with no rules the predicate is exactly the question the shelves asked befo
 /* ====================================================================== */
 
 test('a draft product is never on the shelf, however generous the rule', async () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   product(raw, 'live');
   product(raw, 'draft');
   raw.prepare("UPDATE products SET status = 'draft' WHERE id = 'draft'").run();

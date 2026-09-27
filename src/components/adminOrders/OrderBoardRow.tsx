@@ -43,6 +43,7 @@ import { ChevronsRight, Loader2, Trash2 } from 'lucide-react';
 import { formatIqd, type AdminOrderRow, type OrderStatus } from '../../lib/api';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
 import { DayChip, PriceHoldBadge, ProBadge, TypeBadge, countText } from './OrderBoardBadges';
+import { DeliveryMethodBadge } from './deliveryMethod';
 
 /**
  * «يظهر بشكل صغير سطر بجانب رقم الطلب المنتجات التي طلبها» — WHAT IS IN THE
@@ -141,6 +142,9 @@ export default function OrderBoardRow({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-[1.5] text-text-secondary">
           {govLabel && <span>{govLabel}</span>}
           <TypeBadge type={order.shipping_type} loc={loc} />
+          {/* Latin digits mean English here; Arabic and Sorani both read the
+              method's Arabic title (it carries no Sorani one). */}
+          <DeliveryMethodBadge method={order.delivery_method} lang={latin ? 'en' : 'ar'} />
           {/* The status is INFORMATION here, not a control, and it is not a
               seventh colour: if everything on the row is coloured, the one
               red thing on it stops meaning "late". */}

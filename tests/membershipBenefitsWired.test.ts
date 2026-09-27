@@ -86,6 +86,10 @@ function setup() {
       ('p_acc','mb-acc','Nozzle','فوهة',10000,'active',80,'[]','[]','direct_sale','["direct_sale"]','[]','[]',NULL,NULL);
     INSERT INTO product_catalogs (product_id,catalog_id,position) VALUES ('p_a1','mb_bambu',0);
   `);
+  // These are the benefit MECHANICS, proven with PRO on sale — they are PRO's
+  // the day the owner resumes it. Migration 0145 pauses PRO; while it is
+  // paused a PRO card acts as PREMIUM (tests/proPause.test.ts).
+  raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 
@@ -591,29 +595,34 @@ test('the cash-on-delivery tax is calculated in full, then exempted, and BOTH nu
   assert.equal(order.cod_tax_exemption_iqd, order.cod_tax_before_exemption_iqd);
 });
 
-test('PREMIUM is NOT exempt by default, and the owner can change that in one field', async () => {
+test('PREMIUM pays the cash-on-delivery tax, and no rule can exempt it any more (0145)', async () => {
   const { raw, db } = setup();
   cartLine(raw, 'ci_pm', 'premmem', 'p_a1', 1);
   const prem = appAs(db, 'premmem', 'customer');
 
   const before = await json(await send(prem, 'POST', '/api/orders/quote', checkoutBody('a_prem')));
-  assert.ok(before.quote.cod_tax_iqd > 0, 'PREMIUM pays the tax by default');
+  assert.ok(before.quote.cod_tax_iqd > 0, 'PREMIUM pays the tax');
   assert.equal(before.quote.cod_tax_exemption_iqd, 0);
 
+  // «أما المميزات الأخرى فألغيها»: the exemption starts at PRO now, so a
+  // PREMIUM rule granting it would save and then do nothing — the door
+  // refuses it with the reason, as it refuses a PLUS rule.
   const admin = appAs(db, 'boss', 'admin');
   const rules = await json(await send(admin, 'GET', '/api/admin/membership-benefits'));
   const premRule = rules.rules.find((r: BenefitRule) => r.tier === 'prime' && r.benefit_type === 'cod_tax_exemption');
-  assert.ok(premRule, 'the seed leaves the rule in place, switched off');
+  assert.ok(premRule, 'the seed leaves the rule in place, saying no');
   const edited = await json(
     await send(admin, 'PUT', `/api/admin/membership-benefits/${premRule.id}`, {
       tier: 'prime', benefit_type: 'cod_tax_exemption', scope: 'global', cod_tax_exempt: true,
     })
   );
-  assert.equal(edited.success, true);
+  assert.equal(edited.code, 'BENEFIT_TIER_NOT_ENTITLED');
 
+  // Even a row written behind the door's back exempts nobody at PREMIUM.
+  raw.exec(`UPDATE membership_benefit_rules SET cod_tax_exempt = 1, enabled = 1 WHERE id = '${premRule.id}'`);
   const after = await json(await send(prem, 'POST', '/api/orders/quote', checkoutBody('a_prem')));
-  assert.equal(after.quote.cod_tax_iqd, 0, 'one field, no deploy');
-  assert.equal(after.quote.cod_tax_exemption_iqd, before.quote.cod_tax_iqd);
+  assert.equal(after.quote.cod_tax_iqd, before.quote.cod_tax_iqd);
+  assert.equal(after.quote.cod_tax_exemption_iqd, 0);
 });
 
 test('nothing reaches a non-member, an anonymous cart, or an expired membership', async () => {
@@ -675,7 +684,8 @@ test('the subscription page reads live configuration, never a string in the bund
   assert.deepEqual(pro.free_shipping.methods, ['standard', 'personal']);
   assert.equal(pro.cod_tax_exempt, true);
 
-  assert.equal(plans.benefits.prime.free_shipping.threshold_iqd, 100_000);
+  // PREMIUM's free standard delivery starts above 75,000 since 0145.
+  assert.equal(plans.benefits.prime.free_shipping.threshold_iqd, 75_000);
   assert.deepEqual(plans.benefits.prime.free_shipping.methods, ['standard']);
   assert.equal(plans.benefits.prime.cod_tax_exempt, false);
   // An internal note never leaves the server.
@@ -875,19 +885,23 @@ test('a scheduled offer is not credited to the membership either', async () => {
 
 /* ------------------------------------ the owner's figures, and one section rule */
 
-test('the recommended PREMIUM printers rule is the owner’s 25,000 per unit', async () => {
+test('the recommended starting values offer no PREMIUM discount — PREMIUM carries none since 0145', async () => {
   const { db } = setup();
   const admin = appAs(db, 'boss', 'admin');
-  const keys = (await json(await send(admin, 'GET', '/api/admin/membership-benefits/recommended'))).entries.map(
-    (e: { key: string }) => e.key
+  const entries = (await json(await send(admin, 'GET', '/api/admin/membership-benefits/recommended'))).entries as Array<{
+    key: string;
+    tier: string;
+  }>;
+  assert.equal(entries.some((e) => e.tier === 'prime'), false);
+  const out = await json(await send(admin, 'POST', '/api/admin/membership-benefits/recommended', { keys: entries.map((e) => e.key) }));
+  assert.equal(out.created.some((r: { tier: string }) => r.tier === 'prime'), false, JSON.stringify(out));
+  // And the door refuses one typed by hand.
+  const typed = await json(
+    await send(admin, 'POST', '/api/admin/membership-benefits', {
+      tier: 'prime', benefit_type: 'product_discount', scope: 'global', discount_mode: 'fixed', fixed_iqd: 25_000,
+    })
   );
-  const out = await json(await send(admin, 'POST', '/api/admin/membership-benefits/recommended', { keys }));
-  const premium = out.created.find((r: { tier: string; label: string }) => r.tier === 'prime' && r.label.includes('طابعات'));
-  assert.ok(premium, JSON.stringify(out));
-  assert.equal(premium.discount_mode, 'fixed');
-  assert.equal(premium.fixed_iqd, 25_000);
-  assert.equal(premium.max_discount_iqd, 25_000);
-  assert.equal(premium.cap_scope, 'per_unit');
+  assert.equal(typed.code, 'BENEFIT_TIER_NOT_ENTITLED');
 });
 
 test('only the owner’s printer figures go live; every other suggestion lands switched off', async () => {

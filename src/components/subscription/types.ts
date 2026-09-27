@@ -15,6 +15,12 @@ export interface ApiPlan {
   /** Math.round(price / months), computed by the server; null while unpriced. */
   per_month_iqd: number | null;
   sort: number;
+  /**
+   * The tier is PAUSED (PRO, migration 0145): «قريبًا — يتم العمل على تطوير
+   * النظام». No price is sent and nothing can be bought — not the same thing
+   * as an unpriced plan, and the page says which.
+   */
+  paused?: boolean;
 }
 
 export interface LaunchInfo {
@@ -37,6 +43,8 @@ export interface DeliveryThresholds {
 
 export interface PlansResponse {
   plans: ApiPlan[];
+  /** PRO paused (0145). Absent on an older server = not paused. */
+  pro_pause?: { paused: boolean; since: string | null };
   launch: LaunchInfo;
   features?: PlanFeatures;
   delivery?: DeliveryThresholds;
@@ -64,6 +72,15 @@ export interface ApiMembership {
   starts_at: string | null;
   expires_at: string | null;
   source: string;
+  /** Set while this PRO membership is frozen by the pause. */
+  paused_at?: string | null;
+}
+
+/** A PRO card frozen by the pause — its days kept, its PRO benefits waiting. */
+export interface PausedMembership {
+  tier: 'pro';
+  since: string;
+  remaining_days: number | null;
 }
 
 export interface TierStatus {
@@ -73,6 +90,11 @@ export interface TierStatus {
   pending_launch: { tier: PaidTier; duration_months: number } | null;
   /** Benefits paused by an active restriction case — shown to the member. */
   gated_benefits?: string[];
+  /**
+   * The member's PRO card while PRO is paused; `tier` above is then what it
+   * acts as (PREMIUM) and `expires_at` is null — a frozen clock has no end.
+   */
+  paused?: PausedMembership | null;
 }
 
 export interface MineResponse {

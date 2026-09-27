@@ -121,6 +121,8 @@ async function publicStore(db: D1Database, ctx: StoreContext, rootDomain: string
       name: m.name,
       verified: !!m.verified,
       pro_badge: benefits.proMerchantBadge(tier),
+      // PREMIUM's own mark (0145); a PRO merchant shows the PRO badge alone.
+      premium_badge: !benefits.proMerchantBadge(tier) && benefits.premiumBadge(tier),
       badge: m.badge_override || m.badge,
       rating: m.rating_count ? m.rating_avg_x100 / 100 : null,
       rating_count: m.rating_count,

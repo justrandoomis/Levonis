@@ -142,19 +142,24 @@ export function baghdadDay(offsetDays = 0, nowMs: number = Date.now()): string {
 }
 
 /**
- * The existing check-in ladder, unchanged: 5, 5, 10, 10, 15, 15, then 20 from
- * the seventh consecutive day on. Note what this means for a "reset for
- * profit" attempt — breaking a streak sends the counter back to the CHEAPEST
- * rung, so there is no day count a customer can manufacture that pays more
- * than simply continuing. `tests/pointsIntegrity.test.ts` proves the ladder is
- * monotonic for exactly that reason.
+ * The check-in ladder, one point a rung (owner, 2026-09-27: «تسجيل الدخول
+ * اليومي يبدأ من نقطة واحدة إلى نقطتين ثلاثة أربعة خمسة ستة سبعة وهكذا بدل من
+ * خمسة نقاط وعشرة وخمسة عشر»): 1, 2, 3, 4, 5, 6, then 7 from the seventh
+ * consecutive day on — the week the rewards page draws, its top rung held the
+ * way the old ladder held 20. It replaced 5, 5, 10, 10, 15, 15, 20; a check-in
+ * already awarded keeps what it paid.
+ *
+ * Note what this means for a "reset for profit" attempt — breaking a streak
+ * sends the counter back to the CHEAPEST rung, so there is no day count a
+ * customer can manufacture that pays more than simply continuing.
+ * `tests/pointsIntegrity.test.ts` proves the ladder is monotonic for exactly
+ * that reason.
  */
+export const CHECKIN_TOP_RUNG = 7;
+
 export function checkinBasePoints(streakDay: number): number {
   const day = Math.max(1, Math.trunc(Number(streakDay) || 1));
-  if (day <= 2) return 5;
-  if (day <= 4) return 10;
-  if (day <= 6) return 15;
-  return 20;
+  return Math.min(day, CHECKIN_TOP_RUNG);
 }
 
 /** The period slot a mission occupies: the Baghdad day, or 'once' forever. */
@@ -323,6 +328,8 @@ export interface DirectAwardInput {
   streakDay: number | null;
   nowIso: string;
   label: string;
+  /** false on a database that has not run 0145 (tierPause.ts `isPausedAtMissing`). */
+  pausable?: boolean;
 }
 
 /**
@@ -345,7 +352,7 @@ export function buildDirectAwardStatements(db: D1Database, i: DirectAwardInput):
             streak_day, state, required_seconds, started_at, awarded_at, idempotency_key, wallet_tx_id)
          SELECT ?1, ?2, ?3, ?4, ${multipliedPointsSql('?5', 'm.mult')}, ?5, m.mult, m.tier,
                 ?6, 'awarded', 0, ?7, ?7, ?8, 'wtx_rc_' || ?1
-           FROM (SELECT ${multiplierSql('?2', '?7')} AS mult, ${tierNameSql('?2', '?7')} AS tier) m`
+           FROM (SELECT ${multiplierSql('?2', '?7', i.pausable ?? true)} AS mult, ${tierNameSql('?2', '?7', i.pausable ?? true)} AS tier) m`
       )
       .bind(i.claimId, i.userId, i.mission, i.period, i.basePoints, i.streakDay, i.nowIso, idem),
     ledgerStatement(db, 'rc.id = ?3', i.label, i.nowIso, [i.claimId]),
@@ -401,6 +408,8 @@ export interface TimedAwardInput {
   nowIso: string;
   nowSecs: number;
   label: string;
+  /** false on a database that has not run 0145 (tierPause.ts `isPausedAtMissing`). */
+  pausable?: boolean;
 }
 
 /**
@@ -422,7 +431,7 @@ export interface TimedAwardInput {
  * instead of reporting a success it did not have.
  */
 export function buildTimedAwardStatements(db: D1Database, i: TimedAwardInput): D1PreparedStatement[] {
-  const mult = multiplierSql('?1', '?2');
+  const mult = multiplierSql('?1', '?2', i.pausable ?? true);
   return [
     db
       .prepare(
@@ -431,7 +440,7 @@ export function buildTimedAwardStatements(db: D1Database, i: TimedAwardInput): D
                 awarded_at = ?2,
                 base_points = ?3,
                 multiplier_x100 = ${mult},
-                tier_at_award = ${tierNameSql('?1', '?2')},
+                tier_at_award = ${tierNameSql('?1', '?2', i.pausable ?? true)},
                 points = ${multipliedPointsSql('?3', mult)}
           WHERE user_id = ?1 AND mission = ?4 AND day = ?5 AND state = 'started'
             AND started_at IS NOT NULL

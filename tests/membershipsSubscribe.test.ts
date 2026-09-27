@@ -52,6 +52,10 @@ function setup(launched = true) {
       launched ? '{"activated":true}' : '{"activated":false}'
     }')`
   );
+  // These are the PURCHASE MECHANICS — upgrades, credits, replays, races —
+  // and they are PRO's too the day the owner resumes it. Migration 0145
+  // pauses PRO; the pause itself is proven in tests/proPause.test.ts.
+  raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 
@@ -108,15 +112,17 @@ test('/plans reports the conditional gifts and the delivery thresholds from sett
   const a = app(db, null);
   let body = await json(await a.request('/api/memberships/plans'));
   assert.deepEqual(body.features, { printer_gift: false, preorder_gift: false }, 'nothing is enabled by default');
-  assert.deepEqual(body.delivery, { pro_threshold_iqd: 75000, prime_threshold_iqd: 150000 });
+  // PREMIUM's free delivery starts above 75,000 since 0145, like PRO's.
+  assert.deepEqual(body.delivery, { pro_threshold_iqd: 75000, prime_threshold_iqd: 75000 });
   const plans = body.plans as Array<Record<string, unknown>>;
-  assert.equal(plans.length, 6);
+  // PLUS 1/3/6/12, PREMIUM 1/3/6/12 (0145) and PRO 12.
+  assert.equal(plans.length, 9);
   assert.ok(plans.every((p) => !Object.keys(p).some((k) => k.includes('cost'))));
   // The per-month figure the cards show is the SERVER's arithmetic.
   for (const p of plans) {
     assert.equal(p.per_month_iqd, Math.round((p.price_iqd as number) / (p.duration_months as number)), `${p.id} per_month_iqd`);
   }
-  assert.equal(plans.find((p) => p.id === 'plus_12mo')?.per_month_iqd, 2417);
+  assert.equal(plans.find((p) => p.id === 'plus_12mo')?.per_month_iqd, 833);
 
   // An enabled preorder gift WITHOUT a product is not a gift.
   raw.exec(`INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('preorderGiftConfig','{"enabled":true,"product_id":"","label_ar":"","qty":1}')`);
@@ -133,7 +139,7 @@ test('/plans reports the conditional gifts and the delivery thresholds from sett
   raw.exec(`INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('shippingPolicy','{"pro_threshold_iqd":80000}')`);
   body = await json(await a.request('/api/memberships/plans'));
   assert.deepEqual(body.features, { printer_gift: false, preorder_gift: true });
-  assert.deepEqual(body.delivery, { pro_threshold_iqd: 80000, prime_threshold_iqd: 150000 }, 'a partial policy keeps the shipped default');
+  assert.deepEqual(body.delivery, { pro_threshold_iqd: 80000, prime_threshold_iqd: 75000 }, 'a partial policy keeps the shipped default');
 });
 
 /**
@@ -253,8 +259,8 @@ test('a purchase charges the wallet at the current rate and a replay charges onc
   assert.equal(first.status, 200);
   const b1 = await json(first);
   assert.equal(b1.replay, false);
-  assert.equal(b1.charged_iqd, 29000);
-  assert.equal(b1.charged_usd_cents, cents(29000));
+  assert.equal(b1.charged_iqd, 10000);
+  assert.equal(b1.charged_usd_cents, cents(10000));
   assert.equal((b1.membership as Record<string, unknown>).state, 'active');
   assert.equal((b1.membership as Record<string, unknown>).tier, 'plus');
 
@@ -262,15 +268,15 @@ test('a purchase charges the wallet at the current rate and a replay charges onc
   assert.equal(second.status, 200);
   const b2 = await json(second);
   assert.equal(b2.replay, true, 'the same key is the same attempt');
-  assert.equal(b2.charged_iqd, 29000, 'a replay tells the same story');
-  assert.equal(b2.charged_usd_cents, cents(29000), 'including the wallet debit it made');
+  assert.equal(b2.charged_iqd, 10000, 'a replay tells the same story');
+  assert.equal(b2.charged_usd_cents, cents(10000), 'including the wallet debit it made');
   assert.equal(rows(raw, 'u1').length, 1);
   assert.equal(walletRows(raw, 'u1').length, 1, 'one wallet debit');
-  assert.equal(Number(walletRows(raw, 'u1')[0].amount), cents(29000));
+  assert.equal(Number(walletRows(raw, 'u1')[0].amount), cents(10000));
   // What the row carries into a later upgrade (migration 0052).
   const row = rows(raw, 'u1')[0];
-  assert.equal(Number(row.price_paid_iqd), 29000);
-  assert.equal(Number(row.credit_basis_iqd), 29000);
+  assert.equal(Number(row.price_paid_iqd), 10000);
+  assert.equal(Number(row.credit_basis_iqd), 10000);
   assert.equal(Number(row.credit_applied_iqd), 0);
 });
 
@@ -310,10 +316,10 @@ test('PLUS → PREMIUM is a prorated upgrade: credit for the unused PLUS, old ro
   const r = await subscribe(a, 'prime_12mo', 'up-prime-0001');
   assert.equal(r.status, 200);
   const b = await json(r);
-  // Bought moments ago: every day of PLUS is unused, so the whole 29,000 comes back.
-  assert.equal(b.credit_iqd, 29000);
-  assert.equal(b.charged_iqd, 99000 - 29000);
-  assert.equal(b.charged_usd_cents, cents(70000));
+  // Bought moments ago: every day of PLUS is unused, so the whole 10,000 comes back.
+  assert.equal(b.credit_iqd, 10000);
+  assert.equal(b.charged_iqd, 99000 - 10000);
+  assert.equal(b.charged_usd_cents, cents(89000));
   assert.equal(b.upgraded_from, 'plus');
 
   const all = rows(raw, 'u1');
@@ -326,28 +332,28 @@ test('PLUS → PREMIUM is a prorated upgrade: credit for the unused PLUS, old ro
   );
   const u = raw.prepare('SELECT membership_tier FROM users WHERE id = ?').get('u1') as { membership_tier: string };
   assert.equal(u.membership_tier, 'prime');
-  // The PREMIUM row is worth its PRICE to a later upgrade, not the 70,000 it
+  // The PREMIUM row is worth its PRICE to a later upgrade, not the 89,000 it
   // cost after the credit — and it remembers the credit it consumed.
   const prime = all[1];
-  assert.equal(Number(prime.price_paid_iqd), 70000);
+  assert.equal(Number(prime.price_paid_iqd), 89000);
   assert.equal(Number(prime.credit_basis_iqd), 99000);
-  assert.equal(Number(prime.credit_applied_iqd), 29000);
+  assert.equal(Number(prime.credit_applied_iqd), 10000);
 });
 
 test('two hops keep the first credit: PLUS → PREMIUM → PRO on one day charges the PRO price in total, and a replay reports the same credit', async () => {
   const { db, raw } = setup();
   seedBalance(raw, 'u1', 1_000_000);
-  // A 199,000 PRO makes the arithmetic of the finding visible: 29,000 +
-  // 70,000 + 100,000 = 199,000 — not 29,000 + 70,000 + 129,000 = 228,000.
+  // A 199,000 PRO makes the arithmetic of the finding visible: 10,000 +
+  // 89,000 + 100,000 = 199,000 — not 10,000 + 89,000 + 110,000 = 209,000.
   raw.exec("UPDATE membership_plans SET price_iqd = 199000 WHERE id = 'pro_12mo'");
   const a = app(db, 'u1');
 
   const hop1 = await json(await subscribe(a, 'plus_12mo', 'hop-1-0001'));
   const hop2 = await json(await subscribe(a, 'prime_12mo', 'hop-2-0001'));
   const hop3 = await json(await subscribe(a, 'pro_12mo', 'hop-3-0001'));
-  assert.equal(hop1.charged_iqd, 29000);
-  assert.equal(hop2.charged_iqd, 70000);
-  assert.equal(hop2.credit_iqd, 29000);
+  assert.equal(hop1.charged_iqd, 10000);
+  assert.equal(hop2.charged_iqd, 89000);
+  assert.equal(hop2.credit_iqd, 10000);
   assert.equal(hop3.credit_iqd, 99000, 'the second hop credits the PREMIUM price, not the post-credit charge');
   assert.equal(hop3.charged_iqd, 100000);
   assert.equal(Number(hop1.charged_iqd) + Number(hop2.charged_iqd) + Number(hop3.charged_iqd), 199000);
@@ -383,8 +389,8 @@ test('PLUS → PRO still prorates (the original rule is preserved)', async () =>
   const a = app(db, 'u1');
   await subscribe(a, 'plus_1mo', 'up3-plus-0001');
   const b = await json(await subscribe(a, 'pro_12mo', 'up3-pro-0001'));
-  assert.equal(b.credit_iqd, 4500);
-  assert.equal(b.charged_iqd, 499000 - 4500);
+  assert.equal(b.credit_iqd, 1000);
+  assert.equal(b.charged_iqd, 499000 - 1000);
   assert.equal(rows(raw, 'u1').filter((m) => m.state === 'active').length, 1);
 });
 
@@ -572,17 +578,17 @@ test('the quote says exactly what the purchase then does', async () => {
   const { db, raw } = setup();
   seedBalance(raw, 'u1', 6000); // $60.00
   const a = app(db, 'u1');
-  await subscribe(a, 'plus_12mo', 'q-plus-0001'); // costs $20.72 → $39.28 left
+  await subscribe(a, 'plus_12mo', 'q-plus-0001'); // costs $7.14 → $52.86 left
 
   const q = (await json(await a.request('/api/memberships/quote?planId=prime_12mo'))).quote as Record<string, unknown>;
   assert.equal(q.ok, true);
   assert.equal(q.price_iqd, 99000);
-  assert.equal(q.credit_iqd, 29000);
-  assert.equal(q.charge_iqd, 70000);
+  assert.equal(q.credit_iqd, 10000);
+  assert.equal(q.charge_iqd, 89000);
   assert.equal(q.exchange_rate, RATE);
-  assert.equal(q.charge_usd_cents, cents(70000));
-  assert.equal(q.balance_usd_cents, 6000 - cents(29000));
-  assert.equal(q.shortfall_usd_cents, cents(70000) - (6000 - cents(29000)));
+  assert.equal(q.charge_usd_cents, cents(89000));
+  assert.equal(q.balance_usd_cents, 6000 - cents(10000));
+  assert.equal(q.shortfall_usd_cents, cents(89000) - (6000 - cents(10000)));
   assert.equal(q.activate_now, true);
   assert.equal(typeof q.expires_at, 'string');
   assert.equal(q.upgrade_from_tier, 'plus');
@@ -623,7 +629,7 @@ test('the quote does not hand out an inactive plan — 404, exactly as GET /plan
   assert.equal(r.status, 404);
   const body = await json(r);
   assert.equal(body.quote, undefined, 'no refusal payload carrying the plan and its price');
-  assert.equal(JSON.stringify(body).includes('4500'), false, 'the price of a withdrawn plan is not in the answer');
+  assert.equal(JSON.stringify(body).includes('1000'), false, 'the price of a withdrawn plan is not in the answer');
   // The purchase path refuses it too, as before.
   seedBalance(raw, 'u1', 1_000_000);
   assert.equal((await json(await subscribe(a, 'plus_1mo', 'inactive-0001'))).code, 'PLAN_UNPRICED');
@@ -634,7 +640,7 @@ test('a confirmation carries the figures the page showed: a drifted quote is ref
   seedBalance(raw, 'u1', 1_000_000);
   const a = app(db, 'u1');
   const shown = (await json(await a.request('/api/memberships/quote?planId=plus_12mo'))).quote as Record<string, unknown>;
-  assert.equal(shown.charge_usd_cents, cents(29000));
+  assert.equal(shown.charge_usd_cents, cents(10000));
 
   // The exchange rate moves between the summary and the tap on Confirm.
   raw.exec(`INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('exchangeRate','1500')`);
@@ -644,9 +650,9 @@ test('a confirmation carries the figures the page showed: a drifted quote is ref
   assert.equal(body.code, 'QUOTE_CHANGED');
   const fresh = (body.details as Record<string, unknown>).quote as Record<string, unknown>;
   assert.equal(fresh.ok, true);
-  assert.equal(fresh.charge_iqd, 29000);
+  assert.equal(fresh.charge_iqd, 10000);
   assert.equal(fresh.exchange_rate, 1500);
-  assert.equal(fresh.charge_usd_cents, walletSpendCents(29000, null, 1500));
+  assert.equal(fresh.charge_usd_cents, walletSpendCents(10000, null, 1500));
   assert.equal(typeof fresh.balance_usd_cents, 'number');
   assert.equal(rows(raw, 'u1').length, 0, 'nothing was written');
   assert.equal(walletRows(raw, 'u1').length, 0, 'nothing was charged');
@@ -688,12 +694,12 @@ test('the admin plan list shows inactive plans too, and only to admins', async (
   const admin = app(db, 'boss', 'admin');
   const b = await json(await admin.request('/api/memberships/admin/plans'));
   const plans = b.plans as Array<Record<string, unknown>>;
-  assert.equal(plans.length, 6);
+  assert.equal(plans.length, 9);
   assert.equal(plans.find((p) => p.id === 'plus_1mo')?.active, false);
   assert.equal((b.launch as Record<string, unknown>).activated, true);
 
   const pub = (await json(await app(db, null).request('/api/memberships/plans'))).plans as unknown[];
-  assert.equal(pub.length, 5, 'the public list hides the inactive plan');
+  assert.equal(pub.length, 8, 'the public list hides the inactive plan');
 
   assert.equal((await app(db, 'u1').request('/api/memberships/admin/plans')).status, 403);
 
@@ -774,7 +780,7 @@ test('the memberships admin surface exists only on the main host — a merchant 
   assert.equal((await post(onShop, '/api/memberships/admin/nope/cancel', {})).status, 404);
   // Nothing moved.
   const price = raw.prepare("SELECT price_iqd FROM membership_plans WHERE id = 'plus_1mo'").get() as { price_iqd: number };
-  assert.equal(price.price_iqd, 4500);
+  assert.equal(price.price_iqd, 1000);
   assert.equal((raw.prepare('SELECT COUNT(*) AS n FROM memberships').get() as { n: number }).n, 0);
   // The public routes are still served on the storefront host, and the main host still administers.
   assert.equal((await onShop.request('/api/memberships/plans')).status, 200);

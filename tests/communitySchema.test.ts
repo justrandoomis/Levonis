@@ -116,10 +116,11 @@ test('every PLUS duration is priced, active and therefore purchasable', () => {
   assert.deepEqual(
     rows.map((r) => [r.id, r.price_iqd, r.active]),
     [
-      ['plus_1mo', 4500, 1],
-      ['plus_3mo', 10000, 1],
-      ['plus_6mo', 17000, 1],
-      ['plus_12mo', 29000, 1],
+      // 0145 (owner, 2026-09-27): «اشتراك 1000 دينار فقط شهريًا و10000 سنويًا».
+      ['plus_1mo', 1000, 1],
+      ['plus_3mo', 2750, 1],
+      ['plus_6mo', 5250, 1],
+      ['plus_12mo', 10000, 1],
     ],
     'the owner-set PLUS schedule is not what the database holds'
   );

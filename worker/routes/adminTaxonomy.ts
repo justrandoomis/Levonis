@@ -1,4 +1,5 @@
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
+import { sectionTreeOrder } from '@levonis/catalog/sectionTree';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int, oneOf } from '../lib/http';
@@ -262,10 +263,18 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
     return out;
   };
 
+  // TREE ORDER (packages/catalog/src/sectionTree.ts): each main section is
+  // followed by its own sub-sections. `ORDER BY sort` alone compared sibling
+  // numbers across levels, so a single list — the import panel's — printed
+  // sub-sections above their parents and interleaved two parents' children.
+  const placements = new Map(sectionTreeOrder(results).map((p, i) => [p.row.id, { ...p, index: i }] as const));
+  const ordered = [...results].sort((a, b) => (placements.get(a.id)?.index ?? 0) - (placements.get(b.id)?.index ?? 0));
+
   return c.json({
     success: true,
-    catalogs: results.map((r) => {
+    catalogs: ordered.map((r) => {
       const family = families.get(r.id) ?? null;
+      const placed = placements.get(r.id);
       const type = family ? productTypeForBranch(family, branch(r.id)) : null;
       /**
        * WHAT THIS SECTION'S TEMPLATE ACTUALLY CONTAINS — narrowed, not the
@@ -303,6 +312,10 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
           .map((d) => ({ method: d.method, enabled: d.enabled, quantity_step: d.quantity_step, fee_iqd: d.fee_iqd })),
         spec_columns: groups.reduce((n, g) => n + g.fields.length, 0),
         spec_groups: groups.map((g) => ({ id: g.id, label_ar: g.label_ar, label_en: g.label_en, fields: g.fields.length })),
+        /** 0 for a main section; the list is in tree order. */
+        depth: placed?.depth ?? 0,
+        /** The main section this one files under (itself, for a main section). */
+        root_id: placed?.root.id ?? r.id,
       };
     }),
   });

@@ -10,14 +10,14 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { asD1, freshDb, get, json, stubApp } from './fixtures/app';
+import { asD1, freshDb, get, json, stubApp, proOnSale } from './fixtures/app';
 import { P, seedLiveCatalog } from './fixtures/liveCatalog';
 import { productRoutes } from '../worker/routes/products';
 import { applyFilters, facetTokensOf, sortItems, type ListingItem } from '../worker/lib/listingFacets';
 import { DEFAULT_LISTING } from '../packages/catalog/src/discovery';
 
 function world() {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   seedLiveCatalog(raw);
   const app = stubApp(asD1(raw), null, (a) => a.route('/api/products', productRoutes));
   return { raw, app };

@@ -7,6 +7,7 @@
  */
 import { BadgeCheck } from 'lucide-react';
 import ProMerchantBadge from '../../merchant/ProMerchantBadge';
+import PremiumMemberBadge from '../../merchant/PremiumMemberBadge';
 import { Column, useText } from '../parts';
 import { Avatar, HeroCta, ProfileRows, RatingLine, type HeroProps } from './Hero';
 
@@ -39,6 +40,7 @@ function CoverHero({ block, store, data, cover, name }: VariantProps) {
                 {name}
               </h1>
               {store.merchant.pro_badge && <ProMerchantBadge compact />}
+              {store.merchant.premium_badge && <PremiumMemberBadge compact />}
               {store.merchant.verified && <BadgeCheck className="w-5 h-5 shrink-0 text-white fill-sky-500" aria-hidden="true" />}
             </div>
             {line && (
@@ -79,6 +81,7 @@ function SplitHero({ block, store, data, cover, name }: VariantProps) {
                   {name}
                 </h1>
                 {store.merchant.pro_badge && <ProMerchantBadge compact />}
+              {store.merchant.premium_badge && <PremiumMemberBadge compact />}
               </div>
               <RatingLine store={store} />
             </div>
@@ -115,6 +118,7 @@ function MinimalHero({ block, store, data, name }: VariantProps) {
             {name}
           </h1>
           {store.merchant.pro_badge && <ProMerchantBadge compact />}
+              {store.merchant.premium_badge && <PremiumMemberBadge compact />}
           {store.merchant.verified && <BadgeCheck className="w-5 h-5 shrink-0 text-white fill-sky-500" aria-hidden="true" />}
         </div>
         {line && (

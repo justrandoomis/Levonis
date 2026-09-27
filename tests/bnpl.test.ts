@@ -17,6 +17,9 @@ const PAST = '2020-01-01T00:00:00.000Z';
 function setup() {
   const raw = freshDb();
   const db = asD1(raw);
+  // BNPL is PRO's; it is proven with PRO on sale (0145 pauses it — a frozen
+  // PRO card acts as PREMIUM and has no BNPL, tests/proPause.test.ts).
+  raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
   raw.exec(`
     INSERT INTO users (id,email,password_hash) VALUES
       ('plus','plus@x.co','h'), ('premium','premium@x.co','h'),

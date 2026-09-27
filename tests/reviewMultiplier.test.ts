@@ -60,6 +60,9 @@ function setup(basePoints: number | null = 25) {
   raw.exec('PRAGMA foreign_keys = ON;');
   const dir = join(ROOT, 'migrations');
   for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) raw.exec(readFileSync(join(dir, f), 'utf8'));
+  // PRO's own mechanics, as they read with PRO on sale; migration 0145's
+  // pause is proven in tests/proPause.test.ts.
+  raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
 
   const future = new Date(Date.now() + 365 * 86_400_000).toISOString();
   const past = new Date(Date.now() - 86_400_000).toISOString();
@@ -174,17 +177,18 @@ test('a customer with no subscription is paid exactly what they were paid before
   assert.equal(awarded(raw, 'free')?.points, 50);
 });
 
-test('PREMIUM is paid 1.5× and PRO 2× for the same review', async () => {
+test('PRO is paid 2× for the same review, and PREMIUM the base rate since 0145', async () => {
   const { raw, db } = setup(25);
   const p1 = await post(appAs(db, 'prime'), '/api/reviews', plainReview('ORD-prime'));
   const p2 = await post(appAs(db, 'pro'), '/api/reviews', plainReview('ORD-pro'));
   assert.equal(p1.status, 200, p1.text);
   assert.equal(p2.status, 200, p2.text);
-  assert.equal(awarded(raw, 'prime')?.points, 75, '50 × 1.5');
+  // «اشتراك البريميوم لا يحمل خصومات … أما المميزات الأخرى فألغيها».
+  assert.equal(awarded(raw, 'prime')?.points, 50, 'PREMIUM: 50 × 1');
   assert.equal(awarded(raw, 'pro')?.points, 100, '50 × 2');
-  // The three customers differ ONLY in their subscription, so the ratio the
-  // owner promised is visible directly in the ledger.
-  assert.equal(awarded(raw, 'prime')!.points / 50, 1.5);
+  // The customers differ ONLY in their subscription, so the ratio the owner
+  // promised is visible directly in the ledger.
+  assert.equal(awarded(raw, 'prime')!.points / 50, 1);
   assert.equal(awarded(raw, 'pro')!.points / 50, 2);
 });
 
@@ -283,16 +287,19 @@ test('the admin approval pays the REVIEWER’s multiplier, never the admin’s',
 
 test('a half point on an approval rounds UP, in the member’s favour', async () => {
   const { raw, db } = setup(25);
-  rewardRow(raw, 'prime', 'rev_prime');
-  const res = await post<{ points_awarded: number }>(appAs(db, 'boss', 'admin'), '/api/reviews/admin/rev_prime/reward', {
+  // ×1.5 is a PRO whose priority service an admin has restricted (PREMIUM's
+  // own 1.5× ended with 0145).
+  raw.exec(`INSERT INTO restriction_cases (id,user_id,kind,state,benefit_flags) VALUES ('rc_pro','pro','other','active','["priorityService"]')`);
+  rewardRow(raw, 'pro', 'rev_pro');
+  const res = await post<{ points_awarded: number }>(appAs(db, 'boss', 'admin'), '/api/reviews/admin/rev_pro/reward', {
     action: 'approve',
     reason: 'مراجعة جيدة ومفيدة',
   });
   assert.equal(res.status, 200, res.text);
   // 25 × 1.5 = 37.5. Rounding down would pay ×1.48 and quietly keep the half
-  // for the shop on every odd award a PREMIUM member ever earns.
+  // for the shop on every odd award a 1.5× member ever earns.
   assert.equal(res.json.points_awarded, 38);
-  assert.equal(awarded(raw, 'prime')?.points, 38);
+  assert.equal(awarded(raw, 'pro')?.points, 38);
 });
 
 test('an approval for a customer with no subscription is unchanged', async () => {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, formatIqd } from '../lib/api';
-import { RefreshCw, Users, Inbox, CreditCard, Rocket } from 'lucide-react';
+import { RefreshCw, Users, Inbox, CreditCard, Rocket, PauseCircle } from 'lucide-react';
 import { Overlay } from './ui/Overlay';
 import { tierLabel, tierMetaFor } from './subscription/tierMeta';
 /**
@@ -303,6 +303,17 @@ const PLAN_STRINGS = {
     sweepTitle: 'تفعيل الحجوزات المتبقية',
     deferred: (n: number) => `${n} حجزًا لن يبدأ بالتفعيل — الحساب يملك فئة أعلى تعمل الآن. استرجعه أو ألغِه يدويًا.`,
     sweepBody: 'يبدأ عدّاد كل حجز متبقٍّ من هذه اللحظة، بنفس قواعد الإطلاق (أعلى فئة للحساب، ويُلغى الأدنى). اكتب ACTIVATE للتأكيد.',
+    pauseTitle: 'إيقاف PRO مؤقتًا',
+    pausedState: (since: string, n: number) => `PRO موقوف منذ ${since} — ${n} عضوية مجمّدة، لا تُحتسب أيامها حتى الاستئناف.`,
+    liveState: 'PRO يُباع ويعمل بشكل طبيعي.',
+    pauseHint: 'أثناء الإيقاف: لا يُباع PRO ولا يُمنح، وتظهر بطاقته «قريبًا» بلا سعر ولا مزايا، وتُجمَّد أيام كل مشترك ويحصل خلالها على مزايا PREMIUM. عند الاستئناف تُضاف لكل مشترك المدة التي جُمّدت كاملة.',
+    pauseBtn: 'إيقاف PRO',
+    resumeBtn: 'استئناف PRO',
+    pauseBody: 'سيتوقف بيع PRO وتُجمَّد كل عضوية PRO فعّالة الآن. اكتب PAUSE للتأكيد.',
+    resumeBody: 'سيعود بيع PRO، وتُمدَّد كل عضوية مجمّدة بالمدة التي قضتها مجمّدة. اكتب RESUME للتأكيد.',
+    pausedDone: (n: number) => `أُوقف PRO — جُمّدت ${n} عضوية.`,
+    resumedDone: (n: number) => `استؤنف PRO — مُدّدت ${n} عضوية.`,
+    pausedChip: 'موقوفة مؤقتًا',
   },
   en: {
     tab: 'Plans & launch',
@@ -342,6 +353,17 @@ const PLAN_STRINGS = {
     sweepTitle: 'Activate remaining reservations',
     deferred: (n: number) => `${n} reservations will never start — the account already runs a higher tier. Refund or cancel them by hand.`,
     sweepBody: 'Starts the clock on every remaining reservation from this moment, with the launch rules (highest tier per account, lower ones cancelled). Type ACTIVATE to confirm.',
+    pauseTitle: 'Pause PRO',
+    pausedState: (since: string, n: number) => `PRO paused since ${since} — ${n} memberships frozen; their days do not run until it resumes.`,
+    liveState: 'PRO is on sale and running normally.',
+    pauseHint: 'While paused: PRO is neither sold nor granted, its card reads “Coming soon” with no price or benefits, and every member’s days are frozen while they keep the PREMIUM benefits. On resume each member gets the frozen time back in full.',
+    pauseBtn: 'Pause PRO',
+    resumeBtn: 'Resume PRO',
+    pauseBody: 'PRO sales stop and every active PRO membership is frozen now. Type PAUSE to confirm.',
+    resumeBody: 'PRO goes back on sale and every frozen membership is extended by the time it spent frozen. Type RESUME to confirm.',
+    pausedDone: (n: number) => `PRO paused — ${n} memberships frozen.`,
+    resumedDone: (n: number) => `PRO resumed — ${n} memberships extended.`,
+    pausedChip: 'Paused',
   },
   ckb: {
     tab: 'پلان و دەستپێکردن',
@@ -381,6 +403,17 @@ const PLAN_STRINGS = {
     sweepTitle: 'چالاککردنی پارێزراوە ماوەکان',
     deferred: (n: number) => `${n} — refund / cancel`,
     sweepBody: 'ACTIVATE بنووسە بۆ پشتڕاستکردنەوە.',
+    pauseTitle: 'ڕاگرتنی کاتیی PRO',
+    pausedState: (since: string, n: number) => `PRO لە ${since} ەوە ڕاگیراوە — ${n} ئەندامێتی بەستراوە.`,
+    liveState: 'PRO دەفرۆشرێت و بە ئاسایی کار دەکات.',
+    pauseHint: 'لە کاتی ڕاگرتندا PRO نافرۆشرێت، ڕۆژەکانی هەر ئەندامێک دەبەسترێن و سوودەکانی PREMIUM ی بۆ دەمێنێتەوە؛ لە کاتی دەستپێکردنەوەدا هەموو ماوە بەستراوەکە دەگەڕێتەوە.',
+    pauseBtn: 'ڕاگرتنی PRO',
+    resumeBtn: 'دەستپێکردنەوەی PRO',
+    pauseBody: 'PAUSE بنووسە بۆ پشتڕاستکردنەوە.',
+    resumeBody: 'RESUME بنووسە بۆ پشتڕاستکردنەوە.',
+    pausedDone: (n: number) => `PRO ڕاگیرا — ${n} ئەندامێتی بەسترا.`,
+    resumedDone: (n: number) => `PRO دەستی پێکردەوە — ${n} ئەندامێتی درێژکرایەوە.`,
+    pausedChip: 'ڕاگیراوە',
   },
 };
 
@@ -394,6 +427,13 @@ interface AdminPlan {
   purchasable: boolean;
   active: boolean;
   sort: number;
+  /** PRO while PRO is paused (0145): stored price kept, nothing sold. */
+  paused?: boolean;
+}
+interface AdminProPause {
+  paused: boolean;
+  since: string | null;
+  frozen_count: number;
 }
 interface AdminLaunch {
   launch_at: string | null;
@@ -421,13 +461,21 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
   const [activating, setActivating] = useState(false);
   const [launchNote, setLaunchNote] = useState<{ ok: boolean; text: string } | null>(null);
   const activateBtnRef = useRef<HTMLButtonElement>(null);
+  // «إيقاف PRO» — the pause switch and its typed confirmation.
+  const [proPause, setProPause] = useState<AdminProPause | null>(null);
+  const [pauseOpen, setPauseOpen] = useState(false);
+  const [pauseText, setPauseText] = useState('');
+  const [pausing, setPausing] = useState(false);
+  const [pauseNote, setPauseNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const pauseBtnRef = useRef<HTMLButtonElement>(null);
 
   const load = useCallback(async () => {
     setLoadError('');
     try {
-      const d = await api.get<{ plans: AdminPlan[]; launch: AdminLaunch; prepaid_count?: number; deferred_count?: number }>(
+      const d = await api.get<{ plans: AdminPlan[]; launch: AdminLaunch; prepaid_count?: number; deferred_count?: number; pro_pause?: AdminProPause }>(
         '/api/memberships/admin/plans'
       );
+      setProPause(d.pro_pause ?? null);
       setPrepaidCount(Number(d.prepaid_count) || 0);
       setDeferredCount(Number(d.deferred_count) || 0);
       setPlans(d.plans);
@@ -471,6 +519,25 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
       return;
     }
     void patch(plan, { price_iqd: Number(raw) });
+  }
+
+  async function toggleProPause() {
+    if (!proPause || pausing) return;
+    const next = !proPause.paused;
+    const word = next ? 'PAUSE' : 'RESUME';
+    if (pauseText !== word) return;
+    setPausing(true);
+    try {
+      const r = await api.post<{ memberships: number }>('/api/memberships/admin/pro-pause', { paused: next, confirm: word });
+      setPauseNote({ ok: true, text: next ? ps.pausedDone(r.memberships) : ps.resumedDone(r.memberships) });
+      setPauseOpen(false);
+      setPauseText('');
+      await load();
+    } catch (e) {
+      setPauseNote({ ok: false, text: e instanceof ApiError ? e.message : ps.loadError });
+    } finally {
+      setPausing(false);
+    }
   }
 
   async function activateLaunch() {
@@ -577,8 +644,8 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
                           >
                             {busy ? ps.working : ps.save}
                           </button>
-                          <span className={`text-[10.5px] font-bold px-1.5 py-0.5 rounded-full border ${p.purchasable ? 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10' : 'border-amber-500/30 text-amber-300 bg-amber-500/10'}`}>
-                            {p.purchasable ? `${ps.purchasable} · ${formatIqd(p.price_iqd as number)}` : ps.unpriced}
+                          <span className={`text-[10.5px] font-bold px-1.5 py-0.5 rounded-full border ${p.paused ? 'border-amber-500/30 text-amber-300 bg-amber-500/10' : p.purchasable ? 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10' : 'border-amber-500/30 text-amber-300 bg-amber-500/10'}`}>
+                            {p.paused ? ps.pausedChip : p.purchasable ? `${ps.purchasable} · ${formatIqd(p.price_iqd as number)}` : ps.unpriced}
                           </span>
                         </div>
                         {note?.text && (
@@ -615,6 +682,83 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
           </div>
         )}
       </section>
+
+      {proPause && (
+        <section data-pro-pause={proPause.paused ? 'paused' : 'live'} className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
+          <h3 className="text-white font-bold text-base flex items-center gap-2">
+            <PauseCircle className="w-4 h-4 text-coral" aria-hidden /> {ps.pauseTitle}
+          </h3>
+          <p className={`text-sm font-bold ${proPause.paused ? 'text-amber-300' : 'text-emerald-300'}`}>
+            {proPause.paused ? ps.pausedState((proPause.since ?? '').slice(0, 10), proPause.frozen_count) : ps.liveState}
+          </p>
+          <p className="text-zinc-500 text-xs leading-relaxed max-w-2xl">{ps.pauseHint}</p>
+          <button
+            ref={pauseBtnRef}
+            type="button"
+            onClick={() => {
+              setPauseNote(null);
+              setPauseText('');
+              setPauseOpen(true);
+            }}
+            aria-haspopup="dialog"
+            className={`min-h-[40px] px-4 rounded-xl text-sm font-bold ${proPause.paused ? 'bg-emerald-600 text-snow' : 'bg-[#B03142] text-snow'}`}
+          >
+            {proPause.paused ? ps.resumeBtn : ps.pauseBtn}
+          </button>
+          {pauseNote && <p className={`text-[12.5px] ${pauseNote.ok ? 'text-emerald-400' : 'text-red-400'}`}>{pauseNote.text}</p>}
+        </section>
+      )}
+
+      <Overlay
+        open={pauseOpen}
+        onClose={() => {
+          if (!pausing) setPauseOpen(false);
+        }}
+        labelledBy="pro-pause-title"
+        anchor={pauseBtnRef}
+        dismissOnEscape={!pausing}
+        dismissOnScrim={!pausing}
+        testId="pro-pause"
+        panelClassName="w-full max-w-md"
+      >
+        <div className="p-5 sm:p-6">
+          <h2 id="pro-pause-title" className="text-white font-bold text-lg flex items-center gap-2">
+            <PauseCircle className="w-5 h-5 text-coral" aria-hidden /> {proPause?.paused ? ps.resumeBtn : ps.pauseBtn}
+          </h2>
+          <p className="text-zinc-300 text-sm mt-2 leading-relaxed">{proPause?.paused ? ps.resumeBody : ps.pauseBody}</p>
+          <input
+            value={pauseText}
+            onChange={(e) => setPauseText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void toggleProPause();
+            }}
+            dir="ltr"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={proPause?.paused ? 'RESUME' : 'PAUSE'}
+            aria-label={proPause?.paused ? 'RESUME' : 'PAUSE'}
+            className="mt-4 w-full min-h-[44px] rounded-xl bg-zinc-900 border border-zinc-700 px-3 text-white font-mono tracking-widest outline-none focus-visible:ring-2 focus-visible:ring-crimson"
+          />
+          <div className="mt-5 flex flex-col-reverse sm:flex-row gap-2.5">
+            <button
+              type="button"
+              onClick={() => setPauseOpen(false)}
+              disabled={pausing}
+              className="flex-1 min-h-[48px] rounded-2xl border border-zinc-700 text-zinc-200 font-semibold hover:bg-zinc-900 disabled:opacity-50"
+            >
+              {ps.cancel}
+            </button>
+            <button
+              type="button"
+              onClick={() => void toggleProPause()}
+              disabled={pausing || pauseText !== (proPause?.paused ? 'RESUME' : 'PAUSE')}
+              className="flex-1 min-h-[48px] rounded-2xl bg-[#B03142] text-snow font-bold disabled:opacity-40"
+            >
+              {pausing ? ps.working : proPause?.paused ? ps.resumeBtn : ps.pauseBtn}
+            </button>
+          </div>
+        </div>
+      </Overlay>
 
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
         <h3 className="text-white font-bold text-base flex items-center gap-2">

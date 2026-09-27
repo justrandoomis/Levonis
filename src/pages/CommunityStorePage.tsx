@@ -34,6 +34,7 @@ interface LegacyMerchant {
   avatarUrl: string | null;
   verified: boolean;
   pro_badge?: boolean;
+  premium_badge?: boolean;
   created_at: string;
 }
 
@@ -81,6 +82,7 @@ function syntheticStore(d: LegacyStorePayload): StoreShape {
       name: d.merchant.name,
       verified: d.merchant.verified,
       pro_badge: d.merchant.pro_badge,
+      premium_badge: d.merchant.premium_badge,
       badge: 'new',
       rating: null,
       rating_count: 0,

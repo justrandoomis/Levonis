@@ -1,9 +1,15 @@
 /**
  * Purchase points — integrated mandate §4.2 / §4.3 / §4.4 (SUPERSEDES the
- * earlier "1 point per 1,000 IQD, awarded at delivery" rule).
+ * earlier "awarded at delivery" rule).
+ *
+ * THE RATE IS 1 POINT PER 1,000 IQD again since migration 0146 (owner,
+ * 2026-09-27: «اجعل لكل 1000 دينار نقطة واحدة وليس لكل 100 دينار»): rule v3.
+ * The v2 rate of 100 IQD ran from 0014 until then; its accruals already
+ * released keep what they paid, and the ones still inside their seven-day
+ * hold were re-rated to v3 by that migration, before anyone could claim them.
  *
  * THE RULE (§4.2)
- *  - 1 point per full `iqd_per_point` (100 by default) of NET ELIGIBLE
+ *  - 1 point per full `iqd_per_point` (1,000 by default) of NET ELIGIBLE
  *    MERCHANDISE: the applied product price × qty of official-store lines,
  *    after product/membership discounts, minus order-level coupon discounts,
  *    minus the points already spent on the same order.
@@ -125,7 +131,7 @@ export function computeQualifyingSpendIqd(
 
 /**
  * floor(net eligible / iqd_per_point) — ONE floor, on the order total.
- * 99 → 0, 100 → 1, 199 → 1, 75,000 → 750 at the 100 IQD rate.
+ * 999 → 0, 1,000 → 1, 1,999 → 1, 75,000 → 75 at the 1,000 IQD rate.
  */
 export function pointsForEligibleIqd(eligibleIqd: number, iqdPerPoint: number): number {
   const rate = Math.trunc(Number(iqdPerPoint) || 0);
@@ -237,10 +243,11 @@ export interface PointsRule {
 }
 
 export const POINTS_RULE_DEFAULTS: PointsRuleConfig = {
-  iqd_per_point: 100,
+  // v3 (0146): 1 point per 1,000 IQD. v2 was 100.
+  iqd_per_point: 1000,
   legacy_iqd_per_point: 1000,
   effective_at: null,
-  version: 'v2',
+  version: 'v3',
   legacy_version: 'v1',
 };
 

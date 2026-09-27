@@ -80,11 +80,23 @@ import type { PolicyDocument } from './types';
  *     the one-live-membership article (2.5) say the same. 12.1 says the PLUS printer
  *     gift is granted by hand by the administration, not on purchase —
  *     `grantPrinterGiftIfEligible` has no caller.
+ *
+ * VERSION 4 — WHY IT MOVED (owner, 2026-09-27; migration 0145). The archive
+ * keeps version 3 byte for byte.
+ *   * PREMIUM IS PLUS, FREE STANDARD DELIVERY AND A BADGE. «البريميوم يكون
+ *     فقط إضافة ميزة أنه توصيل مجاني للعادي فوق 75 ألف … وإشارة بأنه مشترك في
+ *     البريميوم … أما المميزات الأخرى فألغيها». 5.2, 5.5 and 5.6 now say what
+ *     PREMIUM no longer gives — no member price, no points multiplier, no
+ *     cash-collection exemption — because entitlements.ts moved all three to
+ *     PRO; 5.7 lists the limits accordingly and 5.8 is the new badge.
+ *   * PRO IS PAUSED. 6.15 is the pause and the freeze: no PRO card is sold,
+ *     every running one is frozen with its days kept (worker/lib/tierPause.ts),
+ *     and meanwhile the member keeps what PREMIUM and PLUS give. 6.1 points at it.
  */
 export const membership: PolicyDocument = {
   key: 'membership',
-  version: 3,
-  effective_at: '2026-09-23',
+  version: 4,
+  effective_at: '2026-09-27',
   title: {
     ar: 'سياسة العضويات',
     en: 'Memberships Policy',
@@ -216,8 +228,8 @@ export const membership: PolicyDocument = {
 ### 5.1 ما ترثه PREMIUM
 تمنح PREMIUM كل ما تمنحه PLUS في الفصل الرابع، وتضيف إليه ما يأتي.
 
-### 5.2 التسعير الخاص بأعضاء PREMIUM
-يُطبَّق على العضو سعر العضوية المسجل للمنتج حيث يكون المتجر قد سجل سعراً خاصاً بالأعضاء لذلك المنتج. وحيث لا يكون قد سجله فالسعر هو السعر المعلن للجمهور.
+### 5.2 لا خصم ولا سعر خاص في PREMIUM
+لا تمنح PREMIUM سعراً خاصاً بالأعضاء ولا خصماً على البضاعة، فيدفع عضوها السعر المعلن للجمهور. وما قد يظهر على منتج من سعر مسجل لفئة PREMIUM قبل هذا التعديل لا يُطبَّق عليه.
 
 ### 5.3 إعفاء التوصيل فوق قيمة الطلب المعلنة
 يتحمل المتجر عن عضو PREMIUM أجرة التوصيل الاعتيادية إذا تجاوزت قيمة بضاعة الطلب المحتسبة لهذا الغرض مبلغ {{PREMIUM_FREE_DELIVERY_MIN_IQD}} ديناراً عراقياً. والتجاوز شرط حقيقي: المبلغ المساوي للحد لا يكفي، بل يجب أن يزيد عليه.
@@ -225,19 +237,22 @@ export const membership: PolicyDocument = {
 ### 5.4 حدود إعفاء PREMIUM
 إعفاء PREMIUM يغطي أجرة التوصيل الاعتيادية وحدها. ولا يغطي رسوم الطابعات ولا رسوم الكراتين الإضافية ولا الرسوم الإضافية الأخرى، وتبقى هذه على الزبون. وتفصيل هذه الرسوم في سياسة التوصيل.
 
-### 5.5 مضاعف النقاط
-تُحتسب نقاط عضو PREMIUM بمعامل مقداره مرة ونصف مما يُحتسب للمستخدم الاعتيادي، في تسجيل الدخول اليومي، وفي المهام، وفي الشراء، وفي المراجعات. وتفصيل الاحتساب والتقريب في سياسة المكافآت والنقاط.
+### 5.5 لا مضاعف للنقاط في PREMIUM
+تُحتسب نقاط عضو PREMIUM كما تُحتسب للمستخدم الاعتيادي. وما استحقه قبل هذا التعديل بمعامل مرة ونصف يبقى له كما استحقه، وتفصيل ذلك في سياسة المكافآت والنقاط.
 
 ### 5.6 ضريبة الدفع عند الاستلام
-الإعفاء من ضريبة التحصيل النقدي مزية مسجلة في النظام لفئة PREMIUM فما فوق، ولا تكون نافذة إلا إذا فعّلها المتجر بقاعدة معلنة. والقاعدة المعمول بها حالياً لا تُعفي عضو PREMIUM من هذه الضريبة، فتبقى مستحقة عليه ما لم يعلن المتجر خلاف ذلك.
+لا تُعفي PREMIUM من ضريبة التحصيل النقدي، فتبقى مستحقة على عضوها كما هي على غيره.
 
 ### 5.7 حدود فئة PREMIUM
-لا تمنح PREMIUM سعر PRO على البضاعة، ولا إعفاء عمولة النقل في الطلب المسبق، ولا الدفع المؤجل، ولا أولوية الخدمة، ولا خدمة الإنجاز خلال اثنتي عشرة ساعة، ولا شارة PRO.
+مزايا PREMIUM هي مزايا PLUS مضافاً إليها ما في المادتين 5.3 و5.8 وحدهما. فلا تمنح خصماً ولا سعراً خاصاً، ولا سعر PRO، ولا مضاعفاً للنقاط، ولا إعفاءً من ضريبة التحصيل النقدي، ولا إعفاء عمولة النقل في الطلب المسبق، ولا الدفع المؤجل، ولا أولوية الخدمة، ولا خدمة الإنجاز خلال اثنتي عشرة ساعة، ولا شارة PRO.
+
+### 5.8 شارة PREMIUM في مجتمع ليفو
+يُمنح عضو PREMIUM شارة مميزة تظهر مع اسمه ومتجره في مجتمع ليفو ما دامت عضويته فعّالة. والشارة دلالة على العضوية وحدها، وليست توثيقاً لهوية ولا شهادة من المتجر على جودة بضاعة التاجر أو التزامه. ومن كان عضو PRO حملت شارته شارة PRO وحدها.
 
 ## 6. ما تمنحه فئة LEVO PRO
 
 ### 6.1 ما ترثه PRO
-تمنح PRO كل ما تمنحه PLUS و PREMIUM في الفصلين الرابع والخامس، وتضيف إليه ما يأتي. ومزايا PRO في الشراء مشروطة بالفصل السابع.
+تمنح PRO كل ما تمنحه PLUS و PREMIUM في الفصلين الرابع والخامس، وتضيف إليه ما يأتي. ومزايا PRO في الشراء مشروطة بالفصل السابع، وسريانها كله موقوف ما دام إيقاف المادة 6.15 قائماً.
 
 ### 6.2 التسعير الخاص بأعضاء PRO
 يُطبَّق على العضو سعر PRO المسجل للمنتج حيث يكون المتجر قد سجله. وحيث لا يكون قد سجله فالسعر هو السعر المعلن للجمهور، ولا يُستنتج سعر PRO من نسبة ولا من مقارنة.
@@ -277,6 +292,14 @@ export const membership: PolicyDocument = {
 
 ### 6.14 الهدية المشروطة لا تُوعد بها خارج شرطها
 إذا لم يشغّل المتجر الهدية أو لم يحدد منتجها، فلا استحقاق فيها. ولا يجوز لأحد من العاملين أو التجار أن يعد بها على أنها آلية أو مضمونة.
+
+### 6.15 إيقاف فئة PRO مؤقتاً وتجميد العضويات القائمة
+أوقف المتجر فئة PRO مؤقتاً إلى إشعار آخر لتطوير نظامها. وطوال مدة الإيقاف:
+- لا تُباع خطة PRO ولا تُمنح، وتظهر في صفحة العضويات بعبارة «قريباً» دون سعر ولا مزايا.
+- تُجمَّد كل عضوية PRO كانت فعّالة لحظة الإيقاف: يتوقف احتساب مدتها فلا تنقضي أيامها ولا تنتهي خلال الإيقاف.
+- ينتفع العضو المجمَّدة عضويته بمزايا PREMIUM و PLUS وحدها، ولا ينتفع بمزايا هذا الفصل ولا بشارة PRO.
+- عند استئناف الفئة تعود العضوية فعّالة بكامل مزايا PRO، ويُمدّ تاريخ انتهائها بقدر المدة التي بقيت فيها مجمّدة تماماً، فلا يُستقطع من أيام العضو شيء.
+ويُعلن الاستئناف في صفحة العضويات.
 
 ## 7. شرط العنوان الافتراضي المعتمد لمزايا الشراء في PRO
 
@@ -624,8 +647,8 @@ Merchant standing is tied to a live membership. When the membership lapses, the 
 ### 5.1 What PREMIUM inherits
 PREMIUM grants everything PLUS grants under chapter 4, and adds the following.
 
-### 5.2 Member pricing for PREMIUM
-The member price recorded for a product is applied where the Store has recorded a member price for that product. Where it has not, the price is the price published to the public.
+### 5.2 No discount and no member price in PREMIUM
+PREMIUM grants no member price and no discount on goods; its member pays the price published to the public. A price recorded for the PREMIUM tier on a product before this revision does not apply to them.
 
 ### 5.3 Delivery exemption above the stated order value
 The Store bears the ordinary delivery charge for a PREMIUM member where the merchandise value of the order counted for this purpose exceeds {{PREMIUM_FREE_DELIVERY_MIN_IQD}} Iraqi dinars. Exceeding is a real condition: an amount equal to the threshold is not enough; it must be above it.
@@ -633,19 +656,22 @@ The Store bears the ordinary delivery charge for a PREMIUM member where the merc
 ### 5.4 The limits of the PREMIUM exemption
 The PREMIUM exemption covers the ordinary delivery charge alone. It does not cover printer charges, additional carton charges or other surcharges, which remain on the customer. Those charges are detailed in the Delivery Policy.
 
-### 5.5 The points multiplier
-A PREMIUM member's points are computed at one and a half times what is computed for an ordinary user, on the daily sign-in, on missions, on purchases and on reviews. The computation and its rounding are detailed in the Rewards and Points Policy.
+### 5.5 No points multiplier in PREMIUM
+A PREMIUM member's points are computed as they are for an ordinary user. Points already earned at one and a half times before this revision remain as earned, as the Rewards and Points Policy details.
 
 ### 5.6 Cash-on-delivery tax
-Exemption from the cash-collection tax is a benefit recorded in the system for PREMIUM and above, and it is effective only where the Store has activated it by an announced rule. The rule currently in force does not exempt a PREMIUM member from that tax, which therefore remains payable unless the Store announces otherwise.
+PREMIUM does not exempt from the cash-collection tax, which remains payable by its member as by anyone else.
 
 ### 5.7 The limits of PREMIUM
-PREMIUM does not grant the PRO price on goods, the pre-order transport commission waiver, deferred payment, priority of service, the twelve-hour fulfilment service or the PRO badge.
+The benefits of PREMIUM are those of PLUS with the addition of articles 5.3 and 5.8 alone. It grants no discount and no member price, no PRO price, no points multiplier, no exemption from the cash-collection tax, no pre-order transport commission waiver, no deferred payment, no priority of service, no twelve-hour fulfilment service and no PRO badge.
+
+### 5.8 The PREMIUM badge in the Levo community
+A PREMIUM member is given a distinctive badge shown with their name and store in the Levo community for as long as their membership is active. The badge signifies the membership alone; it is neither an identity verification nor the Store's certification of a merchant's goods or conduct. A PRO member carries the PRO badge alone.
 
 ## 6. What LEVO PRO grants
 
 ### 6.1 What PRO inherits
-PRO grants everything PLUS and PREMIUM grant under chapters 4 and 5, and adds the following. The PRO purchase benefits are conditional on chapter 7.
+PRO grants everything PLUS and PREMIUM grant under chapters 4 and 5, and adds the following. The PRO purchase benefits are conditional on chapter 7, and all of them are suspended for as long as the pause in article 6.15 lasts.
 
 ### 6.2 PRO pricing
 The PRO price recorded for a product is applied where the Store has recorded one. Where it has not, the price is the price published to the public, and a PRO price is not inferred from a percentage or from a comparison.
@@ -685,6 +711,14 @@ Where the Store has switched this gift on and named the product it is drawn from
 
 ### 6.14 A conditional gift is not promised outside its condition
 Where the Store has not switched the gift on or has not named its product, there is no entitlement to it. No member of staff and no merchant may promise it as automatic or guaranteed.
+
+### 6.15 The temporary pause of PRO and the freeze of existing memberships
+The Store has paused the PRO tier until further notice while its system is developed. For as long as the pause lasts:
+- no PRO plan is sold or granted, and the PRO card is shown on the memberships page as «coming soon», with no price and no benefits;
+- every PRO membership that was active when the pause began is frozen: its term stops running, so none of its days are used and it does not expire during the pause;
+- a member whose membership is frozen enjoys the benefits of PREMIUM and PLUS alone, and neither the benefits of this chapter nor the PRO badge;
+- when the tier resumes, the membership is active again with every PRO benefit, and its expiry date moves forward by exactly the time it spent frozen, so not one of the member's days is deducted.
+The resumption is announced on the memberships page.
 
 ## 7. The approved default address condition for PRO purchase benefits
 
@@ -1032,8 +1066,8 @@ PLUS بە خۆی هیچ نرخێکی تایبەت بۆ ئەندام لەسەر �
 ### 5.1 ئەوەی PREMIUM بە میرات دەیبات
 PREMIUM هەموو ئەوە دەبەخشێت کە PLUS لە بەشی چوارەمدا دەیبەخشێت، و ئەمانەی خوارەوەی بۆ زیاد دەکات.
 
-### 5.2 نرخاندنی تایبەت بە ئەندامانی PREMIUM
-ئەو نرخەی ئەندامێتی کە بۆ بەرهەمەکە تۆمار کراوە لەسەر ئەندام جێبەجێ دەکرێت، لەو شوێنانەی فرۆشگا نرخێکی تایبەت بە ئەندامانی بۆ ئەو بەرهەمە تۆمار کردووە. لەو شوێنانەی تۆماری نەکردووە، نرخەکە ئەو نرخەیە کە بۆ گشت خەڵک ڕاگەیەنراوە.
+### 5.2 نە داشکاندن و نە نرخی تایبەت لە PREMIUM
+PREMIUM نە نرخێکی تایبەت بە ئەندامان دەبەخشێت و نە داشکاندن لەسەر کاڵا، بۆیە ئەندامەکەی ئەو نرخە دەدات کە بۆ گشت خەڵک ڕاگەیەنراوە. ئەو نرخەی پێش ئەم هەموارکردنەوەیە بۆ پلەی PREMIUM لەسەر بەرهەمێک تۆمار کرابێت لەسەری جێبەجێ ناکرێت.
 
 ### 5.3 بەخشینی گەیاندن لە سەرووی بەهای ڕاگەیەنراوی داواکارییەوە
 فرۆشگا کرێی گەیاندنی ئاسایی لەسەر ئەندامی PREMIUM هەڵدەگرێت ئەگەر بەهای کاڵای داواکارییەکە کە بۆ ئەم مەبەستە ژمێردراوە لە بڕی {{PREMIUM_FREE_DELIVERY_MIN_IQD}} دیناری عێراقی تێپەڕی. تێپەڕاندن مەرجێکی ڕاستەقینەیە: بڕی یەکسان بە سنوورەکە بەس نییە، بەڵکو دەبێت لێی زیاتر بێت.
@@ -1041,19 +1075,22 @@ PREMIUM هەموو ئەوە دەبەخشێت کە PLUS لە بەشی چوارە�
 ### 5.4 سنوورەکانی بەخشینی PREMIUM
 بەخشینی PREMIUM تەنها کرێی گەیاندنی ئاسایی دادەپۆشێت. کرێی چاپگەرەکان، کرێی قوتووی زیادە، و کرێیە زیادەکانی تر ناگرێتەوە، و ئەمانە لەسەر کڕیار دەمێننەوە. وردەکاری ئەم کرێیانە لە سیاسەتی گەیاندندایە.
 
-### 5.5 زیادکەری خاڵ
-خاڵەکانی ئەندامی PREMIUM بە هاوکۆڵکەی یەک و نیو ئەوەی بۆ بەکارهێنەری ئاسایی دەژمێردرێت دەژمێردرێن، لە چوونەژوورەوەی ڕۆژانە، لە ئەرکەکان، لە کڕین، و لە هەڵسەنگاندنەکاندا. وردەکاری ژمێرکاری و خڕکردنەوە لە سیاسەتی خەڵات و خاڵدایە.
+### 5.5 زیادکەری خاڵ لە PREMIUM نییە
+خاڵەکانی ئەندامی PREMIUM وەک ئەوەی بۆ بەکارهێنەری ئاسایی دەژمێردرێت دەژمێردرێن. ئەو خاڵانەی پێش ئەم هەموارکردنەوەیە بە یەک و نیو بەدەستی هێناون وەک خۆیان بۆی دەمێننەوە، وەک سیاسەتی خەڵات و خاڵ ڕوونی دەکاتەوە.
 
 ### 5.6 باجی پارەدان لە کاتی گەیاندندا
-بەخشین لە باجی وەرگرتنی نەقد سوودێکی تۆمارکراوە لە سیستەمدا بۆ پلەی PREMIUM بەرەو سەرەوە، و تەنها کاتێک کاری پێدەکرێت کە فرۆشگا بە ڕێسایەکی ڕاگەیەنراو چالاکی بکات. ئەو ڕێسایەی ئێستا کاری پێدەکرێت ئەندامی PREMIUM لەم باجە نابەخشێت، بۆیە لەسەری دەمێنێتەوە مەگەر فرۆشگا پێچەوانەکەی ڕابگەیەنێت.
+PREMIUM لە باجی وەرگرتنی نەقد نابەخشێت، بۆیە وەک هەر کەسێکی تر لەسەر ئەندامەکەی دەمێنێتەوە.
 
 ### 5.7 سنوورەکانی پلەی PREMIUM
-PREMIUM نرخی PRO لەسەر کاڵا نابەخشێت، نە بەخشینی کۆمیسیۆنی گواستنەوە لە داواکاری پێشوەخت، نە پارەدانی دواخراو، نە پێشینەیی خزمەتگوزاری، نە خزمەتگوزاریی تەواوکردن لە ماوەی دوازدە کاتژمێردا، و نە نیشانەی PRO.
+سوودەکانی PREMIUM سوودەکانی PLUSن لەگەڵ زیادکردنی بڕگەکانی 5.3 و 5.8 تەنها. نە داشکاندن دەبەخشێت و نە نرخی تایبەت، نە نرخی PRO، نە زیادکەری خاڵ، نە بەخشین لە باجی وەرگرتنی نەقد، نە بەخشینی کۆمیسیۆنی گواستنەوە لە داواکاری پێشوەخت، نە پارەدانی دواخراو، نە پێشینەیی خزمەتگوزاری، نە خزمەتگوزاریی تەواوکردن لە ماوەی دوازدە کاتژمێردا، و نە نیشانەی PRO.
+
+### 5.8 نیشانەی PREMIUM لە کۆمەڵگەی لیڤۆ
+ئەندامی PREMIUM نیشانەیەکی جیاکەرەوەی پێ دەدرێت کە لەگەڵ ناو و فرۆشگاکەی لە کۆمەڵگەی لیڤۆدا دەردەکەوێت، تا ئەو کاتەی ئەندامێتییەکەی چالاکە. نیشانەکە تەنها ئاماژەیە بۆ ئەندامێتی، نە پشتڕاستکردنەوەی ناسنامەیە و نە شایەتیی فرۆشگایە لەسەر جۆریی کاڵا یان پابەندبوونی بازرگان. ئەندامی PRO تەنها نیشانەی PRO هەڵدەگرێت.
 
 ## 6. پلەی LEVO PRO چی دەبەخشێت
 
 ### 6.1 ئەوەی PRO بە میرات دەیبات
-PRO هەموو ئەوە دەبەخشێت کە PLUS و PREMIUM لە بەشەکانی چوارەم و پێنجەمدا دەیبەخشن، و ئەمانەی خوارەوەی بۆ زیاد دەکات. سوودەکانی کڕینی PRO بە بەشی حەوتەم مەرجدارن.
+PRO هەموو ئەوە دەبەخشێت کە PLUS و PREMIUM لە بەشەکانی چوارەم و پێنجەمدا دەیبەخشن، و ئەمانەی خوارەوەی بۆ زیاد دەکات. سوودەکانی کڕینی PRO بە بەشی حەوتەم مەرجدارن، و هەموویان ڕاگیراون تا ئەو کاتەی ڕاگرتنی بڕگەی 6.15 بەردەوامە.
 
 ### 6.2 نرخاندنی تایبەت بە ئەندامانی PRO
 نرخی PRO کە بۆ بەرهەمەکە تۆمار کراوە لەسەر ئەندام جێبەجێ دەکرێت لەو شوێنانەی فرۆشگا تۆماری کردووە. لەو شوێنانەی تۆماری نەکردووە، نرخەکە ئەو نرخەیە کە بۆ گشت خەڵک ڕاگەیەنراوە، و نرخی PRO لە ڕێژەیەک یان لە بەراوردێکەوە دەرناهێنرێت.
@@ -1093,6 +1130,14 @@ PRO هەموو ئەوە دەبەخشێت کە PLUS و PREMIUM لە بەشەکا�
 
 ### 6.14 دیاریی مەرجدار لە دەرەوەی مەرجەکەی بەڵێنی پێ نادرێت
 ئەگەر فرۆشگا دیارییەکەی چالاک نەکرد یان بەرهەمەکەی دیاری نەکرد، هیچ شایستەییەک تێیدا نییە. هیچ کارمەندێک یان بازرگانێک ناتوانێت بەڵێنی پێ بدات وەک ئەوەی خۆکار یان دڵنیاکراو بێت.
+
+### 6.15 ڕاگرتنی کاتیی پلەی PRO و بەستنی ئەندامێتییە هەبووەکان
+فرۆشگا پلەی PRO بۆ پەرەپێدانی سیستەمەکەی بە شێوەیەکی کاتی ڕاگرتووە تا ئاگادارکردنەوەیەکی تر. بە درێژایی ماوەی ڕاگرتنەکە:
+- هیچ پلانێکی PRO نافرۆشرێت و نابەخشرێت، و کارتی PRO لە پەڕەی ئەندامێتییەکاندا بە «بەم زووانە» دەردەکەوێت بێ نرخ و بێ سوود.
+- هەموو ئەندامێتییەکی PRO کە لە کاتی ڕاگرتنەکەدا چالاک بووە دەبەسترێت: ژماردنی ماوەکەی دەوەستێت، بۆیە هیچ ڕۆژێکی بەسەر ناچێت و لە ماوەی ڕاگرتنەکەدا کۆتایی نایەت.
+- ئەو ئەندامەی ئەندامێتییەکەی بەستراوە تەنها سوودی PREMIUM و PLUS وەردەگرێت، نە سوودەکانی ئەم بەشە و نە نیشانەی PRO.
+- کاتێک پلەکە دەست پێ دەکاتەوە، ئەندامێتییەکە بە هەموو سوودەکانی PRO چالاک دەبێتەوە، و بەرواری کۆتاییهاتنی ڕێک بە ئەندازەی ئەو ماوەیەی بەستراو بووە دوا دەخرێت، بۆیە هیچ ڕۆژێک لە ڕۆژەکانی ئەندام نابڕدرێت.
+دەستپێکردنەوەکە لە پەڕەی ئەندامێتییەکاندا ڕادەگەیەنرێت.
 
 ## 7. مەرجی ناونیشانی بنەڕەتیی پەسەندکراو بۆ سوودەکانی کڕین لە PRO
 

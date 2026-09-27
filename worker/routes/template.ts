@@ -221,7 +221,7 @@ function disableUnparsableLines(text: string): { text: string; disabled: Disable
 /**
  * SIX KEYS PER MEMBER TIER, SPELT EXACTLY AS THE CSV SHEET SPELLS THEM.
  *
- * `membership.pro.percent`, `membership.premium.cap_scope`, … — the same
+ * `membership.pro.percent`, `membership.pro.cap_scope`, … — the same
  * names, the same accepted values and the same refusals as the spreadsheet
  * columns, because the two are imported from `worker/lib/importCsv.ts` rather
  * than written down twice. An admin who has filled one file already knows
@@ -842,7 +842,7 @@ original_price_iqd=125000
 product_cost_iqd=__NULL__
 
 # ------------------------------ خصم العضوية لهذا المنتج / membership discount
-# ستة مفاتيح لكل فئة عضوية تصف قاعدة خصم واحدة مربوطة بهذا المنتج وحده، وهي
+# ستة مفاتيح لفئة PRO تصف قاعدة خصم واحدة مربوطة بهذا المنتج وحده، وهي
 # تتقدّم على قاعدة القسم وعلى القاعدة العامة (docs/MEMBERSHIP_BENEFITS.md §1).
 # كلها اختيارية، ومعطّلة هنا عمداً: المثال يعلّم الشكل ولا يحمل رقماً تجارياً
 # لم يكتبه المالك. احذف علامة # واكتب القيم لتفعيل القاعدة.
@@ -856,12 +856,7 @@ product_cost_iqd=__NULL__
 # membership.pro.max_discount_iqd=
 # membership.pro.cap_scope=
 # membership.pro.max_quantity=
-# membership.premium.discount_mode=
-# membership.premium.percent=
-# membership.premium.fixed_iqd=
-# membership.premium.max_discount_iqd=
-# membership.premium.cap_scope=
-# membership.premium.max_quantity=
+# (PREMIUM لا يحمل أي خصم منذ 2026-09-27 — لا مفاتيح له.)
 
 # ------------------------------ التصنيف / classification
 # لا علامة ولا كتالوج في المثال. العلامة تُطابَق بالاسم أو الـ slug أو المعرّف؛
@@ -1982,6 +1977,28 @@ export function typeSpecScaffold(id: ProductTypeId, groups: TemplateGroup[] = gr
 }
 
 /**
+ * THE SECTION THE TEMPLATE WAS DOWNLOADED FOR, WRITTEN INTO IT.
+ *
+ * The typed template narrowed its spec rows to the chosen section and then
+ * left `category=__NULL__` and `sub_category=__NULL__` exactly as the bare
+ * blank has them — so a product typed into a template downloaded for «طابعات
+ * FDM» was imported with NO section at all, and the owner found it «بلا قسم»
+ * (part of «أريد التأكد من القوالب خاصة TXT والأقسام الرئيسية والفرعية»). The
+ * three lines now say what the download was for: the main section, the
+ * sub-section when one was chosen, and the family that decides its spec
+ * sheet. Each is still an ordinary line the owner may change.
+ */
+export function prefillSection(
+  text: string,
+  section: { category: string; subCategory: string | null; family: string | null }
+): string {
+  let out = text.replace(/^category=__NULL__$/m, `category=${section.category}`);
+  if (section.subCategory) out = out.replace(/^sub_category=__NULL__$/m, `sub_category=${section.subCategory}`);
+  if (section.family) out = out.replace(/^template_family=$/m, `template_family=${section.family}`);
+  return out;
+}
+
+/**
  * `?type=printer|parts|filament|accessory` appends that type's specification
  * scaffold. Without it the template is exactly what it has always been, so
  * every existing caller and saved link keeps its file.
@@ -1998,6 +2015,7 @@ templateRoutes.get('/blank', async (c) => {
   let groups = groupsForType(raw);
   let sectionName = '';
   let selectedSlug = '';
+  let base = buildBlankTemplate().text;
   if (category) {
     const { results } = await c.env.DB.prepare('SELECT * FROM catalogs').all<CatalogRow>();
     const selected = results.find((row) => row.id === category || row.slug === category);
@@ -2005,15 +2023,22 @@ templateRoutes.get('/blank', async (c) => {
     const byId = new Map(results.map((row) => [row.id, row]));
     const branch: SectionRef[] = [];
     let cursor: CatalogRow | undefined = selected;
+    let root: CatalogRow = selected;
     for (let i = 0; i < 20 && cursor; i++) {
       branch.push({ id: cursor.id, slug: cursor.slug });
+      root = cursor;
       cursor = cursor.parent_id ? byId.get(cursor.parent_id) : undefined;
     }
     groups = narrowGroups(raw, branch);
     sectionName = selected.name_ar || selected.name_en || selected.slug;
     selectedSlug = selected.slug;
+    base = prefillSection(base, {
+      category: root.slug,
+      subCategory: selected.id === root.id ? null : selected.slug,
+      family: resolveTemplateFamilies(results).get(selected.id) ?? null,
+    });
   }
-  const text = `${buildBlankTemplate().text}\n${typeSpecScaffold(raw, groups, sectionName).join('\n')}`;
+  const text = `${base}\n${typeSpecScaffold(raw, groups, sectionName).join('\n')}`;
   /**
    * THE NAME CARRIES THE SECTION, and the absence of that is what turned a
    * working feature into a bug report.

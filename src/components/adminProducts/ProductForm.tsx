@@ -98,6 +98,7 @@ import { DimensionsSection } from './form/DimensionsSection';
 import { InventorySummary } from './form/InventorySummary';
 import PricePreview from './PricePreview';
 import MembershipDiscountSection from './form/MembershipDiscountSection';
+import { useProPaused } from '../../lib/proPause';
 import { SpecMultiPick } from './form/SpecMultiPick';
 import { ImagesSection } from './form/ImagesSection';
 import { MainImagesPair } from './form/MainImagesPair';
@@ -137,6 +138,12 @@ export default function ProductForm({
 }) {
   const { dir, lang } = useLanguage();
   const { user } = useAuth();
+  /**
+   * PRO, PAUSED (0145): its price field and its discount rule are hidden
+   * until the owner resumes it. PREMIUM has none at all any more — «حذف خيار
+   * خصم البريميوم» — so its field is gone, not hidden.
+   */
+  const proPaused = useProPaused();
   // §11: cost is only rendered for a financial admin. The SERVER refuses to
   // read or write it either way — this only avoids showing an input that
   // would be rejected.
@@ -425,6 +432,23 @@ export default function ProductForm({
   }, [brands, brandSearch, doc.brand_id]);
 
   const dirty = baseline !== '' && JSON.stringify({ d: doc, rs: rel }) !== baseline;
+
+  /**
+   * Filed under «المستعمل» (migration 0147): the section's main section is
+   * `cat_used`. Read up the tree, so a sub-section the owner adds under it
+   * later counts too.
+   */
+  const inUsedSection = useMemo(() => {
+    const byId = new Map(catalogs.map((c) => [c.id, c]));
+    return [doc.sub_category_id, doc.category_id].some((start) => {
+      let node = start ? byId.get(start) : undefined;
+      for (let hop = 0; node && hop < 12; hop++) {
+        if (node.id === 'cat_used') return true;
+        node = node.parent_id ? byId.get(node.parent_id) : undefined;
+      }
+      return false;
+    });
+  }, [catalogs, doc.category_id, doc.sub_category_id]);
 
   // Extended warranty is a PRINTER's option (owner mandate): the block shows,
   // and the server accepts plans, only when the chosen section or sub-section
@@ -1144,12 +1168,11 @@ export default function ProductForm({
       {/* 3 ──────────────────────────────────────────── prices, memberships */}
       <SectionCard
         n={3}
-        ar="الأسعار والعضويات"
-        en="Prices & memberships"
+        ar={proPaused ? 'الأسعار' : 'الأسعار والعضويات'}
+        en={proPaused ? 'Prices' : 'Prices & memberships'}
         summary={summarize([
           doc.price_iqd !== null ? formatIqd(doc.price_iqd) : 'بلا سعر',
-          doc.prime_price_iqd !== null ? `PRIME ${formatIqd(doc.prime_price_iqd)}` : null,
-          doc.pro_price_iqd !== null ? `PRO ${formatIqd(doc.pro_price_iqd)}` : null,
+          !proPaused && doc.pro_price_iqd !== null ? `PRO ${formatIqd(doc.pro_price_iqd)}` : null,
         ])}
         error={showErrors && (!!errors.price_iqd || !!errors.prices)}
         {...section(3)}
@@ -1157,8 +1180,8 @@ export default function ProductForm({
         {showErrors && errors.prices && <Banner kind="error">{errors.prices}</Banner>}
         <Grid cols={3}>
           <Field
-            ar="السعر الاعتيادي"
-            en="Regular"
+            ar="السعر"
+            en="Price"
             required
             error={err('price_iqd')}
             tip="الخيار أو اللون الذي له سعر خاص يستبدل هذا السعر ولا يُضاف إليه. إن غيّرت هذا الرقم وكانت هناك أسعار خاصة، ستُسأل عمّا تفعل بها."
@@ -1192,31 +1215,23 @@ export default function ProductForm({
             typed price «في الأعلى» is why their rule is not being read — can
             never point at a box that is out of sight.
           */}
-          <TierPriceDisclosure
-            scope="product"
-            marks={
-              [
-                doc.prime_price_iqd !== null ? { label: 'PRIME', iqd: doc.prime_price_iqd } : null,
-                doc.pro_price_iqd !== null ? { label: 'PRO', iqd: doc.pro_price_iqd } : null,
-              ].filter((m): m is TierPriceMark => m !== null)
-            }
-          >
-            <Grid cols={3}>
-              <Field
-                ar="سعر LEVO PRIME"
-                en="PRIME"
-                hint="فارغ = السعر الاعتيادي"
-                tip="خصم PRIME أقل من PRO. الترتيب المطلوب: PRO ≤ PRIME ≤ الاعتيادي."
-              >
-                <Money value={doc.prime_price_iqd} onChange={(v) => setDoc((d) => ({ ...d, prime_price_iqd: v }))} />
-                <MirrorNote kind="replaces" where="خصم العضوية أسفل هذا القسم" detail="السعر المكتوب يفوز على أي قاعدة خصم" />
-              </Field>
-              <Field ar="سعر LEVO PRO" en="PRO" hint="فارغ = سياسة المتجر">
-                <Money value={doc.pro_price_iqd} onChange={(v) => setDoc((d) => ({ ...d, pro_price_iqd: v }))} />
-                <MirrorNote kind="replaces" where="خصم العضوية أسفل هذا القسم" detail="السعر المكتوب يفوز على أي قاعدة خصم" />
-              </Field>
-            </Grid>
-          </TierPriceDisclosure>
+          {!proPaused && (
+            <TierPriceDisclosure
+              scope="product"
+              marks={
+                [doc.pro_price_iqd !== null ? { label: 'PRO', iqd: doc.pro_price_iqd } : null].filter(
+                  (m): m is TierPriceMark => m !== null
+                )
+              }
+            >
+              <Grid cols={3}>
+                <Field ar="سعر LEVO PRO" en="PRO" hint="فارغ = سياسة المتجر">
+                  <Money value={doc.pro_price_iqd} onChange={(v) => setDoc((d) => ({ ...d, pro_price_iqd: v }))} />
+                  <MirrorNote kind="replaces" where="خصم العضوية أسفل هذا القسم" detail="السعر المكتوب يفوز على أي قاعدة خصم" />
+                </Field>
+              </Grid>
+            </TierPriceDisclosure>
+          )}
           {canSeeCost && (
             <Field ar="التكلفة" en="Cost" tip="إداري فقط — لا تظهر للعميل ولا لمساعد الأدمن، ولا في أي تصدير. تُستخدم للمنتجات التي لا دفعات شراء لها؛ ما على الرف قد يحمل تكاليف أخرى.">
               <Money value={doc.product_cost_iqd} onChange={(v) => setDoc((d) => ({ ...d, product_cost_iqd: v }))} />
@@ -1275,14 +1290,16 @@ export default function ProductForm({
             It saves through the admin benefits door, NOT with this form: every
             write to a benefit rule appends a version and an audit row in one
             batch, and the product save has no business doing that. */}
-        <MembershipDiscountSection
-          // `doc.id`, not the `productId` prop: after the FIRST save the prop
-          // is still null (the parent list has not re-mounted the editor) while
-          // the document already carries the id the server assigned — the same
-          // reason PricePreview reads it from the document below.
-          productId={doc.id || null}
-          typedMemberPrice={{ prime: doc.prime_price_iqd, pro: doc.pro_price_iqd }}
-        />
+        {!proPaused && (
+          <MembershipDiscountSection
+            // `doc.id`, not the `productId` prop: after the FIRST save the prop
+            // is still null (the parent list has not re-mounted the editor) while
+            // the document already carries the id the server assigned — the same
+            // reason PricePreview reads it from the document below.
+            productId={doc.id || null}
+            typedMemberPrice={{ prime: doc.prime_price_iqd, pro: doc.pro_price_iqd }}
+          />
+        )}
       </SectionCard>
 
       {/* 4 ───────────────────────────────────── delivery and warranty only */}
@@ -1458,6 +1475,7 @@ export default function ProductForm({
           <ConditionSection
             condition={doc.condition ?? null}
             onChange={(next) => setDoc((d) => ({ ...d, condition: next }))}
+            inUsedSection={inUsedSection}
           />
         </div>
 
@@ -1715,12 +1733,7 @@ export default function ProductForm({
           <Row k="الاسم" v={doc.name_en || '—'} />
           <Row k="القسم" v={catalogs.find((c) => c.id === doc.category_id)?.name_en ?? '—'} />
           <Row k="السعر" v={doc.price_iqd === null ? '—' : formatIqd(doc.price_iqd)} />
-          <Row
-            k="PRIME / PRO"
-            v={`${doc.prime_price_iqd === null ? '—' : formatIqd(doc.prime_price_iqd)} / ${
-              doc.pro_price_iqd === null ? '—' : formatIqd(doc.pro_price_iqd)
-            }`}
-          />
+          {!proPaused && <Row k="PRO" v={doc.pro_price_iqd === null ? '—' : formatIqd(doc.pro_price_iqd)} />}
           <Row k="أنواع البيع" v={doc.sale_types.join(' + ')} />
           <Row k="مصدر المخزون" v={rel.inventory_mode} />
           <Row k="الخيارات / الألوان" v={`${valueCount} / ${rel.colors.length}`} />

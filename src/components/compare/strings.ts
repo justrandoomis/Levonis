@@ -49,6 +49,12 @@ export interface CompareStrings {
 
   // the table
   specsTitle: string;
+  /** «٣ فروقات» — how many rows of a section differ. */
+  groupDiffs: (n: number) => string;
+  /** A section whose every row is the same. */
+  groupSame: string;
+  /** The rail of sections above the table. */
+  jumpTo: string;
   sharedGroup: string;
   narrowGroup: string;
   narrowGroupNote: string;
@@ -126,6 +132,9 @@ const ar: CompareStrings = {
   priceNotScored: 'السعر معروض ولا يدخل في النتيجة أعلاه — هو مفاضلة، مو تفوق.',
 
   specsTitle: 'المواصفات',
+  groupDiffs: (n) => (n === 1 ? 'فرق واحد' : n === 2 ? 'فرقان' : n <= 10 ? `${n} فروقات` : `${n} فرقًا`),
+  groupSame: 'متطابقة',
+  jumpTo: 'أقسام المواصفات',
   sharedGroup: 'مشتركة',
   narrowGroup: 'ما تنطبق على الكل',
   narrowGroupNote: 'هذه المجموعة مسجلة لجهاز دون غيره، فما تُقرأ الفراغات فيها على أنها ضعف.',
@@ -201,6 +210,9 @@ const en: CompareStrings = {
   priceNotScored: 'Price is shown and is not part of the score above — it is a trade-off, not a win.',
 
   specsTitle: 'Specifications',
+  groupDiffs: (n) => (n === 1 ? '1 difference' : `${n} differences`),
+  groupSame: 'Identical',
+  jumpTo: 'Specification sections',
   sharedGroup: 'Shared',
   narrowGroup: 'Not applicable to all',
   narrowGroupNote: 'This group is recorded for one machine and not the other, so a blank here is not a weakness.',
@@ -276,6 +288,9 @@ const ckb: CompareStrings = {
   priceNotScored: 'نرخ پیشان دەدرێت و لە ئەنجامی سەرەوەدا ناژمێردرێت — ئەمە هەڵسەنگاندنە، نەک سەرکەوتن.',
 
   specsTitle: 'تایبەتمەندییەکان',
+  groupDiffs: (n) => `${n} جیاوازی`,
+  groupSame: 'وەک یەک',
+  jumpTo: 'بەشەکانی تایبەتمەندی',
   sharedGroup: 'هاوبەش',
   narrowGroup: 'بۆ هەمووان نییە',
   narrowGroupNote: 'ئەم کۆمەڵەیە تەنها بۆ یەک ئامێر تۆمار کراوە، بۆیە خانەی بەتاڵ لێرەدا لاوازی نییە.',

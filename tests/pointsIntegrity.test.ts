@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, failingD1, freshDb, stubApp, post, get, json, row, all, count, settledPoints, type StubUser } from './fixtures/app';
+import { asD1, failingD1, freshDb, stubApp, post, get, json, row, all, count, settledPoints, type StubUser, proOnSale } from './fixtures/app';
 import { rewardRoutes } from '../worker/routes/rewards';
 import { getTierStatus } from '../worker/lib/entitlements';
 import {
@@ -57,7 +57,7 @@ interface Seed {
 const PLAN: Record<Tier, string> = { plus: 'plus_12mo', prime: 'prime_12mo', pro: 'pro_12mo' };
 
 function seed(o: Seed = {}): DatabaseSync {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   raw.exec(`INSERT INTO users (id,name,email,password_hash,role) VALUES ('u1','Sara','a@x.co','h','customer')`);
   if (o.tier) {
     const expires = o.expired
@@ -150,17 +150,18 @@ test('the SQL multiplier and the TypeScript multiplier agree on every tier × ex
   }
 });
 
-test('the ladder is exactly PREMIUM 1.5× / PRO 2× / everyone else 1×', async () => {
+test('the ladder is exactly PRO 2× / everyone else 1× — PREMIUM\'s 1.5× ended with 0145', async () => {
   const cases: Array<[Seed, number, string]> = [
     [{}, 100, '1x'],
     [{ tier: 'plus' }, 100, '1x'],
-    [{ tier: 'prime' }, 150, '1.5x'],
+    // «اشتراك البريميوم لا يحمل خصومات … أما المميزات الأخرى فألغيها».
+    [{ tier: 'prime' }, 100, '1x'],
     [{ tier: 'pro' }, 200, '2x'],
     // An expired subscription is not a subscription.
     [{ tier: 'pro', expired: true }, 100, '1x'],
     // An admin restriction pauses the benefit without touching the membership.
     [{ tier: 'pro', gates: ['premiumRewards'] }, 100, '1x'],
-    // PRO whose priority benefit alone is paused keeps the PREMIUM rate.
+    // PRO whose priority benefit alone is paused earns 1.5×.
     [{ tier: 'pro', gates: ['priorityService'] }, 150, '1.5x'],
   ];
   for (const [s, expected, label] of cases) {
@@ -175,7 +176,7 @@ test('the ladder is exactly PREMIUM 1.5× / PRO 2× / everyone else 1×', async 
 // ===========================================================================
 
 test('1.5× rounds HALF UP, and the SQL does the identical arithmetic', () => {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   // The boundary: every base whose ×1.5 lands on a .5.
   const halves: Array<[number, number]> = [
     [1, 2],   // 1.5  → 2
@@ -240,13 +241,13 @@ test('a crafted body cannot change the amount, the day, the streak or the tier',
   const res = await post(appFor(asD1(raw)), '/api/rewards/checkin', HOSTILE_BODY);
   const body = await json(res);
   assert.equal(res.status, 200);
-  assert.equal(body.points, 5, 'the server ladder decided the amount, not the request');
-  assert.equal(body.base_points, 5);
+  assert.equal(body.points, 1, 'the server ladder decided the amount, not the request');
+  assert.equal(body.base_points, 1);
   assert.equal(body.multiplier_x100, 100, 'a free account cannot ask to be PRO');
   assert.equal(body.day, 1, 'the request asked for day 7 and got day 1');
 
   const [c] = claims(raw);
-  assert.equal(c.points, 5);
+  assert.equal(c.points, 1);
   assert.equal(c.day, baghdadDay(), 'the row carries the SERVER day, not the 2099 the request sent');
   assert.equal(c.streak_day, 1);
   assert.equal(c.tier_at_award, 'free');
@@ -254,36 +255,48 @@ test('a crafted body cannot change the amount, the day, the streak or the tier',
     count(raw, 'SELECT COUNT(*) n FROM reward_claims'), 1,
     'the request named another user_id and got no row of its own'
   );
-  assert.equal(settledPoints(raw, 'u1'), 5);
+  assert.equal(settledPoints(raw, 'u1'), 1);
   assert.equal(settledPoints(raw, 'someone-else'), 0);
 });
 
 test('a PRO account is paid double, and a free account sending tier:pro is not', async () => {
   const proRaw = seed({ tier: 'pro' });
   const pro = await json(await post(appFor(asD1(proRaw)), '/api/rewards/checkin', {}));
-  assert.equal(pro.base_points, 5);
-  assert.equal(pro.points, 10, 'PRO earns 2× on the daily check-in');
+  assert.equal(pro.base_points, 1);
+  assert.equal(pro.points, 2, 'PRO earns 2× on the daily check-in');
   assert.equal(pro.multiplier_x100, 200);
 
   const freeRaw = seed();
   const free = await json(await post(appFor(asD1(freeRaw)), '/api/rewards/checkin', { tier: 'pro', multiplier_x100: 200 }));
-  assert.equal(free.points, 5, 'claiming to be PRO in the body buys nothing');
+  assert.equal(free.points, 1, 'claiming to be PRO in the body buys nothing');
 });
 
-test('a PREMIUM account is paid 1.5× with the half-up boundary applied end to end', async () => {
-  const raw = seed({ tier: 'prime' });
+test('1.5× is applied half up end to end (a PRO whose priority service is restricted)', async () => {
+  const raw = seed({ tier: 'pro', gates: ['priorityService'] });
   const body = await json(await post(appFor(asD1(raw)), '/api/rewards/checkin', {}));
-  assert.equal(body.base_points, 5);
-  assert.equal(body.points, 8, '5 × 1.5 = 7.5, rounded half up');
+  assert.equal(body.base_points, 1);
+  assert.equal(body.points, 2, '1 × 1.5 = 1.5, rounded half up');
   assert.equal(body.multiplier_x100, 150);
   const [c] = claims(raw);
   assert.equal(c.multiplier_x100, 150);
-  assert.equal(c.tier_at_award, 'prime');
-  // The ledger row says WHY it is 8 rather than 5 — the owner's requirement
+  assert.equal(c.tier_at_award, 'pro');
+  // The ledger row says WHY it is 2 rather than 1 — the owner's requirement
   // that a subscriber sees the multiplier, not just a bigger number.
   const [tx] = pointRows(raw);
-  assert.equal(tx.amount, 8);
-  assert.match(tx.note, /5 × 1\.5 \(PRIME\)/);
+  assert.equal(tx.amount, 2);
+  assert.match(tx.note, /1 × 1\.5 \(PRO\)/);
+});
+
+test('a PREMIUM account is paid the base rate since 0145, and the row says it was PREMIUM', async () => {
+  const raw = seed({ tier: 'prime' });
+  const body = await json(await post(appFor(asD1(raw)), '/api/rewards/checkin', {}));
+  assert.equal(body.base_points, 1);
+  assert.equal(body.points, 1);
+  assert.equal(body.multiplier_x100, 100);
+  const [c] = claims(raw);
+  assert.equal(c.tier_at_award, 'prime');
+  const [tx] = pointRows(raw);
+  assert.doesNotMatch(tx.note, /×/, 'a 1× award is not explained as a multiplied one');
 });
 
 // ===========================================================================
@@ -303,7 +316,7 @@ test('replaying a check-in moves nothing the second time', async () => {
   assert.deepEqual(claims(raw), after.claims, 'no second claim row');
   assert.deepEqual(pointRows(raw), after.ledger, 'no second ledger row');
   assert.equal(settledPoints(raw, 'u1'), after.balance, 'balance unmoved');
-  assert.equal(after.balance, 5);
+  assert.equal(after.balance, 1);
 });
 
 test('the one-time push mission is idempotent for the life of the account, not just for today', async () => {
@@ -435,7 +448,7 @@ test('a concurrent double check-in takes the award exactly once', async () => {
   failing.beforeBatch = (stmts) => {
     if (injected || !stmts.some((s) => s.sql.includes('INSERT INTO reward_claims'))) return;
     injected = true;
-    rivalAward(raw, 'checkin', baghdadDay(), 10, 200, 'pro');
+    rivalAward(raw, 'checkin', baghdadDay(), 2, 200, 'pro');
   };
 
   const res = await post(app, '/api/rewards/checkin');
@@ -443,7 +456,7 @@ test('a concurrent double check-in takes the award exactly once', async () => {
   assert.equal(res.status, 409, 'the losing request is refused, not served a second credit');
   assert.equal(count(raw, "SELECT COUNT(*) n FROM reward_claims WHERE mission='checkin'"), 1, 'one row, not two');
   assert.equal(pointRows(raw).length, 1, 'one credit, not two');
-  assert.equal(settledPoints(raw, 'u1'), 10, 'PRO: 5 × 2, once');
+  assert.equal(settledPoints(raw, 'u1'), 2, 'PRO: 1 × 2, once');
 });
 
 test('a concurrent double push claim takes the award exactly once', async () => {
@@ -504,7 +517,9 @@ test('the streak day is read from the award history, not from the users cache', 
   const body = await json(await post(appFor(db), '/api/rewards/checkin'));
   assert.equal(body.day, 6);
   assert.equal(body.points, checkinBasePoints(6));
-  assert.equal(body.points, 15);
+  // Day 6 of the 1..7 ladder (0146). Yesterday's row keeps the 15 the old
+  // ladder paid: an award already made is history.
+  assert.equal(body.points, 6);
 });
 
 test('breaking the streak can never pay MORE than continuing it — the ladder is monotonic', () => {
@@ -517,8 +532,8 @@ test('breaking the streak can never pay MORE than continuing it — the ladder i
     assert.ok(pts >= previous, `the ladder dips at day ${day}`);
     previous = pts;
   }
-  assert.equal(checkinBasePoints(1), 5, 'a reset lands on the cheapest rung');
-  assert.equal(checkinBasePoints(7), 20, 'continuing reaches the best rung');
+  assert.equal(checkinBasePoints(1), 1, 'a reset lands on the cheapest rung');
+  assert.equal(checkinBasePoints(7), 7, 'continuing reaches the best rung');
   assert.ok(checkinBasePoints(1) < checkinBasePoints(7));
 });
 
@@ -533,13 +548,13 @@ test('a gap in the history resets the counter to 1 and the row records it honest
     .run(old, `${old}T12:00:00.000Z`, `reward:u1:checkin:${old}`);
   const body = await json(await post(appFor(asD1(raw)), '/api/rewards/checkin'));
   assert.equal(body.day, 1);
-  assert.equal(body.points, 5);
+  assert.equal(body.points, 1);
   const fresh = claims(raw).find((c) => c.day === baghdadDay())!;
   assert.equal(fresh.streak_day, 1, 'the row says which day number it paid for');
 });
 
 test('the history tells the truth: the Baghdad day it credited AND the instant it happened', async () => {
-  const raw = seed({ tier: 'prime' });
+  const raw = seed({ tier: 'pro' });
   const app = appFor(asD1(raw));
   await post(app, '/api/rewards/checkin');
   const body = await json(await get(app, '/api/rewards'));
@@ -547,10 +562,10 @@ test('the history tells the truth: the Baghdad day it credited AND the instant i
   const h = body.history[0];
   assert.equal(h.mission, 'checkin');
   assert.equal(h.day, baghdadDay(), 'the day credited');
-  assert.equal(h.points, 8);
-  assert.equal(h.base_points, 5);
-  assert.equal(h.multiplier_x100, 150, 'the history explains the number instead of just showing it');
-  assert.equal(h.tier_at_award, 'prime');
+  assert.equal(h.points, 2);
+  assert.equal(h.base_points, 1);
+  assert.equal(h.multiplier_x100, 200, 'the history explains the number instead of just showing it');
+  assert.equal(h.tier_at_award, 'pro');
   assert.equal(h.streak_day, 1);
   assert.ok(Date.parse(h.awarded_at) > 0, 'and when it actually happened');
 });
@@ -740,8 +755,8 @@ test('GET /api/rewards states the multiplier, what it applies to, and what is un
   assert.deepEqual(body.multiplier.applies_to, ['checkin', 'tasks', 'purchases', 'reviews']);
 
   // Amounts are server-computed, base and credited, so the page never guesses.
-  assert.equal(body.checkin.base_points, 5);
-  assert.equal(body.checkin.points, 10);
+  assert.equal(body.checkin.base_points, 1);
+  assert.equal(body.checkin.points, 2);
   assert.equal(body.missions.push.base_points, 50);
   assert.equal(body.missions.push.points, 100);
   assert.equal(body.missions.video.points, 40);
@@ -750,8 +765,10 @@ test('GET /api/rewards states the multiplier, what it applies to, and what is un
   // The ladder the page draws is the server's, at the server's multiplier.
   assert.deepEqual(
     body.checkin.ladder.map((d: { day: number; points: number }) => [d.day, d.points]),
-    [[1, 10], [2, 10], [3, 20], [4, 20], [5, 30], [6, 30], [7, 40]]
+    [[1, 2], [2, 4], [3, 6], [4, 8], [5, 10], [6, 12], [7, 14]]
   );
+  // How points are earned, in the server's numbers (0146).
+  assert.deepEqual(body.earning, { iqd_per_point: 1000, checkin_top_rung: 7 });
 
   assert.equal(body.checkin.verification, 'server_timed');
   assert.equal(body.missions.video.verification, 'client_asserted');
@@ -761,14 +778,21 @@ test('GET /api/rewards states the multiplier, what it applies to, and what is un
   assert.ok(Date.parse(body.server_time) > 0, 'the page is given the server clock');
 });
 
-test('a PREMIUM member sees 1.5×, and the ladder shows the half-up amounts', async () => {
-  const raw = seed({ tier: 'prime' });
+test('a 1.5× member sees 1.5×, and the ladder shows the half-up amounts', async () => {
+  const raw = seed({ tier: 'pro', gates: ['priorityService'] });
   const body = await json(await get(appFor(asD1(raw)), '/api/rewards'));
   assert.equal(body.multiplier.label, '1.5x');
   assert.deepEqual(
     body.checkin.ladder.map((d: { points: number }) => d.points),
-    [8, 8, 15, 15, 23, 23, 30]
+    [2, 3, 5, 6, 8, 9, 11]
   );
+});
+
+test('a PREMIUM member sees the base ladder since 0145', async () => {
+  const raw = seed({ tier: 'prime' });
+  const body = await json(await get(appFor(asD1(raw)), '/api/rewards'));
+  assert.equal(body.multiplier.label, '1x');
+  assert.deepEqual(body.checkin.ladder.map((d: { points: number }) => d.points), [1, 2, 3, 4, 5, 6, 7]);
 });
 
 // ===========================================================================
@@ -804,10 +828,10 @@ test('a PRO purchase freezes ×2 on the accrual row, in the checkout transaction
   await db.batch(statements);
 
   const a = accrual(raw, 'ORD-1');
-  assert.equal(a.base_points, 750, '75,000 IQD at 100 IQD per point');
+  assert.equal(a.base_points, 75, '75,000 IQD at 1,000 IQD per point (0146)');
   assert.equal(a.multiplier_x100, 200);
   assert.equal(a.tier_at_award, 'pro');
-  assert.equal(a.points, 1500, 'PRO earns double on purchases');
+  assert.equal(a.points, 150, 'PRO earns double on purchases');
 });
 
 test('a subscription that lapses during the seven-day hold cannot rewrite history', async () => {
@@ -820,7 +844,7 @@ test('a subscription that lapses during the seven-day hold cannot rewrite histor
     orderId: 'ORD-2', userId: 'u1', purchaseAt: purchasedAt, netEligibleIqd: 75_000, rule, settledAtPurchase: true,
   });
   await db.batch(statements);
-  assert.equal(accrual(raw, 'ORD-2').points, 1500);
+  assert.equal(accrual(raw, 'ORD-2').points, 150);
 
   // The membership expires BEFORE the accrual releases.
   raw.exec("UPDATE memberships SET expires_at = '2020-01-01T00:00:00.000Z' WHERE user_id='u1'");
@@ -828,8 +852,8 @@ test('a subscription that lapses during the seven-day hold cannot rewrite histor
 
   const released = await releaseAccrualForOrder({ DB: db } as never, 'ORD-2');
   assert.equal(released.awarded, true);
-  assert.equal(released.points, 1500, 'the customer keeps what they earned when they bought');
-  assert.equal(settledPoints(raw, 'u1'), 1500);
+  assert.equal(released.points, 150, 'the customer keeps what they earned when they bought');
+  assert.equal(settledPoints(raw, 'u1'), 150);
   assert.equal(accrual(raw, 'ORD-2').multiplier_x100, 200, 'the row still says which multiplier paid it');
 });
 
@@ -843,7 +867,7 @@ test('a subscription bought AFTER the purchase cannot inflate a pending accrual 
     rule: resolvePointsRule(POINTS_RULE_DEFAULTS, purchasedAt), settledAtPurchase: true,
   });
   await db.batch(statements);
-  assert.equal(accrual(raw, 'ORD-3').points, 750);
+  assert.equal(accrual(raw, 'ORD-3').points, 75);
 
   raw
     .prepare(
@@ -853,11 +877,11 @@ test('a subscription bought AFTER the purchase cannot inflate a pending accrual 
     .run(new Date().toISOString(), new Date(Date.now() + 86_400_000).toISOString());
 
   const released = await releaseAccrualForOrder({ DB: db } as never, 'ORD-3');
-  assert.equal(released.points, 750, 'buying PRO later does not re-price an order already placed');
+  assert.equal(released.points, 75, 'buying PRO later does not re-price an order already placed');
 });
 
 test('the async builder reports the exact multiplied figure before the batch runs', async () => {
-  const raw = seed({ tier: 'prime' });
+  const raw = seed({ tier: 'pro', gates: ['priorityService'] });
   const db = asD1(raw);
   seedOrder(raw, 'ORD-4');
   const now = new Date().toISOString();
@@ -865,12 +889,12 @@ test('the async builder reports the exact multiplied figure before the batch run
     orderId: 'ORD-4', userId: 'u1', purchaseAt: now, netEligibleIqd: 75_099,
     rule: resolvePointsRule(POINTS_RULE_DEFAULTS, now), settledAtPurchase: true,
   });
-  assert.equal(plan.base_points, 750);
+  assert.equal(plan.base_points, 75);
   assert.equal(plan.multiplier_x100, 150);
-  assert.equal(plan.points, 1125, '750 × 1.5');
-  assert.equal(plan.tier_at_award, 'prime');
+  assert.equal(plan.points, 113, '75 × 1.5 = 112.5, half up');
+  assert.equal(plan.tier_at_award, 'pro');
   await db.batch(statements);
-  assert.equal(accrual(raw, 'ORD-4').points, 1125, 'the plan and the row agree');
+  assert.equal(accrual(raw, 'ORD-4').points, 113, 'the plan and the row agree');
 });
 
 test('a partial return removes only the multiplied points that were actually returned', () => {
@@ -913,7 +937,7 @@ test('a spend races an award without ever creating value or a negative balance',
   const db = asD1(raw);
   const app = appFor(db);
   await post(app, '/api/rewards/checkin');
-  assert.equal(settledPoints(raw, 'u1'), 10);
+  assert.equal(settledPoints(raw, 'u1'), 2);
 
   // The codebase's balance-guarded withdrawal: the amount turns negative when
   // the live balance does not cover it, so the CHECK aborts the transaction.
@@ -930,7 +954,7 @@ test('a spend races an award without ever creating value or a negative balance',
       .bind(id, points, new Date().toISOString())
       .run();
 
-  await spend('w1', 10);
+  await spend('w1', 2);
   assert.equal(settledPoints(raw, 'u1'), 0);
   await assert.rejects(spend('w2', 1), /CHECK/, 'a spend beyond the balance is refused by the database');
   assert.equal(settledPoints(raw, 'u1'), 0, 'never negative');
@@ -941,7 +965,7 @@ test('a spend races an award without ever creating value or a negative balance',
 });
 
 test('every awarded claim has exactly one ledger row and every ledger row has its claim', async () => {
-  const raw = seed({ tier: 'prime', taskConfig: { video_enabled: true, video_min_seconds: 5, browse_enabled: true, push_enabled: true } });
+  const raw = seed({ tier: 'pro', gates: ['priorityService'], taskConfig: { video_enabled: true, video_min_seconds: 5, browse_enabled: true, push_enabled: true } });
   const app = appFor(asD1(raw));
   await post(app, '/api/rewards/checkin');
   await post(app, '/api/rewards/push');
@@ -958,7 +982,7 @@ test('every awarded claim has exactly one ledger row and every ledger row has it
     awarded.reduce((n, c) => n + c.points, 0),
     'the ledger total is the awards total'
   );
-  assert.equal(settledPoints(raw, 'u1'), 8 + 75 + 30, 'PREMIUM: 5→8, 50→75, 20→30');
+  assert.equal(settledPoints(raw, 'u1'), 2 + 75 + 30, '1.5×: 1→2, 50→75, 20→30');
   for (const c of awarded) {
     assert.equal(count(raw, 'SELECT COUNT(*) n FROM wallet_transactions WHERE id = ?', c.wallet_tx_id), 1);
     assert.equal(c.base_points !== null, true, 'every award records its base');

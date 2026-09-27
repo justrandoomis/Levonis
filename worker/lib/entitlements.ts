@@ -25,6 +25,7 @@ import type { Env, SessionUser } from './types';
 import { safeParse } from './types';
 import { TIER_RANK, type Tier } from './pricing';
 import { normalizePhone } from './phone';
+import { PAUSED_PRO_ACTS_AS, freezeMembership, frozenRemainingDays, getProPause, isPausedAtMissing, thawMembership } from './tierPause';
 
 export interface LaunchConfig {
   launch_at: string | null;
@@ -53,6 +54,17 @@ export interface MembershipRow {
   starts_at: string | null;
   expires_at: string | null;
   source: string;
+  /** Migration 0145: set while a PRO membership is frozen (worker/lib/tierPause.ts). */
+  paused_at?: string | null;
+}
+
+/** A PRO membership frozen by the pause — shown to the member, never a benefit. */
+export interface PausedMembership {
+  tier: 'pro';
+  /** When its clock stopped. */
+  since: string;
+  /** Whole days it still holds — returned to it, in full, on resume. */
+  remaining_days: number | null;
 }
 
 export interface TierStatus {
@@ -64,6 +76,12 @@ export interface TierStatus {
    *  final phase §10). Gates benefit computation only — never data access,
    *  support, warranty, repayment or login. */
   gated_benefits: string[];
+  /**
+   * The member's PRO card while PRO is paused (0145). `tier` above is then
+   * what the frozen card ACTS AS (PREMIUM), and `expires_at` is null: a
+   * frozen clock has no end date until it resumes.
+   */
+  paused?: PausedMembership | null;
 }
 
 /**
@@ -87,21 +105,31 @@ export const ENTITLEMENT_MINIMUM_TIER = {
   exclusiveSections: 'plus',
   memberOffers: 'plus',
 
-  premiumPricing: 'prime',
+  /**
+   * PREMIUM, AS THE OWNER DEFINED IT ON 2026-09-27: «البريميوم … فقط إضافة ميزة
+   * أنه توصيل مجاني للعادي فوق 75 ألف … وإشارة بأنه مشترك في البريميوم … أما
+   * المميزات الأخرى فألغيها». Everything PLUS gives, plus exactly two things:
+   * free standard delivery (the rule decides the threshold — 75,000, 0145) and
+   * its badge in the community.
+   */
   premiumDelivery: 'prime',
-  premiumRewards: 'prime',
+  premiumBadge: 'prime',
 
   /**
-   * The cash-on-delivery tax exemption, as an entitlement an admin can
-   * restrict on one account the way every other benefit can be.
+   * NO LONGER PREMIUM'S — «اشتراك البريميوم لا يحمل خصومات». Member prices and
+   * discount rules, the points multiplier and the cash-on-delivery exemption
+   * now start at PRO. They keep their names because restriction cases, rule
+   * gates and order snapshots already carry them; what moved is who holds
+   * them. A PREMIUM discount rule an admin re-enabled would therefore still
+   * apply to nobody at the PREMIUM tier (`GATE`, worker/lib/membershipBenefits.ts),
+   * and the rules door refuses to write one (worker/routes/adminMembershipBenefits.ts).
    *
-   * Minimum tier PREMIUM, not PRO, and the distinction is the point: the
-   * entitlement says which tiers MAY be exempt, and the configured rule in
-   * `membership_benefit_rules` says whether they actually are. PREMIUM ships
-   * with a rule that says no. Putting the answer in the rule rather than in
-   * this table is what lets the owner change it without a deploy.
+   * `codTaxExemption` says which tiers MAY be exempt; the configured rule in
+   * `membership_benefit_rules` says whether they actually are.
    */
-  codTaxExemption: 'prime',
+  premiumPricing: 'pro',
+  premiumRewards: 'pro',
+  codTaxExemption: 'pro',
 
   proPricing: 'pro',
   freeDelivery: 'pro',
@@ -157,9 +185,34 @@ export async function usersWithEntitlement(
   userIds: unknown[],
   entitlement: MembershipEntitlement
 ): Promise<Set<string>> {
-  const ids = [...new Set(userIds.filter((id): id is string => typeof id === 'string' && id.length > 0))];
   const entitled = new Set<string>();
-  if (ids.length === 0) return entitled;
+  for (const [userId, status] of await statusesFor(db, userIds)) if (hasEntitlement(status, entitlement)) entitled.add(userId);
+  return entitled;
+}
+
+/**
+ * THE TWO COMMUNITY BADGES FOR A PAGE OF PEOPLE, in one resolution.
+ *
+ * `pro` is the PRO status badge (`proMerchantBadge`). `premium` is PREMIUM's
+ * own mark — «شارة مميزة في مجتمع ليفو» (owner, 2026-09-27) — and a PRO
+ * member, who inherits it, shows the PRO badge instead: one badge per person,
+ * the highest they hold.
+ */
+export async function membershipBadges(db: D1Database, userIds: unknown[]): Promise<{ pro: Set<string>; premium: Set<string> }> {
+  const pro = new Set<string>();
+  const premium = new Set<string>();
+  for (const [userId, status] of await statusesFor(db, userIds)) {
+    if (hasEntitlement(status, 'proMerchantBadge')) pro.add(userId);
+    else if (hasEntitlement(status, 'premiumBadge')) premium.add(userId);
+  }
+  return { pro, premium };
+}
+
+/** Every listed account's resolved status (active memberships only), for the bulk readers above. */
+async function statusesFor(db: D1Database, userIds: unknown[]): Promise<Map<string, TierStatus>> {
+  const ids = [...new Set(userIds.filter((id): id is string => typeof id === 'string' && id.length > 0))];
+  const statusByUser = new Map<string, TierStatus>();
+  if (ids.length === 0) return statusByUser;
 
   // ONE bound parameter for the whole list (json_each), not one per id: the
   // live D1 refuses a statement over 100 bound parameters, and a followed-shops
@@ -167,24 +220,44 @@ export async function usersWithEntitlement(
   const idsJson = JSON.stringify(ids);
   const inIds = `(SELECT value FROM json_each(?))`;
   const nowIso = new Date().toISOString();
-  await db
-    .prepare(
-      `UPDATE memberships SET state = 'expired'
-        WHERE state = 'active' AND expires_at IS NOT NULL AND expires_at < ?
-          AND user_id IN ${inIds}`
-    )
-    .bind(nowIso, idsJson)
-    .run();
+  // A frozen PRO membership (0145) never expires while it waits. A database
+  // that has not run 0145 has no frozen row and no column to name.
+  let pausable = true;
+  try {
+    await db
+      .prepare(
+        `UPDATE memberships SET state = 'expired'
+          WHERE state = 'active' AND expires_at IS NOT NULL AND expires_at < ? AND paused_at IS NULL
+            AND user_id IN ${inIds}`
+      )
+      .bind(nowIso, idsJson)
+      .run();
+  } catch (e) {
+    if (!isPausedAtMissing(e)) throw e;
+    pausable = false;
+    await db
+      .prepare(
+        `UPDATE memberships SET state = 'expired'
+          WHERE state = 'active' AND expires_at IS NOT NULL AND expires_at < ?
+            AND user_id IN ${inIds}`
+      )
+      .bind(nowIso, idsJson)
+      .run();
+  }
 
   const [{ results: memberships }, { results: restrictions }] = await Promise.all([
     db
       .prepare(
-        `SELECT user_id, tier, expires_at FROM memberships
-          WHERE state = 'active' AND (expires_at IS NULL OR expires_at >= ?)
-            AND user_id IN ${inIds}`
+        pausable
+          ? `SELECT user_id, tier, expires_at, paused_at FROM memberships
+              WHERE state = 'active' AND (expires_at IS NULL OR expires_at >= ? OR paused_at IS NOT NULL)
+                AND user_id IN ${inIds}`
+          : `SELECT user_id, tier, expires_at, NULL AS paused_at FROM memberships
+              WHERE state = 'active' AND (expires_at IS NULL OR expires_at >= ?)
+                AND user_id IN ${inIds}`
       )
       .bind(nowIso, idsJson)
-      .all<{ user_id: string; tier: Exclude<Tier, 'free'>; expires_at: string | null }>(),
+      .all<{ user_id: string; tier: Exclude<Tier, 'free'>; expires_at: string | null; paused_at: string | null }>(),
     db
       .prepare(`SELECT user_id, benefit_flags FROM restriction_cases WHERE state = 'active' AND user_id IN ${inIds}`)
       .bind(idsJson)
@@ -197,23 +270,28 @@ export async function usersWithEntitlement(
     for (const flag of safeParse<unknown[]>(row.benefit_flags, [])) if (typeof flag === 'string') flags.add(flag);
     flagsByUser.set(row.user_id, flags);
   }
-  const statusByUser = new Map<string, TierStatus>();
   for (const row of memberships) {
+    // The same answer `getTierStatus` gives one account: a frozen PRO card
+    // counts as PREMIUM (worker/lib/tierPause.ts).
+    const tier: Exclude<Tier, 'free'> = row.tier === 'pro' && row.paused_at ? PAUSED_PRO_ACTS_AS : row.tier;
     const previous = statusByUser.get(row.user_id);
-    if (previous && TIER_RANK[previous.tier] >= TIER_RANK[row.tier]) continue;
+    if (previous && TIER_RANK[previous.tier] >= TIER_RANK[tier]) continue;
     statusByUser.set(row.user_id, {
-      tier: row.tier,
+      tier,
       active: true,
-      expires_at: row.expires_at,
+      expires_at: row.paused_at ? null : row.expires_at,
       pending_launch: null,
       gated_benefits: [...(flagsByUser.get(row.user_id) ?? [])],
     });
   }
-  for (const [userId, status] of statusByUser) if (hasEntitlement(status, entitlement)) entitled.add(userId);
-  return entitled;
+  return statusByUser;
 }
 
-/** Reward multiplier in hundredths: PLUS 1×, PREMIUM 1.5×, PRO 2×. */
+/**
+ * Reward multiplier in hundredths: PRO 2× (1.5× while its priority service is
+ * restricted), everyone else 1× — PREMIUM's 1.5× ended with its other extras
+ * (0145). A frozen PRO card acts as PREMIUM, so it earns 1× until it resumes.
+ */
 export function dailyRewardMultiplierX100(status: TierStatus): number {
   if (!status.active || !hasEntitlement(status, 'premiumRewards')) return 100;
   return hasEntitlement(status, 'priorityService') ? 200 : 150;
@@ -235,12 +313,27 @@ export async function getLaunchConfig(db: D1Database): Promise<LaunchConfig> {
  */
 export async function getTierStatus(db: D1Database, userId: string): Promise<TierStatus> {
   const nowIso = new Date().toISOString();
-  await db
-    .prepare(
-      "UPDATE memberships SET state = 'expired' WHERE user_id = ? AND state = 'active' AND expires_at IS NOT NULL AND expires_at < ?"
-    )
-    .bind(userId, nowIso)
-    .run();
+  // A frozen PRO membership (0145) never expires while it waits. On a
+  // database that has not run 0145 nothing can be frozen, and the column the
+  // guard names is not there to name (tierPause.ts, `isPausedAtMissing`).
+  let pausable = true;
+  try {
+    await db
+      .prepare(
+        "UPDATE memberships SET state = 'expired' WHERE user_id = ? AND state = 'active' AND expires_at IS NOT NULL AND expires_at < ? AND paused_at IS NULL"
+      )
+      .bind(userId, nowIso)
+      .run();
+  } catch (e) {
+    if (!isPausedAtMissing(e)) throw e;
+    pausable = false;
+    await db
+      .prepare(
+        "UPDATE memberships SET state = 'expired' WHERE user_id = ? AND state = 'active' AND expires_at IS NOT NULL AND expires_at < ?"
+      )
+      .bind(userId, nowIso)
+      .run();
+  }
 
   const { results } = await db
     .prepare(
@@ -255,8 +348,29 @@ export async function getTierStatus(db: D1Database, userId: string): Promise<Tie
   if (rows.some((m) => m.state === 'prepaid_pending_launch')) {
     rows = await convertReservationOnRead(db, userId, rows, nowIso);
   }
-  const active = rows.find((m) => m.state === 'active');
+  let active = rows.find((m) => m.state === 'active');
   const pending = rows.find((m) => m.state === 'prepaid_pending_launch');
+
+  // PRO, PAUSED (worker/lib/tierPause.ts). The switch is read only for a PRO
+  // member, so nobody else pays a query for it. A PRO row that became active
+  // while the pause was on (a legacy reservation converted above) is frozen
+  // here; a frozen row whose pause the owner has lifted is thawed here if the
+  // bulk resume has not reached it yet.
+  let paused: PausedMembership | null = null;
+  if (pausable && active && active.tier === 'pro') {
+    const pause = await getProPause(db);
+    if (pause.paused && !active.paused_at) {
+      await freezeMembership(db, active.id, nowIso);
+      active = { ...active, paused_at: nowIso };
+    } else if (!pause.paused && active.paused_at) {
+      await thawMembership(db, active.id, active.paused_at, nowIso);
+      const fresh = await db.prepare('SELECT * FROM memberships WHERE id = ?').bind(active.id).first<MembershipRow>();
+      if (fresh) active = fresh;
+    }
+    if (active.paused_at) {
+      paused = { tier: 'pro', since: active.paused_at, remaining_days: frozenRemainingDays(active.paused_at, active.expires_at) };
+    }
+  }
 
   // Active restriction cases gate specific benefits (admin decision with
   // reason + audit, worker/routes/support.ts). Merged here — the single
@@ -274,11 +388,12 @@ export async function getTierStatus(db: D1Database, userId: string): Promise<Tie
   }
 
   const status: TierStatus = {
-    tier: active ? active.tier : 'free',
+    tier: active ? (paused ? PAUSED_PRO_ACTS_AS : active.tier) : 'free',
     active: !!active,
-    expires_at: active?.expires_at ?? null,
+    expires_at: paused ? null : active?.expires_at ?? null,
     pending_launch: pending ? { tier: pending.tier, duration_months: pending.duration_months } : null,
     gated_benefits: [...gated],
+    paused,
   };
 
   // Cache the resolved tier on the user row. `membership_tier` (migration
@@ -473,6 +588,7 @@ export const benefits = {
   memberOffers: (t: TierStatus) => hasEntitlement(t, 'memberOffers'),
   premiumPricing: (t: TierStatus) => hasEntitlement(t, 'premiumPricing'),
   premiumDelivery: (t: TierStatus) => hasEntitlement(t, 'premiumDelivery'),
+  premiumBadge: (t: TierStatus) => hasEntitlement(t, 'premiumBadge'),
   premiumRewards: (t: TierStatus) => hasEntitlement(t, 'premiumRewards'),
   proPricing: (t: TierStatus) => hasEntitlement(t, 'proPricing'),
   freeDelivery: (t: TierStatus) => hasEntitlement(t, 'freeDelivery'),

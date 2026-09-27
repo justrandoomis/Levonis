@@ -29,9 +29,9 @@ import type { PolicyDocument } from './types';
  *  - `recomputeReversal` recomputes from the REMAINING eligible amount at the
  *    order's FROZEN multiplier and writes negative entries; history is never
  *    erased — articles 11.2 to 11.5.
- *  - worker/lib/pointsMultiplier.ts: PREMIUM ×1.5, PRO ×2, everyone else ×1,
- *    ROUNDED HALF UP. Article 6.7 states the rounding out loud, because a
- *    five-point check-in paying eight at ×1.5 is exactly the line a customer
+ *  - worker/lib/pointsMultiplier.ts: PRO ×2, everyone else ×1 (PREMIUM
+ *    included since 0145), ROUNDED HALF UP. Article 6.7 states the rounding
+ *    out loud, because a fraction of a point is exactly the line a customer
  *    opens a ticket about.
  *  - worker/lib/pointsTasks.ts: every mission value is a server constant, the
  *    day is the server's Baghdad day, elapsed time is re-checked in SQL. The
@@ -81,11 +81,26 @@ import type { PolicyDocument } from './types';
  *     no delivery waiver, no discount, no points and no membership; the code
  *     has no effect on the order price; a delivery waiver comes only from an
  *     active membership. The later articles of chapter 10 move up by one.
+ *
+ * VERSION 4 — WHY IT MOVED (owner, 2026-09-27; migrations 0145 and 0146). The
+ * archive keeps version 3 byte for byte.
+ *   * ONE POINT PER 1,000 DINARS. «اجعل لكل 1000 دينار نقطة واحدة وليس لكل
+ *     100 دينار» — article 2.2. The new article 2.11 states the one exception
+ *     to 2.3, which the owner asked for in so many words: the points still
+ *     PENDING on that day («لأنها تبقى معلقة لـ7 أيام — عدّل عليها قبل أن يتم
+ *     المطالبة») were re-rated to the new rate for every customer before they
+ *     were released; points already in the wallet were not touched.
+ *   * THE CHECK-IN CLIMBS BY ONE. «يبدأ من نقطة واحدة إلى نقطتين ثلاثة أربعة
+ *     خمسة ستة سبعة وهكذا» — article 5.2: 1, 2, … 7, then 7 each day after.
+ *   * NO PREMIUM MULTIPLIER. PREMIUM's ×1.5 ended with its other extras
+ *     (0145): article 6.6 names PRO ×2 alone, says PREMIUM earns the base, and
+ *     keeps what was already earned at ×1.5; 6.7's example no longer names a
+ *     tier.
  */
 export const rewards: PolicyDocument = {
   key: 'rewards',
-  version: 3,
-  effective_at: '2026-09-23',
+  version: 4,
+  effective_at: '2026-09-27',
   title: {
     ar: 'سياسة النقاط والمراجعات والهدايا والإحالات',
     en: 'Points, Reviews, Gifts and Referrals Policy',
@@ -136,13 +151,13 @@ export const rewards: PolicyDocument = {
 يُنشئ كل طلب مثبت على الخادم استحقاق نقاط محسوباً من أساسه المؤهل الصافي، بالمعدل النافذ لحظة الشراء.
 
 ### 2.2 المعدل
-نقطة واحدة عن كل مئة دينار عراقي كاملة من الأساس المؤهل الصافي. وهذا المعدل إعداد في نظام المتجر يجوز للمتجر تغييره للمستقبل.
+نقطة واحدة عن كل ألف دينار عراقي كاملة من الأساس المؤهل الصافي. وهذا المعدل إعداد في نظام المتجر يجوز للمتجر تغييره للمستقبل.
 
 ### 2.3 تجميد المعدل على الطلب
-يُحَل المعدل مرة واحدة عند الشراء ويُثبَّت على سجل الاستحقاق. وتغيير المعدل بعد ذلك لا يعيد تسعير طلب سابق، لا بالزيادة ولا بالنقصان.
+يُحَل المعدل مرة واحدة عند الشراء ويُثبَّت على سجل الاستحقاق. وتغيير المعدل بعد ذلك لا يعيد تسعير طلب سابق، لا بالزيادة ولا بالنقصان، إلا ما تنص عليه المادة 2.11.
 
 ### 2.4 الطلبات القديمة
-الطلبات التي سبقت العمل بالمعدل الحالي تبقى على معدلها القديم — نقطة عن كل ألف دينار، تُمنح عند التسليم — وتبقى قيودها كما هي. ولا تُضاعف ولا يُعاد منحها ولا يُعاد احتسابها.
+الطلبات التي سبقت العمل بنظام الاستحقاق المعلّق تبقى على قيودها القديمة — نقطة عن كل ألف دينار، تُمنح عند التسليم — كما هي. ولا تُضاعف ولا يُعاد منحها ولا يُعاد احتسابها.
 
 ### 2.5 الجمع ثم التقريب مرة واحدة
 تُجمع قيم أسطر الطلب أولاً، ثم يُجرى التقريب إلى الأسفل مرة واحدة على مجموع الطلب. ولا يُقرَّب كل سطر على حدة، لأن ذلك يضيّع على الزبون نقاطاً استحقها.
@@ -165,6 +180,9 @@ export const rewards: PolicyDocument = {
 
 ### 2.10 مضاعف العضوية
 يُطبَّق مضاعف العضوية على النقاط المستحقة وفق الفصل السادس، ويُثبَّت المضاعف المطبق على سجل الاستحقاق ويُسجَّل معه.
+
+### 2.11 النقاط المعلّقة يوم تعديل المعدل
+حين عُدِّل المعدل في 27 أيلول 2026 من نقطة عن كل مئة دينار إلى نقطة عن كل ألف دينار، أُعيد احتساب النقاط التي كانت لا تزال معلّقة ولم تُصرف إلى الرصيد بعد، لجميع الحسابات وقبل صرفها، بالمعدل الجديد وبالمضاعف المثبت على كل طلب. أما النقاط التي صُرفت إلى الرصيد قبل ذلك فبقيت كما هي.
 
 ## 3. دورة حياة النقطة
 
@@ -234,7 +252,7 @@ export const rewards: PolicyDocument = {
 تعرض المنصة مهاماً يمنح إتمامها نقاطاً. وقيمة كل مهمة ثابتٌ في برنامج الخادم، ولا يرسل التطبيق قيمة ولا مدة ولا تاريخاً.
 
 ### 5.2 تسجيل الحضور اليومي
-مهمة يومية واحدة لكل يوم معتمد. وسلّمها: خمس نقاط في اليومين الأول والثاني، وعشر في الثالث والرابع، وخمس عشرة في الخامس والسادس، وعشرون من اليوم السابع المتصل فصاعداً.
+مهمة يومية واحدة لكل يوم معتمد. وسلّمها يبدأ بنقطة واحدة في اليوم الأول ويزيد نقطة في كل يوم متصل: نقطتان في الثاني، وثلاث في الثالث، حتى سبع نقاط في اليوم السابع، ثم سبع نقاط لكل يوم متصل بعده.
 
 ### 5.3 احتساب أيام التتابع
 يُشتق يوم التتابع من سجل المنح نفسه في قاعدة البيانات، لا من عدّاد محفوظ على الحساب. وانقطاع التتابع يعيد العدّاد إلى أول درجات السلّم، وهي أقلها قيمة.
@@ -278,10 +296,10 @@ export const rewards: PolicyDocument = {
 ترقية العضوية لا ترفع نقاط طلب سابق ولا منحة سابقة.
 
 ### 6.6 قيم المضاعف
-عضو LEVO PREMIUM: مرة ونصف. عضو PRO: مرتان. ومن سواهما: مرة واحدة بلا زيادة. ويسري المضاعف على نقاط تسجيل الحضور والمهام والشراء والمراجعة.
+عضو PRO: مرتان. ومن سواه: مرة واحدة بلا زيادة، ومنهم عضو LEVO PREMIUM منذ 27 أيلول 2026. ويسري المضاعف على نقاط تسجيل الحضور والمهام والشراء والمراجعة. وما استحقه عضو PREMIUM قبل ذلك التاريخ بمضاعف مرة ونصف يبقى له كما استحقه وفق المادة 6.2.
 
 ### 6.7 التقريب
-إذا نتج عن ضرب المضاعف كسرُ نقطة قُرِّب النصف إلى الأعلى. فخمس نقاط بمضاعف مرة ونصف تصير ثماني نقاط لا سبعاً. والمضاعف مرتان والمضاعف مرة واحدة لا ينشأ عنهما كسر أصلاً.
+إذا نتج عن ضرب المضاعف كسرُ نقطة قُرِّب النصف إلى الأعلى، فلو كان المضاعف مرة ونصفاً صارت ثلاث نقاط خمساً لا أربعاً. والمضاعف مرتان والمضاعف مرة واحدة لا ينشأ عنهما كسر أصلاً.
 
 ### 6.8 تقييد المزايا
 إذا كان على الحساب قيدٌ إداري قائم يوقف ميزة المضاعف، احتُسبت النقاط بالمضاعف العادي طوال مدة القيد، ويُبيَّن ذلك على قيد المنح.
@@ -568,13 +586,13 @@ Using points, or claiming a review reward or a referral reward, constitutes acce
 Every order committed on the server creates a points entitlement calculated from its net eligible base, at the rate in force at the purchase moment.
 
 ### 2.2 The rate
-One point for every full 100 Iraqi dinars of the net eligible base. This rate is a setting in the Store's system which the Store may change prospectively.
+One point for every full 1,000 Iraqi dinars of the net eligible base. This rate is a setting in the Store's system which the Store may change prospectively.
 
 ### 2.3 The rate is frozen on the order
-The rate is resolved once at purchase and fixed on the entitlement record. A later change of the rate never re-prices an earlier order, neither upwards nor downwards.
+The rate is resolved once at purchase and fixed on the entitlement record. A later change of the rate never re-prices an earlier order, neither upwards nor downwards, save as article 2.11 provides.
 
 ### 2.4 Older orders
-Orders that predate the current rate remain on their own rate — one point per 1,000 dinars, granted at delivery — and their records stay as they are. They are never multiplied, re-granted or recomputed.
+Orders that predate the pending-entitlement system keep their old records — one point per 1,000 dinars, granted at delivery — as they are. They are never multiplied, re-granted or recomputed.
 
 ### 2.5 Summed first, rounded once
 The values of the order's lines are summed first, and the rounding down is applied once to the order total. It is not applied line by line, because that would lose the customer points they had earned.
@@ -597,6 +615,9 @@ An attempt that did not end in a committed order creates no entitlement and is n
 
 ### 2.10 The membership multiplier
 The membership multiplier is applied to the points due in accordance with the Memberships document, and the multiplier applied is fixed on the entitlement record and stored with it.
+
+### 2.11 Points pending on the day the rate changed
+When the rate changed on 27 September 2026 from one point per 100 dinars to one point per 1,000 dinars, the points that were still pending and not yet released to the balance were recomputed, for every account and before their release, at the new rate and at the multiplier fixed on each order. Points released to the balance before then were left as they were.
 
 ## 3. The life of a point
 
@@ -666,7 +687,7 @@ If an order on which points were spent is cancelled, those points are returned t
 The platform offers missions whose completion grants points. The value of each mission is a constant in the server program, and the application sends no value, no duration and no date.
 
 ### 5.2 The daily check-in
-One daily mission per recorded day. Its ladder is: five points on the first and second days, ten on the third and fourth, fifteen on the fifth and sixth, and twenty from the seventh consecutive day onwards.
+One daily mission per recorded day. Its ladder starts at one point on the first day and rises by one point on each consecutive day: two on the second, three on the third, up to seven points on the seventh day, then seven points on each consecutive day after it.
 
 ### 5.3 Computation of the streak
 The streak day is derived from the award records themselves in the database, not from a counter cached on the account. Breaking the streak returns the counter to the first rung of the ladder, which is its cheapest.
@@ -710,10 +731,10 @@ Points reversed are computed at the multiplier fixed on that same order, never a
 Upgrading a membership does not raise the points of an earlier order or an earlier award.
 
 ### 6.6 The values of the multiplier
-A LEVO PREMIUM member: one and a half. A PRO member: twofold. Anyone else: onefold, with no increase. The multiplier applies to check-in points, mission points, purchase points and review points.
+A PRO member: twofold. Anyone else: onefold, with no increase, a LEVO PREMIUM member included since 27 September 2026. The multiplier applies to check-in points, mission points, purchase points and review points. What a PREMIUM member earned before that date at one and a half remains as earned, in accordance with article 6.2.
 
 ### 6.7 Rounding
-Where multiplying produces a fraction of a point, a half is rounded up. Five points at a multiplier of one and a half become eight points, not seven. A twofold and a onefold multiplier produce no fraction at all.
+Where multiplying produces a fraction of a point, a half is rounded up: at a multiplier of one and a half, three points would become five, not four. A twofold and a onefold multiplier produce no fraction at all.
 
 ### 6.8 A restricted benefit
 Where a live administrative restriction on the account suspends the multiplier benefit, points are computed at the ordinary multiplier for the duration of the restriction, and that is shown on the award entry.
@@ -1000,13 +1021,13 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 هەر داواکارییەک کە لەسەر ڕاژە جێگیر بێت شایستەیی خاڵ دروست دەکات، لە بنەمای شایستەی ڕوونی خۆیەوە دەژمێردرێت، بەو ڕێژەیەی لە ساتی کڕیندا کاری پێدەکرا.
 
 ### 2.2 ڕێژەکە
-یەک خاڵ بۆ هەر سەد دیناری عێراقی تەواو لە بنەمای شایستەی ڕوون. ئەم ڕێژەیە ڕێکخستنێکە لە سیستەمی فرۆشگا کە فرۆشگا دەتوانێت بۆ داهاتوو بیگۆڕێت.
+یەک خاڵ بۆ هەر هەزار دیناری عێراقی تەواو لە بنەمای شایستەی ڕوون. ئەم ڕێژەیە ڕێکخستنێکە لە سیستەمی فرۆشگا کە فرۆشگا دەتوانێت بۆ داهاتوو بیگۆڕێت.
 
 ### 2.3 ڕەقکردنی ڕێژە لەسەر داواکاری
-ڕێژەکە جارێک لە کاتی کڕیندا دیاری دەکرێت و لەسەر تۆماری شایستەیی جێگیر دەکرێت. گۆڕینی دواتری ڕێژە هەرگیز داواکارییەکی پێشووتر دووبارە نرخ ناکاتەوە، نە بە زیادکردن و نە بە کەمکردنەوە.
+ڕێژەکە جارێک لە کاتی کڕیندا دیاری دەکرێت و لەسەر تۆماری شایستەیی جێگیر دەکرێت. گۆڕینی دواتری ڕێژە هەرگیز داواکارییەکی پێشووتر دووبارە نرخ ناکاتەوە، نە بە زیادکردن و نە بە کەمکردنەوە، جگە لەوەی بڕگەی 2.11 دیاری دەکات.
 
 ### 2.4 داواکارییە کۆنەکان
-ئەو داواکارییانەی پێش ڕێژەی ئێستا بوون لەسەر ڕێژەی خۆیان دەمێننەوە — یەک خاڵ بۆ هەر هەزار دینار، لە کاتی گەیاندندا دەبەخشرێت — و تۆمارەکانیان وەک خۆیان دەمێننەوە. هەرگیز چەند قات ناکرێن و دووبارە نابەخشرێنەوە و دووبارە ناژمێردرێنەوە.
+ئەو داواکارییانەی پێش سیستەمی شایستەیی هەڵپەسێردراو بوون تۆمارە کۆنەکانیان وەک خۆیان دەمێننەوە — یەک خاڵ بۆ هەر هەزار دینار، لە کاتی گەیاندندا دەبەخشرێت. هەرگیز چەند قات ناکرێن و دووبارە نابەخشرێنەوە و دووبارە ناژمێردرێنەوە.
 
 ### 2.5 کۆکردنەوە سەرەتا، خڕکردنەوە جارێک
 بەهای هێڵەکانی داواکاری سەرەتا کۆ دەکرێنەوە، و خڕکردنەوە بۆ خوارەوە جارێک لەسەر کۆی داواکارییەکە جێبەجێ دەکرێت. هێڵ بە هێڵ جێبەجێ ناکرێت، چونکە ئەوە خاڵی شایستەی کڕیار لەدەست دەدات.
@@ -1029,6 +1050,9 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 
 ### 2.10 زیادکەری ئەندامێتی
 زیادکەری ئەندامێتی بەپێی بەڵگەنامەی ئەندامێتییەکان لەسەر خاڵە شایستەکان جێبەجێ دەکرێت، و ئەو زیادکەرەی جێبەجێ کراوە لەسەر تۆماری شایستەیی جێگیر دەکرێت و لەگەڵیدا هەڵدەگیرێت.
+
+### 2.11 ئەو خاڵانەی لە ڕۆژی گۆڕینی ڕێژەدا هەڵپەسێردراو بوون
+کاتێک لە 27ی ئەیلوولی 2026 ڕێژەکە لە یەک خاڵ بۆ هەر سەد دینار گۆڕدرا بۆ یەک خاڵ بۆ هەر هەزار دینار، ئەو خاڵانەی هێشتا هەڵپەسێردراو بوون و نەچووبوونە باڵانسەوە، بۆ هەموو هەژمارەکان و پێش ئازادکردنیان، بە ڕێژە نوێیەکە و بەو زیادکەرەی لەسەر هەر داواکارییەک جێگیر کرابوو دووبارە ژمێردرانەوە. ئەو خاڵانەی پێشتر چووبوونە باڵانسەوە وەک خۆیان مانەوە.
 
 ## 3. ژیانی خاڵێک
 
@@ -1098,7 +1122,7 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 پلاتفۆرمەکە ئەرک پێشکەش دەکات کە تەواوکردنیان خاڵ دەبەخشێت. بەهای هەر ئەرکێک نەگۆڕێکە لە بەرنامەی ڕاژەدا، و بەرنامەکە هیچ بەها و ماوە و بەروارێک نانێرێت.
 
 ### 5.2 ئامادەبوونی ڕۆژانە
-یەک ئەرکی ڕۆژانە بۆ هەر ڕۆژێکی تۆمارکراو. پلیکانەکەی: پێنج خاڵ لە ڕۆژی یەکەم و دووەم، دە لە سێیەم و چوارەم، پازدە لە پێنجەم و شەشەم، و بیست لە ڕۆژی حەوتەمی بەردەوامەوە بەرەو پێشەوە.
+یەک ئەرکی ڕۆژانە بۆ هەر ڕۆژێکی تۆمارکراو. پلیکانەکەی بە یەک خاڵ لە ڕۆژی یەکەمدا دەست پێ دەکات و لە هەر ڕۆژێکی بەردەوامدا یەک خاڵ زیاد دەبێت: دوو لە دووەم، سێ لە سێیەم، تا حەوت خاڵ لە ڕۆژی حەوتەمدا، پاشان حەوت خاڵ بۆ هەر ڕۆژێکی بەردەوامی دوای ئەوە.
 
 ### 5.3 ژماردنی ڕۆژانی بەردەوامی
 ڕۆژی بەردەوامی لە خودی تۆمارەکانی بەخشیندا لە بنکەدراوەکەوە دەردەهێنرێت، نەک لە ژمێرەرێکی هەڵگیراو لەسەر هەژمار. پچڕانی بەردەوامی ژمێرەرەکە بۆ یەکەم پلەی پلیکانەکە دەگەڕێنێتەوە، کە هەرزانترینیانە.
@@ -1142,10 +1166,10 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 بەرزکردنەوەی ئەندامێتی خاڵی داواکارییەکی پێشوو یان بەخشینێکی پێشوو بەرز ناکاتەوە.
 
 ### 6.6 بەهاکانی زیادکەر
-ئەندامی LEVO PREMIUM: یەک و نیو. ئەندامی PRO: دوو ئەوەندە. کەسانی تر: یەک ئەوەندە بەبێ زیادکردن. زیادکەرەکە لەسەر خاڵی ئامادەبوون و ئەرکەکان و کڕین و پێداچوونەوە جێبەجێ دەکرێت.
+ئەندامی PRO: دوو ئەوەندە. کەسانی تر: یەک ئەوەندە بەبێ زیادکردن، ئەندامی LEVO PREMIUMیش لە 27ی ئەیلوولی 2026ەوە. زیادکەرەکە لەسەر خاڵی ئامادەبوون و ئەرکەکان و کڕین و پێداچوونەوە جێبەجێ دەکرێت. ئەوەی ئەندامی PREMIUM پێش ئەو بەروارە بە یەک و نیو بەدەستی هێناوە وەک خۆی بۆی دەمێنێتەوە، بەپێی بڕگەی 6.2.
 
 ### 6.7 خڕکردنەوە
-کاتێک لێکدان پارچەی خاڵ دروست دەکات، نیوەکە بەرەو سەرەوە خڕ دەکرێتەوە. پێنج خاڵ بە زیادکەری یەک و نیو دەبێتە هەشت خاڵ نەک حەوت. زیادکەری دوو ئەوەندە و یەک ئەوەندە هیچ پارچەیەک دروست ناکەن.
+کاتێک لێکدان پارچەی خاڵ دروست دەکات، نیوەکە بەرەو سەرەوە خڕ دەکرێتەوە: بە زیادکەری یەک و نیو، سێ خاڵ دەبێتە پێنج نەک چوار. زیادکەری دوو ئەوەندە و یەک ئەوەندە هیچ پارچەیەک دروست ناکەن.
 
 ### 6.8 سوودی سنووردارکراو
 کاتێک سنوورێکی کارگێڕی زیندوو لەسەر هەژمار سوودی زیادکەر ڕادەگرێت، خاڵەکان بە زیادکەری ئاسایی دەژمێردرێن بۆ ماوەی سنوورەکە، و ئەمە لەسەر تۆماری بەخشین پیشان دەدرێت.
