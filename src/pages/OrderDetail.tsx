@@ -31,6 +31,9 @@ import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, statusLabe
 import { useMoney } from '../CurrencyContext';
 import type { Claim } from '../components/warranty/types';
 
+/** Its own chunk: only an order with a printer that has parts draws it. */
+const MaintenanceShelf = React.lazy(() => import('../components/product/MaintenanceShelf'));
+
 /**
  * ONE order, everything the customer can know or do about it.
  *
@@ -775,6 +778,27 @@ export default function OrderDetail() {
                     </Link>
                   )}
                   <ReorderButton items={order.items} className="mt-1" />
+                  {/* «مواد الصيانة لطابعتك» (0148) — the parts that fit the
+                      printer this order bought, the moment it is bought. */}
+                  {(order.maintenance_parts ?? []).slice(0, 2).map((m) => (
+                    <div key={m.printer_slug} className="mt-4">
+                      <React.Suspense fallback={null}>
+                        <MaintenanceShelf
+                          id={`maintenance-${m.printer_slug}`}
+                          printerSlug={m.printer_slug}
+                          count={m.count}
+                          path={m.path}
+                          // OWNER: Sorani to be written by hand.
+                          title={loc('مواد الصيانة لطابعتك', 'Maintenance parts for your printer')}
+                          subline={
+                            lang === 'en'
+                              ? `Fits your ${m.name || m.name_ar}`
+                              : `تناسب طابعتك ${lang === 'ckb' ? m.name_ckb || m.name_ar || m.name : m.name_ar || m.name}`
+                          }
+                        />
+                      </React.Suspense>
+                    </div>
+                  ))}
                 </div>
               )}
 

@@ -38,10 +38,13 @@ export const BENTO_MATCHERS: Record<Exclude<BentoTileId, 'used'>, CategoryMatche
   printers: { ids: ['cat_printers'], slugs: ['printers', 'printers-levo', '3d-printers'] },
   filament: { ids: ['cat_materials_fdm'], slugs: ['fdm-materials', 'fdm-materials-levo', 'filament', 'filaments'] },
   resin: { ids: ['cat_materials_resin'], slugs: ['resin-materials', 'resin-materials-levo', 'resin'] },
-  // «قطع الغيار والمستلزمات» — nozzles, hot ends and the like are filed under
-  // «ملحقات الطابعات» (Printer Accessories); there is no separate spare-parts
-  // section in the taxonomy.
-  parts: { ids: ['cat_pacc'], slugs: ['printer-accessories', 'printer-accessories-levo', 'spare-parts'] },
+  // «قطع الغيار والمستلزمات» — «ملحقات الطابعات» (Printer Accessories) first,
+  // as the owner's home v2 draws it; «مواد الصيانة» (0148: hotends, plates,
+  // spare parts) when the accessories shelf has nothing in it.
+  parts: {
+    ids: ['cat_pacc', 'cat_maint'],
+    slugs: ['printer-accessories', 'printer-accessories-levo', 'maintenance-parts', 'spare-parts'],
+  },
   accessories: {
     ids: ['cat_accessories', 'cat_makers_tools'],
     slugs: ['accessories', 'accessories-levo', 'maker-tools', 'maker-tools-levo'],

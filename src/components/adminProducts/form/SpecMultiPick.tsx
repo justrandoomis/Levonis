@@ -39,7 +39,10 @@ export function SpecMultiPick({
     onChange([...known, ...unknown].join(', '));
   };
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap gap-1.5" data-spec-multi={id}>
+    // `ap`: the editor's tokens. The product form renders outside the list's
+    // `.ap` scope, and `T.chip` takes its pressed state from `--ap-accent-*` —
+    // without them a chosen value was drawn exactly like an unchosen one.
+    <div role="group" aria-label={label} className="ap flex flex-wrap gap-1.5" data-spec-multi={id}>
       {[...options, ...extra].map((o) => {
         const on = has(o);
         return (

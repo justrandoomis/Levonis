@@ -67,6 +67,8 @@ export const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced', 'profession
 export const TECH_FACETS = ['fdm', 'resin'] as const;
 
 export const MAX_BRANDS = 10;
+/** «يناسب طابعة» (0148) — how many printers one listing URL may name. */
+export const MAX_FITS = 6;
 export const MAX_FACET_VALUES = 8;
 export const MAX_QUERY_LENGTH = 100;
 /** The price range a filter may state, in IQD. */
@@ -86,6 +88,11 @@ export interface ListingFilters {
   price: PriceRange | null;
   /** Brand SLUGS, canonical order (sorted). */
   brands: string[];
+  /**
+   * «يناسب طابعة» (0148): printer PRODUCT slugs, canonical order (sorted). A
+   * product matches when it is linked to ANY of them (OR within the facet).
+   */
+  fits: string[];
   /** «عليها عرض»: a SALE price or a live/upcoming scheduled offer. */
   offer: boolean;
   /** «سعر أقل للأعضاء»: a PRIME or PRO rung below what the viewer pays. */
@@ -107,6 +114,7 @@ export const DEFAULT_LISTING: ListingState = Object.freeze({
   sale: null,
   price: null,
   brands: [],
+  fits: [],
   offer: false,
   member: false,
   specs: {},
@@ -187,6 +195,8 @@ function tokenList(raw: string | null | undefined, max: number, read: (t: string
 }
 
 const BRAND_SLUG = /^[a-z0-9][a-z0-9-]{0,59}$/;
+/** A product slug: `slugToken` keeps ASCII letters, digits and Arabic-script letters. */
+const PRODUCT_SLUG = /^[a-z0-9\u0600-\u06ff][a-z0-9\u0600-\u06ff-]{0,119}$/;
 
 export type ListingUrlMode = 'page' | 'api';
 
@@ -216,6 +226,11 @@ export function parseListingParams(get: (key: string) => string | null | undefin
       const s = t.trim().toLowerCase();
       return BRAND_SLUG.test(s) ? s : null;
     }),
+    // The same key in both vocabularies: a printer slug is already the word.
+    fits: tokenList(get('fits'), MAX_FITS, (t) => {
+      const s = t.trim().toLowerCase();
+      return PRODUCT_SLUG.test(s) ? s : null;
+    }),
     offer: flag(get('offer')),
     member: flag(get('member')),
     specs,
@@ -231,6 +246,7 @@ export function listingParamPairs(state: ListingState, mode: ListingUrlMode): Ar
   if (state.sale) out.push(['sale', state.sale]);
   if (state.price && (state.price.min !== null || state.price.max !== null)) out.push(['price', formatPriceRange(state.price)]);
   if (state.brands.length) out.push(['brand', [...new Set(state.brands)].sort().join(',')]);
+  if (state.fits?.length) out.push(['fits', [...new Set(state.fits)].sort().join(',')]);
   if (state.offer) out.push(['offer', '1']);
   if (state.member) out.push(['member', '1']);
   for (const field of FACET_FIELD_IDS) {
@@ -251,7 +267,7 @@ export const encodePairs = (pairs: Array<[string, string]>): string =>
 /** True when any filter (not the search text or the sort) is active. */
 export function hasListingFilters(f: ListingFilters): boolean {
   return (
-    f.avail || f.sale !== null || f.price !== null || f.brands.length > 0 || f.offer || f.member ||
+    f.avail || f.sale !== null || f.price !== null || f.brands.length > 0 || (f.fits?.length ?? 0) > 0 || f.offer || f.member ||
     FACET_FIELD_IDS.some((k) => (f.specs[k]?.length ?? 0) > 0)
   );
 }
@@ -260,6 +276,7 @@ export function hasListingFilters(f: ListingFilters): boolean {
 export function activeFilterCount(f: ListingFilters): number {
   return (
     Number(f.avail) + Number(f.sale !== null) + Number(f.price !== null) + Number(f.brands.length > 0) +
+    Number((f.fits?.length ?? 0) > 0) +
     Number(f.offer) + Number(f.member) + FACET_FIELD_IDS.filter((k) => (f.specs[k]?.length ?? 0) > 0).length
   );
 }

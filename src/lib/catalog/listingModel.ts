@@ -48,12 +48,13 @@ export function sectionTypeOf(productType: string | null | undefined, isPrinterC
 const copy = (s: ListingState): ListingState => ({
   ...s,
   brands: [...s.brands],
+  fits: [...(s.fits ?? [])],
   specs: Object.fromEntries(Object.entries(s.specs).map(([k, v]) => [k, [...(v ?? [])]])),
 });
 
 /** Every filter off; the search text and the sort stay. */
 export function clearFilters(s: ListingState): ListingState {
-  return { ...DEFAULT_LISTING, brands: [], specs: {}, q: s.q, sort: s.sort };
+  return { ...DEFAULT_LISTING, brands: [], fits: [], specs: {}, q: s.q, sort: s.sort };
 }
 
 export function setSpec(s: ListingState, field: FacetField, values: string[]): ListingState {
@@ -75,8 +76,16 @@ export function toggleBrand(s: ListingState, slug: string): ListingState {
   return next;
 }
 
+/** «يناسب طابعة» (0148): add or remove one printer, by its product slug. */
+export function toggleFit(s: ListingState, slug: string): ListingState {
+  const next = copy(s);
+  const have = s.fits ?? [];
+  next.fits = have.includes(slug) ? have.filter((f) => f !== slug) : [...have, slug].sort();
+  return next;
+}
+
 /** The filter groups a shopper can remove one at a time. */
-export type FilterGroup = 'avail' | 'sale' | 'price' | 'brands' | 'offer' | 'member' | FacetField;
+export type FilterGroup = 'avail' | 'sale' | 'price' | 'brands' | 'fits' | 'offer' | 'member' | FacetField;
 
 export function activeGroups(s: ListingState): FilterGroup[] {
   const out: FilterGroup[] = [];
@@ -84,6 +93,7 @@ export function activeGroups(s: ListingState): FilterGroup[] {
   if (s.sale) out.push('sale');
   if (s.price) out.push('price');
   if (s.brands.length) out.push('brands');
+  if (s.fits?.length) out.push('fits');
   if (s.offer) out.push('offer');
   if (s.member) out.push('member');
   for (const f of FACET_FIELD_IDS) if (s.specs[f]?.length) out.push(f);
@@ -104,6 +114,9 @@ export function withoutGroup(s: ListingState, g: FilterGroup): ListingState {
       break;
     case 'brands':
       next.brands = [];
+      break;
+    case 'fits':
+      next.fits = [];
       break;
     case 'offer':
       next.offer = false;
@@ -274,6 +287,12 @@ export function brandLabel(slug: string, facets: FacetSet | null): string {
   return b ? b.name_en || b.name_ar : slug;
 }
 
+/** A printer the listing is narrowed to, by its own name (a product name, as written). */
+export function printerLabel(slug: string, facets: FacetSet | null): string {
+  const p = facets?.printers?.find((x) => x.slug === slug);
+  return p ? p.name_en || p.name_ar : slug;
+}
+
 function specOptionLabel(field: FacetField, token: string, ctx: LabelContext): string {
   const opt = ctx.facets?.specs[field]?.find((o) => o.value === token);
   return specValueLabel(field, token, ctx.lang, opt?.label);
@@ -292,6 +311,8 @@ export function groupLabel(s: ListingState, g: FilterGroup, ctx: LabelContext): 
       return s.price ? priceRangeLabel(s.price.min, s.price.max, lang) : '';
     case 'brands':
       return s.brands.map((b) => brandLabel(b, ctx.facets)).join(sep);
+    case 'fits':
+      return `${L(lang, 'يناسب', 'Fits')} ${(s.fits ?? []).map((f) => printerLabel(f, ctx.facets)).join(sep)}`;
     case 'offer':
       return L(lang, 'عليها عرض', 'On offer');
     case 'member':
@@ -315,6 +336,10 @@ export function appliedChips(s: ListingState, ctx: LabelContext): AppliedChip[] 
   for (const g of activeGroups(s)) {
     if (g === 'brands') {
       for (const b of s.brands) out.push({ id: `brand:${b}`, label: brandLabel(b, ctx.facets), next: toggleBrand(s, b) });
+    } else if (g === 'fits') {
+      for (const f of s.fits ?? []) {
+        out.push({ id: `fits:${f}`, label: `${L(ctx.lang, 'يناسب', 'Fits')} ${printerLabel(f, ctx.facets)}`, next: toggleFit(s, f) });
+      }
     } else if ((FACET_FIELD_IDS as readonly string[]).includes(g)) {
       const field = g as FacetField;
       for (const t of s.specs[field] ?? []) {
@@ -428,6 +453,19 @@ export function quickChips(type: SectionType, f: FacetSet | null, s: ListingStat
     flag('offer', L(lang, 'عليها عرض', 'On offer'), f.offer);
   }
 
+  // «يناسب طابعة» (0148): the printers most of this list fits, one tap each —
+  // in «مواد الصيانة» the question a shopper arrives with is «for MY printer».
+  const printers = [...(f.printers ?? [])].filter((p) => p.count > 0).sort((a, b) => b.count - a.count).slice(0, 3);
+  for (const p of printers) {
+    offer({
+      id: `fits:${p.slug}`,
+      label: p.name_en || p.name_ar,
+      active: (s.fits ?? []).includes(p.slug),
+      count: p.count,
+      next: toggleFit(s, p.slug),
+    });
+  }
+
   // The top brand, for printers and the default set.
   if (type !== 'filament' && f.brands.length >= 2) {
     const top = f.brands[0];
@@ -446,7 +484,7 @@ export function quickChips(type: SectionType, f: FacetSet | null, s: ListingStat
 
 // ------------------------------------------------------ filter sheet sections
 
-export type SheetSection = 'availability' | 'price' | 'brands' | 'offers' | FacetField;
+export type SheetSection = 'availability' | 'printers' | 'price' | 'brands' | 'offers' | FacetField;
 
 const PRINTER_FACETS: FacetField[] = ['technology', 'max_colors', 'build_volume', 'enclosed', 'skill_level'];
 const FILAMENT_FACETS: FacetField[] = ['material_type', 'diameter', 'color_name'];
@@ -476,6 +514,10 @@ export function offersShows(f: FacetSet, s: ListingState): { offer: boolean; mem
 /** The sections the filter sheet draws for this section and these counts, in order. */
 export function sheetSections(type: SectionType, f: FacetSet, s: ListingState): SheetSection[] {
   const out: SheetSection[] = [];
+  // «يناسب طابعة» first: where parts are linked to printers, it is the
+  // question the list is for. Drawn when it narrows (a printer some, but not
+  // all, of the list fits), or when it is on.
+  if ((s.fits?.length ?? 0) > 0 || (f.printers ?? []).some((p) => p.count > 0 && p.count < f.total)) out.push('printers');
   const a = availabilityShows(f, s);
   if (a.avail || a.sale) out.push('availability');
   if (s.price || (f.price.min !== null && f.price.max !== null && f.price.max > f.price.min)) out.push('price');

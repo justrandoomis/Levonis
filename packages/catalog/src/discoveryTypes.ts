@@ -149,6 +149,12 @@ export interface FacetSet {
     histogram: number[];
   };
   brands: Array<{ slug: string; id: string; name_ar: string; name_en: string; name_ckb: string; count: number }>;
+  /**
+   * «يناسب طابعة» (0148): the store's printers the candidates are linked to,
+   * by the printer product's slug. Empty when no candidate names a printer —
+   * the sheet then draws no such facet.
+   */
+  printers: Array<{ slug: string; id: string; name_ar: string; name_en: string; name_ckb: string; count: number }>;
   offer: number;
   member: number;
   specs: Partial<Record<FacetField, FacetOption[]>>;

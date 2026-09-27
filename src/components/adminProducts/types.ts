@@ -15,8 +15,11 @@ import type {
 
 // ---------------------------------------------------------------- editor doc
 
-/** The editor form state: the canonical doc + catalog placement. */
-export type EditorDoc = ProductDocV2 & { catalog_ids: string[] };
+/**
+ * The editor form state: the canonical doc + catalog placement + the printers
+ * a part fits («يناسب الطابعات», 0148 — links the save writes in its batch).
+ */
+export type EditorDoc = ProductDocV2 & { catalog_ids: string[]; printer_fit_ids: string[] };
 
 export const defaultProductDeliveryOptions = () => ({
   standard: { enabled: true, quantity_step: 1, fee_iqd: 5000 },
@@ -80,6 +83,7 @@ export function blankDoc(): EditorDoc {
     how_to_use_ckb: '',
     usage_guide: { official_url: '', steps: [] },
     catalog_ids: [],
+    printer_fit_ids: [],
   };
 }
 
@@ -97,7 +101,7 @@ const list = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
  * an empty `sale_types` falls back to the legacy `selling_type` scalar so a
  * product never renders with no sale type when the row still states one.
  */
-export function toEditorDoc(p: Partial<ProductDocV2> & { catalog_ids?: string[] }): EditorDoc {
+export function toEditorDoc(p: Partial<ProductDocV2> & { catalog_ids?: string[]; printer_fit_ids?: string[] }): EditorDoc {
   const b = blankDoc();
   const sellingType = p.selling_type ?? b.selling_type;
   const saleTypes = list<EditorDoc['sale_types'][number]>(p.sale_types);
@@ -140,6 +144,7 @@ export function toEditorDoc(p: Partial<ProductDocV2> & { catalog_ids?: string[] 
     hashtags: list<string>(p.hashtags).filter((x) => typeof x === 'string'),
     usage_guide: { official_url: str(guide.official_url), steps: list(guide.steps) },
     catalog_ids: list<string>(p.catalog_ids),
+    printer_fit_ids: list<string>(p.printer_fit_ids).filter((x) => typeof x === 'string'),
   } as EditorDoc;
 }
 
@@ -269,12 +274,12 @@ export interface ListingResponse {
 }
 
 export interface ProductResponse {
-  product: ProductDocV2 & { catalog_ids: string[] };
+  product: ProductDocV2 & { catalog_ids: string[]; printer_fit_ids?: string[] };
 }
 
 export interface SaveResponse {
   created: boolean;
-  product: ProductDocV2 & { catalog_ids: string[] };
+  product: ProductDocV2 & { catalog_ids: string[]; printer_fit_ids?: string[] };
 }
 
 export interface DeleteResponse {

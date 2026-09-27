@@ -96,6 +96,7 @@ export function sectionFieldLabel(key: string, specs: readonly SpecFieldName[]):
   if (key === 'how_to_use_ar') return 'طريقة الاستخدام (عربي)';
   if (key === 'how_to_use_en' || key === 'how_to_use') return 'طريقة الاستخدام (إنجليزي)';
   if (key === 'how_to_use_ckb') return 'طريقة الاستخدام (كردي)';
+  if (key === 'fits_printers') return 'يناسب الطابعات';
   const m = /^([a-z_]+)\.(\d+)\.(?:rows\.(\d+)\.)?(.+)$/.exec(key);
   if (!m || !GROUP[m[1]]) return key;
   const row = m[3] ? ` · صف ${m[3]}` : '';

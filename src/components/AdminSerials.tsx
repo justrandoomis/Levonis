@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 import {
   Barcode, RefreshCw, Search, ShieldCheck, AlertTriangle, Repeat, CalendarClock,
-  MessageSquare, Send, ChevronDown, ChevronUp, PackageCheck, Unlink, X, Crown, History,
+  MessageSquare, Send, ChevronDown, ChevronUp, PackageCheck, Unlink, X, Crown, History, ExternalLink,
 } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import { Overlay } from './ui/Overlay';
@@ -112,6 +112,7 @@ const STRINGS = {
     loadMore: 'عرض المزيد',
     awaitingStaff: 'الزبون ينتظر الرد',
     messagesN: (n: number) => `${n} رسالة`,
+    compatibleParts: (n: number) => `قطع الغيار المتوافقة (${n})`,
   },
   en: {
     title: 'Serials & Devices',
@@ -207,6 +208,7 @@ const STRINGS = {
     loadMore: 'Load more',
     awaitingStaff: 'Customer waiting for a reply',
     messagesN: (n: number) => (n === 1 ? '1 message' : `${n} messages`),
+    compatibleParts: (n: number) => `Compatible spare parts (${n})`,
   },
   ckb: {
     title: 'ئامێرەکان و ژمارە زنجیرەییەکان',
@@ -310,6 +312,7 @@ const STRINGS = {
     loadMore: 'عرض المزيد', // OWNER: Sorani to be written by hand.
     awaitingStaff: 'الزبون ينتظر الرد', // OWNER: Sorani to be written by hand.
     messagesN: (n: number) => `${n} رسالة`, // OWNER: Sorani to be written by hand.
+    compatibleParts: (n: number) => `قطع الغيار المتوافقة (${n})`, // OWNER: Sorani to be written by hand.
   },
 } as const;
 
@@ -383,6 +386,8 @@ interface AdminClaim {
   message_count?: number;
   /** The customer wrote last — the thread is waiting on the warranty team. */
   awaiting_staff?: boolean;
+  /** 0148 — the spare parts that fit the claimed printer's model, and where they are listed. */
+  maintenance?: { printer_slug: string; count: number; path: string | null } | null;
 }
 
 interface AdminClaimsPage {
@@ -1404,6 +1409,20 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                         <MessageSquare className="w-3 h-3" aria-hidden="true" />
                         {s.awaitingStaff}
                       </div>
+                    )}
+                    {/* «تفيد في صيانة الطابعة» (0148): what the shop stocks
+                        for the printer being repaired, one tap away. */}
+                    {cl.maintenance?.path && (
+                      <a
+                        href={`${cl.maintenance.path}?fits=${encodeURIComponent(cl.maintenance.printer_slug)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-claim-parts={cl.id}
+                        className="mt-1 ms-2 inline-flex items-center gap-1 text-[11px] font-bold text-zinc-400 hover:text-white transition-colors"
+                      >
+                        <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                        {s.compatibleParts(cl.maintenance.count)}
+                      </a>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

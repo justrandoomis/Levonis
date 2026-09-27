@@ -1662,6 +1662,22 @@ export const PRODUCT_TYPES: ProductTypeDef[] = [
       'used-printer-accessories',
       'used-printer-accessories-levo',
       'cat_used_pacc',
+      // «مواد الصيانة» and its three shelves (0148) — every slug form 0148
+      // can write. Without them a maintenance section would resolve by the
+      // devices family's headline type, and a nozzle would be handed the
+      // printer's build-volume form.
+      'maintenance-parts',
+      'maintenance-parts-levo',
+      'cat_maint',
+      'hotends-nozzles',
+      'hotends-nozzles-levo',
+      'cat_maint_hotend',
+      'build-plates',
+      'build-plates-levo',
+      'cat_maint_plate',
+      'spare-parts',
+      'spare-parts-levo',
+      'cat_maint_spare',
     ],
     groups: [
       ...g(DEVICES, 'printer-accessories'),
@@ -1828,7 +1844,18 @@ interface SeededLeaf {
    * Resin and every FDM group leaves the form together, as one always did.
    */
   groups: string[];
+  /**
+   * The section this leaf only counts INSIDE of. «قطع الغيار» (0148) is a
+   * maintenance shelf because it sits under «مواد الصيانة»; a hand-made
+   * «spare-parts» under «ملحقات طابعات FDM» is some other shelf that happens
+   * to share the words, and must keep the nozzle and plate questions it had.
+   * Matched the same way as the leaf itself (id, then 0018's slug forms).
+   */
+  within?: { id: string; slug: string };
 }
+
+/** «مواد الصيانة» (0148) — the section its three shelves only count inside of. */
+const MAINT_ROOT = { id: 'cat_maint', slug: 'maintenance-parts' };
 
 const AXES: Record<string, SeededLeaf[]> = {
   'printer-technology': [
@@ -1884,6 +1911,23 @@ const AXES: Record<string, SeededLeaf[]> = {
     // «قطع ومكونات» under MakerWorld, for the same reason as the two above: a
     // bearing is not a printer accessory of any technology.
     { id: 'cat_makers_parts', slug: 'parts-components', groups: [] },
+    // «مواد الصيانة» (0148): what wears out on an FDM printer — a hotend, a
+    // nozzle, a plate. Not an AMS (that is an accessory, not a part that is
+    // replaced), and nothing Resin or laser. Only the ROOT is on this axis:
+    // a leaf and its parent are both named by a leaf's branch, and on one axis
+    // that would keep the parent's union and undo the leaf. The shelves narrow
+    // on their own axis below.
+    { ...MAINT_ROOT, groups: ['acc_hotend', 'acc_plate'] },
+  ],
+  // «مواد الصيانة»'s three shelves (0148), each saying which of the two kinds
+  // it holds. «قطع الغيار» holds neither — a fan, a PTFE tube, a thermistor —
+  // so its entry is the statement "not a hotend, not a plate" and its form is
+  // the common part fields. A part filed directly under «مواد الصيانة» names
+  // no shelf and keeps both, which is the honest answer for it.
+  'maintenance-kind': [
+    { id: 'cat_maint_hotend', slug: 'hotends-nozzles', groups: ['acc_hotend'], within: MAINT_ROOT },
+    { id: 'cat_maint_plate', slug: 'build-plates', groups: ['acc_plate'], within: MAINT_ROOT },
+    { id: 'cat_maint_spare', slug: 'spare-parts', groups: [], within: MAINT_ROOT },
   ],
 };
 
@@ -1956,7 +2000,9 @@ function excludedGroups(branch: SectionRef[]): Set<string> {
       for (const gid of l.groups) if (!kept.has(gid)) out.add(gid);
     }
   };
-  for (const leaves of Object.values(AXES)) exclude(leaves, leaves.filter((l) => namesLeaf(branch, l)));
+  for (const leaves of Object.values(AXES)) {
+    exclude(leaves, leaves.filter((l) => namesLeaf(branch, l) && (!l.within || namesLeaf(branch, l.within))));
+  }
   for (const leaves of Object.values(KIND_AXES)) exclude(leaves, leaves.filter((l) => namesKind(branch, l)));
   return out;
 }

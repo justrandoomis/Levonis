@@ -109,6 +109,8 @@ import {
 } from '../lib/deviceOps';
 import { linkFromInventory } from '../lib/serialInventory';
 import { serialInventoryRoutes } from './serialInventory';
+import { catalogIndexFor } from '../lib/catalogPresentation';
+import { MAINTENANCE_ROOT_ID, maintenanceFor } from '../lib/printerFits';
 
 export const deviceRoutes = new Hono<AppContext>();
 deviceRoutes.use('*', requireAuth);
@@ -456,9 +458,25 @@ deviceRoutes.get('/mine', async (c) => {
     .bind(user.id)
     .all<DeviceRow>();
   const tier = await getTierStatus(c.env.DB, user.id);
+  // 0148 — «مواد الصيانة المتوافقة»: each device's MODEL (a used unit reads as
+  // its model) and how many maintenance parts fit it, so the card offers the
+  // link only when there is something behind it.
+  const maintenance = await maintenanceFor(
+    c.env.DB,
+    results.map((r) => String(r.product_id ?? '')).filter(Boolean)
+  );
+  const idx = maintenance.size ? await catalogIndexFor(c.env.DB).catch(() => null) : null;
   return c.json({
     success: true,
-    devices: results.map((r) => ({ ...devicePublic(r, { viewerId: user.id }), transferred: r.owner_user_id !== user.id })),
+    devices: results.map((r) => {
+      const m = r.product_id ? maintenance.get(String(r.product_id)) : undefined;
+      return {
+        ...devicePublic(r, { viewerId: user.id }),
+        transferred: r.owner_user_id !== user.id,
+        maintenance: m ? { printer_slug: m.slug, count: m.count } : null,
+      };
+    }),
+    maintenance_path: idx?.byId.has(MAINTENANCE_ROOT_ID) ? `${idx.path(MAINTENANCE_ROOT_ID)}/all` : null,
     // The PRO membership's warranty perk: priority service on claims. Read
     // here so the page can say it without a second request.
     priority_service: benefits.priorityService(tier),
@@ -1786,9 +1804,34 @@ deviceRoutes.get('/admin/claims', async (c) => {
   const total = stageFilter ? counts[stageFilter] ?? 0 : all;
   const rows = results.slice(0, limit);
   const lastRow = rows[rows.length - 1];
+  /**
+   * «تفيد في صيانة وطلب صيانة الطابعة» (0148): the spare parts that fit the
+   * claimed printer — its MODEL's, for a used unit — so the team handling the
+   * request sees what the shop stocks for it without searching. Two reads for
+   * the whole page.
+   */
+  const unitIds = [...new Set(rows.map((r) => String(r.unit_id ?? '')).filter(Boolean))];
+  const unitProduct = new Map<string, string>();
+  if (unitIds.length) {
+    const { results: units } = await c.env.DB.prepare(
+      'SELECT id, product_id FROM order_item_units WHERE id IN (SELECT value FROM json_each(?))'
+    )
+      .bind(JSON.stringify(unitIds))
+      .all<{ id: string; product_id: string | null }>();
+    for (const u of units ?? []) if (u.product_id) unitProduct.set(String(u.id), String(u.product_id));
+  }
+  const maintenance = await maintenanceFor(c.env.DB, [...new Set(unitProduct.values())]);
+  const idx = maintenance.size ? await catalogIndexFor(c.env.DB).catch(() => null) : null;
+  const maintenancePath = idx?.byId.has(MAINTENANCE_ROOT_ID) ? `${idx.path(MAINTENANCE_ROOT_ID)}/all` : null;
   return c.json({
     success: true,
-    claims: rows.map((r) => claimPublic(r, { admin: true })),
+    claims: rows.map((r) => {
+      const m = r.unit_id ? maintenance.get(unitProduct.get(String(r.unit_id)) ?? '') : undefined;
+      return {
+        ...claimPublic(r, { admin: true }),
+        maintenance: m ? { printer_slug: m.slug, count: m.count, path: maintenancePath } : null,
+      };
+    }),
     page,
     limit,
     total,

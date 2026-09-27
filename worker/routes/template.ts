@@ -64,7 +64,8 @@ import {
   type ProductSavePlan,
 } from '../lib/productPersistence';
 import { resolveTemplateFamilies, type CatalogRow } from './adminTaxonomy';
-import { createPendingBrand, inactiveBrandWarning, loadRefRows, matchRef, planBrandCreate } from '../lib/templateRefs';
+import { createPendingBrand, inactiveBrandWarning, loadRefRows, matchPrinterRef, matchRef, planBrandCreate } from '../lib/templateRefs';
+import { loadPrinterFitIds, printerOptions, printerSlugs } from '../lib/printerFits';
 import { ambiguousMessage } from '../lib/importApply';
 import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import { getSetting } from '../lib/settings';
@@ -1274,6 +1275,41 @@ async function resolveRefs(db: D1Database, parsed: ParsedTemplate): Promise<Reso
       if (allResolved) refs.catalog_ids = [...new Set(ids)];
     }
   }
+
+  // 0148 — «يناسب الطابعات»: the store's printers, by slug, id or name. A
+  // name the owner types the short way («A1 mini») is matched against the
+  // END of a printer's name (`matchPrinterRef`); two printers answering to
+  // it is ambiguous and named, never a guess.
+  const fitsField = parsed.fields.fits_printers;
+  if (fitsField) {
+    const wanted = fitsField.clear || fitsField.value === null ? [] : (fitsField.value as string[]);
+    if (wanted.length === 0) {
+      refs.printer_fit_ids = [];
+    } else {
+      const printers = await printerOptions(db);
+      const ids: string[] = [];
+      let allResolved = true;
+      for (const w of wanted) {
+        const match = matchPrinterRef(printers, w);
+        if (match.kind === 'hit') {
+          if (!ids.includes(match.id)) ids.push(match.id);
+        } else if (match.kind === 'ambiguous') {
+          allResolved = false;
+          refs.needs_review!.push({
+            key: 'fits_printers', line: fitsField.line, value: w,
+            message: `${ambiguousMessage('fits_printers', w)} — ${match.candidates.join('، ')}`,
+          });
+        } else {
+          allResolved = false;
+          refs.needs_review!.push({
+            key: 'fits_printers', line: fitsField.line, value: w,
+            message: `«${w}» ليست طابعة في المتجر — اكتب slug الطابعة أو اسمها كما في صفحتها / no printer in this store answers to "${w}"`,
+          });
+        }
+      }
+      if (allResolved) refs.printer_fit_ids = ids;
+    }
+  }
   return refs;
 }
 
@@ -1675,6 +1711,8 @@ async function exportOptsFor(
   specFieldIds: string[];
   /** The same fields, whole — their names and allowed values, for a file's comments. */
   specFields: TemplateField[];
+  /** 0148 — the printers this part fits, as slugs in the admin's order. */
+  fitsPrinters: string[];
 }> {
   let brand: string | null = null;
   if (doc.brand_id) {
@@ -1722,6 +1760,8 @@ async function exportOptsFor(
     id
       ? ((await db.prepare('SELECT slug FROM catalogs WHERE id = ?').bind(id).first<{ slug: string }>())?.slug ?? id)
       : null;
+  // 0148 — slugs, in the order the admin chose.
+  const fitsPrinters = await printerSlugs(db, await loadPrinterFitIds(db, doc.id));
   return {
     brand,
     catalogs: results.map((r) => r.slug),
@@ -1730,6 +1770,7 @@ async function exportOptsFor(
     subCategory: await slugOf(doc.sub_category_id),
     specFieldIds,
     specFields,
+    fitsPrinters,
   };
 }
 
@@ -2207,6 +2248,7 @@ async function plannedRefusal(
           })
         : null,
       catalogIds: a.refs.catalog_ids,
+      printerFits: a.refs.printer_fit_ids,
       actor,
       translations: translationInputsOf(doc),
     });
@@ -2350,6 +2392,15 @@ templateRoutes.post('/section-preview', async (c) => {
     afterMode: a.existingView?.inventory_mode ?? null,
   };
   const changes = a.doc ? computeDiff(a.existing, a.doc, diffOpts).filter((d) => isSectionKey(d.field)) : [];
+  // 0148 — the printers a part fits are LINKS, not a document field, so the
+  // document diff cannot see them. Compared here, as slugs, in order.
+  if (a.doc && a.refs.printer_fit_ids !== undefined) {
+    const before = await printerSlugs(c.env.DB, await loadPrinterFitIds(c.env.DB, productId));
+    const after = await printerSlugs(c.env.DB, a.refs.printer_fit_ids);
+    if (before.join(',') !== after.join(',')) {
+      changes.push({ field: 'fits_printers', before: before.join(', ') || null, after: after.join(', ') || null });
+    }
+  }
 
   let ignoredChanges: Array<{ field: string; before: string | null; after: string | null }> = [];
   if (section.ignored.length > 0) {
@@ -3122,6 +3173,8 @@ templateRoutes.post('/apply', async (c) => {
       prev: isUpdate ? a.existing : null,
       relations,
       catalogIds: a.refs.catalog_ids,
+      // 0148 — «يناسب الطابعات»: written only when the file states the key.
+      printerFits: a.refs.printer_fit_ids,
       actor: { adminId: adminUser.id, money },
       // The file carries its own Arabic and Kurdish; the translation table
       // still gets the English-sourced rows the form path writes.

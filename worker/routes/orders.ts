@@ -91,6 +91,8 @@ import {
 } from '../lib/paymentPolicy';
 import type { PreorderPricing } from '../lib/pricing';
 import { printerProductIds } from '../lib/printerIdentity';
+import { catalogIndexFor } from '../lib/catalogPresentation';
+import { MAINTENANCE_ROOT_ID, maintenanceFor, type MaintenanceTarget } from '../lib/printerFits';
 import { printerHomeDeliveryAdvanceIqd } from '../lib/printerAdvance';
 import { giniSplit, giniHoldUntil, giniStateOf } from '../lib/gini';
 import { refuseNonPrinterWarranty } from '../lib/warrantyPlans';
@@ -4830,12 +4832,35 @@ orderRoutes.get('/:id', async (c) => {
     .bind(id)
     .first<{ id: string; invoice_no: string; revision: number; payment_status: string }>();
   const status = String(data.order.status);
+  /**
+   * «مواد الصيانة لطابعتك» (0148) — the printers on this order that have
+   * maintenance parts, each read as its MODEL (a used unit is its model's), so
+   * the page can offer the parts the moment the printer is bought. Nothing for
+   * a cancelled order, and nothing for an order with no printer on it.
+   */
+  const maintenance =
+    status === 'cancelled'
+      ? new Map<string, MaintenanceTarget>()
+      : await maintenanceFor(
+          c.env.DB,
+          data.items.map((it) => String((it as { product_id?: unknown }).product_id ?? '')).filter(Boolean)
+        );
+  const maintenanceModels = [...new Map([...maintenance.values()].map((m) => [m.id, m])).values()];
+  const maintenanceIdx = maintenanceModels.length ? await catalogIndexFor(c.env.DB).catch(() => null) : null;
   return c.json({
     success: true,
     order: {
       ...orderPublic(data.order, data.items, snaps.get(id), await mysteryViewFor(c.env.DB, [id], 'customer', langOf(c))),
       item_count: itemCount(data.items),
       invoice: invoice ?? null,
+      maintenance_parts: maintenanceModels.map((m) => ({
+        printer_slug: m.slug,
+        name: m.name_en,
+        name_ar: m.name_ar,
+        name_ckb: m.name_ckb,
+        count: m.count,
+        path: maintenanceIdx?.byId.has(MAINTENANCE_ROOT_ID) ? `${maintenanceIdx.path(MAINTENANCE_ROOT_ID)}/all` : null,
+      })),
       // The three verbs the detail screen offers, decided here so the page
       // never has to know which statuses permit which.
       can_cancel: status === 'pending',

@@ -281,6 +281,10 @@ const SCALAR_FIELDS: FieldSpec[] = [
   // classification
   f('brand', 'ref', 'classification', 'العلامة التجارية — brand slug, id or name (ar/en/ckb), resolved against the brands table; a brand that does not exist yet is created and the check step says so first; __NULL__ = no brand', { nullable: true }),
   f('catalogs', 'csv', 'classification', 'الكتالوجات — comma-separated catalog slugs, ids or names; unknown values need review (a section is never created); empty = in no catalog', { nullable: true }),
+  // 0148 — «يناسب الطابعات»: the store's own printers this part fits, as links
+  // (worker/lib/printerFits.ts). The free-text «يناسب الموديلات» spec is for
+  // machines the store does not sell.
+  f('fits_printers', 'csv', 'classification', 'يناسب الطابعات — طابعات المتجر التي تناسبها هذه القطعة، مفصولة بفواصل: slug أو id أو اسم الطابعة (مثل A1, A1 mini, A2L)؛ اسم لا يطابق طابعة في المتجر يحتاج مراجعة؛ __NULL__ = لا يناسب طابعة محددة. Printers this part fits.', { nullable: true }),
   // ---- EIGHT FIELDS THE FILE COULD NOT SAY --------------------------------
   // Every one of these is edited in the admin form and stored on `products`,
   // and none had a template key: worker/lib/template.ts carried them across an
@@ -1511,6 +1515,8 @@ export interface ExportOpts {
   subCategory?: string | null;
   /** catalog slugs; when undefined the catalogs key is omitted (unknown) */
   catalogs?: string[];
+  /** 0148 — the linked printers' slugs, in order; undefined = key omitted */
+  fitsPrinters?: string[];
   /** include field-annotation comments (blank template style) */
   comments?: boolean;
   /**
@@ -1642,6 +1648,8 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   if (opts.brand !== undefined) push('brand', opts.brand);
   else push('brand', doc.brand_id ?? null);
   if (opts.catalogs !== undefined) push('catalogs', opts.catalogs.join(','));
+  // Slugs, like the section pair: readable, and re-importable elsewhere.
+  if (opts.fitsPrinters !== undefined) push('fits_printers', opts.fitsPrinters.join(','));
   // The section pair is written as SLUGS when the caller resolved them, so the
   // file is readable and re-importable on another environment; ids are the
   // fallback rather than the norm.
@@ -2399,7 +2407,7 @@ export function touchesPricingStructure(parsed: ParsedTemplate): boolean {
 export interface NeedsReviewEntry { key: string; line: number; value: string; message: string }
 
 /** Scalar keys the ROUTE resolves against a table before the body is built. */
-const REF_KEYS = new Set(['brand', 'catalogs', 'category', 'sub_category']);
+const REF_KEYS = new Set(['brand', 'catalogs', 'category', 'sub_category', 'fits_printers']);
 
 /**
  * A brand the file names that does not exist yet and the apply WILL create.
@@ -2431,6 +2439,8 @@ export interface ResolvedRefs {
   brands_to_create?: PendingBrand[];
   /** resolved catalog ids; undefined = omitted/unresolved (preserve associations) */
   catalog_ids?: string[];
+  /** 0148 — resolved printer ids, in the file's order; undefined = omitted/unresolved (preserve the links) */
+  printer_fit_ids?: string[];
   /** resolved main-section id; null = clear; undefined = omitted/unresolved */
   category_id?: string | null;
   /** resolved sub-section id; null = clear; undefined = omitted/unresolved */
@@ -3286,6 +3296,27 @@ export function toDocBody(
     }
   } else if (existing) {
     result.preserved_fields.push('catalogs');
+  }
+  // 0148 — «يناسب الطابعات», the same contract as `catalogs`: the LINKS are
+  // written by the route (the save's own batch), never through the body.
+  // An EMPTY list needs no lookup — «no printer» is true whatever the store
+  // stocks — so an offline caller and the blank template, which ships the key
+  // empty, are never sent to review for it (the rule the section pair states).
+  const fitsField = parsed.fields.fits_printers;
+  if (fitsField) {
+    const fitsEmpty =
+      fitsField.clear || fitsField.value === null || (Array.isArray(fitsField.value) && fitsField.value.length === 0);
+    if (fitsEmpty || (resolved && resolved.printer_fit_ids !== undefined)) {
+      result.applied_fields.push('fits_printers');
+    } else if (!result.needs_review.some((n) => n.key === 'fits_printers')) {
+      result.needs_review.push({
+        key: 'fits_printers', line: fitsField.line,
+        value: Array.isArray(fitsField.value) ? (fitsField.value as string[]).join(',') : String(fitsField.value ?? NULL_TOKEN),
+        message: 'printer references were not resolved against the store printers',
+      });
+    }
+  } else if (existing) {
+    result.preserved_fields.push('fits_printers');
   }
 
   // ---- repeatable groups (options first so colors.option_index can resolve)

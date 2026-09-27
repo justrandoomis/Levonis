@@ -121,6 +121,48 @@ export function matchRef(rows: RefRow[], raw: string): RefMatch {
   return { kind: 'ambiguous', candidates: hits.map((r) => r.slug).sort() };
 }
 
+/**
+ * A PRINTER BY THE NAME A PERSON TYPES (0148, `fits_printers=`).
+ *
+ * `matchRef` first — slug, id, a whole name — and then ONE more tier, because
+ * the owner writes a printer the way the owner said it: «A1, A1 mini و A2L»,
+ * not "Bambu Lab A1 mini". The typed words must be the END of a printer's
+ * name, whole words: «A1 mini» names "Bambu Lab A1 mini" and not "Bambu Lab
+ * A1"; «A1» names "Bambu Lab A1" and not the mini, whose name does not END
+ * with it. Digits and letters are kept by `normalizeText`, so «A1» never meets
+ * «A2L».
+ *
+ * A MODEL BEFORE A USED UNIT, stated rather than guessed: a used listing of the
+ * same printer answers to the same words, and a part fits the MODEL. When
+ * exactly one of the answers is a model, it is the match; two models answering
+ * is ambiguous and refused by name, like every other ambiguity here.
+ */
+export function matchPrinterRef(rows: Array<RefRow & { used?: boolean }>, raw: string): RefMatch {
+  const pick = (hits: Array<RefRow & { used?: boolean }>): RefMatch => {
+    if (hits.length === 0) return { kind: 'miss' };
+    if (hits.length === 1) return { kind: 'hit', id: hits[0].id };
+    const models = hits.filter((r) => !r.used);
+    if (models.length === 1) return { kind: 'hit', id: models[0].id };
+    return { kind: 'ambiguous', candidates: hits.map((r) => r.slug).sort() };
+  };
+  const exact = matchRef(rows, raw);
+  if (exact.kind === 'hit') return exact;
+  const key = normalizeText(raw.trim());
+  if (!key) return { kind: 'miss' };
+  if (exact.kind === 'ambiguous') {
+    return pick(rows.filter((r) => [r.name_ar, r.name_en, r.name_ckb].some((n) => n && normalizeText(n) === key)));
+  }
+  return pick(
+    rows.filter((r) =>
+      [r.name_ar, r.name_en, r.name_ckb].some((n) => {
+        if (!n) return false;
+        const name = normalizeText(n);
+        return name === key || name.endsWith(` ${key}`);
+      })
+    )
+  );
+}
+
 /** Arabic, Persian and Kurdish letters — the test that decides which name
  *  column a single string from the file belongs in. */
 const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;

@@ -99,6 +99,7 @@ import { planProductTranslations, type TranslationInput } from './translate/stor
 import { dedupeHashtags, hashtagKey } from './hashtags';
 import { detachedMediaKey, enqueueMediaDetach } from './mediaRefs';
 import { scopeForeignRelationIds } from './relationIdScope';
+import { loadPrinterFitIds, planPrinterFits } from './printerFits';
 import { docToEntries } from './template';
 import { localizableSlots } from './translationSlots';
 import type { PhysicalDimensionOverrides } from './physicalDimensions';
@@ -2217,6 +2218,11 @@ export interface ProductWriteIntent {
   relations: Record<string, unknown> | null;
   /** undefined = preserve the placement. */
   catalogIds?: string[];
+  /**
+   * 0148 — the printers this part fits, in the admin's order (worker/lib/
+   * printerFits.ts). undefined = preserve the links; [] = clear them.
+   */
+  printerFits?: string[];
   actor: { adminId: string; money: boolean };
   /** Rows for product_translations; undefined = leave them. */
   translations?: TranslationInput[];
@@ -2255,6 +2261,8 @@ export interface ProductSavePlan {
    */
   cells: { requested: FulfillmentCell[]; held: ExistingCells } | null;
   catalogIds: string[] | null;
+  /** 0148 — the printer links this save writes, in order; null = preserved. */
+  printerFits: string[] | null;
   priceHistory: PriceDelta[];
   hashtagsRegistered: number;
   /** The vocabulary tags this save is the first to register — the rows a
@@ -2307,6 +2315,7 @@ export async function preflightProductSave(db: D1Database, intent: ProductWriteI
       prev: intent.prev ? clone(intent.prev) : null,
       relations: intent.relations ? clone(intent.relations) : null,
       catalogIds: intent.catalogIds ? [...intent.catalogIds] : undefined,
+      printerFits: intent.printerFits ? [...intent.printerFits] : undefined,
       translations: intent.translations ? clone(intent.translations) : undefined,
       actor: { ...intent.actor },
     },
@@ -2904,6 +2913,16 @@ export async function planProductSave(
     catalogIds = cat.ids;
   }
 
+  // ---- which printer this part fits (0148) --------------------------------
+  // In the SAME batch as the row, after it: on a create the link's foreign
+  // key names a product this batch is inserting.
+  let printerFits: string[] | null = null;
+  if (intent.printerFits !== undefined) {
+    const fits = await planPrinterFits(db, productId, intent.printerFits);
+    statements.push(...fits.stmts);
+    printerFits = fits.ids;
+  }
+
   // ---- price history (§6.8) — every monetary change on an existing product
   let priceHistory: PriceDelta[] = [];
   if (doc && prev && intent.priceHistory !== false) {
@@ -3023,6 +3042,7 @@ export async function planProductSave(
     relations,
     cells: plannedCells,
     catalogIds,
+    printerFits,
     priceHistory,
     hashtagsRegistered,
     hashtagsAdded,
@@ -3268,7 +3288,7 @@ export interface StoredProduct {
   /** The relational view the storefront and the export overlay from. */
   view: ProductRelationsView;
   /** Exactly what `GET /api/admin/products-v2/:id` answers (before §11). */
-  document: ProductDoc & { catalog_ids: string[] };
+  document: ProductDoc & { catalog_ids: string[]; printer_fit_ids: string[] };
   /** Exactly what `GET /api/admin/products/:id/relations` answers. */
   relations: RelationsResponse;
   updated_at: string;
@@ -3285,12 +3305,14 @@ export async function reloadForVerification(db: D1Database, productId: string): 
     .prepare('SELECT catalog_id FROM product_catalogs WHERE product_id = ? ORDER BY catalog_id')
     .bind(productId)
     .all<{ catalog_id: string }>();
+  const printerFitIds = await loadPrinterFitIds(db, productId);
   return {
     row,
     view,
     document: {
       ...projectAdmin(applyRelations(row, view, { includeInactive: true, authoredNames: true })),
       catalog_ids: results.map((r) => r.catalog_id),
+      printer_fit_ids: printerFitIds,
     },
     relations: relations!,
     updated_at: String(raw.updated_at ?? ''),
@@ -3302,7 +3324,7 @@ export async function reloadForVerification(db: D1Database, productId: string): 
 // =========================================================================
 
 export interface Mismatch {
-  section: 'scalars' | 'options' | 'colors' | 'images' | 'variants' | 'spec' | 'catalogs' | 'inventory' | 'slug';
+  section: 'scalars' | 'options' | 'colors' | 'images' | 'variants' | 'spec' | 'catalogs' | 'fits' | 'inventory' | 'slug';
   key: string;
   requested: unknown;
   stored: unknown;
@@ -3355,6 +3377,12 @@ export function verifyApplied(
     const want = [...plan.catalogIds].sort();
     const have = [...stored.document.catalog_ids].sort();
     if (!same(want, have)) out.push({ section: 'catalogs', key: 'catalogs', requested: want, stored: have });
+  }
+
+  // ---- printer links (0148), in order -------------------------------------
+  if (plan.printerFits) {
+    const have = stored.document.printer_fit_ids ?? [];
+    if (!same(plan.printerFits, have)) out.push({ section: 'fits', key: 'printer_fit_ids', requested: plan.printerFits, stored: have });
   }
 
   // ---- relations, row by row ----------------------------------------------

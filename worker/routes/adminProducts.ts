@@ -82,6 +82,7 @@ import {
   type ProductMediaReference,
 } from '../lib/productMediaIngest';
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
+import { loadPrinterFitIds, printerOptions } from '../lib/printerFits';
 
 /** Kept under its old name: the diff is now the contract's (productPersistence). */
 export const priceHistoryDeltas = sharedPriceHistoryDeltas;
@@ -1081,6 +1082,16 @@ adminProductsRoutes.patch('/:id/status', async (c) => {
 });
 
 /** The FULL canonical document + catalog placement — the edit payload. */
+/**
+ * «يناسب الطابعات» — every printer in the catalogue, for the product form's
+ * picker (0148, worker/lib/printerFits.ts). Every status: a part can be linked
+ * to a printer before that printer is published. Registered before `/:id`,
+ * which would otherwise read «printer-options» as a product id.
+ */
+adminProductsRoutes.get('/printer-options', async (c) => {
+  return c.json({ success: true, printers: await printerOptions(c.env.DB) });
+});
+
 adminProductsRoutes.get('/:id', async (c) => {
   const id = c.req.param('id');
   // THE PRODUCT AS IT ACTUALLY IS: the relational overlay, inactive rows
@@ -1250,7 +1261,11 @@ adminProductsRoutes.post('/', async (c) => {
           success: false,
           code: 'STALE_EDIT',
           error: 'This product was modified by someone else since you opened it. Review the current version below.',
-          current: projectForAdmin(c.env, admin, { ...projectAdmin(prev), catalog_ids: await catalogIdsFor(c.env.DB, prev.id) }),
+          current: projectForAdmin(c.env, admin, {
+            ...projectAdmin(prev),
+            catalog_ids: await catalogIdsFor(c.env.DB, prev.id),
+            printer_fit_ids: await loadPrinterFitIds(c.env.DB, prev.id),
+          }),
         },
         409
       );
@@ -1308,6 +1323,11 @@ adminProductsRoutes.post('/', async (c) => {
     relations,
     catalogIds: Array.isArray(body.catalog_ids)
       ? (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string')
+      : undefined,
+    // 0148 — «يناسب الطابعات». Absent = the links stay exactly as they are,
+    // so a client that never heard of the field cannot clear them.
+    printerFits: Array.isArray(body.printer_fit_ids)
+      ? (body.printer_fit_ids as unknown[]).filter((x): x is string => typeof x === 'string')
       : undefined,
     actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
     translations: localized.fields,

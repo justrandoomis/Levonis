@@ -134,7 +134,7 @@ test('the seven sorts, each stable; the default puts available-now first', async
 test('«البيع المباشر أولًا»: direct-sale products first, pre-order-only after — stable', () => {
   const mk = (id: string, sale: string[], available: number, rank: number): ListingItem => ({
     id, card: { id }, name: id, price: 1, regular: 1, prime: null, pro: null, available, saleTypes: sale,
-    brandId: null, brandSlug: null, createdAt: '', rank, scheduledOffer: false, specs: {},
+    brandId: null, brandSlug: null, fits: [], createdAt: '', rank, scheduledOffer: false, specs: {},
   });
   const items = [
     mk('pre-a', ['pre_order'], 0, 0),

@@ -113,6 +113,11 @@ export const OWNED_TABLES: OwnedTable[] = [
   // ---- placement, search, i18n ------------------------------------------
   { table: 'product_catalogs', by: { column: 'product_id' } },
   { table: 'product_facets', by: { column: 'product_id' } },
+  // Which printer a maintenance part fits (0148). BOTH columns name a product,
+  // so the link goes whichever end is deleted: a nozzle deleted stops fitting,
+  // and a printer deleted stops being fitted — it is never BLOCKED by the
+  // parts that list it, because nothing about them depends on it.
+  { table: 'product_printer_fits', by: { sql: 'product_id = ?1 OR printer_id = ?1' } },
   // The search index (migration 0089). It holds the product's NAME, broken
   // into tokens — leave it behind and the shop keeps offering a product that
   // no longer exists to anyone who searches for it.
@@ -1169,6 +1174,9 @@ const ORPHAN_PARENTS: Record<string, { column: string; parent: string; parentKey
   color_id: { column: 'color_id', parent: 'product_colors', parentKey: 'id' },
   option_id: { column: 'option_id', parent: 'product_option_values', parentKey: 'id' },
   cart_item_id: { column: 'cart_item_id', parent: 'cart_items', parentKey: 'id' },
+  // The printer end of `product_printer_fits` (0148) — the only OWNED table
+  // with this column, so it cannot be read as anyone else's printer.
+  printer_id: { column: 'printer_id', parent: 'products', parentKey: 'id' },
 };
 
 export async function scanProductOrphans(

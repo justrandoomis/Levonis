@@ -91,6 +91,8 @@ export interface WarrantyStrings {
   verifyReceipt: string;
   printReceipt: string;
   viewOrder: string;
+  /** 0148 — «مواد الصيانة المتوافقة» with its count. */
+  maintenanceParts: (n: number, formatted: string) => string;
   more: string;
   removeFromAccount: string;
   unlinkTitle: string;
@@ -222,6 +224,7 @@ const ar: WarrantyStrings = {
   verifyReceipt: 'التحقق من الإيصال',
   printReceipt: 'طباعة الإيصال',
   viewOrder: 'الطلب',
+  maintenanceParts: (_n, f) => `مواد الصيانة المتوافقة (${f})`,
   more: 'المزيد',
   removeFromAccount: 'إزالة من حسابي',
   unlinkTitle: 'إزالة هذه الطابعة من حسابك؟',
@@ -355,6 +358,7 @@ const en: WarrantyStrings = {
   verifyReceipt: 'Verify receipt',
   printReceipt: 'Print receipt',
   viewOrder: 'Order',
+  maintenanceParts: (_n, f) => `Compatible maintenance parts (${f})`,
   more: 'More',
   removeFromAccount: 'Remove from my account',
   unlinkTitle: 'Remove this printer from your account?',
@@ -485,6 +489,8 @@ const ckb: WarrantyStrings = {
   verifyReceipt: 'پشتڕاستکردنەوەی پسووڵە',
   printReceipt: 'چاپکردنی پسووڵە',
   viewOrder: 'داواکاری',
+  // OWNER: Sorani to be written by hand — Arabic until then.
+  maintenanceParts: (_n, f) => `مواد الصيانة المتوافقة (${f})`,
   more: 'زیاتر',
   removeFromAccount: 'لابردن لە هەژمارەکەم',
   unlinkTitle: 'ئەم پرینتەرە لە هەژمارەکەت لابردرێت؟',

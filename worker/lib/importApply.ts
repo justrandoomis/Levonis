@@ -44,6 +44,7 @@ import { parseConditionDoc, type ConditionDoc } from './condition';
 import { DIMENSION_FIELDS, parseDimensions } from './productModel';
 import { isOwnedMediaUrl } from './mediaStorage';
 import type { PendingBrand } from './template';
+import type { RefMatch } from './templateRefs';
 
 export interface CatalogRef {
   id: string;
@@ -154,6 +155,13 @@ export interface ImportMaps {
    */
   productSlugs: Map<string, string>;
   /**
+   * 0148 — «يناسب الطابعات»: a cell token → one of the store's printers, the
+   * same matcher the TXT template uses (`matchPrinterRef`: slug, id, a whole
+   * name, or the END of one — «A1 mini»). Passed in, like `brandMatch`, so
+   * this pure module needs no table. Absent: every token is refused.
+   */
+  printerMatch?: (value: string) => RefMatch;
+  /**
    * Normalized display names claimed by MORE than one row. Such a name is in
    * the maps too (pointing at one of them), so a resolver that ignores this
    * set files the product under an arbitrary row; the importer refuses the
@@ -182,6 +190,8 @@ export interface ResolvedProduct {
   /** Body for planRelationsWrite. */
   relations: Record<string, unknown>;
   catalogIds: string[];
+  /** 0148 — the printers this part fits, in the sheet's order; undefined = the sheet said nothing (keep them). */
+  printerFits?: string[];
   /**
    * §18 — the product-scoped membership discount rules the row STATES, one
    * per tier it spoke about, carried straight through from `parseImport`.
@@ -1160,6 +1170,26 @@ export function resolveProduct(
     // filters an admin set before the picker was removed.
   };
 
+  // ---- «يناسب الطابعات» (0148) --------------------------------------------
+  // null = the column is absent: the stored links stay. An empty cell clears
+  // them. A name no printer answers to is refused on its line, like an unknown
+  // section — never dropped, never guessed.
+  let printerFits: string[] | undefined;
+  if (p.fits_printers !== null && p.fits_printers !== undefined) {
+    const ids: string[] = [];
+    for (const token of p.fits_printers) {
+      const m: RefMatch = maps.printerMatch ? maps.printerMatch(token) : { kind: 'miss' };
+      if (m.kind === 'hit') {
+        if (!ids.includes(m.id)) ids.push(m.id);
+      } else if (m.kind === 'ambiguous') {
+        issues.push(err(p.line, `${ambiguousMessage('fits_printers', token)} — ${m.candidates.join('، ')}`));
+      } else {
+        issues.push(err(p.line, `fits_printers: «${token}» ليست طابعة في المتجر — اكتب slug الطابعة أو اسمها كما في صفحتها`));
+      }
+    }
+    printerFits = ids;
+  }
+
   return {
     key: p.key,
     line: p.line,
@@ -1168,6 +1198,7 @@ export function resolveProduct(
     doc,
     relations,
     catalogIds: [...new Set([categoryId, subCategoryId].filter((x): x is string => !!x))],
+    printerFits,
     membership: p.membership_rules,
     issues,
   };

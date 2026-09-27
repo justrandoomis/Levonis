@@ -63,4 +63,4 @@ export function listingApiQuery(
 }
 
 /** A fresh default state (the frozen constant must not be mutated). */
-export const emptyListing = (): ListingState => ({ ...DEFAULT_LISTING, brands: [], specs: {} });
+export const emptyListing = (): ListingState => ({ ...DEFAULT_LISTING, brands: [], fits: [], specs: {} });
