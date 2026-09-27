@@ -52,6 +52,8 @@ export interface ListingItem {
   saleTypes: string[];
   brandId: string | null;
   brandSlug: string | null;
+  /** 0148 — the slugs of the ACTIVE printers this product is linked to. */
+  fits: string[];
   createdAt: string;
   /** Position in the SQL / search order — the stable tie-break for every sort. */
   rank: number;
@@ -67,6 +69,9 @@ export interface BrandInfo {
   name_en: string;
   name_ckb: string;
 }
+
+/** A printer the «يناسب طابعة» facet can offer (0148) — the same shape as a brand's. */
+export type PrinterInfo = BrandInfo;
 
 // --------------------------------------------------------------- spec reading
 
@@ -143,7 +148,7 @@ function matchesFacet(field: FacetField, specs: Record<string, unknown>, selecte
 
 // -------------------------------------------------------------------- filters
 
-type FilterKey = 'avail' | 'sale' | 'price' | 'brands' | 'offer' | 'member' | FacetField;
+type FilterKey = 'avail' | 'sale' | 'price' | 'brands' | 'fits' | 'offer' | 'member' | FacetField;
 
 export const hasSaleType = (item: ListingItem, t: 'direct_sale' | 'pre_order'): boolean => item.saleTypes.includes(t);
 
@@ -163,6 +168,10 @@ function passes(item: ListingItem, f: ListingFilters, except: FilterKey | null):
     if (f.price.max !== null && item.price > f.price.max) return false;
   }
   if (except !== 'brands' && f.brands.length && !(item.brandSlug && f.brands.includes(item.brandSlug))) return false;
+  // «يناسب طابعة»: linked to ANY of the chosen printers. A part linked to none
+  // matches none — «fits every printer» is not something a missing link says.
+  const fits = f.fits ?? [];
+  if (except !== 'fits' && fits.length && !(item.fits ?? []).some((slug) => fits.includes(slug))) return false;
   if (except !== 'offer' && f.offer && !onOffer(item)) return false;
   if (except !== 'member' && f.member && !memberCheaper(item)) return false;
   for (const field of FACET_FIELD_IDS) {
@@ -262,13 +271,19 @@ function specOptions(field: FacetField, all: ListingItem[]): Array<{ value: stri
  * it, so they are stable); `f` is the active selection. Each count applies every
  * other filter and ignores its own — the disjunctive rule.
  */
-export function facetCounts(all: ListingItem[], f: ListingFilters, brands: Map<string, BrandInfo>): FacetSet {
+export function facetCounts(
+  all: ListingItem[],
+  f: ListingFilters,
+  brands: Map<string, BrandInfo>,
+  printers: Map<string, PrinterInfo> = new Map()
+): FacetSet {
   const total = applyFilters(all, f).length;
 
   const forAvail = applyFilters(all, f, 'avail');
   const forSale = applyFilters(all, f, 'sale');
   const forPrice = applyFilters(all, f, 'price');
   const forBrands = applyFilters(all, f, 'brands');
+  const forFits = applyFilters(all, f, 'fits');
   const forOffer = applyFilters(all, f, 'offer');
   const forMember = applyFilters(all, f, 'member');
 
@@ -282,6 +297,15 @@ export function facetCounts(all: ListingItem[], f: ListingFilters, brands: Map<s
     .filter((b): b is BrandInfo => !!b)
     .map((b) => ({ ...b, count: forBrands.filter((i) => i.brandId === b.id).length }))
     .sort((a, b) => b.count - a.count || (a.name_en || a.name_ar).localeCompare(b.name_en || b.name_ar));
+
+  // The printers any candidate names — so the options are stable while the
+  // counts follow every OTHER filter (the disjunctive rule).
+  const printerSlugs = new Set(all.flatMap((i) => i.fits ?? []));
+  const printerRows = [...printerSlugs]
+    .map((slug) => printers.get(slug))
+    .filter((p): p is PrinterInfo => !!p)
+    .map((p) => ({ ...p, count: forFits.filter((i) => (i.fits ?? []).includes(p.slug)).length }))
+    .sort((a, b) => b.count - a.count || (a.name_en || a.name_ar).localeCompare(b.name_en || b.name_ar, 'en', { numeric: true }));
 
   const specs: Partial<Record<FacetField, FacetOption[]>> = {};
   for (const field of FACET_FIELD_IDS) {
@@ -308,6 +332,7 @@ export function facetCounts(all: ListingItem[], f: ListingFilters, brands: Map<s
       histogram: pmin === null || pmax === null ? new Array<number>(HISTOGRAM_BINS).fill(0) : histogram(prices, pmin, pmax),
     },
     brands: brandRows,
+    printers: printerRows,
     offer: forOffer.filter(onOffer).length,
     member: forMember.filter(memberCheaper).length,
     specs,
@@ -318,9 +343,9 @@ export function facetCounts(all: ListingItem[], f: ListingFilters, brands: Map<s
 export function runListing(
   all: ListingItem[],
   state: ListingState,
-  opts: { facets: boolean; brands: Map<string, BrandInfo> }
+  opts: { facets: boolean; brands: Map<string, BrandInfo>; printers?: Map<string, PrinterInfo> }
 ): { items: ListingItem[]; facets?: FacetSet } {
   const filtered = applyFilters(all, state);
   const items = sortItems(filtered, state.sort, state.q.trim() !== '');
-  return opts.facets ? { items, facets: facetCounts(all, state, opts.brands) } : { items };
+  return opts.facets ? { items, facets: facetCounts(all, state, opts.brands, opts.printers) } : { items };
 }

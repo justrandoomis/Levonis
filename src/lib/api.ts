@@ -1021,6 +1021,18 @@ export interface ApiOrder {
   /** The THIRD verb, beside `can_cancel` and `can_review` — the day picker as
    *  a whole answer, including why there is no picker when there is none. */
   delivery_date?: OrderDeliveryDate;
+  /**
+   * «مواد الصيانة لطابعتك» (0148) — each printer on this order that has
+   * maintenance parts, read as its model; [] when none. GET /api/orders/:id only.
+   */
+  maintenance_parts?: Array<{
+    printer_slug: string;
+    name: string;
+    name_ar: string;
+    name_ckb: string;
+    count: number;
+    path: string | null;
+  }>;
   /** A membership gift that ships WITH the order and is worth 0 IQD on every
    *  total — today only «PRO + طلب مسبق مدفوع مقدمًا = فلمنت هدية». */
   membership_gift?: {

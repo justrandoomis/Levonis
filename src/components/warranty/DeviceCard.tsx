@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Wrench, LifeBuoy, Receipt, Printer, Package, MoreHorizontal, Unlink, ArrowLeftRight, Repeat, ExternalLink, ShieldPlus,
+  Wrench, LifeBuoy, Receipt, Printer, Package, MoreHorizontal, Unlink, ArrowLeftRight, Repeat, ExternalLink, ShieldPlus, Cog,
 } from 'lucide-react';
 import type { Language } from '../../translations';
 import SafeImage from '../ui/SafeImage';
@@ -39,10 +39,13 @@ export function DeviceCard({
   s,
   onOpenClaim,
   onRemove,
+  maintenancePath = null,
 }: {
   device: Device;
   lang: Language;
   s: WarrantyStrings;
+  /** 0148 — the maintenance listing the parts link opens, filtered to this printer. */
+  maintenancePath?: string | null;
   onOpenClaim: (device: Device, trigger: HTMLElement) => void;
   onRemove: (device: Device) => void;
 }) {
@@ -149,6 +152,18 @@ export function DeviceCard({
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+        {/* «تفيد في صيانة الطابعة» (0148): what the shop stocks for THIS
+            printer — a nozzle or a plate is often the repair itself. */}
+        {device.maintenance && maintenancePath && (
+          <Link
+            to={`${maintenancePath}?fits=${encodeURIComponent(device.maintenance.printer_slug)}`}
+            className={LINK_QUIET}
+            data-device-parts={device.maintenance.printer_slug}
+          >
+            <Cog aria-hidden="true" className="w-3.5 h-3.5" />
+            {s.maintenanceParts(device.maintenance.count, fmtInt(device.maintenance.count, lang))}
+          </Link>
+        )}
         {device.order_id && (
           <Link to={`/orders/${encodeURIComponent(device.order_id)}`} className={LINK_QUIET}>
             <Package aria-hidden="true" className="w-3.5 h-3.5" />

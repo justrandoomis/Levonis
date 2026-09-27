@@ -1213,6 +1213,8 @@ test('every field of the product form is expressible in the sheet', () => {
     // derived or managed elsewhere, never typed into a sheet
     id: 'derived', slug: 'derived', doc_version: 'derived', content_rev: 'derived',
     template_family: 'derived', translation_meta: 'derived', catalog_ids: 'derived',
+    // 0148 — «يناسب الطابعات», the store's printers this part fits.
+    printer_fit_ids: 'fits_printers',
   };
   const rowTypes = new Set(['option', 'color', 'image', 'transport', 'spec', 'label', 'warranty', 'content', 'guide']);
   for (const field of Object.keys(blankDoc())) {

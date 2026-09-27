@@ -102,6 +102,7 @@ import PricePreview from './PricePreview';
 import MembershipDiscountSection from './form/MembershipDiscountSection';
 import { useProPaused } from '../../lib/proPause';
 import { SpecMultiPick } from './form/SpecMultiPick';
+import PrinterFitsSection from './form/PrinterFitsSection';
 import { ImagesSection } from './form/ImagesSection';
 import { MainImagesPair } from './form/MainImagesPair';
 import { QuickAddDialog, type QuickAddKind, type QuickAddResult } from './form/QuickAdd';
@@ -170,6 +171,8 @@ export default function ProductForm({
   // The family the chosen section resolves to — shown beside the stored one
   // when they differ, never written over it silently.
   const [sectionFamily, setSectionFamily] = useState<string | null>(null);
+  /** The product type the chosen section resolves to (worker/lib/templateFamilies.ts). */
+  const [sectionType, setSectionType] = useState<string | null>(null);
   const [brandSearch, setBrandSearch] = useState('');
   // Quick-add of a section / sub-section / brand from inside the form (the
   // same rows the التصنيفات page manages), selected on creation.
@@ -378,7 +381,7 @@ export default function ProductForm({
       const before = baselineRef.current ? (JSON.parse(baselineRef.current) as { d: EditorDoc; rs: RelationsState }) : null;
       const mine = docRef.current;
       const myRel = relRef.current;
-      const section = new Set<string>(['spec_fields', 'spec_groups', 'labels', 'content_blocks', 'usage_guide', 'how_to_use', 'how_to_use_ar', 'how_to_use_ckb']);
+      const section = new Set<string>(['spec_fields', 'spec_groups', 'labels', 'content_blocks', 'usage_guide', 'how_to_use', 'how_to_use_ar', 'how_to_use_ckb', 'printer_fit_ids']);
       const edited = before
         ? (Object.keys(mine) as Array<keyof EditorDoc>).filter(
             (k) => !section.has(k as string) && JSON.stringify(mine[k]) !== JSON.stringify(before.d[k])
@@ -416,17 +419,19 @@ export default function ProductForm({
     if (!id) {
       setTplGroups([]);
       setSectionFamily(null);
+      setSectionType(null);
       return;
     }
     let alive = true;
     (async () => {
       try {
-        const res = await api.get<{ groups: TemplateGroup[]; template_family: string | null }>(
+        const res = await api.get<{ groups: TemplateGroup[]; template_family: string | null; product_type?: string | null }>(
           `/api/admin/taxonomy/templates?category=${encodeURIComponent(id)}`
         );
         if (!alive) return;
         setTplGroups(res.groups ?? []);
         setSectionFamily(res.template_family ?? null);
+        setSectionType(res.product_type ?? null);
         // The section's family FILLS an empty template_family. It never
         // overwrites a stored one silently (a TXT file's value used to vanish
         // the moment the form opened): a mismatch is shown beside the field,
@@ -438,6 +443,7 @@ export default function ProductForm({
         if (alive) {
           setTplGroups([]);
           setSectionFamily(null);
+          setSectionType(null);
         }
       }
     })();
@@ -1609,11 +1615,22 @@ export default function ProductForm({
             : `${tplGroups.reduce((n, g) => n + g.fields.length, 0)} حقل`,
           storedSpecCount > 0 && tplGroups.length > 0 ? `${storedSpecCount} مواصفة محفوظة` : undefined,
           outsideSpecs.length > 0 ? `${outsideSpecs.length} خارج القالب` : undefined,
+          doc.printer_fit_ids.length ? `يناسب ${doc.printer_fit_ids.length} ${doc.printer_fit_ids.length === 1 ? 'طابعة' : 'طابعات'}` : undefined,
           doc.usage_guide.steps.length ? `${doc.usage_guide.steps.length} خطوة دليل` : undefined,
           preserved.length > 0 ? preserved.map((g) => `${g.count} ${g.label}`).join(' · ') : undefined,
         ])}
         {...section(7)}
       >
+        {/* «يناسب الطابعات» (0148) — for a part or an accessory, which is what
+            the owner links to a printer; shown for any product that already
+            carries links, so a stored link is never hidden by a section change. */}
+        {sectionType === 'parts' || sectionType === 'accessory' || doc.printer_fit_ids.length > 0 ? (
+          <PrinterFitsSection
+            value={doc.printer_fit_ids}
+            productId={doc.id}
+            onChange={(next) => setDoc((d) => ({ ...d, printer_fit_ids: next }))}
+          />
+        ) : null}
         {tplGroups.length === 0 && (
           <p className="text-[12px] text-zinc-500 mb-3">
             حقول المواصفات تتبع القسم والقالب. اختر القسم الرئيسي في القسم رقم 1 لتظهر هنا.

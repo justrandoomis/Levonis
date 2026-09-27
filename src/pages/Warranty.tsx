@@ -322,7 +322,15 @@ export default function Warranty() {
           ) : (
             <div className="space-y-3">
               {devices.map((d) => (
-                <DeviceCard key={d.unit_id} device={d} lang={lang} s={s} onOpenClaim={openClaimFor} onRemove={askUnlink} />
+                <DeviceCard
+                  key={d.unit_id}
+                  device={d}
+                  lang={lang}
+                  s={s}
+                  onOpenClaim={openClaimFor}
+                  onRemove={askUnlink}
+                  maintenancePath={mine?.maintenance_path ?? null}
+                />
               ))}
             </div>
           )}

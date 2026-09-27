@@ -43,6 +43,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'category_delivery_rules',
     // 0136 — a slug a section was renamed away from, so old links resolve.
     'catalog_slug_history',
+    // 0148 — which printer a maintenance part fits. Two catalogue products and
+    // the link between them, written on the product form beside the sections.
+    'product_printer_fits',
     /**
      * 0098 — THE COST LAYERS UNDER THE STOCK COUNTERS.
      *

@@ -211,6 +211,10 @@ export const BASE_COLUMNS = [
   'category',
   'sub_category',
   'hashtags',
+  // 0148 — «يناسب الطابعات»: the store's printers this part fits, by slug or
+  // by the name the owner says («A1 mini»). The TXT template carries the same
+  // key; a field in one importer and not the other is how the two drift.
+  'fits_printers',
   // ---- section 3-4: prices, sale types, stock
   'sale_types',
   'inventory_mode',
@@ -557,6 +561,7 @@ export function labelRow(shape: TemplateShape): string[] {
     category: 'القسم الرئيسي',
     sub_category: 'القسم الفرعي',
     hashtags: 'الهاشتاقات (tag|tag)',
+    fits_printers: 'يناسب الطابعات — slug الطابعة أو اسمها في المتجر (bambu-lab-a1|A1 mini)؛ فارغ = لا يناسب طابعة محددة',
     sale_types: `أنواع البيع (${SALE_TYPES.join('|')})`,
     inventory_mode: `مصدر المخزون (${INVENTORY_MODES.join('/')})`,
     price_iqd: 'السعر الاعتيادي',
@@ -715,6 +720,8 @@ export interface ParsedProduct {
   /** null when the sheet has no hashtags column at all, so an older file
    *  leaves a product's stored tags alone instead of clearing them. */
   hashtags: string[] | null;
+  /** 0148 — printer slugs or names; null = no such column (keep the links), [] clears. */
+  fits_printers: string[] | null;
   /**
    * §18 — the product-scoped membership discount rules this row STATES, one
    * entry per tier it spoke about. An empty array means the file said nothing
@@ -1542,6 +1549,7 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         gini_url: index.has('gini_url') ? cell(r, 'gini_url') : null,
         light_image: index.has('light_image') ? lightImageCell(cell(r, 'light_image'), line, issues) : null,
         hashtags: index.has('hashtags') ? splitList(cell(r, 'hashtags')) : null,
+        fits_printers: index.has('fits_printers') ? splitList(cell(r, 'fits_printers')) : null,
         membership_rules: membershipRulesFrom((name) => cell(r, name), (name) => index.has(name), line, issues),
         spec_fields: spec,
         options: [],
@@ -2197,6 +2205,8 @@ export interface ExportProduct {
   /** Optional so an export built before 0138 still type-checks; written as ''. */
   light_image?: string;
   hashtags: string[];
+  /** 0148 — the linked printers' slugs, in the admin's order. */
+  fits_printers?: string[];
   /**
    * §18 — the product-scoped membership discount rules this product has, at
    * most one per tier. OPTIONAL, and a tier with no rule simply has no entry:
@@ -2299,6 +2309,7 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
       gini_url: p.gini_url,
       light_image: p.light_image ?? '',
       hashtags: p.hashtags.join('|'),
+      fits_printers: (p.fits_printers ?? []).join('|'),
       ...membershipCells(p.membership_rules),
       ...spec,
     });
@@ -2996,7 +3007,7 @@ ${def.hint_ar}
 أنواع الأسطر
 ------------
 ${[
-    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, standard_delivery_enabled, standard_delivery_quantity_step, standard_delivery_fee_iqd, personal_delivery_enabled, personal_delivery_quantity_step, personal_delivery_fee_iqd, warranty_base_months, serialized, payment_options, how_to_use, usage_url, gini_url, light_image, membership.*, spec.*'),
+    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, fits_printers, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, standard_delivery_enabled, standard_delivery_quantity_step, standard_delivery_fee_iqd, personal_delivery_enabled, personal_delivery_quantity_step, personal_delivery_fee_iqd, warranty_base_months, serialized, payment_options, how_to_use, usage_url, gini_url, light_image, membership.*, spec.*'),
     rowType('option', 'قيمة واحدة من مجموعة خيارات — نسخة المنتج ونوع توفرها معًا', 'group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, availability_type, lead_time_text, lead_time_min_days, lead_time_max_days, variant_key, variant_label'),
     rowType('color', 'لون واحد وروابطه بالخيارات', 'value (اسم اللون), hex, sku_part, image, links, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
     rowType('variant', 'توليفة مخزون واحدة (خيارات + لون)', 'links (Group:Value|Group:Value|color:Name), sku_part, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),

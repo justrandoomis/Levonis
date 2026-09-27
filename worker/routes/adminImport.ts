@@ -88,9 +88,11 @@ import {
   createPendingBrand,
   inactiveBrandWarning,
   loadRefRows,
+  matchPrinterRef,
   matchRef,
   planBrandCreate,
 } from '../lib/templateRefs';
+import { printerOptions } from '../lib/printerFits';
 import { normalizeText } from '../lib/search/normalize';
 import type { PendingBrand } from '../lib/template';
 import {
@@ -99,7 +101,7 @@ import {
   refuseStrandedCapacity,
   type ExistingCells,
 } from '../lib/optionFulfillment';
-import { planProductMembershipRules } from '../lib/membershipBenefits';
+import { isMissingTable, planProductMembershipRules } from '../lib/membershipBenefits';
 import {
   isProductType,
   isTemplateFamily,
@@ -441,6 +443,26 @@ async function exportProducts(
     )
     .bind(...productIds)
     .all<Record<string, unknown>>();
+  // 0148 — the printers each part fits, as slugs in the admin's order, so an
+  // export → edit → re-import keeps them. None before 0148 reaches the table.
+  const fitRows = await db
+    .prepare(
+      `SELECT f.product_id, pr.slug FROM product_printer_fits f JOIN products pr ON pr.id = f.printer_id
+        WHERE f.product_id IN (${ph}) ORDER BY f.product_id, f.position, f.printer_id`
+    )
+    .bind(...productIds)
+    .all<{ product_id: string; slug: string }>()
+    .then((r) => r.results ?? [])
+    .catch((e: unknown) => {
+      if (isMissingTable(e)) return [] as Array<{ product_id: string; slug: string }>;
+      throw e;
+    });
+  const fitsByProduct = new Map<string, string[]>();
+  for (const f of fitRows) {
+    const list = fitsByProduct.get(String(f.product_id)) ?? [];
+    list.push(String(f.slug));
+    fitsByProduct.set(String(f.product_id), list);
+  }
 
   const catalogs = await loadCatalogs(db);
   const catById = new Map(catalogs.map((r) => [r.id, r]));
@@ -512,6 +534,7 @@ async function exportProducts(
       gini_url: doc.gini_url ?? '',
       light_image: doc.light_image ?? '',
       hashtags: doc.hashtags,
+      fits_printers: fitsByProduct.get(pid) ?? [],
       // §18. A tier with no product rule contributes NO entry, and
       // `serializeProducts` then writes six empty cells for it — never
       // `__NULL__`, which would turn an export into a deletion order for a
@@ -1098,7 +1121,10 @@ async function buildMaps(db: D1Database, images: Map<string, string>): Promise<I
   const productSlugs = new Map<string, string>(
     (slugRows ?? []).map((r) => [String(r.slug).toLowerCase(), String(r.id)])
   );
-  return { brands, catalogs, facets, familyOf: familyMap(rows), images, productSlugs, ambiguous };
+  // 0148 — the store's printers, matched the way the TXT template matches them.
+  const printers = await printerOptions(db);
+  const printerMatch = (value: string) => matchPrinterRef(printers, value);
+  return { brands, catalogs, facets, familyOf: familyMap(rows), images, productSlugs, printerMatch, ambiguous };
 }
 
 /**
@@ -1409,6 +1435,8 @@ adminImportRoutes.post('/preview', async (c) => {
       doc: r.doc,
       relations: r.relations,
       catalogIds: r.catalogIds,
+      // 0148 — undefined (absent) is dropped by JSON and read back as "keep".
+      printerFits: r.printerFits,
       // §18 — carried into the stored payload so the confirm writes exactly
       // what the preview showed, through `saveBenefitRule` and nothing else.
       membership: r.membership,
@@ -1843,6 +1871,8 @@ adminImportRoutes.post('/confirm', async (c) => {
           prev: prevDoc,
           relations: relationsBody,
           catalogIds,
+          // 0148 — only when the sheet had the column; otherwise the links stay.
+          printerFits: Array.isArray(item.printerFits) ? (item.printerFits as string[]) : undefined,
           actor: { adminId: admin.id, money },
           translations: localized.fields,
         });

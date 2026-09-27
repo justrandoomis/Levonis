@@ -9,7 +9,7 @@
  * ONE SECTION, ENFORCED ON THE SERVER. Section 7 of the product form —
  * «المواصفات والمحتوى الإضافي» — is the spec sheet (`spec.<id>`), the spec
  * groups, the labels, the content blocks, the usage guide's steps and link,
- * and the free usage text. A file may carry anything (the full export, an old
+ * the free usage text, and the printers a part fits (`fits_printers`, 0148). A file may carry anything (the full export, an old
  * file, a spreadsheet); every line outside those keys is dropped here, BEFORE
  * the text reaches the template parser, so no price, option, colour, picture,
  * name or placement can change through this door whatever the file says. The
@@ -90,8 +90,13 @@ export function scanTemplate(text: string): { entries: TemplateEntry[]; malforme
 
 /** Section 7's repeatable groups (`group.N.…`, and `group=__CLEAR__`). */
 export const SECTION_GROUPS = ['spec_groups', 'labels', 'content_blocks', 'usage_steps'] as const;
-/** Section 7's single keys. `how_to_use` is the importer's old spelling of `how_to_use_en`. */
-export const SECTION_SCALARS = ['how_to_use', 'how_to_use_ar', 'how_to_use_en', 'how_to_use_ckb', 'usage_official_url'] as const;
+/**
+ * Section 7's single keys. `how_to_use` is the importer's old spelling of
+ * `how_to_use_en`. `fits_printers` (0148) is the «يناسب الطابعات» picker at
+ * the top of the same section — links, not a document field, so the preview
+ * compares it on its own and the apply writes it through the save's batch.
+ */
+export const SECTION_SCALARS = ['how_to_use', 'how_to_use_ar', 'how_to_use_en', 'how_to_use_ckb', 'usage_official_url', 'fits_printers'] as const;
 
 /** Whether a template key belongs to «المواصفات والمحتوى الإضافي». */
 export function isSectionKey(key: string): boolean {

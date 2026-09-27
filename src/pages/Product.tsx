@@ -91,6 +91,10 @@ import { resolveOrderType, resolveTransport, routeIsUsable } from '../lib/produc
 import { useMoney } from '../CurrencyContext';
 import { CommunityStoreLink } from './community/access';
 import CompareBadge from '../components/compare/CompareBadge';
+import PrinterFitsLine, { type FitPrinterRef } from '../components/product/PrinterFitsLine';
+
+/** Its own chunk: only a printer page with maintenance parts ever draws it. */
+const MaintenanceShelf = React.lazy(() => import('../components/product/MaintenanceShelf'));
 
 // ------------------------------------------------------------------ strings
 
@@ -635,6 +639,10 @@ interface DetailResponse {
   rating?: { average: number; count: number } | null;
   /** The linked new product's CURRENT price, when this is a graded listing. */
   condition_reference?: { reference_iqd: number; saving_iqd: number } | null;
+  /** 0148 — the published printers this part fits, in the admin's order. */
+  fits_printers?: FitPrinterRef[];
+  /** 0148 — for a printer: its maintenance parts' count and listing, or null. */
+  maintenance_parts?: { count: number; printer_slug: string; path: string | null } | null;
 }
 
 interface QuoteResponse {
@@ -819,6 +827,9 @@ export default function Product() {
   const [rating, setRating] = useState<{ average: number; count: number } | null>(null);
   /** Open box / used / refurbished — null for an ordinary new product. */
   const [conditionRef, setConditionRef] = useState<{ reference_iqd: number; saving_iqd: number } | null>(null);
+  // 0148 — «يناسب» under the title, and «مواد الصيانة لهذه الطابعة» above the reviews.
+  const [fitsPrinters, setFitsPrinters] = useState<FitPrinterRef[]>([]);
+  const [maintenance, setMaintenance] = useState<DetailResponse['maintenance_parts']>(null);
 
   /**
    * The condition document rides on the product payload (CARD_FIELDS and the
@@ -1016,6 +1027,8 @@ export default function Product() {
         setSalesBadge(data.sales_badge ?? null);
         setRating(data.rating ?? null);
         setConditionRef(data.condition_reference ?? null);
+        setFitsPrinters(data.fits_printers ?? []);
+        setMaintenance(data.maintenance_parts ?? null);
         // THE PRICE IS ALREADY HERE. `pricing` is the server's own resolver
         // result for the opening selection, computed on this request; seeding the
         // quote with it means the page opens with a real, final figure instead
@@ -3668,6 +3681,8 @@ export default function Product() {
                 ) : null}
                 {stockNote ? <span className="text-zinc-400 text-[12px] leading-normal">{stockNote}</span> : null}
               </div>
+              {/* «يناسب» — the printers this part fits, each one tap away. */}
+              <PrinterFitsLine printers={fitsPrinters} />
               {/* The frame the price below only makes sense inside: what this
                   unit is, what was wrong with it, what it is covered for, and
                   that it cannot be sent back for a change of mind. Above the
@@ -4024,6 +4039,15 @@ export default function Product() {
                   >
                     {s.giniCta}
                   </button>
+                </div>
+              ) : null}
+
+              {/* «مواد الصيانة لهذه الطابعة» — only on a printer with parts. */}
+              {maintenance ? (
+                <div className="pt-2">
+                  <React.Suspense fallback={null}>
+                    <MaintenanceShelf printerSlug={maintenance.printer_slug} count={maintenance.count} path={maintenance.path} />
+                  </React.Suspense>
                 </div>
               ) : null}
 

@@ -42,6 +42,12 @@ export interface Device {
   open_claims: number;
   /** True when the holder is not the original buyer. */
   transferred: boolean;
+  /**
+   * 0148 — the maintenance parts that fit this device's MODEL (a used unit
+   * reads as its model): how many, and the printer slug the listing filters
+   * by. Null when the shop has none for it. GET /api/devices/mine only.
+   */
+  maintenance?: { printer_slug: string; count: number } | null;
 }
 
 export interface EligibleUnit extends Device {
@@ -53,6 +59,8 @@ export type MembershipTier = 'free' | 'plus' | 'prime' | 'pro';
 export interface MineResponse {
   devices: Device[];
   priority_service: boolean;
+  /** 0148 — `/categories/maintenance-parts/all`, or null when the section is not in the tree. */
+  maintenance_path?: string | null;
   tier: { tier: MembershipTier; active: boolean };
 }
 

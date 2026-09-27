@@ -83,6 +83,9 @@ import { motion } from 'motion/react';
 import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
 import { useMoney } from '../CurrencyContext';
 
+/** Its own chunk: fetched only after an order is placed, drawn only for a printer with parts. */
+const PlacedOrderParts = React.lazy(() => import('../components/product/PlacedOrderParts'));
+
 /**
  * The refusal codes validateCoupon can produce. A quote that fails with one
  * of these failed BECAUSE OF THE CODE, so the code is dropped and the quote
@@ -1887,6 +1890,14 @@ export default function Checkout() {
               {dir === 'rtl' ? 'العودة للرئيسية' : 'Back to Home'}
             </button>
           </motion.div>
+
+          {/* «مواد الصيانة لطابعتك» (0148) — only when the order holds a
+              printer with parts, and only once the celebration has settled. */}
+          {celebrated ? (
+            <React.Suspense fallback={null}>
+              <PlacedOrderParts orderId={placedOrder.id} />
+            </React.Suspense>
+          ) : null}
         </div>
 
         {/* Last in the tree and non-blocking by construction: it portals to

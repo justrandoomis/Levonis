@@ -268,6 +268,7 @@ function planOf(statements: D1PreparedStatement[], detachedMedia: string[]): Pro
     relations: null,
     cells: null,
     catalogIds: null,
+    printerFits: null,
     priceHistory: [],
     hashtagsRegistered: 0,
     hashtagsAdded: [],

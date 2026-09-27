@@ -14,6 +14,7 @@ import {
   sheetSections,
   specValueLabel,
   toggleBrand,
+  toggleFit,
   toggleSpec,
   type SectionType,
 } from '../../lib/catalog/listingModel';
@@ -108,6 +109,25 @@ export default function FilterPanel({
                     </button>
                   )
                 }
+              </FacetSection>
+            );
+          case 'printers':
+            // «يناسب الطابعة» (0148) — the store's printers these parts are
+            // linked to, with how many of the list each one fits.
+            return (
+              <FacetSection key={section} id={section} title={loc('يناسب الطابعة', 'Fits printer')}>
+                {(labelId) => (
+                  <CheckboxFacet
+                    labelledBy={labelId}
+                    selected={state.fits ?? []}
+                    onToggle={(slug) => onChange(toggleFit(state, slug))}
+                    options={withSelected(
+                      (facets.printers ?? []).map((p) => ({ value: p.slug, label: p.name_en || p.name_ar, count: p.count })),
+                      state.fits ?? [],
+                      (slug) => ({ value: slug, label: slug, count: 0 })
+                    )}
+                  />
+                )}
               </FacetSection>
             );
           case 'brands':

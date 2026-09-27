@@ -30,7 +30,7 @@ import { activeBenefitRules, ancestryFor, catalogAncestry, degradeIfSchemaMissin
 import { isConditionColumnMissing } from '../lib/conditionProjection';
 import { catalogSubtreeFilter, homeCategoryTree } from '../lib/catalogMembership';
 import { FACET_FIELD_IDS, parseListingParams } from '@levonis/catalog/discovery';
-import { runListing, type BrandInfo, type ListingItem } from '../lib/listingFacets';
+import { runListing, type BrandInfo, type ListingItem, type PrinterInfo } from '../lib/listingFacets';
 import {
   catalogIdForRetiredSlug,
   catalogIndexFor,
@@ -96,6 +96,7 @@ import { publicMysteryBlock, resolveMysteryLines, type MysteryContext } from '..
 import { activePoolProductIds } from '../lib/mysteryDraw';
 import { applyOfferToResolved, loadOffers, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
 import { isPrinterProduct } from '../lib/printerIdentity';
+import { activeFitsFor, MAINTENANCE_ROOT_ID, maintenanceFor, printerFitsInstalled, type FitPrinter } from '../lib/printerFits';
 import { resolveSiteMedia } from '../lib/siteMedia';
 import { normalizeHomeBento } from '../lib/homeBento';
 import { conditionSaving, parseConditionDoc } from '../lib/condition';
@@ -2970,7 +2971,7 @@ export async function resolveProductCards(
  * (the home rails, search, «عرض المزيد», saved links) is untouched.
  */
 const LISTING_PARAM_KEYS = [
-  'sort', 'avail', 'sale', 'price', 'brand', 'offer', 'member', 'facets',
+  'sort', 'avail', 'sale', 'price', 'brand', 'fits', 'offer', 'member', 'facets',
   ...FACET_FIELD_IDS.map((f) => `f.${f}`),
 ];
 
@@ -2986,7 +2987,13 @@ export const LISTING_CANDIDATE_CAP = 300;
 const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 /** A resolved card (ordinary or composition) → what the listing filters read. */
-function listingItemOf(row: Record<string, unknown>, card: Record<string, unknown>, rank: number, brandSlug: string | null): ListingItem {
+function listingItemOf(
+  row: Record<string, unknown>,
+  card: Record<string, unknown>,
+  rank: number,
+  brandSlug: string | null,
+  fits: string[] = []
+): ListingItem {
   const price = numOrNull(card.display_price_iqd) ?? numOrNull(card.price_iqd) ?? (Number(row.price_iqd) || 0);
   const saleTypes = Array.isArray(card.sale_types)
     ? (card.sale_types as unknown[]).map(String)
@@ -3005,6 +3012,7 @@ function listingItemOf(row: Record<string, unknown>, card: Record<string, unknow
     saleTypes: saleTypes.length ? saleTypes : [String(row.selling_type || 'direct_sale')],
     brandId: row.brand_id ? String(row.brand_id) : null,
     brandSlug,
+    fits,
     createdAt: String(row.created_at ?? ''),
     rank,
     scheduledOffer: !!offer && (offer.schedule_state === 'live' || offer.schedule_state === 'upcoming'),
@@ -3372,6 +3380,23 @@ productRoutes.get('/', async (c) => {
     params.push(JSON.stringify(listingState.brands));
   }
   /**
+   * «يناسب طابعة» (0148) NARROWS IN SQL on the same terms as the brand: one
+   * bound list, and only when no counts were asked for. It matters more here
+   * than for a brand — a printer page's shelf asks for its parts across the
+   * whole catalogue, and a 300-candidate cap applied BEFORE the link would
+   * lose parts the in-memory filter never got to see. Before 0148 the table
+   * is absent: nothing can match, and the empty answer below is the truth.
+   */
+  if (listing && !wantsFacets && listingState.fits.length) {
+    if (!(await printerFitsInstalled(c.env.DB))) {
+      return c.json({ success: true, products: [], ...categoryField, total: 0, truncated: false, sort: listingState.sort });
+    }
+    sql +=
+      ' AND id IN (SELECT f.product_id FROM product_printer_fits f JOIN products pr ON pr.id = f.printer_id' +
+      " WHERE pr.status = 'active' AND pr.slug IN (SELECT value FROM json_each(?)))";
+    params.push(JSON.stringify(listingState.fits));
+  }
+  /**
    * A SEARCH RESULT IS ORDERED BY RELEVANCE, NOT BY THE SHELF ORDER.
    *
    * `IN (...)` has no order at all, and `display_order` is the merchandiser's
@@ -3499,10 +3524,29 @@ productRoutes.get('/', async (c) => {
       ).results ?? [])
     : [];
   const brands = new Map(brandRows.map((b) => [b.id, b]));
+  // 0148 — each candidate's ACTIVE printers, for the «يناسب طابعة» filter and
+  // its facet: one read for the whole candidate set, and none at all when the
+  // request neither filters nor counts by printer (every rail and shelf).
+  const fitsByProduct =
+    wantsFacets || listingState.fits.length > 0
+      ? await activeFitsFor(c.env.DB, results.map((r) => String(r.id)))
+      : new Map<string, FitPrinter[]>();
+  const printers = new Map<string, PrinterInfo>();
+  for (const list of fitsByProduct.values()) {
+    for (const p of list) {
+      if (!printers.has(p.slug)) printers.set(p.slug, { id: p.id, slug: p.slug, name_ar: p.name_ar, name_en: p.name_en, name_ckb: p.name_ckb });
+    }
+  }
   const items = results.map((row, i) =>
-    listingItemOf(row, cards[i], i, brands.get(String(row.brand_id ?? ''))?.slug ?? null)
+    listingItemOf(
+      row,
+      cards[i],
+      i,
+      brands.get(String(row.brand_id ?? ''))?.slug ?? null,
+      (fitsByProduct.get(String(row.id)) ?? []).map((p) => p.slug)
+    )
   );
-  const run = runListing(items, listingState, { facets: wantsFacets, brands });
+  const run = runListing(items, listingState, { facets: wantsFacets, brands, printers });
   return c.json({
     success: true,
     ...categoryField,
@@ -3657,6 +3701,32 @@ productRoutes.get('/:slug', async (c) => {
     // non-printer: the cart would refuse the plan (WARRANTY_NOT_PRINTER).
     out.warranty_plans = pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter);
 
+    /**
+     * 0148 — WHICH PRINTER THIS FITS, AND WHAT FITS THIS PRINTER.
+     *
+     * `fits_printers`: the ACTIVE printers the admin linked, in the admin's
+     * order — the «يناسب» line under the title. `maintenance_parts`: for a
+     * printer, how many active parts in «مواد الصيانة» fit it and the listing
+     * that shows them; the page asks for its shelf only when there are some.
+     * A used unit's parts are its MODEL's (`condition.new_product_id`, the
+     * link a graded listing already carries). Both empty before 0148.
+     */
+    // Together, not one after the other: a printer page pays one round trip.
+    const [fitsMap, target] = await Promise.all([
+      activeFitsFor(c.env.DB, [String(row.id)]),
+      isPrinter ? maintenanceFor(c.env.DB, [String(row.id)]).then((m) => m.get(String(row.id))) : Promise.resolve(undefined),
+    ]);
+    const fitsPrinters = fitsMap.get(String(row.id)) ?? [];
+    let maintenanceParts: { count: number; printer_slug: string; path: string | null } | null = null;
+    if (target) {
+      const idx = await catalogIndexFor(c.env.DB).catch(() => null);
+      maintenanceParts = {
+        count: target.count,
+        printer_slug: target.slug,
+        path: idx?.byId.has(MAINTENANCE_ROOT_ID) ? `${idx.path(MAINTENANCE_ROOT_ID)}/all` : null,
+      };
+    }
+
     // `ProductViewed` (03-EVENTS.md §3.2) — `best_effort` and SAMPLED (1:1
     // signed in, 1:5 anonymous): it never touches the outbox and never adds a
     // D1 write to a page read. The viewer travels as a daily-salted hash, or
@@ -3708,6 +3778,9 @@ productRoutes.get('/:slug', async (c) => {
        * price that is not actually lower.
        */
       condition_reference: conditionReference,
+      // 0148 — «يناسب» and «مواد الصيانة لهذه الطابعة» (see above).
+      fits_printers: fitsPrinters.map((p) => ({ id: p.id, slug: p.slug, name: p.name_en, name_ar: p.name_ar, name_ckb: p.name_ckb })),
+      maintenance_parts: maintenanceParts,
       // The structure the JSON model could not express: option GROUPS, the
       // real many-to-many colour links, modelled combinations and bound
       // images. Null when the product has no relational rows at all.

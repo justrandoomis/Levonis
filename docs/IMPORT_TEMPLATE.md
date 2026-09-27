@@ -61,7 +61,7 @@ slug، مكرر في كل أسطر المنتج).
 
 | `row_type` | يحمل | الأعمدة |
 |---|---|---|
-| `product` | المنتج نفسه | `name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, membership.*, stock, low_stock_threshold, warranty_base_months, serialized, payment_options, how_to_use, usage_url, spec.*` |
+| `product` | المنتج نفسه | `name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, fits_printers, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, membership.*, stock, low_stock_threshold, warranty_base_months, serialized, payment_options, how_to_use, usage_url, spec.*` |
 | `option` | قيمة خيار | `group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd` |
 | `color` | لون وروابطه | `value, hex, sku_part, image, links, active, stock, …الأسعار` |
 | `variant` | توليفة مخزون | `links (Group:Value\|Group:Value\|color:Name), sku_part, active, stock, …الأسعار` |
@@ -85,13 +85,20 @@ slug، مكرر في كل أسطر المنتج).
 | ٤أ نوع الطلب لكل موديل وسعته (0075) | أسطر `fulfillment` + عمود `capacity` — §١٢. مخزون البيع المباشر يبقى `stock` على سطر `option`: لا عمود مخزون ثانٍ. |
 | ٥ الخيارات والألوان | أسطر `option` و`color` و`variant` |
 | ٦ الوسائط | أسطر `image` |
-| ٧ المواصفات والاستخدام | أعمدة `spec.*` + أسطر `spec` + `how_to_use` + `usage_url` + أسطر `guide` |
+| ٧ المواصفات والاستخدام | `fits_printers` («يناسب الطابعات»، 0148) + أعمدة `spec.*` + أسطر `spec` + `how_to_use` + `usage_url` + أسطر `guide` |
 | ٨ الشارات والضمان والمحتوى | أسطر `label` و`warranty` (الطابعات فقط) و`content` |
 
 `id` و`slug` و`doc_version` و`content_rev` و`template_family` و`translation_meta`
 مشتقة ولا تُكتب من الملف. يحرس الخريطةَ اختبارُ «every field of the product
 form is expressible in the sheet»، وهو يقرأ `blankDoc()` — حالة النموذج نفسها —
 فحقل جديد في النموذج يُسقط الاختبار حتى يجد بيتًا في الملف.
+
+**`fits_printers` — «يناسب الطابعات» (0148).** طابعات المتجر التي تناسبها القطعة،
+مفصولة بـ `|`: الـslug (كما يصدّره المتجر) أو اسم الطابعة كما يقوله المالك —
+«A1 mini» يطابق «Bambu Lab A1 mini» لأن الاسم ينتهي به، و«A1» لا يطابق الميني.
+اسم لا تجيب عليه طابعة، أو تجيب عليه طابعتان، يُرفض على سطره ولا يُخمَّن. غياب
+العمود يُبقي الروابط المحفوظة؛ الخلية الفارغة تمسحها. المفتاح نفسه في قالب TXT
+(`fits_printers=A1, A1 mini, A2L`) وفي «تحديث البيانات».
 
 **لا يوجد عمود `facets`.** حُذف مُنتقي الفلاتر من نموذج المنتج، وعمودٌ لحقل لا
 يظهر في المتصفح يعني قيمة لا يستطيع أحد تصحيحها بعد كتابتها. جدول `facets`
