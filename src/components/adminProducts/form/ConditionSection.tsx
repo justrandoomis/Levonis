@@ -46,9 +46,16 @@ const INPUT =
 export function ConditionSection({
   condition,
   onChange,
+  inUsedSection = false,
 }: {
   condition: ConditionEntry | null;
   onChange: (next: ConditionEntry | null) => void;
+  /**
+   * The product is filed under «المستعمل» (0147). A unit there with no
+   * condition would be sold as NEW — no grade, no hours, a new printer's
+   * warranty and returns — so the form says so where the choice is made.
+   */
+  inUsedSection?: boolean;
 }) {
   const set = <K extends keyof ConditionEntry>(key: K, value: ConditionEntry[K]) => {
     onChange({ ...(condition ?? EMPTY), [key]: value });
@@ -56,6 +63,11 @@ export function ConditionSection({
 
   return (
     <div>
+      {inUsedSection && !condition ? (
+        <p role="status" data-used-section-hint className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] leading-5 text-amber-200">
+          هذا المنتج في قسم «المستعمل» — اختر حالته (مستعمل أو علبة مفتوحة أو مُجدَّد) لتظهر درجته وساعات تشغيله للزبون وفي المقارنة، وإلا بيع على أنه جديد.
+        </p>
+      ) : null}
       <Grid cols={3}>
         <Field
           ar="حالة المنتج"

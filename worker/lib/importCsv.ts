@@ -230,12 +230,7 @@ export const BASE_COLUMNS = [
   'membership.pro.max_discount_iqd',
   'membership.pro.cap_scope',
   'membership.pro.max_quantity',
-  'membership.premium.discount_mode',
-  'membership.premium.percent',
-  'membership.premium.fixed_iqd',
-  'membership.premium.max_discount_iqd',
-  'membership.premium.cap_scope',
-  'membership.premium.max_quantity',
+  // (PREMIUM's block left with its discount on 2026-09-27 — migration 0145.)
   'stock',
   'low_stock_threshold',
   /**
@@ -422,11 +417,15 @@ export const LABEL_KEYS = ['featured', 'warranty_included', 'free_returns', 'fre
  */
 export const MEMBERSHIP_PREFIX = 'membership.';
 
-/** The sheet's word for each tier, and the tier the database stores. */
-export const MEMBERSHIP_TIERS = [
-  { key: 'pro', tier: 'pro', label_ar: 'PRO' },
-  { key: 'premium', tier: 'prime', label_ar: 'PREMIUM' },
-] as const;
+/**
+ * The sheet's word for each tier, and the tier the database stores. PRO
+ * alone: PREMIUM carries no discount since 2026-09-27 (migration 0145) —
+ * «حذف خيار خصم البريميوم في إضافة المنتج أو تعديله» — so its block left the
+ * templates with its field in the product form. A sheet written before still
+ * imports; its `membership.premium.*` columns are reported as unknown and
+ * change nothing.
+ */
+export const MEMBERSHIP_TIERS = [{ key: 'pro', tier: 'pro', label_ar: 'PRO' }] as const;
 
 export const MEMBERSHIP_FIELDS = [
   'discount_mode',

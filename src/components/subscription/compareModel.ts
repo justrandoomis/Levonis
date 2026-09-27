@@ -167,7 +167,7 @@ export function buildCompare({ tiers, contract, benefits, features, points, loc,
 
   // --------------------------------------------------------------- store
   const store: CompareRow[] = [];
-  for (const key of ['merchantStore', 'merchantSubdomain', 'merchantAnalytics', 'communityOffers', 'proMerchantBadge']) {
+  for (const key of ['merchantStore', 'merchantSubdomain', 'merchantAnalytics', 'communityOffers', 'premiumBadge', 'proMerchantBadge']) {
     const row = tick(key);
     if (row) store.push(row);
   }
@@ -189,7 +189,8 @@ export function buildCompare({ tiers, contract, benefits, features, points, loc,
       ),
     });
   }
-  if (points && tiers.every((t) => typeof points[t] === 'number')) {
+  // Only a multiplier worth stating: a row of «×1» in every column says nothing.
+  if (points && tiers.every((t) => typeof points[t] === 'number') && tiers.some((t) => (points[t] as number) > 100)) {
     const cells = Object.fromEntries(
       tiers.map((t) => [t, { kind: 'text', lines: [`×${(points[t] as number) / 100}`] } as CompareCell])
     ) as Record<PaidTier, CompareCell>;
@@ -208,7 +209,7 @@ export function buildCompare({ tiers, contract, benefits, features, points, loc,
   const groups: CompareGroup[] = [
     { key: 'shopping', label: loc('التسوق والخصومات', 'Shopping and discounts', 'کڕین و داشکاندن'), rows: shopping },
     { key: 'delivery', label: loc('التوصيل والدفع', 'Delivery and payment', 'گەیاندن و پارەدان'), rows: delivery },
-    { key: 'store', label: loc('المتجر والتجارة', 'Your store', 'فرۆشگا و بازرگانی'), rows: store },
+    { key: 'store', label: loc('المتجر والمجتمع', 'Your store and the community', 'فرۆشگا و کۆمەڵگە'), rows: store },
     { key: 'service', label: loc('الخدمة والمكافآت', 'Service and rewards', 'خزمەتگوزاری و خەڵات'), rows: service },
   ].filter((g) => g.rows.length > 0);
 
@@ -246,6 +247,10 @@ export function tierHighlights(
   if (b?.free_shipping) {
     const line = freeShippingLine(tier, b.free_shipping, loc, money);
     if (line) out.push(line);
+  }
+  // PREMIUM's own mark in the community (0145) — its second and last extra.
+  if (tier === 'prime' && has('premiumBadge')) {
+    out.push(loc('شارة PREMIUM مميزة في مجتمع ليفو', 'A distinctive PREMIUM badge in the Levo community', 'نیشانەیەکی تایبەتی PREMIUM لە کۆمەڵگەی لیڤۆ'));
   }
   if (tier === 'pro' && has('bnpl')) {
     out.push(loc('اشترِ الآن وادفع لاحقًا (BNPL) — حصريًا لـ PRO المؤهل', 'Buy Now, Pay Later (BNPL) — exclusively for eligible PRO members', 'ئێستا بکڕە و دواتر بدە (BNPL) — تەنها بۆ PRO ی گونجاو'));

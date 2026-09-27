@@ -1,7 +1,9 @@
 /**
  * Purchase-points unit tests — integrated mandate §4.2 / §4.3 / §4.4 / §5.
- * These pin the NEW rule (100 IQD = 1 point, accrued pending at purchase,
- * released after seven days AND payment settlement) and the acceptance tests
+ * These pin the rule's ARITHMETIC at the v2 rate the mandate wrote it for
+ * (100 IQD = 1 point; the store runs v3's 1,000 since 0146, which
+ * tests/pointsRateV3.test.ts pins), accrued pending at purchase and
+ * released after seven days AND payment settlement and the acceptance tests
  * PTS-01 / PTS-03 / PTS-07 from §14.3.
  * Run: npm run test:unit
  */
@@ -244,12 +246,14 @@ test('PTS-07: a malformed or missing config falls back to safe defaults', () => 
   const fromNothing = parsePointsRuleConfig(undefined);
   assert.deepEqual(fromNothing, POINTS_RULE_DEFAULTS);
   const fromJunk = parsePointsRuleConfig('{"iqd_per_point":-5,"effective_at":"not a date"}');
-  assert.equal(fromJunk.iqd_per_point, 100);
+  // The default is v3's 1,000 IQD per point since migration 0146.
+  assert.equal(fromJunk.iqd_per_point, 1000);
+  assert.equal(fromJunk.version, 'v3');
   assert.equal(fromJunk.legacy_iqd_per_point, 1000);
   assert.equal(fromJunk.effective_at, null);
   // effective_at unset means the new rule is simply in force for NEW
   // purchases; it never reaches back into orders that already accrued.
-  assert.equal(resolvePointsRule(fromJunk, '2020-01-01T00:00:00.000Z').iqd_per_point, 100);
+  assert.equal(resolvePointsRule(fromJunk, '2020-01-01T00:00:00.000Z').iqd_per_point, 1000);
 });
 
 test('PTS-07: the rate is read from config, so no balance is ever multiplied', () => {

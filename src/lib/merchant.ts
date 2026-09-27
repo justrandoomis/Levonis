@@ -29,6 +29,7 @@ export interface StoreMerchantSummary {
   verified: boolean;
   /** Active PRO membership status, independent of identity verification. */
   pro_badge?: boolean;
+  premium_badge?: boolean;
   status?: string;
   badge: string;
   rating: number | null;

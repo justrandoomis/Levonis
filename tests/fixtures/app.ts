@@ -201,3 +201,19 @@ export const put = (a: App, path: string, body: unknown = {}, headers: Record<st
   send(a, 'PUT', path, body, headers);
 export const get = (a: App, path: string, headers: Record<string, string> = {}) =>
   a.request(path, { headers: { 'CF-Connecting-IP': '1.2.3.4', ...headers } }, undefined, ctx);
+
+/**
+ * PRO ON SALE — for a test of PRO's own mechanics (its prices, delivery,
+ * BNPL, 12-hour lane, ×2 points).
+ *
+ * Migration 0145 PAUSES PRO: a fully migrated database says `proPause.paused`,
+ * and every running PRO membership then acts as PREMIUM until the owner
+ * resumes it. A test that seeds a PRO member to exercise what PRO GIVES is
+ * describing the day PRO is resumed, so it says so by calling this. The pause
+ * itself — the refusal, the freeze, the thaw — is proven in
+ * tests/proPause.test.ts, never by leaving it on by accident here.
+ */
+export function proOnSale(raw: DatabaseSync): DatabaseSync {
+  raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
+  return raw;
+}

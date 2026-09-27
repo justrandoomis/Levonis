@@ -5,9 +5,13 @@
  * «لاشتراك البريميوم يحصل المستخدم على 1.5x من النقاط والمستخدم البرو يحصل على
  * 2x أي ضعف النقاط من حيث التسجيل الدخول وربح النقاط وأثناء الشراء والتقييمات»
  *
- *   PREMIUM (tier id `prime`)  ×1.5
- *   PRO                        ×2
- *   everyone else              ×1
+ * …until 2026-09-27: «البريميوم يكون فقط إضافة ميزة أنه توصيل مجاني … أما
+ * المميزات الأخرى فألغيها». PREMIUM's ×1.5 ended with its other extras
+ * (migration 0145), so the ladder is now:
+ *
+ *   PRO                        ×2   (×1.5 while its priority service is restricted)
+ *   everyone else              ×1   — PREMIUM, PLUS, and a PRO card frozen by
+ *                                     the pause, which acts as PREMIUM
  *
  * WHO IS PRO IS NOT DECIDED HERE. The tier, its expiry and the admin
  * restriction cases that pause a benefit all come from worker/lib/
@@ -49,7 +53,8 @@
  *
  * Why half up is affordable. It costs the shop at most one point — one IQD,
  * since §4.4 redeems a point for exactly 1 IQD — per award, and only when the
- * base is odd and the tier is PREMIUM. ×2 and ×1 never round at all.
+ * base is odd and the multiplier is ×1.5 (a PRO member whose priority service
+ * is restricted). ×2 and ×1 never round at all.
  *
  * The arithmetic is integer-only — `(base × x100 + 50) / 100` with a floor —
  * so it is exact, has no float drift, and is reproducible verbatim in SQLite,
@@ -98,13 +103,23 @@ export function multiplierLabel(multiplierX100: number): string {
  * Note it does NOT perform getTierStatus's lazy `state='expired'` write: it
  * filters on the expiry itself, so a membership that is overdue but not yet
  * lazily marked still yields the correct (lower) multiplier.
+ *
+ * A PRO row frozen by the pause (`paused_at`, 0145) ranks as PREMIUM and never
+ * expires while it waits — `getTierStatus`'s own answer for it.
  */
-function tierSql(user: string, now: string): string {
+function tierSql(user: string, now: string, pausable = true): string {
+  // `pausable = false` is the pre-0145 statement, for a database that has no
+  // `paused_at` to name (tierPause.ts, `isPausedAtMissing`): nothing there can
+  // be frozen, so PRO is simply PRO.
+  const proRank = pausable ? `(CASE WHEN m.paused_at IS NOT NULL THEN 2 ELSE 3 END)` : '3';
+  const frozen = pausable ? ' OR m.paused_at IS NOT NULL' : '';
   return `(SELECT COALESCE(
-             MAX(CASE m.tier WHEN 'pro' THEN 3 WHEN 'prime' THEN 2 WHEN 'plus' THEN 1 ELSE 0 END), 0)
+             MAX(CASE m.tier
+                   WHEN 'pro' THEN ${proRank}
+                   WHEN 'prime' THEN 2 WHEN 'plus' THEN 1 ELSE 0 END), 0)
              FROM memberships m
             WHERE m.user_id = ${user} AND m.state = 'active'
-              AND (m.expires_at IS NULL OR m.expires_at >= ${now}))`;
+              AND (m.expires_at IS NULL OR m.expires_at >= ${now}${frozen}))`;
 }
 
 /**
@@ -130,22 +145,23 @@ function gatedSql(user: string, flag: string): string {
  * The ladder is `dailyRewardMultiplierX100`'s, term for term:
  *   inactive, or `premiumRewards` paused            → 100
  *   PRO rank and `priorityService` not paused       → 200
- *   PREMIUM rank or higher                          → 150
+ *   PRO rank                                        → 150
+ *   anything below PRO (PREMIUM included, 0145)     → 100
  */
-export function multiplierSql(user: string, now: string): string {
-  const rank = tierSql(user, now);
+export function multiplierSql(user: string, now: string, pausable = true): string {
+  const rank = tierSql(user, now, pausable);
   return `(SELECT CASE
              WHEN ${gatedSql(user, 'premiumRewards')} THEN 100
              WHEN r.rank >= 3 AND NOT ${gatedSql(user, 'priorityService')} THEN 200
-             WHEN r.rank >= 2 THEN 150
+             WHEN r.rank >= 3 THEN 150
              ELSE 100 END
            FROM (SELECT ${rank} AS rank) r)`;
 }
 
 /** The tier id that multiplier came from ('free' when no active membership). */
-export function tierNameSql(user: string, now: string): string {
+export function tierNameSql(user: string, now: string, pausable = true): string {
   return `(SELECT CASE r.rank WHEN 3 THEN 'pro' WHEN 2 THEN 'prime' WHEN 1 THEN 'plus' ELSE 'free' END
-             FROM (SELECT ${tierSql(user, now)} AS rank) r)`;
+             FROM (SELECT ${tierSql(user, now, pausable)} AS rank) r)`;
 }
 
 /**

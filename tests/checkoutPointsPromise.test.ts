@@ -54,6 +54,9 @@ function setup() {
   raw.exec('PRAGMA foreign_keys = ON;');
   const dir = join(ROOT, 'migrations');
   for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) raw.exec(readFileSync(join(dir, f), 'utf8'));
+  // PRO's own mechanics, as they read with PRO on sale; migration 0145's
+  // pause is proven in tests/proPause.test.ts.
+  raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role) VALUES
       ('plain','Sara','s@x.co','h','customer'),

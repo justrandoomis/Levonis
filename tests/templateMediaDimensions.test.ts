@@ -191,16 +191,25 @@ class MembershipFailureStatement {
  * mutation is reached. The first rule and product statements have run inside
  * that transaction by then, so only a genuine all-in-one batch rolls them all
  * back. */
-class SecondMembershipWriteFailureD1 {
+/**
+ * Fails the batch at its membership-rule write — the product, the versions
+ * and the audits written before it in the same batch must not outlive it.
+ *
+ * It used to fail the SECOND tier (PRO written, PREMIUM refused). Since 0145
+ * PREMIUM holds no product discount («اشتراك البريميوم لا يحمل خصومات»), so a
+ * product carries one tier's rule at most and the one write is the one that
+ * fails; the property — nothing survives a failed membership write — is the
+ * same.
+ */
+class MembershipWriteFailureD1 {
   private readonly inner: SqliteD1;
   constructor(raw: DatabaseSync) { this.inner = new SqliteD1(raw); }
   prepare(sql: string) { return new MembershipFailureStatement(this.inner.prepare(sql), sql); }
   async batch(statements: MembershipFailureStatement[]) {
-    let membershipWrites = 0;
     const injected = statements.map((statement) => {
-      if (/INSERT INTO membership_benefit_rules\b/.test(statement.sql) && ++membershipWrites === 2) {
+      if (/INSERT INTO membership_benefit_rules\b/.test(statement.sql)) {
         return {
-          async run() { throw new Error('simulated second membership tier failure'); },
+          async run() { throw new Error('simulated membership rule failure'); },
         } as unknown as SqliteStatement;
       }
       return statement.inner;
@@ -506,9 +515,9 @@ colors.1.image=/files/legacy/color.webp
   }
 });
 
-test('a failure on the second membership tier rolls back product, rules, versions, and audits', async () => {
+test('a failure on the membership rule write rolls back product, rules, versions, and audits', async () => {
   const raw = freshDb();
-  const db = new SecondMembershipWriteFailureD1(raw);
+  const db = new MembershipWriteFailureD1(raw);
   const bucket = new MemoryBucket();
   const app = mountWithMedia(db as unknown as D1Database, bucket, imagesBinding());
   const versionsBefore = count(raw, 'SELECT COUNT(*) AS n FROM membership_benefit_versions');
@@ -519,8 +528,6 @@ name_en=Membership transaction
 price_iqd=1000
 membership.pro.discount_mode=percent
 membership.pro.percent=10
-membership.premium.discount_mode=fixed
-membership.premium.fixed_iqd=250
 `;
 
   const result = await apply(app, text);
@@ -529,7 +536,7 @@ membership.premium.fixed_iqd=250
   assert.equal(
     count(raw, `SELECT COUNT(*) AS n FROM membership_benefit_rules WHERE scope = 'product'`),
     0,
-    'the first tier does not survive failure of the second'
+    'no rule survives its own failed write'
   );
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM membership_benefit_versions'), versionsBefore);
   assert.equal(count(raw, `SELECT COUNT(*) AS n FROM audit_log WHERE action LIKE 'membership_benefit.%'`), auditsBefore);
@@ -537,7 +544,7 @@ membership.premium.fixed_iqd=250
   assert.equal(count(raw, `SELECT COUNT(*) AS n FROM rate_limits WHERE key LIKE 'tplfp:%'`), 0, 'the failed owner releases its claim');
 });
 
-test('a two-tier membership failure also rolls an existing product update back', async () => {
+test('a membership failure also rolls an existing product update back', async () => {
   const raw = freshDb();
   const bucket = new MemoryBucket();
   const baselineApp = mountWithMedia(asD1(raw), bucket, imagesBinding());
@@ -556,7 +563,7 @@ membership.pro.percent=5
   const claimsBefore = count(raw, `SELECT COUNT(*) AS n FROM rate_limits WHERE key LIKE 'tplfp:%'`);
 
   const failingApp = mountWithMedia(
-    new SecondMembershipWriteFailureD1(raw) as unknown as D1Database,
+    new MembershipWriteFailureD1(raw) as unknown as D1Database,
     bucket,
     imagesBinding()
   );
@@ -565,8 +572,6 @@ product_id=${productId}
 name_en=Membership changed
 membership.pro.discount_mode=percent
 membership.pro.percent=20
-membership.premium.discount_mode=fixed
-membership.premium.fixed_iqd=250
 `, 'update');
   assert.equal(changed.response.status, 500);
   assert.equal(row<{ name: string }>(raw, 'SELECT name FROM products WHERE id = ?', productId)?.name, 'Membership baseline');

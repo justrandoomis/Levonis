@@ -49,10 +49,15 @@ test('PLUS → PREMIUM → PRO is the one authoritative inheritance matrix', () 
   for (const [name, minimum] of Object.entries(ENTITLEMENT_MINIMUM_TIER)) {
     if (minimum === 'plus') assert.equal(premium[name as keyof typeof premium], true, `PREMIUM did not inherit ${name}`);
   }
-  assert.equal(premium.premiumPricing, true);
+  // PREMIUM since 2026-09-27 (migration 0145): PLUS, plus free delivery and
+  // its community badge — «أما المميزات الأخرى فألغيها».
   assert.equal(premium.premiumDelivery, true);
-  assert.equal(premium.premiumRewards, true);
+  assert.equal(premium.premiumBadge, true);
+  assert.equal(premium.premiumPricing, false, 'PREMIUM carries no member price or discount');
+  assert.equal(premium.premiumRewards, false, 'PREMIUM carries no points multiplier');
+  assert.equal(premium.codTaxExemption, false, 'PREMIUM carries no cash-on-delivery exemption');
   assert.equal(premium.bnpl, false, 'PREMIUM must never receive BNPL');
+  assert.equal(plus.premiumBadge, false, 'the PREMIUM badge is PREMIUM’s');
 
   const pro = entitlementSnapshot(status('pro'));
   for (const name of Object.keys(ENTITLEMENT_MINIMUM_TIER)) {
@@ -67,9 +72,9 @@ test('PLUS → PREMIUM → PRO is the one authoritative inheritance matrix', () 
   for (const value of Object.values(entitlementSnapshot(status('pro', false)))) assert.equal(value, false);
 });
 
-test('daily login rewards rise with the inherited tiers and PRO is doubled', () => {
+test('daily login rewards: PRO is doubled, everyone else — PREMIUM included since 0145 — earns ×1', () => {
   assert.equal(dailyRewardMultiplierX100(status('plus')), 100);
-  assert.equal(dailyRewardMultiplierX100(status('prime')), 150);
+  assert.equal(dailyRewardMultiplierX100(status('prime')), 100);
   assert.equal(dailyRewardMultiplierX100(status('pro')), 200);
   assert.equal(dailyRewardMultiplierX100(status('pro', false)), 100);
 });
@@ -77,6 +82,8 @@ test('daily login rewards rise with the inherited tiers and PRO is doubled', () 
 test('expiry, upgrades, downgrades and cancellation change entitlements immediately', async () => {
   const raw = freshDb();
   const db = asD1(raw);
+  // The lifecycle with PRO on sale (0145 pauses it; tests/proPause.test.ts).
+  raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
   raw.exec(`
     INSERT INTO users (id,email,password_hash) VALUES ('u','u@x.co','h'), ('expired','expired@x.co','h');
     INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at) VALUES
@@ -96,7 +103,8 @@ test('expiry, upgrades, downgrades and cancellation change entitlements immediat
   resolved = await getTierStatus(db, 'u');
   assert.equal(resolved.tier, 'prime');
   assert.equal(entitlementSnapshot(resolved).merchantStore, true, 'upgrade retains PLUS');
-  assert.equal(entitlementSnapshot(resolved).premiumPricing, true);
+  assert.equal(entitlementSnapshot(resolved).premiumDelivery, true);
+  assert.equal(entitlementSnapshot(resolved).premiumPricing, false, 'PREMIUM carries no discount');
   assert.equal(entitlementSnapshot(resolved).bnpl, false);
 
   raw.exec(`
@@ -105,7 +113,7 @@ test('expiry, upgrades, downgrades and cancellation change entitlements immediat
       VALUES ('m_pro','u','pro_12mo','pro','active',12,'2026-03-01T00:00:00.000Z','2099-03-01T00:00:00.000Z');
   `);
   resolved = await getTierStatus(db, 'u');
-  assert.equal(entitlementSnapshot(resolved).premiumPricing, true, 'PRO inherits PREMIUM');
+  assert.equal(entitlementSnapshot(resolved).premiumDelivery, true, 'PRO inherits PREMIUM');
   assert.equal(entitlementSnapshot(resolved).bnpl, true);
 
   raw.exec(`
@@ -115,7 +123,7 @@ test('expiry, upgrades, downgrades and cancellation change entitlements immediat
   `);
   resolved = await getTierStatus(db, 'u');
   assert.equal(resolved.tier, 'plus');
-  assert.equal(entitlementSnapshot(resolved).premiumPricing, false, 'downgrade removes PREMIUM');
+  assert.equal(entitlementSnapshot(resolved).premiumDelivery, false, 'downgrade removes PREMIUM');
   assert.equal(entitlementSnapshot(resolved).bnpl, false, 'downgrade removes BNPL');
 
   raw.exec("UPDATE memberships SET state='cancelled' WHERE id='m_plus_2'");

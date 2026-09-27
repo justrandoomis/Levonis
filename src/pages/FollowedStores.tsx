@@ -4,6 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
 import { storeHref } from '../lib/merchant';
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
+import PremiumMemberBadge from '../components/merchant/PremiumMemberBadge';
 import { ArrowLeft, ArrowRight, Store, BadgeCheck } from 'lucide-react';
 
 interface FollowedMerchant {
@@ -13,6 +14,7 @@ interface FollowedMerchant {
   avatarUrl: string | null;
   verified: boolean;
   pro_badge?: boolean;
+  premium_badge?: boolean;
   created_at: string;
   store_slug?: string | null;
   /** The shop's own address — a card click is a full navigation there. */
@@ -154,6 +156,7 @@ export default function FollowedStores() {
                   <h3 className="font-bold truncate">{store.name}</h3>
                   {store.verified && <BadgeCheck className="w-4 h-4 text-gold shrink-0" />}
                   {store.pro_badge && <ProMerchantBadge compact />}
+                  {store.premium_badge && <PremiumMemberBadge compact />}
                 </div>
                 {store.bio && <div className="text-sm text-zinc-400 truncate">{store.bio}</div>}
               </div>

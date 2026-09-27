@@ -24,7 +24,7 @@ import { exportProduct, parseTemplate, toDocBody, FIELD_REGISTRY } from '../work
 import { localizeProductDoc } from '../worker/lib/translate/localizeProduct';
 import { translateText } from '../worker/lib/translate';
 import { localizableSlots } from '../worker/lib/translationSlots';
-import { PRODUCT_TYPES, groupsForType } from '../worker/lib/templateFamilies';
+import { PRODUCT_TYPES, allTemplateGroups, groupsForType } from '../worker/lib/templateFamilies';
 import { relationsBodyFromDoc } from '../worker/lib/templateRelations';
 import { bridgeLeadTimeTranslations } from '../worker/lib/productPersistence';
 import { EMPTY_RELATIONS } from '../worker/lib/productOverlay';
@@ -69,6 +69,16 @@ const SORANI_PENDING = new Set([
   'Multi-nozzle (hotend changer)', 'Colours without filament swaps', 'Purge waste on colour change', 'Near zero',
   'Low', 'High', 'Multi-material in one print', 'Colours as sold', 'AMS units in the box', 'Included laser module',
   'Cutting / pen module', 'Per-option spec differences',
+  // 0147 (2026-09-27) — the FDM accessory kinds and the filament's performance
+  // (OWNER: Sorani to be written by hand). The used-branch groups are asked
+  // only in «المستعمل» and are covered by the Arabic check below.
+  'Slots', 'Max chained units', 'Filament drying', 'Max drying temperature', 'Humidity sensor',
+  'RFID spool reading', 'Unsupported filaments', 'Supported spool sizes', 'Copper alloy', 'Max temperature',
+  'Flow type', 'Standard flow', 'High flow', 'Abrasive filaments', 'Quick swap', 'Plate size', 'Plate surface',
+  'Textured PEI', 'Smooth PEI', 'Cool plate', 'Engineering plate', 'High temperature plate', 'Double-sided',
+  'Max plate temperature', 'AMS compatible', 'RFID tag', 'Empty spool weight', 'Filament length',
+  'Max recommended print speed', 'Tensile strength', 'Heat deflection temperature', 'Elongation at break',
+  'Shore hardness', 'Enclosure needed', 'Recommended', 'Hardened nozzle needed', 'Part cooling',
 ]);
 
 test('the deterministic dictionary covers every built-in template label and choice', () => {
@@ -78,6 +88,15 @@ test('the deterministic dictionary covers every built-in template label and choi
       for (const field of group.fields) {
         vocabulary.add(field.label_en);
         for (const option of field.options ?? []) vocabulary.add(option);
+      }
+    }
+  }
+  // The groups only «المستعمل» is asked (0147) are in no type's unnarrowed
+  // list, and a used unit's spec is read in Arabic like any other.
+  for (const group of allTemplateGroups().filter((g) => g.id === 'used_state' || g.id === 'used_printer')) {
+    for (const field of group.fields) {
+      for (const phrase of [field.label_en, ...(field.options ?? [])]) {
+        assert.equal(translateText(phrase, 'ar').status, 'machine', `Arabic dictionary gap: ${phrase}`);
       }
     }
   }

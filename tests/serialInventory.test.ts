@@ -406,7 +406,17 @@ test('edit, history and the EAN → product memory the scanner uses', async () =
   const bySku = await json(await a.request(`${BASE}/resolve?ean=${EAN}&model_code=pf002-a%2Bsa005`));
   assert.equal(bySku.match.product.id, 'pA1');
   assert.equal(bySku.match.via, 'sku');
-  assert.equal((await json(await a.request(`${BASE}/resolve?ean=${EAN}`))).match, null);
+  // The owner's own box is a KNOWN label: its EAN states «A1 Combo», and
+  // exactly one catalogue product is that model — so it is recognised before
+  // anything was ever filed under it.
+  const known = await json(await a.request(`${BASE}/resolve?ean=${EAN}`));
+  assert.equal(known.match.product.id, 'pA1');
+  assert.equal(known.match.via, 'model_name');
+  assert.equal(known.hint.model, 'A1 Combo');
+  // An EAN nobody has seen, on an A1 serial: the family is a hint, never a product.
+  const unknown = await json(await a.request(`${BASE}/resolve?ean=6977252425391&serial=03900D661014846`));
+  assert.equal(unknown.match, null);
+  assert.equal(unknown.hint.label, 'Bambu Lab A1');
   await commit(db, { rows: [{ serial: SN, ean: EAN, box_sn: BOX }], product_id: 'pA1', source: 'scan', defaults: { model_code: 'PF002-A+SA005', model_name: 'A1 Combo' } });
   const learned = await json(await a.request(`${BASE}/resolve?ean=${EAN}`));
   assert.equal(learned.match.product.id, 'pA1');
@@ -433,4 +443,115 @@ test('deleting the product keeps the serial and its model, and clears only the p
   raw.exec(`INSERT INTO serial_inventory (serial_norm, serial_raw, model_name, product_id, created_by) VALUES ('${SN}','${SN}','A1 Combo','pA1','boss')`);
   const cols = raw.prepare(`PRAGMA table_info(serial_inventory)`).all() as Array<{ name: string; notnull: number }>;
   for (const c of ['product_id', 'variant_id']) assert.equal(cols.find((x) => x.name === c)?.notnull, 0, `${c} is nullable`);
+});
+
+// ------------------------------------------------ the camera: one label, at once
+
+test('a scanned label is registered at once, and the same serial again answers «exists» with when and by whom', async () => {
+  const { db, raw } = setup();
+  const a = appAs(db, boss);
+  const first = await json(await post(a, `${BASE}/scan`, { serial: SN, box_sn: BOX, ean: EAN }));
+  assert.equal(first.outcome, 'added');
+  // The owner's A1 Combo box files itself: the known label names exactly one product.
+  assert.equal(first.row.product.id, 'pA1');
+  assert.equal(first.via, 'model_name');
+  assert.equal(first.needs_product, false);
+  assert.equal((raw.prepare('SELECT source FROM serial_inventory WHERE serial_norm = ?').get(SN) as { source: string }).source, 'scan');
+
+  const again = await json(await post(a, `${BASE}/scan`, { serial: SN.toLowerCase(), ean: EAN }));
+  assert.equal(again.outcome, 'exists');
+  assert.equal(again.row.serial_norm, SN);
+  assert.equal(again.row.created_by.id, 'boss');
+  assert.equal((raw.prepare('SELECT COUNT(*) AS n FROM serial_inventory').get() as { n: number }).n, 1, 'nothing written twice');
+
+  const bad = await json(await post(a, `${BASE}/scan`, { serial: EAN }));
+  assert.equal(bad.outcome, 'invalid');
+  assert.equal(bad.problem, 'SERIAL_LOOKS_LIKE_EAN');
+
+  const audit = raw.prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE action = 'serial_inventory.add'`).get() as { n: number };
+  assert.equal(audit.n, 1);
+  assert.equal((await post(appAs(db, buyer), `${BASE}/scan`, { serial: '03919D580607842' })).status, 403);
+});
+
+test('an unknown box is still registered with its family as the model, and «ربط بمنتج» files every serial of that EAN and teaches the camera', async () => {
+  const { db, raw } = setup();
+  const a = appAs(db, boss);
+  const OTHER_EAN = '6977252425391';
+  const s1 = await json(await post(a, `${BASE}/scan`, { serial: '03900D661014846', ean: OTHER_EAN }));
+  const s2 = await json(await post(a, `${BASE}/scan`, { serial: '03900D661013669', ean: OTHER_EAN }));
+  for (const r of [s1, s2]) {
+    assert.equal(r.outcome, 'added');
+    assert.equal(r.row.product, null);
+    assert.equal(r.needs_product, true);
+    assert.equal(r.row.model_name, '', 'a family is never stored as the model');
+    assert.equal(r.row.model_hint, 'Bambu Lab A1', 'the serial prefix names the family');
+  }
+  // A row filed before this change (no model typed) shows the family as a hint only.
+  raw.exec(`INSERT INTO serial_inventory (serial_norm, serial_raw, ean, created_by) VALUES ('03900D661012388','03900D661012388','${OTHER_EAN}','boss')`);
+  const list = await json(await a.request(`${BASE}?q=03900D661012388`));
+  assert.equal(list.rows[0].model_name, '');
+  assert.equal(list.rows[0].model_hint, 'Bambu Lab A1');
+
+  const refused = await json(await post(a, `${BASE}/link-ean`, { ean: OTHER_EAN }));
+  assert.equal(refused.code, 'SERIAL_PRODUCT_REQUIRED');
+  const linked = await json(await post(a, `${BASE}/link-ean`, { ean: OTHER_EAN, product_id: 'pA1' }));
+  assert.equal(linked.linked, 3);
+  const rows = raw.prepare(`SELECT product_id, model_name FROM serial_inventory WHERE ean = ? ORDER BY serial_norm`).all(OTHER_EAN) as Array<{ product_id: string; model_name: string }>;
+  assert.deepEqual(rows.map((r) => r.product_id), ['pA1', 'pA1', 'pA1']);
+  assert.equal(rows.find((r) => r.model_name === '')?.model_name, undefined, 'a blank model takes the product name');
+  const audit = raw.prepare(`SELECT detail FROM audit_log WHERE action = 'serial_inventory.link_ean'`).get() as { detail: string };
+  assert.equal(JSON.parse(audit.detail).linked, 3);
+
+  // Learned: the next box with that EAN files itself.
+  const next = await json(await post(a, `${BASE}/scan`, { serial: '03900D661010047', ean: OTHER_EAN }));
+  assert.equal(next.row.product.id, 'pA1');
+  assert.equal(next.via, 'ean');
+  assert.equal(next.needs_product, false);
+  // Nothing left to link is not an error.
+  assert.equal((await json(await post(a, `${BASE}/link-ean`, { ean: OTHER_EAN, product_id: 'pA1' }))).linked, 0);
+});
+
+test('the chosen product wins over the label, and a model name matches only its own machine', async () => {
+  const { db } = setup();
+  const a = appAs(db, boss);
+  const chosen = await json(await post(a, `${BASE}/scan`, { serial: '03919D580607899', ean: EAN, product_id: 'pX1' }));
+  assert.equal(chosen.row.product.id, 'pX1');
+  assert.equal(chosen.via, 'chosen');
+  const { modelMatchesProductName, serialModelHint } = await import('../packages/catalog/src/deviceSerials');
+  assert.equal(modelMatchesProductName('A1 Combo', 'Bambu Lab A1 Combo 3D Printer'), true);
+  assert.equal(modelMatchesProductName('A1', 'Bambu Lab A1'), true);
+  assert.equal(modelMatchesProductName('A1', 'Bambu Lab A1 Combo'), false);
+  assert.equal(modelMatchesProductName('A1', 'Bambu Lab A1 mini'), false);
+  assert.equal(modelMatchesProductName('A1 mini', 'Bambu Lab A1mini Combo'), false);
+  assert.equal(modelMatchesProductName('A1 mini', 'Bambu Lab A1mini'), true);
+  assert.equal(serialModelHint('03919D580607841')?.model, 'A1');
+  assert.equal(serialModelHint('01P00A351500123')?.model, 'P1S');
+  assert.equal(serialModelHint('B29A99A660900950'), null, 'another brand, no guess');
+});
+
+test('«إدخال يدوي» goes through the same door: recorded as typed, and a typed model name files the serial under its one product', async () => {
+  const { db, raw } = setup();
+  const a = appAs(db, boss);
+  const sourceOf = (norm: string) => (raw.prepare('SELECT source FROM serial_inventory WHERE serial_norm = ?').get(norm) as { source: string }).source;
+  // No EAN, no product chosen: the model the owner typed is the label's word.
+  const typed = await json(await post(a, `${BASE}/scan`, { serial: '03919D580607877', model_name: 'A1 Combo', source: 'manual' }));
+  assert.equal(typed.outcome, 'added');
+  assert.equal(typed.row.product.id, 'pA1', 'never «بلا منتج» when the label says what it is');
+  assert.equal(typed.via, 'model_name');
+  assert.equal(typed.row.model_name, 'A1 Combo');
+  assert.equal(sourceOf('03919D580607877'), 'manual');
+  // «A1» is not «A1 Combo»: a name that is not exactly one product stays the owner's choice.
+  const vague = await json(await post(a, `${BASE}/scan`, { serial: '03919D580607878', model_name: 'A1', source: 'manual' }));
+  assert.equal(vague.outcome, 'added');
+  assert.equal(vague.row.product, null);
+  assert.equal(vague.needs_product, true);
+  // The same serial typed again is the scanner's «مسجّلة مسبقًا», with its row.
+  const again = await json(await post(a, `${BASE}/scan`, { serial: '03919d580607877', source: 'manual' }));
+  assert.equal(again.outcome, 'exists');
+  assert.equal(again.row.product.id, 'pA1');
+  // Anything but 'manual' is recorded as a scan.
+  await post(a, `${BASE}/scan`, { serial: '03919D580607879', source: 'bulk' });
+  assert.equal(sourceOf('03919D580607879'), 'scan');
+  const audit = raw.prepare(`SELECT detail FROM audit_log WHERE action = 'serial_inventory.add' ORDER BY rowid`).all() as Array<{ detail: string }>;
+  assert.deepEqual(audit.map((r) => JSON.parse(r.detail).source), ['manual', 'manual', 'scan']);
 });

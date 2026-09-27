@@ -22,8 +22,11 @@ import { SCANNER_STRINGS } from './strings';
  *    it to its serial); an EAN alone is never taken, and the frame says why.
  *  - `continuous`: one call per LABEL, then keeps going. The same serial held
  *    in view does not fire twice; `onRead` answers with how it went
- *    (added / duplicate / invalid) and the frame flashes, beeps and buzzes
- *    accordingly.
+ *    (added / exists / duplicate / invalid) and the frame flashes, sounds and
+ *    buzzes accordingly. The answer may be a PROMISE — the admin's camera
+ *    registers each label on the server and the sound must be the server's
+ *    verdict, never a guess made before it («مسجلة مسبقًا» is only known
+ *    there). The scanner keeps reading other labels while one is in flight.
  *
  * THE CAMERA IS NEVER LEFT ON. The stream stops on close, on unmount, on the
  * first read in single mode, and whenever the page is hidden
@@ -45,8 +48,11 @@ export interface ScanRead extends LabelRead {
 
 export interface BarcodeScannerProps {
   mode: 'single' | 'continuous';
-  /** Single: called once. Continuous: per label; return how it went to drive the feedback. */
-  onRead: (read: ScanRead) => ScanFeedback | void;
+  /**
+   * Single: called once. Continuous: per label; return how it went to drive
+   * the feedback — at once, or as a promise of it.
+   */
+  onRead: (read: ScanRead) => ScanFeedback | void | Promise<ScanFeedback | void>;
   onClose: () => void;
   title?: string;
   titleId?: string;
@@ -58,6 +64,17 @@ export interface BarcodeScannerProps {
   onManual?: (text: string) => void;
   /** Rendered under the controls — the admin's list of scanned rows. */
   children?: React.ReactNode;
+  /**
+   * Rendered directly under the camera picture, before the fallbacks — the
+   * verdict on the last label, where the eyes already are.
+   */
+  verdict?: React.ReactNode;
+  /**
+   * Embedded in a window that has its own title and close button (the admin's
+   * scan sheet): no header row, and a shorter picture so the verdict and the
+   * session list stay in view on a phone.
+   */
+  embedded?: boolean;
 }
 
 type CameraState = 'starting' | 'slow' | 'on' | 'paused' | 'denied' | 'unavailable' | 'insecure' | 'failed' | 'stopped';
@@ -92,6 +109,8 @@ export default function BarcodeScanner({
   qr = false,
   onManual,
   children,
+  verdict,
+  embedded = false,
 }: BarcodeScannerProps) {
   const { lang } = useLanguage();
   const s = SCANNER_STRINGS[lang] ?? SCANNER_STRINGS.ar;
@@ -122,6 +141,8 @@ export default function BarcodeScanner({
   const [engine, setEngine] = useState<EngineKind | null>(null);
   const [hint, setHint] = useState<Hint>(null);
   const [flash, setFlash] = useState<ScanFeedback | null>(null);
+  /** Continuous reads still waiting for their answer. */
+  const [inFlight, setInFlight] = useState(0);
   const [torch, setTorch] = useState<{ supported: boolean; on: boolean }>({ supported: false, on: false });
   const [focusAt, setFocusAt] = useState<{ x: number; y: number; key: number } | null>(null);
   const [manual, setManual] = useState('');
@@ -135,7 +156,9 @@ export default function BarcodeScanner({
 
   const showFlash = useCallback((kind: ScanFeedback) => {
     setFlash(kind);
-    window.setTimeout(() => setFlash((f) => (f === kind ? null : f)), 700);
+    // A refusal stays on the frame a little longer: it is the one the eyes must catch.
+    const hold = kind === 'exists' || kind === 'duplicate' ? 1200 : 700;
+    window.setTimeout(() => setFlash((f) => (f === kind ? null : f)), hold);
   }, []);
 
   /** Single mode: hand over one read and switch everything off. */
@@ -187,12 +210,26 @@ export default function BarcodeScanner({
       snFirstSeenRef.current.set(sn, first);
       const waitForCompanions = !fromPhoto && engineRef.current?.kind === 'library' && !(read.ean && read.boxSn);
       if (waitForCompanions && now - first < COMPANION_WAIT_MS) return;
-      const outcome: ScanFeedback = onReadRef.current({ ...read, raw }) || 'added';
+      const answer = onReadRef.current({ ...read, raw });
       snQuietRef.current.set(sn, now);
       snFirstSeenRef.current.delete(sn);
       win.clear();
-      scanFeedback(outcome);
-      showFlash(outcome);
+      // Sound, buzz and flash on the frame the verdict lands — together.
+      const deliver = (outcome: ScanFeedback | void) => {
+        if (!aliveRef.current) return;
+        scanFeedback(outcome || 'added');
+        showFlash(outcome || 'added');
+      };
+      if (answer && typeof (answer as Promise<unknown>).then === 'function') {
+        setInFlight((n) => n + 1);
+        (answer as Promise<ScanFeedback | void>)
+          .then(deliver, () => deliver('invalid'))
+          .finally(() => {
+            if (aliveRef.current) setInFlight((n) => Math.max(0, n - 1));
+          });
+      } else {
+        deliver(answer as ScanFeedback | void);
+      }
     },
     [finish, mode, showFlash]
   );
@@ -389,7 +426,9 @@ export default function BarcodeScanner({
                       ? s.paused
                       : camera === 'stopped'
                         ? s.captured
-                        : hint === 'aimAtSn'
+                        : inFlight > 0
+                          ? s.registering
+                          : hint === 'aimAtSn'
                           ? s.aimAtSn
                           : hint === 'boxOnly'
                             ? s.boxOnly
@@ -402,30 +441,39 @@ export default function BarcodeScanner({
       ? 'border-success'
       : flash === 'duplicate'
         ? 'border-warning'
-        : flash === 'invalid'
+        : flash === 'invalid' || flash === 'exists'
           ? 'border-danger'
           : 'border-gold';
 
   return (
     <div className="flex flex-col min-h-0" data-scanner-mode={mode} data-scanner-engine={engine ?? ''} data-scanner-camera={camera}>
-      <div className="flex items-center justify-between gap-3 ps-4 pe-2 pt-3 pb-2">
-        <h2 id={titleId} className="text-white font-bold text-base truncate">
+      {embedded ? (
+        // The window around it carries the visible title and its own close.
+        <h2 id={titleId} className="sr-only">
           {title ?? s.title}
         </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={s.close}
-          className="inline-flex items-center justify-center w-11 h-11 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-        >
-          <X aria-hidden="true" className="w-5 h-5" />
-        </button>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3 ps-4 pe-2 pt-3 pb-2">
+          <h2 id={titleId} className="text-white font-bold text-base truncate">
+            {title ?? s.title}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={s.close}
+            className="inline-flex items-center justify-center w-11 h-11 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+          >
+            <X aria-hidden="true" className="w-5 h-5" />
+          </button>
+        </div>
+      )}
 
       {/* The camera picture: a dark subtree in both themes. */}
       <div
         data-theme="dark"
-        className="relative w-full aspect-[3/4] sm:aspect-[4/3] max-h-[58vh] bg-charcoal overflow-hidden select-none touch-manipulation"
+        className={`relative w-full bg-charcoal overflow-hidden select-none touch-manipulation ${
+          embedded ? 'aspect-[4/3] max-h-[46vh] rounded-2xl' : 'aspect-[3/4] sm:aspect-[4/3] max-h-[58vh]'
+        }`}
         onPointerDown={live ? onViewportPointer : undefined}
       >
         <video
@@ -506,7 +554,8 @@ export default function BarcodeScanner({
         )}
       </div>
 
-      <div className="px-4 py-3 space-y-3">
+      {verdict}
+      <div className={embedded ? 'py-3 space-y-3' : 'px-4 py-3 space-y-3'}>
         <p role="status" aria-live="polite" className={live ? 'sr-only' : 'text-[13px] text-zinc-300 min-h-[1.25rem]'}>
           {status}
         </p>

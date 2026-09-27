@@ -199,6 +199,9 @@ const ALLOWED_IMPORTS = [
   /^src\/components\/ui\/Tabs$/,
   /^src\/components\/merchant\/profileIcons$/,
   /^src\/components\/merchant\/ProMerchantBadge$/,
+  // PREMIUM's community mark (0145) — the PRO badge's sibling: react, one icon
+  // and the language context, nothing of the merchant workspace.
+  /^src\/components\/merchant\/PremiumMemberBadge$/,
 ];
 
 function importsOf(rel: string): string[] {

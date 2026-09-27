@@ -314,7 +314,10 @@ export default function MembershipDiscountSection({
     );
   }
 
-  const tiers = (schema?.tiers ?? []).filter((t) => t !== 'plus');
+  // The tiers a DISCOUNT may name, as the server states them: PRO alone since
+  // PREMIUM's discounts ended (0145) — «حذف خيار خصم البريميوم في إضافة المنتج
+  // أو تعديله». An older server without `discount_tiers` still lists its tiers.
+  const tiers = (schema?.discount_tiers ?? schema?.tiers ?? []).filter((t) => t !== 'plus');
   const locked = !productId;
 
   return (

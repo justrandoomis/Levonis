@@ -350,3 +350,104 @@ export function parseSerialList(
   }
   return { rows: markDuplicates(rows), too_many: tooMany };
 }
+
+// ---------------------------------------------------------- label knowledge
+
+/**
+ * WHAT A SERIAL ALONE SAYS ABOUT THE MACHINE.
+ *
+ * A Bambu Lab device serial opens with a three-character model prefix that
+ * every unit of one printer family shares. The owner's own label proves the
+ * prefix that matters most here — `03919D580607841` on an «A1-Combo» box —
+ * and the others are the ones Bambu Lab's "find your serial number" pages
+ * show for each family.
+ *
+ * A PREFIX NAMES THE FAMILY, NEVER THE PRODUCT. The same A1 ships alone and as
+ * a Combo with an AMS lite, in several regional boxes, each with its own EAN;
+ * guessing between them would file a buyer's serial under the wrong product,
+ * and the warranty link would then refuse the very customer it was for. So the
+ * family only ever fills the «الموديل» column when nothing better is known —
+ * the product comes from the EAN (learned, or the known table below) or from
+ * the owner's one tap on «ربط بمنتج».
+ */
+const SERIAL_PREFIX_FAMILIES: ReadonlyArray<readonly [prefix: string, family: string]> = [
+  ['039', 'A1'],
+  ['030', 'A1 mini'],
+  ['01P', 'P1S'],
+  ['01S', 'P1P'],
+  ['00M', 'X1 Carbon'],
+];
+
+export interface ModelHint {
+  brand: string;
+  /** The family or model as the box names it: «A1», «A1 Combo». */
+  model: string;
+  /** Brand and model together, for a column: «Bambu Lab A1». */
+  label: string;
+  /** The printed model code when the label is a known one. */
+  model_code: string;
+  /** Where the hint came from: the EAN (a whole product) or the serial's prefix (a family). */
+  source: 'ean' | 'serial_prefix';
+}
+
+/** The printer family a device serial belongs to, from its prefix; null when unknown. */
+export function serialModelHint(serial: string): ModelHint | null {
+  const norm = normalizeSerial(serial);
+  if (!/^[0-9A-Z]{15}$/.test(norm)) return null;
+  const hit = SERIAL_PREFIX_FAMILIES.find(([prefix]) => norm.startsWith(prefix));
+  if (!hit) return null;
+  return { brand: 'Bambu Lab', model: hit[1], label: `Bambu Lab ${hit[1]}`, model_code: '', source: 'serial_prefix' };
+}
+
+/**
+ * Box EANs whose product the label itself states. An EAN is a whole product
+ * in one region (printer, bundle and plug), so it is the one code on the box
+ * that CAN name the product. Only labels the shop has actually seen belong
+ * here; every other EAN is learned the first time the owner files it
+ * (`resolveLabelProduct`).
+ */
+export const KNOWN_LABEL_EANS: Readonly<Record<string, { brand: string; model: string; model_code: string }>> = {
+  // The owner's photographed A1 Combo box (UK2), tests/fixtures/owner-label-a1-combo.pgm.gz.
+  '6977252425445': { brand: 'Bambu Lab', model: 'A1 Combo', model_code: 'PF002-A+SA005' },
+};
+
+/** The best hint a label offers: its EAN when the box is a known one, else the serial's family. */
+export function labelModelHint(input: { serial?: string | null; ean?: string | null }): ModelHint | null {
+  const ean = normalizeEan(input.ean ?? '') || '';
+  const known = ean ? KNOWN_LABEL_EANS[ean] : undefined;
+  if (known) return { brand: known.brand, model: known.model, label: `${known.brand} ${known.model}`, model_code: known.model_code, source: 'ean' };
+  return input.serial ? serialModelHint(input.serial) : null;
+}
+
+/** Words that sell a machine rather than name it. */
+const NOISE_WORDS = new Set(['bambu', 'lab', 'bambulab', '3d', 'printer', 'printers', 'طابعة', 'طابعه', 'ثلاثية', 'ثلاثيه', 'الأبعاد', 'الابعاد']);
+
+/**
+ * Words that make ANOTHER machine of the same family: «A1» is not «A1 mini»
+ * and not «A1 Combo». A product name carrying one the model does not is a
+ * different product.
+ */
+const SIBLING_WORDS = new Set(['mini', 'combo', 'pro', 'max', 'plus', 'lite', 'carbon', 'se', 'ultra', 'hybrid', 'kit', 'ams']);
+
+function nameTokens(text: string): string[] {
+  return String(text ?? '')
+    .toLowerCase()
+    // «A1mini», «P1S-Combo»: a glued sibling word still counts as its own word.
+    .replace(/([a-z0-9])(mini|combo)\b/g, '$1 $2')
+    .split(/[^a-z0-9؀-ۿ]+/)
+    .filter(Boolean);
+}
+
+/**
+ * Whether a catalogue product's name is exactly this model — every word of
+ * the model present, and no sibling word the model lacks. `A1 Combo` matches
+ * «Bambu Lab A1 Combo 3D Printer»; `A1` matches «Bambu Lab A1» and neither
+ * «A1 mini» nor «A1 Combo».
+ */
+export function modelMatchesProductName(model: string, productName: string): boolean {
+  const want = nameTokens(model).filter((t) => !NOISE_WORDS.has(t));
+  if (want.length === 0) return false;
+  const have = nameTokens(productName);
+  if (!want.every((t) => have.includes(t))) return false;
+  return !have.some((t) => SIBLING_WORDS.has(t) && !want.includes(t));
+}

@@ -294,9 +294,16 @@ test('a PRO price stored as an ADJUSTMENT still opens the panel', () => {
 });
 
 test('a typed ZERO is typed, through the resolver, not just through the label', () => {
-  const row: PriceFields = { ...EMPTY, prime_price_iqd: 0 };
-  assert.equal(rowCells(row, BENEATH).prime.mode, 'fixed', 'a typed 0 must not resolve as inherit');
+  const row: PriceFields = { ...EMPTY, pro_price_iqd: 0 };
+  assert.equal(rowCells(row, BENEATH).pro.mode, 'fixed', 'a typed 0 must not resolve as inherit');
   assert.equal(marksFor(row).length, 1);
+});
+
+test('PREMIUM has no box and no mark since 0145 — a stored PREMIUM price folds nothing open', () => {
+  // «حذف خيار خصم البريميوم»: PREMIUM carries no member price any more, so a
+  // value left over from before is not an override the row can hide.
+  const row: PriceFields = { ...EMPTY, prime_price_iqd: 850_000 };
+  assert.deepEqual(marksFor(row), []);
 });
 
 test('the folded label must NOT be built from rowCharges — it would brand every row', () => {
@@ -319,27 +326,27 @@ test('the folded label must NOT be built from rowCharges — it would brand ever
   assert.doesNotMatch(options, /iqd: cells\[f\]\.effective/, 'the fold is printing the stored value again, not the charged one');
 });
 
-test('the folded line never names a number the till does not take — an option PRIME of 0', () => {
+test('the folded line never names a number the till does not take — an option PRO of 0', () => {
   /**
    * The rung carry, which PriceCells documents on `level`: `memberAtRung` drops
    * a member price that lands at zero or below, so the SAME typed 0 means two
    * different things one rung apart.
    *
-   *   OPTION, prime 0 -> cells.fixed/0, charges 900,000 viaRegular  (0 is erased)
-   *   COLOUR, prime 0 -> cells.fixed/0, charges 0                   (0 is charged)
+   *   OPTION, pro 0 -> cells.fixed/0, charges 900,000 viaRegular  (0 is erased)
+   *   COLOUR, pro 0 -> cells.fixed/0, charges 0                   (0 is charged)
    *
    * Both rows must OPEN — the price is typed either way and rule 1 stands. But
-   * the folded line on the option row must not say «PRIME 0 د.ع» while the cell
+   * the folded line on the option row must not say «PRO 0 د.ع» while the cell
    * inside it says «تُحاسب بسعر البيع 900,000» and the customer pays 900,000.
    */
-  const row: PriceFields = { ...EMPTY, prime_price_iqd: 0 };
+  const row: PriceFields = { ...EMPTY, pro_price_iqd: 0 };
 
   const onOption = marksFor(row, 'option');
   assert.equal(onOption.length, 1, 'a typed 0 on an option stopped counting as typed — the panel would fold on it');
   assert.equal(onOption[0].iqd, null, 'the fold prints 0 for an option whose 0 the resolver erased');
   assert.match(render('option', onOption), /aria-expanded="true"/);
   // The fold and the cell must return the same verdict about the same row.
-  assert.equal(rowCharges(row, BENEATH, 'option').prime.viaRegular, true, 'the premise of this test no longer holds');
+  assert.equal(rowCharges(row, BENEATH, 'option').pro.viaRegular, true, 'the premise of this test no longer holds');
   assert.match(tierPriceSummary(onOption), /لا يُحتسب/, 'a typed-but-uncharged price reads as an unknown amount');
   assert.doesNotMatch(tierPriceSummary(onOption), /—/, 'a bare dash reads as "set, value unknown"');
 
@@ -351,14 +358,16 @@ test('the folded line never names a number the till does not take — an option 
 
 // ------------------------------------------------ 5. the three call sites
 
-test('only PRIME and PRO move; «السعر» and «التكلفة» are never inside the fold', () => {
+test('only PRO moves — PREMIUM has no box since 0145; «السعر» and «التكلفة» are never inside the fold', () => {
   const options = src(OPTIONS);
   const open = options.indexOf('<TierPriceDisclosure scope={level}');
   const close = options.indexOf('</TierPriceDisclosure>', open);
   assert.ok(open > 0 && close > open, 'the option/colour rows no longer use the fold');
   const folded = options.slice(open, close);
-  assert.match(folded, /label_ar="PRIME"/);
+  assert.doesNotMatch(folded, /label_ar="PRIME"/, 'the PREMIUM box is back');
   assert.match(folded, /label_ar="PRO"/);
+  // And PRO's box is hidden while PRO is paused (src/lib/proPause.ts).
+  assert.match(options.slice(open - 80, open), /\{!proPaused && \(/);
   assert.doesNotMatch(folded, /label_ar="السعر"/, 'the regular price was folded away');
   assert.doesNotMatch(folded, /label_ar="التكلفة"/, 'the cost was folded away');
   // Regular stays ABOVE the fold, cost BELOW it: the reading order is unchanged.
@@ -395,13 +404,15 @@ test('both row levels and the product pair all use the one control', () => {
   assert.match(form, /<TierPriceDisclosure\s+scope="product"/, 'the product pair is not behind the fold');
   // The product row is the ONE rung with no adjustment column, so `!== null` is
   // the honest gate here and nowhere else.
-  assert.match(form, /doc\.prime_price_iqd !== null \? \{ label: 'PRIME', iqd: doc\.prime_price_iqd \} : null/);
+  assert.doesNotMatch(form, /label: 'PRIME'/, 'PREMIUM carries no price since 0145');
   assert.match(form, /doc\.pro_price_iqd !== null \? \{ label: 'PRO', iqd: doc\.pro_price_iqd \} : null/);
   // The panel that explains the precedence is still fed the same typed prices,
   // and the fields it names still carry their own note.
   assert.match(form, /typedMemberPrice=\{\{ prime: doc\.prime_price_iqd, pro: doc\.pro_price_iqd \}\}/);
-  assert.match(form, /ar="سعر LEVO PRIME"/);
+  assert.doesNotMatch(form, /ar="سعر LEVO PRIME"/);
   assert.match(form, /ar="سعر LEVO PRO"/);
+  // «السعر العادي/الاعتيادي» is «السعر» now (owner, 2026-09-27).
+  assert.match(form, /ar="السعر"\s+en="Price"/);
 });
 
 test('the fold survives a reduced-motion admin without losing the state change', () => {

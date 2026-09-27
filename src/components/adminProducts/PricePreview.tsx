@@ -12,6 +12,7 @@ import type { ProductDocV2 } from '../../lib/productTypes';
 import type { QuoteResponse } from './types';
 import { hasRelationStructure, type RelationsState } from './form/model';
 import { L, Section, inputCls } from './ui';
+import { useProPaused } from '../../lib/proPause';
 
 const ERROR_AR: Record<string, string> = {
   OPTION_NOT_FOUND: 'الخيار غير موجود',
@@ -59,6 +60,10 @@ export default function PricePreview({
   const [transport, setTransport] = useState('');
   const [warrantyId, setWarrantyId] = useState('');
   const [tier, setTier] = useState<'free' | 'prime' | 'pro'>('free');
+  // PREMIUM carries no member price since 0145, and PRO is previewed only
+  // while it is on sale — the same two rules as the form's fields.
+  const proPaused = useProPaused();
+  const tierChoices: Array<'free' | 'pro'> = proPaused ? ['free'] : ['free', 'pro'];
   const [quote, setQuote] = useState<QuoteResponse['quote'] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -150,7 +155,7 @@ export default function PricePreview({
         <div>
           <L ar="الفئة" en="Tier" />
           <div className="flex rounded-xl overflow-hidden border border-zinc-700">
-            {(['free', 'prime', 'pro'] as const).map((t) => (
+            {tierChoices.map((t) => (
               <button
                 key={t}
                 type="button"
@@ -159,7 +164,7 @@ export default function PricePreview({
                   tier === t ? 'bg-[#6B46FF] text-snow' : 'bg-zinc-800/40 text-zinc-400 hover:text-white'
                 }`}
               >
-                {t === 'free' ? 'عادي' : t === 'prime' ? 'PRIME' : 'PRO'}
+                {t === 'free' ? 'الزبون' : 'PRO'}
               </button>
             ))}
           </div>
@@ -187,13 +192,15 @@ export default function PricePreview({
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-            <Row ar="السعر العادي" en="regular" v={formatIqd(quote.regular_iqd)} />
-            <Row
-              ar="سعر PRO"
-              en="pro"
-              v={quote.pro_iqd === null ? 'لا خصم (لا سعر صريح ولا سياسة) / none' : formatIqd(quote.pro_iqd)}
-              dim={quote.pro_iqd === null}
-            />
+            <Row ar="السعر" en="price" v={formatIqd(quote.regular_iqd)} />
+            {!proPaused && (
+              <Row
+                ar="سعر PRO"
+                en="pro"
+                v={quote.pro_iqd === null ? 'لا خصم (لا سعر صريح ولا سياسة) / none' : formatIqd(quote.pro_iqd)}
+                dim={quote.pro_iqd === null}
+              />
+            )}
             <Row
               ar="السعر المطبق"
               en={`applied (${quote.applied_tier})`}
@@ -211,9 +218,6 @@ export default function PricePreview({
                       ? 'الخيار / option'
                       : 'الأساسي / base'
             } />
-            {quote.prime_iqd !== null && (
-              <Row ar="سعر PRIME" en="PRIME price" v={formatIqd(quote.prime_iqd)} />
-            )}
             {quote.transport && (
               <Row
                 ar={`عمولة الشحن (${METHOD_AR[quote.transport.method] ?? quote.transport.method})`}

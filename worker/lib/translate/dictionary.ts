@@ -709,4 +709,80 @@ export const PHRASES: Record<string, TermEntry> = {
   'easy': { ar: 'سهل', ckb: 'ئاسان' },
   'moderate': { ar: 'متوسط', ckb: 'مامناوەند' },
   'difficult': { ar: 'صعب', ckb: 'ئەستەم' },
+
+  // ------------------------------------------------------ 0147 (2026-09-27)
+  // «أضف حقول عند الحاجة في الأقسام الفرعية خاصة الفلامنت والـAMS وملحقات
+  // الطابعات، وحقول مختلفة في قسم المستعمل». Every label and select option the
+  // new groups in templateFamilies.ts added, in Arabic. No Sorani is recorded
+  // for them (DECISIONS row 11: never machine-written) — they stay English for
+  // a Sorani reader and are flagged for the owner's hand, as the 2026-09-26
+  // round is (tests/templateLanguageTriples.test.ts, SORANI_PENDING).
+  //
+  // AMS & multi-material
+  'slots': { ar: 'عدد الخانات' },
+  'max chained units': { ar: 'أقصى عدد وحدات متصلة' },
+  'filament drying': { ar: 'تجفيف الفلامنت' },
+  'max drying temperature': { ar: 'أقصى حرارة تجفيف' },
+  'humidity sensor': { ar: 'حساس الرطوبة' },
+  'rfid spool reading': { ar: 'قراءة بيانات البكرة (RFID)' },
+  'unsupported filaments': { ar: 'فلامنتات غير مدعومة' },
+  'supported spool sizes': { ar: 'مقاسات البكرات المدعومة' },
+  // Hotend & nozzle
+  'copper alloy': { ar: 'سبيكة نحاس' },
+  'flow type': { ar: 'نوع التدفق' },
+  'standard flow': { ar: 'تدفق قياسي' },
+  'high flow': { ar: 'تدفق عالٍ' },
+  'abrasive filaments': { ar: 'يدعم المواد الكاشطة' },
+  'quick swap': { ar: 'تبديل سريع' },
+  // Build plates
+  'plate size': { ar: 'مقاس اللوح' },
+  'plate surface': { ar: 'سطح اللوح' },
+  'textured pei': { ar: 'PEI محبب' },
+  'smooth pei': { ar: 'PEI أملس' },
+  'cool plate': { ar: 'لوح بارد' },
+  'engineering plate': { ar: 'لوح هندسي' },
+  'high temperature plate': { ar: 'لوح للحرارة العالية' },
+  'double-sided': { ar: 'وجهان' },
+  'max plate temperature': { ar: 'أقصى حرارة للوح' },
+  // Filament
+  'ams compatible': { ar: 'متوافق مع AMS' },
+  'rfid tag': { ar: 'شريحة RFID' },
+  'empty spool weight': { ar: 'وزن البكرة الفارغة' },
+  'filament length': { ar: 'طول الفلامنت' },
+  'max recommended print speed': { ar: 'أقصى سرعة طباعة موصى بها' },
+  'tensile strength': { ar: 'مقاومة الشد' },
+  'heat deflection temperature': { ar: 'مقاومة الحرارة (HDT)' },
+  'elongation at break': { ar: 'الاستطالة عند الكسر' },
+  'shore hardness': { ar: 'صلابة شور' },
+  'enclosure needed': { ar: 'يحتاج حجرة مغلقة' },
+  'recommended': { ar: 'موصى به' },
+  'hardened nozzle needed': { ar: 'يحتاج نوزل مقوّى' },
+  'part cooling': { ar: 'تبريد القطعة' },
+  // «المستعمل»
+  'time in use': { ar: 'مدة الاستخدام' },
+  'cosmetic condition': { ar: 'الحالة الشكلية' },
+  'no marks': { ar: 'بلا آثار' },
+  'light marks': { ar: 'آثار خفيفة' },
+  'visible marks': { ar: 'آثار واضحة' },
+  'functional check': { ar: 'فحص التشغيل' },
+  'full test passed': { ar: 'اجتاز الفحص الكامل' },
+  'basic test passed': { ar: 'اجتاز الفحص الأساسي' },
+  'not tested': { ar: 'لم يُفحص' },
+  'original box': { ar: 'العلبة الأصلية' },
+  'replaced parts': { ar: 'قطع مستبدلة' },
+  'filament used': { ar: 'الفلامنت المستهلك' },
+  'nozzle condition': { ar: 'حالة النوزل' },
+  'good': { ar: 'جيدة' },
+  'worn': { ar: 'مستهلكة' },
+  'calibrated after inspection': { ar: 'معايرة بعد الفحص' },
+  'firmware version': { ar: 'نسخة البرنامج الثابت' },
+  // The comparison's «الحالة» rows (worker/lib/compareSpecs.ts): the condition
+  // kinds and the grade ladder of worker/lib/condition.ts, as options. The
+  // grades describe «الحالة», so they agree with it in the feminine.
+  'open box': { ar: 'علبة مفتوحة' },
+  'used': { ar: 'مستعمل' },
+  'refurbished': { ar: 'مُجدَّد' },
+  'like new': { ar: 'كالجديدة' },
+  'excellent': { ar: 'ممتازة' },
+  'fair': { ar: 'مقبولة' },
 };

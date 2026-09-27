@@ -117,16 +117,20 @@ test('on a straight tie it is the LATER column that goes — the one just added'
 
 test('a product whose branch states no type is not refused — «not stated» is not «different»', async () => {
   const raw = seed();
-  // «others» carries no product type, which is exactly the corner of the
-  // taxonomy that would become uncomparable if `null` were read as a conflict.
+  // A shelf the owner made by hand with no template family, and a product
+  // with none of its own: nothing names a type — exactly the corner of the
+  // taxonomy that would become uncomparable if `null` were read as a
+  // conflict. (MakerWorld's «أخرى» used to stand in for this; since 0147 it
+  // is an accessory shelf, templateFamilies.ts.)
+  raw.exec(`INSERT INTO catalogs (id, parent_id, slug, name_ar, name_en, sort) VALUES ('cat_misc', NULL, 'misc-shelf', 'متفرقات', 'Misc', 99)`);
   raw
     .prepare(
       `INSERT INTO products (id,slug,name,name_ar,name_ku,price_iqd,status,stock,options,colors,
          selling_type,sale_types,preorder_transports,images,inventory_mode,ops_policy,spec_fields,
          template_family,category_id)
-       VALUES ('x_a','thing','Thing','Thing','',50000,'active',5,'[]','[]','direct_sale','["direct_sale"]','[]','[]','BASE','{}',?,'devices',?)`
+       VALUES ('x_a','thing','Thing','Thing','',50000,'active',5,'[]','[]','direct_sale','["direct_sale"]','[]','[]','BASE','{}',?,NULL,?)`
     )
-    .run(JSON.stringify({ weight_g: '20' }), shelfId(raw, 'others'));
+    .run(JSON.stringify({ weight_g: '20' }), 'cat_misc');
   const res = await compare(raw, 'p_a,x_a');
   assert.equal(res.status, 200, 'an unclassified product is still comparable');
 });

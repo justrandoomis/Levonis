@@ -48,6 +48,7 @@ import { downloadAdminFile, DownloadError } from './download';
 import { readIssueText, readIssueEntry, bucketise, issueWhere, type ImportIssue } from './importIssues';
 import type { ParseResponse, ApplyResponse, ApplySpecReport, ZipParseResponse, DuplicateChoice } from './types';
 import { applyFailure, applyOutcome, verificationLine, type ApplyOutcome, type VerificationWords } from './applyResult';
+import { sectionTreeOrder } from '../../../packages/catalog/src/sectionTree';
 
 // ------------------------------------------------------------------ strings
 
@@ -72,6 +73,7 @@ const STRINGS = {
     anyType: 'كل الأنواع',
     pickTypeFirst: 'اختر نوع المنتج أولًا.',
     sectionPlaceholder: 'اختر قسمًا…',
+    sectionMain: '{name} — القسم الرئيسي',
     sectionOptional: 'اختياري للاستيراد، لكنه يخصص صفوف قالب TXT حسب القسم.',
     noFamily: 'هذا القسم بلا عائلة قالب. حدّدها (أجهزة أو مواد) من إدارة الأقسام أولًا.',
 
@@ -189,6 +191,7 @@ const STRINGS = {
     anyType: 'All types',
     pickTypeFirst: 'Choose a product type first.',
     sectionPlaceholder: 'Choose a section…',
+    sectionMain: '{name} — main section',
     sectionOptional: 'Optional for import; selecting it tailors the TXT template rows to that section.',
     noFamily: 'This section has no template family. Set it to Devices or Materials in the sections admin first.',
 
@@ -313,6 +316,8 @@ interface Catalog {
   effective_template_family: 'devices' | 'materials' | null;
   product_type: ProductTypeId | null;
   product_count: number;
+  /** The main section this one files under (worker/routes/adminTaxonomy.ts). */
+  root_id?: string;
   /**
    * What THIS section's template actually carries, narrowed — not the product
    * type's union. See the note beside the section select: the panel used to
@@ -332,7 +337,19 @@ interface TypeChoice {
 }
 
 interface Lookups {
-  sections: Array<{ id: string; slug: string; name_en: string; name_ar: string; parent_id: string | null; parent_name_en: string; family: string | null }>;
+  sections: Array<{
+    id: string;
+    slug: string;
+    name_en: string;
+    name_ar: string;
+    parent_id: string | null;
+    parent_name_en: string;
+    family: string | null;
+    /** Tree placement (worker/lib/lookups.ts); absent on an older server. */
+    root_id?: string;
+    path_ar?: string;
+    path_en?: string;
+  }>;
   brands: Array<{ id: string; slug: string; name_en: string; name_ar: string }>;
   hashtags: Array<{ tag: string; name_ar: string }>;
 }
@@ -539,12 +556,26 @@ export default function ImportPanel({
   const effectiveType: ProductTypeId | '' = typeId || section?.product_type || '';
   const isTable = format !== 'txt';
 
-  const label = (c: Catalog) => {
-    const parent = c.parent_id ? byId.get(c.parent_id) : undefined;
-    const own = lang === 'en' ? c.name_en || c.name_ar : c.name_ar || c.name_en;
-    const head = parent ? `${lang === 'en' ? parent.name_en || parent.name_ar : parent.name_ar || parent.name_en} › ` : '';
-    return `${head}${own}`;
-  };
+  const nameOf = (c: Catalog) => (lang === 'en' ? c.name_en || c.name_ar : c.name_ar || c.name_en) || c.slug;
+
+  /**
+   * THE SELECT IS THE TREE (packages/catalog/src/sectionTree.ts): one group per
+   * main section, its own sub-sections under it, deeper levels indented. The
+   * list used to follow `sort` across the whole table, so sub-sections printed
+   * above their parents and two parents' children interleaved — the owner's
+   * «الأقسام الرئيسية والفرعية متداخلة». A main section whose own row is not
+   * offered (another type) still heads its group, so a child is never shown
+   * without the branch it belongs to.
+   */
+  const sectionGroups = useMemo(() => {
+    const offered = new Set(options.map((c) => c.id));
+    const groups: Array<{ root: Catalog; items: Array<{ c: Catalog; depth: number }> }> = [];
+    for (const p of sectionTreeOrder(catalogs)) {
+      if (p.depth === 0) groups.push({ root: p.row, items: [] });
+      if (offered.has(p.row.id)) groups[groups.length - 1]?.items.push({ c: p.row, depth: p.depth });
+    }
+    return groups.filter((g) => g.items.length > 0);
+  }, [catalogs, options]);
 
   // ------------------------------------------------------------ downloads
 
@@ -736,8 +767,14 @@ export default function ImportPanel({
             className={inputCls + ' w-full sm:w-auto sm:min-w-[18rem] max-w-full'}
           >
             <option value="">{t.sectionPlaceholder}</option>
-            {options.map((c) => (
-              <option key={c.id} value={c.id}>{label(c)}</option>
+            {sectionGroups.map((g) => (
+              <optgroup key={g.root.id} label={nameOf(g.root)} data-section-root={g.root.id}>
+                {g.items.map(({ c, depth }) => (
+                  <option key={c.id} value={c.id}>
+                    {depth === 0 ? fill(t.sectionMain, { name: nameOf(c) }) : `${'\u00a0\u00a0'.repeat(depth - 1)}${depth > 1 ? '↳ ' : ''}${nameOf(c)}`}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>
@@ -1504,9 +1541,17 @@ function LookupsBox({ lookups, section, lang, t }: { lookups: Lookups; section?:
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState('');
   const isEn = lang === 'en';
-  const rootId = section ? (section.parent_id ?? section.id) : null;
+  const rootId = section ? (section.root_id ?? section.parent_id ?? section.id) : null;
   const roots = lookups.sections.filter((s) => !s.parent_id);
-  const subs = lookups.sections.filter((s) => !!s.parent_id && (!rootId || s.parent_id === rootId));
+  // In TREE order from the server, each sub-section under its own main one.
+  // Without a chosen section the chip names the whole branch — «الطابعات ›
+  // طابعات FDM» — never the parent alone, which read as a main section listed
+  // twice among the sub-sections.
+  const subs = lookups.sections.filter((s) => !!s.parent_id && (!rootId || (s.root_id ?? s.parent_id) === rootId));
+  const subLabel = (s: Lookups['sections'][number]) =>
+    rootId
+      ? isEn ? s.name_en : s.name_ar || s.name_en
+      : isEn ? s.path_en ?? `${s.parent_name_en} › ${s.name_en}` : s.path_ar ?? (s.name_ar || s.name_en);
   const copy = async (v: string) => {
     try {
       await navigator.clipboard.writeText(v);
@@ -1562,7 +1607,7 @@ function LookupsBox({ lookups, section, lang, t }: { lookups: Lookups; section?:
           </div>
           <div>
             <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkSub}</h5>
-            {chips(subs.map((s) => ({ key: s.id, value: s.slug, label: rootId ? (isEn ? s.name_en : s.name_ar || s.name_en) : s.parent_name_en })), 'sub_category')}
+            {chips(subs.map((s) => ({ key: s.id, value: s.slug, label: subLabel(s) })), 'sub_category')}
           </div>
           <div>
             <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkBrand}</h5>

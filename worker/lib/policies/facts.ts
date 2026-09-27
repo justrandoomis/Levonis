@@ -48,7 +48,8 @@ const iqd = (amount: number): string => amount.toLocaleString('en-US');
  * (worker/lib/membershipBenefits.ts `selectRule`), and falls back to the
  * `shippingPolicy` setting only where no rule exists. Migration 0074 seeds
  * those rules — PRO strictly above 75,000 on standard and personal delivery,
- * PREMIUM strictly above 100,000 on standard delivery — and they are what
+ * PREMIUM strictly above 75,000 on standard delivery (migration 0145 moved it
+ * from 100,000) — and they are what
  * the subscription page shows. The PRO figure also matches
  * `shippingPolicy.pro_threshold_iqd`. tests/policyCorpus.test.ts reads the
  * seed back so a new seed cannot leave the documents promising the old one.
@@ -57,7 +58,7 @@ const iqd = (amount: number): string => amount.toLocaleString('en-US');
  * reads as PREMIUM (membership article 2.4), so both tokens carry one figure.
  */
 export const PRO_FREE_DELIVERY_MIN_IQD = 75000;
-export const PREMIUM_FREE_DELIVERY_MIN_IQD = 100000;
+export const PREMIUM_FREE_DELIVERY_MIN_IQD = 75000;
 
 export const POLICY_FACTS: Readonly<Record<string, PolicyText>> = {
   GOVERNING_LAW_JURISDICTION: {

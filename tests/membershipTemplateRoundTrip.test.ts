@@ -425,15 +425,7 @@ test('serializeProducts and parseImport are inverses for the membership block', 
         cap_scope: 'per_unit',
         max_quantity: null,
       },
-      {
-        tier: 'prime',
-        discount_mode: 'fixed',
-        percent: null,
-        fixed_iqd: 25_000,
-        max_discount_iqd: null,
-        cap_scope: null,
-        max_quantity: 2,
-      },
+      // (No PREMIUM rule: it carries no discount since 0145.)
     ],
     options: [],
     colors: [],
@@ -573,7 +565,7 @@ test('the TXT template writes the product rule, and says what it will do before 
   assert.equal(stored[0].product_id, applied.product_id ?? applied.product?.id);
   assert.equal(stored[0].percent, 10);
   assert.equal(stored[0].cap_scope, 'per_unit');
-  assert.equal(versions(raw), 2, 'the seeded version, then this one');
+  assert.equal(versions(raw), 3, 'the seeded version, 0145’s restructure, then this one');
   assert.equal(audits(raw), 1);
 });
 
@@ -595,9 +587,9 @@ test('the TXT export carries the rule, and re-applying that export changes nothi
   const exported = await res.text();
   assert.match(exported, /^membership\.pro\.percent=10$/m, 'the export states the rule it found');
   assert.match(exported, /^membership\.pro\.cap_scope=per_unit$/m);
-  // PREMIUM has no rule, so its keys ship EMPTY — never __NULL__, which would
-  // make the export a deletion order for a discount written tomorrow.
-  assert.match(exported, /^membership\.premium\.discount_mode=$/m);
+  // PREMIUM carries no discount since 0145, so it has no keys at all — and
+  // no key ships __NULL__, which would make the export a deletion order.
+  assert.doesNotMatch(exported, /^membership\.premium\./m);
   assert.ok(!/^membership\.[a-z]+\.[a-z_]+=__NULL__$/m.test(exported));
 
   const again = await txtApply(app, exported, 'update');
@@ -795,16 +787,25 @@ test('and the value ON the boundary is accepted by both, stored as a whole numbe
       'membership.pro.discount_mode': 'fixed',
       'membership.pro.fixed_iqd': String(MEMBERSHIP_MAX_IQD),
       'membership.pro.max_quantity': String(MEMBERSHIP_MAX_QUANTITY),
-      'membership.premium.discount_mode': 'percent',
-      'membership.premium.percent': String(MEMBERSHIP_MAX_PERCENT),
+    })
+  );
+  // The percent's own boundary, on a second product (PREMIUM, which used to
+  // carry it here, has no discount block since 0145).
+  await importSheet(
+    app,
+    sheet([...HEAD, ...MEMBERSHIP_COLUMNS], {
+      ...productCells('EDGE-2'),
+      'membership.pro.discount_mode': 'percent',
+      'membership.pro.percent': String(MEMBERSHIP_MAX_PERCENT),
     })
   );
   const stored = rules(raw);
   assert.equal(stored.length, 2, JSON.stringify(stored));
-  const pro = stored.find((r) => r.tier === 'pro')!;
+  const pro = stored.find((r) => r.discount_mode === 'fixed')!;
   assert.equal(pro.fixed_iqd, MEMBERSHIP_MAX_IQD);
   assert.equal(pro.max_quantity, MEMBERSHIP_MAX_QUANTITY);
-  assert.equal(stored.find((r) => r.tier === 'prime')!.percent, MEMBERSHIP_MAX_PERCENT);
+  assert.equal(stored.find((r) => r.discount_mode === 'percent')!.percent, MEMBERSHIP_MAX_PERCENT);
+  assert.ok(stored.every((r) => r.tier === 'pro'));
 
   // A dinar column that holds a REAL is a price that no longer adds up: a
   // twenty-digit cell used to land here as 1e20 and floor every member's

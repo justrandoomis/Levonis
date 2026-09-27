@@ -11,14 +11,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { freshDb, asD1, stubApp, post, count } from './fixtures/app';
+import { freshDb, asD1, stubApp, post, count, proOnSale } from './fixtures/app';
 import { kycRoutes } from '../worker/routes/kyc';
 import { isApprovedDefaultAddress, defaultAddressOf } from '../worker/lib/entitlements';
 
 const FUTURE = '2099-01-01T00:00:00.000Z';
 
 function setup(tier: 'pro' | 'prime' | null = 'pro') {
-  const raw = freshDb();
+  const raw = proOnSale(freshDb());
   raw.exec(`INSERT INTO users (id,email,password_hash) VALUES ('u1','u1@x.co','h')`);
   if (tier) {
     raw.exec(`INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at)

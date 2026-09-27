@@ -440,10 +440,10 @@ export const SETTING_DEFAULTS = {
     pro_threshold_iqd: 75000,     // STRICTLY greater-than qualifies (75,000 does NOT)
     threshold_basis: 'merchandise_after_coupon', // pending owner confirmation
     pro_waiver_covers: 'all',     // 'all' | 'ordinary_only' — pending owner confirmation
-    // LEVO PRIME (product-form mandate §5): the owner stated 150,000 IQD
-    // explicitly, so it is a real default, not a placeholder. STRICTLY
-    // greater-than qualifies (150,000 does NOT; 150,001 does).
-    prime_threshold_iqd: 150000,
+    // LEVO PREMIUM: «التوصيل العادي مجاني للمبلغ فوق 75 ألف» (owner,
+    // 2026-09-27; migration 0145 writes the stored row and the PREMIUM rule to
+    // the same figure). STRICTLY greater-than qualifies (75,000 does NOT).
+    prime_threshold_iqd: 75000,
     // §5 gives PRIME no PRO benefit beyond this waiver, so it covers the
     // ordinary delivery fee only — printer and carton surcharges stay payable.
     prime_waiver_covers: 'ordinary_only',

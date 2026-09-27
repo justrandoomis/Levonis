@@ -17,7 +17,7 @@ import { Overlay } from '../components/ui/Overlay';
  * 1. IT DISPLAYS. IT NEVER DECIDES. Every amount on this screen arrives from
  *    GET /api/rewards already computed by the server, base and credited. The
  *    old page multiplied the check-in ladder by two for anybody it considered
- *    "PRO" — which was wrong for a PREMIUM member (who earns 1.5×), wrong
+ *    "PRO" — which was wrong for a PREMIUM member (who earned 1.5× until 0145), wrong
  *    wherever 1.5× rounds, and wrong the moment a subscription lapsed. There is
  *    now no arithmetic here at all.
  *
@@ -95,6 +95,8 @@ interface RewardsData {
     expires_at: string | null;
     applies_to: string[];
   };
+  /** How points are earned, from the server (0146). Absent on an older server. */
+  earning?: { iqd_per_point: number; checkin_top_rung: number };
   history: HistoryRow[];
   is_pro: boolean;
 }
@@ -457,10 +459,15 @@ export default function Rewards() {
                         'يُطبَّق على تسجيل الدخول اليومي والمهام والشراء والتقييمات. المُضاعِف يُثبَّت لحظة منح النقاط، فانتهاء الاشتراك لاحقًا لا يغيّر ما رَبِحته.',
                         'Applied to daily check-in, missions, purchases and reviews. The multiplier is frozen at the moment each award is made, so a subscription that later ends never changes what you already earned.'
                       )
-                    : loc(
-                        'اشتراك بريميوم يمنح 1.5× واشتراك برو يمنح 2× على تسجيل الدخول والمهام والشراء والتقييمات.',
-                        'PREMIUM earns 1.5× and PRO earns 2× on check-in, missions, purchases and reviews.'
-                      )}
+                    : data?.earning
+                      ? loc(
+                          `نقطة واحدة عن كل ${data.earning.iqd_per_point.toLocaleString('en-US')} د.ع من مشترياتك، وتسجيل الدخول اليومي يبدأ بنقطة ويزيد نقطة كل يوم متتالٍ حتى ${data.earning.checkin_top_rung} نقاط.`,
+                          `One point for every ${data.earning.iqd_per_point.toLocaleString('en-US')} IQD you spend, and the daily check-in starts at one point and climbs by one each consecutive day, up to ${data.earning.checkin_top_rung}.`
+                        )
+                      : loc(
+                          'يُطبَّق على تسجيل الدخول اليومي والمهام والشراء والتقييمات.',
+                          'Applies to daily check-in, missions, purchases and reviews.'
+                        )}
                 </p>
                 {boosted && multiplier.expires_at && (
                   <p className="text-zinc-400 text-[11px] mt-2">

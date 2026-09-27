@@ -97,6 +97,8 @@ export default function Subscription() {
    * then states nothing rather than a figure nobody enforces.
    */
   const [benefits, setBenefits] = useState<PlanBenefits | null>(null);
+  /** PRO paused (migration 0145): its card reads «قريبًا» and nothing about it is sold. */
+  const [proPauseFlag, setProPauseFlag] = useState(false);
   const [plansNonce, setPlansNonce] = useState(0);
   const reloadPlans = useCallback(() => setPlansNonce((n) => n + 1), []);
 
@@ -112,6 +114,7 @@ export default function Subscription() {
         setBenefits(data.benefits ?? null);
         setContract(data.entitlement_contract ?? null);
         setPoints(data.points_multiplier_x100 ?? null);
+        setProPauseFlag(!!data.pro_pause?.paused);
       })
       .catch((e: unknown) => {
         // A failed fetch is an error, not an empty catalogue.
@@ -158,6 +161,15 @@ export default function Subscription() {
       : null;
   const pending = mine?.status.pending_launch ?? null;
   const gatedBenefits = mine?.status.gated_benefits ?? [];
+  /** The member's PRO card while PRO is paused — frozen, its days kept. */
+  const pausedPro = mine?.status.paused ?? null;
+  const proPaused = proPauseFlag || (plans || []).some((p) => p.tier === 'pro' && p.paused);
+  /**
+   * The tier the cards measure against. A frozen PRO member ACTS AS PREMIUM
+   * meanwhile, but PREMIUM is not the card they own: measured as PRO, the
+   * PREMIUM card reads «مشمولة في بطاقتك» instead of «باقتك الحالية».
+   */
+  const standingTier: AnyTier = pausedPro ? 'pro' : currentTier;
 
   // ----------------------------------------------------------- selection
   /** Tier order follows the server's own `sort` column, so the owner reorders
@@ -186,18 +198,20 @@ export default function Subscription() {
     for (const tier of ['plus', 'prime', 'pro'] as const) {
       const sellable = plansOf(tier).some((p) => p.purchasable);
       out[tier] =
-        currentTier === tier
-          ? 'current'
-          : TIER_ORDER[tier] < TIER_ORDER[currentTier]
-            ? 'included'
-            : !sellable
-              ? 'tba'
-              : isPaidTier(currentTier)
-                ? 'upgrade'
-                : 'open';
+        tier === 'pro' && proPaused
+          ? 'soon'
+          : standingTier === tier
+            ? 'current'
+            : TIER_ORDER[tier] < TIER_ORDER[standingTier]
+              ? 'included'
+              : !sellable
+                ? 'tba'
+                : isPaidTier(standingTier)
+                  ? 'upgrade'
+                  : 'open';
     }
     return out;
-  }, [currentTier, plansOf]);
+  }, [standingTier, plansOf, proPaused]);
 
   // NOT ALWAYS PRO — see pickDefaultTier.
   const defaultTier = useMemo(
@@ -381,6 +395,7 @@ export default function Subscription() {
   };
 
   const plansReady = plans !== null && !plansError && tiers.length > 0;
+  const compareTiers = tiers.filter((tier) => !(tier === 'pro' && proPaused));
 
   return (
     <div className="w-full flex-1 bg-canvas text-text-secondary">
@@ -391,6 +406,7 @@ export default function Subscription() {
           tier={currentTier}
           expiresAt={currentExpiry}
           pending={pending}
+          paused={pausedPro}
           onManage={() => goTo(membershipRef)}
         />
 
@@ -415,27 +431,30 @@ export default function Subscription() {
         {plansReady && (
           <div className="mt-6 lg:mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
             <div className="min-w-0 space-y-8">
-              {/* 3. The duration, where there is a choice */}
-              <PlanPicker
-                tier={activeTier}
-                tierPlans={tierPlans}
-                selectedPlanId={selectedPlan?.id ?? ''}
-                onSelectPlan={(id) => {
-                  setChosenTier(activeTier);
-                  setChosenPlan(id);
-                }}
-              />
+              {/* 3. The duration, where there is a choice — never for a paused tier */}
+              {standing[activeTier] !== 'soon' && (
+                <PlanPicker
+                  tier={activeTier}
+                  tierPlans={tierPlans}
+                  selectedPlanId={selectedPlan?.id ?? ''}
+                  onSelectPlan={(id) => {
+                    setChosenTier(activeTier);
+                    setChosenPlan(id);
+                  }}
+                />
+              )}
 
-              {/* 4. The comparison */}
+              {/* 4. The comparison — a paused tier has no column: its benefits
+                  are withheld until it returns («إخفاء المميزات وكتابة فقط قريبًا»). */}
               <CompareMatrix
-                tiers={tiers}
+                tiers={compareTiers}
                 plans={plans}
                 contract={contract?.tiers ?? null}
                 benefits={benefits}
                 features={features}
                 points={points ?? null}
                 currentTier={currentTier}
-                selectedTier={activeTier}
+                selectedTier={compareTiers.includes(activeTier) ? activeTier : compareTiers[compareTiers.length - 1] ?? activeTier}
                 loading={false}
                 headingRef={compareRef}
               />

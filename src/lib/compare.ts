@@ -58,6 +58,8 @@ export interface CompareValue {
   missing: boolean;
   axes?: number[];
   items?: string[];
+  /** The value in the reader's language when the store's dictionary holds all of it. */
+  i18n?: { ar?: string; ckb?: string };
 }
 
 export interface CompareRow {

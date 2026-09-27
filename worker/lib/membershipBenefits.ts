@@ -36,7 +36,8 @@ import {
   type TaxBenefit,
 } from '@levonis/pricing/membershipBenefits';
 import type { MemberFallback, Tier } from '@levonis/pricing/pricing';
-import { hasEntitlement, type MembershipEntitlement, type TierStatus } from './entitlements';
+import { ENTITLEMENT_MINIMUM_TIER, hasEntitlement, type MembershipEntitlement, type TierStatus } from './entitlements';
+import { TIER_RANK } from './pricing';
 import { auditStatements } from './audit';
 import { newId } from './crypto';
 
@@ -370,6 +371,20 @@ const GATE: Record<BenefitType, { pro: MembershipEntitlement; prime: MembershipE
   free_shipping: { pro: 'freeDelivery', prime: 'premiumDelivery' },
   cod_tax_exemption: { pro: 'codTaxExemption', prime: 'codTaxExemption' },
 };
+
+/**
+ * Whether a rule written for this tier could EVER apply: the tier holds the
+ * entitlement its benefit is gated on. PLUS holds none of them, and since
+ * 2026-09-27 PREMIUM holds only free delivery — «اشتراك البريميوم لا يحمل
+ * خصومات» (migration 0145) — so a PREMIUM discount or COD-exemption rule
+ * would save cleanly and then do nothing at every checkout, forever. The
+ * rules door and the product import both refuse to write one.
+ */
+export function tierHoldsBenefit(tier: 'plus' | 'prime' | 'pro', type: BenefitType): boolean {
+  if (tier === 'plus') return false;
+  const minimum = ENTITLEMENT_MINIMUM_TIER[GATE[type][tier]];
+  return (TIER_RANK[tier] ?? 0) >= (TIER_RANK[minimum] ?? 99);
+}
 
 function entitled(status: TierStatus, type: BenefitType): boolean {
   if (!status.active) return false;
@@ -803,6 +818,10 @@ export async function planProductMembershipRules(
     const matching = productRows
       .filter((rule) => rule.tier === item.tier)
       .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
+
+    // A rule this tier can never use is not written (a PREMIUM discount since
+    // 0145); removing one that is left over is still allowed.
+    if (!item.remove && !tierHoldsBenefit(item.tier, 'product_discount')) continue;
 
     if (item.remove) {
       for (const before of matching) {

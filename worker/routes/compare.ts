@@ -68,6 +68,7 @@ import {
 } from '../lib/templateFamilies';
 import { readNumber, type CompareResult } from '../lib/compareSpecs';
 import { compareWithLenses } from '../lib/compareLenses';
+import { parseConditionDoc } from '../lib/condition';
 import { adviseFromSpecs, type PowerAdvice } from '../lib/powerAdvice';
 import { loadAuthoritativeProductImages, loadLightProductImages } from '../lib/productSelectionImage';
 import { parseProductRow } from '../lib/productModel';
@@ -706,6 +707,8 @@ compareRoutes.get('/', async (c) => {
       spec_fields: sheets[i],
       // The price of the CONFIGURATION, from the product page's resolver.
       price_iqd: priceOf(i),
+      // Open box / used / refurbished: the table opens with «الحالة» (0147).
+      condition: parseConditionDoc(p.row.condition_doc),
     })),
   });
 

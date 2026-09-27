@@ -1,534 +1,576 @@
 /**
- * «إضافة أرقام تسلسلية» — three ways to fill the serial inventory, one filing.
+ * «إضافة أرقام تسلسلية» — ONE BUTTON, THEN A CHOICE.
  *
- *  - ONE SERIAL: type it (with its box SN and EAN when at hand) and add.
- *  - A LIST: paste one per line or CSV; «معاينة» asks the server what each
- *    line would do (new, already there, repeated, invalid — and why), and
- *    only then «حفظ» commits. The server re-checks everything on commit; the
- *    preview is advice, never trusted.
- *  - CAMERA: continuous scanning of box labels. Each label adds a row (the
- *    product SN, plus the box SN and EAN when they were in view), beeps and
- *    keeps going; a repeated label buzzes twice and adds nothing. The rows
- *    stay on screen, removable, until «حفظ الكل». The EAN also teaches the
- *    screen which product this is: the first time the owner files an EAN
- *    under a product, every later label with that EAN picks it by itself.
+ * The owner: «عند الضغط على إضافة أرقام تسلسلية … نافذة منبثقة من الأسفل على
+ * تصميم أبل ديزاين يختار: الكاميرا أو الإدخال يدويًا. عند الضغط على الكاميرا
+ * يفتح الكاميرا بنافذة منبثقة … وإضافة صوت نجاح عند تسجيل الطابعة بنجاح، وإذا
+ * رجع مرة ثانية يسجل طابعة مسجلة مسبقًا يظهر صوت خطأ واهتزاز».
+ *
+ *  1. THE CHOICE is an action sheet from the bottom edge at every width (the
+ *     «اللغة والمظهر» sheet's clothes — the owner works on an iPad): two
+ *     grouped rows, Camera first, and a separate Cancel under them.
+ *  2. CAMERA is a tall sheet around the continuous scanner. A label is not a
+ *     row waiting for «حفظ الكل» any more: it is REGISTERED the moment it is
+ *     read (POST /scan), and the sound is the server's verdict — the success
+ *     chime for a printer that was just stored, the error tone and a buzz for
+ *     one the inventory already holds (or that this session already scanned),
+ *     with when and by whom it was added. The product is the label's own
+ *     (a learned or known EAN) unless the owner picks one; a box the store
+ *     cannot place is still registered, and «حدّد المنتج» files every serial
+ *     of that EAN at once — after which the camera recognises it by itself.
+ *  3. MANUAL is a sheet with one serial or a pasted list (ManualEntry).
+ *
+ * Nothing in the camera sheet is unsaved, so closing it never asks; the
+ * manual sheet asks only while a pasted list is waiting.
  */
-import React, { Suspense, useCallback, useRef, useState } from 'react';
-import { Camera, ClipboardList, Hash, Plus, Save, Trash2, X } from 'lucide-react';
+import React, { Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { AlertTriangle, Camera, Check, ChevronLeft, ChevronRight, Keyboard, Link2, ScanLine, X } from 'lucide-react';
 import * as T from '../../adminProducts/theme';
-import { TabPanels, TabStrip } from '../../ui/Tabs';
+import { useLanguage } from '../../../LanguageContext';
+import { useMotion } from '../../../lib/motion';
+import { Overlay, Sheet } from '../../ui/Overlay';
+import { Segmented } from '../../ui/Segmented';
 import { useToast } from '../../ui/Toast';
-import { useConfirm } from '../../ui/ConfirmDialog';
-import { serialProblem, normalizeSerial } from '../../../../packages/catalog/src/deviceSerials';
-import { primeScannerAudio, type ScanFeedback } from '../../scanner/feedback';
+import ProductPicker from '../../adminProducts/form/ProductPicker';
+import { normalizeSerial, serialProblem } from '../../../../packages/catalog/src/deviceSerials';
+import { primeScannerAudio, scanFeedback, type ScanFeedback } from '../../scanner/feedback';
 import type { ScanRead } from '../../scanner/BarcodeScanner';
-import FilingFields, { EMPTY_FILING, type FilingState } from './FilingFields';
-import {
-  inventoryApi,
-  refusalText,
-  type InventoryStrings,
-  type PreviewOutcome,
-  type PreviewResponse,
-  type ScanRowInput,
-} from './model';
+import ManualEntry from './ManualEntry';
+import LinkProductDialog, { type LinkTarget } from './LinkProductDialog';
+import { inventoryApi, refusalText, type InventoryRow, type InventoryStrings } from './model';
 
 const BarcodeScanner = React.lazy(() => import('../../scanner/BarcodeScanner'));
 
-type Mode = 'single' | 'bulk' | 'scan';
-const MODES: Mode[] = ['single', 'bulk', 'scan'];
-
-/** The 44px icon button of this panel (the .ap recipe is 32px; these are touch targets on a phone). */
+/** The 44px icon button of these panels (the .ap recipe is 32px; these are touch targets on a phone). */
 export const ICON_BTN_44 =
   'inline-flex items-center justify-center shrink-0 h-11 w-11 rounded-[var(--ap-radius-md)] text-[var(--ap-text-2)] transition-colors hover:text-[var(--ap-text-1)] hover:bg-[var(--ap-surface-2)] active:bg-[var(--ap-surface-3)] disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ap-ring)]';
 
-const TEXTAREA =
-  'w-full min-h-[160px] rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-2)] border border-[var(--ap-border)] px-3 py-2.5 text-[13px] leading-relaxed text-[var(--ap-text-1)] placeholder:text-[var(--ap-text-3)] transition-colors hover:border-[var(--ap-border-hover)] focus:outline-none focus:border-[var(--ap-accent)] focus:shadow-[0_0_0_3px_var(--ap-accent-soft)]';
+type Step = 'choose' | 'camera' | 'manual' | null;
 
-const OUTCOME_TONE: Record<PreviewOutcome | 'checking' | 'error', string> = {
-  new: 'text-[var(--ap-success)] bg-[var(--ap-success-bg)] border-[var(--ap-success-border)]',
-  new_assigned: 'text-[var(--ap-info)] bg-[var(--ap-info-bg)] border-[var(--ap-info-border)]',
-  exists: 'text-[var(--ap-warning)] bg-[var(--ap-warning-bg)] border-[var(--ap-warning-border)]',
-  duplicate_in_batch: 'text-[var(--ap-warning)] bg-[var(--ap-warning-bg)] border-[var(--ap-warning-border)]',
-  invalid: 'text-[var(--ap-danger)] bg-[var(--ap-danger-bg)] border-[var(--ap-danger-border)]',
-  checking: 'text-[var(--ap-text-3)] bg-[var(--ap-surface-2)] border-[var(--ap-border)]',
-  error: 'text-[var(--ap-danger)] bg-[var(--ap-danger-bg)] border-[var(--ap-danger-border)]',
-};
+type ItemState = 'saving' | 'added' | 'exists' | 'invalid' | 'error';
 
-interface ScanItem extends ScanRowInput {
+interface SessionItem {
   key: string;
   norm: string;
-  product_id: string;
-  variant_id: string;
-  state: PreviewOutcome | 'checking' | 'error';
-  problem?: string | null;
+  serial: string;
+  ean: string;
+  box_sn: string;
+  state: ItemState;
+  row: InventoryRow | null;
+  via: string | null;
+  hint: string | null;
+  needsProduct: boolean;
+  problem: string | null;
+  /** A repeat of a serial this session already registered. */
+  repeat?: boolean;
+}
+
+const STATE_TONE: Record<ItemState, string> = {
+  saving: 'text-[var(--ap-text-3)] bg-[var(--ap-surface-2)] border-[var(--ap-border)]',
+  added: 'text-[var(--ap-success)] bg-[var(--ap-success-bg)] border-[var(--ap-success-border)]',
+  exists: 'text-[var(--ap-danger)] bg-[var(--ap-danger-bg)] border-[var(--ap-danger-border)]',
+  invalid: 'text-[var(--ap-danger)] bg-[var(--ap-danger-bg)] border-[var(--ap-danger-border)]',
+  error: 'text-[var(--ap-warning)] bg-[var(--ap-warning-bg)] border-[var(--ap-warning-border)]',
+};
+
+const toFeedback = (s: ItemState): ScanFeedback => (s === 'added' ? 'added' : s === 'exists' ? 'exists' : 'invalid');
+
+/** A row's product in the viewer's language, else what the label says. */
+function rowProductLabel(row: InventoryRow | null, lang: string): string {
+  if (!row) return '';
+  if (row.product) return lang === 'en' ? row.product.name || row.product.name_ar : row.product.name_ar || row.product.name;
+  return row.model_name || row.model_hint || '';
 }
 
 export default function AddSerialsPanel({
   t,
+  open,
   onClose,
   onSaved,
 }: {
   t: InventoryStrings;
+  open: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { dir, lang } = useLanguage();
+  const m = useMotion();
   const toast = useToast();
-  const [confirm, confirmDialog] = useConfirm();
-  const [mode, setMode] = useState<Mode>('scan');
-  const [filing, setFiling] = useState<FilingState>(EMPTY_FILING);
-  const filingRef = useRef(filing);
-  filingRef.current = filing;
+  const chooseTitleId = useId();
+  const scanTitleId = useId();
+  const manualTitleId = useId();
 
-  // ---- one serial
-  const [one, setOne] = useState({ serial: '', box_sn: '', ean: '' });
-  const [oneBusy, setOneBusy] = useState(false);
-  const [oneError, setOneError] = useState<string | null>(null);
+  // The flow's own step; `open` from the list starts it at the choice. The
+  // component stays mounted so every sheet can play its exit.
+  const [step, setStep] = useState<Step>(null);
+  useEffect(() => {
+    if (open) setStep((s) => s ?? 'choose');
+  }, [open]);
 
-  // ---- list
-  const [text, setText] = useState('');
-  const [preview, setPreview] = useState<PreviewResponse | null>(null);
-  const [previewFor, setPreviewFor] = useState('');
-  const [bulkBusy, setBulkBusy] = useState<'preview' | 'commit' | null>(null);
-  const [bulkError, setBulkError] = useState<string | null>(null);
+  const changed = useRef(false);
+  const finish = useCallback(() => {
+    setStep(null);
+    onClose();
+    if (changed.current) {
+      changed.current = false;
+      onSaved();
+    }
+  }, [onClose, onSaved]);
 
-  // ---- camera
-  const [scanning, setScanning] = useState(false);
-  const [items, setItems] = useState<ScanItem[]>([]);
+  // ------------------------------------------------------------ camera
+  const [filingMode, setFilingMode] = useState<'auto' | 'chosen'>('auto');
+  const [chosen, setChosen] = useState<{ id: string; name: string }>({ id: '', name: '' });
+  const filingRef = useRef({ mode: filingMode, id: chosen.id });
+  filingRef.current = { mode: filingMode, id: chosen.id };
+
+  const [items, setItems] = useState<SessionItem[]>([]);
   const itemsRef = useRef(items);
   itemsRef.current = items;
-  const [saving, setSaving] = useState(false);
-  const eanCache = useRef(new Map<string, Awaited<ReturnType<typeof inventoryApi.resolve>>['match']>());
+  const [last, setLast] = useState<SessionItem | null>(null);
+  const [linkTarget, setLinkTarget] = useState<LinkTarget | null>(null);
 
-  const unsaved = items.some((i) => i.state === 'new' || i.state === 'new_assigned' || i.state === 'checking') || (!!text.trim() && mode === 'bulk');
-
-  const close = async () => {
-    if (unsaved && !(await confirm({ title: t.unsavedTitle, confirmLabel: t.discard, cancelLabel: t.cancel, destructive: true }))) return;
-    onClose();
-  };
-
-  // ------------------------------------------------------------ one serial
-  const addOne = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (oneBusy) return;
-    const problem = serialProblem(one.serial);
-    if (problem) {
-      setOneError(t.problems[problem] ?? t.genericError);
-      return;
-    }
-    setOneBusy(true);
-    setOneError(null);
-    try {
-      const res = await inventoryApi.commitRows([{ ...one, model_code: filing.model_code, model_name: filing.model_name }], filing, 'manual');
-      if (res.inserted > 0) {
-        toast.success(t.committed(res.inserted));
-        setOne({ serial: '', box_sn: '', ean: '' });
-        onSaved();
-      } else if (res.counts.exists > 0) setOneError(t.outcomes.exists);
-      else setOneError(t.refusal.SERIAL_NOTHING_TO_ADD);
-    } catch (err) {
-      setOneError(refusalText(err, t));
-    } finally {
-      setOneBusy(false);
-    }
-  };
-
-  // ------------------------------------------------------------------ list
-  const runPreview = async () => {
-    if (!text.trim() || bulkBusy) return;
-    setBulkBusy('preview');
-    setBulkError(null);
-    try {
-      const res = await inventoryApi.previewText(text, filing);
-      setPreview(res);
-      setPreviewFor(text);
-    } catch (err) {
-      setBulkError(refusalText(err, t));
-      setPreview(null);
-    } finally {
-      setBulkBusy(null);
-    }
-  };
-
-  const commitList = async () => {
-    if (!preview || bulkBusy) return;
-    setBulkBusy('commit');
-    setBulkError(null);
-    try {
-      const res = await inventoryApi.commitText(previewFor, filing);
-      toast.success(res.skipped_concurrent ? t.committedSome(res.inserted, res.skipped_concurrent) : t.committed(res.inserted));
-      setText('');
-      setPreview(null);
-      setPreviewFor('');
-      onSaved();
-    } catch (err) {
-      setBulkError(refusalText(err, t));
-    } finally {
-      setBulkBusy(null);
-    }
-  };
-
-  const toAdd = preview ? preview.counts.new + preview.counts.new_assigned : 0;
-  const stale = !!preview && previewFor !== text;
-
-  // ---------------------------------------------------------------- camera
-  const checkItem = useCallback(async (item: ScanItem) => {
-    try {
-      const res = await inventoryApi.previewRows([{ serial: item.serial, box_sn: item.box_sn, ean: item.ean }], {
-        product_id: item.product_id,
-        variant_id: item.variant_id,
-        model_code: item.model_code ?? '',
-        model_name: item.model_name ?? '',
-      });
-      const row = res.rows[0];
-      setItems((list) =>
-        list.map((x) => (x.key === item.key ? { ...x, state: row?.outcome ?? 'error', problem: row?.problem ?? null } : x))
-      );
-    } catch {
-      setItems((list) => list.map((x) => (x.key === item.key ? { ...x, state: 'error' } : x)));
-    }
+  const put = useCallback((item: SessionItem) => {
+    const list = itemsRef.current.some((x) => x.key === item.key)
+      ? itemsRef.current.map((x) => (x.key === item.key ? item : x))
+      : [item, ...itemsRef.current];
+    itemsRef.current = list;
+    setItems(list);
+    setLast(item);
   }, []);
 
-  /** The EAN → product memory: a label whose EAN was filed before picks its product (sticky). */
-  const learnFromEan = useCallback(
-    async (ean: string) => {
-      if (!ean || filingRef.current.product_id) return;
-      let match = eanCache.current.get(ean);
-      if (match === undefined) {
-        try {
-          match = (await inventoryApi.resolve(ean)).match;
-        } catch {
-          match = null;
-        }
-        eanCache.current.set(ean, match);
+  /** One label → registered on the server, and the verdict the scanner sounds. */
+  const register = useCallback(
+    async (input: { serial: string; box_sn: string; ean: string }): Promise<ScanFeedback> => {
+      const norm = normalizeSerial(input.serial);
+      const key = `${norm}-${Date.now()}`;
+      const base: SessionItem = {
+        key,
+        norm,
+        serial: input.serial,
+        ean: input.ean,
+        box_sn: input.box_sn,
+        state: 'saving',
+        row: null,
+        via: null,
+        hint: null,
+        needsProduct: false,
+        problem: null,
+      };
+      // Scanned earlier in this session: the owner's «مسجلة مسبقًا», at once.
+      const prior = itemsRef.current.find((x) => x.norm === norm && (x.state === 'added' || x.state === 'exists' || x.state === 'saving'));
+      if (prior) {
+        put({ ...base, state: 'exists', row: prior.row, repeat: true });
+        return 'exists';
       }
-      if (!match || filingRef.current.product_id) return;
-      const name = match.product.name_en || match.product.name_ar;
-      setFiling((f) => ({
-        ...f,
-        product_id: match.product.id,
-        variant_id: match.variant_id ?? '',
-        product_name: name,
-        serialized: null,
-        model_code: f.model_code || match.model_code,
-        model_name: f.model_name || match.model_name || name,
-      }));
-      // The rows already scanned without a product take it too.
-      setItems((list) => list.map((x) => (x.product_id ? x : { ...x, product_id: match.product.id, variant_id: match.variant_id ?? '' })));
-      toast.info(t.eanMatched(name));
+      const problem = serialProblem(input.serial);
+      if (problem) {
+        put({ ...base, state: 'invalid', problem });
+        return 'invalid';
+      }
+      put(base);
+      try {
+        const f = filingRef.current;
+        const res = await inventoryApi.scan(
+          { serial: input.serial, box_sn: input.box_sn, ean: input.ean },
+          { product_id: f.mode === 'chosen' ? f.id : '', variant_id: '' }
+        );
+        const state: ItemState = res.outcome === 'added' || res.outcome === 'added_assigned' ? 'added' : res.outcome === 'exists' ? 'exists' : 'invalid';
+        if (state === 'added') changed.current = true;
+        put({
+          ...base,
+          state,
+          row: res.row,
+          via: res.via ?? null,
+          hint: res.hint?.label ?? res.row?.model_hint ?? null,
+          needsProduct: state === 'added' && !!res.needs_product,
+          problem: res.problem ?? null,
+        });
+        return toFeedback(state);
+      } catch (e) {
+        put({ ...base, state: 'error', problem: refusalText(e, t) });
+        return 'invalid';
+      }
     },
-    [t, toast]
+    [put, t]
   );
 
   const onRead = useCallback(
-    (read: ScanRead): ScanFeedback => {
-      const sn = read.productSn;
-      if (!sn) return 'invalid';
-      const norm = normalizeSerial(sn);
-      if (itemsRef.current.some((x) => x.norm === norm)) return 'duplicate';
-      const f = filingRef.current;
-      const item: ScanItem = {
-        key: `${norm}-${Date.now()}`,
-        norm,
-        serial: sn,
-        box_sn: read.boxSn ?? '',
-        ean: read.ean ?? '',
-        model_code: f.model_code,
-        model_name: f.model_name,
-        product_id: f.product_id,
-        variant_id: f.variant_id,
-        state: serialProblem(sn) ? 'invalid' : 'checking',
-      };
-      itemsRef.current = [item, ...itemsRef.current];
-      setItems(itemsRef.current);
-      if (item.state === 'invalid') return 'invalid';
-      void checkItem(item);
-      if (read.ean) void learnFromEan(read.ean);
-      return 'added';
+    (read: ScanRead): ScanFeedback | Promise<ScanFeedback> => {
+      if (!read.productSn) return 'invalid';
+      return register({ serial: read.productSn, box_sn: read.boxSn ?? '', ean: read.ean ?? '' });
     },
-    [checkItem, learnFromEan]
+    [register]
   );
 
+  // The scanner's typed fallback: registered the same way, and sounded here
+  // (the scanner sounds only what the camera read).
   const onManualScan = (value: string) => {
-    onRead({ productSn: normalizeSerial(value), boxSn: null, ean: null, receipt: null, raw: [] });
+    void register({ serial: value, box_sn: '', ean: '' }).then(scanFeedback);
   };
 
-  const saveAll = async () => {
-    const ready = items.filter((i) => i.state === 'new' || i.state === 'new_assigned');
-    if (!ready.length || saving) return;
-    setSaving(true);
-    // One commit per product the rows were scanned under: switching the
-    // product mid-session must not refile the boxes scanned before.
-    const groups = new Map<string, ScanItem[]>();
-    for (const i of ready) {
-      const k = `${i.product_id}|${i.variant_id}`;
-      groups.set(k, [...(groups.get(k) ?? []), i]);
-    }
-    let inserted = 0;
-    const saved = new Set<string>();
-    try {
-      for (const group of groups.values()) {
-        const { product_id, variant_id } = group[0];
-        const res = await inventoryApi.commitRows(
-          group.map((i) => ({ serial: i.serial, box_sn: i.box_sn, ean: i.ean, model_code: i.model_code, model_name: i.model_name })),
-          { product_id, variant_id, model_code: '', model_name: '' },
-          'scan'
-        );
-        inserted += res.inserted;
-        group.forEach((i) => saved.add(i.key));
-      }
-      toast.success(t.committed(inserted));
-      setItems((list) => list.filter((i) => !saved.has(i.key)));
-      onSaved();
-    } catch (err) {
-      // What was saved before the failure is off the list; the rest stays.
-      setItems((list) => list.filter((i) => !saved.has(i.key)));
-      toast.error(refusalText(err, t));
-    } finally {
-      setSaving(false);
-    }
+  const onLinked = ({ linked, productId, productName, ean }: { linked: number; productId: string; productName: string; ean: string }) => {
+    setLinkTarget(null);
+    changed.current = true;
+    toast.success(linked > 0 ? t.linked(linked, productName) : t.linkedNone);
+    // Every row of this session with that EAN now has its product.
+    const list = itemsRef.current.map((x) =>
+      x.needsProduct && ((ean && x.ean === ean) || (!ean && x.norm === linkTarget?.serialNorm))
+        ? {
+            ...x,
+            needsProduct: false,
+            via: 'chosen',
+            row: x.row ? { ...x.row, product: { id: productId, name: productName, name_ar: productName } } : x.row,
+          }
+        : x
+    );
+    itemsRef.current = list;
+    setItems(list);
+    setLast((l) => (l ? list.find((x) => x.key === l.key) ?? l : l));
   };
 
-  const readyCount = items.filter((i) => i.state === 'new' || i.state === 'new_assigned').length;
+  const added = items.filter((x) => x.state === 'added').length;
+  const repeats = items.filter((x) => x.state === 'exists').length;
 
-  const scanList = (
-      <div className="space-y-2" data-scan-list>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[12.5px] font-semibold text-[var(--ap-text-2)]" aria-live="polite">
-            {items.length ? t.scanned(items.length) : t.scannedEmpty}
+  // ------------------------------------------------------------ manual
+  const [manualDirty, setManualDirty] = useState(false);
+
+  // ------------------------------------------------------------ render
+  const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight;
+
+  const option = (icon: React.ReactNode, title: string, hint: string, onPick: () => void, data: string) => (
+    <button
+      type="button"
+      onClick={onPick}
+      data-serial-add-option={data}
+      className="flex w-full items-center gap-3 px-4 min-h-[68px] text-start transition-colors hover:bg-[var(--ap-surface-2)] active:bg-[var(--ap-surface-3)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ap-ring)]"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--ap-accent-soft)] text-[var(--ap-accent-text)]">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold text-[var(--ap-text-1)]">{title}</span>
+        <span className="block mt-0.5 text-[12.5px] leading-snug text-[var(--ap-text-3)]">{hint}</span>
+      </span>
+      <Chevron className="h-4 w-4 shrink-0 text-[var(--ap-text-3)]" aria-hidden />
+    </button>
+  );
+
+  const verdictCard = last && (
+    <div aria-live="assertive" className="pt-3" data-scan-verdict={last.state}>
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.div
+          key={last.key}
+          initial={{ opacity: 0, y: m.travel(6), scale: m.reduced ? 1 : 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0 }}
+          transition={m.reduced ? { duration: 0.15 } : m.spring('quick')}
+          className={`flex items-start gap-3 rounded-2xl border p-3 ${
+            last.state === 'added'
+              ? 'border-[var(--ap-success-border)] bg-[var(--ap-success-bg)]'
+              : last.state === 'saving'
+                ? 'border-[var(--ap-border)] bg-[var(--ap-surface-2)]'
+                : last.state === 'error'
+                  ? 'border-[var(--ap-warning-border)] bg-[var(--ap-warning-bg)]'
+                  : 'border-[var(--ap-danger-border)] bg-[var(--ap-danger-bg)]'
+          }`}
+        >
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+              last.state === 'added'
+                ? 'bg-[var(--ap-success)] text-white'
+                : last.state === 'saving'
+                  ? 'bg-[var(--ap-surface-3)] text-[var(--ap-text-2)]'
+                  : last.state === 'error'
+                    ? 'bg-[var(--ap-warning)] text-white'
+                    : 'bg-[var(--ap-danger)] text-white'
+            }`}
+          >
+            {last.state === 'added' ? (
+              <Check className="h-5 w-5" strokeWidth={3} aria-hidden />
+            ) : last.state === 'saving' ? (
+              <ScanLine className="h-5 w-5" aria-hidden />
+            ) : last.state === 'invalid' ? (
+              <X className="h-5 w-5" strokeWidth={3} aria-hidden />
+            ) : (
+              <AlertTriangle className="h-5 w-5" aria-hidden />
+            )}
           </span>
-          <button type="button" className={`${T.btnPrimary} min-h-[44px]`} disabled={!readyCount || saving} onClick={() => void saveAll()} data-scan-save>
-            <Save className="w-4 h-4" aria-hidden />
-            {saving ? t.committing : t.commitAll(readyCount)}
-          </button>
-        </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14.5px] font-bold text-[var(--ap-text-1)]">
+              {last.state === 'added'
+                ? t.scanRegistered
+                : last.state === 'saving'
+                  ? t.checking
+                  : last.state === 'exists'
+                    ? last.repeat
+                      ? t.alreadyInSession
+                      : t.alreadyRegistered
+                    : last.state === 'invalid'
+                      ? t.notASerial
+                      : t.scanFailed}
+            </p>
+            <p className="mt-0.5 font-mono text-[13px] text-[var(--ap-text-1)] break-all" dir="ltr">
+              {last.serial}
+            </p>
+            {last.state === 'exists' && last.row && (
+              <p className="mt-0.5 text-[12px] text-[var(--ap-text-2)]" dir="auto">
+                {t.alreadyAt(last.row.created_at.slice(0, 10), last.row.created_by.email ?? last.row.created_by.username ?? '')}
+                {rowProductLabel(last.row, lang) ? ` · ${rowProductLabel(last.row, lang)}` : ''}
+              </p>
+            )}
+            {last.state === 'added' && (
+              <p className="mt-0.5 text-[12px] text-[var(--ap-text-2)]" dir="auto">
+                {last.needsProduct ? (
+                  <>
+                    {last.hint ? `${last.hint} · ` : ''}
+                    <span className="font-semibold text-[var(--ap-warning)]">{t.unknownProduct}</span>
+                  </>
+                ) : (
+                  <>
+                    {rowProductLabel(last.row, lang)}
+                    {last.via && t.linkedVia[last.via] ? ` · ${t.linkedVia[last.via]}` : ''}
+                  </>
+                )}
+              </p>
+            )}
+            {(last.state === 'invalid' || last.state === 'error') && last.problem && (
+              <p className="mt-0.5 text-[12px] text-[var(--ap-text-2)]">{t.problems[last.problem] ?? last.problem}</p>
+            )}
+            {last.state === 'added' && last.needsProduct && (
+              <button
+                type="button"
+                className={`${T.btnSecondary} mt-2 min-h-[40px]`}
+                onClick={() => setLinkTarget({ ean: last.ean, serialNorm: last.norm, serial: last.serial, hint: last.hint })}
+                data-scan-pick-product
+              >
+                <Link2 className="h-4 w-4" aria-hidden />
+                {t.pickForEan}
+              </button>
+            )}
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+
+  const sessionList = (
+    <section aria-labelledby={`${scanTitleId}-session`} className="space-y-2" data-scan-list>
+      <div className="flex items-baseline justify-between gap-2 px-1">
+        <h3 id={`${scanTitleId}-session`} className="text-[12.5px] font-semibold text-[var(--ap-text-2)]">
+          {t.sessionTitle}
+        </h3>
         {items.length > 0 && (
-          <ul className={`${T.surface} divide-y divide-[var(--ap-hairline)] max-h-[40vh] overflow-y-auto`}>
-            {items.map((i) => (
-              <li key={i.key} className="flex items-center gap-2 px-3 py-2 min-h-[52px]" data-scan-item={i.norm}>
-                <div className="min-w-0 flex-1">
-                  <div className="font-mono text-[13px] text-[var(--ap-text-1)] truncate" dir="ltr">
-                    {i.serial}
-                  </div>
-                  <div className="text-[11px] text-[var(--ap-text-3)] truncate" dir="ltr">
-                    {[i.model_name || i.model_code, i.box_sn && `${t.box} ${i.box_sn}`, i.ean && `EAN ${i.ean}`].filter(Boolean).join(' · ')}
-                  </div>
-                </div>
-                <span className={`${T.badgeBase} ${OUTCOME_TONE[i.state]}`}>
-                  {i.state === 'checking' ? t.checking : i.state === 'error' ? t.genericError : t.outcomes[i.state]}
-                </span>
-                <button
-                  type="button"
-                  className={ICON_BTN_44}
-                  aria-label={`${t.remove} ${i.serial}`}
-                  onClick={() => setItems((list) => list.filter((x) => x.key !== i.key))}
-                >
-                  <Trash2 className="w-4 h-4" aria-hidden />
-                </button>
-              </li>
-            ))}
-          </ul>
+          <span className="text-[12px] tabular-nums text-[var(--ap-text-3)]" aria-live="polite">
+            {t.sessionCounts(added, repeats)}
+          </span>
         )}
       </div>
+      {items.length === 0 ? (
+        <p className="px-1 text-[12.5px] leading-relaxed text-[var(--ap-text-3)]">{t.sessionEmpty}</p>
+      ) : (
+        <ul className={`${T.surface} divide-y divide-[var(--ap-hairline)] overflow-hidden`}>
+          {items.map((i) => (
+            <li key={i.key} className="flex items-center gap-2 px-3 py-2 min-h-[52px]" data-scan-item={i.norm} data-scan-state={i.state}>
+              <div className="min-w-0 flex-1">
+                <div className="font-mono text-[13px] text-[var(--ap-text-1)] truncate" dir="ltr">
+                  {i.serial}
+                </div>
+                <div className="text-[11.5px] text-[var(--ap-text-3)] truncate" dir="auto">
+                  {[rowProductLabel(i.row, lang) || i.hint, i.ean && `EAN ${i.ean}`].filter(Boolean).join(' · ')}
+                </div>
+              </div>
+              {i.needsProduct ? (
+                <button
+                  type="button"
+                  className={`${T.btnSecondary} h-9 min-h-[36px]`}
+                  onClick={() => setLinkTarget({ ean: i.ean, serialNorm: i.norm, serial: i.serial, hint: i.hint })}
+                >
+                  <Link2 className="h-3.5 w-3.5" aria-hidden />
+                  {t.pickForEan}
+                </button>
+              ) : (
+                <span className={`${T.badgeBase} ${STATE_TONE[i.state]}`}>
+                  {i.state === 'added'
+                    ? t.scanRegistered
+                    : i.state === 'exists'
+                      ? t.alreadyRegistered
+                      : i.state === 'saving'
+                        ? t.checking
+                        : i.state === 'invalid'
+                          ? t.outcomes.invalid
+                          : t.genericError}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 
-  const tabLabel = (Icon: React.ElementType, label: string) => (
-    <span className="inline-flex items-center gap-1.5">
-      <Icon aria-hidden="true" className="w-4 h-4" />
-      {label}
-    </span>
+  const sheetHeader = (titleId: string, title: string, onDone: () => void) => (
+    <div className="shrink-0 border-b border-[var(--ap-hairline)]">
+      {!m.reduced && (
+        <div className="flex justify-center pt-2" aria-hidden>
+          <span className="h-1 w-9 rounded-full bg-[var(--ap-text-3)]/40" />
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-3 ps-4 pe-2 py-2">
+        <h2 id={titleId} className="text-[16px] font-bold text-[var(--ap-text-1)] truncate">
+          {title}
+        </h2>
+        <button
+          type="button"
+          onClick={onDone}
+          className="min-h-[44px] px-3 rounded-[var(--ap-radius-md)] text-[15px] font-semibold text-[var(--ap-accent-text)] hover:bg-[var(--ap-surface-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ap-ring)]"
+          data-sheet-done
+        >
+          {t.done}
+        </button>
+      </div>
+    </div>
   );
 
   return (
-    <section className={`${T.surfaceRaised} overflow-hidden`} aria-labelledby="serial-add-title" data-serial-add>
-      <div className="flex items-center justify-between gap-3 px-4 pt-3">
-        <h2 id="serial-add-title" className="text-[15px] font-bold text-[var(--ap-text-1)]">
-          {t.dialogTitle}
-        </h2>
-        <button type="button" className={ICON_BTN_44} onClick={() => void close()} aria-label={t.cancel}>
-          <X className="w-5 h-5" aria-hidden />
-        </button>
-      </div>
-      <TabStrip
-        items={[
-          { id: 'scan', label: tabLabel(Camera, t.modeScan) },
-          { id: 'bulk', label: tabLabel(ClipboardList, t.modeBulk) },
-          { id: 'single', label: tabLabel(Hash, t.modeSingle) },
-        ]}
-        value={mode}
-        onChange={(id) => setMode(id as Mode)}
-        group="serial-add"
-        label={t.dialogTitle}
-        indicatorClassName="bg-[var(--ap-accent)]"
-        activeClassName="text-[var(--ap-text-1)]"
-        idleClassName="text-[var(--ap-text-3)] hover:text-[var(--ap-text-2)]"
-        className="mt-1 border-b border-[var(--ap-border)]"
-      />
-      <div className="p-3 sm:p-4 space-y-4">
-        <FilingFields t={t} value={filing} onChange={setFiling} disabled={saving || bulkBusy === 'commit'} />
-        <TabPanels value={mode} order={MODES}>
-          {mode === 'single' && (
-            <form onSubmit={addOne} className="grid gap-3 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_auto] items-end" data-serial-single>
-              <label className="block min-w-0">
-                <span className="block mb-1 text-[12px] font-medium text-[var(--ap-text-2)]">{t.serial}</span>
-                <input
-                  className={`${T.input} w-full font-mono`}
-                  dir="ltr"
-                  value={one.serial}
-                  onChange={(e) => setOne({ ...one, serial: e.target.value })}
-                  placeholder={t.serialPh}
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                  spellCheck={false}
-                  required
-                  maxLength={80}
-                  aria-invalid={!!oneError}
-                  aria-describedby={oneError ? 'serial-one-error' : undefined}
-                />
-              </label>
-              <label className="block min-w-0">
-                <span className="block mb-1 text-[12px] font-medium text-[var(--ap-text-2)]">
-                  {t.boxSn} <span className="text-[var(--ap-text-3)] font-normal">({t.optional})</span>
-                </span>
-                <input className={`${T.input} w-full font-mono`} dir="ltr" value={one.box_sn} onChange={(e) => setOne({ ...one, box_sn: e.target.value })} placeholder={t.boxPh} maxLength={60} spellCheck={false} />
-              </label>
-              <label className="block min-w-0">
-                <span className="block mb-1 text-[12px] font-medium text-[var(--ap-text-2)]">
-                  {t.ean} <span className="text-[var(--ap-text-3)] font-normal">({t.optional})</span>
-                </span>
-                <input className={`${T.input} w-full font-mono`} dir="ltr" inputMode="numeric" value={one.ean} onChange={(e) => setOne({ ...one, ean: e.target.value })} placeholder={t.eanPh} maxLength={14} />
-              </label>
-              <button type="submit" className={`${T.btnPrimary} h-10 min-h-[44px]`} disabled={oneBusy || !one.serial.trim()}>
-                <Plus className="w-4 h-4" aria-hidden />
-                {oneBusy ? t.committing : t.addOne}
-              </button>
-              {oneError && (
-                <p id="serial-one-error" role="alert" className="sm:col-span-4 text-[12.5px] text-[var(--ap-danger)]">
-                  {oneError}
-                </p>
-              )}
-            </form>
-          )}
+    <>
+      {/* ------------------------------------------------ 1. the choice */}
+      <Sheet
+        open={step === 'choose'}
+        onClose={finish}
+        docked
+        labelledBy={chooseTitleId}
+        z={220}
+        testId="serial-add-choose"
+        panelClassName="w-full max-w-md"
+      >
+        <div className={`${T.AP} px-4 pt-1 pb-4`} dir={dir} data-serial-add-choose>
+          <h2 id={chooseTitleId} className="text-[16px] font-bold text-[var(--ap-text-1)]">
+            {t.chooseTitle}
+          </h2>
+          <p className="mt-0.5 text-[12.5px] text-[var(--ap-text-3)]">{t.chooseBody}</p>
+          <div className={`${T.surface} mt-3 overflow-hidden divide-y divide-[var(--ap-hairline)]`}>
+            {option(
+              <Camera className="h-5 w-5" aria-hidden />,
+              t.optCamera,
+              t.optCameraHint,
+              () => {
+                // The tap that opens the camera is the gesture iOS needs for sound.
+                primeScannerAudio();
+                setStep('camera');
+              },
+              'camera'
+            )}
+            {option(
+              <Keyboard className="h-5 w-5" aria-hidden />,
+              t.optManual,
+              t.optManualHint,
+              () => {
+                primeScannerAudio();
+                setStep('manual');
+              },
+              'manual'
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={finish}
+            className={`${T.surface} mt-2.5 w-full min-h-[50px] text-[15px] font-semibold text-[var(--ap-text-1)] transition-colors hover:bg-[var(--ap-surface-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ap-ring)]`}
+          >
+            {t.cancel}
+          </button>
+        </div>
+      </Sheet>
 
-          {mode === 'bulk' && (
-            <div className="space-y-3" data-serial-bulk>
-              <label className="block">
-                <span className="block mb-1 text-[12.5px] font-semibold text-[var(--ap-text-1)]">{t.pasteLabel}</span>
-                <textarea
-                  className={`${TEXTAREA} font-mono`}
-                  dir="ltr"
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder={t.pastePh}
-                  spellCheck={false}
-                  aria-describedby="serial-bulk-hint"
-                  data-serial-paste
+      {/* ------------------------------------------------ 2. the camera */}
+      <Overlay
+        open={step === 'camera'}
+        onClose={finish}
+        placement="dock"
+        labelledBy={scanTitleId}
+        z={225}
+        testId="serial-scan-sheet"
+        panelClassName="w-full sm:max-w-xl h-[94dvh] flex flex-col overflow-hidden"
+      >
+        <div className={`${T.AP} flex min-h-0 flex-1 flex-col`} dir={dir} data-serial-scan>
+          {sheetHeader(scanTitleId, t.scanTitle, finish)}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+            <div className="space-y-2">
+              <Segmented
+                group="serial-scan-filing"
+                label={t.filing}
+                value={filingMode}
+                onChange={(id) => setFilingMode(id as 'auto' | 'chosen')}
+                size="sm"
+                dataAttr="data-scan-filing"
+                items={[
+                  { id: 'auto', label: t.fileAuto },
+                  { id: 'chosen', label: t.fileChosen },
+                ]}
+              />
+              {filingMode === 'chosen' ? (
+                <ProductPicker
+                  value={chosen.id}
+                  ariaLabel={t.product}
+                  placeholder={t.pickProduct}
+                  onChange={(pid, p) => setChosen({ id: pid, name: p ? p.name_en || p.name_ar : '' })}
                 />
-                <span id="serial-bulk-hint" className="block mt-1 text-[11.5px] text-[var(--ap-text-3)]">
-                  {t.pasteHint}
-                </span>
-              </label>
-              <div className="flex flex-wrap items-center gap-2">
-                <button type="button" className={`${T.btnSecondary} min-h-[44px]`} disabled={!text.trim() || !!bulkBusy} onClick={() => void runPreview()} data-serial-preview>
-                  {bulkBusy === 'preview' ? t.previewing : t.previewBtn}
-                </button>
-                {preview && !stale && (
-                  <button type="button" className={`${T.btnPrimary} min-h-[44px]`} disabled={!toAdd || !!bulkBusy} onClick={() => void commitList()} data-serial-commit>
-                    <Save className="w-4 h-4" aria-hidden />
-                    {bulkBusy === 'commit' ? t.committing : t.commitN(toAdd)}
-                  </button>
-                )}
-              </div>
-              {bulkError && (
-                <p role="alert" className="text-[12.5px] text-[var(--ap-danger)]">
-                  {bulkError}
-                </p>
-              )}
-              {preview && (
-                <div className={`space-y-2 ${stale ? 'opacity-50' : ''}`} data-serial-preview-table>
-                  <p className="text-[12.5px] text-[var(--ap-text-2)]" role="status">
-                    {t.summary(preview.counts)}
-                  </p>
-                  {preview.product?.serialized === false && (
-                    <p className="text-[12px] text-[var(--ap-danger)]">{t.notSerialized}</p>
-                  )}
-                  <div className={`${T.surface} overflow-auto max-h-[46vh]`}>
-                    <table className="w-full border-collapse min-w-[560px]">
-                      <thead className={`${T.tableHead} sticky top-0 bg-[var(--ap-surface-2)]`}>
-                        <tr>
-                          {[t.line, t.serial, t.model, t.outcome].map((h) => (
-                            <th key={h} scope="col" className="px-3 py-2 text-start font-semibold text-[11.5px] whitespace-nowrap">
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--ap-hairline)]">
-                        {preview.rows.map((r) => (
-                          <tr key={r.line} data-preview-outcome={r.outcome}>
-                            <td className="px-3 py-2 text-[12px] text-[var(--ap-text-3)] tabular-nums">{r.line}</td>
-                            <td className="px-3 py-2 font-mono text-[12.5px] text-[var(--ap-text-1)]" dir="ltr">
-                              {r.serial_raw || '—'}
-                            </td>
-                            <td className="px-3 py-2 text-[12px] text-[var(--ap-text-2)]" dir="ltr">
-                              {[r.model_name, r.model_code].filter(Boolean).join(' · ') || '—'}
-                            </td>
-                            <td className="px-3 py-2">
-                              <span className={`${T.badgeBase} ${OUTCOME_TONE[r.outcome]}`}>{t.outcomes[r.outcome]}</span>
-                              {(r.problem || r.duplicate_of) && (
-                                <span className="ms-2 text-[11.5px] text-[var(--ap-text-3)]">
-                                  {r.problem ? t.problems[r.problem] ?? r.problem : t.duplicateOf(r.duplicate_of as number)}
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+              ) : (
+                <p className="px-1 text-[11.5px] leading-relaxed text-[var(--ap-text-3)]">{t.fileAutoHint}</p>
               )}
             </div>
-          )}
-
-          {mode === 'scan' && (
-            <div className="space-y-3" data-serial-scan>
-              {!scanning && (
-                <>
-                  <p className="text-[12.5px] leading-relaxed text-[var(--ap-text-2)] max-w-[70ch]">{t.scanIntro}</p>
-                  <button
-                    type="button"
-                    className={`${T.btnPrimary} min-h-[44px] px-5`}
-                    onClick={() => {
-                      primeScannerAudio();
-                      setScanning(true);
-                    }}
-                    data-scan-start
+            <div className="mt-3">
+              {step === 'camera' && (
+                <Suspense fallback={<div className="py-16 text-center text-[13px] text-[var(--ap-text-3)]">{t.loading}</div>}>
+                  <BarcodeScanner
+                    mode="continuous"
+                    frame="label"
+                    embedded
+                    title={t.scanTitle}
+                    onRead={onRead}
+                    onManual={onManualScan}
+                    onClose={finish}
+                    verdict={verdictCard}
                   >
-                    <Camera className="w-4 h-4" aria-hidden />
-                    {t.scanStart}
-                  </button>
-                </>
+                    {sessionList}
+                  </BarcodeScanner>
+                </Suspense>
               )}
-              {scanning && (
-                <div className="rounded-[var(--ap-radius-lg)] border border-[var(--ap-border)] bg-zinc-950 overflow-hidden max-w-2xl">
-                  <Suspense fallback={<div className="py-16 text-center text-[13px] text-[var(--ap-text-3)]">{t.loading}</div>}>
-                    <BarcodeScanner
-                      mode="continuous"
-                      frame="label"
-                      title={t.scanTitle}
-                      onRead={onRead}
-                      onManual={onManualScan}
-                      onClose={() => setScanning(false)}
-                    />
-                  </Suspense>
-                </div>
-              )}
-              {scanList}
             </div>
-          )}
-        </TabPanels>
-      </div>
-      {confirmDialog}
-    </section>
+          </div>
+        </div>
+      </Overlay>
+
+      {/* ------------------------------------------------ 3. manual entry */}
+      <Overlay
+        open={step === 'manual'}
+        onClose={() => {
+          setManualDirty(false);
+          finish();
+        }}
+        placement="dock"
+        labelledBy={manualTitleId}
+        z={225}
+        dirty={manualDirty}
+        testId="serial-manual-sheet"
+        panelClassName="w-full sm:max-w-xl max-h-[94dvh] flex flex-col overflow-hidden"
+      >
+        {(api) => (
+          <div className={`${T.AP} flex min-h-0 flex-1 flex-col`} dir={dir}>
+            {sheetHeader(manualTitleId, t.manualTitle, api.close)}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+              <ManualEntry
+                t={t}
+                toast={toast}
+                onDirty={setManualDirty}
+                onSaved={() => {
+                  changed.current = true;
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </Overlay>
+
+      <LinkProductDialog t={t} target={linkTarget} onClose={() => setLinkTarget(null)} onLinked={onLinked} />
+    </>
   );
 }

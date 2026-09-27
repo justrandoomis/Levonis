@@ -29,7 +29,7 @@ import type { PolicyDocument } from './types';
  *
  * NO NUMBER IS INVENTED HERE. Where an answer needs a figure, it is either a
  * constant this codebase really holds — the seven-day pending window, 1 point
- * = 1 IQD, the check-in ladder, ×1.5 and ×2 — or it is the same placeholder
+ * = 1 IQD, 1 point per 1,000 IQD, the check-in ladder, ×2 — or it is the same placeholder
  * token the operative document uses. A friendly page is exactly where a wrong
  * number does the most damage, because it is the page people quote.
  *
@@ -48,11 +48,16 @@ import type { PolicyDocument } from './types';
  *     so the clauses that carried it are published instead of withheld.
  *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
  *     by number, an article of this document that is itself withheld.
+ *
+ * VERSION 4 — WHY IT MOVED (owner, 2026-09-27). The archive keeps version 3
+ * byte for byte. 6.4 is the new check-in ladder (1, 2, … 7), 6.5 names PRO ×2
+ * alone (PREMIUM's ×1.5 ended, 0145), and the new 6.8 states the earning rate,
+ * one point per 1,000 dinars (0146) — the question 6.2 is asked about.
  */
 export const faq: PolicyDocument = {
   key: 'faq',
-  version: 3,
-  effective_at: '2026-09-23',
+  version: 4,
+  effective_at: '2026-09-27',
   title: {
     ar: 'الأسئلة الشائعة',
     en: 'Frequently Asked Questions',
@@ -153,16 +158,19 @@ export const faq: PolicyDocument = {
 نقطة واحدة تخصم ديناراً واحداً بالضبط، دون تقريب.
 
 ### 6.4 ما سلّم تسجيل الدخول اليومي؟
-5، 5، 10، 10، 15، 15، ثم 20 من اليوم السابع فصاعداً. وانقطاع التتابع يعيدك إلى أول درجة.
+1، 2، 3، 4، 5، 6، ثم 7 من اليوم السابع فصاعداً. وانقطاع التتابع يعيدك إلى أول درجة.
 
 ### 6.5 مضاعف الاشتراك
-بريميوم ×1.5 و PRO ×2. ويُحسب لحظة قيد النقاط، لا بأثر رجعي.
+PRO ×2، ومن سواه ×1. ويُحسب لحظة قيد النقاط، لا بأثر رجعي.
 
 ### 6.6 هل تنتهي صلاحية النقاط؟
 لا تنتهي بمرور الزمن وحده اليوم. وأي تغيير يُعلَن مسبقاً ولا يسري بأثر رجعي.
 
 ### 6.7 هل أستطيع تحويل نقاطي إلى نقد أو إلى حساب آخر؟
 لا. النقاط شخصية ولا تُصرف نقداً ولا تُنقل.
+
+### 6.8 كم نقطة أكسب من الشراء؟
+نقطة واحدة عن كل 1,000 دينار كاملة من قيمة البضاعة المؤهلة، ثم مضاعف اشتراكك. التفصيل في سياسة النقاط.
 
 ## 7. العضويات
 
@@ -177,6 +185,9 @@ export const faq: PolicyDocument = {
 
 ### 7.4 كيف ألغي الاشتراك؟
 عبر طلب إلى الدعم؛ لا يوجد إلغاء ذاتي. انظر وثيقة العضويات.
+
+### 7.5 لماذا لا أستطيع الاشتراك في PRO؟
+اشتراك PRO متوقف مؤقتاً — قريباً، يتم العمل على تطوير النظام. ومن كان مشتركاً فيه لا تُستقطع أيامه: تُجمَّد مدته وينتفع بمزايا PREMIUM حتى الاستئناف. انظر المادة 6.15 من وثيقة العضويات.
 
 ## 8. مجتمع ليفو
 
@@ -370,16 +381,19 @@ Three common reasons: delivery charges and warranty fees earn nothing; points yo
 One point discounts exactly one dinar, with no rounding.
 
 ### 6.4 What is the daily sign-in ladder?
-5, 5, 10, 10, 15, 15, then 20 from the seventh day onward. Breaking the streak returns you to the first rung.
+1, 2, 3, 4, 5, 6, then 7 from the seventh day onward. Breaking the streak returns you to the first rung.
 
 ### 6.5 The subscription multiplier
-Premium ×1.5 and PRO ×2, applied at the instant the points are recorded, never retroactively.
+PRO ×2 and everyone else ×1, applied at the instant the points are recorded, never retroactively.
 
 ### 6.6 Do points expire?
 They do not expire by the passage of time alone today. Any change is announced in advance and does not apply retroactively.
 
 ### 6.7 Can I convert points to cash or move them to another account?
 No. Points are personal, are not paid out in cash and are not transferable.
+
+### 6.8 How many points does a purchase earn?
+One point for every full 1,000 dinars of eligible merchandise, then your subscription's multiplier. Detail in the Points policy.
 
 ## 7. Memberships
 
@@ -394,6 +408,9 @@ There is no automatic renewal and no stored payment instrument. The subscription
 
 ### 7.4 How do I cancel?
 By request to Support; there is no self-service cancellation. See the Memberships policy.
+
+### 7.5 Why can I not subscribe to PRO?
+PRO is paused for now — coming soon, while the system is being developed. If you already held it, none of your days are deducted: its term is frozen and you enjoy the PREMIUM benefits until it resumes. See article 6.15 of the Memberships document.
 
 ## 8. Levo community
 
@@ -587,16 +604,19 @@ On the documents page inside the site, arranged in sections, each with its versi
 یەک خاڵ بە تەواوی یەک دینار داشکاندن دەکات، بەبێ خڕکردنەوە.
 
 ### 6.4 پێپلیکانەی چوونەژوورەوەی ڕۆژانە چییە؟
-5، 5، 10، 10، 15، 15، پاشان 20 لە ڕۆژی حەوتەمەوە. پچڕانی زنجیرە دەتگەڕێنێتەوە بۆ یەکەم پلە.
+1، 2، 3، 4، 5، 6، پاشان 7 لە ڕۆژی حەوتەمەوە. پچڕانی زنجیرە دەتگەڕێنێتەوە بۆ یەکەم پلە.
 
 ### 6.5 زیادکەری ئەندامێتی
-پریمیۆم ×1.5 و PRO ×2، لە ساتی تۆمارکردنی خاڵەکاندا جێبەجێ دەبێت، هەرگیز بە دواوە نا.
+PRO ×2 و کەسانی تر ×1، لە ساتی تۆمارکردنی خاڵەکاندا جێبەجێ دەبێت، هەرگیز بە دواوە نا.
 
 ### 6.6 خاڵەکان بەسەر دەچن؟
 ئەمڕۆ تەنها بە تێپەڕینی کات بەسەر ناچن. هەر گۆڕانکارییەک پێشوەخت ڕادەگەیەنرێت و بە دواوە جێبەجێ نابێت.
 
 ### 6.7 دەتوانم خاڵەکانم بکەمە پارە یان بۆ هەژمارێکی تر بنێرم؟
 نەخێر. خاڵەکان کەسین، بە پارە نادرێنەوە و ناگوازرێنەوە.
+
+### 6.8 لە کڕین چەند خاڵ بەدەست دەهێنم؟
+یەک خاڵ بۆ هەر 1,000 دیناری تەواو لە بەهای کاڵای شایستە، پاشان زیادکەری ئەندامێتییەکەت. وردەکاری لە سیاسەتی خاڵەکان.
 
 ## 7. ئەندامێتییەکان
 
@@ -611,6 +631,9 @@ On the documents page inside the site, arranged in sections, each with its versi
 
 ### 7.4 چۆن هەڵیدەوەشێنمەوە؟
 بە داواکارییەک بۆ پشتگیری؛ هەڵوەشاندنەوەی خۆکار نییە. بڕوانە بەڵگەنامەی ئەندامێتییەکان.
+
+### 7.5 بۆچی ناتوانم بەشداری PRO بکەم؟
+PRO بە شێوەیەکی کاتی ڕاگیراوە — بەم زووانە، سیستەمەکە پەرەی پێدەدرێت. ئەگەر پێشتر بەشداربوویت، هیچ ڕۆژێکت لێ نابڕدرێت: ماوەکەی دەبەسترێت و تا دەستپێکردنەوە سوودی PREMIUM وەردەگریت. بڕوانە بڕگەی 6.15 ی بەڵگەنامەی ئەندامێتییەکان.
 
 ## 8. کۆمەڵگەی لێڤۆ
 

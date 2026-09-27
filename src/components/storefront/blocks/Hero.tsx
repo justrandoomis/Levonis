@@ -14,6 +14,7 @@
 import { lazy, Suspense } from 'react';
 import { BadgeCheck, Star, Store } from 'lucide-react';
 import ProMerchantBadge from '../../merchant/ProMerchantBadge';
+import PremiumMemberBadge from '../../merchant/PremiumMemberBadge';
 import { WidgetIcon } from '../../merchant/profileIcons';
 import { useLanguage } from '../../../LanguageContext';
 import { badgeLabel } from '../../../lib/storefrontApi';
@@ -88,6 +89,7 @@ function ProfileHero({ block, store, cover, name }: HeroProps & { cover: string;
                 {name}
               </h1>
               {store.merchant.pro_badge && <ProMerchantBadge compact />}
+              {store.merchant.premium_badge && <PremiumMemberBadge compact />}
             </div>
             {rt.profileOnly ? (
               <p className="text-zinc-400 text-[12px] truncate" dir="auto">

@@ -15,7 +15,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { asD1, freshDb, json, stubApp } from './fixtures/app';
+import { asD1, freshDb, json, proOnSale, stubApp } from './fixtures/app';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
 import { catalogRoutes } from '../worker/routes/catalog';
 import { productRoutes } from '../worker/routes/products';
@@ -40,7 +40,9 @@ import {
 import type { CatalogTreeResponse, FacetSet, ListingState } from '../src/lib/catalog/types';
 
 function app() {
-  const raw = freshDb();
+  // The member facet counts PRO prices; with PRO paused (0145) there are none
+  // to count, which tests/proPause.test.ts proves. Here PRO is on sale.
+  const raw = proOnSale(freshDb());
   seedLiveCatalog(raw);
   return stubApp(asD1(raw), null, (a) => {
     a.route('/api/catalog', catalogRoutes);

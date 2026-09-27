@@ -59,6 +59,9 @@ function setup(launched = true) {
       launched ? '{"activated":true}' : '{"activated":false}'
     }')`
   );
+  // Races over PRO are PRO's the day it resumes; migration 0145 pauses it and
+  // tests/proPause.test.ts proves the pause.
+  raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
   return raw;
 }
 
@@ -147,7 +150,7 @@ test('the same plan bought twice at once: exactly one active row, one 409, the w
   assert.equal(live(raw, 'u1', 'active').length, 1, 'one active membership');
   assert.equal(rows(raw, 'u1').length, 1, 'the losing row never landed');
   assert.equal(debits(raw, 'u1').length, 1, 'one wallet debit — the loser rolled back with its spend');
-  assert.equal(Number(debits(raw, 'u1')[0].amount), cents(29000));
+  assert.equal(Number(debits(raw, 'u1')[0].amount), cents(10000));
 });
 
 test('PLUS→PRIME and PLUS→PRO at once: one wins, one is 409, the credit is granted once', async () => {
@@ -160,7 +163,7 @@ test('PLUS→PRIME and PLUS→PRO at once: one wins, one is 409, the credit is g
   assert.deepEqual([r1.status, r2.status].sort(), [200, 409]);
   const winner = await json(r1.status === 200 ? r1 : r2);
   const loser = await json(r1.status === 409 ? r1 : r2);
-  assert.equal(winner.credit_iqd, 29000, 'the whole unused PLUS came back — once');
+  assert.equal(winner.credit_iqd, 10000, 'the whole unused PLUS came back — once');
   assert.equal(winner.upgraded_from, 'plus');
   assert.equal(loser.code, 'ALREADY_SUBSCRIBED');
 
@@ -169,7 +172,7 @@ test('PLUS→PRIME and PLUS→PRO at once: one wins, one is 409, the credit is g
   assert.equal(all.filter((m) => m.state === 'cancelled').length, 1);
   assert.equal(live(raw, 'u1', 'active').length, 1);
   // The credit is written on exactly one row.
-  assert.equal(all.reduce((n, m) => n + Number(m.credit_applied_iqd), 0), 29000);
+  assert.equal(all.reduce((n, m) => n + Number(m.credit_applied_iqd), 0), 10000);
   // Two debits in total: PLUS and the winner — never the loser's.
   assert.equal(debits(raw, 'u1').length, 2);
 });
@@ -183,7 +186,7 @@ test('two prepaid purchases of higher tiers at once, before the launch: one rese
   const [r1, r2] = await Promise.all([subscribe(a, 'prime_12mo', 'pre-race-prime-0001'), subscribe(a, 'pro_12mo', 'pre-race-pro-0001')]);
   assert.deepEqual([r1.status, r2.status].sort(), [200, 409], 'the index only covers active rows — the INSERT guard covers reservations');
   assert.equal(live(raw, 'u1', 'prepaid_pending_launch').length, 1, 'one reservation');
-  assert.equal(rows(raw, 'u1').reduce((n, m) => n + Number(m.credit_applied_iqd), 0), 29000, 'credited once');
+  assert.equal(rows(raw, 'u1').reduce((n, m) => n + Number(m.credit_applied_iqd), 0), 10000, 'credited once');
   assert.equal(debits(raw, 'u1').length, 2);
 });
 

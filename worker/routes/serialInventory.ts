@@ -11,7 +11,9 @@
  *   GET   /export               CSV of the same filter (formula-safe cells)
  *   POST  /preview              { text | rows, defaults, product_id?, variant_id? } → per-row outcome
  *   POST  /commit               same body + source → inserted count (atomic, idempotent)
- *   GET   /resolve?ean=&model_code=   the product a scanned label belongs to
+ *   POST  /scan                 ONE label (scanned, or typed by hand), registered at once → added | exists | invalid
+ *   POST  /link-ean             { ean, product_id, variant_id? } → every unfiled serial with that EAN
+ *   GET   /resolve?ean=&model_code=&serial=   the product a scanned label belongs to
  *   GET   /variants?product_id=  a product's catalogue variants, for the picker
  *   GET   /:serial              one row + its history
  *   PATCH /:serial              model / product / box SN / EAN / note
@@ -25,14 +27,15 @@
  * SERIAL_LIST_EMPTY, SERIAL_LIST_TOO_LONG, SERIAL_NOTHING_TO_ADD,
  * SERIAL_PRODUCT_UNKNOWN, SERIAL_VARIANT_MISMATCH, SERIAL_VARIANT_WITHOUT_PRODUCT,
  * SERIAL_NOT_IN_INVENTORY, SERIAL_ALREADY_VOID, SERIAL_NOT_VOID, BOX_SN_INVALID,
- * EAN_INVALID, NOTHING_TO_CHANGE, CURSOR_INVALID, REASON_REQUIRED.
+ * EAN_INVALID, NOTHING_TO_CHANGE, CURSOR_INVALID, REASON_REQUIRED,
+ * SERIAL_PRODUCT_REQUIRED.
  */
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAdmin, requireMainHost, badRequest, str, int } from '../lib/http';
 import { audit } from '../lib/audit';
-import { normalizeSerial, BULK_MAX_LINES } from '@levonis/catalog/deviceSerials';
+import { normalizeEan, normalizeSerial, buildBulkRow, BULK_MAX_LINES } from '@levonis/catalog/deviceSerials';
 import {
   INVENTORY_STATUSES,
   applyPatch,
@@ -41,14 +44,15 @@ import {
   csvCell,
   decodeCursor,
   exportInventory,
+  identifyLabel,
   inventoryCounts,
   inventoryRowPublic,
+  linkEanToProduct,
   listInventory,
   loadInventoryRow,
   parsePatch,
   previewCounts,
   previewRows,
-  resolveLabelProduct,
   setVoid,
   verifyProductChoice,
   type InventorySource,
@@ -156,12 +160,117 @@ serialInventoryRoutes.post('/commit', async (c) => {
   });
 });
 
+/**
+ * ONE LABEL, REGISTERED AT ONCE — the camera sheet's door.
+ *
+ * The owner: «صوت نجاح عند تسجيل الطابعة بنجاح، وإذا رجع مرة ثانية يسجل طابعة
+ * مسجلة مسبقًا يظهر صوت خطأ واهتزاز». So a scan is not a row in a list waiting
+ * for «حفظ الكل»: it is written the moment it is read, and the answer the
+ * scanner sounds is the DATABASE's — `added` only when this request inserted
+ * the row, `exists` (with the stored row, so the sheet can say when and by
+ * whom) for a serial the inventory already holds, `invalid` for a value that
+ * is not a serial. A race with another admin's insert reads as `exists`,
+ * because by then it is.
+ *
+ * The product is the admin's choice when one is sent; otherwise the label's
+ * own (`identifyLabel`: a learned or known EAN, a learned model code, a SKU,
+ * or a model name that is exactly one catalogue product). A label the store
+ * cannot place is still registered — without a product, with the box's own
+ * model hint — and the answer says so (`needs_product`), so the sheet can
+ * offer «حدد المنتج» for the whole EAN at once.
+ */
+serialInventoryRoutes.post('/scan', async (c) => {
+  const admin = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const s = (k: string) => (typeof body[k] === 'string' ? (body[k] as string).slice(0, 200) : '');
+  // «إدخال يدوي» registers its one serial through this same door (same
+  // recognition, same verdict and sound) and is recorded as typed, not scanned.
+  const source: InventorySource = body.source === 'manual' ? 'manual' : 'scan';
+  const row = buildBulkRow(1, { serial: s('serial'), box_sn: s('box_sn'), ean: s('ean'), model_code: s('model_code'), model_name: s('model_name') });
+  if (row.problem) {
+    return c.json({ success: true, outcome: 'invalid', problem: row.problem, serial_norm: row.serial_norm, row: null });
+  }
+  const before = await loadInventoryRow(c.env.DB, row.serial_norm);
+  if (before) return c.json({ success: true, outcome: 'exists', row: inventoryRowPublic(before) });
+
+  let choice = await verifyProductChoice(c.env.DB, body.product_id, body.variant_id);
+  let via: string | null = choice.product_id ? 'chosen' : null;
+  const { match, hint } = await identifyLabel(c.env.DB, { ean: row.ean, model_code: row.model_code, serial: row.serial_norm, model_name: row.model_name });
+  if (!choice.product_id && match) {
+    choice = await verifyProductChoice(c.env.DB, match.product.id, match.variant_id);
+    via = match.via;
+  }
+  // Only a KNOWN box's own words become the stored model. A family read off
+  // the serial's prefix stays a hint (`model_hint` on every read): stored, it
+  // would pass for a typed model and let the next box of an unknown EAN be
+  // filed under «A1» when it may be an A1 Combo.
+  const candidate = {
+    ...row,
+    model_name: row.model_name || match?.model_name || (hint?.source === 'ean' ? hint.model : ''),
+    model_code: row.model_code || match?.model_code || hint?.model_code || '',
+  };
+  const [preview] = await previewRows(c.env.DB, [candidate]);
+  const result = await commitRows(c.env.DB, admin, [preview], choice, source);
+  if (result.inserted === 0) {
+    const now = await loadInventoryRow(c.env.DB, row.serial_norm);
+    return c.json({ success: true, outcome: 'exists', row: now ? inventoryRowPublic(now) : null });
+  }
+  await audit(c.env.DB, admin.id, 'serial_inventory.add', 'serial_inventory', {
+    source,
+    inserted: 1,
+    product_id: choice.product_id,
+    variant_id: choice.variant_id,
+    via,
+    serials: [row.serial_norm],
+  });
+  const saved = await loadInventoryRow(c.env.DB, row.serial_norm);
+  return c.json({
+    success: true,
+    outcome: preview.outcome === 'new_assigned' ? 'added_assigned' : 'added',
+    row: saved ? inventoryRowPublic(saved) : null,
+    via,
+    hint,
+    needs_product: !choice.product_id,
+    serialized: choice.product_id ? choice.serialized : null,
+  });
+});
+
+/**
+ * «ربط بمنتج» — one EAN, every serial of it still without a product. The
+ * inventory learns the EAN in the same write: the next box carrying it files
+ * itself (`resolveLabelProduct` step 1).
+ */
+serialInventoryRoutes.post('/link-ean', async (c) => {
+  const admin = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const ean = normalizeEan(typeof body.ean === 'string' ? body.ean : '');
+  if (!ean) throw badRequest('Invalid EAN', 'EAN_INVALID');
+  const choice = await verifyProductChoice(c.env.DB, body.product_id, body.variant_id);
+  if (!choice.product_id) throw badRequest('Choose a product', 'SERIAL_PRODUCT_REQUIRED');
+  const res = await linkEanToProduct(c.env.DB, ean, choice);
+  if (res.linked > 0) {
+    await audit(c.env.DB, admin.id, 'serial_inventory.link_ean', 'serial_inventory', {
+      ean,
+      product_id: choice.product_id,
+      variant_id: choice.variant_id,
+      linked: res.linked,
+      serials: res.serials,
+    });
+  }
+  return c.json({
+    success: true,
+    linked: res.linked,
+    product: { id: choice.product_id, name: choice.name, serialized: choice.serialized },
+  });
+});
+
 serialInventoryRoutes.get('/resolve', async (c) => {
   const q = c.req.query();
   const ean = str(q.ean, 'ean', { max: 20, required: false });
   const modelCode = str(q.model_code, 'model_code', { max: 60, required: false });
-  const hit = await resolveLabelProduct(c.env.DB, ean, modelCode);
-  return c.json({ success: true, match: hit });
+  const serial = str(q.serial, 'serial', { max: 60, required: false });
+  const { match, hint } = await identifyLabel(c.env.DB, { ean, model_code: modelCode, serial });
+  return c.json({ success: true, match, hint });
 });
 
 serialInventoryRoutes.get('/variants', async (c) => {

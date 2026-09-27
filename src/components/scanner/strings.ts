@@ -34,6 +34,8 @@ export interface ScannerStrings {
   added: string;
   duplicate: string;
   invalid: string;
+  /** Continuous mode, while the read is being registered. */
+  registering: string;
 }
 
 const ar: ScannerStrings = {
@@ -65,6 +67,7 @@ const ar: ScannerStrings = {
   added: 'أُضيف',
   duplicate: 'مكرّر',
   invalid: 'غير صالح',
+  registering: 'جارٍ التسجيل…',
 };
 
 const en: ScannerStrings = {
@@ -96,6 +99,7 @@ const en: ScannerStrings = {
   added: 'Added',
   duplicate: 'Duplicate',
   invalid: 'Invalid',
+  registering: 'Registering…',
 };
 
 // OWNER: Sorani to be written by hand. The lines that existed before are the

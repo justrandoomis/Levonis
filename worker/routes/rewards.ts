@@ -63,8 +63,11 @@ import { getSetting } from '../lib/settings';
 import { rateLimit } from '../lib/ratelimit';
 import { benefits, getTierStatus } from '../lib/entitlements';
 import { applyMultiplierX100, multiplierLabel, rewardMultiplierX100 } from '../lib/pointsMultiplier';
+import { getPointsRuleConfig } from '../lib/pointsOps';
+import { isPausedAtMissing } from '../lib/tierPause';
 import {
   BROWSE_REQUIRED_SECS,
+  CHECKIN_TOP_RUNG,
   MISSIONS,
   MISSION_BASE_POINTS,
   type MissionId,
@@ -113,12 +116,29 @@ async function requireMissionEnabled(c: Context<AppContext>, mission: MissionId)
  * Runs an award batch and turns the three idempotency guards into one honest
  * 409 instead of a 500. A replay must MOVE NOTHING and SAY SO.
  */
-async function runAward(c: Context<AppContext>, statements: D1PreparedStatement[]): Promise<D1Result[]> {
-  try {
-    return await c.env.DB.batch(statements);
-  } catch (e) {
+/**
+ * Runs one award batch. The statements are BUILT here, from a builder, so a
+ * database that has not run migration 0145 — no `memberships.paused_at` for
+ * the multiplier to read — gets the same award from the pre-0145 statement
+ * instead of a 500 (tierPause.ts, `isPausedAtMissing`). The batch is atomic,
+ * so the first attempt wrote nothing when it refused.
+ */
+async function runAward(
+  c: Context<AppContext>,
+  build: (pausable: boolean) => D1PreparedStatement[]
+): Promise<D1Result[]> {
+  return runBatch(c.env.DB, build).catch((e) => {
     if (isUniqueViolation(e)) throw conflict('You have already claimed this reward');
     throw e;
+  });
+}
+
+async function runBatch(db: D1Database, build: (pausable: boolean) => D1PreparedStatement[]): Promise<D1Result[]> {
+  try {
+    return await db.batch(build(true));
+  } catch (e) {
+    if (!isPausedAtMissing(e)) throw e;
+    return db.batch(build(false));
   }
 }
 
@@ -146,7 +166,7 @@ rewardRoutes.get('/', async (c) => {
   const yesterday = baghdadDay(-1, nowMs);
   const nowSecs = Math.floor(nowMs / 1000);
 
-  const [balances, claims, adVideoUrl, browse, tierStatus, streak, history, taskCfg] = await Promise.all([
+  const [balances, claims, adVideoUrl, browse, tierStatus, streak, history, taskCfg, pointsRule] = await Promise.all([
     getBalances(c.env.DB, user.id),
     c.env.DB.prepare(
       `SELECT mission, day, state, started_at, required_seconds, points
@@ -163,6 +183,7 @@ rewardRoutes.get('/', async (c) => {
     readStreak(c.env.DB, user.id, today, yesterday),
     readRewardHistory(c.env.DB, user.id, 20),
     getRewardTaskConfig(c.env),
+    getPointsRuleConfig(c.env),
   ]);
 
   const multiplierX100 = rewardMultiplierX100(tierStatus);
@@ -249,6 +270,15 @@ rewardRoutes.get('/', async (c) => {
       expires_at: tierStatus.expires_at,
       applies_to: ['checkin', 'tasks', 'purchases', 'reviews'],
     },
+    /**
+     * How points are earned, in the server's numbers, so the page states the
+     * rule instead of remembering one (0146: 1 point per 1,000 IQD; the
+     * check-in climbs one point a day to its top rung).
+     */
+    earning: {
+      iqd_per_point: pointsRule.iqd_per_point,
+      checkin_top_rung: CHECKIN_TOP_RUNG,
+    },
     history,
     is_pro: benefits.priorityService(tierStatus),
     membership_reward_multiplier_x100: multiplierX100,
@@ -276,7 +306,7 @@ rewardRoutes.post('/checkin', async (c) => {
   // award history above is the record. Updating it in the same batch keeps the
   // two agreeing, and the WHERE makes a re-run a no-op rather than a second
   // increment.
-  const res = await runAward(c, [
+  const res = await runAward(c, (pausable) => [
     ...buildDirectAwardStatements(c.env.DB, {
       claimId,
       userId: user.id,
@@ -286,6 +316,7 @@ rewardRoutes.post('/checkin', async (c) => {
       streakDay: day,
       nowIso,
       label: `Daily check-in (day ${day})`,
+      pausable,
     }),
     c.env.DB.prepare(
       `UPDATE users SET checkin_streak = ?, last_checkin_day = ?
@@ -317,10 +348,10 @@ rewardRoutes.post('/push', async (c) => {
 
   // One-time mission: the period slot is the constant 'once', so the unique
   // key dedupes it for the life of the account, not just for today.
-  const res = await runAward(
-    c,
+  const claimId = newId('rc');
+  const res = await runAward(c, (pausable) =>
     buildDirectAwardStatements(c.env.DB, {
-      claimId: newId('rc'),
+      claimId,
       userId: user.id,
       mission: 'push',
       period,
@@ -328,6 +359,7 @@ rewardRoutes.post('/push', async (c) => {
       streakDay: null,
       nowIso,
       label: 'Enabled push notifications',
+      pausable,
     })
   );
   if ((res[0]?.meta.changes ?? 0) === 0) throw conflict('You have already claimed this reward');
@@ -394,8 +426,7 @@ rewardRoutes.post('/video', async (c) => {
   const nowIso = new Date(nowMs).toISOString();
   const today = baghdadDay(0, nowMs);
 
-  const res = await runAward(
-    c,
+  const res = await runAward(c, (pausable) =>
     buildTimedAwardStatements(c.env.DB, {
       userId: user.id,
       mission: 'video',
@@ -404,6 +435,7 @@ rewardRoutes.post('/video', async (c) => {
       nowIso,
       nowSecs: Math.floor(nowMs / 1000),
       label: 'Watched ad',
+      pausable,
     })
   );
 
@@ -509,7 +541,7 @@ rewardRoutes.post('/browse/ping', async (c) => {
   // and both have to agree before a point is paid.
   let res: D1Result[];
   try {
-    res = await c.env.DB.batch(
+    res = await runBatch(c.env.DB, (pausable) =>
       buildTimedAwardStatements(c.env.DB, {
         userId: user.id,
         mission: 'browse',
@@ -518,6 +550,7 @@ rewardRoutes.post('/browse/ping', async (c) => {
         nowIso,
         nowSecs: now,
         label: 'Browsed products',
+        pausable,
       })
     );
   } catch (e) {

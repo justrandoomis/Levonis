@@ -35,7 +35,7 @@ import {
   safeFileName,
   MODEL_MAX_BYTES,
 } from '../lib/attachments';
-import { getTierStatus, benefits, usersWithEntitlement } from '../lib/entitlements';
+import { getTierStatus, benefits, membershipBadges } from '../lib/entitlements';
 import { requireOfferPrivileges, requireSellingPrivileges, storeForUser } from '../lib/merchantAuth';
 import { feeFor, autoCompleteDays } from '../lib/merchantOps';
 import {
@@ -155,7 +155,7 @@ function parseIds(raw: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, OFFER_MAX_MATERIALS) : [];
 }
 
-function offerShape(o: Record<string, unknown>, proBadges: Set<string> = new Set()) {
+function offerShape(o: Record<string, unknown>, badges: { pro: Set<string>; premium: Set<string> } = { pro: new Set(), premium: new Set() }) {
   return {
     id: o.id,
     request_id: o.request_id,
@@ -202,7 +202,8 @@ function offerShape(o: Record<string, unknown>, proBadges: Set<string> = new Set
           name: o.m_name,
           verified: !!o.m_verified,
           /** Membership status badge, separate from the moderation mark. */
-          pro_badge: proBadges.has(String(o.m_user_id)),
+          pro_badge: badges.pro.has(String(o.m_user_id)),
+          premium_badge: badges.premium.has(String(o.m_user_id)),
           badge: o.m_badge_override || o.m_badge,
           rating: o.m_rating_count ? Number(o.m_rating) / 100 : null,
           rating_count: o.m_rating_count,
@@ -871,11 +872,11 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
     history.set(String(v.offer_id), list);
   }
 
-  const proBadges = await usersWithEntitlement(c.env.DB, results.map((row) => row.m_user_id), 'proMerchantBadge');
+  const badges = await membershipBadges(c.env.DB, results.map((row) => row.m_user_id));
   return c.json({
     success: true,
     offers: results.map((row) => ({
-      ...offerShape(row, proBadges),
+      ...offerShape(row, badges),
       history: history.get(String(row.id)) ?? [],
       // The order this offer became — only the winning offer, only to its two parties.
       order_id: row.state === 'accepted' && row.r_accepted_offer_id === row.id ? (row.r_order_id ?? null) : null,

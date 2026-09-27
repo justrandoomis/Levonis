@@ -19,6 +19,7 @@ import {
   fallbackFor,
   resolveMembershipBenefits,
   saveBenefitRule,
+  tierHoldsBenefit,
   type RuleWrite,
 } from '../lib/membershipBenefits';
 import type { TierStatus } from '../lib/entitlements';
@@ -91,6 +92,18 @@ function ruleFromBody(body: Record<string, unknown>, id: string): RuleWrite {
   if (tier === 'plus') {
     throw badRequest(
       'PLUS has no shopping-benefit entitlement, so a PLUS rule would never apply. Use PREMIUM or PRO.',
+      'BENEFIT_TIER_NOT_ENTITLED'
+    );
+  }
+  /**
+   * PREMIUM CARRIES NO DISCOUNT AND NO COD EXEMPTION since 2026-09-27
+   * («اشتراك البريميوم لا يحمل خصومات», migration 0145): its only shopping
+   * benefit is free standard delivery. A rule the tier can never use is
+   * refused here for the same reason a PLUS rule is.
+   */
+  if (!tierHoldsBenefit(tier, benefitType)) {
+    throw badRequest(
+      'PREMIUM has only free delivery now — it carries no discount and no cash-on-delivery exemption, so this rule would never apply. Use PRO.',
       'BENEFIT_TIER_NOT_ENTITLED'
     );
   }
@@ -197,6 +210,13 @@ adminMembershipBenefitRoutes.get('/', async (c) => {
      *  screen renders "%" and "د.ع" from the server's word and not its own. */
     schema: {
       tiers: ['prime', 'pro'],
+      /**
+       * The tiers a DISCOUNT rule can be written for — PRO alone since
+       * PREMIUM's discounts ended (0145). The product form's «خصم العضوية
+       * لهذا المنتج» offers exactly these; the rules screen keeps `tiers`,
+       * because PREMIUM still has its free-delivery rule.
+       */
+      discount_tiers: (['prime', 'pro'] as const).filter((t) => tierHoldsBenefit(t, 'product_discount')),
       benefit_types: TYPES,
       scopes: SCOPES,
       discount_modes: MODES,
@@ -313,23 +333,8 @@ const RECOMMENDED: Array<{
     enabled: false,
     fields: { discount_mode: 'percent', percent: 10 },
   },
-  /**
-   * THE OWNER'S FIGURE: «البريميوم خصم حتى 25,000 لكل وحدة على الطابعات فقط».
-   * A FIXED 25,000 per unit, not "100% capped at 25,000": `unitDiscountIqd`
-   * already never takes more than the unit costs, so a fixed amount IS "up to
-   * 25,000 per unit", while a 100% rule would read as a free printer to anyone
-   * who opens it. The ceiling is written too (25,000, per unit) so the row
-   * passes the same validation as one typed in the dialog, and the public
-   * line prints it once (a ceiling equal to the amount is not repeated).
-   */
-  {
-    key: 'premium-printers',
-    slugs: ['printers', '3d-printers'],
-    tier: 'prime',
-    label: 'PREMIUM — طابعات',
-    enabled: true,
-    fields: { discount_mode: 'fixed', fixed_iqd: 25_000, max_discount_iqd: 25_000, cap_scope: 'per_unit' },
-  },
+  // PREMIUM's printer discount (a fixed 25,000 per unit) was withdrawn on
+  // 2026-09-27 with every other PREMIUM discount (migration 0145).
 ];
 
 const BLANK_RULE: Omit<RuleWrite, 'id' | 'tier' | 'benefit_type' | 'scope' | 'label'> = {

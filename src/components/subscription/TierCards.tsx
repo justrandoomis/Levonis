@@ -36,11 +36,14 @@ import { useMotion } from '../../lib/motion';
 import { useMoney } from '../../CurrencyContext';
 import { ErrorState, EmptyState } from '../ui/AsyncStates';
 import { cardMaterial } from './LevoCard';
-import { TIER_META, durationLabel, durationSep, type PaidTier } from './tierMeta';
+import { PRO_PAUSE_WORDS, TIER_META, durationLabel, durationSep, type PaidTier } from './tierMeta';
 import type { ApiPlan } from './types';
 
-/** Where the account stands against one tier. */
-export type TierStanding = 'current' | 'upgrade' | 'included' | 'tba' | 'open';
+/**
+ * Where the account stands against one tier. `soon` is a PAUSED tier (PRO,
+ * migration 0145): no price, no benefits, no button — only «قريبًا».
+ */
+export type TierStanding = 'current' | 'upgrade' | 'included' | 'tba' | 'open' | 'soon';
 
 export interface TierCardsProps {
   plans: ApiPlan[] | null;
@@ -202,10 +205,19 @@ export function TierCards({
           ? t('includedInYours')
           : state === 'tba'
             ? t('priceTBA')
-            : null;
+            : null; // `soon` says itself in the headline, once
 
   /** «٢٬٤١٧ د.ع / شهر» for a tier with several durations, the price otherwise. */
   const headline = (tier: PaidTier) => {
+    // A paused tier shows no price at all — «قريبًا» in its place.
+    if (standing[tier] === 'soon') {
+      return {
+        main: loc(PRO_PAUSE_WORDS.soonShort.ar, PRO_PAUSE_WORDS.soonShort.en, PRO_PAUSE_WORDS.soonShort.ckb),
+        per: null as string | null,
+        from: false,
+        sub: loc(PRO_PAUSE_WORDS.developing.ar, PRO_PAUSE_WORDS.developing.en, PRO_PAUSE_WORDS.developing.ckb) as React.ReactNode,
+      };
+    }
     const { priced, longest, cheapestMonthly } = priceFacts(plans, tier);
     if (priced.length === 0) return { main: t('priceTBA'), per: null as string | null, from: false, sub: null as React.ReactNode };
     if (priced.length === 1) {
@@ -399,7 +411,7 @@ export function TierCards({
               )}
             </div>
 
-            {highlights[selected].length > 0 && (
+            {standing[selected] !== 'soon' && highlights[selected].length > 0 && (
               <ul className="mt-4 grid gap-2.5 sm:grid-cols-2 sm:gap-x-6">
                 {highlights[selected].map((line) => (
                   <li key={line} className="flex items-start gap-2.5 text-[13.5px] leading-relaxed text-text-secondary">
