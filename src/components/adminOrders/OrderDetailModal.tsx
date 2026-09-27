@@ -9,6 +9,7 @@ import Spinner from '../ui/Spinner';
 import { Overlay } from '../ui/Overlay';
 import { ErrorState } from '../ui/AsyncStates';
 import CopyField from './CopyField';
+import { localIraqiPhone } from './localPhone';
 import { collectOnDeliveryIqd } from './collectAmount';
 import { DeliveryMethodBadge } from './deliveryMethod';
 import MysteryReveal from '../offers/MysteryReveal';
@@ -381,7 +382,8 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {/* The name copies ALONE — it goes in its own box on a courier form. */}
                 <CopyField label={loc('الاسم', 'Name', 'ناو')} value={String(addr.name ?? detail.customer.name ?? '')} />
-                <CopyField label={loc('الرقم', 'Phone', 'ژمارە')} value={String(addr.phone ?? '')} mono />
+                {/* The local form a courier types — 07…, never +964 (localPhone.ts). */}
+                <CopyField label={loc('الرقم', 'Phone', 'ژمارە')} value={localIraqiPhone(String(addr.phone ?? ''))} mono />
                 <CopyField label={loc('المحافظة', 'Governorate', 'پارێزگا')} value={govLabel} />
                 <CopyField label={loc('المنطقة', 'Area', 'ناوچە')} value={String(addr.area ?? '')} />
                 <div className="sm:col-span-2">
@@ -424,7 +426,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 {detail.customer.account_phone && (
                   <CopyField
                     label={loc('رقم الحساب (قد يختلف)', 'Account phone (may differ)', 'ژمارەی هەژمار')}
-                    value={detail.customer.account_phone}
+                    value={localIraqiPhone(detail.customer.account_phone)}
                     mono
                   />
                 )}
