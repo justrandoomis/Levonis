@@ -108,6 +108,34 @@ const THAW_SET = `expires_at = CASE WHEN expires_at IS NULL THEN NULL
                      ELSE strftime('%Y-%m-%dT%H:%M:%fZ', julianday(expires_at) + (julianday(?1) - julianday(paused_at))) END,
                   paused_at = NULL`;
 
+/**
+ * Whether this database can hold a freeze at all — 0145's column is there.
+ * The admin's switch asks BEFORE it writes anything: on a database behind the
+ * code it refuses whole, rather than storing «paused» with nothing frozen.
+ */
+export async function canFreeze(db: D1Database): Promise<boolean> {
+  try {
+    await db.prepare('SELECT paused_at FROM memberships LIMIT 0').all();
+    return true;
+  } catch (e) {
+    if (isPausedAtMissing(e)) return false;
+    throw e;
+  }
+}
+
+/** Running PRO memberships frozen right now; 0 on a database without 0145. */
+export async function countFrozenPro(db: D1Database): Promise<number> {
+  try {
+    const row = await db
+      .prepare(`SELECT COUNT(*) AS n FROM memberships WHERE tier = 'pro' AND state = 'active' AND paused_at IS NOT NULL`)
+      .first<{ n: number }>();
+    return Number(row?.n ?? 0);
+  } catch (e) {
+    if (isPausedAtMissing(e)) return 0;
+    throw e;
+  }
+}
+
 /** Freeze every running PRO membership now (the admin's «إيقاف PRO»). */
 export async function pauseProMemberships(db: D1Database, nowIso: string): Promise<number> {
   const res = await db

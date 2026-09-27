@@ -313,6 +313,7 @@ const PLAN_STRINGS = {
     resumeBody: 'سيعود بيع PRO، وتُمدَّد كل عضوية مجمّدة بالمدة التي قضتها مجمّدة. اكتب RESUME للتأكيد.',
     pausedDone: (n: number) => `أُوقف PRO — جُمّدت ${n} عضوية.`,
     resumedDone: (n: number) => `استؤنف PRO — مُدّدت ${n} عضوية.`,
+    schemaPending: 'تحديث قاعدة البيانات الذي يحتاجه إيقاف PRO لم يُطبَّق بعد — أعد المحاولة بعد دقائق.',
     pausedChip: 'موقوفة مؤقتًا',
   },
   en: {
@@ -363,6 +364,7 @@ const PLAN_STRINGS = {
     resumeBody: 'PRO goes back on sale and every frozen membership is extended by the time it spent frozen. Type RESUME to confirm.',
     pausedDone: (n: number) => `PRO paused — ${n} memberships frozen.`,
     resumedDone: (n: number) => `PRO resumed — ${n} memberships extended.`,
+    schemaPending: 'The database update the PRO pause needs has not been applied yet — try again in a few minutes.',
     pausedChip: 'Paused',
   },
   ckb: {
@@ -413,6 +415,8 @@ const PLAN_STRINGS = {
     resumeBody: 'RESUME بنووسە بۆ پشتڕاستکردنەوە.',
     pausedDone: (n: number) => `PRO ڕاگیرا — ${n} ئەندامێتی بەسترا.`,
     resumedDone: (n: number) => `PRO دەستی پێکردەوە — ${n} ئەندامێتی درێژکرایەوە.`,
+    // OWNER: Sorani to be written by hand; a Kurdish-reading admin gets the Arabic.
+    schemaPending: 'تحديث قاعدة البيانات الذي يحتاجه إيقاف PRO لم يُطبَّق بعد — أعد المحاولة بعد دقائق.',
     pausedChip: 'ڕاگیراوە',
   },
 };
@@ -534,7 +538,7 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
       setPauseText('');
       await load();
     } catch (e) {
-      setPauseNote({ ok: false, text: e instanceof ApiError ? e.message : ps.loadError });
+      setPauseNote({ ok: false, text: e instanceof ApiError ? (e.code === 'SCHEMA_PENDING' ? ps.schemaPending : e.message) : ps.loadError });
     } finally {
       setPausing(false);
     }

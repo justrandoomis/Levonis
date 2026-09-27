@@ -35,6 +35,8 @@ import { SubscriptionChangedV1 } from '@levonis/contracts/events/v1/Subscription
 import { rateLimit } from '../lib/ratelimit';
 import {
   PRO_PAUSE_KEY,
+  canFreeze,
+  countFrozenPro,
   getProPause,
   pauseProMemberships,
   resumeProMemberships,
@@ -1352,15 +1354,13 @@ membershipsRoutes.get('/admin/plans', async (c) => {
     getLaunchConfig(c.env.DB),
     countLaunchReservations(c.env.DB),
     getProPause(c.env.DB),
-    c.env.DB
-      .prepare(`SELECT COUNT(*) AS n FROM memberships WHERE tier = 'pro' AND state = 'active' AND paused_at IS NOT NULL`)
-      .first<{ n: number }>(),
+    countFrozenPro(c.env.DB),
   ]);
   return c.json({
     success: true,
     // The admin sees the stored PRO price even while the storefront hides it.
     plans: results.map((p) => ({ ...planPublic(p), active: !!p.active, paused: p.tier === 'pro' && proPause.paused })),
-    pro_pause: { paused: proPause.paused, since: proPause.since, frozen_count: Number(frozen?.n ?? 0) },
+    pro_pause: { paused: proPause.paused, since: proPause.since, frozen_count: frozen },
     launch,
     // Reservations still waiting. After the launch they are converted as each
     // account is read; this is what the panel's leftover sweep would start.
@@ -1436,6 +1436,12 @@ membershipsRoutes.post('/admin/pro-pause', async (c) => {
     throw badRequest(pause ? 'Type PAUSE to confirm' : 'Type RESUME to confirm', 'CONFIRMATION_REQUIRED');
   }
   const db = c.env.DB;
+  // A Worker can run ahead of its database (tierPause.ts): without 0145's
+  // column nothing can be frozen or thawed, so nothing is switched either —
+  // never «paused» stored over members whose days are still running.
+  if (!(await canFreeze(db))) {
+    throw new HttpError(503, 'The PRO pause needs a database update that has not been applied yet', 'SCHEMA_PENDING');
+  }
   const nowIso = new Date().toISOString();
   const before = await getProPause(db);
   const value: ProPauseConfig = pause ? { paused: true, since: before.paused ? before.since ?? nowIso : nowIso } : { paused: false, since: null };

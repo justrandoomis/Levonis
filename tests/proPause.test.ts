@@ -373,3 +373,24 @@ test('the stored switch is read tolerantly, and the days left are whole and neve
   assert.equal(frozenRemainingDays('2026-09-27T00:00:00.000Z', '2026-10-07T00:00:01.000Z'), 11, 'a started day counts');
   assert.equal(frozenRemainingDays('2026-09-27T00:00:00.000Z', '2026-09-20T00:00:00.000Z'), 0);
 });
+
+test('a Worker ahead of its database: the admin panel still loads, and the switch refuses whole — nothing half-paused', async () => {
+  // Every migration BEFORE 0145: the code of this change on the database it replaces.
+  const raw = new DatabaseSync(':memory:');
+  raw.exec('PRAGMA foreign_keys = ON;');
+  migrate(raw, (f) => f < MIGRATION);
+  raw.exec(`INSERT INTO users (id,name,email,password_hash) VALUES ('u1','Sara','s@x.co','h'), ('boss','Admin','ad@x.co','h')`);
+  raw.exec(`INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('launchConfig','{"activated":true}')`);
+  const db = new SqliteD1(raw) as unknown as D1Database;
+  const admin = app(db, 'boss', 'admin');
+
+  const listing = await admin.request('/api/memberships/admin/plans');
+  assert.equal(listing.status, 200, 'the plans panel does not fail on the missing column');
+  assert.equal(((await json(listing)).pro_pause as Record<string, unknown>).frozen_count, 0);
+
+  const refused = await post(admin, '/api/memberships/admin/pro-pause', { paused: true, confirm: 'PAUSE' });
+  assert.equal(refused.status, 503);
+  assert.equal((await json(refused)).code, 'SCHEMA_PENDING');
+  assert.equal(raw.prepare(`SELECT COUNT(*) AS n FROM admin_settings WHERE key = 'proPause'`).get()?.n, 0, 'no «paused» stored over running members');
+  assert.equal(raw.prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE action LIKE 'membership.pro_%'`).get()?.n, 0);
+});
