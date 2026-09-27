@@ -79,6 +79,7 @@ import {
   generateBlankTemplate,
   toDocBody,
   touchesPricingStructure,
+  withScopedKeys,
   docToEntries,
   translationBookkeeping,
   deriveSlug,
@@ -131,6 +132,7 @@ import {
   type ParsedMembershipRule,
   type RowIssue,
 } from '../lib/importCsv';
+import { csvToTemplateText, isSectionKey, sectionOnlyDoc, sectionTemplate, templateTextToCsv } from '../lib/sectionUpdate';
 
 export const templateRoutes = new Hono<AppContext>();
 templateRoutes.use('*', requireAdmin);
@@ -1499,7 +1501,7 @@ async function analyzeTemplate(
   // never sees a key it would have to file under `unknown_keys`, and a rule the
   // panel would refuse stops the import here rather than after the write.
   const membership = extractMembership(text);
-  const parsed = parseTemplate(membership.text);
+  let parsed = parseTemplate(membership.text);
   parsed.errors.push(...membership.errors);
   const a: Analysis = {
     parsed, refs: {}, existing: null, existingView: null, merge: null, doc: null, validation_error: null, spec: null,
@@ -1518,6 +1520,11 @@ async function analyzeTemplate(
     }
     a.existing = loaded.doc;
     a.existingView = loaded.view;
+    // The file's keys as this product stores them (a key another product
+    // owned was saved here scoped — worker/lib/relationIdScope.ts), for the
+    // merge, the binding check and the preview alike.
+    parsed = withScopedKeys(parsed, loaded.doc, loaded.view.variants);
+    a.parsed = parsed;
   }
 
   const merge = toDocBody(parsed, a.existing, a.refs, {
@@ -1666,6 +1673,8 @@ async function exportOptsFor(
   category: string | null;
   subCategory: string | null;
   specFieldIds: string[];
+  /** The same fields, whole — their names and allowed values, for a file's comments. */
+  specFields: TemplateField[];
 }> {
   let brand: string | null = null;
   if (doc.brand_id) {
@@ -1692,6 +1701,7 @@ async function exportOptsFor(
    * all three places or in none.
    */
   let specFieldIds: string[] = [];
+  let specFields: TemplateField[] = [];
   if (doc.template_family === 'devices' || doc.template_family === 'materials') {
     // SUB-CATEGORY FIRST. The branch is read leaf-first everywhere else, and
     // it must be here too: with the parent first, a Resin printer's export
@@ -1703,7 +1713,8 @@ async function exportOptsFor(
       const row = await db.prepare('SELECT slug FROM catalogs WHERE id = ?').bind(id).first<{ slug: string }>();
       if (row) branch.push({ id, slug: row.slug });
     }
-    specFieldIds = flatFields(groupsForSection(doc.template_family, branch)).map((f) => f.id);
+    specFields = flatFields(groupsForSection(doc.template_family, branch));
+    specFieldIds = specFields.map((f) => f.id);
   }
   // Slugs, not ids: a file that says `category=printers` is readable, and it
   // re-imports on any environment where that section exists.
@@ -1718,6 +1729,7 @@ async function exportOptsFor(
     category: await slugOf(doc.category_id),
     subCategory: await slugOf(doc.sub_category_id),
     specFieldIds,
+    specFields,
   };
 }
 
@@ -2092,6 +2104,49 @@ templateRoutes.get('/export/:productId', async (c) => {
 });
 
 /**
+ * «تحديث البيانات» — THE FILE TO EDIT: the product's specifications and extra
+ * content, and nothing else (worker/lib/sectionUpdate.ts). Built from the full
+ * export, so a key reads exactly as it does there; each spec line carries the
+ * field's own name above it, and its allowed values when it has a list. TXT,
+ * or `?format=csv` for a spreadsheet (`key,value`). No cost, no stale stamp:
+ * the comparison is made against the product as it is when the file comes back.
+ */
+templateRoutes.get('/section-export/:productId', async (c) => {
+  const id = c.req.param('productId');
+  const csv = c.req.query('format') === 'csv';
+  const loaded = await loadProductDocWithView(c.env.DB, id);
+  if (!loaded) throw notFound('Product not found');
+  const doc = loaded.doc;
+  const opts = await exportOptsFor(c.env.DB, doc);
+  const full = exportProduct(doc, {
+    ...opts,
+    variants: templateVariantsFromView(loaded.view),
+    inventoryMode: loaded.view.inventory_mode,
+    includeCost: false,
+  });
+  const notes = new Map(
+    opts.specFields.map((f) => {
+      const name = f.unit ? `${f.label_ar} — ${f.label_en} (${f.unit})` : `${f.label_ar} — ${f.label_en}`;
+      const allowed = f.options?.length ? ` · ${f.multiple ? 'واحد أو أكثر' : 'واحد من'}: ${f.options.join(' | ')}` : '';
+      return [`spec.${f.id}`, `${name}${allowed}`] as const;
+    })
+  );
+  const section = sectionTemplate(full, doc.id, null, notes);
+  if (!csv) return attachment(section.text, `levonis-specs-${doc.id}.txt`);
+  const body = new TextEncoder().encode(templateTextToCsv(section.text));
+  return new Response(body, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': contentDisposition(`levonis-specs-${doc.id}.csv`),
+      'Content-Length': String(body.byteLength),
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+});
+
+/**
  * THE PREVIEW PLANS THE SAVE IT IS PREVIEWING (0075).
  *
  * `analyzeTemplate` parses, merges and validates the DOCUMENT. It never
@@ -2255,6 +2310,76 @@ templateRoutes.post('/parse', async (c) => {
       cap_scope: r.cap_scope,
       max_quantity: r.max_quantity,
     })),
+  }));
+});
+
+// ------------------------------------------------- POST /section-preview
+
+/** The uploaded file as template text: a spreadsheet's `key,value` rows, or the text itself. */
+function sectionSource(body: Record<string, unknown>): { text: string; errors: string[] } {
+  const raw = str(body.text, 'text', { min: 1, max: MAX_TEMPLATE_CHARS });
+  return body.format === 'csv' ? csvToTemplateText(raw) : { text: raw, errors: [] };
+}
+
+/**
+ * «تحديث البيانات» — THE COMPARISON. The file is cut to the product's
+ * specifications and extra content (worker/lib/sectionUpdate.ts) and merged
+ * onto the product exactly as `/apply` will merge it; `changes` is every field
+ * of that section whose value differs, before → after. What the file says
+ * about any OTHER section is named in `ignored_keys` — and, when that part
+ * reads cleanly, as `ignored_changes` with its before/after — so the owner
+ * sees what this door will not touch. `updated_at` is the moment compared
+ * against: the save refuses if the product changed after it.
+ */
+templateRoutes.post('/section-preview', async (c) => {
+  await rateLimit(c, 'tpl_parse', 240, 3600);
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+  const productId = str(body.product_id, 'product_id', { min: 1, max: 80 });
+  const source = sectionSource(body);
+  const loaded = await loadProductDocWithView(c.env.DB, productId);
+  if (!loaded) throw notFound('Product not found');
+  const money = canViewFinancials(c.env, c.get('user'));
+  const section = sectionTemplate(source.text, productId, null);
+  const a = await analyzeTemplate(c.env.DB, section.text, productId, { money });
+  // What the save will write: the stored product, section 7 from the file.
+  if (a.doc && a.existing) a.doc = sectionOnlyDoc(a.doc, a.existing);
+  const planned = await plannedRefusal(c.env.DB, a, { adminId: c.get('user')!.id, money });
+  const diffOpts = {
+    includeCost: money,
+    beforeMode: a.existingView?.inventory_mode ?? null,
+    afterMode: a.existingView?.inventory_mode ?? null,
+  };
+  const changes = a.doc ? computeDiff(a.existing, a.doc, diffOpts).filter((d) => isSectionKey(d.field)) : [];
+
+  let ignoredChanges: Array<{ field: string; before: string | null; after: string | null }> = [];
+  if (section.ignored.length > 0) {
+    try {
+      const whole = await analyzeTemplate(c.env.DB, source.text, productId, { money });
+      if (whole.doc) {
+        ignoredChanges = computeDiff(whole.existing, whole.doc, diffOpts).filter((d) => !isSectionKey(d.field));
+      }
+    } catch (e) {
+      // The part that is ignored need not even read cleanly; its keys are listed regardless.
+      if (!(e instanceof HttpError)) throw e;
+    }
+  }
+
+  return c.json(projectForAdmin(c.env, c.get('user'), {
+    success: true,
+    product_id: productId,
+    updated_at: loaded.doc.updated_at ?? null,
+    errors: [
+      ...source.errors.map((message) => ({ line: 0, key: '', message })),
+      ...section.malformed.map((m) => ({ line: m.line, key: '', message: `not a key=value line: "${m.text}"` })),
+      ...a.parsed.errors,
+    ],
+    warnings: a.merge?.warnings ?? a.parsed.warnings,
+    needs_review: a.merge?.needs_review ?? [],
+    validation_error: a.validation_error ?? planned,
+    lines: section.kept.length,
+    changes,
+    ignored_keys: [...new Set(section.ignored.map((e) => e.key))],
+    ignored_changes: ignoredChanges,
   }));
 });
 
@@ -2622,10 +2747,46 @@ templateRoutes.post('/apply', async (c) => {
   await rateLimit(c, 'tpl_apply', 120, 3600);
   const adminUser = c.get('user')!;
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
-  const text = str(body.text, 'text', { min: 1, max: MAX_TEMPLATE_CHARS });
+  let text = str(body.text, 'text', { min: 1, max: MAX_TEMPLATE_CHARS });
   const mode = oneOf(body.mode, 'mode', APPLY_MODES);
   if (body.confirm !== true) {
     throw badRequest('confirm: true is required — /apply writes to the catalog (use /parse to preview)');
+  }
+  /**
+   * «تحديث البيانات» — scope `specs_content`: the file is cut HERE to the
+   * product's specifications and extra content (worker/lib/sectionUpdate.ts),
+   * with the product and the stale guard written by the server, never read
+   * from the file. Whatever else the file says cannot reach the parser, so no
+   * other section of the product can change through this call.
+   */
+  let sectionScoped = false;
+  if (body.scope !== undefined) {
+    sectionScoped = true;
+    if (body.scope !== 'specs_content') throw badRequest('scope must be "specs_content"');
+    if (mode !== 'update') throw badRequest('scope "specs_content" updates a saved product — use mode "update"');
+    const productId = str(body.product_id, 'product_id', { min: 1, max: 80 });
+    const source = sectionSource(body);
+    if (source.errors.length > 0) {
+      return c.json(
+        {
+          success: false,
+          error: 'Template has errors — nothing was written',
+          code: 'TEMPLATE_ERRORS',
+          errors: source.errors.map((message) => ({ line: 0, key: '', message })),
+        },
+        400
+      );
+    }
+    const expected =
+      typeof body.expected_updated_at === 'string' && body.expected_updated_at ? body.expected_updated_at.slice(0, 40) : null;
+    const section = sectionTemplate(source.text, productId, expected);
+    if (section.kept.length === 0) {
+      throw badRequest(
+        'The file has no specification or extra-content line to update / لا يحتوي الملف على أي سطر من المواصفات أو المحتوى الإضافي',
+        'NOTHING_TO_UPDATE'
+      );
+    }
+    text = section.text;
   }
   const duplicateChoice =
     body.duplicate_choice === undefined || body.duplicate_choice === null || body.duplicate_choice === ''
@@ -2727,6 +2888,9 @@ templateRoutes.post('/apply', async (c) => {
     );
   }
   if (a.validation_error) return analysisValidationResponse(a);
+  // «تحديث البيانات»: every field outside section 7 is the stored one — set on
+  // the analysis itself, because later steps read the document from there.
+  if (sectionScoped && a.existing && a.doc) a.doc = sectionOnlyDoc(a.doc, a.existing);
   let doc = a.doc!;
   const merge = a.merge!;
   warnings.push(...merge.warnings);

@@ -546,10 +546,10 @@ export function Modal({
         // on-screen keyboard; min-w-0 keeps wide tables from pushing the panel.
         style={{ maxHeight: Math.max(240, viewport.height - 24) }}
         className={`${workspace ? 'ap-quick-workspace sm:max-w-[1180px]' : wide ? 'sm:max-w-5xl' : 'sm:max-w-2xl'}
-          bg-[rgba(31,31,36,0.96)] border border-[var(--ap-border-strong)] rounded-t-[24px] sm:rounded-[24px]
+          bg-[var(--ap-surface-1)] border border-[var(--ap-border-strong)] rounded-t-[24px] sm:rounded-[24px]
           w-full min-w-0 overflow-hidden flex flex-col shadow-[0_32px_90px_-24px_rgb(0_0_0_/_0.85)] outline-none`}
       >
-        <div className="px-4 sm:px-5 py-3.5 border-b border-[var(--ap-hairline)] flex items-center justify-between gap-3 shrink-0 bg-[rgba(31,31,36,0.82)] backdrop-blur-xl">
+        <div className="px-4 sm:px-5 py-3.5 border-b border-[var(--ap-hairline)] flex items-center justify-between gap-3 shrink-0 bg-[var(--ap-surface-1)]">
           <h3 id={titleId} className="min-w-0">
             <span className="block text-[15px] sm:text-[17px] leading-tight font-semibold tracking-[-0.01em] text-[var(--ap-text-1)] truncate">{titleAr}</span>
             <span className="block mt-1 text-[11px] sm:text-[12px] leading-tight font-medium text-[var(--ap-text-3)] truncate" dir="ltr">{titleEn}</span>

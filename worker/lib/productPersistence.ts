@@ -98,6 +98,7 @@ import { localizeProductDoc, type LocalizeResult } from './translate/localizePro
 import { planProductTranslations, type TranslationInput } from './translate/store';
 import { dedupeHashtags, hashtagKey } from './hashtags';
 import { detachedMediaKey, enqueueMediaDetach } from './mediaRefs';
+import { scopeForeignRelationIds } from './relationIdScope';
 import { docToEntries } from './template';
 import { localizableSlots } from './translationSlots';
 import type { PhysicalDimensionOverrides } from './physicalDimensions';
@@ -555,12 +556,16 @@ export type RelationsPlan =
 export async function planRelationsWriteFrom(
   db: D1Database,
   snap: RelationsSnapshot,
-  body: Record<string, unknown>,
+  requestBody: Record<string, unknown>,
   opts: { money: boolean; mediaMetadata?: 'authoritative' | 'deferred' }
 ): Promise<RelationsPlan> {
   const money = opts.money;
   const mediaMetadataDeferred = opts.mediaMetadata === 'deferred';
   const productId = snap.productId;
+  // A key another product already owns («refill-1kg» in two filament files)
+  // becomes this product's own id, links included (relationIdScope.ts) —
+  // before any rule below reads an id, so every rule sees the ids it writes.
+  const { body } = await scopeForeignRelationIds(db, productId, requestBody);
   const baseLadder = snap.baseLadder;
   const existing = snap.existing;
   const errors: string[] = [];
@@ -1179,7 +1184,9 @@ export async function planRelationsWriteFrom(
   // The upserts below key on id, so a payload naming another product's group,
   // colour or image would silently re-parent it — and, when two products
   // reuse an id, collide on product_color_option_links' primary key and
-  // surface as a 500 instead of a message. Both are refused here by name.
+  // surface as a 500 instead of a message. A reused KEY never reaches this
+  // point any more (it was scoped to this product at the top); what is left
+  // is the case that cannot be scoped, refused here by name.
   const claimed: Array<{ table: string; ids: string[]; label: string }> = [
     { table: 'product_option_groups', ids: [...groupIds], label: 'option group' },
     { table: 'product_option_values', ids: [...valueIds], label: 'option value' },
