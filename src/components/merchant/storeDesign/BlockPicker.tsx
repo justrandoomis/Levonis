@@ -36,6 +36,7 @@ export default function BlockPicker({
   store,
   data,
   onAdd,
+  position,
 }: {
   open: boolean;
   onClose: () => void;
@@ -43,6 +44,8 @@ export default function BlockPicker({
   store: StorefrontStore;
   data: BlockData;
   onAdd: (type: BlockType, variant: string) => void;
+  /** Where the section will go, in words («يُضاف بعد «…»» / «في آخر الصفحة»). */
+  position: string;
 }) {
   const { loc } = useLanguage();
   const [cat, setCat] = useState<BlockCategory>('products');
@@ -96,7 +99,7 @@ export default function BlockPicker({
       footer={
         <div className="flex items-center gap-3">
           <p className="min-w-0 flex-1 text-[12px] leading-snug text-text-muted">
-            {!refused ? loc('يُضاف بعد القسم المحدد، أو في آخر الصفحة.', 'Added after the selected section, or at the end.') : <span className="text-warning">{say(loc, ADD_REFUSAL_COPY[refused])}</span>}
+            {!refused ? <span data-sd-position>{position}</span> : <span className="text-warning">{say(loc, ADD_REFUSAL_COPY[refused])}</span>}
           </p>
           <Button
             variant="primary"

@@ -118,13 +118,17 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
   const [device, setDevice] = useState<Device>('phone');
   const [phoneView, setPhoneView] = useState<'edit' | 'preview'>('edit');
   const [pickerOpen, setPickerOpen] = useState(false);
+  /**
+   * Where «أضف قسمًا» inserts: after this block (a row's «أضف قسمًا بعده»),
+   * or at the end. The picker used to promise «after the selected section»,
+   * but the add button only shows when no section is selected — every new
+   * section went to the end (review of the store builder, 2026-09-28).
+   */
+  const [insertAfter, setInsertAfter] = useState<string | null>(null);
   const [starterOpen, setStarterOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [firstRunDismissed, setFirstRunDismissed] = useState(false);
   const [starting, setStarting] = useState<ThemeName | null>(null);
-  const [revCursor, setRevCursor] = useState<number | null>(() =>
-    server.revisions.length < server.revision_count && server.revisions.length ? server.revisions[server.revisions.length - 1].revision : null
-  );
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
 
@@ -161,7 +165,10 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
   const visible = renderableBlocks(validation.result.layout).length;
   const status = ed.save?.status ?? 'saved';
   const changes = ed.changes;
-  const nothingToPublish = !!changes?.none && !!server.published;
+  // Nothing differs from what visitors see — the published page, or, before
+  // the first publish, the classic page every store shows. «تغييرات غير
+  // منشورة» used to greet a store that had changed nothing, on its first open.
+  const nothingToPublish = !!changes?.none;
 
   const select = (id: string) => {
     setSelectedId(id);
@@ -171,13 +178,23 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
 
   const refuse = (reason: string) => toast.error(say(loc, ADD_REFUSAL_COPY[reason], reason));
 
+  const after = insertAfter ? layout.blocks.find((b) => b.id === insertAfter) ?? null : null;
   const add = (type: BlockType, variant: string) => {
-    const at = selected ? layout.blocks.indexOf(selected) + 1 : undefined;
+    const at = after ? layout.blocks.indexOf(after) + 1 : undefined;
     const r = addBlock(layout, type, at, { variant });
     if ('refused' in r) return refuse(r.refused);
     ed.change(r.layout);
+    setInsertAfter(null);
     select(r.id);
   };
+  const openPicker = (afterId: string | null) => {
+    setInsertAfter(afterId);
+    setPickerOpen(true);
+  };
+  // OWNER: Sorani to be written by hand.
+  const position = after
+    ? loc(`يُضاف بعد «${say(loc, BLOCK_COPY[after.type].name)}».`, `Added after «${say(loc, BLOCK_COPY[after.type].name)}».`)
+    : loc('يُضاف في آخر الصفحة.', 'Added at the end of the page.');
 
   const duplicate = (id: string) => {
     const r = duplicateBlock(layout, id);
@@ -211,22 +228,35 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
   };
 
   const applyStarter = async (t: ThemeName, first: boolean) => {
-    ed.change(starterLayout(t));
     setSelectedId(null);
     if (first) {
       setStarting(t);
-      const ok = await ed.flush();
+      // The saver is handed the template itself, then asked to save it:
+      // flushing right after `change` saved the page from BEFORE the choice
+      // (the saver hears of a change only after the next render).
+      const ok = await ed.changeAndSave(starterLayout(t));
       setStarting(null);
       setFirstRunDismissed(true);
       if (!ok) toast.error(loc('تعذّر حفظ القالب في المسودة — حاول مجددًا.', 'Could not save the template to the draft — try again.'));
     } else {
+      ed.change(starterLayout(t));
       toast.success(loc('طُبّق القالب على المسودة.', 'Template applied to the draft.'), { action: { label: loc('تراجع', 'Undo'), onClick: ed.undo } });
     }
   };
 
   const publish = async (note: string) => {
     const r = await ed.publish(note);
-    toast.success(loc(`نُشرت النسخة ${r.revision} — هذا ما يراه زبائنك الآن.`, `Version ${r.revision} is live — this is what customers see now.`), {
+    // What the server took out on the way (a product or a collection deleted
+    // since the draft was saved) is said, not left for the merchant to notice.
+    const cleaned = r.issues.some((i) => i.code === 'unknown_ref' || i.code === 'media_not_found');
+    // OWNER: Sorani to be written by hand.
+    const words = cleaned
+      ? loc(
+          `نُشرت النسخة ${r.revision}. أُزيل منها ما لم يعد في متجرك (منتج أو مجموعة أو ملف حُذف).`,
+          `Version ${r.revision} is live. What is no longer in your store (a deleted product, collection or file) was left out.`
+        )
+      : loc(`نُشرت النسخة ${r.revision} — هذا ما يراه زبائنك الآن.`, `Version ${r.revision} is live — this is what customers see now.`);
+    toast.success(words, {
       action: store.url ? { label: loc('عرض المتجر', 'View store'), onClick: () => window.open(store.url, '_blank', 'noopener') } : undefined,
     });
   };
@@ -327,7 +357,7 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
           className="ms-auto whitespace-nowrap"
           icon={<Plus className="h-4 w-4" aria-hidden="true" />}
           disabled={limits.blocks >= limits.maxBlocks}
-          onClick={() => setPickerOpen(true)}
+          onClick={() => openPicker(null)}
           data-sd-open-picker
         >
           {loc('أضف قسمًا', 'Add a section')}
@@ -360,6 +390,8 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
           onDuplicate={duplicate}
           onToggleHidden={toggleHidden}
           onDelete={remove}
+          onAddAfter={(id) => openPicker(id)}
+          full={limits.blocks >= limits.maxBlocks}
         />
       )}
     </div>
@@ -404,13 +436,7 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
               setSelectedId(null);
               toast.success(pub ? loc(`أُعيدت النسخة ${r} ونُشرت.`, `Version ${r} restored and published.`) : loc(`أُعيدت النسخة ${r} إلى المسودة.`, `Version ${r} restored to the draft.`));
             }}
-            onMore={
-              revCursor
-                ? async () => {
-                    setRevCursor(await ed.loadMoreRevisions(revCursor));
-                  }
-                : null
-            }
+            onMore={ed.revCursor !== null ? () => ed.loadMoreRevisions() : null}
           />
         )}
       </div>
@@ -494,7 +520,7 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
         </div>
       )}
 
-      <BlockPicker open={pickerOpen} onClose={() => setPickerOpen(false)} layout={layout} store={store} data={ed.data} onAdd={add} />
+      <BlockPicker open={pickerOpen} onClose={() => setPickerOpen(false)} layout={layout} store={store} data={ed.data} onAdd={add} position={position} />
       <StarterSheet open={starterOpen} onClose={() => setStarterOpen(false)} storeAccent={store.accent} onChoose={(t) => void applyStarter(t, false)} />
       <PublishDialog open={publishOpen} onClose={() => setPublishOpen(false)} changes={changes} onPublish={publish} />
     </div>

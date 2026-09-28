@@ -15,7 +15,8 @@ import { Segmented } from '../../ui/Segmented';
 import { Button } from '../../ui/Button';
 import StoreTheme from '../../storefront/StoreTheme';
 import '../../storefront/styles';
-import { ACCENTS, accentFor } from '../../storefront/theme';
+import { accentFor } from '../../storefront/theme';
+import { AccentSample } from '../AccentSample';
 import { FOOTER_VARIANTS, HEADER_VARIANTS, type StoreLayout } from '../../../../packages/storeLayout/src/schema';
 import { THEME_NAMES, THEME_PRESETS, TOKEN_KEYS, TOKEN_VALUES, type ThemeName, type ThemeTokens } from '../../../../packages/storeLayout/src/tokens';
 import { FOOTER_COPY, HEADER_COPY, say, THEME_COPY, TOKEN_COPY, TOKEN_VALUE_COPY } from './catalog';
@@ -174,7 +175,10 @@ export function ThemePanel({
                   onChange={set}
                   render={(v) => (
                     <>
-                      <span aria-hidden="true" className={`h-3 w-3 rounded-full ${v === 'store' ? accentFor({ ...layout.tokens, accent: 'store' }, storeAccent).classes.indicator : (ACCENTS[v] ?? ACCENTS.default).indicator}`} />
+                      {/* The colour as the page wears it, in a store island: a bare
+                          dot took the app's light theme and could not tell the
+                          three gold-dotted presets apart. */}
+                      <AccentSample accent={v === 'store' ? (accentFor({ ...layout.tokens, accent: 'store' }, storeAccent).name ?? 'default') : v} />
                       {word(v)}
                     </>
                   )}

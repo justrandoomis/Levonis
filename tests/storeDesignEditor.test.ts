@@ -621,6 +621,30 @@ test('autosave: 409 DRAFT_CHANGED is a conflict — no more saves until «reload
   assert.equal(g.saver.unsaved, false);
 });
 
+test('autosave: «keep mine» ALWAYS saves — even when the editor is back to what this tab last saved', async () => {
+  // Another tab saved over this one's draft; this tab then came back (an
+  // undo) to exactly what it had saved. «Keep mine» used to answer «saved»
+  // without sending anything — and a publish then published the OTHER draft.
+  const f = fakeSaver(2);
+  const a = done(addBlock(defaultLayoutFromStore(null), 'text')).layout;
+  f.saver.update(...gated(a));
+  await f.tick();
+  assert.equal(f.saver.snapshot.version, 3);
+  f.answer(async () => {
+    throw Object.assign(new Error('changed'), { code: 'DRAFT_CHANGED', details: { version: 7 } });
+  });
+  f.saver.update(...gated(done(addBlock(a, 'faq')).layout));
+  await f.tick();
+  assert.equal(f.saver.snapshot.status, 'conflict');
+  f.saver.update(...gated(a));
+  f.answer(async (layout, v) => ({ version: v + 1, layout, issues: [] }));
+  assert.equal(await f.saver.keepMine(7), true);
+  assert.equal(f.sent.length, 3, 'mine was sent over the other draft');
+  assert.equal(f.sent[2].version, 7);
+  assert.equal(JSON.stringify(f.sent[2].layout), JSON.stringify(gated(a)[0]));
+  assert.equal(f.saver.snapshot.version, 8);
+});
+
 test('autosave: a failed save is an error the next change or flush retries — never a loop', async () => {
   const f = fakeSaver(0);
   let fail = true;

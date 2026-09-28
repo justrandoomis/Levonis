@@ -1,6 +1,9 @@
 /**
  * SHOWCASE — the workshop on display: finished works, the printers, the
- * materials. Grouped by kind (the classic Showcase tab) or one grid.
+ * materials. Grouped by kind (the classic Showcase tab) or one grid — in the
+ * order the merchant put the kinds in the inspector (↑/↓). It used to draw
+ * works, printers, materials whatever that order said, and the grid came in
+ * the server's alphabetical order: materials first.
  */
 import { Hammer, Layers, Printer } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -24,6 +27,7 @@ export function ShowcaseView({ items, kinds = ['work', 'printer', 'material'] }:
     <div className="space-y-4">
       {groups
         .filter((g) => kinds.includes(g.kind))
+        .sort((a, b) => kinds.indexOf(a.kind) - kinds.indexOf(b.kind))
         .map((g) => {
           const group = items.filter((i) => i.kind === g.kind);
           if (!group.length) return null;
@@ -81,7 +85,13 @@ export default function ShowcaseBlock({ block, data }: BlockProps<'showcase'>) {
   const rows = useBlockRows(data.showcase, rt.loadShowcase);
   if (rows === null) return <Column><Loading /></Column>;
   const kinds = block.settings.kinds;
-  const items = rows.filter((r) => kinds.includes(r.kind)).slice(0, block.settings.limit);
+  // In the kinds' order; within a kind, the merchant's own (the server's).
+  const items = rows
+    .filter((r) => kinds.includes(r.kind))
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => kinds.indexOf(a.r.kind) - kinds.indexOf(b.r.kind) || a.i - b.i)
+    .map(({ r }) => r)
+    .slice(0, block.settings.limit);
   if (!items.length) return null;
   return (
     <Column>

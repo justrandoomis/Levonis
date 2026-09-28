@@ -14,6 +14,8 @@ export function builderRefusal(e: unknown, loc: Loc): string {
   switch (codeOf(e)) {
     case 'DRAFT_CHANGED':
       return loc('تغيّرت المسودة من مكان آخر.', 'The draft changed somewhere else.');
+    case 'DRAFT_SAVE_FAILED':
+      return loc('تعذّر حفظ آخر تعديلاتك قبل النشر — تحقّق من الاتصال وحاول مجددًا.', 'Your latest edits could not be saved before publishing — check the connection and try again.');
     case 'DRAFT_UNSAVED':
       return loc('لم تُحفظ آخر تعديلاتك بعد — صحّح الحقول المعلّمة ثم أعد المحاولة.', 'Your latest edits are not saved yet — fix the marked fields and try again.');
     case 'DRAFT_MISSING':

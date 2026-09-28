@@ -16,7 +16,7 @@
  */
 import { useRef, useState } from 'react';
 import { MotionConfig, Reorder, useDragControls } from 'motion/react';
-import { AlertCircle, ArrowDown, ArrowUp, Copy, Eye, EyeOff, GripVertical, Monitor, MoreHorizontal, Smartphone, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, Copy, Eye, EyeOff, GripVertical, Monitor, MoreHorizontal, Plus, Smartphone, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { IconButton } from '../../ui/Button';
 import { Menu } from '../../ui/Menu';
@@ -53,11 +53,17 @@ export default function BlockList({
   onDuplicate,
   onToggleHidden,
   onDelete,
+  onAddAfter,
+  full = false,
 }: {
   blocks: StoreBlock[];
   selectedId: string | null;
   flags: (b: StoreBlock) => RowFlags;
   onSelect: (id: string) => void;
+  /** «أضف قسمًا بعده»: open the picker to insert right below this row. */
+  onAddAfter: (id: string) => void;
+  /** The page is at its section limit: nothing can be added. */
+  full?: boolean;
   /** A drag in progress: the new order of ids. */
   onReorder: (ids: string[]) => void;
   onMove: (id: string, delta: -1 | 1) => void;
@@ -94,6 +100,8 @@ export default function BlockList({
             onDuplicate={() => onDuplicate(b.id)}
             onToggleHidden={() => onToggleHidden(b.id)}
             onDelete={() => onDelete(b.id)}
+            onAddAfter={() => onAddAfter(b.id)}
+            full={full}
           />
         ))}
       </Reorder.Group>
@@ -115,6 +123,8 @@ function Row({
   onDuplicate,
   onToggleHidden,
   onDelete,
+  onAddAfter,
+  full,
 }: {
   block: StoreBlock;
   index: number;
@@ -126,6 +136,8 @@ function Row({
   onDuplicate: () => void;
   onToggleHidden: () => void;
   onDelete: () => void;
+  onAddAfter: () => void;
+  full: boolean;
 }) {
   const { loc, lang } = useLanguage();
   const controls = useDragControls();
@@ -221,6 +233,14 @@ function Row({
             hint: flags.canDuplicate ? undefined : loc('وصلت إلى الحد', 'At the limit'),
           },
           { id: 'hide', label: block.hidden ? loc('إظهار', 'Show') : loc('إخفاء', 'Hide'), icon: block.hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />, onSelect: onToggleHidden },
+          {
+            id: 'add-after',
+            label: loc('أضف قسمًا بعده', 'Add a section below'),
+            icon: <Plus className="h-4 w-4" />,
+            onSelect: onAddAfter,
+            disabled: full,
+            hint: full ? loc('وصلت إلى الحد', 'At the limit') : undefined,
+          },
           { id: 'sep', separator: true },
           { id: 'del', label: loc('حذف', 'Delete'), icon: <Trash2 className="h-4 w-4" />, onSelect: onDelete, destructive: true },
         ]}

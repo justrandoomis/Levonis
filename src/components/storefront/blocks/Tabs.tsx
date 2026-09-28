@@ -40,11 +40,14 @@ export default function TabsBlock({ block, store, data }: BlockProps<'tabs'>) {
 
   const [tab, setTab] = useState<TabKind>(() => {
     if (rt.section && wants('products')) return 'products';
+    if (rt.section && wants('collections')) return 'collections';
     if (rt.initialTab && wants(rt.initialTab)) return rt.initialTab;
     return items.includes('products') ? 'products' : items[0];
   });
   // The section filter lives up here: the Collections tab picks one, the
-  // Products tab shows it (with a clear chip).
+  // Products tab shows it (with a clear chip). A strip WITHOUT a Products tab
+  // shows the picked collection's products in the Collections tab itself —
+  // picking one used to switch to a tab that was not there, and nothing moved.
   const [sectionFilter, setSectionFilter] = useState(rt.section);
 
   const show: Record<TabKind, boolean> = {
@@ -86,7 +89,7 @@ export default function TabsBlock({ block, store, data }: BlockProps<'tabs'>) {
       </div>
 
       <TabPanels value={current} order={TABS.map((t) => t.id)}>
-        {current === 'products' ? (
+        {current === 'products' || (current === 'collections' && sectionFilter && !wants('products')) ? (
           <ProductsView
             initial={data.products.latest}
             collections={sections}
@@ -107,7 +110,7 @@ export default function TabsBlock({ block, store, data }: BlockProps<'tabs'>) {
               aboutReviews={block.settings.about_reviews}
               onPickSection={(id) => {
                 setSectionFilter(id);
-                setTab('products');
+                if (wants('products')) setTab('products');
               }}
             />
           </Suspense>

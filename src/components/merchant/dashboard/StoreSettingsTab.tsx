@@ -31,7 +31,7 @@ import ShareStore from '../share/ShareStore';
 import { Skeleton } from '../../ui/Skeleton';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { merchantRefusal } from '../shell/refusal';
-import { ACCENTS } from '../../storefront/theme';
+import { AccentSample } from '../AccentSample';
 import { Link } from 'react-router-dom';
 import {
   LIMITS,
@@ -52,14 +52,7 @@ const DeliverySettingsEditor = lazy(() => import('../delivery/DeliverySettingsEd
 
 type Loc = (ar: string, en: string, ckb?: string) => string;
 
-/**
- * The seven store colours, drawn from the STOREFRONT's own accent table
- * (src/components/storefront/theme.ts) inside a dark store island — so the
- * swatch is the colour the shop page will actually wear, in the light app
- * theme too (the app's light theme darkens these utilities everywhere else).
- * Each swatch shows the accent's dot and its button fill: three of the seven
- * share the gold dot and differ only in the button.
- */
+/** The seven store colours' names; each is drawn by `AccentSample` (../AccentSample.tsx). */
 const ACCENT_NAMES: Array<{ id: string; ar: string; en: string }> = [
   { id: 'default', ar: 'Levonis', en: 'Levonis' },
   { id: 'olive', ar: 'زيتوني', en: 'Olive' },
@@ -69,16 +62,6 @@ const ACCENT_NAMES: Array<{ id: string; ar: string; en: string }> = [
   { id: 'teal', ar: 'فيروزي', en: 'Teal' },
   { id: 'blue', ar: 'أزرق', en: 'Blue' },
 ];
-
-export function AccentSample({ accent }: { accent: string }) {
-  const a = ACCENTS[accent] ?? ACCENTS.default;
-  return (
-    <span data-store-theme="" aria-hidden="true" className="inline-flex items-center gap-1 rounded-md bg-canvas p-1">
-      <span className={`h-3.5 w-3.5 rounded-full ${a.indicator}`} />
-      <span className={`h-3.5 w-5 rounded ${a.btn}`} />
-    </span>
-  );
-}
 
 const POLICY_PRESETS: Array<[string, string, string]> = [
   ['الشحن والتوصيل', 'Shipping & delivery', 'گەیاندن'],

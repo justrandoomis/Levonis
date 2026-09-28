@@ -11,6 +11,10 @@
  *     `@container` variants), not the viewport's, so a preview frame lays out
  *     exactly like a device of that width. Per-block visibility is the same
  *     test at 48rem.
+ *   - An address that asks for one part of the store (`/products`, `/about`,
+ *     `?tab=…`, `?section=…`) on a page with no tab strip gets that part as a
+ *     page of its own (./StoreViewPage.tsx) — on six of the seven starters
+ *     such links used to draw the home page again.
  *   - What a visitor sees first on the classic page — the hero, the tab strip
  *     and the Products tab — ships with the storefront. The other tabs' views
  *     (and the blocks made of them) are one lazy chunk, fetched as soon as the
@@ -26,6 +30,7 @@ import type { StoreBlock, StoreLayout } from '../../../packages/storeLayout/src/
 import StoreTheme, { useStoreTheme } from './StoreTheme';
 import { StoreFooter, StoreHeader } from './StoreHeader';
 import { useStorefrontRuntime } from './runtime';
+import { addressedView } from './addressedView';
 import HeroBlock from './blocks/Hero';
 import TabsBlock from './blocks/Tabs';
 import ProductsGridBlock from './blocks/ProductsGrid';
@@ -48,6 +53,9 @@ const TabViewBlock = lazy(() => import('./blocks/tabViews'));
 
 /** Every other block, in one chunk fetched when a layout first needs it. */
 const ExtraBlock = lazy(() => import('./blocks/extra'));
+
+/** One part of the store as its own page, on a layout with no tab strip. */
+const StoreViewPage = lazy(() => import('./StoreViewPage'));
 
 /**
  * The other tabs' chunk, fetched once the page is idle, so the first tab a
@@ -136,16 +144,8 @@ export default function StoreRenderer({
   const rt = useStorefrontRuntime();
   const layout = useMemo(() => renderableLayout(rawLayout ?? store.layout, store), [rawLayout, store]);
   const data = useMemo(() => dataOverride ?? blockData(store), [dataOverride, store]);
-  let blocks = renderableBlocks(layout);
-  // An address that asks for one collection (`?section=`) on a page with no
-  // tab strip to show it in gets that collection first, as a grid.
-  if (rt.section && !blocks.some((b) => b.type === 'tabs')) {
-    const shelf = normalizeLayout(
-      { blocks: [{ id: 'collection-view', type: 'products_grid', settings: { source: 'collection', collection_id: rt.section, limit: 24 } }] },
-      { ownerUserId: null }
-    ).layout.blocks;
-    blocks = [...shelf, ...blocks];
-  }
+  const blocks = renderableBlocks(layout);
+  const view = addressedView(blocks, rt);
   usePrefetchTabViews(blocks.some((b) => b.type === 'tabs'));
 
   return (
@@ -153,11 +153,17 @@ export default function StoreRenderer({
       <Glow />
       <div className="@container relative z-0">
         <StoreHeader variant={layout.header.variant} store={store} />
-        <div className="sf-stack">
-          {blocks.map((b) => (
-            <Block key={b.id} block={b} store={store} data={data} />
-          ))}
-        </div>
+        {view ? (
+          <Suspense fallback={<div className="min-h-48" />}>
+            <StoreViewPage kind={view} store={store} data={data} header={layout.header.variant} />
+          </Suspense>
+        ) : (
+          <div className="sf-stack">
+            {blocks.map((b) => (
+              <Block key={b.id} block={b} store={store} data={data} />
+            ))}
+          </div>
+        )}
         <StoreFooter variant={layout.footer.variant} store={store} />
       </div>
     </StoreTheme>

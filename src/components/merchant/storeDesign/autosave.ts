@@ -194,8 +194,15 @@ export class DraftSaver {
     return !this.unsaved;
   }
 
-  /** «Keep mine»: save this layout over the newer draft, fenced on the version it now has. */
+  /**
+   * «Keep mine»: save this layout over the newer draft, fenced on the version
+   * it now has. ALWAYS a save: the server holds another tab's draft now, so
+   * «what this tab last saved» says nothing about what is there. When the
+   * editor had come back to exactly that (an undo), this used to report
+   * «saved» without saving — and a publish then published the other draft.
+   */
   keepMine(version: number) {
+    this.savedJson = '';
     this.set({ status: 'pending', version, conflictVersion: null, errorCode: null });
     return this.flush();
   }

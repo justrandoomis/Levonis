@@ -26,10 +26,14 @@ const SHOWN_WHEN: Partial<Record<BlockType, Record<string, (s: Record<string, un
   products_carousel: { collection_id: (s) => s.source === 'collection' },
   social_links: { items: (s) => s.source === 'custom' },
   info_cards: { items: (s) => s.source === 'custom' },
+  // A field is offered only where the variant draws it (review of the store
+  // builder, 2026-09-28): the minimal hero has no picture, and the split hero
+  // always sets its words beside the picture, start-aligned.
   hero: {
     show_cover: (_s, v) => v === 'profile',
     show_bio: (_s, v) => v === 'profile',
-    align: (_s, v) => v !== 'profile',
+    align: (_s, v) => v === 'cover' || v === 'minimal',
+    image: (_s, v) => v !== 'minimal',
   },
 };
 

@@ -37,6 +37,7 @@ export function ProductsView({
   onClearSection,
   previewCount,
   storeOpen,
+  expanded = false,
 }: {
   /** The first page of the store's newest products, when it came with the store. */
   initial: ProductPage | undefined;
@@ -45,6 +46,8 @@ export function ProductsView({
   onClearSection: () => void;
   previewCount: number;
   storeOpen: boolean;
+  /** A page of its own (./StoreViewPage.tsx): every product, paged, no «show all» and no title of its own. */
+  expanded?: boolean;
 }) {
   const { loc, lang } = useLanguage();
   const { accent } = useStoreTheme();
@@ -57,7 +60,7 @@ export function ProductsView({
     cursor: injected ? null : (preloaded?.next_cursor ?? null),
   }));
   const [more, setMore] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(expanded);
 
   useEffect(() => {
     if (injected) {
@@ -128,9 +131,9 @@ export function ProductsView({
 
   return (
     <div>
-      <div dir="rtl" className="flex items-center justify-between mb-3">
-        {sectionFilter ? chip : <h2 className="sf-title text-white">{loc('أحدث المنتجات', 'Latest products', 'نوێترین بەرهەمەکان')}</h2>}
-        {!sectionFilter && (sorted.length > previewCount || state.cursor) && (
+      <div dir="rtl" className="flex items-center justify-between mb-3 empty:hidden">
+        {sectionFilter ? chip : expanded ? null : <h2 className="sf-title text-white">{loc('أحدث المنتجات', 'Latest products', 'نوێترین بەرهەمەکان')}</h2>}
+        {!expanded && !sectionFilter && (sorted.length > previewCount || state.cursor) && (
           <button type="button" onClick={() => setShowAll((v) => !v)} className={`relative lv-hit rounded-md text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${accent.text}`}>
             {showAll ? loc('عرض أقل', 'Show less', 'کەمتر') : loc('عرض الكل', 'View all', 'هەموو ببینە')}
           </button>

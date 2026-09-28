@@ -47,7 +47,7 @@ export default function HeroBlock({ block, store, data }: HeroProps) {
 
 // ------------------------------------------------------------------ profile
 
-function ProfileHero({ block, store, cover, name }: HeroProps & { cover: string; name: string }) {
+function ProfileHero({ block, store, data, cover, name }: HeroProps & { cover: string; name: string }) {
   const s = block.settings;
   const { loc, lang } = useLanguage();
   const { accent } = useStoreTheme();
@@ -107,6 +107,9 @@ function ProfileHero({ block, store, cover, name }: HeroProps & { cover: string;
           </div>
         </div>
 
+        {/* The merchant's own button (a label and a link in the inspector):
+            the profile hero used to leave it out while the other three drew it. */}
+        <HeroCta block={block} data={data} className="mb-4 w-full" />
         <ProfileRows block={block} store={store} bio={bio} />
       </Column>
     </div>
@@ -256,7 +259,7 @@ export function Avatar({ store, size }: { store: StorefrontStore; size: string }
   );
 }
 
-export function HeroCta({ block, data }: Pick<HeroProps, 'block' | 'data'>) {
+export function HeroCta({ block, data, className = '' }: Pick<HeroProps, 'block' | 'data'> & { className?: string }) {
   const text = useText();
   const { accent } = useStoreTheme();
   const label = text(block.settings.cta_label);
@@ -265,7 +268,7 @@ export function HeroCta({ block, data }: Pick<HeroProps, 'block' | 'data'>) {
     <LinkTo
       link={block.settings.cta_link}
       data={data}
-      className={`inline-flex items-center justify-center min-h-[44px] px-5 rounded-xl font-bold text-[13px] ${accent.btn} active:scale-[0.98] transition-transform`}
+      className={`inline-flex items-center justify-center min-h-[44px] px-5 rounded-xl font-bold text-[13px] ${accent.btn} active:scale-[0.98] transition-transform ${className}`}
     >
       {label}
     </LinkTo>

@@ -65,8 +65,22 @@ export function useLayoutEditor() {
   const [saver, setSaverState] = useState<SaverState | null>(null);
   const [data, setData] = useState<BlockData>(emptyBlockData);
   const [viewing, setViewing] = useState<{ revision: number; layout: StoreLayout; data: BlockData } | null>(null);
+  /** The next page of published versions, or null when every one is listed. */
+  const [revCursor, setRevCursor] = useState<number | null>(null);
   const saverRef = useRef<DraftSaver | null>(null);
   const dataNeeds = useRef('');
+
+  /**
+   * A fresh answer from GET / (load, publish, restore, reload, keep mine):
+   * its first page of versions REPLACES the list, so the paging cursor is
+   * worked out again from it. It was worked out once, on the first render —
+   * after a publish the «older versions» button could vanish for good.
+   */
+  const adoptServer = useCallback((s: LayoutState) => {
+    setServer(s);
+    const last = s.revisions[s.revisions.length - 1];
+    setRevCursor(last && s.revisions.length < s.revision_count ? last.revision : null);
+  }, []);
 
   const present = history?.present ?? null;
   const validation: Validation | null = useMemo(() => (present && owner ? validateLayout(present, owner) : null), [present, owner]);
@@ -122,7 +136,7 @@ export function useLayoutEditor() {
           .catch(() => me.store as StorefrontStore);
         setStore(pub);
       }
-      setServer(s);
+      adoptServer(s);
       const initial = s.draft.layout;
       dispatch({ t: 'reset', layout: initial });
       makeSaver(s.draft.version, validateLayout(initial, owner || '\u0000').result.layout);
@@ -131,7 +145,7 @@ export function useLayoutEditor() {
     } catch (e) {
       setLoadError(e);
     }
-  }, [makeSaver, owner, refreshData]);
+  }, [adoptServer, makeSaver, owner, refreshData]);
 
   useEffect(() => {
     if (owner) void load();
@@ -162,30 +176,52 @@ export function useLayoutEditor() {
 
   const change = useCallback((layout: StoreLayout, key: string | null = null) => dispatch({ t: 'commit', layout, key }), []);
 
+  /**
+   * Change AND save now — a template chosen on the first run. The saver is
+   * handed the normalised layout here, not on the next render: `flush()`
+   * right after `change()` saved what the editor held BEFORE the change.
+   */
+  const changeAndSave = useCallback(
+    async (layout: StoreLayout) => {
+      dispatch({ t: 'commit', layout, key: null });
+      const v = validateLayout(layout, owner);
+      saverRef.current?.update(v.result.layout, v.fatal);
+      return (await saverRef.current?.flush()) ?? false;
+    },
+    [owner]
+  );
+
   /** What visitors see now: the published layout, or the classic page a store without one shows. */
   const live = useMemo(() => server?.published?.layout ?? defaultLayoutFromStore(null), [server]);
   const changes = useMemo(() => (validation ? summarizeChanges(live, validation.result.layout) : null), [live, validation]);
 
   const reloadDraft = useCallback(async () => {
     const s = await storeLayoutApi.get();
-    setServer(s);
+    adoptServer(s);
     dispatch({ t: 'reset', layout: s.draft.layout });
     saverRef.current?.adopt(s.draft.version, validateLayout(s.draft.layout, owner).result.layout);
     await refreshData(s.draft.layout, true);
-  }, [owner, refreshData]);
+  }, [adoptServer, owner, refreshData]);
 
   const keepMine = useCallback(async () => {
     const s = await storeLayoutApi.get();
-    setServer(s);
+    adoptServer(s);
     return saverRef.current?.keepMine(s.draft.version) ?? false;
-  }, []);
+  }, [adoptServer]);
 
   const flush = useCallback(() => saverRef.current?.flush() ?? Promise.resolve(false), []);
 
   const publish = useCallback(
     async (note: string) => {
       const saved = await flush();
-      if (!saved) throw new ApiError(409, 'not saved', saverRef.current?.snapshot.status === 'conflict' ? 'DRAFT_CHANGED' : 'DRAFT_UNSAVED');
+      if (!saved) {
+        // The reason the save failed, not always «fix the marked fields»: a
+        // dropped connection or a rate limit has no field to fix.
+        const st = saverRef.current?.snapshot;
+        const code =
+          st?.status === 'conflict' ? 'DRAFT_CHANGED' : st?.status === 'blocked' ? 'DRAFT_UNSAVED' : st?.errorCode || 'DRAFT_SAVE_FAILED';
+        throw new ApiError(409, 'not saved', code);
+      }
       let version = saverRef.current?.snapshot.version ?? 0;
       if (version === 0 && present) {
         // Nothing was ever saved: the draft is what the editor shows; save it first.
@@ -194,11 +230,11 @@ export function useLayoutEditor() {
       }
       const r = await storeLayoutApi.publish(version, note.trim());
       const s = await storeLayoutApi.get();
-      setServer(s);
+      adoptServer(s);
       saverRef.current?.adopt(s.draft.version, validateLayout(s.draft.layout, owner).result.layout);
-      return r.published;
+      return { ...r.published, issues: r.issues ?? [] };
     },
-    [flush, owner, present]
+    [adoptServer, flush, owner, present]
   );
 
   const restore = useCallback(
@@ -207,7 +243,7 @@ export function useLayoutEditor() {
       const version = saverRef.current?.snapshot.version ?? 0;
       const r = await storeLayoutApi.restore(revision, version, andPublish);
       const s = await storeLayoutApi.get();
-      setServer(s);
+      adoptServer(s);
       // A restore replaces the draft wholesale: it is the new starting point.
       dispatch({ t: 'reset', layout: r.draft.layout });
       saverRef.current?.adopt(s.draft.version, validateLayout(r.draft.layout, owner).result.layout);
@@ -215,7 +251,7 @@ export function useLayoutEditor() {
       await refreshData(r.draft.layout, true);
       return r;
     },
-    [flush, owner, refreshData]
+    [adoptServer, flush, owner, refreshData]
   );
 
   const viewRevision = useCallback(async (revision: number | null) => {
@@ -227,11 +263,12 @@ export function useLayoutEditor() {
     setViewing({ revision, layout: p.layout, data: p.blocks_data });
   }, []);
 
-  const loadMoreRevisions = useCallback(async (cursor: number) => {
-    const r = await storeLayoutApi.revisions(cursor);
+  const loadMoreRevisions = useCallback(async () => {
+    if (revCursor === null) return;
+    const r = await storeLayoutApi.revisions(revCursor);
     setServer((prev) => (prev ? { ...prev, revisions: [...prev.revisions, ...r.revisions.filter((x) => !prev.revisions.some((y) => y.id === x.id))] } : prev));
-    return r.next_cursor;
-  }, []);
+    setRevCursor(r.next_cursor);
+  }, [revCursor]);
 
   return {
     owner,
@@ -242,6 +279,7 @@ export function useLayoutEditor() {
     layout: present,
     validation,
     change,
+    changeAndSave,
     undo: useCallback(() => dispatch({ t: 'undo' }), []),
     redo: useCallback(() => dispatch({ t: 'redo' }), []),
     canUndo: !!history?.past.length,
@@ -257,6 +295,7 @@ export function useLayoutEditor() {
     data,
     viewing,
     viewRevision,
+    revCursor,
     loadMoreRevisions,
   };
 }

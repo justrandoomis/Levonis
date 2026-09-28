@@ -1,6 +1,14 @@
 /**
  * REVIEWS — from completed orders only; the buyer's name is masked by the
  * server («Ahmed K.»). A summary with the distribution, then the newest.
+ *
+ * Two variants (review of the store builder, 2026-09-28 — the block used to
+ * ignore the one the merchant picked): `list`, one review under another; and
+ * `cards`, the stars first and the words in a card, side by side — a row that
+ * scrolls sideways on a phone, a grid on a wider page. A store with no
+ * reviews yet shows the block to its owner in the builder, and to nobody on
+ * the live page: «لا توجد تقييمات بعد» on a shop's front is not a message a
+ * merchant chose to publish.
  */
 import { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
@@ -10,7 +18,7 @@ import { useStorefrontRuntime } from '../runtime';
 import { BlockHeading, Column, Empty, Loading, useText } from '../parts';
 import type { BlockProps } from '../types';
 
-function useReviews(initial: ReviewsData | null): ReviewsData | null {
+export function useReviews(initial: ReviewsData | null): ReviewsData | null {
   const rt = useStorefrontRuntime();
   const [data, setData] = useState<ReviewsData | null>(initial);
   useEffect(() => {
@@ -29,7 +37,17 @@ function useReviews(initial: ReviewsData | null): ReviewsData | null {
   return data;
 }
 
-export function ReviewsView({ initial, limit = 20, summary = true }: { initial: ReviewsData | null; limit?: number; summary?: boolean }) {
+export function ReviewsView({
+  initial,
+  limit = 20,
+  summary = true,
+  variant = 'list',
+}: {
+  initial: ReviewsData | null;
+  limit?: number;
+  summary?: boolean;
+  variant?: 'list' | 'cards';
+}) {
   const { loc } = useLanguage();
   const data = useReviews(initial);
   if (!data) return <Loading />;
@@ -71,7 +89,10 @@ export function ReviewsView({ initial, limit = 20, summary = true }: { initial: 
         </div>
       )}
 
-      {data.reviews.slice(0, limit).map((r) => (
+      {variant === 'cards' ? (
+        <ReviewCards reviews={data.reviews.slice(0, limit)} />
+      ) : (
+        data.reviews.slice(0, limit).map((r) => (
         <div key={r.id} className="sf-card sf-card-pad">
           <div className="flex items-center justify-between gap-2 mb-1.5">
             <div className="flex items-center gap-2 min-w-0">
@@ -99,6 +120,47 @@ export function ReviewsView({ initial, limit = 20, summary = true }: { initial: 
             </div>
           )}
         </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+/** The `cards` variant: stars first, the words in a card, side by side. */
+function ReviewCards({ reviews }: { reviews: ReviewsData['reviews'] }) {
+  const { loc } = useLanguage();
+  return (
+    <div
+      data-reviews-variant="cards"
+      className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 hide-scrollbar @min-[40rem]:mx-0 @min-[40rem]:grid @min-[40rem]:grid-cols-2 @min-[40rem]:overflow-visible @min-[40rem]:px-0 @min-[64rem]:grid-cols-3"
+    >
+      {reviews.map((r) => (
+        <figure key={r.id} className="sf-card sf-card-pad flex w-[82%] shrink-0 snap-start flex-col gap-2.5 @min-[40rem]:w-auto">
+          <div className="flex gap-0.5" role="img" aria-label={`${r.rating}/5`}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <Star key={n} className={`w-4 h-4 ${n <= r.rating ? 'text-gold fill-gold' : 'text-zinc-700'}`} aria-hidden="true" />
+            ))}
+          </div>
+          {!!r.body && (
+            <blockquote className="text-zinc-200 text-[13px] leading-relaxed line-clamp-5" dir="auto">
+              {r.body}
+            </blockquote>
+          )}
+          <figcaption className="mt-auto flex items-center gap-2 min-w-0">
+            <span className="text-zinc-400 text-[12px] font-semibold truncate" dir="auto">
+              {r.customer_name}
+            </span>
+            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+              {loc('شراء موثّق', 'Verified', 'کڕینی پشتڕاستکراو')}
+            </span>
+          </figcaption>
+          {!!r.merchant_reply && (
+            <div className="ps-3 border-s-2 border-gold/30">
+              <p className="text-gold/80 text-[10.5px] font-semibold mb-0.5">{loc('رد البائع', 'Seller reply', 'وەڵامی فرۆشیار')}</p>
+              <p className="text-zinc-400 text-[12px] leading-relaxed line-clamp-3">{r.merchant_reply}</p>
+            </div>
+          )}
+        </figure>
       ))}
     </div>
   );
@@ -107,10 +169,19 @@ export function ReviewsView({ initial, limit = 20, summary = true }: { initial: 
 export default function ReviewsBlock({ block, data }: BlockProps<'reviews'>) {
   const text = useText();
   const { loc } = useLanguage();
+  const rt = useStorefrontRuntime();
+  const rows = useReviews(data.reviews);
+  // No reviews yet: nothing on the live page; the builder's preview keeps the
+  // empty state, so the merchant sees why the block shows nothing.
+  if (rows && !rows.count && rt.mode === 'live') return null;
   return (
     <Column>
       <BlockHeading title={text(block.settings.title) || loc('التقييمات', 'Reviews', 'هەڵسەنگاندنەکان')} />
-      <ReviewsView initial={data.reviews} limit={block.settings.limit} summary={block.settings.show_summary} />
+      {rows ? (
+        <ReviewsView initial={rows} limit={block.settings.limit} summary={block.settings.show_summary} variant={block.variant === 'cards' ? 'cards' : 'list'} />
+      ) : (
+        <Loading />
+      )}
     </Column>
   );
 }
