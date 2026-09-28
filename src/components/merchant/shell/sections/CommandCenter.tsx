@@ -21,7 +21,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  AlertTriangle, ChevronRight, CircleCheck, ClipboardList, Hourglass, Inbox, MessageCircle, Package, PackageX,
+  AlertTriangle, ChevronRight, Circle, CircleCheck, ClipboardList, Hourglass, Inbox, MessageCircle, Package, PackageX,
   ShoppingBag, Star, Tag, Truck, Wallet,
 } from 'lucide-react';
 import { useLanguage } from '../../../../LanguageContext';
@@ -34,6 +34,22 @@ import { KpiRowSkeleton, ListRowsSkeleton } from '../../../ui/DashboardSkeletons
 import { merchantHref } from '../../../../lib/merchantRoutes';
 import { useWorkspace } from '../context';
 import type { Attention, StoreProblem } from '../attention';
+
+type Setup = NonNullable<Attention['setup']>;
+
+/** The steps of «جهّز متجرك», in the order a new store should take them. */
+export function setupSteps(setup: Setup, loc: Loc): Array<{ id: string; done: boolean; text: string; link: string }> {
+  // OWNER: Sorani to be written by hand (every step).
+  return [
+    { id: 'logo', done: setup.logo, text: loc('أضف شعار متجرك', 'Add your store’s logo'), link: setup.links.settings },
+    { id: 'banner', done: setup.banner, text: loc('أضف صورة الغلاف', 'Add a banner picture'), link: setup.links.settings },
+    { id: 'about', done: setup.about, text: loc('اكتب «عن المتجر»', 'Write «About»'), link: setup.links.settings },
+    { id: 'phone', done: setup.phone, text: loc('أضف رقم التواصل', 'Add a contact phone'), link: setup.links.settings },
+    { id: 'delivery', done: setup.delivery, text: loc('حدّد أين توصل وبكم', 'Set where you deliver, and for how much'), link: setup.links.delivery },
+    { id: 'products', done: setup.products > 0, text: loc('انشر أول منتج', 'Publish your first product'), link: setup.links.products },
+    { id: 'design', done: setup.design, text: loc('اختر شكل صفحتك وانشره', 'Choose your page’s look and publish it'), link: setup.links.design },
+  ];
+}
 import { commandKpis, type ReportLike } from '../kpis';
 import { sellingReason, type Loc } from '../strings';
 
@@ -168,6 +184,8 @@ export default function CommandCenter() {
         </section>
       )}
 
+      {data?.setup && <SetupChecklist setup={data.setup} />}
+
       <section aria-labelledby="cc-waiting" className="space-y-3">
         <h2 id="cc-waiting" className="text-[15px] font-bold text-text-primary">
           {/* OWNER: Sorani to be written by hand. */}
@@ -220,6 +238,94 @@ export default function CommandCenter() {
 
       <WeekFigures />
     </div>
+  );
+}
+
+// ------------------------------------------------------------------ setup
+
+/**
+ * «جهّز متجرك» — a new store's first steps, until every one is done (or the
+ * merchant hides the card on this device). Each open step is a door to the
+ * screen where it is done; a done one says so with a check, not a colour.
+ */
+function SetupChecklist({ setup }: { setup: Setup }) {
+  const { loc, lang } = useLanguage();
+  const ws = useWorkspace();
+  const key = `levo_setup_hidden:${ws.store.id}`;
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem(key) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const steps = setupSteps(setup, loc);
+  const done = steps.filter((s) => s.done).length;
+  if (hidden || done === steps.length) return null;
+  const hide = () => {
+    setHidden(true);
+    try {
+      localStorage.setItem(key, '1');
+    } catch {
+      /* hidden for this visit */
+    }
+  };
+  // OWNER: Sorani to be written by hand (this card).
+  return (
+    <section aria-labelledby="cc-setup" className="lv-surface space-y-3 p-4" data-setup-checklist>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 id="cc-setup" className="text-[15px] font-bold text-text-primary">
+            {loc('جهّز متجرك', 'Set up your store')}
+          </h2>
+          <p className="text-[12.5px] leading-relaxed text-text-muted">
+            <bdi>{formatFigure(done, lang)}</bdi> / <bdi>{formatFigure(steps.length, lang)}</bdi>
+            {' — '}
+            {loc('كل خطوة تجعل صفحتك أوضح لزبائنك.', 'each step makes your page clearer to customers.')}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={hide}
+          className="relative lv-hit min-h-9 shrink-0 rounded-lg px-2 text-[12.5px] font-medium text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          data-setup-hide
+        >
+          {loc('إخفاء', 'Hide')}
+        </button>
+      </div>
+      <div
+        className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={steps.length}
+        aria-valuenow={done}
+        aria-label={loc('ما أنجزته من تجهيز المتجر', 'Store setup done so far')}
+      >
+        <div className="h-full rounded-full bg-success transition-[width] motion-reduce:transition-none" style={{ width: `${Math.round((done / steps.length) * 100)}%` }} />
+      </div>
+      <ul className="divide-y divide-border-subtle">
+        {steps.map((s) => (
+          <li key={s.id} data-setup-step={s.id} data-done={s.done ? 'true' : 'false'}>
+            {s.done ? (
+              <p className="flex min-h-12 items-center gap-3 text-[13.5px] text-text-muted">
+                <CircleCheck aria-hidden="true" className="h-5 w-5 shrink-0 text-success" />
+                <span className="min-w-0 flex-1">{s.text}</span>
+                <span className="sr-only">{loc('تم', 'Done')}</span>
+              </p>
+            ) : (
+              <Door
+                to={s.link}
+                className="group flex min-h-12 items-center gap-3 rounded-lg text-[13.5px] font-medium text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              >
+                <Circle aria-hidden="true" className="h-5 w-5 shrink-0 text-text-muted" />
+                <span className="min-w-0 flex-1">{s.text}</span>
+                <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted rtl:-scale-x-100" />
+              </Door>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

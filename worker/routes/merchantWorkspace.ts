@@ -139,7 +139,7 @@ merchantAttentionRoutes.get('/', async (c) => {
   const now = new Date();
   const nowIso = now.toISOString();
 
-  const [orders, custom, inbox, notices, requests, stock, reviews, money, payouts, coupons, problems] = await Promise.all([
+  const [orders, custom, inbox, notices, requests, stock, reviews, money, payouts, coupons, problems, setup] = await Promise.all([
     source('orders', async () => {
       const { results } = await db
         .prepare(
@@ -246,6 +246,34 @@ merchantAttentionRoutes.get('/', async (c) => {
       return { ending_soon: n(row?.n), first_ends_at: row?.first_ends_at ?? null, within_days: COUPON_ENDING_DAYS, link: merchantHref.coupons() };
     }),
     source('store', async () => ({ problems: await storeProblems(c, ctx) })),
+    // «جهّز متجرك» (review of the merchant page, 2026-09-28): what a new store
+    // still lacks, each with the screen where it is done. The store row
+    // answers the first four; three counts the rest.
+    source('setup', async () => {
+      const row = await db
+        .prepare(
+          `SELECT (SELECT COUNT(*) FROM community_products p WHERE p.merchant_id = ?1 AND p.publish_state = 'published') AS products,
+                  (SELECT COUNT(*) FROM merchant_delivery_profiles d WHERE d.store_id = ?2) AS delivery,
+                  (SELECT COUNT(*) FROM store_layout_revisions r WHERE r.store_id = ?2) AS published`
+        )
+        .bind(merchantId, storeId)
+        .first<{ products: number; delivery: number; published: number }>();
+      return {
+        logo: !!ctx.store.logo_key,
+        banner: !!ctx.store.banner_key,
+        about: !!String(ctx.store.description ?? '').trim(),
+        phone: !!String(ctx.store.contact_phone ?? '').trim(),
+        delivery: n(row?.delivery) > 0,
+        products: n(row?.products),
+        design: n(row?.published) > 0,
+        links: {
+          settings: merchantHref.storeSettings(),
+          delivery: merchantHref.storeDelivery(),
+          products: merchantHref.newProduct(),
+          design: merchantHref.storeDesign(),
+        },
+      };
+    }),
   ]);
 
   const attention: Record<string, unknown> = {
@@ -271,6 +299,7 @@ merchantAttentionRoutes.get('/', async (c) => {
     ...(payouts ? { payouts } : {}),
     ...(coupons ? { coupons } : {}),
     ...(problems ? { store: problems } : {}),
+    ...(setup ? { setup } : {}),
   };
 
   c.header('Cache-Control', 'private, no-store');

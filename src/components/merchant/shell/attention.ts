@@ -28,6 +28,17 @@ export interface Attention {
   payouts?: { in_flight: number; amount_iqd: number; link: string };
   coupons?: { ending_soon: number; first_ends_at: string | null; within_days: number; link: string };
   store?: { problems: Array<{ code: StoreProblem; link: string }> };
+  /** «جهّز متجرك»: what a new store still lacks (GET /api/merchant/attention). */
+  setup?: {
+    logo: boolean;
+    banner: boolean;
+    about: boolean;
+    phone: boolean;
+    delivery: boolean;
+    products: number;
+    design: boolean;
+    links: { settings: string; delivery: string; products: string; design: string };
+  };
 }
 
 export type StoreProblem =

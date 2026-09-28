@@ -162,6 +162,28 @@ test('attention: an unpublished store-page draft is named, with its fix (no draf
   assert.ok(a.store.problems.some((p: { code: string; link: string }) => p.code === 'layout_unpublished' && p.link === '/merchant/store/design'));
 });
 
+test('attention: «جهّز متجرك» — what a new store still lacks, each with its screen, and it fills in as the store does', async () => {
+  const raw = world();
+  const fresh = (await attention(raw)).setup;
+  assert.deepEqual(
+    { logo: fresh.logo, banner: fresh.banner, about: fresh.about, phone: fresh.phone, delivery: fresh.delivery, design: fresh.design },
+    { logo: false, banner: false, about: false, phone: false, delivery: false, design: false }
+  );
+  assert.equal(typeof fresh.products, 'number');
+  for (const l of Object.values(fresh.links) as string[]) assert.ok(parseMerchantPath(l.split('?')[0]), `${l} is a workspace address`);
+  assert.equal(readWorkspaceQuery(fresh.links.products.split('?')[1]).create, true, 'the first product opens the «new» form');
+
+  raw.exec(`
+    UPDATE merchant_stores SET logo_key = 'merchants/owner/public/logo0001.webp', description = 'We print.', contact_phone = '0770' WHERE id = 's1';
+    INSERT INTO merchant_delivery_profiles (store_id, default_mode, default_fee_iqd) VALUES ('s1', 'fee', 5000);
+  `);
+  const later = (await attention(raw)).setup;
+  assert.deepEqual([later.logo, later.about, later.phone, later.delivery, later.banner], [true, true, true, true, false]);
+  // Merchant B's store is B's: A's steps never read it.
+  const b = (await attention(raw, OWNER2)).setup;
+  assert.equal(b.logo, false);
+});
+
 test('attention: signed out 401, no store 404', async () => {
   const raw = world();
   assert.equal((await get(appOf(raw, null, mount), '/api/merchant/attention')).status, 401);

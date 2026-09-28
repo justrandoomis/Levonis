@@ -63,6 +63,11 @@ const BUSY = {
   payouts: { in_flight: 1, amount_iqd: 60_000, link: '/merchant/money' },
   coupons: { ending_soon: 1, first_ends_at: ago(-3), within_days: 7, link: '/merchant/marketing/coupons' },
   store: { problems: [{ code: 'layout_unpublished', link: '/merchant/store/design' }] },
+  // «جهّز متجرك»: a store half set up.
+  setup: {
+    logo: true, banner: false, about: false, phone: true, delivery: true, products: 3, design: false,
+    links: { settings: '/merchant/store/settings', delivery: '/merchant/store/delivery', products: '/merchant/products?new=1', design: '/merchant/store/design' },
+  },
 };
 const CALM = {
   orders: { total: 0, by_stage: { pending: 0, confirmed: 0, processing: 0 }, link: '/merchant/orders', links: BUSY.orders.links },
