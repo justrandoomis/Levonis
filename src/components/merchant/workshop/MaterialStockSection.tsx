@@ -19,6 +19,7 @@ import { NumberInput } from '../../ui/NumberInput';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/Toast';
 import { Skeleton } from '../../ui/Skeleton';
+import { ErrorState } from '../../ui/AsyncStates';
 import { formatFigure } from '../../../lib/localeNumber';
 import { merchantRefusal } from '../shell/refusal';
 import { workshopApi, type StockLine, type StockResponse } from './api';
@@ -49,7 +50,16 @@ export default function MaterialStockSection() {
   const [rows, setRows] = useState<Row[]>([]);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState<unknown>(null);
 
+  /**
+   * A SHELF THAT DID NOT LOAD IS NOT AN EMPTY SHELF. A failed read used to be
+   * answered with «untracked, nothing on it», which offered «ابدأ التتبّع» —
+   * and saving that one new line REPLACES the whole shelf on the server (the
+   * PUT deletes every line before writing), so one dropped request could
+   * wipe a workshop's recorded stock. Now nothing is editable until a real
+   * answer arrives; the failure says so, with a retry.
+   */
   const load = () =>
     workshopApi
       .stock()
@@ -57,8 +67,9 @@ export default function MaterialStockSection() {
         setData(d);
         setRows(d.stock.map(rowOf));
         setDirty(false);
+        setLoadError(null);
       })
-      .catch(() => setData({ tracked: false, stock: [], materials: [], max_lines: 120 }));
+      .catch((e: unknown) => setLoadError(e));
   useEffect(() => {
     void load();
   }, []);
@@ -139,10 +150,23 @@ export default function MaterialStockSection() {
       }
     >
       {data === null ? (
-        <div className="space-y-2" aria-busy="true">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-        </div>
+        loadError ? (
+          <div data-stock-load-failed>
+            <ErrorState
+              compact
+              error={loadError}
+              onRetry={() => {
+                setLoadError(null);
+                void load();
+              }}
+            />
+          </div>
+        ) : (
+          <div className="space-y-2" aria-busy="true">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        )
       ) : rows.length === 0 ? (
         <p className="text-[12.5px] text-text-muted" data-stock-empty>
           {loc('لا مخزون مسجَّل — تُطابَق الطلبات على طابعاتك وحدها.', 'No stock recorded — requests are matched on your printers alone.')}

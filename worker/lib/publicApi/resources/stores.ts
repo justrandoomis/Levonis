@@ -405,7 +405,14 @@ const STORE_SCHEMA = object(
     governorate: nullable(ref('Governorate')),
     categories: array(string(), 'What the shop sells, in its own words.'),
     service_areas: array(string(), 'Where it works, in its own words.'),
-    business_hours: array(object({ day: string(), open: string('HH:MM, or empty.'), close: string('HH:MM, or empty.') })),
+    business_hours: array(
+      object({
+        day: string(),
+        open: string('HH:MM, or empty.'),
+        close: string('HH:MM, or empty.'),
+        closed: boolean('The merchant listed this day as closed (open and close are then empty).'),
+      })
+    ),
     policies: array(object({ topic: string(), text: string() }), 'The shop\'s own policies (returns, delivery, …).'),
     social_links: array(object({ network: string(), url: url() })),
     links: array(object({ title: string(), url: url() }), 'Links the merchant pinned to the shop\'s header.'),
@@ -493,12 +500,14 @@ function hours(v: unknown) {
   const time = (x: unknown) => (typeof x === 'string' && /^\d{1,2}:\d{2}$/.test(x.trim()) ? x.trim() : '');
   return v
     .map((row) => {
-      if (typeof row === 'string') return { day: text(row, 60), open: '', close: '' };
+      if (typeof row === 'string') return { day: text(row, 60), open: '', close: '', closed: false };
       if (!row || typeof row !== 'object') return null;
       const r = row as Rec;
-      return { day: text(r.day, 60), open: time(r.open), close: time(r.close) };
+      // A day the merchant marked «مغلق» travels as closed, with no times.
+      if (r.closed === true) return { day: text(r.day, 60), open: '', close: '', closed: true };
+      return { day: text(r.day, 60), open: time(r.open), close: time(r.close), closed: false };
     })
-    .filter((r): r is { day: string; open: string; close: string } => !!r && !!r.day)
+    .filter((r): r is { day: string; open: string; close: string; closed: boolean } => !!r && !!r.day)
     .slice(0, 14);
 }
 

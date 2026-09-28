@@ -6,7 +6,7 @@
 import { Clock, MapPin, MessageCircle, Phone } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { useStorefrontRuntime } from '../runtime';
-import { BlockHeading, Column, governorateLabel, useText } from '../parts';
+import { BlockHeading, Column, governorateLabel, HoursTime, useText } from '../parts';
 import type { BlockProps } from '../types';
 
 export default function ContactBlock({ block, store }: BlockProps<'contact'>) {
@@ -42,11 +42,7 @@ export default function ContactBlock({ block, store }: BlockProps<'contact'>) {
                   <Clock className="w-3.5 h-3.5" aria-hidden="true" />
                   {typeof h === 'string' ? h : h.day}
                 </span>
-                {typeof h !== 'string' && (
-                  <span className="text-zinc-300" dir="ltr">
-                    {h.open} – {h.close}
-                  </span>
-                )}
+                {typeof h !== 'string' && <HoursTime hours={h} loc={loc} />}
               </div>
             ))}
           </div>

@@ -34,6 +34,7 @@ import { useLanguage } from '../LanguageContext';
 import type { MerchantMe } from '../lib/merchant';
 import { api } from '../lib/api';
 import { useStore } from '../StoreContext';
+import { ErrorState } from '../components/ui/AsyncStates';
 import MerchantShell from '../components/merchant/shell/MerchantShell';
 import { onOwnHost } from '../components/merchant/shell/ownHost';
 
@@ -42,16 +43,34 @@ export default function MerchantDashboardPage() {
   const { store: hostStore, unknownStore: hostUnknown, unavailableStore: hostUnavailable } = useStore();
   const [me, setMe] = useState<MerchantMe | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<unknown>(null);
 
+  /**
+   * A FAILED RELOAD KEEPS THE WORKSPACE IT ALREADY HAS. The shell runs this
+   * after every settings save, address change and delivery save; it used to
+   * answer a failure with `setMe(null)`, and a null reads as «ليس لديك متجر
+   * بعد» with a PLUS upsell — one dropped request replaced a live workspace
+   * with a screen telling a merchant they had no store. Now the last good
+   * answer stays on screen, and only a FIRST load with nothing to keep shows
+   * the failure, with a retry.
+   */
   const reload = useCallback(() => {
     api
       .get<{ success: true } & MerchantMe>('/api/merchant/me')
-      .then(setMe)
-      .catch(() => setMe(null))
+      .then((next) => {
+        setMe(next);
+        setError(null);
+      })
+      .catch((e: unknown) => setError(e))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(reload, [reload]);
+
+  const retry = useCallback(() => {
+    setLoading(true);
+    reload();
+  }, [reload]);
 
   if (loading) {
     return (
@@ -64,8 +83,16 @@ export default function MerchantDashboardPage() {
     );
   }
 
+  if (!me) {
+    return (
+      <div className="flex h-[100dvh] w-full flex-1 items-center justify-center bg-canvas px-6" data-merchant-load-failed>
+        <ErrorState error={error} onRetry={retry} next="/merchant" className="max-w-sm" />
+      </div>
+    );
+  }
+
   // No store yet: point at the one thing that fixes it.
-  if (!me?.store) {
+  if (!me.store) {
     return (
       <div className="flex h-[100dvh] w-full flex-1 items-center justify-center bg-canvas px-6">
         <div className="max-w-sm text-center">
@@ -73,8 +100,8 @@ export default function MerchantDashboardPage() {
           <h1 className="mb-2 text-lg font-bold text-text-primary">
             {loc('ليس لديك متجر بعد', 'You do not have a store yet', 'هێشتا فرۆشگات نییە')}
           </h1>
-          <Link to={me?.eligible ? '/merchant/start' : '/subscription'} className="lv-button lv-button-primary mt-4">
-            {me?.eligible
+          <Link to={me.eligible ? '/merchant/start' : '/subscription'} className="lv-button lv-button-primary mt-4">
+            {me.eligible
               ? loc('أنشئ متجرك', 'Create your store', 'فرۆشگاکەت دروست بکە')
               : loc('اشترك في PLUS', 'Subscribe to PLUS', 'بەشداری PLUS بکە')}
             <ArrowRight aria-hidden="true" className="h-4 w-4 rtl:rotate-180" />

@@ -395,7 +395,8 @@ export async function contactSnapshot(
           .first<Record<string, unknown>>(),
     db
       .prepare(
-        `SELECT m.name, m.governorate, s.name AS store_name, s.slug, s.contact_phone, s.governorate AS store_governorate
+        `SELECT m.name, m.governorate, s.name AS store_name, s.slug, s.contact_phone, s.contact_phone_public,
+                s.governorate AS store_governorate
            FROM community_merchants m LEFT JOIN merchant_stores s ON s.merchant_id = m.id
           WHERE m.id = ?`
       )
@@ -421,8 +422,11 @@ export async function contactSnapshot(
       store_slug: String(merchant?.slug ?? ''),
       // Only the store's PUBLISHED contact phone — never the merchant account's
       // private phone (review W2-5 #7). None published → none shown; the
-      // request thread is how the two sides talk.
-      phone: String(merchant?.contact_phone || ''),
+      // request thread is how the two sides talk. «Published» is the store's
+      // own switch, «إظهار الرقم للزبائن» (`contact_phone_public`), exactly
+      // as the storefront reads it: a number the merchant typed but kept
+      // private is not handed to a customer because they accepted an offer.
+      phone: Number(merchant?.contact_phone_public) === 1 ? String(merchant?.contact_phone || '') : '',
       governorate: String(merchant?.store_governorate || merchant?.governorate || ''),
     },
     delivery_method: p.deliveryMethod,

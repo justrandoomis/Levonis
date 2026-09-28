@@ -43,8 +43,8 @@ function seed() {
       ('mem1','owner','plus_12mo','plus','active',12,29000,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z'),
       ('mem2','owner2','plus_12mo','plus','active',12,29000,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
     INSERT INTO community_merchants (id,user_id,name,phone) VALUES ('m1','owner','Ali 3D','+9647511111111'), ('m2','owner2','Omar Resin','+9647599999999');
-    INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name,contact_phone) VALUES
-      ('s1','m1','owner','ali3d','Ali 3D',''), ('s2','m2','owner2','omarresin','Omar Resin','+9647522222222');
+    INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name,contact_phone,contact_phone_public) VALUES
+      ('s1','m1','owner','ali3d','Ali 3D','',0), ('s2','m2','owner2','omarresin','Omar Resin','+9647522222222',1);
     INSERT INTO merchant_printers (id,merchant_id,store_id,name,technology,build_x_mm,build_y_mm,build_z_mm,materials,quality_max)
       VALUES ('p1','m1','s1','Big FDM','fdm',300,300,300,'[]','ultra'), ('p2','m2','s2','Big FDM 2','fdm',300,300,300,'[]','ultra');
     INSERT INTO addresses (id,user_id,label,name,phone,address,landmark,is_default,governorate,area)
@@ -122,6 +122,15 @@ test('#7: a store with a published phone reveals exactly that phone', async () =
   const orderId = await accept(raw, await published(raw), 'owner2');
   const contact = (await json(await get(as(raw, 'buyer'), `/api/marketplace/orders/${orderId}`))).contact;
   assert.equal(contact.phone, '+9647522222222');
+});
+
+test('#7: a phone the merchant typed but kept private («إظهار الرقم للزبائن» off) is not revealed at acceptance', async () => {
+  const raw = seed();
+  raw.exec(`UPDATE merchant_stores SET contact_phone_public = 0 WHERE id = 's2'`);
+  const orderId = await accept(raw, await published(raw), 'owner2');
+  const contact = (await json(await get(as(raw, 'buyer'), `/api/marketplace/orders/${orderId}`))).contact;
+  assert.equal(contact.phone, '', JSON.stringify(contact));
+  assert.ok(!JSON.stringify(contact).includes('7522222222'));
 });
 
 test('#6: past revisions only for the owner, an admin and a merchant with an offer; the board gets the current one', async () => {

@@ -159,7 +159,6 @@ export function catalogStrings(loc: Loc) {
     sectionPrint: loc('تفاصيل الطباعة ثلاثية الأبعاد', '3D-printing details'), // OWNER: Sorani to be written by hand.
     sectionPrintHint: loc('الخامة والتقنية واللون والتشطيب والأبعاد والوزن.', 'Material, technology, colour, finish, size and weight.'), // OWNER: Sorani to be written by hand.
     sectionCollections: loc('المجموعات', 'Collections'), // OWNER: Sorani to be written by hand.
-    sectionMedia: loc('الصور والفيديو', 'Photos & video'), // OWNER: Sorani to be written by hand.
 
     sku: loc('رمز المنتج (SKU)', 'SKU'), // OWNER: Sorani to be written by hand.
     lowStockAt: loc('نبّهني عندما يصل المخزون إلى', 'Alert me when stock reaches'), // OWNER: Sorani to be written by hand.

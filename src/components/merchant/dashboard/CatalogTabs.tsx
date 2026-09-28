@@ -22,6 +22,7 @@ import { CollectionsManager } from '../catalog/CollectionsManager';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/Toast';
 import { merchantRefusal } from '../shell/refusal';
+import { ErrorState } from '../../ui/AsyncStates';
 
 // ---------------------------------------------------------------- sections
 
@@ -64,13 +65,20 @@ export function ServicesTab({ canSell }: { canSell: boolean }) {
   const [items, setItems] = useState<StoreService[] | null>(null);
   const [editing, setEditing] = useState<StoreService | 'new' | null>(null);
   const [busy, setBusy] = useState('');
+  const [loadError, setLoadError] = useState<unknown>(null);
 
+  // A failed read is not «no services»: shown empty, it invited the merchant
+  // to create again what they already sell.
   const load = useCallback(() => {
-    merchantApi.services().then((d) => setItems(d.services)).catch(() => setItems([]));
+    setLoadError(null);
+    merchantApi
+      .services()
+      .then((d) => setItems(d.services))
+      .catch((e: unknown) => setLoadError(e));
   }, []);
   useEffect(load, [load]);
 
-  if (items === null) return <Spinner />;
+  if (items === null) return loadError ? <ErrorState compact error={loadError} onRetry={load} /> : <Spinner />;
 
   if (editing) {
     return (
@@ -232,6 +240,9 @@ function ServiceEditor({
   async function save() {
     setSaving(true);
     setError('');
+    // `active` travels only when it CHANGED (or on create): switching a
+    // service on is the one edit that needs selling rights, and re-sending it
+    // with every text fix made a paused store's typo fix a refusal.
     const body = {
       title: f.title,
       description: f.description,
@@ -240,7 +251,7 @@ function ServiceEditor({
       price_unit: f.price_unit,
       materials: f.materials,
       image_key: f.imageUrl ?? '',
-      active: f.active,
+      ...(!service || service.active !== f.active ? { active: f.active } : {}),
     };
     try {
       if (service) await merchantApi.updateService(service.id, body);
@@ -346,13 +357,19 @@ export function ShowcaseTab() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState<unknown>(null);
 
+  // A failed read is not an empty workshop.
   const load = useCallback(() => {
-    merchantApi.showcase().then((d) => setItems(d.items)).catch(() => setItems([]));
+    setLoadError(null);
+    merchantApi
+      .showcase()
+      .then((d) => setItems(d.items))
+      .catch((e: unknown) => setLoadError(e));
   }, []);
   useEffect(load, [load]);
 
-  if (items === null) return <Spinner />;
+  if (items === null) return loadError ? <ErrorState compact error={loadError} onRetry={load} /> : <Spinner />;
 
   async function add() {
     if (!title.trim()) return;

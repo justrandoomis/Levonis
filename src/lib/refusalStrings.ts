@@ -554,6 +554,19 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This store is suspended by Levonis. Contact support for details.',
     ckb: 'فرۆشگاکە لەلایەن LEVONIS ڕاگیراوە. پەیوەندی بە پشتیوانییەوە بکە.',
   },
+  // Store settings (review of the settings screen, 2026-09-28): the screen
+  // marks the field itself; these are the sentence any other door shows.
+  // OWNER: Sorani to be written by hand for both (the ckb slot carries the Arabic).
+  STORE_FIELD_INVALID: {
+    ar: 'أحد الحقول غير صالح أو أطول من المسموح. راجعه ثم احفظ.',
+    en: 'One of the fields is not valid or is longer than allowed. Check it, then save.',
+    ckb: 'أحد الحقول غير صالح أو أطول من المسموح. راجعه ثم احفظ.',
+  },
+  MEDIA_NOT_OWNED: {
+    ar: 'اختر صورة رفعتها أنت لهذا المتجر.',
+    en: 'Choose a picture you uploaded to this store.',
+    ckb: 'اختر صورة رفعتها أنت لهذا المتجر.',
+  },
   STORE_PAUSED: {
     ar: 'متجرك متوقّف مؤقتًا بطلبك. أعِد فتحه من إعدادات المتجر.',
     en: 'You paused your store. Re-open it from store settings.',

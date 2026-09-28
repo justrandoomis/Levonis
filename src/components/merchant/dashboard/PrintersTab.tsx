@@ -33,7 +33,7 @@ import { Field, Input } from '../../ui/Field';
 import { Switch } from '../../ui/Switch';
 import Note from '../../ui/Note';
 import Spinner from '../../ui/Spinner';
-import { EmptyState } from '../../ui/AsyncStates';
+import { EmptyState, ErrorState } from '../../ui/AsyncStates';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { merchantRefusal } from '../shell/refusal';
 // Eligibility as data (W5-B): canonical machines, the stock shelf, and the reasons' words.
@@ -600,14 +600,16 @@ function PrintersSection() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState<unknown>(null);
 
+  // A failed read is not «no printers»: it used to hand the form an empty
+  // list and no materials, inviting a workshop to add again printers it has.
   const load = useCallback(() => {
+    setLoadError(null);
     api
       .get<PrintersResponse>('/api/merchant/printers')
       .then(setData)
-      .catch(() =>
-        setData({ printers: [], materials: [], technologies: ['fdm', 'resin'], qualities: ['draft', 'standard', 'fine', 'ultra'] })
-      );
+      .catch((e: unknown) => setLoadError(e));
   }, []);
   useEffect(load, [load]);
 
@@ -702,7 +704,7 @@ function PrintersSection() {
       }
     >
       {data === null ? (
-        <Loading />
+        loadError ? <ErrorState compact error={loadError} onRetry={load} /> : <Loading />
       ) : draft ? (
         <PrinterForm
           value={draft}

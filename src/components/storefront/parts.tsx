@@ -310,6 +310,27 @@ export function factsWithFallback(store: StorefrontStore, loc: Loc, lang: string
   return out.slice(0, 3);
 }
 
+/**
+ * A day's times as the page shows them: «09:00 – 18:00», «مغلق» for a day the
+ * merchant marked closed, or nothing at all for a day written as free text
+ * (a pre-structured row carries its times inside the words). Both empty used
+ * to be drawn as « – », a stray dash that said nothing.
+ */
+export function HoursTime({ hours, loc, className = '' }: { hours: { open?: string; close?: string; closed?: boolean }; loc: Loc; className?: string }) {
+  if (hours.closed) {
+    // OWNER: Sorani to be written by hand.
+    return <span className={`text-zinc-400 ${className}`}>{loc('مغلق', 'Closed')}</span>;
+  }
+  const open = (hours.open ?? '').trim();
+  const close = (hours.close ?? '').trim();
+  if (!open && !close) return null;
+  return (
+    <span className={`text-zinc-300 ${className}`} dir="ltr">
+      {open && close ? `${open} – ${close}` : open || close}
+    </span>
+  );
+}
+
 export function governorateLabel(id: string, lang: string): string {
   return GOVERNORATE_LABELS[id]?.[lang === 'ckb' ? 'ckb' : lang === 'en' ? 'en' : 'ar'] ?? id;
 }

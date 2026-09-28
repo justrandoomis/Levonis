@@ -176,7 +176,7 @@ async function world(opts: { communityOpen?: boolean } = {}) {
                                  categories, service_areas, contact_phone, contact_phone_public, business_hours, policies, social_links,
                                  accepts_custom_requests, sells_direct_products, status, created_at)
      VALUES ('str_ali7q', 'mch_ali7q', 'usr_owner7q', 'ali3d', 'Ali 3D', 'Prints that last', 'We print.', ?, ?, 'baghdad',
-             '["figures"]', '["Karrada"]', '+9647800000077', 1, '[{"day":"Sat","open":"09:00","close":"18:00"}]',
+             '["figures"]', '["Karrada"]', '+9647800000077', 1, '[{"day":"Sat","open":"09:00","close":"18:00"},{"day":"Fri","open":"","close":"","closed":true}]',
              '{"returns":"Seven days."}', '{"instagram":"https://instagram.com/ali3d","bad":"javascript:alert(1)"}',
              1, 1, 'active', '2026-08-01T00:00:00.000Z')`
   ).run('merchants/usr_owner7q/logos/logo.webp', 'merchants/usr_owner7q/covers/banner.webp');
@@ -671,6 +671,7 @@ test('a shop: its public face only — no phone, no pickup address, only real li
     banner: { url: string } | null;
     governorate: { code: string; name: { ar: string; en: string } } | null;
     social_links: Array<{ network: string; url: string }>;
+    business_hours: Array<{ day: string; open: string; close: string; closed: boolean }>;
     delivery: { pickup: { governorate: { code: string } | null } | null; note: string };
     merchant: { name: string; verified: boolean; rating: number | null };
     services: Array<{ title: string; materials: string[]; image: { url: string } | null }>;
@@ -685,6 +686,14 @@ test('a shop: its public face only — no phone, no pickup address, only real li
   assert.equal(shop.governorate?.code, 'baghdad');
   assert.equal(shop.governorate?.name.en, 'Baghdad');
   assert.deepEqual(shop.social_links, [{ network: 'instagram', url: 'https://instagram.com/ali3d' }], 'a javascript: link is never published');
+  assert.deepEqual(
+    shop.business_hours,
+    [
+      { day: 'Sat', open: '09:00', close: '18:00', closed: false },
+      { day: 'Fri', open: '', close: '', closed: true },
+    ],
+    'a day the merchant marked closed says so'
+  );
   assert.deepEqual(shop.delivery.pickup, { governorate: { code: 'baghdad', name: { ar: 'بغداد', en: 'Baghdad', ckb: 'بەغدا' } } });
   assert.equal(shop.delivery.note, 'Packed with care.');
   assert.equal(shop.merchant.name, 'Ali Prints');

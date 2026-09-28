@@ -55,7 +55,8 @@ export interface MerchantStore {
   service_areas: string[];
   contact_phone: string | null;
   contact_phone_public?: boolean;
-  business_hours: Array<{ day: string; open: string; close: string }>;
+  /** `closed: true` = the merchant lists the day as closed («مغلق»). */
+  business_hours: Array<{ day: string; open: string; close: string; closed?: boolean }>;
   policies: Record<string, string>;
   delivery_settings?: Record<string, unknown>;
   /** Storefront reads only (W2-A): where the store delivers and for how much — display, never a price. */

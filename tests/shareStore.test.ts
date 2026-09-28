@@ -158,9 +158,12 @@ test('Sorani is never machine-written: every Sorani line in the panel is reused 
 test('the panel is mounted in the dashboard\'s store settings, outside the form\'s save', () => {
   const tab = SRC('components/merchant/dashboard/StoreSettingsTab.tsx');
   assert.match(tab, /import ShareStore from '\.\.\/share\/ShareStore';/);
-  const mount = tab.indexOf('<ShareStore />');
+  const mount = tab.indexOf('<ShareStore key={shareKey} />');
   assert.ok(mount > 0, 'not mounted');
   assert.ok(mount > tab.indexOf('<Btn onClick={save}'), 'it has its own actions; it is not part of the settings form');
+  // Keyed on what it is built from: a saved name, logo or new address shows
+  // at once instead of the old link and QR until a reload.
+  assert.match(tab, /const shareKey = `\$\{store\.slug\}\|\$\{store\.name\}\|\$\{store\.tagline\}\|\$\{store\.logoUrl \?\? ''\}\|\$\{store\.accent\}`;/);
 });
 
 test('the storefront menu carries the owner row, and the storefront pays only for the row', () => {

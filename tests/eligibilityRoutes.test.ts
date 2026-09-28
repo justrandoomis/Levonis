@@ -299,6 +299,34 @@ test('RE-MATCH ON A WORKSHOP CHANGE: a new printer makes a job eligible and tell
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = 'ali' AND kind = 'matching_request' AND entity_id = ?", id), 1);
 });
 
+test('RE-MATCH ON THE STORE SETTINGS: switching custom requests off, or pausing, takes the job away at once — and back', async () => {
+  const raw = seed();
+  const bucket = new MemoryBucket();
+  const { id } = await published(raw, bucket);
+  assert.equal(verdictRow(raw, id, 'm1')!.eligible, 1);
+
+  // «طلبات مخصصة» off in the settings: the board used to keep counting the job.
+  assert.equal((await patch(as(raw, 'ali'), '/api/merchant/store', { accepts_custom_requests: false })).status, 200);
+  assert.deepEqual(JSON.parse(verdictRow(raw, id, 'm1')!.reasons), ['NOT_TAKING_REQUESTS']);
+  // …and on again: the board used to stay empty until something else re-matched.
+  assert.equal((await patch(as(raw, 'ali'), '/api/merchant/store', { accepts_custom_requests: true })).status, 200);
+  assert.equal(verdictRow(raw, id, 'm1')!.eligible, 1);
+
+  // Pausing the store is the same dimension.
+  assert.equal((await patch(as(raw, 'ali'), '/api/merchant/store', { open: false })).status, 200);
+  assert.ok(JSON.parse(verdictRow(raw, id, 'm1')!.reasons).includes('STORE_UNAVAILABLE'));
+  const reopen = await patch(as(raw, 'ali'), '/api/merchant/store', { open: true });
+  assert.equal(reopen.status, 200, JSON.stringify(await json(reopen.clone())));
+  assert.equal(verdictRow(raw, id, 'm1')!.eligible, 1);
+
+  // An edit that changes neither leaves the verdict alone (no needless re-match).
+  const before = verdictRow(raw, id, 'm1');
+  assert.equal((await patch(as(raw, 'ali'), '/api/merchant/store', { tagline: 'Faster prints' })).status, 200);
+  assert.deepEqual(verdictRow(raw, id, 'm1'), before);
+  // Told once for the request, never again.
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = 'ali' AND kind = 'matching_request' AND entity_id = ?", id), 1);
+});
+
 test('RE-MATCH ON A REVISION: every verdict is decided again for the new revision, and nobody reads an older one', async () => {
   const raw = seed();
   const bucket = new MemoryBucket();

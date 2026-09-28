@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ChevronDown, Copy, Loader2, MapPin, MessageCircle, Phone, Plus, Tag, Trash2,
-  ExternalLink, Hammer, Check,
+  ExternalLink, Hammer, Check, CalendarClock,
 } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { api, ApiError } from '../../../lib/api';
@@ -33,6 +33,8 @@ import { useConfirm } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/Toast';
 import { merchantRefusal } from '../shell/refusal';
 import { formatDate } from '../../orders/format';
+import { ErrorState } from '../../ui/AsyncStates';
+import { couponPhase, dayToIso, isoToDay, windowProblem } from './couponDates';
 
 // ------------------------------------------------------------ store orders
 
@@ -440,14 +442,26 @@ function OrderDetail({ id }: { id: string }) {
   const { store: hostStore } = useStore();
   const mainHref = useMainSiteHref();
   const [data, setData] = useState<Awaited<ReturnType<typeof merchantApi.order>> | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState('');
 
+  // A failed read used to be swallowed, and `!data` then drew a spinner that
+  // never stopped. The failure is shown, with a retry.
   useEffect(() => {
-    merchantApi.order(id).then(setData).catch(() => {});
-  }, [id]);
+    let alive = true;
+    setLoadError(null);
+    merchantApi
+      .order(id)
+      .then((d) => alive && setData(d))
+      .catch((e: unknown) => alive && setLoadError(e));
+    return () => {
+      alive = false;
+    };
+  }, [id, attempt]);
 
-  if (!data) return <Spinner />;
+  if (!data) return loadError ? <ErrorState compact error={loadError} onRetry={() => setAttempt((n) => n + 1)} /> : <Spinner />;
   const o = data.order;
   const addr = (o.address as Record<string, unknown>) ?? {};
   // The snapshot is the addresses-table row: governorate, area, the free-text
@@ -598,16 +612,20 @@ export function CustomOrdersTab({ focusOrderId = null }: { focusOrderId?: string
   // orders below keep running — their routes stay open.
   const { access: communityAccess } = useCommunityAccess();
   const [orders, setOrders] = useState<CommunityOrderRow[] | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [busy, setBusy] = useState('');
   // A refused «ابدأ العمل» says why, on its own card, in the merchant's language
   // (the order changed under them, or its money is not held — review F2).
   const [startError, setStartError] = useState<{ id: string; text: string } | null>(null);
 
+  // A failed read is not «no orders»: funded work waiting on this merchant
+  // must never read as an empty book.
   const load = useCallback(() => {
+    setLoadError(null);
     communityOrdersApi
       .list()
       .then((d) => setOrders(d.orders.filter((o) => o.role === 'merchant')))
-      .catch(() => setOrders([]));
+      .catch((e: unknown) => setLoadError(e));
   }, []);
   useEffect(load, [load]);
   const focusRow = useRef<HTMLDivElement | null>(null);
@@ -618,7 +636,7 @@ export function CustomOrdersTab({ focusOrderId = null }: { focusOrderId?: string
     focusRow.current?.focus({ preventScroll: true });
   }, [focusReady, focusOrderId]);
 
-  if (orders === null) return <Spinner />;
+  if (orders === null) return loadError ? <ErrorState compact error={loadError} onRetry={load} /> : <Spinner />;
 
   return (
     <div className="space-y-3">
@@ -790,16 +808,34 @@ export function CouponsTab({
   }, [couponReady, focusCouponId]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [f, setF] = useState({ code: '', kind: 'percent' as 'percent' | 'fixed_iqd', value: '', min: '', maxUses: '' });
+  const [f, setF] = useState({ code: '', kind: 'percent' as 'percent' | 'fixed_iqd', value: '', min: '', maxUses: '', starts: '', ends: '' });
+  /** The coupon whose window is open for editing, with its two days. */
+  const [editing, setEditing] = useState<{ id: string; starts: string; ends: string } | null>(null);
 
+  const [loadError, setLoadError] = useState<unknown>(null);
   const load = useCallback(() => {
-    merchantApi.coupons().then((d) => setItems(d.coupons)).catch(() => setItems([]));
+    setLoadError(null);
+    merchantApi
+      .coupons()
+      .then((d) => setItems(d.coupons))
+      .catch((e: unknown) => setLoadError(e));
   }, []);
   useEffect(load, [load]);
 
-  if (items === null) return <Spinner />;
+  if (items === null) return loadError ? <ErrorState compact error={loadError} onRetry={load} /> : <Spinner />;
+
+  // OWNER: Sorani to be written by hand.
+  const windowRefusal = () => loc('يجب أن ينتهي الكوبون في يوم بدئه أو بعده.', 'The coupon must end on or after the day it starts.');
+  const couponRefusal = (e: unknown) =>
+    e instanceof ApiError && e.code === 'COUPON_DATES_INVALID'
+      ? windowRefusal()
+      : merchantRefusal(e, lang, loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت'));
 
   async function create() {
+    if (windowProblem(f.starts, f.ends)) {
+      setError(windowRefusal());
+      return;
+    }
     setBusy('new');
     setError('');
     try {
@@ -809,16 +845,48 @@ export function CouponsTab({
         value: Number(f.value) || 0,
         min_total_iqd: Number(f.min) || 0,
         max_uses: f.maxUses ? Number(f.maxUses) : null,
+        starts_at: dayToIso(f.starts, 'start') ?? '',
+        ends_at: dayToIso(f.ends, 'end') ?? '',
       });
-      setF({ code: '', kind: 'percent', value: '', min: '', maxUses: '' });
+      setF({ code: '', kind: 'percent', value: '', min: '', maxUses: '', starts: '', ends: '' });
       setCreating(false);
       load();
     } catch (e) {
-      setError(merchantRefusal(e, lang, loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت')));
+      setError(couponRefusal(e));
     } finally {
       setBusy('');
     }
   }
+
+  async function saveWindow() {
+    if (!editing) return;
+    if (windowProblem(editing.starts, editing.ends)) {
+      toast.error(windowRefusal());
+      return;
+    }
+    setBusy(editing.id);
+    try {
+      await merchantApi.updateCoupon(editing.id, {
+        starts_at: dayToIso(editing.starts, 'start') ?? '',
+        ends_at: dayToIso(editing.ends, 'end') ?? '',
+      });
+      setEditing(null);
+      load();
+    } catch (e) {
+      toast.error(couponRefusal(e));
+    } finally {
+      setBusy('');
+    }
+  }
+
+  // OWNER: Sorani to be written by hand (the four window lines).
+  const phaseLine = (cp: MerchantCoupon) => {
+    const p = couponPhase(cp);
+    if (p.phase === 'ended') return { text: loc(`انتهى في ${formatDate(p.at, lang)}`, `Ended ${formatDate(p.at, lang)}`), tone: 'text-red-400' };
+    if (p.phase === 'scheduled') return { text: loc(`يبدأ في ${formatDate(p.at, lang)}`, `Starts ${formatDate(p.at, lang)}`), tone: 'text-sky-300' };
+    if (p.phase === 'ends') return { text: loc(`ينتهي في ${formatDate(p.at, lang)}`, `Ends ${formatDate(p.at, lang)}`), tone: p.soon ? 'text-amber-300' : 'text-text-muted' };
+    return { text: loc('بلا تاريخ انتهاء', 'No end date'), tone: 'text-text-muted' };
+  };
 
   return (
     <div className="space-y-3">
@@ -858,7 +926,25 @@ export function CouponsTab({
               <Input label={loc('حد أدنى للطلب', 'Min order', 'کەمترین')} value={f.min} type="number" ltr onChange={(v) => setF({ ...f, min: v })} />
               <Input label={loc('عدد الاستخدامات', 'Max uses', 'ژمارە')} value={f.maxUses} type="number" ltr onChange={(v) => setF({ ...f, maxUses: v })} />
             </div>
-            {error && <p className="text-red-400 text-[11.5px]">{error}</p>}
+            {/* OWNER: Sorani to be written by hand. */}
+            <div className="grid grid-cols-2 gap-2" data-coupon-window>
+              <Input
+                label={loc('يبدأ في (اختياري)', 'Starts (optional)')}
+                value={f.starts}
+                type="date"
+                ltr
+                onChange={(v) => setF({ ...f, starts: v })}
+              />
+              <Input
+                label={loc('ينتهي في (اختياري)', 'Ends (optional)')}
+                value={f.ends}
+                type="date"
+                ltr
+                onChange={(v) => setF({ ...f, ends: v })}
+                error={windowProblem(f.starts, f.ends) ? windowRefusal() : undefined}
+              />
+            </div>
+            {error && <p className="text-red-400 text-[11.5px]" role="alert">{error}</p>}
             <div className="flex gap-2">
               <Btn onClick={create} disabled={busy === 'new' || !f.code || !f.value} full>
                 {busy === 'new' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tag className="w-3.5 h-3.5" />}
@@ -892,12 +978,50 @@ export function CouponsTab({
               {cp.kind === 'percent' ? `${cp.value}%` : iqd(cp.value)}
             </span>
           </div>
-          <p className="text-text-muted text-[11px] mb-2">
+          <p className="text-text-muted text-[11px] mb-1">
             {cp.min_total_iqd > 0 && `${loc('حد أدنى', 'Min', 'کەمترین')} ${iqd(cp.min_total_iqd)} · `}
             {loc('استُخدم', 'Used', 'بەکارهاتووە')} {cp.used_count}
             {cp.max_uses !== null && ` / ${cp.max_uses}`}
             {!cp.active && ` · ${loc('موقوف', 'inactive', 'ناچالاک')}`}
           </p>
+          {(() => {
+            const line = phaseLine(cp);
+            return (
+              <p className={`text-[11.5px] mb-2 ${line.tone}`} data-coupon-phase={couponPhase(cp).phase}>
+                {line.text}
+              </p>
+            );
+          })()}
+          {editing?.id === cp.id && (
+            <div className="mb-2 space-y-2 rounded-xl border border-white/10 bg-black/20 p-2.5" data-coupon-window-editor>
+              {/* OWNER: Sorani to be written by hand. */}
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  label={loc('يبدأ في', 'Starts')}
+                  value={editing.starts}
+                  type="date"
+                  ltr
+                  onChange={(v) => setEditing({ ...editing, starts: v })}
+                />
+                <Input
+                  label={loc('ينتهي في', 'Ends')}
+                  value={editing.ends}
+                  type="date"
+                  ltr
+                  onChange={(v) => setEditing({ ...editing, ends: v })}
+                  error={windowProblem(editing.starts, editing.ends) ? windowRefusal() : undefined}
+                />
+              </div>
+              <p className="text-text-muted text-[11px]">{loc('اترك الحقل فارغًا لكوبون بلا بداية أو نهاية.', 'Leave a field empty for no start or no end.')}</p>
+              <div className="flex gap-2">
+                <Btn small onClick={saveWindow} disabled={busy === cp.id || !!windowProblem(editing.starts, editing.ends)}>
+                  {busy === cp.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  {loc('حفظ المدة', 'Save dates')}
+                </Btn>
+                <Btn small kind="ghost" onClick={() => setEditing(null)}>{loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}</Btn>
+              </div>
+            </div>
+          )}
           <div className="flex gap-2">
             <Toggle
               label={cp.active ? loc('فعّال', 'Active', 'چالاک') : loc('موقوف', 'Inactive', 'ناچالاک')}
@@ -915,6 +1039,20 @@ export function CouponsTab({
                 }
               }}
             />
+            {/* OWNER: Sorani to be written by hand. */}
+            <button
+              type="button"
+              onClick={() =>
+                setEditing(editing?.id === cp.id ? null : { id: cp.id, starts: isoToDay(cp.starts_at), ends: isoToDay(cp.ends_at) })
+              }
+              aria-expanded={editing?.id === cp.id}
+              aria-label={loc('مدة الكوبون', 'Coupon dates')}
+              title={loc('مدة الكوبون', 'Coupon dates')}
+              data-coupon-dates={cp.id}
+              className="w-11 h-11 rounded-lg border border-white/10 text-zinc-300 flex items-center justify-center shrink-0 self-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <CalendarClock aria-hidden="true" className="w-4 h-4" />
+            </button>
             <button
               onClick={async () => {
                 const ok = await confirm({

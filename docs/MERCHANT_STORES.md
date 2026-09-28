@@ -140,9 +140,22 @@ back to the platform's identity, and the share card, the sitemap entry and the
 community listings drop it. A `paused` store is not a sanction: it renders and
 says it is closed. Existing customers keep their orders and chats either way.
 
-A suspended store still **saves its settings** — everything but `open`, which
-answers `STORE_SUSPENDED` (or `MERCHANT_SUSPENDED` / `SUBSCRIPTION_INACTIVE`)
-while the rest of the form lands (audit 01 B4).
+A suspended store still **saves its settings** (audit 01 B4): the form does
+not send `open` while the store is suspended, so everything else lands. A save
+that asks to OPEN is refused whole — `STORE_SUSPENDED`, or on re-opening a
+paused store `MERCHANT_SUSPENDED` / `SUBSCRIPTION_INACTIVE` /
+`DELIVERY_NO_COVERAGE` — and nothing of it is written; the settings screen says
+«لم يُحفظ شيء» and how to save the rest (switch «مفتوح» off, then save).
+
+Every other refusal of the settings save names its field (review of the
+settings screen, 2026-09-28): `STORE_FIELD_INVALID` `{field, min, max, reason}`
+for a text outside its limits, a colour not in the list, or a link that cannot
+be an address (`{field: 'social_links', key}`, `{field: 'profile_links',
+index}` — the row as sent), and `MEDIA_NOT_OWNED` `{field}` for a picture the
+merchant did not upload. Links are read by the one rule the form also applies
+(`profileHref`, packages/storeLayout/src/refs.ts): `instagram.com/x` is stored
+as `https://instagram.com/x`, never dropped. A day in the hours may be
+`closed: true` («مغلق», no times).
 
 A merchant can pause and re-open their own shop. **A merchant can never lift an
 admin suspension** — that state is not reachable from the settings endpoint at

@@ -163,8 +163,15 @@ const NOTES = [
   { id: 'n2', kind: 'new_review', title_ar: 'تقييم جديد ★5', title_en: 'New review ★5', body_ar: 'شغل ممتاز', body_en: 'Great work', link: '/merchant/reviews', entity_type: 'review', entity_id: 'r1', read: true, created_at: ago(2) },
 ];
 
-function answer(p: string, q: URLSearchParams, method: string): { status: number; body: Record<string, unknown> } {
+function answer(p: string, q: URLSearchParams, method: string, sent: Record<string, unknown> = {}): { status: number; body: Record<string, unknown> } {
   const ok = (b: Record<string, unknown> = {}) => ({ status: 200, body: { success: true, ...b } });
+  // The settings save answers with the store AS KEPT, as the route does; the
+  // screen rebuilds its form from this answer (review of the settings screen).
+  if (p === '/api/merchant/store' && method === 'PATCH') {
+    const { open, ...fields } = sent;
+    Object.assign(STORE, fields, open === undefined ? {} : { status: open ? 'active' : 'paused' });
+    return ok({ store: STORE });
+  }
   if (p === '/api/auth/me') return ok({ user: { id: 'owner', email: 'ali@x.co', username: 'ali', name: 'Ali Hassan', role: 'merchant', isAdmin: false, is_investor: false, subscription_plan: 'plus', membership_tier: 'plus', locale: lang, email_verified: true, phone_verified: true } });
   if (p === '/api/auth/verify-email/status') return ok({ email: 'ali@x.co', verified: true, emailConfigured: true });
   if (p === '/api/storefront/resolve') {
@@ -273,7 +280,18 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (!u.pathname.startsWith('/api/')) return realFetch(input, init);
   // What the page asked for, for the probes (W3-B: a range preset re-asks the report).
   ((window as unknown as { __apiCalls?: string[] }).__apiCalls ??= []).push(`${u.pathname}${u.search}`);
-  const r = answer(u.pathname, u.searchParams, (init?.method ?? 'GET').toUpperCase());
+  const method = (init?.method ?? 'GET').toUpperCase();
+  let sent: Record<string, unknown> = {};
+  if (method !== 'GET' && typeof init?.body === 'string') {
+    try {
+      sent = JSON.parse(init.body) as Record<string, unknown>;
+    } catch {
+      /* not JSON */
+    }
+    // What the page SENT, for the probes (the settings screen's save).
+    ((window as unknown as { __apiBodies?: unknown[] }).__apiBodies ??= []).push({ path: u.pathname, method, body: sent });
+  }
+  const r = answer(u.pathname, u.searchParams, method, sent);
   await new Promise((res) => setTimeout(res, 50));
   return new Response(JSON.stringify(r.body), { status: r.status, headers: { 'content-type': 'application/json' } });
 };

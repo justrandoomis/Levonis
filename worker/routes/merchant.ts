@@ -20,6 +20,7 @@ import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, oneOf, HttpError } from '../lib/http';
+import { profileHref } from '@levonis/storeLayout/refs';
 import { communityClosedRefusal, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
@@ -198,18 +199,21 @@ merchantRoutes.post('/onboard', async (c) => {
   }
 
   const existing = await storeForUser(c.env.DB, user.id);
-  if (existing) throw conflict('You already have a store');
+  // STORE_EXISTS, the code the onboarding page already answers by going to
+  // the workspace — the race path below said it; the plain second visit said
+  // CONFLICT, and the page read «تعذّر إنشاء المتجر» on every retry.
+  if (existing) throw conflict('You already have a store', 'STORE_EXISTS');
 
   const body = await c.req.json().catch(() => ({}));
-  const name = str(body.name, 'name', { min: 2, max: 60 });
+  const name = storeText(body.name, 'name', { min: 2, max: 60 });
   const slugCheck = await checkSlug(c.env.DB, String(body.slug ?? ''));
   if (!slugCheck.ok) {
     throw badRequest('That store address is not available', 'SLUG_UNAVAILABLE', { reason: slugCheck.reason });
   }
   const slug = slugCheck.slug;
 
-  const tagline = str(body.tagline, 'tagline', { min: 0, max: 140, required: false });
-  const description = str(body.description, 'description', { min: 0, max: 4000, required: false });
+  const tagline = storeText(body.tagline, 'tagline', { min: 0, max: 140, required: false });
+  const description = storeText(body.description, 'description', { min: 0, max: 4000, required: false });
   const governorate = governorateId(body.governorate, '');
 
   const merchantId = (await merchantForUser(c.env.DB, user.id))?.id ?? newId('mch');
@@ -285,10 +289,10 @@ merchantRoutes.patch('/store', async (c) => {
   const vals: unknown[] = [];
   const put = (col: string, v: unknown) => { sets.push(`${col} = ?`); vals.push(v); };
 
-  if (body.name !== undefined) put('name', str(body.name, 'name', { min: 2, max: 60 }));
-  if (body.tagline !== undefined) put('tagline', str(body.tagline, 'tagline', { min: 0, max: 140, required: false }));
+  if (body.name !== undefined) put('name', storeText(body.name, 'name', { min: 2, max: 60 }));
+  if (body.tagline !== undefined) put('tagline', storeText(body.tagline, 'tagline', { min: 0, max: 140, required: false }));
   if (body.description !== undefined)
-    put('description', str(body.description, 'description', { min: 0, max: 4000, required: false }));
+    put('description', storeText(body.description, 'description', { min: 0, max: 4000, required: false }));
   if (body.governorate !== undefined) {
     // An id from the closed list, never free text (audit 02 B27). A legacy
     // store still holding free text gets it back from the form on every save;
@@ -298,7 +302,7 @@ merchantRoutes.patch('/store', async (c) => {
     if (gov !== ctx.store.governorate) put('governorate', gov);
   }
   if (body.contact_phone !== undefined)
-    put('contact_phone', str(body.contact_phone, 'contact_phone', { min: 0, max: 32, required: false }));
+    put('contact_phone', storeText(body.contact_phone, 'contact_phone', { min: 0, max: 32, required: false }));
   if (body.contact_phone_public !== undefined) put('contact_phone_public', body.contact_phone_public ? 1 : 0);
   if (body.accepts_custom_requests !== undefined)
     put('accepts_custom_requests', body.accepts_custom_requests ? 1 : 0);
@@ -312,16 +316,21 @@ merchantRoutes.patch('/store', async (c) => {
   // no logo deserves to be told why.
   for (const [field, col] of [['logo_key', 'logo_key'], ['banner_key', 'banner_key']] as const) {
     if (body[field] === undefined) continue;
-    const raw = str(body[field], field, { min: 0, max: 200, required: false });
+    const raw = storeText(body[field], field, { min: 0, max: 200, required: false });
     if (!raw) { put(col, null); continue; }
     const key = ownedMediaKey(raw, ctx.store.user_id);
-    if (!key) throw badRequest(`${field} must be a file you uploaded to this store`);
+    if (!key) throw badRequest(`${field} must be a file you uploaded to this store`, 'MEDIA_NOT_OWNED', { field });
     put(col, key);
   }
 
   // A PRESET NAME, never a colour value and never CSS. §12: nothing a
   // merchant types may become a style rule on the page.
-  if (body.accent !== undefined) put('accent', oneOf(body.accent, 'accent', ACCENTS));
+  if (body.accent !== undefined) {
+    if (typeof body.accent !== 'string' || !(ACCENTS as readonly string[]).includes(body.accent)) {
+      throw badRequest('Choose a colour from the list', 'STORE_FIELD_INVALID', { field: 'accent' });
+    }
+    put('accent', oneOf(body.accent, 'accent', ACCENTS));
+  }
 
   for (const [key, col] of [
     ['categories', 'categories'],
@@ -437,6 +446,18 @@ merchantRoutes.patch('/store', async (c) => {
   // clears them. Never in front of the save, and never able to fail it.
   if (fresh && (fresh.store.logo_key !== ctx.store.logo_key || fresh.store.accent !== ctx.store.accent)) {
     scheduleStoreIconRefresh(c, fresh.store);
+  }
+  // Being open and taking custom requests are dimensions of request
+  // eligibility (W5-B, worker/lib/eligibility.ts): a change re-matches this
+  // workshop, exactly as a delivery or printer change does. Without it the
+  // board stayed empty after the merchant switched requests ON, and kept
+  // counting jobs after they switched them OFF. `rematchNow` never throws.
+  if (
+    fresh &&
+    (fresh.store.status !== ctx.store.status ||
+      Number(fresh.store.accepts_custom_requests) !== Number(ctx.store.accepts_custom_requests))
+  ) {
+    await rematchNow(c.env, 'merchant', ctx.merchant.id, 'store');
   }
   return c.json({ success: true, store: storePublicShape(fresh!, rootDomainFrom(c.env)) });
 });
@@ -599,6 +620,25 @@ function governorateId(raw: unknown, stored: string): string {
   throw badRequest('Choose a governorate from the list', 'GOVERNORATE_INVALID');
 }
 
+/**
+ * A store text field, refused with a code that NAMES the field and its limits
+ * (`STORE_FIELD_INVALID`, `details: {field, min, max}`), so the settings
+ * screen can say «the name must be 2–60 characters» next to the name. `str`'s
+ * own 400 carries no code, and every such refusal used to read «تعذّر الحفظ».
+ */
+function storeText(v: unknown, field: string, opts: { min: number; max: number; required?: boolean }): string {
+  try {
+    return str(v, field, opts);
+  } catch (e) {
+    if (e instanceof HttpError && e.status === 400) {
+      const text = typeof v === 'string' ? v.trim() : '';
+      const reason = v !== undefined && v !== null && typeof v !== 'string' ? 'invalid' : text.length < opts.min ? 'short' : 'long';
+      throw badRequest(e.message, 'STORE_FIELD_INVALID', { field, min: opts.min, max: opts.max, reason });
+    }
+    throw e;
+  }
+}
+
 function sanitizeList(v: unknown, maxItems: number, maxLen: number): string[] {
   if (!Array.isArray(v)) return [];
   return v
@@ -641,7 +681,7 @@ interface ProfileWidget {
 function sanitizeWidgets(v: unknown, kind: 'link' | 'fact'): ProfileWidget[] {
   if (!Array.isArray(v)) return [];
   const out: ProfileWidget[] = [];
-  for (const raw of v) {
+  for (const [index, raw] of v.entries()) {
     if (out.length >= 3) break;
     if (!raw || typeof raw !== 'object') continue;
     const r = raw as Record<string, unknown>;
@@ -652,15 +692,20 @@ function sanitizeWidgets(v: unknown, kind: 'link' | 'fact'): ProfileWidget[] {
     if (kind === 'fact') {
       item.subtitle = typeof r.subtitle === 'string' ? r.subtitle.trim().slice(0, 40) : '';
     } else {
-      try {
-        const u = new URL(String(r.url ?? ''));
-        const href = u.toString();
-        // Same 300-char ceiling as sanitizeLinks: an uncapped stored URL is
-        // replayed to every visitor of a public, unauthenticated endpoint.
-        if ((u.protocol === 'http:' || u.protocol === 'https:') && href.length <= 300) item.url = href;
-      } catch {
-        /* not a URL — the item is kept for the editor; the public page skips
-           url-less pills entirely until the merchant fixes it */
+      // The shared profile-link rule (packages/storeLayout/src/refs.ts
+      // `profileHref`): `instagram.com/x` becomes `https://instagram.com/x`,
+      // http(s) only, at most 300 characters — an uncapped stored URL is
+      // replayed to every visitor of a public, unauthenticated endpoint. An
+      // EMPTY address keeps the item for the editor (the public page skips a
+      // url-less pill); an address that cannot be one is refused by name,
+      // never dropped after a «saved».
+      const typed = typeof r.url === 'string' ? r.url.trim() : '';
+      if (typed) {
+        const href = profileHref(typed);
+        // `index` is the row's place in the list AS SENT, so the form can
+        // mark the very row.
+        if (!href) throw badRequest('That link is not a web address', 'STORE_FIELD_INVALID', { field: 'profile_links', index });
+        item.url = href;
       }
     }
     out.push(item);
@@ -668,7 +713,13 @@ function sanitizeWidgets(v: unknown, kind: 'link' | 'fact'): ProfileWidget[] {
   return out;
 }
 
-function sanitizeHours(v: unknown): Array<{ day: string; open: string; close: string }> {
+/**
+ * `closed: true` is a day the store lists as CLOSED («مغلق»), with no times.
+ * A day with empty times and no marker is free text a merchant wrote (the
+ * pre-structured rows), shown as written — before the marker, both were
+ * drawn as «الجمعة – », a stray dash that said nothing.
+ */
+function sanitizeHours(v: unknown): Array<{ day: string; open: string; close: string; closed?: true }> {
   if (!Array.isArray(v)) return [];
   const time = (x: unknown) => (typeof x === 'string' && /^\d{1,2}:\d{2}$/.test(x.trim()) ? x.trim() : '');
   return v
@@ -677,9 +728,11 @@ function sanitizeHours(v: unknown): Array<{ day: string; open: string; close: st
       if (!row || typeof row !== 'object') return null;
       const r = row as Record<string, unknown>;
       const day = typeof r.day === 'string' ? r.day.trim().slice(0, 60) : '';
-      return day ? { day, open: time(r.open), close: time(r.close) } : null;
+      if (!day) return null;
+      if (r.closed === true) return { day, open: '', close: '', closed: true as const };
+      return { day, open: time(r.open), close: time(r.close) };
     })
-    .filter((r): r is { day: string; open: string; close: string } => !!r && !!r.day)
+    .filter((r): r is { day: string; open: string; close: string; closed?: true } => !!r && !!r.day)
     .slice(0, 14);
 }
 
@@ -702,15 +755,20 @@ function sanitizeDelivery(v: unknown): Record<string, unknown> {
  * not left to the renderer to remember.
  */
 function sanitizeLinks(v: unknown): Record<string, string> {
-  const raw = sanitizeMap(v, 10, 300);
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
   const out: Record<string, string> = {};
-  for (const [k, val] of Object.entries(raw)) {
-    try {
-      const u = new URL(val);
-      if (u.protocol === 'http:' || u.protocol === 'https:') out[k] = u.toString();
-    } catch {
-      /* not a URL — dropped */
-    }
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof val !== 'string') continue;
+    const key = k.trim().slice(0, 40);
+    if (!key || !val.trim()) continue;
+    if (Object.keys(out).length >= 10) break;
+    // The shared profile-link rule; a value that cannot be an address is
+    // refused by name — it used to be dropped while the form said «saved».
+    // The value is read WHOLE: cutting it at 300 characters first could turn
+    // a long address into a different, shorter one that passes.
+    const href = profileHref(val);
+    if (!href) throw badRequest('That link is not a web address', 'STORE_FIELD_INVALID', { field: 'social_links', key });
+    out[key] = href;
   }
   return out;
 }
@@ -1453,7 +1511,7 @@ async function readServiceBody(c: Context<AppContext>, userId: string, partial: 
     if (!raw) out.image_key = null;
     else {
       const key = ownedMediaKey(raw, userId);
-      if (!key) throw badRequest('image_key must be a file you uploaded to this store');
+      if (!key) throw badRequest('image_key must be a file you uploaded to this store', 'MEDIA_NOT_OWNED', { field: 'image_key' });
       out.image_key = key;
     }
   }
@@ -1500,8 +1558,17 @@ merchantRoutes.patch('/services/:id', async (c) => {
   const f = await readServiceBody(c, ctx.store.user_id, true);
   if (!Object.keys(f).length) throw badRequest('Nothing to update');
   // Switching a service back ON is a new invitation to the public — that one
-  // transition needs selling privileges, the rest is bookkeeping.
-  if (f.active === 1) await requireSellingPrivileges(c);
+  // transition needs selling privileges, the rest is bookkeeping. Only the
+  // TRANSITION: an edit that re-sends `active: 1` for a service that is
+  // already on (the editor sends the whole form) used to demand selling
+  // rights too, so a paused store could not fix a typo in its own service.
+  if (f.active === 1) {
+    const current = await c.env.DB.prepare('SELECT active FROM merchant_services WHERE id = ? AND store_id = ?')
+      .bind(c.req.param('id'), ctx.store.id)
+      .first<{ active: number }>();
+    if (!current) throw notFound('Service not found');
+    if (Number(current.active) !== 1) await requireSellingPrivileges(c);
+  }
   const sets = Object.keys(f).map((k) => `${k} = ?`);
   const vals = Object.values(f);
   sets.push('updated_at = ?');
@@ -1559,7 +1626,7 @@ merchantRoutes.post('/showcase', async (c) => {
   let imageKey: string | null = null;
   if (body.image_key) {
     imageKey = ownedMediaKey(String(body.image_key), ctx.store.user_id);
-    if (!imageKey) throw badRequest('image_key must be a file you uploaded to this store');
+    if (!imageKey) throw badRequest('image_key must be a file you uploaded to this store', 'MEDIA_NOT_OWNED', { field: 'image_key' });
   }
   const id = newId('shw');
   await c.env.DB.prepare(
@@ -1592,7 +1659,7 @@ merchantRoutes.patch('/showcase/:id', async (c) => {
     if (!raw) { sets.push('image_key = ?'); vals.push(null); }
     else {
       const key = ownedMediaKey(raw, ctx.store.user_id);
-      if (!key) throw badRequest('image_key must be a file you uploaded to this store');
+      if (!key) throw badRequest('image_key must be a file you uploaded to this store', 'MEDIA_NOT_OWNED', { field: 'image_key' });
       sets.push('image_key = ?');
       vals.push(key);
     }
@@ -1652,11 +1719,18 @@ function couponDates(body: Record<string, unknown>) {
     const v = body[k];
     if (typeof v === 'string' && v) {
       const d = new Date(v);
-      if (Number.isNaN(d.getTime())) throw badRequest(`${k} is not a valid date`);
+      if (Number.isNaN(d.getTime())) throw badRequest(`${k} is not a valid date`, 'COUPON_DATES_INVALID', { field: k });
       out[k] = d.toISOString();
     }
   }
   return out;
+}
+
+/** A coupon window that ends before it starts would never apply — refused, not stored. */
+function assertCouponWindow(starts: string | null, ends: string | null) {
+  if (starts && ends && Date.parse(ends) <= Date.parse(starts)) {
+    throw badRequest('The coupon must end after it starts', 'COUPON_DATES_INVALID', { field: 'ends_at' });
+  }
 }
 
 merchantRoutes.get('/coupons', async (c) => {
@@ -1676,6 +1750,7 @@ merchantRoutes.post('/coupons', async (c) => {
   const kind = oneOf(body.kind, 'kind', ['fixed_iqd', 'percent'] as const);
   const value = int(body.value, 'value', { min: 1, max: kind === 'percent' ? 90 : 100_000_000 });
   const dates = couponDates(body);
+  assertCouponWindow(dates.starts_at, dates.ends_at);
 
   const id = newId('mcp');
   const ts = nowIso();
@@ -1720,6 +1795,15 @@ merchantRoutes.patch('/coupons/:id', async (c) => {
   }
   if (body.starts_at !== undefined || body.ends_at !== undefined) {
     const dates = couponDates(body);
+    // One end moved: the window is judged with the other end as stored.
+    const current = await c.env.DB.prepare('SELECT starts_at, ends_at FROM merchant_coupons WHERE id = ? AND store_id = ?')
+      .bind(c.req.param('id'), ctx.store.id)
+      .first<{ starts_at: string | null; ends_at: string | null }>();
+    if (!current) throw notFound('Coupon not found');
+    assertCouponWindow(
+      body.starts_at !== undefined ? dates.starts_at : current.starts_at,
+      body.ends_at !== undefined ? dates.ends_at : current.ends_at
+    );
     if (body.starts_at !== undefined) { sets.push('starts_at = ?'); vals.push(dates.starts_at); }
     if (body.ends_at !== undefined) { sets.push('ends_at = ?'); vals.push(dates.ends_at); }
   }

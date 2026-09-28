@@ -6,7 +6,7 @@
 import { useMemo } from 'react';
 import { Clock, MapPin } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
-import { BlockHeading, Column, deliveryNote, Section, sinceLine, useText } from '../parts';
+import { BlockHeading, Column, deliveryNote, HoursTime, Section, sinceLine, useText } from '../parts';
 import type { BlockProps, StorefrontStore } from '../types';
 
 export function AboutView({ store, showPolicies = true, showHours = true }: { store: StorefrontStore; showPolicies?: boolean; showHours?: boolean }) {
@@ -69,11 +69,7 @@ export function AboutView({ store, showPolicies = true, showHours = true }: { st
                   <Clock className="w-3.5 h-3.5" aria-hidden="true" />
                   {typeof h === 'string' ? h : h.day}
                 </span>
-                {typeof h !== 'string' && (
-                  <span className="text-zinc-300" dir="ltr">
-                    {h.open} – {h.close}
-                  </span>
-                )}
+                {typeof h !== 'string' && <HoursTime hours={h} loc={loc} />}
               </div>
             ))}
           </div>

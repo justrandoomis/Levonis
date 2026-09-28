@@ -26,6 +26,7 @@ import { ApiError } from '../lib/api';
 import { merchantApi, slugMessage, type MerchantMe, type SlugRejection } from '../lib/merchant';
 import { GOVERNORATES } from '../lib/governorates';
 import { CommunityClosedCard, useCommunityAccess } from './community/access';
+import { ErrorState } from '../components/ui/AsyncStates';
 
 type SlugState =
   | { kind: 'idle' }
@@ -49,6 +50,11 @@ export default function MerchantStart() {
   const [slugState, setSlugState] = useState<SlugState>({ kind: 'idle' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  // A failed first read is its own state: it used to leave `me` null, which
+  // this page reads as «not eligible» and answered with the PLUS upsell — to
+  // a subscriber whose request simply did not arrive.
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -57,22 +63,28 @@ export default function MerchantStart() {
       .then((d) => {
         if (!alive) return;
         setMe(d);
+        setLoadError(null);
         // Already have a store? There is nothing to create.
         if (d.store) navigate('/merchant', { replace: true });
-        if (d.suggested_slug) setSlug(d.suggested_slug);
+        if (d.suggested_slug) setSlug((current) => current || d.suggested_slug || '');
       })
-      .catch(() => {})
+      .catch((e: unknown) => alive && setLoadError(e))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
-  }, [navigate]);
+  }, [navigate, attempt]);
 
   // Debounced availability check. A keystroke is not a question worth asking
-  // the server; a pause is.
+  // the server; a pause is. And only the LATEST question's answer counts: an
+  // answer for an earlier spelling that arrives late used to overwrite the
+  // current one — «متاح» shown for, and the store then created under, a
+  // slug the field no longer held.
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const asked = useRef(0);
   const checkSlug = useCallback((value: string) => {
     if (timer.current) clearTimeout(timer.current);
+    const ticket = ++asked.current;
     if (!value) {
       setSlugState({ kind: 'idle' });
       return;
@@ -81,9 +93,10 @@ export default function MerchantStart() {
     timer.current = setTimeout(async () => {
       try {
         const r = await merchantApi.checkSlug(value);
+        if (ticket !== asked.current) return;
         setSlugState(r.ok ? { kind: 'ok', slug: r.slug } : { kind: 'bad', reason: r.reason!, slug: r.slug });
       } catch {
-        setSlugState({ kind: 'idle' });
+        if (ticket === asked.current) setSlugState({ kind: 'idle' });
       }
     }, 400);
   }, []);
@@ -127,6 +140,17 @@ export default function MerchantStart() {
         setError(slugMessage(reason, loc));
       } else if (e instanceof ApiError && e.code === 'GOVERNORATE_INVALID') {
         setError(loc('اختر المحافظة من القائمة.', 'Choose a governorate from the list.')); /* OWNER: Sorani to be written by hand. */
+      } else if (e instanceof ApiError && e.code === 'STORE_FIELD_INVALID') {
+        // The field the server named, with its limits (worker/routes/merchant.ts `storeText`).
+        const field = e.details?.field;
+        /* OWNER: Sorani to be written by hand. */
+        setError(
+          field === 'name'
+            ? loc('اسم المتجر من حرفين إلى 60 حرفًا.', 'The store name is 2 to 60 characters.')
+            : field === 'tagline'
+              ? loc('الوصف المختصر 140 حرفًا على الأكثر.', 'The tagline is at most 140 characters.')
+              : loc('«عن المتجر» 4000 حرف على الأكثر.', '«About» is at most 4000 characters.')
+        );
       } else {
         setError(loc('تعذّر إنشاء المتجر. حاول مجددًا.', 'Could not create the store. Try again.', 'نەتوانرا فرۆشگاکە دروست بکرێت.'));
       }
@@ -144,6 +168,22 @@ export default function MerchantStart() {
 
   if (!user) {
     return <Gate title={loc('سجّل الدخول أولًا', 'Sign in first', 'سەرەتا بچۆ ژوورەوە')} to="/auth" label={loc('تسجيل الدخول', 'Sign in', 'چوونەژوورەوە')} />;
+  }
+
+  if (!me && loadError) {
+    return (
+      <div className="min-h-screen bg-canvas flex items-center justify-center px-6" data-merchant-start-failed>
+        <ErrorState
+          error={loadError}
+          next="/merchant/start"
+          className="max-w-sm"
+          onRetry={() => {
+            setLoading(true);
+            setAttempt((n) => n + 1);
+          }}
+        />
+      </div>
+    );
   }
 
   // Not eligible: say so and point at the thing that fixes it, rather than

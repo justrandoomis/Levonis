@@ -27,6 +27,7 @@ import { useRef, useState } from 'react';
 import { Loader2, ImagePlus, Trash2, RefreshCw } from 'lucide-react';
 import { ApiError, uploadFile } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { refusalText } from '../../lib/refusalStrings';
 
 /** Kept in step with the server's sniffer. */
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
@@ -41,6 +42,7 @@ export function ImagePicker({
   label,
   hint,
   disabled,
+  error: saveError,
 }: {
   /** The saved URL, or null. The preview is this and nothing else. */
   value: string | null;
@@ -49,8 +51,10 @@ export function ImagePicker({
   label?: string;
   hint?: string;
   disabled?: boolean;
+  /** A refusal about THIS picture from the form's save (e.g. a file that is not the merchant's). */
+  error?: string;
 }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
   const input = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -81,9 +85,10 @@ export function ImagePicker({
       const { url } = await uploadFile(file, 'community');
       onChange(url);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : loc(
-        'تعذّر رفع الصورة.', 'Could not upload the image.', 'نەتوانرا وێنەکە باربکرێت.'
-      ));
+      // The refusal in the merchant's own language when the server named
+      // one; never the server's English sentence inside an Arabic screen.
+      const fallback = loc('تعذّر رفع الصورة.', 'Could not upload the image.', 'نەتوانرا وێنەکە باربکرێت.');
+      setError(e instanceof ApiError ? refusalText(e.code, lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar', fallback) : fallback);
     } finally {
       setBusy(false);
       // Clear the input so choosing the SAME file again still fires a change
@@ -147,8 +152,8 @@ export function ImagePicker({
               </button>
             )}
           </div>
-          {hint && !error && <p className="text-text-muted text-[11px] mt-2">{hint}</p>}
-          {error && <p className="text-red-400 text-[11.5px] mt-2">{error}</p>}
+          {hint && !(error || saveError) && <p className="text-text-muted text-[11.5px] mt-2">{hint}</p>}
+          {(error || saveError) && <p className="text-red-400 text-[11.5px] mt-2" role="alert">{error || saveError}</p>}
         </div>
       </div>
 

@@ -13,6 +13,7 @@ import { useLanguage } from '../../../../LanguageContext';
 import { merchantApi } from '../../../../lib/merchant';
 import { useToast } from '../../../ui/Toast';
 import { ListRowsSkeleton } from '../../../ui/DashboardSkeletons';
+import { ErrorState } from '../../../ui/AsyncStates';
 import { Btn, Empty } from '../../dashboard/ui';
 import { useWorkspace } from '../context';
 import { merchantRefusal } from '../refusal';
@@ -25,9 +26,15 @@ export default function ReviewsSection() {
   const [replying, setReplying] = useState('');
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
+  // A failed read is not «no reviews yet».
   const load = useCallback(() => {
-    merchantApi.reviews().then((d) => setReviews(d.reviews)).catch(() => setReviews([]));
+    setLoadError(null);
+    merchantApi
+      .reviews()
+      .then((d) => setReviews(d.reviews))
+      .catch((e: unknown) => setLoadError(e));
   }, []);
   useEffect(load, [load]);
 
@@ -48,7 +55,7 @@ export default function ReviewsSection() {
     }
   }
 
-  if (reviews === null) return <ListRowsSkeleton rows={3} thumbnail={false} />;
+  if (reviews === null) return loadError ? <ErrorState compact error={loadError} onRetry={load} /> : <ListRowsSkeleton rows={3} thumbnail={false} />;
   if (!reviews.length) {
     return (
       <Empty

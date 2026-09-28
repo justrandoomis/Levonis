@@ -144,6 +144,47 @@ export function safeExternalUrl(raw: unknown): string | null {
   return href.length <= MAX_URL ? href : null;
 }
 
+const MAX_PROFILE_URL = 300;
+const FOREIGN_SCHEME = /^(javascript|data|vbscript|file|blob|about|mailto|tel|sms|ftp|ws|wss):/i;
+
+/**
+ * A link a merchant typed into their store PROFILE — the header's link pills
+ * and the social links (worker/routes/merchant.ts, the settings screen) — as
+ * an address, or null. The one rule the form and the server share, so a link
+ * the form accepts is never dropped after a «saved».
+ *
+ * What people actually type is `instagram.com/ali3d`, and it is read as
+ * `https://instagram.com/ali3d` rather than refused (review of the settings
+ * screen: such a link used to vanish silently on save). http(s) only — a
+ * `javascript:` or `data:` href on a public page is a stored XSS — no
+ * whitespace or control character, no credentials, a dotted host name, at
+ * most 300 characters. Wider than `safeExternalUrl` on exactly one point:
+ * plain http stays allowed here, as it always has been for these links.
+ */
+export function profileHref(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  let v = raw.trim();
+  if (!v) return null;
+  if (FOREIGN_SCHEME.test(v)) return null;
+  if (!/^https?:\/\//i.test(v)) {
+    if (v.includes('://')) return null;
+    v = `https://${v.replace(/^\/+/, '')}`;
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000- \u007F-\u009F\\]/.test(v)) return null;
+  let u: URL;
+  try {
+    u = new URL(v);
+  } catch {
+    return null;
+  }
+  if ((u.protocol !== 'https:' && u.protocol !== 'http:') || u.username || u.password) return null;
+  const host = u.hostname.toLowerCase();
+  if (!host || !host.includes('.') || host.endsWith('.') || host.startsWith('[')) return null;
+  const href = u.href;
+  return href.length <= MAX_PROFILE_URL ? href : null;
+}
+
 export type LinkVerdict = { link: LinkTarget; issue?: 'unsafe_link' | 'invalid_value' | 'invalid_ref' };
 
 /**

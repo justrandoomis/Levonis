@@ -35,7 +35,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono } from 'hono';
 import { ROOT, SqliteD1 } from './fixtures/d1';
@@ -714,9 +714,10 @@ test('per-store links go to the store\'s own site while the community is shut, n
   const product = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
   assert.ok(!product.includes('to={`/community/store/${product.merchant.id}`}'), 'Product still hard-links the in-site store page');
   assert.match(product, /<CommunityStoreLink id=\{product\.merchant\.id\}/);
-  const dash = readFileSync(join(ROOT, 'src/components/MerchantDashboard.tsx'), 'utf8');
-  assert.ok(!dash.includes('navigate(`/community/store/${merchant.id}`)'), 'MerchantDashboard still navigates to the in-site store page');
-  assert.match(dash, /useCommunityStoreHref\(merchant\?\.id\)/);
+  // The legacy «Merchant Mode» dashboard that also linked the in-site store
+  // page is gone (review of the merchant page, 2026-09-28): it was mounted
+  // nowhere, and the workspace at /merchant replaced it.
+  assert.equal(existsSync(join(ROOT, 'src/components/MerchantDashboard.tsx')), false);
   const saved = readFileSync(join(ROOT, 'src/pages/SavedProducts.tsx'), 'utf8');
   assert.match(saved, /else if \(communityAccess\?\.may_enter !== false\) \{[^}]*navigate\(`\/community\/store\//);
   const requests = readFileSync(join(ROOT, 'src/pages/Requests.tsx'), 'utf8');
