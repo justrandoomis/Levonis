@@ -20,11 +20,15 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { storefrontApi } from '../lib/storefrontApi';
 import type { MerchantStore as StoreShape, MerchantProduct } from '../lib/merchant';
 import Storefront from './Storefront';
 import MerchantStore from './MerchantStore';
+import StoreUnavailable from '../components/merchant/StoreUnavailable';
+
+/** Levonis suspended this shop: every door answers the same refusal. */
+const refused = (e: unknown) => e instanceof ApiError && e.code === 'STORE_UNAVAILABLE';
 
 interface LegacyMerchant {
   id: string;
@@ -96,16 +100,23 @@ export default function CommunityStorePage() {
   const [store, setStore] = useState<StoreShape | null>(null);
   const [profileProducts, setProfileProducts] = useState<MerchantProduct[] | null>(null);
   const [loading, setLoading] = useState(true);
+  // A suspended shop says «غير متاح» here too. It fell through every door to
+  // the legacy page, which asked a fourth time and drew an empty profile.
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     let alive = true;
     setLoading(true);
+    setUnavailable(false);
     setStore(null);
     setProfileProducts(null);
     storefrontApi
       .store(id)
-      .catch(() => storefrontApi.storeById(id))
+      .catch((e: unknown) => {
+        if (refused(e)) throw e;
+        return storefrontApi.storeById(id);
+      })
       .then((d) => {
         if (!alive) return;
         // A shop with its own address IS its own site: hand the visitor over
@@ -129,15 +140,24 @@ export default function CommunityStorePage() {
         setStore(d.store);
         setLoading(false);
       })
-      .catch(async () => {
+      .catch(async (e: unknown) => {
+        if (refused(e)) {
+          if (alive) {
+            setUnavailable(true);
+            setLoading(false);
+          }
+          return;
+        }
         // No store row — assemble the profile-only view from community data.
         try {
           const d = await api.get<LegacyStorePayload>(`/api/community/store/${encodeURIComponent(id)}`);
           if (!alive) return;
           setStore(syntheticStore(d));
           setProfileProducts((d.products ?? []) as unknown as MerchantProduct[]);
-        } catch {
-          /* merchant truly gone — the legacy page below owns not-found */
+        } catch (legacy) {
+          // A suspended merchant with no store row is refused here.
+          if (alive && refused(legacy)) setUnavailable(true);
+          /* otherwise the merchant is truly gone — the legacy page below owns not-found */
         }
         if (alive) setLoading(false);
       });
@@ -153,6 +173,7 @@ export default function CommunityStorePage() {
       </div>
     );
   }
+  if (unavailable) return <StoreUnavailable />;
   return store ? (
     <Storefront store={store} profileProducts={profileProducts ?? undefined} />
   ) : (

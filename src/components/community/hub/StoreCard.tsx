@@ -10,9 +10,10 @@
  *
  * THE NUMBERS ARE THE STORE'S OWN: its rating with how many reviews it rests
  * on, the orders it has finished, its published products. A shop with no
- * reviews says «جديد» — never a fabricated five stars.
+ * reviews says «جديد» — never a fabricated five stars. A shop that takes
+ * custom print requests says so: that is why many come to the community.
  */
-import { BadgeCheck, Check, MapPin, Star } from 'lucide-react';
+import { BadgeCheck, Check, Hammer, MapPin, Star } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { GOVERNORATE_LABELS } from '../../../lib/governorates';
 import { badgeLabel, storeHref } from '../../../lib/merchant';
@@ -91,6 +92,13 @@ export default function StoreCard({
               {place}
             </span>
           )}
+          {m.accepts_custom_requests && (
+            <span className="inline-flex items-center gap-1" data-store-takes-requests>
+              <Hammer className="h-3 w-3" aria-hidden="true" />
+              {/* OWNER: Sorani to be written by hand. */}
+              {loc('يقبل طلبات خاصة', 'Takes custom requests')}
+            </span>
+          )}
         </p>
       </div>
       {canFollow && (
@@ -102,7 +110,7 @@ export default function StoreCard({
             aria-pressed={!!m.following}
             aria-busy={busy || undefined}
             data-community-follow={m.following ? 'on' : 'off'}
-            className={`inline-flex min-h-[36px] items-center gap-1 rounded-full border px-3.5 text-[12.5px] font-semibold transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+            className={`inline-flex min-h-11 items-center gap-1 rounded-full border px-3.5 text-[12.5px] font-semibold transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
               m.following
                 ? 'border-zinc-700 text-zinc-400 hover:bg-zinc-800/60'
                 : 'border-sage/40 bg-sage/10 text-sage hover:bg-sage/20'

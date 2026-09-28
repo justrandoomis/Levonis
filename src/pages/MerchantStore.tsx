@@ -4,6 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
+import { toast } from '../components/ui/Toast';
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 import PremiumMemberBadge from '../components/merchant/PremiumMemberBadge';
 import {
@@ -39,14 +40,14 @@ export default function MerchantStore() {
   const { isAuthenticated } = useAuth();
   const { signIn } = useSignInPrompt();
   const { id } = useParams();
-  const { dir, lang } = useLanguage();
+  const { dir, lang, loc } = useLanguage();
   const [activeTab, setActiveTab] = useState('products');
   const [merchant, setMerchant] = useState<StoreMerchant | null>(null);
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [followers, setFollowers] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [followBusy, setFollowBusy] = useState(false);
   const [messageBusy, setMessageBusy] = useState(false);
 
@@ -65,13 +66,9 @@ export default function MerchantStore() {
         setFollowers(data.followers || 0);
         setIsFollowing(!!data.following);
       })
-      .catch((err) => {
-        if (cancelled) return;
-        setLoadError(
-          err instanceof ApiError && err.status === 404
-            ? (dir === 'rtl' ? 'المتجر غير موجود' : 'Store not found')
-            : (err instanceof ApiError && err.message) || (dir === 'rtl' ? 'تعذر تحميل المتجر' : 'Failed to load store')
-        );
+      // Worded at render time, in the reader's current language.
+      .catch((err: unknown) => {
+        if (!cancelled) setLoadError(err ?? new Error('load failed'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -100,7 +97,9 @@ export default function MerchantStore() {
         navigate(`/auth?next=${encodeURIComponent(`/community/store/${merchant.id}`)}`);
         return;
       }
-      console.error(err);
+      // Said, not swallowed (the console was the only place it went).
+      // OWNER: Sorani to be written by hand.
+      toast.error(loc('تعذّر فتح المحادثة — حاول مجددًا.', 'Could not open the conversation — try again.'));
     } finally {
       setMessageBusy(false);
     }
@@ -130,7 +129,12 @@ export default function MerchantStore() {
       if (err instanceof ApiError && err.status === 401) {
         signIn();
       } else {
-        console.error(err);
+        // OWNER: Sorani to be written by hand.
+        toast.error(
+          err instanceof ApiError && err.code === 'CANNOT_FOLLOW_OWN_STORE'
+            ? loc('هذا متجرك — لا تحتاج إلى متابعته.', 'This is your store — no need to follow it.')
+            : loc('تعذّر تحديث المتابعة. حاول مرة أخرى.', 'Could not update the follow. Try again.')
+        );
       }
     } finally {
       setFollowBusy(false);
@@ -149,7 +153,11 @@ export default function MerchantStore() {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-4 p-8">
         <StoreIcon className="w-14 h-14 text-zinc-700" />
-        <p className="text-zinc-400 text-center">{loadError || (dir === 'rtl' ? 'المتجر غير موجود' : 'Store not found')}</p>
+        <p className="text-zinc-400 text-center">
+          {!loadError || (loadError instanceof ApiError && loadError.status === 404)
+            ? dir === 'rtl' ? 'المتجر غير موجود' : 'Store not found'
+            : (loadError instanceof ApiError && loadError.message) || (dir === 'rtl' ? 'تعذر تحميل المتجر' : 'Failed to load store')}
+        </p>
         <button onClick={() => navigate(-1)} className="border border-zinc-700 bg-zinc-900 text-white rounded-full px-6 py-2.5 font-bold hover:bg-zinc-800 transition-colors">
           {dir === 'rtl' ? 'رجوع' : 'Go Back'}
         </button>

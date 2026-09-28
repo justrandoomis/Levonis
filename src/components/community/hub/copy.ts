@@ -77,7 +77,18 @@ const RESULTS: Forms = {
   enN: 'results',
 };
 
+const STORES: Forms = {
+  one: 'متجر واحد',
+  two: 'متجران',
+  few: 'متاجر',
+  many: 'متجرًا',
+  hundred: 'متجر',
+  en1: 'store',
+  enN: 'stores',
+};
+
 export const resultsLabel = (n: number, lang: HubLang) => counted(n, RESULTS, lang);
+export const storesLabel = (n: number, lang: HubLang) => counted(n, STORES, lang);
 export const followersLabel = (n: number, lang: HubLang) => counted(n, FOLLOWERS, lang);
 export const completedLabel = (n: number, lang: HubLang) => counted(n, COMPLETED, lang);
 export const productsLabel = (n: number, lang: HubLang) => countNoun(n, 'product', lang);

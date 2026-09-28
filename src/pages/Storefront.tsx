@@ -36,11 +36,11 @@ import { useStore } from '../StoreContext';
 import { trackStoreEvent } from '../lib/storeBeacon';
 import { useCommunityAccess } from './community/access';
 import InstallAppButton from '../components/pwa/InstallAppButton';
-import StoreUnavailable from '../components/merchant/StoreUnavailable';
 import StoreRenderer from '../components/storefront/StoreRenderer';
 import '../components/storefront/styles';
 import { SavedIdsProvider, StorefrontRuntimeProvider, type StorefrontRuntime, type TabKind } from '../components/storefront/runtime';
 import type { AccentClasses } from '../components/storefront/theme';
+import { forgetCommunityFeed } from '../components/community/hub/feedCache';
 import type { StorefrontStore } from '../components/storefront/types';
 import type { LinkRoute } from '../../packages/storeLayout/src/refs';
 import type { ReviewsData } from '../../packages/storeLayout/src/data';
@@ -48,11 +48,16 @@ import type { ReviewsData } from '../../packages/storeLayout/src/data';
 // The owner's «QR and store card» row and its strings arrive with the «…»
 // menu, not with the page: a customer's visit never downloads them (W2-F).
 const OwnerShareMenuItem = lazy(() => import('../components/merchant/share/OwnerShareMenuItem'));
+/** A suspended shop's page — rare, so it is not part of every store visit's download. */
+const StoreUnavailable = lazy(() => import('../components/merchant/StoreUnavailable'));
 
 type Loc = (ar: string, en: string, ckb?: string) => string;
 
 const TAB_KINDS: readonly TabKind[] = ['products', 'collections', 'deals', 'services', 'showcase', 'about'];
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Where a store's «اطلب عرض سعر» leads: the request wizard on the main site. */
+const QUOTE_PATH = '/requests?view=new';
 
 /**
  * The main site, from wherever this store is rendered. On a subdomain the
@@ -276,7 +281,9 @@ export default function Storefront({
       legacyProductHref: (productSlug) => `/product/${productSlug}`,
       routeHref,
       collectionHref: (id) => (onHost ? `/products?section=${encodeURIComponent(id)}` : `${base}?section=${encodeURIComponent(id)}`),
-      requestsHref: onHost ? `${MAIN_SITE}/requests` : '/requests',
+      // «اطلب عرض سعر» opens the request wizard, not the board of other
+      // people's requests (a guest lands on the board and is asked to sign in).
+      requestsHref: onHost ? `${MAIN_SITE}${QUOTE_PATH}` : QUOTE_PATH,
       loadProducts: async ({ source, collection_id, cursor }) => {
         if (noStore) return { items: [], next_cursor: null };
         const qs = new URLSearchParams();
@@ -318,7 +325,13 @@ export default function Storefront({
 
   // OWNER DECISION (2026-09-24): an admin-suspended store is this page and
   // nothing else — the server sends nothing of the shop to render anyway.
-  if (hostUnavailable || unavailable) return <StoreUnavailable />;
+  if (hostUnavailable || unavailable) {
+    return (
+      <Suspense fallback={<div className="min-h-[100dvh] bg-black" />}>
+        <StoreUnavailable />
+      </Suspense>
+    );
+  }
 
   if (loading) {
     return (
@@ -458,7 +471,7 @@ function LiveServiceDoors({ accepts }: { accepts: boolean }) {
   const { loc } = useLanguage();
   const MAIN_SITE = useMainSite();
   const { open: openChat, failed: chatFailed } = useOpenChat();
-  const requestsHref = onHost ? `${MAIN_SITE}/requests` : '/requests';
+  const requestsHref = onHost ? `${MAIN_SITE}${QUOTE_PATH}` : QUOTE_PATH;
   // The request board IS Levo Community and closes with it (DECISIONS 110):
   // while it is shut to this viewer the quote door would open onto the
   // maintenance card, so only the conversation is offered.
@@ -586,7 +599,8 @@ function FollowButton({
     if (!signedIn || closed) return;
     let alive = true;
     api
-      .get<{ following: Array<{ merchant_id: string }> }>('/api/community-reviews/following')
+      // Only this shop's row: the whole list was read to find one.
+      .get<{ following: Array<{ merchant_id: string }> }>(`/api/community-reviews/following?merchant_id=${encodeURIComponent(merchantId)}`)
       .then((d) => alive && setFollowing(d.following.some((f) => f.merchant_id === merchantId)))
       .catch(() => {});
     return () => {
@@ -610,6 +624,8 @@ function FollowButton({
         await api.post(`/api/community-reviews/follow/${merchantId}`);
         setFollowing(true);
       }
+      // The community page's cached store list says «تتابعه» from this answer on.
+      forgetCommunityFeed('merchants');
     } catch (e) {
       // Said, not swallowed: the pill used to stay as it was with no word.
       // OWNER: Sorani to be written by hand.

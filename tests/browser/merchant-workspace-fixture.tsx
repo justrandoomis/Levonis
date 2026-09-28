@@ -183,6 +183,23 @@ function answer(p: string, q: URLSearchParams, method: string, sent: Record<stri
     if (onStore) return ok({ kind: 'store', store: state === 'other' ? { ...STORE, id: 's2', slug: 'zahra', name: 'Zahra Prints' } : STORE });
     return ok({ kind: 'main', store: null });
   }
+  // A store's product page (StorefrontProduct): the merchant wrote an Arabic name and description.
+  if (p === '/api/storefront/ali3d/products/bracket') {
+    return ok({
+      store: { ...STORE, url: '', open: true, followers: 210, product_count: 9 },
+      product: {
+        id: 'p_br', slug: 'bracket', name: 'Shelf bracket', name_ar: 'حامل رف', description: 'PETG, twelve in a set.', description_ar: 'بتج، اثنا عشر في الطقم.',
+        images: [], media: [], price_iqd: 15000, original_price_iqd: null, in_stock: true, variant_mode: 'simple', options: [], colors: [],
+        delivery_methods: [], prep_days: 2, attributes: { material: 'petg', technology: null, color: null, finish: null, dim_x_mm: 80, dim_y_mm: 60, dim_z_mm: null, weight_g: null }, category: 'parts', condition: 'new', sales_tier: null,
+      },
+    });
+  }
+  if (p === '/api/community-favorites/ids') return ok({ product_ids: [] });
+  if (/^\/api\/community-favorites\/[^/]+$/.test(p)) return ok({ favorite: method === 'PUT' });
+  // A shop Levonis suspended: every door refuses it (CommunityStorePage → StoreUnavailable).
+  if (p === '/api/storefront/closedshop' || p === '/api/storefront/by-id/closedshop' || p === '/api/community/store/closedshop') {
+    return { status: 404, body: { success: false, error: 'This store is not available right now', code: 'STORE_UNAVAILABLE' } };
+  }
   if (p === '/api/storefront/ali3d') return ok({ store: { ...STORE, followers: 210, product_count: 9, positive_pct: 96, deal_count: 0 } });
   if (p === '/api/community/access') return ok({ closed: false, admin: false, may_enter: true });
   if (p === '/api/merchant/me') return ok(ME);
@@ -222,7 +239,7 @@ function answer(p: string, q: URLSearchParams, method: string, sent: Record<stri
   }
   // «عروضي» on /merchant/requests (W5-A): GET /api/marketplace/my-offers, the real shape.
   if (p === '/api/marketplace/my-offers') return ok({ offers: [{ id: 'off_1', request_id: 'req_1', merchant_id: 'm1', price_iqd: 18000, completion_days: 3, delivery_method: 'merchant_delivery', message: '', materials: '', material_ids: ['petg'], included: '', warranty_terms: '', state: 'superseded', expires_at: ago(-5), created_at: ago(2), updated_at: ago(1), revision: 1, request_revision: 1, stale: true, expired: false, merchant: null, request: { id: 'req_1', title: en ? 'Car phone holder' : 'حامل هاتف للسيارة', state: 'receiving_offers', revision: 2, expires_at: ago(-20) }, order_id: null }], next_cursor: null });
-  if (p === '/api/marketplace/orders') return ok({ orders: [{ id: 'cord_1', state: 'funded', price_iqd: 50000, merchant_receivable_iqd: 47500, created_at: ago(1), delivered_at: null, completed_at: null, auto_complete_at: null, request_title: en ? 'Bracket, PETG ×12' : 'حامل رف PETG ×12', merchant_name: 'Ali', store_slug: 'ali3d', role: 'merchant' }] });
+  if (p === '/api/marketplace/orders') return ok({ orders: [{ id: 'cord_1', state: 'funded', price_iqd: 50000, merchant_receivable_iqd: 47500, created_at: ago(1), delivered_at: null, completed_at: null, auto_complete_at: null, request_title: en ? 'Bracket, PETG ×12' : 'حامل رف PETG ×12', merchant_name: 'Ali', store_slug: 'ali3d', role: 'merchant' }, { id: 'co_9', state: 'completed', price_iqd: 35000, merchant_receivable_iqd: 33250, created_at: ago(9), delivered_at: ago(3), completed_at: ago(1), auto_complete_at: null, request_title: en ? 'Nameplate, brass-look PLA' : 'لوحة اسم بلون نحاسي', merchant_name: en ? 'Zahra Prints' : 'مطبعة زهراء', store_slug: 'zahra', role: 'customer' }] });
   if (p === '/api/merchant/products/stats') return ok({ totals: { total: 3, published: 2, active: 2, draft: 1, hidden: 0, archived: 0, out_of_stock: 1, low_stock: 1, views: 200, sold: 53 }, weekly: [], categories: [], sales_daily: [] });
   if (p === '/api/merchant/products' && method === 'GET') {
     const stock = q.get('stock');
@@ -272,6 +289,28 @@ function answer(p: string, q: URLSearchParams, method: string, sent: Record<stri
       ],
       next_cursor: null,
     });
+  }
+  // A completed custom order waiting for the customer's rating of the workshop (StoreReviews).
+  if (p === '/api/community-reviews/eligible') return ok({ eligible: [{ order_id: null, community_order_id: 'co_9', merchant_id: 'm7', store_id: 's7', merchant_name: en ? 'Zahra Prints' : 'مطبعة زهراء', created_at: ago(1) }] });
+  if (p === '/api/community-reviews' && method === 'POST') return { status: 201, body: { success: true, review_id: 'rev_1' } };
+  // «متاجر أتابعها» (FollowedStores): two shops, one Levonis sanctioned; unfollowing m8 fails.
+  if (p === '/api/community/followed') {
+    if (params.get('followed') === 'none') return ok({ merchants: [] });
+    const shop = (id: string, over: Record<string, unknown>) => ({
+      id, user_id: `u_${id}`, name: '', bio: '', avatarUrl: null, verified: false, pro_badge: false, premium_badge: false, created_at: ago(40),
+      store_slug: id, store_url: `https://${id}.levonis-iq.com`, store_name: '', tagline: '', logoUrl: null, governorate: '', accepts_custom_requests: false,
+      badge: 'new', rating: null, rating_count: 0, completed_orders: 0, followers: 1, product_count: 0, following: true, unavailable: false, ...over,
+    });
+    return ok({
+      merchants: [
+        shop('m7', { store_name: en ? 'Zahra Prints' : 'مطبعة زهراء', tagline: en ? 'Nameplates and gifts, made to order' : 'لوحات أسماء وهدايا حسب الطلب', verified: true, pro_badge: true, governorate: 'baghdad', accepts_custom_requests: true, badge: 'trusted', rating: 4.7, rating_count: 23, completed_orders: 41, followers: 120, product_count: 18 }),
+        shop('m8', { store_name: en ? 'Basra Parts' : 'قطع البصرة', tagline: en ? 'Spare parts for home appliances' : 'قطع غيار للأجهزة المنزلية', governorate: 'basra', followers: 9, product_count: 4 }),
+        { id: 'm9', unavailable: true, name: null, bio: null, avatarUrl: null, verified: false, pro_badge: false, premium_badge: false, created_at: ago(90), store_slug: null, store_url: null },
+      ],
+    });
+  }
+  if (/^\/api\/community\/store\/[^/]+\/follow$/.test(p)) {
+    return p.includes('/m8/') ? { status: 500, body: { success: false, error: 'Something went wrong' } } : ok({ following: method === 'POST' });
   }
   if (p === '/api/marketplace/print/catalog') return ok({ materials: [{ id: 'pla', process: 'fdm', name_en: 'PLA', name_ar: 'PLA', needs_enclosure: false, abrasive: false }], qualities: [], min_job_iqd: 0 });
   if (p === '/api/merchant/store/share') return ok({ store_id: 's1', url: STORE.url, host: 'ali3d.levonis-iq.com', card: { title: STORE.name, description: '', image: '', site_name: 'Levonis', url: STORE.url }, app_icon: { state: 'none', reason: null, icon: null, maskable: null, name: STORE.name, short_name: 'Ali 3D', background: '#0b0c0f' }, suspended: false });

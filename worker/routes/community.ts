@@ -6,6 +6,8 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { getTierStatus, benefits, membershipBadges } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
+import { feedCursor, nextFeedCursor } from '../lib/feedCursor';
+import { requestBoardVisible } from '../lib/requestBoard';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { communityAdminDoor, communityClosedRefusal, communityGate, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { audit } from '../lib/audit';
@@ -67,23 +69,7 @@ function communityProductPublic(p: Record<string, unknown>) {
 /** A media key as the address `/files/*` serves it, or null. */
 const fileUrl = (key: unknown) => (typeof key === 'string' && key ? `/files/${key}` : null);
 
-/**
- * THE COMMUNITY FEEDS PAGE BY (created_at, id), newest first — the storefront's
- * cursor (worker/routes/storefront.ts): `<created_at>|<id>`, so two rows
- * written in the same millisecond can neither repeat nor vanish across a page
- * boundary. A bare timestamp reads as `(timestamp, '')`: strictly older.
- */
-function feedCursor(raw: string | undefined): { at: string; id: string } {
-  const v = (raw ?? '').slice(0, 200);
-  const bar = v.lastIndexOf('|');
-  return bar === -1 ? { at: v, id: '' } : { at: v.slice(0, bar), id: v.slice(bar + 1) };
-}
-
-function nextFeedCursor(rows: Array<Record<string, unknown>>, limit: number): string | null {
-  if (rows.length !== limit) return null;
-  const last = rows[rows.length - 1];
-  return `${String(last.created_at)}|${String(last.id)}`;
-}
+// The feeds page by (created_at, id): worker/lib/feedCursor.ts.
 
 /**
  * A card in the community's product feed: the product, WHERE IT CAN BE BOUGHT,
@@ -257,6 +243,40 @@ export const COMMUNITY_DIRECTORY_COLUMNS = `cm.*, s.id AS store_id, s.slug AS st
                 WHERE p.merchant_id = cm.id AND p.lifecycle = 'active' AND p.status = 'active'
                   AND (s.id IS NULL OR p.store_id = s.id)) AS product_count`;
 
+/**
+ * One store as the directory draws it — and «متاجر أتابعها» too, so a shop
+ * looks the same wherever the customer meets it: the store's own name, logo
+ * and tagline (the community profile's only where there is no store), its
+ * rating, finished orders, products and place.
+ */
+function directoryCard(m: Record<string, unknown>, badges: { pro: Set<string>; premium: Set<string> }, root: string | null) {
+  const hasStore = typeof m.store_id === 'string' && m.store_id !== '';
+  const ratingCount = Number(m.rating_count ?? 0);
+  return {
+    ...merchantPublic(m, badges),
+    store_slug: m.store_slug ?? null,
+    // A suspended store — or a suspended merchant's store — is not
+    // advertised as a destination; the card falls back to the in-site page.
+    // Paused shops keep their address — the page itself says they are closed.
+    store_url:
+      m.store_slug && m.store_status !== 'suspended' && m.status !== 'suspended'
+        ? storeUrl(String(m.store_slug), root, String(m.store_id))
+        : null,
+    store_name: hasStore ? String(m.store_name ?? '') : null,
+    tagline: hasStore ? String(m.store_tagline ?? '') : '',
+    /** The store's logo, else the community avatar. */
+    logoUrl: fileUrl(m.store_logo_key) ?? fileUrl(m.avatar_key),
+    governorate: hasStore ? String(m.store_governorate ?? '') : '',
+    accepts_custom_requests: hasStore && !!m.store_custom,
+    badge: m.badge_override || m.badge || 'new',
+    rating: ratingCount ? Number(m.rating_avg_x100) / 100 : null,
+    rating_count: ratingCount,
+    completed_orders: Number(m.completed_orders ?? 0),
+    followers: Number(m.followers ?? 0),
+    product_count: Number(m.product_count ?? 0),
+  };
+}
+
 communityRoutes.get('/merchants', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 24 });
   const cursor = feedCursor(c.req.query('cursor'));
@@ -281,34 +301,7 @@ communityRoutes.get('/merchants', async (c) => {
   const badges = await membershipBadges(c.env.DB, results.map((m) => m.user_id));
   return c.json({
     success: true,
-    merchants: results.map((m) => {
-      const hasStore = typeof m.store_id === 'string' && m.store_id !== '';
-      const ratingCount = Number(m.rating_count ?? 0);
-      return {
-        ...merchantPublic(m, badges),
-        store_slug: m.store_slug ?? null,
-        // A suspended store — or a suspended merchant's store — is not
-        // advertised as a destination; the card falls back to the in-site page.
-        // Paused shops keep their address — the page itself says they are closed.
-        store_url:
-          m.store_slug && m.store_status !== 'suspended' && m.status !== 'suspended'
-            ? storeUrl(String(m.store_slug), root, String(m.store_id))
-            : null,
-        store_name: hasStore ? String(m.store_name ?? '') : null,
-        tagline: hasStore ? String(m.store_tagline ?? '') : '',
-        /** The store's logo, else the community avatar. */
-        logoUrl: fileUrl(m.store_logo_key) ?? fileUrl(m.avatar_key),
-        governorate: hasStore ? String(m.store_governorate ?? '') : '',
-        accepts_custom_requests: hasStore && !!m.store_custom,
-        badge: m.badge_override || m.badge || 'new',
-        rating: ratingCount ? Number(m.rating_avg_x100) / 100 : null,
-        rating_count: ratingCount,
-        completed_orders: Number(m.completed_orders ?? 0),
-        followers: Number(m.followers ?? 0),
-        product_count: Number(m.product_count ?? 0),
-        following: !!m.viewer_follows,
-      };
-    }),
+    merchants: results.map((m) => ({ ...directoryCard(m, badges, root), following: !!m.viewer_follows })),
     next_cursor: nextFeedCursor(results, limit),
     total: total ? Number(total.n) : null,
   });
@@ -325,16 +318,9 @@ communityRoutes.get('/merchants', async (c) => {
  * offers — instead of «بانتظار العروض» over a request that already had three.
  * `status` and `customer_username` stay for a client that still reads them.
  */
-const REQUEST_SEARCH = ['r.title', 'r.description'] as const;
-
-/**
- * On the public board: published, still taking offers, public, not expired —
- * shared with the public API. `now` and `q` are the placeholders holding the
- * current ISO time and the `likePattern` term.
- */
-export const requestBoardVisible = (now: string, q: string) => `r.state IN ('open','receiving_offers') AND r.visibility = 'public'
-        AND (r.expires_at IS NULL OR r.expires_at > ${now})
-        AND (${q} = '' OR ${sqlLikeClause(REQUEST_SEARCH, q)})`;
+// The board's visibility rule — shared with the request board and the public
+// API — is worker/lib/requestBoard.ts; re-exported for the public API's import.
+export { requestBoardVisible } from '../lib/requestBoard';
 
 communityRoutes.get('/requests', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 20 });
@@ -528,15 +514,21 @@ communityRoutes.delete('/store/:id/follow', requireAuth, async (c) => {
   return c.json({ success: true, following: false });
 });
 
+/** «متاجر أتابعها» has no pages; the follow route's rate limit is what keeps a list short. */
+export const FOLLOWED_LIMIT = 500;
+
 communityRoutes.get('/followed', requireAuth, async (c) => {
   const user = c.get('user')!;
   const root = rootDomainFrom(c.env);
+  // The directory's own columns, so a followed shop is drawn with the same
+  // card. Bounded: a follow is rate-limited, not capped, and this list has no
+  // pages — FOLLOWED_LIMIT is far past any real customer's list.
   const { results } = await c.env.DB.prepare(
-    `SELECT cm.*, s.id AS store_id, s.slug AS store_slug, s.status AS store_status
+    `SELECT ${COMMUNITY_DIRECTORY_COLUMNS}
        FROM follows f
        JOIN community_merchants cm ON cm.id = f.merchant_id
        LEFT JOIN merchant_stores s ON s.merchant_id = cm.id
-      WHERE f.user_id = ? ORDER BY f.created_at DESC`
+      WHERE f.user_id = ? ORDER BY f.created_at DESC LIMIT ${FOLLOWED_LIMIT}`
   )
     .bind(user.id)
     .all<Record<string, unknown>>();
@@ -561,12 +553,7 @@ communityRoutes.get('/followed', requireAuth, async (c) => {
             store_slug: null,
             store_url: null,
           }
-        : {
-            ...merchantPublic(m, badges),
-            unavailable: false,
-            store_slug: m.store_slug ?? null,
-            store_url: m.store_slug ? storeUrl(String(m.store_slug), root, String(m.store_id)) : null,
-          }
+        : { ...directoryCard(m, badges, root), unavailable: false, following: true }
     ),
   });
 });

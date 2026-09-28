@@ -4,7 +4,7 @@ import { Plus, Scale, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { isBottomNavHidden } from '../BottomNav';
 import { useBottomNavSuppressed } from '../../lib/bottomNavSuppress';
-import { Toaster, useToast } from '../ui/Toast';
+import { useToast } from '../ui/Toast';
 import { useConfirm } from '../ui/ConfirmDialog';
 import {
   COMPARE_TRAY_MAX,
@@ -135,7 +135,6 @@ export default function CompareTray() {
 
   return (
     <>
-      {!onAdmin && <Toaster />}
       {confirmDialog}
       {visible && (
         <>

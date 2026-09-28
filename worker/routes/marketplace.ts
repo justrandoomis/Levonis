@@ -102,6 +102,9 @@ import {
   supersedeStatement,
 } from '../lib/requestRevisions';
 import { getSetting } from '../lib/settings';
+import { feedCursor, nextFeedCursor } from '../lib/feedCursor';
+import { requestBoardVisible } from '../lib/requestBoard';
+import { likePattern } from '../lib/sqlLike';
 import { notifyStatement } from '../lib/notifications';
 // Eligibility as data (W5-B): the offer gate, the file matrix and the re-match.
 import { assertMayOffer, eligibleVerdictSql, liveVerdict, rematchNow } from '../lib/printMatchingStore';
@@ -219,10 +222,16 @@ function offerShape(o: Record<string, unknown>, badges: { pro: Set<string>; prem
 
 // -------------------------------------------------------------- requests
 
-/** The public board. Only states a merchant can still act on. */
+/**
+ * The public board. Only states a merchant can still act on — the community
+ * page's rule (`requestBoardVisible`), searchable the same way (`q`, title and
+ * description). Paged by (created_at, id): the bare timestamp it used dropped
+ * a request that shared its second with the last one on a page.
+ */
 marketplaceRoutes.get('/requests', requireCommunityOpen, async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 50, def: 20 });
-  const cursor = c.req.query('cursor') || '';
+  const cursor = feedCursor(c.req.query('cursor'));
+  const q = likePattern(c.req.query('q'));
   const category = c.req.query('category') || '';
   const governorate = c.req.query('governorate') || '';
 
@@ -233,19 +242,17 @@ marketplaceRoutes.get('/requests', requireCommunityOpen, async (c) => {
             u.name AS customer_name,
             (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count
        FROM community_requests r JOIN users u ON u.id = r.customer_id
-      WHERE r.state IN ('open','receiving_offers')
-        AND r.visibility = 'public'
-        AND (r.expires_at IS NULL OR r.expires_at > ?)
-        AND (? = '' OR r.category = ?)
-        AND (? = '' OR r.governorate = ?)
-        AND (? = '' OR r.created_at < ?)
-      ORDER BY r.created_at DESC LIMIT ?`
-  ).bind(nowIso(), category, category, governorate, governorate, cursor, cursor, limit).all();
+      WHERE ${requestBoardVisible('?1', '?2')}
+        AND (?3 = '' OR r.category = ?3)
+        AND (?4 = '' OR r.governorate = ?4)
+        AND (?5 = '' OR r.created_at < ?5 OR (r.created_at = ?5 AND r.id < ?6))
+      ORDER BY r.created_at DESC, r.id DESC LIMIT ?7`
+  ).bind(nowIso(), q, category, governorate, cursor.at, cursor.id, limit).all<Record<string, unknown>>();
 
   return c.json({
     success: true,
     requests: results.map(publicRequest),
-    next_cursor: results.length === limit ? String(results[results.length - 1].created_at) : null,
+    next_cursor: nextFeedCursor(results, limit),
   });
 });
 

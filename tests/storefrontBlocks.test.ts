@@ -202,6 +202,9 @@ const ALLOWED_IMPORTS = [
   // PREMIUM's community mark (0145) — the PRO badge's sibling: react, one icon
   // and the language context, nothing of the merchant workspace.
   /^src\/components\/merchant\/PremiumMemberBadge$/,
+  // A product's name in the reader's language — two pure functions, no imports
+  // (Levo Community review, 2026-09-28).
+  /^src\/lib\/productText$/,
 ];
 
 function importsOf(rel: string): string[] {

@@ -285,6 +285,9 @@ import BrowseMissionTimer from './components/BrowseMissionTimer';
 // The compare tray's door: renders and downloads nothing until the tray
 // holds a product (src/components/compare/CompareTrayGate.tsx).
 import CompareTrayGate from './components/compare/CompareTrayGate';
+// The customer shell's Toaster, downloaded the first time a toast is raised
+// (src/components/ui/ToasterGate.tsx); /admin and /merchant mount their own.
+import ToasterGate from './components/ui/ToasterGate';
 const Policies = React.lazy(() => import('./pages/Policies'));
 const Support = React.lazy(() => import('./pages/Support'));
 /**
@@ -556,6 +559,10 @@ function AppContent() {
   // `/merchant` is the merchant workspace (W3-A): its own full-screen frame, out
   // of the customer shell. `/merchant/start` — onboarding — stays where it was.
   const isMerchantStart = pathForShell === '/merchant/start' || pathForShell.startsWith('/merchant/start/');
+  // The admin console and the merchant workspace mount their own Toaster.
+  const shellHasToaster =
+    pathForShell === '/admin' || pathForShell.startsWith('/admin/') ||
+    ((pathForShell === '/merchant' || pathForShell.startsWith('/merchant/')) && !isMerchantStart);
   const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support', '/chat', '/model-viewer', '/merchant', '/printer-finder'].some(p => pathForShell === p || pathForShell.startsWith(p + '/')) && !isMerchantStart;
 
   if (isFullScreenRoute) {
@@ -693,6 +700,7 @@ function AppContent() {
           </Routes>
           </Suspense>
         </main>
+        {!shellHasToaster && <ToasterGate />}
       </div>
     );
   }
@@ -852,6 +860,7 @@ function AppContent() {
         </ChunkBoundary>
 
         <CompareTrayGate />
+        {!shellHasToaster && <ToasterGate aboveNav={!navHidden} />}
 
         {/* Clearance for the floating BottomNav: its bottom offset plus its
             height plus a small visual gap. `shrink-0` so a flex column cannot

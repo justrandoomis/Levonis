@@ -17,9 +17,9 @@
  * something working correctly.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Loader2, PackageSearch, MapPin, ChevronLeft, FilePen, PencilLine } from 'lucide-react';
+import { Plus, Loader2, PackageSearch, MapPin, ChevronLeft, FilePen, PencilLine, Search, X } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
@@ -38,6 +38,7 @@ import RequestWizard from '../components/community/requests/RequestWizard';
 import { requestsApi, type CatalogMaterial } from '../components/community/requests/api';
 import { REQUEST_STATE_TONE, requestStateLabel } from '../components/community/requests/requestStates';
 import { CommunityLoadError } from './community/access';
+import PendingStoreReviews from '../components/community/reviews/StoreReviews';
 import OfferCompare from '../components/community/offers/OfferCompare';
 import MerchantOfferPanel from '../components/community/offers/MerchantOfferPanel';
 import OrderContactCard from '../components/community/offers/OrderContactCard';
@@ -63,6 +64,7 @@ import Spinner from '../components/ui/Spinner';
 import ConfirmSheet from '../components/print/ConfirmSheet';
 import { apiRefusal } from '../lib/refusalStrings';
 import { asLang, formatDate } from '../components/orders/format';
+import { offersLabel } from '../components/community/hub/copy';
 
 interface RequestRow {
   id: string;
@@ -454,15 +456,37 @@ function AllRequests({
   const [rows, setRows] = useState<RequestRow[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [more, setMore] = useState(false);
+  /** «المزيد» failed: said on the button, which stays to try again. */
+  const [moreError, setMoreError] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [attempt, setAttempt] = useState(0);
+  // Searched on the server (title and description), like the community page's
+  // requests: a filter over the twenty rows on screen would miss page two.
+  const [draft, setDraft] = useState('');
+  const [q, setQ] = useState('');
+  useEffect(() => {
+    const t = window.setTimeout(() => setQ(draft.trim().slice(0, 60)), 300);
+    return () => window.clearTimeout(t);
+  }, [draft]);
+
+  const boardUrl = useCallback(
+    (after?: string) => {
+      const p = new URLSearchParams();
+      if (q) p.set('q', q);
+      if (after) p.set('cursor', after);
+      const qs = p.toString();
+      return `/api/marketplace/requests${qs ? `?${qs}` : ''}`;
+    },
+    [q]
+  );
 
   useEffect(() => {
     let alive = true;
     setRows(null);
     setLoadError(null);
+    setMoreError(false);
     api
-      .get<{ requests: RequestRow[]; next_cursor: string | null }>('/api/marketplace/requests')
+      .get<{ requests: RequestRow[]; next_cursor: string | null }>(boardUrl())
       .then((d) => {
         if (!alive) return;
         setRows(d.requests);
@@ -473,39 +497,76 @@ function AllRequests({
     return () => {
       alive = false;
     };
-  }, [attempt]);
+  }, [attempt, boardUrl]);
 
   async function loadMore() {
     if (!cursor) return;
     setMore(true);
+    setMoreError(false);
     try {
-      const d = await api.get<{ requests: RequestRow[]; next_cursor: string | null }>(
-        `/api/marketplace/requests?cursor=${encodeURIComponent(cursor)}`
-      );
+      const d = await api.get<{ requests: RequestRow[]; next_cursor: string | null }>(boardUrl(cursor));
       setRows((r) => [...(r ?? []), ...d.requests.filter((x) => !(r ?? []).some((y) => y.id === x.id))]);
       setCursor(d.next_cursor ?? null);
     } catch {
-      setCursor(null);
+      // The rest of the board is still there: keep the way to it.
+      setMoreError(true);
     } finally {
       setMore(false);
     }
   }
 
+  const search = (
+    <form role="search" onSubmit={(e) => e.preventDefault()} className="relative">
+      <label htmlFor="requests-search" className="sr-only">
+        {loc('ابحث في طلبات الطباعة', 'Search print requests')}
+      </label>
+      <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+      <input
+        id="requests-search"
+        type="search"
+        enterKeyHint="search"
+        autoComplete="off"
+        value={draft}
+        maxLength={60}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={loc('ابحث في طلبات الطباعة', 'Search print requests')}
+        data-requests-search
+        className="w-full min-h-11 rounded-full border border-zinc-800 bg-zinc-900 py-2 ps-10 pe-11 text-sm text-white placeholder:text-zinc-500 focus:border-olive/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus [&::-webkit-search-cancel-button]:appearance-none"
+      />
+      {draft && (
+        <button
+          type="button"
+          onClick={() => setDraft('')}
+          aria-label={loc('مسح البحث', 'Clear search')}
+          className="absolute end-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      )}
+    </form>
+  );
+
+  // One frame for every state, so the search box is never remounted (and
+  // never loses the keyboard) while a search loads.
+  let body: ReactNode = null;
   if (rows === null) {
-    if (loadError) return <CommunityLoadError error={loadError} onRetry={() => setAttempt((n) => n + 1)} />;
-    return (
+    body = loadError ? (
+      <CommunityLoadError error={loadError} onRetry={() => setAttempt((n) => n + 1)} />
+    ) : (
       <div className="py-12 flex justify-center">
         <Loader2 className="w-5 h-5 text-gold animate-spin" />
       </div>
     );
-  }
-
-  if (!rows.length) {
-    return (
-      <div className="py-14 text-center">
+  } else if (!rows.length) {
+    body = (
+      <div className="py-14 text-center" data-requests-empty={q ? 'search' : 'board'}>
         <PackageSearch className="w-9 h-9 text-text-muted mx-auto mb-3" />
         <p className="text-zinc-400 text-[13px]">
-          {loc('لا توجد طلبات مفتوحة', 'No open requests', 'هیچ داواکارییەکی کراوە نییە')}
+          {q ? (
+            <bdi>{loc(`لا نتائج لـ «${q}»`, `No results for “${q}”`)}</bdi>
+          ) : (
+            loc('لا توجد طلبات مفتوحة', 'No open requests', 'هیچ داواکارییەکی کراوە نییە')
+          )}
         </p>
       </div>
     );
@@ -513,7 +574,9 @@ function AllRequests({
 
   return (
     <div className="space-y-3">
-      {rows.map((r) => (
+      {search}
+      {body}
+      {rows?.map((r) => (
         <button
           key={r.id}
           onClick={() => onOpen(r)}
@@ -540,7 +603,8 @@ function AllRequests({
               </span>
             )}
             <span className="ms-auto text-gold/80 font-semibold">
-              {loc(`${r.offer_count} عرض`, `${r.offer_count} offers`, `${r.offer_count} ئۆفەر`)}
+              {/* «عرضان», «5 عروض», «12 عرضًا» — not «5 عرض». */}
+              {offersLabel(r.offer_count, lang)}
             </span>
           </div>
         </button>
@@ -553,7 +617,12 @@ function AllRequests({
           data-requests-more
           className="w-full min-h-[44px] rounded-2xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[13px] font-semibold disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         >
-          {more ? loc('جارٍ التحميل…', 'Loading…') : loc('المزيد', 'Load more')}
+          {more
+            ? loc('جارٍ التحميل…', 'Loading…')
+            : moreError
+              ? // OWNER: Sorani to be written by hand.
+                loc('تعذّر التحميل — حاول مجددًا', 'Could not load — try again')
+              : loc('المزيد', 'Load more')}
         </button>
       )}
     </div>
@@ -728,7 +797,22 @@ function RequestDetail({
               <Detail label={loc('الأبعاد', 'Dimensions', 'ڕەهەندەکان')} value={current.dimensions} />
             )}
             {current.deadline && (
-              <Detail label={loc('الموعد', 'Deadline', 'کاتی کۆتایی')} value={current.deadline} />
+              <Detail label={loc('الموعد', 'Deadline', 'کاتی کۆتایی')} value={formatDate(current.deadline, lang) || current.deadline} />
+            )}
+            {/* Where it goes, when it was asked, and until when offers are taken —
+                the board's card said the place; the request's own page did not. */}
+            {current.governorate && (
+              <Detail
+                label={loc('المحافظة', 'Governorate', 'پارێزگا')}
+                value={GOVERNORATE_LABELS[current.governorate]?.[lang === 'ckb' ? 'ckb' : lang] ?? current.governorate}
+              />
+            )}
+            {current.state !== 'draft' && formatDate(current.created_at, lang) && (
+              <Detail label={loc('نُشر', 'Published', 'بڵاوکرایەوە')} value={formatDate(current.created_at, lang)} />
+            )}
+            {open && formatDate(current.expires_at, lang) && (
+              // OWNER: Sorani to be written by hand.
+              <Detail label={loc('آخر موعد للعروض', 'Offers close')} value={formatDate(current.expires_at, lang)} />
             )}
           </div>
           {current.customer_notes && (
@@ -1026,9 +1110,14 @@ function StateChip({ state }: { state: string }) {
  */
 type OrderAction = { kind: 'confirm' | 'cancel' | 'dispute'; order: CommunityOrderRow };
 
+/** The states in which the customer's payment sits in escrow. */
+const HELD_STATES = ['funded', 'in_progress', 'merchant_marked_delivered', 'disputed'];
+
 function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = {}) {
   const { loc, lang } = useLanguage();
   const [orders, setOrders] = useState<CommunityOrderRow[] | null>(null);
+  /** Bumped when receipt is confirmed: the work just completed is now waiting for a rating. */
+  const [reviewsKey, setReviewsKey] = useState(0);
   const [action, setAction] = useState<OrderAction | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -1053,8 +1142,10 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
     setBusy(true);
     setError('');
     try {
-      if (action.kind === 'confirm') await communityOrdersApi.confirm(action.order.id);
-      else if (action.kind === 'cancel') await communityOrdersApi.cancel(action.order.id);
+      if (action.kind === 'confirm') {
+        await communityOrdersApi.confirm(action.order.id);
+        setReviewsKey((n) => n + 1);
+      } else if (action.kind === 'cancel') await communityOrdersApi.cancel(action.order.id);
       else await communityOrdersApi.dispute(action.order.id, description.trim());
       setAction(null);
       load();
@@ -1080,6 +1171,10 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
   if (!orders.length) {
     return (
       <div className="py-12 text-center">
+        {/* A list that could not be read is shown empty — a waiting rating is still asked for. */}
+        <div className="text-start">
+          <PendingStoreReviews kind="custom" refreshKey={reviewsKey} />
+        </div>
         <p className="text-zinc-400 text-[13px]">
           {loc('لا توجد طلبات قيد التنفيذ', 'No custom orders in progress', 'هیچ داواکاریەکی تایبەت نییە')}
         </p>
@@ -1119,6 +1214,8 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
       {whileClosed && (
         <h2 className="text-gold font-bold text-[14px]">{loc('تنفيذ طلباتي', 'My custom orders', 'داواکاریە تایبەتەکانم')}</h2>
       )}
+      {/* Completed work waiting for the customer's rating of the workshop. */}
+      <PendingStoreReviews kind="custom" refreshKey={reviewsKey} />
       {orders.map((o) => (
         <div key={o.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5" data-community-order={o.id}>
           {/* The state can be a long phrase ("Delivered — awaiting your
@@ -1134,13 +1231,17 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
           </div>
           <p className="text-text-muted text-[11.5px] mb-2">
             {o.merchant_name} · <span className="text-white font-semibold tabular-nums" dir="ltr">{iqd(o.price_iqd)}</span>
-            {' '}
-            {loc('(محجوز لدى Levonis)', '(held by Levonis)', '(لای LEVONIS پارێزراوە)')}
+            {/* Held only while the work runs or is disputed: a completed order's
+                money went to the merchant, a cancelled one's came back — the
+                state chip says which. */}
+            {HELD_STATES.includes(o.state) && (
+              <> {loc('(محجوز لدى Levonis)', '(held by Levonis)', '(لای LEVONIS پارێزراوە)')}</>
+            )}
           </p>
 
           {/* After acceptance each side has the other's contact, and the
               request's conversation (W5-A, §4.7). */}
-          {['funded', 'in_progress', 'merchant_marked_delivered', 'disputed'].includes(o.state) && (
+          {HELD_STATES.includes(o.state) && (
             <details className="mb-2 group" data-community-order-contact={o.id}>
               <summary className="min-h-[44px] flex items-center cursor-pointer text-[12.5px] font-semibold text-gold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
                 {loc('التواصل مع التاجر', 'Contact the merchant')}

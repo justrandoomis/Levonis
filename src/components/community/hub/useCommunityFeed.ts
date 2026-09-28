@@ -14,16 +14,9 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { communityHubApi, type FeedKind, type Page } from './api';
+import { FRESH_MS, feedCache as cache, forgetCommunityFeed, type FeedEntry as Entry } from './feedCache';
 
-interface Entry {
-  rows: Array<{ id: string }>;
-  next: string | null;
-  total: number | null;
-  at: number;
-}
-
-const FRESH_MS = 2 * 60_000;
-const cache = new Map<string, Entry>();
+export { forgetCommunityFeed };
 
 const LOADERS: Record<FeedKind, (q: string, cursor: string | null) => Promise<Page<{ id: string }>>> = {
   products: communityHubApi.products,
@@ -34,13 +27,6 @@ const LOADERS: Record<FeedKind, (q: string, cursor: string | null) => Promise<Pa
 function fresh(key: string): Entry | null {
   const e = cache.get(key);
   return e && Date.now() - e.at < FRESH_MS ? e : null;
-}
-
-/** Forget one kind's pages (every term), e.g. after a follow changed what they say. */
-export function forgetCommunityFeed(kind: FeedKind, exceptKey?: string) {
-  for (const key of cache.keys()) {
-    if (key !== exceptKey && key.split('|')[1] === kind) cache.delete(key);
-  }
 }
 
 export interface CommunityFeed<T> {

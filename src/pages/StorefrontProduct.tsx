@@ -26,7 +26,7 @@
  * loaded on the first refusal, not with the page: most visits never see one.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
@@ -40,7 +40,6 @@ import type { MerchantProduct, MerchantStore } from '../lib/merchant';
 import SellerConflictDialog, { type SellerConflict } from '../components/merchant/SellerConflictDialog';
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 import PremiumMemberBadge from '../components/merchant/PremiumMemberBadge';
-import StoreUnavailable from '../components/merchant/StoreUnavailable';
 import { useStore } from '../StoreContext';
 import { trackStoreEvent } from '../lib/storeBeacon';
 import StoreTheme from '../components/storefront/StoreTheme';
@@ -53,6 +52,12 @@ import { ProductFacts } from '../components/catalog/ProductFacts';
 import { findVariant, initialSelection, priceRange } from '../../packages/catalog/src/variants';
 import { QuantityInput } from '../components/ui/QuantityInput';
 import { LINE_QTY_MAX } from '../../packages/pricing/src/quantity';
+import { productDescription, productName } from '../lib/productText';
+
+/** A suspended shop's page — rare, so it is not part of every product visit's download. */
+const StoreUnavailable = lazy(() => import('../components/merchant/StoreUnavailable'));
+/** Save and share (components/community/ProductActions.tsx) — lazy, for the same budget. */
+const ProductActions = lazy(() => import('../components/community/ProductActions'));
 
 export default function StorefrontProduct() {
   const { slug: routeSlug, productSlug } = useParams<{ slug: string; productSlug: string }>();
@@ -173,7 +178,13 @@ export default function StorefrontProduct() {
     }
   }
 
-  if (hostUnavailable || unavailable) return <StoreUnavailable />;
+  if (hostUnavailable || unavailable) {
+    return (
+      <Suspense fallback={<div className="min-h-[100dvh] bg-black" />}>
+        <StoreUnavailable />
+      </Suspense>
+    );
+  }
 
   if (loading) {
     return (
@@ -212,27 +223,34 @@ export default function StorefrontProduct() {
     (store as StorefrontStore).layout_theme?.tokens ??
     ((hostStore as StorefrontStore | null)?.layout as { tokens?: Tokens } | undefined)?.tokens;
   const discounted = !!shownCompare && shownCompare > shownPrice;
+  // The merchant's Arabic words for an Arabic reader, when they wrote them.
+  const name = productName(product, lang);
+  const description = productDescription(product, lang);
 
   return (
     <StoreTheme tokens={themeTokens ?? null} storeAccent={store.accent} className="min-h-screen text-zinc-300 pb-32">
       <div className="max-w-2xl mx-auto">
-        <div className="px-4 sm:px-6 pt-4">
-          <Link to={storeHome} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg text-zinc-400 text-[13px] mb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-            <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
-            {store.name}
+        <div className="px-4 sm:px-6 pt-4 mb-2 flex items-center justify-between gap-3">
+          <Link to={storeHome} className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-lg text-zinc-400 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+            <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180" />
+            <span className="truncate">{store.name}</span>
           </Link>
+          {/* Save and share — a lazy chunk, sized in advance so nothing moves when it lands. */}
+          <Suspense fallback={<div className="h-11 w-[96px] shrink-0" aria-hidden="true" />}>
+            <ProductActions productId={product.id} name={name} />
+          </Suspense>
         </div>
 
         <ProductGallery
           items={gallery}
           focusUrl={chosen?.image ?? null}
-          productName={product.name}
+          productName={name}
           videoLabel={loc('فيديو', 'Video') /* OWNER: Sorani to be written by hand. */}
           showLabel={(n) => loc(`عرض ${n}`, `Show ${n}`) /* OWNER: Sorani to be written by hand. */}
         />
 
         <div className="px-4 sm:px-6 pt-4">
-          <h1 className="text-white font-bold text-[18px] leading-snug mb-2">{product.name}</h1>
+          <h1 className="text-white font-bold text-[18px] leading-snug mb-2" dir="auto">{name}</h1>
 
           <div className="flex items-baseline gap-2 mb-4 tabular-nums" dir="ltr" aria-live="polite" data-product-price>
             <span className="text-gold font-bold text-xl">
@@ -311,9 +329,9 @@ export default function StorefrontProduct() {
 
           <ProductFacts attributes={product.attributes} loc={loc} lang={lang} />
 
-          {product.description && (
-            <p className="text-zinc-300 text-[13.5px] leading-relaxed whitespace-pre-wrap mb-6">
-              {product.description}
+          {description && (
+            <p className="text-zinc-300 text-[13.5px] leading-relaxed whitespace-pre-wrap mb-6" dir="auto">
+              {description}
             </p>
           )}
 

@@ -34,14 +34,15 @@ export function ProductFacts({ attributes, loc, lang }: { attributes: Attributes
     });
   }
   if (attributes.finish) rows.push({ k: 'finish', label: loc('التشطيب', 'Finish'), value: pick(FINISH_NAMES[attributes.finish]) }); // OWNER: Sorani to be written by hand.
-  if (dims.some((d) => d !== null)) {
+  // `!= null`: a fact the answer left out is as unstated as a null one.
+  if (dims.some((d) => d != null)) {
     rows.push({
       k: 'dims',
       label: loc('الأبعاد', 'Size'), // OWNER: Sorani to be written by hand.
-      value: <span dir="ltr" className="tabular-nums">{dims.map((d) => (d === null ? '—' : mm(d))).join(' × ')} mm</span>,
+      value: <span dir="ltr" className="tabular-nums">{dims.map((d) => (d == null ? '—' : mm(d))).join(' × ')} mm</span>,
     });
   }
-  if (attributes.weight_g !== null) {
+  if (attributes.weight_g != null) {
     rows.push({ k: 'weight', label: loc('الوزن', 'Weight'), value: <span dir="ltr" className="tabular-nums">{mm(attributes.weight_g)} g</span> }); // OWNER: Sorani to be written by hand.
   }
   if (!rows.length) return null;

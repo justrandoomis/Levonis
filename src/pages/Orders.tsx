@@ -11,6 +11,7 @@ import OrderCard from '../components/orders/OrderCard';
 import OrderCardSkeleton from '../components/orders/OrderCardSkeleton';
 import CancelOrderSheet from '../components/orders/CancelOrderSheet';
 import ReviewSheet from '../components/orders/ReviewSheet';
+import PendingStoreReviews from '../components/community/reviews/StoreReviews';
 import GiftsEntry from '../components/orders/GiftsEntry';
 import { asLang } from '../components/orders/format';
 
@@ -504,6 +505,10 @@ export default function Orders() {
             </button>
           </div>
         )}
+
+        {/* Delivered orders from a community store, waiting for the customer's
+            rating of the SHOP (the product ratings are the sheet below). */}
+        {filter !== 'returns' && <PendingStoreReviews kind="store" />}
 
         {/* Honest explanation of the returns view: it IS the delivered list. */}
         {filter === 'returns' && !loading && !error && (

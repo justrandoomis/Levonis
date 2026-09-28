@@ -7,6 +7,7 @@
  * the product is. «نفد» is the storefront's own word and boolean; a sale shows
  * the struck price the store itself set, never a computed percentage.
  */
+import { productName } from '../../../lib/productText';
 import { useLanguage } from '../../../LanguageContext';
 import { useMoney } from '../../../CurrencyContext';
 import SafeImage from '../../ui/SafeImage';
@@ -16,7 +17,7 @@ import type { CommunityProduct } from './api';
 export default function ProductTile({ product: p, eager = false }: { product: CommunityProduct; eager?: boolean }) {
   const { lang, loc } = useLanguage();
   const { money } = useMoney();
-  const name = lang === 'ar' && p.name_ar ? p.name_ar : p.name || p.name_ar;
+  const name = productName(p, lang);
   const sale = p.original_price_iqd != null && p.original_price_iqd > p.price_iqd;
   const soldOut = p.in_stock === false;
 

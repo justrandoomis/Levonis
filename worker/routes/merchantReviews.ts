@@ -409,36 +409,55 @@ communityReviewRoutes.patch('/follow/:merchantId', requireCommunityOpen, require
   return c.json({ success: true });
 });
 
+/** No pages here either — the same bound as «متاجر أتابعها» (/api/community/followed). */
+const FOLLOWING_LIMIT = 500;
+
+/**
+ * The shops this customer follows, with their notification switches — or,
+ * with `?merchant_id=`, only whether they follow THAT one: a store page asks
+ * about itself, and used to read the whole list to find one row.
+ *
+ * A shop Levonis has sanctioned stays listed (so it can be unfollowed) with
+ * nothing its merchant wrote — no name, tagline or logo — as on
+ * /api/community/followed (review S5). This list sent all three.
+ */
 communityReviewRoutes.get('/following', requireCommunityOpen, requireAuth, async (c) => {
   const user = c.get('user')!;
+  const one = str(c.req.query('merchant_id'), 'merchant_id', { min: 0, max: 60, required: false });
   const { results } = await c.env.DB.prepare(
     `SELECT m.id, m.name, m.verified, m.badge, m.badge_override, m.rating_avg_x100, m.rating_count,
+            m.status AS merchant_status, s.status AS store_status,
             s.slug AS store_slug, s.logo_key, s.tagline,
             f.notify_products, f.notify_offers, f.notify_updates, f.created_at
        FROM follows f
        JOIN community_merchants m ON m.id = f.merchant_id
        LEFT JOIN merchant_stores s ON s.merchant_id = m.id
-      WHERE f.user_id = ? ORDER BY f.created_at DESC`
-  ).bind(user.id).all<Record<string, unknown>>();
+      WHERE f.user_id = ?1 AND (?2 = '' OR f.merchant_id = ?2)
+      ORDER BY f.created_at DESC LIMIT ${FOLLOWING_LIMIT}`
+  ).bind(user.id, one).all<Record<string, unknown>>();
 
   return c.json({
     success: true,
-    following: results.map((r) => ({
-      merchant_id: r.id,
-      name: r.name,
-      verified: !!r.verified,
-      badge: r.badge_override || r.badge,
-      rating: r.rating_count ? Number(r.rating_avg_x100) / 100 : null,
-      rating_count: r.rating_count,
-      store_slug: r.store_slug,
-      logoUrl: r.logo_key ? `/files/${r.logo_key}` : null,
-      tagline: r.tagline,
-      notify: {
-        products: !!r.notify_products,
-        offers: !!r.notify_offers,
-        updates: !!r.notify_updates,
-      },
-      since: r.created_at,
-    })),
+    following: results.map((r) => {
+      const sanctioned = r.merchant_status === 'suspended' || r.store_status === 'suspended';
+      return {
+        merchant_id: r.id,
+        unavailable: sanctioned,
+        name: sanctioned ? null : r.name,
+        verified: sanctioned ? false : !!r.verified,
+        badge: sanctioned ? null : r.badge_override || r.badge,
+        rating: !sanctioned && r.rating_count ? Number(r.rating_avg_x100) / 100 : null,
+        rating_count: sanctioned ? 0 : r.rating_count,
+        store_slug: sanctioned ? null : r.store_slug,
+        logoUrl: !sanctioned && r.logo_key ? `/files/${r.logo_key}` : null,
+        tagline: sanctioned ? null : r.tagline,
+        notify: {
+          products: !!r.notify_products,
+          offers: !!r.notify_offers,
+          updates: !!r.notify_updates,
+        },
+        since: r.created_at,
+      };
+    }),
   });
 });

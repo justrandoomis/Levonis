@@ -5,9 +5,11 @@
  * customer shell's `--nav-stack`; the merchant tabs reported a save with
  * `alert()`, or with nothing. This is the shared one.
  *
- * HOW TO USE. Mount `<Toaster />` ONCE in a shell (it holds the live regions,
- * which must exist before the first message for a screen reader to hear it);
- * then anywhere, in any lazy chunk:
+ * HOW TO USE. Mount `<Toaster />` ONCE in a shell (it holds the live regions);
+ * the customer shell mounts it through ./ToasterGate.tsx the first time a
+ * toast is raised, and a second Toaster mounted at the same time waits its
+ * turn instead of drawing every message twice. The queue itself is
+ * lib/toastStore.ts. Then anywhere, in any lazy chunk:
  *
  *   const toast = useToast();
  *   toast.success(loc('تم الحفظ', 'Saved', 'پاشەکەوت کرا'));
@@ -44,91 +46,26 @@ import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
 import { UI_LAYERS } from './Overlay';
+import {
+  claimToasterHost,
+  dismissToast as dismiss,
+  isToasterHost,
+  subscribeToasterHosts,
+  subscribeToasts as subscribe,
+  toast,
+  toastQueue as snapshot,
+  type ToastRecord,
+  type ToastTone,
+} from '../../lib/toastStore';
 
-export type ToastTone = 'success' | 'error' | 'info';
-
-export interface ToastAction {
-  label: string;
-  onClick: () => void;
-}
-
-export interface ToastOptions {
-  description?: string;
-  /** One verb: «تراجع», «إعادة المحاولة», «عرض». Pressing it also dismisses the toast. */
-  action?: ToastAction;
-  /** Milliseconds on screen; `Infinity` keeps it until dismissed. */
-  duration?: number;
-  /** Replace the toast with this id instead of adding one. */
-  id?: string;
-}
-
-export interface ToastRecord {
-  id: string;
-  tone: ToastTone;
-  title: string;
-  description?: string;
-  action?: ToastAction;
-  duration: number;
-}
+export type { ToastAction, ToastOptions, ToastRecord, ToastTone } from '../../lib/toastStore';
+export { toast, toastQueue } from '../../lib/toastStore';
 
 const VISIBLE = 3;
-const DEFAULT_MS: Record<ToastTone, number> = { success: 4000, info: 4000, error: 8000 };
-const ACTION_MIN_MS = 6000;
-
-let toasts: ToastRecord[] = [];
-let seq = 0;
-const listeners = new Set<() => void>();
-const emit = () => {
-  for (const listener of listeners) listener();
-};
-
-function show(tone: ToastTone, title: string, options: ToastOptions = {}): string {
-  const id = options.id ?? `t${++seq}`;
-  const base = options.duration ?? DEFAULT_MS[tone];
-  const record: ToastRecord = {
-    id,
-    tone,
-    title,
-    description: options.description,
-    action: options.action,
-    duration: options.action ? Math.max(base, ACTION_MIN_MS) : base,
-  };
-  const at = toasts.findIndex((t) => t.id === id);
-  toasts = at >= 0 ? toasts.map((t, i) => (i === at ? record : t)) : [...toasts, record];
-  emit();
-  return id;
-}
-
-function dismiss(id?: string): void {
-  toasts = id === undefined ? [] : toasts.filter((t) => t.id !== id);
-  emit();
-}
-
-/** The toast API. Stable: safe in dependency arrays and outside components. */
-export const toast = Object.freeze({
-  show,
-  success: (title: string, options?: ToastOptions) => show('success', title, options),
-  error: (title: string, options?: ToastOptions) => show('error', title, options),
-  info: (title: string, options?: ToastOptions) => show('info', title, options),
-  dismiss,
-});
 
 export function useToast(): typeof toast {
   return toast;
 }
-
-/** The queue as it stands, oldest first (the Toaster shows the first three). */
-export function toastQueue(): readonly ToastRecord[] {
-  return toasts;
-}
-
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
-const snapshot = () => toasts;
 
 const TONE_ICON: Record<ToastTone, React.ReactNode> = {
   success: <CheckCircle2 aria-hidden="true" className="h-[18px] w-[18px] text-success" />,
@@ -198,7 +135,7 @@ function ToastItem({ record, paused, closeLabel }: { record: ToastRecord; paused
 }
 
 /** What the live regions say: the newest message of each urgency. */
-function useAnnouncements(list: ToastRecord[]): { polite: string; assertive: string } {
+function useAnnouncements(list: readonly ToastRecord[]): { polite: string; assertive: string } {
   const [said, setSaid] = useState({ polite: '', assertive: '' });
   const seen = useRef(new Set<string>());
   const flip = useRef(false);
@@ -217,8 +154,16 @@ function useAnnouncements(list: ToastRecord[]): { polite: string; assertive: str
   return said;
 }
 
-/** Mount once per shell. Renders nothing visible until there is something to say. */
-export function Toaster() {
+/**
+ * Mount once per shell. Renders nothing visible until there is something to say.
+ * `aboveNav`: the customer shell's floating nav is on screen — the stack sits
+ * above it (or above a taller bar a page declares in `--shell-bottom-inset`).
+ */
+export function Toaster({ aboveNav = false }: { aboveNav?: boolean } = {}) {
+  // The first Toaster mounted draws; any other waits (lib/toastStore.ts).
+  const [me] = useState(() => Symbol('toaster'));
+  useEffect(() => claimToasterHost(me), [me]);
+  const drawing = useSyncExternalStore(subscribeToasterHosts, () => isToasterHost(me), () => false);
   const list = useSyncExternalStore(subscribe, snapshot, snapshot);
   const { loc } = useLanguage();
   const [hovered, setHovered] = useState(false);
@@ -232,7 +177,7 @@ export function Toaster() {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
-  if (typeof document === 'undefined') return null;
+  if (typeof document === 'undefined' || !drawing) return null;
   const visible = list.slice(0, VISIBLE);
   const paused = hovered || focusedIn || hidden;
   const closeLabel = loc('إغلاق', 'Dismiss', 'داخستن');
@@ -251,7 +196,9 @@ export function Toaster() {
         className="pointer-events-none fixed inset-x-0 flex flex-col items-center gap-2 px-4 sm:items-end"
         style={{
           zIndex: UI_LAYERS.toast,
-          insetBlockEnd: 'calc(var(--shell-bottom-inset, 0px) + max(0.75rem, env(safe-area-inset-bottom)))',
+          insetBlockEnd: aboveNav
+            ? 'calc(max(var(--shell-bottom-inset, 0px), var(--nav-stack)) + 0.75rem)'
+            : 'calc(var(--shell-bottom-inset, 0px) + max(0.75rem, env(safe-area-inset-bottom)))',
         }}
       >
         <AnimatePresence initial={false}>

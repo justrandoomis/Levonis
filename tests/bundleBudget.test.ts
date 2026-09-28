@@ -291,6 +291,11 @@ test('the split really happened: every page and panel §10 names has a chunk of 
  * packages/pricing/src/quantity.ts), the same control as the Levonis product
  * page and both carts. The closure measured 45.5 KB with it; 47 keeps the
  * guarantee above — re-eagering the smaller lazy piece (2.3 KB) still fails.
+ *
+ * LEVO COMMUNITY (2026-09-28): the history-aware Back and the follow pill's
+ * reset of the community page's remembered lists (a cache module of its own,
+ * not the feed hook) took it to 47.1; the suspended-store page, which only a
+ * sanctioned shop's visitor ever sees, became a lazy chunk (-0.8). 46.5 KB.
  */
 const STOREFRONT_BUDGET = 47 * KB;
 

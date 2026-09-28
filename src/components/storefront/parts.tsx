@@ -4,6 +4,7 @@
  * into an anchor. Presentation only — anything that acts comes from the
  * runtime (runtime.tsx).
  */
+import { productName } from '../../lib/productText';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Loader2, ShoppingBag } from 'lucide-react';
@@ -25,6 +26,8 @@ export interface CardProduct {
   id: string;
   slug: string;
   name: string;
+  /** The merchant's Arabic name, when they wrote one (lib/productText.ts). */
+  name_ar?: string | null;
   images: string[];
   price_iqd: number;
   original_price_iqd: number | null;
@@ -105,7 +108,8 @@ export function Column({ children, className = '' }: { children: ReactNode; clas
 // ----------------------------------------------------------------- products
 
 export function ProductCard({ product, storeOpen, legacyLink = false }: { product: CardProduct; storeOpen: boolean; legacyLink?: boolean }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
+  const name = productName(product, lang);
   const rt = useStorefrontRuntime();
   const href = legacyLink ? rt.legacyProductHref(product.slug) : rt.productHref(product.slug);
   const image = product.images[0];
@@ -117,7 +121,7 @@ export function ProductCard({ product, storeOpen, legacyLink = false }: { produc
     <Link to={href} className="sf-tile active:scale-[0.98] transition-transform">
       <div className="sf-media sf-well overflow-hidden relative">
         {image ? (
-          <img src={image} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+          <img src={image} alt={name} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <ShoppingBag className="w-5 h-5 text-zinc-700" strokeWidth={1.5} aria-hidden="true" />
@@ -154,7 +158,7 @@ export function ProductCard({ product, storeOpen, legacyLink = false }: { produc
       </div>
       <div className="sf-tile-body">
         <p className="text-zinc-300 text-[12.5px] truncate leading-snug" dir="auto">
-          {product.name}
+          {name}
         </p>
         {/* One price line that never wraps — the −% badge already tells the
             deal story on a card this narrow. */}

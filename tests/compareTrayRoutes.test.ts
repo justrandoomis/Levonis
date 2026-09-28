@@ -63,13 +63,15 @@ test('the tray is lazy: the entry imports the gate and the store, never the tray
   assert.match(store, /addEventListener\('storage'/, 'cross-tab sync');
 });
 
-test('the tray answers a refused add, and mounts the only customer-shell Toaster (not on /admin)', () => {
+test('the tray answers a refused add; its toasts go to the shell\'s Toaster', () => {
   const tray = read('src/components/compare/CompareTray.tsx');
   assert.match(tray, /useConfirm\(\)/, 'a type conflict asks with the shared ConfirmDialog');
   assert.doesNotMatch(tray, /window\.confirm|\balert\(/);
   assert.match(tray, /notice\.kind === 'full'/);
   assert.match(tray, /duration: 5000,\s*action: \{ label: loc\('تراجع', 'Undo'\), onClick: \(\) => compareTray\.restore\(saved\) \}/, 'clear offers a 5 s undo');
-  assert.match(tray, /\{!onAdmin && <Toaster \/>\}/, '/admin mounts its own Toaster');
+  // The shell's ToasterGate draws them (tests/toasterGate.test.ts): the tray
+  // held the customer shell's only Toaster, and a visit that compared nothing had none.
+  assert.doesNotMatch(tray, /<Toaster \/>/);
   assert.match(tray, /count >= 2 \?/, '«قارن» needs two products');
   assert.match(tray, /compareHref\(state\)/);
 });
