@@ -3,50 +3,25 @@
  * (with what will change, before it does), and going back to a published
  * version.
  */
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { History, LayoutTemplate } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog, useConfirm } from '../../ui/ConfirmDialog';
 import { Input } from '../../ui/Field';
 import { Sheet } from '../../ui/Sheet';
-import { THEME_NAMES, type ThemeName } from '../../../../packages/storeLayout/src/tokens';
-import { starterLayout } from '../../../../packages/storeLayout/src/starters';
-import { BLOCK_COPY, say, THEME_COPY, TOKEN_COPY } from './catalog';
+import type { ThemeName } from '../../../../packages/storeLayout/src/tokens';
+import { BLOCK_COPY, say, TOKEN_COPY } from './catalog';
+import TemplateGallery, { type StarterUse } from './TemplateGallery';
+import type { StorefrontStore } from '../../storefront/types';
 import type { ChangeSummary } from './editorModel';
-import { ThemeSwatch } from './panels';
 import { builderRefusal } from './refusal';
 import type { LayoutRevision } from './storeLayoutApi';
 
 // ------------------------------------------------------------ templates
 
-export function StarterGrid({ storeAccent, onChoose, busy }: { storeAccent: unknown; onChoose: (t: ThemeName) => void; busy?: ThemeName | null }) {
-  const { loc } = useLanguage();
-  const starters = useMemo(() => THEME_NAMES.map((t) => ({ theme: t, layout: starterLayout(t) })), []);
-  return (
-    <ul className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 lg:grid-cols-3">
-      {starters.map(({ theme, layout }) => (
-        <li key={theme}>
-          <button
-            type="button"
-            onClick={() => onChoose(theme)}
-            disabled={!!busy}
-            data-sd-starter={theme}
-            aria-busy={busy === theme || undefined}
-            className="lv-choice flex h-full w-full flex-col gap-2 p-2.5 text-start disabled:opacity-60"
-          >
-            <ThemeSwatch tokens={layout.tokens} storeAccent={storeAccent} className="h-14" />
-            <span className="block text-[13px] font-bold text-text-primary">{say(loc, THEME_COPY[theme].name)}</span>
-            <span className="block text-[11px] leading-snug text-text-muted">{layout.blocks.map((b) => say(loc, BLOCK_COPY[b.type].name)).join(' · ')}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /** The first-run card: a store with no draft and nothing published. */
-export function FirstRun({ storeAccent, onChoose, onDismiss, busy }: { storeAccent: unknown; onChoose: (t: ThemeName) => void; onDismiss: () => void; busy: ThemeName | null }) {
+export function FirstRun({ store, onChoose, onDismiss, busy }: { store: StorefrontStore; onChoose: (t: ThemeName) => void; onDismiss: () => void; busy: ThemeName | null }) {
   const { loc } = useLanguage();
   return (
     <section aria-labelledby="sd-first-run" className="lv-surface space-y-3 p-4" data-sd-first-run>
@@ -58,13 +33,13 @@ export function FirstRun({ storeAccent, onChoose, onDismiss, busy }: { storeAcce
           </h2>
           <p className="text-[12.5px] leading-relaxed text-text-muted">
             {loc(
-              'كل قالب صفحة كاملة تُبنى من منتجاتك وبياناتك أنت. يُحفظ في المسودة فقط — لا يراه زبائنك حتى تنشر.',
-              'Each template is a whole page built from your own products and data. It is saved to the draft only — customers see nothing until you publish.'
+              'كل قالب صفحة كاملة، مرسومة هنا بمنتجاتك وبياناتك أنت. يُحفظ في المسودة فقط — لا يراه زبائنك حتى تنشر.',
+              'Each template is a whole page, drawn here with your own products and data. It is saved to the draft only — customers see nothing until you publish.'
             )}
           </p>
         </div>
       </div>
-      <StarterGrid storeAccent={storeAccent} onChoose={onChoose} busy={busy} />
+      <TemplateGallery store={store} onChoose={(t) => onChoose(t)} busy={busy} canUseLook={false} />
       <Button variant="ghost" size="sm" onClick={onDismiss}>
         {loc('أبدأ من صفحتي الحالية', 'Start from my current page')}
       </Button>
@@ -72,7 +47,7 @@ export function FirstRun({ storeAccent, onChoose, onDismiss, busy }: { storeAcce
   );
 }
 
-export function StarterSheet({ open, onClose, storeAccent, onChoose }: { open: boolean; onClose: () => void; storeAccent: unknown; onChoose: (t: ThemeName) => void }) {
+export function StarterSheet({ open, onClose, store, onChoose }: { open: boolean; onClose: () => void; store: StorefrontStore; onChoose: (t: ThemeName, use: StarterUse) => void }) {
   const { loc } = useLanguage();
   return (
     <Sheet
@@ -80,24 +55,30 @@ export function StarterSheet({ open, onClose, storeAccent, onChoose }: { open: b
       onClose={onClose}
       label={loc('ابدأ من قالب', 'Start from a template')}
       detents={['large']}
-      panelClassName="sm:max-w-2xl"
+      panelClassName="sm:max-w-4xl"
+      testId="sd-starter-sheet"
       header={
         <div className="px-4 pb-3 pt-1">
           <h2 className="text-[15px] font-bold text-text-primary">{loc('ابدأ من قالب', 'Start from a template')}</h2>
           <p className="text-[12px] text-text-muted">
-            {loc('يحل القالب محل أقسام مسودتك وشكلها. يمكنك التراجع.', 'The template replaces your draft’s sections and look. You can undo.')}
+            {loc(
+              'كل قالب مرسوم بمنتجاتك. «الصفحة كاملة» تحل محل أقسام مسودتك وشكلها؛ «الشكل فقط» يُلبس أقسامك شكله. يمكنك التراجع.',
+              'Each template is drawn with your products. «The whole page» replaces your draft’s sections and look; «the look only» dresses your sections in it. You can undo.'
+            )}
           </p>
         </div>
       }
     >
       <div className="px-4 pb-5">
-        <StarterGrid
-          storeAccent={storeAccent}
-          onChoose={(t) => {
-            onChoose(t);
-            onClose();
-          }}
-        />
+        {open && (
+          <TemplateGallery
+            store={store}
+            onChoose={(t, use) => {
+              onChoose(t, use);
+              onClose();
+            }}
+          />
+        )}
       </div>
     </Sheet>
   );

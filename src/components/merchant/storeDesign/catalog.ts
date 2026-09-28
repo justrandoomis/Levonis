@@ -236,6 +236,17 @@ export const THEME_COPY: Record<ThemeName, { name: Pair; line: Pair }> = {
   product_focused: { name: ['المنتجات أولًا', 'Product focused'], line: ['شبكة منتجات أوسع', 'A wider product grid'] },
 };
 
+/** What each starter PAGE puts first (packages/storeLayout/src/starters.ts) — the gallery's line under the name. */
+export const STARTER_COPY: Record<ThemeName, Pair> = {
+  classic: ['الغلاف والتعريف، ثم تبويبات: المنتجات والأقسام والعروض والخدمات والمعرض وعن المتجر.', 'Cover and profile, then tabs: products, sections, deals, services, showcase and about.'],
+  minimal: ['هادئ: اسمك، ثم شبكة منتجاتك، ثم قصة متجرك.', 'Quiet: your name, a grid of your products, your story.'],
+  modern: ['مجموعاتك في المقدمة، ثم الجديد والعروض وما يقوله زبائنك.', 'Your collections up front, then what is new, the deals and what customers say.'],
+  premium_dark: ['قطعك المميزة بصور كبيرة وكلمات قليلة.', 'Your featured pieces, large, with few words.'],
+  workshop: ['ما تصنعه ورشتك وعلى أي طابعات، وكيف يُطلب منك.', 'What your workshop makes, on which printers, and how to ask for it.'],
+  portfolio: ['أعمالك المنجزة أولًا، ثم الأرقام وآراء الزبائن.', 'Your finished work first, then the numbers and what customers say.'],
+  product_focused: ['متجر: الأقسام، ثم شبكة منتجات واسعة، ثم العروض والتوصيل.', 'A shop: sections, a wide product grid, then deals and delivery.'],
+};
+
 export const TOKEN_COPY: Record<keyof ThemeTokens, Pair> = {
   accent: ['اللون المميز', 'Accent'],
   surface: ['الخلفية', 'Background'],

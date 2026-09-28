@@ -49,7 +49,9 @@ import { starterLayout } from '../../../../packages/storeLayout/src/starters';
 import type { StoreLayout } from '../../../../packages/storeLayout/src/schema';
 import type { ThemeName } from '../../../../packages/storeLayout/src/tokens';
 import './builder.css';
-import { ADD_REFUSAL_COPY, BLOCK_COPY, ISSUE_COPY, say } from './catalog';
+import { ADD_REFUSAL_COPY, BLOCK_COPY, ISSUE_COPY, say, THEME_COPY } from './catalog';
+import type { StarterUse } from './TemplateGallery';
+import { useConfirm } from '../../ui/ConfirmDialog';
 import {
   addBlock,
   canAdd,
@@ -60,6 +62,7 @@ import {
   reorder,
   restoreBlock,
   setHidden,
+  setPreset,
   starvedProductLists,
 } from './editorModel';
 import { useLayoutEditor, type LayoutEditor } from './useLayoutEditor';
@@ -129,6 +132,7 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
   const [publishOpen, setPublishOpen] = useState(false);
   const [firstRunDismissed, setFirstRunDismissed] = useState(false);
   const [starting, setStarting] = useState<ThemeName | null>(null);
+  const [confirm, confirmDialog] = useConfirm();
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
 
@@ -227,7 +231,29 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
     if (b) ed.change(setHidden(layout, id, !b.hidden));
   };
 
-  const applyStarter = async (t: ThemeName, first: boolean) => {
+  const applyStarter = async (t: ThemeName, first: boolean, use: StarterUse = 'page') => {
+    const name = say(loc, THEME_COPY[t].name);
+    if (use === 'look') {
+      // The template's LOOK over the merchant's own sections.
+      ed.change(setPreset(layout, t));
+      // OWNER: Sorani to be written by hand.
+      toast.success(loc(`طُبّق شكل «${name}» على أقسامك.`, `«${name}» look applied to your sections.`), { action: { label: loc('تراجع', 'Undo'), onClick: ed.undo } });
+      return;
+    }
+    if (!first && renderableBlocks(layout).length > 0) {
+      // A whole page replaces the merchant's own: said before, not after.
+      const ok = await confirm({
+        // OWNER: Sorani to be written by hand.
+        title: loc(`استبدال صفحتك بقالب «${name}»؟`, `Replace your page with «${name}»?`),
+        consequence: loc(
+          'تحل أقسام القالب وشكله محل أقسام مسودتك وشكلها. ما يراه زبائنك لا يتغير حتى تنشر، ويمكنك التراجع.',
+          'The template’s sections and look replace your draft’s. What customers see does not change until you publish, and you can undo.'
+        ),
+        confirmLabel: loc('استبدل', 'Replace'),
+        cancelLabel: loc('إلغاء', 'Cancel'),
+      });
+      if (!ok) return;
+    }
     setSelectedId(null);
     if (first) {
       setStarting(t);
@@ -496,7 +522,7 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
       {toolbar}
       {firstRun && (
         <div className="mb-5">
-          <FirstRun storeAccent={store.accent} busy={starting} onChoose={(t) => void applyStarter(t, true)} onDismiss={() => setFirstRunDismissed(true)} />
+          <FirstRun store={store} busy={starting} onChoose={(t) => void applyStarter(t, true)} onDismiss={() => setFirstRunDismissed(true)} />
         </div>
       )}
       {wide ? (
@@ -521,7 +547,8 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
       )}
 
       <BlockPicker open={pickerOpen} onClose={() => setPickerOpen(false)} layout={layout} store={store} data={ed.data} onAdd={add} position={position} />
-      <StarterSheet open={starterOpen} onClose={() => setStarterOpen(false)} storeAccent={store.accent} onChoose={(t) => void applyStarter(t, false)} />
+      <StarterSheet open={starterOpen} onClose={() => setStarterOpen(false)} store={store} onChoose={(t, use) => void applyStarter(t, false, use)} />
+      {confirmDialog}
       <PublishDialog open={publishOpen} onClose={() => setPublishOpen(false)} changes={changes} onPublish={publish} />
     </div>
   );

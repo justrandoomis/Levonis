@@ -570,6 +570,24 @@ storeLayoutRoutes.get('/preview', async (c) => {
 });
 
 /**
+ * THE ROWS FOR A LAYOUT THAT IS NOT SAVED (review of the store builder,
+ * 2026-09-28). The template gallery draws each starter with the merchant's
+ * OWN products, collections, services, works and reviews before one is
+ * chosen — and nothing is written. The layout passes the same gate as a save
+ * (normalised for this owner, its references verified against this store),
+ * and the planner reads this store's rows only (`blockDataFor` is scoped by
+ * the store id), so a posted layout can never show another shop's data.
+ */
+storeLayoutRoutes.post('/preview', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  await rateLimit(c, 'store-layout-preview', 240, 900);
+  const body = await readBody(c);
+  const { layout, issues } = await acceptLayout(c.env.DB, ctx, body.layout);
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, source: 'posted', layout, issues, blocks_data: await blockDataFor(c.env.DB, ctx, layout) });
+});
+
+/**
  * THE BUILDER'S MEDIA LIBRARY (W4-A) — the pictures or videos this store's
  * owner uploaded, newest first, for the block inspector's picker.
  *

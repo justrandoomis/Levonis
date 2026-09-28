@@ -50,6 +50,7 @@ import { blockDataFor, D1_MAX_UNION_TERMS } from '../worker/lib/storeLayout';
 import { storeById } from '../worker/lib/merchantAuth';
 import { collectMediaReferences, readLiveSchema } from '../worker/lib/mediaRefs';
 import { defaultLayoutFromStore } from '../packages/storeLayout/src/defaults';
+import { starterLayout } from '../packages/storeLayout/src/starters';
 import { applyTheme, normalizeLayout } from '../packages/storeLayout/src/normalize';
 import { THEME_PRESETS } from '../packages/storeLayout/src/tokens';
 import { MAX_LAYOUT_BYTES, MAX_REQUEST_BYTES } from '../packages/storeLayout/src/schema';
@@ -169,6 +170,31 @@ test('only the owner reaches the layout API: anonymous 401, a customer without a
   await publish(w, v);
   assert.equal((await get(w.other, `${BASE}/revisions/1`)).status, 404);
   assert.equal((await post(w.other, `${BASE}/restore/1`, { version: 0 })).status, 404);
+});
+
+test('THE TEMPLATE GALLERY: rows for an UNSAVED layout — this store\'s only, nothing written, the same gate as a save', async () => {
+  const w = world();
+  // A starter the merchant has not chosen yet: its rows from the store's own data.
+  const workshop = starterLayout('workshop');
+  const answer = await ok(await post(w.owner, `${BASE}/preview`, { layout: workshop }));
+  assert.equal(answer.source, 'posted');
+  assert.deepEqual(answer.blocks_data.services.map((s: { id: string }) => s.id), ['sv1', 'sv2']);
+  assert.ok(answer.blocks_data.printers.length >= 1, 'the workshop\'s machines');
+  assert.ok(answer.blocks_data.showcase.length >= 1);
+  const modern = await ok(await post(w.owner, `${BASE}/preview`, { layout: starterLayout('modern') }));
+  assert.deepEqual(modern.blocks_data.collections.map((c: { id: string }) => c.id), ['sec1', 'sec2', 'sec3']);
+  assert.equal(modern.blocks_data.reviews.count, 3);
+  // Nothing was written: no draft row, nothing public changed.
+  assert.equal(draftVersion(w.raw), 0);
+  assert.equal(revisions(w.raw), 0);
+  // Another merchant's gallery reads THEIR store — never this one's rows.
+  const theirs = await ok(await post(w.other, `${BASE}/preview`, { layout: workshop }));
+  assert.ok(!theirs.blocks_data.services.some((s: { id: string }) => s.id === 'sv1'));
+  // The same gate as a save: another store's picture is refused whole.
+  const foreign = await ok(await post(w.other, `${BASE}/preview`, { layout: L([{ id: 'b', type: 'banner', settings: { image: MEDIA.picture } }]) }), 400);
+  assert.equal(foreign.code, 'LAYOUT_REJECTED');
+  assert.equal((await post(w.anon, `${BASE}/preview`, { layout: workshop })).status, 401);
+  assert.equal((await post(w.customer, `${BASE}/preview`, { layout: workshop })).status, 404);
 });
 
 // ------------------------------------------------------------------- drafts

@@ -58,6 +58,9 @@ export const storeLayoutApi = {
     ),
   preview: (revision?: number) =>
     api.get<{ source: string; layout: StoreLayout; blocks_data: BlockData }>(`${BASE}/preview${revision ? `?revision=${revision}` : ''}`),
+  /** The rows an UNSAVED layout would show (the template gallery); nothing is written. */
+  previewLayout: (layout: StoreLayout) =>
+    api.post<{ source: 'posted'; layout: StoreLayout; issues: LayoutIssue[]; blocks_data: BlockData }>(`${BASE}/preview`, { layout }),
   revision: (revision: number) => api.get<{ revision: LayoutRevision & { layout: StoreLayout } }>(`${BASE}/revisions/${revision}`),
   /** The owner's own uploads a layout may hold (the builder's media picker). */
   media: (kind: 'image' | 'video', cursor?: string | null) =>
