@@ -32,16 +32,28 @@ export interface CatalogTreeNode {
   description_ar: string;
   description_en: string;
   description_ckb: string;
-  /** The home-tile cover (0100) as a URL, or ''. */
+  /** The home-tile cover (0100) as a URL, or '' — since 0149 the card's DARK picture for a LARGE screen. */
   image_url: string;
   /**
-   * The banner/hero photo for the DARK theme (0136) as a URL, or ''.
-   * The client resolves: this theme's banner → the other theme's → `image_url`
-   * → a product photo (src/lib/catalog/explorerModel.ts authoredPhoto).
+   * The rest of the card's set (0149): light for a large screen, dark and
+   * light for a phone. Optional because a Worker older than 0149, or an
+   * answer cached before it, does not send them.
+   */
+  light_image_url?: string;
+  mobile_image_url?: string;
+  light_mobile_image_url?: string;
+  /**
+   * The banner/hero photo for the DARK theme on a LARGE screen (0136) as a
+   * URL, or ''. The client resolves the theme on screen first, then the
+   * screen size, the banner before the card, else a product photo
+   * (src/lib/catalog/sectionPictures.ts, explorerModel.ts authoredPhoto).
    */
   hero_image_url: string;
   /** Its light-theme twin (0142) as a URL, or ''. */
   hero_light_image_url: string;
+  /** The banner for a PHONE, dark and light (0149); optional as above. */
+  hero_mobile_image_url?: string;
+  hero_light_mobile_image_url?: string;
   /** Active, non-composition products here or anywhere below. */
   product_count: number;
   /** Of those, how many sell direct with units available now. `null` when the

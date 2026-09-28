@@ -2,7 +2,7 @@ import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { sectionTreeOrder } from '@levonis/catalog/sectionTree';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, notFound, str, int, oneOf } from '../lib/http';
+import { HttpError, requireAdmin, badRequest, notFound, str, int, oneOf } from '../lib/http';
 import { newId, } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import {
@@ -82,6 +82,16 @@ export interface CatalogRow {
   hero_image_key?: string;
   /** Migration 0142: the light-theme banner; `hero_image_key` is the dark one. */
   hero_light_image_key?: string;
+  /**
+   * Migration 0149: the rest of each picture's set of four — dark and light,
+   * large screen and phone. `image_key` is the card's dark large picture and
+   * `hero_image_key` / `hero_light_image_key` the banner's two large ones.
+   */
+  light_image_key?: string;
+  mobile_image_key?: string;
+  light_mobile_image_key?: string;
+  hero_mobile_image_key?: string;
+  hero_light_mobile_image_key?: string;
 }
 
 /**
@@ -302,8 +312,15 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
         // storefront does: one place turns a stored key into something that
         // can be put in an `src`, and it re-validates while it is there.
         image_url: catalogImageUrl(r.image_key),
+        light_image_url: catalogImageUrl(r.light_image_key ?? ''),
+        mobile_image_url: catalogImageUrl(r.mobile_image_key ?? ''),
+        light_mobile_image_url: catalogImageUrl(r.light_mobile_image_key ?? ''),
         hero_image_url: catalogImageUrl(r.hero_image_key ?? ''),
         hero_light_image_url: catalogImageUrl(r.hero_light_image_key ?? ''),
+        hero_mobile_image_url: catalogImageUrl(r.hero_mobile_image_key ?? ''),
+        hero_light_mobile_image_url: catalogImageUrl(r.hero_light_mobile_image_key ?? ''),
+        /** False until migration 0149 is applied: the panel offers the large pictures only. */
+        picture_variants: 'light_image_key' in r,
         effective_template_family: family,
         product_type: type,
         product_count: countById.get(r.id) ?? 0,
@@ -702,18 +719,64 @@ adminTaxonomyRoutes.delete('/catalogs/:id/delivery-rules/:method', async (c) => 
 });
 
 /**
- * THE PICTURES A SECTION CAN CARRY, one upload path for all of them:
- *   image             the home tile's cover (0100)                → catalogs.image_key
- *   hero-image        the banner / hero, DARK theme (0136)         → catalogs.hero_image_key
- *   hero-light-image  the banner / hero, LIGHT theme (0142)        → catalogs.hero_light_image_key
+ * THE PICTURES A SECTION CAN CARRY, one upload path for each. A section draws
+ * two pictures — its CARD (the home tile, the category board) and its BANNER
+ * (the explorer rows, the top of its own page) — and each is a set of four:
+ * dark and light, for a large screen and for a phone (owner, 2026-09-28: «أربع
+ * صور اثنين وضع داكن لقياسين اثنين وضع فاتح لقياسين»).
+ *
+ *   segment                   picture  theme  screen   column
+ *   image                     card     dark   large    image_key (0100)
+ *   image-mobile              card     dark   phone    mobile_image_key (0149)
+ *   image-light               card     light  large    light_image_key (0149)
+ *   image-light-mobile        card     light  phone    light_mobile_image_key (0149)
+ *   hero-image                banner   dark   large    hero_image_key (0136)
+ *   hero-mobile-image         banner   dark   phone    hero_mobile_image_key (0149)
+ *   hero-light-image          banner   light  large    hero_light_image_key (0142)
+ *   hero-light-mobile-image   banner   light  phone    hero_light_mobile_image_key (0149)
+ *
+ * Every slot is optional: the storefront falls back through the set
+ * (src/lib/catalog/sectionPictures.ts), so one picture still fills them all.
  * Same rules for all — WebP only, magic bytes, the size cap, R2 before the
  * pointer moves — because they are the same kind of site artwork. Every
- * section, main or sub, takes all three (owner, 2026-09-26: «من قسم اعدادات
+ * section, main or sub, takes all eight (owner, 2026-09-26: «من قسم اعدادات
  * الأقسام الرئيسية و الفئات الفرعيه»).
+ *
+ * `token` prefixes the object name so a listing of the bucket says which slot
+ * a file was uploaded to; `mintCatalogImageObject` keeps 16 characters of
+ * token + id, so the longest token still leaves 13 random hex digits.
  */
 const CATALOG_PICTURES = {
   image: { column: 'image_key', url: 'image_url', token: '', set: 'catalog.image_set', cleared: 'catalog.image_cleared' },
+  'image-mobile': {
+    column: 'mobile_image_key',
+    url: 'mobile_image_url',
+    token: 'cm',
+    set: 'catalog.mobile_image_set',
+    cleared: 'catalog.mobile_image_cleared',
+  },
+  'image-light': {
+    column: 'light_image_key',
+    url: 'light_image_url',
+    token: 'cl',
+    set: 'catalog.light_image_set',
+    cleared: 'catalog.light_image_cleared',
+  },
+  'image-light-mobile': {
+    column: 'light_mobile_image_key',
+    url: 'light_mobile_image_url',
+    token: 'clm',
+    set: 'catalog.light_mobile_image_set',
+    cleared: 'catalog.light_mobile_image_cleared',
+  },
   'hero-image': { column: 'hero_image_key', url: 'hero_image_url', token: 'hero', set: 'catalog.hero_image_set', cleared: 'catalog.hero_image_cleared' },
+  'hero-mobile-image': {
+    column: 'hero_mobile_image_key',
+    url: 'hero_mobile_image_url',
+    token: 'hm',
+    set: 'catalog.hero_mobile_image_set',
+    cleared: 'catalog.hero_mobile_image_cleared',
+  },
   'hero-light-image': {
     column: 'hero_light_image_key',
     url: 'hero_light_image_url',
@@ -721,13 +784,37 @@ const CATALOG_PICTURES = {
     set: 'catalog.hero_light_image_set',
     cleared: 'catalog.hero_light_image_cleared',
   },
+  'hero-light-mobile-image': {
+    column: 'hero_light_mobile_image_key',
+    url: 'hero_light_mobile_image_url',
+    token: 'hlm',
+    set: 'catalog.hero_light_mobile_image_set',
+    cleared: 'catalog.hero_light_mobile_image_cleared',
+  },
 } as const;
+
+/**
+ * A slot whose column the database does not have yet — the code is live and
+ * its migration is not (0149 before `deploy-staging-code.yml` applies it).
+ * `catalogOr404` reads `SELECT *`, so the row names exactly the columns that
+ * exist. Refused BEFORE anything is written to R2: an upload that could never
+ * be pointed at is an orphan, and a 500 would read as a broken picture.
+ */
+function requirePictureColumn(row: CatalogRow, column: string): void {
+  if (column in row) return;
+  throw new HttpError(
+    503,
+    'هذه الصورة تحتاج تحديثًا لقاعدة البيانات لم يُطبَّق بعد / This picture needs a database update that has not been applied yet',
+    'SCHEMA_PENDING'
+  );
+}
 
 for (const [segment, pic] of Object.entries(CATALOG_PICTURES)) {
 adminTaxonomyRoutes.post(`/catalogs/:id/${segment}`, async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');
   const row = await catalogOr404(c.env.DB, id);
+  requirePictureColumn(row, pic.column);
 
   const form = await c.req.formData().catch(() => null);
   if (!form) throw badRequest('Expected multipart form data');
@@ -799,6 +886,7 @@ adminTaxonomyRoutes.delete(`/catalogs/:id/${segment}`, async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');
   const row = await catalogOr404(c.env.DB, id);
+  requirePictureColumn(row, pic.column);
   const previous = String((row as unknown as Record<string, unknown>)[pic.column] ?? '');
   await c.env.DB.prepare(`UPDATE catalogs SET ${pic.column} = '' WHERE id = ?`).bind(id).run();
   await audit(c.env.DB, admin.id, pic.cleared, id, { previous });

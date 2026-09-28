@@ -193,6 +193,16 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   { table: 'catalogs', column: 'hero_image_key', kind: 'text', why: 'the hero photo an admin set for a section\'s category page (0136)' },
   /** Its light-theme twin (0142) — `hero_image_key` is the dark one. Same rules again. */
   { table: 'catalogs', column: 'hero_light_image_key', kind: 'text', why: 'the light-theme banner photo an admin set for a section (0142)' },
+  /**
+   * The rest of a section's two sets of four (0149): the card's light, phone
+   * and light-phone pictures, and the banner's phone and light-phone ones.
+   * Same rules as the three above, including not narrowing by `active`.
+   */
+  { table: 'catalogs', column: 'light_image_key', kind: 'text', why: 'the light-theme card picture an admin set for a section (0149)' },
+  { table: 'catalogs', column: 'mobile_image_key', kind: 'text', why: 'the phone card picture, dark theme, an admin set for a section (0149)' },
+  { table: 'catalogs', column: 'light_mobile_image_key', kind: 'text', why: 'the phone card picture, light theme, an admin set for a section (0149)' },
+  { table: 'catalogs', column: 'hero_mobile_image_key', kind: 'text', why: 'the phone banner picture, dark theme, an admin set for a section (0149)' },
+  { table: 'catalogs', column: 'hero_light_mobile_image_key', kind: 'text', why: 'the phone banner picture, light theme, an admin set for a section (0149)' },
   { table: 'product_images', column: 'r2_key', kind: 'text', why: 'the canonical product image key (0048)' },
   { table: 'product_images', column: 'url', kind: 'text', why: 'the delivery path for the same image; older rows have only this' },
   { table: 'product_option_values', column: 'image', kind: 'text', why: 'per-option swatch' },

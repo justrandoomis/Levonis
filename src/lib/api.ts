@@ -1560,8 +1560,16 @@ export interface HomeTaxon {
    * order deliberately — an authored picture is a decision, a borrowed one is
    * a guess, and the monogram is the designed state for a section with no
    * artwork at all.
+   *
+   * Since migration 0149 this is the card's DARK picture for a LARGE screen;
+   * the three below complete its set of four. Every one is optional — an
+   * older Worker, or a cached answer, does not send them — and the storefront
+   * fills the gaps from the others (src/lib/catalog/sectionPictures.ts).
    */
   image_url?: string;
+  light_image_url?: string;
+  mobile_image_url?: string;
+  light_mobile_image_url?: string;
   /**
    * The sub-sections that actually hold products — «الأقسام الفرعية التي فيها
    * المنتجات». Present on a main section, absent on a brand and on a child.

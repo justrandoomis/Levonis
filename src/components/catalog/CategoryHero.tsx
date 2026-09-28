@@ -25,8 +25,8 @@ import type { CategoryPayload } from '../../lib/catalog/types';
  * printers the primary «ساعدني أختار» and «قارن الطابعات»; for everything
  * else «تصفّح الكل». About 145 px on a phone, 210 px from 1024 px.
  *
- * THE PICTURE. The admin's banner for the theme on screen (0136/0142, see
- * explorerModel `authoredSrc`) is a full-width band behind the words, faded to
+ * THE PICTURE. The admin's banner for the theme and the screen on view
+ * (0136/0142/0149, see explorerModel `authoredPhoto`) is a full-width band behind the words, faded to
  * nothing on the reading side and at the top and bottom edges. A borrowed
  * product photograph is a compact visual on the far side, faded the same way
  * (its light-theme twin, 0138, on the light theme when it has one).
@@ -68,6 +68,8 @@ const CategoryHero = forwardRef<HTMLElement, {
         <CropPhoto
           src={photo.src}
           lightSrc={photo.lightSrc}
+          mobileSrc={photo.mobileSrc}
+          lightMobileSrc={photo.lightMobileSrc}
           crop={photo.productPhoto}
           frame={false}
           size={band ? 1200 : 480}

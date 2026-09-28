@@ -46,6 +46,16 @@ export interface CatalogRecord {
   hero_image_key: string;
   /** The light-theme banner (0142); `hero_image_key` is the dark one. '' on a pre-0142 database. */
   hero_light_image_key: string;
+  /**
+   * The rest of each picture's set of four (0149): the card's light large,
+   * dark phone and light phone pictures, and the banner's two phone ones.
+   * '' on a pre-0149 database.
+   */
+  light_image_key: string;
+  mobile_image_key: string;
+  light_mobile_image_key: string;
+  hero_mobile_image_key: string;
+  hero_light_mobile_image_key: string;
   sort: number;
   active: boolean;
   is_printer_catalog: boolean;
@@ -75,6 +85,11 @@ export async function loadCatalogRecords(db: D1Database): Promise<CatalogRecord[
     image_key: text(r.image_key),
     hero_image_key: text(r.hero_image_key),
     hero_light_image_key: text(r.hero_light_image_key),
+    light_image_key: text(r.light_image_key),
+    mobile_image_key: text(r.mobile_image_key),
+    light_mobile_image_key: text(r.light_mobile_image_key),
+    hero_mobile_image_key: text(r.hero_mobile_image_key),
+    hero_light_mobile_image_key: text(r.hero_light_mobile_image_key),
     sort: Number(r.sort) || 0,
     active: Number(r.active ?? 1) === 1,
     is_printer_catalog: Number(r.is_printer_catalog ?? 0) === 1,
@@ -272,8 +287,13 @@ export function treeNode(
     description_en: r.description_en,
     description_ckb: r.description_ckb,
     image_url: catalogImageUrl(r.image_key),
+    light_image_url: catalogImageUrl(r.light_image_key),
+    mobile_image_url: catalogImageUrl(r.mobile_image_key),
+    light_mobile_image_url: catalogImageUrl(r.light_mobile_image_key),
     hero_image_url: catalogImageUrl(r.hero_image_key),
     hero_light_image_url: catalogImageUrl(r.hero_light_image_key),
+    hero_mobile_image_url: catalogImageUrl(r.hero_mobile_image_key),
+    hero_light_mobile_image_url: catalogImageUrl(r.hero_light_mobile_image_key),
     product_count: c.products,
     available_count: availableKnown ? c.available : null,
     is_printer_catalog: r.is_printer_catalog,

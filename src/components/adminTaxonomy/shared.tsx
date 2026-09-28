@@ -42,6 +42,19 @@ export interface CatalogNode {
   hero_image_url?: string;
   /** Its light-theme twin (migration 0142); `hero_image_url` is the dark one. Absent before 0142. */
   hero_light_image_url?: string;
+  /**
+   * The rest of each picture's set of four (migration 0149): the card's light
+   * picture for a large screen and its two phone pictures, and the banner's
+   * two phone pictures. `image_url` / `hero_image_url` / `hero_light_image_url`
+   * are the large ones. Absent on a server older than 0149.
+   */
+  light_image_url?: string;
+  mobile_image_url?: string;
+  light_mobile_image_url?: string;
+  hero_mobile_image_url?: string;
+  hero_light_mobile_image_url?: string;
+  /** False while the database has not had 0149: only the large pictures can be set. */
+  picture_variants?: boolean;
   /** One or two lines under the name on the category page (0136). '' = none. */
   description_ar?: string;
   description_en?: string;

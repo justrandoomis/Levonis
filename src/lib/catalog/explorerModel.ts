@@ -11,14 +11,24 @@
  *     a sub-section with sections of its own) that node's children. The owner,
  *     2026-09-26: «يظهر فئات الفرعية بشكل هيرو بانر بسطر واحد مستطيل» — no
  *     chips, no grid of tiles;
- *   - the photograph is the admin's banner for the theme on screen, else the
- *     other theme's, else the section's tile cover, else a representative
+ *   - the photograph is the admin's banner — the theme on screen first,
+ *     then the screen's size — else the section's card pictures by the same
+ *     rule (src/lib/catalog/sectionPictures.ts), else a representative
  *     product — available now first, never the same product on two rows
- *     (`authoredSrc`);
+ *     (`authoredPhoto`);
  *   - the call to action is «استكشف» where the section opens onto sections of
  *     its own, «تسوق الآن» where it is a list.
  */
 import type { CatalogTreeNode } from './types';
+import {
+  bannerSet,
+  cardSet,
+  pickPicture,
+  pictureSources,
+  resolvePictures,
+  type PictureScreen,
+  type SectionPictureFields,
+} from './sectionPictures';
 
 /** worker/lib/catalogPresentation.ts LISTING_LAYOUT_BELOW (a test holds them equal). */
 export const LISTING_LAYOUT_BELOW = 8;
@@ -43,6 +53,13 @@ export interface BannerPhoto {
    * (0142).
    */
   lightSrc?: string;
+  /**
+   * A phone's picture (< 640 px) for the dark theme and for the light one,
+   * only when it differs from that theme's large picture — the section's
+   * phone banners (0149). A product photograph has none.
+   */
+  mobileSrc?: string;
+  lightMobileSrc?: string;
   /** A catalogue photograph (crop to its product band) vs a picture the owner uploaded (shown whole). */
   productPhoto: boolean;
   productId: string | null;
@@ -99,34 +116,26 @@ export function productBannerPhoto(p: PhotoCandidate): BannerPhoto {
   return { src: photoOf(p), productPhoto: true, productId: p.id, ...(light ? { lightSrc: light } : {}) };
 }
 
-/** The admin's pictures for a section, as the storefront reads them. */
-type AuthoredPictures = Pick<CatalogTreeNode, 'hero_image_url' | 'image_url'> &
-  // Optional: a Worker older than migration 0142 does not send it.
-  Partial<Pick<CatalogTreeNode, 'hero_light_image_url'>>;
-
 /**
- * THE BANNER PICTURE FOR ONE THEME (owner, 2026-09-26: «صورتين تناسب الثيم
- * الفاتح والثيم الداكن»). In order: this theme's banner → the other theme's
- * banner → the home tile's cover → '' (the caller then borrows a product
- * photograph). `hero_image_url` IS the dark banner (0136, kept so every hero
- * already uploaded still shows); `hero_light_image_url` its light twin (0142).
+ * THE BANNER PICTURE FOR ONE THEME AND ONE SCREEN (owner, 2026-09-26: «صورتين
+ * تناسب الثيم الفاتح والثيم الداكن»; 2026-09-28: a phone size of each). The
+ * section's banner set — this theme's, then the other theme's — then its card
+ * set the same way (src/lib/catalog/sectionPictures.ts `pickPicture`), else ''
+ * — the caller then borrows a product photograph. `hero_image_url` IS the
+ * dark large banner (0136, kept so every hero already uploaded still shows);
+ * `image_url` the card's dark large picture (0100).
  */
-export function authoredSrc(node: AuthoredPictures, theme: 'light' | 'dark'): string {
-  const dark = node.hero_image_url || '';
-  const light = node.hero_light_image_url || '';
-  const chain = theme === 'light' ? [light, dark] : [dark, light];
-  return chain.find(Boolean) || node.image_url || '';
+export function authoredSrc(node: SectionPictureFields, theme: 'light' | 'dark', screen: PictureScreen = 'large'): string {
+  return pickPicture([bannerSet(node), cardSet(node)], theme, screen);
 }
 
 /**
- * The admin's own picture for a section, when there is one — both themes'
- * files, so `CropPhoto` requests only the one on screen (`themedImage`).
+ * The admin's own picture for a section, when there is one — every theme's
+ * and every screen's file, so `CropPhoto` requests only the one on view.
  */
-export function authoredPhoto(node: AuthoredPictures): BannerPhoto | null {
-  const src = authoredSrc(node, 'dark');
-  if (!src) return null;
-  const light = authoredSrc(node, 'light');
-  return { src, productPhoto: false, productId: null, ...(light !== src ? { lightSrc: light } : {}) };
+export function authoredPhoto(node: SectionPictureFields): BannerPhoto | null {
+  const sources = pictureSources(resolvePictures([bannerSet(node), cardSet(node)]));
+  return sources ? { ...sources, productPhoto: false, productId: null } : null;
 }
 
 /** Would `/categories/<node>` draw shelves (true) or be the listing itself (false)? */

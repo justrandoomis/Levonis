@@ -18,8 +18,9 @@ import { bannerCta, type BannerPhoto, type BannerRow } from '../../lib/catalog/e
  * its list). Every row is the full content width.
  *
  * THE PICTURE IS THE BANNER (owner, same day: «اجعل الصورة تملأ البطاقة وليس
- * أن تكون الاسم للفئة فوق أو على الجانب»). The admin's banner for the theme on
- * screen (src/lib/catalog/explorerModel.ts `authoredSrc`) fills the whole row;
+ * أن تكون الاسم للفئة فوق أو على الجانب»). The admin's banner for the theme
+ * and the screen on view — a phone has its own (0149) — fills the whole row
+ * (src/lib/catalog/explorerModel.ts `authoredPhoto`);
  * the name, one line of counts and the «تسوق الآن ←» / «استكشف ←» pill sit ON
  * it, over a scrim from the reading side. The scrim is dark in BOTH themes,
  * so the words are light and legible on any photograph. A borrowed catalogue
@@ -85,6 +86,8 @@ export function CategoryRowBanner({
           // it dissolves into the banner's near-black ground, which a
           // light-theme twin on cream could not.
           lightSrc={cover ? photo.lightSrc : undefined}
+          mobileSrc={cover ? photo.mobileSrc : undefined}
+          lightMobileSrc={cover ? photo.lightMobileSrc : undefined}
           crop={photo.productPhoto}
           frame={false}
           size={cover ? 1200 : 420}

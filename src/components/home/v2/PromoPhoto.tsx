@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTheme } from '../../../lib/theme';
-import { themedImage } from '../../../lib/productImage';
+import { PHONE_MEDIA, themedFiles } from '../../../lib/catalog/sectionPictures';
 
 /**
  * A photograph placed in a ZONE of a tile (absolutely positioned by the
@@ -20,6 +20,11 @@ import { themedImage } from '../../../lib/productImage';
  * `data-ground="dark"` and src/index.css frames it instead of fading it into
  * the cream (FEATURE SURFACES).
  *
+ * A PHONE SIZE OF EACH (0149). `mobileSrc` / `lightMobileSrc` are a section's
+ * card pictures for a phone, drawn below 640 px through `<source media>`
+ * (src/lib/catalog/sectionPictures.ts PHONE_MEDIA) — still one file
+ * downloaded, the one for the theme and the screen on view.
+ *
  * FULL-BLEED (`bleed`, owner 2026-09-26: «اجعل الصورة تملأ البطاقة»). The
  * bento tiles, the editorial banners and the hero's frame now draw the
  * photograph over the WHOLE surface with the words on it, over a dark scrim
@@ -33,6 +38,8 @@ import { themedImage } from '../../../lib/productImage';
 export default function PromoPhoto({
   src,
   lightSrc = '',
+  mobileSrc = '',
+  lightMobileSrc = '',
   crop,
   className,
   width,
@@ -42,6 +49,10 @@ export default function PromoPhoto({
 }: {
   src: string;
   lightSrc?: string;
+  /** The dark theme's picture on a phone (< 640 px), when it differs. */
+  mobileSrc?: string;
+  /** The light theme's picture on a phone, when it differs. */
+  lightMobileSrc?: string;
   crop: boolean;
   /** Positions the zone: e.g. `inset-x-0 bottom-0 top-[30%]` plus a mask. */
   className: string;
@@ -53,25 +64,29 @@ export default function PromoPhoto({
   eager?: boolean;
 }) {
   const { theme } = useTheme();
-  const shown = themedImage(src, lightSrc, theme);
+  const { large: shown, phone } = themedFiles({ src, lightSrc, mobileSrc, lightMobileSrc }, theme);
+  const pair = `${shown}|${phone}`;
   const [failed, setFailed] = React.useState('');
-  if (!shown || failed === shown) return null;
+  if (!shown || failed === pair) return null;
   // Only a catalogue photograph is known to be a dark studio shot; an owner's
   // own picture keeps the edge fade it was designed with.
   const ground = !bleed && crop && theme === 'light' && shown !== lightSrc ? 'dark' : undefined;
   return (
     <div aria-hidden="true" data-ground={ground} className={`lv-promo-zone absolute ${className}`}>
-      <img
-        src={shown}
-        alt=""
-        width={width}
-        height={height}
-        loading={eager ? 'eager' : 'lazy'}
-        decoding="async"
-        data-crop={crop ? '' : undefined}
-        onError={() => setFailed(shown)}
-        className="lv-promo-photo transition-transform duration-500 ease-out group-hover:scale-[1.04] motion-reduce:transition-none"
-      />
+      <picture>
+        {phone !== shown ? <source media={PHONE_MEDIA} srcSet={phone} /> : null}
+        <img
+          src={shown}
+          alt=""
+          width={width}
+          height={height}
+          loading={eager ? 'eager' : 'lazy'}
+          decoding="async"
+          data-crop={crop ? '' : undefined}
+          onError={() => setFailed(pair)}
+          className="lv-promo-photo transition-transform duration-500 ease-out group-hover:scale-[1.04] motion-reduce:transition-none"
+        />
+      </picture>
     </div>
   );
 }

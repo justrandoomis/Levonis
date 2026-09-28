@@ -14,6 +14,7 @@
  */
 import type { ApiProduct, BentoPosition, HomeBanner, HomeTaxon, LocalizedText, SiteMediaEntry } from './api';
 import { productPrimaryImage } from './productImage';
+import { cardSet, pictureSources, resolvePictures } from './catalog/sectionPictures';
 
 // ------------------------------------------------------------- the taxonomy
 
@@ -230,12 +231,20 @@ export interface BentoTile {
   /** The owner's picture for the square, else the section's, else a product photograph, else ''. */
   image: string;
   /**
-   * The light-theme picture: the owner's light upload, or the borrowed
-   * product's light-theme main image (migration 0138); '' when there is none.
-   * The tile shows it on the light theme and `image` on the dark one
-   * (src/lib/productImage.ts `themedImage`).
+   * The light-theme picture: the owner's light upload, the section's light
+   * card picture (0149), or the borrowed product's light-theme main image
+   * (migration 0138); '' when there is none. The tile shows it on the light
+   * theme and `image` on the dark one (src/lib/productImage.ts `themedImage`).
    */
   lightImage: string;
+  /**
+   * The section's card pictures for a PHONE (< 640 px), dark and light
+   * (0149), only when they differ from `image` / the light picture; '' else.
+   * Only a section's own pictures have them — the owner's bento pair and a
+   * borrowed product photograph are one size.
+   */
+  mobileImage: string;
+  lightMobileImage: string;
   /** The product whose photograph was borrowed, for `avoid` bookkeeping. */
   imageProductId: string | null;
 }
@@ -338,12 +347,16 @@ export function resolveBento(
         title: t.title,
         image: own?.image || (photo ? productPrimaryImage(photo) : ''),
         lightImage: own ? own.lightImage : lightOf(photo),
+        mobileImage: '',
+        lightMobileImage: '',
         imageProductId: photo?.id ?? null,
       });
       continue;
     }
     const node = t.node!;
-    const authored = own ? '' : node.image_url || '';
+    // The section's own card set — the theme on screen first, then the
+    // screen size (src/lib/catalog/sectionPictures.ts).
+    const authored = own ? null : pictureSources(resolvePictures([cardSet(node)]));
     const product = own || authored ? null : representative(pool, subtreeIds(node), avoid);
     if (product) avoid.add(product.id);
     tiles.push({
@@ -352,8 +365,10 @@ export function resolveBento(
       to: categoryHref(tree, node),
       category: node,
       title: t.title,
-      image: own?.image || authored || (product ? productPrimaryImage(product) : ''),
-      lightImage: own ? own.lightImage : authored ? '' : lightOf(product),
+      image: own?.image || authored?.src || (product ? productPrimaryImage(product) : ''),
+      lightImage: own ? own.lightImage : authored ? authored.lightSrc ?? '' : lightOf(product),
+      mobileImage: authored?.mobileSrc ?? '',
+      lightMobileImage: authored?.lightMobileSrc ?? '',
       imageProductId: product?.id ?? null,
     });
   }

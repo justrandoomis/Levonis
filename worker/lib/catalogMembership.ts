@@ -125,8 +125,15 @@ export interface CatalogNode {
    * request. Empty means the section has no authored picture, which is not an
    * error — CategoryBoard then borrows a product photo, and failing that draws
    * the monogram, exactly as it did before 0100 existed.
+   *
+   * Since 0149 it is the card's DARK picture for a LARGE screen, and the
+   * three below complete the set — dark and light, large and phone — each ''
+   * when not uploaded (src/lib/catalog/sectionPictures.ts fills the gaps).
    */
   image_url: string;
+  light_image_url: string;
+  mobile_image_url: string;
+  light_mobile_image_url: string;
   /** Sub-catalogs that hold at least one product. Only set on a root. */
   children?: CatalogNode[];
 }
@@ -141,14 +148,33 @@ interface CatalogCountRow {
   sort: number;
   product_count: number;
   image_url: string;
+  light_image_url: string;
+  mobile_image_url: string;
+  light_mobile_image_url: string;
 }
 
 /**
- * The tree query. `cover` is spliced in rather than fixed, because the first
- * screen must still render on a database that has not had migration 0100 yet
- * — see `catalogTreeWithCounts` below.
+ * A section card's four pictures (0100 + 0149), by the column each is read
+ * from and the field its URL leaves the worker as.
  */
-const treeSql = (cover: string) => `WITH RECURSIVE ${ANCESTORS_CTE},
+const CARD_PICTURES = [
+  { column: 'image_key', url: 'image_url' },
+  { column: 'light_image_key', url: 'light_image_url' },
+  { column: 'mobile_image_key', url: 'mobile_image_url' },
+  { column: 'light_mobile_image_key', url: 'light_mobile_image_url' },
+] as const;
+type CardPictureColumn = (typeof CARD_PICTURES)[number]['column'];
+
+/** Every picture read from its column. */
+const ALL_COVERS = CARD_PICTURES.map((p) => `COALESCE(c.${p.column}, '')`);
+
+/**
+ * The tree query. The covers are spliced in rather than fixed, because the
+ * first screen must still render on a database that has not had migration
+ * 0100 (or 0149) yet — see `catalogTreeWithCounts` below. `covers` is one SQL
+ * expression per entry of CARD_PICTURES, in its order.
+ */
+const treeSql = (covers: readonly string[]) => `WITH RECURSIVE ${ANCESTORS_CTE},
        ${MEMBERSHIP_CTE},
        counted AS (
          SELECT a.ancestor_id AS id, COUNT(DISTINCT m.product_id) AS n
@@ -159,53 +185,57 @@ const treeSql = (cover: string) => `WITH RECURSIVE ${ANCESTORS_CTE},
        )
        SELECT c.id, c.parent_id, c.slug, c.name_ar, c.name_en, c.name_ckb, c.sort,
               COALESCE(k.n, 0) AS product_count,
-              ${cover} AS image_key
+              ${CARD_PICTURES.map((p, i) => `${covers[i]} AS ${p.column}`).join(',\n              ')}
          FROM catalogs c
          LEFT JOIN counted k ON k.id = c.id
         WHERE c.active = 1
         ORDER BY c.sort, COALESCE(NULLIF(c.name_en, ''), c.name_ar)`;
 
 /**
- * Is `e` the absence of `catalogs.image_key`, and nothing else?
+ * Which of the card's picture columns does `catalogs` lack — when THAT, and
+ * nothing else, is why the tree query failed? `null` means "re-throw".
  *
  * THE SAME SHAPE, AND THE SAME NARROWNESS, AS `isConditionColumnMissing`
  * (worker/lib/conditionProjection.ts), which exists because a Worker carrying
  * migration 0085 once reached production over a database still at 0083 and
  * `/api/home` answered HTTP 500 for the WHOLE first screen — products,
  * categories and brands included — over one unreadable optional shelf.
- * Migration 0100 creates exactly that window again, and this is what closes
- * it: the code and the migration are deployed by two different workflow steps
- * and there is no ordering that removes the gap entirely.
+ * Migrations 0100 and 0149 create exactly that window again, and this is what
+ * closes it: the code and the migration are deployed by two different
+ * workflow steps and there is no ordering that removes the gap entirely.
  *
  * SUBSTITUTION, NOT DEGRADE, and the distinction is arithmetic rather than
- * judgement. `image_key` is declared `TEXT NOT NULL DEFAULT ''` and `''` means
- * "no authored picture", so a column that does not exist yet can hold nothing
- * else: the instant 0100 runs, every pre-existing row carries `''`. A section
- * drawn with a borrowed product photo on a pre-0100 database is not a guess
- * about what the owner chose — it is what they had chosen, one migration
- * early.
+ * judgement. Every picture column is declared `TEXT NOT NULL DEFAULT ''` and
+ * `''` means "no authored picture", so a column that does not exist yet can
+ * hold nothing else: the instant its migration runs, every pre-existing row
+ * carries `''`. A section drawn with a borrowed product photo on a pre-0100
+ * database is not a guess about what the owner chose — it is what they had
+ * chosen, one migration early.
  *
  * Everything else re-throws. A missing `catalogs` TABLE must not render as a
  * shop with no departments, and any OTHER absent column could be hiding real
- * rows behind an empty answer.
+ * rows behind an empty answer — which is why, when every picture column is
+ * present, the failure is somebody else's and is re-thrown.
  */
-async function isCatalogImageColumnMissing(db: D1Database, e: unknown): Promise<boolean> {
-  if (!isSchemaMissing(e)) return false;
+async function missingCardPictureColumns(db: D1Database, e: unknown): Promise<Set<CardPictureColumn> | null> {
+  if (!isSchemaMissing(e)) return null;
   let cols: { name: string }[];
   try {
     const { results } = await db.prepare('PRAGMA table_info(catalogs)').all<{ name: string }>();
     cols = results ?? [];
   } catch {
     // If we cannot even ask, we do not get to assume. Re-throw.
-    return false;
+    return null;
   }
-  if (cols.length === 0) return false; // the TABLE is gone, not the column
-  if (cols.some((c) => String(c.name) === 'image_key')) return false; // something else failed
+  if (cols.length === 0) return null; // the TABLE is gone, not a column
+  const have = new Set(cols.map((c) => String(c.name)));
+  const missing = new Set(CARD_PICTURES.map((p) => p.column).filter((c) => !have.has(c)));
+  if (missing.size === 0) return null; // something else failed
   console.error(
-    'catalogs.image_key is behind the deployment (migration 0100 has not been applied); ' +
-      'section covers fall back to a product photo until it is'
+    `catalogs.${[...missing].join(', catalogs.')} ${missing.size === 1 ? 'is' : 'are'} behind the deployment ` +
+      '(migration 0100 / 0149 has not been applied); those section pictures read as "none" until it is'
   );
-  return true;
+  return missing;
 }
 
 /**
@@ -221,27 +251,31 @@ async function isCatalogImageColumnMissing(db: D1Database, e: unknown): Promise<
  * schema, which on a migrated database never happens.
  */
 export async function catalogTreeWithCounts(db: D1Database): Promise<CatalogCountRow[]> {
-  const read = async (cover: string) =>
-    (await db.prepare(treeSql(cover)).all<CatalogCountRow & { image_key?: unknown }>()).results ?? [];
+  type Row = Omit<CatalogCountRow, (typeof CARD_PICTURES)[number]['url']> & Partial<Record<CardPictureColumn, unknown>>;
+  const read = async (covers: readonly string[]) => (await db.prepare(treeSql(covers)).all<Row>()).results ?? [];
 
-  let rows: Array<CatalogCountRow & { image_key?: unknown }>;
+  let rows: Row[];
   try {
-    rows = await read("COALESCE(c.image_key, '')");
+    rows = await read(ALL_COVERS);
   } catch (e) {
-    if (!(await isCatalogImageColumnMissing(db, e))) throw e;
-    rows = await read("''");
+    const missing = await missingCardPictureColumns(db, e);
+    if (!missing) throw e;
+    rows = await read(CARD_PICTURES.map((p, i) => (missing.has(p.column) ? "''" : ALL_COVERS[i])));
   }
 
-  // `image_key` is turned into a URL HERE and the key itself is dropped, so
-  // the only representation that ever leaves the worker is the one the
+  // The keys are turned into URLs HERE and the keys themselves are dropped,
+  // so the only representation that ever leaves the worker is the one the
   // storefront can use. `catalogImageUrl` re-validates on the way out: the
-  // column is written by one admin route but it is still a text column in a
-  // database a future import could touch, and a bad value must degrade to "no
-  // picture" rather than to a broken <img> on the first screen.
-  return rows.map(({ image_key, ...r }) => ({
+  // columns are written by one admin route but they are still text columns in
+  // a database a future import could touch, and a bad value must degrade to
+  // "no picture" rather than to a broken <img> on the first screen.
+  return rows.map(({ image_key, light_image_key, mobile_image_key, light_mobile_image_key, ...r }) => ({
     ...r,
     product_count: Number(r.product_count) || 0,
     image_url: catalogImageUrl(image_key),
+    light_image_url: catalogImageUrl(light_image_key),
+    mobile_image_url: catalogImageUrl(mobile_image_key),
+    light_mobile_image_url: catalogImageUrl(light_mobile_image_key),
   }));
 }
 

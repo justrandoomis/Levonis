@@ -6,11 +6,19 @@
  * or sub-sections still use it, and says so).
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Plus, Pencil, Trash2, Power, CornerDownRight, Printer, Image as ImageIcon, Upload, RefreshCw, Truck, GalleryHorizontal, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Power, CornerDownRight, Printer, Image as ImageIcon, Upload, RefreshCw, Truck, GalleryHorizontal, ArrowUp, ArrowDown, Moon, Sun, Monitor, Smartphone } from 'lucide-react';
 import { SectionDeliveryDialog, deliveryRuleSummary } from './SectionDeliveryDialog';
 import * as T from '../adminProducts/theme';
 import { ApiError, api } from '../../lib/api';
 import { Modal } from '../adminProducts/ui';
+import {
+  bannerSet,
+  cardSet,
+  pickPictureOrigin,
+  type PictureOrigin,
+  type PictureScreen,
+  type PictureTheme,
+} from '../../lib/catalog/sectionPictures';
 import {
   Actions,
   ActiveBadge,
@@ -47,9 +55,9 @@ const DESCRIPTION_MAX = 280;
 const DESC_CLASS = `${T.input} w-full h-auto min-h-[64px] py-2 leading-relaxed resize-y`;
 
 /**
- * Which pictures a dialog edits (worker CATALOG_PICTURES): the home tile's
- * cover, or the banner — one per theme, `hero-image` (dark, 0136) and
- * `hero-light-image` (light, 0142) side by side.
+ * Which picture a dialog edits (worker CATALOG_PICTURES): the home tile's
+ * card, or the banner — each a set of four, dark and light, a large screen
+ * and a phone (`PICTURE_SLOTS` below).
  */
 type PictureKind = 'image' | 'banner';
 
@@ -579,7 +587,70 @@ function SectionDialog({
 }
 
 /**
- * THE PICTURE A SECTION SHOWS ON THE HOME PAGE.
+ * THE WORKER'S EIGHT PICTURE SLOTS (worker/routes/adminTaxonomy.ts
+ * CATALOG_PICTURES): a section's CARD and its BANNER, each dark and light,
+ * each for a large screen and for a phone (owner, 2026-09-28: «أربع صور اثنين
+ * وضع داكن لقياسين اثنين وضع فاتح لقياسين»).
+ */
+type PictureSegment =
+  | 'image'
+  | 'image-mobile'
+  | 'image-light'
+  | 'image-light-mobile'
+  | 'hero-image'
+  | 'hero-mobile-image'
+  | 'hero-light-image'
+  | 'hero-light-mobile-image';
+type PictureField =
+  | 'image_url'
+  | 'mobile_image_url'
+  | 'light_image_url'
+  | 'light_mobile_image_url'
+  | 'hero_image_url'
+  | 'hero_mobile_image_url'
+  | 'hero_light_image_url'
+  | 'hero_light_mobile_image_url';
+
+interface PictureSlotSpec {
+  theme: PictureTheme;
+  screen: PictureScreen;
+  segment: PictureSegment;
+  field: PictureField;
+}
+
+const PICTURE_SLOTS: Record<PictureKind, readonly PictureSlotSpec[]> = {
+  image: [
+    { theme: 'dark', screen: 'large', segment: 'image', field: 'image_url' },
+    { theme: 'dark', screen: 'phone', segment: 'image-mobile', field: 'mobile_image_url' },
+    { theme: 'light', screen: 'large', segment: 'image-light', field: 'light_image_url' },
+    { theme: 'light', screen: 'phone', segment: 'image-light-mobile', field: 'light_mobile_image_url' },
+  ],
+  banner: [
+    { theme: 'dark', screen: 'large', segment: 'hero-image', field: 'hero_image_url' },
+    { theme: 'dark', screen: 'phone', segment: 'hero-mobile-image', field: 'hero_mobile_image_url' },
+    { theme: 'light', screen: 'large', segment: 'hero-light-image', field: 'hero_light_image_url' },
+    { theme: 'light', screen: 'phone', segment: 'hero-light-mobile-image', field: 'hero_light_mobile_image_url' },
+  ],
+};
+
+/** What a server older than migration 0149 can store: the large pictures it always had. */
+const BEFORE_0149: ReadonlySet<PictureSegment> = new Set(['image', 'hero-image', 'hero-light-image']);
+
+const ALL_FIELDS: readonly PictureField[] = [...PICTURE_SLOTS.image, ...PICTURE_SLOTS.banner].map((s) => s.field);
+
+/**
+ * The shape the storefront draws each picture at, so the preview crops the
+ * way the shop will: the home tile is about 4:3 on a large screen and about
+ * square on a phone (CategoryBento); the banner row is 8:1 from 1024 px and
+ * 15:4 on a phone (CategoryRowBanners ROW_BANNER_SIZE).
+ */
+const PREVIEW: Record<PictureKind, Record<PictureScreen, string>> = {
+  image: { large: 'h-24 max-w-full aspect-[4/3]', phone: 'h-24 max-w-full aspect-square' },
+  banner: { large: 'w-full aspect-[8/1] min-h-[44px]', phone: 'w-full max-w-[320px] aspect-[15/4]' },
+};
+
+/**
+ * A SECTION'S PICTURES — its card on the home page, or its banner.
  *
  * WHAT IT REPLACES. Until migration 0100 the storefront BORROWED a cover: it
  * used the first photo among the products the first screen happened to have
@@ -588,6 +659,13 @@ function SectionDialog({
  * a section whose products were not among the thirty on screen drew its
  * monogram however good its artwork was. That fallback is still there and
  * still useful; this dialog is how the owner overrules it.
+ *
+ * FOUR SLOTS, ONE RULE (0149). Each picture is a set: dark and light, a large
+ * screen and a phone, grouped by theme because that is how the owner exports
+ * them. Every slot is optional. An empty one shows, faintly, the picture the
+ * shop will draw in its place and says which it is — the storefront's own
+ * resolver (src/lib/catalog/sectionPictures.ts) decides, so this preview and
+ * the shop cannot disagree.
  *
  * WHY IT IS NOT PART OF THE EDIT DIALOG. That one posts JSON and saves on a
  * button; a file is multipart and there is nothing to defer — the moment a
@@ -604,7 +682,7 @@ function SectionImageDialog({
   onChanged,
 }: {
   node: CatalogNode;
-  /** `image` = the home tile's cover; `banner` = the banner/hero, one picture per theme (0136 + 0142). */
+  /** `image` = the home tile's card; `banner` = the banner/hero (0136 + 0142 + 0149). */
   kind?: PictureKind;
   onClose: () => void;
   /** `removed` distinguishes a cleared picture from a newly uploaded one. */
@@ -612,15 +690,29 @@ function SectionImageDialog({
 }) {
   const { loc, lang } = useLoc();
   const [err, setErr] = useState('');
-  const [busy, setBusy] = useState(false);
+  // A count, not a flag: two slots can upload at once, and the first to
+  // finish must not re-enable «إغلاق» while the second is still sending.
+  const [busyCount, setBusyCount] = useState(0);
+  // The dialog owns what it is SHOWING: `node` is a snapshot from the table,
+  // and the table only re-reads after the parent's reload resolves. Held here
+  // rather than in each slot, because an empty slot previews what the others
+  // hold.
+  const [urls, setUrls] = useState<Record<PictureField, string>>(
+    () => Object.fromEntries(ALL_FIELDS.map((f) => [f, node[f] || ''])) as Record<PictureField, string>
+  );
   const banner = kind === 'banner';
   const name = nameOf(node, lang);
+  const variants = node.picture_variants !== false;
+  const slots = PICTURE_SLOTS[kind].filter((s) => variants || BEFORE_0149.has(s.segment));
+  // The banner falls back to the card's set, the card to nothing (then a product photo).
+  const sets = banner ? [bannerSet(urls), cardSet(urls)] : [cardSet(urls)];
+  const onBusy = useCallback((b: boolean) => setBusyCount((n) => Math.max(0, n + (b ? 1 : -1))), []);
 
   return (
     <Modal
-      // OWNER: Sorani to be written by hand (the banner title and copy below).
-      titleAr={banner ? `صور بانر «${name}»` : `صورة «${name}»`}
-      titleEn={banner ? `Banner pictures for "${name}"` : `Picture for "${name}"`}
+      // OWNER: Sorani to be written by hand (the titles and every loc() below without a third argument).
+      titleAr={banner ? `صور بانر «${name}»` : `صور بطاقة «${name}»`}
+      titleEn={banner ? `Banner pictures for "${name}"` : `Card pictures for "${name}"`}
       onClose={onClose}
       footer={
         <div className={`${T.AP} flex items-center justify-end gap-2`} data-tax-dialog="section-image">
@@ -629,113 +721,140 @@ function SectionImageDialog({
               {err}
             </span>
           )}
-          <button type="button" className={T.btnSecondary} onClick={onClose} disabled={busy}>
+          <button type="button" className={T.btnSecondary} onClick={onClose} disabled={busyCount > 0}>
             {loc('إغلاق', 'Close', 'داخستن')}
           </button>
         </div>
       }
     >
       <div className={`${T.AP} grid gap-3.5`} data-tax-dialog-body={banner ? 'section-banner' : 'section-image'}>
-        {banner ? (
-          <>
-            <p className="text-[12px] text-[var(--ap-text-3)] leading-relaxed">
-              {loc(
-                'تملأ هذه الصورة شريط القسم في «كل الفئات» وفي صفحة القسم الأعلى منه، وتظهر كبيرة أعلى صفحة القسم نفسه. ارفع صورة لكل ثيم: يعرض المتجر صورة الثيم الظاهر، وإن غابت يعرض صورة الثيم الآخر، ثم صورة القسم، ثم صورة أحد منتجاته. الاسم والعدد والزر يُكتبان فوق الجهة اليمنى من الصورة على تظليل داكن، فاترك تلك الجهة هادئة. الصيغة WebP فقط، ٢ ميغابايت كحد أقصى، والأنسب صورة عريضة جدًا (نحو ٨:١، مثل ٢٤٠٠×٣٠٠).',
-                'This picture fills the section’s banner row in «All categories» and on its parent’s page, and is shown large at the top of the section’s own page. Upload one per theme: the shop shows the picture for the theme on screen, else the other theme’s, else the section’s picture, else a product photo. The name, the counts and the button are written over the reading side of the picture on a dark scrim, so keep that side calm. WebP only, 2 MB at most; a very wide picture fits best (about 8:1, e.g. 2400×300).'
+        <p className="text-[12px] text-[var(--ap-text-3)] leading-relaxed">
+          {banner
+            ? loc(
+                'تملأ هذه الصور شريط القسم في «كل الفئات» وفي صفحة القسم الأعلى منه، وتظهر كبيرة أعلى صفحة القسم نفسه. الاسم والعدد والزر يُكتبان فوق الجهة اليمنى من الصورة على تظليل داكن، فاترك تلك الجهة هادئة. لكل وضع صورتان: للشاشات الكبيرة وللجوال. كل خانة اختيارية — الفارغة تعرض أقرب صورة لها: من الوضع نفسه أولًا، ثم من الوضع الآخر، ثم صور بطاقة القسم، ثم صورة أحد منتجاته. WebP فقط، ٢ ميغابايت كحد أقصى للصورة.',
+                'These pictures fill the section’s banner row in «All categories» and on its parent’s page, and are shown large at the top of the section’s own page. The name, the counts and the button are written over the reading side of the picture on a dark scrim, so keep that side calm. Each theme takes two: one for large screens and one for phones. Every slot is optional — an empty one shows the nearest picture: the same theme’s first, then the other theme’s, then the section’s card pictures, then a product photo. WebP only, 2 MB at most each.'
+              )
+            : loc(
+                'تظهر هذه الصور على بطاقة القسم في الصفحة الرئيسية. لكل وضع صورتان: للشاشات الكبيرة وللجوال. كل خانة اختيارية — الفارغة تعرض أقرب صورة لها من الوضع نفسه أولًا، وصورة واحدة تكفي لكل الخانات. WebP فقط، ٢ ميغابايت كحد أقصى للصورة.',
+                'These pictures are shown on the section’s card on the home page. Each theme takes two: one for large screens and one for phones. Every slot is optional — an empty one shows the nearest picture, the same theme’s first, so a single picture fills them all. WebP only, 2 MB at most each.'
               )}
-            </p>
-            <PictureSlot
-              node={node}
-              segment="hero-image"
-              field="hero_image_url"
-              initial={node.hero_image_url || ''}
-              plate="dark"
-              label={loc('للثيم الداكن', 'Dark theme')}
-              onBusy={setBusy}
-              onError={setErr}
-              onChanged={onChanged}
-            />
-            <PictureSlot
-              node={node}
-              segment="hero-light-image"
-              field="hero_light_image_url"
-              initial={node.hero_light_image_url || ''}
-              plate="light"
-              label={loc('للثيم الفاتح', 'Light theme')}
-              onBusy={setBusy}
-              onError={setErr}
-              onChanged={onChanged}
-            />
-          </>
-        ) : (
-          <PictureSlot
-            node={node}
-            segment="image"
-            field="image_url"
-            initial={node.image_url || ''}
-            plate="dark"
-            onBusy={setBusy}
-            onError={setErr}
-            onChanged={onChanged}
-            note={loc(
-              'تظهر هذه الصورة على بطاقة القسم في الصفحة الرئيسية. الصيغة WebP فقط، وبحد أقصى ٢ ميغابايت. الأفضل صورة عرضية بنسبة ٤:٣.',
-              'This picture is shown on the section’s card on the home page. WebP only, 2 MB at most. A landscape 4:3 image fits best.',
-              'ئەم وێنەیە لە کارتی بەش لە پەڕەی سەرەکی دەردەکەوێت. تەنها WebP، زۆرترین ٢ مێگابایت. وێنەی ٤:٣ باشترینە.'
+        </p>
+        {(['dark', 'light'] as const).map((theme) => {
+          const own = slots.filter((s) => s.theme === theme);
+          if (own.length === 0) return null;
+          const Icon = theme === 'dark' ? Moon : Sun;
+          const headingId = `pic-${kind}-${theme}`;
+          return (
+            <div key={theme} role="group" aria-labelledby={headingId} className="grid gap-3 rounded-xl border border-[var(--ap-border)] p-3" data-tax-picture-theme={theme}>
+              <div id={headingId} className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--ap-text-1)]">
+                <Icon className="w-3.5 h-3.5 text-[var(--ap-text-3)]" aria-hidden />
+                {theme === 'dark' ? loc('الوضع الداكن', 'Dark theme') : loc('الوضع الفاتح', 'Light theme')}
+              </div>
+              <div className={banner ? 'grid gap-3' : 'grid gap-3 sm:grid-cols-2'}>
+                {own.map((spec) => (
+                  <PictureSlot
+                    key={spec.segment}
+                    node={node}
+                    kind={kind}
+                    spec={spec}
+                    url={urls[spec.field]}
+                    fallback={urls[spec.field] ? null : pickPictureOrigin(sets, spec.theme, spec.screen)}
+                    onUrl={(url) => setUrls((u) => ({ ...u, [spec.field]: url }))}
+                    onBusy={onBusy}
+                    onError={setErr}
+                    onChanged={onChanged}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        {!variants ? (
+          <p className="text-[12px] text-[var(--ap-text-3)] leading-relaxed" data-tax-picture-pending>
+            {loc(
+              'خانات الجوال (وصورة البطاقة للوضع الفاتح) تظهر بعد تطبيق تحديث قاعدة البيانات 0149 مع نشر الموقع القادم.',
+              'The phone slots (and the card’s light picture) appear once database update 0149 is applied with the next site deploy.'
             )}
-          />
-        )}
+          </p>
+        ) : null}
       </div>
     </Modal>
   );
 }
 
 /**
- * ONE PICTURE OF A SECTION: preview, upload/replace, remove — acting at once
- * (see SectionImageDialog). The slot owns what it is SHOWING: `node` is a
- * snapshot from the table and the table only re-reads after the parent's
- * reload resolves, so rendering `node.image_url` would leave the old picture
- * on screen for as long as that round trip takes — directly under the words
- * "saved".
+ * ONE SLOT OF A SECTION'S PICTURE: preview, upload/replace, remove — acting
+ * at once (see SectionImageDialog). The preview sits on the ground of the
+ * theme the slot is for — the dark theme's near-black or the light theme's
+ * cream, whatever theme the panel itself is in — so a picture exported on the
+ * wrong matte shows up here, not on the shop.
  *
- * `plate` is the ground the preview sits on: the dark theme's near-black, or
- * the light theme's cream — a picture exported on the wrong matte shows up
- * here, not on the shop.
+ * An EMPTY slot previews the picture the shop will draw in its place
+ * (`fallback`, the storefront's own resolver), faded and on a dashed edge, and
+ * names it — the rule made visible rather than explained.
  */
 function PictureSlot({
   node,
-  segment,
-  field,
-  initial,
-  plate,
-  label,
-  note,
+  kind,
+  spec,
+  url,
+  fallback,
+  onUrl,
   onBusy,
   onError,
   onChanged,
 }: {
   node: CatalogNode;
-  /** The worker's CATALOG_PICTURES segment. */
-  segment: 'image' | 'hero-image' | 'hero-light-image';
-  /** The URL field the worker answers with. */
-  field: 'image_url' | 'hero_image_url' | 'hero_light_image_url';
-  initial: string;
-  plate: 'dark' | 'light';
-  label?: string;
-  note?: string;
+  kind: PictureKind;
+  spec: PictureSlotSpec;
+  url: string;
+  /** What the shop shows while this slot is empty, or null when it would borrow a product photo. */
+  fallback: PictureOrigin | null;
+  onUrl: (url: string) => void;
   onBusy: (busy: boolean) => void;
   onError: (message: string) => void;
   onChanged: (removed: boolean) => Promise<void>;
 }) {
   const { loc } = useLoc();
-  const [url, setUrl] = useState(initial);
   const [busy, setBusyState] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const base = `/api/admin/taxonomy/catalogs/${encodeURIComponent(node.id)}/${segment}`;
-  const wide = segment !== 'image';
+  const base = `/api/admin/taxonomy/catalogs/${encodeURIComponent(node.id)}/${spec.segment}`;
   const setBusy = (b: boolean) => {
     setBusyState(b);
     onBusy(b);
   };
+
+  // OWNER: Sorani to be written by hand (every loc() in this slot without a third argument).
+  const themeName = spec.theme === 'dark' ? loc('الوضع الداكن', 'Dark theme') : loc('الوضع الفاتح', 'Light theme');
+  const screenName = spec.screen === 'large' ? loc('الشاشات الكبيرة', 'Large screens') : loc('الجوال', 'Phone');
+  const screenHint = spec.screen === 'large' ? loc('اللوحي والحاسوب', 'tablet and computer') : loc('أقل من ٦٤٠ بكسل', 'under 640 px');
+  const bestFit =
+    kind === 'image'
+      ? spec.screen === 'large'
+        ? loc('الأنسب ٤:٣، مثل ١٢٠٠×٩٠٠.', 'Best at 4:3, e.g. 1200×900.')
+        : loc('الأنسب مربعة ١:١، مثل ٨٠٠×٨٠٠.', 'Best square, 1:1, e.g. 800×800.')
+      : spec.screen === 'large'
+        ? loc('الأنسب عريضة جدًا ٨:١، مثل ٢٤٠٠×٣٠٠.', 'Best very wide, 8:1, e.g. 2400×300.')
+        : loc('الأنسب ١٥:٤، مثل ١٢٠٠×٣٢٠.', 'Best at 15:4, e.g. 1200×320.');
+
+  /** «فارغة — يظهر مكانها …»: the slot the shop draws instead, in words. */
+  const emptyLine = (() => {
+    if (!fallback) {
+      return loc(
+        'لا توجد صورة بعد — القسم يأخذ الآن صورة أحد منتجاته تلقائيًا.',
+        'No picture yet — the section is currently borrowing a photo from one of its products.',
+        'هێشتا وێنە نییە — ئێستا وێنەی یەکێک لە بەرهەمەکانی دەبات.'
+      );
+    }
+    const fromCard = kind === 'banner' && fallback.set === 1;
+    const dark = fallback.theme === 'dark';
+    const large = fallback.screen === 'large';
+    const ar = fromCard
+      ? `صورة البطاقة ${dark ? 'للوضع الداكن' : 'للوضع الفاتح'} ${large ? 'والشاشات الكبيرة' : 'والجوال'}`
+      : `صورة ${dark ? 'الوضع الداكن' : 'الوضع الفاتح'} ${large ? 'للشاشات الكبيرة' : 'للجوال'}`;
+    const en = `the ${fromCard ? 'card’s ' : ''}${dark ? 'dark' : 'light'} ${large ? 'large-screen' : 'phone'} picture`;
+    return loc(`فارغة — تظهر مكانها ${ar}.`, `Empty — ${en} shows here.`);
+  })();
 
   const upload = async (file: File) => {
     setBusy(true);
@@ -744,8 +863,8 @@ function PictureSlot({
       const form = new FormData();
       form.append('file', file);
       form.append('originalName', file.name);
-      const res = await api.post<Partial<Record<typeof field, string>>>(base, form);
-      setUrl(res[field] || '');
+      const res = await api.post<Partial<Record<PictureField, string>>>(base, form);
+      onUrl(res[spec.field] || '');
       await onChanged(false);
     } catch (e) {
       onError(e instanceof ApiError ? e.message : errMsg(e));
@@ -763,7 +882,7 @@ function PictureSlot({
     onError('');
     try {
       await api.delete(base);
-      setUrl('');
+      onUrl('');
       await onChanged(true);
     } catch (e) {
       onError(e instanceof ApiError ? e.message : errMsg(e));
@@ -772,69 +891,66 @@ function PictureSlot({
     }
   };
 
+  const shown = url || fallback?.file || '';
   return (
-    <div className={`grid gap-2 ${wide ? 'rounded-xl border border-[var(--ap-border)] p-3' : ''}`} data-tax-picture={segment}>
-      {label ? <div className="text-[13px] font-semibold text-[var(--ap-text-1)]">{label}</div> : null}
-      <div className={wide ? 'grid gap-2' : 'flex items-start gap-3'}>
-        {/* The shape the storefront draws: 4:3 for the home tile (SubCard), a
-            thin strip for the banner (CategoryRowBanners, 8:1 on a desktop). */}
-        <span
-          className={`${wide ? 'w-full aspect-[8/1] min-h-[56px]' : 'w-28 aspect-[4/3]'} shrink-0 rounded-xl border border-[var(--ap-border)] grid place-items-center overflow-hidden ${
-            plate === 'dark' ? 'lv-plate-dark' : 'lv-plate-light'
-          }`}
-        >
-          {url ? (
-            <img src={url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <ImageIcon className="w-6 h-6 text-[var(--ap-text-3)]" aria-hidden />
-          )}
-        </span>
-        <div className="min-w-0 grid gap-2">
-          {note ? <p className="text-[12px] text-[var(--ap-text-3)] leading-relaxed">{note}</p> : null}
-          {!wide ? (
-            <p className="text-[12px] text-[var(--ap-text-3)] leading-relaxed">
-              {url
-                ? loc(
-                    'بدون صورة، يأخذ القسم صورة أحد منتجاته تلقائيًا.',
-                    'With no picture the section borrows a photo from one of its products.',
-                    'بێ وێنە، بەشەکە وێنەی یەکێک لە بەرهەمەکانی دەبات.'
-                  )
-                : loc(
-                    'لا توجد صورة بعد — القسم يأخذ الآن صورة أحد منتجاته تلقائيًا.',
-                    'No picture yet — the section is currently borrowing a photo from one of its products.',
-                    'هێشتا وێنە نییە — ئێستا وێنەی یەکێک لە بەرهەمەکانی دەبات.'
-                  )}
-            </p>
-          ) : null}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* `sr-only`, NOT `hidden`. `display: none` takes a file input out of
-                the focus order, and a <label> is not focusable either, so the
-                whole control would be unreachable by keyboard. */}
-            <label className={`${T.btnPrimary} cursor-pointer`}>
-              {busy ? <RefreshCw className="w-4 h-4 animate-spin" aria-hidden /> : <Upload className="w-4 h-4" aria-hidden />}
-              {url ? loc('استبدال الصورة', 'Replace image', 'وێنە بگۆڕە') : loc('رفع صورة WebP', 'Upload a WebP', 'وێنەی WebP باربکە')}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/webp"
-                className="sr-only"
-                disabled={busy}
-                aria-label={label}
-                data-tax-image-input={`${node.id}:${segment}`}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void upload(file);
-                }}
-              />
-            </label>
-            {url && (
-              <button type="button" className={T.btnDanger} onClick={() => void remove()} disabled={busy} data-tax-image-remove={`${node.id}:${segment}`}>
-                <Trash2 className="w-4 h-4" aria-hidden />
-                {loc('إزالة الصورة', 'Remove image', 'وێنە لاببە')}
-              </button>
-            )}
-          </div>
-        </div>
+    <div className="grid gap-2 min-w-0 content-start" data-tax-picture={spec.segment} data-tax-picture-state={url ? 'own' : fallback ? 'fallback' : 'empty'}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
+        {spec.screen === 'large' ? (
+          <Monitor className="w-3.5 h-3.5 text-[var(--ap-text-3)]" aria-hidden />
+        ) : (
+          <Smartphone className="w-3.5 h-3.5 text-[var(--ap-text-3)]" aria-hidden />
+        )}
+        <span className="text-[12.5px] font-semibold text-[var(--ap-text-1)]">{screenName}</span>
+        <span className="text-[11.5px] text-[var(--ap-text-3)]">{screenHint}</span>
+      </div>
+      <span
+        className={`${PREVIEW[kind][spec.screen]} shrink-0 rounded-lg border grid place-items-center overflow-hidden ${
+          url ? 'border-[var(--ap-border)]' : 'border-dashed border-[var(--ap-border-strong)]'
+        } ${spec.theme === 'dark' ? 'lv-plate-dark' : 'lv-plate-light'}`}
+      >
+        {shown ? (
+          <img src={shown} alt="" loading="lazy" decoding="async" className={`w-full h-full object-cover ${url ? '' : 'opacity-40'}`} />
+        ) : (
+          <ImageIcon className="w-5 h-5 text-[var(--ap-text-3)]" aria-hidden />
+        )}
+      </span>
+      <p className="text-[11.5px] text-[var(--ap-text-3)] leading-relaxed">
+        {url ? bestFit : `${emptyLine} ${bestFit}`}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {/* `sr-only`, NOT `hidden`. `display: none` takes a file input out of
+            the focus order, and a <label> is not focusable either, so the
+            whole control would be unreachable by keyboard. */}
+        <label className={`${T.btnSecondary} cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--ap-accent)]`}>
+          {busy ? <RefreshCw className="w-4 h-4 animate-spin" aria-hidden /> : <Upload className="w-4 h-4" aria-hidden />}
+          {url ? loc('استبدال', 'Replace') : loc('رفع صورة', 'Upload')}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/webp"
+            className="sr-only"
+            disabled={busy}
+            aria-label={`${themeName} — ${screenName}`}
+            data-tax-image-input={`${node.id}:${spec.segment}`}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void upload(file);
+            }}
+          />
+        </label>
+        {url && (
+          <button
+            type="button"
+            className={T.btnIconDanger}
+            onClick={() => void remove()}
+            disabled={busy}
+            aria-label={`${loc('إزالة الصورة', 'Remove image', 'وێنە لاببە')}: ${themeName} — ${screenName}`}
+            title={loc('إزالة الصورة', 'Remove image', 'وێنە لاببە')}
+            data-tax-image-remove={`${node.id}:${spec.segment}`}
+          >
+            <Trash2 className="w-4 h-4" aria-hidden />
+          </button>
+        )}
       </div>
     </div>
   );

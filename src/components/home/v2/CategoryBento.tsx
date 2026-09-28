@@ -22,7 +22,8 @@ import SectionHead, { ArrowGlyph } from './SectionHead';
  * they sit on a photograph, not on the page; the tile under a missing picture
  * is a dark plate for the same reason. The picture is the admin's light/dark
  * pair when there is one (src/lib/homeLayout.ts `ownerPhoto`), else the
- * section's cover, else a real product photograph cropped to its middle band.
+ * section's card pictures — dark and light, a phone size of each (0149) —
+ * else a real product photograph cropped to its middle band.
  * The earlier label zone above or beside a framed photo window is gone.
  *
  * ONE LAYOUT AT EVERY WIDTH (owner, 2026-09-26, with the reference shot:
@@ -77,6 +78,8 @@ function TilePhoto({ tile, size }: { tile: BentoTile; size: number }) {
       <PromoPhoto
         src={tile.image}
         lightSrc={tile.lightImage}
+        mobileSrc={tile.mobileImage}
+        lightMobileSrc={tile.lightMobileImage}
         crop={isProductPhoto(tile)}
         bleed
         width={size}
