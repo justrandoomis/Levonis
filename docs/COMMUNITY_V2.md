@@ -418,6 +418,13 @@ nothing (audit 04 #16). Review pictures are the reviewer's own uploads, at most
 six, or nothing (#17). A public store review names its author the way a platform
 review does — «Ahmed K.» (#15).
 
+**Where a customer is asked.** «قيّم من اشتريت منهم» lists what `GET /eligible`
+answers — on `/orders` the delivered store orders, under «تنفيذ طلباتي» the
+completed custom work, the latter at once after the customer confirms receipt —
+each a card with five stars (a radio group, 44px targets) and optional words;
+a `409` (already rated) closes the card rather than failing it
+(`src/components/community/reviews/`, DECISIONS row 163).
+
 ### Reputation
 
 `merchant_reputation_events` is kept forever. The score is **derived**, so a
@@ -485,10 +492,26 @@ page, `total`.
   orders, followers, published products, and `following` for the viewer.
 - **works** — the stores' showcase rows of kind `work` with a picture, newest
   first, three per store at most (`merchant_showcase`, 0036).
+- **followed** (`GET /followed`, signed in) — the shops this customer follows,
+  each as the directory's own card (store name, logo, tagline, rating,
+  governorate, «takes custom requests», `following: true`), newest follow
+  first; a sanctioned shop is a neutral `unavailable` card (review S5).
+
+The request board (`GET /api/marketplace/requests`) pages the same way —
+`<created_at>|<id>`, where a bare timestamp used to drop a request that shared
+its second with the last one on a page — and takes `q` over the request's title
+and description, with the community page's own visibility rule
+(`worker/lib/requestBoard.ts`, DECISIONS row 165).
 
 ### `/api/community-reviews/*`
 `GET /eligible` · `POST /` · `PATCH /:id` · `POST|DELETE|PATCH /follow/:merchantId` ·
 `GET /following`
+
+`GET /following` takes `?merchant_id=` — a store page asks whether the viewer
+follows THAT shop instead of reading the whole list — and, like
+`GET /api/community/followed`, keeps a shop Levonis has sanctioned in the list
+(so it can be unfollowed) with nothing its merchant wrote: `unavailable: true`
+and no name, tagline or logo. Both lists are bounded (500); neither has pages.
 
 ### `/api/admin/community/*` — apex host only
 `GET /overview` · `GET|PATCH /settings` · `GET|PUT /gate` · `GET /gate/lookup` ·

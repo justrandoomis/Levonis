@@ -183,6 +183,17 @@ function answer(p: string, q: URLSearchParams, method: string, sent: Record<stri
     if (onStore) return ok({ kind: 'store', store: state === 'other' ? { ...STORE, id: 's2', slug: 'zahra', name: 'Zahra Prints' } : STORE });
     return ok({ kind: 'main', store: null });
   }
+  // Another shop, with no address of its own: its page renders in-site (the follower count probe).
+  if (p === '/api/storefront/zahra') {
+    return ok({ store: { ...STORE, id: 's7', merchant_id: 'm7', slug: 'zahra', url: '', name: en ? 'Zahra Prints' : 'مطبعة زهراء', followers: 120, product_count: 18, positive_pct: 97, deal_count: 0, merchant: { ...STORE.merchant, id: 'm7', name: 'Zahra' } } });
+  }
+  if (p === '/api/storefront/zahra/products') return ok({ products: [], next_cursor: null });
+  if (p === '/api/storefront/zahra/sections') return ok({ sections: [] });
+  if (p === '/api/storefront/zahra/services') return ok({ services: [] });
+  if (p === '/api/storefront/zahra/showcase') return ok({ items: [] });
+  if (p === '/api/storefront/zahra/reviews') return ok({ average: null, count: 0, distribution: {}, reviews: [], next_cursor: null });
+  if (p === '/api/community-reviews/following') return ok({ following: [] });
+  if (/^\/api\/community-reviews\/follow\/[^/]+$/.test(p)) return ok({ following: method === 'POST' });
   // A store's product page (StorefrontProduct): the merchant wrote an Arabic name and description.
   if (p === '/api/storefront/ali3d/products/bracket') {
     return ok({

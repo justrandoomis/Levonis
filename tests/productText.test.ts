@@ -52,3 +52,12 @@ test('the store\'s product page can be saved and shared — a lazy chunk, off th
   const facts = code('src/components/catalog/ProductFacts.tsx');
   assert.match(facts, /if \(attributes\.weight_g != null\)/);
 });
+
+test('the preparation time is a counted phrase — «يومين», not «2 يوم»; «1 day», not «1 days»', () => {
+  const page = code('src/pages/StorefrontProduct.tsx');
+  assert.match(page, /if \(n === 1\) return 'يوم واحد';\s*if \(n === 2\) return 'يومين';/);
+  assert.match(page, /if \(r >= 3 && r <= 10\) return `\$\{n\} أيام`;\s*if \(r >= 11 && r <= 99\) return `\$\{n\} يومًا`;\s*return `\$\{n\} يوم`;/);
+  assert.match(page, /`يجهّز خلال \$\{arDays\(product\.prep_days\)\}`/);
+  assert.match(page, /product\.prep_days === 1 \? 'day' : 'days'/);
+  assert.doesNotMatch(page, /`يجهّز خلال \$\{product\.prep_days\} يوم`/);
+});

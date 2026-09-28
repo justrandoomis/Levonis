@@ -106,6 +106,9 @@ try {
 
     // The hero's button goes to the products page — and the page CHANGES.
     const cta = page.getByRole('link', { name: lang === 'ar' ? 'تصفّح المنتجات' : 'Browse products' });
+    // The minimal hero is a lazy block: wait for it rather than for a fixed
+    // 250 ms, which a busy machine did not always give it.
+    await cta.first().waitFor({ timeout: 10000 }).catch(() => {});
     check(`${tag} hero button drawn`, (await cta.count()) === 1);
     await cta.click();
     await page.waitForSelector('[data-store-view="products"]', { timeout: 10000 }).catch(() => {});

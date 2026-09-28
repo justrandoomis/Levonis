@@ -54,6 +54,7 @@ import {
   type SourceType,
   type WizardPayload,
 } from './api';
+import { forgetCommunityFeed } from '../hub/feedCache';
 
 type Step = 1 | 2 | 3 | 4;
 type Lang = 'ar' | 'en' | 'ckb';
@@ -411,6 +412,8 @@ export default function RequestWizard({
     try {
       const id = await ensureDraft();
       const d = await requestsApi.publish(id, wizardPayload(s, primary?.id ?? '', measured));
+      // The community page's remembered request lists no longer say what is on the board.
+      forgetCommunityFeed('requests');
       setPublished({ notified: d.matching.notified, replayed: d.replayed, revised: d.revised });
     } catch (e) {
       setError(refusal(e, loc('تعذّر نشر الطلب', 'Could not publish the request')));

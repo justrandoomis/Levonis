@@ -65,6 +65,7 @@ import ConfirmSheet from '../components/print/ConfirmSheet';
 import { apiRefusal } from '../lib/refusalStrings';
 import { asLang, formatDate } from '../components/orders/format';
 import { offersLabel } from '../components/community/hub/copy';
+import { forgetCommunityFeed } from '../components/community/hub/feedCache';
 
 interface RequestRow {
   id: string;
@@ -724,6 +725,7 @@ function RequestDetail({
     setDraftError('');
     try {
       await api.post(`/api/marketplace/print/requests/${current.id}/publish`, {});
+      forgetCommunityFeed('requests');
       loadFiles();
       load();
     } catch (e) {
@@ -738,6 +740,7 @@ function RequestDetail({
     setCloseError('');
     try {
       await api.post(`/api/marketplace/requests/${current.id}/cancel`);
+      forgetCommunityFeed('requests');
       setCloseOpen(false);
       loadFiles();
       load();
@@ -753,6 +756,7 @@ function RequestDetail({
     setDiscardError('');
     try {
       await api.post(`/api/marketplace/requests/${current.id}/cancel`);
+      forgetCommunityFeed('requests');
       setDiscardOpen(false);
       loadFiles();
     } catch (e) {

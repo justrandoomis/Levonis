@@ -82,6 +82,8 @@ interface LiveState {
   /** Levo Community refused this viewer (the only thing that closes its doors). */
   communityClosed: boolean;
   backTo: string;
+  /** A follow or unfollow went through: the page's own follower count moves with it. */
+  onFollowChange: (following: boolean) => void;
 }
 
 const LiveContext = createContext<LiveState | null>(null);
@@ -318,9 +320,16 @@ export default function Storefront({
     };
   }, [onHost, slug, profileOnly, communityClosed, initialTab, section, profileProducts, toggleSave, MAIN_SITE]);
 
+  // The follower count the hero and the stats show is this page's copy of the
+  // store; a follow from this page moves it (it used to wait for a reload).
+  const onFollowChange = useMemo(
+    () => (following: boolean) =>
+      setStore((s) => (s ? { ...s, followers: Math.max(0, (s.followers ?? 0) + (following ? 1 : -1)) } : s)),
+    []
+  );
   const live = useMemo<LiveState | null>(
-    () => (store ? { store, profileOnly, signedIn: !!user, onHost, communityClosed, backTo } : null),
-    [store, profileOnly, user, onHost, communityClosed, backTo]
+    () => (store ? { store, profileOnly, signedIn: !!user, onHost, communityClosed, backTo, onFollowChange } : null),
+    [store, profileOnly, user, onHost, communityClosed, backTo, onFollowChange]
   );
 
   // OWNER DECISION (2026-09-24): an admin-suspended store is this page and
@@ -424,14 +433,14 @@ function LiveMenu() {
  * pill's far-left end.
  */
 function LiveProfileActions({ accent }: { accent: AccentClasses }) {
-  const { store, signedIn, onHost, profileOnly } = useLive();
+  const { store, signedIn, onHost, profileOnly, onFollowChange } = useLive();
   const { loc } = useLanguage();
   const { access: communityAccess } = useCommunityAccess();
   return (
     <div dir="rtl" className="flex gap-4">
       <ContactButton merchantId={store.merchant.id} signedIn={signedIn} onHost={onHost} loc={loc} accentBtn={accent.btn} profileOnly={profileOnly} />
       <div className="relative flex-[1.08] min-w-0">
-        <FollowButton merchantId={store.merchant.id} signedIn={signedIn} loc={loc} accentChip={accent.chip} closed={communityAccess?.may_enter === false} />
+        <FollowButton merchantId={store.merchant.id} signedIn={signedIn} loc={loc} accentChip={accent.chip} closed={communityAccess?.may_enter === false} onChange={onFollowChange} />
         <SharePin url={store.url} name={store.name} loc={loc} />
       </div>
     </div>
@@ -577,11 +586,14 @@ function FollowButton({
   loc,
   accentChip,
   closed,
+  onChange,
 }: {
   merchantId: string;
   signedIn: boolean;
   loc: Loc;
   accentChip: string;
+  /** Told after a follow or unfollow went through. */
+  onChange?: (following: boolean) => void;
   /**
    * Levo Community is under maintenance for this viewer. Follows are part of
    * it and the server refuses them (/api/community-reviews/follow*), so the
@@ -620,9 +632,11 @@ function FollowButton({
       if (following) {
         await api.delete(`/api/community-reviews/follow/${merchantId}`);
         setFollowing(false);
+        onChange?.(false);
       } else {
         await api.post(`/api/community-reviews/follow/${merchantId}`);
         setFollowing(true);
+        onChange?.(true);
       }
       // The community page's cached store list says «تتابعه» from this answer on.
       forgetCommunityFeed('merchants');

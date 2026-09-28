@@ -54,6 +54,16 @@ import { QuantityInput } from '../components/ui/QuantityInput';
 import { LINE_QTY_MAX } from '../../packages/pricing/src/quantity';
 import { productDescription, productName } from '../lib/productText';
 
+/** «يوم واحد», «يومين», «3 أيام», «12 يومًا», «100 يوم» — the count rule of components/community/hub/copy.ts. */
+function arDays(n: number): string {
+  if (n === 1) return 'يوم واحد';
+  if (n === 2) return 'يومين';
+  const r = n % 100;
+  if (r >= 3 && r <= 10) return `${n} أيام`;
+  if (r >= 11 && r <= 99) return `${n} يومًا`;
+  return `${n} يوم`;
+}
+
 /** A suspended shop's page — rare, so it is not part of every product visit's download. */
 const StoreUnavailable = lazy(() => import('../components/merchant/StoreUnavailable'));
 /** Save and share (components/community/ProductActions.tsx) — lazy, for the same budget. */
@@ -319,9 +329,10 @@ export default function StorefrontProduct() {
           {product.prep_days > 0 && (
             <div className="flex items-center gap-2 text-zinc-400 text-[12.5px] mb-4">
               <Clock className="w-4 h-4" />
+              {/* «يوم واحد», «يومين», «3 أيام», «12 يومًا» — not «2 يوم». */}
               {loc(
-                `يجهّز خلال ${product.prep_days} يوم`,
-                `Prepared in ${product.prep_days} days`,
+                `يجهّز خلال ${arDays(product.prep_days)}`,
+                `Prepared in ${product.prep_days} ${product.prep_days === 1 ? 'day' : 'days'}`,
                 `لە ${product.prep_days} ڕۆژدا ئامادە دەکرێت`
               )}
             </div>

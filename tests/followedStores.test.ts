@@ -177,3 +177,11 @@ test('the legacy store page says a failed follow or chat instead of writing it t
   assert.match(page, /err\.code === 'CANNOT_FOLLOW_OWN_STORE'/);
   assert.match(page, /setLoadError\(err \?\? new Error\('load failed'\)\)/, 'the error is worded at render time (no stale-language effect)');
 });
+
+test('a follow from the store page moves the page\'s own follower count', () => {
+  const sf = code('src/pages/Storefront.tsx');
+  assert.match(sf, /setStore\(\(s\) => \(s \? \{ \.\.\.s, followers: Math\.max\(0, \(s\.followers \?\? 0\) \+ \(following \? 1 : -1\)\) \} : s\)\)/);
+  assert.match(sf, /await api\.delete\(`\/api\/community-reviews\/follow\/\$\{merchantId\}`\);\s*setFollowing\(false\);\s*onChange\?\.\(false\);/);
+  assert.match(sf, /await api\.post\(`\/api\/community-reviews\/follow\/\$\{merchantId\}`\);\s*setFollowing\(true\);\s*onChange\?\.\(true\);/);
+  assert.match(sf, /onChange=\{onFollowChange\} \/>/);
+});

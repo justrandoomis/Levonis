@@ -141,3 +141,13 @@ test('C10/C13/C14: the offer links the merchant, a failed follow says so, and Ba
   assert.match(sf, /const goBack = useGoBack\(backTo\);/);
   assert.match(code('src/pages/Community.tsx'), /const goBack = useGoBack\('\/'\);/);
 });
+
+test('C6: publishing or closing a request drops the community page\'s remembered request lists', () => {
+  const strip = (p: string) => readFileSync(join(ROOT, p), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const wizard = strip('src/components/community/requests/RequestWizard.tsx');
+  assert.match(wizard, /const d = await requestsApi\.publish\(id, wizardPayload\(s, primary\?\.id \?\? '', measured\)\);\s*forgetCommunityFeed\('requests'\);/);
+  const page = strip('src/pages/Requests.tsx');
+  assert.match(page, /\/publish`, \{\}\);\s*forgetCommunityFeed\('requests'\);/);
+  assert.equal(page.match(/\/cancel`\);\s*forgetCommunityFeed\('requests'\);/g)?.length, 2, 'closing a published request and discarding a draft');
+  assert.match(page, /import \{ forgetCommunityFeed \} from '\.\.\/components\/community\/hub\/feedCache';/, 'the cache module, not the feed hook');
+});
