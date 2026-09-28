@@ -178,7 +178,13 @@ printerFinderRoutes.get('/', async (c) => {
   const key = new Request(`${canonical.origin}${canonical.pathname}?${encodePairs(finderParamPairs(answers))}`, { method: 'GET' });
   if (cache) {
     const hit = await cache.match(key).catch(() => undefined);
-    if (hit) return hit;
+    // With this route's own lifetime, not the zone's four-hour Browser Cache
+    // TTL that Cloudflare puts on a hit (worker/routes/catalog.ts `cached`).
+    if (hit) {
+      const res = new Response(hit.body, hit);
+      res.headers.set('Cache-Control', 'public, max-age=60');
+      return res;
+    }
   }
   const { candidates } = await loadCandidates(c);
   const outcome = runFinder(candidates, answers);

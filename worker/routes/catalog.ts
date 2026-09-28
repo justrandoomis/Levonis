@@ -82,7 +82,19 @@ async function cached(c: Context<AppContext>, key: Request, cacheControl: string
   const cache = edgeCache();
   if (cache) {
     const hit = await cache.match(key).catch(() => undefined);
-    if (hit) return hit;
+    /**
+     * A HIT LEAVES WITH THIS ROUTE'S LIFETIME, NOT THE ZONE'S. Cloudflare hands
+     * a cached answer back with its `max-age` raised to the zone's Browser
+     * Cache TTL — four hours on levonis-iq.com (seen live 2026-09-28:
+     * `max-age=14400, s-maxage=300` on /api/catalog/tree). A visitor's browser
+     * then kept the section map for hours after an admin changed it, and
+     * `purgeCatalogTreeCache` clears the edge, never a browser.
+     */
+    if (hit) {
+      const res = new Response(hit.body, hit);
+      res.headers.set('Cache-Control', cacheControl);
+      return res;
+    }
   }
   const res = await build();
   if (res.status === 200) {
