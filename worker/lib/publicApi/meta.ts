@@ -170,7 +170,7 @@ async function contextDocument(routes: readonly PublicRoute[], req: PublicReques
     name: `${PLATFORM_NAME} Public API`,
     version: API_VERSION,
     purpose:
-      'Read-only access to the public content of levonis-iq.com — a 3D printing store in Iraq — at exactly the level of a signed-out visitor. Use it to browse the catalogue, read prices, download product pictures, and answer questions about the shop and its policies.',
+      'Read-only access to the public content of levonis-iq.com — a 3D printing store in Iraq, and Levo Community, its marketplace of independent printing shops — at exactly the level of a signed-out visitor. Use it to browse the catalogue and the shops, read prices, download product pictures, and answer questions about the shop and its policies.',
     website: urls.web('/'),
     base_url: `${urls.origin}${API_PREFIX}`,
     openapi_url: urls.api('/openapi.json'),
@@ -190,11 +190,12 @@ async function contextDocument(routes: readonly PublicRoute[], req: PublicReques
       prices:
         'A price is what a signed-out customer pays for one unit today, offers applied. `member_price` is the PRO price the site advertises to visitors. Items marked members_only show no price to visitors.',
       identifiers:
-        'Items are identified by their slug. Every item carries `url` (its page on the website) and `api_url` (its full record here). Internal database identifiers are never published.',
+        'Items are identified by their slug (a shop by the first label of its address, <slug>.levonis-iq.com). Every item carries `url` (its page on the website) and `api_url` (its full record here). Internal database identifiers are never published; a print request is identified by the reference in its public web address.',
       pagination: `Lists take \`limit\` (1–${MAX_LIMIT}, default ${DEFAULT_LIMIT}) and \`cursor\`. Follow \`links.next\` until it is null.`,
       images:
         'Picture URLs are absolute and point at the original files (WebP) — the highest quality the site stores. Download them directly; they are public and cached for a year.',
-      errors: 'Errors are { "success": false, "error": "…", "code": "…", "details"?: {…} } with the HTTP status (400, 404, 405, 429).',
+      errors:
+        'Errors are { "success": false, "error": "…", "code": "…", "details"?: {…} } with the HTTP status (400, 404, 405, 429). While Levo Community is closed to visitors, /community/* answers 503 with code COMMUNITY_CLOSED; a suspended shop answers 404 STORE_UNAVAILABLE.',
       caching: 'Answers carry Cache-Control and a weak ETag; send If-None-Match to get a 304. Data is at most a few minutes old.',
       rate_limits: `About ${RATE_LIMIT.requests} uncached requests per ${RATE_LIMIT.per_seconds} seconds per IP address. Over it: HTTP 429 with Retry-After. Cached answers are not counted.`,
     },
@@ -205,6 +206,7 @@ async function contextDocument(routes: readonly PublicRoute[], req: PublicReques
       { step: 'Search', request: urls.api('/search?q=printer') },
       { step: 'Everything about one product', request: `${urls.api('/products')}/{slug}` },
       { step: 'Policies and FAQ', request: urls.api('/faq') },
+      { step: 'Levo Community — the independent shops and the print-request board (when open)', request: urls.api('/community') },
     ],
     content: {
       products: counts ? Number(counts.products) || 0 : null,

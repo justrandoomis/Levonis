@@ -58,18 +58,52 @@ const SECRETS = [
   'SUPPLIER-SECRET-7Q',
   'ADMIN-NOTE-SECRET-7Q',
   ADMIN_TOKEN,
+  // The community: a shop, its owner, its products, reviews, and the request board.
+  'owner-secret@example.com',
+  'Owner Person',
+  '+9647800000077', // the shop's contact phone — published on its page, never through the API
+  'MERCHANT-PHONE-SECRET',
+  'MERCHANT-GOV-SECRET',
+  'SANCTION-REASON-SECRET',
+  'PICKUP-NOTE-SECRET',
+  'CP-SKU-SECRET-7Q',
+  'CP-DRAFT-SECRET',
+  'CP-HIDDEN-SECRET',
+  'tracker.example', // an off-platform picture a legacy listing carried
+  'HIDDEN-STORE-REVIEW-SECRET',
+  'SUSPENDED-SHOP-SECRET',
+  'SUSPENDED-PRODUCT-SECRET',
+  'REQUEST-NOTES-SECRET',
+  'CUSTOMER-NOTES-SECRET',
+  'PRIVATE-REQUEST-SECRET',
+  'DRAFT-REQUEST-SECRET',
+  'reviews/usr_leak7q', // a review photo's key names its author
+  'VARIANT-SKU-SECRET',
+  'INACTIVE-VARIANT-SECRET',
 ];
 
 /** Keys no public answer may carry, at any depth. */
 const FORBIDDEN_KEY =
   /^(id|.*_id|.*cost.*|.*profit.*|.*supplier.*|sku|sku_part|source_url|stock|stock_reserved|reserved|low_stock_threshold|capacity|email|phone.*|password.*|token|session.*|.*_note|moderation.*|admin.*|merged_into|group_en|.*_adjust_iqd|pro_price_iqd|prime_price_iqd|rule_id|.*_key|r2_key)$/i;
 
-/** Internal database ids (prd_…, cat_…, brd_…, usr_…); slugs are the public identifiers. */
-const INTERNAL_ID = /\b(prd|cat|brd|usr|ord|mer|str|rev|ses)_[A-Za-z0-9]{2,}/;
+/**
+ * Internal database ids (prd_…, cat_…, usr_…, str_…, cp_…); slugs are the
+ * public identifiers. A print request's reference (req_…) is public — it is
+ * in the request's web address — and is not in this list.
+ */
+const INTERNAL_ID = /\b(prd|cat|brd|usr|ord|mer|mch|cm|cp|str|svc|shw|mrv|sec|og|ov|pv|rev|ses)_[A-Za-z0-9]{2,}/;
+
+/**
+ * A merchant's picture is the site's own public file, `/files/merchants/<owner
+ * account id>/public/…` — the one place an account id is part of a public
+ * answer, exactly as on the shop's own pages. Masked before the id scan; the
+ * owner here is a merchant, never a customer.
+ */
+const MERCHANT_FILE = /\/files\/merchants\/usr_owner7q\/(public|logos|covers)\//g;
 
 const GALLERY_KEY = 'products/p1/gallery/0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0.webp';
 
-async function world() {
+async function world(opts: { communityOpen?: boolean } = {}) {
   const raw = freshDb();
   seedLiveCatalog(raw);
   const first = raw.prepare("SELECT id, slug FROM products WHERE status = 'active' AND composition = '' ORDER BY id LIMIT 1").get() as {
@@ -128,6 +162,79 @@ async function world() {
   );
   raw.exec(`INSERT INTO inventory_suppliers (id, name, notes) VALUES ('sup_7q', 'SUPPLIER-SECRET-7Q', 'ADMIN-NOTE-SECRET-7Q')`);
 
+  // LEVO COMMUNITY: a shop (public on its own address), one a moderator
+  // suspended, their products, reviews, services and work, and the board.
+  const soon = new Date(Date.now() + 7 * 86_400_000).toISOString();
+  raw.exec(`INSERT INTO users (id, name, email, password_hash, role, username, phone_e164)
+            VALUES ('usr_owner7q', 'Owner Person', 'owner-secret@example.com', 'HASH-SECRET-7Q', 'customer', 'ownerp', NULL),
+                   ('usr_ban7q', 'Banned Owner', 'ban@x.co', 'HASH-SECRET-7Q', 'customer', 'banned', NULL)`);
+  raw.exec(`INSERT INTO community_merchants (id, user_id, name, bio, governorate, phone, status, status_reason, verified, badge, rating_avg_x100, rating_count, completed_orders, created_at)
+            VALUES ('mch_ali7q', 'usr_owner7q', 'Ali Prints', 'Honest prints', 'MERCHANT-GOV-SECRET', 'MERCHANT-PHONE-SECRET', 'active', '', 1, 'trusted', 450, 2, 7, '2026-08-01T00:00:00.000Z'),
+                   ('mch_ban7q', 'usr_ban7q', 'SUSPENDED-SHOP-SECRET', '', '', '', 'suspended', 'SANCTION-REASON-SECRET', 0, 'new', 0, 0, 0, '2026-08-02T00:00:00.000Z')`);
+  raw.prepare(
+    `INSERT INTO merchant_stores (id, merchant_id, user_id, slug, name, tagline, description, logo_key, banner_key, governorate,
+                                 categories, service_areas, contact_phone, contact_phone_public, business_hours, policies, social_links,
+                                 accepts_custom_requests, sells_direct_products, status, created_at)
+     VALUES ('str_ali7q', 'mch_ali7q', 'usr_owner7q', 'ali3d', 'Ali 3D', 'Prints that last', 'We print.', ?, ?, 'baghdad',
+             '["figures"]', '["Karrada"]', '+9647800000077', 1, '[{"day":"Sat","open":"09:00","close":"18:00"}]',
+             '{"returns":"Seven days."}', '{"instagram":"https://instagram.com/ali3d","bad":"javascript:alert(1)"}',
+             1, 1, 'active', '2026-08-01T00:00:00.000Z')`
+  ).run('merchants/usr_owner7q/logos/logo.webp', 'merchants/usr_owner7q/covers/banner.webp');
+  raw.exec(`INSERT INTO merchant_stores (id, merchant_id, user_id, slug, name, status, created_at)
+            VALUES ('str_ban7q', 'mch_ban7q', 'usr_ban7q', 'banned-shop', 'SUSPENDED-SHOP-SECRET', 'active', '2026-08-02T00:00:00.000Z')`);
+  raw.exec(`INSERT INTO merchant_store_slugs (slug, store_id, active) VALUES ('ali3d', 'str_ali7q', 1), ('banned-shop', 'str_ban7q', 1)`);
+  raw.exec(`INSERT INTO merchant_delivery_profiles (store_id, default_mode, default_fee_iqd, pickup_enabled, pickup_governorate, pickup_note, prep_days, note)
+            VALUES ('str_ali7q', 'fee', 5000, 1, 'baghdad', 'PICKUP-NOTE-SECRET', 2, 'Packed with care.')`);
+  // `status` is not written directly: migration 0126's triggers derive it from
+  // the lifecycle and an admin's hide, as every real write does.
+  const cp = raw.prepare(
+    `INSERT INTO community_products (id, merchant_id, store_id, slug, name, name_ar, description, images, price_iqd, original_price_iqd,
+                                     sku, stock, track_stock, sold_count, category, lifecycle, admin_hidden_at, admin_hidden_reason, created_at)
+     VALUES (?, ?, ?, ?, ?, '', 'A dragon.', ?, 25000, 30000, 'CP-SKU-SECRET-7Q', 5, 1, 57, 'figures', ?, ?, ?, ?)`
+  );
+  const dragonImages = JSON.stringify(['/files/merchants/usr_owner7q/public/dragon.webp', 'https://tracker.example/pixel.gif']);
+  cp.run('cp_dragon7q', 'mch_ali7q', 'str_ali7q', 'ali3d-dragon', 'Dragon', dragonImages, 'active', null, '', '2026-08-03T00:00:00.000Z');
+  cp.run('cp_draft7q', 'mch_ali7q', 'str_ali7q', 'ali3d-draft', 'CP-DRAFT-SECRET', '[]', 'draft', null, '', '2026-08-04T00:00:00.000Z');
+  cp.run('cp_hidden7q', 'mch_ali7q', 'str_ali7q', 'ali3d-hidden', 'CP-HIDDEN-SECRET', '[]', 'hidden', null, '', '2026-08-05T00:00:00.000Z');
+  cp.run('cp_mod7q', 'mch_ali7q', 'str_ali7q', 'ali3d-moderated', 'CP-HIDDEN-SECRET', '[]', 'active', '2026-08-05T00:00:00.000Z', 'MODERATION-SECRET-7Q', '2026-08-05T01:00:00.000Z');
+  cp.run('cp_ban7q', 'mch_ban7q', 'str_ban7q', 'banned-thing', 'SUSPENDED-PRODUCT-SECRET', '[]', 'active', null, '', '2026-08-06T00:00:00.000Z');
+  // A product sold in sizes: two live variants (one sold out), one switched off.
+  cp.run('cp_vase7q', 'mch_ali7q', 'str_ali7q', 'ali3d-vase', 'Vase', '[]', 'active', null, '', '2026-08-02T00:00:00.000Z');
+  raw.exec(`UPDATE community_products SET variant_mode = 'variants', material = 'pla', print_technology = 'fdm', color = 'white',
+                   dim_x_mm = 100, dim_y_mm = 100, dim_z_mm = 250, weight_g = 180 WHERE id = 'cp_vase7q'`);
+  raw.exec(`INSERT INTO community_product_options (id, product_id, store_id, name, name_ar, kind, position)
+            VALUES ('og_size7q', 'cp_vase7q', 'str_ali7q', 'Size', 'الحجم', 'choice', 0)`);
+  raw.exec(`INSERT INTO community_product_option_values (id, option_id, product_id, name, name_ar, position)
+            VALUES ('ov_s7q', 'og_size7q', 'cp_vase7q', 'Small', 'صغير', 0),
+                   ('ov_l7q', 'og_size7q', 'cp_vase7q', 'Large', 'كبير', 1),
+                   ('ov_x7q', 'og_size7q', 'cp_vase7q', 'INACTIVE-VARIANT-SECRET', '', 2)`);
+  raw.exec(`INSERT INTO community_product_variants (id, product_id, store_id, value1_id, price_iqd, compare_at_iqd, stock, sku, active, position)
+            VALUES ('pv_s7q', 'cp_vase7q', 'str_ali7q', 'ov_s7q', 15000, NULL, 3, 'VARIANT-SKU-SECRET', 1, 0),
+                   ('pv_l7q', 'cp_vase7q', 'str_ali7q', 'ov_l7q', 22000, 26000, 0, 'VARIANT-SKU-SECRET', 1, 1),
+                   ('pv_x7q', 'cp_vase7q', 'str_ali7q', 'ov_x7q', 1, NULL, 9, 'VARIANT-SKU-SECRET', 0, 2)`);
+  raw.exec(`INSERT INTO merchant_reviews (id, merchant_id, store_id, customer_id, order_id, rating, body, images, merchant_reply, hidden, created_at)
+            VALUES ('mrv_pub7q', 'mch_ali7q', 'str_ali7q', 'usr_leak7q', 'sord_a7q', 5, 'Lovely print.', '["/files/reviews/usr_leak7q/photo.webp"]', 'Thank you!', 0, '2026-08-10T00:00:00.000Z'),
+                   ('mrv_hid7q', 'mch_ali7q', 'str_ali7q', 'usr_other7q', 'sord_b7q', 1, 'HIDDEN-STORE-REVIEW-SECRET', '[]', '', 1, '2026-08-11T00:00:00.000Z')`);
+  raw.exec(`INSERT INTO merchant_services (id, store_id, merchant_id, title, description, kind, price_from_iqd, price_unit, materials, image_key)
+            VALUES ('svc_7q', 'str_ali7q', 'mch_ali7q', 'Custom prints', 'Send a model.', 'print_service', 5000, 'per piece', '["PLA","PETG"]', 'merchants/usr_owner7q/public/service.webp')`);
+  raw.exec(`INSERT INTO merchant_showcase (id, store_id, kind, title, details, image_key, created_at)
+            VALUES ('shw_7q', 'str_ali7q', 'work', 'A finished dragon', 'Painted by hand.', 'merchants/usr_owner7q/public/work.webp', '2026-08-12T00:00:00.000Z'),
+                   ('shw_ban7q', 'str_ban7q', 'work', 'SUSPENDED-SHOP-SECRET', '', 'merchants/usr_ban7q/public/work.webp', '2026-08-13T00:00:00.000Z')`);
+  const req = raw.prepare(
+    `INSERT INTO community_requests (id, customer_id, title, description, status, state, visibility, category, quantity, material,
+                                     governorate, budget_iqd, notes, customer_notes, expires_at, created_at)
+     VALUES (?, 'usr_leak7q', ?, 'A tall vase.', 'open', ?, ?, 'decor', 2, 'PLA', 'baghdad', 40000, 'REQUEST-NOTES-SECRET', 'CUSTOMER-NOTES-SECRET', ?, ?)`
+  );
+  req.run('req_vase7q', 'Print me a vase', 'open', 'public', soon, '2026-08-20T00:00:00.000Z');
+  req.run('req_private7q', 'PRIVATE-REQUEST-SECRET', 'open', 'private', soon, '2026-08-21T00:00:00.000Z');
+  req.run('req_draft7q', 'DRAFT-REQUEST-SECRET', 'draft', 'public', soon, '2026-08-22T00:00:00.000Z');
+  req.run('req_old7q', 'Expired request', 'open', 'public', '2020-01-01T00:00:00.000Z', '2019-12-01T00:00:00.000Z');
+  if (opts.communityOpen) {
+    raw.prepare(`INSERT INTO admin_settings (key, value) VALUES ('communityGate', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(
+      JSON.stringify({ open: true, allowed_user_ids: [] })
+    );
+  }
+
   const env = {
     DB: asD1(raw),
     STORE_ROOT_DOMAIN: APEX,
@@ -163,6 +270,8 @@ function concrete(route: PublicRoute, first: { slug: string }): string[] {
   if (route.path === '/sections/{slug}') return [base.replace('{slug}', 'printers')];
   if (route.path === '/brands/{slug}') return [base.replace('{slug}', 'snapmaker')];
   if (route.path === '/policies/{key}') return [base.replace('{key}', 'returns'), base.replace('{key}', 'privacy')];
+  if (route.path.startsWith('/stores/{slug}')) return [base.replace('{slug}', 'ali3d').replace('{product}', 'ali3d-dragon')];
+  if (route.path === '/community/requests/{reference}') return [base.replace('{reference}', 'req_vase7q')];
   return [];
 }
 
@@ -181,7 +290,8 @@ function scanKeys(value: unknown, path: string, out: string[]) {
 // =========================================================================
 
 test('every endpoint answers, and no answer carries a secret, an internal id or a forbidden key', async () => {
-  const { call, first } = await world();
+  // The community open, so its lists are crawled too.
+  const { call, first } = await world({ communityOpen: true });
   const openapi = (await (await call('/api/public/v1/openapi.json')).json()) as { paths: Record<string, unknown> };
   let crawled = 0;
   for (const route of ALL_ROUTES) {
@@ -193,7 +303,7 @@ test('every endpoint answers, and no answer carries a secret, an internal id or 
       for (const s of SECRETS) assert.ok(!text.includes(s), `${path} leaks «${s}»`);
       // The OpenAPI document and /context describe fields by name; only data is scanned for keys and ids.
       if (route.path === '/openapi.json') continue;
-      const m = INTERNAL_ID.exec(text);
+      const m = INTERNAL_ID.exec(text.replace(MERCHANT_FILE, '/files/merchants/<owner>/$1/'));
       assert.equal(m, null, `${path} carries an internal id: ${m?.[0]}`);
       if (route.path === '/context') continue;
       const bad: string[] = [];
@@ -238,7 +348,7 @@ test('a review is public only once published, with the reviewer masked and no ph
 // =========================================================================
 
 test('every answer matches the schema /openapi.json publishes for it — no field more, none missing', async () => {
-  const { call, first } = await world();
+  const { call, first } = await world({ communityOpen: true });
   const doc = (await (await call('/api/public/v1/openapi.json')).json()) as {
     paths: Record<string, { get: { responses: { '200': { content: { 'application/json': { schema: Record<string, unknown> } } } } } }>;
     components: { schemas: Record<string, Record<string, unknown>> };
@@ -477,4 +587,187 @@ test('robots.txt lets agents fetch the public API while /api/ stays disallowed',
   assert.match(robots, /^Allow: \/api\/public\/v1\/$/m);
   assert.match(robots, /^Disallow: \/api\/$/m);
   assert.ok(robots.indexOf('Allow: /api/public/v1/') < robots.indexOf('Disallow: /api/'));
+});
+
+// =========================================================================
+// LEVO COMMUNITY AND ITS SHOPS
+// =========================================================================
+
+test('the community follows its door: closed to visitors by default (503 COMMUNITY_CLOSED), a shop stays public on its own address', async () => {
+  const { call } = await world();
+  const status = (await (await call('/api/public/v1/community')).json()) as { data: { open: boolean } };
+  assert.equal(status.data.open, false);
+  for (const path of [
+    '/api/public/v1/community/products',
+    '/api/public/v1/community/stores',
+    '/api/public/v1/community/requests',
+    '/api/public/v1/community/requests/req_vase7q',
+    '/api/public/v1/community/works',
+  ]) {
+    const res = await call(path);
+    assert.equal(res.status, 503, path);
+    assert.equal(((await res.json()) as { code: string }).code, 'COMMUNITY_CLOSED', path);
+    assert.equal(res.headers.get('Access-Control-Allow-Origin'), '*', `${path}: the refusal is readable too`);
+  }
+  // «A shop with its own address is not the directory» (worker/lib/communityGate.ts).
+  const shop = await call('/api/public/v1/stores/ali3d');
+  assert.equal(shop.status, 200);
+  const product = await call('/api/public/v1/stores/ali3d/products/ali3d-dragon');
+  assert.equal(product.status, 200);
+  // Once the owner opens it, the lists are served — no deploy.
+  const open = await world({ communityOpen: true });
+  assert.equal(((await (await open.call('/api/public/v1/community')).json()) as { data: { open: boolean } }).data.open, true);
+  assert.equal((await open.call('/api/public/v1/community/products')).status, 200);
+});
+
+test('a shop: its public face only — no phone, no pickup address, only real links, pictures as the site\'s own files', async () => {
+  const { call } = await world();
+  interface Shop {
+    slug: string;
+    logo: { url: string } | null;
+    banner: { url: string } | null;
+    governorate: { code: string; name: { ar: string; en: string } } | null;
+    social_links: Array<{ network: string; url: string }>;
+    delivery: { pickup: { governorate: { code: string } | null } | null; note: string };
+    merchant: { name: string; verified: boolean; rating: number | null };
+    services: Array<{ title: string; materials: string[]; image: { url: string } | null }>;
+    showcase: Array<{ kind: string; title: string }>;
+    url: string;
+  }
+  const shop = ((await (await call('/api/public/v1/stores/ali3d')).json()) as { data: Shop }).data;
+  assert.equal(shop.slug, 'ali3d');
+  assert.equal(shop.url, `https://ali3d.${APEX}`);
+  assert.equal(shop.logo?.url, `${ORIGIN}/files/merchants/usr_owner7q/logos/logo.webp`);
+  assert.equal(shop.banner?.url, `${ORIGIN}/files/merchants/usr_owner7q/covers/banner.webp`);
+  assert.equal(shop.governorate?.code, 'baghdad');
+  assert.equal(shop.governorate?.name.en, 'Baghdad');
+  assert.deepEqual(shop.social_links, [{ network: 'instagram', url: 'https://instagram.com/ali3d' }], 'a javascript: link is never published');
+  assert.deepEqual(shop.delivery.pickup, { governorate: { code: 'baghdad', name: { ar: 'بغداد', en: 'Baghdad', ckb: 'بەغدا' } } });
+  assert.equal(shop.delivery.note, 'Packed with care.');
+  assert.equal(shop.merchant.name, 'Ali Prints');
+  assert.equal(shop.merchant.verified, true);
+  assert.equal(shop.merchant.rating, 4.5);
+  assert.deepEqual(shop.services[0].materials, ['PLA', 'PETG']);
+  assert.equal(shop.services[0].image?.url, `${ORIGIN}/files/merchants/usr_owner7q/public/service.webp`);
+  assert.deepEqual(shop.showcase.map((s) => [s.kind, s.title]), [['work', 'A finished dragon']]);
+});
+
+test('a shop\'s products: published only; availability, never a count; the rounded sales tier; no off-site picture', async () => {
+  const { call } = await world();
+  const list = (await (await call('/api/public/v1/stores/ali3d/products')).json()) as {
+    data: Array<{ slug: string }>;
+    meta: { pagination: { total: number } };
+  };
+  assert.deepEqual(list.data.map((p) => p.slug), ['ali3d-dragon', 'ali3d-vase'], 'drafts, hidden and moderated products are not listed');
+  assert.equal(list.meta.pagination.total, 2);
+  for (const slug of ['ali3d-draft', 'ali3d-hidden', 'ali3d-moderated', 'banned-thing']) {
+    assert.equal((await call(`/api/public/v1/stores/ali3d/products/${slug}`)).status, 404, slug);
+  }
+  const product = ((await (await call('/api/public/v1/stores/ali3d/products/ali3d-dragon')).json()) as {
+    data: {
+      images: Array<{ url: string }>;
+      media: Array<{ kind: string; url: string }>;
+      in_stock: boolean;
+      sales_tier: number | null;
+      price_iqd: number;
+      original_price_iqd: number | null;
+      on_sale: boolean;
+      store: { slug: string };
+      url: string;
+    };
+  }).data;
+  assert.deepEqual(product.images.map((i) => i.url), [`${ORIGIN}/files/merchants/usr_owner7q/public/dragon.webp`]);
+  assert.deepEqual(product.media.map((m) => [m.kind, m.url]), [['image', `${ORIGIN}/files/merchants/usr_owner7q/public/dragon.webp`]]);
+  assert.equal(product.in_stock, true);
+  assert.notEqual(product.sales_tier, 57, 'never the exact sales count');
+  assert.equal(product.price_iqd, 25000);
+  assert.equal(product.original_price_iqd, 30000);
+  assert.equal(product.on_sale, true);
+  assert.equal(product.store.slug, 'ali3d');
+  assert.equal(product.url, `https://ali3d.${APEX}/p/ali3d-dragon`);
+});
+
+test('a suspended shop answers nothing of itself, and appears nowhere in the community', async () => {
+  const { call } = await world({ communityOpen: true });
+  for (const path of ['/api/public/v1/stores/banned-shop', '/api/public/v1/stores/banned-shop/products', '/api/public/v1/stores/banned-shop/reviews']) {
+    const res = await call(path);
+    assert.equal(res.status, 404, path);
+    assert.equal(((await res.json()) as { code: string }).code, 'STORE_UNAVAILABLE', path);
+  }
+  const stores = (await (await call('/api/public/v1/community/stores')).json()) as { data: Array<{ slug: string }> };
+  assert.deepEqual(stores.data.map((s) => s.slug), ['ali3d']);
+  const products = (await (await call('/api/public/v1/community/products')).json()) as { data: Array<{ slug: string; store: { slug: string } }> };
+  assert.deepEqual(products.data.map((p) => [p.store.slug, p.slug]), [['ali3d', 'ali3d-dragon'], ['ali3d', 'ali3d-vase']]);
+  const works = (await (await call('/api/public/v1/community/works')).json()) as { data: Array<{ title: string; store: { slug: string } }> };
+  assert.deepEqual(works.data.map((w) => [w.store.slug, w.title]), [['ali3d', 'A finished dragon']]);
+});
+
+test('a shop\'s reviews: visible ones only, the reviewer masked, photos counted not linked, the merchant\'s reply', async () => {
+  const { call } = await world();
+  const body = (await (await call('/api/public/v1/stores/ali3d/reviews')).json()) as {
+    data: {
+      count: number;
+      average: number | null;
+      distribution: Record<string, number>;
+      reviews: Array<{ reviewer: string; text: string; photo_count: number; merchant_reply: string | null }>;
+    };
+  };
+  assert.equal(body.data.count, 1, 'a review moderation hid is not counted');
+  assert.equal(body.data.average, 5);
+  assert.deepEqual(body.data.distribution, { '1': 0, '2': 0, '3': 0, '4': 0, '5': 1 });
+  assert.deepEqual(body.data.reviews, [
+    {
+      rating: 5,
+      text: 'Lovely print.',
+      reviewer: 'Leaky C.',
+      verified_purchase: true,
+      photo_count: 1,
+      merchant_reply: 'Thank you!',
+      merchant_replied_at: null,
+      created_at: '2026-08-10T00:00:00.000Z',
+    },
+  ]);
+});
+
+test('the request board: only requests on the public board, never the customer, never their notes', async () => {
+  const { call } = await world({ communityOpen: true });
+  const list = (await (await call('/api/public/v1/community/requests')).json()) as {
+    data: Array<{ reference: string; title: string; governorate: { code: string } | null; url: string }>;
+  };
+  assert.deepEqual(list.data.map((r) => r.title), ['Print me a vase'], 'private, draft and expired requests are not on the board');
+  assert.equal(list.data[0].reference, 'req_vase7q');
+  assert.equal(list.data[0].url, `${ORIGIN}/requests?request=req_vase7q`);
+  assert.equal(list.data[0].governorate?.code, 'baghdad');
+  const text = JSON.stringify(list);
+  assert.ok(!/Leaky/.test(text), 'the customer is never named, not even masked');
+  for (const ref of ['req_private7q', 'req_draft7q', 'req_old7q']) {
+    assert.equal((await call(`/api/public/v1/community/requests/${ref}`)).status, 404, ref);
+  }
+  const filtered = (await (await call('/api/public/v1/community/requests?governorate=basra')).json()) as { data: unknown[] };
+  assert.equal(filtered.data.length, 0);
+  const searched = (await (await call('/api/public/v1/community/requests?q=vase')).json()) as { data: unknown[] };
+  assert.equal(searched.data.length, 1);
+});
+
+test('a shop product sold in variants: every live combination with its own price and availability, named by its values', async () => {
+  const { call } = await world();
+  const body = (await (await call('/api/public/v1/stores/ali3d/products/ali3d-vase')).json()) as {
+    data: {
+      options: Array<{ name: { ar: string; en: string }; kind: string; values: Array<{ name: { en: string } }> }>;
+      variants: Array<{ choices: Array<{ option: string; value: string }>; price_iqd: number; compare_at_iqd: number | null; in_stock: boolean }>;
+      attributes: { material: string | null; technology: string | null; color: string | null; dimensions_mm: { x: number | null; y: number | null; z: number | null } | null; weight_g: number | null };
+    };
+  };
+  const { options, variants, attributes } = body.data;
+  assert.deepEqual(options.map((o) => [o.name.en, o.name.ar, o.kind]), [['Size', 'الحجم', 'choice']]);
+  assert.deepEqual(options[0].values.map((v) => v.name.en), ['Small', 'Large'], 'a value no live variant uses is not offered');
+  assert.deepEqual(
+    variants.map((v) => [v.choices.map((c) => `${c.option}=${c.value}`).join(','), v.price_iqd, v.compare_at_iqd, v.in_stock]),
+    [
+      ['Size=Small', 15000, null, true],
+      ['Size=Large', 22000, 26000, false],
+    ],
+    'a switched-off variant is not published'
+  );
+  assert.deepEqual(attributes, { material: 'pla', technology: 'fdm', color: 'white', finish: null, dimensions_mm: { x: 100, y: 100, z: 250 }, weight_g: 180 });
 });

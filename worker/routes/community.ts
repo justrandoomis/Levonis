@@ -180,17 +180,26 @@ communityRoutes.use('*', communityGate());
  */
 const PRODUCT_SEARCH = ['p.name', 'p.name_ar', 'p.description', 'p.description_ar'] as const;
 
+/**
+ * The feed's rows and its visibility rule, shared with the public API
+ * (worker/lib/publicApi/resources/community.ts) so both publish exactly the
+ * same products. `q` is the placeholder holding the `likePattern` term.
+ */
+export const COMMUNITY_PRODUCTS_FROM = `FROM community_products p
+       JOIN community_merchants m ON m.id = p.merchant_id
+       LEFT JOIN merchant_stores s ON s.id = p.store_id`;
+
+export const communityProductsVisible = (q: string) => `p.lifecycle = 'active' AND p.status = 'active'
+        AND m.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
+        AND (${q} = '' OR ${sqlLikeClause(PRODUCT_SEARCH, q)})`;
+
 communityRoutes.get('/products', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 24 });
   const cursor = feedCursor(c.req.query('cursor'));
   const q = likePattern(c.req.query('q'));
   const root = rootDomainFrom(c.env);
-  const from = `FROM community_products p
-       JOIN community_merchants m ON m.id = p.merchant_id
-       LEFT JOIN merchant_stores s ON s.id = p.store_id`;
-  const visible = `p.lifecycle = 'active' AND p.status = 'active'
-        AND m.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
-        AND (?1 = '' OR ${sqlLikeClause(PRODUCT_SEARCH, '?1')})`;
+  const from = COMMUNITY_PRODUCTS_FROM;
+  const visible = communityProductsVisible('?1');
   const [{ results }, total] = await Promise.all([
     c.env.DB.prepare(
       `SELECT p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key
@@ -234,24 +243,31 @@ communityRoutes.get('/products', async (c) => {
  */
 const MERCHANT_SEARCH = ['cm.name', 'cm.bio', 's.name', 's.tagline'] as const;
 
+/** The directory's rows, columns and visibility rule — shared with the public API, like the feed's. */
+export const COMMUNITY_DIRECTORY_FROM = 'FROM community_merchants cm LEFT JOIN merchant_stores s ON s.merchant_id = cm.id';
+
+export const communityDirectoryVisible = (q: string) => `cm.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
+        AND (${q} = '' OR ${sqlLikeClause(MERCHANT_SEARCH, q)})`;
+
+export const COMMUNITY_DIRECTORY_COLUMNS = `cm.*, s.id AS store_id, s.slug AS store_slug, s.status AS store_status,
+              s.name AS store_name, s.tagline AS store_tagline, s.logo_key AS store_logo_key,
+              s.governorate AS store_governorate, s.accepts_custom_requests AS store_custom,
+              (SELECT COUNT(*) FROM follows f WHERE f.merchant_id = cm.id) AS followers,
+              (SELECT COUNT(*) FROM community_products p
+                WHERE p.merchant_id = cm.id AND p.lifecycle = 'active' AND p.status = 'active'
+                  AND (s.id IS NULL OR p.store_id = s.id)) AS product_count`;
+
 communityRoutes.get('/merchants', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 24 });
   const cursor = feedCursor(c.req.query('cursor'));
   const q = likePattern(c.req.query('q'));
   const root = rootDomainFrom(c.env);
   const viewer = c.get('user')?.id ?? '';
-  const from = 'FROM community_merchants cm LEFT JOIN merchant_stores s ON s.merchant_id = cm.id';
-  const visible = `cm.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
-        AND (?1 = '' OR ${sqlLikeClause(MERCHANT_SEARCH, '?1')})`;
+  const from = COMMUNITY_DIRECTORY_FROM;
+  const visible = communityDirectoryVisible('?1');
   const [{ results }, total] = await Promise.all([
     c.env.DB.prepare(
-      `SELECT cm.*, s.id AS store_id, s.slug AS store_slug, s.status AS store_status,
-              s.name AS store_name, s.tagline AS store_tagline, s.logo_key AS store_logo_key,
-              s.governorate AS store_governorate, s.accepts_custom_requests AS store_custom,
-              (SELECT COUNT(*) FROM follows f WHERE f.merchant_id = cm.id) AS followers,
-              (SELECT COUNT(*) FROM community_products p
-                WHERE p.merchant_id = cm.id AND p.lifecycle = 'active' AND p.status = 'active'
-                  AND (s.id IS NULL OR p.store_id = s.id)) AS product_count,
+      `SELECT ${COMMUNITY_DIRECTORY_COLUMNS},
               EXISTS (SELECT 1 FROM follows f WHERE f.merchant_id = cm.id AND f.user_id = ?5) AS viewer_follows
          ${from}
         WHERE ${visible}
@@ -311,13 +327,20 @@ communityRoutes.get('/merchants', async (c) => {
  */
 const REQUEST_SEARCH = ['r.title', 'r.description'] as const;
 
+/**
+ * On the public board: published, still taking offers, public, not expired —
+ * shared with the public API. `now` and `q` are the placeholders holding the
+ * current ISO time and the `likePattern` term.
+ */
+export const requestBoardVisible = (now: string, q: string) => `r.state IN ('open','receiving_offers') AND r.visibility = 'public'
+        AND (r.expires_at IS NULL OR r.expires_at > ${now})
+        AND (${q} = '' OR ${sqlLikeClause(REQUEST_SEARCH, q)})`;
+
 communityRoutes.get('/requests', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 20 });
   const cursor = feedCursor(c.req.query('cursor'));
   const q = likePattern(c.req.query('q'));
-  const visible = `r.state IN ('open','receiving_offers') AND r.visibility = 'public'
-        AND (r.expires_at IS NULL OR r.expires_at > ?1)
-        AND (?2 = '' OR ${sqlLikeClause(REQUEST_SEARCH, '?2')})`;
+  const visible = requestBoardVisible('?1', '?2');
   const now = new Date().toISOString();
   const [{ results }, total] = await Promise.all([
     c.env.DB.prepare(
@@ -352,10 +375,8 @@ communityRoutes.get('/requests', async (c) => {
  * about any shop. At most three per store, so one prolific workshop cannot be
  * the whole rail; only works with a picture; nothing of a sanctioned shop.
  */
-communityRoutes.get('/works', async (c) => {
-  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 24, def: 12 });
-  const root = rootDomainFrom(c.env);
-  const { results } = await c.env.DB.prepare(
+export async function communityWorks(db: D1Database, limit: number): Promise<Array<Record<string, unknown>>> {
+  const { results } = await db.prepare(
     `SELECT * FROM (
        SELECT w.id, w.title, w.details, w.image_key, w.created_at,
               s.id AS store_id, s.slug AS store_slug, s.name AS store_name, s.logo_key AS store_logo_key,
@@ -368,6 +389,13 @@ communityRoutes.get('/works', async (c) => {
      ) WHERE nth <= 3
      ORDER BY created_at DESC, id DESC LIMIT ?1`
   ).bind(limit).all<Record<string, unknown>>();
+  return results;
+}
+
+communityRoutes.get('/works', async (c) => {
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 24, def: 12 });
+  const root = rootDomainFrom(c.env);
+  const results = await communityWorks(c.env.DB, limit);
   return c.json({
     success: true,
     works: results.map((w) => ({

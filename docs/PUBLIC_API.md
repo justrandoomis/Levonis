@@ -32,11 +32,22 @@ Owner's request (2026-09-28): «Public Read-Only API متكامل لموقع Lev
 | `/faq` | The FAQ split into topics and questions |
 | `/media` | Logo, hero slides, editorial banners, home-page pictures, brand logos, service pictures |
 | `/memberships` | Membership plans, prices and benefits |
+| `/community` | Whether Levo Community is open to visitors, and where its lists are (always answers) |
+| `/community/products` | Products the community's shops publish, with the shop that sells each: `q`, `limit`, `cursor` |
+| `/community/stores` | The shop directory with each shop's trust signals: `q`, `limit`, `cursor` |
+| `/community/requests`, `/community/requests/{reference}` | The public board of custom print requests: `q`, `category`, `governorate`, `limit`, `cursor` |
+| `/community/works` | Finished work from the shops' workshops |
+| `/stores/{slug}` | One shop: profile, delivery areas and fees, services, workshop, shelves, stats |
+| `/stores/{slug}/products`, `/stores/{slug}/products/{product}` | A shop's published products; one product with its options, variants, every picture and video, print details |
+| `/stores/{slug}/reviews` | A shop's reviews, rating distribution, the merchant's replies |
 
 Every answer except `/`, `/context` and `/openapi.json` is
 `{ "data", "meta": { "version", "pagination" }, "links": { "self", "next", "web" } }`.
 Texts are `{ "ar", "en", "ckb" }`; prices are whole IQD; items are identified
-by slug and carry `url` (website) and `api_url`.
+by slug and carry `url` (website) and `api_url`. A shop's slug is the first
+label of its address (`<slug>.levonis-iq.com`); a print request is identified
+by the reference in its web address (`/requests?request=<reference>`) — the
+only handle the site's own board uses.
 
 ## Rules (and where each is enforced)
 
@@ -58,18 +69,45 @@ by slug and carry `url` (website) and `api_url`.
   settings (e.g. the bank details of wallet top-up methods), drafts, hidden
   products, inactive sections, pending reviews, moderation notes, benefit-rule
   ids. Review photos are counted but not linked: their storage keys embed the
-  reviewer's account id.
+  reviewer's account id. In the community: a shop's contact phone (even when
+  the merchant published it on the shop's page — the API is not a phone
+  directory), its pickup note (it can be a street address), the merchant
+  account's phone, governorate and sanction reasons, draft, merchant-hidden and
+  moderator-hidden shop products, SKUs and stock counts (availability only;
+  sales as the page's rounded tier), hidden shop reviews, and, on the request
+  board, the customer (not even masked), their private notes and their notes
+  to merchants, and any request that is private, a draft or expired.
 - **The same data the site shows.** The API calls the storefront's own
   functions — `listCatalogProducts`, `catalogProductDetail`
   (worker/routes/products.ts), `buildCatalogTree` (catalog.ts), `listBundles`
-  (bundles.ts) — rather than re-implementing listing, search or pricing.
+  (bundles.ts); for shops `servableStoreBySlug`, `publicStore`, `storeStats`,
+  `storeCollections`, `storeServices`, `storeShowcase`, `publishedStoreProduct`
+  and `storeReviewSummary` (storefront.ts) with `publicProductExtras`; for the
+  community the routes' own visibility rules (`communityProductsVisible`,
+  `communityDirectoryVisible`, `requestBoardVisible`, `communityWorks` in
+  community.ts) — rather than re-implementing listing, search or pricing.
 - **Offers:** only a live offer that applies to a visitor (or is shown as
   members-only) is published; an offer the admin switched off never is.
 - **Members-only bundles:** listed with name and picture but no price, as the
   site shows them to a visitor.
-- **Community:** the stores directory and requests board follow the community
-  gate — while it is closed (the default), they are not public
-  (`/site.community_open`, `/context.content.community_open_to_visitors`).
+- **Community:** everything under `/community/*` follows the community's door
+  (worker/lib/communityGate.ts). While it is closed to visitors — the default;
+  the allow-list and the admin door are for signed-in people, and this API
+  never has one — those endpoints answer the site's own refusal, **503
+  `COMMUNITY_CLOSED`**, and they start serving when the owner opens it, with no
+  deploy. `/community` always answers and says which (`open`); so do
+  `/site.community_open` and `/context.content.community_open_to_visitors`.
+- **Shops are public on their own address.** `/stores/{slug}/*` answers whether
+  or not the community is open, because a shop's own site
+  (`<slug>.levonis-iq.com`) is outside the wall — «A shop with its own address
+  is not the directory». Finding shops (the directory) is inside it. A shop
+  Levonis suspended answers 404 `STORE_UNAVAILABLE` and appears in no list.
+- **Merchant pictures** are published only as files the site serves to anyone
+  (`/files/merchants/<owner>/public/…`, `/logos/…`, `/covers/…`), never an
+  external address a merchant typed. That storage key names the owning
+  merchant's account id — exactly as on the shop's own pages. The API does not
+  rename the site's files; changing that is a storage-key change (keying
+  merchant uploads by store), not an API change.
 - **Caching:** answers are edge-cached per colo under their canonical URL
   (origin + path + declared parameters, sorted), with `Cache-Control: public,
   max-age≤60, s-maxage=<route>` and a weak ETag (`If-None-Match` → 304).
@@ -86,4 +124,6 @@ Add a `PublicRoute` to a resource list in `worker/lib/publicApi/resources/`
 and `/context` pick it up; `tests/publicApi.test.ts` crawls it, scans it for
 leaks and validates it against its schema.
 
-Tests: `tests/publicApi.test.ts`.
+Tests: `tests/publicApi.test.ts` (24): the leak crawl runs with the community
+open, over a shop seeded with a secret in every private place and a
+suspended shop beside it.

@@ -7,9 +7,11 @@
  */
 import { COMMON_COMPONENTS } from './common';
 import { CATALOG_COMPONENTS, CATALOG_ROUTES } from './resources/catalog';
+import { COMMUNITY_COMPONENTS, COMMUNITY_ROUTES } from './resources/community';
 import { PRODUCT_COMPONENTS, PRODUCT_ROUTES } from './resources/products';
 import { SHOP_COMPONENTS, SHOP_ROUTES } from './resources/shop';
 import { SITE_COMPONENTS, SITE_ROUTES } from './resources/site';
+import { STORE_COMPONENTS, STORE_ROUTES } from './resources/stores';
 import type { JsonSchema } from './schema';
 import type { PublicRoute } from './types';
 
@@ -20,6 +22,8 @@ export const RESOURCE_ROUTES: readonly PublicRoute[] = [
   ...CATALOG_ROUTES,
   ...PRODUCT_ROUTES,
   ...SHOP_ROUTES.filter((r) => r.path !== '/home'),
+  ...COMMUNITY_ROUTES,
+  ...STORE_ROUTES,
   ...SITE_ROUTES.filter((r) => r.tag !== 'Site'),
 ];
 
@@ -29,4 +33,6 @@ export const RESOURCE_COMPONENTS: Record<string, JsonSchema> = {
   ...PRODUCT_COMPONENTS,
   ...SHOP_COMPONENTS,
   ...SITE_COMPONENTS,
+  ...STORE_COMPONENTS,
+  ...COMMUNITY_COMPONENTS,
 };

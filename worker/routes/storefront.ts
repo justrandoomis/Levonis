@@ -51,8 +51,12 @@ import { normalizeGovernorate } from '../lib/iraqGovernorates';
 
 export const storefrontRoutes = new Hono<AppContext>();
 
-/** The shopfront view. Deliberately smaller than the merchant's own view. */
-async function publicStore(db: D1Database, ctx: StoreContext, rootDomain: string | null, viewerId: string | null = null) {
+/**
+ * The shopfront view. Deliberately smaller than the merchant's own view.
+ * Also read by the public API (worker/lib/publicApi/resources/stores.ts),
+ * which rebuilds its own answer field by field from this one.
+ */
+export async function publicStore(db: D1Database, ctx: StoreContext, rootDomain: string | null, viewerId: string | null = null) {
   const { store: s, merchant: m } = ctx;
   // The store's delivery (W2-A) and — for a signed-in visitor with a saved
   // address — what delivery to THEIR governorate costs, read together.
@@ -132,7 +136,7 @@ async function publicStore(db: D1Database, ctx: StoreContext, rootDomain: string
   };
 }
 
-function publicProduct(p: Record<string, unknown>) {
+export function publicProduct(p: Record<string, unknown>) {
   return {
     id: p.id,
     slug: p.slug,
@@ -180,7 +184,7 @@ async function followerCount(db: D1Database, merchantId: string): Promise<number
  * products, and the share of visible reviews at 4★+. `positive_pct` is null
  * with no reviews — a store with none says "new", never a fabricated 100%.
  */
-async function storeStats(db: D1Database, ctx: StoreContext) {
+export async function storeStats(db: D1Database, ctx: StoreContext) {
   const [followers, products, positive, deals] = await Promise.all([
     followerCount(db, String(ctx.merchant.id)),
     db.prepare(
@@ -261,8 +265,12 @@ async function storeForRetiredSlug(db: D1Database, slug: string): Promise<StoreC
  * any cached call keep working), and never a sanctioned one.
  */
 async function servableStore(c: Context<AppContext>, rawSlug: string | undefined): Promise<StoreContext> {
-  const slug = str(rawSlug, 'slug', { min: 1, max: 64 });
-  const ctx = (await storeBySlug(c.env.DB, slug)) ?? (await storeForRetiredSlug(c.env.DB, slug));
+  return servableStoreBySlug(c.env.DB, str(rawSlug, 'slug', { min: 1, max: 64 }));
+}
+
+/** The same rule for a caller that already validated the slug (the public API). */
+export async function servableStoreBySlug(db: D1Database, slug: string): Promise<StoreContext> {
+  const ctx = (await storeBySlug(db, slug)) ?? (await storeForRetiredSlug(db, slug));
   if (!ctx) throw notFound('Store not found');
   if (storeIsSuspended(ctx)) throw storeUnavailable();
   return ctx;
@@ -408,12 +416,11 @@ storefrontRoutes.get('/:slug/delivery', async (c) => {
  * and only sections that actually hold a published product — an empty shelf
  * is the merchant's business, not the visitor's.
  */
-async function publicCollections(c: Context<AppContext>) {
-  const ctx = await servableStore(c, c.req.param('slug'));
+export async function storeCollections(db: D1Database, storeId: string): Promise<Array<Record<string, unknown>>> {
   // COLLECTIONS (W2-F): the store's «sections» — manual ones count their
   // published members, computed ones the published products their rule picks.
   // (A database before 0126 answers with the pre-0126 shelf count.)
-  const { results } = await c.env.DB.prepare(
+  const { results } = await db.prepare(
     `SELECT s.id, s.name, s.name_ar, s.kind, s.image_key, s.sort_order,
             CASE s.kind
               WHEN 'manual' THEN (SELECT COUNT(*) FROM merchant_collection_products m JOIN community_products p ON p.id = m.product_id
@@ -428,18 +435,22 @@ async function publicCollections(c: Context<AppContext>) {
        FROM merchant_store_sections s
       WHERE s.store_id = ?1 AND s.active = 1
       ORDER BY s.sort_order, s.created_at`
-  ).bind(ctx.store.id, sinceNewArrivals()).all<Record<string, unknown>>().catch(async (e: unknown) => {
+  ).bind(storeId, sinceNewArrivals()).all<Record<string, unknown>>().catch(async (e: unknown) => {
     if (!isSchemaMissing(e)) throw e;
-    return c.env.DB.prepare(
+    return db.prepare(
       `SELECT s.id, s.name, s.name_ar, 'manual' AS kind, NULL AS image_key, s.sort_order,
               (SELECT COUNT(*) FROM community_products p
                 WHERE p.section_id = s.id AND p.lifecycle = 'active' AND p.status = 'active') AS product_count
          FROM merchant_store_sections s WHERE s.store_id = ? AND s.active = 1 ORDER BY s.sort_order, s.created_at`
-    ).bind(ctx.store.id).all<Record<string, unknown>>();
+    ).bind(storeId).all<Record<string, unknown>>();
   });
   // An empty shelf is the merchant's business, not the visitor's.
-  const list = results
-    .filter((s) => Number(s.product_count) > 0)
+  return results.filter((s) => Number(s.product_count) > 0);
+}
+
+async function publicCollections(c: Context<AppContext>) {
+  const ctx = await servableStore(c, c.req.param('slug'));
+  const list = (await storeCollections(c.env.DB, ctx.store.id))
     .map((s) => ({
       id: s.id,
       name: s.name,
@@ -457,13 +468,18 @@ async function publicCollections(c: Context<AppContext>) {
 storefrontRoutes.get('/:slug/sections', publicCollections);
 
 /** The services this shop advertises. Prices here are honest floors, not quotes. */
-storefrontRoutes.get('/:slug/services', async (c) => {
-  const ctx = await servableStore(c, c.req.param('slug'));
-  const { results } = await c.env.DB.prepare(
+export async function storeServices(db: D1Database, storeId: string): Promise<Array<Record<string, unknown>>> {
+  const { results } = await db.prepare(
     `SELECT id, title, description, kind, price_from_iqd, price_unit, materials, image_key
        FROM merchant_services WHERE store_id = ? AND active = 1
       ORDER BY sort_order, created_at LIMIT 40`
-  ).bind(ctx.store.id).all<Record<string, unknown>>();
+  ).bind(storeId).all<Record<string, unknown>>();
+  return results;
+}
+
+storefrontRoutes.get('/:slug/services', async (c) => {
+  const ctx = await servableStore(c, c.req.param('slug'));
+  const results = await storeServices(c.env.DB, ctx.store.id);
   return c.json({
     success: true,
     services: results.map((s) => ({
@@ -480,13 +496,18 @@ storefrontRoutes.get('/:slug/services', async (c) => {
 });
 
 /** Printers, materials and finished works — the workshop on display. */
-storefrontRoutes.get('/:slug/showcase', async (c) => {
-  const ctx = await servableStore(c, c.req.param('slug'));
-  const { results } = await c.env.DB.prepare(
+export async function storeShowcase(db: D1Database, storeId: string): Promise<Array<Record<string, unknown>>> {
+  const { results } = await db.prepare(
     `SELECT id, kind, title, details, image_key
        FROM merchant_showcase WHERE store_id = ? AND active = 1
       ORDER BY kind, sort_order, created_at LIMIT 60`
-  ).bind(ctx.store.id).all<Record<string, unknown>>();
+  ).bind(storeId).all<Record<string, unknown>>();
+  return results;
+}
+
+storefrontRoutes.get('/:slug/showcase', async (c) => {
+  const ctx = await servableStore(c, c.req.param('slug'));
+  const results = await storeShowcase(c.env.DB, ctx.store.id);
   return c.json({
     success: true,
     items: results.map((s) => ({
@@ -568,15 +589,22 @@ storefrontRoutes.get('/:slug/products', async (c) => {
   });
 });
 
+/**
+ * One PUBLISHED product of this store, by slug. Scoped to the store as well
+ * as the product slug: a product id from another shop cannot be rendered
+ * inside this one's storefront.
+ */
+export async function publishedStoreProduct(db: D1Database, storeId: string, productSlug: string) {
+  return db.prepare(
+    `SELECT * FROM community_products
+      WHERE store_id = ? AND slug = ? AND lifecycle = 'active' AND status = 'active'`
+  ).bind(storeId, productSlug).first<Record<string, unknown>>();
+}
+
 storefrontRoutes.get('/:slug/products/:productSlug', async (c) => {
   const ctx = await servableStore(c, c.req.param('slug'));
 
-  // Scoped to the store as well as the product slug: a product id from
-  // another shop cannot be rendered inside this one's storefront.
-  const p = await c.env.DB.prepare(
-    `SELECT * FROM community_products
-      WHERE store_id = ? AND slug = ? AND lifecycle = 'active' AND status = 'active'`
-  ).bind(ctx.store.id, c.req.param('productSlug')).first<Record<string, unknown>>();
+  const p = await publishedStoreProduct(c.env.DB, ctx.store.id, c.req.param('productSlug') ?? '');
   if (!p) throw notFound('Product not found');
 
   // No view is counted here any more (audit 01 B22): a GET is a request, not a
@@ -596,6 +624,29 @@ storefrontRoutes.get('/:slug/products/:productSlug', async (c) => {
   return c.json({ success: true, product: { ...publicProduct(p), ...extras }, store: { ...store, layout_theme } });
 });
 
+/**
+ * The distribution, computed from the rows rather than read from a cached
+ * column (§40). A cached aggregate that drifts is worse than none: it makes a
+ * store look better or worse than its actual reviews. Visible reviews only —
+ * `hidden` is the admin's moderation.
+ */
+export async function storeReviewSummary(db: D1Database, merchantId: string) {
+  const dist = await db.prepare(
+    `SELECT rating, COUNT(*) AS n FROM merchant_reviews
+      WHERE merchant_id = ? AND hidden = 0 GROUP BY rating`
+  ).bind(merchantId).all<{ rating: number; n: number }>();
+
+  const distribution: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
+  let total = 0;
+  let sum = 0;
+  for (const row of dist.results) {
+    distribution[String(row.rating)] = row.n;
+    total += row.n;
+    sum += row.rating * row.n;
+  }
+  return { average: total ? Math.round((sum / total) * 100) / 100 : null, count: total, distribution };
+}
+
 storefrontRoutes.get('/:slug/reviews', async (c) => {
   const ctx = await servableStore(c, c.req.param('slug'));
 
@@ -612,27 +663,12 @@ storefrontRoutes.get('/:slug/reviews', async (c) => {
       ORDER BY r.created_at DESC, r.id DESC LIMIT ?4`
   ).bind(ctx.merchant.id, cursor.at, cursor.id, limit).all<Record<string, unknown>>();
 
-  // The distribution, computed from the rows rather than read from a cached
-  // column (§40). A cached aggregate that drifts is worse than none: it makes
-  // a store look better or worse than its actual reviews.
-  const dist = await c.env.DB.prepare(
-    `SELECT rating, COUNT(*) AS n FROM merchant_reviews
-      WHERE merchant_id = ? AND hidden = 0 GROUP BY rating`
-  ).bind(ctx.merchant.id).all<{ rating: number; n: number }>();
-
-  const distribution: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
-  let total = 0;
-  let sum = 0;
-  for (const row of dist.results) {
-    distribution[String(row.rating)] = row.n;
-    total += row.n;
-    sum += row.rating * row.n;
-  }
+  const { average, count, distribution } = await storeReviewSummary(c.env.DB, String(ctx.merchant.id));
 
   return c.json({
     success: true,
-    average: total ? Math.round((sum / total) * 100) / 100 : null,
-    count: total,
+    average,
+    count,
     distribution,
     reviews: results.map((r) => ({
       id: r.id,
