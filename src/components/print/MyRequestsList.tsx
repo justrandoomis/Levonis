@@ -34,6 +34,7 @@ import { asLang } from '../orders/format';
 import ConfirmSheet from './ConfirmSheet';
 import { requestStateLabel } from '../community/requests/requestStates';
 import { CommunityLoadError } from '../../pages/community/access';
+import { offersLabel } from '../community/hub/copy';
 
 const CONFIDENCE_TEXT: Record<Confidence, [string, string]> = {
   high: ['دقة عالية', 'High confidence'],
@@ -223,7 +224,7 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
                       </span>
                     )}
                     <span className="ms-auto text-gold/80 font-semibold">
-                      {loc(`${r.offer_count} عرض`, `${r.offer_count} offers`, `${r.offer_count} ئۆفەر`)}
+                      {offersLabel(r.offer_count, lang)}
                     </span>
                   </div>
 

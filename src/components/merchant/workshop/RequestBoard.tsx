@@ -24,6 +24,7 @@ import { Skeleton } from '../../ui/Skeleton';
 import { Money } from '../../ui/Money';
 import { GOVERNORATES } from '../../../lib/governorates';
 import { formatFigure } from '../../../lib/localeNumber';
+import { offersLabel } from '../../community/hub/copy';
 import { iqdUnit } from '../../../lib/money';
 import { workshopApi, type BoardFilters, type BoardRequest } from './api';
 
@@ -266,7 +267,7 @@ export default function RequestBoard({
                           </StatusChip>
                         )}
                         <span className="whitespace-nowrap tabular-nums text-text-muted">
-                          {loc(`${formatFigure(r.offer_count, lang)} عرض`, `${formatFigure(r.offer_count, lang)} ${r.offer_count === 1 ? 'offer' : 'offers'}`)}
+                          {offersLabel(r.offer_count, lang, (n) => formatFigure(n, lang))}
                         </span>
                       </span>
                     </span>

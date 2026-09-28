@@ -84,3 +84,16 @@ test('the page: a search box that keeps the keyboard, «المزيد» that says
   assert.match(board, /WHERE \$\{requestBoardVisible\('\?1', '\?2'\)\}/, 'the community page\'s own rule');
   assert.match(board, /ORDER BY r\.created_at DESC, r\.id DESC LIMIT \?7/);
 });
+
+test('every offer count on the request screens is a counted phrase — the workshop board in its own digits', async () => {
+  const { offersLabel } = await import('../src/components/community/hub/copy');
+  assert.deepEqual([0, 1, 2, 5, 12, 100].map((n) => offersLabel(n, 'ar')), ['لا عروض بعد', 'عرض واحد', 'عرضان', '5 عروض', '12 عرضًا', '100 عرض']);
+  assert.equal(offersLabel(5, 'ar', (n) => `<${n}>`), '<5> عروض', 'a screen with its own digits passes its formatter');
+  assert.equal(offersLabel(3, 'ckb', (n) => `<${n}>`), '<3> ئۆفەر', 'Sorani keeps its hand-written word');
+  assert.equal(offersLabel(1, 'en'), '1 offer');
+  assert.match(code('src/components/print/MyRequestsList.tsx'), /\{offersLabel\(r\.offer_count, lang\)\}/);
+  assert.match(code('src/components/merchant/workshop/RequestBoard.tsx'), /\{offersLabel\(r\.offer_count, lang, \(n\) => formatFigure\(n, lang\)\)\}/);
+  for (const f of ['src/pages/Requests.tsx', 'src/components/print/MyRequestsList.tsx', 'src/components/merchant/workshop/RequestBoard.tsx']) {
+    assert.doesNotMatch(code(f), /\} عرض`/, `${f}: «5 عرض»`);
+  }
+});

@@ -1402,7 +1402,7 @@ export function RunningCommunityOrders() {
  * board here.
  */
 function PendingOffersWhileClosed() {
-  const { loc } = useLanguage();
+  const { lang } = useLanguage();
   const [rows, setRows] = useState<RequestRow[]>([]);
   const [open, setOpen] = useState<RequestRow | null>(null);
   useEffect(() => {
@@ -1431,7 +1431,7 @@ function PendingOffersWhileClosed() {
           <div className="flex items-start justify-between gap-3">
             <h3 className="text-white font-semibold text-[14px] leading-snug">{r.title}</h3>
             <span className="shrink-0 text-gold/80 font-semibold text-[11.5px]">
-              {loc(`${r.offer_count} عرض`, `${r.offer_count} offers`, `${r.offer_count} ئۆفەر`)}
+              {offersLabel(r.offer_count, lang)}
             </span>
           </div>
         </button>

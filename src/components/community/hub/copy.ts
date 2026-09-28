@@ -26,15 +26,16 @@ interface Forms {
   enN: string;
 }
 
-function counted(n: number, f: Forms, lang: HubLang): string {
+/** `show` writes the number (a screen with its own digits passes its formatter). */
+function counted(n: number, f: Forms, lang: HubLang, show: (n: number) => string = String): string {
   const count = Math.max(0, Math.floor(n));
-  if (lang === 'en') return `${count} ${count === 1 ? f.en1 : f.enN}`;
+  if (lang === 'en') return `${show(count)} ${count === 1 ? f.en1 : f.enN}`;
   if (count === 1) return f.one;
   if (count === 2) return f.two;
   const r = count % 100;
-  if (r >= 3 && r <= 10) return `${count} ${f.few}`;
-  if (r >= 11 && r <= 99) return `${count} ${f.many}`;
-  return `${count} ${f.hundred}`;
+  if (r >= 3 && r <= 10) return `${show(count)} ${f.few}`;
+  if (r >= 11 && r <= 99) return `${show(count)} ${f.many}`;
+  return `${show(count)} ${f.hundred}`;
 }
 
 const FOLLOWERS: Forms = {
@@ -94,11 +95,11 @@ export const completedLabel = (n: number, lang: HubLang) => counted(n, COMPLETED
 export const productsLabel = (n: number, lang: HubLang) => countNoun(n, 'product', lang);
 
 /** «لا عروض بعد», «عرض واحد», «عرضان», «3 عروض», «12 عرضًا». */
-export function offersLabel(n: number, lang: HubLang): string {
+export function offersLabel(n: number, lang: HubLang, show: (n: number) => string = String): string {
   const count = Math.max(0, Math.floor(n));
-  if (lang === 'ckb') return `${count} ئۆفەر`;
+  if (lang === 'ckb') return `${show(count)} ئۆفەر`;
   if (count === 0) return lang === 'en' ? 'No offers yet' : 'لا عروض بعد';
-  return counted(count, OFFERS, lang);
+  return counted(count, OFFERS, lang, show);
 }
 
 const UNITS: ReadonlyArray<[Intl.RelativeTimeFormatUnit, number]> = [

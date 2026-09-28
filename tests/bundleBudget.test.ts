@@ -295,7 +295,10 @@ test('the split really happened: every page and panel §10 names has a chunk of 
  * LEVO COMMUNITY (2026-09-28): the history-aware Back and the follow pill's
  * reset of the community page's remembered lists (a cache module of its own,
  * not the feed hook) took it to 47.1; the suspended-store page, which only a
- * sanctioned shop's visitor ever sees, became a lazy chunk (-0.8). 46.5 KB.
+ * sanctioned shop's visitor ever sees, became a lazy chunk (-0.8). 46.5 KB;
+ * then 47.0 with the product page's lazy save/share row and the follower
+ * count that moves with a follow. AT THE BUDGET: the next addition to a store
+ * page makes something else lazy, or argues for a new number here.
  */
 const STOREFRONT_BUDGET = 47 * KB;
 

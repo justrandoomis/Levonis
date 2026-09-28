@@ -514,7 +514,8 @@ function LiveServiceDoors({ accepts }: { accepts: boolean }) {
         </p>
       )}
       {quotes && (
-        <p className="text-zinc-600 text-[10.5px] text-center">
+        // zinc-500: at zinc-600 this 10.5px line sat exactly on the 4.5:1 line (W6 sweep).
+        <p className="text-zinc-500 text-[10.5px] text-center">
           {loc(
             'عروض الأسعار تمر عبر منصة Levonis والمبلغ يبقى محجوزًا حتى استلامك.',
             'Quotes go through Levonis and your money stays held until you receive the work.',
