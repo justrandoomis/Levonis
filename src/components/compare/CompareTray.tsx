@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Plus, Scale, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { isBottomNavHidden } from '../BottomNav';
+import { useBottomNavSuppressed } from '../../lib/bottomNavSuppress';
 import { Toaster, useToast } from '../ui/Toast';
 import { useConfirm } from '../ui/ConfirmDialog';
 import {
@@ -44,13 +45,14 @@ import { traySubline, trayTitle } from './trayStrings';
 export default function CompareTray() {
   const { loc, lang } = useLanguage();
   const location = useLocation();
+  const navSuppressed = useBottomNavSuppressed();
   const toast = useToast();
   const [confirm, confirmDialog] = useConfirm();
   const state = useSyncExternalStore(compareTray.subscribe, compareTray.getSnapshot, compareTray.getSnapshot);
   const notice = useSyncExternalStore(compareTray.subscribeNotice, compareTray.getNotice, compareTray.getNotice);
   const count = state.items.length;
   const visible = count > 0 && trayVisibleOn(location.pathname);
-  const navHidden = isBottomNavHidden(location.pathname);
+  const navHidden = isBottomNavHidden(location.pathname) || navSuppressed;
   const onAdmin = location.pathname.toLowerCase().startsWith('/admin');
 
   // ------------------------------------------------------- fold after 4 s

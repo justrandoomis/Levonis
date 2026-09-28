@@ -25,6 +25,7 @@
 
 import { Suspense, createContext, lazy, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useGoBack } from '../lib/useGoBack';
 import { ArrowLeft, Check, Hammer, Link2, Loader2, MessageCircle, MessageCircleMore, MoreHorizontal, PackageX } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
@@ -374,13 +375,25 @@ function LiveBack() {
   const { onHost, backTo } = useLive();
   const { loc } = useLanguage();
   const MAIN_SITE = useMainSite();
+  // A visitor who came from the board, a search or a request returns there;
+  // one who arrived by the store's link goes to `backTo` (review of Levo
+  // Community — it always went to `backTo`, losing the page they came from).
+  const goBack = useGoBack(backTo);
   const cls = 'relative lv-hit w-9 h-9 rounded-full flex items-center justify-center text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
   return onHost ? (
     <a href={`${MAIN_SITE}${backTo}`} className={cls} aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}>
       <ArrowLeft className="w-5 h-5" strokeWidth={2} />
     </a>
   ) : (
-    <Link to={backTo} className={cls} aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}>
+    <Link
+      to={backTo}
+      className={cls}
+      aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
+      onClick={(e) => {
+        e.preventDefault();
+        goBack();
+      }}
+    >
       <ArrowLeft className="w-5 h-5" strokeWidth={2} />
     </Link>
   );
@@ -565,6 +578,7 @@ function FollowButton({
 }) {
   const [following, setFollowing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   // Hydrated from the server: a visitor who already follows this shop must
   // see "Following", not a button that lies until it is pressed.
@@ -587,6 +601,7 @@ function FollowButton({
       return;
     }
     setBusy(true);
+    setError('');
     try {
       if (following) {
         await api.delete(`/api/community-reviews/follow/${merchantId}`);
@@ -596,13 +611,23 @@ function FollowButton({
         setFollowing(true);
       }
     } catch (e) {
-      if (!(e instanceof ApiError)) throw e;
+      // Said, not swallowed: the pill used to stay as it was with no word.
+      // OWNER: Sorani to be written by hand.
+      const code = e instanceof ApiError ? e.code : '';
+      setError(
+        code === 'CANNOT_FOLLOW_OWN_STORE'
+          ? loc('هذا متجرك — لا تحتاج إلى متابعته.', 'This is your store — no need to follow it.')
+          : code === 'RATE_LIMITED'
+            ? loc('محاولات كثيرة — انتظر قليلًا.', 'Too many tries — wait a moment.')
+            : loc('تعذّرت المتابعة — حاول مجددًا.', 'Could not update the follow — try again.')
+      );
     } finally {
       setBusy(false);
     }
   }
 
   return (
+    <>
     <button
       onClick={toggle}
       disabled={busy || closed}
@@ -613,6 +638,12 @@ function FollowButton({
       {following ? <Check className="w-3.5 h-3.5" strokeWidth={1.75} /> : null}
       {following ? loc('تتابعه', 'Following', 'شوێنی کەوتوویت') : loc('تابع', 'Follow', 'شوێنکەوتن')}
     </button>
+    {error && (
+      <p role="alert" className="mt-1 text-center text-[11px] leading-snug text-red-300" data-follow-error>
+        {error}
+      </p>
+    )}
+    </>
   );
 }
 

@@ -32,7 +32,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Wrench } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import { ErrorState } from '../../components/ui/AsyncStates';
@@ -177,6 +177,17 @@ export function CommunityClosedCard({ onRecheck }: { onRecheck?: () => void } = 
       </div>
     </div>
   );
+}
+
+/**
+ * A community read that failed: the maintenance card when the community has
+ * just been closed to this viewer (503 COMMUNITY_CLOSED — it used to read as
+ * «server error», or as an empty list), otherwise the usual failure with a
+ * retry. Never an empty state: nothing was learned about what is there.
+ */
+export function CommunityLoadError({ error, onRetry, compact = false }: { error: unknown; onRetry?: () => void; compact?: boolean }) {
+  if (error instanceof ApiError && error.code === 'COMMUNITY_CLOSED') return <CommunityClosedCard onRecheck={onRetry} />;
+  return <ErrorState error={error} onRetry={onRetry} compact={compact} />;
 }
 
 /**

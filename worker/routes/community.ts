@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, notFound, forbidden, str, int, HttpError } from '../lib/http';
+import { requireAuth, badRequest, notFound, forbidden, str, int, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { getTierStatus, benefits, membershipBadges } from '../lib/entitlements';
@@ -504,10 +504,14 @@ communityRoutes.get('/store/:id', async (c) => {
 });
 
 communityRoutes.post('/store/:id/follow', requireAuth, async (c) => {
+  await rateLimit(c, 'follow', 60, 3600);
   const user = c.get('user')!;
   const id = c.req.param('id');
-  const merchant = await c.env.DB.prepare('SELECT id FROM community_merchants WHERE id = ?').bind(id).first();
-  if (!merchant) throw notFound('Store not found');
+  const merchant = await c.env.DB.prepare('SELECT id, user_id, status FROM community_merchants WHERE id = ?')
+    .bind(id)
+    .first<{ id: string; user_id: string; status: string }>();
+  if (!merchant || merchant.status === 'suspended') throw notFound('Store not found');
+  if (merchant.user_id === user.id) throw badRequest('You cannot follow your own store', 'CANNOT_FOLLOW_OWN_STORE');
   await c.env.DB.prepare(
     'INSERT INTO follows (user_id, merchant_id) VALUES (?, ?) ON CONFLICT DO NOTHING'
   )

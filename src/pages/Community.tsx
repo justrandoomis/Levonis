@@ -26,7 +26,8 @@
  * community under maintenance, a refused visitor never reaches it.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useGoBack } from '../lib/useGoBack';
 import {
   ArrowLeft, ArrowRight, Box, Calculator, ChevronLeft, ChevronRight, ClipboardList,
   Heart, MessageSquare, PackageSearch, Plus, Search, Store, X,
@@ -74,7 +75,9 @@ function remaining(feed: CommunityFeed<{ id: string }>): number {
 }
 
 export default function Community() {
-  const navigate = useNavigate();
+  // A visitor who came from another page goes back to it; one who opened
+  // the community by its link goes home (it used to leave the site).
+  const goBack = useGoBack('/');
   const { loc, dir } = useLanguage();
   const { user, isAuthenticated } = useAuth();
   const [params, setParams] = useSearchParams();
@@ -183,7 +186,7 @@ export default function Community() {
           <button
             type="button"
             aria-label={loc('رجوع', 'Back')}
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="press-scale shrink-0 rounded-full bg-zinc-900 p-2 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             {dir === 'rtl' ? <ArrowRight className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}

@@ -9,6 +9,7 @@ import { signalBloub } from './bloub/events';
 import { MotionCharacterAnchor } from './bloub/MotionCharacterAnchor';
 import { authPathWithSupportRef } from '../lib/supportRef';
 import { useCommunityAccess } from '../pages/community/access';
+import { useBottomNavSuppressed } from '../lib/bottomNavSuppress';
 
 /**
  * Routes on which the floating bottom nav does not render. Exported so the
@@ -25,7 +26,10 @@ export function isBottomNavHidden(pathname: string): boolean {
     // A bundle's detail page uses the product page's sticky bottom purchase
     // bar, and two floating bars stacked on a phone hide each other.
     pathname.startsWith('/bundles/') ||
-    pathname.startsWith('/chat/')
+    pathname.startsWith('/chat/') ||
+    // A store's product page on the main site has its own sticky buy bar
+    // (StorefrontProduct), which the nav covered on a phone.
+    /^\/community\/store\/[^/]+\/p\/[^/]+/.test(pathname)
   );
 }
 
@@ -153,13 +157,15 @@ export default function BottomNav() {
    */
   const { access: communityAccess } = useCommunityAccess();
   const communityShut = communityAccess?.may_enter === false;
+  // A full-screen flow with its own bar under the thumb (the request wizard).
+  const suppressed = useBottomNavSuppressed();
   const rightItems = [
     { icon: ChatsIcon, label: t('webCenter'), path: '/chats' },
     ...(communityShut ? [] : [{ icon: CommunityIcon, label: t('community'), path: '/community' }]),
   ];
   type NavItem = (typeof leftItems)[number];
 
-  if (isBottomNavHidden(location.pathname)) return null;
+  if (isBottomNavHidden(location.pathname) || suppressed) return null;
 
   const linkTarget = (path: string) =>
     !isAuthenticated && PROTECTED_PATHS.has(path)

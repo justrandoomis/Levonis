@@ -32,6 +32,8 @@ import { useMoney } from '../../CurrencyContext';
 import { apiRefusal } from '../../lib/refusalStrings';
 import { asLang } from '../orders/format';
 import ConfirmSheet from './ConfirmSheet';
+import { requestStateLabel } from '../community/requests/requestStates';
+import { CommunityLoadError } from '../../pages/community/access';
 
 const CONFIDENCE_TEXT: Record<Confidence, [string, string]> = {
   high: ['دقة عالية', 'High confidence'],
@@ -39,16 +41,6 @@ const CONFIDENCE_TEXT: Record<Confidence, [string, string]> = {
   low: ['تقدير مبدئي', 'Rough estimate'],
 };
 
-const STATE_TEXT: Record<string, [string, string]> = {
-  draft: ['مسودة', 'Draft'],
-  open: ['مفتوح', 'Open'],
-  receiving_offers: ['يستقبل العروض', 'Receiving offers'],
-  awarded: ['تم اختيار تاجر', 'Merchant chosen'],
-  in_progress: ['قيد التنفيذ', 'In progress'],
-  completed: ['مكتمل', 'Completed'],
-  cancelled: ['ملغى', 'Cancelled'],
-  expired: ['منتهي', 'Expired'],
-};
 
 export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => void }) {
   const { money } = useMoney();
@@ -60,16 +52,18 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
   /** The request the customer asked to repeat — the sheet confirms it. */
   const [asking, setAsking] = useState<MyRequestRow | null>(null);
   const [notice, setNotice] = useState('');
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const load = useCallback(() => {
     if (!isAuthenticated) {
       setRows([]);
       return;
     }
+    setLoadError(null);
     printApi
       .myRequests()
       .then((d) => setRows(d.requests))
-      .catch(() => setRows([]));
+      .catch((e: unknown) => setLoadError(e));
   }, [isAuthenticated]);
 
   useEffect(load, [load]);
@@ -105,6 +99,8 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
   }
 
   if (rows === null) {
+    // A list that did not load is not «you have no requests».
+    if (loadError) return <CommunityLoadError error={loadError} onRetry={load} />;
     return (
       <div className="py-12 flex justify-center">
         <Loader2 className="w-5 h-5 text-gold animate-spin" />
@@ -158,7 +154,6 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
       </ConfirmSheet>
 
       {rows.map((r) => {
-        const st = STATE_TEXT[r.state];
         const p = r.print;
         return (
           <div
@@ -187,7 +182,7 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="text-white font-semibold text-[14px] leading-snug truncate">{r.title}</h3>
                     <span className="shrink-0 text-[10.5px] font-semibold px-2 py-0.5 rounded-full border border-white/15 bg-white/[0.04] text-zinc-300">
-                      {st ? loc(st[0], st[1]) : r.state}
+                      {requestStateLabel(r.state, loc)}
                     </span>
                   </div>
 

@@ -41,6 +41,7 @@ import { Segmented } from '../../ui/Segmented';
 import { Money } from '../../ui/Money';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/Toast';
+import { useSuppressBottomNav } from '../../../lib/bottomNavSuppress';
 import {
   requestsApi,
   type Catalog,
@@ -156,6 +157,8 @@ export default function RequestWizard({
   const { loc, lang } = useLanguage();
   const toast = useToast();
   const [confirm, confirmDialog] = useConfirm();
+  // The wizard's own bar sits under the thumb: the floating nav steps aside.
+  useSuppressBottomNav();
   const [step, setStep] = useState<Step>(1);
   const [s, setS] = useState<WizardState>(() =>
     initialLink ? { ...EMPTY_WIZARD, source_type: 'link', source_url: initialLink } : EMPTY_WIZARD

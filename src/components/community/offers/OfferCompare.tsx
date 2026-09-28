@@ -253,7 +253,9 @@ function OfferColumn({
             )}
             {m?.store_slug && (
               <CommunityStoreLink
-                id={m.store_slug}
+                // A merchant (or store) id: the link resolves ids, and a slug
+                // here answered «no store» (review of Levo Community).
+                id={o.merchant_id}
                 className="lv-button lv-button-ghost lv-button-sm"
               >
                 {loc('زيارة المتجر', 'View store', 'بینینی فرۆشگا')}

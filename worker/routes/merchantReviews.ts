@@ -368,8 +368,13 @@ communityReviewRoutes.post('/follow/:merchantId', requireCommunityOpen, requireA
   const user = c.get('user')!;
   const merchantId = str(c.req.param('merchantId'), 'merchantId', { min: 1, max: 60 });
 
-  const m = await c.env.DB.prepare('SELECT id FROM community_merchants WHERE id = ?').bind(merchantId).first();
-  if (!m) throw notFound('Store not found');
+  const m = await c.env.DB.prepare('SELECT id, user_id, status FROM community_merchants WHERE id = ?')
+    .bind(merchantId)
+    .first<{ id: string; user_id: string; status: string }>();
+  // A store Levonis suspended takes no new followers; nobody follows their own
+  // (the pill showed on the owner's own page, and the follower count counted them).
+  if (!m || m.status === 'suspended') throw notFound('Store not found');
+  if (m.user_id === user.id) throw badRequest('You cannot follow your own store', 'CANNOT_FOLLOW_OWN_STORE');
 
   await c.env.DB.prepare(
     'INSERT INTO follows (user_id, merchant_id) VALUES (?, ?) ON CONFLICT DO NOTHING'

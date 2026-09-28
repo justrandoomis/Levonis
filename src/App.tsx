@@ -208,6 +208,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import { Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import BottomNav, { isBottomNavHidden } from './components/BottomNav';
+import { useBottomNavSuppressed } from './lib/bottomNavSuppress';
 import Home from './pages/Home';
 
 /**
@@ -536,6 +537,7 @@ function AppContent() {
   }, [location.key, location.hash, navigationType]);
 
   const { store, resolved, unknownStore, unavailableStore } = useStore();
+  const navSuppressed = useBottomNavSuppressed();
   // Fetch the catalogue, the product page, the cart and the address book once
   // the browser is idle, so a tap on a product card renders synchronously.
   useIdlePrefetch();
@@ -706,7 +708,7 @@ function AppContent() {
   // under the floating nav. Measured overlap was 7-35px across /profile,
   // /referrals, /wallet and the home page. A spacer is content, and content is
   // always scrolled to.
-  const navHidden = isBottomNavHidden(location.pathname);
+  const navHidden = isBottomNavHidden(location.pathname) || navSuppressed;
 
 
   return (

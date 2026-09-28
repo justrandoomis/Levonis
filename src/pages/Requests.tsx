@@ -17,8 +17,8 @@
  * something working correctly.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Loader2, PackageSearch, MapPin, ChevronLeft, FilePen, PencilLine } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
@@ -36,6 +36,8 @@ import MyRequestsList from '../components/print/MyRequestsList';
  */
 import RequestWizard from '../components/community/requests/RequestWizard';
 import { requestsApi, type CatalogMaterial } from '../components/community/requests/api';
+import { REQUEST_STATE_TONE, requestStateLabel } from '../components/community/requests/requestStates';
+import { CommunityLoadError } from './community/access';
 import OfferCompare from '../components/community/offers/OfferCompare';
 import MerchantOfferPanel from '../components/community/offers/MerchantOfferPanel';
 import OrderContactCard from '../components/community/offers/OrderContactCard';
@@ -162,6 +164,18 @@ export default function Requests() {
    * fetches it, which also makes any request shareable and reloadable.
    */
   const deepLinked = params.get('request') ?? '';
+  const navigate = useNavigate();
+  /** The request's address was pushed from this page (not a link it was opened by). */
+  const pushedHere = useRef(false);
+  // THE ADDRESS IS THE TRUTH. The browser's own Back takes `?request=` away:
+  // the request's screen closes with it (it used to stay, over a board URL).
+  // A different id replaces it rather than showing the old one meanwhile.
+  useEffect(() => {
+    if (!deepLinked || (open && open.id !== deepLinked)) setOpen(null);
+    if (!deepLinked) pushedHere.current = false;
+    // Only the address decides here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinked]);
   useEffect(() => {
     if (!deepLinked || open?.id === deepLinked) return;
     let alive = true;
@@ -195,6 +209,7 @@ export default function Requests() {
   const openRequest = useCallback(
     (r: RequestRow) => {
       setOpen(r);
+      pushedHere.current = true;
       setParams({ request: r.id });
     },
     [setParams]
@@ -206,14 +221,31 @@ export default function Requests() {
    */
   const openRequestId = useCallback(
     (id: string) => {
+      pushedHere.current = true;
       setParams({ request: id });
     },
     [setParams]
   );
+  /**
+   * «رجوع»: a request opened from this page was a step FORWARD, so closing it
+   * is a real step back — replacing the entry instead left the request's
+   * address behind the board, and the browser's Back walked into it again.
+   * A request the visitor arrived at by its link has nothing behind it here:
+   * the board replaces it.
+   */
   const closeRequest = useCallback(() => {
     setOpen(null);
-    setParams({}, { replace: true });
-  }, [setParams]);
+    let pushed = false;
+    try {
+      const idx = (window.history.state as { idx?: unknown } | null)?.idx;
+      pushed = typeof idx === 'number' && idx > 0;
+    } catch {
+      pushed = false;
+    }
+    if (pushed && pushedHere.current) navigate(-1);
+    else setParams({}, { replace: true });
+    pushedHere.current = false;
+  }, [navigate, setParams]);
 
   /**
    * THE WINDOW IS RENDERED ONCE, OUTSIDE THE BRANCH — and that is the whole
@@ -253,6 +285,8 @@ export default function Requests() {
     <>
       {open ? (
         <RequestDetail
+          // Keyed on the request: another request never inherits this one's offers, files or answers.
+          key={open.id}
           request={open}
           me={me}
           onBack={closeRequest}
@@ -260,6 +294,11 @@ export default function Requests() {
             // The wizard takes the screen; the request re-opens when it is done.
             setEditing(id);
             closeRequest();
+          }}
+          onNewRequest={() => {
+            closeRequest();
+            if (user) setView('new');
+            else signIn();
           }}
         />
       ) : (
@@ -341,7 +380,9 @@ export default function Requests() {
             ) : view === 'mine' ? (
               <MyRequestsList onOpen={openRequestId} />
             ) : (
-              <RequestList onOpen={openRequest} canOffer={!!me?.can.offers} />
+              // A PLUS member with no store yet has no workshop: «مناسب لي» is the
+              // workshop's board, and it answered them 404.
+              <RequestList onOpen={openRequest} canOffer={!!me?.store && !!me?.can.offers} />
             )}
           </div>
         </div>
@@ -413,17 +454,26 @@ function AllRequests({
   const [rows, setRows] = useState<RequestRow[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [more, setMore] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    let alive = true;
     setRows(null);
+    setLoadError(null);
     api
       .get<{ requests: RequestRow[]; next_cursor: string | null }>('/api/marketplace/requests')
       .then((d) => {
+        if (!alive) return;
         setRows(d.requests);
         setCursor(d.next_cursor ?? null);
       })
-      .catch(() => setRows([]));
-  }, []);
+      // A board that did not load is not «no open requests».
+      .catch((e: unknown) => alive && setLoadError(e));
+    return () => {
+      alive = false;
+    };
+  }, [attempt]);
 
   async function loadMore() {
     if (!cursor) return;
@@ -442,6 +492,7 @@ function AllRequests({
   }
 
   if (rows === null) {
+    if (loadError) return <CommunityLoadError error={loadError} onRetry={() => setAttempt((n) => n + 1)} />;
     return (
       <div className="py-12 flex justify-center">
         <Loader2 className="w-5 h-5 text-gold animate-spin" />
@@ -517,15 +568,19 @@ function RequestDetail({
   me,
   onBack,
   onEdit,
+  onNewRequest,
 }: {
   request: RequestRow;
   me: MerchantMe | null;
   onBack: () => void;
   /** Open the wizard on this request (a draft to finish, or a published one to edit). */
   onEdit?: (id: string) => void;
+  /** «اطلب مثله»: the wizard, for a visitor who wants something like this. */
+  onNewRequest?: () => void;
 }) {
   const { loc, lang } = useLanguage();
   const [offers, setOffers] = useState<OfferV2[] | null>(null);
+  const [offersError, setOffersError] = useState<unknown>(null);
   const [isCustomer, setIsCustomer] = useState(false);
   const [materials, setMaterials] = useState<CatalogMaterial[]>([]);
   const [files, setFiles] = useState<RequestFile[]>([]);
@@ -541,6 +596,10 @@ function RequestDetail({
   const [discardOpen, setDiscardOpen] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [discardError, setDiscardError] = useState('');
+  /** Closing a PUBLISHED request (the server always allowed it; the page had no door). */
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState('');
 
   useEffect(() => setCurrent(request), [request]);
   // «استخدم هذا كعرضي»: a private costing handed to the offer composer (W5-B).
@@ -549,13 +608,14 @@ function RequestDetail({
   const openCosting = searchParams.get('cost') === '1';
 
   const load = useCallback(() => {
+    setOffersError(null);
     api
       .get<{ offers: OfferV2[]; is_customer: boolean }>(`/api/marketplace/requests/${request.id}/offers`)
       .then((d) => {
         setOffers(d.offers);
         setIsCustomer(d.is_customer);
       })
-      .catch(() => setOffers([]));
+      .catch((e: unknown) => setOffersError(e));
   }, [request.id]);
 
   // The attachments come from the request itself, and so does the answer to
@@ -579,7 +639,9 @@ function RequestDetail({
   }, []);
 
   const open = ['open', 'receiving_offers'].includes(current.state);
-  const canOffer = !!me?.can.offers && !isCustomer && open;
+  const canOffer = !!me?.store && !!me?.can.offers && !isCustomer && open;
+  /** Neither the customer nor a merchant who can answer: a visitor reading someone's request. */
+  const onlookers = !isCustomer && !me?.store;
   const fallback = loc('تعذّر إتمام العملية', 'Could not complete that', 'نەتوانرا تەواو بکرێت');
 
   /**
@@ -599,6 +661,21 @@ function RequestDetail({
       setDraftError(apiRefusal(e, asLang(lang), fallback));
     } finally {
       setPublishing(false);
+    }
+  }
+
+  async function closePublished() {
+    setClosing(true);
+    setCloseError('');
+    try {
+      await api.post(`/api/marketplace/requests/${current.id}/cancel`);
+      setCloseOpen(false);
+      loadFiles();
+      load();
+    } catch (e) {
+      setCloseError(apiRefusal(e, asLang(lang), fallback));
+    } finally {
+      setClosing(false);
     }
   }
 
@@ -754,7 +831,26 @@ function RequestDetail({
         {/* The workshop's own verdict on this request, with the reasons and the
             screen that fixes each, and its private costing (W5-B). Only for a
             merchant looking at somebody else's published request. */}
-        {me && !isCustomer && !isOwner && current.state !== 'draft' && (
+        {/* The customer's way to stop a request: no accepted offer yet, so
+            nothing is owed — it leaves the board and its offers are declined. */}
+        {isOwner && open && (
+          <div className="-mt-2 mb-4 flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setCloseError('');
+                setCloseOpen(true);
+              }}
+              data-requests="close-request"
+              className="min-h-11 rounded-xl px-3 text-[12.5px] font-semibold text-zinc-400 transition-colors hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              {/* OWNER: Sorani to be written by hand. */}
+              {loc('أغلق الطلب', 'Close the request')}
+            </button>
+          </div>
+        )}
+
+        {me?.store && !isCustomer && !isOwner && current.state !== 'draft' && (
           <WorkshopRequestCard
             requestId={current.id}
             takingOffers={open}
@@ -767,16 +863,23 @@ function RequestDetail({
             wait for — the draft card above already says what happens next. */}
         {current.state !== 'draft' && (
           <>
-            <h2 className="text-gold font-bold text-[13px] mb-3">
-              {isCustomer
-                ? loc('العروض المقدّمة', 'Offers received', 'ئۆفەرە وەرگیراوەکان')
-                : loc('عرضك', 'Your offer', 'ئۆفەرەکەت')}
-            </h2>
+            {/* «عرضك» is a merchant's heading; a visitor gets the card below instead. */}
+            {(isCustomer || !onlookers) && (
+              <h2 className="text-gold font-bold text-[13px] mb-3">
+                {isCustomer
+                  ? loc('العروض المقدّمة', 'Offers received', 'ئۆفەرە وەرگیراوەکان')
+                  : loc('عرضك', 'Your offer', 'ئۆفەرەکەت')}
+              </h2>
+            )}
 
             {offers === null ? (
-              <div className="py-8 flex justify-center">
-                <Loader2 className="w-5 h-5 text-gold animate-spin" />
-              </div>
+              offersError ? (
+                <CommunityLoadError error={offersError} onRetry={load} compact />
+              ) : (
+                <div className="py-8 flex justify-center">
+                  <Loader2 className="w-5 h-5 text-gold animate-spin" />
+                </div>
+              )
             ) : isCustomer ? (
               <OfferCompare
                 requestId={current.id}
@@ -788,6 +891,8 @@ function RequestDetail({
                   loadFiles();
                 }}
               />
+            ) : onlookers ? (
+              <OnlookerCard me={me} onNewRequest={onNewRequest} />
             ) : (
               <MerchantOfferPanel
                 requestId={current.id}
@@ -823,6 +928,25 @@ function RequestDetail({
           'This request will not be published. It stays in “My requests” as cancelled, with its files.'
         )}
       </ConfirmSheet>
+      <ConfirmSheet
+        open={closeOpen}
+        testId="close-request"
+        tone="danger"
+        // OWNER: Sorani to be written by hand.
+        title={loc('إغلاق هذا الطلب؟', 'Close this request?')}
+        confirmLabel={loc('أغلق الطلب', 'Close the request')}
+        busyLabel={loc('جارٍ الإغلاق…', 'Closing…')}
+        busy={closing}
+        error={closeError}
+        onConfirm={closePublished}
+        onClose={() => setCloseOpen(false)}
+      >
+        {/* OWNER: Sorani to be written by hand. */}
+        {loc(
+          'يختفي من لوحة الطلبات ولا يُقبل عليه عرض بعد الآن، والعروض القائمة تُرفض. يبقى في «طلباتي» ملغى، مع ملفاته.',
+          'It leaves the request board and takes no more offers; the standing offers are declined. It stays in “My requests” as cancelled, with its files.'
+        )}
+      </ConfirmSheet>
     </div>
   );
 }
@@ -838,36 +962,56 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * A VISITOR READING SOMEONE'S REQUEST — signed out, or signed in without a
+ * store. It used to show them «عرضك» over a panel they could not use; now it
+ * says what they CAN do: ask for something like it, or (to print for others)
+ * open a store. (Review of Levo Community, 2026-09-28.)
+ */
+function OnlookerCard({ me, onNewRequest }: { me: MerchantMe | null; onNewRequest?: () => void }) {
+  const { loc } = useLanguage();
+  const { user } = useAuth();
+  // OWNER: Sorani to be written by hand (this card).
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3" data-request-onlooker>
+      <div>
+        <p className="text-white text-[13.5px] font-semibold">{loc('تريد شيئًا مثل هذا؟', 'Want something like this?')}</p>
+        <p className="text-zinc-400 text-[12.5px] leading-relaxed mt-0.5">
+          {loc('اطلبه أنت، وتصلك عروض التجار الذين يستطيعون صنعه.', 'Ask for it yourself, and get offers from the merchants who can make it.')}
+        </p>
+        {onNewRequest && (
+          <button
+            type="button"
+            onClick={onNewRequest}
+            className="mt-2.5 inline-flex min-h-11 items-center gap-1.5 rounded-2xl bg-olive px-4 text-[12.5px] font-semibold text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            data-request-onlooker-new
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {user ? loc('اطلب مثله', 'Ask for one like it') : loc('سجّل الدخول واطلب', 'Sign in and ask')}
+          </button>
+        )}
+      </div>
+      <div className="border-t border-white/10 pt-3">
+        <p className="text-zinc-400 text-[12.5px] leading-relaxed">
+          {loc('تطبع لغيرك؟ العروض تُقدَّم من متجر على Levonis.', 'You print for others? Offers are made from a store on Levonis.')}
+        </p>
+        <a
+          href={user && me?.eligible ? '/merchant/start' : '/subscription'}
+          className="mt-1.5 inline-flex min-h-11 items-center text-[12.5px] font-semibold text-gold underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded"
+          data-request-onlooker-store
+        >
+          {user && me?.eligible ? loc('افتح متجرك', 'Open your store') : loc('اعرف عن PLUS والمتاجر', 'About PLUS and stores')}
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function StateChip({ state }: { state: string }) {
   const { loc } = useLanguage();
-  const map: Record<string, string> = {
-    draft: 'bg-zinc-500/10 text-zinc-300 border-zinc-500/20',
-    open: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    receiving_offers: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    offer_selected: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
-    in_progress: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
-    delivered: 'bg-purple-500/10 text-purple-300 border-purple-500/20',
-    completed: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    disputed: 'bg-red-500/10 text-red-300 border-red-500/20',
-    cancelled: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
-    expired: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
-  };
-  const label: Record<string, string> = {
-    // The Sorani is the hand-written one AdminMystery.tsx already carries.
-    draft: loc('مسودة', 'Draft', 'ڕەشنووس'),
-    open: loc('مفتوح', 'Open', 'کراوە'),
-    receiving_offers: loc('يستقبل عروضًا', 'Receiving offers', 'ئۆفەر وەردەگرێت'),
-    offer_selected: loc('تم اختيار عرض', 'Offer selected', 'ئۆفەر هەڵبژێردرا'),
-    in_progress: loc('قيد التنفيذ', 'In progress', 'لە جێبەجێکردندا'),
-    delivered: loc('تم التسليم', 'Delivered', 'گەیشت'),
-    completed: loc('مكتمل', 'Completed', 'تەواو'),
-    disputed: loc('نزاع', 'Disputed', 'ناکۆکی'),
-    cancelled: loc('ملغي', 'Cancelled', 'هەڵوەشێنراوە'),
-    expired: loc('منتهٍ', 'Expired', 'بەسەرچوو'),
-  };
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${map[state] ?? map.open}`}>
-      {label[state] ?? state}
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${REQUEST_STATE_TONE[state] ?? REQUEST_STATE_TONE.open}`}>
+      {requestStateLabel(state, loc)}
     </span>
   );
 }
