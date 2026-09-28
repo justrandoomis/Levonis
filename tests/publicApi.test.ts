@@ -28,7 +28,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { APEX, MERCHANT_HOST, asD1, ctx, freshDb } from './fixtures/app';
+import { APEX, MERCHANT_HOST, asD1, ctx, freshDb, pending } from './fixtures/app';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
 import { validate } from './fixtures/jsonSchema';
 import worker from '../worker/index';
@@ -499,6 +499,49 @@ test('HEAD answers without a body; ETag + If-None-Match answer 304; Cache-Contro
   const again = await call('/api/public/v1/sections', { headers: { 'If-None-Match': etag! } });
   assert.equal(again.status, 304);
   assert.equal((await again.text()).length, 0);
+});
+
+test('an answer from the edge cache keeps this API\'s own lifetime — Cloudflare\'s four-hour rewrite is undone', async () => {
+  // A stand-in for `caches.default` that does what the live zone does to a
+  // hit (seen 2026-09-28): the stored `max-age=60` comes back as the zone's
+  // Browser Cache TTL, `max-age=14400`, with CF-Cache-Status: HIT.
+  const store = new Map<string, Response>();
+  const edge = {
+    async match(req: Request) {
+      const stored = store.get(req.url);
+      if (!stored) return undefined;
+      const copy = stored.clone();
+      const headers = new Headers(copy.headers);
+      headers.set('Cache-Control', (headers.get('Cache-Control') ?? '').replace(/max-age=\d+/, 'max-age=14400'));
+      headers.set('CF-Cache-Status', 'HIT');
+      return new Response(copy.body, { status: copy.status, headers });
+    },
+    async put(req: Request, res: Response) {
+      store.set(req.url, res);
+    },
+  };
+  const scope = globalThis as { caches?: unknown };
+  scope.caches = { default: edge };
+  try {
+    const { call } = await world();
+    const miss = await call('/api/public/v1/sections?utm=x');
+    assert.equal(miss.status, 200);
+    await Promise.all(pending);
+    assert.equal(store.size, 1, 'the answer was stored under its canonical URL');
+    const own = miss.headers.get('Cache-Control');
+    assert.match(own ?? '', /^public, max-age=60, s-maxage=\d+$/);
+
+    const hit = await call('/api/public/v1/sections');
+    assert.equal(hit.headers.get('CF-Cache-Status'), 'HIT', 'served from the cache');
+    assert.equal(hit.headers.get('Cache-Control'), own, 'not the zone\'s four hours');
+    assert.equal(await hit.text(), await miss.text());
+
+    const revalidated = await call('/api/public/v1/sections', { headers: { 'If-None-Match': miss.headers.get('ETag')! } });
+    assert.equal(revalidated.status, 304);
+    assert.equal(revalidated.headers.get('Cache-Control'), own, 'a 304 from the cache says the same');
+  } finally {
+    delete scope.caches;
+  }
 });
 
 test('over the limit: 429 with Retry-After; the limit counts per IP', async () => {

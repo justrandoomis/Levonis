@@ -110,7 +110,11 @@ only handle the site's own board uses.
   merchant uploads by store), not an API change.
 - **Caching:** answers are edge-cached per colo under their canonical URL
   (origin + path + declared parameters, sorted), with `Cache-Control: public,
-  max-age≤60, s-maxage=<route>` and a weak ETag (`If-None-Match` → 304).
+  max-age≤60, s-maxage=<route>` and a weak ETag (`If-None-Match` → 304). A
+  cache HIT is sent with the route's own `Cache-Control` too: Cloudflare hands
+  a hit back with `max-age` raised to the zone's Browser Cache TTL (4 hours on
+  levonis-iq.com, seen live 2026-09-28), which would let a client keep a price
+  for hours.
 - **Rate limit:** 240 uncached requests / 60 s per IP (`rateLimit(c,
   'public-v1', …)`, counted only on a cache miss); 429 with `Retry-After`.
 - **CORS:** `Access-Control-Allow-Origin: *`, no credentials (docs/SECURITY.md §2).
@@ -124,6 +128,6 @@ Add a `PublicRoute` to a resource list in `worker/lib/publicApi/resources/`
 and `/context` pick it up; `tests/publicApi.test.ts` crawls it, scans it for
 leaks and validates it against its schema.
 
-Tests: `tests/publicApi.test.ts` (24): the leak crawl runs with the community
+Tests: `tests/publicApi.test.ts` (25): the leak crawl runs with the community
 open, over a shop seeded with a secret in every private place and a
 suspended shop beside it.

@@ -133,12 +133,13 @@ async function serve(c: Context<AppContext>, route: PublicRoute): Promise<Respon
   const { path, query } = readInput(c, route);
   const self = canonicalUrl(urls.origin, route, path, query);
   const ifNoneMatch = c.req.header('If-None-Match');
+  const cacheControl = `public, max-age=${Math.min(60, route.maxAge)}, s-maxage=${route.maxAge}`;
   const cache = edgeCache();
   const key = new Request(self, { method: 'GET' });
 
   if (cache) {
     const hit = await cache.match(key);
-    if (hit) return conditional(hit, ifNoneMatch);
+    if (hit) return conditional(hit, ifNoneMatch, cacheControl);
   }
 
   // A miss reaches the database: that is what the limit protects.
@@ -168,7 +169,7 @@ async function serve(c: Context<AppContext>, route: PublicRoute): Promise<Respon
     status: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': `public, max-age=${Math.min(60, route.maxAge)}, s-maxage=${route.maxAge}`,
+      'Cache-Control': cacheControl,
       ETag: await weakEtag(text),
     },
   });
@@ -180,7 +181,7 @@ async function serve(c: Context<AppContext>, route: PublicRoute): Promise<Respon
       await put;
     }
   }
-  return conditional(res, ifNoneMatch);
+  return conditional(res, ifNoneMatch, cacheControl);
 }
 
 for (const route of ALL_ROUTES) {

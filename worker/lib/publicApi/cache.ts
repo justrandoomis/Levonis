@@ -10,6 +10,13 @@
  * A weak ETag (a hash of the body) lets a client revalidate with
  * `If-None-Match` and get a bodiless 304.
  *
+ * THE ROUTE'S OWN LIFETIME, ON A HIT TOO. Cloudflare hands a cached answer
+ * back with its `max-age` raised to the zone's Browser Cache TTL — four hours
+ * on levonis-iq.com (seen live: `public, max-age=14400, s-maxage=120` on a
+ * hit, `max-age=60` on the miss that stored it). A client would then keep a
+ * price for hours. So every answer, hit or miss, 200 or 304, leaves with the
+ * route's own `Cache-Control`.
+ *
  * `caches` does not exist under Node, where the tests run; the same code then
  * simply builds every answer (the pattern of worker/routes/catalog.ts).
  */
@@ -32,16 +39,22 @@ export function etagMatches(ifNoneMatch: string | undefined, etag: string | null
   return ifNoneMatch.split(',').some((t) => t.trim() === '*' || bare(t) === want);
 }
 
-/** The answer to send: a fresh, mutable copy, or a 304 when the client already has it. */
-export function conditional(res: Response, ifNoneMatch: string | undefined): Response {
+/**
+ * The answer to send: a fresh, mutable copy, or a 304 when the client already
+ * has it — either way carrying `cacheControl`, the route's own policy.
+ */
+export function conditional(res: Response, ifNoneMatch: string | undefined, cacheControl: string): Response {
   const etag = res.headers.get('ETag');
   if (etagMatches(ifNoneMatch, etag)) {
     const headers = new Headers();
-    for (const h of ['ETag', 'Cache-Control', 'Content-Type']) {
+    for (const h of ['ETag', 'Content-Type']) {
       const v = res.headers.get(h);
       if (v) headers.set(h, v);
     }
+    headers.set('Cache-Control', cacheControl);
     return new Response(null, { status: 304, headers });
   }
-  return new Response(res.body, { status: res.status, headers: new Headers(res.headers) });
+  const headers = new Headers(res.headers);
+  headers.set('Cache-Control', cacheControl);
+  return new Response(res.body, { status: res.status, headers });
 }
