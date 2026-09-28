@@ -115,6 +115,12 @@ export const ROUTES: readonly RouteRule[] = [
   // «مرشد الطابعات»: printers scored on the shop's own spec sheets. Keyed by six
   // answers, so an edge entry is a near-miss like /api/compare's.
   { prefix: '/api/printer-finder', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'none', rateClass: 'public-read' },
+  // The public read-only API (worker/routes/publicApi.ts, docs/PUBLIC_API.md):
+  // anonymous by construction, GET/HEAD only, the main host only, served by
+  // the core. The Worker caches it at the edge under canonical URLs itself, so
+  // it is not marked cacheable here — a second copy under another key would
+  // only be something else to purge.
+  { prefix: '/api/public/v1', hosts: 'main', owner: 'CORE', flipPhase: null, requires: 'none', rateClass: 'public-read' },
   // «خبرني لما يرجع». A standing request against ONE product's stock, armed
   // and refused by what the catalogue knows about that product
   // (worker/lib/stockAlertResolve.ts). It is delivered through Notifications

@@ -24,6 +24,7 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/compare': 'CATALOG',
   '/api/catalog': 'CATALOG',
   '/api/printer-finder': 'CATALOG',
+  '/api/public/v1': 'CORE',
   '/api/stock-alerts': 'CATALOG',
   '/api/price-reports': 'CATALOG',
   '/api/admin/price-reports': 'CATALOG',

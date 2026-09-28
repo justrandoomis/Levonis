@@ -37,7 +37,7 @@ import {
   type CatalogIndex,
   type ShelfCandidate,
 } from '../lib/catalogPresentation';
-import { pricingCtx, resolveProductCards } from './products';
+import { pricingCtx, resolveProductCards, type PricingCtx } from './products';
 import { safeParse } from '../lib/types';
 import type { CatalogTreeNode, CategoryPayload } from '@levonis/catalog/discoveryTypes';
 
@@ -101,42 +101,55 @@ async function cached(c: Context<AppContext>, key: Request, cacheControl: string
 
 /** Ids of active, non-composition products with direct units available now. */
 async function availableProductIds(
-  c: Context<AppContext>,
+  db: D1Database,
+  ctxPromise: Promise<PricingCtx>,
   ids: string[],
   idx: CatalogIndex
 ): Promise<Set<string> | null> {
   if (ids.length === 0) return new Set();
   if (ids.length > TREE_AVAILABILITY_CAP) return null;
-  const { results } = await c.env.DB.prepare(
+  const { results } = await db.prepare(
     `SELECT * FROM products WHERE status = 'active' AND composition = '' AND id IN (SELECT value FROM json_each(?))`
   )
     .bind(JSON.stringify(ids))
     .all<Record<string, unknown>>();
-  const cards = await resolveProductCards(c.env.DB, results ?? [], await pricingCtx(c), idx);
+  const cards = await resolveProductCards(db, results ?? [], await ctxPromise, idx);
   const out = new Set<string>();
   for (const [id, card] of cards) if (Number(card.direct_stock_available ?? 0) > 0) out.add(id);
   return out;
 }
 
+/**
+ * The whole explorer tree with its counts — what `GET /api/catalog/tree`
+ * answers, as a function, so the public API (worker/routes/publicApi.ts)
+ * describes the sections from the same roll-up the storefront draws.
+ */
+export async function buildCatalogTree(
+  db: D1Database,
+  ctxPromise: Promise<PricingCtx>
+): Promise<{ roots: CatalogTreeNode[]; totals: { products: number; available: number | null } }> {
+  const [records, memberships] = await Promise.all([loadCatalogRecords(db), loadMemberships(db)]);
+  const idx = indexCatalogs(records);
+  const byProduct = membershipByProduct(memberships, idx);
+  const available = await availableProductIds(db, ctxPromise, [...byProduct.keys()], idx);
+  const counts = rollUpCounts(byProduct, available);
+  const roots = buildTree(idx, counts, available !== null);
+  // Totals over what the explorer SHOWS: products under an active root.
+  const shownRoots = new Set(roots.map((r) => r.id));
+  let products = 0;
+  let avail = 0;
+  for (const [pid, catalogs] of byProduct) {
+    if (![...catalogs].some((id) => shownRoots.has(id))) continue;
+    products += 1;
+    if (available?.has(pid)) avail += 1;
+  }
+  return { roots, totals: { products, available: available ? avail : null } };
+}
+
 catalogRoutes.get('/tree', (c) =>
-  cached(c, treeCacheKey(c.req.url), TREE_CACHE, async () => {
-    const [records, memberships] = await Promise.all([loadCatalogRecords(c.env.DB), loadMemberships(c.env.DB)]);
-    const idx = indexCatalogs(records);
-    const byProduct = membershipByProduct(memberships, idx);
-    const available = await availableProductIds(c, [...byProduct.keys()], idx);
-    const counts = rollUpCounts(byProduct, available);
-    const roots = buildTree(idx, counts, available !== null);
-    // Totals over what the explorer SHOWS: products under an active root.
-    const shownRoots = new Set(roots.map((r) => r.id));
-    let products = 0;
-    let avail = 0;
-    for (const [pid, catalogs] of byProduct) {
-      if (![...catalogs].some((id) => shownRoots.has(id))) continue;
-      products += 1;
-      if (available?.has(pid)) avail += 1;
-    }
-    return c.json({ success: true, roots, totals: { products, available: available ? avail : null } });
-  })
+  cached(c, treeCacheKey(c.req.url), TREE_CACHE, async () =>
+    c.json({ success: true, ...(await buildCatalogTree(c.env.DB, pricingCtx(c))) })
+  )
 );
 
 const notFoundCategory = () =>

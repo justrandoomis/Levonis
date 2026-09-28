@@ -32,7 +32,13 @@ risks. Verification evidence is in `docs/TEST_RESULTS.md`.
   Cookie: `Secure; HttpOnly; SameSite=Lax; Path=/`.
 - **CSRF**: `SameSite=Lax` plus an Origin check on every non-GET request
   (same-origin or `EXTRA_ALLOWED_ORIGINS`). No cross-site read of state is
-  possible (no CORS headers are emitted).
+  possible (no CORS headers are emitted) — with ONE exception: the public
+  read-only API `/api/public/v1/*` (docs/PUBLIC_API.md) answers with
+  `Access-Control-Allow-Origin: *` and no `Allow-Credentials`. That is safe
+  because the prefix never loads a session (worker/index.ts skip-list), so
+  its answers are identical for every caller and hold nothing a signed-out
+  visitor cannot already see; it accepts GET/HEAD/OPTIONS only (405 for the
+  rest).
 - **Passwords**: PBKDF2-SHA256 (WebCrypto, 100k iterations) stored as
   `pbkdf2$iter$salt$hash`; legacy bcrypt hashes (from the old server) verify
   via bcryptjs and are transparently re-hashed on the next successful login.

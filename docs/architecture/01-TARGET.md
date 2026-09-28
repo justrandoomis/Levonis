@@ -232,6 +232,7 @@ Longest prefix, then host class. `→ CORE` rows are the strangler default and f
 | `/api/stock-alerts/*` | all under root | CORE → CATALOG (5) | «خبرني لما يرجع»: a standing request against ONE product's stock, armed and refused by what the catalogue knows about it. Delivered through NOTIFICATIONS, which is its transport and not its owner |
 | `/api/price-reports/*`, `/api/admin/price-reports/*` | root (customer) / main (admin) | CORE → CATALOG (5) | «لكيتها بمكان أرخص»: filed against a product, frozen against `products.price_iqd` at the instant it is filed, and answered by a reprice. Deliberately NOT with `/api/price-protection`, which is order-linked money owed to someone who already bought |
 | `/api/settings/public` | all under root | CORE → CONFIG (4) | cacheable |
+| `/api/public/v1/*` | **main only** | **CORE** (no flip) | the public read-only API (docs/PUBLIC_API.md): anonymous by construction (no session is loaded), GET/HEAD only, CORS `*`; the Worker edge-caches it under canonical URLs itself, so the gateway row is not `cacheable`. Named by the owner's request rather than ADR-010's `/api/v1/<service>` — it is a façade over every service's public reads, not one service's API. |
 | `/api/admin/products*`, `/api/admin/taxonomy/*`, `/api/admin/template/*`, `/api/admin/import/*`, `/api/admin/bundles/*`, `/api/admin/mystery/*`, `/api/admin/offers/*`, `/api/admin/media/*` | main | CORE → CATALOG (5); `/api/admin/media/ingest` → FILES (4) | |
 | `/api/admin/analytics/*` | main | CORE → ANALYTICS (17) | the composition and mystery read models of docs/BUNDLES_MYSTERY.md §12 |
 | `/api/admin/inventory/*` | **main only** | CORE → CATALOG (5) | «إدارة المخزون»: cost layers (`inventory_lots`), incoming purchases and their receipts, stock adjustments and suppliers. CATALOG owns it because every counter it moves is a catalogue counter. `requires: admin`, NOT `admin:full`, and that is the difference from the finance rows below: finance is financial end to end so the edge can shut the whole door, while mandate §52 wants the assistant admin counting units and receiving shipments and never seeing what they cost. A door cannot express a per-field rule, so the gate moves one level in — `projectForAdmin` strips `FINANCIAL_FIELDS` from every payload |
@@ -295,7 +296,7 @@ Off until `TURNSTILE_SECRET` + `TURNSTILE_SITEKEY` exist. Hooks: `POST /api/auth
 
 ### 3.9 Security headers, CORS, correlation
 
-`securityHeaders()` and `spaCsp()` move to the platform kit and are applied by the gateway; `dist/_headers` keeps being generated from the same source (`scripts/write-asset-headers.mjs`). No CORS emitted. Correlation per §11.
+`securityHeaders()` and `spaCsp()` move to the platform kit and are applied by the gateway; `dist/_headers` keeps being generated from the same source (`scripts/write-asset-headers.mjs`). No CORS emitted — except `/api/public/v1/*`, the anonymous read-only public API (docs/PUBLIC_API.md), which answers `Access-Control-Allow-Origin: *` without credentials. Correlation per §11.
 
 ### 3.10 Response envelope
 

@@ -104,6 +104,7 @@ import { adminMysteryRoutes } from './routes/mystery';
 import { adminOffersRoutes } from './routes/offers';
 import { adminCompositionAnalyticsRoutes } from './routes/bundles';
 import { farmRoutes } from './routes/farm';
+import { publicApiRoutes } from './routes/publicApi';
 import { farmAdminRoutes } from './routes/farmAdmin';
 import { configureEventBus } from './lib/eventBus';
 import { safeErrorCode } from './lib/membershipBenefits';
@@ -227,6 +228,17 @@ app.use('*', async (c, next) => {
     await next();
     return;
   }
+  /**
+   * NOR DOES THE PUBLIC API — and here that is the guarantee, not an
+   * optimisation. `/api/public/v1` answers exactly what a signed-out visitor
+   * sees (worker/routes/publicApi.ts); with no session loaded, `user` is never
+   * set on this prefix, so no handler under it can personalise a price or leak
+   * an account even by mistake, whatever cookie arrives with the request.
+   */
+  if (path === '/api/public/v1' || path.startsWith('/api/public/v1/')) {
+    await next();
+    return;
+  }
   await loadSessionUser(c);
   await next();
 });
@@ -304,6 +316,9 @@ app.route('/api/compare', compareRoutes);
 // Catalog discovery (docs/ux/CATALOG_DISCOVERY.md §11): the category map and the printer finder.
 app.route('/api/catalog', catalogRoutes);
 app.route('/api/printer-finder', printerFinderRoutes);
+// The public read-only API: anonymous (no session is loaded for this prefix),
+// GET/HEAD only, main host only — see worker/routes/publicApi.ts.
+app.route('/api/public/v1', publicApiRoutes);
 // «لكيتها بمكان أرخص» — the customer's competitor-price report (0093). Its own
 // prefix rather than a branch of /api/products, and every route inside is
 // behind its own requireAuth: an anonymous form that writes a row the owner

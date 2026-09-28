@@ -176,6 +176,11 @@ export function robotsRoute(c: Context<AppContext>): Response {
     });
   }
 
+  // The public read-only API (worker/routes/publicApi.ts) is MEANT to be
+  // fetched by agents and tools, so it is carved out of `/api/` — `Allow` is
+  // the longer match, which is the rule robots parsers apply. The main site
+  // only: a store's host does not serve it.
+  if (host.kind === 'main') lines.push('Allow: /api/public/v1/');
   for (const path of DISALLOWED) lines.push(`Disallow: ${path}`);
   // Crawl-delay is deliberately absent: Google ignores it, and the shops that
   // honour it are the ones whose traffic this site wants.

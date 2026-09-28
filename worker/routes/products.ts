@@ -3107,8 +3107,32 @@ interface ResolvedCategoryRow {
   path?: string;
 }
 
-productRoutes.get('/', async (c) => {
-  const q = c.req.query();
+/**
+ * THE CATALOGUE LISTING — what `GET /api/products` answers, as a function of
+ * its query, so the storefront route and the public API
+ * (worker/routes/publicApi.ts) share ONE path: the same search, the same
+ * section subtree, the same prices, the same listing grammar. Two copies of
+ * this orchestration would drift, and the first sign would be the API
+ * quoting a price the shop does not.
+ *
+ * `ctxPromise` is the viewer's pricing context, started by the caller before
+ * this runs (see the note at its first use). `rows` hands back the product
+ * rows the cards were built from, by id, for a caller that needs more than
+ * the card; the route ignores it. `withTotal` counts a plain page's matches —
+ * one COUNT over the same WHERE — which the storefront never asks for.
+ */
+export interface CatalogListing {
+  /** Exactly what `GET /api/products` answers, without `success`. */
+  body: Record<string, unknown>;
+  rows: Map<string, Record<string, unknown>>;
+}
+
+export async function listCatalogProducts(
+  db: D1Database,
+  q: Record<string, string>,
+  ctxPromise: Promise<PricingCtx>,
+  opts: { withTotal?: boolean } = {}
+): Promise<CatalogListing> {
   const search = str(q.search, 'search', { max: 100, required: false });
   const category = str(q.category, 'category', { max: 60, required: false });
   const type = str(q.type, 'type', { max: 20, required: false }); // 'bundle' | 'discounted' | 'featured'
@@ -3126,11 +3150,11 @@ productRoutes.get('/', async (c) => {
   const wantsFacets = q.facets === '1';
   // The taxonomy index: card `compare_type` and the category's `path`. Memoised
   // per isolate (catalogPresentation.ts), so this is usually free.
-  const idxPromise = catalogIndexFor(c.env.DB);
+  const idxPromise = catalogIndexFor(db);
   idxPromise.catch(() => {});
 
   /**
-   * STARTED HERE, at the top, because `type=discounted` now BUILDS ITS WHERE
+   * STARTED BY THE CALLER, before this runs, because `type=discounted` now BUILDS ITS WHERE
    * CLAUSE out of the membership rules this carries (`discountedWhere`), and
    * that clause has to exist before the ORDER BY and the LIMIT are appended.
    *
@@ -3148,7 +3172,6 @@ productRoutes.get('/', async (c) => {
    * nothing — every path that needs the value still awaits the promise itself
    * and still sees the rejection.
    */
-  const ctxPromise = pricingCtx(c);
   ctxPromise.catch(() => {});
 
   /**
@@ -3183,7 +3206,7 @@ productRoutes.get('/', async (c) => {
   let categoryRef: ResolvedCategoryRow | null = null;
   if (category) {
     categoryRef =
-      (await c.env.DB.prepare(
+      (await db.prepare(
         // `id` first in the tiebreak: the id is the identifier this API
         // documents, and accepting the slug as well is what makes a
         // hand-typed /products?category=fdm-printers work.
@@ -3195,10 +3218,10 @@ productRoutes.get('/', async (c) => {
     // section, so an old shared link keeps listing and can be replaced to the
     // new path. Only consulted when nothing live matched.
     if (!categoryRef) {
-      const retired = await catalogIdForRetiredSlug(c.env.DB, category);
+      const retired = await catalogIdForRetiredSlug(db, category);
       if (retired) {
         categoryRef =
-          (await c.env.DB.prepare('SELECT id, slug, name_ar, name_en, name_ckb FROM catalogs WHERE id = ?')
+          (await db.prepare('SELECT id, slug, name_ar, name_en, name_ckb FROM catalogs WHERE id = ?')
             .bind(retired)
             .first<ResolvedCategoryRow>()) ?? null;
       }
@@ -3266,7 +3289,7 @@ productRoutes.get('/', async (c) => {
   if (search) {
     const hits = await degradeIfSchemaMissing(
       'search index (migration 0089)',
-      () => searchProducts(c.env.DB, search, { limit: 200, completeLast: typingLastWord }),
+      () => searchProducts(db, search, { limit: 200, completeLast: typingLastWord }),
       null as { ids: string[]; indexReady: boolean } | null
     );
     // A missing TABLE, or a table that exists and is still empty because the
@@ -3278,12 +3301,11 @@ productRoutes.get('/', async (c) => {
       params.push(like, like, like, like);
     } else if (hits.ids.length === 0) {
       // The category block rides this exit as well — see the note above.
-      return c.json({
-        success: true,
+      return { body: {
         products: [],
         ...categoryField,
         ...(listing ? { total: 0, truncated: false, sort: listingState.sort } : {}),
-      });
+      }, rows: new Map() };
     } else {
       /**
        * ONE BOUND PARAMETER FOR THE WHOLE HIT LIST — and the same again for
@@ -3388,8 +3410,8 @@ productRoutes.get('/', async (c) => {
    * is absent: nothing can match, and the empty answer below is the truth.
    */
   if (listing && !wantsFacets && listingState.fits.length) {
-    if (!(await printerFitsInstalled(c.env.DB))) {
-      return c.json({ success: true, products: [], ...categoryField, total: 0, truncated: false, sort: listingState.sort });
+    if (!(await printerFitsInstalled(db))) {
+      return { body: { products: [], ...categoryField, total: 0, truncated: false, sort: listingState.sort }, rows: new Map() };
     }
     sql +=
       ' AND id IN (SELECT f.product_id FROM product_printer_fits f JOIN products pr ON pr.id = f.printer_id' +
@@ -3405,6 +3427,9 @@ productRoutes.get('/', async (c) => {
    * the engine produced and pages through it, and everything else keeps the
    * shelf order it always had.
    */
+  // One COUNT over the same WHERE, before ORDER BY and paging are appended.
+  const countSql = !listing && opts.withTotal ? sql.replace('SELECT * FROM products', 'SELECT COUNT(*) AS n FROM products') : null;
+  const countParams = countSql ? [...params] : [];
   if (searchOrder) {
     // The id's position in the engine's ranking — `key` is the array index
     // `json_each` reports — rather than a `CASE` with one bound id per branch.
@@ -3419,25 +3444,27 @@ productRoutes.get('/', async (c) => {
   if (listing) params.push(LISTING_CANDIDATE_CAP + 1, 0);
   else params.push(limit, offset);
 
-  const [{ results: fetched }, ctx, idx] = await Promise.all([
-    c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>(),
+  const [{ results: fetched }, ctx, idx, counted] = await Promise.all([
+    db.prepare(sql).bind(...params).all<Record<string, unknown>>(),
     ctxPromise,
     idxPromise.catch(() => null),
+    countSql ? db.prepare(countSql).bind(...countParams).first<{ n: number }>() : Promise.resolve(null),
   ]);
   const truncated = listing && fetched.length > LISTING_CANDIDATE_CAP;
   const results = truncated ? fetched.slice(0, LISTING_CANDIDATE_CAP) : fetched;
+  const rowsById = new Map(results.map((r) => [String(r.id), r]));
   // One batched read for the whole page rather than N+1 per card — and one
   // chunked read of every scheduled offer on it, so a special offer costs the
   // listing one query, not one per card (§14).
   const [views, offers, pooled] = await Promise.all([
     loadRelationsViews(
-      c.env.DB,
+      db,
       results.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
     ),
-    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(c.env.DB, results.map((r) => subjectOf(String(r.id)))), EMPTY_OFFERS()),
+    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(db, results.map((r) => subjectOf(String(r.id)))), EMPTY_OFFERS()),
     // §8.2 row 18, for the LISTING too: a card carries `stock`, and a grid
     // captured before and after a purchase is the same two GETs.
-    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, results.map((r) => String(r.id))), new Set<string>()),
+    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(db, results.map((r) => String(r.id))), new Set<string>()),
   ]);
   /**
    * A COMPOSITION ROW IS SERIALIZED BY THE COMPOSITION BUILDER, HERE TOO (§9).
@@ -3457,10 +3484,10 @@ productRoutes.get('/', async (c) => {
   // The JOINED rows: `bundle_config` and `offer_windows` are what decide the
   // price mode and the lock, and the bare `products` row carries neither.
   const compositionJoined = compositionIds.length
-    ? [...(await loadCompositionRows(c.env.DB, compositionIds)).values()]
+    ? [...(await loadCompositionRows(db, compositionIds)).values()]
     : [];
   const compositions = compositionJoined.length
-    ? (await resolveCompositionPageWithMystery(c.env.DB, compositionJoined, ctx)).resolved
+    ? (await resolveCompositionPageWithMystery(db, compositionJoined, ctx)).resolved
     : new Map<string, ResolvedBundle>();
   /**
    * THE GREY COMPLETION IN THE SEARCH BOX («اقتراحات بلون رصاصي في الشريط
@@ -3500,12 +3527,12 @@ productRoutes.get('/', async (c) => {
     );
   });
   if (!listing) {
-    return c.json({
-      success: true,
+    return { body: {
       ...categoryField,
       ...suggestion,
       products: cards,
-    });
+      ...(counted ? { total: Number(counted.n) || 0 } : {}),
+    }, rows: rowsById };
   }
 
   /**
@@ -3516,7 +3543,7 @@ productRoutes.get('/', async (c) => {
   const brandIds = [...new Set(results.map((r) => String(r.brand_id ?? '')).filter(Boolean))];
   const brandRows = brandIds.length
     ? ((
-        await c.env.DB.prepare(
+        await db.prepare(
           'SELECT id, slug, name_ar, name_en, name_ckb FROM brands WHERE id IN (SELECT value FROM json_each(?))'
         )
           .bind(JSON.stringify(brandIds))
@@ -3529,7 +3556,7 @@ productRoutes.get('/', async (c) => {
   // request neither filters nor counts by printer (every rail and shelf).
   const fitsByProduct =
     wantsFacets || listingState.fits.length > 0
-      ? await activeFitsFor(c.env.DB, results.map((r) => String(r.id)))
+      ? await activeFitsFor(db, results.map((r) => String(r.id)))
       : new Map<string, FitPrinter[]>();
   const printers = new Map<string, PrinterInfo>();
   for (const list of fitsByProduct.values()) {
@@ -3547,8 +3574,7 @@ productRoutes.get('/', async (c) => {
     )
   );
   const run = runListing(items, listingState, { facets: wantsFacets, brands, printers });
-  return c.json({
-    success: true,
+  return { body: {
     ...categoryField,
     ...suggestion,
     products: run.items.slice(offset, offset + limit).map((i) => i.card),
@@ -3556,8 +3582,255 @@ productRoutes.get('/', async (c) => {
     truncated,
     sort: listingState.sort,
     ...(run.facets ? { facets: run.facets } : {}),
-  });
+  }, rows: rowsById };
+}
+
+productRoutes.get('/', async (c) => {
+  // Started before the listing so it runs alongside the category probe and the
+  // search-index read (see `listCatalogProducts`).
+  const ctxPromise = pricingCtx(c);
+  ctxPromise.catch(() => {});
+  const { body } = await listCatalogProducts(c.env.DB, c.req.query(), ctxPromise);
+  return c.json({ success: true, ...body });
 });
+
+/**
+ * THE CATALOGUE PRODUCT PAGE — what `GET /api/products/:slug` answers for an
+ * ordinary (non-composition) product, as a function, shared by the storefront
+ * route and the public API (worker/routes/publicApi.ts) so both describe the
+ * product from the same resolver: the same price levels, the same
+ * availability, the same relations. What belongs to ONE viewer — whether
+ * they saved it, the `ProductViewed` event — stays in the route.
+ */
+export async function catalogProductDetail(
+  db: D1Database,
+  row: Record<string, unknown>,
+  parsed: ProductDoc,
+  ctxPromise: Promise<PricingCtx>
+): Promise<{ ctx: PricingCtx; body: Record<string, unknown> }> {
+  const [ctx, brandRow, relations, isPrinter, salesBadge, ratingRow] = await Promise.all([
+    ctxPromise,
+    parsed.brand_id
+      ? db.prepare('SELECT id, name_ar, name_en, name_ckb FROM brands WHERE id = ? AND active = 1')
+          .bind(parsed.brand_id)
+          .first<{ id: string; name_ar: string; name_en: string; name_ckb: string }>()
+      : Promise.resolve(null),
+    // Options, colours, links, variants and images come from the TABLES.
+    // Migration 0022 gave every existing product its rows, so this is the
+    // single source of truth, not a second one.
+    loadRelationsView(db, String(row.id), row.inventory_mode),
+    // The owner's catalog flag: the page shows the printer home-delivery
+    // note off it (worker/lib/printerIdentity.ts) — never off ops_policy.
+    isPrinterProduct(db, String(row.id)),
+    // The header's "how many have sold" tier. Joins this batch rather than
+    // running after it, so the badge costs the page no extra round trip.
+    salesBadgeFor(db, String(row.id)),
+    // The header's score. Same aggregate the reviews tab computes, on the
+    // same `status = 'published'` filter, so the two can never disagree.
+    db.prepare(
+      "SELECT COUNT(*) AS n, AVG(stars) AS avg_stars FROM reviews WHERE product_id = ? AND status = 'published'"
+    )
+      .bind(String(row.id))
+      .first<{ n: number; avg_stars: number | null }>(),
+  ]);
+  /**
+   * The linked new product's live price, when this listing is a used copy.
+   * One extra read, and only for a graded row — an ordinary product pays
+   * nothing for this feature.
+   */
+  let conditionReference: { reference_iqd: number; saving_iqd: number } | null = null;
+  if (parsed.condition?.new_product_id) {
+    const ref = await db.prepare(
+      "SELECT price_iqd FROM products WHERE id = ? AND status = 'active'"
+    )
+      .bind(parsed.condition.new_product_id)
+      .first<{ price_iqd: number }>();
+    conditionReference = conditionSaving(Number(parsed.price_iqd) || 0, ref ? Number(ref.price_iqd) : null);
+  }
+  const ratingCount = Number(ratingRow?.n) || 0;
+  const ratingSummary = ratingCount > 0
+    ? { average: Math.round(Number(ratingRow?.avg_stars ?? 0) * 10) / 10, count: ratingCount }
+    : null;
+  const doc = applyRelations(parsed, relations);
+  // ONE FIELD, ONE MEANING. `display_price_iqd` is the CARD price — the
+  // cheapest way to buy the product — everywhere else it appears, and this
+  // endpoint used to set it to the base selection instead. A customer who
+  // tapped a card reading 250,000 got a page whose own card field said
+  // 400,000, and any surface reading the detail response (a share preview,
+  // a saved-products row) repeated the higher number. The base-selection
+  // quote is still returned, unchanged, as `pricing` — that is what the
+  // page prices with until the customer picks an option.
+  // §8.2 ROW 18. One indexed read (`idx_mystery_entries_product`), resolved
+  // once per request and passed down — never once per option value or
+  // colour. A product that is in no pool costs one empty query and the
+  // payload is byte-identical to today's.
+  const poolMember = (await degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(db, [String(row.id)]), new Set<string>())).size > 0;
+  // Hoisted out of the call below: the SAME window has to price the display
+  // block and the per-selection levels, or the page would paint an offer
+  // price on the card and a ladder price the moment a variant was tapped.
+  const offer = (await degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(db, [subjectOf(String(row.id))]), EMPTY_OFFERS())).get(offerKey(subjectOf(String(row.id))));
+
+  const inventory = snapshotFrom(relations, {
+    stock: doc.stock,
+    reserved: Number(row.stock_reserved ?? 0),
+    low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+  });
+  const initialSelection = firstUsableDirectSelection(doc, {
+    inventory,
+    links: relations.links,
+    activeGroupIds: relations.has_relations
+      ? new Set(
+          relations.groups.filter((group) => group.active !== 0 && group.active !== false).map((group) => group.id)
+        )
+      : undefined,
+    transportDefaults: ctx.transportDefaults,
+    coarseStock: poolMember,
+  });
+  const initialOptionValueIds = initialSelection?.option_value_ids ?? [];
+  const initialOptionId = initialOptionValueIds[0] ?? null;
+  const initialColorId = initialSelection?.color_id ?? null;
+  const resolved = resolveUnitPrice({
+    product: doc,
+    optionId: initialOptionId,
+    colorId: initialColorId,
+    fulfillmentType: initialSelection ? 'direct_sale' : undefined,
+    tier: ctx.tier,
+    tierActive: ctx.tierActive,
+    proPolicy: ctx.proPolicy,
+    transportDefaults: ctx.transportDefaults,
+    memberFallback: benefitFallbackFor(ctx, doc),
+    isPrinter,
+  });
+  const out = publicWithDisplayPrice(row, ctx, relations, undefined, offer, poolMember);
+  // A fact about the product, not a price: the storefront renders the
+  // home-delivery note beside a printer's price block from this flag.
+  out.is_printer = isPrinter;
+  // The extended-warranty options with their fee resolved against the BASE
+  // selection's regular price (the quote re-prices them per selection), and
+  // the total months each yields — so "+12 months → 24 total · +67,425"
+  // is the server's sentence, never the browser's arithmetic. Empty for a
+  // non-printer: the cart would refuse the plan (WARRANTY_NOT_PRINTER).
+  out.warranty_plans = pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter);
+
+  /**
+   * 0148 — WHICH PRINTER THIS FITS, AND WHAT FITS THIS PRINTER.
+   *
+   * `fits_printers`: the ACTIVE printers the admin linked, in the admin's
+   * order — the «يناسب» line under the title. `maintenance_parts`: for a
+   * printer, how many active parts in «مواد الصيانة» fit it and the listing
+   * that shows them; the page asks for its shelf only when there are some.
+   * A used unit's parts are its MODEL's (`condition.new_product_id`, the
+   * link a graded listing already carries). Both empty before 0148.
+   */
+  // Together, not one after the other: a printer page pays one round trip.
+  const [fitsMap, target] = await Promise.all([
+    activeFitsFor(db, [String(row.id)]),
+    isPrinter ? maintenanceFor(db, [String(row.id)]).then((m) => m.get(String(row.id))) : Promise.resolve(undefined),
+  ]);
+  const fitsPrinters = fitsMap.get(String(row.id)) ?? [];
+  let maintenanceParts: { count: number; printer_slug: string; path: string | null } | null = null;
+  if (target) {
+    const idx = await catalogIndexFor(db).catch(() => null);
+    maintenanceParts = {
+      count: target.count,
+      printer_slug: target.slug,
+      path: idx?.byId.has(MAINTENANCE_ROOT_ID) ? `${idx.path(MAINTENANCE_ROOT_ID)}/all` : null,
+    };
+  }
+
+  return {
+    ctx,
+    body: {
+    product: out,
+    source: 'catalog',
+    brand: brandRow ?? null,
+    /**
+     * The two header signals the page could not previously show.
+     *
+     * `sales_badge` is the TIER, not the count — worker/lib/salesBadge.ts
+     * explains why the exact figure must not leave the Worker. Null below
+     * the first tier, so a new product shows nothing rather than "0+".
+     *
+     * `rating` was reachable only through GET /api/reviews/product/:slug,
+     * which the reviews TAB fetches — so the header could not show a score
+     * until the shopper scrolled to and opened that tab. One extra aggregate
+     * here is cheaper than the page being unable to answer "is this any
+     * good?" above the fold.
+     */
+    sales_badge: salesBadge,
+    rating: ratingSummary,
+    /**
+     * The new product's CURRENT price, for the struck-through comparison on
+     * a graded listing. Resolved server-side so the page never has to fetch
+     * a second product to price the first, and omitted entirely when there
+     * is nothing honest to show — no link, a hidden reference, or a used
+     * price that is not actually lower.
+     */
+    condition_reference: conditionReference,
+    // 0148 — «يناسب» and «مواد الصيانة لهذه الطابعة» (see above).
+    fits_printers: fitsPrinters.map((p) => ({ id: p.id, slug: p.slug, name: p.name_en, name_ar: p.name_ar, name_ckb: p.name_ckb })),
+    maintenance_parts: maintenanceParts,
+    // The structure the JSON model could not express: option GROUPS, the
+    // real many-to-many colour links, modelled combinations and bound
+    // images. Null when the product has no relational rows at all.
+    relations: publicRelations(relations, poolMember),
+    // When a shelf-backed direct selection exists, every first-paint block
+    // below answers that SAME selection. Otherwise they retain the legacy
+    // base/null answer until the customer chooses.
+    initial_selection: initialSelection
+      ? {
+          option_id: initialOptionId,
+          option_value_ids: initialOptionValueIds,
+          color_id: initialColorId,
+          fulfillment_type: 'direct_sale' as const,
+        }
+      : null,
+    pricing: publicQuote(resolved), // opening-selection resolver result, cost-free
+    // §8/§9: the opening selection's member prices, from the live rules, so the
+    // page can state the benefit on first paint rather than waiting for the
+    // debounced quote to say what a membership is worth here.
+    membership_preview: membershipPreview(
+      ctx,
+      doc,
+      { optionId: initialOptionId, colorId: initialColorId },
+      isPrinter
+    ),
+    // EVERY SELECTION THE CHOOSERS CAN REACH, PRICED HERE (see `priceLevels`).
+    // The page paints the exact figure on the same frame as the tap, and the
+    // debounced quote becomes a confirmation rather than a prerequisite.
+    price_levels: priceLevels(doc, ctx, offer, Date.now()),
+    // The final price of every way to get the opening selection (the quote
+    // re-computes them per selection) — the page's fulfilment pills and
+    // transport rows read these, and compute nothing.
+    pricing_modes: pricingModes(
+      doc,
+      ctx,
+      { optionId: initialOptionId, colorId: initialColorId },
+      isPrinter
+    ),
+    // §7.2 — the sale mode the page may DEFAULT to, derived from the real
+    // stock model and the admin pre-order policy (never from the browser).
+    //
+    // NO `capacity` HERE, AND THAT IS THE HONEST ANSWER. Capacity is
+    // configured per (model x pre-order) and this block describes the page
+    // before any model has been chosen. Reporting the largest model's quota
+    // would promise units of a model the customer has not picked; reporting
+    // the smallest would hide a model that is wide open. The per-selection
+    // quote below answers with the real counter the moment a model is
+    // tapped, and the cart and the checkout re-derive it server-side
+    // regardless of what this block said.
+    availability:
+      initialSelection?.availability ??
+      saleAvailability(doc, {
+        coarseStock: poolMember,
+        transportDefaults: ctx.transportDefaults,
+        inventory,
+        links: relations.links,
+      }),
+    viewer_tier: viewerTier(ctx),
+  },
+  };
+}
 
 productRoutes.get('/:slug', async (c) => {
   const slug = c.req.param('slug');
@@ -3592,140 +3865,15 @@ productRoutes.get('/:slug', async (c) => {
       });
     }
 
-    const [ctx, favRow, brandRow, relations, isPrinter, salesBadge, ratingRow] = await Promise.all([
-      pricingCtx(c),
-      user
-        ? c.env.DB.prepare('SELECT 1 AS x FROM favorites WHERE user_id = ? AND product_id = ?')
-            .bind(user.id, row.id)
-            .first()
-        : Promise.resolve(null),
-      parsed.brand_id
-        ? c.env.DB.prepare('SELECT id, name_ar, name_en, name_ckb FROM brands WHERE id = ? AND active = 1')
-            .bind(parsed.brand_id)
-            .first<{ id: string; name_ar: string; name_en: string; name_ckb: string }>()
-        : Promise.resolve(null),
-      // Options, colours, links, variants and images come from the TABLES.
-      // Migration 0022 gave every existing product its rows, so this is the
-      // single source of truth, not a second one.
-      loadRelationsView(c.env.DB, String(row.id), row.inventory_mode),
-      // The owner's catalog flag: the page shows the printer home-delivery
-      // note off it (worker/lib/printerIdentity.ts) — never off ops_policy.
-      isPrinterProduct(c.env.DB, String(row.id)),
-      // The header's "how many have sold" tier. Joins this batch rather than
-      // running after it, so the badge costs the page no extra round trip.
-      salesBadgeFor(c.env.DB, String(row.id)),
-      // The header's score. Same aggregate the reviews tab computes, on the
-      // same `status = 'published'` filter, so the two can never disagree.
-      c.env.DB.prepare(
-        "SELECT COUNT(*) AS n, AVG(stars) AS avg_stars FROM reviews WHERE product_id = ? AND status = 'published'"
-      )
-        .bind(String(row.id))
-        .first<{ n: number; avg_stars: number | null }>(),
+    const favPromise = user
+      ? c.env.DB.prepare('SELECT 1 AS x FROM favorites WHERE user_id = ? AND product_id = ?')
+          .bind(user.id, row.id)
+          .first()
+      : Promise.resolve(null);
+    const [{ ctx, body }, favRow] = await Promise.all([
+      catalogProductDetail(c.env.DB, row, parsed, pricingCtx(c)),
+      favPromise,
     ]);
-    /**
-     * The linked new product's live price, when this listing is a used copy.
-     * One extra read, and only for a graded row — an ordinary product pays
-     * nothing for this feature.
-     */
-    let conditionReference: { reference_iqd: number; saving_iqd: number } | null = null;
-    if (parsed.condition?.new_product_id) {
-      const ref = await c.env.DB.prepare(
-        "SELECT price_iqd FROM products WHERE id = ? AND status = 'active'"
-      )
-        .bind(parsed.condition.new_product_id)
-        .first<{ price_iqd: number }>();
-      conditionReference = conditionSaving(Number(parsed.price_iqd) || 0, ref ? Number(ref.price_iqd) : null);
-    }
-    const ratingCount = Number(ratingRow?.n) || 0;
-    const ratingSummary = ratingCount > 0
-      ? { average: Math.round(Number(ratingRow?.avg_stars ?? 0) * 10) / 10, count: ratingCount }
-      : null;
-    const doc = applyRelations(parsed, relations);
-    // ONE FIELD, ONE MEANING. `display_price_iqd` is the CARD price — the
-    // cheapest way to buy the product — everywhere else it appears, and this
-    // endpoint used to set it to the base selection instead. A customer who
-    // tapped a card reading 250,000 got a page whose own card field said
-    // 400,000, and any surface reading the detail response (a share preview,
-    // a saved-products row) repeated the higher number. The base-selection
-    // quote is still returned, unchanged, as `pricing` — that is what the
-    // page prices with until the customer picks an option.
-    // §8.2 ROW 18. One indexed read (`idx_mystery_entries_product`), resolved
-    // once per request and passed down — never once per option value or
-    // colour. A product that is in no pool costs one empty query and the
-    // payload is byte-identical to today's.
-    const poolMember = (await degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, [String(row.id)]), new Set<string>())).size > 0;
-    // Hoisted out of the call below: the SAME window has to price the display
-    // block and the per-selection levels, or the page would paint an offer
-    // price on the card and a ladder price the moment a variant was tapped.
-    const offer = (await degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(c.env.DB, [subjectOf(String(row.id))]), EMPTY_OFFERS())).get(offerKey(subjectOf(String(row.id))));
-
-    const inventory = snapshotFrom(relations, {
-      stock: doc.stock,
-      reserved: Number(row.stock_reserved ?? 0),
-      low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
-    });
-    const initialSelection = firstUsableDirectSelection(doc, {
-      inventory,
-      links: relations.links,
-      activeGroupIds: relations.has_relations
-        ? new Set(
-            relations.groups.filter((group) => group.active !== 0 && group.active !== false).map((group) => group.id)
-          )
-        : undefined,
-      transportDefaults: ctx.transportDefaults,
-      coarseStock: poolMember,
-    });
-    const initialOptionValueIds = initialSelection?.option_value_ids ?? [];
-    const initialOptionId = initialOptionValueIds[0] ?? null;
-    const initialColorId = initialSelection?.color_id ?? null;
-    const resolved = resolveUnitPrice({
-      product: doc,
-      optionId: initialOptionId,
-      colorId: initialColorId,
-      fulfillmentType: initialSelection ? 'direct_sale' : undefined,
-      tier: ctx.tier,
-      tierActive: ctx.tierActive,
-      proPolicy: ctx.proPolicy,
-      transportDefaults: ctx.transportDefaults,
-      memberFallback: benefitFallbackFor(ctx, doc),
-      isPrinter,
-    });
-    const out = publicWithDisplayPrice(row, ctx, relations, undefined, offer, poolMember);
-    // A fact about the product, not a price: the storefront renders the
-    // home-delivery note beside a printer's price block from this flag.
-    out.is_printer = isPrinter;
-    // The extended-warranty options with their fee resolved against the BASE
-    // selection's regular price (the quote re-prices them per selection), and
-    // the total months each yields — so "+12 months → 24 total · +67,425"
-    // is the server's sentence, never the browser's arithmetic. Empty for a
-    // non-printer: the cart would refuse the plan (WARRANTY_NOT_PRINTER).
-    out.warranty_plans = pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter);
-
-    /**
-     * 0148 — WHICH PRINTER THIS FITS, AND WHAT FITS THIS PRINTER.
-     *
-     * `fits_printers`: the ACTIVE printers the admin linked, in the admin's
-     * order — the «يناسب» line under the title. `maintenance_parts`: for a
-     * printer, how many active parts in «مواد الصيانة» fit it and the listing
-     * that shows them; the page asks for its shelf only when there are some.
-     * A used unit's parts are its MODEL's (`condition.new_product_id`, the
-     * link a graded listing already carries). Both empty before 0148.
-     */
-    // Together, not one after the other: a printer page pays one round trip.
-    const [fitsMap, target] = await Promise.all([
-      activeFitsFor(c.env.DB, [String(row.id)]),
-      isPrinter ? maintenanceFor(c.env.DB, [String(row.id)]).then((m) => m.get(String(row.id))) : Promise.resolve(undefined),
-    ]);
-    const fitsPrinters = fitsMap.get(String(row.id)) ?? [];
-    let maintenanceParts: { count: number; printer_slug: string; path: string | null } | null = null;
-    if (target) {
-      const idx = await catalogIndexFor(c.env.DB).catch(() => null);
-      maintenanceParts = {
-        count: target.count,
-        printer_slug: target.slug,
-        path: idx?.byId.has(MAINTENANCE_ROOT_ID) ? `${idx.path(MAINTENANCE_ROOT_ID)}/all` : null,
-      };
-    }
 
     // `ProductViewed` (03-EVENTS.md §3.2) — `best_effort` and SAMPLED (1:1
     // signed in, 1:5 anonymous): it never touches the outbox and never adds a
@@ -3749,97 +3897,8 @@ productRoutes.get('/:slug', async (c) => {
       );
     }
 
-    return c.json({
-      success: true,
-      product: out,
-      source: 'catalog',
-      favorite: !!favRow,
-      brand: brandRow ?? null,
-      /**
-       * The two header signals the page could not previously show.
-       *
-       * `sales_badge` is the TIER, not the count — worker/lib/salesBadge.ts
-       * explains why the exact figure must not leave the Worker. Null below
-       * the first tier, so a new product shows nothing rather than "0+".
-       *
-       * `rating` was reachable only through GET /api/reviews/product/:slug,
-       * which the reviews TAB fetches — so the header could not show a score
-       * until the shopper scrolled to and opened that tab. One extra aggregate
-       * here is cheaper than the page being unable to answer "is this any
-       * good?" above the fold.
-       */
-      sales_badge: salesBadge,
-      rating: ratingSummary,
-      /**
-       * The new product's CURRENT price, for the struck-through comparison on
-       * a graded listing. Resolved server-side so the page never has to fetch
-       * a second product to price the first, and omitted entirely when there
-       * is nothing honest to show — no link, a hidden reference, or a used
-       * price that is not actually lower.
-       */
-      condition_reference: conditionReference,
-      // 0148 — «يناسب» and «مواد الصيانة لهذه الطابعة» (see above).
-      fits_printers: fitsPrinters.map((p) => ({ id: p.id, slug: p.slug, name: p.name_en, name_ar: p.name_ar, name_ckb: p.name_ckb })),
-      maintenance_parts: maintenanceParts,
-      // The structure the JSON model could not express: option GROUPS, the
-      // real many-to-many colour links, modelled combinations and bound
-      // images. Null when the product has no relational rows at all.
-      relations: publicRelations(relations, poolMember),
-      // When a shelf-backed direct selection exists, every first-paint block
-      // below answers that SAME selection. Otherwise they retain the legacy
-      // base/null answer until the customer chooses.
-      initial_selection: initialSelection
-        ? {
-            option_id: initialOptionId,
-            option_value_ids: initialOptionValueIds,
-            color_id: initialColorId,
-            fulfillment_type: 'direct_sale' as const,
-          }
-        : null,
-      pricing: publicQuote(resolved), // opening-selection resolver result, cost-free
-      // §8/§9: the opening selection's member prices, from the live rules, so the
-      // page can state the benefit on first paint rather than waiting for the
-      // debounced quote to say what a membership is worth here.
-      membership_preview: membershipPreview(
-        ctx,
-        doc,
-        { optionId: initialOptionId, colorId: initialColorId },
-        isPrinter
-      ),
-      // EVERY SELECTION THE CHOOSERS CAN REACH, PRICED HERE (see `priceLevels`).
-      // The page paints the exact figure on the same frame as the tap, and the
-      // debounced quote becomes a confirmation rather than a prerequisite.
-      price_levels: priceLevels(doc, ctx, offer, Date.now()),
-      // The final price of every way to get the opening selection (the quote
-      // re-computes them per selection) — the page's fulfilment pills and
-      // transport rows read these, and compute nothing.
-      pricing_modes: pricingModes(
-        doc,
-        ctx,
-        { optionId: initialOptionId, colorId: initialColorId },
-        isPrinter
-      ),
-      // §7.2 — the sale mode the page may DEFAULT to, derived from the real
-      // stock model and the admin pre-order policy (never from the browser).
-      //
-      // NO `capacity` HERE, AND THAT IS THE HONEST ANSWER. Capacity is
-      // configured per (model x pre-order) and this block describes the page
-      // before any model has been chosen. Reporting the largest model's quota
-      // would promise units of a model the customer has not picked; reporting
-      // the smallest would hide a model that is wide open. The per-selection
-      // quote below answers with the real counter the moment a model is
-      // tapped, and the cart and the checkout re-derive it server-side
-      // regardless of what this block said.
-      availability:
-        initialSelection?.availability ??
-        saleAvailability(doc, {
-          coarseStock: poolMember,
-          transportDefaults: ctx.transportDefaults,
-          inventory,
-          links: relations.links,
-        }),
-      viewer_tier: viewerTier(ctx),
-    });
+    const { product, source, ...rest } = body;
+    return c.json({ success: true, product, source, favorite: !!favRow, ...rest });
   }
 
   // Community products share the product-detail page (kept as-is).

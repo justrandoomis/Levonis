@@ -57,12 +57,13 @@ import { rateLimit } from '../lib/ratelimit';
 import { bumpMetric, bundleAnalytics, mysteryAnalytics } from '../lib/compositionAnalytics';
 import { benefits } from '../lib/entitlements';
 import { SESSION_COOKIE_NAME } from '../lib/session';
-import { compositionSelect } from '../lib/bundleRead';
+import { compositionSelect, type ResolvedBundle } from '../lib/bundleRead';
 import {
   compositionCard,
   compositionDetail,
   pricingCtx,
   resolveCompositionPageWithMystery,
+  type PricingCtx,
 } from './products';
 
 // ---------------------------------------------------------------- public
@@ -103,17 +104,28 @@ const LIST_LIMIT_MAX = 48;
  * components with their allow-lists, the member products, and one relations
  * pass over those members.
  */
-bundlesRoutes.get('/', async (c) => {
-  const q = c.req.query();
-  const kind = str(q.kind, 'kind', { max: 20, required: false });
-  const search = str(q.search, 'search', { max: 100, required: false });
-  const categoryId = str(q.category_id, 'category_id', { max: 60, required: false });
-  const family = str(q.family, 'family', { max: 60, required: false });
-  const featured = q.featured === '1' || q.featured === 'true';
-  const limit = int(q.limit, 'limit', { min: 1, max: LIST_LIMIT_MAX, def: 24 });
-  const offset = int(q.offset, 'offset', { min: 0, max: 10_000, def: 0 });
+/**
+ * THE BUNDLES AND MYSTERY BOXES ON SALE — what `GET /api/bundles` lists, as
+ * a function, so the storefront route and the public API
+ * (worker/routes/publicApi.ts) resolve the same compositions through the
+ * same filters (unconfigured rows and switched-off offers are never listed).
+ */
+export interface BundleListFilters {
+  kind?: string;
+  search?: string;
+  categoryId?: string;
+  family?: string;
+  featured?: boolean;
+  limit: number;
+  offset: number;
+}
 
-  const user = c.get('user');
+export async function listBundles(
+  db: D1Database,
+  f: BundleListFilters,
+  ctxPromise: Promise<PricingCtx>
+): Promise<{ ctx: PricingCtx; bundles: ResolvedBundle[] }> {
+  const { kind, search, categoryId, family, featured, limit, offset } = f;
   const params: unknown[] = [];
   let where = "p.status = 'active'";
   if (kind === 'bundle' || kind === 'mystery') {
@@ -139,24 +151,18 @@ bundlesRoutes.get('/', async (c) => {
 
   const [results, ctx] = await Promise.all([
     compositionSelect(
-      c.env.DB,
+      db,
       (cols, from) => `SELECT ${cols} ${from}
         WHERE ${where}
         ORDER BY p.display_order ASC, p.created_at DESC
         LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     ),
-    pricingCtx(c),
+    ctxPromise,
   ]);
+  if (results.length === 0) return { ctx, bundles: [] };
 
-  cacheHeaders(c);
-  // `entitled` keeps its 0034 meaning — the viewer holds a paid membership —
-  // so the page's lock panel and its subscribe path read the same field they
-  // always did. It no longer decides whether the LIST is populated.
-  const entitled = !!ctx.tierStatus && benefits.exclusiveSections(ctx.tierStatus);
-  if (results.length === 0) return c.json({ entitled, signed_in: !!user, bundles: [] });
-
-  const { resolved } = await resolveCompositionPageWithMystery(c.env.DB, results, ctx);
+  const { resolved } = await resolveCompositionPageWithMystery(db, results, ctx);
   const bundles = results
     .map((r) => resolved.get(String(r.id)))
     .filter((b): b is NonNullable<typeof b> => !!b)
@@ -178,10 +184,33 @@ bundlesRoutes.get('/', async (c) => {
      * rather than a state that a derived price below its floor also produces
      * (§4.3 wants that one to stay on the grid showing its unavailable state).
      */
-    .filter((b) => !b.window || b.window.active)
-    .map((b) => compositionCard(b, ctx));
+    .filter((b) => !b.window || b.window.active);
+  return { ctx, bundles };
+}
 
-  return c.json({ entitled, signed_in: !!user, bundles });
+bundlesRoutes.get('/', async (c) => {
+  const q = c.req.query();
+  const kind = str(q.kind, 'kind', { max: 20, required: false });
+  const search = str(q.search, 'search', { max: 100, required: false });
+  const categoryId = str(q.category_id, 'category_id', { max: 60, required: false });
+  const family = str(q.family, 'family', { max: 60, required: false });
+  const featured = q.featured === '1' || q.featured === 'true';
+  const limit = int(q.limit, 'limit', { min: 1, max: LIST_LIMIT_MAX, def: 24 });
+  const offset = int(q.offset, 'offset', { min: 0, max: 10_000, def: 0 });
+
+  const user = c.get('user');
+  const { ctx, bundles } = await listBundles(
+    c.env.DB,
+    { kind, search, categoryId, family, featured, limit, offset },
+    pricingCtx(c)
+  );
+  cacheHeaders(c);
+  // `entitled` keeps its 0034 meaning — the viewer holds a paid membership —
+  // so the page's lock panel and its subscribe path read the same field they
+  // always did. It no longer decides whether the LIST is populated.
+  const entitled = !!ctx.tierStatus && benefits.exclusiveSections(ctx.tierStatus);
+
+  return c.json({ entitled, signed_in: !!user, bundles: bundles.map((b) => compositionCard(b, ctx)) });
 });
 
 /**
