@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, notFound, forbidden, str, HttpError } from '../lib/http';
+import { requireAuth, notFound, forbidden, str, int, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { getTierStatus, benefits, membershipBadges } from '../lib/entitlements';
@@ -9,7 +9,9 @@ import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { communityAdminDoor, communityClosedRefusal, communityGate, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { audit } from '../lib/audit';
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { publishRequest } from './printRequests';
+import { publicRequest } from './marketplace';
 
 export const communityRoutes = new Hono<AppContext>();
 
@@ -62,6 +64,63 @@ function communityProductPublic(p: Record<string, unknown>) {
   };
 }
 
+/** A media key as the address `/files/*` serves it, or null. */
+const fileUrl = (key: unknown) => (typeof key === 'string' && key ? `/files/${key}` : null);
+
+/**
+ * THE COMMUNITY FEEDS PAGE BY (created_at, id), newest first — the storefront's
+ * cursor (worker/routes/storefront.ts): `<created_at>|<id>`, so two rows
+ * written in the same millisecond can neither repeat nor vanish across a page
+ * boundary. A bare timestamp reads as `(timestamp, '')`: strictly older.
+ */
+function feedCursor(raw: string | undefined): { at: string; id: string } {
+  const v = (raw ?? '').slice(0, 200);
+  const bar = v.lastIndexOf('|');
+  return bar === -1 ? { at: v, id: '' } : { at: v.slice(0, bar), id: v.slice(bar + 1) };
+}
+
+function nextFeedCursor(rows: Array<Record<string, unknown>>, limit: number): string | null {
+  if (rows.length !== limit) return null;
+  const last = rows[rows.length - 1];
+  return `${String(last.created_at)}|${String(last.id)}`;
+}
+
+/**
+ * A card in the community's product feed: the product, WHERE IT CAN BE BOUGHT,
+ * and the shop that sells it.
+ *
+ * `url` is the store's product page on THIS site — `/community/store/<store
+ * slug>/p/<product slug>`, the route StorefrontProduct resolves by the store's
+ * slug and sells from (its own cart door), and the address the storefront
+ * itself links a product by on the main site. It stays in-site even when the
+ * shop has its own subdomain: a feed tap should not open a tab per product.
+ * The SHOP is its own site (`store.url`), and the store cards go there.
+ *
+ * A card used to open /product/:slug for every row, which is the platform
+ * catalogue's page: it renders a community listing as «not sold through the
+ * store cart» (COMMUNITY_LISTING_NOT_SELLABLE) — a dead end for a product its
+ * own store sells. /product/:slug is kept only for a pre-store listing, which
+ * has no store to be bought from.
+ *
+ * `in_stock` is the storefront's own boolean (`!track_stock || stock > 0`),
+ * never the count — and null for a pre-store listing, which has no cart path
+ * for the question to be about.
+ */
+function communityFeedProduct(p: Record<string, unknown>, root: string | null) {
+  const storeId = typeof p.store_id === 'string' && p.store_id ? p.store_id : null;
+  const storeSlug = typeof p.s_slug === 'string' && p.s_slug ? p.s_slug : null;
+  const productSlug = encodeURIComponent(String(p.slug ?? ''));
+  if (!storeId || !storeSlug) {
+    return { ...communityProductPublic(p), in_stock: null, url: `/product/${productSlug}`, store: null };
+  }
+  return {
+    ...communityProductPublic(p),
+    in_stock: !Number(p.track_stock) || Number(p.stock) > 0,
+    url: `/community/store/${encodeURIComponent(storeSlug)}/p/${productSlug}`,
+    store: { id: storeId, slug: storeSlug, name: p.s_name ?? '', logoUrl: fileUrl(p.s_logo_key), url: storeUrl(storeSlug, root, storeId) },
+  };
+}
+
 // ------------------------------------------------- the maintenance gate
 
 /**
@@ -101,75 +160,228 @@ communityRoutes.get('/access', async (c) => {
  */
 communityRoutes.use('*', communityGate());
 
-communityRoutes.get('/products', async (c) => {
-  // Nothing of a SANCTIONED shop — a suspended merchant, or a suspended store —
-  // is served anywhere (owner decision 2026-09-24). The merchant suspension no
-  // longer rewrites the store row, so both are asked here.
-  const { results } = await c.env.DB.prepare(
-    `SELECT p.* FROM community_products p
-       JOIN community_merchants m ON m.id = p.merchant_id
-       LEFT JOIN merchant_stores s ON s.id = p.store_id
-      WHERE p.status = 'active' AND m.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
-      ORDER BY p.created_at DESC LIMIT 20`
-  ).all();
-  return c.json({ success: true, products: results.map(communityProductPublic) });
-});
+/**
+ * THE COMMUNITY'S PRODUCTS — what the stores have PUBLISHED, newest first, a
+ * page at a time, searchable on the server (`q`), with the shop that sells
+ * each one and the page it can be bought on (`communityFeedProduct`).
+ *
+ * "Published" is the storefront's own predicate, `lifecycle = 'active' AND
+ * status = 'active'` (worker/routes/storefront.ts, and the 0126 mirrors keep
+ * the two in step). Nothing of a SANCTIONED shop — a suspended merchant, or a
+ * suspended store — is served anywhere (owner decision 2026-09-24). The
+ * merchant suspension no longer rewrites the store row, so both are asked.
+ *
+ * Search used to be the page filtering the twenty rows it happened to hold,
+ * which answered «لا توجد نتائج» for a product that was simply on page two.
+ * The term goes through `likePattern`, which escapes the wildcards a person
+ * types and keeps the pattern inside D1's 50-byte limit (worker/lib/sqlLike.ts
+ * — Arabic is two bytes a letter). `total` is counted on the first page only,
+ * so «عرض المزيد» can say how many are left.
+ */
+const PRODUCT_SEARCH = ['p.name', 'p.name_ar', 'p.description', 'p.description_ar'] as const;
 
-communityRoutes.get('/merchants', async (c) => {
+communityRoutes.get('/products', async (c) => {
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 24 });
+  const cursor = feedCursor(c.req.query('cursor'));
+  const q = likePattern(c.req.query('q'));
   const root = rootDomainFrom(c.env);
-  // The storefront half rides along so a directory card can send the visitor
-  // straight to the shop's own address; a profile-only merchant has neither
-  // slug nor URL and keeps the in-site page.
-  // NOTHING OF A SANCTIONED SHOP (review S5, owner decision 2026-09-24): a
-  // suspended merchant or a suspended store is not in the directory at all —
-  // its name, bio and avatar are exactly what the storefront no longer serves,
-  // and a card linking to the in-site page would advertise them anyway.
-  const { results } = await c.env.DB.prepare(
-    `SELECT cm.*, s.id AS store_id, s.slug AS store_slug, s.status AS store_status
-       FROM community_merchants cm LEFT JOIN merchant_stores s ON s.merchant_id = cm.id
-      WHERE cm.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
-      ORDER BY cm.created_at DESC LIMIT 20`
-  ).all<Record<string, unknown>>();
-  const badges = await membershipBadges(c.env.DB, results.map((m) => m.user_id));
+  const from = `FROM community_products p
+       JOIN community_merchants m ON m.id = p.merchant_id
+       LEFT JOIN merchant_stores s ON s.id = p.store_id`;
+  const visible = `p.lifecycle = 'active' AND p.status = 'active'
+        AND m.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
+        AND (?1 = '' OR ${sqlLikeClause(PRODUCT_SEARCH, '?1')})`;
+  const [{ results }, total] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key
+         ${from}
+        WHERE ${visible}
+          AND (?2 = '' OR p.created_at < ?2 OR (p.created_at = ?2 AND p.id < ?3))
+        ORDER BY p.created_at DESC, p.id DESC LIMIT ?4`
+    ).bind(q, cursor.at, cursor.id, limit).all<Record<string, unknown>>(),
+    cursor.at === ''
+      ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${visible}`).bind(q).first<{ n: number }>()
+      : Promise.resolve(null),
+  ]);
   return c.json({
     success: true,
-    merchants: results.map((m) => ({
-      ...merchantPublic(m, badges),
-      store_slug: m.store_slug ?? null,
-      // A suspended store — or a suspended merchant's store — is not
-      // advertised as a destination; the card falls back to the in-site page.
-      // Paused shops keep their address — the page itself says they are closed.
-      store_url:
-        m.store_slug && m.store_status !== 'suspended' && m.status !== 'suspended'
-          ? storeUrl(String(m.store_slug), root, String(m.store_id))
-          : null,
-    })),
+    products: results.map((p) => communityFeedProduct(p, root)),
+    next_cursor: nextFeedCursor(results, limit),
+    total: total ? Number(total.n) : null,
   });
 });
 
 /**
- * The community page's short list of requests — the SAME rows the board shows
+ * THE STORES OF THE COMMUNITY — the directory, newest first, a page at a time,
+ * searchable on the server.
+ *
+ * A card shows the shop the visitor will LAND ON: the store's name, logo,
+ * tagline and governorate where there is a store; a profile-only merchant from
+ * the pre-store era keeps its community name and avatar. Beside it, the trust
+ * signals its storefront already publishes (worker/routes/storefront.ts):
+ * rating, completed orders, followers and published products. None of this is
+ * new information about a merchant — it is each shop's own header, read for a
+ * page of shops at once. The merchant row's own governorate is NOT served: the
+ * store's is published on its page, the merchant's never was.
+ *
+ * `following` answers for the signed-in viewer (false for a guest), so a card
+ * can offer «متابعة» or «تتابعه» without a request per card.
+ *
+ * NOTHING OF A SANCTIONED SHOP (review S5, owner decision 2026-09-24): a
+ * suspended merchant or a suspended store is not in the directory at all —
+ * its name, bio and avatar are exactly what the storefront no longer serves,
+ * and a card linking to the in-site page would advertise them anyway.
+ */
+const MERCHANT_SEARCH = ['cm.name', 'cm.bio', 's.name', 's.tagline'] as const;
+
+communityRoutes.get('/merchants', async (c) => {
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 24 });
+  const cursor = feedCursor(c.req.query('cursor'));
+  const q = likePattern(c.req.query('q'));
+  const root = rootDomainFrom(c.env);
+  const viewer = c.get('user')?.id ?? '';
+  const from = 'FROM community_merchants cm LEFT JOIN merchant_stores s ON s.merchant_id = cm.id';
+  const visible = `cm.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
+        AND (?1 = '' OR ${sqlLikeClause(MERCHANT_SEARCH, '?1')})`;
+  const [{ results }, total] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT cm.*, s.id AS store_id, s.slug AS store_slug, s.status AS store_status,
+              s.name AS store_name, s.tagline AS store_tagline, s.logo_key AS store_logo_key,
+              s.governorate AS store_governorate, s.accepts_custom_requests AS store_custom,
+              (SELECT COUNT(*) FROM follows f WHERE f.merchant_id = cm.id) AS followers,
+              (SELECT COUNT(*) FROM community_products p
+                WHERE p.merchant_id = cm.id AND p.lifecycle = 'active' AND p.status = 'active'
+                  AND (s.id IS NULL OR p.store_id = s.id)) AS product_count,
+              EXISTS (SELECT 1 FROM follows f WHERE f.merchant_id = cm.id AND f.user_id = ?5) AS viewer_follows
+         ${from}
+        WHERE ${visible}
+          AND (?2 = '' OR cm.created_at < ?2 OR (cm.created_at = ?2 AND cm.id < ?3))
+        ORDER BY cm.created_at DESC, cm.id DESC LIMIT ?4`
+    ).bind(q, cursor.at, cursor.id, limit, viewer).all<Record<string, unknown>>(),
+    cursor.at === ''
+      ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${visible}`).bind(q).first<{ n: number }>()
+      : Promise.resolve(null),
+  ]);
+  const badges = await membershipBadges(c.env.DB, results.map((m) => m.user_id));
+  return c.json({
+    success: true,
+    merchants: results.map((m) => {
+      const hasStore = typeof m.store_id === 'string' && m.store_id !== '';
+      const ratingCount = Number(m.rating_count ?? 0);
+      return {
+        ...merchantPublic(m, badges),
+        store_slug: m.store_slug ?? null,
+        // A suspended store — or a suspended merchant's store — is not
+        // advertised as a destination; the card falls back to the in-site page.
+        // Paused shops keep their address — the page itself says they are closed.
+        store_url:
+          m.store_slug && m.store_status !== 'suspended' && m.status !== 'suspended'
+            ? storeUrl(String(m.store_slug), root, String(m.store_id))
+            : null,
+        store_name: hasStore ? String(m.store_name ?? '') : null,
+        tagline: hasStore ? String(m.store_tagline ?? '') : '',
+        /** The store's logo, else the community avatar. */
+        logoUrl: fileUrl(m.store_logo_key) ?? fileUrl(m.avatar_key),
+        governorate: hasStore ? String(m.store_governorate ?? '') : '',
+        accepts_custom_requests: hasStore && !!m.store_custom,
+        badge: m.badge_override || m.badge || 'new',
+        rating: ratingCount ? Number(m.rating_avg_x100) / 100 : null,
+        rating_count: ratingCount,
+        completed_orders: Number(m.completed_orders ?? 0),
+        followers: Number(m.followers ?? 0),
+        product_count: Number(m.product_count ?? 0),
+        following: !!m.viewer_follows,
+      };
+    }),
+    next_cursor: nextFeedCursor(results, limit),
+    total: total ? Number(total.n) : null,
+  });
+});
+
+/**
+ * The community page's list of requests — the SAME rows the board shows
  * (`GET /api/marketplace/requests`): published, still taking offers, public
  * and not expired. The coarse `status = 'open'` alone also listed a request
  * its customer had made PRIVATE, and one whose expiry had passed.
+ *
+ * And the same FIELDS: the board's own whitelist (`publicRequest`), so a card
+ * can say what the job is — quantity, material, budget, governorate, how many
+ * offers — instead of «بانتظار العروض» over a request that already had three.
+ * `status` and `customer_username` stay for a client that still reads them.
  */
+const REQUEST_SEARCH = ['r.title', 'r.description'] as const;
+
 communityRoutes.get('/requests', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    `SELECT cr.*, u.username AS customer_username FROM community_requests cr
-       LEFT JOIN users u ON u.id = cr.customer_id
-      WHERE cr.state IN ('open','receiving_offers') AND cr.visibility = 'public'
-        AND (cr.expires_at IS NULL OR cr.expires_at > ?)
-      ORDER BY cr.created_at DESC LIMIT 20`
-  ).bind(new Date().toISOString()).all<Record<string, unknown>>();
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 20 });
+  const cursor = feedCursor(c.req.query('cursor'));
+  const q = likePattern(c.req.query('q'));
+  const visible = `r.state IN ('open','receiving_offers') AND r.visibility = 'public'
+        AND (r.expires_at IS NULL OR r.expires_at > ?1)
+        AND (?2 = '' OR ${sqlLikeClause(REQUEST_SEARCH, '?2')})`;
+  const now = new Date().toISOString();
+  const [{ results }, total] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT r.*, u.name AS customer_name, u.username AS customer_username,
+              (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count
+         FROM community_requests r LEFT JOIN users u ON u.id = r.customer_id
+        WHERE ${visible}
+          AND (?3 = '' OR r.created_at < ?3 OR (r.created_at = ?3 AND r.id < ?4))
+        ORDER BY r.created_at DESC, r.id DESC LIMIT ?5`
+    ).bind(now, q, cursor.at, cursor.id, limit).all<Record<string, unknown>>(),
+    cursor.at === ''
+      ? c.env.DB.prepare(`SELECT COUNT(*) AS n FROM community_requests r WHERE ${visible}`).bind(now, q).first<{ n: number }>()
+      : Promise.resolve(null),
+  ]);
   return c.json({
     success: true,
     requests: results.map((r) => ({
-      id: r.id,
-      title: r.title,
-      description: r.description,
+      ...publicRequest(r),
       status: r.status,
-      customer_username: r.customer_username,
-      created_at: r.created_at,
+      customer_username: r.customer_username ?? null,
+    })),
+    next_cursor: nextFeedCursor(results, limit),
+    total: total ? Number(total.n) : null,
+  });
+});
+
+/**
+ * FROM THE WORKSHOPS — finished work the stores show on their own pages
+ * (`merchant_showcase`, kind 'work': «finished works it is proud of», 0036),
+ * newest first across the community. It is the row a store's showcase already
+ * serves in public (GET /api/storefront/:slug/showcase); nothing here is new
+ * about any shop. At most three per store, so one prolific workshop cannot be
+ * the whole rail; only works with a picture; nothing of a sanctioned shop.
+ */
+communityRoutes.get('/works', async (c) => {
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 24, def: 12 });
+  const root = rootDomainFrom(c.env);
+  const { results } = await c.env.DB.prepare(
+    `SELECT * FROM (
+       SELECT w.id, w.title, w.details, w.image_key, w.created_at,
+              s.id AS store_id, s.slug AS store_slug, s.name AS store_name, s.logo_key AS store_logo_key,
+              ROW_NUMBER() OVER (PARTITION BY w.store_id ORDER BY w.created_at DESC, w.id DESC) AS nth
+         FROM merchant_showcase w
+         JOIN merchant_stores s ON s.id = w.store_id
+         JOIN community_merchants cm ON cm.id = s.merchant_id
+        WHERE w.kind = 'work' AND w.active = 1 AND COALESCE(w.image_key, '') <> ''
+          AND s.status <> 'suspended' AND cm.status <> 'suspended'
+     ) WHERE nth <= 3
+     ORDER BY created_at DESC, id DESC LIMIT ?1`
+  ).bind(limit).all<Record<string, unknown>>();
+  return c.json({
+    success: true,
+    works: results.map((w) => ({
+      id: w.id,
+      title: w.title,
+      details: w.details,
+      imageUrl: fileUrl(w.image_key),
+      store: {
+        id: w.store_id,
+        slug: w.store_slug,
+        name: w.store_name,
+        logoUrl: fileUrl(w.store_logo_key),
+        url: storeUrl(String(w.store_slug), root, String(w.store_id)),
+      },
     })),
   });
 });

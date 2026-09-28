@@ -459,9 +459,32 @@ suspended since — or whose store it suspended — cannot be accepted
 
 The community page's own doors (`/api/community/requests`) take the same road:
 a request is created as a draft and published by `publishRequest`, the one door
-onto the board; its list shows exactly what the board shows; and
+onto the board; its list shows exactly what the board shows, with the board's
+own whitelist (`publicRequest`); and
 `POST /api/community/requests/:id/close` answers `307` to
-`/api/marketplace/requests/:id/cancel`.
+`/api/marketplace/requests/:id/cancel`. The page itself no longer posts there:
+«طلب طباعة» opens the wizard (`/requests?view=new`).
+
+### `/api/community/*` — the community page's reads
+
+`GET /products` · `GET /merchants` · `GET /requests` · `GET /works`, all inside
+the maintenance wall. The first three take `q` (searched on the server through
+`likePattern` — literal wildcards, D1's 50-byte limit), `limit` and `cursor`
+(`<created_at>|<id>`, newest first), and answer `next_cursor` and, on the first
+page, `total`.
+
+- **products** — what the storefront serves (`lifecycle = 'active' AND status =
+  'active'`, nothing of a sanctioned shop), each with `url`: its store's
+  product page on this site, `/community/store/<slug>/p/<slug>`, where it is
+  sold (in-site even for a shop with a subdomain — a feed tap does not open a
+  tab per product; `store.url` is the shop's own address) — `/product/:slug`
+  only for a pre-store listing — `store`, and `in_stock` (a boolean, never
+  the count).
+- **merchants** — the directory: the store's name, logo, tagline and
+  governorate (never the merchant row's), rating and its count, completed
+  orders, followers, published products, and `following` for the viewer.
+- **works** — the stores' showcase rows of kind `work` with a picture, newest
+  first, three per store at most (`merchant_showcase`, 0036).
 
 ### `/api/community-reviews/*`
 `GET /eligible` · `POST /` · `PATCH /:id` · `POST|DELETE|PATCH /follow/:merchantId` ·

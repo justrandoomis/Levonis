@@ -1,503 +1,624 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+/**
+ * LEVO COMMUNITY — /community. «مجتمع ليفو»: the print shops of Levonis, what
+ * they make, and the custom print requests they answer.
+ *
+ * THREE LISTS, ONE SEARCH. Products, stores and requests each come from their
+ * own /api/community door a page at a time, and the search box searches the
+ * list on screen ON THE SERVER. It used to filter the twenty rows the page
+ * happened to hold, so a product on page two was «لا توجد نتائج». The tab and
+ * the term live in the URL (`?tab=`, `?q=`), so Back, a reload and a shared
+ * link all land on the same list.
+ *
+ * EVERY CARD GOES SOMEWHERE REAL. A product opens the page it can be bought on
+ * (its store's product page — it used to open the platform catalogue's page,
+ * which calls a community listing «not sold through the store cart»); a store
+ * opens the store; a request opens the request, where offers are made and
+ * compared (it used to open nothing at all).
+ *
+ * A NEW REQUEST IS THE WIZARD. The quick title-and-description sheet published
+ * a request with nothing a workshop could price — no quantity, no material, no
+ * file — straight onto the board. «طلب طباعة» now opens the four-step wizard
+ * on /requests (drafts, files, the estimate; docs/DECISIONS.md row 131), which
+ * is the one road onto the board. `POST /api/community/requests` stays for any
+ * client that still calls it.
+ *
+ * The page sits behind CommunityGate (src/App.tsx): while the owner keeps the
+ * community under maintenance, a refused visitor never reaches it.
+ */
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  ArrowLeft, ArrowRight, Box, Calculator, ChevronLeft, ChevronRight, ClipboardList,
+  Heart, MessageSquare, PackageSearch, Plus, Search, Store, X,
+} from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { STUDIO_URL } from '../translations';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
-import { TabStrip, TabPanels } from '../components/ui/Tabs';
-import { Sheet } from '../components/ui/Overlay';
-import { api, ApiError } from '../lib/api';
-import { storeHref } from '../lib/merchant';
 import { useRail } from '../lib/useRail';
-import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
-import PremiumMemberBadge from '../components/merchant/PremiumMemberBadge';
+import { ApiError } from '../lib/api';
+import { merchantApi, type MerchantMe } from '../lib/merchant';
+import { merchantHref } from '../lib/merchantRoutes';
+import { TabStrip, TabPanels } from '../components/ui/Tabs';
+import { EmptyState, ErrorState } from '../components/ui/AsyncStates';
+import { ProductGridSkeleton } from '../components/ui/Skeleton';
+import { toast } from '../components/ui/Toast';
+import LoadMore from '../components/listing/LoadMore';
+import ProductTile from '../components/community/hub/ProductTile';
+import StoreCard from '../components/community/hub/StoreCard';
+import RequestCard from '../components/community/hub/RequestCard';
+import WorksRail from '../components/community/hub/WorksRail';
+import { RequestListSkeleton, StoreListSkeleton, StoreMark } from '../components/community/hub/parts';
+import { useCommunityFeed, type CommunityFeed } from '../components/community/hub/useCommunityFeed';
+import { resultsLabel } from '../components/community/hub/copy';
 import {
-  ArrowLeft, ArrowRight, Search, Box, Calculator,
-  MessageSquare, Plus, Store,
-  BadgeCheck, X
-} from 'lucide-react';
-import { useMoney } from '../CurrencyContext';
+  communityHubApi,
+  type CommunityProduct,
+  type CommunityRequest,
+  type CommunityStore,
+} from '../components/community/hub/api';
 
-interface CommunityProduct {
-  id: string;
-  slug: string;
-  merchant_id: string;
-  name: string;
-  name_ar: string;
-  description: string;
-  images: string[];
-  price_iqd: number;
-  original_price_iqd: number | null;
-  created_at: string;
-}
+const TABS = ['products', 'merchants', 'requests'] as const;
+type Tab = (typeof TABS)[number];
+const asTab = (v: string | null): Tab => ((TABS as readonly string[]).includes(v ?? '') ? (v as Tab) : 'products');
 
-interface CommunityMerchant {
-  id: string;
-  name: string;
-  bio: string;
-  avatarUrl: string | null;
-  verified: boolean;
-  pro_badge?: boolean;
-  premium_badge?: boolean;
-  created_at: string;
-  store_slug?: string | null;
-  /** The shop's own address — a card click is a full navigation there. */
-  store_url?: string | null;
-}
+/** The wizard, on the requests page. */
+const NEW_REQUEST_PATH = '/requests?view=new';
 
-interface CommunityRequest {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  customer_username: string | null;
-  created_at: string;
+const PRODUCT_GRID = 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5';
+
+/** How many «عرض المزيد» can honestly promise: the first page's total, less what is shown. */
+function remaining(feed: CommunityFeed<{ id: string }>): number {
+  if (!feed.hasMore || !feed.rows) return 0;
+  return Math.max(1, (feed.total ?? 0) - feed.rows.length);
 }
 
 export default function Community() {
-  const { money } = useMoney();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { lang, dir, t } = useLanguage();
+  const { loc, dir } = useLanguage();
+  const { user, isAuthenticated } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const tab = asTab(params.get('tab'));
+  const q = (params.get('q') ?? '').trim().slice(0, 60);
+  const viewer = user?.id ?? 'guest';
+
+  /**
+   * THE BOX AND THE URL. What is typed shows at once; the URL — and so the
+   * search — follows 300 ms after the last key. A term that arrives from the
+   * URL (Back, a shared link) is written into the box, but never over what the
+   * person is in the middle of typing.
+   */
+  const [draft, setDraft] = useState(q);
+  const pushed = useRef(q);
+  useEffect(() => {
+    if (q !== pushed.current) {
+      pushed.current = q;
+      setDraft(q);
+    }
+  }, [q]);
+  useEffect(() => {
+    const next = draft.trim().slice(0, 60);
+    if (next === q) return;
+    const timer = window.setTimeout(() => {
+      pushed.current = next;
+      setParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (next) p.set('q', next);
+          else p.delete('q');
+          return p;
+        },
+        { replace: true }
+      );
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [draft, q, setParams]);
+
+  const clearSearch = () => {
+    setDraft('');
+    pushed.current = '';
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete('q');
+        return p;
+      },
+      { replace: true }
+    );
+  };
+
+  // Tabs are history entries, as they were: Back walks back along them.
+  const chooseTab = (id: string) => {
+    const p = new URLSearchParams(params);
+    p.set('tab', asTab(id));
+    setParams(p);
+  };
+
+  /**
+   * Which merchant this viewer is, for «متجرك» / «أنشئ متجرك» — asked only with
+   * a session, and once per account: keyed on the id, not on the user object,
+   * which a session refresh replaces without anyone having changed.
+   */
+  const userId = user?.id ?? null;
+  const [me, setMe] = useState<MerchantMe | null>(null);
+  useEffect(() => {
+    if (!userId) {
+      setMe(null);
+      return;
+    }
+    let alive = true;
+    merchantApi
+      .me()
+      .then((d) => {
+        if (alive) setMe(d);
+      })
+      .catch(() => {
+        if (alive) setMe(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
+
+  // A guest goes through sign-in first and comes back to the wizard itself.
+  const newRequestLink = isAuthenticated
+    ? { to: NEW_REQUEST_PATH }
+    : { to: '/auth', state: { from: NEW_REQUEST_PATH } };
+
+  const placeholder =
+    tab === 'merchants'
+      ? loc('ابحث عن متجر أو ورشة', 'Search stores and workshops')
+      : tab === 'requests'
+        ? loc('ابحث في طلبات الطباعة', 'Search print requests')
+        : loc('ابحث في منتجات المجتمع', 'Search community products');
+
+  return (
+    <div className="w-full min-h-screen bg-black pb-28 text-zinc-300">
+      {/* The search bar is FLOATING CHROME: content passes under it, and a
+          short gradient says so where the overlap is real (`.scroll-edge`).
+          Its height is fixed (h-16) so the tab strip can stick exactly
+          beneath it. */}
+      <div className="material scroll-edge sticky top-0 z-40 h-16 px-4">
+        <div className="mx-auto flex h-full max-w-6xl items-center gap-3">
+          <button
+            type="button"
+            aria-label={loc('رجوع', 'Back')}
+            onClick={() => navigate(-1)}
+            className="press-scale shrink-0 rounded-full bg-zinc-900 p-2 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            {dir === 'rtl' ? <ArrowRight className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}
+          </button>
+          <form role="search" onSubmit={(e) => e.preventDefault()} className="relative min-w-0 flex-1 lg:max-w-2xl">
+            <label htmlFor="community-search" className="sr-only">
+              {placeholder}
+            </label>
+            <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <input
+              id="community-search"
+              type="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              value={draft}
+              maxLength={60}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={placeholder}
+              data-community-search
+              className="w-full rounded-full border border-zinc-800 bg-zinc-900 py-2 ps-10 pe-10 text-sm text-white placeholder:text-zinc-500 focus:border-olive/50 focus:outline-none [&::-webkit-search-cancel-button]:appearance-none"
+            />
+            {draft && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                aria-label={loc('مسح البحث', 'Clear search')}
+                className="absolute end-1.5 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </form>
+        </div>
+      </div>
+
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-5">
+        <header>
+          {/* OWNER: Sorani to be written by hand. */}
+          <h1 className="text-[20px] font-bold leading-tight text-white">{loc('مجتمع ليفو', 'Levo Community')}</h1>
+          <p className="mt-1 text-balance text-[13px] leading-relaxed text-zinc-400">
+            {loc(
+              'متاجر الطباعة ثلاثية الأبعاد ومنتجاتها، وطلبات الطباعة المخصّصة.',
+              '3D-printing shops, what they make, and custom print requests.'
+            )}
+          </p>
+        </header>
+
+        {/* While a search is running, the page is its results: the shortcuts
+            and the tools step aside so the answer is not pushed below the
+            fold of a phone. Clearing the search brings them back. */}
+        {!q && <Shortcuts newRequestLink={newRequestLink} />}
+        {!q && <ToolsRail />}
+
+        {/* The sections. ONE travelling underline (TabStrip), each tab wired
+            to the panel it controls, and bodies that arrive from the side the
+            change came from — in Arabic, "forward" is leftward. */}
+        <div className="material material-thin scroll-edge sticky top-16 z-30 -mx-4 px-4">
+          <TabStrip
+            group="community"
+            panels
+            label={loc('أقسام المجتمع', 'Community sections')}
+            value={tab}
+            onChange={chooseTab}
+            items={[
+              { id: 'products', label: loc('المنتجات', 'Products') },
+              { id: 'merchants', label: loc('المتاجر', 'Stores') },
+              { id: 'requests', label: loc('الطلبات', 'Requests') },
+            ]}
+            className="mx-auto max-w-6xl justify-between"
+          />
+        </div>
+
+        <div className="min-h-[400px]">
+          <TabPanels value={tab} order={[...TABS]} group="community">
+            {tab === 'products' && <ProductsPanel q={q} viewer={viewer} onClear={clearSearch} />}
+            {tab === 'merchants' && <StoresPanel q={q} viewer={viewer} me={me} onClear={clearSearch} />}
+            {tab === 'requests' && <RequestsPanel q={q} viewer={viewer} onClear={clearSearch} newRequestLink={newRequestLink} />}
+          </TabPanels>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------- pieces
+
+/**
+ * The community's four doors. Real links, so a keyboard, a screen reader and
+ * a long press all know where each goes. «طلب طباعة» is the page's one primary
+ * action and carries its one accent. «ملفي» is gone from here: the bottom bar
+ * already carries «الحساب», and this row is for the community's own places.
+ */
+function Shortcuts({ newRequestLink }: { newRequestLink: { to: string; state?: unknown } }) {
+  const { loc, t } = useLanguage();
+  return (
+    <nav aria-label={loc('اختصارات المجتمع', 'Community shortcuts')} className="grid grid-cols-4 gap-2 sm:max-w-lg">
+      <Shortcut to="/chats" icon={MessageSquare} label={t('webCenter')} />
+      <Shortcut {...newRequestLink} icon={Plus} label={loc('طلب طباعة', 'Print request')} primary testId="community-new-request" />
+      <Shortcut to="/requests?view=mine" icon={ClipboardList} label={loc('طلباتي', 'My requests', 'داواکاریەکانم')} />
+      <Shortcut to="/followed-stores" icon={Heart} label={loc('متاجر أتابعها', 'Following', 'شوێنکەوتن')} />
+    </nav>
+  );
+}
+
+/**
+ * Tools (mandate §9). LEVO Studio is a plain full-page navigation to its own
+ * subdomain (STUDIO_URL, the one configurable constant in src/translations.ts),
+ * opened in its own tab so the store behind it keeps its cart and scroll — no
+ * iframe, no prefetch, no slicer code in this bundle (tests/store-isolation.
+ * test.ts pins all of that). A working href is not a claim that the Studio is
+ * deployed; publishing it is a separate owner step (docs/DECISIONS.md row 30).
+ * The calculator prices from the shop's own filament. The library is not built
+ * yet and says so.
+ */
+function ToolsRail() {
+  const { loc, t } = useLanguage();
+  const featureRail = useRail();
+  return (
+    <div ref={featureRail.ref} className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 hide-scrollbar">
+      <a
+        href={STUDIO_URL}
+        target="_blank"
+        data-testid="community-studio-link"
+        rel="noopener noreferrer"
+        aria-label={`${t('studioCardTitle')} — ${t('studioOpen')}`}
+        className="lv-community-tile relative flex h-24 w-[240px] shrink-0 snap-start flex-col justify-center overflow-hidden rounded-2xl border border-olive/50 bg-gradient-to-r from-olive/25 to-black p-4 transition-colors hover:border-olive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+      >
+        <div aria-hidden="true" className="absolute bottom-0 end-2 opacity-20">
+          <Box aria-hidden="true" className="h-20 w-20 text-olive" />
+        </div>
+        <h3 className="mb-1 text-sm font-bold text-white">{t('studioCardTitle')}</h3>
+        <p className="text-xs font-medium text-sage">{t('studioOpen')}</p>
+      </a>
+      <Link
+        to="/tools"
+        className="lv-community-tile relative flex h-24 w-[240px] shrink-0 snap-start flex-col justify-center overflow-hidden rounded-2xl border border-zinc-700 bg-gradient-to-r from-zinc-800 to-zinc-900 p-4 text-start transition-colors hover:border-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+      >
+        <div aria-hidden="true" className="absolute bottom-0 end-2 opacity-20">
+          <Calculator className="h-20 w-20" />
+        </div>
+        <h3 className="mb-1 text-sm font-bold text-white">{loc('احسب سعر طباعتك', 'Calculate Print Price')}</h3>
+        <p className="text-xs text-zinc-300">{loc('افتح الحاسبة', 'Open the calculator')}</p>
+      </Link>
+      <div
+        className="lv-community-tile relative flex h-24 w-[240px] shrink-0 snap-start flex-col justify-center overflow-hidden rounded-2xl border border-olive/30 bg-gradient-to-r from-olive/20 to-black p-4 opacity-70"
+        aria-disabled="true"
+      >
+        <div aria-hidden="true" className="absolute bottom-0 end-2 opacity-20">
+          <Box className="h-20 w-20 text-olive" />
+        </div>
+        <h3 className="mb-1 text-sm font-bold text-white">{loc('مكتبة ملفات الطباعة', '3D Models Library')}</h3>
+        <p className="text-xs text-text-muted">{t('comingSoon')}</p>
+      </div>
+    </div>
+  );
+}
+
+function Shortcut({
+  to,
+  state,
+  icon: Icon,
+  label,
+  primary = false,
+  testId,
+}: {
+  to: string;
+  state?: unknown;
+  icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' }>;
+  label: string;
+  primary?: boolean;
+  testId?: string;
+}) {
+  return (
+    <Link
+      to={to}
+      state={state}
+      data-testid={testId}
+      className="press-scale group flex min-w-0 flex-col items-center gap-2 rounded-2xl py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+    >
+      <span
+        className={`flex h-12 w-12 items-center justify-center rounded-2xl border transition-colors ${
+          primary ? 'border-sage/40 bg-sage/10 group-hover:bg-sage/20' : 'border-zinc-800 bg-zinc-900 group-hover:border-zinc-700'
+        }`}
+      >
+        <Icon aria-hidden="true" className={`h-5 w-5 ${primary ? 'text-sage' : 'text-zinc-400 group-hover:text-zinc-200'}`} />
+      </span>
+      <span className={`w-full truncate text-center text-[11px] font-medium ${primary ? 'text-sage' : 'text-zinc-400'}`}>{label}</span>
+    </Link>
+  );
+}
+
+/** «3 نتائج لـ «تنين»» — the search's answer, above the list it describes. */
+function SearchLine({ q, total }: { q: string; total: number | null }) {
+  const { loc } = useLanguage();
+  if (!q || total === null) return null;
+  return (
+    <p role="status" className="mb-3 text-[12.5px] text-zinc-400">
+      {/* OWNER: Sorani to be written by hand. */}
+      {loc(`${resultsLabel(total, 'ar')} لـ «${q}»`, `${resultsLabel(total, 'en')} for “${q}”`)}
+    </p>
+  );
+}
+
+/** A search that found nothing — say so, and offer the way back. */
+function NoResults({ q, onClear }: { q: string; onClear: () => void }) {
+  const { loc } = useLanguage();
+  return (
+    <EmptyState
+      icon={<PackageSearch aria-hidden="true" className="h-6 w-6" />}
+      // OWNER: Sorani to be written by hand.
+      title={loc(`لا نتائج لـ «${q}»`, `No results for “${q}”`)}
+      description={loc('جرّب كلمة أقصر، أو ابحث في قسم آخر.', 'Try a shorter word, or search another section.')}
+      action={
+        <button
+          type="button"
+          onClick={onClear}
+          className="mt-1 min-h-[44px] rounded-full border border-zinc-700 px-5 text-[13px] font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          {loc('مسح البحث', 'Clear search')}
+        </button>
+      }
+    />
+  );
+}
+
+// ------------------------------------------------------------------- panels
+
+function ProductsPanel({ q, viewer, onClear }: { q: string; viewer: string; onClear: () => void }) {
+  const { loc } = useLanguage();
+  const feed = useCommunityFeed<CommunityProduct>('products', q, viewer);
+  if (feed.error) return <ErrorState error={feed.error} onRetry={feed.reload} />;
+  if (!feed.rows) return <ProductGridSkeleton count={8} className={PRODUCT_GRID} />;
+  if (feed.rows.length === 0) {
+    return q ? (
+      <NoResults q={q} onClear={onClear} />
+    ) : (
+      <EmptyState
+        icon={<Box aria-hidden="true" className="h-6 w-6" />}
+        title={loc('لا منتجات في المجتمع بعد', 'No community products yet')}
+        description={loc('ما تنشره المتاجر يظهر هنا أولًا بأول.', 'What the stores publish appears here as it goes up.')}
+      />
+    );
+  }
+  return (
+    <div data-community-panel="products">
+      <SearchLine q={q} total={feed.total} />
+      <div className={PRODUCT_GRID}>
+        {feed.rows.map((p, i) => (
+          <ProductTile key={p.id} product={p} eager={i < 4} />
+        ))}
+      </div>
+      <LoadMore remaining={remaining(feed)} state={feed.more} onMore={feed.loadMore} />
+    </div>
+  );
+}
+
+function StoresPanel({ q, viewer, me, onClear }: { q: string; viewer: string; me: MerchantMe | null; onClear: () => void }) {
+  const { loc } = useLanguage();
   const { user, isAuthenticated } = useAuth();
   const { signIn } = useSignInPrompt();
-  const featureRail = useRail();
+  const feed = useCommunityFeed<CommunityStore>('merchants', q, viewer);
+  const [busy, setBusy] = useState<string | null>(null);
 
-  const queryParams = new URLSearchParams(location.search);
-  const activeTab = queryParams.get('tab') || 'products';
-
-  const [products, setProducts] = useState<CommunityProduct[]>([]);
-  const [merchants, setMerchants] = useState<CommunityMerchant[]>([]);
-  const [requests, setRequests] = useState<CommunityRequest[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-
-  // New-request modal state
-  const [showNewRequest, setShowNewRequest] = useState(false);
-  const [reqTitle, setReqTitle] = useState('');
-  const [reqDescription, setReqDescription] = useState('');
-  const [reqSubmitting, setReqSubmitting] = useState(false);
-  const [reqError, setReqError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadData() {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        if (activeTab === 'products') {
-          const data = await api.get<{ products: CommunityProduct[] }>('/api/community/products');
-          if (!cancelled) setProducts(data.products || []);
-        } else if (activeTab === 'merchants') {
-          const data = await api.get<{ merchants: CommunityMerchant[] }>('/api/community/merchants');
-          if (!cancelled) setMerchants(data.merchants || []);
-        } else if (activeTab === 'requests') {
-          const data = await api.get<{ requests: CommunityRequest[] }>('/api/community/requests');
-          if (!cancelled) setRequests(data.requests || []);
-        }
-      } catch (err) {
-        console.error(err);
-        if (!cancelled) {
-          setLoadError(
-            err instanceof ApiError && err.message
-              ? err.message
-              : dir === 'rtl' ? 'تعذر التحميل. حاول مرة أخرى.' : 'Failed to load. Please try again.'
-          );
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    loadData();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab]);
-
-  const openNewRequest = () => {
+  /**
+   * «متابعة» answers at once and is put back if the server says no. A guest is
+   * asked to sign in and brought back here; a follow is never sent that is sure
+   * to fail (docs/DECISIONS.md row 89).
+   */
+  const toggleFollow = async (m: CommunityStore) => {
     if (!isAuthenticated) {
       signIn();
       return;
     }
-    setReqError(null);
-    setShowNewRequest(true);
-  };
-
-  const submitNewRequest = async () => {
-    if (reqTitle.trim().length < 3 || reqSubmitting) return;
-    setReqSubmitting(true);
-    setReqError(null);
+    if (busy) return;
+    const was = !!m.following;
+    const set = (following: boolean, followers: number) =>
+      feed.patch((rows) => rows.map((r) => (r.id === m.id ? { ...r, following, followers } : r)));
+    setBusy(m.id);
+    set(!was, Math.max(0, (m.followers ?? 0) + (was ? -1 : 1)));
     try {
-      await api.post('/api/community/requests', { title: reqTitle.trim(), description: reqDescription.trim() });
-      setShowNewRequest(false);
-      setReqTitle('');
-      setReqDescription('');
-      // Refresh the requests list if it is the visible tab, otherwise take the user there.
-      if (activeTab === 'requests') {
-        try {
-          const data = await api.get<{ requests: CommunityRequest[] }>('/api/community/requests');
-          setRequests(data.requests || []);
-        } catch {
-          /* list refresh is best-effort */
-        }
-      } else {
-        navigate('/community?tab=requests');
-      }
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        signIn();
-        return;
-      }
-      setReqError(
-        err instanceof ApiError && err.message
-          ? err.message
-          : dir === 'rtl' ? 'تعذر إرسال الطلب' : 'Failed to submit request'
-      );
+      await (was ? communityHubApi.unfollow(m.id) : communityHubApi.follow(m.id));
+      feed.forgetOthers();
+    } catch (e) {
+      set(was, m.followers ?? 0);
+      if (e instanceof ApiError && e.status === 401) signIn();
+      // OWNER: Sorani to be written by hand.
+      else toast.error(loc('تعذّر تحديث المتابعة. حاول مرة أخرى.', 'Could not update the follow. Try again.'));
     } finally {
-      setReqSubmitting(false);
+      setBusy(null);
     }
   };
 
-  const q = search.trim().toLowerCase();
-  const filteredProducts = q
-    ? products.filter(p => (p.name || '').toLowerCase().includes(q) || (p.name_ar || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q))
-    : products;
-  const filteredMerchants = q
-    ? merchants.filter(m => (m.name || '').toLowerCase().includes(q) || (m.bio || '').toLowerCase().includes(q))
-    : merchants;
-  const filteredRequests = q
-    ? requests.filter(r => (r.title || '').toLowerCase().includes(q) || (r.description || '').toLowerCase().includes(q))
-    : requests;
-
-  const comingSoon = dir === 'rtl' ? 'قريباً' : 'Coming soon';
+  let list: React.ReactNode;
+  if (feed.error) list = <ErrorState error={feed.error} onRetry={feed.reload} />;
+  else if (!feed.rows) list = <StoreListSkeleton />;
+  else if (feed.rows.length === 0) {
+    list = q ? (
+      <NoResults q={q} onClear={onClear} />
+    ) : (
+      <EmptyState
+        icon={<Store aria-hidden="true" className="h-6 w-6" />}
+        title={loc('لا متاجر في المجتمع بعد', 'No community stores yet')}
+      />
+    );
+  } else {
+    list = (
+      <>
+        <SearchLine q={q} total={feed.total} />
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {feed.rows.map((m) => (
+            <StoreCard key={m.id} store={m} canFollow={m.user_id !== user?.id} busy={busy === m.id} onToggleFollow={toggleFollow} />
+          ))}
+        </div>
+        <LoadMore remaining={remaining(feed)} state={feed.more} onMore={feed.loadMore} />
+      </>
+    );
+  }
 
   return (
-    <div className="w-full pb-24 text-zinc-300 min-h-screen bg-black">
-      {/* The search bar is FLOATING CHROME: content passes under it. It used
-          to end in a 1px border, which is a line the design never asked for —
-          what it was trying to say is "there is more below". A short gradient
-          says that, and only where the overlap is real (`.scroll-edge`). */}
-      <div className="material scroll-edge sticky top-0 z-40 px-4 py-3 flex items-center gap-3">
-        <button
-          type="button"
-          aria-label={dir === 'rtl' ? 'رجوع' : 'Back'}
-          onClick={() => navigate(-1)}
-          className="press-scale p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors"
+    <div data-community-panel="merchants">
+      {!q && <WorksRail />}
+      {!q && <YourStore me={me} />}
+      {list}
+    </div>
+  );
+}
+
+/**
+ * The viewer's own place in the directory: their store, one tap from its
+ * workspace — or, for a member whose plan lets them open one, the way to.
+ * Nothing for anyone else: a button to a door that will not open is the dead
+ * control the mandate forbids (src/components/merchant/StoreCta.tsx). The
+ * words are StoreCta's own, Sorani included.
+ */
+function YourStore({ me }: { me: MerchantMe | null }) {
+  const { loc, dir } = useLanguage();
+  if (!me || (!me.store && !me.eligible)) return null;
+  const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight;
+  const to = me.store ? merchantHref.home() : '/merchant/start';
+  return (
+    <Link
+      to={to}
+      data-community-your-store={me.store ? 'manage' : 'create'}
+      className="mb-4 flex items-center gap-3 rounded-2xl border border-zinc-800/60 bg-zinc-900/40 px-4 py-3 transition-colors hover:border-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+    >
+      {me.store ? (
+        <StoreMark src={me.store.logoUrl} />
+      ) : (
+        <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-sage/40 bg-sage/10">
+          <Plus className="h-5 w-5 text-sage" />
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[14px] font-semibold text-white">
+          {me.store
+            ? loc('متجرك في مجتمع ليفو', 'Your store in the Levo community', 'فرۆشگاکەت لە کۆمەڵگەی Levo')
+            : loc('أنشئ متجرك في ليفو', 'Create your Levo store', 'فرۆشگای Levo خۆت دروست بکە')}
+        </span>
+        <span dir={me.store ? 'auto' : undefined} className="block truncate text-start text-[12px] text-zinc-400">
+          {/* OWNER: Sorani to be written by hand. */}
+          {me.store ? me.store.name : loc('اعرض منتجاتك واستقبل طلبات الطباعة.', 'Sell your prints and take print requests.')}
+        </span>
+      </span>
+      <Chevron aria-hidden="true" className="h-4 w-4 shrink-0 text-zinc-500" />
+    </Link>
+  );
+}
+
+function RequestsPanel({
+  q,
+  viewer,
+  onClear,
+  newRequestLink,
+}: {
+  q: string;
+  viewer: string;
+  onClear: () => void;
+  newRequestLink: { to: string; state?: unknown };
+}) {
+  const { loc, t } = useLanguage();
+  const feed = useCommunityFeed<CommunityRequest>('requests', q, viewer);
+
+  let list: React.ReactNode;
+  if (feed.error) list = <ErrorState error={feed.error} onRetry={feed.reload} />;
+  else if (!feed.rows) list = <RequestListSkeleton />;
+  else if (feed.rows.length === 0) {
+    list = q ? (
+      <NoResults q={q} onClear={onClear} />
+    ) : (
+      <EmptyState
+        icon={<ClipboardList aria-hidden="true" className="h-6 w-6" />}
+        title={loc('لا توجد طلبات مفتوحة', 'No open requests', 'هیچ داواکارییەکی کراوە نییە')}
+        // OWNER: Sorani to be written by hand.
+        description={loc('صف ما تريد طباعته، وتصلك عروض الورش.', 'Describe what you want printed and the workshops will send offers.')}
+        action={
+          <Link
+            to={newRequestLink.to}
+            state={newRequestLink.state}
+            className="mt-1 inline-flex min-h-[44px] items-center gap-2 rounded-full bg-olive px-5 text-[13px] font-bold text-snow transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            {loc('انشر طلب طباعة', 'Post a print request')}
+          </Link>
+        }
+      />
+    );
+  } else {
+    list = (
+      <>
+        <SearchLine q={q} total={feed.total} />
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {feed.rows.map((r) => (
+            <RequestCard key={r.id} request={r} />
+          ))}
+        </div>
+        <LoadMore remaining={remaining(feed)} state={feed.more} onMore={feed.loadMore} />
+      </>
+    );
+  }
+
+  return (
+    <div data-community-panel="requests">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        {/* OWNER: Sorani to be written by hand. */}
+        <p className="text-[12.5px] leading-relaxed text-zinc-400">
+          {loc('طلبات طباعة تنتظر عروض الورش.', 'Print requests waiting for offers from workshops.')}
+        </p>
+        <Link
+          to="/requests"
+          className="shrink-0 rounded-full px-2 py-1 text-[12.5px] font-semibold text-sage hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
-          {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
-        </button>
-        <div className="flex-1 relative">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={dir === 'rtl' ? "بحث في المجتمع..." : "Search community..."}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-full py-2 px-4 ps-10 text-sm focus:outline-none focus:border-olive/50 text-white"
-          />
-          <Search className={`w-4 h-4 text-zinc-500 absolute top-2.5 ${dir === 'rtl' ? 'right-3' : 'left-3'}`} />
-        </div>
+          {t('seeAll')}
+        </Link>
       </div>
-
-      <div className="p-4 flex flex-col gap-6">
-
-        {/* Shortcuts. THESE ARE BUTTONS. They were `<div onClick>` with a
-            `group-hover:` tint, which means: no keyboard access, no screen-
-            reader role, and — on the iPad this app is actually used on — no
-            feedback at all, because `hover:` does not exist on touch. A tile
-            is small enough that shrinking reads as contact rather than as a
-            wobble, so they take `press-scale` on top of the sitewide dim. */}
-        <div className="grid grid-cols-4 gap-2">
-           <button type="button" className="press-scale flex flex-col items-center gap-2 group" onClick={() => navigate('/chats')}>
-             <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center group-hover:border-olive/50 transition-colors">
-               <MessageSquare className="w-5 h-5 text-zinc-400 group-hover:text-sage transition-colors" />
-             </div>
-             <span className="text-[10px] font-medium text-zinc-400">{dir === 'rtl' ? 'الرسائل' : 'Messages'}</span>
-           </button>
-           <button type="button" className="press-scale flex flex-col items-center gap-2 group" onClick={() => navigate('/community?tab=requests')}>
-             <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center group-hover:border-olive/50 transition-colors">
-               <Box className="w-5 h-5 text-zinc-400 group-hover:text-sage transition-colors" />
-             </div>
-             <span className="text-[10px] font-medium text-zinc-400">{dir === 'rtl' ? 'الطلبات' : 'Requests'}</span>
-           </button>
-           <button type="button" className="press-scale flex flex-col items-center gap-2 group" onClick={openNewRequest}>
-             <div className="w-12 h-12 rounded-2xl bg-olive/10 border border-olive/30 flex items-center justify-center group-hover:bg-olive/20 transition-colors">
-               <Plus className="w-5 h-5 text-sage" />
-             </div>
-             <span className="text-[10px] font-medium text-sage">{dir === 'rtl' ? 'طلب جديد' : 'New Order'}</span>
-           </button>
-           <button type="button" className="press-scale flex flex-col items-center gap-2 group" onClick={() => navigate('/profile')}>
-             <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
-               <img referrerPolicy="no-referrer" src={user?.avatar_key ? `/files/${user.avatar_key}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || "Levonis"}&backgroundColor=fde047`} alt="Avatar" className="w-full h-full object-cover" />
-             </div>
-             <span className="text-[10px] font-medium text-zinc-400">{dir === 'rtl' ? 'ملفي' : 'Profile'}</span>
-           </button>
-        </div>
-
-        {/* Banners (mandate §9). The «المساعدات والهدايا» / Giveaways card is
-            GONE and its slot belongs to LEVO Studio — the one real ACTIVE
-            entry here: a plain full-page navigation to the standalone
-            subdomain (STUDIO_URL, the single configurable constant in
-            src/translations.ts). No iframe, no prefetch/preload, no slicer or
-            3D code in this bundle (tests/store-isolation.test.ts pins all of
-            that). The target stays the user's choice — the anchor does not
-            force a new tab — and rel="noopener noreferrer" protects the
-            opener if the user opens one themselves. A working href is NOT a
-            claim that the Studio is deployed; publishing the Studio subdomain
-            is a separate owner step (docs/DECISIONS.md row 30 covers that domain). The remaining
-            cards are features not launched yet, shown honestly as coming soon. */}
-        <div ref={featureRail.ref} className="flex overflow-x-auto hide-scrollbar gap-3 -mx-4 px-4 snap-x pb-2">
-           <a
-             href={STUDIO_URL}
-             target="_blank"
-             data-testid="community-studio-link"
-             rel="noopener noreferrer"
-             aria-label={`${t('studioCardTitle')} — ${t('studioOpen')}`}
-             className="lv-community-tile shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-olive/25 to-black border border-olive/50 p-4 flex flex-col justify-center snap-start relative overflow-hidden hover:border-olive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
-           >
-             <div aria-hidden="true" className="absolute end-2 bottom-0 opacity-20">
-               <Box aria-hidden="true" className="w-20 h-20 text-olive" />
-             </div>
-             <h3 className="text-white font-bold text-sm mb-1">{t('studioCardTitle')}</h3>
-             <p className="text-xs text-sage font-medium">{t('studioOpen')}</p>
-           </a>
-           {/* Was a dead card. The calculator is real now — it prices from
-               the shop's own filament, not from invented numbers. */}
-           <button
-             type="button"
-             onClick={() => navigate('/tools')}
-             className="lv-community-tile shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-zinc-800 to-zinc-900 border border-zinc-700 p-4 flex flex-col justify-center snap-start relative overflow-hidden text-start hover:border-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
-           >
-             <div aria-hidden="true" className="absolute end-2 bottom-0 opacity-20">
-               <Calculator className="w-20 h-20" />
-             </div>
-             <h3 className="text-white font-bold text-sm mb-1">{dir === 'rtl' ? 'احسب سعر طباعتك' : 'Calculate Print Price'}</h3>
-             <p className="text-xs text-zinc-300">{dir === 'rtl' ? 'افتح الحاسبة' : 'Open the calculator'}</p>
-           </button>
-           <div className="lv-community-tile shrink-0 w-[240px] h-24 rounded-2xl bg-gradient-to-r from-olive/20 to-black border border-olive/30 p-4 flex flex-col justify-center snap-start relative overflow-hidden opacity-70" aria-disabled="true">
-             <div aria-hidden="true" className="absolute end-2 bottom-0 opacity-20">
-               <Box className="w-20 h-20 text-olive" />
-             </div>
-             <h3 className="text-white font-bold text-sm mb-1">{dir === 'rtl' ? 'مكتبة ملفات الطباعة' : '3D Models Library'}</h3>
-             <p className="text-xs text-text-muted">{comingSoon}</p>
-           </div>
-        </div>
-
-        {/* Explore Tabs. The underline is now ONE element that travels
-            between them (TabStrip's shared-layout indicator) instead of three
-            conditional divs that blink in and out — so the row reads as one
-            row a person moved along, which is the whole job of an indicator. */}
-        <div className="material material-thin scroll-edge sticky top-[60px] z-30">
-          <TabStrip
-            group="community"
-            label={dir === 'rtl' ? 'أقسام المجتمع' : 'Community sections'}
-            value={activeTab}
-            onChange={(id) => navigate(`/community?tab=${id}`)}
-            items={[
-              { id: 'products', label: dir === 'rtl' ? 'المنتجات' : 'Products' },
-              { id: 'merchants', label: dir === 'rtl' ? 'التجار' : 'Merchants' },
-              { id: 'requests', label: dir === 'rtl' ? 'الطلبات' : 'Requests' },
-            ]}
-            className="justify-between"
-          />
-        </div>
-
-        {/* Tab Content */}
-        <div className="min-h-[400px]">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-6 h-6 border-2 border-olive border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          ) : loadError ? (
-            <div className="flex flex-col items-center justify-center py-16 text-zinc-500 gap-3">
-              <p className="text-sm">{loadError}</p>
-            </div>
-          ) : (
-            /* The bodies arrive from the side the change came from, and leave
-               to the other — so a person can tell whether they went forward or
-               back along the strip. In Arabic "forward" is leftward, which
-               TabPanels takes from the writing direction rather than assuming. */
-            <TabPanels value={activeTab} order={['products', 'merchants', 'requests']}>
-              {activeTab === 'products' && (
-                filteredProducts.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
-                    <Box className="w-12 h-12 mb-3 opacity-40" />
-                    <p className="text-sm">{q ? (dir === 'rtl' ? 'لا توجد نتائج' : 'No results') : (dir === 'rtl' ? 'لا توجد منتجات بعد' : 'No products yet')}</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {filteredProducts.map(p => {
-                      const firstImage = (p.images && p.images[0]) || null;
-                      const name = lang === 'ar' && p.name_ar ? p.name_ar : p.name;
-                      return (
-                        <Link to={`/product/${p.slug}`} key={p.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col group hover:border-olive/50 transition-colors">
-                          <div className="relative aspect-square overflow-hidden bg-black">
-                            {firstImage ? (
-                              <img referrerPolicy="no-referrer" src={firstImage} alt={name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-zinc-700">
-                                <Box className="w-10 h-10" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="p-3">
-                            <h3 className="text-white font-medium text-sm line-clamp-2 mb-1">{name}</h3>
-                            <div className="text-white font-bold text-sm">{money(p.price_iqd || 0)}</div>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )
-              )}
-
-              {activeTab === 'merchants' && (
-                filteredMerchants.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
-                    <Store className="w-12 h-12 mb-3 opacity-40" />
-                    <p className="text-sm">{q ? (dir === 'rtl' ? 'لا توجد نتائج' : 'No results') : (dir === 'rtl' ? 'لا يوجد تجار بعد' : 'No merchants yet')}</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    {filteredMerchants.map((m) => (
-                      <div
-                        key={m.id}
-                        onClick={() => {
-                          // A shop with its own subdomain IS its own site —
-                          // it opens in ITS OWN TAB, leaving the directory
-                          // where the visitor left it (the shared cookie
-                          // keeps their session across the hop).
-                          const href = storeHref(m.store_url, m.id);
-                          if (href.startsWith('http')) window.open(href, '_blank', 'noopener,noreferrer');
-                          else navigate(href);
-                        }}
-                        className="bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-4 flex flex-col gap-4 cursor-pointer hover:border-olive/50 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-zinc-800 rounded-full overflow-hidden flex items-center justify-center border border-zinc-700 shrink-0">
-                              {m.avatarUrl ? (
-                                <img referrerPolicy="no-referrer" src={m.avatarUrl} alt={m.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <Store className="w-5 h-5 text-zinc-500" />
-                              )}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <h3 className="text-white font-bold text-sm">{m.name}</h3>
-                                {m.verified && <BadgeCheck className="w-4 h-4 text-gold" />}
-                                {m.pro_badge && <ProMerchantBadge compact />}
-                                {m.premium_badge && <PremiumMemberBadge compact />}
-                              </div>
-                              {m.bio && <div className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{m.bio}</div>}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="w-8 h-8 rounded-full border border-zinc-700 flex items-center justify-center text-zinc-400">
-                              <Store className="w-4 h-4" />
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )
-              )}
-
-              {activeTab === 'requests' && (
-                filteredRequests.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
-                    <Box className="w-12 h-12 mb-3 opacity-40" />
-                    <p className="text-sm">{q ? (dir === 'rtl' ? 'لا توجد نتائج' : 'No results') : (dir === 'rtl' ? 'لا توجد طلبات بعد' : 'No requests yet')}</p>
-                    {!q && (
-                      <button onClick={openNewRequest} className="mt-4 text-sage text-sm font-medium hover:underline">
-                        {dir === 'rtl' ? 'أنشئ أول طلب' : 'Post the first request'}
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    {filteredRequests.map((r) => (
-                      <div key={r.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4">
-                         <h3 className="text-white font-medium mb-1">{r.title}</h3>
-                         {r.description && <p className="text-sm text-zinc-400 mb-2 line-clamp-3">{r.description}</p>}
-                         <div className="flex justify-between items-center text-xs text-zinc-500">
-                           <span>{dir === 'rtl' ? 'بانتظار العروض' : 'Waiting for offers'}</span>
-                           {r.customer_username && <span dir="ltr">@{r.customer_username}</span>}
-                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )
-              )}
-            </TabPanels>
-          )}
-        </div>
-
-      </div>
-
-      {/* NEW REQUEST — the last window on the community screen, and the only one
-          here that was still a `fixed inset-0` div mounted on a boolean: it
-          appeared instantly and vanished instantly, with nothing to say it had
-          come from the button the member pressed.
-
-          A Sheet, because it is a short form a member fills in on a phone with
-          the feed still behind it — arriving from the bottom edge and thrown
-          back down is the gesture that matches. Both dismissals stay held to
-          `!reqSubmitting`, which is what the old backdrop-click test did, and
-          the Escape key it now inherits is held to the same test: a request
-          being submitted must not be dismissed out from under itself. */}
-      <Sheet
-        open={showNewRequest}
-        onClose={() => setShowNewRequest(false)}
-        label={dir === 'rtl' ? 'طلب جديد' : 'New Request'}
-        z={50}
-        testId="community-new-request"
-        dismissOnScrim={!reqSubmitting}
-        dismissOnEscape={!reqSubmitting}
-        panelClassName="w-full max-w-md max-h-[88dvh] overflow-y-auto"
-      >
-          <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-bold">{dir === 'rtl' ? 'طلب جديد' : 'New Request'}</h3>
-              <button onClick={() => !reqSubmitting && setShowNewRequest(false)} className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex flex-col gap-3">
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">{dir === 'rtl' ? 'العنوان' : 'Title'}</label>
-                <input
-                  type="text"
-                  value={reqTitle}
-                  onChange={(e) => setReqTitle(e.target.value)}
-                  maxLength={150}
-                  placeholder={dir === 'rtl' ? 'ماذا تحتاج؟' : 'What do you need?'}
-                  className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-olive/50"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">{dir === 'rtl' ? 'الوصف (اختياري)' : 'Description (optional)'}</label>
-                <textarea
-                  value={reqDescription}
-                  onChange={(e) => setReqDescription(e.target.value)}
-                  maxLength={2000}
-                  rows={4}
-                  placeholder={dir === 'rtl' ? 'تفاصيل إضافية...' : 'More details...'}
-                  className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-olive/50 resize-none"
-                />
-              </div>
-              {reqError && <p className="text-xs text-red-400">{reqError}</p>}
-              <button
-                onClick={submitNewRequest}
-                disabled={reqTitle.trim().length < 3 || reqSubmitting}
-                className="w-full bg-olive text-snow font-bold py-3 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-              >
-                {reqSubmitting ? (dir === 'rtl' ? 'جارٍ الإرسال...' : 'Submitting...') : (dir === 'rtl' ? 'إرسال الطلب' : 'Submit Request')}
-              </button>
-            </div>
-          </div>
-      </Sheet>
+      {list}
     </div>
   );
 }

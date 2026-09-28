@@ -119,8 +119,11 @@ const nowIso = () => new Date().toISOString();
  * Note what is absent: no customer email, phone, address or user id. A
  * merchant browsing the board sees a job to quote on and a display name,
  * which is everything they need to decide whether to offer.
+ *
+ * Exported for the community page's list (worker/routes/community.ts), so the
+ * two lists of the same rows answer with ONE whitelist.
  */
-function publicRequest(r: Record<string, unknown>) {
+export function publicRequest(r: Record<string, unknown>) {
   return {
     id: r.id,
     title: r.title,

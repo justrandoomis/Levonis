@@ -96,9 +96,11 @@ Data ownership below: "owner" = the signed-in account (server-enforced),
 
 | Page | Control | Original problem | Now | Status |
 | --- | --- | --- | --- | --- |
-| Community | products/merchants/requests tabs | raw SQL | real listing endpoints | ⚙️ |
-| Community | search | decorative | client-side filter, wired | ⚙️ |
-| Community | new request | dead link to unrouted page | inline modal → `POST /api/community/requests` | ⚙️ |
+| Community | products/stores/requests tabs | raw SQL | real listing endpoints, a page at a time («عرض المزيد» with what is left); every card is a link — a product to its store's product page (where it can be bought), a store to the store, a request to `/requests?request=<id>` | ⚙️ |
+| Community | search | decorative | on the server, per tab (`?q=`, kept in the URL); a typed `%`/`_` is literal and the term is cut to D1's 50-byte LIKE limit | ⚙️ |
+| Community | new request | dead link to unrouted page | the four-step wizard, `/requests?view=new` (a guest signs in first and comes back to it) | ⚙️ |
+| Community | follow a store | — | «متابعة» on each store card (`POST`/`DELETE /api/community/store/:id/follow`), answered at once and put back if refused | ⚙️ |
+| Community | «من أعمال الورش» | — | the stores' own showcase work (`GET /api/community/works`), three per shop, nothing of a sanctioned shop | ⚙️ |
 | Community | "Make Offer", 3 promo banners | dead / unrouted | 🔶 honest-disabled (offer flow needs a customer-id in payload — future) | 🔶 |
 | Merchant store | whole page | rendered a blank black screen; all content fabricated | real merchant, products, follower count, member-since | ⚙️ |
 | Merchant store | follow/unfollow | localStorage | server `follows` table | ⚙️ |

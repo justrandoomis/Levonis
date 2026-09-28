@@ -103,7 +103,34 @@ export default function Requests() {
     typeof (location.state as { printLink?: unknown } | null)?.printLink === 'string'
       ? String((location.state as { printLink: string }).printLink)
       : params.get('link') ?? '';
-  const [view, setView] = useState<View>(() => (carriedLink && user ? 'new' : 'board'));
+  /**
+   * A SECTION NAMED IN THE ADDRESS — `?view=new|mine|orders`, what the
+   * community page's shortcuts link to (src/pages/Community.tsx). Read once,
+   * at mount, and then dropped from the URL, so a reload after closing the
+   * wizard does not open it again. A guest who asks for the wizard or «تنفيذ
+   * طلباتي» lands on the board; the community page sends a guest through
+   * sign-in before it links here.
+   */
+  const [view, setView] = useState<View>(() => {
+    // A carried link outranks the address: it is the wizard, with the link in it.
+    const asked = carriedLink ? '' : params.get('view');
+    if (asked === 'mine') return 'mine';
+    if ((asked === 'new' || asked === 'orders') && user) return asked;
+    return carriedLink && user ? 'new' : 'board';
+  });
+  useEffect(() => {
+    if (!params.has('view')) return;
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete('view');
+        return p;
+      },
+      { replace: true }
+    );
+    // Once, at mount: the section it named is already in state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [me, setMe] = useState<MerchantMe | null>(null);
   const [open, setOpen] = useState<RequestRow | null>(null);
   const [deepLinkError, setDeepLinkError] = useState('');
