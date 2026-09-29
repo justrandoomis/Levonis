@@ -512,3 +512,40 @@ author or a bot; analytics endpoints answer only the owner; a private
 collection is 404 to others and a public one lists only public posts; the
 activity filter never leaks another user's rows; the storefront chunk graph
 does not gain the preview sheet (`tests/bundleBudget.test.ts`).
+
+### 9.8 Phase 8 — Performance, accessibility, localisation, verification, deploy
+
+**Performance (the brief's list):** every community list cursor-paged (no
+offsets anywhere in the new routes; `feedCursor`/`nextPostCursor`); media
+lazy below the fold (`SafeImage` default) and eager only for the first four
+tiles / the cover; the feed virtualised past 60 rows (`content-visibility:
+auto` on `.lv-section` rows, no library); skeletons at the section's exact
+height; no 3D file bytes in any list (the viewer loads only on its own page
+by token); the home's first paint = cover + trending + one request row +
+one page of posts (the rest mounts in view); `readPageCache` for Back; the
+budgets (`tests/bundleBudget.test.ts`) unchanged: entry 120 KB, initial
+240 KB, storefront closure 47 KB, CSS 60 KB.
+
+**Accessibility:** one Tab stop per card (stretched link) and buttons as
+siblings; `aria-pressed` on every toggle; ≥ 44 px targets; `focus-visible`
+rings everywhere; sections `aria-labelledby`; the media strip's slides named
+«n / N»; video tap-to-play, never autoplay; reduced motion collapses every
+spring (`useMotion`) and stops skeleton pulses; colour never the only cue.
+
+**Localisation:** ar, en, ckb complete for every string the phases added —
+checked by a test that walks `src/components/community/**/strings.ts` and
+`src/lib/refusalStrings.ts` and fails on a missing key or a ckb equal to its
+ar for more than 10 % of keys (the deliberately identical ones — brand words,
+digits — are listed); notification titles for the new kinds in three
+languages once Q5 is answered (default: ar/en with the merchant feed's
+`title_ckb` meta); RTL walked in the browser scripts for ar and ckb; Arabic
+counted nouns via `hub/copy.ts` forms.
+
+**Verification before deploy:** `npm run check`; `npm run test:unit`;
+`node scripts/migrate-check.mjs --twice`; `npm run build` + the budget test;
+the browser scripts (`e2e-projects`, `e2e-community-home`, and the ones the
+later phases add) in ar/en/ckb × dark/cream × 360/1280; a security pass over
+the brief's attack list (§7) with every case a test; then the deploy
+workflow after the owner's word, with the live checks the earlier deploys
+used (health shows the last migration, the community gate answers, the new
+routes 200/401/404 as designed, `www` still redirects).
