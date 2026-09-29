@@ -300,6 +300,10 @@ scripts/e2e-community-home.mjs in the browser.
 
 ## 9. Phase specifications
 
+### 9.0 Numbering
+
+Migrations in these specs are named by ROLE; the file number is the next free one at merge (`ls migrations | tail -1` + 1) — 0155 was taken by the Phase 2 review fix (`0155_community_comment_replay.sql`) while §9 still spoke of it. The same rule holds for docs/DECISIONS.md rows: the next free row when the phase lands. The merchant programme (docs/MERCHANT_PLATFORM_V2.md §C.3) shares the sequence.
+
 Written before each phase's workflow so the builders code against one text.
 Each spec names the tables (additive), the routes with their guards and
 refusal codes, the client surfaces, and the tests that prove it.
@@ -325,7 +329,7 @@ the viewer: `model_view_tokens` (hash, 60 min, grant preview|full,
 files; no multipart anywhere; limits are constants; `GET /files/*` supports
 Range/206 and serves public keys through the edge cache.
 
-**Migration 0158 (additive)**
+**Migration `asset_platform` (additive; number = next free at merge)**
 
 ```
 upload_sessions        id, owner_id → users, purpose, entity_id, file_name, declared_bytes, declared_mime,
@@ -465,7 +469,7 @@ accepted, rivals → rejected, `community_orders` funded with offer/request/
 contact snapshots), the order state machine and escrow rules (delivered never
 releases; only confirm or the auto-complete sweep do; disputes hold).
 
-**Migration 0155 (additive)**
+**Migration `offers_v2_timeline` (additive; number = next free at merge)**
 
 ```
 community_offers      + delivery_fee_iqd INTEGER NOT NULL DEFAULT 0 CHECK (>= 0)
@@ -589,7 +593,7 @@ and diacritics normalised by `normalizeText` where the index is used).
 
 ### 9.6 Phase 6 — Moderation V2, reputation V2, dispute evidence access
 
-**Migration 0156 (additive)**
+**Migration `moderation_v2` (additive; number = next free at merge)**
 
 ```
 users                 + status TEXT NOT NULL DEFAULT 'active' CHECK (active|restricted|suspended|banned)
@@ -673,7 +677,7 @@ the evidence rows never expose keys.
 
 ### 9.7 Phase 7 — Analytics, collections, activity centre, draft preview
 
-**Migration 0157 (additive)**
+**Migration `analytics_collections` (additive; number = next free at merge)**
 
 ```
 community_post_views_daily  post_id, day, views, PK (post_id, day)    -- from the beacon, salted-visitor deduped
