@@ -312,7 +312,7 @@ function ToolsRail() {
         data-testid="community-studio-link"
         rel="noopener noreferrer"
         aria-label={`${t('studioCardTitle')} — ${t('studioOpen')}`}
-        className="lv-community-tile relative flex h-24 w-[240px] shrink-0 snap-start flex-col justify-center overflow-hidden rounded-2xl border border-olive/50 bg-gradient-to-r from-olive/25 to-black p-4 transition-colors hover:border-olive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+        className="relative flex h-24 w-[240px] shrink-0 snap-start flex-col justify-center overflow-hidden rounded-2xl border border-olive/50 bg-surface p-4 transition-colors hover:border-olive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
       >
         <div aria-hidden="true" className="absolute bottom-0 end-2 opacity-20">
           <Box aria-hidden="true" className="h-20 w-20 text-olive" />
@@ -322,7 +322,7 @@ function ToolsRail() {
       </a>
       <Link
         to="/tools"
-        className="lv-community-tile relative flex h-24 w-[240px] shrink-0 snap-start flex-col justify-center overflow-hidden rounded-2xl border border-zinc-700 bg-gradient-to-r from-zinc-800 to-zinc-900 p-4 text-start transition-colors hover:border-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+        className="relative flex h-24 w-[240px] shrink-0 snap-start flex-col justify-center overflow-hidden rounded-2xl border border-zinc-700 bg-surface p-4 text-start transition-colors hover:border-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
       >
         <div aria-hidden="true" className="absolute bottom-0 end-2 opacity-20">
           <Calculator className="h-20 w-20" />
@@ -331,7 +331,7 @@ function ToolsRail() {
         <p className="text-xs text-zinc-300">{loc('افتح الحاسبة', 'Open the calculator')}</p>
       </Link>
       <div
-        className="lv-community-tile relative flex h-24 w-[240px] shrink-0 snap-start flex-col justify-center overflow-hidden rounded-2xl border border-olive/30 bg-gradient-to-r from-olive/20 to-black p-4 opacity-70"
+        className="relative flex h-24 w-[240px] shrink-0 snap-start flex-col justify-center overflow-hidden rounded-2xl border border-olive/30 bg-surface p-4 opacity-70"
         aria-disabled="true"
       >
         <div aria-hidden="true" className="absolute bottom-0 end-2 opacity-20">
@@ -368,7 +368,7 @@ function Shortcut({
     >
       <span
         className={`flex h-12 w-12 items-center justify-center rounded-2xl border transition-colors ${
-          primary ? 'border-sage/40 bg-sage/10 group-hover:bg-sage/20' : 'border-zinc-800 bg-zinc-900 group-hover:border-zinc-700'
+          primary ? 'border-sage/40 bg-sage/10' : 'border-zinc-800 bg-zinc-900 group-hover:border-zinc-700'
         }`}
       >
         <Icon aria-hidden="true" className={`h-5 w-5 ${primary ? 'text-sage' : 'text-zinc-400 group-hover:text-zinc-200'}`} />

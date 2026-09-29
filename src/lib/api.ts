@@ -317,6 +317,8 @@ export interface ApiUser {
   profile: Record<string, unknown>;
   /** ISO 3166-1 alpha-2, or null when the person has not said. */
   country: string | null;
+  /** Whether /u/<username> — the public creator page — exists for this account. */
+  creator_public?: boolean;
   /** MASKED, e.g. `+9647******567` — the account's own verified number. */
   phone: string | null;
   has_phone: boolean;

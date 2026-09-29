@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Edit2, Store } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
+import { Switch } from '../components/ui/Switch';
+import { useProjectStrings } from '../components/community/projects/strings';
 import { api, uploadFile } from '../lib/api';
 import { COUNTRIES, countryNames, flagOf } from '../components/auth/PhoneField';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
@@ -33,6 +35,20 @@ const InstagramIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+/** A list the profile keeps (printers, materials) as the comma-separated text the box edits. */
+function profileList(profile: Record<string, unknown> | undefined, key: string): string {
+  const v = profile?.[key];
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').join(', ') : '';
+}
+/** The box's text back into a list: trimmed, de-duplicated, at most ten. */
+function splitList(text: string): string[] {
+  const seen = new Set<string>();
+  return text
+    .split(/[,،\n]/)
+    .map((x) => x.trim().slice(0, 40))
+    .filter((x) => x && !seen.has(x.toLowerCase()) && (seen.add(x.toLowerCase()), true))
+    .slice(0, 10);
+}
 function profileStr(profile: Record<string, unknown> | undefined, key: string): string {
   const v = profile?.[key];
   return typeof v === 'string' ? v : '';
@@ -56,6 +72,11 @@ export default function EditProfile() {
   const [xAccount, setXAccount] = useState(profileStr(user?.profile, 'xAccount'));
   const [tiktok, setTiktok] = useState(profileStr(user?.profile, 'tiktok'));
   const [facebook, setFacebook] = useState(profileStr(user?.profile, 'facebook'));
+  // THE CREATOR PAGE (0153): the switch, and the two lists /u/<username> shows.
+  const [creatorPublic, setCreatorPublic] = useState(!!user?.creator_public);
+  const [printers, setPrinters] = useState(profileList(user?.profile, 'printers'));
+  const [materials, setMaterials] = useState(profileList(user?.profile, 'materials'));
+  const projectStrings = useProjectStrings();
 
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar_key ? `/files/${user.avatar_key}` : null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -78,6 +99,9 @@ export default function EditProfile() {
     setBio(user.bio || '');
     setWebsite(user.website || '');
     setInstagram(profileStr(user.profile, 'instagram'));
+    setCreatorPublic(!!user.creator_public);
+    setPrinters(profileList(user.profile, 'printers'));
+    setMaterials(profileList(user.profile, 'materials'));
     setXAccount(profileStr(user.profile, 'xAccount'));
     setTiktok(profileStr(user.profile, 'tiktok'));
     setFacebook(profileStr(user.profile, 'facebook'));
@@ -134,8 +158,12 @@ export default function EditProfile() {
           // above carries whatever this account already had straight back.
           // See the note where the four boxes used to be.
           instagram, xAccount, tiktok, facebook,
+          printers: splitList(printers),
+          materials: splitList(materials),
         },
       };
+      // Sent only when it changed, like the country below.
+      if (creatorPublic !== !!user.creator_public) body.creator_public = creatorPublic;
       // The server enforces the 14-day username cooldown — just attempt it.
       if (username !== (user.username || '')) body.username = username;
       // Sent only when it changed, so an untouched field can never clear a
@@ -363,6 +391,60 @@ export default function EditProfile() {
           still has what they typed, and the fields can be read back into the
           real printer records whenever that migration is written.
         */}
+
+        {/* The creator page — a choice, off until the person says yes. */}
+        <div>
+          <div className="flex justify-between items-end mb-2 ml-1">
+            <h3 className="text-gold text-[13px] font-bold">{projectStrings.creatorPage}</h3>
+          </div>
+          <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-zinc-800">
+              <Switch
+                checked={creatorPublic}
+                onChange={setCreatorPublic}
+                label={projectStrings.creatorPage}
+                description={
+                  creatorPublic ? (
+                    <span>
+                      {projectStrings.creatorPageDesc.replace('{username}', username || '…')}{' '}
+                      {user?.creator_public && username && (
+                        <a href={`/u/${encodeURIComponent(username)}`} className="text-sage underline underline-offset-2">
+                          /u/{username}
+                        </a>
+                      )}
+                    </span>
+                  ) : (
+                    projectStrings.creatorPageOff
+                  )
+                }
+                id="creator-public"
+              />
+            </div>
+            <label className="flex flex-col gap-1 p-4 border-b border-zinc-800">
+              <span className="text-zinc-400 text-[12px] font-semibold">{projectStrings.printersYouUse}</span>
+              <input
+                type="text"
+                value={printers}
+                onChange={(e) => setPrinters(e.target.value)}
+                className="bg-transparent font-bold text-[16px] text-white w-full outline-none placeholder:font-medium placeholder:text-zinc-600"
+                placeholder="Bambu Lab A1, Ender 3 V3"
+                data-profile-printers
+              />
+              <span className="text-zinc-500 text-[11px]">{projectStrings.printersHint}</span>
+            </label>
+            <label className="flex flex-col gap-1 p-4">
+              <span className="text-zinc-400 text-[12px] font-semibold">{projectStrings.materialsYouUse}</span>
+              <input
+                type="text"
+                value={materials}
+                onChange={(e) => setMaterials(e.target.value)}
+                className="bg-transparent font-bold text-[16px] text-white w-full outline-none placeholder:font-medium placeholder:text-zinc-600"
+                placeholder="PLA, PETG, TPU"
+                data-profile-materials
+              />
+            </label>
+          </div>
+        </div>
 
         {/* Socials */}
         <div>

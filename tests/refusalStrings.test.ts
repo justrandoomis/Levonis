@@ -135,6 +135,9 @@ test('every code the table translates is one the server can actually emit', () =
     // refuse with codes the request screens decode through this table.
     'worker/routes/marketplace.ts',
     'worker/routes/printRequests.ts',
+    // Community projects (docs/COMMUNITY_ECOSYSTEM.md Phase 1): the composer
+    // decodes POST_* and CONSENT_* beside the field each one names.
+    'worker/routes/communityPosts.ts',
     // The community-store checkout and the merchant's order door (wave 1):
     // QUOTE_CHANGED, COUPON_EXHAUSTED, ORDER_CHANGED and their siblings.
     'worker/routes/storeOrders.ts',

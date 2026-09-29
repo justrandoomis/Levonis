@@ -169,6 +169,8 @@ export interface SessionUser {
   bio: string;
   website: string;
   profile_json: string;
+  /** 0153 — the creator page switch; absent on rows the migration has not reached in a test double. */
+  creator_public?: number | null;
   /** Google account subject when this account has Google sign-in linked.
    *  NEVER leaves the server — publicUser exposes only whether it is set. */
   google_sub?: string | null;
@@ -248,6 +250,9 @@ export function publicUser(u: SessionUser) {
     website: u.website,
     profile: safeParse(u.profile_json, {}),
     country: u.country ?? null,
+    // Whether /u/<username> exists for this account (0153). Only an explicit
+    // 1 is on: a row from before the column reads as off.
+    creator_public: u.creator_public === 1,
     // WHETHER, never WHICH. The account page needs to show "Google —
     // connected"; the Google subject itself is an identifier for that person
     // at Google and has no business in a JSON response.

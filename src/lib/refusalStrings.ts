@@ -1221,6 +1221,72 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The request changed while you were working on it. Refresh and try again.',
     ckb: 'تغيّر الطلب أثناء عملك عليه. حدّث الصفحة وحاول مرة أخرى.',
   },
+  // ---- Community projects (worker/routes/communityPosts.ts) ----------------
+  POST_MEDIA_NOT_OWNED: {
+    ar: 'هذه الصورة ليست من صورك. ارفع الصورة من جهازك ثم أضفها.',
+    en: 'That picture is not one of yours. Upload it from your device, then add it.',
+    ckb: 'ئەم وێنەیە هی تۆ نییە. لە ئامێرەکەتەوە باری بکە و پاشان زیادی بکە.',
+  },
+  POST_MEDIA_TOO_MANY: {
+    ar: 'الحد 12 صورة أو فيديو للمشروع الواحد. احذف واحدة لتضيف أخرى.',
+    en: 'A project holds up to 12 pictures or videos. Remove one to add another.',
+    ckb: 'پڕۆژەیەک تا ١٢ وێنە یان ڤیدیۆ هەڵدەگرێت. یەکێک بسڕەوە بۆ زیادکردنی یەکێکی تر.',
+  },
+  POST_MEDIA_KIND: {
+    ar: 'هذا الملف ليس صورة ولا فيديو مدعومًا.',
+    en: 'That file is not a supported picture or video.',
+    ckb: 'ئەم فایلە وێنە یان ڤیدیۆیەکی پشتگیریکراو نییە.',
+  },
+  POST_LINK_NOT_OWNED: {
+    ar: 'يمكنك ربط المشروع بمتجرك ومنتجاتك وطلباتك أنت فقط.',
+    en: 'A project can link only to your own store, products and jobs.',
+    ckb: 'پڕۆژە تەنها دەتوانرێت بە فرۆشگا و بەرهەم و کارەکانی خۆت ببەسترێتەوە.',
+  },
+  POST_LINK_NOT_FOUND: {
+    ar: 'الطابعة أو الخامة المختارة غير موجودة في الكتالوج. اختر من القائمة أو اكتب الاسم.',
+    en: 'That printer or material is not in the catalogue. Pick one from the list or type its name.',
+    ckb: 'ئەو چاپکەر یان کەرەستەیە لە کەتەلۆگدا نییە. لە لیستەکە هەڵبژێرە یان ناوەکەی بنووسە.',
+  },
+  POST_SETTING_INVALID: {
+    ar: 'أحد إعدادات الطباعة خارج النطاق المعقول. راجع ارتفاع الطبقة ونسبة الملء وقطر الفوهة.',
+    en: 'A print setting is out of range. Check the layer height, infill and nozzle size.',
+    ckb: 'یەکێک لە ڕێکخستنەکانی چاپ لە دەرەوەی سنوورە. بەرزی چین و ڕێژەی پڕکردنەوە و قەبارەی نۆزڵ بپشکنە.',
+  },
+  POST_NEEDS_MEDIA: {
+    ar: 'أضف صورة واحدة على الأقل قبل النشر.',
+    en: 'Add at least one picture before publishing.',
+    ckb: 'پێش بڵاوکردنەوە لانیکەم یەک وێنە زیاد بکە.',
+  },
+  POST_ARCHIVED: {
+    ar: 'هذا المشروع مؤرشف. أعِده أولًا لتعدّله.',
+    en: 'This project is archived. Restore it first to edit it.',
+    ckb: 'ئەم پڕۆژەیە ئەرشیف کراوە. سەرەتا بیگەڕێنەوە بۆ دەستکاریکردنی.',
+  },
+  POST_PUBLISHED: {
+    ar: 'المشروع منشور، فلا يمكن حذفه مباشرة. أرشِفه أولًا ثم احذفه.',
+    en: 'A published project cannot be deleted outright. Archive it first, then delete it.',
+    ckb: 'پڕۆژەی بڵاوکراوە ڕاستەوخۆ ناسڕدرێتەوە. سەرەتا ئەرشیفی بکە و پاشان بیسڕەوە.',
+  },
+  POST_HIDDEN_BY_ADMIN: {
+    ar: 'أخفت ليفونيس هذا المشروع، فلا يمكن نشره الآن. راجع السبب في صفحة المشروع.',
+    en: 'Levonis hid this project, so it cannot be published now. See the reason on the project page.',
+    ckb: 'لیڤۆنیس ئەم پڕۆژەیەی شاردووەتەوە، بۆیە ئێستا بڵاو ناکرێتەوە. هۆکارەکە لە پەڕەی پڕۆژەکە ببینە.',
+  },
+  CONSENT_REQUIRED: {
+    ar: 'هذه القطعة طُبعت لزبون. ينشر المشروع بعد موافقته — أُرسل إليه طلب الموافقة.',
+    en: 'This part was printed for a customer. The project goes public once they allow it — they have been asked.',
+    ckb: 'ئەم پارچەیە بۆ کڕیارێک چاپ کراوە. پڕۆژەکە دوای ڕەزامەندی ئەو بڵاو دەبێتەوە — داوای لێکراوە.',
+  },
+  CONSENT_DECLINED: {
+    ar: 'رفض الزبون عرض قطعته. يمكنك نشر المشروع بدون ربطه بطلبه.',
+    en: 'The customer declined to have their part shown. You can publish the project without linking it to their job.',
+    ckb: 'کڕیارەکە ڕەزامەند نەبوو پارچەکەی پیشان بدرێت. دەتوانیت پڕۆژەکە بەبێ بەستنەوە بە کارەکەی بڵاو بکەیتەوە.',
+  },
+  CONSENT_NOT_NEEDED: {
+    ar: 'هذا المشروع لا يحتاج موافقتك.',
+    en: 'This project does not need your consent.',
+    ckb: 'ئەم پڕۆژەیە پێویستی بە ڕەزامەندی تۆ نییە.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

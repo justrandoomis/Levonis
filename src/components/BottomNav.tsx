@@ -29,7 +29,9 @@ export function isBottomNavHidden(pathname: string): boolean {
     pathname.startsWith('/chat/') ||
     // A store's product page on the main site has its own sticky buy bar
     // (StorefrontProduct), which the nav covered on a phone.
-    /^\/community\/store\/[^/]+\/p\/[^/]+/.test(pathname)
+    /^\/community\/store\/[^/]+\/p\/[^/]+/.test(pathname) ||
+    // The project composer has its own action bar under the thumb.
+    /^\/community\/projects\/(new|[^/]+\/edit)$/.test(pathname)
   );
 }
 

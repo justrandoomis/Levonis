@@ -64,11 +64,16 @@ const nowIso = () => new Date().toISOString();
 /** The page a post is read on. */
 export const postHref = (id: string) => `/community/projects/${encodeURIComponent(id)}`;
 
-/** The public words of an author: never the email, never the phone. */
+/**
+ * The public words of an author: never the email, never the phone — and the
+ * username only when their page exists (`creatorVisible`'s rule), so a card
+ * never links to a 404 and a closed page is closed from every side.
+ */
 function authorPublic(row: Record<string, unknown>) {
+  const pageExists = Number(row.a_public) === 1 || Number(row.a_merchant) === 1;
   return {
     id: String(row.author_id ?? row.id ?? ''),
-    username: (row.a_username as string | null) ?? null,
+    username: pageExists ? ((row.a_username as string | null) ?? null) : null,
     name: String(row.a_name ?? ''),
     avatarUrl: fileUrl(row.a_avatar),
   };
@@ -132,7 +137,8 @@ export function postCard(p: Record<string, unknown>, root: string | null) {
 
 /** The columns every post read joins — one query, one shape. */
 const POST_COLUMNS = `p.*,
-       u.username AS a_username, u.name AS a_name, u.avatar_key AS a_avatar,
+       u.username AS a_username, u.name AS a_name, u.avatar_key AS a_avatar, u.creator_public AS a_public,
+       EXISTS (SELECT 1 FROM community_merchants acm WHERE acm.user_id = u.id AND acm.status <> 'suspended') AS a_merchant,
        s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo, s.status AS s_status,
        cp.slug AS pr_slug, cp.name AS pr_name, cp.name_ar AS pr_name_ar, cp.price_iqd AS pr_price,
        cp.lifecycle AS pr_lifecycle, cp.status AS pr_status,
@@ -151,7 +157,8 @@ const POST_FROM = `FROM community_posts p
        LEFT JOIN products mp ON mp.id = p.material_product_id`;
 
 /** What everybody may see: published, public, not hidden by Levonis. */
-export const POST_PUBLIC_SQL = `p.state = 'published' AND p.visibility = 'public' AND p.admin_hidden_at IS NULL`;
+export const POST_PUBLIC_SQL = `p.state = 'published' AND p.visibility = 'public' AND p.admin_hidden_at IS NULL
+  AND p.consent_status IN ('not_needed','granted')`;
 
 const POST_SEARCH = ['p.title', 'p.body', 'p.tags', 'p.material', 'p.printer_name'] as const;
 
@@ -237,11 +244,29 @@ async function loadPost(env: Env, id: string): Promise<Record<string, unknown> |
 }
 
 /** May this viewer read this post at all? The author and staff always; everybody else what is public. */
-function mayRead(p: Record<string, unknown>, viewer: { id: string; role: string } | null): boolean {
+function mayRead(p: Record<string, unknown>, viewer: { id: string; role: string } | null, consentParty: string | null = null): boolean {
   if (viewer && (viewer.id === p.author_id || viewer.role === 'admin')) return true;
+  // The customer a workshop asked («صور من قطعتك») may read the piece they
+  // are asked about, whatever its state — they cannot decide about a page
+  // they cannot open. Levonis's hide still wins.
+  if (viewer && consentParty && viewer.id === consentParty && !p.admin_hidden_at) return true;
   if (p.admin_hidden_at) return false;
   if (p.state !== 'published') return false;
   return p.visibility === 'public' || p.visibility === 'unlisted';
+}
+
+/** The customer whose part a portfolio piece shows — the linked job's customer, when consent is in play. */
+async function consentPartyOf(env: Env, p: Record<string, unknown>): Promise<string | null> {
+  if (p.consent_status === 'not_needed') return null;
+  if (typeof p.request_id === 'string' && p.request_id) {
+    const r = await env.DB.prepare('SELECT customer_id FROM community_requests WHERE id = ?').bind(p.request_id).first<{ customer_id: string }>();
+    if (r) return r.customer_id;
+  }
+  if (typeof p.community_order_id === 'string' && p.community_order_id) {
+    const o = await env.DB.prepare('SELECT customer_id FROM community_orders WHERE id = ?').bind(p.community_order_id).first<{ customer_id: string }>();
+    if (o) return o.customer_id;
+  }
+  return null;
 }
 
 async function postMedia(env: Env, id: string) {
@@ -265,8 +290,10 @@ communityPostRoutes.get('/posts/:id', async (c) => {
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const viewer = c.get('user') ?? null;
   const p = await loadPost(c.env, id);
-  if (!p || !mayRead(p, viewer)) throw notFound('Project not found');
+  const consentParty = p && viewer ? await consentPartyOf(c.env, p) : null;
+  if (!p || !mayRead(p, viewer, consentParty)) throw notFound('Project not found');
   const mine = !!viewer && viewer.id === p.author_id;
+  const asked = !!viewer && !!consentParty && viewer.id === consentParty && !mine;
   const root = rootDomainFrom(c.env);
   const media = await postMedia(c.env, id);
   return c.json({
@@ -278,10 +305,12 @@ communityPostRoutes.get('/posts/:id', async (c) => {
       print_settings: safeParse<Record<string, unknown>>(p.print_settings, {}) ?? {},
       request_id: mine ? ((p.request_id as string | null) ?? null) : null,
       community_order_id: mine ? ((p.community_order_id as string | null) ?? null) : null,
-      consent_status: mine ? String(p.consent_status) : undefined,
+      consent_status: mine || asked ? String(p.consent_status) : undefined,
       hidden: p.admin_hidden_at ? { at: p.admin_hidden_at, reason: mine || viewer?.role === 'admin' ? String(p.admin_hidden_reason ?? '') : '' } : null,
       viewer: {
         mine,
+        /** The viewer is the customer whose part this is: their decision is due, or was given. */
+        consent: asked ? (String(p.consent_status) as 'pending' | 'granted' | 'declined') : null,
         can: {
           edit: mine && p.state !== 'archived',
           publish: mine && p.state === 'draft',
@@ -565,6 +594,13 @@ communityPostRoutes.patch('/posts/:id', requireAuth, async (c) => {
   const input = readPost(body, true);
   const { consent, customerToAsk } = await checkLinks(c.env, user.id, input, current);
   if (input.media) await checkMedia(c.env, user.id, input.media);
+  // A PUBLISHED piece keeps the promises publishing made: it cannot lose its
+  // last picture, and it cannot take on a customer's part without their
+  // answer — link the job on a draft, or archive first.
+  if (current.state === 'published') {
+    if (input.media && input.media.length === 0) throw badRequest('A published project keeps at least one picture', 'POST_NEEDS_MEDIA');
+    if (consent === 'pending') throw conflict('Ask the customer from a draft: archive the project, link the job, and publish once they allow it', 'CONSENT_REQUIRED');
+  }
 
   const sets: string[] = [];
   const vals: unknown[] = [];
@@ -615,7 +651,7 @@ communityPostRoutes.post('/posts/:id/publish', requireAuth, async (c) => {
   const user = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const current = await ownPost(c, id);
-  if (current.state === 'published') return c.json({ success: true, replayed: true, published_at: current.published_at });
+  if (current.state === 'published') return c.json({ success: true, replayed: true, published_at: current.published_at, post: postCard(current, rootDomainFrom(c.env)) });
   if (current.admin_hidden_at) throw conflict('Levonis hid this project — it cannot be published until the review is lifted', 'POST_HIDDEN_BY_ADMIN');
   if (current.consent_status === 'pending') throw conflict('Waiting for the customer\'s permission to show their part', 'CONSENT_REQUIRED');
   if (current.consent_status === 'declined') throw conflict('The customer declined to have their part shown', 'CONSENT_DECLINED');
@@ -640,17 +676,19 @@ communityPostRoutes.post('/posts/:id/archive', requireAuth, async (c) => {
   await ownPost(c, id);
   await c.env.DB.prepare("UPDATE community_posts SET state = 'archived', updated_at = ? WHERE id = ? AND author_id = ?").bind(nowIso(), id, user.id).run();
   await audit(c.env.DB, user.id, 'community.post_archived', id, {});
-  return c.json({ success: true });
+  const p = await loadPost(c.env, id);
+  return c.json({ success: true, post: postCard(p!, rootDomainFrom(c.env)) });
 });
 
 communityPostRoutes.post('/posts/:id/restore', requireAuth, async (c) => {
   const user = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const current = await ownPost(c, id);
-  if (current.state !== 'archived') return c.json({ success: true, replayed: true });
+  if (current.state !== 'archived') return c.json({ success: true, replayed: true, post: postCard(current, rootDomainFrom(c.env)) });
   // Back to a draft: the author republishes deliberately (the date is kept).
   await c.env.DB.prepare("UPDATE community_posts SET state = 'draft', updated_at = ? WHERE id = ? AND author_id = ?").bind(nowIso(), id, user.id).run();
-  return c.json({ success: true });
+  const p = await loadPost(c.env, id);
+  return c.json({ success: true, post: postCard(p!, rootDomainFrom(c.env)) });
 });
 
 /** A draft or an archived post may be deleted outright; a published one is archived first. */
@@ -730,16 +768,28 @@ communityPostRoutes.get('/my-posts', requireAuth, async (c) => {
  * page is a 404, as their bio has always been the account's own. The socials
  * are handles the account typed to be shown; the email and the phone never.
  */
-const SOCIAL_KEYS = ['instagram', 'x', 'tiktok', 'facebook', 'youtube'] as const;
+/**
+ * The socials a creator page shows, by allow-list: the public name → the key
+ * the profile editor stores it under (src/pages/EditProfile.tsx writes
+ * `xAccount`; older accounts may hold `x`). Nothing else in profile_json is
+ * ever returned.
+ */
+const SOCIAL_KEYS: ReadonlyArray<readonly [name: string, ...keys: string[]]> = [
+  ['instagram', 'instagram'],
+  ['x', 'x', 'xAccount'],
+  ['tiktok', 'tiktok'],
+  ['facebook', 'facebook'],
+  ['youtube', 'youtube'],
+];
 
 async function creatorRow(env: Env, username: string) {
   return env.DB.prepare(
     `SELECT u.id, u.username, u.name, u.avatar_key, u.bio, u.website, u.profile_json, u.country, u.created_at, u.creator_public,
             cm.id AS merchant_id, cm.status AS merchant_status
        FROM users u LEFT JOIN community_merchants cm ON cm.user_id = u.id
-      WHERE u.username = ? COLLATE NOCASE`
+      WHERE u.username = ?`
   )
-    .bind(username)
+    .bind(username.trim().toLowerCase())
     .first<Record<string, unknown>>();
 }
 
@@ -757,7 +807,10 @@ communityPostRoutes.get('/creators/:username', async (c) => {
   const root = rootDomainFrom(c.env);
   const profile = safeParse<Record<string, unknown>>(u.profile_json, {}) ?? {};
   const socials: Record<string, string> = {};
-  for (const k of SOCIAL_KEYS) if (typeof profile[k] === 'string' && profile[k]) socials[k] = String(profile[k]).slice(0, 80);
+  for (const [name, ...keys] of SOCIAL_KEYS) {
+    const v = keys.map((k) => profile[k]).find((x) => typeof x === 'string' && x.trim());
+    if (typeof v === 'string') socials[name] = v.trim().slice(0, 80);
+  }
   const [projects, badges, store] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) AS n FROM community_posts p WHERE p.author_id = ? AND ${POST_PUBLIC_SQL}`).bind(u.id).first<{ n: number }>(),
     membershipBadges(c.env.DB, [u.id]),

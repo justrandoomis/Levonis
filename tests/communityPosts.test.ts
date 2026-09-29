@@ -20,6 +20,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, post, get, patch, json, count, row, type StubUser, type Mount } from './fixtures/app';
 import { communityRoutes } from '../worker/routes/community';
 import { communityPostRoutes } from '../worker/routes/communityPosts';
+import { profileRoutes } from '../worker/routes/profile';
 
 const SARA: StubUser = { id: 'sara', role: 'customer', email: 'sara@x.co' };
 const EVE: StubUser = { id: 'eve', role: 'customer', email: 'eve@x.co' };
@@ -29,6 +30,7 @@ const BOSS: StubUser = { id: 'boss', role: 'admin', email: 'boss@x.co' };
 const mount: Mount = (a) => {
   a.route('/api/community', communityRoutes);
   a.route('/api/community', communityPostRoutes);
+  a.route('/api/profile', profileRoutes);
 };
 
 function seed(open = true) {
@@ -62,6 +64,9 @@ function seed(open = true) {
   return raw;
 }
 const as = (raw: DatabaseSync, user: StubUser | null) => stubApp(asD1(raw), user, mount);
+/** The caller as their STORED row — what the profile route reads its defaults from. */
+const asRow = (raw: DatabaseSync, id: string) =>
+  stubApp(asD1(raw), raw.prepare('SELECT * FROM users WHERE id = ?').get(id) as unknown as StubUser, mount);
 
 const PROJECT = {
   title: 'Articulated dragon',
@@ -271,11 +276,23 @@ test('a workshop\'s portfolio piece from a customer\'s job waits for that custom
   assert.equal(refused.status, 409);
   assert.equal((await json(refused)).code, 'CONSENT_REQUIRED');
 
+  // The customer can open the draft they are asked about — and only they can;
+  // the page tells them their decision is due, and never shows the keys.
+  const askedView = await get(as(raw, EVE), `/api/community/posts/${id}`);
+  assert.equal(askedView.status, 200);
+  const askedPost = (await json(askedView)).post;
+  assert.equal(askedPost.viewer.consent, 'pending');
+  assert.equal(askedPost.viewer.mine, false);
+  assert.equal(askedPost.consent_status, 'pending');
+  assert.equal('key' in askedPost.media[0], false);
+  assert.equal((await get(as(raw, SARA), `/api/community/posts/${id}`)).status, 404, 'a stranger still cannot');
+
   // Neither a stranger nor the workshop itself can answer for the customer.
   assert.equal((await post(as(raw, SARA), `/api/community/posts/${id}/consent`, { decision: 'granted' })).status, 404);
   assert.equal((await post(as(raw, ALI), `/api/community/posts/${id}/consent`, { decision: 'granted' })).status, 404);
   assert.equal((await post(as(raw, EVE), `/api/community/posts/${id}/consent`, { decision: 'granted' })).status, 200);
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = 'ali' AND kind = 'portfolio_consent'"), 1, 'the workshop hears the answer');
+  assert.equal((await json(await get(as(raw, EVE), `/api/community/posts/${id}`))).post.viewer.consent, 'granted');
   assert.equal((await post(as(raw, ALI), `/api/community/posts/${id}/publish`)).status, 200);
 
   // The customer's OWN job needs nobody's consent.
@@ -304,4 +321,71 @@ test('the new reads and writes sit inside the maintenance wall', async () => {
   }
   assert.equal((await post(as(raw, SARA), '/api/community/posts', PROJECT)).status, 503);
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_posts'), 0);
+});
+
+test('the creator page is a choice: the profile switch opens and closes it, and only the allow-listed socials leave the profile blob', async () => {
+  const raw = seed();
+  // Sara has published nothing and never switched it on: no page.
+  assert.equal((await get(as(raw, null), '/api/community/creators/sara')).status, 404);
+  // Her own PATCH, a strict boolean.
+  assert.equal((await patch(asRow(raw, 'sara'), '/api/profile', { creator_public: 'yes' })).status, 400);
+  const on = await patch(asRow(raw, 'sara'), '/api/profile', { creator_public: true, profile: { instagram: 'sara.prints', xAccount: '@sara', secret_note: 'x', printers: ['Bambu A1', 7], materials: ['PLA'] } });
+  const onBody = await json(on);
+  assert.equal(on.status, 200, JSON.stringify(onBody));
+  assert.equal((onBody.user as { creator_public: boolean }).creator_public, true);
+  const page = await json(await get(as(raw, null), '/api/community/creators/sara'));
+  assert.deepEqual(page.creator.socials, { instagram: 'sara.prints', x: '@sara' }, 'xAccount is shown as x; nothing else from profile_json');
+  assert.deepEqual(page.creator.printers, ['Bambu A1'], 'only strings');
+  assert.equal(JSON.stringify(page).includes('secret_note'), false);
+  assert.equal(JSON.stringify(page).includes('+9647700000009'), false, 'no phone');
+  // A PATCH that does not mention the switch leaves it alone.
+  await patch(asRow(raw, 'sara'), '/api/profile', { bio: 'still here' });
+  assert.equal((await get(as(raw, null), '/api/community/creators/sara')).status, 200);
+  // Off again: 404 to the public, still there for herself.
+  await patch(asRow(raw, 'sara'), '/api/profile', { creator_public: false });
+  assert.equal((await get(as(raw, null), '/api/community/creators/sara')).status, 404);
+  assert.equal((await get(as(raw, SARA), '/api/community/creators/sara')).status, 200);
+  // Nobody flips another account's switch through the posts API either.
+  assert.equal(row(raw, "SELECT creator_public FROM users WHERE id = 'eve'")?.creator_public, 0);
+});
+
+test('a published project keeps its promises: no last picture removed, no customer part added without their answer; a closed creator page is closed on every card', async () => {
+  const raw = seed();
+  const id = await published(raw, SARA, { ...PROJECT, title: 'Kept' });
+  const before = count(raw, 'SELECT COUNT(*) AS n FROM community_post_media WHERE post_id = ?', id);
+  assert.ok(before >= 1);
+  const noMedia = await patch(as(raw, SARA), `/api/community/posts/${id}`, { media: [] });
+  assert.equal(noMedia.status, 400);
+  assert.equal((await json(noMedia)).code, 'POST_NEEDS_MEDIA');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_post_media WHERE post_id = ?', id), before, 'nothing was removed');
+
+  // Ali's published piece cannot quietly take on Eve's job.
+  const aliId = await published(raw, ALI, { ...PROJECT, title: 'Ali kept', media: [{ key: 'merchants/ali/public/w1.webp', kind: 'image' }], store_id: 's_ali' });
+  const link = await patch(as(raw, ALI), `/api/community/posts/${aliId}`, { request_id: 'req_eve' });
+  assert.equal(link.status, 409);
+  assert.equal((await json(link)).code, 'CONSENT_REQUIRED');
+  assert.equal(row<{ consent_status: string; request_id: string | null }>(raw, 'SELECT consent_status, request_id FROM community_posts WHERE id = ?', aliId)!.request_id, null);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = 'eve' AND kind = 'portfolio_consent'"), 0, 'the customer was not asked about a published piece');
+
+  // Even if a row were pending, the feed would not show it.
+  raw.exec(`UPDATE community_posts SET consent_status = 'pending' WHERE id = '${aliId}'`);
+  const feed = (await json(await get(as(raw, null), '/api/community/posts'))).posts as Array<{ id: string }>;
+  assert.equal(feed.some((p) => p.id === aliId), false);
+
+  // Sara closes her page: her cards stop linking to it, her projects stay.
+  await patch(asRow(raw, 'sara'), '/api/profile', { creator_public: false });
+  const card = (await json(await get(as(raw, null), '/api/community/posts'))).posts.find((p: { id: string }) => p.id === id);
+  assert.ok(card, 'the project is still public');
+  assert.equal(card.author.username, null, 'no link to a page that answers 404');
+  assert.equal(card.author.name, 'Sara Kareem');
+  // Ali, a store owner, is public through the store whatever the switch says.
+  const aliCard = (await json(await get(as(raw, ALI), `/api/community/posts/${aliId}`))).post;
+  assert.equal(aliCard.author.username, 'ali');
+  // The lifecycle doors answer with the post itself.
+  const archived = await json(await post(as(raw, SARA), `/api/community/posts/${id}/archive`));
+  assert.equal(archived.post.state, 'archived');
+  const restored = await json(await post(as(raw, SARA), `/api/community/posts/${id}/restore`));
+  assert.equal(restored.post.state, 'draft');
+  // Usernames are looked up as stored: lowercase.
+  assert.equal((await get(as(raw, null), '/api/community/creators/ALI')).status, 200);
 });

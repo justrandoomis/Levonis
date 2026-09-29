@@ -1593,18 +1593,6 @@ html.lv-lang-vt[data-lang-flow='to-rtl']::view-transition-new(root) { animation-
   color: var(--color-zinc-600);
 }
 
-/* The community page's shortcut banners (src/pages/Community.tsx): an olive
-   wash into black on the dark theme; on the light one a plain card, so the
-   ink title is not read through a khaki smudge. */
-[data-theme='light'] .lv-community-tile {
-  background-image: none;
-  background-color: var(--color-surface);
-  border-color: var(--color-border-subtle);
-}
-[data-theme='light'] .lv-community-tile:hover {
-  border-color: var(--color-zinc-700);
-}
-
 /* THE HOME HERO'S GROUND (src/components/home/Hero.tsx DefaultHero). Dark:
    the olive plate the utilities draw. Light: warm cream with a faint gold
    bloom, and the layer lines in ink rather than white. */

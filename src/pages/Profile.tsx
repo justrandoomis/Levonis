@@ -14,6 +14,8 @@ import { api, ApiProduct, ApiOrder, usdCentsToIqd } from '../lib/api';
 import ProfileIconGrid, { ProfileIconAction } from '../components/profile/ProfileIconGrid';
 import GuestCard from '../components/profile/GuestCard';
 import MyReviewsTab from '../components/profile/MyReviewsTab';
+const MyProjectsTab = React.lazy(() => import('../components/profile/MyProjectsTab'));
+import { useProjectStrings } from '../components/community/projects/strings';
 import QrCodeModal from '../components/profile/QrCodeModal';
 import DirectStockEdge from '../components/DirectStockEdge';
 import InstallAppButton from '../components/pwa/InstallAppButton';
@@ -85,7 +87,13 @@ export default function Profile() {
   const [orderCounts, setOrderCounts] = useState<Record<string, number>>({});
   const [latestOrder, setLatestOrder] = useState<ApiOrder | null>(null);
   const [followedStoreCount, setFollowedStoreCount] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState('suggested');
+  const [activeTab, setActiveTab] = useState(() => {
+    // «مشاريعي» is a destination: a deleted project and the composer's back
+    // link both land on it. Only the tabs that exist are honoured.
+    const asked = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null;
+    return asked === 'projects' ? 'projects' : 'suggested';
+  });
+  const projectStrings = useProjectStrings();
   const [scrolled, setScrolled] = useState(false);
   const [mine, setMine] = useState<MembershipMine | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
@@ -719,6 +727,7 @@ export default function Profile() {
             { id: 'suggested', label: loc('المنتجات المقترحة', 'Suggested', 'بەرهەمە پێشنیارکراوەکان') },
             { id: 'collection', label: loc('مجموعتي', 'My Collection', 'کۆکراوەکانم') },
             { id: 'reviews', label: loc('مراجعاتي', 'My Reviews', 'پێداچوونەوەکانم') },
+            ...(isAuthenticated ? [{ id: 'projects', label: projectStrings.myProjects }] : []),
           ].map(tab => (
             <button
               key={tab.id}
@@ -829,6 +838,14 @@ export default function Profile() {
         )}
 
         {/* Reviews Tab — REAL data from GET /api/reviews/mine */}
+        {activeTab === 'projects' && isAuthenticated && (
+          <div className="mb-6">
+            <React.Suspense fallback={<div aria-hidden="true" className="h-[76px] animate-pulse rounded-2xl bg-surface-selected motion-reduce:animate-none" />}>
+              <MyProjectsTab />
+            </React.Suspense>
+          </div>
+        )}
+
         {activeTab === 'reviews' && (
           <div className="mb-6">
             <MyReviewsTab isAuthenticated={isAuthenticated} />

@@ -243,6 +243,11 @@ const Auth = prefetchable(() => import('./pages/Auth'));
  * their route does.
  */
 const Profile = React.lazy(() => import('./pages/Profile'));
+// Levo Community's projects and creators (docs/COMMUNITY_ECOSYSTEM.md Phase 1).
+const CommunityProjects = React.lazy(() => import('./pages/community/Projects'));
+const CommunityProject = React.lazy(() => import('./pages/community/Project'));
+const CommunityProjectComposer = React.lazy(() => import('./pages/community/ProjectComposer'));
+const CommunityCreator = React.lazy(() => import('./pages/community/Creator'));
 const Orders = React.lazy(() => import('./pages/Orders'));
 const OrderDetail = React.lazy(() => import('./pages/OrderDetail'));
 const Community = React.lazy(() => import('./pages/Community'));
@@ -779,6 +784,16 @@ function AppContent() {
               server; this wrapper only spares a refused visitor a page whose
               every call would answer 503. */}
           <Route path="/community" element={<CommunityGate><Community /></CommunityGate>} />
+          {/* WHAT THE COMMUNITY MAKES. A project is public reading (the server
+              hides drafts, private and hidden pieces itself); writing one
+              needs an account. The creator page /u/:username exists only for
+              an account that chose to be public. All behind the same gate:
+              they are Levo Community. */}
+          <Route path="/community/projects" element={<CommunityGate><CommunityProjects /></CommunityGate>} />
+          <Route path="/community/projects/new" element={<ProtectedRoute><CommunityGate><CommunityProjectComposer /></CommunityGate></ProtectedRoute>} />
+          <Route path="/community/projects/:id" element={<CommunityGate><CommunityProject /></CommunityGate>} />
+          <Route path="/community/projects/:id/edit" element={<ProtectedRoute><CommunityGate><CommunityProjectComposer /></CommunityGate></ProtectedRoute>} />
+          <Route path="/u/:username" element={<CommunityGate><CommunityCreator /></CommunityGate>} />
           {/* Resolves slug / store id / merchant id to the SAME storefront
               profile the subdomain serves; profile-only merchants from the
               pre-store era fall through to the legacy page inside. */}

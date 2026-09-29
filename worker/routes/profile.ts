@@ -112,12 +112,27 @@ profileRoutes.patch('/', async (c) => {
     else throw badRequest('Unknown country code', 'BAD_COUNTRY');
   }
 
+  /**
+   * THE CREATOR PAGE SWITCH (0153). A strict boolean like the WhatsApp one:
+   * on, /u/<username> shows this account's projects, bio, website and
+   * socials to everyone; off, the page is a 404 as it always was. Publishing
+   * a first project turns it on (worker/routes/communityPosts.ts says so in
+   * the composer); this is the way back off.
+   */
+  let creatorPublic = user.creator_public === 1 ? 1 : 0;
+  if (body.creator_public !== undefined) {
+    if (typeof body.creator_public !== 'boolean') {
+      throw badRequest('creator_public must be true or false', 'BAD_CREATOR_PUBLIC');
+    }
+    creatorPublic = body.creator_public ? 1 : 0;
+  }
+
   try {
     await c.env.DB.prepare(
       `UPDATE users SET name = ?, bio = ?, website = ?, locale = ?, profile_json = ?, username = ?, avatar_key = ?,
-          country = ?, notify_whatsapp = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
+          country = ?, notify_whatsapp = ?, creator_public = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
     )
-      .bind(name, bio, website, locale, profileJson, newUsername, avatarKey, country, notifyWhatsapp, user.id)
+      .bind(name, bio, website, locale, profileJson, newUsername, avatarKey, country, notifyWhatsapp, creatorPublic, user.id)
       .run();
   } catch (e) {
     // The availability check above and this write are not one operation, so
