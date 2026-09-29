@@ -364,6 +364,9 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   { table: 'kyc_cases', column: 'evidence_keys', kind: 'json', why: 'identity documents under the private kyc/ prefix' },
   { table: 'kyc_cases', column: 'payload', kind: 'json', why: 'the case payload references the same documents' },
 
+  // ---- the community's projects and posts (0153) --------------------------
+  { table: 'community_post_media', column: 'media_key', kind: 'text', why: "a project's picture or video, the author's own public media" },
+
   // ---- printing ----------------------------------------------------------
   { table: 'community_request_files', column: 'file_key', kind: 'text', why: 'the uploaded 3D model or drawing' },
   { table: 'community_request_files', column: 'preview_key', kind: 'text', why: 'the derived preview mesh the viewer serves' },
@@ -392,6 +395,10 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
  * on a live page. Those are not comparable mistakes.
  */
 export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
+  // -- the community's projects (0153): numbers and short words in JSON ------
+  'community_posts.print_settings': 'layer height, infill, supports, nozzle — numbers and flags, never a key',
+  'community_posts.dimensions': 'the printed part\'s size in millimetres',
+  'community_posts.tags': 'short words the author chose',
   // -- identifiers and de-duplication tokens; never a path ------------------
   'admin_settings.key': 'the setting name',
   'bnpl_ledger.idempotency_key': 'request de-duplication token',

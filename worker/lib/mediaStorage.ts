@@ -670,7 +670,9 @@ export function isAnonymousPublicMediaKey(key: string): boolean {
     key.startsWith('products/') ||
     key.startsWith('avatars/') ||
     key.startsWith('community/') ||
-    /^users\/[^/]+\/(?:avatar|public-avatars)\//.test(key) ||
+    // `posts/`: a maker's project pictures and clips (0153) — public by the
+    // author's own act of publishing, like an avatar.
+    /^users\/[^/]+\/(?:avatar|public-avatars|posts)\//.test(key) ||
     /^merchants\/[^/]+\/(?:public|logos|covers)\//.test(key) ||
     /**
      * THE BRAND FOLDER, WHATEVER CASE IT WAS UPLOADED IN.

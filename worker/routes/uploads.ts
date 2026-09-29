@@ -264,7 +264,7 @@ uploadRoutes.post('/', async (c) => {
 
   const form = await c.req.formData().catch(() => null);
   if (!form) throw badRequest('Expected multipart form data');
-  const purpose = oneOf(form.get('purpose'), 'purpose', ['receipt', 'avatar', 'chat', 'product', 'community', 'support', 'complaint'] as const);
+  const purpose = oneOf(form.get('purpose'), 'purpose', ['receipt', 'avatar', 'chat', 'product', 'community', 'support', 'complaint', 'post'] as const);
   const file = form.get('file');
   if (!(file instanceof File)) throw badRequest('No file uploaded');
 
@@ -315,7 +315,13 @@ uploadRoutes.post('/', async (c) => {
    * a picture or an audio file wearing a video header is refused. The ceiling
    * is the one every other video here has.
    */
-  const merchantVideo = purpose === 'community';
+  /**
+   * A MAKER'S PROJECT PICTURE OR CLIP (0153, docs/COMMUNITY_ECOSYSTEM.md Phase 1):
+   * `purpose=post` is the merchant rule opened to every signed-in account —
+   * public, under the uploader's own `users/<uid>/posts/` prefix, the same
+   * end-to-end video sniff, and the same 1 GiB of live video per account.
+   */
+  const merchantVideo = purpose === 'community' || purpose === 'post';
   const allowVideo = purpose === 'product' || purpose === 'chat' || purpose === 'support' || purpose === 'complaint' || merchantVideo;
   const maxSize = allowVideo ? VIDEO_MAX : IMAGE_MAX;
   if (file.size > maxSize) {
@@ -339,9 +345,9 @@ uploadRoutes.post('/', async (c) => {
     const used = await c.env.DB
       .prepare(
         `SELECT COALESCE(SUM(byte_size), 0) AS bytes FROM file_objects
-          WHERE owner_id = ? AND domain = 'merchants' AND visibility = 'public' AND mime_type LIKE 'video/%' AND deleted_at IS NULL`
+          WHERE owner_id = ? AND domain = ? AND visibility = 'public' AND mime_type LIKE 'video/%' AND deleted_at IS NULL`
       )
-      .bind(user.id)
+      .bind(user.id, purpose === 'post' ? 'users' : 'merchants')
       .first<{ bytes: number }>();
     const usedBytes = Number(used?.bytes) || 0;
     if (usedBytes + buf.byteLength > MERCHANT_PUBLIC_VIDEO_QUOTA_BYTES) {
@@ -579,6 +585,7 @@ uploadRoutes.post('/', async (c) => {
     purpose === 'avatar' ? { visibility: 'public', domain: 'users', entityId: user.id, keyKind: 'avatar' } :
     purpose === 'chat' ? { visibility: 'private', domain: 'chat', entityId: chatEntity, keyKind: chatKeyKind(storedMime) } :
     purpose === 'community' ? { visibility: 'public', domain: 'merchants', entityId: user.id, keyKind: 'public' } :
+    purpose === 'post' ? { visibility: 'public', domain: 'users', entityId: user.id, keyKind: 'posts' } :
     { visibility: 'public', domain: 'products', entityId: 'catalog', keyKind: storedMime.startsWith('video/') ? 'video' : 'gallery' };
   // `storedMime` / `storedExt`, never the sniffed pair: after a conversion they
   // differ, and a key that says .jpg over WebP bytes is the same class of lie

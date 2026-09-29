@@ -32,6 +32,11 @@ import { newId } from './crypto';
  * neither is a formality: TypeScript is the whole constraint.
  */
 export type NotificationKind =
+  /**
+   * «ورشة تريد عرض قطعتك» — a workshop asks a customer's permission to show
+   * their part in its portfolio, and the customer's answer back (0153).
+   */
+  | 'portfolio_consent'
   | 'print_request_match'
   | 'offer_received'
   | 'offer_accepted'
@@ -149,6 +154,8 @@ export interface NotificationInput {
     | 'custom_order' | 'coupon' | 'payout' | 'store'
     // 0143 — a trade-in request, with 'trade_in' above.
     | 'trade_in'
+    // 0153 — a maker's project or post (portfolio consent, and the social kinds after it).
+    | 'community_post'
     | '';
   entity_id?: string;
   meta?: Record<string, unknown>;

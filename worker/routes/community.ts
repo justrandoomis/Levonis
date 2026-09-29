@@ -249,7 +249,7 @@ export const COMMUNITY_DIRECTORY_COLUMNS = `cm.*, s.id AS store_id, s.slug AS st
  * and tagline (the community profile's only where there is no store), its
  * rating, finished orders, products and place.
  */
-function directoryCard(m: Record<string, unknown>, badges: { pro: Set<string>; premium: Set<string> }, root: string | null) {
+export function directoryCard(m: Record<string, unknown>, badges: { pro: Set<string>; premium: Set<string> }, root: string | null) {
   const hasStore = typeof m.store_id === 'string' && m.store_id !== '';
   const ratingCount = Number(m.rating_count ?? 0);
   return {

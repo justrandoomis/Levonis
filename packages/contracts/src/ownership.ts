@@ -161,6 +161,10 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'merchant_payout_ledger', 'community_merchants', 'merchant_stores', 'merchant_store_slugs', 'reserved_slugs',
     'merchant_notification_preferences', 'community_products', 'merchant_store_sections', 'merchant_services', 'merchant_showcase',
     'merchant_coupons', 'merchant_reviews', 'merchant_reputation_events',
+    // 0153 — what the community MAKES (docs/COMMUNITY_ECOSYSTEM.md Phase 1): a
+    // maker's projects and posts, and their pictures. Marketplace, because a
+    // project is the door into a store, a product and a print request.
+    'community_posts', 'community_post_media',
     // 0122 — the store page as data (docs/MERCHANT_PLATFORM.md §4.4): the
     // merchant's working draft and the immutable published revisions the
     // storefront reads through merchant_stores.published_revision_id.
