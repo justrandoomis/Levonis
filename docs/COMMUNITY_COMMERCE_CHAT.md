@@ -1,7 +1,7 @@
 # Levo Community as one journey: the commerce chat
 
-Status: **design adopted 2026-09-29; built in stages** (the table in §8 says
-which have landed). Owner request, verbatim in spirit: complete Levo Community
+Status: **design adopted 2026-09-29; all ten stages built** (the table in §8;
+what is left for the owner in §9). Owner request, verbatim in spirit: complete Levo Community
 as ONE experience between a customer and a merchant — conversation → product or
 quote → acceptance → safe payment → order → work → delivery → confirmation or
 dispute — **on top of the systems that already exist**. No second wallet, no
@@ -22,6 +22,7 @@ notifications) and a live diagnosis of Google sign-in.
 - **القرار المالي:** بطاقة منتج أو منتج خاص ← **مسار طلب المتجر** (دفع مسبق من المحفظة، ويُحجز مستحق التاجر حتى الاستلام أو 3 أيام). عرض طباعة ← **مسار الطلب/العرض/الضمان** (حجز عند القبول، إفراج بعد التأكيد). تحويل عرض إلى منتج خاص يُبطل العرض في الدفعة نفسها — مسار مالي واحد لكل عملية.
 - **البطاقة تحمل معرّفات فقط،** والخادم يبني اللقطة الأصلية (لا تتغير) والحالة الحالية (تُحسب عند القراءة). لا سعر ولا اسم ولا صورة من المتصفح.
 - **Google:** النطاق الرئيسي يعمل؛ الخطأ الحي هو `origin_mismatch` على `www` لأن `www` يخدم التطبيق كاملًا. الإصلاح: تحويل `www` إلى النطاق الرئيسي.
+- **الحالة:** نُفّذت المراحل العشر (§8) مع اختبارات هجوم لكل قاعدة صلاحية واختبار للرحلة كاملة بالأموال في كل خطوة. ما ينتظر قرار المالك في §9.
 
 ---
 
@@ -171,9 +172,11 @@ store commerce and are not gated (the store checkout is not). *Owner question:
 whether chat quotes should work while the public community is closed.*
 
 **D10 — Notifications ride the existing kinds.** A card is a message: the
-existing one-notice-per-turn chat notification carries it, worded for the card.
-Money events use the order/offer kinds; the in-thread system card does not send
-a second notice.
+existing one-notice-per-turn chat notification carries it, worded for the card
+— except a card that waits on the other side's decision (a print request for
+the store; a quote, an updated quote or a private product for the customer),
+which is its own notice even mid-turn, once per card. Money events use the
+order/offer kinds; the in-thread system card does not send a second notice.
 
 **D11 — One sign-in origin.** A visit to `www.` moves to the apex (in the SPA
 boot, and with a 301 from the Worker for the documents it serves first).
@@ -289,8 +292,9 @@ board.
 5. One deal, one flow: superseding and locking are statements in the money
    batches, not checks before them.
 6. Replays are harmless: accept (existing order returned), checkout
-   (per-user key), holds (event keys), system cards (event keys), sends
-   (`client_id`).
+   (per-user key), holds (event keys), system cards (event keys), sends,
+   quotes, quote edits and private products (`client_id` on the card's
+   message: the unique index aborts the whole batch the second time).
 7. Merchants never see another merchant's direct request, quote or custom
    product; the customer's contact reaches the merchant only through the
    existing acceptance snapshot.
@@ -323,10 +327,31 @@ fixture.
 | 1 | Google sign-in: `www` → apex | done — `tests/canonicalHost.test.ts`; owner console checks in docs/GOOGLE_SIGNIN_FIX.md §8 |
 | 2 | Structured chat messages | done — 0150, worker/lib/chatCards.ts, `GET /api/chats/:id`, idempotent `client_id`; tests/chatCards.test.ts |
 | 3 | Product and store cards | done — picker, cards with frozen snapshot + current state, add to cart through the store cart |
-| 4 | Print requests and quotes (escrow) | done (server) — 0151, worker/routes/chatCommerce.ts, direct standing, idempotent accept replay, order ↔ thread link; tests/chatQuotes.test.ts |
-| 5 | Private custom products (store flow) | done (server) — 0152, worker/lib/privateProducts.ts, cart/checkout audience rule, immutability trigger, quote → product in one batch, order ↔ thread; tests/chatPrivateProducts.test.ts |
-| 6 | System cards on every money move; `/delivered` fix | building |
-| 7 | Merchant/customer UX, workspace sections, product preview | planned |
-| 8 | Notifications | planned |
-| 9 | Attack tests | planned |
-| 10 | End-to-end journey | planned |
+| 4 | Print requests and quotes (escrow) | done — 0151, worker/routes/chatCommerce.ts, direct standing, idempotent accept replay, order ↔ thread link; tests/chatQuotes.test.ts |
+| 5 | Private custom products (store flow) | done — 0152, worker/lib/privateProducts.ts, cart/checkout audience rule, immutability trigger, quote → product in one batch, order ↔ thread; tests/chatPrivateProducts.test.ts |
+| 6 | System cards on every money move; `/delivered` fix | done — `announceCustomOrder` / `announceStoreOrder` at every door (store, customer, admin, the 3-day sweep); «تم التسليم» that matched nothing is `ORDER_CHANGED`; the request state table says what acceptance writes; tests/chatSystemCards.test.ts |
+| 7 | Merchant/customer UX | done — cards, the «+» menu per side (the deal first), quote / print request / private product / orders sheets, one order card under its newest event, each side's quick replies, «ابدأ من منتج في متجرك», «نسخ الرابط» in the catalog; browser fixture tests/browser/commerce-chat.html. **Not done:** the owner's preview of a draft product page (§9) |
+| 8 | Notifications | done — a card that waits on the other side (print request → store; quote, updated quote, private product → customer) is one notice whoever spoke last, worded for it; every other line keeps the turn rule; money events add no chat notice; tests/chatNotifications.test.ts |
+| 9 | Attack tests | done — tests/chatAttacks.test.ts (the owner's §8/§17 list; found and closed: a retried quote / quote edit / private product made two — each now carries the sheet's `client_id`) |
+| 10 | End-to-end journey | done — tests/chatJourney.test.ts: custom work through escrow, ready goods + a private product through one checkout, a dispute refunded — with the wallet, the escrow and the store's ledger checked at every step |
+
+## 9. Open for the owner
+
+1. **D9 — chat quotes while the public community is closed.** Today the chat's
+   print-request and quote doors follow the community's maintenance switch
+   (the live community is closed), so on the live site a store can send product
+   cards and private products, but not quotes, until the community opens.
+2. **Staff and pre-order conversations.** Staff read a store's ORDER threads
+   (read-only, every read audited). A store conversation before any order —
+   where a quote was negotiated — is not readable by staff at all. When such a
+   deal is disputed, the escrow decision is made from the frozen offer, the
+   order and the complaint, without the messages. Opening it to staff (read-only,
+   audited, only for a thread that has a disputed order) is one rule in
+   `worker/routes/chats.ts` if wanted.
+3. **Preview before publish.** The product editor has draft → publish; a
+   preview of the draft product page needs the storefront product page to
+   render an owner-only draft, and the storefront pages sit at 46.9 of their
+   47 KB budget (tests/bundleBudget.test.ts). It needs either that budget
+   re-cut or the preview drawn inside the workspace.
+4. **Sorani.** Every new sentence carries the Arabic in the `ckb` slot under an
+   `OWNER: Sorani to be written by hand` comment; none was generated.
