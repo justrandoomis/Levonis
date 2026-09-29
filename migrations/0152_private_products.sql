@@ -67,6 +67,11 @@ CREATE INDEX IF NOT EXISTS idx_orders_origin_chat
 DROP TRIGGER IF EXISTS trg_product_state_insert;
 DROP TRIGGER IF EXISTS trg_product_state_mirror;
 
+-- The comma BEFORE `status` is deliberate: wrangler's statement splitter
+-- (local D1, tests/sqlSplit.test.ts) closes a CASE only at an END followed by
+-- a space or `;`, so 0126's `… END,` left its CASE open and fused every
+-- statement after this trigger into one.
+
 CREATE TRIGGER IF NOT EXISTS trg_product_state_insert
 AFTER INSERT ON community_products
 FOR EACH ROW
@@ -76,8 +81,8 @@ BEGIN
                                             WHEN 'archived' THEN 'archived' ELSE 'hidden' END
    WHERE id = NEW.id AND publish_state IS NULL;
   UPDATE community_products
-     SET lifecycle = CASE publish_state WHEN 'published' THEN 'active' ELSE publish_state END,
-         status = CASE WHEN publish_state = 'published' AND admin_hidden_at IS NULL AND audience_user_id IS NULL
+     SET lifecycle = CASE publish_state WHEN 'published' THEN 'active' ELSE publish_state END
+       , status = CASE WHEN publish_state = 'published' AND admin_hidden_at IS NULL AND audience_user_id IS NULL
                        THEN 'active' ELSE 'hidden' END
    WHERE id = NEW.id
      AND (lifecycle IS NOT (CASE publish_state WHEN 'published' THEN 'active' ELSE publish_state END)
@@ -91,8 +96,8 @@ FOR EACH ROW
 WHEN NEW.publish_state IS NOT NULL
 BEGIN
   UPDATE community_products
-     SET lifecycle = CASE publish_state WHEN 'published' THEN 'active' ELSE publish_state END,
-         status = CASE WHEN publish_state = 'published' AND admin_hidden_at IS NULL AND audience_user_id IS NULL
+     SET lifecycle = CASE publish_state WHEN 'published' THEN 'active' ELSE publish_state END
+       , status = CASE WHEN publish_state = 'published' AND admin_hidden_at IS NULL AND audience_user_id IS NULL
                        THEN 'active' ELSE 'hidden' END
    WHERE id = NEW.id
      AND (lifecycle IS NOT (CASE publish_state WHEN 'published' THEN 'active' ELSE publish_state END)

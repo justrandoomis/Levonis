@@ -221,6 +221,36 @@ export function classifyHost(rawHost: string | null | undefined, rootDomain: str
 }
 
 /**
+ * `www.` MOVES TO THE APEX — the Worker's half of src/lib/canonicalHost.ts.
+ *
+ * `www.<root>` classifies as `main` and used to serve the whole application,
+ * while Google's Authorized JavaScript origins name the apex: a sign-in begun
+ * there ended in `origin_mismatch` (live diagnosis 2026-09-29,
+ * docs/GOOGLE_SIGNIN_FIX.md §8). For the documents the Worker answers first
+ * (`run_worker_first`: `/`, product and store pages, the manifest, the crawler
+ * files) a GET or HEAD is answered with the apex address, path and query kept;
+ * the SPA does the same for every page the asset layer answers alone.
+ *
+ * Never for `/api/` or `/files/`: a page already open on `www` keeps working
+ * until its next navigation, and a redirected POST would lose its body.
+ * Returns the target URL, or null to serve the request as it came.
+ */
+export function apexRedirectFor(
+  rawHost: string | null | undefined,
+  rootDomain: string | null | undefined,
+  method: string,
+  pathname: string,
+  search: string
+): string | null {
+  const host = normalizeHost(rawHost);
+  const root = normalizeHost(rootDomain);
+  if (!host || !root || host !== `www.${root}`) return null;
+  if (method !== 'GET' && method !== 'HEAD') return null;
+  if (pathname === '/api' || pathname.startsWith('/api/') || pathname.startsWith('/files/')) return null;
+  return `https://${root}${pathname.startsWith('/') ? pathname : `/${pathname}`}${search}`;
+}
+
+/**
  * May platform administration be served on this host?
  *
  * THE THREAT: a page served from `evil.levonis-iq.com` is same-origin with
