@@ -28,6 +28,8 @@ export interface QuoteInput {
   included: string;
   warranty_terms: string;
   valid_days: number;
+  /** This send's name (0150): a retry of it is the same quote, never a second one. */
+  client_id?: string;
 }
 
 export interface PrintRequestInput {
@@ -50,6 +52,8 @@ export interface CustomProductInput {
   valid_days: number;
   image?: string | null;
   quote_id?: string | null;
+  /** This send's name (0150): a retry of it is the same product, never a second one. */
+  client_id?: string;
 }
 
 export interface ThreadOrders {

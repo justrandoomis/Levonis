@@ -639,6 +639,11 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Choose a picture you uploaded to your store.',
     ckb: 'اختر صورة رفعتها إلى متجرك.',
   },
+  CLIENT_ID_REUSED: {
+    ar: 'هذا الإرسال استُخدم لرسالة أخرى. أغلق النافذة وافتحها من جديد.',
+    en: 'This send was already used for another message. Close the window and open it again.',
+    ckb: 'هذا الإرسال استُخدم لرسالة أخرى. أغلق النافذة وافتحها من جديد.',
+  },
   PRODUCT_NOT_PUBLISHED: {
     ar: 'هذا المنتج غير منشور الآن، فلا يمكن إرساله.',
     en: 'This product is not published right now, so it cannot be sent.',

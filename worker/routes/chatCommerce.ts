@@ -48,6 +48,7 @@ import { assertDirectStanding, directRequest } from '../lib/directRequests';
 import { storeThreadOf, threadRole, type StoreThread } from '../lib/chatThread';
 import {
   cardInsertStatement,
+  clientIdFrom,
   customProductCardFrom,
   notInThread,
   printRequestCard,
@@ -55,7 +56,7 @@ import {
   stampThreadActivity,
   type ResolvedCard,
 } from '../lib/chatCards';
-import { assertMayWriteInThread, notifyStoreThread, publicPage } from './chats';
+import { assertMayWriteInThread, isClientIdClash, notifyStoreThread, publicPage, storedClientMessage } from './chats';
 import { offerShape, publicRequest, readOfferTerms } from './marketplace';
 
 export const chatCommerceRoutes = new Hono<AppContext>();
@@ -273,6 +274,15 @@ async function quotingStore(c: Context<AppContext>, thread: StoreThread) {
  * the offer fenced on the request still being this store's, open and unexpired
  * (0151's trigger refuses any other store's offer even if a route forgot).
  */
+/** A retried quote's answer: the quote the first send made, as the first answer said it. */
+async function quoteReplay(c: Context<AppContext>, message: Record<string, unknown>) {
+  const card = message.card as { type?: string; ref?: string } | null | undefined;
+  if (card?.type !== 'quote' || !card.ref) throw conflict('That send was already used for another message', 'CLIENT_ID_REUSED');
+  const row = await c.env.DB.prepare('SELECT * FROM community_offers WHERE id = ?').bind(card.ref).first<Record<string, unknown>>();
+  if (!row) throw conflict('That send was already used for another message', 'CLIENT_ID_REUSED');
+  return c.json({ success: true, replayed: true, offer: offerShape(row), request_id: String(row.request_id), message });
+}
+
 chatCommerceRoutes.post('/:id/quotes', requireCommunityOpen, async (c) => {
   await rateLimit(c, 'chat-quote', 40, 3600);
   const user = c.get('user')!;
@@ -280,6 +290,13 @@ chatCommerceRoutes.post('/:id/quotes', requireCommunityOpen, async (c) => {
   const thread = await storeThreadFor(c, chatId, 'merchant');
   const ctx = await quotingStore(c, thread);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  // A RETRIED SEND IS THE SAME QUOTE (a lost response, a double tap): the
+  // client's name for this send rides on the card's message, whose unique
+  // index (0150) aborts the whole batch the second time — no second request,
+  // no second offer — and the first one is the answer.
+  const clientId = clientIdFrom(body.client_id);
+  const replay = await storedClientMessage(c.env, chatId, user.id, clientId);
+  if (replay) return quoteReplay(c, replay);
   const ts = nowIso();
   const terms = await readOfferTerms(c.env.DB, body, ts, { partial: false });
   const db = c.env.DB;
@@ -349,7 +366,7 @@ chatCommerceRoutes.post('/:id/quotes', requireCommunityOpen, async (c) => {
   stmts.push(
     cardInsertStatement(
       db,
-      { id: messageId, chatId, senderId: user.id, card, createdAt: ts },
+      { id: messageId, chatId, senderId: user.id, card, createdAt: ts, clientId },
       { sql: 'EXISTS (SELECT 1 FROM community_offers WHERE id = ?)', binds: [offerId] }
     )
   );
@@ -359,6 +376,11 @@ chatCommerceRoutes.post('/:id/quotes', requireCommunityOpen, async (c) => {
     const res = await db.batch(stmts);
     inserted = Number(res[offerAt]?.meta.changes ?? 0);
   } catch (e) {
+    // The retry that raced the first send past the check above.
+    if (clientId && isClientIdClash(e)) {
+      const again = await storedClientMessage(c.env, chatId, user.id, clientId);
+      if (again) return quoteReplay(c, again);
+    }
     // The one-live-offer index: this store already has a quote on this request.
     if (isConstraintAbort(e) && /UNIQUE/i.test(e instanceof Error ? e.message : String(e))) {
       throw conflict('You already have a quote on this request — edit it instead', 'OFFER_EXISTS');
@@ -406,6 +428,10 @@ chatCommerceRoutes.patch('/:id/quotes/:offerId', requireCommunityOpen, async (c)
   await assertDirectStanding(c.env, String(before.request_id), ctx.merchant.id);
 
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  // A retried edit is the SAME revision, never a second one with the same terms.
+  const clientId = clientIdFrom(body.client_id);
+  const replay = await storedClientMessage(c.env, chatId, user.id, clientId);
+  if (replay) return quoteReplay(c, replay);
   const ts = nowIso();
   const t = await readOfferTerms(db, body, ts, { partial: true });
   const sets: string[] = [];
@@ -444,26 +470,35 @@ chatCommerceRoutes.patch('/:id/quotes/:offerId', requireCommunityOpen, async (c)
   });
   const messageId = newId('msg');
   let changes = 0;
-  const res = await db.batch([
-    db.prepare(
-      `UPDATE community_offers
-          SET ${sets.join(', ')}, state = 'pending', revision = revision + 1,
-              request_revision = (SELECT r.revision FROM community_requests r WHERE r.id = community_offers.request_id),
-              updated_at = ?
-        WHERE id = ? AND merchant_id = ? AND state IN ('pending','superseded') AND revision = ?
-          AND EXISTS (SELECT 1 FROM community_requests r
-                       WHERE r.id = community_offers.request_id AND r.visibility = 'direct'
-                         AND r.state IN ('open','receiving_offers')
-                         AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?))`
-    ).bind(...vals, ts, offerId, ctx.merchant.id, fromRevision, ts),
-    recordOfferRevisionStatement(db, offerId, 'edit'),
-    offerCountStatement(db, String(before.request_id)),
-    cardInsertStatement(
-      db,
-      { id: messageId, chatId, senderId: user.id, card, createdAt: ts },
-      { sql: 'EXISTS (SELECT 1 FROM community_offers WHERE id = ? AND revision = ?)', binds: [offerId, next] }
-    ),
-  ]);
+  let res: D1Result[];
+  try {
+    res = await db.batch([
+      db.prepare(
+        `UPDATE community_offers
+            SET ${sets.join(', ')}, state = 'pending', revision = revision + 1,
+                request_revision = (SELECT r.revision FROM community_requests r WHERE r.id = community_offers.request_id),
+                updated_at = ?
+          WHERE id = ? AND merchant_id = ? AND state IN ('pending','superseded') AND revision = ?
+            AND EXISTS (SELECT 1 FROM community_requests r
+                         WHERE r.id = community_offers.request_id AND r.visibility = 'direct'
+                           AND r.state IN ('open','receiving_offers')
+                           AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?))`
+      ).bind(...vals, ts, offerId, ctx.merchant.id, fromRevision, ts),
+      recordOfferRevisionStatement(db, offerId, 'edit'),
+      offerCountStatement(db, String(before.request_id)),
+      cardInsertStatement(
+        db,
+        { id: messageId, chatId, senderId: user.id, card, createdAt: ts, clientId },
+        { sql: 'EXISTS (SELECT 1 FROM community_offers WHERE id = ? AND revision = ?)', binds: [offerId, next] }
+      ),
+    ]);
+  } catch (e) {
+    if (clientId && isClientIdClash(e)) {
+      const again = await storedClientMessage(c.env, chatId, user.id, clientId);
+      if (again) return quoteReplay(c, again);
+    }
+    throw e;
+  }
   changes = Number(res[0]?.meta.changes ?? 0);
   if (!changes) throw conflict('That quote changed or can no longer be changed — reload it', 'OFFER_NOT_AVAILABLE');
 
@@ -495,6 +530,14 @@ chatCommerceRoutes.patch('/:id/quotes/:offerId', requireCommunityOpen, async (c)
  * Immutable once created (0152's trigger): to change it, cancel it and send a
  * new one.
  */
+/** A retried private product's answer: the product the first send made. */
+function customProductReplay(c: Context<AppContext>, message: Record<string, unknown>) {
+  const card = message.card as { type?: string; ref?: string; original?: Record<string, unknown> } | null | undefined;
+  if (card?.type !== 'custom_product' || !card.ref) throw conflict('That send was already used for another message', 'CLIENT_ID_REUSED');
+  const o = card.original ?? {};
+  return c.json({ success: true, replayed: true, product: { id: card.ref, price_iqd: Number(o.price_iqd ?? 0), expires_at: o.expires_at ?? null }, message });
+}
+
 chatCommerceRoutes.post('/:id/custom-products', async (c) => {
   await rateLimit(c, 'chat-custom-product', 30, 3600);
   const user = c.get('user')!;
@@ -507,6 +550,10 @@ chatCommerceRoutes.post('/:id/custom-products', async (c) => {
     throw conflict('Your store is not selling products right now — turn selling on in the store settings first', 'STORE_NOT_SELLING');
   }
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  // A retried send is the SAME product — the quote's rule above.
+  const clientId = clientIdFrom(body.client_id);
+  const replay = await storedClientMessage(c.env, chatId, user.id, clientId);
+  if (replay) return customProductReplay(c, replay);
   const name = str(body.name, 'name', { min: 2, max: 140 });
   const nameAr = str(body.name_ar, 'name_ar', { min: 0, max: 140, required: false });
   const description = str(body.description, 'description', { min: 0, max: 2000, required: false });
@@ -574,11 +621,20 @@ chatCommerceRoutes.post('/:id/custom-products', async (c) => {
   stmts.push(
     cardInsertStatement(
       db,
-      { id: messageId, chatId, senderId: user.id, card, createdAt: ts },
+      { id: messageId, chatId, senderId: user.id, card, createdAt: ts, clientId },
       { sql: 'EXISTS (SELECT 1 FROM community_products WHERE id = ?)', binds: [id] }
     )
   );
-  const res = await db.batch(stmts);
+  let res: D1Result[];
+  try {
+    res = await db.batch(stmts);
+  } catch (e) {
+    if (clientId && isClientIdClash(e)) {
+      const again = await storedClientMessage(c.env, chatId, user.id, clientId);
+      if (again) return customProductReplay(c, again);
+    }
+    throw e;
+  }
   if (!Number(res[0]?.meta.changes ?? 0)) {
     // Only a quote can make the insert match nothing: it closed in between.
     const again = quoteId

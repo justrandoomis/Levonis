@@ -939,7 +939,8 @@ chatRoutes.get('/:id/messages', async (c) => {
  * answer to a retried send, in the read path's own shape. Null on a database
  * a migration behind (no client ids there to find).
  */
-async function storedClientMessage(env: Env, chatId: string, senderId: string, clientId: string | null) {
+/** The message a sender already sent under this client id, in the read path's shape — a retry's answer. */
+export async function storedClientMessage(env: Env, chatId: string, senderId: string, clientId: string | null) {
   if (!clientId) return null;
   const row = await env.DB.prepare('SELECT * FROM chat_messages WHERE chat_id = ? AND sender_id = ? AND client_id = ?')
     .bind(chatId, senderId, clientId)
@@ -953,7 +954,7 @@ async function storedClientMessage(env: Env, chatId: string, senderId: string, c
   return message;
 }
 
-const isClientIdClash = (e: unknown) =>
+export const isClientIdClash = (e: unknown) =>
   /UNIQUE/i.test(e instanceof Error ? e.message : String(e)) && /client_id/i.test(e instanceof Error ? e.message : String(e));
 
 /**

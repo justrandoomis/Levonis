@@ -19,6 +19,7 @@ import { useLanguage } from '../../../LanguageContext';
 import { api, ApiError } from '../../../lib/api';
 import { toast } from '../../../lib/toastStore';
 import { DELIVERY_METHODS, chatCommerceApi } from '../../../lib/chatCommerceApi';
+import { newClientId } from '../../../lib/chatCards';
 import { deliveryText } from '../cards/cardWords';
 import type { QuotePrefill } from '../cards/cardContext';
 
@@ -63,6 +64,9 @@ export default function QuoteSheet({
   const [f, setF] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const [busy, setBusy] = useState(false);
+  // One name per opening of the sheet: a retry after a lost answer is the same
+  // quote (the server answers it as a replay), a fresh opening a new one.
+  const sendId = useRef(newClientId());
   const editing = prefill.edit?.offerId ?? null;
   const onRequest = !!prefill.requestId;
 
@@ -71,6 +75,7 @@ export default function QuoteSheet({
   useEffect(() => {
     if (!open) return;
     setErrors({});
+    sendId.current = newClientId();
     const fromSnapshot = (s: Record<string, unknown>) => ({
       ...EMPTY,
       price: text(s.price_iqd),
@@ -126,6 +131,7 @@ export default function QuoteSheet({
       included: f.included.trim(),
       warranty_terms: f.warranty.trim(),
       valid_days: Number(f.valid),
+      client_id: sendId.current,
     };
     try {
       if (editing) {

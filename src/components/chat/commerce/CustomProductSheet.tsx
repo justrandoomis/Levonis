@@ -14,7 +14,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { ImagePlus, ShoppingBag, X } from 'lucide-react';
 import { Sheet } from '../../ui/Sheet';
 import ProductPickerSheet from '../ProductPickerSheet';
-import { productName, type PickerProduct } from '../../../lib/chatCards';
+import { newClientId, productName, type PickerProduct } from '../../../lib/chatCards';
 import { Field, Input, Textarea, focusFirstInvalid } from '../../ui/Field';
 import { Button } from '../../ui/Button';
 import { useLanguage } from '../../../LanguageContext';
@@ -54,6 +54,8 @@ export default function CustomProductSheet({
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const [busy, setBusy] = useState(false);
   const [baseOpen, setBaseOpen] = useState(false);
+  // One name per opening of the sheet: a retry is the same product (a replay).
+  const sendId = useRef(newClientId());
 
   /**
    * «ابدأ من منتج في متجرك» (docs/COMMUNITY_COMMERCE_CHAT.md §14): one of the
@@ -71,6 +73,7 @@ export default function CustomProductSheet({
     if (!open) return;
     setErrors({});
     setImage(null);
+    sendId.current = newClientId();
     setF({
       name: prefill.name ?? '',
       description: prefill.description ?? '',
@@ -125,6 +128,7 @@ export default function CustomProductSheet({
         valid_days: Number(f.valid),
         image: image?.key ?? null,
         quote_id: prefill.quoteId ?? null,
+        client_id: sendId.current,
       });
       toast.success(loc('أُرسل المنتج الخاص', 'The private product was sent'));
       onSent();
