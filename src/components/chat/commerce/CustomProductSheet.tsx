@@ -11,8 +11,10 @@
  * server); no link from elsewhere is accepted.
  */
 import { useEffect, useId, useRef, useState } from 'react';
-import { ImagePlus, X } from 'lucide-react';
+import { ImagePlus, ShoppingBag, X } from 'lucide-react';
 import { Sheet } from '../../ui/Sheet';
+import ProductPickerSheet from '../ProductPickerSheet';
+import { productName, type PickerProduct } from '../../../lib/chatCards';
 import { Field, Input, Textarea, focusFirstInvalid } from '../../ui/Field';
 import { Button } from '../../ui/Button';
 import { useLanguage } from '../../../LanguageContext';
@@ -51,6 +53,19 @@ export default function CustomProductSheet({
   const [uploading, setUploading] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const [busy, setBusy] = useState(false);
+  const [baseOpen, setBaseOpen] = useState(false);
+
+  /**
+   * «ابدأ من منتج في متجرك» (docs/COMMUNITY_COMMERCE_CHAT.md §14): one of the
+   * store's own products as the base — its name, price and picture filled in
+   * to be changed for this customer. The picture is the store's own media, so
+   * the server accepts it like an upload; nothing of the original product
+   * changes, and the private product stands on its own from here.
+   */
+  const startFrom = (p: PickerProduct) => {
+    setF((prev) => ({ ...prev, name: productName(p, lang), price: String(p.price_iqd) }));
+    if (p.image) setImage({ url: p.image, key: p.image });
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -153,6 +168,11 @@ export default function CustomProductSheet({
       }
     >
       <form ref={formRef} onSubmit={(e) => void submit(e)} noValidate className="flex flex-col gap-4 px-4 py-4">
+        {!prefill.quoteId && (
+          <Button variant="secondary" size="sm" icon={<ShoppingBag className="w-4 h-4" aria-hidden="true" />} onClick={() => setBaseOpen(true)} data-custom-product-base>
+            {loc('ابدأ من منتج في متجرك', 'Start from one of your products')}
+          </Button>
+        )}
         <div className="flex items-center gap-3">
           <input
             ref={fileRef}
@@ -203,6 +223,15 @@ export default function CustomProductSheet({
           )}
         </p>
       </form>
+      {baseOpen && (
+        <ProductPickerSheet
+          open={baseOpen}
+          onClose={() => setBaseOpen(false)}
+          chatId={chatId}
+          title={loc('ابدأ من منتج', 'Start from a product')}
+          onPick={(_id, p) => startFrom(p)}
+        />
+      )}
     </Sheet>
   );
 }

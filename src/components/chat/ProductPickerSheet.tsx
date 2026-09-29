@@ -20,11 +20,15 @@ export default function ProductPickerSheet({
   onClose,
   chatId,
   onPick,
+  title,
 }: {
   open: boolean;
   onClose: () => void;
   chatId: string;
-  onPick: (productId: string) => Promise<void> | void;
+  /** The product as listed — the private product sheet starts from its name, price and picture. */
+  onPick: (productId: string, product: PickerProduct) => Promise<void> | void;
+  /** Another purpose than sending it, said in the sheet's title. */
+  title?: string;
 }) {
   const { lang, loc } = useLanguage();
   const { money } = useMoney();
@@ -69,11 +73,11 @@ export default function ProductPickerSheet({
     return () => clearTimeout(t);
   }, [open, q, load]);
 
-  const pick = async (id: string) => {
+  const pick = async (product: PickerProduct) => {
     if (sending) return;
-    setSending(id);
+    setSending(product.id);
     try {
-      await onPick(id);
+      await onPick(product.id, product);
       onClose();
     } finally {
       setSending(null);
@@ -91,7 +95,7 @@ export default function ProductPickerSheet({
       header={
         <div className="border-b border-border-subtle px-4 pb-3 pt-1">
           <h2 id={titleId} className="text-center text-[16px] font-extrabold text-text-primary">
-            {loc('أرسل منتجًا', 'Send a product')}
+            {title ?? loc('أرسل منتجًا', 'Send a product')}
           </h2>
           <label className="mt-3 flex min-h-11 items-center gap-2 rounded-lg border border-border-subtle bg-surface-raised px-3">
             <Search className="w-4 h-4 text-text-muted shrink-0" aria-hidden="true" />
@@ -115,7 +119,7 @@ export default function ProductPickerSheet({
             <button
               key={p.id}
               type="button"
-              onClick={() => void pick(p.id)}
+              onClick={() => void pick(p)}
               disabled={!!sending}
               data-picker-product={p.id}
               className="flex w-full min-h-[64px] items-center gap-3 rounded-xl px-2 py-2 text-start hover:bg-surface-selected focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-60"

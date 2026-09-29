@@ -97,6 +97,10 @@ export function catalogStrings(loc: Loc) {
     duplicate: loc('نسخ', 'Duplicate', 'لەبەرگرتنەوە'),
     insights: loc('تحليلات', 'Insights', 'شیکاری'),
     openInStore: loc('فتح في المتجر', 'Open in storefront', 'کردنەوە لە فرۆشگا'),
+    // Sorani verbatim from the store share kit (src/components/merchant/share/strings.ts).
+    copyLink: loc('نسخ الرابط', 'Copy link', 'کۆپی بەستەر'),
+    linkCopied: loc('تم النسخ', 'Copied', 'کۆپی کرا'),
+    copyFailed: loc('تعذّر النسخ تلقائيًا — انسخ الرابط يدويًا.', 'Could not copy automatically — copy the link by hand.'), // OWNER: Sorani to be written by hand.
     publish: loc('نشر في المتجر', 'Publish to store', 'بڵاوکردنەوە'),
     hide: loc('إخفاء من المتجر', 'Hide from store', 'شاردنەوە'),
     toDraft: loc('إرجاع إلى مسودة', 'Move to drafts'), // OWNER: Sorani to be written by hand.

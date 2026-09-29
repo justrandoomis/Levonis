@@ -13,7 +13,7 @@
  *     and results are toasts, never `alert()`.
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Copy, Download, ExternalLink, Eye, EyeOff, FileUp, MoreHorizontal, Package, Pencil, Plus, RefreshCcw, Star, Trash2, Archive, Search } from 'lucide-react';
+import { BarChart3, Copy, Download, ExternalLink, Eye, EyeOff, FileUp, Link2, MoreHorizontal, Package, Pencil, Plus, RefreshCcw, Star, Trash2, Archive, Search } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { Button, IconButton } from '../../ui/Button';
 import { Input, Select } from '../../ui/Field';
@@ -208,6 +208,21 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
   const storefrontUrl = (p: CatalogProduct) =>
     /^https?:\/\//.test(store.url) ? `${store.url.replace(/\/$/, '')}/p/${p.slug}` : mainHref(`/community/store/${store.slug}/p/${p.slug}`);
 
+  /**
+   * «نسخ الرابط» — the product's public address, to paste into WhatsApp, an
+   * Instagram bio or a conversation (docs/COMMUNITY_COMMERCE_CHAT.md §14).
+   * Absolute, whichever host the workspace is open on.
+   */
+  async function copyLink(p: CatalogProduct) {
+    const url = new URL(storefrontUrl(p), window.location.origin).href;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(s.linkCopied);
+    } catch {
+      toast.error(s.copyFailed, { description: url });
+    }
+  }
+
   const name = (p: CatalogProduct) => (lang === 'en' ? p.name || p.name_ar : p.name_ar || p.name);
   const t = stats?.totals;
   const stateItems = [
@@ -275,7 +290,10 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
       { id: 'insights', label: s.insights, icon: <BarChart3 className="h-4 w-4" />, onSelect: () => setInsightsFor(p) },
       { id: 'duplicate', label: s.duplicate, icon: <Copy className="h-4 w-4" />, onSelect: () => duplicate(p), disabled: !canSell },
     ];
-    if (p.state === 'published' && !admin) list.push({ id: 'open', label: s.openInStore, icon: <ExternalLink className="h-4 w-4" />, href: storefrontUrl(p) });
+    if (p.state === 'published' && !admin) {
+      list.push({ id: 'open', label: s.openInStore, icon: <ExternalLink className="h-4 w-4" />, href: storefrontUrl(p) });
+      list.push({ id: 'copy_link', label: s.copyLink, icon: <Link2 className="h-4 w-4" />, onSelect: () => void copyLink(p) });
+    }
     list.push({ id: 'sep1', separator: true });
     if (p.state !== 'published') list.push({ id: 'publish', label: s.publish, icon: <Eye className="h-4 w-4" />, onSelect: () => bulk('publish', [p.id]), disabled: !canSell || admin });
     if (p.state === 'published') list.push({ id: 'hide', label: s.hide, icon: <EyeOff className="h-4 w-4" />, onSelect: () => bulk('hide', [p.id]) });
