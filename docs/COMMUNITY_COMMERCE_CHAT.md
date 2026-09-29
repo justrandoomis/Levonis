@@ -320,8 +320,8 @@ fixture.
 
 | # | Stage | Status |
 |---|---|---|
-| 1 | Google sign-in: `www` → apex | building |
-| 2 | Structured chat messages | planned |
+| 1 | Google sign-in: `www` → apex | done — `tests/canonicalHost.test.ts`; owner console checks in docs/GOOGLE_SIGNIN_FIX.md §8 |
+| 2 | Structured chat messages | building |
 | 3 | Product and store cards | planned |
 | 4 | Print requests and quotes (escrow) | planned |
 | 5 | Private custom products (store flow) | planned |

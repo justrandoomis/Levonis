@@ -107,7 +107,7 @@ In [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
    | Origin | Why |
    | --- | --- |
    | `https://levonis-iq.com` | Production — sign-in happens here. |
-   | `https://www.levonis-iq.com` | **Only** if sign-in actually starts on the `www` host (i.e. `www` serves the app instead of redirecting to the apex before the user reaches `/auth`). Do not add other subdomains "just in case" — wildcards are not accepted and unused origins widen the attack surface. |
+   | ~~`https://www.levonis-iq.com`~~ | **Not needed.** Since 29 September `www` no longer serves the app: every page there moves to the apex before Google's script loads (§8), so no sign-in starts on `www`. Do not add other subdomains "just in case" — wildcards are not accepted and unused origins widen the attack surface. |
    | `https://levonis-staging.just-randoomis.workers.dev` | Staging — needed so the acceptance test (section 7) can run on staging first. |
 
 4. An origin is **scheme + host (+ port when non-default)** only.
@@ -192,6 +192,56 @@ On **staging** first, then production:
 Only a **real successful sign-in** on the real origin counts as fixed.
 A rejected forged credential, or the button merely rendering, proves nothing.
 
+## 8. Live diagnosis — 29 September 2026
+
+Run against the deployed site, not assumed (a headless Chromium clicking the
+real Google button and reading the popup):
+
+| Check | Result |
+| --- | --- |
+| `GET https://levonis-iq.com/api/auth/capabilities` | `google: true`, `googleClientId` = the Web client of project **552307303785** (`552307303785-dn2m6k9g….apps.googleusercontent.com`). The button and the server audience use this one value. |
+| Sign-in begun on `https://levonis-iq.com/auth` | **Accepted by Google.** The popup opened on «Sign in to continue to levonis-iq.com» with that client id and `scope=openid email profile`. The apex origin is authorized; there is no Access-blocked page for this client. |
+| Sign-in begun on `https://www.levonis-iq.com/auth` | **Refused.** `www` served the whole application (200, no redirect), and GSI logged «The given origin is not allowed for the given client ID» — **`origin_mismatch`**. This is the live bug: anyone who arrived through a `www` link could not sign in. |
+
+**The fix (in code, no console change needed):** `www` is no longer a second
+home for the app.
+
+- The Worker answers every document it serves first on `www.<root>` (`/`,
+  product, store and bundle pages, the manifest, the crawler files) with a
+  **301** to the same path and query on the apex
+  (`worker/lib/hosts.ts` `apexRedirectFor`, mounted in `worker/index.ts`).
+- The SPA does the same for every page the asset layer answers without the
+  Worker — `/auth` among them — before anything renders and before Google's
+  script can load (`src/lib/canonicalHost.ts`, called first in
+  `src/main.tsx`; no service worker is registered on the way out).
+- Never redirected: `/api/*` and `/files/*` (a page already open on `www`
+  keeps working until its next navigation; a POST would lose its body), and
+  never any host but `www.<root>` — merchant shops, system hosts and foreign
+  hosts are untouched, so this is not an open redirect.
+- The server's verification is unchanged: RS256 signature against Google's
+  keys, issuer, audience = the one client id, expiry and a verified e-mail
+  are all still required (`worker/lib/google.ts`).
+
+Pinned by `tests/canonicalHost.test.ts` (both halves, driven through the real
+Worker entry point).
+
+**Owner checks that remain (Google Cloud Console, project 552307303785):**
+
+1. The client is of type **Web application**.
+2. **Authorized JavaScript origins** = `https://levonis-iq.com` and the staging
+   origin actually used for testing
+   (`https://levonis-staging.just-randoomis.workers.dev`). No `www` (see
+   above), no path such as `/auth`, no wildcard, no merchant subdomain.
+3. **Authorized redirect URIs**: empty — the app uses Google Identity Services
+   ID tokens, never the authorization-code redirect (§4).
+4. **If a user ever sees «Access blocked» / «تم حظر إمكانية الوصول» / «Error
+   granting permission»** (not seen in this diagnosis, but checked for):
+   open **OAuth consent screen** and check the **publishing status**. In
+   **Testing**, only the listed **Test users** can sign in — either add the
+   account or **Publish app** (Production). The scopes must be only `openid`,
+   `email`, `profile` (non-sensitive: no verification review needed). And the
+   client id from `/api/auth/capabilities` must belong to this same project.
+
 ---
 
 ## ملخص بالعربية (خطوات المالك)
@@ -205,7 +255,8 @@ A rejected forged credential, or the button merely rendering, proves nothing.
 
 1. أضف إلى Authorized JavaScript origins:
    - `https://levonis-iq.com`
-   - `https://www.levonis-iq.com` — فقط إذا كان الدخول يبدأ فعلًا من `www`.
+   - **لا حاجة** لإضافة `https://www.levonis-iq.com`: منذ 29 سبتمبر ينقل الموقع
+     كل زيارة لـ `www` إلى `levonis-iq.com` قبل تحميل زر Google (القسم 8).
    - `https://levonis-staging.just-randoomis.workers.dev` — لاختبار staging.
 2. الأصل = بروتوكول + مضيف فقط، **بدون** مسار `/auth`.
 3. حقل **Authorized redirect URIs** يبقى فارغًا — التكامل يستخدم تدفق
@@ -214,3 +265,11 @@ A rejected forged credential, or the button merely rendering, proves nothing.
 5. بعد الحفظ انتظر دقائق، ثم نفّذ اختبار القبول في القسم 7 بحساب اختبار
    حقيقي على staging ثم على الإنتاج. لا يُعتبر Google «مُصلَحًا» قبل نجاح
    دخول حقيقي.
+
+**التشخيص الحي (29 سبتمبر):** الدخول من `levonis-iq.com` يقبله Google وتفتح
+نافذته «Sign in to continue to levonis-iq.com». الخطأ الفعلي كان عند الدخول من
+`www.levonis-iq.com`: كان يعرض التطبيق كاملًا، فيرفضه Google بـ
+`origin_mismatch`. الإصلاح في الكود: كل صفحة على `www` تنتقل إلى النطاق الرئيسي
+(301 من الخادم، وتحويل فوري في التطبيق)، وتحقق الخادم من توقيع Google لم يتغيّر.
+إن ظهرت يومًا رسالة «تم حظر إمكانية الوصول»: افحص حالة شاشة الموافقة (Testing أو
+Production) ومستخدمي الاختبار، كما في القسم 8.

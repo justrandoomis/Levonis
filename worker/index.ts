@@ -68,7 +68,7 @@ import { kycRoutes } from './routes/kyc';
 import { supportRoutes } from './routes/support';
 import { referralRoutes } from './routes/referrals';
 import { studioRoutes } from './routes/studio';
-import { classifyHost, rootDomainFrom } from './lib/hosts';
+import { apexRedirectFor, classifyHost, rootDomainFrom } from './lib/hosts';
 import { merchantRoutes } from './routes/merchant';
 import { storeLayoutRoutes } from './routes/storeLayout';
 import { merchantFinanceRoutes, merchantPayoutRoutes } from './routes/merchantFinance';
@@ -137,6 +137,19 @@ app.use('*', originCheck());
  */
 app.use('*', async (c, next) => {
   c.set('host', classifyHost(c.req.header('Host'), rootDomainFrom(c.env)));
+  await next();
+});
+
+/**
+ * `www.` IS NOT A SECOND HOME: a document asked for on `www` moves to the apex
+ * (301), so a Google sign-in can never begin on an origin the client id does
+ * not allow (worker/lib/hosts.ts `apexRedirectFor`; the SPA covers the pages
+ * the asset layer answers alone).
+ */
+app.use('*', async (c, next) => {
+  const url = new URL(c.req.url);
+  const to = apexRedirectFor(c.req.header('Host'), rootDomainFrom(c.env), c.req.method, url.pathname, url.search);
+  if (to) return c.redirect(to, 301);
   await next();
 });
 

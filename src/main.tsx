@@ -5,6 +5,7 @@ import './index.css';
 import { startInstallPromptCapture } from './hooks/useInstallApp';
 import { watchForUpdates } from './components/pwa/UpdateReadyToast';
 import { initTheme } from './lib/theme';
+import { apexUrlFor } from './lib/canonicalHost';
 
 /**
  * NO GOOGLE PROVIDER HERE ANY MORE.
@@ -23,27 +24,38 @@ import { initTheme } from './lib/theme';
  */
 
 /**
- * THE INSTALL EVENT IS CAUGHT BEFORE REACT EXISTS.
- *
- * Chromium fires `beforeinstallprompt` once and early — frequently before the
- * first component mounts. A listener added inside a `useEffect` therefore
- * wins the race on a slow connection and loses it on a fast one, and the
- * install button appears on some visits and not others, on the same phone.
- * The listener lives in a module-scope store instead, and this line is where
- * it is armed: the earliest statement in the application that runs at all.
- * The call is idempotent, so importing the store from anywhere else is safe.
+ * `www.` IS NOT A SECOND HOME (src/lib/canonicalHost.ts). A visit there moves
+ * to the apex before anything renders — before Google's script can load on an
+ * origin its client id does not allow — and nothing else runs on the way out.
  */
-startInstallPromptCapture();
+const apex = typeof window === 'undefined' ? null : apexUrlFor(window.location.href);
+if (apex) {
+  window.location.replace(apex);
+} else {
+  /**
+   * THE INSTALL EVENT IS CAUGHT BEFORE REACT EXISTS.
+   *
+   * Chromium fires `beforeinstallprompt` once and early — frequently before
+   * the first component mounts. A listener added inside a `useEffect`
+   * therefore wins the race on a slow connection and loses it on a fast one,
+   * and the install button appears on some visits and not others, on the same
+   * phone. The listener lives in a module-scope store instead, and this line
+   * is where it is armed: the earliest statement that runs on a page that
+   * stays. The call is idempotent, so importing the store from anywhere else
+   * is safe.
+   */
+  startInstallPromptCapture();
 
-// The theme the inline script in index.html painted is re-asserted here and
-// kept in step with the device and other tabs from now on (src/lib/theme.ts).
-initTheme();
+  // The theme the inline script in index.html painted is re-asserted here and
+  // kept in step with the device and other tabs from now on (src/lib/theme.ts).
+  initTheme();
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+}
 
 /**
  * THE SERVICE WORKER — registered last, on purpose, and only in a build.
@@ -97,4 +109,4 @@ function registerServiceWorker(): void {
   window.addEventListener('load', register, { once: true });
 }
 
-registerServiceWorker();
+if (!apex) registerServiceWorker();
