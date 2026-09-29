@@ -11,13 +11,16 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowLeft, ArrowRight, BadgeCheck, Globe, Pencil, Plus, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BadgeCheck, Ban, Flag, Globe, MoreHorizontal, Pencil, Plus, UserRound, Volume2, VolumeX } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { useGoBack } from '../../lib/useGoBack';
 import { useMotion } from '../../lib/motion';
 import { ApiError } from '../../lib/api';
+import { apiRefusal } from '../../lib/refusalStrings';
 import { EmptyState, ErrorState } from '../../components/ui/AsyncStates';
+import { Menu, type MenuEntry } from '../../components/ui/Menu';
+import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { TabPanels, TabStrip } from '../../components/ui/Tabs';
 import LoadMore from '../../components/listing/LoadMore';
 import StoreCard from '../../components/community/hub/StoreCard';
@@ -26,11 +29,17 @@ import { communityHubApi } from '../../components/community/hub/api';
 import { useSignInPrompt } from '../../lib/guest';
 import { toast } from '../../components/ui/Toast';
 import ProjectCard, { ProjectCardSkeleton } from '../../components/community/projects/ProjectCard';
-import { projectsApi, type Creator, type PostCard } from '../../components/community/projects/api';
+import { projectsApi, type Creator, type PostCard, type PostFilters } from '../../components/community/projects/api';
 import { useProjectStrings } from '../../components/community/projects/strings';
+import { socialApi } from '../../components/community/social/api';
+import { forgetAfterBlock } from '../../components/community/hub/feedCache';
+import FollowUserButton from '../../components/community/social/FollowUserButton';
+import ReportSheet from '../../components/community/social/ReportSheet';
+import { useSocial } from '../../components/community/social/SocialContext';
+import { followersLabel, socialLang, useSocialStrings } from '../../components/community/social/strings';
 import { dateLocale } from '../../components/orders/format';
 
-const TABS = ['projects', 'about'] as const;
+const TABS = ['projects', 'posts', 'about'] as const;
 type Tab = (typeof TABS)[number];
 
 const SOCIAL_HOST: Record<string, string> = {
@@ -59,10 +68,49 @@ export default function CreatorPage() {
   const { user, isAuthenticated } = useAuth();
   const { signIn } = useSignInPrompt();
   const s = useProjectStrings();
+  const ss = useSocialStrings();
+  const social = useSocial();
   const m = useMotion();
   const [creator, setCreator] = useState<Creator | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [nonce, setNonce] = useState(0);
+  const [followers, setFollowers] = useState<number | null>(null);
+  const [reporting, setReporting] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
+  const l = socialLang(lang);
+
+  useEffect(() => setFollowers(null), [username]);
+
+  const say = (e: unknown) => toast.error(apiRefusal(e, l, ss.actionFailed));
+  const toggleMute = async (c: Creator) => {
+    if (!isAuthenticated) return signIn();
+    const next = !social.muted.has(c.id);
+    social.setMuted(c.id, next);
+    try {
+      await (next ? socialApi.mute(c.id) : socialApi.unmute(c.id));
+      forgetAfterBlock();
+      toast.success(next ? ss.mutedToast : ss.unmutedToast);
+    } catch (e) {
+      social.setMuted(c.id, !next);
+      say(e);
+    }
+  };
+  const toggleBlock = async (c: Creator) => {
+    if (!isAuthenticated) return signIn();
+    const next = !social.blocked.has(c.id);
+    if (!(await confirm({ title: next ? ss.blockQ : ss.unblockQ, consequence: next ? ss.blockConsequence : undefined, confirmLabel: next ? ss.block : ss.unblock, destructive: next }))) return;
+    social.setBlocked(c.id, next);
+    try {
+      await (next ? socialApi.block(c.id) : socialApi.unblock(c.id));
+      forgetAfterBlock();
+      toast.success(next ? ss.blockedToast : ss.unblockedToast);
+      // Blocked either way, the page is a 404: read it again and land there.
+      if (next) setNonce((n) => n + 1);
+    } catch (e) {
+      social.setBlocked(c.id, !next);
+      say(e);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -84,6 +132,17 @@ export default function CreatorPage() {
     const p = new URLSearchParams(params);
     p.set('tab', id);
     setParams(p);
+  };
+
+  const personItems = (c: Creator): MenuEntry[] => {
+    const muted = social.muted.has(c.id);
+    const blocked = social.blocked.has(c.id);
+    return [
+      { id: 'report', label: ss.report, icon: <Flag className="h-4 w-4" />, onSelect: () => (isAuthenticated ? setReporting(true) : signIn()) },
+      { id: 'sep', separator: true },
+      { id: 'mute', label: muted ? ss.unmute : ss.mute, icon: muted ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />, onSelect: () => void toggleMute(c) },
+      { id: 'block', label: blocked ? ss.unblock : ss.block, icon: <Ban className="h-4 w-4" />, destructive: !blocked, onSelect: () => void toggleBlock(c) },
+    ];
   };
 
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
@@ -110,6 +169,23 @@ export default function CreatorPage() {
               {s.editProfile}
             </Link>
           )}
+          {creator && !creator.viewer.mine && (
+            <Menu
+              label={ss.options}
+              items={personItems(creator)}
+              trigger={(props) => (
+                <button
+                  type="button"
+                  {...props}
+                  aria-label={ss.options}
+                  data-creator-menu
+                  className="press-scale -me-2 flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                >
+                  <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+                </button>
+              )}
+            />
+          )}
         </div>
       </div>
 
@@ -123,7 +199,7 @@ export default function CreatorPage() {
         ) : (
           <motion.div initial={{ opacity: 0, y: m.travel(12) }} animate={{ opacity: 1, y: 0 }} transition={m.spring('ui')}>
             <header className="flex items-start gap-4 pt-6 text-start">
-              <span className="size-20 shrink-0 overflow-hidden rounded-full border border-border-subtle/60 bg-surface-selected sm:size-24">
+              <span className="h-20 w-20 shrink-0 overflow-hidden rounded-full border border-border-subtle/60 bg-surface-selected">
                 {creator.avatarUrl ? (
                   <img src={creator.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
                 ) : (
@@ -155,10 +231,26 @@ export default function CreatorPage() {
                     {creator.bio}
                   </p>
                 )}
-                <dl className="mt-3 flex gap-5 text-[13px]">
-                  <Stat n={creator.stats.projects} label={s.projectsCount} />
-                  {creator.stats.completed_jobs > 0 && <Stat n={creator.stats.completed_jobs} label={s.completedJobs} />}
-                </dl>
+                {/* Counts hidden at zero (plan §4): a fresh maker's page says nothing rather than «0 متابعون». */}
+                {(creator.stats.projects > 0 || (followers ?? creator.stats.followers ?? 0) > 0 || creator.stats.completed_jobs > 0) && (
+                  <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px]">
+                    {creator.stats.projects > 0 && <Stat n={creator.stats.projects} label={s.projectsCount} />}
+                    {(followers ?? creator.stats.followers ?? 0) > 0 && (
+                      <Stat n={followers ?? creator.stats.followers ?? 0} label={ss.followers} sr={followersLabel(followers ?? creator.stats.followers ?? 0, l)} data-creator-followers />
+                    )}
+                    {creator.stats.completed_jobs > 0 && <Stat n={creator.stats.completed_jobs} label={s.completedJobs} />}
+                  </ul>
+                )}
+                {!creator.viewer.mine && (
+                  <div className="mt-3">
+                    <FollowUserButton
+                      userId={creator.id}
+                      following={!!creator.viewer.following}
+                      followers={followers ?? creator.stats.followers ?? 0}
+                      onChange={(_on, n) => setFollowers(n)}
+                    />
+                  </div>
+                )}
               </div>
             </header>
 
@@ -173,6 +265,7 @@ export default function CreatorPage() {
                 indicatorClassName="bg-gold"
                 items={[
                   { id: 'projects', label: s.projects },
+                  { id: 'posts', label: ss.posts },
                   { id: 'about', label: s.about },
                 ]}
                 className="mx-auto max-w-3xl"
@@ -181,12 +274,13 @@ export default function CreatorPage() {
 
             <div className="min-h-[320px] pt-4">
               <TabPanels value={tab} order={[...TABS]} group="creator">
-                {tab === 'projects' && <ProjectsTab creator={creator} />}
+                {tab === 'projects' && <ProjectsTab creator={creator} filters={{ kind: 'project' }} />}
+                {tab === 'posts' && <ProjectsTab creator={creator} filters={{ not_kind: 'project' }} empty={ss.noPostsYet} />}
                 {tab === 'about' && (
                   <AboutTab
                     creator={creator}
                     lang={lang}
-                    canFollow={isAuthenticated && creator.store?.user_id !== user?.id}
+                    canFollow={creator.store?.user_id !== user?.id}
                     onFollow={async (store) => {
                       if (!isAuthenticated) return signIn();
                       try {
@@ -203,6 +297,8 @@ export default function CreatorPage() {
           </motion.div>
         )}
       </div>
+      {creator && <ReportSheet open={reporting} onClose={() => setReporting(false)} target={{ type: 'user', id: creator.id }} />}
+      {confirmDialog}
     </div>
   );
 }
@@ -218,30 +314,41 @@ function Badge({ icon, children }: { icon?: React.ReactNode; children: React.Rea
   );
 }
 
-function Stat({ n, label }: { n: number; label: string }) {
+/**
+ * One count: the number then the noun, as a list item (a `<dl>` would put the
+ * definition before its term). When `sr` names the counted phrase («41
+ * متابعًا»), the visible number and noun are both hidden from the reader and
+ * the phrase is read ONCE — not «41» and then «41 متابعًا».
+ */
+function Stat({ n, label, sr, ...rest }: { n: number; label: string; /** The counted phrase, when the visible noun is invariable. */ sr?: string; 'data-creator-followers'?: boolean }) {
   return (
-    <div className="flex items-baseline gap-1">
-      <dd className="text-[16px] font-bold tabular-nums text-text-primary">
+    <li className="flex items-baseline gap-1" {...rest}>
+      <span aria-hidden={sr ? true : undefined} data-count className="text-[16px] font-bold tabular-nums text-text-primary">
         <bdi>{n}</bdi>
-      </dd>
-      <dt className="text-text-muted">{label}</dt>
-    </div>
+      </span>
+      <span aria-hidden={sr ? true : undefined} className="text-text-muted">
+        {label}
+      </span>
+      {sr && <span className="sr-only">{sr}</span>}
+    </li>
   );
 }
 
-function ProjectsTab({ creator }: { creator: Creator }) {
+function ProjectsTab({ creator, filters, empty }: { creator: Creator; filters: PostFilters; empty?: string }) {
   const s = useProjectStrings();
   const [rows, setRows] = useState<PostCard[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
   const [total, setTotal] = useState<number | null>(null);
   const [more, setMore] = useState<'idle' | 'loading' | 'error'>('idle');
   const [error, setError] = useState<unknown>(null);
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     let alive = true;
     setRows(null);
+    setError(null);
     projectsApi
-      .list({ author: creator.username })
+      .list({ ...filters, author: creator.username })
       .then((p) => {
         if (!alive) return;
         setRows(p.posts);
@@ -252,13 +359,15 @@ function ProjectsTab({ creator }: { creator: Creator }) {
     return () => {
       alive = false;
     };
-  }, [creator.username]);
+    // `filters` is a literal per tab; the tab itself is the dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creator.username, filters.kind, filters.not_kind, nonce]);
 
   const loadMore = () => {
     if (!next || more === 'loading') return;
     setMore('loading');
     projectsApi
-      .list({ author: creator.username }, next)
+      .list({ ...filters, author: creator.username }, next)
       .then((p) => {
         setRows((r) => [...(r ?? []), ...p.posts]);
         setNext(p.next);
@@ -267,7 +376,7 @@ function ProjectsTab({ creator }: { creator: Creator }) {
       .catch(() => setMore('error'));
   };
 
-  if (error) return <ErrorState error={error} />;
+  if (error) return <ErrorState error={error} onRetry={() => setNonce((n) => n + 1)} />;
   if (!rows) {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -280,7 +389,7 @@ function ProjectsTab({ creator }: { creator: Creator }) {
   if (rows.length === 0) {
     return (
       <EmptyState
-        title={s.noProjectsYet}
+        title={empty ?? s.noProjectsYet}
         description={creator.viewer.mine ? s.myProjectsEmpty : undefined}
         action={
           creator.viewer.mine ? (
@@ -294,7 +403,7 @@ function ProjectsTab({ creator }: { creator: Creator }) {
     );
   }
   return (
-    <div data-creator-projects>
+    <div data-creator-projects={filters.not_kind ? 'posts' : 'projects'}>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {rows.map((p, i) => (
           <ProjectCard key={p.id} post={p} eager={i < 4} />
@@ -357,7 +466,7 @@ function AboutTab({
           <>
             <dt className="text-text-muted">{s.website}</dt>
             <dd>
-              <a href={/^https?:\/\//i.test(creator.website) ? creator.website : `https://${creator.website}`} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1.5 underline decoration-border-subtle underline-offset-4 hover:decoration-current" dir="ltr">
+              <a href={/^https?:\/\//i.test(creator.website) ? creator.website : `https://${creator.website}`} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1.5 underline decoration-border-subtle underline-offset-4" dir="ltr">
                 <Globe aria-hidden="true" className="h-3.5 w-3.5" />
                 {creator.website.replace(/^https?:\/\//i, '')}
               </a>
@@ -373,7 +482,7 @@ function AboutTab({
             return (
               <li key={k}>
                 {href ? (
-                  <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex min-h-9 items-center rounded-full border border-border-subtle/60 bg-surface px-3 text-[12.5px] font-semibold text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+                  <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="lv-hit relative inline-flex min-h-9 items-center rounded-full border border-border-subtle/60 bg-surface px-3 text-[12.5px] font-semibold text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                     {label}
                   </a>
                 ) : (
@@ -395,7 +504,7 @@ const loc3 = (lang: string) => (lang === 'en' ? 'Social links' : lang === 'ckb' 
 function HeaderSkeleton() {
   return (
     <div aria-hidden="true" className="flex items-start gap-4 pt-6">
-      <div className="size-20 shrink-0 animate-pulse rounded-full bg-surface-selected motion-reduce:animate-none sm:size-24" />
+      <div className="h-20 w-20 shrink-0 animate-pulse rounded-full bg-surface-selected motion-reduce:animate-none" />
       <div className="flex w-full flex-col gap-2">
         <div className="h-3 w-16 animate-pulse rounded bg-surface-selected motion-reduce:animate-none" />
         <div className="h-6 w-40 animate-pulse rounded bg-surface-selected motion-reduce:animate-none" />

@@ -6,10 +6,14 @@ import Spinner from '../ui/Spinner';
  * «عرض المزيد» (§7 item 9) — a button, never an endless scroll: the footer
  * stays reachable, and the list's length is a fact the back button can
  * restore. It says how many remain, and turns into a retry after a failure.
+ *
+ * `remaining` is the number left, `0` for none (nothing is drawn), or `null`
+ * when more exists but the server gave no count (a cursor over a river): the
+ * button is drawn without a digit — never a digit the server did not give.
  */
-export default function LoadMore({ remaining, state, onMore }: { remaining: number; state: 'idle' | 'loading' | 'error'; onMore: () => void }) {
+export default function LoadMore({ remaining, state, onMore }: { remaining: number | null; state: 'idle' | 'loading' | 'error'; onMore: () => void }) {
   const { loc, t } = useLanguage();
-  if (remaining <= 0) return null;
+  if (remaining !== null && remaining <= 0) return null;
   return (
     <div className="mt-5 flex justify-center">
       <button
@@ -22,7 +26,7 @@ export default function LoadMore({ remaining, state, onMore }: { remaining: numb
       >
         {state === 'loading' ? <Spinner size="sm" /> : null}
         {state === 'error' ? t('retry') : loc('عرض المزيد', 'Load more', 'زیاتر پیشان بدە')}
-        {state !== 'error' ? <span className="font-semibold tabular-nums text-text-muted">{remaining}</span> : null}
+        {state !== 'error' && remaining !== null ? <span className="font-semibold tabular-nums text-text-muted">{remaining}</span> : null}
       </button>
     </div>
   );

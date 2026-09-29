@@ -90,7 +90,7 @@ export default function MediaStrip({ media, title }: { media: PostMedia[]; title
           <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center">
             <div className="relative flex gap-1.5 rounded-full bg-black/40 px-2 py-1.5">
               {media.map((item, i) => (
-                <span key={item.id} className="relative h-[5px] w-[5px] rounded-full bg-white/50">
+                <span key={item.id} className="relative h-[5px] w-[5px] rounded-full bg-white/40">
                   {i === active && (
                     <motion.span
                       layoutId="project-media-dot"

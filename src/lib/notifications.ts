@@ -34,7 +34,13 @@ export type NotificationKind =
   | 'offer_stale'
   | 'order_update'
   /** «رد من الدعم» — staff answered a support ticket. */
-  | 'support_reply';
+  | 'support_reply'
+  /** Community (Phase 2), grouped per (recipient, event_key): «أعجب N
+   *  أشخاص بمشروعك», «علّق … على مشروعك», «ردّ … على تعليقك», «بدأ … بمتابعتك». */
+  | 'post_liked'
+  | 'post_commented'
+  | 'comment_replied'
+  | 'new_follower';
 
 export interface NotificationRow {
   id: string;

@@ -126,7 +126,17 @@ export type NotificationKind =
   /** «قرّرت Levonis النزاع» — an admin decided a disputed custom order's escrow (review F4). */
   | 'dispute_resolved'
   | 'coupon_ending'
-  | 'store_status_changed';
+  | 'store_status_changed'
+  /**
+   * THE SOCIAL KINDS (0154; docs/COMMUNITY_ECOSYSTEM.md Phase 2), written by
+   * `notifyGrouped` and never by `notify`: a burst of likes is ONE row whose
+   * count climbs («أعجب 12 شخصًا بمشروعك»), not twelve rows. Saves are private
+   * and never notify.
+   */
+  | 'post_liked'
+  | 'post_commented'
+  | 'comment_replied'
+  | 'new_follower';
 
 export interface NotificationInput {
   userId: string;
@@ -156,6 +166,8 @@ export interface NotificationInput {
     | 'trade_in'
     // 0153 — a maker's project or post (portfolio consent, and the social kinds after it).
     | 'community_post'
+    // 0154 — a comment under a post ('comment_replied'), a person ('new_follower').
+    | 'community_comment' | 'user'
     | '';
   entity_id?: string;
   meta?: Record<string, unknown>;
@@ -225,6 +237,111 @@ export async function notify(db: D1Database, n: NotificationInput): Promise<stri
     console.error(`notification not written (${n.kind}): ${e instanceof Error ? e.message : String(e)}`);
     return null;
   }
+}
+
+/**
+ * A GROUPED NOTIFICATION — one row per (recipient, group key) whose count
+ * climbs (docs/COMMUNITY_ECOSYSTEM.md Phase 2).
+ *
+ * The social kinds arrive in bursts: a project that does well is liked forty
+ * times in an hour, and forty rows in the bell is noise that buries the one
+ * offer the person was waiting for. So a burst is ONE row: the first like
+ * inserts it, every later like lands on the partial unique index
+ * (`user_id, event_key WHERE event_key <> ''`, 0045) and the conflict clause
+ * raises `meta.count`, remembers the latest actor, clears `read_at` and moves
+ * `created_at` to now — the row climbs back to the top, unread, saying «12
+ * people liked …». The title is recomputed from the count the database
+ * answers with (RETURNING), so two likes that race both raise the number and
+ * the last writer's title names the larger count.
+ *
+ * THE COUNT IS PEOPLE, NOT EVENTS. One account liking, unliking and liking
+ * again is one person, and a row that said «6 people liked» over a single
+ * actor — coming back unread each time — was a lie and a lever: the like
+ * bucket allows 240 an hour, so one account could ring a victim's bell a
+ * hundred times an hour per post. `meta.actors` keeps the ids already counted
+ * (the last `ACTORS_KEPT`, a window rather than the whole audience), and the
+ * upsert is conditional on the actor being NEW to it: a repeat leaves the
+ * count, the body, the link, `read_at` and `created_at` exactly as they were.
+ * An actor who fell out of the window is counted again — an approximation
+ * that errs by one in a burst of fifty, never by a hundred over one person.
+ *
+ * SQLite accepts a conflict target with a WHERE clause exactly when it
+ * matches a partial unique index, which `idx_user_notifications_event` is;
+ * `INSERT OR IGNORE` (notify) and this upsert therefore share one index and
+ * one replay rule. Never throws, for the same reason `notify` never does.
+ */
+export interface GroupedNotificationInput {
+  userId: string;
+  kind: Extract<NotificationKind, 'post_liked' | 'post_commented' | 'comment_replied' | 'new_follower'>;
+  /** One row per recipient per key: `post_liked:<postId>`, `new_follower:<userId>`, … */
+  groupKey: string;
+  actor: { id: string; name: string };
+  /** The title for a given count — 1 names the actor, more name the number. */
+  title: (count: number, actorName: string) => { ar: string; en: string };
+  body?: { ar: string; en: string };
+  link: string;
+  entity_type: NonNullable<NotificationInput['entity_type']>;
+  entity_id: string;
+}
+
+/** How many distinct actors a grouped row remembers, so a repeat is recognised. */
+export const ACTORS_KEPT = 50;
+
+export async function notifyGrouped(db: D1Database, n: GroupedNotificationInput): Promise<{ id: string; count: number } | null> {
+  try {
+    const first = n.title(1, n.actor.name);
+    const actorJson = JSON.stringify({ id: n.actor.id, name: n.actor.name });
+    // The row as it stands is `user_notifications.*` inside the DO UPDATE.
+    const seen = `EXISTS (SELECT 1 FROM json_each(user_notifications.meta, '$.actors') WHERE value = ?13)`;
+    const actors = `CASE
+        WHEN json_type(user_notifications.meta, '$.actors') IS NOT 'array' THEN json_array(?13)
+        WHEN json_array_length(user_notifications.meta, '$.actors') >= ${ACTORS_KEPT}
+          THEN json_insert(json_remove(json_extract(user_notifications.meta, '$.actors'), '$[0]'), '$[#]', ?13)
+        ELSE json_insert(json_extract(user_notifications.meta, '$.actors'), '$[#]', ?13) END`;
+    const row = await db
+      .prepare(
+        `INSERT INTO user_notifications
+           (id, user_id, kind, title_ar, title_en, body_ar, body_en, link, entity_type, entity_id, meta, event_key)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, json_object('count', 1, 'last_actor', json(?11), 'actors', json_array(?13)), ?12)
+         ON CONFLICT(user_id, event_key) WHERE event_key <> '' DO UPDATE SET
+           meta = CASE WHEN ${seen} THEN user_notifications.meta
+                  ELSE json_set(user_notifications.meta,
+                                '$.count', COALESCE(json_extract(user_notifications.meta, '$.count'), 1) + 1,
+                                '$.last_actor', json(?11),
+                                '$.actors', json(${actors})) END,
+           body_ar = CASE WHEN ${seen} THEN user_notifications.body_ar ELSE excluded.body_ar END,
+           body_en = CASE WHEN ${seen} THEN user_notifications.body_en ELSE excluded.body_en END,
+           link = CASE WHEN ${seen} THEN user_notifications.link ELSE excluded.link END,
+           read_at = CASE WHEN ${seen} THEN user_notifications.read_at ELSE NULL END,
+           created_at = CASE WHEN ${seen} THEN user_notifications.created_at ELSE strftime('%Y-%m-%dT%H:%M:%fZ','now') END
+         RETURNING id, json_extract(meta, '$.count') AS count`
+      )
+      .bind(
+        newId('ntf'), n.userId, n.kind, first.ar, first.en, n.body?.ar ?? '', n.body?.en ?? '', n.link,
+        n.entity_type, n.entity_id, actorJson, n.groupKey, n.actor.id
+      )
+      .first<{ id: string; count: number }>();
+    if (!row) return null;
+    const count = Number(row.count ?? 1);
+    if (count > 1) {
+      const t = n.title(count, n.actor.name);
+      await db.prepare('UPDATE user_notifications SET title_ar = ?, title_en = ? WHERE id = ?').bind(t.ar, t.en, row.id).run();
+    }
+    return { id: String(row.id), count };
+  } catch (e) {
+    console.error(`grouped notification not written (${n.kind}): ${e instanceof Error ? e.message : String(e)}`);
+    return null;
+  }
+}
+
+/**
+ * «N أشخاص» in Arabic, with the dual and the 3–10 / 11+ forms — the counted
+ * noun changes with the number, so the caller cannot template it.
+ */
+export function peopleAr(n: number): string {
+  if (n === 2) return 'شخصان';
+  if (n >= 3 && n <= 10) return `${n} أشخاص`;
+  return `${n} شخصًا`;
 }
 
 export async function listNotifications(

@@ -14,14 +14,23 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { communityHubApi, type FeedKind, type Page } from './api';
+import { socialApi } from '../social/api';
 import { FRESH_MS, feedCache as cache, forgetCommunityFeed, type FeedEntry as Entry } from './feedCache';
 
 export { forgetCommunityFeed };
 
+/**
+ * The feeds have no `total` (a cursor over a river) and ignore `q`; the
+ * makers' directory searches by it. All page with limit+1 on the server, so
+ * `next` is null on the last page.
+ */
 const LOADERS: Record<FeedKind, (q: string, cursor: string | null) => Promise<Page<{ id: string }>>> = {
   products: communityHubApi.products,
   merchants: communityHubApi.merchants,
   requests: communityHubApi.requests,
+  creators: (q, cursor) => socialApi.creators({ q }, cursor, 18).then((p) => ({ rows: p.creators, next: p.next, total: p.total })),
+  'feed:foryou': (_q, cursor) => socialApi.feed('foryou', cursor, 12).then((p) => ({ rows: p.posts, next: p.next, total: null })),
+  'feed:following': (_q, cursor) => socialApi.feed('following', cursor, 12).then((p) => ({ rows: p.posts, next: p.next, total: null })),
 };
 
 function fresh(key: string): Entry | null {

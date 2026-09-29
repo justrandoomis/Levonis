@@ -63,6 +63,8 @@ export interface PostCard {
   published_at: string | null;
   created_at: string;
   url: string;
+  /** The signed-in viewer's own marks on this piece (Phase 2); absent for a guest. */
+  viewer?: { liked?: boolean; saved?: boolean };
 }
 
 export interface PrintSettings {
@@ -89,6 +91,10 @@ export interface Post extends PostCard {
     /** Set when the viewer is the customer whose part this is: their decision is due, or was given. */
     consent: 'pending' | 'granted' | 'declined' | null;
     can: { edit: boolean; publish: boolean; archive: boolean; delete: boolean };
+    liked?: boolean;
+    saved?: boolean;
+    /** The viewer already follows the author (Phase 2) — the byline's pill starts right. */
+    following_author?: boolean;
   };
 }
 
@@ -132,15 +138,17 @@ export interface Creator {
   printers: string[];
   materials: string[];
   badges: { pro: boolean; premium: boolean; verified_merchant: boolean };
-  stats: { projects: number; completed_jobs: number };
+  stats: { projects: number; completed_jobs: number; followers?: number };
   /** The creator's store card, in the directory's own shape, when they run one. */
   store: Record<string, unknown> | null;
-  viewer: { mine: boolean };
+  viewer: { mine: boolean; following?: boolean; blocked?: boolean };
 }
 
 export interface PostFilters {
   q?: string;
   kind?: PostKind | '';
+  /** Everything but this kind — the creator page's «المنشورات» (`not_kind=project`). */
+  not_kind?: PostKind | '';
   author?: string;
   store?: string;
   product?: string;

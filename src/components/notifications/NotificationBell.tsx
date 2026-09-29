@@ -5,14 +5,18 @@ import {
   Bell,
   CheckCheck,
   CircleCheck,
+  Heart,
+  Images,
   Loader2,
   LifeBuoy,
+  MessageCircle,
   Package,
   Printer,
   RotateCw,
   ShieldCheck,
   Tag,
   Repeat,
+  UserPlus,
 } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
@@ -137,6 +141,18 @@ function kindIcon(kind: string) {
     // /trade-in page and its home tile.
     case 'trade_in':
       return Repeat;
+    // Levo Community (docs/COMMUNITY_ECOSYSTEM.md Phase 2): the grouped
+    // social rows — «أعجب 12 شخصًا بمشروعك», a comment or a reply, a new
+    // follower — and the portfolio consent question a workshop asks.
+    case 'post_liked':
+      return Heart;
+    case 'post_commented':
+    case 'comment_replied':
+      return MessageCircle;
+    case 'new_follower':
+      return UserPlus;
+    case 'portfolio_consent':
+      return Images;
     default:
       return Bell;
   }

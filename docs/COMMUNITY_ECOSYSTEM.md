@@ -163,7 +163,7 @@ Trigger: a published post always has `published_at`. Registered: schema
 version 0153/146, ownership (`marketplace`), media sweeper (`media_key`;
 `print_settings`/`dimensions`/`tags` as non-media).
 
-Planned (Phase 2, 0154): `user_follows(follower_id, user_id)`, `community_likes(user_id, post_id)`,
+Landed (Phase 2, 0154): `user_follows(follower_id, user_id)`, `community_likes(user_id, post_id)`,
 `community_saves(user_id, post_id, collection_id?)`, `community_comments(id, post_id, author_id,
 parent_id, body, state)`, `user_blocks`, `user_mutes`, `community_reports(id, reporter_id,
 target_type, target_id, reason, state)` and the counter triggers on `community_posts`.
@@ -189,6 +189,71 @@ POST_MEDIA_TOO_MANY, POST_MEDIA_KIND, POST_LINK_NOT_OWNED, POST_LINK_NOT_FOUND,
 POST_SETTING_INVALID, POST_NEEDS_MEDIA, POST_ARCHIVED, POST_PUBLISHED,
 POST_HIDDEN_BY_ADMIN, CONSENT_REQUIRED, CONSENT_DECLINED, CONSENT_NOT_NEEDED.
 
+## 4b. API (Phase 2, landed) — all behind `communityGate()`, every write `requireAuth`
+
+Router worker/routes/communitySocial.ts, mounted after the post routes. Every 200/201 carries
+`success: true`; refusals are `{ success: false, error, code }`. Every write is idempotent — a
+replayed like, save, follow, block, mute, report or comment removal changes nothing and answers
+the same, and two comment sends in flight with one `client_id` land once (0155); counters move
+only through the 0154 triggers.
+
+**One story for a block (review fix).** Every community door answers a block with the words a
+missing thing gets — 404 `NOT_FOUND` — from BOTH sides: the creator page, the post page, its
+comments, a like, a save, a comment, a follow. None of them says BLOCKED, so the blocked side
+learns nothing from any post id. The messaging doors are the exception that names it: POST
+`/api/chats/open` answers 403 `BLOCKED`, and a general DM thread that existed before the block
+refuses both sides' messages and typing with 403 `BLOCKED` and leaves the blocker's inbox (a
+thread cannot pretend not to exist). A body that is JSON `null`, an array or a scalar is `{}`
+(`jsonObject` in worker/lib/http.ts), so a malformed body is a 400, never a 500.
+
+| Method, path | Who | Notes |
+|---|---|---|
+| PUT / DELETE `/api/community/posts/:id/like` | account, `social-like` 240/h | `{ liked, likes }`; 404 unreadable post or across a block; author hears `post_liked` grouped (not from someone they muted) |
+| PUT / DELETE `/api/community/posts/:id/save` | account, `social-save` 240/h | body `{ collection? ≤40 }` (a second PUT moves the save); `{ saved, saves }`; nobody is told |
+| GET `/api/community/saved` | account | `PostCard & { saved_at, collection }`, newest first, cursor `saved_at|post_id`, limit ≤48 |
+| GET `/api/community/posts/:id/comments` | per the post's rule; 404 across a block | oldest first, cursor `created_at|id`, limit ≤50, `total` = the visible comments THIS viewer is shown (blocked/muted authors are out of the number as well as the rows; the card's `comment_count` stays the post's own); removed rows are stubs (`body:''`, `author:null`); hidden rows only for staff and their author (a reply whose parent is missing is drawn top-level) |
+| POST `/api/community/posts/:id/comments` | account, `social-comment` 60/h | `{ body 2–2000, parent_id?, client_id? ≤64 }`; 201, or 200 `replayed` when this author already sent this `client_id` under this post (stored, unique per post+author+client_id, 0155 — two sends in flight land once) or for the same body+parent within the 10 s cooldown; 429 `COMMENT_TOO_FAST`; 400 `COMMENT_INDECENT`; 404 across a block; one level — a reply to a reply files under the thread root; `comment_replied` to the parent's author, `post_commented` to the post's author, once when they coincide, neither to someone who muted the writer; links end in `#comments` |
+| DELETE `/api/community/comments/:id` | the comment's or the post's author | state `removed`, stub kept; anyone else 404 |
+| PUT / DELETE `/api/community/users/:id/follow` | account, `follow-user` 60/h | `{ following, followers }` (`users.follower_count`); 400 `CANNOT_FOLLOW_SELF`; PUT 404 without a creator page or store, and 404 across a block; `new_follower` grouped (not to someone who muted the follower), linking to the follower's page only when it exists, else `/community?tab=creators` |
+| PUT / DELETE `/api/community/users/:id/block` | account, `social-block` 60/h | `{ blocked }`; PUT deletes the follows both ways; 400 `CANNOT_BLOCK_SELF` |
+| PUT / DELETE `/api/community/users/:id/mute` | account, `social-block` 60/h | `{ muted }`; tells nobody — and the muted person's likes, comments and follows ring no bell for the muter |
+| GET `/api/community/me/social` | account | `{ following_users, following_stores, blocked, muted }`, ≤500 each, newest first |
+| POST `/api/community/reports` | account, `report` 20/h | `{ target_type: post|comment|user|store|product|request, target_id, reason: spam|abuse|nudity|fraud|copyright|offtopic|other, details? ≤1000 }`; 201 `{ report_id }`, 200 `replayed` on the second press (the first reason stands); 404 `REPORT_TARGET_NOT_FOUND` for anything the reporter could not already open — a post they may read, a visible comment under one, a person WITH a page, a live store, a listed product, a request on the board — so the door is no existence oracle; audit `community.report`, Telegram topic `report` after the response |
+| GET `/api/community/feed?scope=foryou|following` | anyone / account | `PostCard[]`, cursor `published_at|id`, limit ≤30; `following` = followed makers ∪ owners of followed stores, 401 for a guest; both scopes drop blocked-either-way and muted authors |
+| GET `/api/community/creators` | anyone | q over name/username/bio, `featured=1`; only accounts with a page and a username, never blocked either way; opaque offset cursor, `total` on page 1. Starts from the candidates (`creator_public = 1`, 0155's partial index, ∪ live merchants) and joins ONE grouped read of public posts for the project count and last publication — no per-row subqueries over every user |
+
+Changes to Phase 1 routes: every post card (`/posts`, `/posts/trending`, `/feed`, `/saved`,
+`/my-posts`) carries `viewer: { liked, saved }` (false/false for a guest); `/posts/:id` merges
+`liked`/`saved`/`following_author` into its viewer object and answers 404 across a block;
+`/posts` takes `not_kind=<kind>` (the creator page's «المنشورات» = `not_kind=project`, with an exact
+`total`); `/posts` and `/posts/trending` (and `/posts`' `total`) exclude blocked-either-way and
+muted authors for a signed-in viewer; `/creators/:username` adds `stats.followers`,
+`viewer.following`, `viewer.blocked` and answers 404 across a block. POST `/api/chats/open
+{ userId }` answers 403 `BLOCKED` across a block, and so do POST `/api/chats/:id/messages` and
+`/typing` on a general thread between a blocked pair (`assertMayWriteInThread`); GET `/api/chats`
+leaves such a thread out of the blocker's list.
+
+Notifications (worker/lib/notifications.ts): kinds `post_liked`, `post_commented`,
+`comment_replied`, `new_follower`; `notifyGrouped()` keeps ONE `user_notifications` row per
+(recipient, group key) — `INSERT … ON CONFLICT(user_id, event_key) DO UPDATE` climbs
+`meta.count`, records `last_actor`, retitles from the count and clears `read_at`. The count is
+PEOPLE, not events: `meta.actors` remembers the last 50 actor ids and the upsert changes nothing
+(count, body, link, `read_at`, `created_at`) for an actor already in it — one account liking,
+unliking and liking again is one person and rings the bell once. ar/en only, like every
+notification row (Q5 stays open).
+
+Refusal codes (ar/en/ckb in src/lib/refusalStrings.ts): BLOCKED, CANNOT_FOLLOW_SELF,
+CANNOT_BLOCK_SELF, COMMENT_INDECENT, COMMENT_TOO_FAST, REPORT_TARGET_NOT_FOUND.
+
+Tests: tests/communitySocial.test.ts (22 — replay, grouped notifications, comment ownership,
+follow rules and spam, the block matrix, mute, the following feed, report-once, creators, body
+forgery; and the review regressions: people-not-events counting, the DM thread closed by a
+block, the concurrent comment send, the viewer's `total`, the `null` body, the report oracle,
+the quiet mute, `not_kind` + `following_author`, the notification links),
+tests/communitySocialUi.test.ts (8), tests/communityHubUi.test.ts (extended);
+scripts/e2e-projects.mjs (under `<StrictMode>`, as src/main.tsx mounts the app) and
+scripts/e2e-community-home.mjs in the browser.
+
 ## 5. Client (Phase 1, landed)
 
 - `/community/projects` — the list with kind chips, a tag chip and server search (pages/community/Projects.tsx; `ProjectsGrid` is reused by the home's «المشاريع» tab in Phase 2).
@@ -201,7 +266,7 @@ POST_HIDDEN_BY_ADMIN, CONSENT_REQUIRED, CONSENT_DECLINED, CONSENT_NOT_NEEDED.
 ## 6. Phases
 
 1. **Projects + creator profiles** — landed (this document, §3–5). Tests: tests/communityPosts.test.ts (11).
-2. **Social graph + Feed V3** — 0154 tables and counter triggers; like/save/comment/follow-creator/block/mute/report endpoints with rate limits and idempotency; grouped notifications (`ON CONFLICT` upsert on a grouping key + count); the community home rebuilt to the «العدد» plan (masthead, quick actions, six tabs, cover story, numbered sections, rails, the feed, tools, colophon; springs from `useMotion()`, skeletons at exact heights, `bg-canvas` tokens, ≤ 1 new CSS rule).
+2. **Social graph + Feed V3** — landed (§4b, docs/COMMUNITY_HOME_PLAN.md). 0154 tables and counter triggers, 0155 (comment `client_id` replay key, creators index); like/save/comment/follow-creator/block/mute/report endpoints with rate limits and idempotency; grouped notifications (`ON CONFLICT` upsert on a grouping key + count); the community home rebuilt to the «العدد» plan (masthead, quick actions, six tabs, cover story, numbered sections, rails, the feed, tools, colophon; springs from `useMotion()`, skeletons at exact heights, `bg-canvas` tokens, ≤ 1 new CSS rule).
 3. **Unified search + discovery** — one `/api/community/search` over products, stores, creators, projects, requests, materials, brands (LIKE + the catalogue index where it exists), autocomplete from names, «trending» from counters, no query log.
 4. **3D asset platform + files (§27–35)** — upload sessions (multipart/resumable) with checksum, admin-configurable limits, structure sniffing with zip-bomb bounds, file roles on products / requests / chat, link cards with URL validation, the shared viewer with temporary tokens, grouped file notifications, per-file authorization tests.
 5. **Workshop profiles + matching + offers V2 + the request page (§21–26, 36)** — structured workshop profile in the store settings feeding `loadCandidates`; offers gain delivery fee, attachments, validity, `draft`/`revised` semantics and re-acceptance; request discussion; execution timeline with `ready` and progress photos; the consolidated request page in the owner's order; merchant cancel/dispute.

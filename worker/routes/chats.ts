@@ -28,6 +28,7 @@ import {
 import { storeById } from '../lib/merchantAuth';
 import { storeTakesOrders } from '../lib/storeOrderOps';
 import { merchantTakesNewWork } from '../lib/communityRequests';
+import { blockedEither } from './communityPosts';
 import { communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { safeParse } from '../lib/types';
@@ -73,6 +74,35 @@ export async function assertMayWriteInThread(db: D1Database, chatId: string, use
   const thread = await storeOrderThread(db, chatId);
   if (thread && userId !== thread.customer_id && userId !== thread.seller_id) {
     throw new HttpError(403, 'Staff can read this conversation but not write in it', 'CHAT_READ_ONLY');
+  }
+  // A BLOCK CLOSES A DIRECT MESSAGE THAT ALREADY EXISTS (0154). POST /open
+  // refuses to start one across a block; a pair that had exchanged one line
+  // before the block must not keep the thread as a side door. Only the
+  // GENERAL chat between two people — an order's or a store's thread is the
+  // order's business, not the pair's, and stays as it was.
+  if (await blockedInGeneralThread(db, chatId, userId)) throw new HttpError(403, 'You cannot message this account', 'BLOCKED');
+}
+
+/**
+ * Is the other side of this GENERAL thread blocked either way? A database
+ * behind 0154 (or a test double without the community columns) has no blocks
+ * to enforce: the schema-missing error means «no block», exactly as the list
+ * below falls back to the older shape rather than failing the inbox.
+ */
+async function blockedInGeneralThread(db: D1Database, chatId: string, userId: string): Promise<boolean> {
+  try {
+    const other = await db
+      .prepare(
+        `SELECT cp.user_id FROM chat_participants cp
+           JOIN chats ch ON ch.id = cp.chat_id AND ch.order_id IS NULL AND ch.context_type = ''
+          WHERE cp.chat_id = ? AND cp.user_id <> ? LIMIT 1`
+      )
+      .bind(chatId, userId)
+      .first<{ user_id: string }>();
+    return !!other && (await blockedEither(db, userId, other.user_id));
+  } catch (e) {
+    if (isSchemaMissing(e)) return false;
+    throw e;
   }
 }
 
@@ -261,7 +291,7 @@ export async function notifyStoreThread(
  * would 500 the whole list on the missing column. It falls back to the
  * pre-0110 preview — 📷 for any file — instead.
  */
-function chatListSql(withAttachmentKind: boolean): string {
+function chatListSql(withAttachmentKind: boolean, withBlocks = withAttachmentKind): string {
   const kindCases = withAttachmentKind
     ? `WHEN m.attachment_kind = 'audio' THEN '🎤'
                       WHEN m.attachment_kind = 'file' THEN '📄'
@@ -294,6 +324,14 @@ function chatListSql(withAttachmentKind: boolean): string {
        FROM chats ch
        LEFT JOIN merchant_stores s ON s.id = ch.store_id AND ch.context_type IN ('store','store_order','request')
        JOIN chat_participants cp ON cp.chat_id = ch.id AND cp.user_id = ?1
+      -- A general thread with someone this reader BLOCKED leaves their inbox
+      -- (0154); the other side's list is not consulted, so nothing there says
+      -- a block happened. Order and store threads stay whatever the pair did.
+      -- Dropped with the rest of the newer shape on a database behind the
+      -- deployment (the retry below), which has no blocks to hide.
+      ${withBlocks ? `WHERE NOT (ch.order_id IS NULL AND ch.context_type = '' AND EXISTS (
+              SELECT 1 FROM chat_participants o JOIN user_blocks b ON b.user_id = ?1 AND b.blocked_id = o.user_id
+               WHERE o.chat_id = ch.id AND o.user_id <> ?1))` : ''}
       ORDER BY last_at DESC NULLS LAST
       LIMIT 100`;
 }
@@ -561,6 +599,13 @@ chatRoutes.post('/open', async (c) => {
   if (otherUserId === user.id) throw badRequest('You cannot chat with yourself');
   const other = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(otherUserId).first();
   if (!other) throw notFound('User not found');
+  // A block is mutual silence (0154): neither side opens a direct message to
+  // the other. A database behind 0154 has no blocks to consult.
+  const blocked = await blockedEither(c.env.DB, user.id, otherUserId).catch((e: unknown) => {
+    if (isSchemaMissing(e)) return false;
+    throw e;
+  });
+  if (blocked) throw new HttpError(403, 'You cannot message this account', 'BLOCKED');
 
   // Only a GENERAL chat is reused here — an order thread must never be
   // returned as if it were the pair's direct message.

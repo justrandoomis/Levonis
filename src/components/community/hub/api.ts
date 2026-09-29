@@ -95,7 +95,11 @@ export interface Page<T> {
   total: number | null;
 }
 
-export type FeedKind = 'products' | 'merchants' | 'requests';
+/**
+ * The lists the home pages through `useCommunityFeed`: the three directories,
+ * the two feeds (Phase 2, /api/community/feed) and the makers' directory.
+ */
+export type FeedKind = 'products' | 'merchants' | 'requests' | 'creators' | 'feed:foryou' | 'feed:following';
 
 function query(q: string, cursor: string | null, limit: number): string {
   const p = new URLSearchParams();
@@ -120,6 +124,12 @@ export const communityHubApi = {
   requests: (q: string, cursor: string | null) =>
     page<'requests', CommunityRequest>('/api/community/requests', 'requests', q, cursor, 20),
   works: () => api.get<{ works: CommunityWork[] }>('/api/community/works?limit=12').then((d) => d.works ?? []),
+  /** The home's short first pages — a rail or three rows, never a directory. */
+  few: {
+    products: (limit: number) => page<'products', CommunityProduct>('/api/community/products', 'products', '', null, limit),
+    merchants: (limit: number) => page<'merchants', CommunityStore>('/api/community/merchants', 'merchants', '', null, limit),
+    requests: (limit: number) => page<'requests', CommunityRequest>('/api/community/requests', 'requests', '', null, limit),
+  },
   follow: (merchantId: string) => api.post(`/api/community/store/${encodeURIComponent(merchantId)}/follow`),
   unfollow: (merchantId: string) => api.delete(`/api/community/store/${encodeURIComponent(merchantId)}/follow`),
 };

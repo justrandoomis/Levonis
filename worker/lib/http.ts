@@ -141,6 +141,18 @@ export async function requireMainHost(c: Context<AppContext>, next: Next) {
  * builtin's source text ends up inside the query text. Only keys the map
  * itself declares count; anything else is the fallback.
  */
+/**
+ * THE REQUEST BODY AS A PLAIN OBJECT — `{}` for no body, a parse failure, a
+ * JSON `null`, an array or a scalar. `c.req.json().catch(() => ({}))` guards
+ * the parse alone: the literal `null` parses, and `body.field` on it is a
+ * TypeError the client reads as a 500. Every field read after this is a 400
+ * at worst.
+ */
+export async function jsonObject(c: Context<AppContext>): Promise<Record<string, unknown>> {
+  const parsed: unknown = await c.req.json().catch(() => null);
+  return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+}
+
 export function pickFrom<T>(map: Record<string, T>, key: unknown, fallback: T): T {
   return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key) ? map[key] : fallback;
 }

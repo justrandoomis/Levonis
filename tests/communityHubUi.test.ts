@@ -13,9 +13,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
+import { TAB_IDS, canonicalParams, resolveTab } from '../src/components/community/hub/tabs';
+import { HUB_STRINGS, colophon, projectsLabel, sectionNumber, workshopsLabel } from '../src/components/community/hub/strings';
 import {
   completedLabel,
   followersLabel,
@@ -123,4 +125,90 @@ test('times are the language\'s own words, and a bad date says nothing', () => {
   assert.equal(timeAgo(null, 'en', now), '');
   assert.match(shortDate('2026-10-05', 'en'), /5 Oct/);
   assert.equal(shortDate('', 'ar'), '');
+});
+
+// ------------------------------------------------------------ the home V3
+
+test('the home has six sections, in the owner\'s order, and the two old names still open the right one', () => {
+  assert.deepEqual([...TAB_IDS], ['foryou', 'following', 'projects', 'requests', 'stores', 'creators']);
+  const page = code('src/pages/Community.tsx');
+  assert.match(page, /items=\{TAB_IDS\.map\(\(id\) => \(\{ id, label: s\.tabs\[id\] \}\)\)\}/, 'the strip draws exactly the six ids');
+  assert.match(page, /indicatorClassName="bg-gold"/, 'gold is the ink: the underline');
+  assert.match(page, /order=\{\[\.\.\.TAB_IDS\]\}/, 'the panels slide along the same order');
+
+  // ?tab=products → the products list under «لك»; ?tab=merchants → stores.
+  assert.deepEqual(resolveTab(new URLSearchParams('tab=products')), { tab: 'foryou', list: 'products', legacy: true });
+  assert.deepEqual(resolveTab(new URLSearchParams('tab=merchants&q=x')), { tab: 'stores', list: null, legacy: true });
+  assert.equal(canonicalParams(new URLSearchParams('tab=products&q=x')).toString(), 'tab=foryou&q=x&list=products');
+  assert.equal(canonicalParams(new URLSearchParams('tab=merchants')).toString(), 'tab=stores');
+  assert.deepEqual(resolveTab(new URLSearchParams('tab=foryou&list=products')), { tab: 'foryou', list: 'products', legacy: false });
+  assert.deepEqual(resolveTab(new URLSearchParams('tab=stores&list=products')), { tab: 'stores', list: null, legacy: false }, 'the list only lives under «لك»');
+  assert.deepEqual(resolveTab(new URLSearchParams('tab=nonsense')), { tab: 'foryou', list: null, legacy: false });
+  assert.deepEqual(resolveTab(new URLSearchParams('')), { tab: 'foryou', list: null, legacy: false });
+  assert.match(page, /if \(legacy\) setParams\(canonicalParams\(params\), \{ replace: true \}\);/, 'the old name is rewritten, never a history entry');
+  assert.match(code('src/pages/FollowedStores.tsx'), /\/community\?tab=merchants/, 'the old link this rewrite exists for is still in the app');
+});
+
+test('no <button> inside a link, anywhere in the home\'s cards and sections', () => {
+  const dirs = ['src/components/community/hub', 'src/components/community/feed'];
+  const files = dirs.flatMap((d) => readdirSync(join(ROOT, d)).filter((f) => f.endsWith('.tsx')).map((f) => `${d}/${f}`));
+  assert.ok(files.length >= 12, `expected the home components, found ${files.length}`);
+  for (const f of files) {
+    const src = code(f).replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+    for (const tag of ['a', 'Link', 'HubLink']) {
+      const open = new RegExp(`<${tag}(?=[\\s>])`, 'g');
+      let m: RegExpExecArray | null;
+      while ((m = open.exec(src))) {
+        if (/^<[^>]*\/>/.test(src.slice(m.index))) continue;
+        const close = src.indexOf(`</${tag}>`, m.index);
+        const inner = src.slice(m.index, close < 0 ? undefined : close);
+        assert.doesNotMatch(inner, /<button\b/, `${f}: a <button> inside <${tag}>:\n${inner.slice(0, 160)}`);
+      }
+    }
+  }
+  // The feed's card: one stretched link, the social row beside it.
+  const post = code('src/components/community/feed/PostCard.tsx');
+  assert.match(post, /after:absolute after:inset-0/, 'the title is the stretched link');
+  assert.match(post, /<ActionRow post=\{p\} viewer=\{p\.viewer\}/, 'the social row is the shared one');
+});
+
+test('the section numbers read in Arabic-Indic digits for Arabic and Sorani only; the counts stay Latin', () => {
+  assert.equal(sectionNumber(1, 'ar'), '٠١');
+  assert.equal(sectionNumber(7, 'ckb'), '٠٧');
+  assert.equal(sectionNumber(1, 'en'), '01');
+  assert.equal(sectionNumber(12, 'ar'), '١٢');
+  assert.match(code('src/components/community/hub/parts.tsx'), /\{sectionNumber\(index, lang\)\}/, 'SectionHead draws it');
+  assert.equal(projectsLabel(12, 'ar'), '12 مشروعًا');
+  assert.equal(projectsLabel(2, 'ar'), 'مشروعان');
+  assert.equal(workshopsLabel(3, 'ar'), '3 ورش');
+  assert.equal(colophon(12, 3, 'ar'), 'صُنع هذا العدد من 12 مشروعًا و3 ورش');
+  assert.equal(colophon(1, 1, 'en'), 'This issue was made from 1 project and 1 workshop');
+  assert.equal(colophon(5, 2, 'ckb'), 'ئەم ژمارەیە لە 5 پڕۆژە و 2 وۆرکشۆپ دروست کراوە');
+});
+
+test('every word of the home exists in Arabic, English and real Sorani', () => {
+  const flat = (o: Record<string, unknown>, prefix = ''): Record<string, string> => {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(o)) {
+      if (v && typeof v === 'object') Object.assign(out, flat(v as Record<string, unknown>, `${prefix}${k}.`));
+      else out[`${prefix}${k}`] = String(v);
+    }
+    return out;
+  };
+  const ar = flat(HUB_STRINGS.ar);
+  const en = flat(HUB_STRINGS.en);
+  const ckb = flat(HUB_STRINGS.ckb);
+  assert.deepEqual(Object.keys(en).sort(), Object.keys(ar).sort());
+  assert.deepEqual(Object.keys(ckb).sort(), Object.keys(ar).sort());
+  let same = 0;
+  let sorani = 0;
+  const keys = Object.keys(ar);
+  for (const k of keys) {
+    assert.ok(ckb[k].trim(), `ckb.${k} is empty`);
+    if (ckb[k] === ar[k]) same += 1;
+    // The letters Sorani has and Arabic does not: ە ێ ڕ ڵ گ ک ۆ ی.
+    if (/[\u06D5\u06CE\u0695\u06B5\u06AF\u06A9\u06C6\u06CC]/.test(ckb[k])) sorani += 1;
+  }
+  assert.ok(same <= Math.ceil(keys.length / 10), `${same} Sorani strings are the Arabic pasted across`);
+  assert.ok(sorani >= Math.floor(keys.length * 0.9), `only ${sorani} of ${keys.length} Sorani strings carry a Sorani letter`);
 });

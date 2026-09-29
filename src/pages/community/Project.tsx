@@ -11,9 +11,9 @@
  * viewer is the customer being asked.
  */
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowLeft, ArrowRight, Archive, ChevronLeft, ChevronRight, EyeOff, Heart, MessageCircle, MoreHorizontal, Pencil, Printer, RotateCcw, Share2, ShoppingBag, Store, Trash2, Bookmark } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Archive, ChevronLeft, ChevronRight, EyeOff, Printer, ShoppingBag, Store } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { useGoBack } from '../../lib/useGoBack';
@@ -22,7 +22,6 @@ import { apiRefusal } from '../../lib/refusalStrings';
 import { useMoney } from '../../CurrencyContext';
 import { productName } from '../../lib/productText';
 import { ErrorState } from '../../components/ui/AsyncStates';
-import { Menu } from '../../components/ui/Menu';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { toast } from '../../components/ui/Toast';
 import { Button } from '../../components/ui/Button';
@@ -32,11 +31,14 @@ import MediaStrip from '../../components/community/projects/MediaStrip';
 import SpecList from '../../components/community/projects/SpecList';
 import { creatorHref, projectsApi, type Post } from '../../components/community/projects/api';
 import { useProjectStrings } from '../../components/community/projects/strings';
+import ActionRow from '../../components/community/social/ActionRow';
+import FollowUserButton from '../../components/community/social/FollowUserButton';
 
 export default function ProjectPage() {
   const { id = '' } = useParams();
   const goBack = useGoBack('/community');
   const navigate = useNavigate();
+  const location = useLocation();
   const { loc, lang, dir } = useLanguage();
   const { user } = useAuth();
   const s = useProjectStrings();
@@ -66,21 +68,12 @@ export default function ProjectPage() {
 
   const say = (e: unknown, fallback: string) => toast.error(apiRefusal(e, refusalLang, fallback));
 
-  const share = async () => {
-    const url = `${window.location.origin}${post?.url ?? ''}`;
-    try {
-      if (navigator.share) await navigator.share({ title: post?.title, url });
-      else {
-        await navigator.clipboard.writeText(url);
-        toast.success(s.linkCopied);
-      }
-    } catch {
-      /* the person closed the share sheet */
-    }
-  };
-
-  const act = async (what: 'publish' | 'archive' | 'restore' | 'delete') => {
+  const act = async (what: 'publish' | 'archive' | 'restore' | 'delete' | 'edit') => {
     if (!post) return;
+    if (what === 'edit') {
+      navigate(`${post.url}/edit`);
+      return;
+    }
     try {
       if (what === 'delete') {
         if (!(await confirm({ title: s.deleteQ, consequence: s.deleteConsequence, confirmLabel: s.delete, destructive: true }))) return;
@@ -151,30 +144,6 @@ export default function ProjectPage() {
             <Back className="h-5 w-5" />
           </button>
           <span className="min-w-0 flex-1 truncate text-[13px] text-text-muted">{s.project}</span>
-          <button
-            type="button"
-            aria-label={s.share}
-            onClick={() => void share()}
-            className="press-scale flex size-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <Share2 className="h-5 w-5" />
-          </button>
-          {post?.viewer.mine && (
-            <Menu
-              label={loc('خيارات المشروع', 'Project options', 'هەڵبژاردەکانی پڕۆژە')}
-              trigger={(props) => (
-                <button type="button" {...props} aria-label={loc('خيارات المشروع', 'Project options', 'هەڵبژاردەکانی پڕۆژە')} className="press-scale flex size-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-                  <MoreHorizontal className="h-5 w-5" />
-                </button>
-              )}
-              items={[
-                ...(post.viewer.can.edit ? [{ id: 'edit', label: s.edit, icon: <Pencil className="h-4 w-4" />, href: `${post.url}/edit` }] : []),
-                ...(post.viewer.can.archive ? [{ id: 'archive', label: s.archive, icon: <Archive className="h-4 w-4" />, onSelect: () => void act('archive') }] : []),
-                ...(post.state === 'archived' ? [{ id: 'restore', label: s.restore, icon: <RotateCcw className="h-4 w-4" />, onSelect: () => void act('restore') }] : []),
-                ...(post.viewer.can.delete ? [{ id: 'delete', label: s.delete, icon: <Trash2 className="h-4 w-4" />, destructive: true, onSelect: () => void act('delete') }] : []),
-              ]}
-            />
-          )}
         </div>
       </div>
 
@@ -250,14 +219,18 @@ export default function ProjectPage() {
                   <Byline post={post} />
                 </header>
 
-                {/* counts are shown only once they say something */}
-                {(post.counts.likes > 0 || post.counts.comments > 0 || post.counts.saves > 0) && (
-                  <p className="flex items-center gap-4 text-[12.5px] text-text-muted">
-                    {post.counts.likes > 0 && <Count icon={<Heart className="h-3.5 w-3.5" />} n={post.counts.likes} label={loc('إعجاب', 'likes', 'لایک')} />}
-                    {post.counts.comments > 0 && <Count icon={<MessageCircle className="h-3.5 w-3.5" />} n={post.counts.comments} label={loc('تعليق', 'comments', 'کۆمێنت')} />}
-                    {post.counts.saves > 0 && <Count icon={<Bookmark className="h-3.5 w-3.5" />} n={post.counts.saves} label={loc('حفظ', 'saves', 'پاشەکەوت')} />}
-                  </p>
-                )}
+                {/* like · comment · save · share · ⋯ — the server's flags
+                    decide the pressed states; the counts move with them. */}
+                <ActionRow
+                  post={post}
+                  viewer={post.viewer}
+                  mine={post.viewer.mine}
+                  can={{ edit: post.viewer.can.edit, archive: post.viewer.can.archive, restore: post.state === 'archived', delete: post.viewer.can.delete }}
+                  onAuthorAction={(a) => void act(a)}
+                  onCounts={(counts) => setPost((p) => (p ? { ...p, counts: { ...p.counts, ...counts } } : p))}
+                  openComments={location.hash === '#comments'}
+                  className="-mx-2"
+                />
 
                 <div className="flex flex-col gap-5 lg:hidden">{facts}</div>
 
@@ -273,7 +246,7 @@ export default function ProjectPage() {
                       <li key={t}>
                         <Link
                           to={`/community/projects?tag=${encodeURIComponent(t)}`}
-                          className="inline-flex min-h-8 items-center rounded-full bg-surface px-3 text-[12.5px] text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                          className="lv-hit relative inline-flex min-h-8 items-center rounded-full bg-surface px-3 text-[12.5px] text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                         >
                           #{t}
                         </Link>
@@ -282,7 +255,7 @@ export default function ProjectPage() {
                   </ul>
                 )}
               </div>
-              <aside className="hidden lg:flex lg:flex-col lg:gap-5">{facts}</aside>
+              <aside className="hidden lg:grid lg:gap-5">{facts}</aside>
             </div>
           </motion.article>
         )}
@@ -339,22 +312,17 @@ function Byline({ post }: { post: Post }) {
       </span>
     </>
   );
-  return href ? (
-    <Link to={href} data-project-author className="mt-3 inline-flex max-w-full items-center gap-2.5 rounded-full pe-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-      {inner}
-    </Link>
-  ) : (
-    <span className="mt-3 inline-flex max-w-full items-center gap-2.5">{inner}</span>
-  );
-}
-
-function Count({ icon, n, label }: { icon: React.ReactNode; n: number; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1 tabular-nums">
-      <span aria-hidden="true">{icon}</span>
-      <bdi>{n}</bdi>
-      <span className="sr-only">{label}</span>
-    </span>
+    <div className="mt-3 flex items-center justify-between gap-3">
+      {href ? (
+        <Link to={href} data-project-author className="inline-flex min-w-0 max-w-full items-center gap-2.5 rounded-full pe-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+          {inner}
+        </Link>
+      ) : (
+        <span className="inline-flex min-w-0 max-w-full items-center gap-2.5">{inner}</span>
+      )}
+      <FollowUserButton userId={post.author.id} following={!!post.viewer.following_author} size="sm" />
+    </div>
   );
 }
 
@@ -363,7 +331,7 @@ function Banner({ tone, icon, children }: { tone: 'info' | 'danger'; icon: React
     <div
       role="status"
       className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-[13px] ${
-        tone === 'danger' ? 'border-red-500/30 bg-danger/10 text-text-primary' : 'border-border-subtle/60 bg-surface text-text-secondary'
+        tone === 'danger' ? 'border-danger/30 bg-danger/10 text-text-primary' : 'border-border-subtle/60 bg-surface text-text-secondary'
       }`}
     >
       <span aria-hidden="true" className="shrink-0 text-text-muted">
@@ -406,7 +374,7 @@ function Door({ href, icon, kicker, title, trail }: { href: string; icon: React.
 function ProjectSkeleton() {
   return (
     <div aria-hidden="true" className="flex flex-col gap-5 pt-3">
-      <div className="-mx-4 aspect-[4/3] animate-pulse bg-surface-selected sm:mx-0 sm:rounded-2xl motion-reduce:animate-none" />
+      <div className="-mx-4 aspect-[4/3] animate-pulse bg-surface-selected sm:mx-0 sm:rounded-xl motion-reduce:animate-none" />
       <div className="h-3 w-16 animate-pulse rounded bg-surface-selected motion-reduce:animate-none" />
       <div className="h-6 w-3/4 animate-pulse rounded bg-surface-selected motion-reduce:animate-none" />
       <div className="h-9 w-40 animate-pulse rounded-full bg-surface-selected motion-reduce:animate-none" />

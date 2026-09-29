@@ -138,6 +138,9 @@ test('every code the table translates is one the server can actually emit', () =
     // Community projects (docs/COMMUNITY_ECOSYSTEM.md Phase 1): the composer
     // decodes POST_* and CONSENT_* beside the field each one names.
     'worker/routes/communityPosts.ts',
+    // The social graph (Phase 2): likes, comments, follows, blocks, reports —
+    // BLOCKED, CANNOT_FOLLOW_SELF, COMMENT_TOO_FAST and their siblings.
+    'worker/routes/communitySocial.ts',
     // The community-store checkout and the merchant's order door (wave 1):
     // QUOTE_CHANGED, COUPON_EXHAUSTED, ORDER_CHANGED and their siblings.
     'worker/routes/storeOrders.ts',

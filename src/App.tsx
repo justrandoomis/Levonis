@@ -248,6 +248,7 @@ const CommunityProjects = React.lazy(() => import('./pages/community/Projects'))
 const CommunityProject = React.lazy(() => import('./pages/community/Project'));
 const CommunityProjectComposer = React.lazy(() => import('./pages/community/ProjectComposer'));
 const CommunityCreator = React.lazy(() => import('./pages/community/Creator'));
+const CommunitySaved = React.lazy(() => import('./pages/community/Saved'));
 const Orders = React.lazy(() => import('./pages/Orders'));
 const OrderDetail = React.lazy(() => import('./pages/OrderDetail'));
 const Community = React.lazy(() => import('./pages/Community'));
@@ -286,6 +287,10 @@ import { FarmGate } from './pages/farm/shelved';
 // The community's maintenance gate. Eagerly imported for the same reason
 // FarmGate is: it wraps lazy routes, so it must exist before they load.
 import { CommunityGate } from './pages/community/access';
+// The viewer's own social graph (follows, blocks, mutes), fetched once per
+// session the first time a community card asks for it. Tiny on purpose: it
+// rides in the entry chunk with the customer shell.
+import { SocialProvider } from './components/community/social/SocialContext';
 import BrowseMissionTimer from './components/BrowseMissionTimer';
 // The compare tray's door: renders and downloads nothing until the tray
 // holds a product (src/components/compare/CompareTrayGate.tsx).
@@ -742,6 +747,7 @@ function AppContent() {
         <ThemeIntroSheet />
         <ChunkBoundary>
         <Suspense fallback={<RouteFallback />}>
+        <SocialProvider>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
@@ -794,6 +800,8 @@ function AppContent() {
           <Route path="/community/projects/:id" element={<CommunityGate><CommunityProject /></CommunityGate>} />
           <Route path="/community/projects/:id/edit" element={<ProtectedRoute><CommunityGate><CommunityProjectComposer /></CommunityGate></ProtectedRoute>} />
           <Route path="/u/:username" element={<CommunityGate><CommunityCreator /></CommunityGate>} />
+          {/* The viewer's saved projects: a private list, so an account first. */}
+          <Route path="/community/saved" element={<ProtectedRoute><CommunityGate><CommunitySaved /></CommunityGate></ProtectedRoute>} />
           {/* Resolves slug / store id / merchant id to the SAME storefront
               profile the subdomain serves; profile-only merchants from the
               pre-store era fall through to the legacy page inside. */}
@@ -871,6 +879,7 @@ function AppContent() {
           <Route path="/gifts" element={<ProtectedRoute><div className="p-4"><MyGifts /></div></ProtectedRoute>} />
           <Route path="*" element={<div className="p-8 text-white text-center">Under Construction</div>} />
         </Routes>
+        </SocialProvider>
         </Suspense>
         </ChunkBoundary>
 

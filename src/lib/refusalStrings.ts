@@ -1287,6 +1287,39 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This project does not need your consent.',
     ckb: 'ئەم پڕۆژەیە پێویستی بە ڕەزامەندی تۆ نییە.',
   },
+  // ---- The social graph (0154; docs/COMMUNITY_ECOSYSTEM.md Phase 2) ------
+  // Written from worker/routes/communitySocial.ts (and BLOCKED from the DM
+  // door in worker/routes/chats.ts). Real Sorani, per decision D6.
+  BLOCKED: {
+    ar: 'لا يمكن التفاعل مع هذا الحساب.',
+    en: 'You cannot interact with this account.',
+    ckb: 'ناتوانیت لەگەڵ ئەم هەژمارە کارلێک بکەیت.',
+  },
+  CANNOT_FOLLOW_SELF: {
+    ar: 'لا يمكنك متابعة نفسك.',
+    en: 'You cannot follow yourself.',
+    ckb: 'ناتوانیت شوێن خۆت بکەویت.',
+  },
+  CANNOT_BLOCK_SELF: {
+    ar: 'لا يمكنك حظر نفسك أو كتم صوتك.',
+    en: 'You cannot block or mute yourself.',
+    ckb: 'ناتوانیت خۆت ئاستەنگ بکەیت یان بێدەنگ بکەیت.',
+  },
+  COMMENT_INDECENT: {
+    ar: 'عدّل صياغة التعليق قبل نشره.',
+    en: 'Please reword your comment before posting it.',
+    ckb: 'تکایە پێش بڵاوکردنەوە دەربڕینی کۆمێنتەکەت بگۆڕە.',
+  },
+  COMMENT_TOO_FAST: {
+    ar: 'انتظر لحظات قبل إرسال تعليق آخر.',
+    en: 'Wait a few seconds before commenting again.',
+    ckb: 'چەند چرکەیەک چاوەڕێ بکە پێش ئەوەی کۆمێنتێکی تر بنووسیت.',
+  },
+  REPORT_TARGET_NOT_FOUND: {
+    ar: 'لم نجد ما تريد الإبلاغ عنه.',
+    en: 'We could not find what you are reporting.',
+    ckb: 'ئەوەی دەتەوێت ڕاپۆرتی بکەیت نەدۆزرایەوە.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

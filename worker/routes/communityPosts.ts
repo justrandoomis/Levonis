@@ -136,7 +136,7 @@ export function postCard(p: Record<string, unknown>, root: string | null) {
 }
 
 /** The columns every post read joins — one query, one shape. */
-const POST_COLUMNS = `p.*,
+export const POST_COLUMNS = `p.*,
        u.username AS a_username, u.name AS a_name, u.avatar_key AS a_avatar, u.creator_public AS a_public,
        EXISTS (SELECT 1 FROM community_merchants acm WHERE acm.user_id = u.id AND acm.status <> 'suspended') AS a_merchant,
        s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo, s.status AS s_status,
@@ -149,7 +149,7 @@ const POST_COLUMNS = `p.*,
        (SELECT m.width FROM community_post_media m WHERE m.post_id = p.id ORDER BY m.sort_order, m.id LIMIT 1) AS cover_w,
        (SELECT m.height FROM community_post_media m WHERE m.post_id = p.id ORDER BY m.sort_order, m.id LIMIT 1) AS cover_h,
        (SELECT COUNT(*) FROM community_post_media m WHERE m.post_id = p.id) AS media_count`;
-const POST_FROM = `FROM community_posts p
+export const POST_FROM = `FROM community_posts p
        JOIN users u ON u.id = p.author_id
        LEFT JOIN merchant_stores s ON s.id = p.store_id
        LEFT JOIN community_products cp ON cp.id = p.product_id
@@ -162,13 +162,69 @@ export const POST_PUBLIC_SQL = `p.state = 'published' AND p.visibility = 'public
 
 const POST_SEARCH = ['p.title', 'p.body', 'p.tags', 'p.material', 'p.printer_name'] as const;
 
+/**
+ * WHAT A SIGNED-IN VIEWER NEVER MEETS IN A LIST (0154): posts by an author
+ * they blocked or who blocked them, and posts by an author they muted. Bound
+ * to the viewer's id, or '' for a guest, who sees the public rule alone.
+ * A `p` alias must be in scope.
+ */
+export const postExclusionSql = (viewer: string) => `(${viewer} = '' OR (
+      NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.user_id = ${viewer} AND b.blocked_id = p.author_id) OR (b.user_id = p.author_id AND b.blocked_id = ${viewer}))
+  AND NOT EXISTS (SELECT 1 FROM user_mutes mu WHERE mu.user_id = ${viewer} AND mu.muted_id = p.author_id)))`;
+
+/** Has either of these two accounts blocked the other? The one question every social door asks first. */
+export async function blockedEither(db: D1Database, a: string, b: string): Promise<boolean> {
+  if (!a || !b || a === b) return false;
+  const row = await db
+    .prepare('SELECT 1 AS x FROM user_blocks WHERE (user_id = ?1 AND blocked_id = ?2) OR (user_id = ?2 AND blocked_id = ?1) LIMIT 1')
+    .bind(a, b)
+    .first();
+  return !!row;
+}
+
+/** Has `recipient` muted `actor`? A mute is the viewer's own affair — it hides, and it keeps the bell quiet too. */
+export async function mutedBy(db: D1Database, recipient: string, actor: string): Promise<boolean> {
+  if (!recipient || !actor || recipient === actor) return false;
+  const row = await db.prepare('SELECT 1 AS x FROM user_mutes WHERE user_id = ? AND muted_id = ? LIMIT 1').bind(recipient, actor).first();
+  return !!row;
+}
+
+export interface PostViewerFlags {
+  liked: boolean;
+  saved: boolean;
+}
+
+/**
+ * THE VIEWER'S OWN MARKS on a page of cards — liked, saved — in two queries
+ * for the whole page, never one per card. A guest's flags are all false, so
+ * a card always carries the key and a client never branches on its absence.
+ */
+export async function viewerFlagsFor(db: D1Database, viewerId: string | null, postIds: string[]): Promise<Map<string, PostViewerFlags>> {
+  const flags = new Map<string, PostViewerFlags>(postIds.map((id) => [id, { liked: false, saved: false }]));
+  if (!viewerId || postIds.length === 0) return flags;
+  const marks = postIds.map(() => '?').join(',');
+  const [likes, saves] = await Promise.all([
+    db.prepare(`SELECT post_id FROM community_likes WHERE user_id = ? AND post_id IN (${marks})`).bind(viewerId, ...postIds).all<{ post_id: string }>(),
+    db.prepare(`SELECT post_id FROM community_saves WHERE user_id = ? AND post_id IN (${marks})`).bind(viewerId, ...postIds).all<{ post_id: string }>(),
+  ]);
+  for (const r of likes.results) flags.get(r.post_id)!.liked = true;
+  for (const r of saves.results) flags.get(r.post_id)!.saved = true;
+  return flags;
+}
+
+type Card = ReturnType<typeof postCard>;
+export async function withViewerFlags<T extends Card>(db: D1Database, viewerId: string | null, cards: T[]): Promise<Array<T & { viewer: PostViewerFlags }>> {
+  const flags = await viewerFlagsFor(db, viewerId, cards.map((c) => c.id));
+  return cards.map((c) => ({ ...c, viewer: flags.get(c.id) ?? { liked: false, saved: false } }));
+}
+
 /** Pages by (published_at, id): `<published_at>|<id>`. */
 /**
  * A page is read one row longer than asked, so the cursor exists only when a
  * next page really does — an infinite-scroll list never fetches an empty tail.
  * `rows` is trimmed in place to the asked length.
  */
-function nextPostCursor(rows: Array<Record<string, unknown>>, limit: number, at: 'published_at' | 'created_at' = 'published_at'): string | null {
+export function nextPostCursor(rows: Array<Record<string, unknown>>, limit: number, at: 'published_at' | 'created_at' | 'saved_at' = 'published_at'): string | null {
   if (rows.length <= limit) return null;
   rows.length = limit;
   const last = rows[rows.length - 1];
@@ -188,14 +244,21 @@ communityPostRoutes.get('/posts', async (c) => {
   const q = likePattern(c.req.query('q'));
   const kindRaw = (c.req.query('kind') ?? '').trim();
   const kind = (POST_KINDS as readonly string[]).includes(kindRaw) ? kindRaw : '';
+  // `not_kind=project` is the creator page's «المنشورات»: everything but the
+  // projects, filtered here so `total` and the empty state are exact.
+  const notKindRaw = (c.req.query('not_kind') ?? '').trim();
+  const notKind = (POST_KINDS as readonly string[]).includes(notKindRaw) ? notKindRaw : '';
   const author = str(c.req.query('author'), 'author', { max: 40, required: false });
   const store = str(c.req.query('store'), 'store', { max: 60, required: false });
   const product = str(c.req.query('product'), 'product', { max: 60, required: false });
   const tag = str(c.req.query('tag'), 'tag', { max: 30, required: false }).toLowerCase();
   const root = rootDomainFrom(c.env);
+  const viewerId = c.get('user')?.id ?? '';
   const where = `${POST_PUBLIC_SQL}
+          AND ${postExclusionSql('?10')}
           AND (?1 = '' OR ${sqlLikeClause(POST_SEARCH, '?1')})
           AND (?2 = '' OR p.kind = ?2)
+          AND (?11 = '' OR p.kind <> ?11)
           AND (?3 = '' OR u.username = ?3)
           AND (?4 = '' OR p.store_id = ?4)
           AND (?5 = '' OR p.product_id = ?5)
@@ -207,16 +270,16 @@ communityPostRoutes.get('/posts', async (c) => {
           AND (?7 = '' OR p.published_at < ?7 OR (p.published_at = ?7 AND p.id < ?8))
         ORDER BY p.published_at DESC, p.id DESC LIMIT ?9`
     )
-      .bind(q, kind, author, store, product, tag, cursor.at, cursor.id, limit + 1)
+      .bind(q, kind, author, store, product, tag, cursor.at, cursor.id, limit + 1, viewerId, notKind)
       .all<Record<string, unknown>>(),
     cursor.at === ''
-      ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${POST_FROM} WHERE ${where}`).bind(q, kind, author, store, product, tag).first<{ n: number }>()
+      ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${POST_FROM} WHERE ${where}`).bind(q, kind, author, store, product, tag, '', '', 0, viewerId, notKind).first<{ n: number }>()
       : Promise.resolve(null),
   ]);
   const next_cursor = nextPostCursor(results, limit);
   return c.json({
     success: true,
-    posts: results.map((p) => postCard(p, root)),
+    posts: await withViewerFlags(c.env.DB, viewerId || null, results.map((p) => postCard(p, root))),
     next_cursor,
     total: total ? Number(total.n) : null,
   });
@@ -227,24 +290,52 @@ communityPostRoutes.get('/posts/trending', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 24, def: 12 });
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const root = rootDomainFrom(c.env);
+  const viewerId = c.get('user')?.id ?? '';
   const { results } = await c.env.DB.prepare(
     `SELECT ${POST_COLUMNS} ${POST_FROM}
-      WHERE ${POST_PUBLIC_SQL} AND p.published_at >= ?1
+      WHERE ${POST_PUBLIC_SQL} AND p.published_at >= ?1 AND ${postExclusionSql('?3')}
       ORDER BY (p.like_count * 3 + p.comment_count * 4 + p.save_count * 5 + p.view_count) DESC, p.published_at DESC, p.id DESC
       LIMIT ?2`
   )
-    .bind(since, limit)
+    .bind(since, limit, viewerId)
     .all<Record<string, unknown>>();
-  return c.json({ success: true, posts: results.map((p) => postCard(p, root)) });
+  return c.json({ success: true, posts: await withViewerFlags(c.env.DB, viewerId || null, results.map((p) => postCard(p, root))) });
 });
 
 /** One post with its media, for its page. */
-async function loadPost(env: Env, id: string): Promise<Record<string, unknown> | null> {
+export async function loadPost(env: Env, id: string): Promise<Record<string, unknown> | null> {
   return env.DB.prepare(`SELECT ${POST_COLUMNS} ${POST_FROM} WHERE p.id = ?`).bind(id).first<Record<string, unknown>>();
 }
 
+/**
+ * THE HEAD OF A POST — the columns a social write decides on (`mayRead`'s
+ * inputs, the author, the title for a notification), without the card's five
+ * joins and five media subqueries. A like is the hottest write of the phase
+ * (240 an hour per account); it does not need the cover's height.
+ */
+export interface PostHead {
+  id: string;
+  author_id: string;
+  title: string;
+  state: string;
+  visibility: string;
+  admin_hidden_at: string | null;
+  consent_status: string;
+}
+export async function loadPostHead(env: Env, id: string): Promise<PostHead | null> {
+  return env.DB.prepare('SELECT id, author_id, title, state, visibility, admin_hidden_at, consent_status FROM community_posts WHERE id = ?').bind(id).first<PostHead>();
+}
+
+/** The columns `mayRead` decides on — a full card row or a `PostHead` both carry them. */
+export interface PostReadable {
+  author_id?: unknown;
+  admin_hidden_at?: unknown;
+  state?: unknown;
+  visibility?: unknown;
+}
+
 /** May this viewer read this post at all? The author and staff always; everybody else what is public. */
-function mayRead(p: Record<string, unknown>, viewer: { id: string; role: string } | null, consentParty: string | null = null): boolean {
+export function mayRead(p: PostReadable, viewer: { id: string; role: string } | null, consentParty: string | null = null): boolean {
   if (viewer && (viewer.id === p.author_id || viewer.role === 'admin')) return true;
   // The customer a workshop asked («صور من قطعتك») may read the piece they
   // are asked about, whatever its state — they cannot decide about a page
@@ -292,10 +383,21 @@ communityPostRoutes.get('/posts/:id', async (c) => {
   const p = await loadPost(c.env, id);
   const consentParty = p && viewer ? await consentPartyOf(c.env, p) : null;
   if (!p || !mayRead(p, viewer, consentParty)) throw notFound('Project not found');
+  // A block closes the page from both sides with the words a missing page
+  // gets (0154) — the same answer the creator page gives, so no door tells
+  // the blocked side more than the other.
+  if (viewer && (await blockedEither(c.env.DB, viewer.id, String(p.author_id)))) throw notFound('Project not found');
   const mine = !!viewer && viewer.id === p.author_id;
   const asked = !!viewer && !!consentParty && viewer.id === consentParty && !mine;
   const root = rootDomainFrom(c.env);
-  const media = await postMedia(c.env, id);
+  const [media, flags, follows] = await Promise.all([
+    postMedia(c.env, id),
+    viewerFlagsFor(c.env.DB, viewer?.id ?? null, [id]),
+    viewer && !mine
+      ? c.env.DB.prepare('SELECT 1 AS x FROM user_follows WHERE follower_id = ? AND user_id = ?').bind(viewer.id, String(p.author_id)).first()
+      : Promise.resolve(null),
+  ]);
+  const marks = flags.get(id) ?? { liked: false, saved: false };
   return c.json({
     success: true,
     post: {
@@ -309,6 +411,10 @@ communityPostRoutes.get('/posts/:id', async (c) => {
       hidden: p.admin_hidden_at ? { at: p.admin_hidden_at, reason: mine || viewer?.role === 'admin' ? String(p.admin_hidden_reason ?? '') : '' } : null,
       viewer: {
         mine,
+        liked: marks.liked,
+        saved: marks.saved,
+        /** The viewer already follows the author — the byline's pill starts right without waiting for the session graph. */
+        following_author: !!follows,
         /** The viewer is the customer whose part this is: their decision is due, or was given. */
         consent: asked ? (String(p.consent_status) as 'pending' | 'granted' | 'declined') : null,
         can: {
@@ -754,7 +860,11 @@ communityPostRoutes.get('/my-posts', requireAuth, async (c) => {
   const next_cursor = nextPostCursor(results, limit, 'created_at');
   return c.json({
     success: true,
-    posts: results.map((p) => ({ ...postCard(p, root), consent_status: String(p.consent_status), hidden: !!p.admin_hidden_at })),
+    posts: (await withViewerFlags(c.env.DB, user.id, results.map((p) => postCard(p, root)))).map((card, i) => ({
+      ...card,
+      consent_status: String(results[i].consent_status),
+      hidden: !!results[i].admin_hidden_at,
+    })),
     next_cursor,
   });
 });
@@ -785,7 +895,7 @@ const SOCIAL_KEYS: ReadonlyArray<readonly [name: string, ...keys: string[]]> = [
 async function creatorRow(env: Env, username: string) {
   return env.DB.prepare(
     `SELECT u.id, u.username, u.name, u.avatar_key, u.bio, u.website, u.profile_json, u.country, u.created_at, u.creator_public,
-            cm.id AS merchant_id, cm.status AS merchant_status
+            u.follower_count, cm.id AS merchant_id, cm.status AS merchant_status
        FROM users u LEFT JOIN community_merchants cm ON cm.user_id = u.id
       WHERE u.username = ?`
   )
@@ -804,6 +914,8 @@ communityPostRoutes.get('/creators/:username', async (c) => {
   const viewer = c.get('user') ?? null;
   const u = await creatorRow(c.env, username);
   if (!u || !creatorVisible(u, viewer)) throw notFound('Creator not found');
+  // A block closes the page from both sides, with the words a missing page gets (0154).
+  if (viewer && (await blockedEither(c.env.DB, viewer.id, String(u.id)))) throw notFound('Creator not found');
   const root = rootDomainFrom(c.env);
   const profile = safeParse<Record<string, unknown>>(u.profile_json, {}) ?? {};
   const socials: Record<string, string> = {};
@@ -811,13 +923,16 @@ communityPostRoutes.get('/creators/:username', async (c) => {
     const v = keys.map((k) => profile[k]).find((x) => typeof x === 'string' && x.trim());
     if (typeof v === 'string') socials[name] = v.trim().slice(0, 80);
   }
-  const [projects, badges, store] = await Promise.all([
+  const [projects, badges, store, following] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) AS n FROM community_posts p WHERE p.author_id = ? AND ${POST_PUBLIC_SQL}`).bind(u.id).first<{ n: number }>(),
     membershipBadges(c.env.DB, [u.id]),
     u.merchant_id && u.merchant_status !== 'suspended'
       ? c.env.DB.prepare(`SELECT ${COMMUNITY_DIRECTORY_COLUMNS} FROM community_merchants cm LEFT JOIN merchant_stores s ON s.merchant_id = cm.id WHERE cm.id = ?`)
           .bind(u.merchant_id)
           .first<Record<string, unknown>>()
+      : Promise.resolve(null),
+    viewer
+      ? c.env.DB.prepare('SELECT 1 AS x FROM user_follows WHERE follower_id = ? AND user_id = ?').bind(viewer.id, u.id).first()
       : Promise.resolve(null),
   ]);
   const printers = Array.isArray(profile.printers) ? (profile.printers as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 10) : [];
@@ -844,9 +959,15 @@ communityPostRoutes.get('/creators/:username', async (c) => {
       stats: {
         projects: Number(projects?.n ?? 0),
         completed_jobs: store ? Number(store.completed_orders ?? 0) : 0,
+        followers: Number(u.follower_count ?? 0),
       },
       store: store && store.store_status !== 'suspended' ? directoryCard(store, badges, root) : null,
-      viewer: { mine: !!viewer && viewer.id === u.id },
+      viewer: {
+        mine: !!viewer && viewer.id === u.id,
+        following: !!following,
+        // Only the VIEWER's own block is told: whether the other side blocked them is nobody's business (it reads as 404).
+        blocked: false,
+      },
     },
   });
 });

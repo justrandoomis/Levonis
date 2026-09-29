@@ -22,3 +22,34 @@ export function forgetCommunityFeed(kind: FeedKind, exceptKey?: string) {
     if (key !== exceptKey && key.split('|')[1] === kind) feedCache.delete(key);
   }
 }
+
+/**
+ * THE ISSUE'S GENERATION (hub/useHomeData.ts memoises «لك»'s rails for two
+ * minutes). Bumping it makes the next visit read again. It lives here, apart
+ * from the hook, so a button in another chunk (a follow on a creator page)
+ * can forget the home without carrying its loaders.
+ */
+let homeGen = 0;
+export const homeGeneration = () => homeGen;
+export function forgetHome() {
+  homeGen += 1;
+}
+
+/** After a follow or an unfollow: «أتابعهم» and the makers' directory now say something else. */
+export function forgetAfterFollow() {
+  forgetCommunityFeed('feed:following');
+  forgetCommunityFeed('creators');
+}
+
+/**
+ * After a block or a mute: every list that might still carry the person —
+ * both feeds, the directory and the issue's rails — is forgotten, so Back does
+ * not bring them back for two minutes. The rows already on screen are hidden
+ * by the lists themselves from the session graph (SocialContext).
+ */
+export function forgetAfterBlock() {
+  forgetCommunityFeed('feed:foryou');
+  forgetCommunityFeed('feed:following');
+  forgetCommunityFeed('creators');
+  forgetHome();
+}
