@@ -46,7 +46,10 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import { animate, useReducedMotion } from 'motion/react';
+// `animate` alone: the value animator is the small half of the library; the
+// reduced-motion question is a media query (src/lib/motion.ts), not a reason
+// to import the feature bundle before the first paint.
+import { animate } from 'motion/react';
 import {
   project,
   nearestSnap,
@@ -54,6 +57,7 @@ import {
   VelocityTracker,
   DRAG_THRESHOLD_PX,
   SPRING,
+  usePrefersReducedMotion,
 } from './motion';
 
 // --------------------------------------------------------------- direction
@@ -198,7 +202,7 @@ export interface Rail {
  */
 export function useRail(options: RailOptions = {}): Rail {
   const { items, decelerationRate = 0.998, snap = true, drag = true } = options;
-  const reduced = !!useReducedMotion();
+  const reduced = usePrefersReducedMotion();
   const elRef = useRef<HTMLDivElement | null>(null);
   const pointsRef = useRef<number[]>([]);
   const animRef = useRef<{ stop: () => void } | null>(null);

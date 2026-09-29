@@ -41,10 +41,15 @@
  */
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'motion/react';
+// `m` + <MotionFeatures>, never the `motion` proxy: the stack's `layout`
+// animation needs the full feature set, which arrives lazily
+// (src/lib/motionFeatures.tsx) instead of riding in the eager chunk.
+import { AnimatePresence } from 'motion/react';
+import * as Motion from 'motion/react-m';
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
+import { MotionFeatures, useMotionFeaturesFailed } from '../../lib/motionFeatures';
 import { UI_LAYERS } from './Overlay';
 import {
   claimToasterHost,
@@ -75,6 +80,7 @@ const TONE_ICON: Record<ToastTone, React.ReactNode> = {
 
 function ToastItem({ record, paused, closeLabel }: { record: ToastRecord; paused: boolean; closeLabel: string }) {
   const m = useMotion();
+  const atRest = useMotionFeaturesFailed();
   const remaining = useRef(record.duration);
   const startedAt = useRef(0);
 
@@ -94,9 +100,9 @@ function ToastItem({ record, paused, closeLabel }: { record: ToastRecord; paused
   }, [paused, record]);
 
   return (
-    <motion.div
+    <Motion.div
       layout={!m.reduced}
-      initial={{ opacity: 0, y: m.travel(16), scale: m.reduced ? 1 : 0.98 }}
+      initial={atRest ? false : { opacity: 0, y: m.travel(16), scale: m.reduced ? 1 : 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: m.travel(8), scale: m.reduced ? 1 : 0.98 }}
       transition={m.spring('ui')}
@@ -130,7 +136,7 @@ function ToastItem({ record, paused, closeLabel }: { record: ToastRecord; paused
       >
         <X aria-hidden="true" className="h-4 w-4" />
       </button>
-    </motion.div>
+    </Motion.div>
   );
 }
 
@@ -201,11 +207,13 @@ export function Toaster({ aboveNav = false }: { aboveNav?: boolean } = {}) {
             : 'calc(var(--shell-bottom-inset, 0px) + max(0.75rem, env(safe-area-inset-bottom)))',
         }}
       >
-        <AnimatePresence initial={false}>
-          {visible.map((t) => (
-            <ToastItem key={t.id} record={t} paused={paused} closeLabel={closeLabel} />
-          ))}
-        </AnimatePresence>
+        <MotionFeatures>
+          <AnimatePresence initial={false}>
+            {visible.map((t) => (
+              <ToastItem key={t.id} record={t} paused={paused} closeLabel={closeLabel} />
+            ))}
+          </AnimatePresence>
+        </MotionFeatures>
       </section>
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {said.polite}

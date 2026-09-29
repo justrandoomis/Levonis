@@ -323,9 +323,15 @@ test('«recent searches» are the browser\'s alone: a term and a time, nothing e
 test('the CSS budget was paid, not raised: the dead animations are gone and Tailwind reads only the UI trees', () => {
   const css = read('src/index.css');
   for (const dead of ['fly-to-cart', 'spin-shrink', 'slideUp']) assert.doesNotMatch(css, new RegExp(dead), `${dead} is back in src/index.css`);
+  // Since P0 the stylesheet opts out of automatic detection (`source(none)`)
+  // and names the trees it reads; docs/, worker/, migrations/, scripts/,
+  // studio/ and services/ must not be among them.
+  assert.match(css, /@import "tailwindcss" source\(none\);/, 'Tailwind is back to scanning the whole repository');
+  const sources = [...css.matchAll(/^@source "([^"]+)";/gm)].map((m) => m[1]);
   for (const dir of ['docs', 'worker', 'migrations', 'scripts', 'studio', 'services']) {
-    assert.match(css, new RegExp(`@source not "\\.\\./${dir}";`), `Tailwind scans ${dir}/ again`);
+    assert.ok(!sources.some((s) => s === `../${dir}` || s.startsWith(`../${dir}/`)), `Tailwind scans ${dir}/ again`);
   }
-  assert.doesNotMatch(css, /@source not "\.\.\/tests"/, 'the browser fixtures compile under the dev server and must stay scanned');
+  assert.ok(sources.includes('../tests/browser'), 'the browser fixtures compile under the dev server and must stay scanned');
+  assert.ok(sources.includes('../src'), 'the UI tree is scanned');
   assert.doesNotMatch(css, /@source not "\.\.\/(src|packages)"/);
 });

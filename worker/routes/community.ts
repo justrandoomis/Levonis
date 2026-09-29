@@ -12,6 +12,7 @@ import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { communityAdminDoor, communityClosedRefusal, communityGate, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { audit } from '../lib/audit';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
+import { anonymousCached } from '../lib/edgePolicy';
 import { publishRequest } from './printRequests';
 import { publicRequest } from './marketplace';
 
@@ -123,20 +124,24 @@ export function communityFeedProduct(p: Record<string, unknown>, root: string | 
  * a list. `closed` is what the CARD says; `may_enter` is what this viewer may
  * do about it. They differ for exactly those two people.
  */
-communityRoutes.get('/access', async (c) => {
-  const gate = await readCommunityGate(c.env.DB);
-  const user = c.get('user');
-  // Never cached: this is the answer that decides whether a page is shown,
-  // and it is per-user — a shared cache would hand one visitor's verdict to
-  // the next one through it.
-  c.header('Cache-Control', 'no-store');
-  return c.json({
-    success: true,
-    closed: !gate.open,
-    admin: communityAdminDoor(user),
-    may_enter: communityMayEnter(gate, user),
-  });
-});
+communityRoutes.get('/access', (c) =>
+  // A GUEST'S verdict is every guest's verdict — `admin: false`, `may_enter`
+  // iff the switch is open — so it is served from the colo's cache (P2a) and
+  // the gate PUT purges it. A request that carries a session is answered for
+  // that person and never cached: a shared entry would hand one member's
+  // verdict to the next visitor through it.
+  anonymousCached(c, { perViewer: true }, async () => {
+    const gate = await readCommunityGate(c.env.DB);
+    const user = c.get('user');
+    c.header('Cache-Control', 'no-store');
+    return c.json({
+      success: true,
+      closed: !gate.open,
+      admin: communityAdminDoor(user),
+      may_enter: communityMayEnter(gate, user),
+    });
+  })
+);
 
 /**
  * The wall. See worker/lib/communityGate.ts for which handlers sit inside it

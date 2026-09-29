@@ -24,6 +24,7 @@ import {
 } from '../lib/membershipBenefits';
 import type { TierStatus } from '../lib/entitlements';
 import { auditStatements } from '../lib/audit';
+import { purgeCatalogueAfterWrite } from '../lib/edgePolicy';
 import { selectRule, type BenefitRule, type DeliveryMethodId } from '@levonis/pricing/membershipBenefits';
 
 /**
@@ -45,6 +46,10 @@ import { selectRule, type BenefitRule, type DeliveryMethodId } from '@levonis/pr
  */
 export const adminMembershipBenefitRoutes = new Hono<AppContext>();
 adminMembershipBenefitRoutes.use('*', requireAdmin);
+// P2 review: a rule saved or deleted changes every guest price computed from
+// it; the listing and the home are dropped from this colo's cache, not left
+// to age out (worker/lib/edgePolicy.ts). `saveBenefitRule` forgets the memo.
+adminMembershipBenefitRoutes.use('*', purgeCatalogueAfterWrite);
 
 const TIERS = ['plus', 'prime', 'pro'] as const;
 const TYPES = ['product_discount', 'free_shipping', 'cod_tax_exemption'] as const;

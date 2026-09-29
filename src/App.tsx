@@ -165,40 +165,102 @@ function prefetchable<P extends object>(load: () => Promise<{ default: React.Com
 const preload = (c: unknown) => (c as { preload?: () => void }).preload?.();
 
 /**
- * WHEN THE FIRST SCREEN IS DONE, FETCH WHERE THE CUSTOMER IS GOING NEXT.
+ * WHEN THE FIRST SCREEN IS DONE — AND NOT A MOMENT BEFORE — FETCH WHERE THE
+ * CUSTOMER IS GOING NEXT.
  *
- * `requestIdleCallback` is the whole point: it runs only once the browser has
- * nothing more urgent to do, so this can never compete with the first paint,
- * the font, or the home page's own data. Safari has no `requestIdleCallback`,
- * hence the timeout fallback — deliberately long, for the same reason.
+ * WHAT WAS WRONG (docs/MERCHANT_PLATFORM_V2_SURVEY.md «perf-measure»,
+ * plan §B.1 #6). This used `requestIdleCallback` with a 3 s timeout and
+ * fetched four routes at once. On a Slow-4G phone the timeout is what fired:
+ * 57 chunks / 119.5 KB went out while the Arabic font and the hero — the LCP
+ * — were still downloading, and the font's swap moved ~5 s later for it. An
+ * idle callback only means the main thread is idle; the network was not.
  *
- * The ORDER is the journey: a visitor looks at the catalogue, opens a product,
- * adds it, then checks out. The address book comes last because it is only
- * reached from checkout.
+ * WHAT IT WAITS FOR NOW, in order: on the home, its critical request
+ * (`homeCriticalReadyStore` — the same signal the intro uses; elsewhere the
+ * shell's own boot is the wait); then the fonts (`document.fonts.ready`, so
+ * the prefetch never races the woff2 for the pipe); then an idle slot with NO
+ * timeout — on a busy phone it simply happens later. Safari has no
+ * `requestIdleCallback`; a 2 s timer stands in for it there, after the same
+ * two waits.
+ *
+ * WHAT IT FETCHES THEN: the catalogue (`Products`) — where a visitor goes
+ * next from the home — and the motion features (src/lib/motionFeatures.tsx),
+ * so the first sheet opens with its spring. `Product`, `Cart` and `Addresses`
+ * are fetched on the FIRST POINTER over a link that leads there (capture
+ * phase, at `pointerdown`, before the tap completes): a chunk asked for at
+ * touch-down arrives inside the tap's own latency, and a visitor who never
+ * touches a product card never downloads the product page. `focusin` does
+ * the same for a keyboard.
  */
 function useIdlePrefetch() {
+  const { pathname } = useLocation();
+  const homeReady = React.useSyncExternalStore(
+    homeCriticalReadyStore.subscribe,
+    homeCriticalReadyStore.snapshot,
+    homeCriticalReadyStore.serverSnapshot
+  );
+  const ready = pathname !== '/' || homeReady;
+
   React.useEffect(() => {
+    if (!ready) return;
     let cancelled = false;
-    const run = () => {
-      if (cancelled) return;
-      for (const route of [Products, Product, Cart, Addresses]) preload(route);
-    };
+    let idle: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const w = window as typeof window & {
-      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
+      requestIdleCallback?: (cb: () => void) => number;
       cancelIdleCallback?: (h: number) => void;
     };
-    if (typeof w.requestIdleCallback === 'function') {
-      const handle = w.requestIdleCallback(run, { timeout: 3000 });
-      return () => {
-        cancelled = true;
-        w.cancelIdleCallback?.(handle);
-      };
-    }
-    const t = setTimeout(run, 1500);
+    const run = () => {
+      if (cancelled) return;
+      preload(Products);
+      preloadMotionFeatures();
+    };
+    const whenIdle = () => {
+      if (cancelled) return;
+      if (typeof w.requestIdleCallback === 'function') idle = w.requestIdleCallback(run);
+      else timer = setTimeout(run, 2000);
+    };
+    const fonts = typeof document !== 'undefined' ? document.fonts?.ready : undefined;
+    if (fonts && typeof fonts.then === 'function') fonts.then(whenIdle, whenIdle);
+    else whenIdle();
     return () => {
       cancelled = true;
-      clearTimeout(t);
+      if (idle !== undefined) w.cancelIdleCallback?.(idle);
+      if (timer !== undefined) clearTimeout(timer);
     };
+  }, [ready]);
+
+  React.useEffect(() => {
+    const pending = new Set(['product', 'cart', 'addresses']);
+    const onIntent = (e: Event) => {
+      const target = e.target as Element | null;
+      const href = target?.closest?.('a[href]')?.getAttribute('href') ?? '';
+      // A person who is touching the page will open something soon.
+      preloadMotionFeatures();
+      if (/^\/(?:product|bundles)\//.test(href)) {
+        preload(Product);
+        pending.delete('product');
+      }
+      if (/^\/cart(?:[?#]|$)/.test(href)) {
+        // Checkout is reached from the cart, the address book from checkout.
+        preload(Cart);
+        preload(Addresses);
+        pending.delete('cart');
+        pending.delete('addresses');
+      }
+      if (/^\/(?:checkout|addresses)(?:[?#]|$)/.test(href)) {
+        preload(Addresses);
+        pending.delete('addresses');
+      }
+      if (pending.size === 0) detach();
+    };
+    const detach = () => {
+      document.removeEventListener('pointerdown', onIntent, true);
+      document.removeEventListener('focusin', onIntent, true);
+    };
+    document.addEventListener('pointerdown', onIntent, true);
+    document.addEventListener('focusin', onIntent, true);
+    return detach;
   }, []);
 }
 import { LanguageProvider } from './LanguageContext';
@@ -260,8 +322,37 @@ const EditProfile = React.lazy(() => import('./pages/EditProfile'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Subscription = React.lazy(() => import('./pages/Subscription'));
 const Welcome = React.lazy(() => import('./pages/Welcome'));
-import CompleteProfileSheet from './components/profile/CompleteProfileSheet';
-import ThemeIntroSheet from './components/profile/ThemeIntroSheet';
+/**
+ * THE FIRST-RUN SHEETS AND THE VERIFY BANNER ARE FOR A SIGNED-IN PERSON, so
+ * they are lazy chunks mounted once the session has resolved to one (plan
+ * §B.1 #6: the two sheets and the onboarding strings were 15 KB of source in
+ * every guest's first paint). Each gate renders exactly what the component
+ * itself would have rendered before that moment — nothing — and the order
+ * «complete your profile», then «choose the appearance» is unchanged
+ * (src/lib/firstRun.ts; tests/firstRun.test.ts pins the two tags in order).
+ */
+const CompleteProfileSheetLazy = React.lazy(() => import('./components/profile/CompleteProfileSheet'));
+const ThemeIntroSheetLazy = React.lazy(() => import('./components/profile/ThemeIntroSheet'));
+
+function CompleteProfileSheet() {
+  const { user } = useAuth();
+  if (!user) return null;
+  return (
+    <Suspense fallback={null}>
+      <CompleteProfileSheetLazy />
+    </Suspense>
+  );
+}
+
+function ThemeIntroSheet() {
+  const { user } = useAuth();
+  if (!user) return null;
+  return (
+    <Suspense fallback={null}>
+      <ThemeIntroSheetLazy />
+    </Suspense>
+  );
+}
 /**
  * THE GAMES SURFACE IS ITS OWN CHUNK. The Printer Farm (its isometric room,
  * sheets and trilingual strings) is reached from /games, not from browsing
@@ -341,7 +432,28 @@ const CategoryListing = React.lazy(() => import('./pages/CategoryListing'));
 const UsedPrinters = React.lazy(() => import('./pages/UsedPrinters'));
 const TradeIn = React.lazy(() => import('./pages/TradeIn'));
 const MyGifts = React.lazy(() => import('./components/reviews/MyGifts'));
-import EmailVerifyBanner from './components/auth/EmailVerifyBanner';
+const EmailVerifyBannerLazy = React.lazy(() => import('./components/auth/EmailVerifyBanner'));
+
+/** True when the address carries a confirmation token (`?verify_email=`), which the banner acts on even before the session is known. */
+function hasVerifyEmailToken(): boolean {
+  try {
+    return typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('verify_email');
+  } catch {
+    return false;
+  }
+}
+
+/** The banner (lazy, see the first-run sheets above): for a resolved, signed-in session, or a confirmation link. */
+function EmailVerifyBanner() {
+  const { isLoaded, isAuthenticated } = useAuth();
+  const [token] = React.useState(hasVerifyEmailToken);
+  if (!token && !(isLoaded && isAuthenticated)) return null;
+  return (
+    <Suspense fallback={null}>
+      <EmailVerifyBannerLazy />
+    </Suspense>
+  );
+}
 /**
  * THE MASCOT PAINTS AN OVERLAY, NOT THE PAGE — so it must not be in the way of
  * the page.
@@ -367,6 +479,7 @@ import EmailVerifyBanner from './components/auth/EmailVerifyBanner';
 const AppIntro = React.lazy(() => import('./components/bloub/AppIntro'));
 import { MotionCharacterFallbackHeader, useCharacterBusy } from './components/bloub/MotionCharacterAnchor';
 import { homeCriticalReadyStore } from './lib/appBootstrap';
+import { preloadMotionFeatures } from './lib/motionFeatures';
 import { useBusy } from './lib/busy';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -558,7 +671,12 @@ function AppContent() {
   // Hold the first paint until the host question is answered. It is a single
   // request and it decides which application this is — rendering the main
   // site first and swapping to a storefront would flash the wrong brand at
-  // someone who opened a merchant's link.
+  // someone who opened a merchant's link. On the documents the Worker
+  // rewrites (a store's home, a product page) the answer is already in the
+  // document and `resolved` is true on the first render — no fallback frame
+  // at all; elsewhere the request left at module evaluation
+  // (src/lib/bootFetch.ts), so this frame lasts one round trip, not a parse
+  // plus a mount plus a round trip.
   if (!resolved) return <RouteFallback />;
   if (store || unknownStore || unavailableStore) return <StorefrontApp />;
   // Lower-cased on BOTH sides: react-router matches a path case-insensitively,
@@ -580,6 +698,10 @@ function AppContent() {
       <div className="h-[100dvh] min-h-0 flex flex-col font-sans overflow-hidden bg-canvas text-text-primary">
         <MotionCharacterFallbackHeader />
         <main className="flex-1 flex overflow-hidden">
+          {/* The same boundary as the storefront and main trees: a route chunk
+              that cannot be fetched shows the trilingual card with «reload»
+              instead of unmounting the root to a blank screen (P2 review). */}
+          <ChunkBoundary>
           <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
@@ -709,6 +831,7 @@ function AppContent() {
             />
           </Routes>
           </Suspense>
+          </ChunkBoundary>
         </main>
         {!shellHasToaster && <ToasterGate />}
       </div>

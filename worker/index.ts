@@ -2,17 +2,28 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from './lib/types';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
-import { loadSessionUser } from './lib/session';
+import { loadSessionUser, sessionFreePublicGet } from './lib/session';
 import { isAnonymousPublicMediaKey } from './lib/mediaStorage';
 import {
+  chunkPreloads,
+  documentCacheControl,
+  earlyHintsLink,
+  entryStylesheets,
   framedByStore,
+  heroCoverFrom,
+  injectDocumentPreloads,
   injectSocialPreview,
+  MANIFEST_PATH,
+  preloadImagePath,
   previewStoreRef,
   productSlugFromPath,
   resolveProductPreview,
   resolveStorePreview,
+  routeModuleFor,
   storeHomeRef,
+  type ViteManifest,
 } from './lib/socialPreview';
+import { conditional, weakEtag } from './lib/publicApi/cache';
 import { trustedOrigin } from './lib/appOrigin';
 import { runDurableJobs } from './lib/jobs';
 import { authRoutes } from './routes/auth';
@@ -253,6 +264,20 @@ app.use('*', async (c, next) => {
    * an account even by mistake, whatever cookie arrives with the request.
    */
   if (path === '/api/public/v1' || path.startsWith('/api/public/v1/')) {
+    await next();
+    return;
+  }
+  /**
+   * NOR DO THE PUBLIC READS WHOSE ANSWER IS THE SAME FOR EVERYONE (P2a, plan
+   * §B.1 #4): the public settings, the whole storefront router but
+   * `/:slug/delivery`, the print catalogue. Their anonymous variant is what
+   * the colo caches (worker/lib/edgePolicy.ts), and their handlers never read
+   * `user` — pinned by tests/edgeCachePolicy.test.ts, and the reason the list
+   * is a named predicate in worker/lib/session.ts rather than a pattern here.
+   * A signed-in shopper opening a store no longer pays the `sessions` x
+   * `users` JOIN for the store, its products, its reviews or its shelves.
+   */
+  if (sessionFreePublicGet(c.req.method, path)) {
     await next();
     return;
   }
@@ -587,6 +612,117 @@ app.all('/api/upload', (c) => c.json({ success: false, error: 'Use POST /api/upl
 // the slash-star inside the '/api/admin/*' mount string above as a comment
 // opener, so the first block terminator below it deletes every route mount in
 // between, and the admin host guard that test asserts on vanishes with them.
+// P2b — THE HEAD START (docs/MERCHANT_PLATFORM_V2.md §B.1 #3; worker/lib/
+// socialPreview.ts explains each piece). On the same documents, and only
+// those, the rewrite now also writes: a modulepreload for the route's chunk
+// (from Vite's manifest, read once per isolate below), a high-priority preload
+// for the picture the page paints largest, and the ANONYMOUS resolve answer
+// as a JSON data block, so the app renders on its first frame instead of after
+// a round trip. The response keeps a weak ETag computed from the REWRITTEN
+// body (a 304 is honest again), carries the Early Hints `Link` for the entry
+// stylesheet and the Arabic font, and — when nothing about it depended on a
+// session — a shareable Cache-Control; a rewrite that saw a session keeps
+// `no-cache`. tests/documentPreloads.test.ts holds every one of these.
+//
+// THE MANIFEST, ONCE PER ISOLATE. `dist/.vite/manifest.json` ships with the
+// assets (vite.config.ts `build.manifest`). Memoised per ASSETS binding (one
+// object for the life of an isolate; a fresh one per fake in the tests). A
+// miss is remembered for a minute so a deploy without it costs one asset read
+// per minute, not per document; a document served without it simply carries
+// no modulepreload.
+const manifestMemo = new WeakMap<object, { at: number; value: ViteManifest | null }>();
+async function viteManifest(c: Context<AppContext>): Promise<ViteManifest | null> {
+  const now = Date.now();
+  const memo = manifestMemo.get(c.env.ASSETS);
+  if (memo && (memo.value || now - memo.at < 60_000)) return memo.value;
+  let value: ViteManifest | null = null;
+  try {
+    const res = await c.env.ASSETS.fetch(new Request(new URL(MANIFEST_PATH, c.req.url).toString()));
+    // `not_found_handling: single-page-application` answers a missing file
+    // with index.html at 200, so the type is the test, not the status.
+    if (res.ok && /json/i.test(res.headers.get('Content-Type') || '')) {
+      const parsed: unknown = await res.json();
+      if (parsed && typeof parsed === 'object') value = parsed as ViteManifest;
+    }
+  } catch {
+    value = null;
+  }
+  manifestMemo.set(c.env.ASSETS, { at: now, value });
+  return value;
+}
+
+// THE ANONYMOUS RESOLVE ANSWER, FROM THE ROUTE ITSELF. The same handler the
+// browser would call, dispatched inside this Worker with the request's Host
+// and language but NO cookie — so it is exactly the answer a visitor with no
+// session gets, and whatever edge cache that route gains later serves this
+// too. Accepted only when it names the host this document is for: a lost Host
+// header would otherwise inline the platform's answer on a store's page.
+async function anonymousResolve(c: Context<AppContext>): Promise<Record<string, unknown> | null> {
+  try {
+    const host = c.get('host');
+    const headers = new Headers();
+    for (const name of ['Host', 'Accept-Language', 'CF-Connecting-IP', 'X-Forwarded-Proto']) {
+      const v = c.req.header(name);
+      if (v) headers.set(name, v);
+    }
+    const url = new URL(c.req.url);
+    url.pathname = '/api/storefront/resolve';
+    url.search = '';
+    let executionCtx: unknown;
+    try {
+      executionCtx = c.executionCtx;
+    } catch {
+      executionCtx = undefined;
+    }
+    const res = await app.fetch(new Request(url.toString(), { headers }), c.env, executionCtx as never);
+    if (!res.ok) return null;
+    const data = (await res.json()) as Record<string, unknown> | null;
+    if (!data || data.success === false || data.kind !== host.kind) return null;
+    if (host.kind === 'merchant') {
+      const store = data.store as { slug?: unknown } | null;
+      if (!store || store.slug !== host.slug) return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+// WHERE THIS DOCUMENT WAS SERVED FROM, sampled (about one document in fifty),
+// after the response has left (`waitUntil`): the colo the Worker ran in, the
+// `cf-placement` header when the platform adds one to the request, and the
+// region D1 answered from (`meta.served_by_region` of one trivial statement),
+// with its round trip. This is the evidence the Smart Placement and D1
+// location decisions wait on (wrangler.jsonc «SMART PLACEMENT», DECISIONS row
+// 171). Never on the request's own path, never a failure the visitor sees.
+function logDocumentRegion(c: Context<AppContext>, path: string, docMs: number): void {
+  if (Math.random() >= 0.02) return;
+  try {
+    const cf = (c.req.raw as Request & { cf?: { colo?: string; country?: string } }).cf;
+    const t0 = Date.now();
+    const probe = c.env.DB.prepare('SELECT 1')
+      .all()
+      .then((r) => {
+        console.log(
+          JSON.stringify({
+            evt: 'document_region',
+            path,
+            colo: cf?.colo ?? null,
+            country: cf?.country ?? null,
+            cf_placement: c.req.header('cf-placement') ?? null,
+            d1_region: (r.meta as { served_by_region?: string } | undefined)?.served_by_region ?? null,
+            d1_ms: Date.now() - t0,
+            doc_ms: docMs,
+          })
+        );
+      })
+      .catch(() => undefined);
+    c.executionCtx.waitUntil(probe);
+  } catch {
+    // No execution context (a test), or no DB: nothing to log.
+  }
+}
+
 async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
   const asset = await c.env.ASSETS.fetch(c.req.raw);
   const slug = productSlugFromPath(c.req.path);
@@ -601,6 +737,7 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
   if ((!slug && !storeHome) || !asset.ok) return asset;
   if (!/^text\/html\b/i.test(asset.headers.get('Content-Type') || '')) return asset;
 
+  const startedAt = Date.now();
   try {
     // On a merchant host the card names THAT host and only that store's
     // products (audit 01 B15): the apex origin produced `https://<apex>/p/…`,
@@ -612,19 +749,27 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
       storeSlug: onStore ? host.slug : null,
       storeRef: previewStoreRef(c.req.path) ?? homeRef,
     };
-    const product = slug ? await resolveProductPreview(c.env.DB, slug, origin, scope) : null;
+    // The reads that do not depend on each other leave together: the product
+    // card, the store card a store host always needs, the manifest (memoised),
+    // and the anonymous resolve answer. One wave, not four.
+    const [product, storeOnHost, manifest, resolve] = await Promise.all([
+      slug ? resolveProductPreview(c.env.DB, slug, origin, scope) : null,
+      onStore ? resolveStorePreview(c.env.DB, origin, scope) : null,
+      viteManifest(c),
+      anonymousResolve(c),
+    ]);
     // On a store's own host the store IS the site: its name heads every card,
     // its line and logo stand in for what a product lacks, and a link there
     // that names no product of it — the home, a product since removed — is
     // the store's card rather than the platform's. On the main site the store
     // card is only for the store's own page (or a product of it now gone).
     const store =
-      onStore || (!product && scope.storeRef) ? await resolveStorePreview(c.env.DB, origin, scope) : null;
+      storeOnHost ?? (!onStore && !product && scope.storeRef ? await resolveStorePreview(c.env.DB, origin, scope) : null);
     const card = product ? framedByStore(product, onStore ? store : null) : store;
     if (!card) return asset;
 
     const url = new URL(c.req.url);
-    const html = injectSocialPreview(await asset.text(), {
+    let html = injectSocialPreview(await asset.text(), {
       ...card,
       // The URL the crawler was given, not the canonical one — query string
       // included. A shared link carries the supporter's handle as `?ref=`
@@ -635,13 +780,29 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
       url: `${origin}${url.pathname}${url.search}`,
     });
 
+    // The head start. The picture: a product page paints its lead image
+    // largest (the card's own, as a same-origin path); a store home its cover.
+    const routeKey = routeModuleFor(url.pathname, onStore);
+    const chunks = manifest && routeKey ? chunkPreloads(manifest, routeKey) : { scripts: [], styles: [] };
+    const image = product ? preloadImagePath(product.image) : storeHome ? heroCoverFrom(resolve) : null;
+    html = injectDocumentPreloads(html, { ...chunks, image, resolve });
+
     const headers = new Headers(asset.headers);
-    // The body is no longer the asset that was hashed. A stale validator would
-    // let a browser or an intermediary answer a later request with the cached
-    // ORIGINAL — the shop's card again, on a product page.
-    headers.delete('ETag');
+    // The body is no longer the asset that was hashed, so the asset's own
+    // validator would let a browser or an intermediary answer a later request
+    // with the cached ORIGINAL — the shop's card again, on a product page. A
+    // validator of the REWRITTEN body keeps the 304 and loses that hazard.
     headers.delete('Content-Length');
-    return new Response(html, { status: asset.status, headers });
+    headers.set('ETag', await weakEtag(html));
+    const entryCss = manifest ? entryStylesheets(manifest) : [];
+    if (entryCss.length) headers.set('Link', earlyHintsLink(entryCss));
+    // Shareable only when nothing here could differ by visitor: no session was
+    // loaded for this request (these paths skip the lookup above, and the
+    // inline answer is the anonymous one), and no cookie is being set.
+    const viewerDependent = !!c.get('user') || headers.has('Set-Cookie');
+    const cacheControl = documentCacheControl(viewerDependent);
+    logDocumentRegion(c, url.pathname, Date.now() - startedAt);
+    return conditional(new Response(html, { status: asset.status, headers }), c.req.header('If-None-Match'), cacheControl);
   } catch {
     // A card is an enhancement. The app is not.
     return asset;

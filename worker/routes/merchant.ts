@@ -29,6 +29,7 @@ import { audit, auditStatements } from '../lib/audit';
 import { ownedMediaKey } from '../lib/mediaRefs';
 import { getTierStatus, benefits } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
+import { afterStorefrontWrite, purgeStorefrontAfterWrite } from '../lib/edgePolicy';
 import {
   requireStoreOwner,
   requireSellingPrivileges,
@@ -63,6 +64,10 @@ import { CUSTOM_ORDER_EARNED_SQL, CUSTOM_ORDER_KEPT_RECEIVABLE_SQL } from '../li
 export const merchantRoutes = new Hono<AppContext>();
 
 merchantRoutes.use('*', requireAuth);
+// P2 review: a store's cached shopfront (worker/lib/edgePolicy.ts) follows
+// every write on this router — profile, delivery, services, showcase, a
+// review reply — instead of ageing out over two minutes per colo.
+merchantRoutes.use('*', purgeStorefrontAfterWrite);
 
 const nowIso = () => new Date().toISOString();
 
@@ -813,6 +818,11 @@ merchantRoutes.post('/store/slug', async (c) => {
     from: ctx.store.slug,
     to: check.slug,
   });
+  // The OLD address is dropped by the router middleware (`merchantStore` still
+  // names it); the NEW one is dropped here, so a colo that answered the new
+  // slug's `/resolve` with «no such store» a moment ago does not keep saying
+  // so for two minutes after the rename (P2 review).
+  await afterStorefrontWrite(c, { slug: check.slug, id: ctx.store.id });
   return c.json({ success: true, slug: check.slug, changed: true, previous: ctx.store.slug });
 });
 

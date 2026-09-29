@@ -35,13 +35,15 @@
                        arrives the page is whatever the browser decided — so
                        the ground is painted here, per theme.
 
-  THE FONT IS FETCHED FROM HERE, NOT FROM `@import` INSIDE index.css.
-  A CSS `@import` of a remote stylesheet is discovered only AFTER index.css has
-  been downloaded and parsed, and it blocks rendering while it resolves. That
-  made three serialised round trips before any text could paint: index.css →
-  the Google stylesheet → the font file. As a <link> in the head, the request
-  starts in the same instant as the stylesheet's, and `preconnect` warms the
-  TLS handshake to the font host while that is still in flight.
+  THE FONT IS SELF-HOSTED AND DECLARED HERE, NOT LINKED FROM GOOGLE.
+  Until P1a (docs/PERFORMANCE_LOG.md) this head linked Google's stylesheet, and
+  every first paint waited on a third origin: on the lab's Slow-4G phone the
+  home's LCP was 4.96 s with that link and 2.63 s with the same CSS served
+  locally. Now the three Cairo subsets live under /fonts/cairo/, their
+  @font-face rules sit in the inline <style> below — known before index.css
+  has arrived, so the Arabic file matches its preload the moment text is laid
+  out — and one <link rel="preload"> starts the Arabic subset with the
+  document. No preconnect is needed: the origin is our own.
 -->
 <html lang="ar" dir="rtl">
   <head>
@@ -263,25 +265,23 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <script>(function(){var p,d,t,r=document.documentElement,m,b;try{p=localStorage.getItem('levonis.theme.v1')}catch(e){}d=p==='dark'||(p!=='light'&&!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);t=d?'dark':'light';r.setAttribute('data-theme',t);r.style.colorScheme=t;m=document.querySelector('meta[name="theme-color"]');b=document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');if(m)m.setAttribute('content',d?'#0b0c0f':'#e3dacb');if(b)b.setAttribute('content',d?'black':'default')})()</script>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!--
-      300..900 is the range the store actually uses — light through black, and
-      nothing outside it (grep: font-light … font-black).
+      The Arabic subset is on the critical path of every first paint (the
+      store is Arabic-first), so it is preloaded with the document instead of
+      being discovered from the CSSOM after index.css. `crossorigin` is
+      REQUIRED even for a same-origin font: fonts are fetched in CORS mode, and
+      a preload without the attribute is a second, unused download plus a
+      console warning. Latin and latin-ext are left to `unicode-range` — an
+      Arabic page never pays for them; an English one fetches latin on first
+      use. The service worker keeps all of /fonts/ cache-first (public/sw.js).
 
-      IT SAVES NOTHING, AND THAT IS WORTH WRITING DOWN. An earlier version of
-      this comment claimed a narrower axis means a smaller download. Measured
-      against Google Fonts, it does not: `wght@200..1000` and `wght@300..900`
-      resolve to byte-identical woff2 files (30,896 / 16,648 / 33,820 B for the
-      three subsets), because the service serves one variable font per family
-      and the axis in the query only bounds what CSS may ask for. The narrower
-      range is kept because it states the truth about this design, not because
-      it is faster.
+      300..900 is the range the store actually uses — light through black, and
+      nothing outside it (grep: font-light … font-black). The three woff2 files
+      are byte for byte the ones Google Fonts served for that range (30,896 /
+      33,820 / 16,648 B); public/fonts/cairo/LICENSE names the source, the
+      version and the licence. The rules themselves are in the <style> below.
     -->
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@300..900&display=swap"
-    />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/cairo/cairo-v31-arabic.woff2" />
 
     <style>
       /* Before the stylesheet, before React: the ground of the theme the
@@ -294,6 +294,22 @@
         html:not([data-theme]), html:not([data-theme]) body { background-color: #0b0c0f; }
       }
       #root { min-height: 100dvh; background-color: inherit; }
+      /* Cairo, self-hosted (P1a). Declared in the DOCUMENT rather than in
+         index.css for two measured reasons: the browser knows the faces before
+         index.css has arrived, so the preloaded Arabic file is used the instant
+         text is laid out and the latin file is discovered a round trip earlier;
+         and the stylesheet budget (tests/bundleBudget.test.ts, 60 KB gzip) had
+         545 B of room while these rules cost 572 B — the document budget has
+         the room. Same family name, the same 300..900 axis, the same `swap`
+         and the same `unicode-range` values Google's CSS carries, so nothing
+         downstream changes. The Kurdish patch face in src/index.css declares
+         the SAME 300..900 range, which is what lets its unicode-range win its
+         six codepoints (a different range would be a different weight group
+         and never consulted — src/index.css says how that was measured).
+         The comments in this block are stripped at build (vite.config.ts). */
+      @font-face { font-family: "Cairo"; font-style: normal; font-weight: 300 900; font-display: swap; src: url("/fonts/cairo/cairo-v31-arabic.woff2") format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1; }
+      @font-face { font-family: "Cairo"; font-style: normal; font-weight: 300 900; font-display: swap; src: url("/fonts/cairo/cairo-v31-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+      @font-face { font-family: "Cairo"; font-style: normal; font-weight: 300 900; font-display: swap; src: url("/fonts/cairo/cairo-v31-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
     </style>
   </head>
   <body>

@@ -8,7 +8,7 @@
  * file itself.
  *
  * OWNER: Sorani to be written by hand — these phrases are ar/en and Sorani
- * falls back to Arabic (docs/DECISIONS.md row 11), except the offer count,
+ * falls back to Arabic (see docs/DECISIONS.md rows 166–168 (D6)), except the offer count,
  * which reuses the board's own hand-written «ئۆفەر» (src/pages/Requests.tsx).
  */
 import { countNoun } from '../../../lib/catalog/copy';

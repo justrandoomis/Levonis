@@ -1,12 +1,60 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { Suspense, useState, useEffect, useRef } from 'react';
 import { Check, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
-import { tierLabel, tierMetaFor } from './subscription/tierMeta';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import LangThemeButton from './LangThemeSheet';
-import NotificationBell from './notifications/NotificationBell';
 import LiveSearch from './search/LiveSearch';
+
+/**
+ * WHAT THE HEADER DOWNLOADS BEFORE THE FIRST PAINT, AND WHAT IT DOES NOT
+ * (docs/MERCHANT_PLATFORM_V2.md §B.1 #6).
+ *
+ * The header is in the entry chunk of every visit, so everything it imports
+ * statically is parsed before the hero can paint. Two of its imports serve
+ * only a signed-in person, and neither can matter until the session has
+ * resolved — which is an API round trip after the first paint:
+ *
+ *   THE BELL renders nothing for a guest (its own first line), and for a
+ *   member it is 8 KB of source plus the notifications client and the popover.
+ *   It is a lazy chunk rendered once `isAuthenticated` is true — the same
+ *   moment it used to become visible, one chunk later.
+ *
+ *   THE TIER TABLE (`./subscription/tierMeta`: every plan's name and colours)
+ *   is only read when the member is on a paid plan. It is loaded then, and
+ *   held module-wide so later renders are synchronous. Until it is in memory
+ *   the pill stays in its guest/free state: it changes ONCE, from «free» to the
+ *   plan, when both the session and the table are in — never through a raw
+ *   plan id, and never twice.
+ */
+const NotificationBell = React.lazy(() => import('./notifications/NotificationBell'));
+
+type TierMetaModule = typeof import('./subscription/tierMeta');
+let tierMetaModule: TierMetaModule | null = null;
+let tierMetaLoading: Promise<TierMetaModule> | null = null;
+
+/** The tier table, once a paid plan needs it; `null` until it is in memory. */
+function useTierMeta(needed: boolean): TierMetaModule | null {
+  const [, settle] = useState(0);
+  useEffect(() => {
+    if (!needed || tierMetaModule) return;
+    let alive = true;
+    tierMetaLoading ??= import('./subscription/tierMeta').then((mod) => (tierMetaModule = mod));
+    tierMetaLoading
+      .then(() => {
+        if (alive) settle((n) => n + 1);
+      })
+      .catch(() => {
+        // A failed chunk leaves the pill in its free state; the next render
+        // that needs the table asks again.
+        tierMetaLoading = null;
+      });
+    return () => {
+      alive = false;
+    };
+  }, [needed]);
+  return tierMetaModule;
+}
 
 export default function Header() {
   const { t, dir } = useLanguage();
@@ -20,16 +68,20 @@ export default function Header() {
 
   // Plan/expiry come from the server-side user only.
   const now = Date.now();
-  const subTier =
+  const paidTier =
     user &&
     user.membership_tier !== 'free' &&
     (user.subscription_expiry === 0 || user.subscription_expiry > now)
       ? user.membership_tier
       : 'free';
+  const tiers = useTierMeta(paidTier !== 'free');
+  // Free until the table that names and colours the plan is in memory (see
+  // `useTierMeta` above): one change, never a raw plan id.
+  const subTier = tiers ? paidTier : 'free';
   // The tier's own colours, from the one table every surface reads — PRIME is
   // gold here as everywhere else, not PLUS green (it used to be a pro/else
   // test on the hex values).
-  const tierMeta = tierMetaFor(subTier);
+  const tierMeta = tiers ? tiers.tierMetaFor(subTier) : null;
 
 
   const [isScrolled, setIsScrolled] = useState(false);
@@ -145,7 +197,11 @@ export default function Header() {
               there is no such thing as a guest's notifications, and a bell that
               always says zero is furniture. Placed before the language toggle
               so it sits closest to the content it refers to. */}
-          <NotificationBell />
+          {isAuthenticated && (
+            <Suspense fallback={null}>
+              <NotificationBell />
+            </Suspense>
+          )}
 
           {/* «اللغة والمظهر» — the globe opens one bottom sheet with two rows,
               the language and the appearance (src/components/LangThemeSheet.tsx).
@@ -179,7 +235,7 @@ export default function Header() {
               <span className={`text-[13px] tracking-wide capitalize ${
                 subTier !== 'free' ? 'text-white font-bold' : 'text-zinc-300 font-medium'
               }`}>
-                {subTier === 'free' ? subTier : tierLabel(subTier)}
+                {subTier === 'free' || !tiers ? 'free' : tiers.tierLabel(subTier)}
               </span>
               {tierMeta && <Check className="w-4 h-4" style={{ color: tierMeta.hex }} strokeWidth={3} aria-hidden="true" />}
             </div>

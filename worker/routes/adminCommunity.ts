@@ -28,6 +28,7 @@ import { requireAdmin, badRequest, conflict, notFound, str, int, oneOf, HttpErro
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { getSetting } from '../lib/settings';
+import { afterCommunityGateWrite, afterStorefrontWrite } from '../lib/edgePolicy';
 import { releaseEscrow, refundEscrow, escrowForOrder, getEscrow } from '../lib/escrowOps';
 import { announceCustomOrder } from '../lib/chatCards';
 import {
@@ -379,6 +380,8 @@ adminCommunityRoutes.put('/gate', async (c) => {
     before_allowed: before.allowed.length,
     after_allowed: ids.length,
   });
+  // P2a: the guests' cached /api/community/access answer follows the switch.
+  await afterCommunityGateWrite(c);
   return c.json({ success: true, open, closed: !open, allowed_user_ids: ids, changed: before.open !== open });
 });
 
@@ -474,9 +477,13 @@ adminCommunityRoutes.post('/merchants/:id/status', async (c) => {
   await audit(c.env.DB, admin.id, 'admin.merchant_status', id, { status, reason, from: m.status });
   // The merchant is told of the sanction and its reason (W2-E; forced on, §61).
   if (status !== m.status) await notifyStoreStatusChanged(c.env, { scope: 'merchant', id, status, reason, at: nowIso() });
-  const store = await c.env.DB.prepare('SELECT status FROM merchant_stores WHERE merchant_id = ?')
+  const store = await c.env.DB.prepare('SELECT id, slug, status FROM merchant_stores WHERE merchant_id = ?')
     .bind(id)
-    .first<{ status: string }>();
+    .first<{ id: string; slug: string; status: string }>();
+  // The shop of a suspended merchant is shut by THIS row (`storeIsSuspended`),
+  // so its cached shopfront — name, logo, products, the inline resolve — is
+  // dropped from this colo now, not served for another two minutes (P2 review).
+  if (store) await afterStorefrontWrite(c, store);
   return c.json({ success: true, status, store_status: store?.status ?? null });
 });
 
@@ -518,9 +525,9 @@ adminCommunityRoutes.post('/stores/:id/status', async (c) => {
   const reason = str(body.reason, 'reason', { min: 0, max: 500, required: false });
 
   const store = await c.env.DB.prepare(
-    'SELECT s.id, s.merchant_id, m.status AS merchant_status FROM merchant_stores s ' +
+    'SELECT s.id, s.slug, s.merchant_id, m.status AS merchant_status FROM merchant_stores s ' +
     'JOIN community_merchants m ON m.id = s.merchant_id WHERE s.id = ?'
-  ).bind(id).first<{ id: string; merchant_id: string; merchant_status: string }>();
+  ).bind(id).first<{ id: string; slug: string; merchant_id: string; merchant_status: string }>();
   if (!store) throw notFound('Store not found');
 
   // Re-opening a shop whose OWNER is suspended would contradict the merchant
@@ -539,6 +546,9 @@ adminCommunityRoutes.post('/stores/:id/status', async (c) => {
     status, reason, merchant: store.merchant_id,
   });
   await notifyStoreStatusChanged(c.env, { scope: 'store', id, status, reason, at: nowIso() }); // W2-E: the merchant is told (forced on, §61)
+  // «Not one merchant-controlled field» (storefront.ts) holds from this
+  // moment in this colo too: the cached shopfront is dropped (P2 review).
+  await afterStorefrontWrite(c, { id: store.id, slug: store.slug });
   return c.json({ success: true, status });
 });
 

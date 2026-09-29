@@ -25,8 +25,8 @@ import type { ProductDoc } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY, type MemberFallback } from '../lib/pricing';
 import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
 import { pricingTierContext } from '../lib/entitlements';
-import { getProPause } from '../lib/tierPause';
-import { activeBenefitRules, ancestryFor, catalogAncestry, degradeIfSchemaMissing, fallbackFor } from '../lib/membershipBenefits';
+import { ancestryFor, degradeIfSchemaMissing, fallbackFor, pricingInputsFor } from '../lib/membershipBenefits';
+import { anonymousCached } from '../lib/edgePolicy';
 import { isConditionColumnMissing } from '../lib/conditionProjection';
 import { catalogSubtreeFilter, homeCategoryTree } from '../lib/catalogMembership';
 import { FACET_FIELD_IDS, parseListingParams } from '@levonis/catalog/discovery';
@@ -1919,19 +1919,25 @@ export async function pricingCtx(c: Context<AppContext>): Promise<PricingCtx> {
  * `pricingCtx` is this with the session's user, so there is one construction.
  */
 export async function pricingCtxForUser(db: D1Database, userId: string | null): Promise<PricingCtx> {
-  const [tierInfo, settings] = await Promise.all([
-    userId ? pricingTierContext(db, userId) : Promise.resolve(null),
-    getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults']).catch(() => ({}) as Record<string, unknown>),
-  ]);
-  const s = settings as Record<string, unknown>;
   /**
    * Loaded for EVERY viewer, member or not. A guest earns no benefit, but §9
    * asks this page to say what a membership would be worth on this exact
    * product — and a teaser computed from anything other than the live rules is
    * the hardcoded promise this whole system exists to remove. Both tables are
    * a few rows.
+   *
+   * ONE WAVE, AND USUALLY NONE (P2a). The four shared inputs — the policy
+   * settings, the rules, the section ancestry, the PRO pause — come from
+   * `pricingInputsFor`: read together with the viewer's tier on a cold
+   * isolate (they used to wait for the settings first, a second D1 round trip
+   * on every hot route), and from memory for the next thirty seconds.
    */
-  const [benefitRules, ancestry, proPause] = await Promise.all([activeBenefitRules(db), catalogAncestry(db), getProPause(db)]);
+  const [tierInfo, inputs] = await Promise.all([
+    userId ? pricingTierContext(db, userId) : Promise.resolve(null),
+    pricingInputsFor(db),
+  ]);
+  const s = inputs.settings;
+  const { benefitRules, catalogAncestry: ancestry, proPause } = inputs;
   return {
     proPaused: proPause.paused,
     benefitRules,
@@ -3585,14 +3591,27 @@ export async function listCatalogProducts(
   }, rows: rowsById };
 }
 
-productRoutes.get('/', async (c) => {
-  // Started before the listing so it runs alongside the category probe and the
-  // search-index read (see `listCatalogProducts`).
-  const ctxPromise = pricingCtx(c);
-  ctxPromise.catch(() => {});
-  const { body } = await listCatalogProducts(c.env.DB, c.req.query(), ctxPromise);
-  return c.json({ success: true, ...body });
-});
+/**
+ * The query parameters that may change a listing answer — the edge cache key
+ * is built from these and nothing else (worker/lib/edgePolicy.ts). Every key
+ * `listCatalogProducts` reads is here; a parameter it ignores cannot mint an
+ * entry.
+ */
+export const LISTING_CACHE_PARAMS: readonly string[] = ['search', 'category', 'type', 'limit', 'offset', ...LISTING_PARAM_KEYS];
+
+productRoutes.get('/', (c) =>
+  // A GUEST'S listing is the same for every guest and is served from the
+  // colo's cache (P2a); a signed-in customer's carries their membership's
+  // prices and is built for them alone, exactly as before.
+  anonymousCached(c, { params: LISTING_CACHE_PARAMS, perViewer: true }, async () => {
+    // Started before the listing so it runs alongside the category probe and the
+    // search-index read (see `listCatalogProducts`).
+    const ctxPromise = pricingCtx(c);
+    ctxPromise.catch(() => {});
+    const { body } = await listCatalogProducts(c.env.DB, c.req.query(), ctxPromise);
+    return c.json({ success: true, ...body });
+  })
+);
 
 /**
  * THE CATALOGUE PRODUCT PAGE — what `GET /api/products/:slug` answers for an
@@ -3608,7 +3627,12 @@ export async function catalogProductDetail(
   parsed: ProductDoc,
   ctxPromise: Promise<PricingCtx>
 ): Promise<{ ctx: PricingCtx; body: Record<string, unknown> }> {
-  const [ctx, brandRow, relations, isPrinter, salesBadge, ratingRow] = await Promise.all([
+  // EVERYTHING THAT NEEDS ONLY THE ROW'S ID GOES OUT TOGETHER (P2a): the
+  // pool membership, the offer window and the «يناسب» links used to be three
+  // more awaits AFTER this wave — three dependent D1 round trips on every
+  // product page, for reads that depend on nothing this wave returns.
+  const productId = String(row.id);
+  const [ctx, brandRow, relations, isPrinter, salesBadge, ratingRow, poolMember, offer, fitsMap] = await Promise.all([
     ctxPromise,
     parsed.brand_id
       ? db.prepare('SELECT id, name_ar, name_en, name_ckb FROM brands WHERE id = ? AND active = 1')
@@ -3632,6 +3656,17 @@ export async function catalogProductDetail(
     )
       .bind(String(row.id))
       .first<{ n: number; avg_stars: number | null }>(),
+    // §8.2 ROW 18. One indexed read (`idx_mystery_entries_product`), resolved
+    // once per request and passed down — never once per option value or
+    // colour. A product that is in no pool costs one empty query and the
+    // payload is byte-identical to today's.
+    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(db, [productId]), new Set<string>()).then((set) => set.size > 0),
+    // The SAME window has to price the display block and the per-selection
+    // levels, or the page would paint an offer price on the card and a ladder
+    // price the moment a variant was tapped.
+    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(db, [subjectOf(productId)]), EMPTY_OFFERS()).then((m) => m.get(offerKey(subjectOf(productId)))),
+    // 0148 — the ACTIVE printers the admin linked (see `fits_printers` below).
+    activeFitsFor(db, [productId]),
   ]);
   /**
    * The linked new product's live price, when this listing is a used copy.
@@ -3660,15 +3695,6 @@ export async function catalogProductDetail(
   // a saved-products row) repeated the higher number. The base-selection
   // quote is still returned, unchanged, as `pricing` — that is what the
   // page prices with until the customer picks an option.
-  // §8.2 ROW 18. One indexed read (`idx_mystery_entries_product`), resolved
-  // once per request and passed down — never once per option value or
-  // colour. A product that is in no pool costs one empty query and the
-  // payload is byte-identical to today's.
-  const poolMember = (await degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(db, [String(row.id)]), new Set<string>())).size > 0;
-  // Hoisted out of the call below: the SAME window has to price the display
-  // block and the per-selection levels, or the page would paint an offer
-  // price on the card and a ladder price the moment a variant was tapped.
-  const offer = (await degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(db, [subjectOf(String(row.id))]), EMPTY_OFFERS())).get(offerKey(subjectOf(String(row.id))));
 
   const inventory = snapshotFrom(relations, {
     stock: doc.stock,
@@ -3722,12 +3748,10 @@ export async function catalogProductDetail(
    * A used unit's parts are its MODEL's (`condition.new_product_id`, the
    * link a graded listing already carries). Both empty before 0148.
    */
-  // Together, not one after the other: a printer page pays one round trip.
-  const [fitsMap, target] = await Promise.all([
-    activeFitsFor(db, [String(row.id)]),
-    isPrinter ? maintenanceFor(db, [String(row.id)]).then((m) => m.get(String(row.id))) : Promise.resolve(undefined),
-  ]);
-  const fitsPrinters = fitsMap.get(String(row.id)) ?? [];
+  // The fits came with the first wave; only a PRINTER pays a second round
+  // trip, for the parts shelf its flag says it has.
+  const target = isPrinter ? (await maintenanceFor(db, [productId])).get(productId) : undefined;
+  const fitsPrinters = fitsMap.get(productId) ?? [];
   let maintenanceParts: { count: number; printer_slug: string; path: string | null } | null = null;
   if (target) {
     const idx = await catalogIndexFor(db).catch(() => null);
@@ -3832,8 +3856,15 @@ export async function catalogProductDetail(
   };
 }
 
-productRoutes.get('/:slug', async (c) => {
-  const slug = c.req.param('slug');
+// The anonymous product page is one body for every guest — `favorite` is
+// false and `viewer_tier` is «free» for all of them — so it is served from the
+// colo's cache (P2a). A signed-in request builds its own page as before.
+// (`ProductViewed` is sampled 1:5 for guests and best-effort; a cache hit
+// emits none, which the sample already tolerates.)
+productRoutes.get('/:slug', (c) => anonymousCached(c, { perViewer: true }, () => productDetail(c)));
+
+async function productDetail(c: Context<AppContext>): Promise<Response> {
+  const slug = c.req.param('slug') ?? '';
   const row = await c.env.DB.prepare("SELECT * FROM products WHERE slug = ? AND status = 'active'")
     .bind(slug)
     .first<Record<string, unknown>>();
@@ -3935,7 +3966,7 @@ productRoutes.get('/:slug', async (c) => {
       created_at: cp.created_at,
     },
   });
-});
+}
 
 /**
  * Live price quote for the product page (auth optional). The viewer's tier
@@ -4185,7 +4216,36 @@ async function openBoxShelf(db: D1Database): Promise<Record<string, unknown>[]> 
 
 export const homeRoutes = new Hono<AppContext>();
 
-homeRoutes.get('/', async (c) => {
+/**
+ * WHERE D1 ACTUALLY LIVES — logged once per isolate, from the first home
+ * answer (plan §B.2: the primary's region was never recorded; the D1 location
+ * hint and Smart Placement decisions, DECISIONS row 171, are made from this
+ * line). `served_by_region` and `served_by_primary` are D1's own metadata on
+ * every result; `colo` is the PoP the Worker ran in. One structured line,
+ * never per request: an isolate serves thousands.
+ */
+let regionLogged = false;
+function logServedByRegion(c: Context<AppContext>, meta: D1Meta | undefined): void {
+  if (regionLogged || !meta) return;
+  regionLogged = true;
+  const cf = (c.req.raw as Request & { cf?: { colo?: string; country?: string } }).cf;
+  console.log(
+    JSON.stringify({
+      event: 'd1_region',
+      served_by_region: meta.served_by_region ?? null,
+      served_by_primary: meta.served_by_primary ?? null,
+      colo: cf?.colo ?? null,
+      country: cf?.country ?? null,
+      host: c.req.header('Host') ?? null,
+    })
+  );
+}
+
+// A GUEST'S FIRST SCREEN IS ONE BODY FOR EVERY GUEST (P2a): served from the
+// colo's cache; a signed-in customer's carries their prices and is built.
+homeRoutes.get('/', (c) => anonymousCached(c, { perViewer: true }, () => homePage(c)));
+
+async function homePage(c: Context<AppContext>): Promise<Response> {
   /**
    * THE MEMBERSHIP RULES ARE NOW AN INPUT TO THE DISCOUNTS QUERY, so the one
    * request that already loads them is started first and the strip's statement
@@ -4290,6 +4350,7 @@ homeRoutes.get('/', async (c) => {
     ).all<Record<string, unknown>>(),
     ctxPromise,
   ]);
+  logServedByRegion(c, latest.meta);
 
   // Normalize on the way OUT as well as on the way in: rows written before
   // lib/homeContent.ts existed never went through the validator, and the
@@ -4405,7 +4466,7 @@ homeRoutes.get('/', async (c) => {
      */
     open_box: openBoxCards,
   });
-});
+}
 
 // ------------------------------------------------------- home shelves (§below the fold)
 
@@ -4432,7 +4493,9 @@ homeRoutes.get('/', async (c) => {
  * (migration 0060) is the one that matters here, and "no offers table" really
  * does mean "no offer is running".
  */
-homeRoutes.get('/sections', async (c) => {
+homeRoutes.get('/sections', (c) => anonymousCached(c, { perViewer: true }, () => homeSections(c)));
+
+async function homeSections(c: Context<AppContext>): Promise<Response> {
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
 
@@ -4443,15 +4506,20 @@ homeRoutes.get('/sections', async (c) => {
    * re-parent or replace this branch. Looking it up by slug means a shop that
    * calls its materials section something else still gets a shelf, and one
    * that has no such section gets no shelf instead of an error.
+   *
+   * It is the ONLY read the filament shelf depends on, so it flies with the
+   * first wave and only the shelf's own subtree query waits for it (P2a) —
+   * the other three shelves and the pricing context no longer queue behind
+   * one row.
    */
-  const filamentRoot = await c.env.DB
+  const filamentRootPromise = c.env.DB
     .prepare("SELECT id FROM catalogs WHERE slug IN ('printing-materials','fdm-materials') AND active = 1 ORDER BY parent_id IS NOT NULL LIMIT 1")
     .first<{ id: string }>();
 
   const [bestIds, dealIds, filamentPool, featured, ctx] = await Promise.all([
     bestSellerIds(c.env.DB),
     degradeIfSchemaMissing('offers (migration 0060)', () => flashDealIds(c.env.DB, nowIso), [] as string[]),
-    filamentRoot ? filamentCandidateIds(c.env.DB, filamentRoot.id) : Promise.resolve([] as string[]),
+    filamentRootPromise.then((root) => (root ? filamentCandidateIds(c.env.DB, root.id) : ([] as string[]))),
     featuredIds(c.env.DB),
     pricingCtx(c),
   ]);
@@ -4505,4 +4573,4 @@ homeRoutes.get('/sections', async (c) => {
     filament: pick(filament),
     super_deals: pick(featured),
   });
-});
+}

@@ -19,7 +19,7 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
-import { sniff } from './uploads';
+import { parseByteRange, sniff } from './uploads';
 import { getMediaObject, headMediaObject, storeMedia } from '../lib/mediaStorage';
 import { notifyStatement } from '../lib/notifications';
 import {
@@ -1008,11 +1008,49 @@ reviewRoutes.get('/media/*', async (c) => {
   }
   if (!allowed) throw notFound();
 
-  const obj = await getMediaObject(c.env, 'private', key);
+  /**
+   * A REVIEW'S VIDEO HAS TO PLAY ON AN iPHONE (plan §B.1 #9).
+   *
+   * Safari opens every `<video>` with `Range: bytes=0-1` and reads a 200
+   * carrying the whole clip as «this server cannot stream» — so a customer's
+   * review video, the most persuasive thing on a product page, was a dead
+   * player on exactly the phones most customers hold. The same three answers
+   * `/files/*` gives (worker/routes/uploads.ts): 206 with the bytes asked
+   * for, 416 past the end, `Accept-Ranges: bytes` on everything; the size
+   * from a HEAD so an unsatisfiable range reads no byte; `If-Range` honoured.
+   * All of it AFTER the authorisation above — review media is private
+   * storage with a per-request permission, never edge-cached, so the ranged
+   * read goes to the bucket each time and a range is a way of reading, not a
+   * way around the question of whether you may.
+   */
+  const rangeHeader = c.req.header('Range') ?? '';
+  let range: { offset: number; length: number } | null = null;
+  let totalSize = 0;
+  if (rangeHeader) {
+    const head = await headMediaObject(c.env, 'private', key);
+    if (!head) throw notFound();
+    const ifRange = c.req.header('If-Range');
+    if (!ifRange || ifRange === head.httpEtag) {
+      const parsed = parseByteRange(rangeHeader, head.size);
+      if (parsed === 'unsatisfiable') {
+        return new Response(null, {
+          status: 416,
+          headers: { 'Content-Range': `bytes */${head.size}`, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' },
+        });
+      }
+      if (parsed) {
+        range = parsed;
+        totalSize = head.size;
+      }
+    }
+  }
+
+  const obj = await getMediaObject(c.env, 'private', key, range ? { range } : undefined);
   if (!obj) throw notFound();
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
   headers.set('etag', obj.httpEtag);
+  headers.set('Accept-Ranges', 'bytes');
   /**
    * PUBLIC HERE IS A REVOCABLE DECISION, SO THE CACHE MUST ASK EVERY TIME.
    *
@@ -1053,6 +1091,11 @@ reviewRoutes.get('/media/*', async (c) => {
    */
   if (c.req.header('If-None-Match') === obj.httpEtag) {
     return new Response(null, { status: 304, headers });
+  }
+  if (range) {
+    headers.set('Content-Range', `bytes ${range.offset}-${range.offset + range.length - 1}/${totalSize}`);
+    headers.set('Content-Length', String(range.length));
+    return new Response(obj.body, { status: 206, headers });
   }
   return new Response(obj.body, { headers });
 });

@@ -33,6 +33,7 @@ const ServicesGrid = React.lazy(() => import('../components/home/ServicesGrid'))
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { markHomeCriticalReady } from '../lib/appBootstrap';
 import { readPageCache, writePageCache } from '../lib/pageCache';
+import { HOME_PATH, settleJson, takePrimed } from '../lib/bootFetch';
 
 /** One key: the home shelves are the same request for everybody signed in
  *  the same way, and AuthContext drops the lot when that changes. */
@@ -100,7 +101,12 @@ export default function Home() {
     setInitialLoading(!snapshot);
     setLoadError(null);
     try {
-      const data = await api.get<HomePayload>('/api/home');
+      // THE FIRST ASK LEFT BEFORE REACT MOUNTED (src/lib/bootFetch.ts): on `/`
+      // the request for this payload is started at module evaluation and
+      // taken over here, once; a retry or a later visit asks through the
+      // client as before. Same deadline, same errors, same feedback.
+      const primed = takePrimed(HOME_PATH);
+      const data = primed ? await settleJson<HomePayload>(HOME_PATH, primed) : await api.get<HomePayload>(HOME_PATH);
       if (homeReqRef.current !== reqId) return;
       applyHome(data);
       writePageCache(HOME_CACHE_KEY, data);
@@ -255,6 +261,14 @@ export default function Home() {
               </div>
             </Marquee>
           </div>
+        ) : initialLoading || settings == null ? (
+          /* The ticker's own height (py-2.5 around a 13px line = 40px),
+             reserved while /api/home is in flight — without it the sheet
+             below moved 24px when the ads arrived — and kept when the answer
+             never came (the error card below), so the failed state moves
+             nothing either (P1c, measured). A loaded page WITHOUT ads keeps
+             its 16px cap as before. */
+          <div aria-hidden="true" className="h-10" />
         ) : (
           <div aria-hidden="true" className="h-4" />
         )}

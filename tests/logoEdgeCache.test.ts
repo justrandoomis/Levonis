@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
-import { REWRITABLE_EDGE_GENERATION, edgeCacheKey } from '../worker/routes/uploads';
+import { REWRITABLE_EDGE_GENERATION, edgeCacheKey, edgeCachePutKey } from '../worker/routes/uploads';
 import { SITE_LOGO_KEY } from '../src/lib/siteLogo';
 
 const ORIGIN = 'https://levonis-iq.com';
@@ -48,7 +48,15 @@ test('every rewritable folder moves; a minted key keeps its warm entry', () => {
 test('the /files route matches AND writes through the same edge key', () => {
   const src = readFileSync(join(ROOT, 'worker/routes/uploads.ts'), 'utf8');
   assert.ok(src.includes('cache.match(edgeCacheKey(c.req.raw, key))'), 'lookups still use the plain URL');
-  assert.ok(src.includes('cache.put(edgeCacheKey(c.req.raw, key), res.clone())'), 'writes still use the plain URL');
+  // Since P2c the write goes through `edgeCachePutKey`: the same edge key with
+  // the player's Range/If-Range stripped, because what is stored is the whole
+  // file and every later request — ranged or not — must find it under one key.
+  assert.ok(src.includes('cache.put(edgeCachePutKey(c.req.raw, key), res.clone())'), 'writes still use the plain URL');
   assert.ok(!src.includes('cache.match(c.req.raw)'), 'a lookup under the plain URL survives');
   assert.ok(!src.includes('cache.put(c.req.raw'), 'a write under the plain URL survives');
+  const ranged = new Request(`${ORIGIN}/files/${SITE_LOGO_KEY}`, { headers: { Range: 'bytes=0-1', 'If-Range': '"x"' } });
+  const put = edgeCachePutKey(ranged, SITE_LOGO_KEY);
+  assert.equal(put.url, edgeCacheKey(new Request(`${ORIGIN}/files/${SITE_LOGO_KEY}`), SITE_LOGO_KEY).url, 'the put key is the match key of the plain request');
+  assert.equal(put.headers.get('Range'), null);
+  assert.equal(put.headers.get('If-Range'), null);
 });

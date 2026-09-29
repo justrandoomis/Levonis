@@ -1,12 +1,11 @@
-import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, PackageSearch, RotateCcw, Search, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { api, ApiError, type ApiProduct, type ProductsListResponse } from '../../lib/api';
 import { productMainImage } from '../../lib/productImage';
 import { useTheme } from '../../lib/theme';
-import { CROSS_FADE, useMotion } from '../../lib/motion';
+import { preloadMotionFeatures } from '../../lib/motionFeatures';
 import SafeImage from '../ui/SafeImage';
 import { Skeleton } from '../ui/Skeleton';
 import CardPrice from '../CardPrice';
@@ -82,6 +81,14 @@ function remember(query: string, answer: Answer) {
   }
 }
 
+/**
+ * THE ANIMATED PANEL IS A LAZY CHUNK (./LiveSearchPanel.tsx), asked for the
+ * moment the field is touched or focused: the header is in every first paint,
+ * and the motion behind a panel nobody has opened yet is not. The field, the
+ * request and the rows stay here; only the surface that grows is deferred.
+ */
+const LiveSearchPanel = React.lazy(() => import('./LiveSearchPanel'));
+
 /** Where a result opens — the same rule as the results grid. A composition row is bought at /bundles. */
 export const productHref = (p: ApiProduct): string =>
   p.product_slug ? `/bundles/${p.product_slug}` : `/product/${p.slug || p.id}`;
@@ -114,7 +121,6 @@ export default function LiveSearch({
 }: LiveSearchProps) {
   const { t, loc, dir: pageDir } = useLanguage();
   const { theme } = useTheme();
-  const m = useMotion();
   const location = useLocation();
   const uid = useId();
   const listId = `${uid}-list`;
@@ -122,7 +128,6 @@ export default function LiveSearch({
 
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef(0);
   const caretToEndRef = useRef(false);
 
@@ -134,8 +139,15 @@ export default function LiveSearch({
   const [answer, setAnswer] = useState<{ query: string; data: Answer } | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [attempt, setAttempt] = useState(0);
-  const [panelHeight, setPanelHeight] = useState<number | 'auto'>('auto');
   const [inputFontSize, setInputFontSize] = useState<string | undefined>(undefined);
+  // The panel chunk is requested on the first touch or focus, before there is
+  // anything to show, so it is in memory by the time the first answer lands.
+  const [armed, setArmed] = useState(false);
+  const arm = () => {
+    if (armed) return;
+    setArmed(true);
+    preloadMotionFeatures();
+  };
 
   const query = liveQuery(value);
   const hasQuery = query.trim() !== '';
@@ -219,16 +231,6 @@ export default function LiveSearch({
     const fontSize = getComputedStyle(el).fontSize;
     setInputFontSize((have) => (have === fontSize ? have : fontSize));
   }, [value, size]);
-
-  // The panel's height follows its rows, so a new answer grows or shrinks it
-  // instead of snapping.
-  useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!panelShown || !el || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => setPanelHeight(el.offsetHeight));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [panelShown]);
 
   const commit = (next: string, caretToEnd = false) => {
     caretToEndRef.current = caretToEnd;
@@ -392,7 +394,9 @@ export default function LiveSearch({
           onSelect={readCaret}
           onKeyUp={readCaret}
           onClick={readCaret}
+          onPointerDown={arm}
           onFocus={() => {
+            arm();
             setFocused(true);
             readCaret();
             if (openOnFocus && value.trim()) setOpen(true);
@@ -432,109 +436,96 @@ export default function LiveSearch({
         {announcement}
       </div>
 
-      <AnimatePresence>
-        {panelShown && (
-          <motion.div
-            key="panel"
-            data-testid="search-panel"
-            // Grows DOWN out of the field's edge and goes back the way it came.
-            initial={m.reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: panelHeight }}
-            exit={m.reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
-            transition={m.reduced ? { ...CROSS_FADE, height: { duration: 0 } } : m.spring('ui')}
-            // Keeps the caret in the field while a row is tapped.
-            onMouseDown={(e) => e.preventDefault()}
-            className="material material-thick pointer-events-auto absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-border-subtle shadow-2xl shadow-black/50"
-          >
-            <div ref={contentRef}>
-              <div className="max-h-[min(55dvh,26rem)] overflow-y-auto overscroll-contain p-1.5">
-                <div
-                  role="listbox"
-                  id={listId}
-                  aria-label={t('search')}
-                  aria-busy={status === 'loading'}
-                  className={`transition-opacity duration-150 ${view === 'rows' && !fresh ? 'opacity-60' : ''}`}
-                >
-                  {view === 'rows' &&
-                    rows.map((p, i) => (
-                      <Link
-                        key={p.id}
-                        id={optionId(i)}
-                        role="option"
-                        aria-selected={i === activeRow}
-                        tabIndex={-1}
-                        to={productHref(p)}
-                        onClick={pick}
-                        onPointerEnter={() => setActive(i)}
-                        className={`flex min-h-[60px] items-center gap-3 rounded-xl px-2 py-1.5 transition-colors ${
-                          i === activeRow ? 'bg-white/[0.10]' : 'hover:bg-white/[0.05]'
-                        }`}
-                      >
-                        <SafeImage
-                          src={productMainImage(p, theme)}
-                          alt=""
-                          aspect="auto"
-                          className="h-12 w-12 shrink-0 overflow-hidden rounded-lg"
-                          fallbackIconClassName="h-4 w-4"
-                        />
-                        <div className="min-w-0 flex-1">
-                          {/* §3/§12: the product name is English in every language. */}
-                          <p className="line-clamp-2 text-[14px] font-medium leading-snug text-text-primary">{p.name}</p>
-                          <div className="mt-0.5">
-                            <CardPrice p={p} compact />
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                </div>
-                {view === 'skeleton' && (
-                  <div aria-hidden="true">
-                    {[0, 1, 2].map((i) => (
-                      <div key={i} className="flex min-h-[60px] items-center gap-3 px-2 py-1.5">
-                        <Skeleton className="h-12 w-12 shrink-0 rounded-lg" />
-                        <div className="flex-1 space-y-2">
-                          <Skeleton className="h-3.5 w-3/5" />
-                          <Skeleton className="h-3 w-1/4" />
+      <Suspense fallback={null}>
+        {armed && (
+          <LiveSearchPanel shown={panelShown}>
+            <div className="max-h-[min(55dvh,26rem)] overflow-y-auto overscroll-contain p-1.5">
+              <div
+                role="listbox"
+                id={listId}
+                aria-label={t('search')}
+                aria-busy={status === 'loading'}
+                className={`transition-opacity duration-150 ${view === 'rows' && !fresh ? 'opacity-60' : ''}`}
+              >
+                {view === 'rows' &&
+                  rows.map((p, i) => (
+                    <Link
+                      key={p.id}
+                      id={optionId(i)}
+                      role="option"
+                      aria-selected={i === activeRow}
+                      tabIndex={-1}
+                      to={productHref(p)}
+                      onClick={pick}
+                      onPointerEnter={() => setActive(i)}
+                      className={`flex min-h-[60px] items-center gap-3 rounded-xl px-2 py-1.5 transition-colors ${
+                        i === activeRow ? 'bg-white/[0.10]' : 'hover:bg-white/[0.05]'
+                      }`}
+                    >
+                      <SafeImage
+                        src={productMainImage(p, theme)}
+                        alt=""
+                        aspect="auto"
+                        className="h-12 w-12 shrink-0 overflow-hidden rounded-lg"
+                        fallbackIconClassName="h-4 w-4"
+                      />
+                      <div className="min-w-0 flex-1">
+                        {/* §3/§12: the product name is English in every language. */}
+                        <p className="line-clamp-2 text-[14px] font-medium leading-snug text-text-primary">{p.name}</p>
+                        <div className="mt-0.5">
+                          <CardPrice p={p} compact />
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-                {view === 'empty' && (
-                  <div className="flex min-h-[60px] items-center gap-3 px-3 text-text-secondary">
-                    <PackageSearch className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
-                    <span className="text-[14px]">{loc('لا توجد نتائج', 'No results', 'هیچ ئەنجامێک نییە')}</span>
-                  </div>
-                )}
-                {view === 'error' && (
-                  <div className="flex min-h-[60px] items-center justify-between gap-3 px-3">
-                    <span className="text-[14px] text-text-secondary">
-                      {loc('تعذر التحميل', 'Failed to load', 'بارکردن سەرکەوتوو نەبوو')}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setAttempt((n) => n + 1)}
-                      className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-text-primary hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                    >
-                      <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                      {t('retry')}
-                    </button>
-                  </div>
-                )}
+                    </Link>
+                  ))}
               </div>
-              {view === 'rows' && (
-                <button
-                  type="submit"
-                  className="flex min-h-11 w-full items-center justify-between gap-3 border-t border-border-subtle/80 px-4 text-[13px] font-semibold text-text-secondary transition-colors hover:bg-white/[0.04] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
-                >
-                  <span className="truncate">{loc('عرض كل النتائج', 'See all results', 'هەمووی ببینە')}</span>
-                  <Forward className="h-4 w-4 shrink-0" aria-hidden="true" />
-                </button>
+              {view === 'skeleton' && (
+                <div aria-hidden="true">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="flex min-h-[60px] items-center gap-3 px-2 py-1.5">
+                      <Skeleton className="h-12 w-12 shrink-0 rounded-lg" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-3.5 w-3/5" />
+                        <Skeleton className="h-3 w-1/4" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {view === 'empty' && (
+                <div className="flex min-h-[60px] items-center gap-3 px-3 text-text-secondary">
+                  <PackageSearch className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
+                  <span className="text-[14px]">{loc('لا توجد نتائج', 'No results', 'هیچ ئەنجامێک نییە')}</span>
+                </div>
+              )}
+              {view === 'error' && (
+                <div className="flex min-h-[60px] items-center justify-between gap-3 px-3">
+                  <span className="text-[14px] text-text-secondary">
+                    {loc('تعذر التحميل', 'Failed to load', 'بارکردن سەرکەوتوو نەبوو')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAttempt((n) => n + 1)}
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-text-primary hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  >
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                    {t('retry')}
+                  </button>
+                </div>
               )}
             </div>
-          </motion.div>
+            {view === 'rows' && (
+              <button
+                type="submit"
+                className="flex min-h-11 w-full items-center justify-between gap-3 border-t border-border-subtle/80 px-4 text-[13px] font-semibold text-text-secondary transition-colors hover:bg-white/[0.04] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+              >
+                <span className="truncate">{loc('عرض كل النتائج', 'See all results', 'هەمووی ببینە')}</span>
+                <Forward className="h-4 w-4 shrink-0" aria-hidden="true" />
+              </button>
+            )}
+          </LiveSearchPanel>
         )}
-      </AnimatePresence>
+      </Suspense>
     </form>
   );
 }

@@ -188,3 +188,33 @@ export function sniffVideo(bytes: Uint8Array): VideoSniff {
   if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) return sniffWebm(bytes);
   return { ok: false, reason: 'not_video' };
 }
+
+/**
+ * IS THE INDEX IN FRONT OF THE FRAMES? — the «faststart» question.
+ *
+ * An MP4 plays as it downloads only when its `moov` box (the index: where
+ * every frame sits) comes BEFORE its `mdat` (the frames). Most phone cameras
+ * and many desktop encoders write the index LAST, because they only know the
+ * frame table when recording ends; a browser handed such a file must fetch
+ * the whole `mdat` — forty megabytes over Iraqi mobile data — before it can
+ * show frame one, and on a range-capable server it does that by seeking to
+ * the end and back. The fix is the encoder's own «fast start» / «web
+ * optimized» option (ffmpeg `-movflags +faststart`), which moves the index,
+ * so the upload route WARNS rather than refuses: the file is playable, it is
+ * merely slow to start, and the merchant can re-export it when they see the
+ * hint (`VIDEO_NOT_FASTSTART`, src/lib/refusalStrings.ts).
+ *
+ * Only meaningful for an MP4 `sniffVideo` accepted. `true` for anything that
+ * is not an MP4 with both boxes (a WebM streams by construction; an MP4
+ * without `mdat` has nothing to wait for), so a caller can ask
+ * unconditionally and warn only on a false.
+ */
+export function mp4IsFastStart(bytes: Uint8Array): boolean {
+  if (bytes.length < 16 || fourcc(bytes, 4) !== 'ftyp') return true;
+  const top = boxes(bytes, 0, bytes.length, true);
+  if (!top) return true;
+  const moov = top.findIndex((x) => x.type === 'moov');
+  const mdat = top.findIndex((x) => x.type === 'mdat');
+  if (moov < 0 || mdat < 0) return true;
+  return moov < mdat;
+}

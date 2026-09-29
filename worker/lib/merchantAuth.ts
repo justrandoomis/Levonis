@@ -24,7 +24,7 @@
 import type { Context } from 'hono';
 import type { AppContext } from './types';
 import { forbidden, HttpError, notFound, unauthorized } from './http';
-import { getTierStatus, benefits } from './entitlements';
+import { getTierStatus, benefits, type TierStatus } from './entitlements';
 
 export interface MerchantRow {
   id: string;
@@ -170,6 +170,9 @@ export async function requireStoreOwner(c: Context<AppContext>): Promise<StoreCo
   // fail. It is here so that if the query above is ever changed to take an id
   // from the request, the ownership check does not silently disappear with it.
   if (ctx.store.user_id !== user.id) throw forbidden('This store belongs to another account');
+  // For the routers' purge middleware (worker/lib/edgePolicy.ts): the slug
+  // as it is BEFORE this request's write, which is the one a rename retires.
+  c.set('merchantStore', { id: ctx.store.id, slug: ctx.store.slug });
   return ctx;
 }
 
@@ -265,12 +268,15 @@ export async function sellingStatus(
 export async function sellingVerdict(
   db: D1Database,
   ctx: StoreContext,
-  ownerUserId: string
+  ownerUserId: string,
+  // The owner's tier when the caller already read it this request — the same
+  // `getTierStatus` answer, judged by the same rule, read once (P2a).
+  ownerTier?: TierStatus
 ): Promise<{ canSell: boolean; reason: string }> {
   if (ctx.merchant.status === 'suspended') return { canSell: false, reason: 'merchant_suspended' };
   if (ctx.store.status === 'suspended') return { canSell: false, reason: 'store_suspended' };
   if (ctx.store.status === 'paused') return { canSell: false, reason: 'store_paused' };
-  const tier = await getTierStatus(db, ownerUserId);
+  const tier = ownerTier ?? (await getTierStatus(db, ownerUserId));
   if ((tier.gated_benefits ?? []).includes('merchantStore')) {
     return { canSell: false, reason: 'benefit_restricted' };
   }

@@ -35,6 +35,8 @@ export default function ProductTile({ product: p, eager = false }: { product: Co
           alt=""
           aspect="square"
           eager={eager}
+          // The hub grid: 2 across on a phone, 3 from 640 px, 6 from 1024 px.
+          sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 50vw"
           bgClassName="bg-surface-selected"
           imgClassName="transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none"
         />

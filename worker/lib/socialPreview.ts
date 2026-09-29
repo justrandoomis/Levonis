@@ -54,6 +54,7 @@ import { isAnonymousPublicMediaKey } from './mediaStorage';
 import { loadAuthoritativeProductImages } from './productSelectionImage';
 import { logoSourceKey, readStoreIconsQuietly, servableStoreIcons } from './storeIcons';
 import { cleanIdentityText, storeDescription } from './webManifest';
+import { DOCUMENT_CACHE_CONTROL } from './securityPolicy';
 
 /** The four things a chat app reads off a link, already absolute and escaped. */
 export interface SocialPreview {
@@ -527,4 +528,258 @@ export function framedByStore(
     image: product.image || store.image,
     siteName: store.siteName,
   };
+}
+
+// ===========================================================================
+//  THE DOCUMENT'S HEAD START — preloads, the inline resolve answer, and the
+//  validators that let a rewritten document be revalidated and shared
+//  (docs/MERCHANT_PLATFORM_V2.md §B.1 #3, §B.2 «Cache Rules» / «Early Hints»;
+//  measured in docs/PERFORMANCE_LOG.md «P2b»).
+// ===========================================================================
+//
+// The Worker already buffers and rewrites the documents that name a product or
+// a store (for the share card above). Once the document is in hand, three more
+// things can be written into it that the browser otherwise learns only after
+// the whole bundle has been parsed and React has mounted:
+//
+//   1. WHICH CHUNK THIS ROUTE NEEDS. Every page is a lazy chunk; the browser
+//      discovers it when the router renders, one full round trip after the
+//      entry ran. `<link rel="modulepreload">` from Vite's manifest names it in
+//      the head, so it downloads beside the entry. Vite's own preload helper
+//      sees the link and does not add a second one.
+//   2. THE PICTURE THE PAGE WILL PAINT LARGEST — the product's lead image, the
+//      store's cover — as `<link rel="preload" as="image" fetchpriority="high">`,
+//      so the request leaves with the document rather than after the data.
+//   3. THE RESOLVE ANSWER. `src/StoreContext.tsx` held every first paint until
+//      `GET /api/storefront/resolve` came back. The ANONYMOUS answer is written
+//      into the document as a JSON data block (`<script type="application/json"
+//      id="lv-resolve">`, never executed, outside the CSP's script allowance)
+//      and read synchronously. Only the anonymous answer: the document must
+//      stay the same bytes for every visitor, or it could not be shared.
+//
+// Everything here is a pure function over strings and the manifest, so the
+// tests assert the tags directly (tests/documentPreloads.test.ts).
+
+/** One chunk of Vite's `.vite/manifest.json` (`build.manifest = true`). */
+export interface ViteManifestChunk {
+  file: string;
+  src?: string;
+  name?: string;
+  isEntry?: boolean;
+  isDynamicEntry?: boolean;
+  imports?: string[];
+  dynamicImports?: string[];
+  css?: string[];
+}
+export type ViteManifest = Record<string, ViteManifestChunk>;
+
+/** The manifest key of the document's entry, and the path the build ships the manifest at. */
+export const MANIFEST_ENTRY = 'index.html';
+export const MANIFEST_PATH = '/.vite/manifest.json';
+/** The Arabic Cairo subset index.html preloads (P1a) — named again in the Early Hints `Link`. */
+export const ARABIC_FONT_PRELOAD = '/fonts/cairo/cairo-v31-arabic.woff2';
+/** The id `src/lib/bootFetch.ts` reads. */
+export const INLINE_RESOLVE_ID = 'lv-resolve';
+
+/**
+ * THE POLICY OF A DOCUMENT THAT IS THE SAME FOR EVERY VISITOR.
+ *
+ * `max-age=0`: the browser revalidates every navigation (a cheap 304 now that
+ * the ETag survives the rewrite). `s-maxage=60`: the edge may hold it a
+ * minute — a store's name, cover and card are not a price — which is the
+ * Iraqi-PoP answer the plan's «Cache Rules for HTML» row needs (Cloudflare
+ * only caches HTML under such a rule; until the owner adds it this header
+ * changes nothing at the edge). NO `stale-while-revalidate` (P2 review): the
+ * document names content-hashed chunks and inlines the store's resolve, so
+ * a colo answering stale while it refreshes could hand out the previous
+ * build's chunk names, or a suspended store's name, for ten minutes more.
+ * With the plain `s-maxage` the worst case is a minute, and the deploy
+ * workflows purge the zone (scripts/purge-zone-cache.mjs) so a deploy is
+ * not even that. A document whose rewrite read a session keeps `no-cache` —
+ * see `documentCacheControl`.
+ */
+export const DOCUMENT_SHARED_CACHE_CONTROL = 'public, max-age=0, s-maxage=60';
+
+/**
+ * Shared when nothing about the response depends on WHO asked: no session was
+ * loaded for the request, no cookie is being set, and every byte written in
+ * came from public rows and the anonymous resolve answer. Otherwise the
+ * document's ordinary `no-cache` (worker/lib/securityPolicy.ts), which no
+ * shared cache stores.
+ */
+export function documentCacheControl(viewerDependent: boolean): string {
+  return viewerDependent ? DOCUMENT_CACHE_CONTROL : DOCUMENT_SHARED_CACHE_CONTROL;
+}
+
+/**
+ * The page module a document path renders — a key of the manifest — or null
+ * for a path whose chunk this file does not know. Mirrors the `<Route>`s in
+ * src/App.tsx for exactly the paths `assetWithPreview` rewrites.
+ */
+export function routeModuleFor(path: string, onStore: boolean): string | null {
+  if (onStore) {
+    if (path === '/') return 'src/pages/Storefront.tsx';
+    if (/^\/p\/[^/]+\/?$/.test(path)) return 'src/pages/StorefrontProduct.tsx';
+    return null;
+  }
+  if (/^\/product\/[^/]+\/?$/.test(path)) return 'src/pages/Product.tsx';
+  if (/^\/bundles\/[^/]+\/?$/.test(path)) return 'src/pages/BundleDetail.tsx';
+  if (/^\/community\/store\/[^/]+\/p\/[^/]+\/?$/.test(path)) return 'src/pages/StorefrontProduct.tsx';
+  if (/^\/community\/store\/[^/]+\/?$/.test(path)) return 'src/pages/CommunityStorePage.tsx';
+  return null;
+}
+
+/** Every manifest key reachable from `key` through STATIC imports, `key` first. */
+function staticClosure(manifest: ViteManifest, key: string): string[] {
+  const seen = new Set<string>();
+  const order: string[] = [];
+  const queue = [key];
+  while (queue.length) {
+    const k = queue.shift()!;
+    if (seen.has(k) || !manifest[k]) continue;
+    seen.add(k);
+    order.push(k);
+    for (const dep of manifest[k].imports ?? []) if (!seen.has(dep)) queue.push(dep);
+  }
+  return order;
+}
+
+/**
+ * What a route's chunk needs that the document does not already load: the
+ * chunk itself and the static imports it shares with other lazy pages (the
+ * icon chunk, a storefront helper), minus everything in the entry's own
+ * closure, which the built index.html already names. The route chunk is
+ * always first; the cap is a guard against a runaway graph, not a tuning
+ * knob — MEASURED (docs/PERFORMANCE_LOG.md «P2b»): naming the WHOLE closure
+ * (12–18 chunks for these pages) beat naming the first eight by ~200–260 ms
+ * of LCP on the store home, because the browser otherwise discovers the rest
+ * only when the route chunk arrives, one more round trip late; and naming
+ * none at all lost ~250 ms against either. The entry's own arrival did not
+ * move in any variant (the document lists its files first).
+ */
+export function chunkPreloads(
+  manifest: ViteManifest,
+  key: string,
+  cap = 24
+): { scripts: string[]; styles: string[] } {
+  if (!manifest[key]) return { scripts: [], styles: [] };
+  const entry = new Set(staticClosure(manifest, MANIFEST_ENTRY));
+  const scripts: string[] = [];
+  const styles: string[] = [];
+  for (const k of staticClosure(manifest, key)) {
+    if (entry.has(k)) continue;
+    const chunk = manifest[k];
+    if (scripts.length < cap) scripts.push(`/${chunk.file}`);
+    for (const css of chunk.css ?? []) if (styles.length < cap && !styles.includes(`/${css}`)) styles.push(`/${css}`);
+  }
+  return { scripts, styles };
+}
+
+/** The entry's stylesheets (`/assets/index-<hash>.css`), for the Early Hints line. */
+export function entryStylesheets(manifest: ViteManifest): string[] {
+  return (manifest[MANIFEST_ENTRY]?.css ?? []).map((css) => `/${css}`);
+}
+
+/**
+ * The `Link` header Cloudflare turns into a 103 Early Hints response once the
+ * owner switches Early Hints on (plan §B.2): the entry stylesheet and the
+ * Arabic font start one round trip before the document body arrives. Only
+ * `preload`/`preconnect` are honoured there, so the route chunk stays in the
+ * HTML as a modulepreload.
+ */
+export function earlyHintsLink(styles: string[], font: string | null = ARABIC_FONT_PRELOAD): string {
+  const parts = styles.map((href) => `<${href}>; rel=preload; as=style`);
+  if (font) parts.push(`<${font}>; rel=preload; as=font; crossorigin`);
+  return parts.join(', ');
+}
+
+/**
+ * The image a document may preload: a same-origin `/files/<public key>` path
+ * only — the URL the page's own `<img>` will ask for, without the origin the
+ * share card needs. Anything else is not preloaded (a wasted download costs
+ * more than a late one).
+ */
+export function preloadImagePath(url: unknown): string | null {
+  const raw = String(url ?? '').trim();
+  if (!raw) return null;
+  let path = raw;
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const u = new URL(raw);
+      path = `${u.pathname}${u.search}`;
+    } catch {
+      return null;
+    }
+  }
+  if (!path.startsWith('/files/')) return null;
+  const key = path.slice('/files/'.length).split('?')[0];
+  return isAnonymousPublicMediaKey(key) ? path : null;
+}
+
+/**
+ * The store home's largest picture, from the anonymous resolve answer: the
+ * published hero block's own image when it has one (the same `mediaSrc` rule
+ * `blocks/Hero.tsx` applies: `/files/<key>`), else the store's banner.
+ */
+export function heroCoverFrom(resolve: unknown): string | null {
+  const store = (resolve as { store?: Record<string, unknown> | null } | null)?.store;
+  if (!store || typeof store !== 'object') return null;
+  const layout = store.layout as { blocks?: unknown[] } | undefined;
+  for (const block of layout?.blocks ?? []) {
+    const b = block as { type?: unknown; hidden?: unknown; settings?: { image?: unknown } };
+    if (b?.type !== 'hero') continue;
+    if (b.hidden) break;
+    const image = typeof b.settings?.image === 'string' ? b.settings.image.trim() : '';
+    if (image) return preloadImagePath(image.startsWith('/files/') ? image : `/files/${image}`);
+    break;
+  }
+  return preloadImagePath(store.bannerUrl);
+}
+
+/**
+ * A JSON data block. `<`, `>` and `&` are written as escapes inside the JSON
+ * text (still valid JSON, so `JSON.parse` on the client reads the same value)
+ * so no value — a store name, a tagline — can close the element and inject
+ * markup; U+2028/2029 likewise, for any reader that is not a JSON parser.
+ */
+export function inlineJsonScript(id: string, value: unknown): string {
+  const json = JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+  return `<script type="application/json" id="${id}">${json}</script>`;
+}
+
+export interface DocumentPreloads {
+  /** `/assets/<chunk>.js` files for `<link rel="modulepreload">`. */
+  scripts: string[];
+  /** `/assets/<chunk>.css` files for `<link rel="preload" as="style">`. */
+  styles: string[];
+  /** The one image preloaded at high priority, or null. */
+  image: string | null;
+  /** The anonymous resolve answer, or null when the document must not carry one. */
+  resolve: unknown | null;
+}
+
+/**
+ * Write the head start into the document: preloads and the data block, just
+ * before `</head>` — after the entry's own modulepreloads and stylesheet, so
+ * the preload scanner queues them behind the code the first paint needs.
+ * Idempotent on the data block: a document that already carries one (a test
+ * feeding the output back in) has it replaced, never doubled.
+ */
+export function injectDocumentPreloads(html: string, p: DocumentPreloads): string {
+  const lines: string[] = [];
+  for (const href of p.scripts) lines.push(`<link rel="modulepreload" crossorigin href="${escapeAttribute(href)}">`);
+  for (const href of p.styles) lines.push(`<link rel="preload" as="style" crossorigin href="${escapeAttribute(href)}">`);
+  if (p.image) lines.push(`<link rel="preload" as="image" fetchpriority="high" href="${escapeAttribute(p.image)}">`);
+  if (p.resolve !== null && p.resolve !== undefined) lines.push(inlineJsonScript(INLINE_RESOLVE_ID, p.resolve));
+  if (!lines.length) return html;
+  const existing = new RegExp(`<script type="application/json" id="${INLINE_RESOLVE_ID}">[\\s\\S]*?</script>\\s*`, 'i');
+  const out = html.replace(existing, '');
+  const block = lines.map((l) => `  ${l}`).join('\n');
+  // A FUNCTION replacement: `$&`, `$'` and friends are commands in a string one.
+  return out.replace(/<\/head>/i, () => `${block}\n  </head>`);
 }

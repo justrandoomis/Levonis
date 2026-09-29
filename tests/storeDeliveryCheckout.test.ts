@@ -530,19 +530,25 @@ test('GET /api/storefront/:slug/delivery: fees and availability only; the viewer
   assert.equal((await json(bad)).code, 'GOVERNORATE_INVALID');
 });
 
-test('the store payload carries the delivery summary, and «delivery to you» only for the signed-in viewer', async () => {
+test('the store payload carries the delivery summary for everyone, and «delivery to you» ONLY from /:slug/delivery (P2a)', async () => {
+  // Since P2a the store body is one body for every visitor — cached at the
+  // edge for guests, and never a place for the viewer's own address. The
+  // signed-in visitor's «التوصيل إلى محافظتك» is the /delivery answer, which
+  // the storefront asks for separately (src/lib/storefrontApi.ts `deliveryToYou`).
   const raw = freshDb();
   seed(raw);
   const db = asD1(raw);
   await configure(db);
   const signed = (await json(await get(buyer(db), '/api/storefront/ali3d'))).store;
-  assert.deepEqual(signed.delivery_to_you, {
-    governorate: 'baghdad', available: true, reason: null, fee_iqd: 3000, free: false, free_over_iqd: 50_000, prep_days: 1, eta_note: 'Same day',
-  });
+  assert.equal('delivery_to_you' in signed, false, 'the store body never carries the viewer\'s own line');
   assert.equal(signed.delivery.areas.find((a: { governorate: string }) => a.governorate === 'erbil').free, true);
   assert.deepEqual(signed.delivery_settings, { note: 'Delivered by our own courier' });
   const anon = (await json(await get(guest(db), '/api/storefront/ali3d'))).store;
-  assert.equal(anon.delivery_to_you, null);
+  assert.deepEqual(anon, signed, 'a guest and a signed-in visitor read the same shopfront');
   const product = (await json(await get(buyer(db), '/api/storefront/ali3d/products/ali-spool'))).store;
-  assert.equal(product.delivery_to_you.fee_iqd, 3000);
+  assert.equal('delivery_to_you' in product, false);
+  const mine = (await json(await get(buyer(db), '/api/storefront/ali3d/delivery'))).delivery;
+  assert.deepEqual([mine.source, mine.quote], ['address', {
+    governorate: 'baghdad', available: true, reason: null, fee_iqd: 3000, free: false, free_over_iqd: 50_000, prep_days: 1, eta_note: 'Same day',
+  }]);
 });

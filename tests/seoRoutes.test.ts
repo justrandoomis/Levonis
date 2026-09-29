@@ -251,3 +251,42 @@ test('a product with no description keeps the shop line rather than inventing on
   const out = injectSocialPreview(html, { title: 'X', description: '', image: '', url: 'https://x/y' });
   assert.match(out, /content="shop"/);
 });
+
+// =========================================================================
+// the validator a rewritten document keeps (P2b, plan §B.1 #3)
+// =========================================================================
+
+/**
+ * Until P2b the product and store documents LOST their ETag in the rewrite
+ * (the asset's validator no longer matched the body), so a crawler or a
+ * browser revisiting `/product/<slug>` could never be answered 304 — every
+ * revisit was the whole document again. The validator is now computed from
+ * the rewritten body; tests/documentPreloads.test.ts proves the whole round
+ * trip, this pins the SEO-facing half: a product page answers a conditional
+ * request with 304 and the same weak ETag, and never with the asset's own.
+ */
+test('a product document keeps a validator of its rewritten body and answers 304', async () => {
+  const raw = freshDb();
+  seedProducts(raw);
+  const { default: worker } = await import('../worker/index');
+  const shell = '<!doctype html><html><head><title>LEVONIS</title>\n<meta name="description" content="shop" />\n</head><body></body></html>';
+  const env = {
+    DB: asD1(raw),
+    STORE_ROOT_DOMAIN: APEX,
+    APP_ORIGIN: ORIGIN,
+    EXTRA_ALLOWED_ORIGINS: '',
+    ASSETS: { fetch: async () => new Response(shell, { headers: { 'content-type': 'text/html; charset=utf-8', etag: 'W/"asset"' } }) },
+  };
+  const call = (headers: Record<string, string> = {}) =>
+    worker.fetch(new Request(`${ORIGIN}/product/pla-matte`, { headers: { Host: APEX, ...headers } }), env as never, ctx);
+  const first = await call();
+  assert.equal(first.status, 200);
+  const etag = first.headers.get('ETag');
+  assert.match(etag ?? '', /^W\/"[0-9a-f]{32}"$/, 'a weak validator of the rewritten body');
+  assert.notEqual(etag, 'W/"asset"');
+  assert.match(await first.text(), /<title>PLA Matte<\/title>/, 'and it is still the product page');
+  const revisit = await call({ 'If-None-Match': etag! });
+  assert.equal(revisit.status, 304);
+  assert.equal(revisit.headers.get('ETag'), etag);
+  assert.equal((await call({ 'If-None-Match': 'W/"asset"' })).status, 200, "the asset's own validator earns nothing");
+});

@@ -103,10 +103,25 @@ test('the page cannot be framed, re-based, made to submit elsewhere or host plug
   assert.deepEqual(directive(csp, 'object-src'), ["'none'"]);
 });
 
-test('the app talks only to itself (plus Google sign-in, the fonts stylesheet and the analytics beacon)', () => {
+test('the app talks only to itself (plus Google sign-in and the analytics beacon)', () => {
   assert.deepEqual(directive(spaCsp(), 'connect-src'), [
-    "'self'", 'blob:', GOOGLE_SIGNIN_ORIGIN, 'https://fonts.googleapis.com', CLOUDFLARE_INSIGHTS_BEACON,
+    "'self'", 'blob:', GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_BEACON,
   ]);
+});
+
+test('THE FONTS ARE OURS (P1a): no Google Fonts origin anywhere in the SPA policy', () => {
+  // The measured reason: every first paint waited on fonts.googleapis.com —
+  // home LCP 4.96 s with the link, 2.63 s without (docs/PERFORMANCE_LOG.md).
+  // Cairo and IBM Plex Mono are served from /fonts/, which 'self' admits, so
+  // an entry for either origin here would be a regression to that dependency.
+  const csp = spaCsp();
+  assert.ok(!csp.includes('fonts.googleapis.com'), 'fonts.googleapis.com is back in the SPA policy');
+  assert.ok(!csp.includes('fonts.gstatic.com'), 'fonts.gstatic.com is back in the SPA policy');
+  assert.deepEqual(directive(csp, 'font-src'), ["'self'", 'data:']);
+  assert.deepEqual(directive(csp, 'style-src'), ["'self'", "'unsafe-inline'", GOOGLE_SIGNIN_ORIGIN]);
+  // The print documents are a different surface and still link Google (see
+  // documentCsp); that allowance must not leak back into the SPA's.
+  assert.ok(directive(documentCsp(), 'font-src')?.includes('https://fonts.gstatic.com'));
 });
 
 // ------------------------------------------------------ the document policy

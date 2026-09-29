@@ -48,6 +48,22 @@ import {
   viewerGovernorate,
 } from '../lib/merchantDelivery';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
+import { anonymousCached } from '../lib/edgePolicy';
+
+/**
+ * ONE BODY FOR EVERY VISITOR (P2a, plan §B.1 #2 and #4).
+ *
+ * Every read below except `/:slug/delivery` now answers the same bytes to a
+ * guest and to a signed-in customer: «التوصيل إلى محافظتك» — the one field
+ * that was the VIEWER's — moved to GET /:slug/delivery, which the storefront
+ * asks for separately once it knows who is looking (src/lib/storefrontApi.ts
+ * `deliveryToYou`). That is what lets the colo cache a shopfront for guests
+ * (`anonymousCached`: never for a request that carries a session), lets the
+ * request pipeline skip the session lookup for the whole router
+ * (worker/lib/session.ts `sessionFreePublicGet`), and is pinned by
+ * tests/storefrontIsolation.test.ts: a cached storefront never carries
+ * viewer data because the routes that are cached never read a viewer.
+ */
 
 export const storefrontRoutes = new Hono<AppContext>();
 
@@ -56,15 +72,13 @@ export const storefrontRoutes = new Hono<AppContext>();
  * Also read by the public API (worker/lib/publicApi/resources/stores.ts),
  * which rebuilds its own answer field by field from this one.
  */
-export async function publicStore(db: D1Database, ctx: StoreContext, rootDomain: string | null, viewerId: string | null = null) {
+export async function publicStore(db: D1Database, ctx: StoreContext, rootDomain: string | null) {
   const { store: s, merchant: m } = ctx;
-  // The store's delivery (W2-A) and — for a signed-in visitor with a saved
-  // address — what delivery to THEIR governorate costs, read together.
-  const [tier, deliveryCfg, viewerGov] = await Promise.all([
-    getTierStatus(db, m.user_id),
-    loadDeliveryConfig(db, s),
-    viewerGovernorate(db, viewerId),
-  ]);
+  // The owner's tier (badges, and below, whether the cart will take an order)
+  // and the store's delivery (W2-A), read together. The tier is read ONCE and
+  // handed to `storeTakesOrders`: it used to be read a second time inside the
+  // verdict — four more dependent D1 round trips on every shopfront (P2a).
+  const [tier, deliveryCfg] = await Promise.all([getTierStatus(db, m.user_id), loadDeliveryConfig(db, s)]);
   /**
    * «OPEN» MEANS THE CART WILL TAKE AN ORDER (review S1). It used to be
    * `storeIsOpen` — the store's own switch and the merchant suspension — while
@@ -74,7 +88,7 @@ export async function publicStore(db: D1Database, ctx: StoreContext, rootDomain:
    * showed a live «أضف إلى السلة», and every tap came back STORE_CLOSED. One
    * rule for both now: what this says is what the cart does.
    */
-  const takingOrders = (await storeTakesOrders(db, ctx)).ok;
+  const takingOrders = (await storeTakesOrders(db, ctx, tier)).ok;
   return {
     id: s.id,
     slug: s.slug,
@@ -108,11 +122,9 @@ export async function publicStore(db: D1Database, ctx: StoreContext, rootDomain:
     // serves with their fees, pickup, preparation days. Display only — the
     // checkout prices again from the customer's saved address.
     delivery: publicDeliverySummary(deliveryCfg),
-    // «التوصيل إلى <محافظتك>»: the visitor's own default-address governorate,
-    // answered for this store. Null for a guest or an address without one.
-    // It is the VIEWER's own data, in a response nothing caches (the API is
-    // network-only in the service worker and uncached at the edge).
-    delivery_to_you: viewerGov ? deliveryToGovernorate(deliveryCfg, viewerGov) : null,
+    // «التوصيل إلى <محافظتك>» is NOT here any more: it is the viewer's own
+    // data and this body is cached for guests. GET /:slug/delivery answers it
+    // for the signed-in visitor (see the file header).
     accepts_custom_requests: !!s.accepts_custom_requests,
     sells_direct_products: !!s.sells_direct_products,
     open: takingOrders,
@@ -172,38 +184,38 @@ export function publicProduct(p: Record<string, unknown>) {
   };
 }
 
-/** How many people follow this shop — public, same as the community page. */
-async function followerCount(db: D1Database, merchantId: string): Promise<number> {
-  const row = await db.prepare('SELECT COUNT(*) AS n FROM follows WHERE merchant_id = ?')
-    .bind(merchantId).first<{ n: number }>();
-  return row?.n ?? 0;
-}
-
 /**
  * The profile's stats row, computed from real rows: followers, published
  * products, and the share of visible reviews at 4★+. `positive_pct` is null
  * with no reviews — a store with none says "new", never a fabricated 100%.
  */
 export async function storeStats(db: D1Database, ctx: StoreContext) {
-  const [followers, products, positive, deals] = await Promise.all([
-    followerCount(db, String(ctx.merchant.id)),
+  // Four counts, ONE D1 call (P2a): a batch is one round trip for the whole
+  // wave and one subrequest instead of four — the same four statements.
+  const [followersRes, productsRes, positiveRes, dealsRes] = await db.batch([
+    db.prepare('SELECT COUNT(*) AS n FROM follows WHERE merchant_id = ?').bind(String(ctx.merchant.id)),
     db.prepare(
       `SELECT COUNT(*) AS n FROM community_products
         WHERE store_id = ? AND lifecycle = 'active' AND status = 'active'`
-    ).bind(ctx.store.id).first<{ n: number }>(),
+    ).bind(ctx.store.id),
     db.prepare(
       `SELECT COUNT(*) AS total, SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) AS good
          FROM merchant_reviews WHERE merchant_id = ? AND hidden = 0`
-    ).bind(ctx.merchant.id).first<{ total: number; good: number }>(),
+    ).bind(ctx.merchant.id),
     db.prepare(
       `SELECT COUNT(*) AS n FROM community_products
         WHERE store_id = ? AND lifecycle = 'active' AND status = 'active'
           AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd`
-    ).bind(ctx.store.id).first<{ n: number }>(),
+    ).bind(ctx.store.id),
   ]);
+  const first = <T,>(r: D1Result<unknown>) => (r.results?.[0] ?? null) as T | null;
+  const followers = first<{ n: number }>(followersRes);
+  const products = first<{ n: number }>(productsRes);
+  const positive = first<{ total: number; good: number }>(positiveRes);
+  const deals = first<{ n: number }>(dealsRes);
   const total = Number(positive?.total ?? 0);
   return {
-    followers,
+    followers: Number(followers?.n ?? 0),
     product_count: products?.n ?? 0,
     positive_pct: total ? Math.round((Number(positive?.good ?? 0) / total) * 100) : null,
     deal_count: deals?.n ?? 0,
@@ -217,9 +229,9 @@ export async function storeStats(db: D1Database, ctx: StoreContext) {
  * statements (worker/lib/storeLayout.ts). A store that never published gets
  * the classic page generated from its settings. The three reads run together.
  */
-async function storefrontStore(db: D1Database, ctx: StoreContext, rootDomain: string | null, viewerId: string | null = null) {
+async function storefrontStore(db: D1Database, ctx: StoreContext, rootDomain: string | null) {
   const [profile, stats, layout] = await Promise.all([
-    publicStore(db, ctx, rootDomain, viewerId),
+    publicStore(db, ctx, rootDomain),
     storeStats(db, ctx),
     storefrontLayoutPayload(db, ctx),
   ]);
@@ -308,7 +320,9 @@ function nextCursor(rows: Array<Record<string, unknown>>, limit: number): string
  * The SPA calls this once on boot. Returning `store: null` for the main site
  * is a normal answer, not an error — most requests are the main site.
  */
-storefrontRoutes.get('/resolve', async (c) => {
+// Keyed by the request's own origin, so each store host caches its own
+// answer and the apex its `store: null` (worker/lib/edgePolicy.ts).
+storefrontRoutes.get('/resolve', (c) => anonymousCached(c, {}, async () => {
   const host = c.get('host');
   const root = rootDomainFrom(c.env);
   // The platform's own address, from configuration — every answer carries
@@ -369,15 +383,15 @@ storefrontRoutes.get('/resolve', async (c) => {
   return c.json({
     success: true,
     kind: 'merchant',
-    store: await storefrontStore(c.env.DB, ctx, root, c.get('user')?.id ?? null),
+    store: await storefrontStore(c.env.DB, ctx, root),
     root_domain,
   });
-});
+}));
 
-storefrontRoutes.get('/:slug', async (c) => {
+storefrontRoutes.get('/:slug', (c) => anonymousCached(c, {}, async () => {
   const ctx = await servableStore(c, c.req.param('slug'));
-  return c.json({ success: true, store: await storefrontStore(c.env.DB, ctx, rootDomainFrom(c.env), c.get('user')?.id ?? null) });
-});
+  return c.json({ success: true, store: await storefrontStore(c.env.DB, ctx, rootDomainFrom(c.env)) });
+}));
 
 /**
  * GET /:slug/delivery?governorate=<id> — what this store charges to deliver to
@@ -385,6 +399,11 @@ storefrontRoutes.get('/:slug', async (c) => {
  * availability only, never the merchant's editor state. Without `governorate`
  * a signed-in visitor gets their own default address's; a guest gets only the
  * list. The checkout prices again from the saved address — this is a preview.
+ *
+ * THE ONE STOREFRONT READ THAT LOOKS AT THE VIEWER, and therefore the one
+ * that is never cached and never skips the session (worker/lib/session.ts).
+ * Since P2a the store page asks this for «التوصيل إلى محافظتك» instead of
+ * finding it in the store body.
  */
 storefrontRoutes.get('/:slug/delivery', async (c) => {
   const ctx = await servableStore(c, c.req.param('slug'));
@@ -465,7 +484,7 @@ async function publicCollections(c: Context<AppContext>) {
 // One path only: every literal segment of this router must be a reserved
 // store slug (tests/storeSlugsPaging.test.ts B23), so «collections» is served
 // under the path the storefront has always called.
-storefrontRoutes.get('/:slug/sections', publicCollections);
+storefrontRoutes.get('/:slug/sections', (c) => anonymousCached(c, {}, () => publicCollections(c)));
 
 /** The services this shop advertises. Prices here are honest floors, not quotes. */
 export async function storeServices(db: D1Database, storeId: string): Promise<Array<Record<string, unknown>>> {
@@ -477,7 +496,7 @@ export async function storeServices(db: D1Database, storeId: string): Promise<Ar
   return results;
 }
 
-storefrontRoutes.get('/:slug/services', async (c) => {
+storefrontRoutes.get('/:slug/services', (c) => anonymousCached(c, {}, async () => {
   const ctx = await servableStore(c, c.req.param('slug'));
   const results = await storeServices(c.env.DB, ctx.store.id);
   return c.json({
@@ -493,7 +512,7 @@ storefrontRoutes.get('/:slug/services', async (c) => {
       imageUrl: s.image_key ? `/files/${s.image_key}` : null,
     })),
   });
-});
+}));
 
 /** Printers, materials and finished works — the workshop on display. */
 export async function storeShowcase(db: D1Database, storeId: string): Promise<Array<Record<string, unknown>>> {
@@ -505,7 +524,7 @@ export async function storeShowcase(db: D1Database, storeId: string): Promise<Ar
   return results;
 }
 
-storefrontRoutes.get('/:slug/showcase', async (c) => {
+storefrontRoutes.get('/:slug/showcase', (c) => anonymousCached(c, {}, async () => {
   const ctx = await servableStore(c, c.req.param('slug'));
   const results = await storeShowcase(c.env.DB, ctx.store.id);
   return c.json({
@@ -518,9 +537,12 @@ storefrontRoutes.get('/:slug/showcase', async (c) => {
       imageUrl: s.image_key ? `/files/${s.image_key}` : null,
     })),
   });
-});
+}));
 
-storefrontRoutes.get('/:slug/products', async (c) => {
+/** The query parameters a store's product list answers to — the cache key's whole vocabulary. */
+export const STORE_PRODUCTS_PARAMS: readonly string[] = ['limit', 'cursor', 'category', 'collection', 'section', 'deals'];
+
+storefrontRoutes.get('/:slug/products', (c) => anonymousCached(c, { params: STORE_PRODUCTS_PARAMS }, async () => {
   const ctx = await servableStore(c, c.req.param('slug'));
 
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 60, def: 24 });
@@ -587,7 +609,7 @@ storefrontRoutes.get('/:slug/products', async (c) => {
     products: results.map(publicProduct),
     next_cursor: nextCursor(results, limit),
   });
-});
+}));
 
 /**
  * One PUBLISHED product of this store, by slug. Scoped to the store as well
@@ -601,7 +623,7 @@ export async function publishedStoreProduct(db: D1Database, storeId: string, pro
   ).bind(storeId, productSlug).first<Record<string, unknown>>();
 }
 
-storefrontRoutes.get('/:slug/products/:productSlug', async (c) => {
+storefrontRoutes.get('/:slug/products/:productSlug', (c) => anonymousCached(c, {}, async () => {
   const ctx = await servableStore(c, c.req.param('slug'));
 
   const p = await publishedStoreProduct(c.env.DB, ctx.store.id, c.req.param('productSlug') ?? '');
@@ -612,17 +634,16 @@ storefrontRoutes.get('/:slug/products/:productSlug', async (c) => {
   // which counts each visitor once per product per Baghdad day, never the
   // owner or a crawler, and keeps `view_count` as the sum of those days
   // (worker/lib/storefrontAnalytics.ts, W2-E).
-  const viewer = c.get('user')?.id ?? '';
 
   // The product page renders no blocks, only the store's THEME (W2-C).
   // …and the variant picker, the ordered media and the printing attributes (W2-F).
   const [store, layout_theme, extras] = await Promise.all([
-    publicStore(c.env.DB, ctx, rootDomainFrom(c.env), viewer || null),
+    publicStore(c.env.DB, ctx, rootDomainFrom(c.env)),
     storefrontTheme(c.env.DB, ctx),
     publicProductExtras(c.env.DB, p),
   ]);
   return c.json({ success: true, product: { ...publicProduct(p), ...extras }, store: { ...store, layout_theme } });
-});
+}));
 
 /**
  * The distribution, computed from the rows rather than read from a cached
@@ -647,23 +668,29 @@ export async function storeReviewSummary(db: D1Database, merchantId: string) {
   return { average: total ? Math.round((sum / total) * 100) / 100 : null, count: total, distribution };
 }
 
-storefrontRoutes.get('/:slug/reviews', async (c) => {
+/** The query parameters the review list answers to. */
+export const STORE_REVIEWS_PARAMS: readonly string[] = ['limit', 'cursor'];
+
+storefrontRoutes.get('/:slug/reviews', (c) => anonymousCached(c, { params: STORE_REVIEWS_PARAMS }, async () => {
   const ctx = await servableStore(c, c.req.param('slug'));
 
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 50, def: 20 });
   const cursor = parseCursor(c.req.query('cursor'));
 
-  const { results } = await c.env.DB.prepare(
-    `SELECT r.id, r.rating, r.body, r.images, r.merchant_reply, r.merchant_replied_at,
-            r.created_at, r.order_id, r.community_order_id,
-            u.name AS customer_name, u.username AS customer_username
-       FROM merchant_reviews r JOIN users u ON u.id = r.customer_id
-      WHERE r.merchant_id = ?1 AND r.hidden = 0
-        AND (?2 = '' OR r.created_at < ?2 OR (r.created_at = ?2 AND r.id < ?3))
-      ORDER BY r.created_at DESC, r.id DESC LIMIT ?4`
-  ).bind(ctx.merchant.id, cursor.at, cursor.id, limit).all<Record<string, unknown>>();
-
-  const { average, count, distribution } = await storeReviewSummary(c.env.DB, String(ctx.merchant.id));
+  // The page and its distribution together (P2a): the summary used to wait
+  // for the page, a dependent round trip for a read that needs nothing from it.
+  const [{ results }, { average, count, distribution }] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT r.id, r.rating, r.body, r.images, r.merchant_reply, r.merchant_replied_at,
+              r.created_at, r.order_id, r.community_order_id,
+              u.name AS customer_name, u.username AS customer_username
+         FROM merchant_reviews r JOIN users u ON u.id = r.customer_id
+        WHERE r.merchant_id = ?1 AND r.hidden = 0
+          AND (?2 = '' OR r.created_at < ?2 OR (r.created_at = ?2 AND r.id < ?3))
+        ORDER BY r.created_at DESC, r.id DESC LIMIT ?4`
+    ).bind(ctx.merchant.id, cursor.at, cursor.id, limit).all<Record<string, unknown>>(),
+    storeReviewSummary(c.env.DB, String(ctx.merchant.id)),
+  ]);
 
   return c.json({
     success: true,
@@ -688,7 +715,7 @@ storefrontRoutes.get('/:slug/reviews', async (c) => {
     })),
     next_cursor: nextCursor(results, limit),
   });
-});
+}));
 
 /**
  * Compatibility: the pre-subdomain route (§57).
@@ -700,7 +727,7 @@ storefrontRoutes.get('/:slug/reviews', async (c) => {
  * followed-stores list navigate by merchant id, while chat share-cards carry
  * a store id. One store per merchant makes the double meaning unambiguous.
  */
-storefrontRoutes.get('/by-id/:storeId', async (c) => {
+storefrontRoutes.get('/by-id/:storeId', (c) => anonymousCached(c, {}, async () => {
   const id = str(c.req.param('storeId'), 'storeId', { min: 1, max: 64 });
   let ctx = await storeById(c.env.DB, id);
   if (!ctx) {
@@ -711,5 +738,5 @@ storefrontRoutes.get('/by-id/:storeId', async (c) => {
   }
   if (!ctx) throw notFound('Store not found');
   if (storeIsSuspended(ctx)) throw storeUnavailable();
-  return c.json({ success: true, store: await storefrontStore(c.env.DB, ctx, rootDomainFrom(c.env), c.get('user')?.id ?? null) });
-});
+  return c.json({ success: true, store: await storefrontStore(c.env.DB, ctx, rootDomainFrom(c.env)) });
+}));

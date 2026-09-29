@@ -276,6 +276,6 @@ and §4 above until those documents are rewritten in their waves.
 ## 8. Language
 Arabic (RTL, default), English (LTR) and Sorani Kurdish (RTL). Use `t()`/`loc()`
 and logical properties (`ps/pe/ms/me/start/end`). **Sorani is never
-machine-written** (`docs/DECISIONS.md` row 11): reuse existing hand-written Sorani
+machine-written** (see docs/DECISIONS.md rows 166–168 (D6)): reuse existing hand-written Sorani
 verbatim; otherwise the Arabic stands in, marked `// OWNER: Sorani to be written by
 hand.` Long English labels must not clip; numbers and prices stay LTR islands.

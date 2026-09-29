@@ -205,6 +205,9 @@ const ALLOWED_IMPORTS = [
   // A product's name in the reader's language — two pure functions, no imports
   // (Levo Community review, 2026-09-28).
   /^src\/lib\/productText$/,
+  // P1c: the loading screens' bars and their aria-busy group (react and the
+  // language context only) — the store pages' skeletons in storefront/skeletons.tsx.
+  /^src\/components\/ui\/Skeleton$/,
 ];
 
 function importsOf(rel: string): string[] {

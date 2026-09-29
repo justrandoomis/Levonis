@@ -88,6 +88,7 @@ import {
 // it here is what stops the calculator and the print-request wizard from
 // disagreeing about the smallest job a shop will take.
 import { getSetting } from '../lib/settings';
+import { afterPrintCatalogueWrite, anonymousCached } from '../lib/edgePolicy';
 import {
   MAX_ACCESSORY_QTY,
   priceAccessories,
@@ -317,7 +318,9 @@ async function priceGroupsFor(c: Context<AppContext>, models: PrinterModel[]) {
  * the rest never leave the Worker for an anonymous caller — they are how a
  * shop's costs are computed, and §22 keeps them out of the customer view.
  */
-printQuoteRoutes.get('/printers', async (c) => {
+// A guest's list is every guest's list (the platform's price groups); a
+// signed-in merchant's is their own and is built for them (P2a).
+printQuoteRoutes.get('/printers', (c) => anonymousCached(c, { perViewer: true }, async () => {
   const models = await loadPrinterModels(c.env.DB);
   // Which machines the engine cannot tell apart, per door — opaque labels,
   // never the economics behind them (see `printerPriceSignature`). The screen
@@ -346,7 +349,7 @@ printQuoteRoutes.get('/printers', async (c) => {
       untimed_price_group: groups.get(m.id)?.untimed ?? m.id,
     })),
   });
-});
+}));
 
 /**
  * «إكسسوارات ميكر وورد» — the hardware catalogue the calculator offers.
@@ -363,7 +366,7 @@ printQuoteRoutes.get('/printers', async (c) => {
  * Retired rows are filtered out here, so a picker never offers something the
  * quote would then refuse to price.
  */
-printQuoteRoutes.get('/accessories', async (c) => {
+printQuoteRoutes.get('/accessories', (c) => anonymousCached(c, {}, async () => {
   let rows: PrintAccessory[] = [];
   try {
     const raw = await getSetting(c.env.DB, 'printAccessories');
@@ -385,16 +388,16 @@ printQuoteRoutes.get('/accessories', async (c) => {
         cost_iqd: a.cost_iqd,
       })),
   });
-});
+}));
 
-printQuoteRoutes.get('/materials', async (c) => {
+printQuoteRoutes.get('/materials', (c) => anonymousCached(c, {}, async () => {
   const { results } = await c.env.DB.prepare(
     `SELECT id, material_type, name, name_ar, density_g_cm3, diameter_mm,
             needs_enclosure, abrasive, nozzle_temp_c, bed_temp_c
        FROM print_materials WHERE active = 1 ORDER BY material_type`
   ).all<Record<string, unknown>>();
   return c.json({ success: true, materials: results ?? [] });
-});
+}));
 
 // ------------------------------------------------------------------- the upload
 
@@ -1940,6 +1943,8 @@ adminPrintQuoteRoutes.patch('/printer-models/:id', async (c) => {
     before: Object.fromEntries(changed.map((k) => [k, before[k] ?? null])),
     after: Object.fromEntries(changed.map((k) => [k, next[k]])),
   });
+  // The public printer list's price groups follow these economics (P2a purge seam).
+  await afterPrintCatalogueWrite(c);
 
   const row = await c.env.DB.prepare(`SELECT * FROM printer_models WHERE id = ?`).bind(id).first<Record<string, unknown>>();
   return c.json({

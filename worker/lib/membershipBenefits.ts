@@ -40,6 +40,8 @@ import { ENTITLEMENT_MINIMUM_TIER, hasEntitlement, type MembershipEntitlement, t
 import { TIER_RANK } from './pricing';
 import { auditStatements } from './audit';
 import { newId } from './crypto';
+import { getSettings } from './settings';
+import { getProPause, type ProPauseConfig } from './tierPause';
 
 /* ------------------------------ when the feature was never installed ------ */
 
@@ -356,6 +358,63 @@ export async function activeBenefitRules(db: D1Database): Promise<BenefitRule[]>
     },
     [] as BenefitRule[]
   );
+}
+
+/**
+ * THE PRICING CONTEXT'S SHARED INPUTS, READ ONCE PER ISOLATE AND KEPT FOR
+ * HALF A MINUTE (P2a, plan §B.1 #4).
+ *
+ * `pricingCtxForUser` (worker/routes/products.ts) needs four things that are
+ * the same for every viewer: the PRO policy and pre-order transport defaults
+ * (`admin_settings`), the enabled benefit rules, the section ancestry
+ * (`catalogs`) and the PRO pause flag. Every hot public route — the home page,
+ * the listing, the product page, the home shelves — read all four from D1 on
+ * every request, in two dependent waves, before it could price one card. A
+ * warm isolate now prices from memory and the cold one reads them in ONE wave.
+ *
+ * Keyed by the D1 binding through a WeakMap, exactly like the taxonomy index
+ * (worker/lib/catalogPresentation.ts `catalogIndexFor`): a test's fresh
+ * database is never served another's rules. Dropped at once in the isolate
+ * that made the edit — `saveBenefitRule`, `deleteBenefitRule`, the settings
+ * PUT (worker/routes/admin.ts) — and refreshed after `PRICING_INPUTS_TTL_MS`
+ * everywhere else, which is shorter than the edge cache these routes'
+ * anonymous answers already live in (worker/lib/edgePolicy.ts).
+ *
+ * A failed read is not remembered: the next request retries.
+ */
+export const PRICING_INPUTS_TTL_MS = 30_000;
+
+export interface PricingInputs {
+  settings: Record<string, unknown>;
+  benefitRules: BenefitRule[];
+  catalogAncestry: Map<string, string[]>;
+  proPause: ProPauseConfig;
+}
+
+const pricingInputsMemo = new WeakMap<object, { at: number; inputs: Promise<PricingInputs> }>();
+
+async function readPricingInputs(db: D1Database): Promise<PricingInputs> {
+  const [settings, benefitRules, ancestry, proPause] = await Promise.all([
+    getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults']).catch(() => ({}) as Record<string, unknown>),
+    activeBenefitRules(db),
+    catalogAncestry(db),
+    getProPause(db),
+  ]);
+  return { settings, benefitRules, catalogAncestry: ancestry, proPause };
+}
+
+export function pricingInputsFor(db: D1Database, nowMs = Date.now()): Promise<PricingInputs> {
+  const hit = pricingInputsMemo.get(db);
+  if (hit && nowMs - hit.at < PRICING_INPUTS_TTL_MS) return hit.inputs;
+  const inputs = readPricingInputs(db);
+  pricingInputsMemo.set(db, { at: nowMs, inputs });
+  inputs.catch(() => pricingInputsMemo.delete(db));
+  return inputs;
+}
+
+/** Called by every write that changes an input, in the isolate that made it. */
+export function forgetPricingInputs(db: D1Database): void {
+  pricingInputsMemo.delete(db);
 }
 
 /**
@@ -1016,6 +1075,7 @@ export async function saveBenefitRule(
     );
 
   await upsert.run();
+  forgetPricingInputs(db);
   return await appendVersion(env, actorId, action, rule.id, before, rule);
 }
 
@@ -1026,6 +1086,7 @@ export async function deleteBenefitRule(env: Env, actorId: string, id: string): 
     .bind(id)
     .first<RuleRow>();
   await db.prepare('DELETE FROM membership_benefit_rules WHERE id = ?').bind(id).run();
+  forgetPricingInputs(db);
   return await appendVersion(env, actorId, 'delete', id, before, null);
 }
 

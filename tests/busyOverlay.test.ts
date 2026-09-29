@@ -398,7 +398,9 @@ test('beforeunload is armed for the money commits and for nothing else', () => {
 
 test('the overlay animates opacity only, in either motion preference', () => {
   assert.match(appBusy, /shown: \{ opacity: 1 \}/);
-  assert.match(appBusy, /initial="hidden"/);
+  // `hidden` unless the motion-features chunk has FAILED, in which case the
+  // layer paints at rest (P2 review) — the same variants, no scale, no travel.
+  assert.match(appBusy, /initial=\{atRest \? false : "hidden"\}/);
   assert.match(appBusy, /animate="shown"/);
   const code = stripComments(appBusy);
   assert.ok(!/scale:/.test(code), 'no scale');

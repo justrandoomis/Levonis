@@ -217,7 +217,11 @@ test('THROUGH THE WORKER: a store\'s home link unfurls as the store, on the stor
   assert.equal(metaOf(html, 'property', 'og:image'), `${STORE}/files/merchants/u1/logos/appicon-${rev}-icon512.png`);
   assert.equal(metaOf(html, 'name', 'twitter:card'), 'summary', 'a square logo is not cropped into a banner');
   assert.match(html, /<title>متجر علي<\/title>/);
-  assert.equal(res.headers.get('etag'), null, 'the rewritten body is not the hashed asset');
+  // Since P2b the rewritten document carries a WEAK validator of its own body
+  // (so a repeat visit can earn a 304), never the shell asset's hash.
+  const etag = res.headers.get('etag');
+  assert.match(etag ?? '', /^W\/"[0-9a-f]+"$/, 'the rewritten body carries a weak ETag of its own');
+  assert.notEqual(etag, '"shell"', 'the rewritten body is not the hashed asset');
 });
 
 test('THROUGH THE WORKER: the apex home is the shell untouched, with no database read', async () => {

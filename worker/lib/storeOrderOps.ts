@@ -40,6 +40,7 @@ import { newId } from './crypto';
 import { audit, auditStatements } from './audit';
 import { cancelledOrderRefundStatements } from './orderCancelOps';
 import { sellingVerdict, type StoreContext } from './merchantAuth';
+import type { TierStatus } from './entitlements';
 import { notifyBalanceIfNegative, notifyMerchant, storeOrderNotice } from './merchantNotify';
 import {
   merchantSuspendedSql,
@@ -132,7 +133,14 @@ export type StoreSellingVerdict = { ok: true } | { ok: false; reason: StoreClose
  * with no CHECK, so anything other than exactly `active` is closed. A sanction
  * nobody has taught this function yet stops sales rather than slipping past.
  */
-export async function storeTakesOrders(db: D1Database, ctx: StoreContext): Promise<StoreSellingVerdict> {
+export async function storeTakesOrders(
+  db: D1Database,
+  ctx: StoreContext,
+  // The owner's tier when the caller already read it (the storefront reads it
+  // for the badges): `sellingVerdict` then judges without re-reading, and the
+  // shopfront pays one tier read instead of two (P2a).
+  ownerTier?: TierStatus
+): Promise<StoreSellingVerdict> {
   if (ctx.merchant.status !== 'active') {
     return { ok: false, reason: ctx.merchant.status === 'suspended' ? 'merchant_suspended' : 'merchant_restricted' };
   }
@@ -140,7 +148,7 @@ export async function storeTakesOrders(db: D1Database, ctx: StoreContext): Promi
     return { ok: false, reason: ctx.store.status === 'paused' ? 'store_paused' : 'store_suspended' };
   }
   if (Number(ctx.store.sells_direct_products) !== 1) return { ok: false, reason: 'not_selling_products' };
-  const verdict = await sellingVerdict(db, ctx, ctx.store.user_id);
+  const verdict = await sellingVerdict(db, ctx, ctx.store.user_id, ownerTier);
   if (verdict.canSell) return { ok: true };
   return { ok: false, reason: (verdict.reason || 'subscription_inactive') as StoreClosedReason };
 }

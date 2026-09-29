@@ -34,6 +34,8 @@ import { KpiRowSkeleton, ListRowsSkeleton } from '../../../ui/DashboardSkeletons
 import { merchantHref } from '../../../../lib/merchantRoutes';
 import { useWorkspace } from '../context';
 import type { Attention, StoreProblem } from '../attention';
+import { commandKpis, type ReportLike } from '../kpis';
+import { sellingReason, type Loc } from '../strings';
 
 type Setup = NonNullable<Attention['setup']>;
 
@@ -50,8 +52,6 @@ export function setupSteps(setup: Setup, loc: Loc): Array<{ id: string; done: bo
     { id: 'design', done: setup.design, text: loc('اختر شكل صفحتك وانشره', 'Choose your page’s look and publish it'), link: setup.links.design },
   ];
 }
-import { commandKpis, type ReportLike } from '../kpis';
-import { sellingReason, type Loc } from '../strings';
 
 interface Row {
   id: string;

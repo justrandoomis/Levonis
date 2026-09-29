@@ -35,6 +35,9 @@
     "scripts",
     "studio",
     "packages",
-    "services"
+    "services",
+    // The perf lab's scratch directory (gitignored): another builder's
+    // fixture .ts files there once put hundreds of errors into this project.
+    "scratchpad"
   ]
 }

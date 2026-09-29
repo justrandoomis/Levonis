@@ -19,8 +19,12 @@
  *   accounts.google.com   Google sign-in. @react-oauth/google injects
  *                         gsi/client, renders its button inside an iframe from
  *                         that origin and talks back to it.
- *   fonts.googleapis.com  the web fonts' stylesheet, and
- *   fonts.gstatic.com     the font files it references
+ *   (no font origin)      Cairo and the /auth screen's IBM Plex Mono are
+ *                         self-hosted under /fonts/ since P1a, so `font-src
+ *                         'self'` covers every face the SPA uses and the two
+ *                         Google font origins left script-free style-src,
+ *                         font-src and connect-src. The print documents still
+ *                         name them — see documentCsp.
  *   img-src https:        product media comes from vendor CDNs (Shopify,
  *                         Cloudflare Images, …) as well as from R2 under
  *                         /files. A host allowlist would break the next brand
@@ -41,9 +45,10 @@
  *                         eval allowance. Switching the injection off instead
  *                         is a dashboard setting, i.e. the owner's call.
  *
- * The built index.html carries ONE external module script and ONE external
- * stylesheet and no inline code, which is what makes the strict script-src
- * possible without a nonce.
+ * The built index.html carries ONE external module script, ONE external
+ * stylesheet (its own), one hashed inline script and one inline <style> (the
+ * theme ground and the @font-face rules) — 'unsafe-inline' is in style-src
+ * only, and script-src stays strict without a nonce.
  *
  * THE PRINT DOCUMENTS ARE DIFFERENT. Receipts, warranty documents, delivery
  * labels and invoices are stand-alone HTML rendered by the Worker, with inline
@@ -59,6 +64,14 @@
 // not exist. A structural parameter type keeps it dependency-free.
 
 export const GOOGLE_SIGNIN_ORIGIN = 'https://accounts.google.com';
+/**
+ * Google Fonts. Used by documentCsp ONLY: the Worker-rendered print documents
+ * (worker/lib/printDocument.ts) still link Cairo from Google. The SPA policy
+ * stopped naming either origin in P1a — the app's fonts are its own files
+ * under /fonts/, which `'self'` already admits — so a Google outage or a slow
+ * route to it can no longer hold up a first paint in Iraq
+ * (tests/firstPaintAndFonts.test.ts pins this).
+ */
 export const GOOGLE_FONTS_CSS = 'https://fonts.googleapis.com';
 export const GOOGLE_FONTS_FILES = 'https://fonts.gstatic.com';
 /** Cloudflare Web Analytics: where the edge-injected beacon script comes from … */
@@ -132,11 +145,11 @@ export function spaCsp(): string {
   return policy([
     ['default-src', ["'self'"]],
     ['script-src', ["'self'", `'${THEME_BOOT_SCRIPT_HASH}'`, GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_SCRIPT]],
-    ['style-src', ["'self'", "'unsafe-inline'", GOOGLE_FONTS_CSS, GOOGLE_SIGNIN_ORIGIN]],
-    ['font-src', ["'self'", 'data:', GOOGLE_FONTS_FILES]],
+    ['style-src', ["'self'", "'unsafe-inline'", GOOGLE_SIGNIN_ORIGIN]],
+    ['font-src', ["'self'", 'data:']],
     ['img-src', ["'self'", 'data:', 'blob:', 'https:']],
     ['media-src', ["'self'", 'blob:', 'https:']],
-    ['connect-src', ["'self'", 'blob:', GOOGLE_SIGNIN_ORIGIN, GOOGLE_FONTS_CSS, CLOUDFLARE_INSIGHTS_BEACON]],
+    ['connect-src', ["'self'", 'blob:', GOOGLE_SIGNIN_ORIGIN, CLOUDFLARE_INSIGHTS_BEACON]],
     ['frame-src', [GOOGLE_SIGNIN_ORIGIN]],
     ['worker-src', ["'self'", 'blob:']],
     ['manifest-src', ["'self'"]],
@@ -358,11 +371,33 @@ export function assetHeadersFile(): string {
     ...clear,
     ...security,
     `  Cache-Control: ${ICON_CACHE_CONTROL}`,
+    '',
+    '# The self-hosted families (P1a): the three Cairo subsets and the /auth',
+    '# screen\'s IBM Plex Mono. Their file names carry the font\'s upstream version',
+    '# (cairo-v31-…, ibm-plex-mono-v20-…), so a newer cut is a new URL and these',
+    '# can take the chunks\' immutable year. Listed AFTER /fonts/* so they win',
+    '# over its week, with the same unsets for the same reason as every rule.',
+    '/fonts/cairo/*',
+    ...clear,
+    ...security,
+    `  Cache-Control: ${ASSET_CACHE_CONTROL}`,
+    '',
+    '/fonts/ibm-plex-mono/*',
+    ...clear,
+    ...security,
+    `  Cache-Control: ${ASSET_CACHE_CONTROL}`,
   ];
   return lines.join('\n') + '\n';
 }
 
-/** Stand-alone print documents: inline styles, the one hashed inline script, nothing else. */
+/**
+ * Stand-alone print documents: inline styles, the one hashed inline script,
+ * nothing else — plus the two Google Fonts origins, which the SPA policy no
+ * longer carries: worker/lib/printDocument.ts still links Cairo from Google
+ * for a receipt opened outside the app. Moving those documents onto the
+ * self-hosted files (they would need absolute URLs, since a receipt is also
+ * saved and opened from disk) is the follow-up noted in PERFORMANCE_LOG «P1a».
+ */
 export function documentCsp(): string {
   return policy([
     ['default-src', ["'none'"]],

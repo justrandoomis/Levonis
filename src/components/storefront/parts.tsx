@@ -46,11 +46,12 @@ export function useText(): (t: LocalizedText | null | undefined) => string {
  * dinar marker «ع.» immediately left of the western digits. The flex row makes
  * that ordering deterministic — bidi resolution never gets a say.
  */
+const digits = (n: number) => Number(n).toLocaleString('en-US');
 export function DinarPrice({ amount, className = '' }: { amount: number; className?: string }) {
   return (
     <span className={`inline-flex flex-row items-baseline ${className}`} dir="ltr">
       <span>ع.</span>
-      <span>{Number(amount).toLocaleString('en-US')}</span>
+      <span>{digits(amount)}</span>
     </span>
   );
 }
@@ -107,6 +108,21 @@ export function Column({ children, className = '' }: { children: ReactNode; clas
 
 // ----------------------------------------------------------------- products
 
+/**
+ * The server's sized variants of a `/files/` still picture (`?w=`,
+ * worker/lib/imageConvert.ts IMAGE_VARIANT_WIDTHS) — the same three widths
+ * `ui/SafeImage` names, repeated here rather than imported because a store
+ * visit must not carry that component's icons and strings for one line
+ * (tests/storefrontBlocks.test.ts allow-list; tests/imageVariants.test.ts
+ * pins the two lists equal). Anything that is not such a picture — an
+ * external URL, a GIF, a URL with its own query — gets no srcset.
+ */
+const VARIANT_WIDTHS = [320, 640, 1080] as const;
+// A store's pictures are the relative `/files/<key>` the upload answered with.
+function variantSrcSet(src: string): string | undefined {
+  return /^\/files\/[^?#]+\.(?:webp|jpe?g|png)$/i.test(src) ? VARIANT_WIDTHS.map((w) => `${src}?w=${w} ${w}w`).join(', ') : undefined;
+}
+
 export function ProductCard({ product, storeOpen, legacyLink = false }: { product: CardProduct; storeOpen: boolean; legacyLink?: boolean }) {
   const { loc, lang } = useLanguage();
   const name = productName(product, lang);
@@ -121,7 +137,17 @@ export function ProductCard({ product, storeOpen, legacyLink = false }: { produc
     <Link to={href} className="sf-tile active:scale-[0.98] transition-transform">
       <div className="sf-media sf-well overflow-hidden relative">
         {image ? (
-          <img src={image} alt={name} className="w-full h-full object-cover" loading="lazy" />
+          // A store tile is 2 or 3 across on a phone and up to 5 across on a
+          // wide theme (theme.ts gridClasses); the srcset lets the browser
+          // take the 320/640 px cut instead of the stored original.
+          <img
+            src={image}
+            srcSet={variantSrcSet(image)}
+            sizes="(min-width: 1024px) 20vw, (min-width: 640px) 25vw, 50vw"
+            alt={name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <ShoppingBag className="w-5 h-5 text-zinc-700" strokeWidth={1.5} aria-hidden="true" />
@@ -213,42 +239,26 @@ export function LinkTo({
   children: ReactNode;
 }) {
   const rt = useStorefrontRuntime();
-  switch (link.kind) {
-    case 'route':
-      return (
-        <Link to={rt.routeHref(link.route)} className={className}>
-          {children}
-        </Link>
-      );
-    case 'collection':
-      return (
-        <Link to={rt.collectionHref(link.id)} className={className}>
-          {children}
-        </Link>
-      );
-    case 'product': {
-      const p = data.picked.find((x) => x.id === link.id);
-      return p ? (
-        <Link to={rt.productHref(p.slug)} className={className}>
-          {children}
-        </Link>
-      ) : (
-        <span className={className}>{children}</span>
-      );
-    }
-    case 'external': {
-      const href = safeExternalUrl(link.url);
-      return href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer nofollow" className={className}>
-          {children}
-        </a>
-      ) : (
-        <span className={className}>{children}</span>
-      );
-    }
-    default:
-      return <span className={className}>{children}</span>;
+  if (link.kind === 'external') {
+    const href = safeExternalUrl(link.url);
+    return href ? (
+      <a href={href} target="_blank" rel="noopener noreferrer nofollow" className={className}>
+        {children}
+      </a>
+    ) : (
+      <span className={className}>{children}</span>
+    );
   }
+  const picked = link.kind === 'product' ? data.picked.find((x) => x.id === link.id) : null;
+  const to =
+    link.kind === 'route' ? rt.routeHref(link.route) : link.kind === 'collection' ? rt.collectionHref(link.id) : picked ? rt.productHref(picked.slug) : null;
+  return to ? (
+    <Link to={to} className={className}>
+      {children}
+    </Link>
+  ) : (
+    <span className={className}>{children}</span>
+  );
 }
 
 export function hasLink(link: LinkTarget, data: BlockData): boolean {
@@ -292,26 +302,21 @@ export function factsWithFallback(store: StorefrontStore, loc: Loc, lang: string
   if (store.profile_facts_configured) {
     return (store.profile_facts ?? []).filter((w) => w.visible !== false).slice(0, 3);
   }
-  const out: ProfileWidget[] = [];
+  const out: Omit<ProfileWidget, 'visible'>[] = [];
   if (store.governorate) {
-    out.push({ icon: 'map-pin', title: governorateLabel(store.governorate, lang), subtitle: loc('الموقع', 'Location', 'شوێن'), visible: true });
+    out.push({ icon: 'map-pin', title: governorateLabel(store.governorate, lang), subtitle: loc('الموقع', 'Location', 'شوێن') });
   }
   // «التوصيل إلى <محافظتك>: <الأجرة>» — the signed-in visitor's own
   // default-address governorate, answered by the server from this store's
   // delivery rules (W2-A). A preview: the checkout prices again.
   const toYou = deliveryToYou(store, loc, lang);
-  if (toYou) out.push({ icon: 'truck', title: toYou.title, subtitle: toYou.subtitle, visible: true });
+  if (toYou) out.push({ icon: 'truck', title: toYou.title, subtitle: toYou.subtitle });
   if ((store.service_areas?.length ?? 0) > 0) {
-    out.push({
-      icon: 'truck',
-      title: loc('شحن إلى', 'Ships to', 'گەیاندن بۆ'),
-      subtitle: store.service_areas.slice(0, 2).join('، '),
-      visible: true,
-    });
+    out.push({ icon: 'truck', title: loc('شحن إلى', 'Ships to', 'گەیاندن بۆ'), subtitle: store.service_areas.slice(0, 2).join('، ') });
   }
   const note = deliveryNote(store);
-  if (note) out.push({ icon: 'clock', title: loc('التوصيل', 'Delivery', 'گەیاندن'), subtitle: note, visible: true });
-  return out.slice(0, 3);
+  if (note) out.push({ icon: 'clock', title: loc('التوصيل', 'Delivery', 'گەیاندن'), subtitle: note });
+  return out.slice(0, 3).map((w) => ({ ...w, visible: true }));
 }
 
 /**
@@ -336,7 +341,7 @@ export function HoursTime({ hours, loc, className = '' }: { hours: { open?: stri
 }
 
 export function governorateLabel(id: string, lang: string): string {
-  return GOVERNORATE_LABELS[id]?.[lang === 'ckb' ? 'ckb' : lang === 'en' ? 'en' : 'ar'] ?? id;
+  return GOVERNORATE_LABELS[id]?.[lang === 'ckb' || lang === 'en' ? lang : 'ar'] ?? id;
 }
 
 /**
@@ -350,10 +355,12 @@ export function deliveryToYou(store: StorefrontStore, loc: Loc, lang: string): {
   const place = governorateLabel(d.governorate, lang);
   // OWNER: Sorani to be written by hand.
   const title = loc(`التوصيل إلى ${place}`, `Delivery to ${place}`);
-  if (!d.available) return { title, subtitle: loc('لا يوصل إليها', 'Not delivered'), available: false };
-  if (d.free) return { title, subtitle: loc('مجاني', 'Free', 'بەخۆڕایی'), available: true };
-  const fee = `${Number(d.fee_iqd).toLocaleString('en-US')} ${lang === 'en' ? 'IQD' : 'د.ع'}`;
-  return { title, subtitle: fee, available: true };
+  const subtitle = !d.available
+    ? loc('لا يوصل إليها', 'Not delivered')
+    : d.free
+      ? loc('مجاني', 'Free', 'بەخۆڕایی')
+      : `${digits(d.fee_iqd)} ${lang === 'en' ? 'IQD' : 'د.ع'}`;
+  return { title, subtitle, available: !!d.available };
 }
 
 export function deliveryNote(store: StorefrontStore): string {
@@ -361,16 +368,18 @@ export function deliveryNote(store: StorefrontStore): string {
   return typeof note === 'string' ? note : '';
 }
 
+/** «أغسطس 2026» — a month and a year in the reader's calendar words. */
+const monthYear = (iso: string, lang: string) =>
+  new Date(iso).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-IQ', { year: 'numeric', month: 'long' });
+
 /** «انضم في أغسطس 2026» — the joined line a profile-only merchant shows where a store shows its @address. */
 export function joinedLine(createdAt: string, loc: Loc, lang: string): string {
   if (!createdAt) return loc('تاجر مجتمع', 'Community merchant', 'بازرگانی کۆمەڵگا');
-  const when = new Date(createdAt).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-IQ', { year: 'numeric', month: 'long' });
-  return `${loc('انضم في', 'Joined', 'بەشداری کرد لە')} ${when}`;
+  return `${loc('انضم في', 'Joined', 'بەشداری کرد لە')} ${monthYear(createdAt, lang)}`;
 }
 
 /** «على Levonis منذ …» */
 export function sinceLine(createdAt: string, loc: Loc, lang: string): string {
   if (!createdAt) return '';
-  const when = new Date(createdAt).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-IQ', { year: 'numeric', month: 'long' });
-  return `${loc('على Levonis منذ', 'On Levonis since', 'لەسەر LEVONIS لە')} ${when}`;
+  return `${loc('على Levonis منذ', 'On Levonis since', 'لەسەر LEVONIS لە')} ${monthYear(createdAt, lang)}`;
 }

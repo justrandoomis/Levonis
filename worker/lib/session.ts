@@ -13,6 +13,60 @@ const COOKIE_NAME = SESSION_COOKIE_NAME;
 const SESSION_TTL_DAYS = 14;
 
 /**
+ * Does this request CARRY the session cookie at all — valid or not?
+ *
+ * The edge-cache rule (worker/lib/edgePolicy.ts) asks this before the session
+ * is resolved and again when it never will be (the session-free GETs below):
+ * a shared cache entry is written only for a request that could not possibly
+ * be somebody's. The presence of the cookie is enough to refuse; whether it
+ * still names a live session is the database's question, not the cache's.
+ * Same predicate as the gateway's (services/gateway/src/cache.ts).
+ */
+export function hasSessionCookie(cookieHeader: string | null | undefined): boolean {
+  if (!cookieHeader) return false;
+  return cookieHeader.split(';').some((part) => part.trim().startsWith(`${COOKIE_NAME}=`));
+}
+
+/**
+ * THE PUBLIC GETs THAT NEVER READ `user` — so the request pipeline
+ * (worker/index.ts) does not pay the `sessions` x `users` JOIN for them.
+ *
+ * Every path here answers the same bytes to a signed-in customer and to a
+ * guest, and its anonymous variant is what the edge cache stores (P2a, plan
+ * §B.1 #4). That is a property of the HANDLERS, pinned by
+ * tests/edgeCachePolicy.test.ts (the storefront router's only `c.get('user')`
+ * is `/:slug/delivery`, which is excluded here by name), not a hope: a route
+ * added to this list must not read the session, because on this path
+ * `c.get('user')` is `undefined` for everyone.
+ *
+ *   /api/settings/public                 the public settings, no viewer
+ *   /api/storefront/**                   a shopfront is the same for every
+ *                                        visitor since «التوصيل إلى محافظتك»
+ *                                        moved to /:slug/delivery — the one
+ *                                        storefront path that stays out
+ *   /api/print-quote/materials           the material list, no economics
+ *   /api/print-quote/accessories         the accessory catalogue
+ *   /api/marketplace/print/catalog       the request wizard's vocabulary
+ *
+ * NOT here, although cached for guests: /api/home, /api/home/sections,
+ * /api/products and /api/products/:slug price per membership, and
+ * /api/community/access and /api/print-quote/printers answer per viewer —
+ * their session variants must keep loading the session.
+ */
+export function sessionFreePublicGet(method: string, path: string): boolean {
+  if (method !== 'GET') return false;
+  if (path === '/api/settings/public') return true;
+  if (path === '/api/print-quote/materials' || path === '/api/print-quote/accessories') return true;
+  if (path === '/api/marketplace/print/catalog') return true;
+  if (path === '/api/storefront' || path === '/api/storefront/') return false;
+  if (path.startsWith('/api/storefront/')) {
+    // `/api/storefront/<slug>/delivery` answers for the viewer's own address.
+    return !/^\/api\/storefront\/[^/]+\/delivery\/?$/.test(path);
+  }
+  return false;
+}
+
+/**
  * Where the session cookie is valid.
  *
  * ONE Levonis identity, everywhere (§8). A customer signed in on

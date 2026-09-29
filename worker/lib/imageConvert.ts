@@ -379,3 +379,127 @@ export function extensionFor(mime: string): string {
     default: return 'bin';
   }
 }
+
+// ------------------------------------------------------------- variants
+
+/**
+ * A CARD DOES NOT NEED THE PHOTOGRAPH THE CAMERA TOOK.
+ *
+ * Every picture on the site is stored once, at up to 3000 px on its long
+ * edge (`src/lib/imagePreprocess.ts`), and until this existed it was
+ * DELIVERED at that size to a 174 px card on a phone: a twenty-tile rail was
+ * twenty full-size downloads for a screen that could show a tenth of the
+ * pixels. `GET /files/<key>?w=<width>` (worker/routes/uploads.ts) answers a
+ * public still image at one of the widths below through the same `IMAGES`
+ * binding that converts uploads, and in the format the browser's `Accept`
+ * header says it can decode — AVIF before WebP before the stored format.
+ *
+ * THREE WIDTHS, NOT A FREE PARAMETER. Each width × format is a separate
+ * transformation billed once per object and a separate entry in the edge
+ * cache; an open `?w=` would let one visitor mint a thousand of both. The
+ * client's `srcset` (`src/components/ui/SafeImage.tsx`) names exactly these
+ * three, and tests/imageVariants.test.ts pins the two lists to each other.
+ *   320  a card in a 2–3 column grid at DPR 1–2 (148–174 CSS px);
+ *   640  the same card at DPR 3, or a 2-up tile on a wide phone;
+ *   1080 a full-width picture on a phone at DPR 3, or a card on desktop.
+ * `fit: scale-down` never enlarges: a 500 px original asked for at 1080
+ * comes back at 500 px, which is the honest answer.
+ */
+export const IMAGE_VARIANT_WIDTHS = [320, 640, 1080] as const;
+export type ImageVariantWidth = (typeof IMAGE_VARIANT_WIDTHS)[number];
+
+/** The `w` query value, or null when it is absent, or 'invalid' when it names a width not on the list. */
+export function parseVariantWidth(raw: string | null | undefined): ImageVariantWidth | null | 'invalid' {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = Number(raw);
+  return (IMAGE_VARIANT_WIDTHS as readonly number[]).includes(n) ? (n as ImageVariantWidth) : 'invalid';
+}
+
+export type ImageVariantFormat = 'image/avif' | 'image/webp' | 'image/jpeg' | 'image/png';
+
+/**
+ * The still-image formats a variant can be cut from, read from the KEY's
+ * extension — a key never lies about its bytes here (`extensionFor`), and
+ * reading the extension lets the route refuse a video or a GIF before it
+ * touches the cache or the bucket. GIF is excluded on purpose: a resize
+ * keeps one frame, and a merchant's animated banner turning into a still is
+ * the same quiet damage the converter refuses at upload.
+ */
+export function variantSourceMime(key: string): ImageVariantFormat | null {
+  const m = /\.([a-z0-9]+)$/i.exec(key);
+  switch ((m?.[1] ?? '').toLowerCase()) {
+    case 'webp': return 'image/webp';
+    case 'jpg':
+    case 'jpeg': return 'image/jpeg';
+    case 'png': return 'image/png';
+    default: return null;
+  }
+}
+
+/**
+ * The format the browser gets, from its own `Accept` header: AVIF when it
+ * lists it, else WebP when it lists that, else the stored format (a PNG stays
+ * a PNG, so a picture with transparency keeps it). Safari 16, every Chrome
+ * and Firefox of the last years send `image/avif`; the stored WebP is the
+ * floor, never a step down.
+ */
+export function negotiateVariantFormat(accept: string | null | undefined, source: ImageVariantFormat): ImageVariantFormat {
+  const a = (accept ?? '').toLowerCase();
+  if (a.includes('image/avif')) return 'image/avif';
+  if (a.includes('image/webp')) return 'image/webp';
+  return source;
+}
+
+/**
+ * Quality per output format. WebP keeps the converter's own 85, so a variant
+ * is never a lower grade than the stored picture; AVIF's scale is not WebP's
+ * — the same visual grade sits lower on it — and 75 is the value the plan
+ * takes until the owner's own zone measures it (docs/PERFORMANCE_LOG.md P2c
+ * records that this pair was NOT measured in the lab, which has no encoder).
+ */
+export const VARIANT_QUALITY: Record<ImageVariantFormat, number | undefined> = {
+  'image/avif': 75,
+  'image/webp': WEBP_QUALITY,
+  'image/jpeg': WEBP_QUALITY,
+  'image/png': undefined,
+};
+
+export type VariantOutcome =
+  | { ok: true; body: ReadableStream<Uint8Array>; mime: ImageVariantFormat }
+  /** No binding on this deployment: the caller serves the original. */
+  | { ok: false; reason: 'unavailable' }
+  /** The binding is there and the image defeated it: the caller serves the original. */
+  | { ok: false; reason: 'failed'; detail: string };
+
+/**
+ * Cut one variant. The output is a STREAM, not bytes: the route hands it to
+ * the client and to the edge cache and never holds a whole picture in the
+ * isolate. Failure is never an error for the visitor — the route falls back
+ * to the stored file, which is exactly what they got before this existed.
+ */
+export async function renderImageVariant(
+  env: Pick<Env, 'IMAGES'>,
+  source: ReadableStream<Uint8Array>,
+  variant: { width: ImageVariantWidth; format: ImageVariantFormat }
+): Promise<VariantOutcome> {
+  const images = env.IMAGES;
+  if (!images) {
+    // Nobody is listening; let the source go rather than leak a stream.
+    await source.cancel().catch(() => undefined);
+    return { ok: false, reason: 'unavailable' };
+  }
+  try {
+    const quality = VARIANT_QUALITY[variant.format];
+    const result = await images
+      .input(source)
+      .transform({ width: variant.width, fit: 'scale-down' })
+      .output(quality === undefined ? { format: variant.format } : { format: variant.format, quality });
+    const response = result.response();
+    if (!response.ok || !response.body) {
+      return { ok: false, reason: 'failed', detail: `the converter returned HTTP ${response.status}` };
+    }
+    return { ok: true, body: response.body as ReadableStream<Uint8Array>, mime: variant.format };
+  } catch (error) {
+    return { ok: false, reason: 'failed', detail: error instanceof Error ? error.message : String(error) };
+  }
+}

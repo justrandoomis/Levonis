@@ -20,6 +20,9 @@ import { asD1, freshDb, get, pending, stubApp } from './fixtures/app';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
 import { catalogRoutes } from '../worker/routes/catalog';
 import { printerFinderRoutes } from '../worker/routes/printerFinder';
+import { homeRoutes } from '../worker/routes/products';
+import { miscRoutes } from '../worker/routes/misc';
+import { ANONYMOUS_CACHE_CONTROL } from '../worker/lib/edgePolicy';
 
 /** `caches.default` as the live zone behaves: a hit comes back with max-age=14400. */
 function zoneCache() {
@@ -97,5 +100,30 @@ test('the printer finder: the same', async () => {
     const hit = await get(a, path);
     assert.equal(hit.headers.get('CF-Cache-Status'), 'HIT');
     assert.equal(hit.headers.get('Cache-Control'), 'public, max-age=60');
+  });
+});
+
+// ------------------------------------------- the anonymous public reads (P2a)
+
+test('the first screen and the public settings: a hit leaves with the anonymous policy, and so does a 304 from a hit', async () => {
+  await withZoneCache(async (cache) => {
+    const a = app((x) => {
+      x.route('/api/home', homeRoutes);
+      x.route('/api', miscRoutes);
+    });
+    for (const path of ['/api/home', '/api/settings/public']) {
+      const miss = await get(a, path);
+      assert.equal(miss.status, 200, path);
+      assert.equal(miss.headers.get('Cache-Control'), ANONYMOUS_CACHE_CONTROL, `${path}: the miss`);
+      await Promise.all(pending);
+      const hit = await get(a, path);
+      assert.equal(hit.headers.get('CF-Cache-Status'), 'HIT', `${path}: served from the cache`);
+      assert.equal(hit.headers.get('Cache-Control'), ANONYMOUS_CACHE_CONTROL, `${path}: the route's lifetime, not the zone's four hours`);
+      assert.equal(await hit.text(), await miss.text(), path);
+      const revalidated = await get(a, path, { 'If-None-Match': miss.headers.get('ETag')! });
+      assert.equal(revalidated.status, 304, `${path}: a bodiless answer from the hit`);
+      assert.equal(revalidated.headers.get('Cache-Control'), ANONYMOUS_CACHE_CONTROL, `${path}: the 304 too`);
+    }
+    assert.equal(cache.store.size, 2);
   });
 });

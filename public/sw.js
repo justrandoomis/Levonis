@@ -22,6 +22,12 @@
  *                  else, so a deploy is live on the very next navigation.
  *   /assets/*      cache-first, because Vite content-hashes them: the URL
  *                  changes whenever the bytes do, so a hit can never be stale.
+ *   /fonts/*       cache-first too (P1a). The Cairo subsets and the Kurdish
+ *                  patch face are self-hosted now, so a repeat visit paints in
+ *                  the shop's own face without a single font request. Their
+ *                  names carry the font's version, and the patch face is the
+ *                  one fixed name — a corrected glyph reaches installed
+ *                  browsers through a VERSION bump, which drops this cache.
  *   /icons/*       stale-while-revalidate. Small, rarely changed, and wanted
  *                  instantly by the install prompt.
  *   /api/*,        NEVER touched. Prices, stock, the cart, orders and the
@@ -31,6 +37,14 @@
  *                  manifest joins them because its body is built per host from
  *                  a live merchant row — see `strategyFor` for the two ways a
  *                  stored copy gets a shop's name wrong.
+ *
+ * NAVIGATION PRELOAD (P1a). A network-first document still pays for the
+ * worker's own start-up before its fetch leaves the phone — 100–300 ms on a
+ * mid-range Android. With `navigationPreload` enabled the browser starts the
+ * document request IN PARALLEL with booting this worker, and `handleNavigation`
+ * takes that response (`event.preloadResponse`) instead of issuing a second
+ * one. Nothing about the policy changes: it is the same network-first fetch,
+ * started earlier.
  *
  * WHY THE ROUTING DECISION IS A PURE FUNCTION. `strategyFor` takes a URL and a
  * request and returns a string. It reads no cache, performs no I/O and has no
@@ -82,7 +96,11 @@
  * drops v2's store, which still holds the seven unversioned names nothing
  * asks for any more.
  */
-const VERSION = 'v3';
+// v4 (P1a): /fonts/* joined the cache-first branch and navigation preload was
+// switched on; the bump retires the v3 caches so nothing is served from a
+// store that was filled under the old rules. tests/serviceWorker.test.ts pins
+// the version to the precached icon bytes — move both together.
+const VERSION = 'v4';
 
 const DOCUMENT_CACHE = 'levonis-document-' + VERSION;
 const ASSET_CACHE = 'levonis-assets-' + VERSION;
@@ -343,8 +361,8 @@ function strategyFor(url, request) {
   // protocol violation.
   if (!request || request.method !== 'GET') return NETWORK_ONLY;
 
-  // Another origin: Google fonts, the sign-in iframe, the analytics beacon,
-  // product media on a vendor CDN. Their responses are opaque, so caching them
+  // Another origin: the sign-in iframe, the analytics beacon, product media
+  // on a vendor CDN (the fonts are our own since P1a). Their responses are opaque, so caching them
   // stores a body we cannot inspect and cannot invalidate.
   if (url.origin !== self.location.origin) return NETWORK_ONLY;
 
@@ -397,6 +415,15 @@ function strategyFor(url, request) {
   // Content-hashed by Vite: the URL changes whenever the bytes do, which is
   // exactly the condition under which cache-first cannot go stale.
   if (path.startsWith('/assets/')) return CACHE_FIRST;
+
+  // The self-hosted faces (P1a): the three Cairo subsets and the Kurdish patch
+  // under public/fonts/. Cache-first like the chunks, because a font that has
+  // once arrived should never be fetched again on this phone: the woff2 names
+  // carry the font's version (cairo-v31-…), and the one fixed name, the patch
+  // face, is retired with the caches on the next VERSION bump — which is the
+  // same lever the icons already depend on. `/api` and `/files` are refused
+  // above and stay network-only; nothing here reaches them.
+  if (path.startsWith('/fonts/')) return CACHE_FIRST;
 
   // Small, stable, and wanted instantly by the install prompt — but not
   // immutable, so they are revalidated in the background after being served.
@@ -522,8 +549,16 @@ async function handleNavigation(event) {
   // thing to show someone who is online, so it must be reachable from exactly
   // one cause — the network being unreachable — and never from a mistake in
   // the caching below it.
+  //
+  // The browser may already have this document in flight: with navigation
+  // preload on (see `activate`) `event.preloadResponse` resolves to the
+  // response of a request the browser started while this worker was still
+  // booting. Using it is the whole saving; falling through to `fetch` when it
+  // is absent (preload off, an older browser, a synthetic event) is the same
+  // network-first policy as before, started a little later.
   try {
-    response = await fetch(request);
+    response = await preloadedResponse(event);
+    if (!response) response = await fetch(request);
   } catch {
     // Genuinely unreachable. A 404 or a 500 is a response, and was returned.
     const cached = await matchSafely(DOCUMENT_CACHE, DOCUMENT_KEY);
@@ -548,6 +583,23 @@ async function handleNavigation(event) {
   return response;
 }
 
+/**
+ * The navigation-preload response for this event, or undefined. Reading the
+ * promise cannot be allowed to throw past here — an environment without the
+ * feature exposes no `preloadResponse` at all — so both the property and the
+ * await are guarded; a rejected preload counts as no preload, and the caller
+ * fetches.
+ */
+async function preloadedResponse(event) {
+  try {
+    const preload = event && event.preloadResponse;
+    if (!preload || typeof preload.then !== 'function') return undefined;
+    return (await preload) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function isImage(response) {
   try {
     return (response.headers.get('content-type') || '').toLowerCase().indexOf('image/') === 0;
@@ -567,7 +619,7 @@ function isHtml(response) {
   }
 }
 
-/** /assets/* — served from the cache when present, never revalidated. */
+/** /assets/* and /fonts/* — served from the cache when present, never revalidated. */
 async function handleAsset(event) {
   const request = event.request;
   const cached = await matchSafely(ASSET_CACHE, request);
@@ -656,6 +708,21 @@ self.addEventListener('activate', (event) => {
       } catch {
         // Cache storage is unavailable. The handlers all treat that as a miss,
         // so the app runs network-only — degraded, not broken.
+      }
+      try {
+        // Navigation preload: from now on the browser starts every document
+        // request while this worker is still waking up, and handleNavigation
+        // picks the response up from `event.preloadResponse`. Enabled after
+        // the cache sweep so a failure here (an old browser without the API)
+        // never prevents the sweep, and guarded because the registration
+        // object does not exist in every scope this file runs in.
+        const reg = self.registration;
+        if (reg && reg.navigationPreload && typeof reg.navigationPreload.enable === 'function') {
+          await reg.navigationPreload.enable();
+        }
+      } catch {
+        // Unsupported or refused. Documents are still network-first; they
+        // merely wait for the worker to boot, as they did before v4.
       }
       try {
         await self.clients.claim();

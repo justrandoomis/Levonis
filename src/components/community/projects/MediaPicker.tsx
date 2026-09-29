@@ -71,11 +71,15 @@ export function ProjectMediaPicker({
   const input = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(0);
   const [error, setError] = useState('');
+  // A hint the last upload came back with — the clip IS stored; a re-export
+  // would make it start faster (VIDEO_NOT_FASTSTART, src/lib/refusalStrings.ts).
+  const [hint, setHint] = useState('');
   const refusalLang = lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar';
 
   async function pick(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError('');
+    setHint('');
     const room = Math.max(0, max - value.length);
     const chosen = Array.from(files).slice(0, room);
     if (chosen.length < files.length) {
@@ -107,6 +111,8 @@ export function ProjectMediaPicker({
         };
         current = [...current, item];
         onChange(current);
+        const warning = (up as { warnings?: string[] }).warnings?.find((w) => w === 'VIDEO_NOT_FASTSTART');
+        if (warning) setHint(refusalText(warning, refusalLang));
       } catch (e) {
         const fallback = loc('تعذّر رفع الملف.', 'Could not upload the file.', 'نەتوانرا فایلەکە باربکرێت.');
         setError(e instanceof ApiError ? refusalText(e.code, refusalLang, fallback) : fallback);
@@ -199,6 +205,11 @@ export function ProjectMediaPicker({
           `تا ${max} وێنە یان ڤیدیۆ. یەکەمیان بەرگەکەیە.`
         )}
       </p>
+      {hint && (
+        <p className="mt-1.5 text-[11.5px] text-text-muted" role="status" data-media-hint>
+          {hint}
+        </p>
+      )}
       {(error || saveError) && (
         <p className="mt-1.5 text-[11.5px] text-red-400" role="alert">
           {error || saveError}

@@ -286,3 +286,40 @@ test('nothing in the community module DELETES a product row', () => {
     'the community admin module deletes a product row instead of archiving it'
   );
 });
+
+// -------------------------------------- the cached storefront (P2a, plan §B.1 #2)
+
+test('a cached storefront never carries viewer data: the routes that are cached never read a viewer', () => {
+  // The shopfront's anonymous answer is stored in the colo's cache
+  // (worker/lib/edgePolicy.ts). The guarantee that no visitor's own data can
+  // end up in it is structural, not a filter on the way out: `publicStore`
+  // takes no viewer, the store body has no `delivery_to_you`, and the one
+  // storefront read that looks at the session — the delivery preview — is
+  // neither cached nor on the session-free list.
+  const src = code(read('worker/routes/storefront.ts'));
+  assert.match(src, /export async function publicStore\(db: D1Database, ctx: StoreContext, rootDomain: string \| null\)/,
+    'publicStore must not take a viewer');
+  assert.equal(/delivery_to_you/.test(src), false, 'the store body never names the viewer\'s line');
+  assert.equal(/viewerGovernorate\([^)]*c\.get\('user'\)/.test(src.replace(/storefrontRoutes\.get\('\/:slug\/delivery'[\s\S]*?\n\}\);/, '')), false,
+    'only the delivery preview asks for the viewer\'s governorate');
+  const userReads = src.split(/^storefrontRoutes\.get\(/m).slice(1).filter((h) => /c\.get\(\s*['"]user['"]\s*\)/.test(h)).map((h) => /^'([^']+)'/.exec(h)?.[1]);
+  assert.deepEqual(userReads, ['/:slug/delivery']);
+  // The policy itself refuses a session by the cookie's presence, by a resolved user, and by an Authorization header.
+  const policy = code(read('worker/lib/edgePolicy.ts'));
+  const anon = /export function isAnonymousGet[\s\S]*?\n\}/.exec(policy)?.[0] ?? '';
+  assert.match(anon, /c\.req\.method !== 'GET'/);
+  assert.match(anon, /hasSessionCookie\(c\.req\.header\('Cookie'\)\)/);
+  assert.match(anon, /c\.req\.header\('Authorization'\)/);
+  assert.match(anon, /!c\.get\('user'\)/);
+  // …and the request pipeline's session-free branch excludes the delivery preview by name.
+  const session = code(read('worker/lib/session.ts'));
+  assert.match(session, /\/\^\\\/api\\\/storefront\\\/\[\^\/\]\+\\\/delivery\\\/\?\$\//);
+  // The client asks for its own line separately and merges it under the key the parts read.
+  const api = code(read('src/lib/storefrontApi.ts'));
+  assert.match(api, /deliveryToYou: async \(slug: string\)/);
+  for (const page of ['src/pages/Storefront.tsx', 'src/pages/StorefrontProduct.tsx']) {
+    const p = code(read(page));
+    assert.match(p, /storefrontApi\s*\.deliveryToYou\(slug\)/, `${page} asks for the viewer's line`);
+    assert.match(p, /delivery_to_you: quote/, `${page} merges it under the key the parts read`);
+  }
+});

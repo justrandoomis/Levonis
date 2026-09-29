@@ -16,6 +16,31 @@ const STRINGS = {
   ckb: { failed: 'وێنەکە بارنەبوو', retry: 'دووبارە بارکردنی وێنە', noImage: 'وێنە نییە' },
 } as const;
 
+/**
+ * THE WIDTHS THE SERVER WILL CUT — `GET /files/<key>?w=` answers exactly
+ * these (worker/lib/imageConvert.ts IMAGE_VARIANT_WIDTHS; the two lists are
+ * pinned equal by tests/imageVariants.test.ts). A card that says how wide it
+ * is (`sizes`) lets the browser pick the smallest that covers its pixels,
+ * in the format it decodes best (AVIF/WebP by `Accept`), instead of the
+ * 3000 px file the camera produced.
+ */
+export const IMAGE_VARIANT_WIDTHS = [320, 640, 1080] as const;
+
+/** A same-origin `/files/` still picture with no query of its own — the only source a variant can be cut from. */
+const VARIANT_SOURCE = /^(?:https?:\/\/[^/?#]+)?\/files\/[^?#]+\.(?:webp|jpe?g|png)$/i;
+
+/**
+ * The `srcset` for a `/files/` picture, or undefined when the source is
+ * anything else (an external URL, a GIF, a data URI, a URL that already
+ * carries a query) — those pass through exactly as before. `src` stays the
+ * original: it is the fallback candidate and the address every other reader
+ * (the document's image preload, the compare tray) still names.
+ */
+export function variantSrcSet(src: string): string | undefined {
+  if (!VARIANT_SOURCE.test(src)) return undefined;
+  return IMAGE_VARIANT_WIDTHS.map((w) => `${src}?w=${w} ${w}w`).join(', ');
+}
+
 export default function SafeImage({
   src,
   alt = '',
@@ -28,6 +53,7 @@ export default function SafeImage({
   fallbackClassName = 'text-zinc-600',
   fallbackIconClassName = 'w-6 h-6',
   referrerPolicy = 'no-referrer',
+  sizes,
   onStatus,
 }: {
   src?: string | null;
@@ -43,6 +69,16 @@ export default function SafeImage({
   fallbackClassName?: string;
   fallbackIconClassName?: string;
   referrerPolicy?: React.HTMLAttributeReferrerPolicy;
+  /**
+   * How wide this picture is drawn, in the `sizes` grammar (`(min-width:
+   * 1024px) 20vw, 50vw`). Given, AND when `src` is a `/files/` still image,
+   * the element carries a `srcset` of the server's sized variants and the
+   * browser downloads the smallest that covers the slot. Opt-in on purpose:
+   * a full-bleed hero the document already preloads at its original address
+   * (worker/lib/socialPreview.ts) must keep requesting that address, or the
+   * preload becomes a second download.
+   */
+  sizes?: string;
   /**
    * Told whenever this image settles, so a PARENT can act on the fact that a
    * picture is broken. The admin image grid uses it to notice that the primary
@@ -92,6 +128,16 @@ export default function SafeImage({
 
   const aspectCls = aspect === 'square' ? 'aspect-square' : aspect === 'video' ? 'aspect-video' : '';
   const showFallback = !cleanSrc || status === 'error';
+  const srcSet = sizes && cleanSrc ? variantSrcSet(cleanSrc) : undefined;
+  /**
+   * NO FADE ON AN EAGER PICTURE. The 300 ms opacity ramp is a courtesy for a
+   * lazy card scrolling into view; on the above-the-fold picture it is 300 ms
+   * added to the moment the largest paint is complete, on every visit, for
+   * nothing the visitor can see happen. Eager images are simply there.
+   */
+  const revealCls = eager
+    ? 'opacity-100'
+    : `transition-opacity duration-300 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`;
 
   return (
     <div className={`relative overflow-hidden ${aspectCls} ${bgClassName} ${className}`}>
@@ -100,6 +146,8 @@ export default function SafeImage({
           key={`${cleanSrc}#${attempt}`}
           ref={imgRef}
           src={cleanSrc}
+          srcSet={srcSet}
+          sizes={srcSet ? sizes : undefined}
           alt={alt}
           referrerPolicy={referrerPolicy}
           loading={eager ? 'eager' : 'lazy'}
@@ -109,7 +157,7 @@ export default function SafeImage({
           onError={() => setStatus('error')}
           className={`absolute inset-0 w-full h-full ${
             fit === 'contain' ? 'object-contain' : 'object-cover'
-          } transition-opacity duration-300 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'} ${imgClassName}`}
+          } ${revealCls} ${imgClassName}`}
         />
       )}
       {cleanSrc && status === 'loading' && (

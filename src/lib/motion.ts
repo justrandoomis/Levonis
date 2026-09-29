@@ -41,8 +41,7 @@
  * the accessible equivalent — not a dead interface.
  */
 
-import { useMemo } from 'react';
-import { useReducedMotion } from 'motion/react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { useLanguage } from '../LanguageContext';
 
 // ---------------------------------------------------------------- presets
@@ -119,13 +118,59 @@ export interface MotionKit {
   travel: (px: number) => number;
 }
 
+// ------------------------------------------------- the reduced-motion query
+
+/**
+ * THE PREFERENCE, READ FROM THE BROWSER AND NOT FROM THE ANIMATION LIBRARY.
+ *
+ * This used to be `useReducedMotion` from `motion/react`, and that one import
+ * made the whole of motion — the projection tree, the drag and pan gestures,
+ * the layout animator — a STATIC dependency of the entry chunk, downloaded
+ * and parsed before the first paint by every visitor (46 KB gzip; perf plan
+ * §B.1 #6). The question it answers is a one-line media query, so it is asked
+ * here, and the library is loaded when something actually animates
+ * (`src/lib/motionFeatures.tsx`).
+ *
+ * Same contract as the library's hook: `false` on the server and before
+ * hydration, the live value afterwards, and it updates when the OS setting
+ * changes mid-session. `useSyncExternalStore` keeps a hydration tear-free.
+ */
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+let reducedMotionList: MediaQueryList | null | undefined;
+
+function reducedMotionQuery(): MediaQueryList | null {
+  if (reducedMotionList !== undefined) return reducedMotionList;
+  reducedMotionList = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(REDUCED_MOTION_QUERY) : null;
+  return reducedMotionList;
+}
+
+function subscribeReducedMotion(onChange: () => void): () => void {
+  const list = reducedMotionQuery();
+  if (!list) return () => {};
+  // Safari before 14 has only the deprecated pair.
+  if (typeof list.addEventListener === 'function') {
+    list.addEventListener('change', onChange);
+    return () => list.removeEventListener('change', onChange);
+  }
+  list.addListener(onChange);
+  return () => list.removeListener(onChange);
+}
+
+const readReducedMotion = (): boolean => reducedMotionQuery()?.matches ?? false;
+const serverReducedMotion = (): boolean => false;
+
+/** True while the viewer's OS asks for reduced motion; false on the server. */
+export function usePrefersReducedMotion(): boolean {
+  return useSyncExternalStore(subscribeReducedMotion, readReducedMotion, serverReducedMotion);
+}
+
 /**
  * The one hook every animated component uses. It answers three questions a
  * call site would otherwise get wrong: which spring, which direction is
  * forward, and whether to move at all.
  */
 export function useMotion(): MotionKit {
-  const prefersReduced = useReducedMotion();
+  const prefersReduced = usePrefersReducedMotion();
   const { dir: writingDir } = useLanguage();
   const reduced = !!prefersReduced;
   const dir: 1 | -1 = writingDir === 'rtl' ? -1 : 1;

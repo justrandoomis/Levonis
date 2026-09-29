@@ -154,7 +154,14 @@ test('PATCH /api/profile takes a strict boolean and writes the column', () => {
   assert.match(src, /if \(typeof body\.notify_whatsapp !== 'boolean'\)/,
     'a truthy string would let "false" turn the channel ON');
   assert.match(src, /notify_whatsapp = \?/, 'the UPDATE does not write the column');
-  assert.match(src, /notifyWhatsapp, user\.id\)/, 'the value is not bound in the right place');
+  // The value is bound at the column's own position: the n-th `= ?` of the
+  // UPDATE is `notify_whatsapp`, and the n-th argument of its .bind() is
+  // `notifyWhatsapp` — whatever other columns the row gains around it.
+  const update = src.slice(src.indexOf('UPDATE users'), src.indexOf('.run()', src.indexOf('UPDATE users')));
+  const columns = [...update.matchAll(/(\w+) = \?/g)].map((m) => m[1]);
+  const bound = [...update.matchAll(/\.bind\(([^)]*)\)/g)][0]?.[1].split(',').map((a) => a.trim()) ?? [];
+  assert.equal(bound[columns.indexOf('notify_whatsapp')], 'notifyWhatsapp', 'the value is not bound in the right place');
+  assert.equal(bound.at(-1), 'user.id', 'the row is the caller\'s own');
   // Omitting the key leaves the stored value alone, so the language row and
   // the avatar cannot flip a notification preference they never mentioned.
   assert.match(src, /let notifyWhatsapp = user\.notify_whatsapp !== 0 \? 1 : 0;/);

@@ -35,48 +35,64 @@
  * letters — trading one visible defect for another. Vazirmatn's `wght` axis
  * spans 100–900 and covers Cairo's whole 300–900 range.
  *
- * SELF-HOSTED, so `font-src 'self'` already allows it and no new origin joins
- * the CSP. It is declared AFTER the Google stylesheet in document order (that
- * link is in index.html; this file is injected after it), which is what makes
- * this face win for its range.
+ * SELF-HOSTED, like the three Cairo subsets themselves since P1a (they live
+ * under public/fonts/cairo/ and are declared in index.html's inline <style>,
+ * with the Arabic one preloaded — index.html says why the document and not
+ * this file). `font-src 'self'` covers all of them and no third-party origin
+ * is left in the CSP.
+ *
+ * THE SAME WEIGHT RANGE AS THE FAMILY IT PATCHES — `300 900`, not Vazirmatn's
+ * own `100 900`. Chromium picks a face by matching the requested weight FIRST
+ * and only then consults `unicode-range` within the winning group; a face
+ * whose range differs from Cairo's is a different group, loses the weight
+ * match to Cairo's, and is never consulted — measured on the Sorani home
+ * (P2 review): with `100 900` the patch woff2 was never requested and ە ێ ۆ
+ * fell to DejaVu Sans; with `300 900` it is fetched and drawn. Document
+ * order does not decide this. Nothing below 300 is lost: Cairo has no such
+ * weight either.
  */
 @font-face {
   font-family: "Cairo";
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 300 900;
   font-display: swap;
   src: url("/fonts/cairo-kurdish-patch.woff2") format("woff2");
   unicode-range: U+0693, U+0695, U+06B5, U+06C6, U+06CE, U+06D5;
 }
 
 
-/* THE FONT IS LINKED FROM index.html, NOT IMPORTED HERE.
+/* THE FONT IS DECLARED IN index.html, NOT IMPORTED HERE — AND NOT FROM GOOGLE.
 
    A CSS `@import` of a remote stylesheet is discovered only after THIS file has
    been downloaded and parsed, and it blocks rendering while it resolves — three
-   serialised round trips (index.css → Google's stylesheet → the font file)
-   before a single word of Arabic could paint. As a <link> in the document head
-   the request starts alongside this stylesheet's, with `preconnect` already
-   warming the handshake. Same font, same `display=swap`, one round trip
-   instead of three. */
+   serialised round trips before a single word of Arabic could paint. Since P1a
+   there is no remote stylesheet at all: the three Cairo subsets are served from
+   /fonts/cairo/ and their @font-face rules sit in the document's own <style>,
+   so the faces are known before this file arrives and the Arabic subset is
+   already in flight from its <link rel="preload">. Same font, same weights,
+   same `swap`; the rules are not here because this stylesheet's 60 KB gzip
+   budget (tests/bundleBudget.test.ts) had no room for their 572 bytes. */
 
-@import "tailwindcss";
+@import "tailwindcss" source(none);
 /*
   WHAT TAILWIND READS. Left to itself it scans every non-ignored file of the
   repository for class names — the Worker, the migrations, the docs, the
   scripts and the Studio included — and emits a utility for every token that
   looks like one. None of those files is rendered by this stylesheet, so each
   utility they alone mention is dead weight in every visitor's first paint
-  (docs/COMMUNITY_ECOSYSTEM.md D7: the budget is paid for, not raised). Only
-  the UI trees are read: src/, packages/, index.html — and tests/, whose
-  browser fixtures compile under the dev server.
+  (docs/COMMUNITY_ECOSYSTEM.md D7: the budget is paid for, not raised).
+  `source(none)` turns the automatic scan off and the list below is the whole
+  of what is read: the app tree, the document, the one package whose layout
+  tokens name utilities (packages/storeLayout), and the browser fixtures,
+  which compile under the dev server (scripts/e2e-*.mjs). A new folder that
+  renders with this stylesheet is added here; anything else is not read.
+  Measured at P0 (docs/PERFORMANCE_LOG.md): see the entry for the bytes the
+  restriction saved against the `@source not` list it replaces.
 */
-@source not "../docs";
-@source not "../worker";
-@source not "../migrations";
-@source not "../scripts";
-@source not "../studio";
-@source not "../services";
+@source "../src";
+@source "../index.html";
+@source "../packages/storeLayout/src";
+@source "../tests/browser";
 
 /*
   THE ONE HTML ELEMENT THAT REFUSES TO SHRINK.

@@ -11,7 +11,6 @@
  *                               serves it (W6 sweep), from the real routes
  */
 import { createRoot } from 'react-dom/client';
-import App from '../../src/App';
 import '../../src/index.css';
 
 const params = new URLSearchParams(location.search);
@@ -54,4 +53,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   return new Response(JSON.stringify(r.body), { status: r.status, headers: { 'content-type': 'application/json' } });
 };
 
+// The application is imported only now, AFTER the stand-in is installed: since
+// P2b, src/lib/bootFetch.ts sends `/api/storefront/resolve` (and `/api/home`
+// on `/`) at module evaluation, before any component renders — a static
+// `import App` would be hoisted above the patch and that first request would
+// leave through the real fetch, to a dev server with no Worker behind it.
+const { default: App } = await import('../../src/App');
 createRoot(document.getElementById('root')!).render(<App />);

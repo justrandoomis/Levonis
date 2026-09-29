@@ -49,7 +49,7 @@ const KB = 1024;
  * 60 KB, and the budget is re-cut to 120 KB: comfortable headroom for ordinary
  * work, tight enough that re-eagering a page is caught the same day.
  */
-const ENTRY_BUDGET = 120 * KB;
+const ENTRY_BUDGET = 72 * KB;
 /** §10: any single route chunk. */
 const CHUNK_BUDGET = 250 * KB;
 /**
@@ -57,8 +57,20 @@ const CHUNK_BUDGET = 250 * KB;
  * download before it can render ANYTHING. It measured 406 KB gzip when this
  * budget was first written and 185 KB after the storefront's own pages were
  * split out; 240 KB leaves room to work without leaving room to undo it.
+ *
+ * P1b (docs/MERCHANT_PLATFORM_V2.md §B.1 #6, docs/PERFORMANCE_LOG.md «P1b»):
+ * the entry measured 81.9 KB and the initial payload 212.1 KB over four files
+ * before; 65.0 KB and 181.8 KB after — the animation library's feature half
+ * (`vendor-motion`, 15.7 KB) left the first paint for a lazy `LazyMotion`
+ * bundle, the bell, the verify banner, the first-run sheets, the tier table
+ * and the search panel became lazy, and the icons shared by lazy routes
+ * became one `vendor-icons` chunk instead of 112 files under 1 KB. Both
+ * budgets are re-cut to the measured number plus ~10 %: 72 KB and 200 KB.
+ * Re-eagering any one of those pieces (the smallest, the tier table, is
+ * 1.6 KB) still fits, so the guard is the pair of «never in the initial
+ * payload» lists below, which name them; the number catches the next page.
  */
-const INITIAL_BUDGET = 240 * KB;
+const INITIAL_BUDGET = 200 * KB;
 /** Every stylesheet together; the entry's is the one downloaded before first paint. */
 const CSS_BUDGET = 60 * KB;
 
@@ -153,6 +165,10 @@ function distIsStale(): boolean {
 before(() => {
   if (existsSync(ASSETS) && !distIsStale()) return;
   execFileSync('npx', ['vite', 'build'], { cwd: ROOT, stdio: 'inherit' });
+  // What `npm run build` does after vite: the headers file the asset layer
+  // applies. Without it the build below is the bare `vite build` the
+  // `_headers` test exists to refuse.
+  execFileSync('node', ['scripts/write-asset-headers.mjs'], { cwd: ROOT, stdio: 'inherit' });
   assert.ok(existsSync(ASSETS), 'vite build produced no dist/assets');
   assert.ok(!distIsStale(), 'vite build left dist/ older than the sources it was built from');
 });
@@ -167,6 +183,44 @@ test('dist/ exists AND is newer than the sources — never a stale build', () =>
     readdirSync(ASSETS).some((f) => f.endsWith('.js')),
     'dist/assets holds no JavaScript — a budget over an empty directory proves nothing'
   );
+});
+
+/**
+ * THE HEADERS FILE IS PART OF THE BUILD, AND A BUILD WITHOUT IT ONCE MEASURED
+ * AS THE SITE. The performance survey of 2026-09-29 (docs/MERCHANT_PLATFORM_V2_SURVEY.md
+ * «perf-measure») ran against a dist/ produced by a bare `vite build`:
+ * dist/_headers — the immutable caching of /assets/*, the CSP, HSTS — was
+ * absent, and nothing said so. `npm run build` writes it after vite
+ * (scripts/write-asset-headers.mjs; securityPolicy.test.ts pins the order),
+ * so its absence means the artifact on disk is not what the deploy serves.
+ */
+test('dist/_headers exists — the build is `npm run build`, not a bare `vite build`', () => {
+  const headers = join(DIST, '_headers');
+  assert.ok(existsSync(headers), 'dist/_headers is missing — run `npm run build` (a bare `vite build` ships no caching or CSP headers)');
+  const text = readFileSync(headers, 'utf8');
+  assert.match(text, /^\/\*$/m, 'dist/_headers has no rule for the asset layer');
+  assert.match(text, /^ {2}Content-Security-Policy: /m, 'dist/_headers carries no policy');
+  assert.ok(
+    statSync(headers).mtimeMs >= statSync(join(DIST, 'index.html')).mtimeMs,
+    'dist/_headers is older than dist/index.html — vite emptied dist/ after it was written'
+  );
+});
+
+/**
+ * THE DOCUMENT IS PAID FOR ON EVERY VISIT (`no-cache`), and it measured 7.4 KB
+ * gzip of which 5.9 KB were the source's own comments (perf-measure §3).
+ * vite.config.ts strips them at build; this holds the result. Measured after
+ * the strip: 2.0 KB gzip with Vite's modulepreload links in place; 4 KB fails
+ * the day the strip is dropped and passes ordinary head edits.
+ */
+const DOCUMENT_BUDGET = 4 * KB;
+
+test('the built document carries no HTML comments and stays under 4 KB gzip', () => {
+  const html = readFileSync(join(DIST, 'index.html'), 'utf8');
+  assert.equal(/<!--/.test(html), false, 'dist/index.html still carries HTML comments — the strip in vite.config.ts is not running');
+  const bytes = gz(join(DIST, 'index.html'));
+  console.log(`bundle: document ${kb(bytes)} gzip (${html.length} B raw)`);
+  assert.ok(bytes <= DOCUMENT_BUDGET, `the document is ${kb(bytes)} gzip, over ${kb(DOCUMENT_BUDGET)}`);
 });
 
 test('the entry chunk is under 350 KB gzip and every chunk is under 250 KB', () => {
@@ -210,7 +264,14 @@ test('the initial payload — the entry plus everything it STATICALLY imports �
   // is deliberately its own lazy chunk for the same reason: importing the
   // bundle card from the eager home page would put the card, the countdown,
   // the offer badge and the tier metadata back into every first visit.
-  for (const lazyOnly of ['vendor-charts', 'vendor-qr', 'vendor-webgl', 'Bundles', 'BundleDetail', 'BundlesShelf']) {
+  // P1b: the animation features (`vendor-motion`, not `vendor-motion-core`)
+  // and the shared icons of the lazy routes (`vendor-icons`); the bell, the
+  // verify banner, the first-run sheets, the tier table and the search panel
+  // (each a lazy chunk of its own now). tests/motionLazy.test.ts says why.
+  for (const lazyOnly of [
+    'vendor-charts', 'vendor-qr', 'vendor-webgl', 'Bundles', 'BundleDetail', 'BundlesShelf',
+    'vendor-icons', 'NotificationBell', 'EmailVerifyBanner', 'CompleteProfileSheet', 'ThemeIntroSheet', 'tierMeta', 'LiveSearchPanel', 'motionFeaturesBundle',
+  ]) {
     const found = [...seen].find((f) => f.startsWith(`${lazyOnly}-`));
     assert.equal(
       found,
@@ -218,6 +279,8 @@ test('the initial payload — the entry plus everything it STATICALLY imports �
       `${lazyOnly} is a STATIC import of the entry. It is only needed by a lazy route, so something re-grouped it or imported it eagerly — that is ${kb(gz(join(ASSETS, found ?? entry)))} gzip added to every first visit.`
     );
   }
+  const features = [...seen].find((f) => /^vendor-motion-(?!core-)/.test(f));
+  assert.equal(features, undefined, `the animation features (${features}) are a STATIC import of the entry again — an eager module renders \`motion.*\` instead of \`m.*\` under <MotionFeatures> (src/lib/motionFeatures.tsx)`);
 });
 
 test('the split really happened: every page and panel §10 names has a chunk of its own', () => {
@@ -251,8 +314,10 @@ test('the split really happened: every page and panel §10 names has a chunk of 
     // both are named here so a regression that drops either tab — leaving the
     // seventeen `/api/admin/mystery` routes with no UI again — fails loudly.
     'AdminMystery', 'AdminMysteryPools',
-    // the manualChunks groups
-    'vendor-react', 'vendor-motion', 'vendor-charts', 'vendor-phone', 'vendor-qr', 'vendor-i18n', 'vendor-webgl',
+    // the manualChunks groups — `vendor-motion` is the features half and
+    // `vendor-motion-core` the eager half (P1b); `vendor-icons` the icons the
+    // lazy routes share (vite.config.ts `iconChunk`).
+    'vendor-react', 'vendor-motion', 'vendor-motion-core', 'vendor-charts', 'vendor-phone', 'vendor-qr', 'vendor-i18n', 'vendor-webgl', 'vendor-icons',
   ]) {
     if (!has(name)) missing.push(name);
   }
@@ -299,8 +364,23 @@ test('the split really happened: every page and panel §10 names has a chunk of 
  * then 47.0 with the product page's lazy save/share row and the follower
  * count that moves with a follow. AT THE BUDGET: the next addition to a store
  * page makes something else lazy, or argues for a new number here.
+ *
+ * WHAT COUNTS (P1b). The closure is split in two: the store pages' OWN
+ * weight — their chunks and the app modules they pull in, which this budget
+ * has always measured — and the shared `vendor-*` chunks (the animation
+ * features, the icons the lazy routes share), which are printed and capped
+ * in tests/motionLazy.test.ts instead. Before P1b the animation features were
+ * inside the initial payload and so invisible here; moving them out of the
+ * first paint for every visitor (−30 KB gzip before paint) would otherwise
+ * have read as the store pages "growing" by a chunk they already downloaded.
+ * The store visitor's total, initial payload plus closure, fell (258 →
+ * 250 KB gzip). What remains for the store pages themselves is to render
+ * `m.*` under <MotionFeatures> (StorefrontProduct.tsx, StoreCta, the follow
+ * pill) so the features leave their first paint too — P11.
  */
 const STOREFRONT_BUDGET = 47 * KB;
+/** Vendor chunks a lazy page may share; they are budgeted on their own, not against a page. */
+const isSharedVendor = (f: string) => /^vendor-/.test(f);
 
 function staticClosure(start: string): Set<string> {
   const seen = new Set<string>();
@@ -325,9 +405,12 @@ test('the storefront pages add at most 47 KB gzip beyond the initial payload, an
   });
   const beyond = new Set<string>();
   for (const page of pages) for (const f of staticClosure(page)) if (!initial.has(f)) beyond.add(f);
-  const total = [...beyond].reduce((sum, f) => sum + gz(join(ASSETS, f)), 0);
-  const detail = [...beyond].sort().map((f) => `  ${f}: ${kb(gz(join(ASSETS, f)))}`).join('\n');
+  const own = [...beyond].filter((f) => !isSharedVendor(f));
+  const vendor = [...beyond].filter(isSharedVendor);
+  const total = own.reduce((sum, f) => sum + gz(join(ASSETS, f)), 0);
+  const detail = own.sort().map((f) => `  ${f}: ${kb(gz(join(ASSETS, f)))}`).join('\n');
   console.log(`bundle: storefront pages ${kb(total)} gzip beyond the initial payload\n${detail}`);
+  console.log(`bundle: storefront pages also share ${vendor.map((f) => `${f} ${kb(gz(join(ASSETS, f)))}`).join(', ') || 'no vendor chunk'}`);
   assert.ok(total <= STOREFRONT_BUDGET, `the storefront pages add ${kb(total)} gzip, over ${kb(STOREFRONT_BUDGET)}:\n${detail}`);
 
   assert.ok(chunk('extra'), 'the non-classic blocks have no lazy chunk of their own');
@@ -376,7 +459,8 @@ test('the merchant workspace shell is small, stays out of every customer closure
   assert.equal(initial.has(shell!), false, 'the workspace shell is in the initial payload');
 
   const own = gz(join(ASSETS, shell!));
-  const closure = [...staticClosure(shell!)].filter((f) => !initial.has(f));
+  // The shell's own closure; the shared vendor chunks are accounted as for the store pages above.
+  const closure = [...staticClosure(shell!)].filter((f) => !initial.has(f) && !isSharedVendor(f));
   const total = closure.reduce((sum, f) => sum + gz(join(ASSETS, f)), 0);
   const detail = closure.sort().map((f) => `  ${f}: ${kb(gz(join(ASSETS, f)))}`).join('\n');
   console.log(`bundle: workspace shell ${kb(own)} gzip, ${kb(total)} with its closure beyond the initial payload\n${detail}`);

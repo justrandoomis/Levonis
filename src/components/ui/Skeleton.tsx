@@ -19,11 +19,20 @@ const STRINGS = {
 } as const;
 
 /** Base shimmer block. Purely decorative — hidden from screen readers. */
+/**
+ * A `<span>`, not a `<div>`: the page skeletons draw their bars inside the
+ * page's own `<p>` line boxes (so the loaded text lands on the same pixels),
+ * and a `<p>` may hold phrasing content only — React warns «<div> cannot be a
+ * descendant of <p>» and the HTML parser would close the paragraph early. It
+ * lays out as a block unless the caller's classes set the display themselves
+ * (`inline-block` for a line inside text).
+ */
 export function Skeleton({ className = '' }: { className?: string }) {
+  const display = /(?:^|\s)(?:inline-block|inline-flex|inline|flex|grid|hidden)(?:\s|$)/.test(className) ? '' : 'block ';
   return (
-    <div
+    <span
       aria-hidden="true"
-      className={`bg-zinc-800/60 rounded animate-pulse motion-reduce:animate-none ${className}`}
+      className={`${display}bg-zinc-800/60 rounded animate-pulse motion-reduce:animate-none ${className}`}
     />
   );
 }
@@ -135,39 +144,84 @@ export function ProductRowSkeleton({ count = 4 }: { count?: number }) {
 }
 
 /**
- * Mirrors the Product detail page: h-80 hero, action row, title/description
- * lines, price card, the two order-type buttons and two accordion headers.
+ * Mirrors the Product detail page (src/pages/Product.tsx) box for box, so the
+ * swap from loading to content moves nothing (P1c, docs/PERFORMANCE_LOG.md):
+ * the page's own shell (`max-w-[1540px] px-4 pt-2`, the lg two-column grid),
+ * the gallery frame at its responsive height, the thumbnail row, then every
+ * text row drawn INSIDE a real line box — the same type classes around a
+ * zero-width space — so it is exactly as tall as the words will be at every
+ * breakpoint. Measured at 360: gallery 281, thumbs 68, title 28, store line
+ * 18, signal chips 27, price card 66.
  */
+const ZW = '\u200b';
+function Line({ w, h = 'h-3' }: { w: string; h?: string }) {
+  return (
+    <>
+      <Skeleton className={`inline-block align-middle ${h} ${w}`} />
+      {ZW}
+    </>
+  );
+}
+
 export function ProductDetailSkeleton() {
   return (
     <SkeletonGroup>
-      <div aria-hidden="true">
-        <div className="w-full h-80 bg-zinc-900 rounded-b-3xl overflow-hidden">
-          <div className="w-full h-full bg-zinc-800/40 animate-pulse motion-reduce:animate-none" />
-        </div>
-        <div className="px-4 py-5">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-2">
-              <Skeleton className="w-10 h-10 rounded-full" />
-              <Skeleton className="w-10 h-10 rounded-full" />
+      <div aria-hidden="true" className="mx-auto w-full max-w-[1540px] px-4 sm:px-6 xl:px-8 pt-2">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px] lg:gap-8 xl:gap-12 lg:items-start">
+          <div className="min-w-0">
+            <div className="w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] rounded-2xl border border-zinc-800/70 bg-zinc-950 overflow-hidden">
+              <div className="w-full h-full bg-zinc-800/40 animate-pulse motion-reduce:animate-none" />
             </div>
-            <Skeleton className="w-16 h-6 rounded-full" />
+            <div className="mt-3 flex gap-2 pb-1">
+              {Array.from({ length: 4 }, (_, i) => (
+                <Skeleton key={i} className="w-16 h-16 rounded-xl shrink-0" />
+              ))}
+            </div>
+            <div className="mt-5">
+              <p className="text-xl sm:text-2xl leading-snug">
+                <Line w="w-3/4" h="h-5" />
+              </p>
+              <p className="mt-2 text-[12px] flex items-center gap-1.5">
+                <Line w="w-32" h="h-2.5" />
+              </p>
+              <div className="mt-3 flex items-center gap-x-2 gap-y-1.5 flex-wrap">
+                <span className="inline-flex items-center border border-zinc-800 rounded-full px-2.5 py-1 text-[11px] leading-normal">
+                  <Line w="w-16" h="h-2.5" />
+                </span>
+                <span className="inline-flex items-center border border-zinc-800 rounded-full px-2.5 py-1 text-[11px] leading-normal">
+                  <Line w="w-20" h="h-2.5" />
+                </span>
+              </div>
+            </div>
+            {/* The phone purchase panel: the price card, then the selection
+                blocks and the order-type buttons a product carries. */}
+            <div className="mt-5 space-y-3 lg:hidden">
+              <div className="lv-surface p-4">
+                <p className="text-2xl sm:text-3xl">
+                  <Line w="w-1/2" h="h-6" />
+                </p>
+              </div>
+              <Skeleton className="h-14 w-full rounded-xl" />
+              <div className="flex gap-3">
+                <Skeleton className="flex-1 h-12 rounded-xl" />
+                <Skeleton className="flex-1 h-12 rounded-xl" />
+              </div>
+            </div>
+            <div className="mt-6 space-y-3 max-w-[68ch]">
+              <Skeleton className="h-14 w-full rounded-xl" />
+              <Skeleton className="h-14 w-full rounded-xl" />
+            </div>
           </div>
-          <Skeleton className="h-7 w-3/4 mb-3 ml-auto" />
-          <Skeleton className="h-4 w-full mb-2" />
-          <Skeleton className="h-4 w-5/6 mb-6 ml-auto" />
-          <Skeleton className="h-[76px] w-full rounded-2xl mb-6" />
-          <div className="flex gap-3 mb-6">
-            <Skeleton className="flex-1 h-12 rounded-xl" />
-            <Skeleton className="flex-1 h-12 rounded-xl" />
+          {/* The desktop purchase panel's column. */}
+          <div className="hidden lg:block">
+            <div className="lv-surface p-4">
+              <p className="text-2xl sm:text-3xl">
+                <Line w="w-1/2" h="h-6" />
+              </p>
+            </div>
+            <Skeleton className="mt-3 h-14 w-full rounded-xl" />
+            <Skeleton className="mt-3 h-12 w-full rounded-xl" />
           </div>
-          {/* The buy box's selection blocks — options, then the extended-warranty
-              fieldset a printer carries (legend, intro line, three 44px radios,
-              policy link ≈ 236px). Reserved so a printer page does not jump
-              when its plans arrive. */}
-          <Skeleton className="h-14 w-full rounded-xl mb-4" />
-          <Skeleton className="h-[236px] w-full rounded-2xl mb-4" />
-          <Skeleton className="h-14 w-full rounded-xl" />
         </div>
       </div>
     </SkeletonGroup>

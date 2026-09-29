@@ -470,6 +470,19 @@ jobs:
             echo "::notice::no admin-bot secret was uploaded; @alilevobot stays off and admin notifications keep using the legacy chat"
           fi
 
+      # THE ZONE CACHE IS PURGED AFTER EVERY DEPLOY (P2 review). The rewritten
+      # store and product documents say `public, max-age=0, s-maxage=60`
+      # (worker/lib/socialPreview.ts) and name content-hashed chunks. Once the
+      # owner enables the HTML Cache Rule (docs/MERCHANT_PLATFORM_V2.md §B.2),
+      # a colo may hold a document for a minute — and for that minute it would
+      # name chunks this deploy no longer serves. The purge closes the window.
+      # Without CLOUDFLARE_ZONE_ID the script prints a notice and the rule must
+      # stay off; with it, a failed purge fails the run (scripts/purge-zone-cache.mjs).
+      - name: Purge the zone cache (precondition of the HTML Cache Rule)
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: node scripts/purge-zone-cache.mjs
+
       # The same proof the Studio deploy now carries, for the store. A green
       # deploy only means wrangler did not error; it does not mean the browser
       # is being handed the new bundle. Vite content-hashes asset filenames, so

@@ -1,12 +1,24 @@
-import { IMAGES_MAX_INPUT_BYTES, convertToWebp, extensionFor, isConvertibleToWebp } from '../lib/imageConvert';
-import { Hono } from 'hono';
+import {
+  IMAGES_MAX_INPUT_BYTES,
+  convertToWebp,
+  extensionFor,
+  isConvertibleToWebp,
+  negotiateVariantFormat,
+  parseVariantWidth,
+  renderImageVariant,
+  variantSourceMime,
+  webpConversionAvailable,
+  type ImageVariantFormat,
+  type ImageVariantWidth,
+} from '../lib/imageConvert';
+import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { HttpError, requireAuth, badRequest, forbidden, notFound, oneOf, str, unavailable } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { assertMayWriteInThread, recordStaffChatFileRead } from './chats';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
-import { sniffVideo } from '../lib/videoSniff';
+import { mp4IsFastStart, sniffVideo } from '../lib/videoSniff';
 import { storeForUser } from '../lib/merchantAuth';
 import {
   buildMediaKey,
@@ -329,6 +341,8 @@ uploadRoutes.post('/', async (c) => {
   }
 
   let buf = new Uint8Array(await file.arrayBuffer());
+  /** Codes the upload succeeded WITH — the file is stored; the client may show a hint. */
+  const warnings: string[] = [];
   // A conversation may also carry a voice note or a PDF (`sniffChat`); every
   // other purpose keeps the picture-and-clip sniff it always had.
   let kind = purpose === 'chat' ? sniffChat(buf, file.type || '') : sniff(buf);
@@ -342,6 +356,16 @@ uploadRoutes.post('/', async (c) => {
       );
     }
     kind = { ext: video.ext, mime: video.mime };
+    /**
+     * PLAYABLE, BUT SLOW TO START — a warning, not a refusal. An MP4 whose
+     * index (`moov`) sits after its frames (`mdat`) cannot begin playing until
+     * the browser has fetched to the end of the file; the merchant's own
+     * encoder has a one-click fix («fast start» / «web optimized»), so the
+     * answer carries `warnings: ['VIDEO_NOT_FASTSTART']` and the pickers show
+     * the hint (src/lib/refusalStrings.ts). The file is stored either way:
+     * refusing it would turn every phone-camera clip into an error.
+     */
+    if (video.mime === 'video/mp4' && !mp4IsFastStart(buf)) warnings.push('VIDEO_NOT_FASTSTART');
     const used = await c.env.DB
       .prepare(
         `SELECT COALESCE(SUM(byte_size), 0) AS bytes FROM file_objects
@@ -620,6 +644,7 @@ uploadRoutes.post('/', async (c) => {
     bytes: buf.byteLength,
     width: dimensions?.width ?? null,
     height: dimensions?.height ?? null,
+    ...(warnings.length ? { warnings } : {}),
   });
 });
 
@@ -685,6 +710,220 @@ export function edgeCacheKey(request: Request, key: string): Request {
   const url = new URL(request.url);
   url.searchParams.set('__edge', REWRITABLE_EDGE_GENERATION);
   return new Request(url.toString(), request);
+}
+
+/**
+ * THE SAME CACHE ENTRY WITHOUT THE PLAYER'S RANGE.
+ *
+ * A Range request is looked up WITH its header — Cloudflare's cache slices a
+ * stored whole file into the 206 itself — but the entry is always WRITTEN
+ * under the plain request, because what is stored is the whole file and the
+ * key must be the same one every later request, ranged or not, looks up.
+ */
+export function edgeCachePutKey(request: Request, key: string): Request {
+  const headers = new Headers(request.headers);
+  headers.delete('Range');
+  headers.delete('If-Range');
+  return edgeCacheKey(new Request(request.url, { method: 'GET', headers }), key);
+}
+
+/**
+ * `offset` bytes skipped, then exactly `length` bytes, then the source is
+ * released. A player's opening probe is two bytes of a forty-megabyte clip:
+ * the stored whole file is streamed only as far as those two bytes, and the
+ * cache or the bucket is told to stop.
+ */
+export function sliceStream(source: ReadableStream<Uint8Array>, offset: number, length: number): ReadableStream<Uint8Array> {
+  let skip = offset;
+  let remaining = length;
+  return source.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        if (remaining <= 0) return;
+        let c = chunk;
+        if (skip > 0) {
+          if (c.byteLength <= skip) {
+            skip -= c.byteLength;
+            return;
+          }
+          c = c.subarray(skip);
+          skip = 0;
+        }
+        if (c.byteLength > remaining) c = c.subarray(0, remaining);
+        remaining -= c.byteLength;
+        controller.enqueue(c);
+        if (remaining <= 0) controller.terminate();
+      },
+    })
+  );
+}
+
+/**
+ * A WHOLE-FILE 200 TURNED INTO THE ANSWER A RANGE REQUEST WANTED.
+ *
+ * Given the complete object — from the edge cache or fresh from R2 — and the
+ * player's `Range`, this is the 206 with exactly those bytes, the 416 for a
+ * range past the end, or the 200 itself when the range is one this server
+ * ignores (RFC 9110 §14.2) or `If-Range` names a different version of the
+ * file. It reads the size from `Content-Length`, so a stored answer without
+ * one is served whole rather than guessed at.
+ */
+export function answerRangeFromFull(full: Response, rangeHeader: string, ifRange: string | undefined): Response {
+  const declared = full.headers.get('Content-Length');
+  const total = declared === null ? NaN : Number(declared);
+  if (!rangeHeader || !Number.isSafeInteger(total) || total < 0 || !full.body) return full;
+  const etag = full.headers.get('etag') ?? '';
+  if (ifRange && ifRange !== etag) return full;
+  const parsed = parseByteRange(rangeHeader, total);
+  if (parsed === null) return full;
+  if (parsed === 'unsatisfiable') {
+    void full.body.cancel().catch(() => undefined);
+    return new Response(null, {
+      status: 416,
+      headers: { 'Content-Range': `bytes */${total}`, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' },
+    });
+  }
+  const headers = new Headers(full.headers);
+  headers.set('Content-Range', `bytes ${parsed.offset}-${parsed.offset + parsed.length - 1}/${total}`);
+  headers.set('Content-Length', String(parsed.length));
+  return new Response(sliceStream(full.body, parsed.offset, parsed.length), { status: 206, headers });
+}
+
+/** The delivery headers every public file answer carries, cached or not. */
+function publicFileCacheControl(key: string): string {
+  return isRewritableMediaKey(key) ? 'public, max-age=300, must-revalidate' : 'public, max-age=31536000, immutable';
+}
+
+/**
+ * THE CACHE ENTRY OF ONE SIZED VARIANT: the plain URL plus the canonical
+ * `w` and the NEGOTIATED format, so the AVIF a Chrome asked for is never
+ * handed to a browser that sent `Accept: image/webp`. Any other query the
+ * caller carried is dropped from the key — the answer does not depend on it.
+ * Rewritable keys carry the generation as the original does.
+ */
+export function imageVariantCacheKey(request: Request, key: string, width: ImageVariantWidth, format: ImageVariantFormat): Request {
+  const url = new URL(request.url);
+  url.search = '';
+  url.searchParams.set('w', String(width));
+  url.searchParams.set('f', format.slice('image/'.length));
+  return edgeCacheKey(new Request(url.toString(), { method: 'GET' }), key);
+}
+
+/**
+ * THE WHOLE PUBLIC OBJECT, from the edge cache when this colo has it and
+ * from R2 once when it does not — in which case the answer is also written
+ * to the cache, so the variant below and the next visitor both find it. The
+ * response is the exact 200 `/files/<key>` would send.
+ */
+async function loadPublicOriginal(
+  c: Context<AppContext>,
+  key: string,
+  cache: Cache | null
+): Promise<Response | null> {
+  // Re-asked here, not trusted from the caller: this helper WRITES to the
+  // shared cache, and the whole safety argument of that cache is that only a
+  // public key is ever stored in it.
+  const publicPrefix = isAnonymousPublicMediaKey(key);
+  if (!publicPrefix) return null;
+  const plain = new Request(new URL(c.req.url).origin + `/files/${key}`, { method: 'GET' });
+  if (publicPrefix && cache) {
+    const hit = await cache.match(edgeCacheKey(plain, key));
+    if (hit && hit.status === 200 && hit.body) return hit;
+  }
+  const obj = await getMediaObject(c.env, 'public', key);
+  if (!obj) return null;
+  const headers = new Headers();
+  obj.writeHttpMetadata(headers);
+  headers.set('etag', obj.httpEtag);
+  headers.set('Content-Length', String(obj.size));
+  headers.set('Cache-Control', publicFileCacheControl(key));
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
+  headers.set('Accept-Ranges', 'bytes');
+  const res = new Response(obj.body, { headers });
+  if (publicPrefix && cache) {
+    try {
+      c.executionCtx.waitUntil(cache.put(edgeCacheKey(plain, key), res.clone()));
+    } catch {
+      // No execution context (the Node test harness): skip the cache write.
+    }
+  }
+  return res;
+}
+
+/**
+ * `GET /files/<key>?w=<width>` — ONE SIZED VARIANT OF A PUBLIC PICTURE
+ * (plan §B.1 #5; the widths and the negotiation live in
+ * worker/lib/imageConvert.ts).
+ *
+ * The caller has already established that the key is a public still image
+ * and the width is on the list. From here: the variant's own cache entry
+ * first; then the ORIGINAL (edge cache, else R2 once); a 304 when the
+ * browser already holds this exact variant — decided from the original's
+ * ETag, before a pixel is touched; then the binding cuts the width and the
+ * format and the result streams to the visitor and into the cache at once.
+ *
+ * NOTHING HERE CAN FAIL FOR THE VISITOR: without the binding, or when it
+ * refuses the picture, the original is served exactly as `/files/<key>`
+ * would have — which is what every card got before this route existed.
+ */
+async function serveImageVariant(
+  c: Context<AppContext>,
+  key: string,
+  cache: Cache | null,
+  width: ImageVariantWidth,
+  sourceMime: ImageVariantFormat
+): Promise<Response> {
+  const format = negotiateVariantFormat(c.req.header('Accept'), sourceMime);
+  const cacheKey = imageVariantCacheKey(c.req.raw, key, width, format);
+  const ifNoneMatch = c.req.header('If-None-Match');
+  if (cache) {
+    const hit = await cache.match(cacheKey);
+    if (hit) {
+      if (hit.status !== 200) return hit;
+      if (ifNoneMatch && ifNoneMatch === hit.headers.get('etag')) {
+        void hit.body?.cancel().catch(() => undefined);
+        return new Response(null, { status: 304, headers: hit.headers });
+      }
+      return hit;
+    }
+  }
+
+  const original = await loadPublicOriginal(c, key, cache);
+  if (!original) throw notFound();
+  // Without the binding there is no variant to cut: the original IS the answer.
+  if (!webpConversionAvailable(c.env)) return original;
+
+  const sourceEtag = (original.headers.get('etag') ?? '').replace(/^W\//, '').replace(/^"|"$/g, '');
+  const headers = new Headers();
+  headers.set('Content-Type', format);
+  headers.set('etag', `"${sourceEtag}-w${width}-${format.slice('image/'.length)}"`);
+  headers.set('Cache-Control', publicFileCacheControl(key));
+  headers.set('Vary', 'Accept');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
+  if (ifNoneMatch && ifNoneMatch === headers.get('etag')) {
+    void original.body?.cancel().catch(() => undefined);
+    return new Response(null, { status: 304, headers });
+  }
+
+  const rendered = await renderImageVariant(c.env, original.body as ReadableStream<Uint8Array>, { width, format });
+  if (!rendered.ok) {
+    // The picture defeated the converter (or the binding is gone mid-flight):
+    // serve the stored file. The first read was consumed by the attempt.
+    const again = await loadPublicOriginal(c, key, cache);
+    if (!again) throw notFound();
+    return again;
+  }
+  const res = new Response(rendered.body, { headers });
+  if (cache) {
+    try {
+      c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()));
+    } catch {
+      // No execution context: serve the variant, skip the cache write.
+    }
+  }
+  return res;
 }
 
 /**
@@ -827,17 +1066,46 @@ fileRoutes.get('/*', async (c) => {
   // does not.)
   const cache =
     typeof caches !== 'undefined' ? (caches as unknown as { default?: Cache }).default ?? null : null;
+
   /**
-   * A RANGE REQUEST IS ANSWERED FROM R2, NEVER FROM THE SHARED CACHE, in both
-   * directions: a stored full body must not be handed to a player that asked
-   * for two bytes, and a partial body must never be stored as if it were the
-   * file. Ranges are what `<video>` sends, and the objects that need them are
-   * private clips that were never cached in the first place.
+   * `?w=320|640|1080` — A SIZED VARIANT, for public still images only (plan
+   * §B.1 #5; `serveImageVariant` above). A width off the list, a private
+   * key or anything that is not a still picture is refused outright rather
+   * than quietly answered with the original: the client (`SafeImage`) only
+   * ever asks for what this list allows, so a stray value is a mistake to
+   * surface, and an open parameter would let one visitor mint a thousand
+   * cache entries and transformations per picture.
+   */
+  const variantWidth = parseVariantWidth(c.req.query('w'));
+  if (variantWidth === 'invalid') throw badRequest('Unknown image width — use w=320, w=640 or w=1080', 'IMAGE_VARIANT_WIDTH');
+  if (variantWidth !== null) {
+    if (!publicPrefix) throw badRequest('Sized variants exist for public pictures only', 'IMAGE_VARIANT_PRIVATE');
+    const sourceMime = variantSourceMime(key);
+    if (!sourceMime) throw badRequest('Sized variants exist for still images only', 'IMAGE_VARIANT_NOT_IMAGE');
+    return serveImageVariant(c, key, cache, variantWidth, sourceMime);
+  }
+
+  /**
+   * A RANGE REQUEST IS ANSWERED FROM THE CACHED WHOLE FILE (plan §B.1 #9).
+   *
+   * Ranges are what `<video>` sends — Safari opens with `bytes=0-1`, every
+   * seek is another — and until this change each one bypassed the edge cache
+   * in both directions and cost a Worker invocation, an R2 HEAD and an R2 GET
+   * from R2's own region. A merchant's product video was therefore NEVER
+   * served from the Iraqi colo, however many visitors played it.
+   *
+   * Now the whole object is what the cache holds, and a range is cut from
+   * it: Cloudflare's cache answers a ranged `match` with a 206 itself; a
+   * runtime that hands back the whole 200 gets it sliced here
+   * (`answerRangeFromFull`). Only a whole 200 is ever WRITTEN — under the
+   * plain key, without the player's Range — so a partial body can never be
+   * stored as if it were the file.
    */
   const rangeHeader = c.req.header('Range') ?? '';
-  if (publicPrefix && cache && !rangeHeader) {
+  const ifRange = c.req.header('If-Range');
+  if (publicPrefix && cache) {
     const hit = await cache.match(edgeCacheKey(c.req.raw, key));
-    if (hit) return hit;
+    if (hit) return rangeHeader && hit.status === 200 ? answerRangeFromFull(hit, rangeHeader, ifRange) : hit;
   }
 
   const visibility = publicPrefix ? 'public' : 'private';
@@ -853,20 +1121,21 @@ fileRoutes.get('/*', async (c) => {
    * stored, and showed as a dead player on exactly the screens it was sent to.
    *
    * THE ANSWER IS 206 WITH THE BYTES ASKED FOR, 416 FOR A RANGE PAST THE END,
-   * and every response now says `Accept-Ranges: bytes`. The size comes from a
-   * HEAD first so an unsatisfiable range is refused without reading a byte,
-   * and all of it runs AFTER the authorisation above — a range is a way of
-   * reading a file, not a way around the question of whether you may.
+   * and every response now says `Accept-Ranges: bytes`. For a PRIVATE clip the
+   * size comes from a HEAD first so an unsatisfiable range is refused without
+   * reading a byte, and all of it runs AFTER the authorisation above — a range
+   * is a way of reading a file, not a way around the question of whether you
+   * may. A PUBLIC object is read whole, once (no HEAD: the GET carries the
+   * size), sliced for this player and stored for the next one.
    *
    * `If-Range` is honoured: a player resuming against a file that has since
    * changed gets the whole new file, not a splice of two.
    */
   let range: { offset: number; length: number } | null = null;
   let totalSize = 0;
-  if (rangeHeader) {
+  if (rangeHeader && !publicPrefix) {
     const head = await headMediaObject(c.env, visibility, key);
     if (!head) throw notFound();
-    const ifRange = c.req.header('If-Range');
     if (!ifRange || ifRange === head.httpEtag) {
       const parsed = parseByteRange(rangeHeader, head.size);
       if (parsed === 'unsatisfiable') {
@@ -915,6 +1184,9 @@ fileRoutes.get('/*', async (c) => {
         ? 'public, max-age=300, must-revalidate'
         : 'public, max-age=31536000, immutable'
     );
+    // The size travels with the whole file, so a ranged read of the cached
+    // entry — here or at the edge — knows where the end is.
+    headers.set('Content-Length', String(obj.size));
   } else {
     headers.set('Cache-Control', 'private, max-age=300');
   }
@@ -923,8 +1195,11 @@ fileRoutes.get('/*', async (c) => {
 
   headers.set('Accept-Ranges', 'bytes');
 
-  // A revalidation should cost a header, not a body. The etag is R2's own.
+  // A revalidation should cost a header, not a body — and the body is not
+  // read: the GET's stream is released before a byte of it moves. The etag
+  // is R2's own.
   if (c.req.header('If-None-Match') === obj.httpEtag) {
+    void obj.body.cancel().catch(() => undefined);
     return new Response(null, { status: 304, headers });
   }
 
@@ -935,16 +1210,17 @@ fileRoutes.get('/*', async (c) => {
   }
 
   const res = new Response(obj.body, { headers });
-  if (publicPrefix && cache && !rangeHeader) {
+  if (publicPrefix && cache) {
     // `clone()` before the body is streamed to the client, and `waitUntil` so
     // the write never delays the response. `executionCtx` throws when there is
     // none (again, the Node test harness), and a cache write is never worth
-    // failing a response that is otherwise complete.
+    // failing a response that is otherwise complete. The key carries no
+    // Range: what is stored is the whole file.
     try {
-      c.executionCtx.waitUntil(cache.put(edgeCacheKey(c.req.raw, key), res.clone()));
+      c.executionCtx.waitUntil(cache.put(edgeCachePutKey(c.req.raw, key), res.clone()));
     } catch {
       // No execution context: serve the response, skip the cache write.
     }
   }
-  return res;
+  return publicPrefix && rangeHeader ? answerRangeFromFull(res, rangeHeader, ifRange) : res;
 });

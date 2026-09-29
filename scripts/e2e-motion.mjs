@@ -109,14 +109,20 @@ async function main() {
   check('the 300ms double-tap delay is removed from the input path', tapDelay === 'manipulation', String(tapDelay));
 
   // The community's own shortcut tiles were <div onClick> — no role, no
-  // keyboard, no feedback. They must be real buttons now.
+  // keyboard, no feedback. Since the hub rebuild (1444169f) they are the four
+  // quick actions: real LINKS with an href, reachable by keyboard, each a
+  // 44 px target (P2 review re-pointed this check at the current markup).
   const tiles = await page.evaluate(() => {
-    const grid = document.querySelector('.grid.grid-cols-4');
-    if (!grid) return null;
-    const kids = [...grid.children];
-    return { total: kids.length, buttons: kids.filter((k) => k.tagName === 'BUTTON').length };
+    const kids = [...document.querySelectorAll('[data-community-quick-actions] > *')];
+    if (!kids.length) return null;
+    return {
+      total: kids.length,
+      links: kids.filter((k) => k.tagName === 'A' && k.getAttribute('href')).length,
+      tall: kids.filter((k) => k.getBoundingClientRect().height >= 44).length,
+    };
   });
-  check('the community shortcuts are buttons, not clickable divs', !!tiles && tiles.total > 0 && tiles.total === tiles.buttons, JSON.stringify(tiles));
+  check('the community shortcuts are links with an href, not clickable divs', !!tiles && tiles.total === 4 && tiles.links === 4, JSON.stringify(tiles));
+  check('and each is at least a 44px target', !!tiles && tiles.tall === tiles.total, JSON.stringify(tiles));
 
   // ------------------------------------------------- 2. the tab indicator
   console.log('\n2. the tab indicator is one element that moves');
@@ -129,7 +135,9 @@ async function main() {
   check('there is exactly one indicator on the strip', (await page.locator('[data-tab-indicator]').count()) === 1, String(await page.locator('[data-tab-indicator]').count()));
   check('and it has a real box', !!before && before.w > 0, JSON.stringify(before));
 
-  await page.locator('[data-tab="merchants"]').first().click();
+  // The hub's six tabs: foryou, following, projects, requests, stores, creators.
+  await page.waitForSelector('[role="tab"][data-tab="stores"]', { timeout: 10000 }).catch(() => {});
+  await page.locator('[data-tab="stores"]').first().click();
   // Caught MID-FLIGHT: a spring that is animating has not arrived yet, which
   // is the whole difference from a div that blinks into place.
   await page.waitForTimeout(70);
@@ -282,11 +290,12 @@ async function main() {
   });
   check('the press dim is re-stated inside the reduced-motion block', rmPress);
 
+  await rm.waitForSelector('[role="tab"][data-tab="requests"]', { timeout: 10000 }).catch(() => {});
   const rmIndicator = await rm.evaluate(() => {
     const el = document.querySelector('[data-tab-indicator]');
     return el ? Math.round(el.getBoundingClientRect().x) : null;
   });
-  await rm.locator('[data-tab="requests"]').first().click();
+  await rm.locator('[data-tab="requests"]').first().click({ timeout: 10000 }).catch(() => {});
   await rm.waitForTimeout(60);
   const rmMid = await rm.evaluate(() => {
     const el = document.querySelector('[data-tab-indicator]');
@@ -298,6 +307,59 @@ async function main() {
     JSON.stringify({ rmIndicator, rmMid })
   );
   await rmCtx.close();
+
+  // THE PREFERENCE CHANGING MID-SESSION (P2 review). `useMotion()` reads the
+  // media query through a subscription, so flipping the OS setting with the
+  // page open — no reload — must take effect on the next window. Measured on
+  // the header search panel, which every page has: its first twelve frames.
+  console.log('\n5b. the preference flips mid-session, without a reload');
+  const flipCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ar' });
+  const flip = await flipCtx.newPage();
+  await flip.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+  const input = flip.locator('input[role="combobox"]').first();
+  const hasSearch = await input.waitFor({ timeout: 10000 }).then(() => true).catch(() => false);
+  check('the header search field is on the page', hasSearch);
+  if (hasSearch) {
+    const frames = async () => {
+      await flip.evaluate(() => {
+        window.__panelFrames = new Promise((resolve) => {
+          const obs = new MutationObserver(() => {
+            const el = document.querySelector('[data-testid="search-panel"]');
+            if (!el) return;
+            obs.disconnect();
+            const heights = [];
+            const tick = () => {
+              heights.push(Math.round(el.getBoundingClientRect().height));
+              if (heights.length < 12) requestAnimationFrame(tick);
+              else resolve(heights);
+            };
+            tick();
+          });
+          obs.observe(document.body, { childList: true, subtree: true });
+        });
+      });
+      await input.focus();
+      await flip.keyboard.type('pla');
+      const shown = await flip.waitForSelector('[data-testid="search-panel"]', { timeout: 10000 }).then(() => true).catch(() => false);
+      const heights = shown ? await flip.evaluate(() => window.__panelFrames) : [];
+      await flip.keyboard.press('Escape');
+      await input.fill('');
+      await flip.locator('body').click({ position: { x: 5, y: 800 } });
+      await flip.waitForSelector('[data-testid="search-panel"]', { state: 'detached', timeout: 5000 }).catch(() => {});
+      await flip.waitForTimeout(300);
+      return heights;
+    };
+    const ratio = (h) => (h.length ? h[0] / Math.max(1, h[h.length - 1]) : NaN);
+    const full = await frames();
+    check('full motion: the panel grows over several frames', full.length > 0 && ratio(full) < 0.8, JSON.stringify(full));
+    await flip.emulateMedia({ reducedMotion: 'reduce' });
+    const reduced = await frames();
+    check('reduced (flipped mid-session): full height on the first frame', reduced.length > 0 && ratio(reduced) >= 0.9, JSON.stringify(reduced));
+    await flip.emulateMedia({ reducedMotion: 'no-preference' });
+    const back = await frames();
+    check('flipped back: it springs again', back.length > 0 && ratio(back) < 0.8, JSON.stringify(back));
+  }
+  await flipCtx.close();
 
   // ------------------------------------------------------------- 6. RTL
   console.log('\n6. directional motion mirrors with the writing direction');

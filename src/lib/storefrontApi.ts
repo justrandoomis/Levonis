@@ -48,6 +48,21 @@ export const storefrontApi = {
     api.get<{ delivery: StoreDeliverySummary & { governorate: string | null; source: 'query' | 'address' | null; quote: DeliveryToGovernorate | null } }>(
       `/api/storefront/${slug}/delivery${governorate ? `?governorate=${encodeURIComponent(governorate)}` : ''}`
     ),
+  /**
+   * «التوصيل إلى محافظتك» for the SIGNED-IN visitor: delivery to their
+   * default address's governorate, or null (a guest, an address without one,
+   * a store that does not deliver there is still a quote — `available: false`).
+   *
+   * Since P2a the store body no longer carries it: the shopfront is one body
+   * for every visitor, cached at the edge for guests, and the viewer's own
+   * line is asked for separately, only when somebody is signed in. The pages
+   * merge the answer into their `store` under the key the parts read
+   * (`delivery_to_you`), so the words on the page are unchanged.
+   */
+  deliveryToYou: async (slug: string): Promise<DeliveryToGovernorate | null> => {
+    const { delivery } = await storefrontApi.delivery(slug);
+    return delivery.source === 'address' ? delivery.quote : null;
+  },
 };
 
 /** The storefront heart — per-user, so it lives outside /api/storefront. */

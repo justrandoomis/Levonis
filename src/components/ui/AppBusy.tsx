@@ -66,9 +66,14 @@
 
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'motion/react';
+// `m` + <MotionFeatures>: this layer is mounted at boot on every shell, so it
+// must not make the `motion` proxy (every feature, 46 KB gzip) a static
+// dependency of the first paint — src/lib/motionFeatures.tsx.
+import { AnimatePresence } from 'motion/react';
+import * as Motion from 'motion/react-m';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
+import { MotionFeatures, useMotionFeaturesFailed } from '../../lib/motionFeatures';
 import { UI_LAYERS } from './Overlay';
 import Spinner from './Spinner';
 import { COMMITS, useBusySnapshot, type BusyReason } from '../../lib/busy';
@@ -157,6 +162,7 @@ export default function AppBusy() {
   const { reason, session, opener, ended } = useBusySnapshot();
   const { lang, dir } = useLanguage();
   const m = useMotion();
+  const atRest = useMotionFeaturesFailed();
   const [shown, setShown] = useState(false);
   const [released, setReleased] = useState(false);
   /**
@@ -249,7 +255,8 @@ export default function AppBusy() {
   return createPortal(
     <AnimatePresence custom={ended === 'order'}>
       {visible && (
-        <motion.div
+        <MotionFeatures>
+        <Motion.div
           dir={dir}
           data-app-busy={reason}
           role="status"
@@ -276,7 +283,7 @@ export default function AppBusy() {
           // talking about itself.
           variants={SCRIM}
           custom={ended === 'order'}
-          initial="hidden"
+          initial={atRest ? false : "hidden"}
           animate="shown"
           exit="hidden"
           transition={m.spring('quick')}
@@ -285,7 +292,8 @@ export default function AppBusy() {
               two live regions announcing the same wait is one too many. */}
           <Spinner size="md" delayMs={0} decorative />
           <span className="text-[13px] font-light text-zinc-300">{label}</span>
-        </motion.div>
+        </Motion.div>
+        </MotionFeatures>
       )}
     </AnimatePresence>,
     document.body

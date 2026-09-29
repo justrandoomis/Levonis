@@ -24,10 +24,15 @@
  * the main site, the full-screen routes, and a merchant's storefront on its
  * own subdomain. A deploy reaches every one of them.
  */
-import { AnimatePresence, motion } from 'motion/react';
+// `m` + <MotionFeatures> (src/lib/motionFeatures.tsx): this module is in the
+// entry (main.tsx calls `watchForUpdates`), so the `motion` proxy's feature
+// set must not ride with it before the first paint.
+import { AnimatePresence } from 'motion/react';
+import * as Motion from 'motion/react-m';
 import { useState, useSyncExternalStore } from 'react';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
+import { MotionFeatures, useMotionFeaturesFailed } from '../../lib/motionFeatures';
 import { UI_LAYERS } from '../ui/Overlay';
 
 let waiting: ServiceWorker | null = null;
@@ -106,6 +111,7 @@ function onControllerChange(): void {
 export default function UpdateReadyToast() {
   const { t } = useLanguage();
   const m = useMotion();
+  const atRest = useMotionFeaturesFailed();
   const ready = useSyncExternalStore(
     updateReadyStore.subscribe,
     updateReadyStore.snapshot,
@@ -133,7 +139,8 @@ export default function UpdateReadyToast() {
   return (
     <AnimatePresence>
       {visible && (
-        <motion.div
+        <MotionFeatures>
+        <Motion.div
           // `--nav-stack` is the single source of truth for how much of the
           // bottom edge the floating BottomNav owns (src/index.css). Guessing
           // a pixel offset here is precisely how the cart's summary bar ended
@@ -143,7 +150,7 @@ export default function UpdateReadyToast() {
           className="fixed inset-x-3 mx-auto max-w-sm rounded-xl border border-border-subtle bg-surface-raised px-4 py-3 shadow-2xl"
           role="status"
           data-update-toast
-          initial={m.reduced ? { opacity: 0 } : { opacity: 0, y: 16 }}
+          initial={atRest ? false : m.reduced ? { opacity: 0 } : { opacity: 0, y: 16 }}
           animate={m.reduced ? { opacity: 1 } : { opacity: 1, y: 0 }}
           exit={m.reduced ? { opacity: 0 } : { opacity: 0, y: 16 }}
           transition={m.spring('ui')}
@@ -169,7 +176,8 @@ export default function UpdateReadyToast() {
               </button>
             </div>
           </div>
-        </motion.div>
+        </Motion.div>
+        </MotionFeatures>
       )}
     </AnimatePresence>
   );

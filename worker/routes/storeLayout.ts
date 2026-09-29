@@ -45,6 +45,7 @@ import { auditStatements } from '../lib/audit';
 import { newId } from '../lib/crypto';
 import { isConstraintAbort } from '../lib/walletOps';
 import { blockDataFor, publishedLayout, verifyLayoutRefs } from '../lib/storeLayout';
+import { afterStorefrontWrite } from '../lib/edgePolicy';
 import { normalizeLayout, renderableBlocks, type LayoutIssue } from '@levonis/storeLayout/normalize';
 import { defaultLayoutFromStore } from '@levonis/storeLayout/defaults';
 import { MAX_BLOCKS, MAX_LAYOUT_BYTES, MAX_REQUEST_BYTES, SCHEMA_VERSION, type StoreLayout } from '@levonis/storeLayout/schema';
@@ -419,6 +420,7 @@ storeLayoutRoutes.post('/publish', async (c) => {
   }
   const row = await publishedRow(db, revisionId);
   const after = await readDraft(db, ctx.store.id);
+  await afterStorefrontWrite(c, ctx.store); // P2a: the cached shopfront follows the publish
   return c.json({
     success: true,
     published: { id: revisionId, revision: Number(row?.revision), published_at: row?.published_at ?? null },
@@ -534,6 +536,7 @@ storeLayoutRoutes.post('/restore/:revision', async (c) => {
   }
   const after = await readDraft(db, ctx.store.id);
   const published = publish ? await publishedRow(db, revisionId) : null;
+  if (publish) await afterStorefrontWrite(c, ctx.store); // P2a: the cached shopfront follows the publish
   return c.json({
     success: true,
     restored_from: restoredFrom,

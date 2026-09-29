@@ -241,7 +241,9 @@ test('the shop keeps everything that is not the identity of the shared thing', (
   // these exact bytes) and the font links are untouched.
   assert.match(html, /background-color: #e3dacb/);
   assert.ok(html.includes(`<script>${THEME_BOOT_SCRIPT}</script>`), 'the theme script was rewritten, so its hash no longer matches');
-  assert.match(html, /fonts\.googleapis\.com/);
+  // The font is self-hosted since P1a (tests/firstPaintAndFonts.test.ts); its
+  // preload is the shell's and stays exactly where it was.
+  assert.match(html, /<link rel="preload" as="font"[^>]*href="\/fonts\/cairo\/cairo-v31-arabic\.woff2"/);
 });
 
 test('the referral handle survives into the card', () => {
@@ -400,14 +402,18 @@ test('only a published product is readable — a draft must not leak through a c
 
 // ------------------------------------------------------- the route, in place
 
-test('the fallback injects, strips the stale validator, and cannot break a page load', () => {
+test('the fallback injects, replaces the stale validator with one of the rewritten body, and cannot break a page load', () => {
   const index = readFileSync(new URL('../worker/index.ts', import.meta.url), 'utf8');
   assert.match(index, /productSlugFromPath/);
   assert.match(index, /resolveProductPreview/);
   assert.match(index, /injectSocialPreview/);
-  // The body no longer matches the asset that was hashed: a surviving ETag
-  // would let a cache answer a later request with the shop's card again.
-  assert.match(index, /headers\.delete\('ETag'\)/);
+  // The body no longer matches the asset that was hashed: the ASSET's ETag
+  // would let a cache answer a later request with the shop's card again. It
+  // is not deleted any more (P2b, plan §B.1 #3) but recomputed from the
+  // rewritten body, so a 304 is honest — tests/documentPreloads.test.ts proves
+  // the round trip; this only pins that the old validator never survives.
+  assert.doesNotMatch(index, /headers\.delete\('ETag'\)/);
+  assert.match(index, /headers\.set\('ETag', await weakEtag\(html\)\)/);
   assert.match(index, /headers\.delete\('Content-Length'\)/);
   // A card is an enhancement; the app is not. Every failure returns the asset.
   const fn = /async function assetWithPreview[\s\S]*?\n}\n/.exec(index)?.[0] ?? '';

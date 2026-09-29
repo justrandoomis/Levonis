@@ -57,7 +57,7 @@ export function communityAccessOf(body: unknown): CommunityAccess | null {
   return { closed: b.closed, admin: b.admin === true, may_enter: b.may_enter };
 }
 
-/** GET /api/community/access — public, never cached, answers while it is shut. */
+/** GET /api/community/access — public, answers while it is shut; a guest's answer is edge-cached, a member's never. */
 export async function fetchCommunityAccess(): Promise<CommunityAccess> {
   const access = communityAccessOf(await api.get<unknown>('/api/community/access'));
   if (!access) throw new Error('community access: unreadable body');
@@ -67,6 +67,16 @@ export async function fetchCommunityAccess(): Promise<CommunityAccess> {
 /** The in-flight or settled answer for one viewer. Cleared when the viewer changes. */
 let cache: { key: string; promise: Promise<CommunityAccess> } | null = null;
 
+/**
+ * How long a FAILED answer is still shared by the components of one page
+ * load. A failure used to be forgotten the instant it arrived, so the next
+ * component to mount — the services grid ~700 ms after the bottom bar, on a
+ * throttled phone — asked the server again and failed again: measured ×2 per
+ * home load while the API was down (P2a). Inside this window the burst shares
+ * one refusal; after it, or on `reload`, the next asker retries as before.
+ */
+const FAILURE_SHARED_MS = 4000;
+
 /** Drop the cached answer — used after an admin flips the switch. */
 export function resetCommunityAccessCache() {
   cache = null;
@@ -75,9 +85,12 @@ export function resetCommunityAccessCache() {
 function accessFor(key: string): Promise<CommunityAccess> {
   if (cache && cache.key === key) return cache.promise;
   const promise = fetchCommunityAccess().catch((e: unknown) => {
-    // A failed answer must not be remembered: the next component to ask would
-    // inherit a stale failure instead of retrying.
-    if (cache && cache.key === key) cache = null;
+    // A failed answer must not be remembered for long: a component that asks
+    // later must retry rather than inherit a stale failure. It IS remembered
+    // for the rest of this page load's burst (see FAILURE_SHARED_MS).
+    setTimeout(() => {
+      if (cache && cache.key === key && cache.promise === promise) cache = null;
+    }, FAILURE_SHARED_MS);
     throw e;
   });
   cache = { key, promise };

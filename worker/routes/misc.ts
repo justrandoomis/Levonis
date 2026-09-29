@@ -4,6 +4,7 @@ import { requireAdmin, unavailable, str, oneOf } from '../lib/http';
 import { getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
 import { rateLimit } from '../lib/ratelimit';
 import { readSchemaStatus } from '../lib/schemaVersion';
+import { anonymousCached } from '../lib/edgePolicy';
 
 export const miscRoutes = new Hono<AppContext>();
 
@@ -34,11 +35,17 @@ miscRoutes.get('/health', async (c) => {
   return c.json({ status: 'ok', schema });
 });
 
-/** Public storefront settings (no secrets, no internal keys). */
-miscRoutes.get('/settings/public', async (c) => {
-  const settings = await getSettings(c.env.DB, PUBLIC_SETTING_KEYS);
-  return c.json({ success: true, settings });
-});
+/**
+ * Public storefront settings (no secrets, no internal keys). The same body for
+ * every visitor — the request pipeline never loads a session for it and the
+ * colo caches it under the anonymous policy (P2a); the settings PUT purges it.
+ */
+miscRoutes.get('/settings/public', (c) =>
+  anonymousCached(c, {}, async () => {
+    const settings = await getSettings(c.env.DB, PUBLIC_SETTING_KEYS);
+    return c.json({ success: true, settings });
+  })
+);
 
 /** Machine translation via Gemini — admin-only, honestly disabled when unconfigured. */
 miscRoutes.post('/translate', requireAdmin, async (c) => {

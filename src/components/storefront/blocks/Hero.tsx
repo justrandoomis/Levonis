@@ -15,7 +15,6 @@ import { lazy, Suspense } from 'react';
 import { BadgeCheck, Star, Store } from 'lucide-react';
 import ProMerchantBadge from '../../merchant/ProMerchantBadge';
 import PremiumMemberBadge from '../../merchant/PremiumMemberBadge';
-import { WidgetIcon } from '../../merchant/profileIcons';
 import { useLanguage } from '../../../LanguageContext';
 import { badgeLabel } from '../../../lib/storefrontApi';
 import { mediaSrc } from '../../../../packages/storeLayout/src/refs';
@@ -30,6 +29,21 @@ export type HeroProps = BlockProps<'hero'>;
 /** The cover, split and minimal variants: not the classic page's, so in the lazy chunk. */
 const HeroVariant = lazy(() => import('./extra').then((m) => ({ default: m.HeroVariant })));
 
+/**
+ * The widget icons (merchant/profileIcons: twenty lucide names → components)
+ * arrive with the link pills and the info cards, not with the page: 1.2 KB
+ * gzip out of the store pages' static closure (P1c). Until then each slot is
+ * an empty box of the icon's size, so nothing moves when they land.
+ */
+const WidgetIcon = lazy(() => import('../../merchant/profileIcons').then((m) => ({ default: m.WidgetIcon })));
+function Icon({ name, className }: { name: string; className: string }) {
+  return (
+    <Suspense fallback={<span aria-hidden="true" className={className} />}>
+      <WidgetIcon name={name} className={className} />
+    </Suspense>
+  );
+}
+
 export default function HeroBlock({ block, store, data }: HeroProps) {
   const s = block.settings;
   const text = useText();
@@ -37,12 +51,44 @@ export default function HeroBlock({ block, store, data }: HeroProps) {
   const name = text(s.headline) || store.name;
   if (block.variant !== 'profile') {
     return (
-      <Suspense fallback={<div className="min-h-48" />}>
+      <Suspense fallback={<VariantFrame variant={block.variant} cover={cover} />}>
         <HeroVariant block={block} store={store} data={data} cover={cover} name={name} />
       </Suspense>
     );
   }
   return <ProfileHero block={block} store={store} data={data} cover={cover} name={name} />;
+}
+
+/**
+ * THE PICTURE BEFORE THE CHROME (storefront L2). A cover or split hero is
+ * the store's largest paint, and its `<img>` used to be requested only once
+ * the lazy variant chunk had arrived — one more round trip in front of the
+ * LCP. The fallback is the variant's own picture frame (the same classes
+ * HeroVariants.tsx draws), so the request starts with the page and the frame
+ * already holds its height; when the chunk lands the variant re-renders the
+ * same URL and the browser serves it from the request already in flight.
+ */
+function VariantFrame({ variant, cover }: { variant: HeroProps['block']['variant']; cover: string }) {
+  const img = cover ? <img src={cover} alt="" className="w-full h-full object-cover" loading="eager" fetchPriority="high" /> : null;
+  if (variant === 'cover') {
+    return (
+      <div className="relative h-60 @min-[40rem]:h-80 w-full overflow-hidden bg-white/[0.03]">
+        {img}
+        <div className="absolute inset-0 sf-cover-fade" />
+      </div>
+    );
+  }
+  if (variant === 'split') {
+    return (
+      <Column className="pt-5">
+        <div className="grid gap-5 @min-[48rem]:grid-cols-2 @min-[48rem]:items-center">
+          <div className="sf-r-lg overflow-hidden bg-white/[0.03] aspect-[4/3]">{img}</div>
+          <div className="min-h-48" />
+        </div>
+      </Column>
+    );
+  }
+  return <div className="min-h-48" />;
 }
 
 // ------------------------------------------------------------------ profile
@@ -183,7 +229,7 @@ export function ProfileRows({ block, store, bio }: { block: HeroProps['block']; 
               rel="noopener noreferrer nofollow"
               className="relative lv-hit h-7 rounded-full border border-white/15 bg-transparent flex items-center justify-center gap-1.5 px-2.5 text-zinc-200 active:scale-[0.98] transition-transform min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
-              <WidgetIcon name={w.icon} className="w-3 h-3 shrink-0 text-zinc-400" />
+              <Icon name={w.icon} className="w-3 h-3 shrink-0 text-zinc-400" />
               <span className="text-[12px] font-medium truncate" dir="auto">
                 {linkPillLabel(w)}
               </span>
@@ -198,7 +244,7 @@ export function ProfileRows({ block, store, bio }: { block: HeroProps['block']; 
         <div dir="rtl" className={`grid gap-3 mb-4 ${cols(facts.length)}`}>
           {facts.map((w, i) => (
             <div key={i} className="sf-fact px-2 py-2.5 flex items-center justify-center gap-2 min-w-0">
-              <WidgetIcon name={w.icon} className="w-4 h-4 shrink-0 text-zinc-400" />
+              <Icon name={w.icon} className="w-4 h-4 shrink-0 text-zinc-400" />
               <div className="min-w-0">
                 <p className="text-zinc-100 text-[12.5px] font-medium truncate leading-tight">{w.title}</p>
                 {w.subtitle && <p className="text-zinc-500 text-[11px] truncate leading-tight">{w.subtitle}</p>}

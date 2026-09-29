@@ -45,6 +45,7 @@ import { deleteCancelledOrder, OrderDeletionRefusal } from '../lib/orderDeletion
 import { reclaimOrderRedemptionsStatement } from '../lib/offers';
 import { resolveOrderExpiry } from '../lib/orderExpiry';
 import { getSetting, getSettings, normalizePayoutMethods, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
+import { afterCatalogueWrite, afterSettingsWrite } from '../lib/edgePolicy';
 import type { CreateUnitsResult } from '../lib/deviceOps';
 import { runOrderDeliveredEffects } from '../lib/orderDeliveredEffects';
 import { walletTxPublic } from '../lib/wallet';
@@ -1143,6 +1144,7 @@ adminRoutes.post('/products', async (c) => {
   }
   await audit(c.env.DB, adminUser.id, 'product.save', id, { name: p.name, price_iqd: p.price_iqd, status: p.status });
   const row = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  await afterCatalogueWrite(c, [String(row?.slug ?? p.slug ?? '')]); // the guests' listing, home and this product page (P2 review)
   const [product] = await legacyAdminProductProjection(c.env.DB, [row!]);
   return c.json({ success: true, product });
 });
@@ -1150,6 +1152,8 @@ adminRoutes.post('/products', async (c) => {
 adminRoutes.delete('/products/:id', async (c) => {
   const adminUser = c.get('user')!;
   const id = c.req.param('id');
+  // Read before the delete: the cached product page is purged by slug (P2 review).
+  const doomed = await c.env.DB.prepare('SELECT slug FROM products WHERE id = ?').bind(id).first<{ slug: string }>();
   const result = await deleteProductPermanently(c.env.DB, id, { newId: () => newId('mcj') });
   if (result.already_deleted) throw notFound('Product not found');
   if (result.blocked) {
@@ -1187,6 +1191,7 @@ adminRoutes.delete('/products/:id', async (c) => {
   }
   const invalidated = await invalidateMediaCache(new URL(c.req.url).origin, cleanup.deleted);
   const shared = [...new Set([...result.r2_objects_shared_skipped, ...cleanup.shared])];
+  await afterCatalogueWrite(c, doomed?.slug ? [doomed.slug] : []); // the guests' listing, home and the deleted page (P2 review)
   await audit(c.env.DB, adminUser.id, 'product.delete', id, {
     rows_deleted_by_table: result.rows_deleted_by_table,
     rows_unlinked_by_table: result.rows_unlinked_by_table,
@@ -3817,6 +3822,9 @@ adminRoutes.post('/site-media/:slot', async (c) => {
   const stored = normalizeSiteMedia(await getSetting(c.env.DB, 'mainPageMedia'));
   const previous = stored[slot.slot] ?? '';
   await setSetting(c.env.DB, 'mainPageMedia', { ...stored, [slot.slot]: object });
+  // The first screen and the public settings carry this key: the guests' cached
+  // copies are dropped here, as the settings PUT drops its own (P2 review).
+  await afterSettingsWrite(c, 'mainPageMedia');
   await audit(c.env.DB, adminUser.id, 'admin.site_media_set', slot.slot, { object, previous, bytes: buf.byteLength });
 
   return c.json({ success: true, media: resolveSiteMedia({ ...stored, [slot.slot]: object }) });
@@ -3831,6 +3839,7 @@ adminRoutes.delete('/site-media/:slot', async (c) => {
   const previous = stored[slot.slot] ?? '';
   delete stored[slot.slot];
   await setSetting(c.env.DB, 'mainPageMedia', stored);
+  await afterSettingsWrite(c, 'mainPageMedia');
   await audit(c.env.DB, adminUser.id, 'admin.site_media_cleared', slot.slot, { previous });
   return c.json({ success: true, media: resolveSiteMedia(stored) });
 });
@@ -4002,6 +4011,8 @@ adminRoutes.put('/settings/:key', async (c) => {
 
   await setSetting(c.env.DB, key, value);
   await audit(c.env.DB, adminUser.id, 'settings.update', key);
+  // P2a: the cached public answers this key feeds, and the isolate's pricing inputs.
+  await afterSettingsWrite(c, key);
   return c.json({ success: true });
 });
 

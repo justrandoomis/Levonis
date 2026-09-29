@@ -70,9 +70,15 @@
 
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, type PanInfo } from 'motion/react';
+// `m`, not `motion`: this module is in every visitor's first load, and the
+// `motion` proxy carries every feature the library has. The features (drag
+// for the sheet, layout for the toasts) arrive through <MotionFeatures> the
+// first time a window opens — src/lib/motionFeatures.tsx explains the seam.
+import { AnimatePresence, type PanInfo } from 'motion/react';
+import * as Motion from 'motion/react-m';
 import { useLanguage } from '../../LanguageContext';
 import { project, useMotion } from '../../lib/motion';
+import { MotionFeatures, useMotionFeaturesFailed } from '../../lib/motionFeatures';
 import { layerAbove, pushLayer, recentlyPressed } from './overlayStack';
 
 /** One documented stacking contract for the app chrome and every floating UI. */
@@ -192,15 +198,16 @@ export function acquireModalLock(): () => void {
  */
 function Scrim({ onClose, label, visible }: { onClose?: () => void; label: string; visible: boolean }) {
   const m = useMotion();
+  const atRest = useMotionFeaturesFailed();
   return (
-    <motion.button
+    <Motion.button
       type="button"
       aria-label={label}
       tabIndex={-1}
       onClick={onClose}
       data-overlay-scrim
       className="no-press lv-scrim absolute inset-0 backdrop-blur-[3px] cursor-default"
-      initial={{ opacity: 0 }}
+      initial={atRest ? false : { opacity: 0 }}
       animate={{ opacity: visible ? 1 : 0 }}
       exit={{ opacity: 0 }}
       transition={m.spring('quick')}
@@ -387,6 +394,7 @@ export function Overlay({
   onExited,
 }: OverlayProps) {
   const m = useMotion();
+  const atRest = useMotionFeaturesFailed();
   const { dir, lang } = useLanguage();
   const strings = STRINGS[lang] ?? STRINGS.ar;
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -581,10 +589,11 @@ export function Overlay({
           data-overlay={testId ?? true}
           data-overlay-mode={mode}
         >
+          <MotionFeatures>
           {mode === 'modal' && (
             <Scrim visible={open} label={strings.close} onClose={dismissOnScrim ? requestClose : undefined} />
           )}
-          <motion.div
+          <Motion.div
             ref={setPanel}
             dir={dir}
             role="dialog"
@@ -596,8 +605,10 @@ export function Overlay({
             tabIndex={-1}
             data-overlay-panel
             // ENTER AND EXIT ARE THE SAME OBJECT, so they cannot disagree. The
-            // blur travels with the scale: the surface materializes.
-            initial={{ opacity: fadeFrom, scale: scaleFrom, y: travel, filter: `blur(${blurFrom}px)` }}
+            // blur travels with the scale: the surface materializes. When the
+            // feature chunk has failed, the panel paints at rest instead of
+            // waiting below the viewport for motion that will not come.
+            initial={atRest ? false : { opacity: fadeFrom, scale: scaleFrom, y: travel, filter: `blur(${blurFrom}px)` }}
             animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
             exit={{ opacity: fadeFrom, scale: scaleFrom, y: travel, filter: `blur(${blurFrom}px)` }}
             transition={m.spring(placement === 'bottom' || dock ? 'sheet' : 'ui')}
@@ -618,7 +629,8 @@ export function Overlay({
                 }}
               />
             )}
-          </motion.div>
+          </Motion.div>
+          </MotionFeatures>
         </div>
       )}
     </AnimatePresence>,
@@ -768,6 +780,7 @@ export function Anchored({
   id: idProp,
 }: AnchoredProps) {
   const m = useMotion();
+  const atRest = useMotionFeaturesFailed();
   const autoId = useId();
   const id = idProp ?? autoId;
   const { dir } = useLanguage();
@@ -875,14 +888,15 @@ export function Anchored({
   return createPortal(
     <AnimatePresence>
       {open && (
-        <motion.div
+        <MotionFeatures>
+        <Motion.div
           ref={panelRef}
           id={id}
           dir={dir}
           role={role}
           aria-label={label}
           data-anchored={testId ?? true}
-          initial={{ opacity: 0, scale: m.reduced ? 1 : 0.92, y: m.travel(-6) }}
+          initial={atRest ? false : { opacity: 0, scale: m.reduced ? 1 : 0.92, y: m.travel(-6) }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: m.reduced ? 1 : 0.92, y: m.travel(-6) }}
           transition={m.spring('quick')}
@@ -896,7 +910,8 @@ export function Anchored({
           }}
         >
           {children}
-        </motion.div>
+        </Motion.div>
+        </MotionFeatures>
       )}
     </AnimatePresence>,
     document.body

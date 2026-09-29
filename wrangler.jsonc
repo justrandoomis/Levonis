@@ -40,6 +40,31 @@
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
 
+  // SMART PLACEMENT — PREPARED, NOT SWITCHED ON. THE OWNER FLIPS IT
+  // (docs/MERCHANT_PLATFORM_V2.md §B.2, §B.3; docs/DECISIONS.md row 171).
+  //
+  // What is far from an Iraqi visitor is not the Worker — it already runs in
+  // the Iraqi PoP — but D1, a single primary of unknown region. Smart
+  // Placement moves the WHOLE Worker next to what it talks to most, so the
+  // multi-wave API handlers (`/api/home`, `/api/products/:slug`, the store
+  // resolve) stop paying one Worker↔D1 round trip per wave. The same move
+  // takes the document rewrite (`assetWithPreview`) and every edge-cache HIT
+  // away from the visitor, so it is a trade to MEASURE, not to assume:
+  //   1. deploy staging with the line below uncommented;
+  //   2. for a week read `cf-placement` on responses (`curl -sI
+  //      https://levonis-iq.com/api/home | grep -i cf-placement`; `local-XXX`
+  //      means it stayed at the edge, `remote-XXX` that it moved) and the
+  //      `served_by_region`/`colo` lines the Worker logs on documents;
+  //   3. compare the document TTFB and `/api/home` TTFB from Iraq before and
+  //      after (`scripts/psi.mjs`, the PageSpeed «server response time»
+  //      audit; `scripts/perf-lab.mjs` says nothing about this — it is local).
+  // If the documents regress, keep it OFF and rely on the cached resolve +
+  // preloads (plan rank 3, built) and the edge-cached anonymous API (rank 2).
+  // TOP LEVEL ON PURPOSE: `placement` inherits into env.staging and env.dark;
+  // scripts/prepare-deploy-config.mjs also folds it, so declaring it inside
+  // one environment works too. Uncomment ONE line to switch it on:
+  // "placement": { "mode": "smart" },
+
   // Built Vite frontend served as static assets with SPA fallback.
   //
   // `run_worker_first` is the whole routing decision. Anything NOT listed here

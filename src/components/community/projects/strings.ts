@@ -73,7 +73,7 @@ const STRINGS = {
     draftBanner: 'مسودة — لا يراها أحد غيرك.',
     consentPending: 'بانتظار موافقة الزبون على عرض قطعته.',
     consentDeclined: 'رفض الزبون عرض قطعته. انشر بدون ربطه بطلبه، أو اتركه خاصًا.',
-    hiddenBanner: 'أخفت ليفونيس هذا المشروع.',
+    hiddenBanner: 'أخفت Levonis هذا المشروع.',
     reason: 'السبب',
     archivedBanner: 'مؤرشف — لا يظهر في المجتمع.',
     // consent (the customer)
@@ -294,7 +294,7 @@ const STRINGS = {
     draftBanner: 'ڕەشنووس — کەس جگە لە تۆ نایبینێت.',
     consentPending: 'چاوەڕێی ڕەزامەندی کڕیارە بۆ پیشاندانی پارچەکەی.',
     consentDeclined: 'کڕیارەکە ڕەزامەند نەبوو. بەبێ بەستنەوە بە کارەکەی بڵاوی بکەرەوە، یان بە تایبەتی بیهێڵەرەوە.',
-    hiddenBanner: 'لیڤۆنیس ئەم پڕۆژەیەی شاردووەتەوە.',
+    hiddenBanner: 'Levonis ئەم پڕۆژەیەی شاردووەتەوە.',
     reason: 'هۆکار',
     archivedBanner: 'ئەرشیفکراوە — لە کۆمەڵگەدا دەرناکەوێت.',
     askedTitle: 'وۆرکشۆپێک دەیەوێت پارچەکەت پیشان بدات',

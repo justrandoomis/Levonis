@@ -48,7 +48,7 @@ import type { StorefrontStore } from '../components/storefront/types';
 import { deliveryToYou } from '../components/storefront/parts';
 import { VariantPicker } from '../components/catalog/VariantPicker';
 import { ProductGallery, type GalleryItem } from '../components/catalog/ProductGallery';
-import { ProductFacts } from '../components/catalog/ProductFacts';
+import { ProductFactsSkeleton, StoreProductPageSkeleton, factRows } from '../components/storefront/skeletons';
 import { findVariant, initialSelection, priceRange } from '../../packages/catalog/src/variants';
 import { QuantityInput } from '../components/ui/QuantityInput';
 import { LINE_QTY_MAX } from '../../packages/pricing/src/quantity';
@@ -68,6 +68,15 @@ function arDays(n: number): string {
 const StoreUnavailable = lazy(() => import('../components/merchant/StoreUnavailable'));
 /** Save and share (components/community/ProductActions.tsx) — lazy, for the same budget. */
 const ProductActions = lazy(() => import('../components/community/ProductActions'));
+/**
+ * The printed-product facts (material, technology, …) sit below the fold and
+ * bring the catalog vocabulary (attributes, palette, swatches.css) with them:
+ * 1.5 KB gzip that left the store pages' static closure (P1c). The chunk is
+ * asked for as soon as the product request goes out, so it is normally on
+ * hand before the answer; until then `ProductFactsSkeleton` holds its box.
+ */
+const loadProductFacts = () => import('../components/catalog/ProductFacts');
+const ProductFacts = lazy(() => loadProductFacts().then((m) => ({ default: m.ProductFacts })));
 
 export default function StorefrontProduct() {
   const { slug: routeSlug, productSlug } = useParams<{ slug: string; productSlug: string }>();
@@ -82,6 +91,24 @@ export default function StorefrontProduct() {
 
   const [product, setProduct] = useState<MerchantProduct | null>(null);
   const [store, setStore] = useState<MerchantStore | null>(hostStore ?? null);
+  // «التوصيل إلى محافظتك»: the viewer's own line, asked for separately once
+  // somebody is signed in (P2a — the product answer's store is one body for
+  // every visitor) and merged under the key `deliveryToYou` reads.
+  const storeId = store?.id;
+  useEffect(() => {
+    if (!user || !storeId || !slug) return;
+    let alive = true;
+    storefrontApi
+      .deliveryToYou(slug)
+      .then((quote) => {
+        if (!alive || !quote) return;
+        setStore((s) => (s && s.id === storeId ? { ...s, delivery_to_you: quote } : s));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [user, storeId, slug]);
   // Nothing to fetch on a host already answered "unknown" or "unavailable".
   const [loading, setLoading] = useState(!hostUnknown && !hostUnavailable);
   const [unavailable, setUnavailable] = useState(false);
@@ -103,6 +130,8 @@ export default function StorefrontProduct() {
   useEffect(() => {
     if (!slug || !productSlug) return;
     let alive = true;
+    // In parallel with the answer, never after it: see `ProductFacts` above.
+    void loadProductFacts().catch(() => undefined);
     storefrontApi
       .product(slug, productSlug)
       .then((d) => {
@@ -196,13 +225,8 @@ export default function StorefrontProduct() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-gold animate-spin" />
-      </div>
-    );
-  }
+  // The page's own boxes while the answer is in flight (storefront L1).
+  if (loading) return <StoreProductPageSkeleton />;
 
   if (!product || !store) {
     return (
@@ -338,7 +362,9 @@ export default function StorefrontProduct() {
             </div>
           )}
 
-          <ProductFacts attributes={product.attributes} loc={loc} lang={lang} />
+          <Suspense fallback={<ProductFactsSkeleton rows={factRows(product.attributes)} />}>
+            <ProductFacts attributes={product.attributes} loc={loc} lang={lang} />
+          </Suspense>
 
           {description && (
             <p className="text-zinc-300 text-[13.5px] leading-relaxed whitespace-pre-wrap mb-6" dir="auto">

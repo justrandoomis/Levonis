@@ -69,19 +69,18 @@ export default function Hero({ banners, loading }: { banners: HomeBanner[]; load
     touchEndX.current = 0;
   };
 
-  // Reserve the height while /api/home is in flight so the page below does
-  // not jump when the banners (or the fallback) resolve.
-  if (loading && count === 0) {
-    return (
-      <div
-        aria-hidden="true"
-        data-hero="loading"
-        className="w-full h-[380px] md:h-[460px] bg-zinc-900/80 animate-pulse motion-reduce:animate-none"
-      />
-    );
-  }
-
-  if (count === 0) return <DefaultHero />;
+  // WHILE /api/home IS IN FLIGHT THE FALLBACK HERO IS THE RESERVATION.
+  //
+  // This used to be a grey 380/460px box. The brand hero it resolves to on
+  // the live site (no banners configured) is content-sized — 491px at 360
+  // wide — so every first visit moved the whole sheet below by 111px when
+  // the answer arrived: the largest single shift on the home page (CLS
+  // 0.094 → 0, docs/PERFORMANCE_LOG.md «P1c»). Only the fallback knows its
+  // own height, so the fallback is drawn at once; its words need no data.
+  // When banners ARE configured the carousel replaces it on the answer —
+  // one first-visit swap, the same size as before in the other direction;
+  // the snapshot in src/lib/pageCache.ts paints every later visit right.
+  if (count === 0) return <DefaultHero loading={loading} />;
 
   return (
     <section
@@ -270,11 +269,12 @@ function BannerSlide({
  * was. Only the ground and the layer lines need a light version, and those
  * live in src/index.css (`lv-hero-ground`, `lv-hero-lines`, `lv-hero-veil`).
  */
-function DefaultHero() {
+function DefaultHero({ loading = false }: { loading?: boolean }) {
   const { t, dir } = useLanguage();
   return (
     <section
       data-hero="default"
+      data-hero-loading={loading || undefined}
       data-feature=""
       className="lv-hero-ground relative w-full overflow-hidden bg-gradient-to-br from-olive-dark via-olive to-olive-light"
     >

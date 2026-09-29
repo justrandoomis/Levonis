@@ -114,6 +114,10 @@ function CompactCard({
           alt=""
           aspect="auto"
           eager={eager}
+          // The card is 148 px on a rail, half the phone in a grid, a fifth
+          // of the row on desktop: at DPR 3 that is the 640 px variant on a
+          // phone, 320 or 640 on a desktop — never the camera's 3000 px file.
+          sizes="(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
           className="h-full w-full"
           bgClassName={lightShown ? 'bg-surface-selected' : 'bg-charcoal'}
           fallbackClassName="text-snow/35"
@@ -188,6 +192,7 @@ function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
           src={firstImage}
           alt={name}
           aspect="auto"
+          sizes="160px"
           className="w-full h-full group-hover:scale-[1.04] transition-transform duration-500 motion-reduce:transition-none"
         />
         {hasSale && (

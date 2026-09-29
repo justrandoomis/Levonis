@@ -529,7 +529,7 @@ async function getStore(req: PublicRequest): Promise<PublicResult> {
   const root = rootDomainFrom(req.c.env);
   const ctx: StoreContext = await servableStoreBySlug(db, req.path.slug);
   const [profile, stats, collections, services, showcase] = await Promise.all([
-    publicStore(db, ctx, root, null),
+    publicStore(db, ctx, root),
     storeStats(db, ctx),
     storeCollections(db, ctx.store.id),
     storeServices(db, ctx.store.id),

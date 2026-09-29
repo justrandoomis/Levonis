@@ -21,6 +21,7 @@ import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, int, str, forbidden, pickFrom, HttpError } from '../lib/http';
 import { audit } from '../lib/audit';
+import { purgeCatalogueAfterWrite } from '../lib/edgePolicy';
 import { newId } from '../lib/crypto';
 import {
   DIMENSION_FIELDS,
@@ -90,6 +91,10 @@ export const priceHistoryDeltas = sharedPriceHistoryDeltas;
 export const adminProductsRoutes = new Hono<AppContext>();
 
 adminProductsRoutes.use('*', requireAdmin);
+// P2 review: a product saved, hidden, repriced or deleted drops the guests'
+// listing, home shelves and (when the slug is known) the product page from
+// this colo's cache (worker/lib/edgePolicy.ts) instead of ageing out.
+adminProductsRoutes.use('*', purgeCatalogueAfterWrite);
 
 // ---------------------------------------------------------------- helpers
 
@@ -1435,6 +1440,7 @@ adminProductsRoutes.post('/', async (c) => {
   }
 
   const stored = await reloadForVerification(c.env.DB, doc.id);
+  c.set('catalogueSlug', doc.slug); // the product page is purged with the listing
   return c.json({
     success: true,
     created: !prev,
@@ -1736,9 +1742,10 @@ adminProductsRoutes.delete('/:id', async (c) => {
   const id = c.req.param('id');
   const permanent = /^(1|true|yes)$/i.test(c.req.query('permanent') ?? '');
 
-  const row = await c.env.DB.prepare('SELECT id, name_ar, name FROM products WHERE id = ?')
+  const row = await c.env.DB.prepare('SELECT id, name_ar, name, slug FROM products WHERE id = ?')
     .bind(id)
     .first<Record<string, unknown>>();
+  if (typeof row?.slug === 'string') c.set('catalogueSlug', row.slug); // its cached page goes with it
 
   if (!row) {
     // Idempotency, and only for the permanent path: a plain Delete on a

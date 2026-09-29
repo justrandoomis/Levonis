@@ -21,9 +21,14 @@ type Row = Record<string, unknown>;
 export class SqliteStatement {
   constructor(
     private readonly db: DatabaseSync,
-    private readonly sql: string,
+    readonly sql: string,
     private readonly params: unknown[] = []
   ) {}
+
+  /** True for a statement that yields rows — what D1's batch() returns `results` for. */
+  get yieldsRows(): boolean {
+    return /^\s*(?:SELECT|WITH)\b/i.test(this.sql);
+  }
 
   bind(...values: unknown[]): SqliteStatement {
     return new SqliteStatement(this.db, this.sql, values);
@@ -51,6 +56,7 @@ export class SqliteStatement {
     const rows = this.db.prepare(this.sql).all(...this.args()) as T[];
     return { success: true, results: rows, meta: { changes: 0, duration: 0 } };
   }
+
 }
 
 export class SqliteD1 {
@@ -60,12 +66,22 @@ export class SqliteD1 {
     return new SqliteStatement(this.db, sql);
   }
 
-  /** D1 semantics: one transaction; any SQL error rolls the whole batch back. */
+  /**
+   * D1 semantics: one transaction; any SQL error rolls the whole batch back.
+   * Each statement's answer is what the live D1 gives back — a SELECT (or a
+   * WITH … SELECT) carries its ROWS in `results`, a write carries
+   * `meta.changes` — so a route that batches its reads (storeStats, the
+   * pricing inputs) reads the same shape here as on Cloudflare.
+   *
+   * Exactly ONE await per statement, on the statement's own run()/all(): the
+   * race tests wrap statements (a hook inside `run`) and interleave a
+   * competing write on these very ticks, so the count must not change.
+   */
   async batch(statements: SqliteStatement[]) {
     this.db.exec('BEGIN');
     try {
       const out = [];
-      for (const s of statements) out.push(await s.run());
+      for (const s of statements) out.push(await (s.yieldsRows ? s.all() : s.run()));
       this.db.exec('COMMIT');
       return out;
     } catch (e) {

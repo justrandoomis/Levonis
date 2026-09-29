@@ -22,6 +22,9 @@ export default tseslint.config(
       // and one per `services/*/wrangler.jsonc` the local dev rig bundles.
       '**/.wrangler/**',
       'coverage/**',
+      // The lab's scratch directory (gitignored by P0): builders' one-off
+      // measurement scripts live there, never shipped, never linted.
+      'scratchpad/**',
       '**/*.d.ts',
     ],
   },

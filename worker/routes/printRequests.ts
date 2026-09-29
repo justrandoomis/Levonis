@@ -5,6 +5,7 @@ import { newId, randomToken, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { getSetting } from '../lib/settings';
+import { anonymousCached } from '../lib/edgePolicy';
 import {
   MAX_ACCESSORY_QTY,
   type AccessorySelection,
@@ -204,7 +205,9 @@ async function ownedRequest(c: { env: Env }, requestId: string, userId: string) 
  * it may offer, the quality tiers, the capability vocabulary and the file
  * formats with what each one can actually do for the customer.
  */
-printRequestRoutes.get('/catalog', async (c) => {
+// The wizard's vocabulary is the same for everyone: cached for guests, and the
+// request pipeline never loads a session for it (P2a).
+printRequestRoutes.get('/catalog', (c) => anonymousCached(c, {}, async () => {
   const [mats, cfg, accs] = await Promise.all([materials(c.env), pricingConfig(c.env), accessories(c.env)]);
   return c.json({
     success: true,
@@ -235,7 +238,7 @@ printRequestRoutes.get('/catalog', async (c) => {
       cost_iqd: a.cost_iqd,
     })),
   });
-});
+}));
 
 // -------------------------------------------------------------- 2. measuring
 

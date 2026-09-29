@@ -43,6 +43,9 @@ export function MediaEditor({
   const videoInput = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState<'' | 'photo' | 'video'>('');
   const [error, setError] = useState('');
+  // A hint the last upload came back with — the file IS stored; the merchant
+  // may want to re-export it (VIDEO_NOT_FASTSTART, src/lib/refusalStrings.ts).
+  const [hint, setHint] = useState('');
   const [focus, setFocus] = useState<string | null>(null);
   const altId = useId();
   // The newest list, for uploads that answer one after another.
@@ -55,6 +58,7 @@ export function MediaEditor({
   async function add(files: FileList | null, kind: 'image' | 'video') {
     if (!files?.length) return;
     setError('');
+    setHint('');
     const list = [...files].slice(0, kind === 'video' ? Math.min(room, MAX_VIDEOS - videos) : room);
     setBusy(kind === 'video' ? 'video' : 'photo');
     try {
@@ -66,6 +70,8 @@ export function MediaEditor({
         const item: CatalogMedia = { kind, key: up.key, url: up.url, alt: '', alt_ar: '' };
         onChange([...latest.current, item]);
         latest.current = [...latest.current, item];
+        const warning = (up as { warnings?: string[] }).warnings?.find((w) => w === 'VIDEO_NOT_FASTSTART');
+        if (warning) setHint(refusalText(warning, lang));
       }
     } catch (e) {
       if (e instanceof ApiError && e.code === 'VIDEO_UNSUPPORTED') setError(s.videoTypeWrong);
@@ -160,6 +166,11 @@ export function MediaEditor({
         </Button>
       </div>
       <p className="text-[12px] leading-relaxed text-text-muted">{s.mediaHint}</p>
+      {hint && (
+        <p role="status" data-media-hint className="text-[12px] leading-relaxed text-text-muted">
+          {hint}
+        </p>
+      )}
       {error && (
         <p role="alert" className="lv-field-error">
           {error}

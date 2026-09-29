@@ -35,6 +35,7 @@ import { requireAuth } from '../lib/http';
 import { audit } from '../lib/audit';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { requireStoreOwner, requireSellingPrivileges, type StoreContext } from '../lib/merchantAuth';
+import { purgeStorefrontAfterWrite } from '../lib/edgePolicy';
 import { suggestSlug } from '../lib/merchantOps';
 import { parseCsv, toCsv } from '../lib/importCsv';
 import { isSchemaMissing } from '../lib/membershipBenefits';
@@ -77,6 +78,9 @@ async function runAfter(c: Context<AppContext>, work: Promise<unknown>): Promise
 export const merchantCatalogRoutes = new Hono<AppContext>();
 // Every route is the signed-in owner's own store (requireStoreOwner below).
 merchantCatalogRoutes.use('*', requireAuth);
+// P2 review: a product or collection edit drops the store's cached listing
+// and product pages in this colo (worker/lib/edgePolicy.ts).
+merchantCatalogRoutes.use('*', purgeStorefrontAfterWrite);
 
 const nowIso = () => new Date().toISOString();
 

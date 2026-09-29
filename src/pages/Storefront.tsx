@@ -37,6 +37,7 @@ import { trackStoreEvent } from '../lib/storeBeacon';
 import { useCommunityAccess } from './community/access';
 import InstallAppButton from '../components/pwa/InstallAppButton';
 import StoreRenderer from '../components/storefront/StoreRenderer';
+import { StoreHomeSkeleton } from '../components/storefront/skeletons';
 import '../components/storefront/styles';
 import { SavedIdsProvider, StorefrontRuntimeProvider, type StorefrontRuntime, type TabKind } from '../components/storefront/runtime';
 import type { AccentClasses } from '../components/storefront/theme';
@@ -138,6 +139,26 @@ export default function Storefront({
   const slug = store?.slug ?? routeSlug ?? '';
   // First-party analytics (W2-E): the Worker counts one store view per visitor per day.
   useEffect(() => trackStoreEvent(store?.id, 'store_view'), [store?.id]);
+
+  // «التوصيل إلى محافظتك» (W2-A) — the viewer's own line, asked for once the
+  // store and the viewer are known and merged under the key the parts read.
+  // The store body itself is the same for everyone since P2a (edge-cached for
+  // guests); a guest asks nothing.
+  const storeId = store?.id;
+  useEffect(() => {
+    if (!user || !storeId || !slug) return;
+    let alive = true;
+    storefrontApi
+      .deliveryToYou(slug)
+      .then((quote) => {
+        if (!alive || !quote) return;
+        setStore((s) => (s && s.id === storeId ? { ...s, delivery_to_you: quote } : s));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [user, storeId, slug]);
 
   useEffect(() => {
     if (!user) return;
@@ -343,13 +364,9 @@ export default function Storefront({
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-gold animate-spin" />
-      </div>
-    );
-  }
+  // The classic page's own boxes, not a spinner on black (storefront L1):
+  // the answer lands on the pixels the skeleton already holds.
+  if (loading) return <StoreHomeSkeleton />;
 
   if (notFound || !store || !live) {
     return (

@@ -851,6 +851,14 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Open your store first — store pictures and videos belong to a store.',
     ckb: 'افتح متجرك أولًا — صور المتجر وفيديوهاته تخصّ متجرًا.',
   },
+  // A WARNING, NOT A REFUSAL (perf plan §B.1 #9): the upload succeeded and
+  // the file is stored; the MP4's index sits after its frames, so it starts
+  // playing only once fully downloaded. The pickers show this as a hint.
+  VIDEO_NOT_FASTSTART: {
+    ar: 'رُفع الفيديو، لكنه سيبدأ التشغيل بعد تنزيله كاملًا. لتشغيلٍ فوري صدّره من برنامجك بخيار «Fast start» (محسَّن للويب) ثم ارفعه من جديد.',
+    en: 'The video was uploaded, but it will start playing only after it has fully downloaded. For instant playback, export it from your editor with “Fast start” (web optimized) and upload it again.',
+    ckb: 'ڤیدیۆکە بارکرا، بەڵام تەنها دوای داگرتنی تەواوی دەست بە لێدان دەکات. بۆ لێدانی دەستبەجێ، لە بەرنامەکەتەوە بە هەڵبژاردەی «Fast start» (باشکراو بۆ وێب) هەناردەی بکە و دووبارە باری بکە.',
+  },
   VIDEO_QUOTA_EXCEEDED: {
     ar: 'بلغ متجرك حدّ مساحة الفيديو (1 غيغابايت). احذف فيديو لم تعد تستخدمه ثم أعد المحاولة.',
     en: 'Your store has reached its video storage limit (1 GB). Remove a video you no longer use and try again.',
@@ -1278,9 +1286,9 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ckb: 'پڕۆژەی بڵاوکراوە ڕاستەوخۆ ناسڕدرێتەوە. سەرەتا ئەرشیفی بکە و پاشان بیسڕەوە.',
   },
   POST_HIDDEN_BY_ADMIN: {
-    ar: 'أخفت ليفونيس هذا المشروع، فلا يمكن نشره الآن. راجع السبب في صفحة المشروع.',
+    ar: 'أخفت Levonis هذا المشروع، فلا يمكن نشره الآن. راجع السبب في صفحة المشروع.',
     en: 'Levonis hid this project, so it cannot be published now. See the reason on the project page.',
-    ckb: 'لیڤۆنیس ئەم پڕۆژەیەی شاردووەتەوە، بۆیە ئێستا بڵاو ناکرێتەوە. هۆکارەکە لە پەڕەی پڕۆژەکە ببینە.',
+    ckb: 'Levonis ئەم پڕۆژەیەی شاردووەتەوە، بۆیە ئێستا بڵاو ناکرێتەوە. هۆکارەکە لە پەڕەی پڕۆژەکە ببینە.',
   },
   CONSENT_REQUIRED: {
     ar: 'هذه القطعة طُبعت لزبون. ينشر المشروع بعد موافقته — أُرسل إليه طلب الموافقة.',

@@ -675,7 +675,9 @@ test('sw.js is a classic script: no module syntax, no bare specifier, no require
  * is this one line — which is the point: nobody moves the version without
  * being told what it does to the precache.
  */
-const PRECACHE_VERSION = 'v3';
+// v4: P1a moved /fonts/* to the cache-first branch and switched navigation
+// preload on; the icon bytes did not change (same digest below).
+const PRECACHE_VERSION = 'v4';
 const PRECACHE_DIGEST = '72327c6aa8a7cca2cb60cf44be50b798c17af48c1a7619982ac52a8cafb96335';
 
 test('the precached icon bytes and the worker version move together', () => {

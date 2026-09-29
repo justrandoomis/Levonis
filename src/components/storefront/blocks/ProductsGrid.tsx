@@ -17,6 +17,7 @@ import { productQueryKey, type CollectionData, type ProductPage } from '../../..
 import { useStorefrontRuntime } from '../runtime';
 import { useStoreTheme } from '../StoreTheme';
 import { BlockHeading, Column, Empty, Loading, ProductGrid, useText, type CardProduct } from '../parts';
+import { ProductGridLoading } from '../skeletons';
 import type { BlockProps } from '../types';
 
 export function collectionName(c: CollectionData | undefined, lang: string): string {
@@ -95,7 +96,8 @@ export function ProductsView({
   }
 
   const products = state.items;
-  if (products === null) return <Loading />;
+  // Tiles in the theme's grid, not a spinner: the rows land on their own boxes (L1).
+  if (products === null) return <ProductGridLoading />;
 
   const sectionName = sectionFilter ? collectionName(collections.find((x) => x.id === sectionFilter), lang) : '';
   const chip = (

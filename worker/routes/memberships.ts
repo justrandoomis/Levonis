@@ -33,6 +33,7 @@ import { audit } from '../lib/audit';
 import { emitEvent, eventsEnabled } from '../lib/eventBus';
 import { SubscriptionChangedV1 } from '@levonis/contracts/events/v1/SubscriptionChanged';
 import { rateLimit } from '../lib/ratelimit';
+import { afterSettingsWrite } from '../lib/edgePolicy';
 import {
   PRO_PAUSE_KEY,
   canFreeze,
@@ -1449,6 +1450,10 @@ membershipsRoutes.post('/admin/pro-pause', async (c) => {
     .prepare(`INSERT INTO admin_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
     .bind(PRO_PAUSE_KEY, JSON.stringify(value))
     .run();
+  // A pricing input changed: the isolate's memo is dropped and the guests'
+  // cached home, shelves and listing with it — what the settings PUT does for
+  // the same key (worker/lib/edgePolicy.ts `pathsChangedBySetting`; P2 review).
+  await afterSettingsWrite(c, PRO_PAUSE_KEY);
   const moved = pause ? await pauseProMemberships(db, nowIso) : await resumeProMemberships(db, nowIso);
   await audit(db, admin.id, pause ? 'membership.pro_pause' : 'membership.pro_resume', 'pro', {
     before,

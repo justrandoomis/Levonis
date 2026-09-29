@@ -199,6 +199,12 @@ if (target) {
     'workflows',
     'workers_dev',
     'preview_urls',
+    // `placement` (Smart Placement) is declared at the TOP LEVEL of
+    // wrangler.jsonc, where it inherits into every environment; it is on this
+    // list so that the day the owner declares it INSIDE `env.staging` to
+    // measure one Worker alone, it is not silently dropped by the fold
+    // (docs/MERCHANT_PLATFORM_V2.md §B.2, DECISIONS row 171).
+    'placement',
   ]) {
     if (block[key] !== undefined) cfg[key] = structuredClone(block[key]);
   }

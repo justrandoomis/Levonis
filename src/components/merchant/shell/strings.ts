@@ -1,7 +1,7 @@
 /**
  * THE WORKSPACE SHELL'S WORDS.
  *
- * Sorani is never machine-written (docs/DECISIONS.md row 11). Every `ckb`
+ * Sorani is never machine-written (see docs/DECISIONS.md rows 166–168 (D6)). Every `ckb`
  * below already existed, hand-written, elsewhere in the repo and is copied
  * verbatim: the tab names from the dashboard page this shell replaces
  * (src/pages/MerchantDashboardPage.tsx before W3-A), the sidebar words from

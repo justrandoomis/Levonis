@@ -206,6 +206,15 @@ export type AppContext = {
      *  Every merchant-scoped route reads it instead of re-parsing the Host,
      *  so there is exactly one place where a hostname becomes a decision. */
     host: HostInfo;
+    /**
+     * The store the signed-in merchant owns, recorded by `requireStoreOwner`
+     * (worker/lib/merchantAuth.ts) so the merchant routers' purge middleware
+     * (worker/lib/edgePolicy.ts `purgeStorefrontAfterWrite`) can drop the
+     * cached shopfront after any successful write without a second lookup.
+     */
+    merchantStore?: { id: string; slug: string };
+    /** A product slug an admin catalogue write names, for `purgeCatalogueAfterWrite`. */
+    catalogueSlug?: string;
   };
 };
 

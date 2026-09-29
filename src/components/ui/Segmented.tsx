@@ -24,9 +24,13 @@
  * indicator and the label only while that option is chosen.
  */
 import React, { useRef } from 'react';
-import { motion } from 'motion/react';
+// `m`, not the `motion` proxy: this control is in the eager chunk (the
+// «اللغة والمظهر» sheet), and the layout feature its indicator needs arrives
+// through <MotionFeatures> the first time a group renders (src/lib/motionFeatures.tsx).
+import * as Motion from 'motion/react-m';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
+import { MotionFeatures } from '../../lib/motionFeatures';
 
 export interface SegmentedItem {
   id: string;
@@ -141,16 +145,18 @@ export function Segmented({ items, value, onChange, label, group, className = ''
             }`}
           >
             {checked && (
-              <motion.span
-                // ONE element shared across the options of this group: motion
-                // animates it from its old box to its new one instead of
-                // fading one out and another in.
-                layoutId={`segmented-${group}`}
-                data-segmented-indicator
-                aria-hidden
-                className={`absolute inset-0 ${size === 'sm' ? 'rounded-[10px]' : 'rounded-xl'} border ${accent.indicator}`}
-                transition={m.reduced ? { duration: 0 } : m.spring('quick')}
-              />
+              <MotionFeatures>
+                <Motion.span
+                  // ONE element shared across the options of this group: motion
+                  // animates it from its old box to its new one instead of
+                  // fading one out and another in.
+                  layoutId={`segmented-${group}`}
+                  data-segmented-indicator
+                  aria-hidden
+                  className={`absolute inset-0 ${size === 'sm' ? 'rounded-[10px]' : 'rounded-xl'} border ${accent.indicator}`}
+                  transition={m.reduced ? { duration: 0 } : m.spring('quick')}
+                />
+              </MotionFeatures>
             )}
             <span className="relative z-10 flex items-center justify-center gap-1.5 min-w-0">
               {it.icon}
