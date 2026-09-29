@@ -53,6 +53,7 @@ import {
   printRequestCard,
   quoteCardFrom,
   stampThreadActivity,
+  type ResolvedCard,
 } from '../lib/chatCards';
 import { assertMayWriteInThread, notifyStoreThread, publicPage } from './chats';
 import { offerShape, publicRequest, readOfferTerms } from './marketplace';
@@ -125,9 +126,16 @@ async function existingCard(c: Context<AppContext>, chatId: string, type: string
 }
 
 /** After a card landed: the thread moved, and the other side hears it once per turn. Never throws. */
-async function afterCard(c: Context<AppContext>, thread: StoreThread, chatId: string, messageId: string, at: string): Promise<void> {
+async function afterCard(
+  c: Context<AppContext>,
+  thread: StoreThread,
+  chatId: string,
+  messageId: string,
+  at: string,
+  card: ResolvedCard
+): Promise<void> {
   await stampThreadActivity(c.env.DB, chatId, at);
-  await notifyStoreThread(c.env, thread, chatId, c.get('user')!.id, messageId).catch(() => {});
+  await notifyStoreThread(c.env, thread, chatId, c.get('user')!.id, messageId, card).catch(() => {});
 }
 
 // ================================================================ print requests
@@ -227,7 +235,7 @@ chatCommerceRoutes.post('/:id/print-requests/:rid/send', requireCommunityOpen, a
   const snap = await composeSnapshot(c.env.DB, requestId).catch(() => null);
   if (snap) await recordRevisionStatement(c.env.DB, requestId, snap, 'publish', user.id, ts).run().catch(() => {});
   await audit(c.env.DB, user.id, 'community.direct_request_sent', requestId, { store: thread.store_id, chat: chatId });
-  await afterCard(c, thread, chatId, messageId, ts);
+  await afterCard(c, thread, chatId, messageId, ts, card);
   const message = await existingCard(c, chatId, 'print_request', requestId);
   const row = await c.env.DB.prepare('SELECT * FROM community_requests WHERE id = ?').bind(requestId).first<Record<string, unknown>>();
   return c.json({ success: true, request: publicRequest(row!), message }, 201);
@@ -360,7 +368,7 @@ chatCommerceRoutes.post('/:id/quotes', requireCommunityOpen, async (c) => {
   if (!inserted) throw conflict('This request changed while you were quoting — reload it', 'REQUEST_CHANGED');
 
   await audit(db, user.id, 'community.offer_created', offerId, { request: requestId, price: terms.price_iqd, direct: true, chat: chatId });
-  await afterCard(c, thread, chatId, messageId, ts);
+  await afterCard(c, thread, chatId, messageId, ts, card);
   const row = await db.prepare('SELECT * FROM community_offers WHERE id = ?').bind(offerId).first<Record<string, unknown>>();
   const message = await existingCard(c, chatId, 'quote', offerId);
   return c.json({ success: true, offer: offerShape(row!), request_id: requestId, message }, 201);
@@ -464,7 +472,7 @@ chatCommerceRoutes.patch('/:id/quotes/:offerId', requireCommunityOpen, async (c)
     after: { price_iqd: merged.price_iqd, revision: next },
     direct: true,
   });
-  await afterCard(c, thread, chatId, messageId, ts);
+  await afterCard(c, thread, chatId, messageId, ts, card);
   const row = await db.prepare('SELECT * FROM community_offers WHERE id = ?').bind(offerId).first<Record<string, unknown>>();
   const message = await existingCard(c, chatId, 'quote', offerId);
   return c.json({ success: true, offer: offerShape(row!), message });
@@ -580,7 +588,7 @@ chatCommerceRoutes.post('/:id/custom-products', async (c) => {
     throw conflict('That quote is closed', 'OFFER_NOT_AVAILABLE');
   }
   await audit(db, user.id, 'community.custom_product_created', id, { store: ctx.store.id, chat: chatId, price, quote: quoteId });
-  await afterCard(c, thread, chatId, messageId, ts);
+  await afterCard(c, thread, chatId, messageId, ts, card);
   const message = await existingCard(c, chatId, 'custom_product', id);
   return c.json({ success: true, product: { id, price_iqd: price, expires_at: expires }, message }, 201);
 });

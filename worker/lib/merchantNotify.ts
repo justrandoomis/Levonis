@@ -400,17 +400,29 @@ export function pendingOrderNotice(orderId: string): MerchantNotice {
  * The customer's words are NOT in it on any channel: the thread is behind
  * the merchant's login, and that is where it is read.
  */
-export function newMessageNotice(chatId: string, messageId: string, context: { type: string; id: string }): MerchantNotice {
+export function newMessageNotice(
+  chatId: string,
+  messageId: string,
+  context: { type: string; id: string },
+  /** A card the customer sent (docs/COMMUNITY_COMMERCE_CHAT.md §8): named for what it asks of the store. */
+  card?: { type: string; title: string } | null
+): MerchantNotice {
   const about =
-    context.type === 'store_order'
-      ? { ar: `بخصوص الطلب ${iso(context.id)}`, en: `About order ${context.id}` }
-      : context.type === 'request'
-        ? { ar: `بخصوص الطلب المخصص ${iso(context.id)}`, en: `About request ${context.id}` }
-        : { ar: 'رسالة مباشرة إلى متجرك', en: 'A direct message to your store' };
+    card?.type === 'print_request'
+      ? { ar: clip(card.title), en: clip(card.title) }
+      : context.type === 'store_order'
+        ? { ar: `بخصوص الطلب ${iso(context.id)}`, en: `About order ${context.id}` }
+        : context.type === 'request'
+          ? { ar: `بخصوص الطلب المخصص ${iso(context.id)}`, en: `About request ${context.id}` }
+          : { ar: 'رسالة مباشرة إلى متجرك', en: 'A direct message to your store' };
+  const title =
+    card?.type === 'print_request'
+      ? { ar: 'طلب طباعة جديد لمتجرك', en: 'A new print request for your store' }
+      : { ar: 'رسالة جديدة من زبون', en: 'New message from a customer' };
   return {
     kind: 'new_message',
-    title_ar: 'رسالة جديدة من زبون',
-    title_en: 'New message from a customer',
+    title_ar: title.ar,
+    title_en: title.en,
     body_ar: about.ar,
     body_en: about.en,
     link: merchantHref.thread(chatId),

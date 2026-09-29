@@ -22,6 +22,7 @@ import {
   resolveSendableCard,
   stampThreadActivity,
   type CardCurrent,
+  type ResolvedCard,
   type StoreOpen,
 } from '../lib/chatCards';
 import { storeById } from '../lib/merchantAuth';
@@ -170,31 +171,80 @@ async function previousSenderOf(db: D1Database, chatId: string, messageId: strin
  * (worker/lib/merchantNotify.ts: always in-app, outside channels per their
  * `new_messages` switch); the customer as their own `chat_message`.
  */
+/**
+ * THE CARDS THAT WAIT ON THE OTHER SIDE (docs/COMMUNITY_COMMERCE_CHAT.md §8):
+ * a print request waits on the store's quote; a quote and a private product
+ * wait on the customer. Each is one notice keyed on its own message, even
+ * mid-turn — an updated quote is a new card and a new notice — while every
+ * other card and line keeps the turn rule, so a store sending five product
+ * cards in a row is still one «new message».
+ */
+const ASKS_OF: Partial<Record<string, 'seller' | 'customer'>> = {
+  print_request: 'seller',
+  quote: 'customer',
+  custom_product: 'customer',
+};
+
+/** «وصلك عرض سعر» — what a card from the store says on the customer's lock screen. */
+function customerCardWords(card: ResolvedCard, title: string) {
+  const s = card.snapshot;
+  const figure = (iqd: unknown) => Math.max(0, Math.trunc(Number(iqd) || 0)).toLocaleString('en-US');
+  const nameAr = String(s.name_ar || s.name || title);
+  const nameEn = String(s.name || s.name_ar || title);
+  switch (card.type) {
+    case 'quote':
+      return {
+        title: Number(s.revision) > 1
+          ? { ar: 'عدّل المتجر عرض السعر', en: 'The store updated its quote' }
+          : { ar: 'وصلك عرض سعر من المتجر', en: 'The store sent you a quote' },
+        body: { ar: `${title} — ${figure(s.price_iqd)} د.ع`, en: `${title} — IQD ${figure(s.price_iqd)}` },
+      };
+    case 'custom_product':
+      return {
+        title: { ar: 'أعدّ لك المتجر منتجًا خاصًا', en: 'The store made a private product for you' },
+        body: { ar: `${nameAr} — ${figure(s.price_iqd)} د.ع`, en: `${nameEn} — IQD ${figure(s.price_iqd)}` },
+      };
+    case 'product':
+      return { title: { ar: 'أرسل لك المتجر منتجًا', en: 'The store sent you a product' }, body: { ar: nameAr, en: nameEn } };
+    default:
+      return null;
+  }
+}
+
 export async function notifyStoreThread(
   env: Env,
   thread: StoreThread,
   chatId: string,
   senderId: string,
-  messageId: string
+  messageId: string,
+  card: ResolvedCard | null = null
 ): Promise<void> {
-  const prev = await previousSenderOf(env.DB, chatId, messageId);
-  if (prev === senderId) return;
   const toSeller = senderId !== thread.seller_id;
   const recipient = toSeller ? thread.seller_id : thread.customer_id;
   if (!recipient || recipient === senderId) return;
+  // A card that waits on the other side's decision is news whoever spoke last.
+  const waitsOnThem = !!card && ASKS_OF[card.type] === (toSeller ? 'seller' : 'customer');
+  if (!waitsOnThem && (await previousSenderOf(env.DB, chatId, messageId)) === senderId) return;
+  const cardTitle = card ? String(card.snapshot.title ?? card.snapshot.name ?? '') : '';
   if (toSeller) {
-    await notifyMerchant(env, { storeId: thread.store_id }, newMessageNotice(chatId, messageId, { type: thread.context_type, id: thread.context_id }));
+    await notifyMerchant(
+      env,
+      { storeId: thread.store_id },
+      newMessageNotice(chatId, messageId, { type: thread.context_type, id: thread.context_id }, card ? { type: card.type, title: cardTitle } : null)
+    );
     return;
   }
+  const words = card ? customerCardWords(card, cardTitle) : null;
   const about =
-    thread.context_type === 'store_order'
+    words?.body ??
+    (thread.context_type === 'store_order'
       ? { ar: `بخصوص الطلب ${thread.context_id}`, en: `About order ${thread.context_id}` }
-      : { ar: 'افتح المحادثة لقراءته.', en: 'Open the conversation to read it.' };
+      : { ar: 'افتح المحادثة لقراءته.', en: 'Open the conversation to read it.' });
   await notify(env.DB, {
     userId: recipient,
     kind: 'chat_message',
-    title_ar: 'ردّ المتجر على رسالتك',
-    title_en: 'The store replied to your message',
+    title_ar: words?.title.ar ?? 'ردّ المتجر على رسالتك',
+    title_en: words?.title.en ?? 'The store replied to your message',
     body_ar: about.ar,
     body_en: about.en,
     link: `/chat/${chatId}`,
@@ -959,6 +1009,7 @@ chatRoutes.post('/:id/messages', async (c) => {
   // with carries the SAME value the thread will read back.
   const createdAt = new Date().toISOString();
   let stored: Record<string, unknown>;
+  let sentCard: ResolvedCard | null = null;
 
   if (body.card !== undefined) {
     /*
@@ -973,6 +1024,7 @@ chatRoutes.post('/:id/messages', async (c) => {
     }
     const ref = str(raw.ref, 'card.ref', { min: 1, max: 60 });
     const card = await resolveSendableCard(c.env, storeThread, user.id, raw.type, ref);
+    sentCard = card;
     try {
       await cardInsertStatement(c.env.DB, { id, chatId, senderId: user.id, card, createdAt, clientId }).run();
     } catch (e) {
@@ -1063,7 +1115,7 @@ chatRoutes.post('/:id/messages', async (c) => {
       .bind(chatId, storeThread.seller_id)
       .run()
       .catch(() => {});
-    await notifyStoreThread(c.env, storeThread, chatId, user.id, id).catch(() => {});
+    await notifyStoreThread(c.env, storeThread, chatId, user.id, id, sentCard).catch(() => {});
   }
   // The stored message, in the read path's own shape (its card with its
   // current state), so a screen can append it instead of re-fetching the
