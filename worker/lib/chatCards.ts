@@ -30,8 +30,6 @@ import { safeParse } from './types';
 import { HttpError, badRequest } from './http';
 import { newId } from './crypto';
 import { isSchemaMissing } from './membershipBenefits';
-import { storeById } from './merchantAuth';
-import { storeTakesOrders } from './storeOrderOps';
 import { threadRole, type StoreThread } from './chatThread';
 
 export const CARD_TYPES = ['product', 'custom_product', 'print_request', 'quote', 'order', 'custom_order', 'store'] as const;
@@ -481,6 +479,59 @@ export async function postSystemCard(
   }
 }
 
+/**
+ * A CUSTOM ORDER MOVED — its conversation hears it (D8): «بدأ التنفيذ»,
+ * «تم التسليم», «اكتمل», «نزاع مفتوح», «أُلغي»… One card per order per event,
+ * only into the thread the order came from (0151 `community_orders.chat_id`),
+ * posted after the move committed and never able to undo it.
+ */
+export async function announceCustomOrder(env: Env, orderId: string, event: string, actorId: string): Promise<void> {
+  try {
+    const o = await env.DB.prepare(
+      `SELECT o.*, r.title AS request_title FROM community_orders o JOIN community_requests r ON r.id = o.request_id WHERE o.id = ?`
+    )
+      .bind(orderId)
+      .first<Record<string, unknown>>();
+    if (!o?.chat_id) return;
+    await postSystemCard(env, {
+      chatId: String(o.chat_id),
+      actorId,
+      card: customOrderCard(o, String(o.request_title ?? ''), event),
+      eventKey: `custom_order:${orderId}:${event}`,
+      expect: { storeId: String(o.store_id ?? ''), customerId: String(o.customer_id ?? '') },
+    });
+  } catch (e) {
+    console.error('custom order not announced', orderId, event, e instanceof Error ? e.message : String(e));
+  }
+}
+
+/**
+ * A STORE ORDER MOVED — the conversation the purchase came from hears it
+ * (0152 `orders.origin_chat_id`): confirmed, being prepared, shipped,
+ * delivered, received, cancelled. Same rules as above; an order bought outside
+ * a conversation has no thread and nothing is posted.
+ */
+export async function announceStoreOrder(env: Env, orderId: string, event: string, actorId: string): Promise<void> {
+  try {
+    const o = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first<Record<string, unknown>>();
+    if (!o?.origin_chat_id) return;
+    const { results: lines } = await env.DB.prepare(
+      'SELECT name_snapshot AS name, qty, image_snapshot AS image FROM order_items WHERE order_id = ? ORDER BY rowid'
+    )
+      .bind(orderId)
+      .all<{ name: string; qty: number; image: string | null }>();
+    await postSystemCard(env, {
+      chatId: String(o.origin_chat_id),
+      actorId,
+      card: storeOrderCard(o, lines ?? [], event),
+      eventKey: `order:${orderId}:${event}`,
+      expect: { storeId: String(o.store_id ?? ''), customerId: String(o.user_id ?? '') },
+    });
+  } catch (e) {
+    console.error('store order not announced', orderId, event, e instanceof Error ? e.message : String(e));
+  }
+}
+
 // ===========================================================================
 //  READING — THE CURRENT STATE, FOR THIS READER
 // ===========================================================================
@@ -502,22 +553,12 @@ interface CardRow {
   snapshot: Record<string, unknown>;
 }
 
-/** One small memo per read: whether each store may take an order right now. */
-async function storeOpenMemo(env: Env): Promise<(storeId: string) => Promise<boolean>> {
-  const seen = new Map<string, Promise<boolean>>();
-  return (storeId: string) => {
-    let hit = seen.get(storeId);
-    if (!hit) {
-      hit = (async () => {
-        const ctx = await storeById(env.DB, storeId);
-        if (!ctx) return false;
-        return (await storeTakesOrders(env.DB, ctx)).ok;
-      })().catch(() => false);
-      seen.set(storeId, hit);
-    }
-    return hit;
-  };
-}
+/**
+ * Whether a store may take an order right now — the caller's answer
+ * (worker/routes/chats.ts memoises `storeTakesOrders` per read). Passed in, so
+ * this module imports no order machinery and every order door may import it.
+ */
+export type StoreOpen = (storeId: string) => Promise<boolean>;
 
 async function productCurrents(
   env: Env,
@@ -812,7 +853,8 @@ export async function currentCardStates(
   messages: Array<Record<string, unknown>>,
   thread: StoreThread | null,
   viewerId: string,
-  staff = false
+  staff: boolean,
+  storeOpen: StoreOpen
 ): Promise<Map<string, CardCurrent>> {
   const byType = new Map<CardType, CardRow[]>();
   for (const m of messages) {
@@ -829,7 +871,6 @@ export async function currentCardStates(
   const out = new Map<string, CardCurrent>();
   if (!byType.size) return out;
   const viewer: CardViewer = staff ? 'staff' : thread ? (threadRole(thread, viewerId) ?? 'staff') : 'staff';
-  const storeOpen = await storeOpenMemo(env);
   const loaders: Array<Promise<void>> = [];
   for (const [type, rows] of byType) {
     const load = async (): Promise<Map<string, CardCurrent>> => {

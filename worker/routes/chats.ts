@@ -22,6 +22,7 @@ import {
   resolveSendableCard,
   stampThreadActivity,
   type CardCurrent,
+  type StoreOpen,
 } from '../lib/chatCards';
 import { storeById } from '../lib/merchantAuth';
 import { storeTakesOrders } from '../lib/storeOrderOps';
@@ -782,6 +783,23 @@ export function chatMessagePublic(m: Record<string, unknown>, viewerId: string, 
   };
 }
 
+/** Whether each store on a page may take an order right now — asked once per store per read. */
+function storeOpenMemo(env: Env): StoreOpen {
+  const seen = new Map<string, Promise<boolean>>();
+  return (storeId: string) => {
+    let hit = seen.get(storeId);
+    if (!hit) {
+      hit = (async () => {
+        const ctx = await storeById(env.DB, storeId);
+        if (!ctx) return false;
+        return (await storeTakesOrders(env.DB, ctx)).ok;
+      })().catch(() => false);
+      seen.set(storeId, hit);
+    }
+    return hit;
+  };
+}
+
 /**
  * THE MESSAGES OF A PAGE, WITH THEIR CARDS' CURRENT STATE — one read per card
  * type on the page, never one per card, and none at all for a page of plain
@@ -796,7 +814,7 @@ export async function publicPage(
 ) {
   const hasCards = rows.some((m) => typeof m.card_type === 'string' && m.card_type);
   const current = hasCards
-    ? await currentCardStates(env, rows, await storeThreadOf(env.DB, chatId), viewerId, staff)
+    ? await currentCardStates(env, rows, await storeThreadOf(env.DB, chatId), viewerId, staff, storeOpenMemo(env))
     : new Map<string, CardCurrent>();
   return rows.map((m) => chatMessagePublic(m, viewerId, current.get(String(m.id))));
 }

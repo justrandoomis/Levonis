@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { announceStoreOrder } from '../lib/chatCards';
 import { notifyOrderCreditAvailable } from '../lib/merchantNotify';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
@@ -5177,6 +5178,8 @@ orderRoutes.post('/:id/cancel', async (c) => {
   if (String(data.order.seller_type ?? '') === 'merchant') {
     const res = await cancelStoreOrder(c.env, { order: data.order, actor: 'customer', actorUserId: user.id });
     if (!res.ok) throw badRequest('This order was already cancelled or has progressed', 'ORDER_NOT_CANCELLABLE');
+    // The conversation the purchase came from shows it (docs/COMMUNITY_COMMERCE_CHAT.md D8).
+    await announceStoreOrder(c.env, id, 'cancelled', user.id);
     const tell = notifyMerchantOfStoreOrder(c.env, {
       merchantId: String(data.order.merchant_id ?? ''),
       orderId: id,
@@ -5277,6 +5280,8 @@ orderRoutes.post('/:id/confirm-receipt', async (c) => {
   }
   // «صار مبلغ متاحًا» — the merchant's credit just became available (W2-E; one key with the 3-day sweep).
   if (res.released) await notifyOrderCreditAvailable(c.env, id);
+  // «استلم الزبون الطلب» in the conversation the purchase came from (D8; once per order).
+  if (!res.replayed) await announceStoreOrder(c.env, id, 'received', user.id);
   return c.json({ success: true, replayed: res.replayed, released: res.released });
 });
 

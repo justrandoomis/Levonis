@@ -29,6 +29,7 @@ import { merchantNotificationStatement, offerAcceptedNotice } from './merchantNo
 import { merchantHref } from '@levonis/contracts/merchantRoutes';
 import { audit } from './audit';
 import { isSchemaMissing } from './membershipBenefits';
+import { announceCustomOrder } from './chatCards';
 
 const nowIso = () => new Date().toISOString();
 
@@ -568,6 +569,13 @@ export async function sweepCommunityAutoComplete(
           escrow: esc.id,
           auto_complete_at: o.auto_complete_at,
         });
+        // The conversation the deal came from hears it — «recorded» by the store,
+        // so it reads as news to the customer (D8).
+        const owner = await env.DB.prepare('SELECT user_id FROM community_merchants WHERE id = ?')
+          .bind(o.merchant_id)
+          .first<{ user_id: string }>()
+          .catch(() => null);
+        if (owner) await announceCustomOrder(env, o.id, 'completed', owner.user_id);
       } else {
         report.auto_complete_skipped += 1;
       }

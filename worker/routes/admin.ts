@@ -1,4 +1,5 @@
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
+import { announceStoreOrder } from '../lib/chatCards';
 import { Hono } from 'hono';
 import { asDocument } from '../lib/securityPolicy';
 import {
@@ -2503,6 +2504,8 @@ async function adminStoreOrderMove(
   if (await storeCancelMovesMoney(c.env.DB, order)) assertFinancialScope(c);
   const res = await cancelStoreOrder(c.env, { order, actor: 'admin', actorUserId: admin.id, reason: note || undefined });
   if (!res.ok) throw badRequest('The order changed while you were editing — reload and retry');
+  // The conversation the purchase came from records it (docs/COMMUNITY_COMMERCE_CHAT.md D8).
+  await announceStoreOrder(c.env, id, 'cancelled', admin.id);
   if (note) {
     await c.env.DB.prepare('UPDATE orders SET admin_note = ? WHERE id = ?').bind(note, id).run();
   }

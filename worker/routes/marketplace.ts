@@ -111,7 +111,7 @@ import { assertMayOffer, eligibleVerdictSql, liveVerdict, rematchNow } from '../
 // A request addressed to ONE store (0151): its store quotes it without matching.
 import { assertMayQuote, directRequest } from '../lib/directRequests';
 import { isDirectMerchant } from '../lib/communityRequests';
-import { customOrderCard, postSystemCard } from '../lib/chatCards';
+import { announceCustomOrder, customOrderCard, postSystemCard } from '../lib/chatCards';
 import { fileClass, fileReadStatement, fileReader, mayReadBytes, previewGrantFor } from '../lib/requestFilePolicy';
 
 export const marketplaceRoutes = new Hono<AppContext>();
@@ -1843,6 +1843,8 @@ marketplaceRoutes.post('/orders/:id/start', requireAuth, async (c) => {
   await audit(c.env.DB, c.get('user')!.id, 'community.order_started', orderId, {});
   // The customer hears work began (review F4; keyed on the order, once).
   await notifyCustomOrderStarted(c.env, orderId);
+  // …and the conversation the deal came from shows it (D8).
+  await announceCustomOrder(c.env, orderId, 'started', c.get('user')!.id);
   return c.json({ success: true });
 });
 
@@ -1868,15 +1870,33 @@ marketplaceRoutes.post('/orders/:id/delivered', requireAuth, async (c) => {
   // is the safe default for a platform that has not decided its policy yet.
   const autoAt = days > 0 ? new Date(Date.now() + days * 86_400_000).toISOString() : null;
 
-  await c.env.DB.prepare(
+  const res = await c.env.DB.prepare(
     `UPDATE community_orders
         SET state = 'merchant_marked_delivered', delivered_at = ?, auto_complete_at = ?, updated_at = ?
       WHERE id = ? AND state = 'in_progress'`
   ).bind(ts, autoAt, ts, orderId).run();
+  /*
+   * A FLIP THAT MATCHED NOTHING IS NOT A SUCCESS (docs/COMMUNITY_COMMERCE_CHAT.md
+   * §1.3). This answered 200 whatever the UPDATE did: a dispute or a cancel
+   * that landed after the read above left the order where it was while the
+   * merchant was told it was delivered — and the customer was asked to
+   * confirm a delivery that never happened. A second tap that lost to the
+   * first is the replay it is; anything else is ORDER_CHANGED.
+   */
+  if (!Number(res.meta.changes ?? 0)) {
+    const now = await c.env.DB.prepare('SELECT state, auto_complete_at FROM community_orders WHERE id = ?')
+      .bind(orderId)
+      .first<{ state: string; auto_complete_at: string | null }>();
+    if (now?.state === 'merchant_marked_delivered') {
+      return c.json({ success: true, replayed: true, auto_complete_at: now.auto_complete_at });
+    }
+    throw conflict('This order changed — reload it', 'ORDER_CHANGED');
+  }
 
   await audit(c.env.DB, c.get('user')!.id, 'community.order_delivered', orderId, { auto_complete_at: autoAt });
   // «أكّد الاستلام», with the auto-complete date if the owner set one (review F4).
   await notifyCustomOrderDelivered(c.env, orderId);
+  await announceCustomOrder(c.env, orderId, 'delivered', c.get('user')!.id);
   return c.json({ success: true, auto_complete_at: autoAt });
 });
 
@@ -1915,6 +1935,7 @@ marketplaceRoutes.post('/orders/:id/confirm', requireAuth, async (c) => {
         WHERE id = ?2 AND state = 'merchant_marked_delivered'`
     ).bind(ts, orderId).run();
     await audit(c.env.DB, user.id, 'community.order_confirmed_held', orderId, { escrow: escrow.id, reason: 'merchant suspended' });
+    await announceCustomOrder(c.env, orderId, 'confirmed', user.id);
     return c.json({ success: true, released: false, held: true });
   };
   if (await merchantSuspension(c.env.DB, String(row.merchant_id))) return holdForSuspension();
@@ -1954,6 +1975,7 @@ marketplaceRoutes.post('/orders/:id/confirm', requireAuth, async (c) => {
   );
 
   await audit(c.env.DB, user.id, 'community.order_completed', orderId, { escrow: escrow.id });
+  await announceCustomOrder(c.env, orderId, 'completed', user.id);
   // «صار مبلغ متاحًا» — the escrow released the merchant's share (W2-E; keyed on the order, once).
   await notifyPayoutAvailable(c.env, { merchantId: String(row.merchant_id), amountIqd: Number(row.merchant_receivable_iqd) || 0, sourceKey: `community_order:${orderId}`, communityOrderId: orderId });
   return c.json({ success: true, review_available: true });
@@ -2030,6 +2052,7 @@ marketplaceRoutes.post('/orders/:id/dispute', requireAuth, async (c) => {
   }
 
   await audit(c.env.DB, user.id, 'community.order_disputed', orderId, { complaint: complaintId });
+  await announceCustomOrder(c.env, orderId, 'disputed', user.id);
   // The merchant is told the money is frozen and why (W2-E; forced on, §61).
   if (isCustomer) await notifyDisputeOpened(c.env, { communityOrderId: orderId, complaintId, merchantId: String(row.merchant_id) });
   // …and the customer when the MERCHANT raised it (review F4).
@@ -2161,6 +2184,7 @@ marketplaceRoutes.post('/orders/:id/cancel', requireAuth, async (c) => {
   }
 
   await audit(c.env.DB, user.id, 'community.order_cancelled', orderId, { by: role, state });
+  await announceCustomOrder(c.env, orderId, 'cancelled', user.id);
   // The workshop is told not to start (review F4; keyed on the order, once).
   if (isCustomer) await notifyCustomOrderCancelledByCustomer(c.env, orderId);
   return c.json({ success: true, refunded: !!escrow });

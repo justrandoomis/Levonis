@@ -37,10 +37,15 @@ export const REQUEST_TRANSITIONS: Record<RequestState, readonly RequestState[]> 
   // An abandoned draft expires (the sweep, worker/lib/communityRequests.ts):
   // it was never on the board, so nothing else has to move with it.
   draft: ['open', 'cancelled', 'expired'],
-  open: ['receiving_offers', 'cancelled', 'expired'],
-  // A request can go straight from open to selected when the customer accepts
-  // the first offer that arrives.
-  receiving_offers: ['offer_selected', 'cancelled', 'expired'],
+  // ACCEPTANCE MOVES A REQUEST STRAIGHT TO `in_progress` (review of the
+  // commerce chat, docs/COMMUNITY_COMMERCE_CHAT.md §1.3): since audit 03 §10 A
+  // the offer's freeze, the funded order and its escrow are ONE batch, so there
+  // is no moment at which a request is «selected» but not yet under way. The
+  // table said otherwise and no reader could tell which was true; it now says
+  // what the acceptance writes. `offer_selected` remains for rows written
+  // before that change.
+  open: ['receiving_offers', 'in_progress', 'cancelled', 'expired'],
+  receiving_offers: ['offer_selected', 'in_progress', 'cancelled', 'expired'],
   offer_selected: ['in_progress', 'cancelled', 'disputed'],
   in_progress: ['delivered', 'disputed', 'cancelled'],
   delivered: ['completed', 'disputed'],

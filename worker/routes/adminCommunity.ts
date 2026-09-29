@@ -29,6 +29,7 @@ import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { getSetting } from '../lib/settings';
 import { releaseEscrow, refundEscrow, escrowForOrder, getEscrow } from '../lib/escrowOps';
+import { announceCustomOrder } from '../lib/chatCards';
 import {
   adjustMerchantBalance,
   adminPayoutQueue,
@@ -1305,6 +1306,8 @@ adminCommunityRoutes.post('/escrows/:id/resolve', requireFinancialScope, async (
     revokeViewerTokensStatement(c.env.DB, order?.request_id ?? '', ts),
   ]);
 
+  // The conversation the deal came from records the decision (D8).
+  await announceCustomOrder(c.env, esc.community_order_id, orderState, admin.id);
   if (!replayed) {
     await audit(c.env.DB, admin.id, 'admin.escrow_resolved', escrowId, {
       decision,

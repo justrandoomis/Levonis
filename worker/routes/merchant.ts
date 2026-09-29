@@ -15,6 +15,7 @@
  */
 
 import { Hono } from 'hono';
+import { announceStoreOrder } from '../lib/chatCards';
 import { rematchNow } from '../lib/printMatchingStore';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -1196,6 +1197,8 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
     });
     if (!res.ok) throw conflict('The order changed while you were editing — reload and retry', 'ORDER_CHANGED');
     tellCustomer();
+    // The conversation the purchase came from shows it (docs/COMMUNITY_COMMERCE_CHAT.md D8).
+    await announceStoreOrder(c.env, id, 'cancelled', ctx.store.user_id);
     return c.json({ success: true, status: 'cancelled', refunded_usd_cents: res.refundedUsdCents });
   }
 
@@ -1274,6 +1277,8 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
    * response, and flushed straight away rather than at the next cron.
    */
   tellCustomer();
+  // …and so does the conversation the purchase came from (D8), once per move.
+  await announceStoreOrder(c.env, id, to, ctx.store.user_id);
   return c.json({ success: true, status: to });
 });
 
