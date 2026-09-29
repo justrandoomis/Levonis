@@ -165,6 +165,10 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // maker's projects and posts, and their pictures. Marketplace, because a
     // project is the door into a store, a product and a print request.
     'community_posts', 'community_post_media',
+    // 0154 — the social graph around it (Phase 2): follows between people,
+    // likes, saves, comments, blocks, mutes and content reports.
+    'user_follows', 'community_likes', 'community_saves', 'community_comments',
+    'user_blocks', 'user_mutes', 'community_reports',
     // 0122 — the store page as data (docs/MERCHANT_PLATFORM.md §4.4): the
     // merchant's working draft and the immutable published revisions the
     // storefront reads through merchant_stores.published_revision_id.
