@@ -692,7 +692,63 @@ communitySocialRoutes.get('/feed', async (c) => {
 
 // ----------------------------------------------------------------- creators
 
-const CREATOR_SEARCH = ['u.name', 'u.username', 'u.bio'] as const;
+export const CREATOR_SEARCH = ['u.name', 'u.username', 'u.bio'] as const;
+
+/**
+ * THE CREATORS LIST'S SQL, in pieces — shared with the community search
+ * (worker/routes/communitySearch.ts, Phase 3), which draws the same card from
+ * the same candidates under the same block rule, so a creator the list shows
+ * is a creator the search finds and nobody else. `q` and `v` are the
+ * placeholders holding the `likePattern` term and the viewer's id ('' for a
+ * guest); `from` needs `u`, `cm` and `s` in scope and `withCounts` adds `pc`
+ * (the public projects, one grouped read).
+ */
+export function creatorListSql(q: string, v: string) {
+  const candidates = `(SELECT id FROM users WHERE creator_public = 1
+                       UNION SELECT user_id FROM community_merchants WHERE status <> 'suspended') cand`;
+  const where = `u.username IS NOT NULL AND u.username <> ''
+          AND (${q} = '' OR ${sqlLikeClause(CREATOR_SEARCH, q)})
+          AND (${v} = '' OR NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.user_id = ${v} AND b.blocked_id = u.id) OR (b.user_id = u.id AND b.blocked_id = ${v})))`;
+  const from = `FROM ${candidates}
+          JOIN users u ON u.id = cand.id
+          LEFT JOIN community_merchants cm ON cm.user_id = u.id
+          LEFT JOIN merchant_stores s ON s.merchant_id = cm.id`;
+  const withCounts = `${from}
+          LEFT JOIN (SELECT p.author_id, COUNT(*) AS n, MAX(p.published_at) AS last
+                       FROM community_posts p WHERE ${POST_PUBLIC_SQL} GROUP BY p.author_id) pc ON pc.author_id = u.id`;
+  const columns = `u.id, u.username, u.name, u.avatar_key, u.bio, u.follower_count,
+              cm.id AS merchant_id, cm.status AS merchant_status, cm.verified AS merchant_verified,
+              s.id AS store_id, s.slug AS store_slug, s.name AS store_name, s.status AS store_status,
+              COALESCE(pc.n, 0) AS projects,
+              pc.last AS last_published,
+              EXISTS (SELECT 1 FROM user_follows f WHERE f.follower_id = ${v} AND f.user_id = u.id) AS viewer_follows`;
+  return { where, from, withCounts, columns };
+}
+
+/** One creator as the list draws them — the card the search and the trending rail reuse. */
+export function creatorCard(r: Record<string, unknown>, badges: { pro: Set<string>; premium: Set<string> }, root: string | null) {
+  const merchantOk = !!r.merchant_id && r.merchant_status !== 'suspended';
+  const storeOk = merchantOk && !!r.store_id && r.store_status !== 'suspended';
+  const bio = String(r.bio ?? '');
+  return {
+    id: String(r.id),
+    username: String(r.username),
+    name: String(r.name ?? ''),
+    avatarUrl: fileUrl(r.avatar_key),
+    bio: bio.length > 160 ? `${bio.slice(0, 159)}…` : bio,
+    badges: {
+      pro: badges.pro.has(String(r.id)),
+      premium: badges.premium.has(String(r.id)),
+      verified_merchant: merchantOk && !!r.merchant_verified,
+    },
+    stats: { projects: Number(r.projects ?? 0), followers: Number(r.follower_count ?? 0) },
+    store: storeOk
+      ? { id: String(r.store_id), slug: String(r.store_slug ?? ''), name: String(r.store_name ?? ''), url: storeUrl(String(r.store_slug ?? ''), root, String(r.store_id)) }
+      : null,
+    url: `/u/${encodeURIComponent(String(r.username))}`,
+    viewer: { following: !!r.viewer_follows },
+  };
+}
 
 /**
  * THE CREATORS LIST — accounts with a page (D4), never across a block.
@@ -717,27 +773,11 @@ communitySocialRoutes.get('/creators', async (c) => {
   const viewer = c.get('user') ?? null;
   const v = viewer?.id ?? '';
   const root = rootDomainFrom(c.env);
-  const candidates = `(SELECT id FROM users WHERE creator_public = 1
-                       UNION SELECT user_id FROM community_merchants WHERE status <> 'suspended') cand`;
-  const where = `u.username IS NOT NULL AND u.username <> ''
-          AND (?1 = '' OR ${sqlLikeClause(CREATOR_SEARCH, '?1')})
-          AND (?2 = '' OR NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.user_id = ?2 AND b.blocked_id = u.id) OR (b.user_id = u.id AND b.blocked_id = ?2)))`;
-  const from = `FROM ${candidates}
-          JOIN users u ON u.id = cand.id
-          LEFT JOIN community_merchants cm ON cm.user_id = u.id
-          LEFT JOIN merchant_stores s ON s.merchant_id = cm.id`;
-  const withCounts = `${from}
-          LEFT JOIN (SELECT p.author_id, COUNT(*) AS n, MAX(p.published_at) AS last
-                       FROM community_posts p WHERE ${POST_PUBLIC_SQL} GROUP BY p.author_id) pc ON pc.author_id = u.id`;
+  const { where, from, withCounts, columns } = creatorListSql('?1', '?2');
   const order = featured ? 'projects DESC, u.follower_count DESC, u.id DESC' : 'last_published DESC NULLS LAST, u.follower_count DESC, u.id DESC';
   const [{ results }, total] = await Promise.all([
     c.env.DB.prepare(
-      `SELECT u.id, u.username, u.name, u.avatar_key, u.bio, u.follower_count,
-              cm.id AS merchant_id, cm.status AS merchant_status, cm.verified AS merchant_verified,
-              s.id AS store_id, s.slug AS store_slug, s.name AS store_name, s.status AS store_status,
-              COALESCE(pc.n, 0) AS projects,
-              pc.last AS last_published,
-              EXISTS (SELECT 1 FROM user_follows f WHERE f.follower_id = ?2 AND f.user_id = u.id) AS viewer_follows
+      `SELECT ${columns}
          ${withCounts}
         WHERE ${where}
         ORDER BY ${order}
@@ -750,29 +790,7 @@ communitySocialRoutes.get('/creators', async (c) => {
   const more = results.length > limit;
   if (more) results.length = limit;
   const badges = await membershipBadges(c.env.DB, results.map((r) => r.id));
-  const creators = results.map((r) => {
-    const merchantOk = !!r.merchant_id && r.merchant_status !== 'suspended';
-    const storeOk = merchantOk && !!r.store_id && r.store_status !== 'suspended';
-    const bio = String(r.bio ?? '');
-    return {
-      id: String(r.id),
-      username: String(r.username),
-      name: String(r.name ?? ''),
-      avatarUrl: fileUrl(r.avatar_key),
-      bio: bio.length > 160 ? `${bio.slice(0, 159)}…` : bio,
-      badges: {
-        pro: badges.pro.has(String(r.id)),
-        premium: badges.premium.has(String(r.id)),
-        verified_merchant: merchantOk && !!r.merchant_verified,
-      },
-      stats: { projects: Number(r.projects ?? 0), followers: Number(r.follower_count ?? 0) },
-      store: storeOk
-        ? { id: String(r.store_id), slug: String(r.store_slug ?? ''), name: String(r.store_name ?? ''), url: storeUrl(String(r.store_slug ?? ''), root, String(r.store_id)) }
-        : null,
-      url: `/u/${encodeURIComponent(String(r.username))}`,
-      viewer: { following: !!r.viewer_follows },
-    };
-  });
+  const creators = results.map((r) => creatorCard(r, badges, root));
   return c.json({
     success: true,
     creators,

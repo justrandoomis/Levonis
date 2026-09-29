@@ -160,7 +160,7 @@ export const POST_FROM = `FROM community_posts p
 export const POST_PUBLIC_SQL = `p.state = 'published' AND p.visibility = 'public' AND p.admin_hidden_at IS NULL
   AND p.consent_status IN ('not_needed','granted')`;
 
-const POST_SEARCH = ['p.title', 'p.body', 'p.tags', 'p.material', 'p.printer_name'] as const;
+export const POST_SEARCH = ['p.title', 'p.body', 'p.tags', 'p.material', 'p.printer_name'] as const;
 
 /**
  * WHAT A SIGNED-IN VIEWER NEVER MEETS IN A LIST (0154): posts by an author

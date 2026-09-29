@@ -61,6 +61,22 @@
    instead of three. */
 
 @import "tailwindcss";
+/*
+  WHAT TAILWIND READS. Left to itself it scans every non-ignored file of the
+  repository for class names — the Worker, the migrations, the docs, the
+  scripts and the Studio included — and emits a utility for every token that
+  looks like one. None of those files is rendered by this stylesheet, so each
+  utility they alone mention is dead weight in every visitor's first paint
+  (docs/COMMUNITY_ECOSYSTEM.md D7: the budget is paid for, not raised). Only
+  the UI trees are read: src/, packages/, index.html — and tests/, whose
+  browser fixtures compile under the dev server.
+*/
+@source not "../docs";
+@source not "../worker";
+@source not "../migrations";
+@source not "../scripts";
+@source not "../studio";
+@source not "../services";
 
 /*
   THE ONE HTML ELEMENT THAT REFUSES TO SHRINK.
@@ -741,10 +757,6 @@ html {
 @media (prefers-reduced-motion: reduce) {
   /* Decorative loops and travel: gone. Anything essential is opacity, and
      opacity survives because it is not vestibular. */
-  .animate-fly-to-cart,
-  .animate-spin-shrink {
-    animation: none !important;
-  }
   *,
   *::before,
   *::after {
@@ -891,46 +903,6 @@ html:lang(ckb) .leading-tight {
   }
 }
 
-@keyframes slideUp {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-
-@keyframes fly-to-cart {
-  0% {
-    left: var(--start-x);
-    top: var(--start-y);
-    transform: translate(-50%, -50%);
-    opacity: 1;
-  }
-  20% {
-    left: var(--start-x);
-    top: calc(var(--start-y) - 60px);
-    transform: translate(-50%, -50%) scale(1.1);
-    opacity: 1;
-  }
-  100% {
-    left: var(--end-x);
-    top: var(--end-y);
-    transform: translate(-50%, -50%) scale(0.1);
-    opacity: 0;
-  }
-}
-.animate-fly-to-cart {
-  animation: fly-to-cart 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-}
-
-@keyframes spin-shrink {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(180deg); }
-}
-.animate-spin-shrink {
-  animation: spin-shrink 0.8s ease-in-out forwards;
-}
 @keyframes rainbow {
   0% { background-position: 0% 50%; }
   100% { background-position: 100% 50%; }

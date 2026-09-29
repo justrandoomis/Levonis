@@ -92,7 +92,7 @@ const fileUrl = (key: unknown) => (typeof key === 'string' && key ? `/files/${ke
  * never the count — and null for a pre-store listing, which has no cart path
  * for the question to be about.
  */
-function communityFeedProduct(p: Record<string, unknown>, root: string | null) {
+export function communityFeedProduct(p: Record<string, unknown>, root: string | null) {
   const storeId = typeof p.store_id === 'string' && p.store_id ? p.store_id : null;
   const storeSlug = typeof p.s_slug === 'string' && p.s_slug ? p.s_slug : null;
   const productSlug = encodeURIComponent(String(p.slug ?? ''));
@@ -179,13 +179,28 @@ export const communityProductsVisible = (q: string) => `p.lifecycle = 'active' A
         AND m.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
         AND (${q} = '' OR ${sqlLikeClause(PRODUCT_SEARCH, q)})`;
 
+/**
+ * THE VIEWER'S BLOCK, ON A SHOP (Phase 3 review): a signed-in viewer never
+ * meets a merchant they blocked or who blocked them — not in the directory,
+ * not among the products, not as a suggestion or a «قد يعجبك» row — the same
+ * `user_blocks` question `postExclusionSql` asks of a post's author, here of
+ * the merchant's account. `v` is the placeholder holding the viewer's id ('' for
+ * a guest, who sees the list's rule alone); `alias` names the
+ * `community_merchants` row in scope (`cm` in the directory, `m` in the feed).
+ * A mute is a matter between makers and their posts; a shop knows no mute.
+ */
+export const merchantBlockSql = (v: string, alias: 'cm' | 'm' = 'cm') =>
+  `(${v} = '' OR NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.user_id = ${v} AND b.blocked_id = ${alias}.user_id) OR (b.user_id = ${alias}.user_id AND b.blocked_id = ${v})))`;
+
 communityRoutes.get('/products', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 48, def: 24 });
   const cursor = feedCursor(c.req.query('cursor'));
   const q = likePattern(c.req.query('q'));
   const root = rootDomainFrom(c.env);
   const from = COMMUNITY_PRODUCTS_FROM;
-  const visible = communityProductsVisible('?1');
+  const viewer = c.get('user')?.id ?? '';
+  const visible = `${communityProductsVisible('?1')} AND ${merchantBlockSql('?5', 'm')}`;
+  const visibleCount = `${communityProductsVisible('?1')} AND ${merchantBlockSql('?2', 'm')}`;
   const [{ results }, total] = await Promise.all([
     c.env.DB.prepare(
       `SELECT p.*, s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo_key
@@ -193,9 +208,9 @@ communityRoutes.get('/products', async (c) => {
         WHERE ${visible}
           AND (?2 = '' OR p.created_at < ?2 OR (p.created_at = ?2 AND p.id < ?3))
         ORDER BY p.created_at DESC, p.id DESC LIMIT ?4`
-    ).bind(q, cursor.at, cursor.id, limit).all<Record<string, unknown>>(),
+    ).bind(q, cursor.at, cursor.id, limit, viewer).all<Record<string, unknown>>(),
     cursor.at === ''
-      ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${visible}`).bind(q).first<{ n: number }>()
+      ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${visibleCount}`).bind(q, viewer).first<{ n: number }>()
       : Promise.resolve(null),
   ]);
   return c.json({
@@ -284,7 +299,8 @@ communityRoutes.get('/merchants', async (c) => {
   const root = rootDomainFrom(c.env);
   const viewer = c.get('user')?.id ?? '';
   const from = COMMUNITY_DIRECTORY_FROM;
-  const visible = communityDirectoryVisible('?1');
+  const visible = `${communityDirectoryVisible('?1')} AND ${merchantBlockSql('?5')}`;
+  const visibleCount = `${communityDirectoryVisible('?1')} AND ${merchantBlockSql('?2')}`;
   const [{ results }, total] = await Promise.all([
     c.env.DB.prepare(
       `SELECT ${COMMUNITY_DIRECTORY_COLUMNS},
@@ -295,7 +311,7 @@ communityRoutes.get('/merchants', async (c) => {
         ORDER BY cm.created_at DESC, cm.id DESC LIMIT ?4`
     ).bind(q, cursor.at, cursor.id, limit, viewer).all<Record<string, unknown>>(),
     cursor.at === ''
-      ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${visible}`).bind(q).first<{ n: number }>()
+      ? c.env.DB.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${visibleCount}`).bind(q, viewer).first<{ n: number }>()
       : Promise.resolve(null),
   ]);
   const badges = await membershipBadges(c.env.DB, results.map((m) => m.user_id));

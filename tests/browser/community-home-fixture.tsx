@@ -25,6 +25,9 @@ const tab = params.get('tab') ?? 'foryou';
 const viewer = params.get('viewer') ?? 'guest';
 const empty = params.get('empty') === '1';
 localStorage.setItem('levo_lang', lang);
+// `&recent=1`: this browser has searched before (the overlay's empty state).
+if (params.get('recent') === '1') localStorage.setItem('levonis.communityRecent.v1', JSON.stringify([{ term: 'مزهرية', at: Date.now() - 60_000 }, { term: 'PETG', at: Date.now() - 120_000 }]));
+else localStorage.removeItem('levonis.communityRecent.v1');
 document.documentElement.lang = lang;
 document.documentElement.dir = lang === 'en' ? 'ltr' : 'rtl';
 document.documentElement.setAttribute('data-theme', params.get('theme') === 'light' ? 'light' : 'dark');
@@ -237,6 +240,55 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     return ok({ following: graph.followingStores.has(m[1]) });
   }
   if (p === '/api/community/reports' && method === 'POST') return new Response(JSON.stringify({ success: true, report_id: 'rep_1' }), { status: 201, headers: { 'content-type': 'application/json' } });
+  // ---- the search doors (Phase 3) ----
+  if (p === '/api/community/search/suggest') {
+    const term = q(u, 'q');
+    if (term.length < 2 || empty) return ok({ suggestions: [] });
+    const suggestions = [
+      ...ALL_POSTS.filter((c) => has(c.title, term)).slice(0, 3).map((c) => ({ text: c.title, type: 'project', href: c.url })),
+      ...STORES.filter((x) => has(x.store_name, term)).slice(0, 2).map((x) => ({ text: x.store_name, type: 'store', href: x.store_url })),
+      ...['dragon', 'articulated', 'pla'].filter((t) => t.startsWith(term)).map((t) => ({ text: t, type: 'tag', href: `/community/projects?tag=${t}` })),
+    ].slice(0, 8);
+    return ok({ suggestions });
+  }
+  if (p === '/api/community/search') {
+    const term = q(u, 'q');
+    if (term.length > 60) return refused(400);
+    const limit = Math.max(1, Math.min(12, Number(u.searchParams.get('limit')) || 5));
+    const types = (u.searchParams.get('types') ?? '').split(',').filter(Boolean);
+    const runs = (t: string) => types.length === 0 || types.includes(t);
+    const enc = encodeURIComponent(term);
+    const sec = <T,>(t: string, rows: T[], more: string) => (runs(t) ? { rows: empty ? [] : rows.slice(0, limit), total: empty ? 0 : Math.min(rows.length, 200), more } : { rows: [], total: null, more });
+    const materials = [{ id: 'p_pla', slug: 'pla-black', name: 'PLA Black 1kg', name_ar: 'PLA أسود 1 كغ', imageUrl: null, href: '/product/pla-black' }];
+    const brands = [{ id: 'b_bambu', slug: 'bambu', name: 'Bambu Lab', name_ar: 'بامبو لاب', imageUrl: null, href: '/products?brand=b_bambu' }];
+    return ok({
+      q: term,
+      sections: {
+        projects: sec('projects', ALL_POSTS.filter((c) => has(`${c.title} ${c.excerpt}`, term)), `/community/projects?q=${enc}`),
+        stores: sec('stores', STORES.filter((x) => has(`${x.store_name} ${x.bio}`, term)), `/community?tab=stores&q=${enc}`),
+        creators: sec('creators', MAKERS.filter((x) => x.username).map(creatorCard).filter((c) => has(`${c.name} ${c.username} ${c.bio}`, term)), `/community?tab=creators&q=${enc}`),
+        products: sec('products', PRODUCTS.filter((r) => has(`${r.name} ${r.name_ar}`, term)), `/community?tab=foryou&list=products&q=${enc}`),
+        requests: sec('requests', REQUESTS.filter((r) => has(`${r.title} ${r.description}`, term)), `/requests?q=${enc}`),
+        materials: sec('materials', materials.filter((x) => has(`${x.name} ${x.name_ar}`, term)), `/products?search=${enc}&category=cat_materials`),
+        brands: sec('brands', brands.filter((x) => has(`${x.name} ${x.name_ar}`, term)), `/products?search=${enc}`),
+      },
+      took_ms: 3,
+    });
+  }
+  if (p === '/api/community/trending') {
+    return ok({
+      projects: TRENDING,
+      tags: empty ? [] : [{ tag: 'dragon', count: 12 }, { tag: 'articulated', count: 9 }, { tag: 'pla', count: 7 }, { tag: 'vase', count: 4 }],
+      stores: empty ? [] : STORES.slice(0, 6).map((x) => ({ ...x, following: graph.followingStores.has(x.id) })),
+      creators: empty ? [] : MAKERS.filter((x) => x.username).map(creatorCard).slice(0, 6),
+      totals: { merchants: empty ? 0 : STORES.length },
+    });
+  }
+  if (p === '/api/community/recommend') {
+    const anchor = u.searchParams.get('for') ?? '';
+    if (!/^(post|store|product):/.test(anchor)) return refused(400);
+    return ok({ for: anchor, kind: anchor.startsWith('store:') ? 'stores' : 'projects', rows: anchor.startsWith('store:') ? STORES.slice(1, 5) : ALL_POSTS.slice(2, 8) });
+  }
   // ---- the lists ----
   if (p === '/api/community/feed') {
     const scope = u.searchParams.get('scope');

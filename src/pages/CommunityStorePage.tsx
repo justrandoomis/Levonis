@@ -17,7 +17,7 @@
  * at all falls through to the legacy page's not-found state.
  */
 
-import { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
@@ -26,6 +26,18 @@ import type { MerchantStore as StoreShape, MerchantProduct } from '../lib/mercha
 import Storefront from './Storefront';
 import MerchantStore from './MerchantStore';
 import StoreUnavailable from '../components/merchant/StoreUnavailable';
+
+/**
+ * «متاجر مشابهة» — other visible stores of the same governorate or trade
+ * (Phase 3), a lazy rail under the profile. It is handed to Storefront as its
+ * `footer`, so it is drawn INSIDE the store's theme island (`[data-store-theme]`,
+ * StoreRenderer) and wears the store's tokens — never a cream rail under a
+ * dark shop. This page is not part of the storefront closure
+ * (tests/bundleBudget.test.ts measures Storefront and StorefrontProduct,
+ * which this page imports, not the reverse), and the rail is a chunk of its
+ * own besides.
+ */
+const RecommendRail = React.lazy(() => import('../components/community/search/RecommendRail'));
 
 /** Levonis suspended this shop: every door answers the same refusal. */
 const refused = (e: unknown) => e instanceof ApiError && e.code === 'STORE_UNAVAILABLE';
@@ -175,7 +187,15 @@ export default function CommunityStorePage() {
   }
   if (unavailable) return <StoreUnavailable />;
   return store ? (
-    <Storefront store={store} profileProducts={profileProducts ?? undefined} />
+    <Storefront
+      store={store}
+      profileProducts={profileProducts ?? undefined}
+      footer={
+        <Suspense fallback={null}>
+          <RecommendRail anchor={`store:${store.merchant_id}`} kind="stores" className="sf-col mt-8 px-4 @min-[40rem]:px-6" />
+        </Suspense>
+      }
+    />
   ) : (
     <MerchantStore />
   );

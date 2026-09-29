@@ -27,6 +27,7 @@ import { investRoutes } from './routes/invest';
 import { communityRoutes } from './routes/community';
 import { communityPostRoutes } from './routes/communityPosts';
 import { communitySocialRoutes } from './routes/communitySocial';
+import { communitySearchRoutes } from './routes/communitySearch';
 import { chatRoutes } from './routes/chats';
 import { chatCommerceRoutes } from './routes/chatCommerce';
 import { profileRoutes } from './routes/profile';
@@ -318,6 +319,9 @@ app.route('/api/community', communityPostRoutes);
 // The social graph — likes, saves, comments, follows, blocks, reports, the
 // feed and the creators list (0154, Phase 2); same wall.
 app.route('/api/community', communitySocialRoutes);
+// Unified search, suggestions, trending and «قد يعجبك» over the lists above
+// (Phase 3, docs/COMMUNITY_ECOSYSTEM.md §9.3); same wall, guests welcome.
+app.route('/api/community', communitySearchRoutes);
 app.route('/api/chats', chatRoutes);
 // Custom work inside the store's conversation — print requests, quotes, the orders panel
 // (docs/COMMUNITY_COMMERCE_CHAT.md); acceptance stays /api/marketplace/offers/:id/accept.

@@ -21,7 +21,7 @@
  *     browser is idle; every other block is a second lazy chunk, fetched the
  *     first time a layout uses one (tests/bundleBudget.test.ts).
  */
-import { lazy, Suspense, useEffect, useMemo, type ComponentType } from 'react';
+import { lazy, Suspense, useEffect, useMemo, type ComponentType, type ReactNode } from 'react';
 import { normalizeLayout, renderableBlocks } from '../../../packages/storeLayout/src/normalize';
 import { defaultLayoutFromStore } from '../../../packages/storeLayout/src/defaults';
 import { emptyBlockData, type BlockData } from '../../../packages/storeLayout/src/data';
@@ -134,12 +134,15 @@ export default function StoreRenderer({
   layout: rawLayout,
   data: dataOverride,
   className = '',
+  footer = null,
 }: {
   store: StorefrontStore;
   /** A layout to render instead of the store's own (a draft, a revision). */
   layout?: unknown;
   data?: BlockData;
   className?: string;
+  /** Something the page hangs under the blocks, INSIDE the store's theme island — a related-stores rail. */
+  footer?: ReactNode;
 }) {
   const rt = useStorefrontRuntime();
   const layout = useMemo(() => renderableLayout(rawLayout ?? store.layout, store), [rawLayout, store]);
@@ -164,6 +167,7 @@ export default function StoreRenderer({
             ))}
           </div>
         )}
+        {footer}
         <StoreFooter variant={layout.footer.variant} store={store} />
       </div>
     </StoreTheme>

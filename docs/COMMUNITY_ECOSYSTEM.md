@@ -254,6 +254,140 @@ tests/communitySocialUi.test.ts (8), tests/communityHubUi.test.ts (extended);
 scripts/e2e-projects.mjs (under `<StrictMode>`, as src/main.tsx mounts the app) and
 scripts/e2e-community-home.mjs in the browser.
 
+## 4c. API (Phase 3, landed) — all behind `communityGate()`, guest-optional, no writes
+
+Router worker/routes/communitySearch.ts, mounted at `/api/community` after the social routes.
+Every 200 carries `success: true`; refusals are `{ success: false, error, code }`. Nothing is
+written: no new table, no search log, no query tracking — «recent searches» are the browser's
+alone (`localStorage` key `levonis.communityRecent.v1`, ≤ 10 `{ term, at }`, versioned like
+`recentlyViewed.ts`; emails, phones and one-character terms are never stored).
+
+**No new visibility predicate.** Every section is the SQL its own list already publishes with —
+`POST_PUBLIC_SQL` + `postExclusionSql` (Phase 2's block/mute exclusion for a signed-in viewer),
+`communityDirectoryVisible` + `merchantBlockSql`, `creatorListSql` (the `/creators` rule, hoisted
+out of the handler), `communityProductsVisible` + `merchantBlockSql` (a private product is
+`status = 'hidden'` by 0152's trigger), `requestBoardVisible` plus a `NOT EXISTS user_blocks` both
+ways on the request's customer — so a hidden post, a suspended store, a private product, a draft
+or private request or a closed creator page is absent here because it is absent there. No email,
+phone, bio, cost price or private title ever leaves a suggestion or a card.
+
+**The block on a shop** (review of Phase 3): `merchantBlockSql(v, alias)` in worker/routes/community.ts
+is the one `NOT EXISTS user_blocks` both ways between the viewer and the merchant's account,
+ANDed into GET `/merchants` and GET `/products` themselves (the lists' own SQL, so the tab and the
+overlay agree), and from there into the stores and products sections, the store suggestion lane,
+and `/recommend` for a store or a product — both the anchor lookup (a blocked shop 404s, as a
+blocked author's post does) and the rows. A shop knows no mute. The tag suggestion lane carries
+`postExclusionSql` too, so a tag unique to a blocked author's post is not offered and then found
+to lead to an empty page.
+
+**Bounded, every one.** `q` is trimmed and refused past 60 code points (400
+`SEARCH_QUERY_TOO_LONG`); a section reads at most `limit` rows (1–12, default 5) and its `total`
+is `SELECT COUNT(*) FROM (… LIMIT 200)` — «+200» is the most a badge says; every LIKE goes through
+`likePattern` (byte-bounded, wildcards literal); the catalogue index (`searchProducts`) is used
+only where it is installed and ready, with the catalogue route's LIKE fallback otherwise;
+`rateLimit('community-search', 120, 60)` per account or `CF-Connecting-IP` across all four routes
+(429 `RATE_LIMITED`); an edge-cache hit for a guest is served before the limiter and costs no DB
+beyond `communityGate()`'s one `admin_settings` read (the gate is mounted before every handler and
+is the wall — accepted as is; memoising its verdict per isolate is the lever if `/trending`'s volume
+ever matters). The tag lane of `/suggest` and `/recommend` for a post are windowed (30 and 180 days)
+and pre-filtered before their `json_each` walk, so neither scans the whole published table.
+Deferred: the limiter's D1 upsert is still paid once per `/search` and once per `/suggest` for a
+member's keystroke (a guest's within a minute hits the edge); a cheap in-isolate pre-check in
+worker/lib/ratelimit.ts would halve it and is outside this phase's files.
+
+| Method, path | Who | Notes |
+|---|---|---|
+| GET `/api/community/search?q=&types=&limit=` | anyone | `{ q, sections: { projects, stores, creators, products, requests, materials, brands }, took_ms }` in that order; each section `{ rows, total, more }` (+ `error: true`, `rows: []`, `total: null` when its query threw — logged, the others still land). Rows are the EXISTING cards: `postCard` + `withViewerFlags`, `directoryCard` (+ `following`), the `/creators` card (`creatorCard`), the `/api/community/products` card (`communityFeedProduct`), the `/requests` card, and `{ id, slug, name, name_ar, imageUrl, href }` for catalogue materials (the `cat_materials` subtree via `catalogSubtreeFilter`) and active brands (`href` `/products?brand=<slug>`). `types` is a comma list that narrows (unknown names ignored, none = all); a section that did not run answers `total: null`; an empty `q` runs nothing. `more`: `/community/projects?q=`, `/community?tab=stores&q=`, `/community?tab=creators&q=`, `/community?tab=foryou&list=products&q=`, `/community?tab=requests&q=` (the tab reads `?q=`; the board page keeps its term in local state), `/products?search=…&category=cat_materials`, `/products?search=…`. All seven run in one `Promise.all`. Guest: `public, max-age=60` at the edge (every viewer predicate collapses at `''`, so two guests typing the same word share one answer; `took_ms` is the first guest's); member: `private, no-store` |
+| GET `/api/community/search/suggest?q=` | anyone | `{ suggestions: [{ text, type: project\|store\|creator\|product\|tag, href }] ≤ 8, completion }` — names only: store names, creator name/username of page-only accounts, public post titles, catalogue product names (index or LIKE fallback), tags by prefix over public posts (`json_each`); round-robin across the lanes; `completion` is `suggestCompletion` over the ranked names (the ghost word). The tag lane reads the last 30 days' public posts the viewer may see (`postExclusionSql`). Under 2 characters → `{ suggestions: [], completion: null }`. Hrefs: `/community/store/<merchant id>`, `/u/<username>`, `/community/projects/<id>`, `/product/<slug>`, `/community/projects?tag=<tag>`. Guest: `public, max-age=60` at the edge; member: `private, no-store` |
+| GET `/api/community/trending` | anyone | `{ projects (the /posts/trending SQL, 8), tags (top 12 over 30-day public posts), stores (6; completed `community_orders` in 30 d + `user_follows.created_at` in 30 d, ties by rating), creators (6; likes on public posts in 30 d, then followers; only accounts with a public post or a follower), totals: { merchants } (the guest directory's count, for the home's colophon) }` — viewer-independent by construction: post cards carry `viewer { liked:false, saved:false }`, store cards `following: false`; the client overlays `/me/social` and hides blocked/muted authors itself, as Phase 2's rails do. `public, max-age=300` for everyone |
+| GET `/api/community/recommend?for=post:<id>\|store:<id>\|product:<id>&limit=` | anyone | «قد يعجبك»: `{ for, kind: projects\|stores\|products, rows }`, `limit` 1–12 default 6. Post: shared tags weigh 3, the material 2, the printer 1, over the last 180 days and only candidates that share something (pre-filtered before the card projection), never the anchor, blocked/muted authors excluded; the anchor must be PUBLIC for anyone but its author or staff (an unlisted piece is readable by link but is in no list, and a guest's answer is shared at the edge); store (a `community_merchants` id or a `merchant_stores` id): same governorate or overlapping categories, `accepts_custom_requests` first, never a shop across a block; product: other stores' visible products with the same category or material, never a blocked shop's. 404 `NOT_FOUND` when the anchor is not visible to the viewer (own drafts allowed for the author and staff; across a block, for a post, a store or a product); 400 `RECOMMEND_ANCHOR_INVALID` for a malformed `for`. Guest: `public, max-age=60`; member: `private, no-store`; a 404 is never stored |
+
+**The edge cache** is `caches.default` under a CANONICAL key — the origin, the path and only the
+route's declared parameters, sorted (`q`, `types`, `limit` for `/search`; `q` for `/suggest`;
+`for`, `limit` for `/recommend`; none for `/trending`), as worker/routes/publicApi.ts's
+`canonicalUrl` does, so an unknown or reordered parameter cannot mint a second entry
+(`cacheKeyUrl`) — with the route's own `Cache-Control` re-stamped on a hit so the zone's browser
+TTL cannot inflate it. A signed-in `/search`, `/suggest` or `/recommend` answer carries the
+viewer's block/mute exclusions, so it is `private, no-store` and never reaches the shared cache.
+
+Export-only changes to earlier routers: `POST_SEARCH` from worker/routes/communityPosts.ts;
+`communityFeedProduct` from worker/routes/community.ts; `creatorListSql(q, v)`, `creatorCard(...)`
+and `CREATOR_SEARCH` hoisted out of the `/creators` handler in worker/routes/communitySocial.ts
+(identical SQL and output). One behavioural change to earlier routers: GET `/merchants` and GET
+`/products` now AND `merchantBlockSql` for a signed-in viewer (a guest's lists are unchanged).
+
+Refusal codes (ar/en/ckb in src/lib/refusalStrings.ts): `SEARCH_QUERY_TOO_LONG` (its Sorani is now
+real, D6), `RECOMMEND_ANCHOR_INVALID` (new), `NOT_FOUND`, `RATE_LIMITED`.
+
+**Client** (src/components/community/search/, all strings ar/en/real ckb in `strings.ts`):
+`SearchOverlay.tsx` (lazy) opens from the home's search bar and from `/community/projects` on
+focus/click/typing/↓ — a docked full-height panel under the bar on a phone (sheet spring, modal
+lock, bottom nav hidden), a centred `max-w-2xl` panel from `sm`. The input is a `combobox`
+(`aria-autocomplete="both"`: it lists rows AND draws an inline completion) naming ONE `listbox`
+that owns nothing but `option`s and `group`s: the «ابحث في…» chip and the suggestions in one
+group, each section a group labelled by its plain heading text with «الكل» as its last option,
+the recent terms (each term, its «×» and «مسح السجل» all options, 44 px targets) and the trending
+tags as groups of the empty state; the skeleton, an error, the «no results» copy and an
+`aria-live="polite"` line (the sections' bounded counts, «no results», the grey word, a forgotten
+term) sit beside the list, never inside it. Option ids are positional or server ids, never a typed
+term. ↑/↓ through `aria-activedescendant`, Enter opens or submits, Delete (or Backspace over an
+empty box) on a lit recent term forgets it, Escape closes and returns focus. A card inside an
+option carries no follow pill (`StoreCard canFollow={false}`, `CreatorCard follow={false}`): the
+card's page has it. `/suggest` at 200 ms and `/search` at 300 ms with `AbortController`; the
+results block is one stable node whose rows reconcile by id and whose opacity alone moves
+(CROSS_FADE) while a fresher answer is on its way. The ghost completion is drawn inside the page's
+own bar (`src/components/search/ghost.ts`) and accepted by Tab, the end arrow or Space; the page's
+input carries `dir="auto"` and the overlay leaves it there on close, so Latin text does not jump
+across the field. Sections in the owner's order with the bounded count and «الكل» → `section.more`;
+empty box → recent terms + trending tags; no results → trending chips under the copy; client-side
+block/mute hiding. What the browser remembers is the chosen suggestion's own text or the searched
+term, never the fragment behind a suggestion. THE URL CONTRACT: submit writes `?q=` on the current
+tab at once; while the panel is open the page's own 300 ms `?q=` debounce is suspended (a keystroke
+is the panel's two reads, not a third for a list behind a full-height panel — and «لك» is not
+swapped for the projects search under it) and resumes the moment the panel steps aside.
+`TrendingTags.tsx` («وسوم رائجة» under the cover, laid out from the home composite so it never
+inserts itself later and shifts the first screen; `.lv-choice`'s own focus outline), `RecommendRail.tsx`
+(lazy «قد يعجبك» / «متاجر مشابهة» on the project page and the community store page — on the store
+page handed to `Storefront` as its `footer`, rendered by `StoreRenderer` INSIDE the store's theme
+island so it wears the store's tokens; hidden on error or empty). The home composite
+(`hub/useHomeData.ts`) folds the one 5-minute `/trending` read in: it gives the tag row, the makers
+and stores rails and the colophon's merchant count, and the featured `/creators?featured=1` and
+`/merchants` reads are asked only when trending has nothing to say — so the section set and its
+numbering are decided once, at first paint. `useTrending()` remains for the overlay's empty state.
+Nothing new is imported statically by src/pages/Storefront*.tsx (the store page imports Storefront,
+not the reverse). CSS (D7): paid back before adding — dead animation rules retired and `@source
+not` for docs/, worker/, migrations/, scripts/, studio/, services/ so Tailwind no longer emits
+utilities mentioned only there; the build stands at 59.6 KB gzip of 60, the storefront closure at
+46.3 KB of 47.
+
+Tests: tests/communitySearch.test.ts (15 — every section is its list's own rule; `types` narrows
+and unrun sections say `total: null`; 250 matches count as 200 and a section reads ≤ 12; the
+61-character term; suggestions never carry an email, a phone, a bio-only match or a private title;
+the block both ways and the mute, for the viewer and not for a guest; a blocked MERCHANT gone from
+the stores, the products, the store suggestion, `/recommend` (anchor and rows) and GET
+`/merchants` + `/products` themselves, both ways, present for a guest; a blocked or muted author's
+tag not suggested and the tag lane windowed; trending from public posts, orders + follows and
+30-day likes plus the directory count, `max-age=300` for guest and member alike; the three
+recommend rankings, never the anchor, 404 for hidden/draft/private/unlisted/missing/blocked
+anchors (the author may anchor their own), the 180-day window, 400 for a malformed `for`; the
+zone-cache stub — a guest's suggest, search and recommend miss→store→HIT re-stamped `max-age=60`,
+a member never stored; the canonical key — five unknown parameters on `/trending` mint one entry
+and reordered parameters share one; the 121st request → 429 per address; Arabic and Latin both
+match, diacritics folded through the index), tests/communitySearchUi.test.ts (11 — lazy chunks,
+storefront isolation, the store page's rail inside the theme island, the combobox and its
+keyboard, the listbox owning options and groups only, option ids free of user text, the live
+region, no follow control in the panel, the URL debounce suspended under the open panel,
+`dir="auto"`, one stable results node, 44 px targets, the trending chips' focus outline, no
+`<button>` in `<a>`, tokens only, ar/en/ckb parity with real Sorani, bounded counts, `recent.ts`
+stores a term and a time and refuses PII, the CSS payback), tests/refusalStrings.test.ts (the new
+codes); scripts/e2e-community-home.mjs (focus opens the overlay, recent + trending in the empty
+state with the listbox owning options and groups only, Delete forgets a lit term, Escape keeps
+focus, suggestions then the sections in order as labelled groups with 44 px «الكل», no follow
+pill, the live region filled, the URL and the issue holding still under the open panel, the
+results node surviving a keystroke, the `?q=` contract resuming on close, a click reopening on the
+same term, ↓↓ + Enter navigates — 750 checks over ar/en/ckb × dark/cream × 360/1280, no page
+errors, no horizontal overflow with the overlay open) and scripts/e2e-projects.mjs (247).
+
 ## 5. Client (Phase 1, landed)
 
 - `/community/projects` — the list with kind chips, a tag chip and server search (pages/community/Projects.tsx; `ProjectsGrid` is reused by the home's «المشاريع» tab in Phase 2).
@@ -267,7 +401,7 @@ scripts/e2e-community-home.mjs in the browser.
 
 1. **Projects + creator profiles** — landed (this document, §3–5). Tests: tests/communityPosts.test.ts (11).
 2. **Social graph + Feed V3** — landed (§4b, docs/COMMUNITY_HOME_PLAN.md). 0154 tables and counter triggers, 0155 (comment `client_id` replay key, creators index); like/save/comment/follow-creator/block/mute/report endpoints with rate limits and idempotency; grouped notifications (`ON CONFLICT` upsert on a grouping key + count); the community home rebuilt to the «العدد» plan (masthead, quick actions, six tabs, cover story, numbered sections, rails, the feed, tools, colophon; springs from `useMotion()`, skeletons at exact heights, `bg-canvas` tokens, ≤ 1 new CSS rule).
-3. **Unified search + discovery** — one `/api/community/search` over products, stores, creators, projects, requests, materials, brands (LIKE + the catalogue index where it exists), autocomplete from names, «trending» from counters, no query log.
+3. **Unified search + discovery** — landed (§4c, §9.3). One `/api/community/search` over projects, stores, creators, products, requests, materials, brands (LIKE + the catalogue index where it exists, every section its own list's SQL, bounded rows and counts), `/search/suggest` from names only, `/trending` from counters that exist, `/recommend` beside a post, a store or a product; no new table, no query log; the lazy search overlay, «وسوم رائجة» and the «قد يعجبك» rails on the client; the CSS budget paid back before it was spent. Tests: tests/communitySearch.test.ts (12), tests/communitySearchUi.test.ts (10).
 4. **3D asset platform + files (§27–35)** — upload sessions (multipart/resumable) with checksum, admin-configurable limits, structure sniffing with zip-bomb bounds, file roles on products / requests / chat, link cards with URL validation, the shared viewer with temporary tokens, grouped file notifications, per-file authorization tests.
 5. **Workshop profiles + matching + offers V2 + the request page (§21–26, 36)** — structured workshop profile in the store settings feeding `loadCandidates`; offers gain delivery fee, attachments, validity, `draft`/`revised` semantics and re-acceptance; request discussion; execution timeline with `ready` and progress photos; the consolidated request page in the owner's order; merchant cancel/dispute.
 6. **Moderation V2 + Reputation V2 + dispute access** — reports on every target, post hide route + UI, user suspend/ban with enforcement, appeals, audit viewer; explainable badges computed from measured response time and completion rate; staff read of `store`/`request` threads only while a linked order is disputed, audited.
@@ -284,8 +418,8 @@ scripts/e2e-community-home.mjs in the browser.
 | private file access | Phase 4: per-file authorization, never a key in a response |
 | creator block rules | Phase 2: a blocked user cannot DM, follow, comment or see the page |
 | moderation bypass | Phase 6: hidden post is 404 to all but author/staff on every read path (feed, trending, search, creator grid) |
-| hidden project in search | Phase 3 |
-| banned store in recommendations | Phase 3/6 |
+| hidden project in search | tests/communitySearch.test.ts: the hidden, draft and private posts are in no section and no suggestion, out of the trending tags and projects, never a recommendation and no anchor for one — 404 `NOT_FOUND` (done) |
+| banned store in recommendations | tests/communitySearch.test.ts: a suspended store is out of every section and of `/recommend` — `communityDirectoryVisible` is the only rule (done); the ban itself and its enforcement are Phase 6 |
 | forged linked product | tests/communityPosts.test.ts (done) |
 | file ownership spoof | tests/communityPosts.test.ts media keys (done); Phase 4 for 3D files |
 | staff dispute access audit | Phase 6 |
@@ -558,7 +692,13 @@ update; `ready` does not move state nor money; `modification_request` after
 delivered is refused; the timeline never carries a file key; cancel/dispute
 follow `cancellationPolicy` for the merchant too.
 
-### 9.3 Phase 3 — Unified search and discovery
+### 9.3 Phase 3 — Unified search and discovery — LANDED (§4c)
+
+**Landed.** The routes, caching and tests as built are in §4c; the client in §4c «Client». The
+specification below is kept as written; where it named `creatorVisible`, the shipped rule is
+`creatorListSql` (the `/creators` handler's own SQL, hoisted); `sort=trending` on the rails became
+the rails reading `/trending`'s rows directly; `/recommend` for a product matches by category or
+material (no `catalogPresentation` shelves were needed).
 
 **Kept as is:** the catalogue token index (`searchProducts`, synonyms, ghost
 completion — products only), `likePattern`/`sqlLikeClause`, the community

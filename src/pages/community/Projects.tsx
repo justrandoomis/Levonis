@@ -7,7 +7,7 @@
  * The community home's «المشاريع» tab mounts the same grid (Phase 2); this
  * page is the address a tag or a «الكل» link resolves to.
  */
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Plus, Search, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
@@ -18,6 +18,10 @@ import LoadMore from '../../components/listing/LoadMore';
 import ProjectCard, { ProjectCardSkeleton } from '../../components/community/projects/ProjectCard';
 import { POST_KINDS, projectsApi, type PostCard, type PostFilters, type PostKind } from '../../components/community/projects/api';
 import { useProjectStrings } from '../../components/community/projects/strings';
+import { useSearchBox } from '../../components/community/search/useSearchBox';
+
+/** The community's cross-entity search under the bar (Phase 3) — fetched the first time the box is focused. */
+const SearchOverlay = React.lazy(() => import('../../components/community/search/SearchOverlay'));
 
 export default function ProjectsPage() {
   const goBack = useGoBack('/community');
@@ -30,14 +34,19 @@ export default function ProjectsPage() {
   const tag = (params.get('tag') ?? '').trim().slice(0, 30);
   const q = (params.get('q') ?? '').trim().slice(0, 60);
   const [draft, setDraft] = useState(q);
+  // The overlay is the cross-entity view; Enter writes the term here, on this
+  // list. While it is open the URL debounce waits (src/pages/Community.tsx
+  // says why) and resumes when it steps aside.
+  const box = useSearchBox(params, setParams);
 
   useEffect(() => setDraft(q), [q]);
   useEffect(() => {
+    if (box.open) return;
     const next = draft.trim().slice(0, 60);
     if (next === q) return;
     const t = window.setTimeout(() => setParam('q', next), 300);
     return () => window.clearTimeout(t);
-  }, [draft]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [draft, box.open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setParam = (k: string, v: string) =>
     setParams(
@@ -49,6 +58,13 @@ export default function ProjectsPage() {
       },
       { replace: k === 'q' }
     );
+
+  const submitSearch = (term: string) => {
+    const next = term.trim().slice(0, 60);
+    setDraft(next);
+    setParam('q', next);
+    box.close();
+  };
 
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
   const newLink = isAuthenticated ? { to: '/community/projects/new' } : { to: '/auth', state: { from: '/community/projects/new' } };
@@ -65,7 +81,15 @@ export default function ProjectsPage() {
           >
             <Back className="h-5 w-5" />
           </button>
-          <form role="search" onSubmit={(e) => e.preventDefault()} className="relative min-w-0 flex-1 lg:max-w-2xl">
+          <form
+            ref={box.barRef}
+            role="search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitSearch(draft);
+            }}
+            className="relative min-w-0 flex-1 lg:max-w-2xl"
+          >
             <label htmlFor="projects-search" className="sr-only">
               {loc('ابحث في المشاريع', 'Search projects', 'لە پڕۆژەکان بگەڕێ')}
             </label>
@@ -75,11 +99,14 @@ export default function ProjectsPage() {
               type="search"
               enterKeyHint="search"
               autoComplete="off"
+              dir="auto"
               value={draft}
               maxLength={60}
               onChange={(e) => setDraft(e.target.value)}
               placeholder={loc('ابحث في المشاريع', 'Search projects', 'لە پڕۆژەکان بگەڕێ')}
+              data-projects-search
               className="lv-input w-full rounded-full ps-10 pe-10 [&::-webkit-search-cancel-button]:appearance-none"
+              {...box.inputProps}
             />
             {draft && (
               <button
@@ -101,6 +128,12 @@ export default function ProjectsPage() {
           </Link>
         </div>
       </div>
+
+      {box.ever && (
+        <Suspense fallback={null}>
+          <SearchOverlay open={box.open} value={draft} onChange={setDraft} onSubmit={submitSearch} onClose={box.close} inputRef={box.inputRef} barRef={box.barRef} scopeLabel={s.projects} />
+        </Suspense>
+      )}
 
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pt-4">
         <header className="flex items-end justify-between gap-3">

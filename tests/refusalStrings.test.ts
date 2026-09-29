@@ -141,6 +141,9 @@ test('every code the table translates is one the server can actually emit', () =
     // The social graph (Phase 2): likes, comments, follows, blocks, reports —
     // BLOCKED, CANNOT_FOLLOW_SELF, COMMENT_TOO_FAST and their siblings.
     'worker/routes/communitySocial.ts',
+    // Unified search and discovery (Phase 3): the term's length, the
+    // recommendation anchor.
+    'worker/routes/communitySearch.ts',
     // The community-store checkout and the merchant's order door (wave 1):
     // QUOTE_CHANGED, COUPON_EXHAUSTED, ORDER_CHANGED and their siblings.
     'worker/routes/storeOrders.ts',

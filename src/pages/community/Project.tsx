@@ -10,7 +10,7 @@
  * from `viewer.can`, and the consent card only when `viewer.consent` says the
  * viewer is the customer being asked.
  */
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, Archive, ChevronLeft, ChevronRight, EyeOff, Printer, ShoppingBag, Store } from 'lucide-react';
@@ -33,6 +33,9 @@ import { creatorHref, projectsApi, type Post } from '../../components/community/
 import { useProjectStrings } from '../../components/community/projects/strings';
 import ActionRow from '../../components/community/social/ActionRow';
 import FollowUserButton from '../../components/community/social/FollowUserButton';
+
+/** «قد يعجبك» — other pieces on the same material, printer or tags (Phase 3), a lazy rail below the doors. */
+const RecommendRail = React.lazy(() => import('../../components/community/search/RecommendRail'));
 
 export default function ProjectPage() {
   const { id = '' } = useParams();
@@ -257,6 +260,12 @@ export default function ProjectPage() {
               </div>
               <aside className="hidden lg:grid lg:gap-5">{facts}</aside>
             </div>
+
+            {post.state === 'published' && (
+              <Suspense fallback={null}>
+                <RecommendRail anchor={`post:${post.id}`} kind="projects" />
+              </Suspense>
+            )}
           </motion.article>
         )}
       </div>

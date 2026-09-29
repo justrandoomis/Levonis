@@ -56,9 +56,12 @@ import { TAB_IDS, canonicalParams, resolveTab, type CommunityTab } from '../comp
 import { useCommunityFeed, type CommunityFeed } from '../components/community/hub/useCommunityFeed';
 import { forgetHome } from '../components/community/hub/useHomeData';
 import { communityHubApi, type CommunityProduct, type CommunityRequest, type CommunityStore } from '../components/community/hub/api';
+import { useSearchBox } from '../components/community/search/useSearchBox';
 
 const ProjectsPanel = React.lazy(() => import('../components/community/hub/ProjectsPanel'));
 const CreatorsPanel = React.lazy(() => import('../components/community/hub/CreatorsPanel'));
+/** The cross-entity search under the bar (Phase 3) — fetched the first time the box is focused. */
+const SearchOverlay = React.lazy(() => import('../components/community/search/SearchOverlay'));
 
 /** The wizard, on the requests page. */
 const NEW_REQUEST_PATH = '/requests?view=new';
@@ -93,7 +96,16 @@ export default function Community() {
    * search — follows 300 ms after the last key. A term that arrives from the
    * URL (Back, a shared link) is written into the box, but never over what the
    * person is in the middle of typing.
+   *
+   * WHILE THE OVERLAY IS OPEN THE URL WAITS. The overlay already asks the
+   * server twice per settled keystroke (suggestions and the sections); the
+   * tab's own list behind a full-height panel would be a third read nobody
+   * sees — and on «لك» it would swap the issue for the projects search under
+   * the panel. So the debounce is suspended while the panel is open and
+   * resumes the moment it steps aside (Escape, a tap outside): the box and
+   * the URL then agree again within 300 ms; Enter writes it at once.
    */
+  const box = useSearchBox(params, setParams);
   const [draft, setDraft] = useState(q);
   const pushed = useRef(q);
   useEffect(() => {
@@ -103,6 +115,7 @@ export default function Community() {
     }
   }, [q]);
   useEffect(() => {
+    if (box.open) return;
     const next = draft.trim().slice(0, 60);
     if (next === q) return;
     const timer = window.setTimeout(() => {
@@ -118,7 +131,29 @@ export default function Community() {
       );
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [draft, q, setParams]);
+  }, [draft, q, setParams, box.open]);
+
+  /**
+   * THE OVERLAY IS THE CROSS-ENTITY VIEW; THE TAB IS THE DEEP LIST. The box
+   * opens the overlay on focus (search/useSearchBox.ts); Enter — or a row of
+   * the overlay that says «ابحث في…» — writes the term to the URL at once, on
+   * the current tab, and the overlay steps aside so the tab's list answers.
+   */
+  const submitSearch = (term: string) => {
+    const next = term.trim().slice(0, 60);
+    setDraft(next);
+    pushed.current = next;
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next) p.set('q', next);
+        else p.delete('q');
+        return p;
+      },
+      { replace: true }
+    );
+    box.close();
+  };
 
   const clearSearch = () => {
     setDraft('');
@@ -214,7 +249,15 @@ export default function Community() {
           >
             {dir === 'rtl' ? <ArrowRight className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}
           </button>
-          <form role="search" onSubmit={(e) => e.preventDefault()} className="relative min-w-0 flex-1 lg:max-w-2xl">
+          <form
+            ref={box.barRef}
+            role="search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitSearch(draft);
+            }}
+            className="relative min-w-0 flex-1 lg:max-w-2xl"
+          >
             <label htmlFor="community-search" className="sr-only">
               {placeholder}
             </label>
@@ -224,12 +267,15 @@ export default function Community() {
               type="search"
               enterKeyHint="search"
               autoComplete="off"
+              // Latin runs left to right in an Arabic page, and stays put when the overlay closes.
+              dir="auto"
               value={draft}
               maxLength={60}
               onChange={(e) => setDraft(e.target.value)}
               placeholder={placeholder}
               data-community-search
               className="lv-input w-full rounded-full ps-10 pe-10 [&::-webkit-search-cancel-button]:appearance-none"
+              {...box.inputProps}
             />
             {draft && (
               <button
@@ -244,6 +290,21 @@ export default function Community() {
           </form>
         </div>
       </div>
+
+      {box.ever && (
+        <Suspense fallback={null}>
+          <SearchOverlay
+            open={box.open}
+            value={draft}
+            onChange={setDraft}
+            onSubmit={submitSearch}
+            onClose={box.close}
+            inputRef={box.inputRef}
+            barRef={box.barRef}
+            scopeLabel={list === 'products' ? s.communityProducts : s.tabs[tab]}
+          />
+        </Suspense>
+      )}
 
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-5">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between sm:gap-6">

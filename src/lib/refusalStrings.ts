@@ -825,10 +825,20 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Type at least 2 characters to search.',
     ckb: 'اكتب حرفين على الأقل للبحث.',
   },
+  // Shared by the workspace searches and the community's unified search
+  // (worker/routes/communitySearch.ts, docs/COMMUNITY_ECOSYSTEM.md §9.3 — a
+  // community string carries real Sorani, D6).
   SEARCH_QUERY_TOO_LONG: {
     ar: 'نص البحث طويل جدًا — 60 حرفًا على الأكثر.',
     en: 'The search is too long — at most 60 characters.',
-    ckb: 'نص البحث طويل جدًا — 60 حرفًا على الأكثر.',
+    ckb: 'دەقی گەڕان زۆر درێژە — زۆرترین 60 پیت.',
+  },
+  // «قد يعجبك» asked for something that is not post:<id>, store:<id> or
+  // product:<id> (the community search, §9.3).
+  RECOMMEND_ANCHOR_INVALID: {
+    ar: 'تعذّر اقتراح ما يشبه هذا العنصر.',
+    en: 'Nothing to recommend from: that item reference is not valid.',
+    ckb: 'نەتوانرا شتی هاوشێوەی ئەم بابەتە پێشنیار بکرێت.',
   },
   // Review W2-5 (admin payout queue): approve / paid refused while a claw-back
   // left the merchant owing the platform. Admin-facing; the ckb column carries

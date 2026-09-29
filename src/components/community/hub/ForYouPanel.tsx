@@ -10,6 +10,11 @@
  * The feed is a lazy chunk (feed/FeedList.tsx), mounted when its section
  * comes within 400 px of the screen, so the first paint carries the issue
  * and not the river.
+ *
+ * ONE LAYOUT, DECIDED ONCE. Everything above the feed — the cover, the
+ * «وسوم رائجة» row, which sections exist and their numbers — is decided from
+ * the one composite (useHomeData.ts, trending folded in), so nothing arrives
+ * later to push the first screen down or renumber a section after paint.
  */
 import React, { Suspense, useRef } from 'react';
 import { Link } from 'react-router-dom';
@@ -27,6 +32,7 @@ import { CreatorRailSkeleton, PostSkeleton, ProjectRailSkeleton, Rail, Reveal, S
 import { CreatorsRail, StoresRail } from './rails';
 import { colophon, hubLang, useHubStrings } from './strings';
 import { useHomeData, type HomeData } from './useHomeData';
+import TrendingTags from '../search/TrendingTags';
 
 const FeedList = React.lazy(() => import('../feed/FeedList'));
 
@@ -51,6 +57,11 @@ export default function ForYouPanel({
   if (!data) return <IssueSkeleton />;
 
   const cover = pickCover(data.trending, data.works);
+  // The makers and stores rails are trending's rows when it has them (ranked
+  // by the last 30 days' likes, orders and follows), else the featured reads
+  // — chosen inside the composite, so the section set is fixed at first paint.
+  const creators = data.creators;
+  const merchants = data.merchants;
   const sections = visibleSections(data);
   const number = (key: string) => sections.indexOf(key) + 1;
   const totals = data.totals;
@@ -58,6 +69,7 @@ export default function ForYouPanel({
   return (
     <div data-community-panel="foryou" className="flex flex-col gap-8">
       <CoverStory cover={cover} />
+      <TrendingTags tags={data.tags} />
 
       {sections.includes('trending') && (
         <Reveal labelledBy="community-s-trending" data-community-section="trending">
@@ -84,14 +96,14 @@ export default function ForYouPanel({
       {sections.includes('creators') && (
         <Reveal labelledBy="community-s-creators" data-community-section="creators">
           <SectionHead index={number('creators')} id="community-s-creators" title={s.featuredCreators} to="/community?tab=creators" />
-          <CreatorsRail creators={data.creators!} />
+          <CreatorsRail creators={creators!} />
         </Reveal>
       )}
 
       {sections.includes('stores') && (
         <Reveal labelledBy="community-s-stores" data-community-section="stores">
           <SectionHead index={number('stores')} id="community-s-stores" title={s.featuredStores} to="/community?tab=stores" />
-          <StoresRail stores={data.merchants!} works={data.works} />
+          <StoresRail stores={merchants!} works={data.works} />
         </Reveal>
       )}
 

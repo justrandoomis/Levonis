@@ -6,6 +6,8 @@
  * `rail`: the home's 132 px tile — picture, name, one count, the pill.
  * `row`: the makers' directory — StoreCard's rhythm: picture, name and
  * badges, one line of bio, the counts, the pill on the far side.
+ * `follow={false}`: no pill — the search overlay's option rows, where a
+ * control inside an option would lose its role; the maker's page has it.
  */
 import { Link } from 'react-router-dom';
 import { BadgeCheck } from 'lucide-react';
@@ -18,7 +20,7 @@ import { followersLabel, socialLang } from '../social/strings';
 import { Avatar, HubLink } from './parts';
 import { projectsLabel, hubLang, useHubStrings } from './strings';
 
-export default function CreatorCard({ creator: c, variant = 'row' }: { creator: CreatorCardData; variant?: 'row' | 'rail' }) {
+export default function CreatorCard({ creator: c, variant = 'row', follow = true }: { creator: CreatorCardData; variant?: 'row' | 'rail'; follow?: boolean }) {
   const { lang } = useLanguage();
   const s = useHubStrings();
   const href = creatorHref(c.username);
@@ -46,7 +48,7 @@ export default function CreatorCard({ creator: c, variant = 'row' }: { creator: 
         <p className="text-[11px] tabular-nums text-text-muted">
           {c.stats.projects > 0 ? projectsLabel(c.stats.projects, hubLang(lang)) : c.stats.followers > 0 ? followersLabel(c.stats.followers, socialLang(lang)) : ' '}
         </p>
-        <FollowUserButton userId={c.id} following={c.viewer.following} followers={c.stats.followers} size="sm" />
+        {follow && <FollowUserButton userId={c.id} following={c.viewer.following} followers={c.stats.followers} size="sm" />}
       </article>
     );
   }
@@ -79,7 +81,7 @@ export default function CreatorCard({ creator: c, variant = 'row' }: { creator: 
           )}
         </p>
       </div>
-      <FollowUserButton userId={c.id} following={c.viewer.following} followers={c.stats.followers} size="sm" className="shrink-0" />
+      {follow && <FollowUserButton userId={c.id} following={c.viewer.following} followers={c.stats.followers} size="sm" className="shrink-0" />}
     </article>
   );
 }

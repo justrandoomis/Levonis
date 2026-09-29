@@ -96,7 +96,8 @@ function useLive(): LiveState {
 export default function Storefront({
   store: injected,
   profileProducts,
-}: { store?: StorefrontStore | null; profileProducts?: MerchantProduct[] } = {}) {
+  footer,
+}: { store?: StorefrontStore | null; profileProducts?: MerchantProduct[]; footer?: ReactNode } = {}) {
   const { slug: routeSlug } = useParams<{ slug: string }>();
   const location = useLocation();
   const { loc } = useLanguage();
@@ -383,7 +384,7 @@ export default function Storefront({
         <SavedIdsProvider value={savedIds}>
           {/* Keyed on what the address asks for, so following a link to a tab
               or a collection starts the page there. */}
-          <StoreRenderer key={`${initialTab ?? ''}|${section}`} store={store} className="min-h-screen pb-24" />
+          <StoreRenderer key={`${initialTab ?? ''}|${section}`} store={store} className="min-h-screen pb-24" footer={footer} />
         </SavedIdsProvider>
       </StorefrontRuntimeProvider>
     </LiveContext.Provider>
