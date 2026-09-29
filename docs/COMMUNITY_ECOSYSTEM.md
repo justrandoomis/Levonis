@@ -239,6 +239,154 @@ Written before each phase's workflow so the builders code against one text.
 Each spec names the tables (additive), the routes with their guards and
 refusal codes, the client surfaces, and the tests that prove it.
 
+### 9.4 Phase 4 — The 3D asset platform and files (§27–35)
+
+**Measured substrate** (survey 2026-09-29): `POST /api/uploads` reads the
+whole body (`formData()` → `arrayBuffer()`), images 8 MiB / video 40 MiB /
+chat documents 10 MiB, purposes receipt|avatar|chat|product|community|support|
+complaint|post, `file_objects` ledger without a checksum column, response
+carries the key; request files go through `POST /api/marketplace/requests/:id/files`
+(owner only, 6 per request, `classifyAttachment`, key hand-built as
+`requests/<uid>/<id>.<ext>`, private, `fileReader` access levels
+download|view|preview|none, every read logged in `request_file_reads`);
+`classifyAttachment` recognises JPEG/PNG/GIF/WebP/PDF/3MF/AMF/GLB/binary+ASCII
+STL/OBJ/STEP/glTF; `parse3mf`/`parseAmf` call `unzipSync` unfiltered (the
+zip-bomb hole; the bounded filter to copy is worker/routes/template.ts:3455);
+the viewer: `model_view_tokens` (hash, 60 min, grant preview|full,
+`bound_user`), `viewerMesh` → LVM1 ≤ 250k triangles, `GET /viewer/:token`
++ `/mesh`, `src/pages/ModelViewer.tsx` (ogl); chat files under
+`chat/<chatId>/` served by participant check; product media
+`community_product_media` (image|video, ≤12, 2 videos) with no downloadable
+files; no multipart anywhere; limits are constants; `GET /files/*` supports
+Range/206 and serves public keys through the edge cache.
+
+**Migration 0158 (additive)**
+
+```
+upload_sessions        id, owner_id → users, purpose, entity_id, file_name, declared_bytes, declared_mime,
+                       sha256 (hex, client-declared, verified on complete), chunk_bytes, r2_upload_id,
+                       object_key (final), parts_json ('[]': [{n, etag, bytes}]),
+                       state CHECK (open|completed|aborted|expired), expires_at, created_at, updated_at
+file_objects           + sha256 TEXT, + purpose TEXT NOT NULL DEFAULT ''
+product_files          id, product_id → community_products CASCADE, store_id → merchant_stores, file_key (private
+                       prefix merchants/<uid>/product-files/…), role CHECK (preview|download_after_purchase|
+                       reference|instruction|source_model), name, bytes, mime, kind (model|document|image|archive),
+                       analysis JSON, preview_key, position, created_at
+product_file_grants    id, product_file_id → product_files CASCADE, user_id → users, order_id (store order) NULL,
+                       community_order_id NULL, granted_at, expires_at NULL, downloads INTEGER 0
+                       UNIQUE (product_file_id, user_id)
+link_cards             id, url, host, title, description, image_key NULL, kind CHECK (model_page|video|article|
+                       unknown), fetched_at, status CHECK (ok|blocked|failed), created_at   -- one row per URL, reused
+chat_messages          card_type gains 'link' and 'file' (0150's CHECK is a comment-only list? — verify; if a CHECK
+                       exists, rebuild is NOT allowed: store link/file cards as card_type 'link'|'file' only if the
+                       CHECK admits them, else as kind 'text' with card_snapshot and card_type '' — decide in code review)
+admin_settings         keys uploadLimits: { image_mb, video_mb, model_mb, archive_mb, document_mb, chunk_mb,
+                       session_hours } with SETTING_DEFAULTS (image 25, video 100, model 300, archive 500, document
+                       25, chunk 8, session 24), editable by PATCH /api/admin/community/settings (financial scope
+                       not required — a new admin.upload_limits audit)
+```
+
+**Upload sessions (multipart, resumable)** — `worker/routes/uploadSessions.ts`,
+mounted at `/api/uploads/sessions`, `requireAuth`, rate `upload-session` 30/h:
+
+| Method, path | Behaviour |
+|---|---|
+| POST `/` `{purpose, entity_id?, file_name, bytes, mime, sha256}` | validates purpose ⊂ {post, community, chat, request, product_file, offer, order_update}, the entity (same checks `POST /api/uploads` runs: thread participant, request owner, store owner…), the declared size against the purpose's limit from `uploadLimits`, and the extension against `EXTENSION`; creates the R2 multipart upload (`bucket.createMultipartUpload(key)`) under the purpose's prefix via `buildMediaKey`; returns `{ session_id, chunk_bytes, expires_at }` |
+| PUT `/:id/parts/:n` (raw body) | owner only; `n` 1-based; body ≤ chunk_bytes (+ the last part smaller); `resumeMultipartUpload(key, uploadId).uploadPart(n, body)`; records `{n, etag, bytes}`; idempotent per n (a re-sent part replaces); answers `{ received: [n…], bytes_so_far }` |
+| GET `/:id` | the resume point: `{ state, received parts, bytes_so_far, expires_at }` |
+| POST `/:id/complete` | verifies every part present and `SUM(bytes) = declared_bytes`; `complete(parts)`; then reads the first 64 KiB and the last 64 KiB for sniffing (`classifyAttachment` / `sniffVideo` on the head) and streams the object through `crypto.subtle.digest('SHA-256')` in 1 MiB slices to verify the declared `sha256` (on mismatch: delete the object, `CHECKSUM_MISMATCH`); for zip-based formats (3MF/AMF/ZIP) opens the central directory and refuses when entries > 2 000 or the declared uncompressed total > 8× the compressed size or > the model limit (`ARCHIVE_TOO_DEEP`) — the same bound goes into `parse3mf`/`parseAmf` via an `unzipSync` filter; writes `file_objects` (+sha256, purpose) and answers `{ key?, url, mime, bytes, sha256, analysis? }` — the key only for purposes whose consumers send it back (post, community, product_file, offer, order_update), never for chat/request (they answer with the message/file row) |
+| DELETE `/:id` | abort (`abortMultipartUpload`) |
+
+Sessions expire after `session_hours` (cron sweeps `open` sessions past
+`expires_at`: abort + delete). `POST /api/uploads` stays for small files and
+gains the same configurable limits and sniffing; the client picks the session
+path above 8 MiB or when the file is a model/archive.
+
+**Client** — `src/lib/uploadSession.ts`: `uploadLarge(file, purpose, {entityId, onProgress, signal})`
+→ SHA-256 in a Web Worker (`crypto.subtle` over slices), session create,
+parts in sequence (2 in flight), progress events, `AbortSignal` cancel,
+exponential retry per part (3×), resume from `GET /:id` after a reload
+(session id kept in `sessionStorage` per file fingerprint); a shared
+`UploadTile` (progress ring, «إلغاء», «إعادة المحاولة», bytes/total, the
+checksum step named) used by the request wizard, the project composer, the
+offer composer, the chat attachment picker and the product-files editor;
+mobile: `<input capture>` for photos, the picker accepts multiple, big files
+warn on cellular with the size.
+
+**Files on products** — merchant editor (`ProductFilesEditor` in the catalogue
+form): add/remove/reorder, role per file, name; `POST/PATCH/DELETE
+/api/merchant/products/:id/files` (store owner; a `product_file` upload's key
+must sit under the owner's prefix and in `file_objects`); the storefront
+product page lists files by role: `preview` (a viewer token minted through a
+new `POST /api/storefront/:slug/products/:id/files/:fid/viewer-token`, grant
+preview, 60 min, bound to the viewer or the anonymous session hash),
+`reference`/`instruction` (open to read after purchase only when the merchant
+says so — flag `public_before_purchase` on the row? NO: keep roles strict:
+reference/instruction are visible to everyone as names, downloadable after
+purchase), `download_after_purchase`/`source_model` (only through
+`product_file_grants`: granted in the store-order paid/delivered transition
+and the community order funded transition, one grant per buyer per file,
+download counted, `GET /api/storefront/:slug/products/:id/files/:fid/download`
+streams with `Content-Disposition: attachment` after the grant check — never
+a public key, never `/files/<key>`; every download logged).
+
+**Link cards** — `POST /api/chats/:id/cards/link {url}` and the same for
+request comments and post bodies: `validateOutboundUrl` (http/https only,
+no javascript:/data:/file:, private ranges blocked, ≤ 2 KB), host allow-list
+for previews (printables.com, thingiverse.com, makerworld.com, cults3d.com,
+youtube.com/youtu.be, instagram.com, tiktok.com, github.com — everything
+else gets a bare card with the host only), a fetch with a 5 s budget,
+2 MiB cap, `text/html` only, OG title/description/image parsed from the
+first 256 KiB, image re-hosted through the IMAGES binding into a public
+`link-cards/` key (never hot-linked), one `link_cards` row per URL reused for
+24 h; the card renders title/host/image with `rel="noopener noreferrer
+nofollow"` and opens in a new tab; the model-page kind offers «اطلب
+طباعته» which pre-fills the wizard's link source.
+
+**The shared viewer** — `src/pages/ModelViewer.tsx` becomes the one viewer for
+request files, product previews and post attachments through the token
+routes; the mint endpoint per source (request: exists; product: above; post:
+`POST /api/community/posts/:id/files/:fid/viewer-token`, public posts →
+anonymous grant `preview`, bound to a session hash instead of a user); the
+LVM mesh stays the only bytes a viewer receives; tokens revoked when the
+source closes/hides (existing `revokeViewerTokensStatement` pattern with a
+`source_type` column added to `model_view_tokens` in 0158 — nullable, default
+'request').
+
+**Post attachments** — `community_post_files` (0158): id, post_id, file_key
+(private `users/<uid>/post-files/…`), kind (model|document), name, bytes,
+analysis, preview_key; the composer adds «ملف المجسم (اختياري)»; the project
+page lists files as rows (name, size, «عرض ثلاثي الأبعاد» via token; the
+download of the original only when the author ticks `downloadable` and the
+viewer is signed in — logged).
+
+**Grouped file notifications** — the Phase 2 `notifyGrouped` with keys
+`files_added:<threadId>` («أرسل أحمد 4 ملفات») and `request_files:<requestId>`
+for the merchants on a request's matches.
+
+**Protections** — bytes sniffed (head) + structure checked (zip central
+directory bound, STL count arithmetic, glTF JSON parse with a 4 MiB cap,
+STEP header) before any byte is stored permanently; forged MIME ignored
+(`declared_mime` is a hint); path traversal impossible (`buildMediaKey`
+segments only, extension from the sniff); per-owner quotas by purpose
+(`uploadQuotas` setting: post 2 GiB, product_file 5 GiB, request 1 GiB,
+counted from `file_objects`); `X-Content-Type-Options: nosniff` and the
+sandbox CSP on every `/files` and download response (exist); a preview
+image is generated for models by the existing analyse path (`preview_key`)
+and served with `Cache-Control: private` for private sources.
+
+**Tests** (`tests/uploadSessions.test.ts`, `tests/productFiles.test.ts`,
+`tests/linkCards.test.ts`): a session by another user is 404 at every step;
+parts over the chunk size refused; complete with a missing part refused;
+checksum mismatch deletes the object; a zip with 5 000 entries or a 100×
+ratio is refused before storage; a forged `.stl` that is a PNG is classified
+by bytes; the product download without a grant is 404 for a stranger and 403
+for a signed-in non-buyer, 200 with `attachment` for the buyer, and never
+returns a key; the viewer token for a hidden post is revoked; link cards
+refuse `javascript:`, `file:`, `data:`, `http://10.0.0.1/` and never fetch
+without the allow-list; the admin limit change is audited and applied on the
+next session; quotas count only live objects.
+
 ### 9.5 Phase 5 — Workshop profiles, matching, offers V2, the request page (§21–26, 36)
 
 **What exists and is kept as is** (survey §1.5): the eligibility engine
