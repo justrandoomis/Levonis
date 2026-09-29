@@ -18,13 +18,20 @@ import ChatAttachment, {
 } from '../components/chat/ChatAttachment';
 import {
   ArrowLeft, ArrowRight, Mic, Smile, Plus, X, FileText,
-  Image as ImageIcon, Camera, Store as StoreIcon, Gift, MapPin, UserCircle, Wallet, Send, MessageSquare, ShoppingBag
+  Image as ImageIcon, Camera, Store as StoreIcon, Gift, MapPin, UserCircle, Wallet, Send, MessageSquare, ShoppingBag,
+  Printer, Calculator, Sparkles, Receipt
 } from 'lucide-react';
 import ChatCardView, { SystemEventCard } from '../components/chat/cards/ChatCardView';
+import { ChatCardActionsContext, type ChatCardActions, type CustomProductPrefill, type QuotePrefill } from '../components/chat/cards/cardContext';
 import { newClientId, type ChatCard, type ChatThreadInfo } from '../lib/chatCards';
 import { toast } from '../lib/toastStore';
 
+// The commerce sheets load when first opened — a plain conversation never pays for them.
 const ProductPickerSheet = React.lazy(() => import('../components/chat/ProductPickerSheet'));
+const QuoteSheet = React.lazy(() => import('../components/chat/commerce/QuoteSheet'));
+const PrintRequestSheet = React.lazy(() => import('../components/chat/commerce/PrintRequestSheet'));
+const CustomProductSheet = React.lazy(() => import('../components/chat/commerce/CustomProductSheet'));
+const OrdersSheet = React.lazy(() => import('../components/chat/commerce/OrdersSheet'));
 
 /**
  * 'text', the attachment's real kind, or a card's kind (`product_card`…) —
@@ -87,6 +94,11 @@ export default function Chat() {
   // cards this side may send here.
   const [thread, setThread] = useState<ChatThreadInfo | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // The commerce sheets (docs/COMMUNITY_COMMERCE_CHAT.md): one open at a time.
+  const [quoteFor, setQuoteFor] = useState<QuotePrefill | null>(null);
+  const [customFor, setCustomFor] = useState<CustomProductPrefill | null>(null);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [ordersOpen, setOrdersOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   // THE THREAD IN PAGES (audit 04 B5): the newest page first, older ones on
   // the way up. `olderCursor` is where the next older page starts, or null
@@ -457,12 +469,27 @@ export default function Chat() {
     // of these were disabled with "قريباً" on them and did not need to be —
     // each is a message with a link in it, sent as ordinary text so the other
     // side reads it on any client, including a notification.
+    // THE STORE'S MENU: a quote, a private product. THE CUSTOMER'S: a print
+    // request to this store. Each offered only when the server said this side
+    // may (GET /api/chats/:id `can`), so the menu never offers a refusal.
+    ...(thread?.can?.quote
+      ? [{ icon: Calculator, label: loc('عرض سعر', 'Quote'), onClick: () => { setIsPlusMenuOpen(false); setQuoteFor({}); } }]
+      : []),
+    ...(thread?.can?.custom_product
+      ? [{ icon: Sparkles, label: loc('منتج خاص', 'Private product'), onClick: () => { setIsPlusMenuOpen(false); setCustomFor({}); } }]
+      : []),
+    ...(thread?.can?.print_request
+      ? [{ icon: Printer, label: loc('طلب طباعة', 'Print request'), onClick: () => { setIsPlusMenuOpen(false); setPrintOpen(true); } }]
+      : []),
     ...(thread?.can?.product_card
       ? [{
           icon: ShoppingBag,
           label: loc('منتج', 'Product'),
           onClick: () => { setIsPlusMenuOpen(false); setPickerOpen(true); },
         }]
+      : []),
+    ...(thread?.store && (thread.role === 'customer' || thread.role === 'merchant')
+      ? [{ icon: Receipt, label: loc('الطلبات', 'Orders'), onClick: () => { setIsPlusMenuOpen(false); setOrdersOpen(true); } }]
       : []),
     thread?.can?.store_card && thread.store
       ? {
@@ -556,7 +583,19 @@ export default function Chat() {
     </div>
   );
 
+  // What a card may ask of this conversation (src/components/chat/cards/cardContext.ts).
+  const cardActions: ChatCardActions | null = id && thread
+    ? {
+        chatId: id,
+        role: thread.role,
+        refresh: fetchMessages,
+        openQuote: (p) => setQuoteFor(p),
+        openCustomProduct: (p) => setCustomFor(p),
+      }
+    : null;
+
   return (
+    <ChatCardActionsContext.Provider value={cardActions}>
     <div data-chat-layout className="h-full min-h-0 w-full bg-canvas flex flex-col font-sans text-text-secondary">
       <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
       <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileSelect} />
@@ -602,9 +641,23 @@ export default function Chat() {
           </div>
         </div>
         <MotionCharacterHome busy={loading} />
-        <span role="status" aria-live="polite" className="text-xs text-text-secondary">
-          {presence.typing ? loc('يكتب الآن…', 'Typing…', 'دەنووسێت…') : ''}
-        </span>
+        <div className="flex items-center gap-1 justify-end">
+          <span role="status" aria-live="polite" className="text-xs text-text-secondary">
+            {presence.typing ? loc('يكتب الآن…', 'Typing…', 'دەنووسێت…') : ''}
+          </span>
+          {thread?.store && (thread.role === 'customer' || thread.role === 'merchant') && (
+            <button
+              type="button"
+              onClick={() => setOrdersOpen(true)}
+              aria-label={loc('الطلبات', 'Orders')}
+              title={loc('الطلبات', 'Orders')}
+              data-chat-orders
+              className="min-w-11 min-h-11 rounded-md inline-flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <Receipt className="w-5 h-5" strokeWidth={1.75} />
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Chat Area */}
@@ -872,6 +925,33 @@ export default function Chat() {
           />
         </React.Suspense>
       )}
+      {quoteFor && id && (
+        <React.Suspense fallback={null}>
+          <QuoteSheet open onClose={() => setQuoteFor(null)} chatId={id} prefill={quoteFor} onSent={() => void fetchMessages()} />
+        </React.Suspense>
+      )}
+      {customFor && id && (
+        <React.Suspense fallback={null}>
+          <CustomProductSheet open onClose={() => setCustomFor(null)} chatId={id} prefill={customFor} onSent={() => void fetchMessages()} />
+        </React.Suspense>
+      )}
+      {printOpen && id && (
+        <React.Suspense fallback={null}>
+          <PrintRequestSheet
+            open
+            onClose={() => setPrintOpen(false)}
+            chatId={id}
+            storeName={thread?.store?.name ?? ''}
+            onSent={() => void fetchMessages()}
+          />
+        </React.Suspense>
+      )}
+      {ordersOpen && id && (
+        <React.Suspense fallback={null}>
+          <OrdersSheet open onClose={() => setOrdersOpen(false)} chatId={id} />
+        </React.Suspense>
+      )}
     </div>
+    </ChatCardActionsContext.Provider>
   );
 }

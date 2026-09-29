@@ -131,7 +131,7 @@ export default function ProductPickerSheet({
                 <span dir="auto" className="block truncate text-[14px] font-semibold text-text-primary">{name}</span>
                 <span className="block text-[13px] tabular-nums text-text-secondary">
                   {p.price_max_iqd && p.price_max_iqd > p.price_iqd ? `${money(p.price_iqd)} – ${money(p.price_max_iqd)}` : money(p.price_iqd)}
-                  {!p.in_stock && <span className="ms-2 text-amber-600">{loc('نفدت الكمية', 'Out of stock')}</span>}
+                  {!p.in_stock && <span className="ms-2 text-warning">{loc('نفدت الكمية', 'Out of stock')}</span>}
                 </span>
               </span>
               {sending === p.id && <Loader2 className="w-4 h-4 animate-spin text-text-muted" aria-hidden="true" />}
