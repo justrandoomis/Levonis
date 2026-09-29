@@ -1,7 +1,7 @@
 import { useChatPresence } from '../lib/useChatPresence';
 import { mascot } from '../lib/mascot';
 import { MotionCharacterHome, useCharacterBusy } from '../components/bloub/MotionCharacterAnchor';
-import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useLayoutEffect, useMemo } from 'react';
 import { useThreadScroll } from '../lib/supportThread';
 import { mergeNewestPage, prependOlder } from '../lib/chatPaging';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -133,6 +133,24 @@ export default function Chat() {
   // ancestor and yanked a reader who had scrolled up). The same hook the
   // support threads use (src/lib/supportThread.ts).
   useThreadScroll(listRef, id ?? '', messages.length + pending.length, pending.length > 0);
+
+  // AN ORDER'S CARD ONCE (docs/COMMUNITY_COMMERCE_CHAT.md D8): each event of
+  // an order is a line of the thread's history, but only the newest one
+  // carries the order's card with its next step — three «أكّد الاستلام»
+  // buttons for one order would be three questions with one answer.
+  const newestEvent = useMemo(() => {
+    const seen = new Set<string>();
+    const out = new Set<string>();
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (!m.system || !m.card) continue;
+      const key = `${m.card.type}:${m.card.ref}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.add(m.id);
+    }
+    return out;
+  }, [messages]);
 
   // An older page lands ABOVE what the reader is looking at: keep their place
   // by moving the scroll position down by exactly the height it added.
@@ -379,7 +397,12 @@ export default function Chat() {
         ? dir === 'rtl' ? 'تعذّر بدء التسجيل الصوتي' : 'The voice recording could not start'
         : '';
 
-  const suggestions = dir === 'rtl' ? [
+  // The customer asks and the store answers: «كم السعر؟» is not a reply a
+  // store would send, so each side of a store's conversation gets its own row.
+  // OWNER: Sorani to be written by hand (the store's quick replies).
+  const suggestions = thread?.role === 'merchant' ? [
+    loc('أهلًا بك 👋', 'Welcome 👋'), loc('متوفر ✅', 'In stock ✅'), loc('يجهز خلال يومين', 'Ready in two days'), loc('شكرًا لطلبك 🙏', 'Thanks for your order 🙏'),
+  ] : dir === 'rtl' ? [
     "شكراً 🙏", "تمام 👍", "كم السعر؟", "متى يكون جاهزاً؟"
   ] : [
     "Thanks 🙏", "Sounds good 👍", "How much is it?", "When will it be ready?"
@@ -444,7 +467,35 @@ export default function Chat() {
     await sendText(link ? `${name}${handle}\n${link}` : `${name}${handle}`.trim() || (dir === 'rtl' ? 'بطاقتي' : 'My card'));
   };
 
-  const plusMenuOptions: Array<{ icon: any; label: string; onClick?: () => void; disabled?: boolean }> = [
+  type PlusOption = { icon: React.ElementType; label: string; onClick?: () => void; disabled?: boolean };
+  // IN A STORE'S CONVERSATION, REAL CARDS (docs/COMMUNITY_COMMERCE_CHAT.md):
+  // THE STORE'S MENU: a quote, a private product, one of its products, its
+  // store card. THE CUSTOMER'S: a print request to this store. Both: the
+  // orders between them. Each offered only when the server said this side may
+  // (GET /api/chats/:id `can`), so the menu never offers a refusal — and they
+  // come FIRST, because making a deal is what this conversation is for.
+  const commerceOptions: PlusOption[] = [
+    ...(thread?.can?.quote
+      ? [{ icon: Calculator, label: loc('عرض سعر', 'Quote'), onClick: () => { setIsPlusMenuOpen(false); setQuoteFor({}); } }]
+      : []),
+    ...(thread?.can?.custom_product
+      ? [{ icon: Sparkles, label: loc('منتج خاص', 'Private product'), onClick: () => { setIsPlusMenuOpen(false); setCustomFor({}); } }]
+      : []),
+    ...(thread?.can?.print_request
+      ? [{ icon: Printer, label: loc('طلب طباعة', 'Print request'), onClick: () => { setIsPlusMenuOpen(false); setPrintOpen(true); } }]
+      : []),
+    ...(thread?.can?.product_card
+      ? [{ icon: ShoppingBag, label: loc('منتج', 'Product'), onClick: () => { setIsPlusMenuOpen(false); setPickerOpen(true); } }]
+      : []),
+    ...(thread?.store && (thread.role === 'customer' || thread.role === 'merchant')
+      ? [{ icon: Receipt, label: loc('الطلبات', 'Orders'), onClick: () => { setIsPlusMenuOpen(false); setOrdersOpen(true); } }]
+      : []),
+    ...(thread?.can?.store_card && thread.store
+      ? [{ icon: StoreIcon, label: loc('بطاقة المتجر', 'Store card'), onClick: () => void sendCard('store', thread.store!.id).catch(() => {}) }]
+      : []),
+  ];
+  const plusMenuOptions: PlusOption[] = [
+    ...commerceOptions,
     {
       icon: ImageIcon,
       label: dir === 'rtl' ? 'الألبوم' : 'Album',
@@ -462,46 +513,18 @@ export default function Chat() {
       label: dir === 'rtl' ? 'ملف' : 'File',
       onClick: () => documentInputRef.current?.click(),
     },
-    // IN A STORE'S CONVERSATION, REAL CARDS (docs/COMMUNITY_COMMERCE_CHAT.md):
-    // one of THIS store's products, or the store itself — sent by id, built by
-    // the server. «المتجر» used to paste a link to the platform's catalogue into
-    // a conversation with a community shop. Elsewhere it stays that link: three
-    // of these were disabled with "قريباً" on them and did not need to be —
-    // each is a message with a link in it, sent as ordinary text so the other
-    // side reads it on any client, including a notification.
-    // THE STORE'S MENU: a quote, a private product. THE CUSTOMER'S: a print
-    // request to this store. Each offered only when the server said this side
-    // may (GET /api/chats/:id `can`), so the menu never offers a refusal.
-    ...(thread?.can?.quote
-      ? [{ icon: Calculator, label: loc('عرض سعر', 'Quote'), onClick: () => { setIsPlusMenuOpen(false); setQuoteFor({}); } }]
-      : []),
-    ...(thread?.can?.custom_product
-      ? [{ icon: Sparkles, label: loc('منتج خاص', 'Private product'), onClick: () => { setIsPlusMenuOpen(false); setCustomFor({}); } }]
-      : []),
-    ...(thread?.can?.print_request
-      ? [{ icon: Printer, label: loc('طلب طباعة', 'Print request'), onClick: () => { setIsPlusMenuOpen(false); setPrintOpen(true); } }]
-      : []),
-    ...(thread?.can?.product_card
+    // Outside a store's conversation «المتجر» stays what it was: a message
+    // with a link to the catalogue, sent as ordinary text so the other side
+    // reads it on any client. Three of these were disabled with «قريباً» on
+    // them and did not need to be. Inside one it would send the platform's
+    // catalogue to a community shop — the store card above replaces it.
+    ...(!thread?.store
       ? [{
-          icon: ShoppingBag,
-          label: loc('منتج', 'Product'),
-          onClick: () => { setIsPlusMenuOpen(false); setPickerOpen(true); },
-        }]
-      : []),
-    ...(thread?.store && (thread.role === 'customer' || thread.role === 'merchant')
-      ? [{ icon: Receipt, label: loc('الطلبات', 'Orders'), onClick: () => { setIsPlusMenuOpen(false); setOrdersOpen(true); } }]
-      : []),
-    thread?.can?.store_card && thread.store
-      ? {
-          icon: StoreIcon,
-          label: loc('بطاقة المتجر', 'Store card'),
-          onClick: () => void sendCard('store', thread.store!.id).catch(() => {}),
-        }
-      : {
           icon: StoreIcon,
           label: dir === 'rtl' ? 'المتجر' : 'Store',
           onClick: () => void sendText(`${window.location.origin}/products`),
-        },
+        }]
+      : []),
     {
       icon: MapPin,
       label: dir === 'rtl' ? 'الموقع' : 'Location',
@@ -711,7 +734,7 @@ export default function Chat() {
                     <div className="text-center text-[11px] text-text-muted font-medium tracking-wide">{time}</div>
                   )}
                   {msg.system ? (
-                    <SystemEventCard card={msg.card ?? null} fallback={msg.body} />
+                    <SystemEventCard card={msg.card ?? null} fallback={msg.body} withCard={newestEvent.has(msg.id)} />
                   ) : (
                     <div className={`flex items-start gap-2 ${msg.mine ? 'justify-end' : ''}`}>
                       {!msg.mine && renderAvatar(false)}

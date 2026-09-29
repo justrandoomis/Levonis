@@ -164,7 +164,7 @@ export default function PrintRequestSheet({
             <Input value={f.quantity} onChange={set('quantity')} inputMode="numeric" ltr />
           </Field>
           <Field label={loc('المادة', 'Material')} optional>
-            <Input value={f.material} onChange={set('material')} maxLength={60} placeholder="PLA / PETG" />
+            <Input value={f.material} onChange={set('material')} maxLength={60} placeholder="PLA" />
           </Field>
           <Field label={loc('اللون', 'Colour')} optional>
             <Input value={f.color} onChange={set('color')} maxLength={60} />

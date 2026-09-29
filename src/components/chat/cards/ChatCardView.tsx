@@ -187,10 +187,10 @@ export default function ChatCardView(props: CardProps) {
 /**
  * A SYSTEM CARD — an event the server recorded («تم إنشاء الطلب»…), centred
  * and quiet: it is the thread's history, not somebody talking. The sentence
- * says what happened; the order's own card underneath says where it stands
- * now and offers the next step.
+ * says what happened; under the order's NEWEST event (`withCard`), the order's
+ * own card says where it stands now and offers the next step.
  */
-export function SystemEventCard({ card, fallback }: { card: ChatCard | null; fallback: string | null }) {
+export function SystemEventCard({ card, fallback, withCard = true }: { card: ChatCard | null; fallback: string | null; withCard?: boolean }) {
   const { loc } = useLanguage();
   const text = eventText(card, loc) ?? fallback;
   return (
@@ -200,7 +200,7 @@ export function SystemEventCard({ card, fallback }: { card: ChatCard | null; fal
           <Sparkles className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span dir="auto">{text}</span>
         </p>
-        {card && VIEWS[card.type] && <ChatCardView card={card} mine={false} fallback={fallback} />}
+        {withCard && card && VIEWS[card.type] && <ChatCardView card={card} mine={false} fallback={fallback} />}
       </div>
     </div>
   );

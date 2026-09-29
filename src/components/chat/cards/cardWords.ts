@@ -86,7 +86,7 @@ export function eventText(card: ChatCard | null, loc: Loc): string | null {
   if (card.type === 'custom_order') {
     return (
       {
-        funded: loc('قُبل العرض — المبلغ محجوز في الضمان حتى يؤكَّد الاستلام', 'Quote accepted — the money is held until delivery is confirmed'),
+        funded: loc('قُبل العرض وحُجز المبلغ في الضمان', 'Quote accepted — the money is held in escrow'),
         started: loc('بدأ المتجر العمل على الطلب', 'The store started the work'),
         delivered: loc('سلّم المتجر الطلب — بانتظار تأكيد الاستلام', 'The store delivered — waiting for confirmation'),
         confirmed: loc('أكّد الزبون الاستلام', 'The customer confirmed receipt'),

@@ -151,7 +151,7 @@ export function QuoteCardView({ card, mine }: Props) {
               </CardButton>
             )}
             {can.has('edit') && (
-              <CardButton action="to_product" variant="ghost" onClick={() => actions?.openCustomProduct({ quoteId: card.ref, name: title, price_iqd: price, prep_days: Number(s.completion_days ?? 0), description: str(s.message) })}>
+              <CardButton action="to_product" variant="ghost" onClick={() => actions?.openCustomProduct({ quoteId: card.ref, name: title, price_iqd: price, prep_days: Number(s.completion_days ?? 0) })}>
                 {loc('حوّله إلى منتج خاص', 'Make it a private product')}
               </CardButton>
             )}
@@ -215,7 +215,9 @@ export function PrintRequestCardView({ card, mine }: Props) {
     <CardShell mine={mine} kind="print_request" label={loc(`طلب طباعة: ${str(s.title)}`, `Print request: ${str(s.title)}`)}>
       <div className="p-3 flex flex-col gap-2">
         <CardKicker icon={Printer}>
-          {s.created_by === 'merchant' ? loc('طلب أنشأه المتجر لك', 'A job the store wrote for you') : loc('طلب طباعة لهذا المتجر', 'Print request to this store')}
+          {s.created_by === 'merchant'
+            ? side === 'merchant' ? loc('طلب كتبته للزبون', 'A job you wrote for the customer') : loc('طلب أنشأه المتجر لك', 'A job the store wrote for you')
+            : side === 'merchant' ? loc('طلب طباعة لمتجرك', 'Print request to your store') : loc('طلب طباعة لهذا المتجر', 'Print request to this store')}
         </CardKicker>
         <h3 dir="auto" className="text-[14px] font-bold leading-snug">{str(s.title)}</h3>
         <p dir="auto" className="text-[12.5px] text-text-secondary">{job}</p>
