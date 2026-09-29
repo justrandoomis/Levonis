@@ -26,6 +26,7 @@ import { subscriptionRoutes } from './routes/subscription';
 import { investRoutes } from './routes/invest';
 import { communityRoutes } from './routes/community';
 import { chatRoutes } from './routes/chats';
+import { chatCommerceRoutes } from './routes/chatCommerce';
 import { profileRoutes } from './routes/profile';
 import { uploadRoutes, fileRoutes } from './routes/uploads';
 import { storeIconRoute, webManifestRoute } from './routes/manifest';
@@ -310,6 +311,9 @@ app.route('/api/subscription', subscriptionRoutes);
 app.route('/api/invest', investRoutes);
 app.route('/api/community', communityRoutes);
 app.route('/api/chats', chatRoutes);
+// Custom work inside the store's conversation — print requests, quotes, the orders panel
+// (docs/COMMUNITY_COMMERCE_CHAT.md); acceptance stays /api/marketplace/offers/:id/accept.
+app.route('/api/chats', chatCommerceRoutes);
 app.route('/api/profile', profileRoutes);
 app.route('/api/uploads', uploadRoutes);
 // LEVO Printer Farm — the player API. Mounted before the '/api' misc catch-all

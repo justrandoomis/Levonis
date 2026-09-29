@@ -35,6 +35,7 @@ import { governorateName, normalizeGovernorate } from '../lib/iraqGovernorates';
 import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
 import { communityClosedRefusal, communityMayEnter, readCommunityGate, requireCommunityOpen } from '../lib/communityGate';
 import {
+  isDirectMerchant,
   isEngagedMerchant,
   isPast,
   offerCountStatement,
@@ -1457,7 +1458,10 @@ printRequestRoutes.get('/requests/:id/revisions', async (c) => {
   const publicBoard = onPublicBoard(request);
   const boardShut = publicBoard && !isOwner && !communityMayEnter(await readCommunityGate(c.env.DB), user);
   if (!isOwner && !(publicBoard && !boardShut)) {
-    const engaged = user ? await isEngagedMerchant(c.env.DB, requestId, user.id) : false;
+    // The engaged merchant — or the store a DIRECT request is addressed to (0151).
+    const engaged = user
+      ? (await isEngagedMerchant(c.env.DB, requestId, user.id)) || (await isDirectMerchant(c.env.DB, requestId, user.id))
+      : false;
     if (!engaged) throw boardShut ? communityClosedRefusal() : notFound('Request not found');
   }
   /**
@@ -1561,7 +1565,10 @@ printRequestRoutes.get('/requests/:id', async (c) => {
   const boardShut = publicBoard && !isOwner && !communityMayEnter(await readCommunityGate(c.env.DB), user);
   const openToAll = publicBoard && !boardShut;
   if (!isOwner && !openToAll) {
-    const engaged = user ? await isEngagedMerchant(c.env.DB, requestId, user.id) : false;
+    // The engaged merchant — or the store a DIRECT request is addressed to (0151).
+    const engaged = user
+      ? (await isEngagedMerchant(c.env.DB, requestId, user.id)) || (await isDirectMerchant(c.env.DB, requestId, user.id))
+      : false;
     if (!engaged) throw boardShut ? communityClosedRefusal() : notFound('Request not found');
   }
 
@@ -1938,7 +1945,9 @@ printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAut
       String(src.color ?? ''), String(src.dimensions ?? ''),
       // The old deadline has usually passed: the customer sets a new one.
       src.budget_iqd ?? null, null, String(src.governorate ?? ''),
-      String(src.delivery_pref ?? ''), String(src.notes ?? ''), String(src.visibility ?? 'public'),
+      // A repeat of a DIRECT request (0151) is a board draft: it names no store,
+      // and the customer publishes it — or sends it to a store — themselves.
+      String(src.delivery_pref ?? ''), String(src.notes ?? ''), src.visibility === 'direct' ? 'public' : String(src.visibility ?? 'public'),
       now, now, expires, String(src.customer_notes ?? '')
     )
     .run();

@@ -288,7 +288,12 @@ test('the thread is named by the store to its customer, and by the customer to t
     { name: 'Ali 3D Store', logo: '/files/merchants/ali/public/logo01.webp', url: '/community/store/ali3d', open: true }
   );
   assert.equal(mine.chat.other, null, 'the customer is shown the store, not the owner');
-  assert.deepEqual(mine.chat.can, { product_card: true, store_card: true });
+  assert.deepEqual(mine.chat.can, { product_card: true, store_card: true, print_request: false, quote: false },
+    'custom work follows Levo Community\'s switch — closed on a fresh database');
+  raw.exec(`INSERT INTO admin_settings (key, value) VALUES ('communityGate', '{"open":true}')`);
+  assert.equal((await json(await get(as(raw, BUYER), `/api/chats/${chatId}`))).chat.can.print_request, true);
+  assert.equal((await json(await get(as(raw, SELLER), `/api/chats/${chatId}`))).chat.can.quote, true);
+  assert.equal((await json(await get(as(raw, SELLER), `/api/chats/${chatId}`))).chat.can.print_request, false, 'the store does not send print requests');
   assert.doesNotMatch(JSON.stringify(mine), /ali@x\.co|password|phone/);
 
   const theirs = await json(await get(as(raw, SELLER), `/api/chats/${chatId}`));

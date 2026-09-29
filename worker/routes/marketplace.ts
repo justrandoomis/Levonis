@@ -108,6 +108,10 @@ import { likePattern } from '../lib/sqlLike';
 import { notifyStatement } from '../lib/notifications';
 // Eligibility as data (W5-B): the offer gate, the file matrix and the re-match.
 import { assertMayOffer, eligibleVerdictSql, liveVerdict, rematchNow } from '../lib/printMatchingStore';
+// A request addressed to ONE store (0151): its store quotes it without matching.
+import { assertMayQuote, directRequest } from '../lib/directRequests';
+import { isDirectMerchant } from '../lib/communityRequests';
+import { customOrderCard, postSystemCard } from '../lib/chatCards';
 import { fileClass, fileReadStatement, fileReader, mayReadBytes, previewGrantFor } from '../lib/requestFilePolicy';
 
 export const marketplaceRoutes = new Hono<AppContext>();
@@ -161,7 +165,7 @@ function parseIds(raw: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, OFFER_MAX_MATERIALS) : [];
 }
 
-function offerShape(o: Record<string, unknown>, badges: { pro: Set<string>; premium: Set<string> } = { pro: new Set(), premium: new Set() }) {
+export function offerShape(o: Record<string, unknown>, badges: { pro: Set<string>; premium: Set<string> } = { pro: new Set(), premium: new Set() }) {
   return {
     id: o.id,
     request_id: o.request_id,
@@ -273,7 +277,11 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
   // part of the question (audit 03 §10 I): the board hid an expired request
   // while this page still served it to anyone holding the link.
   if (!isOwner && !onPublicBoard(r as unknown as RequestForAccess)) {
-    const engaged = user ? await isEngagedMerchant(c.env.DB, id, user.id) : false;
+    // …and the store a DIRECT request is addressed to (0151): it was sent to
+    // them to quote, and is nobody else's to read.
+    const engaged = user
+      ? (await isEngagedMerchant(c.env.DB, id, user.id)) || (await isDirectMerchant(c.env.DB, id, user.id))
+      : false;
     if (!engaged) throw notFound('Request not found');
   }
 
@@ -750,7 +758,7 @@ marketplaceRoutes.post('/requests/:id/cancel', requireAuth, async (c) => {
  * inclusions, warranty terms, a validity and a message. The same reader for a
  * new offer and an edit, so the two can never accept different things.
  */
-interface OfferTerms {
+export interface OfferTerms {
   price_iqd?: number;
   completion_days?: number;
   delivery_method?: string;
@@ -772,7 +780,7 @@ async function catalogueIds(db: D1Database): Promise<Set<string>> {
   );
 }
 
-async function readOfferTerms(
+export async function readOfferTerms(
   db: D1Database,
   body: Record<string, unknown>,
   now: string,
@@ -1122,7 +1130,8 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
   // An edit prices the job AS IT NOW IS: a new promise, so the same bar as a
   // new offer (W5-B) — a workshop the revised job no longer fits cannot re-price it.
   if (before.state === 'pending' || before.state === 'superseded') {
-    await assertMayOffer(c.env, String(before.request_id), ctx.merchant.id);
+    // A DIRECT request's store quotes it without matching (0151).
+    await assertMayQuote(c.env, String(before.request_id), ctx.merchant.id);
   }
 
   // `state IN (pending, superseded)` is in the WHERE clause, so an accepted
@@ -1189,7 +1198,7 @@ marketplaceRoutes.post('/offers/:id/reconfirm', requireCommunityOpen, requireAut
   const standing = await c.env.DB.prepare(
     `SELECT request_id FROM community_offers WHERE id = ? AND merchant_id = ? AND state IN ('pending','superseded')`
   ).bind(offerId, ctx.merchant.id).first<{ request_id: string }>();
-  if (standing) await assertMayOffer(c.env, standing.request_id, ctx.merchant.id);
+  if (standing) await assertMayQuote(c.env, standing.request_id, ctx.merchant.id);
   let changes = 0;
   try {
     const res = await c.env.DB.batch([
@@ -1331,6 +1340,9 @@ async function offerMerchantStanding(env: Env, offer: Record<string, unknown>): 
   });
   if (!takesWork) return 'unavailable';
   if (offer.state !== 'pending') return 'ok';
+  // A DIRECT request (0151) was addressed to this store by the customer: there
+  // is no printer matching to ask — the store taking new work is the whole bar.
+  if (offer.r_visibility === 'direct') return 'ok';
   const live = await liveVerdict(env, String(offer.req_id ?? offer.request_id), String(offer.merchant_id));
   return live && !live.verdict.eligible ? 'ineligible' : 'ok';
 }
@@ -1340,7 +1352,8 @@ async function offerForAcceptance(db: D1Database, offerId: string) {
   return db
     .prepare(
       `SELECT o.*, r.customer_id, r.state AS request_state, r.id AS req_id, r.revision AS r_revision,
-              r.expires_at AS r_expires_at,
+              r.expires_at AS r_expires_at, r.visibility AS r_visibility,
+              r.accepted_offer_id AS r_accepted_offer_id, r.community_order_id AS r_order_id,
               m.user_id AS m_user_id, m.name AS m_name, m.verified AS m_verified, m.badge AS m_badge,
               m.badge_override AS m_badge_override, m.rating_avg_x100 AS m_rating,
               m.rating_count AS m_rating_count, m.completed_orders AS m_completed,
@@ -1464,10 +1477,42 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
   const offer = await offerForAcceptance(c.env.DB, offerId);
   if (!offer) throw notFound('Offer not found');
   if (offer.customer_id !== user.id) throw forbidden('This request is not yours');
+
+  /**
+   * A REPLAY OF AN ACCEPTANCE THAT LANDED (docs/COMMUNITY_COMMERCE_CHAT.md §6.6).
+   * A double tap, or a retry after a lost response, used to be answered
+   * `409 OFFER_NOT_AVAILABLE` — safe, but it told a customer who HAD accepted
+   * that they had not. The same customer accepting the same offer at the same
+   * price and revision it was frozen at is answered with the order that
+   * acceptance made — never a second hold, never a second order.
+   */
+  if (
+    offer.state === 'accepted' &&
+    offer.r_accepted_offer_id === offerId &&
+    offer.r_order_id &&
+    expected.price === Number(offer.price_iqd) &&
+    expected.revision === Number(offer.revision ?? 1)
+  ) {
+    const placed = await c.env.DB.prepare('SELECT * FROM community_orders WHERE id = ? AND customer_id = ? AND offer_id = ?')
+      .bind(String(offer.r_order_id), user.id, offerId)
+      .first<Record<string, unknown>>();
+    if (placed) {
+      const esc = await c.env.DB.prepare('SELECT id FROM community_escrows WHERE community_order_id = ?')
+        .bind(String(placed.id))
+        .first<{ id: string }>();
+      return c.json({ success: true, order: placed, escrow_id: esc?.id ?? null, replayed: true });
+    }
+  }
+
   const refusal = acceptanceRefusal(offer, expected, nowIso(), await offerMerchantStanding(c.env, offer));
   if (refusal) throw refusal;
 
   const requestId = String(offer.req_id);
+  // THE CONVERSATION THE DEAL CAME FROM (0151): a direct request's order is
+  // written with its thread, and the thread is told once the money is held.
+  // Read before the batch, so a database behind 0151 simply has none.
+  const direct = offer.r_visibility === 'direct' ? await directRequest(c.env.DB, requestId) : null;
+  const originChatId = direct?.origin_chat_id ?? null;
   /**
    * WHAT THE ORDER KEEPS (W5-A, §4.7). The job revision the offer priced —
    * its recorded snapshot, or for a request older than 0130 the job as it
@@ -1579,8 +1624,8 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
            (id, request_id, offer_id, customer_id, merchant_id, store_id, state,
             price_iqd, commission_percent_x100, platform_fee_iqd, merchant_receivable_iqd,
             completion_days, delivery_method, offer_snapshot, created_at, updated_at,
-            request_revision, request_snapshot, contact_snapshot)
-         VALUES (?,?,?,?,?,?, 'funded', ?,?,?,?,?,?,?,?,?,?,?,?)`
+            request_revision, request_snapshot, contact_snapshot, chat_id)
+         VALUES (?,?,?,?,?,?, 'funded', ?,?,?,?,?,?,?,?,?,?,?,?,?)`
       ).bind(
         orderId, requestId, offerId, user.id, offer.merchant_id, offer.store_id,
         price, split.commission_percent_x100, split.platform_fee_iqd, split.merchant_receivable_iqd,
@@ -1604,7 +1649,8 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
         ts, ts,
         Number(offer.r_revision ?? 1),
         JSON.stringify(requestSnapshot),
-        JSON.stringify(contact)
+        JSON.stringify(contact),
+        originChatId
       ),
       ...escrowRecordStatements(db, escrowInput, reserved.reservation, escrowId, ts),
       offerCountStatement(db, requestId),
@@ -1657,7 +1703,19 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
   await notifyOffersRejected(db, requestId, ts, 'other_accepted');
   // The in-app notice rode in the batch; its outside channels follow, per the merchant's switch (W2-E).
   await fanOutMerchantNotice(c.env, { merchant_id: String(offer.merchant_id), user_id: merchantUserId }, offerAcceptedNotice({ requestId, offerId, orderId, priceIqd: price }));
-  const order = await db.prepare('SELECT * FROM community_orders WHERE id = ?').bind(orderId).first();
+  const order = await db.prepare('SELECT * FROM community_orders WHERE id = ?').bind(orderId).first<Record<string, unknown>>();
+  // «تم إنشاء الطلب» IN THE CONVERSATION IT CAME FROM (D8) — after the commit,
+  // once per order, only into a thread of this store and this customer, and
+  // never able to undo the payment (postSystemCard does not throw).
+  if (originChatId && order) {
+    await postSystemCard(c.env, {
+      chatId: originChatId,
+      actorId: user.id,
+      card: customOrderCard(order, direct?.title ?? '', 'funded'),
+      eventKey: `custom_order:${orderId}:funded`,
+      expect: { storeId: String(offer.store_id ?? ''), customerId: user.id },
+    });
+  }
   return c.json({ success: true, order, escrow_id: escrowId }, 201);
 });
 

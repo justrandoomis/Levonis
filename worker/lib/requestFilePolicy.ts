@@ -84,6 +84,10 @@ export async function fileReader(
   if (base.access === 'owner' || base.access === 'admin' || base.access === 'engaged') {
     return { reader: base.access, gateClosed: false, verdict: null, visible: true };
   }
+  // The store a direct request is addressed to (0151) reads it as an eligible
+  // workshop reads a board request: the pictures and drawings, a preview of a
+  // model — never the original before acceptance.
+  if (base.access === 'direct') return { reader: 'eligible', gateClosed: false, verdict: null, visible: true };
   if (base.access !== 'board' || !user) return { reader: null, gateClosed: false, verdict: null, visible: false };
   const live = await liveVerdictForUser(env, r.id, user.id);
   return { reader: live?.verdict.eligible ? 'eligible' : null, gateClosed: false, verdict: live?.verdict ?? null, visible: true };

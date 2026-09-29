@@ -28,6 +28,7 @@ import { notifyStatement } from './notifications';
 import { merchantNotificationStatement, offerAcceptedNotice } from './merchantNotify';
 import { merchantHref } from '@levonis/contracts/merchantRoutes';
 import { audit } from './audit';
+import { isSchemaMissing } from './membershipBenefits';
 
 const nowIso = () => new Date().toISOString();
 
@@ -134,7 +135,30 @@ export async function merchantTakesNewWork(
   return benefits.merchantStore(tier) && benefits.communityOffers(tier);
 }
 
-export type FileAccess = 'owner' | 'admin' | 'engaged' | 'board';
+/**
+ * IS THIS ACCOUNT THE STORE A DIRECT REQUEST IS ADDRESSED TO (migration 0151,
+ * worker/lib/directRequests.ts)? The question every door onto a request asks
+ * after «the customer» and «the engaged merchant» — the request page, its
+ * files, its revisions. False for a board request, and on a database behind
+ * 0151 (no direct request exists there).
+ */
+export async function isDirectMerchant(db: D1Database, requestId: string, userId: string): Promise<boolean> {
+  try {
+    const row = await db
+      .prepare(
+        `SELECT 1 AS x FROM community_requests r JOIN community_merchants m ON m.id = r.target_merchant_id
+          WHERE r.id = ? AND r.visibility = 'direct' AND m.user_id = ?`
+      )
+      .bind(requestId, userId)
+      .first();
+    return !!row;
+  } catch (e) {
+    if (isSchemaMissing(e)) return false;
+    throw e;
+  }
+}
+
+export type FileAccess = 'owner' | 'admin' | 'engaged' | 'board' | 'direct';
 
 /**
  * WHO MAY READ A REQUEST'S ATTACHMENTS, derived from the request on every read.
@@ -160,6 +184,13 @@ export async function requestFileAccess(
   if (user.id === r.customer_id) return { access: 'owner', gateClosed: false };
   if (opts.allowAdmin && user.role === 'admin') return { access: 'admin', gateClosed: false };
   if (await isEngagedMerchant(env.DB, r.id, user.id)) return { access: 'engaged', gateClosed: false };
+  // A DIRECT request (0151) is its store's to read while it takes offers — the
+  // way a board request is an eligible workshop's — and nobody else's. It was
+  // never on the board, so the board's gate does not decide it.
+  if (r.visibility === 'direct') {
+    const open = (BOARD_STATES as readonly string[]).includes(r.state) && !isPast(r.expires_at);
+    return { access: open && (await isDirectMerchant(env.DB, r.id, user.id)) ? 'direct' : null, gateClosed: false };
+  }
   if (!onPublicBoard(r)) return { access: null, gateClosed: false };
   if (!communityMayEnter(await readCommunityGate(env.DB), user)) return { access: null, gateClosed: true };
   return { access: 'board', gateClosed: false };

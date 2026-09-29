@@ -25,6 +25,8 @@ import {
 } from '../lib/chatCards';
 import { storeById } from '../lib/merchantAuth';
 import { storeTakesOrders } from '../lib/storeOrderOps';
+import { merchantTakesNewWork } from '../lib/communityRequests';
+import { communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { safeParse } from '../lib/types';
 
@@ -167,7 +169,7 @@ async function previousSenderOf(db: D1Database, chatId: string, messageId: strin
  * (worker/lib/merchantNotify.ts: always in-app, outside channels per their
  * `new_messages` switch); the customer as their own `chat_message`.
  */
-async function notifyStoreThread(
+export async function notifyStoreThread(
   env: Env,
   thread: StoreThread,
   chatId: string,
@@ -570,10 +572,21 @@ chatRoutes.get('/:id', async (c) => {
   const writeBlocked = readOnly || (!!thread && thread.context_type === 'store_order' && role === 'member');
 
   let store: Record<string, unknown> | null = null;
+  let customWork = false;
   if (thread) {
     const ctx = await storeById(c.env.DB, thread.store_id);
     if (ctx) {
       const open = (await storeTakesOrders(c.env.DB, ctx)).ok;
+      // Custom work (a print request to this store) needs the store to take
+      // custom requests AND new work — asked here so the menu never offers a
+      // door the send would refuse (worker/routes/chatCommerce.ts).
+      customWork =
+        Number(ctx.store.accepts_custom_requests) === 1 &&
+        (await merchantTakesNewWork(c.env.DB, {
+          merchantStatus: ctx.merchant.status,
+          storeStatus: ctx.store.status,
+          ownerUserId: ctx.store.user_id,
+        }));
       store = {
         id: ctx.store.id,
         name: ctx.store.name,
@@ -604,6 +617,9 @@ chatRoutes.get('/:id', async (c) => {
   }
 
   const party = role === 'customer' || role === 'merchant';
+  // Starting custom work follows Levo Community's switch (D9).
+  const communityOpen = party && communityMayEnter(await readCommunityGate(c.env.DB), user);
+  const commerceThread = !!thread && thread.context_type === 'store' && !writeBlocked;
   c.header('Cache-Control', 'private, no-store');
   return c.json({
     success: true,
@@ -618,6 +634,8 @@ chatRoutes.get('/:id', async (c) => {
       can: {
         product_card: !!thread && party && !writeBlocked,
         store_card: !!thread && party && !writeBlocked,
+        print_request: commerceThread && role === 'customer' && communityOpen && customWork,
+        quote: commerceThread && role === 'merchant' && communityOpen,
       },
     },
   });
@@ -766,7 +784,7 @@ export function chatMessagePublic(m: Record<string, unknown>, viewerId: string, 
  * type on the page, never one per card, and none at all for a page of plain
  * messages. Staff reading a store thread see every card and may act on none.
  */
-async function publicPage(
+export async function publicPage(
   env: Env,
   chatId: string,
   rows: Array<Record<string, unknown>>,

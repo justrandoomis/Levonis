@@ -181,6 +181,113 @@ async function resolveStore(env: Env, thread: StoreThread, ref: string): Promise
 }
 
 // ===========================================================================
+//  PRINT REQUEST, QUOTE, CUSTOM ORDER — born with their entity
+// ===========================================================================
+//
+// These three are never sent by id: a print request's card is written with
+// the request (the customer's «طلب طباعة»), a quote's with its offer revision
+// (the store's «عرض سعر»), a custom order's by the server when an acceptance
+// funds it. Each snapshot is built HERE from the database row — or from the
+// server-validated values the same batch writes — never from a client.
+
+const clip = (v: unknown, n: number) => String(v ?? '').slice(0, n);
+
+/** A direct request's card, from its row and its attachments (names only — the bytes stay behind the file route). */
+export async function printRequestCard(db: D1Database, requestId: string): Promise<ResolvedCard> {
+  const r = await db
+    .prepare(
+      `SELECT r.id, r.title, r.description, r.category, r.quantity, r.material, r.color, r.dimensions,
+              r.budget_iqd, r.deadline, r.customer_notes, r.governorate, r.delivery_pref, r.created_by
+         FROM community_requests r WHERE r.id = ?`
+    )
+    .bind(requestId)
+    .first<Record<string, unknown>>();
+  if (!r) throw notInThread('This request');
+  const { results: files } = await db
+    .prepare('SELECT id, file_name, kind, content_type FROM community_request_files WHERE request_id = ? ORDER BY rowid')
+    .bind(requestId)
+    .all<{ id: string; file_name: string; kind: string; content_type: string }>();
+  const snapshot = {
+    v: 1,
+    request_id: String(r.id),
+    title: clip(r.title, 140),
+    description: clip(r.description, 800),
+    category: clip(r.category, 60),
+    quantity: Math.max(1, Math.trunc(Number(r.quantity) || 1)),
+    material: clip(r.material, 60),
+    color: clip(r.color, 60),
+    dimensions: clip(r.dimensions, 120),
+    budget_iqd: num(r.budget_iqd),
+    deadline: r.deadline ? clip(r.deadline, 40) : null,
+    notes: clip(r.customer_notes, 1000),
+    governorate: clip(r.governorate, 60),
+    delivery_pref: clip(r.delivery_pref, 40),
+    created_by: r.created_by === 'merchant' ? 'merchant' : 'customer',
+    files: (files ?? []).map((f) => ({ id: f.id, name: clip(f.file_name, 120), kind: clip(f.kind, 20), inline: String(f.content_type ?? '').startsWith('image/') })),
+  };
+  return { type: 'print_request', ref: String(r.id), snapshot, body: `🖨️ ${clip(r.title, 200)}` };
+}
+
+/** What a quote card freezes: one revision of one offer, with the job it priced. */
+export interface QuoteTerms {
+  offer_id: string;
+  request_id: string;
+  revision: number;
+  request_revision: number;
+  title: string;
+  quantity: number;
+  material: string;
+  color: string;
+  price_iqd: number;
+  completion_days: number;
+  delivery_method: string;
+  message: string;
+  materials: string;
+  included: string;
+  warranty_terms: string;
+  expires_at: string | null;
+}
+
+/** A quote card from terms the server has validated (the same values its batch writes). */
+export function quoteCardFrom(t: QuoteTerms): ResolvedCard {
+  const snapshot = {
+    v: 1,
+    offer_id: t.offer_id,
+    request_id: t.request_id,
+    revision: t.revision,
+    request_revision: t.request_revision,
+    title: clip(t.title, 140),
+    quantity: t.quantity,
+    material: clip(t.material, 60),
+    color: clip(t.color, 60),
+    price_iqd: t.price_iqd,
+    completion_days: t.completion_days,
+    delivery_method: clip(t.delivery_method, 40),
+    message: clip(t.message, 2000),
+    materials: clip(t.materials, 500),
+    included: clip(t.included, 500),
+    warranty_terms: clip(t.warranty_terms, 500),
+    expires_at: t.expires_at,
+  };
+  return { type: 'quote', ref: t.offer_id, snapshot, body: `🧮 ${clip(t.title, 180)}` };
+}
+
+/** A funded (or moved) custom order's card — the event it records is part of the snapshot. */
+export function customOrderCard(order: Record<string, unknown>, title: string, event: string): ResolvedCard {
+  const snapshot = {
+    v: 1,
+    order_id: String(order.id),
+    request_id: String(order.request_id ?? ''),
+    title: clip(title, 140),
+    price_iqd: Number(order.price_iqd ?? 0),
+    completion_days: Math.max(0, Math.trunc(Number(order.completion_days) || 0)),
+    delivery_method: clip(order.delivery_method, 40),
+    event,
+  };
+  return { type: 'custom_order', ref: String(order.id), snapshot, body: `🧾 ${clip(title, 180)}` };
+}
+
+// ===========================================================================
 //  RESOLVING A SEND
 // ===========================================================================
 
@@ -229,26 +336,36 @@ export interface CardMessage {
  * card is `INSERT OR IGNORE`: its event key is unique per thread, so a second
  * post of the same event writes nothing.
  */
-export function cardInsertStatement(db: D1Database, m: CardMessage): D1PreparedStatement {
+export function cardInsertStatement(
+  db: D1Database,
+  m: CardMessage,
+  /**
+   * Written only if this holds, inside the same batch — «the card lands only if
+   * the offer (or the request) it shows did». SQL over `?` placeholders.
+   */
+  onlyIf?: { sql: string; binds: unknown[] }
+): D1PreparedStatement {
+  const values = [
+    m.id,
+    m.chatId,
+    m.senderId,
+    m.card.body,
+    m.card.type,
+    m.card.ref,
+    JSON.stringify(m.card.snapshot),
+    m.eventKey ?? null,
+    m.system ? 1 : 0,
+    m.clientId ?? null,
+    m.createdAt,
+  ];
+  const head = `INSERT ${m.system ? 'OR IGNORE ' : ''}INTO chat_messages
+         (id, chat_id, sender_id, kind, body, card_type, card_ref, card_snapshot, card_event_key, is_system, client_id, created_at)`;
+  if (!onlyIf) {
+    return db.prepare(`${head} VALUES (?, ?, ?, 'text', ?, ?, ?, ?, ?, ?, ?, ?)`).bind(...values);
+  }
   return db
-    .prepare(
-      `INSERT ${m.system ? 'OR IGNORE ' : ''}INTO chat_messages
-         (id, chat_id, sender_id, kind, body, card_type, card_ref, card_snapshot, card_event_key, is_system, client_id, created_at)
-       VALUES (?, ?, ?, 'text', ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(
-      m.id,
-      m.chatId,
-      m.senderId,
-      m.card.body,
-      m.card.type,
-      m.card.ref,
-      JSON.stringify(m.card.snapshot),
-      m.eventKey ?? null,
-      m.system ? 1 : 0,
-      m.clientId ?? null,
-      m.createdAt
-    );
+    .prepare(`${head} SELECT ?, ?, ?, 'text', ?, ?, ?, ?, ?, ?, ?, ? WHERE ${onlyIf.sql}`)
+    .bind(...values, ...onlyIf.binds);
 }
 
 /** The thread's last activity, which the store's inbox pages by (0124). Best effort. */
@@ -421,6 +538,141 @@ async function storeCurrents(
   return out;
 }
 
+const OPEN_REQUEST = new Set(['open', 'receiving_offers']);
+
+async function printRequestCurrents(
+  env: Env,
+  rows: CardRow[],
+  thread: StoreThread | null,
+  viewer: CardViewer
+): Promise<Map<string, CardCurrent>> {
+  const out = new Map<string, CardCurrent>();
+  const ids = [...new Set(rows.map((r) => r.card_ref))];
+  const now = new Date().toISOString();
+  const { results } = await env.DB.prepare(
+    `SELECT r.id, r.state, r.expires_at, r.customer_id, r.target_merchant_id, r.community_order_id,
+            (SELECT o.id FROM community_offers o WHERE o.request_id = r.id AND o.state IN ('pending','superseded')
+              ORDER BY o.created_at DESC LIMIT 1) AS live_offer_id
+       FROM community_requests r WHERE r.id IN (SELECT value FROM json_each(?))`
+  )
+    .bind(JSON.stringify(ids))
+    .all<Record<string, unknown>>();
+  const byId = new Map((results ?? []).map((r) => [String(r.id), r]));
+  for (const row of rows) {
+    const r = byId.get(row.card_ref);
+    // A request that is not between THIS store and THIS customer is not shown here.
+    if (!r || (thread && (r.target_merchant_id !== thread.merchant_id || r.customer_id !== thread.customer_id))) {
+      out.set(row.id, { status: 'unavailable', actions: [] });
+      continue;
+    }
+    const state = String(r.state);
+    const expired = OPEN_REQUEST.has(state) && typeof r.expires_at === 'string' && r.expires_at !== '' && r.expires_at <= now;
+    const status = expired ? 'expired' : state;
+    const actions: string[] = [];
+    if (viewer === 'merchant' && OPEN_REQUEST.has(status)) actions.push(r.live_offer_id ? 'edit_quote' : 'quote');
+    if (viewer === 'customer' && OPEN_REQUEST.has(status)) actions.push('cancel');
+    out.set(row.id, {
+      status,
+      actions,
+      offer_id: (r.live_offer_id as string | null) ?? null,
+      order_id: (r.community_order_id as string | null) ?? null,
+    });
+  }
+  return out;
+}
+
+async function quoteCurrents(
+  env: Env,
+  rows: CardRow[],
+  thread: StoreThread | null,
+  viewer: CardViewer
+): Promise<Map<string, CardCurrent>> {
+  const out = new Map<string, CardCurrent>();
+  const ids = [...new Set(rows.map((r) => r.card_ref))];
+  const now = new Date().toISOString();
+  const { results } = await env.DB.prepare(
+    `SELECT o.id, o.state, o.price_iqd, o.revision, o.request_revision, o.expires_at, o.merchant_id, o.store_id,
+            r.customer_id, r.state AS r_state, r.revision AS r_revision, r.expires_at AS r_expires_at,
+            r.accepted_offer_id, r.community_order_id
+       FROM community_offers o JOIN community_requests r ON r.id = o.request_id
+      WHERE o.id IN (SELECT value FROM json_each(?))`
+  )
+    .bind(JSON.stringify(ids))
+    .all<Record<string, unknown>>();
+  const byId = new Map((results ?? []).map((o) => [String(o.id), o]));
+  const past = (at: unknown) => typeof at === 'string' && at !== '' && at <= now;
+  for (const row of rows) {
+    const o = byId.get(row.card_ref);
+    if (!o || (thread && (o.merchant_id !== thread.merchant_id || o.customer_id !== thread.customer_id))) {
+      out.set(row.id, { status: 'unavailable', actions: [] });
+      continue;
+    }
+    const revision = Number(o.revision ?? 1);
+    const latest = Number(row.snapshot.revision ?? 0) === revision;
+    const state = String(o.state);
+    let status: string;
+    if (state === 'accepted') status = 'accepted';
+    else if (state === 'rejected') status = 'declined';
+    else if (state === 'withdrawn') status = 'withdrawn';
+    else if (state === 'expired') status = 'expired';
+    else if (state === 'superseded' || Number(o.request_revision ?? 1) < Number(o.r_revision ?? 1)) status = 'superseded';
+    else if (past(o.expires_at)) status = 'expired';
+    else if (!OPEN_REQUEST.has(String(o.r_state)) || past(o.r_expires_at)) status = 'closed';
+    else status = 'pending';
+    // An older card of a quote that was edited since: it says so, and only the
+    // newest card carries the buttons — acceptance names the revision it saw.
+    if (!latest && (status === 'pending' || status === 'superseded')) status = 'changed';
+    const actions: string[] = [];
+    if (viewer === 'customer' && status === 'pending') actions.push('accept', 'decline');
+    if (viewer === 'merchant' && latest && status === 'pending') actions.push('edit', 'withdraw');
+    if (viewer === 'merchant' && latest && status === 'superseded') actions.push('reconfirm', 'edit', 'withdraw');
+    out.set(row.id, {
+      status,
+      actions,
+      latest,
+      price_iqd: Number(o.price_iqd ?? 0),
+      revision,
+      order_id: state === 'accepted' && o.accepted_offer_id === o.id ? ((o.community_order_id as string | null) ?? null) : null,
+    });
+  }
+  return out;
+}
+
+async function customOrderCurrents(
+  env: Env,
+  rows: CardRow[],
+  thread: StoreThread | null,
+  viewer: CardViewer
+): Promise<Map<string, CardCurrent>> {
+  const out = new Map<string, CardCurrent>();
+  const ids = [...new Set(rows.map((r) => r.card_ref))];
+  const { results } = await env.DB.prepare(
+    `SELECT id, state, request_id, customer_id, store_id, merchant_id FROM community_orders
+      WHERE id IN (SELECT value FROM json_each(?))`
+  )
+    .bind(JSON.stringify(ids))
+    .all<Record<string, unknown>>();
+  const byId = new Map((results ?? []).map((o) => [String(o.id), o]));
+  for (const row of rows) {
+    const o = byId.get(row.card_ref);
+    if (!o || (thread && (o.store_id !== thread.store_id || o.customer_id !== thread.customer_id))) {
+      out.set(row.id, { status: 'unavailable', actions: [] });
+      continue;
+    }
+    const state = String(o.state);
+    const actions: string[] = ['view'];
+    // The next step each side takes, from the conversation — the order's own
+    // routes decide (worker/routes/marketplace.ts); a dispute needs the order
+    // page, where its reason is written.
+    if (viewer === 'merchant' && state === 'funded') actions.unshift('start');
+    if (viewer === 'merchant' && state === 'in_progress') actions.unshift('deliver');
+    if (viewer === 'customer' && state === 'merchant_marked_delivered') actions.unshift('confirm');
+    if (viewer === 'staff') actions.length = 0;
+    out.set(row.id, { status: state, actions, request_id: String(o.request_id ?? '') });
+  }
+  return out;
+}
+
 /**
  * The current state of every card on a page, for this reader. One statement
  * per card type present, never one per card. A type whose loader fails (a
@@ -458,6 +710,12 @@ export async function currentCardStates(
           return productCurrents(env, rows, thread, viewer, storeOpen);
         case 'store':
           return storeCurrents(env, rows, storeOpen);
+        case 'print_request':
+          return printRequestCurrents(env, rows, thread, viewer);
+        case 'quote':
+          return quoteCurrents(env, rows, thread, viewer);
+        case 'custom_order':
+          return customOrderCurrents(env, rows, thread, viewer);
         default:
           return new Map(rows.map((r) => [r.id, { status: 'unknown', actions: [] }]));
       }

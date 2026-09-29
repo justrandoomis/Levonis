@@ -323,8 +323,8 @@ fixture.
 | 1 | Google sign-in: `www` → apex | done — `tests/canonicalHost.test.ts`; owner console checks in docs/GOOGLE_SIGNIN_FIX.md §8 |
 | 2 | Structured chat messages | done — 0150, worker/lib/chatCards.ts, `GET /api/chats/:id`, idempotent `client_id`; tests/chatCards.test.ts |
 | 3 | Product and store cards | done — picker, cards with frozen snapshot + current state, add to cart through the store cart |
-| 4 | Print requests and quotes (escrow) | building |
-| 5 | Private custom products (store flow) | planned |
+| 4 | Print requests and quotes (escrow) | done (server) — 0151, worker/routes/chatCommerce.ts, direct standing, idempotent accept replay, order ↔ thread link; tests/chatQuotes.test.ts |
+| 5 | Private custom products (store flow) | building |
 | 6 | System cards on every money move; `/delivered` fix | planned |
 | 7 | Merchant/customer UX, workspace sections, product preview | planned |
 | 8 | Notifications | planned |
