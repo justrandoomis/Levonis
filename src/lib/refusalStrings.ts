@@ -591,6 +591,34 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   // SORANI IS INVENTED — the ckb slot carries the ARABIC until the owner writes
   // it by hand (docs/DECISIONS.md row 11).
   // OWNER: Sorani to be written by hand for every entry in this block.
+  // The store's conversation (docs/COMMUNITY_COMMERCE_CHAT.md): a card names an
+  // entity of THIS thread or it is refused. OWNER: Sorani to be written by hand
+  // for every entry in this block (the ckb slot carries the Arabic).
+  CARD_NOT_IN_THREAD: {
+    ar: 'هذا العنصر ليس من هذه المحادثة، فلا يمكن إرساله هنا.',
+    en: 'This item is not part of this conversation, so it cannot be sent here.',
+    ckb: 'هذا العنصر ليس من هذه المحادثة، فلا يمكن إرساله هنا.',
+  },
+  CARD_NOT_ALLOWED_HERE: {
+    ar: 'البطاقات تُرسل في المحادثة مع متجر فقط.',
+    en: 'Cards can only be sent in a conversation with a store.',
+    ckb: 'البطاقات تُرسل في المحادثة مع متجر فقط.',
+  },
+  CARD_NOT_ALLOWED: {
+    ar: 'لا يرسل البطاقات هنا إلا الزبون والمتجر.',
+    en: 'Only the customer and the store send cards here.',
+    ckb: 'لا يرسل البطاقات هنا إلا الزبون والمتجر.',
+  },
+  CARD_TYPE_UNSUPPORTED: {
+    ar: 'لا يمكن إرسال هذه البطاقة بهذه الطريقة.',
+    en: 'That card cannot be sent this way.',
+    ckb: 'لا يمكن إرسال هذه البطاقة بهذه الطريقة.',
+  },
+  PRODUCT_NOT_PUBLISHED: {
+    ar: 'هذا المنتج غير منشور الآن، فلا يمكن إرساله.',
+    en: 'This product is not published right now, so it cannot be sent.',
+    ckb: 'هذا المنتج غير منشور الآن، فلا يمكن إرساله.',
+  },
   CART_EMPTY: {
     ar: 'سلتك فارغة. أضف منتجًا ثم أكمل الطلب.',
     en: 'Your cart is empty. Add a product, then check out.',

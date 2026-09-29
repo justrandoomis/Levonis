@@ -343,6 +343,9 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   // ---- money, support, and everything private ---------------------------
   { table: 'wallet_transactions', column: 'receipt_key', kind: 'text', why: 'the private deposit receipt' },
   { table: 'chat_messages', column: 'file_key', kind: 'text', why: 'a chat attachment' },
+  // 0150 — a card's frozen snapshot shows the product or store picture it was
+  // sent with; the conversation keeps showing it after the product is gone.
+  { table: 'chat_messages', column: 'card_snapshot', kind: 'json', why: 'a chat card as it was sent — its picture paths (0150)' },
   { table: 'claim_messages', column: 'file_key', kind: 'text', why: 'a warranty-claim attachment' },
   { table: 'community_complaint_messages', column: 'file_key', kind: 'text', why: 'a complaint attachment' },
   // Migration 0107. Registered IN THE SAME COMMIT as the column, because
@@ -482,6 +485,7 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'community_product_option_values.swatch': "a palette colour name, e.g. 'red' — never CSS, never a key",
   'order_items.sku_snapshot': 'the SKU text of the variant at order time',
   'chat_messages.attachment_kind': "'image' | 'video' | 'audio' | 'file' — what `file_key` holds, not a key",
+  'chat_messages.card_event_key': 'system-card idempotency key, e.g. order:<id>:placed (0150)',
   // 0123 — bookkeeping of the app-icon renditions. The net does not catch
   // these two names; they are written down anyway because each string embeds
   // the logo key it is about (`<recipe>:<colour>:<key>`). They record which

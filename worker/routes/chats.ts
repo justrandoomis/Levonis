@@ -11,6 +11,22 @@ import { audit } from '../lib/audit';
 import { notify } from '../lib/notifications';
 import { newMessageNotice, notifyMerchant } from '../lib/merchantNotify';
 import { announceCustomerChatMessage } from './adminChats';
+import { storeOrderThread, storeThreadOf, threadRole, type StoreThread } from '../lib/chatThread';
+import {
+  SENDABLE_CARDS,
+  cardInsertStatement,
+  cardPublic,
+  clientIdFrom,
+  currentCardStates,
+  isCardType,
+  resolveSendableCard,
+  stampThreadActivity,
+  type CardCurrent,
+} from '../lib/chatCards';
+import { storeById } from '../lib/merchantAuth';
+import { storeTakesOrders } from '../lib/storeOrderOps';
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
+import { safeParse } from '../lib/types';
 
 /**
  * Direct chats. Only participants can read or write a conversation; there is
@@ -34,27 +50,6 @@ async function assertParticipant(db: D1Database, chatId: string, userId: string)
     .bind(chatId, userId)
     .first();
   if (!row) throw forbidden('You are not part of this conversation');
-}
-
-/** The order a thread is about, when it is a MERCHANT-STORE order's thread. */
-interface StoreOrderThread {
-  order_id: string;
-  customer_id: string;
-  seller_id: string;
-}
-
-async function storeOrderThread(db: D1Database, chatId: string): Promise<StoreOrderThread | null> {
-  const row = await db
-    .prepare(
-      `SELECT o.id AS order_id, o.user_id AS customer_id, m.user_id AS seller_id
-         FROM chats ch
-         JOIN orders o ON o.id = ch.order_id
-         JOIN community_merchants m ON m.id = o.merchant_id
-        WHERE ch.id = ?`
-    )
-    .bind(chatId)
-    .first<StoreOrderThread>();
-  return row ?? null;
 }
 
 /**
@@ -117,48 +112,7 @@ export async function recordStaffChatFileRead(c: Context<AppContext>, chatId: st
   if (thread) await auditStaffRead(c, chatId, thread.order_id);
 }
 
-/**
- * A THREAD THE STORE OWNS (migration 0124): a customer's direct message to the
- * store (`store`), a store order's thread (`store_order`), or a custom
- * request's thread (`request`) — with who its customer and its seller are.
- * A store order's thread opened before 0124 stamped its context is found
- * through the order, exactly as before.
- */
-interface StoreThread {
-  store_id: string;
-  context_type: 'store' | 'store_order' | 'request';
-  context_id: string;
-  customer_id: string;
-  seller_id: string;
-}
-
-async function storeThreadOf(db: D1Database, chatId: string): Promise<StoreThread | null> {
-  const row = await db
-    .prepare(
-      `SELECT ch.store_id, ch.context_type, ch.context_id, s.user_id AS seller_id,
-              CASE ch.context_type
-                WHEN 'store' THEN ch.context_id
-                WHEN 'store_order' THEN (SELECT o.user_id FROM orders o WHERE o.id = ch.context_id)
-                WHEN 'request' THEN (SELECT r.customer_id FROM community_requests r WHERE r.id = ch.context_id)
-              END AS customer_id
-         FROM chats ch
-         JOIN merchant_stores s ON s.id = ch.store_id
-        WHERE ch.id = ? AND ch.context_type IN ('store', 'store_order', 'request')`
-    )
-    .bind(chatId)
-    .first<StoreThread>()
-    .catch(() => null);
-  if (row?.customer_id) return row;
-  const legacy = await storeOrderThread(db, chatId);
-  if (!legacy) return null;
-  const store = await db
-    .prepare('SELECT s.id FROM orders o JOIN merchant_stores s ON s.merchant_id = o.merchant_id WHERE o.id = ?')
-    .bind(legacy.order_id)
-    .first<{ id: string }>();
-  return store
-    ? { store_id: store.id, context_type: 'store_order', context_id: legacy.order_id, customer_id: legacy.customer_id, seller_id: legacy.seller_id }
-    : null;
-}
+// The thread's parties (StoreThread, storeThreadOf) live in worker/lib/chatThread.ts.
 
 /**
  * WHO EACH MEMBER IS (chat_participants.role, migration 0124) — written after
@@ -175,6 +129,30 @@ async function setRoles(db: D1Database, chatId: string, roles: Array<[string, 'c
     );
   } catch (e) {
     if (!isSchemaMissing(e)) console.error('chat roles not written', chatId, e instanceof Error ? e.message : String(e));
+  }
+}
+
+/**
+ * WHO SPOKE BEFORE THIS LINE — the turn rule's one question. A system card
+ * («تم إنشاء الطلب», 0150) records an action, it is not somebody speaking: a
+ * customer who places an order and then writes «أرجو الإسراع» is starting a
+ * turn, and must still be heard. A database a migration behind has no system
+ * cards to skip.
+ */
+async function previousSenderOf(db: D1Database, chatId: string, messageId: string): Promise<string | null> {
+  const read = (skipSystem: boolean) =>
+    db
+      .prepare(
+        `SELECT sender_id FROM chat_messages WHERE chat_id = ? AND id <> ?${skipSystem ? ' AND is_system = 0' : ''}
+          ORDER BY created_at DESC, rowid DESC LIMIT 1`
+      )
+      .bind(chatId, messageId)
+      .first<{ sender_id: string }>();
+  try {
+    return (await read(true))?.sender_id ?? null;
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+    return (await read(false))?.sender_id ?? null;
   }
 }
 
@@ -196,13 +174,8 @@ async function notifyStoreThread(
   senderId: string,
   messageId: string
 ): Promise<void> {
-  const prev = await env.DB.prepare(
-    `SELECT sender_id FROM chat_messages WHERE chat_id = ? AND id <> ?
-      ORDER BY created_at DESC, rowid DESC LIMIT 1`
-  )
-    .bind(chatId, messageId)
-    .first<{ sender_id: string }>();
-  if (prev?.sender_id === senderId) return;
+  const prev = await previousSenderOf(env.DB, chatId, messageId);
+  if (prev === senderId) return;
   const toSeller = senderId !== thread.seller_id;
   const recipient = toSeller ? thread.seller_id : thread.customer_id;
   if (!recipient || recipient === senderId) return;
@@ -258,8 +231,15 @@ function chatListSql(withAttachmentKind: boolean): string {
             (SELECT u.username FROM chat_participants p2 JOIN users u ON u.id = p2.user_id
                WHERE p2.chat_id = ch.id AND p2.user_id <> ?1 LIMIT 1) AS other_username,
             (SELECT u.name FROM chat_participants p2 JOIN users u ON u.id = p2.user_id
-               WHERE p2.chat_id = ch.id AND p2.user_id <> ?1 LIMIT 1) AS other_name
+               WHERE p2.chat_id = ch.id AND p2.user_id <> ?1 LIMIT 1) AS other_name,
+            -- A STORE'S thread (0031/0124) is named by the store to its
+            -- customer — never by the owner's personal name.
+            ch.context_type,
+            s.name AS store_name,
+            s.logo_key AS store_logo_key,
+            CASE WHEN s.user_id = ?1 THEN 1 ELSE 0 END AS is_seller
        FROM chats ch
+       LEFT JOIN merchant_stores s ON s.id = ch.store_id AND ch.context_type IN ('store','store_order','request')
        JOIN chat_participants cp ON cp.chat_id = ch.id AND cp.user_id = ?1
       ORDER BY last_at DESC NULLS LAST
       LIMIT 100`;
@@ -277,7 +257,20 @@ chatRoutes.get('/', async (c) => {
     console.error(`chat_messages is behind the deployment (0110 not applied): ${e instanceof Error ? e.message : String(e)}`);
     ({ results } = await list(false));
   }
-  return c.json({ success: true, chats: results });
+  return c.json({
+    success: true,
+    chats: (results as Array<Record<string, unknown>>).map(({ store_name, store_logo_key, is_seller, ...r }) => {
+      const asCustomer = typeof store_name === 'string' && store_name !== '' && !Number(is_seller);
+      return {
+        ...r,
+        other_name: asCustomer ? store_name : r.other_name,
+        other_username: asCustomer ? null : r.other_username,
+        store: typeof store_name === 'string' && store_name
+          ? { name: store_name, logoUrl: store_logo_key ? `/files/${String(store_logo_key)}` : null, mine: !!Number(is_seller) }
+          : null,
+      };
+    }),
+  });
 });
 
 /**
@@ -518,10 +511,13 @@ chatRoutes.post('/open', async (c) => {
 
   // Only a GENERAL chat is reused here — an order thread must never be
   // returned as if it were the pair's direct message.
+  // …and never a STORE's thread either (0124): a store's conversation with a
+  // customer, or a request's, has two members too, and returning it here put
+  // a personal message into the store's inbox.
   const existing = await c.env.DB.prepare(
     `SELECT a.chat_id FROM chat_participants a
        JOIN chat_participants b ON b.chat_id = a.chat_id AND b.user_id = ?
-       JOIN chats ch ON ch.id = a.chat_id AND ch.order_id IS NULL
+       JOIN chats ch ON ch.id = a.chat_id AND ch.order_id IS NULL AND ch.context_type = ''
       WHERE a.user_id = ?`
   )
     .bind(otherUserId, user.id)
@@ -535,6 +531,156 @@ chatRoutes.post('/open', async (c) => {
     c.env.DB.prepare('INSERT INTO chat_participants (chat_id, user_id) VALUES (?, ?)').bind(chatId, otherUserId),
   ]);
   return c.json({ success: true, chatId });
+});
+
+/**
+ * WHO THIS CONVERSATION IS WITH, AND WHAT THIS READER MAY SEND IN IT.
+ *
+ * The thread screen's header used to be the other account's personal name,
+ * found by scanning the whole conversation list — so a customer talking to a
+ * shop read the owner's first name, never the shop's. Now the store is the
+ * thread's identity (its name, its logo, whether it is open), the customer is
+ * named to the store the way the inbox already names them, and `can` says
+ * which cards this side may send here — the same rules the send door
+ * enforces (worker/lib/chatCards.ts), so the menu never offers a refusal.
+ *
+ * Staff reading a merchant↔customer order thread get the same answer, read-only.
+ * Nothing private crosses: no phone, no e-mail, no address.
+ */
+chatRoutes.get('/:id', async (c) => {
+  const user = c.get('user')!;
+  const chatId = str(c.req.param('id'), 'chatId', { min: 1, max: 60 });
+  const member = await c.env.DB.prepare('SELECT 1 AS x FROM chat_participants WHERE chat_id = ? AND user_id = ?')
+    .bind(chatId, user.id)
+    .first();
+  let readOnly = false;
+  if (!member) {
+    const orderThread = user.role === 'admin' ? await storeOrderThread(c.env.DB, chatId) : null;
+    if (!orderThread) throw forbidden('You are not part of this conversation');
+    readOnly = true;
+  }
+  const chat = await c.env.DB.prepare('SELECT id, order_id, context_type, context_id FROM chats WHERE id = ?')
+    .bind(chatId)
+    .first<{ id: string; order_id: string | null; context_type: string; context_id: string }>();
+  if (!chat) throw notFound('Conversation not found');
+
+  const thread = await storeThreadOf(c.env.DB, chatId);
+  const role = readOnly ? 'staff' : thread ? (threadRole(thread, user.id) ?? 'member') : 'member';
+  // Staff may be members of the shop's OWN order threads (the support desk).
+  const writeBlocked = readOnly || (!!thread && thread.context_type === 'store_order' && role === 'member');
+
+  let store: Record<string, unknown> | null = null;
+  if (thread) {
+    const ctx = await storeById(c.env.DB, thread.store_id);
+    if (ctx) {
+      const open = (await storeTakesOrders(c.env.DB, ctx)).ok;
+      store = {
+        id: ctx.store.id,
+        name: ctx.store.name,
+        slug: ctx.store.slug,
+        logoUrl: ctx.store.logo_key ? `/files/${ctx.store.logo_key}` : null,
+        url: `/community/store/${encodeURIComponent(ctx.store.slug)}`,
+        // A suspended store is «غير متاح» to its customers — never why.
+        open,
+      };
+    }
+  }
+
+  // The other side, by the name this reader should see it by.
+  let other: { name: string; username: string } | null = null;
+  if (thread && role === 'merchant') {
+    const u = await c.env.DB.prepare('SELECT name, username FROM users WHERE id = ?')
+      .bind(thread.customer_id)
+      .first<{ name: string | null; username: string | null }>();
+    other = { name: String(u?.name ?? ''), username: String(u?.username ?? '') };
+  } else if (!thread) {
+    const u = await c.env.DB.prepare(
+      `SELECT u.name, u.username FROM chat_participants p JOIN users u ON u.id = p.user_id
+        WHERE p.chat_id = ? AND p.user_id <> ? LIMIT 1`
+    )
+      .bind(chatId, user.id)
+      .first<{ name: string | null; username: string | null }>();
+    other = u ? { name: String(u.name ?? ''), username: String(u.username ?? '') } : null;
+  }
+
+  const party = role === 'customer' || role === 'merchant';
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({
+    success: true,
+    chat: {
+      id: chat.id,
+      context: { type: thread ? thread.context_type : chat.order_id ? 'order' : 'direct', id: thread ? thread.context_id : (chat.order_id ?? '') },
+      order_id: chat.order_id,
+      role,
+      read_only: writeBlocked,
+      store,
+      other,
+      can: {
+        product_card: !!thread && party && !writeBlocked,
+        store_card: !!thread && party && !writeBlocked,
+      },
+    },
+  });
+});
+
+/**
+ * THE PRODUCT PICKER: this thread's store's products that a customer could buy
+ * — published, not hidden, never another store's and never a private one. The
+ * same rows either side sees; a card sent from here is re-checked by the send
+ * door all the same. Newest first, `?q=` on the name, paged by `created_at|id`.
+ */
+chatRoutes.get('/:id/products', async (c) => {
+  const user = c.get('user')!;
+  const chatId = str(c.req.param('id'), 'chatId', { min: 1, max: 60 });
+  await assertMayWriteInThread(c.env.DB, chatId, user.id);
+  const thread = await storeThreadOf(c.env.DB, chatId);
+  if (!thread || !threadRole(thread, user.id)) throw badRequest('Products are sent in a conversation with a store', 'CARD_NOT_ALLOWED_HERE');
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 40, def: 20 });
+  const q = likePattern(c.req.query('q'));
+  if (q) await rateLimit(c, 'chat-product-search', 60, 60);
+  const beforeRaw = (c.req.query('cursor') ?? '').slice(0, 200);
+  const bar = beforeRaw.lastIndexOf('|');
+  const cursor = bar === -1 ? { at: '', id: '' } : { at: beforeRaw.slice(0, bar), id: beforeRaw.slice(bar + 1) };
+  const { results } = await c.env.DB.prepare(
+    `SELECT p.id, p.slug, p.name, p.name_ar, p.images, p.price_iqd, p.original_price_iqd, p.track_stock, p.stock,
+            p.variant_mode, p.created_at,
+            (SELECT MIN(COALESCE(v.price_iqd, p.price_iqd)) FROM community_product_variants v
+              WHERE v.product_id = p.id AND v.active = 1) AS v_min,
+            (SELECT MAX(COALESCE(v.price_iqd, p.price_iqd)) FROM community_product_variants v
+              WHERE v.product_id = p.id AND v.active = 1) AS v_max
+       FROM community_products p
+      WHERE p.store_id = ?1 AND p.lifecycle = 'active' AND p.status = 'active'
+        AND (?2 = '' OR ${sqlLikeClause(['p.name', 'p.name_ar'], '?2')})
+        AND (?3 = '' OR p.created_at < ?3 OR (p.created_at = ?3 AND p.id < ?4))
+      ORDER BY p.created_at DESC, p.id DESC LIMIT ?5`
+  )
+    .bind(thread.store_id, q, cursor.at, cursor.id, limit)
+    .all<Record<string, unknown>>();
+  const rows = results ?? [];
+  const last = rows.length === limit ? rows[rows.length - 1] : null;
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({
+    success: true,
+    products: rows.map((p) => {
+      const variants = p.variant_mode === 'variants' && p.v_min !== null && p.v_min !== undefined;
+      const lo = variants ? Number(p.v_min) : Number(p.price_iqd ?? 0);
+      const hi = variants ? Number(p.v_max ?? lo) : lo;
+      const images = safeParse<unknown[]>(p.images, []);
+      const image = (Array.isArray(images) ? images : []).find((x): x is string => typeof x === 'string' && x.startsWith('/files/')) ?? null;
+      return {
+        id: p.id,
+        name: p.name,
+        name_ar: p.name_ar,
+        image,
+        price_iqd: lo,
+        price_max_iqd: hi > lo ? hi : null,
+        original_price_iqd: p.original_price_iqd ?? null,
+        in_stock: !Number(p.track_stock) || Number(p.stock) > 0,
+        variants: p.variant_mode === 'variants',
+      };
+    }),
+    next_cursor: last ? `${String(last.created_at)}|${String(last.id)}` : null,
+  });
 });
 
 // Presence inherits authentication and the app's CSRF/host checks. Both
@@ -591,21 +737,47 @@ export function chatAttachmentKind(fileKey: unknown): ChatAttachmentKind | null 
  * a screen draws <img>, <video>, <audio> or a document link from one field.
  * `fileUrl` is composed here and the key never leaves the server.
  */
-export function chatMessagePublic(m: Record<string, unknown>, viewerId: string) {
+export function chatMessagePublic(m: Record<string, unknown>, viewerId: string, current?: CardCurrent) {
   const attachment =
     (typeof m.attachment_kind === 'string' && m.attachment_kind
       ? (m.attachment_kind as ChatAttachmentKind)
       : null) ?? chatAttachmentKind(m.file_key);
+  // A CARD (0150): its kind (`product_card`, `quote_card`…), what it was sent
+  // as and what it is now for THIS reader (worker/lib/chatCards.ts). `body`
+  // stays the plain fallback an older client shows.
+  const card = cardPublic(m, current);
   return {
     id: m.id,
     sender_id: m.sender_id,
     mine: m.sender_id === viewerId,
-    kind: attachment ?? m.kind,
+    kind: card ? card.kind : attachment ?? m.kind,
     attachment_kind: attachment,
     body: m.body,
     fileUrl: m.file_key ? `/files/${m.file_key}` : null,
+    card,
+    /** Written by the server about an event — drawn centred, never as a bubble. */
+    system: Number(m.is_system ?? 0) === 1,
     created_at: m.created_at,
   };
+}
+
+/**
+ * THE MESSAGES OF A PAGE, WITH THEIR CARDS' CURRENT STATE — one read per card
+ * type on the page, never one per card, and none at all for a page of plain
+ * messages. Staff reading a store thread see every card and may act on none.
+ */
+async function publicPage(
+  env: Env,
+  chatId: string,
+  rows: Array<Record<string, unknown>>,
+  viewerId: string,
+  staff: boolean
+) {
+  const hasCards = rows.some((m) => typeof m.card_type === 'string' && m.card_type);
+  const current = hasCards
+    ? await currentCardStates(env, rows, await storeThreadOf(env.DB, chatId), viewerId, staff)
+    : new Map<string, CardCurrent>();
+  return rows.map((m) => chatMessagePublic(m, viewerId, current.get(String(m.id))));
 }
 
 /**
@@ -666,12 +838,62 @@ chatRoutes.get('/:id/messages', async (c) => {
   const oldest = page[0];
   return c.json({
     success: true,
-    messages: page.map((m) => chatMessagePublic(m, user.id)),
+    messages: await publicPage(c.env, chatId, page, user.id, readOnly),
     has_more: hasMore,
     older_cursor: hasMore && oldest ? `${String(oldest.created_at)}|${String(oldest.id)}` : null,
     read_only: readOnly,
   });
 });
+
+/**
+ * A MESSAGE ALREADY STORED FOR THIS CLIENT SEND (0150 `client_id`) — the
+ * answer to a retried send, in the read path's own shape. Null on a database
+ * a migration behind (no client ids there to find).
+ */
+async function storedClientMessage(env: Env, chatId: string, senderId: string, clientId: string | null) {
+  if (!clientId) return null;
+  const row = await env.DB.prepare('SELECT * FROM chat_messages WHERE chat_id = ? AND sender_id = ? AND client_id = ?')
+    .bind(chatId, senderId, clientId)
+    .first<Record<string, unknown>>()
+    .catch((e) => {
+      if (isSchemaMissing(e)) return null;
+      throw e;
+    });
+  if (!row) return null;
+  const [message] = await publicPage(env, chatId, [row], senderId, false);
+  return message;
+}
+
+const isClientIdClash = (e: unknown) =>
+  /UNIQUE/i.test(e instanceof Error ? e.message : String(e)) && /client_id/i.test(e instanceof Error ? e.message : String(e));
+
+/**
+ * A plain line or an attachment, written with the columns this database has.
+ * `attachment_kind` (0110) and `client_id` (0150) are named only when there is
+ * something to put in them, and each is dropped — newest first — when the
+ * Worker is ahead of the migration that made it: the read path derives the
+ * attachment's kind from its key, and a line without its client id is only a
+ * line a retry could repeat.
+ */
+async function insertPlainMessage(
+  db: D1Database,
+  base: { id: string; chatId: string; senderId: string; kind: string; body: string; fileKey: string | null; createdAt: string },
+  optional: { attachment_kind?: string; client_id?: string }
+): Promise<void> {
+  const extra = Object.entries(optional).filter(([, v]) => v !== undefined) as Array<[string, string]>;
+  for (;;) {
+    const cols = ['id', 'chat_id', 'sender_id', 'kind', 'body', 'file_key', ...extra.map(([k]) => k), 'created_at'];
+    const vals = [base.id, base.chatId, base.senderId, base.kind, base.body, base.fileKey, ...extra.map(([, v]) => v), base.createdAt];
+    try {
+      await db.prepare(`INSERT INTO chat_messages (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`).bind(...vals).run();
+      return;
+    } catch (e) {
+      if (!isSchemaMissing(e) || !extra.length) throw e;
+      const dropped = extra.pop()!;
+      console.error(`chat_messages is behind the deployment (no ${dropped[0]}): ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+}
 
 chatRoutes.post('/:id/messages', async (c) => {
   await rateLimit(c, 'chat-send', 200, 3600);
@@ -685,87 +907,110 @@ chatRoutes.post('/:id/messages', async (c) => {
   await assertMayWriteInThread(c.env.DB, chatId, user.id);
   const storeThread = await storeThreadOf(c.env.DB, chatId);
   const body = await c.req.json().catch(() => ({}));
-  // «كاميرا/ملف/بصمة صوتية». Any of the four attachment kinds means "this
-  // message carries a file"; WHICH kind it is comes from where the upload route
-  // filed it (`chatAttachmentKind`), never from this field.
-  const attaching = body.kind === 'image' || body.kind === 'video' || body.kind === 'audio' || body.kind === 'file';
-  const text = str(body.body, 'message', { max: 4000, required: !attaching });
-  let fileKey: string | null = null;
-  let attachmentKind: ChatAttachmentKind | null = null;
-  if (attaching) {
-    fileKey = str(body.fileKey, 'fileKey', { min: 5, max: 300 });
-    /**
-     * ======================================================================
-     *  THE KEY NAMES THE CONVERSATION, NOT THE SENDER.
-     * ======================================================================
-     * This line read `chat/${user.id}/` and had to be changed the day the
-     * upload route re-filed chat attachments under the chat — «الثاني الاسهل
-     * في فتح المحادثه», the owner's own reason. It was not changed, so EVERY
-     * attachment has been refused since: `uploads.ts` builds
-     * `chat/<chatId>/attachments/<id>.webp` (buildMediaKey, purpose='chat',
-     * entityId = the chat), the bytes land in R2, and this check then rejects
-     * the message the upload was for. The customer sees «تعذر إرسال الصورة»
-     * and an orphan object stays in the bucket. Nobody could send a picture in
-     * any conversation on this platform — the order chat included, which is
-     * the screen this is being fixed for.
-     *
-     * AND THE NEW FORM IS THE STRONGER CHECK, not merely the matching one.
-     * `assertParticipant` above has already established that this account is
-     * in THIS chat; pinning the key's first segment to the same chat id is
-     * therefore the whole question — a member cannot attach another
-     * conversation's file, which the sender-scoped form never prevented.
-     * `uploads.ts` verifies participation before it stores a byte, so the two
-     * halves now ask the same question in the same words.
-     */
-    if (!fileKey.startsWith(`chat/${chatId}/`)) throw badRequest('Invalid attachment reference');
-    const head = await headMediaObject(c.env, 'private', fileKey);
-    if (!head) throw badRequest('Attachment upload not found');
-    attachmentKind = chatAttachmentKind(fileKey);
-  }
-  if (!attaching && !text) throw badRequest('Message cannot be empty');
 
-  // `kind` keeps 0001's two values (its CHECK cannot widen without a table
-  // rebuild): a picture or a clip is 'image', as legacy readers expect; a voice
-  // note or a document is 'text' with an empty body, so a reader that knows
-  // nothing of `attachment_kind` shows an empty bubble, never a broken image.
-  const kind = attachmentKind === 'image' || attachmentKind === 'video' ? 'image' : 'text';
+  // A RETRIED SEND IS THE SAME MESSAGE (0150): the client names each send, and
+  // a second POST of that name answers the message already stored — a double
+  // tap or a lost response never puts the line (or the card) in twice.
+  const clientId = clientIdFrom(body.client_id);
+  const replay = await storedClientMessage(c.env, chatId, user.id, clientId);
+  if (replay) return c.json({ success: true, id: replay.id, message: replay, replayed: true });
+
   const id = newId('msg');
   // The timestamp is bound, not defaulted, so the message this route answers
   // with carries the SAME value the thread will read back.
   const createdAt = new Date().toISOString();
-  // `attachment_kind` (0110) is named ONLY when there is an attachment, so a
-  // plain text line never depends on that migration; and an attachment sent
-  // while the Worker is ahead of 0110 is stored without it — the read path
-  // derives the same kind from the key's folder (`chatAttachmentKind`).
-  const insertPlain = () =>
-    c.env.DB.prepare(
-      'INSERT INTO chat_messages (id, chat_id, sender_id, kind, body, file_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    )
-      .bind(id, chatId, user.id, kind, text, fileKey, createdAt)
-      .run();
-  if (attachmentKind) {
-    try {
-      await c.env.DB.prepare(
-        'INSERT INTO chat_messages (id, chat_id, sender_id, kind, body, file_key, attachment_kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-      )
-        .bind(id, chatId, user.id, kind, text, fileKey, attachmentKind, createdAt)
-        .run();
-    } catch (e) {
-      if (!isSchemaMissing(e)) throw e;
-      console.error(`chat_messages is behind the deployment (0110 not applied): ${e instanceof Error ? e.message : String(e)}`);
-      await insertPlain();
+  let stored: Record<string, unknown>;
+
+  if (body.card !== undefined) {
+    /*
+     * A CARD — an id and a type, and nothing else from the client
+     * (worker/lib/chatCards.ts): the server checks the entity belongs to THIS
+     * thread's store (and customer), builds the snapshot and writes it once.
+     */
+    if (!storeThread) throw badRequest('Cards are sent in a conversation with a store', 'CARD_NOT_ALLOWED_HERE');
+    const raw = body.card && typeof body.card === 'object' ? (body.card as Record<string, unknown>) : {};
+    if (!isCardType(raw.type) || !SENDABLE_CARDS.includes(raw.type)) {
+      throw badRequest('That card cannot be sent this way', 'CARD_TYPE_UNSUPPORTED');
     }
+    const ref = str(raw.ref, 'card.ref', { min: 1, max: 60 });
+    const card = await resolveSendableCard(c.env, storeThread, user.id, raw.type, ref);
+    try {
+      await cardInsertStatement(c.env.DB, { id, chatId, senderId: user.id, card, createdAt, clientId }).run();
+    } catch (e) {
+      if (clientId && isClientIdClash(e)) {
+        const again = await storedClientMessage(c.env, chatId, user.id, clientId);
+        if (again) return c.json({ success: true, id: again.id, message: again, replayed: true });
+      }
+      throw e;
+    }
+    stored = {
+      id, sender_id: user.id, kind: 'text', body: card.body, file_key: null,
+      card_type: card.type, card_ref: card.ref, card_snapshot: JSON.stringify(card.snapshot), is_system: 0, created_at: createdAt,
+    };
   } else {
-    await insertPlain();
+    // «كاميرا/ملف/بصمة صوتية». Any of the four attachment kinds means "this
+    // message carries a file"; WHICH kind it is comes from where the upload route
+    // filed it (`chatAttachmentKind`), never from this field.
+    const attaching = body.kind === 'image' || body.kind === 'video' || body.kind === 'audio' || body.kind === 'file';
+    const text = str(body.body, 'message', { max: 4000, required: !attaching });
+    let fileKey: string | null = null;
+    let attachmentKind: ChatAttachmentKind | null = null;
+    if (attaching) {
+      fileKey = str(body.fileKey, 'fileKey', { min: 5, max: 300 });
+      /**
+       * ======================================================================
+       *  THE KEY NAMES THE CONVERSATION, NOT THE SENDER.
+       * ======================================================================
+       * This line read `chat/${user.id}/` and had to be changed the day the
+       * upload route re-filed chat attachments under the chat — «الثاني الاسهل
+       * في فتح المحادثه», the owner's own reason. It was not changed, so EVERY
+       * attachment has been refused since: `uploads.ts` builds
+       * `chat/<chatId>/attachments/<id>.webp` (buildMediaKey, purpose='chat',
+       * entityId = the chat), the bytes land in R2, and this check then rejects
+       * the message the upload was for. The customer sees «تعذر إرسال الصورة»
+       * and an orphan object stays in the bucket. Nobody could send a picture in
+       * any conversation on this platform — the order chat included, which is
+       * the screen this is being fixed for.
+       *
+       * AND THE NEW FORM IS THE STRONGER CHECK, not merely the matching one.
+       * `assertParticipant` above has already established that this account is
+       * in THIS chat; pinning the key's first segment to the same chat id is
+       * therefore the whole question — a member cannot attach another
+       * conversation's file, which the sender-scoped form never prevented.
+       * `uploads.ts` verifies participation before it stores a byte, so the two
+       * halves now ask the same question in the same words.
+       */
+      if (!fileKey.startsWith(`chat/${chatId}/`)) throw badRequest('Invalid attachment reference');
+      const head = await headMediaObject(c.env, 'private', fileKey);
+      if (!head) throw badRequest('Attachment upload not found');
+      attachmentKind = chatAttachmentKind(fileKey);
+    }
+    if (!attaching && !text) throw badRequest('Message cannot be empty');
+
+    // `kind` keeps 0001's two values (its CHECK cannot widen without a table
+    // rebuild): a picture or a clip is 'image', as legacy readers expect; a voice
+    // note or a document is 'text' with an empty body, so a reader that knows
+    // nothing of `attachment_kind` shows an empty bubble, never a broken image.
+    const kind = attachmentKind === 'image' || attachmentKind === 'video' ? 'image' : 'text';
+    try {
+      await insertPlainMessage(
+        c.env.DB,
+        { id, chatId, senderId: user.id, kind, body: text, fileKey, createdAt },
+        { ...(attachmentKind ? { attachment_kind: attachmentKind } : {}), ...(clientId ? { client_id: clientId } : {}) }
+      );
+    } catch (e) {
+      if (clientId && isClientIdClash(e)) {
+        const again = await storedClientMessage(c.env, chatId, user.id, clientId);
+        if (again) return c.json({ success: true, id: again.id, message: again, replayed: true });
+      }
+      throw e;
+    }
+    stored = { id, sender_id: user.id, kind, body: text, file_key: fileKey, attachment_kind: attachmentKind, created_at: createdAt };
   }
+
   await setChatTyping(c.env.DB, chatId, user.id, false).catch(() => {});
   // The thread's last activity, which the store's inbox pages by (0124).
-  await c.env.DB.prepare('UPDATE chats SET last_message_at = ? WHERE id = ?')
-    .bind(createdAt, chatId)
-    .run()
-    .catch((e) => {
-      if (!isSchemaMissing(e)) console.error('chat activity not stamped', chatId, e instanceof Error ? e.message : String(e));
-    });
+  await stampThreadActivity(c.env.DB, chatId, createdAt);
   // «محادثة مباشرة مع الفريق» has to reach the team: a customer line on one of
   // the shop's order threads is announced to «‼️ Support» (debounced; total).
   await announceCustomerChatMessage(c, chatId, user.id, id);
@@ -781,11 +1026,9 @@ chatRoutes.post('/:id/messages', async (c) => {
       .catch(() => {});
     await notifyStoreThread(c.env, storeThread, chatId, user.id, id).catch(() => {});
   }
-  // The stored message, in the read path's own shape, so a screen can append
-  // it instead of re-fetching the whole thread after every send.
-  const message = chatMessagePublic(
-    { id, sender_id: user.id, kind, body: text, file_key: fileKey, attachment_kind: attachmentKind, created_at: createdAt },
-    user.id
-  );
+  // The stored message, in the read path's own shape (its card with its
+  // current state), so a screen can append it instead of re-fetching the
+  // whole thread after every send.
+  const [message] = await publicPage(c.env, chatId, [stored], user.id, false);
   return c.json({ success: true, id, message });
 });

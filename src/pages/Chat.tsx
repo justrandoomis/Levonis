@@ -18,11 +18,19 @@ import ChatAttachment, {
 } from '../components/chat/ChatAttachment';
 import {
   ArrowLeft, ArrowRight, Mic, Smile, Plus, X, FileText,
-  Image as ImageIcon, Camera, Store as StoreIcon, Gift, MapPin, UserCircle, Wallet, Send, MessageSquare
+  Image as ImageIcon, Camera, Store as StoreIcon, Gift, MapPin, UserCircle, Wallet, Send, MessageSquare, ShoppingBag
 } from 'lucide-react';
+import ChatCardView, { SystemEventCard } from '../components/chat/cards/ChatCardView';
+import { newClientId, type ChatCard, type ChatThreadInfo } from '../lib/chatCards';
+import { toast } from '../lib/toastStore';
 
-/** 'text', or the attachment's real kind (worker/routes/chats.ts `chatMessagePublic`). */
-type MessageKind = 'text' | ChatAttachmentKind;
+const ProductPickerSheet = React.lazy(() => import('../components/chat/ProductPickerSheet'));
+
+/**
+ * 'text', the attachment's real kind, or a card's kind (`product_card`…) —
+ * worker/routes/chats.ts `chatMessagePublic`.
+ */
+type MessageKind = 'text' | ChatAttachmentKind | (string & {});
 
 interface ChatMessage {
   id: string;
@@ -31,6 +39,10 @@ interface ChatMessage {
   kind: MessageKind;
   body: string | null;
   fileUrl: string | null;
+  /** A card (0150): what it was sent as and what it is now, for this reader. */
+  card?: ChatCard | null;
+  /** Written by the server about an event — drawn centred. */
+  system?: boolean;
   created_at: string;
 }
 
@@ -44,11 +56,6 @@ interface PendingMessage {
   failed: boolean;
 }
 
-interface ChatListItem {
-  id: string;
-  other_username: string | null;
-  other_name: string | null;
-}
 
 function formatMsgTime(iso: string, lang: string): string {
   const date = new Date(iso);
@@ -75,6 +82,11 @@ export default function Chat() {
   // Separate from sendError: that one is about a message the server refused.
   const [actionNotice, setActionNotice] = useState('');
   const [otherName, setOtherName] = useState<string | null>(null);
+  // WHO THIS CONVERSATION IS WITH (GET /api/chats/:id): the store, by its own
+  // name and logo, for its customer; the customer for the store; and which
+  // cards this side may send here.
+  const [thread, setThread] = useState<ChatThreadInfo | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   // THE THREAD IN PAGES (audit 04 B5): the newest page first, older ones on
   // the way up. `olderCursor` is where the next older page starts, or null
@@ -212,18 +224,25 @@ export default function Chat() {
     };
   }, [fetchMessages]);
 
-  // The other participant's name comes from the chat list.
+  // The thread's identity — no longer the whole conversation list scanned for
+  // one row, and no longer the shop owner's personal name for a shop.
   useEffect(() => {
     let cancelled = false;
+    setThread(null);
+    setOtherName(null);
+    if (!id) return;
     api
-      .get<{ chats: ChatListItem[] }>('/api/chats')
+      .get<{ chat: ChatThreadInfo }>(`/api/chats/${id}`, { mascot: 'silent' })
       .then((data) => {
         if (cancelled) return;
-        const chat = (data.chats || []).find((c) => c.id === id);
-        if (chat) setOtherName(chat.other_name || chat.other_username || null);
+        setThread(data.chat);
+        const who = data.chat.store && data.chat.role !== 'merchant'
+          ? data.chat.store.name
+          : data.chat.other?.name || data.chat.other?.username || null;
+        setOtherName(who);
       })
       .catch(() => {
-        /* the header just shows nothing if the list fails */
+        /* the header just shows «محادثة» if the identity fails */
       });
     return () => {
       cancelled = true;
@@ -249,7 +268,8 @@ export default function Chat() {
     setShowEmojiPicker(false);
     setIsPlusMenuOpen(false);
     try {
-      const res = await api.post<{ id: string }>(`/api/chats/${id}/messages`, { kind: 'text', body });
+      // The send's own name (0150): a retried POST of it is the same message.
+      const res = await api.post<{ id: string }>(`/api/chats/${id}/messages`, { kind: 'text', body, client_id: newClientId() });
       setPending((prev) => prev.map((p) => (p.tempId === tempId ? { ...p, serverId: res.id } : p)));
     } catch (err) {
       setPending((prev) => prev.filter((p) => p.tempId !== tempId));
@@ -286,7 +306,7 @@ export default function Chat() {
       // so one thread's pictures sit in one folder, and the server checks that
       // this account is in it before storing anything.
       const uploaded = await uploadFile(file, 'chat', id);
-      const res = await api.post<{ id: string }>(`/api/chats/${id}/messages`, { kind, fileKey: uploaded.key });
+      const res = await api.post<{ id: string }>(`/api/chats/${id}/messages`, { kind, fileKey: uploaded.key, client_id: newClientId() });
       setPending((prev) => prev.map((p) => (p.tempId === tempId ? { ...p, serverId: res.id } : p)));
     } catch (err) {
       setPending((prev) => prev.filter((p) => p.tempId !== tempId));
@@ -295,6 +315,27 @@ export default function Chat() {
       );
     } finally {
       setUploading(false);
+    }
+  };
+
+  /**
+   * A CARD, BY ITS ID — the server builds it from the database and refuses one
+   * that is not this thread's (worker/lib/chatCards.ts). The thread is re-read
+   * on success so the card appears with its current state.
+   */
+  const sendCard = async (type: 'product' | 'store', ref: string) => {
+    if (!id) return;
+    setSendError(null);
+    setIsPlusMenuOpen(false);
+    try {
+      await api.post(`/api/chats/${id}/messages`, { card: { type, ref }, client_id: newClientId() }, { mascot: 'silent' });
+      await fetchMessages();
+    } catch (err) {
+      const fallback = loc('تعذّر إرسال البطاقة', 'The card could not be sent');
+      // OWNER: Sorani to be written by hand.
+      const { apiRefusal } = await import('../lib/refusalStrings');
+      toast.error(err instanceof ApiError ? apiRefusal(err, lang, fallback) : fallback);
+      throw err;
     }
   };
 
@@ -409,15 +450,31 @@ export default function Chat() {
       label: dir === 'rtl' ? 'ملف' : 'File',
       onClick: () => documentInputRef.current?.click(),
     },
-    // Three of these were disabled with "قريباً" on them and did not need to
-    // be: each is a message with a link in it, which the existing pipeline
-    // already sends. They are sent as ordinary text so the other side reads
-    // them on any client, including a notification.
-    {
-      icon: StoreIcon,
-      label: dir === 'rtl' ? 'المتجر' : 'Store',
-      onClick: () => void sendText(`${window.location.origin}/products`),
-    },
+    // IN A STORE'S CONVERSATION, REAL CARDS (docs/COMMUNITY_COMMERCE_CHAT.md):
+    // one of THIS store's products, or the store itself — sent by id, built by
+    // the server. «المتجر» used to paste a link to the platform's catalogue into
+    // a conversation with a community shop. Elsewhere it stays that link: three
+    // of these were disabled with "قريباً" on them and did not need to be —
+    // each is a message with a link in it, sent as ordinary text so the other
+    // side reads it on any client, including a notification.
+    ...(thread?.can?.product_card
+      ? [{
+          icon: ShoppingBag,
+          label: loc('منتج', 'Product'),
+          onClick: () => { setIsPlusMenuOpen(false); setPickerOpen(true); },
+        }]
+      : []),
+    thread?.can?.store_card && thread.store
+      ? {
+          icon: StoreIcon,
+          label: loc('بطاقة المتجر', 'Store card'),
+          onClick: () => void sendCard('store', thread.store!.id).catch(() => {}),
+        }
+      : {
+          icon: StoreIcon,
+          label: dir === 'rtl' ? 'المتجر' : 'Store',
+          onClick: () => void sendText(`${window.location.origin}/products`),
+        },
     {
       icon: MapPin,
       label: dir === 'rtl' ? 'الموقع' : 'Location',
@@ -465,7 +522,7 @@ export default function Chat() {
         <div
           className={`${mine ? 'bg-surface-selected ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'bg-surface ltr:rounded-tl-sm rtl:rounded-tr-sm'} rounded-lg max-w-[min(80%,24rem)] mt-1 p-2 text-[14px] text-text-primary ${faded ? 'opacity-60' : ''}`}
         >
-          <ChatAttachment kind={kind} url={fileUrl} loc={loc} />
+          <ChatAttachment kind={kind as ChatAttachmentKind} url={fileUrl} loc={loc} />
           {body && <p dir="auto" className="mt-1 px-1 whitespace-pre-wrap break-words">{body}</p>}
         </div>
       );
@@ -516,10 +573,32 @@ export default function Chat() {
           >
             {dir === 'rtl' ? <ArrowRight className="w-5 h-5" strokeWidth={2} /> : <ArrowLeft className="w-5 h-5" strokeWidth={2} />}
           </button>
-          <div className="flex flex-col">
-            <h1 className="font-bold text-base sm:text-lg leading-tight text-text-primary">
+          {thread?.store && thread.role !== 'merchant' && (
+            <button
+              type="button"
+              onClick={() => navigate(thread.store!.url)}
+              aria-label={loc(`افتح صفحة ${thread.store.name}`, `Open ${thread.store.name}`)}
+              className="w-9 h-9 rounded-full overflow-hidden bg-surface-raised flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              {thread.store.logoUrl
+                ? <img referrerPolicy="no-referrer" src={thread.store.logoUrl} alt="" className="w-full h-full object-cover" />
+                : <StoreIcon className="w-4 h-4 text-text-muted" strokeWidth={1.5} aria-hidden="true" />}
+            </button>
+          )}
+          <div className="flex flex-col min-w-0">
+            <h1 className="font-bold text-base sm:text-lg leading-tight text-text-primary truncate">
               {otherName || (dir === 'rtl' ? 'محادثة' : 'Chat')}
             </h1>
+            {thread?.store && (
+              <p className="text-[11px] text-text-muted leading-tight truncate" data-chat-context>
+                {thread.role === 'merchant'
+                  ? loc(`زبون ${thread.store.name}`, `Customer of ${thread.store.name}`)
+                  : thread.store.open
+                    ? loc('متجر في مجتمع ليفو', 'A Levo Community store')
+                    : loc('المتجر لا يستقبل طلبات الآن', 'The store is not taking orders now')}
+                {/* OWNER: Sorani to be written by hand. */}
+              </p>
+            )}
           </div>
         </div>
         <MotionCharacterHome busy={loading} />
@@ -578,11 +657,17 @@ export default function Chat() {
                   {(index === 0 || prevTime !== time) && (
                     <div className="text-center text-[11px] text-text-muted font-medium tracking-wide">{time}</div>
                   )}
-                  <div className={`flex items-start gap-2 ${msg.mine ? 'justify-end' : ''}`}>
-                    {!msg.mine && renderAvatar(false)}
-                    {renderBubble(msg.kind, msg.body, msg.fileUrl, msg.mine)}
-                    {msg.mine && renderAvatar(true)}
-                  </div>
+                  {msg.system ? (
+                    <SystemEventCard card={msg.card ?? null} fallback={msg.body} />
+                  ) : (
+                    <div className={`flex items-start gap-2 ${msg.mine ? 'justify-end' : ''}`}>
+                      {!msg.mine && renderAvatar(false)}
+                      {msg.card
+                        ? <ChatCardView card={msg.card} mine={msg.mine} fallback={msg.body} />
+                        : renderBubble(msg.kind, msg.body, msg.fileUrl, msg.mine)}
+                      {msg.mine && renderAvatar(true)}
+                    </div>
+                  )}
                 </React.Fragment>
               );
             })}
@@ -776,6 +861,16 @@ export default function Chat() {
           </div>
         )}
       </div>
+      )}
+      {pickerOpen && id && (
+        <React.Suspense fallback={null}>
+          <ProductPickerSheet
+            open={pickerOpen}
+            onClose={() => setPickerOpen(false)}
+            chatId={id}
+            onPick={(productId) => sendCard('product', productId)}
+          />
+        </React.Suspense>
       )}
     </div>
   );

@@ -170,6 +170,10 @@ test('every code the table translates is one the server can actually emit', () =
     // «الاستبدال» (0143): eligibility, the draft, the photos, the value, the credit.
     'worker/lib/tradeIn.ts',
     'worker/routes/tradeIn.ts',
+    // The store's conversation (docs/COMMUNITY_COMMERCE_CHAT.md): a card names
+    // an entity of THIS thread or it is refused, in the thread's own words.
+    'worker/lib/chatCards.ts',
+    'worker/routes/chats.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

@@ -159,7 +159,7 @@ moved; checkout reprices on the server and answers `QUOTE_CHANGED` as it always
 did.
 
 **D8 — System cards.** Server-written into the originating thread with
-`system=1`, the actor as sender, and an idempotent `card_event_key` per event
+`is_system=1`, the actor as sender, and an idempotent `card_event_key` per event
 (`order:<id>:placed`, `custom_order:<id>:funded`, …), after the money batch has
 committed; failure to post never fails the money.
 
@@ -192,7 +192,7 @@ card_type      TEXT CHECK (card_type IS NULL OR card_type IN
 card_ref       TEXT            -- the entity id; never a price, name or picture
 card_snapshot  TEXT            -- JSON, written once by the server
 card_event_key TEXT            -- idempotency of system cards: UNIQUE (chat_id, card_event_key)
-system         INTEGER NOT NULL DEFAULT 0 CHECK (system IN (0,1))
+is_system      INTEGER NOT NULL DEFAULT 0 CHECK (is_system IN (0,1))
 client_id      TEXT            -- idempotent send: UNIQUE (chat_id, sender_id, client_id)
 ```
 API kinds: `text · image · video · audio · file · product_card ·
@@ -321,9 +321,9 @@ fixture.
 | # | Stage | Status |
 |---|---|---|
 | 1 | Google sign-in: `www` → apex | done — `tests/canonicalHost.test.ts`; owner console checks in docs/GOOGLE_SIGNIN_FIX.md §8 |
-| 2 | Structured chat messages | building |
-| 3 | Product and store cards | planned |
-| 4 | Print requests and quotes (escrow) | planned |
+| 2 | Structured chat messages | done — 0150, worker/lib/chatCards.ts, `GET /api/chats/:id`, idempotent `client_id`; tests/chatCards.test.ts |
+| 3 | Product and store cards | done — picker, cards with frozen snapshot + current state, add to cart through the store cart |
+| 4 | Print requests and quotes (escrow) | building |
 | 5 | Private custom products (store flow) | planned |
 | 6 | System cards on every money move; `/delivered` fix | planned |
 | 7 | Merchant/customer UX, workspace sections, product preview | planned |
