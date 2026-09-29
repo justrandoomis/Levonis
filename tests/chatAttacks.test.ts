@@ -246,6 +246,17 @@ test('ATTACK: a replayed send — the same client_id is the same quote, the same
   assert.equal(reused.status, 409);
   assert.equal((await json(reused)).code, 'CLIENT_ID_REUSED');
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM community_products WHERE audience_user_id = 'buyer'"), 1, 'nothing written');
+
+  // …and one used for ANOTHER quote is never answered with that quote.
+  const other = await json(await post(as(raw, ALI), `/api/chats/${chatId}/quotes`, { title: 'Second job', price_iqd: 20000, completion_days: 1, client_id: 'quote-send-0002' }));
+  const crossed = await patch(as(raw, ALI), `/api/chats/${chatId}/quotes/${a.offer.id}`, { price_iqd: 1000, client_id: 'quote-send-0002' });
+  assert.equal(crossed.status, 409);
+  assert.equal((await json(crossed)).code, 'CLIENT_ID_REUSED');
+  assert.deepEqual(
+    [row<{ price_iqd: number }>(raw, 'SELECT price_iqd FROM community_offers WHERE id = ?', a.offer.id)!.price_iqd, other.offer.price_iqd],
+    [38000, 20000],
+    'neither quote moved'
+  );
 });
 
 // ============================================================ money

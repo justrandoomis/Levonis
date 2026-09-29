@@ -274,12 +274,25 @@ async function quotingStore(c: Context<AppContext>, thread: StoreThread) {
  * the offer fenced on the request still being this store's, open and unexpired
  * (0151's trigger refuses any other store's offer even if a route forgot).
  */
-/** A retried quote's answer: the quote the first send made, as the first answer said it. */
-async function quoteReplay(c: Context<AppContext>, message: Record<string, unknown>) {
+const clientIdReused = () => conflict('That send was already used for another message', 'CLIENT_ID_REUSED');
+
+/**
+ * A retried quote's answer: the quote the first send made, as the first answer
+ * said it — and only when it IS the same send: a client id already used for
+ * another quote, another request or another offer's edit is refused, never
+ * answered with someone else's result.
+ */
+async function quoteReplay(
+  c: Context<AppContext>,
+  message: Record<string, unknown>,
+  expect: { offerId?: string; requestId?: string } = {}
+) {
   const card = message.card as { type?: string; ref?: string } | null | undefined;
-  if (card?.type !== 'quote' || !card.ref) throw conflict('That send was already used for another message', 'CLIENT_ID_REUSED');
+  if (card?.type !== 'quote' || !card.ref) throw clientIdReused();
+  if (expect.offerId && card.ref !== expect.offerId) throw clientIdReused();
   const row = await c.env.DB.prepare('SELECT * FROM community_offers WHERE id = ?').bind(card.ref).first<Record<string, unknown>>();
-  if (!row) throw conflict('That send was already used for another message', 'CLIENT_ID_REUSED');
+  if (!row) throw clientIdReused();
+  if (expect.requestId && String(row.request_id) !== expect.requestId) throw clientIdReused();
   return c.json({ success: true, replayed: true, offer: offerShape(row), request_id: String(row.request_id), message });
 }
 
@@ -295,8 +308,9 @@ chatCommerceRoutes.post('/:id/quotes', requireCommunityOpen, async (c) => {
   // index (0150) aborts the whole batch the second time — no second request,
   // no second offer — and the first one is the answer.
   const clientId = clientIdFrom(body.client_id);
+  const named = { requestId: typeof body.request_id === 'string' && body.request_id ? body.request_id : undefined };
   const replay = await storedClientMessage(c.env, chatId, user.id, clientId);
-  if (replay) return quoteReplay(c, replay);
+  if (replay) return quoteReplay(c, replay, named);
   const ts = nowIso();
   const terms = await readOfferTerms(c.env.DB, body, ts, { partial: false });
   const db = c.env.DB;
@@ -379,7 +393,7 @@ chatCommerceRoutes.post('/:id/quotes', requireCommunityOpen, async (c) => {
     // The retry that raced the first send past the check above.
     if (clientId && isClientIdClash(e)) {
       const again = await storedClientMessage(c.env, chatId, user.id, clientId);
-      if (again) return quoteReplay(c, again);
+      if (again) return quoteReplay(c, again, named);
     }
     // The one-live-offer index: this store already has a quote on this request.
     if (isConstraintAbort(e) && /UNIQUE/i.test(e instanceof Error ? e.message : String(e))) {
@@ -431,7 +445,7 @@ chatCommerceRoutes.patch('/:id/quotes/:offerId', requireCommunityOpen, async (c)
   // A retried edit is the SAME revision, never a second one with the same terms.
   const clientId = clientIdFrom(body.client_id);
   const replay = await storedClientMessage(c.env, chatId, user.id, clientId);
-  if (replay) return quoteReplay(c, replay);
+  if (replay) return quoteReplay(c, replay, { offerId });
   const ts = nowIso();
   const t = await readOfferTerms(db, body, ts, { partial: true });
   const sets: string[] = [];
@@ -495,7 +509,7 @@ chatCommerceRoutes.patch('/:id/quotes/:offerId', requireCommunityOpen, async (c)
   } catch (e) {
     if (clientId && isClientIdClash(e)) {
       const again = await storedClientMessage(c.env, chatId, user.id, clientId);
-      if (again) return quoteReplay(c, again);
+      if (again) return quoteReplay(c, again, { offerId });
     }
     throw e;
   }
@@ -530,11 +544,12 @@ chatCommerceRoutes.patch('/:id/quotes/:offerId', requireCommunityOpen, async (c)
  * Immutable once created (0152's trigger): to change it, cancel it and send a
  * new one.
  */
-/** A retried private product's answer: the product the first send made. */
-function customProductReplay(c: Context<AppContext>, message: Record<string, unknown>) {
+/** A retried private product's answer: the product the first send made — from the same quote, or none. */
+function customProductReplay(c: Context<AppContext>, message: Record<string, unknown>, quoteId: string | null) {
   const card = message.card as { type?: string; ref?: string; original?: Record<string, unknown> } | null | undefined;
-  if (card?.type !== 'custom_product' || !card.ref) throw conflict('That send was already used for another message', 'CLIENT_ID_REUSED');
+  if (card?.type !== 'custom_product' || !card.ref) throw clientIdReused();
   const o = card.original ?? {};
+  if ((o.quote_id ?? null) !== quoteId) throw clientIdReused();
   return c.json({ success: true, replayed: true, product: { id: card.ref, price_iqd: Number(o.price_iqd ?? 0), expires_at: o.expires_at ?? null }, message });
 }
 
@@ -552,8 +567,9 @@ chatCommerceRoutes.post('/:id/custom-products', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   // A retried send is the SAME product — the quote's rule above.
   const clientId = clientIdFrom(body.client_id);
+  const namedQuote = typeof body.quote_id === 'string' && body.quote_id ? body.quote_id : null;
   const replay = await storedClientMessage(c.env, chatId, user.id, clientId);
-  if (replay) return customProductReplay(c, replay);
+  if (replay) return customProductReplay(c, replay, namedQuote);
   const name = str(body.name, 'name', { min: 2, max: 140 });
   const nameAr = str(body.name_ar, 'name_ar', { min: 0, max: 140, required: false });
   const description = str(body.description, 'description', { min: 0, max: 2000, required: false });
@@ -631,7 +647,7 @@ chatCommerceRoutes.post('/:id/custom-products', async (c) => {
   } catch (e) {
     if (clientId && isClientIdClash(e)) {
       const again = await storedClientMessage(c.env, chatId, user.id, clientId);
-      if (again) return customProductReplay(c, again);
+      if (again) return customProductReplay(c, again, namedQuote);
     }
     throw e;
   }
