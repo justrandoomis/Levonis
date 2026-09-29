@@ -13,6 +13,9 @@ import {
 } from '../lib/cartSeller';
 import { storeById } from '../lib/merchantAuth';
 import { isOwnStore, merchantVariantLabel, storeTakesOrders } from '../lib/storeOrderOps';
+import { isSchemaMissing } from '../lib/membershipBenefits';
+import { storeThreadOf } from '../lib/chatThread';
+import { buyablePrivateIds } from '../lib/privateProducts';
 import { LINE_VARIANT_COLUMNS, LINE_VARIANT_JOIN, resolveCatalogLine } from '../lib/catalog/lines';
 import type { Context } from 'hono';
 import { cartLineSelect } from '../lib/cartLineProjection';
@@ -2260,7 +2263,17 @@ async function loadBuyableMerchantProduct(c: Context<AppContext>, productId: str
   ).bind(productId).first<Record<string, unknown>>();
 
   if (!row) throw notFound('Product not found');
-  if (row.lifecycle !== 'active' || row.status !== 'active') throw notFound('Product not found');
+  // A PRIVATE product (0152) is its one customer's: published but never public.
+  // To that customer it is buyable until it expires; to anyone else — another
+  // customer, the store itself, a guessed id — it does not exist.
+  const privateFor = typeof row.audience_user_id === 'string' && row.audience_user_id ? String(row.audience_user_id) : null;
+  if (privateFor) {
+    const now = new Date().toISOString();
+    const expired = typeof row.custom_expires_at === 'string' && row.custom_expires_at !== '' && row.custom_expires_at <= now;
+    if (privateFor !== user.id || row.lifecycle !== 'active' || row.publish_state !== 'published' || row.admin_hidden_at || expired) {
+      throw notFound('Product not found');
+    }
+  } else if (row.lifecycle !== 'active' || row.status !== 'active') throw notFound('Product not found');
   const ctx = await storeById(c.env.DB, String(row.s_id));
   if (!ctx || ctx.merchant.id !== String(row.m_id)) {
     throw badRequest('This store is not taking orders right now', 'STORE_CLOSED');
@@ -2285,6 +2298,21 @@ cartRoutes.post('/merchant-items', async (c) => {
   const replaceCart = body.replaceCart === true;
 
   const product = await loadBuyableMerchantProduct(c, productId);
+
+  /*
+   * THE CONVERSATION THIS ADD CAME FROM (0152) — so the order it becomes is
+   * announced there («تم إنشاء الطلب»). A private product carries its own; a
+   * product card names its thread, accepted only when that thread IS this
+   * customer's with this store. A thread that is not is simply not recorded:
+   * the add itself stands, and nothing about the price depends on it.
+   */
+  let originChatId: string | null =
+    typeof product.origin_chat_id === 'string' && product.origin_chat_id ? String(product.origin_chat_id) : null;
+  if (!originChatId && typeof body.origin_chat_id === 'string' && body.origin_chat_id) {
+    const claimed = str(body.origin_chat_id, 'origin_chat_id', { min: 1, max: 60 });
+    const thread = await storeThreadOf(c.env.DB, claimed);
+    if (thread && thread.store_id === String(product.s_id) && thread.customer_id === user.id) originChatId = claimed;
+  }
 
   /**
    * A PRODUCT WITH VARIANTS IS BOUGHT AS ONE OF THEM (merchant platform W2-F).
@@ -2367,18 +2395,38 @@ cartRoutes.post('/merchant-items', async (c) => {
   // check above, so a refused add left the customer with no cart at all —
   // the one outcome SellerConflictDialog promises cannot happen.
   const id = newId('ci');
-  try {
-    await c.env.DB.batch([
+  // `origin_chat_id` (0152) is named only when there is one, and dropped on a
+  // database behind that migration — the line is the purchase; its thread is
+  // only where the order will be announced.
+  const addBatch = (withOrigin: boolean) =>
+    c.env.DB.batch([
       ...(replacing ? [c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id)] : []),
-      c.env.DB.prepare(
-        `INSERT INTO cart_items
-           (id, user_id, seller_type, merchant_id, store_id, community_product_id, option_id, color_id, qty, variant_id)
-         VALUES (?, ?, 'merchant', ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (user_id, community_product_id, option_id, color_id)
-           WHERE community_product_id IS NOT NULL
-         DO UPDATE SET qty = MIN(${LINE_QTY_MAX}, cart_items.qty + excluded.qty)`
-      ).bind(id, user.id, product.m_id, product.s_id, productId, optionId, colorId, qty, variantStock !== null ? variantId : null),
+      withOrigin
+        ? c.env.DB.prepare(
+            `INSERT INTO cart_items
+               (id, user_id, seller_type, merchant_id, store_id, community_product_id, option_id, color_id, qty, variant_id, origin_chat_id)
+             VALUES (?, ?, 'merchant', ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT (user_id, community_product_id, option_id, color_id)
+               WHERE community_product_id IS NOT NULL
+             DO UPDATE SET qty = MIN(${LINE_QTY_MAX}, cart_items.qty + excluded.qty),
+                           origin_chat_id = COALESCE(excluded.origin_chat_id, cart_items.origin_chat_id)`
+          ).bind(id, user.id, product.m_id, product.s_id, productId, optionId, colorId, qty, variantStock !== null ? variantId : null, originChatId)
+        : c.env.DB.prepare(
+            `INSERT INTO cart_items
+               (id, user_id, seller_type, merchant_id, store_id, community_product_id, option_id, color_id, qty, variant_id)
+             VALUES (?, ?, 'merchant', ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT (user_id, community_product_id, option_id, color_id)
+               WHERE community_product_id IS NOT NULL
+             DO UPDATE SET qty = MIN(${LINE_QTY_MAX}, cart_items.qty + excluded.qty)`
+          ).bind(id, user.id, product.m_id, product.s_id, productId, optionId, colorId, qty, variantStock !== null ? variantId : null),
     ]);
+  try {
+    try {
+      await addBatch(!!originChatId);
+    } catch (e) {
+      if (!originChatId || !isSchemaMissing(e)) throw e;
+      await addBatch(false);
+    }
   } catch (e) {
     // Another seller's line landed between the read above and this write; the
     // 0114 trigger refused the mix inside the statement (B8).
@@ -2445,6 +2493,9 @@ async function loadMerchantCart(c: Context<AppContext>) {
   for (const r of results) {
     unitsPerProduct.set(String(r.id), (unitsPerProduct.get(String(r.id)) ?? 0) + (Number(r.qty) || 0));
   }
+  // A private product (0152) is `status = 'hidden'` to everyone — and buyable
+  // by its one customer: the same answer the checkout will give.
+  const privateOk = await buyablePrivateIds(c.env.DB, results.map((r) => String(r.id)), user.id);
 
   // A variant line draws on its variant's own units (W2-F).
   const unitsPerVariant = new Map<string, number>();
@@ -2465,7 +2516,8 @@ async function loadMerchantCart(c: Context<AppContext>) {
         ? 'other_store'
         : storeBlock
           ? storeBlock
-          : r.lifecycle !== 'active' || r.product_status !== 'active' || String(r.product_store_id) !== String(r.store_id)
+          : !((r.lifecycle === 'active' && r.product_status === 'active') || privateOk.has(String(r.id))) ||
+              String(r.product_store_id) !== String(r.store_id)
             ? 'unavailable'
             : !priced.ok
               ? 'option_gone'

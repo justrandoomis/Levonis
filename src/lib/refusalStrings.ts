@@ -614,6 +614,31 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'That card cannot be sent this way.',
     ckb: 'لا يمكن إرسال هذه البطاقة بهذه الطريقة.',
   },
+  CUSTOM_PRODUCT_LOCKED: {
+    ar: 'هذا منتج خاص صُنع لزبون واحد، ولا يُعدَّل. ألغه من المحادثة وأرسل منتجًا جديدًا.',
+    en: 'This is a private product made for one customer and cannot be changed. Cancel it from the conversation and send a new one.',
+    ckb: 'هذا منتج خاص صُنع لزبون واحد، ولا يُعدَّل. ألغه من المحادثة وأرسل منتجًا جديدًا.',
+  },
+  QUOTE_ALREADY_ACCEPTED: {
+    ar: 'قبل الزبون هذا العرض وطلبه قيد التنفيذ، فلا يتحول إلى منتج خاص.',
+    en: 'The customer accepted this quote and its order is under way, so it cannot become a private product.',
+    ckb: 'قبل الزبون هذا العرض وطلبه قيد التنفيذ، فلا يتحول إلى منتج خاص.',
+  },
+  STORE_NOT_SELLING: {
+    ar: 'متجرك لا يبيع المنتجات الآن. فعّل البيع من إعدادات المتجر أولًا.',
+    en: 'Your store is not selling products right now. Turn selling on in the store settings first.',
+    ckb: 'متجرك لا يبيع المنتجات الآن. فعّل البيع من إعدادات المتجر أولًا.',
+  },
+  STORE_NO_CUSTOM_REQUESTS: {
+    ar: 'هذا المتجر لا يستقبل طلبات الطباعة المخصصة حاليًا.',
+    en: 'This store is not taking custom print requests right now.',
+    ckb: 'هذا المتجر لا يستقبل طلبات الطباعة المخصصة حاليًا.',
+  },
+  IMAGE_NOT_OWNED: {
+    ar: 'اختر صورة رفعتها إلى متجرك.',
+    en: 'Choose a picture you uploaded to your store.',
+    ckb: 'اختر صورة رفعتها إلى متجرك.',
+  },
   PRODUCT_NOT_PUBLISHED: {
     ar: 'هذا المنتج غير منشور الآن، فلا يمكن إرساله.',
     en: 'This product is not published right now, so it cannot be sent.',

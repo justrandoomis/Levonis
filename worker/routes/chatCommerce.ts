@@ -37,14 +37,23 @@ import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { getSetting } from '../lib/settings';
 import { requireCommunityOpen } from '../lib/communityGate';
-import { requireOfferPrivileges, storeById } from '../lib/merchantAuth';
+import { requireOfferPrivileges, requireSellingPrivileges, requireStoreOwner, storeById } from '../lib/merchantAuth';
+import { storeTakesOrders } from '../lib/storeOrderOps';
+import { ownedMediaKey } from '../lib/mediaRefs';
 import { benefits, getTierStatus } from '../lib/entitlements';
 import { isConstraintAbort } from '../lib/walletOps';
 import { DRAFT_TTL_DAYS, composeSnapshot, recordOfferRevisionStatement, recordRevisionStatement } from '../lib/requestRevisions';
 import { merchantTakesNewWork, offerCountStatement } from '../lib/communityRequests';
 import { assertDirectStanding, directRequest } from '../lib/directRequests';
 import { storeThreadOf, threadRole, type StoreThread } from '../lib/chatThread';
-import { cardInsertStatement, notInThread, printRequestCard, quoteCardFrom, stampThreadActivity } from '../lib/chatCards';
+import {
+  cardInsertStatement,
+  customProductCardFrom,
+  notInThread,
+  printRequestCard,
+  quoteCardFrom,
+  stampThreadActivity,
+} from '../lib/chatCards';
 import { assertMayWriteInThread, notifyStoreThread, publicPage } from './chats';
 import { offerShape, publicRequest, readOfferTerms } from './marketplace';
 
@@ -459,6 +468,168 @@ chatCommerceRoutes.patch('/:id/quotes/:offerId', requireCommunityOpen, async (c)
   const row = await db.prepare('SELECT * FROM community_offers WHERE id = ?').bind(offerId).first<Record<string, unknown>>();
   const message = await existingCard(c, chatId, 'quote', offerId);
   return c.json({ success: true, offer: offerShape(row!), message });
+});
+
+// ================================================================ private products
+
+/**
+ * «منتج خاص» — the store makes a product for THIS thread's customer (0152, D6):
+ * a price, a name, a picture of the store's own, how long it takes, and how
+ * long the offer stands. It is bought through the store's cart and checkout
+ * like any product — prepaid from the wallet, the store's share pending until
+ * receipt — and it is nobody else's to see or buy.
+ *
+ * FROM A QUOTE (`quote_id`, D3): the quote is closed IN THE SAME BATCH that
+ * creates the product, and the product is created only if the quote is still
+ * open — so a quote the customer accepted a moment ago can never also become a
+ * product (`QUOTE_ALREADY_ACCEPTED`), and the deal has one financial flow.
+ *
+ * Immutable once created (0152's trigger): to change it, cancel it and send a
+ * new one.
+ */
+chatCommerceRoutes.post('/:id/custom-products', async (c) => {
+  await rateLimit(c, 'chat-custom-product', 30, 3600);
+  const user = c.get('user')!;
+  const chatId = str(c.req.param('id'), 'chatId', { min: 1, max: 60 });
+  const thread = await storeThreadFor(c, chatId, 'merchant');
+  const ctx = await requireSellingPrivileges(c);
+  if (ctx.merchant.id !== thread.merchant_id) throw forbidden('This conversation belongs to another store');
+  // It is sold through the store cart, so the store must be selling.
+  if (!(await storeTakesOrders(c.env.DB, ctx)).ok) {
+    throw conflict('Your store is not selling products right now — turn selling on in the store settings first', 'STORE_NOT_SELLING');
+  }
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const name = str(body.name, 'name', { min: 2, max: 140 });
+  const nameAr = str(body.name_ar, 'name_ar', { min: 0, max: 140, required: false });
+  const description = str(body.description, 'description', { min: 0, max: 2000, required: false });
+  const price = int(body.price_iqd, 'price_iqd', { min: 1, max: 1_000_000_000 });
+  const prepDays = int(body.prep_days, 'prep_days', { min: 0, max: 365, def: 0 });
+  const validDays = int(body.valid_days, 'valid_days', { min: 1, max: 60, def: 7 });
+  // A picture the platform issued to THIS store's owner, or none — never a URL
+  // the merchant typed (worker/lib/mediaRefs.ts).
+  let image: string | null = null;
+  if (body.image !== undefined && body.image !== null && body.image !== '') {
+    const key = ownedMediaKey(body.image, user.id);
+    if (!key) throw badRequest('Choose a picture you uploaded to your store', 'IMAGE_NOT_OWNED');
+    image = `/files/${key}`;
+  }
+  const db = c.env.DB;
+  const quoteId = str(body.quote_id, 'quote_id', { max: 60, required: false }) || null;
+  let quoteRequestId: string | null = null;
+  if (quoteId) {
+    const q = await db
+      .prepare(
+        `SELECT o.id, o.state, o.merchant_id, o.request_id, r.customer_id, r.visibility
+           FROM community_offers o JOIN community_requests r ON r.id = o.request_id WHERE o.id = ?`
+      )
+      .bind(quoteId)
+      .first<{ id: string; state: string; merchant_id: string; request_id: string; customer_id: string; visibility: string }>();
+    if (!q || q.merchant_id !== ctx.merchant.id || q.visibility !== 'direct' || q.customer_id !== thread.customer_id) {
+      throw notInThread('This quote');
+    }
+    if (q.state === 'accepted') throw conflict('This quote was accepted — its order is under way', 'QUOTE_ALREADY_ACCEPTED');
+    if (q.state !== 'pending' && q.state !== 'superseded') throw conflict('That quote is closed', 'OFFER_NOT_AVAILABLE');
+    quoteRequestId = q.request_id;
+  }
+
+  const id = newId('cp');
+  const ts = nowIso();
+  const expires = new Date(Date.now() + validDays * 86_400_000).toISOString();
+  const quoteOpen = `EXISTS (SELECT 1 FROM community_offers WHERE id = ? AND state IN ('pending','superseded'))`;
+  const stmts: D1PreparedStatement[] = [
+    db.prepare(
+      `INSERT INTO community_products
+         (id, merchant_id, store_id, slug, name, name_ar, description, images, price_iqd, stock, track_stock, prep_days,
+          publish_state, lifecycle, status, variant_mode, audience_user_id, origin_chat_id, origin_offer_id, custom_expires_at,
+          created_at, updated_at)
+       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, 1, ?10, 'published', 'active', 'hidden', 'simple', ?11, ?12, ?13, ?14, ?15, ?15
+        WHERE ${quoteId ? quoteOpen.replace('?', '?16') : '1'}`
+    ).bind(
+      id, ctx.merchant.id, ctx.store.id, `custom-${id}`, name, nameAr, description, JSON.stringify(image ? [image] : []),
+      price, prepDays, thread.customer_id, chatId, quoteId, expires, ts, ...(quoteId ? [quoteId] : [])
+    ),
+  ];
+  if (quoteId && quoteRequestId) {
+    stmts.push(
+      db.prepare(
+        `UPDATE community_offers SET state = 'withdrawn', updated_at = ?
+          WHERE id = ? AND state IN ('pending','superseded') AND EXISTS (SELECT 1 FROM community_products WHERE id = ?)`
+      ).bind(ts, quoteId, id),
+      offerCountStatement(db, quoteRequestId)
+    );
+  }
+  const card = customProductCardFrom({
+    product_id: id, name, name_ar: nameAr, description, image, price_iqd: price, prep_days: prepDays, expires_at: expires,
+    quote_id: quoteId, store: { id: ctx.store.id, slug: ctx.store.slug, name: ctx.store.name },
+  });
+  const messageId = newId('msg');
+  stmts.push(
+    cardInsertStatement(
+      db,
+      { id: messageId, chatId, senderId: user.id, card, createdAt: ts },
+      { sql: 'EXISTS (SELECT 1 FROM community_products WHERE id = ?)', binds: [id] }
+    )
+  );
+  const res = await db.batch(stmts);
+  if (!Number(res[0]?.meta.changes ?? 0)) {
+    // Only a quote can make the insert match nothing: it closed in between.
+    const again = quoteId
+      ? await db.prepare('SELECT state FROM community_offers WHERE id = ?').bind(quoteId).first<{ state: string }>()
+      : null;
+    if (again?.state === 'accepted') throw conflict('This quote was accepted — its order is under way', 'QUOTE_ALREADY_ACCEPTED');
+    throw conflict('That quote is closed', 'OFFER_NOT_AVAILABLE');
+  }
+  await audit(db, user.id, 'community.custom_product_created', id, { store: ctx.store.id, chat: chatId, price, quote: quoteId });
+  await afterCard(c, thread, chatId, messageId, ts);
+  const message = await existingCard(c, chatId, 'custom_product', id);
+  return c.json({ success: true, product: { id, price_iqd: price, expires_at: expires }, message }, 201);
+});
+
+/**
+ * THE STORE CANCELS A PRIVATE PRODUCT — only its own, only one of this thread,
+ * and only before it is bought (after that it is an order, cancelled through
+ * the order's own door, which refunds). It leaves the customer's cart with it.
+ */
+chatCommerceRoutes.post('/:id/custom-products/:pid/cancel', async (c) => {
+  const user = c.get('user')!;
+  const chatId = str(c.req.param('id'), 'chatId', { min: 1, max: 60 });
+  const productId = str(c.req.param('pid'), 'pid', { min: 1, max: 60 });
+  const thread = await storeThreadFor(c, chatId, 'merchant');
+  const ctx = await requireStoreOwner(c);
+  if (ctx.merchant.id !== thread.merchant_id) throw forbidden('This conversation belongs to another store');
+  const db = c.env.DB;
+  const p = await db
+    .prepare(
+      `SELECT p.id, p.publish_state, p.audience_user_id, p.origin_chat_id,
+              EXISTS (SELECT 1 FROM order_items i JOIN orders o ON o.id = i.order_id
+                       WHERE i.community_product_id = p.id AND o.status <> 'cancelled') AS bought
+         FROM community_products p WHERE p.id = ? AND p.merchant_id = ? AND p.store_id = ?`
+    )
+    .bind(productId, ctx.merchant.id, ctx.store.id)
+    .first<{ id: string; publish_state: string; audience_user_id: string | null; origin_chat_id: string | null; bought: number }>();
+  if (!p || p.audience_user_id !== thread.customer_id || p.origin_chat_id !== chatId) throw notInThread('This product');
+  if (p.publish_state === 'archived') return c.json({ success: true, replayed: true });
+  if (Number(p.bought)) {
+    throw conflict('This product was already bought — cancel its order instead', 'CUSTOM_PRODUCT_LOCKED');
+  }
+  const ts = nowIso();
+  const res = await db.batch([
+    db.prepare(
+      `UPDATE community_products SET publish_state = 'archived', updated_at = ?
+        WHERE id = ? AND merchant_id = ? AND audience_user_id = ? AND publish_state <> 'archived'
+          AND NOT EXISTS (SELECT 1 FROM order_items i JOIN orders o ON o.id = i.order_id
+                           WHERE i.community_product_id = community_products.id AND o.status <> 'cancelled')`
+    ).bind(ts, productId, ctx.merchant.id, thread.customer_id),
+    db.prepare(
+      `DELETE FROM cart_items WHERE community_product_id = ?
+          AND EXISTS (SELECT 1 FROM community_products WHERE id = ? AND publish_state = 'archived')`
+    ).bind(productId, productId),
+  ]);
+  if (!Number(res[0]?.meta.changes ?? 0)) {
+    throw conflict('This product was bought or changed a moment ago — reload the conversation', 'CUSTOM_PRODUCT_LOCKED');
+  }
+  await audit(db, user.id, 'community.custom_product_cancelled', productId, { chat: chatId });
+  return c.json({ success: true });
 });
 
 // ================================================================ orders

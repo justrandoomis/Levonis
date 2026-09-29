@@ -28,6 +28,7 @@ import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { HttpError, badRequest, notFound, conflict, str, int, pickFrom } from '../lib/http';
+import { CUSTOM_PRODUCT_LOCKED_MESSAGE, isPrivateProduct, privateProductsReady } from '../lib/privateProducts';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { requireAuth } from '../lib/http';
@@ -150,7 +151,7 @@ export const LOW_STOCK_SQL = `p.track_stock = 1 AND (
 export const OUT_OF_STOCK_SQL = '(p.track_stock = 1 AND p.stock <= 0)';
 
 /** The WHERE clause of the management list, from a whitelist of filters; every value bound. */
-function listFilters(c: Context<AppContext>, ctx: StoreContext): { where: string[]; binds: unknown[] } {
+function listFilters(c: Context<AppContext>, ctx: StoreContext, hidePrivate = false): { where: string[]; binds: unknown[] } {
   const q = str(c.req.query('q') ?? '', 'q', { min: 0, max: 120, required: false });
   const collection = str(c.req.query('collection') ?? c.req.query('section') ?? '', 'collection', { min: 0, max: 64, required: false });
   const stateRaw = c.req.query('state') ?? c.req.query('lifecycle') ?? '';
@@ -158,6 +159,9 @@ function listFilters(c: Context<AppContext>, ctx: StoreContext): { where: string
   const category = str(c.req.query('category') ?? '', 'category', { min: 0, max: 60, required: false });
   const where: string[] = ['p.merchant_id = ?'];
   const binds: unknown[] = [ctx.merchant.id];
+  // A PRIVATE product (0152) is one customer's, made in a conversation — not a
+  // catalogue item. It lives in the workspace's «منتجات خاصة», never here.
+  if (hidePrivate) where.push('p.audience_user_id IS NULL');
   if (q) {
     const like = likePattern(q);
     where.push(`(${sqlLikeClause(['p.name', 'p.name_ar', 'p.sku'])}
@@ -217,7 +221,7 @@ merchantCatalogRoutes.get('/products', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 });
   const sortKey = c.req.query('sort') ?? 'newest';
   const sort = pickFrom(SORTS, sortKey, SORTS.newest);
-  const { where, binds } = listFilters(c, ctx);
+  const { where, binds } = listFilters(c, ctx, await privateProductsReady(db));
   const whereSql = where.join(' AND ');
   const countStmt = db.prepare(`SELECT COUNT(*) AS n FROM community_products p WHERE ${whereSql}`).bind(...binds);
 
@@ -328,7 +332,10 @@ merchantCatalogRoutes.get('/products/stats', async (c) => {
 /** Every product of the store, with its variants and collections, for the CSV. */
 async function exportProducts(db: D1Database, ctx: StoreContext): Promise<{ products: CatalogExportProduct[]; total: number }> {
   const [rows, groups, values, variants, members, count] = await Promise.all([
-    db.prepare('SELECT * FROM community_products WHERE merchant_id = ? ORDER BY created_at DESC, id DESC LIMIT 2000').bind(ctx.merchant.id).all(),
+    db.prepare(
+      `SELECT * FROM community_products WHERE merchant_id = ?${(await privateProductsReady(db)) ? ' AND audience_user_id IS NULL' : ''}
+        ORDER BY created_at DESC, id DESC LIMIT 2000`
+    ).bind(ctx.merchant.id).all(),
     db.prepare(
       `SELECT o.id, o.product_id, o.name FROM community_product_options o WHERE o.store_id = ? ORDER BY o.product_id, o.position`
     ).bind(ctx.store.id).all(),
@@ -593,6 +600,7 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
   const { results: rows } = await db
     .prepare(
       `SELECT p.id, p.name, p.stock, p.low_stock_threshold, p.publish_state, p.variant_mode, p.admin_hidden_at, p.admin_hidden_reason, p.store_id,
+              ${(await privateProductsReady(db)) ? 'p.audience_user_id' : 'NULL'} AS audience_user_id,
               ${PRICE_MISSING_SQL('p')} AS price_missing,
               (SELECT COUNT(*) FROM community_product_variants v WHERE v.product_id = p.id AND v.active = 1) AS active_variants,
               (SELECT COUNT(*) FROM order_items i WHERE i.community_product_id = p.id) AS ordered
@@ -607,6 +615,11 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
     const r = byId.get(id);
     if (!r) {
       results.push({ id, ok: false, code: 'NOT_FOUND' });
+      continue;
+    }
+    // A private product is what it was made as (0152) — no bulk action touches it.
+    if (r.audience_user_id) {
+      results.push({ id, ok: false, code: 'CUSTOM_PRODUCT_LOCKED' });
       continue;
     }
     if (action === 'publish') {
@@ -772,6 +785,8 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
 
 merchantCatalogRoutes.get('/products/:id', async (c) => {
   const ctx = await requireStoreOwner(c);
+  // Not a catalogue item (0152): the workspace shows private products on their own.
+  if (await isPrivateProduct(c.env.DB, c.req.param('id'))) throw notFound('Product not found');
   const product = await readProductDetail(c.env.DB, ctx.merchant.id, c.req.param('id'));
   if (!product) throw notFound('Product not found');
   return c.json({ success: true, product });
@@ -818,6 +833,8 @@ merchantCatalogRoutes.patch('/products/:id', async (c) => {
   ) {
     throw badRequest('Nothing to update');
   }
+  // What the customer was shown is what they pay for (0152's trigger says the same).
+  if (await isPrivateProduct(db, id)) throw new HttpError(409, CUSTOM_PRODUCT_LOCKED_MESSAGE, 'CUSTOM_PRODUCT_LOCKED');
   const current = await db
     .prepare(
       `SELECT p.id, p.name, p.publish_state, p.lifecycle, p.variant_mode, p.admin_hidden_at, p.admin_hidden_reason, p.stock,
@@ -931,6 +948,8 @@ merchantCatalogRoutes.post('/products/:id/duplicate', async (c) => {
   await rateLimit(c, 'merchant-product-create', 60, 3600);
   const ctx = await requireSellingPrivileges(c);
   const db = c.env.DB;
+  // A copy of a private product would be one customer's item made public.
+  if (await isPrivateProduct(db, c.req.param('id'))) throw new HttpError(409, CUSTOM_PRODUCT_LOCKED_MESSAGE, 'CUSTOM_PRODUCT_LOCKED');
   const src = await readProductDetail(db, ctx.merchant.id, c.req.param('id'));
   if (!src) throw notFound('Product not found');
   if (src.moderation?.hidden_by_admin) throw hiddenByAdmin(src.moderation.reason);
@@ -1092,6 +1111,8 @@ merchantCatalogRoutes.delete('/products/:id', async (c) => {
   const ctx = await requireStoreOwner(c);
   const db = c.env.DB;
   const id = c.req.param('id');
+  // A private product is cancelled from its conversation, where its card is.
+  if (await isPrivateProduct(db, id)) throw new HttpError(409, CUSTOM_PRODUCT_LOCKED_MESSAGE, 'CUSTOM_PRODUCT_LOCKED');
   const res = await db
     .prepare(
       `DELETE FROM community_products WHERE id = ?1 AND merchant_id = ?2

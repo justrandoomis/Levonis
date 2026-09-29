@@ -324,8 +324,8 @@ fixture.
 | 2 | Structured chat messages | done — 0150, worker/lib/chatCards.ts, `GET /api/chats/:id`, idempotent `client_id`; tests/chatCards.test.ts |
 | 3 | Product and store cards | done — picker, cards with frozen snapshot + current state, add to cart through the store cart |
 | 4 | Print requests and quotes (escrow) | done (server) — 0151, worker/routes/chatCommerce.ts, direct standing, idempotent accept replay, order ↔ thread link; tests/chatQuotes.test.ts |
-| 5 | Private custom products (store flow) | building |
-| 6 | System cards on every money move; `/delivered` fix | planned |
+| 5 | Private custom products (store flow) | done (server) — 0152, worker/lib/privateProducts.ts, cart/checkout audience rule, immutability trigger, quote → product in one batch, order ↔ thread; tests/chatPrivateProducts.test.ts |
+| 6 | System cards on every money move; `/delivered` fix | building |
 | 7 | Merchant/customer UX, workspace sections, product preview | planned |
 | 8 | Notifications | planned |
 | 9 | Attack tests | planned |

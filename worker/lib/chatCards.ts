@@ -287,6 +287,56 @@ export function customOrderCard(order: Record<string, unknown>, title: string, e
   return { type: 'custom_order', ref: String(order.id), snapshot, body: `🧾 ${clip(title, 180)}` };
 }
 
+/** What a private product's card freezes (0152) — the values its creating batch writes. */
+export interface CustomProductTerms {
+  product_id: string;
+  name: string;
+  name_ar: string;
+  description: string;
+  image: string | null;
+  price_iqd: number;
+  prep_days: number;
+  expires_at: string | null;
+  quote_id: string | null;
+  store: { id: string; slug: string; name: string };
+}
+
+export function customProductCardFrom(t: CustomProductTerms): ResolvedCard {
+  const snapshot = {
+    v: 1,
+    product_id: t.product_id,
+    name: clip(t.name, 140),
+    name_ar: clip(t.name_ar, 140),
+    description: clip(t.description, 2000),
+    image: picture(t.image),
+    price_iqd: t.price_iqd,
+    prep_days: t.prep_days,
+    expires_at: t.expires_at,
+    quote_id: t.quote_id,
+    store: t.store,
+  };
+  return { type: 'custom_product', ref: t.product_id, snapshot, body: `✨ ${clip(t.name, 180)}` };
+}
+
+/** A store order's card, from the order the checkout just placed and the lines it priced. */
+export function storeOrderCard(
+  order: Record<string, unknown>,
+  lines: Array<{ name: string; qty: number; image?: string | null }>,
+  event: string
+): ResolvedCard {
+  const items = lines.reduce((n, l) => n + (Number(l.qty) || 0), 0);
+  const snapshot = {
+    v: 1,
+    order_id: String(order.id),
+    total_iqd: Number(order.total_iqd ?? 0),
+    items,
+    lines: lines.slice(0, 3).map((l) => ({ name: clip(l.name, 120), qty: Number(l.qty) || 1 })),
+    image: picture(lines[0]?.image ?? null),
+    event,
+  };
+  return { type: 'order', ref: String(order.id), snapshot, body: `🧾 ${String(order.id)}` };
+}
+
 // ===========================================================================
 //  RESOLVING A SEND
 // ===========================================================================
@@ -673,6 +723,84 @@ async function customOrderCurrents(
   return out;
 }
 
+async function customProductCurrents(
+  env: Env,
+  rows: CardRow[],
+  thread: StoreThread | null,
+  viewer: CardViewer
+): Promise<Map<string, CardCurrent>> {
+  const out = new Map<string, CardCurrent>();
+  const ids = [...new Set(rows.map((r) => r.card_ref))];
+  const now = new Date().toISOString();
+  const { results } = await env.DB.prepare(
+    `SELECT p.id, p.publish_state, p.admin_hidden_at, p.stock, p.track_stock, p.price_iqd, p.custom_expires_at,
+            p.audience_user_id, p.store_id,
+            (SELECT o.id FROM order_items i JOIN orders o ON o.id = i.order_id
+              WHERE i.community_product_id = p.id AND o.status <> 'cancelled'
+              ORDER BY o.created_at DESC LIMIT 1) AS order_id
+       FROM community_products p WHERE p.id IN (SELECT value FROM json_each(?))`
+  )
+    .bind(JSON.stringify(ids))
+    .all<Record<string, unknown>>();
+  const byId = new Map((results ?? []).map((p) => [String(p.id), p]));
+  for (const row of rows) {
+    const p = byId.get(row.card_ref);
+    if (!p || !p.audience_user_id || (thread && (p.store_id !== thread.store_id || p.audience_user_id !== thread.customer_id))) {
+      out.set(row.id, { status: 'unavailable', actions: [] });
+      continue;
+    }
+    const orderId = (p.order_id as string | null) ?? null;
+    const expired = typeof p.custom_expires_at === 'string' && p.custom_expires_at !== '' && p.custom_expires_at <= now;
+    const status = orderId
+      ? 'purchased'
+      : p.publish_state === 'archived'
+        ? 'cancelled'
+        : p.publish_state !== 'published' || p.admin_hidden_at
+          ? 'unavailable'
+          : expired
+            ? 'expired'
+            : Number(p.track_stock) && Number(p.stock) <= 0
+              ? 'purchased'
+              : 'available';
+    const actions: string[] = [];
+    if (viewer === 'customer' && status === 'available') actions.push('add_to_cart');
+    if (viewer === 'merchant' && status === 'available') actions.push('cancel');
+    if ((viewer === 'customer' || viewer === 'merchant') && orderId) actions.push('view_order');
+    out.set(row.id, { status, actions, order_id: orderId, price_iqd: Number(p.price_iqd ?? 0), expires_at: p.custom_expires_at ?? null });
+  }
+  return out;
+}
+
+async function storeOrderCurrents(
+  env: Env,
+  rows: CardRow[],
+  thread: StoreThread | null,
+  viewer: CardViewer
+): Promise<Map<string, CardCurrent>> {
+  const out = new Map<string, CardCurrent>();
+  const ids = [...new Set(rows.map((r) => r.card_ref))];
+  const { results } = await env.DB.prepare(
+    `SELECT o.id, o.status, o.stage, o.store_id, o.user_id, o.receipt_confirmed_at
+       FROM orders o WHERE o.id IN (SELECT value FROM json_each(?))`
+  )
+    .bind(JSON.stringify(ids))
+    .all<Record<string, unknown>>();
+  const byId = new Map((results ?? []).map((o) => [String(o.id), o]));
+  for (const row of rows) {
+    const o = byId.get(row.card_ref);
+    if (!o || (thread && (o.store_id !== thread.store_id || o.user_id !== thread.customer_id))) {
+      out.set(row.id, { status: 'unavailable', actions: [] });
+      continue;
+    }
+    const status = String(o.status);
+    const actions: string[] = viewer === 'staff' ? [] : ['view'];
+    // «استلمت طلبي» — the receipt that releases the store's share (the existing door).
+    if (viewer === 'customer' && status === 'delivered' && !o.receipt_confirmed_at) actions.unshift('confirm_receipt');
+    out.set(row.id, { status, actions, stage: o.stage ?? null, received: !!o.receipt_confirmed_at });
+  }
+  return out;
+}
+
 /**
  * The current state of every card on a page, for this reader. One statement
  * per card type present, never one per card. A type whose loader fails (a
@@ -716,6 +844,10 @@ export async function currentCardStates(
           return quoteCurrents(env, rows, thread, viewer);
         case 'custom_order':
           return customOrderCurrents(env, rows, thread, viewer);
+        case 'custom_product':
+          return customProductCurrents(env, rows, thread, viewer);
+        case 'order':
+          return storeOrderCurrents(env, rows, thread, viewer);
         default:
           return new Map(rows.map((r) => [r.id, { status: 'unknown', actions: [] }]));
       }

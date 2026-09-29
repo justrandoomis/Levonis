@@ -174,6 +174,7 @@ test('every code the table translates is one the server can actually emit', () =
     // an entity of THIS thread or it is refused, in the thread's own words.
     'worker/lib/chatCards.ts',
     'worker/routes/chats.ts',
+    'worker/routes/chatCommerce.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

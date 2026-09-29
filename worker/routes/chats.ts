@@ -636,6 +636,9 @@ chatRoutes.get('/:id', async (c) => {
         store_card: !!thread && party && !writeBlocked,
         print_request: commerceThread && role === 'customer' && communityOpen && customWork,
         quote: commerceThread && role === 'merchant' && communityOpen,
+        // A private product is store commerce, sold through the store cart:
+        // not gated by the community switch, gated by the store selling (D9).
+        custom_product: commerceThread && role === 'merchant' && !!store?.open,
       },
     },
   });

@@ -65,6 +65,9 @@ import {
 import { rootDomainFrom } from '../lib/hosts';
 import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
 import { storeById } from '../lib/merchantAuth';
+import { isSchemaMissing } from '../lib/membershipBenefits';
+import { PRIVATE_BUYABLE_SQL, buyablePrivateIds } from '../lib/privateProducts';
+import { postSystemCard, storeOrderCard } from '../lib/chatCards';
 import { storeSaleLedgerStatements, storeSaleReceivable } from '../lib/merchantLedger';
 import { CART_SELLER_CONFLICT } from '../lib/cartSeller';
 import { LINE_VARIANT_COLUMNS, LINE_VARIANT_JOIN, resolveCatalogLine } from '../lib/catalog/lines';
@@ -188,6 +191,11 @@ interface PricedCart {
   quote_fingerprint: string;
   /** How it reaches the customer, priced from their saved address (W2-A, worker/lib/merchantDelivery.ts). */
   delivery: CheckoutDelivery;
+  /**
+   * PRIVATE products on this order (0152): published but `status = 'hidden'`,
+   * buyable by this customer alone — the stock fence asks their own predicate.
+   */
+  private_ids: string[];
 }
 
 /**
@@ -268,6 +276,9 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode: string, whe
   ).bind(user.id).all<Record<string, unknown>>();
 
   if (!results.length) throw badRequest('Your cart is empty', 'CART_EMPTY');
+  // A private product (0152) is hidden from everyone and buyable by its one
+  // customer: the same answer the cart gave, asked again here.
+  const privateOk = await buyablePrivateIds(db, results.map((r) => String(r.id)), user.id);
 
   const merchants = new Set(results.map((r) => String(r.line_merchant_id ?? '')));
   const stores = new Set(results.map((r) => String(r.line_store_id ?? '')));
@@ -306,7 +317,8 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode: string, whe
     // Availability is re-checked at checkout, not trusted from when the item
     // was added. A product hidden, archived or moved in between must stop
     // the order rather than create one the merchant cannot fulfil.
-    if (r.lifecycle !== 'active' || r.status !== 'active' || String(r.product_store_id ?? '') !== storeId) {
+    const buyable = (r.lifecycle === 'active' && r.status === 'active') || privateOk.has(productId);
+    if (!buyable || String(r.product_store_id ?? '') !== storeId) {
       throw refuse(`"${r.name}" is no longer available`, 'PRODUCT_UNAVAILABLE', { product_id: productId });
     }
     const optionId = String(r.option_id ?? '');
@@ -462,7 +474,30 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode: string, whe
     commission,
     quote_fingerprint: fingerprint,
     delivery: resolved,
+    private_ids: [...perProduct.keys()].filter((id) => privateOk.has(id)),
   };
+}
+
+/**
+ * THE CONVERSATION THIS CART CAME FROM (0152 `cart_items.origin_chat_id`): a
+ * private product's thread, or the thread a product card was added from. Null
+ * when none — and on a database behind 0152.
+ */
+async function cartOriginChat(db: D1Database, userId: string): Promise<string | null> {
+  try {
+    const row = await db
+      .prepare(
+        `SELECT origin_chat_id FROM cart_items
+          WHERE user_id = ? AND seller_type = 'merchant' AND origin_chat_id IS NOT NULL
+          ORDER BY created_at DESC, id DESC LIMIT 1`
+      )
+      .bind(userId)
+      .first<{ origin_chat_id: string }>();
+    return row?.origin_chat_id ?? null;
+  } catch (e) {
+    if (isSchemaMissing(e)) return null;
+    throw e;
+  }
 }
 
 /** A priced line as the customer's quote shows it. */
@@ -830,6 +865,8 @@ storeOrderRoutes.post('/', async (c) => {
 
   const orderId = `ORD-${newId().slice(0, 10).toUpperCase()}`;
   const ts = nowIso();
+  // Where this purchase started (0152): the order carries it, and is announced there.
+  const originChatId = await cartOriginChat(db, user.id);
 
   const stmts: D1PreparedStatement[] = [
     db.prepare(
@@ -865,6 +902,9 @@ storeOrderRoutes.post('/', async (c) => {
       cart.delivery.resolution.governorate, cart.delivery.resolution.rule, cart.delivery.prep_days, cart.quote_fingerprint
     ),
   ];
+  if (originChatId) {
+    stmts.push(db.prepare('UPDATE orders SET origin_chat_id = ? WHERE id = ?').bind(originChatId, orderId));
+  }
   // The merchant's delivery profile must still be the version this order was
   // priced at when the batch commits (worker/lib/merchantDelivery.ts).
   if (cart.delivery.fence_version !== null) {
@@ -904,16 +944,20 @@ storeOrderRoutes.post('/', async (c) => {
     ).bind(orderId, user.id, JSON.stringify(cart.lines.map((l) => l.cart_item_id)), cart.lines.length)
   );
   for (const need of cart.products) {
+    // A PRIVATE product (0152) is fenced on its own rule — still published,
+    // not hidden by moderation, not expired, and still THIS customer's.
+    const privateLine = cart.private_ids.includes(need.product_id);
     stmts.push(
       db.prepare(
         `UPDATE orders
             SET status = CASE WHEN EXISTS (
                   SELECT 1 FROM community_products p
-                   WHERE p.id = ?2 AND p.store_id = ?3 AND p.lifecycle = 'active' AND p.status = 'active'
+                   WHERE p.id = ?2 AND p.store_id = ?3
+                     AND ${privateLine ? PRIVATE_BUYABLE_SQL('p', '?5', '?6') : "p.lifecycle = 'active' AND p.status = 'active'"}
                      AND (p.track_stock = 0 OR p.stock >= ?4)
                 ) THEN status ELSE NULL END
           WHERE id = ?1`
-      ).bind(orderId, need.product_id, cart.store_id, need.qty)
+      ).bind(orderId, need.product_id, cart.store_id, need.qty, ...(privateLine ? [user.id, ts] : []))
     );
   }
   // THE VARIANT'S OWN STOCK IS FENCED THE SAME WAY (W2-F): the chosen variant
@@ -1180,5 +1224,17 @@ storeOrderRoutes.post('/', async (c) => {
   }
 
   const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first<Record<string, unknown>>();
+  // «تم إنشاء الطلب» IN THE CONVERSATION THE PURCHASE CAME FROM (D8) — once per
+  // order, only into a thread of this store and this customer, never able to
+  // undo the payment (postSystemCard does not throw).
+  if (originChatId && order) {
+    await postSystemCard(c.env, {
+      chatId: originChatId,
+      actorId: user.id,
+      card: storeOrderCard(order, cart.lines, 'placed'),
+      eventKey: `order:${orderId}:placed`,
+      expect: { storeId: cart.store_id, customerId: user.id },
+    });
+  }
   return c.json({ success: true, order: storeOrderPublic(order!) }, 201);
 });
