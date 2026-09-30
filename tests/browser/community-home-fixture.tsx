@@ -3,8 +3,10 @@
  * it knocks on answered locally, so the issue can be seen and photographed
  * without a worker: `?tab=foryou|following|projects|requests|stores|creators`
  * (and the two old names), `&lang=ar|en|ckb`, `&theme=dark|light`,
- * `&viewer=guest|customer|merchant`, `&empty=1` for a community with nothing
- * in it yet (the typeset cover, the first-issue feed).
+ * `&viewer=guest|customer|merchant` (or `restricted|suspended|banned` — a
+ * member under a Moderation V2 sanction, §9.6), `&empty=1` for a community
+ * with nothing in it yet (the typeset cover, the first-issue feed). The first
+ * store carries Reputation V2 badges (its directory card's chips).
  * scripts/e2e-community-home.mjs drives it (Playwright).
  */
 import { createRoot } from 'react-dom/client';
@@ -100,6 +102,15 @@ const STORES = Array.from({ length: 6 }, (_, i) => ({
   followers: 40 - i * 5,
   product_count: 3 + i,
   following: false,
+  // Reputation V2 (§9.6): what `merchantPublic` carries — `[{key, since}]`; the
+  // first store holds all five (the card draws three, the verification left
+  // to its check), the third only the verification (no chip row), the rest none.
+  badges:
+    i === 0
+      ? ['verified_merchant', 'fast_response', 'reliable_seller', 'custom_specialist', 'high_completion'].map((key, n) => ({ key, since: ago(60 * 24 * (40 - n * 5)).slice(0, 10) }))
+      : i === 2
+        ? [{ key: 'verified_merchant', since: ago(60 * 24 * 90).slice(0, 10) }]
+        : [],
 }));
 
 const storeRef = (i: number) => {
@@ -194,10 +205,15 @@ const WORKS = Array.from({ length: 12 }, (_, i) => ({
   store: storeRef(i),
 }));
 
+// Moderation V2 (§9.6): `&viewer=restricted|suspended|banned` — a member whose session carries a sanction (`user.moderation`).
+const sanction = viewer === 'restricted' || viewer === 'suspended' || viewer === 'banned' ? viewer : null;
 const me =
   viewer === 'guest'
     ? null
-    : { id: 'eve', username: 'eve', name: 'إيف', role: 'customer', email: 'x@x.co', locale: lang === 'ckb' ? 'ku' : lang, avatar_key: null, bio: '', website: '', profile: {}, country: 'IQ', phone: null, has_phone: false, notify_whatsapp: true, subscription_plan: 'free', membership_tier: 'free', subscription_expiry: 0, is_investor: false, isAdmin: false, creator_public: false };
+    : {
+        id: 'eve', username: 'eve', name: 'إيف', role: 'customer', email: 'x@x.co', locale: lang === 'ckb' ? 'ku' : lang, avatar_key: null, bio: '', website: '', profile: {}, country: 'IQ', phone: null, has_phone: false, notify_whatsapp: true, subscription_plan: 'free', membership_tier: 'free', subscription_expiry: 0, is_investor: false, isAdmin: false, creator_public: false,
+        ...(sanction ? { moderation: { status: sanction, reason: sanction === 'banned' ? 'احتيال متكرر على المشترين' : 'نشر إعلانات متكررة في التعليقات', until: sanction === 'banned' ? null : new Date(Date.now() + 5 * 86_400_000).toISOString() } } : {}),
+      };
 
 const merchantMe =
   viewer === 'merchant'
@@ -377,6 +393,17 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     return ok(pageOf(rows, u, 24, 'products'));
   }
   if (p === '/api/community/works') return ok({ works: empty ? [] : WORKS });
+  if (p === '/api/community/badges') {
+    return ok({
+      badges: [
+        { key: 'verified_merchant', rule_params: { verified: true } },
+        { key: 'fast_response', rule_params: { window_days: 30, median_within_minutes: 60, min_threads: 10 } },
+        { key: 'reliable_seller', rule_params: { window_days: 90, min_completed: 20, max_merchant_cancel_percent: 3, max_disputes_lost: 0 } },
+        { key: 'custom_specialist', rule_params: { window_days: 90, min_custom_completed: 10, accepts_custom_requests: true } },
+        { key: 'high_completion', rule_params: { window_days: 90, min_completion_percent: 95, min_orders: 20 } },
+      ],
+    });
+  }
   if (p.startsWith('/api/wallet') || p.startsWith('/api/currency') || p.startsWith('/api/settings') || p.startsWith('/api/notifications')) return ok({});
   if (init?.method && init.method !== 'GET') return ok({});
   return realFetch(input, init);

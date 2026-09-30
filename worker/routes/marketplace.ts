@@ -118,6 +118,9 @@ import { fileClass, fileReadStatement, fileReader, mayReadBytes, previewGrantFor
 // rows on a close or a revision, and the timeline's «started» row.
 import { writeRequestSystemUpdate } from './requestDiscussion';
 import { recordOrderEvent } from './communityOrderTimeline';
+// Moderation V2 (0162, §9.6): a restricted, suspended or banned account opens
+// no new request and makes no new offer (worker/lib/userStatus.ts).
+import { assertMayWrite } from '../lib/userStatus';
 // Offers V2 (0159, §9.5): a file key is the caller's own private upload or nothing.
 import { ownedFileObject } from '../lib/fileOwnership';
 import { isSchemaMissing } from '../lib/membershipBenefits';
@@ -504,6 +507,7 @@ async function notifyRequestFiles(
 marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
   await rateLimit(c, 'request-file', 40, 3600);
   const user = c.get('user')!;
+  assertMayWrite(user, 'request');
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const r = await requestForFiles(c, id, user.id);
 
@@ -720,6 +724,7 @@ marketplaceRoutes.delete('/requests/:id/files/:fileId', requireAuth, async (c) =
 marketplaceRoutes.post('/requests', requireCommunityOpen, requireAuth, async (c) => {
   await rateLimit(c, 'request-create', 10, 3600);
   const user = c.get('user')!;
+  assertMayWrite(user, 'request');
   const body = await c.req.json().catch(() => ({}));
 
   const title = str(body.title, 'title', { min: 4, max: 140 });
@@ -1431,6 +1436,7 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
 marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth, async (c) => {
   await rateLimit(c, 'offer-create', 30, 3600);
   const user = c.get('user')!;
+  assertMayWrite(user, 'offer');
   // A new promise: a restricted merchant makes none (audit 03 V).
   const ctx = await requireOfferPrivileges(c);
   const tier = await getTierStatus(c.env.DB, user.id);
@@ -1645,6 +1651,7 @@ function offerUpdatedNotice(
  */
 marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async (c) => {
   // An edit re-prices and re-confirms: a new promise (audit 03 V).
+  assertMayWrite(c.get('user'), 'offer');
   const ctx = await requireOfferPrivileges(c);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const ts = nowIso();
@@ -1775,6 +1782,7 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
 marketplaceRoutes.post('/offers/:id/send', requireCommunityOpen, requireAuth, async (c) => {
   await rateLimit(c, 'offer-create', 30, 3600);
   const user = c.get('user')!;
+  assertMayWrite(user, 'offer');
   const ctx = await requireOfferPrivileges(c);
   const tier = await getTierStatus(c.env.DB, user.id);
   if (!benefits.communityOffers(tier)) throw forbidden('Your plan does not include community offers');
@@ -1909,6 +1917,7 @@ marketplaceRoutes.get('/offers/:id/files/:fileId', requireAuth, async (c) => {
  * merchant edits (PATCH) or withdraws.
  */
 marketplaceRoutes.post('/offers/:id/reconfirm', requireCommunityOpen, requireAuth, async (c) => {
+  assertMayWrite(c.get('user'), 'offer');
   const ctx = await requireOfferPrivileges(c);
   const offerId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const ts = nowIso();

@@ -30,6 +30,8 @@ import { normalizeVariantModel, type VariantModel } from '@levonis/catalog/varia
 import { normalizeAttributes, type Attributes } from '@levonis/catalog/attributes';
 import { isLowStock, isPublishState, isSoldOut, stateFromLegacyLifecycle, type PublishState } from '@levonis/catalog/lifecycle';
 import { variantLabelSql } from './sql';
+// «يُستخدم داخل منتجات مطبوعة» (0164, Programme C C1): the part facts' write gate and the merchant's own read.
+import { partSpecInvalid, partSpecOut, readPartSpecInput } from '../personalize/parts';
 
 export const MAX_MEDIA = 12;
 export const MAX_VIDEOS = 2;
@@ -144,6 +146,8 @@ export function productShape(p: Record<string, unknown>) {
     collection_ids: safeParse<unknown[]>(p.collection_ids_json, []).filter((x): x is string => typeof x === 'string'),
     section_id: p.section_id ?? null,
     featured: !!p.featured,
+    /** A part (0164 `part_spec` present) — the list's «قطعة» chip; the facts themselves are on the detail only. */
+    is_part: p.part_spec !== null && p.part_spec !== undefined,
     sold_count: p.sold_count,
     view_count: p.view_count,
     moderation: p.admin_hidden_at
@@ -158,6 +162,8 @@ export type ProductShape = ReturnType<typeof productShape>;
 
 export interface ProductDetail extends ProductShape {
   media: MediaItem[];
+  /** The part facts as stored (0164) — the flat map `readPartSpec` reads; null = not a part. The merchant's own read only. */
+  part_spec: Record<string, string> | null;
   option_groups: Array<{
     id: string;
     name: string;
@@ -211,6 +217,7 @@ export async function readProductDetail(db: D1Database, merchantId: string, prod
   const vals = values.results as Array<Record<string, unknown>>;
   return {
     ...productShape(p),
+    part_spec: partSpecOut(p.part_spec),
     media: (media.results as Array<Record<string, unknown>>).map((m) => ({
       id: String(m.id),
       kind: m.kind === 'video' ? 'video' : 'image',
@@ -411,6 +418,17 @@ export function readProductInput(body: Record<string, unknown>, partial: boolean
     } else out.collectionIds = [...new Set(list as string[])];
   }
 
+  // «يُستخدم داخل منتجات مطبوعة» (0164): an object is the part's facts as the
+  // flat map, null makes the product an ordinary one again. The map is read
+  // back strictly here; its variant lines are checked against the product's
+  // own option values, and the stored `source` kept, by `settlePartSpec`.
+  let partSpecPath: string | null = null;
+  if (has(body, 'part_spec')) {
+    const read = readPartSpecInput(body.part_spec);
+    if (!read.ok) partSpecPath = read.path;
+    else fields.part_spec = read.map ? JSON.stringify(read.map) : null;
+  }
+
   if (has(body, 'variant_model')) {
     if (body.variant_model === null) out.variantModel = { groups: [], variants: [] };
     else {
@@ -420,6 +438,12 @@ export function readProductInput(body: Record<string, unknown>, partial: boolean
     }
   }
 
+  if (partSpecPath) {
+    // Alone it is its own refusal (400 PART_SPEC_INVALID {path}); beside other
+    // problems it is one more row of the list, so the editor shows them all.
+    if (!errors.length) throw partSpecInvalid(partSpecPath);
+    errors.push({ path: partSpecPath, code: 'PART_SPEC_INVALID' });
+  }
   if (errors.length) throw productInvalid(errors);
   return out;
 }

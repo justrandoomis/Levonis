@@ -1,6 +1,7 @@
 import type { HostInfo } from './hosts';
 import { computeCompletion } from './profileCompletion';
 import { maskPhone } from './phone';
+import { effectiveStatus, standingUntil } from './userStatus';
 
 export interface Env {
   DB: D1Database;
@@ -171,6 +172,19 @@ export interface SessionUser {
   profile_json: string;
   /** 0153 — the creator page switch; absent on rows the migration has not reached in a test double. */
   creator_public?: number | null;
+  /**
+   * 0162 — the account's standing (worker/lib/userStatus.ts): the session row
+   * is `SELECT u.*`, so a decision of the moderation desk is in force from the
+   * next request. Absent on a row the migration has not reached (reads
+   * `active`). A restriction or suspension past `status_until` reads `active`
+   * — ask `effectiveStatus`, never this column alone.
+   */
+  status?: 'active' | 'restricted' | 'suspended' | 'banned' | null;
+  /** What the person is told about their standing; '' when active. */
+  status_reason?: string | null;
+  /** ISO 8601 end of a restriction or suspension; null for none (or a ban, which has no end). */
+  status_until?: string | null;
+  status_changed_at?: string | null;
   /** Google account subject when this account has Google sign-in linked.
    *  NEVER leaves the server — publicUser exposes only whether it is set. */
   google_sub?: string | null;
@@ -228,6 +242,16 @@ export function localeToDb(apiLocale: string): 'ar' | 'en' | 'ku' {
   return apiLocale === 'ar' ? 'ar' : 'en';
 }
 
+/** The account's own standing (0162) as its session answer reads it — see worker/lib/userStatus.ts. */
+function moderationOf(u: SessionUser) {
+  const status = effectiveStatus(u);
+  return {
+    status,
+    reason: status === 'active' ? '' : String(u.status_reason ?? ''),
+    until: standingUntil(u),
+  };
+}
+
 function completionSummary(u: SessionUser) {
   const c = computeCompletion(u as never);
   return { percent: c.percent, complete: c.complete, missing: c.missing };
@@ -262,6 +286,10 @@ export function publicUser(u: SessionUser) {
     // Whether /u/<username> exists for this account (0153). Only an explicit
     // 1 is on: a row from before the column reads as off.
     creator_public: u.creator_public === 1,
+    // The account's own standing (0162), for the banner that says why a door
+    // is closed and until when: the standing IN FORCE (a lapsed suspension
+    // reads active), its reason and its end date. Never another account's.
+    moderation: moderationOf(u),
     // WHETHER, never WHICH. The account page needs to show "Google —
     // connected"; the Google subject itself is an identifier for that person
     // at Google and has no business in a JSON response.

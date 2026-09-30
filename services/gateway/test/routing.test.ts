@@ -92,6 +92,12 @@ const EXPECTED_OWNER: Record<string, string> = {
   // W5-B: the workshop's «مناسب لي» board, live eligibility verdicts and private request costing.
   '/api/merchant/workshop': 'MARKETPLACE',
   '/api/merchant/orders': 'MARKETPLACE',
+  // Programme C C1: parts from Levonis (worker/routes/merchantParts.ts) ride the /api/merchant row;
+  // the customer personalisation doors are their own prefix (§0 row 27).
+  '/api/merchant/parts': 'MARKETPLACE',
+  '/api/personalize': 'MARKETPLACE',
+  // Community Phase 6b: the merchant's own reputation rides the /api/merchant row.
+  '/api/merchant/reputation': 'MARKETPLACE',
   // Phase 4 of the community programme (docs/COMMUNITY_ECOSYSTEM.md §4d): resumable uploads, files on products, link cards.
   '/api/uploads/sessions': 'FILES',
   '/api/product-files': 'MARKETPLACE',

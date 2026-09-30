@@ -27,12 +27,17 @@ import {
   type StoreOpen,
 } from '../lib/chatCards';
 import { storeById } from '../lib/merchantAuth';
+// Dispute evidence access (0163, §9.6): staff read a disputed order's store or request thread.
+import { isPlatformAdmin } from '../lib/http';
+import { evidenceLinkForThread, recordStaffEvidenceRead, type EvidenceLink } from '../lib/disputeEvidence';
 import { storeTakesOrders } from '../lib/storeOrderOps';
 import { merchantTakesNewWork } from '../lib/communityRequests';
 import { blockedEither } from './communityPosts';
 import { communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { safeParse } from '../lib/types';
+// Moderation V2 (0162, §9.6): an account's standing at the direct-message doors.
+import { assertMayWrite, isModerated, type StandingFields } from '../lib/userStatus';
 
 /**
  * Direct chats. Only participants can read or write a conversation; there is
@@ -46,6 +51,16 @@ import { safeParse } from '../lib/types';
  * an audit row (`admin.chat_read`, one per admin per thread per hour). The
  * shop's OWN order threads are different — there the admin IS the other party,
  * the support desk (worker/routes/adminChats.ts), and joins as before.
+ *
+ * AND THE EVIDENCE DOOR (0163, docs/COMMUNITY_ECOSYSTEM.md §9.6). A store's
+ * pre-order thread or a request's thread is read by staff ONLY while an order
+ * linked to it is `disputed` (or a store order bought from it has an open
+ * complaint) — worker/lib/disputeEvidence.ts decides, on every read. The same
+ * three promises hold: never joined, never writing (no POST door admits a
+ * non-party; the cards' actions come back empty), every read SESSION on the
+ * record (`chat_staff_reads` + `admin.chat_read`, once per admin per thread
+ * per half hour). Before a dispute the answer is 403 EVIDENCE_NOT_LINKED;
+ * once it is decided, 403 EVIDENCE_CLOSED — for the thread and its files.
  */
 export const chatRoutes = new Hono<AppContext>();
 chatRoutes.use('*', requireAuth);
@@ -145,6 +160,32 @@ async function auditStaffRead(c: Context<AppContext>, chatId: string, orderId: s
 export async function recordStaffChatFileRead(c: Context<AppContext>, chatId: string): Promise<void> {
   const thread = await storeOrderThread(c.env.DB, chatId);
   if (thread) await auditStaffRead(c, chatId, thread.order_id);
+  // A store's or a request's thread (0163): its files open to staff through the
+  // SAME evidence door as its messages — admitted and recorded while the order
+  // is disputed, refused before and after. Any other thread: unchanged.
+  else await admitEvidenceReader(c, chatId);
+}
+
+/**
+ * THE EVIDENCE DOOR (0163, §9.6) — a staff reader of a `store` or `request`
+ * thread they are no party to. Null when the thread is neither (the caller's
+ * ordinary rule applies); otherwise admitted only for a platform admin on the
+ * admin host (`isPlatformAdmin`, the desk's own bar) while an order linked to
+ * the thread is disputed or its store-order complaint open — and every
+ * admission is a read session on the record (worker/lib/disputeEvidence.ts).
+ */
+async function admitEvidenceReader(c: Context<AppContext>, chatId: string): Promise<EvidenceLink | null> {
+  const link = await evidenceLinkForThread(c.env.DB, chatId);
+  if (!link) return null;
+  if (!isPlatformAdmin(c)) throw forbidden('You are not part of this conversation');
+  if (link.state === 'closed') {
+    throw new HttpError(403, 'The dispute this conversation belonged to is decided — staff can no longer read it', 'EVIDENCE_CLOSED');
+  }
+  if (link.state !== 'open') {
+    throw new HttpError(403, 'This conversation is not linked to an open dispute', 'EVIDENCE_NOT_LINKED');
+  }
+  await recordStaffEvidenceRead(c.env.DB, { chatId, adminId: c.get('user')!.id, link });
+  return link;
 }
 
 // The thread's parties (StoreThread, storeThreadOf) live in worker/lib/chatThread.ts.
@@ -408,6 +449,23 @@ export async function openStoreThread(
 }
 
 /**
+ * MODERATION V2 (0162; docs/COMMUNITY_ECOSYSTEM.md §9.6): a restricted,
+ * suspended or banned account sends no DIRECT message — a person-to-person
+ * thread, or a store's pre-order thread (`context_type` '' or 'store', no
+ * order). An order's thread and a request's stay open: the deals already in
+ * flight go on. One read, and only for an account under a sanction.
+ */
+async function assertMayMessageHere(db: D1Database, chatId: string, user: StandingFields): Promise<void> {
+  if (!isModerated(user)) return;
+  const thread = await db
+    .prepare('SELECT order_id, context_type FROM chats WHERE id = ?')
+    .bind(chatId)
+    .first<{ order_id: string | null; context_type: string | null }>();
+  const ctx = thread?.context_type ?? '';
+  if (thread && !thread.order_id && (ctx === '' || ctx === 'store')) assertMayWrite(user, 'dm');
+}
+
+/**
  * Opens (or returns) a chat.
  *
  * TWO KINDS, and the difference matters. `{userId}` is the general direct
@@ -572,6 +630,9 @@ chatRoutes.post('/open', async (c) => {
   // store payload never has to carry the merchant's account id at all. With a
   // store, it is the STORE's thread with this customer — one per pair, listed
   // in the store's inbox — and not the two accounts' personal DM.
+  // A direct message — to a person, or a store's pre-order thread — is one
+  // more door a restricted, suspended or banned account does not open (0162).
+  assertMayWrite(user, 'dm');
   let otherUserId: string;
   if (body.merchantId !== undefined && body.userId === undefined) {
     const merchantId = str(body.merchantId, 'merchantId', { min: 1, max: 60 });
@@ -653,9 +714,14 @@ chatRoutes.get('/:id', async (c) => {
     .bind(chatId, user.id)
     .first();
   let readOnly = false;
+  // Staff admitted through the evidence door (0163) — which case opened it.
+  let evidence: EvidenceLink | null = null;
   if (!member) {
     const orderThread = user.role === 'admin' ? await storeOrderThread(c.env.DB, chatId) : null;
-    if (!orderThread) throw forbidden('You are not part of this conversation');
+    if (!orderThread) {
+      evidence = user.role === 'admin' ? await admitEvidenceReader(c, chatId) : null;
+      if (!evidence) throw forbidden('You are not part of this conversation');
+    }
     readOnly = true;
   }
   const chat = await c.env.DB.prepare('SELECT id, order_id, context_type, context_id FROM chats WHERE id = ?')
@@ -737,6 +803,18 @@ chatRoutes.get('/:id', async (c) => {
         // not gated by the community switch, gated by the store selling (D9).
         custom_product: commerceThread && role === 'merchant' && !!store?.open,
       },
+      // The case that admitted a staff reader (0163): ids only — the desk
+      // links back to its complaint and order; no key, no party's contact.
+      ...(evidence
+        ? {
+            evidence: {
+              community_order_id: evidence.community_order_id,
+              order_id: evidence.order_id,
+              complaint_id: evidence.complaint_id,
+              request_id: evidence.request_id,
+            },
+          }
+        : {}),
     },
   });
 });
@@ -954,8 +1032,12 @@ chatRoutes.get('/:id/messages', async (c) => {
     // Staff reading a merchant↔customer thread: allowed, never joined,
     // never able to write, always recorded. Anything else is refused.
     const thread = user.role === 'admin' ? await storeOrderThread(c.env.DB, chatId) : null;
-    if (!thread) throw forbidden('You are not part of this conversation');
-    await auditStaffRead(c, chatId, thread.order_id);
+    if (thread) await auditStaffRead(c, chatId, thread.order_id);
+    // …or a disputed order's store / request thread, through the evidence
+    // door (0163): one read session per half hour, not per page.
+    else if (!(user.role === 'admin' && (await admitEvidenceReader(c, chatId)))) {
+      throw forbidden('You are not part of this conversation');
+    }
     readOnly = true;
   }
 
@@ -1050,6 +1132,7 @@ chatRoutes.post('/:id/messages', async (c) => {
    * 04 B6) is still a participant row — and is read-only all the same.
    */
   await assertMayWriteInThread(c.env.DB, chatId, user.id);
+  await assertMayMessageHere(c.env.DB, chatId, user);
   const storeThread = await storeThreadOf(c.env.DB, chatId);
   const body = await c.req.json().catch(() => ({}));
 
@@ -1261,6 +1344,7 @@ chatRoutes.post('/:id/cards/link', async (c) => {
   const user = c.get('user')!;
   const chatId = str(c.req.param('id'), 'chatId', { min: 1, max: 60 });
   await assertMayWriteInThread(c.env.DB, chatId, user.id);
+  await assertMayMessageHere(c.env.DB, chatId, user);
   const storeThread = await storeThreadOf(c.env.DB, chatId);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
 

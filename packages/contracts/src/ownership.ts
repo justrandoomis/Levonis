@@ -163,6 +163,11 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'merchant_payout_ledger', 'community_merchants', 'merchant_stores', 'merchant_store_slugs', 'reserved_slugs',
     'merchant_notification_preferences', 'community_products', 'merchant_store_sections', 'merchant_services', 'merchant_showcase',
     'merchant_coupons', 'merchant_reviews', 'merchant_reputation_events',
+    // 0163 — reputation V2 (docs/COMMUNITY_ECOSYSTEM.md §9.6): a merchant's
+    // measured day (first replies, completions, own cancellations, lost
+    // disputes) that the explainable badges and the ranking are read from.
+    // Beside the reputation events it measures; the nightly job writes it.
+    'merchant_metrics_daily',
     // 0153 — what the community MAKES (docs/COMMUNITY_ECOSYSTEM.md Phase 1): a
     // maker's projects and posts, and their pictures. Marketplace, because a
     // project is the door into a store, a product and a print request.
@@ -178,6 +183,16 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // 0160 — the discussion under a request, the order's timeline, and which
     // row a content report really names (docs/COMMUNITY_ECOSYSTEM.md §9.5).
     'community_request_comments', 'community_order_updates', 'community_report_targets',
+    // 0162 — moderation V2 (docs/COMMUNITY_ECOSYSTEM.md §9.6): every desk
+    // decision on a post, a comment, an account, a store… as a row, and the
+    // one appeal a person may file against it. Beside the reports they answer.
+    'moderation_actions', 'moderation_appeals',
+    // 0164 — «التخصيص» (Programme C C1, docs/LEVO_PROJECT_PROGRAMME.md §B.7):
+    // the merchant's blueprint revisions of a product, the parts each revision
+    // builds in, and the customer's immutable configurations. Beside the
+    // products they describe (`community_products.part_spec` is the column
+    // the same migration adds).
+    'product_blueprints', 'blueprint_part_refs', 'design_configs',
     // 0122 — the store page as data (docs/MERCHANT_PLATFORM.md §4.4): the
     // merchant's working draft and the immutable published revisions the
     // storefront reads through merchant_stores.published_revision_id.
@@ -216,6 +231,10 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // reader (docs/COMMUNITY_ECOSYSTEM.md §9.4 "Link cards"). Chat, because
     // the conversation is the door that writes it; comments and posts read it.
     'link_cards',
+    // 0163 — one row per staff read session of a disputed order's store or
+    // request thread (docs/COMMUNITY_ECOSYSTEM.md §9.6 «Dispute evidence
+    // access»). Chat, because the thread's own read doors write it.
+    'chat_staff_reads',
   ]),
   ...owned('notifications', [
     'outbox', 'user_notifications', 'telegram_updates', 'tg_admin_notifications', 'tg_admin_actions', 'notification_preferences',

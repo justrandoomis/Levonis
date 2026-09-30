@@ -128,6 +128,14 @@ export type NotificationKind =
   | 'coupon_ending'
   | 'store_status_changed'
   /**
+   * «قرار من إدارة Levonis» — a moderation decision about the person or their
+   * content (0162; worker/routes/adminModeration.ts): a hidden project or
+   * comment, a warning, a restriction, a suspension, a ban, a restore, and the
+   * answer to their appeal — always with the reason, and the appeal door as
+   * the link. One row per decision (`moderation:<actionId>`).
+   */
+  | 'moderation_action'
+  /**
    * THE SOCIAL KINDS (0154; docs/COMMUNITY_ECOSYSTEM.md Phase 2), written by
    * `notifyGrouped` and never by `notify`: a burst of likes is ONE row whose
    * count climbs («أعجب 12 شخصًا بمشروعك»), not twelve rows. Saves are private
@@ -193,6 +201,8 @@ export interface NotificationInput {
     | 'community_post'
     // 0154 — a comment under a post ('comment_replied'), a person ('new_follower').
     | 'community_comment' | 'user'
+    // 0162 — the desk's decision a 'moderation_action' notice is about (its appeal door).
+    | 'moderation_action'
     | '';
   entity_id?: string;
   meta?: Record<string, unknown>;

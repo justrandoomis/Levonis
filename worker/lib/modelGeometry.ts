@@ -29,7 +29,7 @@
  */
 
 import { unzipSync } from 'fflate';
-import { zipBombFilter } from './attachments';
+import { zipBombFilter, ARCHIVE_INFLATE_CAP } from './attachments';
 
 // --------------------------------------------------------------- vocabulary
 
@@ -1062,4 +1062,1145 @@ export function viewerMesh(input: ArrayBuffer | Uint8Array, name = '', maxTriang
     }
   }
   return out;
+}
+
+// ===========================================================================
+//  PARTS — the named pieces of a merchant's own model (Programme C, C1)
+// ===========================================================================
+
+/**
+ * WHY A SECOND READER, AND WHY THE FIRST ONE IS NOT TOUCHED.
+ *
+ * `analyseModel` and `viewerMesh` answer "how big, how heavy, what does it look
+ * like" for a customer's request and a merchant's product file, and those
+ * answers are priced and pinned (tests/modelGeometry.test.ts,
+ * tests/printQuoteGeometry.test.ts). They flatten a file into one anonymous
+ * triangle soup — right for a price, useless for personalisation, which has to
+ * know WHICH triangles are the body and which are the name plate.
+ *
+ * `parseModelParts` reads the same files for that other question and returns
+ * the pieces separately: named and coloured as the file states them, in
+ * millimetres, in the assembly frame with every transform composed. It shares
+ * the low-level readers (the bounded ZIP reader, the STL and AMF readers, the
+ * unit table) and nothing else, so every function above keeps its exact
+ * output: a request file or a quote can never change because a blueprint
+ * feature landed. A Bambu / Orca assembly — a root object whose
+ * `<components>` point into `3D/Objects/*.model` — stays unmeasured for
+ * `analyseModel`, exactly as before, and is read in full here.
+ *
+ * WHAT EACH FORMAT GIVES.
+ *   3MF   every build item (printable ones), `<components>` followed through
+ *         `p:path` into the package's other model parts with the transforms
+ *         composed; names from the object, from Bambu/Orca's
+ *         `Metadata/model_settings.config` (parts, subtypes, extruders) or
+ *         PrusaSlicer's `Metadata/Slic3r_PE_model.config` (volumes as triangle
+ *         ranges); colours from the extruder's filament (Bambu
+ *         `project_settings.config`, Prusa `Slic3r_PE.config`), else from
+ *         `<basematerials displaycolor>` / `<m:colorgroup color>`. Modifier,
+ *         negative and support volumes are never parts.
+ *   OBJ   one part per `o` / `g` / `usemtl` combination (no colour: the MTL is
+ *         another file).
+ *   glTF  the scene's nodes with TRS or matrix transforms, a part per node (per
+ *         material when a node's mesh carries several); metres read as
+ *         millimetres and Y-up turned to the print frame's Z-up.
+ *   STL   one part per file (per named solid of an ASCII file); placing
+ *         several files is the compiler's job (worker/lib/personalize/compile.ts).
+ *   AMF   one part.
+ *
+ * NAMES AND COLOURS ARE THE MERCHANT'S. They come back so the builder can
+ * suggest roles and colours; the compiler keeps them out of the mesh bytes and
+ * they are stored only in the merchant-only `product_blueprints.parts`.
+ */
+
+/** One named piece of a model, ready to be compiled. */
+export interface ModelPart {
+  /** The file's own name for the piece. Merchant-only; never written into a mesh. */
+  name: string;
+  /** `#rrggbb` as the file states it (the extruder's filament, a base material or a colour group). Merchant-only. */
+  colour?: string;
+  /** The slicer extruder (1-based) the file assigns, where it says. */
+  extruder?: number;
+  /**
+   * The file's own grouping — the placed object of a 3MF build item, an OBJ
+   * `o`, a glTF root node. The compiler merges by it when a file has more
+   * pieces than one mesh may carry.
+   */
+  group?: string;
+  /** 9 floats per triangle: millimetres, the assembly frame, every transform composed, Z up. */
+  positions: Float32Array;
+  triangles: number;
+}
+
+export type ModelPartsWarning =
+  /** STL / OBJ, or a 3MF or AMF with no unit attribute: millimetres assumed. */
+  | 'UNIT_ASSUMED'
+  /** A glTF (metres by definition) that would be over 2 m long: read as millimetres. */
+  | 'UNIT_GUESSED'
+  /** Modifier, negative, support-blocker/enforcer or support objects were left out. */
+  | 'MODIFIERS_SKIPPED'
+  /** Build items marked `printable="0"` were left out. */
+  | 'NOT_PRINTABLE_SKIPPED'
+  /** Per-triangle painted colours (Bambu `paint_color`, Prusa MMU segmentation) are not separate parts. */
+  | 'PAINT_IGNORED'
+  /** A reference to an object the package does not contain. */
+  | 'MISSING_OBJECT'
+  /** Components nested deeper than the reader follows were cut. */
+  | 'DEPTH_LIMIT'
+  /** Triangles pointing outside their vertex list were dropped. */
+  | 'BAD_INDICES'
+  /** glTF primitives that are not readable float triangles were skipped. */
+  | 'PRIMITIVE_SKIPPED'
+  /** A glTF with no nodes: its meshes were read directly, untransformed. */
+  | 'NO_SCENE';
+
+/** A machine word the merchant UI turns into a sentence (ar / en / ckb); never a sentence itself. */
+export type ModelPartsHint =
+  /** STEP or an unknown format: export the model as 3MF, STL, OBJ or GLB. */
+  | 'export_mesh'
+  /** The file could not be read (truncated, corrupt, not what its bytes claim). */
+  | 'damaged'
+  /** It holds no printable triangles. */
+  | 'empty'
+  /** Draco / meshopt / quantised glTF: export without mesh compression. */
+  | 'compressed_gltf'
+  /** A .gltf whose geometry lives in separate files: export a single .glb. */
+  | 'external_buffers'
+  /** More triangles than allowed: export a lighter file, or publish photo-only. */
+  | 'too_heavy';
+
+export type ModelPartsResult =
+  | {
+      ok: true;
+      format: ModelFormat;
+      unit: 'mm';
+      /** 'declared' = the file (or its format's definition) states the unit. */
+      unit_source: 'declared' | 'assumed';
+      parts: ModelPart[];
+      triangles: number;
+      warnings: ModelPartsWarning[];
+    }
+  | {
+      ok: false;
+      code: 'UNREADABLE' | 'NO_GEOMETRY' | 'TOO_HEAVY' | 'UNSUPPORTED';
+      format: ModelFormat;
+      hint: ModelPartsHint;
+      /** The counted total, for TOO_HEAVY — absent when the package was too large to open at all. */
+      triangles?: number;
+    };
+
+/**
+ * The ceiling `parseModelParts` applies when the caller names none: a memory
+ * guard (36 MB of positions), not a product rule — the blueprint limit is the
+ * admin's `customizationConfig.max_triangles`, passed in by the caller.
+ */
+export const MODEL_PARTS_DEFAULT_MAX_TRIANGLES = 1_000_000;
+/** Components nested deeper than this are cut (a real assembly is 2–3 deep). */
+const PARTS_MAX_DEPTH = 16;
+/** Placed pieces followed before the reader stops — bounds what a hostile file can ask for. */
+const PARTS_MAX_PIECES = 4096;
+/** Declared XML bytes budgeted per allowed triangle when a 3MF is opened (real exports use 70–250). */
+const PARTS_XML_BYTES_PER_TRIANGLE = 512;
+
+/**
+ * THE BOUNDED ZIP READER this file has always used for 3MF and zipped AMF,
+ * exported so geometry code elsewhere opens packages through the same bomb
+ * filter (`zipBombFilter`, worker/lib/attachments.ts) and fflate stays inside
+ * this one allow-listed file (tests/store-isolation.test.ts).
+ *
+ * `want` narrows what is INFLATED — every entry is still counted against the
+ * archive's bound first, so a thumbnail or a sliced G-code costs nothing but
+ * cannot hide a bomb; `maxWantedBytes` caps the declared size of what is
+ * inflated. Throws (`ARCHIVE_TOO_DEEP`, `ARCHIVE_TOO_LARGE`, or fflate's own
+ * error for a damaged archive); never returns a partial package.
+ */
+export function readModelArchive(
+  input: Uint8Array | ArrayBuffer,
+  opts: { want?: (name: string) => boolean; maxWantedBytes?: number } = {}
+): Record<string, Uint8Array> {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  const bomb = zipBombFilter();
+  const cap = opts.maxWantedBytes ?? ARCHIVE_INFLATE_CAP;
+  let wanted = 0;
+  return unzipSync(bytes, {
+    filter: (f) => {
+      bomb(f); // counts every entry; throws past the archive's bound
+      if (opts.want && !opts.want(f.name)) return false;
+      wanted += f.originalSize;
+      if (wanted > cap) throw new Error('ARCHIVE_TOO_LARGE');
+      return true;
+    },
+  });
+}
+
+/**
+ * The pieces of a model file, named and placed. Never throws: an unreadable
+ * file is a RESULT with a code and a hint, like `analyseModel`'s.
+ *
+ * `maxTriangles` is checked against a COUNT taken before any geometry is
+ * built (the STL header, the 3MF tags, the glTF accessors, the OBJ faces), so
+ * a file over the limit is refused without allocating it.
+ */
+export function parseModelParts(
+  input: Uint8Array | ArrayBuffer,
+  name: string,
+  opts: { maxTriangles?: number } = {}
+): ModelPartsResult {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  const format = sniffFormat(bytes, name);
+  const max =
+    opts.maxTriangles !== undefined && Number.isFinite(opts.maxTriangles) && opts.maxTriangles >= 0
+      ? Math.floor(opts.maxTriangles)
+      : MODEL_PARTS_DEFAULT_MAX_TRIANGLES;
+  if (!FORMAT_CAPABILITIES[format].previewable) return { ok: false, code: 'UNSUPPORTED', format, hint: 'export_mesh' };
+
+  let out: PartsOutcome;
+  try {
+    out =
+      format === '3mf' ? threeMfParts(bytes, max)
+      : format === 'obj' ? objParts(bytes, max)
+      : format === 'stl' ? stlParts(bytes, name, max)
+      : format === 'amf' ? amfParts(bytes, name)
+      : gltfParts(bytes, format, max);
+  } catch (e) {
+    if (e instanceof Error && e.message === 'ARCHIVE_TOO_LARGE') return { ok: false, code: 'TOO_HEAVY', format, hint: 'too_heavy' };
+    return { ok: false, code: 'UNREADABLE', format, hint: 'damaged' };
+  }
+  if (!out.ok) return { ok: false, code: out.code, format, hint: out.hint, ...(out.triangles !== undefined ? { triangles: out.triangles } : {}) };
+
+  const parts = out.parts.filter((p) => p.triangles > 0);
+  const triangles = parts.reduce((n, p) => n + p.triangles, 0);
+  if (triangles === 0) return { ok: false, code: 'NO_GEOMETRY', format, hint: 'empty' };
+  if (triangles > max) return { ok: false, code: 'TOO_HEAVY', format, hint: 'too_heavy', triangles };
+  nameParts(parts);
+  return {
+    ok: true,
+    format,
+    unit: 'mm',
+    unit_source: out.declared ? 'declared' : 'assumed',
+    parts,
+    triangles,
+    warnings: [...new Set(out.warnings)],
+  };
+}
+
+type PartsOutcome =
+  | { ok: true; parts: ModelPart[]; declared: boolean; warnings: ModelPartsWarning[] }
+  | { ok: false; code: 'UNREADABLE' | 'NO_GEOMETRY' | 'TOO_HEAVY' | 'UNSUPPORTED'; hint: ModelPartsHint; triangles?: number };
+
+const tooHeavy = (triangles?: number): PartsOutcome => ({
+  ok: false,
+  code: 'TOO_HEAVY',
+  hint: 'too_heavy',
+  ...(triangles !== undefined ? { triangles } : {}),
+});
+
+/** Every piece named, uniquely: the file's name, else «Part N»; repeats numbered «Screw», «Screw 2», … */
+function nameParts(parts: ModelPart[]): void {
+  const used = new Set<string>();
+  parts.forEach((p, i) => {
+    const base = p.name || `Part ${i + 1}`;
+    let name = base;
+    for (let n = 2; used.has(name); n++) name = `${base} ${n}`;
+    used.add(name);
+    p.name = name;
+  });
+}
+
+// ---------------------------------------------------------- shared helpers
+
+/** An affine map in 3MF's row-vector layout: p' = p·R + t, R row-major in [0..8], t in [9..11]. */
+type Affine = number[];
+const AFFINE_IDENTITY: Affine = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+const scaleAffine = (s: number): Affine => [s, 0, 0, 0, s, 0, 0, 0, s, 0, 0, 0];
+
+/** `a` then `b`: the map that applies `a` first. */
+function thenApply(a: Affine, b: Affine): Affine {
+  const out = new Array<number>(12);
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) out[i * 3 + j] = a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j];
+  }
+  for (let j = 0; j < 3; j++) out[9 + j] = a[9] * b[j] + a[10] * b[3 + j] + a[11] * b[6 + j] + b[9 + j];
+  return out;
+}
+
+const affineDet = (m: Affine) =>
+  m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6]) + m[2] * (m[3] * m[7] - m[4] * m[6]);
+
+/** A 3MF `transform` attribute; anything but twelve finite numbers is the identity, as `parse3mf` treats it. */
+function affine3mf(raw: string | undefined): Affine {
+  if (!raw) return AFFINE_IDENTITY;
+  const v = raw.trim().split(/\s+/).map(Number);
+  return v.length >= 12 && v.slice(0, 12).every(Number.isFinite) ? v.slice(0, 12) : AFFINE_IDENTITY;
+}
+
+/**
+ * Indexed geometry → a flat soup under `m`, winding kept outward when `m`
+ * mirrors. `from`/`to` select a triangle range (PrusaSlicer volumes). Returns
+ * the positions and how many triangles pointed outside the vertex list.
+ */
+function soup(vx: ArrayLike<number>, faces: ArrayLike<number>, m: Affine, from = 0, to = faces.length / 3) {
+  const vertexCount = Math.floor(vx.length / 3);
+  const tv = new Float64Array(vertexCount * 3);
+  for (let i = 0; i < vertexCount; i++) {
+    const x = vx[i * 3], y = vx[i * 3 + 1], z = vx[i * 3 + 2];
+    tv[i * 3] = m[0] * x + m[3] * y + m[6] * z + m[9];
+    tv[i * 3 + 1] = m[1] * x + m[4] * y + m[7] * z + m[10];
+    tv[i * 3 + 2] = m[2] * x + m[5] * y + m[8] * z + m[11];
+  }
+  const flip = affineDet(m) < 0;
+  const count = Math.max(0, Math.floor(to) - Math.floor(from));
+  const positions = new Float32Array(count * 9);
+  let written = 0;
+  let bad = 0;
+  for (let t = Math.floor(from); t < Math.floor(from) + count; t++) {
+    const a = faces[t * 3];
+    let b = faces[t * 3 + 1];
+    let c = faces[t * 3 + 2];
+    if (!(a >= 0 && b >= 0 && c >= 0 && a < vertexCount && b < vertexCount && c < vertexCount)) {
+      bad++;
+      continue;
+    }
+    if (flip) [b, c] = [c, b];
+    const o = written * 9;
+    positions[o] = tv[a * 3]; positions[o + 1] = tv[a * 3 + 1]; positions[o + 2] = tv[a * 3 + 2];
+    positions[o + 3] = tv[b * 3]; positions[o + 4] = tv[b * 3 + 1]; positions[o + 5] = tv[b * 3 + 2];
+    positions[o + 6] = tv[c * 3]; positions[o + 7] = tv[c * 3 + 1]; positions[o + 8] = tv[c * 3 + 2];
+    written++;
+  }
+  return { positions: written === count ? positions : positions.slice(0, written * 9), triangles: written, bad };
+}
+
+const XML_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+function xmlText(s: string): string {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (whole, e: string) => {
+    if (e[0] !== '#') return XML_ENTITIES[e.toLowerCase()] ?? whole;
+    const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+    return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+  });
+}
+
+/** A merchant-facing label: entities decoded, control and bidi-override characters dropped, ≤ 80 characters. */
+function partLabel(raw: string | null | undefined): string {
+  if (!raw) return '';
+  let out = '';
+  for (const ch of xmlText(raw)) {
+    const c = ch.codePointAt(0) ?? 0;
+    const hidden = c < 0x20 || (c >= 0x7f && c <= 0x9f) || (c >= 0x202a && c <= 0x202e) || (c >= 0x2066 && c <= 0x2069);
+    out += hidden ? ' ' : ch;
+  }
+  return Array.from(out.replace(/\s+/g, ' ').trim()).slice(0, 80).join('').trim();
+}
+
+/** `#rrggbb` from `#RRGGBB`, `#RRGGBBAA` or the bare digits; the alpha is dropped (a printer has none). */
+function hexColour(raw: string | null | undefined): string | undefined {
+  const m = raw ? /^#?([0-9a-f]{6})(?:[0-9a-f]{2})?$/i.exec(raw.trim()) : null;
+  return m ? `#${m[1].toLowerCase()}` : undefined;
+}
+
+const positiveInt = (raw: string | null | undefined): number | undefined => {
+  const n = raw === null || raw === undefined ? NaN : Number(raw);
+  return Number.isInteger(n) && n > 0 && n < 1000 ? n : undefined;
+};
+
+const ATTRIBUTE_RE = /([A-Za-z_][\w.-]*(?::[A-Za-z_][\w.-]*)?)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+/** Every attribute of a tag, reachable by its full name and by its local name (`p:path` → `path`). */
+function attrsOf(tag: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of tag.matchAll(ATTRIBUTE_RE)) {
+    const value = m[2] ?? m[3] ?? '';
+    const colon = m[1].indexOf(':');
+    if (!out.has(m[1])) out.set(m[1], value);
+    if (colon > 0 && !out.has(m[1].slice(colon + 1))) out.set(m[1].slice(colon + 1), value);
+  }
+  return out;
+}
+
+/**
+ * One numeric attribute of the tag occupying `s[from..to)`, read in place —
+ * no map, no substring of the tag: the hot path of a 60k-triangle mesh. A
+ * missing or unreadable value is 0, as `num` makes it for `parse3mf`.
+ */
+function attrNumber(s: string, from: number, to: number, attrName: string): number {
+  let at = from;
+  for (;;) {
+    at = s.indexOf(attrName, at);
+    if (at < 0 || at >= to) return 0;
+    const before = at === from ? 32 : s.charCodeAt(at - 1);
+    let k = at + attrName.length;
+    while (s.charCodeAt(k) === 32) k++;
+    if ((before === 32 || before === 9 || before === 10 || before === 13) && s.charCodeAt(k) === 61 /* = */) {
+      k++;
+      while (s.charCodeAt(k) === 32) k++;
+      const q = s.charCodeAt(k);
+      if (q !== 34 && q !== 39) return 0;
+      const end = s.indexOf(q === 34 ? '"' : "'", k + 1);
+      if (end <= k + 1 || end > to) return 0;
+      const n = Number(s.slice(k + 1, end));
+      return Number.isFinite(n) ? n : 0;
+    }
+    at += attrName.length;
+  }
+}
+
+/** `<tag` openings that are that tag and not a longer one (`<triangle` but not `<triangles>`). */
+function countTags(body: string, tag: string): number {
+  const open = `<${tag}`;
+  let n = 0;
+  let at = 0;
+  for (;;) {
+    at = body.indexOf(open, at);
+    if (at < 0) return n;
+    const c = body.charCodeAt(at + open.length);
+    if (c === 32 || c === 9 || c === 10 || c === 13 || c === 47 || c === 62) n++;
+    at += open.length;
+  }
+}
+
+/** The key/value `<metadata>` children of a slicer config block. */
+function metadataOf(xml: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of xml.matchAll(/<metadata\s([^>]*)>/gi)) {
+    const a = attrsOf(m[1]);
+    const key = a.get('key');
+    if (key && !out.has(key)) out.set(key, a.get('value') ?? '');
+  }
+  return out;
+}
+
+const baseName = (name: string) => partLabel((name.split(/[\\/]/).pop() ?? '').replace(/\.[A-Za-z0-9]{1,5}$/, ''));
+
+// ----------------------------------------------------------------- 3MF parts
+
+interface ThreeMfObject {
+  id: string;
+  name: string;
+  type: string;
+  pid: string;
+  pindex: number;
+  body: string;
+  triangles: number;
+  components: Array<{ objectid: string; path: string; m: Affine }>;
+}
+interface ThreeMfModel {
+  path: string;
+  objects: Map<string, ThreeMfObject>;
+  /** resource id → colours by index (`<basematerials>` and `<m:colorgroup>`). */
+  colours: Map<string, Array<string | undefined>>;
+}
+interface SlicerPart { name: string; extruder?: number; subtype: string }
+interface SlicerObject { name: string; extruder?: number; parts: Map<string, SlicerPart> }
+interface PrusaVolume { first: number; last: number; name: string; type: string; extruder?: number }
+
+const normPath = (p: string) => p.replace(/^\/+/, '').toLowerCase();
+
+function read3mfModel(path: string, xml: string): ThreeMfModel {
+  // The resource scans run over megabytes of vertices; a cheap `includes`
+  // decides first whether there is anything to find (3MF element names are
+  // case-sensitive XML, lower-case by the schema).
+  const colours = new Map<string, Array<string | undefined>>();
+  if (xml.includes('basematerials')) {
+    for (const m of xml.matchAll(/<(?:[\w-]+:)?basematerials\b([^>]*)>([\s\S]*?)<\/(?:[\w-]+:)?basematerials>/gi)) {
+      const id = attrsOf(m[1]).get('id');
+      if (id) colours.set(id, [...m[2].matchAll(/<(?:[\w-]+:)?base\s([^>]*)>/gi)].map((b) => hexColour(attrsOf(b[1]).get('displaycolor'))));
+    }
+  }
+  if (xml.includes('colorgroup')) {
+    for (const m of xml.matchAll(/<(?:[\w-]+:)?colorgroup\b([^>]*)>([\s\S]*?)<\/(?:[\w-]+:)?colorgroup>/gi)) {
+      const id = attrsOf(m[1]).get('id');
+      if (id) colours.set(id, [...m[2].matchAll(/<(?:[\w-]+:)?color\s([^>]*)>/gi)].map((c) => hexColour(attrsOf(c[1]).get('color'))));
+    }
+  }
+  const objects = new Map<string, ThreeMfObject>();
+  for (const m of xml.matchAll(/<object\b([^>]*)>([\s\S]*?)<\/object>/gi)) {
+    const a = attrsOf(m[1]);
+    const id = a.get('id');
+    if (!id) continue;
+    const body = m[2];
+    const components: ThreeMfObject['components'] = [];
+    for (const c of body.includes('component') ? body.matchAll(/<(?:[\w-]+:)?component\s([^>]*)>/gi) : []) {
+      const ca = attrsOf(c[1]);
+      const objectid = ca.get('objectid');
+      if (objectid) components.push({ objectid, path: normPath(ca.get('path') ?? '') || path, m: affine3mf(ca.get('transform')) });
+    }
+    objects.set(id, {
+      id,
+      name: partLabel(a.get('name')),
+      type: (a.get('type') ?? 'model').toLowerCase(),
+      pid: a.get('pid') ?? '',
+      pindex: Math.max(0, Math.floor(num(a.get('pindex') ?? '0'))),
+      body,
+      triangles: countTags(body, 'triangle'),
+      components,
+    });
+  }
+  return { path, objects, colours };
+}
+
+/** Bambu Studio / Orca: `Metadata/model_settings.config` — object and part names, subtypes, extruders. */
+function readBambuSettings(xml: string): Map<string, SlicerObject> {
+  const out = new Map<string, SlicerObject>();
+  for (const m of xml.matchAll(/<object\s([^>]*)>([\s\S]*?)<\/object>/gi)) {
+    const id = attrsOf(m[1]).get('id');
+    if (!id) continue;
+    const parts = new Map<string, SlicerPart>();
+    for (const p of m[2].matchAll(/<part\s([^>]*)>([\s\S]*?)<\/part>/gi)) {
+      const pa = attrsOf(p[1]);
+      const pid = pa.get('id');
+      if (!pid) continue;
+      const meta = metadataOf(p[2]);
+      parts.set(pid, { name: partLabel(meta.get('name')), extruder: positiveInt(meta.get('extruder')), subtype: (pa.get('subtype') ?? 'normal_part').toLowerCase() });
+    }
+    const meta = metadataOf(m[2].replace(/<part\s[^>]*>[\s\S]*?<\/part>/gi, ''));
+    out.set(id, { name: partLabel(meta.get('name')), extruder: positiveInt(meta.get('extruder')), parts });
+  }
+  return out;
+}
+
+/** PrusaSlicer: `Metadata/Slic3r_PE_model.config` — each object's volumes as triangle ranges. */
+function readPrusaSettings(xml: string): Map<string, { name: string; extruder?: number; volumes: PrusaVolume[] }> {
+  const out = new Map<string, { name: string; extruder?: number; volumes: PrusaVolume[] }>();
+  for (const m of xml.matchAll(/<object\s([^>]*)>([\s\S]*?)<\/object>/gi)) {
+    const id = attrsOf(m[1]).get('id');
+    if (!id) continue;
+    const volumes: PrusaVolume[] = [];
+    for (const v of m[2].matchAll(/<volume\s([^>]*)>([\s\S]*?)<\/volume>/gi)) {
+      const va = attrsOf(v[1]);
+      const meta = metadataOf(v[2]);
+      const first = Number(va.get('firstid'));
+      const last = Number(va.get('lastid'));
+      if (!Number.isInteger(first) || !Number.isInteger(last) || first < 0 || last < first) continue;
+      const type = meta.get('volume_type') ?? (meta.get('modifier') === '1' ? 'ParameterModifier' : 'ModelPart');
+      volumes.push({ first, last, name: partLabel(meta.get('name')), type, extruder: positiveInt(meta.get('extruder')) });
+    }
+    const meta = metadataOf(m[2].replace(/<volume\s[^>]*>[\s\S]*?<\/volume>/gi, ''));
+    out.set(id, { name: partLabel(meta.get('name')), extruder: positiveInt(meta.get('extruder')), volumes });
+  }
+  return out;
+}
+
+/** The filament colour of each extruder (index 0 = extruder 1), as the slicer project states it. */
+function filamentColours(text: (path: string) => string | null): Array<string | undefined> {
+  const bambu = text('metadata/project_settings.config');
+  if (bambu) {
+    const list = /"filament_colou?r"\s*:\s*\[([^\]]*)\]/.exec(bambu);
+    if (list) return [...list[1].matchAll(/"([^"]*)"/g)].map((c) => hexColour(c[1]));
+  }
+  const prusa = text('metadata/slic3r_pe.config');
+  if (prusa) {
+    const line = (key: string) =>
+      (new RegExp(`^;\\s*${key}\\s*=\\s*(.*)$`, 'm').exec(prusa)?.[1] ?? '').split(';').map((s) => hexColour(s.trim().replace(/^"|"$/g, '')));
+    const extruder = line('extruder_colour');
+    const filament = line('filament_colour');
+    return Array.from({ length: Math.max(extruder.length, filament.length) }, (_, i) => extruder[i] ?? filament[i]);
+  }
+  return [];
+}
+
+/** The colour a 3MF object's own resources give it: the object's pid/pindex, else its first triangle's. */
+function materialColour(model: ThreeMfModel, obj: ThreeMfObject): string | undefined {
+  if (obj.pid) {
+    const c = model.colours.get(obj.pid)?.[obj.pindex];
+    if (c) return c;
+  }
+  const first = /<triangle\s([^>]*)>/i.exec(obj.body);
+  if (!first) return undefined;
+  const a = attrsOf(first[1]);
+  const pid = a.get('pid');
+  return pid ? model.colours.get(pid)?.[Math.max(0, Math.floor(num(a.get('p1') ?? a.get('pindex') ?? '0')))] : undefined;
+}
+
+/**
+ * Calls `each` with the attribute text of every `<tag …>` in `body` — an
+ * indexOf walk rather than a regex, because a 60k-triangle mesh is 90k tags
+ * and this is the whole cost of reading one. Unprefixed tags only, as the 3MF
+ * core writes them and as `parse3mf` reads them.
+ */
+function eachTag(body: string, tag: string, each: (from: number, to: number) => boolean | void): void {
+  const open = `<${tag}`;
+  let at = 0;
+  for (;;) {
+    at = body.indexOf(open, at);
+    if (at < 0) return;
+    const c = body.charCodeAt(at + open.length);
+    if (c !== 32 && c !== 9 && c !== 10 && c !== 13) {
+      at += open.length;
+      continue;
+    }
+    const end = body.indexOf('>', at);
+    if (end < 0) return;
+    if (each(at + open.length, end) === false) return;
+    at = end;
+  }
+}
+
+/** A mesh object's vertices and triangle indices, read tag by tag. */
+function meshOf(obj: ThreeMfObject): { vx: Float64Array; faces: Int32Array } {
+  const b = obj.body;
+  const vxList: number[] = [];
+  eachTag(b, 'vertex', (from, to) => {
+    vxList.push(attrNumber(b, from, to, 'x'), attrNumber(b, from, to, 'y'), attrNumber(b, from, to, 'z'));
+  });
+  const faces = new Int32Array(obj.triangles * 3);
+  let t = 0;
+  eachTag(b, 'triangle', (from, to) => {
+    if (t >= obj.triangles) return false;
+    faces[t * 3] = attrNumber(b, from, to, 'v1');
+    faces[t * 3 + 1] = attrNumber(b, from, to, 'v2');
+    faces[t * 3 + 2] = attrNumber(b, from, to, 'v3');
+    t++;
+  });
+  return { vx: Float64Array.from(vxList), faces: t === obj.triangles ? faces : faces.slice(0, t * 3) };
+}
+
+function threeMfParts(bytes: Uint8Array, max: number): PartsOutcome {
+  const want = (n: string) => {
+    const l = n.toLowerCase();
+    return l.endsWith('.model') || l.endsWith('.rels') || (l.startsWith('metadata/') && l.endsWith('.config'));
+  };
+  const cap = Math.min(ARCHIVE_INFLATE_CAP, Math.max(8 * 1024 * 1024, max * PARTS_XML_BYTES_PER_TRIANGLE));
+  const raw = readModelArchive(bytes, { want, maxWantedBytes: cap });
+  const files = new Map<string, Uint8Array>();
+  for (const [n, b] of Object.entries(raw)) files.set(normPath(n), b);
+  const decoder = new TextDecoder();
+  const text = (p: string) => {
+    const b = files.get(p);
+    return b ? decoder.decode(b) : null;
+  };
+
+  // The root model part: the package relationship's target, else the conventional path, else any.
+  const rels = text('_rels/.rels') ?? '';
+  const relTarget = [...rels.matchAll(/<Relationship\s([^>]*)>/gi)]
+    .map((m) => attrsOf(m[1]))
+    .find((a) => /\/3dmodel$/i.test(a.get('Type') ?? ''))
+    ?.get('Target');
+  const rootPath =
+    (relTarget && files.has(normPath(relTarget)) ? normPath(relTarget) : null) ??
+    (files.has('3d/3dmodel.model') ? '3d/3dmodel.model' : [...files.keys()].find((k) => k.endsWith('.model')));
+  if (!rootPath) throw new Error('3MF has no model part');
+  const rootXml = text(rootPath) ?? '';
+
+  const models = new Map<string, ThreeMfModel>();
+  const modelAt = (p: string): ThreeMfModel | null => {
+    const hit = models.get(p);
+    if (hit) return hit;
+    const xml = text(p);
+    if (xml === null) return null;
+    const model = read3mfModel(p, xml);
+    models.set(p, model);
+    return model;
+  };
+  const root = modelAt(rootPath);
+  if (!root) throw new Error('3MF has no model part');
+
+  const unitAttr = /<model\b[^>]*?\sunit\s*=\s*["']([^"']+)["']/i.exec(rootXml);
+  const unitScale = unitAttr ? (UNIT_MM[unitAttr[1].toLowerCase()] ?? 1) : 1;
+  const toMm = scaleAffine(unitScale);
+  const warnings: ModelPartsWarning[] = unitAttr ? [] : ['UNIT_ASSUMED'];
+
+  const settingsXml = text('metadata/model_settings.config');
+  const bambu = settingsXml ? readBambuSettings(settingsXml) : new Map<string, SlicerObject>();
+  const prusaXml = text('metadata/slic3r_pe_model.config');
+  const prusa = prusaXml ? readPrusaSettings(prusaXml) : new Map<string, { name: string; extruder?: number; volumes: PrusaVolume[] }>();
+  const filaments = filamentColours(text);
+
+  // <build> places objects, possibly transformed; a model with no build uses
+  // every root object no component references, once, untransformed.
+  const buildXml = /<build\b[^>]*>([\s\S]*?)<\/build>/i.exec(rootXml)?.[1] ?? '';
+  const items: Array<{ objectid: string; path: string; m: Affine }> = [];
+  for (const it of buildXml.matchAll(/<item\s([^>]*)>/gi)) {
+    const a = attrsOf(it[1]);
+    const objectid = a.get('objectid');
+    if (!objectid) continue;
+    if (a.get('printable') === '0') {
+      warnings.push('NOT_PRINTABLE_SKIPPED');
+      continue;
+    }
+    items.push({ objectid, path: normPath(a.get('path') ?? '') || rootPath, m: affine3mf(a.get('transform')) });
+  }
+  if (items.length === 0 && !/<item\s/i.test(buildXml)) {
+    const referenced = new Set<string>();
+    for (const o of root.objects.values()) for (const c of o.components) if (c.path === rootPath) referenced.add(c.objectid);
+    for (const id of root.objects.keys()) if (!referenced.has(id)) items.push({ objectid: id, path: rootPath, m: AFFINE_IDENTITY });
+  }
+
+  // Follow every item down its components to the meshes, composing transforms.
+  interface Leaf { model: ThreeMfModel; obj: ThreeMfObject; m: Affine; item: number; root: ThreeMfObject }
+  const leaves: Leaf[] = [];
+  const expand = (model: ThreeMfModel, objectid: string, m: Affine, depth: number, item: number, rootObj: ThreeMfObject | null, trail: string) => {
+    if (leaves.length >= PARTS_MAX_PIECES) return;
+    const obj = model.objects.get(objectid);
+    if (!obj) {
+      warnings.push('MISSING_OBJECT');
+      return;
+    }
+    if (obj.type === 'support' || obj.type === 'solidsupport' || obj.type === 'other') {
+      warnings.push('MODIFIERS_SKIPPED');
+      return;
+    }
+    const top = rootObj ?? obj;
+    if (obj.triangles > 0) leaves.push({ model, obj, m, item, root: top });
+    for (const c of obj.components) {
+      const key = `${c.path}#${c.objectid}`;
+      if (depth >= PARTS_MAX_DEPTH || trail.includes(`|${key}|`)) {
+        warnings.push('DEPTH_LIMIT');
+        continue;
+      }
+      const child = modelAt(c.path);
+      if (!child) {
+        warnings.push('MISSING_OBJECT');
+        continue;
+      }
+      expand(child, c.objectid, thenApply(c.m, m), depth + 1, item, top, `${trail}${key}|`);
+    }
+  };
+  items.forEach((it, i) => {
+    const model = modelAt(it.path);
+    if (!model) warnings.push('MISSING_OBJECT');
+    else expand(model, it.objectid, it.m, 0, i, null, `|${it.path}#${it.objectid}|`);
+  });
+
+  // Name, skip and count each leaf before any geometry is built.
+  interface Piece { leaf: Leaf; name: string; extruder?: number; from: number; to: number }
+  const pieces: Piece[] = [];
+  const groupLabels: string[] = [];
+  for (const leaf of leaves) {
+    const settings = bambu.get(leaf.root.id);
+    groupLabels[leaf.item] ??= settings?.name || prusa.get(leaf.root.id)?.name || leaf.root.name || '';
+    if (leaf.obj.body.includes('paint_color=') || leaf.obj.body.includes('mmu_segmentation=')) warnings.push('PAINT_IGNORED');
+    const volumes = leaf.model.path === rootPath ? prusa.get(leaf.obj.id) : undefined;
+    if (volumes && volumes.volumes.length > 0) {
+      for (const v of volumes.volumes) {
+        if (v.type.toLowerCase() !== 'modelpart') {
+          warnings.push('MODIFIERS_SKIPPED');
+          continue;
+        }
+        const from = Math.min(v.first, leaf.obj.triangles);
+        const to = Math.min(v.last + 1, leaf.obj.triangles);
+        if (to > from) pieces.push({ leaf, name: v.name || volumes.name || leaf.obj.name, extruder: v.extruder ?? volumes.extruder, from, to });
+      }
+      continue;
+    }
+    const part = settings?.parts.get(leaf.obj.id);
+    if (part && part.subtype !== 'normal_part') {
+      warnings.push('MODIFIERS_SKIPPED');
+      continue;
+    }
+    const direct = leaf.obj === leaf.root;
+    pieces.push({
+      leaf,
+      name: part?.name || leaf.obj.name || (direct ? settings?.name ?? '' : ''),
+      extruder: part?.extruder ?? settings?.extruder,
+      from: 0,
+      to: leaf.obj.triangles,
+    });
+  }
+  const total = pieces.reduce((n, p) => n + (p.to - p.from), 0);
+  if (total > max) return tooHeavy(total);
+
+  // Group labels, unique per placed item.
+  const usedGroups = new Set<string>();
+  const groups = groupLabels.map((label, i) => {
+    const base = label || `Object ${i + 1}`;
+    let name = base;
+    for (let n = 2; usedGroups.has(name); n++) name = `${base} ${n}`;
+    usedGroups.add(name);
+    return name;
+  });
+
+  const meshes = new Map<ThreeMfObject, { vx: Float64Array; faces: Int32Array }>();
+  const parts: ModelPart[] = [];
+  for (const p of pieces) {
+    let mesh = meshes.get(p.leaf.obj);
+    if (!mesh) {
+      mesh = meshOf(p.leaf.obj);
+      meshes.set(p.leaf.obj, mesh);
+    }
+    const s = soup(mesh.vx, mesh.faces, thenApply(p.leaf.m, toMm), p.from, Math.min(p.to, mesh.faces.length / 3));
+    if (s.bad > 0) warnings.push('BAD_INDICES');
+    const colour = (p.extruder !== undefined ? filaments[p.extruder - 1] : undefined) ?? materialColour(p.leaf.model, p.leaf.obj);
+    parts.push({
+      name: p.name,
+      ...(colour ? { colour } : {}),
+      ...(p.extruder !== undefined ? { extruder: p.extruder } : {}),
+      group: groups[p.leaf.item] ?? '',
+      positions: s.positions,
+      triangles: s.triangles,
+    });
+  }
+  return { ok: true, parts, declared: !!unitAttr, warnings };
+}
+
+// ----------------------------------------------------------------- OBJ parts
+
+function objParts(bytes: Uint8Array, max: number): PartsOutcome {
+  const text = new TextDecoder().decode(bytes);
+  const vx: number[] = [];
+  let vertexCount = 0;
+  interface Acc { o: string; g: string; mtl: string; faces: number[] }
+  const accs = new Map<string, Acc>();
+  let o = '';
+  let g = '';
+  let mtl = '';
+  let total = 0;
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (line.length === 0 || line.charCodeAt(0) === 35 /* # */) continue;
+    const space = line.search(/\s/);
+    const head = space < 0 ? line : line.slice(0, space);
+    const rest = space < 0 ? '' : line.slice(space + 1).trim();
+    if (head === 'v') {
+      if (total <= max) {
+        const p = rest.split(/\s+/);
+        vx.push(Number(p[0]), Number(p[1]), Number(p[2]));
+      }
+      vertexCount++;
+    } else if (head === 'o') {
+      o = partLabel(rest);
+      g = '';
+    } else if (head === 'g') {
+      g = rest === 'default' ? '' : partLabel(rest);
+    } else if (head === 'usemtl') {
+      mtl = partLabel(rest);
+    } else if (head === 'f') {
+      const idx: number[] = [];
+      for (const part of rest.split(/\s+/)) {
+        let i = parseInt(part.split('/')[0], 10);
+        if (!Number.isFinite(i)) continue;
+        // OBJ is 1-based, and a negative index counts back from the last vertex so far.
+        i = i < 0 ? vertexCount + i : i - 1;
+        idx.push(i);
+      }
+      total += Math.max(0, idx.length - 2);
+      if (total > max) continue; // keep counting, stop storing
+      const key = `${o}\u0000${g}\u0000${mtl}`;
+      let acc = accs.get(key);
+      if (!acc) {
+        acc = { o, g, mtl, faces: [] };
+        accs.set(key, acc);
+      }
+      for (let k = 1; k + 1 < idx.length; k++) acc.faces.push(idx[0], idx[k], idx[k + 1]);
+    }
+  }
+  if (total > max) return tooHeavy(total);
+
+  const list = [...accs.values()];
+  const baseOf = (a: Acc) => a.g || a.o;
+  const materialsPerBase = new Map<string, Set<string>>();
+  for (const a of list) {
+    const set = materialsPerBase.get(baseOf(a)) ?? new Set<string>();
+    set.add(a.mtl);
+    materialsPerBase.set(baseOf(a), set);
+  }
+  const warnings: ModelPartsWarning[] = ['UNIT_ASSUMED'];
+  const parts: ModelPart[] = list.map((a) => {
+    const base = baseOf(a);
+    const name = !base ? a.mtl : a.mtl && (materialsPerBase.get(base)?.size ?? 0) > 1 ? `${base} · ${a.mtl}` : base;
+    const s = soup(vx, a.faces, AFFINE_IDENTITY);
+    if (s.bad > 0) warnings.push('BAD_INDICES');
+    return { name, group: a.o || a.g, positions: s.positions, triangles: s.triangles };
+  });
+  return { ok: true, parts, declared: false, warnings };
+}
+
+// ----------------------------------------------------------------- STL parts
+
+function stlParts(bytes: Uint8Array, name: string, max: number): PartsOutcome {
+  const base = baseName(name);
+  const warnings: ModelPartsWarning[] = ['UNIT_ASSUMED'];
+  if (isBinaryStl(bytes)) {
+    const count = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(80, true);
+    if (count > max) return tooHeavy(count);
+    const mesh = parseBinaryStl(bytes);
+    // Materialise / VisCAM write the whole-part colour into the header as `COLOR=` + RGBA.
+    const at = asciiHead(bytes, 80).indexOf('COLOR=');
+    const colour = at >= 0 && at + 9 < 80 ? `#${[bytes[at + 6], bytes[at + 7], bytes[at + 8]].map((v) => v.toString(16).padStart(2, '0')).join('')}` : undefined;
+    return { ok: true, parts: [{ name: base, ...(colour ? { colour } : {}), positions: mesh.positions, triangles: mesh.triangles }], declared: false, warnings };
+  }
+  const text = new TextDecoder().decode(bytes);
+  const count = (text.match(/endfacet/gi) ?? []).length;
+  if (count > max) return tooHeavy(count);
+  const vertexRe = /vertex\s+(-?[\d.eE+-]+)\s+(-?[\d.eE+-]+)\s+(-?[\d.eE+-]+)/g;
+  const toPart = (body: string, partName: string): ModelPart => {
+    const nums: number[] = [];
+    for (const m of body.matchAll(vertexRe)) nums.push(Number(m[1]), Number(m[2]), Number(m[3]));
+    const triangles = Math.floor(nums.length / 9);
+    return { name: partName, positions: Float32Array.from(nums.slice(0, triangles * 9)), triangles };
+  };
+  // Several `solid … endsolid` blocks in one file are the file's own pieces.
+  const solids = [...text.matchAll(/^[ \t]*solid\b[ \t]*([^\r\n]*)$([\s\S]*?)^[ \t]*endsolid\b/gim)];
+  if (solids.length > 1) {
+    return { ok: true, parts: solids.map((m) => toPart(m[2], partLabel(m[1]))), declared: false, warnings };
+  }
+  const only = solids.length === 1 ? partLabel(solids[0][1]) : '';
+  return { ok: true, parts: [toPart(text, only || base)], declared: false, warnings };
+}
+
+// ----------------------------------------------------------------- AMF parts
+
+function amfParts(bytes: Uint8Array, name: string): PartsOutcome {
+  const mesh = parseAmf(bytes);
+  const s = mesh.unitScale;
+  const positions = s === 1 ? mesh.positions : mesh.positions.map((v) => v * s);
+  return {
+    ok: true,
+    parts: [{ name: mesh.title ? partLabel(mesh.title) : baseName(name), positions, triangles: mesh.triangles }],
+    declared: mesh.unitDeclared,
+    warnings: mesh.unitDeclared ? [] : ['UNIT_ASSUMED'],
+  };
+}
+
+// ---------------------------------------------------------------- glTF parts
+
+interface GltfNodeDef {
+  name?: string;
+  mesh?: number;
+  children?: number[];
+  matrix?: number[];
+  translation?: number[];
+  rotation?: number[];
+  scale?: number[];
+}
+interface GltfPrimitiveDef {
+  attributes?: Record<string, number>;
+  indices?: number;
+  mode?: number;
+  material?: number;
+}
+interface GltfAccessorDef extends GltfAccessor {
+  normalized?: boolean;
+  sparse?: unknown;
+}
+
+/** glTF's column-major 4×4 as the row-vector affine used above. */
+function affineOfColumnMajor(m: number[]): Affine {
+  return [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10], m[12], m[13], m[14]];
+}
+
+/** A node's local transform: its `matrix`, else translation · rotation · scale. */
+function nodeAffine(n: GltfNodeDef): Affine {
+  if (Array.isArray(n.matrix) && n.matrix.length === 16 && n.matrix.every(Number.isFinite)) return affineOfColumnMajor(n.matrix);
+  const [tx, ty, tz] = n.translation?.length === 3 && n.translation.every(Number.isFinite) ? n.translation : [0, 0, 0];
+  const [sx, sy, sz] = n.scale?.length === 3 && n.scale.every(Number.isFinite) ? n.scale : [1, 1, 1];
+  const [qx, qy, qz, qw] = n.rotation?.length === 4 && n.rotation.every(Number.isFinite) ? n.rotation : [0, 0, 0, 1];
+  const xx = qx * qx, yy = qy * qy, zz = qz * qz, xy = qx * qy, xz = qx * qz, yz = qy * qz, wx = qw * qx, wy = qw * qy, wz = qw * qz;
+  // Column-major rotation columns, each scaled, then the translation column.
+  return affineOfColumnMajor([
+    (1 - 2 * (yy + zz)) * sx, 2 * (xy + wz) * sx, 2 * (xz - wy) * sx, 0,
+    2 * (xy - wz) * sy, (1 - 2 * (xx + zz)) * sy, 2 * (yz + wx) * sy, 0,
+    2 * (xz + wy) * sz, 2 * (yz - wx) * sz, (1 - 2 * (xx + yy)) * sz, 0,
+    tx, ty, tz, 1,
+  ]);
+}
+
+/** glTF's Y-up turned into the print frame's Z-up: (x, y, z) → (x, −z, y). A rotation, never a mirror. */
+const Y_UP_TO_Z_UP: Affine = [1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0];
+
+/** linear → sRGB, as a display colour: glTF's `baseColorFactor` is linear. */
+function srgbHex(rgb: number[]): string | undefined {
+  if (rgb.length < 3 || !rgb.slice(0, 3).every((v) => Number.isFinite(v))) return undefined;
+  const byte = (l: number) => {
+    const c = Math.min(1, Math.max(0, l));
+    const s = c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+    return Math.round(s * 255).toString(16).padStart(2, '0');
+  };
+  return `#${byte(rgb[0])}${byte(rgb[1])}${byte(rgb[2])}`;
+}
+
+function gltfParts(bytes: Uint8Array, format: ModelFormat, max: number): PartsOutcome {
+  let json: Record<string, unknown> | null = null;
+  let glbBin: Uint8Array | null = null;
+  if (format === 'glb') {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let at = 12;
+    while (at + 8 <= bytes.length) {
+      const len = dv.getUint32(at, true);
+      const type = dv.getUint32(at + 4, true);
+      const start = at + 8;
+      if (start + len > bytes.length) throw new Error('GLB chunk runs past the end');
+      if (type === 0x4e4f534a && !json) json = JSON.parse(new TextDecoder().decode(bytes.subarray(start, start + len)));
+      else if (type === 0x004e4942 && !glbBin) glbBin = bytes.subarray(start, start + len);
+      at = start + len + ((4 - (len % 4)) % 4);
+    }
+  } else {
+    json = JSON.parse(new TextDecoder().decode(bytes));
+  }
+  if (!json || typeof json !== 'object') throw new Error('glTF has no JSON');
+
+  const required = Array.isArray(json.extensionsRequired) ? (json.extensionsRequired as unknown[]).map(String) : [];
+  if (required.some((e) => /draco|meshopt|quantization/i.test(e))) return { ok: false, code: 'UNSUPPORTED', hint: 'compressed_gltf' };
+
+  const buffers = (json.buffers as Array<{ uri?: string }> | undefined) ?? [];
+  const decoded = new Map<number, Uint8Array | null>();
+  let external = false;
+  const bufferBytes = (i: number): Uint8Array | null => {
+    if (decoded.has(i)) return decoded.get(i) ?? null;
+    const b = buffers[i];
+    let out: Uint8Array | null = null;
+    if (b && b.uri === undefined) out = format === 'glb' && i === 0 ? glbBin : null;
+    else if (b && typeof b.uri === 'string' && b.uri.startsWith('data:')) out = base64ToBytes(b.uri.slice(b.uri.indexOf(',') + 1));
+    else if (b) external = true;
+    decoded.set(i, out);
+    return out;
+  };
+  const accessors = (json.accessors as GltfAccessorDef[] | undefined) ?? [];
+  const views = (json.bufferViews as GltfBufferView[] | undefined) ?? [];
+  const meshes = (json.meshes as Array<{ name?: string; primitives?: GltfPrimitiveDef[] }> | undefined) ?? [];
+  const nodes = (json.nodes as GltfNodeDef[] | undefined) ?? [];
+  const materials = (json.materials as Array<{ name?: string; pbrMetallicRoughness?: { baseColorFactor?: number[] } }> | undefined) ?? [];
+  const warnings: ModelPartsWarning[] = [];
+
+  /** The typed view behind an accessor, bounds-checked; null when it cannot be read here. */
+  const view = (a: GltfAccessorDef | undefined, size: number) => {
+    if (!a || a.bufferView === undefined || a.sparse !== undefined || !(a.count >= 0)) return null;
+    const v = views[a.bufferView];
+    if (!v) return null;
+    const bin = bufferBytes(v.buffer ?? 0);
+    if (!bin) return null;
+    const start = (v.byteOffset ?? 0) + (a.byteOffset ?? 0);
+    const stride = v.byteStride && v.byteStride > 0 ? v.byteStride : size;
+    const end = a.count === 0 ? start : start + (a.count - 1) * stride + size;
+    if (end > (v.byteOffset ?? 0) + v.byteLength || end > bin.byteLength) return null;
+    return { dv: new DataView(bin.buffer, bin.byteOffset, bin.byteLength), start, stride, count: a.count };
+  };
+  const positionsOf = (index: number | undefined): Float64Array | null => {
+    const a = index === undefined ? undefined : accessors[index];
+    if (!a || a.type !== 'VEC3' || a.componentType !== 5126 || a.normalized) return null;
+    const v = view(a, 12);
+    if (!v) return null;
+    const out = new Float64Array(v.count * 3);
+    for (let i = 0; i < v.count; i++) {
+      const o = v.start + i * v.stride;
+      out[i * 3] = v.dv.getFloat32(o, true);
+      out[i * 3 + 1] = v.dv.getFloat32(o + 4, true);
+      out[i * 3 + 2] = v.dv.getFloat32(o + 8, true);
+    }
+    return out;
+  };
+  const indicesOf = (index: number): Uint32Array | null => {
+    const a = accessors[index];
+    if (!a || a.type !== 'SCALAR') return null;
+    const size = a.componentType === 5125 ? 4 : a.componentType === 5123 ? 2 : a.componentType === 5121 ? 1 : 0;
+    const v = size ? view(a, size) : null;
+    if (!v) return null;
+    const out = new Uint32Array(v.count);
+    for (let i = 0; i < v.count; i++) {
+      const o = v.start + i * v.stride;
+      out[i] = size === 4 ? v.dv.getUint32(o, true) : size === 2 ? v.dv.getUint16(o, true) : v.dv.getUint8(o);
+    }
+    return out;
+  };
+  /** Triangles a primitive yields, counted from its accessors before anything is read. */
+  const triangleCount = (p: GltfPrimitiveDef): number => {
+    const n = p.indices !== undefined ? accessors[p.indices]?.count ?? 0 : accessors[p.attributes?.POSITION ?? -1]?.count ?? 0;
+    const mode = p.mode ?? 4;
+    return mode === 4 ? Math.floor(n / 3) : mode === 5 || mode === 6 ? Math.max(0, n - 2) : 0;
+  };
+
+  // The scene's node instances, each with its world transform.
+  interface Instance { mesh: number; name: string; m: Affine; root: string }
+  const instances: Instance[] = [];
+  if (nodes.length === 0) {
+    meshes.forEach((m, i) => instances.push({ mesh: i, name: partLabel(m.name), m: AFFINE_IDENTITY, root: '' }));
+    if (meshes.length) warnings.push('NO_SCENE');
+  } else {
+    const scenes = (json.scenes as Array<{ nodes?: number[] }> | undefined) ?? [];
+    const sceneIndex = typeof json.scene === 'number' ? json.scene : 0;
+    let roots = scenes[sceneIndex]?.nodes;
+    if (!Array.isArray(roots)) {
+      const children = new Set<number>();
+      for (const n of nodes) for (const c of n.children ?? []) children.add(c);
+      roots = nodes.map((_, i) => i).filter((i) => !children.has(i));
+    }
+    let visits = 0;
+    const walk = (i: number, parent: Affine, depth: number, root: string, trail: Set<number>) => {
+      const n = nodes[i];
+      if (!n || trail.has(i) || ++visits > PARTS_MAX_PIECES) return;
+      if (depth > 32) {
+        warnings.push('DEPTH_LIMIT');
+        return;
+      }
+      const world = thenApply(nodeAffine(n), parent);
+      const label = partLabel(n.name);
+      const top = depth === 0 ? label || `Group ${i + 1}` : root;
+      if (typeof n.mesh === 'number' && meshes[n.mesh]) instances.push({ mesh: n.mesh, name: label || partLabel(meshes[n.mesh].name), m: world, root: top });
+      const next = new Set(trail).add(i);
+      for (const c of n.children ?? []) walk(c, world, depth + 1, top, next);
+    };
+    for (const r of roots) walk(r, AFFINE_IDENTITY, 0, '', new Set());
+  }
+
+  let total = 0;
+  for (const inst of instances) for (const p of meshes[inst.mesh].primitives ?? []) total += triangleCount(p);
+  if (total > max) return tooHeavy(total);
+
+  // Geometry, in the file's units, turned Z-up; the unit is decided on the result's size.
+  const parts: ModelPart[] = [];
+  const extent = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  for (const inst of instances) {
+    const prims = meshes[inst.mesh].primitives ?? [];
+    const byMaterial = new Map<number, GltfPrimitiveDef[]>();
+    for (const p of prims) {
+      const key = typeof p.material === 'number' ? p.material : -1;
+      byMaterial.set(key, [...(byMaterial.get(key) ?? []), p]);
+    }
+    const m = thenApply(inst.m, Y_UP_TO_Z_UP);
+    for (const [material, group] of byMaterial) {
+      const chunks: Float32Array[] = [];
+      let triangles = 0;
+      for (const p of group) {
+        const mode = p.mode ?? 4;
+        const pos = mode === 4 || mode === 5 || mode === 6 ? positionsOf(p.attributes?.POSITION) : null;
+        const idx = p.indices === undefined ? null : indicesOf(p.indices);
+        if (!pos || (p.indices !== undefined && !idx)) {
+          if (external) return { ok: false, code: 'UNSUPPORTED', hint: 'external_buffers' };
+          warnings.push('PRIMITIVE_SKIPPED');
+          continue;
+        }
+        const order = idx ?? Uint32Array.from({ length: pos.length / 3 }, (_, i) => i);
+        let faces: Uint32Array;
+        if (mode === 4) faces = order.length % 3 === 0 ? order : order.slice(0, order.length - (order.length % 3));
+        else {
+          faces = new Uint32Array(Math.max(0, order.length - 2) * 3);
+          for (let t = 0; t + 2 < order.length; t++) {
+            const [a, b, c] = mode === 6 ? [order[0], order[t + 1], order[t + 2]] : t % 2 === 0 ? [order[t], order[t + 1], order[t + 2]] : [order[t + 1], order[t], order[t + 2]];
+            faces[t * 3] = a;
+            faces[t * 3 + 1] = b;
+            faces[t * 3 + 2] = c;
+          }
+        }
+        const s = soup(pos, faces, m);
+        if (s.bad > 0) warnings.push('BAD_INDICES');
+        chunks.push(s.positions);
+        triangles += s.triangles;
+      }
+      if (triangles === 0) continue;
+      const positions = chunks.length === 1 ? chunks[0] : new Float32Array(triangles * 9);
+      if (chunks.length > 1) {
+        let at = 0;
+        for (const c of chunks) {
+          positions.set(c, at);
+          at += c.length;
+        }
+      }
+      for (let i = 0; i < positions.length; i++) {
+        const v = positions[i];
+        const k = i % 3;
+        if (v < extent[k]) extent[k] = v;
+        if (v > extent[k + 3]) extent[k + 3] = v;
+      }
+      const mat = material >= 0 ? materials[material] : undefined;
+      const colour = mat?.pbrMetallicRoughness?.baseColorFactor ? srgbHex(mat.pbrMetallicRoughness.baseColorFactor) : undefined;
+      const name = byMaterial.size > 1 ? `${inst.name || 'Part'} · ${partLabel(mat?.name) || `material ${material + 1}`}` : inst.name;
+      parts.push({ name, ...(colour ? { colour } : {}), group: inst.root, positions, triangles });
+    }
+  }
+  const longest = Math.max(extent[3] - extent[0], extent[4] - extent[1], extent[5] - extent[2]);
+
+  // glTF is defined in METRES. A printable export authored in millimetres and
+  // written without the unit change reads as a building; above 2 m it is taken
+  // as millimetres and said so, rather than shown as a 50-metre keychain.
+  const guessed = longest > 2;
+  if (guessed) warnings.push('UNIT_GUESSED');
+  else for (const p of parts) for (let i = 0; i < p.positions.length; i++) p.positions[i] *= 1000;
+  return { ok: true, parts, declared: !guessed, warnings };
 }

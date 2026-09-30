@@ -43,6 +43,25 @@ const HeroVariant = lazy(() => import('./extra').then((m) => ({ default: m.HeroV
  */
 const WorkshopFacts = lazy(() => import('./workshopFacts').then((m) => ({ default: m.WorkshopFacts })));
 
+/**
+ * REPUTATION V2 (docs/COMMUNITY_ECOSYSTEM.md §9.6): up to three badges the
+ * store earned, each answering «لماذا؟» — the store read's `merchant.badges`
+ * (`[{key, since}]`; the verification is the hero's own check, not a chip). A
+ * lazy chunk fetched only by a store that has one; until it lands a frame of
+ * the row's own height holds its place.
+ */
+const BadgeChips = lazy(() => import('../../community/reputation/BadgeChips'));
+function HeroBadges({ store }: { store: StorefrontStore }) {
+  const badges = (store.merchant as { badges?: Array<{ key: unknown; since?: unknown }> }).badges;
+  return badges?.some((b) => b.key !== 'verified_merchant') ? (
+    <Column className="mt-3">
+      <Suspense fallback={<div className="h-7" />}>
+        <BadgeChips badges={badges} tone="store" />
+      </Suspense>
+    </Column>
+  ) : null;
+}
+
 export interface StoreWorkshop {
   /** `fdm` / `resin` — the closed list the printers carry; anything else is not worded. */
   technologies: Array<'fdm' | 'resin'>;
@@ -109,6 +128,7 @@ export default function HeroBlock({ block, store, data }: HeroProps) {
           <HeroVariant block={block} store={store} data={data} cover={cover} name={name} />
         </Suspense>
         <HeroWorkshop store={store} />
+        <HeroBadges store={store} />
       </>
     );
   }
@@ -116,6 +136,7 @@ export default function HeroBlock({ block, store, data }: HeroProps) {
     <>
       <ProfileHero block={block} store={store} data={data} cover={cover} name={name} />
       <HeroWorkshop store={store} />
+      <HeroBadges store={store} />
     </>
   );
 }

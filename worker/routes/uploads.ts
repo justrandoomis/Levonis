@@ -926,6 +926,9 @@ fileRoutes.get('/*', async (c) => {
       if (!row && user.role !== 'admin') throw forbidden('Not your file');
       // Staff reading a merchant↔customer thread they are not part of is
       // recorded, file by file as message by message (audit 04 #11).
+      // A store's or a request's thread goes through the dispute evidence
+      // door (0163, §9.6): admitted and recorded only while its order is
+      // disputed — 403 EVIDENCE_NOT_LINKED before, EVIDENCE_CLOSED after.
       if (!row) await recordStaffChatFileRead(c, chatId);
     } else if (key.startsWith('support/')) {
       /**

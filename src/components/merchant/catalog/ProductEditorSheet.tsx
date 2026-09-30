@@ -40,6 +40,11 @@ import { Disclosure, readRefusal } from './parts';
 import { MediaEditor } from './MediaEditor';
 /** The product's files (§9.4) — its own chunk: the upload tile, the role menu and the doors ride only when the section is opened on a saved product. */
 const ProductFilesEditor = lazy(() => import('./ProductFilesEditor'));
+/** «يُستخدم داخل منتجات مطبوعة» (Programme C C1) — the part door and its facts are their own chunks. */
+const PartDoor = lazy(() => import('./parts/PartDoor'));
+/** «التخصيص» (Programme C C1) — the door is its own chunk and the builder another; both dark unless /api/merchant/me says `can.customize`. */
+const BlueprintDoor = lazy(() => import('./blueprint/BlueprintDoor'));
+import { useCanCustomize } from './blueprint/gate';
 import {
   EMPTY_VARIANT_DRAFT, VariantEditor, draftFromDetail, draftToModel, localRef, type VariantDraft,
 } from './VariantEditor';
@@ -63,6 +68,8 @@ interface Form {
   media: CatalogMedia[];
   collectionIds: string[];
   variants: VariantDraft;
+  /** The part facts (0164 `part_spec`), null = not a part. */
+  part: Record<string, string> | null;
 }
 
 function formFrom(p: CatalogProductDetail | null, canSell: boolean): Form {
@@ -71,6 +78,7 @@ function formFrom(p: CatalogProductDetail | null, canSell: boolean): Form {
       name: '', description: '', price: null, compareAt: null, sku: '', trackStock: true, stock: 1, lowStockAt: null,
       category: '', condition: 'new', prepDays: 0, state: canSell ? 'published' : 'draft', featured: false,
       attributes: EMPTY_ATTRIBUTES, media: [], collectionIds: [], variants: EMPTY_VARIANT_DRAFT,
+      part: null,
     };
   }
   return {
@@ -93,6 +101,7 @@ function formFrom(p: CatalogProductDetail | null, canSell: boolean): Form {
       : (p.images ?? []).map((url) => ({ kind: 'image' as const, key: url.replace(/^\/files\//, ''), url, alt: '', alt_ar: '' })),
     collectionIds: p.collection_ids ?? [],
     variants: draftFromDetail(p),
+    part: p.part_spec ?? null,
   };
 }
 
@@ -120,6 +129,8 @@ function bodyFrom(f: Form, original: CatalogProductDetail | null): ProductBody {
   // legacy product untouched keeps selling by its old lists: nothing is sent.
   if (hasVariants) body.variant_model = draftToModel(f.variants);
   else if (original?.variant_mode === 'variants') body.variant_model = null;
+  // The part facts travel only when they changed: the server re-reads them strictly.
+  if (JSON.stringify(f.part) !== JSON.stringify(original?.part_spec ?? null)) body.part_spec = f.part;
   return body;
 }
 
@@ -155,6 +166,7 @@ export default function ProductEditorSheet({
   const [busy, setBusy] = useState(false);
   const [materials, setMaterials] = useState<Array<{ id: string; name_en: string; name_ar: string }> | null>(null);
   const [reload, setReload] = useState(0);
+  const customize = useCanCustomize();
 
   useEffect(() => {
     if (!open) return;
@@ -349,6 +361,12 @@ export default function ProductEditorSheet({
             <Segmented items={stateItems} value={form.state} onChange={(id) => set('state', id as PublishState)} label={s.visibility} group="product-state" size="sm" />
           </Field>
 
+          {customize && (
+            <Suspense fallback={null}>
+              <PartDoor value={form.part} onChange={(v) => set('part', v)} state={form.state} onState={(v) => set('state', v)} product={original} variants={form.variants} errors={errors} dirty={dirty} onReload={() => setReload((n) => n + 1)} />
+            </Suspense>
+          )}
+
           <Disclosure
             title={s.sectionVariants}
             summary={summaryVariants}
@@ -375,6 +393,12 @@ export default function ProductEditorSheet({
               errors={variantErrors}
             />
           </Disclosure>
+
+          {customize && (
+            <Suspense fallback={null}>
+              <BlueprintDoor product={original} dirty={dirty} onReload={() => setReload((n) => n + 1)} />
+            </Suspense>
+          )}
 
           <Disclosure title={s.sectionPricing} summary={[form.compareAt ? s.compareAt : '', form.sku, form.lowStockAt !== null ? `${s.lowStock} ≤ ${form.lowStockAt}` : ''].filter(Boolean).join(' · ') || undefined} forceOpen={has('compare_at_iqd') || has('sku') || has('low_stock_threshold')}>
             <Field label={s.compareAt} hint={s.compareAtHint} error={errors.compare_at_iqd} optional>

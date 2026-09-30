@@ -65,6 +65,11 @@ const CreatorsPanel = React.lazy(() => import('../components/community/hub/Creat
 const SearchOverlay = React.lazy(() => import('../components/community/search/SearchOverlay'));
 /** «طلبات تناسبك» (Phase 5d): the workshop's own board, leading a merchant's «لك» — a lazy chunk nobody else fetches. */
 const BoardRail = React.lazy(() => import('../components/community/hub/BoardRail'));
+/** Moderation V2 (§9.6): a restricted, suspended or banned account's standing — a lazy chunk only such an account fetches. */
+const StatusBanner = React.lazy(() => import('../components/community/moderation/StatusBanner'));
+/** The session's standing (`user.moderation`, Moderation V2) says a sanction is in force. */
+const sanctioned = (user: unknown) =>
+  ['restricted', 'suspended', 'banned'].includes(String((user as { moderation?: { status?: unknown } } | null)?.moderation?.status ?? ''));
 
 /** The wizard, on the requests page. */
 const NEW_REQUEST_PATH = '/requests?view=new';
@@ -356,6 +361,13 @@ export default function Community() {
               aside so the answer is not pushed below the fold of a phone. */}
           {!q && <QuickActions newRequestLink={newRequestLink} composerLink={composerLink} />}
         </div>
+
+        {/* The account's standing, before it writes anything the server will refuse. */}
+        {sanctioned(user) && (
+          <Suspense fallback={null}>
+            <StatusBanner />
+          </Suspense>
+        )}
 
         {/* The sections. ONE travelling underline (TabStrip), each tab wired
             to the panel it controls, and bodies that arrive from the side the

@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import type { AppContext, Env } from './lib/types';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
 import { loadSessionUser, sessionFreePublicGet } from './lib/session';
+import { refuseBannedWrites } from './lib/userStatus';
 import { isAnonymousPublicMediaKey } from './lib/mediaStorage';
 import {
   chunkPreloads,
@@ -26,6 +27,8 @@ import {
 import { conditional, weakEtag } from './lib/publicApi/cache';
 import { trustedOrigin } from './lib/appOrigin';
 import { runDurableJobs } from './lib/jobs';
+// Reputation V2 (0163, §9.6): the merchants' days and badges, once a Baghdad night.
+import { runReputationJobs } from './lib/reputation';
 import { authRoutes } from './routes/auth';
 import { productRoutes, homeRoutes } from './routes/products';
 import { cartRoutes } from './routes/cart';
@@ -73,6 +76,11 @@ import { priceReportRoutes, adminPriceReportRoutes } from './routes/priceReports
 import { merchantPrinterRoutes } from './routes/merchantPrinters';
 import { merchantWorkshopRoutes } from './routes/merchantWorkshop';
 import { merchantCatalogRoutes } from './routes/merchantCatalog';
+// «من ليفونيس» (Programme C C1): a Levonis item becomes the merchant's own hidden part.
+import { merchantPartRoutes } from './routes/merchantParts';
+// «التخصيص» (Programme C C1): the merchant's blueprint builder and the customer's personalisation doors.
+import { merchantBlueprintRoutes } from './routes/merchantBlueprints';
+import { personalizeRoutes } from './routes/personalize';
 // Files on products (§9.4): the merchant's editor and the shopfront's list/viewer/download.
 import { merchantProductFileRoutes, publicProductFileRoutes } from './routes/productFiles';
 import { adminPrintQuoteRoutes, printQuoteRoutes } from './routes/printQuote';
@@ -92,6 +100,8 @@ import { merchantRoutes } from './routes/merchant';
 import { storeLayoutRoutes } from './routes/storeLayout';
 import { merchantFinanceRoutes, merchantPayoutRoutes } from './routes/merchantFinance';
 import { merchantAttentionRoutes, merchantSearchRoutes } from './routes/merchantWorkspace';
+// «سمعتي» (0163, §9.6): the merchant's badges with their evidence and the windows behind them.
+import { merchantReputationRoutes } from './routes/merchantReputation';
 import { storefrontRoutes } from './routes/storefront';
 // Merchant platform W2-E: the store's notification centre, inbox and
 // analytics, and the storefront's first-party analytics beacon.
@@ -108,6 +118,7 @@ import { storeOrderRoutes } from './routes/storeOrders';
 import { communityReviewRoutes } from './routes/merchantReviews';
 import { communityFavoriteRoutes } from './routes/communityFavorites';
 import { adminCommunityRoutes } from './routes/adminCommunity';
+import { adminModerationRoutes, moderationRoutes } from './routes/adminModeration';
 import { adminChatRoutes } from './routes/adminChats';
 import { adminWalletAdjustRoutes } from './routes/adminWalletAdjust';
 import { bundlesRoutes } from './routes/bundles';
@@ -318,6 +329,14 @@ app.use('*', async (c, next) => {
 // nobody. The same middleware guards credential changes in routes/auth.ts.
 app.use('/api/admin/*', requireMainHost);
 
+// A BANNED ACCOUNT READS BUT DOES NOT WRITE (Moderation V2, 0162; §9.6). One
+// middleware after the session is loaded and the admin host guard has
+// answered, before every API router: a banned account's non-read request is
+// refused 403 USER_BANNED whatever door it knocks on, except signing out, the
+// appeal door and marking a notification read (worker/lib/userStatus.ts).
+// Line comments only, for the reason given at the robots.txt route below.
+app.use('*', refuseBannedWrites);
+
 app.route('/api/auth', authRoutes);
 app.route('/api/products', productRoutes);
 // Members-only bundles section; mounted before the '/api' misc catch-all so
@@ -392,6 +411,11 @@ app.route('/api/public/v1', publicApiRoutes);
 // reads is a spam endpoint.
 app.route('/api/price-reports', priceReportRoutes);
 app.route('/api', miscRoutes);
+// The person's own standing and appeals (Moderation V2, 0162): GET
+// /api/moderation/status, GET and POST /api/moderation/appeals. requireAuth on
+// its own sub-path inside the router, never on the whole prefix; open to a
+// banned account (the one door a ban leaves) and outside the community wall.
+app.route('/api', moderationRoutes);
 app.route('/api/admin', adminRoutes);
 // The farm's balancing console. Under /api/admin/* on purpose: the apex-only
 // host guard above covers it, and the generic settings PUT refuses its key so
@@ -420,6 +444,12 @@ app.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
 app.route('/api/warranty', warrantyPublicRoutes);
 app.route('/api/admin/warranties', warrantyAdminRoutes);
 app.route('/api/admin/community', adminCommunityRoutes);
+// The moderation desk (Moderation V2, 0162; §9.6): reports, hides, the
+// account ladder, a target's history and the appeals queue, every path under
+// /api/admin/moderation. Mounted on the admin prefix itself, so the apex-only
+// guard above covers it and the gateway's routing table needs no new row; its
+// own requireAdmin sits on its sub-path inside the router.
+app.route('/api/admin', adminModerationRoutes);
 // The printer-model economics editor (Admin → مجتمع ليفو → تسعير الطباعة).
 app.route('/api/admin/print-quote', adminPrintQuoteRoutes);
 // «الرسائل» in the support console: the shop's order threads and the three
@@ -482,6 +512,12 @@ app.route('/api/merchant', merchantPrinterRoutes);
 // The catalogue — products, variants, media, bulk, import/export, insights —
 // and the store's collections (merchant platform W2-F).
 app.route('/api/merchant', merchantCatalogRoutes);
+// /api/merchant/parts/from-levonis and /:id/refresh (Programme C C1, worker/routes/merchantParts.ts).
+app.route('/api/merchant/parts', merchantPartRoutes);
+// «التخصيص» — /api/merchant/products/:id/blueprint and its doors (Programme C C1,
+// worker/routes/merchantBlueprints.ts): the store owner's builder, dark until
+// customizationConfig opens it. Path middlewares only, never a catch-all.
+app.route('/api/merchant', merchantBlueprintRoutes);
 // The files of a catalogue product — /api/merchant/products/:id/files (§9.4).
 // Its own router: the catalogue's `/products/:id` never matches the extra segment.
 app.route('/api/merchant', merchantProductFileRoutes);
@@ -507,6 +543,9 @@ app.route('/api/merchant/payouts', merchantPayoutRoutes);
 // routing design names it (worker/routes/merchantWorkspace.ts).
 app.route('/api/merchant/attention', merchantAttentionRoutes);
 app.route('/api/merchant/search', merchantSearchRoutes);
+// The merchant's own reputation (0163, §9.6): the badges WITH their evidence,
+// owner-scoped from the session, private — the public reads carry {key, since}.
+app.route('/api/merchant/reputation', merchantReputationRoutes);
 // The storefront's analytics beacon — POST only, before the public reads so
 // `events` can never be taken for a store slug.
 app.route('/api/storefront/events', storefrontEventRoutes);
@@ -516,6 +555,11 @@ app.route('/api/storefront', storefrontRoutes);
 // door (§9.4). NOT under /api/storefront: that router is served session-free
 // for the guest cache, and these doors need to know who is asking.
 app.route('/api/product-files', publicProductFileRoutes);
+// «التخصيص» — the customer's personalisation doors (Programme C C1,
+// worker/routes/personalize.ts): the switch's status, a product's public
+// blueprint, a configuration minted and read back, the owner's design pictures.
+// Commerce doors: outside /api/community, answering on every store host.
+app.route('/api/personalize', personalizeRoutes);
 // The print journey EXTENDS the marketplace rather than starting a second one:
 // it adds measuring, estimating, publishing and matching to the same requests.
 // Mounted BEFORE the marketplace for the same reason the product routes put
@@ -1020,6 +1064,16 @@ export default {
     ctx.waitUntil(
       sweepExpiredUploadSessions(env).catch((error) => {
         console.error('scheduled upload-session sweep rejected:', error);
+      })
+    );
+    // Reputation V2 (0163, §9.6): once per Baghdad day — the first tick after
+    // midnight claims it — the merchants' last two days into
+    // merchant_metrics_daily, then every badge and «يرد عادةً خلال …» line
+    // from the 30/90-day windows (worker/lib/reputation.ts). Beside the
+    // durable jobs' tier-badge step, contained the same way.
+    ctx.waitUntil(
+      runReputationJobs(env).catch((error) => {
+        console.error('scheduled reputation run rejected:', error);
       })
     );
   },

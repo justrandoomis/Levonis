@@ -58,6 +58,8 @@ import {
 import { normalizeGovernorate } from '@levonis/shipping/iraqGovernorates';
 import { fanOutMerchantNotice, matchingRequestNotice, type MerchantNotice } from './merchantNotify';
 import { notifyStatement } from './notifications';
+// Reputation V2 (0163, §9.6): response time and trouble rate, measured.
+import { reputationSignals } from './reputation';
 
 /** The engine that writes a row: 2 = eligibility.ts (0132 `engine`). */
 export const MATCH_ENGINE = 2;
@@ -289,7 +291,7 @@ export async function loadCandidates(db: D1Database, merchantIds?: string[]): Pr
   const ids = JSON.stringify(rows.map((m) => String(m.id)));
   const storeIds = JSON.stringify(rows.map((m) => m.store_id).filter((x): x is string => typeof x === 'string'));
 
-  const [printers, prefs, stock, profiles, rules, planned] = await Promise.all([
+  const [printers, prefs, stock, profiles, rules, planned, signals] = await Promise.all([
     db
       .prepare(
         `SELECT p.*, pm.id AS m_id, pm.technology AS m_technology,
@@ -312,6 +314,9 @@ export async function loadCandidates(db: D1Database, merchantIds?: string[]): Pr
     db.prepare('SELECT * FROM merchant_delivery_profiles WHERE store_id IN (SELECT value FROM json_each(?))').bind(storeIds).all<Record<string, unknown>>(),
     db.prepare('SELECT * FROM merchant_delivery_rules WHERE store_id IN (SELECT value FROM json_each(?))').bind(storeIds).all<Record<string, unknown>>(),
     plannedOwners(db, [...new Set(rows.map((m) => String(m.user_id)))]),
+    // The last 30 / 90 days of `merchant_metrics_daily` (worker/lib/reputation.ts);
+    // an empty map behind 0163, which ranks everybody as «no history».
+    reputationSignals(db, rows.map((m) => String(m.id))),
   ]);
 
   const printersBy = new Map<string, Record<string, unknown>[]>();
@@ -369,10 +374,14 @@ export async function loadCandidates(db: D1Database, merchantIds?: string[]): Pr
       rating_avg_x100: Number(m.rating_avg_x100 ?? 0) || 0,
       rating_count: Number(m.rating_count ?? 0) || 0,
       completed_orders: Number(m.completed_orders ?? 0) || 0,
-      // Not measured anywhere in the platform yet: `null` is the honest value
-      // and ranks mid-table; nothing is invented for it (audit 03 §5).
-      response_minutes: null,
-      trouble_rate: 0,
+      // MEASURED since 0163 (worker/lib/reputation.ts): the bound holding the
+      // 30-day median first reply in the store's and request's threads, and
+      // the merchant's cancellations and lost disputes as a share of the
+      // orders that ended in 90 days. Under ten replies — or no history at
+      // all — `null` / 0 stay the honest values and rank mid-table; nothing
+      // is invented for them (audit 03 §5).
+      response_minutes: signals.get(id)?.response_minutes ?? null,
+      trouble_rate: signals.get(id)?.trouble_rate ?? 0,
       pro: false,
     };
   });

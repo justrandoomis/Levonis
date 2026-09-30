@@ -55,6 +55,11 @@ import {
   viewerSessionInput,
 } from '../lib/viewerGrants';
 import { blockedEither } from '../lib/userBlocks';
+// Moderation V2 (0162, §9.6): a suspended or banned author's content leaves
+// every public list and page (one shared fragment), their writes are refused
+// at the door, and a moderation hide drops the guest caches the post was in.
+import { HIDDEN_AUTHORS_SQL, assertMayWrite, authorHidden, authorRowHidden } from '../lib/userStatus';
+import { originOf, purgeAnonymousCache } from '../lib/edgePolicy';
 
 export const communityPostRoutes = new Hono<AppContext>();
 communityPostRoutes.use('*', communityGate());
@@ -74,6 +79,36 @@ const nowIso = () => new Date().toISOString();
 
 /** The page a post is read on. */
 export const postHref = (id: string) => `/community/projects/${encodeURIComponent(id)}`;
+
+/**
+ * THE GUEST CACHES A POST APPEARS IN — dropped after a moderation decision
+ * changes whether it may be shown (0162: a hide or its lifting, an author's
+ * suspension, ban or restore). Of these only `/trending` is stored
+ * parameter-less today (worker/routes/communitySearch.ts `cached`, five
+ * minutes); a search, a suggestion or a «قد يعجبك» entry is keyed by its
+ * parameters and ages out within its sixty seconds, and the lists and the
+ * page are never stored. Their parameter-less spellings are dropped anyway,
+ * so a list that gains a guest cache later is covered by this one seam.
+ * Per colo and best effort, like every seam in worker/lib/edgePolicy.ts.
+ */
+export const POST_GUEST_CACHE_PATHS: readonly string[] = [
+  '/api/community/trending',
+  '/api/community/posts',
+  '/api/community/posts/trending',
+  '/api/community/feed',
+  '/api/community/creators',
+  '/api/community/search',
+  '/api/community/search/suggest',
+  '/api/community/recommend',
+];
+
+export async function afterPostModeration(c: Context<AppContext>, postIds: readonly string[] = []): Promise<void> {
+  const root = rootDomainFrom(c.env);
+  const origins = new Set<string>([originOf(c)]);
+  if (root) origins.add(`https://${root}`);
+  const paths = [...POST_GUEST_CACHE_PATHS, ...postIds.map((id) => `/api/community/posts/${encodeURIComponent(id)}`)];
+  await Promise.all([...origins].map((o) => purgeAnonymousCache(o, paths)));
+}
 
 /**
  * The public words of an author: never the email, never the phone — and the
@@ -149,6 +184,7 @@ export function postCard(p: Record<string, unknown>, root: string | null) {
 /** The columns every post read joins — one query, one shape. */
 export const POST_COLUMNS = `p.*,
        u.username AS a_username, u.name AS a_name, u.avatar_key AS a_avatar, u.creator_public AS a_public,
+       u.status AS a_status, u.status_until AS a_status_until,
        EXISTS (SELECT 1 FROM community_merchants acm WHERE acm.user_id = u.id AND acm.status <> 'suspended') AS a_merchant,
        s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo, s.status AS s_status,
        cp.slug AS pr_slug, cp.name AS pr_name, cp.name_ar AS pr_name_ar, cp.price_iqd AS pr_price,
@@ -167,9 +203,17 @@ export const POST_FROM = `FROM community_posts p
        LEFT JOIN products pp ON pp.id = p.printer_product_id
        LEFT JOIN products mp ON mp.id = p.material_product_id`;
 
-/** What everybody may see: published, public, not hidden by Levonis. */
+/**
+ * What everybody may see: published, public, not hidden by Levonis — and by
+ * an author whose content may be shown (0162: not suspended, not banned). The
+ * author test is a `NOT IN` over the few moderated accounts rather than a
+ * column of a joined `users` row, so the fragment holds wherever a `p` alias
+ * is in scope — a COUNT, a tag walk, a grouped subquery — not only beside
+ * POST_FROM's join (worker/lib/userStatus.ts HIDDEN_AUTHORS_SQL).
+ */
 export const POST_PUBLIC_SQL = `p.state = 'published' AND p.visibility = 'public' AND p.admin_hidden_at IS NULL
-  AND p.consent_status IN ('not_needed','granted')`;
+  AND p.consent_status IN ('not_needed','granted')
+  AND p.author_id NOT IN (${HIDDEN_AUTHORS_SQL})`;
 
 export const POST_SEARCH = ['p.title', 'p.body', 'p.tags', 'p.material', 'p.printer_name'] as const;
 
@@ -325,9 +369,16 @@ export interface PostHead {
   visibility: string;
   admin_hidden_at: string | null;
   consent_status: string;
+  /** 0162 — the author's standing, for `mayRead` (a suspended or banned author's post is nobody else's to read). */
+  a_status?: string | null;
+  a_status_until?: string | null;
 }
 export async function loadPostHead(env: Env, id: string): Promise<PostHead | null> {
-  return env.DB.prepare('SELECT id, author_id, title, state, visibility, admin_hidden_at, consent_status FROM community_posts WHERE id = ?').bind(id).first<PostHead>();
+  return env.DB.prepare(
+    `SELECT p.id, p.author_id, p.title, p.state, p.visibility, p.admin_hidden_at, p.consent_status,
+            u.status AS a_status, u.status_until AS a_status_until
+       FROM community_posts p LEFT JOIN users u ON u.id = p.author_id WHERE p.id = ?`
+  ).bind(id).first<PostHead>();
 }
 
 /** The columns `mayRead` decides on — a full card row or a `PostHead` both carry them. */
@@ -336,11 +387,17 @@ export interface PostReadable {
   admin_hidden_at?: unknown;
   state?: unknown;
   visibility?: unknown;
+  /** 0162 — the author's standing (POST_COLUMNS and loadPostHead join it); absent reads as active. */
+  a_status?: unknown;
+  a_status_until?: unknown;
 }
 
 /** May this viewer read this post at all? The author and staff always; everybody else what is public. */
 export function mayRead(p: PostReadable, viewer: { id: string; role: string } | null, consentParty: string | null = null): boolean {
   if (viewer && (viewer.id === p.author_id || viewer.role === 'admin')) return true;
+  // A suspended or banned author's content is gone for everybody else — the
+  // page answers the 404 a missing one gets, like the lists (0162).
+  if (authorRowHidden(p)) return false;
   // The customer a workshop asked («صور من قطعتك») may read the piece they
   // are asked about, whatever its state — they cannot decide about a page
   // they cannot open. Levonis's hide still wins.
@@ -796,6 +853,7 @@ async function askConsent(env: Env, postId: string, customerId: string, authorNa
 communityPostRoutes.post('/posts', requireAuth, async (c) => {
   await rateLimit(c, 'post-create', 20, 3600);
   const user = c.get('user')!;
+  assertMayWrite(user, 'post');
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const input = readPost(body, false) as PostInput;
   const { consent, customerToAsk } = await checkLinks(c.env, user.id, input, null);
@@ -836,6 +894,7 @@ async function ownPost(c: Context<AppContext>, id: string): Promise<Record<strin
 communityPostRoutes.patch('/posts/:id', requireAuth, async (c) => {
   await rateLimit(c, 'post-edit', 120, 3600);
   const user = c.get('user')!;
+  assertMayWrite(user, 'post');
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const current = await ownPost(c, id);
   if (current.state === 'archived') throw conflict('An archived project cannot be edited — restore it first', 'POST_ARCHIVED');
@@ -903,6 +962,7 @@ communityPostRoutes.patch('/posts/:id', requireAuth, async (c) => {
 communityPostRoutes.post('/posts/:id/publish', requireAuth, async (c) => {
   await rateLimit(c, 'post-publish', 30, 3600);
   const user = c.get('user')!;
+  assertMayWrite(user, 'post');
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const current = await ownPost(c, id);
   if (current.state === 'published') return c.json({ success: true, replayed: true, published_at: current.published_at, post: postCard(current, rootDomainFrom(c.env)) });
@@ -976,6 +1036,8 @@ interface PostFileHead {
   consent_status: string;
   request_id: string | null;
   community_order_id: string | null;
+  a_status?: string | null;
+  a_status_until?: string | null;
 }
 
 /** The post a file belongs to, readable by this viewer — the page's own rule (`mayRead`, the block), or a 404. */
@@ -983,7 +1045,9 @@ async function readablePostForFile(c: Context<AppContext>, id: string): Promise<
   const viewer = c.get('user') ?? null;
   const fid = str(c.req.param('fid'), 'fid', { min: 1, max: 64 });
   const p = await c.env.DB.prepare(
-    'SELECT id, author_id, state, visibility, admin_hidden_at, consent_status, request_id, community_order_id FROM community_posts WHERE id = ?'
+    `SELECT p.id, p.author_id, p.state, p.visibility, p.admin_hidden_at, p.consent_status, p.request_id, p.community_order_id,
+            u.status AS a_status, u.status_until AS a_status_until
+       FROM community_posts p LEFT JOIN users u ON u.id = p.author_id WHERE p.id = ?`
   )
     .bind(id)
     .first<PostFileHead>();
@@ -1125,7 +1189,7 @@ const SOCIAL_KEYS: ReadonlyArray<readonly [name: string, ...keys: string[]]> = [
 async function creatorRow(env: Env, username: string) {
   return env.DB.prepare(
     `SELECT u.id, u.username, u.name, u.avatar_key, u.bio, u.website, u.profile_json, u.country, u.created_at, u.creator_public,
-            u.follower_count, cm.id AS merchant_id, cm.status AS merchant_status
+            u.follower_count, u.status, u.status_until, cm.id AS merchant_id, cm.status AS merchant_status
        FROM users u LEFT JOIN community_merchants cm ON cm.user_id = u.id
       WHERE u.username = ?`
   )
@@ -1135,6 +1199,8 @@ async function creatorRow(env: Env, username: string) {
 
 export function creatorVisible(u: Record<string, unknown>, viewer: { id: string; role: string } | null): boolean {
   if (viewer && (viewer.id === u.id || viewer.role === 'admin')) return true;
+  // A suspended or banned account's page answers the 404 a private one does (0162).
+  if (authorHidden(u)) return false;
   if (Number(u.creator_public) === 1) return true;
   return !!u.merchant_id && u.merchant_status !== 'suspended';
 }

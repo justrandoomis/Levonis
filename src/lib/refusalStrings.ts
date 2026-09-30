@@ -1355,6 +1355,60 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'We could not find what you are reporting.',
     ckb: 'ئەوەی دەتەوێت ڕاپۆرتی بکەیت نەدۆزرایەوە.',
   },
+  // ---- Moderation V2 (0162; docs/COMMUNITY_ECOSYSTEM.md §9.6, Phase 6a) ----
+  // An account's standing, refused at every write door it takes away
+  // (worker/lib/userStatus.ts), and the desk's and the appeal door's own
+  // refusals (worker/routes/adminModeration.ts). Real Sorani, per D6.
+  USER_RESTRICTED: {
+    ar: 'حسابك مقيَّد، فلا يمكنك النشر أو التعليق أو إرسال العروض والطلبات والرسائل الآن. يمكنك التصفح كالمعتاد، والاعتراض على القرار من إشعار الإدارة.',
+    en: 'Your account is restricted, so you cannot post, comment, or send offers, requests or messages right now. You can still browse, and appeal the decision from the moderation notice.',
+    ckb: 'هەژمارەکەت سنووردار کراوە، بۆیە ئێستا ناتوانیت پۆست بکەیت، کۆمێنت بنووسیت یان ئۆفەر و داواکاری و پەیام بنێریت. هێشتا دەتوانیت بگەڕێیت، و لە ئاگادارکردنەوەی بەڕێوەبردنەوە ناڕەزایی لەسەر بڕیارەکە دەرببڕیت.',
+  },
+  USER_SUSPENDED: {
+    ar: 'حسابك معلَّق، فلا يمكنك النشر أو التعليق أو الإعجاب أو المتابعة أو المراسلة حتى ينتهي التعليق. يمكنك الاعتراض على القرار من إشعار الإدارة.',
+    en: 'Your account is suspended, so you cannot post, comment, like, follow or message until the suspension ends. You can appeal the decision from the moderation notice.',
+    ckb: 'هەژمارەکەت ڕاگیراوە، بۆیە تا کۆتایی ڕاگرتنەکە ناتوانیت پۆست بکەیت، کۆمێنت بنووسیت، لایک بکەیت، شوێن کەس بکەویت یان پەیام بنێریت. دەتوانیت لە ئاگادارکردنەوەی بەڕێوەبردنەوە ناڕەزایی لەسەر بڕیارەکە دەرببڕیت.',
+  },
+  USER_BANNED: {
+    ar: 'حسابك محظور، فهذا الإجراء غير متاح. يمكنك الاعتراض على القرار من إشعار الإدارة.',
+    en: 'Your account is banned, so this action is not available. You can appeal the decision from the moderation notice.',
+    ckb: 'هەژمارەکەت قەدەغە کراوە، بۆیە ئەم کارە بەردەست نییە. دەتوانیت لە ئاگادارکردنەوەی بەڕێوەبردنەوە ناڕەزایی لەسەر بڕیارەکە دەرببڕیت.',
+  },
+  MODERATION_LADDER: {
+    ar: 'هذا القرار أخف من العقوبة السارية. ارفعها أولًا بـ«استعادة» ثم طبّق القرار الجديد.',
+    en: 'This decision is lighter than the sanction in force. Lift it with "Restore" first, then apply the new decision.',
+    ckb: 'ئەم بڕیارە لە سزای ئێستا سووکترە. سەرەتا بە «گەڕاندنەوە» سزاکە لاببە، پاشان بڕیارە نوێیەکە جێبەجێ بکە.',
+  },
+  MODERATION_TARGET_NOT_FOUND: {
+    ar: 'لم نجد ما تريد اتخاذ القرار بشأنه — ربما حُذف.',
+    en: 'We could not find what you are deciding on — it may have been deleted.',
+    ckb: 'ئەوەی دەتەوێت بڕیاری لەسەر بدەیت نەدۆزرایەوە — لەوانەیە سڕابێتەوە.',
+  },
+  MODERATION_UNTIL_INVALID: {
+    ar: 'تاريخ الانتهاء غير صالح أو مضى. اختر تاريخًا قادمًا.',
+    en: 'The end date is invalid or already past. Pick a future date.',
+    ckb: 'بەرواری کۆتایی دروست نییە یان تێپەڕیوە. بەروارێکی داهاتوو هەڵبژێرە.',
+  },
+  MODERATION_STAFF_TARGET: {
+    ar: 'لا تُطبَّق قرارات الإشراف على حسابات فريق Levonis من هنا.',
+    en: 'Moderation decisions are not applied to Levonis staff accounts from here.',
+    ckb: 'بڕیارەکانی بەڕێوەبردن لێرەوە لەسەر هەژمارەکانی ستافی Levonis جێبەجێ ناکرێن.',
+  },
+  APPEAL_EXISTS: {
+    ar: 'قدّمت اعتراضًا على هذا القرار من قبل. سنبلغك بالنتيجة.',
+    en: 'You have already appealed this decision. We will tell you the outcome.',
+    ckb: 'پێشتر ناڕەزاییت لەسەر ئەم بڕیارە دەربڕیوە. ئەنجامەکەت پێ ڕادەگەیەنین.',
+  },
+  APPEAL_NOT_FOUND: {
+    ar: 'لم نجد هذا القرار أو الاعتراض.',
+    en: 'We could not find this decision or appeal.',
+    ckb: 'ئەم بڕیار یان ناڕەزاییە نەدۆزرایەوە.',
+  },
+  APPEAL_DECIDED: {
+    ar: 'بُتَّ في هذا الاعتراض من قبل.',
+    en: 'This appeal has already been decided.',
+    ckb: 'پێشتر بڕیار لەسەر ئەم ناڕەزاییە دراوە.',
+  },
   // ---- Resumable uploads (docs/COMMUNITY_ECOSYSTEM.md §9.4, Phase 4a) -------
   // worker/routes/uploadSessions.ts and worker/routes/uploads.ts. The tile
   // (src/components/upload/UploadTile.tsx) shows these under the file name.
@@ -1520,6 +1574,20 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'That picture is not one of your uploads for this order. Upload it from your device, then add it.',
     ckb: 'ئەم وێنەیە لە بارکراوەکانی تۆ بۆ ئەم داواکارییە نییە. لە ئامێرەکەتەوە باری بکە و پاشان زیادی بکە.',
   },
+  // ---- Dispute evidence access (0163; docs/COMMUNITY_ECOSYSTEM.md §9.6,
+  //      Phase 6b). Staff open a store's or a request's conversation only
+  //      while an order linked to it is disputed (worker/routes/chats.ts); the
+  //      dispute desk shows these beside «المحادثة». Real Sorani, per D6.
+  EVIDENCE_NOT_LINKED: {
+    ar: 'هذه المحادثة غير مرتبطة بنزاع مفتوح، فلا يمكن للفريق قراءتها.',
+    en: 'This conversation is not linked to an open dispute, so staff cannot read it.',
+    ckb: 'ئەم گفتوگۆیە بە ناکۆکییەکی کراوەوە نەبەستراوەتەوە، بۆیە ستاف ناتوانێت بیخوێنێتەوە.',
+  },
+  EVIDENCE_CLOSED: {
+    ar: 'حُسم النزاع المرتبط بهذه المحادثة، فلم تعد متاحة للفريق.',
+    en: 'The dispute linked to this conversation has been decided, so staff can no longer read it.',
+    ckb: 'ناکۆکیی پەیوەست بەم گفتوگۆیە یەکلایی کراوەتەوە، بۆیە ستاف چیتر ناتوانێت بیخوێنێتەوە.',
+  },
   // ---- Offers V2 and the workshop profile (0159; docs/COMMUNITY_ECOSYSTEM.md
   // §9.5, Phase 5a). Raised by worker/routes/marketplace.ts (the offer
   // composer: fee, files, drafts, send) and worker/routes/merchantPrinters.ts
@@ -1595,6 +1663,144 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ar: 'هذا الملف لم يعد في مكتبة متجرك.',
     en: 'This file is no longer in your store\'s library.',
     ckb: 'ئەم فایلە چیتر لە کتێبخانەی فرۆشگاکەتدا نییە.',
+  },
+  // ---- Parts as store products (Programme C C1; docs/LEVO_PROJECT_PROGRAMME.md
+  //      §B.3). The merchant's part facts (worker/lib/personalize/parts.ts,
+  //      `details.path` names the field) and «من ليفونيس»
+  //      (worker/routes/merchantParts.ts, `details.product_id` names the part
+  //      that already exists). The part sheets decode these through this table.
+  PART_SPEC_INVALID: {
+    ar: 'إحدى مواصفات القطعة غير صحيحة — راجع الحقل المحدَّد ثم احفظ.',
+    en: 'One of the part\'s details is not valid — check the highlighted field, then save.',
+    ckb: 'یەکێک لە زانیارییەکانی پارچەکە دروست نییە — خانە دیاریکراوەکە بپشکنە و پاشان پاشەکەوتی بکە.',
+  },
+  PART_NOT_ELIGIBLE: {
+    ar: 'لا يمكن استخدام هذا المنتج من Levonis كقطعة — فهو غير معروض للبيع أو غير مخصّص للاستخدام داخل المنتجات المطبوعة.',
+    en: 'This Levonis item cannot be used as a part — it is not on sale, or not marked for use inside printed products.',
+    ckb: 'ئەم بەرهەمەی Levonis ناتوانرێت وەک پارچە بەکاربهێنرێت — یان بۆ فرۆشتن نییە، یان بۆ بەکارهێنان لەناو بەرهەمە چاپکراوەکان دیاری نەکراوە.',
+  },
+  PART_ALREADY_IMPORTED: {
+    ar: 'أضفت هذه القطعة من Levonis إلى متجرك من قبل — عدّلها بدل إضافتها مرة ثانية.',
+    en: 'You already added this Levonis part to your store — edit that one instead of adding it again.',
+    ckb: 'پێشتر ئەم پارچەیەت بۆ فرۆشگاکەت زیاد کردووە — لە جیاتی دووبارە زیادکردنی، ئەوەی هەیە دەستکاری بکە.',
+  },
+  // ---- «التخصيص» (Programme C C1; docs/LEVO_PROJECT_PROGRAMME.md §B.1, §B.8).
+  //      The CUSTOMER's doors (worker/routes/personalize.ts, worker/lib/personalize/
+  //      configs.ts) — customer words only: no file, model or workshop terms, and
+  //      never «blueprint» or «configuration» (`details.path` names the choice).
+  PERSONALIZATION_UNAVAILABLE: {
+    ar: 'تخصيص هذا المنتج غير متاح الآن.',
+    en: 'Personalizing this product is not available right now.',
+    ckb: 'تایبەتکردنی ئەم بەرهەمە لە ئێستادا بەردەست نییە.',
+  },
+  CONFIG_INVALID: {
+    ar: 'بعض ما اخترته في تصميمك لم يعد متاحًا — حدّث الصفحة وحاول مرة أخرى.',
+    en: 'Something in your design is not one of the choices on offer — refresh and try again.',
+    ckb: 'هەندێک لەوەی لە دیزاینەکەتدا هەڵتبژاردووە چیتر بەردەست نییە — پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
+  },
+  CONFIG_NEEDS_CHANGE: {
+    ar: 'تصميمك يحتاج تعديلًا قبل أن يُصنع — اتبع الاقتراح الظاهر.',
+    en: 'Your design needs a change before it can be made — follow the suggestion shown.',
+    ckb: 'دیزاینەکەت پێش دروستکردن پێویستی بە گۆڕانکارییە — پێشنیارە دیارەکە جێبەجێ بکە.',
+  },
+  CONFIG_NOT_ACCEPTED: {
+    ar: 'يحتاج المتجر أن يرى هذا التصميم أولًا، وهذا المنتج لا يُصنع حسب الطلب — اسأل المتجر.',
+    en: 'The shop needs to see this design first, and this product is not made on request — ask the shop.',
+    ckb: 'فرۆشگاکە پێویستە سەرەتا ئەم دیزاینە ببینێت، و ئەم بەرهەمە بە داواکاری دروست ناکرێت — لە فرۆشگاکە بپرسە.',
+  },
+  DESIGN_TEXT_INVALID: {
+    ar: 'لا يمكن طباعة هذا النص — استخدم الحروف والأرقام وعلامات بسيطة فقط، دون رموز تعبيرية.',
+    en: 'This text cannot be printed — use letters, numbers and simple punctuation only, no emoji.',
+    ckb: 'ئەم دەقە ناتوانرێت چاپ بکرێت — تەنها پیت و ژمارە و نیشانەی سادە بەکاربهێنە، بێ ئیمۆجی.',
+  },
+  DESIGN_TEXT_NOT_ALLOWED: {
+    ar: 'يُرجى اختيار كلمات أخرى لهذا التصميم.',
+    en: 'Please choose different words for this design.',
+    ckb: 'تکایە وشەی تر بۆ ئەم دیزاینە هەڵبژێرە.',
+  },
+  DESIGN_ASSET_NOT_OWNED: {
+    ar: 'هذه الصورة ليست من صورك المرفوعة — أضفها مرة أخرى.',
+    en: 'That picture is not one of your uploads — add it again.',
+    ckb: 'ئەو وێنەیە لە وێنە بارکراوەکانی تۆ نییە — دووبارە زیادی بکەرەوە.',
+  },
+  DESIGN_TOO_LARGE: {
+    ar: 'التصميم أكبر من أن يُحفظ — اختصر نصًا أو احذف صورة.',
+    en: 'This design is too large to save — shorten a text or remove a picture.',
+    ckb: 'ئەم دیزاینە زۆر گەورەیە بۆ پاشەکەوتکردن — دەقێک کورت بکەرەوە یان وێنەیەک لابە.',
+  },
+  QR_TARGET_INVALID: {
+    ar: 'الرابط أو الرقم غير صحيح — تحقّق منه وحاول مرة أخرى.',
+    en: 'That link or number does not look right — check it and try again.',
+    ckb: 'ئەو بەستەر یان ژمارەیە دروست نییە — بیپشکنە و دووبارە هەوڵ بدەرەوە.',
+  },
+  ROSTER_TOO_LARGE: {
+    ar: 'عدد الأسماء أكبر مما يقبله هذا المنتج في طلب واحد.',
+    en: 'There are more names than this product takes in one order.',
+    ckb: 'ژمارەی ناوەکان لەوە زیاترە کە ئەم بەرهەمە لە یەک داواکاریدا وەری دەگرێت.',
+  },
+  BLUEPRINT_CHANGED: {
+    ar: 'حدّث المتجر خيارات هذا المنتج — راجع تصميمك ثم حاول مرة أخرى.',
+    en: 'The shop has updated this product\'s options — check your design, then try again.',
+    ckb: 'فرۆشگاکە هەڵبژاردنەکانی ئەم بەرهەمەی نوێ کردووەتەوە — دیزاینەکەت بپشکنە و پاشان دووبارە هەوڵ بدەرەوە.',
+  },
+  // ---- «التخصيص» — the MERCHANT's builder (worker/routes/merchantBlueprints.ts,
+  //      worker/lib/personalize/blueprints.ts) and the catalogue's write gate
+  //      (worker/routes/merchantCatalog.ts). Plain workshop words are fine here;
+  //      `details.errors` [{path, code}] names each field the builder marks.
+  BLUEPRINT_MODEL_UNREADABLE: {
+    ar: 'تعذّرت قراءة ملف النموذج — صدّره من جديد بصيغة 3MF أو STL أو OBJ أو GLB وحاول مرة أخرى، أو اعرض المنتج بصوره.',
+    en: 'The model file could not be read — export it again as 3MF, STL, OBJ or GLB and try once more, or show the product with its photos.',
+    ckb: 'فایلی مۆدێلەکە نەخوێنرایەوە — دووبارە بە شێوەی 3MF یان STL یان OBJ یان GLB هەناردەی بکە و دووبارە هەوڵ بدەرەوە، یان بەرهەمەکە بە وێنەکانی پیشان بدە.',
+  },
+  BLUEPRINT_TOO_HEAVY: {
+    ar: 'النموذج مفصّل أكثر مما يُعرض للزبائن — صدّر ملفًا أخف، أو اعرض المنتج بصوره.',
+    en: 'This model is too detailed to show customers — export a lighter file, or show the product with its photos.',
+    ckb: 'ئەم مۆدێلە زۆر وردە بۆ پیشاندان بە کڕیاران — فایلێکی سووکتر هەناردە بکە، یان بەرهەمەکە بە وێنەکانی پیشان بدە.',
+  },
+  BLUEPRINT_INVALID: {
+    ar: 'في إعدادات التخصيص ما يحتاج تصحيحًا — راجع الحقول المحدّدة.',
+    en: 'The customization has something to fix — check the highlighted fields.',
+    ckb: 'لە ڕێکخستنەکانی خۆگونجاندندا شتێک هەیە پێویستی بە چاککردنە — خانە دیاریکراوەکان بپشکنە.',
+  },
+  BLUEPRINT_PRICE_INVALID: {
+    ar: 'أحد أسعار التخصيص غير صحيح — السعر عدد صحيح بالدينار، صفر أو أكثر.',
+    en: 'A price in the customization is not valid — a price is a whole number of dinars, zero or more.',
+    ckb: 'یەکێک لە نرخەکانی خۆگونجاندن دروست نییە — نرخ ژمارەیەکی تەواوە بە دینار، سفر یان زیاتر.',
+  },
+  BLUEPRINT_NOT_READY: {
+    ar: 'التخصيص غير جاهز للنشر بعد — أكمل ما ينقصه ثم انشر.',
+    en: 'The customization is not ready to publish yet — finish what it is missing, then publish.',
+    ckb: 'خۆگونجاندنەکە هێشتا ئامادە نییە بۆ بڵاوکردنەوە — ئەوەی کەمە تەواوی بکە و پاشان بڵاوی بکەرەوە.',
+  },
+  BLUEPRINT_PRODUCT_INELIGIBLE: {
+    ar: 'لا يمكن تخصيص هذا المنتج — المنتج الخاص أو المؤرشف يبقى كما هو.',
+    en: 'This product cannot be customized — a private or archived product stays as it is.',
+    ckb: 'ئەم بەرهەمە خۆگونجاندنی بۆ ناکرێت — بەرهەمی تایبەت یان ئەرشیفکراو وەک خۆی دەمێنێتەوە.',
+  },
+  BLUEPRINT_COMPONENT_NOT_ELIGIBLE: {
+    ar: 'إحدى القطع ليست من قطع متجرك، أو لا تناسب مكانها — اختر قطعة أخرى.',
+    en: 'One of the parts is not one of your store\'s parts, or does not fit its place — choose another part.',
+    ckb: 'یەکێک لە پارچەکان هی فرۆشگاکەت نییە، یان لە شوێنەکەیدا ناگونجێت — پارچەیەکی تر هەڵبژێرە.',
+  },
+  BLUEPRINT_LOCKED: {
+    ar: 'النسخة المنشورة لا تُعدّل — حدّث الصفحة لتكمل على المسودة الحالية.',
+    en: 'A published version is never edited — refresh to continue with the current draft.',
+    ckb: 'وەشانی بڵاوکراوە دەستکاری ناکرێت — پەڕەکە نوێ بکەرەوە بۆ ئەوەی لەسەر ڕەشنووسی ئێستا بەردەوام بیت.',
+  },
+  BLUEPRINT_LIMIT: {
+    ar: 'وصل متجرك إلى الحد الأعلى من المنتجات القابلة للتخصيص — تواصل مع الدعم لرفعه.',
+    en: 'Your store has reached its limit of customizable products — contact support to raise it.',
+    ckb: 'فرۆشگاکەت گەیشتووەتە سنووری بەرهەمەکانی خۆگونجاندن — بۆ زیادکردنی پەیوەندی بە پشتگیرییەوە بکە.',
+  },
+  BLUEPRINT_AXIS_IN_USE: {
+    ar: 'هذا الخيار جزء من التخصيص المنشور — أوقف التخصيص أو انشر نسخة دونه أولًا.',
+    en: 'This option is part of your published customization — pause it or publish a version without this option first.',
+    ckb: 'ئەم هەڵبژاردنە بەشێکە لە خۆگونجاندنی بڵاوکراوە — سەرەتا ڕایبگرە یان وەشانێک بەبێ ئەم هەڵبژاردنە بڵاو بکەرەوە.',
+  },
+  PART_IN_USE: {
+    ar: 'هذه القطعة مستخدمة داخل منتج قابل للتخصيص — أوقف ذلك المنتج أو انشره دونها أولًا، أو أرشف القطعة بدل حذفها.',
+    en: 'This part is used inside a customizable product — pause that product or publish it without this part first, or archive the part instead.',
+    ckb: 'ئەم پارچەیە لەناو بەرهەمێکی خۆگونجاندندا بەکاردێت — سەرەتا ئەو بەرهەمە ڕابگرە یان بەبێ ئەم پارچەیە بڵاوی بکەرەوە، یان لە جیاتی سڕینەوە ئەرشیفی بکە.',
   },
 };
 

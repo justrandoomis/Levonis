@@ -51,6 +51,11 @@ import { fetchReport, type AnalyticsReport } from '../../analytics/report';
 import { dateLocale } from '../../../orders/format';
 import { useWorkspace } from '../context';
 import { merchantHref } from '../../../../lib/merchantRoutes';
+// Reputation V2 (docs/COMMUNITY_ECOSYSTEM.md §9.6): «سمعتك» — the merchant's
+// own badges with the evidence that earned them and the 30/90-day figures,
+// PLUS or not. A lazy chunk of this screen.
+import { lazy, Suspense } from 'react';
+const ReputationCard = lazy(() => import('../../analytics/ReputationCard'));
 
 type Lang = 'ar' | 'en' | 'ckb';
 
@@ -115,10 +120,16 @@ export default function AnalyticsSection() {
 
   if (locked) {
     return (
+      <div className="space-y-4">
       <p className="text-[13px] leading-relaxed text-text-muted" data-analytics-locked>
         {/* OWNER: Sorani to be written by hand. */}
         {loc('الأرقام جزء من LEVO PLUS. طلباتك وأرباحك كلها محفوظة وتراها في صفحاتها — جدّد الاشتراك لتعود الأرقام.', 'The figures are part of LEVO PLUS. Your orders and earnings are all kept and visible on their screens — renew to see the figures again.')}
       </p>
+      {/* A merchant's reputation is theirs to read, PLUS or not. */}
+      <Suspense fallback={null}>
+        <ReputationCard />
+      </Suspense>
+      </div>
     );
   }
 
@@ -205,6 +216,11 @@ export default function AnalyticsSection() {
           <Report data={data} lang={L} customerHref={ws.href(merchantHref.customers())} />
         </div>
       )}
+
+      {/* «سمعتك» — its own windows (30 and 90 days), under the report the range above scopes. */}
+      <Suspense fallback={null}>
+        <ReputationCard />
+      </Suspense>
     </div>
   );
 }

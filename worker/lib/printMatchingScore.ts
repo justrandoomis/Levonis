@@ -59,9 +59,13 @@ export interface RankSignals {
   rating_avg_x100: number;
   rating_count: number;
   completed_orders: number;
-  /** Median minutes to a first offer. null = no history. */
+  /**
+   * The 30-day median first reply in the store's and request's threads, as
+   * the bound holding it (15 … 1440 minutes; worker/lib/reputation.ts
+   * `medianReplyWithin`). null = under ten replies, or no history.
+   */
   response_minutes: number | null;
-  /** Cancelled or disputed as a share of finished orders, 0..1. */
+  /** Merchant cancellations and lost disputes as a share of the orders that ended in 90 days, 0..1 (`rankSignalsFromMetrics`). */
   trouble_rate: number;
   pro: boolean;
 }

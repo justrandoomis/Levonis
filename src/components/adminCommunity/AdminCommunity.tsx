@@ -45,20 +45,33 @@ import {
   type CommunityOverview, type AdminMerchantRow, type AdminMerchantProduct, type AdminComplaintRow,
   type AdminRequestRow, type AdminReviewRow, type AdminReputation, type AdminComplaintMessage,
 } from '../../lib/merchant';
+// Moderation V2 (docs/COMMUNITY_ECOSYSTEM.md §9.6): «الإشراف» beside the
+// disputes — the desk is a lazy chunk of its own — and the dispute desk's
+// «المحادثة» / «الطلب», the way to a disputed order's evidence.
+import { Suspense as ModerationSuspense, lazy as lazyModeration } from 'react';
+import { ShieldAlert } from 'lucide-react';
+import { useLanguage } from '../../LanguageContext';
+import EvidenceLinks from './moderation/EvidenceLinks';
+import { evidenceStrings } from './moderation/evidenceStrings';
+const ModerationDesk = lazyModeration(() => import('./moderation/ModerationDesk'));
 
 type Section =
-  | 'overview' | 'merchants' | 'board' | 'disputes' | 'finance' | 'reputation' | 'settings' | 'print';
+  | 'overview' | 'merchants' | 'board' | 'disputes' | 'finance' | 'reputation' | 'settings' | 'print'
+  | 'moderation';
 
 export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
   const rtl = dir === 'rtl';
   const t = (ar: string, en: string) => (rtl ? ar : en);
   const [section, setSection] = useState<Section>('overview');
+  const { lang: moderationLang } = useLanguage();
 
   const SECTIONS: Array<{ id: Section; label: string; icon: React.ElementType }> = [
     { id: 'overview', label: t('نظرة عامة', 'Overview'), icon: TrendingUp },
     { id: 'merchants', label: t('التجار والمتاجر', 'Merchants & stores'), icon: Store },
     { id: 'board', label: t('الطلبات والعروض', 'Requests & offers'), icon: ClipboardList },
     { id: 'disputes', label: t('النزاعات والشكاوى', 'Disputes'), icon: Scale },
+    // «الإشراف» (§9.6): reports, the account ladder, appeals — beside the disputes.
+    { id: 'moderation', label: evidenceStrings(moderationLang).desk, icon: ShieldAlert },
     { id: 'finance', label: t('الأموال', 'Money'), icon: Wallet },
     { id: 'reputation', label: t('التقييمات والسمعة', 'Reviews & reputation'), icon: Star },
     { id: 'settings', label: t('الإعدادات', 'Settings'), icon: Settings2 },
@@ -91,6 +104,11 @@ export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
       {section === 'merchants' && <Merchants t={t} />}
       {section === 'board' && <Board t={t} />}
       {section === 'disputes' && <Disputes t={t} />}
+      {section === 'moderation' && (
+        <ModerationSuspense fallback={<Spin />}>
+          <ModerationDesk />
+        </ModerationSuspense>
+      )}
       {section === 'finance' && <Finance t={t} />}
       {section === 'reputation' && <Reputation t={t} />}
       {section === 'settings' && (
@@ -1786,6 +1804,9 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
           <span>·</span>
           <ComplaintPill status={d.complaint.status} t={t} />
         </div>
+        {/* The case's evidence (§9.6): its order's conversation, read-only
+            and on the record, and the request behind it. */}
+        <EvidenceLinks complaint={d.complaint} className="mt-3" />
       </Section>
 
       <Section title={t('المحادثة', 'The conversation')}>

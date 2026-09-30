@@ -53,6 +53,9 @@ import { loadOwnerTerms } from '../lib/decency';
 import { requestBoardVisible } from '../lib/requestBoard';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { COMMUNITY_PRODUCTS_FROM, communityProductsVisible } from './community';
+// Moderation V2 (0162, §9.6): the one author fragment on every reader here,
+// and an account's standing refused at the like, comment and follow doors.
+import { AUTHOR_VISIBLE_SQL, HIDDEN_AUTHORS_SQL, assertMayWrite, authorHidden } from '../lib/userStatus';
 import {
   POST_COLUMNS,
   POST_FROM,
@@ -111,6 +114,7 @@ function personHref(u: { username: string | null; creator_public: number; mercha
 communitySocialRoutes.put('/posts/:id/like', requireAuth, async (c) => {
   await rateLimit(c, 'social-like', 240, 3600);
   const user = c.get('user')!;
+  assertMayWrite(user, 'like');
   const id = idParam(c);
   const p = await interactablePost(c, id);
   const res = await c.env.DB.prepare('INSERT OR IGNORE INTO community_likes (user_id, post_id) VALUES (?, ?)').bind(user.id, id).run();
@@ -188,7 +192,8 @@ communitySocialRoutes.get('/saved', requireAuth, async (c) => {
     `SELECT ${POST_COLUMNS}, sv.created_at AS saved_at, sv.collection AS saved_collection
        ${POST_FROM}
        JOIN community_saves sv ON sv.post_id = p.id AND sv.user_id = ?1
-      WHERE (p.author_id = ?1 OR (p.state = 'published' AND p.visibility IN ('public','unlisted') AND p.admin_hidden_at IS NULL AND p.consent_status IN ('not_needed','granted')))
+      WHERE (p.author_id = ?1 OR (p.state = 'published' AND p.visibility IN ('public','unlisted') AND p.admin_hidden_at IS NULL AND p.consent_status IN ('not_needed','granted')
+                                  AND ${AUTHOR_VISIBLE_SQL('u')}))
         AND ${postExclusionSql('?1')}
         AND (?2 = '' OR sv.created_at < ?2 OR (sv.created_at = ?2 AND sv.post_id < ?3))
       ORDER BY sv.created_at DESC, sv.post_id DESC LIMIT ?4`
@@ -270,7 +275,8 @@ const commentAuthorOkSql = (v: string) => `(${v} = '' OR (
 const commentVisibleSql = (v: string, admin: string) => `(
       cm.state IN ('visible','removed')
       OR (cm.state = 'hidden' AND (${admin} = 1 OR cm.author_id = ${v}))
-  ) AND ${commentAuthorOkSql(v)}`;
+  ) AND ${commentAuthorOkSql(v)}
+  AND (${admin} = 1 OR cm.author_id = ${v} OR ${AUTHOR_VISIBLE_SQL('u')})`;
 
 communitySocialRoutes.get('/posts/:id/comments', async (c) => {
   const id = idParam(c);
@@ -294,8 +300,11 @@ communitySocialRoutes.get('/posts/:id/comments', async (c) => {
     )
       .bind(id, v, admin, cursor.at, cursor.id, limit + 1)
       .all<Record<string, unknown>>(),
-    c.env.DB.prepare(`SELECT COUNT(*) AS n FROM community_comments cm WHERE cm.post_id = ?1 AND cm.state = 'visible' AND ${commentAuthorOkSql('?2')}`)
-      .bind(id, v)
+    c.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM community_comments cm WHERE cm.post_id = ?1 AND cm.state = 'visible' AND ${commentAuthorOkSql('?2')}
+          AND (?3 = 1 OR cm.author_id = ?2 OR cm.author_id NOT IN (${HIDDEN_AUTHORS_SQL}))`
+    )
+      .bind(id, v, admin)
       .first<{ n: number }>(),
   ]);
   const next_cursor = nextPostCursor(results, limit, 'created_at');
@@ -341,6 +350,7 @@ const isClientIdClash = (e: unknown) => {
 communitySocialRoutes.post('/posts/:id/comments', requireAuth, async (c) => {
   await rateLimit(c, 'social-comment', 60, 3600);
   const user = c.get('user')!;
+  assertMayWrite(user, 'comment');
   const id = idParam(c);
   const raw = await jsonObject(c);
   const body = str(raw.body, 'body', { min: COMMENT_MIN, max: COMMENT_MAX });
@@ -458,15 +468,17 @@ communitySocialRoutes.delete('/comments/:id', requireAuth, async (c) => {
 /** An account that exists, with the columns the follow doors decide on. */
 async function personRow(c: Context<AppContext>, id: string) {
   return c.env.DB.prepare(
-    `SELECT u.id, u.username, u.creator_public, u.follower_count,
+    `SELECT u.id, u.username, u.creator_public, u.follower_count, u.status, u.status_until,
             EXISTS (SELECT 1 FROM community_merchants cm WHERE cm.user_id = u.id AND cm.status <> 'suspended') AS merchant
        FROM users u WHERE u.id = ?`
   )
     .bind(id)
-    .first<{ id: string; username: string | null; creator_public: number; follower_count: number; merchant: number }>();
+    .first<{ id: string; username: string | null; creator_public: number; follower_count: number; merchant: number; status?: string | null; status_until?: string | null }>();
 }
 
-const hasPage = (u: { creator_public: number; merchant: number } | null | undefined) => !!u && (Number(u.creator_public) === 1 || Number(u.merchant) === 1);
+/** A page one can follow or report: public or a live workshop's — and not closed by a suspension or a ban (0162, the creator page's own rule). */
+const hasPage = (u: { creator_public: number; merchant: number; status?: string | null; status_until?: string | null } | null | undefined) =>
+  !!u && !authorHidden(u) && (Number(u.creator_public) === 1 || Number(u.merchant) === 1);
 
 const followersOf = async (c: Context<AppContext>, id: string) =>
   Number((await c.env.DB.prepare('SELECT follower_count FROM users WHERE id = ?').bind(id).first<{ follower_count: number }>())?.follower_count ?? 0);
@@ -474,6 +486,7 @@ const followersOf = async (c: Context<AppContext>, id: string) =>
 communitySocialRoutes.put('/users/:id/follow', requireAuth, async (c) => {
   await rateLimit(c, 'follow-user', 60, 3600);
   const user = c.get('user')!;
+  assertMayWrite(user, 'follow');
   const id = idParam(c);
   if (id === user.id) throw badRequest('You cannot follow yourself', 'CANNOT_FOLLOW_SELF');
   const target = await personRow(c, id);
@@ -707,6 +720,7 @@ export function creatorListSql(q: string, v: string) {
   const candidates = `(SELECT id FROM users WHERE creator_public = 1
                        UNION SELECT user_id FROM community_merchants WHERE status <> 'suspended') cand`;
   const where = `u.username IS NOT NULL AND u.username <> ''
+          AND ${AUTHOR_VISIBLE_SQL('u')}
           AND (${q} = '' OR ${sqlLikeClause(CREATOR_SEARCH, q)})
           AND (${v} = '' OR NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.user_id = ${v} AND b.blocked_id = u.id) OR (b.user_id = u.id AND b.blocked_id = ${v})))`;
   const from = `FROM ${candidates}

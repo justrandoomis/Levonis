@@ -1308,6 +1308,61 @@ export const MATERIALS: TemplateFamilyDef = {
       ],
     },
     /*
+     * «يُستخدم داخل منتجات مطبوعة» — A LEVONIS ITEM A MERCHANT MAY BUILD INTO
+     * WHAT THEY PRINT (Programme C, C1; docs/LEVO_PROJECT_PROGRAMME.md §B.3).
+     *
+     * One reader serves this group and a merchant part's `part_spec` alike —
+     * `readPartSpec` (packages/catalog/src/personalize/parts.ts) — so the
+     * option strings below are the part vocabulary spelled for the admin:
+     * lower-cased, «LED» is `led` and «Keyring» is `keyring`. `printed_use =
+     * Yes` is what lists the item in «من ليفونيس» (GET /api/products/print-parts).
+     *
+     * The volts and the fitting are the fields these sections ALREADY ask —
+     * `voltage` (electronics) and `install_type` (the accessory groups) — never
+     * a second copy of either. Asked only on the four sections that sell such
+     * things (BRANCH_ONLY below), never on a printer accessory or a model kit.
+     */
+    'printed-parts': {
+      id: 'printed_part',
+      label_ar: 'قطعة داخل المنتجات المطبوعة',
+      label_en: 'Part for printed products',
+      fields: [
+        t('printed_use', 'يُستخدم داخل منتجات مطبوعة', 'Can be used inside printed products', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'none', hidden: true },
+          hint_ar: 'Yes = يظهر للتجار في «من ليفونيس» ليضعوه داخل منتجاتهم المطبوعة',
+        }),
+        t('part_kind', 'نوع القطعة', 'Part kind', 'select', {
+          options: ['Magnet', 'Motor', 'LED', 'NFC', 'Screw', 'Bearing', 'Switch', 'Module', 'Insert', 'Keyring', 'Hook', 'Cable', 'Battery', 'Other'],
+          compare: { parse: 'text', better: 'none' },
+        }),
+        t('part_shape', 'شكل القطعة', 'Part shape', 'select', {
+          options: ['Round', 'Square', 'Rectangular', 'Ring', 'Strip', 'Other'],
+          compare: { parse: 'text', better: 'none' },
+        }),
+        t('diameter_mm', 'قطر القطعة', 'Part diameter', 'number', { unit: 'mm', compare: { parse: 'number', better: 'none' }, hint_ar: 'للقطع الدائرية — مثال: 6' }),
+        t('length_mm', 'طول القطعة', 'Part length', 'number', { unit: 'mm', compare: { parse: 'number', better: 'none' } }),
+        t('width_mm', 'عرض القطعة', 'Part width', 'number', { unit: 'mm', compare: { parse: 'number', better: 'none' } }),
+        t('height_mm', 'سماكة القطعة', 'Part height', 'number', { unit: 'mm', compare: { parse: 'number', better: 'none' }, hint_ar: 'الارتفاع أو السماكة — مثال: 3' }),
+        t('power_w', 'قدرة القطعة', 'Part power', 'number', { unit: 'W', compare: { parse: 'number', better: 'none' } }),
+        t('install_minutes', 'دقائق التركيب', 'Fitting minutes', 'number', { unit: 'min', compare: { parse: 'number', better: 'none' } }),
+        t('fits_family', 'يناسب عائلة منتجات', 'Fits product family', 'text', {
+          compare: { parse: 'list', better: 'none', hidden: true },
+          hint_ar: 'مثال: lamp, keychain, sign',
+        }),
+        t('uses', 'الاستخدام داخل المنتج', 'Uses inside products', 'text', {
+          compare: { parse: 'list', better: 'none', hidden: true },
+          hint_ar: 'مثال: base, lid, name plate',
+        }),
+        /* ONE LINE PER OPTION, the multicolor.ts precedent: the option's key
+           (or id), then the facts that differ. Never shown as a row. */
+        t('variant_specs', 'مواصفات تختلف حسب الخيار', 'Per-option spec differences', 'multiline', {
+          compare: { parse: 'text', better: 'none', hidden: true },
+          hint_ar: 'سطر لكل خيار بمفتاحه: magnet-6x3: diameter_mm=6, height_mm=3 — المسموح: part_shape, diameter_mm, length_mm, width_mm, height_mm, voltage, power_w, install_type, install_minutes',
+        }),
+      ],
+    },
+    /*
      * A PLYWOOD SHEET IS A MATERIAL, WHICH IS WHY THERE IS NO THIRD FAMILY.
      *
      * «اضافه مواد الطباعه بجانب الفلمنت والرزن». The two groups below are the
@@ -1689,6 +1744,9 @@ export const PRODUCT_TYPES: ProductTypeDef[] = [
       ...g(DEVICES, 'laser-accessories'),
       ...g(MATERIALS, 'electronics'),
       ...g(MATERIALS, 'hardware-parts'),
+      // «يُستخدم داخل منتجات مطبوعة» — asked only on «إلكترونيات», «قطع
+      // هاردوير» and «قطع ومكونات» (BRANCH_ONLY), never on a nozzle.
+      ...g(MATERIALS, 'printed-parts'),
       PHYSICAL_CORE,
     ],
   },
@@ -1738,6 +1796,9 @@ export const PRODUCT_TYPES: ProductTypeDef[] = [
       ...g(MATERIALS, 'accessories'),
       ...g(MATERIALS, 'model-kits'),
       ...g(MATERIALS, 'cyberbrick-rc'),
+      // Only on «الإكسسوارات» itself (BRANCH_ONLY): a key ring or a hook is a
+      // part a printed product can carry; a model kit is not.
+      ...g(MATERIALS, 'printed-parts'),
       PHYSICAL_CORE,
     ],
   },
@@ -2021,9 +2082,24 @@ const USED_ROOT = { id: 'cat_used', slug: 'used' };
 const USED_PRINTERS = { id: 'cat_used_printers', slug: 'used-printers' };
 const USED_PACC = { id: 'cat_used_pacc', slug: 'used-printer-accessories' };
 
+/**
+ * «يُستخدم داخل منتجات مطبوعة» (Programme C, C1) — the sections that sell what
+ * a printed product can carry inside it: «إلكترونيات», «قطع هاردوير», «قطع
+ * ومكونات» and «الإكسسوارات». Branch-only for the reason the used groups are:
+ * a printer accessory filed nowhere in particular is not a part, so the group
+ * is never in a type's unnarrowed list.
+ */
+const PRINTED_PART_SECTIONS: Array<{ id: string; slug: string }> = [
+  { id: 'cat_makers_elec', slug: 'electronics' },
+  { id: 'cat_makers_hw', slug: 'hardware-parts' },
+  { id: 'cat_makers_parts', slug: 'parts-components' },
+  { id: 'cat_accessories', slug: 'accessories' },
+];
+
 const BRANCH_ONLY: Record<string, Array<{ id: string; slug: string }>> = {
   used_state: [USED_ROOT, USED_PRINTERS, USED_PACC],
   used_printer: [USED_PRINTERS],
+  printed_part: PRINTED_PART_SECTIONS,
 };
 
 /** True when a branch-only group's branch is this one (and always for any other group). */

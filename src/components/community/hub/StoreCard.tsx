@@ -28,6 +28,11 @@ import { HubLink, StoreMark } from './parts';
 import { completedLabel, followersLabel, productsLabel } from './copy';
 import { useHubStrings } from './strings';
 import type { CommunityStore, CommunityWork } from './api';
+// Reputation V2 (docs/COMMUNITY_ECOSYSTEM.md §9.6): up to three earned badges,
+// each answering «لماذا؟» — a lazy chunk, fetched only for a card that carries one.
+import { lazy, Suspense } from 'react';
+import { visibleBadges } from '../reputation/api';
+const BadgeChips = lazy(() => import('../reputation/BadgeChips'));
 
 export interface StoreCardProps {
   store: CommunityStore;
@@ -49,6 +54,10 @@ export default function StoreCard({ store: m, canFollow, busy, onToggleFollow, v
   const place = m.governorate ? GOVERNORATE_LABELS[m.governorate]?.[lang] ?? '' : '';
   const rated = typeof m.rating === 'number' && (m.rating_count ?? 0) > 0;
   const standing = m.badge && m.badge !== 'new' ? badgeLabel(m.badge, loc) : '';
+  // The store card's `badges: [{key, since}]` (worker/routes/community.ts `merchantPublic`).
+  const earned = (m as { badges?: Array<{ key: unknown; since?: unknown }> }).badges;
+  // The verification already has its check on this card; the chips carry the rest.
+  const hasEarned = visibleBadges(earned).some((b) => b.key !== 'verified_merchant');
 
   const follow = canFollow && (
     <button
@@ -112,7 +121,7 @@ export default function StoreCard({ store: m, canFollow, busy, onToggleFollow, v
   return (
     <article
       data-community-store={m.id}
-      className="relative flex min-w-0 items-start gap-3 rounded-2xl border border-border-subtle/60 bg-surface p-4 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus"
+      className="relative flex min-w-0 flex-wrap items-start gap-3 rounded-2xl border border-border-subtle/60 bg-surface p-4 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus"
     >
       <StoreMark src={m.logoUrl ?? m.avatarUrl} />
       <div className="min-w-0 flex-1">
@@ -170,6 +179,17 @@ export default function StoreCard({ store: m, canFollow, busy, onToggleFollow, v
           {(m.followers ?? 0) > 0 && (
             <span className="text-[10.5px] tabular-nums text-text-muted">{followersLabel(m.followers ?? 0, lang)}</span>
           )}
+        </div>
+      )}
+      {/* Reputation V2: the earned badges, the card's last row, its whole
+          width (the text column is too narrow on a phone for three). The chips
+          sit above the card's stretched link (z-10): each is its own button;
+          the row around them is not, so its empty width still opens the store. */}
+      {hasEarned && (
+        <div className="basis-full">
+          <Suspense fallback={<div className="h-7" aria-hidden="true" />}>
+            <BadgeChips badges={earned} className="z-10 w-fit max-w-full" />
+          </Suspense>
         </div>
       )}
     </article>

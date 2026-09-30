@@ -45,6 +45,8 @@ import { deleteCancelledOrder, OrderDeletionRefusal } from '../lib/orderDeletion
 import { reclaimOrderRedemptionsStatement } from '../lib/offers';
 import { resolveOrderExpiry } from '../lib/orderExpiry';
 import { getSetting, getSettings, normalizePayoutMethods, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
+// «التخصيص» (Programme C C1): the customizationConfig switch is written through its own normaliser.
+import { normalizeCustomizationConfig } from '../lib/settings';
 import { afterCatalogueWrite, afterSettingsWrite } from '../lib/edgePolicy';
 import type { CreateUnitsResult } from '../lib/deviceOps';
 import { runOrderDeliveredEffects } from '../lib/orderDeliveredEffects';
@@ -4007,10 +4009,21 @@ adminRoutes.put('/settings/:key', async (c) => {
     // or an out-of-range number is dropped rather than stored to confuse a
     // later reader.
     value = resolveDurations(value);
+  } else if (key === 'customizationConfig') {
+    // «التخصيص» — THE DARK SWITCH OF PROGRAMME C (§B.8). Normalised by the
+    // SAME function every read goes through (worker/lib/settings.ts): a switch
+    // is on only when it is literally `true`, pilot lists keep id strings, the
+    // limits are clamped. Not an object at all is refused, never stored.
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw badRequest('customizationConfig must be an object');
+    }
+    value = normalizeCustomizationConfig(value);
   }
 
   await setSetting(c.env.DB, key, value);
   await audit(c.env.DB, adminUser.id, 'settings.update', key);
+  // The personalisation switch keeps its own audit trail, with what it now says (§B.8).
+  if (key === 'customizationConfig') await audit(c.env.DB, adminUser.id, 'admin.customization', key, value as Record<string, unknown>);
   // P2a: the cached public answers this key feeds, and the isolate's pricing inputs.
   await afterSettingsWrite(c, key);
   return c.json({ success: true });

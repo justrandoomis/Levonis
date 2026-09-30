@@ -101,6 +101,13 @@ export const ENTITLEMENT_MINIMUM_TIER = {
   communityOffers: 'plus',
   merchantAnalytics: 'plus',
   merchantSubdomain: 'plus',
+  /**
+   * «التخصيص» — the blueprint builder: a product the customer personalises
+   * before the cart (Programme C C1, §B.8; E20 decides the tier, PLUS until
+   * then). Surfaced as GET /api/merchant/me `can.customize`, which also asks
+   * the `customizationConfig` switch (worker/lib/personalize/access.ts).
+   */
+  customizableProducts: 'plus',
   exclusiveCoupons: 'plus',
   exclusiveSections: 'plus',
   memberOffers: 'plus',
@@ -583,6 +590,7 @@ export const benefits = {
   communityOffers: (t: TierStatus) => hasEntitlement(t, 'communityOffers'),
   merchantAnalytics: (t: TierStatus) => hasEntitlement(t, 'merchantAnalytics'),
   merchantSubdomain: (t: TierStatus) => hasEntitlement(t, 'merchantSubdomain'),
+  customizableProducts: (t: TierStatus) => hasEntitlement(t, 'customizableProducts'),
   exclusiveCoupons: (t: TierStatus) => hasEntitlement(t, 'exclusiveCoupons'),
   exclusiveSections: (t: TierStatus) => hasEntitlement(t, 'exclusiveSections'),
   memberOffers: (t: TierStatus) => hasEntitlement(t, 'memberOffers'),

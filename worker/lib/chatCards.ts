@@ -905,6 +905,11 @@ export async function currentCardStates(
     );
   }
   await Promise.all(loaders);
+  // THE STAFF VIEWER ACTS ON NOTHING (0163, §9.6). Staff read a store order's
+  // thread, or a disputed order's evidence thread, and may not act from it —
+  // not even «view», which on a product or store card opens a buying page. So
+  // whatever a loader offered, a staff reader's cards carry no action at all.
+  if (viewer === 'staff') for (const current of out.values()) current.actions = [];
   return out;
 }
 

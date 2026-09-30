@@ -22,6 +22,14 @@
  *   asks GET /api/link-cards ONCE per distinct address; the project's story
  *   draws the full card and its door opens the wizard with `?link=`.
  *
+ *   Moderation V2 and Reputation V2 (§9.6): a member under a sanction
+ *   (`viewer=restricted|suspended|banned`) reads it above the tabs — the
+ *   standing, the desk's reason, the end date (none for a ban) and the door
+ *   to /moderation; the directory's first store carries three chips (its
+ *   verification left to the card's own check), a chip answers «لماذا؟» in a
+ *   popover without following the card's link, and the popover's «عن الشارات»
+ *   opens /community/badges#<key>.
+ *
  *   npx vite --port 4191 &   node scripts/e2e-community-home.mjs
  */
 import { mkdir } from 'node:fs/promises';
@@ -69,7 +77,15 @@ const SCENES = [
   { tab: 'merchants', viewer: 'guest', mark: '[data-community-panel="merchants"]', legacy: true },
   { tab: 'foryou', viewer: 'guest', extra: 'empty=1', mark: '[data-community-cover="typeset"]', key: 'foryou-empty', empty: true },
   { tab: 'foryou', viewer: 'customer', extra: 'path=/community/projects/prj_2', mark: '[data-link-card][data-link-variant="full"]', key: 'project-link', project: true },
+  // Moderation V2 (§9.6): the account's standing on the home, before it writes anything the server will refuse.
+  { tab: 'foryou', viewer: 'restricted', mark: '[data-status-banner="restricted"]', key: 'banner-restricted', banner: 'restricted' },
+  { tab: 'foryou', viewer: 'suspended', mark: '[data-status-banner="suspended"]', key: 'banner-suspended', banner: 'suspended' },
+  { tab: 'foryou', viewer: 'banned', mark: '[data-status-banner="banned"]', key: 'banner-banned', banner: 'banned' },
+  // Reputation V2 (§9.6): the directory card's earned badges and their «لماذا؟».
+  { tab: 'stores', viewer: 'guest', mark: '[data-community-store="m_0"] [data-badge-chips]', key: 'stores-badges', badges: true },
 ];
+/** The fixture's sanction reasons (community-home-fixture.tsx `me.moderation`). */
+const SANCTION_REASON = { restricted: 'نشر إعلانات متكررة في التعليقات', suspended: 'نشر إعلانات متكررة في التعليقات', banned: 'احتيال متكرر على المشترين' };
 
 const browser = await chromium.launch();
 for (const lang of ['ar', 'en', 'ckb']) {
@@ -332,6 +348,62 @@ for (const lang of ['ar', 'en', 'ckb']) {
           await btn.click();
           await page.waitForTimeout(500);
           check(`${name}: creator follow flips on`, (await btn.getAttribute('aria-pressed')) === 'true');
+        }
+        if (s.banner) {
+          // MODERATION V2 (§9.6): one banner, the viewer's own standing — what it takes away, the desk's words, the end date, the way to contest it.
+          const banner = page.locator(`[data-status-banner="${s.banner}"]`);
+          check(`${name}: one standing banner`, (await page.locator('[data-status-banner]').count()) === 1);
+          const heading = (await banner.locator('h2').innerText()).trim();
+          check(`${name}: the heading carries the end date (a ban has none)`, s.banner === 'banned' ? !/[0-9٠-٩]/.test(heading) : /[0-9٠-٩]/.test(heading), heading);
+          check(`${name}: the desk's reason is said`, (await banner.locator('[data-status-reason]').innerText()).includes(SANCTION_REASON[s.banner]));
+          const bannerY = (await banner.boundingBox())?.y ?? Infinity;
+          const tabsY = (await page.locator('[role="tab"]').first().boundingBox())?.y ?? -Infinity;
+          check(`${name}: the banner stands above the tabs`, bannerY < tabsY, `banner=${bannerY} tabs=${tabsY}`);
+          const door = banner.locator('a[data-status-appeal]');
+          check(`${name}: the appeal door opens /moderation`, (await door.getAttribute('href')) === '/moderation');
+          check(`${name}: the appeal door is a 44 px target`, ((await door.boundingBox())?.height ?? 0) >= 44);
+          await banner.screenshot({ path: `${out}/${key}-banner-${tag}.png` });
+          await page.screenshot({ path: `${out}/${key}-${tag}.png`, fullPage: false });
+          await door.click();
+          const went = await page.waitForSelector('[data-elsewhere]', { timeout: 8000 }).then((el) => el.getAttribute('data-elsewhere')).catch(() => null);
+          check(`${name}: the door goes to the decisions page`, went === '/moderation', String(went));
+          continue;
+        }
+        if (s.badges) {
+          // REPUTATION V2 (§9.6): at most three chips; the verification keeps the card's own check; a card with only that draws no row.
+          const chips = page.locator('[data-community-store="m_0"] [data-badge-chip]');
+          const keys = await chips.evaluateAll((els) => els.map((el) => el.getAttribute('data-badge-chip')));
+          check(`${name}: three chips on the first store, no second «verified»`, keys.length === 3 && !keys.includes('verified_merchant'), keys.join(','));
+          check(`${name}: a store with only its verification draws no chip row`, (await page.locator('[data-community-store="m_2"] [data-badge-chips]').count()) === 0);
+          check(`${name}: a store with no badges draws no chip row`, (await page.locator('[data-community-store="m_1"] [data-badge-chips]').count()) === 0);
+          // The chips are the card's last row, its whole width, each ONE line — a name never wraps inside the 28 px pill.
+          check(`${name}: every chip is one line`, await chips.evaluateAll((els) => els.every((el) => el.getBoundingClientRect().height <= 29)));
+          check(`${name}: the chips row spans the card, under its text`, await page.locator('[data-community-store="m_0"]').evaluate((card) => {
+            const row = card.querySelector('[data-badge-chips]')?.parentElement?.getBoundingClientRect();
+            const text = card.querySelector('h3')?.getBoundingClientRect();
+            const box = card.getBoundingClientRect();
+            return !!row && !!text && row.top >= text.bottom && row.width >= box.width - 40;
+          }));
+          const chip = chips.first();
+          // 28 px to the eye, 44 px to the finger (`lv-hit`): a press 6 px above the chip still lands on it, not on the card's link.
+          await chip.scrollIntoViewIfNeeded();
+          check(`${name}: a chip is a 44 px target`, await chip.evaluate((el) => { const r = el.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top - 6)?.closest('[data-badge-chip]') === el; }));
+          await chip.click();
+          const why = await page.waitForSelector(`[data-anchored="badge-why"] [data-badge-why="${keys[0]}"]`, { timeout: 8000 }).then(() => true).catch(() => false);
+          check(`${name}: a chip answers «لماذا؟» in a popover`, why);
+          check(`${name}: the chip did not follow the card's link`, (await page.locator('[data-elsewhere]').count()) === 0);
+          check(`${name}: the chip says it is open`, (await chip.getAttribute('aria-expanded')) === 'true');
+          if (why) {
+            await page.waitForTimeout(400);
+            const rule = (await page.locator('[data-anchored="badge-why"] [data-badge-rule]').innerText()).trim();
+            check(`${name}: the rule is a sentence in the page's language`, rule.length > 20 && (lang === 'en' ? /[a-z]/i.test(rule) : /[\u0600-\u06FF]/.test(rule)), rule);
+            check(`${name}: «عن الشارات» opens the badge's entry`, (await page.locator('[data-anchored="badge-why"] [data-badge-about]').getAttribute('href')) === `/community/badges#${keys[0]}`);
+            check(`${name}: no horizontal overflow with the popover`, (await overflow()) <= 0, `overflow=${await overflow()}`);
+            await page.screenshot({ path: `${out}/${key}-why-${tag}.png`, fullPage: false });
+            await page.keyboard.press('Escape');
+            const closed = await page.waitForSelector('[data-anchored="badge-why"]', { state: 'detached', timeout: 5000 }).then(() => true).catch(() => false);
+            check(`${name}: Escape closes the popover`, closed);
+          }
         }
         await page.screenshot({ path: `${out}/${key}-${tag}.png`, fullPage: true });
       }

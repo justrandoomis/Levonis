@@ -53,6 +53,8 @@ export interface CatalogProduct {
   moderation: { hidden_by_admin: boolean; reason: string; at: string } | null;
   created_at: string;
   updated_at: string;
+  /** A part (Programme C C1, 0164 `part_spec` set) — the list's «قطعة» chip. Absent from an older server. */
+  is_part?: boolean;
 }
 
 export interface CatalogMedia {
@@ -89,6 +91,8 @@ export interface CatalogProductDetail extends CatalogProduct {
   media: CatalogMedia[];
   option_groups: CatalogGroup[];
   variants: CatalogVariant[];
+  /** The part's facts as stored — the flat map `readPartSpec` reads; null = not a part (Programme C C1). */
+  part_spec?: Record<string, string> | null;
 }
 
 export type CollectionKind = 'manual' | 'featured' | 'new_arrivals' | 'best_sellers';
@@ -171,6 +175,8 @@ export interface ProductBody {
   attributes?: Partial<Attributes>;
   media?: Array<{ key: string; alt: string; alt_ar: string }>;
   collection_ids?: string[];
+  /** The part's facts (flat map) or null to stop being a part; sent only when changed (Programme C C1). */
+  part_spec?: Record<string, string> | null;
   variant_model?: {
     groups: Array<{ ref: string; name: string; name_ar: string; kind: GroupKind; values: Array<{ ref: string; name: string; name_ar: string; swatch: string }> }>;
     variants: Array<{
@@ -195,6 +201,8 @@ export interface ListQuery {
   sort?: string;
   cursor?: string;
   limit?: number;
+  /** `parts` | `products` (Programme C C1). */
+  kind?: string;
 }
 
 const qs = (o: Record<string, string | number | undefined>) =>

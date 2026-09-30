@@ -30,10 +30,14 @@ import { catalogApi, type BulkAction, type CatalogProduct, type CatalogStats, ty
 import { catalogRefusalText, catalogStrings } from './strings';
 import { StateChip, readRefusal } from './parts';
 import BulkValueSheet, { type BulkValueKind } from './BulkValueSheet';
+import { partListStrings } from './parts/strings';
+import { useCanCustomize } from './blueprint/gate';
 
 const ProductEditorSheet = lazy(() => import('./ProductEditorSheet'));
 const InsightsSheet = lazy(() => import('./InsightsSheet'));
 const ImportSheet = lazy(() => import('./ImportSheet'));
+/** «من ليفونيس» (Programme C C1) — its own chunk. */
+const FromLevonisSheet = lazy(() => import('./parts/FromLevonisSheet'));
 
 type StateFilter = '' | 'published' | 'draft' | 'hidden' | 'archived';
 
@@ -55,6 +59,9 @@ export interface CatalogManagerProps {
 export function CatalogManager({ canSell, store, focusProductId = null, initialState, initialStock, onEditorClose }: CatalogManagerProps) {
   const { loc, lang } = useLanguage();
   const s = catalogStrings(loc);
+  const ps = partListStrings(lang);
+  // «من ليفونيس» is part of «التخصيص», which ships dark: shown only when /api/merchant/me says `can.customize`.
+  const customize = useCanCustomize();
   const toast = useToast();
   const mainHref = useMainSiteHref();
   const [confirm, confirmDialog] = useConfirm();
@@ -65,6 +72,9 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
   const [stock, setStock] = useState(() => (['in', 'low', 'out', 'untracked'].includes(initialStock ?? '') ? initialStock! : ''));
   const [collection, setCollection] = useState('');
   const [sort, setSort] = useState('newest');
+  // «الكل · منتجات · قطع» — parts are products whose facts say so (0164).
+  const [kind, setKind] = useState('');
+  const [fromLevonis, setFromLevonis] = useState(false);
 
   const [rows, setRows] = useState<CatalogProduct[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -96,7 +106,7 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
 
   // A newer request wins: the debounced search and the filters overlap.
   const seq = useRef(0);
-  const query = useMemo(() => ({ q, state, stock, collection, sort }), [q, state, stock, collection, sort]);
+  const query = useMemo(() => ({ q, state, stock, collection, sort, kind }), [q, state, stock, collection, sort, kind]);
 
   const load = useCallback(() => {
     const n = ++seq.current;
@@ -246,6 +256,7 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
           <span className="min-w-0">
             <span className="block truncate font-semibold text-text-primary">{name(p)}</span>
             <span className="block truncate text-[12px] text-text-muted">
+              {p.is_part && <span className="me-1.5 inline-block rounded-md border border-border-subtle px-1.5 align-middle text-[11px] font-semibold leading-4 text-text-secondary" data-part-chip>{ps.chip}</span>}
               {p.variant_mode === 'variants' ? s.variantsCount(p.variant_count) : p.variant_mode === 'legacy' ? s.legacyChoices : p.sku || p.category || ''}
             </span>
           </span>
@@ -321,7 +332,7 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
     { id: 'delete', label: s.remove, destructive: true, onSelect: () => bulkDelete(ids) },
   ];
 
-  const filtered = !!(q || state || stock || collection);
+  const filtered = !!(q || state || stock || collection || kind);
 
   return (
     <div className="space-y-4" data-catalog-manager>
@@ -336,6 +347,7 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
             items={[
               { id: 'export', label: s.exportCsv, icon: <Download className="h-4 w-4" />, onSelect: exportCsv },
               { id: 'import', label: s.importCsv, icon: <FileUp className="h-4 w-4" />, onSelect: () => setImportOpen(true), disabled: !canSell },
+              ...(customize ? [{ id: 'from_levonis', label: ps.fromLevonis, icon: <Package className="h-4 w-4" />, onSelect: () => setFromLevonis(true), disabled: !canSell }] : []),
               { id: 'refresh', label: s.refresh, icon: <RefreshCcw className="h-4 w-4" />, onSelect: reload },
             ]}
             trigger={(props) => <IconButton {...props} label={s.importExport} variant="secondary" icon={<MoreHorizontal className="h-4 w-4" />} />}
@@ -356,6 +368,15 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
         <div className="-mx-1 -mt-2 overflow-x-auto px-1 py-2 hide-scrollbar">
           <Segmented items={stateItems} value={state} onChange={(id) => setState(id as StateFilter)} label={s.stateFilter} group="catalog-state" size="sm" className="min-w-max sm:min-w-0" />
         </div>
+        <Segmented
+          items={[{ id: '', label: ps.all }, { id: 'products', label: ps.products }, { id: 'parts', label: ps.parts }]}
+          value={kind}
+          onChange={setKind}
+          label={ps.kind}
+          group="catalog-kind"
+          size="sm"
+          dataAttr="data-catalog-kind"
+        />
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Select value={stock} onChange={(e) => setStock(e.target.value)} aria-label={s.stock}>
             <option value="">{s.allStock}</option>
@@ -441,6 +462,17 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
         )}
         {insightsFor && <InsightsSheet product={insightsFor} onClose={() => setInsightsFor(null)} />}
         {importOpen && <ImportSheet open={importOpen} onClose={() => setImportOpen(false)} onImported={reload} />}
+        {fromLevonis && (
+          <FromLevonisSheet
+            open={fromLevonis}
+            onClose={() => setFromLevonis(false)}
+            onOpen={(id) => {
+              setFromLevonis(false);
+              setEditing({ id });
+            }}
+            onImported={reload}
+          />
+        )}
       </Suspense>
       <BulkValueSheet
         kind={bulkValue}

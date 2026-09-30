@@ -19,6 +19,8 @@ import { publicRequest } from './marketplace';
 import { eligibleVerdictSql, publicWorkshopFacts } from '../lib/printMatchingStore';
 import { storeForUser } from '../lib/merchantAuth';
 import { merchantTakesNewWork } from '../lib/communityRequests';
+// Reputation V2 (0163, §9.6): the explainable badges a store card carries, and their catalogue.
+import { badgeCatalogue, publicBadges } from '../lib/reputation';
 
 export const communityRoutes = new Hono<AppContext>();
 
@@ -51,6 +53,13 @@ function merchantPublic(m: Record<string, unknown>, badges: { pro: Set<string>; 
     pro_badge: badges.pro.has(String(m.user_id)),
     /** PREMIUM's own mark in the community (0145) — never beside a PRO badge. */
     premium_badge: badges.premium.has(String(m.user_id)),
+    /**
+     * REPUTATION V2 (0163, §9.6): the explainable badges the nightly run
+     * earned — `[{key, since}]`, never the evidence (the merchant's own
+     * GET /api/merchant/reputation has that). The store read, the directory
+     * card and the creator page's store card all come through here.
+     */
+    badges: publicBadges(m),
     created_at: m.created_at,
   };
 }
@@ -553,6 +562,18 @@ communityRoutes.post('/requests', requireAuth, async (c) => {
  */
 communityRoutes.post('/requests/:id/close', requireAuth, (c) =>
   c.redirect(`/api/marketplace/requests/${encodeURIComponent(c.req.param('id') ?? '')}/cancel`, 307)
+);
+
+/**
+ * THE BADGE CATALOGUE (0163, docs/COMMUNITY_ECOSYSTEM.md §9.6) — every
+ * explainable badge's key and the numbers its rule uses (`rule_params`); the
+ * words of «/community/badges» and of each «لماذا؟» are the client's, in three
+ * languages. The same for everyone and for every visit, so a guest's answer is
+ * served from the colo (no query parameter changes it); it moves only with a
+ * deploy. Inside the wall, like the store cards that show the badges.
+ */
+communityRoutes.get('/badges', (c) =>
+  anonymousCached(c, { params: [] }, async () => c.json({ success: true, badges: badgeCatalogue() }))
 );
 
 // Merchant storefront ---------------------------------------------------------

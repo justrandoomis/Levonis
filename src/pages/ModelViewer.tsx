@@ -10,10 +10,12 @@
  * THE BROWSER NEVER PARSES THE CUSTOMER'S FILE. The Worker already measured
  * the upload and cached a derived mesh (worker/lib/modelGeometry.ts →
  * `viewerMesh`); this page fetches THOSE bytes, never the STL/3MF/OBJ. That is
- * why there is a 32-byte header reader below instead of a model loader, and it
- * is what keeps the store bundle free of slicer payload (T1,
+ * why the viewer core (src/lib/viewer — the mesh reader, the scene, the AR
+ * path, shared with the studio) has a 32-byte header reader instead of a model
+ * loader, and it is what keeps the store bundle free of slicer payload (T1,
  * tests/store-isolation.test.ts). `ogl` is the only 3D library available here —
- * `three` is banned by that same test.
+ * `three` is banned by that same test. This file is the page: the strings, the
+ * two fetches, the controls and the measurements.
  *
  * TWO 404s, TWO MEANINGS. Metadata is fetched first: a 404 there means the
  * token is wrong, expired or revoked, and the Worker refuses to say which, so
@@ -24,8 +26,6 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Camera, Geometry, Mesh, Orbit, Program, Renderer, Transform } from 'ogl';
-import type { OGLRenderingContext } from 'ogl';
 import {
   Boxes,
   Component,
@@ -42,6 +42,9 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
+import { parseLvm, type ParsedMesh } from '../lib/viewer/lvm';
+import { mountScene, type Scene } from '../lib/viewer/scene';
+import { xrParts } from '../lib/viewer/xr';
 
 /**
  * No `name`: the server stopped sending the customer's own file name (audit 03
@@ -56,78 +59,6 @@ interface ViewerMeta {
   expires_at: string;
   /** 'preview' = the coarse mesh a merchant quoting on the board is sent (worker/routes/printRequests.ts). */
   grant?: 'full' | 'preview';
-}
-
-/** The decoded LVM1 payload, already in the shape the GPU wants. */
-interface ParsedMesh {
-  triangles: number;
-  position: Float32Array;
-  normal: Float32Array;
-  /** 0 / 1 / 2 per vertex — the corner index, used only for the wireframe. */
-  corner: Uint8Array;
-  min: [number, number, number];
-  max: [number, number, number];
-}
-
-/* --------------------------------------------------------------- WebXR types
- *
- * WebXR is absent from TypeScript's DOM lib, so this is the minimum surface the
- * AR path actually touches. Declared rather than reached for through `any` so a
- * typo in it fails the typecheck like any other call. */
-interface XrRigidTransform {
-  readonly matrix: Float32Array;
-  readonly inverse: XrRigidTransform;
-  readonly position: { readonly x: number; readonly y: number; readonly z: number };
-}
-interface XrView {
-  readonly projectionMatrix: Float32Array;
-  readonly transform: XrRigidTransform;
-}
-interface XrViewport {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
-interface XrViewerPose {
-  readonly views: readonly XrView[];
-}
-interface XrFrame {
-  /** The reference space is an opaque handle we only ever hand back. */
-  getViewerPose(space: unknown): XrViewerPose | null;
-}
-interface XrWebGLLayer {
-  readonly framebuffer: WebGLFramebuffer | null;
-  getViewport(view: XrView): XrViewport | undefined;
-}
-interface XrSession {
-  requestReferenceSpace(type: string): Promise<unknown>;
-  updateRenderState(state: { baseLayer: XrWebGLLayer }): void;
-  requestAnimationFrame(callback: (time: number, frame: XrFrame) => void): number;
-  addEventListener(type: 'end', listener: () => void): void;
-  end(): Promise<void>;
-}
-interface XrSystem {
-  isSessionSupported(mode: string): Promise<boolean>;
-  requestSession(
-    mode: string,
-    init?: { requiredFeatures?: string[]; optionalFeatures?: string[] }
-  ): Promise<XrSession>;
-}
-type XrWebGLLayerCtor = new (
-  session: XrSession,
-  gl: WebGLRenderingContext | WebGL2RenderingContext
-) => XrWebGLLayer;
-
-/**
- * BOTH halves or nothing. `navigator.xr` alone is not enough to draw anything —
- * without the XRWebGLLayer constructor there is no framebuffer to render into,
- * and an AR button that cannot render is worse than no button at all.
- */
-function xrParts(): { xr: XrSystem; Layer: XrWebGLLayerCtor } | null {
-  const xr = (navigator as Navigator & { xr?: XrSystem }).xr;
-  const Layer = (window as Window & { XRWebGLLayer?: XrWebGLLayerCtor }).XRWebGLLayer;
-  return xr && Layer ? { xr, Layer } : null;
 }
 
 const STR = {
@@ -192,456 +123,6 @@ const int = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 0 
 const dec = (n: number, d: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 
-/**
- * LVM1 → GPU buffers.
- *
- * Layout: 'LVM1' | uint32 triangles | 6×float32 bbox | triangles×9 float32,
- * little-endian, millimetres, already centred on the origin. No indices and no
- * normals, so a flat normal is computed per triangle here and repeated across
- * its three vertices — flat shading is also the RIGHT look for a print preview,
- * where facets are what the machine will actually lay down.
- *
- * Positions are a VIEW over the response buffer rather than a copy: at the
- * 250k-triangle ceiling that is 9 MB saved per load, and WebGL requires
- * native-endian typed arrays anyway, so a Float32Array view is what the upload
- * path wants regardless.
- */
-function parseLvm(buffer: ArrayBuffer): ParsedMesh | null {
-  if (buffer.byteLength < 32) return null;
-  const head = new DataView(buffer);
-  if (head.getUint8(0) !== 0x4c || head.getUint8(1) !== 0x56) return null;
-  if (head.getUint8(2) !== 0x4d || head.getUint8(3) !== 0x31) return null;
-
-  const triangles = head.getUint32(4, true);
-  const floats = triangles * 9;
-  if (triangles === 0 || buffer.byteLength < 32 + floats * 4) return null;
-
-  const min: [number, number, number] = [
-    head.getFloat32(8, true),
-    head.getFloat32(12, true),
-    head.getFloat32(16, true),
-  ];
-  const max: [number, number, number] = [
-    head.getFloat32(20, true),
-    head.getFloat32(24, true),
-    head.getFloat32(28, true),
-  ];
-
-  const position = new Float32Array(buffer, 32, floats);
-  const normal = new Float32Array(floats);
-  const corner = new Uint8Array(triangles * 3);
-
-  for (let t = 0; t < triangles; t++) {
-    const o = t * 9;
-    const ax = position[o], ay = position[o + 1], az = position[o + 2];
-    const e1x = position[o + 3] - ax, e1y = position[o + 4] - ay, e1z = position[o + 5] - az;
-    const e2x = position[o + 6] - ax, e2y = position[o + 7] - ay, e2z = position[o + 8] - az;
-    let nx = e1y * e2z - e1z * e2y;
-    let ny = e1z * e2x - e1x * e2z;
-    let nz = e1x * e2y - e1y * e2x;
-    // A degenerate triangle has no direction to point in. Leaving it at zero
-    // drops it to ambient rather than flashing a wrong-facing highlight.
-    const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-    if (len > 0) { nx /= len; ny /= len; nz /= len; }
-    for (let v = 0; v < 3; v++) {
-      normal[o + v * 3] = nx;
-      normal[o + v * 3 + 1] = ny;
-      normal[o + v * 3 + 2] = nz;
-      corner[t * 3 + v] = v;
-    }
-  }
-
-  return { triangles, position, normal, corner, min, max };
-}
-
-const MODEL_VERT = `
-attribute vec3 position;
-attribute vec3 normal;
-attribute float corner;
-uniform mat4 modelViewMatrix;
-uniform mat4 projectionMatrix;
-uniform mat3 normalMatrix;
-varying vec3 vNormal;
-varying vec3 vBary;
-void main() {
-  vNormal = normalMatrix * normal;
-  // Barycentric weights unpacked from the corner index — three floats the
-  // vertex stage makes up, so the wireframe costs one byte per vertex on the
-  // bus instead of twelve.
-  vBary = vec3(float(corner < 0.5), float(corner > 0.5 && corner < 1.5), float(corner > 1.5));
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`;
-
-const MODEL_FRAG = `
-precision highp float;
-uniform vec3 uBase;
-uniform vec3 uAccent;
-uniform float uWire;
-varying vec3 vNormal;
-varying vec3 vBary;
-void main() {
-  // Uploaded meshes have unreliable winding — a customer's export may hand us
-  // inside-out triangles — so instead of culling, the normal is flipped toward
-  // whichever side is being looked at. Nothing ever renders black.
-  vec3 n = normalize(vNormal);
-  if (!gl_FrontFacing) n = -n;
-
-  // View space: the key light rides just over the viewer's shoulder, so the
-  // form reads the same however the part is turned.
-  float key = dot(n, normalize(vec3(0.42, 0.72, 0.55))) * 0.5 + 0.5;
-  float fill = max(dot(n, normalize(vec3(-0.7, -0.25, 0.35))), 0.0);
-  float rim = pow(1.0 - clamp(abs(n.z), 0.0, 1.0), 3.0);
-  vec3 col = uBase * (0.17 + 0.85 * key * key + 0.16 * fill) + uAccent * rim * 0.5;
-
-  if (uWire > 0.5) {
-    float edge = min(min(vBary.x, vBary.y), vBary.z);
-    // A fixed threshold rather than fwidth(): derivatives need an extension on
-    // WebGL1, and this is a toggle, not the primary read of the model.
-    float line = 1.0 - smoothstep(0.0, 0.04, edge);
-    col = mix(col * 0.3, uAccent, line * 0.85);
-  }
-  gl_FragColor = vec4(col, 1.0);
-}
-`;
-
-const GRID_VERT = `
-attribute vec3 position;
-uniform mat4 modelViewMatrix;
-uniform mat4 projectionMatrix;
-uniform float uHalf;
-varying float vFade;
-void main() {
-  vFade = 1.0 - clamp(length(position.xz) / uHalf, 0.0, 1.0);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`;
-
-const GRID_FRAG = `
-precision mediump float;
-uniform vec3 uColor;
-varying float vFade;
-void main() {
-  // Squared falloff so the grid dissolves instead of ending on a hard square.
-  gl_FragColor = vec4(uColor, vFade * vFade * 0.5);
-}
-`;
-
-/** Millimetres → metres. In AR the part is shown at TRUE SIZE — that is the
- *  whole reason someone reaches for the button before paying to print it. */
-const AR_SCALE = 0.001;
-/** Roughly a tabletop below, and an arm's length ahead of, where the session
- *  starts. Placed rather than hit-tested: no plane detection is requested, so
- *  guessing a surface would be a lie the renderer cannot back up. */
-const AR_FLOOR_Y = -0.45;
-const AR_FORWARD_Z = -0.7;
-
-interface Viewer {
-  reset(): void;
-  setGrid(on: boolean): void;
-  setWire(on: boolean): void;
-  startAr(): void;
-  stopAr(): void;
-  destroy(): void;
-}
-
-/**
- * Builds the whole GL scene once and hands back a small imperative handle.
- *
- * Everything expensive happens HERE and only here: the geometry is uploaded as
- * one static buffer per attribute and never rebuilt, and the frame loop does
- * nothing but advance the orbit easing and draw. Throws when WebGL is
- * unavailable, which is the caller's cue to fall back to the numbers.
- */
-function mountViewer(
-  canvas: HTMLCanvasElement,
-  data: ParsedMesh,
-  hooks: { onReady: () => void; onAr: (active: boolean) => void; onArError: () => void }
-): Viewer {
-  const renderer = new Renderer({
-    canvas,
-    alpha: false,
-    antialias: true,
-    dpr: Math.min(window.devicePixelRatio || 1, 2),
-  });
-  const gl: OGLRenderingContext = renderer.gl;
-  // ogl's context is a union of the WebGL 1 and 2 interfaces; the raw alias
-  // exists so the handful of direct calls below resolve to one of them.
-  const raw = gl as WebGLRenderingContext;
-  raw.clearColor(0.0196, 0.0196, 0.0235, 1); // matches the page ground #050506
-
-  const host = canvas.parentElement ?? canvas;
-  const scene = new Transform();
-  const camera = new Camera(gl, { fov: 35, near: 0.03, far: 200 });
-
-  // ---- the model, normalised so the camera maths is size-independent
-  const ex = data.max[0] - data.min[0];
-  const ey = data.max[1] - data.min[1];
-  const ez = data.max[2] - data.min[2];
-  // Bounding-sphere radius of the box. Scaling by its inverse means the model
-  // always has radius 1, so near/far and the framing distance are the same
-  // numbers for a 5 mm bracket and a 400 mm helmet.
-  const radius = 0.5 * Math.sqrt(ex * ex + ey * ey + ez * ez) || 1;
-  const fit = 1 / radius;
-
-  const geometry = new Geometry(gl, {
-    position: { size: 3, data: data.position },
-    normal: { size: 3, data: data.normal },
-    corner: { size: 1, data: data.corner, type: raw.UNSIGNED_BYTE },
-  });
-  const program = new Program(gl, {
-    vertex: MODEL_VERT,
-    fragment: MODEL_FRAG,
-    // See the shader: winding is not trusted, so both faces are drawn.
-    cullFace: false,
-    uniforms: {
-      uBase: { value: [0.70, 0.71, 0.74] },
-      uAccent: { value: [0.729, 0.639, 0.412] }, // --color-gold #BAA369
-      uWire: { value: 0 },
-    },
-  });
-  // frustumCulled false skips ogl's bounds pass, which would otherwise walk all
-  // 2.25M floats on first draw to compute a box we never test against — the
-  // model is the only thing on screen and is always in view.
-  const model = new Mesh(gl, { geometry, program, frustumCulled: false });
-  model.scale.set(fit, fit, fit);
-  // Print meshes are Z-up (Z is build height); the viewer is Y-up. One rotation
-  // here is what makes the part stand on the grid instead of lying on its face.
-  model.rotation.x = -Math.PI / 2;
-  model.setParent(scene);
-
-  // ---- the ground grid, sitting exactly under the part
-  const floorY = data.min[2] * fit;
-  const half = Math.max((Math.max(ex, ey) / 2) * fit * 1.7, 1.25);
-  const divisions = 14;
-  const step = (half * 2) / divisions;
-  const lines: number[] = [];
-  for (let i = 0; i <= divisions; i++) {
-    const p = -half + i * step;
-    lines.push(-half, 0, p, half, 0, p, p, 0, -half, p, 0, half);
-  }
-  const gridGeometry = new Geometry(gl, { position: { size: 3, data: new Float32Array(lines) } });
-  const gridProgram = new Program(gl, {
-    vertex: GRID_VERT,
-    fragment: GRID_FRAG,
-    transparent: true,
-    depthWrite: false,
-    uniforms: { uColor: { value: [0.45, 0.42, 0.33] }, uHalf: { value: half } },
-  });
-  const grid = new Mesh(gl, {
-    geometry: gridGeometry,
-    program: gridProgram,
-    mode: raw.LINES,
-    frustumCulled: false,
-  });
-  // A hair below the lowest facet so a flat-bottomed part does not z-fight.
-  grid.position.y = floorY - 0.004;
-  grid.setParent(scene);
-
-  const resize = () => {
-    const w = Math.max(1, host.clientWidth);
-    const h = Math.max(1, host.clientHeight);
-    renderer.setSize(w, h);
-    camera.perspective({ aspect: w / h });
-  };
-  resize();
-
-  /** Distance at which a unit sphere fills the view on its TIGHTEST axis —
-   *  on a 390 px phone that is the horizontal one, which is why the smaller of
-   *  the two field angles wins. */
-  const framingDistance = () => {
-    const vFov = (camera.fov * Math.PI) / 180;
-    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * (camera.aspect || 1));
-    return 1.18 / Math.sin(Math.min(vFov, hFov) / 2);
-  };
-
-  const place = () => {
-    const d = framingDistance();
-    // Three-quarter view, slightly above: the angle that shows height, width
-    // and depth at once instead of a flat elevation.
-    const az = Math.PI * 0.3;
-    const el = Math.PI * 0.17;
-    camera.position.set(d * Math.cos(el) * Math.sin(az), d * Math.sin(el), d * Math.cos(el) * Math.cos(az));
-    return d;
-  };
-  const initialDistance = place();
-
-  const controls = new Orbit(camera, {
-    element: canvas,
-    // Panning would let the part drift off screen with no way back but Reset;
-    // orbit + zoom is the whole vocabulary this view needs.
-    enablePan: false,
-    ease: 0.2,
-    inertia: 0.72,
-    rotateSpeed: 0.13,
-    zoomSpeed: 1,
-    minDistance: 0.55,
-    maxDistance: initialDistance * 4,
-  });
-
-  let first = true;
-  let running = false;
-  let raf = 0;
-  let arSession: XrSession | null = null;
-  let arLayer: XrWebGLLayer | null = null;
-  let arSpace: unknown = null;
-  let arStarting = false;
-  let gridWanted = true;
-  // Set by destroy(). Ending an XR session fires its own 'end' event, which
-  // would otherwise restart the frame loop on a scene that is already gone.
-  let dead = false;
-
-  const frame = () => {
-    if (!running) return;
-    raf = window.requestAnimationFrame(frame);
-    controls.update();
-    renderer.render({ scene, camera });
-    if (first) {
-      first = false;
-      hooks.onReady();
-    }
-  };
-  const start = () => {
-    if (dead || running || arSession) return;
-    running = true;
-    raf = window.requestAnimationFrame(frame);
-  };
-  const stop = () => {
-    running = false;
-    window.cancelAnimationFrame(raf);
-  };
-
-  // A hidden tab must not spin the GPU. The orbit easing is frame-based, so it
-  // simply resumes from wherever it was left.
-  const onVisibility = () => {
-    if (document.visibilityState === 'visible') start();
-    else stop();
-  };
-  document.addEventListener('visibilitychange', onVisibility);
-
-  const observer = new ResizeObserver(resize);
-  observer.observe(host);
-  start();
-
-  // ------------------------------------------------------------------- AR
-  const arFrame = (_time: number, xrFrame: XrFrame) => {
-    if (!arSession || !arLayer) return;
-    arSession.requestAnimationFrame(arFrame);
-    const pose = xrFrame.getViewerPose(arSpace);
-    if (!pose) return;
-
-    renderer.bindFramebuffer({ buffer: arLayer.framebuffer });
-    renderer.enable(raw.DEPTH_TEST);
-    renderer.setDepthMask(true);
-    // Transparent clear: everything not covered by the model is the camera feed.
-    raw.clearColor(0, 0, 0, 0);
-    raw.clear(raw.COLOR_BUFFER_BIT | raw.DEPTH_BUFFER_BIT);
-    scene.updateMatrixWorld();
-
-    for (const view of pose.views) {
-      const viewport = arLayer.getViewport(view);
-      if (!viewport) continue;
-      renderer.setViewport(viewport.width, viewport.height, viewport.x, viewport.y);
-      // The headset owns the projection and the pose, so ogl's own camera maths
-      // is bypassed and the matrices are copied in per eye.
-      camera.projectionMatrix.fromArray(view.projectionMatrix);
-      camera.viewMatrix.fromArray(view.transform.inverse.matrix);
-      const p = view.transform.position;
-      camera.worldPosition.set(p.x, p.y, p.z);
-      model.draw({ camera });
-    }
-  };
-
-  const endAr = () => {
-    arStarting = false;
-    arSession = null;
-    arLayer = null;
-    arSpace = null;
-    model.scale.set(fit, fit, fit);
-    model.position.set(0, 0, 0);
-    grid.visible = gridWanted;
-    renderer.bindFramebuffer();
-    resize();
-    place();
-    controls.forcePosition();
-    hooks.onAr(false);
-    if (document.visibilityState === 'visible') start();
-  };
-
-  const startAr = () => {
-    const parts = xrParts();
-    if (!parts || arSession || arStarting) return;
-    // The session only exists after two awaits, so a second tap in that window
-    // would open a second one. This flag is the door.
-    arStarting = true;
-    // requestSession FIRST: it needs the click's transient activation, and
-    // makeXRCompatible can take long enough to spend it.
-    parts.xr
-      .requestSession('immersive-ar', { optionalFeatures: ['local-floor'] })
-      .then(async (session) => {
-        const compat = gl as unknown as { makeXRCompatible?: () => Promise<void> };
-        if (compat.makeXRCompatible) await compat.makeXRCompatible();
-        const layer = new parts.Layer(session, raw);
-        session.updateRenderState({ baseLayer: layer });
-        arSpace = await session.requestReferenceSpace('local');
-        arSession = session;
-        arLayer = layer;
-        session.addEventListener('end', endAr);
-
-        stop();
-        // True size, standing on the imagined surface rather than centred on it.
-        model.scale.set(AR_SCALE, AR_SCALE, AR_SCALE);
-        model.position.set(0, AR_FLOOR_Y - data.min[2] * AR_SCALE, AR_FORWARD_Z);
-        grid.visible = false;
-        hooks.onAr(true);
-        session.requestAnimationFrame(arFrame);
-      })
-      .catch(() => {
-        arStarting = false;
-        arSession = null;
-        arLayer = null;
-        hooks.onArError();
-        if (document.visibilityState === 'visible') start();
-      });
-  };
-
-  return {
-    reset() {
-      const d = place();
-      controls.maxDistance = d * 4;
-      controls.forcePosition();
-    },
-    setGrid(on: boolean) {
-      gridWanted = on;
-      if (!arSession) grid.visible = on;
-    },
-    setWire(on: boolean) {
-      program.uniforms.uWire.value = on ? 1 : 0;
-    },
-    startAr,
-    stopAr() {
-      void arSession?.end();
-    },
-    destroy() {
-      dead = true;
-      stop();
-      void arSession?.end();
-      arSession = null;
-      observer.disconnect();
-      document.removeEventListener('visibilitychange', onVisibility);
-      controls.remove();
-      geometry.remove();
-      gridGeometry.remove();
-      program.remove();
-      gridProgram.remove();
-      // Hand the context back rather than waiting for GC: browsers cap live
-      // contexts, and a viewer opened repeatedly would otherwise exhaust them.
-      const lose = raw.getExtension('WEBGL_lose_context');
-      lose?.loseContext();
-    },
-  };
-}
-
 export default function ModelViewer() {
   const { token } = useParams<{ token: string }>();
   const { lang, dir } = useLanguage();
@@ -660,7 +141,7 @@ export default function ModelViewer() {
   const [arError, setArError] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const viewerRef = useRef<Viewer | null>(null);
+  const viewerRef = useRef<Scene | null>(null);
 
   // 1. Metadata. This is also the token check: a 404 here is the ONLY thing
   //    that means "the link is dead", and the panel it feeds is what the
@@ -719,9 +200,9 @@ export default function ModelViewer() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!mesh || !canvas) return;
-    let viewer: Viewer;
+    let viewer: Scene;
     try {
-      viewer = mountViewer(canvas, mesh, {
+      viewer = mountScene(canvas, mesh, {
         onReady: () => setReady(true),
         onAr: setArActive,
         onArError: () => setArError(true),
@@ -733,7 +214,7 @@ export default function ModelViewer() {
     viewerRef.current = viewer;
     return () => {
       viewerRef.current = null;
-      viewer.destroy();
+      viewer.dispose();
     };
   }, [mesh]);
 
@@ -888,7 +369,7 @@ export default function ModelViewer() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => viewerRef.current?.reset()}
+                    onClick={() => viewerRef.current?.resetCamera()}
                     data-viewer="reset"
                     title={t.reset}
                     aria-label={t.reset}

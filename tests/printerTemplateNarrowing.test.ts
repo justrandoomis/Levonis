@@ -207,9 +207,32 @@ test('an ESP32 board is not asked a focal length: «إلكترونيات» and �
     for (const f of LASER_ACC_FIELDS) assert.ok(!shown.includes(f), `${slug} is being asked for "${f}"`);
     assert.ok(!shown.includes('capacity'), `${slug} is being asked for a resin-tank capacity`);
     // Narrowing is not a synonym for hiding: their own groups are untouched.
+    // `printed_part` («يُستخدم داخل منتجات مطبوعة», Programme C C1) is asked
+    // on these two sections only — branch-only, like the used groups.
     assert.deepEqual(groupsForSection('devices', branch).map((g) => g.id), [
-      'acc_common', 'electronics', 'hardware', 'physical_core',
+      'acc_common', 'electronics', 'hardware', 'printed_part', 'physical_core',
     ]);
+  }
+  // The part facts never reach a printer accessory, the unnarrowed root or a
+  // type-only sheet — only «إلكترونيات», «قطع هاردوير», «قطع ومكونات» and
+  // «الإكسسوارات» are asked them.
+  for (const branch of [
+    [{ id: 'cat_pacc', slug: 'printer-accessories' }],
+    [{ id: 'cat_pacc_fdm', slug: 'fdm-printer-accessories' }, { id: 'cat_pacc', slug: 'printer-accessories' }],
+    [{ id: 'cat_makers_kits', slug: 'model-kits' }],
+  ] as SectionRef[][]) {
+    assert.ok(!groupsForSection('devices', branch).some((g) => g.id === 'printed_part'), `${branch[0].slug} is asked the part facts`);
+  }
+  assert.ok(!groupsForType('parts').some((g) => g.id === 'printed_part'), 'a type-only sheet carries no part facts');
+  for (const branch of [
+    [{ id: 'cat_makers_parts', slug: 'parts-components' }],
+    [{ id: 'cat_accessories', slug: 'accessories' }],
+  ] as SectionRef[][]) {
+    const shown = flatFields(groupsForSection('materials', branch)).map((f) => f.id);
+    for (const f of ['printed_use', 'part_kind', 'part_shape', 'diameter_mm', 'height_mm', 'install_minutes', 'fits_family', 'uses']) {
+      assert.ok(shown.includes(f), `${branch[0].slug} is not asked "${f}"`);
+    }
+    assert.equal(shown.filter((f) => f === 'install_type').length, 1, 'the fitting is the section\'s own install_type, asked once');
   }
 
   // «ملحقات الليزر» keeps its own five, and the root «ملحقات الطابعات» keeps

@@ -38,6 +38,10 @@ import ReportSheet from '../../components/community/social/ReportSheet';
 import { useSocial } from '../../components/community/social/SocialContext';
 import { followersLabel, socialLang, useSocialStrings } from '../../components/community/social/strings';
 import { dateLocale } from '../../components/orders/format';
+// Reputation V2 (docs/COMMUNITY_ECOSYSTEM.md §9.6): the maker's store's earned
+// badges (`creator.store.badges`), each answering «لماذا؟» — a lazy chunk.
+import { visibleBadges } from '../../components/community/reputation/api';
+const BadgeChips = React.lazy(() => import('../../components/community/reputation/BadgeChips'));
 
 const TABS = ['projects', 'posts', 'about'] as const;
 type Tab = (typeof TABS)[number];
@@ -225,6 +229,11 @@ export default function CreatorPage() {
                     {creator.badges.pro && <Badge>PRO</Badge>}
                     {creator.badges.premium && <Badge>PREMIUM</Badge>}
                   </p>
+                )}
+                {visibleBadges((creator.store as { badges?: Array<{ key: unknown; since?: unknown }> } | null)?.badges).some((b) => b.key !== 'verified_merchant') && (
+                  <React.Suspense fallback={<div className="mt-2 h-7" aria-hidden="true" />}>
+                    <BadgeChips badges={(creator.store as { badges?: Array<{ key: unknown; since?: unknown }> }).badges} className="mt-2" />
+                  </React.Suspense>
                 )}
                 {creator.bio && (
                   <p dir="auto" className="mt-3 text-balance text-[14px] leading-relaxed text-text-secondary">

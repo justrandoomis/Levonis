@@ -66,6 +66,10 @@ import { requireFinancialScope } from '../lib/walletAdjust';
 import { canViewFinancials } from '../lib/adminScope';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { reconcileRefundUnrefunded, reconcileReverseCredit, storeOrderMoneyDrift } from '../lib/storeOrderOps';
+// Phase 6b (0163, §9.6): the desk's «المحادثة» / «الطلب» links, and a decided
+// dispute that paid the merchant counts as the completion it is.
+import { disputeLinksFor } from '../lib/disputeEvidence';
+import { completionStatements } from '../lib/communityRequests';
 
 export const adminCommunityRoutes = new Hono<AppContext>();
 adminCommunityRoutes.use('*', requireAdmin);
@@ -1082,8 +1086,12 @@ adminCommunityRoutes.get('/complaints', async (c) => {
       ORDER BY CASE ct.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
                ct.created_at DESC
       LIMIT ?`
-  ).bind(status, status, limit).all();
-  return c.json({ success: true, complaints: results });
+  ).bind(status, status, limit).all<Record<string, unknown>>();
+  // «المحادثة» and «الطلب» (0163, §9.6): the conversation the case's order
+  // lives in — the evidence door staff may open while it is disputed — and
+  // its request. Two reads for the page.
+  const links = await disputeLinksFor(c.env.DB, results);
+  return c.json({ success: true, complaints: results.map((r) => ({ ...r, ...links(r) })) });
 });
 
 adminCommunityRoutes.get('/complaints/:id', async (c) => {
@@ -1114,9 +1122,11 @@ adminCommunityRoutes.get('/complaints/:id', async (c) => {
       ).bind(escrow.id).all()
     : { results: [] };
 
+  // The same two links as the list (0163, §9.6).
+  const links = await disputeLinksFor(c.env.DB, [complaint]);
   return c.json({
     success: true,
-    complaint,
+    complaint: { ...complaint, ...links(complaint) },
     messages: messages.results.map(withComplaintFile),
     escrow,
     escrow_events: events.results,
@@ -1387,6 +1397,27 @@ adminCommunityRoutes.post('/escrows/:id/resolve', requireFinancialScope, async (
         WHERE community_order_id = ?4 AND status NOT IN ('resolved','rejected','closed')`
     ).bind(`${decision}: ${reason}`.slice(0, 2000), ts, admin.id, esc.community_order_id),
     revokeViewerTokensStatement(c.env.DB, order?.request_id ?? '', ts),
+    /**
+     * A DECISION THAT PAID THE MERCHANT IS A FINISHED JOB (0163, survey §1.6).
+     * Release and partial refund complete the order above, and the customer's
+     * «تأكيد الاستلام» path counts every completion — `completed_orders + 1`
+     * and the `order_completed` event — through `completionStatements`; the
+     * admin's decision never did, so a merchant who won (or half-won) a
+     * dispute finished a job nobody counted. The SAME statements, appended:
+     * the counter and the event are written only when this batch is the one
+     * that completed the order (`completed_at` carries its stamp) and no
+     * completion event exists yet, so a replayed decision adds nothing. Their
+     * order and request moves only match an order this batch did not already
+     * move — a no-op here.
+     */
+    ...(orderState === 'completed'
+      ? completionStatements(
+          c.env.DB,
+          { id: esc.community_order_id, request_id: order?.request_id ?? '', merchant_id: esc.merchant_id },
+          ts,
+          { confirmedByCustomer: false }
+        )
+      : []),
   ]);
 
   // The conversation the deal came from records the decision (D8).

@@ -32,6 +32,10 @@ import type { PostFile, PostFileInput } from '../../components/community/files/a
 import { POST_KINDS, projectsApi, type Post, type PostInput, type PostKind, type PostVisibility } from '../../components/community/projects/api';
 import { useProjectStrings } from '../../components/community/projects/strings';
 import { warmLinksOnPaste } from '../../components/community/links/useLinkCard';
+// Moderation V2 (docs/COMMUNITY_ECOSYSTEM.md §9.6): a restricted, suspended or
+// banned account is told at the door, before it writes a post the server will
+// refuse (USER_RESTRICTED …) — a lazy chunk only such an account fetches.
+const StatusBanner = React.lazy(() => import('../../components/community/moderation/StatusBanner'));
 
 type Draft = {
   title: string;
@@ -305,6 +309,11 @@ export default function ProjectComposer() {
           </div>
         ) : (
           <form ref={formRef} onSubmit={(e) => { e.preventDefault(); void onSave(!editing || draft.visibility !== 'private'); }} className="flex flex-col gap-6" data-project-composer>
+            {['restricted', 'suspended', 'banned'].includes(String((user as { moderation?: { status?: unknown } } | null)?.moderation?.status ?? '')) && (
+              <React.Suspense fallback={null}>
+                <StatusBanner />
+              </React.Suspense>
+            )}
             <section aria-labelledby="c-pictures">
               <h2 id="c-pictures" className="mb-2 text-[13px] font-semibold text-text-secondary">
                 {s.pictures}

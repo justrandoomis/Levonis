@@ -106,6 +106,8 @@ import {
   canonicalOptionValueIds as canonicalSelectionOptionValueIds,
   optionValueIdsInRelationOrder,
 } from '../lib/cartSelectionIdentity';
+// «من ليفونيس» (Programme C C1) — mounted below, before `/:slug`, like `/print-calculator`.
+import { printPartsRoutes } from './printParts';
 
 export const productRoutes = new Hono<AppContext>();
 
@@ -3029,6 +3031,9 @@ function listingItemOf(
 export { cover as compositionCover };
 
 // ---------------------------------------------------------------- routes
+
+// GET /print-parts — the Levonis items a merchant may build into printed products (worker/routes/printParts.ts).
+productRoutes.route('/print-parts', printPartsRoutes);
 
 /**
  * What the print-price calculator needs: the shop's REAL filaments, with a

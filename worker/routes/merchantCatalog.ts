@@ -67,6 +67,11 @@ import {
 import { catalogCsvRows, parseCatalogCsv, type CatalogExportProduct } from '../lib/catalog/csv';
 import { COLLECTION_KINDS, collectionMemberSql, collectionOrder, sinceNewArrivals, variantLabelSql, type CollectionKind } from '../lib/catalog/sql';
 import { alertLowStock, type StockMove } from '../lib/catalog/lowStock';
+// «يُستخدم داخل منتجات مطبوعة» (0164, Programme C C1): the part facts a write stores.
+import { settlePartSpec } from '../lib/personalize/parts';
+// «التخصيص» (Programme C C1): the write gate a blueprint puts on its product and its parts, and the copy's blueprint.
+import { LIVE_PART_USE_SQL, assertBlueprintAxesKept, assertPartNotInUse, duplicateCustomization, liveUsesOf } from '../lib/personalize/blueprints';
+import { customizationSettings } from '../lib/personalize/access';
 
 /** Work that must not hold the response: `waitUntil` where there is one, else awaited (tests). */
 async function runAfter(c: Context<AppContext>, work: Promise<unknown>): Promise<void> {
@@ -213,6 +218,9 @@ function listFilters(c: Context<AppContext>, ctx: StoreContext, hidePrivate = fa
   if (c.req.query('deals') === '1') where.push('(p.original_price_iqd IS NOT NULL AND p.original_price_iqd > p.price_iqd)');
   if (c.req.query('variants') === 'with') where.push("p.variant_mode = 'variants'");
   else if (c.req.query('variants') === 'without') where.push("p.variant_mode <> 'variants'");
+  // «الكل · منتجات · قطع» (0164): parts are the products whose `part_spec` is set.
+  if (c.req.query('kind') === 'parts') where.push('p.part_spec IS NOT NULL');
+  else if (c.req.query('kind') === 'products') where.push('p.part_spec IS NULL');
   return { where, binds };
 }
 
@@ -460,6 +468,7 @@ function createStatements(
     prep_days: fields.prep_days ?? 0,
     featured: fields.featured ?? 0,
     low_stock_threshold: fields.low_stock_threshold ?? null,
+    part_spec: fields.part_spec ?? null,
     publish_state: state,
     created_at: ts,
     updated_at: ts,
@@ -615,6 +624,8 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
     .bind(ctx.merchant.id, idsJson)
     .all<Record<string, unknown>>();
   const byId = new Map(rows.map((r) => [String(r.id), r]));
+  // A part a LIVE customizable product builds in is not deleted (PART_IN_USE); archiving it stays allowed.
+  const liveParts = action === 'delete' ? await liveUsesOf(db, ids) : new Map<string, string[]>();
   const results: Array<{ id: string; ok: boolean; code?: string }> = [];
   const eligible: string[] = [];
   for (const id of ids) {
@@ -640,6 +651,7 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
     }
     if (action === 'set_stock' && r.variant_mode === 'variants') { results.push({ id, ok: false, code: 'VARIANTS_HAVE_OWN_STOCK' }); continue; }
     if (action === 'delete' && Number(r.ordered) > 0) { results.push({ id, ok: false, code: 'PRODUCT_HAS_ORDERS' }); continue; }
+    if (action === 'delete' && liveParts.has(id)) { results.push({ id, ok: false, code: 'PART_IN_USE' }); continue; }
     eligible.push(id);
   }
 
@@ -706,7 +718,8 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
           db
             .prepare(
               `DELETE FROM community_products WHERE ${own}
-                 AND NOT EXISTS (SELECT 1 FROM order_items i WHERE i.community_product_id = community_products.id)`
+                 AND NOT EXISTS (SELECT 1 FROM order_items i WHERE i.community_product_id = community_products.id)
+                 AND NOT ${LIVE_PART_USE_SQL('community_products')}`
             )
             .bind(ej, ctx.merchant.id),
         ];
@@ -761,6 +774,9 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
         .all<{ id: string }>();
       const remaining = new Set(left.map((r) => r.id));
       for (const id of eligible) results.push(remaining.has(id) ? { id, ok: false, code: 'PRODUCT_HAS_ORDERS' } : { id, ok: true });
+      // «التخصيص»: a part a publish made live meanwhile stayed (the DELETE's own fence) — said as PART_IN_USE, not as orders.
+      const racedParts = remaining.size ? await liveUsesOf(db, [...remaining]) : new Map<string, string[]>();
+      for (const r of results) if (!r.ok && r.code === 'PRODUCT_HAS_ORDERS' && racedParts.has(r.id)) r.code = 'PART_IN_USE';
     } else {
       for (const id of eligible) results.push({ id, ok: true });
     }
@@ -808,6 +824,7 @@ merchantCatalogRoutes.post('/products', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const input = readProductInput(body, false);
   await verifyProductRefs(c, ctx, input);
+  await settlePartSpec(c.env.DB, ctx.merchant.id, null, input);
   const state = input.state ?? 'published';
   if (state === 'published' && !publishableModel(input.variantModel, 0, 'simple')) throw notPublishable();
   if (state === 'published' && priceMissing(Number(input.fields.price_iqd ?? 0), input.variantModel)) throw priceRequired();
@@ -858,6 +875,9 @@ merchantCatalogRoutes.patch('/products/:id', async (c) => {
     .first<Record<string, unknown>>();
   if (!current) throw notFound('Product not found');
   await verifyProductRefs(c, ctx, input, safeParse<string[]>(current.image_keys, []));
+  await settlePartSpec(db, ctx.merchant.id, id, input);
+  // «التخصيص»: an option group or value the live blueprint annotates stays (BLUEPRINT_AXIS_IN_USE).
+  await assertBlueprintAxesKept(db, id, input.variantModel);
 
   const currentState = stateOf(current);
   // A product LEVONIS hid stays hidden until Levonis lifts it (audit 01 B9).
@@ -1021,6 +1041,12 @@ merchantCatalogRoutes.post('/products/:id/duplicate', async (c) => {
   await db.batch(stmts);
   await audit(db, ctx.store.user_id, 'merchant.product_duplicated', id, { from: src.id });
   const product = await readProductDetail(db, ctx.merchant.id, id);
+  // «التخصيص» (C1): the copy keeps the part facts (minus the server-owned `source`, option lines
+  // moved to the copy's values) and the blueprint — as a DRAFT with the copy's own ids.
+  if (product) {
+    const copied = await duplicateCustomization(db, { src, dst: product, merchantId: ctx.merchant.id, cfg: await customizationSettings(db) });
+    if (copied.part_spec) product.part_spec = copied.part_spec;
+  }
   return c.json({ success: true, product }, 201);
 });
 
@@ -1124,12 +1150,15 @@ merchantCatalogRoutes.delete('/products/:id', async (c) => {
   const id = c.req.param('id');
   // A private product is cancelled from its conversation, where its card is.
   if (await isPrivateProduct(db, id)) throw new HttpError(409, CUSTOM_PRODUCT_LOCKED_MESSAGE, 'CUSTOM_PRODUCT_LOCKED');
+  // A part a live customizable product builds in is refused (PART_IN_USE {products}); archiving it stays allowed.
+  await assertPartNotInUse(db, id);
   // Its 3D viewer links first (§9.4): deleted or archived, the product leaves the shopfront either way.
   await revokeProductViewerGrantsStatement(db, [id], nowIso()).run();
   const res = await db
     .prepare(
       `DELETE FROM community_products WHERE id = ?1 AND merchant_id = ?2
-          AND NOT EXISTS (SELECT 1 FROM order_items i WHERE i.community_product_id = ?1)`
+          AND NOT EXISTS (SELECT 1 FROM order_items i WHERE i.community_product_id = ?1)
+          AND NOT ${LIVE_PART_USE_SQL('community_products')}`
     )
     .bind(id, ctx.merchant.id)
     .run();

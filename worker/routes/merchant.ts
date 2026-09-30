@@ -28,6 +28,8 @@ import { rateLimit } from '../lib/ratelimit';
 import { audit, auditStatements } from '../lib/audit';
 import { ownedMediaKey } from '../lib/mediaRefs';
 import { getTierStatus, benefits } from '../lib/entitlements';
+// «التخصيص» (Programme C C1): `can.customize` = the builder's switch for this store AND the entitlement.
+import { canCustomize } from '../lib/personalize/access';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { afterStorefrontWrite, purgeStorefrontAfterWrite } from '../lib/edgePolicy';
 import {
@@ -183,6 +185,7 @@ merchantRoutes.get('/me', async (c) => {
       offers: benefits.communityOffers(tier),
       analytics: benefits.merchantAnalytics(tier),
       subdomain: benefits.merchantSubdomain(tier),
+      customize: ctx ? await canCustomize(c, ctx.store.id, tier) : false,
     },
     store: ctx ? storePublicShape(ctx, root) : null,
     selling: ctx ? await sellingStatus(c, ctx) : { canSell: false, reason: 'no_store' },

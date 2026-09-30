@@ -243,6 +243,14 @@ export const ROUTES: readonly RouteRule[] = [
   // `requires: 'none'` is the point of it, and the route's own per-bucket rate
   // limits do the work an auth gate would otherwise do.
   { prefix: '/api/print-quote', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'upload', note: 'guest uploads a model and is quoted for it' },
+  // «التخصيص» (Programme C C1, docs/LEVO_PROJECT_PROGRAMME.md §0 row 27): the ONE
+  // prefix of every customer personalisation door — the switch's status, a
+  // product's public blueprint (a guest read the core edge-caches itself, so
+  // not marked cacheable here), a configuration minted and read back by its
+  // owner, and the owner's own design pictures. Commerce doors: mounted
+  // outside /api/community, answering on every store host. The merchant's
+  // builder rides the /api/merchant row.
+  { prefix: '/api/personalize', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'user', note: 'worker/routes/personalize.ts — GET /status, GET /blueprints/:productId?rev= (guest, edge-cached by the core, P13 lifetime), POST /configs and GET /configs/:id (auth, owner-scoped), GET /assets/<key> (auth, the owner\'s own design picture); every door 404 while customizationConfig is dark' },
 
   // ------------------------------------------------------- leaves (phase 4)
   { prefix: '/api/chats', hosts: 'root', owner: 'CHAT', flipPhase: 4, requires: 'auth', rateClass: 'write' },

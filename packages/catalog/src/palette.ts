@@ -50,3 +50,16 @@ export const SWATCH_NAMES: Record<Swatch, { ar: string; en: string }> = {
 export function swatchKey(raw: unknown): Swatch | '' {
   return typeof raw === 'string' && (SWATCHES as readonly string[]).includes(raw) ? (raw as Swatch) : '';
 }
+
+/**
+ * THE SAME NAMES IN WRITTEN SORANI — added for Programme C's personalization
+ * engine (packages/catalog/src/personalize/vocab.ts `colorWord`), under
+ * DECISIONS row 169 (real Sorani in merchant and storefront strings). A table
+ * of its own so `SWATCH_NAMES` keeps its ar/en shape for every existing reader.
+ */
+export const SWATCH_NAMES_CKB: Record<Swatch, string> = {
+  black: 'ڕەش', white: 'سپی', gray: 'خۆڵەمێشی', silver: 'زیوی', red: 'سوور', orange: 'پرتەقاڵی',
+  yellow: 'زەرد', green: 'سەوز', teal: 'فیرۆزەیی', blue: 'شین', navy: 'شینی تۆخ', purple: 'مۆر',
+  pink: 'پەمەیی', brown: 'قاوەیی', beige: 'بێج', gold: 'ئاڵتوونی', bronze: 'برۆنزی', wood: 'دارین',
+  marble: 'مەڕمەڕی', clear: 'ڕوون', glow: 'درەوشاوە لە تاریکیدا', multi: 'فرەڕەنگ',
+};

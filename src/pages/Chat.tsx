@@ -34,6 +34,20 @@ import LinkCard from '../components/community/links/LinkCard';
 import { postChatLink, type ChatLink } from '../components/community/links/api';
 import { useLinkStrings } from '../components/community/links/strings';
 
+// DISPUTE EVIDENCE (0163, docs/COMMUNITY_ECOSYSTEM.md §9.6): staff read a
+// disputed order's store or request thread at /admin/chats/:id (or ?evidence=1)
+// — read-only, no composer, no card actions, every read on the record. The
+// banner and the refusal page are a lazy chunk nobody else fetches.
+import { useLocation } from 'react-router-dom';
+import type { ChatEvidence } from '../components/community/reputation/api';
+const EvidenceBanner = React.lazy(() => import('../components/adminCommunity/moderation/EvidenceBanner'));
+const EvidenceRefused = React.lazy(() => import('../components/adminCommunity/moderation/EvidenceBanner').then((m) => ({ default: m.EvidenceRefused })));
+/** Evidence mode reads cards, never acts on them: every card's actions emptied, whatever a server sends. */
+export const withoutActions = (card: ChatCard): ChatCard => ({ ...card, current: { ...card.current, actions: [] } });
+/** The evidence address: the chat page mounted in the admin frame, or `?evidence=1`. */
+export const isEvidencePath = (pathname: string, search: string) =>
+  /^\/admin\/chats\/[^/]+\/?$/.test(pathname) || new URLSearchParams(search).get('evidence') === '1';
+
 // The commerce sheets load when first opened — a plain conversation never pays for them.
 const ProductPickerSheet = React.lazy(() => import('../components/chat/ProductPickerSheet'));
 const QuoteSheet = React.lazy(() => import('../components/chat/commerce/QuoteSheet'));
@@ -89,6 +103,10 @@ export default function Chat() {
   const { id } = useParams();
   const { dir, lang, loc } = useLanguage();
   const { user } = useAuth();
+  // Evidence mode (§9.6): asked for by the address; confirmed by the server's `chat.evidence`.
+  const evidenceLocation = useLocation();
+  const evidenceRoute = isEvidencePath(evidenceLocation.pathname, evidenceLocation.search);
+  const [evidenceRefusal, setEvidenceRefusal] = useState<string | null>(null);
 
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [inputText, setInputText] = useState('');
@@ -131,7 +149,7 @@ export default function Chat() {
   const pagedBack = useRef(false);
   const prependAnchor = useRef<{ height: number; top: number } | null>(null);
 
-  const presence = useChatPresence(id, !!user && !notFound);
+  const presence = useChatPresence(id, !!user && !notFound && !evidenceRoute);
   // «بصمة صوتية» — the microphone that used to say «قريباً».
   const voice = useVoiceRecorder();
   useCharacterBusy(loading || uploading);
@@ -213,6 +231,8 @@ export default function Chat() {
       setNotFound(false);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+        // The evidence door's refusal is said in its own words, not as «not found».
+        if (err.code === 'EVIDENCE_NOT_LINKED' || err.code === 'EVIDENCE_CLOSED') setEvidenceRefusal(err.code);
         setNotFound(true);
       } else if (err instanceof ApiError && err.status === 401) {
         navigate('/auth');
@@ -257,6 +277,7 @@ export default function Chat() {
     setMessages([]);
     setPending([]);
     setNotFound(false);
+    setEvidenceRefusal(null);
     setOlderCursor(null);
     setOlderFailed(false);
     setReadOnly(false);
@@ -629,6 +650,19 @@ export default function Chat() {
     { icon: Wallet, label: dir === 'rtl' ? `إرسال أموال (${comingSoon})` : `Send Money (${comingSoon})`, disabled: true },
   ];
 
+  // Evidence mode (§9.6): the address asked for it, or the server admitted a staff reader through the evidence door.
+  const evidenceThread = (thread as (ChatThreadInfo & { evidence?: ChatEvidence | null }) | null)?.evidence ?? null;
+  const evidence = evidenceRoute || !!evidenceThread;
+
+  // The evidence door refused (not linked to a dispute yet, or the dispute is decided): say why.
+  if (notFound && evidenceRefusal) {
+    return (
+      <React.Suspense fallback={null}>
+        <EvidenceRefused code={evidenceRefusal} />
+      </React.Suspense>
+    );
+  }
+
   if (notFound) {
     return (
       <div className="h-full min-h-0 w-full bg-canvas flex flex-col items-center justify-center gap-4 p-8 font-sans">
@@ -693,7 +727,7 @@ export default function Chat() {
    */
   const renderLinkBubble = (link: ChatLink, faded = false) => (
     <div className={`w-full max-w-[min(80%,24rem)] mt-1 ${faded ? 'opacity-60' : ''}`} data-chat-link>
-      <LinkCard card={link} variant="compact" />
+      <LinkCard card={link} variant="compact" printDoor={!evidence} />
     </div>
   );
 
@@ -780,6 +814,13 @@ export default function Chat() {
         </div>
       </header>
 
+      {/* Evidence mode (§9.6): what the reader is doing, and that every read is on the record. */}
+      {evidence && (
+        <React.Suspense fallback={<div className="shrink-0 min-h-11 border-b border-border-subtle/70 bg-surface" aria-hidden="true" />}>
+          <EvidenceBanner evidence={evidenceThread} />
+        </React.Suspense>
+      )}
+
       {/* Chat Area */}
       <div
         ref={listRef}
@@ -831,12 +872,12 @@ export default function Chat() {
                     <div className="text-center text-[11px] text-text-muted font-medium tracking-wide">{time}</div>
                   )}
                   {msg.system ? (
-                    <SystemEventCard card={msg.card ?? null} fallback={msg.body} withCard={newestEvent.has(msg.id)} />
+                    <SystemEventCard card={msg.card ? (evidence ? withoutActions(msg.card) : msg.card) : null} fallback={msg.body} withCard={newestEvent.has(msg.id)} />
                   ) : (
                     <div className={`flex items-start gap-2 ${msg.mine ? 'justify-end' : ''}`}>
                       {!msg.mine && renderAvatar(false)}
                       {msg.card
-                        ? <ChatCardView card={msg.card} mine={msg.mine} fallback={msg.body} />
+                        ? <ChatCardView card={evidence ? withoutActions(msg.card) : msg.card} mine={msg.mine} fallback={msg.body} />
                         : msg.link
                           ? renderLinkBubble(msg.link)
                           : renderBubble(msg.kind, msg.body, msg.fileUrl, msg.mine)}
@@ -874,7 +915,7 @@ export default function Chat() {
 
       {/* A thread this viewer may read but not write in (staff on a
           merchant↔customer order thread): no composer, and it says why. */}
-      {readOnly && (
+      {readOnly && !evidence && (
         <div data-chat-read-only className="shrink-0 border-t border-border-subtle/70 bg-surface px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] text-center text-xs text-text-secondary">
           {loc(
             'للقراءة فقط — هذه محادثة بين الزبون والمتجر، وكل اطلاع عليها يُسجَّل.',
@@ -885,7 +926,7 @@ export default function Chat() {
       )}
 
       {/* Bottom Area */}
-      {!readOnly && (
+      {!readOnly && !evidence && (
       <div data-chat-composer className="relative z-10 shrink-0 bg-surface border-t border-border-subtle/70 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
 
         {/* Emoji choices remain part of the composer flow. They can expand

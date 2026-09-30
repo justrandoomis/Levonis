@@ -202,6 +202,29 @@ test('every code the table translates is one the server can actually emit', () =
     // Media everywhere in the store page (P5, storefront §4.7): a slot's weight
     // cap, the poster a video needs, a library file still in use.
     'worker/routes/storeLayout.ts',
+    // Moderation V2 (0162, §9.6): an account's standing at every write door
+    // (USER_RESTRICTED / USER_SUSPENDED / USER_BANNED), and the desk's and the
+    // appeal door's refusals (MODERATION_*, APPEAL_*).
+    'worker/lib/userStatus.ts',
+    'worker/routes/adminModeration.ts',
+    // Parts as store products (Programme C C1, §B.3): the part facts' write gate
+    // (PART_SPEC_INVALID) and «من ليفونيس» (PART_NOT_ELIGIBLE, PART_ALREADY_IMPORTED).
+    'worker/lib/personalize/parts.ts',
+    'worker/routes/printParts.ts',
+    'worker/routes/merchantParts.ts',
+    // «التخصيص» (Programme C C1, §B.1, §B.8): the customer's doors and their
+    // configuration helper (PERSONALIZATION_UNAVAILABLE, CONFIG_*, DESIGN_*,
+    // QR_TARGET_INVALID, ROSTER_TOO_LARGE, BLUEPRINT_CHANGED), the builder and
+    // its store (BLUEPRINT_*), the compiler (BLUEPRINT_TOO_HEAVY and
+    // _MODEL_UNREADABLE as data) and the catalogue's write gate (PART_IN_USE,
+    // BLUEPRINT_AXIS_IN_USE).
+    'worker/routes/personalize.ts',
+    'worker/routes/merchantBlueprints.ts',
+    'worker/lib/personalize/access.ts',
+    'worker/lib/personalize/blueprints.ts',
+    'worker/lib/personalize/configs.ts',
+    'worker/lib/personalize/compile.ts',
+    'worker/routes/merchantCatalog.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

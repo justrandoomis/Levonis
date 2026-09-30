@@ -18,6 +18,7 @@ import type { UploadKind } from './attachments';
 import type { Env } from './types';
 import { onPublicBoard } from './communityRequests';
 import { liveVerdictForUser } from './printMatchingStore';
+import { assertDesignAssetDoor } from './personalize/access';
 
 export const MiB = 1024 * 1024;
 export const GiB = 1024 * MiB;
@@ -33,6 +34,11 @@ export const UPLOAD_PURPOSES = [
   'request', 'product_file',
   'order_update',
   'offer',
+  // A person's own logo or photo for a personalised product (Programme C C1):
+  // consumed by POST /api/personalize/configs (`mintConfig`) and served back to
+  // its owner alone by GET /api/personalize/assets/<key>. Session-only — the
+  // whole-body route has no placement for it.
+  'design_asset',
 ] as const;
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
 
@@ -45,6 +51,7 @@ export const SESSION_PURPOSES = [
   'post', 'community', 'chat', 'request', 'product_file',
   'order_update',
   'offer',
+  'design_asset',
 ] as const;
 export type SessionPurpose = (typeof SESSION_PURPOSES)[number];
 
@@ -59,6 +66,8 @@ export const KEY_PURPOSES: ReadonlySet<string> = new Set([
   'order_update',
   // An offer's files (0159, §9.5): the composer sends the keys back as `files: [{key}]`.
   'offer',
+  // A design picture (C1): the studio puts the key in the configuration's `logo` / `photo` choice.
+  'design_asset',
 ]);
 
 const SESSION_KINDS: Record<SessionPurpose, readonly UploadKind[]> = {
@@ -71,6 +80,8 @@ const SESSION_KINDS: Record<SessionPurpose, readonly UploadKind[]> = {
   order_update: ['image'],
   // What an offer may show the customer: a photo of a sample, a PDF quote, a model.
   offer: ['image', 'model', 'document'],
+  // A logo or a photo to put on a personalised product — pictures only (never SVG: no such extension).
+  design_asset: ['image'],
 };
 
 /** May a session for this purpose carry this kind of file? */
@@ -243,6 +254,19 @@ export async function assertUploadEntity(
       return requestId;
     }
 
+    /**
+     * A DESIGN PICTURE (Programme C C1): the entity is the PRODUCT being
+     * personalised, and the door opens exactly where its consumer does — a
+     * blueprint asking for a logo or a photo that personalisation is on for
+     * (or a previewer's draft), within the owner's `design_quota` files
+     * (worker/lib/personalize/access.ts). Everything else is one 404.
+     */
+    case 'design_asset': {
+      const productId = entity(true);
+      await assertDesignAssetDoor(db, user, productId);
+      return productId;
+    }
+
     /** A product file sits under the store owner's prefix; a named product must be the store's own. */
     case 'product_file': {
       const store = await storeForUser(db, user.id);
@@ -348,6 +372,11 @@ export function placementFor(
     // the merchant's own, which is what `ownedFileObject` checks.
     case 'offer':
       return { visibility: 'private', domain: 'merchants', entityId: ctx.userId, kind: 'offers' };
+    // `users/<uid>/design-assets/<id>.<ext>`, PRIVATE — the person's own; the
+    // product it was uploaded for is on the ledger row (`entity_id`). `/files`
+    // answers 404; GET /api/personalize/assets/<key> serves it to its owner.
+    case 'design_asset':
+      return { visibility: 'private', domain: 'users', entityId: ctx.userId, kind: 'design-assets' };
   }
 }
 
@@ -401,6 +430,8 @@ export function quotaBytesFor(quotas: UploadQuotas, purpose: string): number | n
     purpose === 'offer' ? quotas.request_gb :
     // An order update's photos too (review 2026-09-30): a job's pictures, bounded per owner like the rest.
     purpose === 'order_update' ? quotas.request_gb :
+    // A person's design pictures (C1): their own quota, 0.5 GiB unless the owner sets it.
+    purpose === 'design_asset' ? (quotas.design_asset_gb ?? 0.5) :
     null;
   return gb === null ? null : Math.max(0, gb) * GiB;
 }

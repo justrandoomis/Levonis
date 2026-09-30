@@ -385,6 +385,13 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   // ---- resumable uploads (0156, §9.4) ----------------------------------------
   { table: 'upload_sessions', column: 'object_key', kind: 'text', why: 'the key a resumable upload is assembling or has just completed (0156); protected until the session row is swept' },
   { table: 'print_analyses', column: 'file_key', kind: 'text', why: 'the analysed model object' },
+  // ---- «التخصيص» (0164, Programme C C1) --------------------------------------
+  { table: 'product_blueprints', column: 'mesh_key', kind: 'text', why: 'a published revision\'s public mesh (merchants/<uid>/public/bp/…lvm.gz), served by /files to every customer who opens the studio' },
+  { table: 'product_blueprints', column: 'draft_mesh_key', kind: 'text', why: 'the merchant\'s full draft mesh (private merchants/<uid>/blueprints/…lvm.gz), served by the builder\'s owner door' },
+  { table: 'product_blueprints', column: 'source_keys', kind: 'json', why: 'the ≤ 12 private product-file keys a blueprint mesh was compiled from (recompiling needs them)' },
+  { table: 'product_blueprints', column: 'look', kind: 'json', why: 'the look card: its public poster (merchants/<uid>/public/bp/…-look-…)' },
+  { table: 'product_blueprints', column: 'photo_keys', kind: 'json', why: 'the product pictures a (photo-only) blueprint shows, captured at save — the public read builds its photo URLs from them' },
+  { table: 'design_configs', column: 'spec', kind: 'json', why: 'a customer\'s configuration: their own logo / photo keys (users/<uid>/design-assets/…)' },
 
   // ---- outbound ----------------------------------------------------------
   { table: 'tg_admin_notifications', column: 'photo_key', kind: 'text', why: 'the picture a Telegram admin notification sends' },
@@ -576,6 +583,15 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'coupons.transport_methods': 'enum words',
   'coupons.delivery_methods': 'enum words',
   'community_products.delivery_methods': 'enum words',
+  'community_products.part_spec': 'a part\'s facts (kind, shape, millimetres, volts, levonis:<id>#<option> source) — its pictures live in `images`, never here',
+  // -- «التخصيص» (0164): the blueprint's words and numbers; its keys are the sources above
+  'product_blueprints.spec': 'the normalised blueprint: region/area/slot ids, millimetres, palette keys, product media and part ids — never a key (pictures resolve through photo_keys)',
+  'product_blueprints.private_json': 'the merchant\'s private quality notes and notes — words only',
+  'product_blueprints.parts': 'the compiled parts\' names, triangle counts, bboxes and volumes',
+  'product_blueprints.analysis': 'the compile\'s format, dimensions, snap, warnings and the draft mesh hash — never a key',
+  'product_blueprints.tags': 'closed tag words (occ:*, for:*, biz)',
+  'blueprint_part_refs.slot_key': 'a blueprint slot id',
+  'blueprint_part_refs.option_key': 'a slot option id',
   'products.shipping_methods': 'enum words',
   'products.payment_options': 'enum words',
   'products.preorder_transports': 'enum words',
@@ -677,6 +693,7 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   // -- words the wide net catches that are numbers, ids and labels ---------
   'community_merchants.badge': 'a tier label (`new`, `trusted`), not a picture',
   'community_merchants.badge_override': 'an admin override of that same label',
+  'community_merchants.badges_json': 'the explainable reputation badges (0163) — [{key, since, evidence}] of closed keys, days, counts and rates; never a picture',
   'policy_acceptances.document_id': 'a policy_documents id',
   'product_imports.payload_hash': 'a hash of the previewed payload, used to match confirm to preview',
   'warranty_receipts.receipt_no': 'a printed receipt number',

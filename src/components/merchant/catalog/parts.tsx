@@ -83,6 +83,7 @@ export function readRefusal(e: unknown, loc: Loc, fallback: string): { fields: R
     return { fields, message: '' };
   }
   if (e.code === 'STOCK_REQUIRED') return { fields: { stock: fieldErrorText('STOCK_REQUIRED', loc) }, message: '' };
+  if (e.code === 'PART_SPEC_INVALID') return { fields: { [String((e.details as { path?: unknown } | undefined)?.path ?? 'part_spec')]: fieldErrorText('PART_SPEC_INVALID', loc) }, message: '' };
   if (e.code === 'MEDIA_NOT_OWNED') return { fields: { media: fieldErrorText('MEDIA_NOT_OWNED', loc) }, message: '' };
   return { fields: {}, message: catalogRefusalText(e.code, loc, e.message || fallback) };
 }

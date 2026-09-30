@@ -610,8 +610,107 @@ export const SETTING_DEFAULTS = {
    * `file_objects.byte_size` over the owner's LIVE rows with that purpose. A
    * purpose absent here has no quota beyond the per-file ceiling.
    */
-  uploadQuotas: { post_gb: 2, product_file_gb: 5, request_gb: 1 } as UploadQuotas,
+  uploadQuotas: { post_gb: 2, product_file_gb: 5, request_gb: 1, design_asset_gb: 0.5 } as UploadQuotas,
+  /**
+   * «التخصيص» — THE SWITCH FOR BLUEPRINTS, CONFIGURATIONS AND THE STUDIO
+   * (Programme C C1; docs/LEVO_PROJECT_PROGRAMME.md §B.8). Everything ships
+   * DARK: while `enabled` is false every /api/personalize door and the
+   * merchant builder answer 404, except for a platform admin and — on the
+   * blueprint read — the product's own merchant (a private, no-store preview).
+   * `pilot_store_ids` open the store path (a pilot store's products and its
+   * builder), `pilot_user_ids` open it for a signed-in person. The other
+   * switches narrow what `enabled` opens (cart C3, create C4, groups and
+   * social C12, gift C6, market C16a, parts_levonis C3). The limits are the
+   * builder's (triangles a published mesh may carry, blueprints per store)
+   * and the customer's (names in a roster, design pictures kept).
+   *
+   * NOT in PUBLIC_SETTING_KEYS — the pilot ids would leak; the client learns
+   * the switches only through GET /api/personalize/status and /me.can.
+   * Written by PUT /api/admin/settings/customizationConfig through
+   * `normalizeCustomizationConfig` below, audited `admin.customization`.
+   */
+  customizationConfig: {
+    enabled: false,
+    cart: false,
+    create: false,
+    groups: false,
+    social: false,
+    gift: false,
+    market: false,
+    parts_levonis: false,
+    pilot_store_ids: [],
+    pilot_user_ids: [],
+    max_triangles: 60000,
+    max_blueprints_per_store: 200,
+    max_roster: 100,
+    design_quota: 300,
+  } as CustomizationConfig,
 };
+
+/** `customizationConfig` (Programme C C1, §B.8) — see SETTING_DEFAULTS above. */
+export interface CustomizationConfig {
+  enabled: boolean;
+  cart: boolean;
+  create: boolean;
+  groups: boolean;
+  social: boolean;
+  gift: boolean;
+  market: boolean;
+  parts_levonis: boolean;
+  pilot_store_ids: string[];
+  pilot_user_ids: string[];
+  max_triangles: number;
+  max_blueprints_per_store: number;
+  max_roster: number;
+  design_quota: number;
+}
+
+/** The bounds a stored `customizationConfig` number is clamped into (the engine's own caps where it has one). */
+export const CUSTOMIZATION_LIMITS = {
+  max_triangles: [1_000, 250_000],
+  max_blueprints_per_store: [1, 10_000],
+  max_roster: [1, 100],
+  design_quota: [0, 10_000],
+  pilot_ids: 500,
+} as const;
+
+/**
+ * THE ONE READING OF `customizationConfig` — on the way in (the admin PUT) and
+ * on every read (`normalizedSetting`). Merged over the defaults field by field:
+ * a switch is on only when it is literally `true`; a pilot list keeps only id
+ * strings (deduplicated, at most 500); a limit is a whole number clamped into
+ * CUSTOMIZATION_LIMITS, and anything else reads as its default.
+ */
+export function normalizeCustomizationConfig(value: unknown): CustomizationConfig {
+  const d = SETTING_DEFAULTS.customizationConfig;
+  const o: Record<string, unknown> = typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const flag = (k: keyof CustomizationConfig): boolean => (o[k] === undefined ? (d[k] as boolean) : o[k] === true);
+  const ids = (k: 'pilot_store_ids' | 'pilot_user_ids'): string[] =>
+    Array.isArray(o[k])
+      ? [...new Set((o[k] as unknown[]).filter((x): x is string => typeof x === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(x)))].slice(0, CUSTOMIZATION_LIMITS.pilot_ids)
+      : [...d[k]];
+  const whole = (k: 'max_triangles' | 'max_blueprints_per_store' | 'max_roster' | 'design_quota'): number => {
+    const [min, max] = CUSTOMIZATION_LIMITS[k];
+    const v = o[k];
+    return typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.trunc(v))) : d[k];
+  };
+  return {
+    enabled: flag('enabled'),
+    cart: flag('cart'),
+    create: flag('create'),
+    groups: flag('groups'),
+    social: flag('social'),
+    gift: flag('gift'),
+    market: flag('market'),
+    parts_levonis: flag('parts_levonis'),
+    pilot_store_ids: ids('pilot_store_ids'),
+    pilot_user_ids: ids('pilot_user_ids'),
+    max_triangles: whole('max_triangles'),
+    max_blueprints_per_store: whole('max_blueprints_per_store'),
+    max_roster: whole('max_roster'),
+    design_quota: whole('design_quota'),
+  };
+}
 
 export interface UploadLimits {
   image_mb: number;
@@ -627,6 +726,8 @@ export interface UploadQuotas {
   post_gb: number;
   product_file_gb: number;
   request_gb: number;
+  /** A person's own logos and photos for personalised products (purpose `design_asset`, C1); absent = the default 0.5. */
+  design_asset_gb?: number;
 }
 
 /**
@@ -775,6 +876,11 @@ function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeo
       if (k in merged && typeof v === 'number' && Number.isFinite(v) && v >= 0) merged[k] = v;
     }
     return merged as (typeof SETTING_DEFAULTS)[K];
+  }
+  // «التخصيص» (C1): clamped and merged over its defaults on every read, by
+  // the same function the admin PUT writes through.
+  if (key === 'customizationConfig') {
+    return normalizeCustomizationConfig(value) as (typeof SETTING_DEFAULTS)[K];
   }
   if (key === 'bnplPolicy' || key === 'proPriorityDelivery') {
     const object: Record<string, unknown> =
