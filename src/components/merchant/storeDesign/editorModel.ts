@@ -293,11 +293,13 @@ export function dataKey(layout: StoreLayout): string {
 }
 
 export function setHeader(layout: StoreLayout, variant: HeaderVariant): StoreLayout {
-  return { ...layout, header: { variant } };
+  // The notice line and its window (storefront L6) live beside the variant and survive a variant change.
+  return { ...layout, header: { ...layout.header, variant } };
 }
 
 export function setFooter(layout: StoreLayout, variant: FooterVariant): StoreLayout {
-  return { ...layout, footer: { variant } };
+  // The footer links (storefront L7) survive a variant change.
+  return { ...layout, footer: { ...layout.footer, variant } };
 }
 
 // -------------------------------------------------------------- validation

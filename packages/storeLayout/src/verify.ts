@@ -14,10 +14,12 @@
  *
  * Pure, so the builder can run the same walk over its draft.
  */
-import { BLOCKS, type BlockDef, type FieldSpec, type RefKind } from './blocks';
+import { BACKGROUND_MEDIA, BLOCKS, FOOTER_LINKS_SPEC, HEADER_FIELDS, type BlockDef, type FieldSpec, type RefKind } from './blocks';
 import { normalizeLayout, type LayoutIssue, type NormalizeOptions } from './normalize';
 import { NO_LINK, type LinkTarget, type MediaKind } from './refs';
 import type { StoreLayout } from './schema';
+
+export { renderableBlocks, scheduledNow, type RenderMode } from './normalize';
 
 export interface LayoutRefs {
   media: Array<{ key: string; kind: MediaKind }>;
@@ -29,13 +31,21 @@ export interface LayoutRefs {
 export interface RefRejects {
   /** Media keys that are not this owner's live uploads of the right kind. */
   media?: ReadonlySet<string>;
+  /**
+   * The ledger's `byte_size` per media key (storefront L5). A key heavier
+   * than the slot it sits in is dropped there with `media_too_heavy`; a key
+   * this map does not name (a legacy upload without a ledger row) is never
+   * too heavy.
+   */
+  bytes?: ReadonlyMap<string, number>;
   product?: ReadonlySet<string>;
   collection?: ReadonlySet<string>;
   coupon?: ReadonlySet<string>;
 }
 
 type Visit = {
-  media(key: string, kind: MediaKind, path: string): boolean;
+  /** `maxBytes` is the slot's cap, when it has one. */
+  media(key: string, kind: MediaKind, path: string, maxBytes: number | undefined): boolean;
   ref(kind: RefKind, id: string, path: string): boolean;
 };
 
@@ -47,7 +57,7 @@ function walkFields(specs: { readonly [k: string]: FieldSpec }, values: Record<s
     const v = values[key];
     switch (spec.t) {
       case 'media':
-        if (typeof v === 'string' && v && !visit.media(v, spec.kind, at)) values[key] = '';
+        if (typeof v === 'string' && v && !visit.media(v, spec.kind, at, spec.max_bytes)) values[key] = '';
         break;
       case 'ref':
         if (typeof v === 'string' && v && !visit.ref(spec.ref, v, at)) values[key] = '';
@@ -69,13 +79,86 @@ function walkFields(specs: { readonly [k: string]: FieldSpec }, values: Record<s
   }
 }
 
+/**
+ * The whole page: the header's notice link, the footer links, the background's
+ * two media slots (by the background's kind — storefront L4), then every block.
+ */
 function walk(layout: StoreLayout, visit: Visit): StoreLayout {
   const copy = JSON.parse(JSON.stringify(layout)) as StoreLayout;
+  walkFields(HEADER_FIELDS, copy.header as unknown as Record<string, unknown>, 'header', visit);
+  walkFields({ links: FOOTER_LINKS_SPEC }, copy.footer as unknown as Record<string, unknown>, 'footer', visit);
+  const bg = copy.background;
+  if (bg && bg.kind !== 'none') {
+    const slot = bg.kind === 'video' ? BACKGROUND_MEDIA.video : BACKGROUND_MEDIA.image;
+    if (bg.media && !visit.media(bg.media, slot.kind, 'background.media', slot.max_bytes)) bg.media = '';
+    if (bg.poster && !visit.media(bg.poster, 'image', 'background.poster', BACKGROUND_MEDIA.poster.max_bytes)) bg.poster = '';
+  }
   copy.blocks.forEach((block, i) => {
     const def: BlockDef = BLOCKS[block.type];
     walkFields(def.settings, block.settings as unknown as Record<string, unknown>, `blocks[${i}].settings`, visit);
   });
   return copy;
+}
+
+/** One media reference and the slot it sits in. */
+export interface MediaSlot {
+  key: string;
+  kind: MediaKind;
+  /** e.g. `blocks[2].settings.image`, `background.media`. */
+  path: string;
+  /** The block's id, or the page slot (`header`, `footer`, `background`). */
+  block_id: string;
+  max_bytes?: number;
+}
+
+const BLOCK_AT = /^blocks\[(\d+)\]/;
+
+/** Every media reference a (normalised) layout makes, slot by slot — a key once per slot it sits in. */
+export function mediaSlots(layout: StoreLayout): MediaSlot[] {
+  const out: MediaSlot[] = [];
+  walk(layout, {
+    media(key, kind, path, maxBytes) {
+      const m = BLOCK_AT.exec(path);
+      const block_id = m ? layout.blocks[Number(m[1])]?.id ?? path : path.split('.')[0];
+      out.push({ key, kind, path, block_id, ...(maxBytes ? { max_bytes: maxBytes } : {}) });
+      return true;
+    },
+    ref: () => true,
+  });
+  return out;
+}
+
+/** A slot whose key the ledger says is heavier than the slot allows (storefront L5). */
+export interface HeavyMedia extends MediaSlot {
+  size: number;
+  max: number;
+}
+
+/** The slots `dropLayoutRefs` would empty as `media_too_heavy`, with the figures the refusal names. */
+export function heavyMedia(layout: StoreLayout, bytes: ReadonlyMap<string, number>): HeavyMedia[] {
+  const out: HeavyMedia[] = [];
+  for (const slot of mediaSlots(layout)) {
+    const size = bytes.get(slot.key);
+    if (slot.max_bytes && size !== undefined && size > slot.max_bytes) out.push({ ...slot, size, max: slot.max_bytes });
+  }
+  return out;
+}
+
+/**
+ * THE POSTER RULE (storefront L3/L4): a hero video and a background video each
+ * need their still — it is what phones, reduced motion and the first paint
+ * show. Returns the path of every poster slot that is empty beside a video;
+ * publishing with any is refused (LAYOUT_POSTER_REQUIRED). The video BLOCK
+ * keeps its poster optional, as it always was.
+ */
+export function missingPosters(layout: StoreLayout): string[] {
+  const out: string[] = [];
+  const bg = layout.background;
+  if (bg && bg.kind === 'video' && bg.media && !bg.poster) out.push('background.poster');
+  layout.blocks.forEach((b, i) => {
+    if (b.type === 'hero' && b.settings.video && !b.settings.image) out.push(`blocks[${i}].settings.image`);
+  });
+  return out;
 }
 
 /** Every reference a (normalised) layout makes, each value once. */
@@ -96,8 +179,8 @@ export function collectLayoutRefs(layout: StoreLayout): LayoutRefs {
 
 /**
  * The layout without the rejected references, and an issue for each place one
- * was removed (`media_not_found`, `unknown_ref`) — then normalised again with
- * the same owner, whose own issues are appended.
+ * was removed (`media_not_found`, `media_too_heavy`, `unknown_ref`) — then
+ * normalised again with the same owner, whose own issues are appended.
  */
 export function dropLayoutRefs(
   layout: StoreLayout,
@@ -106,10 +189,17 @@ export function dropLayoutRefs(
 ): { layout: StoreLayout; issues: LayoutIssue[] } {
   const issues: LayoutIssue[] = [];
   const stripped = walk(layout, {
-    media(key, _kind, path) {
-      if (!reject.media?.has(key)) return true;
-      issues.push({ path, code: 'media_not_found', fatal: false });
-      return false;
+    media(key, _kind, path, maxBytes) {
+      if (reject.media?.has(key)) {
+        issues.push({ path, code: 'media_not_found', fatal: false });
+        return false;
+      }
+      const size = reject.bytes?.get(key);
+      if (maxBytes && size !== undefined && size > maxBytes) {
+        issues.push({ path, code: 'media_too_heavy', fatal: false });
+        return false;
+      }
+      return true;
     },
     ref(kind, id, path) {
       if (!reject[kind]?.has(id)) return true;

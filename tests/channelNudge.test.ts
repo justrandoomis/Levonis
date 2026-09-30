@@ -387,7 +387,8 @@ test('every inline sentence in the component is trilingual too', () => {
 
 test('the window is mounted after an order, a request and a ticket — and nowhere else', () => {
   const checkout = read('src/pages/Checkout.tsx');
-  const requests = read('src/pages/Requests.tsx');
+  // The request's own page (Phase 5, /requests/:id) is where a new request lands.
+  const requests = read('src/pages/community/Request.tsx');
   const support = read('src/pages/Support.tsx');
 
   // Checkout: inside the `placedOrder` success branch, so it cannot exist
@@ -506,7 +507,9 @@ test('publishing a request does not remount the window — one fetch, one answer
    * The fix is structural, so the assertion is structural: ONE return, with the
    * element in the same position in both branches.
    */
-  const source = read('src/pages/Requests.tsx');
+  // The request's own page (Phase 5): the wizard (editing) and the page are
+  // the two arms; the window sits after both.
+  const source = read('src/pages/community/Request.tsx');
   // Comments are stripped first: the note ABOVE the element quotes `{nudge}`
   // to explain itself, and an assertion that counted that would pass for the
   // very arrangement it is meant to forbid.
@@ -515,7 +518,7 @@ test('publishing a request does not remount the window — one fetch, one answer
   assert.equal(occurrences.length, 1, 'the window is rendered from exactly one place');
   // And that one place is AFTER the branch closes, so the instance survives the
   // board → detail transition rather than being torn down and rebuilt.
-  const branch = code.indexOf('{open ? (');
+  const branch = code.indexOf('{editing ? (');
   assert.ok(branch > 0, 'the two screens are one conditional inside one return');
   assert.ok(code.indexOf('{nudge}') > branch, 'the window sits outside the conditional, not in a arm of it');
   assert.doesNotMatch(code, /if \(open\)\s*\n\s*return \(/, 'the second early return is gone');

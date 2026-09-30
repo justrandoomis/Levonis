@@ -55,6 +55,7 @@ import { useHubStrings } from '../components/community/hub/strings';
 import { TAB_IDS, canonicalParams, resolveTab, type CommunityTab } from '../components/community/hub/tabs';
 import { useCommunityFeed, type CommunityFeed } from '../components/community/hub/useCommunityFeed';
 import { forgetHome } from '../components/community/hub/useHomeData';
+import { BoardRailFrame, boardRailRemembered, workshopHint } from '../components/community/hub/rails';
 import { communityHubApi, type CommunityProduct, type CommunityRequest, type CommunityStore } from '../components/community/hub/api';
 import { useSearchBox } from '../components/community/search/useSearchBox';
 
@@ -62,6 +63,8 @@ const ProjectsPanel = React.lazy(() => import('../components/community/hub/Proje
 const CreatorsPanel = React.lazy(() => import('../components/community/hub/CreatorsPanel'));
 /** The cross-entity search under the bar (Phase 3) — fetched the first time the box is focused. */
 const SearchOverlay = React.lazy(() => import('../components/community/search/SearchOverlay'));
+/** «طلبات تناسبك» (Phase 5d): the workshop's own board, leading a merchant's «لك» — a lazy chunk nobody else fetches. */
+const BoardRail = React.lazy(() => import('../components/community/hub/BoardRail'));
 
 /** The wizard, on the requests page. */
 const NEW_REQUEST_PATH = '/requests?view=new';
@@ -186,19 +189,27 @@ export default function Community() {
    */
   const userId = user?.id ?? null;
   const [me, setMe] = useState<MerchantMe | null>(null);
+  // Whether `me` has been ANSWERED yet — the first-paint workshop hint stands only until it is.
+  const [meAsked, setMeAsked] = useState(false);
   useEffect(() => {
     if (!userId) {
       setMe(null);
+      setMeAsked(true);
       return;
     }
+    setMeAsked(false);
     let alive = true;
     merchantApi
       .me()
       .then((d) => {
-        if (alive) setMe(d);
+        if (!alive) return;
+        setMe(d);
+        setMeAsked(true);
       })
       .catch(() => {
-        if (alive) setMe(null);
+        if (!alive) return;
+        setMe(null);
+        setMeAsked(true);
       });
     return () => {
       alive = false;
@@ -232,6 +243,32 @@ export default function Community() {
   else if (tab === 'creators') panel = <CreatorsPanel q={q} viewer={viewer} onClear={clearSearch} />;
   // «لك» and «أتابعهم» while a term is set: the projects search.
   else panel = <ProjectsPanel q={q} />;
+  /**
+   * «طلبات تناسبك» (Phase 5d, docs/COMMUNITY_ECOSYSTEM.md §9.5): a signed-in
+   * WORKSHOP's «لك» leads with the open requests its printers can make (GET
+   * /api/community/requests?for=me, hub/BoardRail.tsx). The frame is the same
+   * for every signed-in viewer, so `me` arriving later mounts the rail beside
+   * the issue instead of rebuilding it; the rail itself is fetched only for a
+   * workshop — or at once, on Back, for the viewer it led a moment ago. The
+   * issue's own print-requests section then keeps its plain title (`me` is
+   * not handed to it): it is the board's newest three, and «طلبات تناسبك»
+   * is the rail's.
+   */
+  if (tab === 'foryou' && !q && list !== 'products' && isAuthenticated) {
+    // Decided at FIRST paint where the device already knows (review 2026-09-30):
+    // the rail's frame is there before the issue paints, not pushed above it later.
+    const workshop = !!me?.store || boardRailRemembered(viewer) || (!meAsked && workshopHint(viewer));
+    panel = (
+      <div className="flex flex-col gap-8">
+        {workshop && (
+          <Suspense fallback={<BoardRailFrame />}>
+            <BoardRail viewer={viewer} me={me} />
+          </Suspense>
+        )}
+        <ForYouPanel viewer={viewer} me={null} composerLink={composerLink} tools={<ToolsSection />} />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-h-screen bg-canvas pb-28 text-text-primary">

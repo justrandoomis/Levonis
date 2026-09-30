@@ -34,6 +34,12 @@ export interface SaverState {
   conflictVersion: number | null;
   /** On `error`: the refusal code, when there was one. */
   errorCode: string | null;
+  /**
+   * The refusal's own `details` beside its code (review 2026-09-30): the
+   * figures of LAYOUT_MEDIA_TOO_HEAVY {size, max}, the paths of
+   * LAYOUT_POSTER_REQUIRED — without them the status line said «1 KB over 1 KB».
+   */
+  errorDetails?: Record<string, unknown> | null;
 }
 
 export interface SaveAnswer {
@@ -151,7 +157,7 @@ export class DraftSaver {
           const issues = Array.isArray(details.issues) ? (details.issues as LayoutIssue[]) : [];
           this.set({ status: 'blocked', issues, errorCode: code });
         } else {
-          this.set({ status: 'error', errorCode: code });
+          this.set({ status: 'error', errorCode: code, errorDetails: details });
         }
       }
     })();

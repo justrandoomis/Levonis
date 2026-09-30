@@ -26,7 +26,10 @@ import { ApiError } from './api';
 import { sha256OfBlob } from '../components/upload/sha256core';
 import type { HashWorkerMessage } from '../components/upload/sha256.worker';
 
-export type SessionPurpose = 'post' | 'community' | 'chat' | 'request' | 'product_file';
+export type SessionPurpose =
+  | 'post' | 'community' | 'chat' | 'request' | 'product_file' | 'order_update'
+  // An offer's files (0159, §9.5): private, under the merchant's prefix, keyed back to the offer composer.
+  | 'offer';
 
 /** Above this a file takes the session path; the whole-body route is for what fits in one request. */
 export const SESSION_THRESHOLD_BYTES = 8 * 1024 * 1024;

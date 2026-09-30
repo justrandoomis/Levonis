@@ -94,6 +94,13 @@ export function eventText(card: ChatCard | null, loc: Loc): string | null {
         disputed: loc('فُتح نزاع — المبلغ مجمّد حتى يقرّر فريق Levonis', 'A dispute was opened — the money is frozen until Levonis decides'),
         refunded: loc('قرّر فريق Levonis إعادة المبلغ للزبون', 'Levonis decided to refund the customer'),
         cancelled: loc('أُلغي الطلب وأُعيد المبلغ', 'The order was cancelled and refunded'),
+        // The order timeline's updates (0160, POST /orders/:id/updates) — one card each, in
+        // all three languages (D6; review 2026-09-30), in the notices' own Sorani words.
+        progress: loc('أضاف المتجر تحديثًا على التنفيذ', 'The store posted a progress update', 'فرۆشگاکە نوێکردنەوەیەکی لەسەر جێبەجێکردنەکە دانا'),
+        photo: loc('أرسل المتجر صورة من التنفيذ', 'The store shared a photo of the work', 'فرۆشگاکە وێنەیەکی کارەکەی نارد'),
+        ready: loc('الطلب جاهز للتسليم', 'The order is ready for handover', 'داواکارییەکە ئامادەیە بۆ ڕادەستکردن'),
+        note: loc('أضاف المتجر ملاحظة على الطلب', 'The store added a note to the order', 'فرۆشگاکە تێبینییەکی لەسەر داواکارییەکە زیاد کرد'),
+        modification_request: loc('طلب الزبون تعديلًا على الطلب', 'The customer asked for a change', 'کڕیارەکە داوای گۆڕانکاری لە داواکارییەکە کرد'),
       } as Record<string, string>
     )[e] ?? null;
   }

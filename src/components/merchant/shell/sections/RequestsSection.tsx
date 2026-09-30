@@ -51,7 +51,7 @@ export default function RequestsSection() {
         </>
       )}
       {communityAccess?.may_enter !== false && (
-        <MyOffersList requestHref={(id) => mainHref(`/requests?request=${encodeURIComponent(id)}`)} />
+        <MyOffersList requestHref={(id) => mainHref(`/requests/${encodeURIComponent(id)}`)} />
       )}
       <CustomOrdersTab />
     </div>

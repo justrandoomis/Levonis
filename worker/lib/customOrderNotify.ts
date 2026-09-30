@@ -49,9 +49,14 @@ async function orderFacts(env: Env, orderId: string): Promise<OrderFacts | null>
     .first<OrderFacts>();
 }
 
-/** Where the customer reads their custom order: the request page, with its order card. */
+/**
+ * Where the customer reads their custom order: the request page, with its
+ * order card — its own address (`/requests/<id>`, §9.5 item 7), not the old
+ * board address, which only redirects there after loading the board's code
+ * (review 2026-09-30).
+ */
 export function customOrderCustomerLink(requestId: string): string {
-  return `/requests?request=${encodeURIComponent(requestId)}`;
+  return `/requests/${encodeURIComponent(requestId)}`;
 }
 
 /** «١٢ أكتوبر» / «12 Oct» — the date only, in UTC (the clock the sweep runs on). */

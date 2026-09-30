@@ -77,8 +77,10 @@ test('the page: a search box that keeps the keyboard, «المزيد» that says
   assert.match(page, /return \(\s*<div className="space-y-3">\s*\{search\}\s*\{body\}/, 'one frame for every state');
   assert.match(page, /setMoreError\(true\);/);
   assert.doesNotMatch(page, /\} catch \{\s*setCursor\(null\);/, 'a failed page no longer hides the rest of the board');
-  assert.match(page, /label=\{loc\('المحافظة', 'Governorate', 'پارێزگا'\)\}/);
-  assert.match(page, /\{open && formatDate\(current\.expires_at, lang\) && \(/);
+  // The request's place and dates are on its own page (Phase 5, /requests/:id).
+  const detail = code('src/pages/community/Request.tsx');
+  assert.match(detail, /<Fact label=\{s\.governorate\}/);
+  assert.match(detail, /\{open && formatDate\(current\.expires_at, lang\) && \(/);
   assert.match(page, /\{offersLabel\(r\.offer_count, lang\)\}/, '«5 عروض», not «5 عرض»');
   const board = code('worker/routes/marketplace.ts');
   assert.match(board, /WHERE \$\{requestBoardVisible\('\?1', '\?2'\)\}/, 'the community page\'s own rule');

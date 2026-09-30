@@ -15,20 +15,24 @@ import { storeForUser } from './merchantAuth';
 import { assertMayWriteInThread } from '../routes/chats';
 import { getSetting, type UploadLimits, type UploadQuotas } from './settings';
 import type { UploadKind } from './attachments';
+import type { Env } from './types';
+import { onPublicBoard } from './communityRequests';
+import { liveVerdictForUser } from './printMatchingStore';
 
 export const MiB = 1024 * 1024;
 export const GiB = 1024 * MiB;
 
 /**
- * Every purpose either door accepts. `offer` and `order_update` are NOT here
- * yet: no route consumes a key under merchants/<uid>/offers/ or
- * orders/<id>/updates/ (the offer composer has no upload), so a session for
- * them would only produce private objects nothing can reach; they return
- * with their consumers (§9.5).
+ * Every purpose either door accepts. A purpose is listed here only once a
+ * route CONSUMES its keys: `order_update` returned with the order timeline
+ * (worker/routes/communityOrderTimeline.ts, §9.5) — a photo of the work in
+ * progress, filed under the order and read back by its two parties.
  */
 export const UPLOAD_PURPOSES = [
   'receipt', 'avatar', 'chat', 'product', 'community', 'support', 'complaint', 'post',
   'request', 'product_file',
+  'order_update',
+  'offer',
 ] as const;
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
 
@@ -37,7 +41,11 @@ export const SIMPLE_UPLOAD_PURPOSES = ['receipt', 'avatar', 'chat', 'product', '
 export type SimpleUploadPurpose = (typeof SIMPLE_UPLOAD_PURPOSES)[number];
 
 /** What a resumable session may be opened for. */
-export const SESSION_PURPOSES = ['post', 'community', 'chat', 'request', 'product_file'] as const;
+export const SESSION_PURPOSES = [
+  'post', 'community', 'chat', 'request', 'product_file',
+  'order_update',
+  'offer',
+] as const;
 export type SessionPurpose = (typeof SESSION_PURPOSES)[number];
 
 /**
@@ -45,7 +53,13 @@ export type SessionPurpose = (typeof SESSION_PURPOSES)[number];
  * store's product media, a product file row). A chat or a request answers
  * with its own row instead, so the completed session hands those no key.
  */
-export const KEY_PURPOSES: ReadonlySet<string> = new Set(['post', 'community', 'product_file']);
+export const KEY_PURPOSES: ReadonlySet<string> = new Set([
+  'post', 'community', 'product_file',
+  // An order update's photo: the merchant posts the key back to the timeline.
+  'order_update',
+  // An offer's files (0159, §9.5): the composer sends the keys back as `files: [{key}]`.
+  'offer',
+]);
 
 const SESSION_KINDS: Record<SessionPurpose, readonly UploadKind[]> = {
   post: ['image', 'video', 'model', 'document'],
@@ -53,6 +67,10 @@ const SESSION_KINDS: Record<SessionPurpose, readonly UploadKind[]> = {
   chat: ['image', 'video', 'document'],
   request: ['image', 'model', 'document'],
   product_file: ['image', 'model', 'document'],
+  // A picture of the work in progress — what «photo» on the timeline means.
+  order_update: ['image'],
+  // What an offer may show the customer: a photo of a sample, a PDF quote, a model.
+  offer: ['image', 'model', 'document'],
 };
 
 /** May a session for this purpose carry this kind of file? */
@@ -64,6 +82,13 @@ export interface UploadActor {
   id: string;
   role: string;
 }
+
+/**
+ * The order states in which the workshop still writes on the order's
+ * timeline (worker/routes/communityOrderTimeline.ts) — and so the states in
+ * which the `order_update` upload door opens.
+ */
+export const ORDER_UPDATE_LIVE_STATES: ReadonlySet<string> = new Set(['funded', 'in_progress', 'merchant_marked_delivered']);
 
 /** A request may carry this many attachments (the marketplace's own cap). */
 export const MAX_FILES_PER_REQUEST = 6;
@@ -165,6 +190,59 @@ export async function assertUploadEntity(
       return requestId;
     }
 
+    /**
+     * AN ORDER UPDATE'S PHOTO BELONGS TO THE ORDER (0160, §9.5): the entity is
+     * a community order id, and the door opens exactly where its only
+     * consumer does (review 2026-09-30): POST /orders/:id/updates kind
+     * `photo` is written by the WORKSHOP'S OWNER while the order is live
+     * (`ORDER_UPDATE_LIVE_STATES`). The customer's `modification_request`
+     * takes no file, and a closed order takes no update, so an upload there
+     * could only ever be an orphan nothing references. A stranger, and the
+     * customer, get the 404 every order door gives; a closed order is
+     * ORDER_UPDATE_TOO_LATE, the POST's own answer.
+     */
+    case 'order_update': {
+      const orderId = entity(true);
+      const order = await db
+        .prepare(
+          `SELECT o.state FROM community_orders o JOIN community_merchants m ON m.id = o.merchant_id
+            WHERE o.id = ?1 AND m.user_id = ?2 LIMIT 1`
+        )
+        .bind(orderId, user.id)
+        .first<{ state: string }>();
+      if (!order) throw notFound('Order not found');
+      if (!ORDER_UPDATE_LIVE_STATES.has(order.state)) {
+        throw new HttpError(409, `An order that is ${order.state} takes no more updates`, 'ORDER_UPDATE_TOO_LATE', { state: order.state });
+      }
+      return orderId;
+    }
+
+    /**
+     * AN OFFER'S FILE IS FILED UNDER THE REQUEST IT QUOTES (0159, §9.5): the
+     * entity is a request id, and the uploader must be a workshop that may
+     * quote it — the author of an offer or a saved draft on it, or a merchant
+     * whose LIVE verdict for the job is eligible (the same authority the offer
+     * route asks, `liveVerdictForUser`). Anyone else — no store, the request's
+     * own customer, a workshop the job does not fit — is answered 404, so the
+     * door confirms nothing about the request.
+     */
+    case 'offer': {
+      const requestId = entity(true);
+      const store = await storeForUser(db, user.id);
+      if (!store) throw notFound('Request not found');
+      const r = await db
+        .prepare('SELECT id, customer_id, state, visibility, expires_at FROM community_requests WHERE id = ?')
+        .bind(requestId)
+        .first<{ id: string; customer_id: string; state: string; visibility: string; expires_at: string | null }>();
+      if (!r || r.state === 'draft' || r.customer_id === user.id) throw notFound('Request not found');
+      if (await offerAuthorOnRequest(db, requestId, store.merchant.id)) return requestId;
+      if (!onPublicBoard(r)) throw notFound('Request not found');
+      // The matcher reads only the database, so the binding alone is its Env.
+      const live = await liveVerdictForUser({ DB: db } as unknown as Env, requestId, user.id);
+      if (!live?.verdict.eligible) throw notFound('Request not found');
+      return requestId;
+    }
+
     /** A product file sits under the store owner's prefix; a named product must be the store's own. */
     case 'product_file': {
       const store = await storeForUser(db, user.id);
@@ -180,6 +258,29 @@ export async function assertUploadEntity(
       return productId;
     }
   }
+}
+
+/**
+ * Has this workshop an offer (live or superseded) or a saved draft on this
+ * request? The author of either may keep adding files to it whatever the
+ * verdict says today. The drafts table arrives with 0159; behind it there are
+ * no drafts.
+ */
+async function offerAuthorOnRequest(db: D1Database, requestId: string, merchantId: string): Promise<boolean> {
+  const offer = await db
+    .prepare(
+      `SELECT 1 AS x FROM community_offers
+        WHERE request_id = ?1 AND merchant_id = ?2 AND state IN ('pending','superseded','accepted') LIMIT 1`
+    )
+    .bind(requestId, merchantId)
+    .first();
+  if (offer) return true;
+  const draft = await db
+    .prepare('SELECT 1 AS x FROM community_offer_drafts WHERE request_id = ?1 AND merchant_id = ?2 LIMIT 1')
+    .bind(requestId, merchantId)
+    .first()
+    .catch(() => null);
+  return !!draft;
 }
 
 /** The room left on a request for one more attachment — the marketplace's cap of six. */
@@ -239,8 +340,24 @@ export function placementFor(
       return { visibility: 'private', domain: 'requests', entityId: ctx.userId, kind: 'files' };
     case 'product_file':
       return { visibility: 'private', domain: 'merchants', entityId: ctx.userId, kind: 'product-files' };
+    case 'order_update':
+      return { visibility: 'private', domain: ORDER_UPDATE_DOMAIN, entityId: ctx.entityId, kind: 'updates' };
+    // `merchants/<uid>/offers/<id>.<ext>`, private: the request the file quotes
+    // is recorded on the ledger row (`file_objects.entity_id`) rather than in
+    // the key — `buildMediaKey` admits one segment per part, and the prefix is
+    // the merchant's own, which is what `ownedFileObject` checks.
+    case 'offer':
+      return { visibility: 'private', domain: 'merchants', entityId: ctx.userId, kind: 'offers' };
   }
 }
+
+/**
+ * The prefix an order update's photo lives under: `community-orders/<orderId>/
+ * updates/<id>.<ext>` (§9.5). PRIVATE — `/files/*` knows no such prefix and
+ * answers 404; the order's own file route serves it to its two parties.
+ */
+export const ORDER_UPDATE_DOMAIN: MediaDomain = 'community-orders';
+export const orderUpdateKeyPrefix = (orderId: string) => `community-orders/${orderId}/updates/`;
 
 /** The visibility a session key was opened under, read back from its shape (the sweep has only the key). */
 export function visibilityForKey(key: string): MediaVisibility {
@@ -280,6 +397,10 @@ export function quotaBytesFor(quotas: UploadQuotas, purpose: string): number | n
     purpose === 'post' ? quotas.post_gb :
     purpose === 'product_file' ? quotas.product_file_gb :
     purpose === 'request' ? quotas.request_gb :
+    // An offer's files share the request files' ceiling: both are job attachments, bounded per owner.
+    purpose === 'offer' ? quotas.request_gb :
+    // An order update's photos too (review 2026-09-30): a job's pictures, bounded per owner like the rest.
+    purpose === 'order_update' ? quotas.request_gb :
     null;
   return gb === null ? null : Math.max(0, gb) * GiB;
 }

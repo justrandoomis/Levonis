@@ -1662,7 +1662,7 @@ function MatchesPanel() {
                 >
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <a
-                      href={`/requests?request=${encodeURIComponent(m.request_id)}`}
+                      href={`/requests/${encodeURIComponent(m.request_id)}`}
                       className="text-zinc-200 text-[12px] font-semibold truncate underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                     >
                       {m.title}

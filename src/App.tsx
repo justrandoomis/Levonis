@@ -311,6 +311,9 @@ const CommunityProject = React.lazy(() => import('./pages/community/Project'));
 const CommunityProjectComposer = React.lazy(() => import('./pages/community/ProjectComposer'));
 const CommunityCreator = React.lazy(() => import('./pages/community/Creator'));
 const CommunitySaved = React.lazy(() => import('./pages/community/Saved'));
+// A print request's own page (Phase 5, §9.5): /requests/:id. The old
+// /requests?request=<id> address is redirected there by pages/Requests.tsx.
+const CommunityRequest = React.lazy(() => import('./pages/community/Request'));
 const Orders = React.lazy(() => import('./pages/Orders'));
 const OrderDetail = React.lazy(() => import('./pages/OrderDetail'));
 const Community = React.lazy(() => import('./pages/Community'));
@@ -942,6 +945,7 @@ function AppContent() {
               under the card (closedExtra) so they can still confirm or
               cancel — /api/marketplace/orders is outside the wall. */}
           <Route path="/requests" element={<CommunityGate closedExtra={<RunningCommunityOrders />}><Requests /></CommunityGate>} />
+          <Route path="/requests/:id" element={<CommunityGate closedExtra={<RunningCommunityOrders />}><CommunityRequest /></CommunityGate>} />
           <Route path="/merchant/start" element={<ProtectedRoute><MerchantStart /></ProtectedRoute>} />
           {/* Behind the gate too: the page is a list of COMMUNITY stores and it
               reads /api/community/followed, which the wall refuses. Without

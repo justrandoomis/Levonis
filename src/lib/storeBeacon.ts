@@ -61,3 +61,39 @@ export function trackStoreEvent(store: string | null | undefined, event: StoreEv
     /* never on the shopper's path */
   }
 }
+
+/**
+ * «سرعة متجري» (P4): schedules the speed reporter (./storeVitals.ts, ~1 KB)
+ * for the page load that shows `store` — fetched after `load`, once the
+ * browser is idle, with a dynamic import that is never a store page's static
+ * closure (tests/bundleBudget.test.ts). Save-Data (or prefers-reduced-data)
+ * skips it; Do Not Track / GPC are honoured inside it; the Worker never counts
+ * the owner or a bot. Once started it is not stopped on unmount: it sends ONE
+ * beacon for this page load when the page is hidden, in-shop navigation or not.
+ *
+ * ONE COPY for both store pages (review 2026-09-30): the same effect written
+ * into Storefront.tsx and StorefrontProduct.tsx cost the store pages' 47 KB
+ * budget about 270 B twice. Each page runs `useEffect(() =>
+ * scheduleStoreVitals(storeId), [storeId])`; the return value is the effect's
+ * cleanup (nothing starts after the page has gone).
+ */
+export function scheduleStoreVitals(store: string | null | undefined): () => void {
+  const none = () => {};
+  try {
+    if (!store || (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData || window.matchMedia?.('(prefers-reduced-data: reduce)').matches) return none;
+  } catch {
+    return none;
+  }
+  let live = true;
+  const start = () => {
+    if (live) void import('./storeVitals').then((m) => live && m.startStoreVitals(store), () => {});
+  };
+  // Safari has no idle callback: a short timer after `load` instead.
+  const later = () => ('requestIdleCallback' in window ? window.requestIdleCallback(start, { timeout: 5000 }) : setTimeout(start, 2000));
+  if (document.readyState === 'complete') later();
+  else window.addEventListener('load', later, { once: true });
+  return () => {
+    live = false;
+    window.removeEventListener('load', later);
+  };
+}

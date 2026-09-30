@@ -20,13 +20,18 @@
  * It is idempotent: normalising its own output changes nothing and reports
  * nothing (tests/storeLayoutSchema.test.ts).
  */
-import { BLOCKS, blockMax, isBlockType, type BlockDef, type BlockType, type FieldSpec } from './blocks';
-import { isSocialProvider, linkTarget, mediaKey, own, refId, socialHandle, type SocialItem } from './refs';
+import {
+  BACKGROUND_MEDIA, BLOCKS, blockMax, FOOTER_LINKS_SPEC, HEADER_FIELDS, isBlockType, NOTICE_MAX,
+  type BlockDef, type BlockType, type FieldSpec,
+} from './blocks';
+import { isSocialProvider, linkTarget, mediaKey, own, refId, socialHandle, type LinkTarget, type SocialItem } from './refs';
 import { cleanText, EMPTY_TEXT, isBlank, type LocalizedText } from './text';
 import { isThemeName, THEME_PRESETS, TOKEN_KEYS, TOKEN_VALUES, type ThemeName, type ThemeTokens } from './tokens';
 import {
+  BACKGROUND_DIMS, BACKGROUND_KINDS, defaultBackground, defaultFooter, defaultHeader,
   FOOTER_VARIANTS, HEADER_VARIANTS, MAX_BLOCKS, MAX_LAYOUT_BYTES, SCHEMA_VERSION,
-  type FooterVariant, type HeaderVariant, type StoreBlock, type StoreLayout, type Visibility,
+  type BackgroundDim, type BackgroundKind, type BlockSchedule, type FooterLink, type FooterVariant, type HeaderVariant,
+  type StoreBackground, type StoreBlock, type StoreFooter, type StoreHeader, type StoreLayout, type Visibility,
 } from './schema';
 
 export type IssueCode =
@@ -51,7 +56,9 @@ export type IssueCode =
   | 'dropped_item'
   // server write path (worker/lib/storeLayout.ts)
   | 'unknown_ref'
-  | 'media_not_found';
+  | 'media_not_found'
+  /** The ledger says the file is heavier than its slot's `max_bytes` (storefront L5). */
+  | 'media_too_heavy';
 
 const FATAL: ReadonlySet<IssueCode> = new Set<IssueCode>([
   'not_an_object', 'unsupported_schema_version', 'payload_too_large', 'unsafe_link', 'invalid_media', 'foreign_media',
@@ -385,7 +392,8 @@ function normalizeBlock(raw: unknown, index: number, counts: Map<BlockType, numb
   const hiddenRaw = own(raw, 'hidden');
   if (hiddenRaw !== undefined && typeof hiddenRaw !== 'boolean') report(ctx, join(path, 'hidden'), 'invalid_value');
 
-  reportUnknownKeys(ctx, raw, ['id', 'type', 'variant', 'settings', 'visibility', 'hidden'], path);
+  reportUnknownKeys(ctx, raw, ['id', 'type', 'variant', 'settings', 'visibility', 'hidden', 'schedule'], path);
+  const schedule = normalizeSchedule(own(raw, 'schedule'), join(path, 'schedule'), ctx);
   return {
     id,
     type,
@@ -393,7 +401,31 @@ function normalizeBlock(raw: unknown, index: number, counts: Map<BlockType, numb
     settings,
     visibility: normalizeVisibility(own(raw, 'visibility'), join(path, 'visibility'), ctx),
     hidden: hiddenRaw === true,
+    ...(schedule ? { schedule } : {}),
   } as StoreBlock;
+}
+
+/**
+ * A block's schedule (storefront L8): two ISO instants, either blank. An end
+ * that is not after the start is dropped with an issue — a window that can
+ * never open is a mistake, not a hide (the merchant has `hidden` for that).
+ * Returns null when neither bound is set, so an unscheduled block carries no
+ * `schedule` key at all.
+ */
+function normalizeSchedule(v: unknown, path: string, ctx: Ctx): BlockSchedule | null {
+  if (v === undefined || v === null) return null;
+  if (!isObject(v)) {
+    report(ctx, path, 'invalid_value');
+    return null;
+  }
+  const from = normalizeField({ t: 'date' }, own(v, 'from'), join(path, 'from'), ctx) as string;
+  let until = normalizeField({ t: 'date' }, own(v, 'until'), join(path, 'until'), ctx) as string;
+  if (from && until && Date.parse(until) <= Date.parse(from)) {
+    report(ctx, join(path, 'until'), 'invalid_value');
+    until = '';
+  }
+  reportUnknownKeys(ctx, v, ['from', 'until'], path);
+  return from || until ? { from, until } : null;
 }
 
 // ------------------------------------------------------------------ layout
@@ -422,14 +454,75 @@ function normalizeTokens(v: unknown, theme: ThemeName, ctx: Ctx): ThemeTokens {
   return out;
 }
 
-function normalizeVariantBox<T extends string>(v: unknown, allowed: readonly T[], fallback: T, path: string, ctx: Ctx): { variant: T } {
-  if (v === undefined) return { variant: fallback };
+/**
+ * The header box: its variant, the notice line and where the notice goes
+ * (storefront L6), and the optional window the notice shows in. A window
+ * whose end is not after its start loses the end, with an issue.
+ */
+function normalizeHeader(v: unknown, ctx: Ctx): StoreHeader {
+  if (v === undefined) return defaultHeader();
   if (!isObject(v)) {
-    report(ctx, path, 'invalid_value');
-    return { variant: fallback };
+    report(ctx, 'header', 'invalid_value');
+    return defaultHeader();
   }
-  reportUnknownKeys(ctx, v, ['variant'], path);
-  return { variant: pick(own(v, 'variant'), allowed, fallback, join(path, 'variant'), ctx) };
+  const variant = pick<HeaderVariant>(own(v, 'variant'), HEADER_VARIANTS, 'overlay', 'header.variant', ctx);
+  const notice = normalizeText({ max: NOTICE_MAX }, own(v, 'notice'), 'header.notice', ctx);
+  const notice_link = normalizeField(HEADER_FIELDS.notice_link, own(v, 'notice_link'), 'header.notice_link', ctx) as LinkTarget;
+  const from = normalizeField({ t: 'date' }, own(v, 'notice_from'), 'header.notice_from', ctx) as string;
+  let until = normalizeField({ t: 'date' }, own(v, 'notice_until'), 'header.notice_until', ctx) as string;
+  if (from && until && Date.parse(until) <= Date.parse(from)) {
+    report(ctx, 'header.notice_until', 'invalid_value');
+    until = '';
+  }
+  reportUnknownKeys(ctx, v, ['variant', 'notice', 'notice_link', 'notice_from', 'notice_until'], 'header');
+  return {
+    variant,
+    notice,
+    notice_link,
+    ...(from ? { notice_from: from } : {}),
+    ...(until ? { notice_until: until } : {}),
+  };
+}
+
+/** The footer box: its variant and up to MAX_FOOTER_LINKS labelled links (storefront L7). */
+function normalizeFooter(v: unknown, ctx: Ctx): StoreFooter {
+  if (v === undefined) return defaultFooter();
+  if (!isObject(v)) {
+    report(ctx, 'footer', 'invalid_value');
+    return defaultFooter();
+  }
+  const variant = pick<FooterVariant>(own(v, 'variant'), FOOTER_VARIANTS, 'minimal', 'footer.variant', ctx);
+  const links = normalizeField(FOOTER_LINKS_SPEC, own(v, 'links'), 'footer.links', ctx) as FooterLink[];
+  reportUnknownKeys(ctx, v, ['variant', 'links'], 'footer');
+  return { variant, links };
+}
+
+/**
+ * The page background (storefront L4). The media slot's KIND follows
+ * `background.kind` — an image key under `kind: 'video'` is not a video and
+ * is refused as `invalid_media` like any wrong-kind key — and a poster is
+ * only kept for a video (it is the still phones and reduced motion see). Under
+ * `kind: 'none'` both slots are blanked without an issue: a merchant switching
+ * the background off keeps nothing behind it.
+ */
+function normalizeBackground(v: unknown, ctx: Ctx): StoreBackground {
+  if (v === undefined) return defaultBackground();
+  if (!isObject(v)) {
+    report(ctx, 'background', 'invalid_value');
+    return defaultBackground();
+  }
+  const base = defaultBackground();
+  const kind = pick<BackgroundKind>(own(v, 'kind'), BACKGROUND_KINDS, base.kind, 'background.kind', ctx);
+  const dim = pick<BackgroundDim>(own(v, 'dim'), BACKGROUND_DIMS, base.dim, 'background.dim', ctx);
+  const phones = normalizeField({ t: 'bool', d: base.phones }, own(v, 'phones'), 'background.phones', ctx) as boolean;
+  let media = '';
+  let poster = '';
+  if (kind !== 'none') {
+    media = normalizeField(kind === 'video' ? BACKGROUND_MEDIA.video : BACKGROUND_MEDIA.image, own(v, 'media'), 'background.media', ctx) as string;
+  }
+  if (kind === 'video') poster = normalizeField(BACKGROUND_MEDIA.poster, own(v, 'poster'), 'background.poster', ctx) as string;
+  reportUnknownKeys(ctx, v, ['kind', 'media', 'poster', 'dim', 'phones'], 'background');
+  return { kind, media, poster, dim, phones };
 }
 
 export function emptyLayout(theme: ThemeName = 'classic'): StoreLayout {
@@ -437,8 +530,9 @@ export function emptyLayout(theme: ThemeName = 'classic'): StoreLayout {
     schema_version: SCHEMA_VERSION,
     theme,
     tokens: { ...THEME_PRESETS[theme] },
-    header: { variant: 'overlay' },
-    footer: { variant: 'minimal' },
+    header: defaultHeader(),
+    footer: defaultFooter(),
+    background: defaultBackground(),
     blocks: [],
   };
 }
@@ -471,8 +565,9 @@ export function normalizeLayout(input: unknown, opts: NormalizeOptions): Normali
     schema_version: SCHEMA_VERSION,
     theme,
     tokens: normalizeTokens(own(input, 'tokens'), theme, ctx),
-    header: normalizeVariantBox<HeaderVariant>(own(input, 'header'), HEADER_VARIANTS, 'overlay', 'header', ctx),
-    footer: normalizeVariantBox<FooterVariant>(own(input, 'footer'), FOOTER_VARIANTS, 'minimal', 'footer', ctx),
+    header: normalizeHeader(own(input, 'header'), ctx),
+    footer: normalizeFooter(own(input, 'footer'), ctx),
+    background: normalizeBackground(own(input, 'background'), ctx),
     blocks: [],
   };
 
@@ -488,7 +583,7 @@ export function normalizeLayout(input: unknown, opts: NormalizeOptions): Normali
     });
   }
 
-  reportUnknownKeys(ctx, input, ['schema_version', 'theme', 'tokens', 'header', 'footer', 'blocks'], '');
+  reportUnknownKeys(ctx, input, ['schema_version', 'theme', 'tokens', 'header', 'footer', 'background', 'blocks'], '');
   if (utf8Bytes(JSON.stringify(layout)) > MAX_LAYOUT_BYTES) report(ctx, '', 'payload_too_large');
   return { layout, issues: ctx.issues, ok: !ctx.fatal };
 }
@@ -522,7 +617,31 @@ export function applyTheme(layout: StoreLayout, theme: ThemeName): StoreLayout {
   return { ...layout, theme, tokens: { ...THEME_PRESETS[theme] } };
 }
 
-/** The blocks a visitor can see at all (not hidden, visible on some width). */
-export function renderableBlocks(layout: StoreLayout): StoreBlock[] {
-  return layout.blocks.filter((b) => !b.hidden && (b.visibility.mobile || b.visibility.desktop));
+/**
+ * `live` is the public page: a scheduled block (storefront L8) counts only
+ * inside its window. `preview` is the builder, the server's data planner and
+ * every «is there anything on this page» question: the schedule is ignored,
+ * so a page whose blocks are all still to come is published, not empty.
+ */
+export type RenderMode = 'live' | 'preview';
+
+/** Is this block inside its schedule at `nowIso`? An unscheduled block always is. */
+export function scheduledNow(block: StoreBlock, nowIso: string): boolean {
+  const s = block.schedule;
+  if (!s) return true;
+  const now = Date.parse(nowIso);
+  if (!Number.isFinite(now)) return true;
+  if (s.from && Date.parse(s.from) > now) return false;
+  if (s.until && Date.parse(s.until) <= now) return false;
+  return true;
+}
+
+/**
+ * The blocks a visitor can see at all (not hidden, visible on some width) —
+ * and, in `live` mode, inside their schedule at `nowIso` (the caller's clock;
+ * the moment of the call when omitted).
+ */
+export function renderableBlocks(layout: StoreLayout, nowIso?: string, mode: RenderMode = 'preview'): StoreBlock[] {
+  const now = mode === 'live' ? nowIso ?? new Date().toISOString() : null;
+  return layout.blocks.filter((b) => !b.hidden && (b.visibility.mobile || b.visibility.desktop) && (now === null || scheduledNow(b, now)));
 }

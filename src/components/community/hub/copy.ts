@@ -111,10 +111,35 @@ const UNITS: ReadonlyArray<[Intl.RelativeTimeFormatUnit, number]> = [
   ['minute', 60],
 ];
 
-/** «قبل 3 ساعات», «أمس», «الآن» — the language's own words, from Intl. */
+/**
+ * «پێش 3 کاتژمێر» — WHEN, IN SORANI. Intl carries no Sorani relative time (it
+ * answers «yesterday», «-٣ h»), so `timeAgo` writes Sorani itself, in the
+ * notification bell's words (src/components/notifications/NotificationBell.tsx).
+ * ONE rule for every Sorani reader of the community (review 2026-09-30: the
+ * discussion and the request page's «last update» printed Arabic — «قبل
+ * ساعتين» — beside the timeline sheet's «پێش 1 کاتژمێر» for the same event).
+ */
+export function soraniAgo(iso: string, now = Date.now()): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '';
+  const min = Math.floor((now - t) / 60_000);
+  // A clock a few seconds ahead of the server must not print «پێش -1».
+  if (min < 1) return 'ئێستا';
+  if (min < 60) return `پێش ${min} خولەک`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `پێش ${h} کاتژمێر`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return 'دوێنێ';
+  if (d < 30) return `پێش ${d} ڕۆژ`;
+  const mo = Math.floor(d / 30);
+  return mo < 12 ? `پێش ${mo} مانگ` : `پێش ${Math.floor(mo / 12)} ساڵ`;
+}
+
+/** «قبل 3 ساعات», «أمس», «الآن» — the language's own words: Intl's for Arabic and English, `soraniAgo` for Sorani. */
 export function timeAgo(iso: string | null | undefined, lang: HubLang, now = Date.now()): string {
   const t = iso ? Date.parse(iso) : NaN;
   if (!Number.isFinite(t)) return '';
+  if (lang === 'ckb') return soraniAgo(String(iso), now);
   const seconds = Math.round((t - now) / 1000);
   const rtf = new Intl.RelativeTimeFormat(dateLocale(lang), { numeric: 'auto' });
   for (const [unit, size] of UNITS) {

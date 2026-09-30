@@ -47,7 +47,8 @@ test('every card is a link to a real page', () => {
   assert.match(store, /aria-pressed=\{!!m\.following\}/, 'the follow toggle says its state');
 
   const request = code('src/components/community/hub/RequestCard.tsx');
-  assert.match(request, /to=\{`\/requests\?request=\$\{encodeURIComponent\(r\.id\)\}`\}/, 'a request opens its own page');
+  assert.match(request, /to=\{`\/requests\/\$\{encodeURIComponent\(r\.id\)\}`\}/, 'a request opens its own page — its own address, not the board\'s redirect');
+  assert.doesNotMatch(request, /requests\?request=\$/, 'no card goes through the board\'s redirect');
 
   const parts = code('src/components/community/hub/parts.tsx');
   assert.match(parts, /target="_blank" rel="noopener noreferrer"/, 'a shop on its own subdomain opens in its own tab, without an opener');
@@ -123,6 +124,11 @@ test('times are the language\'s own words, and a bad date says nothing', () => {
   assert.match(timeAgo('2026-09-28T09:00:00.000Z', 'ar', now), /3/, 'Latin digits, as every date in the app');
   assert.equal(timeAgo('not a date', 'ar', now), '');
   assert.equal(timeAgo(null, 'en', now), '');
+  // Sorani is written in Sorani — Intl has none, and a ckb page printed «قبل ساعتين» (review 2026-09-30) —
+  // with the timeline's own rule and rounding, so the request page's «last update» and its sheet agree.
+  assert.equal(timeAgo('2026-09-28T09:00:00.000Z', 'ckb', now), 'پێش 3 کاتژمێر');
+  assert.equal(timeAgo('2026-09-27T12:00:00.000Z', 'ckb', now), 'دوێنێ');
+  assert.equal(timeAgo('2026-09-28T11:59:30.000Z', 'ckb', now), 'ئێستا');
   assert.match(shortDate('2026-10-05', 'en'), /5 Oct/);
   assert.equal(shortDate('', 'ar'), '');
 });
@@ -211,4 +217,144 @@ test('every word of the home exists in Arabic, English and real Sorani', () => {
   }
   assert.ok(same <= Math.ceil(keys.length / 10), `${same} Sorani strings are the Arabic pasted across`);
   assert.ok(sorani >= Math.floor(keys.length * 0.9), `only ${sorani} of ${keys.length} Sorani strings carry a Sorani letter`);
+});
+
+// ------------------------------------------------ «طلبات تناسبك» (Phase 5d)
+//
+// The workshop's own board leads a MERCHANT's «لك» (GET /api/community/requests
+// ?for=me, hub/BoardRail.tsx): mounted by the page for a signed-in viewer who
+// runs a store — or, on Back, the viewer it led a moment ago — lazily, and
+// hidden the moment /api/merchant/me says there is no workshop.
+
+// The language provider reads `levo_lang`; the renders below draw Arabic.
+(globalThis as { localStorage?: unknown }).localStorage ??= {
+  getItem: (k: string) => (k === 'levo_lang' ? 'ar' : null),
+  setItem: () => undefined,
+  removeItem: () => undefined,
+};
+const { createElement } = await import('react');
+const { renderToStaticMarkup } = await import('react-dom/server');
+const { MemoryRouter } = await import('react-router-dom');
+const { AuthProvider } = await import('../src/AuthContext');
+const { LanguageProvider } = await import('../src/LanguageContext');
+const { WalletProvider } = await import('../src/WalletContext');
+const { CurrencyProvider } = await import('../src/CurrencyContext');
+const { default: BoardRail, BOARD_RAIL_SIZE, BOARD_ALL_PATH, BOARD_PREFS_PATH } = await import('../src/components/community/hub/BoardRail');
+const { BOARD_RAIL_CACHE, boardRailRemembered } = await import('../src/components/community/hub/rails');
+const { writePageCache, dropPageCache } = await import('../src/lib/pageCache');
+const { offersV2Api } = await import('../src/components/community/requests/api');
+
+type RailMe = Parameters<typeof BoardRail>[0]['me'];
+const merchantMe = { eligible: true, tier: 'pro', store: { id: 'st_1', slug: 'eveprints', name: 'Eve Prints' } } as unknown as RailMe;
+const memberMe = { eligible: false, tier: 'free', store: null } as unknown as RailMe;
+const boardRow = (i: number) => ({
+  id: `req_${i}`,
+  title: `حامل شاشة ${i}`,
+  description: 'أحتاجه خلال أسبوع.',
+  category: null,
+  quantity: 1,
+  material: 'PLA',
+  color: '',
+  dimensions: '',
+  budget_iqd: null,
+  deadline: null,
+  governorate: 'baghdad',
+  delivery_pref: '',
+  state: 'open',
+  offer_count: i,
+  created_at: new Date(Date.now() - i * 60_000).toISOString(),
+  expires_at: null,
+  customer_name: null,
+  file_count: 0,
+  revision: 1,
+  customer_notes: '',
+  status: 'open',
+  customer_username: null,
+  match_score: 80,
+});
+const rail = (me: RailMe, viewer = 'u_eve') =>
+  renderToStaticMarkup(
+    createElement(AuthProvider, {
+      children: createElement(LanguageProvider, {
+        children: createElement(WalletProvider, {
+          children: createElement(CurrencyProvider, { children: createElement(MemoryRouter, null, createElement(BoardRail, { viewer, me })) }),
+        }),
+      }),
+    })
+  );
+
+test('«طلبات تناسبك»: the page mounts the rail for a signed-in workshop only, lazily, and the issue keeps its plain title', () => {
+  const page = code('src/pages/Community.tsx');
+  assert.match(page, /const BoardRail = React\.lazy\(\(\) => import\('\.\.\/components\/community\/hub\/BoardRail'\)\);/, 'a guest or a customer never downloads it');
+  assert.match(page, /if \(tab === 'foryou' && !q && list !== 'products' && isAuthenticated\) \{/);
+  // Decided at first paint where the device knows (review 2026-09-30), and the frame reserved while the chunk loads.
+  assert.match(page, /const workshop = !!me\?\.store \|\| boardRailRemembered\(viewer\) \|\| \(!meAsked && workshopHint\(viewer\)\);/);
+  assert.match(page, /\{workshop && \(\s*<Suspense fallback=\{<BoardRailFrame \/>\}>\s*<BoardRail viewer=\{viewer\} me=\{me\} \/>/);
+  assert.match(page, /<ForYouPanel viewer=\{viewer\} me=\{null\} composerLink=\{composerLink\} tools=\{<ToolsSection \/>\} \/>/, 'one «طلبات تناسبك» on the page — the rail\'s');
+  const src = code('src/components/community/hub/BoardRail.tsx');
+  assert.match(src, /offersV2Api\s*\.boardForMe\('', BOARD_RAIL_SIZE\)/);
+  assert.match(src, /<RequestCard request=\{boardCard\(r\)\} \/>/, 'the card the requests tab draws');
+});
+
+test('«طلبات تناسبك»: the reserved frame IS the rail\'s loading state — the same head and skeleton — so the swap moves nothing', async () => {
+  dropPageCache(BOARD_RAIL_CACHE);
+  const { BoardRailFrame } = await import('../src/components/community/hub/rails');
+  const frame = renderToStaticMarkup(createElement(LanguageProvider, { children: createElement(BoardRailFrame) }));
+  const waiting = rail(merchantMe);
+  const body = (h: string) => h.slice(h.indexOf('<div class="mb-3'), h.lastIndexOf('</section>'));
+  // The frame's «الكل» is inert text (the frame is aria-hidden); everything else is the same markup.
+  const inert = (h: string) => h.replace(/<a [^>]*>(.*?)<\/a>/s, '$1').replace(/<span class="-me-2[^"]*">/, '').replace(/<svg.*?<\/svg>/gs, '').replace(/<span>|<\/span>/g, '');
+  assert.equal(inert(body(frame)), inert(body(waiting)));
+  assert.match(frame, /aria-hidden="true"/);
+  assert.doesNotMatch(frame, /<a /, 'nothing to tab to inside a hidden frame');
+});
+
+test('«طلبات تناسبك»: nothing for a member without a store; the head and a skeleton for a workshop whose board is on its way', () => {
+  dropPageCache(BOARD_RAIL_CACHE);
+  assert.equal(rail(memberMe), '', 'hidden for a non-merchant');
+  const waiting = rail(merchantMe);
+  assert.match(waiting, /data-community-board-rail=""/);
+  assert.match(waiting, /<h2 id="community-s-board"[^>]*>طلبات تناسبك<\/h2>/);
+  assert.ok(waiting.includes('لورشتك') && waiting.includes('طلبات مفتوحة تستطيع طابعاتك تنفيذها الآن.'));
+  assert.match(waiting, /aria-busy="true"/, 'the skeleton says it is loading');
+  assert.match(waiting, new RegExp(`href="${BOARD_ALL_PATH.replace(/[?/]/g, '\\$&')}"`), '«الكل» opens the whole board');
+  assert.doesNotMatch(waiting, /data-community-request=/);
+});
+
+test('«طلبات تناسبك»: the remembered board paints at once, as the requests tab\'s cards; an empty board says so and offers the preferences', () => {
+  writePageCache(BOARD_RAIL_CACHE, { viewer: 'u_eve', rows: [boardRow(1), boardRow(2)], total: 2 });
+  assert.equal(boardRailRemembered('u_eve'), true);
+  assert.equal(boardRailRemembered('u_other'), false, 'another viewer never sees this one\'s board');
+  const h = rail(merchantMe);
+  assert.deepEqual([...h.matchAll(/data-community-request="([^"]+)"/g)].map((m) => m[1]), ['req_1', 'req_2']);
+  assert.ok(h.includes('href="/requests/req_1"'), 'a card opens its request — at its own address, not the board\'s redirect');
+  assert.match(h, /class="relative grid w-72 shrink-0 snap-start"/, 'a rail cell the card fills — positioned, so its sr-only words stay inside the rail');
+  // Before /api/merchant/me answers, the remembered board is shown as it was.
+  assert.match(rail(null), /data-community-request="req_1"/);
+  // …but never to a viewer it was not remembered for.
+  assert.doesNotMatch(rail(merchantMe, 'u_other'), /data-community-request=/);
+  writePageCache(BOARD_RAIL_CACHE, { viewer: 'u_eve', rows: [], total: 0 });
+  const empty = rail(merchantMe);
+  assert.match(empty, /data-community-board-empty/);
+  assert.ok(empty.includes('لا طلبات تناسب ورشتك الآن. نُعلمك حين يصل طلب تستطيع تنفيذه.'));
+  assert.ok(empty.includes(`href="${BOARD_PREFS_PATH}"`), 'the request preferences, one tap away');
+  assert.equal(BOARD_PREFS_PATH, '/merchant/printers#preferences');
+  dropPageCache(BOARD_RAIL_CACHE);
+});
+
+test('«طلبات تناسبك» asks the server for THIS workshop\'s board: `?for=me`, a rail\'s few rows', async () => {
+  const asked: string[] = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    asked.push(String(input));
+    return Response.json({ success: true, requests: [], next_cursor: null, total: 0, for: 'me' });
+  }) as typeof fetch;
+  try {
+    const page = await offersV2Api.boardForMe('', BOARD_RAIL_SIZE);
+    assert.deepEqual(page.requests, []);
+  } finally {
+    globalThis.fetch = real;
+  }
+  assert.equal(asked.length, 1);
+  assert.match(asked[0], /^\/api\/community\/requests\?for=me&limit=6$/);
 });

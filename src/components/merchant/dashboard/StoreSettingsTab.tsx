@@ -33,6 +33,18 @@ import { useConfirm } from '../../ui/ConfirmDialog';
 import { merchantRefusal } from '../shell/refusal';
 import { AccentSample } from '../AccentSample';
 import { Link } from 'react-router-dom';
+// «ملف الورشة» (Phase 5d): the workshop's own section, its own save.
+import { useContext } from 'react';
+import { Card as SurfaceCard } from '../../ui/Card';
+import { Field, Textarea } from '../../ui/Field';
+import { NumberInput } from '../../ui/NumberInput';
+import { Button } from '../../ui/Button';
+import { ErrorState } from '../../ui/AsyncStates';
+import { refusalText } from '../../../lib/refusalStrings';
+import { merchantHref } from '../../../lib/merchantRoutes';
+import { WorkspaceContext } from '../shell/context';
+import { offersV2Api, type RequestPrefsV2 } from '../../community/requests/api';
+import { fillWorkshop, useWorkshopStrings, workshopLang, type WorkshopStrings } from './strings';
 import {
   LIMITS,
   fieldErrorFromRefusal,
@@ -750,6 +762,11 @@ export function StoreSettingsTab({
         </Btn>
       </div>
 
+      {/* «ملف الورشة» (Phase 5d, §9.5): the workshop's intro and usual
+          turnaround, with the facts its printers decide — its own save,
+          outside the form's, like everything below. */}
+      <WorkshopProfileCard />
+
       {/* The store's link, its QR code, the card it unfurls as and the app a
           customer installs (W2-D) — its own actions, outside the form's save. */}
       <ShareStore key={shareKey} />
@@ -1022,5 +1039,248 @@ function SlugCard({ currentSlug, url, onChanged }: { currentSlug: string; url: s
       </div>
       {confirmDialog}
     </Card>
+  );
+}
+
+// ------------------------------------------------------ «ملف الورشة» (Phase 5d)
+
+/**
+ * «ملف الورشة» (docs/COMMUNITY_ECOSYSTEM.md §9.5): the workshop's own words
+ * and figure beside the store's — `workshop_intro` (≤ 300 characters, shown on
+ * the store page) and `turnaround_days` (1–60, or unstated: a ranking signal,
+ * never a filter), written through PUT /api/merchant/request-prefs. The
+ * technologies and the largest build are the SERVER's, derived from the
+ * active printers on every printer, stock and prefs write; they are shown
+ * read-only, with the doors to where they do change.
+ *
+ * THAT PUT KEEPS WHAT IT IS NOT TOLD (worker/routes/merchantPrinters.ts,
+ * review 2026-09-30): a key the body does not name keeps its stored value,
+ * for every column. So `workshopPayload` sends the two fields this section
+ * owns and NOTHING else — sending the filters back «as read» rewrote the
+ * whole row from a read that could be stale (the printers screen saving in
+ * another tab), and could lift the owner's pause — and never the derived
+ * pair, which the server recomputes and no client may set.
+ */
+export const WORKSHOP_INTRO_MAX = 300;
+export const TURNAROUND_MIN = 1;
+export const TURNAROUND_MAX = 60;
+
+export interface WorkshopForm {
+  intro: string;
+  turnaround: number | null;
+}
+
+/** The PUT body: the two workshop fields as edited — and only them (the server keeps every key it is not sent). */
+export function workshopPayload(_prefs: RequestPrefsV2, form: WorkshopForm) {
+  return {
+    turnaround_days: form.turnaround,
+    // The server keeps it whitespace-collapsed; the form compares what will be kept.
+    workshop_intro: form.intro.replace(/\s+/g, ' ').trim(),
+  };
+}
+
+/** «FDM · ريزن» — the printers' technologies, in the reader's words. */
+export function technologyLine(list: readonly string[], s: WorkshopStrings): string {
+  return list.map((t) => (t === 'fdm' ? 'FDM' : t === 'resin' ? s.resin : t)).join(' · ');
+}
+
+/**
+ * «256 × 256 × 300 مم», or '' while no printer states all three sides. The
+ * figure is a left-to-right island (LRI … PDI) inside the sentence: in Arabic
+ * «x × y × z» would otherwise run backwards, and the unit stays the
+ * sentence's own.
+ */
+export function buildLine(b: RequestPrefsV2['max_build_mm'] | null | undefined, s: WorkshopStrings): string {
+  const x = Math.round(Number(b?.x) || 0);
+  const y = Math.round(Number(b?.y) || 0);
+  const z = Math.round(Number(b?.z) || 0);
+  return x > 0 && y > 0 && z > 0 ? fillWorkshop(s.buildValue, { size: `\u2066${x} × ${y} × ${z}\u2069` }) : '';
+}
+
+/** The three doors to where the derived facts change: the printers, the stock, the request preferences. */
+export function workshopDoors(): Array<{ id: 'printers' | 'stock' | 'prefs'; to: string }> {
+  return [
+    { id: 'printers', to: merchantHref.printers() },
+    { id: 'stock', to: `${merchantHref.printers()}#stock` },
+    { id: 'prefs', to: `${merchantHref.printers()}#preferences` },
+  ];
+}
+
+export function WorkshopProfileForm({
+  prefs,
+  hrefFor = (path) => path,
+  saved = false,
+  onSaved,
+}: {
+  prefs: RequestPrefsV2;
+  /** A workspace path as this host serves it (`/admin/…` on the store's own subdomain). */
+  hrefFor?: (path: string) => string;
+  /** The last save landed (the parent re-read the prefs and remounted this form). */
+  saved?: boolean;
+  onSaved?: () => void;
+}) {
+  const { lang } = useLanguage();
+  const s = useWorkshopStrings();
+  const base: WorkshopForm = { intro: prefs.workshop_intro ?? '', turnaround: prefs.turnaround_days ?? null };
+  const [form, setForm] = useState<WorkshopForm>(base);
+  const [turnaroundOk, setTurnaroundOk] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<{ field: 'intro' | 'turnaround' | null; text: string } | null>(null);
+  const dirty = form.intro.replace(/\s+/g, ' ').trim() !== base.intro || form.turnaround !== base.turnaround;
+  const tech = technologyLine(prefs.technologies ?? [], s);
+  const build = buildLine(prefs.max_build_mm, s);
+  const doorWord = { printers: s.doorPrinters, stock: s.doorStock, prefs: s.doorPrefs };
+
+  const save = async () => {
+    if (!dirty || !turnaroundOk || saving) return;
+    setSaving(true);
+    setProblem(null);
+    try {
+      await offersV2Api.saveRequestPrefs(workshopPayload(prefs, form));
+      onSaved?.();
+    } catch (e) {
+      const code = e instanceof ApiError ? e.code ?? '' : '';
+      setProblem({
+        field: code === 'PREFS_TURNAROUND_INVALID' ? 'turnaround' : code === 'PREFS_INTRO_TOO_LONG' ? 'intro' : null,
+        text: refusalText(code, workshopLang(lang), s.failed),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4" data-workshop-profile>
+      <div>
+        <Field label={s.intro} hint={s.introHint} optional error={problem?.field === 'intro' ? problem.text : undefined}>
+          <Textarea
+            rows={3}
+            maxLength={WORKSHOP_INTRO_MAX}
+            value={form.intro}
+            onChange={(e) => setForm((f) => ({ ...f, intro: e.target.value }))}
+            placeholder={s.introPlaceholder}
+            dir="auto"
+            data-workshop-intro
+          />
+        </Field>
+        <p className="mt-1 text-end text-[11px] tabular-nums text-text-muted" data-workshop-intro-count>
+          {fillWorkshop(s.count, { n: form.intro.length, max: WORKSHOP_INTRO_MAX })}
+        </p>
+      </div>
+
+      <Field label={s.turnaround} hint={s.turnaroundHint} optional error={problem?.field === 'turnaround' ? problem.text : undefined}>
+        <NumberInput
+          kind="number"
+          decimals={0}
+          min={TURNAROUND_MIN}
+          max={TURNAROUND_MAX}
+          unit={s.days}
+          value={form.turnaround}
+          onValueChange={(v, ok) => {
+            setTurnaroundOk(ok);
+            setForm((f) => ({ ...f, turnaround: ok ? v : f.turnaround }));
+          }}
+          data-workshop-turnaround
+        />
+      </Field>
+
+      {/* WHAT THE PRINTERS SAY — read-only: no field, no control, only the doors. */}
+      <div className="rounded-xl border border-border-subtle bg-surface-raised p-3" data-workshop-derived>
+        <p className="text-[13px] font-semibold text-text-primary">{s.fromPrinters}</p>
+        <p className="mt-0.5 text-[12px] leading-relaxed text-text-muted">{s.fromPrintersHint}</p>
+        <dl className="mt-2 space-y-1.5 text-[12.5px]">
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-text-muted">{s.technologies}</dt>
+            <dd className="font-semibold text-text-primary" data-workshop-technologies>
+              {tech || s.noPrinters}
+            </dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-text-muted">{s.build}</dt>
+            <dd className="font-semibold tabular-nums text-text-primary" data-workshop-build>
+              {build || '—'}
+            </dd>
+          </div>
+        </dl>
+        {/* The row, not each link, pulls back by the links' own padding — per link, each
+            one overlapped the one before it (review 2026-09-30). */}
+        <div className="-ms-2 mt-2 flex flex-wrap gap-x-1 gap-y-0.5">
+          {workshopDoors().map((d) => (
+            <Link
+              key={d.id}
+              to={hrefFor(d.to)}
+              data-workshop-door={d.id}
+              className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-[12.5px] font-semibold text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              {doorWord[d.id]}
+              <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 rtl:-scale-x-100" />
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="primary" loading={saving} loadingLabel={s.saving} disabled={!dirty || !turnaroundOk} onClick={save} data-workshop-save>
+          {s.save}
+        </Button>
+        <p aria-live="polite" className="text-[12px]">
+          {problem && !problem.field ? (
+            <span role="alert" className="text-danger">
+              {problem.text}
+            </span>
+          ) : dirty ? (
+            <span className="text-warning">{s.unsaved}</span>
+          ) : saved ? (
+            <span className="inline-flex items-center gap-1 text-success" data-workshop-saved>
+              <Check aria-hidden="true" className="h-3.5 w-3.5" />
+              {s.saved}
+            </span>
+          ) : null}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Reads the prefs, draws the form, and reads them again after a save — the form then shows what was kept. */
+export function WorkshopProfileCard() {
+  const s = useWorkshopStrings();
+  const ws = useContext(WorkspaceContext);
+  const [prefs, setPrefs] = useState<RequestPrefsV2 | null>(null);
+  const [failed, setFailed] = useState<unknown>(null);
+  const [saved, setSaved] = useState(false);
+  const load = useCallback(() => {
+    setFailed(null);
+    return offersV2Api
+      .requestPrefs()
+      .then((d) => setPrefs(d.prefs))
+      .catch((e: unknown) => setFailed(e));
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return (
+    <SurfaceCard id="workshop-profile" title={s.title} description={s.description}>
+      {prefs ? (
+        <WorkshopProfileForm
+          key={`${prefs.workshop_intro}|${prefs.turnaround_days ?? ''}`}
+          prefs={prefs}
+          hrefFor={ws ? ws.href : undefined}
+          saved={saved}
+          onSaved={() => {
+            setSaved(true);
+            void load();
+          }}
+        />
+      ) : failed ? (
+        <ErrorState compact error={failed} onRetry={() => void load()} />
+      ) : (
+        <div className="space-y-2" aria-busy="true">
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-11 w-1/2 rounded-xl" />
+        </div>
+      )}
+    </SurfaceCard>
   );
 }

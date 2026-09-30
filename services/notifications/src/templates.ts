@@ -105,7 +105,7 @@ export function requestPublishedInApp(merchantId: string, requestId: string, eve
     title_en: 'A print request suits your shop',
     body_ar: '',
     body_en: '',
-    link: `/requests?request=${requestId}`,
+    link: `/requests/${encodeURIComponent(requestId)}`,
     entity_type: 'request',
     entity_id: requestId,
     eventKey,

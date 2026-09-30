@@ -41,7 +41,7 @@ import SellerConflictDialog, { type SellerConflict } from '../components/merchan
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 import PremiumMemberBadge from '../components/merchant/PremiumMemberBadge';
 import { useStore } from '../StoreContext';
-import { trackStoreEvent } from '../lib/storeBeacon';
+import { scheduleStoreVitals, trackStoreEvent } from '../lib/storeBeacon';
 import StoreTheme from '../components/storefront/StoreTheme';
 import '../components/storefront/styles';
 import type { StorefrontStore } from '../components/storefront/types';
@@ -118,6 +118,10 @@ export default function StorefrontProduct() {
       alive = false;
     };
   }, [user, storeId, slug]);
+
+  // «سرعة متجري» (P4): the speed reporter, after `load` and idle — one shared copy (src/lib/storeBeacon.ts).
+  useEffect(() => scheduleStoreVitals(storeId), [storeId]);
+
   // Nothing to fetch on a host already answered "unknown" or "unavailable".
   const [loading, setLoading] = useState(!hostUnknown && !hostUnavailable);
   const [unavailable, setUnavailable] = useState(false);

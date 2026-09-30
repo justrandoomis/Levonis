@@ -208,8 +208,6 @@ export default function CommandCenter() {
     openSentence,
     unpublished: problems.some((p) => p.code === 'layout_unpublished'),
   });
-  // P4's line: the real-user speed grade. The slot exists; nothing renders until the source does.
-  const speed: PulseLine | null = null;
 
   const [confirming, setConfirming] = useState<string | null>(null);
   const [restock, setRestock] = useState<RestockTarget | null>(null);
@@ -261,7 +259,8 @@ export default function CommandCenter() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-6">
-          <PulseRow title={s.pulse.title} lines={lines} speed={speed} />
+          {/* P4's speed line comes from the attention's `speed` source inside PulseRow. */}
+          <PulseRow title={s.pulse.title} lines={lines} />
 
           {problems.length > 0 && (
             <section aria-labelledby="cc-problems" className="space-y-2">

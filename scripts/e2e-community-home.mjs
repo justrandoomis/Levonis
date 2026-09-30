@@ -9,6 +9,13 @@
  * feed's rows and the composer dock once the feed is reached, the search
  * turning the page into its results, and a follow flipping on a rail.
  *
+ *   «طلبات تناسبك» (Phase 5d, §9.5): a signed-in WORKSHOP's «لك» leads with
+ *   its own board (GET /api/community/requests?for=me, hub/BoardRail.tsx) —
+ *   the requests tab's cards in a rail above the cover, «الكل» to the board;
+ *   the issue's own section then keeps its plain «طلبات الطباعة»; an empty
+ *   board says so in one sentence with the preferences one tap away; a
+ *   customer and a guest see no rail at all.
+ *
  *   Link cards (§9.4): a post whose words name a model page carries its card
  *   (title, host, our copy of the picture, «اطلب طباعته»), a video's card has
  *   no print door, an address nobody resolved draws nothing, and the page
@@ -35,8 +42,10 @@ const check = (name, ok, detail = '') => {
 
 /** The fixture's trending list opens with card(1), whose title is «مزهرية حلزونية». */
 const COVER_TITLE = 'مزهرية حلزونية';
-/** hub/strings.ts requestsForYou — what a merchant's second section is called. */
+/** hub/strings.ts requestsForYou — the title of a merchant's own board (hub/BoardRail.tsx). */
 const MERCHANT_HEADS = ['طلبات تناسبك', 'Requests for your workshop', 'داواکاری گونجاو بۆ تۆ'];
+/** hub/strings.ts printRequests — the issue's own section, the board's newest three, for everyone. */
+const PLAIN_HEADS = ['طلبات الطباعة', 'Print requests', 'داواکارییەکانی چاپ'];
 /** The model page several fixture posts name (one ask for all of them) and its door into the wizard. */
 const LINKED_MODEL = 'https://www.printables.com/model/1234-articulated-dragon';
 const PRINT_DOOR = `/requests?view=new&link=${encodeURIComponent(LINKED_MODEL)}`;
@@ -46,6 +55,9 @@ const LINK_PICTURE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 
 const SCENES = [
   { tab: 'foryou', viewer: 'guest', extra: 'recent=1', mark: '[data-community-panel="foryou"] [data-community-cover]', issue: true },
   { tab: 'foryou', viewer: 'merchant', mark: '[data-community-section="requests"]', merchant: true },
+  // «طلبات تناسبك» (Phase 5d): a customer's «لك» has no rail; a workshop with nothing that fits is told so.
+  { tab: 'foryou', viewer: 'customer', mark: '[data-community-panel="foryou"] [data-community-cover]', key: 'foryou-customer', noRail: true },
+  { tab: 'foryou', viewer: 'merchant', extra: 'empty=1', mark: '[data-community-board-empty]', key: 'foryou-merchant-empty', boardEmpty: true },
   { tab: 'following', viewer: 'guest', mark: '[data-community-following-guest]' },
   { tab: 'following', viewer: 'customer', mark: '[data-community-following-empty]' },
   { tab: 'following', viewer: 'customer', extra: 'follows=1', mark: '[data-community-feed="following"] [data-post-card]', key: 'following-feed' },
@@ -74,6 +86,17 @@ for (const lang of ['ar', 'en', 'ckb']) {
         isMobile: phone,
         // The Sorani pass is also the reduced-motion pass: the cards must land without their travel.
         reducedMotion: lang === 'ckb' ? 'reduce' : 'no-preference',
+      });
+      // Every layout shift not caused by input, summed per page load (the rail's frame check below).
+      await context.addInitScript(() => {
+        window.__lvShifts = [];
+        try {
+          new PerformanceObserver((list) => {
+            for (const e of list.getEntries()) if (!e.hadRecentInput) window.__lvShifts.push(e.value);
+          }).observe({ type: 'layout-shift', buffered: true });
+        } catch {
+          /* no layout-shift entries in this browser */
+        }
       });
       const page = await context.newPage();
       const errors = [];
@@ -115,6 +138,7 @@ for (const lang of ['ar', 'en', 'ckb']) {
           check(`${name}: the old name opens ${s.tab === 'products' ? 'foryou' : 'stores'}`, active === (s.tab === 'products' ? 'foryou' : 'stores'), `active=${active}`);
         }
         if (s.issue) {
+          check(`${name}: a guest's home has no workshop rail`, (await page.locator('[data-community-board-rail]').count()) === 0);
           const alt = await page.locator('[data-community-cover="post"] img').first().getAttribute('alt').catch(() => null);
           check(`${name}: the cover's alt is the project's title`, alt === COVER_TITLE, `alt=${alt}`);
           const numbers = await page.locator('[data-section-number]').allInnerTexts();
@@ -252,8 +276,43 @@ for (const lang of ['ar', 'en', 'ckb']) {
           continue;
         }
         if (s.merchant) {
-          const head = (await page.locator('[data-community-section="requests"] h2').innerText()).trim();
-          check(`${name}: a merchant sees «طلبات تناسبك»`, MERCHANT_HEADS.includes(head), head);
+          // «طلبات تناسبك» is the workshop's own board, leading the home; the issue's section keeps its plain title.
+          const rail = await page.waitForSelector('[data-community-board-rail] [data-community-board-cards] [data-community-request]', { timeout: 10000 }).then(() => true).catch(() => false);
+          check(`${name}: a merchant's home leads with «طلبات تناسبك»`, rail);
+          const head = (await page.locator('[data-community-board-rail] h2').innerText().catch(() => '')).trim();
+          check(`${name}: the rail is called «طلبات تناسبك»`, MERCHANT_HEADS.includes(head), head);
+          const plain = (await page.locator('[data-community-section="requests"] h2').innerText()).trim();
+          check(`${name}: the issue's section keeps «طلبات الطباعة» — one «طلبات تناسبك» on the page`, PLAIN_HEADS.includes(plain), plain);
+          const cards = await page.locator('[data-community-board-cards] [data-community-request]').evaluateAll((els) => els.map((el) => el.getAttribute('href')));
+          // Review 2026-09-30: a request's own address, never the board's ?request= and its redirect (+26 KB, a serial hop).
+          check(`${name}: the rail's cards open their requests`, cards.length >= 1 && cards.length <= 6 && cards.every((h) => /^\/requests\/[^/?#]+$/.test(h ?? '')), cards.join(' '));
+          check(`${name}: «الكل» opens the whole board`, (await page.locator('[data-community-board-all]').getAttribute('href')) === '/requests');
+          const railY = (await page.locator('[data-community-board-rail]').boundingBox())?.y ?? Infinity;
+          const coverY = (await page.locator('[data-community-cover]').first().boundingBox())?.y ?? -Infinity;
+          check(`${name}: the rail leads, above the cover`, railY < coverY, `rail=${railY} cover=${coverY}`);
+          const cardBox = await page.locator('[data-community-board-cards] [data-community-request]').first().boundingBox();
+          check(`${name}: a rail card is a card, not the screen`, !!cardBox && cardBox.width <= 300, JSON.stringify(cardBox));
+          await page.locator('[data-community-board-rail]').screenshot({ path: `${out}/board-rail-${tag}.png` });
+          // THE RAIL'S FRAME IS THERE FROM THE FIRST PAINT on a return visit (perf review 2026-09-30: the rail
+          // mounted above an issue already on screen once /api/merchant/me answered — CLS 0 → 0.206).
+          const firstCls = await page.evaluate(() => (window.__lvShifts ?? []).reduce((a, x) => a + x, 0));
+          await page.reload({ waitUntil: 'networkidle' });
+          await page.waitForSelector('[data-community-board-rail] [data-community-board-cards] [data-community-request]', { timeout: 10000 }).catch(() => null);
+          await page.waitForTimeout(800);
+          const cls = await page.evaluate(() => (window.__lvShifts ?? []).reduce((a, x) => a + x, 0));
+          console.log(`  info ${name}: layout shift, first visit ${firstCls.toFixed(3)}, return visit ${cls.toFixed(3)}`);
+          check(`${name}: a return visit reserves the rail's frame — no layout shift`, cls < 0.02, cls.toFixed(4));
+        }
+        if (s.noRail) {
+          await page.waitForTimeout(600);
+          check(`${name}: no «طلبات تناسبك» rail for a customer`, (await page.locator('[data-community-board-rail]').count()) === 0);
+          const plain = (await page.locator('[data-community-section="requests"] h2').innerText().catch(() => '')).trim();
+          check(`${name}: the issue's section reads «طلبات الطباعة»`, PLAIN_HEADS.includes(plain), plain);
+        }
+        if (s.boardEmpty) {
+          const text = (await page.locator('[data-community-board-empty]').innerText()).trim();
+          check(`${name}: an empty board says so in one sentence`, text.length > 20, text);
+          check(`${name}: the request preferences are one tap away`, (await page.locator('[data-community-board-empty] a').getAttribute('href')) === '/merchant/printers#preferences');
         }
         if (s.empty) {
           await page.locator('[data-community-section="feed"]').scrollIntoViewIfNeeded();

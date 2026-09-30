@@ -45,6 +45,9 @@ import type { MerchantMe } from '../src/lib/merchant';
 import { merchantAttentionRoutes, FIRST_ROWS } from '../worker/routes/merchantWorkspace';
 import { merchantRoutes } from '../worker/routes/merchant';
 import { storefrontRoutes } from '../worker/routes/storefront';
+// P4: the Pulse's speed line, and the builder's table its words are copied from.
+import { SPEED_PULSE_WORDS, speedDoor, speedPulseLine } from '../src/components/merchant/counter/PulseRow';
+import { SPEED_STRINGS } from '../src/components/merchant/storeDesign/strings';
 
 const COUNTER = 'src/components/merchant/counter';
 const SCREEN = 'src/components/merchant/shell/sections/CommandCenter.tsx';
@@ -434,4 +437,31 @@ test('/api/merchant/me and /api/storefront/:slug carry open_now + next_change_at
   assert.deepEqual([none.store.open_now, none.store.next_change_at], [null, null]);
   const mineNone = await json(await get(appOf(raw, OWNER, mount), '/api/merchant/me'));
   assert.deepEqual([mineNone.store.open_now, mineNone.store.next_change_at], [null, null]);
+});
+
+// ------------------------------------------------------------ P4: the speed line
+
+test('the Pulse draws the speed line only when the attention read carries the `speed` source; its door is the builder\'s speed tab', () => {
+  const speed = { grade: 'poor' as const, samples: 180, poor_days: 3, link: '/merchant/store/design' };
+  const html = render({ ...EMPTY, speed });
+  assert.match(html, /data-pulse-line="speed" data-tone="warning"/);
+  assert.match(html, /href="\/merchant\/store\/design\?tab=speed"/, 'the door opens the «السرعة» tab');
+  assert.ok(html.includes(SPEED_PULSE_WORDS.ar), 'the line names the grade in words');
+  assert.ok(html.indexOf('data-pulse-line="open"') < html.indexOf('data-pulse-line="speed"'), 'the speed line comes last');
+  // It is a Pulse line, not a queue row: «nothing waiting» still holds.
+  assert.match(html, /data-attention-clear="true"/);
+  assert.ok(!(EVERY_SOURCE as readonly string[]).includes('speed'), 'absent by design — its silence forbids nothing');
+  // No source, no line (the server answers it only after three poor days running).
+  assert.doesNotMatch(render(EMPTY), /data-pulse-line="speed"/);
+  assert.equal(speedPulseLine(undefined, 'ar'), null);
+  assert.equal(speedPulseLine({ ...speed, grade: 'good' as never }, 'ar'), null, 'only the server\'s own «poor» draws the line');
+  assert.equal(speedPulseLine({ ...speed, link: '' }, 'ar'), null, 'a line with no door is no line');
+  assert.deepEqual(speedPulseLine(speed, 'en'), { id: 'speed', tone: 'warning', text: 'Page speed on phones: poor', to: '/merchant/store/design?tab=speed' });
+  assert.equal(speedPulseLine(speed, 'ckb')!.text, 'خێرایی پەڕە لە مۆبایلدا: لاواز');
+  assert.equal(speedDoor('/admin/store/design'), '/admin/store/design?tab=speed');
+  assert.equal(speedDoor('/merchant/store/design?x=1#top'), '/merchant/store/design?x=1&tab=speed#top');
+  assert.equal(speedDoor('/merchant/store/design?tab=speed'), '/merchant/store/design?tab=speed', 'a link that names its tab is kept as sent');
+  // The words are the builder's table's, verbatim — copied, never imported, so Today never downloads it.
+  assert.deepEqual({ ...SPEED_PULSE_WORDS }, { ar: SPEED_STRINGS.ar.pulse.poor, en: SPEED_STRINGS.en.pulse.poor, ckb: SPEED_STRINGS.ckb.pulse.poor });
+  assert.doesNotMatch(code(`${COUNTER}/PulseRow.tsx`), /storeDesign\/strings/, 'the Pulse imports the builder\'s word table');
 });

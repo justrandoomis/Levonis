@@ -7,6 +7,7 @@
  * DOM. Unknown values fall back to the classic preset.
  */
 import {
+  backgroundAttributes,
   effectiveAccent,
   THEME_PRESETS,
   TOKEN_VALUES,
@@ -59,9 +60,14 @@ export function safeTokens(tokens: Partial<ThemeTokens> | null | undefined): The
 
 /**
  * The data attributes the theme stylesheet (theme.css) keys on. Values come
- * from `safeTokens`, i.e. from the closed lists, never from the input.
+ * from `safeTokens`, i.e. from the closed lists, never from the input. With a
+ * page background (storefront L4) `data-sf-bg` names its kind — `image` or
+ * `video`. P5 spends no theme.css on it: the renderer (StoreRenderer.tsx, which
+ * sets it on the page's container) puts every block on the theme's own opaque
+ * ground and draws no glow, and the dim is one of the three overlay classes
+ * below (`dimClass`), on the layer (BackgroundMedia.tsx).
  */
-export function themeAttributes(tokens: ThemeTokens): Record<string, string> {
+export function themeAttributes(tokens: ThemeTokens, background?: { kind: string; media: string } | null): Record<string, string> {
   return {
     'data-store-theme': '',
     'data-sf-surface': tokens.surface,
@@ -73,7 +79,36 @@ export function themeAttributes(tokens: ThemeTokens): Record<string, string> {
     'data-sf-ratio': tokens.image_ratio,
     'data-sf-spacing': tokens.section_spacing,
     'data-sf-width': tokens.width,
+    ...backgroundAttributes(background),
   };
+}
+
+/**
+ * THE PAGE BACKGROUND (storefront L4, P5). A background is painted only when
+ * its kind is not `none` AND it names a file — the normaliser blanks the file
+ * under `none`, and an empty file under another kind draws nothing either.
+ */
+export function backgroundActive(bg: { kind: string; media: string } | null | undefined): boolean {
+  return !!bg && (bg.kind === 'image' || bg.kind === 'video') && typeof bg.media === 'string' && bg.media !== '';
+}
+
+/**
+ * THE THREE DIMS, as overlay classes the app already ships (0 B of new CSS —
+ * the stylesheet budget has no room for three attribute rules): black at
+ * .45 / .6 / .75 over the picture. A closed table keyed on the schema's enum,
+ * so nothing a merchant chose becomes a colour; anything else reads `medium`.
+ * The dim is décor only: every block over a background sits on the theme's
+ * own opaque ground (StoreRenderer `wrap`), so no text is ever read off the
+ * picture, whatever the dim (docs/MERCHANT_PLATFORM_V2.md storefront §8).
+ */
+export const BACKGROUND_DIM: Readonly<Record<string, string>> = {
+  light: 'bg-black/45',
+  medium: 'bg-black/60',
+  heavy: 'bg-black/75',
+};
+
+export function dimClass(dim: unknown): string {
+  return typeof dim === 'string' && Object.hasOwn(BACKGROUND_DIM, dim) ? BACKGROUND_DIM[dim] : BACKGROUND_DIM.medium;
 }
 
 /**

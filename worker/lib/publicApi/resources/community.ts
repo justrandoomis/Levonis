@@ -22,7 +22,7 @@
  *     profile-only merchant has no page an agent could follow);
  *   - a print request never names its customer — not even masked — and never
  *     carries its private notes; it is identified by the reference in its
- *     public web address (`/requests?request=<reference>`), the only handle
+ *     public web address (`/requests/<reference>`), the only handle
  *     the board itself uses;
  *   - offset paging, so no cursor carries an internal id.
  */
@@ -285,7 +285,7 @@ function printRequest(r: Rec, urls: PublicRequest['urls']) {
     file_count: int(r.file_count) ?? 0,
     created_at: isoOrNull(r.created_at),
     expires_at: isoOrNull(r.expires_at),
-    url: urls.web(`/requests?request=${encodeURIComponent(ref_)}`),
+    url: urls.web(`/requests/${encodeURIComponent(ref_)}`),
     api_url: urls.api(`/community/requests/${encodeURIComponent(ref_)}`),
   };
 }

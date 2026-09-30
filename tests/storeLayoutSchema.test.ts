@@ -13,15 +13,21 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
-import { BLOCKS, BLOCK_TYPES, blockMax, WIDGET_ICON_NAMES, type BlockType, type FieldSpec } from '../packages/storeLayout/src/blocks';
-import { applyTheme, emptyLayout, makeBlock, normalizeLayout, renderableBlocks } from '../packages/storeLayout/src/normalize';
+import {
+  BACKGROUND_MEDIA, BLOCKS, BLOCK_TYPES, blockMax, FOOTER_LINKS_SPEC, HEADER_FIELDS, KB, MAX_FOOTER_LINKS, MB, MEDIA_CAPS, NOTICE_MAX,
+  WIDGET_ICON_NAMES, type BlockType, type FieldSpec,
+} from '../packages/storeLayout/src/blocks';
+import { applyTheme, emptyLayout, makeBlock, normalizeLayout, renderableBlocks, scheduledNow } from '../packages/storeLayout/src/normalize';
 import { defaultLayoutFromStore } from '../packages/storeLayout/src/defaults';
 import { collectDataNeeds, MAX_PRODUCT_QUERIES } from '../packages/storeLayout/src/data';
-import { collectLayoutRefs, dropLayoutRefs } from '../packages/storeLayout/src/verify';
+import { collectLayoutRefs, dropLayoutRefs, heavyMedia, mediaSlots, missingPosters } from '../packages/storeLayout/src/verify';
 import { cleanText, pickText } from '../packages/storeLayout/src/text';
 import { mediaKey, mediaSrc, safeExternalUrl, socialHandle, socialHref, SOCIAL_PROVIDER_NAMES } from '../packages/storeLayout/src/refs';
-import { STORE_ACCENTS, THEME_NAMES, THEME_PRESETS, TOKEN_KEYS, TOKEN_VALUES } from '../packages/storeLayout/src/tokens';
-import { MAX_BLOCKS, MAX_LAYOUT_BYTES, type StoreLayout } from '../packages/storeLayout/src/schema';
+import { backgroundAttributes, STORE_ACCENTS, THEME_NAMES, THEME_PRESETS, TOKEN_KEYS, TOKEN_VALUES } from '../packages/storeLayout/src/tokens';
+import {
+  BACKGROUND_DIMS, BACKGROUND_KINDS, defaultBackground, defaultFooter, defaultHeader, MAX_BLOCKS, MAX_LAYOUT_BYTES, type StoreLayout,
+} from '../packages/storeLayout/src/schema';
+import { themeAttributes } from '../src/components/storefront/theme';
 import { safeLink } from '../worker/lib/homeContent';
 import { WIDGET_ICONS } from '../worker/routes/merchant';
 
@@ -278,6 +284,8 @@ function everyBlockLayout(): unknown {
       id: `b${i}`,
       variant: BLOCKS[type].variants[BLOCKS[type].variants.length - 1],
       visibility: { mobile: i % 2 === 0, desktop: true },
+      // Every third block scheduled (storefront L8), so idempotency covers it.
+      ...(i % 3 === 0 ? { schedule: { from: '2027-01-01T00:00:00Z', until: '2027-02-01T00:00:00Z' } } : {}),
       settings: {
         title: { ar: 'عنوان', en: 'Title' },
         headline: { ar: 'متجر', ckb: 'فرۆشگا' },
@@ -293,7 +301,25 @@ function everyBlockLayout(): unknown {
         coupon_id: 'cp1',
       },
     })),
-    { theme: 'premium_dark', header: { variant: 'bar' }, footer: { variant: 'standard' } }
+    {
+      theme: 'premium_dark',
+      // The page's own keys since P5: the notice line and its window (L6), the footer links (L7), the background (L4).
+      header: {
+        variant: 'bar',
+        notice: { ar: 'توصيل مجاني هذا الأسبوع', en: 'Free delivery this week' },
+        notice_link: { kind: 'route', route: 'deals' },
+        notice_from: '2026-10-01T00:00:00Z',
+        notice_until: '2026-10-08T00:00:00Z',
+      },
+      footer: {
+        variant: 'standard',
+        links: [
+          { label: { ar: 'سياسة الاستبدال' }, link: { kind: 'route', route: 'about' } },
+          { label: { en: 'Instagram' }, link: { kind: 'external', url: 'https://instagram.com/raf3d' } },
+        ],
+      },
+      background: { kind: 'video', media: key('bgclip01', 'mp4'), poster: key('bgpost01'), dim: 'heavy', phones: true },
+    }
   );
 }
 
@@ -323,8 +349,15 @@ test('the default layout IS the classic storefront: overlay header, profile hero
   assert.equal(d.tokens.surface, 'glow', 'the accent glow of the old page');
   assert.equal(d.tokens.grid_columns, 3, 'three products per row, four when wider');
   assert.equal(d.tokens.accent, 'store', 'the accent from store settings keeps applying');
-  assert.deepEqual(d.header, { variant: 'overlay' });
-  assert.deepEqual(d.footer, { variant: 'minimal' });
+  // Moved with P5 (media everywhere): the header and footer boxes carry the
+  // notice line and the links now — both empty on the classic page — and the
+  // page has no background. The pin is the same: nothing of ours in a store.
+  assert.deepEqual(d.header, { variant: 'overlay', notice: { ar: '', en: '', ckb: '' }, notice_link: { kind: 'none' } });
+  assert.deepEqual(d.footer, { variant: 'minimal', links: [] });
+  assert.deepEqual(d.background, { kind: 'none', media: '', poster: '', dim: 'medium', phones: false });
+  assert.deepEqual(d.header, defaultHeader('overlay'));
+  assert.deepEqual(d.footer, defaultFooter('minimal'));
+  assert.deepEqual(d.background, defaultBackground());
   assert.deepEqual(d.blocks.map((b) => [b.type, b.variant]), [['hero', 'profile'], ['tabs', 'underline']]);
   const hero = d.blocks[0].settings as Record<string, unknown>;
   for (const row of ['show_cover', 'show_stats', 'show_bio', 'show_links', 'show_info_cards', 'show_actions']) assert.equal(hero[row], true, row);
@@ -515,4 +548,261 @@ test('every layout the defaults and the presets produce is a valid StoreLayout t
     assert.ok(renderableBlocks(l).length > 0);
   }
   assert.throws(() => makeBlock('products_grid', 'x', { settings: { limit: 99 } }), /makeBlock/);
+});
+
+// ------------------------------------------------ media everywhere (P5)
+
+test('media caps (L5): every media slot that can weigh on the first paint carries its cap, and the registry count is unchanged', () => {
+  assert.equal(BLOCK_TYPES.length, 27, 'P5 adds no block — media lives in the keys the page already has');
+  assert.equal(MEDIA_CAPS.cover, 1.5 * MB);
+  assert.equal(MEDIA_CAPS.poster, 400 * KB);
+  assert.equal(MEDIA_CAPS.video, 12 * MB);
+  assert.equal(MEDIA_CAPS.gallery_item, 1 * MB);
+  const hero = BLOCKS.hero.settings;
+  assert.deepEqual(hero.image, { t: 'media', kind: 'image', max_bytes: MEDIA_CAPS.cover }, 'the hero image is the poster: 1.5 MB, GIF included');
+  assert.deepEqual(hero.video, { t: 'media', kind: 'video', max_bytes: MEDIA_CAPS.video });
+  assert.deepEqual(hero.video_on_phone, { t: 'bool', d: false }, 'phones see the still unless the merchant says otherwise');
+  assert.deepEqual(BLOCKS.banner.settings.image, { t: 'media', kind: 'image', max_bytes: MEDIA_CAPS.cover });
+  assert.deepEqual(BLOCKS.image_text.settings.image, { t: 'media', kind: 'image', max_bytes: MEDIA_CAPS.cover });
+  assert.equal(BLOCKS.gallery.settings.images.item.image.max_bytes, MEDIA_CAPS.gallery_item);
+  assert.equal(BLOCKS.video.settings.video.max_bytes, MEDIA_CAPS.video);
+  assert.equal(BLOCKS.video.settings.poster.max_bytes, MEDIA_CAPS.poster);
+  assert.deepEqual(BACKGROUND_MEDIA, { image: BLOCKS.banner.settings.image, video: hero.video, poster: BLOCKS.video.settings.poster });
+  // Every cap sits under the upload door's own ceilings (8 MB images, 40 MB video).
+  const walkSpecs = (specs: Record<string, FieldSpec>, seen: (s: FieldSpec) => void) => {
+    for (const spec of Object.values(specs)) {
+      seen(spec);
+      if (spec.t === 'list') walkSpecs(spec.item as Record<string, FieldSpec>, seen);
+    }
+  };
+  let capped = 0;
+  for (const type of BLOCK_TYPES) {
+    walkSpecs(BLOCKS[type].settings as Record<string, FieldSpec>, (spec) => {
+      if (spec.t !== 'media') return;
+      assert.ok(spec.max_bytes && spec.max_bytes > 0, `${type}: a media slot without a cap`);
+      assert.ok(spec.max_bytes <= (spec.kind === 'video' ? 12 * MB : 1.5 * MB), `${type}: over the phase's ceiling`);
+      capped++;
+    });
+  }
+  assert.equal(capped, 7, 'hero image + video, banner, image_text, gallery item, video block video + poster');
+  // A layout that names a video with no poster normalises fine — the poster rule is a PUBLISH rule.
+  const r = norm(layoutOf([{ type: 'hero', id: 'h', settings: { video: key('clip0001', 'mp4'), video_on_phone: true } }]));
+  assert.deepEqual(r.issues, []);
+  assert.equal(set0(r).video, key('clip0001', 'mp4'));
+  assert.equal(set0(r).video_on_phone, true);
+  assert.deepEqual(missingPosters(r.layout), ['blocks[0].settings.image']);
+  assert.deepEqual(missingPosters(norm(layoutOf([{ type: 'hero', id: 'h', settings: { video: key('clip0001', 'mp4'), image: key('post0001') } }])).layout), []);
+  assert.deepEqual(missingPosters(norm(layoutOf([{ type: 'video', id: 'v', settings: { video: key('clip0001', 'mp4') } }])).layout), [], 'the video block keeps its poster optional');
+});
+
+test('the notice line (L6): 120 characters per language, a typed link, an optional window, unknown keys stripped', () => {
+  assert.equal(NOTICE_MAX, 120);
+  assert.equal(HEADER_FIELDS.notice.max, NOTICE_MAX);
+  const r = norm(
+    layoutOf([], {
+      header: {
+        variant: 'bar',
+        notice: { ar: '  توصيل مجاني  ', en: 'x'.repeat(200), ckb: 'گەیاندنی بەخۆڕایی' },
+        notice_link: { kind: 'product', id: 'p1' },
+        notice_from: '2026-10-01T00:00:00Z',
+        notice_until: '2026-10-08T12:00:00+03:00',
+        onClick: 'alert(1)',
+      },
+    })
+  );
+  assert.deepEqual(codes(r).sort(), ['truncated', 'unknown_key']);
+  assert.equal(r.layout.header.variant, 'bar');
+  assert.deepEqual(r.layout.header.notice, { ar: 'توصيل مجاني', en: 'x'.repeat(120), ckb: 'گەیاندنی بەخۆڕایی' });
+  assert.deepEqual(r.layout.header.notice_link, { kind: 'product', id: 'p1' });
+  assert.equal(r.layout.header.notice_from, '2026-10-01T00:00:00.000Z');
+  assert.equal(r.layout.header.notice_until, '2026-10-08T09:00:00.000Z', 'instants are canonical UTC');
+  assert.ok(!('onClick' in r.layout.header));
+
+  // No window → no window keys at all (the classic shape stays byte-for-byte).
+  const bare = norm(layoutOf([], { header: { variant: 'overlay', notice: { ar: 'مرحبًا' } } }));
+  assert.deepEqual(bare.issues, []);
+  assert.deepEqual(Object.keys(bare.layout.header).sort(), ['notice', 'notice_link', 'variant']);
+  // A window that ends before it starts keeps the start and drops the end, with an issue.
+  const backwards = norm(layoutOf([], { header: { notice_from: '2026-10-08T00:00:00Z', notice_until: '2026-10-01T00:00:00Z' } }));
+  assert.deepEqual(backwards.issues, [{ path: 'header.notice_until', code: 'invalid_value', fatal: false }]);
+  assert.equal(backwards.layout.header.notice_from, '2026-10-08T00:00:00.000Z');
+  assert.ok(!('notice_until' in backwards.layout.header));
+  // The notice link is a link like any other: a foreign scheme is FATAL.
+  const evil = norm(layoutOf([], { header: { notice_link: 'javascript:alert(1)' } }));
+  assert.equal(evil.ok, false);
+  assert.deepEqual(codes(evil), ['unsafe_link']);
+  assert.deepEqual(evil.layout.header.notice_link, { kind: 'none' });
+  // A header that is not an object falls back whole, with one issue.
+  assert.deepEqual(norm(layoutOf([], { header: 'bar' })).layout.header, defaultHeader());
+});
+
+test('footer links (L7): at most six, a 30-character label, an item without a label is dropped, links typed', () => {
+  assert.equal(MAX_FOOTER_LINKS, 6);
+  assert.equal(FOOTER_LINKS_SPEC.max, 6);
+  assert.equal(FOOTER_LINKS_SPEC.item.label.max, 30);
+  const many = Array.from({ length: 8 }, (_, i) => ({ label: { ar: `رابط ${i}` }, link: { kind: 'route', route: 'home' } }));
+  const r = norm(
+    layoutOf([], {
+      footer: {
+        variant: 'standard',
+        links: [
+          { label: { ar: 'س'.repeat(40) }, link: { kind: 'external', url: 'https://example.com/policy' } },
+          { label: { ar: '' }, link: { kind: 'route', route: 'about' } },
+          { label: { en: 'Deals' }, link: { kind: 'route', route: 'deals' }, target: '_blank' },
+          { label: { en: 'Plain' } },
+          ...many,
+        ],
+      },
+    })
+  );
+  const c = codes(r);
+  assert.ok(c.includes('too_many'));
+  assert.ok(c.includes('truncated'));
+  assert.ok(c.includes('dropped_item'));
+  assert.ok(c.includes('unknown_key'));
+  assert.ok(!r.issues.some((i) => i.fatal));
+  const links = r.layout.footer.links;
+  assert.ok(links.length <= MAX_FOOTER_LINKS);
+  assert.equal(links[0].label.ar.length, 30);
+  assert.deepEqual(links[0].link, { kind: 'external', url: 'https://example.com/policy' });
+  assert.deepEqual(links[1].label, { ar: '', en: 'Deals', ckb: '' }, 'the unlabelled item is gone');
+  assert.deepEqual(links[2], { label: { ar: '', en: 'Plain', ckb: '' }, link: { kind: 'none' } }, 'a label with nowhere to go is kept as text');
+  assert.ok(!JSON.stringify(links).includes('_blank'));
+  // A link with a foreign scheme is fatal here too.
+  const evil = norm(layoutOf([], { footer: { links: [{ label: { ar: 'x' }, link: { kind: 'external', url: 'javascript:alert(1)' } }] } }));
+  assert.equal(evil.ok, false);
+  assert.deepEqual(norm(layoutOf([], { footer: { variant: 'none' } })).layout.footer, defaultFooter('none'));
+});
+
+test('the page background (L4): kind, the owner\'s media by kind, the poster only for a video, dim and phones from closed lists', () => {
+  assert.deepEqual([...BACKGROUND_KINDS], ['none', 'image', 'video']);
+  assert.deepEqual([...BACKGROUND_DIMS], ['light', 'medium', 'heavy']);
+  const image = norm(layoutOf([], { background: { kind: 'image', media: key('bg000001', 'gif'), poster: key('post0001'), dim: 'light', phones: true } }));
+  assert.deepEqual(image.issues, []);
+  assert.deepEqual(image.layout.background, { kind: 'image', media: key('bg000001', 'gif'), poster: '', dim: 'light', phones: true }, 'a GIF is an image; an image has no poster');
+  const video = norm(layoutOf([], { background: { kind: 'video', media: key('bgclip01', 'mp4'), poster: key('post0001') } }));
+  assert.deepEqual(video.issues, []);
+  assert.deepEqual(video.layout.background, { kind: 'video', media: key('bgclip01', 'mp4'), poster: key('post0001'), dim: 'medium', phones: false });
+  assert.deepEqual(missingPosters({ ...video.layout, background: { ...video.layout.background, poster: '' } }), ['background.poster']);
+  // Off: whatever was behind it is blanked without a complaint (the merchant switched it off).
+  const off = norm(layoutOf([], { background: { kind: 'none', media: key('bg000001'), poster: key('post0001'), dim: 'heavy' } }));
+  assert.deepEqual(off.issues, []);
+  assert.deepEqual(off.layout.background, { kind: 'none', media: '', poster: '', dim: 'heavy', phones: false });
+  // The wrong kind of key for the kind is not media at all; somebody else's key is fatal; a URL is fatal.
+  const wrong = norm(layoutOf([], { background: { kind: 'video', media: key('bg000001') } }));
+  assert.deepEqual(codes(wrong), ['invalid_media']);
+  assert.equal(wrong.ok, false);
+  assert.equal(norm(layoutOf([], { background: { kind: 'image', media: 'merchants/someone/public/their001.webp' } })).issues[0].code, 'foreign_media');
+  assert.equal(norm(layoutOf([], { background: { kind: 'image', media: 'https://evil.example/x.webp' } })).ok, false);
+  // Enums outside their lists fall back with an issue; unknown keys are stripped; a non-object falls back whole.
+  const junk = norm(layoutOf([], { background: { kind: 'parallax', dim: 'darker', phones: 'yes', css: 'x' } }));
+  assert.deepEqual(codes(junk).sort(), ['invalid_value', 'invalid_value', 'invalid_value', 'unknown_key']);
+  assert.deepEqual(junk.layout.background, defaultBackground());
+  assert.deepEqual(norm(layoutOf([], { background: 'dark' })).layout.background, defaultBackground());
+  // The renderer's hook: data-sf-bg names the kind, only when there is something to paint.
+  assert.deepEqual(backgroundAttributes(image.layout.background), { 'data-sf-bg': 'image' });
+  assert.deepEqual(backgroundAttributes(video.layout.background), { 'data-sf-bg': 'video' });
+  assert.deepEqual(backgroundAttributes(off.layout.background), {});
+  assert.deepEqual(backgroundAttributes({ kind: 'image', media: '' }), {}, 'a kind with no media paints nothing');
+  assert.deepEqual(backgroundAttributes(null), {});
+  const attrs = themeAttributes(THEME_PRESETS.classic, video.layout.background);
+  assert.equal(attrs['data-sf-bg'], 'video');
+  assert.ok(!('data-sf-bg' in themeAttributes(THEME_PRESETS.classic)), 'no background, no attribute — the classic page is unchanged');
+  assert.ok(!('data-sf-bg' in themeAttributes(THEME_PRESETS.classic, defaultBackground())));
+});
+
+test('scheduled blocks (L8): the window is two instants, the live page filters by it, the preview never does', () => {
+  const l = norm(
+    layoutOf([
+      { type: 'text', id: 'always', settings: {} },
+      { type: 'text', id: 'later', schedule: { from: '2027-01-01T00:00:00Z' } },
+      { type: 'text', id: 'past', schedule: { until: '2026-01-01T00:00:00Z' } },
+      { type: 'text', id: 'window', schedule: { from: '2026-06-01T00:00:00Z', until: '2026-07-01T00:00:00Z' } },
+      { type: 'text', id: 'empty', schedule: { from: '', until: '' } },
+      { type: 'text', id: 'backwards', schedule: { from: '2026-07-01T00:00:00Z', until: '2026-06-01T00:00:00Z' } },
+      { type: 'text', id: 'junk', schedule: { from: 'soon', until: 42, repeat: 'weekly' } },
+    ])
+  );
+  assert.deepEqual(
+    l.issues.map((i) => `${i.path}:${i.code}`).sort(),
+    ['blocks[5].schedule.until:invalid_value', 'blocks[6].schedule.from:invalid_value', 'blocks[6].schedule.repeat:unknown_key', 'blocks[6].schedule.until:invalid_value']
+  );
+  const by = Object.fromEntries(l.layout.blocks.map((b) => [b.id, b]));
+  assert.ok(!('schedule' in by.always) && !('schedule' in by.empty) && !('schedule' in by.junk), 'no window, no key');
+  assert.deepEqual(by.later.schedule, { from: '2027-01-01T00:00:00.000Z', until: '' });
+  assert.deepEqual(by.past.schedule, { from: '', until: '2026-01-01T00:00:00.000Z' });
+  assert.deepEqual(by.backwards.schedule, { from: '2026-07-01T00:00:00.000Z', until: '' }, 'an end before the start is dropped, the start kept');
+  const now = '2026-06-15T12:00:00.000Z';
+  assert.deepEqual(renderableBlocks(l.layout).map((b) => b.id), ['always', 'later', 'past', 'window', 'empty', 'backwards', 'junk'], 'preview: all');
+  assert.deepEqual(renderableBlocks(l.layout, now, 'preview').map((b) => b.id), renderableBlocks(l.layout).map((b) => b.id));
+  assert.deepEqual(renderableBlocks(l.layout, now, 'live').map((b) => b.id), ['always', 'window', 'empty', 'junk']);
+  assert.deepEqual(renderableBlocks(l.layout, '2026-07-01T00:00:00.000Z', 'live').map((b) => b.id), ['always', 'empty', 'backwards', 'junk'], 'the end is exclusive');
+  assert.deepEqual(renderableBlocks(l.layout, '2027-01-01T00:00:00.000Z', 'live').map((b) => b.id), ['always', 'later', 'empty', 'backwards', 'junk'], 'the start is inclusive');
+  assert.equal(scheduledNow(by.later, 'not a date'), true, 'a broken clock hides nothing');
+  // A hidden block stays hidden in every mode; the data planner counts every block whatever the clock says.
+  const hidden = norm(layoutOf([{ type: 'reviews', id: 'r', hidden: true, schedule: { from: '2020-01-01T00:00:00Z' } }, { type: 'printers', id: 'p', schedule: { from: '2099-01-01T00:00:00Z' } }])).layout;
+  assert.deepEqual(renderableBlocks(hidden, now, 'live').map((b) => b.id), []);
+  assert.equal(collectDataNeeds(hidden).printers, true, 'the cached answer must not depend on the moment it was built');
+  assert.equal(collectDataNeeds(hidden).reviews, 0);
+});
+
+test('references (P5): the page\'s own slots are walked, weight is judged per slot, and the notice / footer product links ask for their products', () => {
+  const l = norm(
+    layoutOf(
+      [
+        { type: 'banner', id: 'b', settings: { image: key('shared01') } },
+        { type: 'gallery', id: 'g', settings: { images: [{ image: key('shared01') }, { image: key('light001') }] } },
+        { type: 'hero', id: 'h', settings: { image: key('post0001'), video: key('clip0001', 'mp4') } },
+      ],
+      {
+        header: { notice_link: { kind: 'product', id: 'p7' } },
+        footer: { links: [{ label: { ar: 'أ' }, link: { kind: 'product', id: 'p8' } }, { label: { ar: 'ب' }, link: { kind: 'collection', id: 'sec2' } }] },
+        background: { kind: 'video', media: key('bgclip01', 'mp4'), poster: key('bgpost01') },
+      }
+    )
+  ).layout;
+  const refs = collectLayoutRefs(l);
+  assert.deepEqual(refs.media.map((m) => `${m.kind}:${m.key}`), [
+    `video:${key('bgclip01', 'mp4')}`, `image:${key('bgpost01')}`, `image:${key('shared01')}`, `image:${key('light001')}`, `image:${key('post0001')}`, `video:${key('clip0001', 'mp4')}`,
+  ], 'each key once, the page slots first');
+  assert.deepEqual(refs.product, ['p7', 'p8']);
+  assert.deepEqual(refs.collection, ['sec2']);
+  assert.deepEqual(collectDataNeeds(l).productIds, ['p7', 'p8'], 'the renderer needs their slugs to draw the links');
+
+  const slots = mediaSlots(l);
+  assert.deepEqual(slots.map((s) => [s.path, s.block_id, s.max_bytes]), [
+    ['background.media', 'background', MEDIA_CAPS.video],
+    ['background.poster', 'background', MEDIA_CAPS.poster],
+    ['blocks[0].settings.image', 'b', MEDIA_CAPS.cover],
+    ['blocks[1].settings.images[0].image', 'g', MEDIA_CAPS.gallery_item],
+    ['blocks[1].settings.images[1].image', 'g', MEDIA_CAPS.gallery_item],
+    ['blocks[2].settings.image', 'h', MEDIA_CAPS.cover],
+    ['blocks[2].settings.video', 'h', MEDIA_CAPS.video],
+  ]);
+
+  // The SAME picture fits a banner (1.5 MB) and is too heavy for a gallery item (1 MB).
+  const bytes = new Map([[key('shared01'), 1.2 * MB], [key('light001'), 10 * KB], [key('bgpost01'), 900 * KB]]);
+  assert.deepEqual(heavyMedia(l, bytes).map((h) => [h.path, h.size, h.max]), [
+    ['background.poster', 900 * KB, MEDIA_CAPS.poster],
+    ['blocks[1].settings.images[0].image', 1.2 * MB, MEDIA_CAPS.gallery_item],
+  ]);
+  const dropped = dropLayoutRefs(l, { bytes, product: new Set(['p8']) }, { ownerUserId: OWNER });
+  assert.deepEqual(
+    dropped.issues.map((i) => `${i.path}:${i.code}`).sort(),
+    ['background.poster:media_too_heavy', 'blocks[1].settings.images[0].image:media_too_heavy', 'blocks[1].settings.images[0]:dropped_item', 'footer.links[0].link:unknown_ref'],
+    'the emptied gallery item is then dropped by the re-normalisation, as a deleted picture\'s is'
+  );
+  assert.ok(dropped.issues.every((i) => !i.fatal), 'too heavy is cleaned, never refused, on the re-check');
+  const banner = dropped.layout.blocks[0].settings as { image: string };
+  const gallery = dropped.layout.blocks[1].settings as { images: Array<{ image: string }> };
+  assert.equal(banner.image, key('shared01'), 'the banner keeps the picture its cap allows');
+  assert.deepEqual(gallery.images.map((i) => i.image), [key('light001')], 'the gallery item that was too heavy is gone');
+  assert.equal(dropped.layout.background.poster, '', 'the poster over its cap is gone — publish will ask for one');
+  assert.equal(dropped.layout.background.media, key('bgclip01', 'mp4'));
+  assert.deepEqual(dropped.layout.footer.links[0].link, { kind: 'none' }, 'a footer link to a product that is not this store\'s loses its destination, keeps its label');
+  assert.deepEqual(dropped.layout.footer.links[1].link, { kind: 'collection', id: 'sec2' });
+  // A key the ledger does not size (a legacy upload) is never too heavy; a rejected key is not also heavy.
+  assert.deepEqual(heavyMedia(l, new Map()), []);
+  const both = dropLayoutRefs(l, { media: new Set([key('shared01')]), bytes }, { ownerUserId: OWNER });
+  assert.deepEqual(both.issues.filter((i) => i.path === 'blocks[1].settings.images[0].image').map((i) => i.code), ['media_not_found']);
 });

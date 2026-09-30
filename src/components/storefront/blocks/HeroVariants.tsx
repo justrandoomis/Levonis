@@ -9,6 +9,7 @@ import { BadgeCheck } from 'lucide-react';
 import ProMerchantBadge from '../../merchant/ProMerchantBadge';
 import PremiumMemberBadge from '../../merchant/PremiumMemberBadge';
 import { Column, useText } from '../parts';
+import { HeroVideoButton, HeroVideoStage } from '../BackgroundLayer';
 import { Avatar, HeroCta, ProfileRows, RatingLine, type HeroProps } from './Hero';
 
 type VariantProps = HeroProps & { cover: string; name: string };
@@ -31,6 +32,7 @@ function CoverHero({ block, store, data, cover, name }: VariantProps) {
     <div className="relative">
       <div className="relative h-60 @min-[40rem]:h-80 w-full overflow-hidden bg-white/[0.03]">
         {cover && <img src={cover} alt="" className="w-full h-full object-cover" loading="eager" fetchPriority="high" />}
+        <HeroVideoStage video={s.video} poster={cover} onPhone={s.video_on_phone} />
         <div className="absolute inset-0 sf-cover-fade" />
         <div className="absolute inset-x-0 bottom-0">
           <Column className={`pb-5 flex flex-col gap-2 ${center ? 'items-center text-center' : 'items-start text-start'}`}>
@@ -51,6 +53,7 @@ function CoverHero({ block, store, data, cover, name }: VariantProps) {
             <HeroCta block={block} data={data} />
           </Column>
         </div>
+        <HeroVideoButton video={s.video} onPhone={s.video_on_phone} />
       </div>
       <Column className="pt-4 sf-flush">
         <ProfileRows block={{ ...block, settings: { ...s, show_bio: false } }} store={store} bio="" />
@@ -69,8 +72,10 @@ function SplitHero({ block, store, data, cover, name }: VariantProps) {
   return (
     <Column className="pt-5">
       <div className="grid gap-5 @min-[48rem]:grid-cols-2 @min-[48rem]:items-center">
-        <div className="sf-r-lg overflow-hidden bg-white/[0.03] aspect-[4/3]">
+        <div className="relative sf-r-lg overflow-hidden bg-white/[0.03] aspect-[4/3]">
           {cover && <img src={cover} alt="" className="w-full h-full object-cover" loading="eager" fetchPriority="high" />}
+          <HeroVideoStage video={s.video} poster={cover} onPhone={s.video_on_phone} />
+          <HeroVideoButton video={s.video} onPhone={s.video_on_phone} />
         </div>
         <div className="flex flex-col items-start gap-3 min-w-0">
           <div className="flex items-center gap-3 min-w-0 max-w-full">

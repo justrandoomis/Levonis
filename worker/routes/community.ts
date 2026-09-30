@@ -15,6 +15,10 @@ import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { anonymousCached } from '../lib/edgePolicy';
 import { publishRequest } from './printRequests';
 import { publicRequest } from './marketplace';
+// Workshop facts on the store page, and the merchant's own board (0159, §9.5).
+import { eligibleVerdictSql, publicWorkshopFacts } from '../lib/printMatchingStore';
+import { storeForUser } from '../lib/merchantAuth';
+import { merchantTakesNewWork } from '../lib/communityRequests';
 
 export const communityRoutes = new Hono<AppContext>();
 
@@ -349,6 +353,89 @@ communityRoutes.get('/requests', async (c) => {
   const q = likePattern(c.req.query('q'));
   const visible = requestBoardVisible('?1', '?2');
   const now = new Date().toISOString();
+  /**
+   * `?for=me` — THE WORKSHOP'S OWN BOARD (0159, §9.5): the home's «طلبات
+   * تناسبك». A signed-in merchant reads the requests the eligibility engine
+   * marked eligible for THEIR workshop at the request's CURRENT revision
+   * (`community_request_matches.eligible = 1 AND revision = r.revision`), on
+   * the board's own visibility rule, never their own requests. Guests are
+   * asked to sign in; an account without a workshop has an empty board. One
+   * row more than asked is read, so the cursor is present exactly when a
+   * next page exists (D8). The answer is per viewer — a session request
+   * bypasses the anonymous edge cache — so `for` needs declaring only if
+   * this route is ever wrapped in `anonymousCached`.
+   */
+  if (c.req.query('for') === 'me') {
+    const user = c.get('user');
+    if (!user) throw new HttpError(401, 'Sign in to see the requests that fit your workshop', 'UNAUTHORIZED');
+    const mine = await storeForUser(c.env.DB, user.id);
+    if (!mine) return c.json({ success: true, requests: [], next_cursor: null, total: 0, for: 'me' });
+    /**
+     * THE SAME BAR AS THE WORKSHOP'S OWN BOARD (worker/routes/merchantWorkshop.ts
+     * `/board`, review 2026-09-30): a workshop that cannot take new work — its
+     * store or account suspended, the plan lapsed — or that is not taking
+     * custom requests is shown nothing, with the same `blocked` reason. An
+     * admin suspension queues no re-match, so the stored verdicts alone would
+     * go on saying «fits you» about jobs it can offer on none of.
+     */
+    const open = await merchantTakesNewWork(c.env.DB, {
+      merchantStatus: mine.merchant.status,
+      storeStatus: mine.store.status,
+      ownerUserId: user.id,
+    });
+    const accepts = Number(mine.store.accepts_custom_requests ?? 1) === 1;
+    if (!open || !accepts) {
+      return c.json({
+        success: true, requests: [], next_cursor: null, total: 0, for: 'me',
+        blocked: !open ? 'CANNOT_TAKE_WORK' : 'NOT_TAKING_REQUESTS',
+      });
+    }
+    /**
+     * Only an ENGINE-2 verdict for the request's CURRENT revision counts —
+     * the offer fence's own rule (`eligibleVerdictSql`); a pre-W5-B engine-1
+     * «eligible» is no promise the offer route would keep. The query is driven
+     * from the open board (the state index) with the verdict as an EXISTS on
+     * the (request, merchant) pair index, so the rows read are bounded by what
+     * is on the board today, not by every job this workshop was ever matched
+     * to; the count asks the same way.
+     */
+    const fits = eligibleVerdictSql('r', '?6');
+    const [{ results: rows }, total] = await Promise.all([
+      c.env.DB.prepare(
+        `SELECT r.*, u.name AS customer_name, u.username AS customer_username,
+                (SELECT COUNT(*) FROM community_request_files f WHERE f.request_id = r.id) AS file_count,
+                (SELECT sm.score FROM community_request_matches sm WHERE sm.request_id = r.id AND sm.merchant_id = ?6) AS match_score
+           FROM community_requests r
+           LEFT JOIN users u ON u.id = r.customer_id
+          WHERE ${visible}
+            AND r.customer_id <> ?7
+            AND ${fits}
+            AND (?3 = '' OR r.created_at < ?3 OR (r.created_at = ?3 AND r.id < ?4))
+          ORDER BY r.created_at DESC, r.id DESC LIMIT ?5`
+      ).bind(now, q, cursor.at, cursor.id, limit + 1, mine.merchant.id, user.id).all<Record<string, unknown>>(),
+      cursor.at === ''
+        ? c.env.DB.prepare(
+            `SELECT COUNT(*) AS n FROM community_requests r
+              WHERE ${visible} AND r.customer_id <> ?4 AND ${eligibleVerdictSql('r', '?3')}`
+          ).bind(now, q, mine.merchant.id, user.id).first<{ n: number }>()
+        : Promise.resolve(null),
+    ]);
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
+    return c.json({
+      success: true,
+      requests: page.map((r) => ({
+        ...publicRequest(r),
+        status: r.status,
+        customer_username: r.customer_username ?? null,
+        /** The engine's ranking of this job for THIS workshop — the reader's own number, nobody else's. */
+        match_score: Number(r.match_score ?? 0) || 0,
+      })),
+      next_cursor: rows.length > limit && last ? `${String(last.created_at)}|${String(last.id)}` : null,
+      total: total ? Number(total.n) : null,
+      for: 'me',
+    });
+  }
   const [{ results }, total] = await Promise.all([
     c.env.DB.prepare(
       `SELECT r.*, u.name AS customer_name, u.username AS customer_username,
@@ -484,29 +571,38 @@ communityRoutes.get('/store/:id', async (c) => {
   if (merchant.status === 'suspended' || merchant.store_status === 'suspended') {
     throw new HttpError(404, 'This store is not available right now', 'STORE_UNAVAILABLE');
   }
-  const [{ results: products }, followers] = await Promise.all([
+  const user = c.get('user');
+  // ONE WAVE after the merchant (review 2026-09-30): the products, the
+  // followers, the viewer's own follow, the badges and the workshop's facts
+  // depend on nothing but the merchant row, so they are read side by side.
+  // THE WORKSHOP'S FACTS (0159, §9.5): what it can make and how it works —
+  // public facts only (technologies, materials, the largest bed, the usual
+  // turnaround, where it delivers, whether it takes custom work, its intro).
+  // Never a printer's economics, never a verdict on anybody's job.
+  const [{ results: products }, followers, followRow, badges, workshop] = await Promise.all([
     c.env.DB.prepare(
       "SELECT * FROM community_products WHERE merchant_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 100"
     )
       .bind(id)
       .all(),
     c.env.DB.prepare('SELECT COUNT(*) AS n FROM follows WHERE merchant_id = ?').bind(id).first<{ n: number }>(),
+    user
+      ? c.env.DB.prepare('SELECT 1 AS x FROM follows WHERE user_id = ? AND merchant_id = ?').bind(user.id, id).first()
+      : Promise.resolve(null),
+    membershipBadges(c.env.DB, [merchant.user_id]),
+    publicWorkshopFacts(c.env.DB, String(merchant.id)).catch((e) => {
+      console.error('workshop facts not read', merchant.id, e instanceof Error ? e.message : String(e));
+      return null;
+    }),
   ]);
-  const user = c.get('user');
-  let following = false;
-  if (user) {
-    const f = await c.env.DB.prepare('SELECT 1 AS x FROM follows WHERE user_id = ? AND merchant_id = ?')
-      .bind(user.id, id)
-      .first();
-    following = !!f;
-  }
-  const badges = await membershipBadges(c.env.DB, [merchant.user_id]);
+  const following = !!followRow;
   return c.json({
     success: true,
     merchant: merchantPublic(merchant, badges),
     products: products.map(communityProductPublic),
     followers: followers?.n ?? 0,
     following,
+    workshop,
   });
 });
 

@@ -20,7 +20,7 @@
  */
 import { makeBlock } from './normalize';
 import { defaultLayoutFromStore } from './defaults';
-import type { FooterVariant, HeaderVariant, StoreBlock, StoreLayout } from './schema';
+import { defaultBackground, defaultFooter, defaultHeader, type FooterVariant, type HeaderVariant, type StoreBlock, type StoreLayout } from './schema';
 import { THEME_NAMES, THEME_PRESETS, type ThemeName } from './tokens';
 
 type Spec = [type: Parameters<typeof makeBlock>[0], id: string, opts?: Parameters<typeof makeBlock>[2]];
@@ -116,8 +116,9 @@ export function starterLayout(theme: ThemeName): StoreLayout {
     schema_version: 1,
     theme,
     tokens: { ...THEME_PRESETS[theme] },
-    header: { variant: s.header },
-    footer: { variant: s.footer },
+    header: defaultHeader(s.header),
+    footer: defaultFooter(s.footer),
+    background: defaultBackground(),
     blocks: s.blocks.map(([type, id, opts]): StoreBlock => makeBlock(type, id, opts)),
   };
 }

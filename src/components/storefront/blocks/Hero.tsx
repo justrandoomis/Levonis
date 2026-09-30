@@ -21,6 +21,8 @@ import { mediaSrc } from '../../../../packages/storeLayout/src/refs';
 import { isBlank } from '../../../../packages/storeLayout/src/text';
 import { useStorefrontRuntime } from '../runtime';
 import { useStoreTheme } from '../StoreTheme';
+// P5 (storefront L3): the cover's video — offered with a tap, never on its own; the lazy <video> lives in ../StoreVideo.tsx.
+import { HeroVideoButton, HeroVideoStage } from '../BackgroundLayer';
 import { Column, factsWithFallback, hasLink, joinedLine, LinkTo, linkPillLabel, useText } from '../parts';
 import type { BlockProps, StorefrontStore } from '../types';
 
@@ -28,6 +30,57 @@ export type HeroProps = BlockProps<'hero'>;
 
 /** The cover, split and minimal variants: not the classic page's, so in the lazy chunk. */
 const HeroVariant = lazy(() => import('./extra').then((m) => ({ default: m.HeroVariant })));
+
+/**
+ * THE WORKSHOP'S FACTS (Phase 5d, docs/COMMUNITY_ECOSYSTEM.md §9.5): what the
+ * store read's `workshop` block says the workshop is — its technologies, its
+ * largest build, its usual turnaround, whether it takes custom requests — as
+ * one row of chips under every hero variant. The row and its words are their
+ * own small chunk (./workshopFacts.tsx — not the non-classic blocks' chunk,
+ * which every classic workshop store would otherwise fetch for one row),
+ * fetched only for a store that has facts to show; until it lands a frame of
+ * the row's own height holds its place, so nothing below the hero moves.
+ */
+const WorkshopFacts = lazy(() => import('./workshopFacts').then((m) => ({ default: m.WorkshopFacts })));
+
+export interface StoreWorkshop {
+  /** `fdm` / `resin` — the closed list the printers carry; anything else is not worded. */
+  technologies: Array<'fdm' | 'resin'>;
+  /** The largest build, x × y × z millimetres, when every side is known. */
+  build: [number, number, number] | null;
+  /** The usual turnaround in days (1–60), when the workshop stated one. */
+  turnaround: number | null;
+  /** The store takes custom print requests. */
+  custom: boolean;
+}
+
+/** The store read's `workshop` block, read defensively; null when it says nothing a visitor could use. */
+export function workshopOf(store: StorefrontStore): StoreWorkshop | null {
+  // The server sends a deduplicated, sorted list and whole millimetres (publicWorkshopFacts); only the shape is checked here.
+  const w = (store as { workshop?: Record<string, unknown> }).workshop;
+  if (!w) return null;
+  const technologies = (Array.isArray(w.technologies) ? w.technologies : []).filter((t): t is 'fdm' | 'resin' => t === 'fdm' || t === 'resin');
+  const b = (w.max_build_mm || {}) as Record<string, unknown>;
+  const sides = [b.x, b.y, b.z].map((v) => Number(v) || 0) as [number, number, number];
+  const build = sides.every((n) => n > 0) ? sides : null;
+  const days = Number(w.turnaround_days);
+  const turnaround = Number.isInteger(days) && days > 0 && days <= 60 ? days : null;
+  const custom = w.custom_enabled === true;
+  return technologies.length || build || turnaround || custom ? { technologies, build, turnaround, custom } : null;
+}
+
+/** Under every hero variant: the facts row, or nothing at all for a store without facts. */
+function HeroWorkshop({ store }: { store: StorefrontStore }) {
+  const workshop = workshopOf(store);
+  if (!workshop) return null;
+  return (
+    <Column className="mt-3">
+      <Suspense fallback={<div className="h-7" aria-hidden="true" />}>
+        <WorkshopFacts workshop={workshop} />
+      </Suspense>
+    </Column>
+  );
+}
 
 /**
  * The widget icons (merchant/profileIcons: twenty lucide names → components)
@@ -51,12 +104,20 @@ export default function HeroBlock({ block, store, data }: HeroProps) {
   const name = text(s.headline) || store.name;
   if (block.variant !== 'profile') {
     return (
-      <Suspense fallback={<VariantFrame variant={block.variant} cover={cover} />}>
-        <HeroVariant block={block} store={store} data={data} cover={cover} name={name} />
-      </Suspense>
+      <>
+        <Suspense fallback={<VariantFrame variant={block.variant} cover={cover} />}>
+          <HeroVariant block={block} store={store} data={data} cover={cover} name={name} />
+        </Suspense>
+        <HeroWorkshop store={store} />
+      </>
     );
   }
-  return <ProfileHero block={block} store={store} data={data} cover={cover} name={name} />;
+  return (
+    <>
+      <ProfileHero block={block} store={store} data={data} cover={cover} name={name} />
+      <HeroWorkshop store={store} />
+    </>
+  );
 }
 
 /**
@@ -107,7 +168,9 @@ function ProfileHero({ block, store, data, cover, name }: HeroProps & { cover: s
       {s.show_cover && (
         <div className="h-36 @min-[40rem]:h-48 w-full overflow-hidden bg-white/[0.03] relative">
           {cover && <img src={cover} alt="" className="w-full h-full object-cover" loading="eager" fetchPriority="high" />}
+          <HeroVideoStage video={s.video} poster={cover} onPhone={s.video_on_phone} />
           <div className="absolute inset-0 sf-cover-fade" />
+          <HeroVideoButton video={s.video} onPhone={s.video_on_phone} />
         </div>
       )}
 

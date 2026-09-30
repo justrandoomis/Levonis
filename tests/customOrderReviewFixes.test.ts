@@ -136,7 +136,7 @@ test('F4: start and delivered reach the customer once each; delivered names «أ
   assert.equal(delivered.length, 1);
   assert.equal(delivered[0].kind, 'order_update');
   assert.match(delivered[0].title_en, /confirm receipt/i);
-  assert.equal(delivered[0].link, `/requests?request=${a.id}`);
+  assert.equal(delivered[0].link, `/requests/${a.id}`);
   const title_ar = row<{ title_ar: string }>(raw, 'SELECT title_ar FROM user_notifications WHERE event_key = ?', `custom_order:${a.orderId}:delivered`)!.title_ar;
   assert.match(title_ar, /أكّد الاستلام/);
   assert.ok(d.auto_complete_at, 'the owner set five days');

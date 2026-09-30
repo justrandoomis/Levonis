@@ -114,6 +114,15 @@ import { assertMayQuote, directRequest } from '../lib/directRequests';
 import { isDirectMerchant } from '../lib/communityRequests';
 import { announceCustomOrder, customOrderCard, postSystemCard } from '../lib/chatCards';
 import { fileClass, fileReadStatement, fileReader, mayReadBytes, previewGrantFor } from '../lib/requestFilePolicy';
+// Phase 5b (docs/COMMUNITY_ECOSYSTEM.md §9.5): the discussion's server-written
+// rows on a close or a revision, and the timeline's «started» row.
+import { writeRequestSystemUpdate } from './requestDiscussion';
+import { recordOrderEvent } from './communityOrderTimeline';
+// Offers V2 (0159, §9.5): a file key is the caller's own private upload or nothing.
+import { ownedFileObject } from '../lib/fileOwnership';
+import { isSchemaMissing } from '../lib/membershipBenefits';
+// A board deal's conversation: the request thread, found or created by the chat door's own helper.
+import { openStoreThread } from './chats';
 
 export const marketplaceRoutes = new Hono<AppContext>();
 
@@ -166,6 +175,11 @@ function parseIds(raw: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, OFFER_MAX_MATERIALS) : [];
 }
 
+/** The delivery fee an offer row carries (0159); a row from before it carries none. */
+const offerFee = (o: Record<string, unknown>): number => Math.max(0, Number(o.delivery_fee_iqd ?? 0) || 0);
+/** What the customer agrees to: price plus fee, computed HERE and never read from a client. */
+const offerTotal = (o: Record<string, unknown>): number => (Number(o.price_iqd ?? 0) || 0) + offerFee(o);
+
 export function offerShape(o: Record<string, unknown>, badges: { pro: Set<string>; premium: Set<string> } = { pro: new Set(), premium: new Set() }) {
   return {
     id: o.id,
@@ -205,6 +219,22 @@ export function offerShape(o: Record<string, unknown>, badges: { pro: Set<string
         : false),
     /** Past its own validity — shown as expired even before the sweep writes it. */
     expired: o.state === 'expired' || (o.state === 'pending' && isPast(o.expires_at as string | null)),
+    /**
+     * OFFERS V2 (0159, docs/COMMUNITY_ECOSYSTEM.md §9.5). The fee is part of
+     * what the customer agrees to, so the total is computed on the server;
+     * `revised` is the «عرض معدّل» the customer sees (revision > 1);
+     * `valid_until` the validity under the name the card reads. `files` are
+     * attached by the routes that can say who is asking. A draft is never one
+     * of these rows (`draftShape`), so `draft` is false here by construction.
+     */
+    delivery_fee_iqd: offerFee(o),
+    total_iqd: offerTotal(o),
+    quantity: o.quantity === null || o.quantity === undefined ? null : Number(o.quantity),
+    color: String(o.color ?? ''),
+    terms: String(o.terms ?? ''),
+    revised: Number(o.revision ?? 1) > 1,
+    valid_until: (o.expires_at as string | null) ?? null,
+    draft: false,
     // What a customer needs to compare offers (§27) — reputation, not contact
     // details.
     merchant: o.m_name
@@ -388,6 +418,8 @@ async function afterFilesChanged(db: D1Database, requestId: string, userId: stri
     const stmts = await staleOfferNotifications(db, requestId, Number(row.revision));
     if (snap) stmts.unshift(recordRevisionStatement(db, requestId, snap, 'files', userId, nowIso()));
     if (stmts.length) await db.batch(stmts);
+    // «تغيّر الطلب» in the discussion (§9.5) — after the revision committed.
+    if (snap) await writeRequestSystemUpdate(db, requestId, 'revised', { change: 'files', revision: Number(row.revision) });
   } catch (e) {
     console.error('revision after a file change not recorded for', requestId, e instanceof Error ? e.message : String(e));
   }
@@ -460,7 +492,7 @@ async function notifyRequestFiles(
             written.count === 1
               ? `${name} فایلی زیاد کرد بۆ داواکارییەکە${aboutAr}`
               : `${written.count} کەس فایلیان زیاد کرد بۆ داواکارییەکە${aboutAr}`,
-          body_ckb: 'پێش پشتڕاستکردنەوەی پێشنیارەکەت فایلە نوێیەکان بپشکنە.',
+          body_ckb: 'پێش پشتڕاستکردنەوەی ئۆفەرەکەت فایلە نوێیەکان بپشکنە.',
         });
       }
     }
@@ -814,6 +846,8 @@ marketplaceRoutes.post('/requests/:id/cancel', requireAuth, async (c) => {
   }
 
   await audit(c.env.DB, user.id, 'community.request_cancelled', id, { from });
+  // The discussion records the close (§9.5) — after the commit, never inside it.
+  if (from !== 'draft') await writeRequestSystemUpdate(c.env.DB, id, 'cancelled', { by: 'customer', from });
   if (from !== 'draft') await notifyOffersRejected(c.env.DB, id, ts, 'request_cancelled');
   return c.json({ success: true });
 });
@@ -898,22 +932,425 @@ export async function readOfferTerms(
   return t;
 }
 
+// ------------------------------------------------------------- offers v2
+
+/** The most files one offer carries (§9.5). */
+export const OFFER_FILES_MAX = 6;
+const OFFER_FEE_MAX_IQD = 1_000_000_000;
+const OFFER_COLOR_MAX = 40;
+const OFFER_TERMS_MAX = 500;
+
+export interface OfferExtras {
+  delivery_fee_iqd?: number;
+  quantity?: number | null;
+  color?: string;
+  terms?: string;
+}
+
+/**
+ * THE V2 TERMS (0159): the delivery fee (whole dinars, zero or more — the
+ * total is price + fee and is never read from the client), the quantity the
+ * offer prices, the colour, the merchant's terms. `partial` (an edit, a draft)
+ * reads only what the body names; a new offer reads all, with «not stated»
+ * defaults. One reader for create, edit, draft and send, so none can accept
+ * a different thing.
+ */
+export function readOfferExtras(body: Record<string, unknown>, opts: { partial: boolean }): OfferExtras {
+  const t: OfferExtras = {};
+  const named = (k: string) => body[k] !== undefined;
+  if (!opts.partial || named('delivery_fee_iqd')) {
+    const raw = body.delivery_fee_iqd;
+    if (raw === undefined || raw === null || raw === '') {
+      if (!opts.partial) t.delivery_fee_iqd = 0;
+    } else {
+      const n = typeof raw === 'number' ? raw : Number(raw);
+      if (!Number.isSafeInteger(n) || n < 0 || n > OFFER_FEE_MAX_IQD) {
+        throw badRequest('The delivery fee must be a whole number of dinars, zero or more', 'OFFER_FEE_INVALID');
+      }
+      t.delivery_fee_iqd = n;
+    }
+  }
+  if (!opts.partial || named('quantity')) {
+    t.quantity = body.quantity === undefined || body.quantity === null || body.quantity === ''
+      ? null
+      : int(body.quantity, 'quantity', { min: 1, max: 100_000 });
+  }
+  if (!opts.partial || named('color')) t.color = str(body.color, 'color', { min: 0, max: OFFER_COLOR_MAX, required: false });
+  if (!opts.partial || named('terms')) t.terms = str(body.terms, 'terms', { min: 0, max: OFFER_TERMS_MAX, required: false });
+  return t;
+}
+
+/**
+ * A PICKUP CARRIES NO DELIVERY FEE — the composer's rule, held here too
+ * (review 2026-09-30): the customer collects from the workshop, so there is
+ * nothing to deliver and nothing to charge for it. `method` and `fee` are the
+ * EFFECTIVE values (the body's, else the stored offer's or draft's); `named`
+ * says the body itself named that fee. A fee the body names above zero beside
+ * a pickup is refused `OFFER_PICKUP_FEE`; a fee only inherited (an edit that
+ * switches the method to pickup and says nothing of the fee) answers 'zero',
+ * and the caller writes 0 in the same statement — so the total the customer
+ * is told and funds is the price.
+ */
+export function pickupFeeRule(method: unknown, fee: unknown, named: boolean): 'ok' | 'zero' {
+  if (method !== 'pickup' || !(Number(fee ?? 0) > 0)) return 'ok';
+  if (named) throw badRequest('A pickup from the workshop carries no delivery fee', 'OFFER_PICKUP_FEE');
+  return 'zero';
+}
+
+export type OfferFileKind = 'image' | 'pdf' | 'model';
+export interface OfferFileInput {
+  key: string;
+  kind: OfferFileKind;
+  name: string;
+  bytes: number;
+  content_type: string;
+}
+
+/**
+ * `files: [{key}]` — each key must be the caller's OWN private upload for an
+ * offer ON THIS REQUEST (`ownedFileObject`, worker/lib/fileOwnership.ts): a
+ * key is a string and a string can name anybody's object, so nothing here
+ * trusts it. The door is the strict one (review 2026-09-30): purpose exactly
+ * `offer` (a legacy '' row — a bank-transfer receipt, an old chat picture —
+ * is never an offer file), the key under the merchant's own
+ * `merchants/<uid>/offers/` placement, and `file_objects.entity_id` the
+ * request the upload door filed it under (another job's quote does not ride
+ * this one). At most six; a picture, a PDF or a model. `undefined` when the
+ * body does not name files at all (an edit that leaves them as they are).
+ */
+async function readOfferFiles(db: D1Database, body: Record<string, unknown>, userId: string, requestId: string): Promise<OfferFileInput[] | undefined> {
+  if (body.files === undefined) return undefined;
+  const raw = body.files === null ? [] : body.files;
+  if (!Array.isArray(raw)) throw badRequest('files must be a list of {key}');
+  if (raw.length > OFFER_FILES_MAX) throw badRequest(`An offer may carry at most ${OFFER_FILES_MAX} files`, 'OFFER_FILE_LIMIT');
+  const out: OfferFileInput[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const key = typeof item === 'string' ? item : item && typeof item === 'object' ? (item as { key?: unknown }).key : '';
+    const owned = await ownedFileObject(db, key, userId, ['offer'], {
+      exactPurpose: true,
+      prefix: `merchants/${userId}/offers/`,
+      entityId: requestId,
+    });
+    if (!owned) throw new HttpError(403, 'That file is not one you uploaded for an offer', 'OFFER_FILE_NOT_OWNED');
+    if (seen.has(owned.key)) continue;
+    seen.add(owned.key);
+    const kind: OfferFileKind | null =
+      owned.kind === 'image' ? 'image' : owned.kind === 'model' ? 'model' : owned.mime === 'application/pdf' ? 'pdf' : null;
+    if (!kind) throw badRequest('An offer carries a picture, a PDF or a model', 'UPLOAD_KIND_NOT_ALLOWED');
+    const ext = owned.key.includes('.') ? owned.key.slice(owned.key.lastIndexOf('.') + 1) : 'bin';
+    out.push({ key: owned.key, kind, name: safeFileName(owned.original_name ?? '', ext), bytes: owned.bytes, content_type: owned.mime });
+  }
+  return out;
+}
+
+/**
+ * The file rows of an offer, REPLACED as a set inside the caller's batch: what
+ * the new list no longer names is deleted, what it adds is inserted, every
+ * statement fenced on the offer row existing and — for an edit, `fenceTs` —
+ * on the edit having landed (`updated_at = ts`), so a lost race writes no
+ * file onto an offer that did not move.
+ */
+function offerFileStatements(db: D1Database, offerId: string, files: OfferFileInput[], ts: string, fenceTs: string | null): D1PreparedStatement[] {
+  const fence = `EXISTS (SELECT 1 FROM community_offers o WHERE o.id = ?1 AND (?2 IS NULL OR o.updated_at = ?2))`;
+  return [
+    db
+      .prepare(`DELETE FROM community_offer_files WHERE offer_id = ?1 AND file_key NOT IN (SELECT value FROM json_each(?3)) AND ${fence}`)
+      .bind(offerId, fenceTs, JSON.stringify(files.map((f) => f.key))),
+    ...files.map((f) =>
+      db
+        .prepare(
+          `INSERT OR IGNORE INTO community_offer_files (id, offer_id, file_key, kind, name, bytes, content_type, created_at)
+           SELECT ?3, ?1, ?4, ?5, ?6, ?7, ?8, ?9 WHERE ${fence}`
+        )
+        .bind(offerId, fenceTs, newId('ofl'), f.key, f.kind, f.name, f.bytes, f.content_type, ts)
+    ),
+  ];
+}
+
+/** The files of these offers, grouped by offer — none on a database behind 0159. */
+async function offerFilesFor(db: D1Database, offerIds: string[]): Promise<Map<string, Array<Record<string, unknown>>>> {
+  const out = new Map<string, Array<Record<string, unknown>>>();
+  if (!offerIds.length) return out;
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT id, offer_id, file_key, kind, name, bytes, content_type FROM community_offer_files
+          WHERE offer_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid`
+      )
+      .bind(JSON.stringify([...new Set(offerIds)]))
+      .all<Record<string, unknown>>();
+    for (const f of results ?? []) {
+      const k = String(f.offer_id);
+      out.set(k, [...(out.get(k) ?? []), f]);
+    }
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+  }
+  return out;
+}
+
+/**
+ * The files of the offers a SUBQUERY names (`SELECT o.id FROM community_offers
+ * o WHERE …`, bound with `binds`) — the page's own rule in SQL, so the read
+ * rides the same wave as the offers instead of waiting for their ids
+ * (review 2026-09-30).
+ */
+async function offerFilesWhere(db: D1Database, offerIdsSql: string, binds: readonly unknown[]): Promise<Map<string, Array<Record<string, unknown>>>> {
+  const out = new Map<string, Array<Record<string, unknown>>>();
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT f.id, f.offer_id, f.file_key, f.kind, f.name, f.bytes, f.content_type FROM community_offer_files f
+          WHERE f.offer_id IN (${offerIdsSql})
+          ORDER BY f.created_at, f.rowid`
+      )
+      .bind(...binds)
+      .all<Record<string, unknown>>();
+    for (const f of results ?? []) {
+      const k = String(f.offer_id);
+      out.set(k, [...(out.get(k) ?? []), f]);
+    }
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+  }
+  return out;
+}
+
+/**
+ * The files of every offer on a request the caller may see — the offers
+ * list's own rule (the customer: all; a merchant: their own).
+ */
+function offerFilesInScope(db: D1Database, requestId: string, all: 0 | 1, merchantId: string): Promise<Map<string, Array<Record<string, unknown>>>> {
+  return offerFilesWhere(db, 'SELECT o.id FROM community_offers o WHERE o.request_id = ?1 AND (?2 = 1 OR o.merchant_id = ?3)', [requestId, all, merchantId]);
+}
+
+/**
+ * An offer file as a party sees it: a URL on this Worker, which re-derives the
+ * caller's right on every read (GET /offers/:id/files/:fileId) — NEVER the
+ * key, except to its uploader (the offer's merchant, `keys`), who sends the
+ * keys back on an edit.
+ */
+function offerFilePublic(f: Record<string, unknown>, offerId: string, opts: { keys: boolean }) {
+  return {
+    id: f.id,
+    kind: f.kind,
+    name: f.name,
+    bytes: Number(f.bytes ?? 0),
+    content_type: String(f.content_type ?? ''),
+    url: `/api/marketplace/offers/${encodeURIComponent(offerId)}/files/${encodeURIComponent(String(f.id))}`,
+    ...(opts.keys ? { key: f.file_key } : {}),
+  };
+}
+
+/** The offers' rows with their files, for a reader who may see them all. */
+function withFiles(rows: Array<Record<string, unknown>>, files: Map<string, Array<Record<string, unknown>>>, keys: boolean) {
+  return rows.map((row) => ({
+    ...offerShape(row),
+    files: (files.get(String(row.id)) ?? []).map((f) => offerFilePublic(f, String(row.id), { keys })),
+  }));
+}
+
+// ------------------------------------------------------------------ drafts
+
+/**
+ * «احفظ مسودة» (0159, §9.5) lives in `community_offer_drafts`, not in
+ * `community_offers`: 0031's one-live-offer index is `WHERE state IN
+ * ('pending','accepted')` and cannot be widened, so a draft stored as a
+ * pending row would collide with the same merchant's later live offer and
+ * every reader of `state = 'pending'` would have to skip it. A draft is a
+ * payload the send route feeds to the same fenced INSERT a new offer uses.
+ * The client sees ONE concept: an offer with `draft: true`.
+ */
+interface DraftRow {
+  id: string;
+  request_id: string;
+  merchant_id: string;
+  payload_json: string;
+  files_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** What a draft's payload holds: the validated terms as the readers returned them, plus what «send» needs. */
+interface DraftPayload extends OfferTerms, OfferExtras {
+  store_id?: string | null;
+  quote_id?: string;
+  /** Kept raw so the validity is recomputed from the SEND, not from the day the draft was saved. */
+  valid_days?: number | null;
+}
+
+/** A merchant's own draft by id — null when none, and on a database behind 0159. */
+async function loadDraft(db: D1Database, draftId: string, merchantId: string): Promise<DraftRow | null> {
+  try {
+    return (await db.prepare('SELECT * FROM community_offer_drafts WHERE id = ? AND merchant_id = ?').bind(draftId, merchantId).first<DraftRow>()) ?? null;
+  } catch (e) {
+    if (isSchemaMissing(e)) return null;
+    throw e;
+  }
+}
+
+/** A merchant's draft on a request — at most one (UNIQUE (request_id, merchant_id)). */
+async function draftOnRequest(db: D1Database, requestId: string, merchantId: string): Promise<DraftRow | null> {
+  try {
+    return (await db.prepare('SELECT * FROM community_offer_drafts WHERE request_id = ? AND merchant_id = ?').bind(requestId, merchantId).first<DraftRow>()) ?? null;
+  } catch (e) {
+    if (isSchemaMissing(e)) return null;
+    throw e;
+  }
+}
+
+/** Every draft of a merchant with its request, newest first — «عروضي» flags them. */
+async function merchantDrafts(db: D1Database, merchantId: string): Promise<Array<DraftRow & Record<string, unknown>>> {
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT d.*, r.title AS request_title, r.state AS request_state, r.revision AS r_revision, r.expires_at AS request_expires_at
+           FROM community_offer_drafts d JOIN community_requests r ON r.id = d.request_id
+          WHERE d.merchant_id = ? ORDER BY d.updated_at DESC, d.id DESC LIMIT 50`
+      )
+      .bind(merchantId)
+      .all<DraftRow & Record<string, unknown>>();
+    return results ?? [];
+  } catch (e) {
+    if (isSchemaMissing(e)) return [];
+    throw e;
+  }
+}
+
+/** The `valid_days` a body names (1..60), null for none — the offer form's field, kept raw on a draft. */
+function readValidDays(body: Record<string, unknown>): number | null | undefined {
+  if (body.valid_days === undefined) return undefined;
+  if (body.valid_days === null || body.valid_days === '') return null;
+  return int(body.valid_days, 'valid_days', { min: 1, max: OFFER_VALIDITY_MAX_DAYS });
+}
+
+/**
+ * A DRAFT IN THE OFFER'S SHAPE — `draft: true`, `state: 'draft'`, revision 0 —
+ * so the composer restores it and the lists flag it, with one concept on the
+ * client. Returned to its author only, who may therefore see its file keys
+ * (they are sent back on the next save).
+ */
+function draftShape(d: DraftRow, request: { revision?: unknown } = {}) {
+  const p = safeParse<DraftPayload>(d.payload_json, {});
+  const rawFiles = safeParse<OfferFileInput[]>(d.files_json, []);
+  const files = Array.isArray(rawFiles) ? rawFiles : [];
+  const price = p.price_iqd === undefined || p.price_iqd === null ? null : Number(p.price_iqd);
+  const fee = Math.max(0, Number(p.delivery_fee_iqd ?? 0) || 0);
+  return {
+    id: d.id,
+    request_id: d.request_id,
+    merchant_id: d.merchant_id,
+    store_id: p.store_id ?? null,
+    price_iqd: price,
+    completion_days: Number(p.completion_days ?? 0) || 0,
+    delivery_method: String(p.delivery_method ?? ''),
+    message: String(p.message ?? ''),
+    materials: String(p.materials ?? ''),
+    included: String(p.included ?? ''),
+    warranty_terms: String(p.warranty_terms ?? ''),
+    material_ids: Array.isArray(p.material_ids) ? p.material_ids : [],
+    state: 'draft' as const,
+    draft: true as const,
+    expires_at: p.expires_at ?? null,
+    valid_days: p.valid_days ?? null,
+    created_at: d.created_at,
+    updated_at: d.updated_at,
+    revision: 0,
+    request_revision: Number(request.revision ?? 0) || 0,
+    stale: false,
+    expired: false,
+    revised: false,
+    delivery_fee_iqd: fee,
+    total_iqd: price === null ? null : price + fee,
+    quantity: p.quantity ?? null,
+    color: String(p.color ?? ''),
+    terms: String(p.terms ?? ''),
+    valid_until: p.expires_at ?? null,
+    files: files.map((f) => ({ id: null, kind: f.kind, name: f.name, bytes: f.bytes, content_type: f.content_type ?? '', url: null, key: f.key })),
+    merchant: null,
+    quote_id: p.quote_id ?? null,
+  };
+}
+
+/**
+ * THE OFFER INSERT — one statement for a new offer and for a draft being sent,
+ * so the two cannot write different things. It writes ONLY while the request
+ * is still on the board, not the merchant's own, not expired, and the verdict
+ * row for its CURRENT revision says eligible (`eligibleVerdictSql`, written
+ * by `assertMayOffer` a moment earlier — a revision landing in between leaves
+ * it behind and the write matches nothing; audit 03 §10 P). The batch also
+ * moves the request to receiving_offers, records the first revision (0130)
+ * and recomputes the board's count (never increments it).
+ */
+function insertOfferStatements(
+  db: D1Database,
+  p: { id: string; requestId: string; merchantId: string; storeId: string | null; customerId: string; terms: OfferTerms; extras: OfferExtras; ts: string }
+): D1PreparedStatement[] {
+  const { terms: t, extras: x } = p;
+  return [
+    db
+      .prepare(
+        `INSERT INTO community_offers
+           (id, request_id, merchant_id, store_id, price_iqd, completion_days, delivery_method,
+            message, materials, included, warranty_terms, state, expires_at, revision, request_revision,
+            created_at, updated_at, material_ids, delivery_fee_iqd, quantity, color, terms)
+         SELECT ?1, r.id, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'pending', ?11, 1, r.revision, ?12, ?12, ?15, ?16, ?17, ?18, ?19
+           FROM community_requests r
+          WHERE r.id = ?13 AND r.state IN ('open','receiving_offers') AND r.visibility = 'public'
+            AND r.customer_id <> ?14
+            AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?12)
+            AND ${eligibleVerdictSql('r', '?2')}`
+      )
+      .bind(
+        p.id, p.merchantId, p.storeId, t.price_iqd!,
+        t.completion_days ?? 0, t.delivery_method ?? '', t.message ?? '', t.materials ?? '',
+        t.included ?? '', t.warranty_terms ?? '',
+        t.expires_at ?? null, p.ts, p.requestId, p.customerId, JSON.stringify(t.material_ids ?? []),
+        x.delivery_fee_iqd ?? 0, x.quantity ?? null, x.color ?? '', x.terms ?? ''
+      ),
+    db
+      .prepare(
+        `UPDATE community_requests
+            SET state = CASE WHEN state = 'open' THEN 'receiving_offers' ELSE state END,
+                updated_at = ?
+          WHERE id = ? AND state IN ('open','receiving_offers')
+            AND EXISTS (SELECT 1 FROM community_offers WHERE id = ?)`
+      )
+      .bind(p.ts, p.requestId, p.id),
+    // What the customer will see as this offer's first version (0130).
+    recordOfferRevisionStatement(db, p.id, 'create'),
+    // The board shows a live count; it is recomputed, never incremented.
+    offerCountStatement(db, p.requestId),
+  ];
+}
+
 /** Offers on a request. The customer sees all; a merchant sees only their own. */
 marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
   const user = c.get('user')!;
   const requestId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
-  const req = await c.env.DB.prepare('SELECT customer_id, state FROM community_requests WHERE id = ?')
-    .bind(requestId)
-    .first<{ customer_id: string; state: string }>();
+  const [req, mine] = await Promise.all([
+    c.env.DB.prepare('SELECT customer_id, state, revision FROM community_requests WHERE id = ?')
+      .bind(requestId)
+      .first<{ customer_id: string; state: string; revision: number }>(),
+    storeForUser(c.env.DB, user.id),
+  ]);
   // A draft does not exist for anyone but its customer — not even as an
   // empty offer list that confirms the id (W5-A: draft invisibility).
   if (!req || (req.state === 'draft' && req.customer_id !== user.id)) throw notFound('Request not found');
 
   const isCustomer = req.customer_id === user.id;
-  const mine = await storeForUser(c.env.DB, user.id);
+  const scope = [requestId, isCustomer ? 1 : 0, mine?.merchant.id ?? ''] as const;
 
+  /**
+   * ONE WAVE for everything the caller may see (review 2026-09-30): the
+   * offers, every revision of them, their files and the merchant's own draft
+   * are read side by side — the files by the same visibility rule as the
+   * offers, in SQL, rather than keyed on the offer rows read first. The
+   * badges follow, being keyed on the merchants those rows name.
+   */
   // A merchant must not be able to read a competitor's price on the same job.
-  const { results } = await c.env.DB.prepare(
+  const offersRead = c.env.DB.prepare(
     `SELECT o.*, m.user_id AS m_user_id, m.name AS m_name, m.verified AS m_verified, m.badge AS m_badge,
             m.badge_override AS m_badge_override, m.rating_avg_x100 AS m_rating,
             m.rating_count AS m_rating_count, m.completed_orders AS m_completed,
@@ -928,20 +1365,26 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
       WHERE o.request_id = ?
         AND (? = 1 OR o.merchant_id = ?)
       ORDER BY o.created_at ASC`
-  ).bind(requestId, isCustomer ? 1 : 0, mine?.merchant.id ?? '').all();
+  ).bind(...scope).all();
 
   /**
    * EVERY VERSION OF EVERY OFFER THIS CALLER MAY SEE (0130). An edit is a new
    * revision the customer sees as such — «كان ٥٠٬٠٠٠» — and the merchant sees
    * their own trail. Same visibility rule as the offers themselves, in SQL.
    */
-  const { results: revs } = await c.env.DB.prepare(
+  const revsRead = c.env.DB.prepare(
     `SELECT v.offer_id, v.revision, v.request_revision, v.price_iqd, v.terms, v.reason, v.created_at
        FROM community_offer_revisions v
       WHERE v.offer_id IN (SELECT o.id FROM community_offers o
                             WHERE o.request_id = ? AND (? = 1 OR o.merchant_id = ?))
       ORDER BY v.offer_id, v.revision`
-  ).bind(requestId, isCustomer ? 1 : 0, mine?.merchant.id ?? '').all<Record<string, unknown>>();
+  ).bind(...scope).all<Record<string, unknown>>();
+  const [{ results }, { results: revs }, files, myDraft] = await Promise.all([
+    offersRead,
+    revsRead,
+    offerFilesInScope(c.env.DB, ...scope),
+    !isCustomer && mine ? draftOnRequest(c.env.DB, requestId, mine.merchant.id) : Promise.resolve(null),
+  ]);
   const history = new Map<string, Array<Record<string, unknown>>>();
   for (const v of revs ?? []) {
     const terms = safeParse<Record<string, unknown>>(v.terms, {});
@@ -958,11 +1401,16 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
     history.set(String(v.offer_id), list);
   }
 
+  // OFFERS V2 (0159): each offer's files as URLs — keys only to their uploader
+  // (the merchant reading their own offers) — and the merchant's own saved
+  // draft on this request, which a customer never sees (`draft: null`).
   const badges = await membershipBadges(c.env.DB, results.map((row) => row.m_user_id));
   return c.json({
     success: true,
+    draft: myDraft ? draftShape(myDraft, { revision: req.revision }) : null,
     offers: results.map((row) => ({
       ...offerShape(row, badges),
+      files: (files.get(String(row.id)) ?? []).map((f) => offerFilePublic(f, String(row.id), { keys: !isCustomer })),
       history: history.get(String(row.id)) ?? [],
       // The order this offer became — only the winning offer, only to its two parties.
       order_id: row.state === 'accepted' && row.r_accepted_offer_id === row.id ? (row.r_order_id ?? null) : null,
@@ -1004,8 +1452,14 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
     throw conflict('This request has expired and no longer takes offers', 'REQUEST_EXPIRED');
   }
 
-  const body = await c.req.json().catch(() => ({}));
-  const t = await readOfferTerms(c.env.DB, body as Record<string, unknown>, ts, { partial: false });
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  // «احفظ مسودة» (0159): a draft may be saved without a price; a sent offer may not.
+  const asDraft = body.draft === true;
+  const t = await readOfferTerms(c.env.DB, body, ts, { partial: asDraft });
+  const x = readOfferExtras(body, { partial: asDraft });
+  // Nothing is stored yet: every fee here is one the body named.
+  pickupFeeRule(t.delivery_method, x.delivery_fee_iqd, true);
+  const files = (await readOfferFiles(c.env.DB, body, user.id, requestId)) ?? [];
   /**
    * ELIGIBILITY IS THE PERMISSION (W5-B; audit 03 §9 G7). A plan used to be
    * enough to bid on anything; now the workshop must be able to make THIS job
@@ -1013,11 +1467,40 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
    * board and the notifications read (worker/lib/eligibility.ts). Refused with
    * `403 OFFER_NOT_ELIGIBLE` and the reasons; the INSERT below fences on the
    * verdict row this call just wrote, so a revision landing in between cannot
-   * slip an offer onto a job it was not judged against.
+   * slip an offer onto a job it was not judged against. A DRAFT asks the same
+   * bar: saving one opens the upload door for its files (purpose `offer`), and
+   * that door is a workshop's that may quote the job.
    */
   await assertMayOffer(c.env, requestId, ctx.merchant.id);
   // «استخدم هذا كعرضي» (costing v2): the private quote this offer came from.
-  const quoteId = str((body as Record<string, unknown>).quote_id, 'quote_id', { max: 60, required: false }) || '';
+  const quoteId = str(body.quote_id, 'quote_id', { max: 60, required: false }) || '';
+
+  if (asDraft) {
+    // A draft beside a live offer would only be a second promise waiting to
+    // collide with the first (OFFER_EXISTS on send); refused now, with the
+    // same answer.
+    const live = await c.env.DB.prepare(
+      `SELECT id FROM community_offers WHERE request_id = ? AND merchant_id = ? AND state IN ('pending','superseded','accepted') LIMIT 1`
+    ).bind(requestId, ctx.merchant.id).first();
+    if (live) throw conflict('You already have an active offer on this request', 'OFFER_EXISTS');
+    const payload: DraftPayload = { ...t, ...x, store_id: ctx.store.id, quote_id: quoteId || undefined, valid_days: readValidDays(body) ?? null };
+    const draftId = newId('ofd');
+    try {
+      await c.env.DB.prepare(
+        `INSERT INTO community_offer_drafts (id, request_id, merchant_id, payload_json, files_json, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?)`
+      ).bind(draftId, requestId, ctx.merchant.id, JSON.stringify(payload), JSON.stringify(files), ts, ts).run();
+    } catch (e) {
+      // UNIQUE (request_id, merchant_id): one draft per job — edit it (PATCH /offers/:draftId).
+      if (!(isConstraintAbort(e) && /UNIQUE/i.test(e instanceof Error ? e.message : String(e)))) throw e;
+      const existing = await draftOnRequest(c.env.DB, requestId, ctx.merchant.id);
+      throw new HttpError(409, 'You already have a saved draft on this request — edit it instead', 'OFFER_DRAFT_EXISTS', { draft_id: existing?.id ?? null });
+    }
+    await audit(c.env.DB, user.id, 'community.offer_draft_saved', draftId, { request: requestId });
+    const saved = await loadDraft(c.env.DB, draftId, ctx.merchant.id);
+    // No notice and no count: the customer does not know a draft exists.
+    return c.json({ success: true, offer: draftShape(saved!, { revision: req.revision }) }, 201);
+  }
 
   const id = newId('off');
   let inserted = 0;
@@ -1025,35 +1508,12 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
     const res = await c.env.DB.batch([
       // The offer is written ONLY while the request is still on the board —
       // re-checked here, in the write, not just above (audit 03 §10 P). It
-      // prices the job's CURRENT revision.
-      c.env.DB.prepare(
-        `INSERT INTO community_offers
-           (id, request_id, merchant_id, store_id, price_iqd, completion_days, delivery_method,
-            message, materials, included, warranty_terms, state, expires_at, revision, request_revision,
-            created_at, updated_at, material_ids)
-         SELECT ?1, r.id, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'pending', ?11, 1, r.revision, ?12, ?12, ?15
-           FROM community_requests r
-          WHERE r.id = ?13 AND r.state IN ('open','receiving_offers') AND r.visibility = 'public'
-            AND r.customer_id <> ?14
-            AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?12)
-            AND ${eligibleVerdictSql('r', '?2')}`
-      ).bind(
-        id, ctx.merchant.id, ctx.store.id, t.price_iqd!,
-        t.completion_days ?? 0, t.delivery_method ?? '', t.message ?? '', t.materials ?? '',
-        t.included ?? '', t.warranty_terms ?? '',
-        t.expires_at ?? null, ts, requestId, user.id, JSON.stringify(t.material_ids ?? [])
-      ),
-      c.env.DB.prepare(
-        `UPDATE community_requests
-            SET state = CASE WHEN state = 'open' THEN 'receiving_offers' ELSE state END,
-                updated_at = ?
-          WHERE id = ? AND state IN ('open','receiving_offers')
-            AND EXISTS (SELECT 1 FROM community_offers WHERE id = ?)`
-      ).bind(ts, requestId, id),
-      // What the customer will see as this offer's first version (0130).
-      recordOfferRevisionStatement(c.env.DB, id, 'create'),
-      // The board shows a live count; it is recomputed, never incremented.
-      offerCountStatement(c.env.DB, requestId),
+      // prices the job's CURRENT revision. Its files land in the same batch,
+      // fenced on the offer row.
+      ...insertOfferStatements(c.env.DB, {
+        id, requestId, merchantId: ctx.merchant.id, storeId: ctx.store.id, customerId: user.id, terms: t, extras: x, ts,
+      }),
+      ...offerFileStatements(c.env.DB, id, files, ts, null),
     ]);
     inserted = Number(res[0]?.meta.changes ?? 0);
   } catch (e) {
@@ -1081,7 +1541,9 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
     ).bind(ts, quoteId, ctx.merchant.id, requestId).run();
   }
 
-  await audit(c.env.DB, user.id, 'community.offer_created', id, { request: requestId, price: t.price_iqd, quote: quoteId || null });
+  await audit(c.env.DB, user.id, 'community.offer_created', id, {
+    request: requestId, price: t.price_iqd, fee: x.delivery_fee_iqd ?? 0, files: files.length, quote: quoteId || null,
+  });
   /**
    * THE CUSTOMER WHOSE REQUEST THIS IS HEARS THAT AN OFFER ARRIVED — outside
    * the batch: a failed notification must never roll back a merchant's bid;
@@ -1093,8 +1555,8 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
     // No ExecutionContext on this path. Already in flight, cannot reject.
     void notifyOfferReceived(c.env, id);
   }
-  const row = await c.env.DB.prepare('SELECT * FROM community_offers WHERE id = ?').bind(id).first();
-  return c.json({ success: true, offer: offerShape(row as Record<string, unknown>) }, 201);
+  const row = await c.env.DB.prepare('SELECT * FROM community_offers WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  return c.json({ success: true, offer: withFiles([row!], await offerFilesFor(c.env.DB, [id]), true)[0] }, 201);
 });
 
 /**
@@ -1134,23 +1596,37 @@ marketplaceRoutes.post('/offers/:id/withdraw', requireAuth, async (c) => {
 
 /**
  * «عرض محدَّث» — the customer hears that an offer they may be comparing
- * changed, with the new price, keyed per offer AND revision.
+ * changed, keyed per offer AND revision. The figure is the TOTAL — price plus
+ * delivery fee, what acceptance funds (DECISIONS 178 (١), §4e) — with the fee
+ * named when there is one: a fee-only edit changes what the customer pays,
+ * and «the price is now X» would quote the one number that did not move
+ * (review 2026-09-30). The meta carries the three figures, and the Sorani.
  */
 function offerUpdatedNotice(
   db: D1Database,
-  p: { customerId: string; requestId: string; offerId: string; revision: number; priceIqd: number }
+  p: { customerId: string; requestId: string; offerId: string; revision: number; priceIqd: number; feeIqd: number; totalIqd: number }
 ): D1PreparedStatement {
+  const n = (v: number) => v.toLocaleString('en-US');
+  const fee = p.feeIqd > 0;
   return notifyStatement(db, {
     userId: p.customerId,
     kind: 'offer_received',
     title_ar: 'عدّل تاجر عرضه على طلبك',
     title_en: 'A merchant updated their offer',
-    body_ar: `السعر الآن ${p.priceIqd.toLocaleString('en-US')} د.ع. راجع العرض قبل القبول.`,
-    body_en: `The price is now ${p.priceIqd.toLocaleString('en-US')} IQD. Review the offer before accepting.`,
-    link: `/requests?request=${encodeURIComponent(p.requestId)}`,
+    body_ar: `الإجمالي الآن ${n(p.totalIqd)} د.ع${fee ? ` (منها ${n(p.feeIqd)} توصيل)` : ''}. راجع العرض قبل القبول.`,
+    body_en: `The total is now ${n(p.totalIqd)} IQD${fee ? ` (${n(p.feeIqd)} of it delivery)` : ''}. Review the offer before accepting.`,
+    link: `/requests/${encodeURIComponent(p.requestId)}`,
     entity_type: 'offer',
     entity_id: p.offerId,
-    meta: { request_id: p.requestId, revision: p.revision },
+    meta: {
+      request_id: p.requestId,
+      revision: p.revision,
+      price_iqd: p.priceIqd,
+      delivery_fee_iqd: p.feeIqd,
+      total_iqd: p.totalIqd,
+      title_ckb: 'بازرگانێک ئۆفەرەکەی سەر داواکاریەکەتی دەستکاری کرد',
+      body_ckb: `کۆی گشتی ئێستا ${n(p.totalIqd)} د.ع${fee ? ` (${n(p.feeIqd)}ی بۆ گەیاندنە)` : ''}. پێش قبوڵکردن سەیری ئۆفەرەکە بکە.`,
+    },
     eventKey: `offer_updated:${p.offerId}:${p.revision}`,
   }).stmt;
 }
@@ -1173,6 +1649,8 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const ts = nowIso();
   const t = await readOfferTerms(c.env.DB, body, ts, { partial: true });
+  // Offers V2 (0159): the fee, quantity, colour, terms and the file set.
+  const x = readOfferExtras(body, { partial: true });
   const sets: string[] = [];
   const vals: unknown[] = [];
   const put = (col: string, v: unknown) => { sets.push(`${col} = ?`); vals.push(v); };
@@ -1185,16 +1663,48 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
   if (t.warranty_terms !== undefined) put('warranty_terms', t.warranty_terms);
   if (t.material_ids !== undefined) put('material_ids', JSON.stringify(t.material_ids));
   if (t.expires_at !== undefined) put('expires_at', t.expires_at);
-  if (!sets.length) throw badRequest('Nothing to update');
+  if (x.delivery_fee_iqd !== undefined) put('delivery_fee_iqd', x.delivery_fee_iqd);
+  if (x.quantity !== undefined) put('quantity', x.quantity);
+  if (x.color !== undefined) put('color', x.color);
+  if (x.terms !== undefined) put('terms', x.terms);
+  if (!sets.length && body.files === undefined) throw badRequest('Nothing to update');
+  // A fee the body names is checked against the method it ends up with (the
+  // body's, else the stored one) below, once the stored row is known.
+  const feeNamed = x.delivery_fee_iqd !== undefined;
 
   const offerId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const before = await c.env.DB.prepare(
-    `SELECT o.price_iqd, o.completion_days, o.delivery_method, o.message, o.materials, o.included, o.warranty_terms,
-            o.revision, o.state, o.request_id, r.customer_id
+    `SELECT o.price_iqd, o.completion_days, o.delivery_method, o.delivery_fee_iqd, o.message, o.materials, o.included,
+            o.warranty_terms, o.revision, o.state, o.request_id, r.customer_id
        FROM community_offers o JOIN community_requests r ON r.id = o.request_id
       WHERE o.id = ? AND o.merchant_id = ?`
   ).bind(offerId, ctx.merchant.id).first<Record<string, unknown>>();
-  if (!before) throw notFound('Offer not found');
+  if (!before) {
+    /**
+     * A DRAFT (0159) is edited by the same door, in place: no revision, no
+     * notice, nobody but its author knows it exists. The payload is merged
+     * field by field; a named file list replaces the old one.
+     */
+    const draft = await loadDraft(c.env.DB, offerId, ctx.merchant.id);
+    if (!draft) throw notFound('Offer not found');
+    const files = await readOfferFiles(c.env.DB, body, c.get('user')!.id, draft.request_id);
+    const payload: DraftPayload = { ...safeParse<DraftPayload>(draft.payload_json, {}), ...t, ...x };
+    if (pickupFeeRule(payload.delivery_method, payload.delivery_fee_iqd, feeNamed) === 'zero') payload.delivery_fee_iqd = 0;
+    const validDays = readValidDays(body);
+    if (validDays !== undefined) payload.valid_days = validDays;
+    const keptFiles = safeParse<OfferFileInput[]>(draft.files_json, []);
+    await c.env.DB.prepare(
+      'UPDATE community_offer_drafts SET payload_json = ?, files_json = ?, updated_at = ? WHERE id = ? AND merchant_id = ?'
+    ).bind(JSON.stringify(payload), JSON.stringify(files ?? (Array.isArray(keptFiles) ? keptFiles : [])), ts, offerId, ctx.merchant.id).run();
+    await audit(c.env.DB, c.get('user')!.id, 'community.offer_draft_saved', offerId, { request: draft.request_id });
+    const saved = await loadDraft(c.env.DB, offerId, ctx.merchant.id);
+    return c.json({ success: true, offer: draftShape(saved!) });
+  }
+  const files = await readOfferFiles(c.env.DB, body, c.get('user')!.id, String(before.request_id));
+  // Switching a delivered offer to pickup leaves no fee behind it.
+  if (pickupFeeRule(t.delivery_method ?? before.delivery_method, x.delivery_fee_iqd ?? before.delivery_fee_iqd, feeNamed) === 'zero') {
+    put('delivery_fee_iqd', 0);
+  }
   // An edit prices the job AS IT NOW IS: a new promise, so the same bar as a
   // new offer (W5-B) — a workshop the revised job no longer fits cannot re-price it.
   if (before.state === 'pending' || before.state === 'superseded') {
@@ -1210,7 +1720,7 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
     const res = await c.env.DB.batch([
       c.env.DB.prepare(
         `UPDATE community_offers
-            SET ${sets.join(', ')}, state = 'pending', revision = revision + 1,
+            SET ${sets.length ? `${sets.join(', ')}, ` : ''}state = 'pending', revision = revision + 1,
                 request_revision = (SELECT r.revision FROM community_requests r WHERE r.id = community_offers.request_id),
                 updated_at = ?
           WHERE id = ? AND merchant_id = ? AND state IN ('pending','superseded')
@@ -1220,6 +1730,8 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
       ).bind(...vals, ts, offerId, ctx.merchant.id, ts),
       recordOfferRevisionStatement(c.env.DB, offerId, 'edit'),
       offerCountStatement(c.env.DB, String(before.request_id)),
+      // A new file set rides the same edit, fenced on the edit having landed.
+      ...(files ? offerFileStatements(c.env.DB, offerId, files, ts, ts) : []),
     ]);
     changes = Number(res[0]?.meta.changes ?? 0);
   } catch (e) {
@@ -1242,9 +1754,148 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
       offerId,
       revision: Number(row?.revision ?? 1),
       priceIqd: Number(row?.price_iqd ?? 0),
+      feeIqd: row ? offerFee(row) : 0,
+      totalIqd: row ? offerTotal(row) : 0,
     }),
   ]).catch((e) => console.error('offer-updated notice not written', offerId, e instanceof Error ? e.message : String(e)));
-  return c.json({ success: true, offer: offerShape(row as Record<string, unknown>) });
+  return c.json({ success: true, offer: withFiles([row!], await offerFilesFor(c.env.DB, [offerId]), true)[0] });
+});
+
+/**
+ * «أرسل العرض» — a saved draft becomes a live offer (0159, §9.5). The payload
+ * is validated again AS A WHOLE (a draft may have been saved without a
+ * price), the validity recomputed from `valid_days` as of NOW, the file keys
+ * re-checked as the author's own, the eligibility asked again
+ * (`assertMayOffer`), and the offer written through the same fenced INSERT a
+ * new offer uses — in ONE batch with its files and the draft's deletion, so a
+ * draft never both stays and becomes an offer. Refused OFFER_REQUEST_CLOSED
+ * when the request no longer takes offers (the draft stays); OFFER_NOT_DRAFT
+ * for an id that is already a sent offer.
+ */
+marketplaceRoutes.post('/offers/:id/send', requireCommunityOpen, requireAuth, async (c) => {
+  await rateLimit(c, 'offer-create', 30, 3600);
+  const user = c.get('user')!;
+  const ctx = await requireOfferPrivileges(c);
+  const tier = await getTierStatus(c.env.DB, user.id);
+  if (!benefits.communityOffers(tier)) throw forbidden('Your plan does not include community offers');
+  const draftId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const draft = await loadDraft(c.env.DB, draftId, ctx.merchant.id);
+  if (!draft) {
+    const sent = await c.env.DB.prepare('SELECT id FROM community_offers WHERE id = ? AND merchant_id = ?').bind(draftId, ctx.merchant.id).first();
+    if (sent) throw conflict('This offer was already sent — it is not a draft', 'OFFER_NOT_DRAFT');
+    throw notFound('Offer not found');
+  }
+  const requestId = draft.request_id;
+  const req = await c.env.DB.prepare('SELECT * FROM community_requests WHERE id = ?').bind(requestId).first<Record<string, unknown>>();
+  const ts = nowIso();
+  if (
+    !req || req.state === 'draft' || req.visibility !== 'public' ||
+    !REQUEST_OPEN_STATES.includes(String(req.state) as RequestState) || isPast(req.expires_at as string | null, ts)
+  ) {
+    throw conflict('This request no longer takes offers — your draft was kept', 'OFFER_REQUEST_CLOSED');
+  }
+  if (req.customer_id === user.id) throw badRequest('You cannot bid on your own request', 'OWN_REQUEST');
+
+  const payload = safeParse<DraftPayload>(draft.payload_json, {});
+  // The validity runs from the SEND, not from the day the draft was saved.
+  const source: Record<string, unknown> = { ...payload };
+  if (payload.valid_days) delete source.expires_at;
+  else delete source.valid_days;
+  const t = await readOfferTerms(c.env.DB, source, ts, { partial: false });
+  const x = readOfferExtras(source, { partial: false });
+  // A saved draft cannot hold a fee beside a pickup (the save refuses or
+  // zeroes it); a payload from before that rule is refused here, draft kept.
+  pickupFeeRule(t.delivery_method, x.delivery_fee_iqd, true);
+  const draftFiles = safeParse<OfferFileInput[]>(draft.files_json, []);
+  const files = (await readOfferFiles(c.env.DB, { files: Array.isArray(draftFiles) ? draftFiles : [] }, user.id, requestId)) ?? [];
+  await assertMayOffer(c.env, requestId, ctx.merchant.id);
+  const quoteId = typeof payload.quote_id === 'string' ? payload.quote_id : '';
+
+  const id = newId('off');
+  let inserted = 0;
+  try {
+    const res = await c.env.DB.batch([
+      ...insertOfferStatements(c.env.DB, {
+        id, requestId, merchantId: ctx.merchant.id, storeId: ctx.store.id, customerId: user.id, terms: t, extras: x, ts,
+      }),
+      ...offerFileStatements(c.env.DB, id, files, ts, null),
+      // The draft goes only if the offer landed — else it stays, to be sent again.
+      c.env.DB.prepare('DELETE FROM community_offer_drafts WHERE id = ? AND EXISTS (SELECT 1 FROM community_offers WHERE id = ?)').bind(draftId, id),
+    ]);
+    inserted = Number(res[0]?.meta.changes ?? 0);
+  } catch (e) {
+    throw offerWriteConflict(e) ?? e;
+  }
+  if (!inserted) {
+    const still = await c.env.DB.prepare(
+      `SELECT 1 AS x FROM community_requests WHERE id = ? AND state IN ('open','receiving_offers')`
+    ).bind(requestId).first();
+    if (still) throw conflict('The request changed while you were sending — check it and try again', 'REQUEST_CHANGED');
+    throw conflict('This request no longer takes offers — your draft was kept', 'OFFER_REQUEST_CLOSED');
+  }
+  if (quoteId) {
+    await c.env.DB.prepare(
+      `UPDATE print_quotes SET state = 'offered', updated_at = ?
+        WHERE id = ? AND merchant_id = ? AND request_id = ? AND state = 'draft'`
+    ).bind(ts, quoteId, ctx.merchant.id, requestId).run();
+  }
+  await audit(c.env.DB, user.id, 'community.offer_sent', id, {
+    request: requestId, draft: draftId, price: t.price_iqd, fee: x.delivery_fee_iqd ?? 0, files: files.length, quote: quoteId || null,
+  });
+  // The customer hears now — a draft told nobody (outside the batch, cannot throw).
+  try {
+    c.executionCtx.waitUntil(notifyOfferReceived(c.env, id));
+  } catch {
+    void notifyOfferReceived(c.env, id);
+  }
+  const row = await c.env.DB.prepare('SELECT * FROM community_offers WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  return c.json({ success: true, offer: withFiles([row!], await offerFilesFor(c.env.DB, [id]), true)[0] }, 201);
+});
+
+/**
+ * Stream one offer file to a party of the offer — the request's customer, the
+ * offer's merchant, or an admin — after re-deriving that right on every read.
+ * Anyone else, a rival workshop included, is told the file does not exist.
+ * Never a key, never a public URL (§9.5): the object sits under a private
+ * prefix `/files/*` refuses, and this route is the only door.
+ */
+marketplaceRoutes.get('/offers/:id/files/:fileId', requireAuth, async (c) => {
+  const user = c.get('user')!;
+  const offerId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const fileId = str(c.req.param('fileId'), 'fileId', { min: 1, max: 60 });
+  const row = await c.env.DB.prepare(
+    `SELECT f.file_key, f.name, f.kind, f.content_type, r.customer_id, m.user_id AS merchant_user_id
+       FROM community_offer_files f
+       JOIN community_offers o ON o.id = f.offer_id
+       JOIN community_requests r ON r.id = o.request_id
+       JOIN community_merchants m ON m.id = o.merchant_id
+      WHERE f.id = ? AND f.offer_id = ?`
+  ).bind(fileId, offerId).first<{ file_key: string; name: string; kind: string; content_type: string; customer_id: string; merchant_user_id: string }>()
+    .catch((e) => {
+      if (isSchemaMissing(e)) return null;
+      throw e;
+    });
+  if (!row) throw notFound('File not found');
+  const party = user.id === row.customer_id || user.id === row.merchant_user_id || user.role === 'admin';
+  if (!party) throw notFound('File not found');
+  const obj = await getMediaObject(c.env, 'private', row.file_key);
+  if (!obj) throw notFound('File not found');
+  // A picture may render in place; a PDF or a model is handed over as a
+  // download. Sandboxed with `nosniff` either way, and a stored page can never
+  // render (an HTML type is downgraded to bytes).
+  const mime = row.content_type && !/^text\/html/i.test(row.content_type) ? row.content_type : 'application/octet-stream';
+  const inline = mime.startsWith('image/');
+  const safe = safeFileName(row.name, row.kind === 'pdf' ? 'pdf' : 'bin');
+  const ascii = safe.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+  const headers = new Headers({
+    'Content-Type': mime,
+    'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(safe)}`,
+    'Cache-Control': 'private, max-age=300',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+  });
+  headers.set('etag', obj.httpEtag);
+  return new Response(obj.body, { headers });
 });
 
 /**
@@ -1357,32 +2008,53 @@ marketplaceRoutes.get('/my-offers', requireAuth, async (c) => {
   const cursor = str(c.req.query('cursor') ?? '', 'cursor', { min: 0, max: 120, required: false });
   const [cAt, cId] = cursor.includes('|') ? cursor.split('|') : ['', ''];
   const state = c.req.query('state') ?? '';
-  const { results } = await c.env.DB.prepare(
-    `SELECT o.*, r.title AS request_title, r.state AS request_state, r.revision AS r_revision,
-            r.expires_at AS request_expires_at, r.community_order_id AS order_id_for_request,
-            r.accepted_offer_id AS request_accepted_offer_id
-       FROM community_offers o
-       JOIN community_requests r ON r.id = o.request_id
-      WHERE o.merchant_id = ?1
-        AND (?2 = '' OR o.state = ?2)
-        AND (?3 = '' OR o.updated_at < ?3 OR (o.updated_at = ?3 AND o.id < ?4))
-      ORDER BY o.updated_at DESC, o.id DESC LIMIT ?5`
-  ).bind(mine.merchant.id, ['pending', 'superseded', 'accepted', 'rejected', 'withdrawn', 'expired'].includes(state) ? state : '', cAt, cId, limit).all<Record<string, unknown>>();
+  // DRAFTS (0159) ride the FIRST page, flagged `draft: true` and `state:
+  // 'draft'` — one per request, never many; `state=draft` lists only them.
+  const onlyDrafts = state === 'draft';
+  // ONE WAVE after the store (review 2026-09-30): the drafts, the page and the
+  // page's files start together — the files by the page's own WHERE/ORDER/LIMIT
+  // as a subquery, not keyed on ids the page has yet to return.
+  const draftsRead = cAt === '' && (state === '' || onlyDrafts) ? merchantDrafts(c.env.DB, mine.merchant.id) : Promise.resolve([]);
+  const pageBinds = [mine.merchant.id, ['pending', 'superseded', 'accepted', 'rejected', 'withdrawn', 'expired'].includes(state) ? state : '', cAt, cId, limit] as const;
+  const PAGE_WHERE = `o.merchant_id = ?1
+            AND (?2 = '' OR o.state = ?2)
+            AND (?3 = '' OR o.updated_at < ?3 OR (o.updated_at = ?3 AND o.id < ?4))
+          ORDER BY o.updated_at DESC, o.id DESC LIMIT ?5`;
+  const [{ results }, drafts, files] = await Promise.all([
+    onlyDrafts
+      ? Promise.resolve({ results: [] as Record<string, unknown>[] })
+      : c.env.DB.prepare(
+          `SELECT o.*, r.title AS request_title, r.state AS request_state, r.revision AS r_revision,
+                  r.expires_at AS request_expires_at, r.community_order_id AS order_id_for_request,
+                  r.accepted_offer_id AS request_accepted_offer_id
+             FROM community_offers o
+             JOIN community_requests r ON r.id = o.request_id
+            WHERE ${PAGE_WHERE}`
+        ).bind(...pageBinds).all<Record<string, unknown>>(),
+    draftsRead,
+    onlyDrafts ? Promise.resolve(new Map<string, Array<Record<string, unknown>>>()) : offerFilesWhere(c.env.DB, `SELECT o.id FROM community_offers o WHERE ${PAGE_WHERE}`, pageBinds),
+  ]);
   const last = results.length === limit ? results[results.length - 1] : null;
+  const requestOf = (row: Record<string, unknown>) => ({
+    id: row.request_id,
+    title: row.request_title,
+    state: row.request_state,
+    revision: Number(row.r_revision ?? 1),
+    expires_at: row.request_expires_at ?? null,
+  });
   return c.json({
     success: true,
-    offers: results.map((row) => ({
-      ...offerShape(row),
-      request: {
-        id: row.request_id,
-        title: row.request_title,
-        state: row.request_state,
-        revision: Number(row.r_revision ?? 1),
-        expires_at: row.request_expires_at ?? null,
-      },
-      // The job this offer became, once it won.
-      order_id: row.state === 'accepted' && row.request_accepted_offer_id === row.id ? (row.order_id_for_request ?? null) : null,
-    })),
+    offers: [
+      ...drafts.map((d) => ({ ...draftShape(d, { revision: d.r_revision }), request: requestOf(d), order_id: null })),
+      ...results.map((row) => ({
+        ...offerShape(row),
+        // The merchant is the uploader: the keys come back so an edit can keep them.
+        files: (files.get(String(row.id)) ?? []).map((f) => offerFilePublic(f, String(row.id), { keys: true })),
+        request: requestOf(row),
+        // The job this offer became, once it won.
+        order_id: row.state === 'accepted' && row.request_accepted_offer_id === row.id ? (row.order_id_for_request ?? null) : null,
+      })),
+    ],
     next_cursor: last ? `${String(last.updated_at)}|${String(last.id)}` : null,
   });
 });
@@ -1420,7 +2092,7 @@ async function offerForAcceptance(db: D1Database, offerId: string) {
   return db
     .prepare(
       `SELECT o.*, r.customer_id, r.state AS request_state, r.id AS req_id, r.revision AS r_revision,
-              r.expires_at AS r_expires_at, r.visibility AS r_visibility,
+              r.expires_at AS r_expires_at, r.visibility AS r_visibility, r.title AS r_title,
               r.accepted_offer_id AS r_accepted_offer_id, r.community_order_id AS r_order_id,
               m.user_id AS m_user_id, m.name AS m_name, m.verified AS m_verified, m.badge AS m_badge,
               m.badge_override AS m_badge_override, m.rating_avg_x100 AS m_rating,
@@ -1444,7 +2116,7 @@ async function offerForAcceptance(db: D1Database, offerId: string) {
  */
 function acceptanceRefusal(
   offer: Record<string, unknown>,
-  expected: { price: number; revision: number },
+  expected: { total: number; revision: number },
   now: string,
   standing: OfferStanding
 ): HttpError | null {
@@ -1490,7 +2162,8 @@ function acceptanceRefusal(
       fresh
     );
   }
-  if (expected.price !== Number(offer.price_iqd) || expected.revision !== Number(offer.revision ?? 1)) {
+  // The TOTAL (price + delivery fee, 0159) and the revision the confirmation showed.
+  if (expected.total !== offerTotal(offer) || expected.revision !== Number(offer.revision ?? 1)) {
     return new HttpError(409, 'This offer changed since you opened it — review it again', 'OFFER_CHANGED', fresh);
   }
   return null;
@@ -1506,11 +2179,13 @@ function publicSnapshot(raw: unknown): Record<string, unknown> {
  * Accept one offer. The single most important transaction in the marketplace.
  *
  * THE CUSTOMER ACCEPTS WHAT THEY SAW (audit 03 §10 B). The body carries the
- * `expected_price_iqd` and `offer_revision` the confirmation showed. If the
- * merchant edited the offer since, the answer is `OFFER_CHANGED` with the
- * fresh offer — never a hold at a price nobody confirmed. Missing values are
- * treated exactly like changed ones: the customer is shown the offer and asked
- * again. A STALE offer (priced before the customer changed the job) is
+ * `expected_total_iqd` (price + delivery fee, 0159 — the fee is part of what
+ * was agreed) and `offer_revision` the confirmation showed. If the merchant
+ * edited the offer since, the answer is `OFFER_CHANGED` with the fresh offer
+ * — never a hold at a price nobody confirmed. Missing values are treated
+ * exactly like changed ones: the customer is shown the offer and asked again.
+ * `expected_price_iqd` is still read for one release, from a client that
+ * predates the fee, and only for an offer that HAS no fee. A STALE offer (priced before the customer changed the job) is
  * `OFFER_STALE`; an expired request or offer is `REQUEST_EXPIRED` /
  * `OFFER_EXPIRED` (§10 I).
  *
@@ -1537,14 +2212,19 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
   const user = c.get('user')!;
   const offerId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const expected = {
-    price: Number.isSafeInteger(Number(body.expected_price_iqd)) ? Number(body.expected_price_iqd) : NaN,
-    revision: Number.isSafeInteger(Number(body.offer_revision)) ? Number(body.offer_revision) : NaN,
-  };
 
   const offer = await offerForAcceptance(c.env.DB, offerId);
   if (!offer) throw notFound('Offer not found');
   if (offer.customer_id !== user.id) throw forbidden('This request is not yours');
+  // What was agreed is the TOTAL. A price alone is accepted only from an
+  // older client and only when the offer carries no fee — with a fee, a price
+  // is not what was shown, and is answered OFFER_CHANGED like any mismatch.
+  const fee = offerFee(offer);
+  const asInt = (v: unknown) => (Number.isSafeInteger(Number(v)) ? Number(v) : NaN);
+  const expected = {
+    total: body.expected_total_iqd !== undefined ? asInt(body.expected_total_iqd) : fee === 0 ? asInt(body.expected_price_iqd) : NaN,
+    revision: asInt(body.offer_revision),
+  };
 
   /**
    * A REPLAY OF AN ACCEPTANCE THAT LANDED (docs/COMMUNITY_COMMERCE_CHAT.md §6.6).
@@ -1558,7 +2238,7 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
     offer.state === 'accepted' &&
     offer.r_accepted_offer_id === offerId &&
     offer.r_order_id &&
-    expected.price === Number(offer.price_iqd) &&
+    expected.total === offerTotal(offer) &&
     expected.revision === Number(offer.revision ?? 1)
   ) {
     const placed = await c.env.DB.prepare('SELECT * FROM community_orders WHERE id = ? AND customer_id = ? AND offer_id = ?')
@@ -1619,19 +2299,53 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
       }
     : { revision: Number(offer.r_revision ?? 1), ...((await composeSnapshot(c.env.DB, requestId)) ?? {}), source: 'live' };
   const merchantUserId = String(offer.m_user_id);
+  /**
+   * THE MONEY IS THE TOTAL (0159, §9.5): the price plus the delivery fee is
+   * what the customer agreed to and what the escrow holds; the platform's
+   * split is taken on that gross, and the order's `price_iqd` — the figure
+   * every money identity checks against (`platform_fee + receivable =
+   * price_iqd`) — is the same gross. The item price and the fee are kept
+   * apart in the snapshot.
+   */
   const price = Number(offer.price_iqd);
-  const split = await feeFor(c.env.DB, 'request', price);
+  const total = price + fee;
+  const split = await feeFor(c.env.DB, 'request', total);
   const autoDays = await autoCompleteDays(c.env.DB);
   const orderId = newId('cord');
   const escrowInput: HoldEscrowInput = {
     communityOrderId: orderId,
     customerId: user.id,
     merchantId: String(offer.merchant_id),
-    grossIqd: price,
+    grossIqd: total,
     platformFeeIqd: split.platform_fee_iqd,
     merchantReceivableIqd: split.merchant_receivable_iqd,
     idempotencyKey: `accept:${orderId}`,
   };
+  /**
+   * THE CONVERSATION OF A BOARD DEAL (0159, §9.5). A request accepted from the
+   * board gets the request's thread — the one `POST /api/chats/open
+   * {requestId, merchantId}` opens, found or created by the chat door's own
+   * helper (one per request × store, 0124's unique index) — and the order is
+   * written with it, so «تم إنشاء الطلب» and every later move are told there
+   * exactly as a direct request's are. Opened BEFORE the money is reserved: a
+   * thread between a customer and a workshop with a live offer is allowed
+   * regardless, so a refusal below leaves nothing that should not exist; a
+   * thread that could not be opened costs the deal nothing (chat_id stays null).
+   */
+  let chatId: string | null = originChatId;
+  if (!direct && offer.store_id) {
+    chatId = await openStoreThread(c.env.DB, {
+      contextType: 'request',
+      contextId: requestId,
+      storeId: String(offer.store_id),
+      merchantId: String(offer.merchant_id),
+      customerId: user.id,
+      sellerId: merchantUserId,
+    }).catch((e) => {
+      console.error('accept: request thread not opened', requestId, e instanceof Error ? e.message : String(e));
+      return null;
+    });
+  }
 
   // 1. The money, before anything else. A refusal here has nothing to undo.
   const reserved = await reserveEscrowFunds(c.env.DB, escrowInput);
@@ -1640,7 +2354,7 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
       throw badRequest(
         'Your wallet balance does not cover this offer. Top up and try again.',
         'INSUFFICIENT_FUNDS',
-        { required_iqd: price }
+        { required_iqd: total }
       );
     }
     throw badRequest('Could not reserve the funds for this offer', 'ESCROW_FAILED', { reason: reserved.reason });
@@ -1669,13 +2383,15 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
             SET updated_at = CASE WHEN community_order_id = ?2 THEN updated_at ELSE NULL END
           WHERE id = ?1`
       ).bind(requestId, orderId),
-      // The offer is frozen — the exact version the customer confirmed.
+      // The offer is frozen — the exact version the customer confirmed: the
+      // revision (every edit, a fee change included, bumps it) and the price
+      // the loaded row carried, which the total check above tied to the fee.
       db.prepare(
         `UPDATE community_offers SET state = 'accepted', updated_at = ?1
           WHERE id = ?2 AND request_id = ?3 AND state = 'pending'
             AND revision = ?4 AND price_iqd = ?5 AND request_revision = ?6
             AND (expires_at IS NULL OR expires_at = '' OR expires_at > ?1)`
-      ).bind(ts, offerId, requestId, expected.revision, expected.price, Number(offer.r_revision ?? 1)),
+      ).bind(ts, offerId, requestId, expected.revision, price, Number(offer.r_revision ?? 1)),
       db.prepare(
         `UPDATE community_offers
             SET updated_at = CASE WHEN state = 'accepted' AND updated_at = ?2 THEN updated_at ELSE NULL END
@@ -1696,12 +2412,18 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
          VALUES (?,?,?,?,?,?, 'funded', ?,?,?,?,?,?,?,?,?,?,?,?,?)`
       ).bind(
         orderId, requestId, offerId, user.id, offer.merchant_id, offer.store_id,
-        price, split.commission_percent_x100, split.platform_fee_iqd, split.merchant_receivable_iqd,
+        total, split.commission_percent_x100, split.platform_fee_iqd, split.merchant_receivable_iqd,
         offer.completion_days, offer.delivery_method,
         // The snapshot. Everything the merchant promised, frozen at this
-        // instant, so editing the offer later cannot change the deal.
+        // instant, so editing the offer later cannot change the deal. The
+        // item price, the delivery fee and their total are kept apart (0159).
         JSON.stringify({
           price_iqd: price,
+          delivery_fee_iqd: fee,
+          total_iqd: total,
+          quantity: offer.quantity ?? null,
+          color: offer.color ?? '',
+          terms: offer.terms ?? '',
           completion_days: offer.completion_days,
           delivery_method: offer.delivery_method,
           message: offer.message,
@@ -1718,7 +2440,7 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
         Number(offer.r_revision ?? 1),
         JSON.stringify(requestSnapshot),
         JSON.stringify(contact),
-        originChatId
+        chatId
       ),
       ...escrowRecordStatements(db, escrowInput, reserved.reservation, escrowId, ts),
       offerCountStatement(db, requestId),
@@ -1727,7 +2449,7 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
       // «قبل العميل عرضك» — in the same commit as the acceptance it announces
       // (audit 03 §10 N). INSERT OR IGNORE on a per-offer key: it cannot fail
       // the batch and cannot be sent twice.
-      offerAcceptedNotification(db, { merchantUserId, requestId, offerId, orderId, priceIqd: price }),
+      offerAcceptedNotification(db, { merchantUserId, requestId, offerId, orderId, priceIqd: total }),
     ]);
   } catch (e) {
     /**
@@ -1761,7 +2483,9 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
 
   await audit(db, user.id, 'community.offer_accepted', offerId, {
     order: orderId,
-    price,
+    price: total,
+    item_price: price,
+    delivery_fee: fee,
     offer_revision: expected.revision,
     fee: split.platform_fee_iqd,
     auto_complete_days: autoDays,
@@ -1769,17 +2493,21 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
 
   // The merchants who were not chosen are told (W5-A) — after the commit, never inside it.
   await notifyOffersRejected(db, requestId, ts, 'other_accepted');
+  // «اختار صاحب الطلب عرضًا» in the request's discussion (0160) — ids only,
+  // never a price or a contact line; never throws.
+  await writeRequestSystemUpdate(db, requestId, 'accepted', { offer_id: offerId, order_id: orderId });
   // The in-app notice rode in the batch; its outside channels follow, per the merchant's switch (W2-E).
-  await fanOutMerchantNotice(c.env, { merchant_id: String(offer.merchant_id), user_id: merchantUserId }, offerAcceptedNotice({ requestId, offerId, orderId, priceIqd: price }));
+  await fanOutMerchantNotice(c.env, { merchant_id: String(offer.merchant_id), user_id: merchantUserId }, offerAcceptedNotice({ requestId, offerId, orderId, priceIqd: total }));
   const order = await db.prepare('SELECT * FROM community_orders WHERE id = ?').bind(orderId).first<Record<string, unknown>>();
-  // «تم إنشاء الطلب» IN THE CONVERSATION IT CAME FROM (D8) — after the commit,
-  // once per order, only into a thread of this store and this customer, and
-  // never able to undo the payment (postSystemCard does not throw).
-  if (originChatId && order) {
+  // «تم إنشاء الطلب» IN THE CONVERSATION IT CAME FROM (D8) — a direct request's
+  // origin thread, or the board request's thread opened above (0159) — after
+  // the commit, once per order, only into a thread of this store and this
+  // customer, and never able to undo the payment (postSystemCard does not throw).
+  if (chatId && order) {
     await postSystemCard(c.env, {
-      chatId: originChatId,
+      chatId,
       actorId: user.id,
-      card: customOrderCard(order, direct?.title ?? '', 'funded'),
+      card: customOrderCard(order, direct?.title ?? String(offer.r_title ?? ''), 'funded'),
       eventKey: `custom_order:${orderId}:funded`,
       expect: { storeId: String(offer.store_id ?? ''), customerId: user.id },
     });
@@ -1815,9 +2543,16 @@ async function loadOrderForParty(c: Context<AppContext>, orderId: string) {
 marketplaceRoutes.get('/orders/:id', requireAuth, async (c) => {
   const orderId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const { row, isCustomer, isMerchant } = await loadOrderForParty(c, orderId);
-  const escrow = await escrowForOrder(c.env.DB, orderId);
+  const [escrow, autoDays] = await Promise.all([escrowForOrder(c.env.DB, orderId), autoCompleteDays(c.env.DB)]);
   return c.json({
     success: true,
+    /**
+     * The confirmation window the «سلّمت العمل» dialog names BEFORE delivery
+     * stamps `auto_complete_at` (review 2026-09-30): the admin setting, whose
+     * default is 7 days and whose 0 turns auto-release off — never a number
+     * written into the client's copy.
+     */
+    auto_complete_days: autoDays,
     order: {
       ...row,
       merchant_user_id: undefined,
@@ -1890,12 +2625,15 @@ marketplaceRoutes.post('/orders/:id/start', requireAuth, async (c) => {
    * cancel moves the escrow and the order in ONE batch), and a flip that
    * matched nothing is reported, never answered with a success.
    */
+  // «بدأ التنفيذ» is an instant on the order too (0160 `started_at`), and the
+  // first row of its timeline (worker/routes/communityOrderTimeline.ts).
+  const startedAt = nowIso();
   const res = await c.env.DB.prepare(
-    `UPDATE community_orders SET state = 'in_progress', updated_at = ?
-      WHERE id = ? AND state = 'funded'
+    `UPDATE community_orders SET state = 'in_progress', started_at = COALESCE(started_at, ?1), updated_at = ?1
+      WHERE id = ?2 AND state = 'funded'
         AND EXISTS (SELECT 1 FROM community_escrows e
                      WHERE e.community_order_id = community_orders.id AND e.state = 'held')`
-  ).bind(nowIso(), orderId).run();
+  ).bind(startedAt, orderId).run();
   if (!res.meta.changes) {
     const now = await c.env.DB.prepare(
       `SELECT o.state, (SELECT e.state FROM community_escrows e WHERE e.community_order_id = o.id) AS escrow_state
@@ -1909,6 +2647,8 @@ marketplaceRoutes.post('/orders/:id/start', requireAuth, async (c) => {
     throw conflict('This order changed — reload it', 'ORDER_CHANGED');
   }
   await audit(c.env.DB, c.get('user')!.id, 'community.order_started', orderId, {});
+  // The timeline's «started» row — once, whatever the caller retries (§9.5).
+  await recordOrderEvent(c.env.DB, orderId, c.get('user')!.id, 'started', startedAt);
   // The customer hears work began (review F4; keyed on the order, once).
   await notifyCustomOrderStarted(c.env, orderId);
   // …and the conversation the deal came from shows it (D8).
@@ -2043,6 +2783,8 @@ marketplaceRoutes.post('/orders/:id/confirm', requireAuth, async (c) => {
   );
 
   await audit(c.env.DB, user.id, 'community.order_completed', orderId, { escrow: escrow.id });
+  // The request's discussion records the completion (§9.5).
+  await writeRequestSystemUpdate(c.env.DB, String(row.request_id), 'completed', { order_id: orderId });
   await announceCustomOrder(c.env, orderId, 'completed', user.id);
   // «صار مبلغ متاحًا» — the escrow released the merchant's share (W2-E; keyed on the order, once).
   await notifyPayoutAvailable(c.env, { merchantId: String(row.merchant_id), amountIqd: Number(row.merchant_receivable_iqd) || 0, sourceKey: `community_order:${orderId}`, communityOrderId: orderId });
@@ -2120,6 +2862,8 @@ marketplaceRoutes.post('/orders/:id/dispute', requireAuth, async (c) => {
   }
 
   await audit(c.env.DB, user.id, 'community.order_disputed', orderId, { complaint: complaintId });
+  // The request's discussion records the dispute (§9.5).
+  await writeRequestSystemUpdate(c.env.DB, String(row.request_id), 'disputed', { by: isCustomer ? 'customer' : 'merchant', order_id: orderId });
   await announceCustomOrder(c.env, orderId, 'disputed', user.id);
   // The merchant is told the money is frozen and why (W2-E; forced on, §61).
   if (isCustomer) await notifyDisputeOpened(c.env, { communityOrderId: orderId, complaintId, merchantId: String(row.merchant_id) });
@@ -2252,6 +2996,8 @@ marketplaceRoutes.post('/orders/:id/cancel', requireAuth, async (c) => {
   }
 
   await audit(c.env.DB, user.id, 'community.order_cancelled', orderId, { by: role, state });
+  // The request's discussion records the close (§9.5).
+  await writeRequestSystemUpdate(c.env.DB, String(row.request_id), 'cancelled', { by: role, order_id: orderId });
   await announceCustomOrder(c.env, orderId, 'cancelled', user.id);
   // The workshop is told not to start (review F4; keyed on the order, once).
   if (isCustomer) await notifyCustomOrderCancelledByCustomer(c.env, orderId);

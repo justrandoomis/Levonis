@@ -226,3 +226,168 @@ export function moveLabel(s: OrdersStrings, to: string): string {
 export function fill(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (m, key: string) => (key in values ? String(values[key]) : m));
 }
+
+// ---------------------------------------------------------------------------
+//  THE CUSTOM ORDER'S SCREEN (Phase 5d, docs/COMMUNITY_ECOSYSTEM.md §9.5):
+//  src/components/merchant/orders/CustomOrderScreen.tsx and the rows of the
+//  custom-orders list that open it (dashboard/SalesTabs.tsx). Its own table,
+//  so the orders list's words above stay exactly what
+//  tests/ordersListUi.test.ts pins; the same rule — every key in ar, en and
+//  hand-written Sorani.
+// ---------------------------------------------------------------------------
+
+const CUSTOM_ORDER = {
+  ar: {
+    back: 'الطلبات المخصصة',
+    title: 'طلب مخصص',
+    open: 'افتح الطلب',
+    customer: 'الزبون',
+    total: 'الإجمالي المتفق عليه',
+    itemPrice: 'سعر العمل',
+    deliveryFee: 'رسوم التوصيل',
+    youGet: 'يصلك',
+    commission: 'عمولة Levonis',
+    days: '{n} أيام للتنفيذ',
+    quantity: 'الكمية',
+    color: 'اللون',
+    terms: 'الشروط',
+    delivery: { pickup: 'استلام من الورشة', merchant_delivery: 'توصيل الورشة', courier: 'شركة توصيل' },
+    start: 'ابدأ العمل',
+    delivered: 'سلّمت العمل',
+    deliveredTitle: 'تأكيد التسليم؟',
+    deliveredConsequence: 'المبلغ يبقى محجوزًا حتى يؤكد الزبون الاستلام.',
+    deliveredAuto: 'وإن لم يؤكد ولم يفتح نزاعًا يُحرَّر تلقائيًا بعد {days}.',
+    keep: 'ليس بعد',
+    awaiting: 'المبلغ يُحوَّل لك فور تأكيد الزبون.',
+    autoConfirm: 'التأكيد التلقائي: {d}',
+    readyChip: 'جاهز للتسليم',
+    nextStart: 'ابدأ العمل من صفحة الطلب',
+    nextUpdate: 'حدّث الزبون وسجّل التسليم من صفحة الطلب',
+    contact: 'بيانات الزبون والتسليم',
+    timeline: 'سير التنفيذ',
+    notFound: 'لا يوجد طلب بهذا الرقم في ورشتك',
+    startFailed: 'تعذّر بدء العمل',
+    deliverFailed: 'تعذّر تسجيل التسليم',
+    state: {
+      accepted: 'مقبول',
+      funded: 'مموّل — بانتظار البدء',
+      in_progress: 'قيد التنفيذ',
+      merchant_marked_delivered: 'بانتظار تأكيد الزبون',
+      completed: 'مكتمل — تم تحويل المبلغ',
+      disputed: 'نزاع — بيد Levonis',
+      cancelled: 'ملغي',
+      refunded: 'مسترجع',
+    },
+  },
+  en: {
+    back: 'Custom orders',
+    title: 'Custom order',
+    open: 'Open the order',
+    customer: 'Customer',
+    total: 'Agreed total',
+    itemPrice: 'Work price',
+    deliveryFee: 'Delivery fee',
+    youGet: 'You receive',
+    commission: 'Levonis commission',
+    days: '{n} days to complete',
+    quantity: 'Quantity',
+    color: 'Colour',
+    terms: 'Terms',
+    delivery: { pickup: 'Pickup at the workshop', merchant_delivery: 'Workshop delivery', courier: 'Courier' },
+    start: 'Start work',
+    delivered: 'I delivered the work',
+    deliveredTitle: 'Mark delivered?',
+    deliveredConsequence: 'The money stays held until the customer confirms receipt.',
+    deliveredAuto: 'If they neither confirm nor open a dispute, it is released automatically after {days}.',
+    keep: 'Not yet',
+    awaiting: 'The funds are released to you the moment the customer confirms.',
+    autoConfirm: 'Auto-confirm: {d}',
+    readyChip: 'Ready for delivery',
+    nextStart: 'Start the work from the order’s page',
+    nextUpdate: 'Update the customer and mark delivery from the order’s page',
+    contact: 'Customer and delivery details',
+    timeline: 'Order progress',
+    notFound: 'There is no custom order with this id in your workshop',
+    startFailed: 'Could not start the work',
+    deliverFailed: 'Could not mark the work delivered',
+    state: {
+      accepted: 'Accepted',
+      funded: 'Funded — awaiting start',
+      in_progress: 'In progress',
+      merchant_marked_delivered: 'Awaiting the customer’s confirmation',
+      completed: 'Completed — funds released',
+      disputed: 'Disputed — with Levonis',
+      cancelled: 'Cancelled',
+      refunded: 'Refunded',
+    },
+  },
+  ckb: {
+    back: 'داواکارییە تایبەتەکان',
+    title: 'داواکاری تایبەت',
+    open: 'داواکارییەکە بکەرەوە',
+    customer: 'کڕیار',
+    total: 'کۆی گشتی ڕێککەوتوو',
+    itemPrice: 'نرخی کار',
+    deliveryFee: 'کرێی گەیاندن',
+    youGet: 'دەگاتە تۆ',
+    commission: 'کۆمیسیۆنی Levonis',
+    days: '{n} ڕۆژ بۆ تەواوکردن',
+    quantity: 'بڕ',
+    color: 'ڕەنگ',
+    terms: 'مەرجەکان',
+    delivery: { pickup: 'وەرگرتن لە وۆرکشۆپەکە', merchant_delivery: 'گەیاندنی وۆرکشۆپ', courier: 'کۆمپانیای گەیاندن' },
+    start: 'دەست بە کار بکە',
+    delivered: 'کارەکەم گەیاند',
+    deliveredTitle: 'گەیاندن پشتڕاست بکرێتەوە؟',
+    deliveredConsequence: 'پارەکە ڕاگیراو دەمێنێتەوە تا کڕیار وەرگرتن پشتڕاست دەکاتەوە.',
+    deliveredAuto: 'ئەگەر پشتڕاستی نەکردەوە و ناکۆکیشی نەکردەوە، دوای {days} خۆکارانە دەدرێت.',
+    keep: 'هێشتا نا',
+    awaiting: 'پارەکە دوای پشتڕاستکردنەوەی کڕیار دەگاتە تۆ.',
+    autoConfirm: 'پشتڕاستکردنەوەی خۆکار: {d}',
+    readyChip: 'ئامادەیە بۆ ڕادەستکردن',
+    nextStart: 'لە لاپەڕەی داواکارییەکەوە دەست بە کار بکە',
+    nextUpdate: 'کڕیار ئاگادار بکەرەوە و گەیاندن لە لاپەڕەی داواکارییەکەوە تۆمار بکە',
+    contact: 'زانیاری کڕیار و گەیاندن',
+    timeline: 'ڕەوتی جێبەجێکردن',
+    notFound: 'هیچ داواکارییەک بەم ژمارەیە لە وۆرکشۆپەکەتدا نییە',
+    startFailed: 'نەتوانرا کارەکە دەست پێ بکرێت',
+    deliverFailed: 'نەتوانرا گەیاندنەکە تۆمار بکرێت',
+    state: {
+      accepted: 'پەسەندکراو',
+      funded: 'پارە دراوە — چاوەڕوانی دەستپێکردن',
+      in_progress: 'لە جێبەجێکردندایە',
+      merchant_marked_delivered: 'چاوەڕوانی پشتڕاستکردنەوەی کڕیار',
+      completed: 'تەواو — پارەکە درا',
+      disputed: 'ناکۆکی — لای Levonis',
+      cancelled: 'هەڵوەشێنراوە',
+      refunded: 'گەڕێنراوەتەوە',
+    },
+  },
+} as const;
+
+/**
+ * «٧ أيام» — the confirmation window as the dialog says it, counted the way
+ * the rest of this file counts (one, two, 3–10, 11+; Sorani with the bare
+ * noun). The number is the server's (`auto_complete_days` on the order read,
+ * the admin setting) — never written into the copy (review 2026-09-30: the
+ * dialog promised «three days» while the default is seven).
+ */
+export function releaseAfter(days: number, lang: OrdersLang): string {
+  const n = Math.max(0, Math.floor(days));
+  if (lang === 'en') return n === 1 ? '1 day' : `${n} days`;
+  if (lang === 'ckb') return `${n} ڕۆژ`;
+  return n === 1 ? 'يوم واحد' : n === 2 ? 'يومين' : n <= 10 ? `${n} أيام` : `${n} يومًا`;
+}
+
+/** The «سلّمت العمل» consequence: the hold always; the auto-release only when the setting has one (0 = off). */
+export function deliveredConsequence(s: CustomOrderStrings, days: number | null | undefined, lang: OrdersLang): string {
+  return typeof days === 'number' && days > 0 ? `${s.deliveredConsequence} ${fill(s.deliveredAuto, { days: releaseAfter(days, lang) })}` : s.deliveredConsequence;
+}
+
+export type CustomOrderStrings = Widen<(typeof CUSTOM_ORDER)['ar']>;
+export const CUSTOM_ORDER_STRINGS: Record<OrdersLang, CustomOrderStrings> = CUSTOM_ORDER;
+
+export function useCustomOrderStrings(): CustomOrderStrings {
+  const { lang } = useLanguage();
+  return CUSTOM_ORDER_STRINGS[ordersLang(lang)];
+}

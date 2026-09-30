@@ -21,8 +21,25 @@ import { Input } from '../../ui/Field';
 import type { RefKind } from '../../../../packages/storeLayout/src/blocks';
 import { mediaSrc, type MediaKind } from '../../../../packages/storeLayout/src/refs';
 import type { BlockData } from '../../../../packages/storeLayout/src/data';
-import { storeLayoutApi, type MediaItem } from './storeLayoutApi';
-import { builderRefusal } from './refusal';
+import { storeLayoutApi } from './storeLayoutApi';
+import { builderRefusal, codeOf, detailsOf, formatBytes } from './refusal';
+// Media library v2 (P5, storefront B1): weights, uses, delete, the slot's cap, the large-file door.
+import { useToast } from '../../ui/Toast';
+import { useConfirm } from '../../ui/ConfirmDialog';
+import { UploadTile } from '../../upload/UploadTile';
+import { pickUpload } from '../../../lib/uploadSession';
+import { fillSpeed, useMediaStrings } from './strings';
+import {
+  asLibraryItem,
+  deleteLibraryFile,
+  forgetItem,
+  libraryRefusal,
+  MediaLibraryGrid,
+  overCap,
+  rememberItems,
+  tooHeavyText,
+  type LibraryItem,
+} from './MediaLibrary';
 
 // ------------------------------------------------------------ ref names
 
@@ -304,15 +321,32 @@ const ACCEPT: Record<MediaKind, string> = {
   video: 'video/mp4,video/webm',
 };
 
-export function MediaThumb({ value, kind, className = '' }: { value: string; kind: MediaKind; className?: string }) {
+export function MediaThumb({ value, kind, className = '', onDuration }: { value: string; kind: MediaKind; className?: string; onDuration?: (seconds: number) => void }) {
   const src = mediaSrc(value, kind);
   if (!src) return <span className={`block bg-surface-raised ${className}`} />;
   return kind === 'video' ? (
-    <video src={src} muted playsInline preload="metadata" className={`block bg-black object-cover ${className}`} aria-hidden="true" />
+    <video
+      src={src}
+      muted
+      playsInline
+      preload="metadata"
+      className={`block bg-black object-cover ${className}`}
+      aria-hidden="true"
+      onLoadedMetadata={onDuration ? (e) => onDuration(e.currentTarget.duration) : undefined}
+    />
   ) : (
     <img src={src} alt="" className={`block object-cover ${className}`} loading="lazy" />
   );
 }
+
+/** PNG and JPEG are re-encoded (WebP, 2048 px) before they travel; everything else goes as picked. */
+export function preparedBeforeUpload(file: Pick<File, 'type'>): boolean {
+  return file.type === 'image/png' || file.type === 'image/jpeg';
+}
+
+type PickerPhase = 'idle' | 'preparing' | 'uploading' | 'poster';
+
+const LIBRARY_CODES = new Set(['LAYOUT_MEDIA_TOO_HEAVY', 'LAYOUT_POSTER_REQUIRED', 'MEDIA_IN_USE', 'MEDIA_NOT_FOUND']);
 
 export function MediaPicker({
   open,
@@ -320,26 +354,45 @@ export function MediaPicker({
   kind,
   value,
   onPick,
+  maxBytes,
+  wantPoster = false,
+  posterMaxBytes,
 }: {
   open: boolean;
   onClose: () => void;
   kind: MediaKind;
   value: string;
-  onPick: (key: string) => void;
+  /** The key picked — and, for a video whose poster slot was empty, the key of the still captured from it (W8). */
+  onPick: (key: string, poster?: string) => void;
+  /** The slot's weight cap (storefront L5): a heavier file is refused BEFORE its upload, with the server's own sentence. */
+  maxBytes?: number;
+  /**
+   * The sibling poster slot is empty: a picked video gets a poster captured
+   * from its frame at 0.5 s, uploaded, and handed back WITH the video's key —
+   * one change, so neither overwrites the other.
+   */
+  wantPoster?: boolean;
+  posterMaxBytes?: number;
 }) {
-  const { loc } = useLanguage();
-  const [items, setItems] = useState<MediaItem[] | null>(null);
+  const { loc, lang } = useLanguage();
+  const t = useMediaStrings();
+  const toast = useToast();
+  const [confirm, confirmDialog] = useConfirm();
+  const [items, setItems] = useState<LibraryItem[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const [uploading, setUploading] = useState(false);
+  const [phase, setPhase] = useState<PickerPhase>('idle');
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [large, setLarge] = useState<File | null>(null);
   const file = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
       const r = await storeLayoutApi.media(kind);
-      setItems(r.items);
+      const list = r.items.map((m) => asLibraryItem(m));
+      rememberItems(list);
+      setItems(list);
       setNext(r.next_cursor);
     } catch (e) {
       setError(e);
@@ -347,40 +400,133 @@ export function MediaPicker({
   }, [kind]);
 
   useEffect(() => {
-    if (open) void load();
+    if (open) {
+      setUploadError(null);
+      void load();
+    }
   }, [open, load]);
 
   const more = async () => {
     if (!next) return;
     const r = await storeLayoutApi.media(kind, next);
-    setItems((prev) => [...(prev ?? []), ...r.items]);
+    const list = r.items.map((m) => asLibraryItem(m));
+    rememberItems(list);
+    setItems((prev) => [...(prev ?? []), ...list]);
     setNext(r.next_cursor);
   };
 
-  const upload = async (f: File | undefined) => {
-    if (!f) return;
-    setUploading(true);
+  const resetInput = () => {
+    if (file.current) file.current.value = '';
+  };
+
+  /** The key is the merchant's own; a video with an empty poster slot gets its still first. */
+  const finish = async (key: string, local: Blob | null) => {
+    let poster: string | undefined;
+    if (kind === 'video' && wantPoster) {
+      setPhase('poster');
+      try {
+        const { capturePoster } = await import('./MediaLibraryPoster');
+        const still = await capturePoster(local ?? mediaSrc(key, 'video'), { maxBytes: posterMaxBytes });
+        const r = still ? await uploadFile(still, 'community') : null;
+        if (r?.key && still) {
+          poster = r.key;
+          rememberItems([asLibraryItem({ key: r.key, kind: 'image', mime: r.mime ?? still.type, width: r.width ?? null, height: r.height ?? null, created_at: new Date().toISOString(), byte_size: r.bytes ?? still.size, used_in: [] })]);
+          toast.success(t.library.posterCaptured);
+        } else {
+          toast.error(t.library.posterFailed);
+        }
+      } catch {
+        toast.error(t.library.posterFailed);
+      }
+    }
+    setPhase('idle');
+    onPick(key, poster);
+    onClose();
+  };
+
+  const upload = async (picked: File | undefined) => {
+    resetInput();
+    if (!picked) return;
     setUploadError(null);
+    const isVideo = picked.type.startsWith('video/');
+    if (isVideo !== (kind === 'video')) {
+      setUploadError(kind === 'video' ? t.library.kindVideo : t.library.kindImage);
+      return;
+    }
+    let ready: File = picked;
     try {
-      // `community` is the merchant's own public prefix (merchants/<owner>/public/),
-      // the only one a layout accepts; the server sniffs the bytes.
-      const r = await uploadFile(f, 'community');
-      const isVideo = (r.mime ?? '').startsWith('video/');
-      if (isVideo !== (kind === 'video')) {
-        setUploadError(kind === 'video' ? loc('هذا ليس فيديو.', 'That is not a video.') : loc('هذه ليست صورة.', 'That is not a picture.'));
+      // What is WEIGHED is what will travel: PNG / JPEG are re-encoded first,
+      // a GIF, WebP, AVIF or video goes exactly as picked.
+      if (preparedBeforeUpload(picked)) {
+        setPhase('preparing');
+        const mod = await import('../../../lib/imagePreprocess');
+        ready = (await mod.prepareUploadImage(picked, 'community')).file;
+      }
+      if (maxBytes && overCap(ready.size, maxBytes)) {
+        setPhase('idle');
+        setUploadError(tooHeavyText(t, ready.size, maxBytes));
         return;
       }
-      onPick(r.key);
-      onClose();
+      if (pickUpload(ready) === 'session') {
+        // Above 8 MiB: the resumable session, with its progress and «إلغاء» (UploadTile).
+        setPhase('idle');
+        setLarge(ready);
+        return;
+      }
+      setPhase('uploading');
+      // `community` is the merchant's own public prefix (merchants/<owner>/public/),
+      // the only one a layout accepts; the server sniffs the bytes.
+      const r = await uploadFile(ready, 'community');
+      if ((r.mime ?? '').startsWith('video/') !== (kind === 'video')) {
+        setPhase('idle');
+        setUploadError(kind === 'video' ? t.library.kindVideo : t.library.kindImage);
+        return;
+      }
+      rememberItems([asLibraryItem({ key: r.key, kind, mime: r.mime ?? '', width: r.width ?? null, height: r.height ?? null, created_at: new Date().toISOString(), byte_size: r.bytes ?? ready.size, used_in: [] })]);
+      await finish(r.key, ready);
     } catch (e) {
-      setUploadError(builderRefusal(e, loc));
-    } finally {
-      setUploading(false);
-      if (file.current) file.current.value = '';
+      setPhase('idle');
+      // The weight and poster refusals in the library's words (with the figures); every other upload refusal in the builder's.
+      setUploadError(LIBRARY_CODES.has(codeOf(e)) ? libraryRefusal(e, t, lang) : builderRefusal(e, loc));
     }
   };
 
-  const title = kind === 'video' ? loc('اختر فيديو', 'Choose a video') : loc('اختر صورة', 'Choose a picture');
+  const pickFromLibrary = (key: string) => {
+    if (kind === 'video' && wantPoster) void finish(key, null);
+    else {
+      onPick(key);
+      onClose();
+    }
+  };
+
+  const remove = async (item: LibraryItem) => {
+    setUploadError(null);
+    const ok = await confirm({ title: t.library.deleteTitle, consequence: t.library.deleteBody, confirmLabel: t.library.deleteConfirm, destructive: true });
+    if (!ok) return;
+    try {
+      await deleteLibraryFile(item.key);
+      forgetItem(item.key);
+      setItems((prev) => (prev ?? []).filter((x) => x.key !== item.key));
+      toast.success(t.library.deleted);
+    } catch (e) {
+      // MEDIA_IN_USE names where the store still shows it, in the merchant's language —
+      // and the tile learns it too (review 2026-09-30): it stops saying «غير مستخدم» and
+      // stops offering a delete the server just refused. The sentence names the file.
+      const d = detailsOf(e);
+      if (codeOf(e) === 'MEDIA_IN_USE' && Array.isArray(d.used_in)) {
+        const used = { ...item, used_in: d.used_in as LibraryItem['used_in'] };
+        rememberItems([used]);
+        setItems((prev) => (prev ?? []).map((x) => (x.key === item.key ? used : x)));
+      }
+      const place = items ? items.findIndex((x) => x.key === item.key) : -1;
+      const which = place >= 0 ? `${fillSpeed(kind === 'video' ? t.library.itemVideo : t.library.itemImage, { n: place + 1, total: items!.length })} — ` : '';
+      setUploadError(`${which}${libraryRefusal(e, t, lang)}`);
+    }
+  };
+
+  const busy = phase !== 'idle' || !!large;
+  const busyWords = phase === 'preparing' ? t.library.preparing : phase === 'poster' ? t.library.posterCapturing : t.library.uploading;
+  const title = kind === 'video' ? loc('اختر فيديو', 'Choose a video', 'ڤیدیۆیەک هەڵبژێرە') : loc('اختر صورة', 'Choose a picture', 'وێنەیەک هەڵبژێرە');
   return (
     <Sheet
       open={open}
@@ -388,23 +534,46 @@ export function MediaPicker({
       label={title}
       detents={['large']}
       panelClassName="sm:max-w-lg"
+      testId="sd-media-picker"
       header={
         <div className="flex items-center gap-3 px-4 pb-3 pt-1">
           <h2 className="text-[15px] font-bold text-text-primary">{title}</h2>
-          <input ref={file} type="file" accept={ACCEPT[kind]} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => void upload(e.target.files?.[0])} />
-          <Button size="sm" variant="secondary" className="ms-auto" icon={<Upload className="h-4 w-4" aria-hidden="true" />} loading={uploading} loadingLabel={loc('جارٍ الرفع…', 'Uploading…')} onClick={() => file.current?.click()}>
-            {kind === 'video' ? loc('ارفع فيديو', 'Upload a video') : loc('ارفع صورة', 'Upload a picture')}
+          <input ref={file} type="file" accept={ACCEPT[kind]} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => void upload(e.target.files?.[0])} data-sd-media-file />
+          <Button size="sm" variant="secondary" className="ms-auto" icon={<Upload className="h-4 w-4" aria-hidden="true" />} loading={busy} loadingLabel={busyWords} onClick={() => file.current?.click()}>
+            {kind === 'video' ? loc('ارفع فيديو', 'Upload a video', 'ڤیدیۆیەک باربکە') : loc('ارفع صورة', 'Upload a picture', 'وێنەیەک باربکە')}
           </Button>
         </div>
       }
     >
       <div className="px-4 pb-5">
         {uploadError && (
-          <p role="alert" className="lv-field-error mb-3">
+          <p role="alert" className="lv-field-error mb-3" data-sd-media-error>
             {uploadError}
           </p>
         )}
-        {kind === 'video' && <p className="mb-3 text-[12px] text-text-muted">{loc('MP4 أو WebM حتى 40 ميغابايت. يُعرض من متجرك مباشرة، بلا تضمين خارجي.', 'MP4 or WebM up to 40 MB. Played from your store directly, never embedded.')}</p>}
+        {large && (
+          <div className="mb-3">
+            <UploadTile
+              file={large}
+              purpose="community"
+              onDone={(r) => {
+                const done = large;
+                setLarge(null);
+                if (!r.key || (r.mime ?? '').startsWith('video/') !== (kind === 'video')) {
+                  setUploadError(kind === 'video' ? t.library.kindVideo : t.library.kindImage);
+                  return;
+                }
+                rememberItems([asLibraryItem({ key: r.key, kind, mime: r.mime, width: r.width ?? null, height: r.height ?? null, created_at: new Date().toISOString(), byte_size: r.bytes, used_in: [] })]);
+                void finish(r.key, done);
+              }}
+              onCancel={() => setLarge(null)}
+            />
+          </div>
+        )}
+        <p className="mb-3 text-[12px] text-text-muted" data-sd-media-cap>
+          {kind === 'video' ? `${t.library.videoNote} ` : ''}
+          {maxBytes ? fillSpeed(t.library.cap, { max: formatBytes(maxBytes) }) : ''}
+        </p>
         {error ? (
           <p className="py-6 text-center text-[13px] text-text-muted" role="alert">
             {builderRefusal(error, loc)}
@@ -416,45 +585,31 @@ export function MediaPicker({
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center">
             {kind === 'video' ? <VideoIcon className="h-6 w-6 text-text-muted" aria-hidden="true" /> : <ImagePlus className="h-6 w-6 text-text-muted" aria-hidden="true" />}
-            <p className="text-[13px] text-text-muted">{kind === 'video' ? loc('لم ترفع فيديو بعد.', 'You have not uploaded a video yet.') : loc('لم ترفع صورًا بعد.', 'You have not uploaded pictures yet.')}</p>
+            <p className="text-[13px] text-text-muted">{kind === 'video' ? loc('لم ترفع فيديو بعد.', 'You have not uploaded a video yet.', 'هێشتا هیچ ڤیدیۆیەکت بار نەکردووە.') : loc('لم ترفع صورًا بعد.', 'You have not uploaded pictures yet.', 'هێشتا هیچ وێنەیەکت بار نەکردووە.')}</p>
           </div>
         ) : (
-          <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="listbox" aria-label={title}>
-            {items.map((m) => {
-              const on = m.key === value;
-              return (
-                <li key={m.key}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={on}
-                    aria-label={kind === 'video' ? loc('فيديو', 'Video') : loc('صورة', 'Picture')}
-                    onClick={() => {
-                      onPick(m.key);
-                      onClose();
-                    }}
-                    className={`relative block aspect-square w-full overflow-hidden rounded-xl border bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${on ? 'border-gold' : 'border-border-subtle'}`}
-                  >
-                    <MediaThumb value={m.key} kind={kind} className="h-full w-full" />
-                    {on && (
-                      <span className="absolute end-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-accent-contrast">
-                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                      </span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <MediaLibraryGrid
+            list={items}
+            kind={kind}
+            value={value}
+            maxBytes={maxBytes}
+            t={t}
+            lang={lang}
+            label={title}
+            onPick={pickFromLibrary}
+            onHeavy={(m) => maxBytes && setUploadError(tooHeavyText(t, m.byte_size, maxBytes))}
+            onDelete={(m) => void remove(m)}
+          />
         )}
         {next && (
           <div className="flex justify-center pt-3">
             <Button size="sm" variant="ghost" onClick={more}>
-              {loc('المزيد', 'More')}
+              {loc('المزيد', 'More', 'زیاتر')}
             </Button>
           </div>
         )}
       </div>
+      {confirmDialog}
     </Sheet>
   );
 }

@@ -788,7 +788,7 @@ test('the request board: only requests on the public board, never the customer, 
   };
   assert.deepEqual(list.data.map((r) => r.title), ['Print me a vase'], 'private, draft and expired requests are not on the board');
   assert.equal(list.data[0].reference, 'req_vase7q');
-  assert.equal(list.data[0].url, `${ORIGIN}/requests?request=req_vase7q`);
+  assert.equal(list.data[0].url, `${ORIGIN}/requests/req_vase7q`);
   assert.equal(list.data[0].governorate?.code, 'baghdad');
   const text = JSON.stringify(list);
   assert.ok(!/Leaky/.test(text), 'the customer is never named, not even masked');

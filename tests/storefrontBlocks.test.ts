@@ -156,7 +156,8 @@ test('every block type has exactly one component: in the storefront chunk, the t
   assert.deepEqual([...core].sort(), ['hero', 'products_grid', 'tabs']);
 
   // One file per block type.
-  const helpers = new Set(['extra.tsx', 'tabViews.tsx', 'HeroVariants.tsx']);
+  // workshopFacts.tsx: the hero's facts row, its own small lazy chunk (review 2026-09-30) — lazy like the rest.
+  const helpers = new Set(['extra.tsx', 'tabViews.tsx', 'HeroVariants.tsx', 'workshopFacts.tsx']);
   const blockFiles = readdirSync(join(ROOT, STOREFRONT_DIR, 'blocks')).filter((f) => f.endsWith('.tsx') && !helpers.has(f));
   assert.deepEqual(blockFiles.sort(), BLOCK_TYPES.map(fileOfType).sort());
 

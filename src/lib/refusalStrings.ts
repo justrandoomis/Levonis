@@ -367,82 +367,82 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   OFFER_CHANGED: {
     ar: 'غيّر التاجر هذا العرض بعد أن فتحته. راجع الشروط الجديدة قبل القبول.',
     en: 'The merchant changed this offer after you opened it. Review the new terms before accepting.',
-    ckb: 'غيّر التاجر هذا العرض بعد أن فتحته. راجع الشروط الجديدة قبل القبول.',
+    ckb: 'بازرگانەکە دوای ئەوەی کردتەوە ئەم ئۆفەرەی گۆڕی. پێش قبوڵکردن سەیری مەرجە نوێیەکان بکە.',
   },
   OFFER_STALE: {
     ar: 'عدّلتَ طلبك بعد أن قدّم التاجر هذا العرض، فلا يمكن قبوله حتى يؤكده التاجر من جديد.',
     en: 'You changed your request after this offer was made, so it can be accepted once the merchant re-confirms it.',
-    ckb: 'عدّلتَ طلبك بعد أن قدّم التاجر هذا العرض، فلا يمكن قبوله حتى يؤكده التاجر من جديد.',
+    ckb: 'دوای ئەوەی بازرگانەکە ئەم ئۆفەرەی پێشکەش کرد داواکارییەکەت دەستکاری کرد، بۆیە تا بازرگانەکە دووبارە پشتڕاستی نەکاتەوە قبوڵ ناکرێت.',
   },
   OFFER_EXPIRED: {
     ar: 'انتهت صلاحية هذا العرض. اختر عرضًا آخر أو اطلب من التاجر عرضًا جديدًا.',
     en: 'This offer has expired. Choose another offer, or ask the merchant for a new one.',
-    ckb: 'انتهت صلاحية هذا العرض. اختر عرضًا آخر أو اطلب من التاجر عرضًا جديدًا.',
+    ckb: 'ماوەی ئەم ئۆفەرە بەسەرچووە. ئۆفەرێکی تر هەڵبژێرە یان داوای ئۆفەرێکی نوێ لە بازرگانەکە بکە.',
   },
   OFFER_NOT_AVAILABLE: {
     ar: 'هذا العرض لم يعد متاحًا — ربما سحبه التاجر. حدّث الصفحة.',
     en: 'This offer is no longer available — the merchant may have withdrawn it. Refresh the page.',
-    ckb: 'هذا العرض لم يعد متاحًا — ربما سحبه التاجر. حدّث الصفحة.',
+    ckb: 'ئەم ئۆفەرە چیتر بەردەست نییە — لەوانەیە بازرگانەکە کشاندبێتیەوە. پەڕەکە نوێ بکەرەوە.',
   },
   OFFER_EXISTS: {
     ar: 'لديك عرض قائم على هذا الطلب. اسحبه أولًا إن أردت تقديم عرض جديد.',
     en: 'You already have an active offer on this request. Withdraw it first to make a new one.',
-    ckb: 'لديك عرض قائم على هذا الطلب. اسحبه أولًا إن أردت تقديم عرض جديد.',
+    ckb: 'ئۆفەرێکی چالاکت لەسەر ئەم داواکارییە هەیە. ئەگەر دەتەوێت ئۆفەرێکی نوێ بنێریت، سەرەتا بیکشێنەرەوە.',
   },
   OFFER_NOT_STALE: {
     ar: 'عرضك مطابق للطلب بصيغته الحالية، ولا يحتاج إلى تأكيد.',
     en: 'Your offer already matches the request as it is — there is nothing to re-confirm.',
-    ckb: 'عرضك مطابق للطلب بصيغته الحالية، ولا يحتاج إلى تأكيد.',
+    ckb: 'ئۆفەرەکەت لەگەڵ داواکارییەکە بەم شێوەیەی ئێستای دەگونجێت و پێویستی بە پشتڕاستکردنەوە نییە.',
   },
   OFFER_EXPIRY_INVALID: {
     ar: 'تاريخ صلاحية العرض غير صحيح. اختر تاريخًا قادمًا.',
     en: 'The offer validity date is not valid. Choose a future date.',
-    ckb: 'تاريخ صلاحية العرض غير صحيح. اختر تاريخًا قادمًا.',
+    ckb: 'بەرواری کارابوونی ئۆفەرەکە دروست نییە. بەروارێکی داهاتوو هەڵبژێرە.',
   },
   OWN_REQUEST: {
     ar: 'لا يمكنك تقديم عرض على طلبك.',
     en: 'You cannot make an offer on your own request.',
-    ckb: 'لا يمكنك تقديم عرض على طلبك.',
+    ckb: 'ناتوانیت ئۆفەر لەسەر داواکاریی خۆت پێشکەش بکەیت.',
   },
   REQUEST_NOT_OPEN: {
     ar: 'هذا الطلب لم يعد يستقبل عروضًا.',
     en: 'This request is no longer taking offers.',
-    ckb: 'هذا الطلب لم يعد يستقبل عروضًا.',
+    ckb: 'ئەم داواکارییە چیتر ئۆفەر وەرناگرێت.',
   },
   REQUEST_EXPIRED: {
     ar: 'انتهت مدة هذا الطلب ولم يعد يستقبل عروضًا.',
     en: 'This request has expired and no longer takes offers.',
-    ckb: 'انتهت مدة هذا الطلب ولم يعد يستقبل عروضًا.',
+    ckb: 'ماوەی ئەم داواکارییە بەسەرچووە و چیتر ئۆفەر وەرناگرێت.',
   },
   REQUEST_HAS_ORDER: {
     ar: 'لهذا الطلب تنفيذ مدفوع. ألغِ التنفيذ قبل أن يبدأ التاجر، أو افتح نزاعًا.',
     en: 'This request has a paid order. Cancel the order before the merchant starts, or open a dispute.',
-    ckb: 'لهذا الطلب تنفيذ مدفوع. ألغِ التنفيذ قبل أن يبدأ التاجر، أو افتح نزاعًا.',
+    ckb: 'ئەم داواکارییە جێبەجێکردنێکی پارەدراوی هەیە. پێش ئەوەی بازرگانەکە دەست پێ بکات هەڵیبوەشێنەرەوە، یان ناکۆکییەک بکەرەوە.',
   },
   REQUEST_NOT_CANCELLABLE: {
     ar: 'لا يمكن إلغاء هذا الطلب في حالته الحالية.',
     en: 'This request cannot be cancelled in its current state.',
-    ckb: 'لا يمكن إلغاء هذا الطلب في حالته الحالية.',
+    ckb: 'لە دۆخی ئێستایدا ئەم داواکارییە هەڵناوەشێتەوە.',
   },
   REQUEST_NOT_EDITABLE: {
     ar: 'لم يعد بالإمكان تعديل مرفقات هذا الطلب.',
     en: 'The attachments of this request can no longer change.',
-    ckb: 'لم يعد بالإمكان تعديل مرفقات هذا الطلب.',
+    ckb: 'چیتر ناتوانرێت پاشکۆکانی ئەم داواکارییە بگۆڕدرێن.',
   },
   REQUEST_CHANGED: {
     ar: 'تغيّر هذا الطلب أثناء العملية. حدّث الصفحة وحاول مرة أخرى.',
     en: 'This request changed while you were working on it. Refresh the page and try again.',
-    ckb: 'تغيّر هذا الطلب أثناء العملية. حدّث الصفحة وحاول مرة أخرى.',
+    ckb: 'ئەم داواکارییە لە کاتی کارەکەدا گۆڕا. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
   },
   ACCEPT_CONFLICT: {
     ar: 'تغيّر الطلب أثناء القبول. حدّث الصفحة وحاول مرة أخرى.',
     en: 'The request changed while you were accepting. Refresh the page and try again.',
-    ckb: 'تغيّر الطلب أثناء القبول. حدّث الصفحة وحاول مرة أخرى.',
+    ckb: 'داواکارییەکە لە کاتی قبوڵکردندا گۆڕا. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
   },
   REQUEST_CLOSED: {
     ar: 'هذا الطلب مغلق، ولم تعد معاينة مجسّمه متاحة.',
     en: 'This request is closed, so its model can no longer be previewed.',
-    ckb: 'هذا الطلب مغلق، ولم تعد معاينة مجسّمه متاحة.',
+    ckb: 'ئەم داواکارییە داخراوە، بۆیە چیتر پێشبینینی مۆدێلەکەی بەردەست نییە.',
   },
   VIEWER_NOT_ALLOWED: {
     ar: 'المعاينة ثلاثية الأبعاد متاحة لصاحب الطلب وللتجار الذين يمكنهم تقديم عرض عليه.',
@@ -479,17 +479,17 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   REQUEST_NOT_DRAFT: {
     ar: 'نُشر هذا الطلب بالفعل. حدّث الصفحة وعدّله من صفحته.',
     en: 'This request is already published. Refresh and edit it from its page.',
-    ckb: 'نُشر هذا الطلب بالفعل. حدّث الصفحة وعدّله من صفحته.',
+    ckb: 'ئەم داواکارییە پێشتر بڵاوکراوەتەوە. پەڕەکە نوێ بکەرەوە و لە پەڕەکەی خۆیەوە دەستکاری بکە.',
   },
   OFFER_DELIVERY_INVALID: {
     ar: 'اختر طريقة التسليم من القائمة.',
     en: 'Choose the handover method from the list.',
-    ckb: 'اختر طريقة التسليم من القائمة.',
+    ckb: 'ڕێگای ڕادەستکردن لە لیستەکە هەڵبژێرە.',
   },
   OFFER_MATERIAL_INVALID: {
     ar: 'اختر حتى 5 مواد من القائمة.',
     en: 'Choose up to 5 materials from the list.',
-    ckb: 'اختر حتى 5 مواد من القائمة.',
+    ckb: 'هەتا 5 ماددە لە لیستەکە هەڵبژێرە.',
   },
   BAD_URL: {
     ar: 'الرابط غير صالح. الصق رابط التصميم كاملًا مع ‎https://‎.',
@@ -499,27 +499,27 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   INSUFFICIENT_FUNDS: {
     ar: 'رصيد محفظتك لا يغطي هذا المبلغ. اشحن المحفظة ثم حاول مرة أخرى.',
     en: 'Your wallet balance does not cover this amount. Top up your wallet and try again.',
-    ckb: 'رصيد محفظتك لا يغطي هذا المبلغ. اشحن المحفظة ثم حاول مرة أخرى.',
+    ckb: 'باڵانسی جزدانەکەت ئەم بڕە داناپۆشێت. جزدانەکەت پڕ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
   },
   ESCROW_FAILED: {
     ar: 'تعذّر حجز المبلغ لهذا العرض. حاول مرة أخرى بعد قليل.',
     en: 'The money for this offer could not be reserved. Try again shortly.',
-    ckb: 'تعذّر حجز المبلغ لهذا العرض. حاول مرة أخرى بعد قليل.',
+    ckb: 'نەتوانرا پارەی ئەم ئۆفەرە ڕابگیرێت. کەمێکی تر دووبارە هەوڵ بدەرەوە.',
   },
   ESCROW_RELEASE_FAILED: {
     ar: 'تعذّر تحويل المبلغ للتاجر الآن. حاول مرة أخرى أو تواصل مع الدعم.',
     en: 'The payment to the merchant could not be released right now. Try again, or contact support.',
-    ckb: 'تعذّر تحويل المبلغ للتاجر الآن. حاول مرة أخرى أو تواصل مع الدعم.',
+    ckb: 'ئێستا نەتوانرا پارەکە بۆ بازرگانەکە بنێردرێت. دووبارە هەوڵ بدەرەوە یان پەیوەندی بە پشتگیری بکە.',
   },
   ESCROW_REFUND_FAILED: {
     ar: 'تعذّر إرجاع المبلغ الآن. حاول مرة أخرى أو تواصل مع الدعم.',
     en: 'The refund could not be made right now. Try again, or contact support.',
-    ckb: 'تعذّر إرجاع المبلغ الآن. حاول مرة أخرى أو تواصل مع الدعم.',
+    ckb: 'ئێستا نەتوانرا پارەکە بگەڕێنرێتەوە. دووبارە هەوڵ بدەرەوە یان پەیوەندی بە پشتگیری بکە.',
   },
   ORDER_SETTLED: {
     ar: 'تمت تسوية هذا الطلب بالفعل. حدّث الصفحة.',
     en: 'This order has already been settled. Refresh the page.',
-    ckb: 'تمت تسوية هذا الطلب بالفعل. حدّث الصفحة.',
+    ckb: 'ئەم داواکارییە پێشتر یەکلایی کراوەتەوە. پەڕەکە نوێ بکەرەوە.',
   },
   // Wave 1 review (F2, the older NO_PREVIEW): the merchant's «ابدأ العمل» on an
   // order whose money is not held, and a model with no 3D preview.
@@ -527,7 +527,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   ESCROW_NOT_HELD: {
     ar: 'المبلغ غير محجوز لهذا الطلب، لذلك لا يمكن بدء العمل. تواصل مع الدعم.',
     en: 'The money for this order is not held, so work cannot start. Contact support.',
-    ckb: 'المبلغ غير محجوز لهذا الطلب، لذلك لا يمكن بدء العمل. تواصل مع الدعم.',
+    ckb: 'پارەی ئەم داواکارییە ڕانەگیراوە، بۆیە ناتوانرێت کار دەست پێ بکات. پەیوەندی بە پشتگیری بکە.',
   },
   NO_PREVIEW: {
     ar: 'لا تتوفر معاينة ثلاثية الأبعاد لهذا الملف.',
@@ -582,7 +582,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   MERCHANT_UNAVAILABLE: {
     ar: 'هذا التاجر لا يستقبل أعمالًا جديدة حاليًا. اختر عرضًا آخر.',
     en: 'This merchant is not taking new work right now. Choose another offer.',
-    ckb: 'هذا التاجر لا يستقبل أعمالًا جديدة حاليًا. اختر عرضًا آخر.',
+    ckb: 'ئەم بازرگانە ئێستا کاری نوێ وەرناگرێت. ئۆفەرێکی تر هەڵبژێرە.',
   },
 
   // ---- community-store cart, checkout and orders (merchant platform wave 1) --
@@ -757,7 +757,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   WALLET_ERROR: {
     ar: 'تعذّر حجز المبلغ من محفظتك الآن. لم يُخصم شيء — حاول مرة أخرى بعد قليل.',
     en: 'The payment could not be reserved from your wallet right now. Nothing was charged — try again shortly.',
-    ckb: 'تعذّر حجز المبلغ من محفظتك الآن. لم يُخصم شيء — حاول مرة أخرى بعد قليل.',
+    ckb: 'ئێستا نەتوانرا پارەکە لە جزدانەکەت ڕابگیرێت. هیچ پارەیەک نەبڕدرا — کەمێکی تر دووبارە هەوڵ بدەرەوە.',
   },
   CART_CHANGED: {
     ar: 'تغيّرت سلتك أثناء إتمام الطلب — ربما أُكمل الطلب من نافذة أخرى. راجع «طلباتي» قبل المحاولة مجددًا.',
@@ -785,7 +785,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   ADDRESS_NOT_FOUND: {
     ar: 'لم نجد هذا العنوان في دفتر عناوينك. اختر عنوانًا آخر.',
     en: 'That address is not in your address book. Choose another.',
-    ckb: 'لم نجد هذا العنوان في دفتر عناوينك. اختر عنوانًا آخر.',
+    ckb: 'ئەم ناونیشانە لە ناونیشانەکانتدا نییە. ناونیشانێکی تر هەڵبژێرە.',
   },
   // Wave 2 (W2-F): a product sold by VARIANT is added as one of its variants
   // (worker/routes/cart.ts). The storefront product page picks one before the
@@ -866,7 +866,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   STORE_REQUIRED: {
     ar: 'افتح متجرك أولًا — صور المتجر وفيديوهاته تخصّ متجرًا.',
     en: 'Open your store first — store pictures and videos belong to a store.',
-    ckb: 'افتح متجرك أولًا — صور المتجر وفيديوهاته تخصّ متجرًا.',
+    ckb: 'سەرەتا فرۆشگاکەت بکەرەوە — وێنە و ڤیدیۆکانی فرۆشگا هی فرۆشگایەکن.',
   },
   // A WARNING, NOT A REFUSAL (perf plan §B.1 #9): the upload succeeded and
   // the file is stored; the MP4's index sits after its frames, so it starts
@@ -905,7 +905,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   OFFER_NOT_ELIGIBLE: {
     ar: 'ورشتك لا تستطيع تنفيذ هذا الطلب كما هو الآن — راجع الأسباب في بطاقة «ورشتك».',
     en: 'Your workshop cannot make this request as it stands — see the reasons on the “Your workshop” card.',
-    ckb: 'ورشتك لا تستطيع تنفيذ هذا الطلب كما هو الآن — راجع الأسباب في بطاقة «ورشتك».',
+    ckb: 'وۆرکشۆپەکەت ناتوانێت ئەم داواکارییە وەک ئێستا هەیە جێبەجێ بکات — هۆکارەکان لە کارتی «وۆرکشۆپەکەت» ببینە.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   FILE_ORIGINAL_RESTRICTED: {
@@ -1044,32 +1044,32 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   CUSTOM_ORDER_CANNOT_START: {
     ar: 'لا يمكن بدء العمل على هذا الطلب في حالته الحالية. حدّث الصفحة.',
     en: 'Work cannot start on this order in its current state. Refresh the page.',
-    ckb: 'لا يمكن بدء العمل على هذا الطلب في حالته الحالية. حدّث الصفحة.',
+    ckb: 'لە دۆخی ئێستایدا ناتوانرێت کار لەسەر ئەم داواکارییە دەست پێ بکرێت. پەڕەکە نوێ بکەرەوە.',
   },
   CUSTOM_ORDER_CANNOT_DELIVER: {
     ar: 'لا يمكن تسجيل تسليم هذا الطلب في حالته الحالية. حدّث الصفحة.',
     en: 'This order cannot be marked delivered in its current state. Refresh the page.',
-    ckb: 'لا يمكن تسجيل تسليم هذا الطلب في حالته الحالية. حدّث الصفحة.',
+    ckb: 'لە دۆخی ئێستایدا ناتوانرێت گەیاندنی ئەم داواکارییە تۆمار بکرێت. پەڕەکە نوێ بکەرەوە.',
   },
   CUSTOM_ORDER_CANNOT_CONFIRM: {
     ar: 'لا يمكن تأكيد استلام هذا الطلب الآن — لم تسلّمه الورشة بعد أو تغيّرت حالته. حدّث الصفحة.',
     en: 'This order cannot be confirmed now — the workshop has not delivered it, or it changed. Refresh the page.',
-    ckb: 'لا يمكن تأكيد استلام هذا الطلب الآن — لم تسلّمه الورشة بعد أو تغيّرت حالته. حدّث الصفحة.',
+    ckb: 'ئێستا ناتوانرێت وەرگرتنی ئەم داواکارییە پشتڕاست بکرێتەوە — وۆرکشۆپەکە هێشتا نەیگەیاندووە یان دۆخەکەی گۆڕاوە. پەڕەکە نوێ بکەرەوە.',
   },
   CUSTOM_ORDER_NO_ESCROW: {
     ar: 'لا يوجد مبلغ محجوز لهذا الطلب. تواصل مع الدعم.',
     en: 'There is no held payment for this order. Contact support.',
-    ckb: 'لا يوجد مبلغ محجوز لهذا الطلب. تواصل مع الدعم.',
+    ckb: 'هیچ پارەیەکی ڕاگیراو بۆ ئەم داواکارییە نییە. پەیوەندی بە پشتگیری بکە.',
   },
   CUSTOM_ORDER_CANCEL_NEEDS_DISPUTE: {
     ar: 'بدأ العمل على هذا الطلب، فلا يُلغى مباشرة. افتح نزاعًا وستقرّر Levonis.',
     en: 'Work on this order has started, so it cannot simply be cancelled. Open a dispute and Levonis will decide.',
-    ckb: 'بدأ العمل على هذا الطلب، فلا يُلغى مباشرة. افتح نزاعًا وستقرّر Levonis.',
+    ckb: 'کار لەسەر ئەم داواکارییە دەستی پێکردووە، بۆیە ڕاستەوخۆ هەڵناوەشێتەوە. ناکۆکییەک بکەرەوە و Levonis بڕیار دەدات.',
   },
   CUSTOM_ORDER_CANNOT_CANCEL: {
     ar: 'لا يمكن إلغاء هذا الطلب في حالته الحالية. حدّث الصفحة.',
     en: 'This order cannot be cancelled in its current state. Refresh the page.',
-    ckb: 'لا يمكن إلغاء هذا الطلب في حالته الحالية. حدّث الصفحة.',
+    ckb: 'لە دۆخی ئێستایدا ناتوانرێت ئەم داواکارییە هەڵبوەشێنرێتەوە. پەڕەکە نوێ بکەرەوە.',
   },
   ORDER_NOT_CANCELLABLE: {
     ar: 'يمكن إلغاء الطلب بنفسك ما دام بانتظار التأكيد فقط. بعد ذلك تواصل مع الدعم.',
@@ -1476,6 +1476,125 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ar: 'تعذّر جلب معاينة الصفحة الآن. سيُرسل الرابط باسم موقعه، وتُعاد المحاولة لاحقًا.',
     en: 'The page preview could not be fetched right now. The link is sent with its site’s name and tried again later.',
     ckb: 'پێشبینینی پەڕەکە ئێستا نەهێنرا. لینکەکە بە ناوی ماڵپەڕەکەی دەنێردرێت و دواتر دووبارە هەوڵ دەدرێتەوە.',
+  },
+  // ---- The request's discussion and the order's timeline (0160; docs/
+  //      COMMUNITY_ECOSYSTEM.md §9.5; worker/routes/requestDiscussion.ts,
+  //      worker/routes/communityOrderTimeline.ts). Real Sorani, per D6. --------
+  COMMENT_KIND_NOT_ALLOWED: {
+    ar: 'لا يمكنك إضافة هذا النوع من التعليقات هنا. الأسئلة للورش المؤهلة، والإجابات لصاحب الطلب، والتعليقات ما دام الطلب على اللوحة.',
+    en: 'You cannot post this kind of comment here. Questions are for eligible workshops, answers for the request’s owner, and comments while the request is on the board.',
+    ckb: 'ناتوانیت ئەم جۆرە کۆمێنتە لێرە بنووسیت. پرسیارەکان بۆ وۆرکشۆپە شیاوەکانن، وەڵامەکان بۆ خاوەنی داواکارییەکە، و کۆمێنتەکان تا داواکارییەکە لەسەر تابلۆکەیە.',
+  },
+  COMMENT_TOO_LONG: {
+    ar: 'التعليق أطول من المسموح (1000 حرف). اختصره ثم أعد الإرسال.',
+    en: 'The comment is longer than allowed (1,000 characters). Shorten it and send again.',
+    ckb: 'کۆمێنتەکە لە ڕێگەپێدراو درێژترە (١٠٠٠ پیت). کورتی بکەرەوە و دووبارە بینێرە.',
+  },
+  COMMENT_PARENT_INVALID: {
+    ar: 'التعليق الذي تردّ عليه ليس في هذه المناقشة. حدّث الصفحة ثم حاول مجددًا.',
+    en: 'The comment you are replying to is not in this discussion. Refresh the page and try again.',
+    ckb: 'ئەو کۆمێنتەی وەڵامی دەدەیتەوە لەم گفتوگۆیەدا نییە. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵبدەوە.',
+  },
+  COMMENT_NOT_FOUND: {
+    ar: 'لم نجد هذا التعليق. ربما حُذف.',
+    en: 'We could not find this comment. It may have been removed.',
+    ckb: 'ئەم کۆمێنتە نەدۆزرایەوە. لەوانەیە سڕابێتەوە.',
+  },
+  ORDER_UPDATE_KIND_NOT_ALLOWED: {
+    ar: 'لا يمكن إضافة هذا التحديث من طرفك الآن. الورشة تكتب التقدّم والصور و«جاهز»، والزبون يطلب التعديل.',
+    en: 'This update cannot be posted from your side right now. The workshop posts progress, photos and “ready”; the customer asks for changes.',
+    ckb: 'ئەم نوێکردنەوەیە ئێستا لە لایەن تۆوە زیاد ناکرێت. وۆرکشۆپەکە پێشکەوتن و وێنە و «ئامادەیە» دەنووسێت، کڕیارەکە داوای گۆڕانکاری دەکات.',
+  },
+  ORDER_UPDATE_TOO_LATE: {
+    ar: 'فات وقت هذا التحديث: الطلب سُلِّم أو أُغلق. أكّد الاستلام أو افتح نزاعًا إن كانت هناك مشكلة.',
+    en: 'It is too late for this update: the order was delivered or closed. Confirm receipt, or open a dispute if something is wrong.',
+    ckb: 'کاتی ئەم نوێکردنەوەیە بەسەرچووە: داواکارییەکە گەیەنراوە یان داخراوە. وەرگرتن پشتڕاست بکەرەوە یان ئەگەر کێشەیەک هەیە ناکۆکییەک بکەرەوە.',
+  },
+  ORDER_UPDATE_TOO_LONG: {
+    ar: 'التحديث أطول من المسموح (1000 حرف). اختصره ثم أعد الإرسال.',
+    en: 'The update is longer than allowed (1,000 characters). Shorten it and send again.',
+    ckb: 'نوێکردنەوەکە لە ڕێگەپێدراو درێژترە (١٠٠٠ پیت). کورتی بکەرەوە و دووبارە بینێرە.',
+  },
+  ORDER_UPDATE_FILE_NOT_OWNED: {
+    ar: 'هذه الصورة ليست من ملفاتك المرفوعة لهذا الطلب. ارفعها من جهازك ثم أضفها.',
+    en: 'That picture is not one of your uploads for this order. Upload it from your device, then add it.',
+    ckb: 'ئەم وێنەیە لە بارکراوەکانی تۆ بۆ ئەم داواکارییە نییە. لە ئامێرەکەتەوە باری بکە و پاشان زیادی بکە.',
+  },
+  // ---- Offers V2 and the workshop profile (0159; docs/COMMUNITY_ECOSYSTEM.md
+  // §9.5, Phase 5a). Raised by worker/routes/marketplace.ts (the offer
+  // composer: fee, files, drafts, send) and worker/routes/merchantPrinters.ts
+  // (the workshop's turnaround and intro). Written Sorani, per D6.
+  OFFER_FEE_INVALID: {
+    ar: 'رسوم التوصيل يجب أن تكون رقمًا صحيحًا بالدينار، صفرًا أو أكثر.',
+    en: 'The delivery fee must be a whole number of dinars, zero or more.',
+    ckb: 'کرێی گەیاندن دەبێت ژمارەیەکی تەواو بێت بە دینار، سفر یان زیاتر.',
+  },
+  // A pickup carries no delivery fee (review 2026-09-30) — the composer's rule, held on the server.
+  OFFER_PICKUP_FEE: {
+    ar: 'الاستلام من الورشة لا يحمل رسوم توصيل — اجعل الرسوم صفرًا أو اختر طريقة توصيل.',
+    en: 'A pickup from the workshop carries no delivery fee — set the fee to zero or choose a delivery method.',
+    ckb: 'وەرگرتن لە وۆرکشۆپەکە کرێی گەیاندنی نییە — کرێکە بکە بە سفر یان ڕێگایەکی گەیاندن هەڵبژێرە.',
+  },
+  OFFER_FILE_LIMIT: {
+    ar: 'يمكن إرفاق ستة ملفات على الأكثر بالعرض. احذف ملفًا قبل إضافة آخر.',
+    en: 'An offer can carry at most six files. Remove one before adding another.',
+    ckb: 'زۆرترین شەش فایل دەکرێت لەگەڵ ئۆفەرەکە بنێردرێت. یەکێک بسڕەوە پێش ئەوەی یەکێکی تر زیاد بکەیت.',
+  },
+  OFFER_FILE_NOT_OWNED: {
+    ar: 'هذا الملف ليس من ملفاتك المرفوعة للعرض. ارفعه من جديد من نموذج العرض.',
+    en: 'This file is not one you uploaded for an offer. Upload it again from the offer form.',
+    ckb: 'ئەم فایلە لە فایلە بارکراوەکانی تۆ بۆ ئەم ئۆفەرە نییە. لە فۆڕمی ئۆفەرەکەوە دووبارە باری بکە.',
+  },
+  OFFER_DRAFT_EXISTS: {
+    ar: 'لديك مسودة عرض محفوظة على هذا الطلب. افتحها وعدّلها بدل إنشاء مسودة جديدة.',
+    en: 'You already have a saved draft offer on this request. Open and edit it instead of starting another.',
+    ckb: 'پێشتر ڕەشنووسێکی ئۆفەرت لەسەر ئەم داواکارییە پاشەکەوت کراوە. بیکەرەوە و دەستکاری بکە لە جیاتی دروستکردنی ڕەشنووسێکی نوێ.',
+  },
+  OFFER_REQUEST_CLOSED: {
+    ar: 'لم يعد هذا الطلب يستقبل عروضًا، فبقيت مسودتك محفوظة دون إرسال.',
+    en: 'This request no longer takes offers, so your draft was kept but not sent.',
+    ckb: 'ئەم داواکارییە چیتر ئۆفەر وەرناگرێت، بۆیە ڕەشنووسەکەت پاشەکەوت کرا بەڵام نەنێردرا.',
+  },
+  OFFER_NOT_DRAFT: {
+    ar: 'هذا العرض مُرسل بالفعل وليس مسودة. عدّله أو اسحبه من قائمة عروضك.',
+    en: 'This offer was already sent and is not a draft. Edit or withdraw it from your offers.',
+    ckb: 'ئەم ئۆفەرە پێشتر نێردراوە و ڕەشنووس نییە. لە لیستی ئۆفەرەکانتەوە دەستکاری بکە یان بیکشێنەرەوە.',
+  },
+  PREFS_TURNAROUND_INVALID: {
+    ar: 'مدة التنفيذ المعتادة يجب أن تكون بين يوم واحد و٦٠ يومًا.',
+    en: 'The usual turnaround must be between 1 and 60 days.',
+    ckb: 'ماوەی ئاسایی جێبەجێکردن دەبێت لە نێوان ١ و ٦٠ ڕۆژدا بێت.',
+  },
+  PREFS_INTRO_TOO_LONG: {
+    ar: 'نبذة الورشة طويلة؛ الحد ٣٠٠ حرف.',
+    en: 'The workshop intro is too long; the limit is 300 characters.',
+    ckb: 'ناساندنی وۆرکشۆپەکە زۆر درێژە؛ سنوورەکە ٣٠٠ پیتە.',
+  },
+  // ---- Media everywhere in the store page (P5; docs/MERCHANT_PLATFORM_V2.md
+  //      storefront §4.7, sentences verbatim). Raised by
+  //      worker/routes/storeLayout.ts: a media slot's weight cap, the poster a
+  //      hero / background video needs, a library file still in use. The
+  //      {size} / {max} / {where} figures arrive as `details` and the builder
+  //      (src/components/merchant/storeDesign/refusal.ts) fills them in.
+  LAYOUT_MEDIA_TOO_HEAVY: {
+    ar: 'الملف {size} يتجاوز حدّ هذا الموضع ({max}). اضغطه أو اختر ملفًا أخف.',
+    en: 'The file is {size}, over this slot\'s {max} limit. Compress it or pick a lighter one.',
+    ckb: 'فایلەکە {size}ـە و لە سنووری ئەم شوێنە ({max}) زیاترە. بچووکی بکەرەوە یان فایلێکی سووکتر هەڵبژێرە.',
+  },
+  LAYOUT_POSTER_REQUIRED: {
+    ar: 'اختر صورة ملصق للفيديو حتى يظهر شيء قبل التشغيل.',
+    en: 'Pick a poster image so something shows before the video plays.',
+    ckb: 'وێنەی پۆستەر بۆ ڤیدیۆکە هەڵبژێرە تا پێش لێدان شتێک دەربکەوێت.',
+  },
+  MEDIA_IN_USE: {
+    ar: 'هذا الملف مستخدم في: {where}. أزله من هناك أولًا.',
+    en: 'This file is used in: {where}. Remove it there first.',
+    ckb: 'ئەم فایلە بەکارهاتووە لە: {where}. سەرەتا لەوێ لایبە.',
+  },
+  MEDIA_NOT_FOUND: {
+    ar: 'هذا الملف لم يعد في مكتبة متجرك.',
+    en: 'This file is no longer in your store\'s library.',
+    ckb: 'ئەم فایلە چیتر لە کتێبخانەی فرۆشگاکەتدا نییە.',
   },
 };
 

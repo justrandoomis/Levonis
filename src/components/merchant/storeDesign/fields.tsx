@@ -13,7 +13,7 @@
  * draft is not saved while one stands), the rest as notes of what the gate
  * will clean.
  */
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Film, ImageIcon, Plus, Trash2, X } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { Field, Input, Select, Textarea } from '../../ui/Field';
@@ -24,14 +24,19 @@ import { Button, IconButton } from '../../ui/Button';
 import type { BlockType, FieldSpec, RefKind } from '../../../../packages/storeLayout/src/blocks';
 import { LINK_ROUTES, SOCIAL_PROVIDER_NAMES, safeExternalUrl, type LinkTarget, type MediaKind, type SocialItem, type SocialProviderName } from '../../../../packages/storeLayout/src/refs';
 import type { LocalizedText } from '../../../../packages/storeLayout/src/text';
-import { fieldCopy, ISSUE_COPY, ROUTE_COPY, say, SOCIAL_COPY, VALUE_COPY, type Loc } from './catalog';
+import { FIELD_COPY, fieldCopy, ISSUE_COPY, ROUTE_COPY, say, SOCIAL_COPY, VALUE_COPY, type Loc } from './catalog';
 import type { FieldIssue } from './editorModel';
 import { MediaPicker, MediaThumb, RefPicker, useRefName } from './pickers';
+// Media library v2 (P5): what a media control knows of its file, and the slot's weight rule.
+import { MediaMetaLine, overCap, tooHeavyText, useLibraryItem } from './MediaLibrary';
+import { formatBytes } from './refusal';
+import { fillSpeed, useMediaStrings } from './strings';
 
 type ScalarSpec = Exclude<FieldSpec, { t: 'list' }>;
 
 export interface ControlProps {
-  blockType: BlockType;
+  /** The block the setting belongs to — absent for the page's own fields (the Page panel), which name themselves (`label`). */
+  blockType?: BlockType;
   /** The setting's key in the block (or in a list item). */
   name: string;
   spec: FieldSpec;
@@ -42,6 +47,15 @@ export interface ControlProps {
   issues: FieldIssue[];
   /** A stable id prefix for coalescing (the block id + path). */
   path: string;
+  /** The caller's own label and note (the Page panel, the hero's video — words from storeDesign/strings.ts), instead of the catalogue's. */
+  label?: string;
+  hint?: string;
+  /**
+   * A video's sibling POSTER slot (storefront W8): when it is empty, the
+   * picker captures a still from the picked video and `setBoth` receives the
+   * video's key and the poster's in ONE change.
+   */
+  poster?: { value: string; maxBytes?: number; setBoth: (videoKey: string, posterKey: string) => void };
 }
 
 // ----------------------------------------------------------------- issues
@@ -57,17 +71,35 @@ function issueWords(issues: FieldIssue[], loc: Loc, fatal: boolean): string {
     .join(' ');
 }
 
-function useLabel(blockType: BlockType, name: string) {
+function useLabel(blockType: BlockType | undefined, name: string, own?: { label?: string; hint?: string }) {
   const { loc } = useLanguage();
-  const copy = fieldCopy(blockType, name);
-  return { label: say(loc, copy?.label, name), hint: copy?.hint ? say(loc, copy.hint) : undefined };
+  const copy = blockType ? fieldCopy(blockType, name) : FIELD_COPY[name];
+  if (own?.label) return { label: own.label, hint: own.hint };
+  return { label: say(loc, copy?.label, name), hint: own?.hint ?? (copy?.hint ? say(loc, copy.hint) : undefined) };
 }
 
 /** A setting's frame: its label, its note, its error — then the control. */
-function Frame({ blockType, name, issues, children, hintExtra }: { blockType: BlockType; name: string; issues: FieldIssue[]; children: ReactNode; hintExtra?: ReactNode }) {
+function Frame({
+  blockType,
+  name,
+  issues,
+  children,
+  hintExtra,
+  own,
+  extraError,
+}: {
+  blockType?: BlockType;
+  name: string;
+  issues: FieldIssue[];
+  children: ReactNode;
+  hintExtra?: ReactNode;
+  own?: { label?: string; hint?: string };
+  /** An error the control knows of itself (a file heavier than the slot), shown with the gate's. */
+  extraError?: string;
+}) {
   const { loc } = useLanguage();
-  const { label, hint } = useLabel(blockType, name);
-  const error = issueWords(issues, loc, true);
+  const { label, hint } = useLabel(blockType, name, own);
+  const error = [issueWords(issues, loc, true), extraError ?? ''].filter(Boolean).join(' ');
   const note = issueWords(issues, loc, false);
   return (
     <Field
@@ -102,7 +134,7 @@ export function SettingControl(props: ControlProps) {
     case 'text':
       return <TextControl {...props} spec={spec} />;
     case 'media':
-      return <MediaControl {...props} kind={spec.kind} />;
+      return <MediaControl {...props} kind={spec.kind} maxBytes={spec.max_bytes} />;
     case 'link':
       return <LinkControl {...props} />;
     case 'date':
@@ -122,20 +154,21 @@ export function SettingControl(props: ControlProps) {
 
 // ------------------------------------------------------------------ scalars
 
-function BoolControl({ blockType, name, value, onChange, issues }: ControlProps) {
-  const { label, hint } = useLabel(blockType, name);
+function BoolControl({ blockType, name, value, onChange, issues, label: ownLabel, hint: ownHint }: ControlProps) {
+  const { label, hint } = useLabel(blockType, name, { label: ownLabel, hint: ownHint });
   const { loc } = useLanguage();
   const note = issueWords(issues, loc, false);
   return <Switch checked={value === true} onChange={(v) => onChange(v)} label={label} description={note || hint} />;
 }
 
-function EnumControl({ blockType, name, value, onChange, issues, spec, path }: ControlProps & { spec: Extract<FieldSpec, { t: 'enum' }> }) {
+function EnumControl({ blockType, name, value, onChange, issues, spec, path, label: ownLabel, hint: ownHint }: ControlProps & { spec: Extract<FieldSpec, { t: 'enum' }> }) {
   const { loc } = useLanguage();
-  const { label } = useLabel(blockType, name);
+  const own = { label: ownLabel, hint: ownHint };
+  const { label } = useLabel(blockType, name, own);
   const words = (v: string) => say(loc, VALUE_COPY[v], v);
   if (spec.values.length <= 4) {
     return (
-      <Frame blockType={blockType} name={name} issues={issues}>
+      <Frame blockType={blockType} name={name} issues={issues} own={own}>
         <Segmented
           size="sm"
           group={`sd-${path}`}
@@ -148,7 +181,7 @@ function EnumControl({ blockType, name, value, onChange, issues, spec, path }: C
     );
   }
   return (
-    <Frame blockType={blockType} name={name} issues={issues}>
+    <Frame blockType={blockType} name={name} issues={issues} own={own}>
       <Select value={typeof value === 'string' ? value : spec.d} onChange={(e) => onChange(e.target.value)}>
         {spec.values.map((v) => (
           <option key={v} value={v}>
@@ -160,8 +193,9 @@ function EnumControl({ blockType, name, value, onChange, issues, spec, path }: C
   );
 }
 
-function IntControl({ blockType, name, value, onChange, issues, spec }: ControlProps & { spec: Extract<FieldSpec, { t: 'int' }> }) {
+function IntControl({ blockType, name, value, onChange, issues, spec, label: ownLabel, hint: ownHint }: ControlProps & { spec: Extract<FieldSpec, { t: 'int' }> }) {
   const { loc } = useLanguage();
+  const own = { label: ownLabel, hint: ownHint };
   const [bad, setBad] = useState(false);
   const n = typeof value === 'number' ? value : spec.d;
   return (
@@ -169,6 +203,7 @@ function IntControl({ blockType, name, value, onChange, issues, spec }: ControlP
       blockType={blockType}
       name={name}
       issues={issues}
+      own={own}
       hintExtra={
         <span className={`block ${bad ? 'text-danger' : ''}`}>
           {loc(`من ${spec.min} إلى ${spec.max}`, `From ${spec.min} to ${spec.max}`)}
@@ -201,10 +236,10 @@ type TextLang = (typeof LANGS)[number]['id'];
  * language left empty falls back to one the merchant did write (pickText),
  * never to a machine translation.
  */
-function TextControl({ blockType, name, value, onChange, issues, spec, path }: ControlProps & { spec: Extract<FieldSpec, { t: 'text' }> }) {
+function TextControl({ blockType, name, value, onChange, issues, spec, path, label: ownLabel, hint: ownHint }: ControlProps & { spec: Extract<FieldSpec, { t: 'text' }> }) {
   const { loc, lang: uiLang } = useLanguage();
   const [lang, setLang] = useState<TextLang>(uiLang === 'en' ? 'en' : uiLang === 'ckb' ? 'ckb' : 'ar');
-  const { label, hint } = useLabel(blockType, name);
+  const { label, hint } = useLabel(blockType, name, { label: ownLabel, hint: ownHint });
   const text: LocalizedText = isText(value) ? value : { ar: '', en: '', ckb: '' };
   const cur = text[lang] ?? '';
   const meta = LANGS.find((l) => l.id === lang)!;
@@ -261,11 +296,12 @@ function TextControl({ blockType, name, value, onChange, issues, spec, path }: C
 
 const isText = (v: unknown): v is LocalizedText => !!v && typeof v === 'object' && 'ar' in (v as object);
 
-function DateControl({ blockType, name, value, onChange, issues }: ControlProps) {
+function DateControl({ blockType, name, value, onChange, issues, label: ownLabel, hint: ownHint }: ControlProps) {
+  const own = { label: ownLabel, hint: ownHint };
   const iso = typeof value === 'string' ? value : '';
   const local = iso && Number.isFinite(Date.parse(iso)) ? toLocalInput(new Date(iso)) : '';
   return (
-    <Frame blockType={blockType} name={name} issues={issues}>
+    <Frame blockType={blockType} name={name} issues={issues} own={own}>
       <Input
         type="datetime-local"
         ltr
@@ -288,33 +324,81 @@ function toLocalInput(d: Date): string {
 
 // -------------------------------------------------------------------- media
 
-function MediaControl({ blockType, name, value, onChange, issues, kind }: ControlProps & { kind: MediaKind }) {
-  const { loc } = useLanguage();
+/**
+ * MEDIA v2 (storefront B1, P5): the picture, its weight (and a video's
+ * length), where else the store shows it, and this slot's cap. A file heavier
+ * than the slot — one set before the caps existed — is named here as the
+ * field's error with the server's own sentence, so the merchant knows which
+ * control to fix when a save is refused. A video whose sibling poster slot is
+ * empty gets a still captured from it when picked (`poster`).
+ */
+function MediaControl({ blockType, name, value, onChange, issues, kind, maxBytes, poster, label: ownLabel, hint: ownHint }: ControlProps & { kind: MediaKind; maxBytes?: number }) {
+  const { loc, lang } = useLanguage();
+  const t = useMediaStrings();
   const [open, setOpen] = useState(false);
+  const [duration, setDuration] = useState<number | null>(null);
   const key = typeof value === 'string' ? value : '';
+  const item = useLibraryItem(key, kind);
+  useEffect(() => setDuration(null), [key]);
+  const heavy = !!item && !!maxBytes && overCap(item.byte_size, maxBytes);
+  const wantPoster = kind === 'video' && !!poster && !poster.value;
   return (
-    <Frame blockType={blockType} name={name} issues={issues}>
-      <div className="flex items-center gap-3">
+    <Frame
+      blockType={blockType}
+      name={name}
+      issues={issues}
+      own={{ label: ownLabel, hint: ownHint }}
+      extraError={heavy && item && maxBytes ? tooHeavyText(t, item.byte_size, maxBytes) : undefined}
+      hintExtra={
+        <span className="block space-y-0.5">
+          <MediaMetaLine item={key ? item : null} duration={key ? duration : null} t={t} lang={lang} />
+          {maxBytes ? (
+            <span className="block" data-sd-media-cap>
+              {fillSpeed(t.library.cap, { max: formatBytes(maxBytes) })}
+            </span>
+          ) : null}
+        </span>
+      }
+    >
+      <div className="flex items-center gap-3" data-sd-media-control={kind}>
         <button
           type="button"
           onClick={() => setOpen(true)}
           className="relative flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border-subtle bg-surface-raised text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          aria-label={key ? loc('تغيير', 'Change') : loc('اختيار', 'Choose')}
+          aria-label={key ? loc('تغيير', 'Change', 'گۆڕین') : loc('اختيار', 'Choose', 'هەڵبژاردن')}
         >
-          {key ? <MediaThumb value={key} kind={kind} className="h-full w-full" /> : kind === 'video' ? <Film className="h-5 w-5" aria-hidden="true" /> : <ImageIcon className="h-5 w-5" aria-hidden="true" />}
+          {key ? (
+            <MediaThumb value={key} kind={kind} className="h-full w-full" onDuration={kind === 'video' ? setDuration : undefined} />
+          ) : kind === 'video' ? (
+            <Film className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <ImageIcon className="h-5 w-5" aria-hidden="true" />
+          )}
         </button>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
-            {key ? loc('تغيير', 'Change') : kind === 'video' ? loc('اختر فيديو', 'Choose a video') : loc('اختر صورة', 'Choose a picture')}
+            {key ? loc('تغيير', 'Change', 'گۆڕین') : kind === 'video' ? loc('اختر فيديو', 'Choose a video', 'ڤیدیۆیەک هەڵبژێرە') : loc('اختر صورة', 'Choose a picture', 'وێنەیەک هەڵبژێرە')}
           </Button>
           {key && (
             <Button size="sm" variant="ghost" onClick={() => onChange('')}>
-              {loc('إزالة', 'Remove')}
+              {loc('إزالة', 'Remove', 'لابردن')}
             </Button>
           )}
         </div>
       </div>
-      <MediaPicker open={open} onClose={() => setOpen(false)} kind={kind} value={key} onPick={(k) => onChange(k)} />
+      {/* Mounted while open only, as the link control's picker is: a page of media controls holds no idle sheet. */}
+      {open && (
+        <MediaPicker
+          open
+          onClose={() => setOpen(false)}
+          kind={kind}
+          value={key}
+          maxBytes={maxBytes}
+          wantPoster={wantPoster}
+          posterMaxBytes={poster?.maxBytes}
+          onPick={(k, still) => (still && poster ? poster.setBoth(k, still) : onChange(k))}
+        />
+      )}
     </Frame>
   );
 }
@@ -329,7 +413,8 @@ type LinkKind = LinkTarget['kind'];
  * `javascript:` line, `http:`, a bare path) is shown as an error here and
  * never saved.
  */
-function LinkControl({ blockType, name, value, onChange, issues, path }: ControlProps) {
+function LinkControl({ blockType, name, value, onChange, issues, path, label: ownLabel, hint: ownHint }: ControlProps) {
+  const own = { label: ownLabel, hint: ownHint };
   const { loc } = useLanguage();
   const link = (value && typeof value === 'object' ? value : { kind: 'none' }) as LinkTarget;
   const [picking, setPicking] = useState<RefKind | null>(null);
@@ -354,7 +439,7 @@ function LinkControl({ blockType, name, value, onChange, issues, path }: Control
   const typed = link.kind === 'external' ? link.url : 'https://';
   const localBad = link.kind === 'external' && !safeExternalUrl(typed);
   return (
-    <Frame blockType={blockType} name={name} issues={issues}>
+    <Frame blockType={blockType} name={name} issues={issues} own={own}>
       <div className="space-y-2">
         <Select value={shownKind} onChange={(e) => setKind(e.target.value as LinkKind)} aria-label={loc('نوع الرابط', 'Link kind')}>
           {kinds.map((k) => (

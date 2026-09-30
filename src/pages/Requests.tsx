@@ -17,55 +17,55 @@
  * something working correctly.
  */
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Loader2, PackageSearch, MapPin, ChevronLeft, FilePen, PencilLine, Search, X } from 'lucide-react';
+import { Plus, Loader2, PackageSearch, MapPin, Search, X } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
-import { api, ApiError } from '../lib/api';
+import { api } from '../lib/api';
 import { iqd, merchantApi, communityOrdersApi, type MerchantMe, type CommunityOrderRow } from '../lib/merchant';
 import { GOVERNORATE_LABELS } from '../lib/governorates';
-import { AttachmentList, type RequestFile } from '../components/media/RequestAttachments';
-import PrintSummary from '../components/print/PrintSummary';
 import MyRequestsList from '../components/print/MyRequestsList';
 /**
- * PRINT REQUESTS v2 (stream W5-A): the four-step wizard with drafts, and the
- * offers — compared side by side by the customer, composed and edited by the
- * merchant, and the contact both receive once one is accepted.
+ * PRINT REQUESTS v2 (stream W5-A): the four-step wizard with drafts. The
+ * offers — compared by the customer, composed by the merchant — live on the
+ * request's own page now (src/pages/community/Request.tsx, Client 5c).
  */
 import RequestWizard from '../components/community/requests/RequestWizard';
 import { requestsApi, type CatalogMaterial } from '../components/community/requests/api';
-import { REQUEST_STATE_TONE, requestStateLabel } from '../components/community/requests/requestStates';
+import { REQUEST_STATE_TONE, requestPath, requestRedirect, requestStateLabel } from '../components/community/requests/requestStates';
 import { CommunityLoadError } from './community/access';
 import PendingStoreReviews from '../components/community/reviews/StoreReviews';
-import OfferCompare from '../components/community/offers/OfferCompare';
-import MerchantOfferPanel from '../components/community/offers/MerchantOfferPanel';
 import OrderContactCard from '../components/community/offers/OrderContactCard';
-import type { OfferV2 } from '../components/community/offers/types';
 /**
  * ELIGIBILITY AS DATA (stream W5-B): «مناسب لي» — the requests this workshop
- * can make, by the server's own verdict — and, on a request's page, the
- * workshop's verdict with its reasons and its private costing.
+ * can make, by the server's own verdict. The workshop's verdict on ONE
+ * request, with its private costing, is on the request's page.
  */
 import RequestBoard from '../components/merchant/workshop/RequestBoard';
-import WorkshopRequestCard from '../components/merchant/workshop/WorkshopRequestCard';
-import type { OfferPrefill } from '../components/merchant/workshop/api';
 import { Segmented } from '../components/ui/Segmented';
 import { merchantHref } from '../lib/merchantRoutes';
-/**
- * A PUBLISHED REQUEST IS A PROMISE OF OFFERS, and offers arrive hours later
- * from merchants the customer has never met. For an account with no outbound
- * channel every one of them lands only in the in-app inbox, so the request the
- * customer just wrote sits there collecting answers nobody tells them about.
- */
-import ChannelNudge from '../components/notify/ChannelNudge';
-import Spinner from '../components/ui/Spinner';
 import ConfirmSheet from '../components/print/ConfirmSheet';
 import { apiRefusal } from '../lib/refusalStrings';
 import { asLang, formatDate } from '../components/orders/format';
 import { offersLabel } from '../components/community/hub/copy';
-import { forgetCommunityFeed } from '../components/community/hub/feedCache';
+/**
+ * THE ORDER'S TIMELINE (Phase 5d, §9.5 «Customer order view»): the merged
+ * record of a running order and «اطلب تعديلًا», in a sheet opened from the
+ * order's row — a lazy chunk, downloaded on the first tap.
+ */
+import { lazy, Suspense } from 'react';
+import { Sheet } from '../components/ui/Sheet';
+import { useTimelineStrings } from '../components/community/requests/timelineStrings';
+const OrderTimeline = lazy(() => import('../components/community/requests/OrderTimeline'));
+
+/**
+ * THE REQUEST'S OWN SCREEN, for the one place this page still shows it: the
+ * offers that arrived before the community shut, under the maintenance card
+ * (PendingOffersWhileClosed). A lazy chunk — the route file's own.
+ */
+const RequestDetail = lazy(() => import('./community/Request').then((m) => ({ default: m.RequestDetail })));
 
 interface RequestRow {
   id: string;
@@ -137,261 +137,113 @@ export default function Requests() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [me, setMe] = useState<MerchantMe | null>(null);
-  const [open, setOpen] = useState<RequestRow | null>(null);
-  const [deepLinkError, setDeepLinkError] = useState('');
-  /**
-   * A REQUEST WAS JUST PUBLISHED BY THIS PERSON, in this session. Latched
-   * rather than derived from the open request: the deep-link effect below
-   * opens any request whose id is in the URL — including one a MERCHANT was
-   * pointed at by a match notification — and offering a customer-notification
-   * window to a merchant reading somebody else's job would be the wrong window
-   * on the wrong screen.
-   */
-  const [requestJustCreated, setRequestJustCreated] = useState(false);
-  /** A draft to finish, or a published request to edit, in the wizard. */
-  const [editing, setEditing] = useState('');
-
-  useEffect(() => {
-    if (!user) return;
-    merchantApi.me().then(setMe).catch(() => {});
-  }, [user]);
 
   /**
-   * ONE REQUEST HAS ONE ADDRESS.
+   * ONE REQUEST HAS ONE ADDRESS — /requests/<id>, its own route
+   * (src/pages/community/Request.tsx, Client 5c).
    *
-   * A merchant told about a matching job arrives at `/requests?request=<id>`,
-   * and that link has to land on THAT request — the notification's entire
-   * purpose is to open the one the matcher pointed at, and a page that dropped
-   * them on a generic board would make the match pointless. The detail view
-   * used to be local state with no URL, so this reads the id back out and
-   * fetches it, which also makes any request shareable and reloadable.
+   * Every notice, board card, chat button and costing screen written before
+   * the route existed links `/requests?request=<id>` (`&cost=1` from the
+   * costing screen, `#discussion` / `#timeline` from the grouped notices).
+   * That address still has to land on THAT request — the notification's whole
+   * purpose — so it is REPLACED by the request's own, carrying the rest of the
+   * query and the hash: Back does not walk into a redirect.
    */
   const deepLinked = params.get('request') ?? '';
   const navigate = useNavigate();
-  /** The request's address was pushed from this page (not a link it was opened by). */
-  const pushedHere = useRef(false);
-  // THE ADDRESS IS THE TRUTH. The browser's own Back takes `?request=` away:
-  // the request's screen closes with it (it used to stay, over a board URL).
-  // A different id replaces it rather than showing the old one meanwhile.
   useEffect(() => {
-    if (!deepLinked || (open && open.id !== deepLinked)) setOpen(null);
-    if (!deepLinked) pushedHere.current = false;
-    // Only the address decides here.
+    if (!deepLinked) return;
+    navigate(requestRedirect(deepLinked, params, location.hash), { replace: true });
+    // The address decides, once per id.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deepLinked]);
+
+  // The board's own merchant read — never on the way through to /requests/<id>
+  // (review 2026-09-30: an old link paid a /api/merchant/me it threw away).
   useEffect(() => {
-    if (!deepLinked || open?.id === deepLinked) return;
-    let alive = true;
-    setDeepLinkError('');
-    api
-      .get<{ request: RequestRow }>(`/api/marketplace/requests/${deepLinked}`)
-      .then((d) => {
-        if (alive) setOpen(d.request);
-      })
-      .catch((e) => {
-        if (!alive) return;
-        // A closed or private request 404s by design. Say so plainly rather
-        // than leaving a merchant staring at a board wondering what happened.
-        setDeepLinkError(
-          e instanceof ApiError && e.status === 404
-            ? loc(
-                'هذا الطلب لم يعد متاحًا — ربما أُغلق أو اختار صاحبه عرضًا.',
-                'That request is no longer available — it may have closed or an offer was accepted.',
-                'ئەم داواکاریە بەردەست نییە — لەوانەیە داخرابێت.'
-              )
-            : loc('تعذّر فتح الطلب', 'Could not open the request', 'نەتوانرا داواکاری بکرێتەوە')
-        );
-        setParams({}, { replace: true });
-      });
-    return () => {
-      alive = false;
-    };
-  }, [deepLinked, open?.id, loc, setParams]);
+    if (!user || deepLinked) return;
+    merchantApi.me().then(setMe).catch(() => {});
+  }, [user, deepLinked]);
 
-  /** Opening and closing move the URL with them, so Back works. */
-  const openRequest = useCallback(
-    (r: RequestRow) => {
-      setOpen(r);
-      pushedHere.current = true;
-      setParams({ request: r.id });
-    },
-    [setParams]
-  );
-  /**
-   * The wizard and the repeat button know an id and nothing else. Rather than
-   * make them fetch the row just to hand it back, they move the URL and let the
-   * deep-link effect above do the one fetch it already knows how to do.
-   */
-  const openRequestId = useCallback(
-    (id: string) => {
-      pushedHere.current = true;
-      setParams({ request: id });
-    },
-    [setParams]
-  );
-  /**
-   * «رجوع»: a request opened from this page was a step FORWARD, so closing it
-   * is a real step back — replacing the entry instead left the request's
-   * address behind the board, and the browser's Back walked into it again.
-   * A request the visitor arrived at by its link has nothing behind it here:
-   * the board replaces it.
-   */
-  const closeRequest = useCallback(() => {
-    setOpen(null);
-    let pushed = false;
-    try {
-      const idx = (window.history.state as { idx?: unknown } | null)?.idx;
-      pushed = typeof idx === 'number' && idx > 0;
-    } catch {
-      pushed = false;
-    }
-    if (pushed && pushedHere.current) navigate(-1);
-    else setParams({}, { replace: true });
-    pushedHere.current = false;
-  }, [navigate, setParams]);
+  /** Opening a request is a step forward to its own page, so Back returns here. */
+  const openRequestId = useCallback((id: string) => navigate(requestPath(id)), [navigate]);
+  const openRequest = useCallback((r: RequestRow) => openRequestId(r.id), [openRequestId]);
 
-  /**
-   * THE WINDOW IS RENDERED ONCE, OUTSIDE THE BRANCH — and that is the whole
-   * point of the fragment below.
-   *
-   * This element used to appear in TWO mutually exclusive returns: a fragment
-   * when `open` was set, and inside the board `<div>` otherwise. Different
-   * positions in the tree, so React unmounted and remounted the component on
-   * every toggle, and the publish flow toggles immediately: `onCreated` calls
-   * `openRequestId`, which moves the URL, which wakes the deep-link effect,
-   * which sets `open`. That cost two things.
-   *
-   *   ONE WASTED ROUND TRIP per publish. The board-branch instance fired its
-   *   readiness GET, was unmounted (its AbortController cancelling the request
-   *   in flight), and the detail-branch instance fired a second one — on a
-   *   route the server marks `no-store`, so neither could be served from cache.
-   *
-   *   AND A WINDOW THAT CAME BACK FROM THE DEAD. Escape or a drag sets only the
-   *   sheet's local `open` to false and deliberately records NOTHING — it means
-   *   "not this window", not «ليس الآن». Pressing Back then flipped the branch,
-   *   remounted the component with `active` still latched true, and popped the
-   *   sheet again 1.6 seconds later. To the customer that is a window refusing
-   *   to go away, which is precisely the nagging the owner's «أو لا» forbids.
-   *
-   * Rendered from one place, the instance survives the board ↔ detail
-   * transition: one fetch, one reveal, and a dismissal that stays dismissed.
-   * It portals to document.body and carries no scrim, so the request's own page
-   * stays fully usable behind it either way.
-   */
-  const nudge = <ChannelNudge context="request" active={requestJustCreated} />;
+  // On its way to /requests/<id>: nothing of the board flashes first.
+  if (deepLinked) return null;
 
-  /**
-   * ONE RETURN, so `{nudge}` below keeps the same position in the tree whether
-   * the board or the request's own screen is showing. See the note above it.
-   */
   return (
-    <>
-      {open ? (
-        <RequestDetail
-          // Keyed on the request: another request never inherits this one's offers, files or answers.
-          key={open.id}
-          request={open}
-          me={me}
-          onBack={closeRequest}
-          onEdit={(id) => {
-            // The wizard takes the screen; the request re-opens when it is done.
-            setEditing(id);
-            closeRequest();
-          }}
-          onNewRequest={() => {
-            closeRequest();
-            if (user) setView('new');
-            else signIn();
-          }}
-        />
-      ) : (
-        <div className="min-h-screen bg-black text-zinc-300 pb-28">
-          <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[380px] bg-olive/15 rounded-full blur-[120px] pointer-events-none z-0" />
+    <div className="min-h-screen bg-black text-zinc-300 pb-28">
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[380px] bg-olive/15 rounded-full blur-[120px] pointer-events-none z-0" />
 
-          <div className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 pt-6">
-            <h1 className="text-gold font-bold text-lg mb-1">
-              {loc('طلبات العملاء', 'Customer requests', 'داواکاری کڕیاران')}
-            </h1>
-            <p className="text-text-muted text-[12.5px] mb-5">
-              {loc(
-                'اطلب شيئًا مخصصًا، واستقبل عروضًا من التجار.',
-                'Ask for something custom, and receive offers from merchants.',
-                'داوای شتێکی تایبەت بکە و ئۆفەر لە بازرگانەکانەوە وەربگرە.'
-              )}
-            </p>
+      <div className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 pt-6">
+        <h1 className="text-gold font-bold text-lg mb-1">
+          {loc('طلبات العملاء', 'Customer requests', 'داواکاری کڕیاران')}
+        </h1>
+        <p className="text-text-muted text-[12.5px] mb-5">
+          {loc(
+            'اطلب شيئًا مخصصًا، واستقبل عروضًا من التجار.',
+            'Ask for something custom, and receive offers from merchants.',
+            'داوای شتێکی تایبەت بکە و ئۆفەر لە بازرگانەکانەوە وەربگرە.'
+          )}
+        </p>
 
-            {deepLinkError && (
-              <p
-                className="mb-4 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[12.5px] text-amber-200"
-                data-requests="deep-link-error"
-                role="status"
-              >
-                {deepLinkError}
-              </p>
-            )}
-
-            <div className="flex gap-1.5 mb-5 overflow-x-auto hide-scrollbar">
-              {([['board', loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان')],
-                 ['mine', loc('طلباتي', 'My requests', 'داواکاریەکانم')],
-                 ...(user ? [['orders', loc('تنفيذ طلباتي', 'My custom orders', 'داواکاریە تایبەتەکانم')] as [View, string]] : []),
-                ] as Array<[View, string]>).map(([v, label]) => (
-                <button
-                  key={v}
-                  onClick={() => setView(v)}
-                  className={`shrink-0 px-4 min-h-11 rounded-2xl text-[12.5px] font-semibold border transition-colors ${
-                    view === v ? 'bg-olive text-snow border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-              {(
-                <button
-                  onClick={() => (user ? setView('new') : signIn())}
-                  className="ms-auto shrink-0 px-4 min-h-[40px] rounded-2xl bg-olive text-snow text-[12.5px] font-semibold flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  {loc('طلب جديد', 'New', 'نوێ')}
-                </button>
-              )}
-            </div>
-
-            {view === 'new' || editing ? (
-              /* WIZARD v2 (W5-A). Four steps, a DRAFT all the way until «انشر»,
-                 and «احفظ كمسودة» at any point. The same component finishes a
-                 draft or edits a published request (`editing`); either way it
-                 is the same `community_requests` row, and publishing is what
-                 notifies the merchants who can make it. */
-              <RequestWizard
-                key={editing || 'new'}
-                requestId={editing || undefined}
-                initialLink={carriedLink || undefined}
-                onDone={(id, how) => {
-                  setEditing('');
-                  setView('mine');
-                  setOpen(null);
-                  openRequestId(id);
-                  if (how === 'published') setRequestJustCreated(true);
-                }}
-                onCancel={() => {
-                  setEditing('');
-                  if (view === 'new') setView('board');
-                }}
-              />
-            ) : view === 'orders' ? (
-              <MyCommunityOrders />
-            ) : view === 'mine' ? (
-              <MyRequestsList onOpen={openRequestId} />
-            ) : (
-              // A PLUS member with no store yet has no workshop: «مناسب لي» is the
-              // workshop's board, and it answered them 404.
-              <RequestList onOpen={openRequest} canOffer={!!me?.store && !!me?.can.offers} />
-            )}
-          </div>
+        <div className="flex gap-1.5 mb-5 overflow-x-auto hide-scrollbar">
+          {([['board', loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان')],
+             ['mine', loc('طلباتي', 'My requests', 'داواکاریەکانم')],
+             ...(user ? [['orders', loc('تنفيذ طلباتي', 'My custom orders', 'داواکاریە تایبەتەکانم')] as [View, string]] : []),
+            ] as Array<[View, string]>).map(([v, label]) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`shrink-0 px-4 min-h-11 rounded-2xl text-[12.5px] font-semibold border transition-colors ${
+                view === v ? 'bg-olive text-snow border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          {(
+            <button
+              onClick={() => (user ? setView('new') : signIn())}
+              className="ms-auto shrink-0 px-4 min-h-[40px] rounded-2xl bg-olive text-snow text-[12.5px] font-semibold flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              {loc('طلب جديد', 'New', 'نوێ')}
+            </button>
+          )}
         </div>
-      )}
-      {nudge}
-    </>
+
+        {view === 'new' ? (
+          /* WIZARD v2 (W5-A). Four steps, a DRAFT all the way until «انشر»,
+             and «احفظ كمسودة» at any point. Finishing a draft or editing a
+             published request happens on the request's own page
+             (src/pages/community/Request.tsx); either way it is the same
+             `community_requests` row, and publishing is what notifies the
+             merchants who can make it. */
+          <RequestWizard
+            key="new"
+            initialLink={carriedLink || undefined}
+            onDone={(id, how) => {
+              // Back from the request lands on «طلباتي», where it now is.
+              navigate('/requests?view=mine', { replace: true });
+              // A request this person just PUBLISHED: its page asks about the
+              // notification channels (ChannelNudge), once — never a draft.
+              navigate(requestPath(id), how === 'published' ? { state: { published: true } } : undefined);
+            }}
+            onCancel={() => setView('board')}
+          />
+        ) : view === 'orders' ? (
+          <MyCommunityOrders />
+        ) : view === 'mine' ? (
+          <MyRequestsList onOpen={openRequestId} />
+        ) : (
+          // A PLUS member with no store yet has no workshop: «مناسب لي» is the
+          // workshop's board, and it answered them 404.
+          <RequestList onOpen={openRequest} canOffer={!!me?.store && !!me?.can.offers} />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -632,468 +484,12 @@ function AllRequests({
 
 
 // --------------------------------------------------------------- detail
-
-function RequestDetail({
-  request,
-  me,
-  onBack,
-  onEdit,
-  onNewRequest,
-}: {
-  request: RequestRow;
-  me: MerchantMe | null;
-  onBack: () => void;
-  /** Open the wizard on this request (a draft to finish, or a published one to edit). */
-  onEdit?: (id: string) => void;
-  /** «اطلب مثله»: the wizard, for a visitor who wants something like this. */
-  onNewRequest?: () => void;
-}) {
-  const { loc, lang } = useLanguage();
-  const [offers, setOffers] = useState<OfferV2[] | null>(null);
-  const [offersError, setOffersError] = useState<unknown>(null);
-  const [isCustomer, setIsCustomer] = useState(false);
-  const [materials, setMaterials] = useState<CatalogMaterial[]>([]);
-  const [files, setFiles] = useState<RequestFile[]>([]);
-  const [isOwner, setIsOwner] = useState(false);
-  /**
-   * The request as the server has it NOW. The prop is whatever the list or the
-   * deep link read, and publishing a draft or discarding it changes its state
-   * on this very screen — so the page re-reads it rather than trusting a copy.
-   */
-  const [current, setCurrent] = useState<RequestRow>(request);
-  const [publishing, setPublishing] = useState(false);
-  const [draftError, setDraftError] = useState('');
-  const [discardOpen, setDiscardOpen] = useState(false);
-  const [discarding, setDiscarding] = useState(false);
-  const [discardError, setDiscardError] = useState('');
-  /** Closing a PUBLISHED request (the server always allowed it; the page had no door). */
-  const [closeOpen, setCloseOpen] = useState(false);
-  const [closing, setClosing] = useState(false);
-  const [closeError, setCloseError] = useState('');
-
-  useEffect(() => setCurrent(request), [request]);
-  // «استخدم هذا كعرضي»: a private costing handed to the offer composer (W5-B).
-  const [prefill, setPrefill] = useState<OfferPrefill | null>(null);
-  const [searchParams] = useSearchParams();
-  const openCosting = searchParams.get('cost') === '1';
-
-  const load = useCallback(() => {
-    setOffersError(null);
-    api
-      .get<{ offers: OfferV2[]; is_customer: boolean }>(`/api/marketplace/requests/${request.id}/offers`)
-      .then((d) => {
-        setOffers(d.offers);
-        setIsCustomer(d.is_customer);
-      })
-      .catch((e: unknown) => setOffersError(e));
-  }, [request.id]);
-
-  // The attachments come from the request itself, and so does the answer to
-  // "may this caller see them" — the server decides, this page renders.
-  const loadFiles = useCallback(() => {
-    api
-      .get<{ request: RequestRow; files: RequestFile[]; is_owner: boolean }>(`/api/marketplace/requests/${request.id}`)
-      .then((d) => {
-        if (d.request) setCurrent(d.request);
-        setFiles(d.files ?? []);
-        setIsOwner(!!d.is_owner);
-      })
-      .catch(() => setFiles([]));
-  }, [request.id]);
-
-  useEffect(load, [load]);
-  useEffect(loadFiles, [loadFiles]);
-  // The catalogue names the materials an offer lists.
-  useEffect(() => {
-    requestsApi.catalog().then((c) => setMaterials(c.materials)).catch(() => setMaterials([]));
-  }, []);
-
-  const open = ['open', 'receiving_offers'].includes(current.state);
-  const canOffer = !!me?.store && !!me?.can.offers && !isCustomer && open;
-  /** Neither the customer nor a merchant who can answer: a visitor reading someone's request. */
-  const onlookers = !isCustomer && !me?.store;
-  const fallback = loc('تعذّر إتمام العملية', 'Could not complete that', 'نەتوانرا تەواو بکرێت');
-
-  /**
-   * A DRAFT IS PUBLISHED FROM ITS OWN PAGE. The wizard's first step saves the
-   * request as a draft (it is invisible until published), so a customer who
-   * left the wizard, or whose «إعادة الطلب» copy could not be published, needs
-   * a way to finish. An empty body publishes the spec already stored.
-   */
-  async function publishDraft() {
-    setPublishing(true);
-    setDraftError('');
-    try {
-      await api.post(`/api/marketplace/print/requests/${current.id}/publish`, {});
-      forgetCommunityFeed('requests');
-      loadFiles();
-      load();
-    } catch (e) {
-      setDraftError(apiRefusal(e, asLang(lang), fallback));
-    } finally {
-      setPublishing(false);
-    }
-  }
-
-  async function closePublished() {
-    setClosing(true);
-    setCloseError('');
-    try {
-      await api.post(`/api/marketplace/requests/${current.id}/cancel`);
-      forgetCommunityFeed('requests');
-      setCloseOpen(false);
-      loadFiles();
-      load();
-    } catch (e) {
-      setCloseError(apiRefusal(e, asLang(lang), fallback));
-    } finally {
-      setClosing(false);
-    }
-  }
-
-  async function discardDraft() {
-    setDiscarding(true);
-    setDiscardError('');
-    try {
-      await api.post(`/api/marketplace/requests/${current.id}/cancel`);
-      forgetCommunityFeed('requests');
-      setDiscardOpen(false);
-      loadFiles();
-    } catch (e) {
-      setDiscardError(apiRefusal(e, asLang(lang), fallback));
-    } finally {
-      setDiscarding(false);
-    }
-  }
-
-  return (
-    <div className="min-h-screen bg-black text-zinc-300 pb-28">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-6">
-        <button onClick={onBack} className="inline-flex items-center gap-1.5 text-zinc-400 text-[13px] mb-4">
-          <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
-          {loc('رجوع', 'Back', 'گەڕانەوە')}
-        </button>
-
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 mb-4">
-          <div className="flex items-start justify-between gap-3 mb-2">
-            {/* The customer's own words keep their own direction: an Arabic
-                "80×60 ملم" read in the English interface must not come out
-                as 60×80. */}
-            <h1 dir="auto" className="flex-1 text-white font-bold text-[16px] leading-snug min-w-0 break-words">
-              {current.title}
-            </h1>
-            <StateChip state={current.state} />
-          </div>
-          <p dir="auto" className="text-zinc-300 text-[13px] leading-relaxed whitespace-pre-wrap break-words mb-3">
-            {current.description}
-          </p>
-
-          <div className="grid grid-cols-2 gap-2 text-[12px]">
-            {current.budget_iqd !== null && (
-              <Detail label={loc('الميزانية', 'Budget', 'بودجە')} value={iqd(current.budget_iqd)} />
-            )}
-            {current.quantity > 1 && (
-              <Detail label={loc('الكمية', 'Quantity', 'بڕ')} value={String(current.quantity)} />
-            )}
-            {current.material && <Detail label={loc('المادة', 'Material', 'ماددە')} value={current.material} />}
-            {current.color && <Detail label={loc('اللون', 'Colour', 'ڕەنگ')} value={current.color} />}
-            {current.dimensions && (
-              <Detail label={loc('الأبعاد', 'Dimensions', 'ڕەهەندەکان')} value={current.dimensions} />
-            )}
-            {current.deadline && (
-              <Detail label={loc('الموعد', 'Deadline', 'کاتی کۆتایی')} value={formatDate(current.deadline, lang) || current.deadline} />
-            )}
-            {/* Where it goes, when it was asked, and until when offers are taken —
-                the board's card said the place; the request's own page did not. */}
-            {current.governorate && (
-              <Detail
-                label={loc('المحافظة', 'Governorate', 'پارێزگا')}
-                value={GOVERNORATE_LABELS[current.governorate]?.[lang === 'ckb' ? 'ckb' : lang] ?? current.governorate}
-              />
-            )}
-            {current.state !== 'draft' && formatDate(current.created_at, lang) && (
-              <Detail label={loc('نُشر', 'Published', 'بڵاوکرایەوە')} value={formatDate(current.created_at, lang)} />
-            )}
-            {open && formatDate(current.expires_at, lang) && (
-              // OWNER: Sorani to be written by hand.
-              <Detail label={loc('آخر موعد للعروض', 'Offers close')} value={formatDate(current.expires_at, lang)} />
-            )}
-          </div>
-          {current.customer_notes && (
-            <div className="mt-3 rounded-xl bg-black/30 border border-white/5 px-3 py-2.5" data-request="customer-notes">
-              <p className="text-text-muted text-[11px] mb-0.5">{loc('ملاحظات للتجار', 'Notes for merchants')}</p>
-              <p dir="auto" className="text-zinc-200 text-[12.5px] leading-relaxed whitespace-pre-wrap break-words">{current.customer_notes}</p>
-            </div>
-          )}
-          {isOwner && open && onEdit && (
-            <button
-              type="button"
-              onClick={() => onEdit(current.id)}
-              data-request="edit"
-              className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl text-[13px] font-semibold text-gold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-            >
-              <PencilLine className="w-4 h-4" aria-hidden="true" />
-              {loc('عدّل الطلب', 'Edit request')}
-            </button>
-          )}
-        </div>
-
-        {isOwner && current.state === 'draft' && (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 mb-4" data-requests="draft">
-            <p className="text-white text-[13.5px] font-semibold flex items-center gap-2">
-              <FilePen className="w-4 h-4 text-zinc-400 shrink-0" aria-hidden="true" />
-              {/* OWNER: Sorani to be written by hand. */}
-              {loc('هذا الطلب مسودة', 'This request is a draft')}
-            </p>
-            <p className="text-zinc-400 text-[12.5px] mt-1 leading-relaxed">
-              {/* OWNER: Sorani to be written by hand. */}
-              {loc(
-                'لا يراه أي تاجر بعد. انشره ليصل إلى التجار الذين يستطيعون تنفيذه وتبدأ العروض بالوصول.',
-                'No merchant can see it yet. Publish it to reach the merchants who can make it and start receiving offers.'
-              )}
-            </p>
-            <p role="alert" aria-live="polite" className="text-red-400 text-[12.5px] mt-2 empty:hidden">
-              {draftError}
-            </p>
-            {onEdit && (
-              <button
-                type="button"
-                onClick={() => onEdit(current.id)}
-                data-requests="continue-draft"
-                className="mt-3 w-full min-h-[44px] rounded-xl border border-white/10 bg-white/[0.03] text-white text-[13px] font-bold hover:bg-white/[0.06] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-              >
-                {loc('أكمل التعديل', 'Continue editing')}
-              </button>
-            )}
-            <div className="flex gap-2 mt-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setDiscardError('');
-                  setDiscardOpen(true);
-                }}
-                disabled={publishing}
-                className="flex-1 min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
-              >
-                {/* OWNER: Sorani to be written by hand. */}
-                {loc('إلغاء المسودة', 'Discard draft')}
-              </button>
-              <button
-                type="button"
-                onClick={publishDraft}
-                disabled={publishing}
-                data-requests="publish-draft"
-                className="flex-1 min-h-[44px] rounded-xl bg-olive text-snow text-[13px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
-              >
-                {publishing && <Spinner size="sm" delayMs={0} decorative className="text-white" />}
-                {loc('نشر', 'Publish', 'بڵاوکردنەوە')}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* What Levonis measured and estimated. Renders nothing at all for a
-            request that carries no print row — an older one, or one whose link
-            could not be measured. */}
-        <PrintSummary requestId={current.id} />
-
-        {(files.length > 0 || isOwner) && (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 mb-4">
-            <AttachmentList
-              requestId={current.id}
-              files={files}
-              /* Adding or removing is only offered while the request is still
-                 taking offers. The API refuses it after that anyway — the
-                 merchants priced against these files — but a control that
-                 will be refused should not be there to press. */
-              canEdit={isOwner && ['open', 'receiving_offers', 'draft'].includes(current.state)}
-              onChanged={() => {
-                loadFiles();
-                // A change to a published job makes standing offers stale.
-                load();
-              }}
-            />
-          </div>
-        )}
-
-        {/* The workshop's own verdict on this request, with the reasons and the
-            screen that fixes each, and its private costing (W5-B). Only for a
-            merchant looking at somebody else's published request. */}
-        {/* The customer's way to stop a request: no accepted offer yet, so
-            nothing is owed — it leaves the board and its offers are declined. */}
-        {isOwner && open && (
-          <div className="-mt-2 mb-4 flex justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                setCloseError('');
-                setCloseOpen(true);
-              }}
-              data-requests="close-request"
-              className="min-h-11 rounded-xl px-3 text-[12.5px] font-semibold text-zinc-400 transition-colors hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            >
-              {/* OWNER: Sorani to be written by hand. */}
-              {loc('أغلق الطلب', 'Close the request')}
-            </button>
-          </div>
-        )}
-
-        {me?.store && !isCustomer && !isOwner && current.state !== 'draft' && (
-          <WorkshopRequestCard
-            requestId={current.id}
-            takingOffers={open}
-            openCosting={openCosting}
-            onUseAsOffer={setPrefill}
-          />
-        )}
-
-        {/* A draft cannot be offered on, so there is no "no offers yet" to
-            wait for — the draft card above already says what happens next. */}
-        {current.state !== 'draft' && (
-          <>
-            {/* «عرضك» is a merchant's heading; a visitor gets the card below instead. */}
-            {(isCustomer || !onlookers) && (
-              <h2 className="text-gold font-bold text-[13px] mb-3">
-                {isCustomer
-                  ? loc('العروض المقدّمة', 'Offers received', 'ئۆفەرە وەرگیراوەکان')
-                  : loc('عرضك', 'Your offer', 'ئۆفەرەکەت')}
-              </h2>
-            )}
-
-            {offers === null ? (
-              offersError ? (
-                <CommunityLoadError error={offersError} onRetry={load} compact />
-              ) : (
-                <div className="py-8 flex justify-center">
-                  <Loader2 className="w-5 h-5 text-gold animate-spin" />
-                </div>
-              )
-            ) : isCustomer ? (
-              <OfferCompare
-                requestId={current.id}
-                offers={offers}
-                takingOffers={open}
-                materials={materials}
-                onChanged={() => {
-                  load();
-                  loadFiles();
-                }}
-              />
-            ) : onlookers ? (
-              <OnlookerCard me={me} onNewRequest={onNewRequest} />
-            ) : (
-              <MerchantOfferPanel
-                requestId={current.id}
-                offers={offers}
-                canOffer={canOffer}
-                takingOffers={open}
-                materials={materials}
-                onChanged={load}
-                prefill={prefill}
-                onPrefillDone={() => setPrefill(null)}
-              />
-            )}
-          </>
-        )}
-      </div>
-
-      <ConfirmSheet
-        open={discardOpen}
-        testId="discard-draft"
-        tone="danger"
-        // OWNER: Sorani to be written by hand.
-        title={loc('إلغاء هذه المسودة؟', 'Discard this draft?')}
-        confirmLabel={loc('إلغاء المسودة', 'Discard draft')}
-        busyLabel={loc('جارٍ الإلغاء…', 'Discarding…')}
-        busy={discarding}
-        error={discardError}
-        onConfirm={discardDraft}
-        onClose={() => setDiscardOpen(false)}
-      >
-        {/* OWNER: Sorani to be written by hand. */}
-        {loc(
-          'لن يُنشر هذا الطلب. يبقى في «طلباتي» ملغى، مع ملفاته.',
-          'This request will not be published. It stays in “My requests” as cancelled, with its files.'
-        )}
-      </ConfirmSheet>
-      <ConfirmSheet
-        open={closeOpen}
-        testId="close-request"
-        tone="danger"
-        // OWNER: Sorani to be written by hand.
-        title={loc('إغلاق هذا الطلب؟', 'Close this request?')}
-        confirmLabel={loc('أغلق الطلب', 'Close the request')}
-        busyLabel={loc('جارٍ الإغلاق…', 'Closing…')}
-        busy={closing}
-        error={closeError}
-        onConfirm={closePublished}
-        onClose={() => setCloseOpen(false)}
-      >
-        {/* OWNER: Sorani to be written by hand. */}
-        {loc(
-          'يختفي من لوحة الطلبات ولا يُقبل عليه عرض بعد الآن، والعروض القائمة تُرفض. يبقى في «طلباتي» ملغى، مع ملفاته.',
-          'It leaves the request board and takes no more offers; the standing offers are declined. It stays in “My requests” as cancelled, with its files.'
-        )}
-      </ConfirmSheet>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------ bits
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-black/30 border border-white/5 px-3 py-2">
-      <p className="text-text-muted text-[10.5px] mb-0.5">{label}</p>
-      <p className="text-zinc-200 text-[12px] font-semibold" dir="auto">{value}</p>
-    </div>
-  );
-}
-
-/**
- * A VISITOR READING SOMEONE'S REQUEST — signed out, or signed in without a
- * store. It used to show them «عرضك» over a panel they could not use; now it
- * says what they CAN do: ask for something like it, or (to print for others)
- * open a store. (Review of Levo Community, 2026-09-28.)
- */
-function OnlookerCard({ me, onNewRequest }: { me: MerchantMe | null; onNewRequest?: () => void }) {
-  const { loc } = useLanguage();
-  const { user } = useAuth();
-  // OWNER: Sorani to be written by hand (this card).
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3" data-request-onlooker>
-      <div>
-        <p className="text-white text-[13.5px] font-semibold">{loc('تريد شيئًا مثل هذا؟', 'Want something like this?')}</p>
-        <p className="text-zinc-400 text-[12.5px] leading-relaxed mt-0.5">
-          {loc('اطلبه أنت، وتصلك عروض التجار الذين يستطيعون صنعه.', 'Ask for it yourself, and get offers from the merchants who can make it.')}
-        </p>
-        {onNewRequest && (
-          <button
-            type="button"
-            onClick={onNewRequest}
-            className="mt-2.5 inline-flex min-h-11 items-center gap-1.5 rounded-2xl bg-olive px-4 text-[12.5px] font-semibold text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            data-request-onlooker-new
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            {user ? loc('اطلب مثله', 'Ask for one like it') : loc('سجّل الدخول واطلب', 'Sign in and ask')}
-          </button>
-        )}
-      </div>
-      <div className="border-t border-white/10 pt-3">
-        <p className="text-zinc-400 text-[12.5px] leading-relaxed">
-          {loc('تطبع لغيرك؟ العروض تُقدَّم من متجر على Levonis.', 'You print for others? Offers are made from a store on Levonis.')}
-        </p>
-        <a
-          href={user && me?.eligible ? '/merchant/start' : '/subscription'}
-          className="mt-1.5 inline-flex min-h-11 items-center text-[12.5px] font-semibold text-gold underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded"
-          data-request-onlooker-store
-        >
-          {user && me?.eligible ? loc('افتح متجرك', 'Open your store') : loc('اعرف عن PLUS والمتاجر', 'About PLUS and stores')}
-        </a>
-      </div>
-    </div>
-  );
-}
+//
+// THE REQUEST'S OWN PAGE moved to its own route: src/pages/community/Request.tsx
+// (`/requests/:id`, Client 5c) — header, status strip, files, details, the
+// discussion, the offers, the order and its money. This page keeps the board,
+// «طلباتي», «تنفيذ طلباتي», the wizard for a NEW request, and the redirect
+// from the old `?request=<id>` above.
 
 function StateChip({ state }: { state: string }) {
   const { loc } = useLanguage();
@@ -1119,6 +515,9 @@ const HELD_STATES = ['funded', 'in_progress', 'merchant_marked_delivered', 'disp
 
 function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = {}) {
   const { loc, lang } = useLanguage();
+  const ts = useTimelineStrings();
+  /** The order whose timeline sheet is open (Phase 5d). */
+  const [timelineFor, setTimelineFor] = useState<CommunityOrderRow | null>(null);
   const [orders, setOrders] = useState<CommunityOrderRow[] | null>(null);
   /** Bumped when receipt is confirmed: the work just completed is now waiting for a rating. */
   const [reviewsKey, setReviewsKey] = useState(0);
@@ -1254,6 +653,16 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
             </details>
           )}
 
+          {/* The order's timeline and «اطلب تعديلًا» (Phase 5d), in a sheet. */}
+          <button
+            type="button"
+            onClick={() => setTimelineFor(o)}
+            data-community-order-timeline={o.id}
+            className="mb-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg text-[12.5px] font-semibold text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+          >
+            {ts.open}
+          </button>
+
           {o.state === 'merchant_marked_delivered' && (
             <div className="space-y-2">
               <button
@@ -1368,6 +777,42 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
           {description.trim().length} / 10+
         </p>
       </ConfirmSheet>
+
+      {/* THE TIMELINE SHEET (Phase 5d): medium / large detents, the row's own
+          confirm / cancel / dispute stay on the row — the sheet adds the
+          record and the customer's «اطلب تعديلًا». */}
+      <Sheet
+        open={!!timelineFor}
+        onClose={() => setTimelineFor(null)}
+        label={ts.title}
+        detents={['medium', 'large']}
+        dragHandle
+        testId="community-order-timeline"
+        header={
+          <div className="px-4 pb-2 pt-1">
+            <h2 className="text-[16px] font-bold text-text-primary">{ts.title}</h2>
+            {timelineFor && (
+              <p dir="auto" className="truncate text-start text-[12.5px] text-text-secondary">
+                {timelineFor.request_title}
+              </p>
+            )}
+          </div>
+        }
+      >
+        {timelineFor && (
+          <div className="px-4 pb-4" data-community-order-timeline-sheet={timelineFor.id}>
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-6">
+                  <Loader2 className="w-5 h-5 text-gold animate-spin" />
+                </div>
+              }
+            >
+              <OrderTimeline orderId={timelineFor.id} actions={false} onChanged={load} />
+            </Suspense>
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 }
@@ -1417,7 +862,19 @@ function PendingOffersWhileClosed() {
       alive = false;
     };
   }, []);
-  if (open) return <RequestDetail request={open} me={null} onBack={() => setOpen(null)} />;
+  if (open) {
+    return (
+      <Suspense
+        fallback={
+          <div className="py-12 flex justify-center">
+            <Loader2 className="w-5 h-5 text-gold animate-spin" />
+          </div>
+        }
+      >
+        <RequestDetail request={open} me={null} onBack={() => setOpen(null)} />
+      </Suspense>
+    );
+  }
   if (!rows.length) return null;
   return (
     <div className="space-y-2 mb-4" data-requests="pending-offers">

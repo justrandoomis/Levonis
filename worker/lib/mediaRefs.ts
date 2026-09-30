@@ -370,6 +370,10 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   // ---- printing ----------------------------------------------------------
   { table: 'community_request_files', column: 'file_key', kind: 'text', why: 'the uploaded 3D model or drawing' },
   { table: 'community_request_files', column: 'preview_key', kind: 'text', why: 'the derived preview mesh the viewer serves' },
+  // ---- offers V2 and order updates (0159/0160, §9.5) ------------------------
+  { table: 'community_offer_files', column: 'file_key', kind: 'text', why: "a sent offer's private file (merchants/<uid>/offers/…) — sample photo, PDF quote, model (0159)" },
+  { table: 'community_offer_drafts', column: 'files_json', kind: 'json', why: "a saved offer draft's checked files — [{key, kind, name, bytes, content_type}] (0159)" },
+  { table: 'community_order_updates', column: 'file_key', kind: 'text', why: 'a progress photo on a community order (community-orders/<orderId>/updates/…, 0160)' },
   // ---- files on products and posts (0157, §9.4) ---------------------------
   { table: 'product_files', column: 'file_key', kind: 'text', why: "a merchant's private product file (merchants/<uid>/product-files/…)" },
   { table: 'product_files', column: 'preview_key', kind: 'text', why: 'the derived preview mesh of a product file (product-previews/…)' },
@@ -593,6 +597,9 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'merchant_request_prefs.capabilities': 'capability words',
   'merchant_request_prefs.governorates': 'Iraqi governorate names',
   'merchant_request_prefs.delivery': 'delivery settings',
+  'merchant_request_prefs.technologies': 'process words derived from the active printers (0159)',
+  'merchant_request_prefs.max_build_mm': 'the largest build volume in millimetres {x,y,z} (0159)',
+  'community_offer_drafts.payload_json': "a saved offer's terms — price, days, handover, text; its files are files_json (0159)",
   'merchant_services.materials': 'material names',
   'merchant_stores.categories': 'category slugs',
   'merchant_stores.service_areas': 'governorate names',

@@ -30,7 +30,10 @@ export type MediaDomain =
   | 'trade-in'
   /** 0158 — a link card's re-hosted Open Graph picture: `link-cards/<card id>.webp`,
    *  public, written by worker/lib/linkCards.ts through the IMAGES binding. */
-  | 'link-cards';
+  | 'link-cards'
+  /** 0160 — a community order's progress photos: `community-orders/<order id>/updates/…`,
+   *  private, served only by the order's own file route (worker/routes/communityOrderTimeline.ts). */
+  | 'community-orders';
 
 export interface MediaKeyInput {
   visibility: MediaVisibility;

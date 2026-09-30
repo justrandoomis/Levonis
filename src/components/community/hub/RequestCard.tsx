@@ -5,8 +5,11 @@
  * and how many offers it has, because that is what decides whether a workshop
  * taps it. The card used to say «بانتظار العروض» over every request, including
  * one that already had three, and led nowhere: the request's own page
- * (`/requests?request=<id>`, where offers are made and compared) was never
- * linked from here.
+ * (`/requests/<id>`, where offers are made and compared) was never linked
+ * from here. Its OWN address — not the board's old `/requests?request=`,
+ * which only redirects after loading the board's code (review 2026-09-30).
+ * Spelled here rather than imported from requests/requestStates.ts, so the
+ * community home's chunk does not carry the request page's helpers.
  *
  * No person is named on the card, as on the board: the job is the point, and
  * the display name is one tap away on the request's page.
@@ -88,7 +91,7 @@ export default function RequestCard({ request: r, compact = false }: { request: 
   if (compact) {
     return (
       <Link
-        to={`/requests?request=${encodeURIComponent(r.id)}`}
+        to={`/requests/${encodeURIComponent(r.id)}`}
         data-community-request={r.id}
         className="lv-section flex min-w-0 flex-col gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
@@ -101,7 +104,7 @@ export default function RequestCard({ request: r, compact = false }: { request: 
 
   return (
     <Link
-      to={`/requests?request=${encodeURIComponent(r.id)}`}
+      to={`/requests/${encodeURIComponent(r.id)}`}
       data-community-request={r.id}
       className="flex min-w-0 flex-col gap-2 rounded-2xl border border-border-subtle/60 bg-surface p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >

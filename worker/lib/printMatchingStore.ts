@@ -32,6 +32,7 @@ import { usersWithEntitlement } from './entitlements';
 import { onPublicBoard, type RequestForAccess } from './communityRequests';
 import { effectiveMaterial, effectiveProcess, parseDims } from './requestRevisions';
 import { safeParse } from './types';
+import { isSchemaMissing } from './membershipBenefits';
 import {
   EMPTY_PREFS,
   QUALITIES,
@@ -230,6 +231,8 @@ function readPrefs(p: Record<string, unknown> | undefined): MerchantPrefs {
     workload: (['light', 'normal', 'busy', 'full'].includes(String(p.workload)) ? p.workload : 'normal') as MerchantPrefs['workload'],
     paused: !!Number(p.paused ?? 0),
     paused_until: (p.paused_until as string | null) ?? null,
+    // 0159 — a ranking signal; a row from before the column reads as «not stated».
+    turnaround_days: num(p.turnaround_days),
   };
 }
 
@@ -774,4 +777,182 @@ export function eligibleVerdictSql(requestAlias: string, merchantParam: string):
   return `EXISTS (SELECT 1 FROM community_request_matches vm
                    WHERE vm.request_id = ${requestAlias}.id AND vm.merchant_id = ${merchantParam}
                      AND vm.eligible = 1 AND vm.engine >= ${MATCH_ENGINE} AND vm.revision = ${requestAlias}.revision)`;
+}
+
+// ---------------------------------------------------------- workshop facts
+
+/**
+ * WHAT A WORKSHOP CAN MAKE, AS PUBLIC FACTS (0159, docs/COMMUNITY_ECOSYSTEM.md
+ * §9.5): the technologies its ACTIVE printers run and the largest bed it has,
+ * derived from `merchant_printers` — the canonical model's physics where a
+ * printer is tied to one (`resolvePrinter`), so a bigger bed cannot be typed
+ * in. `materials` is the union the printers declare, the last fallback for
+ * the store page when neither the shelf nor the preferences name any.
+ */
+export interface WorkshopBuildFacts {
+  technologies: string[];
+  /** The largest bed on each axis (mm), `{}` when the workshop has no active printer. */
+  max_build_mm: { x: number; y: number; z: number } | Record<string, never>;
+  materials: string[];
+}
+
+export async function workshopFactsFromPrinters(db: D1Database, merchantId: string): Promise<WorkshopBuildFacts> {
+  const { results } = await db
+    .prepare(
+      `SELECT p.*, pm.id AS m_id, pm.technology AS m_technology,
+              pm.build_x_mm AS m_build_x_mm, pm.build_y_mm AS m_build_y_mm, pm.build_z_mm AS m_build_z_mm,
+              pm.nozzle_sizes AS m_nozzle_sizes, pm.default_nozzle_mm AS m_default_nozzle_mm,
+              pm.enclosed AS m_enclosed, pm.hardened_nozzle_available AS m_hardened,
+              pm.max_simultaneous_materials AS m_max_simultaneous_materials
+         FROM merchant_printers p
+         LEFT JOIN printer_models pm ON pm.id = p.model_id
+        WHERE p.merchant_id = ? AND p.active = 1
+        ORDER BY p.sort_order, p.created_at`
+    )
+    .bind(merchantId)
+    .all<Record<string, unknown>>();
+  const printers = (results ?? []).map(resolvePrinter);
+  const technologies = [...new Set(printers.map((p) => p.technology))].sort();
+  const materials = [...new Set(printers.flatMap((p) => p.materials))].sort();
+  const bed = { x: 0, y: 0, z: 0 };
+  for (const p of printers) {
+    bed.x = Math.max(bed.x, p.build_x_mm);
+    bed.y = Math.max(bed.y, p.build_y_mm);
+    bed.z = Math.max(bed.z, p.build_z_mm);
+  }
+  return { technologies, materials, max_build_mm: bed.x > 0 || bed.y > 0 || bed.z > 0 ? bed : {} };
+}
+
+/**
+ * RE-DERIVE AND STORE the workshop's build facts on `merchant_request_prefs`
+ * — called after every printer write and every prefs save (worker/routes/
+ * merchantPrinters.ts). A merchant with no prefs row gets one holding only the
+ * derived columns: the other columns' defaults read exactly as `EMPTY_PREFS`,
+ * so the row changes nothing about eligibility. Never throws: the save that
+ * asked for it has already committed, and a database behind 0159 has no such
+ * columns yet (the deploy window).
+ */
+export async function refreshWorkshopFacts(db: D1Database, merchantId: string): Promise<WorkshopBuildFacts | null> {
+  try {
+    const facts = await workshopFactsFromPrinters(db, merchantId);
+    await db
+      .prepare(
+        `INSERT INTO merchant_request_prefs (merchant_id, technologies, max_build_mm)
+         VALUES (?1, ?2, ?3)
+         ON CONFLICT (merchant_id) DO UPDATE SET technologies = excluded.technologies, max_build_mm = excluded.max_build_mm`
+      )
+      .bind(merchantId, JSON.stringify(facts.technologies), JSON.stringify(facts.max_build_mm))
+      .run();
+    return facts;
+  } catch (e) {
+    if (!isSchemaMissing(e)) console.error('workshop facts not refreshed', merchantId, e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
+/**
+ * THE STOREFRONT'S COPY of the workshop facts (worker/routes/storefront.ts
+ * `publicStore`): ONE statement, sent in the shopfront's first wave beside the
+ * tier and the delivery reads, so the shopfront gains no round trip
+ * (tests/d1Waves.test.ts ceilings). It reads the STORED derived columns —
+ * refreshed by every printer, stock and prefs write (`refreshWorkshopFacts`)
+ * — and the shelf, never the live derivation from the printers list: that
+ * fallback is the community store page's (`publicWorkshopFacts`), and a
+ * workshop whose printers predate 0159 shows its facts on the shopfront after
+ * its next printer or prefs save. `null` for a shop that has never had a
+ * workshop row (a plain shop says nothing about printing).
+ */
+export async function storefrontWorkshopFacts(
+  db: D1Database,
+  merchantId: string,
+  customEnabled: boolean
+): Promise<PublicWorkshopFacts | null> {
+  const r = await db
+    .prepare(
+      `SELECT p.technologies, p.max_build_mm, p.turnaround_days, p.governorates, p.delivery, p.materials, p.workshop_intro,
+              (SELECT json_group_array(material_id) FROM (
+                 SELECT DISTINCT material_id FROM merchant_material_stock
+                  WHERE merchant_id = ?1 AND grams > 0 ORDER BY material_id)) AS shelf
+         FROM merchant_request_prefs p
+        WHERE p.merchant_id = ?1`
+    )
+    .bind(merchantId)
+    .first<Record<string, unknown>>();
+  if (!r) return null;
+  const shelf = parseList(r.shelf);
+  const maxBuild = safeParse<Record<string, unknown>>(r.max_build_mm, {});
+  const x = Number(maxBuild.x ?? 0) || 0;
+  const y = Number(maxBuild.y ?? 0) || 0;
+  const z = Number(maxBuild.z ?? 0) || 0;
+  const turnaround = r.turnaround_days === null || r.turnaround_days === undefined ? null : Number(r.turnaround_days);
+  return {
+    technologies: parseList(r.technologies),
+    materials: shelf.length ? shelf : parseList(r.materials),
+    max_build_mm: x > 0 || y > 0 || z > 0 ? { x, y, z } : {},
+    turnaround_days: turnaround !== null && Number.isFinite(turnaround) ? turnaround : null,
+    governorates: parseList(r.governorates),
+    delivery: parseList(r.delivery),
+    custom_enabled: customEnabled,
+    intro: String(r.workshop_intro ?? '').slice(0, 300),
+  };
+}
+
+/** The public «workshop» block of a store page (§9.5): facts only, nothing a customer could not already infer from the printers list. */
+export interface PublicWorkshopFacts {
+  technologies: string[];
+  materials: string[];
+  max_build_mm: { x: number; y: number; z: number } | Record<string, never>;
+  turnaround_days: number | null;
+  governorates: string[];
+  delivery: string[];
+  custom_enabled: boolean;
+  intro: string;
+}
+
+/**
+ * The store page's workshop facts. The derived columns are read as stored;
+ * a workshop whose printers were saved before 0159 (nothing has re-derived
+ * them yet) is computed live, so the page is never blank for an old shop.
+ * Materials: the shelf (`merchant_material_stock`) when the workshop tracks
+ * one, else the preferences, else what the printers declare.
+ */
+export async function publicWorkshopFacts(db: D1Database, merchantId: string): Promise<PublicWorkshopFacts> {
+  const [prefs, store, stock] = await Promise.all([
+    db.prepare('SELECT * FROM merchant_request_prefs WHERE merchant_id = ?').bind(merchantId).first<Record<string, unknown>>().catch(() => null),
+    db.prepare('SELECT accepts_custom_requests FROM merchant_stores WHERE merchant_id = ?').bind(merchantId).first<{ accepts_custom_requests: number }>(),
+    db
+      .prepare('SELECT DISTINCT material_id FROM merchant_material_stock WHERE merchant_id = ? AND grams > 0 ORDER BY material_id')
+      .bind(merchantId)
+      .all<{ material_id: string }>()
+      .catch(() => ({ results: [] as { material_id: string }[] })),
+  ]);
+  const p = readPrefs(prefs ?? undefined);
+  let technologies = parseList(prefs?.technologies);
+  let maxBuild = safeParse<Record<string, unknown>>(prefs?.max_build_mm, {});
+  let printerMaterials: string[] | null = null;
+  if (!technologies.length || !Number(maxBuild.x)) {
+    const live = await workshopFactsFromPrinters(db, merchantId);
+    technologies = live.technologies;
+    maxBuild = live.max_build_mm;
+    printerMaterials = live.materials;
+  }
+  const shelf = (stock.results ?? []).map((r) => String(r.material_id));
+  const materials = shelf.length
+    ? shelf
+    : p.materials.length
+      ? p.materials
+      : printerMaterials ?? (await workshopFactsFromPrinters(db, merchantId)).materials;
+  const x = Number(maxBuild.x ?? 0) || 0;
+  const y = Number(maxBuild.y ?? 0) || 0;
+  const z = Number(maxBuild.z ?? 0) || 0;
+  return {
+    technologies,
+    materials,
+    max_build_mm: x > 0 || y > 0 || z > 0 ? { x, y, z } : {},
+    turnaround_days: p.turnaround_days ?? null,
+    governorates: p.governorates,
+    delivery: p.delivery,
+    custom_enabled: store ? Number(store.accepts_custom_requests ?? 1) === 1 : false,
+    intro: String(prefs?.workshop_intro ?? '').slice(0, 300),
+  };
 }

@@ -206,6 +206,17 @@ function iconChunk(id: string, meta: ChunkMeta): string | undefined {
 
 function manualChunks(id: string, meta: ChunkMeta): string | undefined {
   if (id.includes('/src/translations.ts')) return 'vendor-i18n';
+  // THE STORE LAYOUT'S TABLES AS ONE FILE (review 2026-09-30): the package's
+  // three leaf tables (tokens, refs, blocks — no runtime imports of their own)
+  // and the storefront's token → class lookups (theme.ts, which imports only
+  // tokens). Every store page needs all four; the merchant's lazy screens
+  // import them piecemeal (the announcement sheet, the preview QR, the speed
+  // tab, the workshop settings, the product files, the accent sample), so left
+  // to Rollup they split by importer set into three chunks — 287 B more gzip
+  // and two more requests on every store visit (tests/bundleBudget.test.ts).
+  // One group costs those merchant screens the rest of the 4.6 KB once, on
+  // first open, and it is the file the builder and the store pages share.
+  if (/[\\/]packages[\\/]storeLayout[\\/]src[\\/](?:tokens|refs|blocks)\.ts$/.test(id) || /[\\/]src[\\/]components[\\/]storefront[\\/]theme\.ts$/.test(id)) return 'store-layout';
   if (!id.includes('node_modules')) return undefined;
   // Match the package directory, so a nested dependency of a grouped package
   // (scheduler under react-dom, for instance) is grouped with it rather than

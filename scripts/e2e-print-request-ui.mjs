@@ -47,6 +47,9 @@ try {
 
 let passed = 0;
 let failed = 0;
+/** The request id of a /requests/<id> address (Phase 5), or ''. */
+const requestIdFrom = (url) => (new URL(url).pathname.match(/^\/requests\/([^/]+)\/?$/) ?? [])[1] ?? '';
+
 const failures = [];
 function check(label, ok, detail = '') {
   if (ok) {
@@ -274,8 +277,10 @@ async function main() {
       await shot(page, '390-published');
 
       await page.locator('[data-wizard="open-request"]').click();
-      await page.waitForURL(/\?request=/, { timeout: 20000 });
-      requestId = new URL(page.url()).searchParams.get('request') ?? '';
+      // Phase 5: a request has its own page, /requests/<id> (the old
+      // ?request=<id> address is redirected there).
+      await page.waitForURL(/\/requests\/req_/, { timeout: 20000 });
+      requestId = requestIdFrom(page.url());
       check('[390px] publishing lands on THAT request', /^req_/.test(requestId), requestId);
 
       // the request page carries the measurement and the 3D door
@@ -367,10 +372,10 @@ async function main() {
   check('the panel lists it', (await mp.locator('[data-notif-item]').count()) >= 1);
   await shot(mp, '390-bell');
   await mp.locator('[data-notif-item]').first().click();
-  await mp.waitForURL(/\/requests\?request=/, { timeout: 20000 });
+  await mp.waitForURL(/\/requests\/req_/, { timeout: 20000 });
   check('and tapping it opens THE SAME request, not a copy',
-    new URL(mp.url()).searchParams.get('request') === requestId,
-    `${new URL(mp.url()).searchParams.get('request')} vs ${requestId}`);
+    requestIdFrom(mp.url()) === requestId,
+    `${requestIdFrom(mp.url())} vs ${requestId}`);
 
   await mp.goto(`${BASE}/merchant`, { waitUntil: 'networkidle' });
   await mp.locator('text=الطابعات').first().click();

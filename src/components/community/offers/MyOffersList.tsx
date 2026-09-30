@@ -96,7 +96,11 @@ export default function MyOffersList({ requestHref }: { requestHref: (requestId:
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13.5px] font-semibold text-text-primary" dir="auto">{req.title || req.id}</span>
                     <span className="mt-0.5 block text-[12px] text-text-muted">
-                      <Money iqd={o.price_iqd} /> · {loc(`نسخة ${o.revision}`, `v${o.revision}`)}
+                      {/* A draft has no version and may have no price yet; it is continued on its request. */}
+                      <Money iqd={o.price_iqd} /> ·{' '}
+                      {o.draft || o.state === 'draft'
+                        ? loc('أكمله وأرسله من صفحة الطلب', 'Finish and send it on the request', 'لە پەڕەی داواکاریەکە تەواوی بکە و بینێرە')
+                        : loc(`نسخة ${o.revision}`, `v${o.revision}`)}
                       {until && o.state === 'pending' ? <> · {loc(`حتى ${until}`, `until ${until}`)}</> : null}
                     </span>
                     {/* On a phone the state goes under the figures: beside them, a long

@@ -55,6 +55,7 @@ import { applyTheme, normalizeLayout } from '../packages/storeLayout/src/normali
 import { THEME_PRESETS } from '../packages/storeLayout/src/tokens';
 import { MAX_LAYOUT_BYTES, MAX_REQUEST_BYTES } from '../packages/storeLayout/src/schema';
 import { collectDataNeeds, MAX_PICKED_PRODUCTS, MAX_PRODUCT_QUERIES } from '../packages/storeLayout/src/data';
+import { renderableBlocks } from '../packages/storeLayout/src/verify';
 
 const BASE = '/api/merchant/store/layout';
 const ENV = { STORE_ROOT_DOMAIN: 'levonis-iq.com' };
@@ -882,5 +883,172 @@ test('a suspended store or merchant cannot save, publish or restore a layout —
     assert.equal(revisions(w.raw), before, `${table}: nothing published`);
     assert.equal(draftVersion(w.raw), draftBefore, `${table}: the draft is untouched`);
     await ok(await get(w.owner, BASE));
+  }
+});
+
+// ------------------------------------------------------------ media everywhere (P5)
+
+test('weight (L5): a file that grew past its slot since the save is dropped at PUBLISH with the issue media_too_heavy, never served', async () => {
+  const w = world();
+  const v = (
+    await saveDraft(
+      w,
+      L([{ id: 'b', type: 'banner', settings: { image: MEDIA.picture, title: T('عرض') } }, { id: 'g', type: 'gallery', settings: { images: [{ image: MEDIA.picture2 }] } }], {
+        background: { kind: 'image', media: MEDIA.picture, dim: 'light' },
+      }),
+      0
+    )
+  ).draft.version;
+  const first = await publish(w, v);
+  assert.deepEqual(first.issues, [], 'a thousand bytes is under every cap');
+  assert.equal(first.draft.layout.blocks[1].settings.images.length, 1);
+  // The ledger's figure is what counts: the second picture is now 1.2 MB — over a gallery item's 1 MB.
+  w.raw.prepare('UPDATE file_objects SET byte_size = ? WHERE object_key = ?').run(1_200_000, MEDIA.picture2);
+  const out = await publish(w, first.draft.version);
+  const issue = out.issues.filter((i: { code: string }) => i.code === 'media_too_heavy');
+  assert.deepEqual(issue.map((i: { path: string; fatal: boolean }) => [i.path, i.fatal]), [['blocks[1].settings.images[0].image', false]]);
+  assert.deepEqual(out.draft.layout.blocks[1].settings.images, []);
+  assert.equal(out.draft.layout.blocks[0].settings.image, MEDIA.picture, 'the banner keeps its picture: 1000 bytes is under every cap');
+  assert.equal(out.draft.layout.background.media, MEDIA.picture);
+  for (const store of await publicStores(w)) {
+    assert.ok(!JSON.stringify(store.layout.blocks).includes(MEDIA.picture2));
+    assert.deepEqual(store.layout.background, { kind: 'image', media: MEDIA.picture, poster: '', dim: 'light', phones: false });
+  }
+  // Revision 1 still holds the picture; a restore is re-checked the same way and drops it into the draft with the issue.
+  const restored = await ok(await post(w.owner, `${BASE}/restore/1`, { version: out.draft.version }));
+  assert.ok(restored.issues.some((i: { code: string }) => i.code === 'media_too_heavy'), JSON.stringify(restored.issues));
+  assert.deepEqual(restored.draft.layout.blocks[1].settings.images, []);
+});
+
+test('the poster rule (L3/L4): a hero or background video without its still is refused at publish with LAYOUT_POSTER_REQUIRED', async () => {
+  const w = world();
+  // A hero video with no poster saves as a draft (the merchant may still be picking one)…
+  let v = (await saveDraft(w, L([{ id: 'hero', type: 'hero', settings: { video: MEDIA.video } }]), 0)).draft.version;
+  const noPoster = await post(w.owner, `${BASE}/publish`, { version: v });
+  assert.equal(noPoster.status, 400);
+  const body = await json(noPoster);
+  assert.equal(body.code, 'LAYOUT_POSTER_REQUIRED');
+  assert.deepEqual(body.details.paths, ['blocks[0].settings.image']);
+  assert.equal(revisions(w.raw), 0, 'nothing published');
+  assert.equal(pointer(w.raw), null);
+  // …with the poster (the hero image) it publishes, phones see the still, and the public payload carries both.
+  v = (await saveDraft(w, L([{ id: 'hero', type: 'hero', settings: { video: MEDIA.video, image: MEDIA.picture, video_on_phone: false } }]), v)).draft.version;
+  await publish(w, v);
+  for (const store of await publicStores(w)) {
+    assert.equal(store.layout.blocks[0].settings.video, MEDIA.video);
+    assert.equal(store.layout.blocks[0].settings.image, MEDIA.picture);
+    assert.equal(store.layout.blocks[0].settings.video_on_phone, false);
+  }
+  // A background video needs its poster too; a background IMAGE needs none; the video block keeps its poster optional.
+  v = draftVersion(w.raw);
+  v = (await saveDraft(w, L([text('t', 'x'), { id: 'v', type: 'video', settings: { video: MEDIA.video } }], { background: { kind: 'video', media: MEDIA.video } }), v)).draft.version;
+  const bg = await post(w.owner, `${BASE}/publish`, { version: v });
+  assert.equal(bg.status, 400);
+  assert.deepEqual((await json(bg)).details.paths, ['background.poster']);
+  v = (await saveDraft(w, L([text('t', 'x'), { id: 'v', type: 'video', settings: { video: MEDIA.video } }], { background: { kind: 'video', media: MEDIA.video, poster: MEDIA.picture2, phones: true } }), v)).draft.version;
+  const okPub = await publish(w, v);
+  assert.deepEqual(okPub.draft.layout.background, { kind: 'video', media: MEDIA.video, poster: MEDIA.picture2, dim: 'medium', phones: true });
+  v = (await saveDraft(w, L([text('t', 'x')], { background: { kind: 'image', media: MEDIA.picture } }), okPub.draft.version)).draft.version;
+  await publish(w, v);
+  // Restore-with-publish of the poster-less revision is refused the same way; restore into the draft alone is not.
+  const posterless = revisions(w.raw) - 1; // the second revision published above had a poster; revision 1 is the hero WITH poster
+  assert.ok(posterless >= 1);
+  const rev = await ok(await get(w.owner, `${BASE}/revisions/1`));
+  assert.equal(rev.revision.layout.blocks[0].settings.image, MEDIA.picture, 'revision 1 carries its poster');
+  // Delete the poster since: the re-check drops the picture (media_not_found), and the video is now poster-less → refused on publish.
+  w.raw.prepare("UPDATE file_objects SET deleted_at = '2026-09-20T00:00:00.000Z' WHERE object_key = ?").run(MEDIA.picture);
+  const cur = draftVersion(w.raw);
+  const restorePublish = await post(w.owner, `${BASE}/restore/1`, { version: cur, publish: true });
+  assert.equal(restorePublish.status, 400);
+  assert.equal((await json(restorePublish)).code, 'LAYOUT_POSTER_REQUIRED');
+  assert.equal(draftVersion(w.raw), cur, 'nothing written');
+  const restoreOnly = await ok(await post(w.owner, `${BASE}/restore/1`, { version: cur }));
+  assert.equal(restoreOnly.draft.layout.blocks[0].settings.image, '');
+  assert.ok(restoreOnly.issues.some((i: { code: string }) => i.code === 'media_not_found'));
+});
+
+test('the page\'s own keys travel to the public: notice line, footer links, background and schedules — a far-future or closed window stays out of the public page', async () => {
+  const w = world();
+  const soon = new Date(Date.now() + 5 * 60_000).toISOString();
+  const layout = L(
+    [
+      text('always', 'دائمًا'),
+      { ...text('later', 'لاحقًا'), schedule: { from: '2099-01-01T00:00:00Z' } },
+      { ...text('window', 'نافذة'), schedule: { from: '2026-01-01T00:00:00Z', until: '2026-02-01T00:00:00Z' } },
+      { ...text('soon', 'قريبًا'), schedule: { from: soon } },
+    ],
+    {
+      header: { variant: 'bar', notice: T('توصيل مجاني هذا الأسبوع', 'Free delivery'), notice_link: { kind: 'product', id: 'p1' }, notice_until: '2099-01-01T00:00:00Z' },
+      footer: { variant: 'standard', links: [{ label: T('الاستبدال'), link: { kind: 'route', route: 'about' } }, { label: T('منتج'), link: { kind: 'product', id: 'q1' } }] },
+      background: { kind: 'image', media: MEDIA.picture, dim: 'heavy', phones: true },
+    }
+  );
+  const saved = await saveDraft(w, layout, 0);
+  assert.deepEqual(saved.issues.map((i: { path: string; code: string }) => `${i.path}:${i.code}`), ['footer.links[1].link:unknown_ref'], 'another store\'s product is not a footer destination');
+  await publish(w, saved.draft.version);
+  for (const store of await publicStores(w)) {
+    const l = store.layout as StoreLayoutLike;
+    assert.deepEqual(l.header.notice, { ar: 'توصيل مجاني هذا الأسبوع', en: 'Free delivery', ckb: '' });
+    assert.deepEqual(l.header.notice_link, { kind: 'product', id: 'p1' });
+    assert.equal(l.header.notice_until, '2099-01-01T00:00:00.000Z');
+    assert.deepEqual(l.footer.links.map((x) => x.link), [{ kind: 'route', route: 'about' }, { kind: 'none' }]);
+    assert.deepEqual(l.background, { kind: 'image', media: MEDIA.picture, poster: '', dim: 'heavy', phones: true });
+    // The linked product arrives with the page so the notice can be drawn as a link.
+    assert.ok(store.blocks_data.picked.some((p: { id: string }) => p.id === 'p1'));
+    // NOT BEFORE ITS TIME (review 2026-09-30): the public page JSON is edge-cached for everyone, so a
+    // block whose window opens beyond the lead (longer than a cached copy lives) or has closed is left
+    // out; one opening within the lead travels, and the client's own clock shows it at the instant.
+    assert.deepEqual(l.blocks.map((b) => b.id), ['always', 'soon']);
+    assert.ok(!JSON.stringify(store).includes('لاحقًا'), 'the planned launch is not in the public bytes');
+    assert.deepEqual(renderableBlocks(l as never, new Date().toISOString(), 'live').map((b) => b.id), ['always']);
+    assert.deepEqual(renderableBlocks(l as never, new Date(Date.parse(soon) + 1000).toISOString(), 'live').map((b) => b.id), ['always', 'soon']);
+  }
+  // The owner's preview keeps every block, scheduled or not.
+  const preview = await ok(await get(w.owner, `${BASE}/preview`));
+  assert.deepEqual(preview.layout.blocks.map((b: { id: string }) => b.id), ['always', 'later', 'window', 'soon']);
+  assert.equal(preview.layout.blocks[1].schedule.from, '2099-01-01T00:00:00.000Z');
+  // A notice dated for later is out of the public page too (the header keeps its variant), until its lead.
+  const later = L([text('always', 'دائمًا')], {
+    header: { variant: 'bar', notice: T('تخفيضات الجمعة السرية', 'Secret Friday sale'), notice_link: { kind: 'none' }, notice_from: '2099-01-01T00:00:00Z' },
+  });
+  await publish(w, (await saveDraft(w, later, draftVersion(w.raw))).draft.version);
+  for (const store of await publicStores(w)) {
+    assert.equal(store.layout.header.variant, 'bar');
+    assert.deepEqual(store.layout.header.notice, { ar: '', en: '', ckb: '' });
+    assert.ok(!JSON.stringify(store).includes('Secret Friday sale'));
+  }
+  // The sweep sees the background too: a page-level key is a reference like a block's.
+  const db = asD1(w.raw) as unknown as Parameters<typeof readLiveSchema>[0];
+  const scan = await collectMediaReferences(db, await readLiveSchema(db));
+  assert.ok(scan.keys.has(MEDIA.picture));
+});
+
+interface StoreLayoutLike {
+  header: { notice: unknown; notice_link: unknown; notice_until?: string };
+  footer: { links: Array<{ link: unknown }> };
+  background: unknown;
+  blocks: Array<{ id: string; schedule?: { from: string } }>;
+}
+
+test('a tampered row cannot smuggle a page-level key past the public read: background, notice link and footer links are cleaned too', async () => {
+  const w = world();
+  const v = (await saveDraft(w, L([text('a', 'clean')]), 0)).draft.version;
+  const out = await publish(w, v);
+  const tampered = {
+    schema_version: 1,
+    theme: 'classic',
+    header: { variant: 'bar', notice: T('<b>x</b>'), notice_link: 'javascript:alert(1)', notice_from: 'x' },
+    footer: { variant: 'standard', links: [{ label: T('x'), link: { kind: 'external', url: 'http://plain.example' } }, { label: T('y'), link: { kind: 'route', route: '../admin' } }] },
+    background: { kind: 'image', media: MEDIA.foreign, poster: 'https://evil.example/p.webp', dim: 'url(x)', phones: 1 },
+    blocks: [text('a', 'clean')],
+  };
+  w.raw.prepare('UPDATE store_layout_revisions SET layout_json = ? WHERE id = ?').run(JSON.stringify(tampered), out.published.id);
+  for (const store of await publicStores(w)) {
+    const s = JSON.stringify(store.layout);
+    for (const bad of ['javascript:', 'plain.example', 'evil.example', MEDIA.foreign, '../admin', 'url(x)']) assert.ok(!s.includes(bad), bad);
+    assert.deepEqual(store.layout.header.notice_link, { kind: 'none' });
+    assert.equal(store.layout.header.notice.ar, '<b>x</b>', 'text is text');
+    assert.deepEqual(store.layout.footer.links.map((x: { link: unknown }) => x.link), [{ kind: 'none' }, { kind: 'none' }]);
+    assert.deepEqual(store.layout.background, { kind: 'image', media: '', poster: '', dim: 'medium', phones: false });
   }
 });

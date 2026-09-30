@@ -115,14 +115,21 @@ test('C12: a store Levonis suspended takes no new followers', async () => {
 // ------------------------------------------------------------ the rest, pinned
 
 test('C2/C3/C9/C11: the request page follows its address, says failures, and gates the workshop board on a store', () => {
-  const page = code('src/pages/Requests.tsx');
-  assert.match(page, /if \(!deepLinked \|\| \(open && open\.id !== deepLinked\)\) setOpen\(null\);/, 'Back closes the request');
-  assert.match(page, /key=\{open\.id\}/, 'another request never inherits this one\'s state');
-  assert.match(page, /if \(pushed && pushedHere\.current\) navigate\(-1\);/, '«رجوع» is a real step back');
-  assert.match(page, /canOffer=\{!!me\?\.store && !!me\?\.can\.offers\}/);
+  // Phase 5 (§9.5): the request has its own page at /requests/:id
+  // (src/pages/community/Request.tsx); the board keeps the list and replaces
+  // the old ?request=<id> address with the page's own.
+  const board = code('src/pages/Requests.tsx');
+  const page = code('src/pages/community/Request.tsx');
+  assert.match(board, /navigate\(requestRedirect\(deepLinked, params, location\.hash\), \{ replace: true \}\);/, 'the old address lands on the page, query and hash kept');
+  assert.match(page, /key=\{id\}/, 'another request never inherits this one\'s state');
+  assert.match(page, /const goBack = useGoBack\('\/requests'\);/, '«رجوع» is a real step back');
+  assert.match(board, /canOffer=\{!!me\?\.store && !!me\?\.can\.offers\}/);
   assert.match(page, /const canOffer = !!me\?\.store && !!me\?\.can\.offers && !isCustomer && open;/);
-  assert.doesNotMatch(page, /\.catch\(\(\) => setRows\(\[\]\)\)/, 'a board that did not load is not «no requests»');
-  assert.doesNotMatch(page, /\.catch\(\(\) => setOffers\(\[\]\)\)/, 'offers that did not load are not «no offers»');
+  for (const src of [board, page]) {
+    assert.doesNotMatch(src, /\.catch\(\(\) => setRows\(\[\]\)\)/, 'a board that did not load is not «no requests»');
+    assert.doesNotMatch(src, /\.catch\(\(\) => setOffers\(\[\]\)\)/, 'offers that did not load are not «no offers»');
+  }
+  assert.match(board, /<CommunityLoadError error=\{loadError\}/);
   assert.match(page, /<CommunityLoadError error=\{loadError\}/);
   assert.match(page, /<OnlookerCard me=\{me\} onNewRequest=\{onNewRequest\} \/>/);
   // The customer closes a published request from its page (the server always allowed it).
@@ -146,8 +153,9 @@ test('C6: publishing or closing a request drops the community page\'s remembered
   const strip = (p: string) => readFileSync(join(ROOT, p), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const wizard = strip('src/components/community/requests/RequestWizard.tsx');
   assert.match(wizard, /const d = await requestsApi\.publish\(id, wizardPayload\(s, primary\?\.id \?\? '', measured\)\);\s*forgetCommunityFeed\('requests'\);/);
-  const page = strip('src/pages/Requests.tsx');
+  // The publish / close / discard buttons live on the request's own page (Phase 5).
+  const page = strip('src/pages/community/Request.tsx');
   assert.match(page, /\/publish`, \{\}\);\s*forgetCommunityFeed\('requests'\);/);
   assert.equal(page.match(/\/cancel`\);\s*forgetCommunityFeed\('requests'\);/g)?.length, 2, 'closing a published request and discarding a draft');
-  assert.match(page, /import \{ forgetCommunityFeed \} from '\.\.\/components\/community\/hub\/feedCache';/, 'the cache module, not the feed hook');
+  assert.match(page, /import \{ forgetCommunityFeed \} from '\.\.\/\.\.\/components\/community\/hub\/feedCache';/, 'the cache module, not the feed hook');
 });

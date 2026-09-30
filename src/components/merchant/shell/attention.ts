@@ -80,6 +80,13 @@ export interface Attention {
     design: boolean;
     links: { settings: string; delivery: string; products: string; design: string };
   };
+  /**
+   * «سرعة متجري» (P4): PRESENT ONLY when the phone LCP p75 bucket was poor on
+   * three consecutive days with ≥ 30 samples each; absent by design otherwise
+   * — so it is NOT one of the sources whose absence forbids «nothing waiting».
+   * `link` is the builder's «السرعة» tab door (`merchantHref.storeDesign()`).
+   */
+  speed?: { grade: 'poor'; samples: number; poor_days: number; link: string };
 }
 
 export type StoreProblem =

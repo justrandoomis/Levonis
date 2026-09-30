@@ -117,7 +117,7 @@ test('every address the brief lists resolves; the old spellings and unknown path
   }
   // The thread and the request still open where they live (W2-E's adapter did the same).
   assert.deepEqual(resolveWorkspaceRoute('/merchant/inbox/chat_1', MERCHANT_BASE), { kind: 'away', to: '/chat/chat_1' });
-  assert.deepEqual(resolveWorkspaceRoute('/admin/requests/req_9', STORE_HOST_BASE), { kind: 'away', to: '/requests?request=req_9' });
+  assert.deepEqual(resolveWorkspaceRoute('/admin/requests/req_9', STORE_HOST_BASE), { kind: 'away', to: '/requests/req_9' });
   // The brief's `/merchant/custom-orders` spelling redirects to the contract's.
   assert.deepEqual(resolveWorkspaceRoute('/merchant/custom-orders', MERCHANT_BASE), { kind: 'redirect', to: '/merchant/requests/orders' });
   assert.deepEqual(resolveWorkspaceRoute('/admin/custom-orders/cord_2', STORE_HOST_BASE), { kind: 'redirect', to: '/admin/requests/orders/cord_2' });

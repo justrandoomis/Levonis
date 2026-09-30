@@ -158,6 +158,9 @@ const ADMIN_COMMUNITY_ROUTES: Record<string, MoneyClass> = {
   'GET /complaints/:id': 'desk',
   'POST /complaints/:id/status': 'none',
   'POST /complaints/:id/messages': 'none',
+  // The content-reports queue (0160 side table): reported comments and order
+  // updates, their text and state — no amount, no escrow. Read-only.
+  'GET /reports': 'none',
   'POST /escrows/:id/resolve': 'guard',
   'GET /merchants/:id/finance': 'guard',
   'GET /reconciliation/store-orders': 'guard',

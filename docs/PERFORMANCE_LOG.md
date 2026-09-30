@@ -1297,3 +1297,143 @@ registries gained the three new mounts and the session part class); Studio 313 p
 skips; `npm run check` exit 0; `node scripts/migrate-check.mjs --twice` ✔ through 0158; browser:
 `scripts/e2e-projects.mjs` 493 / 0, `scripts/e2e-community-home.mjs` 867 / 0,
 `scripts/e2e-catalog.mjs` 104 / 0 (files editor and product files), `scripts/e2e-store-builder.mjs` 34 / 0.
+
+## 2026-09-30 — Community Phase 5 (offers V2, the request discussion, the order timeline, the request page) + merchant P4 («سرعة متجري») + P5 (media everywhere), the integrated working tree
+
+Eight builders' work merged into one tree (docs/COMMUNITY_ECOSYSTEM.md §4e/§9.5,
+docs/MERCHANT_PLATFORM_V2.md §C.1 rows P4 and P5, docs/DECISIONS.md rows 178–182). Nothing here
+was measured in the lab; these are the bundle figures the gate prints, plus exact bytes.
+
+### Bytes (gzip −9; `npm run build`, tests/bundleBudget.test.ts 12/12; exact bytes with node zlib level 9, the gate's method; CSS also by `gzip -9c | wc -c`)
+
+| | before (Phase 4 + P3 after the review fixes) | after | gate |
+|---|---|---|---|
+| document | 1.9 KB (5,009 B raw) | 1.9 KB (5,009 B raw) | 4 KB |
+| entry chunk | 67,741 B = 66.2 KB | **67,912 B = 66.3 KB** (328 chunks; +171 B: the `/requests/:id` route and its lazy import) | 72 KB |
+| initial payload | 187,158 B = 182.8 KB over 4 files | **187,345 B = 183.0 KB** over 4 files | 200 KB |
+| storefront pages beyond the initial payload | 43,686 B = 42.7 KB | **46.6 KB** (+3.9 KB) | 47 KB — **0.4 KB of headroom left** |
+| a store page's fixed app weight (initial + storefront) | 225.5 KB (`STOREFRONT_FIXED_KB` 226) | **229.6 KB** (`STOREFRONT_FIXED_KB` 230, now pinned within 3 KB by the gate) | — |
+| workspace shell / with its closure | 15.1 / 25.2 KB | **15.2 / 25.3 KB** | 25 / 32 KB |
+| Today (`CommandCenter`) | 15,110 B | **15,653 B** (18,120 B as merged: the announcement sheet's three-language words rode in the Counter's table; moved to the lazy `counter/announceStrings.ts` at integration, −2,467 B) | 18 KB |
+| `StoreDesignPanel` | — | **54,720 B = 53.4 KB** | 250 KB |
+| CSS, all 8 files | 60,964 B (node) / 60,876 B (`gzip -9`) | **60,964 B / 60,876 B — unchanged, 0 B** (`index-*.css` 48,067 B; no builder added a utility class: each ran a class census against the built CSS) | 60 KB and «may not grow»: **met** |
+
+New lazy chunks (none in the entry, the storefront closure or the workspace shell): the request page
+`Request-*.js` 41,300 B (the board chunk `Requests-*.js` is 12,515 B now that the detail moved out);
+`OrderTimeline` 4,183 B + `timelineStrings` 3,169 B; `CustomOrderScreen` 3,197 B; `BoardRail` 1,744 B;
+`SpeedPanel` 6,295 B; `storeVitals` 1,036 B (the reporter, imported after `load` + idle — the gate now pins it
+as a lazy chunk in no storefront static closure, and `SpeedPanel` as no static import of the builder);
+`BackgroundMedia` 2,556 B (the gate pins it lazy too); `AnnouncementSheet` 6,991 B (its words included);
+`PreviewQr` 1,530 B; `MediaLibraryPoster` 845 B.
+
+What grew and why: the storefront closure +3.9 KB (the notice line and footer links in `StoreHeader`, the
+background door and the scheduled-block filter in `StoreRenderer` 12.6 KB, the storefront strings' `media`
+group, the hero's workshop-facts frame, `backgroundAttributes` in the theme chunk 7.1 KB, the reporter's
+dynamic-import call). The first P5 version measured 47.9 KB; the background was split into a door and a
+2.5 KB lazy chunk, whose layer is fixed/absolute so nothing shifts when it arrives. **The next storefront
+surface must pay back before it spends.** The entry +171 B is the new route.
+
+### Tests
+
+`npm run check` exit 0 (tsc root, worker and tests: 0 errors; `eslint .` 0 errors, 151 warnings, none in a
+file this phase touched; check:workspaces, check:boundaries 67/67, check:studio, check:runners); `npm run build`
+exit 0; `tests/bundleBudget.test.ts` 12/12; `node scripts/migrate-check.mjs --twice` ✔ through 0161 (251
+tables, 0 FK violations, 0 orphan catalogs); `node scripts/test-all.mjs` exit 0 on the final tree — root
+`tests/*.test.ts` 7,622 / 7,622, workspaces 361 / 361, Studio 313 pass + 6 declared skips. Browser (vite on :4191):
+`scripts/e2e-projects.mjs` 493 / 0, `scripts/e2e-community-home.mjs` 966 / 0, `scripts/e2e-request.mjs`
+738 / 0, `scripts/e2e-order-timeline.mjs` 577 / 0, `scripts/e2e-storefront-media.mjs` 125 / 0,
+`scripts/e2e-store-builder.mjs` 332 / 0.
+
+### Review fixes on the same tree (post-merge review of 2026-09-30: behaviour/a11y/i18n, perf budget, money/state, files/privacy)
+
+Exact bytes (node zlib level 9, the gate's method; `npm run build` then tests/bundleBudget.test.ts):
+
+| | as integrated (the review's measurement) | after the review's fixes, before the payback | **final** | gate |
+|---|---|---|---|---|
+| storefront pages beyond the initial payload | 47,739 B (389 B of headroom) | 47,862 B (266 B) | **47,480 B (648 B of headroom)** | 48,128 B |
+| entry / initial payload | 67,912 B / 187,345 B | — | **67,883 B / 187,316 B** (66.3 / 182.9 KB, 328 chunks) | 72 / 200 KB |
+| a store page's fixed app weight | 229.6 KB | — | **229.3 KB** (`STOREFRONT_FIXED_KB` 230, within 3 KB) | — |
+| CSS, all 8 files | 60,964 B | 60,978 B (+14 B: `min-h-[168px]`, `sm:mt-1.5`, `sm:pt-4`) | **60,964 B** — `index-B6C-KbqL.css`, the integration's file byte for byte (the skeleton's height inline; `sm:pt-5` and a column gap the stylesheet already had) | 60 KB, «may not grow» |
+
+What paid the store pages back:
+
+- **One scheduler for the speed reporter** (`scheduleStoreVitals`, src/lib/storeBeacon.ts): the same load + idle
+  effect was written into both store pages. `Storefront` 6,636 → 6,379 B, `StorefrontProduct` 6,709 → 6,461 B,
+  `storeBeacon` 520 → 817 B: −208 B net.
+- **The store layout's tables as one file** (`store-layout`, vite.config.ts `manualChunks`): packages/storeLayout
+  `tokens`, `refs`, `blocks` and src/components/storefront/theme.ts, 4,665 B, where Rollup had split them by
+  importer set into `theme` 1,503 + `refs` 1,805 + `blocks` 1,615 = 4,923 B: −258 B and two fewer requests on every
+  store visit. Its cost is on the merchant side, once: the lazy screens that imported one table
+  (`AnnouncementSheet`, `PreviewQr`, `SpeedPanel`, `StoreSettingsTab`, `ProductFiles`, `AccentSample`) fetch the
+  4.6 KB file instead of 1.5–1.8 KB — the same file the builder and the store pages use.
+- **Off the first render, not in the closure:** the hero's workshop-facts row is `workshopFacts` (1,279 B) and the
+  store's video element `StoreVideo` (422 B), each its own lazy chunk; a classic workshop store, or a classic page
+  with a background video, no longer fetches the 8.4 KB `extra` chunk of non-classic blocks for them.
+- What the review's own fixes spend inside the closure: the notice line's three lines, its read at the first
+  render (no collapse on reload), the animated-GIF rule and the focus hand-off after «إخفاء الإعلان»
+  (`StoreRenderer` 12,762 → 12,856 B).
+
+The gate names the new lazy chunks (tests/bundleBudget.test.ts, 13 tests): `Request` 42,028 B, `OrderTimeline`
+4,343 B, `CustomOrderScreen` 3,289 B, `AnnouncementSheet` 7,202 B, `BoardRail` 1,469 B — each a chunk of its own, in
+none of the entry, store-page and workspace-frame closures; the announcement sheet in none of Today's, the rail in
+none of the community home's; `workshopFacts` and `StoreVideo` lazy and never pulling `extra`; `store-layout`
+exists. `refusalStrings` 23,005 → 23,880 B (+875 B: the 36 Sorani sentences that replaced Arabic copies in the
+Phase-5 codes, and `OFFER_PICKUP_FEE`); the review's proposal to move the new surfaces' codes into lazily loaded
+tables is not done here (63 importers; codes such as `OFFER_CHANGED` are shared with the chat's commerce flow) —
+an open item, with the 40-route cost it names.
+
+D1 round trips (dependent waves, tests/fixtures/wavesD1; each now a test's ceiling):
+
+| read | review measured | now | pinned in |
+|---|---|---|---|
+| GET `/api/marketplace/requests/:id/offers` | 7 (customer) / 8 (merchant) | **4 / 4** — [request, caller's store] → [offers, revisions, files by the list's rule in SQL, draft] → the badges' two | tests/offersV2.test.ts |
+| GET `/api/marketplace/my-offers` | 4 | **2** — the store → [page, its files by the page's own subquery, drafts] | tests/offersV2.test.ts |
+| GET `/api/community/store/:id` | 7 | **4** | tests/offersV2.test.ts |
+| GET `/api/marketplace/orders/:id/timeline` | 3, every update | **2**, the newest 200 updates + `older_updates` (the 30 s poll while open now reads ≤ 201 rows) | tests/orderTimeline.test.ts |
+| POST `/api/storefront/events/vitals` | 6–7 | **3** — [limit, store] → [salt, one batch] → [mark + counters]; the discarded COUNT is gone | tests/storefrontVitals.test.ts |
+| GET `…/layout/speed`, `…/speed/report` | 5 / 5 | **4 / 4** (the limit rides the first read; the sizes wave needs the block data's product rows) | tests/storeSpeed.test.ts |
+| GET `/api/marketplace/requests/:id/comments` | 4 (member, workshop); COUNT on every page | **3** for every reader; COUNT on the first page only | tests/requestDiscussion.test.ts |
+| GET `/api/community/requests?for=me` | driven from the merchant's whole match history, sorted, the COUNT repeating the scan | driven from the open board (`idx_community_requests_state_expires`), the verdict an EXISTS on the pair index | tests/offersV2.test.ts (`EXPLAIN QUERY PLAN`) |
+
+The beacon and the speed routes call `rateLimit`, which awaits one more statement — its stale-window DELETE — on
+2 % of the hits that open a window (worker/lib/ratelimit.ts; every limited route alike, unchanged here). Their two
+tests hold that coin (`Math.random`) so the ceiling is the route's own cost on every run: the first final suite
+failed once on it (the beacon at 4 waves), and with the coin held under 2 % the beacon measures 4 / 4 and the audit 5.
+
+Layout shift (the home's «طلبات تناسبك», perf review major): scripts/e2e-community-home.mjs now measures every
+page load's layout shifts for the workshop viewer and requires a return visit to reserve the rail's frame
+(< 0.02): measured first visit / return visit ar-360 0.007 / 0.007, ar-1280 0.007 / 0.007, en-360 0.010 / 0.010,
+en-1280 0.007 / 0.007, ckb-360 (reduced motion) 0.006 / 0.006 — the rail no longer lands above the issue (0.206 as reviewed,
+«even with a 0 ms /api/merchant/me»). With `/api/merchant/me` held back 800 ms (the same fixture, Chromium 360×800, a
+fresh context, then a reload): first visit 0.219, return visit 0.007; a customer 0 / 0. The 0.219 is the one case
+left — a workshop's first visit on a device whose `me` answers after the issue has painted; the device learns it
+then, and every later visit reserves the frame (recorded in docs/COMMUNITY_ECOSYSTEM.md §9.5 deviation 8).
+
+### Gates on the final tree (review fixes)
+
+`npm run check` exit 0 — tsc root, worker and tests 0 errors; `eslint .` «✖ 151 problems (0 errors, 151 warnings)»,
+none in a file this pass touched; check:workspaces clean (12 packages and services), check:boundaries 67 / 67, check:studio
+clean, check:runners «3 embedded runner(s) typecheck clean». `npm run build` exit 0 («check-live-markers: all 7 live
+markers survive the build»); tests/bundleBudget.test.ts 13 / 13 (figures above). `node scripts/migrate-check.mjs
+--twice`: ✔ through 0161, «second full pass applied 0 files (bookkeeping holds)», «0161_storefront_vitals.sql: 4
+idempotent statement(s) re-ran — no row added, no value changed», «tables: 251 foreign_key_check violations: 0
+orphan catalogs: 0»; D1's own engine agrees — `wrangler d1 migrations apply --local` took 0150–0161 onto the old local
+D1 and 0001–0161 onto a fresh one without an error (the local state then restored).
+Root suite `node --import tsx --test tests/*.test.ts`: «# tests 7650 # pass 7650 # fail 0 # cancelled 0 # skipped 0
+# todo 0» (1,991 s; the run before it 7649 / 1 — the limiter's coin in the beacon's wave test, see above; the two
+wave tests now hold it). Browser (vite :4191, PLAYWRIGHT_MODULE):
+`scripts/e2e-request.mjs` 740 / 0 (with the #discussion landing), `scripts/e2e-order-timeline.mjs` 586 / 0 (581 / 5 on the first pass:
+its header check read ASCII digits only, and `<Money>` — the one way the workspace writes a dinar amount, the review's fix — writes «٥٥٬٠٠٠ د.ع» on an Arabic page; the check now reads either script),
+`scripts/e2e-community-home.mjs` 971 / 0 (with the return-visit layout-shift check),
+`scripts/e2e-storefront-media.mjs` 132 / 0, `scripts/e2e-store-builder.mjs` 335 / 0. Wrangler (:8787; the local D1 state copied first and
+restored byte for byte after): `scripts/e2e-print-request.mjs` — HEAD's script, which the phase does not touch —
+98 / 9 on a clean D1 migrated 0001–0161 and seeded with the operator's three settings (90 / 17 on the old local
+D1, whose open requests the new workshops were matched to as well). All nine are the script's drift from HEAD
+behaviour it predates (last changed 2026-09-24): the workshop match notice is `matching_request` →
+`/merchant/requests/<id>` (Wave 2's merchant notifications) and a paused workshop is a notify-block, not a reject
+(«eligibility as data», 2026-09-25); a viewer token opens
+only for the account that minted it (W5-B); «order again» makes a draft the customer publishes.
+`scripts/e2e-print-request-ui.mjs` stops at its first step on HEAD's code too: the one-time «complete your
+profile» sheet covers «طلب جديد», and past it the wizard has no `[data-wizard="stepper"]` any more, so the phase's
+edits to it (the `/requests/<id>` landing) are never reached. Neither is a regression of this tree; both scripts
+want a rewrite against today's wizard and notices (an open item).

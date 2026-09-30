@@ -46,8 +46,9 @@ Every answer except `/`, `/context` and `/openapi.json` is
 Texts are `{ "ar", "en", "ckb" }`; prices are whole IQD; items are identified
 by slug and carry `url` (website) and `api_url`. A shop's slug is the first
 label of its address (`<slug>.levonis-iq.com`); a print request is identified
-by the reference in its web address (`/requests?request=<reference>`) — the
-only handle the site's own board uses.
+by the reference in its web address (`/requests/<reference>`, the request's
+own page since Community Phase 5; the older `/requests?request=<reference>`
+still redirects there) — the only handle the site's own board uses.
 
 ## Rules (and where each is enforced)
 

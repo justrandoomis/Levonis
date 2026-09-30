@@ -39,6 +39,19 @@ export const STOREFRONT_STRINGS = {
     card: {
       hasVideo: 'يحتوي على فيديو',
     },
+    // Media everywhere (P5, storefront L3/L4/L6/L7/L8): the notice line, the
+    // footer links, the header video's control, the moving background's stop,
+    // and the builder preview's mark on a scheduled section.
+    media: {
+      notice: 'إعلان المتجر',
+      hideNotice: 'إخفاء الإعلان',
+      footerLinks: 'روابط المتجر',
+      playVideo: 'تشغيل فيديو الواجهة',
+      stopVideo: 'إيقاف فيديو الواجهة',
+      stopBackground: 'إيقاف حركة الخلفية',
+      playBackground: 'تشغيل حركة الخلفية',
+      scheduled: 'مجدول',
+    },
     // Files on products (§9.4): the block under the description, by role.
     files: {
       title: 'الملفات',
@@ -85,6 +98,16 @@ export const STOREFRONT_STRINGS = {
     card: {
       hasVideo: 'Has a video',
     },
+    media: {
+      notice: 'Store notice',
+      hideNotice: 'Hide the notice',
+      footerLinks: 'Store links',
+      playVideo: 'Play the header video',
+      stopVideo: 'Stop the header video',
+      stopBackground: 'Stop the moving background',
+      playBackground: 'Play the moving background',
+      scheduled: 'Scheduled',
+    },
     files: {
       title: 'Files',
       view3d: 'View in 3D',
@@ -129,6 +152,16 @@ export const STOREFRONT_STRINGS = {
     },
     card: {
       hasVideo: 'ڤیدیۆی تێدایە',
+    },
+    media: {
+      notice: 'ڕاگەیاندنی فرۆشگا',
+      hideNotice: 'شاردنەوەی ڕاگەیاندن',
+      footerLinks: 'بەستەرەکانی فرۆشگا',
+      playVideo: 'لێدانی ڤیدیۆی سەرەوە',
+      stopVideo: 'ڕاگرتنی ڤیدیۆی سەرەوە',
+      stopBackground: 'ڕاگرتنی جووڵەی باکگراوند',
+      playBackground: 'لێدانی جووڵەی باکگراوند',
+      scheduled: 'خشتەکراو',
     },
     files: {
       title: 'فایلەکان',

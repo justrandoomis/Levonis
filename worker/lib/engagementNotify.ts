@@ -84,7 +84,8 @@ const COPY = {
     offerSubject: (id: string) => `عرض جديد على طلبك ${id}`,
     offerBody: (id: string) => `وصلك عرض جديد على طلبك ${id}. افتح الطلب لمقارنة العروض.`,
     offerTitle: 'عرض جديد على طلبك',
-    priceLabel: 'السعر',
+    totalLabel: 'الإجمالي',
+    feeLabel: 'منها التوصيل',
     complaintSubject: (id: string) => `رد على شكواك ${id}`,
     complaintShort: (id: string) => `وصلك رد من إدارة \u2068Levonis\u2069 على شكواك ${id}. افتح «تذاكري» في صفحة الدعم لقراءته.`,
     complaintTitle: 'رد على شكواك',
@@ -96,7 +97,8 @@ const COPY = {
     offerSubject: (id: string) => `A new offer on your request ${id}`,
     offerBody: (id: string) => `A merchant sent an offer on your request ${id}. Open it to compare offers.`,
     offerTitle: 'A new offer on your request',
-    priceLabel: 'Price',
+    totalLabel: 'Total',
+    feeLabel: 'Of which delivery',
     complaintSubject: (id: string) => `Reply on your complaint ${id}`,
     complaintShort: (id: string) => `Levonis answered your complaint ${id}. Open "My tickets" on the Support page to read it.`,
     complaintTitle: 'A reply on your complaint',
@@ -108,7 +110,8 @@ const COPY = {
     offerSubject: (id: string) => `ئۆفەرێکی نوێ بۆ داواکاریەکەت ${id}`,
     offerBody: (id: string) => `بازرگانێک ئۆفەرێکی نوێی ناردووە بۆ داواکاریەکەت ${id}. بیکەرەوە بۆ بەراوردکردنی ئۆفەرەکان.`,
     offerTitle: 'ئۆفەرێکی نوێ بۆ داواکاریەکەت',
-    priceLabel: 'نرخ',
+    totalLabel: 'کۆی گشتی',
+    feeLabel: 'لەوە بۆ گەیاندن',
     // OWNER: the Sorani for the three complaint lines is yours to write by
     // hand. They carry the ARABIC text on purpose — no Kurdish is generated
     // here, and Arabic is the closer of the two for a Sorani reader (the same
@@ -199,16 +202,25 @@ export async function notifySupportReply(env: Env, ticketId: string, messageId: 
 export async function notifyOfferReceived(env: Env, offerId: string): Promise<void> {
   try {
     const row = await env.DB.prepare(
-      `SELECT o.id, o.price_iqd, o.request_id, r.customer_id
+      `SELECT o.id, o.price_iqd, o.delivery_fee_iqd, o.request_id, r.customer_id
          FROM community_offers o
          JOIN community_requests r ON r.id = o.request_id
         WHERE o.id = ?`
     )
       .bind(offerId)
-      .first<{ id: string; price_iqd: number; request_id: string; customer_id: string }>();
+      .first<{ id: string; price_iqd: number; delivery_fee_iqd: number | null; request_id: string; customer_id: string }>();
     if (!row) return;
     const t = COPY[await localeOf(env, row.customer_id)];
-    const price = `${Number(row.price_iqd || 0).toLocaleString()} IQD`;
+    /**
+     * THE FIGURE IS THE TOTAL (DECISIONS 178 (١)): price plus delivery fee is
+     * what acceptance funds, so it is what the bell's meta and the outbound
+     * line carry — the item price alone under-states it whenever there is a
+     * fee (review 2026-09-30). The fee rides as its own line when there is one.
+     */
+    const priceIqd = Number(row.price_iqd || 0);
+    const feeIqd = Math.max(0, Number(row.delivery_fee_iqd ?? 0) || 0);
+    const totalIqd = priceIqd + feeIqd;
+    const iqd = (n: number) => `${n.toLocaleString('en-US')} IQD`;
     await notify(env.DB, {
       userId: row.customer_id,
       kind: 'offer_received',
@@ -218,11 +230,13 @@ export async function notifyOfferReceived(env: Env, offerId: string): Promise<vo
       body_en: COPY.en.offerBody(row.request_id),
       // The request, not the offer: the customer is being sent somewhere to
       // COMPARE, and one offer on its own is the screen that cannot do that.
-      link: `/requests?request=${row.request_id}`,
+      link: `/requests/${encodeURIComponent(row.request_id)}`,
       entity_type: 'offer',
       entity_id: row.id,
       meta: {
-        price_iqd: row.price_iqd,
+        price_iqd: priceIqd,
+        delivery_fee_iqd: feeIqd,
+        total_iqd: totalIqd,
         title_ckb: COPY.ckb.offerTitle,
         body_ckb: COPY.ckb.offerBody(row.request_id),
       },
@@ -233,7 +247,10 @@ export async function notifyOfferReceived(env: Env, offerId: string): Promise<vo
     const msg: CustomerMessage = {
       subject: t.offerSubject(row.request_id),
       body: t.offerBody(row.request_id),
-      details: [{ label: t.priceLabel, value: price }],
+      details: [
+        { label: t.totalLabel, value: iqd(totalIqd) },
+        ...(feeIqd > 0 ? [{ label: t.feeLabel, value: iqd(feeIqd) }] : []),
+      ],
     };
     await notifyCustomer(env, row.customer_id, `offer_received:${row.id}`, msg);
   } catch (e) {

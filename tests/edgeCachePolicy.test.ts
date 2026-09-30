@@ -46,6 +46,7 @@ import { adminProductsRoutes } from '../worker/routes/adminProducts';
 import { adminMembershipBenefitRoutes } from '../worker/routes/adminMembershipBenefits';
 import { membershipsRoutes } from '../worker/routes/memberships';
 import { merchantRoutes } from '../worker/routes/merchant';
+import { merchantPrinterRoutes } from '../worker/routes/merchantPrinters';
 import { storeLayoutRoutes } from '../worker/routes/storeLayout';
 import {
   ANONYMOUS_CACHE_CONTROL,
@@ -82,6 +83,9 @@ const mount: Mount = (a) => {
   a.route('/api/memberships', membershipsRoutes);
   a.route('/api/merchant/store/layout', storeLayoutRoutes);
   a.route('/api/merchant', merchantRoutes);
+  // Mounted after merchantRoutes, as in worker/index.ts: the sibling's purge
+  // middleware covers the printers' and the workshop's writes too.
+  a.route('/api/merchant', merchantPrinterRoutes);
   a.route('/api', miscRoutes);
 };
 
@@ -460,6 +464,25 @@ test('P2 review: every merchant write purges the shopfront (a profile edit, thro
     // A refused write purges nothing.
     await warmStorefront(w, cache);
     assert.equal((await patch(w.owner, '/api/merchant/store', { name: 'x' })).status, 400);
+    assert.equal(cache.store.size, 8);
+  });
+});
+
+test('Phase 5: a workshop write purges the shopfront — the store body carries its `workshop` facts (prefs, printers)', async () => {
+  await withZoneCache(async (cache) => {
+    const w = world();
+    await warmStorefront(w, cache);
+    const before = (await json(await get(w.guest, `/api/storefront/${SLUG}`))).store;
+    assert.ok('workshop' in before, 'the store body carries the workshop block');
+    await warmStorefront(w, cache);
+    const res = await put(w.owner, '/api/merchant/request-prefs', { turnaround_days: 3, workshop_intro: 'ورشة صغيرة في الكرادة' });
+    assert.equal(res.status, 200, await res.text());
+    assert.deepEqual([...cache.store.keys()], [], 'every per-store entry is gone after the prefs save');
+    const after = (await json(await get(w.guest, `/api/storefront/${SLUG}`))).store;
+    assert.equal(after.workshop?.turnaround_days, 3, 'the guest reads the new turnaround at once');
+    // A refused write purges nothing.
+    await warmStorefront(w, cache);
+    assert.equal((await put(w.owner, '/api/merchant/request-prefs', { turnaround_days: 999 })).status, 400);
     assert.equal(cache.store.size, 8);
   });
 });

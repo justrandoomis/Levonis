@@ -60,6 +60,17 @@ function requestHost(c: Context<AppContext>): HostInfo {
  * `requireMainHost`, for the same reason: a wrong-host caller learns the
  * route does not exist here, not that it exists elsewhere.
  */
+/**
+ * The same bar as `requireAdmin`, as a question: a platform admin on a host
+ * where administration is served. For a door that a party of a deal and the
+ * desk both use (the order timeline's reported photo), so the staff branch
+ * cannot be weaker than the admin mounts.
+ */
+export function isPlatformAdmin(c: Context<AppContext>): boolean {
+  const user = c.get('user');
+  return !!user && user.role === 'admin' && adminAllowedOn(requestHost(c));
+}
+
 export async function requireAdmin(c: Context<AppContext>, next: Next) {
   if (!adminAllowedOn(requestHost(c))) return c.json({ success: false, error: 'Not found' }, 404);
   const user = c.get('user');

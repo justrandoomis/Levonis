@@ -82,7 +82,7 @@ export const SECTIONS: Readonly<Record<MerchantSection, Section>> = {
   costing: section(
     () => import('../dashboard/CostingTab'),
     // W5-B: a request's page with its costing sheet open — the board is on the main site.
-    (m, _p, ws) => <m.CostingTab requestHref={(id) => ws.mainHref(`/requests?request=${encodeURIComponent(id)}&cost=1`)} />
+    (m, _p, ws) => <m.CostingTab requestHref={(id) => ws.mainHref(`/requests/${encodeURIComponent(id)}?cost=1`)} />
   ),
 
   store_design: lazy(() => import('../storeDesign/StoreDesignPanel')),

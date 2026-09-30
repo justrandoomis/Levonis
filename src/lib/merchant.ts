@@ -414,6 +414,8 @@ export const communityOrdersApi = {
       role: 'customer' | 'merchant';
       escrow: Record<string, unknown> | null;
       can: Record<string, boolean>;
+      /** The admin's confirmation window in days (0 = no auto-release) — what «سلّمت العمل» may promise. */
+      auto_complete_days?: number;
     }>(`/api/marketplace/orders/${id}`),
   start: (id: string) => api.post(`/api/marketplace/orders/${id}/start`),
   delivered: (id: string) =>

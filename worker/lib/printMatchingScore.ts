@@ -24,6 +24,8 @@ export interface MatchWeights {
   price_suitability: number;
   preference_match: number;
   pro_bonus: number;
+  /** The workshop's stated turnaround (0159, §9.5): shorter ranks first among the eligible. */
+  turnaround: number;
 }
 
 export const DEFAULT_MATCH_WEIGHTS: MatchWeights = {
@@ -41,6 +43,13 @@ export const DEFAULT_MATCH_WEIGHTS: MatchWeights = {
   // never reach an ineligible one, because eligibility is decided before any
   // score is computed.
   pro_bonus: 3,
+  // A stated turnaround (merchant_request_prefs.turnaround_days, 0159). Like
+  // every signal here it runs AFTER eligibility, so a fast promise cannot put
+  // a workshop onto a job its printers cannot make. A workshop that has not
+  // stated one sits mid-table (0.5), never last. A stored `printMatchWeights`
+  // setting from before this key reads it as 0 through `weights[key] ?? 0`,
+  // which is the old ranking exactly.
+  turnaround: 6,
 };
 
 /** The ranking signals of one workshop. */
@@ -58,6 +67,19 @@ export interface RankSignals {
 }
 
 export const clamp01 = (v: number) => (Number.isFinite(v) ? (v < 0 ? 0 : v > 1 ? 1 : v) : 0);
+
+/** The longest turnaround that still earns anything: a month. One day is the full mark. */
+export const TURNAROUND_HORIZON_DAYS = 31;
+
+/**
+ * How much a stated turnaround is worth, 0..1: one day → 1, `TURNAROUND_HORIZON_DAYS`
+ * or more → 0, in between linear; not stated (null) → 0.5, the middle — the
+ * same «no history sits mid-table» rule `response_time` and `rating` use.
+ */
+export function turnaroundFraction(days: number | null | undefined): number {
+  if (days === null || days === undefined || !Number.isFinite(days) || days <= 0) return 0.5;
+  return clamp01(1 - (days - 1) / (TURNAROUND_HORIZON_DAYS - 1));
+}
 
 /** How comfortably the job sits on this machine, 0..1. */
 function capabilityFit(req: EligibilityRequest, printer: CapabilityPrinter, needed: Capability[], prefs: MerchantPrefs): number {
@@ -118,5 +140,7 @@ export function rankScore(
   // Having explicitly asked for this kind of work beats merely tolerating it.
   score += add('preference_match', p.capabilities.length && needed.every((cap) => p.capabilities.includes(cap)) ? 1 : 0.5);
   score += add('pro_bonus', m.pro ? 1 : 0);
+  // Shorter turnaround first (0159) — among the eligible only, like everything above.
+  score += add('turnaround', turnaroundFraction(p.turnaround_days));
   return { score, detail };
 }

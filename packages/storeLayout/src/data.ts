@@ -100,6 +100,18 @@ export function collectDataNeeds(layout: StoreLayout): DataNeeds {
     if (!needs.productIds.includes(id) && needs.productIds.length < MAX_PICKED_PRODUCTS) needs.productIds.push(id);
   };
 
+  // The page's own links (storefront L6/L7): the notice line and the footer
+  // links may point at a product, whose slug the renderer needs like a banner's.
+  const pageLink = (link: LinkTarget | undefined) => {
+    if (link && link.kind === 'product') pick(link.id);
+  };
+  pageLink(layout.header?.notice_link);
+  for (const item of layout.footer?.links ?? []) pageLink(item.link);
+
+  // Every block the page could show, whatever the clock says: the answer is
+  // cached at the edge for anonymous readers, so what it preloads must not
+  // depend on the moment it was built. A scheduled block's rows travel with
+  // the page and the renderer decides, in live mode, whether to draw it.
   for (const b of renderableBlocks(layout)) {
     linkedProducts(b.settings as unknown as Record<string, unknown>, BLOCKS[b.type].settings, pick);
     switch (b.type) {

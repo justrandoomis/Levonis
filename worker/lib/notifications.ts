@@ -147,7 +147,21 @@ export type NotificationKind =
    * recipient whose count is PEOPLE, exactly as a burst of likes is.
    */
   | 'files_added'
-  | 'request_files';
+  | 'request_files'
+  /**
+   * THE DISCUSSION KINDS (0160; docs/COMMUNITY_ECOSYSTEM.md §9.5), grouped by
+   * `notifyGrouped`: «علّق … على طلبك» to the customer while the job is on the
+   * board (`request_comment:<requestId>`, people-counting), «سأل … عن طلبك»
+   * to the customer (`request_question:<requestId>`) and «أجاب الزبون» to the
+   * workshop that asked (`request_answer:<questionId>`) — the last two with
+   * `repeatActor: 'bump'`, because a second question from the same workshop
+   * is news, not noise. `order_update` (above) rides the same upsert per
+   * order (`order_update:<orderId>`), bumped on every update: the two parties
+   * of an order are exactly who may ring each other's bell about it.
+   */
+  | 'request_comment'
+  | 'request_question'
+  | 'request_answer';
 
 export interface NotificationInput {
   userId: string;
@@ -156,7 +170,7 @@ export interface NotificationInput {
   title_en: string;
   body_ar?: string;
   body_en?: string;
-  /** In-app path, e.g. `/requests?request=req_123`. */
+  /** In-app path, e.g. `/requests/req_123`. */
   link: string;
   /**
    * WIDENED WITH `kind`, NEVER AFTER IT. `notifyStatement` writes
@@ -283,7 +297,12 @@ export async function notify(db: D1Database, n: NotificationInput): Promise<stri
  */
 export interface GroupedNotificationInput {
   userId: string;
-  kind: Extract<NotificationKind, 'post_liked' | 'post_commented' | 'comment_replied' | 'new_follower' | 'files_added' | 'request_files'>;
+  kind: Extract<
+    NotificationKind,
+    | 'post_liked' | 'post_commented' | 'comment_replied' | 'new_follower' | 'files_added' | 'request_files'
+    // 0160 — the request's discussion and the order's timeline (§9.5).
+    | 'order_update' | 'request_comment' | 'request_question' | 'request_answer'
+  >;
   /** One row per recipient per key: `post_liked:<postId>`, `new_follower:<userId>`, … */
   groupKey: string;
   actor: { id: string; name: string };
@@ -293,6 +312,17 @@ export interface GroupedNotificationInput {
   link: string;
   entity_type: NonNullable<NotificationInput['entity_type']>;
   entity_id: string;
+  /**
+   * WHAT A REPEAT ACTOR DOES TO THE ROW. `'ignore'` (the default, and the
+   * rule for every crowd kind) leaves the row exactly as it was: the count is
+   * PEOPLE. `'bump'` is for the kinds where the sender and the recipient are
+   * the two parties of one thing — an order's updates, a question and its
+   * answer — and a second message from the same person IS a new event: the
+   * count climbs, the body and link are the latest, the row comes back
+   * unread at the top. The actors window is still kept, so a caller reading
+   * `meta.actors` sees who wrote.
+   */
+  repeatActor?: 'ignore' | 'bump';
 }
 
 /** How many distinct actors a grouped row remembers, so a repeat is recognised. */
@@ -303,7 +333,12 @@ export async function notifyGrouped(db: D1Database, n: GroupedNotificationInput)
     const first = n.title(1, n.actor.name);
     const actorJson = JSON.stringify({ id: n.actor.id, name: n.actor.name });
     // The row as it stands is `user_notifications.*` inside the DO UPDATE.
-    const seen = `EXISTS (SELECT 1 FROM json_each(user_notifications.meta, '$.actors') WHERE value = ?13)`;
+    // A kind that BUMPS on a repeat actor never finds the actor «seen»: every
+    // event of theirs counts, and the row resurfaces (see `repeatActor`).
+    const seen =
+      n.repeatActor === 'bump'
+        ? '0'
+        : `EXISTS (SELECT 1 FROM json_each(user_notifications.meta, '$.actors') WHERE value = ?13)`;
     const actors = `CASE
         WHEN json_type(user_notifications.meta, '$.actors') IS NOT 'array' THEN json_array(?13)
         WHEN json_array_length(user_notifications.meta, '$.actors') >= ${ACTORS_KEPT}

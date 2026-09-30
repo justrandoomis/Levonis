@@ -24,6 +24,7 @@ import { Hono } from 'hono';
 import { notifyPayoutFailed, notifyPayoutPaidById, notifyStoreStatusChanged } from '../lib/merchantNotify';
 import { notifyEscrowResolved } from '../lib/customOrderNotify';
 import type { AppContext } from '../lib/types';
+import { safeParse } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, str, int, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
@@ -1634,4 +1635,57 @@ adminCommunityRoutes.post('/merchants/:id/adjustment', requireFinancialScope, as
  */
 adminCommunityRoutes.get('/ledger/parity', requireFinancialScope, async (c) => {
   return c.json({ success: true, ...(await legacyParity(c.env.DB)) });
+});
+
+// ------------------------------------------------------------ content reports
+
+/**
+ * THE CONTENT REPORTS QUEUE — `community_reports` (0154) with the row a report
+ * REALLY names (0160 `community_report_targets`; docs/COMMUNITY_ECOSYSTEM.md
+ * §9.5). A report of a request comment is filed under target_type 'comment'
+ * and one of an order update under 'request' (the 0154 CHECK is kept), and
+ * the side table says which row is meant; this listing resolves it, so the
+ * desk reads the comment or the update itself — its request or order, its
+ * kind, its state and the first 200 characters — instead of an id that opens
+ * nothing. A report without a side row is what it always was: its own
+ * target_type and target_id. `?state=open|reviewed|actioned|dismissed|all`
+ * (open by default). Read-only; the decision routes arrive with moderation V2.
+ */
+adminCommunityRoutes.get('/reports', async (c) => {
+  const stateRaw = (c.req.query('state') || 'open').trim();
+  const state = ['open', 'reviewed', 'actioned', 'dismissed'].includes(stateRaw) ? stateRaw : '';
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 });
+  const { results } = await c.env.DB.prepare(
+    `SELECT rp.id, rp.reporter_id, rp.target_type, rp.target_id, rp.reason, rp.details, rp.state,
+            rp.reviewed_by, rp.reviewed_at, rp.resolution, rp.created_at,
+            u.name AS reporter_name,
+            t.kind AS real_kind, t.target_id AS real_target_id,
+            CASE t.kind
+              WHEN 'request_comment' THEN (
+                SELECT json_object('request_id', rc.request_id, 'comment_kind', rc.kind, 'state', rc.state,
+                                   'author_id', rc.author_id, 'body', substr(rc.body, 1, 200), 'created_at', rc.created_at)
+                  FROM community_request_comments rc WHERE rc.id = t.target_id)
+              WHEN 'order_update' THEN (
+                SELECT json_object('order_id', ou.community_order_id, 'update_kind', ou.kind, 'actor_id', ou.actor_id,
+                                   'body', substr(ou.body, 1, 200), 'has_file', ou.file_key IS NOT NULL, 'created_at', ou.created_at)
+                  FROM community_order_updates ou WHERE ou.id = t.target_id)
+            END AS real_target
+       FROM community_reports rp
+       JOIN users u ON u.id = rp.reporter_id
+       LEFT JOIN community_report_targets t ON t.report_id = rp.id
+      WHERE (?1 = '' OR rp.state = ?1)
+      ORDER BY rp.created_at DESC
+      LIMIT ?2`
+  )
+    .bind(state, limit)
+    .all<Record<string, unknown>>();
+  const reports = (results ?? []).map(({ real_kind, real_target_id, real_target, ...r }) => ({
+    ...r,
+    /** The thing to open: the side table's row when there is one, else the report's own target. */
+    target: real_kind
+      ? { ...(safeParse<Record<string, unknown>>(real_target, {}) ?? {}), kind: String(real_kind), id: String(real_target_id ?? '') }
+      : { kind: String(r.target_type), id: String(r.target_id) },
+  }));
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, reports });
 });

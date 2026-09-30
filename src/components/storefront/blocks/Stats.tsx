@@ -3,13 +3,23 @@
  * reviews, published products, followers, completed orders, and the year the
  * store joined. A metric with no data yet (no reviews) is left out — never a
  * made-up 100 %.
+ *
+ * A WORKSHOP'S TWO FIGURES (Phase 5d, docs/COMMUNITY_ECOSYSTEM.md §9.5): when
+ * the store read carries `workshop` facts, its usual turnaround (days) and its
+ * largest build (mm) follow the chosen metrics — the workshop's own statement
+ * and what its printers measure, nothing estimated.
  */
 import { useLanguage } from '../../../LanguageContext';
 import { BlockHeading, Column, useText } from '../parts';
 import type { BlockProps } from '../types';
+import { workshopOf } from './Hero';
+import { buildFigure, workshopWords } from './workshopFacts';
+
+// The workshop's words live in ./workshopFacts.tsx (the hero's facts row reads them there too).
+export { WORKSHOP_WORDS, buildFigure, workshopWords, type WorkshopWords } from './workshopFacts';
 
 export default function StatsBlock({ block, store }: BlockProps<'stats'>) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
   const text = useText();
   const values: Array<{ key: string; value: string; label: string }> = [];
   for (const m of block.settings.metrics) {
@@ -27,6 +37,12 @@ export default function StatsBlock({ block, store }: BlockProps<'stats'>) {
       values.push({ key: m, value: String(new Date(store.created_at).getFullYear()), label: loc('على Levonis منذ', 'On Levonis since', 'لەسەر LEVONIS لە') });
     }
   }
+  const workshop = workshopOf(store);
+  if (workshop) {
+    const w = workshopWords(lang);
+    if (workshop.turnaround !== null) values.push({ key: 'turnaround', value: String(workshop.turnaround), label: w.turnaroundStat });
+    if (workshop.build) values.push({ key: 'build', value: buildFigure(workshop.build, '×'), label: w.buildStat });
+  }
   if (!values.length) return null;
   const cards = block.variant === 'cards';
   return (
@@ -36,6 +52,7 @@ export default function StatsBlock({ block, store }: BlockProps<'stats'>) {
         {values.map((v, i) => (
           <div
             key={v.key}
+            data-stat={v.key}
             className={cards ? 'sf-card sf-card-pad text-center' : `flex-1 py-1 px-1 text-center min-w-0 ${i ? 'border-s border-white/10' : ''}`}
           >
             <div className="text-white font-bold text-[16px] leading-tight tabular-nums" dir="ltr">

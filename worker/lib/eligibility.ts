@@ -175,12 +175,19 @@ export interface MerchantPrefs {
   workload: 'light' | 'normal' | 'busy' | 'full';
   paused: boolean;
   paused_until: string | null;
+  /**
+   * The workshop's usual turnaround in days (0159, §9.5) — a RANKING signal
+   * only (worker/lib/printMatchingScore.ts): shorter ranks first among the
+   * eligible; it never decides eligibility. Optional so a candidate built by
+   * an older caller reads as «not stated» (null) rather than failing to type.
+   */
+  turnaround_days?: number | null;
 }
 
 export const EMPTY_PREFS: MerchantPrefs = Object.freeze({
   processes: [], materials: [], colors: [], capabilities: [], governorates: [], delivery: [],
   min_job_iqd: 0, max_job_iqd: null, min_size_mm: 0, max_size_mm: null,
-  workload: 'normal', paused: false, paused_until: null,
+  workload: 'normal', paused: false, paused_until: null, turnaround_days: null,
 }) as MerchantPrefs;
 
 export interface ReachConfig {

@@ -17,7 +17,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, freshDb, get, json, post, put, row, stubApp, type App, type Mount } from './fixtures/app';
+import { asD1, freshDb, get, json, patch, post, put, row, send, stubApp, type App, type Mount } from './fixtures/app';
+import { communityPostRoutes } from '../worker/routes/communityPosts';
 import { MEDIA, OTHER, OWNER, SLUG, STORE_ID, seedLayoutStore } from './fixtures/storeLayout';
 import { storeLayoutRoutes } from '../worker/routes/storeLayout';
 import { storefrontRoutes } from '../worker/routes/storefront';
@@ -262,4 +263,157 @@ test('a fatal layout is never sent by the editor — and the same payload is ref
     assert.equal((await json(res)).code, 'LAYOUT_REJECTED', what);
   }
   assert.equal(draftRow(w.raw), undefined, 'no draft was ever written');
+});
+
+// ------------------------------------------------------------------ media library v2 (P5, storefront B1)
+
+const del = (app: App, key: string) => send(app, 'DELETE', `${BASE}/media/${key}`);
+/** A raw layout straight to the route — what a client outside the editor would send. */
+const L = (blocks: unknown[], extra: Record<string, unknown> = {}) => ({ schema_version: 1, theme: 'classic', blocks, ...extra });
+const byKey = (items: Array<{ key: string }>) => Object.fromEntries(items.map((i) => [i.key, i])) as Record<string, { key: string; byte_size: number; used_in: Array<{ kind: string; id?: string; block_id?: string }> }>;
+
+test('the media library v2: every row carries its byte_size and where it is still shown', async () => {
+  const w = world();
+  // Nothing uses anything yet: byte_size from the ledger, used_in empty.
+  const fresh = byKey((await json(await get(w.owner, `${BASE}/media?kind=image`))).items);
+  assert.equal(fresh[MEDIA.picture].byte_size, 1000);
+  assert.deepEqual(fresh[MEDIA.picture].used_in, []);
+  assert.deepEqual(fresh[MEDIA.picture2].used_in, []);
+
+  // A draft with the picture in a banner and as the page background; publish a layout with it in a gallery.
+  const published = L([{ id: 'g', type: 'gallery', settings: { images: [{ image: MEDIA.picture }] } }]);
+  const v = (await json(await put(w.owner, `${BASE}/draft`, { layout: published, version: 0 }))).draft.version;
+  assert.equal((await post(w.owner, `${BASE}/publish`, { version: v })).status, 200);
+  const draft = L([{ id: 'promo', type: 'banner', settings: { image: MEDIA.picture } }], {
+    background: { kind: 'image', media: MEDIA.picture2, dim: 'light', phones: true },
+  });
+  assert.equal((await put(w.owner, `${BASE}/draft`, { layout: draft, version: v + 1 })).status, 200);
+  // …and the picture also sits on a showcase entry, a collection cover, a product gallery, a service, the store's logo and the avatar.
+  w.raw.prepare('UPDATE merchant_showcase SET image_key = ? WHERE id = ?').run(MEDIA.picture, 'sh3');
+  w.raw.prepare('UPDATE merchant_store_sections SET image_key = ? WHERE id = ?').run(MEDIA.picture, 'sec2');
+  w.raw.prepare('UPDATE community_products SET images = ? WHERE id = ?').run(JSON.stringify([`/files/${MEDIA.picture}`]), 'p4');
+  w.raw.prepare('UPDATE merchant_services SET image_key = ? WHERE id = ?').run(MEDIA.picture, 'sv2');
+  w.raw.prepare('UPDATE merchant_stores SET logo_key = ? WHERE id = ?').run(MEDIA.picture, STORE_ID);
+  w.raw.prepare('UPDATE community_merchants SET avatar_key = ? WHERE id = ?').run(MEDIA.picture, 'm1');
+  // A product of ANOTHER store showing it does not count as this store's use (and could not be this owner's key anyway).
+  w.raw.prepare('UPDATE community_products SET images = ? WHERE id = ?').run(JSON.stringify([`/files/${MEDIA.picture2}`]), 'q1');
+
+  const items = byKey((await json(await get(w.owner, `${BASE}/media?kind=image`))).items);
+  const uses = items[MEDIA.picture].used_in.map((u) => [u.kind, u.id ?? '', u.block_id ?? ''].join(':')).sort();
+  assert.deepEqual(uses, [
+    'avatar::',
+    'collection:sec2:',
+    'layout:draft:promo',
+    'layout:published:g',
+    'product:p4:',
+    'service:sv2:',
+    'showcase:sh3:',
+    'store:logo:',
+  ]);
+  assert.deepEqual(items[MEDIA.picture2].used_in, [{ kind: 'layout', id: 'draft', block_id: 'background' }], 'the page background is a use; another store\'s product is not');
+  const videos = (await json(await get(w.owner, `${BASE}/media?kind=video`))).items;
+  assert.equal(videos[0].byte_size, 9000);
+  assert.deepEqual(videos[0].used_in, []);
+});
+
+test('DELETE /media/<key>: refused with MEDIA_IN_USE and where while anything shows the file; a free file is dated deleted and leaves the library', async () => {
+  const w = world();
+  const v = (await json(await put(w.owner, `${BASE}/draft`, { layout: L([{ id: 'g', type: 'gallery', settings: { images: [{ image: MEDIA.picture }] } }]), version: 0 }))).draft.version;
+  w.raw.prepare('UPDATE merchant_stores SET banner_key = ? WHERE id = ?').run(MEDIA.picture, STORE_ID);
+
+  // In use: the draft and the store banner say so, and nothing is changed.
+  const busy = await del(w.owner, MEDIA.picture);
+  assert.equal(busy.status, 409);
+  const body = await json(busy);
+  assert.equal(body.code, 'MEDIA_IN_USE');
+  assert.deepEqual(body.details.where.sort(), ['layout', 'store']);
+  assert.deepEqual(body.details.used_in, [{ kind: 'layout', id: 'draft', block_id: 'g' }, { kind: 'store', id: 'banner' }]);
+  assert.equal(row(w.raw, 'SELECT deleted_at FROM file_objects WHERE object_key = ?', MEDIA.picture)!.deleted_at, null);
+
+  // Freed from both, it goes: deleted_at is set, the library and the picker stop offering it, and a
+  // later save that names it is cleaned like any deleted picture. The R2 bytes are the sweep's.
+  assert.equal((await put(w.owner, `${BASE}/draft`, { layout: L([{ id: 't', type: 'text', settings: {} }]), version: v })).status, 200);
+  w.raw.prepare('UPDATE merchant_stores SET banner_key = NULL WHERE id = ?').run(STORE_ID);
+  const gone = await del(w.owner, MEDIA.picture);
+  assert.equal(gone.status, 200, JSON.stringify(await gone.clone().json()));
+  const stamped = row<{ deleted_at: string | null }>(w.raw, 'SELECT deleted_at FROM file_objects WHERE object_key = ?', MEDIA.picture)!.deleted_at;
+  assert.ok(stamped && !Number.isNaN(Date.parse(stamped)));
+  assert.equal(row(w.raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'merchant.media_deleted' AND target = ?", STORE_ID)!.n, 1);
+  const left = (await json(await get(w.owner, `${BASE}/media?kind=image`))).items.map((i: { key: string }) => i.key);
+  assert.deepEqual(left, [MEDIA.picture2]);
+  const again = await json(await put(w.owner, `${BASE}/draft`, { layout: L([{ id: 'b', type: 'banner', settings: { image: MEDIA.picture } }]), version: v + 1 }));
+  assert.equal(again.success, true);
+  assert.deepEqual(again.issues.map((i: { code: string }) => i.code), ['media_not_found']);
+  assert.equal(again.draft.layout.blocks[0].settings.image, '');
+
+  // The same file twice, a deleted one, somebody else's, a never-uploaded one, an encoded traversal, a private-prefix
+  // key: one 404, nothing about what exists. (A raw `../` never reaches the route — the URL resolves it away first.)
+  for (const key of [MEDIA.picture, MEDIA.deleted, MEDIA.foreign, MEDIA.unknown, encodeURIComponent('../../etc/passwd'), 'merchants/owner/private/x1aaaa.webp']) {
+    const res = await del(w.owner, key);
+    assert.equal(res.status, 404, key);
+    assert.equal((await json(res)).code, 'MEDIA_NOT_FOUND', key);
+  }
+  assert.equal((await del(w.owner, '../../etc/passwd')).status, 404);
+  assert.equal(row(w.raw, 'SELECT deleted_at FROM file_objects WHERE object_key = ?', MEDIA.foreign)!.deleted_at, null, 'the other owner\'s file is untouched');
+  // A video is a library file too — and the video quota stops counting it. The percent-encoded spelling is read as well.
+  const clip = await del(w.owner, encodeURIComponent(MEDIA.video));
+  assert.equal(clip.status, 200);
+  assert.deepEqual((await json(await get(w.owner, `${BASE}/media?kind=video`))).items, []);
+  // Only the owner: anonymous 401, a customer without a store 403/404, another merchant cannot reach this owner's file.
+  assert.equal((await del(w.anon, MEDIA.picture2)).status, 401);
+  assert.ok([403, 404].includes((await del(w.customer, MEDIA.picture2)).status));
+  assert.equal((await del(w.other, MEDIA.picture2)).status, 404);
+  assert.equal(row(w.raw, 'SELECT deleted_at FROM file_objects WHERE object_key = ?', MEDIA.picture2)!.deleted_at, null);
+});
+
+test('a library picture a community post of the owner shows is in use (kind post): the delete is refused, the post can still be saved (review 2026-09-30)', async () => {
+  const w = world();
+  const posts = stubApp(asD1(w.raw), { id: OWNER, role: 'merchant', email: 'owner@x.co' }, (a) => a.route('/api/community', communityPostRoutes));
+  const media = [{ key: MEDIA.picture, kind: 'image', width: 1000, height: 800 }];
+  const made = await post(posts, '/api/community/posts', { title: 'My dragon print', body: 'PLA', kind: 'project', media });
+  assert.equal(made.status, 201, JSON.stringify(await made.clone().json()));
+  const postId = (await json(made)).post.id as string;
+  assert.equal((await post(posts, `/api/community/posts/${postId}/publish`)).status, 200);
+  // The library says where it is shown, and the delete door agrees.
+  const items = byKey((await json(await get(w.owner, `${BASE}/media?kind=image`))).items);
+  assert.deepEqual(items[MEDIA.picture].used_in, [{ kind: 'post', id: postId }]);
+  const busy = await del(w.owner, MEDIA.picture);
+  assert.equal(busy.status, 409);
+  assert.deepEqual((await json(busy)).details.where, ['post']);
+  assert.equal(row(w.raw, 'SELECT deleted_at FROM file_objects WHERE object_key = ?', MEDIA.picture)!.deleted_at, null);
+  // So the author's edit that re-sends its own picture still passes the post door.
+  assert.equal((await patch(posts, `/api/community/posts/${postId}`, { body: 'PLA, 0.2 mm', media })).status, 200);
+  // A variant's picture and a legacy option picture are uses of the product too.
+  w.raw.prepare('UPDATE community_products SET options = ? WHERE id = ?').run(JSON.stringify([{ name: 'Colour', values: [{ label: 'Red', image: `/files/${MEDIA.picture2}` }] }]), 'p4');
+  const opt = byKey((await json(await get(w.owner, `${BASE}/media?kind=image`))).items);
+  assert.deepEqual(opt[MEDIA.picture2].used_in, [{ kind: 'product', id: 'p4' }]);
+});
+
+test('a file heavier than its slot refuses the DRAFT save with LAYOUT_MEDIA_TOO_HEAVY and the figures — the picker can say them', async () => {
+  const w = world();
+  const heavy = 'merchants/owner/public/heavy001.webp';
+  w.raw
+    .prepare(`INSERT INTO file_objects (object_key,visibility,domain,owner_id,mime_type,byte_size) VALUES (?, 'public','merchants','owner','image/webp', ?)`)
+    .run(heavy, 1_300_000);
+  // 1.3 MB: fine as a banner (1.5 MB), too heavy as a gallery item (1 MB).
+  const asBanner = await put(w.owner, `${BASE}/draft`, { layout: L([{ id: 'b', type: 'banner', settings: { image: heavy } }]), version: 0 });
+  assert.equal(asBanner.status, 200);
+  const v = (await json(asBanner)).draft.version;
+  const asGallery = await put(w.owner, `${BASE}/draft`, { layout: L([{ id: 'g', type: 'gallery', settings: { images: [{ image: heavy }] } }]), version: v });
+  assert.equal(asGallery.status, 400);
+  const body = await json(asGallery);
+  assert.equal(body.code, 'LAYOUT_MEDIA_TOO_HEAVY');
+  assert.deepEqual(body.details, {
+    path: 'blocks[0].settings.images[0].image',
+    block_id: 'g',
+    size: 1_300_000,
+    max: 1024 * 1024,
+    heavy: [{ path: 'blocks[0].settings.images[0].image', block_id: 'g', size: 1_300_000, max: 1024 * 1024 }],
+  });
+  assert.equal(draftRow(w.raw)!.version, v, 'the draft is untouched');
+  // The library says the weight up front, so the picker refuses before the round trip.
+  const item = (await json(await get(w.owner, `${BASE}/media?kind=image`))).items.find((i: { key: string }) => i.key === heavy);
+  assert.equal(item.byte_size, 1_300_000);
+  // The posted preview (the template gallery's door) is the client's layout too: the same refusal.
+  assert.equal((await post(w.owner, `${BASE}/preview`, { layout: L([{ id: 'g', type: 'gallery', settings: { images: [{ image: heavy }] } }]) })).status, 400);
 });

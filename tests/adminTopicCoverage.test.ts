@@ -501,7 +501,8 @@ test('REQUEST PROMISE — an offer on a community request reaches the customer',
   assert.equal(n!.entity_id, 'off_1');
   // The link is the REQUEST, because the customer is being sent somewhere to
   // COMPARE, and one offer on its own is the screen that cannot do that.
-  assert.equal(n!.link, '/requests?request=req_1');
+  // Its own address, not the board's redirect (review 2026-09-30).
+  assert.equal(n!.link, '/requests/req_1');
   assert.match(n!.body_ar, /req_1/);
 });
 

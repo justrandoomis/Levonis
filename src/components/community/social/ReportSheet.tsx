@@ -110,7 +110,7 @@ export default function ReportSheet({ open, onClose, target }: ReportSheetProps)
                 aria-checked={reason === r}
                 tabIndex={reason === r || (!reason && i === 0) ? 0 : -1}
                 data-report-reason={r}
-                className="lv-choice inline-flex items-center px-3.5 text-[13px] font-medium focus-visible:outline-none"
+                className="lv-choice inline-flex items-center px-3.5 text-[13px] font-medium"
               >
                 {s.reportReasons[r]}
               </button>

@@ -74,10 +74,40 @@ import { PagePanel, ThemePanel } from './panels';
 import { FirstRun, HistoryPanel, PublishDialog, StarterSheet } from './flows';
 import { rememberFromData, usePreloadRefNames } from './pickers';
 import { builderRefusal } from './refusal';
+// «سرعة متجري» (P4): the «السرعة» tab — its own chunk — and the doors it opens out of the builder.
+import { lazy, Suspense, useContext } from 'react';
+import { merchantHref } from '../../../lib/merchantRoutes';
+import { WorkspaceContext } from '../shell/context';
+// Media everywhere (P5): the page's own keys count for publishing; «معاينة على هاتفي» opens the draft on the owner's phone.
+import { QrCode } from 'lucide-react';
+import { withPageChanges } from './panels';
+import { useMediaStrings } from './strings';
 
 const runtime = previewRuntime();
 
-type Tab = 'sections' | 'theme' | 'page' | 'history';
+/** The speed tab (speed/SpeedPanel.tsx): its tiles, words and reads arrive when it is opened, not with the builder. */
+const SpeedPanel = lazy(() => import('./speed/SpeedPanel'));
+
+/** «معاينة على هاتفي» (storefront B3): the QR sheet, its own chunk, fetched when the button is pressed. */
+const PreviewQr = lazy(() => import('./PreviewQr'));
+
+type Tab = 'sections' | 'theme' | 'page' | 'history' | 'speed';
+
+/**
+ * The tab an address may open — `?tab=speed` is the Pulse's door to the speed
+ * tab (counter/PulseRow.tsx); anything else opens Sections. Read once, when
+ * the builder mounts.
+ */
+const TABS: readonly Tab[] = ['sections', 'theme', 'page', 'history', 'speed'];
+function tabFromSearch(search: string): Tab {
+  let asked: string | null = null;
+  try {
+    asked = new URLSearchParams(search).get('tab');
+  } catch {
+    /* an unreadable address opens Sections */
+  }
+  return asked !== null && (TABS as readonly string[]).includes(asked) ? (asked as Tab) : 'sections';
+}
 
 export default function StoreDesignPanel() {
   const ed = useLayoutEditor();
@@ -116,7 +146,11 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
   const validation = ed.validation!;
   const store = ed.store!;
   const server = ed.server!;
-  const [tab, setTab] = useState<Tab>('sections');
+  const [tab, setTab] = useState<Tab>(() => (typeof window === 'undefined' ? 'sections' : tabFromSearch(window.location.search)));
+  // The speed tab's doors out of the builder (store settings, products) go through the workspace when there is one.
+  const ws = useContext(WorkspaceContext);
+  /** The speed report reads across the page at wide widths (storefront §3.10): the strip keeps its place, the panel spans both columns. */
+  const speedWide = wide && tab === 'speed';
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [device, setDevice] = useState<Device>('phone');
   const [phoneView, setPhoneView] = useState<'edit' | 'preview'>('edit');
@@ -130,6 +164,8 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
   const [insertAfter, setInsertAfter] = useState<string | null>(null);
   const [starterOpen, setStarterOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const mt = useMediaStrings();
   const [firstRunDismissed, setFirstRunDismissed] = useState(false);
   const [starting, setStarting] = useState<ThemeName | null>(null);
   const [confirm, confirmDialog] = useConfirm();
@@ -168,7 +204,7 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
   const starved = useMemo(() => starvedProductLists(layout), [layout]);
   const visible = renderableBlocks(validation.result.layout).length;
   const status = ed.save?.status ?? 'saved';
-  const changes = ed.changes;
+  const changes = useMemo(() => withPageChanges(ed.changes, ed.live, validation.result.layout), [ed.changes, ed.live, validation.result.layout]);
   // Nothing differs from what visitors see — the published page, or, before
   // the first publish, the classic page every store shows. «تغييرات غير
   // منشورة» used to greet a store that had changed nothing, on its first open.
@@ -179,6 +215,15 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
     setTab('sections');
     setPhoneView('edit');
   };
+
+  // The QR's address (`?view=preview`, ./PreviewQr.tsx) opens a phone on the Preview view.
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get('view') === 'preview') setPhoneView('preview');
+    } catch {
+      /* an unreadable address opens the editor */
+    }
+  }, []);
 
   const refuse = (reason: string) => toast.error(say(loc, ADD_REFUSAL_COPY[reason], reason));
 
@@ -313,6 +358,9 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
             {loc('المتجر', 'Store')}
           </a>
         )}
+        <Button variant="ghost" size="sm" className="hidden lg:inline-flex" icon={<QrCode className="h-4 w-4" aria-hidden="true" />} onClick={() => setQrOpen(true)} data-sd-phone-preview>
+          {mt.qr.open}
+        </Button>
         <Button
           variant="primary"
           size="sm"
@@ -345,7 +393,9 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
           {validation.page.filter((i) => i.fatal).map((i) => ` ${say(loc, ISSUE_COPY[i.code], i.code)}`)}
         </p>
       )}
-      {status === 'error' && ed.save?.errorCode && <p className="w-full text-[12px] text-danger">{builderRefusal({ code: ed.save.errorCode }, loc)}</p>}
+      {status === 'error' && ed.save?.errorCode && (
+        <p className="w-full text-[12px] text-danger">{builderRefusal({ code: ed.save.errorCode, details: ed.save.errorDetails ?? undefined }, loc)}</p>
+      )}
       {serverCleaned.length > 0 && (
         <p className="w-full text-[12px] text-text-muted">
           {loc('أُزيل من التصميم ما لم يعد في متجرك (منتج أو مجموعة أو ملف حُذف).', 'Removed from the design what is no longer in your store (a deleted product, collection or file).')}
@@ -424,7 +474,7 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
   );
 
   const editor = (
-    <div className="min-w-0 space-y-4">
+    <div className={speedWide ? 'grid min-w-0 grid-cols-[minmax(0,22.5rem)_minmax(0,1fr)] gap-x-6 gap-y-4' : 'min-w-0 space-y-4'}>
       <TabStrip
         group="sd-panels"
         label={loc('أجزاء المحرّر', 'Editor parts')}
@@ -437,12 +487,14 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
           { id: 'theme', label: loc('الشكل', 'Look') },
           { id: 'page', label: loc('الصفحة', 'Page') },
           { id: 'history', label: loc('السجل', 'History') },
+          // storeDesign/strings.ts SPEED_STRINGS.*.tab, verbatim: the table itself arrives with the tab's chunk.
+          { id: 'speed', label: loc('السرعة', 'Speed', 'خێرایی') },
         ]}
       />
-      <div role="tabpanel" id={`tabpanel-sd-panels-${tab}`} aria-labelledby={`tab-sd-panels-${tab}`} tabIndex={-1} className="focus:outline-none">
+      <div role="tabpanel" id={`tabpanel-sd-panels-${tab}`} aria-labelledby={`tab-sd-panels-${tab}`} tabIndex={-1} className={speedWide ? 'col-span-2 min-w-0 focus:outline-none' : 'focus:outline-none'}>
         {tab === 'sections' && sectionsPanel}
         {tab === 'theme' && <ThemePanel layout={layout} storeAccent={store.accent} onChange={(l) => ed.change(l)} onStarter={() => setStarterOpen(true)} />}
-        {tab === 'page' && <PagePanel layout={layout} onChange={(l) => ed.change(l)} />}
+        {tab === 'page' && <PagePanel layout={layout} onChange={(l, k) => ed.change(l, k ?? null)} page={validation.page} />}
         {tab === 'history' && (
           <HistoryPanel
             revisions={server.revisions}
@@ -464,6 +516,31 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
             }}
             onMore={ed.revCursor !== null ? () => ed.loadMoreRevisions() : null}
           />
+        )}
+        {tab === 'speed' && (
+          <Suspense
+            fallback={
+              <div className="flex justify-center py-16" aria-busy="true">
+                <Spinner size="md" />
+              </div>
+            }
+          >
+            <SpeedPanel
+              blocks={layout.blocks}
+              hasUnpublished={!nothingToPublish}
+              actions={{
+                openBlock: select,
+                openPage: () => setTab('page'),
+                openSections: () => {
+                  setSelectedId(null);
+                  setTab('sections');
+                  setPhoneView('edit');
+                },
+                openSettings: ws ? () => ws.go(merchantHref.storeSettings()) : undefined,
+                openProducts: ws ? () => ws.go(merchantHref.products()) : undefined,
+              }}
+            />
+          </Suspense>
         )}
       </div>
     </div>
@@ -525,7 +602,9 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
           <FirstRun store={store} busy={starting} onChoose={(t) => void applyStarter(t, true)} onDismiss={() => setFirstRunDismissed(true)} />
         </div>
       )}
-      {wide ? (
+      {speedWide ? (
+        editor
+      ) : wide ? (
         <div className="grid grid-cols-[minmax(0,22.5rem)_minmax(0,1fr)] items-start gap-6">
           {editor}
           <div className="sticky top-16">{preview}</div>
@@ -550,6 +629,11 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
       <StarterSheet open={starterOpen} onClose={() => setStarterOpen(false)} store={store} onChoose={(t, use) => void applyStarter(t, false, use)} />
       {confirmDialog}
       <PublishDialog open={publishOpen} onClose={() => setPublishOpen(false)} changes={changes} onPublish={publish} />
+      {qrOpen && (
+        <Suspense fallback={null}>
+          <PreviewQr open onClose={() => setQrOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

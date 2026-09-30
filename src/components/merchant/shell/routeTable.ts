@@ -12,8 +12,8 @@
  *   /merchant/inbox/<thread>      AWAY: the thread still opens in the Chat
  *                                 page (/chat/<id>) until the merchant thread
  *                                 view exists
- *   /merchant/requests/<id>       AWAY: the request opens on the board
- *                                 (/requests?request=<id>)
+ *   /merchant/requests/<id>       AWAY: the request opens on its own page
+ *                                 (/requests/<id>)
  *   /merchant/custom-orders[/id]  an older spelling of the custom-order book,
  *                                 redirected to /merchant/requests/orders[/id]
  *   anything else under the base  REDIRECTED to the Command Center — never a
@@ -47,7 +47,7 @@ export function resolveWorkspaceRoute(pathname: string, base: string): Workspace
   const at = parseMerchantPath(clean, base);
   if (at) {
     if (at.section === 'inbox' && at.id) return { kind: 'away', to: `/chat/${encodeURIComponent(at.id)}` };
-    if (at.section === 'requests' && at.id) return { kind: 'away', to: `/requests?request=${encodeURIComponent(at.id)}` };
+    if (at.section === 'requests' && at.id) return { kind: 'away', to: `/requests/${encodeURIComponent(at.id)}` };
     return at.id ? { kind: 'section', section: at.section, id: at.id } : { kind: 'section', section: at.section };
   }
   if (clean.startsWith(`${base}/`)) {

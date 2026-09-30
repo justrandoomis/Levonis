@@ -17,6 +17,7 @@
  *                         Showcase · About (+ reviews) — each only when it has
  *                         something behind it
  *   footer  minimal       «install the app», on the store's own host only
+ *   background none       the theme's surface — no picture behind the cards
  *
  * with the `classic` tokens and `accent: 'store'`, so the store's accent from
  * settings keeps applying. Nothing the store says is COPIED into the layout —
@@ -24,7 +25,7 @@
  * editing settings keeps seeing those edits, published layout or not.
  */
 import { makeBlock } from './normalize';
-import type { StoreLayout } from './schema';
+import { defaultBackground, defaultFooter, defaultHeader, type StoreLayout } from './schema';
 import { THEME_PRESETS } from './tokens';
 
 /** What the generator may read from a store row. Everything is optional. */
@@ -44,8 +45,9 @@ export function defaultLayoutFromStore(_store: DefaultLayoutStore | null = null)
     schema_version: 1,
     theme: 'classic',
     tokens: { ...THEME_PRESETS.classic },
-    header: { variant: 'overlay' },
-    footer: { variant: 'minimal' },
+    header: defaultHeader('overlay'),
+    footer: defaultFooter('minimal'),
+    background: defaultBackground(),
     blocks: [makeBlock('hero', 'hero', { variant: 'profile' }), makeBlock('tabs', 'tabs')],
   };
 }

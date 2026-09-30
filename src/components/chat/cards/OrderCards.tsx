@@ -172,7 +172,7 @@ export function CustomOrderCardView({ card, mine }: Props) {
             {can.has('deliver') && <CardButton action="deliver" variant="primary" busy={busy === 'deliver'} onClick={() => void deliver()}>{loc('تم التسليم', 'Mark delivered')}</CardButton>}
             {can.has('confirm') && <CardButton action="confirm" variant="primary" busy={busy === 'confirm'} onClick={() => void confirmIt()}>{loc('أكّد الاستلام', 'Confirm receipt')}</CardButton>}
             {can.has('view') && (
-              <CardButton action="view" onClick={() => navigate(side === 'merchant' ? merchantHref.customOrder(orderId) : `/requests?request=${encodeURIComponent(requestId)}`)}>
+              <CardButton action="view" onClick={() => navigate(side === 'merchant' ? merchantHref.customOrder(orderId) : `/requests/${encodeURIComponent(requestId)}`)}>
                 {loc('صفحة الطلب', 'Order page')}
               </CardButton>
             )}

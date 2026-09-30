@@ -53,3 +53,101 @@ export function requestStateLabel(state: string, loc: Loc): string {
       return loc('قيد المتابعة', 'In progress');
   }
 }
+
+// ---------------------------------------------------------------- Phase 5c
+// THE STATUS STRIP of /requests/:id (src/pages/community/Request.tsx): the
+// six stations a request passes, and where a state sits on them. A state
+// that is not on the line (draft, cancelled, expired, disputed) answers -1
+// and the page says it in a sentence instead.
+export const REQUEST_STEPS = ['published', 'offers', 'chosen', 'in_progress', 'delivered', 'completed'] as const;
+export type RequestStep = (typeof REQUEST_STEPS)[number];
+
+export function requestStepIndex(state: string): number {
+  switch (state) {
+    case 'open':
+    case 'receiving_offers':
+      return 1;
+    case 'offer_selected':
+    case 'awarded':
+      return 2;
+    case 'in_progress':
+      return 3;
+    case 'delivered':
+      return 4;
+    case 'completed':
+      return 5;
+    default:
+      return -1;
+  }
+}
+
+/**
+ * The state chip's tone on the request page (StatusChip: theme tokens, one
+ * word + one dot + one tint), beside REQUEST_STATE_TONE's legacy classes for
+ * the board's own chip.
+ */
+export function requestStateTone(state: string): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {
+  switch (state) {
+    case 'open':
+    case 'receiving_offers':
+      return 'success';
+    case 'offer_selected':
+    case 'awarded':
+    case 'in_progress':
+    case 'delivered':
+      return 'info';
+    case 'completed':
+      return 'success';
+    case 'disputed':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+
+/** The request takes offers (and comments): the board's own two states. */
+export function requestTakesOffers(state: string): boolean {
+  return state === 'open' || state === 'receiving_offers';
+}
+
+/** Where a request lives: its own route (src/pages/community/Request.tsx). */
+export const requestPath = (id: string) => `/requests/${encodeURIComponent(id)}`;
+
+/**
+ * THE OLD ADDRESS, REDIRECTED (src/pages/Requests.tsx): `/requests?request=<id>&cost=1`
+ * with `#discussion` becomes `/requests/<id>?cost=1#discussion` — the id is
+ * the path; every other parameter and the hash ride along.
+ */
+export function requestRedirect(id: string, params: URLSearchParams, hash = ''): string {
+  const rest = new URLSearchParams(params);
+  rest.delete('request');
+  const qs = rest.toString();
+  return `${requestPath(id)}${qs ? `?${qs}` : ''}${hash && hash !== '#' ? hash : ''}`;
+}
+
+/**
+ * THE REQUEST PAGE'S SECTIONS, in the owner's order (docs/COMMUNITY_ECOSYSTEM.md
+ * §9.5 «Client») — the landmarks src/pages/community/Request.tsx draws as
+ * `data-request-section`; `compare` is the offers' own table (OfferCompare).
+ */
+export const REQUEST_SECTIONS = [
+  'header',
+  'status',
+  'files',
+  'details',
+  'discussion',
+  'offers',
+  'compare',
+  'chat',
+  'accepted',
+  'timeline',
+  'escrow',
+  'delivery',
+  'review',
+] as const;
+
+/** The newest moment of an order's timeline — what the page's «آخر تحديث» line says. */
+export function latestEvent<E extends { at: string }>(t: { timeline: E[] } | null | undefined): E | null {
+  if (!t?.timeline?.length) return null;
+  return t.timeline.reduce((a, b) => (Date.parse(b.at) >= Date.parse(a.at) ? b : a));
+}

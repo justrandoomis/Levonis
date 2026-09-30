@@ -27,8 +27,14 @@ type ScalarSpec =
   | { readonly t: 'int'; readonly min: number; readonly max: number; readonly d: number }
   /** LocalizedText; `max` is per language. */
   | { readonly t: 'text'; readonly max: number; readonly multiline?: boolean }
-  /** A storage key the store's owner uploaded; '' = none. */
-  | { readonly t: 'media'; readonly kind: MediaKind }
+  /**
+   * A storage key the store's owner uploaded; '' = none. `max_bytes` is the
+   * slot's weight cap (storefront L5): the server reads the ledger's
+   * `byte_size` and drops a heavier key with the issue `media_too_heavy`
+   * (worker/lib/storeLayout.ts verifyLayoutRefs); the builder's picker refuses
+   * it before the upload starts. Per slot, never per purpose.
+   */
+  | { readonly t: 'media'; readonly kind: MediaKind; readonly max_bytes?: number }
   | { readonly t: 'link' }
   /** An ISO instant between 2020 and 2100; '' = none. */
   | { readonly t: 'date' }
@@ -91,6 +97,30 @@ export const WIDGET_ICON_NAMES = [
 ] as const;
 
 const title = (max = 60) => ({ t: 'text', max }) as const;
+
+export const KB = 1024;
+export const MB = 1024 * KB;
+/**
+ * THE WEIGHT CAPS, PER MEDIA SLOT (docs/MERCHANT_PLATFORM_V2.md storefront L5;
+ * DECISIONS «media caps — phones see the still»). A GIF is an image and pays
+ * the image cap; a video is capped far under the upload door's 40 MB because a
+ * store page's first paint on an Iraqi phone is what it costs.
+ */
+export const MEDIA_CAPS = {
+  /** A hero cover / poster, a banner, an image+text picture, the page background. */
+  cover: 1.5 * MB,
+  /** The still shown before (or instead of) a video. */
+  poster: 400 * KB,
+  /** A hero or background video, and the video block. */
+  video: 12 * MB,
+  /** One gallery picture. */
+  gallery_item: 1 * MB,
+} as const;
+
+const cover = () => ({ t: 'media', kind: 'image', max_bytes: MEDIA_CAPS.cover }) as const;
+const poster = () => ({ t: 'media', kind: 'image', max_bytes: MEDIA_CAPS.poster }) as const;
+const clip = () => ({ t: 'media', kind: 'video', max_bytes: MEDIA_CAPS.video }) as const;
+
 const PRODUCT_SOURCES = ['latest', 'featured', 'deals', 'collection'] as const;
 export const TAB_KINDS = ['products', 'collections', 'deals', 'services', 'showcase', 'about'] as const;
 export const SHOWCASE_KINDS = ['work', 'printer', 'material'] as const;
@@ -108,7 +138,15 @@ export const BLOCKS = {
     variants: ['profile', 'cover', 'split', 'minimal'],
     max: 1,
     settings: {
-      image: { t: 'media', kind: 'image' },
+      /** The cover — and the POSTER when `video` is set (storefront L3): what phones and reduced motion see. */
+      image: cover(),
+      /**
+       * The merchant's own video behind the hero (L3). Publishing a hero video
+       * without its poster (`image`) is refused with LAYOUT_POSTER_REQUIRED;
+       * phones see the still unless `video_on_phone` says otherwise.
+       */
+      video: clip(),
+      video_on_phone: { t: 'bool', d: false },
       headline: title(80),
       subheadline: { t: 'text', max: 200 },
       show_cover: { t: 'bool', d: true },
@@ -125,7 +163,7 @@ export const BLOCKS = {
   banner: {
     variants: ['wide', 'inset'],
     settings: {
-      image: { t: 'media', kind: 'image' },
+      image: cover(),
       title: title(80),
       subtitle: { t: 'text', max: 160 },
       cta_label: title(30),
@@ -137,7 +175,7 @@ export const BLOCKS = {
   image_text: {
     variants: ['image_start', 'image_end'],
     settings: {
-      image: { t: 'media', kind: 'image' },
+      image: cover(),
       title: title(80),
       body: { t: 'text', max: 1200, multiline: true },
       cta_label: title(30),
@@ -260,7 +298,7 @@ export const BLOCKS = {
         t: 'list',
         max: 24,
         requires: ['image'],
-        item: { image: { t: 'media', kind: 'image' }, caption: { t: 'text', max: 120 } },
+        item: { image: { t: 'media', kind: 'image', max_bytes: MEDIA_CAPS.gallery_item }, caption: { t: 'text', max: 120 } },
       },
     },
   },
@@ -271,8 +309,8 @@ export const BLOCKS = {
     requires: 'merchant_video_upload',
     settings: {
       title: title(80),
-      video: { t: 'media', kind: 'video' },
-      poster: { t: 'media', kind: 'image' },
+      video: clip(),
+      poster: poster(),
       caption: { t: 'text', max: 200 },
       autoplay: { t: 'bool', d: false },
     },
@@ -406,3 +444,35 @@ export function blockMax(type: BlockType): number {
   const def: BlockDef = BLOCKS[type];
   return def.max ?? DEFAULT_BLOCK_MAX;
 }
+
+// ------------------------------------------------------- page-level fields
+
+/**
+ * THE FIELDS OUTSIDE ANY BLOCK (schema.ts): the header's notice line, the
+ * footer's links and the page background. Declared as specs like a block's
+ * settings, so the normaliser, the reference walker and the builder read one
+ * declaration for them too (storefront L4, L6, L7).
+ */
+export const NOTICE_MAX = 120;
+export const FOOTER_LABEL_MAX = 30;
+export const MAX_FOOTER_LINKS = 6;
+
+export const HEADER_FIELDS = {
+  notice: { t: 'text', max: NOTICE_MAX },
+  notice_link: { t: 'link' },
+} as const satisfies Record<string, FieldSpec>;
+
+/** `footer.links`: a label and where it goes; an item without a label is dropped. */
+export const FOOTER_LINKS_SPEC = {
+  t: 'list',
+  max: MAX_FOOTER_LINKS,
+  requires: ['label'],
+  item: { label: { t: 'text', max: FOOTER_LABEL_MAX }, link: { t: 'link' } },
+} as const satisfies FieldSpec;
+
+/** The background's two media slots, by the background's `kind`. */
+export const BACKGROUND_MEDIA = {
+  image: cover(),
+  video: clip(),
+  poster: poster(),
+} as const;

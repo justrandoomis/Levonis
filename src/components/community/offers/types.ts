@@ -29,7 +29,9 @@ export interface OfferV2 {
   material_ids: string[];
   included: string;
   warranty_terms: string;
-  state: 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired' | 'superseded' | string;
+  state: 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired' | 'superseded' | 'draft' | string;
+  /** A saved draft the customer has never seen (0159): `state: 'draft'`, revision 0, price possibly unset. */
+  draft?: boolean;
   expires_at: string | null;
   created_at: string;
   updated_at: string;
@@ -126,7 +128,10 @@ export function deliveryLabel(method: string, loc: Loc): string {
   }
 }
 
-export function offerStateLabel(o: Pick<OfferV2, 'state' | 'stale' | 'expired'>, loc: Loc): { text: string; tone: 'neutral' | 'success' | 'warning' | 'danger' | 'info' } {
+export function offerStateLabel(o: Pick<OfferV2, 'state' | 'stale' | 'expired' | 'draft'>, loc: Loc): { text: string; tone: 'neutral' | 'success' | 'warning' | 'danger' | 'info' } {
+  // A DRAFT (0159) rides the first page of «عروضي» and was never sent: it must
+  // not wear the «قائم» a live offer wears (review 2026-09-30).
+  if (o.draft || o.state === 'draft') return { text: loc('مسودة — لم تُرسل', 'Draft — not sent', 'ڕەشنووس — نەنێردراوە'), tone: 'warning' };
   if (o.state === 'accepted') return { text: loc('مقبول', 'Accepted'), tone: 'success' };
   if (o.state === 'superseded' || (o.state === 'pending' && o.stale)) return { text: loc('بانتظار تأكيد التاجر', 'Awaiting re-confirmation'), tone: 'warning' };
   if (o.state === 'expired' || o.expired) return { text: loc('منتهي الصلاحية', 'Expired'), tone: 'neutral' };

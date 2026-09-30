@@ -22,13 +22,24 @@
  *                               blocks show — owner only, never cached, never
  *                               public
  *   GET    /media               ?kind=image|video — the owner's own uploads a
- *                               layout may hold, for the builder's picker (W4-A)
+ *                               layout may hold, for the builder's picker (W4-A);
+ *                               since P5 each row carries `byte_size` and
+ *                               `used_in` (where the file is still shown)
+ *   DELETE /media/<key>         forget a library file nothing shows any more:
+ *                               MEDIA_IN_USE {used_in, where} while something
+ *                               does, else `file_objects.deleted_at` is set and
+ *                               the bytes are left to the media sweep
  *
  * EVERY WRITE NORMALISES (packages/storeLayout) with the owner's id and then
  * checks the references against the store's own rows (worker/lib/storeLayout).
  * A fatal issue — an unsafe link, somebody else's media, a future schema, an
  * oversize layout — refuses the write with LAYOUT_REJECTED and the list of
  * issues; anything merely cleaned is saved and reported back as `issues`.
+ * Two more refusals since P5 (media everywhere): a file heavier than its slot
+ * allows refuses the DRAFT save with LAYOUT_MEDIA_TOO_HEAVY {size, max} — the
+ * merchant just picked it and the picker says so — while publish and restore
+ * drop it with the issue `media_too_heavy`; and a hero or background video
+ * without its poster refuses PUBLISH with LAYOUT_POSTER_REQUIRED {paths}.
  *
  * Changing the look never touches content: these routes write only the two
  * layout tables and the store's pointer. Products, reviews, collections,
@@ -44,13 +55,24 @@ import { rateLimit } from '../lib/ratelimit';
 import { auditStatements } from '../lib/audit';
 import { newId } from '../lib/crypto';
 import { isConstraintAbort } from '../lib/walletOps';
-import { blockDataFor, publishedLayout, verifyLayoutRefs } from '../lib/storeLayout';
+import { blockDataFor, mediaUsedIn, publishedLayout, verifyLayoutRefs } from '../lib/storeLayout';
 import { afterStorefrontWrite } from '../lib/edgePolicy';
 import { normalizeLayout, renderableBlocks, type LayoutIssue } from '@levonis/storeLayout/normalize';
 import { defaultLayoutFromStore } from '@levonis/storeLayout/defaults';
 import { MAX_BLOCKS, MAX_LAYOUT_BYTES, MAX_REQUEST_BYTES, SCHEMA_VERSION, type StoreLayout } from '@levonis/storeLayout/schema';
 import { THEME_NAMES } from '@levonis/storeLayout/tokens';
 import { mediaKey, type MediaKind } from '@levonis/storeLayout/refs';
+import { missingPosters } from '@levonis/storeLayout/verify';
+import { baghdadDay } from '../lib/baghdadTime';
+import { rootDomainFrom, storeUrl } from '../lib/hosts';
+import {
+  auditLayoutWeight,
+  pageSpeedUrl,
+  pickFirstProductRow,
+  readVitalsDays,
+  summarizeVitals,
+  type VitalsDevice,
+} from '../lib/storeSpeed';
 
 export const storeLayoutRoutes = new Hono<AppContext>();
 
@@ -125,11 +147,18 @@ const draftChanged = (version: number | null) =>
 /**
  * Normalise with the owner's id, refuse on any fatal issue, then check the
  * references against the store's own rows. The single path every write takes.
+ *
+ * `refuseHeavy` (the draft save and the posted preview — the layout the
+ * CLIENT just sent): a file over its slot's cap is refused with
+ * LAYOUT_MEDIA_TOO_HEAVY and the figures, so the picker can say them. Publish
+ * and restore re-check a layout that was already saved: there the drop stays
+ * an issue (`media_too_heavy`), like a picture deleted since the save.
  */
 async function acceptLayout(
   db: D1Database,
   ctx: StoreContext,
-  raw: unknown
+  raw: unknown,
+  opts: { refuseHeavy?: boolean } = {}
 ): Promise<{ layout: StoreLayout; issues: LayoutIssue[] }> {
   const first = normalizeLayout(raw, { ownerUserId: ctx.store.user_id });
   if (!first.ok) {
@@ -138,7 +167,25 @@ async function acceptLayout(
     });
   }
   const verified = await verifyLayoutRefs(db, ctx, first.layout);
+  if (opts.refuseHeavy && verified.heavy.length) {
+    const [h] = verified.heavy;
+    throw new HttpError(400, 'A file is heavier than its place on the page allows', 'LAYOUT_MEDIA_TOO_HEAVY', {
+      path: h.path,
+      block_id: h.block_id,
+      size: h.size,
+      max: h.max,
+      heavy: verified.heavy.slice(0, 20).map((x) => ({ path: x.path, block_id: x.block_id, size: x.size, max: x.max })),
+    });
+  }
   return { layout: verified.layout, issues: [...first.issues, ...verified.issues].slice(0, 50) };
+}
+
+/** The poster rule at publish (storefront L3/L4): a hero or background video needs its still. */
+function requirePosters(layout: StoreLayout): void {
+  const paths = missingPosters(layout);
+  if (paths.length) {
+    throw new HttpError(400, 'Pick a poster image for the video before publishing', 'LAYOUT_POSTER_REQUIRED', { paths });
+  }
 }
 
 async function readDraft(db: D1Database, storeId: string): Promise<DraftRow | null> {
@@ -339,7 +386,7 @@ storeLayoutRoutes.put('/draft', async (c) => {
   await rateLimit(c, 'store-layout-draft', 240, 900);
   const body = await readBody(c);
   const expected = versionOf(body);
-  const { layout, issues } = await acceptLayout(c.env.DB, ctx, body.layout);
+  const { layout, issues } = await acceptLayout(c.env.DB, ctx, body.layout, { refuseHeavy: true });
   const user = c.get('user')!;
   const at = nowIso();
   const content = JSON.stringify(layout);
@@ -399,6 +446,7 @@ storeLayoutRoutes.post('/publish', async (c) => {
   if (!renderableBlocks(layout).length) {
     throw new HttpError(400, 'A store page needs at least one visible block', 'LAYOUT_EMPTY');
   }
+  requirePosters(layout);
   const user = c.get('user')!;
   const revisionId = newId();
   try {
@@ -491,6 +539,7 @@ storeLayoutRoutes.post('/restore/:revision', async (c) => {
   if (publish && !renderableBlocks(layout).length) {
     throw new HttpError(400, 'A store page needs at least one visible block', 'LAYOUT_EMPTY');
   }
+  if (publish) requirePosters(layout);
   const user = c.get('user')!;
   const at = nowIso();
   const content = JSON.stringify(layout);
@@ -585,7 +634,7 @@ storeLayoutRoutes.post('/preview', async (c) => {
   const ctx = await requireStoreOwner(c);
   await rateLimit(c, 'store-layout-preview', 240, 900);
   const body = await readBody(c);
-  const { layout, issues } = await acceptLayout(c.env.DB, ctx, body.layout);
+  const { layout, issues } = await acceptLayout(c.env.DB, ctx, body.layout, { refuseHeavy: true });
   c.header('Cache-Control', 'private, no-store');
   return c.json({ success: true, source: 'posted', layout, issues, blocks_data: await blockDataFor(c.env.DB, ctx, layout) });
 });
@@ -601,6 +650,11 @@ storeLayoutRoutes.post('/preview', async (c) => {
  * (a `.webp` recorded as video is not offered as a picture), and whose key
  * passes the schema's own `mediaKey` for this owner — so every key offered is
  * one `verifyLayoutRefs` will accept. Keyset paging on the owner index.
+ *
+ * Library v2 (P5, storefront B1): each row also carries `byte_size` — the
+ * picker checks it against the slot's `max_bytes` before offering the file —
+ * and `used_in`, where the file is still shown (worker/lib/storeLayout.ts
+ * `mediaUsedIn`), so «حذف» is offered only for a file nothing uses.
  */
 storeLayoutRoutes.get('/media', async (c) => {
   const ctx = await requireStoreOwner(c);
@@ -612,28 +666,173 @@ storeLayoutRoutes.get('/media', async (c) => {
   const cursor = bar > 0 && cursorRaw.length <= 300 ? { at: cursorRaw.slice(0, bar), key: cursorRaw.slice(bar + 1) } : null;
   const owner = ctx.store.user_id;
   const { results } = await c.env.DB.prepare(
-    `SELECT object_key, mime_type, width, height, created_at FROM file_objects
+    `SELECT object_key, mime_type, byte_size, width, height, created_at FROM file_objects
       WHERE owner_id = ?1 AND domain = 'merchants' AND deleted_at IS NULL AND mime_type LIKE ?2
         AND (?3 = '' OR created_at < ?3 OR (created_at = ?3 AND object_key < ?4))
       ORDER BY created_at DESC, object_key DESC LIMIT ?5`
   )
     .bind(owner, kind === 'video' ? 'video/%' : 'image/%', cursor?.at ?? '', cursor?.key ?? '', limit)
-    .all<{ object_key: string; mime_type: string; width: number | null; height: number | null; created_at: string }>();
+    .all<{ object_key: string; mime_type: string; byte_size: number | null; width: number | null; height: number | null; created_at: string }>();
   const rows = results ?? [];
-  const items = rows
-    .filter((r) => {
-      const v = mediaKey(r.object_key, kind, owner);
-      return !!v && v.ok && v.key === r.object_key;
-    })
-    .map((r) => ({
-      key: r.object_key,
-      kind,
-      mime: r.mime_type,
-      width: r.width === null ? null : Number(r.width),
-      height: r.height === null ? null : Number(r.height),
-      created_at: r.created_at,
-    }));
+  const offered = rows.filter((r) => {
+    const v = mediaKey(r.object_key, kind, owner);
+    return !!v && v.ok && v.key === r.object_key;
+  });
+  const uses = await mediaUsedIn(c.env.DB, ctx, offered.map((r) => r.object_key));
+  const items = offered.map((r) => ({
+    key: r.object_key,
+    kind,
+    mime: r.mime_type,
+    byte_size: Number(r.byte_size ?? 0),
+    width: r.width === null ? null : Number(r.width),
+    height: r.height === null ? null : Number(r.height),
+    created_at: r.created_at,
+    used_in: uses.get(r.object_key) ?? [],
+  }));
   const last = rows[rows.length - 1];
   c.header('Cache-Control', 'private, no-store');
   return c.json({ success: true, items, next_cursor: rows.length === limit && last ? `${last.created_at}|${last.object_key}` : null });
 });
+
+/**
+ * FORGET A LIBRARY FILE (P5, storefront B1) — DELETE /media/<key>, the key
+ * with its slashes. Owner only, the key must pass the schema's `mediaKey` for
+ * this owner (as image or as video) and name a live ledger row of theirs — one
+ * 404 for a foreign, deleted or unknown key, so the door says nothing about
+ * what exists. While anything on the store still shows the file (the draft or
+ * the published page, the showcase, a collection, a product, a service, the
+ * store's logo / banner, the avatar) the answer is 409 MEDIA_IN_USE with
+ * `used_in` and the distinct `where` kinds, and nothing changes: a delete
+ * never breaks a page. Otherwise `file_objects.deleted_at` is set — the media
+ * sweep's contract; the R2 bytes are its job — with an audit row in the same
+ * batch, and the library, the quota and the picker stop offering it.
+ */
+storeLayoutRoutes.delete('/media/*', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  await rateLimit(c, 'store-layout-media-delete', 120, 900);
+  const db = c.env.DB;
+  const owner = ctx.store.user_id;
+  // The key is the rest of the path after `/media/`, slashes and all; a
+  // percent-encoded spelling is read too. Whatever arrives must still pass
+  // `mediaKey` for this owner before it is looked up.
+  const path = c.req.path;
+  const cut = path.indexOf('/media/');
+  let raw = cut >= 0 ? path.slice(cut + '/media/'.length) : '';
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    raw = '';
+  }
+  const notFound = () => new HttpError(404, 'No such file in your library', 'MEDIA_NOT_FOUND');
+  const asImage = mediaKey(raw, 'image', owner);
+  const asVideo = mediaKey(raw, 'video', owner);
+  const key = asImage && asImage.ok ? asImage.key : asVideo && asVideo.ok ? asVideo.key : null;
+  if (!key || !key.startsWith('merchants/')) throw notFound();
+  const row = await db
+    .prepare(`SELECT object_key FROM file_objects WHERE object_key = ?1 AND owner_id = ?2 AND domain = 'merchants' AND deleted_at IS NULL`)
+    .bind(key, owner)
+    .first<{ object_key: string }>();
+  if (!row) throw notFound();
+  const used = (await mediaUsedIn(db, ctx, [key])).get(key) ?? [];
+  if (used.length) {
+    throw new HttpError(409, 'This file is still shown on your store', 'MEDIA_IN_USE', {
+      used_in: used,
+      where: [...new Set(used.map((u) => u.kind))],
+    });
+  }
+  const user = c.get('user')!;
+  const at = nowIso();
+  const audit = await auditStatements(db, user.id, 'merchant.media_deleted', ctx.store.id, { key });
+  const res = await db.batch([
+    db
+      .prepare(`UPDATE file_objects SET deleted_at = ?1 WHERE object_key = ?2 AND owner_id = ?3 AND domain = 'merchants' AND deleted_at IS NULL`)
+      .bind(at, key, owner),
+    ...audit.statements,
+  ]);
+  if (!Number(res[0]?.meta?.changes ?? 0)) throw notFound();
+  return c.json({ success: true, key, deleted_at: at });
+});
+
+// ------------------------------------------------------------- speed (P4)
+
+/**
+ * «سرعة متجري» (merchant platform v2 §4.5 S4/S5/S7, worker/lib/storeSpeed.ts):
+ *
+ *   GET /speed?source=published|draft   the first-view WEIGHT AUDIT of that
+ *                                       layout — the files a phone downloads
+ *                                       before the first product row, what the
+ *                                       ledger says each weighs, and closed
+ *                                       finding codes (the copy is the client's)
+ *   GET /speed/report?days=7|28&device=phone|desktop
+ *                                       the REPORT: the real-user vitals of the
+ *                                       window as daily buckets, the p75 bucket
+ *                                       of each vital as a WORD (null under 50
+ *                                       samples), the verdict, the published
+ *                                       layout's audit and the PageSpeed link
+ *
+ * Owner-only reads (`requireStoreOwner`, `private, no-store`): the audit names
+ * the owner's own file keys, which is the one reader they may reach. Both ride
+ * this router's mount; `storeSpeedRoutes` is the report as a router of its own
+ * for a mount at the plan's `/api/merchant/store/speed` should the gateway
+ * table gain that row.
+ */
+async function layoutForSpeed(db: D1Database, ctx: StoreContext, source: 'published' | 'draft'): Promise<{ layout: StoreLayout; source: 'published' | 'draft' | 'default' }> {
+  if (source === 'draft') {
+    const draft = await readDraft(db, ctx.store.id);
+    if (draft) return { layout: normalizeLayout(safeParse<unknown>(draft.layout_json, null), { ownerUserId: ctx.store.user_id }).layout, source: 'draft' };
+  }
+  const published = await publishedLayout(db, ctx);
+  return { layout: published.layout, source: published.source };
+}
+
+/** The audit of a layout for THIS store: its first product row from the same planner the storefront uses, then the ledger's sizes. */
+async function auditFor(db: D1Database, ctx: StoreContext, layout: StoreLayout, nowIso: string) {
+  const data = await blockDataFor(db, ctx, layout);
+  return auditLayoutWeight(db, ctx.store, layout, pickFirstProductRow(layout, data, nowIso), nowIso);
+}
+
+storeLayoutRoutes.get('/speed', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const source = c.req.query('source') === 'draft' ? 'draft' : 'published';
+  // The limit rides the first read's wave (review 2026-09-30); a refused read costs one harmless SELECT.
+  const [, chosen] = await Promise.all([rateLimit(c, 'store-speed', 60, 60), layoutForSpeed(c.env.DB, ctx, source)]);
+  const audit = await auditFor(c.env.DB, ctx, chosen.layout, nowIso());
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, source: chosen.source, audit });
+});
+
+async function speedReport(c: Context<AppContext>) {
+  const ctx = await requireStoreOwner(c);
+  const days = c.req.query('days') === '7' ? 7 : 28;
+  const device: VitalsDevice = c.req.query('device') === 'desktop' ? 'desktop' : 'phone';
+  const db = c.env.DB;
+  const now = Date.now();
+  const today = baghdadDay(now);
+  const from = baghdadDay(now, -(days - 1));
+  // The limit rides the first read's wave (review 2026-09-30).
+  const [, rows, published] = await Promise.all([
+    rateLimit(c, 'store-speed', 60, 60),
+    readVitalsDays(db, ctx.store.id, device, from),
+    publishedLayout(db, ctx),
+  ]);
+  const rum = summarizeVitals(rows, { days, today, device });
+  const weight = await auditFor(db, ctx, published.layout, new Date(now).toISOString());
+  const link = storeUrl(ctx.store.slug, rootDomainFrom(c.env), ctx.store.id);
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({
+    success: true,
+    generated_at: new Date(now).toISOString(),
+    rum,
+    weight,
+    weight_source: published.source,
+    // S7: a link, never a fetch. Null when the store has no https address of its own yet.
+    psi_url: pageSpeedUrl(link),
+  });
+}
+
+storeLayoutRoutes.get('/speed/report', speedReport);
+
+/** The report as a router of its own (see above). */
+export const storeSpeedRoutes = new Hono<AppContext>();
+storeSpeedRoutes.use('*', requireAuth);
+storeSpeedRoutes.get('/', speedReport);

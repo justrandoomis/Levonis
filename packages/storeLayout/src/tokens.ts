@@ -134,3 +134,16 @@ export function effectiveAccent(token: AccentToken, storeAccent: unknown): Store
     ? (storeAccent as StoreAccent)
     : 'default';
 }
+
+/**
+ * THE BACKGROUND ATTRIBUTE (storefront L4). The renderer keys `data-sf-bg` on
+ * the background's KIND — `image` or `video`, from the closed list — when
+ * there is a picture to paint; nothing when the page keeps the theme's own
+ * surface. The dim is inline (the client's BackgroundLayer), never a token:
+ * every value here is a name from `BACKGROUND_KINDS`, so nothing a merchant
+ * typed reaches the attribute.
+ */
+export function backgroundAttributes(background: { kind: string; media: string } | null | undefined): Record<string, string> {
+  if (!background || background.kind === 'none' || !background.media) return {};
+  return background.kind === 'video' ? { 'data-sf-bg': 'video' } : { 'data-sf-bg': 'image' };
+}

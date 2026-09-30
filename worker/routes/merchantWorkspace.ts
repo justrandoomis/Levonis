@@ -74,6 +74,8 @@ import { normalizeLayout } from '@levonis/storeLayout/normalize';
 import { inboxUnreadCounts } from './merchantInbox';
 import { LOW_STOCK_SQL, OUT_OF_STOCK_SQL } from './merchantCatalog';
 import { merchantHref } from '@levonis/contracts/merchantRoutes';
+import { baghdadDay } from '../lib/baghdadTime';
+import { ATTENTION_WINDOW_DAYS, readVitalsDays, speedAttention } from '../lib/storeSpeed';
 
 export const merchantAttentionRoutes = new Hono<AppContext>();
 merchantAttentionRoutes.use('*', requireAuth);
@@ -165,7 +167,7 @@ merchantAttentionRoutes.get('/', async (c) => {
   const now = new Date();
   const nowIso = now.toISOString();
 
-  const [orders, custom, inbox, notices, requests, stock, reviews, returns, money, payouts, coupons, problems, setup] = await Promise.all([
+  const [orders, custom, inbox, notices, requests, stock, reviews, returns, money, payouts, coupons, problems, setup, speed] = await Promise.all([
     source('orders', async () => {
       // The counts by stage, and the first pending orders as a JSON column of
       // the same statement — one read, never a second wave.
@@ -407,6 +409,17 @@ merchantAttentionRoutes.get('/', async (c) => {
         },
       };
     }),
+    // «سرعة متجري» (P4, worker/lib/storeSpeed.ts S6): a row ONLY when the
+    // phone LCP p75 bucket has been poor on three consecutive days with at
+    // least thirty samples each. «Nothing to say» is undefined, so the field is
+    // absent exactly like a source that could not answer — the Pulse line and
+    // the Command Center render no row. Not a member of EVERY_SOURCE.
+    source('speed', async () => {
+      const today = baghdadDay(now.getTime());
+      const rows = await readVitalsDays(db, storeId, 'phone', baghdadDay(now.getTime(), -(ATTENTION_WINDOW_DAYS - 1)));
+      const verdict = speedAttention(rows, today);
+      return verdict ? { ...verdict, link: merchantHref.storeDesign() } : undefined;
+    }),
   ]);
 
   const attention: Record<string, unknown> = {
@@ -434,6 +447,7 @@ merchantAttentionRoutes.get('/', async (c) => {
     ...(coupons ? { coupons } : {}),
     ...(problems ? { store: problems } : {}),
     ...(setup ? { setup } : {}),
+    ...(speed ? { speed } : {}),
   };
 
   c.header('Cache-Control', 'private, no-store');

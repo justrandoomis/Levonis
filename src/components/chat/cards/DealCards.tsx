@@ -159,7 +159,7 @@ export function QuoteCardView({ card, mine }: Props) {
             {orderId && (
               <CardButton
                 action="view_order"
-                onClick={() => navigate(side === 'merchant' ? merchantHref.customOrder(orderId) : `/requests?request=${encodeURIComponent(str(s.request_id))}`)}
+                onClick={() => navigate(side === 'merchant' ? merchantHref.customOrder(orderId) : `/requests/${encodeURIComponent(str(s.request_id))}`)}
               >
                 {loc('عرض الطلب', 'View the order')}
               </CardButton>

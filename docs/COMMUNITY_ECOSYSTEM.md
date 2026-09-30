@@ -404,7 +404,7 @@ place, `assertUploadEntity` (worker/lib/uploadEntity.ts).
 
 | Method, path | Guard | Refusal codes |
 |---|---|---|
-| POST `/api/uploads/sessions` `{purpose, entity_id?, file_name, bytes, mime, sha256}` → 201 `{session_id, chunk_bytes, parts_total, expires_at}` | `requireAuth`; `rateLimit` `upload-session` 30/h; purpose ∈ post\|community\|chat\|request\|product_file (`offer`/`order_update` return with their consumer routes — review 2026-09-30); `assertUploadEntity`; limits from `uploadLimits`, quota from `uploadQuotas` — the owner's LIVE objects **plus their open, unexpired sessions**, so sessions opened in turn cannot each pass the same cap | 400 `UPLOAD_KIND_NOT_ALLOWED` {extension, purpose}, `UPLOAD_TOO_LARGE` {limit_bytes, kind}, `UPLOAD_QUOTA_EXCEEDED` {limit_bytes, used_bytes, purpose}; 403 `STORE_REQUIRED` (community, product_file), chat non-participant, `CHAT_READ_ONLY`; 404 a stranger's request/product; 409 `REQUEST_NOT_EDITABLE` |
+| POST `/api/uploads/sessions` `{purpose, entity_id?, file_name, bytes, mime, sha256}` → 201 `{session_id, chunk_bytes, parts_total, expires_at}` | `requireAuth`; `rateLimit` `upload-session` 30/h; purpose ∈ post\|community\|chat\|request\|product_file (`offer`/`order_update`, withdrawn by the 2026-09-30 review, returned with their consumer routes in Phase 5 — §4e); `assertUploadEntity`; limits from `uploadLimits`, quota from `uploadQuotas` — the owner's LIVE objects **plus their open, unexpired sessions**, so sessions opened in turn cannot each pass the same cap | 400 `UPLOAD_KIND_NOT_ALLOWED` {extension, purpose}, `UPLOAD_TOO_LARGE` {limit_bytes, kind}, `UPLOAD_QUOTA_EXCEEDED` {limit_bytes, used_bytes, purpose}; 403 `STORE_REQUIRED` (community, product_file), chat non-participant, `CHAT_READ_ONLY`; 404 a stranger's request/product; 409 `REQUEST_NOT_EDITABLE` |
 | PUT `/api/uploads/sessions/:id/parts/:n` (raw `application/octet-stream`, `n` 1-based) → `{received[], bytes_so_far, parts_total}` | owner only; `rateLimit` `upload-part` 3600/h; non-final parts exactly `chunk_bytes`; idempotent per `n` (CAS on `parts_json`) | 404 `UPLOAD_SESSION_NOT_FOUND` (anyone else, closed, expired, or the upload already assembled/aborted on the bucket while the part was in flight); 400 `UPLOAD_PART_TOO_LARGE` {chunk_bytes, expected_bytes, part}; plain 400 past the end |
 | GET `/api/uploads/sessions/:id` → `{session_id, state, received, bytes_so_far, declared_bytes, chunk_bytes, parts_total, expires_at}` | owner only; `rateLimit` `upload-session-read` 600/h | 404 `UPLOAD_SESSION_NOT_FOUND` (also aborted/expired) |
 | POST `/api/uploads/sessions/:id/complete` → `{key?, url, visibility, mime, bytes, sha256, width, height, analysis?, warnings?, file?}` (`key` only for post\|community\|product_file; `file` = the `community_request_files` row for `request`) | owner only; `rateLimit` `upload-session-close` 120/h; the quota asked AGAIN (this session left out of the count) before the ledger row, then head + tail sniff, ZIP central-directory bound, streamed SHA-256; every refusal deletes the object and aborts the session | `UPLOAD_QUOTA_EXCEEDED`, `UPLOAD_INCOMPLETE` {missing, bytes_so_far, declared_bytes}, `UPLOAD_KIND_NOT_ALLOWED` {declared, detected}, `VIDEO_UNSUPPORTED`, `IMAGE_HEIC_UNSUPPORTED`, `ARCHIVE_TOO_DEEP`, `CHECKSUM_MISMATCH` {declared, actual}, `UPLOAD_TOO_LARGE` (glTF > 4 MiB); warning `VIDEO_NOT_FASTSTART` |
@@ -430,11 +430,69 @@ after 7 days). Key placement (`placementFor`): post image/video → public `user
 model/document → private `users/<uid>/post-files/`; community → public `merchants/<uid>/public/`;
 chat → private `chat/<chatId>/…`; request → private `requests/<uid>/files/`; product_file → private
 `merchants/<uid>/product-files/` (`offer` → `merchants/<uid>/offers/` and `order_update` →
-`orders/<orderId>/updates/` are reserved for the day their consumer routes exist and are not
-session purposes yet); link cards → public `link-cards/<id>.webp`; previews →
+`community-orders/<orderId>/updates/` became session purposes in Phase 5 with their consumer
+routes — §4e); link cards → public `link-cards/<id>.webp`; previews →
 `product-previews/<productId>/<fileId>.lvm`, `post-previews/<postId>/<fileId>.lvm`. Private keys
 under the new prefixes answer 404 through `GET /files/*`; consumers serve them through the gated
 routes above.
+
+## 4e. API (Phase 5, landed) — offers V2, the workshop profile, the request discussion, the order timeline
+
+Migrations 0159 (`community_offers` + `delivery_fee_iqd`, `quantity`, `color`, `terms`, `is_draft`;
+`community_offer_files`; `community_offer_drafts`; `merchant_request_prefs` + `turnaround_days`,
+`technologies`, `max_build_mm`, `workshop_intro`) and 0160 (`community_request_comments`,
+`community_order_updates`, `community_report_targets`; `community_orders` + `ready_at`, `started_at`). All
+five tables are owned by `marketplace` (packages/contracts/src/ownership.ts); the key-bearing columns
+(`community_offer_files.file_key`, `community_offer_drafts.files_json`, `community_order_updates.file_key`)
+are media-reference sources in worker/lib/mediaRefs.ts. Routers: worker/routes/marketplace.ts (offers,
+accept, start), worker/routes/requestDiscussion.ts and worker/routes/communityOrderTimeline.ts (NEW — both
+mounted at `/api/marketplace`, each carrying its full sub-path), worker/routes/merchantPrinters.ts
+(request-prefs), worker/routes/community.ts (the board's `?for=me`, the store's `workshop`),
+worker/routes/storefront.ts (the shopfront's `workshop`), worker/routes/adminCommunity.ts (the reports queue).
+Every 200 carries `success: true`; refusals are `{ success: false, error, code }` and every code is localised
+in src/lib/refusalStrings.ts (ar/en/ckb).
+
+| Method, path | Guard | Refusal codes |
+|---|---|---|
+| POST `/api/marketplace/requests/:id/offers` — body gains `delivery_fee_iqd` (≥ 0), `quantity` (1..100000\|null), `color` (≤ 40), `terms` (≤ 500), `files: [{key}]` (≤ 6), `valid_days`, `draft: true` → 201 `{offer}` or `{draft}` | `requireCommunityOpen` + `requireAuth` + `requireOfferPrivileges` + the plan's `communityOffers` benefit; `rateLimit` `offer-create` 30/h; the eligibility-fenced INSERT through ONE helper (`insertOfferStatements`, also used by send); each file key must be the caller's own PRIVATE upload with purpose EXACTLY `offer`, under `merchants/<uid>/offers/` and filed under THIS request (`ownedFileObject` with `exactPurpose`, `prefix`, `entityId` — review 2026-09-30: a legacy purpose-less object or an offer upload of another request no longer passes); a pickup offer (`delivery_method` pickup) carries no fee — naming one is refused, the server's rule and not only the composer's; a draft is a `community_offer_drafts` row (`ofd_…`): no notice, no `offer_count`, same `assertMayOffer` gate; `offer_received` meta carries `price_iqd`, `delivery_fee_iqd`, `total_iqd` and its sentence the TOTAL | 400 `OFFER_FEE_INVALID`, `OFFER_PICKUP_FEE`, `OFFER_FILE_LIMIT`, `UPLOAD_KIND_NOT_ALLOWED` (not image\|pdf\|model); 403 `OFFER_FILE_NOT_OWNED`, `OWN_REQUEST`; 404 a request not on the board; 409 `OFFER_EXISTS` (a live offer stands), `OFFER_DRAFT_EXISTS` {draft_id}, `REQUEST_CHANGED` |
+| PATCH `/api/marketplace/offers/:id` — the same fields; `files` replaces the whole set | `requireCommunityOpen` + `requireAuth` + `requireOfferPrivileges`; a SENT offer bumps its revision and tells the customer (`offer_updated`) the TOTAL — «الإجمالي الآن X د.ع (منها Y توصيل)», meta `price_iqd`/`delivery_fee_iqd`/`total_iqd`, Sorani in meta, link `/requests/<id>` (review 2026-09-30: a fee-only edit used to quote the unchanged item price); switching an offer to pickup zeroes the stored fee; the files are read only after the offer/draft is found; a draft id edits the draft in place (fenced on `updated_at`) | as POST; 404 another merchant's offer |
+| POST `/api/marketplace/offers/:id/send` — draft → live offer | `requireCommunityOpen` + `requireAuth` + `requireOfferPrivileges` + `communityOffers`; `rateLimit` `offer-create` 30/h; the draft's payload goes through the same fenced INSERT and the draft is deleted in that batch; `offer_count` recomputed (never incremented), `offer_received` notice | 400 `OFFER_PICKUP_FEE` (a pickup draft that names a fee); 409 `OFFER_NOT_DRAFT` (already sent), `OFFER_REQUEST_CLOSED`, `OFFER_EXISTS`, `REQUEST_CHANGED`; 403 `OWN_REQUEST`; 404 |
+| GET `/api/marketplace/requests/:id/offers` → `{offers[], draft, is_customer}` | `requireAuth`; rows gain `delivery_fee_iqd`, `total_iqd` (server-computed price + fee), `quantity`, `color`, `terms`, `revised` (revision > 1), `valid_until` (= `expires_at`), `draft: false`, `files[{id, kind, name, bytes, content_type, url, key? (the merchant only)}]`; top-level `draft` = the merchant's own draft or null (always null for the customer); four dependent D1 round trips — [the request, the caller's store] → [offers, revisions, files by the list's own rule in SQL, the draft] → the membership badges' two (tests/offersV2.test.ts) | 404 |
+| GET `/api/marketplace/offers/:id/files/:fileId` (inline for images, attachment otherwise; `nosniff`, `sandbox` CSP, `private, max-age=300`) | `requireAuth`; the request's customer, the offer's merchant or an admin | 404 for anyone else (no oracle) |
+| GET `/api/marketplace/my-offers` | `requireAuth`; drafts prepended on the first page (flagged `draft: true`, `state: 'draft'`, with `request`; «عروضي» labels them «مسودة — لم تُرسل», never the «قائم» of a sent offer); `state=draft` lists drafts only; two round trips — the store, then the page, its files (the page's WHERE/ORDER/LIMIT as a subquery) and the drafts together | — |
+| POST `/api/marketplace/offers/:id/accept` `{expected_total_iqd, offer_revision?, address_id?}` → 201 `{order, escrow_id}` | `requireAuth`; `rateLimit` `offer-accept` 20/h; the customer only; `expected_price_iqd` still accepted for a FEE-LESS offer (one release); escrow gross = price + fee, `feeFor` split on the total, `community_orders.price_iqd` = the total (money identity), `offer_snapshot` keeps item price, fee, total, quantity, colour, terms; a BOARD request finds-or-creates the request thread (`openStoreThread`, context `request`), writes `community_orders.chat_id` and posts the funded card there (event `custom_order:<id>:funded`); a system row `accepted` {offer_id, order_id} joins the discussion | 409 `OFFER_CHANGED` (details.offer carries `total_iqd`), `OFFER_STALE`; 400 `INSUFFICIENT_FUNDS` {required_iqd = total}; 403 not the customer; 404 |
+| POST `/api/marketplace/orders/:id/start` (changed) | as before; also stamps `started_at` (COALESCE) and writes ONE `started` update row | as before |
+| GET/PUT `/api/merchant/request-prefs` — gains `turnaround_days` (1..60\|null), `workshop_intro` (≤ 300, whitespace collapsed); `technologies` and `max_build_mm` are DERIVED from the active printers on every prefs save and every printer/stock write (`refreshWorkshopFacts` inside `rematchWorkshop`) | `requireAuth` + `requireStoreOwner`; a key the body does not name keeps its stored value — EVERY column (review 2026-09-30: the UPSERT's per-column keep rule reads the body's named-key map, so a body with only the workshop keys no longer wipes the matching filters or unpauses the notices, and the printers screen saving its filters no longer wipes the workshop profile); a merchant without a row reads a fresh copy of the defaults, never the module-level object; the shopfront cache is purged by the merchant routers' write middleware | 400 `PREFS_TURNAROUND_INVALID`, `PREFS_INTRO_TOO_LONG` |
+| GET `/api/community/store/:id` (changed) | as before; gains `workshop: {technologies, materials (stock → prefs → printers), max_build_mm, turnaround_days, governorates, delivery, custom_enabled, intro}` (live computation when the stored facts are empty; null only if the read throws) | — |
+| GET `/api/storefront/resolve`, `/:slug`, `/by-id/:id` (changed) | `anonymousCached` as before; the store body carries the same `workshop` (one statement in the shopfront's first wave; a store that takes no custom requests sends null) | — |
+| GET `/api/community/requests?for=me` | 401 for a guest; `[]` for an account without a workshop; `[]` with `blocked: 'CANNOT_TAKE_WORK' \| 'NOT_TAKING_REQUESTS'` for a workshop that cannot take new work (`merchantTakesNewWork`) or takes no custom requests — the workshop board's own bar; else only an ENGINE-2 verdict for the request's current revision (`eligibleVerdictSql`, the offer fence's rule — a pre-W5-B engine-1 «eligible» no longer counts) on the board's visibility rule, the merchant's own requests excluded, `created_at DESC, id DESC`, exact limit+1 cursor `created_at\|id`; the query is driven from the open board (the requests' state index) with the verdict an EXISTS on the (request, merchant) pair index, the count likewise; rows = the board row + `status`, `customer_username`, `match_score`; `for: 'me'`, `total` on the first page | 401 `UNAUTHORIZED` |
+| GET `/api/marketplace/requests/:id/comments?limit=1..50&cursor=` → `{comments[], next_cursor, total, can:{comment, ask, answer}}` | `requireCommunityOpen`; readable by the customer, an admin, an engaged merchant, the direct store, and anyone (guest too) while the request is on the board; the engagement and the viewer's store ride the request's own read (three round trips with the gate, for everyone); the author's `username` only when their creator page is public or they write as a workshop (D4 — a closed page shows the name, never the handle); rows in written order (`created_at, rowid` — same-millisecond rows never by their random ids), the cursor carries the rowid tie; exact limit+1 cursor; `total` on the first page only (`null` after); removed rows omitted, hidden rows admin-only; `private, no-store` | 404 |
+| POST `/api/marketplace/requests/:id/comments` `{kind, body ≤ 1000, parent_id?}` → 201 `{comment}` | `requireCommunityOpen` + `requireAuth`; `rateLimit` `request-comment` 60/h; `public_comment` only while on the board; `merchant_question` only for a workshop `liveVerdictForUser` finds eligible (or the direct store / an engaged merchant on a direct request), never the customer; `customer_answer` only by the customer, parent = a visible question of this request; decency filter; blocks | 403 `COMMENT_KIND_NOT_ALLOWED` {reason: REQUEST_CLOSED\|OWN_REQUEST\|NOT_CUSTOMER\|NOT_A_WORKSHOP\|NOT_ELIGIBLE\|<eligibility reason>}, `BLOCKED`; 400 `COMMENT_TOO_LONG` {max}, `COMMENT_PARENT_INVALID`, `COMMENT_INDECENT` |
+| DELETE `/api/marketplace/requests/:id/comments/:cid` | `requireAuth`; the author only → `state = 'removed'` | 404 `COMMENT_NOT_FOUND` |
+| POST `/api/marketplace/requests/:id/comments/:cid/report` `{reason, details?}` | `requireAuth`; `rateLimit` `report` 20/h; `community_reports` ('comment', cid) + `community_report_targets` ('request_comment') in one batch; replay → `{replayed: true, report_id}` | 404 `REPORT_TARGET_NOT_FOUND` |
+| POST `/api/marketplace/orders/:id/updates` `{kind, body?, file_key?}` → 201 `{update}` | `requireAuth`; `rateLimit` `order-update` 120/h; the two parties only (a stranger 404); merchant: progress\|photo\|ready\|note while funded\|in_progress\|merchant_marked_delivered; customer: `modification_request` while funded\|in_progress; `ready` only in in_progress, sets `ready_at` once, moves no state and no money (second → `{replayed: true}`); the INSERT is FENCED on the order's state (allowed states as JSON, and «ready» on no earlier ready row) and `ready_at` on the row's id, so an update racing a state change is refused in the write, not only in the read (review 2026-09-30: a «اطلب تعديلًا» could land after «سلّمت», a «ready» on a disputed order without `ready_at`); a photo key must be the caller's own `order_update` upload under `community-orders/<orderId>/updates/`; notifies the other party (grouped `order_update:<orderId>`, `repeatActor: 'bump'`) and posts a card in the order's chat when `chat_id` is set | 403 `ORDER_UPDATE_KIND_NOT_ALLOWED` {reason: SERVER_ONLY\|NOT_STARTED}; 409 `ORDER_UPDATE_TOO_LATE` {state}; 400 `ORDER_UPDATE_TOO_LONG`, `ORDER_UPDATE_FILE_NOT_OWNED`; 404 |
+| GET `/api/marketplace/orders/:id/timeline` → `{role, order, timeline[], older_updates, can}` | `requireAuth`; the two parties; merges escrow events, order columns and update rows (created, funded, started, progress\|photo\|ready\|note\|modification_request, delivered, confirmed, released, refunded, dispute, dispute_resolved, cancelled, completed); the newest `TIMELINE_UPDATES_MAX` (200) updates, `older_updates: true` when more exist (the page says so above the spine); two round trips (the order, then the escrow, its events joined through the order and the updates together); one instant reads «the act, then the money» (`cancelled` before `refunded`) and same-millisecond updates keep their written order (rowid); actors as roles; never a key; `private, no-store` | 404 |
+| GET `/api/marketplace/orders/:id` (changed) | as before; gains `auto_complete_days` — the admin's confirmation window (default 7, `0` = auto-release off), which «سلّمت العمل» quotes instead of a fixed number | — |
+| GET `/api/marketplace/orders/:id/updates/:uid/file` (inline image, `nosniff`, sandbox CSP, `private, no-store`) | `requireAuth`; the two parties; a platform admin too once a report names that update (the desk can open the reported photo; any other update stays the parties' own), audited `admin.order_update_file_read` | 404 |
+| POST `/api/marketplace/orders/:id/updates/:uid/report` `{reason, details?}` | `requireAuth`; `rateLimit` `report` 20/h; `community_reports` ('request', **the update id**) + side row ('order_update', uid) — one report per update, so a second update of the same order is its own report (review 2026-09-30; it used to answer as a replay of the first) | 404 `REPORT_TARGET_NOT_FOUND` (own, started, delivered rows) |
+| GET `/api/admin/community/reports?state=open\|reviewed\|actioned\|dismissed\|all&limit=` | `requireAdmin` (router-wide); money class `none`; resolves the side table into `target` {kind, id, request_id\|order_id, comment_kind\|update_kind, body ≤ 200, …}; read-only (decisions are Phase 6) | — |
+
+Uploads: purposes `offer` (kinds image\|model\|document; entity = the request id; the caller must own a store
+and be the author of an offer or draft on it, or see it on the public board AND be live-eligible; placement
+private `merchants/<uid>/offers/<objectId>.<ext>`; quota `request_gb`) and `order_update` (image only;
+entity = the community order id; the door opens exactly where its only consumer does — the order's WORKSHOP,
+while the order is live (`ORDER_UPDATE_LIVE_STATES`: funded, in_progress, merchant_marked_delivered); the
+customer and a stranger get the order's 404, a closed order `ORDER_UPDATE_TOO_LATE`; quota `request_gb`
+(review 2026-09-30: it admitted uploads no route could consume, with no quota); placement private
+`community-orders/<orderId>/updates/<id>.<ext>`, `MediaDomain` `community-orders`) are back in
+`UPLOAD_PURPOSES`, `SESSION_PURPOSES` and `KEY_PURPOSES` with their consumers. Notifications:
+`request_comment:<requestId>` (people-counting), `request_question:<requestId>` and
+`request_answer:<questionId>` (`repeatActor: 'bump'`), `order_update:<orderId>` (bump), Sorani stamped in
+meta. Every link to a request — notices, chat cards, the workspace, the public API — is `/requests/<id>`
+itself (review 2026-09-30: through the board route and its redirect it cost +26 KB of JS and a serial chunk
+hop). System rows in the discussion (`system_update`, body `{code, meta}` — never a price or a contact line):
+`revised` (files), `accepted`, `cancelled` (request close, order cancel), `disputed`, `completed`. Ranking:
+`MatchWeights.turnaround` = 6 (1 day → 1, ≥ 31 → 0, unknown 0.5), after eligibility.
 
 ## 5. Client (Phase 1, landed)
 
@@ -451,7 +509,7 @@ routes above.
 2. **Social graph + Feed V3** — landed (§4b, docs/COMMUNITY_HOME_PLAN.md). 0154 tables and counter triggers, 0155 (comment `client_id` replay key, creators index); like/save/comment/follow-creator/block/mute/report endpoints with rate limits and idempotency; grouped notifications (`ON CONFLICT` upsert on a grouping key + count); the community home rebuilt to the «العدد» plan (masthead, quick actions, six tabs, cover story, numbered sections, rails, the feed, tools, colophon; springs from `useMotion()`, skeletons at exact heights, `bg-canvas` tokens, ≤ 1 new CSS rule).
 3. **Unified search + discovery** — landed (§4c, §9.3). One `/api/community/search` over projects, stores, creators, products, requests, materials, brands (LIKE + the catalogue index where it exists, every section its own list's SQL, bounded rows and counts), `/search/suggest` from names only, `/trending` from counters that exist, `/recommend` beside a post, a store or a product; no new table, no query log; the lazy search overlay, «وسوم رائجة» and the «قد يعجبك» rails on the client; the CSS budget paid back before it was spent. Tests: tests/communitySearch.test.ts (12), tests/communitySearchUi.test.ts (10).
 4. **3D asset platform + files (§27–35)** — landed (§4d, §9.4). Resumable multipart sessions with a streamed SHA-256 verify, admin-configurable limits and per-purpose quotas, head+tail sniffing with the ZIP central-directory bound (and the same filter inside `parse3mf`/`parseAmf`), files with roles on products and posts, grants written at checkout, the shared viewer over `viewer_grants`, link cards behind an allow-list with re-hosted pictures as ordinary chat messages, grouped `files_added`/`request_files` notifications; the client: `uploadLarge` + `UploadTile` in the project media picker, the request wizard, the chat picker, the post composer and the product-files editor; link cards in chat, comments and posts. Tests: tests/uploadSessions.test.ts (10), tests/uploadSession.client.test.ts (12), tests/productFiles.test.ts (12), tests/postFiles.test.ts (6), tests/linkCards.test.ts (14), tests/postFilesUi.test.ts (9), tests/productFilesUi.test.ts (13), tests/linkCardsUi.test.ts (11). Review fixes 2026-09-30 (DECISIONS row 177): refund revokes grants, buyer per product, quota counts open sessions, allow-list per hop, `offer`/`order_update` withdrawn.
-5. **Workshop profiles + matching + offers V2 + the request page (§21–26, 36)** — structured workshop profile in the store settings feeding `loadCandidates`; offers gain delivery fee, attachments, validity, `draft`/`revised` semantics and re-acceptance; request discussion; execution timeline with `ready` and progress photos; the consolidated request page in the owner's order; merchant cancel/dispute.
+5. **Workshop profiles + matching + offers V2 + the request page (§21–26, 36)** — landed (§4e, §9.5; DECISIONS rows 178–179). Offers carry a delivery fee (escrow gross = price + fee, accepted against `expected_total_iqd`), quantity, colour, terms, up to six private files (upload purpose `offer`) and drafts (`community_offer_drafts`, sent through the same fenced INSERT); a board acceptance opens the request thread and posts the funded card there; the request discussion (comments, workshop questions for eligible workshops, customer answers, server system rows, reports through a side table); the order timeline (`started`, progress, photo, `ready`, note, modification request, merged with the escrow events — «ready» is an event, not a state; merchant cancel/dispute per `cancellationPolicy`); the workshop profile (turnaround, intro, derived technologies and largest build) in the store settings, on the store page and the shopfront, with `turnaround` in the ranking; the home's «طلبات تناسبك» (`?for=me`). Client: `/requests/:id` in the owner's order (old address redirected), OfferComposer/OfferCompare V2, Discussion, OrderTimeline on both sides, the merchant's CustomOrderScreen, «ملف الورشة». Tests: tests/offersV2.test.ts (16), tests/requestDiscussion.test.ts (11), tests/orderTimeline.test.ts (15), tests/workshopFactsSeams.test.ts (4), tests/requestPageUi.test.ts (14), tests/orderTimelineUi.test.ts (11), tests/workshopProfileUi.test.ts (8), tests/communityHubUi.test.ts (15) — after the review of 2026-09-30, whose fixes each carry a test (the money and privacy probes, the D1 round-trip ceilings of the offers, discussion and timeline reads, the `?for=me` query plan); browser: scripts/e2e-request.mjs, scripts/e2e-order-timeline.mjs, scripts/e2e-community-home.mjs.
 6. **Moderation V2 + Reputation V2 + dispute access** — reports on every target, post hide route + UI, user suspend/ban with enforcement, appeals, audit viewer; explainable badges computed from measured response time and completion rate; staff read of `store`/`request` threads only while a linked order is disputed, audited.
 7. **Analytics + collections + activity centre + draft preview** — post view beacon (same privacy rules), creator and merchant dashboards, private saved collections, the activity centre, the draft preview surface off the storefront budget.
 8. **Performance, accessibility, localisation, verification, deploy** — cursor paging everywhere, lazy media, virtualised long lists, 44 px targets, full RTL, ckb everywhere new, the whole test plan green, deploy after the owner's word.
@@ -471,6 +529,14 @@ routes above.
 | forged linked product | tests/communityPosts.test.ts (done) |
 | file ownership spoof | tests/communityPosts.test.ts media keys (done); tests/productFiles.test.ts / tests/postFiles.test.ts: a public, foreign or unknown key is `PRODUCT_FILE_NOT_OWNED` / `POST_FILE_NOT_OWNED`; a forged `.stl` that is a PNG is classified by bytes (tests/uploadSessions.test.ts) (done) |
 | staff dispute access audit | Phase 6 |
+| offer drafts and the fee | tests/offersV2.test.ts: a draft is invisible to the customer and blocks no one; send is one batch with its files; the fee is in the escrow gross and the snapshot; a price-only or wrong total → `OFFER_CHANGED`; a revised offer accepted without its revision → `OFFER_STALE` (done) |
+| private offer and order-update files | tests/offersV2.test.ts, tests/orderTimeline.test.ts: a foreign, public or unknown key → `OFFER_FILE_NOT_OWNED` / `ORDER_UPDATE_FILE_NOT_OWNED`; bytes to the two parties only (stranger/rival 404, guest 401); no key in the customer's JSON or in any timeline (done) |
+| discussion roles | tests/requestDiscussion.test.ts: an ineligible workshop cannot ask (`PROCESS`), the customer cannot ask, only the customer answers and only a question of this request; a stranger cannot read or write a direct request's discussion (done) |
+| «ready» moves nothing; modification after delivery | tests/orderTimeline.test.ts: `ready` changes no state and no money and replays; refused before start; `modification_request` only before delivery; merchant cancel before start refunds, after start needs a dispute (done) |
+| board acceptance opens the thread | tests/offersV2.test.ts: `chat_id`, participants and the `custom_order` system card (done) |
+| money and state after the 2026-09-30 review | tests/offersV2.test.ts: a pickup offer naming a fee is `OFFER_PICKUP_FEE` on create, draft, edit and send, and a switch to pickup zeroes the stored fee; every offer notice quotes the TOTAL; «عروضي» labels a draft «مسودة — لم تُرسل»; `?for=me` trusts engine-2 verdicts only and blocks a workshop that cannot take work; tests/workshopFactsSeams.test.ts: a PUT naming only the workshop keys keeps every filter and the pause; tests/orderTimeline.test.ts: an update racing a state change is refused in the write (`ORDER_UPDATE_TOO_LATE`), a cancel and its refund on one instant read «the act, then the money» (done) |
+| privacy after the 2026-09-30 review | tests/offersV2.test.ts: a legacy purpose-less object or another request's offer upload is `OFFER_FILE_NOT_OWNED`; tests/orderTimeline.test.ts: the `order_update` door is the workshop's while the order is live, a second update report is its own report, the desk opens a reported photo (audited); tests/requestDiscussion.test.ts: a closed creator page shows the name, never the handle (D4); tests/storefrontVitals.test.ts, tests/storeSpeed.test.ts: at most 10 anonymous samples per network, no mean under 50 samples (done) |
+| read costs after the 2026-09-30 review | dependent D1 round trips pinned: the offers list 4, «عروضي» 2, the store card 4 (tests/offersV2.test.ts), the timeline 2 with ≤ 201 update rows (tests/orderTimeline.test.ts), the discussion 3 with the COUNT on the first page only (tests/requestDiscussion.test.ts); `?for=me` driven from the open board (`EXPLAIN QUERY PLAN`, tests/offersV2.test.ts) (done) |
 
 ## 8. Open questions for the owner
 
@@ -690,7 +756,76 @@ off-list `og:image` included; the admin limit change is audited and applied on
 the next session; quotas count live objects and open sessions and are asked
 again on complete.
 
-### 9.5 Phase 5 — Workshop profiles, matching, offers V2, the request page (§21–26, 36)
+### 9.5 Phase 5 — Workshop profiles, matching, offers V2, the request page (§21–26, 36) — LANDED (§4e)
+
+**Landed 2026-09-30 (DECISIONS rows 178–179) with these deviations from the text below:**
+
+1. **Drafts are their own table**, `community_offer_drafts` (UNIQUE `(request_id, merchant_id)`, ids
+   `ofd_…`, `payload_json` + `files_json`), not `is_draft` rows: 0031's partial unique index
+   `WHERE state IN ('pending','accepted')` cannot be widened in place, and every reader of
+   `state = 'pending'` (the customer's list, the count, the sweeps, the accept) would have had to skip a
+   draft. «send» feeds the payload to the same eligibility-fenced INSERT and deletes the draft in that batch;
+   the client sees one concept (an offer with `draft: true`, `state: 'draft'`, revision 0).
+   `community_offers.is_draft` exists (DEFAULT 0, CHECK 0|1) and nothing branches on it yet.
+2. **Offer file keys** are `merchants/<uid>/offers/<objectId>.<ext>` (the request id rides on
+   `file_objects.entity_id`; `buildMediaKey` admits one segment per part), not `offers/<offerId>/…`, and
+   nothing is moved at send. Keys go back only to the uploading merchant (so an edit can keep them); the
+   customer reads `url`s through `GET /api/marketplace/offers/:id/files/:fileId`.
+3. **`community_reports` was not rebuilt.** A request comment is reported as `('comment', id)` and an order
+   update as `('request', <the update's id>)`; the new side table `community_report_targets` (report id →
+   kind `request_comment|order_update` + the real row) says which row is meant, and the new read-only
+   `GET /api/admin/community/reports` resolves it. Review 2026-09-30: the update report was first filed
+   under the REQUEST id, so the (reporter, type, target) uniqueness let one reporter report one update per
+   order and a second report answered as a replay; it is filed per update now, and the desk may open a
+   reported update's photo (audited).
+4. **Mount paths.** The discussion and the timeline are their own routers
+   (worker/routes/requestDiscussion.ts, worker/routes/communityOrderTimeline.ts) mounted at
+   `/api/marketplace` with their full sub-paths — the public URLs are exactly the table's.
+5. **Money identity.** `community_orders.price_iqd` is the TOTAL (price + delivery fee); the item price, the
+   fee and the total are in `offer_snapshot`; the platform fee is split on the total.
+6. **The board thread is opened before the wallet reservation** (the find-or-create is idempotent and is the
+   chat door's own); a refused acceptance can leave a request thread with no card in it.
+7. **Client.** `/requests/:id` is a lazy route of its own (src/pages/community/Request.tsx);
+   `/requests?request=<id>` is REPLACED by `/requests/<id>` keeping the rest of the query and the hash
+   (`&cost=1`, `#discussion`, `#timeline`), so the old links in notifications and chat cards still land.
+   The merchant's custom order is an addressed page, `/merchant/requests/orders/<id>`. For bundle reasons
+   the timeline's words are their own module (`requests/timelineStrings.ts`, re-exported by `strings.ts`),
+   «ملف الورشة» words live in `merchant/dashboard/strings.ts` and the storefront facts' row and words in
+   `storefront/blocks/workshopFacts.tsx` — its own 1.3 KB lazy chunk (review 2026-09-30: in the 9 KB
+   non-classic `extra` chunk, every classic workshop store fetched all the other blocks for one row).
+   Every in-app and notification link now names `/requests/<id>` directly; the redirect serves the links
+   already stored.
+8. **Seams fixed at integration** (tests/workshopFactsSeams.test.ts): PUT `/request-prefs` keeps a key the
+   body does not name (the printers screen no longer wipes the workshop profile), the GET no longer writes
+   into the module-level defaults, and the shopfront answers carry `workshop`. **The review of 2026-09-30**
+   (DECISIONS rows 178–179 addenda) then made the keep rule cover every column, fenced the order-update
+   INSERT on the order's state, refused a fee on a pickup offer on the server, told the customer the TOTAL
+   in every offer notice, held offer files to the exact purpose/prefix/request, closed the `order_update`
+   door to the customer and to closed orders (with the `request_gb` quota), held `?for=me` to the offer
+   fence's engine-2 rule and the workshop board's bar, kept closed creator pages' handles out of the
+   discussion (D4), capped the timeline read at 200 updates (`older_updates`), put `cancelled` before
+   `refunded` on one instant, ordered same-millisecond rows by rowid, and flagged drafts in «عروضي». On
+   the home, «طلبات تناسبك»'s frame is reserved from the first paint once the device knows its viewer runs a
+   workshop (a flag under a key derived from the viewer; `me` still decides) — the rail no longer lands
+   above an issue already on screen (CLS 0.206 as reviewed; 0.006–0.010 now, scripts/e2e-community-home.mjs);
+   a workshop's very first visit on a device can still shift when `/api/merchant/me` answers after the issue
+   paints (0.219 with it held back 800 ms; 0.007 on the next visit — docs/PERFORMANCE_LOG.md).
+9. **Not wired yet:** offer revision history (`community_offer_revisions.terms`) records no fee, quantity,
+   colour or terms; the discussion's system rows for publish/edit (worker/routes/printRequests.ts) and the
+   sweeps (`expired`, the auto-complete `completed`); `expected_price_iqd` is still accepted for a
+   fee-less offer for one release (the V1 `offersApi.accept` and `chatCommerceApi` send it). The chat
+   cards of the update events now say their sentence in Sorani too (src/components/chat/cards/cardWords.ts,
+   review 2026-09-30; the rest of that file's older cards still wait for the owner's hand). Offer MODELS
+   have no viewer or preview path yet: the customer's «ملفات العرض» downloads the model's bytes (to the
+   two parties only, before acceptance), and the composer now says so to the merchant under «ملفات
+   العرض» (ar/en/ckb). A derived preview with a viewer token before acceptance — the request files' rule
+   (DECISIONS 134) the other way round — is Phase 6 work.
+10. **Older components inside the Sorani request page** (review 2026-09-30, recorded as debt): the request
+   page reuses `WorkshopRequestCard` («ورشتك», «احسب التكلفة» in Arabic in every language), `PrintSummary`
+   («دقة متوسطة», «س 20 د 4») and `AttachmentList`'s kind line (`model · 1.8 MB`, RequestAttachments.tsx),
+   which pre-date Phase 5 and are shared with the board and the workshop pages; they are translated with
+   those pages (Phase 8, «ckb everywhere new»), not piecemeal here.
+
 
 **What exists and is kept as is** (survey §1.5): the eligibility engine
 (`evaluateEligibility`, `loadCandidates`, `matchRequest`/`matchMerchant`,

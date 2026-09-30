@@ -11,11 +11,11 @@
  * transition of those machines.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ChevronDown, Copy, Loader2, MapPin, MessageCircle, Phone, Plus, Tag, Trash2,
-  ExternalLink, Hammer, Check, CalendarClock,
+  ExternalLink, Hammer, CalendarClock,
 } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { api, ApiError } from '../../../lib/api';
@@ -25,7 +25,6 @@ import {
   merchantApi, communityOrdersApi, iqd,
   type CommunityOrderRow, type MerchantCoupon,
 } from '../../../lib/merchant';
-import OrderContactCard from '../../community/offers/OrderContactCard';
 import { Btn, Card, Chip, Empty, Input, Notice, Spinner, Toggle, useMainSiteHref, type Loc } from './ui';
 import { Sheet } from '../../ui/Overlay';
 import { apiRefusal } from '../../../lib/refusalStrings';
@@ -35,6 +34,12 @@ import { merchantRefusal } from '../shell/refusal';
 import { formatDate } from '../../orders/format';
 import { ErrorState } from '../../ui/AsyncStates';
 import { couponPhase, dayToIso, isoToDay, windowProblem } from './couponDates';
+import { WorkspaceContext } from '../shell/context';
+import { merchantHref } from '../../../lib/merchantRoutes';
+import { fill, useCustomOrderStrings } from '../orders/strings';
+
+/** The custom order's own screen (Phase 5d): a lazy chunk, opened for one row or for the id the address names. */
+const CustomOrderScreen = lazy(() => import('../orders/CustomOrderScreen'));
 
 // ------------------------------------------------------------ store orders
 
@@ -604,8 +609,6 @@ function communityStateLabel(k: string, loc: Loc): string {
  */
 export function CustomOrdersTab({ focusOrderId = null }: { focusOrderId?: string | null } = {}) {
   const { loc, lang } = useLanguage();
-  const [confirm, confirmDialog] = useConfirm();
-  const toast = useToast();
   const mainHref = useMainSiteHref();
   // The request board is Levo Community (DECISIONS 110): while it is shut to
   // this merchant, browsing it would land on the maintenance card. Funded
@@ -613,10 +616,24 @@ export function CustomOrdersTab({ focusOrderId = null }: { focusOrderId?: string
   const { access: communityAccess } = useCommunityAccess();
   const [orders, setOrders] = useState<CommunityOrderRow[] | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
-  const [busy, setBusy] = useState('');
-  // A refused «ابدأ العمل» says why, on its own card, in the merchant's language
-  // (the order changed under them, or its money is not held — review F2).
-  const [startError, setStartError] = useState<{ id: string; text: string } | null>(null);
+  // THE ORDER'S OWN SCREEN (Phase 5d, CustomOrderScreen.tsx): the moves, the
+  // timeline and the contact live there. In the workspace it is a real page —
+  // `/merchant/custom_orders/<id>`, the address every custom-order
+  // notification carries: a row opens it, «رجوع» returns to the list's
+  // address, and the browser's Back walks the same way (the orders section's
+  // pattern, W3-B). Outside the workspace (no address to own) a row opens it
+  // in place.
+  const ws = useContext(WorkspaceContext);
+  const co = useCustomOrderStrings();
+  const [localId, setLocalId] = useState<string | null | undefined>(undefined);
+  const openId = ws ? focusOrderId : localId === undefined ? focusOrderId : localId;
+  // «رجوع» lands on the row that was opened (review 2026-09-30: focus fell to <body> both ways).
+  const returnTo = useRef<string | null>(null);
+  const openOrder = (id: string) => {
+    returnTo.current = id;
+    if (ws) ws.go(ws.href(merchantHref.customOrder(id)));
+    else setLocalId(id);
+  };
 
   // A failed read is not «no orders»: funded work waiting on this merchant
   // must never read as an empty book.
@@ -628,13 +645,28 @@ export function CustomOrdersTab({ focusOrderId = null }: { focusOrderId?: string
       .catch((e: unknown) => setLoadError(e));
   }, []);
   useEffect(load, [load]);
-  const focusRow = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const back = returnTo.current;
+    if (openId || orders === null || !back) return;
+    returnTo.current = null;
+    document.querySelector<HTMLElement>(`[data-custom-order="${CSS.escape(back)}"]`)?.focus();
+  }, [openId, orders]);
+  const focusRow = useRef<HTMLButtonElement | null>(null);
   const focusReady = orders !== null && !!focusOrderId && orders.some((o) => o.id === focusOrderId);
   useEffect(() => {
     if (!focusReady) return;
     focusRow.current?.scrollIntoView({ block: 'center' });
     focusRow.current?.focus({ preventScroll: true });
   }, [focusReady, focusOrderId]);
+
+  if (openId) {
+    const close = () => (ws ? ws.go(ws.href(merchantHref.customOrders())) : setLocalId(null));
+    return (
+      <Suspense fallback={<Spinner />}>
+        <CustomOrderScreen key={openId} id={openId} onBack={close} onChanged={load} />
+      </Suspense>
+    );
+  }
 
   if (orders === null) return loadError ? <ErrorState compact error={loadError} onRetry={load} /> : <Spinner />;
 
@@ -662,111 +694,51 @@ export function CustomOrdersTab({ focusOrderId = null }: { focusOrderId?: string
         />
       )}
 
-      {orders.map((o) => (
-        <div
-          key={o.id}
-          ref={o.id === focusOrderId ? focusRow : undefined}
-          tabIndex={o.id === focusOrderId ? -1 : undefined}
-          data-custom-order={o.id}
-          data-focused={o.id === focusOrderId ? 'true' : undefined}
-          className={`rounded-2xl border bg-white/[0.03] p-3 focus-visible:outline-none ${o.id === focusOrderId ? 'border-gold/50 ring-1 ring-gold/40' : 'border-white/10'}`}
-        >
-          <div className="flex items-start justify-between gap-2 mb-1.5">
-            <p className="text-white text-[12.5px] font-semibold flex-1 min-w-0 truncate">{o.request_title}</p>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 shrink-0">
-              {communityStateLabel(o.state, loc)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-[11.5px] mb-2">
-            <span className="text-text-muted">
-              {loc('قيمة الاتفاق', 'Deal value', 'بەهای ڕێککەوتن')}: <span className="text-white font-semibold" dir="ltr">{iqd(o.price_iqd)}</span>
-            </span>
-            <span className="text-text-muted">
-              {loc('لك', 'You get', 'بۆ تۆ')}: <span className="text-gold font-semibold" dir="ltr">{iqd(o.merchant_receivable_iqd)}</span>
-            </span>
-          </div>
-
-          {/* W5-A: the customer's contact and delivery details, revealed by the
-              acceptance, and the request's conversation. */}
-          {['funded', 'in_progress', 'merchant_marked_delivered', 'disputed'].includes(o.state) && (
-            <details className="mb-2" data-custom-order-contact={o.id}>
-              <summary className="min-h-[44px] flex items-center cursor-pointer text-[12px] font-semibold text-gold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
-                {loc('بيانات الزبون والتسليم', 'Customer and delivery details')}
-              </summary>
-              <OrderContactCard orderId={o.id} compact />
-            </details>
-          )}
-
-          {o.state === 'funded' && (
-            <Btn
-              small
-              disabled={busy === o.id}
-              onClick={async () => {
-                setBusy(o.id);
-                setStartError(null);
-                try {
-                  await communityOrdersApi.start(o.id);
-                } catch (e) {
-                  // OWNER: Sorani to be written by hand.
-                  setStartError({ id: o.id, text: apiRefusal(e, lang, loc('تعذّر بدء العمل', 'Could not start the work')) });
-                } finally {
-                  setBusy('');
-                  // Either way the card shows the order as it now stands.
-                  load();
-                }
-              }}
-            >
-              {loc('ابدأ العمل', 'Start work', 'دەست پێ بکە')}
-            </Btn>
-          )}
-          {startError?.id === o.id && (
-            <p role="alert" className="text-red-300 text-[11px] mt-1.5">
-              {startError.text}
-            </p>
-          )}
-          {o.state === 'in_progress' && (
-            <Btn
-              small
-              disabled={busy === o.id}
-              onClick={async () => {
-                const ok = await confirm({
-                  title: loc('تأكيد التسليم؟', 'Mark delivered?', 'گەیاندن پشتڕاست بکرێتەوە؟'),
-                  // OWNER: Sorani to be written by hand.
-                  consequence: loc('المبلغ يبقى محجوزًا حتى يؤكد الزبون الاستلام.', 'The money stays held until the customer confirms.'),
-                  confirmLabel: loc('سلّمت العمل', 'I delivered the work', 'کارەکەم گەیاند'),
-                  cancelLabel: loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە'),
-                });
-                if (!ok) return;
-                setBusy(o.id);
-                try {
-                  await communityOrdersApi.delivered(o.id);
-                  load();
-                } catch (e) {
-                  // OWNER: Sorani to be written by hand.
-                  toast.error(merchantRefusal(e, lang, loc('تعذّر تسجيل التسليم', 'Could not mark the work delivered')));
-                } finally {
-                  setBusy('');
-                }
-              }}
-            >
-              <Check className="w-3.5 h-3.5" />
-              {loc('سلّمت العمل', 'I delivered the work', 'کارەکەم گەیاند')}
-            </Btn>
-          )}
-          {o.state === 'merchant_marked_delivered' && (
-            <p className="text-text-muted text-[11px]">
-              {loc(
-                'المبلغ يُحوَّل لك فور تأكيد الزبون.',
-                'The funds are released to you the moment the customer confirms.',
-                'پارەکە دوای پشتڕاستکردنەوەی کڕیار دەگاتە تۆ.'
-              )}
-              {o.auto_complete_at &&
-                ` ${loc('التأكيد التلقائي', 'Auto-confirm', 'پشتڕاستکردنەوەی خۆکار')}: ${new Date(o.auto_complete_at).toLocaleDateString()}`}
-            </p>
-          )}
-        </div>
-      ))}
-      {confirmDialog}
+      {orders.map((o) => {
+        // One line on what happens next; the moves themselves are on the order's screen.
+        const next =
+          o.state === 'funded'
+            ? co.nextStart
+            : o.state === 'in_progress'
+              ? co.nextUpdate
+              : o.state === 'merchant_marked_delivered'
+                ? `${co.awaiting}${o.auto_complete_at ? ` ${fill(co.autoConfirm, { d: formatDate(o.auto_complete_at, lang) })}` : ''}`
+                : '';
+        return (
+          <button
+            key={o.id}
+            type="button"
+            ref={o.id === focusOrderId ? focusRow : undefined}
+            tabIndex={o.id === focusOrderId ? -1 : undefined}
+            data-custom-order={o.id}
+            data-focused={o.id === focusOrderId ? 'true' : undefined}
+            onClick={() => openOrder(o.id)}
+            className={`w-full rounded-2xl border bg-surface p-3 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${o.id === focusOrderId ? 'border-gold/50 ring-1 ring-gold/40' : 'border-border-subtle'}`}
+          >
+            <div className="flex items-start justify-between gap-2 mb-1.5">
+              <p dir="auto" className="text-text-primary text-[12.5px] font-semibold flex-1 min-w-0 truncate">{o.request_title}</p>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-border-subtle bg-surface-raised text-text-secondary shrink-0">
+                {communityStateLabel(o.state, loc)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[11.5px] mb-1.5">
+              <span className="text-text-muted">
+                {loc('قيمة الاتفاق', 'Deal value', 'بەهای ڕێککەوتن')}: <span className="text-text-primary font-semibold" dir="ltr">{iqd(o.price_iqd)}</span>
+              </span>
+              <span className="text-text-muted">
+                {loc('لك', 'You get', 'بۆ تۆ')}: <span className="text-gold font-semibold" dir="ltr">{iqd(o.merchant_receivable_iqd)}</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-text-muted text-[11px] min-w-0 flex-1">{next}</span>
+              <span className="inline-flex items-center gap-1 shrink-0 text-[12px] font-semibold text-gold">
+                {co.open}
+                <ChevronDown className="w-3.5 h-3.5 -rotate-90 rtl:rotate-90" aria-hidden="true" />
+              </span>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }

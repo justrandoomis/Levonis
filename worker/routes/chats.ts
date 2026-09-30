@@ -371,7 +371,7 @@ chatRoutes.get('/', async (c) => {
  * two first opens that race both end in the same thread. Both parties are
  * members from the start, and nobody else ever is.
  */
-async function openStoreThread(
+export async function openStoreThread(
   db: D1Database,
   t: { contextType: 'store' | 'request'; contextId: string; storeId: string; merchantId: string; customerId: string; sellerId: string }
 ): Promise<string> {

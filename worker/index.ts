@@ -102,6 +102,8 @@ import { merchantOrderRoutes } from './routes/merchantOrders';
 import { merchantCustomerRoutes } from './routes/merchantCustomers';
 import { storefrontEventRoutes } from './routes/storefrontEvents';
 import { marketplaceRoutes } from './routes/marketplace';
+import { requestDiscussionRoutes } from './routes/requestDiscussion';
+import { communityOrderTimelineRoutes } from './routes/communityOrderTimeline';
 import { storeOrderRoutes } from './routes/storeOrders';
 import { communityReviewRoutes } from './routes/merchantReviews';
 import { communityFavoriteRoutes } from './routes/communityFavorites';
@@ -522,6 +524,12 @@ app.route('/api/product-files', publicProductFileRoutes);
 app.route('/api/marketplace/print', printRequestRoutes);
 // The customer-request marketplace: requests, offers, escrowed community orders.
 app.route('/api/marketplace', marketplaceRoutes);
+// The request's discussion and the order's timeline (Phase 5b, docs/COMMUNITY_ECOSYSTEM.md
+// §9.5): the same prefix, their own routers — /requests/:id/comments,
+// /orders/:id/updates, /orders/:id/timeline. After the marketplace, which
+// registers no path of theirs, so nothing is shadowed either way.
+app.route('/api/marketplace', requestDiscussionRoutes);
+app.route('/api/marketplace', communityOrderTimelineRoutes);
 // The in-app notification inbox. General, not print-specific: it is what was
 // missing when a merchant needed to be told a matching request had been posted.
 app.route('/api/notifications', notificationRoutes);

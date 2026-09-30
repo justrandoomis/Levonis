@@ -41,6 +41,7 @@
 
 import { sha256Hex } from './crypto';
 import { addDays } from './baghdadTime';
+import { isSchemaMissing } from './membershipBenefits';
 
 export const STOREFRONT_EVENTS = ['store_view', 'product_view', 'add_to_cart', 'checkout_started'] as const;
 export type StorefrontEvent = (typeof STOREFRONT_EVENTS)[number];
@@ -124,8 +125,13 @@ export function cleanAnonId(raw: unknown): string {
 export async function dailySalt(db: D1Database, day: string): Promise<string> {
   const fresh = crypto.getRandomValues(new Uint8Array(24));
   const salt = Array.from(fresh, (b) => b.toString(16).padStart(2, '0')).join('');
-  await db.prepare('INSERT OR IGNORE INTO storefront_salts (day, salt) VALUES (?, ?)').bind(day, salt).run();
-  const row = await db.prepare('SELECT salt FROM storefront_salts WHERE day = ?').bind(day).first<{ salt: string }>();
+  // Read-or-insert in ONE round trip (review 2026-09-30): the batch runs in
+  // order, so the SELECT sees the row whichever request inserted it.
+  const [, read] = await db.batch([
+    db.prepare('INSERT OR IGNORE INTO storefront_salts (day, salt) VALUES (?, ?)').bind(day, salt),
+    db.prepare('SELECT salt FROM storefront_salts WHERE day = ?').bind(day),
+  ]);
+  const row = (read?.results?.[0] ?? null) as { salt?: string } | null;
   return row?.salt ?? salt;
 }
 
@@ -253,5 +259,14 @@ export async function pruneStorefrontAnalytics(db: D1Database, today: string): P
   if (!keepFrom) return { marks: 0, salts: 0 };
   const marks = await db.prepare('DELETE FROM storefront_event_marks WHERE day < ?').bind(keepFrom).run();
   const salts = await db.prepare('DELETE FROM storefront_salts WHERE day < ?').bind(keepFrom).run();
-  return { marks: marks.meta?.changes ?? 0, salts: salts.meta?.changes ?? 0 };
+  // The vitals marks (0161, «سرعة متجري») live and die with the event marks:
+  // the same salt cut them, so they are useless — and must be gone — the
+  // moment it is. A database behind 0161 has no table and prunes the rest.
+  let vitals = 0;
+  try {
+    vitals = (await db.prepare('DELETE FROM storefront_vitals_marks WHERE day < ?').bind(keepFrom).run()).meta?.changes ?? 0;
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+  }
+  return { marks: (marks.meta?.changes ?? 0) + vitals, salts: salts.meta?.changes ?? 0 };
 }

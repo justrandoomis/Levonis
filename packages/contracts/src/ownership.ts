@@ -156,6 +156,8 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'community_print_requests', 'community_request_matches', 'model_view_tokens', 'community_escrows', 'community_escrow_events',
     // 0130 — what each published revision of a request said, and each offer's terms over time (print requests v2).
     'community_request_revisions', 'community_offer_revisions',
+    // 0159 — offers V2 (docs/COMMUNITY_ECOSYSTEM.md §9.5): the files a sent offer carries, and a merchant's saved draft.
+    'community_offer_files', 'community_offer_drafts',
     // 0132 — eligibility as data (W5-B): the workshop's material stock, the re-match queue, and every read of a request file.
     'merchant_material_stock', 'community_match_queue', 'request_file_reads',
     'merchant_payout_ledger', 'community_merchants', 'merchant_stores', 'merchant_store_slugs', 'reserved_slugs',
@@ -173,6 +175,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // likes, saves, comments, blocks, mutes and content reports.
     'user_follows', 'community_likes', 'community_saves', 'community_comments',
     'user_blocks', 'user_mutes', 'community_reports',
+    // 0160 — the discussion under a request, the order's timeline, and which
+    // row a content report really names (docs/COMMUNITY_ECOSYSTEM.md §9.5).
+    'community_request_comments', 'community_order_updates', 'community_report_targets',
     // 0122 — the store page as data (docs/MERCHANT_PLATFORM.md §4.4): the
     // merchant's working draft and the immutable published revisions the
     // storefront reads through merchant_stores.published_revision_id.
@@ -265,6 +270,11 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // once-per-visitor-per-day marks that dedupe them, and the daily salt the
     // visitor hash is cut with (deleted two days later).
     'merchant_product_analytics_daily', 'storefront_event_marks', 'storefront_salts',
+    // 0161 — «سرعة متجري» (merchant platform v2 P4): each store's real-user
+    // vitals as daily buckets per device, and the once-per-visitor-per-day
+    // marks that dedupe them (the event marks' CHECK on `event` cannot hold a
+    // sixth name, so the vitals have their own). Same owner, same sweep.
+    'storefront_vitals_daily', 'storefront_vitals_marks',
   ]),
   ...owned('ads', ['ads_providers', 'ads_event_map', 'ads_deliveries', 'ads_consent_snapshots', 'ads_dead_letters']),
   ...owned('search', ['search_products', 'search_stores', 'search_index_state']),

@@ -571,3 +571,63 @@ test('the cleanup lists the bucket BEFORE it reads the references, and re-reads 
   assert.ok(recheckAt > verifiedAt, 'there must be a SECOND coverage read');
   assert.ok(recheckAt < deleteAt, 'and it must come before anything is removed from the bucket');
 });
+
+// ---------------------------------------------------------------------------
+//  MEDIA EVERYWHERE IN THE STORE PAGE (P5): the page-level keys are references
+// ---------------------------------------------------------------------------
+
+/**
+ * Storefront L3/L4 put media OUTSIDE any block: the hero's video, the page
+ * background and its poster. They live inside the same `layout_json` the
+ * sweeper already scans as JSON at any depth, so no new registry row is
+ * needed — and this proves it, so that a future move of the background to its
+ * own column cannot happen without a row (the coverage audit above would then
+ * name it).
+ */
+test('a store page\'s background, its poster and the hero video are referenced from layout_json, draft or published', async () => {
+  const db = freshSchema();
+  const owner = 'ownerp5';
+  const bg = `merchants/${owner}/public/bgclip001.mp4`;
+  const poster = `merchants/${owner}/public/bgpost001.webp`;
+  const heroClip = `merchants/${owner}/public/heroclip1.mp4`;
+  const loose = `merchants/${owner}/public/nobody0001.webp`;
+  insert(db, 'users', { id: owner, email: 'p5@x.co', role: 'merchant' });
+  insert(db, 'community_merchants', { id: 'mp5', user_id: owner, name: 'P5', governorate: 'baghdad' });
+  insert(db, 'merchant_stores', { id: 'sp5', merchant_id: 'mp5', user_id: owner, slug: 'p5store', name: 'P5' });
+  const layout = {
+    schema_version: 1,
+    theme: 'classic',
+    background: { kind: 'video', media: bg, poster, dim: 'medium', phones: false },
+    blocks: [{ id: 'hero', type: 'hero', settings: { video: heroClip } }],
+  };
+  insert(db, 'store_layout_drafts', { store_id: 'sp5', layout_json: JSON.stringify({ ...layout, blocks: [] }), version: 1, updated_by: owner });
+  insert(db, 'store_layout_revisions', { id: 'revp5', store_id: 'sp5', revision: 1, schema_version: 1, layout_json: JSON.stringify(layout), published_by: owner });
+  const dbx = d1(db);
+  const scan = await collectMediaReferences(dbx, await readLiveSchema(dbx));
+  assert.deepEqual(scan.failed.filter((f) => f.source.startsWith('store_layout')), []);
+  for (const k of [bg, poster, heroClip]) assert.ok(scan.keys.has(k), `${k} is shown by a store page and must be referenced`);
+  assert.ok(!scan.keys.has(loose), 'a key no page names stays an orphan');
+  const ids = new Set(MEDIA_REFERENCE_SOURCES.map((x) => `${x.table}.${x.column}`));
+  assert.ok(ids.has('store_layout_drafts.layout_json') && ids.has('store_layout_revisions.layout_json'), 'the layout columns stay registered as JSON sources');
+});
+
+
+/**
+ * THE LIBRARY'S DELETE DOOR SEES EVERY HOLDER (review 2026-09-30). `mediaUsedIn`
+ * (worker/lib/storeLayout.ts) missed `community_post_media`, so a published
+ * post's picture could leave the store library while the post still showed
+ * it. Every registered source is now DECIDED — read by the door, or listed
+ * with the reason a store-library key cannot be a live use there — and a
+ * source added to the manifest without that decision fails here.
+ */
+test('every media source is either read by the library\'s MEDIA_IN_USE door or listed with its reason', async () => {
+  const { LIBRARY_HOLDERS, NOT_LIBRARY_HOLDERS } = await import('../worker/lib/storeLayout');
+  const registered = MEDIA_REFERENCE_SOURCES.map((s) => `${s.table}.${s.column}`);
+  const undecided = registered.filter((k) => !LIBRARY_HOLDERS.includes(k) && !(k in NOT_LIBRARY_HOLDERS));
+  assert.deepEqual(undecided, [], 'a media source nobody decided for the library delete door');
+  const both = LIBRARY_HOLDERS.filter((k) => k in NOT_LIBRARY_HOLDERS);
+  assert.deepEqual(both, [], 'decided twice');
+  const stale = [...LIBRARY_HOLDERS, ...Object.keys(NOT_LIBRARY_HOLDERS)].filter((k) => !registered.includes(k));
+  assert.deepEqual(stale, [], 'a decision about a column the manifest no longer lists');
+  assert.ok(LIBRARY_HOLDERS.includes('community_post_media.media_key'));
+});

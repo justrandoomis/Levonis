@@ -33,7 +33,7 @@ import { api, ApiError } from '../lib/api';
 import { storefrontApi, communityFavoritesApi } from '../lib/storefrontApi';
 import type { MerchantProduct } from '../lib/merchant';
 import { useStore } from '../StoreContext';
-import { trackStoreEvent } from '../lib/storeBeacon';
+import { scheduleStoreVitals, trackStoreEvent } from '../lib/storeBeacon';
 import { useCommunityAccess } from './community/access';
 import InstallAppButton from '../components/pwa/InstallAppButton';
 import StoreRenderer from '../components/storefront/StoreRenderer';
@@ -159,6 +159,9 @@ export default function Storefront({
       alive = false;
     };
   }, [user, storeId, slug]);
+
+  // «سرعة متجري» (P4): the speed reporter, after `load` and idle — one shared copy (src/lib/storeBeacon.ts).
+  useEffect(() => scheduleStoreVitals(storeId), [storeId]);
 
   useEffect(() => {
     if (!user) return;

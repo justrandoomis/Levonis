@@ -52,7 +52,7 @@ export interface NotificationRow {
   title_en: string;
   body_ar: string;
   body_en: string;
-  /** An in-app PATH (`/requests?request=req_123`), never an absolute URL —
+  /** An in-app PATH (`/requests/req_123`), never an absolute URL —
    *  safe to hand straight to react-router's navigate(). May be empty. */
   link: string;
   entity_type: string;

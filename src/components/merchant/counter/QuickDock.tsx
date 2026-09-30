@@ -8,8 +8,8 @@
  * plan: never a door the other side would refuse). Read-only use of the gate:
  * a failed or slow answer simply means no reel door this visit.
  */
-import { useEffect, useState } from 'react';
-import { Clapperboard, Image, Palette, Plus } from 'lucide-react';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { Clapperboard, Image, Megaphone, Palette, Plus } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { merchantHref } from '../../../lib/merchantRoutes';
 import { Door } from './PulseRow';
@@ -18,9 +18,17 @@ import { useCounterStrings } from './strings';
 /** The community composer the reel door opens (src/App.tsx). */
 export const REEL_COMPOSER_PATH = '/community/projects/new';
 
+/**
+ * «📣 إعلان» (P5, §3.2 / §4.6): not a page but a sheet — the store page's
+ * notice line, written through the layout's draft and publish. Its own lazy
+ * chunk: Today downloads it only when the door is pressed.
+ */
+const AnnouncementSheet = lazy(() => import('./AnnouncementSheet'));
+
 export default function QuickDock() {
   const s = useCounterStrings();
   const [reel, setReel] = useState(false);
+  const [announcing, setAnnouncing] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -37,9 +45,10 @@ export default function QuickDock() {
     };
   }, []);
 
-  const doors: Array<{ id: string; to: string; icon: typeof Plus; label: string }> = [
+  const doors: Array<{ id: string; icon: typeof Plus; label: string } & ({ to: string } | { open: () => void })> = [
     { id: 'new-product', to: merchantHref.newProduct(), icon: Plus, label: s.dock.newProduct },
     ...(reel ? [{ id: 'reel', to: REEL_COMPOSER_PATH, icon: Clapperboard, label: s.dock.reel }] : []),
+    { id: 'announce', open: () => setAnnouncing(true), icon: Megaphone, label: s.dock.announce },
     { id: 'cover', to: merchantHref.storeSettings(), icon: Image, label: s.dock.cover },
     { id: 'design', to: merchantHref.storeDesign(), icon: Palette, label: s.dock.design },
   ];
@@ -57,6 +66,14 @@ export default function QuickDock() {
       <nav aria-label={s.dock.title} data-quick-dock className="-mx-4 flex gap-2 overflow-x-auto px-4 hide-scrollbar sm:mx-0 sm:px-0 lg:flex-wrap lg:overflow-visible">
         {doors.map((d) => {
           const Icon = d.icon;
+          if ('open' in d) {
+            return (
+              <button key={d.id} type="button" onClick={d.open} aria-haspopup="dialog" className="lv-button lv-button-secondary lv-button-sm press-scale shrink-0" data-dock={d.id}>
+                <Icon aria-hidden="true" className="h-4 w-4" />
+                {d.label}
+              </button>
+            );
+          }
           return (
             <Door key={d.id} to={d.to} className="lv-button lv-button-secondary lv-button-sm press-scale shrink-0" data-dock={d.id}>
               <Icon aria-hidden="true" className="h-4 w-4" />
@@ -65,6 +82,11 @@ export default function QuickDock() {
           );
         })}
       </nav>
+      {announcing && (
+        <Suspense fallback={null}>
+          <AnnouncementSheet open onClose={() => setAnnouncing(false)} />
+        </Suspense>
+      )}
     </section>
   );
 }

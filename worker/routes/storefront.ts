@@ -51,6 +51,7 @@ import {
 } from '../lib/merchantDelivery';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
 import { anonymousCached } from '../lib/edgePolicy';
+import { storefrontWorkshopFacts } from '../lib/printMatchingStore';
 import { openNow } from '../lib/storeHours';
 
 /**
@@ -81,7 +82,13 @@ export async function publicStore(db: D1Database, ctx: StoreContext, rootDomain:
   // and the store's delivery (W2-A), read together. The tier is read ONCE and
   // handed to `storeTakesOrders`: it used to be read a second time inside the
   // verdict — four more dependent D1 round trips on every shopfront (P2a).
-  const [tier, deliveryCfg] = await Promise.all([getTierStatus(db, m.user_id), loadDeliveryConfig(db, s)]);
+  const [tier, deliveryCfg, workshop] = await Promise.all([
+    getTierStatus(db, m.user_id),
+    loadDeliveryConfig(db, s),
+    // THE WORKSHOP'S FACTS (0159, §9.5) — one statement in this same wave; a
+    // shop behind 0159 or without a workshop row simply says nothing.
+    storefrontWorkshopFacts(db, m.id, !!s.accepts_custom_requests).catch(() => null),
+  ]);
   /**
    * «OPEN» MEANS THE CART WILL TAKE AN ORDER (review S1). It used to be
    * `storeIsOpen` — the store's own switch and the merchant suspension — while
@@ -136,6 +143,10 @@ export async function publicStore(db: D1Database, ctx: StoreContext, rootDomain:
     // for the signed-in visitor (see the file header).
     accepts_custom_requests: !!s.accepts_custom_requests,
     sells_direct_products: !!s.sells_direct_products,
+    // What the workshop can make, as public facts (technologies, materials,
+    // the largest bed, the usual turnaround, the intro) — never a printer's
+    // economics. Guest-cacheable like the rest of this body: no viewer in it.
+    workshop,
     open: takingOrders,
     // The reason a shop is shut is between the merchant and Levonis. A
     // visitor is told it is closed, never whether the merchant paused it, an

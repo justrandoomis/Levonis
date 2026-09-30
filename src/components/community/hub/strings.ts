@@ -90,6 +90,14 @@ const STRINGS = {
     workshops: 'ورش',
     kind: 'النوع',
     tags: 'وسوم',
+    // «طلبات تناسبك» (Phase 5d): the workshop's own board on the home (hub/BoardRail.tsx).
+    board: {
+      kicker: 'لورشتك',
+      dek: 'طلبات مفتوحة تستطيع طابعاتك تنفيذها الآن.',
+      empty: 'لا طلبات تناسب ورشتك الآن. نُعلمك حين يصل طلب تستطيع تنفيذه.',
+      prefs: 'راجع تفضيلات الطلبات',
+      label: 'طلبات تناسب ورشتك',
+    },
   },
   en: {
     kicker: 'Levo Community · what the makers made',
@@ -172,6 +180,13 @@ const STRINGS = {
     workshops: 'workshops',
     kind: 'Kind',
     tags: 'Tags',
+    board: {
+      kicker: 'For your workshop',
+      dek: 'Open requests your printers can make now.',
+      empty: 'No requests fit your workshop right now. We will tell you when one you can make arrives.',
+      prefs: 'Review your request preferences',
+      label: 'Requests that fit your workshop',
+    },
   },
   ckb: {
     kicker: 'کۆمەڵگەی لیڤۆ · ئەوەی دروستکەران دروستیان کردووە',
@@ -254,6 +269,13 @@ const STRINGS = {
     workshops: 'وۆرکشۆپ',
     kind: 'جۆر',
     tags: 'تاگەکان',
+    board: {
+      kicker: 'بۆ وۆرکشۆپەکەت',
+      dek: 'داواکاریی کراوە کە چاپکەرەکانت ئێستا دەتوانن جێبەجێیان بکەن.',
+      empty: 'ئێستا هیچ داواکارییەک لەگەڵ وۆرکشۆپەکەت ناگونجێت. کاتێک داواکارییەک بگات کە دەتوانیت جێبەجێی بکەیت ئاگادارت دەکەینەوە.',
+      prefs: 'ڕێکخستنەکانی داواکاری ببینەوە',
+      label: 'داواکاریی گونجاو بۆ وۆرکشۆپەکەت',
+    },
   },
 } as const;
 

@@ -35,6 +35,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { STOREFRONT_FIXED_KB } from '../worker/lib/storeSpeed';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = join(ROOT, 'dist');
@@ -314,10 +315,18 @@ test('the split really happened: every page and panel §10 names has a chunk of 
     // both are named here so a regression that drops either tab — leaving the
     // seventeen `/api/admin/mystery` routes with no UI again — fails loudly.
     'AdminMystery', 'AdminMysteryPools',
+    // COMMUNITY PHASE 5 + MERCHANT P4/P5 (perf review 2026-09-30): the request
+    // page (offers, discussion, compare), the order timeline, the merchant's
+    // custom-order screen, the Counter's announcement sheet and the workshop
+    // board rail are each a lazy chunk — named here, and kept out of the
+    // entry, the store pages and the workspace frame by the test below.
+    'Request', 'OrderTimeline', 'CustomOrderScreen', 'AnnouncementSheet', 'BoardRail',
     // the manualChunks groups — `vendor-motion` is the features half and
     // `vendor-motion-core` the eager half (P1b); `vendor-icons` the icons the
     // lazy routes share (vite.config.ts `iconChunk`).
     'vendor-react', 'vendor-motion', 'vendor-motion-core', 'vendor-charts', 'vendor-phone', 'vendor-qr', 'vendor-i18n', 'vendor-webgl', 'vendor-icons',
+    // the store layout's tables and the storefront's theme lookups, one file (review 2026-09-30).
+    'store-layout',
   ]) {
     if (!has(name)) missing.push(name);
   }
@@ -364,6 +373,15 @@ test('the split really happened: every page and panel §10 names has a chunk of 
  * then 47.0 with the product page's lazy save/share row and the follower
  * count that moves with a follow. AT THE BUDGET: the next addition to a store
  * page makes something else lazy, or argues for a new number here.
+ *
+ * COMMUNITY PHASE 5 + MERCHANT P4/P5 (2026-09-30): 47,739 B as integrated —
+ * 389 B from the gate. The review paid it back: ONE scheduler for the speed
+ * reporter (src/lib/storeBeacon.ts `scheduleStoreVitals`, the same effect had
+ * been written into both pages) and the store layout's tables as ONE file
+ * (vite.config.ts `store-layout`, where Rollup had split them in three by
+ * importer set) — 47,480 B with the review's own a11y fixes inside it. The
+ * hero's workshop facts and the video element became small chunks of their
+ * own, so a classic page no longer fetches `extra` for them.
  *
  * WHAT COUNTS (P1b). The closure is split in two: the store pages' OWN
  * weight — their chunks and the app modules they pull in, which this budget
@@ -412,11 +430,31 @@ test('the storefront pages add at most 47 KB gzip beyond the initial payload, an
   console.log(`bundle: storefront pages ${kb(total)} gzip beyond the initial payload\n${detail}`);
   console.log(`bundle: storefront pages also share ${vendor.map((f) => `${f} ${kb(gz(join(ASSETS, f)))}`).join(', ') || 'no vendor chunk'}`);
   assert.ok(total <= STOREFRONT_BUDGET, `the storefront pages add ${kb(total)} gzip, over ${kb(STOREFRONT_BUDGET)}:\n${detail}`);
+  // P4: the speed tab's «ثابت للتطبيق» row (worker/lib/storeSpeed.ts STOREFRONT_FIXED_KB) IS this
+  // measurement — the initial payload plus the storefront pages' own closure — so the number a
+  // merchant is shown cannot drift from the build by more than 3 KB.
+  const fixed = ([...initial].reduce((sum, f) => sum + gz(join(ASSETS, f)), 0) + total) / KB;
+  console.log(`bundle: a store page's fixed app weight ${fixed.toFixed(1)} KB (STOREFRONT_FIXED_KB = ${STOREFRONT_FIXED_KB})`);
+  assert.ok(
+    Math.abs(fixed - STOREFRONT_FIXED_KB) <= 3,
+    `worker/lib/storeSpeed.ts STOREFRONT_FIXED_KB is ${STOREFRONT_FIXED_KB} but the build measures ${fixed.toFixed(1)} KB — update the figure the speed tab shows`
+  );
 
   assert.ok(chunk('extra'), 'the non-classic blocks have no lazy chunk of their own');
   assert.ok(chunk('StoreDesignPanel'), 'the store design panel is not a lazy chunk');
   assert.ok(chunk('tabViews'), 'the other tabs\' views have no lazy chunk of their own');
-  for (const lazyOnly of ['extra', 'tabViews', 'StoreDesignPanel', 'MerchantDashboardPage', 'vendor-charts']) {
+  // P4: the real-user speed reporter is imported after load + idle, never statically.
+  assert.ok(chunk('storeVitals'), 'the speed reporter has no lazy chunk of its own');
+  // P5: the page background's media (poster, image, video) arrives after the blocks.
+  assert.ok(chunk('BackgroundMedia'), 'the background media layer has no lazy chunk of its own');
+  // Review 2026-09-30: the hero's workshop facts row and the moving picture are small chunks of their own —
+  // a classic store no longer fetches the 9 KB `extra` chunk for either.
+  assert.ok(chunk('workshopFacts'), 'the workshop facts row has no lazy chunk of its own');
+  assert.ok(chunk('StoreVideo'), 'the store video element has no lazy chunk of its own');
+  for (const piece of ['workshopFacts', 'StoreVideo']) {
+    assert.equal(staticClosure(chunk(piece)!).has(chunk('extra')!), false, `${piece} statically pulls in the non-classic blocks' chunk`);
+  }
+  for (const lazyOnly of ['extra', 'tabViews', 'StoreDesignPanel', 'MerchantDashboardPage', 'vendor-charts', 'storeVitals', 'BackgroundMedia', 'workshopFacts', 'StoreVideo']) {
     const found = [...beyond, ...initial].find((f) => f.startsWith(`${lazyOnly}-`));
     assert.equal(found, undefined, `${lazyOnly} is a STATIC import of a storefront page — every store visit would download it`);
   }
@@ -488,6 +526,9 @@ test('the merchant workspace shell is small, stays out of every customer closure
     assert.equal(inShell.has(f!), false, `${name} is a STATIC import of the workspace shell — opening /merchant would download it`);
     assert.equal(initial.has(f!), false, `${name} is in the initial payload`);
   }
+  // P4: the builder's «السرعة» tab is a lazy chunk of the builder, fetched when the tab opens.
+  assert.ok(chunk('SpeedPanel'), 'the speed tab has no chunk of its own');
+  assert.equal(staticClosure(chunk('StoreDesignPanel')!).has(chunk('SpeedPanel')!), false, 'the speed tab is a static import of the builder');
   // Nothing of the workspace reaches a store visitor either.
   const storefront = new Set(['Storefront', 'StorefrontProduct'].flatMap((n) => [...staticClosure(chunk(n)!)]));
   for (const name of ['MerchantDashboardPage', ...WORKSPACE_SCREENS]) {
@@ -537,6 +578,37 @@ test('the analytics, order and Today screens stay small and never pull in a char
       assert.equal(beyond.some((x) => /^RestockSheet-/.test(x)), false, `${name} imports the restock sheet statically — it opens on a tap, as a lazy chunk`);
     }
   }
+});
+
+/**
+ * THE PHASE-5 SCREENS STAY LAZY (perf review 2026-09-30). The request page,
+ * the order timeline, the custom-order screen, the announcement sheet and the
+ * workshop board rail were new lazy chunks the gate did not name: a static
+ * import of any of them would have added it to every first visit, every store
+ * visit or every workspace open without a test failing. Each must be a chunk
+ * of its own and a static import of none of those closures; the announcement
+ * sheet opens on a tap from Today, so it is not in Today's closure either.
+ */
+const PHASE5_LAZY = ['Request', 'OrderTimeline', 'CustomOrderScreen', 'AnnouncementSheet', 'BoardRail'] as const;
+
+test('the Phase-5 screens are lazy chunks outside the entry, the store pages, the workspace frame and Today', () => {
+  const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
+  const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
+  const initial = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
+  const storefront = new Set(['Storefront', 'StorefrontProduct'].flatMap((n) => [...staticClosure(chunk(n)!)]));
+  const shell = staticClosure(chunk('MerchantDashboardPage')!);
+  const today = staticClosure(chunk('CommandCenter')!);
+  for (const name of PHASE5_LAZY) {
+    const f = chunk(name);
+    assert.ok(f, `${name} has no chunk of its own — its lazy import was removed`);
+    console.log(`bundle: ${name} ${kb(gz(join(ASSETS, f!)))} gzip (lazy)`);
+    assert.equal(initial.has(f!), false, `${name} is in the initial payload — every first visit would download it`);
+    assert.equal(storefront.has(f!), false, `${name} is a static import of a store page`);
+    assert.equal(shell.has(f!), false, `${name} is a static import of the workspace frame — opening /merchant would download it`);
+  }
+  assert.equal(today.has(chunk('AnnouncementSheet')!), false, 'the announcement sheet is a static import of Today — it opens on a tap, as a lazy chunk');
+  // The board rail is fetched by the community home only for a signed-in workshop — never inside the home's own chunk.
+  assert.equal(staticClosure(chunk('Community')!).has(chunk('BoardRail')!), false, 'the board rail is a static import of the community home');
 });
 
 test('the stylesheets stay under their budget', () => {

@@ -17,8 +17,15 @@
  *
  * WRITE (merchant). `verifyLayoutRefs` runs after `normalizeLayout` on every
  * save, publish and restore: media keys must be THIS owner's live uploads of
- * the right kind (image vs video), product / collection / coupon ids must be
- * THIS store's rows. What fails is removed with an issue.
+ * the right kind (image vs video) and no heavier than their slot allows
+ * (storefront L5), product / collection / coupon ids must be THIS store's
+ * rows. What fails is removed with an issue.
+ *
+ * LIBRARY (merchant). `mediaUsedIn` answers where a library file is still
+ * shown — the draft and the published page, the showcase, collections,
+ * products, the store's own logo, banner and avatar — so the builder can say
+ * «used in …» and the delete door can refuse (MEDIA_IN_USE) instead of
+ * breaking a page.
  */
 import { normalizeLayout, renderableBlocks, type LayoutIssue } from '@levonis/storeLayout/normalize';
 import { defaultLayoutFromStore } from '@levonis/storeLayout/defaults';
@@ -32,8 +39,9 @@ import {
   type ProductPage,
   type ReviewsData,
 } from '@levonis/storeLayout/data';
-import { collectLayoutRefs, dropLayoutRefs } from '@levonis/storeLayout/verify';
-import type { StoreLayout } from '@levonis/storeLayout/schema';
+import { collectLayoutRefs, dropLayoutRefs, heavyMedia, mediaSlots, type HeavyMedia } from '@levonis/storeLayout/verify';
+import { defaultHeader, type StoreLayout } from '@levonis/storeLayout/schema';
+import { ANONYMOUS_LIFETIME } from './edgePolicy';
 import { safeLink } from './homeContent';
 import { ownedMediaKey } from './mediaRefs';
 import { isSchemaMissing } from './membershipBenefits';
@@ -87,13 +95,39 @@ export interface StorefrontLayoutPayload {
   blocks_data: BlockData;
 }
 
-export async function storefrontLayoutPayload(db: D1Database, ctx: StoreContext): Promise<StorefrontLayoutPayload> {
+/**
+ * NOT BEFORE ITS TIME (review 2026-09-30). The live page filters a scheduled
+ * block and a dated notice in the browser (`renderableBlocks(…, 'live')`,
+ * `noticeLive`), but the page JSON is the same bytes for every visitor and
+ * edge-cached: a merchant's planned launch — the block, its data, the notice
+ * — was readable in it days before its window opened. The PUBLIC payload
+ * therefore leaves out a block or a notice whose window opens later than
+ * `SCHEDULE_LEAD_MS` from now, and one whose window has closed. The lead is
+ * longer than the longest an edge copy of the page lives (s-maxage plus
+ * stale-while-revalidate, worker/lib/edgePolicy.ts), so a block is always in
+ * the payload by the time it opens, and the browser still shows it at the
+ * exact instant. What leaves the payload is never planned for either, so its
+ * rows are not read. The builder's preview reads the layout itself.
+ */
+export const SCHEDULE_LEAD_MS = (ANONYMOUS_LIFETIME.sMaxAge + ANONYMOUS_LIFETIME.staleWhileRevalidate) * 1000 + 8 * 60_000;
+
+export function publicLayoutAt(layout: StoreLayout, nowMs: number): StoreLayout {
+  const later = (iso: string | undefined) => !!iso && Date.parse(iso) > nowMs + SCHEDULE_LEAD_MS;
+  const over = (iso: string | undefined) => !!iso && Date.parse(iso) <= nowMs;
+  const blocks = layout.blocks.filter((b) => !b.schedule || (!later(b.schedule.from) && !over(b.schedule.until)));
+  const h = layout.header;
+  const header = h && (later(h.notice_from) || over(h.notice_until)) ? defaultHeader(h.variant) : h;
+  return blocks.length === layout.blocks.length && header === h ? layout : { ...layout, blocks, header };
+}
+
+export async function storefrontLayoutPayload(db: D1Database, ctx: StoreContext, nowMs: number = Date.now()): Promise<StorefrontLayoutPayload> {
   const published = await publishedLayout(db, ctx);
+  const layout = publicLayoutAt(published.layout, nowMs);
   return {
-    layout: published.layout,
+    layout,
     layout_source: published.source,
     layout_revision: published.revision,
-    blocks_data: await blockDataFor(db, ctx, published.layout),
+    blocks_data: await blockDataFor(db, ctx, layout),
   };
 }
 
@@ -549,11 +583,19 @@ async function printersFor(db: D1Database, ctx: StoreContext): Promise<PrinterDa
  *
  * Returns the layout without what failed, and an issue for each removal.
  */
-export async function verifyLayoutRefs(
-  db: D1Database,
-  ctx: StoreContext,
-  layout: StoreLayout
-): Promise<{ layout: StoreLayout; issues: LayoutIssue[] }> {
+export interface VerifiedLayout {
+  layout: StoreLayout;
+  issues: LayoutIssue[];
+  /**
+   * The slots emptied as `media_too_heavy`, with the figures a refusal names
+   * (storefront L5). The draft door refuses on any (LAYOUT_MEDIA_TOO_HEAVY —
+   * the merchant just picked the file and can pick another); publish and
+   * restore keep the drop as an issue, like a picture deleted since the save.
+   */
+  heavy: HeavyMedia[];
+}
+
+export async function verifyLayoutRefs(db: D1Database, ctx: StoreContext, layout: StoreLayout): Promise<VerifiedLayout> {
   const refs = collectLayoutRefs(layout);
   const owner = ctx.store.user_id;
   const storeId = ctx.store.id;
@@ -576,26 +618,36 @@ export async function verifyLayoutRefs(
     canonical.length
       ? db
           .prepare(
-            `SELECT object_key, mime_type FROM file_objects
+            `SELECT object_key, mime_type, byte_size FROM file_objects
               WHERE owner_id = ?1 AND deleted_at IS NULL AND object_key IN (SELECT value FROM json_each(?2))`
           )
           .bind(owner, JSON.stringify(canonical.map((m) => m.key)))
-          .all<{ object_key: string; mime_type: string }>()
-          .then(({ results }) => new Map((results ?? []).map((r) => [String(r.object_key), String(r.mime_type)])))
-      : Promise.resolve(new Map<string, string>()),
+          .all<{ object_key: string; mime_type: string; byte_size: number | null }>()
+          .then(
+            ({ results }) =>
+              new Map((results ?? []).map((r) => [String(r.object_key), { mime: String(r.mime_type), bytes: Number(r.byte_size ?? 0) }]))
+          )
+      : Promise.resolve(new Map<string, { mime: string; bytes: number }>()),
     idsIn('community_products', refs.product),
     idsIn('merchant_store_sections', refs.collection),
     idsIn('merchant_coupons', refs.coupon),
   ]);
+  const bytes = new Map<string, number>();
   for (const m of canonical) {
-    const mime = live.get(m.key);
-    if (!mime || !mime.startsWith(m.kind === 'video' ? 'video/' : 'image/')) rejectMedia.add(m.key);
+    const row = live.get(m.key);
+    if (!row || !row.mime.startsWith(m.kind === 'video' ? 'video/' : 'image/')) rejectMedia.add(m.key);
+    else bytes.set(m.key, row.bytes);
   }
+  // The weight rule (storefront L5) is judged per SLOT from the ledger's own
+  // byte count: the same picture may sit inside a banner's cap and over a
+  // gallery item's. A key already rejected is not also «too heavy».
+  const heavy = heavyMedia(layout, bytes).filter((h) => !rejectMedia.has(h.key));
   const missing = (ids: string[], found: Set<string>) => new Set(ids.filter((id) => !found.has(id)));
   const dropped = dropLayoutRefs(
     layout,
     {
       media: rejectMedia,
+      bytes,
       product: missing(refs.product, products),
       collection: missing(refs.collection, collections),
       coupon: missing(refs.coupon, coupons),
@@ -608,9 +660,10 @@ export async function verifyLayoutRefs(
     // that loosening it can never widen what reaches an href unnoticed.
     throw new Error('store layout: an external link passed the schema and failed safeLink');
   }
-  return dropped;
+  return { ...dropped, heavy };
 }
 
+/** Every external address the page holds — the header's notice link and the footer links included (L6/L7). */
 function externalLinks(layout: StoreLayout): string[] {
   const out: string[] = [];
   const visit = (v: unknown) => {
@@ -621,6 +674,222 @@ function externalLinks(layout: StoreLayout): string[] {
       else Object.values(o).forEach(visit);
     }
   };
+  visit(layout.header);
+  visit(layout.footer);
   layout.blocks.forEach((b) => visit(b.settings));
+  return out;
+}
+
+// ------------------------------------------------------------------ library
+
+/** Where a stored layout lives: the working draft, or the revision the public reads. */
+export type LayoutHome = 'draft' | 'published';
+
+/**
+ * The two layouts a store keeps that can still SHOW a file: the draft and the
+ * published revision (older revisions are restorable, and a restore is
+ * re-verified — a picture deleted in between is dropped there with an issue,
+ * never served). Each normalised with the owner's id; a database before 0122
+ * has neither.
+ */
+export async function storedLayouts(db: D1Database, ctx: StoreContext): Promise<Array<{ home: LayoutHome; layout: StoreLayout }>> {
+  const out: Array<{ home: LayoutHome; layout: StoreLayout }> = [];
+  const parse = (json: string) => normalizeLayout(safeParse<unknown>(json, null), { ownerUserId: ctx.store.user_id }).layout;
+  try {
+    const [draft, published] = await Promise.all([
+      db.prepare('SELECT layout_json FROM store_layout_drafts WHERE store_id = ?').bind(ctx.store.id).first<{ layout_json: string }>(),
+      db
+        .prepare(
+          `SELECT r.layout_json
+             FROM merchant_stores s
+             JOIN store_layout_revisions r ON r.id = s.published_revision_id AND r.store_id = s.id
+            WHERE s.id = ?`
+        )
+        .bind(ctx.store.id)
+        .first<{ layout_json: string }>(),
+    ]);
+    if (draft) out.push({ home: 'draft', layout: parse(draft.layout_json) });
+    if (published) out.push({ home: 'published', layout: parse(published.layout_json) });
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+  }
+  return out;
+}
+
+/**
+ * Where a library file is shown (docs/MERCHANT_PLATFORM_V2.md storefront B1).
+ * `layout` names the home (`draft` / `published`) in `id` and the block — or
+ * the page slot `header` / `footer` / `background` — in `block_id`; the rest
+ * name the row: a showcase entry, a collection cover, a product (its gallery,
+ * its media rows, a variant's picture or a legacy option / colour picture), a
+ * service card, the store's own logo / banner (`id` is which), the merchant's
+ * avatar and — since the 2026-09-30 review — a community post of the owner's
+ * (`post`, which may carry the store's library pictures: communityPosts.ts
+ * `checkMedia`).
+ */
+export type MediaUseKind = 'layout' | 'showcase' | 'collection' | 'product' | 'service' | 'store' | 'avatar' | 'post';
+
+/**
+ * EVERY COLUMN OF THE MEDIA MANIFEST, DECIDED (review 2026-09-30). The delete
+ * door below must never call a file unused while a row still shows it, and
+ * the one it missed — `community_post_media`, a post carrying the store's
+ * library picture — let a published post lose its picture from the library
+ * and then refuse its own author's edit (POST_MEDIA_NOT_OWNED). So every
+ * source in `MEDIA_REFERENCE_SOURCES` (worker/lib/mediaRefs.ts) is either READ
+ * by `mediaUsedIn` (`LIBRARY_HOLDERS`) or listed in `NOT_LIBRARY_HOLDERS` with
+ * the reason a store-library key (`merchants/<uid>/public/…`) cannot be a live
+ * use there; tests/mediaReferences.test.ts fails on a source in neither list,
+ * so the next holder is decided on the day it is registered.
+ */
+export const LIBRARY_HOLDERS: readonly string[] = [
+  'store_layout_drafts.layout_json',
+  'store_layout_revisions.layout_json',
+  'merchant_showcase.image_key',
+  'merchant_store_sections.image_key',
+  'merchant_services.image_key',
+  'community_products.images',
+  'community_products.options',
+  'community_products.colors',
+  'community_product_media.media_key',
+  'community_product_variants.image_key',
+  'merchant_stores.logo_key',
+  'merchant_stores.banner_key',
+  'community_merchants.avatar_key',
+  'community_post_media.media_key',
+];
+
+const ADMIN_SHOP = "the admin catalogue, the site's own products and settings: admin uploads (products/, UiUx/), never a store's library";
+const FROZEN = 'a frozen record of something already sent or sold: it keeps the bytes alive through the media sweep, and a library delete sets only `deleted_at`, so it never takes a served byte from it';
+const PRIVATE = 'a private object under its own prefix, served by its own gated route: a public store-library key cannot be one';
+const PERSON = "a person's own media under their own prefix (account avatar and profile, a review's photographs), not a store's library";
+
+export const NOT_LIBRARY_HOLDERS: Readonly<Record<string, string>> = {
+  ...Object.fromEntries(
+    [
+      'catalogs.image_key', 'catalogs.hero_image_key', 'catalogs.hero_light_image_key', 'catalogs.light_image_key',
+      'catalogs.mobile_image_key', 'catalogs.light_mobile_image_key', 'catalogs.hero_mobile_image_key', 'catalogs.hero_light_mobile_image_key',
+      'product_images.r2_key', 'product_images.url', 'product_option_values.image', 'product_colors.image',
+      'products.images', 'products.light_image', 'products.description_images', 'products.description_videos', 'products.options',
+      'products.colors', 'products.content_blocks', 'products.usage_guide', 'products.how_to_use', 'products.how_to_use_ar',
+      'products.how_to_use_ckb', 'products.specifications', 'products.condition_doc', 'products.stores',
+      'product_imports.payload', 'product_imports.report', 'bundles.image', 'investment_items.image', 'admin_settings.value',
+    ].map((k) => [k, ADMIN_SHOP])
+  ),
+  ...Object.fromEntries(
+    [
+      'order_items.image_snapshot', 'mystery_allocations.image_snapshot', 'community_orders.offer_snapshot', 'invoices.snapshot',
+      'chat_messages.card_snapshot', 'user_notifications.meta', 'tg_admin_notifications.photo_key',
+    ].map((k) => [k, FROZEN])
+  ),
+  ...Object.fromEntries(
+    [
+      'review_rewards.instagram_evidence', 'wallet_transactions.receipt_key', 'chat_messages.file_key', 'claim_messages.file_key',
+      'community_complaint_messages.file_key', 'support_ticket_messages.file_key', 'warranty_claims.evidence', 'return_cases.evidence',
+      'trade_in_photos.file_key', 'restriction_cases.evidence', 'kyc_cases.evidence_keys', 'kyc_cases.payload',
+      'community_request_files.file_key', 'community_request_files.preview_key', 'community_offer_files.file_key',
+      'community_offer_drafts.files_json', 'community_order_updates.file_key', 'product_files.file_key', 'product_files.preview_key',
+      'community_post_files.file_key', 'community_post_files.preview_key', 'viewer_grants.file_key', 'print_analyses.file_key',
+    ].map((k) => [k, PRIVATE])
+  ),
+  ...Object.fromEntries(['users.avatar_key', 'users.profile_json', 'reviews.media', 'merchant_reviews.images'].map((k) => [k, PERSON])),
+  ...Object.fromEntries(
+    ['merchant_store_icons.icon192_key', 'merchant_store_icons.icon512_key', 'merchant_store_icons.maskable512_key',
+      'merchant_store_icons.apple180_key', 'merchant_store_icons.favicon32_key'].map((k) => [k, 'an icon rendition under its own store-icons/ prefix, cut from the logo'])
+  ),
+  'merchant_store_icons.source_key': 'the logo the renditions were cut from — the same key `merchant_stores.logo_key` holds, which is read',
+  'link_cards.image_key': 'a re-hosted Open Graph picture under link-cards/, never a library file',
+  'upload_sessions.object_key': 'an upload still being assembled: not in the library until it completes',
+};
+
+export interface MediaUse {
+  kind: MediaUseKind;
+  id?: string;
+  block_id?: string;
+}
+
+/**
+ * THE USES OF THESE KEYS ON THIS STORE — narrow on purpose: only the rows this
+ * store (or its owner) can show, only the keys asked, each source one
+ * set-based statement through `json_each`. Keys may be stored bare or as
+ * `/files/<key>`; both spellings are looked for and the bare key answers.
+ * A source that cannot be read is an error, not a smaller answer: the delete
+ * door must never call a file unused because a table was unreadable.
+ */
+export async function mediaUsedIn(db: D1Database, ctx: StoreContext, keys: readonly string[]): Promise<Map<string, MediaUse[]>> {
+  const out = new Map<string, MediaUse[]>();
+  const wanted = new Set(keys.filter((k) => typeof k === 'string' && k));
+  if (!wanted.size) return out;
+  const bare = (k: string) => (k.startsWith('/files/') ? k.slice('/files/'.length) : k);
+  const add = (key: unknown, use: MediaUse) => {
+    if (typeof key !== 'string') return;
+    const k = bare(key);
+    if (!wanted.has(k)) return;
+    const list = out.get(k) ?? [];
+    if (!list.some((u) => u.kind === use.kind && u.id === use.id && u.block_id === use.block_id)) list.push(use);
+    out.set(k, list);
+  };
+  const forms = JSON.stringify([...wanted].flatMap((k) => [k, `/files/${k}`]));
+  const storeId = ctx.store.id;
+  const rows = async (sql: string, ...binds: unknown[]) =>
+    (await db.prepare(sql).bind(...binds).all<Record<string, unknown>>()).results ?? [];
+  const optional = async (sql: string, ...binds: unknown[]) => {
+    try {
+      return await rows(sql, ...binds);
+    } catch (e) {
+      if (isSchemaMissing(e)) return [];
+      throw e;
+    }
+  };
+  const IN = 'IN (SELECT value FROM json_each(?2))';
+
+  const [layouts, showcase, sections, services, products, productMedia, variants, store, merchant, posts] = await Promise.all([
+    storedLayouts(db, ctx),
+    rows(`SELECT id, image_key AS k FROM merchant_showcase WHERE store_id = ?1 AND image_key ${IN}`, storeId, forms),
+    rows(`SELECT id, image_key AS k FROM merchant_store_sections WHERE store_id = ?1 AND image_key ${IN}`, storeId, forms),
+    rows(`SELECT id, image_key AS k FROM merchant_services WHERE store_id = ?1 AND image_key ${IN}`, storeId, forms),
+    // The gallery, and the legacy embedded option / colour lists — their
+    // pictures sit at any depth, so the whole document is walked.
+    rows(
+      `SELECT p.id, j.value AS k
+         FROM community_products p, json_each(CASE WHEN json_valid(p.images) THEN p.images ELSE '[]' END) j
+        WHERE p.store_id = ?1 AND j.value ${IN}
+       UNION
+       SELECT p.id, t.value AS k
+         FROM community_products p, json_tree(CASE WHEN json_valid(p.options) THEN p.options ELSE '[]' END) t
+        WHERE p.store_id = ?1 AND t.type = 'text' AND t.value ${IN}
+       UNION
+       SELECT p.id, t.value AS k
+         FROM community_products p, json_tree(CASE WHEN json_valid(p.colors) THEN p.colors ELSE '[]' END) t
+        WHERE p.store_id = ?1 AND t.type = 'text' AND t.value ${IN}`,
+      storeId,
+      forms
+    ),
+    optional(`SELECT product_id AS id, media_key AS k FROM community_product_media WHERE store_id = ?1 AND media_key ${IN}`, storeId, forms),
+    optional(`SELECT product_id AS id, image_key AS k FROM community_product_variants WHERE store_id = ?1 AND image_key ${IN}`, storeId, forms),
+    rows('SELECT logo_key, banner_key FROM merchant_stores WHERE id = ?1', storeId),
+    rows('SELECT avatar_key FROM community_merchants WHERE id = ?1', ctx.merchant.id),
+    // A community post of the store's owner, in any state: a draft re-saved,
+    // an archived one restored, must still find its picture in the library.
+    optional(
+      `SELECT pm.post_id AS id, pm.media_key AS k
+         FROM community_post_media pm JOIN community_posts p ON p.id = pm.post_id
+        WHERE p.author_id = ?1 AND pm.media_key ${IN}`,
+      ctx.store.user_id,
+      forms
+    ),
+  ]);
+  for (const { home, layout } of layouts) {
+    for (const slot of mediaSlots(layout)) add(slot.key, { kind: 'layout', id: home, block_id: slot.block_id });
+  }
+  for (const r of showcase) add(r.k, { kind: 'showcase', id: String(r.id) });
+  for (const r of sections) add(r.k, { kind: 'collection', id: String(r.id) });
+  for (const r of services) add(r.k, { kind: 'service', id: String(r.id) });
+  for (const r of [...products, ...productMedia, ...variants]) add(r.k, { kind: 'product', id: String(r.id) });
+  for (const r of posts) add(r.k, { kind: 'post', id: String(r.id) });
+  for (const r of store) {
+    add(r.logo_key, { kind: 'store', id: 'logo' });
+    add(r.banner_key, { kind: 'store', id: 'banner' });
+  }
+  for (const r of merchant) add(r.avatar_key, { kind: 'avatar' });
   return out;
 }

@@ -89,6 +89,21 @@ export function fileKindFromMime(mime: string, key = ''): FileKind {
 }
 
 /**
+ * A STRICTER DOOR for a consumer whose purpose was born WITH the purpose
+ * column (review 2026-09-30, offers): no legacy row can be one of its files,
+ * so the '' admission above is closed (`exactPurpose`), the key must sit
+ * under the consumer's own placement (`prefix`, e.g. `merchants/<uid>/offers/`)
+ * and — where the upload door filed it under a thing — under THAT thing
+ * (`entityId`, `file_objects.entity_id`). A bank-transfer receipt, a chat
+ * picture or another job's quote therefore never passes as an offer file.
+ */
+export interface OwnedFileOptions {
+  exactPurpose?: boolean;
+  prefix?: string;
+  entityId?: string;
+}
+
+/**
  * The caller's own private object under one of `purposes`, or null. Null for
  * a missing row, somebody else's row, a public object, a deleted one and a
  * key that is not even well-formed — one answer, so the door says nothing
@@ -98,19 +113,34 @@ export async function ownedFileObject(
   db: D1Database,
   key: unknown,
   userId: string,
-  purposes: readonly string[]
+  purposes: readonly string[],
+  opts: OwnedFileOptions = {}
 ): Promise<OwnedFileObject | null> {
   const k = typeof key === 'string' ? key.trim().replace(/^\/files\//, '') : '';
   if (!isSafeMediaKey(k) || !userId) return null;
+  if (opts.prefix && !k.startsWith(opts.prefix)) return null;
   const hasPurpose = await fileObjectsHavePurpose(db);
+  // Placeholders are appended with their values, so the SQL never names a
+  // parameter it was not given.
+  const binds: unknown[] = [k, userId];
+  const where: string[] = [];
+  if (hasPurpose) {
+    binds.push(JSON.stringify(purposes));
+    const inPurposes = `purpose IN (SELECT value FROM json_each(?${binds.length}))`;
+    where.push(opts.exactPurpose ? `AND ${inPurposes}` : `AND (purpose = '' OR ${inPurposes})`);
+  }
+  if (opts.entityId !== undefined) {
+    binds.push(opts.entityId);
+    where.push(`AND entity_id = ?${binds.length}`);
+  }
   const row = await db
     .prepare(
       `SELECT object_key, mime_type, byte_size, original_name
          FROM file_objects
         WHERE object_key = ?1 AND owner_id = ?2 AND deleted_at IS NULL AND visibility = 'private'
-          ${hasPurpose ? `AND (purpose = '' OR purpose IN (SELECT value FROM json_each(?3)))` : ''}`
+          ${where.join(' ')}`
     )
-    .bind(k, userId, ...(hasPurpose ? [JSON.stringify(purposes)] : []))
+    .bind(...binds)
     .first<{ object_key: string; mime_type: string; byte_size: number; original_name: string | null }>();
   if (!row) return null;
   return {

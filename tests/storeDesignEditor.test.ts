@@ -674,3 +674,82 @@ test('autosave: a failed save is an error the next change or flush retries — n
   assert.equal(g.saver.snapshot.status, 'blocked');
   assert.equal(g.saver.snapshot.issues[0].code, 'unsafe_link');
 });
+
+// ------------------------------------------------------------ media everywhere (P5): the page's own keys
+
+/**
+ * The editor holds the page's new keys (storefront L3/L4/L6/L7/L8) exactly as
+ * the gate returns them, so an autosave sends what it holds and nothing moves
+ * under the merchant. The UI builder's controls (Page panel, schedule field)
+ * write these shapes; until they land, this pins the shapes themselves.
+ */
+test('P5 round-trips: header.notice + window, footer.links, background and a block schedule are canonical through the gate', () => {
+  const base = starterLayout('modern');
+  const heroId = base.blocks.find((b) => b.type === 'hero')!.id;
+  let l: StoreLayout = {
+    ...base,
+    header: {
+      ...base.header,
+      notice: { ar: 'توصيل مجاني هذا الأسبوع', en: 'Free delivery this week', ckb: 'ئەم هەفتەیە گەیاندن بەخۆڕاییە' },
+      notice_link: { kind: 'route', route: 'deals' },
+      notice_from: '2026-10-01T00:00:00.000Z',
+      notice_until: '2026-10-08T00:00:00.000Z',
+    },
+    footer: {
+      ...base.footer,
+      links: [
+        { label: { ar: 'سياسة الاستبدال', en: 'Returns', ckb: 'گەڕاندنەوە' }, link: { kind: 'route', route: 'about' } },
+        { label: { ar: '', en: 'Instagram', ckb: '' }, link: { kind: 'external', url: 'https://www.instagram.com/raf3d' } },
+        { label: { ar: 'المنتج', en: '', ckb: '' }, link: { kind: 'product', id: 'p1' } },
+      ],
+    },
+    background: { kind: 'video', media: VID, poster: PIC, dim: 'heavy', phones: true },
+  };
+  l = setSetting(l, heroId, 'video', VID);
+  l = setSetting(l, heroId, 'image', PIC);
+  l = setSetting(l, heroId, 'video_on_phone', true);
+  l = { ...l, blocks: l.blocks.map((b) => (b.type === 'hero' ? b : { ...b, schedule: { from: '2027-01-01T00:00:00.000Z', until: '' } })) };
+  assertCanonical(l, 'notice + links + background + schedule');
+  const v = validateLayout(l, OWNER);
+  assert.equal(v.fatal, false);
+  assert.deepEqual(v.page, []);
+  assert.deepEqual(v.result.layout, l);
+
+  // The variant setters keep the new keys beside the variant.
+  const moved = setHeader(setFooter(l, 'none'), 'bar');
+  assert.equal(moved.header.variant, 'bar');
+  assert.deepEqual(moved.header.notice, l.header.notice);
+  assert.equal(moved.header.notice_until, l.header.notice_until);
+  assert.equal(moved.footer.variant, 'none');
+  assert.deepEqual(moved.footer.links, l.footer.links);
+  assertCanonical(moved, 'variant change keeps notice and links');
+
+  // The background by kind: an image (a GIF too) carries no poster; off carries nothing.
+  for (const background of [
+    { kind: 'image' as const, media: PIC, poster: '', dim: 'light' as const, phones: false },
+    { kind: 'image' as const, media: 'merchants/owner/public/loop0001.gif', poster: '', dim: 'medium' as const, phones: true },
+    { kind: 'none' as const, media: '', poster: '', dim: 'medium' as const, phones: false },
+  ]) {
+    assertCanonical({ ...l, background }, `background ${background.kind}`);
+  }
+  // Every dim, every kind, the empty notice and no links are canonical too.
+  for (const dim of ['light', 'medium', 'heavy'] as const) assertCanonical({ ...l, background: { ...l.background, dim } }, dim);
+  assertCanonical({ ...l, header: { variant: 'overlay', notice: { ar: '', en: '', ckb: '' }, notice_link: { kind: 'none' } }, footer: { variant: 'minimal', links: [] } }, 'empty page keys');
+
+  // Hostile page keys go where hostile block keys go: stripped or refused, never sent.
+  const hostile = {
+    ...l,
+    header: { ...l.header, notice_link: { kind: 'external', url: 'javascript:alert(1)' }, style: 'position:fixed' },
+    footer: { ...l.footer, links: [{ label: { ar: 'x', en: '', ckb: '' }, link: 'data:text/html,<script>' }] },
+    background: { kind: 'image', media: 'https://evil.example/pixel.gif', poster: '', dim: 'medium', phones: false },
+  } as unknown as StoreLayout;
+  const h = validateLayout(hostile, OWNER);
+  assert.equal(h.fatal, true, 'a foreign address in a page key refuses the save like one in a block');
+  const out = JSON.stringify(h.result.layout);
+  for (const bad of ['javascript:', 'data:', 'evil.example', 'position:fixed']) assert.ok(!out.includes(bad), bad);
+  assert.equal(h.result.layout.background.media, '');
+  assert.deepEqual(h.result.layout.header.notice_link, { kind: 'none' });
+  const another = validateLayout({ ...l, background: { ...l.background, media: 'merchants/other/public/their001.mp4' } }, OWNER);
+  assert.equal(another.fatal, true, 'somebody else\'s video behind the page is refused');
+  assert.ok(another.page.some((i) => i.path === 'background.media' && i.code === 'foreign_media'));
+});

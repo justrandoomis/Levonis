@@ -21,6 +21,25 @@ import { FOOTER_VARIANTS, HEADER_VARIANTS, type StoreLayout } from '../../../../
 import { THEME_NAMES, THEME_PRESETS, TOKEN_KEYS, TOKEN_VALUES, type ThemeName, type ThemeTokens } from '../../../../packages/storeLayout/src/tokens';
 import { FOOTER_COPY, HEADER_COPY, say, THEME_COPY, TOKEN_COPY, TOKEN_VALUE_COPY } from './catalog';
 import { setFooter, setHeader, setPreset, setToken } from './editorModel';
+// The Page panel's own fields (P5, storefront L4/L6/L7, B2): the notice line, the footer links, the background.
+import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { IconButton } from '../../ui/Button';
+import { Switch } from '../../ui/Switch';
+import { BACKGROUND_MEDIA, FOOTER_LINKS_SPEC, HEADER_FIELDS, MAX_FOOTER_LINKS } from '../../../../packages/storeLayout/src/blocks';
+import {
+  BACKGROUND_DIMS,
+  BACKGROUND_KINDS,
+  type BackgroundDim,
+  type BackgroundKind,
+  type FooterLink,
+  type StoreBackground,
+} from '../../../../packages/storeLayout/src/schema';
+import { EMPTY_TEXT, type LocalizedText } from '../../../../packages/storeLayout/src/text';
+import { NO_LINK, type LinkTarget } from '../../../../packages/storeLayout/src/refs';
+import type { LayoutIssue } from '../../../../packages/storeLayout/src/normalize';
+import type { ChangeSummary, FieldIssue } from './editorModel';
+import { SettingControl } from './fields';
+import { useMediaStrings, type MediaStrings } from './strings';
 
 // ----------------------------------------------------------- the swatch
 
@@ -198,8 +217,122 @@ export function ThemePanel({
 
 // ------------------------------------------------------------ page
 
-export function PagePanel({ layout, onChange }: { layout: StoreLayout; onChange: (l: StoreLayout) => void }) {
+// ------------------------------------------------------ page-level edits
+
+/** The notice line's words (L6); blank in every language = no bar. */
+export function setNotice(layout: StoreLayout, notice: LocalizedText): StoreLayout {
+  return { ...layout, header: { ...layout.header, notice: { ...EMPTY_TEXT, ...notice } } };
+}
+
+/** Where the notice goes when tapped. */
+export function setNoticeLink(layout: StoreLayout, link: LinkTarget): StoreLayout {
+  return { ...layout, header: { ...layout.header, notice_link: link } };
+}
+
+/** The notice's window: a bound set to '' is taken away (absent = no bound), as the normaliser writes it. */
+export function setNoticeWindow(layout: StoreLayout, patch: { from?: string; until?: string }): StoreLayout {
+  const header = { ...layout.header };
+  if (patch.from !== undefined) {
+    if (patch.from) header.notice_from = patch.from;
+    else delete header.notice_from;
+  }
+  if (patch.until !== undefined) {
+    if (patch.until) header.notice_until = patch.until;
+    else delete header.notice_until;
+  }
+  return { ...layout, header };
+}
+
+/** The footer links (L7), never more than the schema keeps. */
+export function setFooterLinks(layout: StoreLayout, links: readonly FooterLink[]): StoreLayout {
+  return { ...layout, footer: { ...layout.footer, links: links.slice(0, MAX_FOOTER_LINKS).map((l) => ({ label: { ...EMPTY_TEXT, ...l.label }, link: l.link })) } };
+}
+
+export function addFooterLink(layout: StoreLayout): StoreLayout {
+  if (layout.footer.links.length >= MAX_FOOTER_LINKS) return layout;
+  return setFooterLinks(layout, [...layout.footer.links, { label: { ...EMPTY_TEXT }, link: { ...NO_LINK } }]);
+}
+
+export function moveFooterLink(layout: StoreLayout, index: number, delta: -1 | 1): StoreLayout {
+  const links = [...layout.footer.links];
+  const j = index + delta;
+  if (index < 0 || index >= links.length || j < 0 || j >= links.length) return layout;
+  [links[index], links[j]] = [links[j], links[index]];
+  return setFooterLinks(layout, links);
+}
+
+export function removeFooterLink(layout: StoreLayout, index: number): StoreLayout {
+  if (index < 0 || index >= layout.footer.links.length) return layout;
+  return setFooterLinks(layout, layout.footer.links.filter((_, i) => i !== index));
+}
+
+/**
+ * The page background (L4). Changing the KIND clears the file (a picture's key
+ * under «video» would be refused as the wrong kind, and the reverse), and a
+ * poster lives only beside a video — the same rules the normaliser applies,
+ * so what the panel holds is what will be saved.
+ */
+export function setBackground(layout: StoreLayout, patch: Partial<StoreBackground>): StoreLayout {
+  const cur = layout.background;
+  const kind: BackgroundKind = patch.kind && (BACKGROUND_KINDS as readonly string[]).includes(patch.kind) ? patch.kind : cur.kind;
+  const kindChanged = kind !== cur.kind;
+  const media = kind === 'none' ? '' : patch.media !== undefined ? patch.media : kindChanged ? '' : cur.media;
+  const poster = kind !== 'video' ? '' : patch.poster !== undefined ? patch.poster : kindChanged ? '' : cur.poster;
+  const dim: BackgroundDim = patch.dim && (BACKGROUND_DIMS as readonly string[]).includes(patch.dim) ? patch.dim : cur.dim;
+  const phones = typeof patch.phones === 'boolean' ? patch.phones : cur.phones;
+  return { ...layout, background: { kind, media, poster, dim, phones } };
+}
+
+/**
+ * What publishing would change, with the page's own keys counted.
+ * `summarizeChanges` (editorModel.ts) compares the header and footer VARIANTS
+ * only, so a draft whose only change is its notice, its footer links or its
+ * background read «nothing to publish» and the Publish button stayed off. A
+ * notice or window counts as the header; the links as the footer; the
+ * background — which ChangeList has no row for yet — as the header too, so the
+ * dialog lists something rather than «no changes».
+ */
+export function withPageChanges(changes: ChangeSummary | null, live: StoreLayout, next: StoreLayout): ChangeSummary | null {
+  if (!changes) return changes;
+  const header = changes.header || JSON.stringify(live.header) !== JSON.stringify(next.header);
+  const footer = changes.footer || JSON.stringify(live.footer) !== JSON.stringify(next.footer);
+  const background = JSON.stringify(live.background ?? null) !== JSON.stringify(next.background ?? null);
+  if (header === changes.header && footer === changes.footer && !background) return changes;
+  return { ...changes, header: header || background, footer, none: false };
+}
+
+/** The gate's issues about one part of the page (`header`, `footer`, `background`), as the field kit reads them. */
+export function pageIssues(page: readonly LayoutIssue[], prefix: string): FieldIssue[] {
+  return page
+    .filter((i) => i.path === prefix || i.path.startsWith(`${prefix}.`))
+    .map((i) => ({ ...i, field: i.path === prefix ? '' : i.path.slice(prefix.length + 1) }));
+}
+
+const under = (issues: readonly FieldIssue[], field: string) =>
+  issues
+    .filter((i) => i.field === field || i.field.startsWith(`${field}.`) || i.field.startsWith(`${field}[`))
+    .map((i) => ({ ...i, field: i.field === field ? '' : i.field.slice(field.length + 1).replace(/^\./, '') }));
+
+/** Before `until`, or no window at all. */
+function outOfOrder(from: string | undefined, until: string | undefined): boolean {
+  return !!from && !!until && Number.isFinite(Date.parse(from)) && Number.isFinite(Date.parse(until)) && Date.parse(until) <= Date.parse(from);
+}
+
+// ------------------------------------------------------------ page
+
+export function PagePanel({
+  layout,
+  onChange,
+  page = [],
+}: {
+  layout: StoreLayout;
+  /** `key` coalesces keystrokes into one undo step. */
+  onChange: (l: StoreLayout, key?: string | null) => void;
+  /** The gate's issues about the page itself (Validation.page). */
+  page?: readonly LayoutIssue[];
+}) {
   const { loc } = useLanguage();
+  const t = useMediaStrings();
   return (
     <div className="space-y-6" data-sd-page>
       <VariantCards
@@ -209,6 +342,7 @@ export function PagePanel({ layout, onChange }: { layout: StoreLayout; onChange:
         copy={HEADER_COPY}
         onChange={(v) => onChange(setHeader(layout, v))}
       />
+      <NoticeFields layout={layout} onChange={onChange} issues={pageIssues(page, 'header')} t={t} />
       <VariantCards
         title={loc('تذييل الصفحة', 'Page footer')}
         value={layout.footer.variant}
@@ -216,6 +350,8 @@ export function PagePanel({ layout, onChange }: { layout: StoreLayout; onChange:
         copy={FOOTER_COPY}
         onChange={(v) => onChange(setFooter(layout, v))}
       />
+      <FooterLinkFields layout={layout} onChange={onChange} issues={pageIssues(page, 'footer')} t={t} />
+      <BackgroundFields layout={layout} onChange={onChange} issues={pageIssues(page, 'background')} t={t} />
       <p className="text-[12px] leading-relaxed text-text-muted">
         {loc(
           'اسم المتجر وشعاره وغلافه ووصفه وروابطه تُعدَّل من «إعدادات المتجر»، فتبقى واحدة في كل مكان.',
@@ -223,6 +359,207 @@ export function PagePanel({ layout, onChange }: { layout: StoreLayout; onChange:
         )}
       </p>
     </div>
+  );
+}
+
+type PartProps = { layout: StoreLayout; onChange: (l: StoreLayout, key?: string | null) => void; issues: FieldIssue[]; t: MediaStrings };
+
+/** «شريط الإعلان» (L6): the words, where they go, and when they show. */
+function NoticeFields({ layout, onChange, issues, t }: PartProps) {
+  const id = useId();
+  const h = layout.header;
+  const bad = outOfOrder(h.notice_from, h.notice_until);
+  return (
+    <section aria-labelledby={id} className="space-y-3" data-sd-notice>
+      <h3 id={id} className="text-[13px] font-bold text-text-primary">
+        {t.page.notice}
+      </h3>
+      <SettingControl
+        name="notice"
+        spec={HEADER_FIELDS.notice}
+        value={h.notice}
+        path="page.header.notice"
+        issues={under(issues, 'notice')}
+        label={t.page.noticeText}
+        hint={t.page.noticeHint}
+        onChange={(v, k) => onChange(setNotice(layout, v as LocalizedText), k ?? null)}
+      />
+      <SettingControl
+        name="notice_link"
+        spec={HEADER_FIELDS.notice_link}
+        value={h.notice_link}
+        path="page.header.notice_link"
+        issues={under(issues, 'notice_link')}
+        label={t.page.noticeLink}
+        onChange={(v, k) => onChange(setNoticeLink(layout, v as LinkTarget), k ?? null)}
+      />
+      {/* One under the other: the panel is a narrow column at every width, and a date-and-time field needs its whole line. */}
+      <div className="grid gap-3">
+        <SettingControl
+          name="notice_from"
+          spec={{ t: 'date' }}
+          value={h.notice_from ?? ''}
+          path="page.header.notice_from"
+          issues={[]}
+          label={t.page.from}
+          onChange={(v) => onChange(setNoticeWindow(layout, { from: typeof v === 'string' ? v : '' }))}
+        />
+        <SettingControl
+          name="notice_until"
+          spec={{ t: 'date' }}
+          value={h.notice_until ?? ''}
+          path="page.header.notice_until"
+          issues={[]}
+          label={t.page.until}
+          onChange={(v) => onChange(setNoticeWindow(layout, { until: typeof v === 'string' ? v : '' }))}
+        />
+      </div>
+      {bad ? (
+        <p className="lv-field-error" data-sd-notice-order>
+          {t.page.windowOrder}
+        </p>
+      ) : (
+        <p className="text-[12px] text-text-muted">{t.page.windowHint}</p>
+      )}
+    </section>
+  );
+}
+
+/** «روابط التذييل» (L7): up to six, each a label and a destination, in the merchant's order. */
+function FooterLinkFields({ layout, onChange, issues, t }: PartProps) {
+  const id = useId();
+  const links = layout.footer.links;
+  return (
+    <section aria-labelledby={id} className="space-y-2" data-sd-footer-links>
+      <div className="flex items-center gap-2">
+        <h3 id={id} className="text-[13px] font-bold text-text-primary">
+          {t.page.links}
+        </h3>
+        <span className="ms-auto text-[12px] tabular-nums text-text-muted" dir="ltr">
+          {links.length}/{MAX_FOOTER_LINKS}
+        </span>
+      </div>
+      {layout.footer.variant === 'none' && links.length > 0 && <p className="text-[12px] text-warning">{t.page.linksNone}</p>}
+      {links.map((l, i) => {
+        const at = `links[${i}]`;
+        const mine = under(issues, at);
+        const blank = !l.label.ar.trim() && !l.label.en.trim() && !l.label.ckb.trim();
+        return (
+          <div key={i} className="space-y-3 rounded-xl border border-border-subtle p-3" data-sd-footer-link={i}>
+            <div className="flex items-center gap-1">
+              <span className="text-[12px] font-semibold tabular-nums text-text-muted">{i + 1}</span>
+              <span className="ms-auto flex">
+                <IconButton icon={<ArrowUp className="h-4 w-4" />} label={t.page.moveUp} disabled={i === 0} onClick={() => onChange(moveFooterLink(layout, i, -1))} />
+                <IconButton icon={<ArrowDown className="h-4 w-4" />} label={t.page.moveDown} disabled={i === links.length - 1} onClick={() => onChange(moveFooterLink(layout, i, 1))} />
+                <IconButton icon={<Trash2 className="h-4 w-4" />} label={t.page.removeLink} onClick={() => onChange(removeFooterLink(layout, i))} />
+              </span>
+            </div>
+            <SettingControl
+              name="label"
+              spec={FOOTER_LINKS_SPEC.item.label}
+              value={l.label}
+              path={`page.footer.${at}.label`}
+              issues={under(mine, 'label')}
+              label={t.page.linkLabel}
+              onChange={(v, k) => onChange(setFooterLinks(layout, links.map((x, j) => (j === i ? { ...x, label: v as LocalizedText } : x))), k ?? null)}
+            />
+            <SettingControl
+              name="link"
+              spec={FOOTER_LINKS_SPEC.item.link}
+              value={l.link}
+              path={`page.footer.${at}.link`}
+              issues={under(mine, 'link')}
+              label={t.page.linkTarget}
+              onChange={(v, k) => onChange(setFooterLinks(layout, links.map((x, j) => (j === i ? { ...x, link: v as LinkTarget } : x))), k ?? null)}
+            />
+            {blank && <p className="text-[12px] text-warning">{t.page.linkIncomplete}</p>}
+          </div>
+        );
+      })}
+      {links.length < MAX_FOOTER_LINKS && (
+        <Button variant="secondary" size="sm" icon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => onChange(addFooterLink(layout))} data-sd-add-footer-link>
+          {t.page.addLink}
+        </Button>
+      )}
+    </section>
+  );
+}
+
+/** «الخلفية» (L4): the kind, its file (and a video's poster), the dim, and whether phones play the video. */
+function BackgroundFields({ layout, onChange, issues, t }: PartProps) {
+  const id = useId();
+  const bg = layout.background;
+  const set = (patch: Partial<StoreBackground>) => onChange(setBackground(layout, patch));
+  return (
+    <section aria-labelledby={id} className="space-y-3" data-sd-background={bg.kind}>
+      <h3 id={id} className="text-[13px] font-bold text-text-primary">
+        {t.page.background}
+      </h3>
+      <p className="text-[12px] leading-relaxed text-text-muted">{t.page.backgroundHint}</p>
+      <Segmented
+        size="sm"
+        group="sd-bg-kind"
+        label={t.page.kindLabel}
+        value={bg.kind}
+        onChange={(v) => set({ kind: v as BackgroundKind })}
+        items={BACKGROUND_KINDS.map((k) => ({ id: k, label: t.page.kind[k] }))}
+      />
+      {bg.kind === 'image' && (
+        <SettingControl
+          name="media"
+          spec={BACKGROUND_MEDIA.image}
+          value={bg.media}
+          path="page.background.media"
+          issues={under(issues, 'media')}
+          label={t.page.image}
+          hint={t.page.imageHint}
+          onChange={(v) => set({ media: typeof v === 'string' ? v : '' })}
+        />
+      )}
+      {bg.kind === 'video' && (
+        <>
+          <SettingControl
+            name="media"
+            spec={BACKGROUND_MEDIA.video}
+            value={bg.media}
+            path="page.background.media"
+            issues={under(issues, 'media')}
+            label={t.page.video}
+            poster={{ value: bg.poster, maxBytes: BACKGROUND_MEDIA.poster.max_bytes, setBoth: (media, poster) => set({ media, poster }) }}
+            onChange={(v) => set({ media: typeof v === 'string' ? v : '' })}
+          />
+          <SettingControl
+            name="poster"
+            spec={BACKGROUND_MEDIA.poster}
+            value={bg.poster}
+            path="page.background.poster"
+            issues={under(issues, 'poster')}
+            label={t.page.poster}
+            hint={t.page.posterHint}
+            onChange={(v) => set({ poster: typeof v === 'string' ? v : '' })}
+          />
+          {bg.media && !bg.poster && (
+            <p className="lv-field-error" data-sd-poster-required>
+              {t.library.posterRequired}
+            </p>
+          )}
+          <Switch checked={bg.phones} onChange={(v) => set({ phones: v })} label={t.page.phones} description={t.page.phonesHint} />
+        </>
+      )}
+      {bg.kind !== 'none' && (
+        <div className="space-y-1.5">
+          <p className="text-[12.5px] font-medium text-text-secondary">{t.page.dim}</p>
+          <Segmented
+            size="sm"
+            group="sd-bg-dim"
+            label={t.page.dim}
+            value={bg.dim}
+            onChange={(v) => set({ dim: v as BackgroundDim })}
+            items={BACKGROUND_DIMS.map((d) => ({ id: d, label: t.page.dims[d] }))}
+          />
+        </div>
+      )}
+    </section>
   );
 }
 

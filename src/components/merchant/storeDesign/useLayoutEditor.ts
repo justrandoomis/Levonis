@@ -220,7 +220,8 @@ export function useLayoutEditor() {
         const st = saverRef.current?.snapshot;
         const code =
           st?.status === 'conflict' ? 'DRAFT_CHANGED' : st?.status === 'blocked' ? 'DRAFT_UNSAVED' : st?.errorCode || 'DRAFT_SAVE_FAILED';
-        throw new ApiError(409, 'not saved', code);
+        // The save's own details ride along (the figures of a too-heavy file), so the refusal can say them.
+        throw new ApiError(409, 'not saved', code, st?.status === 'error' ? (st.errorDetails ?? undefined) : undefined);
       }
       let version = saverRef.current?.snapshot.version ?? 0;
       if (version === 0 && present) {

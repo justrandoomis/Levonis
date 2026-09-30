@@ -195,6 +195,13 @@ test('every code the table translates is one the server can actually emit', () =
     // not touch, and a preview that could not be fetched (a reason on the card).
     'worker/lib/linkCards.ts',
     'worker/routes/linkCards.ts',
+    // The request's discussion and the order's timeline (Phase 5b, §9.5):
+    // COMMENT_* and ORDER_UPDATE_* land on the request page and the order screen.
+    'worker/routes/requestDiscussion.ts',
+    'worker/routes/communityOrderTimeline.ts',
+    // Media everywhere in the store page (P5, storefront §4.7): a slot's weight
+    // cap, the poster a video needs, a library file still in use.
+    'worker/routes/storeLayout.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');
@@ -413,4 +420,65 @@ test('the review codes (F12) are translated, and each is emitted by its route', 
     const file = emitters[code] ?? 'worker/routes/marketplace.ts';
     assert.ok(readFileSync(join(ROOT, file), 'utf8').includes(`'${code}'`), `${file} does not emit ${code}`);
   }
+});
+
+/**
+ * MEDIA EVERYWHERE IN THE STORE PAGE (P5; docs/MERCHANT_PLATFORM_V2.md
+ * storefront §4.7): the three refusals the builder meets when a file is
+ * heavier than its slot, a video has no poster, or a library file is still in
+ * use. Each is written in all three languages — the §4.7 sentences verbatim —
+ * is raised by the layout routes, and is decoded by the builder's own map
+ * (src/components/merchant/storeDesign/refusal.ts) with its {size}/{max}/
+ * {where} figures filled from `details`.
+ */
+test('the store page\'s media refusals (P5) are translated, emitted by the layout routes and decoded by the builder', () => {
+  const codes = ['LAYOUT_MEDIA_TOO_HEAVY', 'LAYOUT_POSTER_REQUIRED', 'MEDIA_IN_USE', 'MEDIA_NOT_FOUND'] as const;
+  const route = readFileSync(join(ROOT, 'worker/routes/storeLayout.ts'), 'utf8');
+  const builder = readFileSync(join(ROOT, 'src/components/merchant/storeDesign/refusal.ts'), 'utf8');
+  for (const code of codes) {
+    const e = REFUSAL_STRINGS[code];
+    assert.ok(e, `${code} has no sentence`);
+    for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(e[lang]?.trim(), `${code}.${lang} is empty`);
+    assert.notEqual(e.ckb, e.ar, `${code}: ckb is a copy of the Arabic`);
+    assert.notEqual(e.ckb, e.en);
+    assert.ok(!/[A-Z]{3,}_[A-Z]/.test(e.ar + e.ckb), `${code}: a machine code leaked into the sentence`);
+    assert.ok(route.includes(`'${code}'`), `worker/routes/storeLayout.ts does not emit ${code}`);
+    assert.ok(builder.includes(`case '${code}'`), `the builder does not decode ${code}`);
+  }
+  // The figures are placeholders the builder fills, in every language.
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.ok(REFUSAL_STRINGS.LAYOUT_MEDIA_TOO_HEAVY[lang].includes('{size}') && REFUSAL_STRINGS.LAYOUT_MEDIA_TOO_HEAVY[lang].includes('{max}'), lang);
+    assert.ok(REFUSAL_STRINGS.MEDIA_IN_USE[lang].includes('{where}'), lang);
+  }
+  assert.equal(REFUSAL_STRINGS.LAYOUT_POSTER_REQUIRED.ar, 'اختر صورة ملصق للفيديو حتى يظهر شيء قبل التشغيل.');
+});
+
+
+/**
+ * THE PHASE 5 SCREENS SPEAK SORANI (docs/COMMUNITY_ECOSYSTEM.md §4e: «every
+ * code is localised … ar/en/ckb»; review 2026-09-30: the accept sheet showed
+ * an Arabic OFFER_CHANGED above an otherwise Sorani sheet). Every code the
+ * offers, acceptance, discussion, order timeline and custom-order screens can
+ * show — and the builder's media codes — carries its own Sorani, never the
+ * Arabic standing in, and the pages' words: «ئۆفەر», «وۆرکشۆپ».
+ */
+test('every Phase 5 refusal code has real Sorani — not the Arabic pasted across — in the pages\' own vocabulary', () => {
+  const PHASE5 = [
+    'OFFER_FEE_INVALID', 'OFFER_PICKUP_FEE', 'OFFER_FILE_LIMIT', 'UPLOAD_KIND_NOT_ALLOWED', 'OFFER_FILE_NOT_OWNED', 'OWN_REQUEST',
+    'OFFER_EXISTS', 'OFFER_DRAFT_EXISTS', 'REQUEST_CHANGED', 'OFFER_NOT_DRAFT', 'OFFER_REQUEST_CLOSED', 'OFFER_CHANGED', 'OFFER_STALE',
+    'INSUFFICIENT_FUNDS', 'ADDRESS_NOT_FOUND', 'OFFER_NOT_ELIGIBLE', 'OFFER_EXPIRED', 'ACCEPT_CONFLICT', 'OFFER_NOT_AVAILABLE',
+    'MERCHANT_UNAVAILABLE', 'WALLET_ERROR', 'PREFS_TURNAROUND_INVALID', 'PREFS_INTRO_TOO_LONG',
+    'COMMENT_KIND_NOT_ALLOWED', 'COMMENT_TOO_LONG', 'COMMENT_PARENT_INVALID', 'COMMENT_INDECENT', 'COMMENT_NOT_FOUND', 'REPORT_TARGET_NOT_FOUND',
+    'ORDER_UPDATE_KIND_NOT_ALLOWED', 'ORDER_UPDATE_TOO_LATE', 'ORDER_UPDATE_TOO_LONG', 'ORDER_UPDATE_FILE_NOT_OWNED',
+    'CUSTOM_ORDER_CANCEL_NEEDS_DISPUTE', 'CUSTOM_ORDER_CANNOT_START', 'CUSTOM_ORDER_CANNOT_DELIVER', 'CUSTOM_ORDER_CANNOT_CANCEL',
+    'CUSTOM_ORDER_CANNOT_CONFIRM', 'LAYOUT_MEDIA_TOO_HEAVY', 'LAYOUT_POSTER_REQUIRED', 'MEDIA_IN_USE', 'MEDIA_NOT_FOUND',
+  ];
+  const problems: string[] = [];
+  for (const code of PHASE5) {
+    const e = (REFUSAL_STRINGS as Record<string, { ar: string; en: string; ckb: string } | undefined>)[code];
+    if (!e) { problems.push(`${code}: absent`); continue; }
+    if (!e.ckb || e.ckb === e.ar) problems.push(`${code}: ckb is the Arabic`);
+    if (/پێشنیار|وەرشە/.test(e.ckb)) problems.push(`${code}: ckb says «پێشنیار»/«وەرشە», the pages say «ئۆفەر»/«وۆرکشۆپ»`);
+  }
+  assert.deepEqual(problems, []);
 });

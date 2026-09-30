@@ -4,15 +4,22 @@
  * it is for real customers. Each line is a DOOR to where it is changed, with
  * one dot for its tone and nothing else — the words carry the meaning.
  *
+ * THE SPEED LINE (P4) is read from the attention's `speed` source, which the
+ * server answers ONLY when the phone LCP p75 has been poor three days running
+ * (worker/lib/storeSpeed.ts `speedAttention`): no source, no line — never a
+ * guessed «جيدة». Its door is the builder's «السرعة» tab (`?tab=speed`).
+ *
  * `Door` lives here because every Today surface needs the same thing: a link
  * that stays inside the workspace router when the address is a workspace
  * address, and becomes a plain anchor when the server sent a main-site path
  * (from a store's own subdomain that is another site — `ws.resolveLink`).
  */
-import type { ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
-import { useWorkspace } from '../shell/context';
+import { useLanguage } from '../../../LanguageContext';
+import { useWorkspace, WorkspaceContext } from '../shell/context';
+import type { Attention } from '../shell/attention';
 
 export function Door({ to, className, children, ...rest }: { to: string; className: string; children: ReactNode } & Record<`data-${string}`, string | undefined>) {
   const ws = useWorkspace();
@@ -38,11 +45,44 @@ export interface PulseLine {
 const DOT: Record<PulseLine['tone'], string> = { success: 'bg-success', warning: 'bg-warning' };
 
 /**
- * `speed` is P4's line (the real-user speed grade, only with ≥ 50 samples):
- * typed now so the slot exists, rendered as nothing until the source does.
+ * The speed line's words, VERBATIM from src/components/merchant/storeDesign/
+ * strings.ts (`SPEED_STRINGS.*.pulse.poor`; tests/workspaceUi.test.ts holds
+ * the copy to the table). Copied, never imported: Today must not download the
+ * builder's word table for one line.
+ */
+export const SPEED_PULSE_WORDS = {
+  ar: 'سرعة الصفحة على الهاتف: ضعيفة',
+  en: 'Page speed on phones: poor',
+  ckb: 'خێرایی پەڕە لە مۆبایلدا: لاواز',
+} as const;
+
+/** The builder's «السرعة» tab: the server's link, asked to open on that tab (StoreDesignPanel reads `?tab=`). */
+export function speedDoor(link: string): string {
+  const hash = link.indexOf('#');
+  const path = hash < 0 ? link : link.slice(0, hash);
+  // A link that already names a tab is the server's own choice.
+  if (/[?&]tab=/.test(path)) return link;
+  return `${path}${path.includes('?') ? '&' : '?'}tab=speed${hash < 0 ? '' : link.slice(hash)}`;
+}
+
+/**
+ * The Pulse's speed line from the attention read, or null when the source
+ * did not answer — which, by the server's rule, is most of the time.
+ */
+export function speedPulseLine(speed: Attention['speed'] | null | undefined, lang: string): PulseLine | null {
+  if (!speed || speed.grade !== 'poor' || typeof speed.link !== 'string' || !speed.link) return null;
+  return { id: 'speed', tone: 'warning', text: SPEED_PULSE_WORDS[lang === 'en' || lang === 'ckb' ? lang : 'ar'], to: speedDoor(speed.link) };
+}
+
+/**
+ * `speed` is P4's line: an explicit line wins; otherwise it is read from the
+ * workspace's attention (`speed` source), and nothing renders without it.
  */
 export default function PulseRow({ title, lines, speed = null }: { title: string; lines: PulseLine[]; speed?: PulseLine | null }) {
-  const all = speed ? [...lines, speed] : lines;
+  const ws = useContext(WorkspaceContext);
+  const { lang } = useLanguage();
+  const speedLine = speed ?? speedPulseLine(ws?.attention.data?.speed, lang);
+  const all = speedLine ? [...lines, speedLine] : lines;
   if (all.length === 0) return null;
   return (
     <section aria-label={title} data-pulse>

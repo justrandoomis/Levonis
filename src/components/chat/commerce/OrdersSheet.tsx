@@ -78,7 +78,7 @@ export default function OrdersSheet({ open, onClose, chatId }: { open: boolean; 
           <button
             key={o.id}
             type="button"
-            onClick={() => go(merchant ? merchantHref.customOrder(o.id) : `/requests?request=${encodeURIComponent(o.request_id)}`)}
+            onClick={() => go(merchant ? merchantHref.customOrder(o.id) : `/requests/${encodeURIComponent(o.request_id)}`)}
             className="flex w-full min-h-[60px] items-center gap-3 rounded-xl px-3 py-2 text-start hover:bg-surface-selected focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             data-orders-row="custom"
           >

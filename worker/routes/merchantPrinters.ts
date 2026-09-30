@@ -8,7 +8,8 @@ import { getSetting } from '../lib/settings';
 import { CAPABILITIES } from '../lib/printMatching';
 import type { PrintMaterial } from '../lib/printPricing';
 import { readReasons } from '../lib/eligibility';
-import { loadCatalogue, rematchNow } from '../lib/printMatchingStore';
+import { loadCatalogue, refreshWorkshopFacts, rematchNow, workshopFactsFromPrinters } from '../lib/printMatchingStore';
+import { isSchemaMissing } from '../lib/membershipBenefits';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
 import { audit } from '../lib/audit';
 
@@ -145,6 +146,9 @@ async function selectableModels(db: D1Database) {
  * either way; `rematchNow` never throws.
  */
 async function rematchWorkshop(env: Env, merchantId: string, reason: string): Promise<void> {
+  // The public workshop facts (technologies, the largest bed — 0159, §9.5)
+  // are re-derived from the printers on every write that could move them.
+  await refreshWorkshopFacts(env.DB, merchantId);
   await rematchNow(env, 'merchant', merchantId, reason);
 }
 
@@ -462,7 +466,18 @@ const EMPTY_PREFS = {
   workload: 'normal',
   paused: false,
   paused_until: null as string | null,
+  // Workshop facts (0159, §9.5): the merchant's word, and what the printers say.
+  turnaround_days: null as number | null,
+  workshop_intro: '',
+  technologies: [] as string[],
+  max_build_mm: {} as Record<string, number>,
 };
+
+/** The usual turnaround a workshop may state, in days. */
+const TURNAROUND_MIN_DAYS = 1;
+const TURNAROUND_MAX_DAYS = 60;
+/** «ملف الورشة»: the intro shown on the store page. */
+const WORKSHOP_INTRO_MAX = 300;
 
 merchantPrinterRoutes.get('/request-prefs', async (c) => {
   const ctx = await requireStoreOwner(c);
@@ -487,8 +502,24 @@ merchantPrinterRoutes.get('/request-prefs', async (c) => {
         workload: String(row.workload ?? 'normal'),
         paused: !!row.paused,
         paused_until: (row.paused_until as string | null) ?? null,
+        turnaround_days: row.turnaround_days === null || row.turnaround_days === undefined ? null : Number(row.turnaround_days),
+        workshop_intro: String(row.workshop_intro ?? ''),
+        technologies: parse<string[]>(row.technologies, []),
+        max_build_mm: parse<Record<string, number>>(row.max_build_mm, {}),
       }
-    : EMPTY_PREFS;
+    : // A COPY, never the module's own object: the live facts below are
+      // written into `prefs`, and writing them into EMPTY_PREFS itself showed
+      // the NEXT merchant without a row this workshop's technologies and bed
+      // (and skipped their own live read) for the life of the isolate.
+      structuredClone(EMPTY_PREFS);
+  // The derived facts as the printers stand NOW — a row saved before 0159, or
+  // never saved, carries none; the screen shows the truth and the next save
+  // stores it.
+  if (!prefs.technologies.length) {
+    const live = await workshopFactsFromPrinters(c.env.DB, ctx.merchant.id);
+    prefs.technologies = live.technologies;
+    prefs.max_build_mm = live.max_build_mm as Record<string, number>;
+  }
 
   const materials = (await getSetting(c.env.DB, 'printMaterials')) as PrintMaterial[];
   return c.json({
@@ -534,28 +565,91 @@ merchantPrinterRoutes.put('/request-prefs', async (c) => {
     paused: body.paused === true ? 1 : 0,
     paused_until: pausedUntil && !Number.isNaN(Date.parse(pausedUntil)) ? pausedUntil : null,
   };
+  /**
+   * WORKSHOP FACTS (0159, §9.5). `turnaround_days` is the merchant's usual
+   * turnaround — a ranking signal, never a filter — 1..60 or unstated;
+   * `workshop_intro` the paragraph the store page shows. Both refuse with a
+   * code the settings screen words beside the field.
+   */
+  /**
+   * ABSENT MEANS UNCHANGED (below, for every column). The printers screen
+   * (PrintersTab «إشعارات طلبات الطباعة») saves the matching filters alone
+   * and must not wipe the «ملف الورشة» the store settings wrote; the store
+   * settings send the workshop pair alone and must not reset the filters. A
+   * key that IS sent — `null` or '' included — is the new value.
+   */
+  let turnaroundDays: number | null = null;
+  if (body.turnaround_days !== undefined && body.turnaround_days !== null && body.turnaround_days !== '') {
+    const n = typeof body.turnaround_days === 'number' ? body.turnaround_days : Number(body.turnaround_days);
+    if (!Number.isInteger(n) || n < TURNAROUND_MIN_DAYS || n > TURNAROUND_MAX_DAYS) {
+      throw badRequest(`The usual turnaround must be between ${TURNAROUND_MIN_DAYS} and ${TURNAROUND_MAX_DAYS} days`, 'PREFS_TURNAROUND_INVALID');
+    }
+    turnaroundDays = n;
+  }
+  const introRaw = body.workshop_intro === undefined || body.workshop_intro === null ? '' : body.workshop_intro;
+  if (typeof introRaw !== 'string') throw badRequest('workshop_intro must be text');
+  const workshopIntro = introRaw.replace(/\s+/g, ' ').trim();
+  if (workshopIntro.length > WORKSHOP_INTRO_MAX) {
+    throw badRequest(`The workshop intro is too long (max ${WORKSHOP_INTRO_MAX} characters)`, 'PREFS_INTRO_TOO_LONG');
+  }
+  // The derived facts, from the printers as they stand at this save.
+  const facts = await workshopFactsFromPrinters(c.env.DB, ctx.merchant.id);
 
-  await c.env.DB.prepare(
-    `INSERT INTO merchant_request_prefs
-       (merchant_id, processes, materials, colors, capabilities, governorates, delivery,
-        min_job_iqd, max_job_iqd, min_size_mm, max_size_mm, workload, paused, paused_until, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-     ON CONFLICT (merchant_id) DO UPDATE SET
-       processes=excluded.processes, materials=excluded.materials, colors=excluded.colors,
-       capabilities=excluded.capabilities, governorates=excluded.governorates,
-       delivery=excluded.delivery, min_job_iqd=excluded.min_job_iqd,
-       max_job_iqd=excluded.max_job_iqd, min_size_mm=excluded.min_size_mm,
-       max_size_mm=excluded.max_size_mm, workload=excluded.workload,
-       paused=excluded.paused, paused_until=excluded.paused_until, updated_at=excluded.updated_at`
-  )
-    .bind(
-      ctx.merchant.id,
-      JSON.stringify(values.processes), JSON.stringify(values.materials), JSON.stringify(values.colors),
-      JSON.stringify(values.capabilities), JSON.stringify(values.governorates), JSON.stringify(values.delivery),
-      values.min_job_iqd, values.max_job_iqd, values.min_size_mm, values.max_size_mm,
-      values.workload, values.paused, values.paused_until
+  /**
+   * ABSENT MEANS UNCHANGED — FOR EVERY COLUMN (§4e, DECISIONS 178 (٦); review
+   * 2026-09-30). A key the body does not name keeps its stored value: a
+   * caller that names only the workshop pair (the store settings' «ملف
+   * الورشة») must not reset the matching filters to their defaults, and above
+   * all must not lift the owner's «إيقاف» (`paused`, «honoured absolutely»).
+   * A NEW row takes the defaults for what the body leaves out. One statement,
+   * so two screens saving at once cannot interleave a read and a write: the
+   * UPSERT picks, per column, the body's value or the stored one, by the
+   * `named` map bound as JSON.
+   */
+  const named = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
+  const keep = (col: string, flag: string) =>
+    `${col} = CASE WHEN json_extract(?${flag}, '$.${col}') = 1 THEN excluded.${col} ELSE merchant_request_prefs.${col} END`;
+  const BASE_COLUMNS = [
+    'processes', 'materials', 'colors', 'capabilities', 'governorates', 'delivery',
+    'min_job_iqd', 'max_job_iqd', 'min_size_mm', 'max_size_mm', 'workload', 'paused', 'paused_until',
+  ] as const;
+  const baseValues = [
+    ctx.merchant.id,
+    JSON.stringify(values.processes), JSON.stringify(values.materials), JSON.stringify(values.colors),
+    JSON.stringify(values.capabilities), JSON.stringify(values.governorates), JSON.stringify(values.delivery),
+    values.min_job_iqd, values.max_job_iqd, values.min_size_mm, values.max_size_mm,
+    values.workload, values.paused, values.paused_until,
+  ];
+  const namedMap: Record<string, 0 | 1> = Object.fromEntries(
+    [...BASE_COLUMNS, 'turnaround_days', 'workshop_intro'].map((k) => [k, named(k) ? 1 : 0])
+  );
+  const place = (from: number, n: number) => Array.from({ length: n }, (_, i) => `?${from + i}`).join(', ');
+  try {
+    // ?1..?14 the base row, ?15..?18 the workshop pair and the derived facts, ?19 the `named` map.
+    await c.env.DB.prepare(
+      `INSERT INTO merchant_request_prefs
+         (merchant_id, ${BASE_COLUMNS.join(', ')}, turnaround_days, workshop_intro, technologies, max_build_mm, updated_at)
+       VALUES (${place(1, 18)}, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+       ON CONFLICT (merchant_id) DO UPDATE SET
+         ${[...BASE_COLUMNS, 'turnaround_days', 'workshop_intro'].map((col) => keep(col, '19')).join(',\n         ')},
+         technologies = excluded.technologies, max_build_mm = excluded.max_build_mm, updated_at = excluded.updated_at`
     )
-    .run();
+      .bind(...baseValues, turnaroundDays, workshopIntro, JSON.stringify(facts.technologies), JSON.stringify(facts.max_build_mm), JSON.stringify(namedMap))
+      .run();
+  } catch (e) {
+    // A Worker deployed ahead of 0159 (the deploy window): the filters still
+    // save, by the same rule; the workshop facts land with the migration.
+    if (!isSchemaMissing(e)) throw e;
+    await c.env.DB.prepare(
+      `INSERT INTO merchant_request_prefs (merchant_id, ${BASE_COLUMNS.join(', ')}, updated_at)
+       VALUES (${place(1, 14)}, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+       ON CONFLICT (merchant_id) DO UPDATE SET
+         ${BASE_COLUMNS.map((col) => keep(col, '15')).join(',\n         ')},
+         updated_at = excluded.updated_at`
+    )
+      .bind(...baseValues, JSON.stringify(namedMap))
+      .run();
+  }
   await rematchWorkshop(c.env, ctx.merchant.id, 'prefs');
 
   return c.json({ success: true });
