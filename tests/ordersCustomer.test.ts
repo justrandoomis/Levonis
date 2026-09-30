@@ -114,6 +114,59 @@ test('another customer gets 404 on my order and on its units; the owner and an a
   );
 });
 
+// ------------------------------------------------------------ store identity
+
+/**
+ * «طلبك من {store}» (merchant platform V2, storefront A6): a community-store
+ * order carries the shop's PUBLIC identity — slug, name, logo, address — on
+ * the list and on the order; a platform order carries `store: null`; and
+ * nothing of the merchant's row (phone, owner, delivery settings) ever
+ * travels with it.
+ */
+function storeOwned(raw: ReturnType<typeof setup>['raw'], orderId: string) {
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash,role) VALUES ('ali','Ali','ali@x.co','h','merchant');
+    INSERT INTO community_merchants (id,user_id,name,status) VALUES ('m_ali','ali','Ali 3D','active');
+    INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name,status,delivery_settings,logo_key,contact_phone,contact_phone_public)
+      VALUES ('s_ali','m_ali','ali','ali3d','Ali 3D','active','{"fee_iqd":9999}','merchants/ali/public/logo0001.webp','07700000000',0);
+    UPDATE orders SET seller_type = 'merchant', merchant_id = 'm_ali', store_id = 's_ali' WHERE id = '${orderId}';
+  `);
+}
+
+test('a store order carries the shop’s public identity on the list and the order; a platform order carries null', async () => {
+  const { db, raw } = setup();
+  storeOwned(raw, 'ORD-2');
+  const a = appAs(db, buyer);
+  const expected = { slug: 'ali3d', name: 'Ali 3D', logo_url: '/files/merchants/ali/public/logo0001.webp', url: '/community/store/s_ali' };
+
+  const list = await json(await a.request('/api/orders?limit=50'));
+  const byId = new Map((list.orders as Array<{ id: string; store: unknown }>).map((o) => [o.id, o.store]));
+  assert.deepEqual(byId.get('ORD-2'), expected, 'the merchant order names its store');
+  for (const id of ['ORD-1', 'ORD-3', 'ORD-4', 'ORD-5']) assert.equal(byId.get(id), null, `${id} is a platform order`);
+
+  const one = await json(await a.request('/api/orders/ORD-2'));
+  assert.deepEqual(one.order.store, expected);
+  assert.deepEqual(Object.keys(one.order.store).sort(), ['logo_url', 'name', 'slug', 'url'], 'exactly the public identity');
+  const platform = await json(await a.request('/api/orders/ORD-1'));
+  assert.equal(platform.order.store, null);
+
+  // Never the merchant's private fields — on the store object or anywhere in the payload because of it.
+  const text = JSON.stringify(one);
+  for (const leak of ['07700000000', 'contact_phone', '"user_id":"ali"', 'fee_iqd', 'merchant_id":"m_ali"']) {
+    assert.ok(!text.includes(leak), `${leak} leaked into the customer's order payload`);
+  }
+});
+
+test('an order whose store row is gone, or a stranger’s order, says nothing about the store', async () => {
+  const { db, raw } = setup();
+  storeOwned(raw, 'ORD-3');
+  // The store row disappears (a merchant deleted): the order is still the customer's, the store is simply null.
+  raw.exec("PRAGMA foreign_keys = OFF; DELETE FROM merchant_stores WHERE id = 's_ali'; PRAGMA foreign_keys = ON;");
+  const one = await json(await appAs(db, buyer).request('/api/orders/ORD-3'));
+  assert.equal(one.order.store, null);
+  assert.equal((await appAs(db, stranger).request('/api/orders/ORD-3')).status, 404, 'ownership is unchanged by the join');
+});
+
 // ----------------------------------------------------------------- pagination
 
 test('limit/before walk the list newest-first and next_before is null on the last page', async () => {

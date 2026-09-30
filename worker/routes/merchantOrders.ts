@@ -46,8 +46,11 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { HttpError, requireAuth } from '../lib/http';
+import { HttpError, badRequest, requireAuth, str } from '../lib/http';
+import { rateLimit } from '../lib/ratelimit';
 import { requireStoreOwner } from '../lib/merchantAuth';
+// The one forward move, repeated per id by the bulk door below (P3b).
+import { MERCHANT_ORDER_FLOW, applyMerchantOrderMove, readTrackingNo } from './merchant';
 import { orderCreditStateSql } from '../lib/merchantLedger';
 import { STORE_RELEASE_DAYS, cancelAnchorId, openDisputeSql } from '../lib/storeOrderOps';
 import { merchantHref } from '@levonis/contracts/merchantRoutes';
@@ -392,4 +395,89 @@ merchantOrderRoutes.get('/:id/timeline', async (c) => {
     })),
     ...(chat ? { chat: { id: chat.id, link: merchantHref.thread(chat.id) } } : {}),
   });
+});
+
+// ------------------------------------------------------------- bulk status
+//
+// POST /api/merchant/orders/bulk-status {ids[≤50], status, tracking_no?}
+// (merchant platform v2 §4.2). The list's tray moves a selection in one
+// request; the server runs THE SAME single transition per id — flow check,
+// conditional batch, history row, the customer's notice and the chat card —
+// and answers which ids moved and which were refused, each with the code the
+// single route would have thrown. Nothing is transactional across ids on
+// purpose: three confirmed orders are three facts, and the one that changed
+// under the merchant's hand is reported, not rolled back with the others.
+//
+// A CANCEL IS NEVER BULK. It refunds the customer and cannot be undone; it
+// stays one order at a time, behind its own confirmation.
+
+/** How many orders one bulk move may name. */
+export const BULK_MAX = 50;
+
+/** The statuses a bulk move may target: every forward step of the flow, never the cancel. */
+export const BULK_TARGETS: readonly string[] = [
+  ...new Set(Object.values(MERCHANT_ORDER_FLOW).flat().filter((s) => s !== 'cancelled')),
+];
+
+export interface BulkRefusal {
+  id: string;
+  code: string;
+}
+
+merchantOrderRoutes.post('/bulk-status', async (c) => {
+  await rateLimit(c, 'merchant-order-bulk', 30, 3600);
+  const ctx = await requireStoreOwner(c);
+  const body = await c.req.json().catch(() => ({}));
+
+  const rawIds: unknown = body?.ids;
+  if (!Array.isArray(rawIds) || rawIds.length === 0) throw badRequest('ids must be a non-empty list', 'BAD_IDS');
+  if (rawIds.length > BULK_MAX) throw new HttpError(400, `At most ${BULK_MAX} orders per move`, 'BULK_TOO_MANY');
+  const to = str(body?.status, 'status', { min: 1, max: 30 });
+  if (to === 'cancelled') throw new HttpError(400, 'Cancel orders one at a time', 'BULK_CANCEL_NOT_ALLOWED');
+  if (!BULK_TARGETS.includes(to)) throw badRequest(`status must be one of ${BULK_TARGETS.join(', ')}`, 'BAD_STATUS');
+  // Refused before any order moves: a too-long number must not ship half the list.
+  const trackingNo = readTrackingNo(body?.tracking_no);
+
+  const ids = [...new Set(rawIds.map((v) => (typeof v === 'string' ? v : '')))];
+  const done: string[] = [];
+  const refused: BulkRefusal[] = [];
+  // ONE read for the whole list — owner-isolated in SQL, like the single
+  // route: another store's order is not found. The loop below is then the
+  // conditional batch per id and nothing else inside the request; the audit
+  // row and the chat card of each move run after the response (`defer`), the
+  // way the customer's notice already did — a 50-order move used to be
+  // 150–400 dependent D1 round trips, past the client's own deadline.
+  const wellFormed = ids.filter((id) => ORDER_ID_RE.test(id));
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM orders WHERE merchant_id = ?1 AND id IN (SELECT value FROM json_each(?2))'
+  )
+    .bind(ctx.merchant.id, JSON.stringify(wellFormed))
+    .all<Record<string, unknown>>();
+  const byId = new Map((results ?? []).map((o) => [String(o.id), o]));
+  const defer = (work: Promise<void>) => {
+    const quiet = work.catch((error) => console.error('bulk-status follow-up rejected:', error));
+    try {
+      c.executionCtx.waitUntil(quiet);
+    } catch {
+      // No ExecutionContext on this call path (a test harness): still done, just not kept alive past the response.
+      void quiet;
+    }
+  };
+  for (const id of ids) {
+    const order = byId.get(id);
+    if (!order) {
+      refused.push({ id, code: 'ORDER_NOT_FOUND' });
+      continue;
+    }
+    try {
+      await applyMerchantOrderMove(c, ctx, order, to, trackingNo, { defer });
+      done.push(id);
+    } catch (e) {
+      if (!(e instanceof HttpError)) throw e;
+      refused.push({ id, code: e.code ?? 'CONFLICT' });
+    }
+  }
+
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, status: to, done, refused });
 });

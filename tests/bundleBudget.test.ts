@@ -448,6 +448,8 @@ const WORKSPACE_SCREENS = [
   'CustomersSection', 'RequestsSection', 'NotificationsSection', 'CommandPalette', 'MoreSheet',
   // W3-B: the orders address picks the list or the order's own screen, each lazy.
   'OrdersSection', 'OrderDetailScreen',
+  // P3b: the orders list itself is a lazy chunk beside the order screen.
+  'OrdersList',
 ];
 
 test('the merchant workspace shell is small, stays out of every customer closure, and loads each screen lazily', () => {
@@ -466,6 +468,18 @@ test('the merchant workspace shell is small, stays out of every customer closure
   console.log(`bundle: workspace shell ${kb(own)} gzip, ${kb(total)} with its closure beyond the initial payload\n${detail}`);
   assert.ok(own <= WORKSPACE_SHELL_BUDGET, `the workspace shell is ${kb(own)} gzip, over ${kb(WORKSPACE_SHELL_BUDGET)}`);
   assert.ok(total <= WORKSPACE_CLOSURE_BUDGET, `the workspace shell adds ${kb(total)} gzip, over ${kb(WORKSPACE_CLOSURE_BUDGET)}:\n${detail}`);
+  // The shared vendor chunks the shell reaches are printed too, and the one
+  // that matters is pinned: the frame renders `m.*` under <MotionFeatures>, so
+  // the animation FEATURES half (`vendor-motion`, 16 KB gzip) is never a static
+  // import of it again — a re-eagered `motion.*` in the shell used to hide
+  // behind `isSharedVendor` while the shell number stayed green (perf review 2026-09-30).
+  const shellVendor = [...staticClosure(shell!)].filter((f) => !initial.has(f) && isSharedVendor(f));
+  console.log(`bundle: workspace shell also shares ${shellVendor.map((f) => `${f} ${kb(gz(join(ASSETS, f)))}`).join(', ') || 'no vendor chunk'}`);
+  assert.equal(
+    shellVendor.find((f) => /^vendor-motion-(?!core-)/.test(f)),
+    undefined,
+    'the animation features chunk is a STATIC import of the workspace shell — an element renders motion.* instead of m.* under <MotionFeatures>'
+  );
 
   const inShell = new Set(closure);
   for (const name of WORKSPACE_SCREENS) {
@@ -492,14 +506,24 @@ test('the merchant workspace shell is small, stays out of every customer closure
  */
 const ANALYTICS_SCREEN_BUDGET = 16 * KB;
 const ORDER_SCREEN_BUDGET = 12 * KB;
+/**
+ * TODAY (CommandCenter) is the merchant's landing screen on every workspace
+ * open. Measured after the perf review of 2026-09-30: the chunk 14.8 KB gzip
+ * (the Counter's three-language strings ride in it), its closure beyond the
+ * shell 18 KB — the restock sheet is a lazy chunk, the refusal sentences load
+ * on the first refusal, and the `motion` proxy is gone from it AND from the
+ * switch it renders. 18 KB leaves room for a line, not for a sheet or a
+ * sentence table; the two names below are the ones that used to sneak in.
+ */
+const TODAY_SCREEN_BUDGET = 18 * KB;
 
-test('the analytics and order screens stay small and never pull in a chart library', () => {
+test('the analytics, order and Today screens stay small and never pull in a chart library, the animation features or the refusal sentences', () => {
   const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
   const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
   const shell = chunk('MerchantDashboardPage')!;
   const initial = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
   const shellClosure = staticClosure(shell);
-  for (const [name, budget] of [['AnalyticsSection', ANALYTICS_SCREEN_BUDGET], ['OrderDetailScreen', ORDER_SCREEN_BUDGET]] as const) {
+  for (const [name, budget] of [['AnalyticsSection', ANALYTICS_SCREEN_BUDGET], ['OrderDetailScreen', ORDER_SCREEN_BUDGET], ['CommandCenter', TODAY_SCREEN_BUDGET]] as const) {
     const f = chunk(name);
     assert.ok(f, `${name} has no chunk of its own`);
     const own = gz(join(ASSETS, f!));
@@ -507,6 +531,11 @@ test('the analytics and order screens stay small and never pull in a chart libra
     console.log(`bundle: ${name} ${kb(own)} gzip; beyond the shell: ${beyond.join(', ')}`);
     assert.ok(own <= budget, `${name} is ${kb(own)} gzip, over ${kb(budget)}`);
     assert.equal(beyond.some((x) => /^vendor-charts-/.test(x)), false, `${name} pulls the chart library in`);
+    if (name === 'CommandCenter') {
+      assert.equal(beyond.some((x) => /^vendor-motion-(?!core-)/.test(x)), false, `${name} carries the animation features statically — an element (or a primitive it renders) uses motion.* instead of m.* under <MotionFeatures>`);
+      assert.equal(beyond.some((x) => /^refusalStrings-/.test(x)), false, `${name} carries the refusal sentences statically — load them on the first refusal`);
+      assert.equal(beyond.some((x) => /^RestockSheet-/.test(x)), false, `${name} imports the restock sheet statically — it opens on a tap, as a lazy chunk`);
+    }
   }
 });
 

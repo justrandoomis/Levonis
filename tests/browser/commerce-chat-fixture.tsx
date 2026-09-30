@@ -67,6 +67,14 @@ const card = (from: 'customer' | 'store', min: number, c: Card, system = false) 
   id: `msg_${++seq}`, sender_id: who(from), mine: isMine(from), kind: `${c.type}_card`, body: String(c.original.title ?? c.original.name ?? ''), fileUrl: null, card: c, system, created_at: ago(min),
 });
 
+/** A link line (§9.4): kind 'text', the address as body, the card the server stored beside it (`link`). */
+const LINKED_MODEL = 'https://www.printables.com/model/1234-articulated-dragon';
+const dragonLink: { card_id: string; url: string; host: string; title: string; description: string; image_url: string | null; kind: string } = { card_id: 'lc_model', url: LINKED_MODEL, host: 'printables.com', title: L('تنين مفصلي v2 — يُطبع مجمّعًا', 'Articulated Dragon v2 — print-in-place'), description: '', image_url: '/files/link-cards/lc_model.webp', kind: 'model_page' };
+const videoLink = { card_id: 'lc_video', url: 'https://youtu.be/dQw4w9WgXcQ', host: 'youtu.be', title: L('ضبط خلوص المفاصل على A1', 'Tuning joint clearance on an A1'), description: '', image_url: null, kind: 'video' };
+const bareLink = { card_id: 'lc_bare', url: 'https://example.org/notes/42', host: 'example.org', title: '', description: '', image_url: null, kind: 'unknown' };
+type ChatLinkShape = { card_id: string; url: string; host: string; title: string; description: string; image_url: string | null; kind: string };
+const link = (from: 'customer' | 'store', min: number, l: ChatLinkShape) => ({ ...text(from, min, l.url), link: l });
+
 const job = {
   title: L('حامل هاتف للسيارة بشعار الشركة', 'Car phone holder with our logo'),
   quantity: 20,
@@ -148,10 +156,13 @@ const messages =
   scene === 'deal'
     ? [
         text('customer', 95, L('السلام عليكم، أحتاج حامل هاتف للسيارة بشعار شركتي — 20 قطعة.', 'Hi! I need a car phone holder with my company logo — 20 pieces.')),
+        link('customer', 94, dragonLink),
         text('store', 92, L('وعليكم السلام، أكيد. أرسل التفاصيل كطلب طباعة من زر + وأرسل لك عرض سعر هنا.', 'Sure — send the details as a print request from the + button and I will quote here.')),
         card('customer', 80, request),
         card('store', 60, quoteOld),
         text('customer', 41, L('ممكن أقل شوي؟ الميزانية 150 ألف.', 'Could it be a little less? My budget is 150k.')),
+        link('store', 40, videoLink),
+        link('store', 39, bareLink),
         card('store', 30, quoteNew(false)),
         text('store', 12, L('وهذا من الجاهز عندي، نزل سعره اليوم:', 'And this one is ready-made — its price dropped today:')),
         card('store', 11, product),
@@ -200,6 +211,16 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (p === '/api/wallet') return ok({ balance_usd_cents: 0, balance_iqd: 420000, point_balance: 0, transactions: [], point_transactions: [] });
   if (p === '/api/chats/ch_1') return ok({ chat: thread });
   if (p === '/api/chats/ch_1/messages' && method === 'GET') return ok({ messages, older_cursor: null });
+  // «رابط» (§9.4): the server resolves the card and writes the line; a repeated client_id is the same line.
+  if (p === '/api/chats/ch_1/cards/link' && method === 'POST') {
+    const body = JSON.parse(String(init?.body ?? '{}')) as { url?: string; client_id?: string };
+    const url = String(body.url ?? '');
+    if (!/^https?:\/\//i.test(url)) return new Response(JSON.stringify({ success: false, error: 'not a link', code: 'LINK_URL_INVALID' }), { status: 400, headers: { 'content-type': 'application/json' } });
+    const l = url === LINKED_MODEL ? dragonLink : { card_id: 'lc_new', url, host: new URL(url).hostname.replace(/^www\./, ''), title: '', description: '', image_url: null, kind: 'unknown' };
+    const msg = { ...link(merchant ? 'store' : 'customer', 0, l), created_at: new Date().toISOString() };
+    messages.push(msg);
+    return new Response(JSON.stringify({ success: true, id: msg.id, message: msg, card: { ...l, id: l.card_id, status: l.title ? 'ok' : 'blocked', fetched_at: msg.created_at, reason: null } }), { status: 201, headers: { 'content-type': 'application/json' } });
+  }
   if (p === '/api/chats/ch_1/typing') return ok({ typing: false, remainingMs: 0 });
   if (p === '/api/chats/ch_1/orders') return ok(orders);
   if (p === '/api/chats/ch_1/products') return ok({ products: picker, next_cursor: null });

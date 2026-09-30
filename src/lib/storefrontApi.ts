@@ -33,13 +33,15 @@ export const storefrontApi = {
     api.get<{ product: MerchantProduct; store: MerchantStore }>(
       `/api/storefront/${slug}/products/${productSlug}`
     ),
-  reviews: (slug: string) =>
+  /** `params` is the query string with its «?» (`?rating=5`, `?photos=1&cursor=…`), or nothing (storefront L12). */
+  reviews: (slug: string, params = '') =>
     api.get<{
       average: number | null;
       count: number;
       distribution: Record<string, number>;
       reviews: Array<Record<string, unknown>>;
-    }>(`/api/storefront/${slug}/reviews`),
+      next_cursor: string | null;
+    }>(`/api/storefront/${slug}/reviews${params}`),
   sections: (slug: string) => api.get<{ sections: StoreSection[] }>(`/api/storefront/${slug}/sections`),
   services: (slug: string) => api.get<{ services: StoreService[] }>(`/api/storefront/${slug}/services`),
   showcase: (slug: string) => api.get<{ items: ShowcaseItem[] }>(`/api/storefront/${slug}/showcase`),

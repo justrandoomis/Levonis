@@ -308,12 +308,18 @@ export default function Storefront({
       // «اطلب عرض سعر» opens the request wizard, not the board of other
       // people's requests (a guest lands on the board and is asked to sign in).
       requestsHref: onHost ? `${MAIN_SITE}${QUOTE_PATH}` : QUOTE_PATH,
-      loadProducts: async ({ source, collection_id, cursor }) => {
+      loadProducts: async ({ source, collection_id, cursor, q: term, sort }) => {
         if (noStore) return { items: [], next_cursor: null };
         const qs = new URLSearchParams();
         if (source === 'deals') qs.set('deals', '1');
         if (source === 'collection' && collection_id) qs.set('section', collection_id);
         if (cursor) qs.set('cursor', cursor);
+        // In-store search and sort (L11): the server matches the term as a
+        // literal and refuses one over 60 characters; the field never sends more.
+        if (term) qs.set('q', term.slice(0, 60));
+        // «new» is never sent: it means the list's own order, and a manual
+        // collection's own order is the merchant's arrangement.
+        if (sort && sort !== 'new') qs.set('sort', sort);
         const q = qs.toString();
         const d = await storefrontApi.products(slug, q ? `?${q}` : '');
         return { items: d.products, next_cursor: d.next_cursor };
@@ -329,10 +335,17 @@ export default function Storefront({
             })),
       loadServices: async () => (noStore ? [] : (await storefrontApi.services(slug)).services),
       loadShowcase: async () => (noStore ? [] : (await storefrontApi.showcase(slug)).items),
-      loadReviews: async () =>
-        noStore
-          ? { average: null, count: 0, distribution: {}, reviews: [], next_cursor: null }
-          : ((await storefrontApi.reviews(slug)) as unknown as ReviewsData),
+      loadReviews: async (rq) => {
+        if (noStore) return { average: null, count: 0, distribution: {}, reviews: [], next_cursor: null };
+        // The filters and «المزيد» (L12): declared parameters of the route,
+        // so a guest's «★5» is never answered from the «all» entry at the edge.
+        const qs = new URLSearchParams();
+        if (rq?.rating) qs.set('rating', String(rq.rating));
+        if (rq?.photos) qs.set('photos', '1');
+        if (rq?.cursor) qs.set('cursor', rq.cursor);
+        const params = qs.toString();
+        return (await storefrontApi.reviews(slug, params ? `?${params}` : '')) as unknown as ReviewsData;
+      },
       Back: LiveBack,
       Menu: LiveMenu,
       ProfileActions: LiveProfileActions,

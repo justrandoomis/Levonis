@@ -87,7 +87,7 @@ test('the prompt is mounted where each kind of purchase is followed', () => {
   assert.match(prompt, /api\s*\.get<\{ eligible: EligibleReview\[\] \}>\('\/api\/community-reviews\/eligible'\)/);
   assert.match(prompt, /setRows\(ofKind\(d\.eligible \?\? \[\], kind\)\)/);
   assert.match(prompt, /\.catch\(\(\) => alive && setRows\(\[\]\)\)/, 'an unreadable list offers nothing rather than an error');
-  assert.match(prompt, /api\.post\('\/api\/community-reviews', \{ rating, body: body\.trim\(\), \.\.\.reviewTarget\(item\) \}\)/);
+  assert.match(prompt, /api\.post\('\/api\/community-reviews', \{ rating, body: body\.trim\(\), images: photos, \.\.\.reviewTarget\(item\) \}\)/);
   assert.match(prompt, /if \(e instanceof ApiError && e\.status === 409\) onDone\(\);/);
   assert.match(prompt, /role="radiogroup"/);
   assert.match(prompt, /role="radio"\s+aria-checked=\{rating === n\}/);

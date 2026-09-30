@@ -150,3 +150,63 @@ test('B26 the merchant orders list pages through every order once, ties included
   assert.deepEqual(await walk(''), ['ORD-M1', 'ORD-M3', 'ORD-M2', 'ORD-M4', 'ORD-M5'], 'newest first, ties by id, nothing twice');
   assert.deepEqual(await walk('pending'), ['ORD-M1', 'ORD-M2', 'ORD-M4', 'ORD-M5'], 'the filter holds on every page');
 });
+
+/**
+ * TRACKING ON SHIP (merchant platform v2 §4.2, P3b). A move to `shipped` may
+ * carry `tracking_no` (≤ 60): it lands on `orders.delivery_tracking_no` (0028)
+ * — no new column — is recorded in the history row's note, echoed to the
+ * merchant, and reaches the customer's tracker as `tracking_no`
+ * (worker/routes/orders.ts). Too long is refused as itself; on any other move
+ * the number is ignored.
+ */
+test('A SHIP WITH A TRACKING NUMBER stores it, records it, echoes it, and the customer\'s tracker returns it', async () => {
+  const raw = seed('processing');
+  const res = await post(merchantApp(asD1(raw)), '/api/merchant/orders/ORD-M1/status', { status: 'shipped', tracking_no: ' IQ-778899 ' });
+  const body = await json(res);
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.status, 'shipped');
+  assert.equal(body.tracking_no, 'IQ-778899', 'trimmed and echoed');
+  const o = raw.prepare("SELECT status, delivery_tracking_no AS t FROM orders WHERE id = 'ORD-M1'").get() as { status: string; t: string };
+  assert.deepEqual({ ...o }, { status: 'shipped', t: 'IQ-778899' });
+  const note = raw.prepare("SELECT note FROM order_status_history WHERE order_id = 'ORD-M1' AND status = 'shipped'").get() as { note: string };
+  assert.match(note.note, /IQ-778899/);
+
+  const { orderRoutes } = await import('../worker/routes/orders');
+  const buyer = stubApp(asD1(raw), { id: 'buyer', role: 'customer', email: 'buyer@x.co' }, (a) => a.route('/api/orders', orderRoutes));
+  const tracker = await get(buyer, '/api/orders/ORD-M1');
+  assert.equal(tracker.status, 200);
+  assert.equal((await json(tracker)).order?.tracking_no, 'IQ-778899');
+
+  await Promise.all(pending.splice(0));
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = 'buyer' AND event_key = 'order.status.shipped:ORD-M1'"), 1);
+});
+
+test('a tracking number over 60 characters is TRACKING_NO_TOO_LONG and moves nothing; on a confirm it is ignored', async () => {
+  const raw = seed('processing');
+  const app = merchantApp(asD1(raw));
+  const long = await post(app, '/api/merchant/orders/ORD-M1/status', { status: 'shipped', tracking_no: 'x'.repeat(61) });
+  assert.equal(long.status, 400);
+  assert.equal((await json(long)).code, 'TRACKING_NO_TOO_LONG');
+  assert.equal((raw.prepare("SELECT status FROM orders WHERE id = 'ORD-M1'").get() as { status: string }).status, 'processing');
+  // A bidi-format or control character would survive HTML escaping into the history note, the CSV and the customer's tracker.
+  const bidi = await post(app, '/api/merchant/orders/ORD-M1/status', { status: 'shipped', tracking_no: 'IQ-\u202E998877' });
+  assert.equal(bidi.status, 400);
+  assert.equal((await json(bidi)).code, 'TRACKING_NO_INVALID');
+  assert.equal((raw.prepare("SELECT status FROM orders WHERE id = 'ORD-M1'").get() as { status: string }).status, 'processing', 'nothing moved');
+
+  const raw2 = seed('pending');
+  const res = await post(merchantApp(asD1(raw2)), '/api/merchant/orders/ORD-M1/status', { status: 'confirmed', tracking_no: 'TRK-EARLY' });
+  assert.equal(res.status, 200);
+  const o = raw2.prepare("SELECT status, delivery_tracking_no AS t FROM orders WHERE id = 'ORD-M1'").get() as { status: string; t: string };
+  assert.deepEqual({ ...o }, { status: 'confirmed', t: '' }, 'only a ship carries a tracking number');
+  assert.equal((await json(res)).tracking_no, undefined);
+});
+
+test('a ship WITHOUT a tracking number keeps whatever number the order already had', async () => {
+  const raw = seed('processing');
+  raw.exec("UPDATE orders SET delivery_tracking_no = 'KEEP-1' WHERE id = 'ORD-M1'");
+  const res = await post(merchantApp(asD1(raw)), '/api/merchant/orders/ORD-M1/status', { status: 'shipped' });
+  assert.equal(res.status, 200);
+  assert.equal((raw.prepare("SELECT delivery_tracking_no AS t FROM orders WHERE id = 'ORD-M1'").get() as { t: string }).t, 'KEEP-1');
+  assert.equal((raw.prepare("SELECT note FROM order_status_history WHERE order_id = 'ORD-M1' AND status = 'shipped'").get() as { note: string }).note, 'Moved by the store');
+});

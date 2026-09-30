@@ -53,6 +53,7 @@ import { findVariant, initialSelection, priceRange } from '../../packages/catalo
 import { QuantityInput } from '../components/ui/QuantityInput';
 import { LINE_QTY_MAX } from '../../packages/pricing/src/quantity';
 import { productDescription, productName } from '../lib/productText';
+import { storefrontFilesApi, type ProductFilePublic } from '../components/community/files/api';
 
 /** «يوم واحد», «يومين», «3 أيام», «12 يومًا», «100 يوم» — the count rule of components/community/hub/copy.ts. */
 function arDays(n: number): string {
@@ -77,6 +78,14 @@ const ProductActions = lazy(() => import('../components/community/ProductActions
  */
 const loadProductFacts = () => import('../components/catalog/ProductFacts');
 const ProductFacts = lazy(() => loadProductFacts().then((m) => ({ default: m.ProductFacts })));
+/**
+ * The product's files by role (§9.4) — a lazy chunk mounted only when the
+ * product has any: most products have none, and those visits download
+ * nothing for it. The list itself is one small read; the block gets the
+ * typed doors as a prop (its directory's import allow-list keeps it to the
+ * store's own vocabulary — see the block's header).
+ */
+const ProductFiles = lazy(() => import('../components/storefront/ProductFiles'));
 
 export default function StorefrontProduct() {
   const { slug: routeSlug, productSlug } = useParams<{ slug: string; productSlug: string }>();
@@ -126,6 +135,28 @@ export default function StorefrontProduct() {
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState<SellerConflict | null>(null);
   const [selection, setSelection] = useState<Record<string, string>>({});
+  /**
+   * The files by role, from their own door. Per viewer: the same list says
+   * `downloadable` for a buyer and not for a guest, so it is read again when
+   * somebody signs in. A refused or failed read leaves the block away.
+   */
+  const [files, setFiles] = useState<ProductFilePublic[]>([]);
+  const productId = product?.id;
+  // Asked only when the product read says there is something behind the door
+  // (`file_count`, most products carry none) — a member's ask is uncached and
+  // costs a Worker plus D1 round trips. An older server that sends no count is asked as before.
+  const hasFiles = !!product && product.file_count !== 0;
+  useEffect(() => {
+    if (!slug || !productId || !hasFiles) return;
+    let alive = true;
+    storefrontFilesApi
+      .list(slug, productId)
+      .then((list) => alive && setFiles(list))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [slug, productId, hasFiles, user]);
 
   useEffect(() => {
     if (!slug || !productSlug) return;
@@ -370,6 +401,12 @@ export default function StorefrontProduct() {
             <p className="text-zinc-300 text-[13.5px] leading-relaxed whitespace-pre-wrap mb-6" dir="auto">
               {description}
             </p>
+          )}
+
+          {files.length > 0 && (
+            <Suspense fallback={null}>
+              <ProductFiles slug={slug} productId={product.id} files={files} door={storefrontFilesApi} />
+            </Suspense>
           )}
 
         </div>

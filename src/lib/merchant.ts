@@ -57,6 +57,9 @@ export interface MerchantStore {
   contact_phone_public?: boolean;
   /** `closed: true` = the merchant lists the day as closed («مغلق»). */
   business_hours: Array<{ day: string; open: string; close: string; closed?: boolean }>;
+  /** P3a: derived server-side from `business_hours` at read time (worker/lib/storeHours.ts); null when no row is readable. */
+  open_now?: boolean | null;
+  next_change_at?: string | null;
   policies: Record<string, string>;
   delivery_settings?: Record<string, unknown>;
   /** Storefront reads only (W2-A): where the store delivers and for how much — display, never a price. */
@@ -177,6 +180,8 @@ export interface MerchantProduct {
   /** Public: sales rounded DOWN to a tier the product has passed, or null
    *  below the first tier — never the exact count (worker/lib/salesBadge.ts). */
   sales_tier?: number | null;
+  /** How many files the product carries (§9.4) — the page asks the files door only when it is not zero; absent on an older server. */
+  file_count?: number;
   view_count?: number;
   /** Public shape reports availability, never the exact count. */
   in_stock?: boolean;

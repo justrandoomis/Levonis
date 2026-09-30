@@ -92,6 +92,9 @@ const STRINGS = {
     notFoundBack: 'رجوع إلى الطلبات',
     claimThread: 'محادثة مطالبة الضمان',
     claimNewReply: 'رد جديد',
+    /** The community store this order came from (merchant platform V2, A6). */
+    fromStore: (store: string) => `طلبك من ${store}`,
+    openStore: 'زيارة المتجر',
   },
   en: {
     title: 'Order details',
@@ -128,6 +131,8 @@ const STRINGS = {
     notFoundBack: 'Back to orders',
     claimThread: 'Warranty claim conversation',
     claimNewReply: 'New reply',
+    fromStore: (store: string) => `Your order from ${store}`,
+    openStore: 'Visit the store',
   },
   ckb: {
     title: 'وردەکاری داواکاری',
@@ -164,8 +169,45 @@ const STRINGS = {
     notFoundBack: 'گەڕانەوە بۆ داواکارییەکان',
     claimThread: 'گفتوگۆی داواکاری گەرەنتی',
     claimNewReply: 'وەڵامی نوێ',
+    fromStore: (store: string) => `داواکاریەکەت لە ${store}`,
+    openStore: 'سەردانی فرۆشگا بکە',
   },
 };
+
+/**
+ * THE STORE STRIP (A6): the shop this order came from, one tap back to it.
+ * Only what the storefront shows anyway — logo, name, address; the merchant's
+ * row never reaches this page. An absolute address is the store's own host.
+ */
+function OrderStoreStrip({ store, label, cta }: { store: NonNullable<ApiOrder['store']>; label: string; cta: string }) {
+  const cls =
+    'flex items-center gap-3 rounded-2xl border border-border-subtle bg-surface px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
+  const inner = (
+    <>
+      {store.logo_url ? (
+        <img src={store.logo_url} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+      ) : (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-raised text-text-muted" aria-hidden="true">
+          <Truck className="h-4 w-4" />
+        </span>
+      )}
+      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-text-primary" dir="auto">
+        {label}
+      </span>
+      <span className="shrink-0 text-[12px] font-semibold text-gold">{cta}</span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-text-muted rtl:rotate-180" aria-hidden="true" />
+    </>
+  );
+  return store.url.startsWith('/') ? (
+    <Link to={store.url} className={cls} data-order-store={store.slug}>
+      {inner}
+    </Link>
+  ) : (
+    <a href={store.url} className={cls} data-order-store={store.slug}>
+      {inner}
+    </a>
+  );
+}
 
 function DetailSkeleton() {
   return (
@@ -456,6 +498,9 @@ export default function OrderDetail() {
                 await load({ quiet: true });
               }}
             />
+            {/* The store this order came from (A6), before the summary: on a
+                store order it is the first thing a customer wants to know. */}
+            {order.store && <OrderStoreStrip store={order.store} label={s.fromStore(order.store.name)} cta={s.openStore} />}
             {/* Summary */}
             <section
               data-order-summary={order.id}

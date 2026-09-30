@@ -9,6 +9,12 @@
  * feed's rows and the composer dock once the feed is reached, the search
  * turning the page into its results, and a follow flipping on a rail.
  *
+ *   Link cards (§9.4): a post whose words name a model page carries its card
+ *   (title, host, our copy of the picture, «اطلب طباعته»), a video's card has
+ *   no print door, an address nobody resolved draws nothing, and the page
+ *   asks GET /api/link-cards ONCE per distinct address; the project's story
+ *   draws the full card and its door opens the wizard with `?link=`.
+ *
  *   npx vite --port 4191 &   node scripts/e2e-community-home.mjs
  */
 import { mkdir } from 'node:fs/promises';
@@ -31,6 +37,11 @@ const check = (name, ok, detail = '') => {
 const COVER_TITLE = 'مزهرية حلزونية';
 /** hub/strings.ts requestsForYou — what a merchant's second section is called. */
 const MERCHANT_HEADS = ['طلبات تناسبك', 'Requests for your workshop', 'داواکاری گونجاو بۆ تۆ'];
+/** The model page several fixture posts name (one ask for all of them) and its door into the wizard. */
+const LINKED_MODEL = 'https://www.printables.com/model/1234-articulated-dragon';
+const PRINT_DOOR = `/requests?view=new&link=${encodeURIComponent(LINKED_MODEL)}`;
+/** Our re-hosted copy of a card's picture (`/files/link-cards/<id>.webp`), served here since there is no worker. */
+const LINK_PICTURE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9e2d3"/><stop offset="1" stop-color="#b8ad96"/></linearGradient></defs><rect width="1200" height="630" fill="url(#g)"/><path d="M260 470 q120 -300 380 -220 t330 90 q80 60 -40 120 t-300 -30 q-170 -30 -230 110 z" fill="#6c7a4a"/><circle cx="880" cy="290" r="22" fill="#111"/></svg>`;
 
 const SCENES = [
   { tab: 'foryou', viewer: 'guest', extra: 'recent=1', mark: '[data-community-panel="foryou"] [data-community-cover]', issue: true },
@@ -45,6 +56,7 @@ const SCENES = [
   { tab: 'products', viewer: 'guest', mark: '[data-community-panel="products"] [data-community-product]', legacy: true },
   { tab: 'merchants', viewer: 'guest', mark: '[data-community-panel="merchants"]', legacy: true },
   { tab: 'foryou', viewer: 'guest', extra: 'empty=1', mark: '[data-community-cover="typeset"]', key: 'foryou-empty', empty: true },
+  { tab: 'foryou', viewer: 'customer', extra: 'path=/community/projects/prj_2', mark: '[data-link-card][data-link-variant="full"]', key: 'project-link', project: true },
 ];
 
 const browser = await chromium.launch();
@@ -60,10 +72,13 @@ for (const lang of ['ar', 'en', 'ckb']) {
         colorScheme: theme,
         hasTouch: phone,
         isMobile: phone,
+        // The Sorani pass is also the reduced-motion pass: the cards must land without their travel.
+        reducedMotion: lang === 'ckb' ? 'reduce' : 'no-preference',
       });
       const page = await context.newPage();
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
+      await page.route('**/files/link-cards/**', (route) => route.fulfill({ contentType: 'image/svg+xml', body: LINK_PICTURE }));
       const tag = `${lang}-${theme}-${width}`;
       const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
@@ -76,6 +91,23 @@ for (const lang of ['ar', 'en', 'ckb']) {
         await page.waitForTimeout(500);
         check(`${name}: ${s.mark} present`, found);
         check(`${name}: no horizontal overflow`, (await overflow()) <= 0, `overflow=${await overflow()}`);
+        if (s.project) {
+          // THE PROJECT'S STORY (§9.4): its first link as the full card — picture on top, description, host — and the door into the wizard.
+          const full = page.locator('[data-link-card][data-link-variant="full"]');
+          check(`${name}: the story's link is one full card`, (await full.count()) === 1);
+          const open = full.locator('a[data-link-open]');
+          check(`${name}: the card opens in a new tab with no referrer and no follow`, (await open.getAttribute('target')) === '_blank' && (await open.getAttribute('rel')) === 'noopener noreferrer nofollow');
+          check(`${name}: the picture is our copy, not theirs`, ((await full.locator('img').first().getAttribute('src').catch(() => '')) ?? '').startsWith('/files/link-cards/'));
+          check(`${name}: the description is on the full card`, (await full.innerText()).includes('24 joints'));
+          check(`${name}: a model page offers «اطلب طباعته»`, (await full.locator('[data-link-print]').count()) === 1);
+          check(`${name}: one ask for the story's address`, ((await page.evaluate(() => window.__linkAsks)) ?? []).length === 1);
+          await full.scrollIntoViewIfNeeded();
+          await page.screenshot({ path: `${out}/${key}-${tag}.png`, fullPage: true });
+          await full.locator('[data-link-print]').click();
+          const went = await page.waitForSelector('[data-elsewhere]', { timeout: 8000 }).then((el) => el.getAttribute('data-elsewhere')).catch(() => null);
+          check(`${name}: «اطلب طباعته» opens the wizard with the link in it`, went === PRINT_DOOR, String(went));
+          continue;
+        }
         check(`${name}: one h1`, (await page.locator('h1').count()) === 1);
         check(`${name}: six tabs`, (await page.locator('[role="tab"]').count()) === 6, String(await page.locator('[role="tab"]').count()));
         if (s.legacy) {
@@ -109,11 +141,30 @@ for (const lang of ['ar', 'en', 'ckb']) {
             check(`${name}: the social row is on each post`, (await page.locator('[data-post-card] [data-action-row]').count()) >= 12);
             check(`${name}: no horizontal overflow with the feed`, (await overflow()) <= 0, `overflow=${await overflow()}`);
             await page.screenshot({ path: `${out}/feed-${tag}.png`, fullPage: false });
+            // LINK CARDS (§9.4): the words name a model page → its card, a compact row beside the story.
+            const linked = await page.waitForSelector('[data-community-feed="foryou"] [data-post-card] [data-link-card]', { timeout: 8000 }).then(() => true).catch(() => false);
+            check(`${name}: a post that names a link carries its card`, linked);
+            if (linked) {
+              const open = page.locator('[data-post-card] [data-link-card] a[data-link-open]').first();
+              check(`${name}: the card opens in a new tab with no referrer and no follow`, (await open.getAttribute('target')) === '_blank' && (await open.getAttribute('rel')) === 'noopener noreferrer nofollow');
+              check(`${name}: the model card shows our copy of the picture`, ((await page.locator('[data-post-card] [data-link-card][data-link-kind="model_page"] img').first().getAttribute('src').catch(() => '')) ?? '').startsWith('/files/link-cards/'));
+              check(`${name}: a model page offers «اطلب طباعته», a video does not`, (await page.locator('[data-post-card] [data-link-card][data-link-kind="model_page"] [data-link-print]').count()) >= 1 && (await page.locator('[data-post-card] [data-link-card][data-link-kind="video"] [data-link-print]').count()) === 0);
+              check(`${name}: a link nobody resolved draws nothing`, (await page.locator('[data-link-card][data-link-host="example.org"]').count()) === 0);
+              const asks = (await page.evaluate(() => window.__linkAsks)) ?? [];
+              check(`${name}: one ask per distinct address (three addresses, five cards)`, asks.length === 3 && new Set(asks).size === 3, JSON.stringify(asks));
+              // The card's doors are pressable through the card's stretched title link.
+              const door = page.locator('[data-post-card] [data-link-card][data-link-kind="model_page"] [data-link-print]').first();
+              await door.scrollIntoViewIfNeeded();
+              await page.waitForTimeout(400);
+              await page.screenshot({ path: `${out}/link-card-${tag}.png`, fullPage: false });
+              check(`${name}: the print door is a 44 px target`, ((await door.boundingBox())?.height ?? 0) >= 44);
+            }
             // Auto-load: the sentinel near the end of the list fetches the next page.
             await page.locator('[data-load-more], [data-community-colophon]').first().scrollIntoViewIfNeeded().catch(() => {});
             await page.waitForTimeout(900);
             const after = await page.locator('[data-community-feed="foryou"] [data-post-card]').count();
             check(`${name}: the next page arrived on its own`, after > 12, `rows=${after}`);
+            check(`${name}: the next page asked nothing new about the same addresses`, ((await page.evaluate(() => window.__linkAsks)) ?? []).length === 3);
           }
           check(`${name}: the colophon counts`, (await page.locator('[data-community-colophon]').count()) === 1);
           check(`${name}: «وسوم رائجة» under the cover`, (await page.locator('[data-community-trending-tags] a').count()) === 4);

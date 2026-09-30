@@ -30,16 +30,18 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { HttpError, notFound, int, str } from '../lib/http';
+import { HttpError, notFound, int, str, oneOf } from '../lib/http';
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { storeBySlug, storeById, storeIsSuspended, type StoreContext } from '../lib/merchantAuth';
 import { storeTakesOrders } from '../lib/storeOrderOps';
 import { benefits, getTierStatus } from '../lib/entitlements';
 import { salesBadgeTier } from '../lib/salesBadge';
 import { maskName } from './reviews';
-import { storefrontLayoutPayload, storefrontTheme } from '../lib/storeLayout';
+import { HAS_VIDEO_NONE, hasVideoSql, storefrontLayoutPayload, storefrontTheme } from '../lib/storeLayout';
 import { collectionMemberSql, collectionOrder, sinceNewArrivals, type CollectionKind } from '../lib/catalog/sql';
 import { publicProductExtras } from '../lib/catalog/public';
+import { productFileCount } from '../lib/fileOwnership';
 import { isSchemaMissing } from '../lib/membershipBenefits';
 import {
   deliveryToGovernorate,
@@ -49,6 +51,7 @@ import {
 } from '../lib/merchantDelivery';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
 import { anonymousCached } from '../lib/edgePolicy';
+import { openNow } from '../lib/storeHours';
 
 /**
  * ONE BODY FOR EVERY VISITOR (P2a, plan §B.1 #2 and #4).
@@ -106,6 +109,12 @@ export async function publicStore(db: D1Database, ctx: StoreContext, rootDomain:
     // a person's phone, not a store attribute.
     contact_phone: s.contact_phone_public ? s.contact_phone : null,
     business_hours: safeParse(s.business_hours, []),
+    // «مفتوح الآن» from the hours, in Baghdad time, with the instant the word
+    // next changes (worker/lib/storeHours.ts). A guest reads this body from
+    // the edge cache for up to 120 s (worker/lib/edgePolicy.ts), so the
+    // client re-derives the word from `business_hours` with the same pure
+    // function once `next_change_at` has passed. Vacation columns are P7: null.
+    ...openNow(safeParse(s.business_hours, []), null, Date.now()),
     policies: safeParse(s.policies, {}),
     social_links: safeParse(s.social_links, {}),
     // The merchant-arranged header rows. Hidden items are the merchant's
@@ -181,6 +190,9 @@ export function publicProduct(p: Record<string, unknown>) {
     sales_tier: salesBadgeTier(p.sold_count),
     section_id: p.section_id ?? null,
     featured: !!p.featured,
+    // A ▶ mark on the card (storefront L10): stamped by `withVideoFlags` on
+    // the list reads; a row read without it says false, never undefined.
+    has_video: !!p.has_video,
   };
 }
 
@@ -539,8 +551,19 @@ storefrontRoutes.get('/:slug/showcase', (c) => anonymousCached(c, {}, async () =
   });
 }));
 
-/** The query parameters a store's product list answers to — the cache key's whole vocabulary. */
-export const STORE_PRODUCTS_PARAMS: readonly string[] = ['limit', 'cursor', 'category', 'collection', 'section', 'deals'];
+/**
+ * The query parameters a store's product list answers to — the cache key's
+ * whole vocabulary. `q` and `sort` (storefront L11) are declared here FIRST:
+ * the anonymous edge key is built from this list only, so an undeclared
+ * parameter would hand one search's answer to every other (worker/lib/edgePolicy.ts).
+ */
+export const STORE_PRODUCTS_PARAMS: readonly string[] = ['limit', 'cursor', 'category', 'collection', 'section', 'deals', 'q', 'sort'];
+
+/** In-store search: a term this long is a sentence, not a product name. */
+export const STORE_SEARCH_MAX = 60;
+/** The orders a visitor may ask for. Nothing named keeps the list's own order. */
+export const STORE_PRODUCT_SORTS = ['new', 'price_asc', 'price_desc'] as const;
+export type StoreProductSort = (typeof STORE_PRODUCT_SORTS)[number];
 
 storefrontRoutes.get('/:slug/products', (c) => anonymousCached(c, { params: STORE_PRODUCTS_PARAMS }, async () => {
   const ctx = await servableStore(c, c.req.param('slug'));
@@ -550,6 +573,15 @@ storefrontRoutes.get('/:slug/products', (c) => anonymousCached(c, { params: STOR
   const category = c.req.query('category') || '';
   const section = c.req.query('collection') || c.req.query('section') || '';
   const dealsOnly = c.req.query('deals') === '1' ? 1 : 0;
+  // IN-STORE SEARCH AND SORT (L11). The term is a bound LIKE pattern with its
+  // wildcards escaped (worker/lib/sqlLike.ts): a «%» or «_» a visitor types is
+  // a literal, never «everything». Too long is refused, not cut. The sort is
+  // one of three names; anything else is a 400, and no sort at all keeps the
+  // list's own order (newest, or a collection's arrangement).
+  const like = likePattern(str(c.req.query('q'), 'q', { max: STORE_SEARCH_MAX, required: false }));
+  const sortRaw = c.req.query('sort') || '';
+  const sort: StoreProductSort | '' = sortRaw ? oneOf(sortRaw, 'sort', STORE_PRODUCT_SORTS) : '';
+  const priceSort = sort === 'price_asc' || sort === 'price_desc';
 
   // ONE COLLECTION (W2-F): its members in the merchant's order, or its rule's
   // products in the rule's order, paged by (that order's value, id). A
@@ -569,24 +601,37 @@ storefrontRoutes.get('/:slug/products', (c) => anonymousCached(c, { params: STOR
     if (!col && !legacySection) return c.json({ success: true, products: [], next_cursor: null });
   }
   if (col) {
-    const order = collectionOrder(col.kind, 'p', '?2');
+    // A sort the visitor named replaces the collection's own arrangement for
+    // this read; the keyset then follows the named value, the same way.
+    const order = priceSort
+      ? { sortExpr: 'p.price_iqd', dir: sort === 'price_asc' ? ('ASC' as const) : ('DESC' as const) }
+      : sort === 'new'
+        ? { sortExpr: 'p.created_at', dir: 'DESC' as const }
+        : collectionOrder(col.kind, 'p', '?2');
     const cmp = order.dir === 'DESC' ? '<' : '>';
-    const numeric = col.kind === 'manual' || col.kind === 'best_sellers';
+    const numeric = priceSort || (!sort && (col.kind === 'manual' || col.kind === 'best_sellers'));
     const cursorValue = cursor.at === '' ? '' : numeric ? Number(cursor.at) : cursor.at;
-    const { results } = await c.env.DB.prepare(
-      `SELECT p.*, ${order.sortExpr} AS sort_value FROM community_products p
+    // `has_video` (L10) is a column of this one statement — the page stays
+    // its two waves (tests/d1Waves.test.ts); a collection exists only after 0126,
+    // so the media table is always there beside it.
+    // One row past the page (COMMUNITY_ECOSYSTEM §2 D8): `next_cursor` is exact,
+    // never «maybe» — a page that ends on the last product offers no empty next page.
+    const { results: fetched } = await c.env.DB.prepare(
+      `SELECT p.*, ${order.sortExpr} AS sort_value, ${hasVideoSql('p')} FROM community_products p
         WHERE p.store_id = ?1 AND p.lifecycle = 'active' AND p.status = 'active'
           AND ${collectionMemberSql(col.kind, 'p', '?2', '?3')}
           AND (?4 = '' OR p.category = ?4)
           AND (?5 = 0 OR (p.original_price_iqd IS NOT NULL AND p.original_price_iqd > p.price_iqd))
           AND (?6 = '' OR ${order.sortExpr} ${cmp} ?6 OR (${order.sortExpr} = ?6 AND p.id < ?7))
+          AND (?9 = '' OR ${sqlLikeClause(['p.name', 'p.name_ar'], '?9')})
         ORDER BY ${order.sortExpr} ${order.dir}, p.id DESC LIMIT ?8`
-    ).bind(ctx.store.id, col.id, sinceNewArrivals(), category, dealsOnly, cursorValue, cursor.id, limit).all<Record<string, unknown>>();
+    ).bind(ctx.store.id, col.id, sinceNewArrivals(), category, dealsOnly, cursorValue, cursor.id, limit + 1, like).all<Record<string, unknown>>();
+    const results = fetched.slice(0, limit);
     const last = results[results.length - 1];
     return c.json({
       success: true,
       products: results.map(publicProduct),
-      next_cursor: results.length === limit && last ? `${String(last.sort_value)}|${String(last.id)}` : null,
+      next_cursor: fetched.length > limit && last ? `${String(last.sort_value)}|${String(last.id)}` : null,
     });
   }
 
@@ -594,20 +639,44 @@ storefrontRoutes.get('/:slug/products', (c) => anonymousCached(c, { params: STOR
   // invisible here — the WHERE clause is the enforcement, not a filter the
   // caller can drop. The section filter is a server query so a shelf's whole
   // contents are reachable, not just whatever slice one page happened to hold.
-  const { results } = await c.env.DB.prepare(
-    `SELECT * FROM community_products
-      WHERE store_id = ?1 AND lifecycle = 'active' AND status = 'active'
-        AND (?2 = '' OR category = ?2)
-        AND (?3 = '' OR section_id = ?3)
-        AND (?4 = 0 OR (original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd))
-        AND (?5 = '' OR created_at < ?5 OR (created_at = ?5 AND id < ?6))
-      ORDER BY created_at DESC, id DESC LIMIT ?7`
-  ).bind(ctx.store.id, category, legacySection, dealsOnly, cursor.at, cursor.id, limit).all();
+  // The keyset is unchanged for the default order — `(created_at DESC, id
+  // DESC)`, cursor `<created_at>|<id>` — and a price sort pages by
+  // `(price_iqd, id)` with the same cursor shape, `<price>|<id>`.
+  const sortExpr = priceSort ? 'price_iqd' : 'created_at';
+  const dir = sort === 'price_asc' ? 'ASC' : 'DESC';
+  const cmp = dir === 'DESC' ? '<' : '>';
+  const cursorValue = cursor.at === '' ? '' : priceSort ? Number(cursor.at) : cursor.at;
+  // `has_video` (L10) rides inside the one statement, so the page stays its
+  // two waves (tests/d1Waves.test.ts). A database before 0126 has no media
+  // table: the same statement runs again saying «no video».
+  const list = (videoSql: string) =>
+    c.env.DB.prepare(
+      `SELECT *, ${videoSql} FROM community_products
+        WHERE store_id = ?1 AND lifecycle = 'active' AND status = 'active'
+          AND (?2 = '' OR category = ?2)
+          AND (?3 = '' OR section_id = ?3)
+          AND (?4 = 0 OR (original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd))
+          AND (?5 = '' OR ${sortExpr} ${cmp} ?5 OR (${sortExpr} = ?5 AND id < ?6))
+          AND (?8 = '' OR ${sqlLikeClause(['name', 'name_ar'], '?8')})
+        ORDER BY ${sortExpr} ${dir}, id DESC LIMIT ?7`
+    ).bind(ctx.store.id, category, legacySection, dealsOnly, cursorValue, cursor.id, limit + 1, like).all<Record<string, unknown>>();
+  // One row past the page (D8) — the price sort's cursor is exact; the default
+  // order keeps its pre-existing `nextCursor` shape, out of this phase's scope.
+  const { results: fetched } = await list(hasVideoSql('community_products')).catch((e) => {
+    if (!isSchemaMissing(e)) throw e;
+    return list(HAS_VIDEO_NONE);
+  });
+  const results = fetched.slice(0, limit);
+  const last = results[results.length - 1];
 
   return c.json({
     success: true,
     products: results.map(publicProduct),
-    next_cursor: nextCursor(results, limit),
+    next_cursor: priceSort
+      ? fetched.length > limit && last
+        ? `${String(last.price_iqd)}|${String(last.id)}`
+        : null
+      : nextCursor(results, limit),
   });
 }));
 
@@ -637,12 +706,16 @@ storefrontRoutes.get('/:slug/products/:productSlug', (c) => anonymousCached(c, {
 
   // The product page renders no blocks, only the store's THEME (W2-C).
   // …and the variant picker, the ordered media and the printing attributes (W2-F).
-  const [store, layout_theme, extras] = await Promise.all([
+  // …and how many files the product carries (§9.4), in the same wave, so the
+  // page asks the files door only when there is something behind it — most
+  // products carry none, and a member's ask is uncached (perf review 2026-09-30).
+  const [store, layout_theme, extras, file_count] = await Promise.all([
     publicStore(c.env.DB, ctx, rootDomainFrom(c.env)),
     storefrontTheme(c.env.DB, ctx),
     publicProductExtras(c.env.DB, p),
+    productFileCount(c.env.DB, String(p.id)),
   ]);
-  return c.json({ success: true, product: { ...publicProduct(p), ...extras }, store: { ...store, layout_theme } });
+  return c.json({ success: true, product: { ...publicProduct(p), ...extras, file_count }, store: { ...store, layout_theme } });
 }));
 
 /**
@@ -668,18 +741,28 @@ export async function storeReviewSummary(db: D1Database, merchantId: string) {
   return { average: total ? Math.round((sum / total) * 100) / 100 : null, count: total, distribution };
 }
 
-/** The query parameters the review list answers to. */
-export const STORE_REVIEWS_PARAMS: readonly string[] = ['limit', 'cursor'];
+/**
+ * The query parameters the review list answers to — declared so the edge key
+ * tells «★5 only» and «with photos» apart (worker/lib/edgePolicy.ts; L12).
+ */
+export const STORE_REVIEWS_PARAMS: readonly string[] = ['limit', 'cursor', 'rating', 'photos'];
 
 storefrontRoutes.get('/:slug/reviews', (c) => anonymousCached(c, { params: STORE_REVIEWS_PARAMS }, async () => {
   const ctx = await servableStore(c, c.req.param('slug'));
 
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 50, def: 20 });
   const cursor = parseCursor(c.req.query('cursor'));
+  // THE FILTERS (L12): one star value, or «with photos» — a review whose
+  // `images` is a non-empty JSON list. Both narrow the page only; the summary
+  // and its distribution are always the whole store's.
+  const ratingRaw = c.req.query('rating') || '';
+  const rating = ratingRaw ? int(ratingRaw, 'rating', { min: 1, max: 5 }) : 0;
+  const photos = c.req.query('photos') === '1' ? 1 : 0;
 
   // The page and its distribution together (P2a): the summary used to wait
   // for the page, a dependent round trip for a read that needs nothing from it.
-  const [{ results }, { average, count, distribution }] = await Promise.all([
+  // One row past the page (D8): `next_cursor` is exact, never «maybe».
+  const [{ results: fetched }, { average, count, distribution }] = await Promise.all([
     c.env.DB.prepare(
       `SELECT r.id, r.rating, r.body, r.images, r.merchant_reply, r.merchant_replied_at,
               r.created_at, r.order_id, r.community_order_id,
@@ -687,10 +770,13 @@ storefrontRoutes.get('/:slug/reviews', (c) => anonymousCached(c, { params: STORE
          FROM merchant_reviews r JOIN users u ON u.id = r.customer_id
         WHERE r.merchant_id = ?1 AND r.hidden = 0
           AND (?2 = '' OR r.created_at < ?2 OR (r.created_at = ?2 AND r.id < ?3))
+          AND (?5 = 0 OR r.rating = ?5)
+          AND (?6 = 0 OR (json_valid(r.images) AND json_array_length(r.images) > 0))
         ORDER BY r.created_at DESC, r.id DESC LIMIT ?4`
-    ).bind(ctx.merchant.id, cursor.at, cursor.id, limit).all<Record<string, unknown>>(),
+    ).bind(ctx.merchant.id, cursor.at, cursor.id, limit + 1, rating, photos).all<Record<string, unknown>>(),
     storeReviewSummary(c.env.DB, String(ctx.merchant.id)),
   ]);
+  const results = fetched.slice(0, limit);
 
   return c.json({
     success: true,
@@ -713,7 +799,7 @@ storefrontRoutes.get('/:slug/reviews', (c) => anonymousCached(c, { params: STORE
       merchant_replied_at: r.merchant_replied_at,
       created_at: r.created_at,
     })),
-    next_cursor: nextCursor(results, limit),
+    next_cursor: fetched.length > limit ? nextCursor(results, limit) : null,
   });
 }));
 

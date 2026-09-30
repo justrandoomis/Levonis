@@ -165,6 +165,10 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // maker's projects and posts, and their pictures. Marketplace, because a
     // project is the door into a store, a product and a print request.
     'community_posts', 'community_post_media',
+    // 0157 — files on posts and products (Phase 4, §9.4): the model/PDF rows
+    // under a post, the merchant's product files, who may download them, and
+    // the viewer tokens minted for either (model_view_tokens keeps requests).
+    'community_post_files', 'product_files', 'product_file_grants', 'viewer_grants',
     // 0154 — the social graph around it (Phase 2): follows between people,
     // likes, saves, comments, blocks, mutes and content reports.
     'user_follows', 'community_likes', 'community_saves', 'community_comments',
@@ -201,7 +205,13 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ]),
   ...owned('reviews', ['reviews', 'review_rewards', 'gift_entitlements', 'gift_pool_items', 'gift_redemptions', 'gift_pools', 'review_media']),
   ...owned('devices', ['order_item_units', 'device_serials', 'device_registrations', 'warranty_claims', 'claim_messages', 'warranty_receipts', 'serial_inventory']),
-  ...owned('chat', ['chats', 'chat_participants', 'chat_messages', 'chat_typing_presence']),
+  ...owned('chat', [
+    'chats', 'chat_participants', 'chat_messages', 'chat_typing_presence',
+    // 0158 — what the server learned about a pasted URL, once, for every
+    // reader (docs/COMMUNITY_ECOSYSTEM.md §9.4 "Link cards"). Chat, because
+    // the conversation is the door that writes it; comments and posts read it.
+    'link_cards',
+  ]),
   ...owned('notifications', [
     'outbox', 'user_notifications', 'telegram_updates', 'tg_admin_notifications', 'tg_admin_actions', 'notification_preferences',
     // 0080 — the ADMIN bot (@alilevobot): the group it learned from a
@@ -263,7 +273,12 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   // the product write has finished. Commerce writes a job or briefly holds a
   // guard the way it writes any cross-service intent — through the owner's
   // media path — and the Files service executes and retires that state.
-  ...owned('files', ['file_objects', 'file_migration_log', 'media_cleanup_jobs', 'media_object_guards']),
+  ...owned('files', [
+    'file_objects', 'file_migration_log', 'media_cleanup_jobs', 'media_object_guards',
+    // 0156 — a resumable multipart upload in flight (docs/COMMUNITY_ECOSYSTEM.md
+    // §9.4): the R2 upload id, the parts received, the key it will become.
+    'upload_sessions',
+  ]),
 ];
 
 export const TABLE_OWNER: Readonly<Record<string, Owner>> = Object.fromEntries(TABLE_OWNER_ENTRIES);

@@ -388,6 +388,54 @@ results node surviving a keystroke, the `?q=` contract resuming on close, a clic
 same term, ↓↓ + Enter navigates — 750 checks over ar/en/ckb × dark/cream × 360/1280, no page
 errors, no horizontal overflow with the overlay open) and scripts/e2e-projects.mjs (247).
 
+## 4d. API (Phase 4, landed) — files, viewer grants and link cards
+
+Migrations 0156 (`upload_sessions`; `file_objects` + `sha256`, `purpose`), 0157 (`product_files`,
+`product_file_grants`, `community_post_files`, `viewer_grants`; `model_view_tokens` + `source_type`,
+`source_id`), 0158 (`link_cards`). Routers: worker/routes/uploadSessions.ts (mounted at
+`/api/uploads/sessions`, `requireAuth` on `*`), worker/routes/productFiles.ts (`merchantProductFileRoutes`
+under `/api/merchant`, `publicProductFileRoutes` at `/api/product-files`), worker/routes/communityPosts.ts
+(files on posts, under `/api/community`), worker/routes/printRequests.ts (the shared viewer),
+worker/routes/linkCards.ts (`/api/link-cards`), worker/routes/chats.ts (link messages),
+worker/routes/uploads.ts (the whole-body door, changed), worker/routes/adminCommunity.ts (limits).
+Every 200 carries `success: true`; refusals are `{ success: false, error, code }` and every code is
+localised in src/lib/refusalStrings.ts (ar/en/ckb). Entity rules for BOTH upload doors live in one
+place, `assertUploadEntity` (worker/lib/uploadEntity.ts).
+
+| Method, path | Guard | Refusal codes |
+|---|---|---|
+| POST `/api/uploads/sessions` `{purpose, entity_id?, file_name, bytes, mime, sha256}` → 201 `{session_id, chunk_bytes, parts_total, expires_at}` | `requireAuth`; `rateLimit` `upload-session` 30/h; purpose ∈ post\|community\|chat\|request\|product_file (`offer`/`order_update` return with their consumer routes — review 2026-09-30); `assertUploadEntity`; limits from `uploadLimits`, quota from `uploadQuotas` — the owner's LIVE objects **plus their open, unexpired sessions**, so sessions opened in turn cannot each pass the same cap | 400 `UPLOAD_KIND_NOT_ALLOWED` {extension, purpose}, `UPLOAD_TOO_LARGE` {limit_bytes, kind}, `UPLOAD_QUOTA_EXCEEDED` {limit_bytes, used_bytes, purpose}; 403 `STORE_REQUIRED` (community, product_file), chat non-participant, `CHAT_READ_ONLY`; 404 a stranger's request/product; 409 `REQUEST_NOT_EDITABLE` |
+| PUT `/api/uploads/sessions/:id/parts/:n` (raw `application/octet-stream`, `n` 1-based) → `{received[], bytes_so_far, parts_total}` | owner only; `rateLimit` `upload-part` 3600/h; non-final parts exactly `chunk_bytes`; idempotent per `n` (CAS on `parts_json`) | 404 `UPLOAD_SESSION_NOT_FOUND` (anyone else, closed, expired, or the upload already assembled/aborted on the bucket while the part was in flight); 400 `UPLOAD_PART_TOO_LARGE` {chunk_bytes, expected_bytes, part}; plain 400 past the end |
+| GET `/api/uploads/sessions/:id` → `{session_id, state, received, bytes_so_far, declared_bytes, chunk_bytes, parts_total, expires_at}` | owner only; `rateLimit` `upload-session-read` 600/h | 404 `UPLOAD_SESSION_NOT_FOUND` (also aborted/expired) |
+| POST `/api/uploads/sessions/:id/complete` → `{key?, url, visibility, mime, bytes, sha256, width, height, analysis?, warnings?, file?}` (`key` only for post\|community\|product_file; `file` = the `community_request_files` row for `request`) | owner only; `rateLimit` `upload-session-close` 120/h; the quota asked AGAIN (this session left out of the count) before the ledger row, then head + tail sniff, ZIP central-directory bound, streamed SHA-256; every refusal deletes the object and aborts the session | `UPLOAD_QUOTA_EXCEEDED`, `UPLOAD_INCOMPLETE` {missing, bytes_so_far, declared_bytes}, `UPLOAD_KIND_NOT_ALLOWED` {declared, detected}, `VIDEO_UNSUPPORTED`, `IMAGE_HEIC_UNSUPPORTED`, `ARCHIVE_TOO_DEEP`, `CHECKSUM_MISMATCH` {declared, actual}, `UPLOAD_TOO_LARGE` (glTF > 4 MiB); warning `VIDEO_NOT_FASTSTART` |
+| DELETE `/api/uploads/sessions/:id` → `{state}` | owner only; `rateLimit` `upload-session-close` 120/h; aborts the R2 multipart upload | 404 `UPLOAD_SESSION_NOT_FOUND` |
+| POST `/api/uploads` (changed) | `requireAuth`; `SIMPLE_UPLOAD_PURPOSES` (unchanged set); `uploadLimits` capped at `SIMPLE_UPLOAD_HARD_CAP` 40 MiB; writes `file_objects.purpose` | `UPLOAD_TOO_LARGE` {limit_bytes}, `UPLOAD_QUOTA_EXCEEDED` (post_gb) |
+| PATCH `/api/admin/community/settings` `{uploadLimits?, uploadQuotas?}` | any admin (a pre-handler before the financial one; fee keys still need the financial scope); audit `admin.upload_limits` {before, after} | 400 outside the bounds (image_mb 1..1024, video/model/archive_mb 1..4096, document_mb 1..1024, chunk_mb 5..40, session_hours 1..168, quotas 0..1024 GB) |
+| GET `/api/merchant/products/:id/files`; POST `{file_key, role, name?, position?}`; PATCH `/:fid` `{role?, name?, position?}`; DELETE `/:fid`; PUT `/order` `{ids[]}` | `requireAuth` + `storeForUser` + the product of that store; `rateLimit` `product-file-write` 120/h; the key must be the caller's own PRIVATE `file_objects` row with purpose `product_file`; audit `merchant.product_file_added/updated/removed` | `PRODUCT_FILE_NOT_OWNED`, `PRODUCT_FILE_LIMIT` (12), `PRODUCT_FILE_ROLE_INVALID`, `PRODUCT_FILE_ORDER_INVALID`, `PRODUCT_FILE_NOT_FOUND`; 404 another store's product |
+| GET `/api/product-files/:slug/:productId` → `{files:[{id, role, name, bytes, kind, has_preview, downloadable, granted}]}` | guest OK; `anonymousCached` (`perViewer: true`, no params); never a key; the store and the product are read in ONE wave and a member's grants ride in the files statement; `granted` on the `preview` row = a LIVE grant on any file of the product (the buyer's viewer link then opens the full mesh); the product read (`/api/storefront/:slug/products/:productSlug`) carries `file_count`, and the page asks here only when it is not 0 | 404 |
+| POST `/api/product-files/:slug/:productId/:fid/viewer-token` → `{token, url:'/model-viewer/<token>', expires_at, grant}` | guest OK (bound to SHA-256(`CF-Connecting-IP`+UA+day) — never `X-Forwarded-For`) or the account; `rateLimit` `viewer-token` 60/h; grant `preview` for the preview role, `full` for the owner and for a BUYER = an account holding a live grant on any file of the product (`hasProductGrant`; the preview role itself is never granted) | `PRODUCT_FILE_NOT_FOUND`, `NO_PREVIEW`, `VIEWER_NOT_ALLOWED` |
+| GET `/api/product-files/:slug/:productId/:fid/download` (attachment, nosniff, sandbox CSP; counted; audit `product_file.downloaded`) | signed-in holder of a LIVE `product_file_grants` row (written inside the store checkout batch for download_after_purchase\|source_model\|reference\|instruction; **revoked inside `cancelStoreOrder`'s batch when the order is cancelled and refunded** — re-pointed at another live order of the buyer that covers the product, deleted otherwise — and dead at the door in any case once its order is `cancelled`: `liveGrantSql`) or the owner; `rateLimit` `product-file-download` 120/h; a purchase outlives a hide | 404 guest; 404 a signed-in non-holder once the product is hidden/archived (no oracle on a withdrawn product's file ids); 403 `PRODUCT_FILE_NOT_GRANTED` on a shown product |
+| POST/PATCH `/api/community/posts` `files[]` `{file_key\|key, name?, downloadable?}`; GET `/posts/:id` → `post.files[]` `{id, name, bytes, kind, downloadable, has_preview, key? (author/admin only)}` | the post's own guards; model\|document only, from a `post` PRIVATE key of the author (a `community` upload is public and can never be one) | `POST_FILE_LIMIT` (3), `POST_FILE_NOT_OWNED`, `POST_FILE_KIND` |
+| POST `/api/community/posts/:id/files/:fid/viewer-token` | guest OK on a public post (session-bound), the author always; `rateLimit` `viewer-token` | `POST_FILE_NOT_FOUND`, `NO_PREVIEW`, `VIEWER_NOT_ALLOWED` |
+| GET `/api/community/posts/:id/files/:fid/download` (attachment; counted; audit `community.post_file_downloaded`) | `requireAuth`; `downloadable` or the author; `rateLimit` `post-file-download` 120/h | 403 `POST_FILE_NOT_DOWNLOADABLE`, `POST_FILE_NOT_FOUND` |
+| GET `/api/marketplace/print/viewer/:token` (+ `source_type`, `name`), GET `…/:token/mesh` | `model_view_tokens` first, then `viewer_grants`; the source's live visibility re-checked on every read — and, for an account-bound post link, a block between reader and author (`blockedEither`, worker/lib/userBlocks.ts); revoked on archive/delete/private/hide/unpublish | 404 `VIEWER_TOKEN_INVALID` |
+| POST `/api/link-cards/resolve` `{url}` → `{card}` | `requireAuth`; `rateLimit` `link-card` 60/h; off-list host → bare card `status: 'blocked'` with NO fetch; the allow-list holds on EVERY hop (`guardedFetchBytes` `allowHost`): a listed host redirecting off it is refused before the landing page is requested, and a picture is fetched only from a listed host or one of the picture hosts the listed pages use (`imageHostAllowed`) | 400 `LINK_URL_INVALID`, `LINK_HOST_BLOCKED` (`LINK_FETCH_FAILED` rides as `card.reason`, never thrown) |
+| GET `/api/link-cards?url=` → `{card}` | guest OK; session-free (`sessionFreePublicGet`: the body has no per-viewer field, so a member's feed hits the colo entry too); `anonymousCached` params `['url']`; stored rows only, never fetches | 404 `NOT_FOUND` |
+| POST `/api/chats/:id/cards/link` `{url, client_id}` → 201 `{id, message, card}` / 200 `{…, replayed: true}` | `requireAuth`; `assertMayWriteInThread`; `rateLimit` `chat-send` 200/h + `link-card` 60/h; the message is kind `text`, body = URL, `card_snapshot` `{type:'link', …}`; readers get `message.link` | `LINK_URL_INVALID`, `LINK_HOST_BLOCKED`; 403 non-participant |
+
+Notifications: `files_added:<chatId>` (people, not files; Sorani stamped into meta) and
+`request_files:<requestId>` (owners of matched merchants ∪ merchants with a live offer, before the
+re-match). Cron: `sweepExpiredUploadSessions` (abort + `expired`, ≤ 200 per tick; closed rows deleted
+after 7 days). Key placement (`placementFor`): post image/video → public `users/<uid>/posts/`; post
+model/document → private `users/<uid>/post-files/`; community → public `merchants/<uid>/public/`;
+chat → private `chat/<chatId>/…`; request → private `requests/<uid>/files/`; product_file → private
+`merchants/<uid>/product-files/` (`offer` → `merchants/<uid>/offers/` and `order_update` →
+`orders/<orderId>/updates/` are reserved for the day their consumer routes exist and are not
+session purposes yet); link cards → public `link-cards/<id>.webp`; previews →
+`product-previews/<productId>/<fileId>.lvm`, `post-previews/<postId>/<fileId>.lvm`. Private keys
+under the new prefixes answer 404 through `GET /files/*`; consumers serve them through the gated
+routes above.
+
 ## 5. Client (Phase 1, landed)
 
 - `/community/projects` — the list with kind chips, a tag chip and server search (pages/community/Projects.tsx; `ProjectsGrid` is reused by the home's «المشاريع» tab in Phase 2).
@@ -402,7 +450,7 @@ errors, no horizontal overflow with the overlay open) and scripts/e2e-projects.m
 1. **Projects + creator profiles** — landed (this document, §3–5). Tests: tests/communityPosts.test.ts (11).
 2. **Social graph + Feed V3** — landed (§4b, docs/COMMUNITY_HOME_PLAN.md). 0154 tables and counter triggers, 0155 (comment `client_id` replay key, creators index); like/save/comment/follow-creator/block/mute/report endpoints with rate limits and idempotency; grouped notifications (`ON CONFLICT` upsert on a grouping key + count); the community home rebuilt to the «العدد» plan (masthead, quick actions, six tabs, cover story, numbered sections, rails, the feed, tools, colophon; springs from `useMotion()`, skeletons at exact heights, `bg-canvas` tokens, ≤ 1 new CSS rule).
 3. **Unified search + discovery** — landed (§4c, §9.3). One `/api/community/search` over projects, stores, creators, products, requests, materials, brands (LIKE + the catalogue index where it exists, every section its own list's SQL, bounded rows and counts), `/search/suggest` from names only, `/trending` from counters that exist, `/recommend` beside a post, a store or a product; no new table, no query log; the lazy search overlay, «وسوم رائجة» and the «قد يعجبك» rails on the client; the CSS budget paid back before it was spent. Tests: tests/communitySearch.test.ts (12), tests/communitySearchUi.test.ts (10).
-4. **3D asset platform + files (§27–35)** — upload sessions (multipart/resumable) with checksum, admin-configurable limits, structure sniffing with zip-bomb bounds, file roles on products / requests / chat, link cards with URL validation, the shared viewer with temporary tokens, grouped file notifications, per-file authorization tests.
+4. **3D asset platform + files (§27–35)** — landed (§4d, §9.4). Resumable multipart sessions with a streamed SHA-256 verify, admin-configurable limits and per-purpose quotas, head+tail sniffing with the ZIP central-directory bound (and the same filter inside `parse3mf`/`parseAmf`), files with roles on products and posts, grants written at checkout, the shared viewer over `viewer_grants`, link cards behind an allow-list with re-hosted pictures as ordinary chat messages, grouped `files_added`/`request_files` notifications; the client: `uploadLarge` + `UploadTile` in the project media picker, the request wizard, the chat picker, the post composer and the product-files editor; link cards in chat, comments and posts. Tests: tests/uploadSessions.test.ts (10), tests/uploadSession.client.test.ts (12), tests/productFiles.test.ts (12), tests/postFiles.test.ts (6), tests/linkCards.test.ts (14), tests/postFilesUi.test.ts (9), tests/productFilesUi.test.ts (13), tests/linkCardsUi.test.ts (11). Review fixes 2026-09-30 (DECISIONS row 177): refund revokes grants, buyer per product, quota counts open sessions, allow-list per hop, `offer`/`order_update` withdrawn.
 5. **Workshop profiles + matching + offers V2 + the request page (§21–26, 36)** — structured workshop profile in the store settings feeding `loadCandidates`; offers gain delivery fee, attachments, validity, `draft`/`revised` semantics and re-acceptance; request discussion; execution timeline with `ready` and progress photos; the consolidated request page in the owner's order; merchant cancel/dispute.
 6. **Moderation V2 + Reputation V2 + dispute access** — reports on every target, post hide route + UI, user suspend/ban with enforcement, appeals, audit viewer; explainable badges computed from measured response time and completion rate; staff read of `store`/`request` threads only while a linked order is disputed, audited.
 7. **Analytics + collections + activity centre + draft preview** — post view beacon (same privacy rules), creator and merchant dashboards, private saved collections, the activity centre, the draft preview surface off the storefront budget.
@@ -415,13 +463,13 @@ errors, no horizontal overflow with the overlay open) and scripts/e2e-projects.m
 | follow spam, like replay, save replay | Phase 2: idempotent PUT/DELETE, `rateLimit` buckets, counters unchanged on replay |
 | comment ownership | Phase 2: only the author edits/deletes; the post author may hide |
 | project privacy | tests/communityPosts.test.ts: draft/private/unlisted/hidden matrix (done) |
-| private file access | Phase 4: per-file authorization, never a key in a response |
+| private file access | tests/productFiles.test.ts, tests/postFiles.test.ts, tests/uploadSessions.test.ts: a stranger is 404 at every session step; the shopfront list never carries a key; download 404 guest / 403 non-buyer / 200 attachment for the buyer with no key in any header; a hidden post's viewer token answers 404 (done) |
 | creator block rules | Phase 2: a blocked user cannot DM, follow, comment or see the page |
 | moderation bypass | Phase 6: hidden post is 404 to all but author/staff on every read path (feed, trending, search, creator grid) |
 | hidden project in search | tests/communitySearch.test.ts: the hidden, draft and private posts are in no section and no suggestion, out of the trending tags and projects, never a recommendation and no anchor for one — 404 `NOT_FOUND` (done) |
 | banned store in recommendations | tests/communitySearch.test.ts: a suspended store is out of every section and of `/recommend` — `communityDirectoryVisible` is the only rule (done); the ban itself and its enforcement are Phase 6 |
 | forged linked product | tests/communityPosts.test.ts (done) |
-| file ownership spoof | tests/communityPosts.test.ts media keys (done); Phase 4 for 3D files |
+| file ownership spoof | tests/communityPosts.test.ts media keys (done); tests/productFiles.test.ts / tests/postFiles.test.ts: a public, foreign or unknown key is `PRODUCT_FILE_NOT_OWNED` / `POST_FILE_NOT_OWNED`; a forged `.stl` that is a PNG is classified by bytes (tests/uploadSessions.test.ts) (done) |
 | staff dispute access audit | Phase 6 |
 
 ## 8. Open questions for the owner
@@ -442,7 +490,49 @@ Written before each phase's workflow so the builders code against one text.
 Each spec names the tables (additive), the routes with their guards and
 refusal codes, the client surfaces, and the tests that prove it.
 
-### 9.4 Phase 4 — The 3D asset platform and files (§27–35)
+### 9.4 Phase 4 — The 3D asset platform and files (§27–35) — LANDED (§4d)
+
+**Landed 2026-09-29 — deviations from the specification below** (the spec is kept as written; the
+routes, guards and codes as built are in §4d):
+
+- **Migrations**: 0156 `asset_platform` (sessions, `file_objects.sha256`/`purpose`), 0157
+  `product_and_post_files` (`product_files`, `product_file_grants`, `community_post_files`,
+  `viewer_grants`, `model_view_tokens.source_type`/`source_id`), 0158 `link_cards` — post files and
+  the viewer columns landed in 0157, not 0158.
+- **`viewer_grants` is its own table**: product and post viewer tokens live there (60 min, SHA-256
+  hashed, bound to the account or to SHA-256(IP+UA+UTC day) with a one-day grace, the source's live
+  visibility re-checked on every read); `model_view_tokens` keeps request tokens and only gained the
+  `source_type`/`source_id` columns. Column `grant_level` mirrors the older table; the API field is `grant`.
+- **Link cards are ordinary chat messages**: 0150's `card_type` CHECK was not rebuilt; a link line is
+  kind `text`, body = the canonical URL, `card_type` NULL, `card_snapshot` `{type:'link', card_id, url,
+  host, title, description, image_url, kind}`; readers get `message.link`. Request comments do not
+  exist as a table; the comments surface that cards links is the post comments sheet.
+- **Final mount paths**: the public product side is `/api/product-files/:slug/:productId[/:fid/…]`
+  (not under `/api/storefront`), the merchant editor `/api/merchant/products/:id/files`, link cards
+  `/api/link-cards`. The public list also answers `granted` beside `downloadable`.
+- **Grants** are written inside the store checkout batch (not a paid/delivered transition) for
+  download_after_purchase, source_model, reference and instruction (the spec's own prose says the
+  last two are «downloadable after purchase»); the community-order funded transition grants nothing
+  because a community order carries no product id (`productFileGrantStatement` already accepts
+  `communityOrderId` for the day it does).
+- **Complete** answers `url` and no key for `chat` and creates NO message row — the client posts the
+  message with the session's key (a server-side message on complete is a chat-wave follow-up); for
+  `request` it inserts the `community_request_files` row (cap 6) but does not replay the marketplace
+  route's revise/supersede statements for a published request with pending offers. Video is sniffed
+  from the first 64 KiB (a non-faststart MP4 is accepted with the `VIDEO_NOT_FASTSTART` warning).
+- **`.zip` is refused at session creation** (the `EXTENSION` allow-list has no zip; `archive_mb` waits
+  for the day it is admitted); `merchants/<uid>/offers/` stays reserved for `offer` keys (no `offers`
+  domain, and no `offer` session purpose, until the offer composer uploads).
+- **Whole-body `POST /api/uploads`** keeps a 40 MiB hard cap whatever `image_mb`/`video_mb` say;
+  larger files take sessions. Post files ALWAYS take a session (the simple door files `post` under
+  the public `posts/` prefix, which the post API refuses).
+- **No offer composer upload exists** in the tree, so the `UploadTile` is adopted in the request
+  wizard, the project media picker and composer, the chat picker and the product-files editor only —
+  and `offer` / `order_update` are NOT session purposes until those routes exist (a completed
+  session must never answer a key nothing can consume; review 2026-09-30).
+- **Grouped `request_files`** counts people (the grouped contract): a second batch from the same
+  customer does not re-surface a read row.
+
 
 **Measured substrate** (survey 2026-09-29): `POST /api/uploads` reads the
 whole body (`formData()` → `arrayBuffer()`), images 8 MiB / video 40 MiB /
@@ -573,7 +663,13 @@ STEP header) before any byte is stored permanently; forged MIME ignored
 (`declared_mime` is a hint); path traversal impossible (`buildMediaKey`
 segments only, extension from the sniff); per-owner quotas by purpose
 (`uploadQuotas` setting: post 2 GiB, product_file 5 GiB, request 1 GiB,
-counted from `file_objects`); `X-Content-Type-Options: nosniff` and the
+counted from `file_objects` PLUS the owner's open, unexpired sessions, and
+asked again on `complete` with the session left out — so neither sessions
+opened in turn nor two opened in one instant pass the same cap twice);
+download grants that die with the money — `cancelStoreOrder` revokes the
+grants an order paid for inside the batch that refunds it, and a grant whose
+order is `cancelled` is not live at any door (`liveGrantSql`); the link-card
+allow-list held on every fetch hop, pictures included; `X-Content-Type-Options: nosniff` and the
 sandbox CSP on every `/files` and download response (exist); a preview
 image is generated for models by the existing analyse path (`preview_key`)
 and served with `Cache-Control: private` for private sources.
@@ -585,10 +681,14 @@ checksum mismatch deletes the object; a zip with 5 000 entries or a 100×
 ratio is refused before storage; a forged `.stl` that is a PNG is classified
 by bytes; the product download without a grant is 404 for a stranger and 403
 for a signed-in non-buyer, 200 with `attachment` for the buyer, and never
-returns a key; the viewer token for a hidden post is revoked; link cards
-refuse `javascript:`, `file:`, `data:`, `http://10.0.0.1/` and never fetch
-without the allow-list; the admin limit change is audited and applied on the
-next session; quotas count only live objects.
+returns a key; a refunded order takes its grants back (and a second paid
+order keeps them); a buyer's viewer link on the preview carries `full`; a
+hidden product's file ids answer a stranger 404; the viewer token for a hidden
+post is revoked; link cards refuse `javascript:`, `file:`, `data:`,
+`http://10.0.0.1/` and never fetch without the allow-list — on any hop, an
+off-list `og:image` included; the admin limit change is audited and applied on
+the next session; quotas count live objects and open sessions and are asked
+again on complete.
 
 ### 9.5 Phase 5 — Workshop profiles, matching, offers V2, the request page (§21–26, 36)
 

@@ -30,10 +30,27 @@ import type { AccentClasses } from './theme';
 
 export type TabKind = 'products' | 'collections' | 'deals' | 'services' | 'showcase' | 'about';
 
+/** The orders a visitor may ask a product list for (storefront L11; the server's `STORE_PRODUCT_SORTS`). */
+export type ProductSort = 'new' | 'price_asc' | 'price_desc';
+
 export interface ProductQueryRequest {
   source: ProductSource;
   collection_id: string;
   cursor: string | null;
+  /** In-store search, ≤ 60 characters; the server matches it as a literal (L11). */
+  q?: string;
+  /** Absent keeps the list's own order (newest, or a collection's arrangement). */
+  sort?: ProductSort;
+}
+
+/** What the reviews block may ask for beyond the first page (storefront L12). */
+export interface ReviewQuery {
+  /** One star value, or null for every rating. */
+  rating?: number | null;
+  /** Only reviews that carry pictures. */
+  photos?: boolean;
+  /** «المزيد»: the server's `next_cursor` of the page before. */
+  cursor?: string | null;
 }
 
 export interface StorefrontRuntime {
@@ -64,7 +81,7 @@ export interface StorefrontRuntime {
   loadCollections: () => Promise<CollectionData[]>;
   loadServices: () => Promise<ServiceData[]>;
   loadShowcase: () => Promise<ShowcaseData[]>;
-  loadReviews: () => Promise<ReviewsData>;
+  loadReviews: (q?: ReviewQuery) => Promise<ReviewsData>;
   // ---- live controls the host draws
   /** The way out of the store, in the header's corner. */
   Back: ComponentType;

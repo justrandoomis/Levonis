@@ -13,13 +13,20 @@ import {
 } from '../lib/imageConvert';
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { HttpError, requireAuth, badRequest, forbidden, notFound, oneOf, str, unavailable } from '../lib/http';
+import { requireAuth, badRequest, forbidden, notFound, oneOf, unavailable } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
-import { assertMayWriteInThread, recordStaffChatFileRead } from './chats';
+import { recordStaffChatFileRead } from './chats';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { mp4IsFastStart, sniffVideo } from '../lib/videoSniff';
-import { storeForUser } from '../lib/merchantAuth';
+import { getSetting, type UploadLimits } from '../lib/settings';
+import {
+  SIMPLE_UPLOAD_PURPOSES,
+  assertQuota,
+  assertUploadEntity,
+  chatKeyKind,
+  kindLimitBytes,
+} from '../lib/uploadEntity';
 import {
   buildMediaKey,
   getMediaObject,
@@ -45,8 +52,30 @@ import {
  * Legacy keys remain readable while the migration inventory is verified.
  */
 
-const IMAGE_MAX = 8 * 1024 * 1024;
-const VIDEO_MAX = 40 * 1024 * 1024;
+/**
+ * THE CEILINGS ARE SETTINGS NOW (§9.4 `uploadLimits`: image 25 MB, video
+ * 100 MB, document 25 MB by default; worker/lib/settings.ts) — but this route
+ * reads the WHOLE body into memory before it sniffs a byte, so whatever the
+ * admin sets, one request here never carries more than this. Anything larger
+ * takes the resumable session path (worker/routes/uploadSessions.ts), which
+ * the client picks above 8 MiB and for every model or archive.
+ */
+export const SIMPLE_UPLOAD_HARD_CAP = 40 * 1024 * 1024;
+
+/**
+ * The purpose a stored file was uploaded for, beside its ledger row (0156),
+ * so a per-owner quota can be counted per purpose. Total by design, like the
+ * ledger write itself (worker/lib/mediaStorage.ts `recordMediaObject`): a
+ * Worker ahead of the migration must not fail an upload it has already stored.
+ */
+async function recordPurpose(db: D1Database, key: unknown, purpose: string): Promise<void> {
+  if (typeof key !== 'string' || !key) return;
+  try {
+    await db.prepare('UPDATE file_objects SET purpose = ? WHERE object_key = ?').bind(purpose, key).run();
+  } catch {
+    // pre-0156 schema: no purpose column yet
+  }
+}
 /**
  * THE PUBLIC-VIDEO QUOTA OF ONE STORE OWNER (review W2-5 p3): the live
  * (`deleted_at IS NULL`) videos they stored under purpose=community may total
@@ -249,23 +278,15 @@ export function sniffChat(buf: Uint8Array, declared: string): { ext: string; mim
   return null;
 }
 
-/** A voice note or a document in a conversation. Ten minutes of speech is
- *  two or three megabytes in any of the containers above; the headroom is for
- *  a scanned PDF. */
-const CHAT_DOCUMENT_MAX = 10 * 1024 * 1024;
+/** A voice note or a document in a conversation: `uploadLimits.document_mb`
+ *  (25 MB by default — ten minutes of speech is two or three megabytes in any
+ *  of the containers above; the headroom is for a scanned PDF), never above
+ *  the whole-body cap. */
+const documentMaxFor = (limits: UploadLimits) => Math.min(kindLimitBytes(limits, 'document'), SIMPLE_UPLOAD_HARD_CAP);
 
-/**
- * The folder a chat attachment is filed in, and therefore what the message
- * route (worker/routes/chats.ts `chatAttachmentKind`) reads it back as —
- * `chat/<chatId>/<folder>/<id>.<ext>`. The folder, not a client claim, is the
- * record of what the bytes were sniffed as.
- */
-function chatKeyKind(mime: string): string {
-  if (mime.startsWith('video/')) return 'video';
-  if (mime.startsWith('audio/')) return 'audio';
-  if (mime === 'application/pdf') return 'files';
-  return 'attachments';
-}
+// `chatKeyKind` — the folder a chat attachment is filed in, and therefore what
+// the message route reads it back as — lives in worker/lib/uploadEntity.ts,
+// shared with the resumable sessions so both doors file a clip the same way.
 
 export const uploadRoutes = new Hono<AppContext>();
 uploadRoutes.use('*', requireAuth);
@@ -276,25 +297,24 @@ uploadRoutes.post('/', async (c) => {
 
   const form = await c.req.formData().catch(() => null);
   if (!form) throw badRequest('Expected multipart form data');
-  const purpose = oneOf(form.get('purpose'), 'purpose', ['receipt', 'avatar', 'chat', 'product', 'community', 'support', 'complaint', 'post'] as const);
+  const purpose = oneOf(form.get('purpose'), 'purpose', SIMPLE_UPLOAD_PURPOSES);
   const file = form.get('file');
   if (!(file instanceof File)) throw badRequest('No file uploaded');
 
-  if (purpose === 'product' && user.role !== 'admin') {
-    throw forbidden('Only administrators can upload product media');
-  }
-
   /**
-   * PUBLIC MERCHANT MEDIA NEEDS A STORE (review W2-5 p3). purpose=community
-   * files are PUBLIC and served from the merchant prefix; any signed-in account
-   * could store 40 MB videos there. Every client caller (the catalogue
-   * editor's MediaEditor and ImagePicker, the store builder's media picker,
-   * store settings, the dashboard's product form) runs inside a store the
-   * caller owns, so the rule costs no merchant flow anything.
+   * WHO MAY FILE UNDER WHAT — one answer for both upload doors
+   * (worker/lib/uploadEntity.ts, shared with /api/uploads/sessions): product
+   * media is staff-only; public store media needs a store (STORE_REQUIRED,
+   * review W2-5 p3); a chat file needs a thread the uploader may write in; a
+   * support or complaint attachment needs the uploader's own ticket or
+   * complaint, or staff. Verified BEFORE a byte is read, so a key can never
+   * name an entity the uploader was not entitled to write to.
    */
-  if (purpose === 'community' && !(await storeForUser(c.env.DB, user.id))) {
-    throw new HttpError(403, 'Open your store first — store pictures and videos belong to a store', 'STORE_REQUIRED');
-  }
+  const entityId = await assertUploadEntity(c.env.DB, user, purpose, form.get('entity_id'));
+  const limits = await getSetting(c.env.DB, 'uploadLimits');
+  const imageMax = Math.min(kindLimitBytes(limits, 'image'), SIMPLE_UPLOAD_HARD_CAP);
+  const videoMax = Math.min(kindLimitBytes(limits, 'video'), SIMPLE_UPLOAD_HARD_CAP);
+  const documentMax = documentMaxFor(limits);
 
   /**
    * A CONVERSATION CARRIES VIDEO TOO.
@@ -335,9 +355,9 @@ uploadRoutes.post('/', async (c) => {
    */
   const merchantVideo = purpose === 'community' || purpose === 'post';
   const allowVideo = purpose === 'product' || purpose === 'chat' || purpose === 'support' || purpose === 'complaint' || merchantVideo;
-  const maxSize = allowVideo ? VIDEO_MAX : IMAGE_MAX;
+  const maxSize = allowVideo ? videoMax : imageMax;
   if (file.size > maxSize) {
-    throw badRequest(`File is too large (max ${Math.round(maxSize / 1024 / 1024)} MB)`);
+    throw badRequest(`File is too large (max ${Math.round(maxSize / 1024 / 1024)} MB)`, 'UPLOAD_TOO_LARGE', { limit_bytes: maxSize });
   }
 
   let buf = new Uint8Array(await file.arrayBuffer());
@@ -398,14 +418,14 @@ uploadRoutes.post('/', async (c) => {
         (purpose === 'chat' ? ', an MP4 video, a voice note or a PDF' : allowVideo ? ' or MP4 video' : '')
     );
   }
-  if ((kind.mime.startsWith('audio/') || kind.mime === 'application/pdf') && file.size > CHAT_DOCUMENT_MAX) {
-    throw badRequest(`File is too large (max ${Math.round(CHAT_DOCUMENT_MAX / 1024 / 1024)} MB)`);
+  if ((kind.mime.startsWith('audio/') || kind.mime === 'application/pdf') && file.size > documentMax) {
+    throw badRequest(`File is too large (max ${Math.round(documentMax / 1024 / 1024)} MB)`, 'UPLOAD_TOO_LARGE', { limit_bytes: documentMax });
   }
   if (kind.mime.startsWith('video/') && !allowVideo) {
     throw badRequest('Videos are not allowed here');
   }
-  if (kind.mime.startsWith('image/') && file.size > IMAGE_MAX) {
-    throw badRequest(`Image is too large (max ${Math.round(IMAGE_MAX / 1024 / 1024)} MB)`);
+  if (kind.mime.startsWith('image/') && file.size > imageMax) {
+    throw badRequest(`Image is too large (max ${Math.round(imageMax / 1024 / 1024)} MB)`, 'UPLOAD_TOO_LARGE', { limit_bytes: imageMax });
   }
 
   /**
@@ -423,6 +443,7 @@ uploadRoutes.post('/', async (c) => {
         entity_id: 'catalog',
         cleanup_grace_minutes: PRODUCT_MEDIA_FORM_STAGING_GRACE_MINUTES,
       });
+      await recordPurpose(c.env.DB, stored.key, purpose);
       return c.json({
         success: true,
         ...stored,
@@ -529,85 +550,21 @@ uploadRoutes.post('/', async (c) => {
   }
 
   /**
-   * A CHAT FILE BELONGS TO THE CONVERSATION, NOT TO WHOEVER SENT IT.
-   *
-   * It was filed under the UPLOADER — `chat/<userId>/attachments/…` — so one
-   * thread's pictures were scattered across as many folders as it had
-   * participants, and opening a conversation in the bucket browser was
-   * impossible. The owner chose the other ordering explicitly, for exactly
-   * that reason: «الثاني الاسهل في فتح المحادثه».
-   *
-   * It is also the stronger rule. Under the old layout the delivery route
-   * granted the uploader access by prefix and everyone else by a lookup for a
-   * MESSAGE carrying the key — so between the upload and the send, the file
-   * belonged to nobody but its uploader, and the check had two branches that
-   * could disagree. Keyed by chat, access is one question with one answer:
-   * are you in this conversation.
-   *
-   * Participation is verified HERE, before a byte is stored, so the key cannot
-   * name a conversation the uploader is not in.
+   * A CHAT FILE BELONGS TO THE CONVERSATION, NOT TO WHOEVER SENT IT — the owner
+   * chose that ordering («الثاني الاسهل في فتح المحادثه») so one thread's
+   * pictures sit in one folder and access is ONE question: are you in this
+   * conversation. A support attachment belongs to the ticket and a complaint's
+   * evidence to the complaint, for the same reason. `entityId` above is that
+   * thread, ticket or complaint, already verified as the uploader's to write
+   * to (worker/lib/uploadEntity.ts) before a byte was read.
    */
-  let chatEntity = '';
-  if (purpose === 'chat') {
-    chatEntity = str(form.get('entity_id'), 'entity_id', { max: 64 });
-    // Storing a file under a thread is writing in it: the same rule as the
-    // message door — a participant, and on a store thread only its customer
-    // or its seller (review S3; 403 CHAT_READ_ONLY for read-only staff).
-    await assertMayWriteInThread(c.env.DB, chatEntity, user.id);
-  }
-
-  /**
-   * A SUPPORT ATTACHMENT BELONGS TO THE TICKET, for the reason the chat block
-   * above states for a conversation: one thread's files sit in one folder, and
-   * access becomes ONE question with one answer — is this your ticket.
-   *
-   * Ownership is verified HERE, before a byte is stored, so the key cannot
-   * name a ticket the uploader does not own. An admin may attach to any
-   * ticket: staff answering a complaint routinely send back a photograph of
-   * the replacement part or a screenshot of the tracking page, and they are
-   * already authorised to read and write the whole thread.
-   */
-  let supportEntity = '';
-  if (purpose === 'support') {
-    supportEntity = str(form.get('entity_id'), 'entity_id', { max: 64 });
-    if (user.role !== 'admin') {
-      const own = await c.env.DB.prepare('SELECT 1 AS x FROM support_tickets WHERE id = ? AND user_id = ? LIMIT 1')
-        .bind(supportEntity, user.id)
-        .first();
-      if (!own) throw forbidden('Not your ticket');
-    } else {
-      const exists = await c.env.DB.prepare('SELECT 1 AS x FROM support_tickets WHERE id = ? LIMIT 1').bind(supportEntity).first();
-      if (!exists) throw forbidden('Not your ticket');
-    }
-  }
-
-  /**
-   * A COMPLAINT'S EVIDENCE BELONGS TO THE COMPLAINT — the ticket rule above,
-   * one table over. The person who filed it may attach to it (the photograph
-   * of the print that arrived broken is the whole of most disputes), staff may
-   * attach to any, and nobody else may name it: the check runs before a byte
-   * is stored, so a key under `complaints/<id>/` always names a complaint the
-   * uploader was entitled to write to.
-   */
-  let complaintEntity = '';
-  if (purpose === 'complaint') {
-    complaintEntity = str(form.get('entity_id'), 'entity_id', { max: 64 });
-    const allowed = await c.env.DB.prepare(
-      user.role === 'admin'
-        ? 'SELECT 1 AS x FROM community_complaints WHERE id = ? LIMIT 1'
-        : 'SELECT 1 AS x FROM community_complaints WHERE id = ? AND reporter_id = ? LIMIT 1'
-    )
-      .bind(...(user.role === 'admin' ? [complaintEntity] : [complaintEntity, user.id]))
-      .first();
-    if (!allowed) throw forbidden('Not your complaint');
-  }
 
   const target: { visibility: MediaVisibility; domain: MediaDomain; entityId: string; keyKind: string } =
     purpose === 'receipt' ? { visibility: 'private', domain: 'receipts', entityId: user.id, keyKind: 'evidence' } :
-    purpose === 'support' ? { visibility: 'private', domain: 'support', entityId: supportEntity, keyKind: storedMime.startsWith('video/') ? 'video' : 'attachments' } :
-    purpose === 'complaint' ? { visibility: 'private', domain: 'complaints', entityId: complaintEntity, keyKind: storedMime.startsWith('video/') ? 'video' : 'attachments' } :
+    purpose === 'support' ? { visibility: 'private', domain: 'support', entityId, keyKind: storedMime.startsWith('video/') ? 'video' : 'attachments' } :
+    purpose === 'complaint' ? { visibility: 'private', domain: 'complaints', entityId, keyKind: storedMime.startsWith('video/') ? 'video' : 'attachments' } :
     purpose === 'avatar' ? { visibility: 'public', domain: 'users', entityId: user.id, keyKind: 'avatar' } :
-    purpose === 'chat' ? { visibility: 'private', domain: 'chat', entityId: chatEntity, keyKind: chatKeyKind(storedMime) } :
+    purpose === 'chat' ? { visibility: 'private', domain: 'chat', entityId, keyKind: chatKeyKind(storedMime) } :
     purpose === 'community' ? { visibility: 'public', domain: 'merchants', entityId: user.id, keyKind: 'public' } :
     purpose === 'post' ? { visibility: 'public', domain: 'users', entityId: user.id, keyKind: 'posts' } :
     { visibility: 'public', domain: 'products', entityId: 'catalog', keyKind: storedMime.startsWith('video/') ? 'video' : 'gallery' };
@@ -616,6 +573,10 @@ uploadRoutes.post('/', async (c) => {
   // this route was changed to stop telling.
   const key = buildMediaKey({ ...target, kind: target.keyKind, extension: storedExt, objectId: newId() });
   const cacheControl = target.visibility === 'public' ? 'public, max-age=31536000, immutable' : 'private, max-age=300';
+
+  // The per-purpose quota (§9.4 `uploadQuotas`: a maker's posts may hold 2 GiB
+  // of live files), counted on the bytes that will actually be stored.
+  await assertQuota(c.env.DB, user.id, purpose, buf.byteLength);
 
   await putMediaObject(
     c.env,
@@ -634,6 +595,7 @@ uploadRoutes.post('/', async (c) => {
     buf,
     { httpMetadata: { contentType: storedMime, cacheControl } }
   );
+  await recordPurpose(c.env.DB, key, purpose);
 
   return c.json({
     success: true,

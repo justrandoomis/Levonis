@@ -111,6 +111,17 @@ test('attention: real counts, merchant A never counts merchant B', async () => {
   assert.equal(b.requests.matching, 0, 'B already offered on r1, and r2 was not a match for B');
   assert.equal(b.stock.low, 1);
   assert.equal(b.coupons.ending_soon, 1);
+
+  // The sub-rows (`first[]`) are the merchant's own too — a widened subquery
+  // would pass the counts above and still hand A a row of B's.
+  const ids = (rows: Array<{ id: string }> | undefined) => (rows ?? []).map((r) => r.id).sort();
+  assert.deepEqual(ids(a.orders.first), ['ORD-A1', 'ORD-A2'], 'the pending sub-rows of A are its two pending orders');
+  assert.deepEqual(ids(b.orders.first), ['ORD-B1'], 'the one of B is its own');
+  assert.deepEqual(ids(a.stock.first), ['cp2'], 'the sold-out row of A is cp2; cp9 of B is neither sold out nor A\'s');
+  assert.deepEqual(ids(b.stock.first), [], 'B has nothing sold out');
+  for (const src of ['inbox', 'returns'] as const) {
+    assert.deepEqual(ids(a[src]?.first), [], `${src}: A has none, and nothing of B stands in for it`);
+  }
 });
 
 test('attention: the host never widens the scope — A on B\'s subdomain still reads A', async () => {

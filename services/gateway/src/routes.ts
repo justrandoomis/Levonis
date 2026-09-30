@@ -228,6 +228,8 @@ export const ROUTES: readonly RouteRule[] = [
   // store host, never cached, limited per account or network inside the core.
   { prefix: '/api/storefront/events', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'public-read', methods: ['POST'], note: 'POST only, anonymous per-network beacon (core bucket 240/min) — store_view, product_view, add_to_cart, checkout_started (merchant platform W2-E)' },
   { prefix: '/api/storefront', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'public-read', cacheable: true, note: '/api/storefront/resolve must answer on every hostname' },
+  // 0157 — the storefront's files on products (§4d): list by role (per viewer — `downloadable`/`granted` differ by session, so NOT cacheable here), viewer token, grant-checked download streamed as an attachment.
+  { prefix: '/api/product-files', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'public-read', note: 'worker/routes/productFiles.ts — never carries a key; the download is 404 for a guest and 403 without a grant' },
   { prefix: '/api/community-reviews', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'write' },
   { prefix: '/api/community', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'user', legacy: true, note: 'legacy shims' },
   { prefix: '/api/store-orders', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'auth', rateClass: 'money' },
@@ -244,8 +246,12 @@ export const ROUTES: readonly RouteRule[] = [
 
   // ------------------------------------------------------- leaves (phase 4)
   { prefix: '/api/chats', hosts: 'root', owner: 'CHAT', flipPhase: 4, requires: 'auth', rateClass: 'write' },
+  // 0158 — link previews (docs/COMMUNITY_ECOSYSTEM.md §4d): the chat writes them, comments and posts read them; a guest GET answers stored rows only and never fetches, POST /resolve needs a session.
+  { prefix: '/api/link-cards', hosts: 'root', owner: 'CHAT', flipPhase: 4, requires: 'none', rateClass: 'user', note: 'worker/routes/linkCards.ts — GET ?url= (guest, edge-cached by url) and POST /resolve (auth, link-card 60/h)' },
   { prefix: '/api/notifications', hosts: 'root', owner: 'NOTIFICATIONS', flipPhase: 4, requires: 'auth', rateClass: 'user' },
   { prefix: '/api/uploads', hosts: 'root', owner: 'FILES', flipPhase: 4, requires: 'auth', rateClass: 'upload' },
+  // 0156 — resumable multipart sessions (§4d): create / PUT raw parts / resume point / complete / abort, owner-only; same owner and class as the whole-body door above, written out so the mount has its own row.
+  { prefix: '/api/uploads/sessions', hosts: 'root', owner: 'FILES', flipPhase: 4, requires: 'auth', rateClass: 'upload', note: 'worker/routes/uploadSessions.ts — PUT /:id/parts/:n carries a raw body up to SESSION_PART_MAX_BYTES (src/uploadClasses.ts)' },
   { prefix: '/files', hosts: 'root', owner: 'FILES', flipPhase: 4, requires: 'none', rateClass: 'public-read', cacheable: true, note: 'the /files/<key> path contract is permanent' },
   { prefix: '/api/invoices', hosts: 'main', owner: 'INVOICES', flipPhase: 4, requires: 'auth', rateClass: 'user' },
   { prefix: '/api/kyc/admin', hosts: 'main', owner: 'KYC', flipPhase: 4, requires: 'admin:full', rateClass: 'admin-write' },

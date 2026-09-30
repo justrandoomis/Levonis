@@ -21,8 +21,14 @@
  * selected", for a select-all box over a partly selected list.
  */
 import React, { useEffect, useId, useRef } from 'react';
-import { motion } from 'motion/react';
+// `m` + <MotionFeatures>, never the `motion` proxy: the switch sits in Today's
+// status strip, the orders list and the composers, and the proxy carried the
+// animation-features chunk (16 KB gzip) into every one of them for one thumb.
+// `layout` works under the lazy bundle (domMax), as the Segmented indicator's
+// `layoutId` does; until it lands the thumb sits at rest in its flex end.
+import * as Motion from 'motion/react-m';
 import { useMotion } from '../../lib/motion';
+import { MotionFeatures } from '../../lib/motionFeatures';
 
 export interface SwitchProps {
   checked: boolean;
@@ -76,11 +82,13 @@ export function Switch({ checked, onChange, label, description, disabled = false
             checked ? 'justify-end border-transparent bg-accent' : 'justify-start border-border-subtle bg-white/10'
           }`}
         >
-          <motion.span
-            layout
-            transition={m.reduced ? { duration: 0 } : m.spring('quick')}
-            className={`block h-[22px] w-[22px] rounded-full shadow-1 ${checked ? 'bg-accent-contrast' : 'bg-text-secondary'}`}
-          />
+          <MotionFeatures>
+            <Motion.span
+              layout
+              transition={m.reduced ? { duration: 0 } : m.spring('quick')}
+              className={`block h-[22px] w-[22px] rounded-full shadow-1 ${checked ? 'bg-accent-contrast' : 'bg-text-secondary'}`}
+            />
+          </MotionFeatures>
         </span>
       </button>
     </div>

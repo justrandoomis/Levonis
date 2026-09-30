@@ -35,6 +35,20 @@
  * The search runs three capped statements (5 rows each) with at most four
  * bound parameters apiece — far under D1's 100.
  *
+ * THE FIRST ROWS (merchant platform v2 §3.2, Today's sub-rows). The orders,
+ * inbox and stock sources also carry `first[]` — at most FIRST_ROWS of what
+ * the count counts, newest first, each with its own address — so the Command
+ * Center can confirm an order or restock a product ON the row. They come from
+ * the SAME read: the count and its first rows are ONE statement — the rows
+ * ride as a JSON aggregate column beside the count — so the rule above («one
+ * statement per source») still holds and there is no second wave. (Not a
+ * `db.batch`: a batch is a transaction, and the sources run concurrently, so
+ * two batches in flight would nest one transaction inside another.) The inbox
+ * pairs its count helper with the rows in one `Promise.all`. A `returns`
+ * source counts the return cases still open on this merchant's orders
+ * (worker/routes/returns.ts writes them, the admin decides them — the field
+ * is read-only here).
+ *
  * RATE-LIMITED like the other merchant reads that a client may call often:
  * the attention read 120/min (the shell refreshes it on focus and every 90s),
  * the search 60/min (the palette debounces it).
@@ -73,6 +87,18 @@ type ActionStage = (typeof ACTION_STAGES)[number];
 
 /** Coupons ending within this many days are «ending soon». */
 export const COUPON_ENDING_DAYS = 7;
+
+/** How many of a ticket's rows Today shows under it (the rest are behind its door). */
+export const FIRST_ROWS = 2;
+
+/** A return case the customer is still waiting on (worker/routes/returns.ts `RETURN_STATES`). */
+const OPEN_RETURN_SQL = `rc.state NOT IN ('rejected','resolved')`;
+
+/** The `first` column of a source's statement, back into rows (a bad value is no rows). */
+function firstRows<T>(v: unknown): T[] {
+  const parsed = safeParse<unknown>(typeof v === 'string' ? v : '[]', []);
+  return Array.isArray(parsed) ? (parsed as T[]) : [];
+}
 
 /** The store problems the Command Center names, each with where it is fixed. */
 export type StoreProblem =
@@ -139,22 +165,44 @@ merchantAttentionRoutes.get('/', async (c) => {
   const now = new Date();
   const nowIso = now.toISOString();
 
-  const [orders, custom, inbox, notices, requests, stock, reviews, money, payouts, coupons, problems, setup] = await Promise.all([
+  const [orders, custom, inbox, notices, requests, stock, reviews, returns, money, payouts, coupons, problems, setup] = await Promise.all([
     source('orders', async () => {
-      const { results } = await db
+      // The counts by stage, and the first pending orders as a JSON column of
+      // the same statement — one read, never a second wave.
+      const row = await db
         .prepare(
-          `SELECT status, COUNT(*) AS n FROM orders
-            WHERE merchant_id = ? AND status IN (${ACTION_STAGES.map(() => '?').join(',')})
-            GROUP BY status`
+          `SELECT
+             (SELECT json_group_object(status, n) FROM (
+                SELECT status, COUNT(*) AS n FROM orders
+                 WHERE merchant_id = ?1 AND status IN (${ACTION_STAGES.map((_s, i) => `?${i + 3}`).join(',')})
+                 GROUP BY status)) AS counts,
+             (SELECT json_group_array(json_object('id', f.id, 'total_iqd', f.total_iqd, 'created_at', f.created_at,
+                                                  'customer_name', f.customer_name, 'governorate', f.governorate)) FROM (
+                SELECT o.id, o.total_iqd, o.created_at, u.name AS customer_name,
+                       CASE WHEN json_valid(o.address_snapshot) THEN COALESCE(json_extract(o.address_snapshot, '$.governorate'), '') ELSE '' END AS governorate
+                  FROM orders o JOIN users u ON u.id = o.user_id
+                 WHERE o.merchant_id = ?1 AND o.status = 'pending'
+                 ORDER BY o.created_at DESC, o.id DESC LIMIT ?2) f) AS first`
         )
-        .bind(merchantId, ...ACTION_STAGES)
-        .all<{ status: ActionStage; n: number }>();
-      const by_stage = Object.fromEntries(ACTION_STAGES.map((s) => [s, 0])) as Record<ActionStage, number>;
-      for (const r of results ?? []) if (r.status in by_stage) by_stage[r.status] = n(r.n);
+        .bind(merchantId, FIRST_ROWS, ...ACTION_STAGES)
+        .first<{ counts: string | null; first: string | null }>();
+      const counted = safeParse<Record<string, unknown>>(row?.counts ?? '{}', {});
+      const by_stage = Object.fromEntries(ACTION_STAGES.map((s) => [s, n(counted?.[s])])) as Record<ActionStage, number>;
       const total = ACTION_STAGES.reduce((sum, s) => sum + by_stage[s], 0);
+      const first = firstRows<{ id: string; total_iqd: number; created_at: string; customer_name: string | null; governorate: string | null }>(row?.first)
+        .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : a.id < b.id ? 1 : -1))
+        .map((o) => ({
+          id: String(o.id),
+          customer_name: String(o.customer_name ?? ''),
+          total_iqd: n(o.total_iqd),
+          governorate: String(o.governorate ?? ''),
+          created_at: String(o.created_at),
+          link: merchantHref.order(String(o.id)),
+        }));
       return {
         total,
         by_stage,
+        first,
         link: merchantHref.orders(),
         links: Object.fromEntries(ACTION_STAGES.map((s) => [s, merchantHref.ordersInStatus(s)])) as Record<ActionStage, string>,
       };
@@ -172,7 +220,49 @@ merchantAttentionRoutes.get('/', async (c) => {
       const in_progress = n(row?.in_progress);
       return { to_start, in_progress, total: to_start + in_progress, link: merchantHref.customOrders() };
     }),
-    source('inbox', async () => ({ ...(await inboxUnreadCounts(db, user.id, storeId)), link: merchantHref.inbox() })),
+    source('inbox', async () => {
+      // The count helper (worker/routes/merchantInbox.ts) and the first unread
+      // threads, side by side — one wave. The preview is the latest message
+      // FROM THE OTHER SIDE the owner has not read: the words that wait.
+      const [counts, firstRows] = await Promise.all([
+        inboxUnreadCounts(db, user.id, storeId),
+        db
+          .prepare(
+            `SELECT * FROM (
+               SELECT ch.id, ch.last_message_at,
+                      (SELECT COUNT(*) FROM chat_messages m
+                        WHERE m.chat_id = ch.id AND m.sender_id <> ?1
+                          AND (cp.last_read_at IS NULL OR m.created_at > cp.last_read_at)) AS unread,
+                      (SELECT substr(m.body, 1, 140) FROM chat_messages m
+                        WHERE m.chat_id = ch.id AND m.sender_id <> ?1
+                          AND (cp.last_read_at IS NULL OR m.created_at > cp.last_read_at)
+                        ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_message,
+                      (SELECT u.name FROM chat_participants o JOIN users u ON u.id = o.user_id
+                        WHERE o.chat_id = ch.id AND o.user_id <> ?1
+                        ORDER BY CASE o.role WHEN 'customer' THEN 0 ELSE 1 END LIMIT 1) AS customer_name
+                 FROM chats ch
+                 JOIN chat_participants cp ON cp.chat_id = ch.id AND cp.user_id = ?1
+                WHERE ch.store_id = ?2 AND ch.context_type IN ('store','store_order','request')
+                  AND (cp.last_read_at IS NULL OR COALESCE(ch.last_message_at, '') > cp.last_read_at)
+             ) t WHERE t.unread > 0
+             ORDER BY COALESCE(t.last_message_at, '') DESC, t.id DESC LIMIT ?3`
+          )
+          .bind(user.id, storeId, FIRST_ROWS)
+          .all<{ id: string; last_message_at: string | null; unread: number; last_message: string | null; customer_name: string | null }>(),
+      ]);
+      return {
+        ...counts,
+        first: (firstRows.results ?? []).map((t) => ({
+          id: t.id,
+          customer_name: String(t.customer_name ?? ''),
+          last_message: String(t.last_message ?? ''),
+          unread: n(t.unread),
+          last_message_at: t.last_message_at,
+          link: merchantHref.thread(t.id),
+        })),
+        link: merchantHref.inbox(),
+      };
+    }),
     source('notifications', () => merchantUnreadCounts(db, user.id)),
     source('matching requests', async () => {
       // The board is Levo Community: while it is shut to this merchant, the
@@ -193,19 +283,33 @@ merchantAttentionRoutes.get('/', async (c) => {
       return { matching: n(row?.n), link: merchantHref.requests() };
     }),
     source('stock', async () => {
-      // The catalogue list's own predicates, over what customers can see.
+      // The catalogue list's own predicates, over what customers can see —
+      // and the first sold-out products (for the restock sheet) as a JSON
+      // column of the same statement.
       const row = await db
         .prepare(
           `SELECT SUM(CASE WHEN ${LOW_STOCK_SQL} THEN 1 ELSE 0 END) AS low,
-                  SUM(CASE WHEN ${OUT_OF_STOCK_SQL} THEN 1 ELSE 0 END) AS out_n
+                  SUM(CASE WHEN ${OUT_OF_STOCK_SQL} THEN 1 ELSE 0 END) AS out_n,
+                  (SELECT json_group_array(json_object('id', f.id, 'name', f.name, 'name_ar', f.name_ar, 'stock', f.stock)) FROM (
+                     SELECT p.id, p.name, p.name_ar, p.stock
+                       FROM community_products p
+                      WHERE p.merchant_id = ?1 AND p.publish_state = 'published' AND ${OUT_OF_STOCK_SQL}
+                      ORDER BY p.updated_at DESC, p.id DESC LIMIT ?2) f) AS first
              FROM community_products p
-            WHERE p.merchant_id = ? AND p.publish_state = 'published'`
+            WHERE p.merchant_id = ?1 AND p.publish_state = 'published'`
         )
-        .bind(merchantId)
-        .first<{ low: number | null; out_n: number | null }>();
+        .bind(merchantId, FIRST_ROWS)
+        .first<{ low: number | null; out_n: number | null; first: string | null }>();
       return {
         low: n(row?.low),
         out: n(row?.out_n),
+        first: firstRows<{ id: string; name: string | null; name_ar: string | null; stock: number }>(row?.first).map((p) => ({
+          id: String(p.id),
+          name: String(p.name ?? ''),
+          name_ar: String(p.name_ar ?? ''),
+          stock: n(p.stock),
+          link: merchantHref.product(String(p.id)),
+        })),
         link_low: merchantHref.productsInStock('low'),
         link_out: merchantHref.productsInStock('out'),
       };
@@ -219,6 +323,35 @@ merchantAttentionRoutes.get('/', async (c) => {
         .bind(merchantId)
         .first<{ n: number }>();
       return { unanswered: n(row?.n) };
+    }),
+    source('returns', async () => {
+      // Return cases the customer opened on THIS merchant's orders and Levonis
+      // has not yet decided (worker/routes/returns.ts). Read-only: the
+      // decision is the admin's; each row is a door to its order.
+      const row = await db
+        .prepare(
+          `SELECT COUNT(*) AS n,
+                  (SELECT json_group_array(json_object('id', f.id, 'order_id', f.order_id, 'state', f.state, 'requested_at', f.requested_at)) FROM (
+                     SELECT rc.id, rc.order_id, rc.state, rc.requested_at
+                       FROM return_cases rc JOIN orders o ON o.id = rc.order_id
+                      WHERE o.merchant_id = ?1 AND ${OPEN_RETURN_SQL}
+                      ORDER BY rc.requested_at DESC, rc.id DESC LIMIT ?2) f) AS first
+             FROM return_cases rc JOIN orders o ON o.id = rc.order_id
+            WHERE o.merchant_id = ?1 AND ${OPEN_RETURN_SQL}`
+        )
+        .bind(merchantId, FIRST_ROWS)
+        .first<{ n: number; first: string | null }>();
+      return {
+        open: n(row?.n),
+        first: firstRows<{ id: string; order_id: string; state: string; requested_at: string }>(row?.first).map((r) => ({
+          id: String(r.id),
+          order_id: String(r.order_id),
+          state: String(r.state),
+          requested_at: String(r.requested_at),
+          link: merchantHref.order(String(r.order_id)),
+        })),
+        link: merchantHref.orders(),
+      };
     }),
     source('money', async () => {
       const b = await merchantBuckets(db, merchantId);
@@ -295,6 +428,7 @@ merchantAttentionRoutes.get('/', async (c) => {
           },
         }
       : {}),
+    ...(returns ? { returns } : {}),
     ...(money ? { money } : {}),
     ...(payouts ? { payouts } : {}),
     ...(coupons ? { coupons } : {}),

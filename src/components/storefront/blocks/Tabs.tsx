@@ -12,15 +12,98 @@
  * other tabs' views are one lazy chunk (./tabViews.tsx) the renderer fetches
  * while the browser is idle.
  */
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { Search, X } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { TabStrip, TabPanels } from '../../ui/Tabs';
-import { useStorefrontRuntime, type TabKind } from '../runtime';
+import { Segmented } from '../../ui/Segmented';
+import { useStorefrontRuntime, type ProductSort, type TabKind } from '../runtime';
 import { useStoreTheme } from '../StoreTheme';
 import { Column, Loading } from '../parts';
+import { storefrontStrings } from '../strings';
 import { useBlockRows } from '../useBlockRows';
 import { ProductsView } from './ProductsGrid';
 import type { BlockProps } from '../types';
+
+/** The server's ceiling for a search term (worker/routes/storefront.ts `STORE_SEARCH_MAX`). */
+const SEARCH_MAX = 60;
+/** How long a pause in typing is a search — one request per thought, not per key. */
+const SEARCH_DEBOUNCE_MS = 250;
+
+/**
+ * IN-STORE SEARCH AND SORT (storefront L11) — over the Products tab only. The
+ * term is debounced and sent as the route's `q` (matched as a literal on the
+ * server, so «50%» finds «50%»); the sort is one of the three names the
+ * server knows, and «الأحدث» means the list's own order. Both are state of
+ * this strip, so switching tabs and back keeps the search.
+ */
+export function ProductSearch({
+  q,
+  sort,
+  onQuery,
+  onSort,
+}: {
+  q: string;
+  sort: ProductSort;
+  onQuery: (q: string) => void;
+  onSort: (sort: ProductSort) => void;
+}) {
+  const { lang } = useLanguage();
+  const s = storefrontStrings(lang);
+  const [typed, setTyped] = useState(q);
+  useEffect(() => {
+    const term = typed.trim().slice(0, SEARCH_MAX);
+    if (term === q) return;
+    const t = setTimeout(() => onQuery(term), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [typed, q, onQuery]);
+  return (
+    <div className="mb-3 space-y-2" data-store-search>
+      <div className="relative">
+        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" aria-hidden="true" />
+        <input
+          type="search"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          maxLength={SEARCH_MAX}
+          placeholder={s.search.placeholder}
+          aria-label={s.search.label}
+          enterKeyHint="search"
+          autoComplete="off"
+          dir="auto"
+          className="w-full h-10 rounded-xl border border-white/10 bg-white/[0.05] ps-9 pe-10 text-[13px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          data-store-search-input
+        />
+        {typed && (
+          <button
+            type="button"
+            onClick={() => {
+              setTyped('');
+              onQuery('');
+            }}
+            aria-label={s.search.clear}
+            className="absolute end-1 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            <X className="w-4 h-4" aria-hidden="true" />
+          </button>
+        )}
+      </div>
+      <Segmented
+        size="sm"
+        group="store-sort"
+        label={s.sort.label}
+        value={sort}
+        onChange={(id) => onSort(id as ProductSort)}
+        dataAttr="data-store-sort"
+        items={[
+          { id: 'new', label: s.sort.new },
+          { id: 'price_asc', label: s.sort.priceAsc },
+          { id: 'price_desc', label: s.sort.priceDesc },
+        ]}
+      />
+    </div>
+  );
+}
 
 const TabView = lazy(() => import('./tabViews').then((m) => ({ default: m.TabView })));
 
@@ -49,6 +132,9 @@ export default function TabsBlock({ block, store, data }: BlockProps<'tabs'>) {
   // shows the picked collection's products in the Collections tab itself —
   // picking one used to switch to a tab that was not there, and nothing moved.
   const [sectionFilter, setSectionFilter] = useState(rt.section);
+  // The visitor's search and sort (L11): server queries, kept across tab changes.
+  const [q, setQ] = useState('');
+  const [sort, setSort] = useState<ProductSort>('new');
 
   const show: Record<TabKind, boolean> = {
     products: true,
@@ -90,14 +176,19 @@ export default function TabsBlock({ block, store, data }: BlockProps<'tabs'>) {
 
       <TabPanels value={current} order={TABS.map((t) => t.id)}>
         {current === 'products' || (current === 'collections' && sectionFilter && !wants('products')) ? (
-          <ProductsView
-            initial={data.products.latest}
-            collections={sections}
-            sectionFilter={sectionFilter}
-            onClearSection={() => setSectionFilter('')}
-            previewCount={block.settings.products_preview}
-            storeOpen={!!store.open}
-          />
+          <>
+            {/* A profile-only merchant has no store to search. */}
+            {live && <ProductSearch q={q} sort={sort} onQuery={setQ} onSort={setSort} />}
+            <ProductsView
+              initial={data.products.latest}
+              collections={sections}
+              sectionFilter={sectionFilter}
+              onClearSection={() => setSectionFilter('')}
+              previewCount={block.settings.products_preview}
+              storeOpen={!!store.open}
+              query={{ q, sort }}
+            />
+          </>
         ) : (
           <Suspense fallback={<Loading />}>
             <TabView

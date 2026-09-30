@@ -8,6 +8,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { api, ApiError, uploadFile } from '../lib/api';
+import { pickUpload, type UploadLargeResult } from '../lib/uploadSession';
+import { UploadTile } from '../components/upload/UploadTile';
+import { UPLOAD_STRINGS } from '../components/upload/strings';
 import { formatElapsed, useVoiceRecorder } from '../lib/voiceRecorder';
 import ChatAttachment, {
   attachmentErrorText,
@@ -25,6 +28,11 @@ import ChatCardView, { SystemEventCard } from '../components/chat/cards/ChatCard
 import { ChatCardActionsContext, type ChatCardActions, type CustomProductPrefill, type QuotePrefill } from '../components/chat/cards/cardContext';
 import { newClientId, type ChatCard, type ChatThreadInfo } from '../lib/chatCards';
 import { toast } from '../lib/toastStore';
+// Link cards (§9.4): the bubble, the words, and the chat's own send.
+import { Link2 } from 'lucide-react';
+import LinkCard from '../components/community/links/LinkCard';
+import { postChatLink, type ChatLink } from '../components/community/links/api';
+import { useLinkStrings } from '../components/community/links/strings';
 
 // The commerce sheets load when first opened — a plain conversation never pays for them.
 const ProductPickerSheet = React.lazy(() => import('../components/chat/ProductPickerSheet'));
@@ -32,6 +40,7 @@ const QuoteSheet = React.lazy(() => import('../components/chat/commerce/QuoteShe
 const PrintRequestSheet = React.lazy(() => import('../components/chat/commerce/PrintRequestSheet'));
 const CustomProductSheet = React.lazy(() => import('../components/chat/commerce/CustomProductSheet'));
 const OrdersSheet = React.lazy(() => import('../components/chat/commerce/OrdersSheet'));
+const LinkSheet = React.lazy(() => import('../components/community/links/LinkSheet'));
 
 /**
  * 'text', the attachment's real kind, or a card's kind (`product_card`…) —
@@ -48,6 +57,8 @@ interface ChatMessage {
   fileUrl: string | null;
   /** A card (0150): what it was sent as and what it is now, for this reader. */
   card?: ChatCard | null;
+  /** A link line (§9.4): the card as it was when sent — `chatMessagePublic`'s `link`. */
+  link?: ChatLink | null;
   /** Written by the server about an event — drawn centred. */
   system?: boolean;
   created_at: string;
@@ -61,13 +72,15 @@ interface PendingMessage {
   fileUrl: string | null;
   created_at: string;
   failed: boolean;
+  /** A link send (§9.4): the card once the server has answered, drawn in place of the address. */
+  link?: ChatLink | null;
 }
 
 
 function formatMsgTime(iso: string, lang: string): string {
   const date = new Date(iso);
   if (isNaN(date.getTime())) return '';
-  const locale = lang === 'ar' ? 'ar' : lang === 'ku' ? 'ckb' : 'en-US';
+  const locale = lang === 'ar' ? 'ar' : lang === 'ckb' ? 'ckb' : 'en-US';
   return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -99,7 +112,13 @@ export default function Chat() {
   const [customFor, setCustomFor] = useState<CustomProductPrefill | null>(null);
   const [printOpen, setPrintOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
+  // «رابط» (§9.4): the address sheet; the words its bubble and menu entry use.
+  const [linkSheetOpen, setLinkSheetOpen] = useState(false);
+  const linkStrings = useLinkStrings();
   const [uploading, setUploading] = useState(false);
+  // Attachments on the resumable path (§9.4): a clip or a document above
+  // 8 MiB is a tile in the thread until the server has the whole file.
+  const [largeUploads, setLargeUploads] = useState<Array<{ id: string; file: File }>>([]);
   // THE THREAD IN PAGES (audit 04 B5): the newest page first, older ones on
   // the way up. `olderCursor` is where the next older page starts, or null
   // when the whole thread is on screen.
@@ -132,7 +151,7 @@ export default function Chat() {
   // bottom, and never by `scrollIntoView` (which walked every scrollable
   // ancestor and yanked a reader who had scrolled up). The same hook the
   // support threads use (src/lib/supportThread.ts).
-  useThreadScroll(listRef, id ?? '', messages.length + pending.length, pending.length > 0);
+  useThreadScroll(listRef, id ?? '', messages.length + pending.length + largeUploads.length, pending.length > 0 || largeUploads.length > 0);
 
   // AN ORDER'S CARD ONCE (docs/COMMUNITY_COMMERCE_CHAT.md D8): each event of
   // an order is a line of the thread's history, but only the newest one
@@ -315,6 +334,34 @@ export default function Chat() {
   };
 
   /**
+   * A LINK AS A CARD (§9.4): the address goes to the server, which resolves
+   * the card and writes the line in one step, once per `client_id`. The
+   * bubble appears at once as the bare address and takes the card the moment
+   * the server answers; the next poll replaces it with the stored line. A
+   * refusal (not an address, a host the server will not touch) takes the
+   * bubble back and is thrown to the sheet, which says why under its field.
+   */
+  const sendLink = async (url: string) => {
+    if (!id) return;
+    presence.onStop();
+    setSendError(null);
+    const tempId = nextTempId();
+    setPending((prev) => [
+      ...prev,
+      { tempId, serverId: null, kind: 'text', body: url, fileUrl: null, created_at: new Date().toISOString(), failed: false },
+    ]);
+    try {
+      const res = await postChatLink(id, url, newClientId());
+      const link = res.message?.link ?? null;
+      setPending((prev) => prev.map((p) => (p.tempId === tempId ? { ...p, serverId: res.id, link } : p)));
+      if (res.card?.status === 'failed') setActionNotice(linkStrings.fetchFailed);
+    } catch (err) {
+      setPending((prev) => prev.filter((p) => p.tempId !== tempId));
+      throw err;
+    }
+  };
+
+  /**
    * ONE PATH FOR EVERY ATTACHMENT — a photo, a clip, a document or a voice
    * note. The bubble appears at once from the local file and is replaced by
    * the server's copy on the next poll; the kind sent is only a hint, the
@@ -322,6 +369,14 @@ export default function Chat() {
    */
   const sendAttachment = async (file: File) => {
     if (!id || uploading) return;
+    // Above 8 MiB the file takes the resumable session (§9.4): a tile in the
+    // thread with its ring, cancel and retry — the message is written by
+    // `finishLargeUpload` once the server holds and has verified the bytes.
+    if (pickUpload(file) === 'session') {
+      setSendError(null);
+      setLargeUploads((prev) => [...prev, { id: nextTempId(), file }]);
+      return;
+    }
     setSendError(null);
     setUploading(true);
     const tempId = nextTempId();
@@ -349,6 +404,28 @@ export default function Chat() {
   };
 
   /**
+   * A SESSION UPLOAD LANDED (§9.4). The session filed the bytes under this
+   * conversation (chat/<id>/…) and answered their url; the message row is
+   * written here with that key — the server re-checks the prefix and heads
+   * the object before it stores a row — then the thread is re-read so the
+   * bubble appears as the other side will see it.
+   */
+  const finishLargeUpload = async (entry: { id: string; file: File }, result: UploadLargeResult) => {
+    setLargeUploads((prev) => prev.filter((u) => u.id !== entry.id));
+    if (!id) return;
+    const fileKey = result.key ?? result.url.replace(/^\/files\//, '');
+    try {
+      await api.post<{ id: string }>(`/api/chats/${id}/messages`, { kind: attachmentKindOfFile(entry.file), fileKey, client_id: newClientId() });
+      await fetchMessages();
+    } catch (err) {
+      // The store's own sentence in the reader's language (ar/en/ckb), never the
+      // server's raw text; the sentences load on the first refusal, as everywhere on this page.
+      const { apiRefusal } = await import('../lib/refusalStrings');
+      setSendError(apiRefusal(err, lang, UPLOAD_STRINGS[lang].failed));
+    }
+  };
+
+  /**
    * A CARD, BY ITS ID — the server builds it from the database and refuses one
    * that is not this thread's (worker/lib/chatCards.ts). The thread is re-read
    * on success so the card appears with its current state.
@@ -370,11 +447,13 @@ export default function Chat() {
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    // Several at once from the album (§9.4): one after the other, so the
+    // bubbles land in the order they were picked; a large one becomes a
+    // tile at once and the next photo is not held behind it.
+    const files = Array.from(e.target.files ?? []);
     e.target.value = '';
     setIsPlusMenuOpen(false);
-    if (!file) return;
-    await sendAttachment(file);
+    for (const file of files) await sendAttachment(file);
   };
 
   /** Tap the microphone to record; ✕ throws it away, send uploads it. */
@@ -513,6 +592,13 @@ export default function Chat() {
       label: dir === 'rtl' ? 'ملف' : 'File',
       onClick: () => documentInputRef.current?.click(),
     },
+    // «رابط» (§9.4): an address the server turns into a card — title, host,
+    // our copy of the picture — instead of a bare line of text.
+    {
+      icon: Link2,
+      label: linkStrings.link,
+      onClick: () => { setIsPlusMenuOpen(false); setLinkSheetOpen(true); },
+    },
     // Outside a store's conversation «المتجر» stays what it was: a message
     // with a link to the catalogue, sent as ordinary text so the other side
     // reads it on any client. Three of these were disabled with «قريباً» on
@@ -600,6 +686,17 @@ export default function Chat() {
     );
   };
 
+  /**
+   * A LINK'S LINE (§9.4): the card the server stored with the message —
+   * title, host, our copy of the picture, «اطلب طباعته» on a model page —
+   * in place of the bare address. Faded while the send is still out.
+   */
+  const renderLinkBubble = (link: ChatLink, faded = false) => (
+    <div className={`w-full max-w-[min(80%,24rem)] mt-1 ${faded ? 'opacity-60' : ''}`} data-chat-link>
+      <LinkCard card={link} variant="compact" />
+    </div>
+  );
+
   const renderAvatar = (mine: boolean) => (
     <div className="w-8 h-8 rounded-full bg-surface-raised flex items-center justify-center shrink-0 overflow-hidden">
       <span className="text-xs font-bold text-text-secondary">{mine ? myInitial : otherInitial}</span>
@@ -620,9 +717,9 @@ export default function Chat() {
   return (
     <ChatCardActionsContext.Provider value={cardActions}>
     <div data-chat-layout className="h-full min-h-0 w-full bg-canvas flex flex-col font-sans text-text-secondary">
-      <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
+      <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
       <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileSelect} />
-      <input type="file" accept={CHAT_FILE_ACCEPT} className="hidden" ref={documentInputRef} onChange={handleFileSelect} data-chat-document-input />
+      <input type="file" multiple accept={CHAT_FILE_ACCEPT} className="hidden" ref={documentInputRef} onChange={handleFileSelect} data-chat-document-input />
 
       {/* Header */}
       <header className="lv-character-header shrink-0 bg-canvas px-3 sm:px-4 py-2 items-center border-b border-border-subtle/70">
@@ -740,7 +837,9 @@ export default function Chat() {
                       {!msg.mine && renderAvatar(false)}
                       {msg.card
                         ? <ChatCardView card={msg.card} mine={msg.mine} fallback={msg.body} />
-                        : renderBubble(msg.kind, msg.body, msg.fileUrl, msg.mine)}
+                        : msg.link
+                          ? renderLinkBubble(msg.link)
+                          : renderBubble(msg.kind, msg.body, msg.fileUrl, msg.mine)}
                       {msg.mine && renderAvatar(true)}
                     </div>
                   )}
@@ -749,7 +848,17 @@ export default function Chat() {
             })}
             {pending.map((msg) => (
               <div key={msg.tempId} className="flex items-start gap-2 justify-end" aria-label={dir === 'rtl' ? 'جارٍ الإرسال' : 'Sending'}>
-                {renderBubble(msg.kind, msg.body, msg.fileUrl, true, true)}
+                {msg.link ? renderLinkBubble(msg.link, true) : renderBubble(msg.kind, msg.body, msg.fileUrl, true, true)}
+                {renderAvatar(true)}
+              </div>
+            ))}
+            {/* A large attachment on its way up (§9.4): the tile stands where
+                the bubble will, with its ring, the checksum step, cancel and retry. */}
+            {largeUploads.map((u) => (
+              <div key={u.id} className="flex items-start gap-2 justify-end" data-chat-large-upload>
+                <div className="w-full max-w-[min(80%,24rem)] mt-1">
+                  <UploadTile file={u.file} purpose="chat" entityId={id} onDone={(r) => void finishLargeUpload(u, r)} onCancel={() => setLargeUploads((prev) => prev.filter((x) => x.id !== u.id))} />
+                </div>
                 {renderAvatar(true)}
               </div>
             ))}
@@ -972,6 +1081,13 @@ export default function Chat() {
       {ordersOpen && id && (
         <React.Suspense fallback={null}>
           <OrdersSheet open onClose={() => setOrdersOpen(false)} chatId={id} />
+        </React.Suspense>
+      )}
+      {/* «رابط» (§9.4): the address goes to POST /api/chats/:id/cards/link,
+          which resolves the card and writes the line in one step. */}
+      {linkSheetOpen && id && (
+        <React.Suspense fallback={null}>
+          <LinkSheet open onClose={() => setLinkSheetOpen(false)} onSend={sendLink} />
         </React.Suspense>
       )}
     </div>

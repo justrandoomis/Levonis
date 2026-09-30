@@ -29,10 +29,13 @@ import { StoreMark } from '../../components/community/hub/parts';
 import { timeAgo } from '../../components/community/hub/copy';
 import MediaStrip from '../../components/community/projects/MediaStrip';
 import SpecList from '../../components/community/projects/SpecList';
+import FileRows from '../../components/community/projects/FileRows';
+import type { PostFile } from '../../components/community/files/api';
 import { creatorHref, projectsApi, type Post } from '../../components/community/projects/api';
 import { useProjectStrings } from '../../components/community/projects/strings';
 import ActionRow from '../../components/community/social/ActionRow';
 import FollowUserButton from '../../components/community/social/FollowUserButton';
+import { LinkRow } from '../../components/community/links/LinkCard';
 
 /** «قد يعجبك» — other pieces on the same material, printer or tags (Phase 3), a lazy rail below the doors. */
 const RecommendRail = React.lazy(() => import('../../components/community/search/RecommendRail'));
@@ -104,6 +107,8 @@ export default function ProjectPage() {
   };
 
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
+  /** The attachments (§9.4): GET /posts/:id answers `files[]`; the projects api type predates it. */
+  const files: PostFile[] = post ? ((post as Post & { files?: PostFile[] }).files ?? []) : [];
 
   /** The facts and the doors — placed once per layout, never shown twice. */
   const facts = post ? (
@@ -242,6 +247,16 @@ export default function ProjectPage() {
                     {post.body}
                   </p>
                 )}
+                {/* the first link in the story as a card (§9.4): the page's
+                    title, its host, our copy of its picture; a model page
+                    offers «اطلب طباعته». Drawn only when the server already
+                    holds the card — a reader never makes it fetch. */}
+                <LinkRow text={post.body} variant="full" />
+
+                {/* the model and the documents behind the pictures (§9.4):
+                    «عرض ثلاثي الأبعاد» mints a viewer link; the download only
+                    when the author allowed it and the reader is signed in. */}
+                <FileRows postId={post.id} files={files} signedIn={!!user} />
 
                 {post.tags.length > 0 && (
                   <ul className="flex flex-wrap gap-1.5" aria-label={s.tags}>

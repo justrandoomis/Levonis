@@ -14,10 +14,11 @@ import { useEffect, useState } from 'react';
 import { ShoppingBag, X } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { productQueryKey, type CollectionData, type ProductPage } from '../../../../packages/storeLayout/src/data';
-import { useStorefrontRuntime } from '../runtime';
+import { useStorefrontRuntime, type ProductSort } from '../runtime';
 import { useStoreTheme } from '../StoreTheme';
 import { BlockHeading, Column, Empty, Loading, ProductGrid, useText, type CardProduct } from '../parts';
 import { ProductGridLoading } from '../skeletons';
+import { storefrontStrings } from '../strings';
 import type { BlockProps } from '../types';
 
 export function collectionName(c: CollectionData | undefined, lang: string): string {
@@ -39,6 +40,7 @@ export function ProductsView({
   previewCount,
   storeOpen,
   expanded = false,
+  query,
 }: {
   /** The first page of the store's newest products, when it came with the store. */
   initial: ProductPage | undefined;
@@ -49,18 +51,33 @@ export function ProductsView({
   storeOpen: boolean;
   /** A page of its own (./StoreViewPage.tsx): every product, paged, no «show all» and no title of its own. */
   expanded?: boolean;
+  /** The visitor's search and sort (storefront L11): server queries; «new» with no term is the list as it came. */
+  query?: { q: string; sort: ProductSort };
 }) {
   const { loc, lang } = useLanguage();
   const { accent } = useStoreTheme();
   const rt = useStorefrontRuntime();
   const injected = rt.injectedProducts;
-  const preloaded = !sectionFilter && !injected ? initial : undefined;
+  const q = query?.q ?? '';
+  const sort: ProductSort = query?.sort ?? 'new';
+  // A search or a named sort is a server query of its own; the page that
+  // arrived with the store answers only the plain list.
+  const filtered = !!q || sort !== 'new';
+  const preloaded = !sectionFilter && !injected && !filtered ? initial : undefined;
+  const ask = (cursor: string | null) => ({
+    source: sectionFilter ? ('collection' as const) : ('latest' as const),
+    collection_id: sectionFilter,
+    cursor,
+    ...(q ? { q } : {}),
+    ...(sort !== 'new' ? { sort } : {}),
+  });
   const [state, setState] = useState<ListState>(() => ({
     key: sectionFilter,
     items: injected ?? preloaded?.items ?? null,
     cursor: injected ? null : (preloaded?.next_cursor ?? null),
   }));
   const [more, setMore] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [showAll, setShowAll] = useState(expanded);
 
   useEffect(() => {
@@ -73,20 +90,31 @@ export function ProductsView({
       return;
     }
     let alive = true;
+    setFailed(false);
     setState({ key: sectionFilter, items: null, cursor: null });
-    rt.loadProducts({ source: sectionFilter ? 'collection' : 'latest', collection_id: sectionFilter, cursor: null })
+    rt.loadProducts({
+      source: sectionFilter ? 'collection' : 'latest',
+      collection_id: sectionFilter,
+      cursor: null,
+      ...(q ? { q } : {}),
+      ...(sort !== 'new' ? { sort } : {}),
+    })
       .then((d) => alive && setState({ key: sectionFilter, items: d.items, cursor: d.next_cursor }))
-      .catch(() => alive && setState({ key: sectionFilter, items: [], cursor: null }));
+      .catch(() => {
+        if (!alive) return;
+        setFailed(true);
+        setState({ key: sectionFilter, items: [], cursor: null });
+      });
     return () => {
       alive = false;
     };
-  }, [sectionFilter, injected, preloaded, rt]);
+  }, [sectionFilter, injected, preloaded, rt, q, sort]);
 
   async function loadMore() {
     if (!state.cursor) return;
     setMore(true);
     try {
-      const d = await rt.loadProducts({ source: sectionFilter ? 'collection' : 'latest', collection_id: sectionFilter, cursor: state.cursor });
+      const d = await rt.loadProducts(ask(state.cursor));
       setState((s) => ({ ...s, items: [...(s.items ?? []), ...d.items], cursor: d.next_cursor }));
     } catch {
       /* keep the page we have */
@@ -112,30 +140,36 @@ export function ProductsView({
   );
 
   if (!products.length) {
+    const st = storefrontStrings(lang);
     return (
       <div>
         {sectionFilter && <div className="mb-3">{chip}</div>}
         <Empty
           icon={<ShoppingBag className="w-8 h-8 text-zinc-600" strokeWidth={1.5} aria-hidden="true" />}
           text={
-            sectionFilter
-              ? loc('لا توجد منتجات في هذا القسم حاليًا', 'No products in this section right now', 'لەم بەشە بەرهەم نییە')
-              : loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا بەرهەم نییە')
+            failed && q
+              ? st.search.error
+              : q
+                ? st.search.empty(q)
+                : sectionFilter
+                  ? loc('لا توجد منتجات في هذا القسم حاليًا', 'No products in this section right now', 'لەم بەشە بەرهەم نییە')
+                  : loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا بەرهەم نییە')
           }
         />
       </div>
     );
   }
 
-  // The merchant's featured picks lead; within that, the server's order.
-  const sorted = [...products].sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
-  const revealed = showAll || sectionFilter ? sorted : sorted.slice(0, previewCount);
+  // The merchant's featured picks lead; within that, the server's order — and
+  // a price sort the visitor asked for is the server's order entire.
+  const sorted = sort === 'new' ? [...products].sort((a, b) => Number(!!b.featured) - Number(!!a.featured)) : products;
+  const revealed = showAll || sectionFilter || filtered ? sorted : sorted.slice(0, previewCount);
 
   return (
     <div>
       <div dir="rtl" className="flex items-center justify-between mb-3 empty:hidden">
-        {sectionFilter ? chip : expanded ? null : <h2 className="sf-title text-white">{loc('أحدث المنتجات', 'Latest products', 'نوێترین بەرهەمەکان')}</h2>}
-        {!expanded && !sectionFilter && (sorted.length > previewCount || state.cursor) && (
+        {sectionFilter ? chip : expanded || filtered ? null : <h2 className="sf-title text-white">{loc('أحدث المنتجات', 'Latest products', 'نوێترین بەرهەمەکان')}</h2>}
+        {!expanded && !sectionFilter && !filtered && (sorted.length > previewCount || state.cursor) && (
           <button type="button" onClick={() => setShowAll((v) => !v)} className={`relative lv-hit rounded-md text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${accent.text}`}>
             {showAll ? loc('عرض أقل', 'Show less', 'کەمتر') : loc('عرض الكل', 'View all', 'هەموو ببینە')}
           </button>
@@ -144,7 +178,7 @@ export function ProductsView({
 
       <ProductGrid products={revealed} storeOpen={storeOpen} legacyLinks={!!injected} />
 
-      {state.cursor && (showAll || sectionFilter) && (
+      {state.cursor && (showAll || sectionFilter || filtered) && (
         <button
           type="button"
           onClick={loadMore}

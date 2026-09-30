@@ -97,6 +97,7 @@ import {
   type PrintAccessory,
 } from '../lib/printAccessories';
 import { DEFAULT_PRICING } from '../lib/printPricing';
+import { engineBUnitPriceAt, fromEngineB, quantityCurve } from '../lib/printEstimate';
 import { DEFAULT_LINK_PROVIDERS, parseModelLink, resolveModelLink, type LinkProviderConfig } from '../lib/externalModels';
 
 export const printQuoteRoutes = new Hono<AppContext>();
@@ -925,7 +926,10 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
     merchantId,
     merchantPrinter: null,
     quantity,
-    targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
+    // E5. A merchant pricing their own job may name their margin; every other
+    // caller gets the platform's. The body used to be read for everyone, which
+    // let an anonymous caller have the platform's estimate priced at any margin.
+    targetMarginPercent: merchantId ? merchantMargin(body) : PLATFORM_TARGET_MARGIN_PERCENT,
     minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
     platformMachineHourIqd: await platformMachineHourIqd(c.env.DB, printer.technology),
     accessories: await pricedAccessories(c.env.DB, readAccessories(body.accessories), quantity),
@@ -957,6 +961,19 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
     // TWO PAYLOADS, NOT ONE WITH A FLAG. The customer's shape physically cannot
     // carry a cost line, so no future edit can leak one by forgetting a check.
     quote: merchantId ? merchantQuote(priced.result) : publicQuote(priced.result),
+    // THE ESTIMATE CONTRACT (docs/MERCHANT_PLATFORM_V2.md §4.1 E1–E4): the same
+    // shape the request wizard's engine answers in, so one card reads both.
+    // The curve is `priceJob` re-run, pure, at each quantity.
+    estimate: fromEngineB(priced.result, {
+      analysis: loaded.analysis,
+      process: printer.technology,
+      quantity,
+      // Engine B's `qty` counts COPIES OF THE ANALYSED JOB (nine parts on a bed
+      // are one job, `quantity` is pinned to 1 above), and `unit_iqd` is per
+      // copy — the contract says so (contract.ts `EstimateCurvePoint`) until
+      // E10 converges the two engines on what a piece is.
+      curve: quantityCurve(quantity, (qty) => engineBUnitPriceAt(priced.pricing, qty)),
+    }),
   });
 });
 
@@ -1245,7 +1262,8 @@ printQuoteRoutes.post('/grams-quote', async (c) => {
       rows,
       printMinutes,
       accessories: readAccessories(body.accessories),
-      targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
+      // E5: honoured only once `quoteStatedWeight` knows the caller is a merchant.
+      merchantTargetMarginPercent: merchantMargin(body),
     })),
   });
 });
@@ -1265,13 +1283,19 @@ async function quoteStatedWeight(
     rows: GramsRow[];
     printMinutes: number;
     accessories: AccessorySelection[];
-    targetMarginPercent: number;
+    /** A margin the caller asked for. Applied only when the caller turns out
+     *  to be a merchant (E5); a customer's estimate is always the platform's. */
+    merchantTargetMarginPercent?: number;
   }
 ) {
   const { printer, rows, printMinutes } = input;
   const user = c.get('user');
   const store = user ? await storeForUser(c.env.DB, user.id) : null;
   const merchantId = store?.merchant?.id ?? null;
+  const targetMarginPercent =
+    merchantId && input.merchantTargetMarginPercent !== undefined
+      ? input.merchantTargetMarginPercent
+      : PLATFORM_TARGET_MARGIN_PERCENT;
 
   // The stated grams already describe the whole job, so the accessory counts
   // are taken as stated too — `perPart` of 1, matching the `quantity` below.
@@ -1285,7 +1309,7 @@ async function quoteStatedWeight(
     // The stated grams already describe the whole job, so there is nothing left
     // for a quantity to multiply — the same reading the file routes take.
     quantity: 1,
-    targetMarginPercent: input.targetMarginPercent,
+    targetMarginPercent,
     minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
     // Read for the same reason the floor is: the file calculator and the grams
     // calculator must never answer the same question with two numbers, and an
@@ -1402,7 +1426,6 @@ printQuoteRoutes.post('/link', async (c) => {
       rows,
       printMinutes,
       accessories: [],
-      targetMarginPercent: PLATFORM_TARGET_MARGIN_PERCENT,
     })),
   });
 });
@@ -1469,7 +1492,8 @@ printQuoteRoutes.post('/analyses/:id/compare', requireAuth, async (c) => {
       merchantId,
       merchantPrinter: mp,
       quantity,
-      targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
+      // Merchant-only (the `forbidden` above), so the margin is theirs to name.
+      targetMarginPercent: merchantMargin(body),
       minimumJobIqd,
       platformMachineHourIqd:
         mp.model.technology === 'resin' ? platformResinMachineHourIqd : platformFdmMachineHourIqd,
@@ -1510,6 +1534,17 @@ printQuoteRoutes.post('/analyses/:id/compare', requireAuth, async (c) => {
 
 // ------------------------------------------------------------------- internals
 
+/**
+ * The margin a MERCHANT asked their own quote to be priced at (E5). Called
+ * only once the caller is known to be a merchant — a public caller never
+ * reaches it and gets `PLATFORM_TARGET_MARGIN_PERCENT` — and bounded, because
+ * a margin of 99 % is a division by nearly zero wearing a percent sign.
+ */
+function merchantMargin(body: Record<string, unknown>): number {
+  const n = Number(body.target_margin_percent);
+  return Number.isFinite(n) && n > 0 && n <= 90 ? n : PLATFORM_TARGET_MARGIN_PERCENT;
+}
+
 export interface PriceForPrinterInput {
   analysis: PrintAnalysis;
   printer: PrinterModel;
@@ -1538,7 +1573,7 @@ export interface PriceForPrinterInput {
 export async function priceForPrinter(
   c: Context<AppContext>,
   input: PriceForPrinterInput
-): Promise<{ result: QuoteResult; snapshot: Record<string, unknown> }> {
+): Promise<{ result: QuoteResult; pricing: PricingInputs; snapshot: Record<string, unknown> }> {
   const materialIds = input.analysis.materials.map((m) => m.materialId).filter(Boolean);
   const materialPrices = await loadMaterialPrices(c.env.DB, input.merchantId, materialIds);
 
@@ -1636,6 +1671,9 @@ export async function priceForPrinter(
   // the catalogue, the margins and the engine have all moved on.
   return {
     result,
+    // The frozen inputs themselves, so a caller can re-run the pure engine at
+    // another quantity for the estimate's curve without a second read.
+    pricing,
     snapshot: {
       engine_version: PRICING_ENGINE_VERSION,
       printer: input.printer,

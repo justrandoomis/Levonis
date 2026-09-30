@@ -87,7 +87,7 @@ test('each screen is its own lazy chunk; the list links to the order screen', ()
   assert.match(sections, /orders: lazy\(\(\) => import\('\.\/sections\/OrdersSection'\)\)/);
   const orders = read('src/components/merchant/shell/sections/OrdersSection.tsx');
   assert.match(orders, /lazy\(\(\) => import\('\.\.\/\.\.\/orders\/OrderDetailScreen'\)\)/);
-  assert.match(orders, /lazy\(\(\) => import\('\.\.\/\.\.\/dashboard\/SalesTabs'\)/);
+  assert.match(orders, /lazy\(\(\) => import\('\.\.\/\.\.\/orders\/OrdersList'\)\)/, 'P3b: the list is its own lazy chunk');
   assert.match(read('src/components/merchant/dashboard/SalesTabs.tsx'), /data-open-order/);
   const detail = read('src/components/merchant/orders/OrderDetailScreen.tsx');
   assert.match(detail, /useConfirm\(\)/, 'status moves ask first');

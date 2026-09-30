@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Info, Repeat, Search, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Info, Repeat, Search, Store, X } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { api } from '../lib/api';
 import type { ApiOrder } from '../lib/api';
@@ -116,6 +116,8 @@ const STRINGS = {
     // POST /api/reviews writes status='published' and answers published:true —
     // the review is LIVE, and only the separate gift/points decision waits.
     reviewThanks: 'شكرًا — نُشرت مراجعتك. اعتماد المكافأة قرار منفصل.',
+    /** «طلبك من {store}» over a community-store order's card (merchant platform V2, A6). */
+    fromStore: (store: string) => `طلبك من ${store}`,
   },
   en: {
     title: 'My Orders',
@@ -147,6 +149,7 @@ const STRINGS = {
     allRatedLoaded: 'Every loaded order is rated — load more to keep looking.',
     cancelledNotice: (id: string) => `Order ${id} was cancelled.`,
     reviewThanks: 'Thank you — your review is published. Reward approval is separate.',
+    fromStore: (store: string) => `Your order from ${store}`,
   },
   ckb: {
     title: 'داواکارییەکانم',
@@ -182,8 +185,40 @@ const STRINGS = {
     // publishes immediately — so the ARABIC wording stands in until you write
     // the Sorani yourself. Nothing here is machine-translated Kurdish.
     reviewThanks: 'شكرًا — نُشرت مراجعتك. اعتماد المكافأة قرار منفصل.',
+    fromStore: (store: string) => `داواکاریەکەت لە ${store}`,
   },
 };
+
+/**
+ * The store a community order came from, over its card (A6): the logo and
+ * «طلبك من {store}», leading back to the shop — on its own host when the
+ * deployment has one (an absolute address), else the apex page.
+ */
+function OrderStoreLine({ store, label }: { store: NonNullable<ApiOrder['store']>; label: string }) {
+  const cls =
+    'mb-1.5 inline-flex max-w-full items-center gap-2 rounded-lg text-[12.5px] text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
+  const inner = (
+    <>
+      {store.logo_url ? (
+        <img src={store.logo_url} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" loading="lazy" />
+      ) : (
+        <Store className="h-4 w-4 shrink-0" aria-hidden="true" />
+      )}
+      <span className="truncate" dir="auto">
+        {label}
+      </span>
+    </>
+  );
+  return store.url.startsWith('/') ? (
+    <Link to={store.url} className={cls} data-order-store={store.slug}>
+      {inner}
+    </Link>
+  ) : (
+    <a href={store.url} className={cls} data-order-store={store.slug}>
+      {inner}
+    </a>
+  );
+}
 
 function listUrl(filter: Filter, before?: string | null): string {
   const p = new URLSearchParams();
@@ -574,15 +609,17 @@ export default function Orders() {
         ) : (
           <div className="flex flex-col gap-4" data-orders-list>
             {visible.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                reviewedProductIds={reviewed}
-                trackingOpen={trackingFor === order.id}
-                onToggleTracking={() => setTrackingFor((cur) => (cur === order.id ? null : order.id))}
-                onCancel={(o) => setCancelFor(o)}
-                onReview={(o) => setReviewFor(o)}
-              />
+              <div key={order.id} data-order-entry={order.id}>
+                {order.store && <OrderStoreLine store={order.store} label={s.fromStore(order.store.name)} />}
+                <OrderCard
+                  order={order}
+                  reviewedProductIds={reviewed}
+                  trackingOpen={trackingFor === order.id}
+                  onToggleTracking={() => setTrackingFor((cur) => (cur === order.id ? null : order.id))}
+                  onCancel={(o) => setCancelFor(o)}
+                  onReview={(o) => setReviewFor(o)}
+                />
+              </div>
             ))}
             {search && nextBefore && <p className="text-[11.5px] text-zinc-500 text-center">{s.searchHint}</p>}
             {nextBefore && (

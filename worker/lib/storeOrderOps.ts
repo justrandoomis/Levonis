@@ -39,6 +39,7 @@ import { safeParse } from './types';
 import { newId } from './crypto';
 import { audit, auditStatements } from './audit';
 import { cancelledOrderRefundStatements } from './orderCancelOps';
+import { productFilesReady, revokeOrderProductFileGrantStatements } from './fileOwnership';
 import { sellingVerdict, type StoreContext } from './merchantAuth';
 import type { TierStatus } from './entitlements';
 import { notifyBalanceIfNegative, notifyMerchant, storeOrderNotice } from './merchantNotify';
@@ -341,6 +342,8 @@ export type CancelStoreOrderResult =
  *      (`cancelledOrderRefundStatements`, the customer door's own statements);
  *   4. the community stock and `sold_count` put back, per product;
  *   5. the coupon use given back;
+ *   5b. the product-file download grants this order paid for, revoked (or
+ *      re-pointed at another live order of the buyer that covers the product);
  *   6. the merchant's credit, undone in the append-only merchant ledger
  *      (worker/lib/merchantLedger.ts): refund lines in «pending», or — when it
  *      had already become available (an admin cancelling after a release) —
@@ -440,6 +443,15 @@ export async function cancelStoreOrder(env: Env, p: CancelStoreOrderInput): Prom
         )
         .bind(now, storeId, couponCode, anchor)
     );
+  }
+
+  // THE FILES THE PURCHASE OPENED CLOSE AGAIN (§9.4): the download grants the
+  // checkout batch wrote for this order leave in the batch that refunds it —
+  // re-pointed at another live order of the same buyer where one covers the
+  // product, deleted otherwise — fenced on THIS batch's gate row like every
+  // other statement here. Only on a database that carries 0157.
+  if (await productFilesReady(db)) {
+    stmts.push(...revokeOrderProductFileGrantStatements(db, id, { sql: gate(2), binds: [anchor] }));
   }
 
   // The merchant's credit, undone in the merchant ledger: refund lines in

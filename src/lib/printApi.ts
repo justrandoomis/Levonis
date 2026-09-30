@@ -14,6 +14,7 @@
  */
 
 import { api } from './api';
+import type { Estimate } from './printEstimate';
 
 export type PrintProcess = 'fdm' | 'resin';
 export type PrintQuality = 'draft' | 'standard' | 'fine' | 'ultra';
@@ -130,6 +131,17 @@ export interface PublicQuote {
   confidence: Confidence;
   confidence_reasons: string[];
   unit_price_iqd: number;
+  /** Hardware ids the catalogue no longer has. */
+  accessories_unknown?: string[];
+  /** Present when the range spans the catalogue because no material was chosen. */
+  range_basis?: 'materials';
+}
+
+/** What `POST /quote` answers: the engine's public half, and BESIDE it the
+ *  `Estimate` contract every pricing surface converges on (E3). */
+export interface PublicQuoteAnswer {
+  quote: PublicQuote;
+  estimate: Estimate;
 }
 
 export interface PrintSpec {
@@ -246,7 +258,7 @@ export const printApi = {
 
   link: (url: string) => api.post<LinkResult>(`${BASE}/link`, { url }),
 
-  quote: (body: Record<string, unknown>) => api.post<{ quote: PublicQuote }>(`${BASE}/quote`, body),
+  quote: (body: Record<string, unknown>) => api.post<PublicQuoteAnswer>(`${BASE}/quote`, body),
 
   publish: (requestId: string, body: Record<string, unknown>) =>
     api.post<{ notified: number; matched: number; estimate: PublicQuote }>(

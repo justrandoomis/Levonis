@@ -208,6 +208,10 @@ const ALLOWED_IMPORTS = [
   // P1c: the loading screens' bars and their aria-busy group (react and the
   // language context only) — the store pages' skeletons in storefront/skeletons.tsx.
   /^src\/components\/ui\/Skeleton$/,
+  // P3c (storefront L11/L12): the in-store sort and the review filter chips
+  // are the app's one segmented control — a radio group already in the entry
+  // chunk (the language/theme sheet), so a store visit downloads nothing new.
+  /^src\/components\/ui\/Segmented$/,
 ];
 
 function importsOf(rel: string): string[] {

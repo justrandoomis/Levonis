@@ -27,8 +27,11 @@ import { Switch } from '../../components/ui/Switch';
 import { ErrorState } from '../../components/ui/AsyncStates';
 import { toast } from '../../components/ui/Toast';
 import { ProjectMediaPicker, type PickedMedia } from '../../components/community/projects/MediaPicker';
+import { FileComposer, type ComposerFile } from '../../components/community/projects/FileComposer';
+import type { PostFile, PostFileInput } from '../../components/community/files/api';
 import { POST_KINDS, projectsApi, type Post, type PostInput, type PostKind, type PostVisibility } from '../../components/community/projects/api';
 import { useProjectStrings } from '../../components/community/projects/strings';
+import { warmLinksOnPaste } from '../../components/community/links/useLinkCard';
 
 type Draft = {
   title: string;
@@ -51,6 +54,8 @@ type Draft = {
   store_id: string | null;
   product_id: string | null;
   media: PickedMedia[];
+  /** The models and documents (§9.4): keys from purpose=post sessions, ≤ 3. */
+  files: ComposerFile[];
 };
 
 const EMPTY: Draft = {
@@ -74,9 +79,13 @@ const EMPTY: Draft = {
   store_id: null,
   product_id: null,
   media: [],
+  files: [],
 };
 
-function fromPost(p: Post): Draft {
+/** GET /posts/:id answers `files[]` (§9.4) — the projects api type predates it. */
+type PostWithFiles = Post & { files?: PostFile[] };
+
+function fromPost(p: PostWithFiles): Draft {
   const t = p.print_time_minutes ?? 0;
   return {
     title: p.title,
@@ -99,6 +108,10 @@ function fromPost(p: Post): Draft {
     store_id: p.store?.id ?? null,
     product_id: p.product?.id ?? null,
     media: p.media.filter((m): m is typeof m & { key: string } => typeof m.key === 'string').map((m) => ({ key: m.key, url: m.url, kind: m.kind, width: m.width, height: m.height, duration_s: m.duration_s })),
+    // The author's own read carries each file's key; a row without one cannot be sent back and is dropped.
+    files: (p.files ?? [])
+      .filter((f): f is PostFile & { key: string } => typeof f.key === 'string')
+      .map((f) => ({ key: f.key, name: f.name, bytes: f.bytes, kind: f.kind, downloadable: f.downloadable })),
   };
 }
 
@@ -107,7 +120,7 @@ const num = (v: string): number | undefined => {
   return v.trim() === '' || !Number.isFinite(n) ? undefined : n;
 };
 
-function toInput(d: Draft): Partial<PostInput> {
+function toInput(d: Draft): Partial<PostInput> & { files: PostFileInput[] } {
   const h = num(d.hours) ?? 0;
   const mnt = num(d.minutes) ?? 0;
   const time = d.hours.trim() === '' && d.minutes.trim() === '' ? null : Math.round(h * 60 + mnt);
@@ -139,6 +152,7 @@ function toInput(d: Draft): Partial<PostInput> {
     store_id: d.store_id,
     product_id: d.store_id ? d.product_id : null,
     media: d.media.map((m) => ({ key: m.key, kind: m.kind, width: m.width, height: m.height, duration_s: m.duration_s })),
+    files: d.files.map((f) => ({ file_key: f.key, name: f.name.trim(), downloadable: f.downloadable })),
   };
 }
 
@@ -224,6 +238,7 @@ export default function ProjectComposer() {
   const fieldOf = (code: string | undefined): string => {
     if (!code) return 'form';
     if (code.startsWith('POST_MEDIA')) return 'media';
+    if (code.startsWith('POST_FILE')) return 'files';
     if (code.startsWith('POST_LINK')) return 'links';
     if (code === 'POST_SETTING_INVALID') return 'settings';
     if (code.startsWith('CONSENT')) return 'links';
@@ -313,8 +328,18 @@ export default function ProjectComposer() {
             </div>
 
             <Field label={s.body} optional>
-              <Textarea value={draft.body} rows={5} maxLength={4000} onChange={(e) => set('body', e.target.value)} placeholder={s.bodyPh} />
+              {/* a pasted address is resolved now (§9.4), so the card is warm the moment the post is published */}
+              <Textarea value={draft.body} rows={5} maxLength={4000} onChange={(e) => set('body', e.target.value)} onPaste={warmLinksOnPaste} placeholder={s.bodyPh} />
             </Field>
+
+            {/* THE FILES (§9.4) — the model behind the pictures, or a PDF of the
+                instructions; each goes up through a resumable session. */}
+            <section aria-labelledby="c-files">
+              <h2 id="c-files" className="mb-2 text-[13px] font-semibold text-text-secondary">
+                {s.modelFile}
+              </h2>
+              <FileComposer value={draft.files} onChange={(f) => set('files', f)} disabled={!!busy} error={errors.files} />
+            </section>
 
             {/* THE FACTS */}
             <section aria-labelledby="c-facts" className="flex flex-col gap-4 rounded-2xl border border-border-subtle/60 bg-surface p-4">

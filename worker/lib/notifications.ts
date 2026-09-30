@@ -136,7 +136,18 @@ export type NotificationKind =
   | 'post_liked'
   | 'post_commented'
   | 'comment_replied'
-  | 'new_follower';
+  | 'new_follower'
+  /**
+   * THE FILE KINDS (0158; docs/COMMUNITY_ECOSYSTEM.md §9.4 "Grouped file
+   * notifications"), both grouped by `notifyGrouped` and never by `notify`:
+   * «أرسل أحمد ملفات» to the other side of a conversation
+   * (`files_added:<chatId>`, worker/routes/chats.ts) and «أضاف سارة ملفات إلى
+   * الطلب» to the workshops matched to a request (`request_files:<requestId>`,
+   * worker/routes/marketplace.ts). A burst of attachments is ONE row per
+   * recipient whose count is PEOPLE, exactly as a burst of likes is.
+   */
+  | 'files_added'
+  | 'request_files';
 
 export interface NotificationInput {
   userId: string;
@@ -272,7 +283,7 @@ export async function notify(db: D1Database, n: NotificationInput): Promise<stri
  */
 export interface GroupedNotificationInput {
   userId: string;
-  kind: Extract<NotificationKind, 'post_liked' | 'post_commented' | 'comment_replied' | 'new_follower'>;
+  kind: Extract<NotificationKind, 'post_liked' | 'post_commented' | 'comment_replied' | 'new_follower' | 'files_added' | 'request_files'>;
   /** One row per recipient per key: `post_liked:<postId>`, `new_follower:<userId>`, … */
   groupKey: string;
   actor: { id: string; name: string };
@@ -331,6 +342,29 @@ export async function notifyGrouped(db: D1Database, n: GroupedNotificationInput)
   } catch (e) {
     console.error(`grouped notification not written (${n.kind}): ${e instanceof Error ? e.message : String(e)}`);
     return null;
+  }
+}
+
+/**
+ * THE SORANI OF A GROUPED ROW — the meta trick worker/lib/merchantNotify.ts
+ * uses (`meta.title_ckb` / `meta.body_ckb`), applied AFTER `notifyGrouped`
+ * answered with the count, because the grouped upsert owns `meta` (count,
+ * last actor, actors) and the Sorani title depends on the count it returns.
+ * A second stamp for the same row overwrites the first, so the Sorani names
+ * the same number the Arabic does. Never throws, like every notifier.
+ */
+export async function stampGroupedCkb(
+  db: D1Database,
+  id: string,
+  text: { title_ckb: string; body_ckb?: string }
+): Promise<void> {
+  try {
+    await db
+      .prepare(`UPDATE user_notifications SET meta = json_set(meta, '$.title_ckb', ?, '$.body_ckb', ?) WHERE id = ?`)
+      .bind(text.title_ckb, text.body_ckb ?? '', id)
+      .run();
+  } catch (e) {
+    console.error(`grouped notification's Sorani not stamped (${id}): ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 

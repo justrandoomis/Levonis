@@ -47,6 +47,10 @@ export function hasSessionCookie(cookieHeader: string | null | undefined): boole
  *   /api/print-quote/materials           the material list, no economics
  *   /api/print-quote/accessories         the accessory catalogue
  *   /api/marketplace/print/catalog       the request wizard's vocabulary
+ *   /api/link-cards?url=                 a stored link card: the same body for
+ *                                        every reader (linkCardPublic has no
+ *                                        per-viewer field), so a member's feed
+ *                                        hits the colo entry as a guest's does
  *
  * NOT here, although cached for guests: /api/home, /api/home/sections,
  * /api/products and /api/products/:slug price per membership, and
@@ -58,6 +62,7 @@ export function sessionFreePublicGet(method: string, path: string): boolean {
   if (path === '/api/settings/public') return true;
   if (path === '/api/print-quote/materials' || path === '/api/print-quote/accessories') return true;
   if (path === '/api/marketplace/print/catalog') return true;
+  if (path === '/api/link-cards' || path === '/api/link-cards/') return true;
   if (path === '/api/storefront' || path === '/api/storefront/') return false;
   if (path.startsWith('/api/storefront/')) {
     // `/api/storefront/<slug>/delivery` answers for the viewer's own address.

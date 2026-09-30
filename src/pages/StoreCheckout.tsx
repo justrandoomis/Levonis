@@ -436,12 +436,15 @@ export default function StoreCheckout() {
               'فرۆشگاکە داواکاریەکەتی وەرگرت.'
             )}
           </p>
+          {/* THE ORDER, not the list (storefront A5): the success screen holds
+              the id it just showed, and the tracker is one tap away. */}
           <Link
-            to="/orders"
+            to={`/orders/${encodeURIComponent(done)}`}
             className="lv-button lv-button-primary"
+            data-store-checkout-order={done}
           >
             <ShoppingBag className="w-4 h-4" />
-            {loc('طلباتي', 'My orders', 'داواکاریەکانم')}
+            {loc('تابع طلبك', 'Follow your order', 'داواکاریەکەت بەدواداچوون بکە')}
           </Link>
         </div>
       </div>

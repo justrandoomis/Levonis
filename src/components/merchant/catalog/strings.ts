@@ -337,3 +337,139 @@ export function stateTone(s: PublishState, hiddenByAdmin: boolean): 'success' | 
   if (hiddenByAdmin) return 'danger';
   return s === 'published' ? 'success' : s === 'draft' ? 'warning' : 'neutral';
 }
+
+// ---------------------------------------------------------------------------
+// FILES ON PRODUCTS (§9.4; src/components/merchant/catalog/ProductFilesEditor.tsx).
+// A table rather than `loc(...)` lines, so every key is in ar, en AND Sorani
+// written by hand — never the Arabic standing in (decision row 168; pinned by
+// tests/productFilesUi.test.ts).
+// ---------------------------------------------------------------------------
+export type ProductFileRoleKey = 'preview' | 'download_after_purchase' | 'reference' | 'instruction' | 'source_model';
+
+export const PRODUCT_FILES_STRINGS = {
+  ar: {
+    section: 'الملفات',
+    sectionHint: 'مجسمات ومستندات تُعرض أو تُنزَّل مع المنتج',
+    saveFirst: 'احفظ المنتج أولًا، ثم أضف ملفاته.',
+    add: 'إضافة ملف',
+    empty: 'لا ملفات بعد. أضف مجسمًا للمعاينة الثلاثية، أو ملفًا يُنزَّل بعد الشراء.',
+    hint: 'STL أو OBJ أو 3MF أو GLB أو STEP للمجسمات، وPDF للمستندات — حتى 12 ملفًا.',
+    count: (n: number, max: number) => `${n} من ${max}`,
+    name: 'اسم الملف',
+    role: 'دور الملف',
+    roles: {
+      preview: 'معاينة',
+      download_after_purchase: 'تنزيل بعد الشراء',
+      reference: 'مرجع',
+      instruction: 'تعليمات',
+      source_model: 'ملف المصدر',
+    } as Record<ProductFileRoleKey, string>,
+    roleHints: {
+      preview: 'يُعرض ثلاثي الأبعاد لكل زائر، ولا يُنزَّل.',
+      download_after_purchase: 'يُنزَّل بعد الشراء فقط.',
+      reference: 'يظهر اسمه للجميع، ويُنزَّل بعد الشراء.',
+      instruction: 'يظهر اسمه للجميع، ويُنزَّل بعد الشراء.',
+      source_model: 'ملف التصميم الأصلي؛ يُنزَّل بعد الشراء فقط.',
+    } as Record<ProductFileRoleKey, string>,
+    moveUp: 'تقديم',
+    moveDown: 'تأخير',
+    remove: 'إزالة الملف',
+    removeTitle: 'إزالة هذا الملف؟',
+    removeConsequence: 'من اشترى المنتج لن يستطيع تنزيله بعد الآن.',
+    removeConfirm: 'إزالة',
+    cancel: 'إلغاء',
+    kindWrong: 'هذا النوع غير مدعوم هنا. ارفع مجسمًا أو ملف PDF.',
+    addFailed: 'تعذّرت إضافة الملف.',
+    saveFailed: 'تعذّر الحفظ.',
+    loadFailed: 'تعذّر تحميل الملفات.',
+    retry: 'إعادة المحاولة',
+    hasPreview: 'معاينة ثلاثية جاهزة',
+    noPreview: 'بلا معاينة ثلاثية',
+  },
+  en: {
+    section: 'Files',
+    sectionHint: 'Models and documents shown or downloaded with the product',
+    saveFirst: 'Save the product first, then add its files.',
+    add: 'Add file',
+    empty: 'No files yet. Add a model for the 3D preview, or a file to download after purchase.',
+    hint: 'STL, OBJ, 3MF, GLB or STEP for models, PDF for documents — up to 12 files.',
+    count: (n: number, max: number) => `${n} of ${max}`,
+    name: 'File name',
+    role: 'File role',
+    roles: {
+      preview: 'Preview',
+      download_after_purchase: 'Download after purchase',
+      reference: 'Reference',
+      instruction: 'Instructions',
+      source_model: 'Source file',
+    } as Record<ProductFileRoleKey, string>,
+    roleHints: {
+      preview: 'Viewed in 3D by every visitor, never downloaded.',
+      download_after_purchase: 'Downloaded after purchase only.',
+      reference: 'Its name is visible to everyone; downloaded after purchase.',
+      instruction: 'Its name is visible to everyone; downloaded after purchase.',
+      source_model: 'The original design file; downloaded after purchase only.',
+    } as Record<ProductFileRoleKey, string>,
+    moveUp: 'Move up',
+    moveDown: 'Move down',
+    remove: 'Remove file',
+    removeTitle: 'Remove this file?',
+    removeConsequence: 'Buyers of the product will no longer be able to download it.',
+    removeConfirm: 'Remove',
+    cancel: 'Cancel',
+    kindWrong: 'That type is not supported here. Upload a model or a PDF.',
+    addFailed: 'The file could not be added.',
+    saveFailed: 'Could not save.',
+    loadFailed: 'The files could not be loaded.',
+    retry: 'Retry',
+    hasPreview: '3D preview ready',
+    noPreview: 'No 3D preview',
+  },
+  ckb: {
+    section: 'فایلەکان',
+    sectionHint: 'مۆدێل و بەڵگەنامەکان کە لەگەڵ بەرهەمەکە پیشان دەدرێن یان دادەگیرێن',
+    saveFirst: 'سەرەتا بەرهەمەکە پاشەکەوت بکە، پاشان فایلەکانی زیاد بکە.',
+    add: 'زیادکردنی فایل',
+    empty: 'هێشتا فایل نییە. مۆدێلێک بۆ پێشبینینی سێ ڕەهەندی زیاد بکە، یان فایلێک کە دوای کڕین دابگیرێت.',
+    hint: 'STL یان OBJ یان 3MF یان GLB یان STEP بۆ مۆدێلەکان، و PDF بۆ بەڵگەنامەکان — تا ١٢ فایل.',
+    count: (n: number, max: number) => `${n} لە ${max}`,
+    name: 'ناوی فایل',
+    role: 'ڕۆڵی فایل',
+    roles: {
+      preview: 'پێشبینین',
+      download_after_purchase: 'داگرتن دوای کڕین',
+      reference: 'سەرچاوە',
+      instruction: 'ڕێنمایی',
+      source_model: 'فایلی سەرچاوە',
+    } as Record<ProductFileRoleKey, string>,
+    roleHints: {
+      preview: 'بە سێ ڕەهەندی بۆ هەموو سەردانکەرێک پیشان دەدرێت، هەرگیز دانەگیرێت.',
+      download_after_purchase: 'تەنها دوای کڕین دادەگیرێت.',
+      reference: 'ناوەکەی بۆ هەمووان دیارە؛ دوای کڕین دادەگیرێت.',
+      instruction: 'ناوەکەی بۆ هەمووان دیارە؛ دوای کڕین دادەگیرێت.',
+      source_model: 'فایلی دیزاینی ڕەسەن؛ تەنها دوای کڕین دادەگیرێت.',
+    } as Record<ProductFileRoleKey, string>,
+    moveUp: 'بردنە سەرەوە',
+    moveDown: 'بردنە خوارەوە',
+    remove: 'لابردنی فایل',
+    removeTitle: 'ئەم فایلە لاببرێت؟',
+    removeConsequence: 'ئەوانەی بەرهەمەکەیان کڕیوە چیتر ناتوانن دایبگرن.',
+    removeConfirm: 'لابردن',
+    cancel: 'هەڵوەشاندنەوە',
+    kindWrong: 'ئەم جۆرە لێرە پشتگیری ناکرێت. مۆدێلێک یان فایلی PDF بار بکە.',
+    addFailed: 'فایلەکە زیاد نەکرا.',
+    saveFailed: 'پاشەکەوت نەکرا.',
+    loadFailed: 'فایلەکان بار نەکران.',
+    retry: 'دووبارە هەوڵبدەوە',
+    hasPreview: 'پێشبینینی سێ ڕەهەندی ئامادەیە',
+    noPreview: 'بێ پێشبینینی سێ ڕەهەندی',
+  },
+} as const;
+
+export type ProductFilesLang = keyof typeof PRODUCT_FILES_STRINGS;
+export type ProductFilesStrings = (typeof PRODUCT_FILES_STRINGS)[ProductFilesLang];
+
+/** The editor's words for the merchant's language; anything the app does not carry reads Arabic. */
+export function productFilesStrings(lang: string): ProductFilesStrings {
+  return (PRODUCT_FILES_STRINGS as unknown as Record<string, ProductFilesStrings>)[lang] ?? PRODUCT_FILES_STRINGS.ar;
+}

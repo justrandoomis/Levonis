@@ -8,6 +8,7 @@
  * them (`media[].key`), because a key is what the editor sends back.
  */
 import { api } from '../../../lib/api';
+import type { PostFile, PostFileInput } from '../files/api';
 
 export const POST_KINDS = ['project', 'post', 'tutorial', 'timelapse', 'before_after'] as const;
 export type PostKind = (typeof POST_KINDS)[number];
@@ -80,6 +81,8 @@ export interface PrintSettings {
 export interface Post extends PostCard {
   body: string;
   media: PostMedia[];
+  /** Phase 4 (§9.4): the post's model/PDF rows; `key` only on the author's read. */
+  files?: PostFile[];
   print_settings: PrintSettings;
   /** The author's own view only. */
   request_id?: string | null;
@@ -123,6 +126,8 @@ export interface PostInput {
   request_id: string | null;
   community_order_id: string | null;
   media: Array<{ key: string; kind: 'image' | 'video'; width: number | null; height: number | null; duration_s: number | null }>;
+  /** Phase 4 (§9.4): ≤ 3 private post-files keys from a `post` upload session. */
+  files?: PostFileInput[];
 }
 
 export interface Creator {

@@ -60,6 +60,12 @@ function binaryStl(triangles: number[][]): Uint8Array {
 
 const cube = (mm: number): ModelAnalysis => analyseModel(binaryStl(boxTriangles(mm, mm, mm)), 'c.stl');
 
+/** A 50 mm slab on a 10 mm column — 2,500 mm² of underside hanging in the air
+ *  above the bed, so this is a model that genuinely needs support. A cube is
+ *  not: its only downward face lies on the plate. */
+const tee = (): ModelAnalysis =>
+  analyseModel(binaryStl([...boxTriangles(10, 10, 20, 20, 20, 0), ...boxTriangles(50, 50, 10, 0, 0, 20)]), 't.stl');
+
 const base = (over: Partial<QuoteInput> = {}): QuoteInput => ({
   analysis: cube(50),
   materialId: 'pla',
@@ -137,13 +143,48 @@ test('a convoluted model costs more than a plain one of identical volume', () =>
 });
 
 test('overhangs cost support material AND the hands that remove it', () => {
-  const withSupports = quotePrint(base({ supports: true }), M, C);
-  const without = quotePrint(base({ supports: false }), M, C);
+  const withSupports = quotePrint(base({ analysis: tee(), supports: true }), M, C);
+  const without = quotePrint(base({ analysis: tee(), supports: false }), M, C);
   assert.ok(line(withSupports, 'support_material') > 0);
   assert.ok(line(withSupports, 'support_removal') > 0);
   assert.equal(line(without, 'support_material'), 0, 'supports off means no support cost');
   assert.equal(line(without, 'support_removal'), 0);
   assert.ok(withSupports.price_iqd > without.price_iqd);
+});
+
+test('the face lying on the build plate is never charged as support (E6)', () => {
+  // A cube's whole underside is bed contact. Before the fix it was billed for
+  // support plastic and support removal it would never print — a tenth of its
+  // own weight — so a flat-bottomed part quoted more with supports «on».
+  const on = quotePrint(base({ supports: true }), M, C);
+  const off = quotePrint(base({ supports: false }), M, C);
+  assert.equal(line(on, 'support_material'), 0, 'nothing hangs, so nothing is supported');
+  assert.equal(line(on, 'support_removal'), 0);
+  assert.equal(on.price_iqd, off.price_iqd, 'supports on or off, a cube on its base costs the same');
+
+  // Only the overhang ABOVE the bed is supported: 1,500 mm² of overhang with
+  // 1,000 mm² of it on the plate is the same job as 500 mm² in the air.
+  const measured = cube(50);
+  const partlyOnBed = { ...measured, overhang_area_mm2: 1500, bed_contact_area_mm2: 1000 };
+  const inTheAir = { ...measured, overhang_area_mm2: 500, bed_contact_area_mm2: 0 };
+  const a = quotePrint(base({ analysis: partlyOnBed }), M, C);
+  const b = quotePrint(base({ analysis: inTheAir }), M, C);
+  assert.ok(line(a, 'support_material') > 0);
+  assert.equal(line(a, 'support_material'), line(b, 'support_material'));
+  assert.equal(line(a, 'support_removal'), line(b, 'support_removal'));
+  assert.equal(a.price_iqd, b.price_iqd);
+
+  // More on the bed than hangs (a stored analysis rounded oddly) clamps at zero
+  // rather than going negative and paying the customer for their own base.
+  const odd = quotePrint(base({ analysis: { ...measured, overhang_area_mm2: 300, bed_contact_area_mm2: 900 } }), M, C);
+  assert.equal(line(odd, 'support_material'), 0);
+
+  // An analysis stored before `bed_contact_area_mm2` existed is priced from its
+  // raw overhang, as it always was — the field is read, never required.
+  const legacy = { ...measured, overhang_area_mm2: 500 } as Record<string, unknown>;
+  delete legacy.bed_contact_area_mm2;
+  const old = quotePrint(base({ analysis: legacy as unknown as ModelAnalysis }), M, C);
+  assert.equal(line(old, 'support_material'), line(b, 'support_material'));
 });
 
 test('a second colour costs a purge and a slower print, not just a click', () => {
@@ -236,9 +277,10 @@ test('the whole model is settings — nothing is hardcoded into the answer', () 
     min_margin_percent: 0,
   };
   const q = quotePrint(base(), M, cheap);
-  // With every rate zeroed only the material and its waste survive.
+  // With every rate zeroed only the material and its waste survive — and no
+  // support line, because a cube sits on its base and nothing under it hangs.
   const keys = q.cost_lines.map((l) => l.key).sort();
-  assert.deepEqual(keys, ['material', 'support_material', 'waste'].sort(), keys.join(','));
+  assert.deepEqual(keys, ['material', 'waste'].sort(), keys.join(','));
   // And with all three floors at zero the floor collapses to the cost itself —
   // a zero minimum margin on a real cost is that cost. This line used to read
   // the material's own economic minimum; the owner has since ruled that no

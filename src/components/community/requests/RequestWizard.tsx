@@ -28,11 +28,13 @@
  * falls back to the Arabic until the owner writes it.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Check, FileText, Image as ImageIcon, Link2, Ruler, Trash2, Upload } from 'lucide-react';
+import { Box, Camera, Check, FileText, Image as ImageIcon, Link2, Ruler, Trash2, Upload } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { ApiError } from '../../../lib/api';
 import { apiRefusal } from '../../../lib/refusalStrings';
 import { GOVERNORATES } from '../../../lib/governorates';
+import { pickUpload, resumeKey } from '../../../lib/uploadSession';
+import { UploadTile } from '../../upload/UploadTile';
 import { uploadRequestFiles, formatBytes } from '../../media/RequestAttachments';
 import { Button } from '../../ui/Button';
 import { Field, Input, Select, Textarea } from '../../ui/Field';
@@ -62,6 +64,68 @@ type Lang = 'ar' | 'en' | 'ckb';
 const MODEL_ACCEPT = '.stl,.3mf,.obj,.amf,.glb,.gltf,.step,.stp';
 const IMAGE_ACCEPT = '.jpg,.jpeg,.png,.webp,.gif';
 const MAX_FILES = 6;
+
+/**
+ * THE FILE STEP'S OWN WORDS (§9.4) — every line in Arabic, English and real
+ * Sorani. A model or an archive always goes up through a resumable session
+ * (UploadTile); a photo above 8 MiB does too; the rest takes the whole-body
+ * route as before.
+ */
+const FILE_STEP = {
+  ar: {
+    modelHint: 'المجسمات الكبيرة تُرفع على أجزاء وتُستأنف إن انقطع الاتصال. نقيسه نحن — لا تحتاج أن تعرف مقاسه.',
+    imagesHint: '6 ملفات كحد أقصى. الصور الكبيرة تُرفع على أجزاء وتُستأنف إن انقطع الاتصال.',
+    uploading: 'ملفات قيد الرفع',
+    takePhoto: 'التقط صورة',
+    resume: (name: string) => `رفع «${name}» لم يكتمل — اختر الملف نفسه مرة أخرى ليُستأنف من حيث توقف.`,
+  },
+  en: {
+    modelHint: 'Large models upload in parts and resume if the connection drops. We measure it — you do not need to know its size.',
+    imagesHint: '6 files at most. Large pictures upload in parts and resume if the connection drops.',
+    uploading: 'Files uploading',
+    takePhoto: 'Take a photo',
+    resume: (name: string) => `“${name}” did not finish uploading — pick the same file again to resume where it stopped.`,
+  },
+  ckb: {
+    modelHint: 'مۆدێلە گەورەکان بە بەش باردەکرێن و ئەگەر هێڵەکە بپچڕێت بەردەوام دەبنەوە. ئێمە دەیپێوین — پێویست ناکات قەبارەکەی بزانیت.',
+    imagesHint: 'زۆرترین ٦ فایل. وێنە گەورەکان بە بەش باردەکرێن و ئەگەر هێڵەکە بپچڕێت بەردەوام دەبنەوە.',
+    uploading: 'فایلەکان باردەکرێن',
+    takePhoto: 'وێنەیەک بگرە',
+    resume: (name: string) => `بارکردنی «${name}» تەواو نەبووە — هەمان فایل دووبارە هەڵبژێرە بۆ ئەوەی لەو شوێنەوە بەردەوام بێت کە وەستاوە.`,
+  },
+} as const;
+
+/** One file on its way up through a session, with the request it belongs to. */
+interface SessionTile {
+  id: string;
+  file: File;
+  entityId: string;
+  state: 'working' | 'done' | 'gone';
+}
+
+/**
+ * The names of this request's uploads a reload interrupted: the resume records
+ * src/lib/uploadSession.ts keeps in sessionStorage under
+ * `levonis.upload.request:<id>:<size>:<mtime>:<name>`. A browser cannot keep
+ * the File itself across a reload, so the person is asked to pick the same
+ * file again; the upload then continues from the parts the server holds.
+ */
+export function unfinishedUploads(requestId: string, storage: Pick<Storage, 'length' | 'key'> | null | undefined): string[] {
+  if (!requestId || !storage) return [];
+  const prefix = resumeKey('request', '', requestId);
+  const names: string[] = [];
+  try {
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i) ?? '';
+      if (!k.startsWith(prefix)) continue;
+      const name = k.slice(prefix.length).split(':').slice(2).join(':');
+      if (name) names.push(name);
+    }
+  } catch {
+    // a blocked storage only costs the hint
+  }
+  return names;
+}
 
 /** Colours by name — the merchant reads the word, not only the swatch. */
 const SWATCHES: Array<{ hex: string; ar: string; en: string }> = [
@@ -177,8 +241,37 @@ export default function RequestWizard({
   const [linkInfo, setLinkInfo] = useState<{ name?: string } | null>(null);
   const [published, setPublished] = useState<{ notified: number; replayed: boolean; revised: boolean } | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const cameraInput = useRef<HTMLInputElement | null>(null);
   const L = lang as Lang;
+  const fs = FILE_STEP[L] ?? FILE_STEP.ar;
   const editingPublished = !!requestId && state !== '' && state !== 'draft';
+
+  // ---- the session uploads (§9.4): tiles that «التالي» waits for ----
+  const [tiles, setTiles] = useState<SessionTile[]>([]);
+  // `ensureDraft` parks its promise here; the effect below settles it once
+  // every tile is done or gone (a failed tile keeps «إعادة المحاولة» and «إلغاء»).
+  const tilesWaiter = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!tilesWaiter.current || tiles.length === 0) return;
+    if (tiles.some((t) => t.state === 'working')) return;
+    const settle = tilesWaiter.current;
+    tilesWaiter.current = null;
+    setTiles([]);
+    settle();
+  }, [tiles]);
+  // A phone gets «التقط صورة» beside the album on the pictures source.
+  const [touch] = useState(() => typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
+  // Uploads a reload cut short: named, so the person knows which file to pick again.
+  const [unfinished, setUnfinished] = useState<string[]>([]);
+  useEffect(() => {
+    let storage: Storage | null = null;
+    try {
+      storage = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
+    } catch {
+      storage = null;
+    }
+    setUnfinished(unfinishedUploads(requestId, storage));
+  }, [requestId, tiles, pending]);
 
   const set = useCallback(<K extends keyof WizardState>(k: K, v: WizardState[K]) => setS((p) => ({ ...p, [k]: v })), []);
   const refusal = useCallback(
@@ -299,8 +392,20 @@ export default function RequestWizard({
       setState('draft');
     }
     if (pending.length) {
-      const failed = await uploadRequestFiles(id, pending);
+      // Two doors (§9.4): a model, an archive or anything above 8 MiB goes
+      // through a resumable session — a tile in the list that «التالي»
+      // waits for — the rest in one request each, as before.
+      const session = pending.filter((f) => pickUpload(f) === 'session');
+      const simple = pending.filter((f) => pickUpload(f) !== 'session');
       setPending([]);
+      const failed = simple.length ? await uploadRequestFiles(id, simple) : 0;
+      if (session.length) {
+        const stamp = Date.now();
+        await new Promise<void>((resolve) => {
+          tilesWaiter.current = resolve;
+          setTiles(session.map((file, i) => ({ id: `t${stamp}_${i}`, file, entityId: id, state: 'working' })));
+        });
+      }
       if (failed) toast.error(loc(`تعذّر رفع ${failed} من الملفات.`, `${failed} file(s) did not upload.`));
       const back = await requestsApi.draft(id);
       const fresh = back.draft.files;
@@ -538,6 +643,8 @@ export default function RequestWizard({
                     accept={s.source_type === 'model' ? `${MODEL_ACCEPT},${IMAGE_ACCEPT},.pdf` : `${IMAGE_ACCEPT},.pdf`}
                     onChange={(e) => addFiles(e.target.files)}
                   />
+                  {/* The camera itself, on a phone: a photo of the broken part, straight in. */}
+                  <input ref={cameraInput} type="file" hidden accept="image/*" capture="environment" onChange={(e) => addFiles(e.target.files)} data-wizard="camera-input" />
                   <button
                     type="button"
                     onClick={() => fileInput.current?.click()}
@@ -548,14 +655,26 @@ export default function RequestWizard({
                     <span className="text-[13.5px] font-semibold text-text-primary">
                       {s.source_type === 'model' ? loc('اختر ملف المجسم', 'Choose the model file') : loc('اختر الصور', 'Choose pictures')}
                     </span>
-                    <span className="text-[11.5px] text-text-muted">
-                      {s.source_type === 'model'
-                        ? loc('حتى 40 ميغابايت. نقيسه نحن — لا تحتاج أن تعرف مقاسه.', 'Up to 40 MB. We measure it — you do not need to know its size.')
-                        : loc('حتى 8 ميغابايت لكل صورة، و6 ملفات كحد أقصى.', 'Up to 8 MB each, 6 files at most.')}
-                    </span>
+                    <span className="text-[11.5px] text-text-muted">{s.source_type === 'model' ? fs.modelHint : fs.imagesHint}</span>
                   </button>
+                  {touch && s.source_type === 'images' && (
+                    <button
+                      type="button"
+                      onClick={() => cameraInput.current?.click()}
+                      data-wizard="take-photo"
+                      className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full px-2 text-[12px] font-semibold text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                    >
+                      <Camera aria-hidden="true" className="h-4 w-4" />
+                      {fs.takePhoto}
+                    </button>
+                  )}
+                  {unfinished.length > 0 && (
+                    <p className="mt-2 text-[11.5px] text-warning" role="status" data-wizard="resume-hint">
+                      {unfinished.map((name) => fs.resume(name)).join(' ')}
+                    </p>
+                  )}
                   {errors.source && <p className="lv-field-error mt-2" role="alert">{errors.source}</p>}
-                  {(files.length > 0 || pending.length > 0) && (
+                  {(files.length > 0 || pending.length > 0 || tiles.length > 0) && (
                     <ul className="mt-3 space-y-1.5" aria-label={loc('الملفات', 'Files')}>
                       {files.map((f) => (
                         <li key={f.id} className="flex items-center gap-2 rounded-xl bg-white/[0.03] px-3 py-2 text-[12.5px]">
@@ -589,6 +708,21 @@ export default function RequestWizard({
                           </button>
                         </li>
                       ))}
+                      {/* The session uploads (§9.4): ring, checksum step, cancel, retry;
+                          «التالي» stays busy until each is done or given up. */}
+                      {tiles
+                        .filter((t) => t.state === 'working')
+                        .map((t) => (
+                          <li key={t.id} aria-label={fs.uploading} data-wizard="upload-tile">
+                            <UploadTile
+                              file={t.file}
+                              purpose="request"
+                              entityId={t.entityId}
+                              onDone={() => setTiles((list) => list.map((x) => (x.id === t.id ? { ...x, state: 'done' } : x)))}
+                              onCancel={() => setTiles((list) => list.map((x) => (x.id === t.id ? { ...x, state: 'gone' } : x)))}
+                            />
+                          </li>
+                        ))}
                     </ul>
                   )}
                 </div>

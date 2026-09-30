@@ -8,8 +8,9 @@ import { rateLimit } from '../lib/ratelimit';
 import { headMediaObject } from '../lib/mediaStorage';
 import { isSchemaMissing } from '../lib/membershipBenefits';
 import { audit } from '../lib/audit';
-import { notify } from '../lib/notifications';
+import { notify, notifyGrouped, peopleAr, stampGroupedCkb } from '../lib/notifications';
 import { newMessageNotice, notifyMerchant } from '../lib/merchantNotify';
+import { linkFromSnapshot, linkSnapshot, resolveLinkCard } from '../lib/linkCards';
 import { announceCustomerChatMessage } from './adminChats';
 import { storeOrderThread, storeThreadOf, threadRole, type StoreThread } from '../lib/chatThread';
 import {
@@ -872,6 +873,13 @@ export function chatMessagePublic(m: Record<string, unknown>, viewerId: string, 
     body: m.body,
     fileUrl: m.file_key ? `/files/${m.file_key}` : null,
     card,
+    /**
+     * A LINK CARD (0158, docs/COMMUNITY_ECOSYSTEM.md §9.4): an ordinary line
+     * whose body is the URL and whose `card_snapshot` is `{type:'link', …}` —
+     * 0150's `card_type` CHECK does not admit 'link'. `kind` stays 'text' so
+     * an older screen draws the address; a newer one draws this.
+     */
+    link: card ? null : linkFromSnapshot(m.card_snapshot),
     /** Written by the server about an event — drawn centred, never as a bubble. */
     system: Number(m.is_system ?? 0) === 1,
     created_at: m.created_at,
@@ -1013,7 +1021,9 @@ export const isClientIdClash = (e: unknown) =>
 async function insertPlainMessage(
   db: D1Database,
   base: { id: string; chatId: string; senderId: string; kind: string; body: string; fileKey: string | null; createdAt: string },
-  optional: { attachment_kind?: string; client_id?: string }
+  // `card_snapshot` (0150) carries a LINK card's `{type:'link', …}`; dropped
+  // with `client_id` on a database behind 0150, where the line is the URL.
+  optional: { attachment_kind?: string; card_snapshot?: string; client_id?: string }
 ): Promise<void> {
   const extra = Object.entries(optional).filter(([, v]) => v !== undefined) as Array<[string, string]>;
   for (;;) {
@@ -1145,27 +1155,140 @@ chatRoutes.post('/:id/messages', async (c) => {
     stored = { id, sender_id: user.id, kind, body: text, file_key: fileKey, attachment_kind: attachmentKind, created_at: createdAt };
   }
 
-  await setChatTyping(c.env.DB, chatId, user.id, false).catch(() => {});
+  await afterMessageWritten(c, { chatId, user, id, createdAt, storeThread, sentCard, filesAdded: !!stored.file_key });
+  // The stored message, in the read path's own shape (its card with its
+  // current state), so a screen can append it instead of re-fetching the
+  // whole thread after every send.
+  const [message] = await publicPage(c.env, chatId, [stored], user.id, false);
+  return c.json({ success: true, id, message });
+});
+
+/**
+ * WHAT EVERY WRITTEN LINE SETS IN MOTION — the message route's tail, shared
+ * with the link-card route below so a card never takes a shortcut past the
+ * typing reset, the inbox stamp, the support announce or the store's notice.
+ */
+async function afterMessageWritten(
+  c: Context<AppContext>,
+  m: {
+    chatId: string;
+    user: { id: string; name?: string | null; username?: string | null };
+    id: string;
+    createdAt: string;
+    storeThread: StoreThread | null;
+    sentCard: ResolvedCard | null;
+    /** The line carried an attachment: the other side hears «أرسل … ملفات», grouped. */
+    filesAdded: boolean;
+  }
+): Promise<void> {
+  await setChatTyping(c.env.DB, m.chatId, m.user.id, false).catch(() => {});
   // The thread's last activity, which the store's inbox pages by (0124).
-  await stampThreadActivity(c.env.DB, chatId, createdAt);
+  await stampThreadActivity(c.env.DB, m.chatId, m.createdAt);
   // «محادثة مباشرة مع الفريق» has to reach the team: a customer line on one of
   // the shop's order threads is announced to «‼️ Support» (debounced; total).
-  await announceCustomerChatMessage(c, chatId, user.id, id);
-  if (storeThread) {
+  await announceCustomerChatMessage(c, m.chatId, m.user.id, m.id);
+  if (m.storeThread) {
     // …and a line on one of a store's threads reaches its SELLER (or the
     // customer, when the seller answers). The seller is made a member first: a
     // thread opened before migration 0118 may not have them, and a
     // notification pointing at a thread they cannot open would be worse than
     // none.
     await c.env.DB.prepare('INSERT OR IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)')
-      .bind(chatId, storeThread.seller_id)
+      .bind(m.chatId, m.storeThread.seller_id)
       .run()
       .catch(() => {});
-    await notifyStoreThread(c.env, storeThread, chatId, user.id, id, sentCard).catch(() => {});
+    await notifyStoreThread(c.env, m.storeThread, m.chatId, m.user.id, m.id, m.sentCard).catch(() => {});
   }
-  // The stored message, in the read path's own shape (its card with its
-  // current state), so a screen can append it instead of re-fetching the
-  // whole thread after every send.
+  if (m.filesAdded) await notifyFilesAdded(c.env.DB, m.chatId, m.user).catch(() => {});
+}
+
+/**
+ * «أرسل أحمد ملفات» — GROUPED FILE NOTIFICATIONS (0158, docs/COMMUNITY_ECOSYSTEM.md
+ * §9.4). Ten photographs sent in a row are one row in the other side's bell
+ * whose count is PEOPLE (`notifyGrouped`, key `files_added:<chatId>`): a
+ * second attachment from the same sender leaves the row as it was, a file
+ * from a THIRD participant raises it to «أرسل شخصان ملفات». The Sorani is
+ * stamped into `meta` after the count is known, the merchant centre's trick.
+ */
+async function notifyFilesAdded(
+  db: D1Database,
+  chatId: string,
+  actor: { id: string; name?: string | null; username?: string | null }
+): Promise<void> {
+  const { results } = await db
+    .prepare('SELECT user_id FROM chat_participants WHERE chat_id = ? AND user_id <> ?')
+    .bind(chatId, actor.id)
+    .all<{ user_id: string }>();
+  const name = actor.name || actor.username || '';
+  for (const r of results ?? []) {
+    const written = await notifyGrouped(db, {
+      userId: String(r.user_id),
+      kind: 'files_added',
+      groupKey: `files_added:${chatId}`,
+      actor: { id: actor.id, name },
+      title: (n, a) => ({
+        ar: n === 1 ? `أرسل ${a} ملفات جديدة` : `أرسل ${peopleAr(n)} ملفات جديدة`,
+        en: n === 1 ? `${a} sent new files` : `${n} people sent new files`,
+      }),
+      body: { ar: 'افتح المحادثة لرؤية الملفات.', en: 'Open the conversation to see the files.' },
+      link: `/chat/${chatId}`,
+      entity_type: 'chat',
+      entity_id: chatId,
+    });
+    if (written) {
+      await stampGroupedCkb(db, written.id, {
+        title_ckb: written.count === 1 ? `${name} فایلی نوێی نارد` : `${written.count} کەس فایلی نوێیان نارد`,
+        body_ckb: 'گفتوگۆکە بکەرەوە بۆ بینینی فایلەکان.',
+      });
+    }
+  }
+}
+
+/**
+ * A LINK CARD IN THE CONVERSATION — POST /:id/cards/link {url, client_id}
+ * (0158, docs/COMMUNITY_ECOSYSTEM.md §9.4). The same door as a line: the
+ * same participant check, the same replay by `client_id`, the same tail. The
+ * address is resolved on the SERVER (worker/lib/linkCards.ts: the fetch
+ * guard, the host allow-list, one fetch per URL per day) and what was learned
+ * is frozen into `card_snapshot` as `{type:'link', …}`; the line's body is
+ * the URL, so a screen that predates cards still shows a link. Rate limited
+ * as a send AND as a link resolve — this door must not be a way round the
+ * resolve door's fetch budget.
+ */
+chatRoutes.post('/:id/cards/link', async (c) => {
+  await rateLimit(c, 'chat-send', 200, 3600);
+  await rateLimit(c, 'link-card', 60, 3600);
+  const user = c.get('user')!;
+  const chatId = str(c.req.param('id'), 'chatId', { min: 1, max: 60 });
+  await assertMayWriteInThread(c.env.DB, chatId, user.id);
+  const storeThread = await storeThreadOf(c.env.DB, chatId);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+
+  const clientId = clientIdFrom(body.client_id);
+  const replay = await storedClientMessage(c.env, chatId, user.id, clientId);
+  if (replay) return c.json({ success: true, id: replay.id, message: replay, replayed: true });
+
+  const card = await resolveLinkCard(c.env, body.url);
+  const id = newId('msg');
+  const createdAt = new Date().toISOString();
+  const snapshot = JSON.stringify(linkSnapshot(card));
+  try {
+    await insertPlainMessage(
+      c.env.DB,
+      { id, chatId, senderId: user.id, kind: 'text', body: card.url, fileKey: null, createdAt },
+      { card_snapshot: snapshot, ...(clientId ? { client_id: clientId } : {}) }
+    );
+  } catch (e) {
+    if (clientId && isClientIdClash(e)) {
+      const again = await storedClientMessage(c.env, chatId, user.id, clientId);
+      if (again) return c.json({ success: true, id: again.id, message: again, replayed: true });
+    }
+    throw e;
+  }
+  const stored: Record<string, unknown> = {
+    id, sender_id: user.id, kind: 'text', body: card.url, file_key: null, card_type: null, card_snapshot: snapshot, is_system: 0, created_at: createdAt,
+  };
+  await afterMessageWritten(c, { chatId, user, id, createdAt, storeThread, sentCard: null, filesAdded: false });
   const [message] = await publicPage(c.env, chatId, [stored], user.id, false);
-  return c.json({ success: true, id, message });
+  return c.json({ success: true, id, message, card }, 201);
 });

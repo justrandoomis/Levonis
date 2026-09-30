@@ -217,3 +217,111 @@ export function proOnSale(raw: DatabaseSync): DatabaseSync {
   raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
   return raw;
 }
+
+/**
+ * AN R2 DOUBLE WITH MULTIPART UPLOADS (§9.4). The `put`/`get`/`head`/`delete`
+ * quartet the media tests stub by hand, plus `createMultipartUpload` /
+ * `resumeMultipartUpload` for the resumable-session routes: parts are kept
+ * per upload id, `complete` concatenates them in part order after checking
+ * every etag, and `abort` throws the parts away. `get` honours a `range` the
+ * way R2 does, so a route that sniffs a head and a tail reads the right bytes.
+ * Everything is inspectable (`objects`, `uploads`) so a test can prove what
+ * was stored, what was aborted and what never landed.
+ */
+export interface MemoryMultipart {
+  key: string;
+  uploadId: string;
+  parts: Map<number, { bytes: Uint8Array; etag: string }>;
+  aborted: boolean;
+  completed: boolean;
+}
+const toBytes = (value: ArrayBuffer | ArrayBufferView | string | Blob | ReadableStream | null | undefined): Uint8Array => {
+  if (value instanceof ArrayBuffer) return new Uint8Array(value.slice(0));
+  if (ArrayBuffer.isView(value)) return new Uint8Array(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength));
+  if (typeof value === 'string') return new TextEncoder().encode(value);
+  throw new Error('MemoryBucket: only buffers and strings are stored');
+};
+export class MemoryBucket {
+  objects = new Map<string, { bytes: Uint8Array; contentType: string }>();
+  uploads = new Map<string, MemoryMultipart>();
+  private nextUpload = 1;
+
+  async put(key: string, value: ArrayBuffer | ArrayBufferView | string, options?: { httpMetadata?: { contentType?: string } }) {
+    this.objects.set(key, { bytes: toBytes(value), contentType: options?.httpMetadata?.contentType ?? '' });
+    return { key, size: this.objects.get(key)!.bytes.byteLength, httpEtag: `"${key}"` };
+  }
+  async get(key: string, options?: { range?: { offset: number; length: number } }) {
+    const stored = this.objects.get(key);
+    if (!stored) return null;
+    const range = options?.range;
+    const bytes = range ? stored.bytes.subarray(range.offset, range.offset + range.length) : stored.bytes;
+    const copy = bytes.slice();
+    return {
+      key,
+      body: new Blob([copy as unknown as BlobPart]).stream(),
+      size: stored.bytes.byteLength,
+      httpEtag: `"${key}"`,
+      async arrayBuffer() { return copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength); },
+      writeHttpMetadata(headers: Headers) {
+        if (stored.contentType) headers.set('Content-Type', stored.contentType);
+      },
+    };
+  }
+  async head(key: string) {
+    const stored = this.objects.get(key);
+    return stored ? { key, size: stored.bytes.byteLength, httpEtag: `"${key}"` } : null;
+  }
+  async delete(key: string | string[]) {
+    for (const k of Array.isArray(key) ? key : [key]) this.objects.delete(k);
+  }
+  async createMultipartUpload(key: string, _options?: unknown) {
+    const uploadId = `mpu_${this.nextUpload++}`;
+    this.uploads.set(uploadId, { key, uploadId, parts: new Map(), aborted: false, completed: false });
+    return this.resumeMultipartUpload(key, uploadId);
+  }
+  resumeMultipartUpload(key: string, uploadId: string) {
+    const uploads = this.uploads;
+    const objects = this.objects;
+    const live = () => {
+      const u = uploads.get(uploadId);
+      if (!u || u.key !== key || u.aborted || u.completed) throw new Error('MemoryBucket: no such multipart upload');
+      return u;
+    };
+    return {
+      key,
+      uploadId,
+      async uploadPart(partNumber: number, value: ArrayBuffer | ArrayBufferView | string) {
+        const u = live();
+        const bytes = toBytes(value);
+        const etag = `"p${partNumber}-${bytes.byteLength}-${Math.random().toString(36).slice(2, 8)}"`;
+        u.parts.set(partNumber, { bytes, etag });
+        return { partNumber, etag };
+      },
+      async abort() {
+        const u = uploads.get(uploadId);
+        if (u) u.aborted = true;
+      },
+      async complete(parts: Array<{ partNumber: number; etag: string }>) {
+        const u = live();
+        const ordered = [...parts].sort((a, b) => a.partNumber - b.partNumber);
+        let total = 0;
+        for (const p of ordered) {
+          const have = u.parts.get(p.partNumber);
+          if (!have || have.etag !== p.etag) throw new Error(`MemoryBucket: part ${p.partNumber} missing or etag mismatch`);
+          total += have.bytes.byteLength;
+        }
+        const out = new Uint8Array(total);
+        let at = 0;
+        for (const p of ordered) {
+          const have = u.parts.get(p.partNumber)!;
+          out.set(have.bytes, at);
+          at += have.bytes.byteLength;
+        }
+        u.completed = true;
+        objects.set(key, { bytes: out, contentType: '' });
+        return { key, size: total, httpEtag: `"${key}"` };
+      },
+    };
+  }
+}
+export const memoryBucket = () => new MemoryBucket();

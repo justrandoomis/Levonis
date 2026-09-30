@@ -58,12 +58,15 @@ import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { feeFor } from '../lib/merchantOps';
 import { exchangeRate } from '../lib/escrowOps';
+// «this buyer may download this file» — written in the batch that captures the payment (§9.4).
+import { productFileGrantStatement, productFilesReady } from '../lib/fileOwnership';
 import {
   createPurchaseHold, commitHoldStatements, holdSettledEventStatements, getAvailableBalances,
   readWalletDust, releaseHold, walletIqdAvailable, walletLedgerDinarsReady, walletSpendCents,
 } from '../lib/walletOps';
 import { rootDomainFrom } from '../lib/hosts';
 import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
+import { notifyOrderPlaced } from '../lib/orderNotify';
 import { storeById } from '../lib/merchantAuth';
 import { isSchemaMissing } from '../lib/membershipBenefits';
 import { PRIVATE_BUYABLE_SQL, buyablePrivateIds } from '../lib/privateProducts';
@@ -1006,6 +1009,18 @@ storeOrderRoutes.post('/', async (c) => {
       )
     );
   }
+  // THE FILES THE PURCHASE OPENS (§9.4): one grant per (file, buyer) for every
+  // downloadable file of every product on this order, in the batch that
+  // commits the wallet debit below — a grant exists exactly when the money
+  // moved. INSERT OR IGNORE: a second order of the same product, or this
+  // batch re-run, adds nothing.
+  // Only on a database that carries 0157 — a Worker ahead of its migration
+  // still sells; there are no product files to grant on a database without them.
+  if (await productFilesReady(db)) {
+    stmts.push(
+      productFileGrantStatement(db, { productIds: cart.products.map((p) => p.product_id), userId: user.id, orderId, ts })
+    );
+  }
   // Per PRODUCT, after the fences: the units the fences just proved are there.
   for (const need of cart.products) {
     stmts.push(
@@ -1211,6 +1226,17 @@ storeOrderRoutes.post('/', async (c) => {
     c.executionCtx.waitUntil(tell);
   } catch {
     await tell;
+  }
+  // …AND SO DOES THE CUSTOMER (storefront A8). «We have your order» went only
+  // to platform checkouts (worker/routes/orders.ts); a store sale told the
+  // merchant and nobody else. Idempotent by its event key (`order.placed:<id>`,
+  // worker/lib/orderNotify.ts), so a replayed checkout re-notifies nobody;
+  // after the response, never holding it, never able to fail it.
+  const placed = notifyOrderPlaced(c.env, orderId);
+  try {
+    c.executionCtx.waitUntil(placed);
+  } catch {
+    await placed;
   }
   // «المخزون ينفد» — a product or variant this sale took to (or under) the
   // merchant's own line is told once per order (W2-F, worker/lib/catalog/lowStock.ts).

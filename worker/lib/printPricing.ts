@@ -35,6 +35,14 @@ import {
 } from './printAccessories';
 import type { ModelAnalysis } from './modelGeometry';
 
+/**
+ * The engine's version, reported in every `Estimate` (worker/lib/printEstimate)
+ * so a stored snapshot can say which arithmetic produced it. 1 was this file
+ * before it carried a version; 2 stops charging support for the face that lies
+ * on the build plate (`bed_contact_area_mm2`, below).
+ */
+export const PRINT_PRICING_VERSION = 2;
+
 // ------------------------------------------------------------- the catalogue
 
 export type PrintProcess = 'fdm' | 'resin';
@@ -380,7 +388,14 @@ export function quotePrint(
 
   const heightMm = measured ? Math.max(a!.dimensions_mm.z, 0.1) : Math.cbrt(solidVolumeMm3);
   const areaMm2 = measured ? a!.surface_area_mm2 : 6 * Math.pow(solidVolumeMm3, 2 / 3);
-  const overhangMm2 = measured && input.supports ? a!.overhang_area_mm2 : 0;
+  // Support rises under the overhanging faces MINUS the ones lying on the
+  // build plate, which the plate already holds up — the same subtraction
+  // worker/lib/printQuote/geometryAdapter.ts makes. Charging for those is not
+  // a rounding error: a flat-bottomed part is mostly bottom, and a 20 mm cube
+  // was carrying a tenth of its own weight in support it never prints. The
+  // `?? 0` keeps an analysis stored before the field existed priced as it was.
+  const overhangMm2 =
+    measured && input.supports ? Math.max(0, a!.overhang_area_mm2 - (a!.bed_contact_area_mm2 ?? 0)) : 0;
   const complexity = measured ? a!.complexity : 0.3;
 
   const layerMm = cfg.quality_layer_mm[input.quality] ?? cfg.quality_layer_mm.standard;

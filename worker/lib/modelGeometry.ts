@@ -29,6 +29,7 @@
  */
 
 import { unzipSync } from 'fflate';
+import { zipBombFilter } from './attachments';
 
 // --------------------------------------------------------------- vocabulary
 
@@ -676,7 +677,9 @@ const UNIT_MM: Record<string, number> = {
  * measurement.
  */
 function parse3mf(bytes: Uint8Array): Mesh {
-  const files = unzipSync(bytes);
+  // Bounded before a byte is inflated (worker/lib/attachments.ts): a 3MF is a
+  // ZIP, and a ZIP can declare gigabytes behind a few kilobytes.
+  const files = unzipSync(bytes, { filter: zipBombFilter() });
   const names = Object.keys(files);
   const modelName =
     names.find((f) => f.toLowerCase() === '3d/3dmodel.model') ??
@@ -775,7 +778,7 @@ function parseAmf(bytes: Uint8Array): Mesh {
   // An AMF may be a bare XML file or a ZIP containing one.
   let xml: string;
   if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
-    const files = unzipSync(bytes);
+    const files = unzipSync(bytes, { filter: zipBombFilter() });
     const key = Object.keys(files).find((f) => f.toLowerCase().endsWith('.amf') || f.toLowerCase().endsWith('.xml'));
     if (!key) throw new Error('AMF archive has no XML part');
     xml = new TextDecoder().decode(files[key]);

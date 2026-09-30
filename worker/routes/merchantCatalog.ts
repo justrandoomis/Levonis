@@ -36,6 +36,8 @@ import { audit } from '../lib/audit';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { requireStoreOwner, requireSellingPrivileges, type StoreContext } from '../lib/merchantAuth';
 import { purgeStorefrontAfterWrite } from '../lib/edgePolicy';
+// A product hidden, archived, drafted or deleted closes its 3D viewer links (§9.4).
+import { revokeProductViewerGrantsStatement } from '../lib/viewerGrants';
 import { suggestSlug } from '../lib/merchantOps';
 import { parseCsv, toCsv } from '../lib/importCsv';
 import { isSchemaMissing } from '../lib/membershipBenefits';
@@ -647,6 +649,9 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
     let stmts: D1PreparedStatement[] = [];
     const setState = (state: PublishState, extra = '') =>
       db.prepare(`UPDATE community_products SET publish_state = ?3, updated_at = ?4 WHERE ${own}${extra}`).bind(ej, ctx.merchant.id, state, ts);
+    // The viewer links of a product leaving the shopfront stop with it — FIRST,
+    // because a delete's cascade would hide its files from the revoke.
+    const revokeViewer = ['hide', 'archive', 'draft', 'delete'].includes(action) ? [revokeProductViewerGrantsStatement(db, eligible, ts)] : [];
     switch (action) {
       case 'publish':
         // The admin hide and the active-variant rule are repeated IN the
@@ -739,7 +744,7 @@ merchantCatalogRoutes.post('/products/bulk', async (c) => {
         break;
       }
     }
-    await db.batch(stmts);
+    await db.batch([...revokeViewer, ...stmts]);
     // What actually changed, read back — a row the statement's own fence
     // skipped is reported as such, never as done.
     if (action === 'publish') {
@@ -909,6 +914,8 @@ merchantCatalogRoutes.patch('/products/:id', async (c) => {
   );
   if (input.media) stmts.push(...mediaStatements(db, id, ctx.store.id, input.media));
   if (input.collectionIds) stmts.push(...membershipStatements(db, id, ctx.store.id, input.collectionIds));
+  // Leaving `published` closes the product's 3D viewer links (§9.4).
+  if (input.state && input.state !== 'published') stmts.push(revokeProductViewerGrantsStatement(db, [id], ts));
   await db.batch(stmts);
 
   await audit(db, ctx.store.user_id, 'merchant.product_updated', id, {
@@ -1117,6 +1124,8 @@ merchantCatalogRoutes.delete('/products/:id', async (c) => {
   const id = c.req.param('id');
   // A private product is cancelled from its conversation, where its card is.
   if (await isPrivateProduct(db, id)) throw new HttpError(409, CUSTOM_PRODUCT_LOCKED_MESSAGE, 'CUSTOM_PRODUCT_LOCKED');
+  // Its 3D viewer links first (§9.4): deleted or archived, the product leaves the shopfront either way.
+  await revokeProductViewerGrantsStatement(db, [id], nowIso()).run();
   const res = await db
     .prepare(
       `DELETE FROM community_products WHERE id = ?1 AND merchant_id = ?2

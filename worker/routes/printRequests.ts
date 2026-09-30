@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { AppContext, Env, SessionUser } from '../lib/types';
 import { requireAuth, badRequest, notFound, conflict, str, int, HttpError } from '../lib/http';
 import { newId, randomToken, sha256Hex } from '../lib/crypto';
@@ -6,6 +7,7 @@ import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { getSetting } from '../lib/settings';
 import { anonymousCached } from '../lib/edgePolicy';
+import { fromEngineA, quantityCurve } from '../lib/printEstimate';
 import {
   MAX_ACCESSORY_QTY,
   type AccessorySelection,
@@ -35,6 +37,9 @@ import { resolveModelLink, parseModelLink } from '../lib/externalModels';
 import { governorateName, normalizeGovernorate } from '../lib/iraqGovernorates';
 import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
 import { communityClosedRefusal, communityMayEnter, readCommunityGate, requireCommunityOpen } from '../lib/communityGate';
+// Product and post viewer links (§9.4): the same viewer, a second token table.
+import { countViewerGrantUseStatement, resolveViewerGrant, viewerSessionInput, type ResolvedViewerGrant } from '../lib/viewerGrants';
+import { formatFromName } from '../lib/modelGeometry';
 import {
   isDirectMerchant,
   isEngagedMerchant,
@@ -515,11 +520,29 @@ printRequestRoutes.post('/quote', requireAuth, async (c) => {
   };
   const quote = estimateFor(spec, choices, input, mats, cfg);
 
+  // THE ESTIMATE CONTRACT (docs/MERCHANT_PLATFORM_V2.md §4.1 E1–E4): the one
+  // shape every screen reads, beside the engine's own public fields for one
+  // release. The quantity curve is this same engine re-run at 1, 2, 5, 10 and
+  // the asked-for count — pure, no read — so the curve's figure for a quantity
+  // is exactly what this route would answer for it.
+  const estimate = fromEngineA(quote, {
+    quantity: spec.quantity,
+    curve: quantityCurve(spec.quantity, (qty) => {
+      const at =
+        qty === spec.quantity
+          ? quote
+          : estimateFor({ ...spec, quantity: qty }, choices, { ...input, quantity: qty }, mats, cfg);
+      return at.priced ? at.unit_price_iqd : null;
+    }),
+  });
+
   // The cost breakdown is the shop's business, not the customer's. What the
-  // customer gets is the range, the confidence and why.
-  const { cost_lines, cost_iqd, floor_iqd, margin_percent, ...publicQuote } = quote;
-  void cost_lines; void cost_iqd; void floor_iqd; void margin_percent;
-  return c.json({ success: true, quote: publicQuote });
+  // customer gets is the range, the confidence and why. `accessory_lines` goes
+  // too: no client read it from this route, the estimate names the hardware
+  // as a factor, and the contract forbids any `lines` in a public payload.
+  const { cost_lines, cost_iqd, floor_iqd, margin_percent, accessory_lines, ...publicQuote } = quote;
+  void cost_lines; void cost_iqd; void floor_iqd; void margin_percent; void accessory_lines;
+  return c.json({ success: true, quote: publicQuote, estimate });
 });
 
 // ------------------------------------------- 4b. what a matched merchant reads
@@ -1740,6 +1763,26 @@ printRequestRoutes.post('/requests/:id/files/:fileId/viewer-token', requireAuth,
  * under is theirs. The format and the measured size say what the page needs.
  */
 printRequestRoutes.get('/viewer/:token', async (c) => {
+  // A PRODUCT OR POST LINK (§9.4 "The shared viewer"): a token that is not a
+  // request token is resolved in `viewer_grants`; request tokens keep every
+  // rule below untouched. One 404 for both worlds when a link stopped working.
+  const grant = await viewerGrantFor(c);
+  if (grant) {
+    const a = grant.analysis;
+    return c.json({
+      success: true,
+      format: a?.format ?? formatFromName(grant.name),
+      dimensions_mm: a?.dimensions_mm ?? null,
+      volume_mm3: a?.volume_mm3 ?? null,
+      triangle_count: a?.triangle_count ?? null,
+      shell_count: a?.shell_count ?? null,
+      expires_at: grant.expires_at,
+      grant: grant.grant,
+      source_type: grant.source_type,
+      /** Public on a shopfront and a project page, unlike a request file's name. */
+      name: grant.name,
+    });
+  }
   const row = await viewerToken(c.env, c.req.param('token'), c.get('user'));
   const file = await c.env.DB.prepare(
     'SELECT analysis, model_format FROM community_request_files WHERE id = ?'
@@ -1758,11 +1801,22 @@ printRequestRoutes.get('/viewer/:token', async (c) => {
     expires_at: row.expires_at,
     /** 'preview' = the coarse mesh a merchant quoting on the board sees. */
     grant: row.grant,
+    source_type: 'request',
   });
 });
 
 /** The derived mesh. Bytes only — the original file is never served here. */
 printRequestRoutes.get('/viewer/:token/mesh', async (c) => {
+  const grant = await viewerGrantFor(c);
+  if (grant) {
+    if (!grant.preview_key) throw notFound('No preview available');
+    const object = await getMediaObject(c.env, 'private', grant.preview_key);
+    if (!object) throw notFound('No preview available');
+    await countViewerGrantUseStatement(c.env.DB, grant.token_hash).run().catch((e) =>
+      console.error('viewer grant use not counted', e instanceof Error ? e.message : String(e))
+    );
+    return meshResponse(object, grant.grant);
+  }
   const row = await viewerToken(c.env, c.req.param('token'), c.get('user'));
   const file = await c.env.DB.prepare('SELECT preview_key FROM community_request_files WHERE id = ?')
     .bind(row.file_id)
@@ -1779,11 +1833,18 @@ printRequestRoutes.get('/viewer/:token/mesh', async (c) => {
     ).bind(row.token_hash),
     viewerReadStatement(c.env.DB, row, 'preview_mesh'),
   ]);
+  return meshResponse(object, row.grant);
+});
 
-  // A merchant quoting on the board gets the coarse mesh, derived here from
-  // the stored preview — the stored one is not sent to them at all.
+/**
+ * The mesh bytes for a grant. A `preview` grant — a merchant quoting on the
+ * board, a shopper on a product page, a reader of a public post — gets the
+ * coarse mesh derived here from the stored preview; the stored one is not
+ * sent to them at all.
+ */
+async function meshResponse(object: R2ObjectBody, grant: PreviewGrant): Promise<Response> {
   let body: BodyInit = object.body;
-  if (row.grant === 'preview') {
+  if (grant === 'preview') {
     const coarse = coarsePreviewMesh(new Uint8Array(await new Response(object.body).arrayBuffer()));
     if (!coarse) throw notFound('No preview available');
     body = coarse;
@@ -1795,7 +1856,23 @@ printRequestRoutes.get('/viewer/:token/mesh', async (c) => {
       'X-Content-Type-Options': 'nosniff',
     },
   });
-});
+}
+
+/**
+ * A product/post viewer link, or null when the token is a REQUEST token (the
+ * caller then applies the request rules). A token that is neither — wrong,
+ * expired, revoked, bound to somebody else, or whose source closed — is the
+ * same 404 a dead request link gets, with the code the client maps.
+ */
+async function viewerGrantFor(c: Context<AppContext>): Promise<ResolvedViewerGrant | null> {
+  const raw = str(c.req.param('token'), 'token', { min: 20, max: 120 });
+  const hash = await sha256Hex(raw);
+  const isRequestToken = await c.env.DB.prepare('SELECT 1 AS x FROM model_view_tokens WHERE token_hash = ?').bind(hash).first();
+  if (isRequestToken) return null;
+  const grant = await resolveViewerGrant(c.env, raw, c.get('user'), viewerSessionInput(c));
+  if (!grant) throw new HttpError(404, 'This link is no longer valid', 'VIEWER_TOKEN_INVALID');
+  return grant;
+}
 
 interface ViewerRow {
   token_hash: string;

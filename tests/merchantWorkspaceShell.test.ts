@@ -290,7 +290,27 @@ test('the shell mounts the Toaster once, owns one scroll area, and the page moun
   assert.match(shell, /data-scroll-owner/);
   assert.doesNotMatch(code('src/pages/MerchantDashboardPage.tsx'), /Toaster/);
   // Every screen sits under a chunk boundary and a per-screen skeleton.
-  assert.match(shell, /<ChunkBoundary>\s*<Suspense key=\{section\} fallback=\{<SectionFallback section=\{section\} \/>\}>/);
+  // PIN MOVED (P3, merchant platform v2 §3.1 «settle»): the section now
+  // arrives inside a `motion.div` keyed by the section — opacity and a slide
+  // along the inline axis through `useMotion` (`m.inline`, `m.spring('ui')`)
+  // — between the chunk boundary and the Suspense. The boundary → skeleton
+  // → screen order is unchanged; only the settle wrapper was added.
+  assert.match(
+    shell,
+    /<ChunkBoundary>\s*<MotionFeatures>\s*<Motion\.div key=\{section\} initial=\{\{ opacity: 0, x: m\.inline\(m\.travel\(12\)\) \}\} animate=\{\{ opacity: 1, x: 0 \}\} transition=\{m\.spring\('ui'\)\}[^>]*>\s*<Suspense key=\{section\} fallback=\{<SectionFallback section=\{section\} \/>\}>/
+  );
+  // The frame's motion (P3): the Seam is ONE shared-layout hairline per
+  // surface, the badge re-keys on its count, and no spring is invented.
+  assert.match(shell, /<Motion\.span layoutId="ws-side-seam" transition=\{m\.spring\('move'\)\}/, 'the sidebar Seam');
+  assert.match(shell, /<Motion\.span layoutId="ws-tabs-seam" transition=\{m\.spring\('move'\)\}/, 'the phone-tab Seam');
+  assert.match(shell, /<Motion\.span\s+key=\{n\}[\s\S]*?transition=\{m\.spring\('quick'\)\}/, 'the badge lands with quick');
+  // The frame renders `m.*` under <MotionFeatures> (perf review 2026-09-30): the
+  // `motion` proxy would carry the animation-features chunk in front of the shell's paint.
+  assert.match(shell, /import \* as Motion from 'motion\/react-m';/, 'the shell takes m from motion/react-m');
+  assert.doesNotMatch(shell, /from 'motion\/react'/, 'the shell imports the motion proxy');
+  assert.doesNotMatch(shell, /<motion\./, 'the shell renders <motion.*>');
+  assert.match(shell, /<MotionFeatures>/, 'the m.* elements have their provider');
+  assert.doesNotMatch(shell, /transition=\{\{\s*duration/, 'a duration outside the motion kit');
 });
 
 // ------------------------------------------------------------------ source rules

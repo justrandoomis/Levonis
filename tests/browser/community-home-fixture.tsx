@@ -15,6 +15,7 @@ import { WalletProvider } from '../../src/WalletContext';
 import { CurrencyProvider } from '../../src/CurrencyContext';
 import { Toaster } from '../../src/components/ui/Toast';
 import Community from '../../src/pages/Community';
+import ProjectPage from '../../src/pages/community/Project';
 import { CommunityGate } from '../../src/pages/community/access';
 import { SocialProvider } from '../../src/components/community/social/SocialContext';
 import '../../src/index.css';
@@ -50,6 +51,21 @@ const TONES = ['#6c7a4a', '#b08d3c', '#4a6c7a', '#7a4a5a'];
 const SHAPES = ['dragon', 'vase', 'stand'] as const;
 const TITLES = ['تنين مفصلي بلونين', 'مزهرية حلزونية', 'حامل هاتف قابل للطي', 'علبة تنظيم أدوات'];
 const KINDS = ['project', 'post', 'tutorial', 'timelapse', 'before_after'] as const;
+
+// LINK CARDS (§9.4): one model page named by several posts (ONE ask for all
+// of them), one video, and an address nobody resolved (404 → no card). The
+// rows are what GET /api/link-cards answers; the picture is our re-hosted
+// key, served by the e2e script's route.
+const LINKED_MODEL = 'https://www.printables.com/model/1234-articulated-dragon';
+const LINKED_VIDEO = 'https://youtu.be/dQw4w9WgXcQ';
+const LINKED_UNKNOWN = 'https://example.org/notes/42';
+const LINK_CARDS: Record<string, Record<string, unknown>> = {
+  [LINKED_MODEL]: { id: 'lc_model', url: LINKED_MODEL, host: 'printables.com', title: 'Articulated Dragon v2 — print-in-place', description: 'A two-colour dragon with 24 joints, no supports, 0.2 mm layers, PLA.', image_url: '/files/link-cards/lc_model.webp', kind: 'model_page', status: 'ok', fetched_at: ago(30), reason: null },
+  [LINKED_VIDEO]: { id: 'lc_video', url: LINKED_VIDEO, host: 'youtu.be', title: 'Tuning joint clearance on a Bambu A1', description: '', image_url: null, kind: 'video', status: 'ok', fetched_at: ago(30), reason: null },
+};
+/** Every GET /api/link-cards the page made — one per distinct address is the contract. */
+const linkAsks: string[] = [];
+(window as unknown as { __linkAsks: string[] }).__linkAsks = linkAsks;
 
 const MAKERS = [
   { id: 'sara', username: 'sara', name: 'سارة كريم', avatarUrl: picture('#7a8c5a', 'vase', 200, 200), bio: 'أطبع في البيت منذ 2021 — ألعاب مفصلية وقطع غيار لا تُباع.' },
@@ -102,7 +118,7 @@ function card(i: number) {
     id: `prj_${i}`,
     kind,
     title: `${TITLES[i % 4]}${i >= 4 ? ` ${i}` : ''}`,
-    excerpt: kind === 'tutorial' ? 'كيف تضبط الخلوص بين المفاصل كي تتحرك من أول طبعة — ثلاث تجارب وقياساتها.' : 'طُبع بدون دعامات، طبقة 0.2، ملء 15%.',
+    excerpt: `${kind === 'tutorial' ? 'كيف تضبط الخلوص بين المفاصل كي تتحرك من أول طبعة — ثلاث تجارب وقياساتها.' : 'طُبع بدون دعامات، طبقة 0.2، ملء 15%.'}${i % 6 === 2 ? ` الملف: ${LINKED_MODEL}` : i % 6 === 4 ? ` الشرح: ${LINKED_VIDEO}` : i === 7 ? ` ${LINKED_UNKNOWN}` : ''}`,
     cover: { url: picture(TONES[i % 4], SHAPES[i % 3], portrait ? 800 : 1200, portrait ? 1000 : 900), kind: i % 7 === 3 ? 'video' : 'image', width: portrait ? 800 : 1200, height: portrait ? 1000 : 900 },
     media_count: 3,
     author: { id: author.id, username: author.username, name: author.name, avatarUrl: author.avatarUrl },
@@ -289,6 +305,40 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     if (!/^(post|store|product):/.test(anchor)) return refused(400);
     return ok({ for: anchor, kind: anchor.startsWith('store:') ? 'stores' : 'projects', rows: anchor.startsWith('store:') ? STORES.slice(1, 5) : ALL_POSTS.slice(2, 8) });
   }
+  // ---- link cards (§9.4): the reader's door answers stored rows only; the author's resolves ----
+  if (p === '/api/link-cards' && method === 'GET') {
+    const url = u.searchParams.get('url') ?? '';
+    linkAsks.push(url);
+    const row = LINK_CARDS[url];
+    return row ? ok({ card: row }) : refused(404);
+  }
+  if (p === '/api/link-cards/resolve' && method === 'POST') {
+    if (!me) return refused(401);
+    const url = String((JSON.parse(String(init?.body ?? '{}')) as { url?: string }).url ?? '');
+    let host = url;
+    try {
+      host = new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+      /* the server would refuse; the fixture answers a bare card */
+    }
+    return ok({ card: LINK_CARDS[url] ?? { id: 'lc_bare', url, host, title: '', description: '', image_url: null, kind: 'unknown', status: 'blocked', fetched_at: ago(0), reason: null } });
+  }
+  // ---- one project, for the full card in its story ----
+  m = /^\/api\/community\/posts\/([^/]+)$/.exec(p);
+  if (m && method === 'GET' && m[1] !== 'trending') {
+    const c = card(Number(m[1].replace('prj_', '')) || 0);
+    return ok({
+      post: {
+        ...c,
+        body: `طُبع على قطعتين بلونين بدون دعامات. الملف من هنا: ${LINKED_MODEL}\n\nالمفاصل تحتاج خلوصًا 0.3 مم كي تتحرك بحرية بعد الطباعة مباشرة.`,
+        media: [{ id: 'm1', kind: 'image', url: c.cover.url, width: c.cover.width, height: c.cover.height, duration_s: null }],
+        print_settings: { layer_height_mm: 0.2, infill_percent: 15, nozzle_mm: 0.4, supports: false },
+        files: [],
+        hidden: null,
+        viewer: { ...c.viewer, mine: false, consent: null, following_author: false, can: { edit: false, publish: false, archive: false, delete: false } },
+      },
+    });
+  }
   // ---- the lists ----
   if (p === '/api/community/feed') {
     const scope = u.searchParams.get('scope');
@@ -343,6 +393,10 @@ function Elsewhere() {
 }
 
 const extra = params.get('extra') ? `&${params.get('extra')}` : '';
+// `&path=/community/projects/prj_2`: open on a page other than the home (the project's story with its link card).
+// The project route is mounted only then, so every other navigation still lands on `Elsewhere`, which names its address.
+const start = params.get('path') || `/community?tab=${encodeURIComponent(tab)}${extra}`;
+const projectRoute = (params.get('path') ?? '').startsWith('/community/projects/');
 
 // The app's own provider order (src/App.tsx): Auth → Language → Wallet → Currency → Social.
 createRoot(document.getElementById('root')!).render(
@@ -350,7 +404,7 @@ createRoot(document.getElementById('root')!).render(
     <LanguageProvider>
       <WalletProvider>
         <CurrencyProvider>
-          <MemoryRouter initialEntries={[`/community?tab=${encodeURIComponent(tab)}${extra}`]}>
+          <MemoryRouter initialEntries={[start]}>
             <SocialProvider>
               <Routes>
                 <Route
@@ -361,6 +415,16 @@ createRoot(document.getElementById('root')!).render(
                     </CommunityGate>
                   }
                 />
+                {projectRoute && (
+                  <Route
+                    path="/community/projects/:id"
+                    element={
+                      <CommunityGate>
+                        <ProjectPage />
+                      </CommunityGate>
+                    }
+                  />
+                )}
                 <Route path="*" element={<Elsewhere />} />
               </Routes>
             </SocialProvider>

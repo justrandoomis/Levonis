@@ -105,7 +105,8 @@ import { getSetting } from '../lib/settings';
 import { feedCursor, nextFeedCursor } from '../lib/feedCursor';
 import { requestBoardVisible } from '../lib/requestBoard';
 import { likePattern } from '../lib/sqlLike';
-import { notifyStatement } from '../lib/notifications';
+import { notifyStatement, notifyGrouped, peopleAr, stampGroupedCkb } from '../lib/notifications';
+import { merchantHref } from '@levonis/contracts/merchantRoutes';
 // Eligibility as data (W5-B): the offer gate, the file matrix and the re-match.
 import { assertMayOffer, eligibleVerdictSql, liveVerdict, rematchNow } from '../lib/printMatchingStore';
 // A request addressed to ONE store (0151): its store quotes it without matching.
@@ -406,6 +407,68 @@ async function rematchAfterFiles(env: Env, requestId: string): Promise<void> {
   if (row) await rematchNow(env, 'request', requestId, 'files');
 }
 
+/**
+ * «أضاف سارة ملفات إلى الطلب» — GROUPED FILE NOTIFICATIONS TO THE WORKSHOPS
+ * (0158, docs/COMMUNITY_ECOSYSTEM.md §9.4). The merchants ON A REQUEST'S
+ * MATCHES hear that its files changed: the owners of the workshops the
+ * eligibility engine marked eligible (`community_request_matches`) and of
+ * those standing behind a live offer — never the whole workshop list, and
+ * never the customer's own account. ONE row per owner keyed
+ * `request_files:<requestId>` (`notifyGrouped`, counted by people like every
+ * grouped kind), the Sorani stamped into `meta` after the count is known.
+ * Never throws: the file is stored whatever the bell does.
+ */
+async function notifyRequestFiles(
+  db: D1Database,
+  requestId: string,
+  actor: { id: string; name?: string | null; username?: string | null }
+): Promise<void> {
+  try {
+    const req = await db.prepare('SELECT title FROM community_requests WHERE id = ?').bind(requestId).first<{ title: string }>();
+    const { results } = await db
+      .prepare(
+        `SELECT DISTINCT m.user_id FROM community_merchants m
+          WHERE m.user_id <> ?1 AND (
+            m.id IN (SELECT rm.merchant_id FROM community_request_matches rm WHERE rm.request_id = ?2 AND rm.eligible = 1)
+            OR m.id IN (SELECT o.merchant_id FROM community_offers o WHERE o.request_id = ?2 AND o.state IN ('pending','superseded','accepted'))
+          )`
+      )
+      .bind(actor.id, requestId)
+      .all<{ user_id: string }>();
+    const title = String(req?.title ?? '').trim();
+    const name = actor.name || actor.username || '';
+    const aboutAr = title ? ` «${title}»` : '';
+    const aboutEn = title ? ` “${title}”` : '';
+    for (const r of results ?? []) {
+      const written = await notifyGrouped(db, {
+        userId: String(r.user_id),
+        kind: 'request_files',
+        groupKey: `request_files:${requestId}`,
+        actor: { id: actor.id, name },
+        title: (n, a) => ({
+          ar: n === 1 ? `أضاف ${a} ملفات إلى الطلب${aboutAr}` : `أضاف ${peopleAr(n)} ملفات إلى الطلب${aboutAr}`,
+          en: n === 1 ? `${a} added files to the request${aboutEn}` : `${n} people added files to the request${aboutEn}`,
+        }),
+        body: { ar: 'راجع الملفات الجديدة قبل تأكيد عرضك.', en: 'Review the new files before you confirm your offer.' },
+        link: merchantHref.request(requestId),
+        entity_type: 'request',
+        entity_id: requestId,
+      });
+      if (written) {
+        await stampGroupedCkb(db, written.id, {
+          title_ckb:
+            written.count === 1
+              ? `${name} فایلی زیاد کرد بۆ داواکارییەکە${aboutAr}`
+              : `${written.count} کەس فایلیان زیاد کرد بۆ داواکارییەکە${aboutAr}`,
+          body_ckb: 'پێش پشتڕاستکردنەوەی پێشنیارەکەت فایلە نوێیەکان بپشکنە.',
+        });
+      }
+    }
+  } catch (e) {
+    console.error('request file notice not written for', requestId, e instanceof Error ? e.message : String(e));
+  }
+}
+
 marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
   await rateLimit(c, 'request-file', 40, 3600);
   const user = c.get('user')!;
@@ -487,6 +550,11 @@ marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
     throw e;
   }
   await afterFilesChanged(c.env.DB, id, user.id);
+  // The workshops on this request's matches hear «أضاف … ملفات», grouped (0158)
+  // — BEFORE the re-match: the ones who were weighing the job as it stood are
+  // the ones the change concerns; a workshop the new file makes eligible gets
+  // the engine's own «طلب يناسب ورشتك» from the re-match itself.
+  await notifyRequestFiles(c.env.DB, id, user);
   await rematchAfterFiles(c.env, id);
 
   return c.json({

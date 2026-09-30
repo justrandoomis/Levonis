@@ -92,6 +92,10 @@ const EXPECTED_OWNER: Record<string, string> = {
   // W5-B: the workshop's «مناسب لي» board, live eligibility verdicts and private request costing.
   '/api/merchant/workshop': 'MARKETPLACE',
   '/api/merchant/orders': 'MARKETPLACE',
+  // Phase 4 of the community programme (docs/COMMUNITY_ECOSYSTEM.md §4d): resumable uploads, files on products, link cards.
+  '/api/uploads/sessions': 'FILES',
+  '/api/product-files': 'MARKETPLACE',
+  '/api/link-cards': 'CHAT',
   '/api/storefront/events': 'MARKETPLACE',
   '/api/storefront': 'MARKETPLACE',
   '/api/marketplace/print': 'MARKETPLACE',

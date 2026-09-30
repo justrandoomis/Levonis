@@ -11,9 +11,10 @@
  * The shelf order, the on/off switch and the name are the merchant's for
  * both. Deleting asks in the shared dialog; products are never deleted with it.
  */
-import { useCallback, useEffect, useId, useState } from 'react';
-import { ArrowDown, ArrowUp, ListOrdered, MoreHorizontal, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, ImageOff, ImagePlus, ListOrdered, Loader2, MoreHorizontal, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
+import { uploadFile } from '../../../lib/api';
 import { Button, IconButton } from '../../ui/Button';
 import { Field, Input } from '../../ui/Field';
 import { Switch } from '../../ui/Switch';
@@ -27,6 +28,9 @@ import { useToast } from '../../ui/Toast';
 import { catalogApi, type CatalogProduct, type Collection, type CollectionKind } from './catalogApi';
 import { catalogStrings, type Loc } from './strings';
 import { readRefusal } from './parts';
+
+/** The picture types the picker offers — spelled out, as the catalogue's MediaEditor does (a source-level `/*` reads as a comment to the pins). */
+const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/avif';
 
 function words(loc: Loc) {
   return {
@@ -63,7 +67,74 @@ function words(loc: Loc) {
     saveOrder: loc('حفظ الترتيب', 'Save order'), // OWNER: Sorani to be written by hand.
     saved: loc('حُفظ.', 'Saved.'), // OWNER: Sorani to be written by hand.
     empty: loc('لا منتجات في هذا القسم بعد.', 'No products in this section yet.'), // OWNER: Sorani to be written by hand.
+    // THE COVER (storefront L9) — the picture the storefront's collection
+    // cards show; written in all three languages (DECISIONS row 169).
+    addCover: loc('أضف صورة للقسم', 'Add a section picture', 'وێنەیەک بۆ بەشەکە زیاد بکە'),
+    changeCover: loc('تغيير صورة القسم', 'Change the section picture', 'گۆڕینی وێنەی بەشەکە'),
+    removeCover: loc('إزالة صورة القسم', 'Remove the section picture', 'لابردنی وێنەی بەشەکە'),
+    coverUploading: loc('جارٍ رفع الصورة…', 'Uploading the picture…', 'وێنەکە بار دەکرێت…'),
+    coverFailed: loc('تعذّر رفع صورة القسم.', 'The section picture could not be uploaded.', 'وێنەی بەشەکە بار نەکرا.'),
+    coverOnlyImages: loc('الصور فقط.', 'Pictures only.', 'تەنها وێنە.'),
   };
+}
+
+/**
+ * The cover control on a collection row: the picture itself when there is
+ * one, a placeholder when there is not; a tap picks a file. The upload is the
+ * merchant's community picture (`uploadFile(file, 'community')`) and its key
+ * goes through the same PATCH every other field uses — the server keeps only
+ * a key this owner uploaded (`MEDIA_NOT_OWNED` otherwise).
+ */
+function CoverControl({
+  collection,
+  busy,
+  disabled,
+  labels,
+  onPick,
+}: {
+  collection: Collection;
+  busy: boolean;
+  disabled: boolean;
+  labels: { add: string; change: string; uploading: string };
+  onPick: (file: File) => void;
+}) {
+  const input = useRef<HTMLInputElement | null>(null);
+  const label = busy ? labels.uploading : collection.image_url ? labels.change : labels.add;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => input.current?.click()}
+        disabled={disabled || busy}
+        aria-label={label}
+        aria-busy={busy}
+        title={label}
+        className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border-subtle bg-surface text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50"
+        data-collection-cover={collection.image_url ? 'set' : 'empty'}
+      >
+        {busy ? (
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        ) : collection.image_url ? (
+          <img src={collection.image_url} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <ImagePlus className="h-4 w-4" aria-hidden="true" />
+        )}
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept={IMAGE_ACCEPT}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onPick(f);
+          e.target.value = '';
+        }}
+      />
+    </>
+  );
 }
 
 export function CollectionsManager({ canSell, autoFocusCreate = false }: { canSell: boolean; /** The workspace's «new section» door (W3-A): start in the name field. */ autoFocusCreate?: boolean }) {
@@ -111,6 +182,24 @@ export function CollectionsManager({ canSell, autoFocusCreate = false }: { canSe
       load();
     } catch (e) {
       fail(e);
+    } finally {
+      setBusy('');
+    }
+  }
+
+  /** The cover (L9): upload, then the key through the existing PATCH; '' clears it. */
+  async function setCover(c: Collection, file: File | null) {
+    setBusy(`cover-${c.id}`);
+    try {
+      if (file && !file.type.startsWith('image/')) {
+        toast.error(w.coverOnlyImages);
+        return;
+      }
+      const key = file ? (await uploadFile(file, 'community')).key : '';
+      await catalogApi.updateCollection(c.id, { image_key: key });
+      load();
+    } catch (e) {
+      toast.error(readRefusal(e, loc, w.coverFailed).message || w.coverFailed);
     } finally {
       setBusy('');
     }
@@ -188,6 +277,13 @@ export function CollectionsManager({ canSell, autoFocusCreate = false }: { canSe
         <ul className="space-y-2">
           {items.map((c, i) => (
             <li key={c.id} className="flex items-center gap-2 rounded-2xl border border-border-subtle bg-white/[0.03] px-3 py-2.5" data-collection={c.kind}>
+              <CoverControl
+                collection={c}
+                busy={busy === `cover-${c.id}`}
+                disabled={!canSell}
+                labels={{ add: w.addCover, change: w.changeCover, uploading: w.coverUploading }}
+                onPick={(file) => setCover(c, file)}
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[14px] font-semibold text-text-primary">{label(c)}</p>
                 <p className="flex min-w-0 items-center gap-1.5 text-[12px] text-text-muted tabular-nums">
@@ -203,6 +299,7 @@ export function CollectionsManager({ canSell, autoFocusCreate = false }: { canSe
                 items={[
                   { id: 'rename', label: w.rename, icon: <Pencil className="h-4 w-4" />, onSelect: () => setRenaming(c) },
                   ...(c.kind === 'manual' ? [{ id: 'arrange', label: w.arrange, icon: <ListOrdered className="h-4 w-4" />, onSelect: () => setArranging(c) }] : []),
+                  ...(c.image_url ? [{ id: 'cover-remove', label: w.removeCover, icon: <ImageOff className="h-4 w-4" />, onSelect: () => void setCover(c, null) }] : []),
                   { id: 'sep', separator: true as const },
                   { id: 'delete', label: s.remove, icon: <Trash2 className="h-4 w-4" />, destructive: true, onSelect: () => remove(c) },
                 ]}

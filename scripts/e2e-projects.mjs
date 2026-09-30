@@ -7,7 +7,12 @@
  * page errors, the landmarks each page promises, and the social row's
  * behaviour (Phase 2): a like flips its `aria-pressed` and rolls its count, a
  * follow flips and moves the follower count, the comments sheet opens with
- * its rows and its composer.
+ * its rows and its composer. Phase 4 (§9.4): the project's file rows — two
+ * rows, «عرض ثلاثي الأبعاد» minting ONE token for a double tap and opening
+ * the viewer, the download hidden from a guest and from a kept file with the
+ * sentence why — and the composer's file picker: an STL dropped in becomes an
+ * upload tile, then a named row with its «قابل للتنزيل» switch. The cream
+ * pass runs with reduced motion on.
  *
  *   npx vite --port 4191 &   node scripts/e2e-projects.mjs
  */
@@ -93,6 +98,60 @@ async function social(page, kind, tag, check) {
   }
 }
 
+/** The file rows (§9.4), as a guest, a stranger and the author each see them. */
+async function files(page, viewer, tag, check) {
+  const rows = await page.locator('[data-project-files] [data-project-file]').count();
+  check(`${tag} files: two rows`, rows === 2, `rows=${rows}`);
+  const views = await page.locator('[data-project-file-view]').count();
+  check(`${tag} files: one «عرض ثلاثي الأبعاد» (the PDF has no mesh)`, views === 1, `views=${views}`);
+  const downloads = await page.locator('[data-project-file-download]').count();
+  const whys = await page.locator('[data-project-file-why]').count();
+  if (viewer === 'guest') {
+    check(`${tag} files: a guest gets no download`, downloads === 0, `downloads=${downloads}`);
+    check(`${tag} files: a guest is told why, twice`, whys === 2, `whys=${whys}`);
+  } else {
+    check(`${tag} files: one download — the downloadable file only`, downloads === 1, `downloads=${downloads}`);
+    const href = await page.locator('[data-project-file-download]').getAttribute('href');
+    check(`${tag} files: the anchor points at the gated route`, href === '/api/community/posts/prj_0/files/f1/download', `href=${href}`);
+    check(`${tag} files: the kept file says why`, whys === 1, `whys=${whys}`);
+  }
+  // A double tap mints ONE token and opens the viewer once.
+  const view = page.locator('[data-project-file-view]');
+  await view.click();
+  await view.click({ force: true }).catch(() => {});
+  await page.waitForTimeout(900);
+  const lab = await page.evaluate(() => window.__lab);
+  check(`${tag} files: a double tap minted one token`, lab.mints === 1, `mints=${lab.mints}`);
+  check(`${tag} files: the viewer opened once, on /model-viewer/<token>`, lab.opened.length === 1 && lab.opened[0] === '/model-viewer/tok_1', JSON.stringify(lab.opened));
+  check(`${tag} files: no horizontal overflow`, (await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0);
+}
+
+/** The composer's file picker: an STL becomes a tile, then a row. */
+async function composeFile(page, tag, check, shot) {
+  const input = page.locator('[data-project-file-input]');
+  check(`${tag} compose: the file input is there`, (await input.count()) === 1);
+  // 96 KiB of a binary STL: an 80-byte header, a triangle count, and bytes.
+  const bytes = Buffer.alloc(96 * 1024);
+  bytes.write('levonis e2e', 0, 'ascii');
+  bytes.writeUInt32LE(Math.floor((bytes.length - 84) / 50), 80);
+  await input.setInputFiles({ name: 'dragon-body.stl', mimeType: 'model/stl', buffer: bytes });
+  const row = await page.waitForSelector('[data-composer-file]', { timeout: 15000 }).then(() => true).catch(() => false);
+  check(`${tag} compose: the upload landed as a row`, row);
+  if (row) {
+    const name = await page.locator('[data-composer-file-name]').inputValue();
+    check(`${tag} compose: the row is named after the file`, name === 'dragon-body', `name=${name}`);
+    check(`${tag} compose: the «قابل للتنزيل» switch starts off`, (await page.locator('[data-composer-file] [role="switch"]').getAttribute('aria-checked')) === 'false');
+    await page.locator('[data-composer-file] [role="switch"]').click();
+    await page.waitForTimeout(300);
+    check(`${tag} compose: the switch turns on`, (await page.locator('[data-composer-file] [role="switch"]').getAttribute('aria-checked')) === 'true');
+    const lab = await page.evaluate(() => window.__lab);
+    check(`${tag} compose: one session, one part, one complete`, lab.sessions === 1 && lab.parts === 1 && lab.completed === 1, JSON.stringify({ s: lab.sessions, p: lab.parts, c: lab.completed }));
+    await page.locator('[data-composer-files]').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${out}/compose-file-${shot}.png`, fullPage: false });
+  }
+  check(`${tag} compose: no horizontal overflow with the file row`, (await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0);
+}
+
 const browser = await chromium.launch();
 for (const lang of ['ar', 'en', 'ckb']) {
   for (const theme of ['dark', 'light']) {
@@ -106,6 +165,9 @@ for (const lang of ['ar', 'en', 'ckb']) {
         colorScheme: theme,
         hasTouch: phone,
         isMobile: phone,
+        // The cream pass doubles as the reduced-motion pass: every spring
+        // collapses to a cross-fade and the pages must read the same.
+        reducedMotion: theme === 'light' ? 'reduce' : 'no-preference',
       });
       const page = await context.newPage();
       const errors = [];
@@ -121,6 +183,8 @@ for (const lang of ['ar', 'en', 'ckb']) {
         check(`${tag} ${s.page}/${s.viewer}: ${s.mark} present`, found);
         check(`${tag} ${s.page}/${s.viewer}: no horizontal overflow`, (await overflow()) <= 0, `overflow=${await overflow()}`);
         await page.screenshot({ path: `${out}/${s.page}-${s.viewer}-${tag}.png`, fullPage: true });
+        if (s.page === 'project' && found) await files(page, s.viewer, `${tag} ${s.page}/${s.viewer}`, check);
+        if (s.page === 'compose' && found) await composeFile(page, `${tag} ${s.page}/${s.viewer}`, check, tag);
         if (s.social && found) await social(page, s.social, `${tag} ${s.page}/${s.viewer}`, check);
       }
       check(`${tag}: no page errors`, errors.length === 0, errors.join(' | '));

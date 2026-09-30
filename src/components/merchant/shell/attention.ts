@@ -16,14 +16,55 @@ import { api } from '../../../lib/api';
 
 export type ActionStage = 'pending' | 'confirmed' | 'processing';
 
+/** The first pending orders under the orders ticket (≤ FIRST_ROWS on the server). */
+export interface FirstOrder {
+  id: string;
+  customer_name: string;
+  total_iqd: number;
+  governorate: string;
+  created_at: string;
+  link: string;
+}
+
+/** The first unread threads under the inbox ticket. */
+export interface FirstThread {
+  id: string;
+  customer_name: string;
+  /** The latest unread words from the customer's side, at most 140 characters; '' for a bare attachment. */
+  last_message: string;
+  unread: number;
+  last_message_at: string | null;
+  link: string;
+}
+
+/** The first sold-out products under the stock ticket — what the restock sheet edits. */
+export interface FirstProduct {
+  id: string;
+  name: string;
+  name_ar: string;
+  stock: number;
+  link: string;
+}
+
+/** An open return case on one of this merchant's orders (decided by Levonis; a door to the order). */
+export interface FirstReturn {
+  id: string;
+  order_id: string;
+  state: string;
+  requested_at: string;
+  link: string;
+}
+
 export interface Attention {
-  orders?: { total: number; by_stage: Record<ActionStage, number>; link: string; links: Record<ActionStage, string> };
+  orders?: { total: number; by_stage: Record<ActionStage, number>; link: string; links: Record<ActionStage, string>; first?: FirstOrder[] };
   custom_orders?: { to_start: number; in_progress: number; total: number; link: string };
-  inbox?: { threads: number; messages: number; link: string };
+  inbox?: { threads: number; messages: number; link: string; first?: FirstThread[] };
   notifications?: { unread: number; link: string };
   requests?: { matching: number; link: string };
-  stock?: { low: number; out: number; link_low: string; link_out: string };
+  stock?: { low: number; out: number; link_low: string; link_out: string; first?: FirstProduct[] };
   reviews?: { new?: number; unanswered?: number; link: string };
+  /** Return cases still open on this merchant's orders — read-only, the admin decides (v2 §4.1). */
+  returns?: { open: number; link: string; first?: FirstReturn[] };
   money?: { available_iqd: number; pending_iqd: number; link: string };
   payouts?: { in_flight: number; amount_iqd: number; link: string };
   coupons?: { ending_soon: number; first_ends_at: string | null; within_days: number; link: string };

@@ -27,7 +27,10 @@ export type MediaDomain =
   | 'print-requests'
   /** 0143 — a trade-in's photographs: `trade-in/<request id>/photos/…`,
    *  private, read through the gate in worker/routes/uploads.ts. */
-  | 'trade-in';
+  | 'trade-in'
+  /** 0158 — a link card's re-hosted Open Graph picture: `link-cards/<card id>.webp`,
+   *  public, written by worker/lib/linkCards.ts through the IMAGES binding. */
+  | 'link-cards';
 
 export interface MediaKeyInput {
   visibility: MediaVisibility;
@@ -670,6 +673,9 @@ export function isAnonymousPublicMediaKey(key: string): boolean {
     key.startsWith('products/') ||
     key.startsWith('avatars/') ||
     key.startsWith('community/') ||
+    // `link-cards/`: a link preview's picture, re-hosted by the server from a
+    // public page (0158) — public by the nature of what it is.
+    key.startsWith('link-cards/') ||
     // `posts/`: a maker's project pictures and clips (0153) — public by the
     // author's own act of publishing, like an avatar.
     /^users\/[^/]+\/(?:avatar|public-avatars|posts)\//.test(key) ||

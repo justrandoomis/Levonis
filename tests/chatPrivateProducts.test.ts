@@ -30,6 +30,7 @@ import { communityRoutes } from '../worker/routes/community';
 import { merchantCatalogRoutes } from '../worker/routes/merchantCatalog';
 import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
 import { resetPrivateProductsMemo } from '../worker/lib/privateProducts';
+import { resetProductFilesMemo } from '../worker/lib/fileOwnership';
 
 const RATE = 1400;
 const FUTURE = '2099-01-01T00:00:00.000Z';
@@ -53,6 +54,7 @@ const mount: Mount = (a) => {
 
 function seed(raw: DatabaseSync = freshDb()) {
   resetPrivateProductsMemo();
+  resetProductFilesMemo();
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role,username) VALUES
       ('buyer','Sara','buyer@x.co','h','customer','sara'), ('ali','Ali','ali@x.co','h','merchant','ali'),

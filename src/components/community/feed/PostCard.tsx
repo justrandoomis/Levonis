@@ -28,6 +28,7 @@ import { creatorHref, type PostCard as PostCardData } from '../projects/api';
 import { Avatar, HubLink } from '../hub/parts';
 import { timeAgo } from '../hub/copy';
 import { useHubStrings } from '../hub/strings';
+import { LinkRow } from '../links/LinkCard';
 
 const CHIP =
   'lv-hit relative z-10 inline-flex min-h-8 max-w-full items-center gap-1 truncate rounded-full border border-border-subtle/60 bg-surface px-2.5 text-[11.5px] text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
@@ -111,6 +112,10 @@ function PostCard({ post: p, eager = false, onPatch }: { post: PostCardData; eag
             {p.excerpt}
           </p>
         )}
+        {/* The first link in the words as a card (§9.4) — a sibling of the
+            stretched title link, so its two doors are pressable; drawn only
+            when the server already holds the card, never fetched for a reader. */}
+        <LinkRow text={p.excerpt} variant="compact" className="relative z-10 mt-2" />
       </div>
 
       {chips.length > 0 && (

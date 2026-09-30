@@ -587,7 +587,47 @@ export const SETTING_DEFAULTS = {
    * and audits before/after per section.
    */
   printerFarmConfig: FARM_CONFIG_DEFAULTS as FarmConfig,
+
+  /**
+   * THE UPLOAD CEILINGS (docs/COMMUNITY_ECOSYSTEM.md §9.4). Megabytes per kind
+   * of file, the multipart part size and how long an open upload session
+   * lives. Read by POST /api/uploads and /api/uploads/sessions on every
+   * request, written by PATCH /api/admin/community/settings — no financial
+   * scope, an `admin.upload_limits` audit row per change. `chunk_mb` is never
+   * read below 5: R2 refuses a non-final multipart part under 5 MiB.
+   */
+  uploadLimits: {
+    image_mb: 25,
+    video_mb: 100,
+    model_mb: 300,
+    archive_mb: 500,
+    document_mb: 25,
+    chunk_mb: 8,
+    session_hours: 24,
+  } as UploadLimits,
+  /**
+   * Per-owner storage quotas in GiB, by upload PURPOSE, counted as the sum of
+   * `file_objects.byte_size` over the owner's LIVE rows with that purpose. A
+   * purpose absent here has no quota beyond the per-file ceiling.
+   */
+  uploadQuotas: { post_gb: 2, product_file_gb: 5, request_gb: 1 } as UploadQuotas,
 };
+
+export interface UploadLimits {
+  image_mb: number;
+  video_mb: number;
+  model_mb: number;
+  archive_mb: number;
+  document_mb: number;
+  chunk_mb: number;
+  session_hours: number;
+}
+
+export interface UploadQuotas {
+  post_gb: number;
+  product_file_gb: number;
+  request_gb: number;
+}
 
 /**
  * The printer note amount as stored, or null when nothing usable is
@@ -723,6 +763,18 @@ function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeo
       ...object,
       conditions: { ...SETTING_DEFAULTS.giniPolicy.conditions, ...storedText },
     } as (typeof SETTING_DEFAULTS)[K];
+  }
+  // The upload ceilings and quotas are merged over their defaults field by
+  // field, so a shop that stored `{ chunk_mb: 16 }` before a new limit existed
+  // reads every other ceiling at its default rather than as `undefined`.
+  if (key === 'uploadLimits' || key === 'uploadQuotas') {
+    const object: Record<string, unknown> =
+      typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+    const merged: Record<string, unknown> = { ...(SETTING_DEFAULTS[key] as Record<string, unknown>) };
+    for (const [k, v] of Object.entries(object)) {
+      if (k in merged && typeof v === 'number' && Number.isFinite(v) && v >= 0) merged[k] = v;
+    }
+    return merged as (typeof SETTING_DEFAULTS)[K];
   }
   if (key === 'bnplPolicy' || key === 'proPriorityDelivery') {
     const object: Record<string, unknown> =

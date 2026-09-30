@@ -29,13 +29,35 @@
  *
  * Each screen is `React.lazy` (./sections.tsx) behind its own skeleton and a
  * chunk boundary, so a screen that fails to download cannot blank the frame.
+ *
+ * MOTION (merchant platform v2 §3.1, §5 — every spring through `useMotion`):
+ *   · the SEAM — the one gold hairline under the current destination — is a
+ *     shared-layout `m.span` (`layoutId` per surface: sidebar, phone
+ *     tabs) that TRAVELS between links with `m.spring('move')`; `aria-current`
+ *     stays on the link, the hairline is decoration on top of state;
+ *   · a section SETTLES: the `Suspense` child arrives in an `m.div` keyed
+ *     by the section, opacity 0→1 and a 12 px slide forward along the inline
+ *     axis (`m.inline`, zero under reduced motion), `m.spring('ui')`; no exit,
+ *     the router keeps the old page under `useTransition`;
+ *   · a BADGE count that changes re-keys its pill, `m.spring('quick')`;
+ *   · on a section change focus moves to the screen's h1 (the frame's title,
+ *     sr-only for `ownHeading` screens), so a screen reader hears the landing.
+ * Operate | Design is a `Segmented` in the desktop top bar; Design is the
+ * store-design section, not a new route.
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronsLeft, ChevronsRight, ExternalLink, MoreHorizontal, Palette, Plus, Search, Store } from 'lucide-react';
+// `m` + <MotionFeatures>, never the `motion` proxy (src/lib/motionFeatures.tsx):
+// the shell is what every /merchant open downloads first, and the proxy would
+// put the animation-features chunk (16 KB gzip) back in front of its paint —
+// the very byte P1b removed. `layoutId` works under the lazy bundle (domMax).
+import * as Motion from 'motion/react-m';
+import { ChevronsLeft, ChevronsRight, ExternalLink, MoreHorizontal, Plus, Search, Store } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { api } from '../../../lib/api';
 import { formatMoney } from '../../../lib/money';
+import { useMotion } from '../../../lib/motion';
+import { MotionFeatures } from '../../../lib/motionFeatures';
 import type { MerchantMe } from '../../../lib/merchant';
 import {
   MERCHANT_BASE, STORE_HOST_BASE, hostPath, merchantHref, parseMerchantPath, readWorkspaceQuery, type MerchantSection,
@@ -44,6 +66,7 @@ import { useIsPhone } from '../../../lib/useMediaQuery';
 import ChunkBoundary from '../../ChunkBoundary';
 import { IconButton } from '../../ui/Button';
 import { Menu, type MenuEntry } from '../../ui/Menu';
+import { Segmented } from '../../ui/Segmented';
 import { Toaster } from '../../ui/Toast';
 import MerchantNotificationBell from '../notifications/MerchantNotificationBell';
 import { useAttention, type Attention } from './attention';
@@ -106,6 +129,7 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
   const id = route.kind === 'section' ? route.id : undefined;
   const query = useMemo(() => readWorkspaceQuery(location.search), [location.search]);
 
+  const m = useMotion();
   const attention = useAttention();
   const [bellUnread, setBellUnread] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -157,9 +181,23 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
 
   // ---- a new screen starts at its top, and the counts are re-read (at most every 15 s)
   const refreshAttention = attention.refresh;
+  const landed = useRef(false);
   useEffect(() => {
     scroller.current?.scrollTo({ top: 0 });
     refreshAttention();
+    // Focus follows a section CHANGE to the screen's h1 (the frame's own title,
+    // sr-only for `ownHeading` screens, or Today's) — not the first landing,
+    // where the skip link must stay first. The content region is the fallback
+    // while a lazy screen is still on its way.
+    if (!landed.current) {
+      landed.current = true;
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      const h1 = scroller.current?.querySelector<HTMLElement>('h1');
+      (h1 ?? scroller.current)?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [section, id, refreshAttention]);
 
   // ---- ⌘K / Ctrl+K anywhere in the workspace
@@ -256,6 +294,8 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
             bell={<MerchantNotificationBell onOpen={() => navigate(sectionPath('notifications', base))} unread={bellUnread} />}
             base={base}
             href={href}
+            mode={section === 'store_design' ? 'design' : 'operate'}
+            onMode={(next) => go(next === 'design' ? merchantHref.storeDesign() : merchantHref.home())}
           />
 
           <div
@@ -283,15 +323,19 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
                 </p>
               )}
               {current && section !== 'home' && (
-                <h1 className={current.ownHeading ? 'sr-only' : 'mb-5 text-[20px] font-bold leading-tight text-text-primary'} data-section-title>
+                <h1 tabIndex={-1} className={current.ownHeading ? 'sr-only' : 'mb-5 text-[20px] font-bold leading-tight text-text-primary focus:outline-none'} data-section-title>
                   {say(loc, current.label)}
                 </h1>
               )}
               {Screen && section ? (
                 <ChunkBoundary>
-                  <Suspense key={section} fallback={<SectionFallback section={section} />}>
-                    <Screen id={id} />
-                  </Suspense>
+                  <MotionFeatures>
+                    <Motion.div key={section} initial={{ opacity: 0, x: m.inline(m.travel(12)) }} animate={{ opacity: 1, x: 0 }} transition={m.spring('ui')} data-section-settle>
+                      <Suspense key={section} fallback={<SectionFallback section={section} />}>
+                        <Screen id={id} />
+                      </Suspense>
+                    </Motion.div>
+                  </MotionFeatures>
                 </ChunkBoundary>
               ) : (
                 <SectionFallback section="home" />
@@ -324,17 +368,30 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
 // ------------------------------------------------------------------ sidebar
 
 function CountBadge({ n, compact }: { n: number | null; compact?: boolean }) {
+  const m = useMotion();
   if (!n) return null;
   if (compact) return <span aria-hidden="true" className="absolute end-2 top-2 h-2 w-2 rounded-full bg-gold ring-2 ring-surface" />;
+  // A changed count is a new pill: it re-keys and lands with `quick` (opacity only under reduced motion).
   return (
-    <span aria-hidden="true" className="ms-auto shrink-0 rounded-full bg-white/[0.08] px-2 text-[12px] font-semibold leading-6 tabular-nums text-text-primary" dir="ltr">
-      {n > 99 ? '99+' : n}
-    </span>
+    <MotionFeatures>
+      <Motion.span
+        key={n}
+        initial={{ scale: m.reduced ? 1 : 0.6, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={m.spring('quick')}
+        aria-hidden="true"
+        className="ms-auto shrink-0 rounded-full bg-white/[0.08] px-2 text-[12px] font-semibold leading-6 tabular-nums text-text-primary"
+        dir="ltr"
+      >
+        {n > 99 ? '99+' : n}
+      </Motion.span>
+    </MotionFeatures>
   );
 }
 
 function NavLink({ entry, base, active, count, labelClass, compactBadge }: { entry: NavEntry; base: string; active: boolean; count: number | null; labelClass: string; compactBadge: string }) {
   const { loc } = useLanguage();
+  const m = useMotion();
   const label = say(loc, entry.label);
   const Icon = entry.icon;
   return (
@@ -349,7 +406,11 @@ function NavLink({ entry, base, active, count, labelClass, compactBadge }: { ent
         active ? 'bg-surface-selected font-semibold text-text-primary' : 'text-text-secondary hover:bg-white/[0.04] hover:text-text-primary'
       }`}
     >
-      {active && <span aria-hidden="true" className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-gold" />}
+      {active && (
+        <MotionFeatures>
+          <Motion.span layoutId="ws-side-seam" transition={m.spring('move')} aria-hidden="true" className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-gold" />
+        </MotionFeatures>
+      )}
       <Icon aria-hidden="true" className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-text-primary' : 'text-text-muted'}`} />
       <span className={`min-w-0 flex-1 truncate ${labelClass}`}>{label}</span>
       <span className={labelClass}>
@@ -446,6 +507,8 @@ function SideNav({
 
 // ------------------------------------------------------------------ top bar
 
+type WorkspaceMode = 'operate' | 'design';
+
 function TopBar({
   store,
   status,
@@ -456,6 +519,8 @@ function TopBar({
   bell,
   base,
   href,
+  mode,
+  onMode,
 }: {
   store: MerchantMe['store'] & object;
   status: ReturnType<typeof storeStatus>;
@@ -466,8 +531,17 @@ function TopBar({
   bell: ReactNode;
   base: string;
   href: (link: string) => string;
+  mode: WorkspaceMode;
+  onMode: (next: WorkspaceMode) => void;
 }) {
   const { loc } = useLanguage();
+  // Operate | Design (v2 §2.3). The three words are copied verbatim from
+  // src/components/merchant/counter/strings.ts `mode` — the shell writes no
+  // Sorani of its own.
+  const modes = [
+    { id: 'operate', label: loc('تشغيل', 'Operate', 'کارپێکردن') },
+    { id: 'design', label: loc('تصميم', 'Design', 'دیزاین') },
+  ];
   const statusText = say(loc, status.label);
   const statusName = `${say(loc, W.storeStatus)}: ${statusText}${status.key === 'open' ? '' : ` — ${status.reason(loc)}`}`;
   // Quick create — the section, with its «new» form open. Each one makes a
@@ -539,15 +613,19 @@ function TopBar({
             )}
           />
         </span>
-        <Link
-          to={sectionPath('store_design', base)}
-          title={say(loc, W.storeDesign)}
-          className="hidden min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-text-secondary hover:bg-white/[0.04] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus xl:inline-flex"
-          data-design-store
-        >
-          <Palette aria-hidden="true" className="h-4 w-4" />
-          {say(loc, W.storeDesign)}
-        </Link>
+        <span className="hidden lg:inline-flex" data-design-store title={say(loc, W.storeDesign)}>
+          <Segmented
+            size="sm"
+            group="ws-mode"
+            label={loc('وضع العمل', 'Mode', 'دۆخی کار')}
+            items={modes}
+            value={mode}
+            onChange={(id) => {
+              if (id !== mode) onMode(id as WorkspaceMode);
+            }}
+            dataAttr="data-ws-mode"
+          />
+        </span>
         <a
           href={store.url}
           target="_blank"
@@ -570,7 +648,13 @@ function TopBar({
 
 function BottomTabs({ base, current, attention, onMore }: { base: string; current: MerchantSection | null; attention: Attention | null; onMore: () => void }) {
   const { loc } = useLanguage();
+  const m = useMotion();
   const lit = current ? phoneTabFor(current) : 'home';
+  const seam = (
+    <MotionFeatures>
+      <Motion.span layoutId="ws-tabs-seam" transition={m.spring('move')} aria-hidden="true" className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-gold" />
+    </MotionFeatures>
+  );
   const moreCount = moreEntries().some((e) => (badgeCount(e.badge, attention) ?? 0) > 0);
   const tabClass = (active: boolean) =>
     `relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
@@ -596,7 +680,7 @@ function BottomTabs({ base, current, attention, onMore }: { base: string; curren
               {count ? <span aria-hidden="true" className="absolute -end-1.5 -top-1 h-2 w-2 rounded-full bg-gold ring-2 ring-surface" /> : null}
             </span>
             <span className="max-w-full truncate">{label}</span>
-            {active && <span aria-hidden="true" className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-gold" />}
+            {active && seam}
           </Link>
         );
       })}
@@ -606,7 +690,7 @@ function BottomTabs({ base, current, attention, onMore }: { base: string; curren
           {moreCount && <span aria-hidden="true" className="absolute -end-1.5 -top-1 h-2 w-2 rounded-full bg-gold ring-2 ring-surface" />}
         </span>
         <span>{say(loc, W.more)}</span>
-        {lit === 'more' && <span aria-hidden="true" className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-gold" />}
+        {lit === 'more' && seam}
       </button>
     </nav>
   );

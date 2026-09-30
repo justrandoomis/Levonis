@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import { announceStoreOrder } from '../lib/chatCards';
 import { notifyOrderCreditAvailable } from '../lib/merchantNotify';
 import type { Context } from 'hono';
-import type { AppContext, SessionUser } from '../lib/types';
+import type { AppContext, Env, SessionUser } from '../lib/types';
+import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, str, int, unavailable, HttpError } from '../lib/http';
 import { cartLineSelect } from '../lib/cartLineProjection';
@@ -930,6 +931,54 @@ async function loadOrder(db: D1Database, orderId: string) {
   if (!order) return null;
   const { results: items } = await db.prepare(`${ORDER_ITEMS_SELECT} WHERE oi.order_id = ?`).bind(orderId).all();
   return { order, items };
+}
+
+/**
+ * THE STORE AN ORDER CAME FROM (merchant platform V2, storefront A6 / K1):
+ * «طلبك من {store}» on the list and a strip on the order that leads back to
+ * the shop. Only what a visitor sees on the storefront anyway — the slug, the
+ * name, the logo and the address — never the merchant's row (no phone, no
+ * owner id, no delivery configuration). A platform order (`store_id` null)
+ * carries `store: null`, and a database a migration behind carries it too.
+ */
+export interface OrderStoreIdentity {
+  slug: string;
+  name: string;
+  logo_url: string | null;
+  url: string;
+}
+
+export async function storesForOrders(
+  db: D1Database,
+  env: Env,
+  orders: ReadonlyArray<Record<string, unknown>>
+): Promise<Map<string, OrderStoreIdentity>> {
+  const ids = [...new Set(orders.map((o) => (typeof o.store_id === 'string' && o.store_id ? o.store_id : '')).filter(Boolean))];
+  const out = new Map<string, OrderStoreIdentity>();
+  if (!ids.length) return out;
+  try {
+    const { results } = await db
+      .prepare('SELECT id, slug, name, logo_key FROM merchant_stores WHERE id IN (SELECT value FROM json_each(?1))')
+      .bind(JSON.stringify(ids))
+      .all<{ id: string; slug: string; name: string; logo_key: string | null }>();
+    const root = rootDomainFrom(env);
+    for (const s of results ?? []) {
+      out.set(String(s.id), {
+        slug: String(s.slug),
+        name: String(s.name ?? ''),
+        logo_url: s.logo_key ? `/files/${String(s.logo_key)}` : null,
+        url: storeUrl(String(s.slug), root, String(s.id)),
+      });
+    }
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+  }
+  return out;
+}
+
+/** The order's store, or null — by the order's own `store_id`, never by anything the caller sent. */
+export function orderStore(o: Record<string, unknown>, stores: Map<string, OrderStoreIdentity>): OrderStoreIdentity | null {
+  return typeof o.store_id === 'string' && o.store_id ? (stores.get(o.store_id) ?? null) : null;
 }
 
 /**
@@ -3599,9 +3648,11 @@ orderRoutes.get('/', async (c) => {
     }
   }
   const mysteryView = await mysteryViewFor(c.env.DB, ids, 'customer', langOf(c));
+  // One read for the page's stores (A6): «طلبك من {store}» on each merchant order.
+  const stores = await storesForOrders(c.env.DB, c.env, orders);
   const out = orders.map((o) => {
     const items = itemsByOrder.get(String(o.id)) ?? [];
-    return { ...orderPublic(o, items, snaps.get(String(o.id)), mysteryView), item_count: itemCount(items) };
+    return { ...orderPublic(o, items, snaps.get(String(o.id)), mysteryView), item_count: itemCount(items), store: orderStore(o, stores) };
   });
   return c.json({
     success: true,
@@ -4848,11 +4899,14 @@ orderRoutes.get('/:id', async (c) => {
         );
   const maintenanceModels = [...new Map([...maintenance.values()].map((m) => [m.id, m])).values()];
   const maintenanceIdx = maintenanceModels.length ? await catalogIndexFor(c.env.DB).catch(() => null) : null;
+  // The store this order came from (A6), for the strip that leads back to it.
+  const stores = await storesForOrders(c.env.DB, c.env, [data.order]);
   return c.json({
     success: true,
     order: {
       ...orderPublic(data.order, data.items, snaps.get(id), await mysteryViewFor(c.env.DB, [id], 'customer', langOf(c))),
       item_count: itemCount(data.items),
+      store: orderStore(data.order, stores),
       invoice: invoice ?? null,
       maintenance_parts: maintenanceModels.map((m) => ({
         printer_slug: m.slug,

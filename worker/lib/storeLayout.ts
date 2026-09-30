@@ -115,6 +115,11 @@ export function productCard(p: Record<string, unknown>): ProductCardData {
     name: String(p.name ?? ''),
     name_ar: String(p.name_ar ?? ''),
     images: images.slice(0, 1),
+    // The second frame (storefront L10): shown on hover / focus, never a third
+    // request for the whole gallery. `has_video` is stamped on the row by
+    // `withVideoFlags` before this runs; a row read without it says false.
+    image_2: images[1] ?? null,
+    has_video: !!p.has_video,
     price_iqd: Number(p.price_iqd ?? 0),
     original_price_iqd: p.original_price_iqd === null || p.original_price_iqd === undefined ? null : Number(p.original_price_iqd),
     in_stock: !p.track_stock || Number(p.stock) > 0,
@@ -130,6 +135,47 @@ function cursorOf(rows: Array<Record<string, unknown>>, limit: number): string |
   const last = rows[rows.length - 1];
   return `${String(last.created_at)}|${String(last.id)}`;
 }
+
+/**
+ * WHICH OF THESE PRODUCTS CARRY A VIDEO (storefront L10) — one statement for a
+ * whole page of cards, through `json_each` (one bound parameter however many
+ * ids). The card draws a ▶ mark from it; the video itself stays on the
+ * product page. A database before 0126 (no media table) says nobody does.
+ */
+export async function videoProductIds(db: D1Database, ids: readonly string[]): Promise<Set<string>> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (!unique.length) return new Set();
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT DISTINCT product_id FROM community_product_media
+          WHERE kind = 'video' AND product_id IN (SELECT value FROM json_each(?1))`
+      )
+      .bind(JSON.stringify(unique))
+      .all<{ product_id: string }>();
+    return new Set((results ?? []).map((r) => String(r.product_id)));
+  } catch (e) {
+    if (isSchemaMissing(e)) return new Set();
+    throw e;
+  }
+}
+
+/** The same rows with `has_video` stamped on each — what `productCard` and the storefront's `publicProduct` read. */
+export async function withVideoFlags<T extends Record<string, unknown>>(db: D1Database, rows: T[]): Promise<T[]> {
+  if (!rows.length) return rows;
+  const videos = await videoProductIds(db, rows.map((r) => String(r.id)));
+  return rows.map((r) => ({ ...r, has_video: videos.has(String(r.id)) }));
+}
+
+/**
+ * The same fact as a column of the product statement itself, so the layout's
+ * wave stays the fixed handful of statements it is pinned to
+ * (tests/storeLayoutRoutes.test.ts). `p` is the products table or its alias.
+ * A database before 0126 has no media table: the caller runs the statement
+ * again with `'0 AS has_video'` (`HAS_VIDEO_NONE`) when this one is refused.
+ */
+export const hasVideoSql = (p: string) => `EXISTS (SELECT 1 FROM community_product_media m WHERE m.product_id = ${p}.id AND m.kind = 'video') AS has_video`;
+export const HAS_VIDEO_NONE = '0 AS has_video';
 
 /**
  * The rows a layout's visible blocks show. A fixed number of statements, run
@@ -175,43 +221,55 @@ export async function blockDataFor(db: D1Database, ctx: StoreContext, layout: St
     // ask for up to 12 lists. So the lists go in chunks of D1_MAX_UNION_TERMS,
     // one statement each, every chunk numbering its own parameters from ?3.
     const since = sinceNewArrivals();
-    const statements: Array<{ sql: string; binds: unknown[] }> = [];
-    for (let i = 0; i < needs.products.length; i += D1_MAX_UNION_TERMS) {
-      const parts: string[] = [];
-      const binds: unknown[] = [storeId, since];
-      const param = (v: unknown) => {
-        binds.push(v);
-        return `?${binds.length}`;
-      };
-      for (const q of needs.products.slice(i, i + D1_MAX_UNION_TERMS)) {
-        const key = param(q.key);
-        let filter = '';
-        let sv = 'created_at';
-        let order = 'created_at DESC, id DESC';
-        if (q.source === 'featured') filter = 'AND featured = 1';
-        else if (q.source === 'deals') filter = 'AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd';
-        else if (q.source === 'collection') {
-          const kind = kinds.get(q.collection_id);
-          const idp = param(q.collection_id);
-          if (!kind) filter = 'AND 0';
-          else {
-            filter = `AND ${collectionMemberSql(kind, 'community_products', idp, '?2')}`;
-            const o = collectionOrder(kind, 'community_products', idp);
-            sv = o.sortExpr;
-            order = `${o.sortExpr} ${o.dir}, id DESC`;
+    // `has_video` (L10) rides inside the statement — no extra round trip; a
+    // database before 0126 refuses the media table and the same statements
+    // run once more saying «no video».
+    const buildStatements = (videoSql: string): Array<{ sql: string; binds: unknown[] }> => {
+      const statements: Array<{ sql: string; binds: unknown[] }> = [];
+      for (let i = 0; i < needs.products.length; i += D1_MAX_UNION_TERMS) {
+        const parts: string[] = [];
+        const binds: unknown[] = [storeId, since];
+        const param = (v: unknown) => {
+          binds.push(v);
+          return `?${binds.length}`;
+        };
+        for (const q of needs.products.slice(i, i + D1_MAX_UNION_TERMS)) {
+          const key = param(q.key);
+          let filter = '';
+          let sv = 'created_at';
+          let order = 'created_at DESC, id DESC';
+          if (q.source === 'featured') filter = 'AND featured = 1';
+          else if (q.source === 'deals') filter = 'AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd';
+          else if (q.source === 'collection') {
+            const kind = kinds.get(q.collection_id);
+            const idp = param(q.collection_id);
+            if (!kind) filter = 'AND 0';
+            else {
+              filter = `AND ${collectionMemberSql(kind, 'community_products', idp, '?2')}`;
+              const o = collectionOrder(kind, 'community_products', idp);
+              sv = o.sortExpr;
+              order = `${o.sortExpr} ${o.dir}, id DESC`;
+            }
           }
+          const limit = param(q.limit);
+          parts.push(
+            `SELECT * FROM (SELECT ${key} AS qk, ${PRODUCT_CARD_COLUMNS}, ${sv} AS sv, ${videoSql} FROM community_products
+               WHERE store_id = ?1 AND ${live} ${filter}
+               ORDER BY ${order} LIMIT ${limit})`
+          );
         }
-        const limit = param(q.limit);
-        parts.push(
-          `SELECT * FROM (SELECT ${key} AS qk, ${PRODUCT_CARD_COLUMNS}, ${sv} AS sv FROM community_products
-             WHERE store_id = ?1 AND ${live} ${filter}
-             ORDER BY ${order} LIMIT ${limit})`
-        );
+        statements.push({ sql: parts.join(' UNION ALL '), binds });
       }
-      statements.push({ sql: parts.join(' UNION ALL '), binds });
-    }
+      return statements;
+    };
+    const runLists = (videoSql: string) =>
+      Promise.all(buildStatements(videoSql).map((st) => db.prepare(st.sql).bind(...st.binds).all<Record<string, unknown>>()));
     tasks.push(
-      Promise.all(statements.map((st) => db.prepare(st.sql).bind(...st.binds).all<Record<string, unknown>>()))
+      runLists(hasVideoSql('community_products'))
+        .catch((e) => {
+          if (!isSchemaMissing(e)) throw e;
+          return runLists(HAS_VIDEO_NONE);
+        })
         .then((answers) => {
           const byKey = new Map<string, Array<Record<string, unknown>>>();
           for (const { results } of answers) {
@@ -241,14 +299,20 @@ export async function blockDataFor(db: D1Database, ctx: StoreContext, layout: St
   }
 
   if (needs.productIds.length) {
-    tasks.push(
+    const picked = (videoSql: string) =>
       db
         .prepare(
-          `SELECT ${PRODUCT_CARD_COLUMNS} FROM community_products
+          `SELECT ${PRODUCT_CARD_COLUMNS}, ${videoSql} FROM community_products
             WHERE store_id = ?1 AND ${live} AND id IN (SELECT value FROM json_each(?2))`
         )
         .bind(storeId, JSON.stringify(needs.productIds))
-        .all<Record<string, unknown>>()
+        .all<Record<string, unknown>>();
+    tasks.push(
+      picked(hasVideoSql('community_products'))
+        .catch((e) => {
+          if (!isSchemaMissing(e)) throw e;
+          return picked(HAS_VIDEO_NONE);
+        })
         .then(({ results }) => {
           const byId = new Map((results ?? []).map((r) => [String(r.id), productCard(r)]));
           data.picked = needs.productIds.map((id) => byId.get(id)).filter((p): p is ProductCardData => !!p);
@@ -261,7 +325,7 @@ export async function blockDataFor(db: D1Database, ctx: StoreContext, layout: St
       db
         .prepare(
           `SELECT * FROM (
-             SELECT s.id, s.name, s.name_ar, s.sort_order, s.created_at,
+             SELECT s.id, s.name, s.name_ar, s.sort_order, s.created_at, s.image_key,
                     CASE s.kind
                       WHEN 'manual' THEN (SELECT COUNT(*) FROM merchant_collection_products m JOIN community_products p ON p.id = m.product_id
                                            WHERE m.collection_id = s.id AND p.lifecycle = 'active' AND p.status = 'active')
@@ -285,6 +349,9 @@ export async function blockDataFor(db: D1Database, ctx: StoreContext, layout: St
             name: String(s.name ?? ''),
             name_ar: String(s.name_ar ?? ''),
             product_count: Number(s.product_count ?? 0),
+            // The cover the merchant chose (L9): the key was PATCHable and
+            // swept (worker/lib/mediaRefs.ts) long before the page showed it.
+            image_url: s.image_key ? `/files/${String(s.image_key)}` : null,
           }));
         })
     );
@@ -390,7 +457,8 @@ async function reviewsFor(db: D1Database, ctx: StoreContext, limit: number): Pro
           WHERE r.merchant_id = ? AND r.hidden = 0
           ORDER BY r.created_at DESC, r.id DESC LIMIT ?`
       )
-      .bind(ctx.merchant.id, limit)
+      // One row past the page (D8): «المزيد» is offered only when a next page exists.
+      .bind(ctx.merchant.id, limit + 1)
       .all<Record<string, unknown>>(),
     db
       .prepare('SELECT rating, COUNT(*) AS n FROM merchant_reviews WHERE merchant_id = ? AND hidden = 0 GROUP BY rating')
@@ -405,7 +473,8 @@ async function reviewsFor(db: D1Database, ctx: StoreContext, limit: number): Pro
     total += row.n;
     sum += row.rating * row.n;
   }
-  const results = rows.results ?? [];
+  const fetched = rows.results ?? [];
+  const results = fetched.slice(0, limit);
   return {
     average: total ? Math.round((sum / total) * 100) / 100 : null,
     count: total,
@@ -421,7 +490,7 @@ async function reviewsFor(db: D1Database, ctx: StoreContext, limit: number): Pro
       merchant_replied_at: (r.merchant_replied_at as string | null) ?? null,
       created_at: String(r.created_at),
     })),
-    next_cursor: cursorOf(results, limit),
+    next_cursor: fetched.length > limit ? cursorOf(results, limit) : null,
   };
 }
 

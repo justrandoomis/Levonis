@@ -90,6 +90,12 @@ const project = {
     { id: 'm3', kind: 'image', url: picture('#4a6c7a', 'vase', 1200, 900), width: 1200, height: 900, duration_s: null },
   ],
   print_settings: { layer_height_mm: 0.2, infill_percent: 15, nozzle_mm: 0.4, supports: false },
+  // The files (§9.4): a model with a preview mesh the maker lets people take,
+  // and a PDF kept to the page. The keys travel only to the author.
+  files: [
+    { id: 'f1', name: 'dragon-body', bytes: 4_812_233, kind: 'model', downloadable: true, has_preview: true, ...(viewer === 'author' ? { key: 'users/sara/post-files/f1.stl' } : {}) },
+    { id: 'f2', name: 'assembly-notes', bytes: 288_120, kind: 'document', downloadable: false, has_preview: false, ...(viewer === 'author' ? { key: 'users/sara/post-files/f2.pdf' } : {}) },
+  ],
   hidden: null,
   viewer: {
     mine: viewer === 'author',
@@ -142,6 +148,15 @@ const readJson = async (init?: RequestInit) => {
 
 const me = viewer === 'guest' ? null : { id: viewer === 'author' ? 'sara' : 'eve', username: viewer === 'author' ? 'sara' : 'eve', name: viewer === 'author' ? 'سارة كريم' : 'إيف', role: 'customer', email: 'x@x.co', locale: lang === 'ckb' ? 'ku' : lang, avatar_key: null, bio: '', website: '', profile: {}, country: 'IQ', phone: null, has_phone: false, notify_whatsapp: true, subscription_plan: 'free', membership_tier: 'free', subscription_expiry: 0, is_investor: false, isAdmin: false, creator_public: false };
 
+// What the Phase 4 scenes count: tokens minted, viewer pages opened, session
+// parts sent — read by scripts/e2e-projects.mjs as `window.__lab`.
+const lab = { mints: 0, opened: [] as string[], sessions: 0, parts: 0, completed: 0, lastSession: null as { bytes: number; name: string } | null };
+(window as unknown as { __lab: typeof lab }).__lab = lab;
+window.open = ((url?: string | URL) => {
+  lab.opened.push(String(url ?? ''));
+  return null;
+}) as typeof window.open;
+
 const realFetch = window.fetch.bind(window);
 window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
@@ -189,6 +204,37 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   if (p === '/api/community/saved') return me ? ok({ posts: [card(2), card(5), card(1)].map(withViewer), next_cursor: null }) : new Response(JSON.stringify({ success: false }), { status: 401 });
   if (p === '/api/community/feed') return ok({ posts: Array.from({ length: 6 }, (_, i) => withViewer(card(i))), next_cursor: null });
   if (p === '/api/community/creators') return ok({ creators: [{ ...creator, stats: { projects: 8, followers: 41 }, store: null, viewer: { following: graph.following.has('sara') } }], next_cursor: null, total: 1 });
+  // ---- Phase 4: the files (§9.4) ----
+  // A viewer token, minted after a pause so a double tap has time to be a
+  // double tap; the count is on the window for scripts/e2e-projects.mjs.
+  m = /^\/api\/community\/posts\/([^/]+)\/files\/([^/]+)\/viewer-token$/.exec(p);
+  if (m && method === 'POST') {
+    lab.mints += 1;
+    await new Promise((r) => setTimeout(r, 300));
+    return ok({ token: 'tok_1', url: '/model-viewer/tok_1', expires_at: new Date(Date.now() + 3_600_000).toISOString(), grant: viewer === 'author' ? 'full' : 'preview' });
+  }
+  // A resumable session for the composer's file picker: one part, then complete.
+  if (p === '/api/uploads/sessions' && method === 'POST') {
+    const body = await readJson(init);
+    lab.sessions += 1;
+    lab.lastSession = { bytes: Number(body.bytes ?? 0), name: String(body.file_name ?? '') };
+    return new Response(JSON.stringify({ success: true, session_id: `us_${lab.sessions}`, chunk_bytes: 5 * 1024 * 1024, parts_total: 1, expires_at: new Date(Date.now() + 86_400_000).toISOString() }), { status: 201, headers: { 'content-type': 'application/json' } });
+  }
+  m = /^\/api\/uploads\/sessions\/([^/]+)(?:\/(parts\/\d+|complete))?$/.exec(p);
+  if (m) {
+    if (method === 'PUT') {
+      lab.parts += 1;
+      return ok({ received: [1], bytes_so_far: lab.lastSession?.bytes ?? 0, parts_total: 1 });
+    }
+    if (method === 'GET') return ok({ session_id: m[1], state: 'open', received: [], bytes_so_far: 0, declared_bytes: lab.lastSession?.bytes ?? 0, chunk_bytes: 5 * 1024 * 1024, parts_total: 1, expires_at: '' });
+    if (method === 'DELETE') return ok({ state: 'aborted' });
+    if (method === 'POST') {
+      lab.completed += 1;
+      const name = lab.lastSession?.name ?? 'part.stl';
+      const key = `users/sara/post-files/${name}`;
+      return ok({ key, url: `/files/${key}`, visibility: 'private', mime: 'model/stl', bytes: lab.lastSession?.bytes ?? 0, sha256: 'a'.repeat(64) });
+    }
+  }
   // ---- Phase 1 ----
   if (p === '/api/community/posts/trending') return ok({ posts: [card(1), card(2), card(3), card(0)].map(withViewer) });
   if (p === '/api/community/posts') return ok({ posts: Array.from({ length: 8 }, (_, i) => withViewer(card(i))), next_cursor: null, total: 8 });

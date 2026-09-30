@@ -212,7 +212,9 @@ test('the cron entrypoint really drains the queue — scheduled → runDurableJo
 
   worker.scheduled(cronEvent(), env, ctx);
 
-  assert.equal(waited.length, 1, 'the run must be registered with waitUntil, not merely started');
+  // Two steps since 0156: the durable jobs and the upload-session sweep, each
+  // handed to waitUntil on its own; the bucket assertion below proves the drain.
+  assert.equal(waited.length, 2, 'every scheduled step must be registered with waitUntil, not merely started');
   await Promise.all(waited);
 
   assert.deepEqual(bucket.deleted, ['products/eeee5555.jpg'], 'the cron must reach R2, not just the report');

@@ -6,11 +6,18 @@
  * and 1280px. A browser fixture beside ui-kit.html, served only by a local
  * `vite` dev server, never reachable from production.
  *
- *   /tests/browser/catalog.html?lang=ar|en&view=manager|editor|collections|product
+ *   /tests/browser/catalog.html?lang=ar|en&view=manager|editor|collections|product[&granted=1]
+ *
+ * Phase 4 (§9.4 files on products): the editor's «الملفات» section and the
+ * product page's files block read four files — a preview with a mesh, a
+ * printable, a reference sheet and instructions; `granted=1` answers the
+ * public list as a buyer who holds them. A viewer mint is recorded on
+ * `window.__viewerMints` for scripts/e2e-catalog.mjs.
  *
  * `window.fetch` answers the endpoints these screens call with the shapes the
  * Worker returns (tests/catalogRoutes.test.ts pins those shapes).
  */
+import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { LanguageProvider } from '../../src/LanguageContext';
@@ -100,7 +107,52 @@ const PUBLIC_PRODUCT = {
   })),
 };
 
-function answer(path: string, method: string): { status: number; body: unknown } {
+// ---- files on products (§9.4). The shapes tests/productFiles.test.ts pins.
+const granted = params.get('granted') === '1';
+const FILE_ROWS = [
+  { id: 'f1', role: 'preview', name: 'dragon-preview.stl', bytes: 2_516_582, kind: 'model', has_preview: true, file_key: 'merchants/u/product-files/a.stl', mime: 'model/stl' },
+  { id: 'f2', role: 'download_after_purchase', name: 'dragon-printable.3mf', bytes: 41_943_040, kind: 'model', has_preview: false, file_key: 'merchants/u/product-files/b.3mf', mime: 'model/3mf' },
+  { id: 'f3', role: 'reference', name: lang === 'en' ? 'Assembly reference.pdf' : 'مرجع التجميع.pdf', bytes: 812_000, kind: 'document', has_preview: false, file_key: 'merchants/u/product-files/c.pdf', mime: 'application/pdf' },
+  { id: 'f4', role: 'instruction', name: lang === 'en' ? 'Printing guide.pdf' : 'دليل الطباعة.pdf', bytes: 1_234_567, kind: 'document', has_preview: false, file_key: 'merchants/u/product-files/d.pdf', mime: 'application/pdf' },
+];
+let ownerFiles = FILE_ROWS.map((f, i) => ({ ...f, position: i, created_at: '2026-09-20T10:00:00Z' }));
+const publicFiles = () =>
+  FILE_ROWS.map(({ file_key: _k, mime: _m, ...f }) => ({ ...f, downloadable: f.role !== 'preview' && granted, granted }));
+(window as unknown as { __viewerMints: string[] }).__viewerMints = [];
+
+function filesAnswer(path: string, method: string, body: Record<string, unknown>): { status: number; body: unknown } | null {
+  if (path === '/api/product-files/ali3d/p1' && method === 'GET') return { status: 200, body: { success: true, files: publicFiles() } };
+  const mint = /^\/api\/product-files\/ali3d\/p1\/(f\d)\/viewer-token$/.exec(path);
+  if (mint && method === 'POST') {
+    (window as unknown as { __viewerMints: string[] }).__viewerMints.push(mint[1]);
+    return { status: 200, body: { success: true, token: 'tok', url: '/model-viewer/tok', expires_at: '2099-01-01T00:00:00Z', grant: granted ? 'full' : 'preview' } };
+  }
+  if (path === '/api/merchant/products/p1/files' && method === 'GET') return { status: 200, body: { success: true, files: ownerFiles, max: 12 } };
+  if (path === '/api/merchant/products/p1/files' && method === 'POST') {
+    const file = { ...ownerFiles[1], id: `f${ownerFiles.length + 1}`, name: String(body.name ?? 'new.stl'), role: String(body.role ?? 'download_after_purchase'), position: ownerFiles.length, has_preview: false };
+    ownerFiles = [...ownerFiles, file];
+    return { status: 201, body: { success: true, file } };
+  }
+  if (path === '/api/merchant/products/p1/files/order' && method === 'PUT') {
+    const ids = (body.ids as string[]) ?? [];
+    ownerFiles = ids.map((id, i) => ({ ...ownerFiles.find((f) => f.id === id)!, position: i })).filter((f) => f.id);
+    return { status: 200, body: { success: true, files: ownerFiles } };
+  }
+  const one = /^\/api\/merchant\/products\/p1\/files\/(f\d+)$/.exec(path);
+  if (one && method === 'PATCH') {
+    ownerFiles = ownerFiles.map((f) => (f.id === one[1] ? { ...f, ...(typeof body.role === 'string' ? { role: body.role } : {}), ...(typeof body.name === 'string' ? { name: body.name } : {}) } : f));
+    return { status: 200, body: { success: true, file: ownerFiles.find((f) => f.id === one[1]) } };
+  }
+  if (one && method === 'DELETE') {
+    ownerFiles = ownerFiles.filter((f) => f.id !== one[1]);
+    return { status: 200, body: { success: true } };
+  }
+  return null;
+}
+
+function answer(path: string, method: string, body: Record<string, unknown> = {}): { status: number; body: unknown } {
+  const files = filesAnswer(path, method, body);
+  if (files) return files;
   if (path === '/api/auth/me') return { status: 200, body: { success: true, user: { id: 'buyer', name: 'Sara', email: 's@x.co', role: 'user' } } };
   if (path === '/api/storefront/resolve') return { status: 200, body: { success: true, kind: 'main', store: null } };
   if (path === '/api/merchant/products/stats') return { status: 200, body: { success: true, totals: { total: 4, published: 2, draft: 1, hidden: 1, archived: 0, out_of_stock: 1, low_stock: 1, views: 480, sold: 58 }, categories: [] } };
@@ -117,7 +169,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   const u = new URL(url, location.origin);
   if (!u.pathname.startsWith('/api/')) return realFetch(input, init);
-  const r = answer(u.pathname, (init?.method ?? 'GET').toUpperCase());
+  let body: Record<string, unknown> = {};
+  try {
+    if (typeof init?.body === 'string') body = JSON.parse(init.body) as Record<string, unknown>;
+  } catch {
+    /* not JSON */
+  }
+  const r = answer(u.pathname, (init?.method ?? 'GET').toUpperCase(), body);
   await new Promise((res) => setTimeout(res, 40));
   return new Response(JSON.stringify(r.body), { status: r.status, headers: { 'content-type': 'application/json' } });
 };
@@ -131,6 +189,22 @@ function Dashboard({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * The editor OPENS AFTER MOUNT, as the real doors open it (`?new=1`, a row's
+ * tap): a Sheet v2 that is already open at first paint on a phone measures its
+ * detent before `useIsPhone` has reported, keeps `height: auto`, and the 360
+ * e2e could not scroll to the file rows.
+ */
+function EditorView() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(true), []);
+  return (
+    <Dashboard>
+      <ProductEditorSheet open={open} productId="p1" canSell collections={COLLECTIONS as never} onClose={() => {}} onSaved={() => {}} />
+    </Dashboard>
+  );
+}
+
 function App() {
   if (view === 'product') {
     return (
@@ -140,13 +214,7 @@ function App() {
     );
   }
   if (view === 'collections') return <Dashboard><CollectionsManager canSell /></Dashboard>;
-  if (view === 'editor') {
-    return (
-      <Dashboard>
-        <ProductEditorSheet open productId="p1" canSell collections={COLLECTIONS as never} onClose={() => {}} onSaved={() => {}} />
-      </Dashboard>
-    );
-  }
+  if (view === 'editor') return <EditorView />;
   return <Dashboard><CatalogManager canSell store={STORE} /></Dashboard>;
 }
 

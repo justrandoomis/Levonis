@@ -162,6 +162,10 @@ export interface ProductCardData {
   name_ar: string;
   /** The first picture only — a card shows one. */
   images: string[];
+  /** The second picture, shown on hover / focus (storefront L10); null when the product has one picture. */
+  image_2?: string | null;
+  /** The product carries a video (`community_product_media`): the card draws a ▶ mark, never the video. */
+  has_video?: boolean;
   price_iqd: number;
   original_price_iqd: number | null;
   /** Availability, never the count. */
@@ -182,6 +186,8 @@ export interface CollectionData {
   name: string;
   name_ar: string;
   product_count: number;
+  /** The merchant's cover (`merchant_store_sections.image_key`, storefront L9), as its `/files/` URL, or null. */
+  image_url?: string | null;
 }
 
 export interface ServiceData {

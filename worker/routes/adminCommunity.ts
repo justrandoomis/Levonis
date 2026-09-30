@@ -27,7 +27,7 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, str, int, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { getSetting } from '../lib/settings';
+import { getSetting, setSetting } from '../lib/settings';
 import { afterCommunityGateWrite, afterStorefrontWrite } from '../lib/edgePolicy';
 import { releaseEscrow, refundEscrow, escrowForOrder, getEscrow } from '../lib/escrowOps';
 import { announceCustomOrder } from '../lib/chatCards';
@@ -172,6 +172,78 @@ adminCommunityRoutes.get('/settings', async (c) => {
   const out: Record<string, string> = {};
   for (const k of FEE_KEYS) out[k] = String((await getSetting(c.env.DB, k)) ?? '');
   return c.json({ success: true, settings: out });
+});
+
+// ------------------------------------------------- the upload ceilings (§9.4)
+
+/**
+ * `uploadLimits` (megabytes per kind of file, the part size, the session
+ * life) and `uploadQuotas` (GiB per owner per purpose), with the bounds an
+ * admin form is not trusted to keep: a part under 5 MiB is one R2 refuses, a
+ * session that lives a week is a week of parts nobody will finish.
+ */
+const UPLOAD_LIMIT_BOUNDS: Record<string, [number, number]> = {
+  image_mb: [1, 1024],
+  video_mb: [1, 4096],
+  model_mb: [1, 4096],
+  archive_mb: [1, 4096],
+  document_mb: [1, 1024],
+  chunk_mb: [5, 40], // the platform accepts no body over 40 MiB anywhere (SESSION_PART_MAX_BYTES, the gateway class)
+  session_hours: [1, 168],
+};
+const UPLOAD_QUOTA_BOUNDS: Record<string, [number, number]> = {
+  post_gb: [0, 1024],
+  product_file_gb: [0, 1024],
+  request_gb: [0, 1024],
+};
+
+/**
+ * THE UPLOAD KEYS ON THE SAME PATCH, WITHOUT THE FINANCIAL SCOPE. (Reading
+ * them needs no route of its own: the generic GET /api/admin/settings serves
+ * every SETTING_DEFAULTS key, these two included.) A file
+ * ceiling moves no money, so any admin may set it; the commission keys below
+ * keep their `requireFinancialScope`. Registered AHEAD of that handler: a
+ * body carrying `uploadLimits` / `uploadQuotas` is handled here, audited as
+ * `admin.upload_limits`, and the fee keys — if the same body carries any —
+ * are handed on to the financial handler with `next()`. A body with neither
+ * upload key passes straight through untouched.
+ */
+adminCommunityRoutes.patch('/settings', async (c, next) => {
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+  const limitsPatch = isObject(body.uploadLimits) ? body.uploadLimits : null;
+  const quotasPatch = isObject(body.uploadQuotas) ? body.uploadQuotas : null;
+  if (!limitsPatch && !quotasPatch) return next();
+
+  const admin = c.get('user')!;
+  const before: Record<string, unknown> = {};
+  const after: Record<string, unknown> = {};
+  if (limitsPatch) {
+    const current = await getSetting(c.env.DB, 'uploadLimits');
+    const merged: Record<string, number> = { ...current };
+    for (const [field, [min, max]] of Object.entries(UPLOAD_LIMIT_BOUNDS)) {
+      if (limitsPatch[field] === undefined) continue;
+      merged[field] = int(limitsPatch[field], `uploadLimits.${field}`, { min, max });
+    }
+    await setSetting(c.env.DB, 'uploadLimits', merged);
+    before.uploadLimits = current;
+    after.uploadLimits = merged;
+  }
+  if (quotasPatch) {
+    const current = await getSetting(c.env.DB, 'uploadQuotas');
+    const merged: Record<string, number> = { ...current };
+    for (const [field, [min, max]] of Object.entries(UPLOAD_QUOTA_BOUNDS)) {
+      if (quotasPatch[field] === undefined) continue;
+      merged[field] = int(quotasPatch[field], `uploadQuotas.${field}`, { min, max });
+    }
+    await setSetting(c.env.DB, 'uploadQuotas', merged);
+    before.uploadQuotas = current;
+    after.uploadQuotas = merged;
+  }
+  await audit(c.env.DB, admin.id, 'admin.upload_limits', 'uploads', { before, after });
+
+  if (FEE_KEYS.some((k) => body[k] !== undefined)) return next();
+  return c.json({ success: true, settings: after, applies_to: 'the next upload' });
 });
 
 /**

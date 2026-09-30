@@ -1220,3 +1220,80 @@ Follow-ups: `preloadImagePath` variant (above); `worker/lib/mediaStorage.ts`
 304 costs no GET at all (not this PR's file); GIF/video `max_bytes` caps per
 layout slot are P5 (plan #5, `packages/storeLayout/src/blocks.ts`); posters
 for every new video slot (plan #9) belong to the reels phase.
+
+## 2026-09-29 — Community Phase 4 (files, viewer grants, link cards) + merchant programme P3 (Counter 0 · Storefront A · Journeys 1), the integrated working tree
+
+Ten builders' work merged into one tree (docs/COMMUNITY_ECOSYSTEM.md §4d/§9.4,
+docs/MERCHANT_PLATFORM_V2.md §C.1 row P3, docs/DECISIONS.md rows 172–176). Nothing
+here was measured in the lab; these are the bundle figures the gate prints.
+
+### Bytes (gzip −9; `npm run build`, tests/bundleBudget.test.ts 12/12; exact CSS bytes from `gzip -9c | wc -c` over `dist/assets/*.css`)
+
+| | before (P2c row above) | after | gate |
+|---|---|---|---|
+| document | 1.9 KB | 1.9 KB (5,009 B raw) | — |
+| entry chunk | 65.9 KB | **66.2 KB** (`index-*.js` 67,454 B; 307 chunks) | 120 KB (test pin 72) |
+| initial payload | 182.5 KB | **182.7 KB** over 4 files | 240 KB (test pin 200) |
+| storefront pages beyond the initial payload | 39.5 KB | **42.6 KB** | 47 KB |
+| workspace shell / with its closure | 14.6 / 24.7 KB (HEAD c41a1301, measured — the earlier «15.1 / 25.2» before column was copied from an older row) | **15.1 / 25.2 KB** (+0.5 KB: the Operate\|Design segmented, the Seam, the settle) | 25 / 32 KB |
+| CSS, all 8 files | 60,990 B (HEAD c41a1301 built with the gate's method: node zlib level 9 over `dist/assets/*.css`; the P2-exit row's 60,992 B) | **60,964 B = 59.5 KB** as the gate prints it (`gzip -9c \| wc -c` gives 60,876 B; `index-*.css` 48,067 B node / 47,844 B gzip) | 60 KB; «may not grow» against P0–P2: **met (−26 B)** — no new utility class in any Phase 4 / P3 file (each builder ran a class census against the built CSS). The earlier row's «60,845 B / −147 B» did not reproduce and is corrected here; `orderPrint-*.css` (378 B) is `OrderDetailScreen-*.css` renamed, not a saving |
+
+New lazy chunks (none in the entry, the storefront closure or the workspace shell):
+OrdersList `OrdersList-DzQ34mVI.js` 7.9 KB; ProductFilesEditor `ProductFilesEditor-Dw5pzuyV.js` 2.8 KB; ProductFiles
+`ProductFiles-DJqoA3mJ.js` 1.6 KB; LinkSheet `LinkSheet-xI7DsWYT.js` 1.0 KB; UploadTile `UploadTile-DwuXNwCc.js` 5.7 KB;
+the SHA-256 worker `sha256.worker-DLW96Ikd.js` 1.5 KB.
+`tests/bundleBudget.test.ts` WORKSPACE_SCREENS now pins `OrdersList` as lazy beside
+`OrdersSection`/`OrderDetailScreen`.
+
+What grew and why: the storefront closure +3.2 KB against HEAD (40,450 → 43,686 B: the theme chunk +1.6 KB
+for the blocks' runtime, StoreRenderer +0.7 KB, `community/files/api.ts` 654 B as a new static member, the
+two pages +0.3 KB — recorded against P2c's open «may not grow» item; the files door itself is now asked only
+when the product read's `file_count` is not 0) (in-store search field + sort `Segmented`,
+review chips / photo strip / «المزيد», collection covers, the card's second-image swap and video
+mark, the product page's files read + lazy mount, the storefront strings file in three languages);
+the entry +0.3 KB (`ApiOrder.store`, the orders pages' store line, the `'ku'→'ckb'` clock; the
+chat's link branch sits inside the lazy Chat chunk). `SalesTabs.OrdersTab` is still built
+(`SalesTabs-bAXM-snZ.js` 10.2 KB) because three tests outside P3b's ownership pin it; retiring it is the
+recorded CSS payback still owed (docs/MERCHANT_PLATFORM_V2.md §C.1 P3).
+
+### Review fixes (2026-09-30; DECISIONS row 177)
+
+Static-import closures beyond the initial payload, gzip −9 (node zlib, the gate's method), HEAD c41a1301 →
+as merged → after the fixes:
+
+| page / chunk | HEAD | merged | **after** | what moved |
+|---|---|---|---|---|
+| Chat | 37,406 B | 84,392 B | **47,767 B** | `vendor-motion` (16,046 B) and `refusalStrings` (20,777 B) left: `UploadTile` and `LinkCard` render `m.*` under `<MotionFeatures>` and load the sentences on the first failure; what remains of the growth is the tile (6,159 B), the card (2,636 B) and `useLinkCard` (775 B) |
+| Requests | 100,080 B | 127,257 B | **111,416 B** | the same tile, no `vendor-motion` |
+| workspace shell (own / closure) | 14,964 / 37,567 B | 15,482 / 54,307 B | **15,488 / 38,271 B** | the Seam, the settle and the badge are `m.*` under `<MotionFeatures>`; `vendor-motion` is no longer a static import of the frame (the gate now prints the shell's vendor share and pins the features chunk out) |
+| Today (own / closure) | 5,874 / 45,083 B | 14,897 / 95,953 B | **15,110 / 56,521 B** (18,250 B beyond the shell) | the restock sheet is a lazy chunk, the sentences load on the first refusal, the ticket list is `m.li`, and the `Switch` primitive — the last path to the features chunk — renders `m.span`; the chunk's own bytes are the Counter's three-language strings. New pin: `TODAY_SCREEN_BUDGET` 18 KB, no `vendor-motion`, no `refusalStrings`, no `RestockSheet` in its closure |
+| orders list (OrdersSection / OrdersList) | 38,490 / 77,315 B (SalesTabs) | 55,318 / 94,100 B | **39,265 / 78,228 B** | the tray and the chip are `m.*`; the `Switch` fix; `refusalStrings` stays (the row's `merchantRefusal`, as at HEAD) |
+| Project (reader) | 87,366 B | 104,861 B | **96,758 B** | `FileComposer` is its own module: the reader's `FileRows` no longer carries the tile, the switch and the input (FileRows 1,384 B) |
+| storefront pages (own) | 40,450 B | 43,658 B | **43,686 B** (42.7 KB) | unchanged in kind; the product read carries `file_count` so the files door is asked only when there is something behind it |
+| entry / initial | 65.9 / 182.5 KB (P2c row) | 67,454 B = 66.2 KB / 182.7 KB | **67,741 B = 66.2 KB / 187,158 B = 182.8 KB** over 4 files | +287 B against the merge (the `file_count` gate, the bulk deadline) |
+
+Server side (no bundle figure): the product-files list reads the store and the product in one wave and folds
+the viewer's grants into the files statement (one wave fewer for a member); `productFilesReady` is memoised
+(one `LIMIT 0` probe per isolate instead of one per checkout); `GET /api/link-cards` is session-free, so a
+member's feed hits the colo entry as a guest's does; the bulk status door reads its whole list in one statement
+and defers each move's audit row and chat card past the response, while the client's deadline grows with the
+list and the screen re-reads on any failure.
+
+### Tests
+
+After the review fixes (2026-09-30): `npm run check` exit 0; `npm run build` exit 0 and
+`tests/bundleBudget.test.ts` 12 / 12 (entry 66.2 KB, initial 182.8 KB over 4 files, storefront pages 42.7 KB,
+workspace shell 15.1 / 25.2 KB, Today 14.8 KB, CSS 59.5 KB); `tests/motionLazy.test.ts` 4 / 4;
+`node scripts/migrate-check.mjs --twice` ✔ through 0158 (244 tables, 0 FK violations); root suite
+`node scripts/test-all.mjs` 8,153 / 8,154 on the first pass — the one failure (storeLayoutRoutes, a
+pre-0122 database inheriting another handle's `productFilesReady` memo) fixed by keying the memo per
+database handle, `tests/storeLayoutRoutes.test.ts` 26 / 26 on the re-run; browser: `scripts/e2e-projects.mjs`
+493 / 0, `scripts/e2e-community-home.mjs` 867 / 0, `scripts/e2e-catalog.mjs` 104 / 0 (the 360 editor scenes
+reach the file rows now that the fixture opens the sheet after mount).
+
+Root suite `node --import tsx --test tests/*.test.ts` 7,468 / 7,468 after integration;
+`node scripts/test-workspaces.mjs` 361 / 361 (the gateway's routing, rate-limit-parity and body-class
+registries gained the three new mounts and the session part class); Studio 313 pass, 6 declared
+skips; `npm run check` exit 0; `node scripts/migrate-check.mjs --twice` ✔ through 0158; browser:
+`scripts/e2e-projects.mjs` 493 / 0, `scripts/e2e-community-home.mjs` 867 / 0,
+`scripts/e2e-catalog.mjs` 104 / 0 (files editor and product files), `scripts/e2e-store-builder.mjs` 34 / 0.

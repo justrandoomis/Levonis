@@ -44,6 +44,11 @@ import { orderCreditStateSql } from '../lib/merchantLedger';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { notifyOrderStatus } from '../lib/orderNotify';
+// The orders list's `?q=` (P3b): D1-safe LIKE patterns, the phone-digit rule
+// the workspace search already applies, and the CSV response shape.
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
+import { phoneDigits, SEARCH_MAX } from './merchantWorkspace';
+import { csvResponse, CSV_MAX_ROWS } from '../lib/csv';
 import { cancelStoreOrder, STORE_RELEASE_DAYS } from '../lib/storeOrderOps';
 import { stageForLegacyStatus } from '../lib/orderStages';
 import { newHistoryId } from '../lib/orderStageOps';
@@ -60,6 +65,8 @@ import {
 } from '../lib/merchantDelivery';
 import { deliveryCoverage, validateDeliveryConfig } from '@levonis/shipping/merchantDelivery';
 import { CUSTOM_ORDER_EARNED_SQL, CUSTOM_ORDER_KEPT_RECEIVABLE_SQL } from '../lib/communityStates';
+import { openNow } from '../lib/storeHours';
+import { BAGHDAD_OFFSET_MS } from '../lib/baghdadTime';
 
 export const merchantRoutes = new Hono<AppContext>();
 
@@ -92,6 +99,10 @@ function storePublicShape(ctx: StoreContext, rootDomain: string | null) {
     contact_phone: s.contact_phone,
     contact_phone_public: !!s.contact_phone_public,
     business_hours: safeParse(s.business_hours, []),
+    // «مفتوح الآن» from the hours themselves, in Baghdad time, and the
+    // instant that word next changes (worker/lib/storeHours.ts; merchant
+    // platform v2 §4.4). The vacation columns arrive with P7 — null until then.
+    ...openNow(safeParse(s.business_hours, []), null, Date.now()),
     policies: safeParse(s.policies, {}),
     delivery_settings: safeParse(s.delivery_settings, {}),
     social_links: safeParse(s.social_links, {}),
@@ -1018,6 +1029,112 @@ function releaseAfter(o: Record<string, unknown>): string | null {
 // From the merchant ledger (worker/lib/merchantLedger.ts): pending / available / reversed.
 const CREDIT_STATE_SQL = orderCreditStateSql('o.id');
 
+/** The governorate an order went to: the applied rule's, else the address's (merchantCustomers.ts). */
+const ORDER_GOVERNORATE_SQL =
+  `COALESCE(NULLIF(o.delivery_governorate, ''), CASE WHEN json_valid(o.address_snapshot) THEN json_extract(o.address_snapshot, '$.governorate') END, '')`;
+
+/**
+ * The phone the store was GIVEN on this order (the address snapshot), with the
+ * separators people type removed — matched, never selected (review W2-5 p7:
+ * the account phone `users.phone_e164` is not searched, or a merchant could
+ * rebuild it digit by digit from the result list).
+ */
+const ORDER_PHONE_DIGITS_SQL =
+  `replace(replace(replace(CASE WHEN json_valid(o.address_snapshot) THEN COALESCE(json_extract(o.address_snapshot, '$.phone'), '') ELSE '' END, ' ', ''), '-', ''), '+', '')`;
+
+/** A day the merchant typed into `from` / `to` — `YYYY-MM-DD` and a real date, or ''. */
+function csvDay(raw: unknown, name: string): string {
+  const v = str(raw, name, { max: 10, required: false });
+  if (!v) return '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(Date.parse(`${v}T00:00:00.000Z`))) {
+    throw badRequest(`${name} must be a day, YYYY-MM-DD`, 'BAD_DATE');
+  }
+  return v;
+}
+
+/**
+ * A typed day is a BAGHDAD day — the merchant's, as worker/lib/storeHours.ts
+ * reads it: 00:00 in Baghdad is 21:00 UTC the evening before. An order placed
+ * at 01:30 Baghdad on the 2nd used to land in the 1st's export.
+ */
+function baghdadDayStart(day: string): string {
+  return day ? new Date(Date.parse(`${day}T00:00:00.000Z`) - BAGHDAD_OFFSET_MS).toISOString() : '';
+}
+
+/** The instant the typed day ends (the next Baghdad midnight) — `to` is inclusive of its whole day. */
+function baghdadDayEnd(day: string): string {
+  return day ? new Date(Date.parse(`${day}T00:00:00.000Z`) - BAGHDAD_OFFSET_MS + 86_400_000).toISOString() : '';
+}
+
+/**
+ * The store's orders, filtered and paged — the one query behind the list and
+ * the CSV export, so the two can never disagree about which orders exist.
+ *
+ * `q` (merchant platform v2 §4.2): a prefix of the order number (with or
+ * without the «ORD-» the ids carry, with or without a typed «#»), part of the
+ * customer's name, or four or more digits of the phone on the order's
+ * address. The phone is matched and never returned; the list's columns are
+ * the same with or without a search.
+ *
+ * Reads `limit + 1` so `next_cursor` is exact (D8): a page that happens to
+ * end on the last order says so instead of offering an empty next page.
+ */
+async function readMerchantOrders(
+  c: Context<AppContext>,
+  ctx: StoreContext,
+  f: { status: string; q: string; from: string; to: string; cursor: { at: string; id: string }; limit: number }
+): Promise<{ rows: Record<string, unknown>[]; next_cursor: string | null }> {
+  const term = f.q.replace(/^#/, '');
+  const idPrefix = likePattern(term, 'prefix');
+  const idTail = idPrefix && !/^ord-/i.test(term) ? likePattern(`ORD-${term}`, 'prefix') : idPrefix;
+  const name = likePattern(term);
+  const digits = term ? phoneDigits(term) : '';
+  // A phone is searched only from 4 digits up: fewer match half the book.
+  const phone = digits.length >= 4 ? likePattern(digits) : '';
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT o.id, o.status, o.stage, o.origin, o.total_iqd, o.subtotal_iqd, o.shipping_iqd,
+            o.platform_fee_iqd, o.merchant_receivable_iqd, o.payment_method_id,
+            o.created_at, o.updated_at, o.delivered_at, o.receipt_confirmed_at,
+            o.delivery_tracking_no AS tracking_no,
+            ${ORDER_GOVERNORATE_SQL} AS governorate,
+            u.name AS customer_name,
+            (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count,
+            ${CREDIT_STATE_SQL} AS credit_state
+       FROM orders o JOIN users u ON u.id = o.user_id
+      WHERE o.merchant_id = ?1
+        AND (?2 = '' OR o.status = ?2)
+        AND (?3 = '' OR o.created_at < ?3 OR (o.created_at = ?3 AND o.id < ?4))
+        AND (?6 = '' OR ${sqlLikeClause(['o.id'], '?6')} OR ${sqlLikeClause(['o.id'], '?7')}
+             OR ${sqlLikeClause(['u.name'], '?8')}
+             OR (?9 <> '' AND ${sqlLikeClause([ORDER_PHONE_DIGITS_SQL], '?9')}))
+        AND (?10 = '' OR o.created_at >= ?10)
+        AND (?11 = '' OR o.created_at < ?11)
+      ORDER BY o.created_at DESC, o.id DESC LIMIT ?5`
+  )
+    .bind(ctx.merchant.id, f.status, f.cursor.at, f.cursor.id, f.limit + 1, idPrefix, idTail, name, phone, baghdadDayStart(f.from), baghdadDayEnd(f.to))
+    .all<Record<string, unknown>>();
+
+  const rows = results.slice(0, f.limit);
+  const last = rows[rows.length - 1];
+  return {
+    rows,
+    next_cursor: results.length > f.limit && last ? `${String(last.created_at)}|${String(last.id)}` : null,
+  };
+}
+
+/** The list's own query words: the status filter and the search, checked once for both readers. */
+async function orderListFilters(c: Context<AppContext>): Promise<{ status: string; q: string }> {
+  const status = str(c.req.query('status'), 'status', { max: 30, required: false });
+  const q = str(c.req.query('q'), 'q', { max: 200, required: false });
+  if (q) {
+    // As the inbox and the customers list: a search is a typed request, limited as one.
+    await rateLimit(c, 'merchant-orders-search', 60, 60);
+    if ([...q].length > SEARCH_MAX) throw new HttpError(400, `At most ${SEARCH_MAX} characters`, 'SEARCH_QUERY_TOO_LONG');
+  }
+  return { status, q };
+}
+
 /**
  * Both commerce paths in one list, with an origin filter (§74).
  *
@@ -1029,27 +1146,52 @@ merchantRoutes.get('/orders', async (c) => {
   const ctx = await requireStoreOwner(c);
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 30 });
   const cursor = keysetCursor(c.req.query('cursor'));
-  const status = c.req.query('status') || '';
+  const { status, q } = await orderListFilters(c);
+  const { rows, next_cursor } = await readMerchantOrders(c, ctx, { status, q, from: '', to: '', cursor, limit });
 
-  const { results } = await c.env.DB.prepare(
-    `SELECT o.id, o.status, o.stage, o.origin, o.total_iqd, o.subtotal_iqd, o.shipping_iqd,
-            o.platform_fee_iqd, o.merchant_receivable_iqd, o.payment_method_id,
-            o.created_at, o.updated_at, o.delivered_at, o.receipt_confirmed_at,
-            u.name AS customer_name,
-            (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count,
-            ${CREDIT_STATE_SQL} AS credit_state
-       FROM orders o JOIN users u ON u.id = o.user_id
-      WHERE o.merchant_id = ?1
-        AND (?2 = '' OR o.status = ?2)
-        AND (?3 = '' OR o.created_at < ?3 OR (o.created_at = ?3 AND o.id < ?4))
-      ORDER BY o.created_at DESC, o.id DESC LIMIT ?5`
-  ).bind(ctx.merchant.id, status, cursor.at, cursor.id, limit).all<Record<string, unknown>>();
-
+  c.header('Cache-Control', 'private, no-store');
   return c.json({
     success: true,
-    orders: results.map((o) => ({ ...o, release_after: releaseAfter(o) })),
-    next_cursor: nextKeyset(results, limit, 'created_at', 'id'),
+    ...(q ? { q } : {}),
+    orders: rows.map((o) => ({ ...o, release_after: releaseAfter(o) })),
+    next_cursor,
   });
+});
+
+/** The CSV's columns — what the list already shows, and nothing the list withholds (no phone, no street). */
+const ORDER_CSV_COLUMNS = [
+  'order_id', 'status', 'created_at', 'customer', 'governorate', 'items',
+  'subtotal_iqd', 'shipping_iqd', 'total_iqd', 'your_share_iqd', 'payment_method', 'tracking_no',
+] as const;
+
+/** One list row as the CSV's cells, in `ORDER_CSV_COLUMNS` order. Pure, for the test. */
+export function orderCsvRow(o: Record<string, unknown>): string[] {
+  const cell = (v: unknown) => (v == null ? '' : String(v));
+  return [
+    cell(o.id), cell(o.status), cell(o.created_at), cell(o.customer_name), cell(o.governorate), cell(o.item_count),
+    cell(o.subtotal_iqd), cell(o.shipping_iqd), cell(o.total_iqd), cell(o.merchant_receivable_iqd),
+    cell(o.payment_method_id), cell(o.tracking_no),
+  ];
+}
+
+/**
+ * The list as a spreadsheet — the current filter (`status`, `q`), a day range
+ * (`from` / `to`, inclusive), at most CSV_MAX_ROWS newest rows. Registered
+ * BEFORE `/orders/:id`, which would otherwise take «export.csv» for an id.
+ */
+merchantRoutes.get('/orders/export.csv', async (c) => {
+  await rateLimit(c, 'merchant-orders-export', 20, 3600);
+  const ctx = await requireStoreOwner(c);
+  const { status, q } = await orderListFilters(c);
+  const from = csvDay(c.req.query('from'), 'from');
+  const to = csvDay(c.req.query('to'), 'to');
+  const { rows, next_cursor } = await readMerchantOrders(c, ctx, {
+    status, q, from, to, cursor: { at: '', id: '' }, limit: CSV_MAX_ROWS,
+  });
+  const res = csvResponse([[...ORDER_CSV_COLUMNS], ...rows.map(orderCsvRow)], `orders${status ? `-${status}` : ''}${from ? `-${from}` : ''}${to ? `-${to}` : ''}.csv`);
+  // More existed than the file carries: said in a header the client can show.
+  if (next_cursor) res.headers.set('X-Truncated', '1');
+  return res;
 });
 
 /**
@@ -1133,8 +1275,8 @@ merchantRoutes.get('/orders/:id', async (c) => {
   });
 });
 
-/** The states a merchant may move their own order through. */
-const MERCHANT_ORDER_FLOW: Record<string, readonly string[]> = {
+/** The states a merchant may move their own order through (also the bulk door, merchantOrders.ts). */
+export const MERCHANT_ORDER_FLOW: Record<string, readonly string[]> = {
   pending: ['confirmed', 'cancelled'],
   confirmed: ['processing', 'cancelled'],
   processing: ['shipped', 'cancelled'],
@@ -1145,72 +1287,73 @@ const MERCHANT_ORDER_FLOW: Record<string, readonly string[]> = {
   cancelled: [],
 };
 
+/** A courier's tracking number, as `orders.delivery_tracking_no` (0028) holds it. */
+export const TRACKING_NO_MAX = 60;
+
 /**
- * Move an order forward — or cancel it, which REFUNDS the customer.
+ * The tracking number a move to `shipped` may carry (v2 §4.2): trimmed, at
+ * most TRACKING_NO_MAX characters, or '' when none was given. Its own code,
+ * so the sheet can say «طويل» beside the field rather than a generic 400.
+ * Printable characters only: a control or a bidi-format character (U+202E,
+ * a zero-width joiner) would survive HTML escaping into the history note, the
+ * CSV and the customer's tracker, where it can reverse or hide the number.
+ */
+export function readTrackingNo(raw: unknown): string {
+  if (raw === undefined || raw === null || raw === '') return '';
+  if (typeof raw !== 'string') throw badRequest('tracking_no must be a string', 'TRACKING_NO_INVALID');
+  const t = raw.trim().replace(/\s+/g, ' ');
+  if (/[\p{Cc}\p{Cf}]/u.test(t)) throw badRequest('tracking_no carries characters that cannot be printed', 'TRACKING_NO_INVALID');
+  if ([...t].length > TRACKING_NO_MAX) {
+    throw new HttpError(400, `At most ${TRACKING_NO_MAX} characters`, 'TRACKING_NO_TOO_LONG');
+  }
+  return t;
+}
+
+/**
+ * ONE FORWARD MOVE of a store order — the body of `POST /orders/:id/status`
+ * for everything but a cancel, and what the bulk door repeats per id
+ * (worker/routes/merchantOrders.ts). Throws the route's own refusals:
+ * ORDER_TRANSITION_INVALID when the flow forbids it, ORDER_CHANGED when the
+ * conditional flip lost a race.
  *
  * WHAT A MOVE WRITES, ALL IN ONE CONDITIONAL BATCH (B9): the status, the
  * customer-facing `stage` beside it (the tracker used to say «تم استلام
- * الطلب» for ever), an `order_status_history` row, and on delivery
+ * الطلب» for ever), an `order_status_history` row, on delivery
  * `delivered_at` — stamped on EVERY move into delivered, because it starts
- * the customer's three days (review F5). It used to be stamped once
- * (COALESCE): a delivery an admin walked back («I never got it» → shipped)
- * kept its old date, so the merchant's next «تم التسليم» released the money
- * the same minute, with no window after the delivery that really happened.
+ * the customer's three days (review F5) — and, on a ship that names one, the
+ * tracking number the customer's tracker already returns (`tracking_no`,
+ * worker/routes/orders.ts). No new column: the number sits in
+ * `orders.delivery_tracking_no` and the history row's note records that this
+ * move carried it.
  *
- * «تم التسليم» NO LONGER RELEASES MONEY (B10, owner decision 2026-09-24). This
- * route used to flip the sale credit to `available` on the merchant's own
- * word; it now stays `pending` until the customer confirms receipt or three
- * days pass with no open complaint.
- *
- * A CANCEL IS THE ONE STORE CANCELLATION (B2, worker/lib/storeOrderOps.ts):
- * the buyer is refunded, stock and `sold_count` and the coupon use come back,
- * and the merchant's credit is reversed — the old cancel reversed the credit
- * and kept the customer's money.
+ * «تم التسليم» NO LONGER RELEASES MONEY (B10, owner decision 2026-09-24): the
+ * credit stays `pending` until the customer confirms receipt or three days
+ * pass with no open complaint.
  */
-merchantRoutes.post('/orders/:id/status', async (c) => {
-  await rateLimit(c, 'merchant-order-status', 120, 3600);
-  const ctx = await requireStoreOwner(c);
-  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
-  const body = await c.req.json().catch(() => ({}));
-  const to = str(body.status, 'status', { min: 1, max: 30 });
-  const reason = str(body.reason, 'reason', { max: 300, required: false });
-
-  const order = await c.env.DB.prepare(
-    'SELECT * FROM orders WHERE id = ? AND merchant_id = ?'
-  ).bind(id, ctx.merchant.id).first<Record<string, unknown>>();
-  if (!order) throw notFound('Order not found');
+export async function applyMerchantOrderMove(
+  c: Context<AppContext>,
+  ctx: StoreContext,
+  order: Record<string, unknown>,
+  to: string,
+  trackingNo = '',
+  opts: {
+    /**
+     * Where the audit row and the chat card run: awaited here (the single
+     * route), or handed to the caller — the bulk door gives them to
+     * `waitUntil`, so fifty orders cost fifty conditional batches inside the
+     * request and not fifty audit + card round trips on top of them.
+     */
+    defer?: (work: Promise<void>) => void;
+  } = {}
+): Promise<void> {
+  const id = String(order.id);
   const from = String(order.status);
-
   const allowed = MERCHANT_ORDER_FLOW[from] ?? [];
-  if (!allowed.includes(to)) {
+  if (to === 'cancelled' || !allowed.includes(to)) {
     throw conflict(`An order that is ${from} cannot become ${to}`, 'ORDER_TRANSITION_INVALID');
   }
-
-  const tellCustomer = () => {
-    try {
-      c.executionCtx.waitUntil(
-        notifyOrderStatus(c.env, id, to, { defer: (work) => c.executionCtx.waitUntil(work) })
-      );
-    } catch {
-      // No ExecutionContext on this call path (a test harness): the notice is
-      // still queued, just not kept alive past the response.
-      void notifyOrderStatus(c.env, id, to);
-    }
-  };
-
-  if (to === 'cancelled') {
-    const res = await cancelStoreOrder(c.env, {
-      order,
-      actor: 'merchant',
-      actorUserId: ctx.store.user_id,
-      reason: reason || undefined,
-    });
-    if (!res.ok) throw conflict('The order changed while you were editing — reload and retry', 'ORDER_CHANGED');
-    tellCustomer();
-    // The conversation the purchase came from shows it (docs/COMMUNITY_COMMERCE_CHAT.md D8).
-    await announceStoreOrder(c.env, id, 'cancelled', ctx.store.user_id);
-    return c.json({ success: true, status: 'cancelled', refunded_usd_cents: res.refundedUsdCents });
-  }
+  // Only a ship carries a tracking number; on any other move it is ignored.
+  const tracking = to === 'shipped' ? trackingNo : '';
 
   const ts = nowIso();
   const stage = stageForLegacyStatus(to, 'direct');
@@ -1219,18 +1362,19 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
       `UPDATE orders SET status = ?1, stage = ?2, stage_changed_at = ?3, stage_source = 'manual',
               next_stage = '', next_stage_at = NULL,
               delivered_at = CASE WHEN ?1 = 'delivered' THEN ?3 ELSE delivered_at END,
+              delivery_tracking_no = CASE WHEN ?7 <> '' THEN ?7 ELSE delivery_tracking_no END,
               updated_at = ?3
         WHERE id = ?4 AND merchant_id = ?5 AND status = ?6`
-    ).bind(to, stage, ts, id, ctx.merchant.id, from),
+    ).bind(to, stage, ts, id, ctx.merchant.id, from, tracking),
     // The customer's tracker reads this table. Written only by the batch whose
     // flip landed: the row must be at THIS status with THIS batch's timestamp.
     c.env.DB.prepare(
       `INSERT OR IGNORE INTO order_status_history (id, order_id, stage, status, source, changed_at, changed_by, note)
-       SELECT ?1, ?2, ?3, ?4, 'manual', ?5, ?6, 'Moved by the store'
+       SELECT ?1, ?2, ?3, ?4, 'manual', ?5, ?6, ?7
         WHERE EXISTS (SELECT 1 FROM orders WHERE id = ?2 AND status = ?4 AND stage_changed_at = ?5)`
     // The status in the id: two moves of one order inside one millisecond
     // (a fast double step) must not collide into one silently ignored row.
-    ).bind(`${newHistoryId(id, ts)}_${to}`, id, stage, to, ts, ctx.store.user_id),
+    ).bind(`${newHistoryId(id, ts)}_${to}`, id, stage, to, ts, ctx.store.user_id, tracking ? `Moved by the store · tracking ${tracking}` : 'Moved by the store'),
   ];
 
   if (to === 'delivered') {
@@ -1275,7 +1419,6 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
   if ((results[0]?.meta?.changes ?? 0) === 0) {
     throw conflict('The order changed while you were editing — reload and retry', 'ORDER_CHANGED');
   }
-  await audit(c.env.DB, ctx.store.user_id, 'merchant.order_status', id, { from, to });
   /*
    * THE BUYER IS TOLD, AS THE PLATFORM'S OWN DOORS TELL THEM.
    *
@@ -1286,10 +1429,89 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
    * key (so a replay is silent), and nothing for `processing`. After the
    * response, and flushed straight away rather than at the next cron.
    */
-  tellCustomer();
-  // …and so does the conversation the purchase came from (D8), once per move.
-  await announceStoreOrder(c.env, id, to, ctx.store.user_id);
-  return c.json({ success: true, status: to });
+  tellOrderCustomer(c, id, to);
+  const after = async () => {
+    await audit(c.env.DB, ctx.store.user_id, 'merchant.order_status', id, { from, to, ...(tracking ? { tracking: true } : {}) });
+    // …and so does the conversation the purchase came from (D8), once per move.
+    await announceStoreOrder(c.env, id, to, ctx.store.user_id);
+  };
+  if (opts.defer) opts.defer(after());
+  else await after();
+}
+
+/** The customer's notice, kept alive past the response where there is an ExecutionContext. */
+function tellOrderCustomer(c: Context<AppContext>, id: string, to: string): void {
+  try {
+    c.executionCtx.waitUntil(
+      notifyOrderStatus(c.env, id, to, { defer: (work) => c.executionCtx.waitUntil(work) })
+    );
+  } catch {
+    // No ExecutionContext on this call path (a test harness): the notice is
+    // still queued, just not kept alive past the response.
+    void notifyOrderStatus(c.env, id, to);
+  }
+}
+
+/**
+ * Move an order forward — or cancel it, which REFUNDS the customer.
+ *
+ * WHAT A MOVE WRITES, ALL IN ONE CONDITIONAL BATCH (B9): the status, the
+ * customer-facing `stage` beside it (the tracker used to say «تم استلام
+ * الطلب» for ever), an `order_status_history` row, and on delivery
+ * `delivered_at` — stamped on EVERY move into delivered, because it starts
+ * the customer's three days (review F5). It used to be stamped once
+ * (COALESCE): a delivery an admin walked back («I never got it» → shipped)
+ * kept its old date, so the merchant's next «تم التسليم» released the money
+ * the same minute, with no window after the delivery that really happened.
+ *
+ * «تم التسليم» NO LONGER RELEASES MONEY (B10, owner decision 2026-09-24). This
+ * route used to flip the sale credit to `available` on the merchant's own
+ * word; it now stays `pending` until the customer confirms receipt or three
+ * days pass with no open complaint.
+ *
+ * A CANCEL IS THE ONE STORE CANCELLATION (B2, worker/lib/storeOrderOps.ts):
+ * the buyer is refunded, stock and `sold_count` and the coupon use come back,
+ * and the merchant's credit is reversed — the old cancel reversed the credit
+ * and kept the customer's money.
+ */
+merchantRoutes.post('/orders/:id/status', async (c) => {
+  await rateLimit(c, 'merchant-order-status', 120, 3600);
+  const ctx = await requireStoreOwner(c);
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = await c.req.json().catch(() => ({}));
+  const to = str(body.status, 'status', { min: 1, max: 30 });
+  const reason = str(body.reason, 'reason', { max: 300, required: false });
+  // Read before the order, so a too-long number is refused as itself — not as
+  // a move that failed for no visible reason.
+  const trackingNo = readTrackingNo(body.tracking_no);
+
+  const order = await c.env.DB.prepare(
+    'SELECT * FROM orders WHERE id = ? AND merchant_id = ?'
+  ).bind(id, ctx.merchant.id).first<Record<string, unknown>>();
+  if (!order) throw notFound('Order not found');
+  const from = String(order.status);
+
+  const allowed = MERCHANT_ORDER_FLOW[from] ?? [];
+  if (!allowed.includes(to)) {
+    throw conflict(`An order that is ${from} cannot become ${to}`, 'ORDER_TRANSITION_INVALID');
+  }
+
+  if (to === 'cancelled') {
+    const res = await cancelStoreOrder(c.env, {
+      order,
+      actor: 'merchant',
+      actorUserId: ctx.store.user_id,
+      reason: reason || undefined,
+    });
+    if (!res.ok) throw conflict('The order changed while you were editing — reload and retry', 'ORDER_CHANGED');
+    tellOrderCustomer(c, id, 'cancelled');
+    // The conversation the purchase came from shows it (docs/COMMUNITY_COMMERCE_CHAT.md D8).
+    await announceStoreOrder(c.env, id, 'cancelled', ctx.store.user_id);
+    return c.json({ success: true, status: 'cancelled', refunded_usd_cents: res.refundedUsdCents });
+  }
+
+  await applyMerchantOrderMove(c, ctx, order, to, trackingNo);
+  return c.json({ success: true, status: to, ...(to === 'shipped' && trackingNo ? { tracking_no: trackingNo } : {}) });
 });
 
 // ---------------------------------------------------------------- payouts

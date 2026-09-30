@@ -114,6 +114,7 @@ export type GuardedFetchErrorCode =
   | 'FETCH_TIMEOUT'
   | 'FETCH_FAILED'
   | 'HTTP_ERROR'
+  | 'HOST_NOT_ALLOWED'
   | 'BAD_REDIRECT'
   | 'TOO_MANY_REDIRECTS'
   | 'SOURCE_TOO_LARGE'
@@ -205,6 +206,13 @@ export interface GuardedFetchOptions {
   headers?: HeadersInit;
   budget?: GuardedFetchBudget;
   fetcher?: typeof fetch;
+  /**
+   * An allow-list on top of the address guard, asked for EVERY hop — the first
+   * address and each redirect target — before its request is sent. A caller
+   * that may only talk to named hosts (the link cards) fails a redirect off
+   * the list here, with no request to the landing page and no byte of it read.
+   */
+  allowHost?: (hostname: string) => boolean;
 }
 
 export interface GuardedFetchResult {
@@ -247,6 +255,9 @@ export async function guardedFetchBytes(rawUrl: string, options: GuardedFetchOpt
       // Validate again at the point of use. This is intentionally redundant
       // for the first hop and makes future loop edits fail closed.
       target = validateOutboundUrl(target.toString());
+      if (options.allowHost && !options.allowHost(target.hostname)) {
+        throw new GuardedFetchError('HOST_NOT_ALLOWED', `${target.hostname} is not on the allow-list`);
+      }
       if (options.budget) {
         if (options.budget.fetches <= 0) {
           throw new GuardedFetchError('FETCH_BUDGET_EXCEEDED', 'Outbound fetch budget exhausted');

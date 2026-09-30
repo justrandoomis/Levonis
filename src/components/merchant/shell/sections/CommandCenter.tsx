@@ -1,10 +1,14 @@
 /**
- * THE COMMAND CENTER — `/merchant`: «ما الذي يحتاج انتباهي الآن».
+ * TODAY — `/merchant`: «ما الذي يحتاج انتباهي الآن» (merchant platform v2
+ * §3.2, «The Counter»).
  *
- * One list of the things that are waiting on the merchant, each a door to
- * the screen where it is done, from ONE read (GET /api/merchant/attention,
- * shared with the shell's badges). Then this week in four figures from the
- * analytics report.
+ * The status strip (the store, the clock word from the server's hours, the
+ * pause switch), the Pulse (open · published · P4: fast), the problems, ONE
+ * queue of what is waiting — each ticket a door to the screen where it is
+ * done, its first rows under it with the action done ON the row (confirm an
+ * order, restock a product) — this week's figures, the dock of daily doors,
+ * and «جهّز متجرك» while it is not finished. All the counts come from ONE
+ * read (GET /api/merchant/attention, shared with the shell's badges).
  *
  * WHAT IT WILL NOT DO:
  *   · show a row whose source did not answer — the server leaves the field
@@ -13,47 +17,72 @@
  *     waiting» is said once, in words, when every source answered and all
  *     of them are zero;
  *   · invent a trend — the figures, their week-on-week change and the
- *     fortnight line are the report's own rows (./kpis.ts says how);
+ *     fortnight line are the report's own rows (../kpis.ts says how);
+ *   · decide anything on the client — a confirm is POST /orders/:id/status,
+ *     a restock is PATCH /products/:id, and a refusal is rendered as the
+ *     store's own sentence (src/lib/refusalStrings.ts), never the raw text;
  *   · stop a lapsed merchant — the analytics are PLUS, and without it the
- *     figures say so in one line instead of standing where the list is
- *     (audit 01 B17: the old Overview put an error on the landing screen).
+ *     figures say so in one line instead of standing where the list is.
+ *
+ * Motion (§5): a ticket leaves after its action succeeds — `m.li layout`
+ * inside `AnimatePresence`, `m.spring('ui')`; under reduced motion it
+ * cross-fades. Every spring through `useMotion()`.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+// `AnimatePresence` is in the core half of the library; the elements are
+// `m.*` under <MotionFeatures> (src/lib/motionFeatures.tsx), never the
+// `motion` proxy — this is the merchant's landing screen, and the proxy would
+// add the animation-features chunk to every workspace open.
+import { AnimatePresence } from 'motion/react';
+import * as Motion from 'motion/react-m';
 import {
   AlertTriangle, ChevronRight, Circle, CircleCheck, ClipboardList, Hourglass, Inbox, MessageCircle, Package, PackageX,
-  ShoppingBag, Star, Tag, Truck, Wallet,
+  ShoppingBag, Star, Tag, Truck, Undo2, Wallet,
 } from 'lucide-react';
 import { useLanguage } from '../../../../LanguageContext';
 import { api, ApiError } from '../../../../lib/api';
 import { formatFigure } from '../../../../lib/localeNumber';
+import { useMotion } from '../../../../lib/motion';
+import { MotionFeatures } from '../../../../lib/motionFeatures';
 import { KpiTile, Sparkline } from '../../../ui/KpiTile';
 import { Money } from '../../../ui/Money';
 import { ErrorState } from '../../../ui/AsyncStates';
+import { Button, IconButton } from '../../../ui/Button';
 import { KpiRowSkeleton, ListRowsSkeleton } from '../../../ui/DashboardSkeletons';
+import { useToast } from '../../../ui/Toast';
 import { merchantHref } from '../../../../lib/merchantRoutes';
 import { useWorkspace } from '../context';
 import type { Attention, StoreProblem } from '../attention';
 import { commandKpis, type ReportLike } from '../kpis';
-import { sellingReason, type Loc } from '../strings';
+import { storeStatus } from '../status';
+import { say, sellingReason, type Loc } from '../strings';
+import { Door, type PulseLine } from '../../counter/PulseRow';
+import PulseRow from '../../counter/PulseRow';
+import QuickDock from '../../counter/QuickDock';
+import type { RestockTarget } from '../../counter/RestockSheet';
+import StatusStrip, { openStateSentence } from '../../counter/StatusStrip';
+import { fill, useCounterStrings, type CounterLang, type CounterStrings } from '../../counter/strings';
 
 type Setup = NonNullable<Attention['setup']>;
 
+/** The restock sheet opens on a tap of a sold-out row; its chunk (a Sheet, a Field, a NumberInput) is fetched then, not with Today. */
+const RestockSheet = lazy(() => import('../../counter/RestockSheet'));
+
 /** The steps of «جهّز متجرك», in the order a new store should take them. */
-export function setupSteps(setup: Setup, loc: Loc): Array<{ id: string; done: boolean; text: string; link: string }> {
-  // OWNER: Sorani to be written by hand (every step).
+export function setupSteps(setup: Setup, s: CounterStrings): Array<{ id: string; done: boolean; text: string; link: string }> {
   return [
-    { id: 'logo', done: setup.logo, text: loc('أضف شعار متجرك', 'Add your store’s logo'), link: setup.links.settings },
-    { id: 'banner', done: setup.banner, text: loc('أضف صورة الغلاف', 'Add a banner picture'), link: setup.links.settings },
-    { id: 'about', done: setup.about, text: loc('اكتب «عن المتجر»', 'Write «About»'), link: setup.links.settings },
-    { id: 'phone', done: setup.phone, text: loc('أضف رقم التواصل', 'Add a contact phone'), link: setup.links.settings },
-    { id: 'delivery', done: setup.delivery, text: loc('حدّد أين توصل وبكم', 'Set where you deliver, and for how much'), link: setup.links.delivery },
-    { id: 'products', done: setup.products > 0, text: loc('انشر أول منتج', 'Publish your first product'), link: setup.links.products },
-    { id: 'design', done: setup.design, text: loc('اختر شكل صفحتك وانشره', 'Choose your page’s look and publish it'), link: setup.links.design },
+    { id: 'logo', done: setup.logo, text: s.setup.logo, link: setup.links.settings },
+    { id: 'banner', done: setup.banner, text: s.setup.banner, link: setup.links.settings },
+    { id: 'about', done: setup.about, text: s.setup.about, link: setup.links.settings },
+    { id: 'phone', done: setup.phone, text: s.setup.phone, link: setup.links.settings },
+    { id: 'delivery', done: setup.delivery, text: s.setup.delivery, link: setup.links.delivery },
+    { id: 'products', done: setup.products > 0, text: s.setup.products, link: setup.links.products },
+    { id: 'design', done: setup.design, text: s.setup.design, link: setup.links.design },
   ];
 }
 
-interface Row {
+export interface Row {
   id: string;
   icon: ReactNode;
   text: string;
@@ -65,180 +94,361 @@ interface Row {
 
 const ic = (Icon: typeof ShoppingBag) => <Icon aria-hidden="true" className="h-5 w-5" />;
 
+/** The sources whose silence forbids «nothing waiting». */
+export const EVERY_SOURCE = ['orders', 'custom_orders', 'inbox', 'stock', 'reviews', 'returns'] as const;
+
 /** The rows, in the order a merchant should act on them. Zero and absent make no row. */
-export function attentionRows(a: Attention, loc: Loc): Row[] {
+export function attentionRows(a: Attention, s: CounterStrings): Row[] {
   const rows: Row[] = [];
   const add = (cond: unknown, row: Row) => {
     if (cond) rows.push(row);
   };
   const o = a.orders;
-  // OWNER: Sorani to be written by hand (every sentence of this list).
-  add(o?.by_stage.pending, { id: 'orders-pending', icon: ic(ShoppingBag), text: loc('طلبات جديدة تنتظر تأكيدك', 'New orders waiting for you to confirm'), value: o?.by_stage.pending, link: o?.links.pending ?? '', tone: 'warning' });
-  add(o?.by_stage.confirmed, { id: 'orders-confirmed', icon: ic(Package), text: loc('طلبات مؤكدة تنتظر التجهيز', 'Confirmed orders to prepare'), value: o?.by_stage.confirmed, link: o?.links.confirmed ?? '' });
-  add(o?.by_stage.processing, { id: 'orders-processing', icon: ic(Truck), text: loc('طلبات قيد التجهيز تنتظر الشحن', 'Orders being prepared, waiting to ship'), value: o?.by_stage.processing, link: o?.links.processing ?? '' });
+  add(o?.by_stage.pending, { id: 'orders-pending', icon: ic(ShoppingBag), text: s.tickets.ordersPending, value: o?.by_stage.pending, link: o?.links.pending ?? '', tone: 'warning' });
+  add(o?.by_stage.confirmed, { id: 'orders-confirmed', icon: ic(Package), text: s.tickets.ordersConfirmed, value: o?.by_stage.confirmed, link: o?.links.confirmed ?? '' });
+  add(o?.by_stage.processing, { id: 'orders-processing', icon: ic(Truck), text: s.tickets.ordersProcessing, value: o?.by_stage.processing, link: o?.links.processing ?? '' });
   const co = a.custom_orders;
-  add(co?.to_start, { id: 'custom-start', icon: ic(ClipboardList), text: loc('طلبات مخصصة مدفوعة تنتظر أن تبدأ', 'Paid custom orders waiting for you to start'), value: co?.to_start, link: co?.link ?? '', tone: 'warning' });
-  add(co?.in_progress, { id: 'custom-progress', icon: ic(Hourglass), text: loc('طلبات مخصصة قيد التنفيذ', 'Custom orders in progress'), value: co?.in_progress, link: co?.link ?? '' });
+  add(co?.to_start, { id: 'custom-start', icon: ic(ClipboardList), text: s.tickets.customStart, value: co?.to_start, link: co?.link ?? '', tone: 'warning' });
+  add(co?.in_progress, { id: 'custom-progress', icon: ic(Hourglass), text: s.tickets.customProgress, value: co?.in_progress, link: co?.link ?? '' });
   const inbox = a.inbox;
   add(inbox?.threads, {
     id: 'inbox',
     icon: ic(MessageCircle),
-    text: loc('محادثات فيها رسائل لم تقرأها', 'Conversations with messages you have not read'),
-    detail: inbox && inbox.messages > inbox.threads ? loc(`${inbox.messages} رسالة`, `${inbox.messages} messages`) : undefined,
+    text: s.tickets.inbox,
+    detail: inbox && inbox.messages > inbox.threads ? fill(s.tickets.inboxMessages, { n: inbox.messages }) : undefined,
     value: inbox?.threads,
     link: inbox?.link ?? '',
   });
-  add(a.requests?.matching, { id: 'requests', icon: ic(Inbox), text: loc('طلبات زبائن تطابق ورشتك ولم تقدّم عليها عرضًا', 'Customer requests that match your workshop, not yet answered'), value: a.requests?.matching, link: a.requests?.link ?? '' });
+  add(a.requests?.matching, { id: 'requests', icon: ic(Inbox), text: s.tickets.requests, value: a.requests?.matching, link: a.requests?.link ?? '' });
   const st = a.stock;
-  add(st?.out, { id: 'stock-out', icon: ic(PackageX), text: loc('منتجات معروضة نفد مخزونها', 'Listed products that are sold out'), value: st?.out, link: st?.link_out ?? '', tone: 'warning' });
-  add(st?.low, { id: 'stock-low', icon: ic(Package), text: loc('منتجات قارب مخزونها على النفاد', 'Products running low'), value: st?.low, link: st?.link_low ?? '' });
+  add(st?.out, { id: 'stock-out', icon: ic(PackageX), text: s.tickets.stockOut, value: st?.out, link: st?.link_out ?? '', tone: 'warning' });
+  add(st?.low, { id: 'stock-low', icon: ic(Package), text: s.tickets.stockLow, value: st?.low, link: st?.link_low ?? '' });
+  add(a.returns?.open, { id: 'returns', icon: ic(Undo2), text: s.tickets.returns, detail: s.returns.adminDecides, value: a.returns?.open, link: a.returns?.link ?? '' });
   const rv = a.reviews;
-  add(rv?.new, { id: 'reviews-new', icon: ic(Star), text: loc('تقييمات جديدة لم تطّلع عليها', 'New reviews you have not seen'), value: rv?.new, link: rv?.link ?? '' });
-  add(rv?.unanswered, { id: 'reviews-unanswered', icon: ic(Star), text: loc('تقييمات بلا رد منك', 'Reviews you have not replied to'), value: rv?.unanswered, link: rv?.link ?? '' });
-  add(a.money && a.money.available_iqd > 0, { id: 'money', icon: ic(Wallet), text: loc('أرباح متاحة يمكنك طلب تحويلها', 'Earnings available to request'), value: <Money iqd={a.money?.available_iqd} />, link: a.money?.link ?? '' });
+  add(rv?.new, { id: 'reviews-new', icon: ic(Star), text: s.tickets.reviewsNew, value: rv?.new, link: rv?.link ?? '' });
+  add(rv?.unanswered, { id: 'reviews-unanswered', icon: ic(Star), text: s.tickets.reviewsUnanswered, value: rv?.unanswered, link: rv?.link ?? '' });
+  add(a.money && a.money.available_iqd > 0, { id: 'money', icon: ic(Wallet), text: s.tickets.money, value: <Money iqd={a.money?.available_iqd} />, link: a.money?.link ?? '' });
   const po = a.payouts;
-  add(po?.in_flight, { id: 'payouts', icon: ic(Wallet), text: loc('طلبات تحويل أرباح قيد المعالجة', 'Payout requests being processed'), detail: po ? <Money iqd={po.amount_iqd} /> : undefined, value: po?.in_flight, link: po?.link ?? '' });
+  add(po?.in_flight, { id: 'payouts', icon: ic(Wallet), text: s.tickets.payouts, detail: po ? <Money iqd={po.amount_iqd} /> : undefined, value: po?.in_flight, link: po?.link ?? '' });
   const cp = a.coupons;
-  add(cp?.ending_soon, { id: 'coupons', icon: ic(Tag), text: loc(`كوبونات تنتهي خلال ${cp?.within_days ?? 7} أيام`, `Coupons ending within ${cp?.within_days ?? 7} days`), value: cp?.ending_soon, link: cp?.link ?? '' });
+  add(cp?.ending_soon, { id: 'coupons', icon: ic(Tag), text: fill(s.tickets.coupons, { n: cp?.within_days ?? 7 }), value: cp?.ending_soon, link: cp?.link ?? '' });
   return rows.filter((r) => r.link);
 }
 
 /** The store problem, in words, and the verb that fixes it. */
-function problemText(code: StoreProblem, loc: Loc): { text: string; action: string } {
+function problemText(code: StoreProblem, loc: Loc, s: CounterStrings): { text: string; action: string } {
   switch (code) {
     case 'layout_unpublished':
-      // OWNER: Sorani to be written by hand.
-      return { text: loc('في صفحة متجرك تعديلات محفوظة لم تُنشر بعد — الزبائن يرون النسخة السابقة.', 'Your store page has saved changes that are not published — customers see the previous version.'), action: loc('راجع وانشر', 'Review and publish') };
+      return { text: s.problems.layoutUnpublished, action: s.problems.reviewAndPublish };
     case 'subscription_inactive':
-      // OWNER: Sorani to be written by hand.
-      return { text: sellingReason(code, loc), action: loc('جدّد الاشتراك', 'Renew') };
+      return { text: sellingReason(code, loc), action: s.problems.renew };
     case 'benefit_restricted':
+      return { text: sellingReason(code, loc), action: s.problems.contactSupport };
     case 'store_suspended':
     case 'merchant_suspended':
     case 'merchant_restricted':
-      // OWNER: Sorani to be written by hand.
-      return { text: sellingReason(code, loc), action: code === 'benefit_restricted' ? loc('تواصل مع الدعم', 'Contact support') : loc('إعداد المتجر', 'Store setup', 'ڕێکخستنی فرۆشگا') };
     case 'store_paused':
     default:
-      return { text: sellingReason(code, loc), action: loc('إعداد المتجر', 'Store setup', 'ڕێکخستنی فرۆشگا') };
+      return { text: sellingReason(code, loc), action: s.problems.storeSetup };
   }
 }
 
-function Door({ to, className, children }: { to: string; className: string; children: ReactNode }) {
-  const ws = useWorkspace();
-  const target = ws.resolveLink(to);
-  return target.internal ? (
-    <Link to={target.to} className={className}>
-      {children}
-    </Link>
-  ) : (
-    <a href={target.to} className={className}>
-      {children}
-    </a>
-  );
+// ------------------------------------------------------------ row actions
+
+/** What a row action needs from the outside — the client and the refresh — so the tests can hand it stubs. */
+export interface RowActionDeps {
+  post: <T>(path: string, body?: unknown) => Promise<T>;
+  refresh: (force?: boolean) => void;
 }
+
+/**
+ * «تأكيد» on an order's sub-row: the same route the order screen uses
+ * (POST /api/merchant/orders/:id/status {status:'confirmed'}), then the ONE
+ * attention read is re-done so the ticket, the badge and the sub-rows all
+ * move together. The server keeps the transition table; a refused move
+ * (ORDER_TRANSITION_INVALID, ORDER_CHANGED) is thrown to the caller.
+ */
+export async function confirmOrder(deps: RowActionDeps, orderId: string): Promise<void> {
+  await deps.post(`/api/merchant/orders/${encodeURIComponent(orderId)}/status`, { status: 'confirmed' });
+  deps.refresh(true);
+}
+
+/** The Pulse lines from what the shell and the attention read already know. */
+export function pulseLines(args: { s: CounterStrings; statusKey: string; statusWord: string; openSentence: string; unpublished: boolean }): PulseLine[] {
+  const { s, statusKey, statusWord, openSentence, unpublished } = args;
+  const lines: PulseLine[] = [
+    statusKey === 'open'
+      ? { id: 'open', tone: 'success', text: openSentence, to: merchantHref.storeSettings() }
+      : { id: 'open', tone: 'warning', text: `${statusWord} · ${openSentence}`, to: merchantHref.storeSettings() },
+  ];
+  if (unpublished) lines.push({ id: 'unpublished', tone: 'warning', text: s.pulse.unpublished, to: merchantHref.storeDesign() });
+  return lines;
+}
+
+// ------------------------------------------------------------------ screen
 
 export default function CommandCenter() {
   const { loc, lang } = useLanguage();
+  const s = useCounterStrings();
   const ws = useWorkspace();
+  const m = useMotion();
+  const toast = useToast();
   const { data, error, loading, refresh } = ws.attention;
+  const status = storeStatus(ws.me);
 
   const problems = data?.store?.problems ?? [];
-  const rows = data ? attentionRows(data, loc) : [];
+  const rows = data ? attentionRows(data, s) : [];
   // «Nothing waiting» is a claim about every source; one that did not answer forbids it.
-  const everySource = !!data && ['orders', 'custom_orders', 'inbox', 'stock', 'reviews'].every((k) => k in data);
+  const everySource = !!data && EVERY_SOURCE.every((k) => k in data);
+  const openSentence = openStateSentence(s, ws.store, lang as CounterLang);
+  const lines = pulseLines({
+    s,
+    statusKey: status.key,
+    statusWord: say(loc, status.label),
+    openSentence,
+    unpublished: problems.some((p) => p.code === 'layout_unpublished'),
+  });
+  // P4's line: the real-user speed grade. The slot exists; nothing renders until the source does.
+  const speed: PulseLine | null = null;
+
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [restock, setRestock] = useState<RestockTarget | null>(null);
+  const [restockMounted, setRestockMounted] = useState(false);
+
+  // After a confirm lands, focus moves on with the queue (§8): to the next
+  // order's «تأكيد», or to the «بانتظارك» heading when no order is left. Done
+  // once the re-read attention has arrived, so it lands on the NEXT row —
+  // never on a button inside a ticket that AnimatePresence is still showing out.
+  const focusNext = useRef(false);
+  useEffect(() => {
+    if (!focusNext.current || !data) return;
+    focusNext.current = false;
+    const nextId = data.orders?.first?.[0]?.id;
+    const next = nextId ? document.querySelector<HTMLElement>(`[data-row-confirm="${CSS.escape(nextId)}"]`) : null;
+    (next ?? document.getElementById('cc-waiting'))?.focus();
+  }, [data]);
+
+  const confirm = async (id: string) => {
+    setConfirming(id);
+    try {
+      await confirmOrder({ post: api.post, refresh }, id);
+      focusNext.current = true;
+      toast.success(fill(s.rows.confirmed, { id }));
+    } catch (e) {
+      // The sentences (~20 KB gzip) are loaded on the first refusal, not with the screen.
+      const { apiRefusal } = await import('../../../../lib/refusalStrings');
+      toast.error(apiRefusal(e, lang, s.generic.error));
+    } finally {
+      setConfirming(null);
+    }
+  };
+  const openRestock = (t: RestockTarget) => {
+    setRestockMounted(true);
+    setRestock(t);
+  };
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-1">
-        <h1 className="text-[22px] font-bold leading-tight text-text-primary [text-wrap:balance]">
-          {/* OWNER: Sorani to be written by hand. */}
-          {loc('ما الذي يحتاج انتباهك الآن', 'What needs your attention now')}
-        </h1>
-        <p className="text-[13px] text-text-muted">
-          {/* OWNER: Sorani to be written by hand. */}
-          {loc('كل رقم هنا من سجلات متجرك الآن، وكل سطر يفتح المكان الذي تُنجزه فيه.', 'Every number here is counted from your store right now; every line opens where you act on it.')}
-        </p>
+    <div className="space-y-6">
+      <header className="space-y-4">
+        <div className="space-y-1">
+          <h1 tabIndex={-1} className="text-[22px] font-bold leading-tight text-text-primary [text-wrap:balance] focus:outline-none">
+            {s.today.title}
+          </h1>
+          <p className="text-[13px] text-text-muted">{s.today.subtitle}</p>
+        </div>
+        <StatusStrip />
       </header>
 
-      {problems.length > 0 && (
-        <section aria-labelledby="cc-problems" className="space-y-2">
-          <h2 id="cc-problems" className="sr-only">
-            {/* OWNER: Sorani to be written by hand. */}
-            {loc('ما يمنع متجرك الآن', 'What is holding your store back')}
-          </h2>
-          <ul className="space-y-2">
-            {problems.map((p) => {
-              const t = problemText(p.code, loc);
-              return (
-                <li key={p.code} data-store-problem={p.code} className="flex flex-col gap-3 rounded-e-2xl border-s-2 border-s-warning/70 bg-warning/[0.06] py-3 pe-3 ps-3.5 sm:flex-row sm:items-center">
-                  <AlertTriangle aria-hidden="true" className="hidden h-5 w-5 shrink-0 text-warning sm:block" />
-                  <p className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-text-primary">{t.text}</p>
-                  <Door to={p.link} className="lv-button lv-button-secondary lv-button-sm shrink-0 self-start sm:self-auto">
-                    {t.action}
-                  </Door>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 space-y-6">
+          <PulseRow title={s.pulse.title} lines={lines} speed={speed} />
+
+          {problems.length > 0 && (
+            <section aria-labelledby="cc-problems" className="space-y-2">
+              <h2 id="cc-problems" className="sr-only">
+                {s.today.problems}
+              </h2>
+              <ul className="space-y-2">
+                {problems.map((p) => {
+                  const t = problemText(p.code, loc, s);
+                  return (
+                    <li key={p.code} data-store-problem={p.code} className="flex flex-col gap-3 rounded-e-2xl border-s-2 border-s-warning/70 bg-warning/[0.06] py-3 pe-3 ps-3.5 sm:flex-row sm:items-center">
+                      <AlertTriangle aria-hidden="true" className="hidden h-5 w-5 shrink-0 text-warning sm:block" />
+                      <p className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-text-primary">{t.text}</p>
+                      <Door to={p.link} className="lv-button lv-button-secondary lv-button-sm shrink-0 self-start sm:self-auto">
+                        {t.action}
+                      </Door>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          <section aria-labelledby="cc-waiting" className="space-y-3">
+            <h2 id="cc-waiting" tabIndex={-1} className="text-[15px] font-bold text-text-primary focus:outline-none">
+              {s.today.waiting}
+            </h2>
+            {loading && !data ? (
+              <div className="lv-surface overflow-hidden" aria-busy="true" aria-label={s.today.loading}>
+                <ListRowsSkeleton rows={4} />
+              </div>
+            ) : !data ? (
+              <ErrorState error={error} onRetry={() => refresh(true)} compact />
+            ) : rows.length === 0 ? (
+              <div className="lv-surface flex items-center gap-3 p-4" data-attention-clear={everySource || undefined}>
+                <CircleCheck aria-hidden="true" className="h-5 w-5 shrink-0 text-success" />
+                <p className="text-[13.5px] text-text-secondary">{everySource ? s.today.empty : s.today.emptyPartial}</p>
+              </div>
+            ) : (
+              <ul className="lv-surface divide-y divide-border-subtle overflow-hidden" data-attention-list>
+                <MotionFeatures>
+                <AnimatePresence initial={false}>
+                  {rows.map((r) => (
+                    <Motion.li key={r.id} layout initial={false} exit={{ height: 0, opacity: 0 }} transition={m.spring('ui')} data-attention={r.id} className="overflow-hidden">
+                      <Door
+                        to={r.link}
+                        className="group flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-raised focus-visible:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+                      >
+                        <span aria-hidden="true" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] ${r.tone === 'warning' ? 'text-warning' : 'text-text-secondary'}`}>
+                          {r.icon}
+                        </span>
+                        {/* The figure leads the sentence it counts — «3 طلبات جديدة…» —
+                            so on a wide screen it is not a table's width away from its words. */}
+                        <span className={`shrink-0 font-bold tabular-nums text-text-primary ${typeof r.value === 'number' ? 'min-w-7 text-[17px]' : 'text-[15px]'}`}>
+                          {typeof r.value === 'number' ? <bdi>{formatFigure(r.value, lang)}</bdi> : r.value}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[14px] font-medium leading-snug text-text-primary">{r.text}</span>
+                          {r.detail && <span className="mt-0.5 block text-[12.5px] text-text-muted">{r.detail}</span>}
+                        </span>
+                        <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
+                      </Door>
+                      <SubRows row={r.id} a={data} s={s} confirming={confirming} onConfirm={confirm} onRestock={openRestock} />
+                    </Motion.li>
+                  ))}
+                </AnimatePresence>
+                </MotionFeatures>
+              </ul>
+            )}
+          </section>
+        </div>
+
+        <div className="min-w-0 space-y-6">
+          <WeekFigures />
+          <QuickDock />
+          {data?.setup && <SetupChecklist setup={data.setup} />}
+        </div>
+      </div>
+
+      {restockMounted && (
+        <Suspense fallback={null}>
+          <RestockSheet target={restock} onClose={() => setRestock(null)} onDone={() => refresh(true)} />
+        </Suspense>
       )}
-
-      {data?.setup && <SetupChecklist setup={data.setup} />}
-
-      <section aria-labelledby="cc-waiting" className="space-y-3">
-        <h2 id="cc-waiting" className="text-[15px] font-bold text-text-primary">
-          {/* OWNER: Sorani to be written by hand. */}
-          {loc('بانتظارك', 'Waiting for you')}
-        </h2>
-        {loading && !data ? (
-          <div className="lv-surface overflow-hidden">
-            <ListRowsSkeleton rows={4} />
-          </div>
-        ) : !data ? (
-          <ErrorState error={error} onRetry={() => refresh(true)} compact />
-        ) : rows.length === 0 ? (
-          <div className="lv-surface flex items-center gap-3 p-4" data-attention-clear={everySource || undefined}>
-            <CircleCheck aria-hidden="true" className="h-5 w-5 shrink-0 text-success" />
-            <p className="text-[13.5px] text-text-secondary">
-              {everySource
-                ? // OWNER: Sorani to be written by hand.
-                  loc('لا شيء ينتظرك الآن. الطلبات والرسائل والمخزون كلها في حالها.', 'Nothing is waiting for you right now. Orders, messages and stock are all in hand.')
-                : // OWNER: Sorani to be written by hand.
-                  loc('لا شيء مما أمكن عدّه ينتظرك الآن.', 'Nothing that could be counted is waiting for you right now.')}
-            </p>
-          </div>
-        ) : (
-          <ul className="lv-surface divide-y divide-border-subtle overflow-hidden" data-attention-list>
-            {rows.map((r) => (
-              <li key={r.id} data-attention={r.id}>
-                <Door
-                  to={r.link}
-                  className="group flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-raised focus-visible:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
-                >
-                  <span aria-hidden="true" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] ${r.tone === 'warning' ? 'text-warning' : 'text-text-secondary'}`}>
-                    {r.icon}
-                  </span>
-                  {/* The figure leads the sentence it counts — «3 طلبات جديدة…» —
-                      so on a wide screen it is not a table's width away from its words. */}
-                  <span className={`shrink-0 font-bold tabular-nums text-text-primary ${typeof r.value === 'number' ? 'min-w-7 text-[17px]' : 'text-[15px]'}`}>
-                    {typeof r.value === 'number' ? <bdi>{formatFigure(r.value, lang)}</bdi> : r.value}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-medium leading-snug text-text-primary">{r.text}</span>
-                    {r.detail && <span className="mt-0.5 block text-[12.5px] text-text-muted">{r.detail}</span>}
-                  </span>
-                  <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
-                </Door>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <WeekFigures />
     </div>
   );
+}
+
+// ---------------------------------------------------------------- sub-rows
+
+/**
+ * The first rows under a ticket (≤ 2, the server's `first[]`): an order with
+ * «تأكيد» done here, a thread with its unread words and «رد», a sold-out
+ * product with «+ مخزون», an open return with its state. A source without
+ * `first` (an older server) draws no sub-row — the ticket alone stands.
+ */
+function SubRows({
+  row,
+  a,
+  s,
+  confirming,
+  onConfirm,
+  onRestock,
+}: {
+  row: string;
+  a: Attention;
+  s: CounterStrings;
+  confirming: string | null;
+  onConfirm: (id: string) => void;
+  onRestock: (t: RestockTarget) => void;
+}) {
+  const ws = useWorkspace();
+  const { lang } = useLanguage();
+  const openIcon = <ChevronRight className="h-4 w-4 rtl:-scale-x-100" />;
+  const li = 'flex items-center gap-2 text-[12.5px] text-text-secondary';
+  const body = 'min-w-0 flex-1 truncate';
+
+  if (row === 'orders-pending' && a.orders?.first?.length) {
+    return (
+      <ul className="space-y-2 pb-3 ps-8 pe-4" data-sub-rows="orders">
+        {a.orders.first.map((o) => (
+          <li key={o.id} className={li} data-sub-row={o.id}>
+            {/* The customer and the amount first, the id last: at 360 the body truncates
+                its tail, and a merchant confirms knowing who and how much (§3.2). */}
+            <span className={body}>
+              {o.customer_name} · <Money iqd={o.total_iqd} /> · <bdi>#{o.id}</bdi>
+            </span>
+            <Button size="sm" variant="secondary" loading={confirming === o.id} onClick={() => onConfirm(o.id)} aria-label={`${s.rows.confirm} — ${fill(s.rows.orderLabel, { id: o.id, name: o.customer_name })}`} data-row-confirm={o.id}>
+              {s.rows.confirm}
+            </Button>
+            <IconButton variant="ghost" label={s.generic.open} icon={openIcon} onClick={() => ws.go(o.link)} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  if (row === 'inbox' && a.inbox?.first?.length) {
+    return (
+      <ul className="space-y-2 pb-3 ps-8 pe-4" data-sub-rows="inbox">
+        {a.inbox.first.map((t) => (
+          <li key={t.id} className={li} data-sub-row={t.id}>
+            <span className={body}>
+              {t.customer_name}: «{t.last_message || s.rows.attachment}»
+            </span>
+            <Button size="sm" variant="secondary" onClick={() => ws.go(t.link)} data-row-reply={t.id}>
+              {s.rows.reply}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  if (row === 'stock-out' && a.stock?.first?.length) {
+    return (
+      <ul className="space-y-2 pb-3 ps-8 pe-4" data-sub-rows="stock">
+        {a.stock.first.map((p) => {
+          const name = (lang !== 'en' && p.name_ar) || p.name;
+          return (
+            <li key={p.id} className={li} data-sub-row={p.id}>
+              <span className={body}>
+                {name} · <bdi>{formatFigure(p.stock, lang)}</bdi>
+              </span>
+              <Button size="sm" variant="secondary" onClick={() => onRestock({ id: p.id, name, stock: p.stock })} data-row-restock={p.id}>
+                + {s.rows.restock}
+              </Button>
+              <IconButton variant="ghost" label={s.generic.open} icon={openIcon} onClick={() => ws.go(p.link)} />
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+  if (row === 'returns' && a.returns?.first?.length) {
+    return (
+      <ul className="space-y-2 pb-3 ps-8 pe-4" data-sub-rows="returns">
+        {a.returns.first.map((r) => (
+          <li key={r.id} className={li} data-sub-row={r.id}>
+            <span className={body}>
+              <bdi>#{r.order_id}</bdi> · {s.returns.state[r.state] ?? r.state}
+            </span>
+            <IconButton variant="ghost" label={s.generic.open} icon={openIcon} onClick={() => ws.go(r.link)} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return null;
 }
 
 // ------------------------------------------------------------------ setup
@@ -249,7 +459,8 @@ export default function CommandCenter() {
  * screen where it is done; a done one says so with a check, not a colour.
  */
 function SetupChecklist({ setup }: { setup: Setup }) {
-  const { loc, lang } = useLanguage();
+  const { lang } = useLanguage();
+  const s = useCounterStrings();
   const ws = useWorkspace();
   const key = `levo_setup_hidden:${ws.store.id}`;
   const [hidden, setHidden] = useState(() => {
@@ -259,8 +470,8 @@ function SetupChecklist({ setup }: { setup: Setup }) {
       return false;
     }
   });
-  const steps = setupSteps(setup, loc);
-  const done = steps.filter((s) => s.done).length;
+  const steps = setupSteps(setup, s);
+  const done = steps.filter((x) => x.done).length;
   if (hidden || done === steps.length) return null;
   const hide = () => {
     setHidden(true);
@@ -270,18 +481,17 @@ function SetupChecklist({ setup }: { setup: Setup }) {
       /* hidden for this visit */
     }
   };
-  // OWNER: Sorani to be written by hand (this card).
   return (
     <section aria-labelledby="cc-setup" className="lv-surface space-y-3 p-4" data-setup-checklist>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <h2 id="cc-setup" className="text-[15px] font-bold text-text-primary">
-            {loc('جهّز متجرك', 'Set up your store')}
+            {s.setup.title}
           </h2>
           <p className="text-[12.5px] leading-relaxed text-text-muted">
             <bdi>{formatFigure(done, lang)}</bdi> / <bdi>{formatFigure(steps.length, lang)}</bdi>
             {' — '}
-            {loc('كل خطوة تجعل صفحتك أوضح لزبائنك.', 'each step makes your page clearer to customers.')}
+            {s.setup.each}
           </p>
         </div>
         <button
@@ -290,7 +500,7 @@ function SetupChecklist({ setup }: { setup: Setup }) {
           className="relative lv-hit min-h-9 shrink-0 rounded-lg px-2 text-[12.5px] font-medium text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           data-setup-hide
         >
-          {loc('إخفاء', 'Hide')}
+          {s.setup.hide}
         </button>
       </div>
       <div
@@ -299,26 +509,26 @@ function SetupChecklist({ setup }: { setup: Setup }) {
         aria-valuemin={0}
         aria-valuemax={steps.length}
         aria-valuenow={done}
-        aria-label={loc('ما أنجزته من تجهيز المتجر', 'Store setup done so far')}
+        aria-label={s.setup.progress}
       >
         <div className="h-full rounded-full bg-success transition-[width] motion-reduce:transition-none" style={{ width: `${Math.round((done / steps.length) * 100)}%` }} />
       </div>
       <ul className="divide-y divide-border-subtle">
-        {steps.map((s) => (
-          <li key={s.id} data-setup-step={s.id} data-done={s.done ? 'true' : 'false'}>
-            {s.done ? (
+        {steps.map((x) => (
+          <li key={x.id} data-setup-step={x.id} data-done={x.done ? 'true' : 'false'}>
+            {x.done ? (
               <p className="flex min-h-12 items-center gap-3 text-[13.5px] text-text-muted">
                 <CircleCheck aria-hidden="true" className="h-5 w-5 shrink-0 text-success" />
-                <span className="min-w-0 flex-1">{s.text}</span>
-                <span className="sr-only">{loc('تم', 'Done')}</span>
+                <span className="min-w-0 flex-1">{x.text}</span>
+                <span className="sr-only">{s.setup.done}</span>
               </p>
             ) : (
               <Door
-                to={s.link}
+                to={x.link}
                 className="group flex min-h-12 items-center gap-3 rounded-lg text-[13.5px] font-medium text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 <Circle aria-hidden="true" className="h-5 w-5 shrink-0 text-text-muted" />
-                <span className="min-w-0 flex-1">{s.text}</span>
+                <span className="min-w-0 flex-1">{x.text}</span>
                 <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted rtl:-scale-x-100" />
               </Door>
             )}
@@ -332,7 +542,8 @@ function SetupChecklist({ setup }: { setup: Setup }) {
 // ------------------------------------------------------------------ figures
 
 function WeekFigures() {
-  const { loc, lang } = useLanguage();
+  const { lang } = useLanguage();
+  const s = useCounterStrings();
   const ws = useWorkspace();
   const [report, setReport] = useState<ReportLike | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -353,48 +564,43 @@ function WeekFigures() {
   const k = report ? commandKpis(report) : null;
   const analytics = ws.href(merchantHref.analytics());
   const orders = ws.href(merchantHref.orders());
-  // OWNER: Sorani to be written by hand (the week's labels).
-  const vsLastWeek = loc('مقارنة بالأسبوع السابق', 'vs the week before');
 
   return (
     <section aria-labelledby="cc-week" className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
         <h2 id="cc-week" className="text-[15px] font-bold text-text-primary">
-          {/* OWNER: Sorani to be written by hand. */}
-          {loc('اليوم وآخر 7 أيام', 'Today and the last 7 days')}
+          {s.week.title}
         </h2>
         {!locked && (
           <Link to={analytics} className="rounded-md text-[13px] font-medium text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-            {/* OWNER: Sorani to be written by hand. */}
-            {loc('كل التحليلات', 'All analytics')}
+            {s.week.all}
           </Link>
         )}
       </div>
       {locked ? (
         <p className="text-[13px] leading-relaxed text-text-muted" data-analytics-locked>
-          {/* OWNER: Sorani to be written by hand. */}
-          {loc('الأرقام جزء من LEVO PLUS. طلباتك وأرباحك كلها محفوظة وتراها في صفحاتها — جدّد الاشتراك لتعود الأرقام.', 'The figures are part of LEVO PLUS. Your orders and earnings are all kept and visible on their screens — renew to see the figures again.')}
+          {s.week.locked}
         </p>
       ) : error ? (
         <ErrorState error={error} onRetry={load} compact />
       ) : !k ? (
         <KpiRowSkeleton count={4} />
       ) : (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-command-kpis>
-          <KpiTile label={loc('طلبات اليوم', 'Orders today')} value={<bdi>{formatFigure(k.today.orders, lang)}</bdi>} to={orders} />
-          <KpiTile label={loc('مبيعات اليوم', 'Sales today')} value={<Money iqd={k.today.gross_iqd} />} to={analytics} />
+        <div className="grid grid-cols-2 gap-3" data-command-kpis>
+          <KpiTile label={s.week.ordersToday} value={<bdi>{formatFigure(k.today.orders, lang)}</bdi>} to={orders} />
+          <KpiTile label={s.week.salesToday} value={<Money iqd={k.today.gross_iqd} />} to={analytics} />
           <KpiTile
-            label={loc('طلبات آخر 7 أيام', 'Orders, last 7 days')}
+            label={s.week.orders7}
             value={<bdi>{formatFigure(k.week.orders, lang)}</bdi>}
-            delta={k.week.previous ? { value: k.week.orders - k.week.previous.orders, format: 'number', label: vsLastWeek } : null}
+            delta={k.week.previous ? { value: k.week.orders - k.week.previous.orders, format: 'number', label: s.week.vsLastWeek } : null}
             trend={k.week.trend ? <Sparkline series={k.week.trend} /> : undefined}
             to={analytics}
           />
           <KpiTile
-            label={loc('مبيعات آخر 7 أيام', 'Sales, last 7 days')}
+            label={s.week.sales7}
             value={<Money iqd={k.week.gross_iqd} />}
-            delta={k.week.previous ? { value: k.week.gross_iqd - k.week.previous.gross_iqd, format: 'money', label: vsLastWeek } : null}
-            hint={k.visitors7 !== undefined ? loc(`${formatFigure(k.visitors7, lang)} زائر`, `${formatFigure(k.visitors7, lang)} visitors`) : undefined}
+            delta={k.week.previous ? { value: k.week.gross_iqd - k.week.previous.gross_iqd, format: 'money', label: s.week.vsLastWeek } : null}
+            hint={k.visitors7 !== undefined ? fill(s.week.visitors, { n: formatFigure(k.visitors7, lang) }) : undefined}
             to={analytics}
           />
         </div>

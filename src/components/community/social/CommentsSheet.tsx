@@ -35,6 +35,8 @@ import { timeAgo } from '../hub/copy';
 import { clientId, creatorHref, socialApi, type Comment } from './api';
 import ReportSheet from './ReportSheet';
 import { commentsLabel, replyToLabel, socialLang, useSocialStrings } from './strings';
+import { LinkRow } from '../links/LinkCard';
+import { warmLinksOnPaste } from '../links/useLinkCard';
 
 export interface CommentsSheetProps {
   postId: string;
@@ -218,6 +220,7 @@ export default function CommentsSheet({ postId, open, onClose, onCountChange }: 
           placeholder={replyTo ? replyToLabel(s, replyTo.author.name) : s.writeComment}
           aria-label={s.writeComment}
           aria-invalid={sendError ? true : undefined}
+          onPaste={warmLinksOnPaste}
           onChange={(e) => {
             setDraft(e.target.value);
             if (sendError) setSendError(null);
@@ -341,6 +344,9 @@ function Row({ c, onReply, onRemove, onReport }: { c: Comment; onReply: (c: Comm
         <p dir="auto" className="mt-0.5 whitespace-pre-line break-words text-start text-[14px] leading-relaxed text-text-secondary">
           {c.body}
         </p>
+        {/* the first link in the comment as a card (§9.4) — only when the
+            server already holds it; a reader never makes it fetch. */}
+        <LinkRow text={c.body} variant="compact" className="mt-1.5" />
         <div className="-ms-2 mt-0.5 flex items-center gap-1">
           {isAuthenticated && !c.pending && (
             <button

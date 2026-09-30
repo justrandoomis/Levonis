@@ -17,14 +17,19 @@
  * screen shows: the store orders on /orders, the custom orders under
  * «تنفيذ طلباتي».
  */
-import { useCallback, useEffect, useState } from 'react';
-import { Check, Star } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Camera, Check, Loader2, Star, X } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { useAuth } from '../../../AuthContext';
-import { api, ApiError } from '../../../lib/api';
+import { api, ApiError, uploadFile } from '../../../lib/api';
 import { keyOf, ofKind, reviewTarget, type EligibleReview } from './eligible';
+import { reviewFormStrings } from './strings';
 
 const MAX_BODY = 3000;
+/** The server keeps at most six of the reviewer's own uploads (worker/routes/merchantReviews.ts `ownedMediaUrls`). */
+const MAX_PHOTOS = 6;
+/** The picture types the picker offers — spelled out, as the catalogue's MediaEditor does (a source-level `/*` reads as a comment to the pins). */
+const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/avif';
 
 /** The transactions waiting for this customer's rating, of one kind. */
 export function useEligibleReviews(kind: 'store' | 'custom', refreshKey = 0) {
@@ -76,12 +81,41 @@ export default function PendingStoreReviews({ kind, refreshKey = 0 }: { kind: 's
 }
 
 export function StoreReviewCard({ item, onDone }: { item: EligibleReview; onDone: () => void }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
+  const rs = reviewFormStrings(lang);
   const [open, setOpen] = useState(false);
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // THE PHOTOS (storefront L12): the reviewer's own uploads, as the `/files/…`
+  // URLs the upload answered with — the server keeps only those it issued to
+  // this account, so a URL from anywhere else is dropped there, not trusted.
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const fileInput = useRef<HTMLInputElement | null>(null);
+
+  async function addPhotos(files: FileList | null) {
+    if (!files?.length || uploading) return;
+    setPhotoError('');
+    const room = MAX_PHOTOS - photos.length;
+    const list = [...files].slice(0, Math.max(0, room));
+    if (!list.length) return;
+    setUploading(true);
+    try {
+      for (const file of list) {
+        if (!file.type.startsWith('image/')) throw new Error(rs.onlyImages);
+        const up = await uploadFile(file, 'community');
+        setPhotos((p) => (p.includes(up.url) || p.length >= MAX_PHOTOS ? p : [...p, up.url]));
+      }
+    } catch (e) {
+      setPhotoError(e instanceof Error && e.message === rs.onlyImages ? rs.onlyImages : rs.uploadFailed);
+    } finally {
+      setUploading(false);
+      if (fileInput.current) fileInput.current.value = '';
+    }
+  }
 
   const refusal = useCallback(
     (e: unknown) => {
@@ -101,7 +135,7 @@ export function StoreReviewCard({ item, onDone }: { item: EligibleReview; onDone
     setBusy(true);
     setError('');
     try {
-      await api.post('/api/community-reviews', { rating, body: body.trim(), ...reviewTarget(item) });
+      await api.post('/api/community-reviews', { rating, body: body.trim(), images: photos, ...reviewTarget(item) });
       onDone();
     } catch (e) {
       setError(refusal(e));
@@ -172,6 +206,53 @@ export function StoreReviewCard({ item, onDone }: { item: EligibleReview; onDone
               className="w-full resize-y rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-white outline-none focus:border-gold/40 focus-visible:ring-2 focus-visible:ring-focus"
             />
           </label>
+          <div data-store-review-photos={photos.length}>
+            <span className="mb-1 block text-[12px] font-semibold text-zinc-400">{rs.photos}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {photos.map((src, i) => (
+                <span key={src} className="relative h-14 w-14 overflow-hidden rounded-xl border border-white/10">
+                  <img src={src} alt={rs.photoAlt(i + 1)} className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setPhotos((p) => p.filter((x) => x !== src))}
+                    aria-label={rs.removePhoto(i + 1)}
+                    className="absolute end-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+              {photos.length < MAX_PHOTOS && (
+                <button
+                  type="button"
+                  onClick={() => fileInput.current?.click()}
+                  disabled={uploading || busy}
+                  aria-label={uploading ? rs.uploading : rs.addPhoto}
+                  aria-busy={uploading}
+                  className="flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-white/15 text-zinc-400 hover:text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  data-store-review-add-photo
+                >
+                  {uploading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Camera className="h-5 w-5" aria-hidden="true" />}
+                </button>
+              )}
+              <input
+                ref={fileInput}
+                type="file"
+                accept={IMAGE_ACCEPT}
+                multiple
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden="true"
+                onChange={(e) => void addPhotos(e.target.files)}
+              />
+            </div>
+            <p className="mt-1 text-[11.5px] text-zinc-500">{rs.photosHint(MAX_PHOTOS)}</p>
+            {photoError && (
+              <p className="mt-1 text-[12px] text-red-300" role="alert">
+                {photoError}
+              </p>
+            )}
+          </div>
           {error && (
             <p className="text-[12px] text-red-300" role="alert">
               {error}

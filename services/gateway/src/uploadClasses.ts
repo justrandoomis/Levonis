@@ -46,7 +46,13 @@ export interface BodyClass {
 }
 
 export const UPLOAD_CLASSES: readonly BodyClass[] = [
-  { prefix: '/api/uploads', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/routes/uploads.ts#VIDEO_MAX', routeFile: 'uploads.ts' },
+  // The whole-body door: since 0156 its per-kind limits are admin settings (`uploadLimits`), but the
+  // route buffers the body and caps every request at SIMPLE_UPLOAD_HARD_CAP whatever they say.
+  { prefix: '/api/uploads', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/routes/uploads.ts#SIMPLE_UPLOAD_HARD_CAP', routeFile: 'uploads.ts' },
+  // Resumable sessions (0156): `PUT /api/uploads/sessions/:id/parts/:n` is ONE raw part (application/octet-stream,
+  // no multipart envelope) of at most `chunk_bytes`, whose admin ceiling is SESSION_PART_MAX_BYTES. The
+  // multipart kind's 256 KB allowance is slack here, not a need; the route refuses over `chunk_bytes` itself.
+  { prefix: '/api/uploads/sessions', methods: ['PUT'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/lib/uploadEntity.ts#SESSION_PART_MAX_BYTES', routeFile: 'uploadSessions.ts' },
   { prefix: '/api/kyc/upload', methods: ['POST'], kind: 'multipart', maxBytes: 8 * MB, source: 'worker/routes/kyc.ts#IMAGE_MAX', routeFile: 'kyc.ts' },
   { prefix: '/api/marketplace/requests', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/lib/attachments.ts#MODEL_MAX_BYTES', routeFile: 'marketplace.ts' },
   { prefix: '/api/reviews/uploads', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/routes/reviews.ts#VIDEO_MAX', routeFile: 'reviews.ts' },

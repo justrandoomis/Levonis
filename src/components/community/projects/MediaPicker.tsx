@@ -9,16 +9,23 @@
  * because a timelapse is a video. Uploads go through purpose=post, so every
  * file lands under `users/<uid>/posts/` — the one prefix a post may cite.
  *
- * WHAT «SAVED» MEANS. A tile appears only once the server has the file; a
- * failed upload is a message under the grid, never a ghost tile. The first
- * tile is the cover; «اجعلها الغلاف» moves a tile there, because that is the
- * reorder people actually ask for.
+ * TWO DOORS, ONE PURPOSE (§9.4). A photo goes up in one request as before. A
+ * clip or a picture above 8 MiB (`pickUpload`) takes the resumable session
+ * instead — an UploadTile under the grid shows the ring, the checksum step,
+ * «إلغاء» and «إعادة المحاولة», warns on mobile data, and a reload resumes
+ * from the parts the server already holds. Either way a tile in the grid
+ * appears only once the server has the file; a failed upload is a message,
+ * never a ghost tile. The first tile is the cover; «اجعلها الغلاف» moves a
+ * tile there, because that is the reorder people actually ask for.
  */
-import { useRef, useState } from 'react';
-import { Film, ImagePlus, Loader2, Star, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Camera, Film, ImagePlus, Loader2, Star, Trash2 } from 'lucide-react';
 import { ApiError, uploadFile } from '../../../lib/api';
+import { pickUpload, type UploadLargeResult } from '../../../lib/uploadSession';
 import { useLanguage } from '../../../LanguageContext';
 import { refusalText } from '../../../lib/refusalStrings';
+import { UploadTile } from '../../upload/UploadTile';
+import { useProjectStrings } from './strings';
 
 export interface PickedMedia {
   key: string;
@@ -32,8 +39,9 @@ export interface PickedMedia {
 /** Kept in step with the server's sniffer (worker/routes/uploads.ts). */
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
-const IMAGE_MAX = 8 * 1024 * 1024;
-const VIDEO_MAX = 40 * 1024 * 1024;
+/** The server's defaults (SETTING_DEFAULTS.uploadLimits): a courtesy check, the refusal names the real limit. */
+const IMAGE_MAX = 25 * 1024 * 1024;
+const VIDEO_MAX = 100 * 1024 * 1024;
 
 export const PROJECT_MEDIA_MAX = 12;
 
@@ -53,6 +61,14 @@ function videoDuration(file: File): Promise<number | null> {
   });
 }
 
+interface LargeUpload {
+  id: string;
+  file: File;
+  kind: 'image' | 'video';
+}
+
+let largeSeq = 0;
+
 export function ProjectMediaPicker({
   value,
   onChange,
@@ -68,19 +84,29 @@ export function ProjectMediaPicker({
   error?: string;
 }) {
   const { loc, lang } = useLanguage();
+  const s = useProjectStrings();
   const input = useRef<HTMLInputElement | null>(null);
+  const camera = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(0);
+  const [large, setLarge] = useState<LargeUpload[]>([]);
   const [error, setError] = useState('');
   // A hint the last upload came back with — the clip IS stored; a re-export
   // would make it start faster (VIDEO_NOT_FASTSTART, src/lib/refusalStrings.ts).
   const [hint, setHint] = useState('');
+  // A phone gets «التقط صورة» beside the album; a desktop has no camera to offer.
+  const [touch] = useState(() => typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
   const refusalLang = lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar';
+  // A session tile finishes later than the render that made it: append to what the form holds THEN.
+  const latest = useRef(value);
+  useEffect(() => {
+    latest.current = value;
+  }, [value]);
 
   async function pick(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError('');
     setHint('');
-    const room = Math.max(0, max - value.length);
+    const room = Math.max(0, max - value.length - large.length);
     const chosen = Array.from(files).slice(0, room);
     if (chosen.length < files.length) {
       setError(loc(`الحد ${max} ملفًا للمشروع الواحد.`, `A project holds up to ${max} files.`, `پڕۆژەیەک تا ${max} فایل هەڵدەگرێت.`));
@@ -96,6 +122,12 @@ export function ProjectMediaPicker({
       if (file.size > (isVideo ? VIDEO_MAX : IMAGE_MAX)) {
         const mb = (isVideo ? VIDEO_MAX : IMAGE_MAX) / 1024 / 1024;
         setError(loc(`الملف أكبر من ${mb} ميغابايت.`, `That file is larger than ${mb} MB.`, `فایلەکە لە ${mb} MB گەورەترە.`));
+        continue;
+      }
+      // Above 8 MiB the file takes the resumable session: a tile under the
+      // grid, parts retried, a reload picking up where it stopped.
+      if (pickUpload(file) === 'session') {
+        setLarge((list) => [...list, { id: `lg${++largeSeq}`, file, kind: isVideo ? 'video' : 'image' }]);
         continue;
       }
       setBusy((n) => n + 1);
@@ -120,8 +152,27 @@ export function ProjectMediaPicker({
         setBusy((n) => n - 1);
       }
     }
-    // Clear the input so choosing the SAME file again still fires a change.
+    // Clear the inputs so choosing the SAME file again still fires a change.
     if (input.current) input.current.value = '';
+    if (camera.current) camera.current.value = '';
+  }
+
+  /** A session finished: the server's key and url become a grid tile, in the order they arrive. */
+  async function finishLarge(u: LargeUpload, up: UploadLargeResult) {
+    setLarge((list) => list.filter((x) => x.id !== u.id));
+    if (!up.key) return;
+    const duration = u.kind === 'video' ? await videoDuration(u.file) : null;
+    const item: PickedMedia = {
+      key: up.key,
+      url: up.url,
+      kind: u.kind,
+      width: up.width ?? null,
+      height: up.height ?? null,
+      duration_s: duration,
+    };
+    onChange([...latest.current, item]);
+    const warning = up.warnings?.find((w) => w === 'VIDEO_NOT_FASTSTART');
+    if (warning) setHint(refusalText(warning, refusalLang));
   }
 
   const remove = (key: string) => onChange(value.filter((m) => m.key !== key));
@@ -131,7 +182,7 @@ export function ProjectMediaPicker({
     onChange([item, ...value.filter((m) => m.key !== key)]);
   };
 
-  const full = value.length >= max;
+  const full = value.length + large.length >= max;
 
   return (
     <div>
@@ -198,13 +249,36 @@ export function ProjectMediaPicker({
           </li>
         )}
       </ul>
-      <p className="mt-2 text-[11.5px] text-text-muted">
-        {loc(
-          `حتى ${max} صورة أو فيديو. الأولى هي الغلاف.`,
-          `Up to ${max} pictures or videos. The first is the cover.`,
-          `تا ${max} وێنە یان ڤیدیۆ. یەکەمیان بەرگەکەیە.`
+      {large.length > 0 && (
+        <ul className="mt-2 flex flex-col gap-2" aria-label={s.uploadingFiles} data-project-media-uploads>
+          {large.map((u) => (
+            <li key={u.id}>
+              <UploadTile file={u.file} purpose="post" onDone={(r) => void finishLarge(u, r)} onCancel={() => setLarge((list) => list.filter((x) => x.id !== u.id))} />
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <p className="text-[11.5px] text-text-muted">
+          {loc(
+            `حتى ${max} صورة أو فيديو. الأولى هي الغلاف.`,
+            `Up to ${max} pictures or videos. The first is the cover.`,
+            `تا ${max} وێنە یان ڤیدیۆ. یەکەمیان بەرگەکەیە.`
+          )}
+        </p>
+        {touch && !full && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => camera.current?.click()}
+            data-project-media-camera
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-2 text-[12px] font-semibold text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40"
+          >
+            <Camera aria-hidden="true" className="h-4 w-4" />
+            {s.takePhoto}
+          </button>
         )}
-      </p>
+      </div>
       {hint && (
         <p className="mt-1.5 text-[11.5px] text-text-muted" role="status" data-media-hint>
           {hint}
@@ -223,6 +297,8 @@ export function ProjectMediaPicker({
         className="hidden"
         onChange={(e) => void pick(e.target.files)}
       />
+      {/* The camera itself, on a phone: one shot, straight into the project. */}
+      <input ref={camera} type="file" accept="image/*,video/*" capture="environment" className="hidden" onChange={(e) => void pick(e.target.files)} data-project-media-camera-input />
     </div>
   );
 }

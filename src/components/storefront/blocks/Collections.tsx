@@ -74,16 +74,36 @@ export default function CollectionsBlock({ block, data }: BlockProps<'collection
       <Column>
         <BlockHeading title={title} />
         <div className="grid grid-cols-2 @min-[40rem]:grid-cols-3 sf-grid">
-          {sections.map((s) => (
-            <Link key={s.id} to={rt.collectionHref(s.id)} className="sf-card sf-card-pad flex flex-col gap-1 min-h-[76px] justify-center active:scale-[0.99] transition-transform">
-              <span className="text-zinc-100 text-[13.5px] font-semibold truncate" dir="auto">
-                {collectionName(s, lang)}
-              </span>
-              <span className="text-zinc-500 text-[11px]">
-                {s.product_count} {loc('منتج', 'products', 'بەرهەم')}
-              </span>
-            </Link>
-          ))}
+          {sections.map((s) =>
+            s.image_url ? (
+              // A COVER (L9): the merchant's picture in the theme's media
+              // ratio, the name over the fade at its lower edge — the same
+              // fade the hero uses, so a cover reads as part of the page.
+              <Link key={s.id} to={rt.collectionHref(s.id)} className="sf-tile press-scale" data-collection-cover={s.id}>
+                <div className="sf-media sf-well overflow-hidden relative">
+                  <img src={s.image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <div className="absolute inset-0 sf-cover-fade" />
+                  <div className="absolute inset-x-0 bottom-0 p-3 flex flex-col gap-0.5">
+                    <span className="text-white text-[13.5px] font-semibold truncate" dir="auto">
+                      {collectionName(s, lang)}
+                    </span>
+                    <span className="text-zinc-300 text-[11px]">
+                      {s.product_count} {loc('منتج', 'products', 'بەرهەم')}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ) : (
+              <Link key={s.id} to={rt.collectionHref(s.id)} className="sf-card sf-card-pad flex flex-col gap-1 min-h-[76px] justify-center press-scale">
+                <span className="text-zinc-100 text-[13.5px] font-semibold truncate" dir="auto">
+                  {collectionName(s, lang)}
+                </span>
+                <span className="text-zinc-500 text-[11px]">
+                  {s.product_count} {loc('منتج', 'products', 'بەرهەم')}
+                </span>
+              </Link>
+            )
+          )}
         </div>
       </Column>
     );

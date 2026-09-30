@@ -41,8 +41,10 @@ import { communitySocialRoutes } from './routes/communitySocial';
 import { communitySearchRoutes } from './routes/communitySearch';
 import { chatRoutes } from './routes/chats';
 import { chatCommerceRoutes } from './routes/chatCommerce';
+import { linkCardRoutes } from './routes/linkCards';
 import { profileRoutes } from './routes/profile';
 import { uploadRoutes, fileRoutes } from './routes/uploads';
+import { uploadSessionRoutes, sweepExpiredUploadSessions } from './routes/uploadSessions';
 import { storeIconRoute, webManifestRoute } from './routes/manifest';
 import { robotsRoute, sitemapRoute } from './routes/seo';
 import { miscRoutes } from './routes/misc';
@@ -71,6 +73,8 @@ import { priceReportRoutes, adminPriceReportRoutes } from './routes/priceReports
 import { merchantPrinterRoutes } from './routes/merchantPrinters';
 import { merchantWorkshopRoutes } from './routes/merchantWorkshop';
 import { merchantCatalogRoutes } from './routes/merchantCatalog';
+// Files on products (§9.4): the merchant's editor and the shopfront's list/viewer/download.
+import { merchantProductFileRoutes, publicProductFileRoutes } from './routes/productFiles';
 import { adminPrintQuoteRoutes, printQuoteRoutes } from './routes/printQuote';
 import { membershipsRoutes } from './routes/memberships';
 import { telegramRoutes } from './routes/telegram';
@@ -351,8 +355,15 @@ app.route('/api/chats', chatRoutes);
 // Custom work inside the store's conversation — print requests, quotes, the orders panel
 // (docs/COMMUNITY_COMMERCE_CHAT.md); acceptance stays /api/marketplace/offers/:id/accept.
 app.route('/api/chats', chatCommerceRoutes);
+// Link cards (docs/COMMUNITY_ECOSYSTEM.md §9.4): the author's resolve (signed
+// in, rate limited, the only door that fetches) and the reader's cached row
+// (a guest may ask; never a fetch). Its own requireAuth on the resolve.
+app.route('/api/link-cards', linkCardRoutes);
 app.route('/api/profile', profileRoutes);
 app.route('/api/uploads', uploadRoutes);
+// Resumable multipart uploads (docs/COMMUNITY_ECOSYSTEM.md §9.4): a session per
+// large file, parts, a resume point, a verified complete. Its own requireAuth.
+app.route('/api/uploads/sessions', uploadSessionRoutes);
 // LEVO Printer Farm — the player API. Mounted before the '/api' misc catch-all
 // so nothing there can shadow it; its one public route (the leaderboard) is
 // registered inside the module ahead of its own requireAuth.
@@ -469,6 +480,9 @@ app.route('/api/merchant', merchantPrinterRoutes);
 // The catalogue — products, variants, media, bulk, import/export, insights —
 // and the store's collections (merchant platform W2-F).
 app.route('/api/merchant', merchantCatalogRoutes);
+// The files of a catalogue product — /api/merchant/products/:id/files (§9.4).
+// Its own router: the catalogue's `/products/:id` never matches the extra segment.
+app.route('/api/merchant', merchantProductFileRoutes);
 // The store page as data — its draft, publish, history and restore
 // (merchant platform W2-C). Its own mount so the routing design can name it;
 // the same session-scoped rules as the rest of /api/merchant.
@@ -496,6 +510,10 @@ app.route('/api/merchant/search', merchantSearchRoutes);
 app.route('/api/storefront/events', storefrontEventRoutes);
 // The public shopfront: readable by anyone, on any host.
 app.route('/api/storefront', storefrontRoutes);
+// A product's files as a shopper sees them, the viewer link and the download
+// door (§9.4). NOT under /api/storefront: that router is served session-free
+// for the guest cache, and these doors need to know who is asking.
+app.route('/api/product-files', publicProductFileRoutes);
 // The print journey EXTENDS the marketplace rather than starting a second one:
 // it adds measuring, estimating, publishing and matching to the same requests.
 // Mounted BEFORE the marketplace for the same reason the product routes put
@@ -986,6 +1004,14 @@ export default {
       // See (1) above: the entrypoint contains what the steps already contain.
       runDurableJobs(env).catch((error) => {
         console.error('scheduled durable jobs rejected outside any step:', error);
+      })
+    );
+    // Upload sessions past `expires_at` (§9.4): abort the R2 multipart upload
+    // so its parts stop costing storage, expire the row, ≤ 200 per tick.
+    // Contained the same way as the durable jobs above.
+    ctx.waitUntil(
+      sweepExpiredUploadSessions(env).catch((error) => {
+        console.error('scheduled upload-session sweep rejected:', error);
       })
     );
   },

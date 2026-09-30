@@ -5,9 +5,9 @@
  * runtime (runtime.tsx).
  */
 import { productName } from '../../lib/productText';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Loader2, ShoppingBag } from 'lucide-react';
+import { Heart, Loader2, Play, ShoppingBag } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
 import type { ProfileWidget } from '../../lib/merchant';
@@ -17,6 +17,7 @@ import type { BlockData } from '../../../packages/storeLayout/src/data';
 import { useSavedIds, useStorefrontRuntime } from './runtime';
 import { useStoreTheme } from './StoreTheme';
 import { gridClasses } from './theme';
+import { storefrontStrings } from './strings';
 import type { StorefrontStore } from './types';
 
 export type Loc = (ar: string, en: string, ckb?: string) => string;
@@ -29,6 +30,10 @@ export interface CardProduct {
   /** The merchant's Arabic name, when they wrote one (lib/productText.ts). */
   name_ar?: string | null;
   images: string[];
+  /** The second picture, shown while the card is hovered or focused (storefront L10). */
+  image_2?: string | null;
+  /** The product carries a video: the card draws a ▶ mark, never the video. */
+  has_video?: boolean;
   price_iqd: number;
   original_price_iqd: number | null;
   in_stock?: boolean;
@@ -125,16 +130,33 @@ function variantSrcSet(src: string): string | undefined {
 
 export function ProductCard({ product, storeOpen, legacyLink = false }: { product: CardProduct; storeOpen: boolean; legacyLink?: boolean }) {
   const { loc, lang } = useLanguage();
+  const s = storefrontStrings(lang);
   const name = productName(product, lang);
   const rt = useStorefrontRuntime();
   const href = legacyLink ? rt.legacyProductHref(product.slug) : rt.productHref(product.slug);
-  const image = product.images[0];
+  const first = product.images[0];
+  // THE SECOND FRAME (L10): the server's `image_2`, or the gallery's second
+  // picture when a whole product arrived. A `src` swap while the pointer is
+  // over the card or it holds focus — state, not motion: no transform, and
+  // reduced motion changes nothing. Touch never hovers, so a phone shows the
+  // first picture as it always did.
+  const second = product.image_2 ?? product.images[1] ?? null;
+  const [peek, setPeek] = useState(false);
+  const image = peek && second ? second : first;
   const discounted = !!product.original_price_iqd && product.original_price_iqd > product.price_iqd;
   const sellable = storeOpen && product.in_stock !== false;
   const saved = useSavedIds().has(product.id);
 
   return (
-    <Link to={href} className="sf-tile active:scale-[0.98] transition-transform">
+    <Link
+      to={href}
+      className="sf-tile press-scale"
+      onPointerEnter={() => setPeek(true)}
+      onPointerLeave={() => setPeek(false)}
+      onFocus={() => setPeek(true)}
+      onBlur={() => setPeek(false)}
+      data-card-frame={peek && second ? '2' : '1'}
+    >
       <div className="sf-media sf-well overflow-hidden relative">
         {image ? (
           // A store tile is 2 or 3 across on a phone and up to 5 across on a
@@ -167,13 +189,25 @@ export function ProductCard({ product, storeOpen, legacyLink = false }: { produc
           aria-label={saved ? loc('إزالة من المحفوظات', 'Remove from saved', 'لابردن') : loc('حفظ المنتج', 'Save product', 'پاشەکەوتکردن')}
           aria-pressed={saved}
         >
-          <span className="w-[22px] h-[22px] rounded-full bg-[#10161f]/85 flex items-center justify-center group-focus-visible:ring-2 group-focus-visible:ring-focus">
+          <span className="w-[22px] h-[22px] rounded-full bg-black/60 flex items-center justify-center group-focus-visible:ring-2 group-focus-visible:ring-focus">
             <Heart className={`w-3 h-3 ${saved ? 'text-rose-500 fill-rose-500' : 'text-white'}`} strokeWidth={2} aria-hidden="true" />
           </span>
         </button>
         {discounted && (
-          <span className="absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-600/90 text-white" dir="ltr">
+          <span className="absolute top-1.5 end-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-danger text-snow" dir="ltr">
             −{Math.round((1 - product.price_iqd / (product.original_price_iqd as number)) * 100)}%
+          </span>
+        )}
+        {/* ▶ at the picture's bottom end when the product carries a video (L10):
+            a mark, never a player — video plays on the product page only. */}
+        {product.has_video && (
+          <span
+            className="absolute bottom-1 end-1 w-[22px] h-[22px] rounded-full bg-black/60 flex items-center justify-center"
+            role="img"
+            aria-label={s.card.hasVideo}
+            data-card-video
+          >
+            <Play className="w-3 h-3 text-snow" strokeWidth={2} aria-hidden="true" />
           </span>
         )}
         {!sellable && (

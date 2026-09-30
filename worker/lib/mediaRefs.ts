@@ -370,6 +370,16 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   // ---- printing ----------------------------------------------------------
   { table: 'community_request_files', column: 'file_key', kind: 'text', why: 'the uploaded 3D model or drawing' },
   { table: 'community_request_files', column: 'preview_key', kind: 'text', why: 'the derived preview mesh the viewer serves' },
+  // ---- files on products and posts (0157, §9.4) ---------------------------
+  { table: 'product_files', column: 'file_key', kind: 'text', why: "a merchant's private product file (merchants/<uid>/product-files/…)" },
+  { table: 'product_files', column: 'preview_key', kind: 'text', why: 'the derived preview mesh of a product file (product-previews/…)' },
+  { table: 'community_post_files', column: 'file_key', kind: 'text', why: "a maker's private project attachment (users/<uid>/post-files/…)" },
+  { table: 'community_post_files', column: 'preview_key', kind: 'text', why: 'the derived preview mesh of a post attachment (post-previews/…)' },
+  { table: 'viewer_grants', column: 'file_key', kind: 'text', why: 'the product/post file a viewer link was minted for (same key as its source row)' },
+  // ---- link cards (0158, §9.4) --------------------------------------------
+  { table: 'link_cards', column: 'image_key', kind: 'text', why: 'the re-hosted Open Graph picture of a link card (link-cards/<id>.webp)' },
+  // ---- resumable uploads (0156, §9.4) ----------------------------------------
+  { table: 'upload_sessions', column: 'object_key', kind: 'text', why: 'the key a resumable upload is assembling or has just completed (0156); protected until the session row is swept' },
   { table: 'print_analyses', column: 'file_key', kind: 'text', why: 'the analysed model object' },
 
   // ---- outbound ----------------------------------------------------------
@@ -478,6 +488,10 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'product_import_items.item_key': 'the CSV row key (SKU or slug) used to resume one import item, not an R2 key',
   'product_imports.media_stage_until': 'the UTC expiry of a staged import reference, not an object path',
   'model_view_tokens.file_id': 'a row id in community_request_files, not a key',
+  'product_file_grants.product_file_id': 'a row id in product_files, not a key (0157)',
+  'link_cards.url': "the outbound address a link card previews — somebody else's page, never a key (0158)",
+  'upload_sessions.file_name': 'the name the uploader gave the file, never a key (0156)',
+  'upload_sessions.parts_json': 'received multipart parts {n, etag, bytes} — etags, not keys (0156)',
   'community_print_requests.primary_file_id': 'a row id in community_request_files, not a key',
   'printer_models.slicer_profile_id': 'a slicer profile identifier',
   'print_analyses.profile_revision': 'a slicer profile revision string',

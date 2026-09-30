@@ -164,6 +164,10 @@ test('every code the table translates is one the server can actually emit', () =
     // quota; a payout is not approved or paid while the merchant is in debt.
     'worker/routes/uploads.ts',
     'worker/routes/adminCommunity.ts',
+    // Resumable uploads (§9.4 Phase 4a): the session lifecycle, the checksum,
+    // the archive bound, the per-purpose quota and the configurable ceilings.
+    'worker/routes/uploadSessions.ts',
+    'worker/lib/uploadEntity.ts',
     // Eligibility as data (W5-B): the offer gate, the printer and stock routes,
     // and the private request costing.
     'worker/lib/printMatchingStore.ts',
@@ -184,6 +188,13 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/lib/chatCards.ts',
     'worker/routes/chats.ts',
     'worker/routes/chatCommerce.ts',
+    // Files on products and posts (§9.4): the merchant editor's refusals, the
+    // download door's PRODUCT_FILE_NOT_GRANTED, and the shared viewer's dead link.
+    'worker/routes/productFiles.ts',
+    // Link cards (§9.4): a pasted address that is not a web page, one we will
+    // not touch, and a preview that could not be fetched (a reason on the card).
+    'worker/lib/linkCards.ts',
+    'worker/routes/linkCards.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

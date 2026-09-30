@@ -1046,6 +1046,13 @@ export interface ApiOrder {
     value_iqd: number;
     granted_at: string;
   } | null;
+  /**
+   * The community store this order came from (merchant platform V2, A6):
+   * «طلبك من {store}» on the list, a strip back to the shop on the order.
+   * Only the storefront's public identity — slug, name, logo, address — never
+   * the merchant's row. null on a platform order.
+   */
+  store?: { slug: string; name: string; logo_url: string | null; url: string } | null;
 }
 
 /** One order item unit — a physical device with its own serial and cover. */

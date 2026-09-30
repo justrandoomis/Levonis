@@ -6,6 +6,7 @@
  * figure the server will believe.
  */
 import { api } from '../../../lib/api';
+import type { Estimate } from '../../../lib/printEstimate';
 
 export type SourceType = 'model' | 'link' | 'images' | 'description';
 export type ProcessChoice = 'fdm' | 'resin' | 'unsure';
@@ -86,14 +87,47 @@ export interface DraftShape {
   files: DraftFile[];
 }
 
+/**
+ * The engine's own public fields, as `/quote` and `/publish` answer them
+ * today (cost lines, floor and margin stripped server-side). New screens read
+ * the `Estimate` that `/quote` now sends BESIDE it (`QuoteAnswer`), which is
+ * the one contract both pricing engines converge on (E3).
+ */
 export interface Quote {
   priced: boolean;
   reason?: string;
+  process: 'fdm' | 'resin';
+  material_id: string;
+  printed_volume_cm3: number;
+  material_grams: number;
+  print_time_minutes: number;
+  total_time_minutes: number;
   price_iqd: number;
   price_low_iqd: number;
   price_high_iqd: number;
+  unit_price_iqd: number;
   confidence: 'high' | 'medium' | 'low';
+  confidence_reasons: string[];
+  /** Hardware ids the catalogue no longer has, so the wizard can say so. */
+  accessories_unknown?: string[];
   range_basis?: 'materials';
+}
+
+/** What `POST /api/marketplace/print/quote` answers: the engine's fields and
+ *  the contract, side by side. */
+export interface QuoteAnswer {
+  quote: Quote;
+  estimate: Estimate;
+}
+
+/** One row of `/revisions`: the estimate as it stood when the revision was
+ *  recorded (E8) — the public half of `Quote`, never a cost line. */
+export interface RevisionRow {
+  revision: number;
+  created_at: string;
+  changes: string[];
+  reason: string;
+  estimate: Partial<Quote>;
 }
 
 /** What the wizard sends, for a draft save and for a publish alike. */
@@ -147,9 +181,9 @@ export const requestsApi = {
       '/api/marketplace/print/link',
       { url }
     ),
-  quote: (b: Record<string, unknown>) => api.post<{ quote: Quote }>('/api/marketplace/print/quote', b),
+  quote: (b: Record<string, unknown>) => api.post<QuoteAnswer>('/api/marketplace/print/quote', b),
   revisions: (id: string) =>
-    api.get<{ current: number; revisions: Array<{ revision: number; created_at: string; changes: string[]; reason: string }> }>(
+    api.get<{ current: number; revisions: RevisionRow[] }>(
       `/api/marketplace/print/requests/${encodeURIComponent(id)}/revisions`
     ),
 };

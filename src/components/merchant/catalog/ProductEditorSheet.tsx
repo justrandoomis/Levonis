@@ -14,7 +14,7 @@
  * is shown read-only with «convert to variants»: the conversion is a draft the
  * merchant completes with real stock — nothing is split on their behalf.
  */
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { Sheet } from '../../ui/Sheet';
@@ -35,9 +35,11 @@ import { allCombinations, comboKey } from '../../../../packages/catalog/src/vari
 import {
   catalogApi, type CatalogMedia, type CatalogProductDetail, type Collection, type ProductBody, type PublishState,
 } from './catalogApi';
-import { catalogStrings } from './strings';
+import { catalogStrings, productFilesStrings } from './strings';
 import { Disclosure, readRefusal } from './parts';
 import { MediaEditor } from './MediaEditor';
+/** The product's files (§9.4) — its own chunk: the upload tile, the role menu and the doors ride only when the section is opened on a saved product. */
+const ProductFilesEditor = lazy(() => import('./ProductFilesEditor'));
 import {
   EMPTY_VARIANT_DRAFT, VariantEditor, draftFromDetail, draftToModel, localRef, type VariantDraft,
 } from './VariantEditor';
@@ -139,6 +141,7 @@ export default function ProductEditorSheet({
 }) {
   const { loc, lang } = useLanguage();
   const s = catalogStrings(loc);
+  const fs = productFilesStrings(lang);
   const toast = useToast();
   const titleId = useId();
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -492,6 +495,17 @@ export default function ProductEditorSheet({
               </div>
             )}
             {errors.collection_ids && <p className="lv-field-error">{errors.collection_ids}</p>}
+          </Disclosure>
+
+          {/* Files by role (§9.4). A file attaches to a SAVED product (the door is /products/:id/files), so a new product says so and gets the editor on its next open. */}
+          <Disclosure title={fs.section} summary={original ? fs.sectionHint : fs.saveFirst} testId="files">
+            {original ? (
+              <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+                <ProductFilesEditor productId={original.id} disabled={busy} />
+              </Suspense>
+            ) : (
+              <p className="text-[12.5px] leading-relaxed text-text-muted" data-files-save-first>{fs.saveFirst}</p>
+            )}
           </Disclosure>
 
           {formError && (

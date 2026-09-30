@@ -31,7 +31,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, notFound, conflict, str, int, oneOf } from '../lib/http';
+import { requireAuth, badRequest, notFound, conflict, str, int, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
@@ -42,8 +42,19 @@ import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { communityGate } from '../lib/communityGate';
 import { membershipBadges } from '../lib/entitlements';
 import { storeForUser } from '../lib/merchantAuth';
-import { isSafeMediaKey } from '../lib/mediaStorage';
+import { getMediaObject, isSafeMediaKey } from '../lib/mediaStorage';
 import { COMMUNITY_DIRECTORY_COLUMNS, directoryCard } from './community';
+// Post attachments (§9.4): a model or a document beside the pictures, viewed
+// through the shared viewer, downloaded only when the author says so.
+import { POST_FILES_MAX, attachmentResponse, ownedFileObject, type FileKind } from '../lib/fileOwnership';
+import {
+  deriveModelPreview,
+  mintViewerGrant,
+  revokePostFileViewerGrantsStatement,
+  revokePostViewerGrantsStatement,
+  viewerSessionInput,
+} from '../lib/viewerGrants';
+import { blockedEither } from '../lib/userBlocks';
 
 export const communityPostRoutes = new Hono<AppContext>();
 communityPostRoutes.use('*', communityGate());
@@ -172,15 +183,8 @@ export const postExclusionSql = (viewer: string) => `(${viewer} = '' OR (
       NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.user_id = ${viewer} AND b.blocked_id = p.author_id) OR (b.user_id = p.author_id AND b.blocked_id = ${viewer}))
   AND NOT EXISTS (SELECT 1 FROM user_mutes mu WHERE mu.user_id = ${viewer} AND mu.muted_id = p.author_id)))`;
 
-/** Has either of these two accounts blocked the other? The one question every social door asks first. */
-export async function blockedEither(db: D1Database, a: string, b: string): Promise<boolean> {
-  if (!a || !b || a === b) return false;
-  const row = await db
-    .prepare('SELECT 1 AS x FROM user_blocks WHERE (user_id = ?1 AND blocked_id = ?2) OR (user_id = ?2 AND blocked_id = ?1) LIMIT 1')
-    .bind(a, b)
-    .first();
-  return !!row;
-}
+/** Has either of these two accounts blocked the other? The one question every social door asks first (worker/lib/userBlocks.ts). */
+export { blockedEither };
 
 /** Has `recipient` muted `actor`? A mute is the viewer's own affair — it hides, and it keeps the bell quiet too. */
 export async function mutedBy(db: D1Database, recipient: string, actor: string): Promise<boolean> {
@@ -377,6 +381,39 @@ async function postMedia(env: Env, id: string) {
   }));
 }
 
+interface PostFileRow {
+  id: string;
+  post_id: string;
+  file_key: string;
+  kind: string;
+  name: string;
+  bytes: number;
+  mime: string;
+  analysis: string | null;
+  preview_key: string;
+  downloadable: number;
+  downloads: number;
+  position: number;
+}
+
+async function postFiles(env: Env, id: string) {
+  const { results } = await env.DB.prepare(
+    'SELECT id, file_key, kind, name, bytes, mime, preview_key, downloadable, downloads FROM community_post_files WHERE post_id = ? ORDER BY position, id'
+  )
+    .bind(id)
+    .all<PostFileRow>();
+  return (results ?? []).map((f) => ({
+    id: String(f.id),
+    name: String(f.name ?? ''),
+    bytes: Number(f.bytes ?? 0),
+    kind: String(f.kind) as FileKind,
+    downloadable: Number(f.downloadable) === 1,
+    has_preview: !!f.preview_key,
+    /** The author's own view only — what the composer sends back. */
+    key: String(f.file_key),
+  }));
+}
+
 communityPostRoutes.get('/posts/:id', async (c) => {
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const viewer = c.get('user') ?? null;
@@ -390,8 +427,9 @@ communityPostRoutes.get('/posts/:id', async (c) => {
   const mine = !!viewer && viewer.id === p.author_id;
   const asked = !!viewer && !!consentParty && viewer.id === consentParty && !mine;
   const root = rootDomainFrom(c.env);
-  const [media, flags, follows] = await Promise.all([
+  const [media, files, flags, follows] = await Promise.all([
     postMedia(c.env, id),
+    postFiles(c.env, id),
     viewerFlagsFor(c.env.DB, viewer?.id ?? null, [id]),
     viewer && !mine
       ? c.env.DB.prepare('SELECT 1 AS x FROM user_follows WHERE follower_id = ? AND user_id = ?').bind(viewer.id, String(p.author_id)).first()
@@ -404,6 +442,8 @@ communityPostRoutes.get('/posts/:id', async (c) => {
       ...postCard(p, root),
       body: String(p.body ?? ''),
       media: mine || viewer?.role === 'admin' ? media : media.map(({ key: _key, ...m }) => m),
+      /** The attachments (§9.4): names, sizes, kinds — the keys to the author alone (D11). */
+      files: mine || viewer?.role === 'admin' ? files : files.map(({ key: _key, ...f }) => f),
       print_settings: safeParse<Record<string, unknown>>(p.print_settings, {}) ?? {},
       request_id: mine ? ((p.request_id as string | null) ?? null) : null,
       community_order_id: mine ? ((p.community_order_id as string | null) ?? null) : null,
@@ -449,6 +489,21 @@ interface PostInput {
   request_id: string | null;
   community_order_id: string | null;
   media: Array<{ key: string; kind: 'image' | 'video'; width: number | null; height: number | null; duration_s: number | null }>;
+  /** The attachments (§9.4): the author's own private uploads, at most POST_FILES_MAX. */
+  files: PostFileInput[];
+}
+
+interface PostFileInput {
+  key: string;
+  name: string;
+  downloadable: boolean;
+}
+
+/** A file input the ledger has vouched for. */
+interface CheckedPostFile extends PostFileInput {
+  kind: FileKind;
+  mime: string;
+  bytes: number;
 }
 
 const optionalId = (v: unknown, name: string): string | null => {
@@ -545,6 +600,24 @@ function readPost(body: Record<string, unknown>, partial: boolean): Partial<Post
       };
     });
   }
+  if (has('files')) {
+    const raw = Array.isArray(body.files) ? body.files : [];
+    if (raw.length > POST_FILES_MAX) throw badRequest(`At most ${POST_FILES_MAX} files on a project`, 'POST_FILE_LIMIT');
+    const seen = new Set<string>();
+    out.files = [];
+    raw.forEach((f, i) => {
+      const item = f && typeof f === 'object' ? (f as Record<string, unknown>) : {};
+      const key = str(item.file_key ?? item.key, `files[${i}].file_key`, { min: 5, max: 200 }).replace(/^\/files\//, '');
+      if (!isSafeMediaKey(key)) throw badRequest('That file is not one of yours', 'POST_FILE_NOT_OWNED');
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.files!.push({
+        key,
+        name: str(item.name, `files[${i}].name`, { min: 0, max: 120, required: false }),
+        downloadable: item.downloadable === true || item.downloadable === 1,
+      });
+    });
+  }
   return out;
 }
 
@@ -625,6 +698,73 @@ async function checkMedia(env: Env, userId: string, media: PostInput['media']) {
   }
 }
 
+/**
+ * THE FILES ARE THE AUTHOR'S OWN PRIVATE UPLOADS (purpose `post` in the
+ * ledger — worker/lib/fileOwnership.ts; a `community` upload is PUBLIC under
+ * merchants/<uid>/public/ and can never be a post file, so it is not offered
+ * as a door that would not open), and a post carries models and documents
+ * only: a picture belongs in `media`, an archive is not a project attachment.
+ * A key that merely looks right is refused with the words a missing one gets.
+ */
+async function checkFiles(env: Env, userId: string, files: PostFileInput[]): Promise<CheckedPostFile[]> {
+  const out: CheckedPostFile[] = [];
+  for (const f of files) {
+    const owned = await ownedFileObject(env.DB, f.key, userId, ['post']);
+    if (!owned) throw badRequest('That file is not one of yours', 'POST_FILE_NOT_OWNED');
+    if (owned.kind !== 'model' && owned.kind !== 'document') throw badRequest('A project file is a 3D model or a document', 'POST_FILE_KIND');
+    out.push({
+      ...f,
+      name: f.name || owned.original_name || owned.key.split('/').pop() || 'file',
+      kind: owned.kind,
+      mime: owned.mime,
+      bytes: owned.bytes,
+    });
+  }
+  return out;
+}
+
+/**
+ * The attachments as the composer now lists them. A row whose key is still
+ * listed is UPDATED in place (its id, its preview and its download count
+ * survive an edit, and so do the viewer links on it); a key no longer listed
+ * loses its row and every link on it; a new key gets a row and, for a model,
+ * its mesh (best effort, worker/lib/viewerGrants.ts).
+ */
+async function fileStatements(env: Env, postId: string, ownerId: string, files: CheckedPostFile[], ts: string): Promise<D1PreparedStatement[]> {
+  const { results: existing } = await env.DB.prepare('SELECT id, file_key FROM community_post_files WHERE post_id = ?').bind(postId).all<{ id: string; file_key: string }>();
+  const keep = new Map((existing ?? []).map((r) => [r.file_key, r.id]));
+  const incoming = new Set(files.map((f) => f.key));
+  const gone = (existing ?? []).filter((r) => !incoming.has(r.file_key)).map((r) => r.id);
+  const stmts: D1PreparedStatement[] = [];
+  if (gone.length) {
+    stmts.push(
+      revokePostFileViewerGrantsStatement(env.DB, gone, ts),
+      env.DB.prepare('DELETE FROM community_post_files WHERE post_id = ? AND id IN (SELECT value FROM json_each(?))').bind(postId, JSON.stringify(gone))
+    );
+  }
+  for (const [i, f] of files.entries()) {
+    const id = keep.get(f.key);
+    if (id) {
+      stmts.push(
+        env.DB.prepare('UPDATE community_post_files SET name = ?, downloadable = ?, position = ? WHERE id = ? AND post_id = ?')
+          .bind(f.name, f.downloadable ? 1 : 0, i, id, postId)
+      );
+      continue;
+    }
+    const nid = newId('pfl');
+    const preview = f.kind === 'model'
+      ? await deriveModelPreview(env, { fileKey: f.key, name: f.name, previewKey: `post-previews/${postId}/${nid}.lvm`, domain: 'users', ownerId, entityId: postId })
+      : { preview_key: '', analysis: null };
+    stmts.push(
+      env.DB.prepare(
+        `INSERT INTO community_post_files (id, post_id, file_key, kind, name, bytes, mime, analysis, preview_key, downloadable, position, created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+      ).bind(nid, postId, f.key, f.kind, f.name, f.bytes, f.mime, preview.analysis ? JSON.stringify(preview.analysis) : null, preview.preview_key, f.downloadable ? 1 : 0, i, ts)
+    );
+  }
+  return stmts;
+}
+
 function mediaStatements(env: Env, postId: string, media: PostInput['media']) {
   const stmts = [env.DB.prepare('DELETE FROM community_post_media WHERE post_id = ?').bind(postId)];
   media.forEach((m, i) => {
@@ -660,8 +800,10 @@ communityPostRoutes.post('/posts', requireAuth, async (c) => {
   const input = readPost(body, false) as PostInput;
   const { consent, customerToAsk } = await checkLinks(c.env, user.id, input, null);
   await checkMedia(c.env, user.id, input.media);
+  const files = await checkFiles(c.env, user.id, input.files ?? []);
   const id = newId('prj');
   const ts = nowIso();
+  const fileStmts = await fileStatements(c.env, id, user.id, files, ts);
   await c.env.DB.batch([
     c.env.DB.prepare(
       `INSERT INTO community_posts
@@ -676,9 +818,10 @@ communityPostRoutes.post('/posts', requireAuth, async (c) => {
       input.community_order_id, consent ?? 'not_needed', ts, ts
     ),
     ...mediaStatements(c.env, id, input.media),
+    ...fileStmts,
   ]);
   if (customerToAsk) await askConsent(c.env, id, customerToAsk, user.name || user.username || '', input.title);
-  await audit(c.env.DB, user.id, 'community.post_created', id, { kind: input.kind, media: input.media.length });
+  await audit(c.env.DB, user.id, 'community.post_created', id, { kind: input.kind, media: input.media.length, files: files.length });
   const p = await loadPost(c.env, id);
   return c.json({ success: true, post: postCard(p!, rootDomainFrom(c.env)) }, 201);
 });
@@ -700,6 +843,7 @@ communityPostRoutes.patch('/posts/:id', requireAuth, async (c) => {
   const input = readPost(body, true);
   const { consent, customerToAsk } = await checkLinks(c.env, user.id, input, current);
   if (input.media) await checkMedia(c.env, user.id, input.media);
+  const files = input.files ? await checkFiles(c.env, user.id, input.files) : null;
   // A PUBLISHED piece keeps the promises publishing made: it cannot lose its
   // last picture, and it cannot take on a customer's part without their
   // answer — link the job on a draft, or archive first.
@@ -734,10 +878,14 @@ communityPostRoutes.patch('/posts/:id', requireAuth, async (c) => {
   // A job link that changed resets the consent question to what the new link needs.
   if (consent !== null) put('consent_status', consent);
   else if (input.request_id === null && input.community_order_id === null && (current.request_id || current.community_order_id)) put('consent_status', 'not_needed');
-  put('updated_at', nowIso());
+  const ts = nowIso();
+  put('updated_at', ts);
   await c.env.DB.batch([
     c.env.DB.prepare(`UPDATE community_posts SET ${sets.join(', ')} WHERE id = ? AND author_id = ?`).bind(...vals, id, user.id),
     ...(input.media ? mediaStatements(c.env, id, input.media) : []),
+    ...(files ? await fileStatements(c.env, id, user.id, files, ts) : []),
+    // A post taken private closes its viewer links with it (§9.4).
+    ...(input.visibility === 'private' ? [revokePostViewerGrantsStatement(c.env.DB, [id], ts)] : []),
   ]);
   if (customerToAsk && consent === 'pending' && current.consent_status !== 'pending') {
     await askConsent(c.env, id, customerToAsk, user.name || user.username || '', input.title ?? String(current.title));
@@ -780,7 +928,12 @@ communityPostRoutes.post('/posts/:id/archive', requireAuth, async (c) => {
   const user = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   await ownPost(c, id);
-  await c.env.DB.prepare("UPDATE community_posts SET state = 'archived', updated_at = ? WHERE id = ? AND author_id = ?").bind(nowIso(), id, user.id).run();
+  const ts = nowIso();
+  await c.env.DB.batch([
+    // Its viewer links stop with it (§9.4 "tokens revoked when the source closes/hides").
+    revokePostViewerGrantsStatement(c.env.DB, [id], ts),
+    c.env.DB.prepare("UPDATE community_posts SET state = 'archived', updated_at = ? WHERE id = ? AND author_id = ?").bind(ts, id, user.id),
+  ]);
   await audit(c.env.DB, user.id, 'community.post_archived', id, {});
   const p = await loadPost(c.env, id);
   return c.json({ success: true, post: postCard(p!, rootDomainFrom(c.env)) });
@@ -803,9 +956,86 @@ communityPostRoutes.delete('/posts/:id', requireAuth, async (c) => {
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const current = await ownPost(c, id);
   if (current.state === 'published') throw conflict('Archive the project first', 'POST_PUBLISHED');
-  await c.env.DB.prepare('DELETE FROM community_posts WHERE id = ? AND author_id = ?').bind(id, user.id).run();
+  await c.env.DB.batch([
+    // Before the delete: the cascade would hide the files from the revoke's subquery.
+    revokePostViewerGrantsStatement(c.env.DB, [id], nowIso()),
+    c.env.DB.prepare('DELETE FROM community_posts WHERE id = ? AND author_id = ?').bind(id, user.id),
+  ]);
   await audit(c.env.DB, user.id, 'community.post_deleted', id, {});
   return c.json({ success: true });
+});
+
+// ------------------------------------------------------- the attachments
+
+interface PostFileHead {
+  id: string;
+  author_id: string;
+  state: string;
+  visibility: string;
+  admin_hidden_at: string | null;
+  consent_status: string;
+  request_id: string | null;
+  community_order_id: string | null;
+}
+
+/** The post a file belongs to, readable by this viewer — the page's own rule (`mayRead`, the block), or a 404. */
+async function readablePostForFile(c: Context<AppContext>, id: string): Promise<{ post: PostFileHead; file: PostFileRow; mine: boolean }> {
+  const viewer = c.get('user') ?? null;
+  const fid = str(c.req.param('fid'), 'fid', { min: 1, max: 64 });
+  const p = await c.env.DB.prepare(
+    'SELECT id, author_id, state, visibility, admin_hidden_at, consent_status, request_id, community_order_id FROM community_posts WHERE id = ?'
+  )
+    .bind(id)
+    .first<PostFileHead>();
+  const consentParty = p && viewer ? await consentPartyOf(c.env, p as unknown as Record<string, unknown>) : null;
+  if (!p || !mayRead(p, viewer, consentParty)) throw notFound('Project not found');
+  if (viewer && (await blockedEither(c.env.DB, viewer.id, p.author_id))) throw notFound('Project not found');
+  const file = await c.env.DB.prepare('SELECT * FROM community_post_files WHERE id = ? AND post_id = ?').bind(fid, id).first<PostFileRow>();
+  if (!file) throw new HttpError(404, 'File not found', 'POST_FILE_NOT_FOUND');
+  return { post: p, file, mine: !!viewer && viewer.id === p.author_id };
+}
+
+/**
+ * «عرض ثلاثي الأبعاد»: a viewer link for a model attachment. A public post
+ * mints for a guest too — the link is then bound to the guest's session hash
+ * instead of an account (worker/lib/viewerGrants.ts); a private post or a
+ * draft mints only for whoever may read it. The author gets the stored mesh,
+ * everyone else the coarse one.
+ */
+communityPostRoutes.post('/posts/:id/files/:fid/viewer-token', async (c) => {
+  await rateLimit(c, 'viewer-token', 60, 3600);
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const { file, mine } = await readablePostForFile(c, id);
+  if (!file.preview_key) throw conflict('This file has no 3D preview', 'NO_PREVIEW');
+  const minted = await mintViewerGrant(c.env.DB, {
+    sourceType: 'post',
+    sourceId: file.id,
+    fileKey: file.file_key,
+    grant: mine ? 'full' : 'preview',
+    user: c.get('user') ?? null,
+    session: viewerSessionInput(c),
+  });
+  return c.json({ success: true, ...minted });
+});
+
+/**
+ * The original, as an attachment — only when the author ticked `downloadable`
+ * (or IS the author), only signed in, counted on the row and logged. A guest
+ * meets the same 401 every signed-in door gives.
+ */
+communityPostRoutes.get('/posts/:id/files/:fid/download', requireAuth, async (c) => {
+  await rateLimit(c, 'post-file-download', 120, 3600);
+  const user = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const { file, mine } = await readablePostForFile(c, id);
+  if (!mine && Number(file.downloadable) !== 1) {
+    throw new HttpError(403, 'The author did not make this file downloadable', 'POST_FILE_NOT_DOWNLOADABLE');
+  }
+  const object = await getMediaObject(c.env, 'private', file.file_key);
+  if (!object) throw new HttpError(404, 'The stored file is no longer available', 'POST_FILE_NOT_FOUND');
+  await c.env.DB.prepare('UPDATE community_post_files SET downloads = downloads + 1 WHERE id = ?').bind(file.id).run();
+  await audit(c.env.DB, user.id, 'community.post_file_downloaded', file.id, { post: id, mine });
+  return attachmentResponse(object, file.name, file.mime, Number(file.bytes ?? 0));
 });
 
 /** The customer answers a workshop's request to show their part. */

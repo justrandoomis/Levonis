@@ -722,12 +722,29 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   ORDER_CHANGED: {
     ar: 'تغيّر هذا الطلب أثناء عملك عليه. حدّث الصفحة ثم حاول مرة أخرى.',
     en: 'This order changed while you were working on it. Refresh the page, then try again.',
-    ckb: 'تغيّر هذا الطلب أثناء عملك عليه. حدّث الصفحة ثم حاول مرة أخرى.',
+    ckb: 'ئەم داواکارییە لە کاتی کارکردنت لەسەری گۆڕا. پەڕەکە نوێ بکەرەوە و پاشان دووبارە هەوڵ بدەرەوە.',
   },
   ORDER_TRANSITION_INVALID: {
     ar: 'لا يمكن نقل الطلب إلى هذه الحالة من حالته الحالية. حدّث الصفحة.',
     en: 'The order cannot move to that status from where it is now. Refresh the page.',
-    ckb: 'لا يمكن نقل الطلب إلى هذه الحالة من حالته الحالية. حدّث الصفحة.',
+    ckb: 'ناتوانرێت داواکارییەکە لە دۆخی ئێستایەوە بۆ ئەم دۆخە بگوازرێتەوە. پەڕەکە نوێ بکەرەوە.',
+  },
+  // The orders list's bulk move and the ship-with-tracking sheet (merchant
+  // platform v2 §4.2; worker/routes/merchantOrders.ts, merchant.ts).
+  BULK_TOO_MANY: {
+    ar: 'حدّد 50 طلبًا على الأكثر في المرة الواحدة.',
+    en: 'Select at most 50 orders at a time.',
+    ckb: 'لە هەر جارێکدا زۆرترین ٥٠ داواکاری هەڵبژێرە.',
+  },
+  BULK_CANCEL_NOT_ALLOWED: {
+    ar: 'الإلغاء يُعيد المال للزبون، لذا يتم طلبًا طلبًا من صفحة الطلب.',
+    en: 'A cancellation refunds the customer, so it is done one order at a time from the order page.',
+    ckb: 'هەڵوەشاندنەوە پارە بۆ کڕیار دەگەڕێنێتەوە، بۆیە یەک بە یەک لە پەڕەی داواکارییەکەوە دەکرێت.',
+  },
+  TRACKING_NO_TOO_LONG: {
+    ar: 'رقم التتبع طويل — 60 حرفًا على الأكثر.',
+    en: 'The tracking number is too long — at most 60 characters.',
+    ckb: 'ژمارەی بەدواداچوون درێژە — زۆرترین ٦٠ پیت.',
   },
   // Wave 1 review: the store cart's own "gone" (the merchant-line quantity
   // door), the wallet reservation a checkout could not make, and a cart another
@@ -1337,6 +1354,128 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ar: 'لم نجد ما تريد الإبلاغ عنه.',
     en: 'We could not find what you are reporting.',
     ckb: 'ئەوەی دەتەوێت ڕاپۆرتی بکەیت نەدۆزرایەوە.',
+  },
+  // ---- Resumable uploads (docs/COMMUNITY_ECOSYSTEM.md §9.4, Phase 4a) -------
+  // worker/routes/uploadSessions.ts and worker/routes/uploads.ts. The tile
+  // (src/components/upload/UploadTile.tsx) shows these under the file name.
+  UPLOAD_SESSION_NOT_FOUND: {
+    ar: 'انتهت جلسة الرفع أو لم نجدها — ابدأ الرفع من جديد.',
+    en: 'This upload session has expired or could not be found — start the upload again.',
+    ckb: 'دانیشتنی بارکردن بەسەرچووە یان نەدۆزرایەوە — بارکردنەکە لە سەرەتاوە دەست پێ بکەرەوە.',
+  },
+  UPLOAD_PART_TOO_LARGE: {
+    ar: 'جزء الملف أكبر من الحجم المسموح — حدّث الصفحة وأعد المحاولة.',
+    en: 'A part of the file is larger than allowed — refresh the page and try again.',
+    ckb: 'بەشێکی فایلەکە لە قەبارەی ڕێگەپێدراو گەورەترە — پەڕەکە نوێ بکەرەوە و دووبارە هەوڵبدەوە.',
+  },
+  UPLOAD_INCOMPLETE: {
+    ar: 'لم تصل كل أجزاء الملف بعد — أكمل الرفع ثم أعد المحاولة.',
+    en: 'Not every part of the file has arrived yet — finish uploading and try again.',
+    ckb: 'هێشتا هەموو بەشەکانی فایلەکە نەگەیشتوون — بارکردنەکە تەواو بکە و دووبارە هەوڵبدەوە.',
+  },
+  CHECKSUM_MISMATCH: {
+    ar: 'تغيّر الملف أثناء الرفع ولم يُحفظ — أعد رفعه.',
+    en: 'The file changed during the upload and was not saved — upload it again.',
+    ckb: 'فایلەکە لە کاتی بارکردندا گۆڕا و پاشەکەوت نەکرا — دووبارە باری بکە.',
+  },
+  ARCHIVE_TOO_DEEP: {
+    ar: 'هذا الملف المضغوط كبير جدًا عند فكّه أو يحوي ملفات كثيرة — صدّر المجسّم بملف أصغر.',
+    en: 'This archive expands too far or holds too many files — export the model as a smaller file.',
+    ckb: 'ئەم فایلە پەستێنراوە کاتێک دەکرێتەوە زۆر گەورە دەبێت یان فایلی زۆری تێدایە — مۆدێلەکە بە فایلێکی بچووکتر دەربکە.',
+  },
+  UPLOAD_QUOTA_EXCEEDED: {
+    ar: 'بلغت حدّ مساحة التخزين لهذا النوع من الملفات — احذف ملفًا لم تعد تحتاجه ثم أعد المحاولة.',
+    en: 'You have reached the storage limit for this kind of file — remove a file you no longer need and try again.',
+    ckb: 'گەیشتیتە سنووری بیرگەی ئەم جۆرە فایلانە — فایلێک بسڕەوە کە پێویستت پێی نییە و دووبارە هەوڵبدەوە.',
+  },
+  UPLOAD_TOO_LARGE: {
+    ar: 'الملف أكبر من الحد المسموح لهذا النوع من الملفات.',
+    en: 'The file is larger than the limit for this kind of file.',
+    ckb: 'فایلەکە لە سنووری ڕێگەپێدراوی ئەم جۆرە فایلانە گەورەترە.',
+  },
+  UPLOAD_KIND_NOT_ALLOWED: {
+    ar: 'هذا النوع من الملفات غير مقبول هنا، أو أن محتواه لا يطابق امتداده.',
+    en: 'This kind of file is not accepted here, or its contents do not match its name.',
+    ckb: 'ئەم جۆرە فایلە لێرە قبوڵ ناکرێت، یان ناوەڕۆکەکەی لەگەڵ ناوەکەی ناگونجێت.',
+  },
+  // ---- Files on products and posts (§9.4; worker/routes/productFiles.ts,
+  //      worker/routes/communityPosts.ts, worker/routes/printRequests.ts) -----
+  PRODUCT_FILE_NOT_FOUND: {
+    ar: 'لم نجد هذا الملف. ربما أزاله المتجر.',
+    en: 'We could not find this file. The store may have removed it.',
+    ckb: 'ئەم فایلە نەدۆزرایەوە. لەوانەیە فرۆشگاکە لایبردبێت.',
+  },
+  PRODUCT_FILE_NOT_GRANTED: {
+    ar: 'هذا الملف متاح بعد شراء المنتج. أكمل الشراء ثم عد لتنزيله.',
+    en: 'This file is available after you buy the product. Complete the purchase, then come back to download it.',
+    ckb: 'ئەم فایلە دوای کڕینی بەرهەمەکە بەردەست دەبێت. کڕینەکە تەواو بکە و پاشان بگەڕێوە بۆ داگرتنی.',
+  },
+  PRODUCT_FILE_NOT_OWNED: {
+    ar: 'هذا الملف ليس من ملفاتك المرفوعة. ارفعه من جهازك ثم أضفه.',
+    en: 'That file is not one of your uploads. Upload it from your device, then add it.',
+    ckb: 'ئەم فایلە لە بارکراوەکانی تۆ نییە. لە ئامێرەکەتەوە باری بکە و پاشان زیادی بکە.',
+  },
+  PRODUCT_FILE_LIMIT: {
+    ar: 'الحد 12 ملفًا للمنتج الواحد. احذف ملفًا لتضيف آخر.',
+    en: 'A product holds up to 12 files. Remove one to add another.',
+    ckb: 'بەرهەمێک تا ١٢ فایل هەڵدەگرێت. یەکێک بسڕەوە بۆ زیادکردنی یەکێکی تر.',
+  },
+  PRODUCT_FILE_ROLE_INVALID: {
+    ar: 'اختر دور الملف: معاينة، تنزيل بعد الشراء، مرجع، تعليمات، أو ملف المصدر.',
+    en: 'Choose the file’s role: preview, download after purchase, reference, instructions, or source model.',
+    ckb: 'ڕۆڵی فایلەکە هەڵبژێرە: پێشبینین، داگرتن دوای کڕین، سەرچاوە، ڕێنمایی، یان فایلی سەرچاوەی مۆدێل.',
+  },
+  PRODUCT_FILE_ORDER_INVALID: {
+    ar: 'أرسل معرّفات الملفات بترتيبها الجديد.',
+    en: 'Send the file ids in their new order.',
+    ckb: 'ناسنامەی فایلەکان بە ڕیزبەندی نوێیان بنێرە.',
+  },
+  POST_FILE_LIMIT: {
+    ar: 'الحد 3 ملفات للمشروع الواحد. احذف ملفًا لتضيف آخر.',
+    en: 'A project holds up to 3 files. Remove one to add another.',
+    ckb: 'پڕۆژەیەک تا ٣ فایل هەڵدەگرێت. یەکێک بسڕەوە بۆ زیادکردنی یەکێکی تر.',
+  },
+  POST_FILE_NOT_OWNED: {
+    ar: 'هذا الملف ليس من ملفاتك المرفوعة. ارفعه من جهازك ثم أضفه.',
+    en: 'That file is not one of your uploads. Upload it from your device, then add it.',
+    ckb: 'ئەم فایلە لە بارکراوەکانی تۆ نییە. لە ئامێرەکەتەوە باری بکە و پاشان زیادی بکە.',
+  },
+  POST_FILE_KIND: {
+    ar: 'ملف المشروع يكون مجسمًا ثلاثي الأبعاد أو مستندًا. الصور تُضاف مع الوسائط.',
+    en: 'A project file is a 3D model or a document. Pictures go with the media.',
+    ckb: 'فایلی پڕۆژە مۆدێلی سێ ڕەهەندی یان بەڵگەنامەیە. وێنەکان لەگەڵ میدیا زیاد دەکرێن.',
+  },
+  POST_FILE_NOT_FOUND: {
+    ar: 'لم نجد هذا الملف. ربما أزاله صاحب المشروع.',
+    en: 'We could not find this file. The maker may have removed it.',
+    ckb: 'ئەم فایلە نەدۆزرایەوە. لەوانەیە دروستکەرەکە لایبردبێت.',
+  },
+  POST_FILE_NOT_DOWNLOADABLE: {
+    ar: 'صاحب المشروع لم يُتح تنزيل هذا الملف. يمكنك عرضه ثلاثي الأبعاد فقط.',
+    en: 'The maker did not make this file downloadable. You can view it in 3D only.',
+    ckb: 'دروستکەرەکە ڕێگەی بە داگرتنی ئەم فایلە نەداوە. تەنها دەتوانیت بە سێ ڕەهەندی بیبینیت.',
+  },
+  VIEWER_TOKEN_INVALID: {
+    ar: 'انتهت صلاحية رابط العرض أو أُغلق. افتح المعاينة من صفحتها مرة أخرى.',
+    en: 'This viewer link has expired or was closed. Open the preview from its page again.',
+    ckb: 'ماوەی ئەم لینکی بینینە تەواو بووە یان داخراوە. پێشبینینەکە دووبارە لە پەڕەکەیەوە بکەرەوە.',
+  },
+  // ---- Link cards (§9.4; worker/lib/linkCards.ts, worker/routes/linkCards.ts,
+  //      worker/routes/chats.ts) -------------------------------------------------
+  LINK_URL_INVALID: {
+    ar: 'هذا ليس رابط صفحة ويب. الصق رابطًا يبدأ بـ http أو https.',
+    en: 'That is not a web page link. Paste a link that starts with http or https.',
+    ckb: 'ئەمە لینکی پەڕەی وێب نییە. لینکێک بلکێنە کە بە http یان https دەست پێ بکات.',
+  },
+  LINK_HOST_BLOCKED: {
+    ar: 'لا يمكن مشاركة هذا العنوان هنا. جرّب رابط الصفحة العامة بدلًا منه.',
+    en: 'This address cannot be shared here. Try the public page’s link instead.',
+    ckb: 'ئەم ناونیشانە لێرە هاوبەش ناکرێت. لە جیاتی ئەوە لینکی پەڕە گشتییەکە تاقی بکەرەوە.',
+  },
+  LINK_FETCH_FAILED: {
+    ar: 'تعذّر جلب معاينة الصفحة الآن. سيُرسل الرابط باسم موقعه، وتُعاد المحاولة لاحقًا.',
+    en: 'The page preview could not be fetched right now. The link is sent with its site’s name and tried again later.',
+    ckb: 'پێشبینینی پەڕەکە ئێستا نەهێنرا. لینکەکە بە ناوی ماڵپەڕەکەی دەنێردرێت و دواتر دووبارە هەوڵ دەدرێتەوە.',
   },
 };
 

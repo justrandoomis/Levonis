@@ -749,3 +749,86 @@ test('only a merchant may compare printers', async () => {
   // does not confirm the id exists.
   assert.equal(res.status, 404);
 });
+
+// ----------------------------------------------- the margin belongs to the shop
+
+/**
+ * THE MARGIN LEAK (docs/MERCHANT_PLATFORM_V2.md §4.1 E5).
+ *
+ * Three routes read `target_margin_percent` off the request body for EVERY
+ * caller, so an anonymous visitor could have the platform's own estimate
+ * priced at 1 % — and a competitor could walk the margin down until the price
+ * stopped moving, which is the cost line §22 keeps private, read off a public
+ * door. A public caller now gets the platform margin whatever the body says;
+ * a merchant pricing their own job may still name their own.
+ */
+async function measuredGuest(raw: Raw) {
+  const bytes = stlBytes();
+  const bucket = {
+    put: async () => ({}),
+    get: async () => ({ arrayBuffer: async () => bytes.buffer.slice(0) }),
+    head: async () => null,
+    delete: async () => undefined,
+  };
+  const a = stubApp(asD1(raw), null, mount, { env: { R2_PRIVATE: bucket, R2_PUBLIC: bucket, BUCKET: bucket } });
+  const { body } = await upload(a, 'tok-guest-m');
+  const id = body.analysis_id as string;
+  const h = { 'X-Guest-Token': 'tok-guest-m' };
+  const measured = await json(await post(a, `/api/print-quote/analyses/${id}/measure`, { printer_model_id: 'bbl-a1m', material_id: 'pla' }, h));
+  if (!measured.success) throw new Error(JSON.stringify(measured));
+  return { a, id, h };
+}
+
+test('a public caller cannot choose the margin: target_margin_percent in the body is ignored (E5)', async () => {
+  const raw = freshDb();
+  raw.prepare(`UPDATE print_materials SET default_iqd_per_kg = 22000 WHERE id = 'pla'`).run();
+  const { a, id, h } = await measuredGuest(raw);
+
+  const platform = await json(await post(a, `/api/print-quote/analyses/${id}/quote`, {}, h));
+  assert.equal(platform.success, true, JSON.stringify(platform));
+  assert.ok(platform.quote.price_iqd > 0);
+  for (const attempted of [1, 5, 80, 0, -20, 'abc']) {
+    const tried = await json(await post(a, `/api/print-quote/analyses/${id}/quote`, { target_margin_percent: attempted }, h));
+    assert.equal(tried.quote.price_iqd, platform.quote.price_iqd, `margin ${attempted} moved a public price`);
+    assert.deepEqual(tried.quote.range_iqd, platform.quote.range_iqd);
+    assert.equal(tried.estimate.price_iqd, platform.estimate.price_iqd);
+  }
+
+  // The grams door too — same engine, same rule.
+  const grams = { printer_model_id: 'bbl-a1m', rows: [{ material_id: 'pla', grams: 100 }], print_minutes: 90 };
+  const plain = await json(await post(a, '/api/print-quote/grams-quote', grams));
+  assert.equal(plain.success, true, JSON.stringify(plain));
+  const lowered = await json(await post(a, '/api/print-quote/grams-quote', { ...grams, target_margin_percent: 1 }));
+  assert.equal(lowered.quote.price_iqd, plain.quote.price_iqd, 'a guest lowered the grams price with a margin');
+  const raised = await json(await post(a, '/api/print-quote/grams-quote', { ...grams, target_margin_percent: 85 }));
+  assert.equal(raised.quote.price_iqd, plain.quote.price_iqd);
+});
+
+test('a merchant may still price their own job at their own margin, within reason', async () => {
+  const raw = freshDb();
+  seedMerchant(raw, 'm-2', 'u-merchant-2');
+  raw.prepare(`UPDATE print_materials SET default_iqd_per_kg = 22000 WHERE id = 'pla'`).run();
+  const bucket = { put: async () => ({}), get: async () => null, head: async () => null, delete: async () => undefined };
+  const me = { id: 'u-merchant-2', role: 'merchant' as const, email: 'merchant2@levonis.test' };
+  const a = stubApp(asD1(raw), me, mount, { env: { R2_PRIVATE: bucket, R2_PUBLIC: bucket, BUCKET: bucket } });
+  const { body: up } = await upload(a);
+  const id = up.analysis_id as string;
+  const analysed = await json(await post(a, `/api/print-quote/analyses/${id}`, analyseBody()));
+  assert.equal(analysed.success, true, JSON.stringify(analysed));
+
+  const platform = await json(await post(a, `/api/print-quote/analyses/${id}/quote`, {}));
+  assert.equal(platform.success, true, JSON.stringify(platform));
+  // Their own economics — this is the merchant payload — at the platform margin.
+  assert.ok(Math.abs(platform.quote.margin_percent - 35) < 1, `${platform.quote.margin_percent}%`);
+
+  const own = await json(await post(a, `/api/print-quote/analyses/${id}/quote`, { target_margin_percent: 60 }));
+  assert.ok(own.quote.price_iqd > platform.quote.price_iqd, 'a higher margin is a higher price, for the merchant');
+  assert.ok(Math.abs(own.quote.margin_percent - 60) < 1, `${own.quote.margin_percent}%`);
+  // The estimate follows the merchant's own price too — it is their card.
+  assert.equal(own.estimate.price_iqd, own.quote.price_iqd);
+
+  // A margin that is not a margin (99 % is a division by nearly nothing) is
+  // not honoured; the platform's applies.
+  const absurd = await json(await post(a, `/api/print-quote/analyses/${id}/quote`, { target_margin_percent: 99 }));
+  assert.equal(absurd.quote.price_iqd, platform.quote.price_iqd);
+});

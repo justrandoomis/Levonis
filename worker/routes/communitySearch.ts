@@ -29,7 +29,7 @@
  * every LIKE goes through `likePattern` (D1's 50-byte pattern limit,
  * wildcards literal); the catalogue index is used only where it is installed
  * and ready, with the catalogue route's own LIKE fallback otherwise;
- * `rateLimit('community-search', 120, 60)` per account or IP.
+ * the `community-search` bucket, 120 per minute per account or IP.
  *
  * THE EDGE CACHE. A guest's /search, /suggest and /recommend (60 s) and
  * everybody's /trending (5 min) go through `caches.default` under a CANONICAL
@@ -114,8 +114,10 @@ const THIRTY_DAYS_MS = 30 * 86_400_000;
 /** How far back «قد يعجبك» looks for a post's neighbours: half a year, not the whole table. */
 const RECOMMEND_WINDOW_MS = 180 * 86_400_000;
 
-const RATE = ['community-search', 120, 60] as const;
-const limitRate = (c: Context<AppContext>) => rateLimit(c, RATE[0], RATE[1], RATE[2]);
+// Written as a literal call site — bucket, limit and window as literals — because the gateway's
+// parity suite (services/gateway/test/rateLimitParity.test.ts) reads every rate-limit call out of
+// worker/routes as text and cannot prove parity over a tuple.
+const limitRate = (c: Context<AppContext>) => rateLimit(c, 'community-search', 120, 60);
 
 /** The trimmed term, refused past `SEARCH_QUERY_MAX` characters (code points, like the boxes count). */
 function readQuery(c: Context<AppContext>): string {
