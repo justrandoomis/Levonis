@@ -15,10 +15,10 @@ import { join } from 'node:path';
 const DATABASE = 'levonis-db-staging';
 const ENVIRONMENT = 'staging';
 const directory = join(process.cwd(), 'migrations');
-const command = ['--no-install', 'wrangler', 'd1', 'execute', DATABASE, '--remote', '--env', ENVIRONMENT, '--yes', '--json'];
+const command = ['--no-install', 'wrangler', 'd1', 'execute', DATABASE, '--remote', '--env', ENVIRONMENT, '--yes'];
 
-function execute(args) {
-  const result = spawnSync('npx', [...command, ...args], {
+function execute(args, expectJson = false) {
+  const result = spawnSync('npx', [...command, ...args, ...(expectJson ? ['--json'] : [])], {
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
   });
@@ -27,6 +27,14 @@ function execute(args) {
     if (result.stderr.trim()) console.error(result.stderr.trim());
     if (result.stdout.trim()) console.error(result.stdout.trim());
     throw new Error(`Wrangler failed (exit ${result.status ?? 'signal'}) — no further migration will run`);
+  }
+  // File ingestion may print progress outside the JSON payload even when
+  // --json is passed. Its CLI exits only after ingestion is complete; the
+  // authoritative confirmation is the separate history read below.
+  if (!expectJson) {
+    if (result.stdout.trim()) console.log(result.stdout.trim());
+    if (result.stderr.trim()) console.error(result.stderr.trim());
+    return;
   }
   let response;
   try { response = JSON.parse(result.stdout); } catch {
@@ -38,7 +46,7 @@ function execute(args) {
 }
 
 function history() {
-  const rows = execute(['--command', 'SELECT name FROM d1_migrations ORDER BY name']).results;
+  const rows = execute(['--command', 'SELECT name FROM d1_migrations ORDER BY name'], true).results;
   if (rows.length === 0) throw new Error('Remote migration history is empty — refusing to bootstrap the live database');
   if (rows.some((row) => typeof row?.name !== 'string' || !row.name.endsWith('.sql')))
     throw new Error('Remote migration history is malformed');

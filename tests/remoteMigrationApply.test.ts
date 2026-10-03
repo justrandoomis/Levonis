@@ -29,13 +29,15 @@ import { DatabaseSync } from 'node:sqlite';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 const args = process.argv.slice(2);
-const expected = ['--no-install','wrangler','d1','execute','levonis-db-staging','--remote','--env','staging','--yes','--json'];
+const expected = ['--no-install','wrangler','d1','execute','levonis-db-staging','--remote','--env','staging','--yes'];
 if (JSON.stringify(args.slice(0, expected.length)) !== JSON.stringify(expected)) process.exit(90);
 const fileAt = args.indexOf('--file'), commandAt = args.indexOf('--command');
 const sql = fileAt >= 0 ? readFileSync(args[fileAt+1], 'utf8') : undefined;
 const previous = (() => { try { return readFileSync(process.env.MOCK_CALLS, 'utf8'); } catch { return ''; } })();
 appendFileSync(process.env.MOCK_CALLS, JSON.stringify({args,sql})+'\\n');
 if (commandAt >= 0 && args[commandAt+1] !== 'SELECT name FROM d1_migrations ORDER BY name') process.exit(91);
+if (commandAt >= 0 && !args.includes('--json')) process.exit(94);
+if (fileAt >= 0 && args.includes('--json')) process.exit(95);
 const afterImport = previous.includes('"--file"');
 if (commandAt >= 0 && (process.env.MOCK_HISTORY || (afterImport && process.env.MOCK_HISTORY_AFTER_IMPORT))) {
   const mode = process.env.MOCK_HISTORY || process.env.MOCK_HISTORY_AFTER_IMPORT;
@@ -57,7 +59,8 @@ if (commandAt >= 0) {
     db.exec(actualSql);
     if (process.env.MOCK_FAIL_FILE === basename(args[fileAt+1])) throw new Error('injected import failure');
     db.exec('COMMIT');
-    console.log(JSON.stringify([{success:true,results:[{'Total queries executed':1}],finalBookmark:'mock-bookmark',meta:{}}]));
+    console.log('Uploading SQL file...');
+    console.log('Executed SQL file successfully (progress output, not JSON)');
     db.close();
   } catch (error) {
     db.exec('ROLLBACK'); db.close(); console.error(error.message); process.exit(44);
@@ -103,19 +106,23 @@ function fixture(files = sampleFiles, applied = [base], seed = '') {
 const importedNames = (calls: Call[]) => calls.filter((call) => call.sql).map((call) => /VALUES \('([^']+)'\);\s*$/.exec(call.sql!)?.[1]);
 const historyNames = (db: DatabaseSync) => db.prepare('SELECT name FROM d1_migrations ORDER BY name').all().map((row) => row.name);
 
-test('atomic ingestion preserves full trigger bodies, orders predecessors, and skips confirmed files on retry', () => {
+test('non-JSON file progress succeeds with confirmed history, preserves trigger bodies and order, and retries without duplication', () => {
   const f = fixture();
   try {
     const result = f.run();
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(importedNames(f.calls()), [trigger, predecessor, upgrade]);
     for (const call of f.calls()) {
-      assert.deepEqual(call.args.slice(0, 10), ['--no-install', 'wrangler', 'd1', 'execute', 'levonis-db-staging', '--remote', '--env', 'staging', '--yes', '--json']);
+      assert.deepEqual(call.args.slice(0, 9), ['--no-install', 'wrangler', 'd1', 'execute', 'levonis-db-staging', '--remote', '--env', 'staging', '--yes']);
       if (call.sql) {
         assert.ok(call.args.includes('--file'));
+        assert.ok(!call.args.includes('--json'));
         assert.ok(!call.args.includes('--command'), 'schema and bookkeeping must share the file import');
+      } else {
+        assert.ok(call.args.includes('--json'), 'history confirmation must remain strict JSON');
       }
     }
+    assert.match(result.stdout, /Executed SQL file successfully \(progress output, not JSON\)/);
     assert.match(f.calls().find((call) => call.sql?.includes('CREATE TRIGGER'))!.sql!, /BEGIN UPDATE media SET value=value\+1; END;/);
     f.inspect((db) => {
       assert.deepEqual(historyNames(db), sampleFiles.map(([name]) => name));
