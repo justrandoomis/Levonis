@@ -18,9 +18,9 @@
  * transaction is a window in which the shelf and its cost disagree.
  *
  * ---------------------------------------------------------------------------
- * THE QUEUE IS PER (scope, scope_id), WHICH IS THE LEDGER'S OWN IDENTITY.
+ * THE QUEUE IS PER (product_id, scope, scope_id).
  *
- * Not per product. §22: black must not consume white's older lot merely because
+ * BASE rows share an empty scope_id, so product identity is essential. §22: black must not consume white's older lot merely because
  * it is older, and it cannot — white's lots are in a different queue. The four
  * stock scopes have lots; 'preorder' and 'preorder_transport' do not, because
  * capacity is a promise to import and not a unit on a shelf (§65).
@@ -35,6 +35,7 @@
  * none, and one cancelled after restores to the exact rows recorded here.
  */
 
+import { newId } from './crypto';
 import type { StockMove, StockScope } from './inventory';
 
 /** Lots exist only for units on a shelf. Capacity scopes are promises. */
@@ -182,7 +183,9 @@ export interface LotRow {
   received_at: string;
 }
 
-const identityKey = (scope: string, scopeId: string) => `${scope}:${scopeId}`;
+/** BASE uses an empty scope_id on EVERY product. Its product is part of the key. */
+export const lotIdentityKey = (scope: string, scopeId: string, productId?: string | null) =>
+  scope === 'base' ? `base:${productId ?? ''}` : `${scope}:${scopeId}`;
 
 /**
  * Which of this order's lines have already been allocated.
@@ -224,19 +227,24 @@ async function appliedAllocationLines(db: D1Database, orderId: string): Promise<
  */
 export async function fifoQueues(
   db: D1Database,
-  identities: ReadonlyArray<{ scope: StockScope; scope_id: string }>
+  identities: ReadonlyArray<{ scope: StockScope; scope_id: string; product_id?: string }>
 ): Promise<Map<string, LotRow[]>> {
   const out = new Map<string, LotRow[]>();
-  const wanted = identities.filter((i) => hasLots(i.scope));
+  const wanted = [...new Map(identities.filter((i) => hasLots(i.scope)).map(i => [lotIdentityKey(i.scope,i.scope_id,i.product_id),i])).values()];
+  if (wanted.some((i) => i.scope === 'base' && !i.product_id)) {
+    throw new Error('A BASE FIFO queue requires product_id');
+  }
   if (wanted.length === 0) return out;
 
   // Chunked for the same reason inventory.ts chunks: D1 caps bound parameters,
   // and a bundle multiplies the identity count without an obvious bound.
-  const CHUNK = 40;
+  const CHUNK = 30;
   for (let i = 0; i < wanted.length; i += CHUNK) {
     const part = wanted.slice(i, i + CHUNK);
-    const where = part.map(() => '(scope = ? AND scope_id = ?)').join(' OR ');
-    const args = part.flatMap((p) => [p.scope, p.scope_id]);
+    const where = part.map((p) => p.product_id
+      ? '(scope = ? AND scope_id = ? AND product_id = ?)'
+      : '(scope = ? AND scope_id = ?)').join(' OR ');
+    const args = part.flatMap((p) => p.product_id ? [p.scope, p.scope_id, p.product_id] : [p.scope, p.scope_id]);
     const { results } = await db
       .prepare(
         `SELECT id, product_id, scope, scope_id, qty_remaining, unit_cost_iqd, received_at
@@ -247,7 +255,7 @@ export async function fifoQueues(
       .bind(...args)
       .all<LotRow>();
     for (const row of results ?? []) {
-      const key = identityKey(row.scope, row.scope_id);
+      const key = lotIdentityKey(row.scope, row.scope_id, row.product_id);
       const list = out.get(key);
       if (list) list.push(row);
       else out.set(key, [row]);
@@ -349,7 +357,7 @@ export async function planLotConsumption(
 
   const queues = await fifoQueues(
     db,
-    relevant.map((x) => ({ scope: x.target.scope, scope_id: x.target.scope_id }))
+    relevant.map((x) => ({ scope: x.target.scope, scope_id: x.target.scope_id, product_id: x.move.product_id }))
   );
 
   // A RUNNING SIMULATION, not a fresh read per line. Two lines of one order may
@@ -365,7 +373,7 @@ export async function planLotConsumption(
   const shortfall: LotPlan['shortfall'] = [];
 
   for (const { move, target } of relevant) {
-    const key = identityKey(target.scope, target.scope_id);
+    const key = lotIdentityKey(target.scope, target.scope_id, move.product_id);
     const lots = queues.get(key) ?? [];
     const left = remaining.get(key) ?? [];
     let need = move.qty;
@@ -499,12 +507,15 @@ export async function planLotRestore(
    */
   const releasedKeys = await db
     .prepare(
-      `SELECT idempotency_key FROM order_item_inventory_allocations
+      `SELECT idempotency_key, order_item_id, lot_id, qty FROM order_item_inventory_allocations
         WHERE order_id = ? AND released_at IS NOT NULL`
     )
     .bind(orderId)
-    .all<{ idempotency_key: string }>();
+    .all<{ idempotency_key: string; order_item_id: string; lot_id: string; qty: number }>();
   const released = new Set((releasedKeys.results ?? []).map((r) => r.idempotency_key));
+  if ([...released].some(key => key.startsWith(`${operation}:${orderId}:`))) return EMPTY;
+  const returned = new Map<string, number>();
+  for (const r of releasedKeys.results ?? []) { const key = `${r.order_item_id}:${r.lot_id}`; returned.set(key, (returned.get(key) ?? 0) + r.qty); }
   const budget = new Map<string, number>();
   if (opts.qtyByLine) for (const [k, v] of Object.entries(opts.qtyByLine)) budget.set(k, Math.max(0, Math.floor(v)));
 
@@ -519,11 +530,12 @@ export async function planLotRestore(
     // defensible; this one is deterministic and matches the direction of
     // travel, so a return and an immediate re-sale leave the shelf where it
     // started.
-    let give = r.qty;
+    const remaining = Math.max(0, r.qty - (returned.get(`${r.order_item_id}:${r.lot_id}`) ?? 0));
+    let give = remaining;
     if (opts.qtyByLine) {
       const left = budget.get(r.order_item_id) ?? 0;
       if (left <= 0) continue;
-      give = Math.min(r.qty, left);
+      give = Math.min(remaining, left);
       budget.set(r.order_item_id, left - give);
     }
     if (give <= 0) continue;
@@ -539,10 +551,10 @@ export async function planLotRestore(
           // duplicate no-op while its UPDATE credits the lot a second time.
           `INSERT INTO order_item_inventory_allocations
              (id, order_id, order_item_id, lot_id, scope, scope_id, qty, unit_cost_iqd, cogs_iqd, idempotency_key, released_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, CASE WHEN (SELECT COALESCE(SUM(qty),0) FROM order_item_inventory_allocations WHERE order_item_id=?3 AND lot_id=?4 AND released_at IS NOT NULL)+?7 <= (SELECT COALESCE(SUM(qty),0) FROM order_item_inventory_allocations WHERE order_item_id=?3 AND lot_id=?4 AND released_at IS NULL) THEN ?7 ELSE -1 END, ?8, ?9, ?10, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
         )
         .bind(
-          `ialloc_${idem.replace(/[^A-Za-z0-9_]/g, '_')}`.slice(0, 120),
+          newId('ialloc'),
           orderId,
           r.order_item_id,
           r.lot_id,
@@ -564,8 +576,8 @@ export async function planLotRestore(
           // The cap stays: a lot may never hold more than it received. The
           // `EXISTS` that used to sit beside it is gone — it was the thing that
           // made the replay possible, not the thing that prevented it.
-          `UPDATE inventory_lots SET qty_remaining = qty_remaining + ?1
-            WHERE id = ?2 AND qty_remaining + ?1 <= qty_received`
+          `UPDATE inventory_lots SET qty_remaining = CASE WHEN qty_remaining + ?1 <= qty_received THEN qty_remaining + ?1 ELSE -1 END
+            WHERE id = ?2`
         )
         .bind(give, r.lot_id)
     );

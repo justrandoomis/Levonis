@@ -720,7 +720,7 @@ test('the printer note: is_printer on the quote lines and the order items, the a
   // advance is debited from the wallet first, so the door carries 854,000:
   // one whole block, and 3,000 of tax.
   assert.equal(home.cod_tax_iqd, 3_000, 'COD delivery tax is a separate server-calculated line');
-  assert.equal(home.total_iqd, 899_000 + 5_000 + 3_000, 'the printer note is NOT added to the total');
+  assert.equal(home.total_iqd, 899_000 + 10_000 + 3_000, 'printer shipping is 10,000; the informational advance note adds no fee');
 
   const pickup = (await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'cash', { deliveryMethodId: 'pickup' })))).quote;
   assert.equal(pickup.lines[0].is_printer, true);
@@ -730,7 +730,7 @@ test('the printer note: is_printer on the quote lines and the order items, the a
   assert.equal(placed.success, true, JSON.stringify(placed));
   assert.equal(placed.order.items[0].is_printer, true);
   assert.equal(placed.order.cod_tax_iqd, 3_000);
-  assert.equal(placed.order.total_iqd, 907_000);
+  assert.equal(placed.order.total_iqd, 912_000);
   const detail = await json(await a.request(`/api/orders/${placed.order.id}`));
   assert.equal(detail.order.items[0].is_printer, true);
   assert.equal(detail.order.cod_tax_iqd, 3_000, 'persisted order details use the COD tax snapshot');

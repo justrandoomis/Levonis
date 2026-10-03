@@ -53,6 +53,9 @@ import { walletCreditStatement } from '../lib/wallet';
 import { walletLedgerDinarsReady } from '../lib/walletOps';
 import { planInventory, planReservationFence, chunk, IN_CHUNK } from '../lib/inventory';
 import { restoreMovesForItem } from '../lib/orderInventory';
+import { planLotRestore } from '../lib/inventoryLots';
+import { operationsInstalled, baghdadDay } from '../lib/operations';
+import { recordReturnFinancials, recordFinancialFailure } from '../lib/orderFinance';
 import { isRevealed, loadAllocations, paidOrderIds } from '../lib/mysteryReveal';
 import { mysteryRefusal } from '../lib/mystery/issues';
 import { typeForTransport } from '../lib/shippingType';
@@ -636,6 +639,10 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
 
   let refundResult: Record<string, unknown> | null = null;
   let pointsResult: Record<string, unknown> | null = null;
+  const operationalReturns = await operationsInstalled(c.env.DB);
+  const inspection = operationalReturns ? await c.env.DB.prepare('SELECT disposition FROM stock_return_inspections WHERE return_case_id=?').bind(id).first<{ disposition: string }>() : null;
+  const restock = !inspection || inspection.disposition === 'restock';
+  let restoredCost: number | null | undefined;
 
   if (to === 'resolved' && resolution === 'refund') {
     const item = await c.env.DB.prepare(
@@ -811,7 +818,7 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       // (§3.3), so a guard that matched nothing rolls the credit back with it
       // instead of recording a movement that never happened.
       const restoreMoves = await restoreMovesForItem(c.env.DB, kase.order_id, kase.order_item_id, kase.qty);
-      if (restoreMoves.length) {
+      if (restoreMoves.length && restock) {
         const restorePlan = await planInventory(c.env.DB, restoreMoves, {
           kind: 'restore',
           operationId: id,
@@ -822,10 +829,18 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
         restorePlan.statements.push(
           await planReservationFence(c.env.DB, kase.order_id, 'restore', restorePlan.plannedLedgerRows)
         );
+        const lots = await planLotRestore(c.env.DB,kase.order_id,{lineIds:[kase.order_item_id],qtyByLine:{[kase.order_item_id]:kase.qty},operation:`return:${id}`});
+        restorePlan.statements.push(...lots.statements);
+        if(lots.allocations.length)restoredCost=lots.allocations.some(a=>a.cogs_iqd===null)?null:lots.allocations.reduce((n,a)=>n+(a.cogs_iqd??0),0);
         if (restorePlan.statements.length) await c.env.DB.batch(restorePlan.statements);
         pumpAfter(c.env.DB, restorePlan.eventIds, waitUntilFrom(c));
       }
     }
+  }
+
+  if (refundResult && operationalReturns) {
+    try { await recordReturnFinancials(c.env,{caseId:id,orderId:kase.order_id,itemId:kase.order_item_id,refundIqd:Number(refundResult.amount_iqd),qty:kase.qty,restocked:restock,actor:admin.id,day:baghdadDay(new Date(nowIso)),cogsIqd:restoredCost,channel:String(refundResult.channel)}); }
+    catch(e) { await recordFinancialFailure(c.env.DB,kase.order_id,'refund',e).catch(()=>undefined); }
   }
 
   await audit(c.env.DB, admin.id, 'return.transition', id, {

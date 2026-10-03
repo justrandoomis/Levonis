@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import {
@@ -35,6 +35,7 @@ import { honestyNotices, isEstimated, type Notice } from './honesty';
 import { defaultGranularity, presetRange, rangeProblem, type PresetId } from './period';
 import { financeStrings } from './strings';
 import ExpenseLedger from './ExpenseLedger';
+const FinanceOperationsPanel=lazy(()=>import('../adminOperations/FinanceOperationsPanel'));
 
 /**
  * «لوحة الأرباح» — WHAT THE SHOP EARNED, AND WHAT IT COST TO EARN IT.
@@ -119,7 +120,7 @@ export default function AdminFinance() {
    * that scopes ONE card while others keep another scope, and there is only
    * ever one scope here.
    */
-  const [view, setView] = useState<'report' | 'ledger'>('report');
+  const [view, setView] = useState<'report' | 'ledger' | 'operations'>('report');
 
   const { from, to, granularity } = period;
 
@@ -309,6 +310,9 @@ export default function AdminFinance() {
         onGranularity={onGranularity}
         onRefresh={() => setReloadKey((k) => k + 1)}
       />
+
+      <button type="button" className="lv-button lv-button-secondary mb-3" onClick={() => setView('operations')} aria-pressed={view === 'operations'}>{loc('العمليات المالية والأجور والمحاسبة', 'Financial operations, payroll and accounting', 'کارە داراییەکان و مووچە و ژمێریاری')}</button>
+      {view === 'operations' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…')}</p>}><FinanceOperationsPanel from={period.from} to={period.to} onChanged={() => setReloadKey(k => k + 1)} /></Suspense>}
 
       {view === 'ledger' && (
         <ExpenseLedger

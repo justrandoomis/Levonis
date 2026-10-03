@@ -699,6 +699,8 @@ export interface SchemaFacts {
    * `fifo_available: false` rather than reporting a FIFO COGS of zero.
    */
   hasFifo: boolean;
+  /** 0162 records the exact stock disposition and refund amount. */
+  hasOperationalRefunds?: boolean;
 }
 
 /**
@@ -1134,15 +1136,19 @@ export const salesByDaySql = (schema: SchemaFacts): string => `
  * constraint says it cannot happen" is not a reason to let the whole financial
  * screen fail. Binds: startIso, endIso.
  */
+const refundJoin = (schema: SchemaFacts) => schema.hasOperationalRefunds ? ' LEFT JOIN finance_refund_facts rf ON rf.case_id=rc.id' : '';
+const refundProjection = (schema: SchemaFacts) => `${costProjection(schema)},
+  ${schema.hasOperationalRefunds ? 'CASE WHEN rf.case_id IS NOT NULL THEN 1 ELSE 0 END AS operational,rf.cogs_iqd AS restored_cogs_iqd,rf.refund_iqd AS actual_refund_iqd' : '0 AS operational,NULL AS restored_cogs_iqd,NULL AS actual_refund_iqd'}`;
+
 export const refundsByDaySql = (schema: SchemaFacts): string => `
   WITH r AS (
     SELECT COALESCE(date(rc.decided_at, '${BAGHDAD_SQL_SHIFT}'), '') AS day,
            MIN(rc.qty, i.qty) AS ref_qty,
            MAX(1, i.qty) AS line_qty,
            ${NET_REFUND_IQD} AS net_iqd,
-           ${costProjection(schema)}
+           ${refundProjection(schema)}
       FROM return_cases rc
-      JOIN order_items i ON i.id = rc.order_item_id${REFUND_ORDER_JOIN}${lineJoins(schema)}
+      JOIN order_items i ON i.id = rc.order_item_id${REFUND_ORDER_JOIN}${lineJoins(schema)}${refundJoin(schema)}
      WHERE ${REFUND_WHERE}
   )
   SELECT r.day AS day,${REFUND_AGGREGATES}
@@ -1169,21 +1175,23 @@ export const refundsByDaySql = (schema: SchemaFacts): string => `
  * one convention, so the two columns round the same way.
  */
 const REFUND_COGS = `CASE
+        WHEN r.operational=1 THEN r.restored_cogs_iqd
         WHEN r.fifo_cogs_iqd IS NOT NULL AND r.ref_qty >= r.line_qty THEN r.fifo_cogs_iqd
         WHEN r.fifo_cogs_iqd IS NOT NULL THEN r.fifo_cogs_iqd * r.ref_qty / r.line_qty
         WHEN r.unit_cost_iqd IS NULL THEN NULL
         ELSE r.unit_cost_iqd * r.ref_qty END`;
 const UNCOSTED_R = `(${REFUND_COGS}) IS NULL`;
 
+const REFUND_REVENUE = `CASE WHEN r.operational=1 THEN r.actual_refund_iqd ELSE r.net_iqd * r.ref_qty / r.line_qty END`;
 const REFUND_AGGREGATES = `
          COUNT(*) AS cases,
          SUM(r.ref_qty) AS units,
-         SUM(r.net_iqd * r.ref_qty / r.line_qty) AS revenue_iqd,
+         SUM((${REFUND_REVENUE})) AS revenue_iqd,
          SUM(CASE WHEN ${UNCOSTED_R} THEN 0
-                  ELSE r.net_iqd * r.ref_qty / r.line_qty END) AS costed_revenue_iqd,
+                  ELSE (${REFUND_REVENUE}) END) AS costed_revenue_iqd,
          SUM(COALESCE(${REFUND_COGS}, 0)) AS cogs_iqd,
          SUM(CASE WHEN ${UNCOSTED_R}
-                  THEN r.net_iqd * r.ref_qty / r.line_qty ELSE 0 END) AS uncosted_revenue_iqd,
+                  THEN (${REFUND_REVENUE}) ELSE 0 END) AS uncosted_revenue_iqd,
          SUM(CASE WHEN ${UNCOSTED_R} THEN r.ref_qty ELSE 0 END) AS uncosted_units,
          SUM(CASE WHEN ${UNCOSTED_R} AND r.ref_qty >= r.line_qty THEN 1 ELSE 0 END) AS uncosted_lines,
          SUM(CASE WHEN r.cost_confidence = 'estimated' AND r.ref_qty >= r.line_qty THEN 1 ELSE 0 END) AS estimated_lines,
@@ -1315,9 +1323,9 @@ export const refundsByProductSql = (schema: SchemaFacts): string => `
            MIN(rc.qty, i.qty) AS ref_qty,
            MAX(1, i.qty) AS line_qty,
            ${NET_REFUND_IQD} AS net_iqd,
-           ${costProjection(schema)}
+           ${refundProjection(schema)}
       FROM return_cases rc
-      JOIN order_items i ON i.id = rc.order_item_id${REFUND_ORDER_JOIN}${lineJoins(schema)}
+      JOIN order_items i ON i.id = rc.order_item_id${REFUND_ORDER_JOIN}${lineJoins(schema)}${refundJoin(schema)}
      WHERE ${REFUND_WHERE}
   )
   SELECT r.product_id AS product_id,
@@ -1363,9 +1371,9 @@ export const refundsByCategorySql = (schema: SchemaFacts, level: 'main' | 'sub')
            MIN(rc.qty, i.qty) AS ref_qty,
            MAX(1, i.qty) AS line_qty,
            ${NET_REFUND_IQD} AS net_iqd,
-           ${costProjection(schema)}
+           ${refundProjection(schema)}
       FROM return_cases rc
-      JOIN order_items i ON i.id = rc.order_item_id${REFUND_ORDER_JOIN}${lineJoins(schema)}
+      JOIN order_items i ON i.id = rc.order_item_id${REFUND_ORDER_JOIN}${lineJoins(schema)}${refundJoin(schema)}
      WHERE ${REFUND_WHERE}
   )
   SELECT r.category_id AS category_id,

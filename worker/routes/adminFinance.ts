@@ -60,6 +60,8 @@ import {
  * covers reads, writes and anything added to this file later.
  */
 
+import { planExpenseAccounting } from '../lib/expenseAccounting';
+
 export const adminFinanceRoutes = new Hono<AppContext>();
 adminFinanceRoutes.use('*', requireAdmin);
 
@@ -365,15 +367,16 @@ adminFinanceRoutes.post('/expenses', async (c) => {
    * Separate statements each bind eleven, and the batch is still atomic: twelve
    * months of rent land together or not at all.
    */
-  await c.env.DB.batch(
-    days.map((d, i) =>
+  const inserts = days.map((d, i) =>
       c.env.DB.prepare(
         `INSERT INTO operating_expenses
            (id, category_id, amount_iqd, expense_day, title, note, series_id, created_by, created_at, updated_at, void_reason)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')`
       ).bind(ids[i], categoryId, amount, d, title, note, seriesId, admin.id, ts, ts)
-    )
-  );
+    );
+  const journals:D1PreparedStatement[]=[];
+  for(let i=0;i<ids.length;i++)journals.push(...await planExpenseAccounting(c.env.DB,{id:ids[i],actor:admin.id,title,day:days[i],amount,fresh:true}));
+  await c.env.DB.batch([...inserts,...journals]);
   await audit(c.env.DB, admin.id, 'finance.expense.create', ids[0], {
     category_id: categoryId,
     amount_iqd: amount,
@@ -416,13 +419,13 @@ adminFinanceRoutes.patch('/expenses/:id', async (c) => {
   const title = body.title === undefined ? row.title : str(body.title, 'title', { min: 0, max: 120 });
   const note = body.note === undefined ? row.note : str(body.note, 'note', { min: 0, max: 1000 });
 
-  await c.env.DB.prepare(
+  const change=c.env.DB.prepare(
     `UPDATE operating_expenses
         SET category_id = ?, amount_iqd = ?, expense_day = ?, title = ?, note = ?, updated_at = ?
       WHERE id = ? AND voided_at IS NULL`
   )
-    .bind(categoryId, amount, day, title, note, nowIso(), id)
-    .run();
+    .bind(categoryId, amount, day, title, note, nowIso(), id);
+  await c.env.DB.batch([change,...await planExpenseAccounting(c.env.DB,{id,actor:admin.id,title,day,amount})]);
   await audit(c.env.DB, admin.id, 'finance.expense.update', id, {
     before: { category_id: row.category_id, amount_iqd: Number(row.amount_iqd), expense_day: row.expense_day },
     after: { category_id: categoryId, amount_iqd: amount, expense_day: day },
@@ -455,12 +458,14 @@ adminFinanceRoutes.delete('/expenses/:id', async (c) => {
   if (!row) throw notFound('Expense not found');
   const reason = str(c.req.query('reason') ?? '', 'reason', { min: 0, max: 300 });
   const ts = nowIso();
-  const res = await c.env.DB.prepare(
+  if(row.voided_at)return c.json({success:true,voided:false});
+  const change=c.env.DB.prepare(
     `UPDATE operating_expenses SET voided_at = ?, voided_by = ?, void_reason = ?, updated_at = ?
       WHERE id = ? AND voided_at IS NULL`
   )
     .bind(ts, admin.id, reason, ts, id)
-    .run();
+;
+  const [res]=await c.env.DB.batch([change,...await planExpenseAccounting(c.env.DB,{id,actor:admin.id,title:row.title,day:row.expense_day,amount:Number(row.amount_iqd),void:true})]);
   /**
    * THE AUDIT FOLLOWS THE UPDATE, IT DOES NOT ASSUME IT.
    *
@@ -491,12 +496,14 @@ adminFinanceRoutes.post('/expenses/:id/restore', async (c) => {
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const row = await c.env.DB.prepare('SELECT * FROM operating_expenses WHERE id = ?').bind(id).first<ExpenseRow>();
   if (!row) throw notFound('Expense not found');
-  const res = await c.env.DB.prepare(
+  if(!row.voided_at)return c.json({success:true,restored:false});
+  const change=c.env.DB.prepare(
     `UPDATE operating_expenses SET voided_at = NULL, voided_by = NULL, void_reason = '', updated_at = ?
       WHERE id = ? AND voided_at IS NOT NULL`
   )
     .bind(nowIso(), id)
-    .run();
+;
+  const [res]=await c.env.DB.batch([change,...await planExpenseAccounting(c.env.DB,{id,actor:admin.id,title:row.title,day:row.expense_day,amount:Number(row.amount_iqd),void:false})]);
   // The mirror of the void's rule: a restore that restored nothing is not an
   // entry either. A trail showing a restore against a row that was never
   // voided is a trail that cannot be read back as a sequence of facts.

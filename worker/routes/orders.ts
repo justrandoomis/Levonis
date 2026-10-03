@@ -111,6 +111,7 @@ import { dailyUserHash, emitFromRequest, eventsEnabled, outboxStatement, pumpAft
 import { CheckoutStartedV1 } from '@levonis/contracts/events/v1/CheckoutStarted';
 import { OrderCreatedV1 } from '@levonis/contracts/events/v1/OrderCreated';
 import { planOrderReturn } from '../lib/orderInventory';
+import { planOrderFinanceSnapshot } from '../lib/orderFinance';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
 import { voidPendingPriceAdjustmentStatement } from '../lib/orderPriceAdjust';
 import {
@@ -1332,7 +1333,7 @@ function priceCompositionLine(
      * other shipping fact.
      */
     const facts = shippingFactsFrom(b.row.ops_policy);
-    shippingItems.push({ product_id: String(b.doc.id), qty: 1, ...facts });
+    shippingItems.push({ product_id: String(b.doc.id), qty: 1, is_printer: printerIds.has(String(b.doc.id)), ...facts });
   });
   included.forEach((k, i) => {
     const componentQty = k.qty_per_bundle * qty;
@@ -1428,6 +1429,7 @@ function priceCompositionLine(
     shippingItems.push({
       product_id: k.member_product_id,
       qty: componentQty,
+      is_printer: printerIds.has(k.member_product_id),
       ...facts,
     });
     composition.items.push({
@@ -2582,7 +2584,7 @@ async function computeCheckout(
       merchandise += resolved.applied_iqd * qty;
       productIds.push(String(row.id));
       const facts = shippingFactsFrom(row.ops_policy, row);
-      shippingItems.push({ product_id: String(row.id), qty, ...facts });
+      shippingItems.push({ product_id: String(row.id), qty, is_printer: isPrinter, ...facts });
       // Persisted resolver snapshot: cost fields must NEVER be stored on the
       // order (it is served back to the buyer). It carries `direct.waived`,
       // `transport.waived_by` and `pricing_basis`, so an invoice, a refund or
@@ -4629,6 +4631,7 @@ orderRoutes.post('/', async (c) => {
   if (orderEvent) stmts.push(orderEvent.statement);
 
   try {
+    stmts.push(...await planOrderFinanceSnapshot(c.env.DB, orderId, comp.lines.map(l => ({ id: l.id, product_id: l.product_id })), now, comp.walletApplied));
     await c.env.DB.batch(stmts);
   } catch (e) {
     if (isPolicyAcceptanceConflict(e)) {

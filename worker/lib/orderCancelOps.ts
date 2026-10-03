@@ -27,6 +27,7 @@
 import type { Env } from './types';
 import { releaseOrderRedemptionsStatement } from './offers';
 import { walletLedgerDinarsReady } from './walletOps';
+import { baghdadDay, journalPlan, operationsInstalled } from './operations';
 
 /** The order row as both routes hold it (a raw `SELECT *`); only four columns are read. */
 export type CancellableOrderMoney = Record<string, unknown>;
@@ -157,6 +158,12 @@ export async function cancelledOrderRefundStatements(
   // THE FENCE. `status` is NOT NULL: when the flip did not land, this writes
   // NULL into it and the constraint aborts the whole batch; when it did, the
   // column is rewritten to its own value and nothing changes.
+  if (await operationsInstalled(env.DB)) {
+    const advance = await env.DB.prepare(`SELECT SUM(l.debit_iqd) AS amount FROM accounting_lines l JOIN accounting_entries e ON e.id=l.entry_id WHERE e.event_key=? AND l.account_code='2200'`).bind(`wallet-advance:${id}`).first<{amount:number|null}>();
+    if (advance?.amount && !await env.DB.prepare('SELECT id FROM accounting_entries WHERE event_key=?').bind(`cancel-wallet:${id}`).first()) {
+      out.push(...journalPlan(env.DB,{key:`cancel-wallet:${id}`,day:baghdadDay(new Date(nowIso)),title:'إرجاع دفعة المحفظة لطلب ملغى',source:'order_cancel',sourceId:id},[{account:'2300',debit:advance.amount},{account:'2200',credit:advance.amount}]).statements);
+    }
+  }
   out.push(
     env.DB.prepare(
       `UPDATE orders SET status = CASE WHEN status = 'cancelled' THEN status ELSE NULL END WHERE id = ?1`

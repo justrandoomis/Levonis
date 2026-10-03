@@ -1,0 +1,153 @@
+import { badRequest, conflict, forbidden, unavailable } from './http';
+import { canViewFinancials, isOwner } from './adminScope';
+import type { Env, SessionUser } from './types';
+import { newId } from './crypto';
+
+export type Capability =
+  | 'purchase'
+  | 'receive'
+  | 'count'
+  | 'transfer'
+  | 'rules'
+  | 'pay'
+  | 'accounting'
+  | 'close';
+export const baghdadDay = (at = new Date()) =>
+  new Date(at.getTime() + 3 * 3600000).toISOString().slice(0, 10);
+export const dateValue = (value: unknown, fallback?: string): string => {
+  const v = typeof value === 'string' ? value : fallback;
+  if (
+    !v ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(v) ||
+    !Number.isFinite(Date.parse(`${v}T00:00:00Z`)) ||
+    new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) !== v
+  )
+    throw badRequest('تاريخ غير صحيح', 'BAD_DATE');
+  return v;
+};
+export const whole = (value: unknown, label: string, min = 0, max = 1e12) => {
+  const n = Number(value);
+  if (value === null || value === '' || value === undefined || !Number.isSafeInteger(n) || n < min || n > max)
+    throw badRequest(`${label}: أدخل عددًا صحيحًا`, 'BAD_NUMBER');
+  return n;
+};
+export const decimal = (value: unknown, label: string, min = 0) => {
+  const n = Number(value);
+  if (value === null || value === '' || value === undefined || !Number.isFinite(n) || n < min || n > 1e9)
+    throw badRequest(`${label}: قيمة غير صحيحة`, 'BAD_NUMBER');
+  return n;
+};
+export async function operationsInstalled(db: D1Database) {
+  return !!(await db
+    .prepare("SELECT 1 AS yes FROM sqlite_master WHERE type='table' AND name='purchase_orders'")
+    .first());
+}
+export async function requireCapability(env: Env, user: SessionUser, capability: Capability) {
+  if (!(await operationsInstalled(env.DB)))
+    throw unavailable(
+      'تحديث عمليات المخزون والمالية لم يطبق على قاعدة البيانات بعد',
+      'OPERATIONS_NOT_CONFIGURED',
+    );
+  if (isOwner(env, user)) return;
+  const financial = ['purchase', 'rules', 'pay', 'accounting', 'close'].includes(capability);
+  if (financial && !canViewFinancials(env, user)) throw forbidden('هذه العملية تتطلب صلاحية مالية');
+  const permission = await env.DB.prepare(
+    'SELECT allowed FROM ops_permissions WHERE user_id=? AND capability=?',
+  )
+    .bind(user.id, capability)
+    .first<{ allowed: number }>();
+  if (permission?.allowed === 0) throw forbidden('ليس لديك صلاحية لهذه العملية');
+}
+export function fence(db: D1Database, sqlCondition: string, args: unknown[] = []): D1PreparedStatement[] {
+  const id = newId('guard');
+  return [
+    db
+      .prepare(`INSERT INTO ops_guards(id,ok) SELECT ?, CASE WHEN ${sqlCondition} THEN 1 ELSE 0 END`)
+      .bind(id, ...args),
+    db.prepare('DELETE FROM ops_guards WHERE id=?').bind(id),
+  ];
+}
+/** Integer largest remainder. Money never disappears into rounded unit prices. */
+export function allocateExact(total: number, weights: number[]): number[] {
+  whole(total, 'total');
+  if (!weights.length || weights.some((w) => !Number.isFinite(w) || w < 0))
+    throw badRequest('أساس توزيع التكلفة غير صحيح', 'BAD_ALLOCATION');
+  const scaled = weights.map((w) => BigInt(Math.round(w * 1000)));
+  const sum = scaled.reduce((a, b) => a + b, 0n);
+  if (sum === 0n) {
+    if (total === 0) return weights.map(() => 0);
+    throw badRequest('أدخل الوزن أو الحجم لجميع البنود قبل توزيع التكلفة', 'ALLOCATION_BASIS_MISSING');
+  }
+  const shares = scaled.map((w) => Number((BigInt(total) * w) / sum));
+  const ranked = scaled
+    .map((w, i) => ({ i, rem: (BigInt(total) * w) % sum }))
+    .sort((a, b) => (a.rem === b.rem ? a.i - b.i : a.rem > b.rem ? -1 : 1));
+  let left = total - shares.reduce((a, b) => a + b, 0);
+  for (const r of ranked) {
+    if (left-- <= 0) break;
+    shares[r.i]++;
+  }
+  return shares;
+}
+export async function periodOpen(db: D1Database, day: string) {
+  if (await db.prepare('SELECT month FROM accounting_periods WHERE month=?').bind(day.slice(0, 7)).first())
+    throw conflict('الفترة المحاسبية مغلقة؛ سجّل التصحيح في فترة مفتوحة', 'PERIOD_CLOSED');
+}
+export type JournalLine = { account: string; debit?: number; credit?: number };
+export function journalPlan(
+  db: D1Database,
+  input: {
+    key: string;
+    day: string;
+    title: string;
+    source: string;
+    sourceId: string;
+    actor?: string | null;
+    reversalOf?: string | null;
+  },
+  lines: JournalLine[],
+) {
+  const active = lines.filter((l) => (l.debit ?? 0) + (l.credit ?? 0) > 0);
+  const balance = active.reduce((s, l) => s + (l.debit ?? 0) - (l.credit ?? 0), 0);
+  if (
+    balance !== 0 ||
+    active.length < 2 ||
+    active.some(
+      (l) =>
+        !Number.isSafeInteger((l.debit ?? 0) + (l.credit ?? 0)) ||
+        (l.debit ?? 0) < 0 ||
+        (l.credit ?? 0) < 0 ||
+        ((l.debit ?? 0) > 0 && (l.credit ?? 0) > 0),
+    )
+  )
+    throw badRequest('القيد المحاسبي غير متوازن', 'UNBALANCED_JOURNAL');
+  const id = newId('je');
+  return {
+    id,
+    statements: [
+      db
+        .prepare(
+          `INSERT INTO accounting_entries(id,event_key,entry_day,title,source_type,source_id,actor_id,reversal_of,created_at) VALUES (?,?,?,?,?,?,?,?,?)`,
+        )
+        .bind(
+          id,
+          input.key,
+          input.day,
+          input.title,
+          input.source,
+          input.sourceId,
+          input.actor ?? null,
+          input.reversalOf ?? null,
+          new Date().toISOString(),
+        ),
+      ...active.map((l) =>
+        db
+          .prepare(
+            'INSERT INTO accounting_lines(id,entry_id,account_code,debit_iqd,credit_iqd) VALUES (?,?,?,?,?)',
+          )
+          .bind(newId('jl'), id, l.account, l.debit ?? 0, l.credit ?? 0),
+      ),
+      db.prepare("UPDATE accounting_entries SET state='posted' WHERE id=?").bind(id),
+    ],
+  };
+}

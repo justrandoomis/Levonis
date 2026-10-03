@@ -177,6 +177,7 @@ export interface MediaRefSource {
  * before it issues a statement.
  */
 export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
+  { table: 'purchase_orders', column: 'attachment_url', kind: 'text', why: 'invoice attachment retained with the purchase document' },
   // ---- the catalogue ----------------------------------------------------
   /**
    * A SECTION'S OWN COVER — the one picture on the home page that an admin
@@ -409,6 +410,16 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
  * on a live page. Those are not comparable mistakes.
  */
 export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
+  'accounting_entries.event_key': 'journal de-duplication token',
+  'finance_posting_errors.event_key': 'financial event retry token',
+  'finance_cost_rules.group_key': 'work-group label, rendered only as text',
+  'finance_order_costs.group_key': 'frozen work-group label',
+  'finance_task_assignments.group_key': 'work-group label',
+  'finance_order_costs.snapshot': 'frozen cost formula, money, staff and product ids; no rendered media',
+  'finance_order_snapshots.rules_json': 'immutable cost-rule formulas and applicability',
+  'finance_rule_versions.snapshot': 'immutable cost-rule configuration',
+  'purchase_orders.request_json': 'request de-duplication; invoice attachment is scanned separately',
+  'purchase_receiving_events.request_json': 'receipt ids, quantities and inspection notes',
   // -- the community's projects (0153): numbers and short words in JSON ------
   'community_posts.print_settings': 'layer height, infill, supports, nozzle — numbers and flags, never a key',
   'community_posts.dimensions': 'the printed part\'s size in millimetres',

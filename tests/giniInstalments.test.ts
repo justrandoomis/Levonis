@@ -49,6 +49,7 @@ import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 
 const PRINTER_IQD = 899_000;
 const DELIVERY_IQD = 5_000;
+const PRINTER_DELIVERY_IQD = 10_000;
 
 function setup() {
   resetPolicyCorpusMemo();
@@ -240,10 +241,10 @@ test('a gini printer order: gini pays the goods, only the delivery fee is due at
 
   const q = (await json(await post(a, '/api/orders/quote', body()))).quote;
   assert.ok(q.allowed_payment_methods.includes('gini'));
-  assert.equal(q.total_iqd, PRINTER_IQD + DELIVERY_IQD, 'the order still costs what it costs');
+  assert.equal(q.total_iqd, PRINTER_IQD + PRINTER_DELIVERY_IQD, 'the order still costs what it costs');
   assert.equal(q.gini.paid_iqd, PRINTER_IQD, 'settled inside the app');
-  assert.equal(q.gini.delivery_due_iqd, DELIVERY_IQD);
-  assert.equal(q.due_on_delivery_iqd, DELIVERY_IQD, '«فقط سعر التوصيل»');
+  assert.equal(q.gini.delivery_due_iqd, PRINTER_DELIVERY_IQD);
+  assert.equal(q.due_on_delivery_iqd, PRINTER_DELIVERY_IQD, '«فقط سعر التوصيل»');
   assert.equal(
     q.gini.paid_iqd + q.gini.delivery_due_iqd,
     q.total_iqd,
@@ -278,8 +279,8 @@ test('a gini printer order: gini pays the goods, only the delivery fee is due at
   assert.equal(row.gini_state, 'awaiting_receipt');
   assert.equal(row.gini_order_no, '904221');
   assert.equal(Number(row.gini_paid_iqd), PRINTER_IQD);
-  assert.equal(Number(row.due_on_delivery_iqd), DELIVERY_IQD);
-  assert.equal(Number(row.total_iqd), PRINTER_IQD + DELIVERY_IQD);
+  assert.equal(Number(row.due_on_delivery_iqd), PRINTER_DELIVERY_IQD);
+  assert.equal(Number(row.total_iqd), PRINTER_IQD + PRINTER_DELIVERY_IQD);
   assert.equal(Number(row.wallet_applied_iqd), 0, 'the wallet never part-pays a gini order');
   assert.equal(Number(row.bnpl_due_iqd), 0, 'no Levonis financing, no ledger, no limit');
   assert.ok(String(row.gini_hold_until) > String(row.created_at), 'the deadline is frozen ahead of the order');
@@ -295,7 +296,7 @@ test('a gini printer order: gini pays the goods, only the delivery fee is due at
   assert.equal(placed.order.financial.gini_paid_iqd, PRINTER_IQD);
   assert.equal(
     placed.order.financial.outstanding_iqd,
-    DELIVERY_IQD,
+    PRINTER_DELIVERY_IQD,
     'never the full price — gini already paid the goods',
   );
 });
@@ -748,9 +749,9 @@ test('the courier is asked for the delivery fee on a gini order — not 0, and n
   }
 
   assert.equal(sent.length, 1, 'one shipment, one call');
-  assert.equal(sent[0].price, DELIVERY_IQD, 'the door amount, which is the delivery fee');
+  assert.equal(sent[0].price, PRINTER_DELIVERY_IQD, 'the door amount, which is the delivery fee');
   assert.notEqual(sent[0].price, 0, 'the old `not cash → 0` rule lost this fee on every gini delivery');
-  assert.notEqual(sent[0].price, PRINTER_IQD + DELIVERY_IQD, 'and it is never the whole price gini already financed');
+  assert.notEqual(sent[0].price, PRINTER_IQD + PRINTER_DELIVERY_IQD, 'and it is never the whole price gini already financed');
 });
 
 // ------------------------------------- what may be REFUNDED, and to whom
@@ -793,7 +794,7 @@ test('an approved return on a gini order credits no wallet balance — the goods
   const money = raw.prepare('SELECT gini_paid_iqd AS gini, due_on_delivery_iqd AS due FROM orders WHERE id = ?').get(id) as
     { gini: number; due: number };
   assert.equal(Number(money.gini), PRINTER_IQD, 'the bank financed the goods');
-  assert.equal(Number(money.due), DELIVERY_IQD, 'and the door collected the fee, nothing else');
+  assert.equal(Number(money.due), PRINTER_DELIVERY_IQD, 'and the door collected the fee, nothing else');
 
   const itemId = String((raw.prepare('SELECT id FROM order_items WHERE order_id = ?').get(id) as { id: string }).id);
   const opened = await json(await post(a, '/api/returns', { orderItemId: itemId, qty: 1, reason: 'defective' }));

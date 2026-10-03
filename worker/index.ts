@@ -63,6 +63,9 @@ import { adminPriceGridRoutes } from './routes/adminPriceGrid';
 import { adminFinanceRoutes } from './routes/adminFinance';
 import { adminFinanceReportRoutes } from './routes/adminFinanceReport';
 import { adminInventoryRoutes } from './routes/adminInventory';
+import { adminProcurementRoutes } from './routes/adminProcurement';
+import { adminStockOperationsRoutes } from './routes/adminStockOperations';
+import { adminFinanceOperationsRoutes } from './routes/adminFinanceOperations';
 import { printRequestRoutes } from './routes/printRequests';
 import { notificationRoutes } from './routes/notifications';
 import { stockAlertRoutes } from './routes/stockAlerts';
@@ -413,6 +416,9 @@ app.route('/api/admin/taxonomy', adminTaxonomyRoutes);
 // The split is per FIELD, not per route, so the door stays open and every
 // payload leaves through `projectForAdmin`.
 app.route('/api/admin/inventory', adminInventoryRoutes);
+app.route('/api/admin/procurement', adminProcurementRoutes);
+app.route('/api/admin/stock-operations', adminStockOperationsRoutes);
+app.route('/api/admin/finance-operations', adminFinanceOperationsRoutes);
 // Every commercial value PRO and PREMIUM shopping benefits are made of (§6).
 app.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
 // The issued warranty document: public verification by receipt number or by

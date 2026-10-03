@@ -24,6 +24,8 @@
  * confirming, and the number the admin approved would not be the number that
  * was written.
  */
+import StockSelection from '../adminOperations/StockSelection';
+import { type Selection, money } from '../adminOperations/shared';
 import React, { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, PackagePlus, Plus, RefreshCw, TrendingUp, Truck } from 'lucide-react';
 import * as T from '../adminProducts/theme';
@@ -198,6 +200,7 @@ export function IncomingTab({ s, onChanged }: { s: InvStrings; onChanged: () => 
 
 function PurchaseDialog({ s, onClose, onDone }: { s: InvStrings; onClose: () => void; onDone: () => void }) {
   const { latin } = useLoc();
+  const [selection, setSelection] = useState<Selection | null>(null);
   const [productId, setProductId] = useState('');
   const [scope, setScope] = useState<InventoryScope>('base');
   const [scopeId, setScopeId] = useState('');
@@ -219,7 +222,7 @@ function PurchaseDialog({ s, onClose, onDone }: { s: InvStrings; onClose: () => 
     fetchSuppliers().then((r) => setSuppliers(r.suppliers)).catch(() => setSuppliers([]));
   }, []);
 
-  const ready = productId.trim() !== '' && qty !== null && qty > 0 && unit !== null;
+  const ready = selection !== null && productId.trim() !== '' && qty !== null && qty > 0 && unit !== null;
 
   const submit = async () => {
     if (!ready || busy) return;
@@ -270,25 +273,12 @@ function PurchaseDialog({ s, onClose, onDone }: { s: InvStrings; onClose: () => 
       <div className="grid gap-4 min-w-0">
         {err && <Notice state={{ tone: 'error', text: err }} onClose={() => setErr(null)} />}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1.5 min-w-0">
-            <span className={`text-[12px] font-semibold ${T.text2}`}>{s.incoming.product}<span className="text-[var(--ap-danger)]"> *</span></span>
-            <input className={T.input} value={productId} onChange={(e) => setProductId(e.target.value)} placeholder="product id" />
-          </label>
-          <label className="flex flex-col gap-1.5 min-w-0">
-            <span className={`text-[12px] font-semibold ${T.text2}`}>scope</span>
-            <select className={T.select} value={scope} onChange={(e) => setScope(e.target.value as InventoryScope)}>
-              {(['base', 'option', 'color', 'variant'] as const).map((k) => <option key={k} value={k}>{k}</option>)}
-            </select>
-          </label>
-        </div>
-
-        {scope !== 'base' && (
-          <label className="flex flex-col gap-1.5 min-w-0">
-            <span className={`text-[12px] font-semibold ${T.text2}`}>scope id<span className="text-[var(--ap-danger)]"> *</span></span>
-            <input className={T.input} value={scopeId} onChange={(e) => setScopeId(e.target.value)} />
-          </label>
-        )}
+        <StockSelection value={selection} onChange={(next) => {
+          setSelection(next); setProductId(next?.product_id ?? '');
+          setScope(next?.scope ?? 'base'); setScopeId(next?.scope_id ?? '');
+          setUnit(next?.purchase_unit_iqd ?? null);
+        }} />
+        {selection && <p className={`text-[12px] ${T.text2}`}>{s.incoming.sellingPrice}: {money(selection.selling_price_iqd)}</p>}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <IqdField label={s.incoming.qty} value={qty} onChange={setQty} required />

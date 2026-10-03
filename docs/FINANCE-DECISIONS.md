@@ -1,3 +1,5 @@
+> Operations extension, authorized 2026-10-03: [OPERATIONS-UPGRADE.md](OPERATIONS-UPGRADE.md) documents versioned order costs, payroll, scoped overhead allocation, collections and accounting journals.
+
 # The owner's accounting rules
 
 Four questions decide every number on the financial dashboard. The owner

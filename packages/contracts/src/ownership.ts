@@ -62,6 +62,8 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
      * that reads it is the same admin screen that reads the lots.
      */
     'inventory_lots', 'incoming_inventory', 'incoming_inventory_receipts',
+    'stock_locations', 'inventory_lot_locations', 'stock_transfers', 'purchase_orders', 'purchase_lines',
+    'purchase_charges', 'purchase_receiving_notes', 'purchase_receiving_events', 'stock_counts', 'stock_count_lines',
     'inventory_suppliers', 'inventory_reorder_settings',
     // 0093 — «لكيتها بمكان أرخص». A customer's report that a competitor sells
     // this product for less, with OUR price frozen into the row at the moment
@@ -92,6 +94,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ]),
   ...owned('commerce', [
     'cart_items', 'orders', 'order_items', 'order_payment_settlements', 'checkout_sagas', 'checkout_saga_steps', 'coupons',
+    'ops_guards', 'stock_return_inspections',
     'coupon_redemptions', 'return_cases', 'price_protection_claims',
     // 0140 — an admin's proposed new final total and the customer's decision on it.
     'order_price_adjustments',
@@ -143,6 +146,11 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // label set those rows point at, under ON DELETE RESTRICT, so it cannot
     // live under a different owner than the rows it names.
     'operating_expenses', 'expense_categories',
+    'supplier_payments', 'finance_staff', 'finance_cost_centers', 'finance_cost_rules', 'finance_rule_versions',
+    'finance_order_snapshots', 'finance_task_assignments', 'finance_order_costs', 'finance_advance_settlements', 'finance_staff_payments',
+    'finance_payment_allocations', 'finance_cost_reversals', 'finance_expense_links', 'accounting_periods',
+    'accounting_accounts', 'accounting_entries', 'accounting_lines', 'finance_collections',
+    'finance_posting_errors', 'finance_refund_facts',
   ]),
   ...owned('subscriptions', [
     'membership_plans', 'memberships', 'entitlement_snapshots',
@@ -209,7 +217,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'print_actuals', 'print_failures', 'printer_calibration_stats',
   ]),
   ...owned('reviews', ['reviews', 'review_rewards', 'gift_entitlements', 'gift_pool_items', 'gift_redemptions', 'gift_pools', 'review_media']),
-  ...owned('devices', ['order_item_units', 'device_serials', 'device_registrations', 'warranty_claims', 'claim_messages', 'warranty_receipts', 'serial_inventory']),
+  ...owned('devices', ['order_item_units', 'device_serials', 'device_registrations', 'warranty_claims', 'claim_messages', 'warranty_receipts', 'serial_inventory', 'stock_serial_links']),
   ...owned('chat', [
     'chats', 'chat_participants', 'chat_messages', 'chat_typing_presence',
     // 0158 — what the server learned about a pasted URL, once, for every
@@ -256,7 +264,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'farm_profiles', 'farm_ledger', 'farm_printers', 'farm_spools', 'farm_jobs', 'farm_assignments', 'farm_events', 'farm_daily',
     'farm_achievements', 'farm_requests', 'farm_config',
   ]),
-  ...owned('config', ['admin_settings', 'feature_flags', 'config_versions']),
+  ...owned('config', ['admin_settings', 'feature_flags', 'config_versions', 'ops_permissions']),
   ...owned('audit', ['audit_log', 'audit_events', 'audit_chain_heads']),
   ...owned('analytics', [
     'merchant_store_analytics_daily', 'analytics_events', 'analytics_daily_platform', 'analytics_daily_merchant',

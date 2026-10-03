@@ -764,6 +764,7 @@ const PRIVATE = 'a private object under its own prefix, served by its own gated 
 const PERSON = "a person's own media under their own prefix (account avatar and profile, a review's photographs), not a store's library";
 
 export const NOT_LIBRARY_HOLDERS: Readonly<Record<string, string>> = {
+  'purchase_orders.attachment_url': FROZEN,
   ...Object.fromEntries(
     [
       'catalogs.image_key', 'catalogs.hero_image_key', 'catalogs.hero_light_image_key', 'catalogs.light_image_key',
