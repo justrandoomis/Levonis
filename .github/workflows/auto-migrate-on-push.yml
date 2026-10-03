@@ -116,24 +116,11 @@ jobs:
             | jq -r '.[0].results[].name' | tee /tmp/before.txt
           echo "count=$(wc -l < /tmp/before.txt)" >> "$GITHUB_OUTPUT"
 
-      # `d1 migrations apply --remote` sends the whole migration through the
-      # synchronous /query endpoint. D1 parses 0099 as incomplete input there,
-      # even though Wrangler's local D1 engine and SQLite both accept it. The
-      # file-ingest endpoint is the supported atomic path for a SQL file: the
-      # schema and its bookkeeping row commit together, or D1 restores the
-      # database to its pre-import state. Once 0099 is recorded, the ordinary
-      # migrations command remains responsible for every later file.
+      # /query rejects compound triggers in 0099 and 0162. The helper reads
+      # current history, imports pending files in order, includes bookkeeping
+      # in each atomic file import, and confirms history before proceeding.
       - name: Apply
-        run: |
-          set -euo pipefail
-          MIGRATION_NAME=0099_product_media_dimensions.sql
-          if ! grep -Fxq "$MIGRATION_NAME" /tmp/before.txt; then
-            BUNDLE_PATH=$(mktemp /tmp/levonis-0099-apply.XXXXXX.sql)
-            cp "migrations/$MIGRATION_NAME" "$BUNDLE_PATH"
-            printf "\nINSERT INTO d1_migrations (name) VALUES ('%s');\n" "$MIGRATION_NAME" >> "$BUNDLE_PATH"
-            npx wrangler d1 execute levonis-db-staging --remote --env staging --file "$BUNDLE_PATH"
-          fi
-          npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
+        run: node scripts/apply-remote-migrations.mjs
 
       - name: What is applied, after — and is the data still there
         id: after

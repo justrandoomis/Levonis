@@ -72,7 +72,7 @@ printf 'reached-migrations\n' >> "$GITHUB_OUTPUT"
   test(`${file}: the restore point precedes live migrations`, () => {
     const workflow = readWorkflow(file);
     const bookmarkAt = workflow.indexOf('      - name: Record a Time Travel bookmark (restore point)');
-    const migrateAt = workflow.indexOf('npx wrangler d1 migrations apply levonis-db-staging --remote --env staging');
+    const migrateAt = workflow.indexOf('node scripts/apply-remote-migrations.mjs');
     assert.ok(bookmarkAt >= 0 && migrateAt > bookmarkAt);
   });
 }

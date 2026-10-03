@@ -153,7 +153,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Apply any pending migrations BEFORE the code that needs them
-        run: npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
+        run: node scripts/apply-remote-migrations.mjs
 
       # Carrying vars forward preserves what is already there, but it gives
       # the owner no way to SET one — and the Studio sign-in handoff needs a

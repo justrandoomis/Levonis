@@ -37,7 +37,7 @@ only. The deployer was the other one.
 | | **Workflow 7** (`deploy-staging-code.yml`) | **Cloudflare Workers Builds** (Git integration) |
 | --- | --- | --- |
 | Triggered by | a human, `workflow_dispatch` | **every push to the default branch**, automatically |
-| Applies migrations | **yes**, before the code — `wrangler d1 migrations apply levonis-db-staging --remote --env staging` | **no** |
+| Applies migrations | **yes**, before the code — `node scripts/apply-remote-migrations.mjs` imports pending SQL files atomically, with migration history in the same import | **no** |
 | Runs the test suite | yes | no |
 | Probes the live site afterwards | yes — `/api/health`, `/api/home`, `/api/products`, `/api/memberships/plans` | no |
 | Configured in | this repository | **the Cloudflare dashboard** — invisible from here |
