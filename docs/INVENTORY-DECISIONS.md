@@ -1,5 +1,11 @@
 # Inventory management — the compatibility decisions
 
+The owner authorized the expanded operations workflow on 2026-10-03.
+[OPERATIONS-UPGRADE.md](OPERATIONS-UPGRADE.md) records migration 0162, the new
+procurement and warehouse screens, consolidated counts, and the corrected BASE
+FIFO identity `(product_id, scope, scope_id)`. Historical decisions below describe
+the original module; the new workflow still uses its counters and reservations.
+
 > «المخزون الحالي قد يحمل أكثر من تكلفة تاريخية، وكل عملية بيع تستهلك أقدم دفعة
 > تكلفة متاحة أولًا.»
 

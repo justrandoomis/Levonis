@@ -50,26 +50,16 @@ const FIL_STD: CategoryDeliveryRule = { catalog_id: 'cat_fil', method: 'standard
 
 // ------------------------------------------------------------- pure engine
 
-test('20 spools across 3 filament products/colours are ONE pool: ceil(20/15) = 2 blocks = 10,000', () => {
-  const q = quoteShipping({
-    items: [spool('pla-black', 8), spool('pla-white', 7), spool('petg-red', 5, PETG)],
-    deliveryMethod: 'standard', categoryRules: [FIL_STD], merchandiseIqd: 50000,
-    ...asFree, atApprovedDefaultAddress: false, config: cfg(),
-  });
-  const cats = q.components.filter((c) => c.kind === 'category');
-  assert.equal(cats.length, 1);
-  assert.equal(cats[0].catalog_id, 'cat_fil');
-  assert.equal(cats[0].units, 20);
-  assert.equal(cats[0].fee_iqd, 10000);
-  assert.equal(cats[0].quantity_step, 15);
-  assert.equal(cats[0].fee_per_step_iqd, 5000);
-  assert.deepEqual(cats[0].product_ids, ['pla-black', 'pla-white', 'petg-red']);
-  assert.equal(q.components.some((c) => c.kind === 'ordinary'), false, 'the pool replaces the flat ordinary fee');
-  assert.equal(q.total_iqd, 10000);
+test('standard delivery has one 5,000 shipment fee across filament products and colours', () => {
+  const q = quoteShipping({ items: [spool('pla-black',8),spool('pla-white',7),spool('petg-red',5,PETG)],
+    deliveryMethod:'standard',categoryRules:[FIL_STD],merchandiseIqd:50000,...asFree,atApprovedDefaultAddress:false,config:cfg() });
+  assert.equal(q.total_iqd,5000);
+  assert.deepEqual(q.components.map(c=>[c.kind,c.units,c.fee_iqd]),[['ordinary',20,5000]]);
+  assert.deepEqual(q.components[0].product_ids,['pla-black','pla-white','petg-red']);
 });
 
-test('the pool keeps the per-product semantics: 1..15 = 5,000, 16..30 = 10,000, 31 = 15,000', () => {
-  for (const [n, fee] of [[1, 5000], [15, 5000], [16, 10000], [30, 10000], [31, 15000]] as const) {
+test('standard fee stays 5,000 at all quantity boundaries', () => {
+  for (const [n, fee] of [[1, 5000], [15, 5000], [16, 5000], [30, 5000], [31, 5000]] as const) {
     const q = quoteShipping({
       items: [spool('a', n)], deliveryMethod: 'standard', categoryRules: [FIL_STD], merchandiseIqd: 1,
       ...asFree, atApprovedDefaultAddress: false, config: cfg(),
@@ -79,16 +69,16 @@ test('the pool keeps the per-product semantics: 1..15 = 5,000, 16..30 = 10,000, 
   assert.equal(pooledFeeIqd(20, 15, 5000), 10000, 'the admin preview uses the same arithmetic');
 });
 
-test('mixed categories: the filament pool plus the flat ordinary fee for the rest', () => {
+test('mixed ordinary categories share one standard fee', () => {
   const q = quoteShipping({
     items: [spool('pla', 20), keychain(3)], deliveryMethod: 'standard', categoryRules: [FIL_STD],
     merchandiseIqd: 50000, ...asFree, atApprovedDefaultAddress: false, config: cfg(),
   });
-  assert.deepEqual(q.components.map((c) => [c.kind, c.fee_iqd, c.units]), [['category', 10000, 20], ['ordinary', 5000, 3]]);
-  assert.equal(q.total_iqd, 15000);
+  assert.deepEqual(q.components.map((c) => [c.kind, c.fee_iqd, c.units]), [['ordinary', 5000, 23]]);
+  assert.equal(q.total_iqd, 5000);
 });
 
-test('the nearest section wins: a PETG rule prices PETG apart from the filament pool', () => {
+test('category metadata still resolves nearest rules, while standard is flat', () => {
   const petgRule: CategoryDeliveryRule = { catalog_id: 'cat_petg', method: 'standard', enabled: true, quantity_step: 10, fee_iqd: 3000 };
   assert.equal(categoryRuleFor({ category_path: PETG }, [FIL_STD, petgRule], 'standard'), petgRule);
   assert.equal(categoryRuleFor({ category_path: PLA }, [FIL_STD, petgRule], 'standard'), FIL_STD);
@@ -98,7 +88,7 @@ test('the nearest section wins: a PETG rule prices PETG apart from the filament 
     items: [spool('pla', 16), spool('petg', 11, PETG)], deliveryMethod: 'standard', categoryRules: [FIL_STD, petgRule],
     merchandiseIqd: 1, ...asFree, atApprovedDefaultAddress: false, config: cfg(),
   });
-  assert.deepEqual(q.components.map((c) => [c.catalog_id, c.fee_iqd]), [['cat_fil', 10000], ['cat_petg', 6000]]);
+  assert.deepEqual(q.components.map((c) => [c.kind, c.fee_iqd]), [['ordinary', 5000]]);
 });
 
 test('a product-level quantity rule on a pooled line is NOT also charged', () => {
@@ -109,13 +99,13 @@ test('a product-level quantity rule on a pooled line is NOT also charged', () =>
     ...asFree, atApprovedDefaultAddress: false, config: cfg(),
   });
   assert.equal(q.components.some((c) => c.kind === 'product'), false);
-  assert.equal(q.total_iqd, 10000);
-  // Without a category rule the product rule is exactly what it was.
+  assert.equal(q.total_iqd, 5000);
+  // Standard product rules also cannot multiply the shipment tariff.
   const legacy = quoteShipping({
     items: [spool('pla-a', 10, PLA, { delivery: own })], deliveryMethod: 'standard', merchandiseIqd: 1,
     ...asFree, atApprovedDefaultAddress: false, config: cfg(),
   });
-  assert.equal(legacy.total_iqd, 20000);
+  assert.equal(legacy.total_iqd, 5000);
 });
 
 test('a product that disables the method stays out of the pool and stays unavailable', () => {
@@ -147,7 +137,7 @@ test('pooled spools leave the carton count (no second charge for the same spools
     ...asFree, atApprovedDefaultAddress: false, config: cfg({ carton_threshold_spools: 10, carton_fee_iqd: 3000 }),
   });
   assert.equal(q.components.some((c) => c.kind === 'carton'), false);
-  assert.equal(q.total_iqd, 10000);
+  assert.equal(q.total_iqd, 5000);
 });
 
 test('PRO free delivery waives the pool; a free-delivery threshold not met charges it', () => {
@@ -156,15 +146,15 @@ test('PRO free delivery waives the pool; a free-delivery threshold not met charg
     items, deliveryMethod: 'standard', categoryRules: [FIL_STD], merchandiseIqd: 80000,
     tier: 'pro', tierActive: true, atApprovedDefaultAddress: true, config: cfg(),
   });
-  assert.equal(pro.total_before_waiver_iqd, 10000);
+  assert.equal(pro.total_before_waiver_iqd, 5000);
   assert.equal(pro.total_iqd, 0);
-  assert.equal(pro.membership_subsidy_iqd, 10000);
+  assert.equal(pro.membership_subsidy_iqd, 5000);
   assert.equal(pro.components[0].waived, true);
   const below = quoteShipping({
     items, deliveryMethod: 'standard', categoryRules: [FIL_STD], merchandiseIqd: 75000,
     tier: 'pro', tierActive: true, atApprovedDefaultAddress: true, config: cfg(),
   });
-  assert.equal(below.total_iqd, 10000, '75,000 is not strictly above the threshold');
+  assert.equal(below.total_iqd, 5000, '75,000 is not strictly above the threshold');
   const promo = quoteShipping({
     items, deliveryMethod: 'standard', categoryRules: [FIL_STD], merchandiseIqd: 1, independentFreeDelivery: true,
     ...asFree, atApprovedDefaultAddress: false, config: cfg(),
@@ -176,10 +166,10 @@ test('a configured membership rule with a subsidy ceiling caps the pooled fee li
   const q = quoteShipping({
     items: [spool('pla', 40)], deliveryMethod: 'standard', categoryRules: [FIL_STD], merchandiseIqd: 200000,
     tier: 'pro', tierActive: true, atApprovedDefaultAddress: true, config: cfg(),
-    membershipShipping: { rule_id: 'r1', eligible: true, threshold_iqd: 0, basis_iqd: 200000, max_subsidy_iqd: 5000, reason: 'applied' },
+    membershipShipping: { rule_id: 'r1', eligible: true, threshold_iqd: 0, basis_iqd: 200000, max_subsidy_iqd: 2500, reason: 'applied' },
   });
-  assert.equal(q.total_before_waiver_iqd, 15000);
-  assert.equal(q.total_iqd, 10000);
+  assert.equal(q.total_before_waiver_iqd, 5000);
+  assert.equal(q.total_iqd, 2500);
   assert.equal(q.membership_subsidy_capped, true);
 });
 
@@ -246,7 +236,7 @@ async function shippingOf(db: D1Database) {
   return res.quote;
 }
 
-test('route: the quote pools the section and the placed order charges and snapshots the same figure', async () => {
+test('route: quote and checkout snapshot the same single standard shipment tariff', async () => {
   const { raw, db } = setup();
   const admin = stubApp(db, ADMIN, (a) => a.route('/api/admin/taxonomy', adminTaxonomyRoutes));
 
@@ -257,14 +247,13 @@ test('route: the quote pools the section and the placed order charges and snapsh
   assert.equal(set.success, true, JSON.stringify(set));
 
   const quote = await shippingOf(db);
-  assert.equal(quote.shipping.total_iqd, 10000, '20 spools over 3 products = 2 blocks');
-  const cat = quote.shipping.components.find((c: { kind: string }) => c.kind === 'category');
-  assert.equal(cat.catalog_id, 'cat_fil');
+  assert.equal(quote.shipping.total_iqd, 5000, 'one ordinary shipment across all products');
+  const cat = quote.shipping.components.find((c: { kind: string }) => c.kind === 'ordinary');
   assert.equal(cat.units, 20);
   // Each method card prices its own rules: standard pools, personal (no rule)
   // keeps the flat personal tariff.
   const card = (id: string) => quote.delivery_method_fees.find((m: { id: string }) => m.id === id).fee_iqd;
-  assert.equal(card('standard'), 10000);
+  assert.equal(card('standard'), 5000);
   assert.equal(card('personal'), 10000, 'the default personal flat fee, untouched');
 
   const shop = stubApp(db, BUYER, (a) => a.route('/api/orders', orderRoutes));
@@ -275,23 +264,23 @@ test('route: the quote pools the section and the placed order charges and snapsh
   assert.equal(placed.order.shipping_iqd, quote.shipping.total_iqd, 'quote/place parity');
   assert.equal(placed.order.total_iqd, quote.total_iqd, 'quote/place parity on the total');
   const snap = raw.prepare('SELECT delivery_method_snapshot AS s FROM orders WHERE id = ?').get(placed.order.id) as { s: string };
-  const frozen = JSON.parse(snap.s).quote.components.find((c: { kind: string }) => c.kind === 'category');
+  const frozen = JSON.parse(snap.s).quote.components.find((c: { kind: string }) => c.kind === 'ordinary');
   assert.deepEqual(
-    [frozen.catalog_id, frozen.method, frozen.quantity_step, frozen.fee_per_step_iqd, frozen.units, frozen.fee_iqd],
-    ['cat_fil', 'standard', 15, 5000, 20, 10000],
+    [frozen.kind, frozen.method, frozen.units, frozen.fee_iqd],
+    ['ordinary', 'standard', 20, 5000],
     'the order snapshots the rule it was priced with'
   );
   await Promise.allSettled(pending);
 });
 
-test('route: a mixed cart adds the flat ordinary fee for the other section; an inactive section’s rule is ignored', async () => {
+test('route: a mixed ordinary cart remains 5,000 regardless of active section rules', async () => {
   const { raw, db } = setup();
   raw.prepare(
     `INSERT INTO cart_items (id,user_id,product_id,option_id,option_value_ids,color_id,shipping_method_id,transport_method,warranty_plan_id,qty)
      VALUES ('c4','buyer','p_key','','[]','','','','',2)`
   ).run();
   raw.exec(`INSERT INTO category_delivery_rules (catalog_id, method, quantity_step, fee_per_step_iqd) VALUES ('cat_fil','standard',15,5000)`);
-  assert.equal((await shippingOf(db)).shipping.total_iqd, 15000);
+  assert.equal((await shippingOf(db)).shipping.total_iqd, 5000);
   raw.exec(`UPDATE catalogs SET active = 0 WHERE id = 'cat_fil'`);
   assert.equal((await shippingOf(db)).shipping.total_iqd, 5000);
 });

@@ -57,6 +57,9 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/admin/media': 'CATALOG',
   '/api/admin/taxonomy': 'CATALOG',
   '/api/admin/inventory': 'CATALOG',
+  '/api/admin/procurement': 'CATALOG',
+  '/api/admin/stock-operations': 'CATALOG',
+  '/api/admin/finance-operations': 'ANALYTICS',
   '/api/admin/membership-benefits': 'SUBSCRIPTIONS',
   '/api/warranty': 'DEVICES',
   '/api/admin/warranties': 'DEVICES',
@@ -177,6 +180,35 @@ test('the narrow rows win over their prefix, and only for their method', () => {
   assert.equal(resolve('/api/orders/o1', 'GET', 7)!.target, 'COMMERCE');
   assert.equal(resolve('/api/admin/orders/o1/stage', 'PATCH', 7)!.target, 'FULFILMENT');
   assert.equal(resolve('/api/admin/orders', 'GET', 7)!.target, 'COMMERCE');
+});
+
+test('assistant stock picker reads pass while every other procurement path retains the financial gate', () => {
+  const selection = '/api/admin/procurement/selections/product-1';
+  for (const method of ['GET', 'HEAD']) {
+    const rule = matchRoute(selection, method)!;
+    assert.equal(rule.requires, 'admin');
+    assert.equal(rule.hosts, 'main');
+    assert.equal(rule.owner, 'CATALOG');
+    assert.equal(resolve(selection, method, 1)!.target, 'CORE');
+    assert.equal(resolve(selection, method, 5)!.target, 'CATALOG');
+  }
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    assert.equal(matchRoute(selection, method)!.requires, 'admin:full');
+  }
+  for (const path of [
+    '/api/admin/procurement',
+    '/api/admin/procurement/config',
+    '/api/admin/procurement/documents',
+    '/api/admin/procurement/documents/purchase-1',
+    '/api/admin/procurement/documents/purchase-1/payments',
+    '/api/admin/procurement/selections',
+    '/api/admin/procurement/selections/product-1/extra',
+    '/api/admin/procurement/selections-extra/product-1',
+  ]) {
+    for (const method of ['GET', 'HEAD', 'POST']) {
+      assert.equal(matchRoute(path, method)!.requires, 'admin:full', `${method} ${path}`);
+    }
+  }
 });
 
 test('the prefixes that share a stem resolve to their own owner, not to the shorter row', () => {

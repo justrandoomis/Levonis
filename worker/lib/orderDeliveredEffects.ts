@@ -46,6 +46,7 @@ import type { Env } from './types';
 import { createUnitsOnDelivery, type CreateUnitsResult } from './deviceOps';
 import { awardOrderPoints } from './pointsOps';
 import { onOrderDelivered } from './membershipOps';
+import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance';
 
 export interface DeliveredEffectsResult {
   deviceUnits: CreateUnitsResult | null;
@@ -90,6 +91,9 @@ export async function runOrderDeliveredEffects(
   }
 
   // Mandate §4: one device record per PHYSICAL unit of every serialized
+  try { await runOrderFinancialEffects(env, orderId, 'delivered'); }
+  catch (e) { console.error('order financial posting pending', orderId, e instanceof Error ? e.message : String(e)); await recordFinancialFailure(env.DB,orderId,'delivered',e).catch(()=>undefined); }
+
   // product, clocked to the delivered_at the move just stamped (the flip keeps
   // an existing one, so a re-delivery never restarts a clock). Awaited:
   // warranty clocks are account state, not a fire-and-forget message.

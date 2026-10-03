@@ -170,18 +170,20 @@ export async function probeSchema(db: D1Database): Promise<SchemaFacts> {
   // not 0098 (every database did, until 0098 ran), so one flag cannot stand in
   // for the other. `columnsOf` answers an empty set for a table that is not
   // there, which is exactly the signal wanted.
-  const [items, allocations] = await Promise.all([
+  const [items, allocations, refunds] = await Promise.all([
     columnsOf(db, 'order_items'),
     columnsOf(db, 'order_item_inventory_allocations'),
+    columnsOf(db, 'finance_refund_facts'),
   ]);
   const facts: SchemaFacts = {
     has0095: items.has('cost_basis') && items.has('cost_iqd'),
     hasFifo: allocations.has('cogs_iqd') && allocations.has('released_at'),
+    hasOperationalRefunds: refunds.has('cogs_iqd'),
   };
   // MEMOISED ONLY WHEN BOTH ARE TRUE. Caching a `hasFifo: false` taken during
   // the minute between the deploy and its migration would keep this isolate
   // reporting snapshot costs long after the lots were there to read.
-  if (facts.has0095 && facts.hasFifo) schemaMemo = facts;
+  if (facts.has0095 && facts.hasFifo && facts.hasOperationalRefunds) schemaMemo = facts;
   return facts;
 }
 
@@ -235,6 +237,10 @@ const rowsOf = async (db: D1Database, sql: string, binds: unknown[]): Promise<Ro
 async function expenseRows(db: D1Database, schema: SchemaFacts, sql: string, binds: unknown[]): Promise<Row[]> {
   if (!schema.has0095) return [];
   try {
+    const reversals = await db.prepare("SELECT 1 AS yes FROM sqlite_master WHERE type='table' AND name='finance_cost_reversals'").first();
+    if (reversals) sql = sql.replace(/FROM operating_expenses\b/, `FROM (SELECT * FROM operating_expenses UNION ALL
+      SELECT r.id,c.category_id,-r.amount_iqd,r.reversal_day,'Cost reversal',r.reason,NULL,r.actor_id,
+        r.reversal_day,r.reversal_day,NULL,NULL,'' FROM finance_cost_reversals r JOIN finance_order_costs c ON c.id=r.cost_id)`);
     return await rowsOf(db, sql, binds);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

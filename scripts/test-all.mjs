@@ -34,6 +34,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STUDIO = join(ROOT, 'studio');
+// Unit suites may replace fetch with an explicit transport mock. Never let a
+// missing mock reach notification or payment providers from a test process.
+const testEnv = { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${new URL('./test-no-network.mjs', import.meta.url).href}` };
 
 if (!existsSync(join(STUDIO, 'node_modules', 'three-slicer'))) {
   console.error(
@@ -52,7 +55,7 @@ const runs = [
 
 const failed = [];
 for (const run of runs) {
-  const res = spawnSync(run.cmd, run.args, { stdio: 'inherit', shell: run.shell, cwd: run.cwd });
+  const res = spawnSync(run.cmd, run.args, { stdio: 'inherit', shell: run.shell, cwd: run.cwd, env: testEnv });
   if (res.status !== 0) failed.push(`${run.name} (exit ${res.status ?? 'signal ' + res.signal})`);
 }
 

@@ -135,8 +135,25 @@ jobs:
 
       # Migrations first: code must never be ahead of its database again.
       # This is the exact failure that took the storefront down on 2026-08-30.
+      - name: Record a Time Travel bookmark (restore point)
+        id: bookmark
+        run: |
+          set -euo pipefail
+          npx wrangler d1 time-travel info levonis-db-staging 2>&1 | tee /tmp/tt.txt
+          BM=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}' /tmp/tt.txt | head -1 || true)
+          [ -n "$BM" ] || { echo "::error::no Time Travel restore bookmark was returned — refusing to migrate the live database"; exit 1; }
+          echo "bookmark=$BM" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Main site migration restore point"
+            echo "Database: levonis-db-staging"
+            echo "Time Travel bookmark: \`$BM\`"
+            echo '```'
+            echo "wrangler d1 time-travel restore levonis-db-staging --bookmark $BM"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Apply any pending migrations BEFORE the code that needs them
-        run: npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
+        run: node scripts/apply-remote-migrations.mjs
 
       # Carrying vars forward preserves what is already there, but it gives
       # the owner no way to SET one — and the Studio sign-in handoff needs a

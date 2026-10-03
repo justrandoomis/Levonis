@@ -233,6 +233,7 @@ export const HISTORY_TABLES: HistoryTable[] = [
    */
   { table: 'inventory_lots', columns: ['product_id'] },
   { table: 'incoming_inventory', columns: ['product_id'] },
+  { table: 'stock_count_lines', columns: ['product_id'] },
   /**
    * 0139 — a box serial the shop recorded before the sale. The serial is a
    * physical fact about a box on a shelf (or in a customer's home); the

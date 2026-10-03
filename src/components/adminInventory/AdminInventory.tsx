@@ -14,7 +14,7 @@
  * exactly 5,620,000.
  *
  * ---------------------------------------------------------------------------
- * FOUR TABS, AND NO FIFTH.
+ * Connected stock, procurement, supplier and warehouse operations.
  *
  *   المخزون الحالي   what is on the shelf, and what each layer of it cost
  *   المشتريات القادمة what has been bought and not yet arrived
@@ -35,7 +35,7 @@
  * COLUMNS rather than printing a wall of dashes that advertises what is behind
  * them. The summary strip does the same.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { Boxes, CalendarClock, Layers, PackagePlus, RefreshCw, Truck } from 'lucide-react';
 import * as T from '../adminProducts/theme';
 import '../adminProducts/theme.css';
@@ -46,13 +46,15 @@ import { StockTab } from './StockTab';
 import { IncomingTab } from './IncomingTab';
 import { MovementsTab } from './MovementsTab';
 import { SuppliersTab } from './SuppliersTab';
+const ProcurementPanel=lazy(()=>import('../adminOperations/ProcurementPanel'));
+const StockOperationsPanel=lazy(()=>import('../adminOperations/StockOperationsPanel'));
 
-type Tab = 'stock' | 'incoming' | 'movements' | 'suppliers';
+type Tab = 'stock' | 'incoming' | 'movements' | 'suppliers' | 'procurement' | 'operations';
 
 export default function AdminInventory() {
   const { dir, loc, latin } = useLoc();
   const count = useCount();
-  const s = inventoryStrings(loc);
+  const s = useMemo(() => inventoryStrings(loc), [loc]);
   const [tab, setTab] = useState<Tab>('stock');
   const [overview, setOverview] = useState<InventoryOverview | null>(null);
   const [notice, setNotice] = useState<NoticeState | null>(null);
@@ -73,7 +75,9 @@ export default function AdminInventory() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'stock', label: s.tabs.stock },
-    { id: 'incoming', label: s.tabs.incoming },
+    ...(showsCosts ? [{ id: 'procurement' as const, label: loc('أوامر الشراء والشحنات', 'Purchase orders and shipments', 'داواکاریی کڕین و بارەکان') }] : []),
+    { id: 'operations', label: loc('الجرد والمستودعات', 'Counts and warehouses', 'ژماردن و کۆگاکان') },
+    { id: 'incoming', label: loc('المشتريات المنفردة السابقة', 'Legacy individual purchases', 'کڕینە تاکە کۆنەکان') },
     { id: 'movements', label: s.tabs.movements },
     { id: 'suppliers', label: s.tabs.suppliers },
   ];
@@ -160,6 +164,8 @@ export default function AdminInventory() {
       {tab === 'incoming' && <IncomingTab s={s} onChanged={loadOverview} />}
       {tab === 'movements' && <MovementsTab s={s} />}
       {tab === 'suppliers' && <SuppliersTab s={s} />}
+      {tab === 'procurement' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…')}</p>}><ProcurementPanel onChanged={loadOverview} /></Suspense>}
+      {tab === 'operations' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…')}</p>}><StockOperationsPanel onChanged={loadOverview} /></Suspense>}
     </div>
   );
 }

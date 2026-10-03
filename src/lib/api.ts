@@ -2716,6 +2716,9 @@ export const createAdjustment = (body: {
   delta: number;
   reason: AdjustReason;
   note?: string;
+  operation_id?: string;
+  expected_stock?: number;
+  unit_cost_iqd?: number | null;
 }) => api.post<{ success: boolean }>(`${INV}/adjustments`, body);
 
 export const fetchSuppliers = (opts?: RequestOptions) =>

@@ -226,7 +226,7 @@ function LotsDialog({ s, line, onClose }: { s: InvStrings; line: InventoryLine; 
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchInventoryLots({ scope: line.scope, scope_id: line.scope_id })
+    fetchInventoryLots({ product_id: line.product_id ?? undefined, scope: line.scope, scope_id: line.scope_id })
       .then((r) => setLots(r.lots))
       .catch((e) => { setLots([]); setErr(errMsg(e, s.common.failed, s.common.failed, latin)); });
   }, [line, s, latin]);
@@ -315,6 +315,7 @@ function AdjustDialog({
   const count = useCount();
   const [counted, setCounted] = useState<number | null>(null);
   const [reason, setReason] = useState<AdjustReason>('count');
+  const [operationId] = useState(() => crypto.randomUUID());
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -331,6 +332,8 @@ function AdjustDialog({
         scope: line.scope,
         scope_id: line.scope_id,
         delta,
+        operation_id: operationId,
+        expected_stock: line.on_hand,
         reason,
         note: note.trim(),
       });

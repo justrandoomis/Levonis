@@ -293,7 +293,7 @@ test('product delivery tiers use ceil(quantity / step) with integer IQD', () => 
   assert.equal(productDeliveryFeeIqd(35, { ...rule, enabled: false }), 0);
 });
 
-test('selected product delivery is summed per physical product and quantity', () => {
+test('standard delivery stays flat despite per-product quantity fees', () => {
   const q = quoteShipping({
     items: [
       {
@@ -314,9 +314,9 @@ test('selected product delivery is summed per physical product and quantity', ()
     deliveryMethod: 'standard', merchandiseIqd: 50000,
     ...asFree, atApprovedDefaultAddress: false, config: cfg(),
   });
-  assert.equal(q.total_iqd, 26000); // 20,000 + (2 × 3,000)
-  assert.deepEqual(q.components.filter((c) => c.kind === 'product').map((c) => c.product_id), ['tiered', 'single']);
-  assert.equal(q.components.some((c) => c.kind === 'ordinary'), false, 'explicit rules must not double-charge legacy delivery');
+  assert.equal(q.total_iqd, 5000);
+  assert.equal(q.components.length, 1);
+  assert.equal(q.components[0].kind, 'ordinary');
 });
 
 test('a disabled product method is unavailable and never contributes a fee', () => {

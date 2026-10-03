@@ -58,6 +58,7 @@ import { reclaimOrderRedemptionsStatement } from './offers';
 import { notifyOrderStatus } from './orderNotify';
 import { runOrderDeliveredEffects } from './orderDeliveredEffects';
 import { isPriceHeld, isPriceHoldAbort } from './priceHold';
+import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance';
 
 /** Mirrors STOCK_DEDUCTED_STATES in the admin route — the same four statuses. */
 const STOCK_DEDUCTED_STATES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
@@ -475,6 +476,10 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
    * again and nothing is granted twice.
    */
   if (opts.to === 'delivered') await runOrderDeliveredEffects(env, order.id, { defer: opts.defer });
+  if (['preparing','local_delivery_prep','out_for_delivery','delivered'].includes(opts.to)) {
+    try { await runOrderFinancialEffects(env, order.id, 'prepared'); }
+    catch (e) { console.error('preparation financial posting pending', order.id, e instanceof Error ? e.message : String(e)); await recordFinancialFailure(env.DB,order.id,'prepared',e).catch(()=>undefined); }
+  }
 
   /*
    * THE STAGE DOOR TELLS THE CUSTOMER — and the courier sync with it, because

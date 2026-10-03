@@ -43,7 +43,7 @@ export function deliveryRuleSummary(
   return on
     .map((r) =>
       r.method === 'standard'
-        ? loc(`عادي: ${fmtN(r.fee_iqd)} د.ع لكل ${fmtN(r.quantity_step)}`, `Standard: ${fmtN(r.fee_iqd)} IQD per ${fmtN(r.quantity_step)}`)
+        ? loc('عادي: 5,000 د.ع للشحنة؛ 10,000 للطابعات', 'Standard: 5,000 IQD per shipment; 10,000 with printers')
         : loc(`شخصي: ${fmtN(r.fee_iqd)} د.ع لكل ${fmtN(r.quantity_step)}`, `Personal: ${fmtN(r.fee_iqd)} IQD per ${fmtN(r.quantity_step)}`)
     )
     .join(' · ');
@@ -81,7 +81,7 @@ export function SectionDeliveryDialog({
       dirty={dirty}
       testId="section-delivery"
       onSave={async () => {
-        for (const m of METHODS) {
+        for (const m of METHODS.filter(m => m !== 'standard')) {
           const d = drafts[m];
           const had = node.delivery_rules?.some((x) => x.method === m) ?? false;
           const path = `/api/admin/taxonomy/catalogs/${encodeURIComponent(node.id)}/delivery-rules/${m}`;
@@ -111,11 +111,12 @@ export function SectionDeliveryDialog({
     >
       <p className="text-[12.5px] text-[var(--ap-text-2)]">
         {loc(
-          'كل القطع في هذا القسم وأقسامه الفرعية — أي منتج، أي خيار، أي لون — تُجمع معًا في الطلب الواحد، ويُحسب التوصيل: عدد الدفعات (تقريب للأعلى) × رسم الدفعة. تحل هذه القاعدة محل رسم التوصيل الخاص بكل منتج ومحل رسم التوصيل العادي لهذه القطع، ولا تُضاف فوقهما. إعفاءات العضوية والعروض تنطبق عليها كما تنطبق على التوصيل.',
-          'Every unit in this section and its sub-sections — any product, option or colour — is pooled per order, and delivery is: started blocks × the block fee. This rule replaces the per-product delivery rule and the flat ordinary fee for those units; it is never added on top. Membership and promotion waivers apply to it like any delivery fee.'
+          'للتوصيل الشخصي: كل القطع في هذا القسم وأقسامه الفرعية — أي منتج، أي خيار، أي لون — تُجمع معًا في الطلب الواحد، ويُحسب التوصيل: عدد الدفعات (تقريب للأعلى) × رسم الدفعة. تحل هذه القاعدة محل رسم التوصيل الخاص بكل منتج ومحل رسم التوصيل العادي لهذه القطع، ولا تُضاف فوقهما. إعفاءات العضوية والعروض تنطبق عليها كما تنطبق على التوصيل.',
+          'For personal delivery: every unit in this section and its sub-sections — any product, option or colour — is pooled per order, and delivery is: started blocks × the block fee. This rule replaces the per-product delivery rule and the flat ordinary fee for those units; it is never added on top. Membership and promotion waivers apply to it like any delivery fee.'
         )}
       </p>
       {METHODS.map((m) => {
+        if (m === 'standard') return <p key={m} className="rounded-xl border border-[var(--ap-border)] p-3 text-sm">{loc('التوصيل العادي ثابت للشحنة: 5,000 د.ع للبضاعة العادية، و10,000 د.ع عند وجود طابعة. لا يزيد بتعدد المنتجات أو الألوان.', 'Standard is fixed per shipment: 5,000 IQD for ordinary goods, 10,000 IQD when it includes a printer. Product and colour counts do not increase it.')}</p>;
         const d = drafts[m];
         const step = Number(d.step);
         const fee = Number(d.fee);

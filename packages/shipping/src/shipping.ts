@@ -64,6 +64,8 @@ export interface ShippingConfig {
 export interface ShippingItem {
   product_id: string;
   qty: number;
+  /** Authoritative printer classification from the catalogue, including bundle components. */
+  is_printer?: boolean;
   /** from products.ops_policy.size_class */
   size_class: 'ordinary' | 'printer_small' | 'printer_large' | null | undefined;
   /** filament spools count toward the carton threshold */
@@ -281,6 +283,9 @@ export function quoteShipping(input: {
   const assumptions: string[] = [];
   const reasons: string[] = [];
   const components: ShippingComponent[] = [];
+  // Owner, 2026-10-03: standard delivery is ONE tariff for the shipment.
+  // Product/category quantity blocks must not make mixed ordinary orders 10k/15k.
+  const standardShipment = input.deliveryMethod === 'standard';
 
   const printers = { printer_small: 0, printer_large: 0 };
   let ordinaryUnits = 0;
@@ -294,7 +299,7 @@ export function quoteShipping(input: {
   const categoryPools = new Map<string, { rule: CategoryDeliveryRule; units: number; products: string[] }>();
   const pooled = new Set<ShippingItem>();
   for (const it of input.items) {
-    const catRule = categoryRuleFor(it, input.categoryRules, input.deliveryMethod);
+    const catRule = standardShipment ? null : categoryRuleFor(it, input.categoryRules, input.deliveryMethod);
     if (!catRule || it.qty <= 0) continue;
     if (it.delivery !== undefined && input.deliveryMethod && it.delivery[input.deliveryMethod]?.enabled !== true) continue;
     const pool = categoryPools.get(catRule.catalog_id) ?? { rule: catRule, units: 0, products: [] };
@@ -307,6 +312,12 @@ export function quoteShipping(input: {
     const qty = Math.max(0, Math.trunc(it.qty));
     // A pooled line is priced by its category rule alone.
     if (pooled.has(it)) continue;
+    if (standardShipment) {
+      if (it.is_printer || it.size_class === 'printer_small' || it.size_class === 'printer_large') {
+        printers[it.size_class === 'printer_large' ? 'printer_large' : 'printer_small'] += qty;
+      } else ordinaryUnits += qty;
+      continue;
+    }
     // A product with explicit delivery options is priced below by its own
     // rule. It must never also enter the legacy ordinary/printer tariff.
     if (it.delivery === undefined) {
@@ -392,7 +403,7 @@ export function quoteShipping(input: {
 
   // Product-owned fees. The server supplies deliveryMethod from the selected
   // checkout method; callers that omit it keep the historical quote exactly.
-  if (input.deliveryMethod) {
+  if (input.deliveryMethod && !standardShipment) {
     for (const item of input.items) {
       if (item.delivery === undefined || item.qty <= 0 || pooled.has(item)) continue;
       /**
@@ -427,6 +438,27 @@ export function quoteShipping(input: {
     }
   }
 
+  if (standardShipment) {
+    const availability = productDeliveryMethodAvailable(input.items, 'standard');
+    for (const id of availability.unavailable_product_ids) {
+      needs.push(`product:${id}:standard_unavailable`);
+      reasons.push(`Standard delivery is unavailable for product ${id}.`);
+    }
+    const printerUnits = printers.printer_small + printers.printer_large;
+    if (ordinaryUnits + printerUnits > 0) {
+      components.push({
+        kind: printerUnits ? (printers.printer_large ? 'printer_large' : 'printer_small') : 'ordinary',
+        fee_iqd: printerUnits ? 10_000 : 5_000,
+        waived: ruleFeeWaived,
+        units: ordinaryUnits + printerUnits,
+        method: 'standard',
+        product_ids: [...new Set(input.items.filter((i) => i.qty > 0).map((i) => i.product_id))],
+        advance_required: printerUnits > 0 && config.printer_advance_required,
+      });
+      reasons.push(printerUnits ? 'One standard printer shipment: 10,000 IQD.' : 'One standard ordinary shipment: 5,000 IQD.');
+    }
+  }
+
   // Category-rule pools: one component per section, over the whole order.
   if (input.deliveryMethod) {
     for (const pool of categoryPools.values()) {
@@ -448,7 +480,7 @@ export function quoteShipping(input: {
   }
 
   // Ordinary component: one flat fee per order when any ordinary unit ships.
-  if (ordinaryUnits > 0) {
+  if (ordinaryUnits > 0 && !standardShipment) {
     const waived = waiverOrdinary || independent;
     components.push({ kind: 'ordinary', fee_iqd: config.ordinary_iqd, waived, units: ordinaryUnits, advance_required: false });
     if (independent && !proEligible) reasons.push('Free delivery applied from an approved promotion/referral.');
@@ -487,6 +519,7 @@ export function quoteShipping(input: {
 
   // Printer components: per-unit fee by size class; fee paid in advance.
   for (const cls of ['printer_small', 'printer_large'] as const) {
+    if (standardShipment) break;
     const count = printers[cls];
     if (count === 0) continue;
     const fee = cls === 'printer_small' ? config.printer_small_iqd : config.printer_large_iqd;
@@ -501,6 +534,7 @@ export function quoteShipping(input: {
 
   // Carton surcharge: only when the owner configured BOTH threshold and fee.
   if (
+    !standardShipment &&
     config.carton_threshold_spools !== null &&
     config.carton_fee_iqd !== null &&
     spoolUnits > config.carton_threshold_spools

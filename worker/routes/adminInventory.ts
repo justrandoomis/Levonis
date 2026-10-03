@@ -9,14 +9,15 @@ import {
   ADJUST_REASONS,
   counterTarget,
   isAdjustReason,
-  planAdjustmentLedger,
   planReceive,
   readyToReceive,
   type IncomingRow,
 } from '../lib/inventoryReceiving';
-import { lotCostBreakdown } from '../lib/inventoryLots';
+import { lotCostBreakdown, lotIdentityKey } from '../lib/inventoryLots';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
+import { planAtomicAdjustment } from '../lib/inventoryAdjustment';
+import { requireSelection } from '../lib/inventorySelection';
 
 /**
  * «إدارة المخزون» — THE OPERATIONAL LAYER, AS AN API.
@@ -52,6 +53,8 @@ import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
  * No mixed-shipment allocation (§31): each purchase carries its own freight
  * totals and the owner decides outside this system what belongs to each.
  */
+import { operationsInstalled, requireCapability } from '../lib/operations';
+
 export const adminInventoryRoutes = new Hono<AppContext>();
 adminInventoryRoutes.use('*', requireAdmin);
 
@@ -210,17 +213,17 @@ adminInventoryRoutes.get('/lines', async (c) => {
   // hide cheaper stock the shop still holds.
   const heads = new Map<string, { oldest: number | null; newest: number | null }>();
   for (const r of rows) {
-    const key = `${r.scope}:${r.scope_id}`;
+    const key = lotIdentityKey(String(r.scope), String(r.scope_id), String(r.product_id));
     const pair = await c.env.DB.prepare(
       `SELECT
          (SELECT unit_cost_iqd FROM inventory_lots
-           WHERE scope = ?1 AND scope_id = ?2 AND qty_remaining > 0
+           WHERE scope = ?1 AND scope_id = ?2 AND product_id = ?3 AND qty_remaining > 0
            ORDER BY received_at ASC, id ASC LIMIT 1) AS oldest,
          (SELECT unit_cost_iqd FROM inventory_lots
-           WHERE scope = ?1 AND scope_id = ?2 AND qty_remaining > 0
+           WHERE scope = ?1 AND scope_id = ?2 AND product_id = ?3 AND qty_remaining > 0
            ORDER BY received_at DESC, id DESC LIMIT 1) AS newest`
     )
-      .bind(r.scope, r.scope_id)
+      .bind(r.scope, r.scope_id, r.product_id)
       .first<{ oldest: number | null; newest: number | null }>();
     heads.set(key, { oldest: pair?.oldest ?? null, newest: pair?.newest ?? null });
   }
@@ -229,7 +232,7 @@ adminInventoryRoutes.get('/lines', async (c) => {
     projectForAdmin(c.env, c.get('user'), {
       success: true,
       lines: rows.map((r) => {
-        const head = heads.get(`${r.scope}:${r.scope_id}`);
+        const head = heads.get(lotIdentityKey(String(r.scope), String(r.scope_id), String(r.product_id)));
         return {
           product_id: r.product_id,
           product_name: r.product_name ?? null,
@@ -263,8 +266,11 @@ adminInventoryRoutes.get('/lots', async (c) => {
   const productId = (c.req.query('product_id') ?? '').trim();
   if (!productId && !isScope(scope)) throw badRequest('product_id or scope is required', 'MISSING_FILTER');
 
-  const where = isScope(scope) ? 'l.scope = ? AND l.scope_id = ?' : 'l.product_id = ?';
-  const args = isScope(scope) ? [scope, scopeId] : [productId];
+  if (scope === 'base' && !productId) throw badRequest('product_id is required for BASE lots', 'MISSING_PRODUCT_ID');
+  const where = isScope(scope)
+    ? `l.scope = ? AND l.scope_id = ?${productId ? ' AND l.product_id = ?' : ''}`
+    : 'l.product_id = ?';
+  const args = isScope(scope) ? [scope, scopeId, ...(productId ? [productId] : [])] : [productId];
 
   const { results } = await c.env.DB.prepare(
     `SELECT l.*, s.name AS supplier_name,
@@ -288,10 +294,11 @@ adminInventoryRoutes.get('/lots', async (c) => {
 
 adminInventoryRoutes.get('/incoming', async (c) => {
   const status = c.req.query('status');
-  const where = status && ['draft', 'incoming', 'partial', 'received', 'cancelled'].includes(status)
+  let where = status && ['draft', 'incoming', 'partial', 'received', 'cancelled'].includes(status)
     ? 'i.status = ?'
     : "i.status <> 'cancelled'";
   const args = status && where.includes('?') ? [status] : [];
+  if(await operationsInstalled(c.env.DB))where+=' AND NOT EXISTS(SELECT 1 FROM purchase_lines pl WHERE pl.incoming_id=i.id)';
 
   const { results } = await c.env.DB.prepare(
     `SELECT i.*, p.name AS product_name, s.name AS supplier_name
@@ -326,6 +333,7 @@ adminInventoryRoutes.get('/incoming', async (c) => {
 });
 
 adminInventoryRoutes.post('/incoming', async (c) => {
+  if(await operationsInstalled(c.env.DB))await requireCapability(c.env,c.get('user')!,'purchase');
   const user = c.get('user')!;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
 
@@ -364,6 +372,7 @@ adminInventoryRoutes.post('/incoming', async (c) => {
   }
 
   const qty = int(body.qty_ordered, 'qty_ordered', { min: 1, max: 1_000_000 });
+  await requireSelection(c.env.DB, productId, scope, scopeId);
   const unit = int(body.purchase_unit_iqd, 'purchase_unit_iqd', { min: 0, max: 10_000_000_000 });
   const id = newId('inc');
 
@@ -407,11 +416,13 @@ adminInventoryRoutes.post('/incoming', async (c) => {
 });
 
 adminInventoryRoutes.patch('/incoming/:id', async (c) => {
+  if(await operationsInstalled(c.env.DB)){await requireCapability(c.env,c.get('user')!,'purchase');if(await c.env.DB.prepare('SELECT id FROM purchase_lines WHERE incoming_id=?').bind(c.req.param('id')).first())throw badRequest('عدّل هذا البند من أمر الشراء المرتبط به','PURCHASE_EDIT_REQUIRED');}
   const user = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { max: 60 });
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const row = await c.env.DB.prepare('SELECT * FROM incoming_inventory WHERE id = ?').bind(id).first<IncomingRow>();
   if (!row) throw notFound('Purchase not found');
+
 
   /**
    * ONCE UNITS HAVE BEEN RECEIVED, THE COSTS ARE FROZEN. §54.
@@ -500,11 +511,13 @@ adminInventoryRoutes.get('/incoming/:id/receive-preview', async (c) => {
  * same key, the UNIQUE index refuses it and the batch writes nothing.
  */
 adminInventoryRoutes.post('/incoming/:id/receive', async (c) => {
+  if(await operationsInstalled(c.env.DB))await requireCapability(c.env,c.get('user')!,'receive');
   const user = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { max: 60 });
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const receiptId = str(body.receipt_id, 'receipt_id', { min: 1, max: 60 });
 
+  if(await operationsInstalled(c.env.DB)&&await c.env.DB.prepare('SELECT id FROM purchase_lines WHERE incoming_id=?').bind(c.req.param('id')).first())throw badRequest('استلم هذا البند من أمر الشراء لتثبيت التكلفة والفاتورة معًا','PURCHASE_RECEIPT_REQUIRED');
   const row = await c.env.DB.prepare('SELECT * FROM incoming_inventory WHERE id = ?').bind(id).first<IncomingRow>();
   if (!row) throw notFound('Purchase not found');
 
@@ -619,6 +632,7 @@ adminInventoryRoutes.get('/movements', async (c) => {
 });
 
 adminInventoryRoutes.post('/adjustments', async (c) => {
+  if(await operationsInstalled(c.env.DB))await requireCapability(c.env,c.get('user')!,'count');
   const user = c.get('user')!;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const productId = str(body.product_id, 'product_id', { min: 1, max: 60 });
@@ -633,85 +647,21 @@ adminInventoryRoutes.post('/adjustments', async (c) => {
     throw badRequest(`reason must be one of: ${ADJUST_REASONS.join(', ')}`, 'REASON_REQUIRED');
   }
 
-  /**
-   * THE TWO REFUSALS AN ADMIN IS OWED IN WORDS.
-   *
-   * Both are enforced by the database as well — an untracked rung writes no
-   * ledger row, and a shelf driven below zero fails its CHECK and takes the
-   * batch with it. But a CHECK violation reaches the admin as a 500, and
-   * «تعذّر تنفيذ العملية» tells somebody counting boxes nothing. So the same
-   * two conditions are read first and answered by name.
-   */
-  const target = counterTarget(scope);
-  if (!target) throw badRequest('This scope has no shelf', 'BAD_SCOPE');
-  const shelfId = scope === 'base' ? productId : scopeId;
-  const shelf = await c.env.DB.prepare(`SELECT "${target.column}" AS stock FROM "${target.table}" WHERE id = ?`)
-    .bind(shelfId)
-    .first<{ stock: number | null }>();
-  if (!shelf) throw notFound('The stock row this adjustment targets does not exist');
-  if (shelf.stock === null) {
-    throw badRequest(
-      'هذا المستوى لا يتتبع المخزون — فعّل التتبع أولاً / This level does not track stock; enable tracking first',
-      'STOCK_NOT_TRACKED'
-    );
-  }
-  if (delta < 0 && shelf.stock + delta < 0) {
-    // §40. Never negative, and never a silent partial write-off either.
-    throw badRequest(
-      `لا يمكن خصم ${Math.abs(delta)} من ${shelf.stock} وحدة / Cannot remove ${Math.abs(delta)} from a shelf of ${shelf.stock}`,
-      'INSUFFICIENT_STOCK',
-      { on_hand: shelf.stock }
-    );
-  }
-
-  const statements = planAdjustmentLedger(c.env.DB, {
+  const operationId = str(body.operation_id, 'operation_id', { max: 40, required: false }) || newId('adj');
+  const plan = await planAtomicAdjustment(c.env.DB, {
     productId,
     scope,
     scopeId,
     delta,
     reason: body.reason,
     note: str(body.note, 'note', { max: 200, required: false }) ?? '',
-    operationId: newId('adj'),
+    operationId,
     actorUserId: user.id,
+    expectedStock: body.expected_stock === undefined ? undefined : int(body.expected_stock, 'expected_stock', { min: 0 }),
+    unitCostIqd: canViewFinancials(c.env, user) ? statedInt(body.unit_cost_iqd, 'unit_cost_iqd') : null,
   });
-  await c.env.DB.batch(statements);
-
-  /**
-   * A NEGATIVE ADJUSTMENT MUST ALSO LEAVE THE LOTS, or the shelf and its cost
-   * stop agreeing. The units written off were bought, and the oldest layer is
-   * the one the next sale would have consumed — so the write-off eats the queue
-   * in the same order a sale would.
-   *
-   * Done as a second batch rather than in the one above, and that is a real
-   * (small) window: if it fails, the counter has moved and the lots have not.
-   * The alternative was to plan the lot consumption from a read taken before
-   * the counter moved, which would be a guess about a number that had just
-   * changed. The window is reported by the invariant check on the overview
-   * screen rather than hidden.
-   */
-  if (delta < 0) {
-    const need = Math.abs(delta);
-    const { results } = await c.env.DB.prepare(
-      `SELECT id, qty_remaining FROM inventory_lots
-        WHERE scope = ? AND scope_id = ? AND qty_remaining > 0
-        ORDER BY received_at ASC, id ASC`
-    )
-      .bind(scope, scopeId)
-      .all<{ id: string; qty_remaining: number }>();
-    let left = need;
-    const lotStatements: D1PreparedStatement[] = [];
-    for (const lot of results ?? []) {
-      if (left <= 0) break;
-      const take = Math.min(lot.qty_remaining, left);
-      left -= take;
-      lotStatements.push(
-        c.env.DB.prepare(
-          `UPDATE inventory_lots SET qty_remaining = qty_remaining - ?1 WHERE id = ?2 AND qty_remaining >= ?1`
-        ).bind(take, lot.id)
-      );
-    }
-    if (lotStatements.length) await c.env.DB.batch(lotStatements);
-  }
+  if (plan.already) return c.json({ success: true, already: true });
+  await c.env.DB.batch(plan.statements);
 
   await audit(c.env.DB, user.id, 'inventory.adjusted', productId, {
     scope,
@@ -773,6 +723,8 @@ adminInventoryRoutes.get('/incoming/:id/profit-preview', async (c) => {
     .bind(id)
     .first<IncomingRow & { price_iqd: number | null }>();
   if (!row) throw notFound('Purchase not found');
+  const selection = await requireSelection(c.env.DB, row.product_id!, row.scope, row.scope_id);
+  row.price_iqd = selection.selling_price_iqd;
 
   const cost = lotCostBreakdown({
     purchaseUnitIqd: row.purchase_unit_iqd,
