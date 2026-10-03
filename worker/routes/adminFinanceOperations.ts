@@ -230,11 +230,22 @@ adminFinanceOperationsRoutes.post('/orders/:id/assignment', async (c) => {
       .first()
   )
     throw conflict('أجر المهمة مثبت؛ صحّحه بعكس الاستحقاق أولًا');
-  await c.env.DB.prepare(
-    'INSERT INTO finance_task_assignments(order_id,group_key,staff_id,completed_at,actor_id) VALUES (?,?,?,?,?) ON CONFLICT(order_id,group_key) DO UPDATE SET staff_id=excluded.staff_id,completed_at=excluded.completed_at,actor_id=excluded.actor_id',
-  )
-    .bind(id, group, staff, b.completed ? new Date().toISOString() : null, user.id)
-    .run();
+  try {
+    await c.env.DB.batch([
+      // Financial posting may complete FIFO after the eligibility read.
+      // Freeze the same rule inside the assignment write's transaction.
+      ...fence(c.env.DB,
+        "NOT EXISTS(SELECT 1 FROM finance_order_costs WHERE order_id=? AND group_key=? AND state<>'pending_cost')",
+        [id, group]),
+      c.env.DB.prepare(
+        'INSERT INTO finance_task_assignments(order_id,group_key,staff_id,completed_at,actor_id) VALUES (?,?,?,?,?) ON CONFLICT(order_id,group_key) DO UPDATE SET staff_id=excluded.staff_id,completed_at=excluded.completed_at,actor_id=excluded.actor_id',
+      ).bind(id, group, staff, b.completed ? new Date().toISOString() : null, user.id),
+    ]);
+  } catch (e) {
+    if (/CHECK constraint failed/i.test(e instanceof Error ? e.message : String(e)))
+      throw conflict('ثبت أجر المهمة أثناء حفظ الإسناد؛ حدّث الصفحة قبل تغيير الموظف');
+    throw e;
+  }
   await runOrderFinancialEffects(c.env, id, b.completed ? 'prepared' : 'delivered');
   return c.json({ success: true });
 });
@@ -305,7 +316,9 @@ adminFinanceOperationsRoutes.post('/costs/:id/reverse', async (c) => {
 });
 adminFinanceOperationsRoutes.get('/payroll', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'pay');
-  const db = c.env.DB;
+  const db = c.env.DB,
+    staffId = text(c.req.query('staff_id'), 60),
+    offset = whole(c.req.query('offset') ?? 0, 'offset', 0, 100000);
   const { results } = await db
     .prepare(
       `SELECT s.*,
@@ -322,7 +335,19 @@ adminFinanceOperationsRoutes.get('/payroll', async (c) => {
       'SELECT p.*,s.name AS staff_name FROM finance_staff_payments p JOIN finance_staff s ON s.id=p.staff_id ORDER BY p.created_at DESC LIMIT 100',
     )
     .all();
-  return c.json({ success: true, staff: results ?? [], payments: payments.results ?? [] });
+  // Payment staff can review the earnings they approve or settle without
+  // acquiring permission to manage cost rules. The general /costs reader
+  // continues to require that separate capability.
+  const costs = await db.prepare(
+    `SELECT oc.*,s.name AS staff_name,c.name AS center_name,
+    (SELECT COALESCE(SUM(a.amount_iqd),0) FROM finance_payment_allocations a WHERE a.cost_id=oc.id) AS paid_iqd
+    FROM finance_order_costs oc LEFT JOIN finance_staff s ON s.id=oc.staff_id
+    LEFT JOIN finance_cost_centers c ON c.id=oc.center_id
+    WHERE (?='' OR oc.staff_id=?) ORDER BY oc.cost_day DESC,oc.id LIMIT 100 OFFSET ?`,
+  )
+    .bind(staffId, staffId, offset)
+    .all();
+  return c.json({ success: true, staff: results ?? [], payments: payments.results ?? [], costs: costs.results ?? [], offset });
 });
 adminFinanceOperationsRoutes.post('/staff/:id/payments', async (c) => {
   const user = c.get('user')!;
@@ -501,7 +526,15 @@ adminFinanceOperationsRoutes.post('/collections', async (c) => {
     .first<{ status: string; due_on_delivery_iqd: number; gini_paid_iqd: number; seller_type: string }>();
   if (!order || order.seller_type !== 'levonis') throw notFound('Platform order not found');
   if (order.status === 'cancelled') throw badRequest('الطلب ملغى');
+  const salePosted = !!(await db
+    .prepare("SELECT id FROM accounting_entries WHERE event_key=? AND state='posted'")
+    .bind(`sale:${orderId}`)
+    .first());
   const payer = b.payer === 'bank' ? 'bank' : b.payer === 'courier' ? 'courier' : 'customer';
+  const giniRefunds = (await db
+    .prepare("SELECT COALESCE(SUM(refund_iqd),0) AS n FROM finance_refund_facts WHERE order_id=? AND channel='gini'")
+    .bind(orderId)
+    .first<{ n: number }>())?.n ?? 0;
   const collected =
     (
       await db
@@ -511,15 +544,15 @@ adminFinanceOperationsRoutes.post('/collections', async (c) => {
         .bind(orderId, payer === 'bank' ? 1 : 0)
         .first<{ n: number }>()
     )?.n ?? 0;
-  if (collected + amount > (payer === 'bank' ? order.gini_paid_iqd : order.due_on_delivery_iqd))
+  if (collected + amount > (payer === 'bank' ? order.gini_paid_iqd - giniRefunds : order.due_on_delivery_iqd))
     throw badRequest('التحصيل يتجاوز المبلغ المتبقي للطلب');
   await periodOpen(db, day);
   const expense = fee ? newId('opex') : null,
     statements = [
       ...fence(
         db,
-        "(SELECT COALESCE(SUM(amount_iqd),0) FROM finance_collections WHERE order_id=? AND (payer='bank')=?)=?",
-        [orderId, payer === 'bank' ? 1 : 0, collected],
+        "(SELECT COALESCE(SUM(amount_iqd),0) FROM finance_collections WHERE order_id=? AND (payer='bank')=?)=? AND EXISTS(SELECT 1 FROM accounting_entries WHERE event_key=? AND state='posted')=? AND EXISTS(SELECT 1 FROM orders WHERE id=? AND status<>'cancelled') AND (SELECT COALESCE(SUM(refund_iqd),0) FROM finance_refund_facts WHERE order_id=? AND channel='gini')=?",
+        [orderId, payer === 'bank' ? 1 : 0, collected, `sale:${orderId}`, salePosted ? 1 : 0, orderId, orderId, giniRefunds],
       ),
     ];
   if (expense) {
@@ -563,7 +596,7 @@ adminFinanceOperationsRoutes.post('/collections', async (c) => {
       [
         { account: '1000', debit: amount - fee },
         { account: '5200', debit: fee },
-        { account: order.status === 'delivered' ? '1100' : '2300', credit: amount },
+        { account: salePosted ? '1100' : '2300', credit: amount },
       ],
     ).statements,
   );
@@ -573,9 +606,28 @@ adminFinanceOperationsRoutes.post('/collections', async (c) => {
 adminFinanceOperationsRoutes.get('/receivables', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'pay');
   const { results } = await c.env.DB.prepare(
-    `SELECT o.id,o.status,o.delivered_at,o.delivery_provider,o.delivery_tracking_no,o.due_on_delivery_iqd,o.gini_paid_iqd,
-    COALESCE(SUM(c.amount_iqd),0) AS collected_iqd,COALESCE(SUM(c.fee_iqd),0) AS courier_fee_iqd,o.due_on_delivery_iqd+o.gini_paid_iqd-COALESCE(SUM(c.amount_iqd),0) AS balance_iqd,
-    CAST(julianday('now')-julianday(o.delivered_at) AS INTEGER) AS overdue_days FROM orders o LEFT JOIN finance_collections c ON c.order_id=o.id WHERE o.status='delivered' AND o.seller_type='levonis' GROUP BY o.id HAVING balance_iqd>0 ORDER BY o.delivered_at LIMIT 100`,
+    `WITH collected AS (
+      SELECT order_id,SUM(amount_iqd) AS collected_iqd,SUM(fee_iqd) AS courier_fee_iqd,
+        SUM(CASE WHEN payer='bank' THEN amount_iqd ELSE 0 END) AS bank_collected_iqd,
+        SUM(CASE WHEN payer<>'bank' THEN amount_iqd ELSE 0 END) AS door_collected_iqd
+      FROM finance_collections GROUP BY order_id
+    ), refunds AS (
+      SELECT order_id,SUM(refund_iqd) AS gini_refund_iqd FROM finance_refund_facts WHERE channel='gini' GROUP BY order_id
+    ), balances AS (
+      SELECT o.id,o.status,o.delivered_at,o.delivery_provider,o.delivery_tracking_no,o.due_on_delivery_iqd,o.gini_paid_iqd,
+        COALESCE(c.collected_iqd,0) AS collected_iqd,COALESCE(c.courier_fee_iqd,0) AS courier_fee_iqd,
+        COALESCE(c.bank_collected_iqd,0) AS bank_collected_iqd,COALESCE(c.door_collected_iqd,0) AS door_collected_iqd,
+        COALESCE(r.gini_refund_iqd,0) AS gini_refund_iqd,
+        o.gini_paid_iqd-COALESCE(r.gini_refund_iqd,0) AS bank_expected_iqd,
+        o.gini_paid_iqd-COALESCE(r.gini_refund_iqd,0)-COALESCE(c.bank_collected_iqd,0) AS bank_balance_iqd,
+        o.due_on_delivery_iqd-COALESCE(c.door_collected_iqd,0) AS door_balance_iqd,
+        CAST(julianday('now')-julianday(o.delivered_at) AS INTEGER) AS overdue_days
+      FROM orders o LEFT JOIN collected c ON c.order_id=o.id LEFT JOIN refunds r ON r.order_id=o.id
+      WHERE o.status='delivered' AND o.seller_type='levonis'
+    ) SELECT *,bank_balance_iqd+door_balance_iqd AS balance_iqd,
+      MAX(0,bank_balance_iqd) AS bank_receivable_iqd,MAX(0,-bank_balance_iqd) AS bank_credit_balance_iqd,
+      MAX(0,door_balance_iqd)+MAX(0,bank_balance_iqd) AS receivable_iqd
+      FROM balances WHERE door_balance_iqd>0 OR bank_balance_iqd<>0 ORDER BY delivered_at LIMIT 100`,
   ).all();
   return c.json({ success: true, orders: results ?? [] });
 });

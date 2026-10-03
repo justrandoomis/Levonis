@@ -385,8 +385,10 @@ adminStockOperationsRoutes.post('/reorder', async (c) => {
 adminStockOperationsRoutes.get('/trace', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'receive');
   const serial = text(c.req.query('serial'), 160),
+    q = text(c.req.query('q'), 120),
+    offset = whole(c.req.query('offset') ?? 0, 'offset', 0, 100000),
     db = c.env.DB;
-  const [links, returns] = await Promise.all([
+  const [links, returns, lots] = await Promise.all([
     db
       .prepare(
         `SELECT s.serial_norm,l.id AS lot_id,l.product_id,l.received_at,l.unit_cost_iqd,w.name AS location_name,pl.purchase_id,po.invoice_no,po.supplier_id,COALESCE(oi.order_id,u.order_id) AS order_id,
@@ -404,12 +406,26 @@ adminStockOperationsRoutes.get('/trace', async (c) => {
       WHERE r.state NOT IN ('resolved','rejected') AND NOT EXISTS(SELECT 1 FROM stock_return_inspections x WHERE x.return_case_id=r.id) ORDER BY r.requested_at LIMIT 200`,
       )
       .all(),
+    // Linking a delivered device needs its consumed purchase lot as well as
+    // lots still on the shelf. Read access follows receiving, not transfers.
+    db.prepare(
+      `SELECT l.id,l.product_id,l.qty_remaining,p.name,p.name_ar,il.location_id,w.name AS location_name
+      FROM inventory_lots l LEFT JOIN products p ON p.id=l.product_id
+      LEFT JOIN inventory_lot_locations il ON il.lot_id=l.id LEFT JOIN stock_locations w ON w.id=il.location_id
+      WHERE l.qty_received>0 AND (?='' OR instr(lower(COALESCE(p.name,'')||' '||COALESCE(p.name_ar,'')||' '||COALESCE(p.sku,'')||' '||l.id),lower(?))>0)
+      ORDER BY l.received_at DESC,l.id LIMIT 200 OFFSET ?`,
+    )
+      .bind(q, q, offset)
+      .all(),
   ]);
   return c.json(
     projectForAdmin(c.env, c.get('user'), {
       success: true,
       links: links.results ?? [],
       returns: returns.results ?? [],
+      lots: lots.results ?? [],
+      limit: 200,
+      offset,
     }),
   );
 });

@@ -173,6 +173,10 @@ export const ROUTES: readonly RouteRule[] = [
   // level in — `projectForAdmin` strips FINANCIAL_FIELDS from every payload
   // before it is serialised (worker/routes/adminInventory.ts).
   { prefix: '/api/admin/inventory', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
+  // Stock counting shares the exact-selection picker with procurement. Its
+  // read response is projected for assistants by the core; all purchasing
+  // documents and writes keep the financial gate below.
+  { prefix: '/api/admin/procurement/selections', pattern: /^\/api\/admin\/procurement\/selections\/[^/]+$/, methods: ['GET', 'HEAD'], hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/procurement', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin:full', rateClass: 'admin-write' },
   { prefix: '/api/admin/stock-operations', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/template', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'upload' },

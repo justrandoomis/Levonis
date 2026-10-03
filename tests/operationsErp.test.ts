@@ -720,7 +720,7 @@ test('estimated purchase can be finalized after supplier advance while preservin
   const changed = {
     ...original,
     cost_state: 'final',
-    version: created.detail.purchase.version,
+    version: (await json(await get(app, `/p/documents/${created.id}`))).purchase.version,
     charges: [{ title: 'الشحن النهائي', amount_iqd: 20, basis: 'quantity' }],
   };
   const edited = await put(app, `/p/documents/${created.id}`, changed);
@@ -764,7 +764,7 @@ test('scoped overhead is allocated only to orders containing the selected depart
 });
 
 test('missing FIFO cost stays pending and posts once when the allocations become complete after revenue posting', async () => {
-  const { raw, db, app, env } = setup();
+  const { raw, app, env } = setup();
   await post(app, '/f/rules', ruleInput({ basis: 'profit_percent', amount: 1000 }));
   seedOrder(raw);
   raw.exec("DELETE FROM order_item_inventory_allocations WHERE order_id='order'");

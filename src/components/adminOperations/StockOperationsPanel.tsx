@@ -21,7 +21,7 @@ type Lot = {
   id: string;
   product_id: string;
   qty_remaining: number;
-  unit_cost_iqd: number | null;
+  unit_cost_iqd?: number | null;
   name: string;
   name_ar: string;
   location_id: string | null;
@@ -106,17 +106,19 @@ export default function StockOperationsPanel({ onChanged }: { onChanged: () => v
     } else if (tab === 'counts') {
       const r = await api.get<{ counts: Count[] }>(`${STOCK}/counts`);
       setCounts(r.counts);
+    } else if (tab === 'serials') {
+      const r = await api.get<{ returns: typeof returnCases; links: typeof trace; lots: Lot[] }>(
+        `${STOCK}/trace?q=${encodeURIComponent(search)}&offset=${offset}`,
+      );
+      setLots(r.lots);
+      setReturnCases(r.returns);
+      setTrace(r.links);
     } else {
       const r = await api.get<{ locations: Named[]; lots: Lot[] }>(
         `${STOCK}/locations?q=${encodeURIComponent(search)}&offset=${offset}`,
       );
       setLocations(r.locations);
       setLots(r.lots);
-      if (tab === 'serials') {
-        const t = await api.get<{ returns: typeof returnCases; links: typeof trace }>(`${STOCK}/trace`);
-        setReturnCases(t.returns);
-        setTrace(t.links);
-      }
     }
   }, [tab, search, offset]);
   const { run } = op;

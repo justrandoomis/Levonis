@@ -20,6 +20,7 @@ export async function operationsReport(db: D1Database, from: string, to: string)
        SUM(CASE WHEN i.parent=0 AND i.cogs IS NOT NULL AND i.estimated=1 THEN 1 ELSE 0 END) AS estimated_lines,
        SUM(CASE WHEN i.parent=0 THEN COALESCE(i.cogs,0) ELSE 0 END) AS cogs_iqd,COALESCE(c.direct,0) AS direct_cost_iqd,COALESCE(c.pending,0) AS pending_costs,
        COALESCE(col.collected,0) AS collected_iqd,COALESCE(col.fee,0) AS courier_fee_iqd,
+       (SELECT COALESCE(SUM(rf.refund_iqd),0) FROM finance_refund_facts rf WHERE rf.order_id=o.id AND rf.channel='gini') AS gini_refund_iqd,
        (SELECT COALESCE(SUM(e.amount_iqd),0) FROM finance_expense_links l JOIN operating_expenses e ON e.id=l.expense_id WHERE l.order_id=o.id AND e.voided_at IS NULL) AS manual_direct_iqd
       FROM orders o JOIN item_cost i ON i.order_id=o.id LEFT JOIN costs c ON c.order_id=o.id LEFT JOIN collections col ON col.order_id=o.id
       WHERE o.seller_type='levonis' AND o.status='delivered' AND date(o.delivered_at,'+3 hours') BETWEEN ? AND ? GROUP BY o.id ORDER BY o.delivered_at,o.id LIMIT 5001`,
@@ -137,12 +138,13 @@ export async function operationsReport(db: D1Database, from: string, to: string)
             Number(o.courier_fee_iqd);
     return {
       ...o,
+      id: String(o.id),
       gross_profit_iqd: gross,
       contribution_profit_iqd: contribution,
       allocated_overhead_iqd: truncated ? null : overhead[i],
       managerial_net_iqd: contribution === null || truncated ? null : contribution - overhead[i],
       collection_difference_iqd:
-        Number(o.due_on_delivery_iqd) + Number(o.gini_paid_iqd) - Number(o.collected_iqd),
+        Number(o.due_on_delivery_iqd) + Number(o.gini_paid_iqd) - Number(o.gini_refund_iqd) - Number(o.collected_iqd),
     };
   });
   return {

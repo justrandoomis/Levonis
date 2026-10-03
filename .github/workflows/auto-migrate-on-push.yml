@@ -42,7 +42,9 @@ name: 51 - Auto-apply migrations on push (live database)
 
 on:
   push:
-    branches: [claude/kind-bardeen-20sn98]
+    # GitHub cannot interpolate default_branch in a trigger filter. Observe
+    # branch pushes here, and open the live database only behind the job guard.
+    branches: ['**']
     paths:
       - 'migrations/**'
       - '.github/workflows/auto-migrate-on-push.yml'
@@ -50,12 +52,13 @@ on:
   # run that failed can be retried without an empty commit.
   workflow_dispatch:
 
-# The same group workflow 6 and the deploy workflows use: two runs must never
-# open `migrations apply` on the same database at once.
-concurrency: staging-deploy
-
 jobs:
   migrate:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    # Acquire the live deploy lock only for an allowed migration job. A
+    # feature push that skips this job must not cancel a pending live deploy.
+    # The group is shared with workflow 6 and the live deploy workflows.
+    concurrency: staging-deploy
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -99,10 +102,11 @@ jobs:
       - name: Record a Time Travel bookmark (restore point)
         id: bookmark
         run: |
-          set -e
+          set -euo pipefail
           npx wrangler d1 time-travel info levonis-db-staging 2>&1 | tee /tmp/tt.txt
           BM=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}' /tmp/tt.txt | head -1 || true)
-          echo "bookmark=${BM:-see-log}" >> "$GITHUB_OUTPUT"
+          [ -n "$BM" ] || { echo "::error::no Time Travel restore bookmark was returned — refusing to migrate the live database"; exit 1; }
+          echo "bookmark=$BM" >> "$GITHUB_OUTPUT"
 
       - name: What is applied, before
         id: before

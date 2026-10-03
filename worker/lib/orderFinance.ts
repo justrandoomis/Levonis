@@ -68,6 +68,11 @@ export function costAmount(
   return value;
 }
 type RuleSnapshot = { line_id: string; product_id: string; rules: CostRule[] }[];
+// Classification is a journal fact, not the order's delivery status. A
+// delivered order may still be waiting for its sale journal to be posted.
+const advanceCollectionsSql = `SELECT COALESCE(SUM(l.credit_iqd-l.debit_iqd),0) FROM finance_collections c
+  JOIN accounting_entries e ON e.event_key='collection:'||c.id AND e.state='posted'
+  JOIN accounting_lines l ON l.entry_id=e.id AND l.account_code='2300' WHERE c.order_id=?`;
 async function snapshotFor(
   db: D1Database,
   lines: Array<{ id: string; product_id: string | null }>,
@@ -318,6 +323,13 @@ export async function runOrderFinancialEffects(
     const cogs = relevant.some((l) => l.cogs_iqd === null || l.cost_confidence !== 'fifo')
       ? null
       : relevant.reduce((s, l) => s + l.cogs_iqd!, 0);
+    const snapshotJson = JSON.stringify({
+      rule,
+      net_goods_iqd: revenue,
+      fifo_cogs_iqd: cogs,
+      qty,
+      staff_id: staff,
+    });
     let amount = costAmount({ ...rule, cap_iqd: null }, qty, revenue, cogs);
     const itemId = rule.basis === 'order' ? null : lineIds[0];
     const existing = await db
@@ -327,7 +339,24 @@ export async function runOrderFinancialEffects(
       .bind(orderId, rule.id, itemId)
       .first<{ id: string; state: string; amount_iqd: number | null }>();
     if (existing && existing.state !== 'pending_cost') continue;
-    if (existing && amount === null) continue;
+    // The employee and completion state read above must still belong to this
+    // task when its cost becomes payable. Reassignment is a competing write,
+    // even when the previous cost was only waiting for FIFO.
+    statements.push(...fence(
+      db,
+      assigned
+        ? 'EXISTS(SELECT 1 FROM finance_task_assignments WHERE order_id=? AND group_key=? AND staff_id=? AND completed_at IS ?)'
+        : 'NOT EXISTS(SELECT 1 FROM finance_task_assignments WHERE order_id=? AND group_key=?)',
+      assigned ? [orderId, rule.group_key, assigned.staff_id, assigned.completed_at] : [orderId, rule.group_key],
+    ));
+    if (existing && amount === null) {
+      statements.push(
+        ...fence(db, "EXISTS(SELECT 1 FROM finance_order_costs WHERE id=? AND state='pending_cost')", [existing.id]),
+        db.prepare("UPDATE finance_order_costs SET staff_id=?,snapshot=? WHERE id=? AND state='pending_cost'")
+          .bind(staff, snapshotJson, existing.id),
+      );
+      continue;
+    }
     if (amount !== null && rule.cap_iqd !== null)
       amount = Math.min(amount, Math.max(0, rule.cap_iqd - (capUsed.get(rule.id) ?? 0)));
     if (amount !== null) capUsed.set(rule.id, (capUsed.get(rule.id) ?? 0) + amount);
@@ -352,18 +381,11 @@ export async function runOrderFinancialEffects(
             `طلب ${orderId} / قاعدة ${rule.id} إصدار ${rule.version}`,
           ),
       );
-    const snapshotJson = JSON.stringify({
-      rule,
-      net_goods_iqd: revenue,
-      fifo_cogs_iqd: cogs,
-      qty,
-      staff_id: staff,
-    });
     if (existing)
       statements.push(
         db
           .prepare(
-            "UPDATE finance_order_costs SET amount_iqd=?,base_iqd=?,state='due',expense_id=?,snapshot=?,cost_day=? WHERE id=? AND state='pending_cost'",
+            "UPDATE finance_order_costs SET amount_iqd=?,base_iqd=?,state='due',expense_id=?,snapshot=?,cost_day=?,staff_id=? WHERE id=? AND state='pending_cost'",
           )
           .bind(
             amount,
@@ -371,6 +393,7 @@ export async function runOrderFinancialEffects(
             expense,
             snapshotJson,
             day,
+            staff,
             id,
           ),
       );
@@ -424,9 +447,9 @@ export async function runOrderFinancialEffects(
       (
         await db
           .prepare(
-            'SELECT COALESCE(SUM(amount_iqd),0) AS n FROM finance_collections WHERE order_id=? AND collection_day<=?',
+            `SELECT (${advanceCollectionsSql}) AS n`,
           )
-          .bind(orderId, day)
+          .bind(orderId)
           .first<{ n: number }>()
       )?.n ?? 0;
     const receivable = Math.max(
@@ -438,6 +461,13 @@ export async function runOrderFinancialEffects(
     );
     if (total > 0)
       statements.push(
+        // Serialize with collections: if another request records an advance
+        // or posts this sale after our reads, the entire batch must retry.
+        ...fence(
+          db,
+          `(${advanceCollectionsSql})=? AND NOT EXISTS(SELECT 1 FROM accounting_entries WHERE event_key=?)`,
+          [orderId, prepaid, `sale:${orderId}`],
+        ),
         ...journalPlan(
           db,
           { key: `sale:${orderId}`, day, title: 'إيراد طلب مستلم', source: 'order', sourceId: orderId },

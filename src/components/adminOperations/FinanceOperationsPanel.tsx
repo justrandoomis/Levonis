@@ -489,12 +489,11 @@ function Payroll({ config, onChanged }: { config: Config; onChanged: () => void 
     [reason, setReason] = useState(''),
     [offset, setOffset] = useState(0);
   const load = useCallback(async () => {
-    const [p, c] = await Promise.all([
-      api.get<{ staff: StaffBalance[] }>(`${FINANCE}/payroll`),
-      api.get<{ costs: Cost[] }>(`${FINANCE}/costs?staff_id=${encodeURIComponent(staffId)}&offset=${offset}`),
-    ]);
+    const p = await api.get<{ staff: StaffBalance[]; costs: Cost[] }>(
+      `${FINANCE}/payroll?staff_id=${encodeURIComponent(staffId)}&offset=${offset}`,
+    );
     setStaff(p.staff);
-    setCosts(c.costs);
+    setCosts(p.costs);
   }, [staffId, offset]);
   const { run } = op;
   useEffect(() => {
@@ -772,6 +771,10 @@ function Collections({ config, onChanged }: { config: Config; onChanged: () => v
         due_on_delivery_iqd: number;
         collected_iqd: number;
         balance_iqd: number;
+        bank_expected_iqd: number;
+        bank_balance_iqd: number;
+        door_balance_iqd: number;
+        bank_credit_balance_iqd: number;
         overdue_days: number;
         courier_fee_iqd: number;
       }>
@@ -864,8 +867,11 @@ function Collections({ config, onChanged }: { config: Config; onChanged: () => v
         </button>
       </Card>
       <Card
-        title={loc('الذمم المتبقية لشركات التوصيل والعملاء', 'Outstanding courier and customer receivables')}
+        title={loc('ذمم البنك والتوصيل والتسويات الدائنة', 'Bank and courier receivables and credit balances')}
       >
+        <p className={`mb-3 text-sm ${T.text2}`}>
+          {loc('مرتجعات Gini تخصم من استحقاق البنك وحده. الرصيد الدائن للبنك بعد التحصيل يُعرض منفصلًا كتسوية مستحقة؛ أجرة الباب تبقى مستقلة.', 'Gini refunds reduce only the bank receivable. A bank credit after collection is shown separately as a settlement due; the door balance remains independent.')}
+        </p>
         <DataTable
           headers={[
             loc('الطلب', 'Order'),
@@ -873,7 +879,9 @@ function Collections({ config, onChanged }: { config: Config; onChanged: () => v
             loc('المتوقع', 'Expected'),
             loc('المحصّل', 'Collected'),
             loc('أجور الشركة', 'Courier fees'),
-            loc('المتبقي', 'Outstanding'),
+            loc('مستحق الباب', 'Door due'),
+            loc('مستحق البنك', 'Bank due'),
+            loc('تسوية مستحقة للبنك', 'Bank credit settlement due'),
             loc('أيام التأخير', 'Overdue days'),
             '',
           ]}
@@ -882,22 +890,36 @@ function Collections({ config, onChanged }: { config: Config; onChanged: () => v
             <tr key={r.id}>
               <Cell>{r.id}</Cell>
               <Cell>{r.delivery_provider || '—'}</Cell>
-              <Cell>{money(r.due_on_delivery_iqd)}</Cell>
+              <Cell>{money(r.due_on_delivery_iqd + r.bank_expected_iqd)}</Cell>
               <Cell>{money(r.collected_iqd)}</Cell>
               <Cell>{money(r.courier_fee_iqd)}</Cell>
-              <Cell>{money(r.balance_iqd)}</Cell>
+              <Cell>{money(Math.max(0, r.door_balance_iqd))}</Cell>
+              <Cell>{money(Math.max(0, r.bank_balance_iqd))}</Cell>
+              <Cell>{money(r.bank_credit_balance_iqd)}</Cell>
               <Cell>{r.overdue_days}</Cell>
               <Cell>
-                <button
+                {r.door_balance_iqd > 0 && <button
                   type="button"
                   className={T.btnSecondary}
                   onClick={() => {
                     setOrder(r.id);
-                    setAmount(String(r.balance_iqd));
+                    setPayer('courier');
+                    setAmount(String(r.door_balance_iqd));
                   }}
                 >
-                  {loc('تحصيل', 'Collect')}
-                </button>
+                  {loc('تحصيل الباب', 'Collect door payment')}
+                </button>}
+                {r.bank_balance_iqd > 0 && <button
+                  type="button"
+                  className={T.btnSecondary}
+                  onClick={() => {
+                    setOrder(r.id);
+                    setPayer('bank');
+                    setAmount(String(r.bank_balance_iqd));
+                  }}
+                >
+                  {loc('تحصيل البنك', 'Collect bank payment')}
+                </button>}
               </Cell>
             </tr>
           ))}

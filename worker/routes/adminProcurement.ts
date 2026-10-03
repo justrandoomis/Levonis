@@ -43,6 +43,23 @@ type Line = IncomingRow & {
   volume_mm3: number;
   selling_price_iqd: number | null;
 };
+async function commitPurchase(
+  db: D1Database,
+  purchase: Purchase,
+  statements: D1PreparedStatement[],
+) {
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    const current = await db
+      .prepare('SELECT version FROM purchase_orders WHERE id=?')
+      .bind(purchase.id)
+      .first<{ version: number }>();
+    if (!current || current.version !== purchase.version)
+      throw conflict('تغير أمر الشراء أو رصيد المورد؛ حدّث الشحنة وأعد المحاولة', 'VERSION_CHANGED');
+    throw error;
+  }
+}
 const bodyOf = async (c: Context<AppContext>) => await c.req.json<Record<string, unknown>>();
 const text = (v: unknown, max = 200) => str(v, 'text', { max, required: false }) ?? '';
 async function document(db: D1Database, id: string) {
@@ -546,7 +563,7 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
       `UPDATE purchase_orders SET status=CASE WHEN NOT EXISTS(SELECT 1 FROM purchase_lines l JOIN incoming_inventory i ON i.id=l.incoming_id WHERE l.purchase_id=? AND i.qty_received<i.qty_ordered) THEN 'received' ELSE 'partial' END,version=version+1,updated_at=? WHERE id=?`,
     ).bind(id, new Date().toISOString(), id),
   );
-  await c.env.DB.batch(statements);
+  await commitPurchase(c.env.DB, d.purchase, statements);
   await audit(c.env.DB, user.id, 'purchase.received', id, { event_id: eventId });
   return c.json({ success: true });
 });
@@ -580,11 +597,15 @@ adminProcurementRoutes.post('/documents/:id/payments', async (c) => {
         .first<{ n: number }>()
     )?.n ?? 0;
   const settle = Math.min(amount, Math.max(0, payable));
-  await c.env.DB.batch([
-    ...fence(c.env.DB, '(SELECT COALESCE(SUM(amount_iqd),0) FROM supplier_payments WHERE purchase_id=?)=?', [
-      id,
-      d.paid_iqd,
-    ]),
+  await commitPurchase(c.env.DB, d.purchase, [
+    // Receipts and document edits change both the amount owed and the prepaid
+    // split. Share their version fence, so a stale payment plan cannot commit
+    // against a newer receipt, edit or cancellation.
+    ...fence(
+      c.env.DB,
+      "EXISTS(SELECT 1 FROM purchase_orders WHERE id=? AND version=? AND status NOT IN ('draft','cancelled')) AND (SELECT COALESCE(SUM(amount_iqd),0) FROM supplier_payments WHERE purchase_id=?)=?",
+      [id, d.purchase.version, id, d.paid_iqd],
+    ),
     c.env.DB.prepare(
       'INSERT INTO supplier_payments(id,purchase_id,amount_iqd,payment_day,reference,actor_id,created_at) VALUES (?,?,?,?,?,?,?)',
     ).bind(paymentId, id, amount, day, text(b.reference), user.id, new Date().toISOString()),
@@ -604,6 +625,12 @@ adminProcurementRoutes.post('/documents/:id/payments', async (c) => {
         { account: '1000', credit: amount },
       ],
     ).statements,
+    // Advancing the version also invalidates receipts planned before this
+    // payment, whose prepaid balance was read outside the transaction.
+    c.env.DB.prepare('UPDATE purchase_orders SET version=version+1,updated_at=? WHERE id=?').bind(
+      new Date().toISOString(),
+      id,
+    ),
   ]);
   return c.json({ success: true });
 });
