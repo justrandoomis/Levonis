@@ -19,6 +19,7 @@ import { recordReturnFinancials } from '../worker/lib/orderFinance';
 import { refundsByDaySql } from '../worker/lib/financeReport';
 import { planLotRestore } from '../worker/lib/inventoryLots';
 import { parsePurchaseCsv } from '../worker/lib/purchaseCsv';
+import { getOrderProfitBase } from '../worker/lib/orderProfit';
 import type { Env } from '../worker/lib/types';
 
 const ADMIN = { id: 'admin', email: 'boss@x.co', role: 'admin' as const };
@@ -106,6 +107,26 @@ const ruleInput = (over: Record<string, unknown> = {}) => ({
   category_id: 'wages',
   milestone: 'delivered',
   ...over,
+});
+
+test('checkout freezes financial department names while staff scope exclusions win over parent inclusion', async () => {
+  const { raw, db } = setup();
+  seedOrder(raw);
+  raw.exec("UPDATE products SET category_id='main',sub_category_id='sub' WHERE id='printer'");
+  const statements = await planOrderFinanceSnapshot(db, 'order', [{ id: 'order-item', product_id: 'printer' }], new Date().toISOString());
+  await db.batch(statements);
+  raw.exec("UPDATE products SET category_id=NULL,sub_category_id=NULL WHERE id='printer'; UPDATE catalogs SET name_ar='قسم معدل' WHERE id='main'");
+  const report = await getOrderProfitBase(db, 'order');
+  assert.equal(report.lines[0].main_catalog_id, 'main');
+  assert.equal(report.lines[0].main_name, 'طابعات');
+  assert.equal(report.lines[0].sub_catalog_id, 'sub');
+  const base = { ...ruleInput(), id: 'first', version: 1, priority: 0 } as CostRule;
+  const scoped = { ...base, scope_json: JSON.stringify({ catalog_ids: ['main', 'sub'], product_ids: [], excluded_product_ids: ['printer'] }) };
+  assert.equal(matchingRules([scoped], 'printer', new Map([['main', 1], ['sub', 2]])).length, 0);
+  const included = { ...scoped, scope_json: JSON.stringify({ catalog_ids: ['main', 'sub'], product_ids: ['printer'], excluded_product_ids: [] }) };
+  assert.equal(matchingRules([included], 'printer', new Map([['main', 1], ['sub', 2]])).length, 1);
+  assert.equal(matchingRules([included, { ...included, id: 'second', staff_id: 'staff_other' }], 'printer', new Map([['main', 1], ['sub', 2]])).length, 2);
+  raw.close();
 });
 
 test('integer weighted freight conserves every dinar, with deterministic remainders', () => {

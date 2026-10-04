@@ -66,6 +66,10 @@ import { adminInventoryRoutes } from './routes/adminInventory';
 import { adminProcurementRoutes } from './routes/adminProcurement';
 import { adminStockOperationsRoutes } from './routes/adminStockOperations';
 import { adminFinanceOperationsRoutes } from './routes/adminFinanceOperations';
+import { adminFinanceWorkspaceRoutes } from './routes/adminFinanceWorkspace';
+import { adminFinancePeopleRoutes } from './routes/adminFinancePeople';
+import { adminInvestmentFinanceRoutes } from './routes/adminInvestmentFinance';
+import { financeEarningsRoutes } from './routes/financeEarnings';
 import { printRequestRoutes } from './routes/printRequests';
 import { notificationRoutes } from './routes/notifications';
 import { stockAlertRoutes } from './routes/stockAlerts';
@@ -419,6 +423,10 @@ app.route('/api/admin/inventory', adminInventoryRoutes);
 app.route('/api/admin/procurement', adminProcurementRoutes);
 app.route('/api/admin/stock-operations', adminStockOperationsRoutes);
 app.route('/api/admin/finance-operations', adminFinanceOperationsRoutes);
+app.route('/api/admin/finance-workspace', adminFinanceWorkspaceRoutes);
+app.route('/api/admin/finance-people', adminFinancePeopleRoutes);
+app.route('/api/admin/investment-finance', adminInvestmentFinanceRoutes);
+app.route('/api/finance-earnings', financeEarningsRoutes);
 // Every commercial value PRO and PREMIUM shopping benefits are made of (§6).
 app.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
 // The issued warranty document: public verification by receipt number or by

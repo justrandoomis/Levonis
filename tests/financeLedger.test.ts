@@ -263,6 +263,7 @@ const EXPENSE_ROUTES: ReadonlyArray<[string, string]> = [
 test('an assistant admin is refused on EVERY expense route, read and write alike', async () => {
   const raw = seedCatalogue();
   const db = asD1(raw);
+  const initialCategories = all(raw, 'SELECT id FROM expense_categories ORDER BY id');
   assert.equal(EXPENSE_ROUTES.length, 8, 'a route was added or removed — cover it here');
   for (const [method, path] of EXPENSE_ROUTES) {
     const app = financeApp(db, assistant);
@@ -276,7 +277,7 @@ test('an assistant admin is refused on EVERY expense route, read and write alike
   }
   // …and the assistant's attempts wrote nothing at all.
   assert.deepEqual(all(raw, 'SELECT id FROM operating_expenses'), []);
-  assert.deepEqual(all(raw, 'SELECT id FROM expense_categories'), []);
+  assert.deepEqual(all(raw, 'SELECT id FROM expense_categories ORDER BY id'), initialCategories);
 });
 
 test('a customer and a merchant cannot reach the expense ledger either', async () => {
@@ -369,6 +370,18 @@ test('the owner records an expense, repeats it monthly as REAL rows, and voids o
   ]) {
     assert.ok(actions.includes(a), `${a} must be audited — got ${JSON.stringify(actions)}`);
   }
+});
+
+test('system expense categories do not suppress first-use defaults or resurrect defaults the owner removed', async () => {
+  const raw = seedCatalogue();
+  raw.exec("INSERT OR IGNORE INTO expense_categories(id,slug,name_ar,name_en) VALUES ('finance_staff_wages','finance-staff-wages','أجور الموظفين','Staff wages')");
+  const app = financeApp(asD1(raw), owner);
+  const first = await json(await get(app, '/api/admin/finance/expense-categories'));
+  assert.ok(first.categories.some((category: { slug: string }) => category.slug === 'rent'));
+  raw.exec("DELETE FROM expense_categories WHERE id NOT IN ('exp_owner_marketing','finance_staff_wages')");
+  const second = await json(await get(app, '/api/admin/finance/expense-categories'));
+  assert.equal(second.categories.length, 2, 'removed ordinary categories stay removed');
+  assert.equal(all(raw, "SELECT id FROM audit_log WHERE action='finance.expense_category.seed'").length, 1);
 });
 
 test('an expense belongs to the day the owner names, not the day it was typed, and a correction is auditable', async () => {

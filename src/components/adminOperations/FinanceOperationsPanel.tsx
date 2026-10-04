@@ -104,14 +104,18 @@ export default function FinanceOperationsPanel({
   from,
   to,
   onChanged,
+  initialTab = 'rules',
+  initialOrderId = '',
 }: {
   from: string;
   to: string;
   onChanged: () => void;
+  initialTab?: string;
+  initialOrderId?: string;
 }) {
   const { loc } = useLabels(),
     op = useOperation();
-  const [tab, setTab] = useState('rules'),
+  const [tab, setTab] = useState(initialTab),
     [config, setConfig] = useState<Config>(emptyConfig);
   const load = useCallback(async () => setConfig(await api.get<Config>(`${FINANCE}/config`)), []);
   const { run } = op;
@@ -134,8 +138,8 @@ export default function FinanceOperationsPanel({
         ]}
       />
       {tab === 'rules' && <Rules config={config} onConfig={load} onChanged={onChanged} />}
-      {tab === 'payroll' && <Payroll config={config} onChanged={onChanged} />}
-      {tab === 'collections' && <Collections config={config} onChanged={onChanged} />}
+      {tab === 'payroll' && <Payroll config={config} onChanged={onChanged} initialOrderId={initialOrderId} />}
+      {tab === 'collections' && <Collections config={config} onChanged={onChanged} initialOrderId={initialOrderId} />}
       {tab === 'reports' && <Reports config={config} from={from} to={to} />}{' '}
       {tab === 'accounting' && <Accounting config={config} from={from} to={to} />}
       {tab === 'permissions' && <Permissions config={config} onChanged={load} />}
@@ -471,7 +475,7 @@ function Rules({
     </div>
   );
 }
-function Payroll({ config, onChanged }: { config: Config; onChanged: () => void }) {
+function Payroll({ config, onChanged, initialOrderId = '' }: { config: Config; onChanged: () => void; initialOrderId?: string }) {
   const { loc } = useLabels(),
     op = useOperation();
   const [staff, setStaff] = useState<StaffBalance[]>([]),
@@ -481,7 +485,7 @@ function Payroll({ config, onChanged }: { config: Config; onChanged: () => void 
     [kind, setKind] = useState('payment'),
     [note, setNote] = useState(''),
     [payId, setPayId] = useState(() => crypto.randomUUID()),
-    [orderId, setOrderId] = useState(''),
+    [orderId, setOrderId] = useState(initialOrderId),
     [group, setGroup] = useState(''),
     [assigned, setAssigned] = useState(''),
     [complete, setComplete] = useState(true),
@@ -761,7 +765,7 @@ function Payroll({ config, onChanged }: { config: Config; onChanged: () => void 
     </div>
   );
 }
-function Collections({ config, onChanged }: { config: Config; onChanged: () => void }) {
+function Collections({ config, onChanged, initialOrderId = '' }: { config: Config; onChanged: () => void; initialOrderId?: string }) {
   const { loc } = useLabels(),
     op = useOperation();
   const [rows, setRows] = useState<
@@ -779,7 +783,7 @@ function Collections({ config, onChanged }: { config: Config; onChanged: () => v
         courier_fee_iqd: number;
       }>
     >([]),
-    [order, setOrder] = useState(''),
+    [order, setOrder] = useState(initialOrderId),
     [payer, setPayer] = useState('courier'),
     [amount, setAmount] = useState(''),
     [fee, setFee] = useState('0'),

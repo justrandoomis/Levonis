@@ -120,8 +120,9 @@
  *
  *   line revenue = line_total_iqd − coupon_discount_iqd − membership_discount_iqd
  *
- * Exact integers, no allocation, no division — so the per-product breakdown and
- * the period total are the same arithmetic and agree to the dinar.
+ * Accepted final-price changes (0140) are then allocated across the sale's
+ * revenue-bearing lines in exact integer dinars. The product breakdown and
+ * period total share this allocation; pending proposals never change revenue.
  *
  * WHAT IS DELIBERATELY *NOT* IN LINE REVENUE, and is reported separately at
  * the period level because it belongs to no product:
@@ -701,6 +702,8 @@ export interface SchemaFacts {
   hasFifo: boolean;
   /** 0162 records the exact stock disposition and refund amount. */
   hasOperationalRefunds?: boolean;
+  /** 0140's accepted order-price deltas; absent databases keep their old SQL. */
+  hasPriceAdjustments?: boolean;
 }
 
 /**
@@ -1009,6 +1012,82 @@ const NET_LINE_IQD = `MAX(0, COALESCE(i.line_total_iqd, 0)
                 - COALESCE(i.coupon_discount_iqd, 0)
                 - COALESCE(i.membership_discount_iqd, 0))`;
 
+/** SQLite promotes an overflowing integer product to REAL. Large legitimate
+ * bulk orders must not lose dinars there. The common path uses integer SQL;
+ * only overflowing products use binary multiply/divide, whose intermediates
+ * stay below twice the input amount/divisor instead of multiplying them. */
+const exactProductCtes = (prefix: string, input: string): string => `
+  ${prefix}_input AS (${input}),
+  ${prefix}_multiply(id,multiplier,denom,part_q,part_r,result_q,result_r) AS (
+    SELECT id,b,d,a/d,a%d,0,0 FROM ${prefix}_input
+     WHERE b>0 AND d>0 AND a>9223372036854775807/b
+    UNION ALL
+    SELECT id,multiplier/2,denom,part_q*2+(part_r*2)/denom,(part_r*2)%denom,
+      result_q+CASE WHEN multiplier%2=1 THEN part_q+(result_r+part_r)/denom ELSE 0 END,
+      CASE WHEN multiplier%2=1 THEN (result_r+part_r)%denom ELSE result_r END
+    FROM ${prefix}_multiply WHERE multiplier>0
+  ), ${prefix}_exact AS (
+    SELECT id,CASE WHEN d>0 THEN a*b/d ELSE 0 END AS floor_iqd,
+      CASE WHEN d>0 THEN (a*b)%d ELSE 0 END AS remainder_iqd
+    FROM ${prefix}_input WHERE b=0 OR d=0 OR a<=9223372036854775807/b
+    UNION ALL
+    SELECT id,result_q,result_r FROM ${prefix}_multiply WHERE multiplier=0
+  ),`;
+
+/**
+ * Accepted final-price changes belong to the delivered sale, including its
+ * product/category breakdown. Components carry no sale revenue here: the
+ * bundle parent carries the delta once, just as it carries the original price.
+ *
+ * Points remain a period-level deduction. They only determine the goods value
+ * available for a price reduction and the allocation weights; subtracting them
+ * again from net_iqd would charge them twice. Largest-remainder allocation uses
+ * stable line ids and integer dinars at both stages (points, then price delta).
+ * Only adjusted orders enter this CTE, so ordinary orders keep their exact
+ * previous arithmetic and a pre-0140 database never references the new column.
+ */
+const priceAdjustmentCtes = (schema: SchemaFacts): string => !schema.hasPriceAdjustments ? '' : `
+  ap_base AS (
+    SELECT i.id,i.order_id,i.qty,${NET_LINE_IQD} AS base_iqd,
+           o.price_adjustment_iqd AS delta_iqd,COALESCE(o.points_discount_iqd,0) AS points_iqd
+      FROM order_items i JOIN orders o ON o.id=i.order_id
+     WHERE COALESCE(o.price_adjustment_iqd,0)<>0 AND i.bundle_parent_item_id IS NULL
+  ), ap_totals AS (
+    SELECT *,SUM(base_iqd) OVER(PARTITION BY order_id) AS goods_iqd FROM ap_base
+  ), ${exactProductCtes('ap_point', 'SELECT id,MIN(goods_iqd,points_iqd) AS a,base_iqd AS b,goods_iqd AS d FROM ap_totals')}
+  ap_points AS (
+    SELECT t.*,MIN(goods_iqd,points_iqd) AS applied_points,p.floor_iqd AS point_floor,p.remainder_iqd AS point_remainder
+    FROM ap_totals t JOIN ap_point_exact p ON p.id=t.id
+  ), ap_point_rank AS (
+    SELECT *,SUM(point_floor) OVER(PARTITION BY order_id) AS point_floors,
+      ROW_NUMBER() OVER(PARTITION BY order_id ORDER BY point_remainder DESC,id) AS point_rank
+    FROM ap_points
+  ), ap_weights AS (
+    SELECT *,MAX(-(goods_iqd-applied_points),delta_iqd) AS goods_delta,
+      CASE WHEN goods_iqd>applied_points
+        THEN base_iqd-point_floor-CASE WHEN point_rank<=applied_points-point_floors THEN 1 ELSE 0 END
+        ELSE qty END AS weight
+    FROM ap_point_rank
+  ), ap_weight_totals AS (
+    SELECT *,SUM(weight) OVER(PARTITION BY order_id) AS total_weight FROM ap_weights
+  ), ${exactProductCtes('ap_delta', 'SELECT id,ABS(goods_delta) AS a,weight AS b,total_weight AS d FROM ap_weight_totals')}
+  ap_parts AS (
+    SELECT w.*,d.floor_iqd AS delta_floor,d.remainder_iqd AS delta_remainder
+    FROM ap_weight_totals w JOIN ap_delta_exact d ON d.id=w.id
+  ), ap_ranked AS (
+    SELECT *,SUM(delta_floor) OVER(PARTITION BY order_id) AS delta_floors,
+      ROW_NUMBER() OVER(PARTITION BY order_id ORDER BY delta_remainder DESC,id) AS delta_rank
+    FROM ap_parts
+  ), ap_revenue AS (
+    SELECT id,order_id,base_iqd+(CASE WHEN goods_delta<0 THEN -1 ELSE 1 END)*
+      (delta_floor+CASE WHEN delta_rank<=ABS(goods_delta)-delta_floors THEN 1 ELSE 0 END) AS net_iqd
+    FROM ap_ranked
+  ),`;
+const priceAdjustmentJoin = (schema: SchemaFacts): string => schema.hasPriceAdjustments
+  ? ' LEFT JOIN ap_revenue adjusted ON adjusted.id=i.id' : '';
+const adjustedNetLine = (schema: SchemaFacts): string => schema.hasPriceAdjustments
+  ? `COALESCE(adjusted.net_iqd,${NET_LINE_IQD})` : NET_LINE_IQD;
+
 /**
  * The same figure for a REFUND, which prefers `component_alloc_iqd` (§4). A
  * bundle component's own `line_total_iqd` is 0 — the money is on the parent —
@@ -1020,6 +1099,39 @@ const NET_LINE_IQD = `MAX(0, COALESCE(i.line_total_iqd, 0)
 const NET_REFUND_IQD = `MAX(0, COALESCE(i.component_alloc_iqd, i.line_total_iqd, 0)
                   - COALESCE(i.coupon_discount_iqd, 0)
                   - COALESCE(i.membership_discount_iqd, 0))`;
+
+/** Legacy refunds have no frozen operational amount. Reverse the same adjusted
+ * revenue they originally recognised, allocating a parent's change across its
+ * components without losing a dinar. Modern refund facts remain authoritative. */
+const refundPriceCtes = (schema: SchemaFacts): string => !schema.hasPriceAdjustments ? '' : `
+  ${priceAdjustmentCtes(schema)}
+  ap_child_base AS (
+    SELECT i.id,i.bundle_parent_item_id AS parent_id,i.qty,${NET_REFUND_IQD} AS base_iqd,
+      parent.net_iqd-original.base_iqd AS delta_iqd
+    FROM order_items i JOIN ap_revenue parent ON parent.id=i.bundle_parent_item_id
+      JOIN ap_base original ON original.id=parent.id
+  ), ap_child_totals AS (
+    SELECT *,SUM(base_iqd) OVER(PARTITION BY parent_id) AS base_total,
+      SUM(qty) OVER(PARTITION BY parent_id) AS qty_total FROM ap_child_base
+  ), ${exactProductCtes('ap_child_delta', 'SELECT id,ABS(delta_iqd) AS a,CASE WHEN base_total>0 THEN base_iqd ELSE qty END AS b,CASE WHEN base_total>0 THEN base_total ELSE qty_total END AS d FROM ap_child_totals')}
+  ap_child_parts AS (
+    SELECT c.*,d.floor_iqd AS delta_floor,d.remainder_iqd AS delta_remainder
+    FROM ap_child_totals c JOIN ap_child_delta_exact d ON d.id=c.id
+  ), ap_child_ranked AS (
+    SELECT *,SUM(delta_floor) OVER(PARTITION BY parent_id) AS delta_floors,
+      ROW_NUMBER() OVER(PARTITION BY parent_id ORDER BY delta_remainder DESC,id) AS delta_rank
+    FROM ap_child_parts
+  ), ap_refund_revenue AS (
+    SELECT id,net_iqd FROM ap_revenue
+    UNION ALL
+    SELECT id,base_iqd+(CASE WHEN delta_iqd<0 THEN -1 ELSE 1 END)*
+      (delta_floor+CASE WHEN delta_rank<=ABS(delta_iqd)-delta_floors THEN 1 ELSE 0 END)
+    FROM ap_child_ranked
+  ),`;
+const refundPriceJoin = (schema: SchemaFacts): string => schema.hasPriceAdjustments
+  ? ' LEFT JOIN ap_refund_revenue refund_price ON refund_price.id=i.id' : '';
+const adjustedNetRefund = (schema: SchemaFacts): string => schema.hasPriceAdjustments
+  ? `COALESCE(refund_price.net_iqd,${NET_REFUND_IQD})` : NET_REFUND_IQD;
 
 /**
  * The per-line facts both the day report and the breakdowns are built on.
@@ -1041,7 +1153,7 @@ const lineSelect = (schema: SchemaFacts): string => `
          COALESCE(p.sub_category_id, mp.sub_category_id) AS sub_category_id,
          i.qty AS qty,
          (${isParentSql(schema)}) AS is_parent,
-         ${NET_LINE_IQD} AS net_iqd,
+         ${adjustedNetLine(schema)} AS net_iqd,
          ${costProjection(schema)}`;
 
 /**
@@ -1116,11 +1228,11 @@ const REFUND_ORDER_JOIN = `
 
 /** Sales, grouped by the Baghdad day of delivery. Binds: startIso, endIso. */
 export const salesByDaySql = (schema: SchemaFacts): string => `
-  WITH l AS (
+  WITH RECURSIVE ${priceAdjustmentCtes(schema)} l AS (
     SELECT COALESCE(date(o.delivered_at, '${BAGHDAD_SQL_SHIFT}'), '') AS day,
     ${lineSelect(schema)}
       FROM orders o
-      JOIN order_items i ON i.order_id = o.id${lineJoins(schema)}
+      JOIN order_items i ON i.order_id = o.id${lineJoins(schema)}${priceAdjustmentJoin(schema)}
      WHERE ${DELIVERED_WHERE}
   )
   SELECT l.day AS day,${LINE_AGGREGATES}
@@ -1141,14 +1253,14 @@ const refundProjection = (schema: SchemaFacts) => `${costProjection(schema)},
   ${schema.hasOperationalRefunds ? 'CASE WHEN rf.case_id IS NOT NULL THEN 1 ELSE 0 END AS operational,rf.cogs_iqd AS restored_cogs_iqd,rf.refund_iqd AS actual_refund_iqd' : '0 AS operational,NULL AS restored_cogs_iqd,NULL AS actual_refund_iqd'}`;
 
 export const refundsByDaySql = (schema: SchemaFacts): string => `
-  WITH r AS (
+  WITH RECURSIVE ${refundPriceCtes(schema)} r AS (
     SELECT COALESCE(date(rc.decided_at, '${BAGHDAD_SQL_SHIFT}'), '') AS day,
            MIN(rc.qty, i.qty) AS ref_qty,
            MAX(1, i.qty) AS line_qty,
-           ${NET_REFUND_IQD} AS net_iqd,
+           ${adjustedNetRefund(schema)} AS net_iqd,
            ${refundProjection(schema)}
       FROM return_cases rc
-      JOIN order_items i ON i.id = rc.order_item_id${REFUND_ORDER_JOIN}${lineJoins(schema)}${refundJoin(schema)}
+      JOIN order_items i ON i.id = rc.order_item_id${REFUND_ORDER_JOIN}${lineJoins(schema)}${refundJoin(schema)}${refundPriceJoin(schema)}
      WHERE ${REFUND_WHERE}
   )
   SELECT r.day AS day,${REFUND_AGGREGATES}
@@ -1216,6 +1328,25 @@ export const ORDERS_BY_DAY_SQL = `
     FROM orders o
    WHERE ${DELIVERED_WHERE}
    GROUP BY day`;
+
+/** An excessive goods reduction reaches delivery first and COD second, exactly
+ * as calculateGoods does. The original points column is still deducted once. */
+export const ordersByDaySql = (schema: SchemaFacts): string => !schema.hasPriceAdjustments ? ORDERS_BY_DAY_SQL : `
+  WITH ap_order_goods AS (
+    SELECT i.order_id,SUM(${NET_LINE_IQD}) AS goods_iqd
+      FROM order_items i WHERE i.bundle_parent_item_id IS NULL GROUP BY i.order_id
+  ), ap_order_cuts AS (
+    SELECT o.*,MAX(0,-COALESCE(o.price_adjustment_iqd,0)-MAX(0,COALESCE(g.goods_iqd,0)-COALESCE(o.points_discount_iqd,0))) AS excess_cut
+      FROM orders o LEFT JOIN ap_order_goods g ON g.order_id=o.id
+     WHERE ${DELIVERED_WHERE}
+  )
+  SELECT COALESCE(date(o.delivered_at, '${BAGHDAD_SQL_SHIFT}'), '') AS day,
+         COUNT(*) AS orders,
+         SUM(MAX(0,COALESCE(o.shipping_iqd,0)-o.excess_cut)) AS shipping_iqd,
+         SUM(MAX(0,COALESCE(o.cod_tax_iqd,0)-MAX(0,o.excess_cut-COALESCE(o.shipping_iqd,0)))) AS cod_tax_iqd,
+         SUM(COALESCE(o.points_discount_iqd,0)) AS points_iqd,
+         SUM(COALESCE(json_extract(o.coupon_snapshot,'$.discount_iqd'),o.coupon_discount_iqd,0)) AS coupon_iqd
+    FROM ap_order_cuts o GROUP BY day`;
 
 /**
  * Delivered orders that belong to no day at all (§1). Bound to nothing: it is
@@ -1290,10 +1421,10 @@ export const EXPENSES_BY_CATEGORY_SQL = `
  * pure loss.
  */
 export const salesByProductSql = (schema: SchemaFacts): string => `
-  WITH l AS (
+  WITH RECURSIVE ${priceAdjustmentCtes(schema)} l AS (
     SELECT ${lineSelect(schema)}
       FROM orders o
-      JOIN order_items i ON i.order_id = o.id${lineJoins(schema)}
+      JOIN order_items i ON i.order_id = o.id${lineJoins(schema)}${priceAdjustmentJoin(schema)}
      WHERE ${DELIVERED_WHERE}
   )
   SELECT l.product_id AS product_id,
@@ -1309,7 +1440,7 @@ export const salesByProductSql = (schema: SchemaFacts): string => `
 
 /** Refunds grouped by product, same range, same basis. Binds: startIso, endIso. */
 export const refundsByProductSql = (schema: SchemaFacts): string => `
-  WITH r AS (
+  WITH RECURSIVE ${refundPriceCtes(schema)} r AS (
     -- THE SAME COALESCE AS \`lineSelect\`, AND FOR THE SAME REASON. A spool row
     -- binds \`product_id\` NULL so the pick cannot leak, so a refund touching one
     -- grouped under NULL while the SALE of that same row grouped under the
@@ -1322,10 +1453,10 @@ export const refundsByProductSql = (schema: SchemaFacts): string => `
     SELECT COALESCE(i.product_id, mys.offer_product_id) AS product_id,
            MIN(rc.qty, i.qty) AS ref_qty,
            MAX(1, i.qty) AS line_qty,
-           ${NET_REFUND_IQD} AS net_iqd,
+           ${adjustedNetRefund(schema)} AS net_iqd,
            ${refundProjection(schema)}
       FROM return_cases rc
-      JOIN order_items i ON i.id = rc.order_item_id${REFUND_ORDER_JOIN}${lineJoins(schema)}${refundJoin(schema)}
+      JOIN order_items i ON i.id = rc.order_item_id${REFUND_ORDER_JOIN}${lineJoins(schema)}${refundJoin(schema)}${refundPriceJoin(schema)}
      WHERE ${REFUND_WHERE}
   )
   SELECT r.product_id AS product_id,
@@ -1345,10 +1476,10 @@ export const refundsByProductSql = (schema: SchemaFacts): string => `
 export const salesByCategorySql = (schema: SchemaFacts, level: 'main' | 'sub'): string => {
   const col = level === 'sub' ? 'sub_category_id' : 'category_id';
   return `
-  WITH l AS (
+  WITH RECURSIVE ${priceAdjustmentCtes(schema)} l AS (
     SELECT ${lineSelect(schema)}
       FROM orders o
-      JOIN order_items i ON i.order_id = o.id${lineJoins(schema)}
+      JOIN order_items i ON i.order_id = o.id${lineJoins(schema)}${priceAdjustmentJoin(schema)}
      WHERE ${DELIVERED_WHERE}
   )
   SELECT l.${col} AS category_id,
@@ -1366,14 +1497,14 @@ export const salesByCategorySql = (schema: SchemaFacts, level: 'main' | 'sub'): 
 export const refundsByCategorySql = (schema: SchemaFacts, level: 'main' | 'sub'): string => {
   const col = level === 'sub' ? 'sub_category_id' : 'category_id';
   return `
-  WITH r AS (
+  WITH RECURSIVE ${refundPriceCtes(schema)} r AS (
     SELECT p.${col} AS category_id,
            MIN(rc.qty, i.qty) AS ref_qty,
            MAX(1, i.qty) AS line_qty,
-           ${NET_REFUND_IQD} AS net_iqd,
+           ${adjustedNetRefund(schema)} AS net_iqd,
            ${refundProjection(schema)}
       FROM return_cases rc
-      JOIN order_items i ON i.id = rc.order_item_id${REFUND_ORDER_JOIN}${lineJoins(schema)}${refundJoin(schema)}
+      JOIN order_items i ON i.id = rc.order_item_id${REFUND_ORDER_JOIN}${lineJoins(schema)}${refundJoin(schema)}${refundPriceJoin(schema)}
      WHERE ${REFUND_WHERE}
   )
   SELECT r.category_id AS category_id,

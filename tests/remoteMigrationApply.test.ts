@@ -189,18 +189,22 @@ test('empty history and attempts to override the fixed live target are refused',
   } finally { f.dispose(); }
 });
 
-test('the real 0162 retry imports only the missing file and preserves existing customer data', () => {
+for (const installedThrough of [predecessor, upgrade]) test(`real upgrade from ${installedThrough} imports only pending files and preserves customer data`, () => {
   const files = readdirSync(join(root, 'migrations')).filter((name) => name.endsWith('.sql')).sort()
     .map((name): [string, string] => [name, readFileSync(join(root, 'migrations', name), 'utf8')]);
-  const applied = files.map(([name]) => name).filter((name) => name < upgrade);
+  const applied = files.map(([name]) => name).filter((name) => name <= installedThrough);
+  const pending = files.map(([name]) => name).filter((name) => name > installedThrough);
   const f = fixture(files, applied, "INSERT INTO users(id,name,email,password_hash,role) VALUES ('existing','Existing','existing@example.com','h','customer')");
   try {
     const result = f.run();
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(importedNames(f.calls()), [upgrade]);
+    assert.deepEqual(importedNames(f.calls()), pending);
     f.inspect((db) => {
       assert.equal(db.prepare("SELECT name FROM users WHERE id='existing'").get()!.name, 'Existing');
       assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE name='purchase_orders'").get());
+      assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE name='investment_contracts'").get());
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM finance_withdrawals').get()!.n, 0);
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM investment_contracts').get()!.n, 0);
       assert.ok(historyNames(db).includes(upgrade));
       assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
     });

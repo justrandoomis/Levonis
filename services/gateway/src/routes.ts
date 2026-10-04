@@ -156,6 +156,10 @@ export const ROUTES: readonly RouteRule[] = [
   // forwarded — the gate stops being one service's discipline and becomes the
   // door's. The longer prefix is listed first so it cannot be shadowed.
   { prefix: '/api/admin/finance/report', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin:full', rateClass: 'admin-write' },
+  { prefix: '/api/admin/finance-workspace', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin:full', rateClass: 'admin-write' },
+  { prefix: '/api/admin/finance-people', hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'admin:full', rateClass: 'money' },
+  { prefix: '/api/admin/investment-finance', hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'admin:full', rateClass: 'money' },
+  { prefix: '/api/finance-earnings', hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'auth', rateClass: 'money' },
   { prefix: '/api/admin/finance', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin:full', rateClass: 'admin-write' },
   { prefix: '/api/admin/products-v2', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/products', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
@@ -268,7 +272,7 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/support/admin', hosts: 'main', owner: 'SUPPORT', flipPhase: 4, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/support', hosts: 'main', owner: 'SUPPORT', flipPhase: 4, requires: 'auth', rateClass: 'write' },
   { prefix: '/api/invest', hosts: 'main', owner: 'INVEST', flipPhase: 4, requires: 'investor', rateClass: 'user' },
-  { prefix: '/api/admin/invest', hosts: 'main', owner: 'INVEST', flipPhase: 4, requires: 'admin', rateClass: 'admin-write' },
+  { prefix: '/api/admin/invest', hosts: 'main', owner: 'INVEST', flipPhase: 4, requires: 'admin:full', rateClass: 'admin-write' },
   { prefix: '/api/farm', hosts: 'main', owner: 'FARM', flipPhase: 4, requires: 'none', rateClass: 'user', note: 'the leaderboard is the one public route' },
   { prefix: '/api/admin/farm', hosts: 'main', owner: 'FARM', flipPhase: 4, requires: 'admin:full', rateClass: 'admin-write', note: 'grants coins' },
   { prefix: '/api/admin/settings', hosts: 'main', owner: 'CONFIG', flipPhase: 4, requires: 'admin', rateClass: 'admin-write' },

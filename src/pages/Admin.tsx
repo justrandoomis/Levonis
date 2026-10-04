@@ -66,6 +66,7 @@ const AdminOverview = React.lazy(() => import('../components/AdminOverview'));
  * screen only the owner can open.
  */
 const AdminFinance = React.lazy(() => import('../components/adminFinance/AdminFinance'));
+const MyEarnings = React.lazy(() => import('../components/financePeople/MyEarnings'));
 const AdminInventory = React.lazy(() => import('../components/adminInventory/AdminInventory'));
 const AdminUsers = React.lazy(() => import('../components/AdminUsers'));
 const AdminWalletRequests = React.lazy(() => import('../components/AdminWalletRequests'));
@@ -123,6 +124,7 @@ function PanelFallback({ dir }: { dir: 'rtl' | 'ltr' }) {
 type AdminTab =
   | 'overview'
   | 'finance'
+  | 'earnings'
   | 'inventory'
   | 'orders'
   | 'trade_in'
@@ -159,7 +161,7 @@ type AdminTab =
  * (`?tab=wallet_requests&op=…`). Read once, for the first render only; anything
  * else, or nothing, opens the overview exactly as before.
  */
-const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in'];
+const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'finance', 'inventory', 'earnings'];
 
 function initialAdminTab(): AdminTab {
   try {
@@ -200,6 +202,7 @@ export default function Admin() {
     ...(canSeeFinance
       ? [{ id: 'finance', icon: TrendingUp, label: loc('الأرباح والتكاليف', 'Profit & costs', 'قازانج و تێچوون'), ...section('operations', 'التشغيل', 'Operations') }]
       : []),
+    { id: 'earnings', icon: Wallet, label: loc('أرباحي', 'My earnings'), ...section('operations', 'التشغيل', 'Operations') },
     // «إدارة المخزون». Under Operations rather than Catalog on purpose: the
     // catalogue is what the shop SELLS, this is what it HOLDS, and the person
     // receiving a shipment is doing operations work. Deliberately NOT gated on
@@ -275,6 +278,8 @@ export default function Admin() {
         {activeTab === 'finance' && canSeeFinance && (
           <AdminFinance />
         )}
+
+        {activeTab === 'earnings' && <MyEarnings />}
 
         {activeTab === 'inventory' && (
           <AdminInventory />

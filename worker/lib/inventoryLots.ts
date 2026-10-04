@@ -37,12 +37,17 @@
 
 import { newId } from './crypto';
 import type { StockMove, StockScope } from './inventory';
+import { fence } from './operations';
 
 /** Lots exist only for units on a shelf. Capacity scopes are promises. */
 export const LOT_SCOPES: readonly StockScope[] = ['base', 'option', 'color', 'variant'];
 
 export const hasLots = (scope: StockScope): boolean =>
   (LOT_SCOPES as readonly string[]).includes(scope);
+export async function effectiveLotCostSql(db:D1Database,alias='l'){
+  const versioned=!!await db.prepare("SELECT 1 FROM sqlite_master WHERE name='inventory_lot_cost_versions'").first();
+  return versioned?`COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id=${alias}.id ORDER BY version DESC LIMIT 1),${alias}.unit_cost_iqd)`:`${alias}.unit_cost_iqd`;
+}
 
 // ===========================================================================
 //  MONEY: INTEGER DINARS, AND THE REMAINDER IS NOT LOST
@@ -181,6 +186,7 @@ export interface LotRow {
   qty_remaining: number;
   unit_cost_iqd: number | null;
   received_at: string;
+  cost_version?: number;
 }
 
 /** BASE uses an empty scope_id on EVERY product. Its product is part of the key. */
@@ -239,6 +245,7 @@ export async function fifoQueues(
   // Chunked for the same reason inventory.ts chunks: D1 caps bound parameters,
   // and a bundle multiplies the identity count without an obvious bound.
   const CHUNK = 30;
+  const versioned = !!await db.prepare("SELECT 1 FROM sqlite_master WHERE name='inventory_lot_cost_versions'").first();
   for (let i = 0; i < wanted.length; i += CHUNK) {
     const part = wanted.slice(i, i + CHUNK);
     const where = part.map((p) => p.product_id
@@ -247,7 +254,7 @@ export async function fifoQueues(
     const args = part.flatMap((p) => p.product_id ? [p.scope, p.scope_id, p.product_id] : [p.scope, p.scope_id]);
     const { results } = await db
       .prepare(
-        `SELECT id, product_id, scope, scope_id, qty_remaining, unit_cost_iqd, received_at
+        `SELECT id, product_id, scope, scope_id, qty_remaining, ${versioned ? "COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id=inventory_lots.id ORDER BY version DESC LIMIT 1),unit_cost_iqd) AS unit_cost_iqd,COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=inventory_lots.id),0) AS cost_version" : 'unit_cost_iqd'}, received_at
            FROM inventory_lots
           WHERE qty_remaining > 0 AND (${where})
           ORDER BY received_at ASC, id ASC`
@@ -409,6 +416,7 @@ export async function planLotConsumption(
       allocations.push(alloc);
 
       const idem = `alloc:${orderId}:${move.line_id}:${lot.id}`;
+      if(lot.cost_version!==undefined)statements.push(...fence(db,'COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=?),0)=?',[lot.id,lot.cost_version]));
       statements.push(
         db
           .prepare(
@@ -488,6 +496,11 @@ export async function planLotRestore(
   if (rows.length === 0) return EMPTY;
 
   const operation = opts.operation ?? 'return';
+  let evidence:Map<string,number>|null=null;
+  if(operation.startsWith('return:')&&await db.prepare("SELECT 1 FROM sqlite_master WHERE name='stock_return_lot_evidence'").first()){
+    const found=(await db.prepare('SELECT allocation_id,qty FROM stock_return_lot_evidence WHERE return_case_id=?').bind(operation.slice(7)).all<{allocation_id:string;qty:number}>()).results??[];
+    if(found.length)evidence=new Map(found.map(e=>[e.allocation_id,e.qty]));
+  }
 
   /**
    * THE RELEASES THIS ORDER HAS ALREADY RECORDED, so a second call plans none
@@ -531,11 +544,11 @@ export async function planLotRestore(
     // travel, so a return and an immediate re-sale leave the shelf where it
     // started.
     const remaining = Math.max(0, r.qty - (returned.get(`${r.order_item_id}:${r.lot_id}`) ?? 0));
-    let give = remaining;
+    let give = evidence ? Math.min(remaining,evidence.get(r.id)??0) : remaining;
     if (opts.qtyByLine) {
       const left = budget.get(r.order_item_id) ?? 0;
       if (left <= 0) continue;
-      give = Math.min(remaining, left);
+      give = Math.min(give, left);
       budget.set(r.order_item_id, left - give);
     }
     if (give <= 0) continue;

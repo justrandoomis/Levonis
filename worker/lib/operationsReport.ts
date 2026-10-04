@@ -1,8 +1,11 @@
 import { allocateExact } from './operations';
 import { badRequest } from './http';
+import { addOwnerPromotions, getOrderProfitBases, workspaceInstalled } from './orderProfit';
 export async function operationsReport(db: D1Database, from: string, to: string) {
   const days = (Date.parse(to) - Date.parse(from)) / 86400000;
   if (days < 0 || days > 365) throw badRequest('اختر فترة لا تتجاوز سنة');
+  const workspace=await workspaceInstalled(db);
+  const costAdjustments=!!await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_cost_adjustments'").first();
   const [orders, expenses, suppliers, wallets, centers, refunds] = await Promise.all([
     db
       .prepare(
@@ -31,7 +34,8 @@ export async function operationsReport(db: D1Database, from: string, to: string)
       .prepare(
         `SELECT e.id,e.amount_iqd,l.allocation_basis,l.center_id,l.target_type,l.target_id FROM operating_expenses e LEFT JOIN finance_expense_links l ON l.expense_id=e.id
        WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ? AND l.order_id IS NULL AND NOT EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.expense_id=e.id)
-       AND NOT EXISTS(SELECT 1 FROM finance_collections c WHERE c.expense_id=e.id)`,
+       AND NOT EXISTS(SELECT 1 FROM finance_collections c WHERE c.expense_id=e.id)
+       ${workspace?'AND NOT EXISTS(SELECT 1 FROM finance_monthly_promotions p WHERE p.expense_id=e.id)':''}`,
       )
       .bind(from, to)
       .all<{
@@ -60,7 +64,8 @@ export async function operationsReport(db: D1Database, from: string, to: string)
       .prepare(
         `SELECT cc.id,cc.name,
       (SELECT COALESCE(SUM(c.amount_iqd),0) FROM finance_order_costs c WHERE c.center_id=cc.id AND c.state<>'pending_cost' AND c.cost_day BETWEEN ?1 AND ?2)
-      -(SELECT COALESCE(SUM(r.amount_iqd),0) FROM finance_cost_reversals r JOIN finance_order_costs c ON c.id=r.cost_id WHERE c.center_id=cc.id AND r.reversal_day BETWEEN ?1 AND ?2) AS rule_cost_iqd,
+      -(SELECT COALESCE(SUM(r.amount_iqd),0) FROM finance_cost_reversals r JOIN finance_order_costs c ON c.id=r.cost_id WHERE c.center_id=cc.id AND r.reversal_day BETWEEN ?1 AND ?2)
+      ${costAdjustments?'+(SELECT COALESCE(SUM(a.delta_iqd),0) FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id WHERE c.center_id=cc.id AND a.adjustment_day BETWEEN ?1 AND ?2)':''} AS rule_cost_iqd,
       (SELECT COALESCE(SUM(e.amount_iqd),0) FROM operating_expenses e JOIN finance_expense_links l ON l.expense_id=e.id WHERE l.center_id=cc.id AND e.voided_at IS NULL AND e.expense_day BETWEEN ?1 AND ?2) AS manual_cost_iqd,
       (SELECT COUNT(*) FROM finance_order_costs c WHERE c.center_id=cc.id AND c.state='pending_cost' AND c.cost_day BETWEEN ?1 AND ?2) AS pending_costs
       FROM finance_cost_centers cc ORDER BY cc.name`,
@@ -74,7 +79,15 @@ export async function operationsReport(db: D1Database, from: string, to: string)
       .bind(from, to)
       .all(),
   ]);
-  const list = orders.results ?? [],
+  const rawList=orders.results??[];
+  const bases=workspace?await addOwnerPromotions(db,await getOrderProfitBases(db,rawList.slice(0,5000).map((o)=>String(o.id)))):[];
+  const list = rawList.map((o)=>{
+    const base=bases.find((b)=>b.order_id===o.id);
+    if(!base)return o;
+    return {...o,...base.totals,shipping_iqd:base.totals.shipping_income_iqd,
+      estimated_lines:base.lines.filter((l)=>l.cost_confidence==='snapshot').length,
+      warnings:base.warnings,version:base.version};
+  }),
     truncated = list.length > 5000;
   const overhead = list.map(() => 0);
   const eligibility = new Map<string, { products: Set<string>; catalogs: Set<string> }>();
@@ -126,10 +139,11 @@ export async function operationsReport(db: D1Database, from: string, to: string)
       const shares = allocateExact(e.amount_iqd, weights);
       shares.forEach((v, i) => (overhead[i] += v));
     }
-  const rows = list.slice(0, 5000).map((o, i) => {
-    const gross = Number(o.unknown_lines) > 0 ? null : Number(o.net_goods_iqd) - Number(o.cogs_iqd),
+  const rows = list.slice(0, 5000).map((o, i):Record<string,unknown> => {
+    const base=bases.find((b)=>b.order_id===o.id);
+    const gross = base?base.totals.gross_profit_iqd:Number(o.unknown_lines) > 0 ? null : Number(o.net_goods_iqd) - Number(o.cogs_iqd),
       contribution =
-        gross === null || Number(o.pending_costs) > 0
+        base?base.totals.contribution_profit_iqd:gross === null || Number(o.pending_costs) > 0
           ? null
           : gross +
             Number(o.shipping_iqd) -
@@ -142,7 +156,7 @@ export async function operationsReport(db: D1Database, from: string, to: string)
       gross_profit_iqd: gross,
       contribution_profit_iqd: contribution,
       allocated_overhead_iqd: truncated ? null : overhead[i],
-      managerial_net_iqd: contribution === null || truncated ? null : contribution - overhead[i],
+      managerial_net_iqd: contribution === null || truncated ? null : contribution - Number(o.promotion_iqd??0) - overhead[i],
       collection_difference_iqd:
         Number(o.due_on_delivery_iqd) + Number(o.gini_paid_iqd) - Number(o.gini_refund_iqd) - Number(o.collected_iqd),
     };

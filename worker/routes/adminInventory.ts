@@ -13,7 +13,7 @@ import {
   readyToReceive,
   type IncomingRow,
 } from '../lib/inventoryReceiving';
-import { lotCostBreakdown, lotIdentityKey } from '../lib/inventoryLots';
+import { effectiveLotCostSql, lotCostBreakdown, lotIdentityKey } from '../lib/inventoryLots';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 import { planAtomicAdjustment } from '../lib/inventoryAdjustment';
@@ -91,13 +91,14 @@ function statedInt(v: unknown, field: string): number | null {
  */
 adminInventoryRoutes.get('/overview', async (c) => {
   const db = c.env.DB;
+  const cost=await effectiveLotCostSql(db,'inventory_lots');
   const [lots, incoming, aging] = await Promise.all([
     db
       .prepare(
         `SELECT COUNT(*) AS lots,
                 COALESCE(SUM(qty_remaining), 0) AS units,
-                COALESCE(SUM(CASE WHEN unit_cost_iqd IS NOT NULL THEN qty_remaining * unit_cost_iqd END), 0) AS value,
-                COALESCE(SUM(CASE WHEN unit_cost_iqd IS NULL THEN qty_remaining END), 0) AS unpriced_units
+                COALESCE(SUM(CASE WHEN ${cost} IS NOT NULL THEN qty_remaining * ${cost} END), 0) AS value,
+                COALESCE(SUM(CASE WHEN ${cost} IS NULL THEN qty_remaining END), 0) AS unpriced_units
            FROM inventory_lots WHERE qty_remaining > 0`
       )
       .first<{ lots: number; units: number; value: number; unpriced_units: number }>(),
@@ -159,6 +160,7 @@ adminInventoryRoutes.get('/overview', async (c) => {
  * the first year the shop trades.
  */
 adminInventoryRoutes.get('/lines', async (c) => {
+  const cost=await effectiveLotCostSql(c.env.DB,'l'),headCost=await effectiveLotCostSql(c.env.DB,'inventory_lots');
   const limit = Math.min(100, Math.max(1, int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 })));
   const offset = Math.max(0, int(c.req.query('offset'), 'offset', { min: 0, max: 100000, def: 0 }));
   const q = (c.req.query('q') ?? '').trim().slice(0, 60);
@@ -190,8 +192,8 @@ adminInventoryRoutes.get('/lines', async (c) => {
             COUNT(*) AS lot_count,
             SUM(l.qty_remaining) AS on_hand,
             MIN(l.received_at) AS oldest_received_at,
-            SUM(CASE WHEN l.unit_cost_iqd IS NOT NULL THEN l.qty_remaining * l.unit_cost_iqd END) AS inventory_value_iqd,
-            SUM(CASE WHEN l.unit_cost_iqd IS NULL THEN l.qty_remaining ELSE 0 END) AS unpriced_units
+            SUM(CASE WHEN ${cost} IS NOT NULL THEN l.qty_remaining * ${cost} END) AS inventory_value_iqd,
+            SUM(CASE WHEN ${cost} IS NULL THEN l.qty_remaining ELSE 0 END) AS unpriced_units
        FROM inventory_lots l
        LEFT JOIN products p ON p.id = l.product_id
       WHERE ${where.join(' AND ')}
@@ -216,10 +218,10 @@ adminInventoryRoutes.get('/lines', async (c) => {
     const key = lotIdentityKey(String(r.scope), String(r.scope_id), String(r.product_id));
     const pair = await c.env.DB.prepare(
       `SELECT
-         (SELECT unit_cost_iqd FROM inventory_lots
+         (SELECT ${headCost} FROM inventory_lots
            WHERE scope = ?1 AND scope_id = ?2 AND product_id = ?3 AND qty_remaining > 0
            ORDER BY received_at ASC, id ASC LIMIT 1) AS oldest,
-         (SELECT unit_cost_iqd FROM inventory_lots
+         (SELECT ${headCost} FROM inventory_lots
            WHERE scope = ?1 AND scope_id = ?2 AND product_id = ?3 AND qty_remaining > 0
            ORDER BY received_at DESC, id DESC LIMIT 1) AS newest`
     )
@@ -261,6 +263,7 @@ adminInventoryRoutes.get('/lines', async (c) => {
 // ===========================================================================
 
 adminInventoryRoutes.get('/lots', async (c) => {
+  const cost=await effectiveLotCostSql(c.env.DB,'l');
   const scope = c.req.query('scope');
   const scopeId = c.req.query('scope_id') ?? '';
   const productId = (c.req.query('product_id') ?? '').trim();
@@ -273,7 +276,7 @@ adminInventoryRoutes.get('/lots', async (c) => {
   const args = isScope(scope) ? [scope, scopeId, ...(productId ? [productId] : [])] : [productId];
 
   const { results } = await c.env.DB.prepare(
-    `SELECT l.*, s.name AS supplier_name,
+    `SELECT l.*, ${cost} AS unit_cost_iqd, s.name AS supplier_name,
             (SELECT COALESCE(SUM(qty), 0) FROM order_item_inventory_allocations a
               WHERE a.lot_id = l.id AND a.released_at IS NULL) AS consumed
        FROM inventory_lots l

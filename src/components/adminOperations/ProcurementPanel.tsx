@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import StockSelection from './StockSelection';
+import '../adminInventory/inventory-workspace.css';
+const InvestorContractForm = lazy(() => import('../financePeople/InvestorPanel').then((m) => ({ default: m.InvestorContractForm })));
 import {
   api,
   Card,
-  Cell,
-  DataTable,
   Input,
   money,
   nameOf,
@@ -50,6 +50,7 @@ type Detail = {
   lines: Array<
     DraftLine & {
       line_id: string;
+      id: string;
       qty_received: number;
       rejected_qty: number;
       purchase_unit_iqd: number;
@@ -97,9 +98,10 @@ const newHeader = (): Header => ({
   invoice_total_iqd: '',
   cost_state: 'final',
 });
-export default function ProcurementPanel({ onChanged }: { onChanged: () => void }) {
+export default function ProcurementPanel({ onChanged, initialAction }: { onChanged: () => void; initialAction?: 'purchase' | 'receive' }) {
   const { loc } = useLabels(),
     op = useOperation();
+  const [investmentFor, setInvestmentFor] = useState('');
   const [config, setConfig] = useState<{ suppliers: Named[]; locations: Named[] }>({
       suppliers: [],
       locations: [],
@@ -107,7 +109,9 @@ export default function ProcurementPanel({ onChanged }: { onChanged: () => void 
     [purchases, setPurchases] = useState<Purchase[]>([]),
     [offset, setOffset] = useState(0),
     [selected, setSelected] = useState<Detail | null>(null),
-    [editing, setEditing] = useState(false),
+    [editing, setEditing] = useState(initialAction === 'purchase'),
+    [step, setStep] = useState(0),
+    [receiveOnly, setReceiveOnly] = useState(initialAction === 'receive'),
     [editId, setEditId] = useState(''),
     [header, setHeader] = useState(newHeader),
     [lines, setLines] = useState<DraftLine[]>([]),
@@ -149,6 +153,8 @@ export default function ProcurementPanel({ onChanged }: { onChanged: () => void 
     setPayId(crypto.randomUUID());
   };
   const start = (d?: Detail, clone = false) => {
+    setStep(0);
+    setReceiveOnly(false);
     setHeader(
       d
         ? {
@@ -196,6 +202,8 @@ export default function ProcurementPanel({ onChanged }: { onChanged: () => void 
     onChanged();
   };
   const update = (key: keyof Header, value: string | number) => setHeader((h) => ({ ...h, [key]: value }));
+  const quantitiesValid = lines.length > 0 && lines.every((l) => Number.isSafeInteger(l.qty_ordered) && l.qty_ordered > 0 && Number.isSafeInteger(l.invoiced_qty) && l.invoiced_qty >= 0);
+  const costsValid = quantitiesValid && Number.isFinite(header.exchange_rate) && header.exchange_rate > 0 && lines.every((l) => l.source_unit_amount !== '' && Number.isFinite(Number(l.source_unit_amount)) && Number(l.source_unit_amount) >= 0) && charges.every((c) => c.title.trim() && Number.isSafeInteger(c.amount_iqd) && c.amount_iqd >= 0);
   const total =
     lines.reduce(
       (s, l) =>
@@ -205,347 +213,92 @@ export default function ProcurementPanel({ onChanged }: { onChanged: () => void 
       0,
     ) + charges.reduce((s, c) => s + c.amount_iqd, 0);
   return (
-    <div>
+    <div className="inventory-workspace">
       {op.feedback}
+      {investmentFor && <Suspense fallback={<p role="status">{loc('جارٍ تحميل اتفاق التمويل…', 'Loading funding agreement…')}</p>}><InvestorContractForm initialIncomingId={investmentFor} onClose={() => setInvestmentFor('')} onSaved={() => { setInvestmentFor(''); onChanged(); }} /></Suspense>}
       <div className="mb-4 flex flex-wrap gap-2">
         <button type="button" className={T.btnPrimary} onClick={() => start()}>
           {loc('شراء / شحنة جديدة', 'New purchase / shipment')}
+        </button>
+        <button type="button" className={T.btnSecondary} aria-pressed={receiveOnly} onClick={() => { setEditing(false); setSelected(null); setReceiveOnly((v) => !v); }}>
+          {loc('الشحنات بانتظار الاستلام', 'Awaiting receipt')}
         </button>
         <button type="button" className={T.btnSecondary} disabled={op.busy} onClick={() => op.run(load)}>
           {loc('تحديث', 'Refresh')}
         </button>
       </div>
       {editing && (
-        <Card
-          title={loc(
-            editId ? 'تعديل أمر الشراء' : 'تسجيل شراء متعدد المنتجات',
-            editId ? 'Edit purchase' : 'Record a multi-product purchase',
-          )}
-        >
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Select
-              label={loc('المورد', 'Supplier')}
-              value={header.supplier_id}
-              onChange={(v) => update('supplier_id', v)}
-              empty={loc('بدون مورد', 'No supplier')}
-              options={config.suppliers.map((x) => ({ id: x.id, name: nameOf(x) }))}
-            />
-            <Input
-              label={loc('رقم الفاتورة', 'Invoice number')}
-              value={header.invoice_no}
-              onChange={(v) => update('invoice_no', v)}
-            />
-            <Select
-              label={loc('المستودع / الموقع', 'Warehouse / location')}
-              value={header.warehouse_id}
-              onChange={(v) => update('warehouse_id', v)}
-              empty={loc('غير محدد', 'Unassigned')}
-              options={config.locations.map((x) => ({ id: x.id, name: nameOf(x) }))}
-            />
-            <Input
-              label={loc('تاريخ الشراء', 'Purchase date')}
-              type="date"
-              value={header.purchase_day}
-              onChange={(v) => update('purchase_day', v)}
-            />
-            <Select
-              label={loc('عملة الشراء', 'Purchase currency')}
-              value={header.currency}
-              onChange={(v) => {
-                update('currency', v);
-                update('exchange_rate', v === 'IQD' ? 1 : header.exchange_rate);
-              }}
-              options={['IQD', 'USD', 'CNY', 'EUR'].map((id) => ({ id, name: id }))}
-            />
-            {header.currency !== 'IQD' && (
-              <Input
-                label={loc('دينار لكل وحدة عملة', 'IQD per currency unit')}
-                type="number"
-                value={header.exchange_rate}
-                onChange={(v) => update('exchange_rate', Number(v))}
-              />
-            )}
-            <Input
-              label={loc('الوصول المتوقع', 'Expected arrival')}
-              type="date"
-              value={header.expected_day}
-              onChange={(v) => update('expected_day', v)}
-            />
-            <Select
-              label={loc('حالة التكلفة', 'Cost status')}
-              value={header.cost_state}
-              onChange={(v) => update('cost_state', v)}
-              options={[
-                { id: 'estimated', name: loc('تقديرية؛ لا يمكن الاستلام', 'Estimated; receiving blocked') },
-                { id: 'final', name: loc('نهائية ومثبتة', 'Final and confirmed') },
-              ]}
-            />
-          </div>
-          <div className="my-5 max-w-2xl">
-            <StockSelection value={choice} onChange={setChoice} />
-            <button
-              type="button"
-              className={`${T.btnSecondary} mt-3`}
-              disabled={!choice}
-              onClick={() => {
-                setLines((old) => [
-                  ...old,
-                  {
-                    ...choice,
-                    qty_ordered: 1,
-                    invoiced_qty: 1,
-                    source_unit_amount:
-                      choice.purchase_unit_iqd == null
-                        ? ''
-                        : choice.purchase_unit_iqd / (header.currency === 'IQD' ? 1 : header.exchange_rate),
-                  },
-                ]);
-                setChoice(null);
-              }}
-            >
-              {loc('إضافة بند', 'Add line')}
-            </button>
-          </div>
-          <DataTable
-            headers={[
-              loc('المنتج والخيار واللون', 'Product / selection'),
-              loc('الكمية', 'Quantity'),
-              loc('سعر الوحدة بعملة الشراء', 'Unit price in purchase currency'),
-              loc('كمية الفاتورة', 'Invoice quantity'),
-              loc('سعر البيع المرجعي', 'Selling reference'),
-              '',
-            ]}
-          >
-            {lines.map((l, i) => (
-              <tr key={i}>
-                <Cell>
-                  {l.label}
-                  <small className="block">{l.sku}</small>
-                </Cell>
-                <Cell>
-                  <input
-                    aria-label={loc('الكمية', 'Quantity')}
-                    className={T.input}
-                    type="number"
-                    min="1"
-                    value={l.qty_ordered}
-                    onChange={(e) =>
-                      setLines((a) =>
-                        a.map((v, j) => (j === i ? { ...v, qty_ordered: Number(e.target.value) } : v)),
-                      )
-                    }
-                  />
-                </Cell>
-                <Cell>
-                  <input
-                    aria-label={loc('التكلفة', 'Cost')}
-                    className={T.input}
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={l.source_unit_amount}
-                    onChange={(e) =>
-                      setLines((a) =>
-                        a.map((v, j) =>
-                          j === i
-                            ? {
-                                ...v,
-                                source_unit_amount: e.target.value === '' ? '' : Number(e.target.value),
-                              }
-                            : v,
-                        ),
-                      )
-                    }
-                  />
-                </Cell>
-                <Cell>
-                  <input
-                    aria-label={loc('كمية الفاتورة', 'Invoice quantity')}
-                    className={T.input}
-                    type="number"
-                    min="0"
-                    value={l.invoiced_qty}
-                    onChange={(e) =>
-                      setLines((a) =>
-                        a.map((v, j) => (j === i ? { ...v, invoiced_qty: Number(e.target.value) } : v)),
-                      )
-                    }
-                  />
-                </Cell>
-                <Cell>{money(l.selling_price_iqd)}</Cell>
-                <Cell>
-                  <button
-                    type="button"
-                    className={T.btnGhost}
-                    onClick={() => setLines((a) => a.filter((_, j) => i !== j))}
-                  >
-                    {loc('حذف', 'Remove')}
-                  </button>
-                </Cell>
-              </tr>
+        <Card title={loc(editId ? 'تعديل أمر الشراء' : 'شراء جديد', editId ? 'Edit purchase' : 'New purchase')}>
+          <ol className="inventory-stepper" aria-label={loc('خطوات الشراء', 'Purchase steps')}>
+            {[loc('المورد والمنتجات', 'Supplier and items'), loc('التكلفة والشحن', 'Cost and shipping'), loc('مراجعة وتأكيد', 'Review and confirm')].map((label, i) => (
+              <li key={label}><button type="button" aria-current={step === i ? 'step' : undefined} disabled={(i > 0 && !quantitiesValid) || (i === 2 && !costsValid)} onClick={() => setStep(i)}><span>{i + 1}</span>{label}</button></li>
             ))}
-          </DataTable>
-          <details className="my-4">
-            <summary className={`cursor-pointer text-sm ${T.text2}`}>
-              {loc('تفاصيل الوزن والحجم والاستيراد والمرفقات', 'Weights, volumes, CSV and attachments')}
-            </summary>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {lines.map((l, i) => (
-                <div key={i} className="grid gap-2">
-                  <span className="text-xs">{l.label}</span>
-                  <Input
-                    label={loc('وزن الوحدة بالغرام', 'Unit weight (g)')}
-                    type="number"
-                    value={l.weight_g}
-                    onChange={(v) =>
-                      setLines((a) => a.map((x, j) => (j === i ? { ...x, weight_g: Number(v) } : x)))
-                    }
-                  />
-                  <Input
-                    label={loc('حجم الوحدة بالملم المكعب', 'Unit volume (mm³)')}
-                    type="number"
-                    value={l.volume_mm3}
-                    onChange={(v) =>
-                      setLines((a) => a.map((x, j) => (j === i ? { ...x, volume_mm3: Number(v) } : x)))
-                    }
-                  />
-                </div>
-              ))}
-              <Input
-                label={loc('رابط مرفق الفاتورة HTTPS', 'Invoice attachment HTTPS URL')}
-                value={header.attachment_url}
-                onChange={(v) => update('attachment_url', v)}
-              />
-              <Input
-                label={loc('مجموع الفاتورة للمطابقة (اختياري)', 'Invoice total for matching (optional)')}
-                type="number"
-                value={header.invoice_total_iqd}
-                onChange={(v) => update('invoice_total_iqd', v)}
-              />
-              <Input
-                label={loc('رقم التتبع', 'Tracking number')}
-                value={header.tracking}
-                onChange={(v) => update('tracking', v)}
-              />
-              <Input
-                label={loc('الملاحظات', 'Notes')}
-                value={header.note}
-                onChange={(v) => update('note', v)}
-              />
-              <div className="sm:col-span-2">
-                <p className="mb-2 text-xs">CSV: sku,qty,unit_amount,weight_g,volume_mm3</p>
-                <input
-                  aria-label="CSV"
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) f.text().then(setCsv);
-                  }}
-                />
-                <textarea
-                  aria-label={loc('محتوى CSV', 'CSV content')}
-                  className={`${T.input} mt-2 h-24 w-full`}
-                  value={csv}
-                  onChange={(e) => setCsv(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className={T.btnSecondary}
-                  disabled={op.busy || !csv}
-                  onClick={() =>
-                    op.run(async () => {
-                      const r = await api.post<{ lines: DraftLine[] }>(`${PROCUREMENT}/import-preview`, {
-                        csv,
-                      });
-                      setLines(r.lines.map((l) => ({ ...l, invoiced_qty: l.qty_ordered })));
-                    })
-                  }
-                >
-                  {loc('فحص واستيراد البنود', 'Validate and import lines')}
-                </button>
-              </div>
+          </ol>
+          {step === 0 && <>
+            <div className="inventory-fields">
+              <Select label={loc('المورد', 'Supplier')} value={header.supplier_id} onChange={(v) => update('supplier_id', v)} empty={loc('بدون مورد', 'No supplier')} options={config.suppliers.map((x) => ({ id: x.id, name: nameOf(x) }))} />
+              <Input label={loc('تاريخ الشراء', 'Purchase date')} type="date" value={header.purchase_day} onChange={(v) => update('purchase_day', v)} />
             </div>
-          </details>
-          <h4 className={`my-3 font-semibold ${T.text1}`}>
-            {loc('تكاليف الشحن والجمارك والتوصيل وغيرها', 'Freight, customs, delivery and other charges')}
-          </h4>
-          {charges.map((c, i) => (
-            <div key={i} className="mb-3 grid items-end gap-2 sm:grid-cols-4">
-              <Input
-                label={loc('اسم التكلفة', 'Charge name')}
-                value={c.title}
-                onChange={(v) => setCharges((a) => a.map((x, j) => (j === i ? { ...x, title: v } : x)))}
-              />
-              <Input
-                label={loc('إجمالي بالدينار', 'Total IQD')}
-                type="number"
-                value={c.amount_iqd}
-                onChange={(v) =>
-                  setCharges((a) => a.map((x, j) => (j === i ? { ...x, amount_iqd: Number(v) } : x)))
-                }
-              />
-              <Select
-                label={loc('طريقة التوزيع', 'Allocation method')}
-                value={c.basis}
-                onChange={(v) => setCharges((a) => a.map((x, j) => (j === i ? { ...x, basis: v } : x)))}
-                options={['quantity', 'value', 'weight', 'volume'].map((id, j) => ({
-                  id,
-                  name: [
-                    loc('الكمية', 'Quantity'),
-                    loc('القيمة', 'Value'),
-                    loc('الوزن', 'Weight'),
-                    loc('الحجم', 'Volume'),
-                  ][j],
-                }))}
-              />
-              <button
-                type="button"
-                className={T.btnGhost}
-                onClick={() => setCharges((a) => a.filter((_, j) => i !== j))}
-              >
-                {loc('حذف التكلفة', 'Remove charge')}
-              </button>
+            <div className="my-5 max-w-2xl">
+              <StockSelection value={choice} onChange={setChoice} />
+              <button type="button" className={`${T.btnSecondary} mt-3`} disabled={!choice} onClick={() => {
+                if (!choice) return;
+                setLines((old) => [...old, { ...choice, qty_ordered: 1, invoiced_qty: 1, source_unit_amount: choice.purchase_unit_iqd == null ? '' : choice.purchase_unit_iqd / (header.currency === 'IQD' ? 1 : header.exchange_rate) }]);
+                setChoice(null);
+              }}>{loc('إضافة المنتج', 'Add item')}</button>
             </div>
-          ))}
-          <button
-            type="button"
-            className={T.btnSecondary}
-            onClick={() =>
-              setCharges((a) => [...a, { title: loc('شحن', 'Shipping'), amount_iqd: 0, basis: 'quantity' }])
-            }
-          >
-            {loc('إضافة تكلفة', 'Add charge')}
-          </button>
-          <p className={`my-4 font-bold ${T.text1}`}>
-            {loc('المجموع مع تكاليف الشحنة', 'Total landed cost')}: {money(total)}
-          </p>
-          <p className={`mb-3 text-xs ${T.text3}`}>
-            {loc(
-              'السعر المرجعي للمعاينة؛ يمكن تحديث سعر البيع من محرر المنتجات. تثبيت التكلفة يمنع تغييرها بعد الاستلام.',
-              'Selling references are previews; update selling prices in the product editor. Received costs are frozen.',
-            )}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={T.btnSecondary}
-              disabled={op.busy || !lines.length}
-              onClick={() => op.run(() => save('draft'), loc('تم حفظ المسودة', 'Draft saved'))}
-            >
-              {loc('حفظ مسودة', 'Save draft')}
-            </button>
-            <button
-              type="button"
-              className={T.btnPrimary}
-              disabled={op.busy || !lines.length}
-              onClick={() => op.run(() => save('ordered'), loc('تم تأكيد أمر الشراء', 'Purchase confirmed'))}
-            >
-              {loc('حفظ وتأكيد الشراء', 'Save and confirm')}
-            </button>
-            <button type="button" className={T.btnGhost} onClick={() => setEditing(false)}>
-              {loc('إلغاء', 'Cancel')}
-            </button>
+            {!lines.length && <p className={`py-3 text-sm ${T.text3}`}>{loc('ابحث عن المنتج ثم حدد الخيار واللون. سنملأ آخر تكلفة وسعر البيع تلقائيًا.', 'Find the item and choose its option and colour. The latest cost and selling price fill automatically.')}</p>}
+            <div className="inventory-lines">{lines.map((l, i) => <article key={i} className="inventory-line">
+              <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{l.sku}</small></div><button type="button" className={T.btnGhost} onClick={() => setLines((a) => a.filter((_, j) => i !== j))}>{loc('حذف', 'Remove')}</button></div>
+              <Input label={loc('الكمية المطلوبة', 'Quantity ordered')} type="number" min={1} value={l.qty_ordered} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, qty_ordered: Number(v), invoiced_qty: x.invoiced_qty === x.qty_ordered ? Number(v) : x.invoiced_qty } : x))} />
+              <details className="mt-2"><summary>{loc('كمية الفاتورة مختلفة؟', 'Different invoiced quantity?')}</summary><Input label={loc('كمية الفاتورة', 'Invoice quantity')} type="number" min={0} value={l.invoiced_qty} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, invoiced_qty: Number(v) } : x))} /></details>
+            </article>)}</div>
+            <details><summary>{loc('فاتورة وموقع ووصول متوقع', 'Invoice, location and arrival')}</summary><div className="inventory-fields mt-3">
+              <Input label={loc('رقم الفاتورة', 'Invoice number')} value={header.invoice_no} onChange={(v) => update('invoice_no', v)} />
+              <Select label={loc('المستودع / الموقع', 'Warehouse / location')} value={header.warehouse_id} onChange={(v) => update('warehouse_id', v)} empty={loc('غير محدد', 'Unassigned')} options={config.locations.map((x) => ({ id: x.id, name: nameOf(x) }))} />
+              <Input label={loc('الوصول المتوقع', 'Expected arrival')} type="date" value={header.expected_day} onChange={(v) => update('expected_day', v)} />
+              <Input label={loc('رقم التتبع', 'Tracking number')} value={header.tracking} onChange={(v) => update('tracking', v)} />
+            </div></details>
+          </>}
+          {step === 1 && <>
+            <div className="inventory-fields">
+              <Select label={loc('عملة الشراء', 'Purchase currency')} value={header.currency} onChange={(v) => { if (v === header.currency) return; update('currency', v); update('exchange_rate', 1); setLines((a) => a.map((l) => ({ ...l, source_unit_amount: v === 'IQD' ? l.purchase_unit_iqd ?? '' : '' }))); }} options={['IQD', 'USD', 'CNY', 'EUR'].map((id) => ({ id, name: id }))} />
+              {header.currency !== 'IQD' && <Input label={loc('دينار لكل وحدة عملة', 'IQD per currency unit')} type="number" min={0} value={header.exchange_rate} onChange={(v) => update('exchange_rate', Number(v))} />}
+            </div>
+            <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={i}>
+              <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('الكمية', 'Quantity')}: {l.qty_ordered} · {loc('سعر البيع المرجعي', 'Selling reference')}: {money(l.selling_price_iqd)}</small></div></div>
+              <Input label={`${loc('تكلفة الوحدة', 'Unit purchase cost')} (${header.currency})`} type="number" min={0} value={l.source_unit_amount} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, source_unit_amount: v === '' ? '' : Number(v) } : x))} hint={l.cost_source === 'latest_purchase' ? loc('معبأة من آخر شراء لنفس الخيار واللون', 'Filled from the latest purchase of this selection') : loc('راجع التكلفة قبل تأكيد الشراء', 'Check the cost before confirming')} />
+            </article>)}</div>
+            <h4 className={`mb-3 font-semibold ${T.text1}`}>{loc('تكاليف الشحنة', 'Shipment charges')}</h4>
+            {charges.map((c, i) => <div key={i} className="inventory-line mb-3"><div className="inventory-fields">
+              <Input label={loc('اسم التكلفة', 'Charge name')} value={c.title} onChange={(v) => setCharges((a) => a.map((x, j) => j === i ? { ...x, title: v } : x))} />
+              <Input label={loc('إجمالي بالدينار', 'Total IQD')} type="number" min={0} value={c.amount_iqd} onChange={(v) => setCharges((a) => a.map((x, j) => j === i ? { ...x, amount_iqd: Number(v) } : x))} />
+            </div><details className="mt-2"><summary>{loc('توزيع التكلفة', 'Charge allocation')}</summary><Select label={loc('طريقة التوزيع', 'Allocation method')} value={c.basis} onChange={(v) => setCharges((a) => a.map((x, j) => j === i ? { ...x, basis: v } : x))} options={['quantity', 'value', 'weight', 'volume'].map((id, j) => ({ id, name: [loc('الكمية', 'Quantity'), loc('القيمة', 'Value'), loc('الوزن', 'Weight'), loc('الحجم', 'Volume')][j] }))} /></details><button type="button" className={T.btnGhost} onClick={() => setCharges((a) => a.filter((_, j) => i !== j))}>{loc('حذف التكلفة', 'Remove charge')}</button></div>)}
+            <button type="button" className={T.btnSecondary} onClick={() => setCharges((a) => [...a, { title: loc('شحن', 'Shipping'), amount_iqd: 0, basis: 'quantity' }])}>{loc('إضافة شحن أو تكلفة', 'Add freight or charge')}</button>
+            <details className="mt-4"><summary>{loc('تكلفة تقديرية ووزن وحجم ومرفقات واستيراد', 'Estimated cost, weights, attachments and import')}</summary><div className="inventory-fields mt-3">
+              <Select label={loc('حالة التكلفة', 'Cost status')} value={header.cost_state} onChange={(v) => update('cost_state', v)} options={[{ id: 'estimated', name: loc('تقديرية؛ الاستلام ينتظر تثبيتها', 'Estimated; receiving waits for confirmation') }, { id: 'final', name: loc('نهائية ومثبتة', 'Final and confirmed') }]} />
+              <Input label={loc('رابط مرفق الفاتورة HTTPS', 'Invoice attachment HTTPS URL')} value={header.attachment_url} onChange={(v) => update('attachment_url', v)} />
+              <Input label={loc('مجموع الفاتورة للمطابقة (اختياري)', 'Invoice total for matching (optional)')} type="number" value={header.invoice_total_iqd} onChange={(v) => update('invoice_total_iqd', v)} />
+              <Input label={loc('ملاحظات (اختياري)', 'Notes (optional)')} value={header.note} onChange={(v) => update('note', v)} />
+              {lines.map((l, i) => <div className="grid gap-2" key={i}><span className={`text-sm ${T.text2}`}>{l.label}</span><Input label={loc('وزن الوحدة بالغرام', 'Unit weight (g)')} type="number" value={l.weight_g} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, weight_g: Number(v) } : x))} /><Input label={loc('حجم الوحدة بالملم المكعب', 'Unit volume (mm³)')} type="number" value={l.volume_mm3} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, volume_mm3: Number(v) } : x))} /></div>)}
+            </div><p className={`my-3 text-xs ${T.text3}`}>CSV: sku,qty,unit_amount,weight_g,volume_mm3</p><input aria-label="CSV" type="file" accept=".csv,text/csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then(setCsv); }} /><textarea aria-label={loc('محتوى CSV', 'CSV content')} className={`${T.input} my-2 h-24 w-full`} value={csv} onChange={(e) => setCsv(e.target.value)} /><button type="button" className={T.btnSecondary} disabled={op.busy || !csv} onClick={() => op.run(async () => { const r = await api.post<{ lines: DraftLine[] }>(`${PROCUREMENT}/import-preview`, { csv }); setLines(r.lines.map((l) => ({ ...l, invoiced_qty: l.qty_ordered }))); })}>{loc('فحص واستيراد البنود', 'Validate and import lines')}</button></details>
+          </>}
+          {step === 2 && <>
+            <dl className="inventory-review">
+              <div><dt>{loc('المورد', 'Supplier')}</dt><dd>{nameOf(config.suppliers.find((x) => x.id === header.supplier_id) ?? { id: loc('بدون مورد', 'No supplier') })}</dd></div>
+              <div><dt>{loc('تاريخ الشراء', 'Purchase date')}</dt><dd>{header.purchase_day}</dd></div>
+              <div><dt>{loc('الفاتورة', 'Invoice')}</dt><dd>{header.invoice_no || '—'}</dd></div>
+              <div><dt>{loc('التكلفة', 'Cost status')}</dt><dd>{header.cost_state === 'final' ? loc('نهائية', 'Final') : loc('تقديرية؛ لا تستلم بعد', 'Estimated; receipt is blocked')}</dd></div>
+            </dl>
+            <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={i}><strong>{l.label}</strong><div className={`mt-2 flex flex-wrap gap-3 text-sm ${T.text2}`}><span>{loc('الكمية', 'Quantity')}: {l.qty_ordered}</span><span>{loc('تكلفة البند', 'Line cost')}: {money(l.qty_ordered * Math.round(Number(l.source_unit_amount) * (header.currency === 'IQD' ? 1 : header.exchange_rate)))}</span></div></article>)}</div>
+            <p className={`text-sm ${T.text3}`}>{loc('احفظ مسودة إن كنت تنتظر تكلفة نهائية. تأكيد الشراء يضيف شحنة قادمة؛ اختر استلام شحنة عند وصولها.', 'Save a draft while waiting for final costs. Confirming creates an incoming shipment; receive it when it arrives.')}</p>
+          </>}
+          <div className="inventory-total"><span>{loc('المجموع مع تكاليف الشحنة', 'Total landed cost')}</span><strong>{money(costsValid ? total : null)}</strong></div>
+          <div className="inventory-footer">
+            {step > 0 && <button type="button" className={T.btnSecondary} onClick={() => setStep((v) => v - 1)}>{loc('رجوع', 'Back')}</button>}
+            {step < 2 ? <button type="button" className={T.btnPrimary} disabled={op.busy || !quantitiesValid || (step === 1 && !costsValid)} onClick={() => setStep((v) => v + 1)}>{loc('التالي', 'Continue')}</button> : <button type="button" className={T.btnPrimary} disabled={op.busy || !costsValid} onClick={() => op.run(() => save('ordered'), loc('تم تأكيد أمر الشراء', 'Purchase confirmed'))}>{loc('تأكيد الشراء', 'Confirm purchase')}</button>}
+            <button type="button" className={T.btnSecondary} disabled={op.busy || !costsValid} onClick={() => op.run(() => save('draft'), loc('تم حفظ المسودة', 'Draft saved'))}>{loc('حفظ مسودة', 'Save draft')}</button>
+            <button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => setEditing(false)}>{loc('إلغاء', 'Cancel')}</button>
           </div>
         </Card>
       )}
@@ -553,6 +306,7 @@ export default function ProcurementPanel({ onChanged }: { onChanged: () => void 
         <Card
           title={`${loc('تفاصيل الشحنة', 'Shipment details')} · ${selected.purchase.invoice_no || selected.purchase.id}`}
         >
+          <details className="mb-4"><summary>{loc('ربط هذا الشراء بمستثمر', 'Associate this purchase with an investor')}</summary><p className={`mb-3 text-sm ${T.text3}`}>{loc('اختر بند المنتج لربط اتفاق رأس المال والربح. تسجيل التمويل الفعلي يتم في حساب المستثمر.', 'Choose the item to associate a capital and profit agreement. Record actual funding in the investor account.')}</p><div className="inventory-lines">{selected.lines.map((l) => <button type="button" className={T.btnSecondary} key={l.line_id} onClick={() => setInvestmentFor(l.id)}>{l.label}</button>)}</div></details>
           <div className="mb-4 flex flex-wrap gap-4 text-sm">
             <span>
               {loc('المطلوب / المستلم / المفوتر / المرفوض', 'Ordered / received / invoiced / rejected')}:{' '}
@@ -566,7 +320,7 @@ export default function ProcurementPanel({ onChanged }: { onChanged: () => void 
               {loc('رصيد المورد', 'Supplier balance')}: {money(selected.balance_iqd)}
             </span>
           </div>
-          <div className="mb-3 flex gap-2">
+          <div className="mb-3 flex flex-wrap gap-2">
             <button type="button" className={T.btnSecondary} onClick={() => start(selected, true)}>
               {loc('نسخ لشراء جديد', 'Clone purchase')}
             </button>
@@ -579,63 +333,16 @@ export default function ProcurementPanel({ onChanged }: { onChanged: () => void 
               {loc('إغلاق', 'Close')}
             </button>
           </div>
-          <DataTable
-            headers={[
-              loc('المنتج', 'Product'),
-              loc('المطلوب / المستلم', 'Ordered / received'),
-              loc('تكلفة الوحدة / نصيب الشحنة', 'Unit cost / charge share'),
-              loc('استلام الآن', 'Receive now'),
-              loc('مرفوض الآن', 'Rejected now'),
-            ]}
-          >
-            {selected.lines.map((l) => (
-              <tr key={l.line_id}>
-                <Cell>{l.label}</Cell>
-                <Cell>
-                  {l.qty_ordered} / {l.qty_received}
-                </Cell>
-                <Cell>
-                  {money(l.purchase_unit_iqd)} / {money(l.charges_iqd)}
-                </Cell>
-                <Cell>
-                  <input
-                    aria-label={loc('المستلم', 'Received')}
-                    className={T.input}
-                    type="number"
-                    min="0"
-                    max={l.qty_ordered - l.qty_received}
-                    value={receiving[l.line_id]?.qty ?? 0}
-                    onChange={(e) =>
-                      setReceiving((r) => ({
-                        ...r,
-                        [l.line_id]: { ...r[l.line_id], qty: Number(e.target.value) },
-                      }))
-                    }
-                  />
-                </Cell>
-                <Cell>
-                  <input
-                    aria-label={loc('المرفوض', 'Rejected')}
-                    className={T.input}
-                    type="number"
-                    min="0"
-                    value={receiving[l.line_id]?.rejected_qty ?? 0}
-                    onChange={(e) =>
-                      setReceiving((r) => ({
-                        ...r,
-                        [l.line_id]: { ...r[l.line_id], rejected_qty: Number(e.target.value) },
-                      }))
-                    }
-                  />
-                </Cell>
-              </tr>
-            ))}
-          </DataTable>
+          <div className="inventory-lines">{selected.lines.map((l) => <article className="inventory-line" key={l.line_id}>
+            <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('المطلوب / المستلم', 'Ordered / received')}: {l.qty_ordered} / {l.qty_received} · {loc('تكلفة الوحدة', 'Unit cost')}: {money(l.purchase_unit_iqd)}</small></div></div>
+            <Input label={loc('الكمية التي وصلت الآن', 'Quantity arriving now')} type="number" min={0} value={receiving[l.line_id]?.qty ?? 0} onChange={(v) => setReceiving((r) => ({ ...r, [l.line_id]: { ...r[l.line_id], qty: Number(v) } }))} hint={`${loc('المتبقي للاستلام', 'Remaining to receive')}: ${l.qty_ordered - l.qty_received}`} />
+            <details className="mt-2"><summary>{loc('كمية مرفوضة وتكلفة الشحنة', 'Rejected quantity and charges')}</summary><Input label={loc('المرفوض الآن', 'Rejected now')} type="number" min={0} value={receiving[l.line_id]?.rejected_qty ?? 0} onChange={(v) => setReceiving((r) => ({ ...r, [l.line_id]: { ...r[l.line_id], rejected_qty: Number(v) } }))} /><p className={`mt-2 text-xs ${T.text3}`}>{loc('نصيب البند من الشحنة', 'Line share of shipment charges')}: {money(l.charges_iqd)}</p></details>
+          </article>)}</div>
           {['ordered', 'partial'].includes(selected.purchase.status) && (
             <button
               type="button"
               className={`${T.btnPrimary} my-3`}
-              disabled={op.busy}
+              disabled={op.busy || selected.purchase.cost_state !== 'final' || !selected.lines.some((l) => receiving[l.line_id]?.qty > 0) || selected.lines.some((l) => !Number.isInteger(receiving[l.line_id]?.qty) || receiving[l.line_id]?.qty < 0 || receiving[l.line_id]?.qty > l.qty_ordered - l.qty_received)}
               onClick={() =>
                 op.run(
                   async () => {
@@ -654,7 +361,7 @@ export default function ProcurementPanel({ onChanged }: { onChanged: () => void 
               {loc('استلام الكميات المحددة', 'Receive selected quantities')}
             </button>
           )}
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <details className="mt-4"><summary>{loc('دفعات المورد', 'Supplier payments')}</summary><div className="mt-3 grid gap-3 sm:grid-cols-3">
             <Input
               label={loc('دفعة المورد بالدينار', 'Supplier payment IQD')}
               type="number"
@@ -684,7 +391,7 @@ export default function ProcurementPanel({ onChanged }: { onChanged: () => void 
             >
               {loc('تسجيل الدفعة', 'Record payment')}
             </button>
-          </div>
+          </div></details>
           {['draft', 'ordered', 'partial'].includes(selected.purchase.status) && (
             <details className="mt-4">
               <summary className="cursor-pointer text-sm">
@@ -718,49 +425,13 @@ export default function ProcurementPanel({ onChanged }: { onChanged: () => void 
           )}
         </Card>
       )}
-      <Card title={loc('سجل أوامر الشراء', 'Purchase orders')}>
-        <DataTable
-          headers={[
-            loc('الفاتورة / المورد', 'Invoice / supplier'),
-            loc('الحالة', 'Status'),
-            loc('المجموع', 'Total'),
-            loc('المدفوع', 'Paid'),
-            '',
-          ]}
-        >
-          {purchases.map((p) => (
-            <tr key={p.id}>
-              <Cell>
-                {p.invoice_no || p.id}
-                <small className="block">{p.supplier_name}</small>
-              </Cell>
-              <Cell>
-                {loc(
-                  {
-                    draft: 'مسودة',
-                    ordered: 'قادم',
-                    partial: 'استلام جزئي',
-                    received: 'مكتمل',
-                    cancelled: 'ملغى',
-                  }[p.status] || p.status,
-                  p.status,
-                )}
-              </Cell>
-              <Cell>{money(p.total_cost_iqd)}</Cell>
-              <Cell>{money(p.paid_iqd)}</Cell>
-              <Cell>
-                <button
-                  type="button"
-                  className={T.btnSecondary}
-                  disabled={op.busy}
-                  onClick={() => op.run(() => open(p.id))}
-                >
-                  {loc('فتح', 'Open')}
-                </button>
-              </Cell>
-            </tr>
-          ))}
-        </DataTable>
+      <Card title={receiveOnly ? loc('شحنات بانتظار الاستلام', 'Shipments awaiting receipt') : loc('سجل أوامر الشراء', 'Purchase orders')}>
+        {receiveOnly && <p className={`mb-3 text-sm ${T.text3}`}>{loc('اختر الشحنة ثم أدخل الكميات التي وصلت. تظهر الأوامر القادمة والاستلام الجزئي فقط من الصفحة الحالية.', 'Choose a shipment and enter the quantities received. Shows ordered and partial shipments from the current page.')}</p>}
+        <div className="inventory-lines">{purchases.filter((p) => !receiveOnly || ['ordered', 'partial'].includes(p.status)).map((p) => <article className="inventory-line" key={p.id}>
+          <div className="inventory-line-head"><div><strong>{p.invoice_no || loc('شراء بلا رقم فاتورة', 'Purchase without invoice number')}</strong><small>{p.supplier_name || loc('بدون مورد', 'No supplier')} · {loc(({ draft: 'مسودة', ordered: 'قادم', partial: 'استلام جزئي', received: 'مكتمل', cancelled: 'ملغى' } as Record<string, string>)[p.status] || p.status, p.status)}</small></div><button type="button" className={T.btnSecondary} disabled={op.busy} onClick={() => op.run(() => open(p.id))}>{receiveOnly ? loc('استلام', 'Receive') : loc('فتح', 'Open')}</button></div>
+          <div className={`flex flex-wrap gap-3 text-sm ${T.text2}`}><span>{loc('الإجمالي', 'Total')}: {money(p.total_cost_iqd)}</span><span>{loc('المدفوع', 'Paid')}: {money(p.paid_iqd)}</span></div>
+        </article>)}</div>
+        {!purchases.filter((p) => !receiveOnly || ['ordered', 'partial'].includes(p.status)).length && <p className={`py-3 text-sm ${T.text3}`}>{loc('لا توجد أوامر في هذه الصفحة', 'No orders on this page')}</p>}
         <div className="mt-3 flex gap-2">
           <button
             type="button"

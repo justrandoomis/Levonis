@@ -77,7 +77,7 @@ import { baghdadDay } from '../lib/baghdadTime';
 import {
   GRANULARITIES,
   MAX_BREAKDOWN_ROWS,
-  ORDERS_BY_DAY_SQL,
+  ordersByDaySql,
   UNRECOGNIZED_ORDERS_SQL,
   buildPeriodReport,
   combineBreakdown,
@@ -170,20 +170,22 @@ export async function probeSchema(db: D1Database): Promise<SchemaFacts> {
   // not 0098 (every database did, until 0098 ran), so one flag cannot stand in
   // for the other. `columnsOf` answers an empty set for a table that is not
   // there, which is exactly the signal wanted.
-  const [items, allocations, refunds] = await Promise.all([
+  const [items, allocations, refunds, orders] = await Promise.all([
     columnsOf(db, 'order_items'),
     columnsOf(db, 'order_item_inventory_allocations'),
     columnsOf(db, 'finance_refund_facts'),
+    columnsOf(db, 'orders'),
   ]);
   const facts: SchemaFacts = {
     has0095: items.has('cost_basis') && items.has('cost_iqd'),
     hasFifo: allocations.has('cogs_iqd') && allocations.has('released_at'),
     hasOperationalRefunds: refunds.has('cogs_iqd'),
+    hasPriceAdjustments: orders.has('price_adjustment_iqd'),
   };
   // MEMOISED ONLY WHEN BOTH ARE TRUE. Caching a `hasFifo: false` taken during
   // the minute between the deploy and its migration would keep this isolate
   // reporting snapshot costs long after the lots were there to read.
-  if (facts.has0095 && facts.hasFifo && facts.hasOperationalRefunds) schemaMemo = facts;
+  if (facts.has0095 && facts.hasFifo && facts.hasOperationalRefunds && facts.hasPriceAdjustments) schemaMemo = facts;
   return facts;
 }
 
@@ -276,7 +278,7 @@ adminFinanceReportRoutes.get('/summary', async (c) => {
   const [sales, refunds, orders, expenses, expenseCategories, unrecognized] = await Promise.all([
     rowsOf(c.env.DB, salesByDaySql(schema), binds),
     rowsOf(c.env.DB, refundsByDaySql(schema), binds),
-    rowsOf(c.env.DB, ORDERS_BY_DAY_SQL, binds),
+    rowsOf(c.env.DB, ordersByDaySql(schema), binds),
     // Days are fetched across the WIDENED window so the comparison period has
     // its expenses too; the category breakdown is only ever asked of the
     // requested range, because nothing on the screen breaks down last month's

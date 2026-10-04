@@ -18,6 +18,7 @@ import {
   whole,
 } from '../lib/operations';
 import { parsePurchaseCsv } from '../lib/purchaseCsv';
+import { investorFinanceInstalled } from '../lib/investorFinance';
 
 export const adminProcurementRoutes = new Hono<AppContext>();
 adminProcurementRoutes.use('*', requireAdmin);
@@ -55,7 +56,7 @@ async function commitPurchase(
       .prepare('SELECT version FROM purchase_orders WHERE id=?')
       .bind(purchase.id)
       .first<{ version: number }>();
-    if (!current || current.version !== purchase.version)
+    if (!current || current.version !== purchase.version || /CHECK constraint/i.test(String(error)))
       throw conflict('تغير أمر الشراء أو رصيد المورد؛ حدّث الشحنة وأعد المحاولة', 'VERSION_CHANGED');
     throw error;
   }
@@ -278,6 +279,9 @@ async function planDocument(
     throw conflict('المجموع الجديد أقل من دفعات المورد؛ سوّ الدفعة أولًا');
   const statements: D1PreparedStatement[] = [];
   if (previous) {
+    const investorReady=await investorFinanceInstalled(db);
+    if(investorReady&&await db.prepare("SELECT 1 FROM investment_contracts c JOIN purchase_lines l ON l.incoming_id=c.incoming_id WHERE l.purchase_id=? AND c.state='active'").bind(id).first())throw conflict('أبطل اتفاق الاستثمار غير الممول قبل تعديل بنود الشراء؛ الاتفاقات الممولة تحتفظ بأصلها','INVESTMENT_PURCHASE_FROZEN');
+    if(investorReady)statements.push(...fence(db,"NOT EXISTS(SELECT 1 FROM investment_contracts c JOIN purchase_lines l ON l.incoming_id=c.incoming_id WHERE l.purchase_id=? AND c.state='active')",[id]));
     statements.push(
       ...fence(
         db,
@@ -296,8 +300,10 @@ async function planDocument(
       db.prepare('DELETE FROM purchase_charges WHERE purchase_id=?').bind(id),
       db.prepare('DELETE FROM purchase_lines WHERE purchase_id=?').bind(id),
     );
-    for (const l of old)
-      statements.push(db.prepare('DELETE FROM incoming_inventory WHERE id=?').bind(l.incoming_id));
+    for (const l of old){
+      if(investorReady)statements.push(db.prepare("UPDATE incoming_inventory SET status='cancelled' WHERE id=? AND EXISTS(SELECT 1 FROM investment_contracts WHERE incoming_id=?)").bind(l.incoming_id,l.incoming_id));
+      statements.push(db.prepare(`DELETE FROM incoming_inventory WHERE id=?${investorReady?' AND NOT EXISTS(SELECT 1 FROM investment_contracts WHERE incoming_id=?)':''}`).bind(l.incoming_id,...(investorReady?[l.incoming_id]:[])));
+    }
   }
   const header = {
     supplier_id: supplier,
@@ -419,7 +425,7 @@ adminProcurementRoutes.put('/documents/:id', async (c) => {
     throw conflict('تغيرت الشحنة؛ افتح أحدث نسخة', 'VERSION_CHANGED');
   if (d.lines.some((l) => l.qty_received > 0) || !['draft', 'ordered'].includes(d.purchase.status))
     throw conflict('لا تعدّل التكلفة بعد الاستلام؛ استخدم شحنة جديدة', 'PURCHASE_FROZEN');
-  await c.env.DB.batch(await planDocument(c.env.DB, b, user.id, id, d.purchase));
+  await commitPurchase(c.env.DB,d.purchase,await planDocument(c.env.DB, b, user.id, id, d.purchase));
   await audit(c.env.DB, user.id, 'purchase.updated', id, {
     before: JSON.parse(d.purchase.request_json),
     after: b,

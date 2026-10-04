@@ -74,6 +74,7 @@ const RunningCommunityOrders = React.lazy(() =>
 );
 const Admin = React.lazy(() => import('./pages/Admin'));
 const Invest = React.lazy(() => import('./pages/Invest'));
+const Earnings = React.lazy(() => import('./pages/Earnings'));
 const InvestAdmin = React.lazy(() => import('./pages/InvestAdmin'));
 const Warranty = React.lazy(() => import('./pages/Warranty'));
 const WarrantyVerify = React.lazy(() => import('./pages/WarrantyVerify'));
@@ -709,6 +710,7 @@ function AppContent() {
           <Routes>
             <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/invest" element={<ProtectedRoute><Invest /></ProtectedRoute>} />
+          <Route path="/earnings" element={<ProtectedRoute><Earnings /></ProtectedRoute>} />
           <Route path="/admin/invest" element={<AdminRoute><InvestAdmin /></AdminRoute>} />
 
             <Route path="/auth" element={<Auth />} />
@@ -878,6 +880,7 @@ function AppContent() {
           <Route path="/" element={<Home />} />
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/invest" element={<ProtectedRoute><Invest /></ProtectedRoute>} />
+          <Route path="/earnings" element={<ProtectedRoute><Earnings /></ProtectedRoute>} />
           <Route path="/admin/invest" element={<AdminRoute><InvestAdmin /></AdminRoute>} />
 
           <Route path="/profile" element={<Profile />} />

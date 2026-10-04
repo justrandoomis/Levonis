@@ -56,6 +56,7 @@ import { restoreMovesForItem } from '../lib/orderInventory';
 import { planLotRestore } from '../lib/inventoryLots';
 import { operationsInstalled, baghdadDay } from '../lib/operations';
 import { recordReturnFinancials, recordFinancialFailure } from '../lib/orderFinance';
+import { validateInvestorReturnEvidence } from '../lib/investorFinance';
 import { isRevealed, loadAllocations, paidOrderIds } from '../lib/mysteryReveal';
 import { mysteryRefusal } from '../lib/mystery/issues';
 import { typeForTransport } from '../lib/shippingType';
@@ -627,6 +628,9 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
   const nowIso = new Date().toISOString();
   // Conditional flip: concurrent transitions cannot both pass (same pattern
   // as the order-cancel flow).
+  if (to === 'resolved' && resolution === 'refund') {
+    await validateInvestorReturnEvidence(c.env.DB, id);
+  }
   const flip = await c.env.DB.prepare(
     `UPDATE return_cases SET state = ?, resolution = COALESCE(?, resolution),
         admin_note = CASE WHEN ? <> '' THEN ? ELSE admin_note END,

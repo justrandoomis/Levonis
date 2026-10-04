@@ -97,6 +97,18 @@ export function StockTab({ s, onChanged }: { s: InvStrings; onChanged: () => voi
       ) : lines.length === 0 ? (
         <Empty text={s.stock.empty} />
       ) : (
+        <div>
+          <div className="inventory-stock-mobile inventory-lines">{lines.map((l) => <article className="inventory-line" key={`${l.scope}:${l.scope_id}:${l.product_id}`}>
+            <div className="inventory-line-head"><div><strong>{l.product_name ?? l.product_id}</strong><small>{l.product_sku}</small></div><span className={`${T.badgeBase} ${T.badge.active}`}>{s.stock.onHand}: {count(l.on_hand)}</span></div>
+            <dl className="inventory-review">
+              <div><dt>{s.stock.batches}</dt><dd>{count(l.lot_count)}</dd></div>
+              <div><dt>{s.stock.oldest}</dt><dd>{daysSince(l.oldest_received_at) === null ? s.common.none : s.stock.days(count(daysSince(l.oldest_received_at)))}</dd></div>
+              {showsCosts && <><div><dt>{s.stock.nextCost}</dt><dd><Money value={l.oldest_unit_cost_iqd} unknownLabel={s.stock.unknown} /></dd></div><div><dt>{s.stock.value}</dt><dd><Money value={l.inventory_value_iqd} unknownLabel={s.stock.unknown} /></dd></div></>}
+            </dl>
+            {showsCosts && l.unpriced_units > 0 && <p className={`mt-2 text-xs ${T.text3}`}>{s.stats.unpriced(count(l.unpriced_units))}</p>}
+            <div className="inventory-footer"><button type="button" className={T.btnSecondary} onClick={() => setLotsFor(l)}>{s.stock.viewLots}</button><button type="button" className={T.btnGhost} onClick={() => setAdjusting(l)}><SlidersHorizontal size={14} aria-hidden />{s.stock.adjust}</button></div>
+          </article>)}</div>
+          <div className="inventory-stock-table">
         <TableFrame minWidth={showsCosts ? 980 : 720}>
           <thead className={T.tableHead}>
             <tr className="text-start">
@@ -182,7 +194,8 @@ export function StockTab({ s, onChanged }: { s: InvStrings; onChanged: () => voi
               );
             })}
           </tbody>
-        </TableFrame>
+        </TableFrame>          </div>
+        </div>
       )}
 
       {lines !== null && (lines.length === PAGE || offset > 0) && (
