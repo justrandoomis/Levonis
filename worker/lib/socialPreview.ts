@@ -49,9 +49,10 @@
  * No invented text either. A product with an empty description keeps the
  * shop's default line rather than getting a sentence written for it here.
  */
-import { primaryMedia, upgradeMedia } from './productModel';
+import { canonicalProductMediaUrl, primaryMedia, upgradeMedia } from './productModel';
 import { isAnonymousPublicMediaKey } from './mediaStorage';
-import { loadAuthoritativeProductImages } from './productSelectionImage';
+import { productImageFromRelations } from './productSelectionImage';
+import { isActiveProductImageRow, type ImageRow } from './productOverlay';
 import { logoSourceKey, readStoreIconsQuietly, servableStoreIcons } from './storeIcons';
 import { cleanIdentityText, storeDescription } from './webManifest';
 import { DOCUMENT_CACHE_CONTROL } from './securityPolicy';
@@ -280,6 +281,13 @@ interface PreviewRow {
   description_ar?: unknown;
   description_en?: unknown;
   images?: unknown;
+  light_image?: unknown;
+}
+
+/** Internal document metadata; never written into social tags or public JSON. */
+interface ProductPreview extends Pick<SocialPreview, 'title' | 'description' | 'image'> {
+  /** null explicitly suppresses a speculative catalogue preload; absent preserves merchant behaviour. */
+  preloadImage?: string | null;
 }
 
 /** Arabic first — the store's own default language — then English, then any. */
@@ -324,7 +332,7 @@ export async function resolveProductPreview(
    * no card at all — its page is «المتجر غير متاح حاليًا».
    */
   scope: { storeSlug?: string | null; storeRef?: string | null } = {}
-): Promise<Pick<SocialPreview, 'title' | 'description' | 'image'> | null> {
+): Promise<ProductPreview | null> {
   const storeKey = scope.storeSlug || scope.storeRef || '';
   if (storeKey) {
     const scoped = await db
@@ -348,7 +356,7 @@ export async function resolveProductPreview(
   // (tests/storeShareCards.test.ts).
   const product = await db
     .prepare(
-      "SELECT id, name, name_ar, description, description_ar FROM products WHERE slug = ? AND status = 'active'"
+      "SELECT id, name, name_ar, description, description_ar, light_image FROM products WHERE slug = ? AND status = 'active'"
     )
     .bind(slug)
     .first<PreviewRow>();
@@ -374,21 +382,44 @@ async function previewFrom(
   product: PreviewRow | null,
   origin: string,
   db: D1Database
-): Promise<Pick<SocialPreview, 'title' | 'description' | 'image'> | null> {
+): Promise<ProductPreview | null> {
   const title = pickText(row.name_ar, row.name, row.name_en);
   if (!title) return null; // nothing to identify it by; keep the shop's card
 
-  const productImages = product
-    ? await loadAuthoritativeProductImages(db, [String(product.id ?? '')])
-    : null;
+  let images: ImageRow[] = [];
+  if (product) {
+    try {
+      // The same single authoritative read as the card already needed. No
+      // inventory/pricing read or visitor-dependent choice in shareable HTML.
+      const { results } = await db.prepare(
+        'SELECT * FROM product_images WHERE product_id IN (?) ORDER BY product_id, sort_order, id'
+      ).bind(String(product.id ?? '')).all<ImageRow>();
+      images = (results ?? []).filter(isActiveProductImageRow);
+    } catch (error) {
+      // Authority unavailable must not resurrect the stale products.images.
+      console.error(`product image authority unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
   const image = product
-    ? productImages?.get(String(product.id ?? '')) ?? ''
+    ? productImageFromRelations(images)
     : primaryMedia(upgradeMedia(row.images))?.url ?? '';
+  const lightImage = product ? canonicalProductMediaUrl(product.light_image) : '';
+  // Product may open on a shelf-backed option/colour/variant instead of the
+  // primary. Its saved theme also lives only in this browser, so a system
+  // media query cannot choose the light override reliably. Preload only when
+  // every possible opening selection/theme must use this same image. False
+  // negatives cost a head start; a wrong preload costs a second full request.
+  const selectionCanChangeImage = new Set(images.map((entry) => entry.url)).size > 1 &&
+    images.some((entry) => entry.option_value_id || entry.color_id || entry.variant_id);
+  const preloadImage = image && !selectionCanChangeImage && (!lightImage || lightImage === image)
+    ? image
+    : null;
 
   return {
     title,
     description: shortDescription(pickText(row.description_ar, row.description, row.description_en)),
     image: absoluteImageUrl(image, origin),
+    ...(product ? { preloadImage } : {}),
   };
 }
 

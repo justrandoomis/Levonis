@@ -1,5 +1,7 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
@@ -14,10 +16,11 @@ import ChunkBoundary from '../src/components/ChunkBoundary';
 import { api, type ApiProduct } from '../src/lib/api';
 import { type BentoTile } from '../src/lib/homeLayout';
 import { bentoImageSizes } from '../src/lib/homeImageSizes';
-import { variantSrcSet } from '../src/components/ui/SafeImage';
+import SafeImage, { IMAGE_VARIANT_WIDTHS, variantSrcSet } from '../src/components/ui/SafeImage';
 import { bootRequests, clearPrimedRequests, primeGet, takePrimedJson } from '../src/lib/bootFetch';
 import { productImagePreload, injectDocumentPreloads } from '../worker/lib/socialPreview';
 import { PRODUCT_GALLERY_SIZES } from '../packages/contracts/src/imageSizing';
+import { ROOT } from './fixtures/d1';
 
 const originalFetch = globalThis.fetch;
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
@@ -38,10 +41,10 @@ test('promo photo selects one responsive light/phone file and prioritizes only t
   }));
   const photo = html.match(/<img[^>]*>/)?.[0] ?? '';
   assert.match(photo, /src="\/files\/products\/light.webp"/);
-  assert.match(photo, /srcSet="\/files\/products\/light.webp\?w=320 320w/);
+  assert.match(photo, /srcSet="\/files\/products\/light.webp\?w=160 160w/);
   assert.match(photo, /loading="eager"/);
   assert.match(photo, /fetchPriority="high"/);
-  assert.match(html, /<source media="\(max-width: 639px\)" srcSet="\/files\/products\/phone-light.webp\?w=320 320w/);
+  assert.match(html, /<source media="\(max-width: 639px\)" srcSet="\/files\/products\/phone-light.webp\?w=160 160w/);
   assert.match(html, /sizes="400px"/);
   assert.doesNotMatch(html, /src(?:Set)?="[^"\n]*dark.webp/);
   const gif = render(createElement(PromoPhoto, { src: '/files/products/motion.gif', crop: false, className: 'inset-0', width: 100, height: 100, sizes: '100px' }));
@@ -74,13 +77,41 @@ test('a 148px rail requests a rail-sized variant while grid slots retain respons
   assert.match(card('fill'), /sizes="\(min-width: 1280px\)/);
 });
 
+test('product thumbnails declare their real slots, leaving the zoom image at its original resolution', () => {
+  const source = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
+  const images = [...source.matchAll(/<SafeImage\b[\s\S]*?\/>/g)].map((match) => match[0]);
+  for (const [src, size] of [
+    ['optionImage(value.id)', '40px'],
+    ['optionImage(m.options[0].id)', '40px'],
+    ['optionImage(opt.id)', '40px'],
+    ['colorImage(col.id)', '36px'],
+    ['m.url', '64px'],
+  ]) {
+    const image = images.find((element) => element.includes(`src={${src}}`));
+    assert.ok(image, `${src} has a thumbnail`);
+    assert.ok(image.includes(`sizes="${size}"`), `${src} tells the browser its ${size} slot`);
+  }
+  for (const size of ['64px', '40px', '36px']) {
+    const html = render(createElement(SafeImage, { src: '/files/products/thumb.webp', alt: '', sizes: size, aspect: 'square' }));
+    assert.ok(html.includes(`srcSet="${variantSrcSet('/files/products/thumb.webp')}"`));
+    assert.ok(html.includes(`sizes="${size}"`));
+    assert.match(html, /loading="lazy"/);
+    assert.doesNotMatch(html, /fetchPriority="high"/);
+  }
+  const zoom = source.match(/<img\s+src=\{activeMedia\?\.url\}[\s\S]*?\/>/)?.[0];
+  assert.ok(zoom, 'zoom keeps the selected original URL');
+  assert.doesNotMatch(zoom, /srcSet=|sizes=/);
+  assert.equal(IMAGE_VARIANT_WIDTHS.find((width) => width >= 64 * 2), 160, 'a 2x thumbnail does not need a 320px file');
+  assert.equal(IMAGE_VARIANT_WIDTHS.find((width) => width >= 185 * 1.75), 480, 'the observed phone grid can retain DPR without jumping to 640px');
+});
+
 test('product preload matches the gallery candidates and sizes; private, animated and queried files do not resize', () => {
   const image = '/files/products/a.webp';
   const preload = productImagePreload(image);
   assert.equal(preload.imageSrcSet, variantSrcSet(image));
   assert.equal(preload.imageSizes, PRODUCT_GALLERY_SIZES);
   const html = injectDocumentPreloads('<head></head>', { scripts: [], styles: [], image, resolve: null, ...preload });
-  assert.match(html, /imagesrcset="\/files\/products\/a.webp\?w=320 320w/);
+  assert.match(html, /imagesrcset="\/files\/products\/a.webp\?w=160 160w/);
   assert.match(html, /imagesizes="\(min-width: 1540px\) 988px/);
   for (const source of ['/files/finance/secret.webp', '/files/products/a.gif', '/files/products/a.webp?token=secret', 'https://external.example/a.webp']) assert.deepEqual(productImagePreload(source), {});
 });

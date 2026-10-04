@@ -1,11 +1,11 @@
 /**
  * A CARD DOWNLOADS A CARD-SIZED PICTURE (perf plan §B.1 #5).
  *
- * `GET /files/<key>?w=320|640|1080` answers a PUBLIC still image at one of
- * three widths through the `IMAGES` binding, in the format the browser's
+ * `GET /files/<key>?w=160|320|480|640|1080` answers a PUBLIC still image at one of
+ * five widths through the `IMAGES` binding, in the format the browser's
  * `Accept` header allows (AVIF, else WebP, else the stored format), and stores
  * the result in the same shared edge cache the original lives in. The client
- * (`ui/SafeImage`, `storefront/parts`) names exactly those three widths in a
+ * (`ui/SafeImage`, `storefront/parts`) names exactly those five widths in a
  * `srcset` for `/files/` pictures and leaves every other source untouched.
  *
  * What these pin: the width allow-list and the refusals (a private key, a
@@ -34,14 +34,16 @@ import {
 
 // ------------------------------------------------------------ the pure parts
 
-test('the width list is closed: three widths, anything else is invalid, absence is null', () => {
-  assert.deepEqual([...IMAGE_VARIANT_WIDTHS], [320, 640, 1080]);
+test('the width list is closed: five widths, anything else is invalid, absence is null', () => {
+  assert.deepEqual([...IMAGE_VARIANT_WIDTHS], [160, 320, 480, 640, 1080]);
+  assert.equal(parseVariantWidth('160'), 160);
   assert.equal(parseVariantWidth('320'), 320);
+  assert.equal(parseVariantWidth('480'), 480);
   assert.equal(parseVariantWidth('640'), 640);
   assert.equal(parseVariantWidth('1080'), 1080);
   assert.equal(parseVariantWidth(undefined), null);
   assert.equal(parseVariantWidth(''), null);
-  for (const bad of ['321', '0', '-640', '3000', '640.5', 'abc', '1e3']) {
+  for (const bad of ['159', '321', '481', '0', '-640', '3000', '640.5', 'abc', '1e3']) {
     assert.equal(parseVariantWidth(bad), 'invalid', `w=${bad} must not mint a new size`);
   }
 });
@@ -215,18 +217,47 @@ test('a width off the list, a private key and a non-image are refused — and to
   assert.equal(odd.status, 400);
   assert.equal(((await odd.json()) as { code: string }).code, 'IMAGE_VARIANT_WIDTH');
   // The signed-in owner of the receipt may read it, but not as a variant: private bytes never enter the shared cache.
-  const priv = await fetchIt(`/files/${PRIVATE_KEY}?w=320`);
-  assert.equal(priv.status, 400);
-  assert.equal(((await priv.json()) as { code: string }).code, 'IMAGE_VARIANT_PRIVATE');
-  const video = await fetchIt(`/files/${VIDEO_KEY}?w=320`);
-  assert.equal(video.status, 400);
-  assert.equal(((await video.json()) as { code: string }).code, 'IMAGE_VARIANT_NOT_IMAGE');
+  for (const width of [160, 320, 480]) {
+    const priv = await fetchIt(`/files/${PRIVATE_KEY}?w=${width}`);
+    assert.equal(priv.status, 400);
+    assert.equal(((await priv.json()) as { code: string }).code, 'IMAGE_VARIANT_PRIVATE');
+    const video = await fetchIt(`/files/${VIDEO_KEY}?w=${width}`);
+    assert.equal(video.status, 400);
+    assert.equal(((await video.json()) as { code: string }).code, 'IMAGE_VARIANT_NOT_IMAGE');
+  }
   assert.deepEqual(bucket.reads, [], 'no refusal reached the bucket');
   assert.deepEqual(images.calls, [], 'nor the binding');
   // The private receipt itself is still served to its owner, exactly as before.
   const own = await fetchIt(`/files/${PRIVATE_KEY}`);
   assert.equal(own.status, 200);
   assert.equal(own.headers.get('Cache-Control'), 'private, max-age=300');
+});
+
+test('thumbnail and intermediate widths transform once and cache independently without refetching the original', async () => {
+  const images = imagesBinding();
+  const cache = new MemCache();
+  const { bucket, fetchIt } = setup({ images: images.binding, cache });
+  for (const [width, format, extension] of [[160, 'image/webp', 'webp'], [480, 'image/avif', 'avif']] as const) {
+    const path = `/files/${PUBLIC_KEY}?w=${width}`;
+    const first = await fetchIt(path, { Accept: format });
+    assert.equal(first.status, 200);
+    assert.equal(first.headers.get('Content-Type'), format);
+    assert.equal(first.headers.get('Cache-Control'), 'public, max-age=31536000, immutable');
+    assert.equal(first.headers.get('ETag'), `"etag-${PUBLIC_KEY}-w${width}-${extension}"`);
+    assert.equal(await first.text(), `variant:${width}:${format}`);
+    assert.ok([...cache.store.keys()].some((key) => key.endsWith(`/files/${PUBLIC_KEY}?w=${width}&f=${extension}`)));
+
+    const cached = await fetchIt(path, { Accept: format });
+    assert.equal(cached.status, 200);
+    assert.equal(await cached.text(), `variant:${width}:${format}`);
+    const unchanged = await fetchIt(path, { Accept: format, 'If-None-Match': `"etag-${PUBLIC_KEY}-w${width}-${extension}"` });
+    assert.equal(unchanged.status, 304);
+  }
+  assert.deepEqual(images.calls, [
+    { width: 160, fit: 'scale-down', format: 'image/webp', quality: 85 },
+    { width: 480, fit: 'scale-down', format: 'image/avif', quality: 75 },
+  ]);
+  assert.deepEqual(bucket.reads, [`get ${PUBLIC_KEY}`], 'both sizes share the cached original, but not each other’s result');
 });
 
 test('the variant is cached: a second request reaches neither the binding nor the bucket, and 304s on its ETag', async () => {

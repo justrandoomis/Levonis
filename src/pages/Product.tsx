@@ -2938,6 +2938,7 @@ export default function Product() {
                             aspect="square"
                             fit="cover"
                             className="h-10 w-10 shrink-0 rounded-md"
+                            sizes="40px"
                             bgClassName="bg-black"
                           />
                         ) : null}
@@ -2993,6 +2994,7 @@ export default function Product() {
                       aspect="square"
                       fit="cover"
                       className="h-10 w-10 shrink-0 rounded-md"
+                      sizes="40px"
                       bgClassName="bg-black"
                     />
                   ) : null}
@@ -3120,6 +3122,7 @@ export default function Product() {
                       aspect="square"
                       fit="cover"
                       className="h-10 w-10 shrink-0 rounded-md"
+                      sizes="40px"
                       bgClassName="bg-black"
                     />
                   ) : null}
@@ -3184,6 +3187,7 @@ export default function Product() {
                       aspect="square"
                       fit="cover"
                       className="h-9 w-9 shrink-0 rounded-md"
+                      sizes="36px"
                       bgClassName="bg-black"
                     />
                   ) : (
@@ -3608,6 +3612,7 @@ export default function Product() {
                         className="w-full h-full"
                         bgClassName="bg-zinc-900"
                         fallbackIconClassName="w-4 h-4"
+                        sizes="64px"
                       />
                     </button>
                   ))}

@@ -115,14 +115,14 @@ export function Column({ children, className = '' }: { children: ReactNode; clas
 
 /**
  * The server's sized variants of a `/files/` still picture (`?w=`,
- * worker/lib/imageConvert.ts IMAGE_VARIANT_WIDTHS) — the same three widths
+ * worker/lib/imageConvert.ts IMAGE_VARIANT_WIDTHS) — the same five widths
  * `ui/SafeImage` names, repeated here rather than imported because a store
  * visit must not carry that component's icons and strings for one line
  * (tests/storefrontBlocks.test.ts allow-list; tests/imageVariants.test.ts
  * pins the two lists equal). Anything that is not such a picture — an
  * external URL, a GIF, a URL with its own query — gets no srcset.
  */
-const VARIANT_WIDTHS = [320, 640, 1080] as const;
+const VARIANT_WIDTHS = [160, 320, 480, 640, 1080] as const;
 // A store's pictures are the relative `/files/<key>` the upload answered with.
 function variantSrcSet(src: string): string | undefined {
   return /^\/files\/[^?#]+\.(?:webp|jpe?g|png)$/i.test(src) ? VARIANT_WIDTHS.map((w) => `${src}?w=${w} ${w}w`).join(', ') : undefined;

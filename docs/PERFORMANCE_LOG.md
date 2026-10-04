@@ -1476,3 +1476,32 @@ static JavaScript closure at **257.2 KiB gzip**, down from **287.2 KiB**
 size measurement; the after-deployment PageSpeed report remains the browser
 performance comparison. Main-host opening requests are one-use, deadline-bound,
 identity-invalidated and never substitute for authoritative cart/checkout data.
+
+### Published revision 830b4e2 — follow-up measurement
+
+Measured at 20:24 UTC on 2026-10-04 with the same PageSpeed mobile profile:
+
+| Page | Mobile score | FCP | LCP | TBT | CLS | Speed index |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| [Home](https://pagespeed.web.dev/analysis/https-levonis-iq-com/e4ls1nigtb?form_factor=mobile) | 76 | 2.9 s | 4.6 s | 30 ms | .002 | 4.8 s |
+| [Products](https://pagespeed.web.dev/analysis/https-levonis-iq-com-products/ipdineaqpl?form_factor=mobile) | 77 | 3.0 s | 4.7 s | 10 ms | .002 | 3.0 s |
+| [A1 product](https://pagespeed.web.dev/analysis/https-levonis-iq-com-product-bambu-lab-a1/fc4fen3dok?form_factor=mobile) | 71 | 3.6 s | 5.1 s | 0 ms | 0 | 5.1 s |
+
+The home improves, but these single runs do **not** establish faster product
+pages. Inspecting the live document and report found two concrete remaining
+causes: the A1 document preloads a different relation image from the first
+displayed gallery image, and four 62px gallery thumbnails still download their
+originals (about 210 KiB). At the emulated phone's pixel density, some card slots
+also fall just above the 320px candidate and jump directly to 640px.
+
+A second provider inventory, Check-Host's public `/nodes/hosts`, contained 59
+nodes and none in Iraq on this date. No Iraqi measurement was obtained from
+either checked provider; this is a limitation of the available test locations,
+not a claim that no Iraqi testing service exists.
+
+The follow-up correction uses bounded 160/320/480/640/1080px variants and actual
+64/40/36px thumbnail slots. It suppresses speculative catalogue image preloads
+when a light-theme override or a bound selection can change the opening image;
+social cards, route module preloads and unambiguous image preloads retain their
+behaviour. This does not change the gallery's selection or zoom originals,
+personalise shareable HTML, or add an inventory/pricing query to the document.

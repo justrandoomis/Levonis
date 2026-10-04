@@ -822,11 +822,14 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
       url: `${origin}${url.pathname}${url.search}`,
     });
 
-    // The head start. The picture: a product page paints its lead image
-    // largest (the card's own, as a same-origin path); a store home its cover.
+    // Catalogue OG and the opening gallery can differ (saved theme or a
+    // server-selected shelf). Only preload a lead whose identity is certain.
+    // A store home keeps its cover and merchant/bundle behaviour is unchanged.
     const routeKey = routeModuleFor(url.pathname, onStore);
     const chunks = manifest && routeKey ? chunkPreloads(manifest, routeKey) : { scripts: [], styles: [] };
-    const image = product ? preloadImagePath(product.image) : storeHome ? heroCoverFrom(resolve) : null;
+    const image = product
+      ? preloadImagePath(routeKey === 'src/pages/Product.tsx' && product.preloadImage !== undefined ? product.preloadImage : product.image)
+      : storeHome ? heroCoverFrom(resolve) : null;
     html = injectDocumentPreloads(html, { ...chunks, image, resolve, ...(routeKey === 'src/pages/Product.tsx' ? productImagePreload(image) : {}) });
 
     const headers = new Headers(asset.headers);
