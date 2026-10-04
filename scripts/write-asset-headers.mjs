@@ -34,7 +34,9 @@ import { assetHeadersFile } from '../worker/lib/securityPolicy.ts';
 export const ARABIC_FONT_PRELOAD = '/fonts/cairo/cairo-v31-arabic.woff2';
 export const entryStylesheets = (manifest) => (manifest?.['index.html']?.css ?? []).map((css) => `/${css}`);
 export function earlyHintsLink(styles, font = ARABIC_FONT_PRELOAD) {
-  const parts = styles.map((href) => `<${href}>; rel=preload; as=style`);
+  // Vite emits crossorigin stylesheets: the hint must use the same fetch mode
+  // or Chromium downloads the render-blocking CSS twice.
+  const parts = styles.map((href) => `<${href}>; rel=preload; as=style; crossorigin`);
   if (font) parts.push(`<${font}>; rel=preload; as=font; crossorigin`);
   return parts.join(', ');
 }

@@ -733,7 +733,9 @@ export function entryStylesheets(manifest: ViteManifest): string[] {
  * HTML as a modulepreload.
  */
 export function earlyHintsLink(styles: string[], font: string | null = ARABIC_FONT_PRELOAD): string {
-  const parts = styles.map((href) => `<${href}>; rel=preload; as=style`);
+  // Vite emits crossorigin stylesheets: the hint must use the same fetch mode
+  // or Chromium downloads the render-blocking CSS twice.
+  const parts = styles.map((href) => `<${href}>; rel=preload; as=style; crossorigin`);
   if (font) parts.push(`<${font}>; rel=preload; as=font; crossorigin`);
   return parts.join(', ');
 }

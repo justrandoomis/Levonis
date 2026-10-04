@@ -198,10 +198,10 @@ test('the real product document preloads a route published under its dynamic ali
   assert.doesNotMatch(html, /rel="modulepreload"[^>]*href="\/assets\/index-abc\.js"/, 'the entry is already loaded by the document');
 });
 
-test('the Early Hints line names the entry stylesheet and the Arabic font as preloads', () => {
+test('Early Hints match the anonymous CORS mode of Vite stylesheets and fonts', () => {
   assert.equal(
     earlyHintsLink(['/assets/index-abc.css']),
-    `</assets/index-abc.css>; rel=preload; as=style, <${ARABIC_FONT_PRELOAD}>; rel=preload; as=font; crossorigin`
+    `</assets/index-abc.css>; rel=preload; as=style; crossorigin, <${ARABIC_FONT_PRELOAD}>; rel=preload; as=font; crossorigin`
   );
   assert.equal(earlyHintsLink([], null), '');
   // The build script spells the same three lines again (it runs under plain
@@ -270,7 +270,7 @@ test('the shareable policy is for a viewer-independent document only', () => {
 
 test('dist/_headers gains the Link on the catch-all and unsets it on every rule after', () => {
   const text = ['# c', '/*', '  A: 1', '  Cache-Control: no-cache', '', '# x', '/assets/*', '  ! A', '  A: 1', '', '/sw.js', '  ! A', '  A: 2', ''].join('\n');
-  const out = withEarlyHints(text, '</assets/i.css>; rel=preload; as=style') as string;
+  const out = withEarlyHints(text, '</assets/i.css>; rel=preload; as=style; crossorigin') as string;
   const rules = new Map<string, string[]>();
   let current = '';
   for (const line of out.split('\n')) {
@@ -278,7 +278,7 @@ test('dist/_headers gains the Link on the catch-all and unsets it on every rule 
     if (!line.startsWith(' ')) { current = line.trim(); rules.set(current, []); continue; }
     rules.get(current)!.push(line.trim());
   }
-  assert.deepEqual(rules.get('/*'), ['A: 1', 'Cache-Control: no-cache', 'Link: </assets/i.css>; rel=preload; as=style']);
+  assert.deepEqual(rules.get('/*'), ['A: 1', 'Cache-Control: no-cache', 'Link: </assets/i.css>; rel=preload; as=style; crossorigin']);
   assert.deepEqual(rules.get('/assets/*'), ['! Link', '! A', 'A: 1']);
   assert.deepEqual(rules.get('/sw.js'), ['! Link', '! A', 'A: 2']);
   assert.equal(withEarlyHints(text, null), text, 'no manifest, no Link, the file as before');
@@ -327,7 +327,7 @@ test("a store's home carries its chunk, its cover, the anonymous resolve answer,
   assert.equal(res.headers.get('Content-Length'), null);
   assert.equal(res.headers.get('Cache-Control'), DOCUMENT_SHARED_CACHE_CONTROL);
   assert.equal(res.headers.get('Set-Cookie'), null);
-  assert.equal(res.headers.get('Link'), `</assets/index-abc.css>; rel=preload; as=style, <${ARABIC_FONT_PRELOAD}>; rel=preload; as=font; crossorigin`);
+  assert.equal(res.headers.get('Link'), `</assets/index-abc.css>; rel=preload; as=style; crossorigin, <${ARABIC_FONT_PRELOAD}>; rel=preload; as=font; crossorigin`);
   assert.match(res.headers.get('Content-Security-Policy') ?? '', /script-src/);
   // The same document twice is the same bytes — and a 304 when the client has it.
   const again = await call(STORE_HOST, '/');

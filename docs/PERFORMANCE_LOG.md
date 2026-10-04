@@ -1505,3 +1505,17 @@ when a light-theme override or a bound selection can change the opening image;
 social cards, route module preloads and unambiguous image preloads retain their
 behaviour. This does not change the gallery's selection or zoom originals,
 personalise shareable HTML, or add an inventory/pricing query to the document.
+
+### Published revision b6f667d — CSS request reuse correction
+
+The 2026-10-04 21:20 UTC mobile runs measured Home 77 / LCP 4.4 s,
+Products 82 / LCP 3.8 s and A1 76 / LCP 4.4 s (CLS .077). The A1
+report `ax0g1tky7e` identified the exact same entry stylesheet twice,
+each 44.7 KiB transferred, with 590 ms estimated render-blocking savings.
+The HTTP Link preload lacked `crossorigin`, whereas Vite's stylesheet
+link uses anonymous CORS. Both the asset-header generator and Worker
+rewrite now match that mode, including the existing font and route CSS
+conventions. The generated-header/Worker parity and real document tests
+cover both delivery paths. Post-deployment measurement must establish
+request reuse; these estimates are not a promise of a score improvement.
+No layout fix is claimed: the remaining A1 CLS needs separate evidence.
