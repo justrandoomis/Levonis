@@ -72,8 +72,10 @@ const CHUNK_BUDGET = 250 * KB;
  * payload» lists below, which name them; the number catches the next page.
  */
 const INITIAL_BUDGET = 200 * KB;
-/** Every stylesheet together; the entry's is the one downloaded before first paint. */
+/** Existing/public stylesheets; the entry's is downloaded before first paint. */
 const CSS_BUDGET = 60 * KB;
+/** Three new authenticated operations sheets, only after their lazy routes open. */
+const OPERATIONS_CSS_BUDGET = 7 * KB;
 
 const gz = (path: string) => gzipSync(readFileSync(path), { level: 9 }).length;
 const kb = (n: number) => `${(n / KB).toFixed(1)} KB`;
@@ -611,16 +613,72 @@ test('the Phase-5 screens are lazy chunks outside the entry, the store pages, th
   assert.equal(staticClosure(chunk('Community')!).has(chunk('BoardRail')!), false, 'the board rail is a static import of the community home');
 });
 
+const operationsSheets = [
+  { name: 'finance workspace', file: /^FinanceWorkspace-[\w-]+\.css$/, root: /\.fw\{/ },
+  { name: 'inventory workspace', file: /^AdminInventory-[\w-]+\.css$/, root: /\.inventory-workspace\{/ },
+  { name: 'linked-account earnings', file: /^shared-[\w-]+\.css$/, root: /\.fp\{/ },
+] as const;
+
+function operationsCssFiles(): Set<string> {
+  const files = readdirSync(ASSETS).filter((f) => f.endsWith('.css'));
+  return new Set(operationsSheets.flatMap((sheet) => {
+    const matches = files.filter((f) => sheet.file.test(f) && sheet.root.test(readFileSync(join(ASSETS, f), 'utf8')));
+    assert.equal(matches.length, 1, `${sheet.name} must have exactly one dedicated scoped stylesheet`);
+    return matches;
+  }));
+}
+
 test('the stylesheets stay under their budget', () => {
-  // Not "one file": splitting a route out also splits the CSS it is the only
-  // user of, which is the point. The budget is on the total, because the whole
-  // set is what a visitor who walks the site eventually downloads.
+  // Keep the existing 60 KiB gate for every stylesheet except the three new,
+  // named operations sheets. They have a separate 7 KiB combined gate, and
+  // the test below proves they cannot enter a customer's static CSS closure.
+  // A new/renamed/merged stylesheet stays in the original gate; this is not a
+  // blanket exclusion for admin files or an increase to the public budget.
   const css = readdirSync(ASSETS).filter((f) => f.endsWith('.css'));
   assert.ok(css.length > 0, 'no stylesheet was emitted at all');
   const each = css.map((f) => ({ f, bytes: gz(join(ASSETS, f)) })).sort((a, b) => b.bytes - a.bytes);
-  const total = each.reduce((sum, x) => sum + x.bytes, 0);
-  console.log(`bundle: css ${kb(total)} gzip over ${css.length} file(s) — ${each.map((x) => `${x.f} ${kb(x.bytes)}`).join(', ')}`);
+  const operations = operationsCssFiles();
+  const baseline = each.filter((x) => !operations.has(x.f));
+  const feature = each.filter((x) => operations.has(x.f));
+  const total = baseline.reduce((sum, x) => sum + x.bytes, 0);
+  const operationsTotal = feature.reduce((sum, x) => sum + x.bytes, 0);
+  console.log(`bundle: original/public css ${kb(total)} gzip over ${baseline.length} file(s) — ${baseline.map((x) => `${x.f} ${kb(x.bytes)}`).join(', ')}`);
   assert.ok(total <= CSS_BUDGET, `the stylesheets total ${kb(total)} gzip, over ${kb(CSS_BUDGET)}`);
+  console.log(`bundle: private operations css ${kb(operationsTotal)} gzip over ${operations.size} file(s), limit ${kb(OPERATIONS_CSS_BUDGET)} — ${feature.map((x) => `${x.f} ${kb(x.bytes)}`).join(', ')}`);
+  assert.ok(operationsTotal <= OPERATIONS_CSS_BUDGET, `the private operations stylesheets total ${kb(operationsTotal)} gzip, over ${kb(OPERATIONS_CSS_BUDGET)}`);
+});
+
+test('the three operations stylesheets stay outside every public static closure', () => {
+  type ManifestEntry = { file: string; imports?: string[]; css?: string[]; isDynamicEntry?: boolean };
+  const manifest = JSON.parse(readFileSync(join(DIST, '.vite', 'manifest.json'), 'utf8')) as Record<string, ManifestEntry>;
+  const byFile = new Map(Object.values(manifest).map((entry) => [entry.file.replace(/^assets\//, ''), entry]));
+  const cssFor = (closure: Set<string>) => new Set([...closure].flatMap((file) => (byFile.get(file)?.css ?? []).map((f) => f.replace(/^assets\//, ''))));
+  const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
+  const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
+  const operationsCss = operationsCssFiles();
+  const privateNames = ['FinanceWorkspace', 'AdminInventory', 'PeoplePanel', 'InvestorPanel', 'WithdrawalPanel', 'MyEarnings', 'Earnings'];
+  const privateFiles = privateNames.map((name) => {
+    const file = chunk(name);
+    assert.ok(file, `${name} has no lazy chunk of its own`);
+    assert.equal(byFile.get(file!)?.isDynamicEntry, true, `${name} is not a dynamic entry`);
+    return file!;
+  });
+  const privateCss = new Set(privateFiles.flatMap((file) => [...cssFor(staticClosure(file))]));
+  for (const css of operationsCss) assert.ok(privateCss.has(css), `${css} is not owned by a named operations route`);
+
+  const initial = entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!;
+  const publicNames = ['Storefront', 'StorefrontProduct', 'Product', 'Products', 'Cart', 'Checkout', 'StoreCheckout', 'Auth', 'Addresses', 'Profile', 'Orders', 'OrderDetail', 'Settings', 'Subscription', 'Community', 'SavedProducts', 'Policies', 'Support', 'MerchantDashboardPage'];
+  for (const [name, file] of [['initial', initial], ...publicNames.map((name) => [name, chunk(name)])]) {
+    assert.ok(file, `${name} has no built chunk`);
+    const closure = staticClosure(file!);
+    const css = cssFor(closure);
+    for (const feature of privateFiles) assert.equal(closure.has(feature), false, `${feature} is a static dependency of ${name}`);
+    for (const sheet of operationsCss) assert.equal(css.has(sheet), false, `${sheet} is downloaded with ${name}`);
+  }
+  const app = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8');
+  const earningsRoutes = [...app.matchAll(/path="\/earnings"/g)];
+  assert.ok(earningsRoutes.length > 0, 'the linked-account earnings route is missing');
+  assert.equal([...app.matchAll(/path="\/earnings"\s+element=\{<ProtectedRoute><Earnings\s*\/>/g)].length, earningsRoutes.length, 'each earnings route must require a signed-in account');
 });
 
 /**

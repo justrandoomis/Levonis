@@ -65,6 +65,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'stock_locations', 'inventory_lot_locations', 'stock_transfers', 'purchase_orders', 'purchase_lines',
     'purchase_charges', 'purchase_receiving_notes', 'purchase_receiving_events', 'stock_counts', 'stock_count_lines',
     'inventory_suppliers', 'inventory_reorder_settings',
+    'lot_cost_adjustments', 'lot_cost_adjustment_shares', 'inventory_lot_cost_versions', 'lot_count_events',
     // 0093 — «لكيتها بمكان أرخص». A customer's report that a competitor sells
     // this product for less, with OUR price frozen into the row at the moment
     // it was filed.
@@ -95,6 +96,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ...owned('commerce', [
     'cart_items', 'orders', 'order_items', 'order_payment_settlements', 'checkout_sagas', 'checkout_saga_steps', 'coupons',
     'ops_guards', 'stock_return_inspections',
+    'stock_return_lot_evidence',
     'coupon_redemptions', 'return_cases', 'price_protection_claims',
     // 0140 — an admin's proposed new final total and the customer's decision on it.
     'order_price_adjustments',
@@ -151,6 +153,12 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'finance_payment_allocations', 'finance_cost_reversals', 'finance_expense_links', 'accounting_periods',
     'accounting_accounts', 'accounting_entries', 'accounting_lines', 'finance_collections',
     'finance_posting_errors', 'finance_refund_facts',
+    // Order-only revisions, monthly owner promotion and account-linked dues.
+    'finance_order_versions', 'finance_order_adjustments', 'finance_order_calculations', 'finance_line_departments',
+    'finance_workspace_postings',
+    'finance_monthly_promotions', 'finance_promotion_history', 'finance_cost_adjustments', 'finance_staff_basis',
+    'finance_withdrawals', 'finance_withdrawal_allocations', 'finance_withdrawal_payments',
+    'investment_contracts', 'investment_contract_voids', 'investor_finance_events', 'investor_allocation_results', 'finance_investor_earnings', 'investor_capital_losses',
   ]),
   ...owned('subscriptions', [
     'membership_plans', 'memberships', 'entitlement_snapshots',

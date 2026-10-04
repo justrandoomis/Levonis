@@ -10,6 +10,8 @@ import { baghdadDay, fence, journalPlan, requireCapability, whole } from '../lib
 import { normalizeSerial } from '../lib/deviceOps';
 import { counterTarget } from '../lib/inventoryReceiving';
 import type { StockScope } from '../lib/inventory';
+import { investorFinanceInstalled, planInvestorCapitalLoss, planInvestorSources, type InvestmentContract } from '../lib/investorFinance';
+import { effectiveLotCostSql } from '../lib/inventoryLots';
 
 export const adminStockOperationsRoutes = new Hono<AppContext>();
 adminStockOperationsRoutes.use('*', requireAdmin);
@@ -18,10 +20,11 @@ adminStockOperationsRoutes.get('/locations', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'transfer');
   const q = text(c.req.query('q'), 120),
     offset = whole(c.req.query('offset') ?? 0, 'offset', 0, 100000);
+  const cost=await effectiveLotCostSql(c.env.DB,'l');
   const [locations, lots] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM stock_locations ORDER BY name').all(),
     c.env.DB.prepare(
-      `SELECT l.id,l.product_id,l.scope,l.scope_id,l.qty_remaining,l.unit_cost_iqd,p.name_ar,p.name,loc.location_id,w.name AS location_name
+      `SELECT l.id,l.product_id,l.scope,l.scope_id,l.qty_remaining,${cost} AS unit_cost_iqd,p.name_ar,p.name,loc.location_id,w.name AS location_name
     FROM inventory_lots l LEFT JOIN products p ON p.id=l.product_id LEFT JOIN inventory_lot_locations loc ON loc.lot_id=l.id LEFT JOIN stock_locations w ON w.id=loc.location_id
     WHERE l.qty_remaining>0 AND (?='' OR instr(lower(COALESCE(p.name,'')||' '||COALESCE(p.name_ar,'')||' '||COALESCE(p.sku,'')||' '||l.id),lower(?))>0) ORDER BY l.received_at,l.id LIMIT 200 OFFSET ?`,
     )
@@ -108,6 +111,8 @@ adminStockOperationsRoutes.post('/transfers', async (c) => {
   )
     throw conflict('انقل الدفعة المسلسلة كاملة لتبقى أرقام الأجهزة مرتبطة بموقعها', 'SERIAL_TRANSFER');
   const target = qty === l.qty_remaining ? lotId : newId('ilot');
+  const versioned=await investorFinanceInstalled(db);
+  const costVersion=versioned?await db.prepare('SELECT * FROM inventory_lot_cost_versions WHERE lot_id=? ORDER BY version DESC LIMIT 1').bind(lotId).first<{version:number;unit_cost_iqd:number;adjustment_id:string}>():null;
   const counter = counterTarget(l.scope)!;
   const statements = [
     ...fence(
@@ -141,6 +146,10 @@ adminStockOperationsRoutes.post('/transfers', async (c) => {
           l.purchase_date,
         ),
     );
+  if(versioned){
+    statements.push(...fence(db,'COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=?),0)=?',[lotId,costVersion?.version??0]));
+    if(target!==lotId&&costVersion)statements.push(db.prepare('INSERT INTO inventory_lot_cost_versions(lot_id,version,unit_cost_iqd,adjustment_id) VALUES (?,1,?,?)').bind(target,costVersion.unit_cost_iqd,costVersion.adjustment_id));
+  }
   statements.push(
     db
       .prepare(
@@ -325,13 +334,14 @@ adminStockOperationsRoutes.get('/health', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'count');
   const q = text(c.req.query('q'), 120),
     offset = whole(c.req.query('offset') ?? 0, 'offset', 0, 100000);
+  const cost=await effectiveLotCostSql(c.env.DB,'inventory_lots');
   const { results } = await c.env.DB.prepare(
     `WITH counters AS (
     SELECT id AS product_id,'base' AS scope,'' AS scope_id,stock,stock_reserved AS reserved,low_stock_threshold FROM products WHERE inventory_mode='BASE' AND stock IS NOT NULL
     UNION ALL SELECT v.product_id,'option',v.id,v.stock,v.reserved,v.low_stock_threshold FROM product_option_values v JOIN products p ON p.id=v.product_id WHERE p.inventory_mode='OPTION' AND v.stock IS NOT NULL
     UNION ALL SELECT v.product_id,'color',v.id,v.stock,v.reserved,v.low_stock_threshold FROM product_colors v JOIN products p ON p.id=v.product_id WHERE p.inventory_mode='COLOR' AND v.stock IS NOT NULL
     UNION ALL SELECT v.product_id,'variant',v.id,v.stock,v.reserved,v.low_stock_threshold FROM product_variants v JOIN products p ON p.id=v.product_id WHERE p.inventory_mode='VARIANT_COMBINATION' AND v.stock IS NOT NULL
-    ), layers AS (SELECT product_id,scope,scope_id,SUM(qty_remaining) AS units,SUM(qty_remaining*unit_cost_iqd) AS inventory_value_iqd,MIN(CASE WHEN qty_remaining>0 THEN received_at END) AS oldest FROM inventory_lots GROUP BY product_id,scope,scope_id), velocity AS (
+    ), layers AS (SELECT product_id,scope,scope_id,SUM(qty_remaining) AS units,SUM(qty_remaining*${cost}) AS inventory_value_iqd,MIN(CASE WHEN qty_remaining>0 THEN received_at END) AS oldest FROM inventory_lots GROUP BY product_id,scope,scope_id), velocity AS (
     SELECT product_id,scope,scope_id,SUM(qty) AS sold FROM inventory_ledger WHERE kind='deduct' AND created_at>=datetime('now','-30 days') GROUP BY product_id,scope,scope_id)
     SELECT c.*,p.name,p.name_ar,COALESCE(l.units,0) AS lot_units,c.stock-COALESCE(l.units,0) AS discrepancy,l.inventory_value_iqd,l.oldest,
       COALESCE(v.sold,0) AS sold_30d,COALESCE(r.lead_time_days,7) AS lead_time_days,COALESCE(r.reorder_point,c.low_stock_threshold,0) AS reorder_point,
@@ -388,7 +398,8 @@ adminStockOperationsRoutes.get('/trace', async (c) => {
     q = text(c.req.query('q'), 120),
     offset = whole(c.req.query('offset') ?? 0, 'offset', 0, 100000),
     db = c.env.DB;
-  const [links, returns, lots] = await Promise.all([
+  const investmentReady=await investorFinanceInstalled(db);
+  const [links, returns, lots,returnAllocations] = await Promise.all([
     db
       .prepare(
         `SELECT s.serial_norm,l.id AS lot_id,l.product_id,l.received_at,l.unit_cost_iqd,w.name AS location_name,pl.purchase_id,po.invoice_no,po.supplier_id,COALESCE(oi.order_id,u.order_id) AS order_id,
@@ -417,6 +428,9 @@ adminStockOperationsRoutes.get('/trace', async (c) => {
     )
       .bind(q, q, offset)
       .all(),
+    investmentReady?db.prepare(`SELECT a.id,a.order_item_id,a.lot_id,a.qty,i.name_snapshot||' · '||substr(a.lot_id,-12) AS label,
+      (SELECT COALESCE(SUM(e.qty),0) FROM stock_return_lot_evidence e JOIN return_cases r ON r.id=e.return_case_id WHERE e.allocation_id=a.id AND r.state<>'rejected') AS claimed
+      FROM order_item_inventory_allocations a JOIN order_items i ON i.id=a.order_item_id WHERE a.released_at IS NULL AND EXISTS(SELECT 1 FROM return_cases r WHERE r.order_item_id=a.order_item_id AND r.state NOT IN ('resolved','rejected'))`).all():Promise.resolve({results:[]}),
   ]);
   return c.json(
     projectForAdmin(c.env, c.get('user'), {
@@ -424,6 +438,7 @@ adminStockOperationsRoutes.get('/trace', async (c) => {
       links: links.results ?? [],
       returns: returns.results ?? [],
       lots: lots.results ?? [],
+      return_allocations:returnAllocations.results??[],
       limit: 200,
       offset,
     }),
@@ -498,13 +513,18 @@ adminStockOperationsRoutes.post('/return-inspections', async (c) => {
   if (prior) {
     if (prior.return_case_id !== b.return_case_id || prior.disposition !== b.disposition)
       throw conflict('عملية الفحص مستخدمة لحالة أو نتيجة مختلفة');
+    if(Array.isArray(b.allocations)&&b.allocations.length&&await investorFinanceInstalled(db)){
+      const stored=(await db.prepare('SELECT allocation_id,qty FROM stock_return_lot_evidence WHERE return_case_id=? ORDER BY allocation_id').bind(prior.return_case_id).all<{allocation_id:string;qty:number}>()).results??[];
+      const requested=b.allocations.map(v=>{const r=v as Record<string,unknown>;return{allocation_id:text(r.allocation_id,120),qty:whole(r.qty,'الكمية',1,100000)};}).sort((a,b)=>a.allocation_id.localeCompare(b.allocation_id));
+      if(JSON.stringify(stored)!==JSON.stringify(requested))throw conflict('معرف المعاينة مستخدم لدفعات مختلفة','IDEMPOTENCY_MISMATCH');
+    }
     return c.json({ success: true, already: true });
   }
   const caseId = str(b.return_case_id, 'حالة المرتجع', { min: 1, max: 60 });
   const kase = await db
-    .prepare('SELECT order_item_id,qty,state FROM return_cases WHERE id=?')
+    .prepare('SELECT order_item_id,unit_id,qty,state FROM return_cases WHERE id=?')
     .bind(caseId)
-    .first<{ order_item_id: string; qty: number; state: string }>();
+    .first<{ order_item_id: string; unit_id:string|null;qty: number; state: string }>();
   if (!kase || ['resolved', 'rejected'].includes(kase.state)) throw badRequest('اختر حالة مرتجع مفتوحة');
   const item = kase.order_item_id,
     qty = kase.qty,
@@ -515,7 +535,27 @@ adminStockOperationsRoutes.post('/return-inspections', async (c) => {
     .bind(item)
     .first<{ qty: number }>();
   if (!orderItem) throw notFound('Order line not found');
+  const evidence:D1PreparedStatement[]=[];
+  if(await investorFinanceInstalled(db)){
+    let requested=Array.isArray(b.allocations)?b.allocations:[];
+    if(!requested.length&&kase.unit_id&&qty===1){const linked=await db.prepare(`SELECT a.id FROM device_serials d JOIN stock_serial_links s ON s.serial_norm=d.serial_norm JOIN order_item_inventory_allocations a ON a.lot_id=s.lot_id WHERE d.unit_id=? AND a.order_item_id=? AND a.released_at IS NULL`).bind(kase.unit_id,item).first<{id:string}>();if(linked)requested=[{allocation_id:linked.id,qty:1}];}
+    const allocations=(await db.prepare(`SELECT a.id,a.lot_id,a.qty,EXISTS(SELECT 1 FROM investment_contracts c WHERE c.incoming_id=l.incoming_id AND c.state='active') AS funded,
+      (SELECT COALESCE(SUM(e.qty),0) FROM stock_return_lot_evidence e JOIN return_cases r ON r.id=e.return_case_id WHERE e.allocation_id=a.id AND r.state<>'rejected') AS claimed
+      FROM order_item_inventory_allocations a JOIN inventory_lots l ON l.id=a.lot_id WHERE a.order_item_id=? AND a.released_at IS NULL`).bind(item).all<{id:string;lot_id:string;qty:number;funded:number;claimed:number}>()).results??[];
+    const mixed=new Set(allocations.map(a=>a.lot_id)).size>1&&allocations.some(a=>a.funded);
+    if(mixed&&!requested.length)throw badRequest('حدد دفعة القطع المرتجعة لتسوية المستثمر الصحيح','RETURN_LOT_REQUIRED');
+    if(requested.length){
+      const seen=new Set<string>();let sum=0;
+      for(const v of requested){const r=v as Record<string,unknown>,aid=text(r.allocation_id,120),n=whole(r.qty,'الكمية',1,100000),a=allocations.find(a=>a.id===aid);
+        if(!a||seen.has(aid)||n>a.qty-a.claimed)throw badRequest('أصل المرتجع أو كميته لا يطابق الدفعة المباعة','RETURN_LOT_MISMATCH');seen.add(aid);sum+=n;
+        evidence.push(...fence(db,`(SELECT COALESCE(SUM(e.qty),0) FROM stock_return_lot_evidence e JOIN return_cases r ON r.id=e.return_case_id WHERE e.allocation_id=? AND r.state<>'rejected')+?<=?`,[aid,n,a.qty]),db.prepare('INSERT INTO stock_return_lot_evidence(return_case_id,allocation_id,qty) VALUES (?,?,?)').bind(caseId,aid,n));
+      }
+      if(sum!==qty)throw badRequest('مجموع الدفعات يجب أن يساوي كمية المرتجع','RETURN_LOT_MISMATCH');
+    }
+  }
   await db.batch([
+    ...fence(db,"EXISTS(SELECT 1 FROM return_cases WHERE id=? AND state=?)",[caseId,kase.state]),
+    ...evidence,
     ...fence(db, '(SELECT COALESCE(SUM(qty),0) FROM stock_return_inspections WHERE order_item_id=?)+?<=?', [
       item,
       qty,
@@ -541,4 +581,42 @@ adminStockOperationsRoutes.post('/return-inspections', async (c) => {
     success: true,
     message: 'تم حفظ الفحص؛ استرجاع المال والكمية يتم من مسار المرتجعات المعتمد',
   });
+});
+
+adminStockOperationsRoutes.post('/scan',async c=>{
+  const user=c.get('user')!;await requireCapability(c.env,user,'receive');const b=await c.req.json<Record<string,unknown>>(),db=c.env.DB;
+  const code=text(b.code,160).trim(),serial=await db.prepare('SELECT * FROM stock_serial_links WHERE serial_norm=?').bind(normalizeSerial(code)).first<{lot_id:string;serial_norm:string;order_item_id:string|null}>();
+  const lot=await db.prepare('SELECT l.*,p.name,p.name_ar FROM inventory_lots l LEFT JOIN products p ON p.id=l.product_id WHERE l.id=?').bind(serial?.lot_id??code).first<Record<string,unknown>>();if(!lot)throw notFound('الرمز غير مرتبط بدفعة أو رقم جهاز موثق');
+  if((b.product_id&&b.product_id!==lot.product_id)||(b.scope&&b.scope!==lot.scope)||(b.scope_id!==undefined&&b.scope_id!==lot.scope_id))throw badRequest('الرمز لا يطابق المنتج أو الخيار أو اللون المختار','SCAN_SELECTION_MISMATCH');
+  if(b.order_item_id&&!await db.prepare('SELECT id FROM order_item_inventory_allocations WHERE order_item_id=? AND lot_id=? AND released_at IS NULL').bind(text(b.order_item_id,60),lot.id).first())throw badRequest('الدفعة ليست من أصل هذا الطلب','SCAN_ORDER_MISMATCH');
+  return c.json(projectForAdmin(c.env,user,{success:true,lot,serial,match:true}));
+});
+
+adminStockOperationsRoutes.post('/lot-counts',async c=>{
+  const user=c.get('user')!;await requireCapability(c.env,user,'count');const b=await c.req.json<Record<string,unknown>>(),db=c.env.DB;
+  const id=str(b.operation_id,'operation_id',{min:8,max:60}),lotId=text(b.lot_id,60),counted=whole(b.counted_qty,'الكمية الفعلية',0,100000);
+  const prior=await db.prepare('SELECT lot_id,counted_qty FROM lot_count_events WHERE id=?').bind(id).first<{lot_id:string;counted_qty:number}>();if(prior){if(prior.lot_id!==lotId||prior.counted_qty!==counted)throw conflict('المعرف مستخدم لجرد مختلف');return c.json({success:true,already:true});}
+  const lot=await db.prepare(`SELECT l.*,COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id=l.id ORDER BY version DESC LIMIT 1),l.unit_cost_iqd) AS effective,
+    COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=l.id),0) AS cost_version,
+    qty_received-(SELECT COALESCE(SUM(t.qty),0) FROM stock_transfers t WHERE t.source_lot_id=l.id AND t.target_lot_id<>t.source_lot_id)-(SELECT COALESCE(SUM(CASE WHEN a.released_at IS NULL THEN a.qty ELSE -a.qty END),0) FROM order_item_inventory_allocations a WHERE a.lot_id=l.id) AS max_remaining
+    FROM inventory_lots l WHERE id=?`).bind(lotId).first<{product_id:string;scope:StockScope;scope_id:string;qty_remaining:number;incoming_id:string|null;effective:number|null;max_remaining:number;cost_version:number}>();if(!lot)throw notFound('Lot not found');
+  if(counted>lot.max_remaining)throw badRequest('الكمية تتجاوز الوحدات المستلمة غير المباعة لهذه الدفعة؛ سجّل شراء أو أصل مستقل للوحدات الجديدة','LOT_COUNT_ORIGIN_LIMIT');
+  const s=await requireSelection(db,lot.product_id,lot.scope,lot.scope_id);if(s.stock===null)throw badRequest('المخزون غير متتبع');if(s.reserved>0)throw conflict('أكمل تجهيز الوحدات المحجوزة قبل جرد الدفعة','RESERVED_STOCK');
+  const delta=counted-lot.qty_remaining,target=counterTarget(lot.scope)!,rowId=lot.scope==='base'?lot.product_id:lot.scope_id;
+  const statements=[...fence(db,`EXISTS(SELECT 1 FROM inventory_lots WHERE id=? AND qty_remaining=?) AND EXISTS(SELECT 1 FROM ${target.table} WHERE id=? AND stock=? AND ${lot.scope==='base'?'stock_reserved':'reserved'}=0) AND COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=?),0)=?`,[lotId,lot.qty_remaining,rowId,s.stock,lotId,lot.cost_version]),db.prepare('INSERT INTO lot_count_events(id,lot_id,expected_qty,counted_qty,delta,actor_id,created_at) VALUES (?,?,?,?,?,?,?)').bind(id,lotId,lot.qty_remaining,counted,delta,user.id,new Date().toISOString())];
+  const contracts=lot.incoming_id?(await db.prepare("SELECT * FROM investment_contracts WHERE incoming_id=? AND state='active'").bind(lot.incoming_id).all<InvestmentContract>()).results??[]:[];
+  if(delta){
+    statements.push(db.prepare('INSERT INTO inventory_ledger(id,product_id,scope,scope_id,kind,qty,idempotency_key,actor_user_id,reason) VALUES (?,?,?,?,?,?,?,?,?)').bind(newId('ilg'),lot.product_id,lot.scope,lot.scope_id,delta>0?'adjust_in':'adjust_out',Math.abs(delta),`lot-count:${id}`,user.id,'count'),db.prepare(`UPDATE ${target.table} SET stock=stock+? WHERE id=?`).bind(delta,rowId),db.prepare('UPDATE inventory_lots SET qty_remaining=? WHERE id=?').bind(counted,lotId));
+    if(lot.effective!==null&&lot.effective>0){const value=Math.abs(delta)*lot.effective;
+      statements.push(...journalPlan(db,{key:`lot-count:${id}`,day:baghdadDay(),title:'فرق جرد دفعة محددة',source:'lot-count',sourceId:id,actor:user.id},delta<0?[{account:'5300',debit:value},{account:'1200',credit:value}]:[{account:'1200',debit:value},{account:'5300',credit:value}]).statements);
+      for(const contract of contracts){const amount=Math.trunc(-delta*lot.effective*contract.loss_share_bps/10000);if(!amount)continue;
+        if(amount<0){const known=(await db.prepare("SELECT COALESCE(SUM(amount_iqd),0) AS n FROM investor_finance_events WHERE contract_id=? AND lot_id=? AND allocation_id IS NULL AND kind IN ('loss','loss_correction')").bind(contract.id,lotId).first<{n:number}>())?.n??0;if(-amount>known)throw badRequest('لا توجد خسارة موثقة تكفي لتصحيح رأس مال المستثمر');}
+        statements.push(db.prepare('INSERT INTO investor_finance_events(id,event_key,contract_id,kind,amount_iqd,event_day,lot_id,actor_id,snapshot,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)').bind(newId('ive'),`lot-count:${id}:${contract.id}`,contract.id,amount>0?'loss':'loss_correction',amount,baghdadDay(),lotId,user.id,JSON.stringify({expected:lot.qty_remaining,counted,unit_cost_iqd:lot.effective}),new Date().toISOString()));
+        const loss=await planInvestorCapitalLoss(db,contract,amount,baghdadDay(),user.id);statements.unshift(...loss.guards);statements.push(...loss.post);
+      }
+    }
+  }
+  statements.push(...contracts.flatMap(c=>planInvestorSources(db,c,baghdadDay())));
+  try{await db.batch(statements);}catch(e){if(/ops_guards|CHECK constraint|UNIQUE/i.test(String(e)))throw conflict('تغيرت الدفعة أثناء الجرد؛ حدّث الصفحة');throw e;}
+  return c.json({success:true,delta,unknown_cost:lot.effective===null});
 });

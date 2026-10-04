@@ -779,6 +779,8 @@ export const NOT_LIBRARY_HOLDERS: Readonly<Record<string, string>> = {
   ...Object.fromEntries(
     [
       'order_items.image_snapshot', 'mystery_allocations.image_snapshot', 'community_orders.offer_snapshot', 'invoices.snapshot',
+      'finance_withdrawals.receipt_url', 'finance_withdrawal_payments.receipt_url',
+      'finance_order_adjustments.before_json', 'finance_order_adjustments.after_json', 'finance_order_calculations.snapshot',
       'chat_messages.card_snapshot', 'user_notifications.meta', 'tg_admin_notifications.photo_key',
     ].map((k) => [k, FROZEN])
   ),

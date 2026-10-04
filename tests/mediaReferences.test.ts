@@ -158,6 +158,32 @@ test('the wide net catches a JSON column whose name says nothing about media', (
   assert.deepEqual(auditMediaCoverage(schema).unclassified, ['promo.payload']);
 });
 
+test('financial payment proofs and full order calculation history protect their referenced media', async () => {
+  const db = freshSchema();
+  const keys = {
+    withdrawal: 'products/finance/withdrawal-proof.webp',
+    payment: 'products/finance/payment-proof.webp',
+    before: 'products/finance/before-order.webp',
+    after: 'products/finance/after-order.webp',
+    calculation: 'products/finance/calculation-order.webp',
+  };
+  insert(db, 'finance_withdrawals', { id: 'fw-media', user_id: 'owner', amount_iqd: 1000, receipt_url: `/files/${keys.withdrawal}` });
+  insert(db, 'finance_withdrawal_payments', { id: 'fp-media', withdrawal_id: 'fw-media', amount_iqd: 1000, receipt_url: `/files/${keys.payment}` });
+  insert(db, 'finance_order_adjustments', {
+    id: 'fa-media', operation_id: 'op-media', order_id: 'order-media', field: 'cogs_iqd', new_value_iqd: 1000, version: 1,
+    before_json: JSON.stringify({ lines: [{ image_snapshot: `/files/${keys.before}` }] }),
+    after_json: JSON.stringify({ lines: [{ image_snapshot: `/files/${keys.after}` }] }),
+  });
+  insert(db, 'finance_order_calculations', {
+    order_id: 'order-media', version: 1,
+    snapshot: JSON.stringify({ lines: [{ image_snapshot: `/files/${keys.calculation}` }] }),
+  });
+  const dbx = d1(db);
+  const scan = await collectMediaReferences(dbx, await readLiveSchema(dbx));
+  assert.deepEqual(scan.failed, []);
+  for (const key of Object.values(keys)) assert.ok(scan.keys.has(key), `${key} must survive cleanup`);
+});
+
 // ---------------------------------------------------------------------------
 //  2. THE REFERENCES THE OLD SWEEPER COULD NOT SEE
 // ---------------------------------------------------------------------------

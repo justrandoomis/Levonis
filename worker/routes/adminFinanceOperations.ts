@@ -16,6 +16,9 @@ import {
   type JournalLine,
 } from '../lib/operations';
 import { settleAdvance } from '../lib/payrollAdvance';
+import { validateRuleScope, readRuleScope } from '../lib/financeRuleScopes';
+import { commitParticipantStatements, effectiveStaffCostSql, heldSourceSql, staffAdvanceSql, staffReconciliationBlockedSql } from '../lib/financeParticipants';
+import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { orderGoods, postStoredRefund, runOrderFinancialEffects, type CostRule } from '../lib/orderFinance';
 import { operationsReport } from '../lib/operationsReport';
 
@@ -87,7 +90,7 @@ adminFinanceOperationsRoutes.get('/rules', async (c) => {
   const { results } = await c.env.DB.prepare(
     'SELECT r.*,s.name AS staff_name,c.name AS center_name FROM finance_cost_rules r LEFT JOIN finance_staff s ON s.id=r.staff_id LEFT JOIN finance_cost_centers c ON c.id=r.center_id ORDER BY r.active DESC,r.name',
   ).all();
-  return c.json({ success: true, rules: results ?? [] });
+  return c.json({ success: true, rules: (results ?? []).map((r) => ({ ...r, scope: readRuleScope(r as unknown as CostRule) })) });
 });
 async function ruleValues(
   db: D1Database,
@@ -96,7 +99,7 @@ async function ruleValues(
   id: string,
   version: number,
   createdAt: string,
-): Promise<CostRule & { active: number; created_by: string }> {
+): Promise<CostRule & { active: number; created_by: string; scope_json: string }> {
   const target = text(b.target_type, 20) || 'all',
     basis = text(b.basis, 30) || 'unit',
     milestone = b.milestone === 'prepared' ? 'prepared' : 'delivered';
@@ -114,7 +117,15 @@ async function ruleValues(
       .first())
   )
     throw badRequest('اختر القسم أو المنتج');
-  const category = text(b.category_id, 60);
+  const scope = b.scope == null ? null : await validateRuleScope(db,b.scope);
+  const staffId = text(b.staff_id, 60) || null;
+  const staff = staffId ? await db.prepare('SELECT id,name FROM finance_staff WHERE id=? AND active=1').bind(staffId).first<{id:string;name:string}>() : null;
+  if(staffId && !staff) throw badRequest('اختر موظفًا نشطًا من القائمة');
+  let category = text(b.category_id, 60);
+  if(!category) {
+    await db.prepare("INSERT OR IGNORE INTO expense_categories(id,slug,name_ar,name_en) VALUES ('finance_staff_wages','finance-staff-wages','أجور الموظفين','Staff wages')").run();
+    category='finance_staff_wages';
+  }
   if (!(await db.prepare('SELECT id FROM expense_categories WHERE id=? AND active=1').bind(category).first()))
     throw badRequest('اختر تصنيف المصروف');
   const from = dateValue(b.effective_from, baghdadDay()),
@@ -123,13 +134,14 @@ async function ruleValues(
   return {
     id,
     version,
-    name: str(b.name, 'اسم القاعدة', { min: 1, max: 120 }),
-    group_key: str(b.group_key, 'مجموعة الأجر', { min: 1, max: 80 }),
+    name: text(b.name,120) || (staff ? `أجر ${staff.name}` : 'تكلفة تشغيل'),
+    group_key: text(b.group_key,80) || (staffId ? `staff:${staffId}:${milestone}` : `overhead:${id}`),
+    scope_json: scope ? JSON.stringify(scope) : '{}',
     target_type: target as CostRule['target_type'],
     target_id: targetId,
     basis: basis as CostRule['basis'],
     amount: whole(b.amount, 'المبلغ أو النسبة', 0, basis.endsWith('percent') ? 10000 : 1e9),
-    staff_id: text(b.staff_id, 60) || null,
+    staff_id: staffId,
     category_id: category,
     center_id: text(b.center_id, 60) || null,
     milestone,
@@ -193,7 +205,7 @@ adminFinanceOperationsRoutes.get('/costs', async (c) => {
     staffId = text(c.req.query('staff_id'), 60),
     offset = whole(c.req.query('offset') ?? 0, 'offset', 0, 100000);
   const { results } = await c.env.DB.prepare(
-    `SELECT oc.*,s.name AS staff_name,c.name AS center_name,(SELECT COALESCE(SUM(a.amount_iqd),0) FROM finance_payment_allocations a WHERE a.cost_id=oc.id) AS paid_iqd FROM finance_order_costs oc LEFT JOIN finance_staff s ON s.id=oc.staff_id LEFT JOIN finance_cost_centers c ON c.id=oc.center_id WHERE (?='' OR oc.order_id=?) AND (?='' OR oc.staff_id=?) ORDER BY oc.cost_day DESC,oc.id LIMIT 100 OFFSET ?`,
+    `SELECT oc.*,${effectiveStaffCostSql('oc')} AS amount_iqd,s.name AS staff_name,c.name AS center_name,(SELECT COALESCE(SUM(a.amount_iqd),0) FROM finance_payment_allocations a WHERE a.cost_id=oc.id) AS paid_iqd FROM finance_order_costs oc LEFT JOIN finance_staff s ON s.id=oc.staff_id LEFT JOIN finance_cost_centers c ON c.id=oc.center_id WHERE (?='' OR oc.order_id=?) AND (?='' OR oc.staff_id=?) ORDER BY oc.cost_day DESC,oc.id LIMIT 100 OFFSET ?`,
   )
     .bind(orderId, orderId, staffId, staffId, offset)
     .all();
@@ -264,7 +276,7 @@ adminFinanceOperationsRoutes.post('/costs/:id/reverse', async (c) => {
     db = c.env.DB,
     id = c.req.param('id');
   const cost = await db
-    .prepare('SELECT * FROM finance_order_costs WHERE id=?')
+    .prepare(`SELECT c.*,${effectiveStaffCostSql()} AS amount_iqd FROM finance_order_costs c WHERE id=?`)
     .bind(id)
     .first<{ state: string; amount_iqd: number; expense_id: string | null; staff_id: string | null }>();
   if (!cost) throw notFound('Cost not found');
@@ -276,8 +288,10 @@ adminFinanceOperationsRoutes.post('/costs/:id/reverse', async (c) => {
       .first()
   )
     throw conflict('استحقاق مدفوع؛ سجّل استرداد الموظف بقيد مستقل أولًا');
+  if(await db.prepare(`SELECT ${heldSourceSql("'staff'",'?')} AS held`).bind(id).first<{held:number}>().then((r)=>Number(r?.held??0)>0))
+    throw conflict('هذا الاستحقاق محجوز في طلب سحب؛ ارفض طلب السحب أو ألغِه أولًا');
   const day = dateValue(b.day, baghdadDay()),
-    reason = str(b.reason, 'سبب التصحيح', { min: 3, max: 500 });
+    reason = text(b.reason,500) || 'تصحيح الاستحقاق';
   await periodOpen(db, day);
   const statements = [
     ...fence(
@@ -310,7 +324,7 @@ adminFinanceOperationsRoutes.post('/costs/:id/reverse', async (c) => {
         ],
       ).statements,
     );
-  await db.batch(statements);
+  await commitParticipantStatements(db,statements);
   await audit(db, user.id, 'finance.cost_reversed', id, { reason });
   return c.json({ success: true });
 });
@@ -322,8 +336,8 @@ adminFinanceOperationsRoutes.get('/payroll', async (c) => {
   const { results } = await db
     .prepare(
       `SELECT s.*,
-    (SELECT COALESCE(SUM(amount_iqd),0) FROM finance_order_costs WHERE staff_id=s.id AND state IN ('due','approved')) AS due_iqd,
-    (SELECT COALESCE(SUM(amount_iqd),0) FROM finance_order_costs WHERE staff_id=s.id AND state='approved') AS approved_iqd,
+    (SELECT COALESCE(SUM(${effectiveStaffCostSql()}),0) FROM finance_order_costs c WHERE c.staff_id=s.id AND c.state IN ('due','approved')) AS due_iqd,
+    (SELECT COALESCE(SUM(${effectiveStaffCostSql()}),0) FROM finance_order_costs c WHERE c.staff_id=s.id AND c.state='approved') AS approved_iqd,
     (SELECT COALESCE(SUM(a.amount_iqd),0) FROM finance_payment_allocations a JOIN finance_order_costs c ON c.id=a.cost_id WHERE c.staff_id=s.id) AS paid_iqd,
     (SELECT COALESCE(SUM(amount_iqd),0) FROM finance_staff_payments WHERE staff_id=s.id AND kind='advance')-
     (SELECT COALESCE(SUM(a.amount_iqd),0) FROM finance_payment_allocations a JOIN finance_staff_payments p ON p.id=a.payment_id WHERE p.staff_id=s.id AND p.kind='advance') AS advance_balance_iqd,
@@ -339,7 +353,7 @@ adminFinanceOperationsRoutes.get('/payroll', async (c) => {
   // acquiring permission to manage cost rules. The general /costs reader
   // continues to require that separate capability.
   const costs = await db.prepare(
-    `SELECT oc.*,s.name AS staff_name,c.name AS center_name,
+    `SELECT oc.*,${effectiveStaffCostSql('oc')} AS amount_iqd,s.name AS staff_name,c.name AS center_name,
     (SELECT COALESCE(SUM(a.amount_iqd),0) FROM finance_payment_allocations a WHERE a.cost_id=oc.id) AS paid_iqd
     FROM finance_order_costs oc LEFT JOIN finance_staff s ON s.id=oc.staff_id
     LEFT JOIN finance_cost_centers c ON c.id=oc.center_id
@@ -377,17 +391,19 @@ adminFinanceOperationsRoutes.post('/staff/:id/payments', async (c) => {
       .bind(id, staff, amount, kind, day, text(b.note, 500), user.id, new Date().toISOString()),
   ];
   if (kind === 'payment') {
+    const advance=(await db.prepare(`SELECT ${staffAdvanceSql('?')} AS balance`).bind(staff).first<{balance:number}>())?.balance??0;
     const costs =
       (
         await db
           .prepare(
-            "SELECT c.id,c.amount_iqd-COALESCE((SELECT SUM(a.amount_iqd) FROM finance_payment_allocations a WHERE a.cost_id=c.id),0) AS balance FROM finance_order_costs c WHERE c.staff_id=? AND c.state='approved' ORDER BY c.cost_day,c.id",
+            `SELECT c.id,${effectiveStaffCostSql()}-COALESCE((SELECT SUM(a.amount_iqd) FROM finance_payment_allocations a WHERE a.cost_id=c.id),0)-${heldSourceSql("'staff'", 'c.id')} AS balance FROM finance_order_costs c WHERE c.staff_id=? AND c.state='approved' AND NOT ${staffReconciliationBlockedSql()} ORDER BY c.cost_day,c.id`,
           )
           .bind(staff)
           .all<{ id: string; balance: number }>()
       ).results ?? [];
-    if (costs.reduce((s, c) => s + c.balance, 0) < amount)
-      throw badRequest('المبلغ يتجاوز المستحقات المعتمدة؛ استخدم سلفة للدفعة المقدمة');
+    if (costs.reduce((s, c) => s + c.balance, 0)-advance < amount)
+      throw badRequest('المبلغ يتجاوز المستحقات المتاحة بعد خصم السلف وطلبات السحب');
+    statements.push(...fence(db,`${staffAdvanceSql('?')}=? AND (SELECT COALESCE(SUM(${effectiveStaffCostSql()}-COALESCE((SELECT SUM(a.amount_iqd) FROM finance_payment_allocations a WHERE a.cost_id=c.id),0)-${heldSourceSql("'staff'",'c.id')}),0) FROM finance_order_costs c WHERE staff_id=? AND state='approved' AND NOT ${staffReconciliationBlockedSql()})=?`,[staff,advance,staff,costs.reduce((sum,c)=>sum+c.balance,0)]));
     let left = amount;
     for (const cost of costs) {
       if (left === 0) break;
@@ -396,7 +412,7 @@ adminFinanceOperationsRoutes.post('/staff/:id/payments', async (c) => {
       statements.push(
         ...fence(
           db,
-          "EXISTS(SELECT 1 FROM finance_order_costs WHERE id=? AND state='approved' AND amount_iqd-COALESCE((SELECT SUM(amount_iqd) FROM finance_payment_allocations WHERE cost_id=?),0)=?)",
+          `EXISTS(SELECT 1 FROM finance_order_costs c WHERE id=? AND state='approved' AND NOT ${staffReconciliationBlockedSql()} AND ${effectiveStaffCostSql()}-COALESCE((SELECT SUM(amount_iqd) FROM finance_payment_allocations WHERE cost_id=?),0)-${heldSourceSql("'staff'", 'c.id')}=?)`,
           [cost.id, cost.id, cost.balance],
         ),
         db
@@ -423,7 +439,7 @@ adminFinanceOperationsRoutes.post('/staff/:id/payments', async (c) => {
       ],
     ).statements,
   );
-  await db.batch(statements);
+  await commitParticipantStatements(db,statements);
   await audit(db, user.id, 'finance.staff_paid', id, { staff_id: staff, kind });
   return c.json({ success: true });
 });
@@ -492,12 +508,15 @@ adminFinanceOperationsRoutes.post('/expense-links', async (c) => {
       .first())
   )
     throw badRequest('اختر نطاق التوزيع');
-  await db
-    .prepare(
-      'INSERT INTO finance_expense_links(expense_id,center_id,order_id,allocation_basis,target_type,target_id) VALUES (?,?,?,?,?,?) ON CONFLICT(expense_id) DO UPDATE SET center_id=excluded.center_id,order_id=excluded.order_id,allocation_basis=excluded.allocation_basis,target_type=excluded.target_type,target_id=excluded.target_id',
-    )
-    .bind(expense, text(b.center_id, 60) || null, text(b.order_id, 60) || null, basis, target, targetId)
-    .run();
+  const oldLink=await db.prepare('SELECT * FROM finance_expense_links WHERE expense_id=?').bind(expense).first<{center_id:string|null;order_id:string|null;allocation_basis:string;target_type:string;target_id:string}>();
+  const orderId=text(b.order_id,60)||null;
+  if(orderId && !await db.prepare('SELECT id FROM orders WHERE id=?').bind(orderId).first())throw badRequest('اختر طلبًا موجودًا');
+  const changes=oldLink?fence(db,'EXISTS(SELECT 1 FROM finance_expense_links WHERE expense_id=? AND center_id IS ? AND order_id IS ? AND allocation_basis=? AND target_type=? AND target_id=?)',[expense,oldLink.center_id,oldLink.order_id,oldLink.allocation_basis,oldLink.target_type,oldLink.target_id]):fence(db,'NOT EXISTS(SELECT 1 FROM finance_expense_links WHERE expense_id=?)',[expense]);
+  changes.push(db.prepare('INSERT INTO finance_expense_links(expense_id,center_id,order_id,allocation_basis,target_type,target_id) VALUES (?,?,?,?,?,?) ON CONFLICT(expense_id) DO UPDATE SET center_id=excluded.center_id,order_id=excluded.order_id,allocation_basis=excluded.allocation_basis,target_type=excluded.target_type,target_id=excluded.target_id')
+    .bind(expense,text(b.center_id,60)||null,orderId,basis,target,targetId));
+  await commitParticipantStatements(db,changes);
+  for(const affected of new Set([oldLink?.order_id,orderId].filter((id):id is string=>!!id)))
+    await reconcileFinanceOrder(db,affected,{actor:user.id});
   return c.json({ success: true });
 });
 adminFinanceOperationsRoutes.post('/collections', async (c) => {
@@ -518,6 +537,7 @@ adminFinanceOperationsRoutes.post('/collections', async (c) => {
   if (existing) {
     if (existing.order_id !== orderId || existing.amount_iqd !== amount || existing.fee_iqd !== fee)
       throw conflict('عملية التحصيل مستخدمة لمحتوى مختلف');
+    await reconcileFinanceOrder(db,orderId,{actor:user.id});
     return c.json({ success: true, already: true });
   }
   const order = await db
@@ -601,6 +621,7 @@ adminFinanceOperationsRoutes.post('/collections', async (c) => {
     ).statements,
   );
   await db.batch(statements);
+  await reconcileFinanceOrder(db,orderId,{actor:user.id,day});
   return c.json({ success: true });
 });
 adminFinanceOperationsRoutes.get('/receivables', async (c) => {
@@ -831,6 +852,7 @@ adminFinanceOperationsRoutes.post('/orders/:id/retry-posting', async (c) => {
         .all<{ case_id: string }>()
     ).results ?? [];
   for (const r of refunds) await postStoredRefund(c.env, r.case_id, user.id, day);
+  await reconcileFinanceOrder(c.env.DB,id,{actor:user.id,day});
   await audit(c.env.DB, user.id, 'finance.posting_retried', id, { posting_day: day });
   return c.json({ success: true });
 });

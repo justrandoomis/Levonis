@@ -178,6 +178,11 @@ export interface MediaRefSource {
  */
 export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   { table: 'purchase_orders', column: 'attachment_url', kind: 'text', why: 'invoice attachment retained with the purchase document' },
+  { table: 'finance_withdrawals', column: 'receipt_url', kind: 'text', why: 'withdrawal settlement proof retained with the financial record' },
+  { table: 'finance_withdrawal_payments', column: 'receipt_url', kind: 'text', why: 'immutable proof of an actual withdrawal payment' },
+  { table: 'finance_order_adjustments', column: 'before_json', kind: 'json', why: 'full financial order snapshot includes historical order-item images' },
+  { table: 'finance_order_adjustments', column: 'after_json', kind: 'json', why: 'full corrected financial order snapshot includes historical order-item images' },
+  { table: 'finance_order_calculations', column: 'snapshot', kind: 'json', why: 'frozen financial calculation includes the original order and item snapshots' },
   // ---- the catalogue ----------------------------------------------------
   /**
    * A SECTION'S OWN COVER — the one picture on the home page that an admin
@@ -413,6 +418,10 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'accounting_entries.event_key': 'journal de-duplication token',
   'finance_posting_errors.event_key': 'financial event retry token',
   'finance_cost_rules.group_key': 'work-group label, rendered only as text',
+  'finance_cost_rules.scope_json': 'validated catalog and product ids, including exclusions; no media fields',
+  'finance_order_adjustments.allocations_json': 'order-item ids and numerical amounts allocated to each item',
+  'finance_promotion_history.before_json': 'monthly promotion amount, exchange rate, currency, title and accounting ids',
+  'finance_promotion_history.after_json': 'monthly promotion figures and input request; no media input or rendered media',
   'finance_order_costs.group_key': 'frozen work-group label',
   'finance_task_assignments.group_key': 'work-group label',
   'finance_order_costs.snapshot': 'frozen cost formula, money, staff and product ids; no rendered media',
@@ -420,6 +429,11 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'finance_rule_versions.snapshot': 'immutable cost-rule configuration',
   'purchase_orders.request_json': 'request de-duplication; invoice attachment is scanned separately',
   'purchase_receiving_events.request_json': 'receipt ids, quantities and inspection notes',
+  'investment_contracts.request_json': 'investor and incoming-stock ids, contract name, capital and percentage terms',
+  'investor_allocation_results.snapshot': 'financial calculation version, fingerprint, quantities, costs and profit; no order-item images',
+  'investor_finance_events.event_key': 'financial event de-duplication token',
+  'investor_finance_events.snapshot': 'funding amount, date and reference text or numerical allocation calculation; no receipt image field',
+  'lot_cost_adjustments.request_json': 'incoming-stock id, unit cost, adjustment day and descriptive title',
   // -- the community's projects (0153): numbers and short words in JSON ------
   'community_posts.print_settings': 'layer height, infill, supports, nozzle — numbers and flags, never a key',
   'community_posts.dimensions': 'the printed part\'s size in millimetres',

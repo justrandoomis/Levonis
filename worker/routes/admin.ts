@@ -114,6 +114,12 @@ import { supportInboxCounts } from './adminChats';
 
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
+// Investment administration exposes capital and profit amounts, even in the
+// legacy manual register. Personal earnings have their own owner-scoped router.
+adminRoutes.use('/invest/*', async (c, next) => {
+  assertFinancialScope(c);
+  await next();
+});
 
 // ---------------------------------------------------------------- overview
 

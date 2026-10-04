@@ -1,6 +1,11 @@
 import type { Env } from './types';
-import { allocateExact, baghdadDay, fence, journalPlan, operationsInstalled } from './operations';
+import { baghdadDay, fence, journalPlan, operationsInstalled } from './operations';
 import { newId } from './crypto';
+import { getOrderGoods, workspaceInstalled } from './orderProfit';
+import { ruleScopeRank } from './financeRuleScopes';
+import { reconcileFinanceOrder } from './financeReconcile';
+import { recordFinancialFailure } from './financePostingErrors';
+export { recordFinancialFailure } from './financePostingErrors';
 
 export interface CostRule {
   id: string;
@@ -22,20 +27,14 @@ export interface CostRule {
   effective_to: string | null;
   created_at: string;
   scope_rank?: number;
+  scope_json?: string;
 }
 export function matchingRules(rules: CostRule[], productId: string, ancestors: Map<string, number>) {
   const groups = new Map<string, { rule: CostRule; rank: number }>();
   for (const rule of rules) {
-    const rank =
-      rule.target_type === 'product'
-        ? rule.target_id === productId
-          ? 10000
-          : -1
-        : rule.target_type === 'catalog'
-          ? (ancestors.get(rule.target_id) ?? -1)
-          : 0;
+    const rank = ruleScopeRank(rule, productId, ancestors);
     if (rank < 0) continue;
-    const key = `${rule.group_key}:${rule.milestone}`,
+    const key = `${rule.staff_id ?? ''}:${rule.group_key}:${rule.milestone}`,
       prev = groups.get(key);
     if (
       !prev ||
@@ -143,6 +142,15 @@ export async function planOrderFinanceSnapshot(
       .prepare('INSERT INTO finance_order_snapshots(order_id,rules_json,created_at) VALUES (?,?,?)')
       .bind(orderId, JSON.stringify(frozen), at),
   ];
+  if (await workspaceInstalled(db)) {
+    for (const line of lines) {
+      statements.push(db.prepare(`INSERT INTO finance_line_departments
+        (order_item_id,main_catalog_id,sub_catalog_id,main_name,sub_name,captured_at)
+        SELECT ?,p.category_id,p.sub_category_id,COALESCE(mc.name_ar,''),COALESCE(sc.name_ar,''),?
+        FROM products p LEFT JOIN catalogs mc ON mc.id=p.category_id LEFT JOIN catalogs sc ON sc.id=p.sub_category_id
+        WHERE p.id=? ON CONFLICT(order_item_id) DO NOTHING`).bind(line.id, at, line.product_id));
+    }
+  }
   if (walletAdvanceIqd > 0)
     statements.push(
       ...journalPlan(
@@ -180,72 +188,7 @@ export interface OrderGoodsLine {
   sku_snapshot: string;
 }
 export async function orderGoods(db: D1Database, orderId: string) {
-  const order = await db
-    .prepare('SELECT * FROM orders WHERE id=?')
-    .bind(orderId)
-    .first<Record<string, unknown>>();
-  if (!order) return null;
-  const [raw, allocations] = await Promise.all([
-    db.prepare('SELECT * FROM order_items WHERE order_id=? ORDER BY id').bind(orderId).all<OrderGoodsLine>(),
-    db
-      .prepare(
-        'SELECT order_item_id,SUM(qty) AS qty,SUM(cogs_iqd) AS cost,SUM(CASE WHEN cogs_iqd IS NULL THEN 1 ELSE 0 END) AS unknown FROM order_item_inventory_allocations WHERE order_id=? AND released_at IS NULL GROUP BY order_item_id',
-      )
-      .bind(orderId)
-      .all<{ order_item_id: string; qty: number; cost: number | null; unknown: number }>(),
-  ]);
-  const all = raw.results ?? [],
-    parents = new Set(all.map((l) => l.bundle_parent_item_id).filter(Boolean));
-  const items = all.filter((l) => !parents.has(l.id));
-  const net = items.map((l) =>
-    Math.max(
-      0,
-      (l.component_alloc_iqd ?? l.line_total_iqd) -
-        (l.coupon_discount_iqd ?? 0) -
-        (l.membership_discount_iqd ?? 0),
-    ),
-  );
-  for (const parentId of parents) {
-    const parent = all.find((l) => l.id === parentId)!;
-    const indices = items
-      .map((l, i) => (l.bundle_parent_item_id === parentId ? i : -1))
-      .filter((i) => i >= 0);
-    const discount = (parent.coupon_discount_iqd ?? 0) + (parent.membership_discount_iqd ?? 0);
-    if (discount > 0) {
-      const shares = allocateExact(
-        Math.min(
-          discount,
-          indices.reduce((s, i) => s + net[i], 0),
-        ),
-        indices.map((i) => net[i]),
-      );
-      indices.forEach((i, j) => (net[i] -= shares[j]));
-    }
-  }
-  const points = Number(order.points_discount_iqd ?? 0);
-  if (points > 0 && net.some((v) => v > 0)) {
-    const shares = allocateExact(
-      Math.min(
-        points,
-        net.reduce((a, b) => a + b, 0),
-      ),
-      net,
-    );
-    shares.forEach((v, i) => (net[i] -= v));
-  }
-  return {
-    order,
-    lines: items.map((l, i) => {
-      const a = (allocations.results ?? []).find((a) => a.order_item_id === l.id);
-      const exact = a && a.unknown === 0 && a.qty >= l.qty;
-      return {
-        ...l,
-        net_goods_iqd: net[i],
-        cogs_iqd: exact ? a.cost : l.cost_iqd === null ? null : l.cost_iqd * l.qty,
-        cost_confidence: exact ? 'fifo' : l.cost_iqd !== null ? 'snapshot' : 'unknown',
-      };
-    }),
-  };
+  return getOrderGoods(db, orderId);
 }
 export async function runOrderFinancialEffects(
   env: Env,
@@ -300,7 +243,7 @@ export async function runOrderFinancialEffects(
   for (const line of goods.lines) {
     for (const rule of frozen.find((f) => f.line_id === line.id)?.rules ?? []) {
       if (rule.milestone !== milestone) continue;
-      const key = rule.basis === 'order' ? `${rule.group_key}:order` : `${rule.id}:${line.id}`;
+      const key = rule.basis === 'order' ? `${rule.staff_id ?? ''}:${rule.group_key}:order` : `${rule.id}:${line.id}`;
       const found = groups.get(key);
       if (found) {
         found.lineIds.push(line.id);
@@ -515,20 +458,9 @@ export async function runOrderFinancialEffects(
     else
       await db.prepare('DELETE FROM finance_posting_errors WHERE event_key=?').bind(`cogs:${orderId}`).run();
   }
-}
-export async function recordFinancialFailure(db: D1Database, orderId: string, event: string, error: unknown) {
-  if (!(await operationsInstalled(db))) return;
-  await db
-    .prepare(
-      'INSERT INTO finance_posting_errors(event_key,order_id,message,last_attempt_at) VALUES (?,?,?,?) ON CONFLICT(event_key) DO UPDATE SET message=excluded.message,last_attempt_at=excluded.last_attempt_at',
-    )
-    .bind(
-      `${event}:${orderId}`,
-      orderId,
-      (error instanceof Error ? error.message : String(error)).slice(0, 500),
-      new Date().toISOString(),
-    )
-    .run();
+  // Prepared wages, delivery and explicit retries all validate the same source
+  // before their percentage earnings become available for withdrawal.
+  await reconcileFinanceOrder(db, orderId, { day });
 }
 export async function recordReturnFinancials(
   env: Env,
@@ -589,7 +521,11 @@ export async function postStoredRefund(env: Env, caseId: string, actor: string, 
       refunded_day: string;
       posted_at: string | null;
     }>();
-  if (!fact || fact.posted_at) return;
+  if (!fact) return;
+  if (fact.posted_at) {
+    await reconcileFinanceOrder(db, fact.order_id, { actor, day: postingDay });
+    return;
+  }
   const day = postingDay ?? fact.refunded_day;
   const statements: D1PreparedStatement[] = [];
   if (fact.refund_iqd > 0)
@@ -638,4 +574,5 @@ export async function postStoredRefund(env: Env, caseId: string, actor: string, 
     .prepare('DELETE FROM finance_posting_errors WHERE event_key=?')
     .bind(`refund:${fact.order_id}`)
     .run();
+  await reconcileFinanceOrder(db, fact.order_id, { actor, day });
 }

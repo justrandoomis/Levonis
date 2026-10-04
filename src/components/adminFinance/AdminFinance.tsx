@@ -35,6 +35,7 @@ import { honestyNotices, isEstimated, type Notice } from './honesty';
 import { defaultGranularity, presetRange, rangeProblem, type PresetId } from './period';
 import { financeStrings } from './strings';
 import ExpenseLedger from './ExpenseLedger';
+const FinanceWorkspace = lazy(() => import('../financeWorkspace/FinanceWorkspace'));
 const FinanceOperationsPanel=lazy(()=>import('../adminOperations/FinanceOperationsPanel'));
 
 /**
@@ -93,7 +94,7 @@ interface Loaded {
   sub: FinanceCategoriesReport;
 }
 
-export default function AdminFinance() {
+export function LegacyAdminFinance() {
   const { loc, lang, dir } = useLanguage();
   const s = useMemo(() => financeStrings(loc), [loc]);
   const latin = isLatin(lang);
@@ -559,6 +560,11 @@ export default function AdminFinance() {
       )}
     </section>
   );
+}
+
+/** The current workspace keeps the previous reports available under accounting. */
+export default function AdminFinance() {
+  return <Suspense fallback={<p role="status">…</p>}><FinanceWorkspace legacy={<LegacyAdminFinance />} /></Suspense>;
 }
 
 /** Inclusive day count between two 'YYYY-MM-DD' strings, never via `Date`. */

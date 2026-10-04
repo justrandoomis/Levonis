@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import StockSelection from './StockSelection';
+import LotCountForm from '../adminInventory/LotCountForm';
+import LotScanner from '../adminInventory/LotScanner';
+import '../adminInventory/inventory-workspace.css';
 import {
   api,
   Card,
@@ -48,16 +51,18 @@ type Health = {
   reorder_point: number;
   lead_time_days: number;
 };
-export default function StockOperationsPanel({ onChanged }: { onChanged: () => void }) {
+export default function StockOperationsPanel({ onChanged, initialTab }: { onChanged: () => void; initialTab?: 'counts' | 'locations' }) {
   const { loc } = useLabels(),
     op = useOperation();
-  const [tab, setTab] = useState('health'),
+  const [tab, setTab] = useState(initialTab ?? 'health'),
     [search, setSearch] = useState(''),
     [offset, setOffset] = useState(0),
     [returnCase, setReturnCase] = useState(''),
     [returnCases, setReturnCases] = useState<
-      Array<{ id: string; order_id: string; name_snapshot: string; qty: number }>
+      Array<{ id: string; order_id: string; order_item_id: string; name_snapshot: string; qty: number }>
     >([]),
+    [returnAllocations, setReturnAllocations] = useState<Array<{ id: string; order_item_id: string; lot_id: string; qty: number; claimed: number; label?: string }>>([]),
+    [returnQuantities, setReturnQuantities] = useState<Record<string, number>>({}),
     [trace, setTrace] = useState<
       Array<{
         serial_norm: string;
@@ -104,14 +109,16 @@ export default function StockOperationsPanel({ onChanged }: { onChanged: () => v
       );
       setHealth(r.rows);
     } else if (tab === 'counts') {
-      const r = await api.get<{ counts: Count[] }>(`${STOCK}/counts`);
-      setCounts(r.counts);
+      const [countRows, locationRows] = await Promise.all([api.get<{ counts: Count[] }>(`${STOCK}/counts`), api.get<{ lots: Lot[] }>(`${STOCK}/locations?q=${encodeURIComponent(search)}&offset=${offset}`)]);
+      setCounts(countRows.counts);
+      setLots(locationRows.lots);
     } else if (tab === 'serials') {
-      const r = await api.get<{ returns: typeof returnCases; links: typeof trace; lots: Lot[] }>(
+      const r = await api.get<{ returns: typeof returnCases; return_allocations?: typeof returnAllocations; links: typeof trace; lots: Lot[] }>(
         `${STOCK}/trace?q=${encodeURIComponent(search)}&offset=${offset}`,
       );
       setLots(r.lots);
       setReturnCases(r.returns);
+      setReturnAllocations(r.return_allocations ?? []);
       setTrace(r.links);
     } else {
       const r = await api.get<{ locations: Named[]; lots: Lot[] }>(
@@ -129,8 +136,12 @@ export default function StockOperationsPanel({ onChanged }: { onChanged: () => v
     await load();
     onChanged();
   };
+  const selectedReturn = returnCases.find((r) => r.id === returnCase);
+  const returnOrigins = returnAllocations.filter((a) => a.order_item_id === selectedReturn?.order_item_id);
+  const returnEvidence = returnOrigins.map((a) => ({ allocation_id: a.id, qty: returnOrigins.length === 1 ? selectedReturn?.qty ?? 0 : returnQuantities[a.id] ?? 0 })).filter((a) => a.qty > 0);
+  const returnValid = returnOrigins.length === 0 || (returnEvidence.reduce((n, a) => n + a.qty, 0) === selectedReturn?.qty && returnOrigins.every((a) => { const n = returnOrigins.length === 1 ? selectedReturn?.qty ?? 0 : returnQuantities[a.id] ?? 0; return Number.isSafeInteger(n) && n >= 0 && n <= Math.max(0, a.qty - a.claimed); }));
   return (
-    <div>
+    <div className="inventory-workspace">
       {op.feedback}
       <Tabs
         value={tab}
@@ -145,7 +156,7 @@ export default function StockOperationsPanel({ onChanged }: { onChanged: () => v
           { id: 'serials', name: loc('الأجهزة والمرتجعات', 'Serials and returns') },
         ]}
       />
-      {['health', 'locations', 'serials'].includes(tab) && (
+      {['health', 'locations', 'serials', 'counts'].includes(tab) && (
         <div className="mb-3 grid gap-2 sm:grid-cols-3">
           <Input
             label={loc('بحث بالاسم أو SKU أو الدفعة', 'Search name, SKU or lot')}
@@ -280,7 +291,7 @@ export default function StockOperationsPanel({ onChanged }: { onChanged: () => v
       )}
       {tab === 'locations' && (
         <>
-          <Card title={loc('إضافة مستودع أو رف أو حجر', 'Add warehouse, shelf or quarantine location')}>
+          <details className="mb-4"><summary>{loc('إدارة المستودعات والرفوف', 'Manage warehouses and shelves')}</summary><Card title={loc('إضافة مستودع أو رف أو حجر', 'Add warehouse, shelf or quarantine location')}>
             <div className="grid gap-3 sm:grid-cols-4">
               <Input label={loc('الاسم', 'Name')} value={name} onChange={setName} />
               <Select
@@ -322,8 +333,9 @@ export default function StockOperationsPanel({ onChanged }: { onChanged: () => v
                 {loc('إضافة', 'Add')}
               </button>
             </div>
-          </Card>
+          </Card></details>
           <Card title={loc('نقل دفعة أو جزء منها', 'Transfer a lot or part of a lot')}>
+            <LotScanner onScanned={(result) => { if (result.lot) { const l = result.lot; if (!lots.some((v) => v.id === l.id)) setLots((old) => [...old, { id: l.id, product_id: l.product_id ?? '', name: l.name ?? '', name_ar: l.name_ar ?? '', qty_remaining: l.qty_remaining ?? 0, location_id: null, location_name: null }]); setSource(l.id); } }} />
             <div className="grid gap-3 sm:grid-cols-3">
               <Select
                 label={loc('الدفعة', 'Lot')}
@@ -358,7 +370,7 @@ export default function StockOperationsPanel({ onChanged }: { onChanged: () => v
             <button
               type="button"
               className={T.btnPrimary}
-              disabled={op.busy || !source || !target}
+              disabled={op.busy || !source || !target || !Number.isSafeInteger(qty) || qty < 1 || qty > (lots.find((l) => l.id === source)?.qty_remaining ?? 0)}
               onClick={() =>
                 op.run(
                   async () => {
@@ -406,7 +418,8 @@ export default function StockOperationsPanel({ onChanged }: { onChanged: () => v
       )}
       {tab === 'counts' && (
         <>
-          <Card title={loc('إنشاء جرد شامل للمخزون', 'Create consolidated stock count')}>
+          <Card title={loc('جرد دفعة محددة', 'Count a specific lot')}><LotCountForm lots={lots} onChanged={refresh} /></Card>
+          <details className="mb-4"><summary>{loc('جرد شامل لعدة منتجات', 'Consolidated count for multiple items')}</summary><Card title={loc('إنشاء جرد شامل للمخزون', 'Create consolidated stock count')}>
             <p className={`mb-3 text-xs ${T.text3}`}>
               {loc(
                 'أدخل إجمالي الكمية الفعلية للنسخة في جميع المستودعات والرفوف. نقل الدفعات بين المواقع لا يغيّر هذا الإجمالي.',
@@ -506,7 +519,7 @@ export default function StockOperationsPanel({ onChanged }: { onChanged: () => v
             >
               {loc('حفظ الجرد للمراجعة', 'Save count for review')}
             </button>
-          </Card>
+          </Card></details>
           <Card title={loc('الجرد المحفوظ', 'Saved counts')}>
             <DataTable headers={[loc('الاسم', 'Name'), loc('الحالة', 'Status'), loc('البنود', 'Lines'), '']}>
               {counts.map((c) => (
@@ -686,7 +699,7 @@ export default function StockOperationsPanel({ onChanged }: { onChanged: () => v
               <Select
                 label={loc('حالة المرتجع المفتوحة', 'Open return case')}
                 value={returnCase}
-                onChange={setReturnCase}
+                onChange={(v) => { setReturnCase(v); setReturnQuantities({}); setReturnId(crypto.randomUUID()); }}
                 empty={loc('اختر المرتجع', 'Choose return')}
                 options={returnCases.map((r) => ({
                   id: r.id,
@@ -705,10 +718,19 @@ export default function StockOperationsPanel({ onChanged }: { onChanged: () => v
               />
               <Input label={loc('الملاحظات', 'Notes')} value={note} onChange={setNote} />
             </div>
+            {returnOrigins.length > 0 && <div className="inventory-line mt-4">
+              <h4 className={`mb-3 font-semibold ${T.text1}`}>{loc('مصدر القطع المرتجعة', 'Origin of returned units')}</h4>
+              {returnOrigins.length > 1 ? <>
+                <p className={`mb-3 text-sm ${T.text3}`}>{loc(`حدد دفعات القطع ${selectedReturn?.qty ?? 0} المرتجعة حتى تُسوّى تكلفة ومستثمر كل قطعة بدقة.`, `Select the origin of all ${selectedReturn?.qty ?? 0} returned units so each unit’s cost and investor are settled accurately.`)}</p>
+                <LotScanner orderItemId={selectedReturn?.order_item_id} onScanned={(r) => { const a = returnOrigins.find((v) => v.lot_id === r.lot?.id); if (!a) throw new Error(loc('الدفعة ليست من أصل هذا المرتجع', 'This lot is not an origin of this return')); setReturnQuantities((old) => ({ ...old, [a.id]: Math.min(Math.max(0, a.qty - a.claimed), (old[a.id] ?? 0) + 1) })); }} />
+                <div className="inventory-fields">{returnOrigins.map((a) => <Input key={a.id} label={a.label || `${loc('دفعة', 'Lot')} · ${a.lot_id.slice(-8)}`} type="number" min={0} value={returnQuantities[a.id] ?? 0} onChange={(v) => setReturnQuantities((old) => ({ ...old, [a.id]: Number(v) }))} hint={`${loc('المتاح للإرجاع', 'Available to return')}: ${Math.max(0, a.qty - a.claimed)}`} />)}</div>
+                <p className={`mt-3 text-sm ${T.text2}`}>{loc('المحدد / المطلوب', 'Selected / required')}: {returnEvidence.reduce((n, a) => n + a.qty, 0)} / {selectedReturn?.qty}</p>
+              </> : <p className={`text-sm ${T.text2}`}>{returnOrigins[0].label || `${loc('دفعة', 'Lot')} · ${returnOrigins[0].lot_id.slice(-8)}`} · {loc('الكمية', 'Quantity')}: {selectedReturn?.qty}</p>}
+            </div>}
             <button
               type="button"
               className={`${T.btnPrimary} mt-3`}
-              disabled={op.busy || !returnCase}
+              disabled={op.busy || !returnCase || !returnValid}
               onClick={() =>
                 op.run(
                   async () => {
@@ -717,6 +739,7 @@ export default function StockOperationsPanel({ onChanged }: { onChanged: () => v
                       return_case_id: returnCase,
                       disposition,
                       note,
+                      ...(returnOrigins.length > 0 ? { allocations: returnEvidence } : {}),
                     });
                     setReturnId(crypto.randomUUID());
                     setReturnCase('');

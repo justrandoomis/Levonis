@@ -102,6 +102,16 @@ export default function Profile() {
   const navigate = useNavigate();
   const { balanceUsdCents, balanceIqd: walletBalanceIqd, pointBalance, exchangeRate } = useWallet();
   const { isAuthenticated, user, isLoaded } = useAuth();
+  const [earningsAccess, setEarningsAccess] = useState<{ userId: string; eligible: boolean } | null>(null);
+  const accountId = user?.id;
+  useEffect(() => {
+    if (!isAuthenticated || !accountId) return;
+    let current = true;
+    api.get<{ eligible: boolean }>('/api/finance-earnings/eligibility')
+      .then((result) => { if (current) setEarningsAccess({ userId: accountId, eligible: result.eligible }); })
+      .catch(() => { if (current) setEarningsAccess({ userId: accountId, eligible: false }); });
+    return () => { current = false; };
+  }, [isAuthenticated, accountId]);
 
   const now = Date.now();
   const planActive =
@@ -429,6 +439,17 @@ export default function Profile() {
         {!isAuthenticated && <GuestCard />}
 
         {/* First Card: Membership Center — members only (real ledger data). */}
+        {isAuthenticated && earningsAccess?.userId === accountId && earningsAccess?.eligible && (
+          <button type="button" onClick={() => navigate('/earnings')}
+            className="mb-3 flex min-h-14 w-full items-center gap-3 rounded-xl bg-zinc-900 p-3 text-start text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:opacity-80">
+            <Wallet className="h-5 w-5 shrink-0 text-gold" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">{loc('أرباحي', 'My earnings')}</span>
+              <span className="block text-xs leading-5 text-zinc-400">{loc('المستحقات وطلبات السحب', 'Earnings and withdrawal requests')}</span>
+            </span>
+            {dir === 'rtl' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+          </button>
+        )}
         {isAuthenticated && (
         <div className="rounded-xl p-3 mb-3 shadow-sm bg-zinc-900">
           {/* Top section of the card */}

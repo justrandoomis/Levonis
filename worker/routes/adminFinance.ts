@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Context, Next } from 'hono';
-import type { AppContext } from '../lib/types';
+import type { AppContext, Env } from '../lib/types';
 import { requireAdmin, badRequest, forbidden, notFound, str, int } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
@@ -61,6 +61,21 @@ import {
  */
 
 import { planExpenseAccounting } from '../lib/expenseAccounting';
+import { workspaceInstalled } from '../lib/orderProfit';
+import { reconcileFinanceOrder } from '../lib/financeReconcile';
+
+/** An edited linked expense must also change the investor's payable projection. */
+async function syncExpenseOrders(env: Env, expenseId: string, actor: string): Promise<boolean> {
+  if (!await workspaceInstalled(env.DB)) return false;
+  const links = await env.DB.prepare('SELECT DISTINCT order_id FROM finance_expense_links WHERE expense_id=? AND order_id IS NOT NULL')
+    .bind(expenseId).all<{ order_id: string }>();
+  let pending = false;
+  for (const link of links.results ?? []) {
+    const result = await reconcileFinanceOrder(env.DB, link.order_id, { actor });
+    pending ||= !result.complete;
+  }
+  return pending;
+}
 
 export const adminFinanceRoutes = new Hono<AppContext>();
 adminFinanceRoutes.use('*', requireAdmin);
@@ -95,16 +110,20 @@ const nowIso = () => new Date().toISOString();
  * They are not seeded from migration 0095, and that is deliberate: a seeded
  * INSERT is a write (`scripts/check-migrations-additive.mjs` classifies it as
  * non-additive), and re-applying the migration would resurrect a category the
- * owner had deliberately removed. Here, they are created only when the table is
- * EMPTY — so the moment the owner touches the list, this function never runs
- * again and can never undo their edits.
+ * owner had deliberately removed. System categories for monthly promotion and
+ * payroll can already exist before the owner's first visit. They do not count
+ * as an initialized owner list. Once seeded, the audit marker also prevents a
+ * later removal of all ordinary categories from resurrecting those defaults.
  *
  * The write is audited like any other admin write, so «من أضاف هذه الفئات» has
  * an answer.
  */
 async function ensureDefaultCategories(c: Context<AppContext>): Promise<void> {
-  const existing = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM expense_categories').first<{ n: number }>();
+  const existing = await c.env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM expense_categories WHERE id NOT IN ('exp_owner_marketing','finance_staff_wages')"
+  ).first<{ n: number }>();
   if ((existing?.n ?? 0) > 0) return;
+  if (await c.env.DB.prepare("SELECT 1 FROM audit_log WHERE action='finance.expense_category.seed' AND target='expense_categories' LIMIT 1").first()) return;
   const admin = c.get('user')!;
   const ts = nowIso();
   // One statement per row, one batch: nine rows of eight parameters is 72
@@ -430,7 +449,7 @@ adminFinanceRoutes.patch('/expenses/:id', async (c) => {
     before: { category_id: row.category_id, amount_iqd: Number(row.amount_iqd), expense_day: row.expense_day },
     after: { category_id: categoryId, amount_iqd: amount, expense_day: day },
   });
-  return c.json({ success: true });
+  return c.json({ success: true, posting_pending: await syncExpenseOrders(c.env, id, admin.id) });
 });
 
 /**
@@ -485,7 +504,7 @@ adminFinanceRoutes.delete('/expenses/:id', async (c) => {
       reason,
     });
   }
-  return c.json({ success: true, voided: (res.meta?.changes ?? 0) > 0 });
+  return c.json({ success: true, voided: (res.meta?.changes ?? 0) > 0, posting_pending: await syncExpenseOrders(c.env, id, admin.id) });
 });
 
 /** The other half of a void: an expense removed by mistake comes back, with the
@@ -513,5 +532,5 @@ adminFinanceRoutes.post('/expenses/:id/restore', async (c) => {
       expense_day: row.expense_day,
     });
   }
-  return c.json({ success: true, restored: (res.meta?.changes ?? 0) > 0 });
+  return c.json({ success: true, restored: (res.meta?.changes ?? 0) > 0, posting_pending: await syncExpenseOrders(c.env, id, admin.id) });
 });
