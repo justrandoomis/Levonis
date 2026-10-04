@@ -41,10 +41,10 @@ export function useRemote<T>(path: string) {
 export function useMutation() {
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const lock = useRef(false);
-  const run = async (fn: () => Promise<void>, message?: string) => {
+  const run = async (fn: () => Promise<void>, message?: string | (() => string)) => {
     if (lock.current) return false;
     lock.current = true; setBusy(true); setError(''); setNotice('');
-    try { await fn(); setNotice(message ?? ''); return true; }
+    try { await fn(); setNotice(typeof message === 'function' ? message() : message ?? ''); return true; }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); return false; }
     finally { lock.current = false; setBusy(false); }
   };

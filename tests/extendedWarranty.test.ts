@@ -64,6 +64,7 @@ import { PRODUCT_TYPES } from '../worker/lib/templateFamilies';
 import { POLICY_KEYS, POLICY_LANGS } from '../worker/lib/policyOps';
 import { getPolicyDocument } from '../worker/lib/policies';
 import { acceptedPolicies } from './lib/policies';
+import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 import {
   warrantyFee as formWarrantyFee,
@@ -187,6 +188,7 @@ let seq = 0;
 const orderBody = (paymentMethodId: string, over: Record<string, unknown> = {}) => ({
   addressId: 'addr_b',
   deliveryMethodId: 'standard',
+  printerStandardDeliveryAcceptance: { version: PRINTER_STANDARD_DELIVERY_POLICY.version, accepted: true },
   paymentMethodId,
   useWallet: false,
   usePoints: false,

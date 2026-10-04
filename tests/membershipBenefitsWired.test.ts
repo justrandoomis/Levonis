@@ -33,6 +33,7 @@ import { quoteShipping } from '../packages/shipping/src/shipping';
 import type { ShippingConfig } from '../packages/shipping/src/shipping';
 import { acceptedPolicies } from './lib/policies';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
+import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
 
 // ------------------------------------------------------------------ fixture
 
@@ -152,6 +153,9 @@ const checkoutBody = (addressId: string, over: Record<string, unknown> = {}) => 
   ...over,
 });
 const orderBody = (addressId: string, over: Record<string, unknown> = {}) => ({
+  // Valid printer checkouts explicitly acknowledge the transport policy,
+  // including when the membership makes standard delivery free.
+  printerStandardDeliveryAcceptance: { version: PRINTER_STANDARD_DELIVERY_POLICY.version, accepted: true },
   ...checkoutBody(addressId, over),
   idempotencyKey: `mb-${++seq}-${addressId}`,
   policyAcceptance: acceptedPolicies(),

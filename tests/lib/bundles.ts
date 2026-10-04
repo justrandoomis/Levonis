@@ -18,6 +18,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb } from '../fixtures/app';
 import { acceptedPolicies } from './policies';
+import { PRINTER_STANDARD_DELIVERY_POLICY } from '../../packages/shipping/src/printerDeliveryPolicy';
 
 export const FUTURE = '2099-01-01T00:00:00.000Z';
 export const PAST = '2020-01-01T00:00:00.000Z';
@@ -240,6 +241,9 @@ let seq = 0;
 export const orderBody = (over: Record<string, unknown> = {}) => ({
   addressId: 'addr_b',
   deliveryMethodId: 'standard',
+  // The worked-example bundle contains a physical printer. Its buyer
+  // explicitly acknowledges standard transport before this valid checkout.
+  printerStandardDeliveryAcceptance: { version: PRINTER_STANDARD_DELIVERY_POLICY.version, accepted: true },
   paymentMethodId: 'cash',
   useWallet: false,
   usePoints: false,

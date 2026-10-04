@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
 import { api, ApiUser } from './lib/api';
 import { clearPageCache } from './lib/pageCache';
+import { clearPrimedRequests } from './lib/bootFetch';
 
 /**
  * Authentication state. The session lives in a Secure HttpOnly cookie managed
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (lastIdentityRef.current === id) return;
     lastIdentityRef.current = id;
     clearPageCache();
+    clearPrimedRequests();
   }, [user?.id]);
 
   const refreshUser = useCallback(async () => {
@@ -77,11 +79,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const data = await api.post<{ user: ApiUser }>('/api/auth/login', { email, password });
+    clearPrimedRequests();
     setUser(data.user);
   }, []);
 
   const loginWithGoogle = useCallback(async (credential: string) => {
     const data = await api.post<{ user: ApiUser }>('/api/auth/google', { credential });
+    clearPrimedRequests();
     setUser(data.user);
   }, []);
 
@@ -89,13 +93,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Email-first sign-up (mail configured) answers pending_email with no
     // account object: the account opens from the link in the inbox.
     const data = await api.post<{ user?: ApiUser; pending_email?: boolean }>('/api/auth/register', { username, name, email, password });
-    if (data.user) setUser(data.user);
+    if (data.user) { clearPrimedRequests(); setUser(data.user); }
   }, []);
 
   const logout = useCallback(async () => {
     try {
       await api.post('/api/auth/logout');
     } finally {
+      clearPrimedRequests();
       setUser(null);
     }
   }, []);

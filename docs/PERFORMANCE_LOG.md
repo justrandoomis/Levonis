@@ -1437,3 +1437,42 @@ only for the account that minted it (W5-B); «order again» makes a draft the cu
 profile» sheet covers «طلب جديد», and past it the wizard has no `[data-wizard="stepper"]` any more, so the phase's
 edits to it (the `/requests/<id>` landing) are never reached. Neither is a regression of this tree; both scripts
 want a rewrite against today's wizard and notices (an open item).
+
+## 2026-10-04 — finance overview and customer loading
+
+Baseline measured on deployed revision `925aea8c` using PageSpeed Insights,
+Lighthouse 13.5.0, emulated Moto G Power, Slow 4G and an initial page load:
+
+| Page | Mobile score | FCP | LCP | TBT | CLS | Speed index |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| [Home](https://pagespeed.web.dev/analysis/https-levonis-iq-com/zdz2bams0u?form_factor=mobile) | 70 | 3.0 s | 6.2 s | 0 ms | .002 | 4.4 s |
+| [Products](https://pagespeed.web.dev/analysis/https-levonis-iq-com-products/hbavvebsny?form_factor=mobile) | 80 | 2.9 s | 4.2 s | 60 ms | .002 | 3.7 s |
+| [A1 product](https://pagespeed.web.dev/analysis/https-levonis-iq-com-product-bambu-lab-a1/ts356nqvhq?form_factor=mobile) | 72 | 3.5 s | 5.0 s | 0 ms | .077 | 3.6 s |
+
+The same home report's desktop score was 95, FCP .6 s and LCP 1.1 s. These are
+single lab measurements, not guarantees for every connection. The origin's
+28-day mobile field figures were LCP 4.1 s, INP 118 ms and CLS .11; historical
+field data cannot establish the effect of a just-published revision.
+
+The home LCP was a lazily loaded `lv-promo-photo` catalogue image. The report
+estimated 635 KiB of image savings: original 1254-square images were displayed
+at much smaller sizes. Product rails also declared a 50vw image slot despite
+their fixed 148px cards. The product page additionally loaded closed purchase
+dialogs, the refusal translation dictionary, and below-fold reviews eagerly.
+These observations guided the responsive image, preload and lazy-loading work.
+
+**Location limitation:** PageSpeed's inspected report did not identify an Iraqi
+measurement location. A separate public Globalping probe inventory contained
+5,201 probes and none with country `IQ`. One explicitly Iraq-only HTTPS request
+for the home page returned `no_probes_found` / “No matching IPv4 probes
+available.” No nearby-country result is presented as an Iraqi result. This
+attempt did not measure Iraqi HTTP latency or browser rendering.
+
+
+The local production build after these changes measures the complete product
+static JavaScript closure at **257.2 KiB gzip**, down from **287.2 KiB**
+(30.0 KiB, about 10.4%). The initial application closure is 184.2 KiB, and all
+15 bundle-budget assertions pass without increasing limits. This is a transfer
+size measurement; the after-deployment PageSpeed report remains the browser
+performance comparison. Main-host opening requests are one-use, deadline-bound,
+identity-invalidated and never substitute for authoritative cart/checkout data.

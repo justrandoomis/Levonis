@@ -27,13 +27,13 @@ The measured build on 2026-10-04, using `gzipSync` at level 9:
 
 | Measurement | Bytes | Limit |
 | --- | ---: | ---: |
-| Original and other stylesheets | 61,009 | 61,440 |
-| New finance workspace sheet | 3,728 | Combined below |
+| Original and other stylesheets | 61,071 | 61,440 |
+| New finance workspace sheet | 3,890 | Combined below |
 | New inventory workspace sheet | 1,041 | Combined below |
-| New linked-account earnings sheet | 1,822 | Combined below |
-| Three new sheets together | 6,591 | 7,168 |
+| New linked-account earnings sheet | 1,852 | Combined below |
+| Three new sheets together | 6,783 | 7,168 |
 
-The entry stylesheet remains `index-C8GexQY2.css`, 48,112 bytes gzip. The build's
+The entry stylesheet is `index-6D9En6Ql.css`, 48,174 bytes gzip. The build's
 Vite manifest shows only this sheet in the initial static closure. The storefront
 adds its existing theme sheet; the storefront product page also adds the existing
 swatches sheet. None of the three new operation sheets is present in those

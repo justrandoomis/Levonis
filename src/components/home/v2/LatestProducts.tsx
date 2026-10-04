@@ -152,7 +152,7 @@ export default function LatestProducts({
             ))
           : products.map((p, i) => (
               <div key={p.id} className={`flex shrink-0 snap-start ${i >= ROWS_OF_FIVE ? 'lg:hidden 2xl:flex' : ''}`}>
-                <ProductCard p={p} density="compact" compareToggle widthClass="w-[148px] shrink-0 lg:w-full" />
+                <ProductCard p={p} density="compact" compareToggle widthClass="w-[148px] shrink-0 lg:w-full" imageSizes="(min-width: 1920px) 293px, (min-width: 1536px) calc((100vw - 164px) / 6), (min-width: 1024px) calc((100vw - 128px) / 5), 148px" />
               </div>
             ))}
       </div>

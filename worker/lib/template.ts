@@ -3195,8 +3195,10 @@ export function toDocBody(
   ] as const;
   if (deliveryKeys.some((key) => parsed.fields[key])) {
     const previous = existing?.delivery_options ?? {
-      standard: { enabled: false, quantity_step: 1, fee_iqd: 0 },
-      personal: { enabled: false, quantity_step: 1, fee_iqd: 0 },
+      // A partial edit of a legacy product inherits the normal enabled
+      // methods, just like the product editor. Only an explicit false disables.
+      standard: { enabled: true, quantity_step: 1, fee_iqd: 5000 },
+      personal: { enabled: true, quantity_step: 1, fee_iqd: 10000 },
     };
     const value = <T,>(key: typeof deliveryKeys[number], fallback: T): T =>
       (parsed.fields[key]?.value === undefined ? fallback : parsed.fields[key].value) as T;

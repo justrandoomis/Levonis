@@ -21,6 +21,7 @@ import { commitParticipantStatements, effectiveStaffCostSql, heldSourceSql, staf
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { orderGoods, postStoredRefund, runOrderFinancialEffects, type CostRule } from '../lib/orderFinance';
 import { operationsReport } from '../lib/operationsReport';
+import { nextEmploymentDay, queueStaffReconciliation, readStaff, updateStaffEmployment } from '../lib/financeEmployment';
 
 export const adminFinanceOperationsRoutes = new Hono<AppContext>();
 adminFinanceOperationsRoutes.use('*', requireAdmin);
@@ -79,6 +80,7 @@ for (const [path, table] of [
     const user = c.get('user')!;
     await requireCapability(c.env, user, 'rules');
     const b = await c.req.json<Record<string, unknown>>();
+    if(path==='staff')return c.json({success:true,id:c.req.param('id'),...await updateStaffEmployment(c.env.DB,c.req.param('id'),b,user.id)});
     await c.env.DB.prepare(`UPDATE ${table} SET name=?,active=? WHERE id=?`)
       .bind(str(b.name, 'الاسم', { min: 1, max: 120 }), b.active === false ? 0 : 1, c.req.param('id'))
       .run();
@@ -119,7 +121,7 @@ async function ruleValues(
     throw badRequest('اختر القسم أو المنتج');
   const scope = b.scope == null ? null : await validateRuleScope(db,b.scope);
   const staffId = text(b.staff_id, 60) || null;
-  const staff = staffId ? await db.prepare('SELECT id,name FROM finance_staff WHERE id=? AND active=1').bind(staffId).first<{id:string;name:string}>() : null;
+  const staff = staffId ? await db.prepare('SELECT id,name,start_work_date FROM finance_staff WHERE id=? AND active=1 AND archived_at IS NULL').bind(staffId).first<{id:string;name:string;start_work_date:string|null}>() : null;
   if(staffId && !staff) throw badRequest('اختر موظفًا نشطًا من القائمة');
   let category = text(b.category_id, 60);
   if(!category) {
@@ -128,7 +130,7 @@ async function ruleValues(
   }
   if (!(await db.prepare('SELECT id FROM expense_categories WHERE id=? AND active=1').bind(category).first()))
     throw badRequest('اختر تصنيف المصروف');
-  const from = dateValue(b.effective_from, baghdadDay()),
+  const from = dateValue(b.effective_from, staff?.start_work_date?nextEmploymentDay(staff.start_work_date):baghdadDay()),
     to = b.effective_to ? dateValue(b.effective_to) : null;
   if (to && to < from) throw badRequest('تاريخ نهاية القاعدة يسبق البداية');
   return {
@@ -149,6 +151,7 @@ async function ruleValues(
     cap_iqd: b.cap_iqd == null || b.cap_iqd === '' ? null : whole(b.cap_iqd, 'السقف'),
     priority: whole(b.priority ?? 0, 'الأولوية', 0, 10000),
     effective_from: from,
+    employment_effective_default:staff?.start_work_date&&(b.effective_from===undefined||b.employment_effective_default===1)?1:0,
     effective_to: to,
     created_at: createdAt,
     created_by: actor,
@@ -163,16 +166,19 @@ adminFinanceOperationsRoutes.post('/rules', async (c) => {
     now = new Date().toISOString(),
     r = await ruleValues(c.env.DB, b, user.id, id, 1, now);
   const keys = Object.keys(r);
-  await c.env.DB.batch([
+  const statements=[
     c.env.DB.prepare(
       `INSERT INTO finance_cost_rules(${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`,
     ).bind(...Object.values(r)),
     c.env.DB.prepare(
       'INSERT INTO finance_rule_versions(rule_id,version,snapshot,created_at,actor_id) VALUES (?,1,?,?,?)',
     ).bind(id, JSON.stringify(r), now, user.id),
-  ]);
+  ];
+  const staff=r.staff_id?await readStaff(c.env.DB,r.staff_id):null;
+  const reconciliation=staff?.start_work_date?await queueStaffReconciliation(c.env.DB,staff.id,user.id,statements,true,{...r}):null;
+  if(!staff?.start_work_date)await c.env.DB.batch(statements);
   await audit(c.env.DB, user.id, 'finance.rule_created', id, {});
-  return c.json({ success: true, id });
+  return c.json({ success: true, id, reconciliation });
 });
 adminFinanceOperationsRoutes.put('/rules/:id', async (c) => {
   const user = c.get('user')!;
@@ -185,7 +191,7 @@ adminFinanceOperationsRoutes.put('/rules/:id', async (c) => {
   if (whole(b.version, 'version', 1) !== old.version) throw conflict('تغيرت القاعدة؛ حدّث الصفحة');
   const r = await ruleValues(db, b, user.id, id, old.version + 1, old.created_at),
     keys = Object.keys(r).filter((k) => k !== 'id');
-  await db.batch([
+  const statements=[
     ...fence(db, 'EXISTS(SELECT 1 FROM finance_cost_rules WHERE id=? AND version=?)', [id, old.version]),
     db
       .prepare(`UPDATE finance_cost_rules SET ${keys.map((k) => `${k}=?`).join(',')} WHERE id=?`)
@@ -195,9 +201,12 @@ adminFinanceOperationsRoutes.put('/rules/:id', async (c) => {
         'INSERT INTO finance_rule_versions(rule_id,version,snapshot,created_at,actor_id) VALUES (?,?,?,?,?)',
       )
       .bind(id, r.version, JSON.stringify(r), new Date().toISOString(), user.id),
-  ]);
+  ];
+  const staff=r.staff_id?await readStaff(db,r.staff_id):null;
+  const reconciliation=staff?.start_work_date?await queueStaffReconciliation(db,staff.id,user.id,statements,true,{...r}):null;
+  if(!staff?.start_work_date)await db.batch(statements);
   await audit(db, user.id, 'finance.rule_updated', id, { version: r.version });
-  return c.json({ success: true, id });
+  return c.json({ success: true, id, reconciliation });
 });
 adminFinanceOperationsRoutes.get('/costs', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'rules');

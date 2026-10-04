@@ -465,20 +465,17 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                     <li
                       key={it.id}
                       data-order-item
-                      className="flex gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 min-w-0"
+                      className="flex flex-wrap gap-3 rounded-xl border border-border-subtle bg-surface p-3 sm:p-4 min-w-0"
                     >
                       <div className="w-14 h-14 shrink-0 rounded-lg bg-black/50 overflow-hidden flex items-center justify-center">
                         {it.image ? (
-                          <img src={it.image} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={it.image} alt="" width={56} height={56} loading="lazy" decoding="async" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
                           <Package className="w-5 h-5 text-zinc-600" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-white font-bold text-sm">{it.name}</p>
-                        {/* The option and colour the customer actually chose —
-                            the whole reason a picker exists. */}
-                        {it.variant && <p className="text-[12px] text-olive-light mt-0.5">{it.variant}</p>}
+                        <p className="text-text-primary font-bold text-sm leading-relaxed break-words">{it.name}</p>
                         <p className="text-[12px] text-zinc-400 mt-1">
                           <span className="font-bold text-white">×{it.qty}</span>
                           {' · '}
@@ -493,26 +490,6 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                               ` — ${units.map((u) => u.serial).filter(Boolean).join(', ')}`}
                           </p>
                         )}
-                        {/* THE BOX, AS THE PERSON PACKING IT SEES IT
-                            (docs/BUNDLES_MYSTERY.md §6.3). A bundle's parts are
-                            grouped UNDER their parent rather than listed as N
-                            ungrouped zero-price rows: this is the screen staff
-                            read while packing, and "one bundle" plus an
-                            indented parts list is what is actually in the
-                            carton. */}
-                        {it.bundle && it.bundle.components.length > 0 && (
-                          <ul className="mt-2 border-s-2 border-zinc-700 ps-3 space-y-1" data-order-bundle={it.id}>
-                            {it.bundle.components.map((k) => (
-                              <li key={k.order_item_id} className="text-[12px] text-zinc-300 flex items-baseline gap-2">
-                                <span className="font-bold text-white tabular-nums shrink-0">×{k.qty}</span>
-                                <span className="min-w-0 truncate">
-                                  {k.name}
-                                  {k.variant && <span className="text-olive-light"> · {k.variant}</span>}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
                         {/* THE PICK, ON THE SCREEN STAFF READ WHEN PACKING
                             (§8.2). Admins see it from the first second, with a
                             "not yet revealed to the customer" chip — an
@@ -523,9 +500,35 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                           <MysteryReveal mystery={it.mystery} cover={it.image} viewer="admin" />
                         )}
                       </div>
-                      <div className="shrink-0 self-center text-2xl font-black text-white tabular-nums">
-                        {it.qty}
+                      <div className="shrink-0 self-start rounded-lg bg-surface-selected px-3 py-2 text-center">
+                        <span className="block text-[11px] text-text-secondary">{loc('العدد', 'Qty', 'ژمارە')}</span>
+                        <span className="block text-xl font-black text-text-primary tabular-nums">{it.qty}</span>
                       </div>
+                      {/* Keep the immutable checkout description intact: older
+                          orders store option and colour in one snapshot. A
+                          guessed split, or today's product names, can cause
+                          the wrong item to be packed. */}
+                      {it.variant && <div className="w-full min-w-0"><PackingSelection value={it.variant} /></div>}
+                      {/* THE BOX, AS THE PERSON PACKING IT SEES IT
+                          (docs/BUNDLES_MYSTERY.md §6.3). A bundle's parts are
+                          grouped UNDER their parent rather than listed as N
+                          ungrouped zero-price rows: this is the screen staff
+                          read while packing, and "one bundle" plus an
+                          indented parts list is what is actually in the
+                          carton. */}
+                      {it.bundle && it.bundle.components.length > 0 && (
+                        <ul className="w-full min-w-0 border-s-2 border-border-subtle ps-3 space-y-3" data-order-bundle={it.id}>
+                          {it.bundle.components.map((k) => (
+                            <li key={k.order_item_id} className="text-[12px] text-zinc-300 flex items-baseline gap-2">
+                              <span className="font-bold text-white tabular-nums shrink-0">×{k.qty}</span>
+                              <span className="min-w-0 flex-1 break-words">
+                                {k.name}
+                                {k.variant && <PackingSelection value={k.variant} />}
+                              </span>
+                            </li>
+                            ))}
+                          </ul>
+                        )}
                     </li>
                   );
                 })}
@@ -594,6 +597,19 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
         )}
       </div>
     </Overlay>
+  );
+}
+
+function PackingSelection({ value }: { value: string }) {
+  const { loc } = useLanguage();
+  if (!value.trim()) return null;
+  return (
+    <span data-packing-selection className="mt-2 block rounded-lg border border-border-subtle bg-surface-selected px-3 py-2.5">
+      <span className="block text-[11px] font-medium text-text-secondary mb-1">
+        {loc('الخيار واللون المطلوبان', 'Selected option and colour')}
+      </span>
+      <bdi dir="auto" className="block whitespace-pre-wrap break-words text-[15px] leading-relaxed font-bold text-text-primary">{value}</bdi>
+    </span>
   );
 }
 

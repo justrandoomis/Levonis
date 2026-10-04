@@ -39,15 +39,54 @@
  * it (the promise is settled quietly otherwise), and without a `window` (the
  * unit tests, a server render) the module does nothing.
  */
-import { ApiError, DEFAULT_TIMEOUT_MS } from './api';
+import { api, ApiError, DEFAULT_TIMEOUT_MS } from './api';
 import { beginRequestFeedback } from './mascotRequest';
 
 export const RESOLVE_PATH = '/api/storefront/resolve';
 export const HOME_PATH = '/api/home';
+export function productsOpeningPath(search = ''): string {
+  const query = new URLSearchParams(search);
+  const params = new URLSearchParams();
+  if (query.get('search')) params.set('search', query.get('search')!);
+  if (query.get('category')) params.set('category', query.get('category')!);
+  params.set('limit', '50');
+  return `/api/products?${params}`;
+}
 /** The id of the data block `worker/index.ts` writes into a rewritten document. */
 export const INLINE_RESOLVE_ID = 'lv-resolve';
 
 const primed = new Map<string, Promise<Response>>();
+const deadlines = new WeakMap<Promise<Response>, { finish: () => void; cancel: () => void }>();
+let sessionEpoch = 0;
+
+/** Authentication changed: an opening answer from the earlier session is unusable. */
+export function clearPrimedRequests(): void {
+  for (const response of primed.values()) deadlines.get(response)?.cancel();
+  primed.clear();
+  sessionEpoch += 1;
+}
+
+/** Consumed once, never a page cache. A session change while it settles forces a fresh GET. */
+export function takePrimedJson<T>(path: string): Promise<T> | null {
+  const response = takePrimed(path);
+  if (!response) return null;
+  return (async () => {
+    let epoch = sessionEpoch;
+    let answer = settleJson<T>(path, response);
+    for (;;) {
+      try {
+        const data = await answer;
+        if (epoch === sessionEpoch) return data;
+      } catch (error) {
+        if (epoch === sessionEpoch) throw error;
+      }
+      epoch = sessionEpoch;
+      // The ordinary in-flight coalescer is keyed by URL. An old-session
+      // request for this URL may still be pending, so explicitly bypass it.
+      answer = api.get<T>(path, { signal: new AbortController().signal });
+    }
+  })();
+}
 
 /** The JSON of a `<script type="application/json" id=…>` data block, or null when absent or unreadable. */
 export function readInlineJson<T>(id: string): T | null {
@@ -63,13 +102,23 @@ export function readInlineJson<T>(id: string): T | null {
 }
 
 /** Start a GET now, once per path, with the API client's own deadline. */
-export function primeGet(path: string): void {
+export function primeGet(path: string, timeoutMs = DEFAULT_TIMEOUT_MS): void {
   if (typeof window === 'undefined' || typeof fetch !== 'function' || primed.has(path)) return;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-  const started = fetch(path, { credentials: 'same-origin', signal: controller.signal }).finally(() => clearTimeout(timer));
+  const started = fetch(path, { credentials: 'same-origin', signal: controller.signal });
+  const timer = setTimeout(() => {
+    if (primed.get(path) === started) primed.delete(path);
+    controller.abort();
+    deadlines.delete(started);
+  }, timeoutMs);
+  // Keep the deadline alive through res.json(), not just response headers.
+  const finish = () => { clearTimeout(timer); deadlines.delete(started); };
+  deadlines.set(started, { finish, cancel: () => { controller.abort(); finish(); } });
   // A primed request nobody takes must not surface as an unhandled rejection.
-  started.catch(() => undefined);
+  started.catch(() => {
+    if (primed.get(path) === started) primed.delete(path);
+    finish();
+  });
   primed.set(path, started);
 }
 
@@ -114,6 +163,8 @@ export async function settleJson<T>(path: string, response: Promise<Response>): 
   } catch (error) {
     feedback.finish(error instanceof ApiError ? error : { status: 0 });
     throw error;
+  } finally {
+    deadlines.get(response)?.finish();
   }
 }
 
@@ -125,18 +176,28 @@ export async function settleJson<T>(path: string, response: Promise<Response>): 
 export function bootRequests(
   pathname: string,
   inline: { kind?: unknown } | null,
-  start: (path: string) => void = primeGet
+  start: (path: string) => void = primeGet,
+  search = '',
+  hostname = ''
 ): string[] {
   const started: string[] = [];
   if (!inline) started.push(RESOLVE_PATH);
   if (pathname === '/' && (!inline || inline.kind !== 'merchant')) started.push(HOME_PATH);
+  // A bare /product on a custom or merchant host is not a platform product.
+  // Only the two canonical main-site hosts may start catalogue requests here.
+  if ((hostname === 'levonis-iq.com' || hostname === 'www.levonis-iq.com') && inline?.kind !== 'merchant') {
+    if (pathname === '/products') started.push(productsOpeningPath(search));
+    if (/^\/product\/[^/]+\/?$/.test(pathname)) {
+      try { started.push(`/api/products/${decodeURIComponent(pathname.split('/')[2])}`); } catch { /* invalid route encoding */ }
+    }
+  }
   for (const path of started) start(path);
   return started;
 }
 
 if (typeof window !== 'undefined') {
   try {
-    bootRequests(window.location.pathname, readInlineJson<{ kind?: unknown }>(INLINE_RESOLVE_ID));
+    bootRequests(window.location.pathname, readInlineJson<{ kind?: unknown }>(INLINE_RESOLVE_ID), primeGet, window.location.search, window.location.hostname);
   } catch {
     // Nothing here may break a page load.
   }

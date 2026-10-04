@@ -57,6 +57,7 @@ import {
   type SaveResponse,
 } from './types';
 import PinnedPriceNotice from './PinnedPriceNotice';
+import DeliveryAvailabilityNotice from './DeliveryAvailabilityNotice';
 const TranslationsSheet = React.lazy(() => import('./form/TranslationsSheet'));
 // «تحديث البيانات» — its own lazy chunk too; only a saved product opens it.
 const SectionUpdateSheet = React.lazy(() => import('./form/SectionUpdateSheet'));
@@ -1361,6 +1362,8 @@ export default function ProductForm({
         en="Delivery & warranty"
         summary={summarize([
           doc.delivery_options ? 'توصيل مخصص' : 'تعرفة التوصيل العامة',
+          doc.delivery_options?.standard.enabled === false ? 'العادي معطّل' : undefined,
+          doc.delivery_options?.personal.enabled === false ? 'الشخصي معطّل' : undefined,
           isPrinterCatalog && doc.warranty_plans.some((p) => p.active)
             ? `ضمان ممدد ${doc.warranty_plans.filter((p) => p.active).map((p) => `+${p.duration_months}`).join(' / ')}`
             : undefined,
@@ -1381,7 +1384,7 @@ export default function ProductForm({
                 خيارات التوصيل <span className="text-[11px] font-medium text-zinc-500">Delivery options</span>
               </h4>
               <p className="text-[11px] leading-relaxed text-zinc-500 mt-0.5">
-                الرسم = تقريب الكمية إلى الشريحة التالية × رسم الشريحة. تعطيل الطريقة يمنع اختيارها لهذا المنتج.
+                العادي رسم واحد للشحنة: ٥٬٠٠٠ د.ع للقطع العادية و١٠٬٠٠٠ د.ع للشحنة التي تحتوي طابعة. شرائح الكمية تخص التوصيل الشخصي. تعطيل الطريقة يمنع اختيارها لهذا المنتج.
               </p>
             </div>
             {doc.delivery_options ? (
@@ -1404,6 +1407,8 @@ export default function ProductForm({
               </button>
             )}
           </div>
+
+          <DeliveryAvailabilityNotice options={doc.delivery_options} printer={isPrinterCatalog} />
 
           {!doc.delivery_options ? (
             <p className="rounded-md bg-zinc-800/35 px-3 py-2 text-[11px] text-zinc-400" data-delivery-legacy-note>
@@ -1438,7 +1443,7 @@ export default function ProductForm({
                         sub={en}
                       />
                     </div>
-                    <Grid cols={2}>
+                    {method === 'personal' ? <Grid cols={2}>
                       <Field
                         ar="عدد القطع لكل شريحة"
                         en="Quantity per fee tier"
@@ -1453,7 +1458,7 @@ export default function ProductForm({
                       >
                         <Money value={rule.fee_iqd} onChange={(v) => setRule({ fee_iqd: v ?? 0 })} />
                       </Field>
-                    </Grid>
+                    </Grid> : <p className="text-[11px] text-zinc-400">تعطيل أو تفعيل التوصيل العادي فقط؛ الرسم ثابت للشحنة ولا يزيد مع الكمية أو عدد المنتجات.</p>}
                   </div>
                 );
               })}

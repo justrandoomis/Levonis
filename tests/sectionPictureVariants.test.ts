@@ -27,6 +27,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import PromoPhoto from '../src/components/home/v2/PromoPhoto';
+import { variantSrcSet } from '../src/components/ui/SafeImage';
 import { APEX, asD1, ctx, dbThrough, freshDb, get, hasColumn, json, row, stubApp } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
@@ -366,7 +370,9 @@ test('the renderers pick the theme in script and the screen with <source media>'
   for (const file of ['src/components/catalog/CropPhoto.tsx', 'src/components/home/v2/PromoPhoto.tsx']) {
     const src = code(file);
     assert.match(src, /themedFiles\(\{ src, lightSrc, mobileSrc, lightMobileSrc \}, theme\)/, `${file}: one resolver for the pair`);
-    assert.match(src, /<source media=\{PHONE_MEDIA\} srcSet=\{phone\} \/>/, `${file}: the phone file through <source>`);
+    if (file.endsWith('/CropPhoto.tsx')) {
+      assert.match(src, /<source media=\{PHONE_MEDIA\} srcSet=\{phone\} \/>/, `${file}: the phone file through <source>`);
+    }
     assert.match(src, /phone !== shown \?/, `${file}: no <source> when the phone draws the same file`);
   }
   // Every banner call site passes the phone pictures through.
@@ -375,4 +381,25 @@ test('the renderers pick the theme in script and the screen with <source media>'
     assert.match(code(file), /lightMobileSrc=\{[^}]*photo\.lightMobileSrc/, file);
   }
   assert.match(code('src/components/home/v2/CategoryBento.tsx'), /mobileSrc=\{tile\.mobileImage\}\s+lightMobileSrc=\{tile\.lightMobileImage\}/);
+});
+
+test('the promo phone source keeps its themed file through responsive candidates and original-only fallbacks', () => {
+  // useTheme's server snapshot is light. The dark pair must never enter this
+  // picture's candidates, and the phone must use its own file, not the lead.
+  const props = {
+    src: '/files/products/dark.webp', lightSrc: '/files/products/light.webp',
+    mobileSrc: '/files/products/phone-dark.webp', lightMobileSrc: '/files/products/phone-light.webp',
+    crop: false, className: 'inset-0', width: 560, height: 560,
+  };
+  const render = (over: Partial<typeof props> & { sizes?: string } = {}) => renderToStaticMarkup(createElement(PromoPhoto, { ...props, ...over }));
+  const phone = (html: string) => html.match(/<source[^>]*>/)?.[0] ?? '';
+  const responsive = render({ sizes: '400px' });
+  assert.equal(phone(responsive), `<source media="${PHONE_MEDIA}" srcSet="${variantSrcSet(props.lightMobileSrc)}" sizes="400px"/>`);
+  assert.doesNotMatch(responsive, /phone-dark\.webp|\/dark\.webp/);
+  assert.match(responsive, /<img[^>]*src="\/files\/products\/light\.webp"/);
+  const original = render();
+  assert.equal(phone(original), `<source media="${PHONE_MEDIA}" srcSet="${props.lightMobileSrc}"/>`);
+  assert.doesNotMatch(original, /\?w=|sizes=/, 'without a sizing opt-in the original pair stays untouched');
+  assert.equal(phone(render({ lightMobileSrc: '/files/products/phone-light.gif', sizes: '400px' })), `<source media="${PHONE_MEDIA}" srcSet="/files/products/phone-light.gif"/>`, 'animated phone pictures retain all frames');
+  assert.equal(phone(render({ lightMobileSrc: props.lightSrc, sizes: '400px' })), '', 'the same themed file needs no duplicate source');
 });

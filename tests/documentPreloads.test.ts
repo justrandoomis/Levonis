@@ -38,6 +38,7 @@ import {
   injectDocumentPreloads,
   inlineJsonScript,
   preloadImagePath,
+  productImagePreload,
   routeModuleFor,
   type ViteManifest,
 } from '../worker/lib/socialPreview';
@@ -155,6 +156,46 @@ test('the preload closure is the route chunk plus what it shares with other lazy
   assert.deepEqual(chunkPreloads(MANIFEST, 'src/pages/Nope.tsx'), { scripts: [], styles: [] });
   assert.equal(chunkPreloads(MANIFEST, 'src/pages/Storefront.tsx', 1).scripts.length, 1, 'capped, the route chunk first');
   assert.deepEqual(entryStylesheets(MANIFEST), ['/assets/index-abc.css']);
+});
+
+test('a route emitted as a unique dynamic manifest alias retains its preload and only its static closure', () => {
+  // Actual production build shape after deferring Product's optional pieces:
+  // src/pages/Product.tsx is absent, but _Product-<hash>.js is a dynamic entry.
+  const manifest: ViteManifest = { ...MANIFEST };
+  delete manifest['src/pages/Product.tsx'];
+  manifest['_Product-DtSmEuhQ.js'] = {
+    file: 'assets/Product-DtSmEuhQ.js', name: 'Product', isDynamicEntry: true,
+    imports: ['index.html', '_vendor-icons-i1.js'],
+    dynamicImports: ['src/components/reviews/ReviewSection.tsx', 'src/lib/refusalStrings.ts'],
+    css: ['assets/Product-DtSmEuhQ.css'],
+  };
+  manifest['src/components/reviews/ReviewSection.tsx'] = { file: 'assets/ReviewSection-r1.js', name: 'ReviewSection', isDynamicEntry: true };
+  manifest['src/lib/refusalStrings.ts'] = { file: 'assets/refusalStrings-f1.js', name: 'refusalStrings', isDynamicEntry: true };
+  assert.deepEqual(chunkPreloads(manifest, 'src/pages/Product.tsx'), {
+    scripts: ['/assets/Product-DtSmEuhQ.js', '/assets/vendor-icons-i1.js'],
+    styles: ['/assets/Product-DtSmEuhQ.css'],
+  });
+  assert.equal(chunkPreloads(manifest, 'src/pages/Product.tsx', 1).scripts.length, 1);
+  assert.deepEqual(chunkPreloads(manifest, 'src/pages/Nope.tsx'), { scripts: [], styles: [] });
+  const staticOnly: ViteManifest = { ...manifest, '_Product-DtSmEuhQ.js': { ...manifest['_Product-DtSmEuhQ.js'], isDynamicEntry: false } };
+  assert.deepEqual(chunkPreloads(staticOnly, 'src/pages/Product.tsx'), { scripts: [], styles: [] }, 'a static helper is not a route');
+  const differentSource: ViteManifest = { ...manifest, '_Product-DtSmEuhQ.js': { ...manifest['_Product-DtSmEuhQ.js'], src: 'src/components/Product.tsx' } };
+  assert.deepEqual(chunkPreloads(differentSource, 'src/pages/Product.tsx'), { scripts: [], styles: [] }, 'a different module with the same name cannot replace the route');
+  const ambiguous = { ...manifest, '_Product-another.js': { ...manifest['_Product-DtSmEuhQ.js'], file: 'assets/Product-another.js' } };
+  assert.deepEqual(chunkPreloads(ambiguous, 'src/pages/Product.tsx'), { scripts: [], styles: [] }, 'an ambiguous alias is not guessed');
+  manifest['src/pages/Product.tsx'] = MANIFEST['src/pages/Product.tsx'];
+  assert.deepEqual(chunkPreloads(manifest, 'src/pages/Product.tsx').scripts, ['/assets/Product-p1.js', '/assets/vendor-icons-i1.js'], 'an explicit source key remains authoritative');
+});
+
+test('the real product document preloads a route published under its dynamic alias', async () => {
+  const manifest: ViteManifest = { ...MANIFEST };
+  delete manifest['src/pages/Product.tsx'];
+  manifest['_Product-DtSmEuhQ.js'] = { file: 'assets/Product-DtSmEuhQ.js', name: 'Product', isDynamicEntry: true, imports: ['index.html', '_vendor-icons-i1.js'] };
+  const { call } = realWorker({ manifest });
+  const html = await (await call(APEX, '/product/filament-pla')).text();
+  assert.match(html, /<link rel="modulepreload" crossorigin href="\/assets\/Product-DtSmEuhQ\.js">/);
+  assert.match(html, /<link rel="modulepreload" crossorigin href="\/assets\/vendor-icons-i1\.js">/);
+  assert.doesNotMatch(html, /rel="modulepreload"[^>]*href="\/assets\/index-abc\.js"/, 'the entry is already loaded by the document');
 });
 
 test('the Early Hints line names the entry stylesheet and the Arabic font as preloads', () => {
@@ -327,7 +368,9 @@ test("the platform's product page carries its chunk, its lead image and the apex
   const html = await res.text();
   assert.match(html, /<title>خيط PLA<\/title>/);
   assert.deepEqual(links(html, 'modulepreload').slice(1), ['/assets/Product-p1.js', '/assets/vendor-icons-i1.js']);
-  assert.ok(html.includes('<link rel="preload" as="image" fetchpriority="high" href="/files/products/filament-pla/main.webp">'));
+  const lead = '/files/products/filament-pla/main.webp';
+  const responsive = productImagePreload(lead);
+  assert.ok(html.includes(`<link rel="preload" as="image" fetchpriority="high" href="${lead}" imagesrcset="${responsive.imageSrcSet}" imagesizes="${responsive.imageSizes}">`));
   assert.deepEqual(inline(html), { success: true, kind: 'main', store: null, root_domain: APEX });
   assert.equal(res.headers.get('Cache-Control'), DOCUMENT_SHARED_CACHE_CONTROL);
   assert.match(res.headers.get('ETag') ?? '', /^W\/"/);
@@ -337,6 +380,7 @@ test("the platform's product page carries its chunk, its lead image and the apex
   assert.equal((inline(pHtml)!.store as { slug: string }).slug, 'ali3d');
   assert.ok(pHtml.includes('href="/assets/StorefrontProduct-sp1.js"'));
   assert.ok(pHtml.includes('as="image" fetchpriority="high" href="/files/merchants/owner/public/aaaa1111.webp"'));
+  assert.doesNotMatch(pHtml, /imagesrcset=|imagesizes=/, 'the merchant gallery still requests its original image; no variant may preload ahead of it');
 });
 
 test('every other document passes through as the asset came', async () => {

@@ -46,6 +46,7 @@ import SummaryInfo from '../components/ui/SummaryInfo';
  * imports at all, so nothing of the Worker runtime enters the bundle.
  */
 import { COD_TAX_BLOCK_IQD, COD_TAX_PER_BLOCK_IQD } from '../../packages/shipping/src/codTax';
+import { PRINTER_STANDARD_DELIVERY_POLICY, chooseDeliveryMethod, printerStandardAcceptanceContext, requiresPrinterStandardAcceptance } from '../../packages/shipping/src/printerDeliveryPolicy';
 /**
  * THE SIX DIGITS, FROM THE MODULE THAT ALSO REFUSES THEM AT THE DOOR.
  *
@@ -285,7 +286,8 @@ interface CheckoutQuoteDto {
   /** Every configured delivery method priced for THIS cart by the server —
    *  so a card can print a true fee before anything is selected.
    *  `fee_iqd: null` + `available: false` = the cart cannot use that method. */
-  delivery_method_fees?: Array<{ id: string; fee_iqd: number | null; available: boolean }>;
+  delivery_method_fees?: Array<{ id: string; fee_iqd: number | null; available: boolean; reason?: 'needs_configuration' }>;
+  printer_standard_warning?: { key: string; version: number; text_ar: string } | null;
   shipping: ShippingQuoteDto;
   is_pickup: boolean;
   /** The protected-delivery add-on: offered only when the owner priced it. */
@@ -664,6 +666,7 @@ export default function Checkout() {
 
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('');
+  const deliveryPickedRef = useRef(false);
   /**
    * THE DAY, AND IT IS OPTIONAL. `null` means «في أقرب وقت» and is where every
    * checkout starts, because that is what the great majority of orders want —
@@ -741,6 +744,7 @@ export default function Checkout() {
   // Versioned-policy consent: ALWAYS starts unchecked; any material quote
   // change (totals / shipping / required versions) resets it.
   const [policyAccepted, setPolicyAccepted] = useState(false);
+  const [printerStandardAcceptedContext, setPrinterStandardAcceptedContext] = useState<string | null>(null);
   useEffect(() => { setPolicyAccepted(false); }, [lang]);
   const [consentResetNote, setConsentResetNote] = useState(false);
   const quoteSignatureRef = useRef('');
@@ -836,6 +840,10 @@ export default function Checkout() {
   // Product delivery options are an allow-list. A method disabled by any
   // selected physical line is not presented as valid; pickup remains a
   // separate no-last-mile choice. The server repeats this check at the door.
+  const quoteMatchesItems = quote?.lines.length === items.length && quote.lines.every((line) =>
+    items.some((item) => item.id === line.cart_item_id && item.productId === line.product_id && item.qty === line.qty));
+  const containsPrinter = items.some((item) => item.is_printer) || Boolean(quoteMatchesItems && (
+    quote?.lines.some((line) => line.is_printer) || quote?.shipping.components.some((part) => part.kind === 'printer_small' || part.kind === 'printer_large')));
   const availableDeliveryMethods = checkoutDeliveryMethods.filter((method) => {
     if (method.id === 'pickup') return true;
     if (method.id !== 'standard' && method.id !== 'personal') {
@@ -844,19 +852,26 @@ export default function Checkout() {
     return items.every((item) => item.delivery_availability?.[method.id] !== false);
   });
   const availableDeliveryKey = availableDeliveryMethods.map((method) => method.id).join(',');
+  const quotedDeliveryFees = quoteMatchesItems ? quote?.delivery_method_fees : undefined;
+  const quotedDeliveryKey = quotedDeliveryFees?.map((fee) => `${fee.id}:${fee.available}`).join(',') ?? '';
 
   // Default the selector once settings/items arrive, and move away from a
   // method that became unavailable after a quantity/cart refresh.
   useEffect(() => {
+    if (!items.length) return;
     if (availableDeliveryMethods.length === 0) {
       if (deliveryMethod) setDeliveryMethod('');
       return;
     }
-    if (!deliveryMethod || !availableDeliveryMethods.some((method) => method.id === deliveryMethod)) {
-      setDeliveryMethod(availableDeliveryMethods[0].id);
-    }
+    const next = chooseDeliveryMethod(deliveryPickedRef.current || !containsPrinter ? deliveryMethod : '',
+      availableDeliveryMethods.map((method) => method.id), containsPrinter, quotedDeliveryFees);
+    if (next !== deliveryMethod) setDeliveryMethod(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableDeliveryKey, deliveryMethod]);
+  }, [availableDeliveryKey, quotedDeliveryKey, deliveryMethod, containsPrinter, items.length]);
+
+  const printerStandardRequired = requiresPrinterStandardAcceptance(deliveryMethod,
+    containsPrinter || Boolean(quoteMatchesItems && quote?.printer_standard_warning));
+  const printerStandardPolicy = quote?.printer_standard_warning ?? PRINTER_STANDARD_DELIVERY_POLICY;
 
   // THE SCREEN OFFERS EXACTLY WHAT THE SERVER ALLOWS. The owner's rule is two
   // ways to pay — in advance from the wallet, or cash on delivery — for every
@@ -902,6 +917,11 @@ export default function Checkout() {
   // same lines, so shipping, the coupon and the waiver kept answering for a
   // total that no longer existed. Quantity belongs here for the same reason.
   const itemIdsKey = items.map((i) => `${i.id}:${i.qty}:${i.unit_price_iqd}`).join(',');
+  const printerAcceptanceContext = printerStandardAcceptanceContext(deliveryMethod, printerStandardRequired, selectedAddressId, itemIdsKey, printerStandardPolicy.version, lang);
+  const printerStandardAccepted = printerAcceptanceContext !== null && printerStandardAcceptedContext === printerAcceptanceContext;
+  useEffect(() => {
+    setPrinterStandardAcceptedContext(null);
+  }, [deliveryMethod, selectedAddressId, itemIdsKey, lang, printerStandardPolicy.version]);
   useEffect(() => {
     if (!selectedAddressId || !deliveryMethod || items.length === 0) {
       // No request, so nothing to hold the screen for — and a mark left
@@ -938,8 +958,10 @@ export default function Checkout() {
           data.quote.shipping.total_iqd,
           data.quote.due_on_delivery_iqd,
           data.quote.policies.map((p) => `${p.key}:${p.version}`).join('|'),
+          data.quote.printer_standard_warning?.version ?? '',
         ].join('~');
         if (quoteSignatureRef.current && quoteSignatureRef.current !== sig) {
+          setPrinterStandardAcceptedContext(null);
           setPolicyAccepted((prev) => {
             if (prev) setConsentResetNote(true);
             return false;
@@ -1405,6 +1427,7 @@ export default function Checkout() {
      */
     if (isGiniMethod && !giniOrderNoValid) return S.giniOrderNoBlock;
     if (shippingNeedsConfig) return S.needsConfig;
+    if (printerStandardRequired && !printerStandardAccepted) return loc('اقرأ تحذير التوصيل العادي للطابعات ووافق عليه لإتمام الطلب.', 'Read and acknowledge the printer standard-delivery warning to place your order.');
     if (!consentSatisfied) return S.policyRequired;
     /**
      * The full-advance method with a short balance is not the printer-advance
@@ -1549,6 +1572,8 @@ export default function Checkout() {
         // Versioned consent (§7): only sent once the customer explicitly
         // checked the unchecked-by-default box for these exact versions.
         policyLocale: lang,
+        printerStandardDeliveryAcceptance: printerStandardRequired && printerStandardAccepted
+          ? { version: printerStandardPolicy.version, accepted: true } : undefined,
         policyAcceptance: policyAccepted
           ? requiredPolicies.map((p) => ({ key: p.key, version: p.version }))
           : [],
@@ -2067,10 +2092,15 @@ export default function Checkout() {
             {quote?.tier?.tier === 'pro' && quote.tier.active && !quote.tier.pro_benefits_context ? (
               <ProAddressNotice className="mb-3" />
             ) : null}
+            {containsPrinter && availableDeliveryMethods.some((method) => method.id === 'personal') && !quotedDeliveryFees?.some((fee) => fee.id === 'personal' && !fee.available) && (
+              <p className="mb-3 text-sm text-zinc-300" data-printer-delivery-default>
+                {loc('نختار التوصيل الشخصي افتراضيًا لطلبات الطابعات عندما يكون متاحًا. يمكنك اختيار التوصيل العادي أدناه بعد قراءة تحذير النقل.', 'Personal delivery is the initial choice for printer orders when available. You can choose standard delivery below after reading the transport warning.')}
+              </p>
+            )}
             <div className="grid grid-cols-1 gap-3">
               {availableDeliveryMethods.map(method => {
                 const selected = deliveryMethod === method.id;
-                const selectedQuote = selected ? quote?.shipping : null;
+                const selectedQuote = selected && quoteMatchesItems ? quote?.shipping : null;
                 /**
                  * THE SERVER'S FIGURE FOR *THIS* METHOD, not for the selected
                  * one and not a flat rate from settings.
@@ -2085,7 +2115,7 @@ export default function Checkout() {
                  * every method in the same pass, with the same function that
                  * prices the order.
                  */
-                const serverFee = quote?.delivery_method_fees?.find((f) => f.id === method.id);
+                const serverFee = quotedDeliveryFees?.find((f) => f.id === method.id);
                 const unavailable = serverFee ? !serverFee.available : false;
                 const displayedPrice = serverFee?.fee_iqd ?? selectedQuote?.total_iqd ?? null;
                 const memberWaiver = selectedQuote?.waiver_source === 'pro' || selectedQuote?.waiver_source === 'prime';
@@ -2101,8 +2131,8 @@ export default function Checkout() {
                 const pickupMapUrl = isPickupMethod ? (method.map_url || '').trim() : '';
                 return (
                 <React.Fragment key={method.id}>
-                <label data-selected={selected} className="lv-choice relative flex cursor-pointer items-center gap-3 p-4 sm:gap-4">
-                  <input type="radio" name="delivery" className="sr-only" checked={selected} onChange={() => { customerQuote.mark(); setDeliveryMethod(method.id); }} />
+                <label data-selected={selected} className={`lv-choice relative flex items-center gap-3 p-4 sm:gap-4 ${unavailable ? 'cursor-not-allowed opacity-65' : 'cursor-pointer'}`}>
+                  <input type="radio" name="delivery" className="sr-only" checked={selected} disabled={unavailable} onChange={() => { deliveryPickedRef.current = true; setPrinterStandardAcceptedContext(null); customerQuote.mark(); setDeliveryMethod(method.id); }} />
                   <div className="flex-1 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/35 text-text-secondary">
@@ -2152,7 +2182,9 @@ export default function Checkout() {
                           <p className={`mt-1 text-[11px] font-medium ${memberWaiver ? 'text-emerald-400' : 'text-zinc-400'}`}>
                             {memberWaiver
                               ? loc('ميزة توصيل الأعضاء مطبّقة', 'Member delivery benefit applied', 'سوودی گەیاندنی ئەندام جێبەجێ کرا')
-                              : loc('محسوب حسب القطع والكمية', 'Calculated for items and quantity', 'بەپێی پارچە و بڕ هەژمار کراوە')}
+                              : method.id === 'standard'
+                                ? loc('رسم واحد للشحنة كاملة', 'One fee for the whole consignment')
+                                : loc('محسوب حسب القطع والكمية', 'Calculated for items and quantity', 'بەپێی پارچە و بڕ هەژمار کراوە')}
                           </p>
                         ) : null}
                       </div>
@@ -2167,7 +2199,8 @@ export default function Checkout() {
                       data-delivery-fee={method.id}
                     >
                       {unavailable
-                        ? loc('غير متاح', 'Unavailable', 'بەردەست نییە')
+                        ? serverFee?.reason === 'needs_configuration'
+                          ? loc('غير مهيأ', 'Not configured') : loc('غير متاح', 'Unavailable', 'بەردەست نییە')
                         : displayedPrice === null
                           ? '—'
                           : displayedPrice === 0
@@ -2177,6 +2210,19 @@ export default function Checkout() {
                   </div>
                   <span className="lv-choice-mark ms-1"><Check className="h-3 w-3" aria-hidden="true" /></span>
                 </label>
+                {selected && method.id === 'standard' && printerStandardRequired && (
+                  <div className="rounded-xl border-2 border-amber-400/65 bg-amber-950/45 p-4 text-amber-100" data-printer-standard-warning>
+                    <div className="flex items-start gap-3" role="alert">
+                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />
+                      <p className="text-sm font-medium leading-7" lang="ar" dir="rtl">{printerStandardPolicy.text_ar}</p>
+                    </div>
+                    <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm leading-6">
+                      <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-amber-400" checked={printerStandardAccepted}
+                        onChange={(event) => setPrinterStandardAcceptedContext(event.target.checked ? printerAcceptanceContext : null)} />
+                      <span>{loc('قرأت تحذير النقل وأوافق على اختيار التوصيل العادي لهذا الطلب.', 'I have read the transport warning and agree to standard delivery for this order.')}</span>
+                    </label>
+                  </div>
+                )}
                 {/*
                   UNDER THE CHOSEN METHOD, and only that one. The day is a
                   property of the delivery that was just picked, so it belongs

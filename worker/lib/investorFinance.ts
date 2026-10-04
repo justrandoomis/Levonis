@@ -2,6 +2,7 @@ import { newId } from './crypto';
 import { badRequest, conflict, notFound } from './http';
 import { allocateExact, baghdadDay, fence, journalPlan, periodOpen } from './operations';
 import { getOrderProfitBase } from './orderProfit';
+import { employmentInstalled, investorEmploymentPendingSql } from './financeEmployment';
 
 export type InvestmentContract = {
   id: string; incoming_id: string; user_id: string; name: string; principal_iqd: number;
@@ -214,7 +215,8 @@ export async function syncInvestorOrder(db: D1Database, orderId: string, opts: {
 
 export async function investorParticipantSources(db: D1Database, userId: string) {
   if (!await investorFinanceInstalled(db)) return [];
-  const rows = (await db.prepare(`SELECT e.*,${investorProjectionStaleSql()} AS stale,COALESCE((SELECT SUM(a.paid_iqd) FROM finance_withdrawal_allocations a WHERE a.source_kind=e.kind AND a.source_id=e.id),0) AS paid_iqd
+  const employmentPending=await employmentInstalled(db)?investorEmploymentPendingSql():'0';
+  const rows = (await db.prepare(`SELECT e.*,(${investorProjectionStaleSql()} OR ${employmentPending}) AS stale,COALESCE((SELECT SUM(a.paid_iqd) FROM finance_withdrawal_allocations a WHERE a.source_kind=e.kind AND a.source_id=e.id),0) AS paid_iqd
     FROM finance_investor_earnings e WHERE e.user_id=? ORDER BY e.day,e.id`).bind(userId).all<Record<string, unknown>>()).results ?? [];
   return rows.map(r => ({ ...r, id: String(r.id), contract_id:String(r.contract_id), kind: r.kind as 'investor_profit' | 'investor_capital', title: String(r.title), order_id: r.order_id == null ? null : String(r.order_id), day: String(r.day),
     amount_iqd: Number(r.amount_iqd), accrued_iqd: Number(r.accrued_iqd), paid_iqd: Number(r.paid_iqd), version: Number(r.version), state: r.stale?'pending':String(r.state), eligible: !r.stale&&r.state === 'available' }));
