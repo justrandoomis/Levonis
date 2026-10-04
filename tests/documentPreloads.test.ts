@@ -117,7 +117,7 @@ function realWorker(opts: { manifest?: unknown; setCookie?: boolean } = {}) {
   };
   const call = (host: string, path: string, headers: Record<string, string> = {}) =>
     worker.fetch(new Request(`https://${host}${path}`, { headers: { Host: host, 'CF-Connecting-IP': '9.9.9.9', ...headers } }), env as never, ctx);
-  return { call, assetCalls };
+  return { call, assetCalls, raw };
 }
 
 const STORE_HOST = `ali3d.${APEX}`;
@@ -381,6 +381,93 @@ test("the platform's product page carries its chunk, its lead image and the apex
   assert.ok(pHtml.includes('href="/assets/StorefrontProduct-sp1.js"'));
   assert.ok(pHtml.includes('as="image" fetchpriority="high" href="/files/merchants/owner/public/aaaa1111.webp"'));
   assert.doesNotMatch(pHtml, /imagesrcset=|imagesizes=/, 'the merchant gallery still requests its original image; no variant may preload ahead of it');
+  const communityOnProduct = await (await call(APEX, '/product/ali3d-bracket')).text();
+  assert.match(communityOnProduct, /as="image" fetchpriority="high" href="\/files\/merchants\/owner\/public\/aaaa1111\.webp"/,
+    'absent catalogue metadata preserves the existing community-on-product route');
+});
+
+test('a saved-theme-dependent hero is not speculatively preloaded into shared HTML', async () => {
+  const { call, raw } = realWorker();
+  raw.prepare('UPDATE products SET light_image = ? WHERE id = ?')
+    .run('/files/products/filament-pla/light.webp', 'p1');
+  const anonymous = await call(APEX, '/product/filament-pla');
+  const html = await anonymous.text();
+  assert.doesNotMatch(html, /<link rel="preload" as="image"/);
+  assert.match(html, /property="og:image" content="https:\/\/levonis-iq\.com\/files\/products\/filament-pla\/main\.webp"/);
+  assert.ok(links(html, 'modulepreload').includes('/assets/Product-p1.js'), 'the page-code head start remains');
+  assert.deepEqual(inline(html), { success: true, kind: 'main', store: null, root_domain: APEX });
+  assert.equal(html.includes('light.webp'), false, 'internal image metadata is not a new public payload');
+  // localStorage can override either system preference. Neither a system hint
+  // nor any visitor cookie may specialize this public document's image.
+  for (const preference of ['light', 'dark']) {
+    const response = await call(APEX, '/product/filament-pla', {
+      'Sec-CH-Prefers-Color-Scheme': preference,
+      Cookie: 'levonis_session=not-a-real-session',
+    });
+    assert.equal(await response.text(), html);
+    assert.equal(response.headers.get('ETag'), anonymous.headers.get('ETag'));
+    assert.equal(response.headers.get('Cache-Control'), DOCUMENT_SHARED_CACHE_CONTROL);
+  }
+});
+
+test('an identical light override keeps the unambiguous responsive preload', async () => {
+  const { call, raw } = realWorker();
+  const lead = '/files/products/filament-pla/main.webp';
+  raw.prepare('UPDATE products SET light_image = ? WHERE id = ?').run(lead, 'p1');
+  const html = await (await call(APEX, '/product/filament-pla')).text();
+  const responsive = productImagePreload(lead);
+  assert.ok(html.includes(`href="${lead}" imagesrcset="${responsive.imageSrcSet}" imagesizes="${responsive.imageSizes}"`));
+});
+
+test('a bound gallery omits a speculative hero for both empty and automatic opening selections', async () => {
+  const { call, raw } = realWorker();
+  raw.exec(`
+    INSERT INTO product_option_groups (id,product_id,name_en) VALUES ('g1','p1','Model');
+    INSERT INTO product_option_values (id,product_id,group_id,name_en,sort,stock) VALUES
+      ('first','p1','g1','First',0,0), ('second','p1','g1','Second',1,3);
+    INSERT INTO product_images (id,product_id,url,r2_key,sort_order,option_value_id)
+      VALUES ('bound','p1','/files/products/filament-pla/second.webp','products/filament-pla/second.webp',1,'second');
+    UPDATE products SET inventory_mode = 'OPTION', stock = 0 WHERE id = 'p1';
+  `);
+  for (const stock of [0, 3]) {
+    raw.prepare('UPDATE product_option_values SET stock = ? WHERE id = ?').run(stock, 'second');
+    const detailResponse = await call(APEX, '/api/products/filament-pla');
+    assert.equal(detailResponse.status, 200);
+    const detail = await detailResponse.json() as { initial_selection: { option_value_ids: string[] } | null };
+    assert.deepEqual(detail.initial_selection?.option_value_ids ?? [], stock ? ['second'] : [],
+      'exercise both no shelf selection and the real server-selected alternative image');
+    const html = await (await call(APEX, '/product/filament-pla')).text();
+    assert.doesNotMatch(html, /<link rel="preload" as="image"/, `stock ${stock}`);
+    assert.ok(links(html, 'modulepreload').includes('/assets/Product-p1.js'));
+    assert.match(html, /property="og:image" content="https:\/\/levonis-iq\.com\/files\/products\/filament-pla\/main\.webp"/);
+  }
+});
+
+test('only canonical active rows may make a lead or suppress its unambiguous preload', async () => {
+  const { call, raw } = realWorker();
+  raw.exec(`
+    INSERT INTO product_option_groups (id,product_id,name_en) VALUES ('hidden-group','p1','Hidden');
+    INSERT INTO product_option_values (id,product_id,group_id,name_en,active)
+      VALUES ('hidden-option','p1','hidden-group','Hidden',0);
+    INSERT INTO product_images (id,product_id,url,r2_key,is_primary,sort_order,option_value_id,quarantined,source_url)
+      VALUES ('quarantined','p1','','',0,-2,'hidden-option',1,'https://bad.example/quarantined.jpg'),
+             ('mismatched','p1','/files/products/filament-pla/wrong.webp','products/filament-pla/other.webp',0,-1,'hidden-option',0,'');
+  `);
+  const html = await (await call(APEX, '/product/filament-pla')).text();
+  assert.match(html, /as="image" fetchpriority="high" href="\/files\/products\/filament-pla\/main\.webp"/);
+  assert.equal(html.includes('bad.example'), false);
+  assert.equal(html.includes('wrong.webp'), false);
+});
+
+test('a one-address bound gallery cannot change the opening image', async () => {
+  const { call, raw } = realWorker();
+  raw.exec(`
+    INSERT INTO product_option_groups (id,product_id,name_en) VALUES ('g1','p1','Model');
+    INSERT INTO product_option_values (id,product_id,group_id,name_en) VALUES ('one','p1','g1','Only');
+    UPDATE product_images SET option_value_id = 'one' WHERE id = 'pi1';
+  `);
+  const html = await (await call(APEX, '/product/filament-pla')).text();
+  assert.match(html, /as="image" fetchpriority="high" href="\/files\/products\/filament-pla\/main\.webp"/);
 });
 
 test('every other document passes through as the asset came', async () => {

@@ -394,18 +394,20 @@ export function extensionFor(mime: string): string {
  * binding that converts uploads, and in the format the browser's `Accept`
  * header says it can decode — AVIF before WebP before the stored format.
  *
- * THREE WIDTHS, NOT A FREE PARAMETER. Each width × format is a separate
+ * FIVE WIDTHS, NOT A FREE PARAMETER. Each width × format is a separate
  * transformation billed once per object and a separate entry in the edge
  * cache; an open `?w=` would let one visitor mint a thousand of both. The
  * client's `srcset` (`src/components/ui/SafeImage.tsx`) names exactly these
- * three, and tests/imageVariants.test.ts pins the two lists to each other.
+ * five, and tests/imageVariants.test.ts pins the two lists to each other.
+ *   160  a 36–64 CSS px thumbnail at DPR 2;
  *   320  a card in a 2–3 column grid at DPR 1–2 (148–174 CSS px);
+ *   480  a wider phone card at DPR 2, without a jump from 320 to 640;
  *   640  the same card at DPR 3, or a 2-up tile on a wide phone;
  *   1080 a full-width picture on a phone at DPR 3, or a card on desktop.
  * `fit: scale-down` never enlarges: a 500 px original asked for at 1080
  * comes back at 500 px, which is the honest answer.
  */
-export const IMAGE_VARIANT_WIDTHS = [320, 640, 1080] as const;
+export const IMAGE_VARIANT_WIDTHS = [160, 320, 480, 640, 1080] as const;
 export type ImageVariantWidth = (typeof IMAGE_VARIANT_WIDTHS)[number];
 
 /** The `w` query value, or null when it is absent, or 'invalid' when it names a width not on the list. */

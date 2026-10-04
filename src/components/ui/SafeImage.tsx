@@ -24,7 +24,7 @@ const STRINGS = {
  * in the format it decodes best (AVIF/WebP by `Accept`), instead of the
  * 3000 px file the camera produced.
  */
-export const IMAGE_VARIANT_WIDTHS = [320, 640, 1080] as const;
+export const IMAGE_VARIANT_WIDTHS = [160, 320, 480, 640, 1080] as const;
 
 /** A same-origin `/files/` still picture with no query of its own — the only source a variant can be cut from. */
 const VARIANT_SOURCE = /^(?:https?:\/\/[^/?#]+)?\/files\/[^?#]+\.(?:webp|jpe?g|png)$/i;

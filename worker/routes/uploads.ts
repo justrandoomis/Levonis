@@ -1,5 +1,6 @@
 import {
   IMAGES_MAX_INPUT_BYTES,
+  IMAGE_VARIANT_WIDTHS,
   convertToWebp,
   extensionFor,
   isConvertibleToWebp,
@@ -1030,7 +1031,7 @@ fileRoutes.get('/*', async (c) => {
     typeof caches !== 'undefined' ? (caches as unknown as { default?: Cache }).default ?? null : null;
 
   /**
-   * `?w=320|640|1080` — A SIZED VARIANT, for public still images only (plan
+   * `?w=160|320|480|640|1080` — A SIZED VARIANT, for public still images only (plan
    * §B.1 #5; `serveImageVariant` above). A width off the list, a private
    * key or anything that is not a still picture is refused outright rather
    * than quietly answered with the original: the client (`SafeImage`) only
@@ -1039,7 +1040,7 @@ fileRoutes.get('/*', async (c) => {
    * cache entries and transformations per picture.
    */
   const variantWidth = parseVariantWidth(c.req.query('w'));
-  if (variantWidth === 'invalid') throw badRequest('Unknown image width — use w=320, w=640 or w=1080', 'IMAGE_VARIANT_WIDTH');
+  if (variantWidth === 'invalid') throw badRequest(`Unknown image width — use ${IMAGE_VARIANT_WIDTHS.map((width) => `w=${width}`).join(', ')}`, 'IMAGE_VARIANT_WIDTH');
   if (variantWidth !== null) {
     if (!publicPrefix) throw badRequest('Sized variants exist for public pictures only', 'IMAGE_VARIANT_PRIVATE');
     const sourceMime = variantSourceMime(key);
