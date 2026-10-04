@@ -157,6 +157,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'finance_order_versions', 'finance_order_adjustments', 'finance_order_calculations', 'finance_line_departments',
     'finance_workspace_postings',
     'finance_monthly_promotions', 'finance_promotion_history', 'finance_cost_adjustments', 'finance_staff_basis',
+    'finance_staff_reconciliations', 'finance_staff_order_rules',
     'finance_withdrawals', 'finance_withdrawal_allocations', 'finance_withdrawal_payments',
     'investment_contracts', 'investment_contract_voids', 'investor_finance_events', 'investor_allocation_results', 'finance_investor_earnings', 'investor_capital_losses',
   ]),

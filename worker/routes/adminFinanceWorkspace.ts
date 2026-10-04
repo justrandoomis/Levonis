@@ -43,6 +43,33 @@ function grouped(lines:ProfitLine[],kind:'product'|'main'|'sub'){
     const g=groups.get(key)??{name:name||'غير مصنف',lines:[]};g.lines.push(l);groups.set(key,g);}
   return [...groups].map(([id,g])=>({id,name:g.name,level:kind,qty:g.lines.reduce((v,l)=>v+l.qty,0),...sumRows(g.lines),orders_count:new Set(g.lines.map((l)=>l.order_id)).size}));
 }
+/** Charts use the same delivered-order bases and full-month promotion shares as the report. */
+function chartAmounts(t:Row,general=0,unallocated=0,truncated=false){
+  const revenue=n(t.retained_revenue_iqd)+n(t.shipping_income_iqd)+n(t.cod_tax_iqd);
+  const cost=t.profit_basis_iqd===null||truncated?null:n(t.cogs_iqd)+n(t.direct_cost_iqd)+n(t.manual_direct_iqd)+n(t.courier_fee_iqd)+n(t.payment_fee_iqd)+n(t.promotion_iqd)+general+unallocated;
+  return {revenue_iqd:revenue,cost_iqd:cost,owner_net_iqd:t.owner_net_iqd===null||truncated?null:n(t.owner_net_iqd)-general-unallocated,
+    investor_iqd:t.investor_iqd===null||truncated?null:n(t.investor_iqd),orders_count:n(t.orders_count),unknown_lines:n(t.unknown_lines),pending_costs:n(t.pending_costs)};
+}
+function summaryCharts(bases:OrderProfitBase[],r:{from:string;to:string},expenses:Row[],unallocated:Map<string,number>,totals:Row,truncated:boolean){
+  const groups=new Map<string,Row[]>(),generalByDay=new Map(expenses.map((e)=>[s(e.expense_day),n(e.total)]));
+  for(const b of bases){const at=s(b.order.delivered_at).replace(' ','T'),stamp=Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(at)?at:`${at}Z`);
+    const day=new Date(stamp+3*3600000).toISOString().slice(0,10),rows=groups.get(day)??[];rows.push(b.totals);groups.set(day,rows);}
+  const daily=[];
+  for(let stamp=Date.parse(r.from);stamp<=Date.parse(r.to);stamp+=86400000){const day=new Date(stamp).toISOString().slice(0,10),rows=groups.get(day)??[],t=sumRows(rows);t.orders_count=rows.length;
+    const general=generalByDay.get(day)??0;
+    daily.push({day,...chartAmounts(t,general,unallocated.get(day)??0,truncated)});}
+  const pending=n(totals.pending_costs)>0;
+  const expense_composition=[
+    {key:'goods',amount_iqd:totals.cogs_iqd===null||truncated?null:n(totals.cogs_iqd)},
+    {key:'wages',amount_iqd:pending||truncated?null:n(totals.wages_iqd)},
+    {key:'materials',amount_iqd:pending||truncated?null:n(totals.materials_iqd)},
+    {key:'other',amount_iqd:pending||truncated?null:n(totals.direct_cost_iqd)-n(totals.wages_iqd)-n(totals.materials_iqd)+n(totals.manual_direct_iqd)},
+    {key:'delivery',amount_iqd:truncated?null:n(totals.courier_fee_iqd)+n(totals.payment_fee_iqd)},
+    {key:'promotion',amount_iqd:truncated?null:n(totals.promotion_iqd)+n(totals.unallocated_promotion_iqd)},
+    {key:'general',amount_iqd:n(totals.general_expenses_iqd)},
+  ];
+  return {daily,expense_composition,basis:'delivered_baghdad_day',...chartAmounts(totals,n(totals.general_expenses_iqd),n(totals.unallocated_promotion_iqd),truncated)};
+}
 async function addInvestors(db:D1Database,bases:OrderProfitBase[],live=false){
   await addOwnerPromotions(db,bases);
   if(!await investorFinanceInstalled(db)){for(const b of bases){b.totals.investor_iqd=0;for(const l of b.lines)l.investor_iqd=0;}return bases;}
@@ -82,16 +109,16 @@ adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
   const db=c.env.DB,r=range(c.req.query('from'),c.req.query('to'));
   const {bases,truncated}=await selectOrders(db,r,{summary:true});
   const [expenses,failures,promotions]=await Promise.all([
-    db.prepare(`SELECT COALESCE(SUM(e.amount_iqd),0) total FROM operating_expenses e WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ?
+    db.prepare(`SELECT e.expense_day,COALESCE(SUM(e.amount_iqd),0) total FROM operating_expenses e WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ?
       AND NOT EXISTS(SELECT 1 FROM finance_expense_links l WHERE l.expense_id=e.id AND l.order_id IS NOT NULL)
       AND NOT EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.expense_id=e.id)
       AND NOT EXISTS(SELECT 1 FROM finance_collections c WHERE c.expense_id=e.id)
-      AND NOT EXISTS(SELECT 1 FROM finance_monthly_promotions p WHERE p.expense_id=e.id)`).bind(r.from,r.to).first<{total:number}>(),
+      AND NOT EXISTS(SELECT 1 FROM finance_monthly_promotions p WHERE p.expense_id=e.id) GROUP BY e.expense_day`).bind(r.from,r.to).all<Row>(),
     db.prepare('SELECT event_key id,order_id,message,last_attempt_at FROM finance_posting_errors WHERE order_id IN (SELECT value FROM json_each(?)) ORDER BY last_attempt_at DESC LIMIT 100').bind(JSON.stringify(bases.map((b)=>b.order_id))).all<Row>(),
     db.prepare("SELECT *,CASE WHEN currency='IQD' THEN amount_minor ELSE amount_minor/100.0 END amount FROM finance_monthly_promotions WHERE month BETWEEN ? AND ? ORDER BY month,id").bind(r.from.slice(0,7),r.to.slice(0,7)).all<Row>()]);
-  const totals=sumRows(bases.map((b)=>b.totals));totals.orders_count=bases.length;totals.general_expenses_iqd=expenses?.total??0;
-  let unallocated=0;
-  for(const month of new Set((promotions.results??[]).map((p)=>s(p.month))))if(`${month}-01`>=r.from&&`${month}-01`<=r.to)unallocated+=(await monthlyPromotionShares(db,month)).unallocated_iqd;
+  const expenseDays=expenses.results??[],totals=sumRows(bases.map((b)=>b.totals));totals.orders_count=bases.length;totals.general_expenses_iqd=expenseDays.reduce((v,e)=>v+n(e.total),0);
+  let unallocated=0;const unallocatedDays=new Map<string,number>();
+  for(const month of new Set((promotions.results??[]).map((p)=>s(p.month))))if(`${month}-01`>=r.from&&`${month}-01`<=r.to){const amount=(await monthlyPromotionShares(db,month)).unallocated_iqd;unallocated+=amount;unallocatedDays.set(`${month}-01`,amount);}
   totals.unallocated_promotion_iqd=unallocated;
   totals.owner_period_net_iqd=totals.owner_net_iqd===null||truncated?null:n(totals.owner_net_iqd)-n(totals.general_expenses_iqd)-unallocated;
   if(truncated)totals.owner_net_iqd=null;
@@ -99,7 +126,7 @@ adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
   for(const b of bases)for(const warning of b.warnings)exceptions.push({id:`${b.order_id}:${warning}`,order_id:b.order_id,type:warning.split(':')[0],message:warning.startsWith('cost:')?'تكلفة البضاعة تحتاج تثبيت FIFO أو تحققًا ماليًا خاصًا':warning==='investor:pending'?'توزيع المستثمر ينتظر التسوية':'يوجد بند مالي يحتاج مراجعة'});
   for(const b of bases)if(n(b.totals.pending_costs)>0)exceptions.push({id:`${b.order_id}:pending_cost`,order_id:b.order_id,type:'pending_cost',message:'الأجور أو المواد تنتظر تثبيت التكلفة'});
   const lines=bases.flatMap((b)=>b.lines);
-  return c.json({success:true,range:r,totals,orders:bases.map(orderRow),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sold_units'});
+  return c.json({success:true,range:r,totals,orders:bases.map(orderRow),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sold_units'});
 });
 adminFinanceWorkspaceRoutes.get('/orders',async(c)=>{
   const r=range(c.req.query('from'),c.req.query('to')),offset=whole(c.req.query('offset')??0,'الصفحة',0,100000);

@@ -26,6 +26,7 @@ import { useLanguage } from '../../LanguageContext';
 import { Sheet } from '../ui/Overlay';
 import { asLang } from '../orders/format';
 import { ExternalLink } from 'lucide-react';
+export { giniLinkOf } from '../../lib/giniLink';
 
 /**
  * The link as it may be rendered into an `href`, or '' for "do not offer this".
@@ -40,11 +41,6 @@ import { ExternalLink } from 'lucide-react';
  * under a button that says «افتح المنتج في تطبيق جني» — a promise the shop
  * cannot keep, which is exactly the case the caller must render nothing for.
  */
-export function giniLinkOf(raw: unknown): string {
-  const value = typeof raw === 'string' ? raw.trim() : '';
-  return /^https?:\/\//i.test(value) ? value : '';
-}
-
 const STRINGS = {
   ar: {
     title: 'تريدها أقساط؟',

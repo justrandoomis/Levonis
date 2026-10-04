@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { PRINTER_STANDARD_DELIVERY_POLICY, isPrinterStandardAcceptance, requiresPrinterStandardAcceptance } from '@levonis/shipping/printerDeliveryPolicy';
 import { announceStoreOrder } from '../lib/chatCards';
 import { notifyOrderCreditAvailable } from '../lib/merchantNotify';
 import type { Context } from 'hono';
@@ -3349,7 +3350,7 @@ async function computeCheckout(
      * the screen can grey it out instead of quoting a delivery that would be
      * refused at the door.
      */
-    const deliveryMethodFees: Array<{ id: string; fee_iqd: number | null; available: boolean }> = (
+    const deliveryMethodFees: Array<{ id: string; fee_iqd: number | null; available: boolean; reason?: 'needs_configuration' }> = (
       settings.checkoutDeliveryMethods as DeliveryMethod[]
     ).map((m) => {
       if (m.id === 'pickup') return { id: m.id, fee_iqd: 0, available: true };
@@ -3366,7 +3367,9 @@ async function computeCheckout(
       // The SAME basis the chosen method's own final quote uses, so the
       // card's figure and the summary's figure cannot disagree.
       const q = runQuote(memberMerchandise, undefined, m.id);
-      return { id: m.id, fee_iqd: q.total_iqd, available: true };
+      return q.needs_config.length
+        ? { id: m.id, fee_iqd: null, available: false, reason: 'needs_configuration' as const }
+        : { id: m.id, fee_iqd: q.total_iqd, available: true };
     });
 
     return {
@@ -3960,6 +3963,9 @@ orderRoutes.post('/quote', async (c) => {
         pro_benefits_context: comp.proContext,
       },
       policies: comp.policies,
+      printer_standard_warning: requiresPrinterStandardAcceptance(comp.delivery.id,
+        comp.lines.some((line) => line.is_printer) || comp.shipping.components.some((part) => part.kind === 'printer_small' || part.kind === 'printer_large'))
+        ? PRINTER_STANDARD_DELIVERY_POLICY : null,
       blockers,
       can_checkout: blockers.length === 0,
     },
@@ -4041,6 +4047,13 @@ orderRoutes.post('/', async (c) => {
 
   const orderId = newOrderId();
   const now = new Date().toISOString();
+  const printerStandardRequired = requiresPrinterStandardAcceptance(comp.delivery.id,
+    comp.lines.some((line) => line.is_printer) || comp.shipping.components.some((part) => part.kind === 'printer_small' || part.kind === 'printer_large'));
+  if (printerStandardRequired && !isPrinterStandardAcceptance(body.printerStandardDeliveryAcceptance)) {
+    throw new HttpError(400, 'تجب الموافقة على تحذير التوصيل العادي للطابعات قبل تأكيد الطلب.', 'PRINTER_STANDARD_DELIVERY_ACCEPTANCE_REQUIRED', {
+      policy: PRINTER_STANDARD_DELIVERY_POLICY,
+    });
+  }
   // The cart rule guarantees a single type across the lines, so the first one
   // speaks for the order. Falls back to direct for an order with no transport,
   // which is what "no transport" has always meant.
@@ -4112,6 +4125,14 @@ orderRoutes.post('/', async (c) => {
     ...comp.delivery,
     quote: comp.shipping,
     priority_delivery: comp.priorityDelivery,
+    ...(printerStandardRequired ? {
+      printer_standard_transport_acceptance: {
+        ...PRINTER_STANDARD_DELIVERY_POLICY,
+        accepted: true,
+        accepted_at: now,
+        user_id: user.id,
+      },
+    } : {}),
   });
 
   /**

@@ -46,6 +46,7 @@ import { printerProductIds, isPrinterProduct } from '../worker/lib/printerIdenti
 import { SETTING_DEFAULTS, PUBLIC_SETTING_KEYS, printerNoteIqdFrom } from '../worker/lib/settings';
 import { acceptedPolicies } from './lib/policies';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
+import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
 
 // ------------------------------------------------------------------ fixture
 
@@ -726,7 +727,9 @@ test('the printer note: is_printer on the quote lines and the order items, the a
   assert.equal(pickup.lines[0].is_printer, true);
   assert.equal(pickup.notes.printer_home_delivery_iqd, null, 'no home delivery, no note');
 
-  const placed = await json(await post(a, '/api/orders', orderBody('addr_b', 'cash')));
+  const placed = await json(await post(a, '/api/orders', orderBody('addr_b', 'cash', {
+    printerStandardDeliveryAcceptance: { version: PRINTER_STANDARD_DELIVERY_POLICY.version, accepted: true },
+  })));
   assert.equal(placed.success, true, JSON.stringify(placed));
   assert.equal(placed.order.items[0].is_printer, true);
   assert.equal(placed.order.cod_tax_iqd, 3_000);

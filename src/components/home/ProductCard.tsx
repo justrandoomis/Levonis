@@ -53,6 +53,7 @@ export default function ProductCard({
   width = 'fill',
   compareToggle = false,
   eager = false,
+  imageSizes,
 }: {
   p: ApiProduct;
   /** An explicit width utility; overrides `width`. */
@@ -64,6 +65,8 @@ export default function ProductCard({
   compareToggle?: boolean;
   /** Above-the-fold: load the photograph eagerly. */
   eager?: boolean;
+  /** Override for a shelf that changes from a fixed-width rail to a grid. */
+  imageSizes?: string;
 }) {
   if (density === 'compact') {
     return (
@@ -72,6 +75,7 @@ export default function ProductCard({
         widthClass={widthClass ?? (width === 'rail' ? 'w-[148px] shrink-0' : 'w-full')}
         compareToggle={compareToggle}
         eager={eager}
+        imageSizes={imageSizes ?? (width === 'rail' ? '148px' : '(min-width: 1280px) calc((100vw - 72px) / 5), (min-width: 1024px) calc((100vw - 68px) / 4), (min-width: 640px) calc((100vw - 56px) / 3), calc((100vw - 42px) / 2)')}
       />
     );
   }
@@ -83,11 +87,13 @@ function CompactCard({
   widthClass,
   compareToggle,
   eager,
+  imageSizes,
 }: {
   p: CardProduct;
   widthClass: string;
   compareToggle: boolean;
   eager: boolean;
+  imageSizes: string;
 }) {
   const { lang } = useLanguage();
   const { theme } = useTheme();
@@ -114,10 +120,7 @@ function CompactCard({
           alt=""
           aspect="auto"
           eager={eager}
-          // The card is 148 px on a rail, half the phone in a grid, a fifth
-          // of the row on desktop: at DPR 3 that is the 640 px variant on a
-          // phone, 320 or 640 on a desktop — never the camera's 3000 px file.
-          sizes="(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
+          sizes={imageSizes}
           className="h-full w-full"
           bgClassName={lightShown ? 'bg-surface-selected' : 'bg-charcoal'}
           fallbackClassName="text-snow/35"

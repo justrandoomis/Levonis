@@ -5,6 +5,7 @@ import { pickText, type BentoPosition } from '../../../lib/api';
 import { isProductPhoto, type BentoTile, type BentoTileId } from '../../../lib/homeLayout';
 import PromoPhoto from './PromoPhoto';
 import SectionHead, { ArrowGlyph } from './SectionHead';
+import { bentoImageSizes } from '../../../lib/homeImageSizes';
 
 /**
  * «تسوق حسب الفئة» — THE BENTO.
@@ -71,7 +72,7 @@ const TILE =
  * The photograph over the whole tile and the scrim over it. `size` is only the
  * intrinsic size hint for the browser; the crop is CSS (PromoPhoto).
  */
-function TilePhoto({ tile, size }: { tile: BentoTile; size: number }) {
+function TilePhoto({ tile, size, sizes, eager }: { tile: BentoTile; size: number; sizes: string; eager: boolean }) {
   if (!tile.image) return null;
   return (
     <>
@@ -84,6 +85,8 @@ function TilePhoto({ tile, size }: { tile: BentoTile; size: number }) {
         bleed
         width={size}
         height={size}
+        sizes={sizes}
+        eager={eager}
         className="inset-0"
       />
       <div aria-hidden="true" className="lv-bleed-scrim pointer-events-none absolute inset-0" />
@@ -92,11 +95,12 @@ function TilePhoto({ tile, size }: { tile: BentoTile; size: number }) {
 }
 
 /** Printers — the near-square tile: the name and the pill in the bottom corner. */
-function LargeTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
+type TileProps = { tile: BentoTile; copy: Copy; sizes: string; eager: boolean };
+function LargeTile({ tile, copy, sizes, eager }: TileProps) {
   const { loc } = useLanguage();
   return (
     <Link to={tile.to} data-bento-tile={tile.id ?? tile.category?.id ?? tile.position} data-bento-position={tile.position} data-feature="" className={TILE}>
-      <TilePhoto tile={tile} size={560} />
+      <TilePhoto tile={tile} size={560} sizes={sizes} eager={eager} />
       <div className="relative flex h-full flex-col items-start justify-end gap-2 p-3 lg:gap-3 lg:p-6">
         <h3 className="max-w-[12ch] text-[15px] font-bold leading-[1.4] text-snow [text-shadow:0_1px_8px_rgb(0_0_0/0.35)] sm:text-[17px] lg:max-w-none lg:text-[28px] lg:leading-[1.3]">
           {copy.title}
@@ -112,10 +116,10 @@ function LargeTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
 }
 
 /** The two material tiles: the name and its caption in the bottom corner. */
-function WideTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
+function WideTile({ tile, copy, sizes, eager }: TileProps) {
   return (
     <Link to={tile.to} data-bento-tile={tile.id ?? tile.category?.id ?? tile.position} data-bento-position={tile.position} data-feature="" className={TILE}>
-      <TilePhoto tile={tile} size={400} />
+      <TilePhoto tile={tile} size={400} sizes={sizes} eager={eager} />
       <div className="relative flex h-full flex-col justify-end p-2 sm:p-2.5 lg:p-5">
         <h3 className="text-[12px] font-bold leading-[1.4] text-snow [text-shadow:0_1px_6px_rgb(0_0_0/0.35)] sm:text-[13px] lg:text-[20px] lg:leading-[1.35]">
           {copy.title}
@@ -128,10 +132,10 @@ function WideTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
   );
 }
 
-function CompactTile({ tile, copy }: { tile: BentoTile; copy: Copy }) {
+function CompactTile({ tile, copy, sizes, eager }: TileProps) {
   return (
     <Link to={tile.to} data-bento-tile={tile.id ?? tile.category?.id ?? tile.position} data-bento-position={tile.position} data-feature="" className={TILE}>
-      <TilePhoto tile={tile} size={240} />
+      <TilePhoto tile={tile} size={240} sizes={sizes} eager={eager} />
       <div className="relative flex h-full flex-col justify-end p-2 lg:p-4">
         <h3 className="text-[10.5px] font-bold leading-[1.4] text-snow [text-shadow:0_1px_6px_rgb(0_0_0/0.35)] sm:text-[11px] lg:text-[15px] lg:leading-[1.45]">
           {copy.title}
@@ -162,19 +166,25 @@ export default function CategoryBento({ tiles }: { tiles: BentoTile[] }) {
   const bottom = tiles.filter((t) => BOTTOM.includes(t.position));
   if (tiles.length === 0) return null;
 
+  const priorityTile = large ?? top[0] ?? bottom[0];
+  const photoProps = (tile: BentoTile) => ({
+    eager: tile === priorityTile,
+    sizes: bentoImageSizes({ position: tile.position, crop: isProductPhoto(tile), hasLarge: !!large, topCount: top.length, bottomCount: bottom.length }),
+  });
+
   const side = top.length + bottom.length > 0 ? (
     <div className={`grid min-w-0 gap-2 lg:gap-3 ${top.length && bottom.length ? 'grid-rows-[1fr_1.08fr]' : 'grid-rows-1'}`}>
       {top.length > 0 && (
         <div className={`grid min-h-0 gap-2 lg:gap-3 ${COLS[top.length]}`}>
           {top.map((t) => (
-            <WideTile key={t.position} tile={t} copy={copyOf(t)} />
+            <WideTile key={t.position} tile={t} copy={copyOf(t)} {...photoProps(t)} />
           ))}
         </div>
       )}
       {bottom.length > 0 && (
         <div className={`grid min-h-0 gap-2 lg:gap-3 ${COLS[bottom.length]}`}>
           {bottom.map((t) => (
-            <CompactTile key={t.position} tile={t} copy={copyOf(t)} />
+            <CompactTile key={t.position} tile={t} copy={copyOf(t)} {...photoProps(t)} />
           ))}
         </div>
       )}
@@ -198,7 +208,7 @@ export default function CategoryBento({ tiles }: { tiles: BentoTile[] }) {
         {/* The side column first: in Arabic the grid starts on the right, so
             the printers tile lands on the LEFT, as in the owner's reference. */}
         {side}
-        {large ? <LargeTile tile={large} copy={copyOf(large)} /> : null}
+        {large ? <LargeTile tile={large} copy={copyOf(large)} {...photoProps(large)} /> : null}
       </div>
     </section>
   );

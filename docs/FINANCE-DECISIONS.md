@@ -164,3 +164,36 @@ The waived amount belongs to the ORDER, not to the product — the same reason
 rent does. So it is subtracted in **net** profit, per period, and never spread
 across products to make a per-product net figure. Gross margin on a product
 stays the margin on that product.
+
+## 6. Owner workspace and employment dates (2026-10-04)
+
+The later owner requirements add managerial allocation alongside the original
+accounting report. The workspace labels the owner's net share separately:
+goods, delivery, payment fees, discounts, staff, investor distributions and
+recorded expenses all affect it. Monthly promotion is allocated across the
+whole month's sold units; narrowing the report's from/to filter does not move
+the entire month's advertising bill onto the remaining products. The original
+accounting view remains explicitly labelled as before profit distribution.
+
+The overview supports inclusive report dates in Baghdad time, up to 365 days,
+and daily revenue/cost/net, expense composition and main-section comparison
+charts. Unknown costs remain unknown in figures and chart gaps. Monthly cost
+entry retains its own month selector independently of the report's date range.
+
+An employee's work start date is an **exclusive Baghdad delivery-day cutoff**,
+as requested: a start date of 20 September makes deliveries from 21 September
+eligible. Order creation time does not establish wage eligibility. Adding or
+changing that cutoff queues resumable historical calculation; the browser
+processes a short foreground batch and the scheduled worker resumes the rest.
+Explicit earning-rule date limits remain visible and applicable.
+
+Employment corrections append audited adjustments in an open period. Original
+costs, settled payments, user accounts and closed-period journals remain
+preserved. Deleting an employee archives them, stops new accrual, and allows
+restoration without deleting financial history. Pending recalculation is
+visible and protects withdrawals from stale balances. Metadata-only name and
+job-title edits do not start another financial recalculation.
+
+The employee earnings page keeps balances, withdrawals and investment capital;
+the order-by-order earnings section is no longer shown there. Finance retains
+the order-level audit and cost detail.

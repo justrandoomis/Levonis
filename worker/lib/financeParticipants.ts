@@ -7,6 +7,7 @@ import { auditStatements } from './audit';
 import { notifyStatement } from './notifications';
 import { canViewFinancials, isOwner } from './adminScope';
 import type { Env, SessionUser } from './types';
+import { employmentInstalled, investorEmploymentPendingSql, staffDateEligible } from './financeEmployment';
 
 export type BalanceType = 'earnings' | 'capital' | 'all';
 export type EarningKind = 'staff' | 'investor_profit' | 'investor_capital';
@@ -24,12 +25,12 @@ export const effectiveStaffCostSql = (alias = 'c') => `(${alias}.amount_iqd+COAL
 export const staffPaidSql = (id = 'c.id') => `(SELECT COALESCE(SUM(pa.amount_iqd),0) FROM finance_payment_allocations pa WHERE pa.cost_id=${id})`;
 export const heldSourceSql = (kind: string, id: string) => `(SELECT COALESCE(SUM(wa.amount_iqd-wa.paid_iqd),0) FROM finance_withdrawal_allocations wa JOIN finance_withdrawals w ON w.id=wa.withdrawal_id WHERE wa.source_kind=${kind} AND wa.source_id=${id} AND w.state IN ('requested','approved','part_paid'))`;
 const paidSourceSql = (kind: string, id: string) => `(SELECT COALESCE(SUM(wp.paid_iqd),0) FROM finance_withdrawal_allocations wp WHERE wp.source_kind=${kind} AND wp.source_id=${id})`;
-export const staffReconciliationBlockedSql=(orderSql='c.order_id',costSql='c.id',includeLate=true)=>`(EXISTS(SELECT 1 FROM finance_posting_errors pe WHERE pe.order_id=${orderSql}) OR EXISTS(
+export const staffReconciliationBlockedSql=(orderSql='c.order_id',costSql='c.id',includeLate=true)=>`(EXISTS(SELECT 1 FROM finance_order_costs ec JOIN finance_staff es ON es.id=ec.staff_id JOIN orders eo ON eo.id=ec.order_id WHERE ec.id=${costSql} AND COALESCE(ec.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments ca WHERE ca.cost_id=ec.id),0)>0 AND es.start_work_date IS NOT NULL AND (eo.status<>'delivered' OR COALESCE(date(eo.delivered_at,'+3 hours')>es.start_work_date,0)=0)) OR EXISTS(SELECT 1 FROM finance_staff_reconciliations j JOIN finance_order_costs ec ON ec.staff_id=j.staff_id WHERE ec.id=${costSql} AND j.state<>'complete') OR EXISTS(SELECT 1 FROM finance_posting_errors pe WHERE pe.order_id=${orderSql}) OR EXISTS(
   SELECT 1 FROM finance_order_costs sc WHERE sc.id=${costSql} AND json_extract(sc.snapshot,'$.rule.basis') IN ('profit_percent','revenue_percent')
   AND NOT EXISTS(SELECT 1 FROM finance_cost_adjustments ca WHERE ca.cost_id=sc.id AND ca.kind='manual')
   AND NOT EXISTS(SELECT 1 FROM finance_staff_basis sb WHERE sb.order_id=${orderSql} AND sb.basis_fingerprint=(${staffBasisFingerprintSql(orderSql,includeLate)}))))`;
 
-const investorReconciliationBlockedSql=(contractSql='e.contract_id')=>`(${investorProjectionStaleSql(contractSql)} OR EXISTS(SELECT 1 FROM finance_posting_errors pe JOIN order_item_inventory_allocations ia ON ia.order_id=pe.order_id JOIN inventory_lots il ON il.id=ia.lot_id JOIN investment_contracts ic ON ic.incoming_id=il.incoming_id WHERE ic.id=${contractSql}))`;
+const investorReconciliationBlockedSql=(contractSql='e.contract_id')=>`(${investorEmploymentPendingSql(contractSql)} OR ${investorProjectionStaleSql(contractSql)} OR EXISTS(SELECT 1 FROM finance_posting_errors pe JOIN order_item_inventory_allocations ia ON ia.order_id=pe.order_id JOIN inventory_lots il ON il.id=ia.lot_id JOIN investment_contracts ic ON ic.incoming_id=il.incoming_id WHERE ic.id=${contractSql}))`;
 const active = (state: string) => ['requested', 'approved', 'part_paid'].includes(state);
 
 /** Only the participant's payable amounts. No customer, margin, cost base or other people's accounts. */
@@ -61,10 +62,14 @@ export const staffAdvanceSql=(staffIdSql='s.id')=>`(SELECT COALESCE(SUM(p.amount
 export function participantSummary(entries: ParticipantSource[],advanceBalance=0) {
   const sum = (f: (s: ParticipantSource) => number) => entries.reduce((v, s) => v + f(s), 0);
   const debt = sum((s) => Math.max(0, s.paid_iqd+s.held_iqd-s.amount_iqd));
-  const earningsAvailable=Math.max(0,sum((s)=>s.kind==='investor_capital'?0:s.available_iqd)-debt-advanceBalance);
-  const totalAvailable=Math.max(0,sum((s)=>s.available_iqd)-debt-advanceBalance);
+  // Until a blocked source is reconciled, protect its already-paid/held amount
+  // against possible carryforward debt while leaving independent surplus free.
+  const guardedDebt=sum((s)=>Math.max(0,s.paid_iqd+s.held_iqd-(s.blocked?0:s.amount_iqd)));
+  const earningsAvailable=Math.max(0,sum((s)=>s.kind==='investor_capital'?0:s.available_iqd)-guardedDebt-advanceBalance);
+  const totalAvailable=Math.max(0,sum((s)=>s.available_iqd)-guardedDebt-advanceBalance);
   return {
     reconciliation_pending:entries.some((s)=>!!s.blocked),
+    pending_settlement_reserve_iqd:guardedDebt-debt,
     advance_balance_iqd:advanceBalance,
     available_earnings_iqd:earningsAvailable,earnings_available_iqd:earningsAvailable,
     available_capital_iqd:totalAvailable-earningsAvailable,capital_available_iqd:totalAvailable-earningsAvailable,
@@ -209,13 +214,14 @@ export async function payWithdrawal(db: D1Database, actor: string, withdrawalId:
 }
 
 const wageBasisSql=`json_array(
- (SELECT json_array(status,price_adjustment_iqd,shipping_iqd,cod_tax_iqd,points_discount_iqd) FROM orders WHERE id=?),
+ (SELECT json_array(status,delivered_at,price_adjustment_iqd,shipping_iqd,cod_tax_iqd,points_discount_iqd) FROM orders WHERE id=?),
  (SELECT json_group_array(json_array(id,qty,line_total_iqd,component_alloc_iqd,coupon_discount_iqd,membership_discount_iqd,cost_iqd)) FROM (SELECT * FROM order_items WHERE order_id=? ORDER BY id)),
  (SELECT COALESCE(MAX(version),0) FROM finance_order_adjustments WHERE order_id=?),
  (SELECT json_group_array(json_array(id,qty,cogs_iqd,released_at)) FROM (SELECT * FROM order_item_inventory_allocations WHERE order_id=? ORDER BY id)),
  (SELECT json_group_array(json_array(case_id,refund_iqd,qty,cogs_iqd,disposition)) FROM (SELECT * FROM finance_refund_facts WHERE order_id=? ORDER BY case_id)),
  (SELECT json_group_array(json_array(group_key,staff_id,completed_at)) FROM (SELECT * FROM finance_task_assignments WHERE order_id=? ORDER BY group_key)),
- (SELECT json_group_array(json_array(ca.id,ca.cost_id,ca.delta_iqd)) FROM finance_cost_adjustments ca JOIN finance_order_costs cc ON cc.id=ca.cost_id WHERE cc.order_id=? AND ca.kind='manual'))`;
+ (SELECT json_group_array(json_array(ca.id,ca.cost_id,ca.delta_iqd)) FROM finance_cost_adjustments ca JOIN finance_order_costs cc ON cc.id=ca.cost_id WHERE cc.order_id=? AND ca.kind='manual'),
+ (SELECT json_group_array(json_array(id,employment_version,start_work_date)) FROM (SELECT DISTINCT s.id,s.employment_version,s.start_work_date FROM finance_staff s JOIN finance_order_costs ec ON ec.staff_id=s.id WHERE ec.order_id=? ORDER BY s.id)))`;
 function staffBasisFingerprintSql(orderSql:string,includeLate=true) {
   const simple=wageBasisSql.replace(/\?/g,orderSql);
   return includeLate?`json_array(${simple},(SELECT json_group_array(json_array(s.adjustment_id,s.allocation_id,s.unit_delta_iqd)) FROM lot_cost_adjustment_shares s JOIN order_item_inventory_allocations a ON a.id=s.allocation_id WHERE a.order_id=${orderSql}))`:simple;
@@ -235,11 +241,13 @@ export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, 
     .bind(orderId).all<{id:string;order_item_id:string|null;rule_id:string;state:string;snapshot:string;effective_iqd:number|null;paid_iqd:number;held_iqd:number;manual_override:number;category_id:string;staff_id:string|null;rule_name:string;group_key:string;milestone:string}>()).results??[];
   if(!costs.length)return {adjusted:0};
   const base=await getOrderProfitBase(db,orderId),day=opts.day??baghdadDay();
+  const staffStarts=await employmentInstalled(db)?new Map(((await db.prepare('SELECT id,start_work_date FROM finance_staff').all<{id:string;start_work_date:string|null}>()).results??[]).map((s)=>[s.id,s])):new Map<string,{start_work_date:string|null}>();
   const frozen=await db.prepare('SELECT rules_json FROM finance_order_snapshots WHERE order_id=?').bind(orderId).first<{rules_json:string}>();
   const snapshot=frozen?JSON.parse(frozen.rules_json) as Array<{line_id:string;rules:Array<{id:string}>}>:[];
   const plans:Array<{cost:typeof costs[number];amount:number;base_iqd:number}>=[],caps=new Map<string,number>();
   for(const cost of costs.filter((c)=>c.manual_override))caps.set(cost.rule_id,(caps.get(cost.rule_id)??0)+(cost.effective_iqd??0));
   for(const cost of costs) {
+    if(cost.staff_id&&staffStarts.has(cost.staff_id)&&!staffDateEligible(staffStarts.get(cost.staff_id)!,base.order))continue;
     let rule:{basis:string;amount:number;cap_iqd:number|null;requires_assignment?:number};
     try{rule=JSON.parse(cost.snapshot).rule;}catch{continue;}
     if(!rule || !['profit_percent','revenue_percent'].includes(rule.basis))continue;

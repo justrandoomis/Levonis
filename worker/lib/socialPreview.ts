@@ -55,6 +55,8 @@ import { loadAuthoritativeProductImages } from './productSelectionImage';
 import { logoSourceKey, readStoreIconsQuietly, servableStoreIcons } from './storeIcons';
 import { cleanIdentityText, storeDescription } from './webManifest';
 import { DOCUMENT_CACHE_CONTROL } from './securityPolicy';
+import { IMAGE_VARIANT_WIDTHS, variantSourceMime } from './imageConvert';
+import { PRODUCT_GALLERY_SIZES } from '../../packages/contracts/src/imageSizing';
 
 /** The four things a chat app reads off a link, already absolute and escaped. */
 export interface SocialPreview {
@@ -662,11 +664,23 @@ export function chunkPreloads(
   key: string,
   cap = 24
 ): { scripts: string[]; styles: string[] } {
-  if (!manifest[key]) return { scripts: [], styles: [] };
+  let routeKey = key;
+  if (!manifest[routeKey]) {
+    // Rollup can emit a dynamic route under a shared-chunk alias (for
+    // example `_Product-<hash>.js`) with no src field. Resolve only a unique
+    // dynamic entry of that route's name; never guess a static helper or a
+    // different source module that happens to share the basename.
+    const name = /^src\/pages\/([A-Za-z][\w]*)\.tsx$/.exec(key)?.[1];
+    const candidates = name ? Object.entries(manifest).filter(([alias, chunk]) =>
+      alias.startsWith('_') && !chunk.src && chunk.isDynamicEntry === true && chunk.name === name
+    ) : [];
+    if (candidates.length !== 1) return { scripts: [], styles: [] };
+    routeKey = candidates[0][0];
+  }
   const entry = new Set(staticClosure(manifest, MANIFEST_ENTRY));
   const scripts: string[] = [];
   const styles: string[] = [];
-  for (const k of staticClosure(manifest, key)) {
+  for (const k of staticClosure(manifest, routeKey)) {
     if (entry.has(k)) continue;
     const chunk = manifest[k];
     if (scripts.length < cap) scripts.push(`/${chunk.file}`);
@@ -759,8 +773,21 @@ export interface DocumentPreloads {
   styles: string[];
   /** The one image preloaded at high priority, or null. */
   image: string | null;
+  /** The same candidates/sizes the product gallery renders; absent for a store's cover. */
+  imageSrcSet?: string;
+  imageSizes?: string;
   /** The anonymous resolve answer, or null when the document must not carry one. */
   resolve: unknown | null;
+}
+
+/** Public still pictures only. A private key, GIF or pre-existing query keeps its original preload. */
+export function productImagePreload(image: string | null): Pick<DocumentPreloads, 'imageSrcSet' | 'imageSizes'> {
+  if (!image || image.includes('?') || !image.startsWith('/files/') || !variantSourceMime(image.slice('/files/'.length))) return {};
+  if (!preloadImagePath(image)) return {};
+  return {
+    imageSrcSet: IMAGE_VARIANT_WIDTHS.map((w) => `${image}?w=${w} ${w}w`).join(', '),
+    imageSizes: PRODUCT_GALLERY_SIZES,
+  };
 }
 
 /**
@@ -774,7 +801,12 @@ export function injectDocumentPreloads(html: string, p: DocumentPreloads): strin
   const lines: string[] = [];
   for (const href of p.scripts) lines.push(`<link rel="modulepreload" crossorigin href="${escapeAttribute(href)}">`);
   for (const href of p.styles) lines.push(`<link rel="preload" as="style" crossorigin href="${escapeAttribute(href)}">`);
-  if (p.image) lines.push(`<link rel="preload" as="image" fetchpriority="high" href="${escapeAttribute(p.image)}">`);
+  if (p.image) {
+    const responsive = p.imageSrcSet && p.imageSizes
+      ? ` imagesrcset="${escapeAttribute(p.imageSrcSet)}" imagesizes="${escapeAttribute(p.imageSizes)}"`
+      : '';
+    lines.push(`<link rel="preload" as="image" fetchpriority="high" href="${escapeAttribute(p.image)}"${responsive}>`);
+  }
   if (p.resolve !== null && p.resolve !== undefined) lines.push(inlineJsonScript(INLINE_RESOLVE_ID, p.resolve));
   if (!lines.length) return html;
   const existing = new RegExp(`<script type="application/json" id="${INLINE_RESOLVE_ID}">[\\s\\S]*?</script>\\s*`, 'i');

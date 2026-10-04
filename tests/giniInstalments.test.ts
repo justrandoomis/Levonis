@@ -45,6 +45,7 @@ import { giniSplit, giniHoldUntil, giniBlocksConfirmation, giniStateOf } from '.
 import { sweepGiniHolds } from '../worker/lib/giniSweep';
 import { SETTING_DEFAULTS, PUBLIC_SETTING_KEYS, getSetting } from '../worker/lib/settings';
 import { acceptedPolicies } from './lib/policies';
+import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 
 const PRINTER_IQD = 899_000;
@@ -160,6 +161,7 @@ const body = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 const orderBody = (over: Record<string, unknown> = {}) => ({
+  printerStandardDeliveryAcceptance: { version: PRINTER_STANDARD_DELIVERY_POLICY.version, accepted: true },
   ...body(over),
   idempotencyKey: `gini-${Date.now()}-${++seq}`,
   policyAcceptance: acceptedPolicies(),

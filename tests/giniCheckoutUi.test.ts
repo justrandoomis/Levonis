@@ -47,7 +47,7 @@ test('the note renders nothing at all when there is no Gini link', () => {
     'the «تريدها أقساط؟» line is guarded on the resolved link, not on the policy alone'
   );
   assert.ok(
-    /\{giniLink \? \(\s*<GiniInstalmentsSheet/.test(product),
+    /\{giniLink && giniStarted \? \(\s*<ChunkBoundary[^\n]*\n\s*<React\.Suspense[^\n]*\n\s*<GiniInstalmentsSheet/.test(product),
     'and the sheet is not even mounted, so stale state cannot open it onto an empty promise'
   );
 });
@@ -73,7 +73,7 @@ test('the note is a note, not a third button competing with Add to cart', () => 
   assert.ok(/text-\[12\.5px\]/.test(around), 'it is the smallest type on the page, in the muted foreground');
   // Placement: after the compare/cheaper pair, before the reviews.
   const pair = product.indexOf('data-product-cheaper');
-  const reviews = product.indexOf('<ReviewSection productId={product.id} />');
+  const reviews = product.indexOf('<ProductReviews key={product.id} productId={product.id} />');
   assert.ok(pair > 0 && reviews > 0);
   assert.ok(pair < at && at < reviews, 'it sits under the two buttons and above the reviews');
 });

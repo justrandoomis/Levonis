@@ -33,6 +33,7 @@ import { orderRoutes } from '../worker/routes/orders';
 import { walletRoutes } from '../worker/routes/wallet';
 import { createDepositRequest } from '../worker/lib/walletOps';
 import { acceptedPolicies } from './lib/policies';
+import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 import { iqdToUsdCents } from '../src/lib/api';
 
@@ -93,6 +94,7 @@ const cartLine = (raw: DatabaseSync, id: string) =>
 
 let seq = 0;
 const orderBody = () => ({
+  printerStandardDeliveryAcceptance: { version: PRINTER_STANDARD_DELIVERY_POLICY.version, accepted: true },
   addressId: 'addr_b',
   deliveryMethodId: 'standard',
   paymentMethodId: 'cash',

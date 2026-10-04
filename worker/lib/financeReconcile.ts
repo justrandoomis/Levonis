@@ -2,6 +2,7 @@ import { reconcileStaffOrderCosts } from './financeParticipants';
 import { recognizeLateCosts, syncInvestorOrder } from './investorFinance';
 import { recordFinancialFailure } from './financePostingErrors';
 import { getOrderProfitBase, syncOrderWorkspaceAccounting } from './orderProfit';
+import { reconcileEmploymentCutoff } from './financeEmployment';
 
 /** A source mutation has already committed. Keep its financial projections
  * current, or retain a durable, operator-visible retry instead of losing it. */
@@ -9,6 +10,7 @@ export async function reconcileFinanceOrder(db:D1Database,orderId:string,opts:{a
   try {
     if(await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lot_cost_adjustment_shares'").first())
       await recognizeLateCosts(db,orderId,opts.day,opts.actor);
+    await reconcileEmploymentCutoff(db,orderId,opts.actor,opts.day);
     await reconcileStaffOrderCosts(db,orderId,opts);
     await syncOrderWorkspaceAccounting(db,orderId,opts);
     // A verified per-order cost is an accepted accounting basis even when the

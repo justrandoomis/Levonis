@@ -2,6 +2,7 @@ export type FinanceSection = 'overview' | 'orders' | 'products' | 'monthly' | 's
 
 export interface ProfitTotals {
   net_goods_iqd?: number | null;
+  retained_revenue_iqd?: number | null;
   cogs_iqd?: number | null;
   gross_profit_iqd?: number | null;
   shipping_income_iqd?: number | null;
@@ -47,6 +48,7 @@ export interface FinanceProduct extends ProfitTotals {
   id: string;
   name: string;
   qty: number;
+  level?: 'product' | 'main' | 'sub';
   product_image?: string;
   image_url?: string;
 }
@@ -64,6 +66,7 @@ export interface Promotion {
 }
 
 export interface FinanceSummary {
+  range?: FinanceRange;
   totals: ProfitTotals;
   orders: FinanceOrder[];
   products: FinanceProduct[];
@@ -71,6 +74,23 @@ export interface FinanceSummary {
   exceptions: Array<{ id?: string; order_id?: string; message?: string; type?: string }>;
   promotions: Promotion[];
   truncated: boolean;
+  chart_data?: FinanceCharts;
+}
+
+export interface FinanceRange { from: string; to: string }
+export interface FinanceChartAmounts {
+  revenue_iqd: number;
+  cost_iqd: number | null;
+  owner_net_iqd: number | null;
+  investor_iqd: number | null;
+  orders_count: number;
+  unknown_lines: number;
+  pending_costs: number;
+}
+export interface FinanceCharts extends FinanceChartAmounts {
+  daily: Array<FinanceChartAmounts & { day: string }>;
+  expense_composition: Array<{ key: 'goods' | 'wages' | 'materials' | 'other' | 'delivery' | 'promotion' | 'general'; amount_iqd: number | null }>;
+  basis: 'delivered_baghdad_day';
 }
 
 export interface ProfitLine extends ProfitTotals {
@@ -89,7 +109,6 @@ export interface ProfitLine extends ProfitTotals {
   returned_qty: number;
   original_net_goods_iqd?: number;
   price_adjustment_iqd?: number;
-  retained_revenue_iqd?: number;
   fifo_cogs_iqd?: number | null;
   restored_cogs_iqd?: number | null;
   cost_confidence: string;
@@ -133,6 +152,27 @@ export interface OrderProfit {
 
 export const WORKSPACE_API = '/api/admin/finance-workspace';
 export const currentMonth = () => new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 7);
+export const financeToday = () => new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 10);
+export function validFinanceRange(range: FinanceRange): boolean {
+  const valid = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v)) && new Date(Date.parse(v)).toISOString().slice(0, 10) === v;
+  if (!valid(range.from) || !valid(range.to)) return false;
+  const days = (Date.parse(range.to) - Date.parse(range.from)) / 86400000;
+  return days >= 0 && days <= 365;
+}
+export function financePreset(preset: 'month' | '7days' | '30days' | 'previous' | 'year', today = financeToday()): FinanceRange {
+  const shift = (days: number) => new Date(Date.parse(today) - days * 86400000).toISOString().slice(0, 10);
+  if (preset === '7days') return { from: shift(6), to: today };
+  if (preset === '30days') return { from: shift(29), to: today };
+  if (preset === 'year') return { from: `${today.slice(0, 4)}-01-01`, to: today };
+  if (preset === 'previous') return monthRange(new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, 0)).toISOString().slice(0, 7));
+  return { from: `${today.slice(0, 7)}-01`, to: today };
+}
+export function financeRangeFromSearch(search: string): { range: FinanceRange; invalid: boolean } {
+  const query = new URLSearchParams(search), from = query.get('from'), to = query.get('to');
+  if (from === null && to === null) return { range: financePreset('month'), invalid: false };
+  const range = { from: from ?? '', to: to ?? '' };
+  return validFinanceRange(range) ? { range, invalid: false } : { range: financePreset('month'), invalid: true };
+}
 export function financeDay(value?: string) {
   if (!value) return '';
   const normalized = value.replace(' ', 'T');

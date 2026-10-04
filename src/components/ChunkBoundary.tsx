@@ -60,6 +60,10 @@ function copyForDocument(): (typeof COPY)[keyof typeof COPY] {
 
 interface Props {
   children: React.ReactNode;
+  /** An optional section must not replace the entire purchase page on failure. */
+  compact?: boolean;
+  /** A deferred dialog can keep its dismissible shell around the failure. */
+  renderFallback?: (content: React.ReactNode) => React.ReactNode;
 }
 
 interface State {
@@ -82,11 +86,11 @@ export default class ChunkBoundary extends React.Component<Props, State> {
   render(): React.ReactNode {
     if (!this.state.failed) return this.props.children;
     const s = copyForDocument();
-    return (
+    const content = (
       <div
         role="alert"
         data-chunk-boundary
-        className="min-h-dvh bg-black grid place-items-center px-6 text-center"
+        className={`${this.props.compact ? 'py-6' : 'min-h-dvh'} bg-black grid place-items-center px-6 text-center`}
       >
         <div className="max-w-sm">
           <p className="text-white text-[15px] font-bold">{s.title}</p>
@@ -101,5 +105,6 @@ export default class ChunkBoundary extends React.Component<Props, State> {
         </div>
       </div>
     );
+    return this.props.renderFallback ? this.props.renderFallback(content) : content;
   }
 }

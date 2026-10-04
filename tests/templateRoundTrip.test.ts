@@ -62,6 +62,23 @@ test('TXT export/import preserves product delivery rules and partial edits merge
   });
 });
 
+test('a partial TXT shipping edit inherits enabled legacy methods, preserving explicit restrictions', () => {
+  const legacy = parseProductRow(baseRow());
+  assert.equal(legacy.delivery_options, null);
+  const feeOnly = parseTemplate('template_version=2\nstandard_delivery_fee_iqd=7000\n');
+  const edited = validateProductDoc(toDocBody(feeOnly, legacy, { needs_review: [] }).body);
+  assert.deepEqual(edited.delivery_options, {
+    standard: { enabled: true, quantity_step: 1, fee_iqd: 7000 },
+    personal: { enabled: true, quantity_step: 1, fee_iqd: 10000 },
+  });
+  const disabled = validateProductDoc(toDocBody(parseTemplate('template_version=2\nstandard_delivery_enabled=false\n'), legacy, { needs_review: [] }).body);
+  assert.equal(disabled.delivery_options?.standard.enabled, false);
+  assert.equal(disabled.delivery_options?.personal.enabled, true);
+  const further = validateProductDoc(toDocBody(feeOnly, disabled, { needs_review: [] }).body);
+  assert.equal(further.delivery_options?.standard.enabled, false, 'a stored restriction is never silently enabled');
+  assert.equal(further.delivery_options?.personal.enabled, true);
+});
+
 /**
  * A product shaped the way the admin form stores one, including the three
  * things the old export threw away: an INACTIVE option, a colour linked to

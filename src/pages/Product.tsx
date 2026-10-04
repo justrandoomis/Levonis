@@ -53,19 +53,19 @@ import { rememberViewed } from '../lib/recentlyViewed';
 import { useGoBack } from '../lib/useGoBack';
 import { useFreshOnReturn } from '../lib/useFreshOnReturn';
 import { setCartCount, countCartItems } from '../lib/cartCount';
-import ReviewSection from '../components/reviews/ReviewSection';
-import CheaperElsewhereSheet from '../components/product/CheaperElsewhereSheet';
-import GiniInstalmentsSheet, { giniLinkOf } from '../components/product/GiniInstalmentsSheet';
+import { giniLinkOf } from '../lib/giniLink';
+import { takePrimedJson } from '../lib/bootFetch';
+import { PRODUCT_GALLERY_SIZES } from '../../packages/contracts/src/imageSizing';
 import SafeImage from '../components/ui/SafeImage';
 import Note from '../components/ui/Note';
 import { QuantityInput } from '../components/ui/QuantityInput';
 import { quantityLimit } from '../../packages/pricing/src/quantity';
-import { Overlay } from '../components/ui/Overlay';
+import { Overlay, Sheet } from '../components/ui/Overlay';
+import ChunkBoundary from '../components/ChunkBoundary';
 import { ProductDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { monthsLabel } from '../components/orders/format';
 import { authPathWithSupportRef, captureSupportRefFromSearch } from '../lib/supportRef';
-import { refusalText, stockRefusal } from '../lib/refusalStrings';
 import { productGalleryForSelection, productVariantIdForSelection } from '../lib/productImage';
 import { useTheme } from '../lib/theme';
 import {
@@ -95,6 +95,33 @@ import PrinterFitsLine, { type FitPrinterRef } from '../components/product/Print
 
 /** Its own chunk: only a printer page with maintenance parts ever draws it. */
 const MaintenanceShelf = React.lazy(() => import('../components/product/MaintenanceShelf'));
+const loadCheaperSheet = () => import('../components/product/CheaperElsewhereSheet');
+const loadGiniSheet = () => import('../components/product/GiniInstalmentsSheet');
+const CheaperElsewhereSheet = React.lazy(loadCheaperSheet);
+const GiniInstalmentsSheet = React.lazy(loadGiniSheet);
+const ReviewSection = React.lazy(() => import('../components/reviews/ReviewSection'));
+
+/** Reviews and eligibility are below the purchase panel; start them near the scroll viewport. */
+function ProductReviews({ productId }: { productId: string }) {
+  const target = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!target.current || typeof IntersectionObserver === 'undefined') {
+      setReady(true);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setReady(true);
+        observer.disconnect();
+      }
+    }, { root: document.getElementById('main-scroll-container'), rootMargin: '500px', threshold: 0 });
+    observer.observe(target.current);
+    return () => observer.disconnect();
+  }, []);
+  const placeholder = <div aria-hidden="true" className="mt-8 h-32" />;
+  return <div ref={target}>{ready ? <ChunkBoundary compact><React.Suspense fallback={placeholder}><ReviewSection productId={productId} /></React.Suspense></ChunkBoundary> : placeholder}</div>;
+}
 
 // ------------------------------------------------------------------ strings
 
@@ -787,6 +814,9 @@ export default function Product() {
   const { isAuthenticated } = useAuth();
   const [cheaperOpen, setCheaperOpen] = useState(false);
   const [giniOpen, setGiniOpen] = useState(false);
+  const [cheaperStarted, setCheaperStarted] = useState(false);
+  const [giniStarted, setGiniStarted] = useState(false);
+  const openingRequest = useRef<{ path: string; promise: Promise<DetailResponse> } | null>(null);
   const { settings: publicSettings } = useWallet();
   const s = STRINGS[lang as Lang];
   const pageRef = useRef<HTMLDivElement>(null);
@@ -985,7 +1015,11 @@ export default function Product() {
       setLoading(true);
       setLoadError(null);
       try {
-        const data = await api.get<DetailResponse>(`/api/products/${slug}`);
+        const path = `/api/products/${slug}`;
+        if (openingRequest.current?.path !== path) {
+          openingRequest.current = { path, promise: takePrimedJson<DetailResponse>(path) ?? api.get<DetailResponse>(path) };
+        }
+        const data = await openingRequest.current.promise;
         if (cancelled) return;
         // THE SERVER'S REDIRECT IS HONOURED (§10). A composition slug resolves
         // here — a bundle is a real `products` row — and the server answers
@@ -1107,7 +1141,7 @@ export default function Product() {
           setLoadError(err);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) { openingRequest.current = null; setLoading(false); }
       }
     }
     if (slug) load();
@@ -1678,7 +1712,15 @@ export default function Product() {
          * row 18 suppresses), which this page has no string for.
          */
         const code = err instanceof ApiError ? err.code ?? '' : '';
-        const counted = stockRefusal(err, lang);
+        // An offline refusal dictionary must not hide the original server
+        // message or strand the add-to-cart button in its busy state.
+        let counted = '';
+        let translated = '';
+        try {
+          const { refusalText, stockRefusal } = await import('../lib/refusalStrings');
+          counted = stockRefusal(err, lang);
+          translated = refusalText(code, lang, err instanceof Error ? err.message : 'Failed to add to cart');
+        } catch { /* Keep the original server refusal visible below. */ }
         // The door's ceiling moved under the page (another buyer took units):
         // the quantity follows it down on its own, and the ceiling is re-read.
         const left = err instanceof ApiError ? Number(err.details?.available ?? err.details?.max_qty) : NaN;
@@ -1689,7 +1731,7 @@ export default function Product() {
         const said = code ? reasonText(s, code) : '';
         const raw = err instanceof Error ? err.message : 'Failed to add to cart';
         setActionError(
-          counted || (said && said !== code ? said : refusalText(code, lang, raw))
+          counted || (said && said !== code ? said : translated || raw)
         );
       } finally {
         addInFlight.current = false;
@@ -3523,6 +3565,7 @@ export default function Product() {
                   aspect="auto"
                   fit="contain"
                   eager={galleryIndex === 0}
+                  sizes={PRODUCT_GALLERY_SIZES}
                   className="w-full h-full"
                   bgClassName="bg-zinc-950"
                   imgClassName="p-3"
@@ -3995,6 +4038,7 @@ export default function Product() {
                       navigate(authPathWithSupportRef(`/product/${product.slug}`));
                       return;
                     }
+                    setCheaperStarted(true);
                     setCheaperOpen(true);
                   }}
                   data-product-cheaper
@@ -4033,7 +4077,9 @@ export default function Product() {
                       on the phone this page is mostly read on. */}
                   <button
                     type="button"
-                    onClick={() => setGiniOpen(true)}
+                    onPointerDown={() => void loadGiniSheet().catch(() => undefined)}
+                    onFocus={() => void loadGiniSheet().catch(() => undefined)}
+                    onClick={() => { setGiniStarted(true); setGiniOpen(true); }}
                     data-product-gini
                     className="inline-flex min-h-[40px] items-center -mx-1 rounded-sm px-1 text-[12.5px] font-light text-zinc-500 underline decoration-zinc-700 underline-offset-4 transition-colors hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   >
@@ -4052,7 +4098,7 @@ export default function Product() {
               ) : null}
 
               <div className="pt-2">
-                <ReviewSection productId={product.id} />
+                <ProductReviews key={product.id} productId={product.id} />
               </div>
             </div>
           </div>
@@ -4221,21 +4267,27 @@ export default function Product() {
         onCancel={() => setShippingConflict(null)}
       />
 
-      <CheaperElsewhereSheet
-        open={cheaperOpen}
-        productId={product.id}
-        onClose={() => setCheaperOpen(false)}
-      />
+      {cheaperStarted ? (
+        <ChunkBoundary compact renderFallback={(content) => <Sheet open={cheaperOpen} label={s.cheaperCta} onClose={() => setCheaperOpen(false)}>{content}</Sheet>}>
+        <React.Suspense fallback={<Sheet open={cheaperOpen} label={s.cheaperCta} onClose={() => setCheaperOpen(false)}><p role="status" className="p-5">{s.cheaperCta}…</p></Sheet>}>
+          <CheaperElsewhereSheet open={cheaperOpen} productId={product.id} onClose={() => setCheaperOpen(false)} />
+        </React.Suspense>
+        </ChunkBoundary>
+      ) : null}
 
       {/* Mounted only when there is a link to open, so the sheet can never be
           opened onto an empty promise by a stale piece of state. */}
-      {giniLink ? (
+      {giniLink && giniStarted ? (
+        <ChunkBoundary compact renderFallback={(content) => <Sheet open={giniOpen} label={s.giniCta} onClose={() => setGiniOpen(false)}>{content}</Sheet>}>
+        <React.Suspense fallback={<Sheet open={giniOpen} label={s.giniCta} onClose={() => setGiniOpen(false)}><p role="status" className="p-5">{s.giniCta}…</p></Sheet>}>
         <GiniInstalmentsSheet
           open={giniOpen}
           url={giniLink}
           condition={pickText(giniPolicy?.conditions, lang)}
           onClose={() => setGiniOpen(false)}
         />
+        </React.Suspense>
+        </ChunkBoundary>
       ) : null}
     </div>
   );

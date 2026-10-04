@@ -64,7 +64,7 @@ export default function ProductShelf({
         <ul className="-mx-4 flex snap-x gap-2.5 overflow-x-auto overscroll-x-contain px-4 pb-1 hide-scrollbar sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-5 lg:gap-4 lg:overflow-visible lg:px-0">
           {products.map((p, i) => (
             <li key={p.id} className={`flex shrink-0 snap-start ${i >= 5 ? 'lg:hidden' : ''}`}>
-              <ProductCard p={p} density="compact" compareToggle widthClass="w-[148px] shrink-0 lg:w-full" />
+              <ProductCard p={p} density="compact" compareToggle widthClass="w-[148px] shrink-0 lg:w-full" imageSizes="(min-width: 1024px) calc((100vw - 128px) / 5), 148px" />
             </li>
           ))}
         </ul>

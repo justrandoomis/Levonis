@@ -10,6 +10,7 @@ import { readPageCache, writePageCache } from '../lib/pageCache';
 import ProductCard from '../components/home/ProductCard';
 import { availableFirst, cardAvailability } from '../lib/productCard';
 import LiveSearch from '../components/search/LiveSearch';
+import { takePrimedJson } from '../lib/bootFetch';
 
 /** One page of the listing. The route's own ceiling (`limit` max 50). */
 const PAGE_SIZE = 50;
@@ -46,6 +47,7 @@ export default function Products() {
   // Monotonic request id: when the query changes mid-flight, the stale
   // response is ignored so a previous query's results never flash in.
   const reqIdRef = useRef(0);
+  const openingRequest = useRef<{ path: string; promise: Promise<ProductsListResponse> } | null>(null);
   /**
    * THE REST OF A LONG ANSWER. The grid asked for fifty and stopped there, so a
    * search for a brand with more products than that silently ended at fifty
@@ -91,7 +93,13 @@ export default function Products() {
       if (search) params.set('search', search);
       if (category) params.set('category', category);
       params.set('limit', String(PAGE_SIZE));
-      const data = await api.get<ProductsListResponse>(`/api/products?${params.toString()}`);
+      const path = `/api/products?${params.toString()}`;
+      // StrictMode's effect replay shares the opening promise; after it
+      // settles every refresh/query change still requests current prices.
+      if (openingRequest.current?.path !== path) {
+        openingRequest.current = { path, promise: takePrimedJson<ProductsListResponse>(path) ?? api.get<ProductsListResponse>(path) };
+      }
+      const data = await openingRequest.current.promise;
       if (reqIdRef.current !== reqId) return;
       const resolved = category ? data.category ?? null : null;
       setProducts(data.products || []);
@@ -109,7 +117,7 @@ export default function Products() {
       // the error card.
       setCategoryRef(null);
     } finally {
-      if (reqIdRef.current === reqId) setLoading(false);
+      if (reqIdRef.current === reqId) { openingRequest.current = null; setLoading(false); }
     }
   }, [search, category]);
 

@@ -414,6 +414,20 @@ function staticClosure(start: string): Set<string> {
   return seen;
 }
 
+test('opening a product excludes below-fold reviews, closed purchase dialogs and refusal translations', () => {
+  const files = readdirSync(ASSETS).filter((file) => file.endsWith('.js'));
+  const product = files.find((file) => file.startsWith('Product-'));
+  assert.ok(product, 'the product page has its own route chunk');
+  const opening = staticClosure(product!);
+  const bytes = [...opening].reduce((sum, file) => sum + gz(join(ASSETS, file)), 0);
+  console.log(`bundle: product opening ${kb(bytes)} gzip (complete static closure)`);
+  for (const name of ['ReviewSection', 'CheaperElsewhereSheet', 'GiniInstalmentsSheet', 'refusalStrings']) {
+    const file = files.find((candidate) => candidate.startsWith(`${name}-`));
+    assert.ok(file, `${name} remains available in its own deferred chunk`);
+    assert.equal(opening.has(file!), false, `${name} became a static product import and would compete with the lead image`);
+  }
+});
+
 test('the storefront pages add at most 47 KB gzip beyond the initial payload, and the other blocks stay lazy', () => {
   const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
   const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
@@ -656,7 +670,7 @@ test('the three operations stylesheets stay outside every public static closure'
   const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
   const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
   const operationsCss = operationsCssFiles();
-  const privateNames = ['FinanceWorkspace', 'AdminInventory', 'PeoplePanel', 'InvestorPanel', 'WithdrawalPanel', 'MyEarnings', 'Earnings'];
+  const privateNames = ['FinanceWorkspace', 'OverviewCharts', 'AdminInventory', 'PeoplePanel', 'InvestorPanel', 'WithdrawalPanel', 'MyEarnings', 'Earnings'];
   const privateFiles = privateNames.map((name) => {
     const file = chunk(name);
     assert.ok(file, `${name} has no lazy chunk of its own`);

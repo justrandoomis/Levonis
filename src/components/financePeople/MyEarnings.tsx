@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ArrowDownToLine, CircleDollarSign, RefreshCw, Wallet } from 'lucide-react';
+import { ArrowDownToLine, RefreshCw, Wallet } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
 import { api, Button, dateLabel, Dialog, EARNINGS, Empty, Feedback, Field, Loading, Money, StateBadge, Surface, useLanguage, useMutation, useRemote, type Withdrawal } from './shared';
 
@@ -12,7 +12,7 @@ export type EarningsData = {
 export default function MyEarnings() {
   const { loc, lang, dir } = useLanguage();
   const remote = useRemote<EarningsData>(EARNINGS), op = useMutation();
-  const [open, setOpen] = useState(false), [amount, setAmount] = useState<number | null>(null), [kind, setKind] = useState('all'), [balanceType, setBalanceType] = useState<'earnings' | 'capital'>('earnings');
+  const [open, setOpen] = useState(false), [amount, setAmount] = useState<number | null>(null), [balanceType, setBalanceType] = useState<'earnings' | 'capital'>('earnings');
   const operationId = useRef('');
   const data = remote.data, s = data?.summary;
   const balance = (type: 'earnings' | 'capital') => type === 'capital' ? s?.capital_available_iqd ?? 0 : s?.earnings_available_iqd ?? s?.available_iqd ?? 0;
@@ -21,7 +21,6 @@ export default function MyEarnings() {
     await api.post(`${EARNINGS}/withdrawals`, { operation_id: operationId.current, amount_iqd: amount, balance_type: balanceType });
     setOpen(false); await remote.load();
   }, loc('تم إرسال طلب السحب وحجز المبلغ. سيظهر التسديد بعد تسوية الإدارة.', 'Withdrawal requested and funds reserved. Payment appears after settlement.'));
-  const rows = data?.entries.filter((e) => kind === 'all' || e.kind === kind) ?? [];
   return <div className="ap fp fp-stack" dir={dir}>
     <header className="fp-heading"><div><h2>{loc('أرباحي', 'My earnings')}</h2><p>{loc('مستحقاتك من العمل والاستثمار، في مكان واحد.', 'Your work and investment earnings, together.')}</p></div><Button variant="ghost" aria-label={loc('تحديث الأرباح', 'Refresh earnings')} icon={<RefreshCw size={17} />} onClick={remote.load} loading={remote.loading} /></header>
     <Feedback error={op.error} notice={op.notice} />
@@ -45,10 +44,6 @@ export default function MyEarnings() {
       </div></Surface>
       <Surface title={loc('طلبات السحب', 'Withdrawal requests')} hint={loc('طلب السحب يحجز الرصيد إلى أن تسدده الإدارة.', 'A withdrawal reserves your balance until the administrator pays it.')}>
         {!data.withdrawals.length ? <Empty>{loc('لا توجد طلبات سحب بعد.', 'No withdrawal requests yet.')}</Empty> : <div className="fp-rows">{data.withdrawals.map((w) => <div className="fp-row" key={w.id}><div className="min-w-0"><StateBadge state={w.state} /><div className="fp-row-meta">{dateLabel(w.created_at, lang)}</div>{w.reference && <div className="fp-row-meta">{loc('مرجع التسديد: ', 'Payment reference: ')}<bdi>{w.reference}</bdi></div>}{w.state === 'requested' && <Button size="sm" variant="ghost" loading={op.busy} onClick={() => op.run(async () => { await api.post(`${EARNINGS}/withdrawals/${encodeURIComponent(w.id)}/cancel`, {}); await remote.load(); }, loc('ألغي الطلب وأعيد المبلغ إلى المتاح.', 'Request cancelled and funds released.'))}>{loc('إلغاء الطلب', 'Cancel request')}</Button>}</div><div className="text-end"><Money value={w.amount_iqd} />{w.paid_iqd > 0 && w.state !== 'paid' && <p className="fp-row-meta">{loc('المسدد: ', 'Paid: ')}<Money value={w.paid_iqd} /></p>}</div></div>)}</div>}
-      </Surface>
-      <Surface title={loc('تفاصيل الأرباح', 'Earning details')} action={<CircleDollarSign size={20} className="fp-muted" aria-hidden="true" />}>
-        <div className="fp-chips mb-5">{[['all', loc('الكل', 'All')], ['staff', loc('العمل', 'Work')], ['investor_profit', loc('الاستثمار', 'Investment')], ['investor_capital', loc('رأس المال', 'Capital')]].map(([id, label]) => <button key={id} type="button" className="fp-chip" aria-pressed={kind === id} onClick={() => setKind(id)}>{label}</button>)}</div>
-        {!rows.length ? <Empty>{loc('ستظهر مستحقاتك هنا عند تسجيلها.', 'Your earnings will appear here when recorded.')}</Empty> : <div className="fp-rows">{rows.map((e) => <div className="fp-row" key={`${e.kind}:${e.id}`}><div className="min-w-0"><div className="fp-row-title">{e.title || loc('مستحق مالي', 'Earning')}</div><div className="fp-row-meta">{dateLabel(e.day, lang)}{e.order_id && <> · {loc('طلب ', 'Order ')}<bdi>{e.order_id}</bdi></>}</div><StateBadge state={e.state} /></div><div className="text-end"><Money value={e.state === 'pending_cost' ? null : e.accrued_iqd ?? e.amount_iqd} />{e.available_iqd > 0 && <p className="fp-row-meta">{loc('متاح: ', 'Available: ')}<Money value={e.available_iqd} /></p>}</div></div>)}</div>}
       </Surface>
     </>}
     <Dialog open={open} onClose={() => setOpen(false)} title={balanceType === 'capital' ? loc('طلب سحب رأس المال المسترد', 'Withdraw recovered capital') : loc('طلب سحب الأرباح', 'Request withdrawal')} busy={op.busy}>

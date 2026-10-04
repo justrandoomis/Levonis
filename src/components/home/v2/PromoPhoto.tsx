@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTheme } from '../../../lib/theme';
 import { PHONE_MEDIA, themedFiles } from '../../../lib/catalog/sectionPictures';
+import { variantSrcSet } from '../../ui/SafeImage';
 
 /**
  * A photograph placed in a ZONE of a tile (absolutely positioned by the
@@ -46,6 +47,7 @@ export default function PromoPhoto({
   height,
   bleed = false,
   eager = false,
+  sizes,
 }: {
   src: string;
   lightSrc?: string;
@@ -62,6 +64,8 @@ export default function PromoPhoto({
   bleed?: boolean;
   /** On the first screen (the hero): load now rather than lazily. */
   eager?: boolean;
+  /** Actual rendered width, including the middle-band crop for studio photos. */
+  sizes?: string;
 }) {
   const { theme } = useTheme();
   const { large: shown, phone } = themedFiles({ src, lightSrc, mobileSrc, lightMobileSrc }, theme);
@@ -71,16 +75,21 @@ export default function PromoPhoto({
   // Only a catalogue photograph is known to be a dark studio shot; an owner's
   // own picture keeps the edge fade it was designed with.
   const ground = !bleed && crop && theme === 'light' && shown !== lightSrc ? 'dark' : undefined;
+  const largeSet = sizes ? variantSrcSet(shown) : undefined;
+  const phoneSet = sizes ? variantSrcSet(phone) : undefined;
   return (
     <div aria-hidden="true" data-ground={ground} className={`lv-promo-zone absolute ${className}`}>
       <picture>
-        {phone !== shown ? <source media={PHONE_MEDIA} srcSet={phone} /> : null}
+        {phone !== shown ? <source media={PHONE_MEDIA} srcSet={phoneSet ?? phone} sizes={phoneSet ? sizes : undefined} /> : null}
         <img
           src={shown}
+          srcSet={largeSet}
+          sizes={largeSet ? sizes : undefined}
           alt=""
           width={width}
           height={height}
           loading={eager ? 'eager' : 'lazy'}
+          fetchPriority={eager ? 'high' : 'auto'}
           decoding="async"
           data-crop={crop ? '' : undefined}
           onError={() => setFailed(pair)}

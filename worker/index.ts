@@ -12,6 +12,7 @@ import {
   framedByStore,
   heroCoverFrom,
   injectDocumentPreloads,
+  productImagePreload,
   injectSocialPreview,
   MANIFEST_PATH,
   preloadImagePath,
@@ -26,6 +27,7 @@ import {
 import { conditional, weakEtag } from './lib/publicApi/cache';
 import { trustedOrigin } from './lib/appOrigin';
 import { runDurableJobs } from './lib/jobs';
+import { drainStaffReconciliations } from './lib/financeStaffAccrual';
 import { authRoutes } from './routes/auth';
 import { productRoutes, homeRoutes } from './routes/products';
 import { cartRoutes } from './routes/cart';
@@ -825,7 +827,7 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
     const routeKey = routeModuleFor(url.pathname, onStore);
     const chunks = manifest && routeKey ? chunkPreloads(manifest, routeKey) : { scripts: [], styles: [] };
     const image = product ? preloadImagePath(product.image) : storeHome ? heroCoverFrom(resolve) : null;
-    html = injectDocumentPreloads(html, { ...chunks, image, resolve });
+    html = injectDocumentPreloads(html, { ...chunks, image, resolve, ...(routeKey === 'src/pages/Product.tsx' ? productImagePreload(image) : {}) });
 
     const headers = new Headers(asset.headers);
     // The body is no longer the asset that was hashed, so the asset's own
@@ -1022,6 +1024,13 @@ export default {
   //     worker/lib/productDeletion.ts, not a lock here.
   scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     configureEventBus(env);
+    // Employment-date recalculation survives a closed admin tab. Each tick
+    // processes a bounded batch; its durable cursor resumes on the next run.
+    ctx.waitUntil(
+      drainStaffReconciliations(env, { maxJobs: 2, maxOrders: 25 }).catch((error) => {
+        console.error('scheduled staff reconciliation rejected:', error);
+      })
+    );
     ctx.waitUntil(
       // See (1) above: the entrypoint contains what the steps already contain.
       runDurableJobs(env).catch((error) => {

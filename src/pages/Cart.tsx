@@ -10,6 +10,7 @@ import { mascot } from '../lib/mascot';
 import { api, ApiError, CartItem } from '../lib/api';
 import type { CartWarrantyPlan } from '../lib/api';
 import { shippingTypeLabel, type ShippingType } from '../lib/shippingType';
+import { standardDeliveryFeeIqd } from '../../packages/shipping/src/shipping';
 import { asLang, monthsLabel } from '../components/orders/format';
 import Note from '../components/ui/Note';
 import { QuantityInput } from '../components/ui/QuantityInput';
@@ -1143,15 +1144,13 @@ export default function Cart() {
   /** Everything the selected lines saved, however each part was applied. */
   const savedTotal = otherDiscounts + memberNamedSaving;
 
-  // Shipping preview only — the standard delivery method's configured price,
-  // a server setting. The final figure, and every waiver (an active
+  // Shipping preview only — the same one-consignment standard tariff as the
+  // server. The final figure, and every waiver (an active
   // membership's rule — a referral or support code waives nothing), is the
   // checkout quote's: the thresholds live
   // in the server's shipping policy and are not repeated here, because a
   // browser-side copy of them had already drifted from the real rule once.
-  const standardDelivery =
-    checkoutDeliveryMethods.find((m) => m.id === 'standard') ?? checkoutDeliveryMethods[0];
-  const shipping = selectedCount > 0 ? standardDelivery?.price_iqd ?? 0 : 0;
+  const shipping = selectedCount > 0 ? standardDeliveryFeeIqd(selectedItems.some((item) => item.is_printer)) : 0;
 
   // §5: points come after the membership, against the merchandise the
   // membership has already reduced.

@@ -129,6 +129,11 @@ export function categoryRuleFor(
 
 export type ProductDeliveryMethod = 'standard' | 'personal';
 
+/** One standard consignment, regardless of quantity or number of products. */
+export function standardDeliveryFeeIqd(containsPrinter: boolean): number {
+  return containsPrinter ? 10_000 : 5_000;
+}
+
 export interface ProductDeliveryRule {
   enabled: boolean;
   /** Number of units covered by one fee block. Integer >= 1. */
@@ -448,7 +453,7 @@ export function quoteShipping(input: {
     if (ordinaryUnits + printerUnits > 0) {
       components.push({
         kind: printerUnits ? (printers.printer_large ? 'printer_large' : 'printer_small') : 'ordinary',
-        fee_iqd: printerUnits ? 10_000 : 5_000,
+        fee_iqd: standardDeliveryFeeIqd(printerUnits > 0),
         waived: ruleFeeWaived,
         units: ordinaryUnits + printerUnits,
         method: 'standard',

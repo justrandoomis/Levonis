@@ -8,6 +8,8 @@ import { baghdadDay, dateValue, fence, journalPlan, periodOpen, requireCapabilit
 import { changeWithdrawalState, effectiveStaffCostSql, heldSourceSql, participantOverview, payWithdrawal, staffPaidSql } from '../lib/financeParticipants';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { readRuleScope, type ScopedCostRule } from '../lib/financeRuleScopes';
+import { employmentDate, publicReconciliation, readStaff, readStaffReconciliation, staffDateEligible, updateStaffEmployment } from '../lib/financeEmployment';
+import { continueStaffReconciliation } from '../lib/financeStaffAccrual';
 
 export const adminFinancePeopleRoutes = new Hono<AppContext>();
 adminFinancePeopleRoutes.use('*',requireAdmin);
@@ -22,14 +24,15 @@ adminFinancePeopleRoutes.get('/accounts',async(c)=>{
 adminFinancePeopleRoutes.get('/staff',async(c)=>{
   await requireCapability(c.env,c.get('user')!,'rules');
   const db=c.env.DB;
-  const [staff,catalogs,rules]=await Promise.all([
+  const [staff,catalogs,rules,jobs]=await Promise.all([
     db.prepare('SELECT s.*,u.name AS account_name,u.email AS account_email,u.role AS account_role FROM finance_staff s LEFT JOIN users u ON u.id=s.user_id ORDER BY s.active DESC,s.name').all(),
     db.prepare('SELECT id,parent_id,name_ar,name_en FROM catalogs WHERE active=1 ORDER BY sort').all(),
-    db.prepare('SELECT r.*,s.name AS staff_name FROM finance_cost_rules r LEFT JOIN finance_staff s ON s.id=r.staff_id ORDER BY r.active DESC,r.name').all<ScopedCostRule&Record<string,unknown>>()]);
+    db.prepare('SELECT r.*,s.name AS staff_name FROM finance_cost_rules r LEFT JOIN finance_staff s ON s.id=r.staff_id ORDER BY r.active DESC,r.name').all<ScopedCostRule&Record<string,unknown>>(),
+    db.prepare('SELECT * FROM finance_staff_reconciliations').all<import('../lib/financeEmployment').StaffReconciliation>()]);
   const rr=(rules.results??[]).map((r)=>({...r,scope:readRuleScope(r)??{catalog_ids:r.target_type==='catalog'?[r.target_id]:[],product_ids:r.target_type==='product'?[r.target_id]:[],excluded_product_ids:[]}}));
   const ids=[...new Set(rr.flatMap((r)=>[...r.scope.product_ids,...r.scope.excluded_product_ids]))];
   const products=ids.length?await db.prepare('SELECT id,name,name_ar,name_en,sku FROM products WHERE id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(ids)).all():{results:[]};
-  return c.json({success:true,staff:staff.results??[],catalogs:catalogs.results??[],rules:rr,scope_products:products.results??[]});
+  return c.json({success:true,staff:staff.results??[],catalogs:catalogs.results??[],rules:rr,scope_products:products.results??[],reconciliations:(jobs.results??[]).map(publicReconciliation)});
 });
 adminFinancePeopleRoutes.post('/staff',async(c)=>{
   const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');
@@ -37,25 +40,26 @@ adminFinancePeopleRoutes.post('/staff',async(c)=>{
   const account=await db.prepare('SELECT id,name,email FROM users WHERE id=?').bind(userId).first<{id:string;name:string;email:string}>();
   if(!account)throw badRequest('اختر حساب الموظف من القائمة');
   const existing=await db.prepare('SELECT id FROM finance_staff WHERE user_id=?').bind(userId).first<{id:string}>();
-  if(existing)return c.json({success:true,id:existing.id,staff:await db.prepare('SELECT * FROM finance_staff WHERE id=?').bind(existing.id).first(),already:true});
-  const id=newId('staff'),name=text(b.name,120)||account.name||account.email;
-  await db.batch([db.prepare('INSERT INTO finance_staff(id,name,role,user_id) VALUES (?,?,?,?)').bind(id,name,text(b.role,120),userId),
+  if(existing)throw conflict(`الحساب مرتبط بموظف موجود؛ عدّل الموظف الحالي (${existing.id})`);
+  const id=newId('staff'),name=text(b.name,120)||account.name||account.email,start=b.start_work_date===undefined?null:employmentDate(b.start_work_date),now=new Date().toISOString(),active=b.active===false?0:1;
+  await db.batch([db.prepare('INSERT INTO finance_staff(id,name,role,user_id,start_work_date,active,inactive_periods_json) VALUES (?,?,?,?,?,?,?)').bind(id,name,text(b.role,120),userId,start,active,active?'[]':JSON.stringify([{from:now,to:null}])),
+    db.prepare("INSERT INTO finance_staff_reconciliations(staff_id,revision,rules_json,actor_id,updated_at) VALUES (?,1,'[]',?,?)").bind(id,actor.id,now),
     ...(await auditStatements(db,actor.id,'finance.staff_linked',id,{user_id:userId})).statements]);
-  return c.json({success:true,id,staff:{id,user_id:userId,name,role:text(b.role,120),active:1}});
+  return c.json({success:true,id,staff:await db.prepare('SELECT * FROM finance_staff WHERE id=?').bind(id).first(),reconciliation:publicReconciliation(await readStaffReconciliation(db,id))});
 });
 adminFinancePeopleRoutes.patch('/staff/:id',async(c)=>{
   const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');
   const b=await c.req.json<Record<string,unknown>>(),db=c.env.DB,id=c.req.param('id');
-  const old=await db.prepare('SELECT * FROM finance_staff WHERE id=?').bind(id).first<{name:string;role:string;active:number;user_id:string|null}>();
-  if(!old)throw notFound('الموظف غير موجود');
-  const userId=b.user_id===undefined?old.user_id:text(b.user_id,100);
-  if(userId && !(await db.prepare('SELECT id FROM users WHERE id=?').bind(userId).first()))throw badRequest('اختر حسابًا موجودًا');
-  if(old.user_id&&old.user_id!==userId && await db.prepare('SELECT 1 FROM finance_order_costs WHERE staff_id=? UNION ALL SELECT 1 FROM finance_staff_payments WHERE staff_id=? LIMIT 1').bind(id,id).first())throw conflict('هذا الحساب مرتبط باستحقاقات سابقة؛ أضف موظفًا جديدًا للحساب الآخر');
-  try {await db.batch([...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND user_id IS ?)',[id,old.user_id]),
-    db.prepare('UPDATE finance_staff SET user_id=?,name=?,role=?,active=? WHERE id=?').bind(userId||null,b.name===undefined?old.name:str(b.name,'الاسم',{min:1,max:120}),b.role===undefined?old.role:text(b.role,120),b.active===undefined?old.active:b.active?1:0,id),
-    ...(await auditStatements(db,actor.id,'finance.staff_updated',id,{before:old,changes:b})).statements]);}
-  catch(e){if(/UNIQUE constraint|cannot be reassigned|CHECK constraint/.test(String(e)))throw conflict('الحساب مرتبط بموظف آخر أو تغير أثناء الحفظ');throw e;}
-  return c.json({success:true,id});
+  return c.json({success:true,id,...await updateStaffEmployment(db,id,b,actor.id)});
+});
+adminFinancePeopleRoutes.delete('/staff/:id',async(c)=>{
+  const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');
+  return c.json({success:true,id:c.req.param('id'),...await updateStaffEmployment(c.env.DB,c.req.param('id'),{},actor.id,true)});
+});
+adminFinancePeopleRoutes.post('/staff/:id/reconcile',async(c)=>{
+  const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');
+  const b=await c.req.json<Record<string,unknown>>();
+  return c.json({success:true,reconciliation:await continueStaffReconciliation(c.env,c.req.param('id'),b.revision===undefined?undefined:whole(b.revision,'الإصدار',1))});
 });
 adminFinancePeopleRoutes.get('/accounts/:id/earnings',async(c)=>{
   await requireCapability(c.env,c.get('user')!,'pay');
@@ -85,12 +89,15 @@ adminFinancePeopleRoutes.patch('/costs/:id',async(c)=>{
   const old=await db.prepare(`SELECT c.*,${effectiveStaffCostSql()} AS effective_iqd,${staffPaidSql()} AS paid_iqd,${heldSourceSql("'staff'",'c.id')} AS held_iqd FROM finance_order_costs c WHERE c.id=?`).bind(id).first<{state:string;effective_iqd:number|null;paid_iqd:number;held_iqd:number;staff_id:string|null;order_id:string}>();
   if(!old)throw notFound('الاستحقاق غير موجود');
   if(!['due','approved'].includes(old.state)||old.effective_iqd===null)throw conflict('الاستحقاق ينتظر تثبيت التكلفة أو تم عكسه');
+  const employee=old.staff_id?await readStaff(db,old.staff_id):null;
+  const delivery=await db.prepare('SELECT status,delivered_at FROM orders WHERE id=?').bind(old.order_id).first<{status:string;delivered_at:string|null}>();
+  if(employee&&delivery&&!staffDateEligible(employee,delivery))throw conflict('الطلب خارج تاريخ استحقاق الموظف؛ عدّل تاريخ البداية أولًا');
   if(old.held_iqd>0 && amount<old.paid_iqd+old.held_iqd)throw conflict('المبلغ أقل من المسدد أو المحجوز للسحب؛ سوِّ طلب السحب أولًا');
   if(amount===old.effective_iqd){const reconciled=await reconcileFinanceOrder(db,old.order_id,{actor:actor.id});return c.json({success:true,already:true,reconciliation_pending:!reconciled.complete});}
   const adjustmentId=newId('wagefix'),day=baghdadDay(),delta=amount-old.effective_iqd;await periodOpen(db,day);
   const liability=old.staff_id?'2100':'2000';
   const lines=delta>0?[{account:'5100',debit:delta},{account:liability,credit:delta}]:[{account:liability,debit:-delta},{account:'5100',credit:-delta}];
-  try{await db.batch([...fence(db,`EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.id=? AND c.state=? AND ${effectiveStaffCostSql()}=? AND (${heldSourceSql("'staff'",'c.id')}=0 OR ${staffPaidSql()}+${heldSourceSql("'staff'",'c.id')}<=?))`,[id,old.state,old.effective_iqd,amount]),
+  try{await db.batch([...(employee&&delivery?fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=? AND start_work_date IS ?) AND EXISTS(SELECT 1 FROM orders WHERE id=? AND status=? AND delivered_at IS ?)',[employee.id,employee.employment_version,employee.start_work_date,old.order_id,delivery.status,delivery.delivered_at]):[]),...fence(db,`EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.id=? AND c.state=? AND ${effectiveStaffCostSql()}=? AND (${heldSourceSql("'staff'",'c.id')}=0 OR ${staffPaidSql()}+${heldSourceSql("'staff'",'c.id')}<=?))`,[id,old.state,old.effective_iqd,amount]),
     db.prepare('INSERT INTO finance_cost_adjustments(id,cost_id,delta_iqd,before_iqd,after_iqd,actor_id,adjustment_day,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(adjustmentId,id,delta,old.effective_iqd,amount,actor.id,day,new Date().toISOString()),
     ...journalPlan(db,{key:`staff-adjustment:${adjustmentId}`,day,title:old.staff_id?'تصحيح أجر هذا الطلب':'تصحيح تكلفة هذا الطلب',source:'finance_cost_adjustment',sourceId:adjustmentId,actor:actor.id},lines).statements,
     ...(await auditStatements(db,actor.id,'finance.staff_cost_adjusted',id,{before_iqd:old.effective_iqd,after_iqd:amount,order_id:old.order_id})).statements]);}

@@ -9,8 +9,11 @@ import {investorOrderSplit,syncInvestorOrder,investorParticipantSources,investme
 import {getOrderProfitBase} from '../worker/lib/orderProfit';
 import {fifoQueues,planLotConsumption,planLotRestore} from '../worker/lib/inventoryLots';
 import {baghdadDay,journalPlan} from '../worker/lib/operations';
-import {recordReturnFinancials} from '../worker/lib/orderFinance';
-import {requestWithdrawal,changeWithdrawalState,payWithdrawal} from '../worker/lib/financeParticipants';
+import {recordReturnFinancials,runOrderFinancialEffects} from '../worker/lib/orderFinance';
+import {requestWithdrawal,changeWithdrawalState,payWithdrawal,participantOverview} from '../worker/lib/financeParticipants';
+import {adminFinancePeopleRoutes} from '../worker/routes/adminFinancePeople';
+import {adminFinanceOperationsRoutes} from '../worker/routes/adminFinanceOperations';
+import {continueStaffReconciliation} from '../worker/lib/financeStaffAccrual';
 import {adminInventoryRoutes} from '../worker/routes/adminInventory';
 import type {Env} from '../worker/lib/types';
 const ADMIN={id:'admin',email:'boss@x.co',role:'admin' as const};
@@ -152,4 +155,55 @@ test('restocked returns reverse investor entitlement and late COGS without delet
   assert.equal(count(s.raw,'SELECT recognized_iqd n FROM lot_cost_adjustment_shares WHERE allocation_id IS NOT NULL'),0);
   assert.equal((await getOrderProfitBase(s.db,'order')).lines[0].cogs_iqd,0);assert.equal(count(s.raw,'SELECT SUM(debit_iqd-credit_iqd) n FROM accounting_lines'),0);
   const events=count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events');await syncInvestorOrder(s.db,'order');assert.equal(count(s.raw,'SELECT COUNT(*) n FROM investor_finance_events'),events);
+});
+
+test('pending retrospective wages protect investor requests, approval, payment and the transaction fence',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);await sale(s,'order',['lot-a']);await syncInvestorOrder(s.db,'order');
+  const env={DB:s.db} as Env,approved=crypto.randomUUID(),requested=crypto.randomUUID();
+  await requestWithdrawal(env,'investor',approved,70);await changeWithdrawalState(s.db,approved,'admin','approve');
+  await requestWithdrawal(env,'investor',requested,70);
+  const people=stubApp(s.db,ADMIN,a=>{a.route('/p',adminFinancePeopleRoutes);a.route('/o',adminFinanceOperationsRoutes);});
+  const added=await json(await post(people,'/p/staff',{user_id:'other',start_work_date:'2026-09-20'}));
+  const rule=await post(people,'/o/rules',{staff_id:added.id,basis:'unit',amount:100,milestone:'delivered'});assert.equal(rule.status,200,JSON.stringify(await json(rule)));
+  assert.equal((await investmentContractSummary(s.db,c.operation_id)).summary.available_profit_iqd,0);
+  assert.equal((await participantOverview(s.db,'investor')).summary.available_earnings_iqd,0);
+  await assert.rejects(requestWithdrawal(env,'investor',crypto.randomUUID(),1),/متاح|تسوية/);
+  await assert.rejects(changeWithdrawalState(s.db,requested,'admin','approve'),/مصدر|تسوية|مستحقات|محجوزة/);
+  await assert.rejects(payWithdrawal(s.db,'admin',approved,{id:crypto.randomUUID(),amount:70,reference:'cash',receipt_url:''}),/مصدر|تسوية|مستحقات/);
+  await changeWithdrawalState(s.db,approved,'admin','reject');await changeWithdrawalState(s.db,requested,'admin','reject');
+  await continueStaffReconciliation(env,added.id);
+  assert.equal((await participantOverview(s.db,'investor')).summary.available_earnings_iqd,105);
+  const race=s.pauseOn('INSERT INTO finance_withdrawals'),withdrawal=crypto.randomUUID();
+  const pending=requestWithdrawal(env,'investor',withdrawal,105);await race.waiting;
+  const changed=await people.request(`/p/staff/${added.id}`,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({start_work_date:'2026-09-19'})});assert.equal(changed.status,200);
+  race.resume();await assert.rejects(pending,/تغير الرصيد/);
+  assert.equal(count(s.raw,'SELECT COUNT(*) n FROM finance_withdrawals WHERE id=?',withdrawal),0);
+});
+
+test('pending loss-bearing wages protect exposed capital while loss-free unpaid capital remains independent',async()=>{
+  for(const lossShare of [10000,0]){
+    const s=setup(),c=await contract(s,'inc-a','investor',{loss_share_bps:lossShare});await fund(s,c.operation_id,300);await sale(s,'order',['lot-a']);await syncInvestorOrder(s.db,'order');
+    const people=stubApp(s.db,ADMIN,a=>{a.route('/p',adminFinancePeopleRoutes);a.route('/o',adminFinanceOperationsRoutes);});
+    const added=await json(await post(people,'/p/staff',{user_id:'other',start_work_date:'2026-09-20'}));
+    assert.equal((await post(people,'/o/rules',{staff_id:added.id,basis:'unit',amount:1000,milestone:'delivered'})).status,200);
+    const env={DB:s.db} as Env;
+    const capital=(await participantOverview(s.db,'investor')).summary.available_capital_iqd;
+    assert.equal(capital,lossShare?0:100);
+    if(lossShare)await assert.rejects(requestWithdrawal(env,'investor',crypto.randomUUID(),100,'capital'),/متاح|تسوية/);
+    else await requestWithdrawal(env,'investor',crypto.randomUUID(),100,'capital');
+  }
+});
+
+test('delivery recognizes deferred preparation wages before publishing the first investor profit',async()=>{
+  const s=setup(),c=await contract(s);await fund(s,c.operation_id,300);
+  const people=stubApp(s.db,ADMIN,a=>{a.route('/p',adminFinancePeopleRoutes);a.route('/o',adminFinanceOperationsRoutes);});
+  const added=await json(await post(people,'/p/staff',{user_id:'other',start_work_date:'2026-09-20'}));
+  assert.equal((await post(people,'/o/rules',{staff_id:added.id,basis:'unit',amount:100,milestone:'prepared'})).status,200);
+  const env={DB:s.db} as Env;await continueStaffReconciliation(env,added.id);
+  await sale(s,'order',['lot-a']);
+  const gate=s.pauseOn('INSERT INTO investor_allocation_results');
+  const delivered=runOrderFinancialEffects(env,'order','delivered');await gate.waiting;
+  assert.equal(count(s.raw,"SELECT COALESCE(SUM(amount_iqd),0) n FROM finance_order_costs WHERE order_id='order'"),100);
+  gate.resume();await delivered;
+  assert.equal((await participantOverview(s.db,'investor')).summary.available_earnings_iqd,105);
 });

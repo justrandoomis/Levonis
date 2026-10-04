@@ -4,6 +4,7 @@ import { useLanguage } from '../../../LanguageContext';
 import type { EditorialCard } from '../../../lib/homeLayout';
 import { ArrowGlyph } from './SectionHead';
 import PromoPhoto from './PromoPhoto';
+import { editorialImageSizes } from '../../../lib/homeImageSizes';
 
 /**
  * THE TWO EDITORIAL BANNERS — side by side, on a phone too.
@@ -33,7 +34,7 @@ import PromoPhoto from './PromoPhoto';
  * aspect ratio (16:10 on a phone, 16:9 on a tablet, 12:5 from 1024 px). On a
  * phone the sub-line is dropped to keep the title and the pill clear.
  */
-function Banner({ card }: { card: EditorialCard }) {
+function Banner({ card, columns }: { card: EditorialCard; columns: number }) {
   const { loc } = useLanguage();
 
   // OWNER: Sorani to be written by hand (both presets' three lines).
@@ -66,6 +67,7 @@ function Banner({ card }: { card: EditorialCard }) {
             bleed
             width={720}
             height={720}
+            sizes={editorialImageSizes(card.productPhoto, columns)}
             className="inset-0"
           />
           <div aria-hidden="true" className="lv-bleed-scrim-deep pointer-events-none absolute inset-0" />
@@ -125,7 +127,7 @@ export default function EditorialBanners({ cards }: { cards: EditorialCard[] }) 
       className={`grid gap-2 sm:gap-2.5 lg:gap-4 ${cards.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
     >
       {cards.map((c) => (
-        <Banner key={c.key} card={c} />
+        <Banner key={c.key} card={c} columns={cards.length > 1 ? 2 : 1} />
       ))}
     </section>
   );

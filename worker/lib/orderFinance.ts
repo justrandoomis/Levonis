@@ -5,6 +5,7 @@ import { getOrderGoods, workspaceInstalled } from './orderProfit';
 import { ruleScopeRank } from './financeRuleScopes';
 import { reconcileFinanceOrder } from './financeReconcile';
 import { recordFinancialFailure } from './financePostingErrors';
+import { employmentInstalled, nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
 export { recordFinancialFailure } from './financePostingErrors';
 
 export interface CostRule {
@@ -28,6 +29,7 @@ export interface CostRule {
   created_at: string;
   scope_rank?: number;
   scope_json?: string;
+  employment_effective_default?:number;
 }
 export function matchingRules(rules: CostRule[], productId: string, ancestors: Map<string, number>) {
   const groups = new Map<string, { rule: CostRule; rank: number }>();
@@ -72,14 +74,16 @@ type RuleSnapshot = { line_id: string; product_id: string; rules: CostRule[] }[]
 const advanceCollectionsSql = `SELECT COALESCE(SUM(l.credit_iqd-l.debit_iqd),0) FROM finance_collections c
   JOIN accounting_entries e ON e.event_key='collection:'||c.id AND e.state='posted'
   JOIN accounting_lines l ON l.entry_id=e.id AND l.account_code='2300' WHERE c.order_id=?`;
-async function snapshotFor(
+export async function snapshotFor(
   db: D1Database,
   lines: Array<{ id: string; product_id: string | null }>,
   at: string,
+  rulesOverride?:CostRule[],
+  dayOverride?:string,
 ): Promise<RuleSnapshot> {
-  const day = baghdadDay(new Date(at));
+  const day = dayOverride??baghdadDay(new Date(at));
   const [rawRules, catalogs, placements] = await Promise.all([
-    db
+    rulesOverride?Promise.resolve({results:rulesOverride.map((r)=>({snapshot:JSON.stringify(r)}))}):db
       .prepare(
         `SELECT v.snapshot FROM finance_rule_versions v WHERE v.created_at<=? AND v.version=(SELECT MAX(v2.version) FROM finance_rule_versions v2 WHERE v2.rule_id=v.rule_id AND v2.created_at<=?) ORDER BY v.rule_id LIMIT 500`,
       )
@@ -195,6 +199,7 @@ export async function runOrderFinancialEffects(
   orderId: string,
   milestone: 'prepared' | 'delivered',
   postingDay?: string,
+  staffOnly?:{staffId:string;employmentVersion:number;rules:CostRule[];skipReconcile?:boolean},
 ) {
   const db = env.DB;
   if (!(await operationsInstalled(db))) return;
@@ -215,7 +220,30 @@ export async function runOrderFinancialEffects(
       .first<{ rules_json: string }>();
   }
   if (!snapshot) return;
-  const frozen = JSON.parse(snapshot.rules_json) as RuleSnapshot;
+  let frozen = JSON.parse(snapshot.rules_json) as RuleSnapshot;
+  const hasEmployment=await employmentInstalled(db);
+  const staffRows=hasEmployment?(await db.prepare('SELECT * FROM finance_staff').all<EmploymentStaff>()).results??[]:[];
+  const staffById=new Map(staffRows.map((s)=>[s.id,s]));
+  // Deferred preparation pay must exist before the delivery sale publishes
+  // investor profit. Publishing first would expose a transient inflated margin.
+  if(!staffOnly&&milestone==='delivered'&&staffRows.some((s)=>s.start_work_date&&staffCanAccrue(s,goods.order)))
+    await runOrderFinancialEffects(env,orderId,'prepared',postingDay??baghdadDay(new Date(String(goods.order.delivered_at??new Date().toISOString()))));
+  if(hasEmployment){
+    const eligible=staffRows.filter((s)=>s.start_work_date&&staffCanAccrue(s,goods.order)&&(!staffOnly||s.id===staffOnly.staffId));
+    for(const employee of eligible){
+      if(staffOnly&&employee.employment_version!==staffOnly.employmentVersion)throw new Error('تغير إعداد الموظف أثناء تطبيق الاستحقاقات');
+      const prior=await db.prepare('SELECT employment_version FROM finance_staff_order_rules WHERE order_id=? AND staff_id=?').bind(orderId,employee.id).first<{employment_version:number}>();
+      if(prior?.employment_version===employee.employment_version)continue;
+      const rules=staffOnly?.rules??(await db.prepare('SELECT * FROM finance_cost_rules WHERE staff_id=? AND active=1').bind(employee.id).all<CostRule>()).results??[];
+      const deliveredDay=baghdadDay(new Date(String(goods.order.delivered_at)));
+      const applied=await snapshotFor(db,goods.lines,new Date().toISOString(),rules.map((r)=>r.employment_effective_default&&employee.start_work_date?{...r,effective_from:nextEmploymentDay(employee.start_work_date)}:r),deliveredDay);
+      await db.batch([...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=? AND active=1 AND archived_at IS NULL) AND EXISTS(SELECT 1 FROM orders WHERE id=? AND status=? AND delivered_at IS ?)',[employee.id,employee.employment_version,orderId,goods.order.status,goods.order.delivered_at]),
+        db.prepare(`INSERT INTO finance_staff_order_rules(order_id,staff_id,employment_version,rules_json,created_at) VALUES (?,?,?,?,?) ON CONFLICT(order_id,staff_id) DO UPDATE SET employment_version=excluded.employment_version,rules_json=excluded.rules_json,created_at=excluded.created_at`).bind(orderId,employee.id,employee.employment_version,JSON.stringify(applied),new Date().toISOString())]);
+    }
+    const overlays=(await db.prepare('SELECT r.rules_json FROM finance_staff_order_rules r JOIN finance_staff s ON s.id=r.staff_id WHERE r.order_id=? AND r.employment_version=s.employment_version AND s.active=1 AND s.archived_at IS NULL').bind(orderId).all<{rules_json:string}>()).results??[];
+    const supplemental=overlays.flatMap((r)=>JSON.parse(r.rules_json) as RuleSnapshot);
+    frozen=goods.lines.map((line)=>({line_id:line.id,product_id:line.product_id??'',rules:[...(frozen.find((f)=>f.line_id===line.id)?.rules??[]).filter((r)=>!r.staff_id||!staffById.get(r.staff_id)?.start_work_date),...supplemental.filter((f)=>f.line_id===line.id).flatMap((f)=>f.rules)]}));
+  }
   const assignments =
     (
       await db
@@ -260,6 +288,9 @@ export async function runOrderFinancialEffects(
     if (rule.requires_assignment && (!assigned || (milestone === 'prepared' && !assigned.completed_at)))
       continue;
     const staff = assigned?.staff_id ?? rule.staff_id;
+    if(staffOnly&&staff!==staffOnly.staffId)continue;
+    const employee=staff?staffById.get(staff):undefined;
+    if(employee&&!staffCanAccrue(employee,goods.order))continue;
     const relevant = goods.lines.filter((l) => lineIds.includes(l.id));
     const qty = relevant.reduce((s, l) => s + l.qty, 0),
       revenue = relevant.reduce((s, l) => s + l.net_goods_iqd, 0);
@@ -275,6 +306,7 @@ export async function runOrderFinancialEffects(
     });
     let amount = costAmount({ ...rule, cap_iqd: null }, qty, revenue, cogs);
     const itemId = rule.basis === 'order' ? null : lineIds[0];
+    if(staff&&await db.prepare(`SELECT 1 FROM finance_order_costs WHERE order_id=? AND staff_id=? AND group_key=? AND milestone=? AND rule_id<>? AND state<>'reversed' AND (order_item_id IS ? OR order_item_id IS NULL OR ? IS NULL) LIMIT 1`).bind(orderId,staff,rule.group_key,milestone,rule.id,itemId,itemId).first())continue;
     const existing = await db
       .prepare(
         'SELECT id,state,amount_iqd FROM finance_order_costs WHERE order_id=? AND rule_id=? AND order_item_id IS ?',
@@ -282,6 +314,7 @@ export async function runOrderFinancialEffects(
       .bind(orderId, rule.id, itemId)
       .first<{ id: string; state: string; amount_iqd: number | null }>();
     if (existing && existing.state !== 'pending_cost') continue;
+    if(employee)statements.push(...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=? AND active=1 AND archived_at IS NULL) AND EXISTS(SELECT 1 FROM orders WHERE id=? AND status=? AND delivered_at IS ?)',[employee.id,employee.employment_version,orderId,goods.order.status,goods.order.delivered_at??null]));
     // The employee and completion state read above must still belong to this
     // task when its cost becomes payable. Reassignment is a competing write,
     // even when the previous cost was only waiting for FIFO.
@@ -380,7 +413,7 @@ export async function runOrderFinancialEffects(
       );
   }
   if (
-    milestone === 'delivered' &&
+    !staffOnly && milestone === 'delivered' &&
     !(await db.prepare('SELECT id FROM accounting_entries WHERE event_key=?').bind(`sale:${orderId}`).first())
   ) {
     const revenue = goods.lines.reduce((s, l) => s + l.net_goods_iqd, 0),
@@ -424,7 +457,7 @@ export async function runOrderFinancialEffects(
       );
   }
   if (
-    milestone === 'delivered' &&
+    !staffOnly && milestone === 'delivered' &&
     !(await db.prepare('SELECT id FROM accounting_entries WHERE event_key=?').bind(`cogs:${orderId}`).first())
   ) {
     const cogs = goods.lines.every((l) => l.cost_confidence === 'fifo')
@@ -447,7 +480,7 @@ export async function runOrderFinancialEffects(
     .prepare('DELETE FROM finance_posting_errors WHERE event_key=?')
     .bind(`${milestone}:${orderId}`)
     .run();
-  if (milestone === 'delivered') {
+  if (!staffOnly && milestone === 'delivered') {
     if (goods.lines.some((l) => l.cost_confidence !== 'fifo'))
       await recordFinancialFailure(
         db,
@@ -460,7 +493,7 @@ export async function runOrderFinancialEffects(
   }
   // Prepared wages, delivery and explicit retries all validate the same source
   // before their percentage earnings become available for withdrawal.
-  await reconcileFinanceOrder(db, orderId, { day });
+  if(!staffOnly?.skipReconcile)await reconcileFinanceOrder(db, orderId, { day });
 }
 export async function recordReturnFinancials(
   env: Env,

@@ -33,6 +33,7 @@ import { cartRoutes } from '../worker/routes/cart';
 import { tradeInCallbackData, parseTradeInCallbackData } from '../worker/lib/tradeIn';
 import { DEFAULT_RULE_SETS, REQUIRED_PHOTOS, blankInputs, valuateComponent, wholeMonthsBetween } from '../packages/pricing/src/tradeIn';
 import { acceptedPolicies } from './lib/policies';
+import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
 
 const HOOK_SECRET = 'customer-hook-secret';
 const CUSTOMER_TG = 7101;
@@ -453,6 +454,7 @@ test('the customer can decline: the request closes and the device is free again'
 
 async function checkoutBody(extra: Record<string, unknown> = {}) {
   return {
+    printerStandardDeliveryAcceptance: { version: PRINTER_STANDARD_DELIVERY_POLICY.version, accepted: true },
     addressId: 'addr_c',
     deliveryMethodId: 'standard',
     paymentMethodId: 'cash',

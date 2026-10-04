@@ -58,6 +58,10 @@
 .fp-detail[open] summary { margin-bottom:12px; }
 .fp-rule { padding:14px; border:1px solid var(--ap-border); border-radius:14px; background:var(--ap-surface-2); display:grid; gap:9px; }
 .fp-rule-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.fp-staff-heading { flex-wrap:wrap; }
+.fp-staff-heading h3 { overflow-wrap:anywhere; }
+.fp-staff-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.fp-staff-actions .lv-button { flex:1 1 auto; }
 .fp-steps { display:flex; gap:5px; padding:0; margin:0 0 24px; list-style:none; }
 .fp-steps li { flex:1; min-width:0; color:var(--ap-text-3); font-size:11px; text-align:center; border-top:3px solid var(--ap-border-strong); padding-top:9px; }
 .fp-steps li[aria-current=step] { color:var(--ap-accent-text); border-color:var(--ap-accent); font-weight:650; }

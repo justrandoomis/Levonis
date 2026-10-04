@@ -8,6 +8,7 @@ import { operationsReport } from '../worker/lib/operationsReport';
 import { baghdadDay } from '../worker/lib/operations';
 import { reconcileFinanceOrder } from '../worker/lib/financeReconcile';
 import type { Env } from '../worker/lib/types';
+import { financePreset, financeRangeFromSearch, validFinanceRange } from '../src/components/financeWorkspace/types';
 
 function setup(cost:number|null=10000){
   const raw=freshDb(),at=new Date().toISOString();
@@ -160,6 +161,7 @@ test('summary withholds a persisted investor split after a linked expense change
   let summary=await json(await get(app,`/f/summary?${period()}`));assert.equal(summary.totals.investor_iqd,3400);assert.equal(summary.totals.owner_net_iqd,30600);
   raw.exec("UPDATE operating_expenses SET amount_iqd=3000 WHERE id='direct'");
   summary=await json(await get(app,`/f/summary?${period()}`));assert.equal(summary.orders[0].version,0);assert.equal(summary.totals.investor_iqd,null);assert.equal(summary.totals.owner_net_iqd,null);
+  assert.equal(summary.chart_data.owner_net_iqd,null);assert.equal(summary.chart_data.investor_iqd,null);assert.equal(summary.chart_data.cost_iqd,23000);
   assert.ok(summary.exceptions.some((e:{type:string})=>e.type==='investor'));
   await reconcileFinanceOrder(db,'order');summary=await json(await get(app,`/f/summary?${period()}`));assert.equal(summary.totals.investor_iqd,3200);assert.equal(summary.totals.owner_net_iqd,28800);
   const detail=await json(await get(app,'/f/orders/order'));assert.equal(detail.totals.owner_net_iqd,summary.totals.owner_net_iqd);
@@ -167,4 +169,49 @@ test('summary withholds a persisted investor split after a linked expense change
 test('financial exports and numeric mutations enforce financial scope and emit safe source CSV',async()=>{
   const {app,assistant,raw}=setup();assert.equal((await get(assistant,`/f/summary?${period()}`)).status,403);assert.equal((await get(assistant,`/f/export.csv?${period()}`)).status,403);assert.equal((await edit(assistant,'cogs_iqd',1)).status,403);
   raw.exec("UPDATE order_items SET name_snapshot='=HYPERLINK(\"https://x\")'");const response=await get(app,`/f/export.csv?${period()}`);assert.equal(response.status,200);assert.match(await response.text(),/'=HYPERLINK/);
+});
+test('chart days reconcile revenue, costs and owner result without reallocating month promotion on a date filter',async()=>{
+  const {raw,db,add,app}=setup();
+  raw.prepare('UPDATE orders SET delivered_at=?,created_at=?').run(`${month()}-01T21:30:00Z`,`${month()}-01T21:30:00Z`);
+  add('other',1,`${month()}-03T00:00:00Z`);
+  raw.prepare("INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('chart-rent','rent',2000,?,'Rent','admin')").run(`${month()}-02`);
+  assert.equal((await post(app,'/f/promotions',{month:month(),currency:'IQD',amount:1000})).status,200);
+  const result=await json(await get(app,`/f/summary?from=${month()}-01&to=${month()}-03`)),chart=result.chart_data;
+  assert.equal(chart.daily.length,3);assert.equal(chart.basis,'delivered_baghdad_day');
+  assert.equal(chart.revenue_iqd,85000);assert.equal(chart.cost_iqd,33000);assert.equal(chart.owner_net_iqd,52000);
+  for(const field of ['revenue_iqd','cost_iqd','owner_net_iqd'])assert.equal(chart.daily.reduce((sum:number,day:Record<string,number>)=>sum+day[field],0),chart[field]);
+  assert.equal(chart.owner_net_iqd,result.totals.owner_period_net_iqd);
+  assert.equal(chart.expense_composition.reduce((sum:number,item:{amount_iqd:number})=>sum+item.amount_iqd,0),chart.cost_iqd);
+  assert.equal(chart.daily[0].orders_count,0);assert.equal(chart.daily[1].orders_count,1);
+  const promotion=await monthlyPromotionShares(db,month()),filtered=await json(await get(app,`/f/summary?from=${month()}-02&to=${month()}-02`));
+  assert.equal(filtered.totals.promotion_iqd,promotion.shares.get('order:item'));
+  assert.equal(filtered.chart_data.revenue_iqd,55000);assert.equal(filtered.chart_data.cost_iqd,22000+n(promotion.shares.get('order:item')));
+});
+test('unknown daily profit and costs stay null, genuine quiet days stay zero and finance scope still applies',async()=>{
+  const {raw,app,assistant}=setup(null);
+  raw.prepare('UPDATE orders SET delivered_at=?,created_at=?').run(`${month()}-02T00:00:00Z`,`${month()}-02T00:00:00Z`);
+  const url=`/f/summary?from=${month()}-01&to=${month()}-02`,result=await json(await get(app,url));
+  assert.equal(result.chart_data.owner_net_iqd,null);assert.equal(result.chart_data.cost_iqd,null);
+  assert.equal(result.chart_data.daily[0].owner_net_iqd,0);assert.equal(result.chart_data.daily[1].owner_net_iqd,null);assert.equal(result.chart_data.daily[1].cost_iqd,null);
+  assert.equal(result.chart_data.expense_composition.find((v:{key:string})=>v.key==='goods').amount_iqd,null);
+  assert.equal((await get(assistant,url)).status,403);
+});
+test('no-sales promotion and general expenses appear on their own days and reconcile to a loss',async()=>{
+  const {raw,app}=setup();raw.exec("UPDATE orders SET status='confirmed',delivered_at=NULL");
+  await post(app,'/f/promotions',{month:month(),currency:'IQD',amount:1000});
+  raw.prepare("INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('chart-general','rent',2000,?,'Rent','admin')").run(`${month()}-02`);
+  const result=await json(await get(app,`/f/summary?from=${month()}-01&to=${month()}-03`));
+  assert.equal(result.chart_data.revenue_iqd,0);assert.equal(result.chart_data.cost_iqd,3000);assert.equal(result.chart_data.owner_net_iqd,-3000);
+  assert.deepEqual(result.chart_data.daily.map((v:{owner_net_iqd:number})=>v.owner_net_iqd),[-1000,-2000,0]);
+});
+test('finance date ranges validate real calendar dates and presets preserve Baghdad date boundaries',()=>{
+  assert.equal(validFinanceRange({from:'2026-02-30',to:'2026-03-01'}),false);
+  assert.equal(validFinanceRange({from:'2026-10-04',to:'2026-10-03'}),false);
+  assert.equal(validFinanceRange({from:'2025-01-01',to:'2026-01-02'}),false);
+  assert.equal(validFinanceRange({from:'2025-01-01',to:'2026-01-01'}),true);
+  assert.deepEqual(financePreset('7days','2026-01-04'),{from:'2025-12-29',to:'2026-01-04'});
+  assert.deepEqual(financePreset('previous','2026-01-04'),{from:'2025-12-01',to:'2025-12-31'});
+  assert.deepEqual(financePreset('previous','2024-03-04'),{from:'2024-02-01',to:'2024-02-29'});
+  assert.deepEqual(financeRangeFromSearch('?from=2026-02-01&to=2026-02-28'),{range:{from:'2026-02-01',to:'2026-02-28'},invalid:false});
+  assert.equal(financeRangeFromSearch('?from=2026-01-01').invalid,true);
 });
