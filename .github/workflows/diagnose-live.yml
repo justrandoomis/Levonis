@@ -21,44 +21,51 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - name: Prepare read-only queries from the candidate eligibility predicate
+      - name: Verify actual participant response (SELECT only, no names or amounts)
         run: |
           node --import tsx --input-type=module <<'JS'
-          import { writeFileSync } from 'node:fs';
-          import { staffReconciliationBlockedSql, effectiveStaffCostSql, staffPaidSql, heldSourceSql } from './worker/lib/financeParticipants.ts';
-          const ready = `c.state IN ('due','approved') AND ${effectiveStaffCostSql()}-${staffPaidSql()}-${heldSourceSql("'staff'","c.id")}>0 AND NOT ${staffReconciliationBlockedSql()}`;
-          writeFileSync('/tmp/staff-verification.sql', `
-            SELECT s.active,s.archived_at IS NOT NULL AS archived,s.start_work_date IS NOT NULL AS has_start,
-              j.state AS calculation_state,
-              EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.staff_id=s.id AND ${ready}) AS has_ready_wage_source,
-              EXISTS(SELECT 1 FROM finance_order_costs c JOIN finance_posting_errors p ON p.order_id=c.order_id WHERE c.staff_id=s.id AND p.event_key='cogs:'||c.order_id AND ${ready}) AS ready_despite_inventory_warning,
-              EXISTS(SELECT 1 FROM orders o WHERE o.seller_type='levonis' AND o.status='delivered' AND date(o.delivered_at,'+3 hours')>s.start_work_date) AS has_deliveries_after_start
-            FROM finance_staff s LEFT JOIN finance_staff_reconciliations j ON j.staff_id=s.id ORDER BY s.id;
-            SELECT substr(p.event_key,1,instr(p.event_key,':')-1) AS warning_type,
-              json_extract(c.snapshot,'$.rule.basis') AS pay_basis,COUNT(*) AS affected_sources
-            FROM finance_order_costs c JOIN finance_posting_errors p ON p.order_id=c.order_id
-            WHERE c.staff_id IS NOT NULL GROUP BY warning_type,pay_basis;
-            SELECT c.state,json_extract(c.snapshot,'$.rule.basis') AS basis,
-              c.amount_iqd IS NULL AS amount_pending,
-              COALESCE(c.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments x WHERE x.cost_id=c.id),0)>0 AS effective_positive,
-              c.order_item_id IS NOT NULL AS per_line,
-              json_extract(c.snapshot,'$.fifo_cogs_iqd') IS NOT NULL AS frozen_cost_known,
-              EXISTS(SELECT 1 FROM order_items i WHERE i.id=c.order_item_id
-                AND (SELECT COALESCE(SUM(a.qty),0) FROM order_item_inventory_allocations a WHERE a.order_item_id=i.id AND a.released_at IS NULL)>=i.qty
-                AND EXISTS(SELECT 1 FROM order_item_inventory_allocations a WHERE a.order_item_id=i.id AND a.released_at IS NULL)
-                AND NOT EXISTS(SELECT 1 FROM order_item_inventory_allocations a WHERE a.order_item_id=i.id AND a.released_at IS NULL AND a.cogs_iqd IS NULL)) AS current_fifo_known,
-              EXISTS(SELECT 1 FROM finance_order_adjustments x WHERE x.order_id=c.order_id AND x.field='cogs_iqd' AND (x.order_item_id=c.order_item_id OR x.order_item_id IS NULL)) AS manually_verified_cost,
-              EXISTS(SELECT 1 FROM finance_payment_allocations x WHERE x.cost_id=c.id) AS has_payment,
-              EXISTS(SELECT 1 FROM finance_withdrawal_allocations x WHERE x.source_kind='staff' AND x.source_id=c.id) AS has_withdrawal
-            FROM finance_order_costs c JOIN finance_posting_errors p ON p.order_id=c.order_id
-            WHERE c.staff_id IS NOT NULL ORDER BY c.id;`);
-          JS
-      - name: Verify live accrual without displaying names or amounts (SELECT only)
-        run: |
-          node --input-type=module <<'JS'
-          import { readFileSync } from 'node:fs';
           import { spawnSync } from 'node:child_process';
-          const result = spawnSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'd1', 'execute', 'levonis-db-staging', '--remote', '--json', '--command', readFileSync('/tmp/staff-verification.sql', 'utf8')], { encoding: 'utf8' });
-          if (result.status !== 0) { console.error(result.stderr || result.stdout); process.exit(result.status || 1); }
-          console.log(JSON.stringify(JSON.parse(result.stdout).map((query) => query.results), null, 2));
+          import { participantOverview } from './worker/lib/financeParticipants.ts';
+          function literal(v) {
+            if(v == null) return 'NULL';
+            if(typeof v === 'number' && Number.isFinite(v)) return String(v);
+            if(typeof v === 'string') return "'" + v.replaceAll("'", "''") + "'";
+            throw new Error('Unsupported read parameter');
+          }
+          function rows(sql, values=[]) {
+            if(!/^\s*SELECT\b/i.test(sql)) throw new Error('Only SELECT is allowed');
+            let n=0;
+            const command=sql.replace(/\?/g,()=>literal(values[n++]));
+            if(n!==values.length) throw new Error('Parameter mismatch');
+            const result=spawnSync(process.execPath,['node_modules/wrangler/bin/wrangler.js','d1','execute','levonis-db-staging','--remote','--json','--command',command],{encoding:'utf8',maxBuffer:8*1024*1024});
+            if(result.status!==0) throw new Error('Read-only database query failed; no account data printed');
+            const payload=JSON.parse(result.stdout);
+            if(payload.length!==1||payload[0].success!==true)throw new Error('Read-only query did not succeed');
+            return payload[0].results;
+          }
+          const db={prepare(sql){
+            let values=[];
+            const statement={bind(...next){values=next;return statement;},async all(){return {results:rows(sql,values)};},async first(){return rows(sql,values)[0]??null;}};
+            return statement;
+          }};
+          const users=rows("SELECT DISTINCT user_id FROM finance_staff WHERE user_id IS NOT NULL AND archived_at IS NULL ORDER BY user_id");
+          const summaries=[];
+          for(const user of users){
+            const data=await participantOverview(db,user.user_id),s=data.summary;
+            summaries.push({
+              linked_employment_records:data.employment.length,
+              calculation_states:data.employment.map(e=>e.reconciliation_state),
+              has_work_earnings:s.staff_iqd>0,
+              has_available_earnings:s.earnings_available_iqd>0,
+              has_available_staff_source:data.entries.some(e=>e.kind==='staff'&&e.available_iqd>0),
+              has_paid_earnings:s.earnings_paid_iqd>0,
+              has_reserved_earnings:s.earnings_held_iqd>0,
+              has_advance_balance:s.advance_balance_iqd>0,
+              has_settlement_debt:s.debt_iqd>0,
+              pending_costs:s.pending_costs,
+              reconciliation_pending:s.reconciliation_pending,
+              summary_numbers_finite:Object.values(s).every(v=>typeof v!=='number'||Number.isFinite(v))
+            });
+          }
+          console.log(JSON.stringify({participant_response_checks:summaries},null,2));
           JS
