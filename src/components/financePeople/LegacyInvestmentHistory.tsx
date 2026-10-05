@@ -1,0 +1,19 @@
+import { useState } from 'react';
+import { Button, Feedback, Field, Input, Loading, Surface, api, useLanguage, useMutation, useRemote } from './shared';
+type Legacy = { currency: string; unit: string; withdrawable: false; investments: { id: string; user_name: string; amount_usd_cents: number; expected_profit_usd_cents: number; review_state?: string; evidence?: string; items_count: number }[]; items: { id: string; investment_id: string; name: string; price_usd_cents: number }[]; messages: { id: string; message: string; created_at: string }[] };
+export default function LegacyInvestmentHistory({ admin = false }: { admin?: boolean }) {
+  const [open, setOpen] = useState(false); const { loc } = useLanguage();
+  return <details className="fp-detail" onToggle={(e) => setOpen(e.currentTarget.open)}><summary>{loc('سجل الاستثمار السابق · بالدولار', 'Previous investment register · USD')}</summary>{open && <History admin={admin} />}</details>;
+}
+function History({ admin }: { admin: boolean }) {
+  const { loc } = useLanguage(), remote = useRemote<Legacy>(admin ? '/api/admin/investment-finance/legacy' : '/api/finance-earnings/legacy');
+  const [review, setReview] = useState<string | null>(null), [evidence, setEvidence] = useState(''); const op = useMutation();
+  const usd = (n: number) => `${(n / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD`;
+  if (!remote.data) return <Loading error={remote.error} retry={remote.load} />;
+  const d = remote.data;
+  return <div className="fp-stack"><p className="fp-note">{loc('مبالغ السجل القديم محفوظة بسنتات الدولار. لم تُحوّل إلى دينار، والأرباح المتوقعة ليست رصيدًا قابلًا للسحب. تبقى المطابقة بحاجة إلى دليل.', 'Legacy amounts retain their USD-cent unit. They have not been converted to IQD. Expected profits are not withdrawable; matching requires evidence.')}</p><Feedback error={op.error} notice={op.notice} />
+    {d.investments.map((i) => <Surface key={i.id} title={i.user_name || i.id} hint={i.review_state === 'linked' ? loc('مرتبط بدليل · دون قيد مالي تلقائي', 'Evidence linked · no automatic posting') : i.review_state === 'historical' ? loc('سجل تاريخي تمت مراجعته', 'Reviewed historical record') : loc('يحتاج مراجعة', 'Needs review')}><div className="fp-row"><span>{loc('رأس المال المسجل', 'Recorded capital')}</span><bdi>{usd(i.amount_usd_cents)}</bdi></div><div className="fp-row"><span>{loc('ربح متوقع سابقًا', 'Historical expected profit')}</span><bdi>{usd(i.expected_profit_usd_cents)}</bdi></div>{d.items.filter((x) => x.investment_id === i.id).map((x) => <p className="fp-muted" key={x.id}>{x.name} · <bdi>{usd(x.price_usd_cents)}</bdi></p>)}{i.evidence && <p className="fp-note">{i.evidence}</p>}{admin && (review === i.id ? <div className="fp-stack"><Field label={loc('نتيجة المراجعة ودليلها', 'Review finding and evidence')}><Input value={evidence} onChange={(e) => setEvidence(e.target.value)} /></Field><Button disabled={evidence.trim().length < 10} loading={op.busy} onClick={() => op.run(async () => { await api.post(`/api/admin/investment-finance/legacy/${i.id}/link`, { evidence }); setReview(null); await remote.load(); }, loc('حُفظ كسجل تاريخي دون إضافة رصيد.', 'Saved as history without creating a balance.'))}>{loc('حفظ كسجل تاريخي', 'Mark as historical')}</Button></div> : <Button variant="ghost" onClick={() => { setReview(i.id); setEvidence(i.evidence || ''); }}>{loc('مراجعة السجل', 'Review record')}</Button>)}</Surface>)}
+    {!d.investments.length && <p className="fp-muted">{loc('لا استثمارات في السجل السابق.', 'No previous investment records.')}</p>}
+    {d.messages.length > 0 && <details className="fp-detail"><summary>{loc('المراسلات المحفوظة', 'Retained messages')} ({d.messages.length})</summary>{d.messages.map((m) => <p key={m.id} className="fp-note"><small>{m.created_at.slice(0, 10)}</small> · {m.message}</p>)}</details>}
+  </div>;
+}

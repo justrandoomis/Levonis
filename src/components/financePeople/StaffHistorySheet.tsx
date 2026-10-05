@@ -1,0 +1,16 @@
+import { Sheet } from '../financeWorkspace/ui';
+import { dateLabel, Loading, Money, PEOPLE, Surface, useLanguage, useRemote } from './shared';
+
+type WagePeriod={id:string;starts_on:string;ends_before:string|null;snapshot:string;reason:string};
+type History={periods:WagePeriod[];versions:{id:string;recorded_at:string;actor_name:string;reason:string}[];adjustments:{id:string;adjustment_day:string;earning_day:string|null;delta_iqd:number;reason:string;rule_name:string}[];account:{summary:{staff_net_iqd:number;staff_available_iqd:number;staff_debt_iqd:number;earnings_held_iqd:number}}|null};
+export default function StaffHistorySheet({staff,onClose}:{staff:{id:string;name:string};onClose:()=>void}){
+  const {loc,lang}=useLanguage(),remote=useRemote<History>(`${PEOPLE}/staff/${encodeURIComponent(staff.id)}/history`),data=remote.data;
+  return <Sheet title={staff.name} subtitle={loc('سجل الأجور والتسويات','Wage history and adjustments')} onClose={onClose} wide={false}><div className="ap fp fp-stack">
+    {!data?<Loading error={remote.error} retry={remote.load}/>:<>
+    {data.account&&<div className="fp-stats">{[[loc('الرصيد','Balance'),data.account.summary.staff_net_iqd],[loc('متاح للسحب','Available'),data.account.summary.staff_available_iqd],[loc('الدين المتبقي','Remaining debt'),data.account.summary.staff_debt_iqd],[loc('محجوز','Reserved'),data.account.summary.earnings_held_iqd]].map(([label,value])=><div className="fp-stat" key={label}><span>{label}</span><Money value={Number(value)}/></div>)}</div>}
+    <Surface title={loc('فترات الأجر','Effective wage periods')}><div className="fp-timeline">{data.periods.map(p=>{const rule=JSON.parse(p.snapshot) as {basis:string;amount:number;active:number};return <article className="fp-timeline-item" key={p.id}><div className="fp-row"><strong>{rule.basis.endsWith('percent')?`${rule.amount/100}%`: <Money value={rule.amount}/>}</strong><span className="fp-status">{rule.basis==='unit'?loc('أجر لكل قطعة','Pay per unit'):rule.basis==='order'?loc('أجر لكل طلب','Pay per order'):rule.basis==='profit_percent'?loc('نسبة ربح البضاعة','Goods profit share'):loc('نسبة المبيعات','Sales share')}</span></div><p>{dateLabel(p.starts_on,lang)} · {p.ends_before?loc('قبل ','before ')+dateLabel(p.ends_before,lang):loc('مستمرة','Ongoing')}</p><p className="fp-muted">{p.reason}</p>{!rule.active&&<span className="fp-status">{loc('موقوفة خلال هذه الفترة','Disabled in this period')}</span>}</article>;})}</div></Surface>
+    <Surface title={loc('التسويات','Adjustments')}><div className="fp-rows">{data.adjustments.length?data.adjustments.map(a=><div className="fp-row" key={a.id}><div><strong>{a.reason||a.rule_name}</strong><p className="fp-row-meta">{loc('قيد: ','Posted: ')}{dateLabel(a.adjustment_day,lang)}{a.earning_day&&<> · {loc('استحقاق: ','Earned: ')}{dateLabel(a.earning_day,lang)}</>}</p></div><Money value={a.delta_iqd} className={a.delta_iqd<0?'fp-negative':'fp-positive'}/></div>):<p className="fp-muted">{loc('لا توجد تسويات بعد.','No adjustments yet.')}</p>}</div></Surface>
+    <details className="fp-detail"><summary>{loc('سجل التدقيق','Audit history')}</summary>{data.versions.map(v=><div className="fp-timeline-item" key={v.id}><strong>{v.actor_name}</strong><p>{v.reason}</p><small className="fp-muted">{dateLabel(v.recorded_at,lang)}</small></div>)}</details>
+    </>}
+  </div></Sheet>;
+}

@@ -1,20 +1,40 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, conflict, forbidden, notFound, requireAdmin, str } from '../lib/http';
-import { canViewFinancials } from '../lib/adminScope';
+import { canViewFinancials, isOwner } from '../lib/adminScope';
 import { auditStatements } from '../lib/audit';
+import { staffPeriodReport } from '../lib/financeParticipantReports';
+import { financeRange, financeRangeArgs, inFinanceRangeSql } from '../lib/financeRange';
 import { newId } from '../lib/crypto';
 import { baghdadDay, dateValue, fence, journalPlan, periodOpen, requireCapability, whole } from '../lib/operations';
 import { changeWithdrawalState, effectiveStaffCostSql, heldSourceSql, participantOverview, payWithdrawal, staffPaidSql } from '../lib/financeParticipants';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { readRuleScope, type ScopedCostRule } from '../lib/financeRuleScopes';
 import { employmentDate, publicReconciliation, readStaff, readStaffReconciliation, staffDateEligible, updateStaffEmployment } from '../lib/financeEmployment';
+import { effectiveWageRules, wageVersions } from '../lib/financeWageTimeline';
+import { applyWageChange, previewWageChangePage, type WageChangeInput } from '../lib/financeWageChanges';
 import { continueStaffReconciliation } from '../lib/financeStaffAccrual';
 
 export const adminFinancePeopleRoutes = new Hono<AppContext>();
 adminFinancePeopleRoutes.use('*',requireAdmin);
 adminFinancePeopleRoutes.use('*',async(c,next)=>{if(!canViewFinancials(c.env,c.get('user')!))throw forbidden('هذه الشاشة تتطلب صلاحية مالية');await next();});
 const text=(v:unknown,max=200)=>str(v,'النص',{max,required:false})??'';
+for(const action of ['preview','apply'] as const)adminFinancePeopleRoutes.post(`/rules/:id/${action}`,async c=>{
+  const user=c.get('user')!;if(!isOwner(c.env,user))throw forbidden('تغيير الأجر والتسوية الرجعية للأدمن الرئيسي فقط');
+  const body=await c.req.json<WageChangeInput>();
+  if(action==='preview')return c.json({success:true,...await previewWageChangePage(c.env.DB,c.req.param('id'),body,user.id)});
+  return c.json({success:true,...await applyWageChange(c.env.DB,c.req.param('id'),body,user.id,true)});
+});
+adminFinancePeopleRoutes.get('/staff/:id/history',async c=>{
+  await requireCapability(c.env,c.get('user')!,'rules');
+  const db=c.env.DB,id=c.req.param('id'),person=await readStaff(db,id);if(!person)throw notFound('الموظف غير موجود');
+  const [periods,changes,adjustments,account]=await Promise.all([
+    db.prepare('SELECT * FROM finance_wage_periods WHERE staff_id=? ORDER BY rule_id,starts_on DESC').bind(id).all(),
+    db.prepare('SELECT v.*,u.name AS actor_name FROM finance_wage_versions v LEFT JOIN users u ON u.id=v.actor_id WHERE v.staff_id=? ORDER BY recorded_at DESC,revision DESC').bind(id).all(),
+    db.prepare('SELECT a.*,c.order_id,c.rule_name FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id WHERE c.staff_id=? ORDER BY a.created_at DESC LIMIT 200').bind(id).all(),
+    person.user_id?participantOverview(db,person.user_id):Promise.resolve(null)]);
+  return c.json({success:true,staff:person,periods:periods.results??[],versions:changes.results??[],adjustments:adjustments.results??[],account});
+});
 adminFinancePeopleRoutes.get('/accounts',async(c)=>{
   await requireCapability(c.env,c.get('user')!,'rules');
   const q=text(c.req.query('q'),120).trim();
@@ -29,13 +49,22 @@ adminFinancePeopleRoutes.get('/staff',async(c)=>{
     db.prepare('SELECT id,parent_id,name_ar,name_en FROM catalogs WHERE active=1 ORDER BY sort').all(),
     db.prepare('SELECT r.*,s.name AS staff_name FROM finance_cost_rules r LEFT JOIN finance_staff s ON s.id=r.staff_id ORDER BY r.active DESC,r.name').all<ScopedCostRule&Record<string,unknown>>(),
     db.prepare('SELECT * FROM finance_staff_reconciliations').all<import('../lib/financeEmployment').StaffReconciliation>()]);
-  const rr=(rules.results??[]).map((r)=>({...r,scope:readRuleScope(r)??{catalog_ids:r.target_type==='catalog'?[r.target_id]:[],product_ids:r.target_type==='product'?[r.target_id]:[],excluded_product_ids:[]}}));
+  const reportRange=financeRange(c.req.query()),periods=await staffPeriodReport(db,reportRange);
+  const histories=await wageVersions(db);
+  const currentRules=new Map<string,import('../lib/financeWageTimeline').EffectiveWageRule>();
+  const balances=new Map<string,Awaited<ReturnType<typeof participantOverview>>['summary']>();
+  for(const employee of staff.results??[]){
+    const person=employee as unknown as import('../lib/financeEmployment').EmploymentStaff;
+    for(const rule of effectiveWageRules(histories.filter(v=>v.staff_id===person.id),person,baghdadDay()))currentRules.set(rule.id,rule);
+    if(person.user_id)balances.set(person.id,(await participantOverview(db,person.user_id)).summary);
+  }
+  const rr=(rules.results??[]).map(r=>{const current=currentRules.get(String(r.id));return current?{...r,...current,version:r.version}:r;}).map((r)=>({...r,scope:readRuleScope(r)??{catalog_ids:r.target_type==='catalog'?[r.target_id]:[],product_ids:r.target_type==='product'?[r.target_id]:[],excluded_product_ids:[]}}));
   const ids=[...new Set(rr.flatMap((r)=>[...r.scope.product_ids,...r.scope.excluded_product_ids]))];
   const products=ids.length?await db.prepare('SELECT id,name,name_ar,name_en,sku FROM products WHERE id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(ids)).all():{results:[]};
-  return c.json({success:true,staff:staff.results??[],catalogs:catalogs.results??[],rules:rr,scope_products:products.results??[],reconciliations:(jobs.results??[]).map(publicReconciliation)});
+  return c.json({success:true,staff:(staff.results??[]).map(s=>({...s,balance:balances.get(String(s.id))??null,period:periods.get(String(s.id))??{earned_iqd:0,paid_iqd:0,adjustments_iqd:0,pending_costs:0}})),catalogs:catalogs.results??[],rules:rr,scope_products:products.results??[],reconciliations:(jobs.results??[]).map(publicReconciliation)});
 });
 adminFinancePeopleRoutes.post('/staff',async(c)=>{
-  const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');
+  const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');if(!isOwner(c.env,actor))throw forbidden('تعديل الموظفين وتواريخهم للأدمن الرئيسي فقط');
   const b=await c.req.json<Record<string,unknown>>(),userId=text(b.user_id,100),db=c.env.DB;
   const account=await db.prepare('SELECT id,name,email FROM users WHERE id=?').bind(userId).first<{id:string;name:string;email:string}>();
   if(!account)throw badRequest('اختر حساب الموظف من القائمة');
@@ -48,16 +77,16 @@ adminFinancePeopleRoutes.post('/staff',async(c)=>{
   return c.json({success:true,id,staff:await db.prepare('SELECT * FROM finance_staff WHERE id=?').bind(id).first(),reconciliation:publicReconciliation(await readStaffReconciliation(db,id))});
 });
 adminFinancePeopleRoutes.patch('/staff/:id',async(c)=>{
-  const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');
+  const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');if(!isOwner(c.env,actor))throw forbidden('تعديل الموظفين وتواريخهم للأدمن الرئيسي فقط');
   const b=await c.req.json<Record<string,unknown>>(),db=c.env.DB,id=c.req.param('id');
   return c.json({success:true,id,...await updateStaffEmployment(db,id,b,actor.id)});
 });
 adminFinancePeopleRoutes.delete('/staff/:id',async(c)=>{
-  const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');
+  const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');if(!isOwner(c.env,actor))throw forbidden('تعديل الموظفين وتواريخهم للأدمن الرئيسي فقط');
   return c.json({success:true,id:c.req.param('id'),...await updateStaffEmployment(c.env.DB,c.req.param('id'),{},actor.id,true)});
 });
 adminFinancePeopleRoutes.post('/staff/:id/reconcile',async(c)=>{
-  const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');
+  const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');if(!isOwner(c.env,actor))throw forbidden('تعديل الموظفين وتواريخهم للأدمن الرئيسي فقط');
   const b=await c.req.json<Record<string,unknown>>();
   return c.json({success:true,reconciliation:await continueStaffReconciliation(c.env,c.req.param('id'),b.revision===undefined?undefined:whole(b.revision,'الإصدار',1))});
 });
@@ -68,8 +97,12 @@ adminFinancePeopleRoutes.get('/accounts/:id/earnings',async(c)=>{
 adminFinancePeopleRoutes.get('/withdrawals',async(c)=>{
   await requireCapability(c.env,c.get('user')!,'pay');
   const offset=whole(c.req.query('offset')??0,'الصفحة',0,100000),state=text(c.req.query('state'),20);
-  const rows=await c.env.DB.prepare(`SELECT w.*,u.name AS user_name,u.email AS email FROM finance_withdrawals w JOIN users u ON u.id=w.user_id WHERE (?='' OR w.state=?) ORDER BY CASE WHEN w.state IN ('requested','approved','part_paid') THEN 0 ELSE 1 END,w.created_at DESC LIMIT 100 OFFSET ?`).bind(state,state,offset).all();
-  return c.json({success:true,withdrawals:rows.results??[],offset});
+  const reportRange=financeRange(c.req.query()),args=[state,state,state,...financeRangeArgs(reportRange)];
+  const filter=`(?='' OR (?='open' AND w.state IN('requested','approved','part_paid')) OR w.state=?) AND ${inFinanceRangeSql("date(w.created_at,'+3 hours')")}`;
+  const [rows,totals]=await Promise.all([
+    c.env.DB.prepare(`SELECT w.*,u.name AS user_name,u.email AS email FROM finance_withdrawals w JOIN users u ON u.id=w.user_id WHERE ${filter} ORDER BY CASE WHEN w.state IN ('requested','approved','part_paid') THEN 0 ELSE 1 END,w.created_at DESC,w.id LIMIT 100 OFFSET ?`).bind(...args,offset).all(),
+    c.env.DB.prepare(`SELECT COUNT(*) AS count,COALESCE(SUM(w.amount_iqd),0) AS requested_iqd,COALESCE(SUM(w.paid_iqd),0) AS paid_iqd,COALESCE(SUM(CASE WHEN w.state IN('requested','approved','part_paid') THEN w.amount_iqd-w.paid_iqd ELSE 0 END),0) AS held_iqd FROM finance_withdrawals w WHERE ${filter}`).bind(...args).first()]);
+  return c.json({success:true,withdrawals:rows.results??[],totals,offset,range:reportRange});
 });
 for(const action of ['approve','reject'] as const)adminFinancePeopleRoutes.post(`/withdrawals/:id/${action}`,async(c)=>{
   const actor=c.get('user')!;await requireCapability(c.env,actor,'pay');

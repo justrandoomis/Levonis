@@ -11,7 +11,7 @@ import './people.css';
 export { api, Button, Field, Input, useLanguage };
 export const PEOPLE = '/api/admin/finance-people';
 export const EARNINGS = '/api/finance-earnings';
-export type PanelProps = { month?: string; onChanged?: () => void };
+export type PanelProps = { month?: string; from?: string; to?: string; onChanged?: () => void };
 export type Account = { id: string; name: string; email: string; role: string; admin_scope?: string };
 export type Withdrawal = {
   id: string; amount_iqd: number; paid_iqd: number; state: string; created_at: string;

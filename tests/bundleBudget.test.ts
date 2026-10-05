@@ -305,7 +305,7 @@ test('the split really happened: every page and panel §10 names has a chunk of 
     // every first visit; `BundleDetail` arrives with its route. Both are named
     // here so a regression that re-eagers either one fails loudly.
     'Bundles', 'BundleDetail',
-    'Chat', 'Chats', 'Warranty', 'WarrantyVerify', 'Invest', 'InvestAdmin', 'Tools', 'Rewards', 'Referrals',
+    'Chat', 'Chats', 'Warranty', 'WarrantyVerify', 'LegacyInvestmentRedirect', 'Tools', 'Rewards', 'Referrals',
     'AdminProducts', 'AdminBundles', 'AdminTaxonomy', 'AdminWarranties', 'AdminAds', 'AdminHomeSettings',
     'AdminOverview', 'AdminUsers', 'AdminWalletRequests', 'AdminWalletSettings', 'AdminStoreSettings',
     'AdminSerials', 'AdminReviews', 'AdminKyc', 'AdminMemberships', 'AdminCoupons', 'AdminDelivery',

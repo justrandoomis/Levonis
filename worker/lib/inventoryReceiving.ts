@@ -70,6 +70,7 @@ export interface IncomingRow {
   qty_ordered: number;
   qty_received: number;
   purchase_unit_iqd: number;
+  purchase_total_iqd?:number|null;
   shipping_total_iqd: number | null;
   internal_delivery_total_iqd: number | null;
   supplier_id: string | null;
@@ -142,6 +143,7 @@ export function readyToReceive(row: IncomingRow, qty: number): ReceiveCheck {
     remaining,
     cost: lotCostBreakdown({
       purchaseUnitIqd: row.purchase_unit_iqd,
+      purchaseTotalIqd: row.purchase_total_iqd,
       shippingTotalIqd: row.shipping_total_iqd,
       internalDeliveryTotalIqd: row.internal_delivery_total_iqd,
       qtyOrdered: row.qty_ordered,

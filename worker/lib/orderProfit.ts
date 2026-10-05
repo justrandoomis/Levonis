@@ -155,10 +155,10 @@ export function planProfitAdjustment(base: OrderProfitBase, lineId: string | nul
 
 /** Batched read-only basis. No investor or monthly-marketing table is read
  * here, so employee/investor entitlement cannot inherit an owner-only cost. */
-export async function getOrderProfitBases(db: D1Database, orderIds: string[], options: { skipAdjustments?: boolean } = {}): Promise<OrderProfitBase[]> {
+export async function getOrderProfitBases(db: D1Database, orderIds: string[], options: { skipAdjustments?: boolean; costOverrides?:Record<string,Row[]> } = {}): Promise<OrderProfitBase[]> {
   if (!orderIds.length) return [];
   const ids = JSON.stringify([...new Set(orderIds)]);
-  const tables = (await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('finance_order_adjustments','finance_cost_adjustments','finance_line_departments','lot_cost_adjustment_shares')").all<{ name: string }>()).results ?? [];
+  const tables = (await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('finance_order_adjustments','finance_cost_adjustments','finance_line_departments','lot_cost_adjustment_shares','finance_wage_targets')").all<{ name: string }>()).results ?? [];
   const present = new Set(tables.map((t) => t.name));
   const adjustedCost = present.has('finance_cost_adjustments') ? 'c.amount_iqd+COALESCE((SELECT SUM(a.delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id),0)' : 'c.amount_iqd';
   const scopeJoin = present.has('finance_line_departments') ? 'LEFT JOIN finance_line_departments fd ON fd.order_item_id=i.id' : '';
@@ -167,7 +167,7 @@ export async function getOrderProfitBases(db: D1Database, orderIds: string[], op
     db.prepare('SELECT o.*,u.name customer_name FROM orders o LEFT JOIN users u ON u.id=o.user_id WHERE o.id IN (SELECT value FROM json_each(?)) ORDER BY o.id').bind(ids).all<Row>(),
     db.prepare(`SELECT i.*,${scopes} FROM order_items i LEFT JOIN products p ON p.id=i.product_id LEFT JOIN catalogs mc ON mc.id=p.category_id LEFT JOIN catalogs sc ON sc.id=p.sub_category_id ${scopeJoin} WHERE i.order_id IN (SELECT value FROM json_each(?)) ORDER BY i.id`).bind(ids).all<GoodsLine>(),
     db.prepare('SELECT a.*,l.incoming_id FROM order_item_inventory_allocations a LEFT JOIN inventory_lots l ON l.id=a.lot_id WHERE a.order_id IN (SELECT value FROM json_each(?)) ORDER BY a.id').bind(ids).all<Allocation>(),
-    db.prepare(`SELECT c.*,${adjustedCost} effective_amount_iqd,s.name staff_name FROM finance_order_costs c LEFT JOIN finance_staff s ON s.id=c.staff_id WHERE c.order_id IN (SELECT value FROM json_each(?)) ORDER BY c.id`).bind(ids).all<Row>(),
+    db.prepare(`SELECT c.*,${present.has('finance_wage_targets')?"CASE WHEN EXISTS(SELECT 1 FROM finance_wage_targets wt WHERE wt.cost_id=c.id AND wt.amount_iqd IS NULL) THEN 'pending_cost' ELSE c.state END":'c.state'} AS state,${adjustedCost} effective_amount_iqd,s.name staff_name FROM finance_order_costs c LEFT JOIN finance_staff s ON s.id=c.staff_id WHERE c.order_id IN (SELECT value FROM json_each(?)) ORDER BY c.id`).bind(ids).all<Row>(),
     db.prepare('SELECT f.*,r.order_item_id FROM finance_refund_facts f JOIN return_cases r ON r.id=f.case_id WHERE f.order_id IN (SELECT value FROM json_each(?))').bind(ids).all<Row>(),
     db.prepare('SELECT l.order_id,e.amount_iqd FROM finance_expense_links l JOIN operating_expenses e ON e.id=l.expense_id WHERE e.voided_at IS NULL AND l.order_id IN (SELECT value FROM json_each(?)) AND NOT EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.expense_id=e.id) AND NOT EXISTS(SELECT 1 FROM finance_collections c WHERE c.expense_id=e.id)').bind(ids).all<Row>(),
     db.prepare('SELECT order_id,SUM(amount_iqd) collected_iqd,SUM(fee_iqd) courier_fee_iqd FROM finance_collections WHERE order_id IN (SELECT value FROM json_each(?)) GROUP BY order_id').bind(ids).all<Row>(),
@@ -184,7 +184,7 @@ export async function getOrderProfitBases(db: D1Database, orderIds: string[], op
     const orderId = s(order.id);
     const orderAllocs = (allocs.results ?? []).filter((a) => a.order_id === orderId);
     const goods = calculateGoods(order, (items.results ?? []).filter((i) => i.order_id === orderId), orderAllocs);
-    const orderCosts = (costs.results ?? []).filter((c) => c.order_id === orderId);
+    const orderCosts = options.costOverrides?.[orderId]??(costs.results ?? []).filter((c) => c.order_id === orderId);
     const originalRefunds=(refunds.results??[]).filter((r)=>r.order_id===orderId);
     const legacy:Row[]=(legacyRefunds.results??[]).filter((r)=>r.order_id===orderId).map((r):Row=>{
       if(r.disposition==='damage')return {...r,cogs_iqd:0,legacy:true};

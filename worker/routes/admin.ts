@@ -118,6 +118,8 @@ adminRoutes.use('*', requireAdmin);
 // legacy manual register. Personal earnings have their own owner-scoped router.
 adminRoutes.use('/invest/*', async (c, next) => {
   assertFinancialScope(c);
+  c.header('Deprecation','true');
+  if(c.req.method!=='GET')return c.json({success:false,error:{code:'LEGACY_INVESTMENT_READ_ONLY',message:'سجل الاستثمار القديم للقراءة فقط؛ استخدم المستثمرين ودفعات الشراء في المالية'}},410);
   await next();
 });
 

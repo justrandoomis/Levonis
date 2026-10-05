@@ -72,6 +72,7 @@ export default function StockSelection({
           }))}
         />
       )}
+      {value?.image_url && <img src={value.image_url} alt="" className="inventory-thumb" loading="lazy" />}
       {value && (
         <p className={`text-xs ${T.text3}`}>
           {loc('المتاح', 'Available')}: {value.stock === null ? '∞' : value.stock - value.reserved} ·{' '}
@@ -79,13 +80,13 @@ export default function StockSelection({
           {value.purchase_unit_iqd !== undefined && (
             <>
               {' '}
-              · {loc('تكلفة الشراء المرجعية', 'Purchase reference')}: {money(value.purchase_unit_iqd)} (
-              {value.cost_source === 'latest_purchase'
+              · {loc('تكلفة الشراء المرجعية', 'Purchase reference')}: {value.purchase_unit_iqd == null ? loc('تحتاج إدخالًا', 'Needs input') : money(value.purchase_unit_iqd)} (
+              {['latest_purchase', 'confirmed_purchase'].includes(value.cost_source)
                 ? loc('آخر شراء لنفس النسخة', 'Latest purchase')
                 : value.cost_source === 'catalogue'
                   ? loc('بطاقة المنتج', 'Catalogue')
                   : loc('غير معروفة', 'Unknown')}
-              )
+              ){value.cost_date ? ` · ${value.cost_date.slice(0, 10)}` : ''}
             </>
           )}
         </p>

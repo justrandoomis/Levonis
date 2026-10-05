@@ -1,3 +1,5 @@
+import { productImageFromRelations } from './productSelectionImage';
+import type { ImageRow,VariantRow } from './productOverlay';
 import { badRequest, notFound } from './http';
 import { derivedRung, type PriceFields } from './pricing';
 import { counterTarget } from './inventoryReceiving';
@@ -15,6 +17,8 @@ export type Selection = {
   unit_cost_iqd: number | null;
   purchase_unit_iqd: number | null;
   cost_source: string;
+  cost_date?:string|null;
+  image_url?:string;
   weight_g: number;
   volume_mm3: number;
   option_id?: string;
@@ -84,11 +88,12 @@ export async function productSelections(db: D1Database, productId: string): Prom
     (
       await db
         .prepare(
-          `SELECT i.scope,i.scope_id,i.purchase_unit_iqd FROM incoming_inventory i WHERE product_id=? AND status<>'cancelled' ORDER BY created_at DESC,id DESC`,
+          `SELECT i.scope,i.scope_id,COALESCE(i.purchase_total_iqd*1.0/i.qty_ordered,i.purchase_unit_iqd) AS purchase_unit_iqd,COALESCE(i.purchase_date,i.updated_at) AS cost_date FROM incoming_inventory i LEFT JOIN purchase_lines pl ON pl.incoming_id=i.id LEFT JOIN purchase_orders po ON po.id=pl.purchase_id WHERE i.product_id=? AND i.qty_received>0 AND i.status<>'cancelled' AND (po.id IS NULL OR po.cost_state='final') ORDER BY COALESCE(i.purchase_date,i.updated_at) DESC,i.id DESC`,
         )
         .bind(productId)
-        .all<{ scope: string; scope_id: string; purchase_unit_iqd: number }>()
+        .all<{ scope: string; scope_id: string; purchase_unit_iqd: number;cost_date:string }>()
     ).results ?? [];
+  const images=(await db.prepare('SELECT * FROM product_images WHERE product_id=? ORDER BY sort_order,id').bind(productId).all<ImageRow>()).results??[];
   const out: Selection[] = [];
   for (const cell of cells) {
     let regular = Number(p.price_iqd),
@@ -144,11 +149,13 @@ export async function productSelections(db: D1Database, productId: string): Prom
       selling_price_iqd: regular,
       unit_cost_iqd: cost,
       purchase_unit_iqd: last?.purchase_unit_iqd ?? cost,
-      cost_source: last ? 'latest_purchase' : cost !== null ? 'catalogue' : 'unknown',
+      cost_source: last ? 'confirmed_purchase' : cost !== null ? 'catalogue' : 'unknown',
+      cost_date:last?.cost_date??null,
+      image_url:productImageFromRelations(images,{optionValueIds:option?[option.id]:scope==='option'?[cell.id]:[],colorId:color?.id??(scope==='color'?cell.id:null)},(variants.results??[]) as unknown as VariantRow[]),
       weight_g: weight,
       volume_mm3: dim('width') * dim('depth') * dim('height'),
-      option_id: option?.id,
-      color_id: color?.id,
+      option_id: option?.id??(scope==='option'?cell.id:undefined),
+      color_id: color?.id??(scope==='color'?cell.id:undefined),
     });
   }
   return out;

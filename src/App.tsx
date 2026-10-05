@@ -73,9 +73,8 @@ const RunningCommunityOrders = React.lazy(() =>
   import('./pages/Requests').then((m) => ({ default: m.RunningCommunityOrders }))
 );
 const Admin = React.lazy(() => import('./pages/Admin'));
-const Invest = React.lazy(() => import('./pages/Invest'));
+const LegacyInvestmentRedirect = React.lazy(() => import('./pages/LegacyInvestmentRedirect'));
 const Earnings = React.lazy(() => import('./pages/Earnings'));
-const InvestAdmin = React.lazy(() => import('./pages/InvestAdmin'));
 const Warranty = React.lazy(() => import('./pages/Warranty'));
 const WarrantyVerify = React.lazy(() => import('./pages/WarrantyVerify'));
 const Checkout = React.lazy(() => import('./pages/Checkout'));
@@ -709,9 +708,9 @@ function AppContent() {
           <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
-          <Route path="/invest" element={<ProtectedRoute><Invest /></ProtectedRoute>} />
+          <Route path="/invest" element={<ProtectedRoute><LegacyInvestmentRedirect /></ProtectedRoute>} />
           <Route path="/earnings" element={<ProtectedRoute><Earnings /></ProtectedRoute>} />
-          <Route path="/admin/invest" element={<AdminRoute><InvestAdmin /></AdminRoute>} />
+          <Route path="/admin/invest" element={<ProtectedRoute><LegacyInvestmentRedirect admin /></ProtectedRoute>} />
 
             <Route path="/auth" element={<Auth />} />
             {/* OPEN TO GUESTS. The points page is how someone finds out the
@@ -879,9 +878,9 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
-          <Route path="/invest" element={<ProtectedRoute><Invest /></ProtectedRoute>} />
+          <Route path="/invest" element={<ProtectedRoute><LegacyInvestmentRedirect /></ProtectedRoute>} />
           <Route path="/earnings" element={<ProtectedRoute><Earnings /></ProtectedRoute>} />
-          <Route path="/admin/invest" element={<AdminRoute><InvestAdmin /></AdminRoute>} />
+          <Route path="/admin/invest" element={<ProtectedRoute><LegacyInvestmentRedirect admin /></ProtectedRoute>} />
 
           <Route path="/profile" element={<Profile />} />
             <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />

@@ -447,6 +447,20 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'community_escrow_events.idempotency_key': 'request de-duplication token',
   'farm_ledger.idempotency_key': 'request de-duplication token',
   'farm_requests.idempotency_key': 'request de-duplication token',
+  // 0167–0170: financial values, rule scopes, preview state and audit references.
+  // These forms do not upload media; receipt files stay in the existing payment sources.
+  'finance_cost_adjustments.recalculation_key': 'financial reconciliation identity',
+  'finance_wage_changes.preview_json': 'server wage impact, amounts and source identifiers',
+  'finance_wage_changes.request_json': 'effective wage rule, scope ids, date and reason',
+  'finance_wage_preview_jobs.input_json': 'wage preview parameters',
+  'finance_wage_preview_jobs.preview_token': 'optimistic preview fingerprint',
+  'finance_wage_preview_jobs.result_json': 'wage impact amounts and source identifiers',
+  'finance_wage_preview_jobs.work_json': 'paged financial preview cursor and accumulated amounts',
+  'finance_wage_versions.snapshot': 'immutable wage value and scope identifiers',
+  'investment_legacy_links.evidence': 'human-entered matching explanation, no file upload',
+  'investment_profile_history.snapshot': 'default investor rates and account state',
+  'purchase_investor_agreements.request_json': 'funding amounts, percentages and account identifiers',
+  'purchase_investor_receipts.request_json': 'cash receipt amount, date and textual reference',
   'inventory_ledger.idempotency_key': 'request de-duplication token',
   // 0098 — the same token shape, on the two tables the FIFO inventory layer
   // makes idempotent: a receipt (a double-tapped Receive) and a lot allocation

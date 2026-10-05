@@ -4,7 +4,9 @@ import { newId } from './crypto';
 import { getOrderGoods, workspaceInstalled } from './orderProfit';
 import { ruleScopeRank } from './financeRuleScopes';
 import { reconcileFinanceOrder } from './financeReconcile';
+import { reconcileStaffOrderCosts } from './financeParticipants';
 import { recordFinancialFailure } from './financePostingErrors';
+import { wageVersions } from './financeWageTimeline';
 import { employmentInstalled, nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
 export { recordFinancialFailure } from './financePostingErrors';
 
@@ -61,10 +63,10 @@ export function costAmount(
       : rule.basis === 'order'
         ? rule.amount
         : rule.basis === 'revenue_percent'
-          ? Math.floor((netGoods * rule.amount) / 10000)
+          ? Number(BigInt(netGoods) * BigInt(rule.amount) / 10000n)
           : cogs === null
             ? null
-            : Math.floor((Math.max(0, netGoods - cogs) * rule.amount) / 10000);
+            : Number(BigInt(Math.max(0, netGoods - cogs)) * BigInt(rule.amount) / 10000n);
   if (value !== null && rule.cap_iqd !== null) value = Math.min(value, rule.cap_iqd);
   return value;
 }
@@ -200,6 +202,7 @@ export async function runOrderFinancialEffects(
   milestone: 'prepared' | 'delivered',
   postingDay?: string,
   staffOnly?:{staffId:string;employmentVersion:number;rules:CostRule[];skipReconcile?:boolean},
+  deferDeliveryReconcile=false,
 ) {
   const db = env.DB;
   if (!(await operationsInstalled(db))) return;
@@ -223,13 +226,16 @@ export async function runOrderFinancialEffects(
   let frozen = JSON.parse(snapshot.rules_json) as RuleSnapshot;
   const hasEmployment=await employmentInstalled(db);
   const staffRows=hasEmployment?(await db.prepare('SELECT * FROM finance_staff').all<EmploymentStaff>()).results??[]:[];
+  const temporalVersions=await wageVersions(db);
+  const temporalRules=new Set(temporalVersions.filter(v=>staffRows.find(s=>s.id===v.staff_id)?.start_work_date||(v.revision>1&&!v.id.startsWith('wage:baseline:'))).map(v=>v.rule_id));
+  const temporalStaff=new Set(temporalVersions.filter(v=>temporalRules.has(v.rule_id)).map(v=>v.staff_id));
   const staffById=new Map(staffRows.map((s)=>[s.id,s]));
   // Deferred preparation pay must exist before the delivery sale publishes
   // investor profit. Publishing first would expose a transient inflated margin.
   if(!staffOnly&&milestone==='delivered'&&staffRows.some((s)=>s.start_work_date&&staffCanAccrue(s,goods.order)))
-    await runOrderFinancialEffects(env,orderId,'prepared',postingDay??baghdadDay(new Date(String(goods.order.delivered_at??new Date().toISOString()))));
+    await runOrderFinancialEffects(env,orderId,'prepared',postingDay??baghdadDay(new Date(String(goods.order.delivered_at??new Date().toISOString()))),undefined,true);
   if(hasEmployment){
-    const eligible=staffRows.filter((s)=>s.start_work_date&&staffCanAccrue(s,goods.order)&&(!staffOnly||s.id===staffOnly.staffId));
+    const eligible=staffRows.filter((s)=>!temporalStaff.has(s.id)&&s.start_work_date&&staffCanAccrue(s,goods.order)&&(!staffOnly||s.id===staffOnly.staffId));
     for(const employee of eligible){
       if(staffOnly&&employee.employment_version!==staffOnly.employmentVersion)throw new Error('تغير إعداد الموظف أثناء تطبيق الاستحقاقات');
       const prior=await db.prepare('SELECT employment_version FROM finance_staff_order_rules WHERE order_id=? AND staff_id=?').bind(orderId,employee.id).first<{employment_version:number}>();
@@ -270,7 +276,7 @@ export async function runOrderFinancialEffects(
   const groups = new Map<string, { rule: CostRule; lineIds: string[] }>();
   for (const line of goods.lines) {
     for (const rule of frozen.find((f) => f.line_id === line.id)?.rules ?? []) {
-      if (rule.milestone !== milestone) continue;
+      if (rule.milestone !== milestone || temporalRules.has(rule.id)) continue;
       const key = rule.basis === 'order' ? `${rule.staff_id ?? ''}:${rule.group_key}:order` : `${rule.id}:${line.id}`;
       const found = groups.get(key);
       if (found) {
@@ -493,7 +499,10 @@ export async function runOrderFinancialEffects(
   }
   // Prepared wages, delivery and explicit retries all validate the same source
   // before their percentage earnings become available for withdrawal.
-  if(!staffOnly?.skipReconcile)await reconcileFinanceOrder(db, orderId, { day });
+  // The delivery call posts sale/COGS immediately after its preparation pass.
+  // Publishing investors in that inner pass would require a sale not posted yet.
+  if(deferDeliveryReconcile) await reconcileStaffOrderCosts(db,orderId,{day});
+  else if(!staffOnly?.skipReconcile){const reconciled=await reconcileFinanceOrder(db, orderId, { day });if(!reconciled.complete)throw new Error('تغيرت بيانات الطلب أثناء التسوية؛ أعد المحاولة');}
 }
 export async function recordReturnFinancials(
   env: Env,

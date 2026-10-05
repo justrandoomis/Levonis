@@ -15,6 +15,7 @@
  * mutations are written to the audit log.
  */
 
+import { updateSelectionPrice } from '../lib/inventoryReferencePrice';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -95,6 +96,8 @@ adminProductsRoutes.use('*', requireAdmin);
 // listing, home shelves and (when the slug is known) the product page from
 // this colo's cache (worker/lib/edgePolicy.ts) instead of ageing out.
 adminProductsRoutes.use('*', purgeCatalogueAfterWrite);
+
+adminProductsRoutes.post('/:id/selection-price',async c=>{const user=c.get('user')!;if(!canViewFinancials(c.env,user))throw forbidden('تحديث سعر البيع من الشراء يتطلب صلاحية مالية');const result=await updateSelectionPrice(c.env.DB,c.req.param('id'),await c.req.json<Record<string,unknown>>(),user.id);c.set('catalogueSlug',result.slug);return c.json({success:true,...result});});
 
 // ---------------------------------------------------------------- helpers
 
@@ -574,9 +577,9 @@ adminProductsRoutes.get('/', async (c) => {
   if (search) {
     // SKU is searchable too: §4 made it a real identifier, and an admin who
     // has a packing slip in hand has the SKU, not the Arabic name.
-    clauses.push(`(${sqlLikeClause(['name', 'name_ar', 'name_ku', 'slug', 'sku'])})`);
+    clauses.push(`(${sqlLikeClause(['name', 'name_ar', 'name_ku', 'slug', 'sku'])} OR EXISTS(SELECT 1 FROM product_variants pv WHERE pv.product_id=products.id AND pv.sku=?) OR EXISTS(SELECT 1 FROM product_option_values ov WHERE ov.product_id=products.id AND ov.sku_part=?) OR EXISTS(SELECT 1 FROM product_colors pc WHERE pc.product_id=products.id AND pc.sku_part=?))`);
     const like = likePattern(search);
-    params.push(like, like, like, like, like);
+    params.push(like, like, like, like, like,search,search,search);
   }
   if (['draft', 'active', 'hidden'].includes(q.status ?? '')) {
     clauses.push('status = ?');

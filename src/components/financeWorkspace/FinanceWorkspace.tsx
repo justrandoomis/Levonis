@@ -12,6 +12,7 @@ const PeoplePanel = lazy(() => import('../financePeople/PeoplePanel'));
 const InvestorPanel = lazy(() => import('../financePeople/InvestorPanel'));
 const WithdrawalPanel = lazy(() => import('../financePeople/WithdrawalPanel'));
 const FinanceOperationsPanel = lazy(() => import('../adminOperations/FinanceOperationsPanel'));
+const ParticipantCharts = lazy(() => import('./ParticipantCharts'));
 const OverviewCharts = lazy(() => import('./OverviewCharts'));
 
 const initialSection = (): FinanceSection => {
@@ -43,7 +44,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   const [collections, setCollections] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [legacyOpen, setLegacyOpen] = useState(false);
-  const usesRange = ['overview', 'orders', 'products', 'accounting'].includes(section);
+  const usesRange = ['overview', 'orders', 'products', 'accounting', 'staff', 'investors', 'settlements'].includes(section);
   const refresh = useCallback(() => setRevision((v) => v + 1), []);
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -73,7 +74,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   return <div className="fw fw-workspace" dir={dir} data-finance-workspace>
     <header className="fw-header"><div><div className="fw-eyebrow">LEVONIS / {loc('الإدارة المالية', 'Finance')}</div><h1>{loc('المال والأرباح', 'Money & profit')}</h1>
       <p>{loc('راقب الأداء، وافهم التكاليف، وراجع حصتك من كل طلب.', 'Track performance, understand costs and review your share of every order.')}</p></div>
-      <div className="fw-header-tools">{!usesRange && <label className="fw-month-control"><CalendarDays size={16} aria-hidden />
+      <div className="fw-header-tools">{section === 'monthly' && <label className="fw-month-control"><CalendarDays size={16} aria-hidden />
         <input type="month" value={month} aria-label={loc('شهر التكاليف والمستحقات', 'Costs and earnings month')} onChange={(e) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)) setMonth(e.target.value); }} /></label>}
         <Button className="fw-icon-button" variant="secondary" busy={busy} onClick={refresh} aria-label={loc('تحديث المالية', 'Refresh finance')}>
           {!busy && <RefreshCw size={17} />}
@@ -94,14 +95,14 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
     </form>}
     <div className="fw-body">
       {error && <div className="fw-error" role="alert">{error}<Button variant="ghost" onClick={refresh}>{loc('إعادة المحاولة', 'Retry')}</Button></div>}
-      {section === 'overview' && (busy && !data ? <Loading text={loc('تحميل أرقام الفترة…', 'Loading this period…')} /> : data && <Overview data={data} openOrder={setOrderId} onNavigate={setSection} onCollections={() => setCollections(true)} />)}
+      {section === 'overview' && (busy && !data ? <Loading text={loc('تحميل أرقام الفترة…', 'Loading this period…')} /> : data && <Overview from={range.from} to={range.to} revision={revision} data={data} openOrder={setOrderId} onNavigate={setSection} onCollections={() => setCollections(true)} />)}
       {section === 'orders' && <Orders from={range.from} to={range.to} revision={revision} openOrder={setOrderId} />}
       {section === 'products' && (busy && !data ? <Loading text={loc('تحميل المنتجات…', 'Loading products…')} /> : data && <Products data={data} onOpenOrders={() => setSection('orders')} />)}
       {section === 'monthly' && <MonthlyCosts key={month} month={month} onChanged={refresh} />}
       <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}>
-        {section === 'staff' && <PeoplePanel month={month} onChanged={refresh} />}
-        {section === 'investors' && <InvestorPanel month={month} onChanged={refresh} />}
-        {section === 'settlements' && <WithdrawalPanel month={month} onChanged={refresh} />}
+        {section === 'staff' && <PeoplePanel from={range.from} to={range.to} onChanged={refresh} />}
+        {section === 'investors' && <InvestorPanel from={range.from} to={range.to} onChanged={refresh} />}
+        {section === 'settlements' && <WithdrawalPanel from={range.from} to={range.to} onChanged={refresh} />}
         {section === 'accounting' && <>
           <Surface title={loc('المحاسبة', 'Accounting')} subtitle={loc('الأرصدة والقيود والتسويات المعتمدة', 'Balances, journals and verified settlements')}>
             <Row label={loc('دفتر القيود وميزان المراجعة', 'Journal and trial balance')} value={<ArrowUpLeft size={18} />} onClick={() => setAdvanced(true)} />
@@ -119,7 +120,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   </div>;
 }
 
-function Overview({ data, openOrder, onNavigate, onCollections }: { data: FinanceSummary; openOrder: (id: string) => void; onNavigate: (section: FinanceSection) => void; onCollections: () => void }) {
+function Overview({ data, from, to, revision, openOrder, onNavigate, onCollections }: { data: FinanceSummary; from: string; to: string; revision: number; openOrder: (id: string) => void; onNavigate: (section: FinanceSection) => void; onCollections: () => void }) {
   const { loc } = useLanguage();
   const t = data.totals;
   const incomplete = (t.unknown_lines ?? 0) + (t.pending_costs ?? 0);
@@ -139,7 +140,7 @@ function Overview({ data, openOrder, onNavigate, onCollections }: { data: Financ
     </div>
     {data.truncated && <p className="fw-error" role="alert">{loc('عدد الطلبات يتجاوز حد التقرير؛ راجع الفترة قبل اعتماد الإجمالي.', 'Order count exceeds the report limit. Review the period before accepting totals.')}</p>}
     {needsReview && <p className="fw-note">{loc('الشرطة (—) تعني قيمة لم تكتمل، ولا تعني صفرًا. راجع التكاليف أو توزيع الأرباح قبل اعتماد الصافي.', 'A dash (—) means an incomplete value, not zero. Review costs or profit distribution before accepting the net figure.')}</p>}
-    <Suspense fallback={<Loading text={loc('تحميل الرسوم المالية…', 'Loading financial charts…')} />}><OverviewCharts data={data} /></Suspense>
+    <Suspense fallback={<Loading text={loc('تحميل الرسوم المالية…', 'Loading financial charts…')} />}><OverviewCharts data={data} /><ParticipantCharts from={from} to={to} revision={revision} /></Suspense>
     <details className="fw-advanced"><summary>{loc('تفصيل الحساب: من البيع إلى حصتك', 'Calculation breakdown: from sales to your share')}</summary><Surface>
       <Row label={loc('ربح البضاعة', 'Goods profit')} value={<Money value={t.gross_profit_iqd} />} />
       <Row label={loc('أجور الموظفين', 'Staff earnings')} value={<Money value={t.wages_iqd} />} onClick={() => onNavigate('staff')} />

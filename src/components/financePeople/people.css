@@ -14,7 +14,7 @@
 .fp-money { display:inline-flex; align-items:baseline; gap:5px; font-weight:650; white-space:nowrap; }
 .fp-money small { color:var(--ap-text-2); font-size:11px; font-weight:400; }
 .fp-stat .fp-money { font-size:19px; }
-.fp-hero { padding:24px; border-radius:22px; border:1px solid var(--ap-accent-border); background:linear-gradient(135deg,var(--ap-accent-soft),var(--ap-surface-1) 70%); display:flex; gap:20px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+.fp-hero { padding:24px; border-radius:22px; border:1px solid var(--ap-border); background:var(--ap-surface-1); display:flex; gap:20px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
 .fp-hero .fp-money { font-size:clamp(25px,6vw,36px); }
 .fp-hero .fp-money small { font-size:13px; }
 .fp-hero p { color:var(--ap-text-2); }
@@ -74,3 +74,15 @@
 @media(prefers-reduced-motion:reduce) { .fp * { scroll-behavior:auto; } }
 
 .fp [role="option"] { min-height:44px; }
+
+.fp-review-heading { display:flex; gap:12px; align-items:center; padding:16px; border:1px solid var(--ap-border); border-radius:14px; background:var(--ap-surface-2); }
+.fp-positive { color:var(--ap-success); }
+.fp-negative { color:var(--ap-danger); }
+.fp-warning-box { padding:16px; border-radius:14px; background:var(--ap-warning-bg); border:1px solid var(--ap-border); line-height:1.8; }
+.fp-timeline { display:grid; gap:0; }
+.fp-timeline-item { padding:16px 0 16px 16px; margin-inline-start:6px; border-inline-start:2px solid var(--ap-border); padding-inline-start:18px; position:relative; }
+.fp-timeline-item::before { content:""; width:8px; height:8px; border-radius:50%; position:absolute; inset-inline-start:-5px; top:24px; background:var(--ap-text-3); }
+.fp-timeline-item p { margin-top:6px; font-size:13px; line-height:1.7; }
+.fp-movement-balance { font-size:12px; color:var(--ap-text-2); display:block; margin-top:5px; }
+.fp-balance-label { font-weight:650; font-size:16px; }
+@media (max-width:540px) { .fp-footer { flex-wrap:wrap; } .fp-review-heading { padding:12px; } .fp-row { align-items:flex-start; } .fp-row>div:first-child { min-width:0; } .fp-timeline-item { padding-block:13px; } }

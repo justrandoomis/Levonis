@@ -1,0 +1,10 @@
+import { useState } from 'react';
+import { NumberInput } from '../ui/NumberInput';
+import { api, Button, Dialog, Feedback, Field, Loading, Money, useLanguage, useMutation, useRemote } from '../financePeople/shared';
+import { PROCUREMENT, type Selection } from './shared';
+export default function SelectionPriceUpdate({ line, onClose }: { line: Pick<Selection, 'product_id' | 'scope' | 'scope_id' | 'selling_price_iqd' | 'label'>; onClose: () => void }) {
+  const { loc } = useLanguage(), op = useMutation(), remote = useRemote<{ selections: Selection[] }>(`${PROCUREMENT}/selections/${line.product_id}`);
+  const [price, setPrice] = useState<number | null>(line.selling_price_iqd);
+  const selection = remote.data?.selections.find((r) => r.scope === line.scope && r.scope_id === line.scope_id);
+  return <Dialog open onClose={onClose} busy={op.busy} title={loc('تحديث سعر هذا الخيار في المتجر', 'Update this selection’s store price')}><div className="fp-stack"><strong>{line.label}</strong>{!remote.data ? <Loading error={remote.error} retry={remote.load} /> : <><p>{loc('سعر المتجر الحالي', 'Current store price')}: <Money value={selection?.selling_price_iqd} /></p><Field label={loc('سعر البيع الجديد', 'New selling price')}><NumberInput kind="money" value={price} onValueChange={(n, valid) => setPrice(valid ? n : null)} /></Field><p className="fp-note">{loc('سيطبق على المبيعات الجديدة للخيار واللون المحددين. أسعار الطلبات السابقة تبقى محفوظة.', 'Applies to new sales of the selected option and colour. Existing order prices are preserved.')}</p></>}<Feedback error={op.error} /></div><footer className="fp-footer"><Button variant="ghost" disabled={op.busy} onClick={onClose}>{loc('رجوع', 'Back')}</Button><Button variant="primary" loading={op.busy} disabled={!selection || price == null} onClick={() => op.run(async () => { await api.post(`/api/admin/products-v2/${line.product_id}/selection-price`, { scope: line.scope, scope_id: line.scope_id, expected_price_iqd: selection!.selling_price_iqd, price_iqd: price }); onClose(); })}>{loc('تحديث سعر المتجر', 'Update store price')}</Button></footer></Dialog>;
+}
