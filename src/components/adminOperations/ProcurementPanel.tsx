@@ -251,7 +251,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
       {investmentFor && <Suspense fallback={<p role="status">{loc('جارٍ تحميل اتفاق التمويل…', 'Loading funding agreement…')}</p>}><InvestorContractForm initialIncomingId={investmentFor} onClose={() => setInvestmentFor('')} onSaved={() => { setInvestmentFor(''); onChanged(); }} /></Suspense>}
       <div className="mb-4 flex flex-wrap gap-2">
         <button type="button" className={T.btnPrimary} onClick={() => start(undefined, false, true)}>{loc('إضافة مخزون موجود', 'Add stock on hand')}</button>
-        {draftAvailable && <button type="button" className={T.btnSecondary} onClick={restoreLocal}>{loc('استكمال المسودة المحفوظة', 'Resume saved draft')}</button>}
+        {draftAvailable && <><button type="button" className={T.btnSecondary} onClick={restoreLocal}>{loc('استكمال المسودة المحفوظة', 'Resume saved draft')}</button><button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => { setEditing(false); localStorage.removeItem('levonis-purchase-draft-v2'); setDraftAvailable(false); }}>{loc('حذف المسودة المحلية', 'Discard local draft')}</button></>}
         <button type="button" className={T.btnPrimary} onClick={() => start()}>
           {loc('شراء قادم', 'Incoming purchase')}
         </button>

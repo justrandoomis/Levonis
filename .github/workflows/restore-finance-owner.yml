@@ -1,0 +1,42 @@
+name: Restore LIVE finance owner binding (approval required)
+
+on:
+  workflow_dispatch:
+    inputs:
+      username:
+        description: Existing unrestricted administrator username
+        required: true
+        default: just.randoomis
+      mode:
+        type: choice
+        options: [preview, apply]
+        default: preview
+        required: true
+      confirmation:
+        description: 'For apply only: SET-OWNER: followed by the exact username'
+        required: false
+
+permissions:
+  contents: read
+concurrency: staging-deploy
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      OWNER_USERNAME: ${{ inputs.username }}
+      OWNER_MODE: ${{ inputs.mode }}
+      OWNER_CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Validate owner restoration guards
+        run: node --import tsx --test tests/ownerBindingRepair.test.ts
+      - name: Preview or explicitly approved restoration
+        run: node --import tsx scripts/restore-finance-owner.ts

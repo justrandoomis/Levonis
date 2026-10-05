@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
 import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat } from 'lucide-react';
@@ -159,13 +159,15 @@ type AdminTab =
  * THE TABS A TELEGRAM BUTTON MAY OPEN DIRECTLY — «🔗 فتح في لوحة الإدارة» on
  * an order message (`?tab=orders&order=…`) and on a wallet request
  * (`?tab=wallet_requests&op=…`). Read once, for the first render only; anything
- * else, or nothing, opens the overview exactly as before.
+ * else opens the overview. Existing financial links without a parent tab
+ * reopen finance, preserving their report section and date range.
  */
 const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'finance', 'inventory', 'earnings'];
 
 function initialAdminTab(): AdminTab {
   try {
-    const tab = new URLSearchParams(window.location.search).get('tab') ?? '';
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab') ?? (params.has('finance') ? 'finance' : '');
     return (DEEP_LINK_TABS as readonly string[]).includes(tab) ? (tab as AdminTab) : 'overview';
   } catch {
     return 'overview';
@@ -176,6 +178,14 @@ export default function Admin() {
   const { t, dir, loc } = useLanguage();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>(initialAdminTab);
+
+  // Keep the parent workspace alongside its own filters. A reload after a
+  // network interruption must reopen the same finance/inventory/earnings tab.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', activeTab);
+    window.history.replaceState(window.history.state, '', url);
+  }, [activeTab]);
 
   /**
    * A COURTESY, NOT THE GATE. The three finance endpoints refuse an assistant
