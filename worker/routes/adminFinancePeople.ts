@@ -61,7 +61,7 @@ adminFinancePeopleRoutes.get('/staff',async(c)=>{
   const rr=(rules.results??[]).map(r=>{const current=currentRules.get(String(r.id));return current?{...r,...current,version:r.version}:r;}).map((r)=>({...r,scope:readRuleScope(r)??{catalog_ids:r.target_type==='catalog'?[r.target_id]:[],product_ids:r.target_type==='product'?[r.target_id]:[],excluded_product_ids:[]}}));
   const ids=[...new Set(rr.flatMap((r)=>[...r.scope.product_ids,...r.scope.excluded_product_ids]))];
   const products=ids.length?await db.prepare('SELECT id,name,name_ar,name_en,sku FROM products WHERE id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(ids)).all():{results:[]};
-  return c.json({success:true,staff:(staff.results??[]).map(s=>({...s,balance:balances.get(String(s.id))??null,period:periods.get(String(s.id))??{earned_iqd:0,paid_iqd:0,adjustments_iqd:0,pending_costs:0}})),catalogs:catalogs.results??[],rules:rr,scope_products:products.results??[],reconciliations:(jobs.results??[]).map(publicReconciliation)});
+  return c.json({success:true,can_manage_staff:isOwner(c.env,c.get('user')!),staff:(staff.results??[]).map(s=>({...s,balance:balances.get(String(s.id))??null,period:periods.get(String(s.id))??{earned_iqd:0,paid_iqd:0,adjustments_iqd:0,pending_costs:0}})),catalogs:catalogs.results??[],rules:rr,scope_products:products.results??[],reconciliations:(jobs.results??[]).map(publicReconciliation)});
 });
 adminFinancePeopleRoutes.post('/staff',async(c)=>{
   const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');if(!isOwner(c.env,actor))throw forbidden('تعديل الموظفين وتواريخهم للأدمن الرئيسي فقط');
@@ -85,10 +85,18 @@ adminFinancePeopleRoutes.delete('/staff/:id',async(c)=>{
   const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');if(!isOwner(c.env,actor))throw forbidden('تعديل الموظفين وتواريخهم للأدمن الرئيسي فقط');
   return c.json({success:true,id:c.req.param('id'),...await updateStaffEmployment(c.env.DB,c.req.param('id'),{},actor.id,true)});
 });
+adminFinancePeopleRoutes.get('/staff/:id/reconcile',async(c)=>{
+  const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');if(!isOwner(c.env,actor))throw forbidden('تعديل الموظفين وتواريخهم للأدمن الرئيسي فقط');
+  const job=await readStaffReconciliation(c.env.DB,c.req.param('id'));
+  if(!job)throw notFound('لا توجد إعادة حساب لهذا الموظف');
+  return c.json({success:true,reconciliation:publicReconciliation(job)});
+});
 adminFinancePeopleRoutes.post('/staff/:id/reconcile',async(c)=>{
   const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');if(!isOwner(c.env,actor))throw forbidden('تعديل الموظفين وتواريخهم للأدمن الرئيسي فقط');
   const b=await c.req.json<Record<string,unknown>>();
-  return c.json({success:true,reconciliation:await continueStaffReconciliation(c.env,c.req.param('id'),b.revision===undefined?undefined:whole(b.revision,'الإصدار',1))});
+  // Each order can reconcile several financial sources. Bound browser work
+  // to one order; the durable cursor and cron own the remaining pages.
+  return c.json({success:true,reconciliation:await continueStaffReconciliation(c.env,c.req.param('id'),b.revision===undefined?undefined:whole(b.revision,'الإصدار',1),1)});
 });
 adminFinancePeopleRoutes.get('/accounts/:id/earnings',async(c)=>{
   await requireCapability(c.env,c.get('user')!,'pay');
