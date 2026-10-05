@@ -188,6 +188,7 @@ export function statusName(status: string, loc: (ar: string, en: string) => stri
   const names: Record<string, [string, string]> = {
     delivered: ['مستلم', 'Delivered'], cancelled: ['ملغى', 'Cancelled'], pending: ['جديد', 'New'],
     confirmed: ['مؤكد', 'Confirmed'], preparing: ['قيد التجهيز', 'Preparing'], out_for_delivery: ['في الطريق', 'On the way'],
+    processing: ['قيد التجهيز', 'Preparing'], shipped: ['في الطريق', 'On the way'],
     completed: ['مكتمل', 'Completed'], paid: ['مدفوع', 'Paid'],
   };
   return names[status] ? loc(...names[status]) : status;
