@@ -37,7 +37,21 @@ jobs:
             SELECT substr(p.event_key,1,instr(p.event_key,':')-1) AS warning_type,
               json_extract(c.snapshot,'$.rule.basis') AS pay_basis,COUNT(*) AS affected_sources
             FROM finance_order_costs c JOIN finance_posting_errors p ON p.order_id=c.order_id
-            WHERE c.staff_id IS NOT NULL GROUP BY warning_type,pay_basis;`);
+            WHERE c.staff_id IS NOT NULL GROUP BY warning_type,pay_basis;
+            SELECT c.state,json_extract(c.snapshot,'$.rule.basis') AS basis,
+              c.amount_iqd IS NULL AS amount_pending,
+              COALESCE(c.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments x WHERE x.cost_id=c.id),0)>0 AS effective_positive,
+              c.order_item_id IS NOT NULL AS per_line,
+              json_extract(c.snapshot,'$.fifo_cogs_iqd') IS NOT NULL AS frozen_cost_known,
+              EXISTS(SELECT 1 FROM order_items i WHERE i.id=c.order_item_id
+                AND (SELECT COALESCE(SUM(a.qty),0) FROM order_item_inventory_allocations a WHERE a.order_item_id=i.id AND a.released_at IS NULL)>=i.qty
+                AND EXISTS(SELECT 1 FROM order_item_inventory_allocations a WHERE a.order_item_id=i.id AND a.released_at IS NULL)
+                AND NOT EXISTS(SELECT 1 FROM order_item_inventory_allocations a WHERE a.order_item_id=i.id AND a.released_at IS NULL AND a.cogs_iqd IS NULL)) AS current_fifo_known,
+              EXISTS(SELECT 1 FROM finance_order_adjustments x WHERE x.order_id=c.order_id AND x.field='cogs_iqd' AND (x.order_item_id=c.order_item_id OR x.order_item_id IS NULL)) AS manually_verified_cost,
+              EXISTS(SELECT 1 FROM finance_payment_allocations x WHERE x.cost_id=c.id) AS has_payment,
+              EXISTS(SELECT 1 FROM finance_withdrawal_allocations x WHERE x.source_kind='staff' AND x.source_id=c.id) AS has_withdrawal
+            FROM finance_order_costs c JOIN finance_posting_errors p ON p.order_id=c.order_id
+            WHERE c.staff_id IS NOT NULL ORDER BY c.id;`);
           JS
       - name: Verify live accrual without displaying names or amounts (SELECT only)
         run: |
