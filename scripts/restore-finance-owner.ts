@@ -52,7 +52,9 @@ async function main() {
   // Do not replay a stale binding list after an unrelated configuration update.
   const latest = await request(path) as { bindings: Binding[] };
   if (!isDeepStrictEqual(before.bindings, latest.bindings)) throw new Error('Live bindings changed; run a new preview');
-  if (!isDeepStrictEqual(result, await readAccount())) throw new Error('Administrator identity changed; run a new preview');
+  const latestAccount = await readAccount();
+  // D1 query metadata (duration, rows read, etc.) may differ for an unchanged row.
+  if (!latestAccount[0]?.success || !isDeepStrictEqual(result[0].results, latestAccount[0].results)) throw new Error('Administrator identity changed; run a new preview');
   const form = new FormData();
   form.set('settings', new Blob([JSON.stringify({ bindings: plan.bindings })], { type: 'application/json' }));
   await request(path, { method: 'PATCH', body: form });
