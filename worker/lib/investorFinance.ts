@@ -66,12 +66,14 @@ export async function validateInvestorReturnEvidence(db: D1Database, caseId: str
 }
 
 /** Read-only current entitlement. It never creates money from a GET. */
-export async function investorOrderSplit(db: D1Database, orderId: string) {
+export async function investorOrderSplit(db: D1Database, orderId: string, previewBase?:ProfitView) {
   if (!await investorFinanceInstalled(db)) return { allocations: [], investor_profit_iqd: 0, owner_profit_iqd: null, pending: false };
   const sourceFingerprint = await fingerprint(db, orderId);
-  const base = await getOrderProfitBase(db, orderId) as unknown as ProfitView;
+  const base = previewBase??await getOrderProfitBase(db, orderId) as unknown as ProfitView;
   const contracts = (await db.prepare(`SELECT DISTINCT c.* FROM investment_contracts c JOIN inventory_lots l ON l.incoming_id=c.incoming_id
     JOIN order_item_inventory_allocations a ON a.lot_id=l.id WHERE a.order_id=? AND a.released_at IS NULL AND c.state='active'`).bind(orderId).all<InvestmentContract>()).results ?? [];
+  const capitalUnits=(await db.prepare('SELECT lc.* FROM purchase_investor_lot_capital lc JOIN order_item_inventory_allocations a ON a.lot_id=lc.lot_id WHERE a.order_id=?').bind(orderId).all<{lot_id:string;contract_id:string;unit_principal_iqd:number}>()).results??[];
+  const exactContracts=(await db.prepare('SELECT contract_id FROM purchase_investor_allocations WHERE contract_id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(contracts.map(c=>c.id))).all<{contract_id:string}>()).results??[];
   const origins = (await db.prepare(`SELECT a.id,l.incoming_id FROM order_item_inventory_allocations a JOIN inventory_lots l ON l.id=a.lot_id
     WHERE a.order_id=? AND a.released_at IS NULL`).bind(orderId).all<{ id: string; incoming_id: string | null }>()).results ?? [];
   const adjustments = (await db.prepare(`SELECT s.allocation_id,SUM(s.unit_delta_iqd) AS unit_delta FROM lot_cost_adjustment_shares s
@@ -113,15 +115,19 @@ export async function investorOrderSplit(db: D1Database, orderId: string) {
       const profit = revenue[i] - cost - expenses[i];
       totalBasis -= lateCost;
       for (const c of contracts.filter(c => c.incoming_id === origins.find(o => o.id === a.id)?.incoming_id)) {
+        const principalUnit=capitalUnits.find(p=>p.lot_id===a.lot_id&&p.contract_id===c.id);
+        if(exactContracts.some(p=>p.contract_id===c.id)&&!principalUnit){pending=true;continue;}
+        const assignedPrincipal=(principalUnit?.unit_principal_iqd??0)*weights[i];
+        const recovered=principalUnit?(cost>0&&revenue[i]<cost?Number(BigInt(assignedPrincipal)*BigInt(Math.max(0,revenue[i]))/BigInt(cost)):assignedPrincipal):percent(Math.max(0,Math.min(cost,revenue[i])),c.capital_share_bps);
         const earned = percent(Math.max(0, profit), c.profit_share_bps);
         const loss = percent(Math.max(0, -profit), c.loss_share_bps);
         investorProfit += earned;
         investorLoss += loss;
         out.push({ allocation_id: a.id, lot_id: a.lot_id, contract_id: c.id, user_id: c.user_id,
           qty: weights[i], profit_basis_iqd: profit, profit_iqd: earned,
-          capital_iqd: percent(Math.max(0, Math.min(cost, revenue[i])), c.capital_share_bps),
+          capital_iqd: recovered,
           loss_iqd: loss,raw_loss_iqd:loss,eligible: delivered && collected,
-          snapshot: JSON.stringify({ version: base.version, source_fingerprint:sourceFingerprint,contract_version: c.version, qty: weights[i], revenue: revenue[i], cost, expenses: expenses[i], profit, collected, delivered }) });
+          snapshot: JSON.stringify({ version: base.version, source_fingerprint:sourceFingerprint,contract_version: c.version, qty: weights[i], principal_iqd:recovered, revenue: revenue[i], cost, expenses: expenses[i], profit, collected, delivered }) });
       }
     }
   }
@@ -250,12 +256,14 @@ export async function investmentContractSummary(db: D1Database, id: string) {
   const funded = (await db.prepare("SELECT COALESCE(SUM(amount_iqd),0) AS n FROM investor_finance_events WHERE contract_id=? AND kind='funding'").bind(id).first<{ n: number }>())?.n ?? 0;
   const inventory = (await db.prepare(`SELECT SUM(l.qty_remaining*COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id=l.id ORDER BY version DESC LIMIT 1),l.unit_cost_iqd)) AS n,
     SUM(CASE WHEN l.unit_cost_iqd IS NULL THEN l.qty_remaining ELSE 0 END) AS unknown FROM inventory_lots l WHERE l.incoming_id=?`).bind(contract.incoming_id).first<{ n: number; unknown: number }>());
+  const exactInventory=await db.prepare('SELECT SUM(l.qty_remaining*p.unit_principal_iqd) AS n FROM purchase_investor_lot_capital p JOIN inventory_lots l ON l.id=p.lot_id WHERE p.contract_id=?').bind(id).first<{n:number|null}>();
   const sources = (await investorParticipantSources(db, contract.user_id)).filter(s => s.contract_id === id);
-  const holds=(await db.prepare(`SELECT a.source_id,SUM(a.amount_iqd-a.paid_iqd) AS n FROM finance_withdrawal_allocations a JOIN finance_withdrawals w ON w.id=a.withdrawal_id WHERE w.state IN ('requested','approved','part_paid') AND a.source_id IN (?,?) GROUP BY a.source_id`).bind(`invprofit:${id}`,`invcapital:${id}`).all<{source_id:string;n:number}>()).results??[];
-  const available=(kind:string)=>{const s=sources.find(s=>s.kind===kind);return s?.eligible?Math.max(0,s.amount_iqd-s.paid_iqd-(holds.find(h=>h.source_id===s.id)?.n??0)):0;};
+  const {participantSources,participantWithdrawableSources}=await import('./financeParticipants');
+  const budgets=participantWithdrawableSources(await participantSources(db,contract.user_id));
+  const available=(kind:string)=>budgets.get(`${kind==='investor_profit'?'invprofit':'invcapital'}:${id}`)??0;
   const loss = (await db.prepare("SELECT COALESCE(amount_iqd,0) AS n FROM investor_capital_losses WHERE contract_id=?").bind(id).first<{ n: number }>())?.n ?? 0;
   return { contract, summary: { funded_iqd: funded, principal_iqd: contract.principal_iqd,
-    inventory_capital_iqd: inventory?.unknown ? null : percent(inventory?.n ?? 0, contract.capital_share_bps),
+    inventory_capital_iqd: exactInventory?.n??(inventory?.unknown ? null : percent(inventory?.n ?? 0, contract.capital_share_bps)),
     accrued_profit_iqd: sources.find(s => s.kind === 'investor_profit')?.accrued_iqd ?? 0,
     available_profit_iqd: available('investor_profit'),available_capital_iqd:available('investor_capital'),
     paid_profit_iqd:sources.find(s=>s.kind==='investor_profit')?.paid_iqd??0,paid_capital_iqd:sources.find(s=>s.kind==='investor_capital')?.paid_iqd??0,

@@ -215,3 +215,10 @@ test('finance date ranges validate real calendar dates and presets preserve Bagh
   assert.deepEqual(financeRangeFromSearch('?from=2026-02-01&to=2026-02-28'),{range:{from:'2026-02-01',to:'2026-02-28'},invalid:false});
   assert.equal(financeRangeFromSearch('?from=2026-01-01').invalid,true);
 });
+
+test('participant charts use actual Baghdad period filters, separate capital and require finance scope',async()=>{
+ const x=setup();await runOrderFinancialEffects(x.env,'order','delivered');
+ const response=await get(x.app,`/f/participant-report?${period()}`),data=await json(response);assert.equal(response.status,200,JSON.stringify(data));assert.equal(data.capital.received_iqd,0);assert.equal(data.participants[0].earned_iqd,0);assert.deepEqual(data.batches,[]);
+ assert.equal((await get(x.assistant,`/f/participant-report?${period()}`)).status,403);
+ assert.equal((await get(x.app,'/f/participant-report?from=2026-10-06&to=2026-10-01')).status,400);
+});

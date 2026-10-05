@@ -1,8 +1,6 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireInvestor, str } from '../lib/http';
-import { newId } from '../lib/crypto';
-import { rateLimit } from '../lib/ratelimit';
+import { requireInvestor } from '../lib/http';
 
 /**
  * Investor portal (customer side). Investments themselves are created and
@@ -27,19 +25,7 @@ investRoutes.get('/', async (c) => {
       .all();
     items[String(inv.id)] = results;
   }
-  return c.json({ success: true, investments: investments.results, items, messages: messages.results });
+  return c.json({ success: true, currency:'USD',unit:'cent',withdrawable:false, investments: investments.results, items, messages: messages.results });
 });
 
-investRoutes.post('/messages', async (c) => {
-  await rateLimit(c, 'invest-msg', 60, 3600);
-  const user = c.get('user')!;
-  const body = await c.req.json().catch(() => ({}));
-  const message = str(body.message, 'message', { min: 1, max: 2000 });
-  const id = newId('imsg');
-  await c.env.DB.prepare(
-    "INSERT INTO investor_messages (id, user_id, sender, message) VALUES (?, ?, 'user', ?)"
-  )
-    .bind(id, user.id, message)
-    .run();
-  return c.json({ success: true, id });
-});
+investRoutes.post('/messages',c=>c.json({success:false,error:{code:'LEGACY_INVESTMENT_READ_ONLY',message:'سجل الاستثمار القديم محفوظ للقراءة؛ راجع حساب أرباحي'}},410));

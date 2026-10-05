@@ -10,7 +10,7 @@ export interface EmploymentStaff {
 export interface StaffReconciliation {
   staff_id:string; revision:number; state:'pending'|'running'|'complete'|'failed';cursor:string;
   processed_orders:number;adjusted_orders:number;error:string;updated_at:string;
-  rules_json:string;actor_id:string|null;
+  rules_json:string;actor_id:string|null;affected_from?:string|null;affected_until?:string|null;reason?:string;operation_id?:string|null;
 }
 export const publicReconciliation=(job:StaffReconciliation|null)=>job?{staff_id:job.staff_id,revision:job.revision,state:job.state,cursor:job.cursor,processed_orders:job.processed_orders,adjusted_orders:job.adjusted_orders,error:job.error,updated_at:job.updated_at}:null;
 export const employmentInstalled=(db:D1Database)=>db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_staff_reconciliations'").first();
@@ -21,7 +21,7 @@ export const investorEmploymentPendingSql=(contractSql='e.contract_id',kindSql='
   SELECT 1 FROM investment_contracts ec JOIN inventory_lots el ON el.incoming_id=ec.incoming_id
   JOIN order_item_inventory_allocations ea ON ea.lot_id=el.id JOIN orders eo ON eo.id=ea.order_id
   JOIN finance_staff_reconciliations ej JOIN finance_staff es ON es.id=ej.staff_id
-  WHERE ec.id=${contractSql} AND ej.state<>'complete' AND eo.id>ej.cursor
+  WHERE ec.id=${contractSql} AND ej.state<>'complete' AND eo.id>ej.cursor AND (ej.affected_from IS NULL OR date(eo.delivered_at,'+3 hours')>=ej.affected_from) AND (ej.affected_until IS NULL OR date(eo.delivered_at,'+3 hours')<ej.affected_until)
   AND (${kindSql}='investor_profit' OR ec.loss_share_bps>0 OR EXISTS(SELECT 1 FROM finance_withdrawal_allocations pa WHERE pa.source_id='invprofit:'||ec.id AND pa.source_kind='investor_profit' AND pa.paid_iqd>0))
   AND (EXISTS(SELECT 1 FROM finance_order_costs cost WHERE cost.order_id=eo.id AND cost.staff_id=es.id AND cost.state<>'reversed')
     OR (es.active=1 AND es.archived_at IS NULL AND es.start_work_date IS NOT NULL AND eo.status='delivered' AND date(eo.delivered_at,'+3 hours')>es.start_work_date
@@ -37,20 +37,25 @@ export function staffDateEligible(staff:Pick<EmploymentStaff,'start_work_date'>,
   return order.status==='delivered'&&Number.isFinite(at)&&baghdadDay(new Date(at))>staff.start_work_date;
 }
 export function staffCanAccrue(staff:EmploymentStaff,order:Record<string,unknown>) {
-  if(!staff.active||staff.archived_at||!staffDateEligible(staff,order))return false;
+  if(!staffDateEligible(staff,order))return false;
+  // Archiving stops its own interval, not the employee's past deliveries.
+  if((!staff.active||staff.archived_at)&&!order.delivered_at)return false;
   const at=deliveryTime(order.delivered_at);
   const periods=JSON.parse(staff.inactive_periods_json) as Array<{from:string;to:string|null}>;
   return !Number.isFinite(at)||!periods.some((p)=>at>=Date.parse(p.from)&&(!p.to||at<Date.parse(p.to)));
 }
-export async function queueStaffReconciliation(db:D1Database,staffId:string,actor:string|null,statements:D1PreparedStatement[]=[],bump=true,replacementRule?:{id:string;[key:string]:unknown}) {
+export async function queueStaffReconciliation(db:D1Database,staffId:string,actor:string|null,statements:D1PreparedStatement[]=[],bump=true,replacementRule?:{id:string;[key:string]:unknown},range?:{from:string;until:string|null;reason:string;operationId:string}) {
   const staff=await readStaff(db,staffId);if(!staff)throw notFound('الموظف غير موجود');
   const revision=staff.employment_version+(bump?1:0),now=new Date().toISOString();
   let rules=(await db.prepare('SELECT * FROM finance_cost_rules WHERE staff_id=? AND active=1 ORDER BY id').bind(staffId).all()).results??[];
   if(replacementRule){rules=rules.filter((r)=>r.id!==replacementRule.id);if(replacementRule.active===1&&replacementRule.staff_id===staffId)rules.push(replacementRule);}
+  const previous=await readStaffReconciliation(db,staffId);
+  const from=previous&&previous.state!=='complete'?(!previous.affected_from||!range?null:[previous.affected_from,range.from].sort()[0]):range?.from??null;
+  const until=previous&&previous.state!=='complete'?(!previous.affected_until||!range?.until?null:[previous.affected_until,range.until].sort().at(-1)!):range?.until??null;
   await db.batch([...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=?)',[staffId,staff.employment_version]),...statements,
     db.prepare('UPDATE finance_staff SET employment_version=? WHERE id=?').bind(revision,staffId),
-    db.prepare(`INSERT INTO finance_staff_reconciliations(staff_id,revision,rules_json,actor_id,updated_at) VALUES (?,?,?,?,?)
-      ON CONFLICT(staff_id) DO UPDATE SET revision=excluded.revision,state='pending',cursor='',processed_orders=0,adjusted_orders=0,rules_json=excluded.rules_json,error='',actor_id=excluded.actor_id,updated_at=excluded.updated_at`).bind(staffId,revision,JSON.stringify(rules),actor,now)]);
+    db.prepare(`INSERT INTO finance_staff_reconciliations(staff_id,revision,rules_json,actor_id,updated_at,affected_from,affected_until,reason,operation_id) VALUES (?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(staff_id) DO UPDATE SET revision=excluded.revision,state='pending',cursor='',processed_orders=0,adjusted_orders=0,rules_json=excluded.rules_json,error='',actor_id=excluded.actor_id,updated_at=excluded.updated_at,affected_from=excluded.affected_from,affected_until=excluded.affected_until,reason=excluded.reason,operation_id=excluded.operation_id`).bind(staffId,revision,JSON.stringify(rules),actor,now,from,until,range?.reason??'',range?.operationId??null)]);
   return publicReconciliation(await readStaffReconciliation(db,staffId));
 }
 export async function updateStaffEmployment(db:D1Database,id:string,b:Record<string,unknown>,actor:string,archive=false) {
@@ -97,6 +102,15 @@ async function updateWithLegacyRules(db:D1Database,id:string,actor:string,statem
   const staff=(await readStaff(db,id))!,revision=staff.employment_version+1;
   const rules=(await db.prepare('SELECT * FROM finance_cost_rules WHERE staff_id=? AND active=1 ORDER BY id').bind(id).all()).results??[];
   const adjusted=rules.map((r)=>legacy.includes(String(r.id))?{...r,employment_effective_default:1}:r);
+  const timeline=await db.prepare("SELECT 1 FROM sqlite_master WHERE name='finance_wage_versions'").first();
+  if(timeline)for(const rule of adjusted.filter(r=>legacy.includes(String(r.id)))){
+    const old=await db.prepare('SELECT * FROM finance_wage_versions WHERE rule_id=? ORDER BY revision DESC LIMIT 1').bind(rule.id).first<{id:string;revision:number;effective_from:string;effective_until:string|null}>();
+    if(!old)continue;
+    const version=Number(rule.version)+1,now=new Date().toISOString(),snapshot=JSON.stringify({...rule,version});
+    statements.push(db.prepare('INSERT INTO finance_wage_versions(id,rule_id,revision,staff_id,effective_from,effective_until,follows_employment,snapshot,reason,actor_id,recorded_at,supersedes_id) VALUES (?,?,?,?,?,?,1,?,?,?,?,?)').bind(`wage:${rule.id}:${version}`,rule.id,version,id,old.effective_from,old.effective_until,snapshot,'ربط القاعدة الافتراضية بأول تاريخ بدء عمل',actor,now,old.id),
+      db.prepare('UPDATE finance_cost_rules SET version=? WHERE id=?').bind(version,rule.id),
+      db.prepare('INSERT INTO finance_rule_versions(rule_id,version,snapshot,created_at,actor_id) VALUES (?,?,?,?,?)').bind(rule.id,version,snapshot,now,actor));
+  }
   await db.batch([...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=?)',[id,staff.employment_version]),...statements,
     db.prepare('UPDATE finance_staff SET employment_version=? WHERE id=?').bind(revision,id),
     db.prepare(`INSERT INTO finance_staff_reconciliations(staff_id,revision,rules_json,actor_id,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(staff_id) DO UPDATE SET revision=excluded.revision,state='pending',cursor='',processed_orders=0,adjusted_orders=0,rules_json=excluded.rules_json,error='',actor_id=excluded.actor_id,updated_at=excluded.updated_at`).bind(id,revision,JSON.stringify(adjusted),actor,new Date().toISOString())]);
@@ -107,13 +121,16 @@ async function updateWithLegacyRules(db:D1Database,id:string,actor:string,statem
  * cash settlements and manual corrections remain immutable. */
 export async function reconcileEmploymentCutoff(db:D1Database,orderId:string,actor?:string,day=baghdadDay()) {
   if(!await employmentInstalled(db))return 0;
-  const rows=(await db.prepare(`SELECT c.id,c.staff_id,c.amount_iqd,c.state,s.start_work_date,s.employment_version,o.status AS order_status,o.delivered_at,
+  const rows=(await db.prepare(`SELECT c.id,c.rule_id,c.staff_id,c.amount_iqd,c.state,s.start_work_date,s.employment_version,o.status AS order_status,o.delivered_at,
     COALESCE(c.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id),0) AS effective,
     COALESCE(c.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id AND a.employment_version IS NULL),0) AS intended,
     (SELECT COALESCE(SUM(a.amount_iqd-a.paid_iqd),0) FROM finance_withdrawal_allocations a JOIN finance_withdrawals w ON w.id=a.withdrawal_id WHERE a.source_kind='staff' AND a.source_id=c.id AND w.state IN ('requested','approved','part_paid')) AS held
-    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id JOIN orders o ON o.id=c.order_id WHERE c.order_id=? AND c.state IN ('due','approved')`).bind(orderId).all<{id:string;staff_id:string;amount_iqd:number;state:string;start_work_date:string|null;employment_version:number;order_status:string;delivered_at:string|null;effective:number;intended:number;held:number}>()).results??[];
+    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id JOIN orders o ON o.id=c.order_id WHERE c.order_id=? AND c.state IN ('due','approved')`).bind(orderId).all<{id:string;rule_id:string;staff_id:string;amount_iqd:number;state:string;start_work_date:string|null;employment_version:number;order_status:string;delivered_at:string|null;effective:number;intended:number;held:number}>()).results??[];
+  const timeline=await db.prepare("SELECT 1 FROM sqlite_master WHERE name='finance_wage_versions'").first();
+  const managed=timeline?new Set(((await db.prepare('SELECT DISTINCT rule_id FROM finance_wage_versions').all<{rule_id:string}>()).results??[]).map(r=>r.rule_id)):new Set<string>();
   const statements:D1PreparedStatement[]=[];let changed=0;
   for(const row of rows){
+    if(managed.has(row.rule_id))continue;
     const target=staffDateEligible(row,{status:row.order_status,delivered_at:row.delivered_at})?Math.max(0,row.intended):0;
     if(target===row.effective)continue;
     if(row.held>0&&target<row.effective)throw conflict('حرر طلب السحب المحجوز قبل تطبيق تاريخ الاستحقاق');

@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { api } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import * as T from '../adminProducts/theme';
+import { NumberInput } from '../ui/NumberInput';
 
 export const PROCUREMENT = '/api/admin/procurement',
   STOCK = '/api/admin/stock-operations',
@@ -27,6 +28,8 @@ export type Selection = {
   unit_cost_iqd?: number | null;
   purchase_unit_iqd?: number | null;
   cost_source: string;
+  cost_date?: string | null;
+  image_url?: string;
   weight_g: number;
   volume_mm3: number;
 };
@@ -96,6 +99,7 @@ export function Input({
   hint,
   min,
   required = false,
+  decimals = 6,
 }: {
   label: string;
   value: string | number;
@@ -104,10 +108,11 @@ export function Input({
   hint?: string;
   min?: number;
   required?: boolean;
+  decimals?: number;
 }) {
   return (
     <Field label={label} hint={hint}>
-      <input
+      {type === 'number' ? <NumberInput className={T.input} value={value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value)} min={min} decimals={decimals} required={required} onValueChange={(n, ok) => onChange(!ok ? 'NaN' : n == null ? '' : String(n))} /> : <input
         className={T.input}
         type={type}
         value={value}
@@ -115,7 +120,7 @@ export function Input({
         min={min}
         step={type === 'number' ? 'any' : undefined}
         required={required}
-      />
+      />}
     </Field>
   );
 }

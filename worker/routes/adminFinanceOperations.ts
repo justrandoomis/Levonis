@@ -21,6 +21,7 @@ import { commitParticipantStatements, effectiveStaffCostSql, heldSourceSql, staf
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { orderGoods, postStoredRefund, runOrderFinancialEffects, type CostRule } from '../lib/orderFinance';
 import { operationsReport } from '../lib/operationsReport';
+import { wageVersionStatement } from '../lib/financeWageTimeline';
 import { nextEmploymentDay, queueStaffReconciliation, readStaff, updateStaffEmployment } from '../lib/financeEmployment';
 
 export const adminFinanceOperationsRoutes = new Hono<AppContext>();
@@ -80,6 +81,7 @@ for (const [path, table] of [
     const user = c.get('user')!;
     await requireCapability(c.env, user, 'rules');
     const b = await c.req.json<Record<string, unknown>>();
+    if(path==='staff'&&!isOwner(c.env,user))throw forbidden('تعديل بدء العمل للأدمن الرئيسي فقط');
     if(path==='staff')return c.json({success:true,id:c.req.param('id'),...await updateStaffEmployment(c.env.DB,c.req.param('id'),b,user.id)});
     await c.env.DB.prepare(`UPDATE ${table} SET name=?,active=? WHERE id=?`)
       .bind(str(b.name, 'الاسم', { min: 1, max: 120 }), b.active === false ? 0 : 1, c.req.param('id'))
@@ -161,6 +163,7 @@ async function ruleValues(
 adminFinanceOperationsRoutes.post('/rules', async (c) => {
   const user = c.get('user')!;
   await requireCapability(c.env, user, 'rules');
+  if(!isOwner(c.env,user))throw forbidden('تعديل الأجور والنسب للأدمن الرئيسي فقط');
   const b = await c.req.json<Record<string, unknown>>(),
     id = newId('rule'),
     now = new Date().toISOString(),
@@ -174,6 +177,7 @@ adminFinanceOperationsRoutes.post('/rules', async (c) => {
       'INSERT INTO finance_rule_versions(rule_id,version,snapshot,created_at,actor_id) VALUES (?,1,?,?,?)',
     ).bind(id, JSON.stringify(r), now, user.id),
   ];
+  if(r.staff_id)statements.push(wageVersionStatement(c.env.DB,r,user.id,'إنشاء قاعدة الأجر',now));
   const staff=r.staff_id?await readStaff(c.env.DB,r.staff_id):null;
   const reconciliation=staff?.start_work_date?await queueStaffReconciliation(c.env.DB,staff.id,user.id,statements,true,{...r}):null;
   if(!staff?.start_work_date)await c.env.DB.batch(statements);
@@ -188,6 +192,7 @@ adminFinanceOperationsRoutes.put('/rules/:id', async (c) => {
     id = c.req.param('id'),
     old = await db.prepare('SELECT * FROM finance_cost_rules WHERE id=?').bind(id).first<CostRule>();
   if (!old) throw notFound('Rule not found');
+  if(old.staff_id)throw conflict('استخدم تغيير الأجر بتاريخ سريان ومعاينة الأثر','WAGE_PREVIEW_REQUIRED');
   if (whole(b.version, 'version', 1) !== old.version) throw conflict('تغيرت القاعدة؛ حدّث الصفحة');
   const r = await ruleValues(db, b, user.id, id, old.version + 1, old.created_at),
     keys = Object.keys(r).filter((k) => k !== 'id');

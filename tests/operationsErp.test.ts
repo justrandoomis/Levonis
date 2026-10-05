@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { freshDb, asD1, stubApp, post, patch, put, get, json, row, count } from './fixtures/app';
 import { adminProcurementRoutes } from '../worker/routes/adminProcurement';
 import { adminStockOperationsRoutes } from '../worker/routes/adminStockOperations';
+import { previewWageChange, applyWageChange } from '../worker/lib/financeWageChanges';
+import { nextEmploymentDay } from '../worker/lib/financeEmployment';
 import { adminFinanceOperationsRoutes } from '../worker/routes/adminFinanceOperations';
 import { allocateExact, baghdadDay, journalPlan } from '../worker/lib/operations';
 import {
@@ -247,7 +249,7 @@ test('rule specificity and profit base exclude wages; losses earn zero and unkno
   assert.equal(costAmount({ ...r, basis: 'profit_percent', amount: 1000 }, 2, 10000, 20000), 0);
   assert.equal(costAmount({ ...r, basis: 'profit_percent', amount: 1000 }, 2, 50000, null), null);
 });
-test('order freezes rule version, generates one expense and one payable, and wage payment is not another expense', async () => {
+test('checkout evidence stays immutable; a future wage change preserves earlier delivery pay and payment is not another expense', async () => {
   const { raw, db, app, env } = setup();
   const r = await json(await post(app, '/f/rules', ruleInput()));
   seedOrder(raw);
@@ -262,8 +264,11 @@ test('order freezes rule version, generates one expense and one payable, and wag
   const old = await json(await get(app, '/f/rules'));
   assert.equal(
     (await put(app, `/f/rules/${r.id}`, { ...old.rules[0], amount: 7000, active: true })).status,
-    200,
+    409,
   );
+  const change={amount:7000,effective_from:nextEmploymentDay(baghdadDay()),reason:'New rate starting tomorrow',version:old.rules[0].version};
+  const preview=await previewWageChange(db,r.id,change,'admin');
+  await applyWageChange(db,r.id,{...change,operation_id:crypto.randomUUID(),preview_token:preview.preview.preview_token},'admin');
   await runOrderFinancialEffects(env, 'order', 'delivered');
   await runOrderFinancialEffects(env, 'order', 'delivered');
   assert.equal(count(raw, 'SELECT SUM(amount_iqd) n FROM finance_order_costs'), 10000);

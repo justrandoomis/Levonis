@@ -1,3 +1,4 @@
+import { participantReport } from '../lib/financeParticipantReports';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, conflict, forbidden, notFound, requireAdmin, str, unavailable } from '../lib/http';
@@ -98,13 +99,16 @@ async function selectOrders(db:D1Database,r:{from:string;to:string},opts:{q?:str
   const condition="o.seller_type='levonis' AND date(CASE WHEN o.status='delivered' THEN o.delivered_at ELSE o.created_at END,'+3 hours') BETWEEN ? AND ? AND (?='' OR o.status=?) AND (?='' OR instr(lower(o.id||' '||COALESCE(u.name,'')),lower(?))>0)";
   const args=[r.from,r.to,status,status,q,q];
   const [rows,total]=await Promise.all([
-    db.prepare(`SELECT o.id FROM orders o LEFT JOIN users u ON u.id=o.user_id WHERE ${condition} ORDER BY COALESCE(o.delivered_at,o.created_at) DESC,o.id LIMIT ? OFFSET ?`).bind(...args,opts.summary?5001:100,opts.offset??0).all<{id:string}>(),
+    db.prepare(`SELECT o.id FROM orders o LEFT JOIN users u ON u.id=o.user_id WHERE ${condition} ORDER BY COALESCE(o.delivered_at,o.created_at) DESC,o.id ${opts.summary?'':'LIMIT 100 OFFSET ?'}`).bind(...args,...(opts.summary?[]:[opts.offset??0])).all<{id:string}>(),
     db.prepare(`SELECT COUNT(*) total FROM orders o LEFT JOIN users u ON u.id=o.user_id WHERE ${condition}`).bind(...args).first<{total:number}>()]);
-  const orderIds=(rows.results??[]).slice(0,opts.summary?5000:100).map((r)=>r.id);
-  const rawBases=await getOrderProfitBases(db,orderIds),byId=new Map(rawBases.map((b)=>[b.order_id,b]));
+  const orderIds=(rows.results??[]).map((r)=>r.id);
+  const rawBases:OrderProfitBase[]=[];
+  for(let i=0;i<orderIds.length;i+=250)rawBases.push(...await getOrderProfitBases(db,orderIds.slice(i,i+250)));
+  const byId=new Map(rawBases.map((b)=>[b.order_id,b]));
   const bases=orderIds.map((id)=>byId.get(id)!).filter(Boolean);
-  await addInvestors(db,bases);return {bases,total:total?.total??0,truncated:(rows.results??[]).length>5000};
+  await addInvestors(db,bases);return {bases,total:total?.total??0,truncated:false};
 }
+adminFinanceWorkspaceRoutes.get('/participant-report',async c=>{const r=range(c.req.query('from'),c.req.query('to'));return c.json({success:true,...await participantReport(c.env.DB,r)});});
 adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
   const db=c.env.DB,r=range(c.req.query('from'),c.req.query('to'));
   const {bases,truncated}=await selectOrders(db,r,{summary:true});

@@ -158,6 +158,12 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'finance_workspace_postings',
     'finance_monthly_promotions', 'finance_promotion_history', 'finance_cost_adjustments', 'finance_staff_basis',
     'finance_staff_reconciliations', 'finance_staff_order_rules',
+    // Effective wage timelines, resumable previews and immutable adjustment/payment evidence.
+    'finance_wage_versions', 'finance_wage_targets', 'finance_wage_changes', 'finance_withdrawal_reviews',
+    'finance_mutation_clock', 'finance_withdrawal_payment_lines', 'finance_wage_preview_jobs', 'finance_wage_pending_targets',
+    // Investor defaults are separate from immutable funded-purchase agreements.
+    'investment_profiles', 'investment_profile_history', 'investment_legacy_links',
+    'purchase_investor_agreements', 'purchase_investor_allocations', 'purchase_investor_receipts', 'purchase_investor_lot_capital',
     'finance_withdrawals', 'finance_withdrawal_allocations', 'finance_withdrawal_payments',
     'investment_contracts', 'investment_contract_voids', 'investor_finance_events', 'investor_allocation_results', 'finance_investor_earnings', 'investor_capital_losses',
   ]),

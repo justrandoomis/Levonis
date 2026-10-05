@@ -1,15 +1,17 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, conflict, notFound, str } from '../lib/http';
-import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
+import { requireAdmin, badRequest, conflict, forbidden, notFound, str } from '../lib/http';
+import { canViewFinancials, isOwner, projectForAdmin } from '../lib/adminScope';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { baghdadDay, dateValue, fence, journalPlan, periodOpen, requireCapability, whole } from '../lib/operations';
 import { investmentContractSummary, investorOrderSplit, refreshInvestorContract, type InvestmentContract } from '../lib/investorFinance';
+import { adminInvestmentProfilesRoutes } from './adminInvestmentProfiles';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
 
 export const adminInvestmentFinanceRoutes = new Hono<AppContext>();
 adminInvestmentFinanceRoutes.use('*', requireAdmin);
+adminInvestmentFinanceRoutes.route('/',adminInvestmentProfilesRoutes);
 const text = (v: unknown, max=200) => str(v,'text',{max,required:false}) ?? '';
 async function commit(db:D1Database, statements:D1PreparedStatement[]) {
   try { await db.batch(statements); } catch(e) {
@@ -20,10 +22,10 @@ async function commit(db:D1Database, statements:D1PreparedStatement[]) {
 adminInvestmentFinanceRoutes.get('/config',async c=>{
   await requireCapability(c.env,c.get('user')!,'accounting');
   const [users,incoming,contracts]=await Promise.all([
-    c.env.DB.prepare("SELECT id,name,email,admin_scope FROM users WHERE role='admin' ORDER BY name,email").all(),
+    c.env.DB.prepare("SELECT id,name,email,admin_scope FROM users WHERE role='admin' AND admin_scope='assistant' ORDER BY name,email").all(),
     c.env.DB.prepare(`SELECT i.id,i.product_id,i.qty_ordered,i.qty_received,i.purchase_unit_iqd,p.name_ar,p.name,
       pl.purchase_id,pl.purchase_id AS purchase_document_id,po.invoice_no,
-      CASE WHEN i.shipping_total_iqd IS NULL OR i.internal_delivery_total_iqd IS NULL THEN NULL ELSE i.qty_ordered*i.purchase_unit_iqd+i.shipping_total_iqd+i.internal_delivery_total_iqd+COALESCE((SELECT SUM(a.amount_iqd) FROM lot_cost_adjustments a WHERE a.incoming_id=i.id),0) END AS total_cost_iqd
+      CASE WHEN i.shipping_total_iqd IS NULL OR i.internal_delivery_total_iqd IS NULL THEN NULL ELSE COALESCE(i.purchase_total_iqd,i.qty_ordered*i.purchase_unit_iqd)+i.shipping_total_iqd+i.internal_delivery_total_iqd+COALESCE((SELECT SUM(a.amount_iqd) FROM lot_cost_adjustments a WHERE a.incoming_id=i.id),0) END AS total_cost_iqd
       FROM incoming_inventory i LEFT JOIN products p ON p.id=i.product_id LEFT JOIN purchase_lines pl ON pl.incoming_id=i.id
       LEFT JOIN purchase_orders po ON po.id=pl.purchase_id WHERE i.status<>'cancelled' ORDER BY i.created_at DESC LIMIT 300`).all<Record<string,unknown>>(),
     c.env.DB.prepare('SELECT c.*,u.name AS user_name FROM investment_contracts c JOIN users u ON u.id=c.user_id ORDER BY c.created_at DESC LIMIT 300').all(),
@@ -36,7 +38,7 @@ adminInvestmentFinanceRoutes.get('/contracts',async c=>{
   return c.json({success:true,contracts:rows});
 });
 adminInvestmentFinanceRoutes.post('/contracts',async c=>{
-  const user=c.get('user')!; await requireCapability(c.env,user,'accounting');
+  const user=c.get('user')!; await requireCapability(c.env,user,'accounting');if(!isOwner(c.env,user))throw forbidden('اتفاقات المستثمرين للأدمن الرئيسي فقط');
   const b=await c.req.json<Record<string,unknown>>(),db=c.env.DB;
   const id=str(b.operation_id,'operation_id',{min:8,max:60});
   const input={incoming_id:str(b.incoming_id,'الشراء',{min:1,max:60}),user_id:str(b.user_id,'المستثمر',{min:1,max:60}),
@@ -44,9 +46,10 @@ adminInvestmentFinanceRoutes.post('/contracts',async c=>{
     capital_share_bps:whole(b.capital_share_bps,'نسبة رأس المال',1,10000),profit_share_bps:whole(b.profit_share_bps,'نسبة الربح',0,10000),loss_share_bps:whole(b.loss_share_bps,'نسبة الخسارة',0,10000)};
   const request=JSON.stringify(input),prior=await db.prepare('SELECT request_json FROM investment_contracts WHERE id=?').bind(id).first<{request_json:string}>();
   if(prior){if(prior.request_json!==request)throw conflict('المعرف مستخدم لعقد مختلف');return c.json({success:true,id,already:true});}
-  if(!await db.prepare("SELECT id FROM users WHERE id=? AND role='admin'").bind(input.user_id).first())throw badRequest('اختر حساب مساعد أو مسؤول');
+  if(!await db.prepare("SELECT id FROM users WHERE id=? AND role='admin' AND admin_scope='assistant'").bind(input.user_id).first())throw badRequest('اختر حساب مساعد أو مسؤول');
   if(!await db.prepare("SELECT id FROM incoming_inventory WHERE id=? AND status<>'cancelled'").bind(input.incoming_id).first())throw badRequest('اختر بند شراء فعالًا');
-  await commit(db,[...fence(db,`NOT EXISTS(SELECT 1 FROM order_item_inventory_allocations a JOIN inventory_lots l ON l.id=a.lot_id WHERE l.incoming_id=? AND a.released_at IS NULL)`,[input.incoming_id]),
+  const profileStatement=db.prepare("INSERT INTO investment_profiles(user_id,default_profit_share_bps,default_capital_share_bps,default_loss_share_bps,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO NOTHING").bind(input.user_id,input.profit_share_bps,input.capital_share_bps,input.loss_share_bps,user.id,new Date().toISOString(),new Date().toISOString());
+  await commit(db,[profileStatement,...fence(db,`NOT EXISTS(SELECT 1 FROM order_item_inventory_allocations a JOIN inventory_lots l ON l.id=a.lot_id WHERE l.incoming_id=? AND a.released_at IS NULL)`,[input.incoming_id]),
     db.prepare('INSERT INTO investment_contracts(id,incoming_id,user_id,name,principal_iqd,capital_share_bps,profit_share_bps,loss_share_bps,created_by,created_at,request_json) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
       .bind(id,input.incoming_id,input.user_id,input.name,input.principal_iqd,input.capital_share_bps,input.profit_share_bps,input.loss_share_bps,user.id,new Date().toISOString(),request)]);
   await refreshInvestorContract(db,id); await audit(db,user.id,'investment.contract_created',id,input);
@@ -55,6 +58,8 @@ adminInvestmentFinanceRoutes.post('/contracts',async c=>{
 adminInvestmentFinanceRoutes.post('/contracts/:id/funding',async c=>{
   const user=c.get('user')!;await requireCapability(c.env,user,'accounting');
   const b=await c.req.json<Record<string,unknown>>(),db=c.env.DB,id=c.req.param('id');
+  if(!isOwner(c.env,user))throw forbidden('تسجيل التمويل للأدمن الرئيسي فقط');
+  if(await db.prepare('SELECT 1 FROM purchase_investor_allocations WHERE contract_id=?').bind(id).first())throw conflict('سجّل استلام التمويل من دفعة الشراء لتوزيعه دون تكرار');
   const input={operation_id:str(b.operation_id,'operation_id',{min:8,max:60}),amount_iqd:whole(b.amount_iqd,'المبلغ',1),payment_day:dateValue(b.payment_day,baghdadDay()),reference:text(b.reference,200)};
   const request=JSON.stringify(input),key=`funding:${input.operation_id}`;
   const prior=await db.prepare('SELECT contract_id,snapshot FROM investor_finance_events WHERE event_key=?').bind(key).first<{contract_id:string;snapshot:string}>();
@@ -67,6 +72,7 @@ adminInvestmentFinanceRoutes.post('/contracts/:id/funding',async c=>{
   await refreshInvestorContract(db,id,input.payment_day);return c.json({success:true});
 });
 adminInvestmentFinanceRoutes.post('/contracts/:id/void',async c=>{
+  if(!isOwner(c.env,c.get('user')!))throw forbidden('إبطال اتفاقات المستثمرين للأدمن الرئيسي فقط');
   const user=c.get('user')!;await requireCapability(c.env,user,'accounting');const db=c.env.DB,b=await c.req.json<Record<string,unknown>>(),id=c.req.param('id'),operation=str(b.operation_id,'operation_id',{min:8,max:60});
   const prior=await db.prepare('SELECT contract_id FROM investment_contract_voids WHERE id=?').bind(operation).first<{contract_id:string}>();if(prior){if(prior.contract_id!==id)throw conflict('المعرف مستخدم لعقد آخر');return c.json({success:true,already:true});}
   const contract=await db.prepare('SELECT * FROM investment_contracts WHERE id=?').bind(id).first<InvestmentContract>();if(!contract)throw notFound('Contract not found');
@@ -76,6 +82,8 @@ adminInvestmentFinanceRoutes.post('/contracts/:id/void',async c=>{
 adminInvestmentFinanceRoutes.get('/contracts/:id',async c=>{
   await requireCapability(c.env,c.get('user')!,'accounting');const db=c.env.DB,id=c.req.param('id');
   const summary=await investmentContractSummary(db,id);
+  const linked=await db.prepare('SELECT purchase_id FROM purchase_investor_allocations WHERE contract_id=?').bind(id).first<{purchase_id:string}>();
+  if(linked)Object.assign(summary.contract,{purchase_id:linked.purchase_id});
   const [events,lots]=await Promise.all([db.prepare('SELECT * FROM investor_finance_events WHERE contract_id=? ORDER BY created_at,id').bind(id).all(),db.prepare('SELECT * FROM inventory_lots WHERE incoming_id=? ORDER BY received_at,id').bind(summary.contract.incoming_id).all()]);
   const canVoid=!!await db.prepare(`SELECT 1 FROM investment_contracts c WHERE c.id=? AND c.state='active' AND NOT EXISTS(SELECT 1 FROM investor_finance_events e WHERE e.contract_id=c.id) AND NOT EXISTS(SELECT 1 FROM order_item_inventory_allocations a JOIN inventory_lots l ON l.id=a.lot_id WHERE l.incoming_id=c.incoming_id AND a.released_at IS NULL)`).bind(id).first();
   return c.json({success:true,...summary,can_void:canVoid,events:events.results??[],lots:lots.results??[]});

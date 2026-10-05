@@ -14,8 +14,9 @@ export async function continueStaffReconciliation(env:Env,staffId:string,revisio
   if(job.state==='complete')return publicReconciliation(job);
   const staff=await readStaff(db,staffId);if(!staff||staff.employment_version!==job.revision)throw conflict('تغير إعداد الموظف؛ حدّث الصفحة');
   const rules=JSON.parse(job.rules_json) as CostRule[],day=baghdadDay();
-  const selection=`seller_type='levonis' AND ((? IS NOT NULL AND status='delivered' AND date(delivered_at,'+3 hours')>?) OR EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.order_id=orders.id AND c.staff_id=?))`;
-  const orders=(await db.prepare(`SELECT id,status,delivered_at FROM orders WHERE id>? AND ${selection} ORDER BY id LIMIT ?`).bind(job.cursor,staff.start_work_date,staff.start_work_date,staffId,Math.max(1,Math.min(10,maxOrders))).all<{id:string;status:string;delivered_at:string|null}>()).results??[];
+  const selection=`seller_type='levonis' AND ((status='delivered' AND (? IS NULL OR date(delivered_at,'+3 hours')>?)) OR EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.order_id=orders.id AND c.staff_id=?)) AND (? IS NULL OR date(delivered_at,'+3 hours')>=?) AND (? IS NULL OR date(delivered_at,'+3 hours')<?)`;
+  const selectionArgs=[staff.start_work_date,staff.start_work_date,staffId,job.affected_from??null,job.affected_from??null,job.affected_until??null,job.affected_until??null];
+  const orders=(await db.prepare(`SELECT id,status,delivered_at FROM orders WHERE id>? AND ${selection} ORDER BY id LIMIT ?`).bind(job.cursor,...selectionArgs,Math.max(1,Math.min(10,maxOrders))).all<{id:string;status:string;delivered_at:string|null}>()).results??[];
   let cursor=job.cursor,processed=job.processed_orders,adjusted=job.adjusted_orders;
   try{
     for(const order of orders){
@@ -32,7 +33,7 @@ export async function continueStaffReconciliation(env:Env,staffId:string,revisio
         db.prepare("UPDATE finance_staff_reconciliations SET cursor=?,processed_orders=?,adjusted_orders=?,state='running',error='',updated_at=? WHERE staff_id=? AND revision=?").bind(order.id,processed,adjusted,new Date().toISOString(),staffId,job.revision)]);
       cursor=order.id;
     }
-    const more=await db.prepare(`SELECT 1 FROM orders WHERE id>? AND ${selection} LIMIT 1`).bind(cursor,staff.start_work_date,staff.start_work_date,staffId).first();
+    const more=await db.prepare(`SELECT 1 FROM orders WHERE id>? AND ${selection} LIMIT 1`).bind(cursor,...selectionArgs).first();
     await db.prepare('UPDATE finance_staff_reconciliations SET state=?,error=?,updated_at=? WHERE staff_id=? AND revision=? AND cursor=?').bind(more?'pending':'complete','',new Date().toISOString(),staffId,job.revision,cursor).run();
   }catch(e){
     // The last committed cursor is retained: retry resumes the failing order.

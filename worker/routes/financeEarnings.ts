@@ -1,3 +1,4 @@
+import { investmentLegacy } from '../lib/investmentLegacy';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, requireAuth, requireMainHost, str } from '../lib/http';
@@ -11,9 +12,12 @@ financeEarningsRoutes.get('/eligibility',async(c)=>{
   const db=c.env.DB,id=c.get('user')!.id;
   const staff=await db.prepare('SELECT 1 FROM finance_staff WHERE user_id=? LIMIT 1').bind(id).first();
   const installed=await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='investment_contracts'").first();
-  const investor=installed?await db.prepare('SELECT 1 FROM investment_contracts WHERE user_id=? LIMIT 1').bind(id).first():null;
+  const profiles=await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='investment_profiles'").first();
+  const registered=profiles?await db.prepare("SELECT 1 FROM investment_profiles WHERE user_id=?").bind(id).first():null;
+  const investor=registered||(installed?await db.prepare('SELECT 1 FROM investment_contracts WHERE user_id=? LIMIT 1').bind(id).first():null);
   return c.json({success:true,eligible:!!staff||!!investor,staff:!!staff,investor:!!investor});
 });
+financeEarningsRoutes.get('/legacy',async c=>c.json({success:true,...await investmentLegacy(c.env.DB,c.get('user')!.id)}));
 financeEarningsRoutes.get('/', async (c) => c.json({ success:true,...await participantOverview(c.env.DB,c.get('user')!.id) }));
 financeEarningsRoutes.post('/withdrawals', async (c) => {
   await rateLimit(c,'finance-earnings-withdrawal',10,3600);

@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, conflict, notFound, str } from '../lib/http';
-import { projectForAdmin } from '../lib/adminScope';
+import { requireAdmin, badRequest, conflict, forbidden, notFound, str } from '../lib/http';
+import { isOwner, projectForAdmin } from '../lib/adminScope';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { requireSelection, productSelections, type Selection } from '../lib/inventorySelection';
@@ -18,6 +18,7 @@ import {
   whole,
 } from '../lib/operations';
 import { parsePurchaseCsv } from '../lib/purchaseCsv';
+import { planPurchaseFunding, purchaseFundingSummary, receivePurchaseFunding, type FundedPurchaseLine } from '../lib/purchaseFunding';
 import { investorFinanceInstalled } from '../lib/investorFinance';
 
 export const adminProcurementRoutes = new Hono<AppContext>();
@@ -74,7 +75,7 @@ async function document(db: D1Database, id: string) {
   const [lines, charges, payments] = await Promise.all([
     db
       .prepare(
-        'SELECT i.*,l.id AS line_id,l.label,l.source_unit_amount,l.weight_g,l.volume_mm3,l.selling_price_iqd,l.charges_iqd,l.invoiced_qty,l.rejected_qty FROM purchase_lines l JOIN incoming_inventory i ON i.id=l.incoming_id WHERE l.purchase_id=? ORDER BY l.id',
+        'SELECT i.*,l.id AS line_id,l.label,l.source_unit_amount,l.weight_g,l.volume_mm3,l.selling_price_iqd,l.charges_iqd,l.invoiced_qty,l.rejected_qty,l.purchase_cost_mode FROM purchase_lines l JOIN incoming_inventory i ON i.id=l.incoming_id WHERE l.purchase_id=? ORDER BY l.id',
       )
       .bind(id)
       .all<Line>(),
@@ -85,10 +86,11 @@ async function document(db: D1Database, id: string) {
       .all<{ amount_iqd: number }>(),
   ]);
   const items = lines.results ?? [];
-  const ordered = items.reduce((s, l) => s + l.qty_ordered * l.purchase_unit_iqd + l.charges_iqd, 0);
+  const ordered = items.reduce((s, l) => s + (l.purchase_total_iqd ?? l.qty_ordered * l.purchase_unit_iqd) + l.charges_iqd, 0);
   const paid = (payments.results ?? []).reduce((s, pay) => s + pay.amount_iqd, 0);
   return {
     purchase: p,
+    funding: await purchaseFundingSummary(db,id),
     lines: items,
     charges: charges.results ?? [],
     payments: payments.results ?? [],
@@ -146,24 +148,28 @@ adminProcurementRoutes.post('/import-preview', async (c) => {
 });
 adminProcurementRoutes.get('/config', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'purchase');
-  const [suppliers, locations] = await Promise.all([
+  const [suppliers, locations, investors] = await Promise.all([
     c.env.DB.prepare('SELECT id,name FROM inventory_suppliers WHERE active=1 ORDER BY name').all(),
     c.env.DB.prepare('SELECT * FROM stock_locations WHERE active=1 ORDER BY name').all(),
+    c.env.DB.prepare("SELECT p.*,u.name,u.email FROM investment_profiles p JOIN users u ON u.id=p.user_id WHERE p.state='active' AND u.role='admin' AND u.admin_scope='assistant' ORDER BY u.name").all(),
   ]);
-  return c.json({ success: true, suppliers: suppliers.results ?? [], locations: locations.results ?? [] });
+  return c.json({ success: true, suppliers: suppliers.results ?? [], locations: locations.results ?? [],investors:investors.results??[] });
 });
 adminProcurementRoutes.get('/documents', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'purchase');
   const offset = whole(c.req.query('offset') ?? 0, 'offset', 0, 100000);
+  const awaiting=c.req.query('awaiting')==='1';
+  const filter=awaiting?"WHERE p.status IN ('ordered','partial')":'';
+  const count=await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM purchase_orders p ${filter}`).first<{n:number}>();
   const { results } = await c.env.DB.prepare(
     `SELECT p.*,s.name AS supplier_name,
-    (SELECT COALESCE(SUM(i.qty_ordered*i.purchase_unit_iqd+l.charges_iqd),0) FROM purchase_lines l JOIN incoming_inventory i ON i.id=l.incoming_id WHERE l.purchase_id=p.id) AS total_cost_iqd,
+    (SELECT COALESCE(SUM(COALESCE(i.purchase_total_iqd,i.qty_ordered*i.purchase_unit_iqd)+l.charges_iqd),0) FROM purchase_lines l JOIN incoming_inventory i ON i.id=l.incoming_id WHERE l.purchase_id=p.id) AS total_cost_iqd,
     (SELECT COALESCE(SUM(amount_iqd),0) FROM supplier_payments WHERE purchase_id=p.id) AS paid_iqd
-    FROM purchase_orders p LEFT JOIN inventory_suppliers s ON s.id=p.supplier_id ORDER BY p.created_at DESC LIMIT 50 OFFSET ?`,
+    FROM purchase_orders p LEFT JOIN inventory_suppliers s ON s.id=p.supplier_id ${filter} ORDER BY p.created_at DESC LIMIT 50 OFFSET ?`,
   )
     .bind(offset)
     .all();
-  return c.json({ success: true, purchases: results ?? [], offset });
+  return c.json({ success: true, purchases: results ?? [], offset, total:count?.n??0 });
 });
 adminProcurementRoutes.get('/documents/:id', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'purchase');
@@ -188,6 +194,8 @@ async function planDocument(
     sel: Selection;
     qty: number;
     unit: number;
+    total: number;
+    costMode: 'unit'|'total';
     source: number;
     weight: number;
     volume: number;
@@ -199,13 +207,17 @@ async function planDocument(
     const r = v as Record<string, unknown>;
     const sel = await requireSelection(db, text(r.product_id, 60), text(r.scope, 20), text(r.scope_id, 60));
     const qty = whole(r.qty_ordered, 'الكمية', 1, 100000);
-    const source = decimal(r.source_unit_amount ?? r.purchase_unit_iqd, 'تكلفة الشراء');
-    const unit = whole(Math.round(source * rate), 'التكلفة');
-    whole(unit * qty, 'مجموع تكلفة البند');
+    const costMode=r.purchase_cost_mode==='total'?'total':'unit';
+    const entered=decimal(costMode==='total'?r.source_total_amount??r.purchase_total_iqd:r.source_unit_amount??r.purchase_unit_iqd,'تكلفة الشراء');
+    if(currency==='IQD')whole(entered,'تكلفة الشراء بالدينار');
+    const total=whole(Math.round(costMode==='total'?entered*rate:Math.round(entered*rate)*qty),'إجمالي شراء البند');
+    const unit=Math.floor(total/qty),source=costMode==='total'?entered/qty:entered;
     lines.push({
       sel,
       qty,
       unit,
+      total,
+      costMode,
       source,
       weight: decimal(r.weight_g ?? sel.weight_g, 'الوزن'),
       volume: decimal(r.volume_mm3 ?? sel.volume_mm3, 'الحجم'),
@@ -231,7 +243,7 @@ async function planDocument(
           : basis === 'volume'
             ? l.qty * l.volume
             : basis === 'value'
-              ? l.qty * l.unit
+              ? l.total
               : l.qty,
       ),
     );
@@ -240,7 +252,7 @@ async function planDocument(
   });
   if (charges.length > 15) throw badRequest('Too many charges');
   whole(
-    lines.reduce((n, l) => n + l.unit * l.qty + l.charges, 0),
+    lines.reduce((n, l) => n + l.total + l.charges, 0),
     'مجموع الشحنة',
   );
   const supplier = text(b.supplier_id, 60) || null,
@@ -275,7 +287,7 @@ async function planDocument(
     (supplier !== previous.supplier_id || currency !== previous.currency || status === 'draft')
   )
     throw conflict('المورد والعملة وأصل الطلب مثبتة بالدفعة المقدمة');
-  if (paid > lines.reduce((n, l) => n + l.qty * l.unit + l.charges, 0))
+  if (paid > lines.reduce((n, l) => n + l.total + l.charges, 0))
     throw conflict('المجموع الجديد أقل من دفعات المورد؛ سوّ الدفعة أولًا');
   const statements: D1PreparedStatement[] = [];
   if (previous) {
@@ -342,13 +354,15 @@ async function planDocument(
         .bind(...Object.values(row)),
     );
   }
+  const plannedLines:FundedPurchaseLine[]=[];
   for (const l of lines) {
     const incoming = newId('inc'),
       line = newId('pol');
+    plannedLines.push({incoming_id:incoming,total_iqd:l.total+l.charges,label:l.sel.label});
     statements.push(
       db
         .prepare(
-          `INSERT INTO incoming_inventory(id,product_id,scope,scope_id,qty_ordered,purchase_unit_iqd,shipping_total_iqd,internal_delivery_total_iqd,source_currency,source_unit_amount,exchange_rate_used,supplier_id,supplier_ref,purchase_date,expected_at,tracking,notes,status,created_by) VALUES (?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?,?,?,?)`,
+          `INSERT INTO incoming_inventory(id,product_id,scope,scope_id,qty_ordered,purchase_unit_iqd,shipping_total_iqd,internal_delivery_total_iqd,source_currency,source_unit_amount,exchange_rate_used,supplier_id,supplier_ref,purchase_date,expected_at,tracking,notes,status,created_by,purchase_total_iqd) VALUES (?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?,?,?,?,?)`,
         )
         .bind(
           incoming,
@@ -369,12 +383,13 @@ async function planDocument(
           text(b.note, 2000),
           status === 'draft' ? 'draft' : 'incoming',
           actor,
+          l.total,
         ),
     );
     statements.push(
       db
         .prepare(
-          'INSERT INTO purchase_lines(id,purchase_id,incoming_id,label,source_unit_amount,weight_g,volume_mm3,selling_price_iqd,charges_iqd,invoiced_qty) VALUES (?,?,?,?,?,?,?,?,?,?)',
+          'INSERT INTO purchase_lines(id,purchase_id,incoming_id,label,source_unit_amount,weight_g,volume_mm3,selling_price_iqd,charges_iqd,invoiced_qty,purchase_total_iqd,purchase_cost_mode) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
         )
         .bind(
           line,
@@ -387,6 +402,8 @@ async function planDocument(
           l.selling,
           l.charges,
           l.invoiceQty,
+          l.total,
+          l.costMode,
         ),
     );
   }
@@ -396,6 +413,7 @@ async function planDocument(
         .prepare('INSERT INTO purchase_charges(id,purchase_id,title,amount_iqd,basis) VALUES (?,?,?,?,?)')
         .bind(newId('pch'), id, charge.title, charge.amount, charge.basis),
     );
+  if(status==='ordered')statements.push(...await planPurchaseFunding(db,id,b.funding,plannedLines,actor));
   return statements;
 }
 adminProcurementRoutes.post('/documents', async (c) => {
@@ -403,6 +421,7 @@ adminProcurementRoutes.post('/documents', async (c) => {
   await requireCapability(c.env, user, 'purchase');
   const b = await bodyOf(c),
     id = str(b.operation_id, 'operation_id', { min: 8, max: 40 });
+  if((b.funding as {mode?:string}|undefined)?.mode==='investor'&&!isOwner(c.env,user))throw forbidden('تمويل المستثمرين للأدمن الرئيسي فقط');
   const existing = await c.env.DB.prepare('SELECT request_json FROM purchase_orders WHERE id=?')
     .bind(id)
     .first<{ request_json: string }>();
@@ -421,6 +440,7 @@ adminProcurementRoutes.put('/documents/:id', async (c) => {
   const b = await bodyOf(c),
     id = c.req.param('id'),
     d = await document(c.env.DB, id);
+  if((b.funding as {mode?:string}|undefined)?.mode==='investor'&&!isOwner(c.env,user))throw forbidden('تمويل المستثمرين للأدمن الرئيسي فقط');
   if (d.purchase.version !== whole(b.version, 'version', 1))
     throw conflict('تغيرت الشحنة؛ افتح أحدث نسخة', 'VERSION_CHANGED');
   if (d.lines.some((l) => l.qty_received > 0) || !['draft', 'ordered'].includes(d.purchase.status))
@@ -464,6 +484,7 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
       'INSERT INTO purchase_receiving_events(id,purchase_id,request_json) VALUES (?,?,?)',
     ).bind(eventId, id, JSON.stringify(b)),
   ];
+  const funded=(await c.env.DB.prepare('SELECT * FROM purchase_investor_allocations WHERE purchase_id=?').bind(id).all<{incoming_id:string;contract_id:string;principal_iqd:number}>()).results??[];
   let total = 0,
     seq = 0,
     changed = 0;
@@ -489,15 +510,16 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
         [line.id, line.qty_received],
       ),
     );
-    // Split at the rounding boundary, so each FIFO lot has a real integer unit cost.
-    const base = Math.floor(line.charges_iqd / line.qty_ordered),
-      remainder = line.charges_iqd % line.qty_ordered;
-    const high = Math.max(0, Math.min(qty, remainder - line.qty_received));
-    let received = line.qty_received;
-    for (const segment of [
-      { qty: high, extra: 1 },
-      { qty: qty - high, extra: 0 },
-    ]) {
+    // Split at every integer remainder boundary. Purchase total and inbound
+    // freight retain their own components, and FIFO sees uniform-cost lots.
+    const purchaseTotal=line.purchase_total_iqd??line.purchase_unit_iqd*line.qty_ordered;
+    const purchaseBase=Math.floor(purchaseTotal/line.qty_ordered),purchaseRemainder=purchaseTotal%line.qty_ordered;
+    const shippingBase=Math.floor(line.charges_iqd/line.qty_ordered),shippingRemainder=line.charges_iqd%line.qty_ordered;
+    const capitalShares=funded.filter(a=>a.incoming_id===line.id);
+    const boundaries=[...new Set([line.qty_received,line.qty_received+qty,purchaseRemainder,shippingRemainder,...capitalShares.map(a=>a.principal_iqd%line.qty_ordered)].filter(n=>n>=line.qty_received&&n<=line.qty_received+qty))].sort((a,b)=>a-b);
+    let received=line.qty_received;
+    for(let segmentIndex=0;segmentIndex<boundaries.length-1;segmentIndex++){
+      const position=boundaries[segmentIndex],segment={qty:boundaries[segmentIndex+1]-position};
       if (!segment.qty) continue;
       const receipt = `${eventId}_${seq++}`,
         lot = newId('ilot');
@@ -511,6 +533,7 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
         receivedAt: `${day}T09:00:00.000Z`,
       });
       statements.push(...plan.statements);
+      for(const share of capitalShares)statements.push(c.env.DB.prepare('INSERT INTO purchase_investor_lot_capital(lot_id,contract_id,unit_principal_iqd,qty) VALUES (?,?,?,?)').bind(lot,share.contract_id,Math.floor(share.principal_iqd/line.qty_ordered)+Number(position<share.principal_iqd%line.qty_ordered),segment.qty));
       if (d.purchase.warehouse_id)
         statements.push(
           c.env.DB.prepare('INSERT INTO inventory_lot_locations(lot_id,location_id) VALUES (?,?)').bind(
@@ -523,7 +546,7 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
           'INSERT INTO purchase_receiving_notes(id,purchase_id,rejected_qty,note) VALUES (?,?,?,?)',
         ).bind(receipt, id, 0, text(r.note, 500)),
       );
-      total += segment.qty * (line.purchase_unit_iqd + base + segment.extra);
+      total += segment.qty * (purchaseBase+Number(position<purchaseRemainder)+shippingBase+Number(position<shippingRemainder));
       received += segment.qty;
     }
     if (rejected)
@@ -667,4 +690,10 @@ adminProcurementRoutes.post('/documents/:id/close', async (c) => {
   ]);
   await audit(c.env.DB, user.id, 'purchase.remainder_closed', id, { reason });
   return c.json({ success: true });
+});
+
+adminProcurementRoutes.post('/documents/:id/investor-receipts',async c=>{
+  const user=c.get('user')!;if(!isOwner(c.env,user))throw forbidden('تسجيل تمويل المستثمر للأدمن الرئيسي فقط');
+  await requireCapability(c.env,user,'accounting');
+  return c.json({success:true,...await receivePurchaseFunding(c.env.DB,c.req.param('id'),await bodyOf(c),user.id)});
 });

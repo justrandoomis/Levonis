@@ -106,6 +106,7 @@ export function splitExact(total: number, parts: number): number[] {
  */
 export interface LotCostInput {
   purchaseUnitIqd: number;
+  purchaseTotalIqd?:number|null;
   /** null = not entered yet. 0 = genuinely free. */
   shippingTotalIqd: number | null;
   internalDeliveryTotalIqd: number | null;
@@ -160,13 +161,13 @@ export function lotCostBreakdown(input: LotCostInput): LotCostBreakdown {
   // exact slice of each freight bill. The per-unit cost is derived from it, and
   // it is the per-unit figure that rounds, never the total: a lot of 7 whose
   // total is 3,000,001 has a unit cost of 428,571.57…, and FIFO consumes units.
-  const purchaseTotal = purchaseUnitIqd * qty;
+  const purchaseTotal = input.purchaseTotalIqd==null?purchaseUnitIqd*qty:slice(input.purchaseTotalIqd)!;
   const totalCostIqd = purchaseTotal + shippingShareIqd! + internalShareIqd!;
   return {
     // Rounded per unit for display and for allocation arithmetic; the exact
     // total is stored beside it so the lot always reconciles to what was paid.
     unitCostIqd: Math.round(totalCostIqd / qty),
-    purchaseUnitIqd,
+    purchaseUnitIqd: Math.round(purchaseTotal / qty),
     shippingShareIqd,
     internalShareIqd,
     totalCostIqd,
