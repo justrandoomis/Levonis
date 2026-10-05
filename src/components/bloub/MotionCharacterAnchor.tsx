@@ -56,6 +56,9 @@ export function MotionCharacterHome({ busy = false, kind = 'top-header', compact
  *
  * A page's own header takes precedence; there is never a second Home row once
  * that header mounts. No fixed top/left guesses or covering existing controls.
+ * On the main site's product route, RouteFallback already owns the product
+ * header while its chunk loads. That anchor removes this shell strip before
+ * paint, so the scroll container does not jump when the product mounts.
  *
  * IT MOUNTS EVEN WHILE A ROUTE IS STILL LOADING, and that is a deliberate
  * reversal. Suppressing it during the lazy-load window was meant to avoid a

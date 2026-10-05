@@ -496,7 +496,7 @@ test('the character carries the loading state instead of a second indicator', ()
   assert.doesNotMatch(app, />Loading\.\.\.</, 'no untranslated full-page loading screen');
   assert.match(read('src/components/bloub/character/expressions.ts'), /loading:/);
   // The route gate hands waiting to the character rather than painting its own.
-  assert.match(app, /const RouteFallback = \(\) => \{\s*useCharacterBusy\(true\);/);
+  assert.match(app, /const RouteFallback = \([^)]*\) => \{\s*useCharacterBusy\(true\);/);
 });
 
 test('the engine is actually what the app renders', () => {

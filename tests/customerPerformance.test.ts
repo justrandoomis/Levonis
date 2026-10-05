@@ -112,7 +112,7 @@ test('product preload matches the gallery candidates and sizes; private, animate
   assert.equal(preload.imageSizes, PRODUCT_GALLERY_SIZES);
   const html = injectDocumentPreloads('<head></head>', { scripts: [], styles: [], image, resolve: null, ...preload });
   assert.match(html, /imagesrcset="\/files\/products\/a.webp\?w=160 160w/);
-  assert.match(html, /imagesizes="\(min-width: 1540px\) 988px/);
+  assert.match(html, /imagesizes="\(min-width: 1540px\) 962px/);
   for (const source of ['/files/finance/secret.webp', '/files/products/a.gif', '/files/products/a.webp?token=secret', 'https://external.example/a.webp']) assert.deepEqual(productImagePreload(source), {});
 });
 
