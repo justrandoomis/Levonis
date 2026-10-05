@@ -201,6 +201,25 @@ test('durable financial posting failures suspend stale earnings and invalidate a
   assert.equal((await post(boss,'/a/withdrawals/pending-posting/pay',{operation_id:'reconciled-payment',reference:'cash receipt'})).status,200);
 });
 
+test('a COGS-independent wage can be paid through payroll, while other posting failures still block it', async () => {
+  const { raw, cost, self, boss } = setup(); cost();
+  raw.exec(`UPDATE finance_order_costs SET snapshot='{"rule":{"basis":"unit","amount":10000,"cap_iqd":null}}' WHERE id='cost';
+    INSERT INTO finance_posting_errors(event_key,order_id,message,last_attempt_at) VALUES ('cogs:o','o','FIFO pending','now');`);
+  assert.equal((await json(await get(self, '/e'))).summary.available_earnings_iqd, 10000);
+  const paid = await post(boss, '/f/staff/staff_sajjad/payments', { operation_id: 'fixed-without-cogs', amount_iqd: 3000, kind: 'payment' });
+  assert.equal(paid.status, 200, JSON.stringify(await json(paid)));
+  assert.equal((await json(await get(self, '/e'))).summary.available_earnings_iqd, 7000);
+  await request(self, 'wage-awaits-posting', 7000);
+  raw.exec("INSERT INTO finance_posting_errors(event_key,order_id,message,last_attempt_at) VALUES ('delivered:o','o','sale posting failed','now')");
+  assert.equal((await json(await get(self, '/e'))).summary.available_earnings_iqd, 0);
+  assert.equal((await post(boss, '/a/withdrawals/wage-awaits-posting/approve')).status, 409);
+  raw.exec("DELETE FROM finance_posting_errors WHERE event_key='delivered:o'");
+  assert.equal((await post(boss, '/a/withdrawals/wage-awaits-posting/approve')).status, 200);
+  assert.equal((await post(boss, '/a/withdrawals/wage-awaits-posting/pay', { operation_id: 'wage-settlement-no-cogs', reference: 'cash receipt' })).status, 200);
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='cogs:o'"), 1);
+  assert.equal((await json(await get(self, '/e'))).summary.paid_iqd, 10000);
+});
+
 test('percentage wage projection is unspendable immediately after a price mutation, before background reconciliation',async()=>{
   const {raw,cost,db,self,boss,failing}=setup();cost('percent-fresh',4000);
   raw.exec(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES ('line','o','p','Printer',1,50000,50000,10000,'snapshot');

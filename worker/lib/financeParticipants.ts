@@ -7,7 +7,7 @@ import { auditStatements } from './audit';
 import { notifyStatement } from './notifications';
 import { canViewFinancials, isOwner } from './adminScope';
 import type { Env, SessionUser } from './types';
-import { employmentInstalled, investorEmploymentPendingSql, staffDateEligible } from './financeEmployment';
+import { employmentInstalled, investorEmploymentPendingSql, nextEmploymentDay, staffDateEligible } from './financeEmployment';
 
 export type BalanceType = 'earnings' | 'capital' | 'all';
 export type EarningKind = 'staff' | 'investor_profit' | 'investor_capital';
@@ -25,7 +25,12 @@ export const effectiveStaffCostSql = (alias = 'c') => `(${alias}.amount_iqd+COAL
 export const staffPaidSql = (id = 'c.id') => `(SELECT COALESCE(SUM(pa.amount_iqd),0) FROM finance_payment_allocations pa WHERE pa.cost_id=${id})`;
 export const heldSourceSql = (kind: string, id: string) => `(SELECT COALESCE(SUM(wa.amount_iqd-wa.paid_iqd),0) FROM finance_withdrawal_allocations wa JOIN finance_withdrawals w ON w.id=wa.withdrawal_id WHERE wa.source_kind=${kind} AND wa.source_id=${id} AND w.state IN ('requested','approved','part_paid'))`;
 const paidSourceSql = (kind: string, id: string) => `(SELECT COALESCE(SUM(wp.paid_iqd),0) FROM finance_withdrawal_allocations wp WHERE wp.source_kind=${kind} AND wp.source_id=${id})`;
-export const staffReconciliationBlockedSql=(orderSql='c.order_id',costSql='c.id',includeLate=true)=>`(EXISTS(SELECT 1 FROM finance_order_costs ec JOIN finance_staff es ON es.id=ec.staff_id JOIN orders eo ON eo.id=ec.order_id WHERE ec.id=${costSql} AND COALESCE(ec.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments ca WHERE ca.cost_id=ec.id),0)>0 AND es.start_work_date IS NOT NULL AND (eo.status<>'delivered' OR COALESCE(date(eo.delivered_at,'+3 hours')>es.start_work_date,0)=0)) OR EXISTS(SELECT 1 FROM finance_staff_reconciliations j JOIN finance_order_costs ec ON ec.staff_id=j.staff_id WHERE ec.id=${costSql} AND j.state<>'complete') OR EXISTS(SELECT 1 FROM finance_posting_errors pe WHERE pe.order_id=${orderSql}) OR EXISTS(
+// A COGS warning concerns inventory valuation, not a fixed wage or a share of
+// sales. Keep that warning for the owner and investors, but do not freeze an
+// independently determined wage. Unknown/legacy bases remain conservative;
+// all other posting failures and percentage-basis freshness guards still apply.
+export const staffReconciliationBlockedSql=(orderSql='c.order_id',costSql='c.id',includeLate=true)=>`(EXISTS(SELECT 1 FROM finance_order_costs ec JOIN finance_staff es ON es.id=ec.staff_id JOIN orders eo ON eo.id=ec.order_id WHERE ec.id=${costSql} AND COALESCE(ec.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments ca WHERE ca.cost_id=ec.id),0)>0 AND es.start_work_date IS NOT NULL AND (eo.status<>'delivered' OR COALESCE(date(eo.delivered_at,'+3 hours')>es.start_work_date,0)=0)) OR EXISTS(SELECT 1 FROM finance_staff_reconciliations j JOIN finance_order_costs ec ON ec.staff_id=j.staff_id WHERE ec.id=${costSql} AND j.state<>'complete') OR EXISTS(SELECT 1 FROM finance_posting_errors pe WHERE pe.order_id=${orderSql}
+  AND (pe.event_key<>'cogs:'||${orderSql} OR NOT EXISTS(SELECT 1 FROM finance_order_costs wage WHERE wage.id=${costSql} AND json_extract(wage.snapshot,'$.rule.basis') IN ('unit','order','revenue_percent')))) OR EXISTS(
   SELECT 1 FROM finance_order_costs sc WHERE sc.id=${costSql} AND json_extract(sc.snapshot,'$.rule.basis') IN ('profit_percent','revenue_percent')
   AND NOT EXISTS(SELECT 1 FROM finance_cost_adjustments ca WHERE ca.cost_id=sc.id AND ca.kind='manual')
   AND NOT EXISTS(SELECT 1 FROM finance_staff_basis sb WHERE sb.order_id=${orderSql} AND sb.basis_fingerprint=(${staffBasisFingerprintSql(orderSql,includeLate)}))))`;
@@ -88,7 +93,21 @@ export async function participantOverview(db: D1Database, userId: string) {
   const advance=await participantAdvanceState(db,userId);
   const entries = await participantSources(db, userId);
   const withdrawals = await db.prepare('SELECT * FROM finance_withdrawals WHERE user_id=? ORDER BY created_at DESC LIMIT 200').bind(userId).all<WithdrawalRow>();
-  return { summary: participantSummary(entries,advance.balance), entries: entries.map(({ eligible: _e, version: _v, staff_id: _s, blocked, ...e }) => ({...e,state:blocked?'pending_reconciliation':e.state})), withdrawals: (withdrawals.results ?? []).map((w)=>({id:w.id,amount_iqd:w.amount_iqd,paid_iqd:w.paid_iqd,state:w.state,balance_type:w.balance_type,created_at:w.created_at,reference:w.reference,receipt_url:w.receipt_url,note:w.note})) };
+  // Own setup/progress is useful even before the first cost exists. Never
+  // expose rule snapshots, raw failures, account identifiers or other staff.
+  const employmentRows = (await db.prepare(`SELECT s.start_work_date,s.active,
+    s.archived_at IS NOT NULL AS archived,
+    EXISTS(SELECT 1 FROM finance_cost_rules r WHERE r.staff_id=s.id AND r.active=1) AS has_rules,
+    j.state AS reconciliation_state,COALESCE(j.processed_orders,0) AS processed_orders
+    FROM finance_staff s LEFT JOIN finance_staff_reconciliations j ON j.staff_id=s.id
+    WHERE s.user_id=? ORDER BY s.id`).bind(userId).all<{
+      start_work_date:string|null;active:number;archived:number;has_rules:number;
+      reconciliation_state:string|null;processed_orders:number;
+    }>()).results??[];
+  const employment=employmentRows.map((s)=>({...s,first_earning_day:s.start_work_date?nextEmploymentDay(s.start_work_date):null}));
+  const summary=participantSummary(entries,advance.balance);
+  summary.reconciliation_pending ||= employment.some((s)=>s.reconciliation_state!==null&&s.reconciliation_state!=='complete');
+  return { summary, employment, entries: entries.map(({ eligible: _e, version: _v, staff_id: _s, blocked, ...e }) => ({...e,state:blocked?'pending_reconciliation':e.state})), withdrawals: (withdrawals.results ?? []).map((w)=>({id:w.id,amount_iqd:w.amount_iqd,paid_iqd:w.paid_iqd,state:w.state,balance_type:w.balance_type,created_at:w.created_at,reference:w.reference,receipt_url:w.receipt_url,note:w.note})) };
 }
 async function sourceSetFence(db: D1Database, userId: string, sources: ParticipantSource[],advanceSnapshot:string) {
   const investorInstalled=await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_investor_earnings'").first();

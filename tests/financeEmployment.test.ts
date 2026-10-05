@@ -125,6 +125,59 @@ test('repeating retrospective accrual preserves one cost and one journal and nev
   assert.equal(row(raw, "SELECT rules_json FROM finance_order_snapshots WHERE order_id='historic'")?.rules_json, before);
 });
 
+for (const basis of ['unit', 'order', 'revenue_percent']) {
+  test(`retrospective ${basis} wages remain available when the delivered order only awaits inventory COGS`, async () => {
+    const { raw, env, self, order, staff, rule, drain, costs } = setup();
+    await order('legacy-without-fifo', '2026-09-22T10:00:00.000Z');
+    raw.exec("DELETE FROM order_item_inventory_allocations WHERE order_id='legacy-without-fifo'");
+    await runOrderFinancialEffects(env, 'legacy-without-fifo', 'delivered');
+    assert.equal(count(raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='cogs:legacy-without-fifo'"), 1);
+    const id = await staff();
+    await rule(id, { basis, amount: basis === 'revenue_percent' ? 1000 : 5000 });
+    await drain(id);
+    assert.equal(costs(id)[0].effective_iqd, 5000);
+    const earnings = await json(await get(self, '/earnings'));
+    assert.equal(earnings.summary.available_earnings_iqd, 5000);
+    assert.equal(earnings.summary.reconciliation_pending, false);
+    assert.equal((await post(self, '/earnings/withdrawals', { operation_id: `legacy-wage-${basis}`, amount_iqd: 5000 })).status, 200);
+    // The inventory warning must stay visible to the owner until COGS is fixed.
+    assert.equal(count(raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='cogs:legacy-without-fifo'"), 1);
+  });
+}
+
+test('retrospective profit-percentage wages still wait for verified inventory cost', async () => {
+  const { raw, env, self, order, staff, rule, drain, costs } = setup();
+  await order('profit-without-fifo', '2026-09-22T10:00:00.000Z');
+  raw.exec("DELETE FROM order_item_inventory_allocations WHERE order_id='profit-without-fifo'");
+  await runOrderFinancialEffects(env, 'profit-without-fifo', 'delivered');
+  const id = await staff(); await rule(id, { basis: 'profit_percent', amount: 1000 }); await drain(id);
+  assert.equal(costs(id)[0].state, 'pending_cost');
+  const earnings = await json(await get(self, '/earnings'));
+  assert.equal(earnings.summary.available_earnings_iqd, 0);
+  assert.equal(earnings.summary.pending_costs, 1);
+  assert.equal((await post(self, '/earnings/withdrawals', { operation_id: 'unverified-profit-withdrawal', amount_iqd: 1 })).status, 400);
+});
+
+test('own earnings explains work-start progress before any costs exist without exposing other accounts or rule snapshots', async () => {
+  const { self, order, staff, rule, drain } = setup();
+  await order('before-employment', '2026-09-22T10:00:00.000Z');
+  const id = await staff({ start_work_date: '2027-01-01' }); await rule(id);
+  await staff({ user_id: 'another', start_work_date: '2026-09-01' });
+  let earnings = await json(await get(self, '/earnings?user_id=another'));
+  assert.equal(earnings.entries.length, 0);
+  assert.equal(earnings.summary.reconciliation_pending, true);
+  assert.deepEqual(earnings.employment, [{
+    start_work_date: '2027-01-01', first_earning_day: '2027-01-02', active: 1, archived: 0,
+    has_rules: 1, reconciliation_state: 'pending', processed_orders: 0,
+  }]);
+  await drain(id);
+  earnings = await json(await get(self, '/earnings'));
+  assert.equal(earnings.summary.reconciliation_pending, false);
+  assert.equal(earnings.employment[0].reconciliation_state, 'complete');
+  assert.equal(earnings.employment[0].processed_orders, 0);
+  assert.equal(earnings.summary.available_earnings_iqd, 0);
+});
+
 test('changing the start date after payout adjusts the current period and preserves original earnings and payment history', async () => {
   const { raw, boss, self, order, staff, rule, drain, costs } = setup();
   await order('paid-historic', '2026-09-21T10:00:00.000Z');

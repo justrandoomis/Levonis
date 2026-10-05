@@ -197,3 +197,26 @@ job-title edits do not start another financial recalculation.
 The employee earnings page keeps balances, withdrawals and investment capital;
 the order-by-order earnings section is no longer shown there. Finance retains
 the order-level audit and cost detail.
+
+### Cost warnings and employee availability (2026-10-05)
+
+A completed employment calculation can create valid wages on older delivered
+orders whose inventory COGS is still unverified. A `cogs:<order>` posting warning
+must not withhold fixed per-unit/per-order pay or a reconciled share of sales:
+those rules do not use inventory cost. Profit-percentage pay and unknown legacy
+rule bases remain blocked. Other posting failures, stale percentage bases,
+employment cutoff jobs, holds and advances retain their existing payout guards.
+The same eligibility predicate governs balances, withdrawal reservations,
+approval, settlement and the older payroll screen. Inventory warnings and
+investor safeguards remain intact; no cost estimate is substituted for FIFO.
+
+The participant response now includes only the signed-in employee's start date,
+first eligible Baghdad delivery day and calculation progress, even before the
+first wage exists. The employee screen refreshes while that calculation runs
+and when returning to the tab. A completed calculation with no deliveries after
+the cutoff is explained to both employee and administrator, without changing
+the configured date or exposing other accounts or raw diagnostic errors.
+
+Regression coverage reproduces the original zero available balance for fixed
+and revenue-share wages, verifies withdrawal/payroll settlement, and keeps
+unverified profit shares and unrelated posting failures protected.
