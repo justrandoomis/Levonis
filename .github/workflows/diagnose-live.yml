@@ -21,7 +21,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - name: Prepare read-only queries from the deployed eligibility predicate
+      - name: Prepare read-only queries from the candidate eligibility predicate
         run: |
           node --import tsx --input-type=module <<'JS'
           import { writeFileSync } from 'node:fs';
@@ -41,4 +41,10 @@ jobs:
           JS
       - name: Verify live accrual without displaying names or amounts (SELECT only)
         run: |
-          npx wrangler d1 execute levonis-db-staging --remote --json --file /tmp/staff-verification.sql | jq '[.[].results]'
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          import { spawnSync } from 'node:child_process';
+          const result = spawnSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'd1', 'execute', 'levonis-db-staging', '--remote', '--json', '--command', readFileSync('/tmp/staff-verification.sql', 'utf8')], { encoding: 'utf8' });
+          if (result.status !== 0) { console.error(result.stderr || result.stdout); process.exit(result.status || 1); }
+          console.log(JSON.stringify(JSON.parse(result.stdout).map((query) => query.results), null, 2));
+          JS
