@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowDownToLine, RefreshCw, Wallet } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
 import { api, Button, dateLabel, Dialog, EARNINGS, Empty, Feedback, Field, Loading, Money, StateBadge, Surface, useLanguage, useMutation, useRemote, type Withdrawal } from './shared';
@@ -7,6 +7,7 @@ type Entry = { id: string; kind: 'staff' | 'investor_profit' | 'investor_capital
 export type EarningsData = {
   summary: { earned_iqd: number; available_iqd: number; held_iqd: number; paid_iqd: number; pending_iqd: number; staff_iqd: number; investor_profit_iqd: number; capital_iqd: number; earnings_paid_iqd?: number; earnings_held_iqd?: number; earnings_available_iqd?: number; capital_available_iqd?: number; pending_costs?: number; debt_iqd?: number; advance_balance_iqd?: number; reconciliation_pending?: boolean };
   entries: Entry[]; withdrawals: Withdrawal[];
+  employment?: { start_work_date: string | null; first_earning_day: string | null; active: number; archived: number; has_rules: number; reconciliation_state: string | null; processed_orders: number }[];
 };
 
 export default function MyEarnings() {
@@ -15,6 +16,17 @@ export default function MyEarnings() {
   const [open, setOpen] = useState(false), [amount, setAmount] = useState<number | null>(null), [balanceType, setBalanceType] = useState<'earnings' | 'capital'>('earnings');
   const operationId = useRef('');
   const data = remote.data, s = data?.summary;
+  const calculating = data?.employment?.some((e) => ['pending', 'running'].includes(e.reconciliation_state ?? '')) ?? false;
+  // Keep an open employee screen current while historical orders are being
+  // calculated, and refresh on return from another tab. Retain existing data.
+  useEffect(() => {
+    if (remote.loading || remote.error) return;
+    const refresh = () => { if (document.visibilityState === 'visible') void remote.load(); };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    const timer = calculating && document.visibilityState === 'visible' ? window.setTimeout(refresh, 15000) : undefined;
+    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); window.clearTimeout(timer); };
+  }, [calculating, remote.loading, remote.error, remote.load]);
   const balance = (type: 'earnings' | 'capital') => type === 'capital' ? s?.capital_available_iqd ?? 0 : s?.earnings_available_iqd ?? s?.available_iqd ?? 0;
   const startWithdrawal = (type: 'earnings' | 'capital' = 'earnings') => { setBalanceType(type); operationId.current = crypto.randomUUID(); setAmount(balance(type)); op.clear(); setOpen(true); };
   const request = () => op.run(async () => {
@@ -33,7 +45,15 @@ export default function MyEarnings() {
         <div className="fp-stat"><span>{loc('محجوز للسحب', 'Reserved')}</span><Money value={s.earnings_held_iqd ?? s.held_iqd} /></div>
         <div className="fp-stat"><span>{loc('تم تسديده', 'Paid')}</span><Money value={s.earnings_paid_iqd ?? s.paid_iqd} /></div>
       </div>
-      {!!s.reconciliation_pending && <p className="fp-note">{loc('توجد تسوية مالية قيد المراجعة؛ تتاح الأرباح بعد إكمالها.', 'A financial reconciliation is under review. Earnings become available when it is complete.')}</p>}
+      {data.employment?.filter((e) => !e.archived && (e.first_earning_day || !e.active || !e.has_rules || (e.reconciliation_state && e.reconciliation_state !== 'complete'))).map((employment, index) => <div className="fp-note" key={index} role="status">
+        {employment.first_earning_day && <p>{loc('تُحتسب أجورك على الطلبات المسلّمة من ', 'Delivery earnings start on ')}<strong>{dateLabel(employment.first_earning_day, lang)}</strong>{loc(' بتوقيت بغداد، ضمن الأقسام والمنتجات المحددة لك.', ' in Baghdad time, for your assigned categories and products.')}</p>}
+        {!employment.active ? <p>{loc('احتساب الأجور الجديدة متوقف حاليًا. مستحقاتك السابقة محفوظة.', 'New work earnings are paused. Your past earnings are preserved.')}</p>
+          : !employment.has_rules ? <p>{loc('لم تُحدّد قاعدة أجرك بعد. تحتاج الإدارة إلى تحديد الأجر والأقسام المشمولة.', 'Your pay rule has not been set up yet. The administrator needs to choose your pay and eligible products.')}</p>
+          : ['pending', 'running'].includes(employment.reconciliation_state ?? '') ? <p>{loc(`جارٍ حساب مستحقاتك السابقة؛ تمت مراجعة ${employment.processed_orders} طلب. تتحدث الأرباح تلقائيًا عند الاكتمال.`, `Calculating past earnings; ${employment.processed_orders} orders reviewed. Your balance refreshes automatically when complete.`)}</p>
+          : employment.reconciliation_state === 'failed' ? <p>{loc('تحتاج إعادة حساب المستحقات إلى متابعة من الإدارة. تاريخ بدايتك محفوظ.', 'The administrator needs to resume your earnings calculation. Your start date is saved.')}</p>
+          : employment.first_earning_day && employment.reconciliation_state === 'complete' && employment.processed_orders === 0 && !s.staff_iqd ? <p>{loc('لم يجد آخر احتساب طلبات مسلّمة بعد تاريخ بدء عملك. يظهر الأجر عند تسليم طلب مشمول.', 'The last calculation found no deliveries after your work start date. Earnings appear when an eligible order is delivered.')}</p> : null}
+      </div>)}
+      {!!s.reconciliation_pending && !calculating && <p className="fp-note">{loc('بعض المستحقات تنتظر إكمال تسويتها المالية؛ الرصيد المتاح أعلاه قابل لطلب السحب.', 'Some earnings await reconciliation. The available balance above can be requested for withdrawal.')}</p>}
       {!!s.advance_balance_iqd && <p className="fp-note">{loc('حُسمت السلف غير المسواة من المبلغ المتاح: ', 'Unsettled advances deducted from available earnings: ')}<Money value={s.advance_balance_iqd} /></p>}
       {!!s.pending_costs && <p className="fp-note">{loc(`يوجد ${s.pending_costs} استحقاق بانتظار تثبيت التكلفة؛ لم يدخل في المجموع بعد.`, `${s.pending_costs} earnings await final costs and are not included in the total yet.`)}</p>}
       {!!s.debt_iqd && <p className="fp-note">{loc('رصيد تسوية يُخصم من المستحقات المتاحة: ', 'A carried settlement is deducted from available earnings: ')}<Money value={s.debt_iqd} /></p>}

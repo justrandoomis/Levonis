@@ -62,7 +62,9 @@ export default function PeoplePanel({ onChanged }: PanelProps = {}) {
   };
   const jobNotice = (person: Staff) => {
     const job = [jobs[person.id], config?.reconciliations?.find((item) => item.staff_id === person.id)].filter((item): item is Reconciliation => !!item).sort((a, b) => b.revision - a.revision || Date.parse(b.updated_at) - Date.parse(a.updated_at) || Number(b.state === 'complete') - Number(a.state === 'complete'))[0];
-    if (!job || job.state === 'complete') return null;
+    if (!job) return null;
+    if (job.state === 'complete') return person.active && person.start_work_date && job.processed_orders === 0 && config?.rules.some((r) => r.staff_id === person.id && r.active)
+      ? <p className="fp-note">{loc('اكتمل الحساب ولم يجد طلبات مسلّمة بعد تاريخ البداية. راجع التاريخ إن كنت تقصد احتساب طلبات أقدم.', 'Calculation complete: no deliveries were found after the start date. Check the date if earlier orders should qualify.')}</p> : null;
     return <div className="fp-note"><p role="status">{job.state === 'failed' ? loc('حُفظ التعديل ويحتاج حساب المستحقات إلى متابعة.', 'Saved. The earnings calculation needs to be resumed.') : loc(`احتساب المستحقات السابقة · تمت مراجعة ${job.processed_orders} طلب`, `Calculating past earnings · ${job.processed_orders} orders reviewed`)}</p>{!op.busy && <Button size="sm" className="mt-2" onClick={() => resume(job)}>{loc('متابعة الحساب', 'Continue calculation')}</Button>}</div>;
   };
   return <div className="ap fp fp-stack" dir={dir}>
