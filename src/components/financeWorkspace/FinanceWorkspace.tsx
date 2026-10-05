@@ -174,7 +174,7 @@ function OrderRow({ order, onClick }: { order: FinanceOrder; onClick: () => void
     <div className="fw-order-identity"><span className="fw-order-icon"><Layers3 size={18} strokeWidth={1.6} /></span><div><h3>{order.customer_name || `${loc('طلب', 'Order')} ${order.order_id || order.id}`}</h3>
       <p>{(order.order_id || order.id).slice(-12)} · {financeDay(order.delivered_at || order.created_at)}</p>
       <Status tone={incomplete ? 'warning' : order.status === 'delivered' ? 'positive' : 'neutral'}>{incomplete ? loc('يحتاج مراجعة', 'Needs review') : statusName(order.status, loc)}</Status>
-    </div></div><div className="fw-order-values"><Money value={order.owner_net_iqd} /><small>{loc('صافي المالك', 'Owner net')}</small><ChevronLeft size={15} className="fw-muted" aria-hidden /></div>
+    </div></div><div className="fw-order-values"><Money value={order.owner_net_iqd} /><small>{order.status === 'delivered' ? loc('صافي المالك', 'Owner net') : order.status === 'cancelled' ? loc('ملغى · غير مستحق', 'Cancelled · not earned') : loc('تقديري · غير مستحق', 'Projected · not earned')}</small><ChevronLeft size={15} className="fw-muted" aria-hidden /></div>
   </button>;
 }
 
