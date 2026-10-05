@@ -145,7 +145,9 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
   if(investorProfit>cap&&out.length){const shares=signedShares(cap,out.map(a=>a.profit_iqd));out.forEach((a,i)=>{a.profit_iqd=shares[i];a.snapshot=JSON.stringify({...JSON.parse(a.snapshot),profit_share_iqd:shares[i]});});investorProfit=cap;}
   return { allocations: out, investor_profit_iqd: delivered ? investorProfit : 0, investor_loss_iqd: delivered ? investorLoss : 0,
     investor_net_iqd: delivered ? investorProfit - investorLoss : 0,
-    owner_profit_iqd: pending ? null : totalBasis - (delivered ? investorProfit - investorLoss : 0), pending, source_fingerprint: sourceFingerprint };
+    // A partial sum of known lines is not the owner's net profit. Keep this
+    // uncertainty separate from the eligibility of a verified investor lot.
+    owner_profit_iqd: pending || base.lines.some(line => line.profit_basis_iqd === null) ? null : totalBasis - (delivered ? investorProfit - investorLoss : 0), pending, source_fingerprint: sourceFingerprint };
 }
 
 export function planInvestorSources(db: D1Database, contract: InvestmentContract, day: string) {
