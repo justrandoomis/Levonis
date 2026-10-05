@@ -103,7 +103,7 @@ const BundleDetail = React.lazy(() => import('./pages/BundleDetail'));
  * looks exactly like a session resolving and the page never flashes a second
  * kind of "loading".
  */
-const RouteFallback = () => {
+const RouteFallback = ({ productHeader = false }: { productHeader?: boolean }) => {
   useCharacterBusy(true);
   /**
    * AND IT TAKES THE SCREEN, not just the routed rectangle — on the waits that
@@ -127,6 +127,18 @@ const RouteFallback = () => {
   useBusy(true, 'route');
   return (
     <div className="min-h-dvh bg-black" aria-busy="true" aria-live="polite">
+      {/* Product owns its header even while its route chunk is pending. The
+          shell's fallback yields to this anchor before paint, keeping main at
+          the same top position when Product's loading/ready header takes over.
+          Scope this to the resolved main-site product boundary: host lookup,
+          merchant storefronts and other route fallbacks keep their own chrome. */}
+      {productHeader && (
+        <div className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 pb-1.5 flex items-center">
+          <span aria-hidden="true" />
+          <MotionCharacterHome busy />
+          <span aria-hidden="true" />
+        </div>
+      )}
       <span className="sr-only">…</span>
     </div>
   );
@@ -480,7 +492,7 @@ function EmailVerifyBanner() {
  * unaffected, because nothing below the mascot depends on it.
  */
 const AppIntro = React.lazy(() => import('./components/bloub/AppIntro'));
-import { MotionCharacterFallbackHeader, useCharacterBusy } from './components/bloub/MotionCharacterAnchor';
+import { MotionCharacterFallbackHeader, MotionCharacterHome, useCharacterBusy } from './components/bloub/MotionCharacterAnchor';
 import { homeCriticalReadyStore } from './lib/appBootstrap';
 import { preloadMotionFeatures } from './lib/motionFeatures';
 import { useBusy } from './lib/busy';
@@ -873,7 +885,7 @@ function AppContent() {
         <CompleteProfileSheet />
         <ThemeIntroSheet />
         <ChunkBoundary>
-        <Suspense fallback={<RouteFallback />}>
+        <Suspense fallback={<RouteFallback productHeader={/^\/product\/[^/]+\/?$/.test(pathForShell)} />}>
         <SocialProvider>
         <Routes>
           <Route path="/" element={<Home />} />

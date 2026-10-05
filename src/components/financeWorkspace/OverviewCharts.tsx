@@ -5,11 +5,11 @@ import type { FinanceSummary } from './types';
 
 const colors = { revenue: '#6d96d7', cost: '#c59957', net: '#9980ce', negative: '#ce7775' };
 const short = (value: number) => Math.abs(value) >= 1e6 ? `${+(value / 1e6).toFixed(1)}m` : Math.abs(value) >= 1000 ? `${+(value / 1000).toFixed(1)}k` : String(value);
-const tooltipStyle = { background: 'var(--fw-surface)', border: '1px solid var(--fw-line)', borderRadius: 12, color: 'var(--fw-text)', fontSize: 12, direction: 'rtl' as const };
+const tooltipStyle = { background: 'var(--fw-surface)', border: '1px solid var(--fw-line)', borderRadius: 12, color: 'var(--fw-text)', fontSize: 12 };
 
 /** This module (including Recharts) is loaded only when the finance overview opens. */
 export default function OverviewCharts({ data }: { data: FinanceSummary }) {
-  const { loc } = useLanguage();
+  const { loc, dir } = useLanguage();
   const charts = data.chart_data;
   if (!charts) return <Surface><Empty title={loc('بيانات الرسم غير متاحة', 'Chart data unavailable')} text={loc('يمكن مراجعة الأرقام وتفاصيل الطلبات أدناه.', 'You can review figures and order details below.')} /></Surface>;
   const labels = { revenue_iqd: loc('الإيراد', 'Revenue'), cost_iqd: loc('التكاليف', 'Costs'), owner_net_iqd: loc('صافي حصتك', 'Your net share') };
@@ -21,7 +21,7 @@ export default function OverviewCharts({ data }: { data: FinanceSummary }) {
   const ranked = [...categories].filter((row) => row.owner_net_iqd != null).sort((a, b) => Math.abs(b.owner_net_iqd!) - Math.abs(a.owner_net_iqd!)).slice(0, 8);
   const active = charts.daily.some((row) => row.orders_count > 0 || row.cost_iqd !== null && row.cost_iqd !== 0);
   const axis = { tick: { fill: 'var(--fw-muted)', fontSize: 10 }, axisLine: false, tickLine: false };
-  const tooltip = <Tooltip contentStyle={tooltipStyle} formatter={(value) => formatMoney(value == null ? null : Number(value))} cursor={{ stroke: 'var(--fw-line)' }} />;
+  const tooltip = <Tooltip contentStyle={{ ...tooltipStyle, direction: dir }} formatter={(value) => formatMoney(value == null ? null : Number(value))} cursor={{ stroke: 'var(--fw-line)' }} />;
   return <>
     <Surface title={loc('الإيراد والتكاليف والصافي', 'Revenue, costs & net')} subtitle={loc('القيم بالدينار؛ حسب يوم استلام الطلب بتوقيت بغداد.', 'Values in IQD, by delivered date in Baghdad time.')}>
       <div className="fw-chart-legend">{Object.entries(labels).map(([key, label], index) => <span key={key}><i style={{ background: [colors.revenue, colors.cost, colors.net][index] }} />{label}</span>)}</div>

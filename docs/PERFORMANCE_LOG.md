@@ -1519,3 +1519,40 @@ conventions. The generated-header/Worker parity and real document tests
 cover both delivery paths. Post-deployment measurement must establish
 request reuse; these estimates are not a promise of a score improvement.
 No layout fix is claimed: the remaining A1 CLS needs separate evidence.
+
+## 2026-10-05 — product image sizing and loading handoff
+
+The live A1 page at revision `be1039c` was measured again at 23:29 Baghdad
+with [PageSpeed Insights mobile](https://pagespeed.web.dev/analysis/https-levonis-iq-com-product-bambu-lab-a1/aalcynl7du?form_factor=mobile):
+performance **81**, FCP **3.2 s**, LCP **3.9 s**, TBT **0 ms**, CLS **0**,
+speed index **3.7 s**. This is one initial-load lab run (emulated Moto G Power,
+Slow 4G, Lighthouse 13.5.0), not an Iraqi-location test or a real-device check.
+The [home report](https://pagespeed.web.dev/analysis/https-levonis-iq-com/1v5slaucnx?form_factor=mobile)
+from 23:27 Baghdad measured **81**, FCP **2.7 s**, LCP **3.8 s**, TBT **0 ms**,
+CLS **.002** and speed index **5.1 s** with the same mobile profile.
+The report's origin field figures cover the prior 28 days: LCP 4.1 s,
+INP 121 ms and CLS .11; they do not isolate this revision.
+
+The image audit identified the opening A1 image at `?w=1080`, 72.3 KiB,
+displayed at 517×517 device pixels, with estimated image savings of 55.7 KiB.
+The shared gallery `sizes` declaration included the frame's 1px border and
+the image's 12px padding on each side. Removing those 26px describes the
+actual image content width: at 412 CSS pixels and DPR 1.75, the declared
+requirement falls from 665 to 619.5 device pixels, so the existing 640w
+candidate is sufficient. Client and document preload use the same declaration.
+Wide photos retain their full content-width allocation, and zoom still uses
+the original. No extra transformation widths or quality reduction were added.
+
+The product route's lazy fallback now owns a header anchor inside the route,
+matching the loading and ready product header. The shell fallback yields
+before paint instead of later removing a 60px row above the main scroll area.
+This addresses the timing-dependent shift described in earlier measurements;
+the current baseline already measured CLS 0, so it does not establish a new
+CLS improvement. Host resolution and non-product fallbacks remain unchanged.
+
+Related private-workspace fixes keep financial numbers visible on narrow
+cards, wrap purchase-line actions, leave checkboxes at their native size,
+and follow the active language direction in chart tooltips. Those styles
+remain lazy and subject to the existing 7 KiB combined operations budget.
+Source and automated checks do not substitute for real-phone visual QA.
+Post-deployment lab results must establish any speed change.

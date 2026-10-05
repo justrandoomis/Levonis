@@ -23,6 +23,8 @@ The preview distinguishes all reviewed orders from orders/units in the changed s
 
 Apply requires a reason, operation ID and current preview token. It atomically saves the wage version, impact audit, pending targets and resumable reconciliation job. Unpaid reservations affected directly or through investor profit need explicit release; paid portions remain. Pending wage corrections reserve the necessary overpayment while independent wages remain withdrawable. Jobs resume through the existing reconciliation route/runner and post each difference once.
 
+Employment-date recalculation is separate from saving the date. The previous browser loop stopped after five seconds, while a reconciliation HTTP request could attempt ten orders within the client's twenty-second timeout. A request could commit several orders before disconnecting, leaving the screen displaying an old partial balance until a refresh or the fifteen-minute scheduled runner. Keep HTTP pages bounded to one order, read durable job status after uncertain responses, and continue serially while the employee screen remains open. Refresh balances during progress and at completion; a failed job must remain visible for explicit retry. Neither a reconnect nor a revision change may replay an already-posted monetary difference.
+
 Adjustments use the open posting day and separately preserve historical earning day. Manual per-order overrides remain visible and are preserved. Correcting them remains a separate order-finance action.
 
 ## Funded procurement

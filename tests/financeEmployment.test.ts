@@ -256,14 +256,62 @@ test('retrospective reconciliation progresses in bounded requests and replaying 
   const first = await json(response);
   assert.equal(response.status, 200, JSON.stringify(first));
   assert.equal(first.reconciliation.state, 'pending');
-  assert.ok(first.reconciliation.processed_orders > 0 && first.reconciliation.processed_orders <= 25);
-  assert.ok(costs(id).length <= 25);
+  assert.equal(first.reconciliation.processed_orders, 1);
+  assert.equal(costs(id).length, 1);
   await drain(id);
   assert.equal(costs(id).length, 27);
   assert.equal(costs(id).reduce((sum, c) => sum + c.effective_iqd, 0), 135000);
   const entries = count(raw, 'SELECT COUNT(*) n FROM accounting_entries');
   await drain(id);
   assert.equal(costs(id).length, 27);
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM accounting_entries'), entries);
+});
+
+test('owner can read committed reconciliation progress after a lost response, resume one order and replay without another accrual', async () => {
+  const { raw, boss, self, app, order, staff, rule, costs } = setup();
+  await order('progress-a', '2026-09-22T10:00:00.000Z');
+  await order('progress-b', '2026-09-23T10:00:00.000Z');
+  const id = await staff(); await rule(id);
+  const endpoint = `/people/staff/${id}/reconcile`;
+  const financialAdmin = app('financial-admin', 'full');
+  assert.equal((await json(await get(boss, '/people/staff'))).can_manage_staff, true);
+  assert.equal((await json(await get(financialAdmin, '/people/staff'))).can_manage_staff, false);
+  assert.equal((await get(self, endpoint)).status, 403);
+  assert.equal((await get(financialAdmin, endpoint)).status, 403);
+  assert.equal((await get(boss, '/people/staff/missing/reconcile')).status, 404);
+  assert.equal((await get(boss, '/people/staff/staff_sajjad/reconcile')).status, 404);
+  const initial = await json(await get(boss, endpoint));
+  assert.equal(initial.reconciliation.processed_orders, 0);
+  const revision = initial.reconciliation.revision;
+  // The browser may lose this successful response. Its next GET must read
+  // committed progress without starting another page or posting more money.
+  assert.equal((await post(boss, endpoint, { revision, maxOrders: 1000 })).status, 200);
+  const before = {
+    job: row(raw, 'SELECT * FROM finance_staff_reconciliations WHERE staff_id=?', id),
+    entries: count(raw, 'SELECT COUNT(*) n FROM accounting_entries'),
+    clock: count(raw, 'SELECT version n FROM finance_mutation_clock'),
+  };
+  const progress = await json(await get(boss, endpoint));
+  assert.equal(progress.reconciliation.state, 'pending');
+  assert.equal(progress.reconciliation.processed_orders, 1);
+  assert.equal(progress.reconciliation.cursor, 'progress-a');
+  assert.equal('rules_json' in progress.reconciliation, false);
+  assert.equal('actor_id' in progress.reconciliation, false);
+  assert.equal(costs(id).length, 1);
+  assert.deepEqual({
+    job: row(raw, 'SELECT * FROM finance_staff_reconciliations WHERE staff_id=?', id),
+    entries: count(raw, 'SELECT COUNT(*) n FROM accounting_entries'),
+    clock: count(raw, 'SELECT version n FROM finance_mutation_clock'),
+  }, before);
+  assert.equal((await post(boss, endpoint, { revision: revision + 1 })).status, 409);
+  assert.equal(costs(id).length, 1);
+  const resumed = await json(await post(boss, endpoint, { revision }));
+  assert.equal(resumed.reconciliation.state, 'complete');
+  assert.equal(resumed.reconciliation.processed_orders, 2);
+  assert.equal(costs(id).reduce((sum, cost) => sum + cost.effective_iqd, 0), 10000);
+  const entries = count(raw, 'SELECT COUNT(*) n FROM accounting_entries');
+  assert.equal((await post(boss, endpoint, { revision })).status, 200);
+  assert.equal(costs(id).length, 2);
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM accounting_entries'), entries);
 });
 

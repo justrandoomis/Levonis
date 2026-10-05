@@ -459,7 +459,7 @@ test('the route wait takes the screen too — the third reason is reachable', ()
   assert.match(app, /useBusy\(true, 'route'\);/);
   assert.match(app, /^import \{ useBusy \} from '\.\/lib\/busy';$/m);
   // And it is held by the ONE fallback every lazy route shares, not sprinkled.
-  const fallback = /const RouteFallback = \(\) => \{[\s\S]*?\n\};/.exec(app);
+  const fallback = /const RouteFallback = \([^)]*\) => \{[\s\S]*?\n\};/.exec(app);
   assert.ok(fallback, 'RouteFallback should be findable');
   assert.match(fallback[0], /useBusy\(true, 'route'\);/);
   assert.equal((app.match(/useBusy\(/g) ?? []).length, 1, 'exactly one route holder in App');
