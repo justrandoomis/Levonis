@@ -4,7 +4,7 @@ import { badRequest, conflict, notFound, str } from './http';
 import { baghdadDay, dateValue, fence, periodOpen, whole } from './operations';
 import { nextEmploymentDay, queueStaffReconciliation, readStaff } from './financeEmployment';
 import { effectiveWageRules, wageBoundaries, wageVersionStatement, wageVersions, type EffectiveWageRule, type WageVersion } from './financeWageTimeline';
-import { planStaffWages } from './financeWageCalculation';
+import { planStaffWages, type WageTarget } from './financeWageCalculation';
 import { getOrderProfitBase, getOrderProfitBases } from './orderProfit';
 import { participantAdvanceState, participantSources, participantSummary, type ParticipantSource } from './financeParticipants';
 import { investorOrderSplit } from './investorFinance';
@@ -39,9 +39,28 @@ async function changeContext(db:D1Database,ruleId:string,input:WageChangeInput,a
   return {old,staff,rule,versions,added,from,until,reason,now};
 }
 
-type PreviewDetail={order_id:string;earning_day:string;units:number;previous_iqd:number;corrected_iqd:number|null;delta_iqd:number;manual_overrides:number;pending_costs:number;investor_delta_iqd:number|null;owner_delta_iqd:number|null};
-type PreviewWork={projected:ParticipantSource[];detail:PreviewDetail[];affectedCostIds:string[];affectedInvestorIds:string[];pendingTargets:Record<string,number|null>;previous:number;corrected:number;delta:number;units:number;unknown:number;manual:number;investorDelta:number;ownerDelta:number;profitUnknown:number;matched:number};
+// Completed and interrupted previews from an older calculation must be
+// reviewed again after a deploy, even when their source rows did not change.
+const PREVIEW_CALCULATION_VERSION=2;
+type PreviewDetail={order_id:string;earning_day:string;affected:boolean;units:number;previous_iqd:number;corrected_iqd:number|null;delta_iqd:number;manual_overrides:number;pending_costs:number;investor_delta_iqd:number|null;owner_delta_iqd:number|null};
+type PreviewWork={calculation_version:number;projected:ParticipantSource[];detail:PreviewDetail[];affectedCostIds:string[];affectedInvestorIds:string[];pendingTargets:Record<string,number|null>;previous:number;corrected:number;knownCorrected:number;delta:number;units:number;unknown:number;manual:number;investorDelta:number;ownerDelta:number;profitUnknown:number;investorUnknown:number;matched:number;reviewed:number};
 type PreviewPage={cursor:string;work?:PreviewWork};
+/** Include the old scope when it is removed, and competing rules displaced by
+ * the edit. Unrelated rules reviewed by the same reconciliation are not units
+ * affected by this wage change. Manual overrides remain visible for review. */
+function affectedWageLines(ruleId:string,before:WageTarget[],after:WageTarget[]){
+  const key=(t:WageTarget)=>JSON.stringify([t.rule.id,t.line_id]);
+  const signature=(t:WageTarget)=>JSON.stringify([t.amount,t.manual,[...t.line_ids].sort()]);
+  const beforeByKey=new Map(before.map(t=>[key(t),t]));
+  const afterByKey=new Map(after.map(t=>[key(t),t]));
+  const lines=new Set<string>();let affected=false;
+  for(const [targets,other] of [[before,afterByKey],[after,beforeByKey]] as const)for(const t of targets){
+    const counterpart=other.get(key(t));
+    const selected=t.rule.id===ruleId&&(t.qty>0||t.manual||t.amount===null||t.amount!==0||!!t.cost?.effective_iqd);
+    if(selected||(!counterpart||signature(t)!==signature(counterpart))){affected=true;for(const id of t.line_ids)lines.add(id);}
+  }
+  return {affected,lines};
+}
 export async function previewWageChange(db:D1Database,ruleId:string,input:WageChangeInput,actor:string,page?:PreviewPage){
   const beforeClock=await clock(db),context=await changeContext(db,ruleId,input,actor);
   const {staff,rule,versions,added,from,until}=context;
@@ -53,11 +72,14 @@ export async function previewWageChange(db:D1Database,ruleId:string,input:WageCh
   const affectedCostIds=page?.work?.affectedCostIds??[];
   const affectedInvestorIds=page?.work?.affectedInvestorIds??[];
   const pendingTargets=page?.work?.pendingTargets??{};
-  let {previous=0,corrected=0,delta=0,units=0,unknown=0,manual=0,investorDelta=0,ownerDelta=0,profitUnknown=0,matched=0}=page?.work??{};
+  let {previous=0,corrected=0,knownCorrected=0,delta=0,units=0,unknown=0,manual=0,investorDelta=0,ownerDelta=0,profitUnknown=0,investorUnknown=0,matched=0,reviewed=0}=page?.work??{};
   const scanned=page?orders.slice(0,6):orders;
+  reviewed+=scanned.length;
   for(const {id} of scanned){
     const base=await getOrderProfitBase(db,id),targets=await planStaffWages(db,staff,base,[...versions,added]);
     if(!targets.length)continue;
+    const beforeTargets=await planStaffWages(db,staff,base,versions);
+    const affected=affectedWageLines(ruleId,beforeTargets,targets);
     const oldAmount=targets.reduce((n,t)=>n+(t.cost?.effective_iqd??0),0),pending=targets.filter(t=>t.amount===null).length;
     const newAmount=targets.reduce((n,t)=>n+(t.amount??t.cost?.effective_iqd??0),0);
     const costIds=new Set(targets.map(t=>t.cost?.id).filter(Boolean));
@@ -68,14 +90,16 @@ export async function previewWageChange(db:D1Database,ruleId:string,input:WageCh
     const newBase=(await getOrderProfitBases(db,[id],{costOverrides:{[id]:simulatedCosts}}))[0];
     const [beforeInvestor,afterInvestor]=await Promise.all([investorOrderSplit(db,id),investorOrderSplit(db,id,newBase as unknown as NonNullable<Parameters<typeof investorOrderSplit>[2]>)]);
     for(const a of [...beforeInvestor.allocations,...afterInvestor.allocations]){const id=`invprofit:${a.contract_id}`;if(!affectedInvestorIds.includes(id))affectedInvestorIds.push(id);}
-    const profitPending=beforeInvestor.pending||afterInvestor.pending||beforeInvestor.owner_profit_iqd===null||afterInvestor.owner_profit_iqd===null;
-    const invDelta=profitPending?null:afterInvestor.investor_profit_iqd-beforeInvestor.investor_profit_iqd;
+    const investorPending=beforeInvestor.pending||afterInvestor.pending;
+    const profitPending=beforeInvestor.owner_profit_iqd===null||afterInvestor.owner_profit_iqd===null;
+    const invDelta=investorPending?null:afterInvestor.investor_profit_iqd-beforeInvestor.investor_profit_iqd;
     const ownDelta=profitPending?null:afterInvestor.owner_profit_iqd!-beforeInvestor.owner_profit_iqd!;
-    const quantity=base.lines.filter(l=>targets.some(t=>t.line_ids.includes(l.id))).reduce((n,l)=>n+Math.max(0,l.qty-l.returned_qty),0);
+    const quantity=base.lines.filter(l=>affected.lines.has(l.id)).reduce((n,l)=>n+Math.max(0,l.qty-l.returned_qty),0);
     const overrides=targets.filter(t=>t.manual).length;
-    previous+=oldAmount;corrected+=newAmount;delta+=newAmount-oldAmount;units+=quantity;unknown+=pending;manual+=overrides;
-    investorDelta+=invDelta??0;ownerDelta+=ownDelta??0;if(profitPending)profitUnknown++;
-    matched++; if(detail.length<200)detail.push({order_id:id,earning_day:String(base.order.delivered_at),units:quantity,previous_iqd:oldAmount,corrected_iqd:pending?null:newAmount,delta_iqd:newAmount-oldAmount,manual_overrides:overrides,pending_costs:pending,investor_delta_iqd:invDelta,owner_delta_iqd:ownDelta});
+    previous+=oldAmount;corrected+=newAmount;knownCorrected+=targets.reduce((n,t)=>n+(t.amount??0),0);delta+=newAmount-oldAmount;units+=quantity;unknown+=pending;manual+=overrides;
+    investorDelta+=invDelta??0;ownerDelta+=ownDelta??0;if(profitPending)profitUnknown++;if(investorPending)investorUnknown++;
+    if(affected.affected)matched++;
+    if(detail.length<200)detail.push({order_id:id,earning_day:String(base.order.delivered_at),affected:affected.affected,units:quantity,previous_iqd:oldAmount,corrected_iqd:pending?null:newAmount,delta_iqd:newAmount-oldAmount,manual_overrides:overrides,pending_costs:pending,investor_delta_iqd:invDelta,owner_delta_iqd:ownDelta});
     for(const t of targets){
       if(t.cost){affectedCostIds.push(t.cost.id);pendingTargets[t.cost.id]=t.amount;}
       const existing=projected.find(s=>s.id===t.cost?.id&&s.kind==='staff');
@@ -87,19 +111,23 @@ export async function previewWageChange(db:D1Database,ruleId:string,input:WageCh
   const withdrawals=(await db.prepare(`SELECT DISTINCT w.id,w.amount_iqd,w.paid_iqd,w.state,w.version FROM finance_withdrawals w JOIN finance_withdrawal_allocations a ON a.withdrawal_id=w.id WHERE w.state IN('requested','approved','part_paid') AND ((a.source_kind='staff' AND a.source_id IN (SELECT value FROM json_each(?))) OR (a.source_kind='investor_profit' AND a.source_id IN (SELECT value FROM json_each(?)))) AND a.amount_iqd>a.paid_iqd ORDER BY w.id`).bind(JSON.stringify(affectedCostIds),JSON.stringify(affectedInvestorIds)).all<{id:string;amount_iqd:number;paid_iqd:number;state:string;version:number}>()).results??[];
   const existingBalance=participantSummary(sources,advance),expectedBalance=participantSummary(projected,advance);
   const current=effectiveWageRules(versions,staff,baghdadDay()).find(r=>r.id===ruleId)??null;
-  const preview={rule_id:ruleId,staff_id:staff.id,staff_name:staff.name,current_rule:current,proposed_rule:rule,
-    from,until,orders_count:matched,units_count:units,previous_iqd:previous,corrected_iqd:unknown?null:corrected,known_corrected_iqd:corrected,delta_iqd:delta,
+  const preview={calculation_version:PREVIEW_CALCULATION_VERSION,rule_id:ruleId,staff_id:staff.id,staff_name:staff.name,current_rule:current,proposed_rule:rule,
+    from,until,orders_count:matched,reviewed_orders_count:reviewed,units_count:units,previous_iqd:previous,corrected_iqd:unknown?null:corrected,known_corrected_iqd:knownCorrected,pending_carried_iqd:corrected-knownCorrected,delta_iqd:delta,
     paid_iqd:existingBalance.ledgers.staff.paid_iqd,held_iqd:existingBalance.ledgers.staff.held_iqd,
     before_balance:existingBalance,after_balance:expectedBalance,pending_costs:unknown,manual_overrides:manual,
-    investor_delta_iqd:profitUnknown?null:investorDelta,owner_delta_iqd:profitUnknown?null:ownerDelta,
+    investor_delta_iqd:investorUnknown?null:investorDelta,owner_delta_iqd:profitUnknown?null:ownerDelta,
     profit_review_orders:profitUnknown,withdrawals,orders:detail,
     profit_basis:'retained_goods_less_verified_cogs',recorded_at:context.now};
   if(await clock(db)!==beforeClock)throw conflict('تغيرت بيانات الطلبات أثناء المعاينة؛ أعد المعاينة','WAGE_PREVIEW_STALE');
-  const token=await sha256Hex(JSON.stringify({clock:beforeClock,rule:context.rule,reason:context.reason,from,until,actor}));
-  return {context,clock:beforeClock,preview:{...preview,preview_token:token},page:{cursor:scanned.at(-1)?.id??page?.cursor??'',complete:!page||orders.length<=6,scanned:scanned.length},work:{projected,detail,affectedCostIds,affectedInvestorIds,pendingTargets,previous,corrected,delta,units,unknown,manual,investorDelta,ownerDelta,profitUnknown,matched}};
+  const token=await sha256Hex(JSON.stringify({calculation_version:PREVIEW_CALCULATION_VERSION,clock:beforeClock,rule:context.rule,reason:context.reason,from,until,actor}));
+  return {context,clock:beforeClock,preview:{...preview,preview_token:token},page:{cursor:scanned.at(-1)?.id??page?.cursor??'',complete:!page||orders.length<=6,scanned:scanned.length},work:{calculation_version:PREVIEW_CALCULATION_VERSION,projected,detail,affectedCostIds,affectedInvestorIds,pendingTargets,previous,corrected,knownCorrected,delta,units,unknown,manual,investorDelta,ownerDelta,profitUnknown,investorUnknown,matched,reviewed}};
 }
 
 type PreviewJob={id:string;rule_id:string;actor_id:string;input_json:string;source_version:number;cursor:string;processed_orders:number;state:string;work_json:string;result_json:string|null;preview_token:string|null;version:number};
+function currentPreviewCalculation(job:PreviewJob){
+  return JSON.parse(job.work_json).calculation_version===PREVIEW_CALCULATION_VERSION&&
+    (job.state!=='complete'||JSON.parse(job.result_json!).calculation_version===PREVIEW_CALCULATION_VERSION);
+}
 const previewInput=(input:WageChangeInput)=>JSON.stringify({...input,operation_id:undefined,preview_token:undefined,release_withdrawals:undefined,preview_job_id:undefined});
 /** At most six orders per call; refresh/retry resumes at the last committed
  * cursor. Concurrent continuations cannot append a page twice. */
@@ -107,7 +135,7 @@ export async function previewWageChangePage(db:D1Database,ruleId:string,input:Wa
   const request=previewInput(input);
   let job:PreviewJob|null=null;
   if(input.preview_job_id){job=await db.prepare('SELECT * FROM finance_wage_preview_jobs WHERE id=? AND actor_id=? AND rule_id=?').bind(String(input.preview_job_id),actor,ruleId).first<PreviewJob>();if(!job||job.input_json!==request)throw conflict('تغير طلب المعاينة؛ ابدأ معاينة جديدة','WAGE_PREVIEW_STALE');}
-  if(job&&job.source_version!==await clock(db))throw conflict('تغيرت بيانات الحساب؛ حدّث المعاينة قبل التطبيق','WAGE_PREVIEW_STALE');
+  if(job&&(!currentPreviewCalculation(job)||job.source_version!==await clock(db)))throw conflict('تغيرت بيانات الحساب أو طريقة المعاينة؛ حدّث المعاينة قبل التطبيق','WAGE_PREVIEW_STALE');
   if(job?.state==='complete')return {...JSON.parse(job.result_json!),preview_job_id:job.id,complete:true,processed_orders:job.processed_orders};
   const calculated=await previewWageChange(db,ruleId,input,actor,{cursor:job?.cursor??'',work:job?JSON.parse(job.work_json) as PreviewWork:undefined});
   const id=job?.id??newId('wpreview'),processed=(job?.processed_orders??0)+calculated.page.scanned;
@@ -126,7 +154,7 @@ export async function applyWageChange(db:D1Database,ruleId:string,input:WageChan
   if(prior){if(prior.rule_id!==ruleId||prior.request_json!==canonical)throw conflict('رقم العملية مستخدم لتغيير آخر');return {already:true,wage_version_id:prior.wage_version_id};}
   const stored=await db.prepare("SELECT * FROM finance_wage_preview_jobs WHERE preview_token=? AND actor_id=? AND rule_id=? AND state='complete' ORDER BY updated_at DESC LIMIT 1").bind(String(input.preview_token),actor,ruleId).first<PreviewJob>();
   if(requireStoredPreview&&!stored)throw conflict('أكمل المعاينة قبل تطبيق التسوية','WAGE_PREVIEW_STALE');
-  if(stored&&(stored.source_version!==await clock(db)||stored.input_json!==previewInput(input)))throw conflict('تغيرت بيانات المعاينة؛ اعرض الأثر المحدّث قبل التطبيق','WAGE_PREVIEW_STALE');
+  if(stored&&(!currentPreviewCalculation(stored)||stored.source_version!==await clock(db)||stored.input_json!==previewInput(input)))throw conflict('تغيرت بيانات المعاينة؛ اعرض الأثر المحدّث قبل التطبيق','WAGE_PREVIEW_STALE');
   const calculated=stored?{context:await changeContext(db,ruleId,input,actor),clock:stored.source_version,preview:JSON.parse(stored.result_json!) as Awaited<ReturnType<typeof previewWageChange>>['preview']}:await previewWageChange(db,ruleId,input,actor);
   const {context,preview}=calculated;
   if(input.preview_token!==preview.preview_token)throw conflict('تغيرت بيانات المعاينة؛ اعرض الأثر المحدّث قبل التطبيق','WAGE_PREVIEW_STALE');

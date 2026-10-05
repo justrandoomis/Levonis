@@ -19,6 +19,8 @@ A paid 100,000 corrected to 70,000 leaves debt 30,000 and no availability. Earni
 
 Owner-only routes under `/api/admin/finance-people/rules/:id` accept `preview` and `apply`. Preview processes six real orders per page, saves a durable cursor and accumulates totals for every match. Detail display is bounded, totals are not. Refresh/retry reuses the job. Source-clock changes require a fresh preview.
 
+The preview distinguishes all reviewed orders from orders/units in the changed scope, including the previous scope and displaced rules. Earnings totals cover the reviewed orders; balance and paid amounts are cumulative. Known corrected wages remain visible when other profit-based wages need verified costs; previously recorded amounts awaiting verification are disclosed separately. Unknown line profit keeps the owner's result unknown instead of presenting a partial sum as net profit. Investor uncertainty is evaluated separately. A calculation revision invalidates saved and interrupted previews across deployments, requiring a new review before application.
+
 Apply requires a reason, operation ID and current preview token. It atomically saves the wage version, impact audit, pending targets and resumable reconciliation job. Unpaid reservations affected directly or through investor profit need explicit release; paid portions remain. Pending wage corrections reserve the necessary overpayment while independent wages remain withdrawable. Jobs resume through the existing reconciliation route/runner and post each difference once.
 
 Adjustments use the open posting day and separately preserve historical earning day. Manual per-order overrides remain visible and are preserved. Correcting them remains a separate order-finance action.

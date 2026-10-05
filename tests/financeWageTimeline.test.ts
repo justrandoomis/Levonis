@@ -6,7 +6,7 @@ import { adminFinanceOperationsRoutes } from '../worker/routes/adminFinanceOpera
 import { financeEarningsRoutes } from '../worker/routes/financeEarnings';
 import { participantSummary, type ParticipantSource } from '../worker/lib/financeParticipants';
 
-async function setup(){
+async function setup(ruleOverrides:Record<string,unknown>={}){
   const raw=freshDb();raw.exec(`INSERT INTO users(id,email,name,role,admin_scope) VALUES
    ('boss','boss@x.co','Owner','admin','full'),('employee','employee@x.co','Sajjad','admin','assistant'),
    ('finance','finance@x.co','Finance','admin','full'),('buyer','buyer@x.co','Buyer','customer',NULL);
@@ -15,7 +15,7 @@ async function setup(){
   const app=(id:string,scope='assistant')=>stubApp(db,{id,email:`${id}@x.co`,role:'admin',admin_scope:scope},a=>{a.route('/people',adminFinancePeopleRoutes);a.route('/operations',adminFinanceOperationsRoutes);a.route('/earnings',financeEarningsRoutes);});
   const boss=app('boss','full'),self=app('employee');
   const staff=await json(await post(boss,'/people/staff',{user_id:'employee',start_work_date:'2026-08-31'}));
-  const rule=await json(await post(boss,'/operations/rules',{staff_id:staff.id,basis:'unit',amount:10000}));
+  const rule=await json(await post(boss,'/operations/rules',{staff_id:staff.id,basis:'unit',amount:10000,...ruleOverrides}));
   async function order(id:string,qty:number,delivered:string,created='2026-08-01T12:00:00Z'){
     raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,created_at,delivered_at) VALUES (?,'buyer','delivered','{}','standard','{}','cash',?,1500,?,?,0,?,?)`).run(id,qty*50000,qty*50000,qty*50000,created,delivered);
     raw.prepare(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES (?,?,'printer','Printer',?,50000,?,20000,'snapshot')`).run(`line:${id}`,id,qty,qty*50000);
@@ -159,5 +159,64 @@ test('a migrated baseline cannot silently replace a different historical wage; a
  x.raw.prepare("INSERT INTO finance_wage_versions(id,rule_id,revision,staff_id,effective_from,follows_employment,snapshot,reason,actor_id,recorded_at,supersedes_id) VALUES(?,?,2,?,'2026-09-01',1,?,'Legacy baseline','boss',?,?)").run(`wage:baseline:${x.ruleId}`,x.ruleId,x.staffId,JSON.stringify(snapshot),new Date().toISOString(),prior.id);
  x.raw.prepare('UPDATE finance_cost_rules SET amount=5000,version=2 WHERE id=?').run(x.ruleId);
  await post(x.boss,'/operations/orders/legacy/reconcile',{});assert.equal((await x.earnings()).summary.earned_iqd,10000);
- await x.apply(5000,'2026-09-15');assert.equal((await x.earnings()).summary.earned_iqd,5000);
+  await x.apply(5000,'2026-09-15');assert.equal((await x.earnings()).summary.earned_iqd,5000);
+});
+
+test('fixed-pay preview counts its scope, keeps known wages visible and never invents a partial owner profit',async()=>{
+  const scope={catalog_ids:[],product_ids:['printer'],excluded_product_ids:[]};
+  const x=await setup({basis:'order',amount:2500,scope});
+  x.raw.exec("INSERT INTO products(id,name,slug,price_iqd,stock,inventory_mode) VALUES('accessory','Accessory','accessory',1000,0,'BASE')");
+  const res=await post(x.boss,'/operations/rules',{staff_id:x.staffId,basis:'profit_percent',amount:1000,group_key:'accessory-support',scope:{...scope,product_ids:['accessory']}});
+  assert.equal(res.status,200,JSON.stringify(await json(res.clone())));
+  await x.order('mixed',2,'2026-09-20T12:00:00Z');
+  await x.order('accessories-only',1,'2026-09-21T12:00:00Z');
+  x.raw.exec("DELETE FROM order_item_inventory_allocations WHERE order_id='accessories-only'; UPDATE order_items SET product_id='accessory',qty=8,cost_iqd=NULL WHERE order_id='accessories-only'; INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd) VALUES('mixed-accessory','mixed','accessory','Accessory',3,1000,3000)");
+  await x.drain();
+  const p=await x.preview(3000,'2026-09-15',{basis:'order',scope});
+  assert.equal(p.value.reviewed_orders_count,2);
+  assert.equal(p.value.orders_count,1);
+  assert.equal(p.value.units_count,2);
+  assert.equal(p.value.previous_iqd,2500);
+  assert.equal(p.value.corrected_iqd,null);
+  assert.equal(p.value.known_corrected_iqd,3000);
+  assert.equal(p.value.pending_carried_iqd,0);
+  assert.equal(p.value.delta_iqd,500);
+  assert.equal(p.value.pending_costs,2);
+  assert.equal(p.value.owner_delta_iqd,null);
+  assert.equal(p.value.investor_delta_iqd,0);
+  assert.equal(p.value.after_balance.ledgers.staff.net_iqd,3000);
+  assert.equal((await x.earnings()).summary.earned_iqd,2500,'Preview must not post any wages');
+  await x.apply(3000,'2026-09-15',{basis:'order',scope});
+  assert.equal((await x.earnings()).summary.earned_iqd,3000);
+});
+
+test('changing a per-order scope counts both removed and newly included units without counting unrelated lines',async()=>{
+  const x=await setup({basis:'order',scope:{catalog_ids:[],product_ids:['printer'],excluded_product_ids:[]}});
+  x.raw.exec("INSERT INTO products(id,name,slug,price_iqd,stock,inventory_mode) VALUES('accessory','Accessory','accessory',1000,0,'BASE')");
+  await x.order('mixed',2,'2026-09-20T12:00:00Z');
+  x.raw.exec("INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd) VALUES('mixed-accessory','mixed','accessory','Accessory',3,1000,3000)");
+  await x.drain();
+  const p=await x.preview(5000,'2026-09-15',{basis:'order',scope:{catalog_ids:[],product_ids:['accessory'],excluded_product_ids:[]}});
+  assert.equal(p.value.orders_count,1);assert.equal(p.value.units_count,5);assert.equal(p.value.delta_iqd,-5000);
+  const removed=await x.preview(5000,'2026-09-15',{basis:'order',active:false});
+  assert.equal(removed.value.units_count,2);assert.equal(removed.value.delta_iqd,-10000);
+});
+
+test('a preview made by a superseded calculation cannot resume or apply even if source data is unchanged',async()=>{
+  const x=await setup();await x.order('order',1,'2026-09-20T12:00:00Z');await x.drain();
+  const p=await x.preview(5000,'2026-09-15');
+  x.raw.prepare("UPDATE finance_wage_preview_jobs SET work_json=json_remove(work_json,'$.calculation_version'),result_json=json_remove(result_json,'$.calculation_version') WHERE id=?").run(p.value.preview_job_id);
+  assert.equal((await post(x.boss,`/people/rules/${x.ruleId}/preview`,{...p.body,preview_job_id:p.value.preview_job_id})).status,409);
+  assert.equal((await post(x.boss,`/people/rules/${x.ruleId}/apply`,{...p.body,preview_token:p.value.preview_token,operation_id:crypto.randomUUID()})).status,409);
+  assert.equal((await x.earnings()).summary.earned_iqd,10000);
+  await x.apply(5000,'2026-09-15');assert.equal((await x.earnings()).summary.earned_iqd,5000);
+});
+
+test('an interrupted preview from a superseded calculation is restarted instead of combining incompatible totals',async()=>{
+  const x=await setup();for(let i=0;i<7;i++)await x.order(`order-${i}`,1,'2026-09-20T12:00:00Z');await x.drain();
+  const body={version:1,amount:5000,basis:'unit',effective_from:'2026-09-15',reason:'Check calculation upgrade'};
+  const p=await json(await post(x.boss,`/people/rules/${x.ruleId}/preview`,body));assert.equal(p.complete,false);
+  x.raw.prepare("UPDATE finance_wage_preview_jobs SET work_json=json_remove(work_json,'$.calculation_version') WHERE id=?").run(p.preview_job_id);
+  assert.equal((await post(x.boss,`/people/rules/${x.ruleId}/preview`,{...body,preview_job_id:p.preview_job_id})).status,409);
+  const fresh=await x.preview(5000,'2026-09-15');assert.equal(fresh.value.orders_count,7);assert.equal(fresh.value.reviewed_orders_count,7);assert.equal(fresh.value.delta_iqd,-35000);
 });
