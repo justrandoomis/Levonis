@@ -3,7 +3,7 @@ import { auditStatements } from './audit';
 import { badRequest, conflict, notFound, str } from './http';
 import { baghdadDay, dateValue, fence, periodOpen, whole } from './operations';
 import { nextEmploymentDay, queueStaffReconciliation, readStaff } from './financeEmployment';
-import { effectiveWageRules, wageVersionStatement, wageVersions, type EffectiveWageRule, type WageVersion } from './financeWageTimeline';
+import { effectiveWageRules, wageBoundaries, wageVersionStatement, wageVersions, type EffectiveWageRule, type WageVersion } from './financeWageTimeline';
 import { planStaffWages } from './financeWageCalculation';
 import { getOrderProfitBase, getOrderProfitBases } from './orderProfit';
 import { participantAdvanceState, participantSources, participantSummary, type ParticipantSource } from './financeParticipants';
@@ -33,9 +33,9 @@ async function changeContext(db:D1Database,ruleId:string,input:WageChangeInput,a
     scope_json:input.scope===undefined?old.scope_json:JSON.stringify(await validateRuleScope(db,input.scope)),
     cap_iqd:input.cap_iqd===undefined?old.cap_iqd:input.cap_iqd===null||input.cap_iqd===''?null:whole(input.cap_iqd,'سقف الأجر'),
     requires_assignment:input.requires_assignment===undefined?old.requires_assignment:input.requires_assignment?1:0};
-  const next=versions.filter(v=>v.rule_id===old.id&&!versions.some(n=>n.supersedes_id===v.id)).map(v=>v.follows_employment&&staff.start_work_date?nextEmploymentDay(staff.start_work_date):v.effective_from).filter(day=>day>from).sort()[0];
-  const until=[next,to?nextEmploymentDay(to):undefined].filter((v):v is string=>!!v).sort()[0]??null;
   const added:WageVersion={id:`wage:${rule.id}:${rule.version}`,rule_id:rule.id,revision:rule.version,staff_id:staff.id,effective_from:from,effective_until:to?nextEmploymentDay(to):null,follows_employment:0,snapshot:JSON.stringify(rule),reason,actor_id:actor,recorded_at:now};
+  const next=wageBoundaries([...versions,added],staff).filter(({v})=>v.rule_id===old.id).map(({from})=>from).filter(day=>day>from).sort()[0];
+  const until=[next,to?nextEmploymentDay(to):undefined].filter((v):v is string=>!!v).sort()[0]??null;
   return {old,staff,rule,versions,added,from,until,reason,now};
 }
 

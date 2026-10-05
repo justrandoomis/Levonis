@@ -25,8 +25,12 @@ CREATE VIEW finance_wage_periods AS
  WITH starts AS (
   SELECT v.*,CASE WHEN follows_employment=1 AND s.start_work_date IS NOT NULL THEN date(s.start_work_date,'+1 day') ELSE effective_from END AS starts_on
   FROM finance_wage_versions v JOIN finance_staff s ON s.id=v.staff_id WHERE NOT EXISTS(SELECT 1 FROM finance_wage_versions replacement WHERE replacement.supersedes_id=v.id)
+ ), eligible_starts AS (
+  SELECT initial.* FROM starts initial WHERE follows_employment=0 OR NOT EXISTS(
+   SELECT 1 FROM starts explicit WHERE explicit.rule_id=initial.rule_id AND explicit.follows_employment=0 AND explicit.starts_on<=initial.starts_on
+  )
  ), boundaries AS (
-  SELECT *,ROW_NUMBER() OVER(PARTITION BY rule_id,starts_on ORDER BY revision DESC) AS position FROM starts
+  SELECT *,ROW_NUMBER() OVER(PARTITION BY rule_id,starts_on ORDER BY revision DESC) AS position FROM eligible_starts
  ), periods AS (
   SELECT *,LEAD(starts_on) OVER(PARTITION BY rule_id ORDER BY starts_on) AS next_start FROM boundaries WHERE position=1
  ) SELECT *,CASE WHEN next_start IS NULL THEN effective_until WHEN effective_until IS NULL THEN next_start ELSE MIN(next_start,effective_until) END AS ends_before FROM periods;

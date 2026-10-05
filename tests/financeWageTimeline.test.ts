@@ -137,6 +137,21 @@ test('staff and withdrawal filters apply on the server; cumulative balance stays
  assert.equal(before.totals.count,0);assert.equal(inside.totals.count,1);assert.equal(inside.totals.paid_iqd,10000);assert.equal((await json(await get(x.boss,'/people/withdrawals?state=open'))).totals.count,0);
 });
 
+test('delaying employment past an explicit wage change never restores the initial wage',async()=>{
+ const x=await setup();await x.order('sep',1,'2026-09-20T12:00:00Z');await x.order('oct',1,'2026-10-03T12:00:00Z');await x.drain();await x.apply(5000,'2026-09-15');
+ assert.equal((await patch(x.boss,`/people/staff/${x.staffId}`,{start_work_date:'2026-09-30'})).status,200);await x.drain();
+ assert.equal((await x.earnings()).summary.earned_iqd,5000);
+ const periods=all<{starts_on:string;ends_before:string|null}>(x.raw,'SELECT * FROM finance_wage_periods WHERE rule_id=?',x.ruleId);
+ assert.equal(periods.length,1);assert.equal(periods[0].starts_on,'2026-09-15');assert.equal(periods[0].ends_before,null);
+ const people=await json(await get(x.boss,'/people/staff'));assert.equal(people.rules.find((r:{id:string})=>r.id===x.ruleId).amount,5000);
+});
+
+test('an explicit change before the employment baseline continues after the first eligible day',async()=>{
+ const x=await setup();await x.order('early',1,'2026-09-05T12:00:00Z');await x.order('later',1,'2026-09-20T12:00:00Z');await x.drain();
+ const preview=await x.preview(5000,'2026-08-20');assert.equal(preview.value.until,null);assert.equal(preview.value.corrected_iqd,10000);
+ await x.apply(5000,'2026-08-20');assert.equal((await x.earnings()).summary.earned_iqd,10000);
+});
+
 test('a migrated baseline cannot silently replace a different historical wage; an explicit effective change can',async()=>{
  const x=await setup();await x.order('legacy',1,'2026-09-20T12:00:00Z');await x.drain();
  const prior=row<{id:string;snapshot:string}>(x.raw,'SELECT id,snapshot FROM finance_wage_versions WHERE rule_id=?',x.ruleId)!;

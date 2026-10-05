@@ -13,14 +13,21 @@ export async function wageVersions(db:D1Database,staffId?:string):Promise<WageVe
   if(!await wageTimelineInstalled(db))return [];
   return (await db.prepare(`SELECT * FROM finance_wage_versions${staffId?' WHERE staff_id=?':''} ORDER BY rule_id,effective_from,revision`).bind(...(staffId?[staffId]:[])).all<WageVersion>()).results??[];
 }
+/** A floating employment baseline is initial pay, not a later pay change.
+ * Moving employment past an explicit boundary cannot revive that baseline. */
+export function wageBoundaries(versions:WageVersion[],staff:Pick<EmploymentStaff,'start_work_date'>){
+  const superseded=new Set(versions.map(v=>v.supersedes_id).filter(Boolean));
+  const current=versions.filter(v=>!superseded.has(v.id));
+  const firstExplicit=new Map<string,string>();
+  for(const v of current)if(!v.follows_employment){const prior=firstExplicit.get(v.rule_id);if(!prior||v.effective_from<prior)firstExplicit.set(v.rule_id,v.effective_from);}
+  return current.map(v=>({v,from:v.follows_employment&&staff.start_work_date?nextEmploymentDay(staff.start_work_date):v.effective_from}))
+    .filter(({v,from})=>!v.follows_employment||!firstExplicit.has(v.rule_id)||from<firstExplicit.get(v.rule_id)!);
+}
 /** One winning version per rule. A new boundary ends the previous version,
  * even if the newer rule is disabled or has an explicit end date. */
 export function effectiveWageRules(versions:WageVersion[],staff:Pick<EmploymentStaff,'start_work_date'>,day:string):EffectiveWageRule[] {
   const selected=new Map<string,{v:WageVersion;from:string}>();
-  const superseded=new Set(versions.map(v=>v.supersedes_id).filter(Boolean));
-  for(const v of versions){
-    if(superseded.has(v.id))continue;
-    const from=v.follows_employment&&staff.start_work_date?nextEmploymentDay(staff.start_work_date):v.effective_from;
+  for(const {v,from} of wageBoundaries(versions,staff)){
     if(from>day)continue;
     const prior=selected.get(v.rule_id);
     if(!prior||from>prior.from||(from===prior.from&&v.revision>prior.v.revision))selected.set(v.rule_id,{v,from});
