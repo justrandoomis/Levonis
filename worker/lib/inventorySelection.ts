@@ -3,7 +3,9 @@ import type { ImageRow,VariantRow } from './productOverlay';
 import { badRequest, notFound } from './http';
 import { derivedRung, type PriceFields } from './pricing';
 import { counterTarget } from './inventoryReceiving';
-import type { StockScope } from './inventory';
+import { comboKey, type StockScope } from './inventory';
+import { validateSelection, type OptionGroupRow, type OptionValueRow, type ColorRow, type ColorLinkRow } from './productRelations';
+import { canonicalOptionValueIds, optionValueIdsInRelationOrder } from './cartSelectionIdentity';
 
 export type Selection = {
   product_id: string;
@@ -35,6 +37,78 @@ type Cell = Record<string, unknown> & {
   stock: number | null;
   reserved: number;
 };
+type CostRow = Record<string, unknown>;
+const knownCost = (value: unknown): number | null => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+export function selectionCostRung(cost: number | null, row: CostRow | undefined): number | null {
+  if (!row) return cost;
+  if (row.cost_iqd !== null && row.cost_iqd !== undefined) return knownCost(row.cost_iqd);
+  return row.cost_adjust_iqd !== null && row.cost_adjust_iqd !== undefined && cost !== null && Number.isSafeInteger(row.cost_adjust_iqd)
+    ? knownCost(Math.max(0, cost + Number(row.cost_adjust_iqd))) : cost;
+}
+/** Resolve a main-store order's persisted selectors, never the marketplace's
+ * variant_id. Missing, foreign or ambiguous identities cannot inherit a cost. */
+export function matchOrderCostSelection(product: CostRow, line: CostRow, rows: { options: CostRow[]; colors: CostRow[]; variants: CostRow[]; fulfillments: CostRow[]; groups?: CostRow[]; links?: CostRow[]; transports?: CostRow[] }) {
+  let stored: unknown = line.option_value_ids;
+  try { if (typeof stored === 'string') stored = JSON.parse(stored); } catch { return null; }
+  if (stored !== undefined && stored !== null && (!Array.isArray(stored) || stored.some(id => typeof id !== 'string' || !id))) return null;
+  const ids = canonicalOptionValueIds(Array.isArray(stored) && stored.length ? stored : line.option_id ? [line.option_id] : []);
+  const colorId = typeof line.color_id === 'string' ? line.color_id : '';
+  const active = (row: CostRow) => row.product_id === product.id && row.active !== 0 && row.active !== false && !row.merged_into;
+  const options = rows.options.filter(row => active(row) && ids.includes(String(row.id)));
+  const colors = rows.colors.filter(row => active(row) && row.id === colorId);
+  if (options.length !== ids.length || (colorId && colors.length !== 1)) return null;
+  if (validateSelection({ groups: (rows.groups ?? []) as unknown as OptionGroupRow[], values: rows.options as unknown as OptionValueRow[], colors: rows.colors as unknown as ColorRow[], links: (rows.links ?? []) as unknown as ColorLinkRow[], selectedValueIds: ids, selectedColorId: colorId || null }).length) return null;
+  let scope: StockScope, scopeId = '', variant: CostRow | undefined;
+  if (product.inventory_mode === 'VARIANT_COMBINATION') {
+    const key = comboKey({ option_value_ids: ids, color_id: colorId });
+    const matches = rows.variants.filter(row => active(row) && row.combo_key === key);
+    if (!key || matches.length !== 1) return null;
+    scope = 'variant'; variant = matches[0]; scopeId = String(variant.id);
+  } else if (product.inventory_mode === 'OPTION') {
+    if (options.length !== 1) return null;
+    scope = 'option'; scopeId = String(options[0].id);
+  } else if (product.inventory_mode === 'COLOR') {
+    if (!colorId) return null;
+    scope = 'color'; scopeId = colorId;
+  } else if (product.inventory_mode === 'BASE') scope = 'base';
+  else return null;
+  let cost = knownCost(product.product_cost_iqd);
+  const firstId = optionValueIdsInRelationOrder(ids, { groups: (rows.groups ?? []) as unknown as OptionGroupRow[], values: rows.options as unknown as OptionValueRow[] })[0];
+  const pricingOption = options.find(option => option.id === firstId);
+  cost = selectionCostRung(cost, pricingOption);
+  const cells = rows.fulfillments.filter(row => row.option_id === pricingOption?.id && row.enabled === 1);
+  if (cells.length) {
+    let pricing: CostRow = {}, transport: CostRow = {};
+    try {
+      pricing = typeof line.pricing_snapshot === 'string' ? JSON.parse(line.pricing_snapshot) ?? {} : {};
+      transport = typeof line.transport_snapshot === 'string' ? JSON.parse(line.transport_snapshot) ?? {} : {};
+    } catch { return null; }
+    const declared = (pricing.fulfillment as CostRow | undefined)?.type;
+    const direct = cells.find(row => row.fulfillment_type === 'direct_sale');
+    const type = pricing.pricing_basis === 'preorder' ? 'pre_order'
+      : pricing.pricing_basis === 'direct' ? (declared === 'pre_order' && !direct ? 'pre_order' : 'direct_sale')
+      : declared === 'direct_sale' ? 'direct_sale'
+      : declared === 'pre_order' ? null
+      : line.order_shipping_type === 'direct' ? 'direct_sale' : null;
+    // Pre-order COD may use the direct cell, while prepaid uses its own
+    // transport ladder. Without the saved pricing basis these disagree.
+    if (!type) return null;
+    const cell = cells.find(row => row.fulfillment_type === type);
+    if (!cell) return null;
+    cost = selectionCostRung(cost, cell);
+    if (type === 'pre_order' && cell) {
+      const routes = (rows.transports ?? []).filter(row => row.fulfillment_id === cell.id && row.enabled === 1);
+      const method = transport.method ?? (pricing.transport as CostRow | undefined)?.method;
+      if (routes.length && !['air', 'sea', 'land'].includes(String(method))) return null;
+      const route = routes.find(row => row.method === method);
+      if (routes.length && !route) return null;
+      cost = selectionCostRung(cost, route);
+    }
+  }
+  cost = selectionCostRung(cost, colors[0]);
+  cost = selectionCostRung(cost, variant);
+  return { product_id: String(product.id), scope, scope_id: scopeId, unit_cost_iqd: cost };
+}
 export async function productSelections(db: D1Database, productId: string): Promise<Selection[]> {
   const p = await db
     .prepare('SELECT * FROM products WHERE id=?')
@@ -101,11 +175,7 @@ export async function productSelections(db: D1Database, productId: string): Prom
     const apply = (r: Cell | undefined) => {
       if (!r) return;
       regular = derivedRung(r as unknown as PriceFields, { regular, prime: null, pro: null }).regular;
-      cost =
-        r.cost_iqd ??
-        (r.cost_adjust_iqd !== null && r.cost_adjust_iqd !== undefined && cost !== null
-          ? Math.max(0, cost + r.cost_adjust_iqd)
-          : cost);
+      cost = selectionCostRung(cost, r);
     };
     let option: Cell | undefined, color: Cell | undefined;
     if (scope === 'variant') {

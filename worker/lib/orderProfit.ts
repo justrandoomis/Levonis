@@ -2,6 +2,7 @@ import { allocateExact, baghdadDay, fence, journalPlan, periodOpen } from './ope
 import { badRequest, conflict, notFound } from './http';
 import { newId } from './crypto';
 import { describeOrderProfit, type ProfitCostReview } from './orderProfitReview';
+import type { OrderCostProjection, ProjectedOrderFinance } from './orderCostProjection';
 import { COST_BASIS, isConfirmedOrderCost, normalizeCostBasis } from './financeLedger';
 
 type Row = Record<string, unknown>;
@@ -87,6 +88,7 @@ export interface ProfitLine extends Row {
   gross_profit_iqd: number | null; contribution_profit_iqd: number | null; profit_basis_iqd: number | null;
   main_catalog_id: string; sub_catalog_id: string; main_name: string; sub_name: string;
   cost_review?: ProfitCostReview;
+  cost_projection?: OrderCostProjection;
   return_review_sources?: Array<{id:string;cogs_unknown:boolean;refund_unknown:boolean}>;
   allocations: Array<{ id: string; lot_id: string; incoming_id: string | null; qty: number; cogs_iqd: number | null; unit_cost_iqd: number | null; returned_qty: number; returned_cogs_iqd: number | null; late_cost_iqd: number }>;
 }
@@ -99,6 +101,8 @@ export interface ProfitTotals extends Row {
 }
 export interface OrderProfitBase {
   order_id: string; version: number; order: Row; lines: ProfitLine[]; totals: ProfitTotals; costs: Row[]; warnings: string[];
+  projected_finance?: ProjectedOrderFinance;
+  has_financial_activity?: boolean;
 }
 export interface AdjustmentAllocation { line_id: string; delta_iqd: number | null; value_iqd?: number;quantity_basis?:number;restocked_qty_basis?:number }
 export interface ProfitAdjustment extends Row {

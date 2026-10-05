@@ -7,6 +7,7 @@ import { currentMonth, financeDay, financePreset, financeRangeFromSearch, validF
 import OrderProfitSheet from './OrderProfitSheet';
 import MonthlyCosts from './MonthlyCosts';
 import './finance-workspace.css';
+import { orderFinancePresentation } from './orderFinancePresentation';
 
 const PeoplePanel = lazy(() => import('../financePeople/PeoplePanel'));
 const InvestorPanel = lazy(() => import('../financePeople/InvestorPanel'));
@@ -169,7 +170,8 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
 
 function OrderRow({ order, onClick }: { order: FinanceOrder; onClick: () => void }) {
   const { loc } = useLanguage();
-  const reasons = [...new Set((order.review_reasons ?? []).map((issue) => ({
+  const view = orderFinancePresentation(order);
+  const reasons = [...new Set(view.reviewReasons.map((issue) => ({
     fifo_missing: loc('تكلفة القطع غير مثبتة', 'Unit cost missing'),
     fifo_quantity_incomplete: loc('تخصيص المخزون غير مكتمل', 'Inventory allocation incomplete'),
     fifo_cost_missing: loc('تكلفة الدفعة ناقصة', 'Lot cost missing'),
@@ -179,13 +181,12 @@ function OrderRow({ order, onClick }: { order: FinanceOrder; onClick: () => void
     verified_goods_cost_required: loc('نسبة الأجر تنتظر التكلفة', 'Profit-based pay awaits cost'),
     wage_reconciliation_pending: loc('تسوية الأجر معلقة', 'Wage reconciliation pending'),
   } as Record<string, string>)[issue.code] ?? loc('بيانات تحتاج مراجعة', 'Details need review')))];
-  const incomplete = reasons.length > 0 || (order.unknown_lines ?? 0) + (order.pending_costs ?? 0) > 0;
   return <button type="button" className="fw-order-row" onClick={onClick}>
     <div className="fw-order-identity"><span className="fw-order-icon"><Layers3 size={18} strokeWidth={1.6} /></span><div><h3>{order.customer_name || `${loc('طلب', 'Order')} ${order.order_id || order.id}`}</h3>
       <p>{(order.order_id || order.id).slice(-12)} · {financeDay(order.delivered_at || order.created_at)}</p>
-      <Status tone={incomplete ? 'warning' : order.status === 'delivered' ? 'positive' : 'neutral'}>{incomplete ? loc('يحتاج مراجعة', 'Needs review') : statusName(order.status, loc)}</Status>
-      {incomplete && <p>{reasons.length ? reasons.slice(0, 2).join(' · ') : loc('افتح الطلب لمعرفة البنود المعلقة', 'Open the order to review pending lines')}{reasons.length > 2 ? ` · +${reasons.length - 2}` : ''}</p>}
-    </div></div><div className="fw-order-values"><Money value={order.owner_net_iqd} /><small>{order.status === 'delivered' ? loc('صافي المالك', 'Owner net') : order.status === 'cancelled' ? loc('ملغى · غير مستحق', 'Cancelled · not earned') : loc('تقديري · غير مستحق', 'Projected · not earned')}</small><ChevronLeft size={15} className="fw-muted" aria-hidden /></div>
+      <Status tone={order.status === 'delivered' ? 'positive' : 'neutral'}>{statusName(order.status, loc)}</Status>
+      {view.needsReview && <><Status tone="warning">{loc('يحتاج مراجعة', 'Needs review')}</Status><p>{reasons.length ? reasons.slice(0, 2).join(' · ') : loc('افتح الطلب لمعرفة البنود المعلقة', 'Open the order to review pending lines')}{reasons.length > 2 ? ` · +${reasons.length - 2}` : ''}</p></>}
+    </div></div><div className="fw-order-values">{view.amountKind === 'not_earned' ? <Status>{loc('غير مستحق', 'Not earned')}</Status> : <Money value={view.amount} />}<small>{view.amountKind === 'projected_goods_margin' ? loc('هامش البضاعة المتوقع · قبل المصاريف وغير مستحق', 'Forecast goods margin · before expenses, not earned') : view.amountKind === 'owner_net' ? loc('صافي المالك', 'Owner net') : loc('لا ربح مستحق من هذا الطلب', 'No earned profit from this order')}</small><ChevronLeft size={15} className="fw-muted" aria-hidden /></div>
   </button>;
 }
 

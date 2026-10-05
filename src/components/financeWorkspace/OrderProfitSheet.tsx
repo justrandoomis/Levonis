@@ -3,8 +3,9 @@ import { Check, Clock3, Pencil, Package, ShieldCheck } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { Button, Field, Loading, Money, Row, Sheet, Status, Surface, formatMoney } from './ui';
-import { financeDay, monthRange, WORKSPACE_API, type OrderProfit, type ProfitLine, type ProfitCost, type ProfitReviewIssue } from './types';
+import { financeDay, monthRange, statusName, WORKSPACE_API, type OrderProfit, type ProfitLine, type ProfitCost, type ProfitReviewIssue } from './types';
 import { canReconcilePendingCosts, displayedCostAmount, groupOrderCosts } from './orderCostGroups';
+import { orderFinancePresentation, projectedLineCost, visibleOrderReviewReasons } from './orderFinancePresentation';
 
 const FinanceOperationsPanel = lazy(() => import('../adminOperations/FinanceOperationsPanel'));
 
@@ -27,6 +28,9 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
   const requestId = useRef<string>(crypto.randomUUID());
   const saveLock = useRef(false);
   const verificationIds = useRef(new Map<string, string>());
+  const presentationOrder = data && { ...data.order, ...data.totals, has_financial_activity: data.has_financial_activity, projected_finance: data.projected_finance,
+    review_reasons: [...data.lines.flatMap(line => line.cost_review?.issues ?? []), ...data.costs.flatMap(cost => cost.review_reasons ?? [])] };
+  const view = presentationOrder && orderFinancePresentation(presentationOrder);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -116,16 +120,21 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
   };
   const reviewCost = (line: ProfitLine) => {
     const review = line.cost_review;
-    if (!review || !review.issues.length && !review.suggestion && !review.sources.length && review.source !== 'recorded_snapshot') return null;
-    const suggestion = review.suggestion;
+    const projection = data && projectedLineCost(data.order, line);
+    const projectionNote = projection && <p className="fw-note">{projection.source === 'confirmed_lot' ? loc('تقدير من تكلفة دفعة مؤكدة متاحة', 'Estimate from an available confirmed lot cost') : loc('تقدير من تكلفة الخيار واللون في بطاقة المنتج الحالية', 'Estimate from the current catalogue option and colour cost')}: <Money value={projection.unit_cost_iqd} /> {loc('للقطعة', 'per unit')} · {loc('الكمية', 'Quantity')}: {line.qty}{projection.as_of && <> · {financeDay(projection.as_of)}</>}. {loc('تكلفة للتوقع فقط؛ تُثبت التكلفة الفعلية عند صرف المخزون، ولا ينشأ منها استحقاق للسحب.', 'Forecast only; the actual cost is confirmed when stock is issued and this estimate creates no withdrawable earnings.')}</p>;
+    if (!review || !review.issues.length && !review.suggestion && !review.sources.length && review.source !== 'recorded_snapshot') return projectionNote;
+    const issues = presentationOrder ? visibleOrderReviewReasons(presentationOrder, review.issues) : review.issues;
+    const suggestion = view?.hasFinancialActivity && !projection ? review.suggestion : null;
+    if (!issues.length && !suggestion && !review.sources.length && review.source !== 'recorded_snapshot') return projectionNote;
     return <div className="fw-note">
+      {projectionNote}
       {review.source === 'recorded_snapshot' && <p>{loc('تكلفة القطعة المثبتة وقت إنشاء الطلب', 'Unit cost recorded when the order was created')}: <Money value={review.snapshot_unit_iqd} /> · {loc('كمية الطلب', 'Order quantity')}: {line.qty}. {loc('تخص الخيار واللون المحفوظين في هذا الطلب؛ تغيير تكلفة المنتج الحالية لا يغيرها.', 'This belongs to the option and colour saved in this order; current catalogue changes do not alter it.')}</p>}
-      {review.issues.map((issue, index) => <p key={`${issue.code}:${issue.source_id}:${index}`}>{reviewReason(issue, line)}</p>)}
-      {suggestion && <p>{suggestion.source === 'order_snapshot' ? loc('التكلفة المقترحة من لقطة الطلب', 'Suggested cost from the order snapshot') : loc('التكلفة المقترحة من بطاقة المنتج الحالية', 'Suggested cost from the current catalogue')}: <Money value={suggestion.total_cost_iqd} /> {loc('إجمالي هذا البند', 'for this entire line')} · <Money value={suggestion.unit_cost_iqd} /> {loc('للقطعة', 'per unit')}{suggestion.as_of && <> · {financeDay(suggestion.as_of)}</>}. {loc('قيمة مرجعية تحتاج موافقتك وليست تكلفة مؤكدة بعد.', 'This reference requires your confirmation and is not a verified cost yet.')}</p>}
+      {issues.map((issue, index) => <p key={`${issue.code}:${issue.source_id}:${index}`}>{reviewReason(issue, line)}</p>)}
+      {suggestion && <p>{suggestion.source === 'order_snapshot' ? loc('التكلفة المقترحة من لقطة الطلب', 'Suggested cost from the order snapshot') : suggestion.source === 'confirmed_lot' ? loc('التكلفة المقترحة من دفعة مؤكدة متاحة', 'Suggested cost from an available confirmed lot') : loc('التكلفة المقترحة من بطاقة المنتج الحالية', 'Suggested cost from the current catalogue')}: <Money value={suggestion.total_cost_iqd} /> {loc('إجمالي هذا البند', 'for this entire line')} · <Money value={suggestion.unit_cost_iqd} /> {loc('للقطعة', 'per unit')}{suggestion.as_of && <> · {financeDay(suggestion.as_of)}</>}. {loc('قيمة مرجعية تحتاج موافقتك وليست تكلفة مؤكدة بعد.', 'This reference requires your confirmation and is not a verified cost yet.')}</p>}
       {review.sources.length > 0 && <details className="fw-advanced"><summary>{loc('مصادر تكلفة القطع', 'Unit cost sources')}</summary>{review.sources.map((source) => <div key={source.allocation_id}><Row label={<>{loc('دفعة المخزون', 'Inventory lot')} <bdi>{source.lot_id}</bdi><small>{loc('الكمية المصروفة', 'Issued quantity')}: {source.qty}{!!source.returned_qty && <> · {loc('المرتجع', 'Returned')}: {source.returned_qty}</>}{!!source.late_cost_iqd && <> · {loc('تصحيح تكلفة لاحق', 'Later cost correction')}: {formatMoney(source.late_cost_iqd)}</>}</small></>} value={<Money value={source.retained_cogs_iqd === undefined ? source.cogs_iqd : source.retained_cogs_iqd} />} hint={source.retained_cogs_iqd === undefined ? loc('تكلفة المصدر الأصلية', 'Original source cost') : loc('التكلفة الحالية بعد المرتجع وتصحيحات الدفعة', 'Current cost after returns and lot corrections')} />{source.purchase_id && <p>{loc('مرجع الشراء', 'Purchase reference')}: <bdi>{source.purchase_id}</bdi></p>}</div>)}</details>}
       <div className="fw-list">
         {suggestion && review.can_verify && <Button disabled={saving} onClick={() => verifyCost(line, suggestion.total_cost_iqd)}>{loc('اعتماد هذه التكلفة لهذا الطلب', 'Verify this cost for this order')}</Button>}
-        {!['fifo', 'manual_verified', 'recorded_snapshot'].includes(review.source) && <Button variant="ghost" disabled={saving} onClick={() => beginEdit('cogs_iqd', `${loc('إجمالي تكلفة القطع', 'Total goods cost')} · ${line.name_snapshot}`, line.id)}>{loc('إدخال أو تعديل تكلفة القطع', 'Enter or edit goods cost')}</Button>}
+        {view?.hasFinancialActivity && !['fifo', 'manual_verified', 'recorded_snapshot'].includes(review.source) && <Button variant="ghost" disabled={saving} onClick={() => beginEdit('cogs_iqd', `${loc('إجمالي تكلفة القطع', 'Total goods cost')} · ${line.name_snapshot}`, line.id)}>{loc('إدخال أو تعديل تكلفة القطع', 'Enter or edit goods cost')}</Button>}
       </div>
     </div>;
   };
@@ -134,19 +143,21 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
     return editable ? <button type="button" className="fw-line-metric fw-line-metric--editable" onClick={() => beginEdit(field, label, line.id)}
       aria-label={`${loc('تعديل', 'Edit')} ${label} · ${line.name_snapshot}`}>{content}</button> : <div className="fw-line-metric">{content}</div>;
   };
+  const amountLabel = view?.amountKind === 'projected_goods_margin' ? loc('هامش البضاعة المتوقع قبل المصاريف', 'Forecast goods margin before expenses') : loc('صافي المالك', 'Owner net');
+  const warnings = data?.warnings?.filter(warning => !warning.startsWith('cost:') || view?.needsReview) ?? [];
   return <Sheet title={`${loc('تفاصيل ربح الطلب', 'Order profit')} · ${orderId}`} subtitle={data?.order?.customer_name || loc('كل قطعة، وتكلفتها وربحها', 'Each product, its cost and profit')}
-    onClose={onClose} footer={data && <><span className="fw-muted">{loc('صافي المالك', 'Owner net')}</span><Money value={data.totals.owner_net_iqd} /></>}>
+    onClose={onClose} footer={view && <><span className="fw-muted">{view.amountKind === 'not_earned' ? loc('لا ربح مستحق من هذا الطلب', 'No earned profit from this order') : amountLabel}</span>{view.amountKind !== 'not_earned' && <Money value={view.amount} />}</>}>
     {loading && !data ? <Loading text={loc('تحميل تفاصيل الطلب…', 'Loading order details…')} /> : null}
     {error && <div className="fw-error" role="alert">{error}<Button variant="ghost" onClick={() => setRevision((v) => v + 1)}>{loc('تحديث', 'Refresh')}</Button></div>}
     {notice && <p className={noticePending ? 'fw-note' : 'fw-success'} role="status">{noticePending ? <Status tone="warning">{loc('التسوية معلقة', 'Reconciliation pending')}</Status> : <Check size={16} />}{notice}</p>}
     {data && <>
-      {data.order.status !== 'delivered' && <p className="fw-note"><Status tone="warning">{loc('أرقام تقديرية', 'Projected figures')}</Status> {loc('يُعتمد الربح عند استلام الطلب. التحصيل يُراجع بصورة مستقلة.', 'Profit is recognised on delivery. Collections are reviewed separately.')}</p>}
-      {data.warnings?.length > 0 && <div className="fw-error">{data.warnings.some((w) => w.startsWith('cost:')) && <p>{loc('بعض التكاليف تحتاج تثبيتًا. يظهر الحقل الناقص ومصدر التكلفة وخيار تصحيحه تحت المنتج المعني.', 'Some costs need verification. Missing fields, cost sources and correction actions appear under the affected product.')}</p>}{data.warnings.filter((w) => !w.startsWith('cost:')).map((w) => <p key={w}>{w === 'investor:pending' ? loc('توزيع حصة المستثمر بانتظار تثبيت التكلفة وتسوية الطلب.', 'Investor distribution is awaiting verified costs and order reconciliation.') : w}</p>)}</div>}
+      {data.order.status !== 'delivered' && <p className="fw-note"><Status>{statusName(data.order.status, loc)}</Status> {view?.expectsDelivery ? loc('توقع قبل المصاريف وليس ربحًا مستحقًا. يُعتمد الربح بعد التسليم وتثبيت التكاليف واستيفاء شروط التحصيل.', 'A forecast before expenses, not earned profit. Profit is recognised after delivery, confirmed costs and collection requirements.') : view?.hasFinancialActivity ? loc('تظهر الحركات المالية السابقة وتسوياتها؛ لا يُنشأ توقع بيع جديد لهذا الطلب.', 'Prior financial activity and its adjustments remain visible; this order creates no new sale forecast.') : loc('لا ربح متوقع أو مستحق من هذا الطلب.', 'This order has no expected or earned profit.')}</p>}
+      {warnings.length > 0 && <div className="fw-error">{warnings.some((w) => w.startsWith('cost:')) && <p>{loc('بعض التكاليف تحتاج تثبيتًا. يظهر الحقل الناقص ومصدر التكلفة وخيار تصحيحه تحت المنتج المعني.', 'Some costs need verification. Missing fields, cost sources and correction actions appear under the affected product.')}</p>}{warnings.filter((w) => !w.startsWith('cost:')).map((w) => <p key={w}>{w === 'investor:pending' ? loc('توزيع حصة المستثمر بانتظار تثبيت التكلفة وتسوية الطلب.', 'Investor distribution is awaiting verified costs and order reconciliation.') : w}</p>)}</div>}
       <div className="fw-metrics">
         <div className="fw-metric"><span>{loc('صافي بيع البضاعة', 'Net goods sales')}</span><Money value={data.totals.net_goods_iqd} /></div>
-        <div className="fw-metric"><span>{loc('تكلفة البضاعة', 'Goods cost')}</span><Money value={data.totals.cogs_iqd} /></div>
-        <div className="fw-metric"><span>{loc('حصة المستثمر', 'Investor share')}</span><Money value={data.totals.investor_iqd} /></div>
-        <div className="fw-metric"><span>{loc('صافي المالك', 'Owner net')}</span><Money value={data.totals.owner_net_iqd} /></div>
+        <div className="fw-metric"><span>{view?.expectsDelivery ? loc('تكلفة البضاعة التقديرية', 'Forecast goods cost') : loc('تكلفة البضاعة', 'Goods cost')}</span><Money value={view?.expectsDelivery ? view.projection?.cogs_iqd : data.totals.cogs_iqd} /></div>
+        {!view?.expectsDelivery && view?.hasFinancialActivity && <div className="fw-metric"><span>{loc('حصة المستثمر', 'Investor share')}</span><Money value={data.totals.investor_iqd} /></div>}
+        {view?.amountKind !== 'not_earned' && <div className="fw-metric"><span>{amountLabel}</span><Money value={view?.amount} /></div>}
       </div>
       {data.lines.map((line) => <Surface className="fw-line-item" key={line.id}>
         <div className="fw-line-heading">
@@ -154,11 +165,11 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
           <div><h3>{line.name_snapshot}</h3><p>{[line.option_snapshot, line.color_snapshot, line.sku_snapshot].filter(Boolean).join(' · ')}</p>
             <p>{loc('الكمية', 'Quantity')}: {line.qty}{line.returned_qty > 0 ? ` · ${loc('مرتجع', 'Returned')}: ${line.returned_qty}` : ''}</p></div>
         </div>
-        <Status tone={['fifo', 'manual_verified', 'recorded_snapshot'].includes(line.cost_confidence) ? 'positive' : 'warning'}>{line.cost_confidence === 'fifo' ? <><ShieldCheck size={12} />{loc('تكلفة من دفعات الشراء', 'Purchase lot cost')}</> : line.cost_confidence === 'manual_verified' ? loc('تكلفة ثبتها المدير', 'Cost verified by admin') : line.cost_confidence === 'recorded_snapshot' ? loc('تكلفة المنتج المثبتة وقت الطلب', 'Product cost recorded at order time') : line.cogs_iqd == null ? loc('التكلفة غير مكتملة', 'Cost incomplete') : loc('تكلفة مرجعية', 'Reference cost')}</Status>
+        <Status tone={projectedLineCost(data.order, line) ? 'neutral' : ['fifo', 'manual_verified', 'recorded_snapshot'].includes(line.cost_confidence) ? 'positive' : view?.hasFinancialActivity ? 'warning' : 'neutral'}>{projectedLineCost(data.order, line) ? loc('تكلفة تقديرية · غير مستحقة', 'Forecast cost · not earned') : line.cost_confidence === 'fifo' ? <><ShieldCheck size={12} />{loc('تكلفة من دفعات الشراء', 'Purchase lot cost')}</> : line.cost_confidence === 'manual_verified' ? loc('تكلفة ثبتها المدير', 'Cost verified by admin') : line.cost_confidence === 'recorded_snapshot' ? loc('تكلفة المنتج المثبتة وقت الطلب', 'Product cost recorded at order time') : !view?.hasFinancialActivity ? view?.expectsDelivery ? loc('التكلفة الفعلية بانتظار صرف المخزون', 'Actual cost awaits stock issue') : loc('لا تكلفة بضاعة مصروفة', 'No issued goods cost') : line.cogs_iqd == null ? loc('التكلفة غير مكتملة', 'Cost incomplete') : loc('تكلفة مرجعية', 'Reference cost')}</Status>
         {reviewCost(line)}
         <div className="fw-line-metrics">
           {metric(line, loc('صافي البيع', 'Net sales'), 'net_goods_iqd', line.net_goods_iqd)}
-          {metric(line, loc('تكلفة القطع', 'Goods cost'), 'cogs_iqd', line.cogs_iqd)}
+          {metric(line, projectedLineCost(data.order, line) ? loc('تكلفة القطع التقديرية', 'Forecast goods cost') : loc('تكلفة القطع', 'Goods cost'), 'cogs_iqd', projectedLineCost(data.order, line)?.total_cost_iqd ?? line.cogs_iqd, !projectedLineCost(data.order, line) && !!view?.hasFinancialActivity)}
           {metric(line, loc('أجور الموظفين', 'Staff wages'), 'manual_direct_iqd', line.wages_iqd, false, data.costs.some((cost) => cost.state === 'pending_cost' && !!(cost.staff_id || cost.staff_user_id) && (cost.line_ids ?? (cost.order_item_id ? [cost.order_item_id] : data.lines.map((item) => item.id))).includes(line.id)))}
           {metric(line, loc('المواد', 'Materials'), 'manual_direct_iqd', line.materials_iqd, false)}
           {metric(line, loc('تكلفة إضافية', 'Additional cost'), 'manual_direct_iqd', line.manual_direct_iqd)}
@@ -166,9 +177,9 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
         </div>
         {editor(line.id)}
         {(line.refund_iqd ?? 0) > 0 && <><Row label={loc('المبلغ المرتجع', 'Refunded amount')} value={<Money value={line.refund_iqd} />} /><Row label={loc('البيع المتبقي بعد المرتجع', 'Sales retained after returns')} value={<Money value={line.retained_revenue_iqd} />} /></>}
-        <div className="fw-line-profit"><span>{loc('ربح البضاعة', 'Goods profit')}</span><Money value={line.gross_profit_iqd} /></div>
+        {!view?.expectsDelivery && view?.hasFinancialActivity && <><div className="fw-line-profit"><span>{loc('ربح البضاعة', 'Goods profit')}</span><Money value={line.gross_profit_iqd} /></div>
         <Row label={loc('حصة المستثمر', 'Investor share')} value={<Money value={line.investor_iqd} />} />
-        <Row label={loc('صافي المالك', 'Owner net')} value={<Money value={line.owner_net_iqd} />} prominent />
+        <Row label={loc('صافي المالك', 'Owner net')} value={<Money value={line.owner_net_iqd} />} prominent /></>}
       </Surface>)}
       <Surface title={loc('التوصيل وتكاليف الطلب', 'Delivery and order costs')} subtitle={loc('التعديل يخص هذا الطلب فقط', 'Changes apply to this order only')}>
         <Row label={loc('التوصيل على الزبون', 'Customer delivery charge')} value={<Money value={data.totals.shipping_income_iqd ?? data.order.shipping_iqd} />}

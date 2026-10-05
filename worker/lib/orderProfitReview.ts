@@ -1,5 +1,4 @@
 import type { OrderProfitBase } from './orderProfit';
-import { productSelections } from './inventorySelection';
 import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
 
 export interface ProfitReviewReason {
@@ -16,7 +15,7 @@ export interface ProfitCostReview {
   required_qty: number;
   sources: Array<{ allocation_id: string; lot_id: string; incoming_id: string | null; purchase_id: string | null; qty: number; cogs_iqd: number | null; unit_cost_iqd: number | null; returned_qty: number; returned_cogs_iqd: number | null; late_cost_iqd: number; retained_cogs_iqd: number | null }>;
   issues: ProfitReviewReason[];
-  suggestion: null | { source: 'order_snapshot' | 'current_catalogue'; unit_cost_iqd: number; total_cost_iqd: number; as_of: string | null; requires_confirmation: true };
+  suggestion: null | { source: 'order_snapshot' | 'current_catalogue' | 'confirmed_lot'; unit_cost_iqd: number; total_cost_iqd: number; as_of: string | null; requires_confirmation: true };
   can_verify: boolean;
 }
 const amount = (value: unknown): number | null => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -91,20 +90,9 @@ export function describeOrderProfit(base: OrderProfitBase) {
 export async function enrichOrderProfitReview(db: D1Database, base: OrderProfitBase, canVerify: boolean) {
   const incomingIds = [...new Set(base.lines.flatMap(line => line.allocations.flatMap(a => a.incoming_id ? [a.incoming_id] : [])))];
   const purchases = incomingIds.length ? (await db.prepare('SELECT incoming_id,purchase_id FROM purchase_lines WHERE incoming_id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(incomingIds)).all<{ incoming_id: string; purchase_id: string }>()).results ?? [] : [];
-  const selectionCache = new Map<string, Awaited<ReturnType<typeof productSelections>>>();
   for (const line of base.lines) {
     const review = line.cost_review as ProfitCostReview;
     for (const source of review.sources) source.purchase_id = purchases.find(p => p.incoming_id === source.incoming_id)?.purchase_id ?? null;
-    if (!review.suggestion && !isConfirmedOrderCost(review.source) && line.product_id) {
-      if (!selectionCache.has(line.product_id)) {
-        // Deleted/composed products cannot provide a safe current selection.
-        const product = await db.prepare('SELECT composition FROM products WHERE id=?').bind(line.product_id).first<{ composition: string | null }>();
-        selectionCache.set(line.product_id, product && !product.composition ? await productSelections(db, line.product_id) : []);
-      }
-      const selection = selectionCache.get(line.product_id)!.find(s => s.scope === 'variant' ? s.scope_id === line.variant_id : s.scope === 'option' ? s.scope_id === line.option_id && !line.color_id : s.scope === 'color' ? s.scope_id === line.color_id && !line.option_id : !line.option_id && !line.color_id && !line.variant_id);
-      const unit = amount(selection?.unit_cost_iqd), total = unit === null ? null : amount(unit * Math.max(0, line.qty - Number(line.restocked_qty ?? 0)));
-      if (unit !== null && total !== null) review.suggestion = { source: 'current_catalogue', unit_cost_iqd: unit, total_cost_iqd: total, as_of: null, requires_confirmation: true };
-    }
     review.can_verify = canVerify && !['cancelled', 'returned'].includes(String(base.order.status)) && !!review.suggestion;
   }
   return base;

@@ -34,6 +34,8 @@ export interface ProfitTotals {
 }
 
 export interface FinanceOrder extends ProfitTotals {
+  has_financial_activity?: boolean;
+  projected_finance?: ProjectedOrderFinance;
   review_reasons?: ProfitReviewIssue[];
   id: string;
   order_id?: string;
@@ -100,6 +102,19 @@ export interface ProfitReviewIssue {
   source_id: string | null;
   line_ids: string[];
 }
+export interface ProjectedOrderFinance {
+  cogs_iqd: number | null;
+  gross_profit_iqd: number | null;
+  owner_net_iqd: number | null;
+  is_estimate: true;
+}
+export interface ProjectedLineCost {
+  unit_cost_iqd: number | null;
+  total_cost_iqd: number | null;
+  source: 'confirmed_lot' | 'current_catalogue';
+  source_id: string | null;
+  as_of: string | null;
+}
 export interface ProfitCostReview {
   source: 'fifo' | 'manual_verified' | 'recorded_snapshot' | 'snapshot' | 'unknown';
   source_field: string;
@@ -108,7 +123,7 @@ export interface ProfitCostReview {
   required_qty: number;
   sources: Array<{ allocation_id: string; lot_id: string; incoming_id: string | null; purchase_id: string | null; qty: number; cogs_iqd: number | null; unit_cost_iqd: number | null; returned_qty?: number; returned_cogs_iqd?: number | null; late_cost_iqd?: number; retained_cogs_iqd?: number | null }>;
   issues: ProfitReviewIssue[];
-  suggestion: null | { source: 'order_snapshot' | 'current_catalogue'; unit_cost_iqd: number; total_cost_iqd: number; as_of: string | null; requires_confirmation: true };
+  suggestion: null | { source: 'order_snapshot' | 'current_catalogue' | 'confirmed_lot'; unit_cost_iqd: number; total_cost_iqd: number; as_of: string | null; requires_confirmation: true };
   can_verify: boolean;
 }
 
@@ -133,6 +148,7 @@ export interface ProfitLine extends ProfitTotals {
   cost_confidence: string;
   profit_basis_iqd?: number | null;
   cost_review?: ProfitCostReview;
+  cost_projection?: ProjectedLineCost;
 }
 
 export interface ProfitCost {
@@ -168,6 +184,8 @@ export interface FinancialHistory {
 }
 
 export interface OrderProfit {
+  has_financial_activity?: boolean;
+  projected_finance?: ProjectedOrderFinance;
   can_reconcile?: boolean;
   order_id: string;
   version: number;
@@ -215,7 +233,7 @@ export function monthRange(month: string) {
 }
 export function statusName(status: string, loc: (ar: string, en: string) => string) {
   const names: Record<string, [string, string]> = {
-    delivered: ['مستلم', 'Delivered'], cancelled: ['ملغى', 'Cancelled'], pending: ['جديد', 'New'],
+    delivered: ['مستلم', 'Delivered'], cancelled: ['ملغى', 'Cancelled'], returned: ['مرتجع', 'Returned'], refunded: ['مسترد', 'Refunded'], pending: ['جديد', 'New'],
     confirmed: ['مؤكد', 'Confirmed'], preparing: ['قيد التجهيز', 'Preparing'], out_for_delivery: ['في الطريق', 'On the way'],
     processing: ['قيد التجهيز', 'Preparing'], shipped: ['في الطريق', 'On the way'],
     completed: ['مكتمل', 'Completed'], paid: ['مدفوع', 'Paid'],

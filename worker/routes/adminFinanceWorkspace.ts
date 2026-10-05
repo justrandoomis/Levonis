@@ -13,6 +13,7 @@ import { addOwnerPromotions, applyProfitAdjustment, getOrderProfitBase, getOrder
 import { investorFinanceInstalled, investorOrderSplit, investorProjectionStaleSql } from '../lib/investorFinance';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { enrichOrderProfitReview } from '../lib/orderProfitReview';
+import { enrichOrderCostProjections } from '../lib/orderCostProjection';
 
 type Row=Record<string,unknown>;
 const n=(v:unknown)=>Number(v??0),s=(v:unknown)=>String(v??'');
@@ -37,6 +38,7 @@ function sumRows(rows:Row[]):Row {
   return totals;
 }
 function orderRow(base:OrderProfitBase){return {...base.order,...base.totals,id:base.order_id,order_id:base.order_id,version:base.version,
+  has_financial_activity:base.has_financial_activity,projected_finance:base.projected_finance,
   review_reasons:[...base.lines.flatMap(l=>l.cost_review?.issues??[]),...base.costs.flatMap(c=>Array.isArray(c.review_reasons)?c.review_reasons:[])],
   cost_confidence:base.lines.every((l)=>isConfirmedOrderCost(l.cost_confidence))?'verified':base.lines.some((l)=>l.cogs_iqd===null)?'unknown':'snapshot'};}
 function grouped(lines:ProfitLine[],kind:'product'|'main'|'sub'){
@@ -109,7 +111,7 @@ async function selectOrders(db:D1Database,r:{from:string;to:string},opts:{q?:str
   for(let i=0;i<orderIds.length;i+=250)rawBases.push(...await getOrderProfitBases(db,orderIds.slice(i,i+250)));
   const byId=new Map(rawBases.map((b)=>[b.order_id,b]));
   const bases=orderIds.map((id)=>byId.get(id)!).filter(Boolean);
-  await addInvestors(db,bases);return {bases,total:total?.total??0,truncated:false};
+  await addInvestors(db,bases);if(!opts.summary)await enrichOrderCostProjections(db,bases);return {bases,total:total?.total??0,truncated:false};
 }
 adminFinanceWorkspaceRoutes.get('/participant-report',async c=>{const r=range(c.req.query('from'),c.req.query('to'));return c.json({success:true,...await participantReport(c.env.DB,r)});});
 adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
@@ -143,6 +145,7 @@ adminFinanceWorkspaceRoutes.get('/orders',async(c)=>{
 async function detail(db:D1Database,id:string,canVerify=true){
   const base=await getOrderProfitBase(db,id);if(base.order.seller_type!=='levonis')throw notFound('Order not found');
   await addInvestors(db,[base],true);
+  await enrichOrderCostProjections(db,[base],true);
   await enrichOrderProfitReview(db,base,canVerify);
   const history=await db.prepare('SELECT a.id,a.order_item_id line_id,a.field,a.old_value_iqd,a.new_value_iqd,a.version,a.actor_id,u.name actor_name,a.created_at,a.reason,a.journal_id FROM finance_order_adjustments a LEFT JOIN users u ON u.id=a.actor_id WHERE a.order_id=? ORDER BY a.version DESC LIMIT 200').bind(id).all<Row>();
   const wages=await db.prepare("SELECT a.id,c.order_item_id line_id,'amount_iqd' field,a.before_iqd old_value_iqd,a.after_iqd new_value_iqd,a.actor_id,u.name actor_name,a.created_at,a.kind,0 version FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id LEFT JOIN users u ON u.id=a.actor_id WHERE c.order_id=? ORDER BY a.created_at DESC LIMIT 200").bind(id).all<Row>();
