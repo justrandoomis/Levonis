@@ -39,6 +39,8 @@ Active orders that have not been delivered can show a separate goods-cost and go
 
 Order detail explains missing allocation quantity, unknown lot cost, unverified historical cost, return/refund gaps and pending wage reconciliation beside the relevant product. Proven snapshot costs need recalculation of previously pending wages, not manual approval of an invented cost. Existing order reconciliation and the resumable employee job preserve original entries, payments, manual overrides and idempotent adjustments.
 
+A staff-only recheck does not post the order's native goods expense. When a historical delivered order has a proven snapshot but no COGS journal, retain its accounting alert and identify the missing posting explicitly. Full order-finance retry posts that expense once; only a posted journal, a reconciled manual-cost overlay or a genuine zero cost can clear the old COGS alert. A known cost alone must not hide an unposted expense.
+
 An unknown refund amount also leaves sales/profit-based pay unknown. Both the original and timeline writers use the corrected order basis, and refreshing a legacy wage fingerprint cannot make an unrecorded refund withdrawable. Fixed pay remains independent of the refund amount. Saved wage previews from calculation version 2 must be reviewed again after these changes.
 
 Adjustments use the open posting day and separately preserve historical earning day. Manual per-order overrides remain visible and are preserved. Correcting them remains a separate order-finance action.

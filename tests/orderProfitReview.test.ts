@@ -1,8 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { asD1, count, freshDb, get, json, stubApp } from './fixtures/app';
+import { asD1, count, freshDb, get, json, row, stubApp } from './fixtures/app';
 import { getOrderProfitBase } from '../worker/lib/orderProfit';
 import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
+import { reconcileFinanceOrder } from '../worker/lib/financeReconcile';
+import { journalPlan } from '../worker/lib/operations';
+import { recordFinancialFailure, runOrderFinancialEffects } from '../worker/lib/orderFinance';
+import type { Env } from '../worker/lib/types';
 
 function setup() {
   const raw = freshDb();
@@ -18,6 +22,52 @@ function setup() {
   const app = (owner = true) => stubApp(db, { id: owner ? 'owner' : 'financial', email: owner ? 'boss@x.co' : 'finance@x.co', role: 'admin', admin_scope: 'full' }, a => a.route('/f', adminFinanceWorkspaceRoutes));
   return { raw, db, app };
 }
+
+test('historical recorded snapshot reconciliation retains a missing COGS posting until the full financial retry posts it', async () => {
+  const { raw, db } = setup();
+  // Before recorded snapshots were accepted, delivery could post the sale
+  // while rejecting this proven cost and leaving no COGS journal at all.
+  await db.batch(journalPlan(db, {
+    key: 'sale:order', day: '2026-09-22', title: 'Historical delivered sale', source: 'order', sourceId: 'order',
+  }, [{ account: '1100', debit: 150000 }, { account: '4000', credit: 150000 }]).statements);
+  await recordFinancialFailure(db, 'order', 'cogs', new Error('Historical FIFO-only cost rejection'));
+  const postedGoodsCost = () => count(raw, `SELECT COALESCE(SUM(l.debit_iqd-l.credit_iqd),0) n
+    FROM accounting_lines l JOIN accounting_entries e ON e.id=l.entry_id
+    WHERE l.account_code='5000' AND e.state='posted' AND e.source_id='order'`);
+  assert.equal(postedGoodsCost(), 0);
+  assert.equal((await getOrderProfitBase(db, 'order')).totals.cogs_iqd, 30000);
+  assert.equal((await reconcileFinanceOrder(db, 'order', { day: '2026-10-06' })).complete, true);
+  assert.equal(postedGoodsCost(), 0, 'staff reconciliation does not implicitly replay the entire sale');
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='cogs:order'"), 1,
+    'a known snapshot must not clear a still-unposted goods expense warning');
+  const message = row<{ message: string }>(raw, "SELECT message FROM finance_posting_errors WHERE event_key='cogs:order'")!.message;
+  assert.match(message, /تكلفة البضاعة مثبتة/, 'known cost must not be described as missing cost evidence');
+  assert.match(message, /قيد مصروفها المحاسبي لم يُرحّل/, 'the warning must identify the missing accounting posting');
+  assert.match(message, /أعد ترحيل مالية الطلب/, 'the warning must explain how to complete the posting');
+  await reconcileFinanceOrder(db, 'order', { day: '2026-10-06' });
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='cogs:order'"), 1);
+  await runOrderFinancialEffects({ DB: db } as Env, 'order', 'delivered', '2026-10-06');
+  assert.equal(postedGoodsCost(), 30000);
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='cogs:order'"), 0);
+  await runOrderFinancialEffects({ DB: db } as Env, 'order', 'delivered', '2026-10-06');
+  await reconcileFinanceOrder(db, 'order', { day: '2026-10-06' });
+  assert.equal(postedGoodsCost(), 30000, 'delivery and reconciliation retries must not duplicate the expense');
+});
+
+test('a genuine zero recorded cost clears the historical COGS error without requiring a zero-value journal', async () => {
+  const { raw, db } = setup();
+  raw.exec("UPDATE order_items SET cost_iqd=0 WHERE order_id='order'");
+  await db.batch(journalPlan(db, {
+    key: 'sale:order', day: '2026-09-22', title: 'Historical delivered sale', source: 'order', sourceId: 'order',
+  }, [{ account: '1100', debit: 150000 }, { account: '4000', credit: 150000 }]).statements);
+  await recordFinancialFailure(db, 'order', 'cogs', new Error('Historical FIFO-only cost rejection'));
+  const base = await getOrderProfitBase(db, 'order');
+  assert.equal(base.lines[0].cost_confidence, 'recorded_snapshot');
+  assert.equal(base.totals.cogs_iqd, 0);
+  assert.equal((await reconcileFinanceOrder(db, 'order', { day: '2026-10-06' })).complete, true);
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='cogs:order'"), 0);
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM accounting_entries WHERE event_key='cogs:order'"), 0);
+});
 
 test('order review distinguishes a recorded sale-time cost from unrecorded or unpriced history and never applies catalogue suggestions', async () => {
   const { raw, db, app } = setup();
