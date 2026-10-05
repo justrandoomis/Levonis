@@ -1,4 +1,5 @@
 import { auditStatements } from './audit';
+import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
 import { newId } from './crypto';
 import { conflict } from './http';
 import { baghdadDay, fence, journalPlan, periodOpen } from './operations';
@@ -79,10 +80,11 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
     const lines=base.lines.filter(l=>ids.includes(l.id));
     const qty=lines.reduce((n,l)=>n+Math.max(0,l.qty-l.returned_qty),0);
     const revenue=lines.reduce((n,l)=>n+l.retained_revenue_iqd,0);
-    const cogs=lines.some(l=>l.cogs_iqd===null||!['fifo','manual_verified'].includes(l.cost_confidence))?null:lines.reduce((n,l)=>n+l.cogs_iqd!,0);
-    let amount=qty===0?0:costAmount({...rule,cap_iqd:null},qty,Math.max(0,revenue),cogs);
+    const cogs=lines.some(l=>l.cogs_iqd===null||!isConfirmedOrderCost(l.cost_confidence))?null:lines.reduce((n,l)=>n+l.cogs_iqd!,0);
+    const unknownRevenue=['profit_percent','revenue_percent'].includes(rule.basis)&&lines.some(hasUnknownRefund);
+    let amount=unknownRevenue?null:qty===0?0:costAmount({...rule,cap_iqd:null},qty,Math.max(0,revenue),cogs);
     if(amount!==null){if(rule.cap_iqd!==null)amount=Math.min(amount,Math.max(0,rule.cap_iqd-(used.get(rule.id)??0)));used.set(rule.id,(used.get(rule.id)??0)+amount);}
-    result.push({cost:old.find(c=>key(c.rule_id,c.order_item_id)===key(rule.id,lineId))??null,rule,line_id:lineId,amount,qty,base_iqd:rule.basis==='profit_percent'?(cogs===null?null:Math.max(0,revenue-cogs)):revenue,manual:false,line_ids:ids});
+    result.push({cost:old.find(c=>key(c.rule_id,c.order_item_id)===key(rule.id,lineId))??null,rule,line_id:lineId,amount,qty,base_iqd:unknownRevenue?null:rule.basis==='profit_percent'?(cogs===null?null:Math.max(0,revenue-cogs)):revenue,manual:false,line_ids:ids});
   }
   // Scope exclusions, priority changes and an employment cutoff remove the
   // entitlement with an offset, preserving any payment that already happened.
@@ -114,7 +116,7 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
       const {cost,rule,amount}=target;
       const id=cost?.id??newId('oc'),liability='2100';
       if(cost&&cost.held_iqd>0&&amount!==null&&amount<cost.paid_iqd+cost.held_iqd)throw conflict('طلب سحب مفتوح يحتاج إعادة اعتماد قبل تخفيض الاستحقاق');
-      const snapshot=JSON.stringify({rule,qty:target.qty,staff_id:staff.id,earning_day:earningDay,profit_basis:'retained_goods_less_verified_cogs'});
+      const snapshot=JSON.stringify({rule,line_ids:target.line_ids,qty:target.qty,staff_id:staff.id,earning_day:earningDay,profit_basis:'retained_goods_less_verified_cogs'});
       if(!cost){
         const expense=amount!==null&&amount>0?newId('opex'):null;
         if(expense)statements.push(db.prepare('INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,note) VALUES (?,?,?,?,?,?)').bind(expense,rule.category_id,amount,day,rule.name,`استحقاق تسليم ${earningDay} / طلب ${orderId}`));

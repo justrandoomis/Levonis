@@ -1,8 +1,9 @@
 import { participantReport } from '../lib/financeParticipantReports';
+import { isConfirmedOrderCost } from '../lib/financeLedger';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, conflict, forbidden, notFound, requireAdmin, str, unavailable } from '../lib/http';
-import { canViewFinancials } from '../lib/adminScope';
+import { canViewFinancials, isOwner } from '../lib/adminScope';
 import { newId } from '../lib/crypto';
 import { auditStatements } from '../lib/audit';
 import { baghdadDay, dateValue, decimal, fence, periodOpen, requireCapability, whole } from '../lib/operations';
@@ -11,6 +12,7 @@ import { planExpenseAccounting } from '../lib/expenseAccounting';
 import { addOwnerPromotions, applyProfitAdjustment, getOrderProfitBase, getOrderProfitBases, monthlyPromotionShares, planProfitAdjustment, planWorkspaceAccounting, profitFields, profitSourceFingerprint, workspaceInstalled, type OrderProfitBase, type ProfitAdjustment, type ProfitField, type ProfitLine } from '../lib/orderProfit';
 import { investorFinanceInstalled, investorOrderSplit, investorProjectionStaleSql } from '../lib/investorFinance';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
+import { enrichOrderProfitReview } from '../lib/orderProfitReview';
 
 type Row=Record<string,unknown>;
 const n=(v:unknown)=>Number(v??0),s=(v:unknown)=>String(v??'');
@@ -35,7 +37,8 @@ function sumRows(rows:Row[]):Row {
   return totals;
 }
 function orderRow(base:OrderProfitBase){return {...base.order,...base.totals,id:base.order_id,order_id:base.order_id,version:base.version,
-  cost_confidence:base.lines.every((l)=>['fifo','manual_verified'].includes(l.cost_confidence))?'verified':base.lines.some((l)=>l.cogs_iqd===null)?'unknown':'snapshot'};}
+  review_reasons:[...base.lines.flatMap(l=>l.cost_review?.issues??[]),...base.costs.flatMap(c=>Array.isArray(c.review_reasons)?c.review_reasons:[])],
+  cost_confidence:base.lines.every((l)=>isConfirmedOrderCost(l.cost_confidence))?'verified':base.lines.some((l)=>l.cogs_iqd===null)?'unknown':'snapshot'};}
 function grouped(lines:ProfitLine[],kind:'product'|'main'|'sub'){
   const groups=new Map<string,{name:string;lines:ProfitLine[]}>();
   for(const l of lines){const id=kind==='product'?l.product_id||l.id:kind==='main'?l.main_catalog_id:l.sub_catalog_id;
@@ -86,7 +89,7 @@ async function addInvestors(db:D1Database,bases:OrderProfitBase[],live=false){
     db.prepare('SELECT order_id FROM finance_posting_errors WHERE order_id IN (SELECT value FROM json_each(?))').bind(ids).all<Row>()]);
   for(const b of bases){let pending=false;
     for(const l of b.lines){const rr=(rows.results??[]).filter((r)=>r.order_id===b.order_id&&r.order_item_id===l.id),isFunded=(funded.results??[]).some((r)=>r.order_id===b.order_id&&r.order_item_id===l.id);
-      const stale=isFunded&&(rr.length===0||rr.some((r)=>n(r.pending)>0||n(r.projection_stale)>0||n(JSON.parse(s(r.snapshot)).version)!==b.version)||(errors.results??[]).some((r)=>r.order_id===b.order_id)||!['fifo','manual_verified'].includes(l.cost_confidence)||l.profit_basis_iqd===null);
+      const stale=isFunded&&(rr.length===0||rr.some((r)=>n(r.pending)>0||n(r.projection_stale)>0||n(JSON.parse(s(r.snapshot)).version)!==b.version)||(errors.results??[]).some((r)=>r.order_id===b.order_id)||!isConfirmedOrderCost(l.cost_confidence)||l.profit_basis_iqd===null);
       l.investor_iqd=stale?null:rr.reduce((v,r)=>v+n(r.profit_iqd)-n(r.loss_iqd),0);
       l.owner_net_iqd=stale||l.profit_basis_iqd===null?null:l.profit_basis_iqd-n(l.promotion_iqd)-n(l.investor_iqd);pending ||= stale;}
     b.totals.investor_iqd=b.lines.some((l)=>l.investor_iqd===null)?null:b.lines.reduce((v,l)=>v+n(l.investor_iqd),0);
@@ -137,9 +140,10 @@ adminFinanceWorkspaceRoutes.get('/orders',async(c)=>{
   const result=await selectOrders(c.env.DB,r,{offset,q:text(c.req.query('q'),100),status:text(c.req.query('status'),30)});
   return c.json({success:true,orders:result.bases.map(orderRow),total:result.total,offset,range:r});
 });
-async function detail(db:D1Database,id:string){
+async function detail(db:D1Database,id:string,canVerify=true){
   const base=await getOrderProfitBase(db,id);if(base.order.seller_type!=='levonis')throw notFound('Order not found');
   await addInvestors(db,[base],true);
+  await enrichOrderProfitReview(db,base,canVerify);
   const history=await db.prepare('SELECT a.id,a.order_item_id line_id,a.field,a.old_value_iqd,a.new_value_iqd,a.version,a.actor_id,u.name actor_name,a.created_at,a.reason,a.journal_id FROM finance_order_adjustments a LEFT JOIN users u ON u.id=a.actor_id WHERE a.order_id=? ORDER BY a.version DESC LIMIT 200').bind(id).all<Row>();
   const wages=await db.prepare("SELECT a.id,c.order_item_id line_id,'amount_iqd' field,a.before_iqd old_value_iqd,a.after_iqd new_value_iqd,a.actor_id,u.name actor_name,a.created_at,a.kind,0 version FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id LEFT JOIN users u ON u.id=a.actor_id WHERE c.order_id=? ORDER BY a.created_at DESC LIMIT 200").bind(id).all<Row>();
   return {...base,history:[...(history.results??[]),...(wages.results??[])].sort((a,b)=>s(b.created_at).localeCompare(s(a.created_at))).slice(0,200)};
@@ -149,7 +153,13 @@ async function reconcileWorkspace(db:D1Database,id:string,actor:string,day:strin
   if(result.complete)await db.prepare('DELETE FROM finance_posting_errors WHERE event_key=?').bind(`workspace-reconciliation:${id}`).run();
   return !result.complete;
 }
-adminFinanceWorkspaceRoutes.get('/orders/:id',async(c)=>c.json({success:true,...await detail(c.env.DB,c.req.param('id'))}));
+adminFinanceWorkspaceRoutes.get('/orders/:id',async(c)=>{
+  const actor=c.get('user')!;
+  const permissions=(await c.env.DB.prepare("SELECT capability,allowed FROM ops_permissions WHERE user_id=? AND capability IN ('accounting','rules')").bind(actor.id).all<{capability:string;allowed:number}>()).results??[];
+  const canVerify=isOwner(c.env,actor)||permissions.find(p=>p.capability==='accounting')?.allowed!==0;
+  const canReconcile=isOwner(c.env,actor)||permissions.find(p=>p.capability==='rules')?.allowed!==0;
+  return c.json({success:true,...await detail(c.env.DB,c.req.param('id'),canVerify),can_reconcile:canReconcile});
+});
 adminFinanceWorkspaceRoutes.post('/orders/:id/adjustments',async(c)=>{
   const db=c.env.DB,actor=c.get('user')!,id=c.req.param('id');await requireCapability(c.env,actor,'accounting');
   const body=await c.req.json<Row>(),field=text(body.field,40) as ProfitField,value=whole(body.value_iqd,'القيمة الجديدة'),lineId=text(body.line_id,100)||null;

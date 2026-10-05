@@ -70,8 +70,8 @@ test('unknown actual cost remains null until explicit verification, then reconci
   assert.equal(balance(raw,'5000'),30000);assert.equal(balance(raw,'2990'),-10000);assert.equal((await getOrderProfitBase(db,'order')).totals.cogs_iqd,30000);
   await syncOrderWorkspaceAccounting(db,'order');assert.equal(balance(raw,'5000'),30000);
 });
-test('a verified cost posts its whole amount when only an untrusted checkout snapshot existed',async()=>{
-  const {raw,env,app}=setup();raw.exec('DELETE FROM order_item_inventory_allocations');await runOrderFinancialEffects(env,'order','delivered');
+test('a verified cost posts its whole amount when only an unrecorded historical estimate existed',async()=>{
+  const {raw,env,app}=setup();raw.exec("DELETE FROM order_item_inventory_allocations;UPDATE order_items SET cost_basis='unrecorded'");await runOrderFinancialEffects(env,'order','delivered');
   assert.equal(balance(raw,'5000'),0);assert.equal((await json(await get(app,'/f/orders/order'))).lines[0].cost_confidence,'snapshot');
   const response=await edit(app,'cogs_iqd',15000);assert.equal(response.status,200,JSON.stringify(await json(response)));
   assert.equal(balance(raw,'5000'),15000);assert.equal(balance(raw,'2990'),-15000);assert.equal(count(raw,"SELECT COUNT(*) n FROM accounting_entries WHERE event_key='cogs:order'"),0);

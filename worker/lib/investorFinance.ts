@@ -1,4 +1,5 @@
 import { newId } from './crypto';
+import { isConfirmedOrderCost } from './financeLedger';
 import { badRequest, conflict, notFound } from './http';
 import { allocateExact, baghdadDay, fence, journalPlan, periodOpen } from './operations';
 import { getOrderProfitBase } from './orderProfit';
@@ -97,7 +98,7 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
   for (const line of base.lines) {
     if (line.profit_basis_iqd !== null) totalBasis += line.profit_basis_iqd;
     const rows = line.allocations;
-    if (!rows.length || line.profit_basis_iqd === null || line.cogs_iqd === null || !['fifo','manual_verified'].includes(line.cost_confidence) || (line.cost_confidence !== 'manual_verified' && rows.some(a => a.cogs_iqd === null))) {
+    if (!rows.length || line.profit_basis_iqd === null || line.cogs_iqd === null || !isConfirmedOrderCost(line.cost_confidence) || (line.cost_confidence !== 'manual_verified' && rows.some(a => a.cogs_iqd === null))) {
       if (rows.some(a => contracts.some(c => c.incoming_id === origins.find(o => o.id === a.id)?.incoming_id))) pending = true;
       continue;
     }

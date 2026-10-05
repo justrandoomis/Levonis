@@ -202,10 +202,10 @@ test('changing a per-order scope counts both removed and newly included units wi
   assert.equal(removed.value.units_count,2);assert.equal(removed.value.delta_iqd,-10000);
 });
 
-test('a preview made by a superseded calculation cannot resume or apply even if source data is unchanged',async()=>{
+for(const oldCalculationVersion of [null,2])test(`a preview made by superseded calculation ${oldCalculationVersion??'legacy'} cannot resume or apply even if source data is unchanged`,async()=>{
   const x=await setup();await x.order('order',1,'2026-09-20T12:00:00Z');await x.drain();
   const p=await x.preview(5000,'2026-09-15');
-  x.raw.prepare("UPDATE finance_wage_preview_jobs SET work_json=json_remove(work_json,'$.calculation_version'),result_json=json_remove(result_json,'$.calculation_version') WHERE id=?").run(p.value.preview_job_id);
+  x.raw.prepare("UPDATE finance_wage_preview_jobs SET work_json=json_set(work_json,'$.calculation_version',?),result_json=json_set(result_json,'$.calculation_version',?) WHERE id=?").run(oldCalculationVersion,oldCalculationVersion,p.value.preview_job_id);
   assert.equal((await post(x.boss,`/people/rules/${x.ruleId}/preview`,{...p.body,preview_job_id:p.value.preview_job_id})).status,409);
   assert.equal((await post(x.boss,`/people/rules/${x.ruleId}/apply`,{...p.body,preview_token:p.value.preview_token,operation_id:crypto.randomUUID()})).status,409);
   assert.equal((await x.earnings()).summary.earned_iqd,10000);
@@ -216,7 +216,7 @@ test('an interrupted preview from a superseded calculation is restarted instead 
   const x=await setup();for(let i=0;i<7;i++)await x.order(`order-${i}`,1,'2026-09-20T12:00:00Z');await x.drain();
   const body={version:1,amount:5000,basis:'unit',effective_from:'2026-09-15',reason:'Check calculation upgrade'};
   const p=await json(await post(x.boss,`/people/rules/${x.ruleId}/preview`,body));assert.equal(p.complete,false);
-  x.raw.prepare("UPDATE finance_wage_preview_jobs SET work_json=json_remove(work_json,'$.calculation_version') WHERE id=?").run(p.preview_job_id);
+  x.raw.prepare("UPDATE finance_wage_preview_jobs SET work_json=json_set(work_json,'$.calculation_version',2) WHERE id=?").run(p.preview_job_id);
   assert.equal((await post(x.boss,`/people/rules/${x.ruleId}/preview`,{...body,preview_job_id:p.preview_job_id})).status,409);
   const fresh=await x.preview(5000,'2026-09-15');assert.equal(fresh.value.orders_count,7);assert.equal(fresh.value.reviewed_orders_count,7);assert.equal(fresh.value.delta_iqd,-35000);
 });

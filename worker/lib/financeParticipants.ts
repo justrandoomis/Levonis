@@ -1,4 +1,5 @@
 import { investorAccountProgress } from './financeInvestorAccount';
+import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
 import { accountMovements } from './financeAccountHistory';
 import { reconcileEffectiveWages } from './financeWageCalculation';
 import { investorProjectionStaleSql } from './investorFinance';
@@ -32,11 +33,21 @@ const paidSourceSql = (kind: string, id: string) => `(SELECT COALESCE(SUM(wp.pai
 // sales. Keep that warning for the owner and investors, but do not freeze an
 // independently determined wage. Unknown/legacy bases remain conservative;
 // all other posting failures and percentage-basis freshness guards still apply.
-export const staffReconciliationBlockedSql=(orderSql='c.order_id',costSql='c.id',includeLate=true)=>`(EXISTS(SELECT 1 FROM finance_wage_targets wt WHERE wt.cost_id=${costSql} AND wt.amount_iqd IS NULL) OR EXISTS(SELECT 1 FROM finance_order_costs ec JOIN finance_staff es ON es.id=ec.staff_id JOIN orders eo ON eo.id=ec.order_id WHERE ec.id=${costSql} AND COALESCE(ec.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments ca WHERE ca.cost_id=ec.id),0)>0 AND es.start_work_date IS NOT NULL AND (eo.status<>'delivered' OR COALESCE(date(eo.delivered_at,'+3 hours')>es.start_work_date,0)=0)) OR EXISTS(SELECT 1 FROM finance_staff_reconciliations j JOIN finance_order_costs ec ON ec.staff_id=j.staff_id JOIN orders jo ON jo.id=ec.order_id WHERE ec.id=${costSql} AND j.state<>'complete' AND ec.order_id>j.cursor AND (j.affected_from IS NULL OR date(jo.delivered_at,'+3 hours')>=j.affected_from) AND (j.affected_until IS NULL OR date(jo.delivered_at,'+3 hours')<j.affected_until)) OR EXISTS(SELECT 1 FROM finance_posting_errors pe WHERE pe.order_id=${orderSql}
+// Delivery reconciles its own wage synchronously. An older bulk job may still
+// be walking historical orders: its cursor is not evidence that this new
+// order's current-version target is stale. Release only that proven target;
+// older costs and their paid-overpayment reserves remain blocked below.
+const currentWageTargetSql=(cost='ec',job='j',order='jo')=>`EXISTS(SELECT 1 FROM finance_wage_targets ready WHERE ready.cost_id=${cost}.id AND ready.employment_version=${job}.revision AND ready.amount_iqd=${effectiveStaffCostSql(cost)} AND ready.earning_day=date(${order}.delivered_at,'+3 hours'))`;
+// Match the refund evidence used by getOrderProfitBase, including pre-ledger
+// returns. A refreshed basis fingerprint alone never proves a missing amount.
+const unknownWageRefundSql=(orderSql:string,itemSql:string)=>`EXISTS(SELECT 1 FROM return_cases ur WHERE ur.order_id=${orderSql} AND (${itemSql} IS NULL OR ur.order_item_id=${itemSql}) AND ur.state='resolved' AND ur.resolution='refund' AND
+  CASE WHEN EXISTS(SELECT 1 FROM finance_refund_facts uf WHERE uf.case_id=ur.id) THEN (SELECT uf.refund_iqd FROM finance_refund_facts uf WHERE uf.case_id=ur.id)
+  ELSE COALESCE((SELECT json_extract(ua.detail,'$.refund.amount_iqd') FROM audit_log ua WHERE ua.action='return.transition' AND ua.target=ur.id AND json_valid(ua.detail) AND json_extract(ua.detail,'$.refund.amount_iqd') IS NOT NULL ORDER BY ua.id DESC LIMIT 1),(SELECT uw.amount_iqd FROM wallet_transactions uw WHERE uw.id='wtx_ret_'||ur.id AND uw.status='approved')) END IS NULL)`;
+export const staffReconciliationBlockedSql=(orderSql='c.order_id',costSql='c.id',includeLate=true)=>`(EXISTS(SELECT 1 FROM finance_wage_targets wt WHERE wt.cost_id=${costSql} AND wt.amount_iqd IS NULL) OR EXISTS(SELECT 1 FROM finance_order_costs ec JOIN finance_staff es ON es.id=ec.staff_id JOIN orders eo ON eo.id=ec.order_id WHERE ec.id=${costSql} AND COALESCE(ec.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments ca WHERE ca.cost_id=ec.id),0)>0 AND es.start_work_date IS NOT NULL AND (eo.status<>'delivered' OR COALESCE(date(eo.delivered_at,'+3 hours')>es.start_work_date,0)=0)) OR EXISTS(SELECT 1 FROM finance_staff_reconciliations j JOIN finance_order_costs ec ON ec.staff_id=j.staff_id JOIN orders jo ON jo.id=ec.order_id WHERE ec.id=${costSql} AND j.state<>'complete' AND ec.order_id>j.cursor AND (j.affected_from IS NULL OR date(jo.delivered_at,'+3 hours')>=j.affected_from) AND (j.affected_until IS NULL OR date(jo.delivered_at,'+3 hours')<j.affected_until) AND NOT ${currentWageTargetSql()}) OR EXISTS(SELECT 1 FROM finance_posting_errors pe WHERE pe.order_id=${orderSql}
   AND (pe.event_key<>'cogs:'||${orderSql} OR NOT EXISTS(SELECT 1 FROM finance_order_costs wage WHERE wage.id=${costSql} AND COALESCE((SELECT basis FROM finance_wage_targets WHERE cost_id=wage.id),json_extract(wage.snapshot,'$.rule.basis')) IN ('unit','order','revenue_percent')))) OR EXISTS(
   SELECT 1 FROM finance_order_costs sc WHERE sc.id=${costSql} AND COALESCE((SELECT basis FROM finance_wage_targets WHERE cost_id=sc.id),json_extract(sc.snapshot,'$.rule.basis')) IN ('profit_percent','revenue_percent')
   AND NOT EXISTS(SELECT 1 FROM finance_cost_adjustments ca WHERE ca.cost_id=sc.id AND ca.kind='manual')
-  AND NOT EXISTS(SELECT 1 FROM finance_staff_basis sb WHERE sb.order_id=${orderSql} AND sb.basis_fingerprint=(${staffBasisFingerprintSql(orderSql,includeLate)}))))`;
+  AND (${unknownWageRefundSql(orderSql,'sc.order_item_id')} OR NOT EXISTS(SELECT 1 FROM finance_staff_basis sb WHERE sb.order_id=${orderSql} AND sb.basis_fingerprint=(${staffBasisFingerprintSql(orderSql,includeLate)})))))`;
 
 const pendingPaymentCoverSql=(cost='c.id')=>`COALESCE((SELECT MIN(${staffPaidSql(cost)},COALESCE(t.amount_iqd,0)) FROM finance_wage_pending_targets t JOIN finance_wage_changes wc ON wc.id=t.change_id JOIN finance_order_costs ec ON ec.id=t.cost_id JOIN finance_staff_reconciliations j ON j.staff_id=ec.staff_id AND j.operation_id=t.change_id WHERE t.cost_id=${cost} AND j.state<>'complete' AND ec.order_id>j.cursor ORDER BY wc.created_at DESC LIMIT 1),0)`;
 
@@ -44,17 +55,17 @@ const investorReconciliationBlockedSql=(contractSql='e.contract_id')=>`(${invest
 const active = (state: string) => ['requested', 'approved', 'part_paid'].includes(state);
 
 /** Only the participant's payable amounts. No customer, margin, cost base or other people's accounts. */
-export async function participantSources(db: D1Database, userId: string): Promise<ParticipantSource[]> {
+export async function participantSources(db: D1Database, userId: string, scope: 'account' | 'staff' = 'account'): Promise<ParticipantSource[]> {
   const installed = await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_investor_earnings'").first();
   const staff = await db.prepare(`SELECT c.id,'staff' AS kind,c.rule_name AS title,c.order_id,c.cost_day AS day,
     COALESCE(${effectiveStaffCostSql()},0) AS amount_iqd,COALESCE(${effectiveStaffCostSql()},0) AS accrued_iqd,
     ${pendingPaymentCoverSql()} AS pending_payment_cover_iqd,${staffPaidSql()} AS paid_iqd,${heldSourceSql("'staff'", 'c.id')} AS held_iqd,c.state,c.staff_id,EXISTS(SELECT 1 FROM finance_wage_targets wt WHERE wt.cost_id=c.id AND wt.amount_iqd IS NULL) AS pending_cost,${staffReconciliationBlockedSql('c.order_id','c.id',!!installed)} AS blocked,
     CASE WHEN c.state IN ('due','approved') THEN 1 ELSE 0 END AS eligible,
     (SELECT COUNT(*) FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id) AS version
-    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id WHERE s.user_id=? AND c.state<>'reversed'
+    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id WHERE ${scope==='staff'?'s.id':'s.user_id'}=? AND c.state<>'reversed'
     ORDER BY c.cost_day,c.id`).bind(userId).all<ParticipantSource>();
   let sources = staff.results ?? [];
-  if (installed) {
+  if (installed && scope === 'account') {
     const investor = await db.prepare(`SELECT e.id,e.kind,e.title,e.order_id,e.day,e.amount_iqd,e.accrued_iqd,
       ${paidSourceSql('e.kind', 'e.id')} AS paid_iqd,${heldSourceSql('e.kind', 'e.id')} AS held_iqd,e.state,e.version,${investorReconciliationBlockedSql()} AS blocked,
       CASE WHEN e.state='available' THEN 1 ELSE 0 END AS eligible
@@ -63,10 +74,10 @@ export async function participantSources(db: D1Database, userId: string): Promis
   }
   return sources.map((s) => ({ ...s, eligible: !!s.eligible&&!s.blocked, available_iqd: s.eligible&&!s.blocked ? Math.max(0, s.amount_iqd-s.paid_iqd-s.held_iqd) : 0 }));
 }
-const participantAdvanceSql=`SELECT p.id,p.amount_iqd,COALESCE((SELECT SUM(a.amount_iqd) FROM finance_payment_allocations a WHERE a.payment_id=p.id),0) AS allocated
-  FROM finance_staff_payments p JOIN finance_staff s ON s.id=p.staff_id WHERE s.user_id=? AND p.kind='advance' ORDER BY p.id`;
-export async function participantAdvanceState(db:D1Database,userId:string) {
-  return (await db.prepare(`SELECT COALESCE(SUM(amount_iqd-allocated),0) AS balance,json_group_array(json_array(id,amount_iqd,allocated)) AS snapshot FROM (${participantAdvanceSql})`).bind(userId).first<{balance:number;snapshot:string}>())!;
+const participantAdvanceSql=(scope: 'account' | 'staff' = 'account')=>`SELECT p.id,p.amount_iqd,COALESCE((SELECT SUM(a.amount_iqd) FROM finance_payment_allocations a WHERE a.payment_id=p.id),0) AS allocated
+  FROM finance_staff_payments p JOIN finance_staff s ON s.id=p.staff_id WHERE ${scope==='staff'?'s.id':'s.user_id'}=? AND p.kind='advance' ORDER BY p.id`;
+export async function participantAdvanceState(db:D1Database,userId:string,scope: 'account' | 'staff' = 'account') {
+  return (await db.prepare(`SELECT COALESCE(SUM(amount_iqd-allocated),0) AS balance,json_group_array(json_array(id,amount_iqd,allocated)) AS snapshot FROM (${participantAdvanceSql(scope)})`).bind(userId).first<{balance:number;snapshot:string}>())!;
 }
 export const staffAdvanceSql=(staffIdSql='s.id')=>`(SELECT COALESCE(SUM(p.amount_iqd-COALESCE((SELECT SUM(a.amount_iqd) FROM finance_payment_allocations a WHERE a.payment_id=p.id),0)),0) FROM finance_staff_payments p WHERE p.staff_id=${staffIdSql} AND p.kind='advance')`;
 /** Cash debt and reservations are different. Each ledger offsets its own future
@@ -144,17 +155,30 @@ export function participantWithdrawableSources(entries: ParticipantSource[], adv
     return [s.id,take];
   }));
 }
-async function sourceSetFence(db: D1Database, userId: string, sources: ParticipantSource[],advanceSnapshot:string) {
+async function sourceSetFence(db: D1Database, userId: string, sources: ParticipantSource[],advanceSnapshot:string,scope: 'account' | 'staff' = 'account') {
   const investorInstalled=await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_investor_earnings'").first();
-  const staffSql=`SELECT c.id,'staff' AS kind,COALESCE(${effectiveStaffCostSql()},0) AS amount,${pendingPaymentCoverSql()} AS cover,${staffPaidSql()} AS paid,${heldSourceSql("'staff'",'c.id')} AS held,c.state,${staffReconciliationBlockedSql('c.order_id','c.id',!!investorInstalled)} AS blocked,
+  const includeInvestors=!!investorInstalled&&scope==='account';
+  const staffSql=`SELECT c.id AS id,'staff' AS kind,COALESCE(${effectiveStaffCostSql()},0) AS amount,${pendingPaymentCoverSql()} AS cover,${staffPaidSql()} AS paid,${heldSourceSql("'staff'",'c.id')} AS held,c.state,${staffReconciliationBlockedSql('c.order_id','c.id',!!investorInstalled)} AS blocked,
     (SELECT COUNT(*) FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id) AS version
-    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id WHERE s.user_id=? AND c.state<>'reversed'`;
+    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id WHERE ${scope==='staff'?'s.id':'s.user_id'}=? AND c.state<>'reversed'`;
   const investorSql=`SELECT e.id,e.kind,e.amount_iqd AS amount,0 AS cover,${paidSourceSql('e.kind','e.id')} AS paid,${heldSourceSql('e.kind','e.id')} AS held,e.state,${investorReconciliationBlockedSql()} AS blocked,e.version FROM finance_investor_earnings e WHERE e.user_id=?`;
   const expected=JSON.stringify([...sources].sort((a,b)=>a.kind===b.kind?(a.id<b.id?-1:a.id>b.id?1:0):(a.kind<b.kind?-1:1)).map((s)=>[s.id,s.kind,s.amount_iqd,s.paid_iqd,s.held_iqd,s.state,s.version,s.blocked?1:0,s.pending_payment_cover_iqd??0]));
   // One snapshot fence covers both changed rows and newly added sources. A
   // large staff history does not turn one payout into thousands of queries.
-  return [...fence(db,`(SELECT json_group_array(json_array(id,kind,amount,paid,held,state,version,blocked,cover)) FROM (${staffSql}${investorInstalled?' UNION ALL '+investorSql:''} ORDER BY kind,id))=?`,investorInstalled?[userId,userId,expected]:[userId,expected]),
-    ...fence(db,`(SELECT json_group_array(json_array(id,amount_iqd,allocated)) FROM (${participantAdvanceSql}))=?`,[userId,advanceSnapshot])];
+  return [...fence(db,`(SELECT json_group_array(json_array(id,kind,amount,paid,held,state,version,blocked,cover)) FROM (${staffSql}${includeInvestors?' UNION ALL '+investorSql:''} ORDER BY kind,id))=?`,includeInvestors?[userId,userId,expected]:[userId,expected]),
+    ...fence(db,`(SELECT json_group_array(json_array(id,amount_iqd,allocated)) FROM (${participantAdvanceSql(scope)}))=?`,[userId,advanceSnapshot])];
+}
+
+/** Direct payroll has the same wage-only debt/reservation budget as a self
+ * withdrawal, including historical blocked payments and unlinked legacy staff.
+ * The caller still limits allocation to approved costs. Fence every source,
+ * not only those positive approved rows, so a concurrent correction cannot
+ * create debt between calculating this budget and committing cash payment. */
+export async function staffPaymentBudget(db:D1Database,staffId:string) {
+  const sources=await participantSources(db,staffId,'staff');
+  const advance=await participantAdvanceState(db,staffId,'staff');
+  return {available_iqd:participantSummary(sources,advance.balance).ledgers.staff.available_iqd,
+    statements:await sourceSetFence(db,staffId,sources,advance.snapshot,'staff')};
 }
 export async function commitParticipantStatements(db: D1Database, statements: D1PreparedStatement[]) {
   try { await db.batch(statements); } catch (e) {
@@ -274,10 +298,11 @@ export async function payWithdrawal(db: D1Database, actor: string, withdrawalId:
 
 const wageBasisSql=`json_array(
  (SELECT json_array(status,delivered_at,price_adjustment_iqd,shipping_iqd,cod_tax_iqd,points_discount_iqd) FROM orders WHERE id=?),
- (SELECT json_group_array(json_array(id,qty,line_total_iqd,component_alloc_iqd,coupon_discount_iqd,membership_discount_iqd,cost_iqd)) FROM (SELECT * FROM order_items WHERE order_id=? ORDER BY id)),
+ (SELECT json_group_array(json_array(id,qty,line_total_iqd,component_alloc_iqd,coupon_discount_iqd,membership_discount_iqd,cost_iqd,cost_basis)) FROM (SELECT * FROM order_items WHERE order_id=? ORDER BY id)),
  (SELECT COALESCE(MAX(version),0) FROM finance_order_adjustments WHERE order_id=?),
  (SELECT json_group_array(json_array(id,qty,cogs_iqd,released_at)) FROM (SELECT * FROM order_item_inventory_allocations WHERE order_id=? ORDER BY id)),
  (SELECT json_group_array(json_array(case_id,refund_iqd,qty,cogs_iqd,disposition)) FROM (SELECT * FROM finance_refund_facts WHERE order_id=? ORDER BY case_id)),
+ (SELECT json_group_array(json_array(r.id,r.state,r.resolution,r.qty,w.amount_iqd,w.status,(SELECT json_extract(a.detail,'$.refund.amount_iqd') FROM audit_log a WHERE a.action='return.transition' AND a.target=r.id AND json_valid(a.detail) AND json_extract(a.detail,'$.refund.amount_iqd') IS NOT NULL ORDER BY a.id DESC LIMIT 1))) FROM (SELECT * FROM return_cases WHERE order_id=? ORDER BY id) r LEFT JOIN wallet_transactions w ON w.id='wtx_ret_'||r.id),
  (SELECT json_group_array(json_array(group_key,staff_id,completed_at)) FROM (SELECT * FROM finance_task_assignments WHERE order_id=? ORDER BY group_key)),
  (SELECT json_group_array(json_array(ca.id,ca.cost_id,ca.delta_iqd)) FROM finance_cost_adjustments ca JOIN finance_order_costs cc ON cc.id=ca.cost_id WHERE cc.order_id=? AND ca.kind='manual'),
  (SELECT json_group_array(json_array(id,employment_version,start_work_date)) FROM (SELECT DISTINCT s.id,s.employment_version,s.start_work_date FROM finance_staff s JOIN finance_order_costs ec ON ec.staff_id=s.id WHERE ec.order_id=? ORDER BY s.id)))`;
@@ -315,7 +340,7 @@ export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, 
     const used=caps.get(cost.rule_id)??0;
     if(cost.manual_override)continue;
     const targets=base.lines.filter((l)=>cost.order_item_id?l.id===cost.order_item_id:snapshot.some((f)=>f.line_id===l.id&&f.rules.some((r)=>r.id===cost.rule_id)));
-    if(!targets.length || (rule.basis==='profit_percent' && targets.some((l)=>l.cogs_iqd===null || !['fifo','manual_verified'].includes(l.cost_confidence))))continue;
+    if(!targets.length || targets.some(hasUnknownRefund) || (rule.basis==='profit_percent' && targets.some((l)=>l.cogs_iqd===null || !isConfirmedOrderCost(l.cost_confidence))))continue;
     if(cost.state==='pending_cost' && rule.requires_assignment) {
       const task=await db.prepare('SELECT staff_id,completed_at FROM finance_task_assignments WHERE order_id=? AND group_key=?').bind(orderId,cost.group_key).first<{staff_id:string;completed_at:string|null}>();
       if(!task || task.staff_id!==cost.staff_id || (cost.milestone==='prepared'&&!task.completed_at))continue;

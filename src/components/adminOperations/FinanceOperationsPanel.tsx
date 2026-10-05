@@ -1147,7 +1147,7 @@ function Reports({ config, from, to }: { config: Config; from: string; to: strin
                 <Cell>{money(l.net_goods_iqd)}</Cell>
                 <Cell>{money(l.cogs_iqd)}</Cell>
                 <Cell>
-                  {l.cost_confidence === 'fifo' ? 'FIFO' : loc('تقدير / غير معروف', 'Snapshot / unknown')}
+                  {l.cost_confidence === 'fifo' ? loc('دفعات المخزون', 'Inventory lots') : l.cost_confidence === 'recorded_snapshot' ? loc('تكلفة مثبتة وقت الطلب', 'Cost recorded at checkout') : l.cost_confidence === 'manual_verified' ? loc('تكلفة معتمدة للطلب', 'Verified order cost') : loc('تقدير / غير معروف', 'Reference / unknown')}
                 </Cell>
               </tr>
             ))}

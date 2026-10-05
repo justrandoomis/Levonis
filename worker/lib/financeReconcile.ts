@@ -1,4 +1,5 @@
 import { reconcileStaffOrderCosts } from './financeParticipants';
+import { isConfirmedOrderCost } from './financeLedger';
 import { recognizeLateCosts, syncInvestorOrder } from './investorFinance';
 import { recordFinancialFailure } from './financePostingErrors';
 import { getOrderProfitBase, syncOrderWorkspaceAccounting } from './orderProfit';
@@ -17,7 +18,7 @@ export async function reconcileFinanceOrder(db:D1Database,orderId:string,opts:{a
     // original FIFO posting was incomplete. Clear only that old COGS warning
     // after the delivered sale and its accounting overlay have reconciled.
     const basis=await getOrderProfitBase(db,orderId);
-    if(basis.order.status==='delivered' && basis.lines.length>0 && basis.lines.every((line)=>line.cogs_iqd!==null && ['fifo','manual_verified'].includes(line.cost_confidence)) &&
+    if(basis.order.status==='delivered' && basis.lines.length>0 && basis.lines.every((line)=>line.cogs_iqd!==null && isConfirmedOrderCost(line.cost_confidence)) &&
       await db.prepare("SELECT 1 FROM accounting_entries WHERE event_key=? AND state='posted'").bind(`sale:${orderId}`).first())
       await db.prepare('DELETE FROM finance_posting_errors WHERE event_key=?').bind(`cogs:${orderId}`).run();
     await syncInvestorOrder(db,orderId,opts);

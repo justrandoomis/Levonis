@@ -1,6 +1,8 @@
 import { allocateExact, baghdadDay, fence, journalPlan, periodOpen } from './operations';
 import { badRequest, conflict, notFound } from './http';
 import { newId } from './crypto';
+import { describeOrderProfit, type ProfitCostReview } from './orderProfitReview';
+import { COST_BASIS, isConfirmedOrderCost, normalizeCostBasis } from './financeLedger';
 
 type Row = Record<string, unknown>;
 const n = (v: unknown) => Number(v ?? 0);
@@ -57,10 +59,12 @@ export function calculateGoods(order: Row, all: GoodsLine[], allocations: Alloca
     lines: items.map((v, i) => {
       const consumed = allocations.filter((a) => a.order_item_id === v.id && !a.released_at);
       const exact = consumed.length > 0 && consumed.every((a) => a.cogs_iqd !== null) && consumed.reduce((sum, a) => sum + a.qty, 0) >= v.qty;
-      const cost = exact ? consumed.reduce((sum, a) => sum + n(a.cogs_iqd), 0) : consumed.length > 0 || v.cost_iqd === null ? null : v.cost_iqd * v.qty;
+      const basis = normalizeCostBasis(v.cost_basis);
+      const savedCost = v.cost_iqd !== null && Number.isSafeInteger(v.cost_iqd) && v.cost_iqd >= 0 ? v.cost_iqd : null;
+      const cost = exact ? consumed.reduce((sum, a) => sum + n(a.cogs_iqd), 0) : consumed.length > 0 || savedCost === null || basis === COST_BASIS.unpriced ? null : savedCost * v.qty;
       return { ...v, original_net_goods_iqd: original[i], price_adjustment_iqd: shares[i] ?? 0,
         net_goods_iqd: net[i], cogs_iqd: cost, fifo_cogs_iqd: exact ? cost : null,
-        cost_confidence: exact ? 'fifo' : cost === null ? 'unknown' : 'snapshot' } as PricedGoodsLine;
+        cost_confidence: exact ? 'fifo' : cost === null ? 'unknown' : basis === COST_BASIS.snapshot ? 'recorded_snapshot' : 'snapshot' } as PricedGoodsLine;
     }),
   };
 }
@@ -82,6 +86,8 @@ export interface ProfitLine extends Row {
   wages_iqd: number; materials_iqd: number; manual_direct_iqd: number;
   gross_profit_iqd: number | null; contribution_profit_iqd: number | null; profit_basis_iqd: number | null;
   main_catalog_id: string; sub_catalog_id: string; main_name: string; sub_name: string;
+  cost_review?: ProfitCostReview;
+  return_review_sources?: Array<{id:string;cogs_unknown:boolean;refund_unknown:boolean}>;
   allocations: Array<{ id: string; lot_id: string; incoming_id: string | null; qty: number; cogs_iqd: number | null; unit_cost_iqd: number | null; returned_qty: number; returned_cogs_iqd: number | null; late_cost_iqd: number }>;
 }
 export interface ProfitTotals extends Row {
@@ -167,7 +173,7 @@ export async function getOrderProfitBases(db: D1Database, orderIds: string[], op
     db.prepare('SELECT o.*,u.name customer_name FROM orders o LEFT JOIN users u ON u.id=o.user_id WHERE o.id IN (SELECT value FROM json_each(?)) ORDER BY o.id').bind(ids).all<Row>(),
     db.prepare(`SELECT i.*,${scopes} FROM order_items i LEFT JOIN products p ON p.id=i.product_id LEFT JOIN catalogs mc ON mc.id=p.category_id LEFT JOIN catalogs sc ON sc.id=p.sub_category_id ${scopeJoin} WHERE i.order_id IN (SELECT value FROM json_each(?)) ORDER BY i.id`).bind(ids).all<GoodsLine>(),
     db.prepare('SELECT a.*,l.incoming_id FROM order_item_inventory_allocations a LEFT JOIN inventory_lots l ON l.id=a.lot_id WHERE a.order_id IN (SELECT value FROM json_each(?)) ORDER BY a.id').bind(ids).all<Allocation>(),
-    db.prepare(`SELECT c.*,${present.has('finance_wage_targets')?"CASE WHEN EXISTS(SELECT 1 FROM finance_wage_targets wt WHERE wt.cost_id=c.id AND wt.amount_iqd IS NULL) THEN 'pending_cost' ELSE c.state END":'c.state'} AS state,${adjustedCost} effective_amount_iqd,s.name staff_name FROM finance_order_costs c LEFT JOIN finance_staff s ON s.id=c.staff_id WHERE c.order_id IN (SELECT value FROM json_each(?)) ORDER BY c.id`).bind(ids).all<Row>(),
+    db.prepare(`SELECT c.*,${present.has('finance_wage_targets')?"CASE WHEN EXISTS(SELECT 1 FROM finance_wage_targets wt WHERE wt.cost_id=c.id AND wt.amount_iqd IS NULL) THEN 'pending_cost' ELSE c.state END":'c.state'} AS state,${adjustedCost} effective_amount_iqd,s.name staff_name,${present.has('finance_cost_adjustments')?'s.user_id':'NULL'} staff_user_id,${present.has('finance_wage_targets')?'(SELECT v.snapshot FROM finance_wage_targets wt JOIN finance_wage_versions v ON v.id=wt.wage_version_id WHERE wt.cost_id=c.id)':'NULL'} wage_rule_snapshot FROM finance_order_costs c LEFT JOIN finance_staff s ON s.id=c.staff_id WHERE c.order_id IN (SELECT value FROM json_each(?)) ORDER BY c.id`).bind(ids).all<Row>(),
     db.prepare('SELECT f.*,r.order_item_id FROM finance_refund_facts f JOIN return_cases r ON r.id=f.case_id WHERE f.order_id IN (SELECT value FROM json_each(?))').bind(ids).all<Row>(),
     db.prepare('SELECT l.order_id,e.amount_iqd FROM finance_expense_links l JOIN operating_expenses e ON e.id=l.expense_id WHERE e.voided_at IS NULL AND l.order_id IN (SELECT value FROM json_each(?)) AND NOT EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.expense_id=e.id) AND NOT EXISTS(SELECT 1 FROM finance_collections c WHERE c.expense_id=e.id)').bind(ids).all<Row>(),
     db.prepare('SELECT order_id,SUM(amount_iqd) collected_iqd,SUM(fee_iqd) courier_fee_iqd FROM finance_collections WHERE order_id IN (SELECT value FROM json_each(?)) GROUP BY order_id').bind(ids).all<Row>(),
@@ -212,6 +218,7 @@ export async function getOrderProfitBases(db: D1Database, orderIds: string[], op
       return {
         ...l, id: l.id, order_item_id: l.id, name_snapshot: s(l.name_snapshot), sku_snapshot: s(l.sku_snapshot),
         returned_qty: returns.reduce((sum, r) => sum + n(r.qty), 0),restocked_qty:returns.filter((r)=>r.disposition==='restock').reduce((sum,r)=>sum+n(r.qty),0), refund_iqd: returns.reduce((sum, r) => sum + n(r.refund_iqd), 0),unknown_refund:returns.some((r)=>r.refund_iqd===null)?1:0,
+        return_review_sources:returns.map(r=>({id:s(r.case_id),cogs_unknown:r.disposition==='restock'&&r.cogs_iqd===null,refund_unknown:r.refund_iqd===null})),
         retained_revenue_iqd: 0, restored_cogs_iqd: restored, cogs_iqd: lineCost,
         shipping_income_iqd: shipping[i] ?? 0, cod_tax_iqd: tax[i] ?? 0, courier_fee_iqd: courier[i] ?? 0, payment_fee_iqd: 0,
         direct_cost_iqd: 0, wages_iqd: 0, materials_iqd: 0, manual_direct_iqd: manual[i] ?? 0, pending_costs: 0,
@@ -238,7 +245,7 @@ export async function getOrderProfitBases(db: D1Database, orderIds: string[], op
         a.late_cost_iqd = n((lateCosts.results ?? []).find((c) => c.allocation_id === a.id)?.unit_delta_iqd) * Math.max(0,a.qty-a.returned_qty);
       }
       if(l.cogs_iqd!==null)l.cogs_iqd+=l.allocations.reduce((sum,a)=>sum+a.late_cost_iqd,0);
-      if (l.cost_confidence !== 'fifo') warnings.push(`cost:${l.id}:${l.cost_confidence}`);
+      if (!isConfirmedOrderCost(l.cost_confidence)) warnings.push(`cost:${l.id}:${l.cost_confidence}`);
     }
     for (const c of orderCosts) {
       if (c.state === 'reversed') continue;
@@ -258,7 +265,7 @@ export async function getOrderProfitBases(db: D1Database, orderIds: string[], op
     base.totals.collected_iqd = n(collected?.collected_iqd);
     base.totals.collection_difference_iqd = n(order.due_on_delivery_iqd) + n(order.gini_paid_iqd) - orderRefunds.filter((r) => r.channel === 'gini').reduce((sum, r) => sum + n(r.refund_iqd), 0) - n(collected?.collected_iqd);
     base.totals.orders_count = 1;
-    return base;
+    return describeOrderProfit(base);
   });
 }
 export async function getOrderProfitBase(db: D1Database, orderId: string): Promise<OrderProfitBase> {
@@ -306,7 +313,7 @@ export async function planWorkspaceAccounting(db:D1Database,plain:OrderProfitBas
     const key=fieldKey(field),before=plain.lines.reduce((sum,l)=>sum+n(l[key]),0),after=corrected.lines.reduce((sum,l)=>sum+n(l[key]),0);
     if(corrected.lines.some((l)=>l[key]===null)){if(field==='cogs_iqd'&&corrected.lines.some((l)=>l.cost_confidence==='manual_verified'))pending=true;continue;}
     const manualCost=corrected.lines.some((l)=>l.cost_confidence==='manual_verified');
-    if(field==='cogs_iqd'&&manualCost&&corrected.lines.some((l)=>!['fifo','manual_verified'].includes(l.cost_confidence))){pending=true;continue;}
+    if(field==='cogs_iqd'&&manualCost&&corrected.lines.some((l)=>!isConfirmedOrderCost(l.cost_confidence))){pending=true;continue;}
     const desired=field==='cogs_iqd'?(manualCost?after-nativeCogs-recognizedLate:0):after-before,delta=desired-(rows.find((r)=>r.field===field)?.total??0);
     if(!delta)continue;
     const income=['net_goods_iqd','shipping_iqd','cod_tax_iqd'].includes(field),amount=Math.abs(delta),increase=delta>0;

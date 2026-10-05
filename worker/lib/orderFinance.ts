@@ -1,7 +1,8 @@
 import type { Env } from './types';
+import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
 import { baghdadDay, fence, journalPlan, operationsInstalled } from './operations';
 import { newId } from './crypto';
-import { getOrderGoods, workspaceInstalled } from './orderProfit';
+import { getOrderGoods, getOrderProfitBase, workspaceInstalled } from './orderProfit';
 import { ruleScopeRank } from './financeRuleScopes';
 import { reconcileFinanceOrder } from './financeReconcile';
 import { reconcileStaffOrderCosts } from './financeParticipants';
@@ -289,6 +290,7 @@ export async function runOrderFinancialEffects(
       } else groups.set(key, { rule, lineIds: [line.id] });
     }
   }
+  const percentageBase=[...groups.values()].some(({rule})=>['profit_percent','revenue_percent'].includes(rule.basis))?await getOrderProfitBase(db,orderId):null;
   for (const { rule, lineIds } of groups.values()) {
     const assigned = assignments.find((a) => a.group_key === rule.group_key);
     if (rule.requires_assignment && (!assigned || (milestone === 'prepared' && !assigned.completed_at)))
@@ -298,19 +300,23 @@ export async function runOrderFinancialEffects(
     const employee=staff?staffById.get(staff):undefined;
     if(employee&&!staffCanAccrue(employee,goods.order))continue;
     const relevant = goods.lines.filter((l) => lineIds.includes(l.id));
+    const percentageLines=['profit_percent','revenue_percent'].includes(rule.basis)?percentageBase!.lines.filter(l=>lineIds.includes(l.id)):null;
     const qty = relevant.reduce((s, l) => s + l.qty, 0),
-      revenue = relevant.reduce((s, l) => s + l.net_goods_iqd, 0);
-    const cogs = relevant.some((l) => l.cogs_iqd === null || l.cost_confidence !== 'fifo')
+      revenue = percentageLines?percentageLines.reduce((sum,l)=>sum+l.retained_revenue_iqd,0):relevant.reduce((s, l) => s + l.net_goods_iqd, 0);
+    const costLines=percentageLines??relevant;
+    const cogs = costLines.some((l) => l.cogs_iqd === null || !isConfirmedOrderCost(l.cost_confidence))
       ? null
-      : relevant.reduce((s, l) => s + l.cogs_iqd!, 0);
+      : costLines.reduce((s, l) => s + l.cogs_iqd!, 0);
+    const unknownRevenue=percentageLines?.some(hasUnknownRefund)??false;
     const snapshotJson = JSON.stringify({
       rule,
-      net_goods_iqd: revenue,
+      line_ids: lineIds,
+      net_goods_iqd: unknownRevenue?null:revenue,
       fifo_cogs_iqd: cogs,
       qty,
       staff_id: staff,
     });
-    let amount = costAmount({ ...rule, cap_iqd: null }, qty, revenue, cogs);
+    let amount = unknownRevenue?null:costAmount({ ...rule, cap_iqd: null }, qty, revenue, cogs);
     const itemId = rule.basis === 'order' ? null : lineIds[0];
     if(staff&&await db.prepare(`SELECT 1 FROM finance_order_costs WHERE order_id=? AND staff_id=? AND group_key=? AND milestone=? AND rule_id<>? AND state<>'reversed' AND (order_item_id IS ? OR order_item_id IS NULL OR ? IS NULL) LIMIT 1`).bind(orderId,staff,rule.group_key,milestone,rule.id,itemId,itemId).first())continue;
     const existing = await db
@@ -371,7 +377,7 @@ export async function runOrderFinancialEffects(
           )
           .bind(
             amount,
-            rule.basis === 'profit_percent' ? (cogs === null ? null : Math.max(0, revenue - cogs)) : revenue,
+            unknownRevenue?null:rule.basis === 'profit_percent' ? (cogs === null ? null : Math.max(0, revenue - cogs)) : revenue,
             expense,
             snapshotJson,
             day,
@@ -397,7 +403,7 @@ export async function runOrderFinancialEffects(
             rule.category_id,
             rule.center_id,
             milestone,
-            rule.basis === 'profit_percent' ? (cogs === null ? null : Math.max(0, revenue - cogs)) : revenue,
+            unknownRevenue?null:rule.basis === 'profit_percent' ? (cogs === null ? null : Math.max(0, revenue - cogs)) : revenue,
             qty,
             amount,
             day,
@@ -466,7 +472,7 @@ export async function runOrderFinancialEffects(
     !staffOnly && milestone === 'delivered' &&
     !(await db.prepare('SELECT id FROM accounting_entries WHERE event_key=?').bind(`cogs:${orderId}`).first())
   ) {
-    const cogs = goods.lines.every((l) => l.cost_confidence === 'fifo')
+    const cogs = goods.lines.every((l) => l.cogs_iqd !== null && isConfirmedOrderCost(l.cost_confidence))
       ? goods.lines.reduce((s, l) => s + (l.cogs_iqd ?? 0), 0)
       : null;
     if (cogs && cogs > 0)
@@ -487,12 +493,12 @@ export async function runOrderFinancialEffects(
     .bind(`${milestone}:${orderId}`)
     .run();
   if (!staffOnly && milestone === 'delivered') {
-    if (goods.lines.some((l) => l.cost_confidence !== 'fifo'))
+    if (goods.lines.some((l) => l.cogs_iqd === null || !isConfirmedOrderCost(l.cost_confidence)))
       await recordFinancialFailure(
         db,
         orderId,
         'cogs',
-        new Error('تكلفة FIFO غير مكتملة؛ راجع دفعات المخزون وأعد الترحيل'),
+        new Error('تكلفة البضاعة غير مكتملة؛ راجع دفعات المخزون أو تكلفة الطلب المثبتة وأعد الترحيل'),
       );
     else
       await db.prepare('DELETE FROM finance_posting_errors WHERE event_key=?').bind(`cogs:${orderId}`).run();

@@ -17,7 +17,7 @@ import {
 } from '../lib/operations';
 import { settleAdvance } from '../lib/payrollAdvance';
 import { validateRuleScope, readRuleScope } from '../lib/financeRuleScopes';
-import { commitParticipantStatements, effectiveStaffCostSql, heldSourceSql, staffAdvanceSql, staffReconciliationBlockedSql } from '../lib/financeParticipants';
+import { commitParticipantStatements, effectiveStaffCostSql, heldSourceSql, staffAdvanceSql, staffPaymentBudget, staffReconciliationBlockedSql } from '../lib/financeParticipants';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { orderGoods, postStoredRefund, runOrderFinancialEffects, type CostRule } from '../lib/orderFinance';
 import { operationsReport } from '../lib/operationsReport';
@@ -405,6 +405,11 @@ adminFinanceOperationsRoutes.post('/staff/:id/payments', async (c) => {
       .bind(id, staff, amount, kind, day, text(b.note, 500), user.id, new Date().toISOString()),
   ];
   if (kind === 'payment') {
+    const budget=await staffPaymentBudget(db,staff);
+    if(budget.available_iqd<amount)throw badRequest('المبلغ يتجاوز صافي الأجور المتاح بعد التسويات والسلف والحجوزات');
+    // Guard the canonical whole wage ledger BEFORE inserting this payment.
+    // Approved positive rows alone omit debt from older blocked paid costs.
+    statements.unshift(...budget.statements);
     const advance=(await db.prepare(`SELECT ${staffAdvanceSql('?')} AS balance`).bind(staff).first<{balance:number}>())?.balance??0;
     const costs =
       (

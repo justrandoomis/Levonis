@@ -44,13 +44,13 @@ export function staffCanAccrue(staff:EmploymentStaff,order:Record<string,unknown
   const periods=JSON.parse(staff.inactive_periods_json) as Array<{from:string;to:string|null}>;
   return !Number.isFinite(at)||!periods.some((p)=>at>=Date.parse(p.from)&&(!p.to||at<Date.parse(p.to)));
 }
-export async function queueStaffReconciliation(db:D1Database,staffId:string,actor:string|null,statements:D1PreparedStatement[]=[],bump=true,replacementRule?:{id:string;[key:string]:unknown},range?:{from:string;until:string|null;reason:string;operationId:string}) {
+export async function queueStaffReconciliation(db:D1Database,staffId:string,actor:string|null,statements:D1PreparedStatement[]=[],bump=true,replacementRule?:{id:string;[key:string]:unknown},range?:{from:string|null;until:string|null;reason:string;operationId:string}) {
   const staff=await readStaff(db,staffId);if(!staff)throw notFound('الموظف غير موجود');
   const revision=staff.employment_version+(bump?1:0),now=new Date().toISOString();
   let rules=(await db.prepare('SELECT * FROM finance_cost_rules WHERE staff_id=? AND active=1 ORDER BY id').bind(staffId).all()).results??[];
   if(replacementRule){rules=rules.filter((r)=>r.id!==replacementRule.id);if(replacementRule.active===1&&replacementRule.staff_id===staffId)rules.push(replacementRule);}
   const previous=await readStaffReconciliation(db,staffId);
-  const from=previous&&previous.state!=='complete'?(!previous.affected_from||!range?null:[previous.affected_from,range.from].sort()[0]):range?.from??null;
+  const from=previous&&previous.state!=='complete'?(!previous.affected_from||!range?.from?null:[previous.affected_from,range.from].sort()[0]):range?.from??null;
   const until=previous&&previous.state!=='complete'?(!previous.affected_until||!range?.until?null:[previous.affected_until,range.until].sort().at(-1)!):range?.until??null;
   await db.batch([...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=?)',[staffId,staff.employment_version]),...statements,
     db.prepare('UPDATE finance_staff SET employment_version=? WHERE id=?').bind(revision,staffId),

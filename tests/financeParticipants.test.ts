@@ -156,7 +156,7 @@ test('investment account eligibility precedes sales; profit withdrawals do not s
 
 test('verified per-order COGS materializes pending percentage pay once; reference cost alone stays pending',async()=>{
   const {raw,cost,db,self}=setup();cost('pending',0);
-  raw.exec(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES ('line','o','p','Printer',1,50000,50000,10000,'snapshot');
+  raw.exec(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES ('line','o','p','Printer',1,50000,50000,10000,'unrecorded');
     UPDATE finance_order_costs SET order_item_id='line',amount_iqd=NULL,state='pending_cost',snapshot='{"rule":{"basis":"profit_percent","amount":1000,"cap_iqd":null}}' WHERE id='pending';`);
   await runOrderFinancialEffects({DB:db} as Env,'o','delivered');
   assert.equal(count(raw,"SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='cogs:o'"),1);

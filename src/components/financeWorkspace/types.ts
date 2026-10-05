@@ -34,6 +34,7 @@ export interface ProfitTotals {
 }
 
 export interface FinanceOrder extends ProfitTotals {
+  review_reasons?: ProfitReviewIssue[];
   id: string;
   order_id?: string;
   status: string;
@@ -93,6 +94,24 @@ export interface FinanceCharts extends FinanceChartAmounts {
   basis: 'delivered_baghdad_day';
 }
 
+export interface ProfitReviewIssue {
+  code: string;
+  field: string;
+  source_id: string | null;
+  line_ids: string[];
+}
+export interface ProfitCostReview {
+  source: 'fifo' | 'manual_verified' | 'recorded_snapshot' | 'snapshot' | 'unknown';
+  source_field: string;
+  snapshot_unit_iqd: number | null;
+  allocated_qty: number;
+  required_qty: number;
+  sources: Array<{ allocation_id: string; lot_id: string; incoming_id: string | null; purchase_id: string | null; qty: number; cogs_iqd: number | null; unit_cost_iqd: number | null; returned_qty?: number; returned_cogs_iqd?: number | null; late_cost_iqd?: number; retained_cogs_iqd?: number | null }>;
+  issues: ProfitReviewIssue[];
+  suggestion: null | { source: 'order_snapshot' | 'current_catalogue'; unit_cost_iqd: number; total_cost_iqd: number; as_of: string | null; requires_confirmation: true };
+  can_verify: boolean;
+}
+
 export interface ProfitLine extends ProfitTotals {
   id: string;
   product_id: string | null;
@@ -113,6 +132,7 @@ export interface ProfitLine extends ProfitTotals {
   restored_cogs_iqd?: number | null;
   cost_confidence: string;
   profit_basis_iqd?: number | null;
+  cost_review?: ProfitCostReview;
 }
 
 export interface ProfitCost {
@@ -120,6 +140,14 @@ export interface ProfitCost {
   rule_name: string;
   staff_id: string | null;
   staff_name?: string;
+  staff_user_id?: string | null;
+  basis?: string | null;
+  rate?: number | null;
+  qty?: number;
+  base_iqd?: number | null;
+  line_ids?: string[];
+  review_reasons?: ProfitReviewIssue[];
+  scope_confidence?: 'line' | 'recorded' | 'all_products' | 'historical_unknown';
   amount_iqd: number | null;
   effective_amount_iqd?: number | null;
   state: string;
@@ -140,6 +168,7 @@ export interface FinancialHistory {
 }
 
 export interface OrderProfit {
+  can_reconcile?: boolean;
   order_id: string;
   version: number;
   order: FinanceOrder & { total_iqd?: number; shipping_iqd?: number; cod_tax_iqd?: number; shipping_benefit_iqd?: number };
