@@ -1,32 +1,19 @@
-# READ-ONLY diagnosis of whatever is currently serving levonis-iq.com.
-#
-# Makes NO changes: no deploy, no migration, no write to any database, bucket
-# or DNS record. Every D1 statement below is a SELECT. Secret VALUES are never
-# printed (GitHub masks them anyway); only presence and names are reported.
-#
-# Why this exists: the site answered "خطأ في الخادم" on the storefront and
-# "Something went wrong" in the admin product list, while sign-in and the
-# static sections kept working. That pattern means the worker is alive and
-# some queries succeed while others fail — which can only be told apart by
-# reading the actual response bodies and the actual schema of the database
-# the live worker is bound to.
 name: 0 - Diagnose Live Site (read-only)
-
 on:
   workflow_dispatch:
     inputs:
       host:
-        description: 'Host to probe (no scheme)'
+        description: Host to probe (unused; verification uses the configured database)
         required: false
-        default: 'levonis-iq.com'
-
+        default: levonis-iq.com
+permissions:
+  contents: read
 jobs:
   diagnose:
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      HOST: ${{ github.event.inputs.host || 'levonis-iq.com' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,346 +21,63 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
-
-      # ---------------------------------------------------------------- HTTP
-      - name: Public endpoints — status, headers and body
-        continue-on-error: true
+      - name: Verify actual participant response (SELECT only, no names or amounts)
         run: |
-          probe() {
-            echo "───────────────────────────────────────────────"
-            echo "GET https://$HOST$1"
-            code=$(curl -s -o /tmp/body.txt -w '%{http_code}' --max-time 25 "https://$HOST$1" || echo 000)
-            echo "status: $code"
-            echo "-- headers --"
-            curl -s -o /dev/null -D - --max-time 25 "https://$HOST$1" \
-              | grep -iE '^(cf-ray|server|content-type|x-|cf-cache)' || true
-            echo "-- body (first 1500 bytes) --"
-            head -c 1500 /tmp/body.txt
-            echo
+          node --import tsx --input-type=module <<'JS'
+          import { spawnSync } from 'node:child_process';
+          import { participantOverview } from './worker/lib/financeParticipants.ts';
+          function literal(v) {
+            if(v == null) return 'NULL';
+            if(typeof v === 'number' && Number.isFinite(v)) return String(v);
+            if(typeof v === 'string') return "'" + v.replaceAll("'", "''") + "'";
+            throw new Error('Unsupported read parameter');
           }
-          probe /api/health
-          probe /api/home
-          probe '/api/products?limit=2'
-          probe '/api/products/does-not-exist'
-          probe /api/settings/public
-
-      # Which worker actually answers the domain, and when it was last shipped.
-      - name: Which worker serves the domain
-        continue-on-error: true
-        run: |
-          echo "── the domain's own headers (cf-ray proves Cloudflare answered)"
-          curl -s -o /dev/null -D - --max-time 20 "https://$HOST/" | head -25 || true
-          echo "── deployments of levonis-staging (most recent first)"
-          npx wrangler deployments list --name levonis-staging 2>&1 | head -30 || true
-          echo "── deployments of levonis (production worker)"
-          npx wrangler deployments list --name levonis 2>&1 | head -30 || true
-
-      # The worker's OWN exception. The 500 body is the generic onError
-      # message by design (it must not leak internals to the public), so the
-      # only way to see the real stack is to read the worker's log stream
-      # while the failing request is made. `wrangler tail` is read-only.
-      - name: Live worker log for the failing request
-        continue-on-error: true
-        run: |
-          npx wrangler tail levonis-staging --format json \
-            > /tmp/tail.log 2>/tmp/tail.err &
-          TAIL=$!
-          sleep 12
-          echo "── firing the failing requests"
-          curl -s -o /dev/null "https://$HOST/api/products?limit=2" || true
-          curl -s -o /dev/null "https://$HOST/api/products" || true
-          curl -s -o /dev/null "https://$HOST/api/home" || true
-          sleep 15
-          kill $TAIL 2>/dev/null || true
-          sleep 2
-          echo "── tail stderr"
-          head -20 /tmp/tail.err || true
-          echo "── captured events"
-          cat /tmp/tail.log | head -c 6000 || true
-          echo
-          echo "── exceptions and logs only"
-          jq -c 'select(.exceptions or .logs) | {url: .event.request.url, outcome, exceptions, logs}' /tmp/tail.log 2>/dev/null | head -40 || true
-
-      # WHICH ROW POISONS THE LIST. /api/home projects the 20 newest products
-      # and answers 200; /api/products projects by display_order and answers
-      # 500 — so the list itself is fine and one row's projection throws.
-      # Walking the list one row at a time with public GETs names that row
-      # without touching the database.
-      - name: Bisect the product list one row at a time
-        continue-on-error: true
-        run: |
-          bad=0
-          for off in $(seq 0 43); do
-            code=$(curl -s -o /tmp/one.json -w '%{http_code}' --max-time 20 \
-              "https://$HOST/api/products?limit=1&offset=$off")
-            if [ "$code" = "200" ]; then
-              slug=$(jq -r '.products[0].slug // "(none)"' /tmp/one.json 2>/dev/null)
-              echo "offset $off: ok    $slug"
-            else
-              echo "offset $off: $code  <<< THIS ROW FAILS TO PROJECT"
-              bad=$((bad+1))
-            fi
-          done
-          echo "failing rows: $bad"
-
-      # ------------------------------------------------------------------ D1
-      - name: D1 — which databases exist
-        id: dbs
-        continue-on-error: true
-        run: |
-          npx wrangler d1 list --json > /tmp/d1.json
-          jq -r '.[] | "\(.name)  \(.uuid)"' /tmp/d1.json
-          jq -e '.[] | select(.name=="levonis-db-staging")' /tmp/d1.json > /dev/null \
-            && echo "staging=yes" >> "$GITHUB_OUTPUT" || echo "staging=no" >> "$GITHUB_OUTPUT"
-
-      - name: Staging D1 — schema, applied migrations and row counts (SELECT only)
-        if: steps.dbs.outputs.staging == 'yes'
-        continue-on-error: true
-        run: |
-          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
-
-          echo "── applied migrations"
-          q "SELECT name FROM d1_migrations ORDER BY name" | jq -r '.[0].results[].name' || true
-
-          echo "── tables"
-          q "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name" \
-            | jq -r '[.[0].results[].name] | join(", ")' || true
-
-          echo "── products table columns"
-          q "SELECT name FROM pragma_table_info('products') ORDER BY cid" \
-            | jq -r '[.[0].results[].name] | join(", ")' || true
-
-          echo "── row counts"
-          for t in users products catalogs orders settings; do
-            n=$(q "SELECT COUNT(*) AS n FROM $t" 2>/dev/null | jq -r '.[0].results[0].n' 2>/dev/null || echo "n/a")
-            echo "$t: $n"
-          done
-
-          echo "── integrity"
-          q "PRAGMA foreign_key_check" | jq -r '.[0].results | length | "foreign_key_check rows: \(.)"' || true
-
-          echo "── membership tables effectiveTier() reads on every priced request"
-          for t in membership_plans memberships; do
-            n=$(q "SELECT COUNT(*) AS n FROM $t" 2>/dev/null | jq -r '.[0].results[0].n' 2>/dev/null || echo "MISSING/ERROR")
-            echo "$t: $n"
-          done
-          q "SELECT id, tier, active FROM membership_plans ORDER BY id" | jq -c '.[0].results' || true
-
-          echo "── settings rows the public endpoints read"
-          q "SELECT key FROM settings ORDER BY key" | jq -r '[.[0].results[].key] | join(", ")' || true
-          q "SELECT key FROM settings WHERE json_valid(value)=0" | jq -r '.[0].results[].key' || true
-
-          echo "── products that would fail JSON parsing"
-          q "SELECT id, slug FROM products WHERE json_valid(images)=0 OR json_valid(options)=0 OR json_valid(colors)=0 OR json_valid(specifications)=0 LIMIT 20" \
-            | jq -r '.[0].results[] | "\(.id)  \(.slug)"' || true
-
-      # LEVO Studio: the slicer reports "Worker terminated (likely out of
-      # memory): worker error". That message is the engine's own worker.onerror
-      # fallback, used whenever ErrorEvent.message is EMPTY — which happens both
-      # on a real OOM kill and when the worker SCRIPT FAILS TO LOAD. The two are
-      # told apart by whether the chunk is actually served, with a JavaScript
-      # content type, under headers that a cross-origin-isolated page will
-      # accept. All read-only GETs.
-      - name: LEVO Studio — worker chunk and isolation headers
-        continue-on-error: true
-        run: |
-          S=https://studio.levonis-iq.com
-          echo "── document headers (COOP/COEP decide whether a worker may load at all)"
-          curl -s -o /tmp/studio.html -D /tmp/studio.hdr --max-time 25 "$S/"
-          grep -iE '^(HTTP|content-type|cross-origin|cf-ray)' /tmp/studio.hdr || true
-
-          echo "── walking the chunk graph (the editor and its worker load lazily,"
-          echo "   so the worker chunk is NOT referenced by the document itself)"
-          : > /tmp/seen.txt
-          grep -oE '/assets/[A-Za-z0-9_.-]+\.js' /tmp/studio.html | sort -u > /tmp/queue.txt
-          for depth in 1 2 3 4; do
-            : > /tmp/next.txt
-            while read -r c; do
-              [ -n "$c" ] || continue
-              grep -qxF "$c" /tmp/seen.txt && continue
-              echo "$c" >> /tmp/seen.txt
-              curl -s --max-time 25 "$S$c" -o /tmp/chunk.js || continue
-              grep -oE '[A-Za-z0-9_.-]+\.js' /tmp/chunk.js \
-                | sed 's#^#/assets/#' | sort -u >> /tmp/next.txt || true
-            done < /tmp/queue.txt
-            sort -u /tmp/next.txt > /tmp/queue.txt
-            echo "   depth $depth: $(wc -l < /tmp/seen.txt) chunks seen"
-          done
-
-          echo "── worker chunks found anywhere in the graph"
-          grep -hoE '[A-Za-z0-9_.-]*(slicer|parse_3mf|sla_slice|sla_reconstruct|sl1_encode)\.worker[A-Za-z0-9_.-]*\.js' \
-            /tmp/seen.txt /tmp/queue.txt 2>/dev/null | sort -u | tee /tmp/w.txt
-          [ -s /tmp/w.txt ] || echo "   (none found — the worker chunk is not reachable from the served graph)"
-
-          echo "── does each worker chunk actually serve?"
-          while read -r w; do
-            [ -n "$w" ] || continue
-            url="$S/assets/$(basename "$w")"
-            code=$(curl -s -o /tmp/wb.js -D /tmp/wh.txt -w '%{http_code}' --max-time 25 "$url")
-            ct=$(grep -i '^content-type' /tmp/wh.txt | tr -d '\r')
-            corp=$(grep -i '^cross-origin-resource-policy' /tmp/wh.txt | tr -d '\r')
-            echo "$url -> $code | $ct | ${corp:-no CORP header}"
-            echo "   first bytes: $(head -c 100 /tmp/wb.js | tr -d '\n')"
-          done < /tmp/w.txt
-
-          echo "── the engine chunk that owns makeSlicerWorker"
-          for c in $(cat /tmp/seen.txt); do
-            if curl -s --max-time 20 "$S$c" | grep -q 'likely out of memory'; then
-              echo "   worker.onerror handler lives in $c"
-            fi
-          done
-
-      # The membership catalog the storefront will actually offer.
-      - name: Membership plans the live site serves
-        continue-on-error: true
-        run: |
-          curl -s --max-time 25 "https://$HOST/api/memberships/plans" \
-            | jq -c '[.plans[] | {id, tier, months: .duration_months, price: .price_iqd}]'
-
-      # The home page grew a hero, a categories strip and a top-brands strip.
-      # The strips are fed by the REAL catalogs and brands tables, so whether
-      # they actually appear depends on live data, not on the code — and an
-      # empty strip renders as nothing at all. This says which of them the
-      # live site can currently fill.
-      - name: What the live home page has to work with
-        continue-on-error: true
-        run: |
-          curl -s --max-time 25 "https://$HOST/api/home" -o /tmp/home.json
-          echo "── banners the owner has configured"
-          jq -c '[.settings.homeBanners // {} | to_entries[] | {slot: .key, count: (.value | length)}]' /tmp/home.json
-          echo "   (empty = the default brand hero is what visitors see)"
-          echo "── categories with at least one active product"
-          jq -c '[.categories // [] | .[] | {name: .name_en, n: .product_count}]' /tmp/home.json
-          echo "── brands with at least one active product"
-          jq -c '[.brands // [] | .[] | {name: .name_en, n: .product_count}]' /tmp/home.json
-          echo "── owner-authored section cards"
-          jq -c '[.settings.homeSectionItems // {} | to_entries[] | {slot: .key, count: (.value | length)}]' /tmp/home.json
-          echo "── the section layout the storefront now honours"
-          jq -c '[.settings.homeSections // [] | .[] | {id, visible: .isVisible}]' /tmp/home.json
-
-      # The §5 write-time rules refuse a save where the selling price equals
-      # the cost, or where the PRO/PRIME/Regular ladder is inverted. Existing
-      # rows are NOT re-validated — nothing breaks on deploy — but a product
-      # already in that state becomes un-editable until its price is fixed, so
-      # the owner should know which ones BEFORE the code ships. SELECT only.
-      - name: Which live products the new price rules would refuse to save
-        if: steps.dbs.outputs.staging == 'yes'
-        continue-on-error: true
-        run: |
-          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
-
-          echo "── products whose selling price EQUALS their cost"
-          q "SELECT id, sku, name, price_iqd, product_cost_iqd
-               FROM products
-              WHERE product_cost_iqd IS NOT NULL
-                AND price_iqd = product_cost_iqd" \
-            | jq -c '.[0].results'
-
-          echo "── products whose price ladder is inverted (PRO > PRIME, or either above regular)"
-          q "SELECT id, sku, name, price_iqd, prime_price_iqd, pro_price_iqd
-               FROM products
-              WHERE (prime_price_iqd IS NOT NULL AND prime_price_iqd > price_iqd)
-                 OR (pro_price_iqd   IS NOT NULL AND pro_price_iqd   > price_iqd)
-                 OR (pro_price_iqd IS NOT NULL AND prime_price_iqd IS NOT NULL
-                     AND pro_price_iqd > prime_price_iqd)" \
-            | jq -c '.[0].results'
-
-          echo "(empty results above = every live product still saves cleanly)"
-
-      # Does the DEPLOYED css actually carry the palette? The owner reported
-      # the colour unchanged twice, both times because nothing had shipped.
-      - name: The olive the live sites actually serve
-        continue-on-error: true
-        run: |
-          check_site() {
-            echo "── $1"
-            curl -s --max-time 25 "$1/" -o /tmp/doc.html
-            css=$(grep -oE '/assets/[A-Za-z0-9_.-]+\.css' /tmp/doc.html | head -1)
-            if [ -z "$css" ]; then echo "   (no css link found)"; return; fi
-            echo "   css: $css"
-            body=$(curl -s --max-time 25 "$1$css")
-            for hex in 1b2010 0f1208 2b3318; do
-              n=$(printf '%s' "$body" | grep -oic "#$hex" || true)
-              echo "   #$hex occurrences: ${n:-0}"
-            done
-            for old in 0f2f25 0a1f18 184235 0b2519; do
-              n=$(printf '%s' "$body" | grep -oic "#$old" || true)
-              [ "${n:-0}" = "0" ] || echo "   !! stale #$old still present: $n"
-            done
+          function rows(sql, values=[]) {
+            if(!/^\s*SELECT\b/i.test(sql)) throw new Error('Only SELECT is allowed');
+            let next=0;const used=new Set();
+            const command=sql.replace(/\?(\d*)/g,(_match,index)=>{const i=index?Number(index)-1:next++;used.add(i);return literal(values[i]);});
+            if(used.size!==values.length||[...used].some(i=>i<0||i>=values.length)) throw new Error('Parameter mismatch');
+            const result=spawnSync(process.execPath,['node_modules/wrangler/bin/wrangler.js','d1','execute','levonis-db-staging','--remote','--json','--command',command],{encoding:'utf8',maxBuffer:8*1024*1024});
+            if(result.status!==0) throw new Error('Read-only database query failed; no account data printed');
+            const payload=JSON.parse(result.stdout);
+            if(payload.length!==1||payload[0].success!==true)throw new Error('Read-only query did not succeed');
+            return payload[0].results;
           }
-          check_site "https://$HOST"
-          check_site "https://studio.levonis-iq.com"
-
-      # WHY A PRODUCT PAGE SHOWS NO «الألوان» SECTION.
-      #
-      # Two very different things produce that screen — the CODE dropping
-      # colours that exist, or the DATABASE having no active colour rows — and
-      # no amount of reading source can tell them apart. This asks both ends
-      # the same question and prints the answers side by side.
-      #
-      # SELECT only, GET only. Nothing here writes.
-      - name: Colours — what the database holds vs what the live site publishes
-        continue-on-error: true
-        run: |
-          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
-
-          echo "── products that have colour rows at all"
-          q "SELECT p.id AS id, p.slug AS slug,
-                    COUNT(c.id) AS total,
-                    SUM(CASE WHEN c.active IN (1,'1','true') THEN 1 ELSE 0 END) AS active_rows,
-                    SUM(CASE WHEN c.active IS NULL THEN 1 ELSE 0 END) AS null_active
-               FROM products p JOIN product_colors c ON c.product_id = p.id
-              WHERE p.status = 'active'
-              GROUP BY p.id, p.slug
-              ORDER BY total DESC LIMIT 15" \
-            | jq -r '.[0].results[] | "\(.slug)  total=\(.total)  active=\(.active_rows)  active_is_null=\(.null_active)"' \
-            || echo "   (query failed — product_colors may not exist on this database)"
-
-          echo
-          echo "── products with option groups but ZERO colour rows"
-          q "SELECT p.slug AS slug, COUNT(DISTINCT v.id) AS values_n
-               FROM products p JOIN product_option_values v ON v.product_id = p.id
-              WHERE p.status = 'active'
-                AND NOT EXISTS (SELECT 1 FROM product_colors c WHERE c.product_id = p.id)
-              GROUP BY p.slug ORDER BY values_n DESC LIMIT 15" \
-            | jq -r '.[0].results[] | "\(.slug)  option_values=\(.values_n)  colours=0"' || true
-
-          echo
-          echo "── and what the LIVE site publishes for the top colour-carrying product"
-          SLUG=$(q "SELECT p.slug AS slug FROM products p JOIN product_colors c ON c.product_id = p.id
-                     WHERE p.status = 'active' GROUP BY p.slug
-                     ORDER BY COUNT(c.id) DESC LIMIT 1" | jq -r '.[0].results[0].slug // empty')
-          if [ -n "$SLUG" ]; then
-            echo "GET https://$HOST/api/products/$SLUG"
-            curl -s --max-time 25 "https://$HOST/api/products/$SLUG" -o /tmp/pc.json
-            jq -r '{
-              product_colors:   (.product.colors   | length? // "MISSING"),
-              relations_colors: (.relations.colors | length? // "MISSING"),
-              product_options:  (.product.options  | length? // "MISSING"),
-              inventory_mode:   (.relations.inventory_mode // "n/a"),
-              color_required:   (.availability.selection.color_required // "n/a"),
-              mode:             (.availability.mode // "n/a")
-            } | to_entries[] | "\(.key): \(.value)"' /tmp/pc.json || head -c 600 /tmp/pc.json
-            echo "-- product keys --"
-            jq -r '.product | [keys[]] | join(", ")' /tmp/pc.json || true
-          else
-            echo "   NO PRODUCT ANYWHERE HAS A COLOUR ROW — the colours were never saved."
-          fi
-
-      - name: How to read the colour step
-        if: always()
-        run: |
-          {
-            echo "### Colours: database vs live site"
-            echo ""
-            echo "| colour rows in D1 | live \`product.colors\` | verdict |"
-            echo "|---|---|---|"
-            echo "| 0 | 0 | the colours were never saved — admin/data, not code |"
-            echo "| >0 active | 0 | the code is dropping them — a real defect |"
-            echo "| >0, none active | 0 | the rows exist but are switched off |"
-            echo "| >0 active | >0 | the server is fine; the defect is in the page |"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Summary
-        if: always()
-        run: echo "Read the step logs above — nothing was changed." >> "$GITHUB_STEP_SUMMARY"
+          const db={prepare(sql){
+            let values=[];
+            const statement={bind(...next){values=next;return statement;},async all(){return {results:rows(sql,values)};},async first(){return rows(sql,values)[0]??null;}};
+            return statement;
+          }};
+          const users=rows("SELECT user_id FROM finance_staff WHERE user_id IS NOT NULL UNION SELECT user_id FROM investment_profiles ORDER BY user_id");
+          const summaries=[];
+          for(const user of users){
+            const data=await participantOverview(db,user.user_id),s=data.summary;
+            summaries.push({
+              linked_employment_records:data.employment.length,
+              calculation_states:data.employment.map(e=>e.reconciliation_state),
+              has_work_earnings:s.staff_iqd>0,
+              has_available_earnings:s.earnings_available_iqd>0,
+              has_available_staff_source:data.entries.some(e=>e.kind==='staff'&&e.available_iqd>0),
+              has_paid_earnings:s.earnings_paid_iqd>0,
+              has_reserved_earnings:s.earnings_held_iqd>0,
+              has_advance_balance:s.advance_balance_iqd>0,
+              has_settlement_debt:s.debt_iqd>0,
+              pending_costs:s.pending_costs,
+              reconciliation_pending:s.reconciliation_pending,
+              summary_numbers_finite:Object.values(s).every(v=>typeof v!=='number'||Number.isFinite(v))
+            });
+          }
+          const pending=rows("SELECT c.state,json_extract(c.snapshot,'$.rule.basis') AS basis,\n    s.active,s.archived_at IS NOT NULL AS archived,s.start_work_date IS NOT NULL AS has_start,\n    o.status AS order_state,\n    COALESCE(o.status='delivered' AND date(o.delivered_at,'+3 hours')>s.start_work_date,0) AS date_eligible,\n    COUNT(*) AS source_count\n  FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id JOIN orders o ON o.id=c.order_id\n  WHERE s.user_id IS NOT NULL AND c.state='pending_cost'\n  GROUP BY c.state,basis,s.active,archived,has_start,order_state,date_eligible");
+          const integrity=rows(`SELECT
+            (SELECT COUNT(*) FROM finance_wage_periods WHERE ends_before IS NOT NULL AND ends_before<=starts_on) AS invalid_wage_intervals,
+            (SELECT COUNT(*) FROM finance_cost_rules r WHERE r.staff_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM finance_wage_versions v WHERE v.rule_id=r.id)) AS staff_rules_without_history,
+            (SELECT COUNT(*) FROM finance_wage_targets t JOIN finance_order_costs c ON c.id=t.cost_id JOIN finance_wage_versions v ON v.id=t.wage_version_id WHERE v.staff_id<>c.staff_id) AS mismatched_wage_staff,
+            (SELECT COUNT(*) FROM purchase_investor_agreements a WHERE a.allocated_iqd<>(SELECT COALESCE(SUM(principal_iqd),0) FROM purchase_investor_allocations x WHERE x.purchase_id=a.purchase_id)) AS unbalanced_funding_allocations,
+            (SELECT COUNT(*) FROM purchase_investor_lot_capital p JOIN inventory_lots l ON l.id=p.lot_id JOIN investment_contracts c ON c.id=p.contract_id WHERE c.incoming_id<>l.incoming_id) AS mismatched_capital_lots`)[0];
+          const review=rows(`SELECT
+            (SELECT COUNT(*) FROM finance_staff_reconciliations WHERE state='failed') AS failed_reconciliations,
+            (SELECT COUNT(*) FROM finance_withdrawal_payments p WHERE p.amount_iqd<>(SELECT COALESCE(SUM(amount_iqd),0) FROM finance_withdrawal_payment_lines l WHERE l.payment_id=p.id)) AS historical_payment_allocations_to_review,
+            (SELECT COUNT(*) FROM investments i WHERE NOT EXISTS(SELECT 1 FROM investment_legacy_links l WHERE l.legacy_investment_id=i.id)) AS unreviewed_legacy_investments`)[0];
+          console.log(JSON.stringify({participant_response_checks:summaries,pending_source_checks:pending,integrity,review},null,2));
+          if(Object.values(integrity).some(v=>v!==0)||summaries.some(s=>!s.summary_numbers_finite))throw new Error('Financial release integrity check failed');
+          JS
