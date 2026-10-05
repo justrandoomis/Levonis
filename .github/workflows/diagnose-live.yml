@@ -67,5 +67,6 @@ jobs:
               summary_numbers_finite:Object.values(s).every(v=>typeof v!=='number'||Number.isFinite(v))
             });
           }
-          console.log(JSON.stringify({participant_response_checks:summaries},null,2));
+          const pending=rows("SELECT c.state,json_extract(c.snapshot,'$.rule.basis') AS basis,\n    s.active,s.archived_at IS NOT NULL AS archived,s.start_work_date IS NOT NULL AS has_start,\n    o.status AS order_state,\n    COALESCE(o.status='delivered' AND date(o.delivered_at,'+3 hours')>s.start_work_date,0) AS date_eligible,\n    COUNT(*) AS source_count\n  FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id JOIN orders o ON o.id=c.order_id\n  WHERE s.user_id IS NOT NULL AND c.state='pending_cost'\n  GROUP BY c.state,basis,s.active,archived,has_start,order_state,date_eligible");
+          console.log(JSON.stringify({participant_response_checks:summaries,pending_source_checks:pending},null,2));
           JS
