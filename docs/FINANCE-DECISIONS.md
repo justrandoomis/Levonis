@@ -220,3 +220,14 @@ the configured date or exposing other accounts or raw diagnostic errors.
 Regression coverage reproduces the original zero available balance for fixed
 and revenue-share wages, verifies withdrawal/payroll settlement, and keeps
 unverified profit shares and unrelated posting failures protected.
+
+### Earnings screens opened before a date change (2026-10-05)
+
+An employee can already have the earnings page open when the owner changes
+their start date on another device. Polling only a job already observed as
+pending misses that transition entirely. The screen now uses the existing
+visibility-aware refresh hook every 30 seconds, accelerated to 15 seconds
+while historical calculation is pending. It also refreshes on focus and browser
+history restoration, and retries after temporary read failures. Hidden tabs,
+in-flight reads, withdrawal forms and submissions pause refreshes. These are
+read-only balance requests; no new accrual or withdrawal is initiated by polling.

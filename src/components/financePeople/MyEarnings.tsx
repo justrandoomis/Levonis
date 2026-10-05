@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ArrowDownToLine, RefreshCw, Wallet } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
+import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { api, Button, dateLabel, Dialog, EARNINGS, Empty, Feedback, Field, Loading, Money, StateBadge, Surface, useLanguage, useMutation, useRemote, type Withdrawal } from './shared';
 
 type Entry = { id: string; kind: 'staff' | 'investor_profit' | 'investor_capital'; title: string; order_id?: string; day: string; amount_iqd: number; accrued_iqd?: number; paid_iqd: number; held_iqd: number; available_iqd: number; state: string };
@@ -17,16 +18,15 @@ export default function MyEarnings() {
   const operationId = useRef('');
   const data = remote.data, s = data?.summary;
   const calculating = data?.employment?.some((e) => ['pending', 'running'].includes(e.reconciliation_state ?? '')) ?? false;
-  // Keep an open employee screen current while historical orders are being
-  // calculated, and refresh on return from another tab. Retain existing data.
-  useEffect(() => {
-    if (remote.loading || remote.error) return;
-    const refresh = () => { if (document.visibilityState === 'visible') void remote.load(); };
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', refresh);
-    const timer = calculating && document.visibilityState === 'visible' ? window.setTimeout(refresh, 15000) : undefined;
-    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); window.clearTimeout(timer); };
-  }, [calculating, remote.loading, remote.error, remote.load]);
+  // The owner can change the start date from another device after this screen
+  // was opened. Keep checking even when the last read had no pending job.
+  // The shared hook pauses hidden tabs, deduplicates wake events and recovers
+  // on browser-history restoration. Keep the withdrawal form stable mid-edit.
+  useFreshOnReturn(remote.load, {
+    pollWhileVisibleMs: calculating ? 15_000 : 30_000,
+    minIntervalMs: 5_000,
+    enabled: !remote.loading && !open && !op.busy,
+  });
   const balance = (type: 'earnings' | 'capital') => type === 'capital' ? s?.capital_available_iqd ?? 0 : s?.earnings_available_iqd ?? s?.available_iqd ?? 0;
   const startWithdrawal = (type: 'earnings' | 'capital' = 'earnings') => { setBalanceType(type); operationId.current = crypto.randomUUID(); setAmount(balance(type)); op.clear(); setOpen(true); };
   const request = () => op.run(async () => {
