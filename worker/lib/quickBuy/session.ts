@@ -28,7 +28,7 @@ import type { AppContext, SessionUser } from '../types';
 import { HttpError, badRequest, conflict, int, str } from '../http';
 import { newId, newOrderId } from '../crypto';
 import { fence } from '../operations';
-import { planInventory, stockRowKey, type InventoryPlan, type StockMove, type StockTarget } from '../inventory';
+import { freeOnTargets, planInventory, stockRowKey, type InventoryPlan, type StockMove, type StockTarget } from '../inventory';
 import { assertHoldStateStatement, purchaseHoldInsertStatement, releaseHoldStatement } from '../walletOps';
 import { walletFreeDeliveryPublic, WALLET_FREE_DELIVERY_LABEL } from '../walletFreeDelivery';
 import { PRINTER_STANDARD_DELIVERY_POLICY, isPrinterStandardAcceptance } from '@levonis/shipping/printerDeliveryPolicy';
@@ -163,7 +163,7 @@ interface ItemSnapshot {
   membership_discount_iqd?: number;
 }
 
-export async function sessionView(db: D1Database, s: QuickBuySessionRow, nowMs = Date.now()) {
+export async function sessionView(db: D1Database, s: QuickBuySessionRow, nowMs = Date.now(), lang: string = 'ar') {
   const { results } = await db
     .prepare(
       `SELECT qi.*, p.slug AS product_slug, p.status AS product_status
@@ -178,6 +178,18 @@ export async function sessionView(db: D1Database, s: QuickBuySessionRow, nowMs =
   const pick = (k: string) => (typeof address[k] === 'string' ? (address[k] as string) : '');
   const open = s.state === 'open';
   const remaining = Math.max(0, Date.parse(s.expires_at) - nowMs);
+  // The «+» ceiling of each line: what it holds plus what the shelf has free
+  // right now (an untracked product is limited only by the per-line maximum).
+  const rows = results ?? [];
+  const ceilings = open
+    ? await Promise.all(
+        rows.map(async (it) => {
+          const free = await freeOnTargets(db, it.product_id, parseJson<HeldTarget[]>(it.stock_targets, []) as Array<Pick<StockTarget, 'scope' | 'scope_id'>>);
+          return Math.min(QUICK_BUY_MAX_QTY, free === null ? QUICK_BUY_MAX_QTY : it.qty + free);
+        })
+      )
+    : rows.map((it) => it.qty);
+  const labelLang = lang === 'en' || lang === 'ckb' ? lang : 'ar';
   return {
     id: s.id,
     state: s.state,
@@ -187,7 +199,7 @@ export async function sessionView(db: D1Database, s: QuickBuySessionRow, nowMs =
     remaining_ms: open ? remaining : 0,
     /** Edits are accepted only while this is true — and the server re-checks it in the batch. */
     editable: open && remaining > 0,
-    items: (results ?? []).map((it) => {
+    items: rows.map((it, i) => {
       const snap = parseJson<ItemSnapshot>(it.snapshot, {});
       return {
         id: it.id,
@@ -198,8 +210,12 @@ export async function sessionView(db: D1Database, s: QuickBuySessionRow, nowMs =
         name_ku: snap.name_ku ?? '',
         image: it.image_snapshot,
         variant: snap.variant ?? '',
+        /** The selection as checkout resolved it — option values and colour in one label. */
+        option_label: snap.variant ?? '',
+        color_label: '',
         sku: snap.sku ?? '',
         qty: it.qty,
+        max_qty: ceilings[i],
         unit_price_iqd: it.unit_price_iqd,
         line_total_iqd: it.line_total_iqd,
         option_value_ids: parseJson<string[]>(it.option_value_ids, []),
@@ -213,7 +229,9 @@ export async function sessionView(db: D1Database, s: QuickBuySessionRow, nowMs =
     shipping_before_iqd: s.shipping_before_iqd,
     free_delivery: {
       applied: quote.wallet_free_delivery?.applied === true,
-      label: WALLET_FREE_DELIVERY_LABEL,
+      /** «توصيل عادي مجاني — للدفع الكامل من محفظة Levo», in the reader's language, when applied. */
+      label: quote.wallet_free_delivery?.applied === true ? WALLET_FREE_DELIVERY_LABEL[labelLang] : null,
+      labels: WALLET_FREE_DELIVERY_LABEL,
     },
     total_iqd: s.total_iqd,
     held_iqd: open ? s.held_iqd : 0,
@@ -227,6 +245,7 @@ export async function sessionView(db: D1Database, s: QuickBuySessionRow, nowMs =
     },
     delivery_method: 'standard' as const,
     order_id: s.state === 'submitted' ? s.order_id : null,
+    submitted_at: s.submitted_at,
     finalize_error: s.state === 'failed' ? s.finalize_error : null,
     rev: s.rev,
   };

@@ -45,7 +45,7 @@ const finalizeIfDue = (c: Context<AppContext>) => async (s: QuickBuySessionRow) 
 };
 
 /** The last session that ended, for «تم إرسال طلب الشراء السريع» (§13). */
-async function recentView(db: D1Database, userId: string) {
+async function recentView(db: D1Database, userId: string, lang: string) {
   const s = await db
     .prepare(
       `SELECT * FROM quick_buy_sessions
@@ -55,7 +55,7 @@ async function recentView(db: D1Database, userId: string) {
     .bind(userId)
     .first<QuickBuySessionRow>();
   if (!s) return null;
-  const view = await sessionView(db, s);
+  const view = await sessionView(db, s, Date.now(), lang);
   const order =
     s.state === 'submitted'
       ? await db.prepare('SELECT id, status, total_iqd FROM orders WHERE id = ?').bind(s.order_id).first<{ id: string; status: string; total_iqd: number }>()
@@ -72,8 +72,8 @@ async function currentSession(c: Context<AppContext>) {
     s = await loadOpenSession(db, user.id);
   }
   return {
-    session: s ? await sessionView(db, s) : null,
-    recent: s ? null : await recentView(db, user.id),
+    session: s ? await sessionView(db, s, Date.now(), langOf(c)) : null,
+    recent: s ? null : await recentView(db, user.id, langOf(c)),
     server_now: new Date().toISOString(),
   };
 }
@@ -102,7 +102,7 @@ quickBuyRoutes.get('/session', async (c) => {
 
 async function respondWithChange(c: Context<AppContext>, change: QuickBuyChange) {
   const result = await applyQuickBuyChange(c, c.get('user')!, change, finalizeIfDue(c));
-  const view = result.session ? await sessionView(c.env.DB, result.session) : null;
+  const view = result.session ? await sessionView(c.env.DB, result.session, Date.now(), langOf(c)) : null;
   return c.json({
     success: true,
     session: view && view.state === 'open' ? view : null,

@@ -493,6 +493,32 @@ export interface ApplyOptions {
   reservedCredit?: ReadonlyMap<string, number>;
 }
 
+/**
+ * Units free right now on each of these counters — `stock − reserved`, the
+ * smallest across the targets, or null when none of them tracks stock. A
+ * READ for a screen (Quick Buy's «+» ceiling); every move still decides at
+ * commit through its own guard.
+ */
+export async function freeOnTargets(
+  db: D1Database,
+  productId: string,
+  targets: ReadonlyArray<Pick<StockTarget, 'scope' | 'scope_id'>>
+): Promise<number | null> {
+  let free: number | null = null;
+  for (const t of targets) {
+    const cols = SCOPE_COLUMNS[t.scope];
+    if (!cols) continue;
+    const row = await db
+      .prepare(`SELECT ${cols.stock} AS stock, ${cols.reserved} AS reserved FROM ${cols.table} WHERE id = ?`)
+      .bind(t.scope === 'base' ? productId : t.scope_id)
+      .first<{ stock: number | null; reserved: number | null }>();
+    if (!row || row.stock === null || row.stock === undefined) continue;
+    const here = Math.max(0, Number(row.stock) - Math.max(0, Number(row.reserved) || 0));
+    free = free === null ? here : Math.min(free, here);
+  }
+  return free;
+}
+
 /** The identity of the counter row a target moves — the key `reservedCredit` uses. */
 export function stockRowKey(productId: string, target: Pick<StockTarget, 'scope' | 'scope_id'>): string {
   return `${tableFor(target.scope)}#${target.scope === 'base' ? productId : target.scope_id}`;
