@@ -32,6 +32,7 @@ import { freeOnTargets, planInventory, stockRowKey, type InventoryPlan, type Sto
 import { assertHoldStateStatement, purchaseHoldInsertStatement, releaseHoldStatement } from '../walletOps';
 import { walletFreeDeliveryPublic, WALLET_FREE_DELIVERY_LABEL } from '../walletFreeDelivery';
 import { PRINTER_STANDARD_DELIVERY_POLICY, isPrinterStandardAcceptance } from '@levonis/shipping/printerDeliveryPolicy';
+import { CART_LINE_COLUMNS } from '../cartLineProjection';
 import {
   checkoutInputFrom,
   computeCheckout,
@@ -299,21 +300,26 @@ interface Candidate {
   existing: QuickBuyItemRow | null;
 }
 
+/** What a Quick Buy line says for each cart column; any other column reads as
+ *  its own migration's default (CART_LINE_COLUMNS), so a column the cart gains
+ *  later can never break a Quick Buy read. */
+const CANDIDATE_VALUES: Record<string, string> = {
+  option_id: "json_extract(value, '$.option_id')",
+  option_value_ids: "json_extract(value, '$.option_value_ids')",
+  color_id: "json_extract(value, '$.color_id')",
+  fulfillment_type: "'direct_sale'",
+  warranty_plan_id: "json_extract(value, '$.warranty_plan_id')",
+};
+
 /** The session's lines as a cart: one JSON parameter however many lines. */
 function linesSource(lines: readonly Candidate[]): NonNullable<CheckoutSource['lines']> {
+  const columns = CART_LINE_COLUMNS.map((col) => `${CANDIDATE_VALUES[col.name] ?? col.sqlDefault} AS ${col.name}`).join(',\n               ');
   return {
     build: (projection) => `WITH ci AS (
         SELECT json_extract(value, '$.id') AS id,
                json_extract(value, '$.product_id') AS product_id,
                CAST(json_extract(value, '$.qty') AS INTEGER) AS qty,
-               json_extract(value, '$.option_id') AS option_id,
-               json_extract(value, '$.option_value_ids') AS option_value_ids,
-               json_extract(value, '$.color_id') AS color_id,
-               '' AS shipping_method_id,
-               '' AS transport_method,
-               'direct_sale' AS fulfillment_type,
-               json_extract(value, '$.warranty_plan_id') AS warranty_plan_id,
-               '' AS draw_salt
+               ${columns}
           FROM json_each(?))
       SELECT ci.id AS cart_item_id, ci.qty, ${projection}, p.*
         FROM ci JOIN products p ON p.id = ci.product_id`,
@@ -330,6 +336,25 @@ function linesSource(lines: readonly Candidate[]): NonNullable<CheckoutSource['l
         }))
       ),
     ],
+  };
+}
+
+/** The columns quick_buy_items itself carries (0176), read as they are. */
+const ITEM_COLUMNS = new Set([
+  'option_id', 'option_value_ids', 'color_id', 'shipping_method_id', 'transport_method',
+  'fulfillment_type', 'warranty_plan_id', 'draw_salt',
+]);
+
+/** A session's stored lines as a cart, for the finaliser — same rule as above. */
+export function storedLinesSource(sessionId: string): NonNullable<CheckoutSource['lines']> {
+  const columns = CART_LINE_COLUMNS.map((col) => `${ITEM_COLUMNS.has(col.name) ? `qi.${col.name}` : col.sqlDefault} AS ${col.name}`).join(', ');
+  return {
+    build: (projection) => `WITH ci AS (
+        SELECT qi.id, qi.qty, qi.product_id, ${columns}
+          FROM quick_buy_items qi WHERE qi.session_id = ? AND qi.qty > 0)
+      SELECT ci.id AS cart_item_id, ci.qty, ${projection}, p.*
+        FROM ci JOIN products p ON p.id = ci.product_id`,
+    params: [sessionId],
   };
 }
 

@@ -42,7 +42,7 @@ import {
   type QuickBuyItemRow,
   type QuickBuySessionRow,
 } from './model';
-import { eventStatement, heldCredit, heldMove, liveItems, loadSession, planFence } from './session';
+import { eventStatement, heldCredit, heldMove, liveItems, loadSession, planFence, storedLinesSource } from './session';
 
 export type FinalizeOutcome =
   | { status: 'submitted'; orderId: string }
@@ -213,13 +213,7 @@ export async function finalizeQuickBuySession(env: Env, runner: FinalizeRunner, 
     sessionId: session.id,
     orderId: session.order_id,
     source: {
-      lines: {
-        build: (projection) =>
-          `SELECT ci.id AS cart_item_id, ci.qty, ${projection}, p.*
-             FROM quick_buy_items ci JOIN products p ON p.id = ci.product_id
-            WHERE ci.session_id = ? AND ci.qty > 0`,
-        params: [session.id],
-      },
+      lines: storedLinesSource(session.id),
       address: parseJson<Record<string, unknown>>(session.address_snapshot, {}),
       reservedCredit: credit,
       walletCreditCents: session.hold_id ? session.held_cents : 0,
