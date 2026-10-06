@@ -22,3 +22,22 @@ Deletion deliberately refuses linked accounting/wage/payment/fulfilment evidence
 - Live **pre-deployment** PageSpeed mobile homepage: Performance **82**, Accessibility **100**, Best Practices **100**, SEO **100**. FCP 2.7 s, LCP 3.9 s, TBT 0 ms, CLS 0.002, Speed Index 4.2 s.
 - Report: https://pagespeed.web.dev/analysis/https-levonis-iq-com/uk68m278ly?form_factor=mobile
 - Largest delay: discovery of the opening promo image (2,140 ms); blocking CSS 44.6 KiB / 1,310 ms. These are baseline measurements, not results of the changes above. A score above 95 has **not** yet been verified.
+
+## Follow-up: cancellation advances and product navigation
+
+The shared stage-transition route returned stock on cancellation but did not call the wallet/points refund operation. Legacy status cancellation and customer cancellation used a different path. Stage cancellation now includes the common refund, stock return and points release in the same transaction. Historical recovery processes only cancelled, unfulfilled platform orders whose approved ledger proves the remaining debit, and runs before retention. Deterministic transaction identifiers prevent duplicate credits.
+
+The common operation fences the current money snapshot against simultaneous price adjustments. Partial price refunds retain exact dinars as well as wallet cents; an already-refunded order cannot be reopened with stale prepaid fields through either admin route. A new order is required to collect a fresh advance.
+
+Navigation diagnosis found a route-chunk → mount → detail-request waterfall, followed by a duplicate quote for the exact opening selection. Explicit product/catalogue taps now start data and route downloads together. The fresh detail quote is reused only while its exact selection matches; changed choices, focus refreshes and refusals still request current server prices. Catalogue Back navigation restores its cached viewport before paint. Optional printer-maintenance and taxonomy reads start alongside the main product-detail query wave.
+
+Additional pre-deployment PageSpeed results:
+
+| Page/device | Performance | Accessibility | Best practices | SEO |
+|---|---:|---:|---:|---:|
+| Home/desktop | 75 | 100 | 100 | 100 |
+| Products/mobile | 83 | 98 | 100 | 100 |
+
+Products mobile: FCP 2.6 s, LCP 4.1 s, TBT 10 ms, Speed Index 3.0 s. Report: https://pagespeed.web.dev/analysis/https-levonis-iq-com-products/t8g3dhu5lz?form_factor=mobile
+
+Workspace curl latency is not used as a site-speed benchmark: both a cached HTML document and cached home API response showed large environment/network delays. The independent PageSpeed lab is the baseline.

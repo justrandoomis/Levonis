@@ -52,6 +52,25 @@ export function productsOpeningPath(search = ''): string {
   params.set('limit', '50');
   return `/api/products?${params}`;
 }
+
+/** The next catalogue read can overlap its route chunk on an actual tap.
+ * Only the main storefront and same-origin catalogue links qualify. This
+ * never warms account, cart or payment data, and carries no arbitrary query
+ * parameters into an API path. */
+export function navigationDataPath(href: string, origin: string): string | null {
+  try {
+    const url = new URL(href, origin);
+    const current = new URL(origin);
+    if (url.origin !== current.origin || !['levonis-iq.com', 'www.levonis-iq.com'].includes(url.hostname)) return null;
+    if (url.pathname === '/products') return productsOpeningPath(url.search);
+    if (!/^\/product\/[^/]+\/?$/.test(url.pathname)) return null;
+    const slug = decodeURIComponent(url.pathname.split('/')[2]);
+    if (!slug || /[/\\?#]/.test(slug)) return null;
+    return `/api/products/${slug}`;
+  } catch {
+    return null;
+  }
+}
 /** The id of the data block `worker/index.ts` writes into a rewritten document. */
 export const INLINE_RESOLVE_ID = 'lv-resolve';
 

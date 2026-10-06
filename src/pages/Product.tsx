@@ -973,6 +973,14 @@ export default function Product() {
   const [warrantyOpen, setWarrantyOpen] = useState(false);
   const [quoteError, setQuoteError] = useState<unknown>(null);
   const [quoteToken, setQuoteToken] = useState(0);
+  // Only the freshly returned detail's exact opening selection may skip a
+  // second quote. This is invalidated by a choice, focus refresh or refusal;
+  // it is never a cache of previous selections or previous page visits.
+  const openingQuoteKey = useRef<string | null>(null);
+  const refreshQuote = useCallback(() => {
+    openingQuoteKey.current = null;
+    setQuoteToken((n) => n + 1);
+  }, []);
 
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [lightbox, setLightbox] = useState(false);
@@ -1014,6 +1022,7 @@ export default function Product() {
     async function load() {
       setLoading(true);
       setLoadError(null);
+      openingQuoteKey.current = null;
       try {
         const path = `/api/products/${slug}`;
         if (openingRequest.current?.path !== path) {
@@ -1073,11 +1082,11 @@ export default function Product() {
           ? data.initial_selection
           : null;
         setQuote(data.pricing ? { ...data.pricing, qty: 1, line_total_iqd: data.pricing.unit_subtotal_iqd } : null);
-        setQuotedFor(
-          data.pricing
-            ? `${initial?.option_value_ids?.length ? initial.option_value_ids.join(',') : initial?.option_id ?? ''}|${initial?.color_id ?? ''}|${initial ? 'direct_sale' : ''}||`
-            : null
-        );
+        const openingPriceKey = data.pricing
+          ? `${initial?.option_value_ids?.length ? initial.option_value_ids.join(',') : initial?.option_id ?? ''}|${initial?.color_id ?? ''}|${initial ? 'direct_sale' : ''}||`
+          : null;
+        setQuotedFor(openingPriceKey);
+        openingQuoteKey.current = openingPriceKey === null ? null : `${data.product.slug}:${openingPriceKey}`;
         // A quote left in flight by the PREVIOUS product must not leave this
         // one looking like it is still resolving.
         setQuoteLoading(false);
@@ -1232,6 +1241,14 @@ export default function Product() {
   const productSlug = product?.slug ?? '';
   useEffect(() => {
     if (!productSlug || source !== 'catalog') return;
+    if (openingQuoteKey.current === `${productSlug}:${priceKey}`) {
+      // The detail endpoint has already resolved pricing and availability
+      // together for exactly this selection. Repeating that work after a
+      // 140ms timer only holds the purchase panel in "updating" unnecessarily.
+      setQuoteLoading(false);
+      return;
+    }
+    openingQuoteKey.current = null;
     let cancelled = false;
     const ac = new AbortController();
     // The price on screen is NOT hidden while this runs — it is marked
@@ -1317,7 +1334,7 @@ export default function Product() {
    * under an add the customer is waiting on, under the lightbox, or under the
    * shipping-conflict dialog they are answering.
    */
-  useFreshOnReturn(() => setQuoteToken((n) => n + 1), {
+  useFreshOnReturn(refreshQuote, {
     enabled: !addingToCart && !lightbox && shippingConflict === null,
     minIntervalMs: 8_000,
   });
@@ -1726,7 +1743,7 @@ export default function Product() {
         const left = err instanceof ApiError ? Number(err.details?.available ?? err.details?.max_qty) : NaN;
         if (code === 'QTY_UNAVAILABLE' && Number.isInteger(left) && left >= 1 && left < qty) {
           setQty(left);
-          setQuoteToken((n) => n + 1);
+          refreshQuote();
         }
         const said = code ? reasonText(s, code) : '';
         const raw = err instanceof Error ? err.message : 'Failed to add to cart';
@@ -1738,7 +1755,7 @@ export default function Product() {
         setAddingToCart(false);
       }
     },
-    [product, qty, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, isAuthenticated, navigate, s, lang]
+    [product, qty, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, isAuthenticated, navigate, s, lang, refreshQuote]
   );
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
@@ -3446,7 +3463,7 @@ export default function Product() {
       ) : null}
       {quoteError ? (
         <div className="pt-1">
-          <ErrorState error={quoteError} onRetry={() => setQuoteToken((n) => n + 1)} compact />
+          <ErrorState error={quoteError} onRetry={refreshQuote} compact />
         </div>
       ) : null}
       {actionError ? (

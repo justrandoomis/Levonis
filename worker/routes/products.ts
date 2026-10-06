@@ -3632,7 +3632,24 @@ export async function catalogProductDetail(
   // more awaits AFTER this wave — three dependent D1 round trips on every
   // product page, for reads that depend on nothing this wave returns.
   const productId = String(row.id);
-  const [ctx, brandRow, relations, isPrinter, salesBadge, ratingRow, poolMember, offer, fitsMap] = await Promise.all([
+  const printerPromise = isPrinterProduct(db, productId);
+  // The maintenance shelf depends only on printer identity, not on pricing,
+  // options or ratings. Its 2–3 reads used to start after that entire wave;
+  // overlap them, and the shared taxonomy lookup, with the main detail work.
+  const maintenancePromise = printerPromise.then(async (printer) => {
+    if (!printer) return null;
+    const [targets, idx] = await Promise.all([
+      maintenanceFor(db, [productId]),
+      catalogIndexFor(db).catch(() => null),
+    ]);
+    const target = targets.get(productId);
+    return target ? {
+      count: target.count,
+      printer_slug: target.slug,
+      path: idx?.byId.has(MAINTENANCE_ROOT_ID) ? `${idx.path(MAINTENANCE_ROOT_ID)}/all` : null,
+    } : null;
+  });
+  const [ctx, brandRow, relations, isPrinter, salesBadge, ratingRow, poolMember, offer, fitsMap, maintenanceParts] = await Promise.all([
     ctxPromise,
     parsed.brand_id
       ? db.prepare('SELECT id, name_ar, name_en, name_ckb FROM brands WHERE id = ? AND active = 1')
@@ -3645,7 +3662,7 @@ export async function catalogProductDetail(
     loadRelationsView(db, String(row.id), row.inventory_mode),
     // The owner's catalog flag: the page shows the printer home-delivery
     // note off it (worker/lib/printerIdentity.ts) — never off ops_policy.
-    isPrinterProduct(db, String(row.id)),
+    printerPromise,
     // The header's "how many have sold" tier. Joins this batch rather than
     // running after it, so the badge costs the page no extra round trip.
     salesBadgeFor(db, String(row.id)),
@@ -3667,6 +3684,7 @@ export async function catalogProductDetail(
     degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(db, [subjectOf(productId)]), EMPTY_OFFERS()).then((m) => m.get(offerKey(subjectOf(productId)))),
     // 0148 — the ACTIVE printers the admin linked (see `fits_printers` below).
     activeFitsFor(db, [productId]),
+    maintenancePromise,
   ]);
   /**
    * The linked new product's live price, when this listing is a used copy.
@@ -3748,19 +3766,8 @@ export async function catalogProductDetail(
    * A used unit's parts are its MODEL's (`condition.new_product_id`, the
    * link a graded listing already carries). Both empty before 0148.
    */
-  // The fits came with the first wave; only a PRINTER pays a second round
-  // trip, for the parts shelf its flag says it has.
-  const target = isPrinter ? (await maintenanceFor(db, [productId])).get(productId) : undefined;
+  // Fits and optional printer maintenance now arrive in the initial wave.
   const fitsPrinters = fitsMap.get(productId) ?? [];
-  let maintenanceParts: { count: number; printer_slug: string; path: string | null } | null = null;
-  if (target) {
-    const idx = await catalogIndexFor(db).catch(() => null);
-    maintenanceParts = {
-      count: target.count,
-      printer_slug: target.slug,
-      path: idx?.byId.has(MAINTENANCE_ROOT_ID) ? `${idx.path(MAINTENANCE_ROOT_ID)}/all` : null,
-    };
-  }
 
   return {
     ctx,

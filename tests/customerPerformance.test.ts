@@ -17,7 +17,9 @@ import { api, type ApiProduct } from '../src/lib/api';
 import { type BentoTile } from '../src/lib/homeLayout';
 import { bentoImageSizes } from '../src/lib/homeImageSizes';
 import SafeImage, { IMAGE_VARIANT_WIDTHS, variantSrcSet } from '../src/components/ui/SafeImage';
-import { bootRequests, clearPrimedRequests, primeGet, takePrimedJson } from '../src/lib/bootFetch';
+import { bootRequests, clearPrimedRequests, navigationDataPath, primeGet, takePrimedJson } from '../src/lib/bootFetch';
+import { clearPageCache, writePageCache } from '../src/lib/pageCache';
+import Products from '../src/pages/Products';
 import { productImagePreload, injectDocumentPreloads } from '../worker/lib/socialPreview';
 import { PRODUCT_GALLERY_SIZES } from '../packages/contracts/src/imageSizing';
 import { ROOT } from './fixtures/d1';
@@ -26,6 +28,7 @@ const originalFetch = globalThis.fetch;
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 afterEach(() => {
   clearPrimedRequests();
+  clearPageCache();
   globalThis.fetch = originalFetch;
   if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
   else Reflect.deleteProperty(globalThis, 'window');
@@ -126,6 +129,48 @@ test('opening catalogue requests start before React only on the canonical main h
   }
   assert.deepEqual(start('/product/x', 'levonis-iq.com', { kind: 'merchant' }), []);
   assert.deepEqual(start('/admin/finance', 'levonis-iq.com'), []);
+});
+
+test('a navigation intent starts only the target same-origin catalogue read with its exact query', () => {
+  const origin = 'https://levonis-iq.com';
+  assert.equal(navigationDataPath('/product/bambu-p2s?ref=ali', origin), '/api/products/bambu-p2s');
+  assert.equal(navigationDataPath('/products?category=printers&search=P2S&offset=50', origin), '/api/products?search=P2S&category=printers&limit=50');
+  for (const href of ['/wallet', '/cart', '/checkout', '/orders', '/bundles/x', '/api/products/x', '/product/x%2Fquote', '/product/x%3Fadmin=1', '/product/%E0%A4%A', 'https://other.example/product/x', '//shop.levonis-iq.com/product/x']) {
+    assert.equal(navigationDataPath(href, origin), null, href);
+  }
+  assert.equal(navigationDataPath('/product/x', 'https://shop.levonis-iq.com'), null);
+});
+
+test('pointerdown and click share the in-flight detail request before the lazy route consumes it', async () => {
+  browser();
+  let requests = 0;
+  let finish: (response: Response) => void = () => {};
+  globalThis.fetch = (() => {
+    requests += 1;
+    return new Promise<Response>((resolve) => { finish = resolve; });
+  }) as typeof fetch;
+  const path = navigationDataPath('/product/p2s', 'https://levonis-iq.com')!;
+  primeGet(path); // Touch down, before the route module is available.
+  primeGet(path); // Click, before React starts the navigation.
+  assert.equal(requests, 1);
+  const read = takePrimedJson<{ product: { slug: string } }>(path)!;
+  finish(Response.json({ success: true, product: { slug: 'p2s' } }));
+  assert.equal((await read).product.slug, 'p2s');
+  assert.equal(requests, 1, 'mount takes over the actual request rather than fetching again');
+});
+
+test('returning to a catalogue paints its saved products before effects run', () => {
+  const p = { id: 'p', slug: 'p2s', name: 'Bambu P2S saved shelf', images: [], price_iqd: 5000, membership_prices: {}, options: [], colors: [] } as unknown as ApiProduct;
+  writePageCache('products:|printers', { products: [p], category: { id: 'printers', name_ar: 'طابعات', name_en: 'Printers', name_ckb: 'چاپکەر' } });
+  const html = renderToStaticMarkup(createElement(AuthContext.Provider, {
+    value: { isAuthenticated: false, user: null, isLoaded: true, login: async () => {}, loginWithGoogle: async () => {}, register: async () => {}, refreshUser: async () => {}, logout: async () => {} },
+    children: createElement(WalletProvider, { children: createElement(CurrencyProvider, { children: createElement(LanguageProvider, {
+      children: createElement(MemoryRouter, { initialEntries: ['/products?category=printers'] }, createElement(Products)),
+    }) }) }),
+  }));
+  assert.match(html, /Bambu P2S saved shelf/);
+  assert.match(html, /data-product-card="compact"/);
+  assert.match(html, /aria-busy="false"/);
 });
 
 test('an opening answer is consumed once and replaced if the session changes while it is in flight', async () => {

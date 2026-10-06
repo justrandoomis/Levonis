@@ -11,6 +11,7 @@ import NavigationRouter from './components/NavigationRouter';
 import { StoreProvider, useStore } from './StoreContext';
 import ChunkBoundary from './components/ChunkBoundary';
 import { afterCriticalPaint, allowsSpeculativeLoads } from './lib/afterCriticalPaint';
+import { navigationDataPath, primeGet } from './lib/bootFetch';
 /**
  * THE MERCHANT STOREFRONT IS NOT ON THE APEX'S CRITICAL PATH, AND IT WAS IN
  * THE APEX'S ENTRY BUNDLE.
@@ -96,7 +97,7 @@ const Referrals = React.lazy(() => import('./pages/Referrals'));
  * with the storefront. `tests/bundleBudget.test.ts` pins both chunks.
  */
 const Bundles = React.lazy(() => import('./pages/Bundles'));
-const BundleDetail = React.lazy(() => import('./pages/BundleDetail'));
+const BundleDetail = prefetchable(() => import('./pages/BundleDetail'));
 
 /**
  * The one fallback every lazy route shares. It is the same markup the two
@@ -220,34 +221,47 @@ function useIdlePrefetch() {
   }, [ready]);
 
   React.useEffect(() => {
-    const pending = new Set(['product', 'cart', 'addresses']);
     const onIntent = (e: Event) => {
+      if (e instanceof MouseEvent && (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey)) return;
       const target = e.target as Element | null;
-      const href = target?.closest?.('a[href]')?.getAttribute('href') ?? '';
+      const link = target?.closest?.('a[href]');
+      if (!link || link.hasAttribute('download') || (link.getAttribute('target') && link.getAttribute('target') !== '_self')) return;
+      const href = link.getAttribute('href') ?? '';
       // A person who is touching the page will open something soon.
       preloadMotionFeatures();
-      if (/^\/(?:product|bundles)\//.test(href)) {
+      if (/^\/product\//.test(href)) {
         preload(Product);
-        pending.delete('product');
+      }
+      if (/^\/bundles\//.test(href)) {
+        preload(BundleDetail);
+      }
+      if (/^\/products(?:[?#]|$)/.test(href)) {
+        preload(Products);
       }
       if (/^\/cart(?:[?#]|$)/.test(href)) {
         // Checkout is reached from the cart, the address book from checkout.
         preload(Cart);
         preload(Addresses);
-        pending.delete('cart');
-        pending.delete('addresses');
       }
       if (/^\/(?:checkout|addresses)(?:[?#]|$)/.test(href)) {
         preload(Addresses);
-        pending.delete('addresses');
       }
-      if (pending.size === 0) detach();
+      // Previously the detail GET waited for the Product chunk to download,
+      // parse and mount. Start the one-shot read in parallel on the press;
+      // the destination already consumes it with takePrimedJson. Focus warms
+      // code only, so tabbing past a link cannot leave an old quoted price.
+      if (e.type !== 'focusin') {
+        const path = navigationDataPath(href, window.location.origin);
+        if (path) primeGet(path);
+      }
     };
     const detach = () => {
       document.removeEventListener('pointerdown', onIntent, true);
+      document.removeEventListener('click', onIntent, true);
       document.removeEventListener('focusin', onIntent, true);
     };
     document.addEventListener('pointerdown', onIntent, true);
+    document.addEventListener('click', onIntent, true);
     document.addEventListener('focusin', onIntent, true);
     return detach;
   }, []);

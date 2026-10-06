@@ -60,6 +60,15 @@ export async function cancelledOrderRefundStatements(
   const out: D1PreparedStatement[] = [];
   const ledgerDinars = walletCents > 0 ? await walletLedgerDinarsReady(env.DB) : false;
 
+  // A customer can approve a lower price after the cancel route reads the
+  // order. That already returned part of the advance without changing stage
+  // or status. Abort the entire cancellation if its money snapshot is stale.
+  out.push(env.DB.prepare(`UPDATE orders SET status=CASE WHEN status='cancelled'
+    AND user_id=?2 AND wallet_applied_usd_cents=?3 AND points_discount_iqd=?4
+    AND wallet_applied_iqd IS ?5 AND exchange_rate IS ?6
+    THEN status ELSE NULL END WHERE id=?1`)
+    .bind(id, userId, walletCents, points, order.wallet_applied_iqd ?? null, order.exchange_rate ?? null));
+
   /**
    * Wallet money comes back by its own channel, as an approved credit that
    * reverses the debit posted at checkout (usdSpendStatement / the store
@@ -101,14 +110,14 @@ export async function cancelledOrderRefundStatements(
     // their cents, so the cancel returns the REST in both units — never the
     // same dinars twice.
     const refundDinarsSql = `((SELECT SUM(d.amount_iqd) FROM wallet_transactions d
-            WHERE d.ref = ?2 AND d.user_id = ?3 AND d.currency = 'USD' AND d.type = 'withdrawal'
+            WHERE d.ref = ?2 AND d.user_id = ?3 AND d.currency = 'USD' AND d.type = 'withdrawal' AND d.status = 'approved'
               AND d.amount_iqd > 0 AND d.exchange_rate_snapshot > 0)
           - (SELECT COALESCE(SUM(CASE WHEN p.type = 'deposit' THEN p.amount_iqd ELSE -p.amount_iqd END), 0)
                FROM wallet_transactions p
               WHERE p.ref = 'order-price:' || ?2 AND p.user_id = ?3 AND p.currency = 'USD'
                 AND p.status = 'approved' AND p.amount_iqd > 0))`;
     const refundRateSql = `(SELECT MAX(d.exchange_rate_snapshot) FROM wallet_transactions d
-            WHERE d.ref = ?2 AND d.user_id = ?3 AND d.currency = 'USD' AND d.type = 'withdrawal'
+            WHERE d.ref = ?2 AND d.user_id = ?3 AND d.currency = 'USD' AND d.type = 'withdrawal' AND d.status = 'approved'
               AND d.amount_iqd > 0 AND d.exchange_rate_snapshot > 0)`;
     out.push(
       env.DB.prepare(
@@ -122,6 +131,29 @@ export async function cancelledOrderRefundStatements(
           WHERE NOT EXISTS (SELECT 1 FROM wallet_transactions t WHERE t.id = ?1)`
       ).bind(`wtx_refund_${id}_usd`, id, userId, walletCents, `Refund for cancelled order ${id}`, createdBy, nowIso)
     );
+    if (ledgerDinars) {
+      // A previous partial price refund can leave the remaining cents worth
+      // MORE than its remaining dinars (e.g. 2,143 cents vs 30,000 IQD).
+      // walletDustIqdSql clamps each row's remainder at zero, so returning
+      // those cents alone overcredits by two dinars. A zero-net-cent pair
+      // records the missing negative remainder while returning every cent.
+      // Both legs are deterministic and share the cancellation transaction.
+      const extra = `CAST(r.amount*r.exchange_rate_snapshot/100 AS INTEGER)-r.amount_iqd`;
+      const one = `CAST(r.exchange_rate_snapshot/100 AS INTEGER)`;
+      for (const [suffix, type, dinars] of [
+        ['rounding_in', 'deposit', one],
+        ['rounding_out', 'withdrawal', `${one}+(${extra})`],
+      ] as const) {
+        out.push(env.DB.prepare(`INSERT INTO wallet_transactions
+          (id,user_id,type,currency,amount,status,note,ref,created_by,decided_at,amount_iqd,exchange_rate_snapshot)
+          SELECT ?1,?2,?3,'USD',1,'approved',?4,?5,?6,?7,${dinars},r.exchange_rate_snapshot
+            FROM wallet_transactions r WHERE r.id=?8 AND r.status='approved'
+              AND r.user_id=?2 AND r.amount_iqd>0 AND r.exchange_rate_snapshot>=100 AND (${extra})>0
+              AND NOT EXISTS(SELECT 1 FROM wallet_transactions t WHERE t.id=?1)`)
+          .bind(`wtx_refund_${id}_${suffix}`, userId, type, `Exact dinar cancellation rounding for order ${id}`,
+            `order-cancel-rounding:${id}`, createdBy, nowIso, `wtx_refund_${id}_usd`));
+      }
+    }
   }
   // §4.4: points come back AS POINTS, never as cash, and the reservation
   // records that the redemption was given back.

@@ -3314,6 +3314,7 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
   if (!res.moved) {
     if (res.reason === 'NOT_FOUND') throw notFound('Order not found');
     if (res.reason === 'RACED') throw badRequest('The order changed while you were editing — reload and retry');
+    if (res.reason === 'REFUNDED_ORDER') throw badRequest('تم إرجاع رصيد هذا الطلب؛ لا يمكن إعادة فتحه. أنشئ طلباً جديداً ليتم احتساب الدفعة من جديد.', 'REFUNDED_ORDER');
     // «بانتظار موافقة الزبون على السعر» (0140): withdraw the proposal or wait.
     if (res.reason === 'PRICE_APPROVAL_PENDING') throw priceHeldRefusal(id);
     // The re-claim trigger refused (§17 decision 4). The transition itself is
@@ -3450,14 +3451,26 @@ adminRoutes.patch('/orders/:id', async (c) => {
     stockNote = stockReturnNote(stock.kind, stock.plan?.applied ?? 0);
   } else if (from === 'cancelled') {
     // RE-OPENING. The slot this order released when it was cancelled has to
-    // come back with it (§17 decision 4) — otherwise the customer keeps the
-    // goods AND the entitlement. Flip and re-claim in ONE batch, because a
-    // re-claim the limit trigger refuses must take the re-open with it.
+    // come back with it (§17 decision 4). A refund makes this order's old
+    // prepaid amounts unusable: create a new order instead of treating money
+    // already returned to the buyer as a payment. The guard shares the flip's
+    // transaction so a concurrent historical repair cannot slip past it.
     try {
-      const res = await c.env.DB.batch([flipStmt, reclaimOrderRedemptionsStatement(c.env.DB, id)]);
+      const res = await c.env.DB.batch([
+        flipStmt,
+        c.env.DB.prepare(`UPDATE orders SET status=CASE WHEN NOT EXISTS(
+          SELECT 1 FROM wallet_transactions t WHERE t.user_id=orders.user_id AND t.ref=orders.id
+            AND t.type='deposit' AND t.status='approved'
+            AND t.id IN ('wtx_refund_'||orders.id||'_usd','wtx_refund_'||orders.id||'_pts')
+          ) THEN status ELSE NULL END WHERE id=?`).bind(id),
+        reclaimOrderRedemptionsStatement(c.env.DB, id),
+      ]);
       flipped = res[0]?.meta.changes ?? 0;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('NOT NULL constraint failed: orders.status')) {
+        throw badRequest('تم إرجاع رصيد هذا الطلب؛ لا يمكن إعادة فتحه. أنشئ طلباً جديداً ليتم احتساب الدفعة من جديد.', 'REFUNDED_ORDER');
+      }
       if (msg.includes('OFFER_PER_USER_LIMIT') || msg.includes('OFFER_GLOBAL_LIMIT')) {
         throw badRequest(
           'This order cannot be re-opened: its offer allowance was used again after the cancellation.',

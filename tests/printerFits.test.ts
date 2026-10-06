@@ -23,7 +23,8 @@ import { all, asD1, ctx, dbThrough, freshDb, get, json, post, row, stubApp, type
 import { templateRoutes } from '../worker/routes/template';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
 import { adminProductRelationsRoutes } from '../worker/routes/adminProductRelations';
-import { productRoutes } from '../worker/routes/products';
+import { catalogProductDetail, pricingCtxForUser, productRoutes, type PricingCtx } from '../worker/routes/products';
+import { parseProductRow } from '../worker/lib/productModel';
 import { orderRoutes } from '../worker/routes/orders';
 import { deviceRoutes } from '../worker/routes/devices';
 import { adminImportRoutes } from '../worker/routes/adminImport';
@@ -367,6 +368,31 @@ test('deleting a printer takes its links; deleting a part takes its own — neit
 });
 
 // ======================================================== the storefront
+
+test('printer maintenance reads start while unrelated pricing is still pending', async () => {
+  const t = setup();
+  const readyPricing = await pricingCtxForUser(t.db, null);
+  let releasePricing: (ctx: PricingCtx) => void = () => {};
+  const pricing = new Promise<PricingCtx>((resolve) => { releasePricing = resolve; });
+  let maintenanceStarted = false;
+  const tracked = Object.create(t.db) as D1Database;
+  tracked.prepare = (sql: string) => {
+    if (/AS model_id/.test(sql)) maintenanceStarted = true;
+    return t.db.prepare(sql);
+  };
+  const product = row(t.raw, "SELECT * FROM products WHERE id='prd_a1'")!;
+  const detail = catalogProductDetail(tracked, product, parseProductRow(product), pricing);
+  try {
+    // Let all ready database promises run; the price remains deliberately
+    // unresolved. A late maintenance waterfall cannot start in this window.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(maintenanceStarted, true, 'independent maintenance work overlaps the main response');
+  } finally {
+    releasePricing(readyPricing);
+  }
+  const result = await detail;
+  assert.equal(result.body.maintenance_parts, null, 'a printer with no linked parts still omits the shelf');
+});
 
 test('the part says which published printers it fits; the printer — and its used unit — count their parts', async () => {
   const t = setup();

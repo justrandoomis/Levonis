@@ -127,11 +127,40 @@ test('admin cancel: refunds wallet and points, returns the reservation and cance
   assert.equal(spendable(raw, 'buyer'), 50_000);
   assert.equal(settledPoints(raw, 'buyer'), 3000);
 
-  // Re-opened and cancelled again: the refund replays, it does not double.
-  assert.equal((await patch(app, '/api/admin/orders/O1', { status: 'processing' })).status, 200);
-  assert.equal((await patch(app, '/api/admin/orders/O1', { status: 'cancelled' })).status, 200);
+  // Returned money cannot still count as an advance on a reopened order.
+  const reopen = await patch(app, '/api/admin/orders/O1', { status: 'processing' });
+  assert.equal(reopen.status, 400);
+  assert.equal((await json(reopen)).code, 'REFUNDED_ORDER');
+  assert.equal(status(raw), 'cancelled');
   assert.equal(count(raw, "SELECT COUNT(*) n FROM wallet_transactions WHERE id LIKE 'wtx_refund_O1_%'"), 2);
   assert.equal(spendable(raw, 'buyer'), 50_000, 'not refunded twice');
+  await Promise.allSettled(pending);
+});
+
+test('admin reopening refuses a cancellation refund that lands after the initial order read', async () => {
+  for (const currency of ['USD', 'POINT'] as const) {
+    const raw = freshDb(); seed(raw, 'cancelled');
+    const { db, failing } = failingD1(raw);
+    failing.beforeBatch = stmts => {
+      if (!stmts.some(s => /SET status = \?/.test(s.sql))) return;
+      raw.prepare(`INSERT INTO wallet_transactions(id,user_id,type,currency,amount,status,ref)
+        VALUES(?,'buyer','deposit',?,?,'approved','O1')`)
+        .run(`wtx_refund_O1_${currency === 'USD' ? 'usd' : 'pts'}`, currency, currency === 'USD' ? 50000 : 1000);
+    };
+    const response = await patch(adminApp(db), '/api/admin/orders/O1', { status: 'confirmed' });
+    assert.equal(response.status, 400, currency);
+    assert.equal((await json(response)).code, 'REFUNDED_ORDER');
+    assert.equal(status(raw), 'cancelled');
+    assert.equal(count(raw, "SELECT COUNT(*) n FROM wallet_transactions WHERE id LIKE 'wtx_refund_O1_%'"), 1);
+  }
+});
+
+test('admin can still reopen a cancelled order whose payment has not been refunded', async () => {
+  const raw = freshDb(); seed(raw, 'cancelled');
+  const response = await patch(adminApp(asD1(raw)), '/api/admin/orders/O1', { status: 'confirmed' });
+  assert.equal(response.status, 200, JSON.stringify(await json(response)));
+  assert.equal(status(raw), 'confirmed');
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM wallet_transactions WHERE id LIKE 'wtx_refund_O1_%'"), 0);
   await Promise.allSettled(pending);
 });
 

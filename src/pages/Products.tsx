@@ -25,9 +25,12 @@ export default function Products() {
 
   /** What this page needs to paint: the grid and the resolved section name. */
   type ProductsSnapshot = { products: ApiProduct[]; category: ResolvedCategory | null };
+  // Seed before the first paint, so Back restores the real grid and its
+  // scroll height rather than painting skeletons before the mount effect.
+  const [initialSnapshot] = useState(() => readPageCache<ProductsSnapshot>(`products:${search}|${category}`));
 
-  const [products, setProducts] = useState<ApiProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<ApiProduct[]>(initialSnapshot?.products ?? []);
+  const [loading, setLoading] = useState(!initialSnapshot);
   const [error, setError] = useState<unknown>(null);
   /**
    * THREE STATES, NOT TWO — and that is what keeps the id off the screen.
@@ -43,7 +46,7 @@ export default function Products() {
    *               real products behind it. The heading shows the plain word.
    *   an object — the name, localized.
    */
-  const [categoryRef, setCategoryRef] = useState<ResolvedCategory | null | undefined>(undefined);
+  const [categoryRef, setCategoryRef] = useState<ResolvedCategory | null | undefined>(initialSnapshot?.category);
   // Monotonic request id: when the query changes mid-flight, the stale
   // response is ignored so a previous query's results never flash in.
   const reqIdRef = useRef(0);
@@ -55,7 +58,7 @@ export default function Products() {
    * back short"; until then a «عرض المزيد» asks for the next fifty at the
    * route's `offset`, which keeps the search ranking across pages.
    */
-  const [exhausted, setExhausted] = useState(true);
+  const [exhausted, setExhausted] = useState(!initialSnapshot || initialSnapshot.products.length < PAGE_SIZE);
   const [more, setMore] = useState<'idle' | 'loading' | 'error'>('idle');
   /**
    * WHAT IS IN THE SEARCH FIELD ON THIS PAGE. The results page had no field at

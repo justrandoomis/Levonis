@@ -48,7 +48,8 @@ import {
   stageForLegacyStatus,
   stagesFor,
 } from './orderStages';
-import { deductOrderStock, returnOrderStock, stockReturnNote } from './orderInventory';
+import { deductOrderStock, planOrderReturn, stockReturnNote } from './orderInventory';
+import { cancelledOrderRefundStatements } from './orderCancelOps';
 import { emitEvent, eventsEnabled } from './eventBus';
 import { OrderStatusChangedV1 } from '@levonis/contracts/events/v1/OrderStatusChanged';
 import { OrderDeliveredV1 } from '@levonis/contracts/events/v1/OrderDelivered';
@@ -111,7 +112,7 @@ export interface MoveResult {
   /** Honest partial outcomes — the move happened, something beside it did not. */
   notes: string[];
   /** Why a move was refused, when moved === false. */
-  reason?: 'ILLEGAL_MOVE' | 'RACED' | 'NOT_FOUND' | 'OFFER_LIMIT_REACHED' | 'PRICE_APPROVAL_PENDING';
+  reason?: 'ILLEGAL_MOVE' | 'RACED' | 'NOT_FOUND' | 'OFFER_LIMIT_REACHED' | 'PRICE_APPROVAL_PENDING' | 'REFUNDED_ORDER';
 }
 
 export interface MoveOptions {
@@ -316,8 +317,7 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   }
   /*
    * A COMMUNITY-STORE ORDER NEVER ENTERS OR LEAVES `cancelled` HERE — not even
-   * forced. A stage move into `cancelled` refunds nothing (see below), and a
-   * store order's cancellation must refund the buyer, restock the store and
+   * forced. A store order's cancellation must refund the buyer, restock the store and
    * reverse the merchant's credit together: that is `cancelStoreOrder`
    * (worker/lib/storeOrderOps.ts), which every door calls instead. Leaving
    * `cancelled` would re-open an order whose money went back to the customer.
@@ -398,17 +398,51 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   // back in the SAME batch as the flip (§17 decision 4): if the customer spent
   // that slot elsewhere meanwhile, `trg_offer_redemption_reclaim` aborts and
   // the move does not happen either, which is the honest outcome. This is only
-  // a re-claim — a stage move INTO cancelled releases nothing, because it
-  // refunds nothing (it calls returnOrderStock alone, never
-  // cancelledOrderRefundStatements), and the owner's rule frees a slot only
-  // for an order that was genuinely cancelled AND refunded.
+  // a re-claim. Cancellation returns the wallet, points, stock and offer slot
+  // in this same transaction, just like the customer and legacy status doors.
   const moveStatements = [flipStatement];
+  const refundedSql = `SELECT 1 FROM wallet_transactions t WHERE t.user_id=?1 AND t.ref=?2
+    AND t.type='deposit' AND t.status='approved'
+    AND t.id IN ('wtx_refund_'||?2||'_usd','wtx_refund_'||?2||'_pts')`;
+  if (reopening) {
+    // A refunded order no longer owns its prepaid amount. Reopening it with
+    // the old wallet/due fields would fulfil goods whose advance was returned.
+    // This also catches a historical repair landing after our initial read.
+    moveStatements.push(env.DB.prepare(`UPDATE orders SET status=CASE WHEN NOT EXISTS(${refundedSql})
+      THEN status ELSE NULL END WHERE id=?2`).bind(String(row.user_id), order.id));
+  }
+  const cancellation = legacyTo === 'cancelled'
+    ? await planOrderReturn(env.DB, order.id, opts.changedBy || null)
+    : null;
+  if (cancellation) {
+    // Immediately after the conditional flip: even a competing cancellation
+    // must not let a stale stage move commit any of its dependent writes.
+    moveStatements.push(env.DB.prepare(
+      `UPDATE orders SET status = CASE WHEN changes() = 1 THEN status ELSE NULL END WHERE id = ?`
+    ).bind(order.id));
+    moveStatements.push(...(cancellation.plan?.statements ?? []));
+    moveStatements.push(...await cancelledOrderRefundStatements(
+      env, row, opts.source === 'manual' ? 'admin' : 'system', nowIso
+    ));
+  }
   if (stamp) moveStatements.push(stamp);
   if (reopening) moveStatements.push(reclaimOrderRedemptionsStatement(env.DB, order.id));
   let flipResult;
   try {
     [flipResult] = await env.DB.batch(moveStatements);
   } catch (e) {
+    if (reopening && await env.DB.prepare(refundedSql).bind(String(row.user_id), order.id).first()) {
+      return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'REFUNDED_ORDER' };
+    }
+    if (cancellation) {
+      const current = await env.DB.prepare('SELECT stage,status,wallet_applied_iqd,wallet_applied_usd_cents,points_discount_iqd,exchange_rate FROM orders WHERE id = ?')
+        .bind(order.id).first<Record<string, unknown>>();
+      if (!current || current.stage !== storedStage || current.status !== legacyFrom
+        || ['wallet_applied_iqd','wallet_applied_usd_cents','points_discount_iqd','exchange_rate'].some(key => current[key] !== row[key])) {
+        return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'RACED' };
+      }
+    }
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('OFFER_PER_USER_LIMIT') || msg.includes('OFFER_GLOBAL_LIMIT')) {
       return {
@@ -530,9 +564,8 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
     if (res.rejected > 0) {
       notes.push(`Stock could not be deducted for ${res.rejected} line(s) — check the product's stock before shipping.`);
     }
-  } else if (legacyTo === 'cancelled') {
-    const res = await returnOrderStock(env.DB, order.id, opts.changedBy || null);
-    const note = stockReturnNote(res.kind, res.applied);
+  } else if (cancellation) {
+    const note = stockReturnNote(cancellation.kind, cancellation.plan?.applied ?? 0);
     if (note) notes.push(note);
   }
 

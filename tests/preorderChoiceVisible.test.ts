@@ -115,6 +115,26 @@ test('THE FIRST PAINT names both ways and defaults to the stocked direct-sale mo
   assert.equal(chooserRenders(a), true, 'so «طريقة التوفر» is on the page');
 });
 
+test('the detail opening price and availability equal a fresh quote for that exact selection', async () => {
+  const app = shopApp(asD1(seedA1()));
+  const detail = await json(await get(app, '/api/products/a1'));
+  const selection = detail.initial_selection;
+  const quoted = await json(await post(app, '/api/products/a1/quote', {
+    qty: 1, optionId: selection.option_id, optionValueIds: selection.option_value_ids,
+    colorId: selection.color_id || undefined, fulfillmentType: selection.fulfillment_type,
+  }));
+  const { qty, line_total_iqd, ...price } = quoted.quote;
+  assert.equal(qty, 1);
+  assert.equal(line_total_iqd, detail.pricing.unit_subtotal_iqd);
+  assert.deepEqual(price, detail.pricing, 'opening details already contain the complete authoritative quote');
+  assert.deepEqual(quoted.availability, detail.availability, 'skipping a duplicate opening quote does not skip stock validation');
+  const changed = await json(await post(app, '/api/products/a1/quote', {
+    qty: 1, optionId: selection.option_id, optionValueIds: selection.option_value_ids,
+    fulfillmentType: 'pre_order', transportMethod: 'land',
+  }));
+  assert.notDeepEqual(changed.quote, quoted.quote, 'changing order type and transport still needs its own server quote');
+});
+
 test('the option cells reach the browser, with the cost stripped', async () => {
   const app = shopApp(asD1(seedA1()));
   const detail = await json(await get(app, '/api/products/a1'));

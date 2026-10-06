@@ -26,6 +26,7 @@ import { runStoreOrderSweeps } from './storeOrderOps';
 import { runMerchantSweeps } from './merchantSweeps';
 import { refreshStaleMerchantBadges } from '../routes/merchantReviews';
 import { CANCELLED_ORDER_RETENTION_DAYS, sweepCancelledOrders, type CancelledOrderSweepReport } from './orderDeletion';
+import { repairCancelledOrderRefunds, type CancelledRefundRepairReport } from './orderCancelRepair';
 import {
   sweepStockAlerts,
   pruneFinishedStockAlerts,
@@ -113,6 +114,7 @@ export interface DurableJobsReport {
   gini_holds: GiniHoldReport;
   /** Cancelled, never-fulfilled orders permanently removed after seven days. */
   cancelled_order_retention: CancelledOrderSweepReport;
+  cancelled_order_refunds: CancelledRefundRepairReport;
   /**
    * Local-courier status sync. Separate from order_stages because it is the
    * only thing allowed to move an order to "في الطريق إليك" or "تم التوصيل":
@@ -214,6 +216,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     order_expiry: { configured: false, scanned: 0, cancelled: 0, skipped: 0, errors: 0 },
     gini_holds: { scanned: 0, cancelled: 0, skipped: 0, errors: 0 },
     cancelled_order_retention: { retention_days: CANCELLED_ORDER_RETENTION_DAYS, scanned: 0, deleted: 0, skipped: 0, errors: 0 },
+    cancelled_order_refunds: { scanned: 0, repaired: 0, skipped: 0, errors: 0 },
     delivery_sync: { configured: false, scanned: 0, moved: 0, unmapped: 0, errors: 0 },
     delivered_units: { scanned: 0, orders: 0, created: 0, errors: 0 },
     bnpl_overdue: { scanned: 0, overdue: 0, suspended: 0 },
@@ -460,6 +463,13 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   //      Gini method still has to let its outstanding orders go.
   await step('gini_holds', async () => {
     report.gini_holds = await sweepGiniHolds(env, nowIso, 100);
+  });
+
+  // Recover approved wallet payments missed by the old stage cancellation
+  // before retention is allowed to inspect the order. Future refunds happen
+  // in the cancellation transaction itself, without waiting for this sweep.
+  await step('cancelled_order_refunds', async () => {
+    report.cancelled_order_refunds = await repairCancelledOrderRefunds(env, nowIso);
   });
 
   // 11c. A cancelled order remains visible for support for seven full
