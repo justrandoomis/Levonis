@@ -377,7 +377,27 @@ import { CommunityGate } from './pages/community/access';
 // session the first time a community card asks for it. Tiny on purpose: it
 // rides in the entry chunk with the customer shell.
 import { SocialProvider } from './components/community/social/SocialContext';
-import BrowseMissionTimer from './components/BrowseMissionTimer';
+/**
+ * THE BROWSE-MISSION CLOCK, FOR A SIGNED-IN ACCOUNT ONLY, AS A LAZY CHUNK.
+ *
+ * It draws nothing unless a signed-in customer has a browse mission running
+ * (src/components/BrowseMissionTimer.tsx returns null for everyone else), yet
+ * it rode in every visitor's entry chunk — and the first paint plus the store
+ * pages sit at their byte cap (tests/bundleBudget.test.ts, 233 KB). The door
+ * stays here; the clock arrives once an account is signed in. A chunk that does
+ * not arrive draws nothing, which is what the clock draws until a mission starts.
+ */
+const BrowseMissionClock = React.lazy(() =>
+  import('./components/BrowseMissionTimer').catch(() => ({ default: () => null }))
+);
+function BrowseMissionTimer() {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? (
+    <Suspense fallback={null}>
+      <BrowseMissionClock />
+    </Suspense>
+  ) : null;
+}
 // The compare tray's door: renders and downloads nothing until the tray
 // holds a product (src/components/compare/CompareTrayGate.tsx).
 import CompareTrayGate from './components/compare/CompareTrayGate';

@@ -77,6 +77,15 @@ import { useInstallApp } from '../hooks/useInstallApp';
 import InstallAppButton from '../components/pwa/InstallAppButton';
 import { Segmented } from '../components/ui/Segmented';
 import { setThemePreference, useTheme, type ThemePreference } from '../lib/theme';
+import ChunkBoundary from '../components/ChunkBoundary';
+
+/**
+ * «الشراء السريع» — its own lazy chunk (docs/GIFTS_QUICK_BUY.md §3.5): the
+ * switch, the default address, the consents and the re-consent sheet load
+ * with the section, not with this page. It is drawn with THIS page's
+ * `SectionCard`, handed to it, so it is the same card as the other seven.
+ */
+const QuickBuySettings = React.lazy(() => import('../components/quickBuy/QuickBuySettings'));
 
 const PASSWORD_MIN = 8; // mirrors worker/routes/auth.ts checkPassword
 const USERNAME_COOLDOWN_DAYS = 14; // mirrors worker/routes/profile.ts
@@ -1187,6 +1196,23 @@ export default function Settings() {
                 ) : null}
               </div>
             </SectionCard>
+
+            {/* ------------------------------------- 3b. Quick Buy */}
+            {/* Beside the addresses because its one setting that is not a
+                switch IS an address — the default Quick Buy delivers to. The
+                placeholder holds the card's place while its chunk arrives,
+                so the two-column flow does not jump twice. */}
+            <ChunkBoundary compact>
+              <React.Suspense
+                fallback={
+                  <section className="mb-7 break-inside-avoid" aria-hidden="true">
+                    <div className="lv-surface animate-pulse" style={{ height: 190, marginTop: 26 }} />
+                  </section>
+                }
+              >
+                <QuickBuySettings SectionCard={SectionCard} />
+              </React.Suspense>
+            </ChunkBoundary>
 
             {/* ------------------------------------------- 4. Security */}
             <SectionCard title={s.secSecurity} icon={<ShieldCheck aria-hidden="true" className="w-4 h-4" />}>

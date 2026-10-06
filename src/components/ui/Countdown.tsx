@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '../../LanguageContext';
 import { daysLeftLabel } from '../orders/format';
+import { subscribeSecond } from '../../lib/secondTicker';
 
 /**
  * THE OFFER CLOCK (docs/BUNDLES_MYSTERY.md §13.2).
@@ -36,29 +37,11 @@ import { daysLeftLabel } from '../orders/format';
  *    product name for the same reason.
  */
 
-type Tick = (now: number) => void;
-
-const subscribers = new Set<Tick>();
-let timer: ReturnType<typeof setInterval> | null = null;
-
-/** The shared 1 Hz heartbeat. Started by the first clock on the page, stopped
- *  by the last — no page without a countdown ever pays for one. */
-function subscribe(fn: Tick): () => void {
-  subscribers.add(fn);
-  if (timer === null) {
-    timer = setInterval(() => {
-      const now = Date.now();
-      for (const s of subscribers) s(now);
-    }, 1000);
-  }
-  return () => {
-    subscribers.delete(fn);
-    if (subscribers.size === 0 && timer !== null) {
-      clearInterval(timer);
-      timer = null;
-    }
-  };
-}
+/** The shared 1 Hz heartbeat (src/lib/secondTicker.ts). Started by the first
+ *  clock on the page, stopped by the last — no page without a countdown ever
+ *  pays for one. The Quick Buy clock in the bottom bar beats with it, so a
+ *  page showing both wakes up once a second, not twice. */
+const subscribe = subscribeSecond;
 
 const STRINGS = {
   ar: { opens: 'يبدأ خلال', ends: 'ينتهي خلال', gone: '—' },
