@@ -1,21 +1,16 @@
-import { allocateProcurementCharge, roundProcurementProduct } from '../../../packages/contracts/src/procurementCost';
+import { allocateProcurementCharges, procurementSelectionKey, roundProcurementProduct, type ProcurementChargeBasis } from '../../../packages/contracts/src/procurementCost';
 
-export type EstimateLine = { qty_ordered: number; source_unit_amount: number | string; source_total_amount?: number | string; purchase_cost_mode?: string; selling_price_iqd: number; weight_g: number; volume_mm3: number };
-export type EstimateCharge = { amount_iqd: number; basis: string };
+export type EstimateLine = { product_id?: string; scope?: string; scope_id?: string | null; qty_ordered: number; source_unit_amount: number | string; source_total_amount?: number | string; purchase_cost_mode?: string; selling_price_iqd: number; weight_g: number; volume_mm3: number };
+export type EstimateCharge = { amount_iqd: number; basis: string; scope?: 'shipment' | 'unit'; unit_amount_iqd?: number | null; applies_to?: readonly string[] | null; review?: boolean };
 export type EstimateShipping = { basis: 'weight' | 'volume'; rate: number };
-// Mirrors the server's declared allocation for the estimate only. The server
-// validates selections, rounds IQD and allocates every dinar again at save time.
-function split(total: number, weights: number[]) {
-  const sum = weights.reduce((a, b) => a + b, 0);
-  if (!sum) return weights.map(() => 0);
-  const raw = weights.map((w) => total * w / sum), out = raw.map(Math.floor);
-  const order = raw.map((n, i) => ({ i, part: n - out[i] })).sort((a, b) => b.part - a.part || a.i - b.i);
-  for (let i = 0, left = total - out.reduce((a, b) => a + b, 0); i < left; i++) out[order[i % order.length].i]++;
-  return out;
-}
+/** The key a charge's `applies_to` names; a line without a selection is its own. */
+export const estimateLineKey = (l: EstimateLine, i: number) =>
+  l.product_id ? procurementSelectionKey({ product_id: l.product_id, scope: l.scope ?? '', scope_id: l.scope_id }) : `line:${i}`;
 function rounded(values: (number | string)[], divisor = 1) {
   try { return roundProcurementProduct(values, divisor); } catch { return NaN; }
 }
+// The server validates selections, rounds IQD and allocates every dinar again
+// at save time — with the same allocator, so the preview is what is saved.
 export function purchaseEstimate(lines: EstimateLine[], charges: EstimateCharge[], rate: number, profitBps: number, included?: number[], shipping?: EstimateShipping) {
   const costs = lines.map((l) => {
     const source = l.purchase_cost_mode === 'total' ? l.source_total_amount : l.source_unit_amount;
@@ -30,17 +25,20 @@ export function purchaseEstimate(lines: EstimateLine[], charges: EstimateCharge[
     if (!Number.isFinite(measure) || measure <= 0 || measure > 1e15) return NaN;
     return rounded([l.qty_ordered, measure, shipping.rate], shipping.basis === 'weight' ? 1_000 : 1_000_000_000);
   });
-  const allocated = [...autoFreight];
-  for (const c of charges) {
-    const weights = lines.map((l, i) => c.basis === 'value' ? costs[i] : c.basis === 'weight' ? l.qty_ordered * l.weight_g : c.basis === 'volume' ? l.qty_ordered * l.volume_mm3 : l.qty_ordered);
-    let parts: number[];
-    try { parts = shipping ? allocateProcurementCharge(c.amount_iqd, weights) : split(c.amount_iqd, weights); }
-    catch { parts = lines.map(() => NaN); }
-    parts.forEach((v, i) => { allocated[i] += v; });
-  }
+  const chargeLines = lines.map((l, i) => ({ key: estimateLineKey(l, i), qty: l.qty_ordered, value: costs[i], weight_g: l.weight_g, volume_mm3: l.volume_mm3 }));
+  // shares[charge][line]: the dinars a charge puts on a line. A charge waiting
+  // for review counts nothing; one that cannot be allocated yet is NaN.
+  const shares = charges.map((c) => {
+    if (c.review) return lines.map(() => 0);
+    try {
+      return allocateProcurementCharges([{ scope: c.scope ?? 'shipment', amount_iqd: c.amount_iqd, unit_amount_iqd: c.unit_amount_iqd ?? null, basis: c.basis as ProcurementChargeBasis, applies_to: c.applies_to ?? null }], chargeLines)[0];
+    } catch { return lines.map(() => NaN); }
+  });
   return lines.map((l, i) => {
-    const total = costs[i] + allocated[i], profit = l.selling_price_iqd * l.qty_ordered - total;
+    const extras = shares.reduce((n, row) => n + row[i], 0);
+    const freight = autoFreight[i] + extras;
+    const total = costs[i] + freight, profit = l.selling_price_iqd * l.qty_ordered - total;
     const investor = !included || included.includes(i) ? Math.floor(Math.max(0, profit) * profitBps / 10000) : 0;
-    return { purchase_iqd: costs[i], auto_shipping_iqd: autoFreight[i], freight_iqd: allocated[i], total_iqd: total, unit_iqd: total / l.qty_ordered, profit_iqd: profit, investor_iqd: investor, owner_iqd: profit - investor };
+    return { purchase_iqd: costs[i], auto_shipping_iqd: autoFreight[i], extras_iqd: extras, charge_shares: shares.map((row) => row[i]), freight_iqd: freight, total_iqd: total, unit_iqd: total / l.qty_ordered, profit_iqd: profit, investor_iqd: investor, owner_iqd: profit - investor };
   });
 }

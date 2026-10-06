@@ -1,5 +1,5 @@
 import { Hono, type Context } from 'hono';
-import { exactProcurementUnitDefault } from '../../packages/contracts/src/procurementCost';
+import { allocateProcurementCharges, exactProcurementUnitDefault, procurementSelectionKey } from '../../packages/contracts/src/procurementCost';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, forbidden, notFound, str } from '../lib/http';
 import { isOwner, projectForAdmin } from '../lib/adminScope';
@@ -8,7 +8,6 @@ import { audit } from '../lib/audit';
 import { requireSelection, productSelections, type Selection } from '../lib/inventorySelection';
 import { planReceive, type IncomingRow } from '../lib/inventoryReceiving';
 import {
-  allocateExact,
   baghdadDay,
   dateValue,
   decimal,
@@ -21,7 +20,7 @@ import {
 import { parsePurchaseCsv } from '../lib/purchaseCsv';
 import { planPurchaseFunding, purchaseFundingSummary, receivePurchaseFunding, type FundedPurchaseLine } from '../lib/purchaseFunding';
 import { investorFinanceInstalled } from '../lib/investorFinance';
-import { packedMeasure, procurementAllocation, procurementAmount, procurementProfiles, profileRates } from '../lib/procurementCosts';
+import { packedMeasure, procurementAmount, procurementProfiles, profileRates, purchaseChargeShares, purchaseCharges, type PurchaseCharge } from '../lib/procurementCosts';
 
 export const adminProcurementRoutes = new Hono<AppContext>();
 adminProcurementRoutes.use('*', requireAdmin);
@@ -67,6 +66,35 @@ async function commitPurchase(
   }
 }
 const bodyOf = async (c: Context<AppContext>) => await c.req.json<Record<string, unknown>>();
+type ChargeRow = { id: string; title: string; amount_iqd: number; basis: PurchaseCharge['basis']; scope: string | null; unit_amount_iqd: number | null; applies_to_json: string | null; allocation_json: string | null };
+type ChargeShare = { line_id: string; amount_iqd: number };
+const json = <T,>(value: string | null): T | null => {
+  if (!value) return null;
+  try { return JSON.parse(value) as T; } catch { return null; }
+};
+/** Each extra charge with the dinars it put on each line it covers. Documents
+ * saved before shares were stored are recomputed with the same allocator, and
+ * shown only when that reproduces every line's saved extras to the dinar. */
+function chargeView(rows: ChargeRow[], items: Line[]) {
+  const charges = rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    amount_iqd: r.amount_iqd,
+    basis: r.basis,
+    scope: r.scope === 'unit' ? 'unit' as const : 'shipment' as const,
+    unit_amount_iqd: r.unit_amount_iqd ?? null,
+    applies_to: json<string[]>(r.applies_to_json),
+    allocations: json<ChargeShare[]>(r.allocation_json),
+  }));
+  if (!charges.length || !items.length || charges.some((c) => c.allocations)) return charges;
+  const lines = items.map((l) => ({ key: procurementSelectionKey({ product_id: l.product_id ?? '', scope: l.scope, scope_id: l.scope_id }), qty: l.qty_ordered, value: l.purchase_total_iqd ?? l.qty_ordered * l.purchase_unit_iqd, weight_g: l.weight_g, volume_mm3: l.volume_mm3 }));
+  try {
+    const shares = allocateProcurementCharges(charges, lines);
+    if (items.every((l, i) => shares.reduce((n, row) => n + row[i], 0) === l.charges_iqd - (l.auto_shipping_iqd ?? 0)))
+      return charges.map((c, j) => ({ ...c, allocations: items.flatMap((l, i) => !c.applies_to || c.applies_to.includes(lines[i].key) ? [{ line_id: l.line_id, amount_iqd: shares[j][i] }] : []) }));
+  } catch { /* an unreadable historical basis keeps its shares unknown */ }
+  return charges;
+}
 const text = (v: unknown, max = 200) => str(v, 'text', { max, required: false }) ?? '';
 async function document(db: D1Database, id: string) {
   const p = await db
@@ -83,7 +111,7 @@ async function document(db: D1Database, id: string) {
       )
       .bind(id)
       .all<Line>(),
-    db.prepare('SELECT * FROM purchase_charges WHERE purchase_id=? ORDER BY id').bind(id).all(),
+    db.prepare('SELECT * FROM purchase_charges WHERE purchase_id=? ORDER BY COALESCE(position,2147483647),id').bind(id).all<ChargeRow>(),
     db
       .prepare('SELECT * FROM supplier_payments WHERE purchase_id=? ORDER BY payment_day,id')
       .bind(id)
@@ -96,7 +124,7 @@ async function document(db: D1Database, id: string) {
     purchase: p,
     funding: await purchaseFundingSummary(db,id),
     lines: items,
-    charges: charges.results ?? [],
+    charges: chargeView(charges.results ?? [], items),
     payments: payments.results ?? [],
     ordered_total_iqd: ordered,
     paid_iqd: paid,
@@ -240,6 +268,9 @@ async function planDocument(
     selling: number | null;
     charges: number;
     autoShipping: number;
+    key: string;
+    incomingId: string;
+    lineId: string;
   }> = [];
   for (const v of raw) {
     const r = v as Record<string, unknown>;
@@ -277,30 +308,20 @@ async function planDocument(
           : whole(r.selling_price_iqd ?? sel.selling_price_iqd, 'سعر البيع'),
       charges: autoShipping,
       autoShipping,
+      key: procurementSelectionKey(sel),
+      incomingId: newId('inc'),
+      lineId: newId('pol'),
     });
   }
-  const charges = (Array.isArray(b.charges) ? b.charges : []).map((v) => {
-    const r = v as Record<string, unknown>,
-      basis = text(r.basis, 20) || 'quantity';
-    if (!['quantity', 'weight', 'volume', 'value'].includes(basis))
-      throw badRequest('Invalid allocation method');
-    const amount = whole(r.amount_iqd, 'تكلفة الشحنة');
-    const shares = (profile ? procurementAllocation : allocateExact)(
-      amount,
-      lines.map((l) =>
-        basis === 'weight'
-          ? l.qty * l.weight
-          : basis === 'volume'
-            ? l.qty * l.volume
-            : basis === 'value'
-              ? l.total
-              : l.qty,
-      ),
-    );
-    lines.forEach((l, i) => (l.charges += shares[i]));
-    return { title: str(r.title, 'عنوان التكلفة', { min: 1, max: 120 }), basis, amount };
-  });
-  if (charges.length > 15) throw badRequest('Too many charges');
+  // Extra costs are only what was typed for this document's own lines. Route
+  // freight above is already in l.charges; nothing here repeats it.
+  const charges = purchaseCharges(b.charges, lines.map((l) => l.key));
+  const shares = purchaseChargeShares(
+    charges,
+    lines.map((l) => ({ key: l.key, qty: l.qty, value: l.total, weight_g: l.weight, volume_mm3: l.volume })),
+    profile ? 'BAD_ALLOCATION' : 'ALLOCATION_BASIS_MISSING',
+  );
+  shares.forEach((row) => row.forEach((share, i) => (lines[i].charges += share)));
   whole(
     lines.reduce((n, l) => n + l.total + l.charges, 0),
     'مجموع الشحنة',
@@ -417,8 +438,8 @@ async function planDocument(
   }
   const plannedLines:FundedPurchaseLine[]=[];
   for (const l of lines) {
-    const incoming = newId('inc'),
-      line = newId('pol');
+    const incoming = l.incomingId,
+      line = l.lineId;
     plannedLines.push({incoming_id:incoming,total_iqd:l.total+l.charges,label:l.sel.label});
     statements.push(
       db
@@ -473,12 +494,14 @@ async function planDocument(
       VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(profile_id,product_id,scope,scope_id) DO UPDATE SET source_unit_amount=excluded.source_unit_amount,weight_g=excluded.weight_g,volume_mm3=excluded.volume_mm3,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
       .bind(profile.id, l.sel.product_id, l.sel.scope, l.sel.scope_id, l.costMode === 'total' ? exactProcurementUnitDefault(l.sourceTotal!, l.qty) : l.source, l.weight, l.volume, actor, now));
   }
-  for (const charge of charges)
+  charges.forEach((charge, position) => {
+    const allocations: ChargeShare[] = lines.flatMap((l, i) => !charge.applies_to || charge.applies_to.includes(l.key) ? [{ line_id: l.lineId, amount_iqd: shares[position][i] }] : []);
     statements.push(
       db
-        .prepare('INSERT INTO purchase_charges(id,purchase_id,title,amount_iqd,basis) VALUES (?,?,?,?,?)')
-        .bind(newId('pch'), id, charge.title, charge.amount, charge.basis),
+        .prepare('INSERT INTO purchase_charges(id,purchase_id,title,amount_iqd,basis,scope,unit_amount_iqd,applies_to_json,allocation_json,position) VALUES (?,?,?,?,?,?,?,?,?,?)')
+        .bind(newId('pch'), id, charge.title, shares[position].reduce((a, b) => a + b, 0), charge.basis, charge.scope, charge.unit_amount_iqd, charge.applies_to ? JSON.stringify(charge.applies_to) : null, JSON.stringify(allocations), position),
     );
+  });
   if(status==='ordered')statements.push(...await planPurchaseFunding(db,id,b.funding,plannedLines,actor));
   return statements;
 }

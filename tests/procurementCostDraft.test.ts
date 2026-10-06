@@ -77,7 +77,7 @@ test('restoring a historical local draft preserves manual economics without inhe
   assert.equal(restored.cost_profile_version, null);
 });
 
-test('editing or cloning preserves its snapshot rates and refreshes only the concurrency token', () => {
+test('editing preserves its snapshot rates and refreshes only the concurrency token (a copy is priced at current rates: procurementCharges.test.ts)', () => {
   const restored = restoreCostProfileSnapshot({ cost_profile_id: germany.id, cost_profile_version: 2, currency: 'EUR', exchange_rate: 1500, shipping_rate_iqd: 5000, shipping_basis: 'weight' as const }, [germany]);
   assert.equal(restored.cost_profile_version, 7);
   assert.equal(restored.exchange_rate, 1500);

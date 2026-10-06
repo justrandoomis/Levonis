@@ -76,6 +76,17 @@ export function restoreCostProfileSnapshot<T extends object>(snapshot: T, profil
   };
 }
 
+/** A new purchase copied from an old one is priced today: the route's current
+ * exchange and freight rates, never the old document's — confirming the copy
+ * would otherwise save those old rates back as the route's defaults. */
+export function cloneCostProfileSnapshot<T extends object>(snapshot: T, profiles: CostProfile[]) {
+  const restored = restoreCostProfileSnapshot(snapshot, profiles);
+  const profile = profiles.find((p) => p.id === restored.cost_profile_id);
+  return profile
+    ? { ...restored, currency: profile.currency, exchange_rate: profile.exchange_rate ?? NaN, shipping_rate_iqd: profile.shipping_rate_iqd, shipping_basis: profile.shipping_basis, cost_profile_version: profile.version }
+    : restored;
+}
+
 export function packedMeasureInput(value: string, basis: 'weight' | 'volume') {
   if (value === '' || !Number.isFinite(Number(value))) return NaN;
   // The UI exposes kg (up to a gram) and CBM (up to a cubic millimetre).

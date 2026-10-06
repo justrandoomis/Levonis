@@ -79,3 +79,48 @@ export function exactProcurementUnitDefault(sourceTotal: number | string, qty: n
   const [unitNumerator, unitDivisor] = rational(candidate);
   return unitNumerator * BigInt(qty) * denominator === numerator * unitDivisor ? candidate : null;
 }
+
+export type ProcurementChargeBasis = 'quantity' | 'value' | 'weight' | 'volume';
+export const PROCUREMENT_CHARGE_BASES: readonly ProcurementChargeBasis[] = ['quantity', 'value', 'weight', 'volume'];
+/** An extra cost actually paid for this shipment: local delivery, customs,
+ * transfer fees, packaging. Never the raw supplier price, and never the freight
+ * a supplier route already calculates from packed weight or volume.
+ * `shipment`: one amount split over the lines it covers by `basis`.
+ * `unit`: `unit_amount_iqd` for every piece of the lines it covers. */
+export type ProcurementCharge = {
+  scope: 'shipment' | 'unit';
+  amount_iqd: number;
+  unit_amount_iqd: number | null;
+  basis: ProcurementChargeBasis;
+  /** Selection keys this charge covers; null covers every line. */
+  applies_to: readonly string[] | null;
+};
+export type ProcurementChargeLine = { key: string; qty: number; value: number; weight_g: number; volume_mm3: number };
+
+export const procurementSelectionKey = (s: { product_id: string; scope: string; scope_id?: string | null }) =>
+  `${s.product_id}:${s.scope}:${s.scope_id ?? ''}`;
+
+/** Each charge's whole-dinar share of each line. The editor preview and the
+ * saved document both call this, so a shown share is the share that is saved.
+ * Shipment shares use the largest-remainder rule above: no dinar is lost or
+ * invented. A line the charge does not cover receives exactly 0. */
+export function allocateProcurementCharges(charges: readonly ProcurementCharge[], lines: readonly ProcurementChargeLine[]): number[][] {
+  return charges.map((charge) => {
+    const covered = lines.map((line) => !charge.applies_to || charge.applies_to.includes(line.key));
+    if (!covered.some(Boolean)) throw new RangeError('Procurement charge covers no line');
+    if (charge.scope === 'unit') {
+      const unit = charge.unit_amount_iqd;
+      if (unit == null || !Number.isSafeInteger(unit) || unit < 0) throw new RangeError('Invalid procurement unit charge');
+      return lines.map((line, i) => {
+        const share = covered[i] ? unit * line.qty : 0;
+        if (!Number.isSafeInteger(share) || share > 1e12) throw new RangeError('Procurement amount is too large');
+        return share;
+      });
+    }
+    return allocateProcurementCharge(charge.amount_iqd, lines.map((line, i) => !covered[i] ? 0
+      : charge.basis === 'value' ? line.value
+        : charge.basis === 'weight' ? line.qty * line.weight_g
+          : charge.basis === 'volume' ? line.qty * line.volume_mm3
+            : line.qty));
+  });
+}

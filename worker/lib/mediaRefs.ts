@@ -544,6 +544,8 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   // the three fixed cost profiles, never an uploaded object or media path.
   'procurement_selection_cost_defaults.profile_id': 'foreign key to a fixed supplier cost profile (germany_land, china_air, china_sea)',
   'purchase_orders.cost_profile_id': 'snapshot of the supplier cost profile identity, not an R2 object or invoice attachment',
+  'purchase_charges.applies_to_json': 'selection keys (product:scope:scope_id) an extra purchase cost covers',
+  'purchase_charges.allocation_json': 'purchase line ids and the whole-dinar share of an extra cost on each',
   'print_analyses.profile_revision': 'a slicer profile revision string',
   'print_analyses.orientation_key': 'which orientation was measured, e.g. z-up',
   'print_analyses.file_sha256': 'the content hash of the analysed model, not its location',

@@ -1,5 +1,5 @@
-import type { CostProfile, CostProfileId } from '../../packages/contracts/src/procurementCost';
-import { allocateProcurementCharge, roundProcurementProduct } from '../../packages/contracts/src/procurementCost';
+import type { CostProfile, CostProfileId, ProcurementCharge, ProcurementChargeBasis, ProcurementChargeLine } from '../../packages/contracts/src/procurementCost';
+import { PROCUREMENT_CHARGE_BASES, allocateProcurementCharges, roundProcurementProduct } from '../../packages/contracts/src/procurementCost';
 import { badRequest } from './http';
 import { decimal, whole } from './operations';
 
@@ -31,7 +31,42 @@ export function profileRates(body: Record<string, unknown>) {
   };
 }
 
-export function procurementAllocation(total: number, weights: number[]) {
-  try { return allocateProcurementCharge(total, weights); }
-  catch { throw badRequest('أدخل الوزن أو الحجم لجميع البنود قبل توزيع التكلفة', 'BAD_ALLOCATION'); }
+
+export type PurchaseCharge = ProcurementCharge & { title: string };
+/** Only what the buyer typed for this document's own lines. A charge without a
+ * name, a positive amount, or lines of this shipment to cover is refused —
+ * never saved as zero, guessed, or carried in from another purchase. */
+export function purchaseCharges(raw: unknown, keys: readonly string[]): PurchaseCharge[] {
+  const rows = Array.isArray(raw) ? raw : [];
+  if (rows.length > 15) throw badRequest('أضف 15 تكلفة إضافية كحد أقصى', 'BAD_CHARGE');
+  return rows.map((value) => {
+    const r = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+    const title = typeof r.title === 'string' ? r.title.trim() : '';
+    if (!title) throw badRequest('اكتب اسم كل تكلفة إضافية، مثل توصيل محلي أو جمارك', 'BAD_CHARGE');
+    if (title.length > 120) throw badRequest('اسم التكلفة الإضافية أطول من 120 حرفًا', 'BAD_CHARGE');
+    const scope = r.scope == null || r.scope === '' ? 'shipment' : r.scope;
+    if (scope !== 'shipment' && scope !== 'unit') throw badRequest(`حدد هل «${title}» للشحنة كاملة أم لكل قطعة`, 'BAD_CHARGE');
+    const basis = scope === 'unit' || r.basis == null || r.basis === '' ? 'quantity' : r.basis;
+    if (!PROCUREMENT_CHARGE_BASES.includes(basis as ProcurementChargeBasis)) throw badRequest('Invalid allocation method');
+    const amount = whole(scope === 'unit' ? r.unit_amount_iqd : r.amount_iqd, `مبلغ «${title}» بالدينار`);
+    if (amount < 1) throw badRequest(`أدخل مبلغ «${title}» أكبر من صفر، أو احذف هذه التكلفة`, 'BAD_CHARGE');
+    let appliesTo: string[] | null = null;
+    if (r.applies_to != null) {
+      const chosen = Array.isArray(r.applies_to) && r.applies_to.every((k) => typeof k === 'string') ? [...new Set(r.applies_to as string[])] : [];
+      if (!chosen.length || chosen.some((k) => !keys.includes(k)))
+        throw badRequest(`اختر البنود التي تشملها «${title}» من بنود هذه الشحنة`, 'BAD_CHARGE');
+      appliesTo = keys.every((k) => chosen.includes(k)) ? null : chosen;
+    }
+    return { title, scope, basis: basis as ProcurementChargeBasis, applies_to: appliesTo, amount_iqd: scope === 'unit' ? 0 : amount, unit_amount_iqd: scope === 'unit' ? amount : null };
+  });
+}
+/** Server-side twin of the editor preview: the same allocator, so the shares
+ * shown before saving are the shares saved. */
+export function purchaseChargeShares(charges: readonly PurchaseCharge[], lines: readonly ProcurementChargeLine[], missingCode: string) {
+  try { return allocateProcurementCharges(charges, lines); }
+  catch (error) {
+    if (error instanceof RangeError && /too large/i.test(error.message))
+      throw badRequest('مجموع التكاليف الإضافية يتجاوز الحد المسموح', 'BAD_NUMBER');
+    throw badRequest('أدخل الوزن أو الحجم لجميع البنود التي تشملها التكلفة قبل توزيعها، أو اختر توزيعًا آخر', missingCode);
+  }
 }

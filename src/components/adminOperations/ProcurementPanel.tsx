@@ -2,9 +2,11 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import SelectionPriceUpdate from './SelectionPriceUpdate';
 import StockSelection from './StockSelection';
 import PurchaseFundingFields, { newFunding, fundingValid, type FundingDraft, type PurchaseInvestor } from './PurchaseFundingFields';
-import { purchaseEstimate } from './purchaseEstimate';
-import { changeLineCostProfile, changePurchaseCostMode, packedMeasureInput, packedMeasureValid, restoreCostProfileSnapshot, selectionCostDraft, type ProcurementDraftLine as DraftLine } from './procurementCostDraft';
-import type { CostProfile } from '../../../packages/contracts/src/procurementCost';
+import { estimateLineKey, purchaseEstimate } from './purchaseEstimate';
+import { changeLineCostProfile, changePurchaseCostMode, cloneCostProfileSnapshot, packedMeasureInput, packedMeasureValid, restoreCostProfileSnapshot, selectionCostDraft, type ProcurementDraftLine as DraftLine } from './procurementCostDraft';
+import { chargeDraft, chargeProblems, chargesAfterRouteChange, chargeWire, looksLikeFreight, newChargeDraft, type ChargeDraft } from './procurementCharges';
+import PurchaseLineCosts, { type ExtraChargeView } from './PurchaseLineCosts';
+import type { CostProfile, ProcurementChargeBasis } from '../../../packages/contracts/src/procurementCost';
 import '../adminInventory/inventory-workspace.css';
 const InvestorContractForm = lazy(() => import('../financePeople/InvestorPanel').then((m) => ({ default: m.InvestorContractForm })));
 import {
@@ -23,7 +25,9 @@ import {
   type Selection,
 } from './shared';
 
-type Charge = { title: string; amount_iqd: number; basis: string };
+/** A saved extra charge and the dinars it put on each line it covers;
+ * `allocations` is null for an older document whose split was never saved. */
+type SavedCharge = { id: string; title: string; amount_iqd: number; basis: ProcurementChargeBasis; scope: 'shipment' | 'unit'; unit_amount_iqd: number | null; applies_to: string[] | null; allocations: Array<{ line_id: string; amount_iqd: number }> | null };
 type Purchase = {
   id: string;
   invoice_no: string;
@@ -66,7 +70,7 @@ type Detail = {
       auto_shipping_iqd?: number;
     }
   >;
-  charges: Charge[];
+  charges: SavedCharge[];
   ordered_total_iqd: number;
   paid_iqd: number;
   balance_iqd: number;
@@ -144,7 +148,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     [editVersion, setEditVersion] = useState<number | undefined>(),
     [header, setHeader] = useState(newHeader),
     [lines, setLines] = useState<DraftLine[]>([]),
-    [charges, setCharges] = useState<Charge[]>([]),
+    [charges, setCharges] = useState<ChargeDraft[]>([]),
     [choice, setChoice] = useState<Selection | null>(null),
     [csv, setCsv] = useState(''),
     [operationId, setOperationId] = useState(() => crypto.randomUUID()),
@@ -193,7 +197,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
       d
         ? {
             ...newHeader(),
-            ...restoreCostProfileSnapshot(d.purchase, config.cost_profiles),
+            ...(clone ? cloneCostProfileSnapshot(d.purchase, config.cost_profiles) : restoreCostProfileSnapshot(d.purchase, config.cost_profiles)),
             invoice_total_iqd:
               d.purchase.invoice_total_iqd == null ? '' : String(d.purchase.invoice_total_iqd),
             invoice_no: clone ? '' : d.purchase.invoice_no,
@@ -214,7 +218,9 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
           }))
         : [],
     );
-    setCharges(d?.charges ?? []);
+    // A copy starts with no extra costs: they belong to the old shipment and
+    // must never reach a new one unseen. Editing keeps the document's own.
+    setCharges(clone || !d ? [] : d.charges.map(chargeDraft));
     setEditId(d && !clone ? d.purchase.id : '');
     setEditVersion(d && !clone ? d.purchase.version : undefined);
     setOperationId(crypto.randomUUID());
@@ -227,7 +233,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
       invoice_total_iqd: header.invoice_total_iqd === '' ? null : Number(header.invoice_total_iqd),
       status,
       lines,
-      charges,
+      charges: charges.map(chargeWire),
       funding,
       operation_id: operationId,
       version: editVersion,
@@ -253,6 +259,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   const shippingBasis = header.shipping_basis ?? costProfile?.shipping_basis;
   const chooseCostProfile = (id: string) => {
     const profile = config.cost_profiles.find((p) => p.id === id) ?? null;
+    setCharges((old) => chargesAfterRouteChange(old, header.cost_profile_id, profile?.id ?? null));
     setHeader((h) => ({ ...h, cost_profile_id: profile?.id ?? null, cost_profile_version: profile?.version ?? null, currency: profile?.currency ?? 'IQD', exchange_rate: profile ? profile.exchange_rate ?? NaN : 1, shipping_rate_iqd: profile?.shipping_rate_iqd ?? null, shipping_basis: profile?.shipping_basis ?? null }));
     setLines((old) => old.map((l) => changeLineCostProfile(l, profile)));
   };
@@ -270,14 +277,19 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   };
   const profileValid = !header.cost_profile_id || (!!shippingBasis && Number.isFinite(header.shipping_rate_iqd) && header.shipping_rate_iqd !== null && header.shipping_rate_iqd >= 0 && lines.every((l) => packedMeasureValid(l, shippingBasis)));
   const quantitiesValid = lines.length > 0 && lines.every((l) => Number.isSafeInteger(l.qty_ordered) && l.qty_ordered > 0 && Number.isSafeInteger(l.invoiced_qty) && l.invoiced_qty >= 0);
-  const inputsValid = quantitiesValid && profileValid && Number.isFinite(header.exchange_rate) && header.exchange_rate > 0 && lines.every((l) => (l.purchase_cost_mode === 'total' ? l.source_total_amount !== '' && l.source_total_amount != null && Number.isFinite(Number(l.source_total_amount)) && Number(l.source_total_amount) >= 0 : l.source_unit_amount !== '' && l.source_unit_amount != null && Number.isFinite(Number(l.source_unit_amount)) && Number(l.source_unit_amount) >= 0)) && lines.every((l) => Number.isSafeInteger(l.selling_price_iqd) && l.selling_price_iqd >= 0) && charges.every((c) => c.title.trim() && Number.isSafeInteger(c.amount_iqd) && c.amount_iqd >= 0);
+  const inputsValid = quantitiesValid && profileValid && Number.isFinite(header.exchange_rate) && header.exchange_rate > 0 && lines.every((l) => (l.purchase_cost_mode === 'total' ? l.source_total_amount !== '' && l.source_total_amount != null && Number.isFinite(Number(l.source_total_amount)) && Number(l.source_total_amount) >= 0 : l.source_unit_amount !== '' && l.source_unit_amount != null && Number.isFinite(Number(l.source_unit_amount)) && Number(l.source_unit_amount) >= 0)) && lines.every((l) => Number.isSafeInteger(l.selling_price_iqd) && l.selling_price_iqd >= 0);
   const estimates = purchaseEstimate(lines, charges, header.currency === 'IQD' ? 1 : header.exchange_rate, funding.mode === 'investor' ? funding.profit_share_bps : 0, funding.incoming_indexes, header.cost_profile_id && shippingBasis ? { basis: shippingBasis, rate: header.shipping_rate_iqd ?? NaN } : undefined);
+  const lineKeys = lines.map(estimateLineKey);
+  const lineChoices = lines.flatMap((l, i) => lineKeys.indexOf(lineKeys[i]) === i ? [{ key: lineKeys[i], label: l.label }] : []);
+  const chargeIssues = charges.map((c, j) => chargeProblems(c, lineKeys, estimates.every((e) => Number.isFinite(e.charge_shares[j]))));
+  const coverLabels = (keys: readonly string[] | null) => keys && lineChoices.filter((x) => keys.includes(x.key)).map((x) => x.label);
+  const updateCharge = (j: number, change: Partial<ChargeDraft>) => setCharges((a) => a.map((x, k) => k === j ? { ...x, ...change } : x));
   const total = estimates.reduce((n, e) => n + e.total_iqd, 0);
-  const costsValid = inputsValid && Number.isSafeInteger(total) && total <= 1e12 && estimates.every((e) => Number.isSafeInteger(e.total_iqd) && e.total_iqd >= 0);
+  const costsValid = inputsValid && chargeIssues.every((p) => !p.length) && Number.isSafeInteger(total) && total <= 1e12 && estimates.every((e) => Number.isSafeInteger(e.total_iqd) && e.total_iqd >= 0);
   const fundedCost = estimates.reduce((n, e, i) => n + (!funding.incoming_indexes || funding.incoming_indexes.includes(i) ? e.total_iqd : 0), 0);
   const allocated = funding.mode === 'investor' ? Math.min(Number(funding.agreed_iqd), fundedCost) : 0;
   const saveLocal = () => { localStorage.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive })); setDraftAvailable(true); };
-  const restoreLocal = () => { try { const d = JSON.parse(localStorage.getItem('levonis-purchase-draft-v2') || '{}'); if (!Array.isArray(d.lines)) return; setHeader({ ...newHeader(), ...restoreCostProfileSnapshot(d.header ?? {}, config.cost_profiles) }); setLines(d.lines); setCharges(d.charges ?? []); setFunding(d.funding ?? newFunding()); setEditId(d.editId); setEditVersion(d.editVersion); setOperationId(d.operationId); setQuickReceive(d.quickReceive); setEditing(true); setStep(0); } catch { localStorage.removeItem('levonis-purchase-draft-v2'); } };
+  const restoreLocal = () => { try { const d = JSON.parse(localStorage.getItem('levonis-purchase-draft-v2') || '{}'); if (!Array.isArray(d.lines)) return; setHeader({ ...newHeader(), ...restoreCostProfileSnapshot(d.header ?? {}, config.cost_profiles) }); setLines(d.lines); setCharges(Array.isArray(d.charges) ? d.charges.map(chargeDraft) : []); setFunding(d.funding ?? newFunding()); setEditId(d.editId); setEditVersion(d.editVersion); setOperationId(d.operationId); setQuickReceive(d.quickReceive); setEditing(true); setStep(0); } catch { localStorage.removeItem('levonis-purchase-draft-v2'); } };
   const addChoice = () => { if (!choice) return; setLines((old) => [...old, selectionCostDraft(choice, header.cost_profile_id)]); setRecent((old) => [choice, ...old.filter((r) => `${r.product_id}:${r.scope}:${r.scope_id}` !== `${choice.product_id}:${choice.scope}:${choice.scope_id}`)].slice(0, 6)); setChoice(null); };
   return (
     <div className="inventory-workspace">
@@ -351,22 +363,58 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
                 : <Input label={loc('وزن كرتون القطعة مع التغليف بالكيلوغرام', 'Packed carton weight per unit (kg)')} type="number" min={0} decimals={3} value={l.weight_g > 0 ? l.weight_g / 1_000 : ''} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, weight_g: packedMeasureInput(v, 'weight') } : x))} hint={loc('الوزن الإجمالي مع الكرتون والتغليف؛ يُحفظ لهذا الخيار عند التأكيد.', 'Gross weight including carton and packaging. Saved for this selection on confirmation.')} />)}
               </div>
               {l.unit_conversion_inexact && <p role="status" className={`mt-2 text-sm ${T.text2}`}>{loc('إجمالي الفاتورة لا يعطي سعر قطعة دقيقًا ضمن دقة هذه العملة. أدخل سعر القطعة، أو عد إلى إجمالي الشراء لاستعادة المبلغ الأصلي.', 'The invoice total has no exact unit price at this currency’s input precision. Enter a unit price, or return to total input to restore the original amount.')}</p>}
-              <dl className="inventory-review mt-3.5 pt-3.5 border-t border-[var(--ap-border)] tabular-nums" aria-live="polite">
-                <div><dt>{loc('شراء القطعة الخام بالدينار', 'Raw purchase per unit in IQD')}</dt><dd>{costMoney(estimates[i]?.purchase_iqd / l.qty_ordered)}</dd></div>
-                <div><dt>{loc('شحن القطعة', 'Freight per unit')}</dt><dd>{costMoney((header.cost_profile_id ? estimates[i]?.auto_shipping_iqd : estimates[i]?.freight_iqd) / l.qty_ordered)}</dd></div>
-                {header.cost_profile_id && charges.length > 0 && <div><dt>{loc('تكاليف إضافية للقطعة', 'Other charges per unit')}</dt><dd>{costMoney((estimates[i]?.freight_iqd - estimates[i]?.auto_shipping_iqd) / l.qty_ordered)}</dd></div>}
-                <div className="inventory-line"><dt>{loc('تكلفة القطعة النهائية', 'Landed unit cost')}</dt><dd><strong><output aria-label={`${loc('تكلفة القطعة النهائية', 'Landed unit cost')}: ${l.label}`}>{costMoney(estimates[i]?.unit_iqd)}</output></strong></dd></div>
-              </dl>
+              <PurchaseLineCosts
+                label={l.label}
+                qty={l.qty_ordered}
+                rawLabel={loc('شراء القطعة الخام بالدينار', 'Raw purchase per unit in IQD')}
+                raw={estimates[i]?.purchase_iqd / l.qty_ordered}
+                freight={header.cost_profile_id ? estimates[i]?.auto_shipping_iqd / l.qty_ordered : null}
+                extrasLabel={header.cost_profile_id ? loc('تكاليف إضافية للقطعة', 'Extra costs per unit', 'تێچووی زیادەی هەر پارچەیەک') : loc('الشحن والتكاليف اليدوية للقطعة', 'Manual freight and charges per unit', 'گواستنەوە و تێچووی دەستیی هەر پارچەیەک')}
+                extras={estimates[i]?.extras_iqd / l.qty_ordered}
+                lineExtras={estimates[i]?.extras_iqd}
+                final={estimates[i]?.unit_iqd}
+                charges={charges.map((c, j): ExtraChargeView => ({ title: c.title.trim() || loc('تكلفة بلا اسم', 'Unnamed charge', 'تێچووی بێ ناو'), scope: c.scope, amount_iqd: c.amount_iqd, unit_amount_iqd: c.unit_amount_iqd, basis: c.basis, covers: coverLabels(c.applies_to), covered: !c.applies_to || c.applies_to.includes(lineKeys[i]), share_iqd: estimates[i]?.charge_shares[j] ?? NaN, status: c.review ? 'review' : chargeIssues[j].length ? 'incomplete' : 'counted' }))}
+                emptyHint={header.cost_profile_id ? loc('إن دفعت مصروفًا فعليًا، أضفه من «مصاريف إضافية فعلية» أدناه.', 'If you actually paid an extra expense, add it under “Actual extra expenses” below.', 'ئەگەر خەرجییەکی زیادەت بە ڕاستی داوە، لە «خەرجیی زیادەی ڕاستەقینە» لە خوارەوە زیادی بکە.') : undefined}
+              />
               <p className={`mt-2 text-xs ${T.text3}`}>{loc('إجمالي البند مع الشحن', 'Total line cost with freight')}: {costMoney(estimates[i]?.total_iqd)} · {loc('تُقرب المجاميع إلى أقرب دينار، ومتوسط القطعة للعرض.', 'Totals round to the nearest IQD; the unit average is for display.')}</p>
               {funding.mode === 'investor' && <label className="mt-3 flex gap-2 text-sm"><input type="checkbox" checked={!funding.incoming_indexes || funding.incoming_indexes.includes(i)} onChange={(e) => setFunding((f) => { const indexes = f.incoming_indexes ?? lines.map((_, j) => j); return { ...f, incoming_indexes: e.target.checked ? [...indexes, i] : indexes.filter((j) => j !== i) }; })} />{loc('مشمول بتمويل المستثمر ونسبته', 'Include in investor funding and profit share')}</label>}
             </article>)}</div>
-            <h4 className={`mb-3 font-semibold ${T.text1}`}>{header.cost_profile_id ? loc('تكاليف إضافية غير الشحن المحسوب', 'Additional charges beyond calculated freight') : loc('تكاليف الشحنة اليدوية', 'Manual shipment charges')}</h4>
-            {header.cost_profile_id && <p className={`mb-3 text-sm ${T.text3}`}>{loc('الشحن محسوب أعلاه بالفعل. أضف هنا فقط أي رسوم أخرى، مثل التخليص، لتجنب احتساب الشحن مرتين.', 'Freight is already calculated above. Add only other fees here, such as customs handling, to avoid counting freight twice.')}</p>}
-            {charges.map((c, i) => <div key={i} className="inventory-line mb-3"><div className="inventory-fields">
-              <Input label={loc('اسم التكلفة', 'Charge name')} value={c.title} onChange={(v) => setCharges((a) => a.map((x, j) => j === i ? { ...x, title: v } : x))} />
-              <Input label={loc('إجمالي بالدينار', 'Total IQD')} type="number" min={0} value={c.amount_iqd} onChange={(v) => setCharges((a) => a.map((x, j) => j === i ? { ...x, amount_iqd: v === '' ? NaN : Number(v) } : x))} />
-            </div><details className="mt-2"><summary>{loc('توزيع التكلفة', 'Charge allocation')}</summary><Select label={loc('طريقة التوزيع', 'Allocation method')} value={c.basis} onChange={(v) => setCharges((a) => a.map((x, j) => j === i ? { ...x, basis: v } : x))} options={['quantity', 'value', 'weight', 'volume'].map((id, j) => ({ id, name: [loc('الكمية', 'Quantity'), loc('القيمة', 'Value'), loc('الوزن', 'Weight'), loc('الحجم', 'Volume')][j] }))} /></details><button type="button" className={T.btnGhost} onClick={() => setCharges((a) => a.filter((_, j) => i !== j))}>{loc('حذف التكلفة', 'Remove charge')}</button></div>)}
-            <button type="button" className={T.btnSecondary} onClick={() => setCharges((a) => [...a, { title: header.cost_profile_id ? loc('رسوم إضافية', 'Additional fees') : loc('شحن', 'Shipping'), amount_iqd: 0, basis: 'quantity' }])}>{header.cost_profile_id ? loc('إضافة رسوم أخرى', 'Add other fees') : loc('إضافة شحن أو تكلفة', 'Add freight or charge')}</button>
+            <section aria-labelledby="purchase-extras-title">
+              <h4 id="purchase-extras-title" className={`mb-1 font-semibold ${T.text1}`}>{header.cost_profile_id ? loc('مصاريف إضافية فعلية', 'Actual extra expenses', 'خەرجیی زیادەی ڕاستەقینە') : loc('الشحن والتكاليف اليدوية', 'Manual freight and charges', 'گواستنەوە و تێچووە دەستییەکان')}</h4>
+              <p className={`mb-3 text-sm ${T.text3}`}>{header.cost_profile_id
+                ? loc('الشحن محسوب أعلاه من وزن الكرتون أو حجمه. أضف هنا فقط ما دفعته فعلًا لهذه الشحنة، مثل التوصيل المحلي أو الجمارك أو رسوم التحويل أو التغليف. لا تُضاف أي تكلفة تلقائيًا، ولا تُنسخ من شحنة سابقة.', 'Freight is already calculated above from packed weight or volume. Add only what you actually paid for this shipment, such as local delivery, customs, transfer fees or packaging. Nothing is added automatically or copied from an earlier shipment.', 'کرێی گواستنەوە لە سەرەوە بەپێی کێش یان قەبارەی کارتۆن حیساب کراوە. لێرە تەنها ئەوەی بە ڕاستی بۆ ئەم بارە داوتە زیاد بکە، وەک گەیاندنی ناوخۆیی، گومرگ، کرێی حەواڵە یان پاکێجکردن. هیچ تێچوویەک خۆکارانە زیاد ناکرێت و لە بارێکی پێشوو کۆپی ناکرێت.')
+                : loc('بدون مسار شحن، أدخل الشحن وأي تكلفة أخرى هنا. لكل تكلفة اسم ومبلغ فعلي.', 'Without a freight route, enter freight and any other cost here. Each cost needs a name and an actual amount.', 'بەبێ ڕێگای گواستنەوە، کرێی گواستنەوە و هەر تێچوویەکی تر لێرە بنووسە. هەر تێچوویەک ناو و بڕێکی ڕاستەقینەی دەوێت.')}</p>
+              {!charges.length && <p className={`mb-3 text-sm ${T.text2}`}>{loc('لا توجد مصاريف إضافية؛ قيمتها 0 د.ع.', 'No extra expenses: 0 IQD.', 'هیچ خەرجییەکی زیادە نییە: 0 د.ع.')}</p>}
+              {charges.map((c, i) => <div key={i} className="inventory-line mb-3">
+                {c.review && <div role="alert" className="mb-3 rounded-[var(--ap-radius-md)] border border-[var(--ap-warning-border)] bg-[var(--ap-warning-bg)] px-3 py-2.5 text-[13px] text-[var(--ap-text-1)]">
+                  <p>{loc('أُدخلت هذه التكلفة قبل اختيار مسار الشحن، وقد تكون الشحن نفسه المحسوب الآن من الوزن. لا تُحتسب حتى تختار.', 'This charge was entered before the freight route was chosen and may be the same freight now calculated from weight. It counts nothing until you decide.', 'ئەم تێچووە پێش هەڵبژاردنی ڕێگای گواستنەوە تۆمار کراوە و لەوانەیە هەمان کرێی گواستنەوە بێت کە ئێستا بەپێی کێش حیساب دەکرێت. تا بڕیار نەدەیت حیساب ناکرێت.')}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button type="button" className={T.btnSecondary} onClick={() => updateCharge(i, { review: false })}>{loc('ليست شحنًا، احتسبها', 'Not freight, count it', 'کرێی گواستنەوە نییە، حیسابی بکە')}</button>
+                    <button type="button" className={T.btnGhost} onClick={() => setCharges((a) => a.filter((_, j) => i !== j))}>{loc('حذفها', 'Remove it', 'بیسڕەوە')}</button>
+                  </div>
+                </div>}
+                <div className="inventory-fields">
+                  <Input label={loc('اسم التكلفة', 'Charge name', 'ناوی تێچوو')} value={c.title} hint={loc('مثل: توصيل محلي، جمارك، رسوم تحويل، تغليف', 'e.g. local delivery, customs, transfer fees, packaging', 'وەک: گەیاندنی ناوخۆیی، گومرگ، کرێی حەواڵە، پاکێجکردن')} onChange={(v) => updateCharge(i, { title: v })} />
+                  <Select label={loc('تخص', 'Charged to', 'تایبەتە بە')} value={c.scope} onChange={(v) => updateCharge(i, { scope: v === 'unit' ? 'unit' : 'shipment' })} options={[{ id: 'shipment', name: loc('الشحنة كاملة', 'The whole shipment', 'هەموو بارەکە') }, { id: 'unit', name: loc('كل قطعة', 'Each piece', 'هەر پارچەیەک') }]} />
+                  <Input label={c.scope === 'unit' ? loc('المبلغ لكل قطعة بالدينار', 'Amount per piece IQD', 'بڕ بۆ هەر پارچەیەک بە دینار') : loc('المبلغ الإجمالي بالدينار', 'Total amount IQD', 'کۆی بڕ بە دینار')} type="number" min={0} decimals={0} hint={c.scope === 'unit' ? loc('يُضرب في عدد قطع كل بند تشمله.', 'Multiplied by the pieces of each item it covers.', 'لە ژمارەی پارچەکانی هەر بەندێک کە دەیگرێتەوە دەدرێت.') : loc('مبلغ واحد يوزَّع على القطع بالطريقة التي تختارها.', 'One amount, split across pieces the way you choose.', 'یەک بڕ کە بەو شێوازەی هەڵیدەبژێریت بەسەر پارچەکاندا دابەش دەکرێت.')} value={c.scope === 'unit' ? c.unit_amount_iqd : c.amount_iqd} onChange={(v) => updateCharge(i, c.scope === 'unit' ? { unit_amount_iqd: v === '' ? NaN : Number(v) } : { amount_iqd: v === '' ? NaN : Number(v) })} />
+                  {c.scope === 'shipment' && <Select label={loc('طريقة توزيعها على القطع', 'How it is split across pieces', 'شێوازی دابەشکردنی بەسەر پارچەکاندا')} value={c.basis} onChange={(v) => updateCharge(i, { basis: v as ProcurementChargeBasis })} options={[{ id: 'quantity', name: loc('حسب عدد القطع', 'By number of pieces', 'بەپێی ژمارەی پارچەکان') }, { id: 'value', name: loc('حسب قيمة الشراء الخام', 'By raw purchase value', 'بەپێی نرخی کڕینی خاو') }, { id: 'weight', name: loc('حسب وزن الكرتون', 'By packed weight', 'بەپێی کێشی کارتۆنەکە') }, { id: 'volume', name: loc('حسب حجم الكرتون', 'By packed volume', 'بەپێی قەبارەی کارتۆنەکە') }]} />}
+                </div>
+                {lineChoices.length > 1 && <fieldset className="mt-3"><legend className={`text-sm ${T.text2}`}>{loc('البنود التي تشملها', 'Items it covers', 'ئەو بەندانەی دەیگرێتەوە')}</legend><div className="flex flex-wrap gap-3">{lineChoices.map((x) => <label key={x.key} className="flex gap-2 text-sm"><input type="checkbox" checked={!c.applies_to || c.applies_to.includes(x.key)} onChange={(e) => {
+                  const chosen = (c.applies_to ?? lineChoices.map((y) => y.key)).filter((k) => lineKeys.includes(k) && k !== x.key);
+                  if (e.target.checked) chosen.push(x.key);
+                  updateCharge(i, { applies_to: lineChoices.every((y) => chosen.includes(y.key)) ? null : chosen });
+                }} />{x.label}</label>)}</div></fieldset>}
+                {chargeIssues[i].filter((p) => p !== 'review').map((p) => <p key={p} role="status" className="mt-2 text-[13px] text-[var(--ap-danger)]">{p === 'title' ? loc('اكتب اسم التكلفة.', 'Name this charge.', 'ناوی ئەم تێچووە بنووسە.')
+                  : p === 'amount' ? loc('أدخل مبلغًا فعليًا أكبر من صفر بالدينار، أو احذف التكلفة.', 'Enter an actual amount above zero in IQD, or remove the charge.', 'بڕێکی ڕاستەقینەی سەرووی سفر بە دینار بنووسە، یان تێچووەکە بسڕەوە.')
+                    : p === 'lines' ? loc('اختر بندًا واحدًا على الأقل من بنود هذه الشحنة.', 'Choose at least one item of this shipment.', 'لانیکەم یەک بەند لە بەندەکانی ئەم بارە هەڵبژێرە.')
+                      : c.basis === 'weight' ? loc('أدخل وزن كل بند تشمله، أو اختر توزيعًا آخر.', 'Enter the weight of every item it covers, or choose another split.', 'کێشی هەموو ئەو بەندانەی دەیگرێتەوە بنووسە، یان شێوازێکی تری دابەشکردن هەڵبژێرە.')
+                        : c.basis === 'volume' ? loc('أدخل حجم التغليف لكل بند تشمله، أو اختر توزيعًا آخر.', 'Enter the packed volume of every item it covers, or choose another split.', 'قەبارەی پاکێجی هەموو ئەو بەندانەی دەیگرێتەوە بنووسە، یان شێوازێکی تری دابەشکردن هەڵبژێرە.')
+                          : loc('أكمل سعر الشراء الخام والكمية للبنود التي تشملها.', 'Complete the raw purchase price and quantity of the items it covers.', 'نرخی کڕینی خاو و بڕی ئەو بەندانەی دەیگرێتەوە تەواو بکە.')}</p>)}
+                {header.cost_profile_id && !c.review && looksLikeFreight(c.title) && <p className={`mt-2 text-sm ${T.text2}`}>{loc('الشحن الدولي محسوب أعلاه من الوزن. أبقِ هذه التكلفة فقط إن كانت مصروفًا آخر، مثل توصيل محلي، حتى لا يُحتسب الشحن مرتين.', 'International freight is calculated above from weight. Keep this charge only if it is a different expense, such as local delivery, so freight is not counted twice.', 'کرێی گواستنەوەی نێودەوڵەتی لە سەرەوە بەپێی کێش حیساب کراوە. ئەم تێچووە تەنها ئەگەر خەرجییەکی ترە بهێڵەوە، وەک گەیاندنی ناوخۆیی، بۆ ئەوەی کرێی گواستنەوە دووجار حیساب نەکرێت.')}</p>}
+                <button type="button" className={`${T.btnGhost} mt-2`} onClick={() => setCharges((a) => a.filter((_, j) => i !== j))}>{loc('حذف التكلفة', 'Remove charge', 'سڕینەوەی تێچوو')}</button>
+              </div>)}
+              <button type="button" className={T.btnSecondary} disabled={charges.length >= 15} onClick={() => setCharges((a) => [...a, newChargeDraft()])}>{header.cost_profile_id ? loc('إضافة مصروف إضافي', 'Add an extra expense', 'زیادکردنی خەرجییەکی زیادە') : loc('إضافة شحن أو تكلفة', 'Add freight or charge', 'زیادکردنی کرێی گواستنەوە یان تێچوو')}</button>
+            </section>
             <details className="mt-4"><summary>{loc('تكلفة تقديرية ووزن وحجم ومرفقات واستيراد', 'Estimated cost, weights, attachments and import')}</summary><div className="inventory-fields mt-3">
               <Select label={loc('حالة التكلفة', 'Cost status')} value={header.cost_state} onChange={(v) => update('cost_state', v)} options={[{ id: 'estimated', name: loc('تقديرية؛ الاستلام ينتظر تثبيتها', 'Estimated; receiving waits for confirmation') }, { id: 'final', name: loc('نهائية ومثبتة', 'Final and confirmed') }]} />
               <Input label={loc('رابط مرفق الفاتورة HTTPS', 'Invoice attachment HTTPS URL')} value={header.attachment_url} onChange={(v) => update('attachment_url', v)} />
@@ -429,11 +477,21 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
           </div>
           <div className="inventory-lines">{selected.lines.map((l) => <article className="inventory-line" key={l.line_id}>
             <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('المطلوب / المستلم', 'Ordered / received')}: {l.qty_ordered} / {l.qty_received}</small></div></div>
-            <dl className="inventory-review mt-3.5 pt-3.5 border-t border-[var(--ap-border)] tabular-nums">
-              <div><dt>{loc('شراء القطعة دون التكاليف الإضافية', 'Purchase per unit before added charges')}</dt><dd>{costMoney((l.purchase_total_iqd ?? l.purchase_unit_iqd * l.qty_ordered) / l.qty_ordered)}</dd></div>
-              <div><dt>{loc('شحن وتكاليف إضافية للقطعة', 'Freight and additional charges per unit')}</dt><dd>{costMoney(l.charges_iqd / l.qty_ordered)}</dd></div>
-              <div className="inventory-line"><dt>{loc('تكلفة القطعة النهائية', 'Landed unit cost')}</dt><dd><strong>{costMoney(((l.purchase_total_iqd ?? l.purchase_unit_iqd * l.qty_ordered) + l.charges_iqd) / l.qty_ordered)}</strong></dd></div>
-            </dl>
+            <PurchaseLineCosts
+              label={l.label}
+              qty={l.qty_ordered}
+              rawLabel={loc('شراء القطعة دون التكاليف الإضافية', 'Purchase per unit before added charges')}
+              raw={(l.purchase_total_iqd ?? l.purchase_unit_iqd * l.qty_ordered) / l.qty_ordered}
+              freight={selected.purchase.cost_profile_id ? (l.auto_shipping_iqd ?? 0) / l.qty_ordered : null}
+              extrasLabel={selected.purchase.cost_profile_id ? loc('تكاليف إضافية للقطعة', 'Extra costs per unit', 'تێچووی زیادەی هەر پارچەیەک') : loc('الشحن والتكاليف اليدوية للقطعة', 'Manual freight and charges per unit', 'گواستنەوە و تێچووی دەستیی هەر پارچەیەک')}
+              extras={(l.charges_iqd - (l.auto_shipping_iqd ?? 0)) / l.qty_ordered}
+              lineExtras={l.charges_iqd - (l.auto_shipping_iqd ?? 0)}
+              final={((l.purchase_total_iqd ?? l.purchase_unit_iqd * l.qty_ordered) + l.charges_iqd) / l.qty_ordered}
+              charges={selected.charges.map((c): ExtraChargeView => {
+                const key = estimateLineKey(l, 0), covered = !c.applies_to || c.applies_to.includes(key);
+                return { title: c.title, scope: c.scope, amount_iqd: c.amount_iqd, unit_amount_iqd: c.unit_amount_iqd, basis: c.basis, covers: c.applies_to && [...new Set(selected.lines.filter((x) => c.applies_to!.includes(estimateLineKey(x, 0))).map((x) => x.label))], covered, share_iqd: c.allocations ? c.allocations.find((a) => a.line_id === l.line_id)?.amount_iqd ?? 0 : null, status: 'counted' };
+              })}
+            />
             <button type="button" className={T.btnGhost} onClick={()=>setPriceLine(l)}>{loc('تحديث سعر هذا الخيار في المتجر','Update this selection’s store price')}</button>
             <Input label={loc('الكمية التي وصلت الآن', 'Quantity arriving now')} type="number" min={0} value={receiving[l.line_id]?.qty ?? 0} onChange={(v) => setReceiving((r) => ({ ...r, [l.line_id]: { ...r[l.line_id], qty: Number(v) } }))} hint={`${loc('المتبقي للاستلام', 'Remaining to receive')}: ${l.qty_ordered - l.qty_received}`} />
             <details className="mt-2"><summary>{loc('كمية مرفوضة وتكلفة الشحنة', 'Rejected quantity and charges')}</summary><Input label={loc('المرفوض الآن', 'Rejected now')} type="number" min={0} value={receiving[l.line_id]?.rejected_qty ?? 0} onChange={(v) => setReceiving((r) => ({ ...r, [l.line_id]: { ...r[l.line_id], rejected_qty: Number(v) } }))} /><p className={`mt-2 text-xs ${T.text3}`}>{loc('نصيب البند من الشحنة', 'Line share of shipment charges')}: {money(l.charges_iqd)}</p></details>
