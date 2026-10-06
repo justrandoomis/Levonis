@@ -19,7 +19,8 @@ import {
 import { deliversToHome, getSetting, getSettings, printerNoteIqdFrom } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig, GiniPolicy } from '../lib/settings';
 import { addDays, baghdadDay, baghdadDayOf, isDay } from '../lib/baghdadTime';
-import { COMPOSED_SNAPSHOT, COST_BASIS, costSnapshot, type CostBasis } from '../lib/financeLedger';
+import { COMPOSED_SNAPSHOT, costSnapshot, type CostBasis } from '../lib/financeLedger';
+import { orderInsertStatement, orderItemInsertStatement } from '../lib/orderRows';
 import {
   MAX_DELIVERY_DAYS,
   dayLabel,
@@ -4179,35 +4180,27 @@ orderRoutes.post('/', async (c) => {
   const giniOrderNo = isGiniPayment ? input.giniOrderNo : '';
 
   const stmts = [
-    c.env.DB.prepare(
-      `INSERT INTO orders (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
-         payment_method_id, subtotal_iqd, shipping_iqd, cod_tax_iqd, points_discount_iqd, wallet_applied_iqd,
-         wallet_applied_usd_cents, exchange_rate, total_iqd, due_on_delivery_iqd, client_idempotency_key,
-         membership_tier_snapshot, delivery_waived, priority, coupon_snapshot, merchandise_iqd,
-         support_snapshot, shipping_type, membership_gift, referral_delivery_waived,
-         fulfillment_service, priority_due_at, bnpl_due_iqd, bnpl_due_at,
-         benefit_version_id, membership_discount_iqd, shipping_before_benefit_iqd, shipping_benefit_iqd,
-         cod_tax_before_exemption_iqd, cod_tax_exemption_iqd, benefit_snapshot,
-         delivery_day_schedulable, delivery_day_window_end, delivery_due_day, delivery_day_source,
-         gini_order_no, gini_paid_iqd, gini_state, gini_hold_until,
-         created_at, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      orderId, user.id, JSON.stringify(comp.address), input.deliveryMethodId, deliverySnapshot,
-      input.paymentMethodId, comp.subtotal, shippingTotal, comp.codTaxIqd, comp.pointsDiscount, comp.walletApplied,
-      comp.walletUsdCents, comp.exchangeRate, comp.totalIqd, comp.dueOnDelivery, idempotencyKey,
-      comp.tierStatus.active ? comp.tierStatus.tier : 'free', deliveryWaived, priority, comp.couponSnapshot,
+    orderInsertStatement(c.env.DB, {
+      id: orderId, user_id: user.id, address_snapshot: JSON.stringify(comp.address),
+      delivery_method_id: input.deliveryMethodId, delivery_method_snapshot: deliverySnapshot,
+      payment_method_id: input.paymentMethodId, subtotal_iqd: comp.subtotal, shipping_iqd: shippingTotal,
+      cod_tax_iqd: comp.codTaxIqd, points_discount_iqd: comp.pointsDiscount, wallet_applied_iqd: comp.walletApplied,
+      wallet_applied_usd_cents: comp.walletUsdCents, exchange_rate: comp.exchangeRate, total_iqd: comp.totalIqd,
+      due_on_delivery_iqd: comp.dueOnDelivery, client_idempotency_key: idempotencyKey,
+      membership_tier_snapshot: comp.tierStatus.active ? comp.tierStatus.tier : 'free',
+      delivery_waived: deliveryWaived, priority, coupon_snapshot: comp.couponSnapshot,
       // §5: merchandise is stored apart from fees so every screen and the
       // invoice read ONE basis. Support attribution is frozen here and can
       // never be re-pointed after purchase (§3.3) — worth 0 IQD to the buyer.
-      comp.merchandise, comp.supportSnapshot ? JSON.stringify(comp.supportSnapshot) : null,
+      merchandise_iqd: comp.merchandise, support_snapshot: comp.supportSnapshot ? JSON.stringify(comp.supportSnapshot) : null,
       // §1: the journey this order is on, frozen at purchase. A direct order
       // moves through five states and a pre-order through fourteen, so the
       // state machine must not have to re-derive the path from lines that can
       // change afterwards. The cart guarantees one type, so the first line
       // speaks for all of them.
-      orderShippingType, membershipGift, referralWaived,
-      fulfillmentService, comp.priorityDelivery.due_at, comp.bnplAmount, comp.bnplDueAt,
+      shipping_type: orderShippingType, membership_gift: membershipGift, referral_delivery_waived: referralWaived,
+      fulfillment_service: fulfillmentService, priority_due_at: comp.priorityDelivery.due_at,
+      bnpl_due_iqd: comp.bnplAmount, bnpl_due_at: comp.bnplDueAt,
       /**
        * §19 / §21 — THE MEMBERSHIP BENEFIT SNAPSHOT.
        *
@@ -4218,9 +4211,11 @@ orderRoutes.post('/', async (c) => {
        * requirement — «تغيير الإعدادات غدًا يجب ألا يغيّر طلب الأمس». Nothing
        * re-reads the live rules to explain an order once this row exists.
        */
-      benefitVersionId, comp.benefits.discount_total_iqd,
-      comp.shipping.total_before_waiver_iqd, comp.shipping.total_before_waiver_iqd - shippingTotal,
-      comp.codTaxBeforeExemptionIqd, comp.codTaxExemptionIqd, benefitSnapshot,
+      benefit_version_id: benefitVersionId, membership_discount_iqd: comp.benefits.discount_total_iqd,
+      shipping_before_benefit_iqd: comp.shipping.total_before_waiver_iqd,
+      shipping_benefit_iqd: comp.shipping.total_before_waiver_iqd - shippingTotal,
+      cod_tax_before_exemption_iqd: comp.codTaxBeforeExemptionIqd, cod_tax_exemption_iqd: comp.codTaxExemptionIqd,
+      benefit_snapshot: benefitSnapshot,
       /**
        * THE DELIVERY DAY, frozen by the same rule as the benefit snapshot
        * above it. `delivery_day_changed_at` and `delivery_day_changes` are
@@ -4228,7 +4223,8 @@ orderRoutes.post('/', async (c) => {
        * first value, not a change to one, and a support question about an
        * order whose day kept moving must be able to tell those apart.
        */
-      deliveryDay.schedulable, deliveryDay.window_end, deliveryDay.day, deliveryDay.source,
+      delivery_day_schedulable: deliveryDay.schedulable, delivery_day_window_end: deliveryDay.window_end,
+      delivery_due_day: deliveryDay.day, delivery_day_source: deliveryDay.source,
       /**
        * IN THE SAME BATCH AS THE ORDER — the four Gini columns are not a
        * follow-up write. `gini_paid_iqd` is what the money view and the
@@ -4238,9 +4234,9 @@ orderRoutes.post('/', async (c) => {
        * and whose receipt requirement does not exist. Both are facts about
        * this row, so they land with it or not at all.
        */
-      giniOrderNo, comp.giniPaidIqd, giniState, giniHoldUntilIso,
-      now, now
-    ),
+      gini_order_no: giniOrderNo, gini_paid_iqd: comp.giniPaidIqd, gini_state: giniState, gini_hold_until: giniHoldUntilIso,
+      created_at: now, updated_at: now,
+    }),
   ];
 
   // Foreign-key order association and consent commit or roll back together.
@@ -4294,80 +4290,20 @@ orderRoutes.post('/', async (c) => {
 
   for (const it of comp.lines) {
     stmts.push(
-      c.env.DB.prepare(
-        `INSERT INTO order_items (id, order_id, product_id, name_snapshot, image_snapshot, option_snapshot,
-           option_id, option_value_ids, color_id, shipping_method_id, qty, unit_price_iqd, line_total_iqd,
-           pricing_snapshot, warranty_snapshot, transport_snapshot,
-           bundle_parent_item_id, bundle_component_id, component_value_iqd, component_alloc_iqd,
-           membership_discount_iqd, membership_rule_id, cost_iqd, cost_basis,
-           net_weight_g, width_mm, depth_mm, height_mm,
-           package_weight_g, package_width_mm, package_depth_mm, package_height_mm)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                 ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        it.id, orderId,
-        // §7.7: a MYSTERY SPOOL binds NULL here on purpose. It is the single
-        // choice that removes the largest class of reveal leak — the
-        // `ORDER_ITEMS_SELECT` join to `products` yields no slug,
-        // `GET /api/orders/:id/units` finds nothing to join, the invoice and
-        // the courier payload say the offer's name — with no filtering code at
-        // all. `ComputedLine.product_id` still carries the real product, which
-        // is what `planInventory` reserves against below.
-        it.mystery_spool ? null : it.product_id,
-        it.name, it.image, it.variant,
-        it.option_id, JSON.stringify(it.option_value_ids), it.color_id, it.shipping_method_id,
-        it.qty, it.unit, it.line,
+      orderItemInsertStatement(c.env.DB, orderId, {
+        ...it,
+        // §7.7: a MYSTERY SPOOL binds NULL here on purpose — see OrderItemRow.
+        // `ComputedLine.product_id` still carries the real product, which is
+        // what `planInventory` reserves against below.
+        product_id: it.mystery_spool ? null : it.product_id,
         // …and `pricing_snapshot = null`, never the drawn item's ladder
         // (§6.2, §8.2 row 19). The share it was worth is on
         // `component_value_iqd`, offer-derived.
-        it.mystery_spool ? null : it.pricing_snapshot,
-        it.warranty_snapshot, it.transport_snapshot,
-        it.bundle_parent_item_id ?? null, it.bundle_component_id ?? null,
-        it.component_value_iqd ?? null, it.component_alloc_iqd ?? null,
+        pricing_snapshot: it.mystery_spool ? null : it.pricing_snapshot,
         // §19 — WHAT THE MEMBERSHIP TOOK OFF THIS LINE, and under which rule.
-        // Frozen per item so a return, a partial refund or a question about
-        // one product answers from the row itself, and an admin editing the
-        // rule tomorrow cannot change the answer.
-        comp.benefits.byLine.get(it.id)?.total_iqd ?? 0,
-        comp.benefits.byLine.get(it.id)?.rule_id ?? null,
-        /**
-         * THE COST OF GOODS SOLD, AS IT WAS AT THIS INSTANT (migration 0095).
-         *
-         * It is bound here and NOWHERE ELSE, from `ComputedLine`, which took it
-         * from the same resolver output that priced the line. Nothing on this
-         * path re-reads a product to work it out: the resolver already walked
-         * the option, colour, fulfilment and transport rungs for this exact
-         * selection, and a second walk is a second answer.
-         *
-         * WHY THIS DOES NOT LEAK TO THE CUSTOMER, checked rather than assumed:
-         * `orderPublic` builds each item object from an explicit field list, so
-         * a column added to the row cannot appear in a customer payload by
-         * growing it; the invoice (worker/lib/invoices.ts), the delivery and
-         * warranty events, the returns screens and the stage sweep all name
-         * their columns one by one; and the only two `SELECT *`-shaped readers
-         * of this table are `ORDER_ITEMS_SELECT`, whose rows go through
-         * `orderPublic`, and the merchant-store endpoint, which is filtered to
-         * `orders.merchant_id = ?` — a column this checkout never writes, so it
-         * can never see a row this INSERT produced.
-         *
-         * A LINE THAT SET NEITHER FIELD FALLS THROUGH TO 'unrecorded' — today
-         * that is the mystery-box spool, whose draw record carries no cost and
-         * whose `product_id` is bound NULL two lines up so the pick cannot leak
-         * (§7.7). 'unrecorded' makes the dashboard say "unknown"; a bound 0
-         * would make it say "pure profit", which is a lie the owner would price
-         * against.
-         */
-        it.cost_iqd ?? null,
-        it.cost_basis ?? COST_BASIS.unrecorded,
-        it.physical_dimensions.net_weight_g,
-        it.physical_dimensions.width_mm,
-        it.physical_dimensions.depth_mm,
-        it.physical_dimensions.height_mm,
-        it.physical_dimensions.package_weight_g,
-        it.physical_dimensions.package_width_mm,
-        it.physical_dimensions.package_depth_mm,
-        it.physical_dimensions.package_height_mm
-      )
+        membership_discount_iqd: comp.benefits.byLine.get(it.id)?.total_iqd ?? 0,
+        membership_rule_id: comp.benefits.byLine.get(it.id)?.rule_id ?? null,
+      })
     );
     // THE ALLOCATION, in the ORDER'S OWN BATCH — never a second batch and
     // never a post-response write. `PRIMARY KEY (order_item_id, spool_index)`

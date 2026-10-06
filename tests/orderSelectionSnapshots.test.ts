@@ -69,11 +69,14 @@ test('order-item image and physical facts remain immutable after catalogue edits
 
 test('checkout persists the exact resolved dimensions and invoice/units read the image snapshot', () => {
   const orders = readFileSync(new URL('../worker/routes/orders.ts', import.meta.url), 'utf8');
+  // The checkout and Quick Buy share one order_items builder (docs/GIFTS_QUICK_BUY.md D10).
+  const orderRows = readFileSync(new URL('../worker/lib/orderRows.ts', import.meta.url), 'utf8');
   const invoices = readFileSync(new URL('../worker/lib/invoices.ts', import.meta.url), 'utf8');
 
   assert.match(orders, /resolveSelectionPhysicalDimensions\(/);
+  assert.match(orders, /orderItemInsertStatement\(c\.env\.DB, orderId, \{\s*\.\.\.it,/);
   assert.match(
-    orders,
+    orderRows,
     /INSERT INTO order_items[^`]*net_weight_g[^`]*package_height_mm[\s\S]*it\.physical_dimensions\.net_weight_g[\s\S]*it\.physical_dimensions\.package_height_mm/
   );
   assert.match(orders, /image:\s*String\(r\.image_snapshot \?\? ''\),/);

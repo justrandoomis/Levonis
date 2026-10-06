@@ -220,6 +220,8 @@ test('cart and checkout snapshot the same authoritative selection image', () => 
   const orders = readFileSync(new URL('../worker/routes/orders.ts', import.meta.url), 'utf8');
   assert.match(cart, /image:\s*productImageForSelection\(doc,[\s\S]{0,180}optionValueIds:[\s\S]{0,180}colorId:/);
   assert.match(orders, /image:\s*productImageForSelection\(doc,[\s\S]{0,180}optionValueIds:[\s\S]{0,180}colorId:/);
-  assert.match(orders, /INSERT INTO order_items[^`]*image_snapshot/);
+  // The order line itself is written by the shared builder (docs/GIFTS_QUICK_BUY.md D10).
+  const orderRows = readFileSync(new URL('../worker/lib/orderRows.ts', import.meta.url), 'utf8');
+  assert.match(orderRows, /INSERT INTO order_items[^`]*image_snapshot/);
   assert.match(orders, /image:\s*(?:k|it)\.image_snapshot/);
 });

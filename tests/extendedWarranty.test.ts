@@ -968,5 +968,7 @@ test('no route in the worker writes order_items.warranty_snapshot after the chec
     assert.ok(!/UPDATE\s+order_items\s+SET\s+[^`]*warranty/s.test(src), `${rel} rewrites a warranty column on an order item`);
     if (/INSERT\s+INTO\s+order_items[^`]*warranty_snapshot/s.test(src)) inserts.push(rel);
   }
-  assert.deepEqual(inserts, ['worker/routes/orders.ts'], 'the checkout is the only writer of the snapshot');
+  // The checkout and Quick Buy finalisation both write order lines through ONE
+  // builder (docs/GIFTS_QUICK_BUY.md D10), so it is still a single writer.
+  assert.deepEqual(inserts, ['worker/lib/orderRows.ts'], 'the shared order-line builder is the only writer of the snapshot');
 });
