@@ -17,6 +17,7 @@ import { newId } from './crypto';
 import { audit } from './audit';
 import { parseSupportSnapshot, type SupportSnapshot } from './supportCode';
 import { levonisCollectibleSql } from './gini';
+import { isSchemaMissing } from './membershipBenefits';
 
 /**
  * Calendar-month addition with month-end clamping: the day-of-month is
@@ -40,15 +41,36 @@ function isUniqueViolation(e: unknown): boolean {
   return msg.includes('UNIQUE') || msg.includes('PRIMARY KEY');
 }
 
-/** True when any of the order's items belongs to a printer catalog. */
+/**
+ * A GIFT LINE EARNS NO OTHER REWARD (0175, docs/GIFTS_QUICK_BUY.md S8).
+ *
+ * `order_items.gift_entitlement_id` marks a line the customer was given, not
+ * one they bought, and the order-level rewards below — the support-code
+ * referrer gift, the referral printer reward, the printer membership gift —
+ * look only at bought lines. `run` receives the SQL condition to append; a
+ * database behind 0175 has no such column and therefore no gift line, so the
+ * query is run again without it rather than failing a delivery hook.
+ */
+async function withoutGiftLines<T>(alias: string, run: (giftFilter: string) => Promise<T>): Promise<T> {
+  try {
+    return await run(` AND ${alias}gift_entitlement_id IS NULL`);
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+    return run('');
+  }
+}
+
+/** True when any of the order's BOUGHT items belongs to a printer catalog (a gift line never counts). */
 async function orderHasPrinterProduct(db: D1Database, orderId: string): Promise<boolean> {
   // "Is this a printer" is answered in one place (worker/lib/printerIdentity.ts)
   // so the gift, the reviews reward, the home-delivery note and the extended
   // warranty can never disagree about which products are printers.
-  const { results } = await db
-    .prepare('SELECT DISTINCT product_id FROM order_items WHERE order_id = ?')
-    .bind(orderId)
-    .all<{ product_id: string }>();
+  const { results } = await withoutGiftLines('', (giftFilter) =>
+    db
+      .prepare(`SELECT DISTINCT product_id FROM order_items WHERE order_id = ?${giftFilter}`)
+      .bind(orderId)
+      .all<{ product_id: string }>()
+  );
   const printers = await printerProductIds(db, results.map((r) => r.product_id));
   return printers.size > 0;
 }
@@ -463,23 +485,26 @@ export function decideSupportGift(f: SupportGiftFacts): SupportGiftDecision {
  * catalog can be excluded per product without touching the catalog.
  */
 export async function orderHasSupportEligibleLine(db: D1Database, orderId: string): Promise<boolean> {
-  const hit = await db
-    .prepare(
-      `SELECT 1 AS x
-         FROM order_items oi
-         JOIN products p ON p.id = oi.product_id
-        WHERE oi.order_id = ?1
-          AND COALESCE(
-                p.support_gift_eligible,
-                CASE WHEN EXISTS (SELECT 1
-                                    FROM product_catalogs pc
-                                    JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
-                                   WHERE pc.product_id = p.id)
-                     THEN 1 ELSE 0 END) = 1
-        LIMIT 1`
-    )
-    .bind(orderId)
-    .first();
+  // A gift line (0175) is given, not bought: it never qualifies the referrer (S8).
+  const hit = await withoutGiftLines('oi.', (giftFilter) =>
+    db
+      .prepare(
+        `SELECT 1 AS x
+           FROM order_items oi
+           JOIN products p ON p.id = oi.product_id
+          WHERE oi.order_id = ?1${giftFilter}
+            AND COALESCE(
+                  p.support_gift_eligible,
+                  CASE WHEN EXISTS (SELECT 1
+                                      FROM product_catalogs pc
+                                      JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
+                                     WHERE pc.product_id = p.id)
+                       THEN 1 ELSE 0 END) = 1
+          LIMIT 1`
+      )
+      .bind(orderId)
+      .first()
+  );
   return !!hit;
 }
 
@@ -538,25 +563,29 @@ async function supportGiftGuard(db: D1Database, orderId: string): Promise<{ need
     .first<{ id: string }>();
   if (legacy) return { needsReview: true, reason: `legacy_printer_reward:${legacy.id}` };
 
-  const openReturn = await db
-    .prepare(
-      `SELECT rc.id AS id
-         FROM return_cases rc
-         JOIN order_items oi ON oi.id = rc.order_item_id
-         JOIN products p ON p.id = oi.product_id
-        WHERE rc.order_id = ?1
-          AND rc.state <> 'rejected'
-          AND COALESCE(
-                p.support_gift_eligible,
-                CASE WHEN EXISTS (SELECT 1
-                                    FROM product_catalogs pc
-                                    JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
-                                   WHERE pc.product_id = p.id)
-                     THEN 1 ELSE 0 END) = 1
-        LIMIT 1`
-    )
-    .bind(orderId)
-    .first<{ id: string }>();
+  // A return of a gift line (0175) cannot touch the referrer's gift: that line
+  // never qualified it in the first place.
+  const openReturn = await withoutGiftLines('oi.', (giftFilter) =>
+    db
+      .prepare(
+        `SELECT rc.id AS id
+           FROM return_cases rc
+           JOIN order_items oi ON oi.id = rc.order_item_id
+           JOIN products p ON p.id = oi.product_id
+          WHERE rc.order_id = ?1${giftFilter}
+            AND rc.state <> 'rejected'
+            AND COALESCE(
+                  p.support_gift_eligible,
+                  CASE WHEN EXISTS (SELECT 1
+                                      FROM product_catalogs pc
+                                      JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
+                                     WHERE pc.product_id = p.id)
+                       THEN 1 ELSE 0 END) = 1
+          LIMIT 1`
+      )
+      .bind(orderId)
+      .first<{ id: string }>()
+  );
   if (openReturn) return { needsReview: true, reason: `return_case_open:${openReturn.id}` };
 
   return { needsReview: false, reason: '' };

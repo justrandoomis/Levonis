@@ -91,6 +91,7 @@ import { telegramRoutes } from './routes/telegram';
 import { invoiceRoutes } from './routes/invoices';
 import { deviceRoutes } from './routes/devices';
 import { reviewRoutes } from './routes/reviews';
+import { giftRoutes, legacyGiftRoutes } from './routes/gifts';
 import { returnRoutes, priceProtectionRoutes } from './routes/returns';
 import { policiesRoutes } from './routes/policies';
 import { kycRoutes } from './routes/kyc';
@@ -474,6 +475,11 @@ app.route('/api/telegram', telegramRoutes);
 app.route('/api/invoices', invoiceRoutes);
 app.route('/api/devices', deviceRoutes);
 app.route('/api/reviews', reviewRoutes);
+// The gifts (owner brief 2026-10-06 §1, docs/GIFTS_QUICK_BUY.md): the customer's
+// gifts and the admin's levels and grants. Their old `/api/reviews/gifts*` URLs
+// keep answering for clients cached before the move; no path overlaps a review route.
+app.route('/api/reviews', legacyGiftRoutes);
+app.route('/api/gifts', giftRoutes);
 app.route('/api/returns', returnRoutes);
 app.route('/api/price-protection', priceProtectionRoutes);
 app.route('/api/policies', policiesRoutes);

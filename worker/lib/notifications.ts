@@ -50,6 +50,11 @@ export type NotificationKind =
   | 'order_update'
   | 'review_reward_pending'
   /**
+   * «وصلتك هدية» — an admin granted the customer a gift, or approved a review
+   * reward as one (worker/lib/gifts/grant.ts). The link opens /gifts.
+   */
+  | 'gift_granted'
+  /**
    * «رجع المنتج» — the back-in-stock sweep (0092, worker/lib/stockAlerts.ts)
    * telling a customer the thing they armed an alert on is buyable again.
    */
@@ -193,6 +198,8 @@ export interface NotificationInput {
     | 'community_post'
     // 0154 — a comment under a post ('comment_replied'), a person ('new_follower').
     | 'community_comment' | 'user'
+    // 0175 — a granted gift ('gift_granted').
+    | 'gift'
     | '';
   entity_id?: string;
   meta?: Record<string, unknown>;

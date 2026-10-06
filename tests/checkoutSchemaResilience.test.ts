@@ -37,7 +37,7 @@ import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 /** Columns `cart_items` grew after 0001, each in its own migration. Dropping
  *  one reproduces the window in which the Worker is deployed and its
  *  migration is not. */
-const LATE_CART_COLUMNS = ['fulfillment_type', 'option_value_ids', 'transport_method', 'warranty_plan_id', 'draw_salt'];
+const LATE_CART_COLUMNS = ['fulfillment_type', 'option_value_ids', 'transport_method', 'warranty_plan_id', 'draw_salt', 'gift_entitlement_id'];
 
 function setup(dropColumn?: string) {
   // A NEW DATABASE IS A NEW ARCHIVE. `ensurePolicyCorpus` memoises a COMPLETED
@@ -64,6 +64,8 @@ function setup(dropColumn?: string) {
     if (dropColumn === 'option_value_ids') {
       raw.exec('DROP INDEX IF EXISTS idx_cart_levonis_line_v2; DROP INDEX IF EXISTS idx_cart_levonis_line;');
     }
+    // 0175's gift line column carries its own UNIQUE index.
+    if (dropColumn === 'gift_entitlement_id') raw.exec('DROP INDEX IF EXISTS idx_cart_items_gift_line;');
     raw.exec(`ALTER TABLE cart_items DROP COLUMN ${dropColumn};`);
   }
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };

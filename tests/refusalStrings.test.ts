@@ -202,6 +202,9 @@ test('every code the table translates is one the server can actually emit', () =
     // Media everywhere in the store page (P5, storefront §4.7): a slot's weight
     // cap, the poster a video needs, a library file still in use.
     'worker/routes/storeLayout.ts',
+    // Gifts (0175, docs/GIFTS_QUICK_BUY.md §1): choose, redeem, the gift line
+    // in the cart and at checkout.
+    'worker/routes/gifts.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');
@@ -224,6 +227,40 @@ test('every code the table translates is one the server can actually emit', () =
   assert.deepEqual(orphans, [], `translated codes no route can emit: ${orphans.join(', ')}`);
 });
 
+
+/**
+ * THE GIFT CARD'S REFUSALS (0175, docs/GIFTS_QUICK_BUY.md §1). Every code the
+ * gift doors answer a customer with — the card on «هداياي», the gift line in
+ * the cart and the checkout — has three real sentences, the Sorani its own.
+ */
+const GIFT_CUSTOMER_FACING = [
+  'GIFT_NOT_FOUND',
+  'GIFT_STATE',
+  'GIFT_CHOICE_REQUIRED',
+  'GIFT_ITEM_UNAVAILABLE',
+  'GIFT_NOT_REDEEMED',
+  'GIFT_ALREADY_ORDERED',
+  'GIFT_NOT_AVAILABLE',
+  'GIFT_NOT_ORDERABLE',
+  'GIFT_LINE_LOCKED',
+  'GIFT_SALE_TYPE_UNAVAILABLE',
+] as const;
+
+test('every gift refusal a customer can meet has ar, en and its own ckb', () => {
+  for (const code of GIFT_CUSTOMER_FACING) {
+    const e = REFUSAL_STRINGS[code];
+    assert.ok(e, `${code}: absent`);
+    for (const lang of ['ar', 'en', 'ckb'] as const) {
+      assert.ok(typeof e[lang] === 'string' && e[lang].trim().length > 0, `${code}.${lang} is empty`);
+      assert.ok(!/^[A-Z_]{6,}$/.test(e[lang]), `${code}.${lang} reads as a machine code`);
+    }
+    for (const lang of ['ar', 'ckb'] as const) {
+      assert.ok(!/[A-Z]{3,}_[A-Z]/.test(e[lang]), `${code}.${lang} leaks a machine code`);
+    }
+    assert.notEqual(e.ckb, e.ar, `${code}: ckb is a copy of the Arabic`);
+    assert.notEqual(e.ckb, e.en, `${code}: ckb is a copy of the English`);
+  }
+});
 
 // ------------------------------------------- the codes actually REACH a screen
 

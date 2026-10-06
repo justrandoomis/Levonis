@@ -225,6 +225,26 @@ BEGIN
    WHERE order_id = NEW.id AND state = 'ordered';
 END;
 
+-- A delivery undone by the one-step-back correction (canMoveStage: a mis-tapped
+-- «تم التسليم») undoes the gift's `fulfilled` with it, so a later cancellation
+-- still returns the gift. A delivered order that is cancelled keeps its gift
+-- `fulfilled`: it was received.
+CREATE TRIGGER IF NOT EXISTS trg_orders_gift_undelivered
+AFTER UPDATE OF status ON orders FOR EACH ROW
+WHEN OLD.status = 'delivered' AND NEW.status NOT IN ('delivered', 'cancelled')
+BEGIN
+  INSERT INTO audit_log (actor_id, action, target, detail)
+  SELECT NULL, 'gift.undelivered', g.id,
+         json_object('order_id', NEW.id, 'order_item_id', g.order_item_id, 'user_id', g.user_id, 'level', g.level,
+                     'product_id', g.gift_product_id, 'from', 'fulfilled', 'to', 'ordered')
+    FROM gift_entitlements g
+   WHERE g.order_id = NEW.id AND g.state = 'fulfilled' AND g.grant_mode <> 'legacy';
+  UPDATE gift_entitlements
+     SET state = 'ordered', fulfilled_at = NULL,
+         version = version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+   WHERE order_id = NEW.id AND state = 'fulfilled' AND grant_mode <> 'legacy';
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_orders_gift_reopen_guard
 BEFORE UPDATE OF status ON orders FOR EACH ROW
 WHEN OLD.status = 'cancelled' AND NEW.status <> 'cancelled'

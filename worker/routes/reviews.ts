@@ -17,11 +17,14 @@ import {
 } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
-import { audit } from '../lib/audit';
+import { audit, auditStatements } from '../lib/audit';
+import { notifyGiftGranted, planGrant } from '../lib/gifts/grant';
+import { changedExactlyOne, isLostRace } from '../lib/gifts/model';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { parseByteRange, sniff } from './uploads';
 import { getMediaObject, headMediaObject, storeMedia } from '../lib/mediaStorage';
 import { notifyStatement } from '../lib/notifications';
+import { isSchemaMissing } from '../lib/membershipBenefits';
 import {
   evaluateReviewQuality,
   normalizeReviewText,
@@ -67,16 +70,12 @@ const PAGE_SIZE = 10;
 const IMAGE_MAX = 8 * 1024 * 1024;
 const VIDEO_MAX = 40 * 1024 * 1024;
 
-type GiftKind = 'accessory' | 'filament' | 'nozzle' | 'plate' | 'other';
-
-/** Composition of each gift box level (owner catalog, mandate §5). */
-export const LEVEL_COMPOSITION: Readonly<Record<number, readonly GiftKind[]>> = {
-  1: ['accessory'],
-  2: ['filament'],
-  3: ['filament', 'accessory'],
-  4: ['nozzle'],
-  5: ['nozzle', 'plate'],
-};
+/**
+ * The legacy review boxes' composition now lives with the rest of the gift
+ * code (worker/lib/gifts/legacy.ts); it is re-exported here for the readers
+ * that have always found it on this module.
+ */
+export { LEVEL_COMPOSITION } from '../lib/gifts/legacy';
 
 // --------------------------------------------------------------- helpers
 
@@ -95,6 +94,8 @@ interface EligibilityFacts {
   has_video: boolean;
   has_instagram: boolean;
   text_chars: number;
+  /** 0175: the order line proving the purchase was a GIFT (S8) — no review reward. */
+  gift_line?: boolean;
 }
 
 type MediaEntry = ReviewQualityMedia;
@@ -228,21 +229,6 @@ function isUniqueViolation(e: unknown): boolean {
   return msg.includes('UNIQUE') || msg.includes('PRIMARY KEY');
 }
 
-function isCheckViolation(e: unknown): boolean {
-  const msg = e instanceof Error ? e.message : String(e);
-  return msg.includes('CHECK');
-}
-
-/** Unbiased random index via WebCrypto. */
-function randomIndex(n: number): number {
-  if (n <= 1) return 0;
-  const buf = new Uint32Array(1);
-  const limit = Math.floor(0xffffffff / n) * n;
-  for (;;) {
-    crypto.getRandomValues(buf);
-    if (buf[0] < limit) return buf[0] % n;
-  }
-}
 
 // ---------------------------------------------------- review submission
 
@@ -309,15 +295,32 @@ async function computeFacts(
   userId: string,
   input: ReviewInput
 ): Promise<EligibilityFacts> {
-  const order = await db
-    .prepare(
-      `SELECT o.id, o.delivered_at, o.status, oi.id AS order_item_id
-         FROM orders o JOIN order_items oi ON oi.order_id = o.id AND oi.product_id = ?
-        WHERE o.id = ? AND o.user_id = ?
-        LIMIT 1`
-    )
-    .bind(input.productId, input.orderId, userId)
-    .first<{ id: string; delivered_at: string | null; status: string; order_item_id: string }>();
+  /**
+   * THE PURCHASE PROOF IS A BOUGHT LINE (0175, decision S8). A gift line — a
+   * product the customer was given at 0 IQD — never proves a purchase for a
+   * review reward, so a bought line of the same product in the same order is
+   * preferred, and a review proved only by a gift line earns nothing. A
+   * database behind 0175 has no gift line at all, and is read without the
+   * column rather than failing the review.
+   */
+  const read = (giftAware: boolean) =>
+    db
+      .prepare(
+        `SELECT o.id, o.delivered_at, o.status, oi.id AS order_item_id${giftAware ? ', oi.gift_entitlement_id AS gift_id' : ''}
+           FROM orders o JOIN order_items oi ON oi.order_id = o.id AND oi.product_id = ?
+          WHERE o.id = ? AND o.user_id = ?
+          ${giftAware ? 'ORDER BY (oi.gift_entitlement_id IS NOT NULL), oi.rowid' : ''}
+          LIMIT 1`
+      )
+      .bind(input.productId, input.orderId, userId)
+      .first<{ id: string; delivered_at: string | null; status: string; order_item_id: string; gift_id?: string | null }>();
+  let order: Awaited<ReturnType<typeof read>>;
+  try {
+    order = await read(true);
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+    order = await read(false);
+  }
   if (!order) throw notFound('Order not found or it does not contain this product');
   const delivered = !!order.delivered_at || order.status === 'delivered';
   if (!delivered) {
@@ -337,6 +340,7 @@ async function computeFacts(
     has_video: input.media.some((m) => m.kind === 'video'),
     has_instagram: !!input.evidence,
     text_chars: input.body.length,
+    gift_line: !!order.gift_id,
   };
 }
 
@@ -442,7 +446,10 @@ reviewRoutes.post('/', requireAuth, async (c) => {
     ));
   }
 
-  if (quality.rewardEligible && quality.tier !== null) {
+  if (facts.gift_line) {
+    // A GIFT TRIGGERS NO OTHER REWARD (S8): the review is published like any
+    // other, and earns neither a reward row nor the fallback points.
+  } else if (quality.rewardEligible && quality.tier !== null) {
     const rewardId = newId('rr');
     statements.push(c.env.DB.prepare(
       `INSERT INTO review_rewards
@@ -518,7 +525,7 @@ reviewRoutes.post('/', requireAuth, async (c) => {
       `\nReview: ${reviewId}` +
       `\nOrder: ${input.orderId}` +
       `\nQuality: ${quality.score}/100` +
-      (quality.rewardEligible && quality.tier !== null ? `\nReward level ${quality.tier} — awaiting an admin decision` : '')
+      (!facts.gift_line && quality.rewardEligible && quality.tier !== null ? `\nReward level ${quality.tier} — awaiting an admin decision` : '')
   );
 
   return c.json({
@@ -1100,292 +1107,6 @@ reviewRoutes.get('/media/*', async (c) => {
   return new Response(obj.body, { headers });
 });
 
-// ------------------------------------------------------- gift catalog
-
-interface PoolItemRow {
-  id: string;
-  level: number;
-  kind: GiftKind;
-  label_ar: string;
-  label_en: string;
-  label_ckb: string;
-  brand: string;
-  material: string;
-  color: string;
-  option_value: string;
-  compat_products: string;
-  stock: number;
-  active: number;
-}
-
-function itemFitsPrinter(item: PoolItemRow, printerProductId: string): boolean {
-  const compat = safeParse<string[]>(item.compat_products, []);
-  return Array.isArray(compat) && compat.includes(printerProductId);
-}
-
-function contentsSnapshot(item: PoolItemRow) {
-  return {
-    item_id: item.id,
-    kind: item.kind,
-    label_ar: item.label_ar,
-    label_en: item.label_en,
-    label_ckb: item.label_ckb,
-    brand: item.brand,
-    material: item.material,
-    color: item.color,
-    option_value: item.option_value,
-  };
-}
-
-/**
- * Availability of one level for one entitlement, computed from live pool
- * stock. Never fabricates availability: unconfigured pools and unconfigured
- * nozzle/plate compatibility surface as explicit honest states.
- */
-function levelAvailability(items: PoolItemRow[], level: number, printerProductId: string) {
-  const pool = items.filter((i) => i.level === level && i.active === 1 && i.stock > 0);
-  const composition = LEVEL_COMPOSITION[level] ?? [];
-  const out: {
-    level: number;
-    available: boolean;
-    reason: 'ok' | 'pool_unconfigured' | 'compat_unconfigured';
-    nozzle_sizes: string[];
-    plates: Array<{ id: string; label_ar: string; label_en: string; label_ckb: string; brand: string }>;
-  } = { level, available: true, reason: 'ok', nozzle_sizes: [], plates: [] };
-
-  for (const slot of composition) {
-    const slotItems = pool.filter((i) => i.kind === slot);
-    if (slotItems.length === 0) {
-      out.available = false;
-      out.reason = 'pool_unconfigured';
-      continue;
-    }
-    if (slot === 'nozzle' || slot === 'plate') {
-      const compatible = slotItems.filter((i) => itemFitsPrinter(i, printerProductId));
-      if (compatible.length === 0) {
-        out.available = false;
-        if (out.reason === 'ok') out.reason = 'compat_unconfigured';
-        continue;
-      }
-      if (slot === 'nozzle') {
-        out.nozzle_sizes = [...new Set(compatible.map((i) => i.option_value).filter(Boolean))];
-        if (out.nozzle_sizes.length === 0) {
-          out.available = false;
-          if (out.reason === 'ok') out.reason = 'pool_unconfigured'; // nozzles without a size are not selectable
-        }
-      } else {
-        out.plates = compatible.map((i) => ({
-          id: i.id, label_ar: i.label_ar, label_en: i.label_en, label_ckb: i.label_ckb, brand: i.brand,
-        }));
-      }
-    }
-  }
-  return out;
-}
-
-async function loadEntitlement(db: D1Database, entitlementId: string) {
-  return db
-    .prepare(
-      `SELECT ge.*, rr.review_id, r.product_id,
-              p.name AS product_name, p.name_ar AS product_name_ar
-         FROM gift_entitlements ge
-         JOIN review_rewards rr ON rr.id = ge.reward_id
-         JOIN reviews r ON r.id = rr.review_id
-         LEFT JOIN products p ON p.id = r.product_id
-        WHERE ge.id = ?`
-    )
-    .bind(entitlementId)
-    .first<Record<string, unknown>>();
-}
-
-function entitlementView(ge: Record<string, unknown>, redemption: Record<string, unknown> | null) {
-  return {
-    id: ge.id,
-    max_level: Number(ge.max_level),
-    chosen_level: ge.chosen_level != null ? Number(ge.chosen_level) : null,
-    chosen_options: safeParse(ge.chosen_options, {}),
-    contents: safeParse(ge.contents, []),
-    state: ge.state, // available | selected | fulfilled | cancelled
-    created_at: ge.created_at,
-    selected_at: ge.selected_at ?? null,
-    fulfilled_at: ge.fulfilled_at ?? null,
-    product: { id: ge.product_id, name: ge.product_name, name_ar: ge.product_name_ar },
-    redeemed: !!redemption,
-  };
-}
-
-/** GET /api/reviews/gifts — my entitlements with live level availability. */
-reviewRoutes.get('/gifts', requireAuth, async (c) => {
-  const user = c.get('user')!;
-  const { results: ents } = await c.env.DB.prepare(
-    `SELECT ge.*, rr.review_id, r.product_id,
-            p.name AS product_name, p.name_ar AS product_name_ar
-       FROM gift_entitlements ge
-       JOIN review_rewards rr ON rr.id = ge.reward_id
-       JOIN reviews r ON r.id = rr.review_id
-       LEFT JOIN products p ON p.id = r.product_id
-      WHERE ge.user_id = ?
-      ORDER BY ge.created_at DESC LIMIT 50`
-  )
-    .bind(user.id)
-    .all<Record<string, unknown>>();
-
-  const { results: items } = await c.env.DB.prepare(
-    'SELECT * FROM gift_pool_items WHERE active = 1 AND stock > 0'
-  ).all<PoolItemRow>();
-
-  const { results: redemptions } = await c.env.DB.prepare(
-    'SELECT * FROM gift_redemptions WHERE user_id = ?'
-  )
-    .bind(user.id)
-    .all<Record<string, unknown>>();
-  const redemptionByEnt = new Map(redemptions.map((r) => [String(r.entitlement_id), r]));
-
-  return c.json({
-    success: true,
-    gifts: ents.map((ge) => {
-      const maxLevel = Number(ge.max_level);
-      const productId = String(ge.product_id ?? '');
-      const levels =
-        ge.state === 'available'
-          ? Array.from({ length: maxLevel }, (_, i) => levelAvailability(items, i + 1, productId))
-          : [];
-      return { ...entitlementView(ge, redemptionByEnt.get(String(ge.id)) ?? null), levels };
-    }),
-  });
-});
-
-/**
- * POST /api/reviews/gifts/:entitlementId/redeem — choose exactly ONE box
- * with level L <= quality score. Contents are picked SERVER-side from real
- * in-stock pool rows, persisted once (gift_redemptions PK aborts replays)
- * and never rerolled; stock decrements atomically (CHECK stock >= 0 aborts
- * the whole batch on concurrent depletion).
- */
-reviewRoutes.post('/gifts/:entitlementId/redeem', requireAuth, async (c) => {
-  await rateLimit(c, 'gift_redeem', 10, 3600);
-  const user = c.get('user')!;
-  const entId = c.req.param('entitlementId') ?? '';
-  const ge = await loadEntitlement(c.env.DB, entId);
-  if (!ge || ge.user_id !== user.id) throw notFound('Gift not found');
-
-  const existingRedemption = await c.env.DB.prepare('SELECT * FROM gift_redemptions WHERE entitlement_id = ?')
-    .bind(entId)
-    .first<Record<string, unknown>>();
-  if (existingRedemption) {
-    // Already redeemed — return the persisted selection, never reroll.
-    const fresh = (await loadEntitlement(c.env.DB, entId))!;
-    return c.json({ success: true, gift: entitlementView(fresh, existingRedemption), replay: true });
-  }
-  if (ge.state !== 'available') throw conflict('This gift can no longer be redeemed');
-
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const level = int(body.level, 'level', { min: 1, max: 5 });
-  const maxLevel = Number(ge.max_level);
-  if (level > maxLevel) {
-    throw badRequest(`Your quality score unlocks boxes 1 to ${maxLevel} — box ${level} is locked`, 'LEVEL_LOCKED');
-  }
-  const opts = (body.options && typeof body.options === 'object' ? body.options : {}) as Record<string, unknown>;
-  const nozzleSize = str(opts.nozzleSize, 'options.nozzleSize', { max: 20, required: false });
-  const plateItemId = str(opts.plateItemId, 'options.plateItemId', { max: 60, required: false });
-
-  const printerProductId = String(ge.product_id ?? '');
-  const { results: pool } = await c.env.DB.prepare(
-    'SELECT * FROM gift_pool_items WHERE level = ? AND active = 1 AND stock > 0'
-  )
-    .bind(level)
-    .all<PoolItemRow>();
-
-  const composition = LEVEL_COMPOSITION[level];
-  const picks: PoolItemRow[] = [];
-  for (const slot of composition) {
-    const slotItems = pool.filter((i) => i.kind === slot);
-    if (slotItems.length === 0) {
-      throw unavailable(
-        `The level ${level} gift pool is not stocked/configured yet — your gift stays reserved, please try later or contact support`,
-        'GIFT_POOL_UNCONFIGURED'
-      );
-    }
-    if (slot === 'nozzle') {
-      const compatible = slotItems.filter((i) => itemFitsPrinter(i, printerProductId));
-      if (compatible.length === 0) {
-        throw unavailable(
-          'Nozzle compatibility for your printer model is not configured yet — your gift stays reserved',
-          'GIFT_COMPAT_UNCONFIGURED'
-        );
-      }
-      const sizes = [...new Set(compatible.map((i) => i.option_value).filter(Boolean))];
-      if (!nozzleSize) {
-        throw badRequest(`Please choose a nozzle size (${sizes.join(', ')})`, 'NOZZLE_SIZE_REQUIRED');
-      }
-      const sized = compatible.filter((i) => i.option_value === nozzleSize);
-      if (sized.length === 0) {
-        throw badRequest(`Nozzle size not available — choose one of: ${sizes.join(', ')}`, 'NOZZLE_SIZE_UNAVAILABLE');
-      }
-      picks.push(sized[randomIndex(sized.length)]);
-    } else if (slot === 'plate') {
-      const compatible = slotItems.filter((i) => itemFitsPrinter(i, printerProductId));
-      if (compatible.length === 0) {
-        throw unavailable(
-          'Plate compatibility for your printer model is not configured yet — your gift stays reserved',
-          'GIFT_COMPAT_UNCONFIGURED'
-        );
-      }
-      let plate: PoolItemRow | undefined;
-      if (plateItemId) plate = compatible.find((i) => i.id === plateItemId);
-      else if (compatible.length === 1) plate = compatible[0];
-      if (!plate) throw badRequest('Please choose a plate from the available options', 'PLATE_CHOICE_REQUIRED');
-      picks.push(plate);
-    } else {
-      // accessory / filament: random server-side pick from real stock.
-      picks.push(slotItems[randomIndex(slotItems.length)]);
-    }
-  }
-
-  const now = new Date().toISOString();
-  const optionsJson = JSON.stringify({ nozzle_size: nozzleSize || null, plate_item_id: plateItemId || null });
-  const contentsJson = JSON.stringify(picks.map(contentsSnapshot));
-
-  const stmts = [
-    // PK(entitlement_id): a concurrent/replayed redeem aborts the whole batch.
-    c.env.DB.prepare(
-      `INSERT INTO gift_redemptions (entitlement_id, user_id, level, options, contents, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).bind(entId, user.id, level, optionsJson, contentsJson, now),
-    ...picks.map((p) =>
-      // CHECK (stock >= 0) aborts if another redemption took the last unit.
-      c.env.DB.prepare('UPDATE gift_pool_items SET stock = stock - 1 WHERE id = ?').bind(p.id)
-    ),
-    c.env.DB.prepare(
-      `UPDATE gift_entitlements SET state = 'selected', chosen_level = ?, chosen_options = ?, contents = ?, selected_at = ?
-        WHERE id = ? AND state = 'available'`
-    ).bind(level, optionsJson, contentsJson, now, entId),
-  ];
-
-  try {
-    await c.env.DB.batch(stmts);
-  } catch (e) {
-    if (isUniqueViolation(e)) {
-      const red = await c.env.DB.prepare('SELECT * FROM gift_redemptions WHERE entitlement_id = ?')
-        .bind(entId)
-        .first<Record<string, unknown>>();
-      const fresh = (await loadEntitlement(c.env.DB, entId))!;
-      return c.json({ success: true, gift: entitlementView(fresh, red), replay: true });
-    }
-    if (isCheckViolation(e)) {
-      throw conflict('Gift stock changed while redeeming — nothing was consumed, please try again');
-    }
-    console.error('gift redeem failed', e instanceof Error ? e.message : e);
-    throw badRequest('Redemption failed. Please try again.');
-  }
-
-  const fresh = (await loadEntitlement(c.env.DB, entId))!;
-  const red = await c.env.DB.prepare('SELECT * FROM gift_redemptions WHERE entitlement_id = ?')
-    .bind(entId)
-    .first<Record<string, unknown>>();
-  return c.json({ success: true, gift: entitlementView(fresh, red) });
-});
-
 // ---------------------------------------------------------- admin: queue
 
 /**
@@ -1579,27 +1300,53 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
         'CHECKLIST_INCOMPLETE'
       );
     }
-    const entId = newId('gent');
+    /**
+     * THE APPROVAL GRANTS A LEVEL GIFT OF THE NEW FLOW (docs/GIFTS_QUICK_BUY.md
+     * §1.2): level = the quality score, reason 'review', linked to the reward.
+     * The customer then chooses one of the level's real store products on
+     * /gifts and orders it through the cart at 0 IQD. The reward flip, the
+     * grant, its audit row, the review audit row and the in-app notice are ONE
+     * batch; the fence after the flip and UNIQUE(reward_id) make a concurrent
+     * or replayed approval write nothing.
+     */
+    const plan = await planGrant(c.env.DB, {
+      userId: String(row.user_id),
+      level: score,
+      reason: 'review',
+      note: reason,
+      actorId: admin.id,
+      rewardId: String(row.reward_id),
+      now,
+      auditExtra: { review_id: id, reward_id: row.reward_id, product_id_reviewed: row.product_id ?? null },
+    });
+    const reviewAudit = await auditStatements(c.env.DB, admin.id, 'review.reward', id, {
+      action: 'approve',
+      kind: 'printer_gift',
+      quality_score: score,
+      reason,
+      entitlement_id: plan.id,
+    });
     try {
       await c.env.DB.batch([
         c.env.DB.prepare(
           `UPDATE review_rewards SET state = 'approved', quality_score = ?, reason = ?, decided_by = ?, decided_at = ?
             WHERE id = ? AND state != 'approved'`
         ).bind(score, reason, admin.id, now, row.reward_id),
-        // ONE entitlement per review (default multiplicity — decision row 5/19):
-        // UNIQUE(reward_id) makes concurrent/replayed approval abort here.
-        c.env.DB.prepare(
-          `INSERT INTO gift_entitlements (id, reward_id, user_id, max_level, state, created_at)
-           VALUES (?, ?, ?, ?, 'available', ?)`
-        ).bind(entId, row.reward_id, row.user_id, score, now),
+        ...changedExactlyOne(c.env.DB),
+        ...plan.statements,
+        ...reviewAudit.statements,
       ]);
     } catch (e) {
-      if (isUniqueViolation(e)) throw conflict('This reward was already approved');
+      if (isUniqueViolation(e) || isLostRace(e)) throw conflict('This reward was already approved');
       console.error('gift approval failed', e instanceof Error ? e.message : e);
       throw badRequest('Approval failed. Please try again.');
     }
-    await audit(c.env.DB, admin.id, 'review.reward', id, { action: 'approve', kind: 'printer_gift', quality_score: score, reason, entitlement_id: entId });
-    return c.json({ success: true, review_id: id, reward_state: 'approved', quality_score: score, entitlement_id: entId });
+    try {
+      c.executionCtx.waitUntil(notifyGiftGranted(c.env, plan.id));
+    } catch {
+      /* no execution context (a test harness): the in-app notice already landed in the batch */
+    }
+    return c.json({ success: true, review_id: id, reward_state: 'approved', quality_score: score, entitlement_id: plan.id });
   }
 
   // kind === 'points'
@@ -1636,162 +1383,4 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
   }
   await audit(c.env.DB, admin.id, 'review.reward', id, { action: 'approve', kind: 'points', points, reason });
   return c.json({ success: true, review_id: id, reward_state: 'approved', points_awarded: points });
-});
-
-// ---------------------------------------------------------- admin: pools
-
-function poolItemView(i: PoolItemRow) {
-  return {
-    id: i.id,
-    level: i.level,
-    kind: i.kind,
-    label_ar: i.label_ar,
-    label_en: i.label_en,
-    label_ckb: i.label_ckb,
-    brand: i.brand,
-    material: i.material,
-    color: i.color,
-    option_value: i.option_value,
-    compat_products: safeParse<string[]>(i.compat_products, []),
-    stock: i.stock,
-    active: !!i.active,
-  };
-}
-
-reviewRoutes.get('/admin/pools', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    'SELECT * FROM gift_pool_items ORDER BY level ASC, kind ASC, created_at ASC'
-  ).all<PoolItemRow>();
-  return c.json({ success: true, items: results.map(poolItemView) });
-});
-
-function parsePoolItemBody(body: Record<string, unknown>, partial: boolean) {
-  const out: Record<string, unknown> = {};
-  if (!partial || body.level !== undefined) out.level = int(body.level, 'level', { min: 1, max: 5 });
-  if (!partial || body.kind !== undefined) out.kind = oneOf(body.kind, 'kind', ['accessory', 'filament', 'nozzle', 'plate', 'other'] as const);
-  if (!partial || body.label_ar !== undefined) out.label_ar = str(body.label_ar, 'label_ar', { min: 1, max: 200 });
-  if (!partial || body.label_en !== undefined) out.label_en = str(body.label_en, 'label_en', { max: 200, required: false });
-  if (!partial || body.label_ckb !== undefined) out.label_ckb = str(body.label_ckb, 'label_ckb', { max: 200, required: false });
-  if (!partial || body.brand !== undefined) out.brand = str(body.brand, 'brand', { max: 100, required: false });
-  if (!partial || body.material !== undefined) out.material = str(body.material, 'material', { max: 100, required: false });
-  if (!partial || body.color !== undefined) out.color = str(body.color, 'color', { max: 100, required: false });
-  if (!partial || body.option_value !== undefined) out.option_value = str(body.option_value, 'option_value', { max: 40, required: false });
-  if (!partial || body.compat_products !== undefined) {
-    const list = Array.isArray(body.compat_products) ? body.compat_products.map(String).slice(0, 100) : [];
-    out.compat_products = JSON.stringify(list);
-  }
-  if (!partial || body.stock !== undefined) out.stock = int(body.stock, 'stock', { min: 0, max: 100000 });
-  if (!partial || body.active !== undefined) out.active = body.active === false ? 0 : 1;
-  return out;
-}
-
-reviewRoutes.post('/admin/pools', async (c) => {
-  const admin = c.get('user')!;
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const f = parsePoolItemBody(body, false);
-  const id = newId('gpi');
-  await c.env.DB.prepare(
-    `INSERT INTO gift_pool_items (id, level, kind, label_ar, label_en, label_ckb, brand, material, color, option_value, compat_products, stock, active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  )
-    .bind(
-      id, f.level, f.kind, f.label_ar, f.label_en ?? '', f.label_ckb ?? '', f.brand ?? '', f.material ?? '',
-      f.color ?? '', f.option_value ?? '', f.compat_products ?? '[]', f.stock, f.active ?? 1
-    )
-    .run();
-  await audit(c.env.DB, admin.id, 'gift.pool.create', id, f);
-  const row = await c.env.DB.prepare('SELECT * FROM gift_pool_items WHERE id = ?').bind(id).first<PoolItemRow>();
-  return c.json({ success: true, item: poolItemView(row!) });
-});
-
-reviewRoutes.put('/admin/pools/:itemId', async (c) => {
-  const admin = c.get('user')!;
-  const itemId = c.req.param('itemId') ?? '';
-  const existing = await c.env.DB.prepare('SELECT * FROM gift_pool_items WHERE id = ?').bind(itemId).first<PoolItemRow>();
-  if (!existing) throw notFound('Pool item not found');
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const f = parsePoolItemBody(body, true);
-  const keys = Object.keys(f);
-  if (keys.length === 0) throw badRequest('Nothing to update');
-  const sets = keys.map((k) => `${k} = ?`).join(', ');
-  await c.env.DB.prepare(`UPDATE gift_pool_items SET ${sets} WHERE id = ?`)
-    .bind(...keys.map((k) => f[k]), itemId)
-    .run();
-  await audit(c.env.DB, admin.id, 'gift.pool.update', itemId, { before: { stock: existing.stock, active: existing.active }, changes: f });
-  const row = await c.env.DB.prepare('SELECT * FROM gift_pool_items WHERE id = ?').bind(itemId).first<PoolItemRow>();
-  return c.json({ success: true, item: poolItemView(row!) });
-});
-
-reviewRoutes.delete('/admin/pools/:itemId', async (c) => {
-  const admin = c.get('user')!;
-  const itemId = c.req.param('itemId') ?? '';
-  const existing = await c.env.DB.prepare('SELECT * FROM gift_pool_items WHERE id = ?').bind(itemId).first<PoolItemRow>();
-  if (!existing) throw notFound('Pool item not found');
-  // Granted gifts keep their own contents snapshot — deleting a pool item
-  // never touches an existing entitlement/redemption.
-  await c.env.DB.prepare('DELETE FROM gift_pool_items WHERE id = ?').bind(itemId).run();
-  await audit(c.env.DB, admin.id, 'gift.pool.delete', itemId, { label_ar: existing.label_ar, level: existing.level, stock: existing.stock });
-  return c.json({ success: true });
-});
-
-// ------------------------------------------------- admin: grant history
-
-reviewRoutes.get('/admin/gifts', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    `SELECT ge.*, rr.review_id, rr.quality_score, r.product_id, u.email, u.username,
-            p.name AS product_name, p.name_ar AS product_name_ar,
-            gr.options AS redemption_options, gr.created_at AS redeemed_at
-       FROM gift_entitlements ge
-       JOIN review_rewards rr ON rr.id = ge.reward_id
-       JOIN reviews r ON r.id = rr.review_id
-       JOIN users u ON u.id = ge.user_id
-       LEFT JOIN products p ON p.id = r.product_id
-       LEFT JOIN gift_redemptions gr ON gr.entitlement_id = ge.id
-      ORDER BY ge.created_at DESC LIMIT 200`
-  ).all<Record<string, unknown>>();
-  return c.json({
-    success: true,
-    gifts: results.map((ge) => ({
-      ...entitlementView(ge, ge.redeemed_at ? { entitlement_id: ge.id } : null),
-      customer: { email: ge.email, username: ge.username },
-      review_id: ge.review_id,
-      quality_score: ge.quality_score ?? null,
-      redeemed_at: ge.redeemed_at ?? null,
-    })),
-  });
-});
-
-/** Mark a selected gift as delivered/fulfilled. */
-reviewRoutes.post('/admin/gifts/:id/fulfill', async (c) => {
-  const admin = c.get('user')!;
-  const id = c.req.param('id') ?? '';
-  const res = await c.env.DB.prepare(
-    `UPDATE gift_entitlements SET state = 'fulfilled', fulfilled_at = ? WHERE id = ? AND state = 'selected'`
-  )
-    .bind(new Date().toISOString(), id)
-    .run();
-  if (res.meta.changes === 0) throw badRequest('Only a selected (redeemed) gift can be marked fulfilled');
-  await audit(c.env.DB, admin.id, 'gift.fulfill', id, {});
-  return c.json({ success: true });
-});
-
-/**
- * Cancel an UNREDEEMED entitlement (fraud/return handling) — an explicit,
- * audited, reason-required operation; never an invisible debit. A redeemed
- * gift is preserved (returns/fraud on redeemed gifts go through the case
- * review process, not this endpoint).
- */
-reviewRoutes.post('/admin/gifts/:id/cancel', async (c) => {
-  const admin = c.get('user')!;
-  const id = c.req.param('id') ?? '';
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const reason = str(body.reason, 'reason', { min: 5, max: 1000 });
-  const res = await c.env.DB.prepare(
-    `UPDATE gift_entitlements SET state = 'cancelled' WHERE id = ? AND state = 'available'`
-  )
-    .bind(id)
-    .run();
-  if (res.meta.changes === 0) throw conflict('Only an unredeemed (available) gift can be cancelled');
-  await audit(c.env.DB, admin.id, 'gift.cancel', id, { reason });
-  return c.json({ success: true });
 });

@@ -1596,6 +1596,61 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This file is no longer in your store\'s library.',
     ckb: 'ئەم فایلە چیتر لە کتێبخانەی فرۆشگاکەتدا نییە.',
   },
+
+  // ---- Gifts (0175, docs/GIFTS_QUICK_BUY.md §1) ----------------------------
+  // The gift card on «هداياي», the cart's gift line and the checkout. A gift
+  // moves «اختر» → «استرداد» → «أضف إلى السلة» → «تم الطلب»; each sentence
+  // names the step the customer can take next.
+  GIFT_NOT_FOUND: {
+    ar: 'لم نجد هذه الهدية في حسابك.',
+    en: 'We could not find this gift on your account.',
+    ckb: 'ئەم دیارییە لە هەژمارەکەتدا نەدۆزرایەوە.',
+  },
+  GIFT_STATE: {
+    ar: 'تغيّرت حالة هذه الهدية. حدّث الصفحة لترى حالتها الآن.',
+    en: 'This gift has changed. Refresh the page to see where it stands now.',
+    ckb: 'دۆخی ئەم دیارییە گۆڕاوە. پەڕەکە نوێ بکەرەوە بۆ بینینی دۆخی ئێستای.',
+  },
+  GIFT_CHOICE_REQUIRED: {
+    ar: 'اختر هديتك أولًا، ثم استردها.',
+    en: 'Choose your gift first, then redeem it.',
+    ckb: 'سەرەتا دیارییەکەت هەڵبژێرە، پاشان وەریبگرەوە.',
+  },
+  GIFT_ITEM_UNAVAILABLE: {
+    ar: 'هذه الهدية غير متاحة الآن. اختر هدية أخرى من القائمة.',
+    en: 'This gift is not available right now. Pick another one from the list.',
+    ckb: 'ئەم دیارییە ئێستا بەردەست نییە. دیارییەکی تر لە لیستەکە هەڵبژێرە.',
+  },
+  GIFT_NOT_REDEEMED: {
+    ar: 'استرد الهدية أولًا، ثم أضفها إلى السلة.',
+    en: 'Redeem the gift first, then add it to your cart.',
+    ckb: 'سەرەتا دیارییەکە وەربگرەوە، پاشان زیادی بکە بۆ سەبەتەکە.',
+  },
+  GIFT_ALREADY_ORDERED: {
+    ar: 'طُلبت هذه الهدية بالفعل ولا يمكن طلبها مرة أخرى.',
+    en: 'This gift has already been ordered and cannot be ordered again.',
+    ckb: 'ئەم دیارییە پێشتر داواکراوە و ناتوانرێت دووبارە داوا بکرێتەوە.',
+  },
+  GIFT_NOT_AVAILABLE: {
+    ar: 'هذه الهدية لم تعد متاحة. تواصل مع الدعم إن كان ذلك خطأ.',
+    en: 'This gift is no longer available. Contact support if this is a mistake.',
+    ckb: 'ئەم دیارییە ئیتر بەردەست نییە. ئەگەر هەڵەیە پەیوەندی بە پشتگیرییەوە بکە.',
+  },
+  GIFT_NOT_ORDERABLE: {
+    ar: 'لا يمكن طلب الهدية الآن. حدّث صفحة الهدايا ثم حاول مرة أخرى.',
+    en: 'The gift cannot be ordered right now. Refresh your gifts page and try again.',
+    ckb: 'ئێستا ناتوانرێت دیارییەکە داوا بکرێت. پەڕەی دیارییەکان نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
+  },
+  GIFT_LINE_LOCKED: {
+    ar: 'سطر الهدية ثابت: لا يمكن تغيير كميته أو خياراته. يمكنك حذفه فقط.',
+    en: 'A gift line is fixed: its quantity and options cannot change. You can only remove it.',
+    ckb: 'هێڵی دیاری جێگیرە: بڕ و هەڵبژاردنەکانی ناگۆڕدرێن. تەنها دەتوانیت لایببەیت.',
+  },
+  GIFT_SALE_TYPE_UNAVAILABLE: {
+    ar: 'نوع البيع المحدد لهذه الهدية غير متاح حاليًا. تواصل مع الدعم.',
+    en: 'The sale type set for this gift is not available right now. Contact support.',
+    ckb: 'جۆری فرۆشتنی دیاریکراو بۆ ئەم دیارییە ئێستا بەردەست نییە. پەیوەندی بە پشتگیرییەوە بکە.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

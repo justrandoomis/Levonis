@@ -2538,6 +2538,19 @@ async function adminStoreOrderMove(
   return true;
 }
 
+/**
+ * 409 for every admin door that would re-open a cancelled order that held a
+ * gift line (0175, trg_orders_gift_reopen_guard): the cancellation returned
+ * the gift to its owner, who may already have ordered it again.
+ */
+function giftReopenRefusal(): HttpError {
+  return new HttpError(
+    409,
+    'هذا الطلب يحتوي هدية أُعيدت إلى صاحبها عند الإلغاء؛ لا يمكن إعادة فتحه. أنشئ طلباً جديداً.',
+    'GIFT_ORDER_REOPEN_REFUSED'
+  );
+}
+
 /** 409 for every admin door that would move a price-held order (0140). */
 function priceHeldRefusal(orderId: string): HttpError {
   return new HttpError(409, PRICE_APPROVAL_PENDING_MESSAGE, 'PRICE_APPROVAL_PENDING', { order_id: orderId });
@@ -3315,6 +3328,7 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
     if (res.reason === 'NOT_FOUND') throw notFound('Order not found');
     if (res.reason === 'RACED') throw badRequest('The order changed while you were editing — reload and retry');
     if (res.reason === 'REFUNDED_ORDER') throw badRequest('تم إرجاع رصيد هذا الطلب؛ لا يمكن إعادة فتحه. أنشئ طلباً جديداً ليتم احتساب الدفعة من جديد.', 'REFUNDED_ORDER');
+    if (res.reason === 'GIFT_ORDER_REOPEN_REFUSED') throw giftReopenRefusal();
     // «بانتظار موافقة الزبون على السعر» (0140): withdraw the proposal or wait.
     if (res.reason === 'PRICE_APPROVAL_PENDING') throw priceHeldRefusal(id);
     // The re-claim trigger refused (§17 decision 4). The transition itself is
@@ -3477,6 +3491,7 @@ adminRoutes.patch('/orders/:id', async (c) => {
           'OFFER_LIMIT_REACHED'
         );
       }
+      if (msg.includes('GIFT_ORDER_REOPEN_REFUSED')) throw giftReopenRefusal();
       throw e;
     }
   } else {

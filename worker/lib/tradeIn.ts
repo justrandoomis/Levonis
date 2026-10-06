@@ -1662,7 +1662,7 @@ export async function tradeInCouponCap(
   db: D1Database,
   userId: string,
   couponId: string,
-  lines: ReadonlyArray<{ product_id: string; option_value_ids?: readonly string[]; color_id?: string | null; unit: number; pricing_basis?: string }>
+  lines: ReadonlyArray<{ product_id: string; option_value_ids?: readonly string[]; color_id?: string | null; unit: number; pricing_basis?: string; gift?: unknown }>
 ): Promise<number | null> {
   const c = await db
     .prepare(
@@ -1687,6 +1687,9 @@ export async function tradeInCouponCap(
   }
   const line = lines.find(
     (l) =>
+      // A gift line (0175, S8) is never the bought target: its 0 IQD would cap
+      // the credit at nothing, and a product given free earns no trade-in.
+      !l.gift &&
       l.product_id === c.product_id &&
       (!c.option_value_id || (l.option_value_ids ?? []).includes(c.option_value_id)) &&
       (!c.color_id || l.color_id === c.color_id) &&
