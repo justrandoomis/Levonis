@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck, MessageSquare, Repeat, Gift } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck, MessageSquare, Repeat, Gift, Zap } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
 import { api } from '../lib/api';
@@ -27,7 +27,7 @@ import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
 import StoreReceipt from '../components/orders/StoreReceipt';
 import PriceApprovalCard from '../components/orders/PriceApprovalCard';
 import { apiRefusal } from '../lib/refusalStrings';
-import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, statusLabel, statusStyle } from '../components/orders/format';
+import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, orderStatusLabel, statusStyle } from '../components/orders/format';
 import { useMoney } from '../CurrencyContext';
 import type { Claim } from '../components/warranty/types';
 
@@ -60,6 +60,7 @@ const STRINGS = {
     back: 'رجوع إلى الطلبات',
     orderNo: 'رقم الطلب',
     placed: 'تاريخ الطلب',
+    quickBuy: 'تم إنشاؤه بالشراء السريع',
     total: 'المجموع',
     priority12h: 'طلب PRO مؤهل للتجهيز والتوصيل خلال 12 ساعة',
     priority: 'طلب PRO بأولوية التجهيز والتوصيل',
@@ -101,6 +102,7 @@ const STRINGS = {
     back: 'Back to orders',
     orderNo: 'Order number',
     placed: 'Placed',
+    quickBuy: 'Placed with Quick Buy',
     total: 'Total',
     priority12h: 'PRO order eligible for preparation and delivery within 12 hours',
     priority: 'PRO order with preparation and delivery priority',
@@ -139,6 +141,7 @@ const STRINGS = {
     back: 'گەڕانەوە بۆ داواکارییەکان',
     orderNo: 'ژمارەی داواکاری',
     placed: 'بەرواری داواکاری',
+    quickBuy: 'بە کڕینی خێرا دروستکراوە',
     total: 'کۆی گشتی',
     priority12h: 'داواکاری PRO ی گونجاو بۆ ئامادەکردن و گەیاندن لە ١٢ کاتژمێردا',
     priority: 'داواکاری PRO بە پێشینەیی ئامادەکردن و گەیاندن',
@@ -448,7 +451,7 @@ export default function OrderDetail() {
 
   // The pill names the CURRENT stage in the server's words when the tracker
   // loaded; the six-value legacy label is the fallback, never a guess.
-  const pillLabel = tracking?.steps.find((st) => st.current)?.label ?? (order ? statusLabel(lang, order.status) : '');
+  const pillLabel = tracking?.steps.find((st) => st.current)?.label ?? (order ? orderStatusLabel(lang, order) : '');
   const notFound = orderError !== null && classifyError(orderError) === 'not-found';
 
   return (
@@ -518,6 +521,13 @@ export default function OrderDetail() {
                   {s.placed}: <time dateTime={order.created_at}>{formatDate(order.created_at, lang)}</time>
                 </p>
               </div>
+              {/* §13: after its 30 minutes a Quick Buy order is an ordinary order; this only says how it was placed. */}
+              {order.order_kind === 'quick_buy' && (
+                <p data-order-quick-buy className="mt-2 inline-flex items-center gap-1 rounded px-2 py-0.5 w-max bg-gold/10 text-gold text-[11px] font-bold">
+                  <Zap className="w-3 h-3 shrink-0" aria-hidden="true" />
+                  {s.quickBuy}
+                </p>
+              )}
               <div className="mt-3">
                 <CopyField label={s.orderNo} value={order.id} mono />
               </div>

@@ -76,6 +76,29 @@ export const STATUS_STYLES: Record<OrderStatus, string> = {
   cancelled: 'bg-red-500/10 text-red-300 border-red-500/20',
 };
 
+/**
+ * A PENDING ORDER THAT IS ALREADY PAID. «بانتظار الدفع» is the legacy name of
+ * `pending`, and it is wrong for an order the wallet paid in full — every
+ * Quick Buy order, and any checkout paid entirely from Levo Wallet: the money
+ * is taken, and what the order waits for is the shop's confirmation. An order
+ * with anything left to pay (cash on delivery, a transfer to verify) keeps
+ * the legacy label.
+ */
+const AWAITING_CONFIRMATION: Record<Lang, string> = {
+  ar: 'بانتظار التأكيد',
+  en: 'Awaiting confirmation',
+  ckb: 'چاوەڕێی پشتڕاستکردنەوە',
+};
+
+export function orderStatusLabel(
+  lang: string,
+  order: { status: OrderStatus | string; total_iqd?: number; wallet_applied_iqd?: number; due_on_delivery_iqd?: number }
+): string {
+  const paidInFull =
+    Number(order.due_on_delivery_iqd ?? 1) <= 0 && Number(order.wallet_applied_iqd ?? 0) >= Number(order.total_iqd ?? Infinity);
+  return order.status === 'pending' && paidInFull ? AWAITING_CONFIRMATION[asLang(lang)] : statusLabel(lang, order.status);
+}
+
 export function statusLabel(lang: string, status: OrderStatus | string): string {
   const table = STATUS_LABELS[asLang(lang)];
   return (table as Record<string, string>)[status] ?? String(status);

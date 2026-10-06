@@ -12,14 +12,14 @@
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Truck, Star, XCircle, Clock, Gift } from 'lucide-react';
+import { ChevronRight, Truck, Star, XCircle, Clock, Gift, Zap } from 'lucide-react';
 import type { ApiOrder } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import SafeImage from '../ui/SafeImage';
 import OrderTracker from '../OrderTracker';
 import StatusHairline from './StatusHairline';
 import InlineCopy from './InlineCopy';
-import { asLang, countItems, formatDate, formatDateTime, itemCountLabel, statusLabel, statusStyle } from './format';
+import { asLang, countItems, formatDate, formatDateTime, itemCountLabel, orderStatusLabel, statusStyle } from './format';
 import { useMoney } from '../../CurrencyContext';
 
 const STRINGS = {
@@ -41,6 +41,7 @@ const STRINGS = {
     giftDefault: 'بكرة فلمنت',
     giftLine: 'هدية',
     giftOrder: 'طلب هدية',
+    quickBuy: 'تم إنشاؤه بالشراء السريع',
     more: (n: number) => `+${n}`,
     open: (id: string) => `فتح تفاصيل الطلب ${id}`,
   },
@@ -62,6 +63,7 @@ const STRINGS = {
     giftDefault: 'Filament spool',
     giftLine: 'Gift',
     giftOrder: 'Gift order',
+    quickBuy: 'Placed with Quick Buy',
     more: (n: number) => `+${n}`,
     open: (id: string) => `Open order ${id}`,
   },
@@ -84,6 +86,7 @@ const STRINGS = {
     giftDefault: 'بەکەرەی فیلامێنت',
     giftLine: 'دیاری',
     giftOrder: 'داواکاریی دیاری',
+    quickBuy: 'بە کڕینی خێرا دروستکراوە',
     more: (n: number) => `+${n}`,
     open: (id: string) => `کردنەوەی داواکاری ${id}`,
   },
@@ -213,7 +216,7 @@ export default function OrderCard({
             data-order-pill
             className={`shrink-0 inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${statusStyle(order.status)}`}
           >
-            {statusLabel(lang, order.status)}
+            {orderStatusLabel(lang, order)}
           </span>
         </header>
 
@@ -228,6 +231,13 @@ export default function OrderCard({
           <p className="mt-3 text-[13px] text-zinc-300 truncate">
             {order.items[0].name}
             {extraLines > 0 && <span className="text-zinc-500"> {s.more(extraLines)}</span>}
+          </p>
+        )}
+        {/* §13: an ordinary order in every way; the label only says how it was placed. */}
+        {order.order_kind === 'quick_buy' && (
+          <p data-order-card-quick-buy className="mt-1.5 inline-flex items-center gap-1 rounded px-2 py-0.5 w-max bg-gold/10 text-gold text-[11px] font-bold">
+            <Zap className="w-3 h-3 shrink-0" aria-hidden="true" />
+            {s.quickBuy}
           </p>
         )}
         {/* 0175: a gift order (every line given at 0), or an order carrying a gift line. */}
