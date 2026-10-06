@@ -10,6 +10,7 @@ import { Routes, Route, useLocation, useNavigationType } from 'react-router-dom'
 import NavigationRouter from './components/NavigationRouter';
 import { StoreProvider, useStore } from './StoreContext';
 import ChunkBoundary from './components/ChunkBoundary';
+import { afterCriticalPaint, allowsSpeculativeLoads } from './lib/afterCriticalPaint';
 /**
  * THE MERCHANT STOREFRONT IS NOT ON THE APEX'S CRITICAL PATH, AND IT WAS IN
  * THE APEX'S ENTRY BUNDLE.
@@ -187,13 +188,10 @@ const preload = (c: unknown) => (c as { preload?: () => void }).preload?.();
  * — were still downloading, and the font's swap moved ~5 s later for it. An
  * idle callback only means the main thread is idle; the network was not.
  *
- * WHAT IT WAITS FOR NOW, in order: on the home, its critical request
- * (`homeCriticalReadyStore` — the same signal the intro uses; elsewhere the
- * shell's own boot is the wait); then the fonts (`document.fonts.ready`, so
- * the prefetch never races the woff2 for the pipe); then an idle slot with NO
- * timeout — on a busy phone it simply happens later. Safari has no
- * `requestIdleCallback`; a 2 s timer stands in for it there, after the same
- * two waits.
+ * On Home, wait for its data, the document, fonts and visible photographs,
+ * then a painted frame and an idle slot without a deadline. Save-Data and
+ * slow-2G/2G skip speculation. Other routes keep intent preloading only:
+ * shell readiness does not prove that a product's opening photo is painted.
  *
  * WHAT IT FETCHES THEN: the catalogue (`Products`) — where a visitor goes
  * next from the home — and the motion features (src/lib/motionFeatures.tsx),
@@ -211,35 +209,14 @@ function useIdlePrefetch() {
     homeCriticalReadyStore.snapshot,
     homeCriticalReadyStore.serverSnapshot
   );
-  const ready = pathname !== '/' || homeReady;
+  const ready = pathname === '/' && homeReady;
 
   React.useEffect(() => {
-    if (!ready) return;
-    let cancelled = false;
-    let idle: number | undefined;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const w = window as typeof window & {
-      requestIdleCallback?: (cb: () => void) => number;
-      cancelIdleCallback?: (h: number) => void;
-    };
-    const run = () => {
-      if (cancelled) return;
+    if (!ready || !allowsSpeculativeLoads()) return;
+    return afterCriticalPaint(() => {
       preload(Products);
       preloadMotionFeatures();
-    };
-    const whenIdle = () => {
-      if (cancelled) return;
-      if (typeof w.requestIdleCallback === 'function') idle = w.requestIdleCallback(run);
-      else timer = setTimeout(run, 2000);
-    };
-    const fonts = typeof document !== 'undefined' ? document.fonts?.ready : undefined;
-    if (fonts && typeof fonts.then === 'function') fonts.then(whenIdle, whenIdle);
-    else whenIdle();
-    return () => {
-      cancelled = true;
-      if (idle !== undefined) w.cancelIdleCallback?.(idle);
-      if (timer !== undefined) clearTimeout(timer);
-    };
+    });
   }, [ready]);
 
   React.useEffect(() => {

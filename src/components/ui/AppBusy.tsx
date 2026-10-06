@@ -74,7 +74,7 @@ import * as Motion from 'motion/react-m';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
 import { MotionFeatures, useMotionFeaturesFailed } from '../../lib/motionFeatures';
-import { UI_LAYERS } from './Overlay';
+import { UI_LAYERS } from './overlayLayers';
 import Spinner from './Spinner';
 import { COMMITS, useBusySnapshot, type BusyReason } from '../../lib/busy';
 import { DEFAULT_TIMEOUT_MS } from '../../lib/api';

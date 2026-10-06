@@ -33,7 +33,7 @@ import { useState, useSyncExternalStore } from 'react';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
 import { MotionFeatures, useMotionFeaturesFailed } from '../../lib/motionFeatures';
-import { UI_LAYERS } from '../ui/Overlay';
+import { UI_LAYERS } from '../ui/overlayLayers';
 
 let waiting: ServiceWorker | null = null;
 let snapshot = false;

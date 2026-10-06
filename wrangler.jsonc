@@ -102,6 +102,7 @@
       "/api/*",
       "/files/*",
       "/product/*",
+      "/products",
       "/bundles/*",
       "/p/*",
       "/community/store/*",
@@ -124,8 +125,8 @@
       //
       // "/" — ONE exact path, the root document: a store's home link is the
       // link its merchant shares, and only the Worker can write the STORE's
-      // card into it (worker/lib/socialPreview.ts). On the apex it passes the
-      // asset through untouched, with no database read.
+      // card into it (worker/lib/socialPreview.ts). The apex gets opening
+      // API hints and its public host identity, with no database read.
       "/store-icon/*",
       "/"
     ]
@@ -245,6 +246,7 @@
           "/api/*",
           "/files/*",
           "/product/*",
+          "/products",
           "/bundles/*",
           "/p/*",
           "/community/store/*",
@@ -331,6 +333,7 @@
           "/api/*",
           "/files/*",
           "/product/*",
+          "/products",
           "/bundles/*",
           "/p/*",
           "/community/store/*",

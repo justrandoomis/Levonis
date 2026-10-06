@@ -34,6 +34,8 @@ import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { markHomeCriticalReady } from '../lib/appBootstrap';
 import { readPageCache, writePageCache } from '../lib/pageCache';
 import { HOME_PATH, settleJson, takePrimed } from '../lib/bootFetch';
+import { afterCriticalPaint } from '../lib/afterCriticalPaint';
+import DeferredHomeSection from '../components/home/DeferredHomeSection';
 
 /** One key: the home shelves are the same request for everybody signed in
  *  the same way, and AuthContext drops the lot when that changes. */
@@ -51,9 +53,8 @@ export default function Home() {
   const [discountedProducts, setDiscountedProducts] = useState<ApiProduct[]>([]);
   const [newProducts, setNewProducts] = useState<ApiProduct[]>([]);
   /**
-   * `/api/home/sections` — a SECOND request, fired alongside the first and
-   * never awaited by it. It no longer draws shelves of its own; its products
-   * widen what a filter chip can show before its own section request answers.
+   * `/api/home/sections` widens chip suggestions after the opening screen
+   * paints. The default rail already uses the primary response.
    */
   const [shelves, setShelves] = useState<{
     best_sellers?: ApiProduct[];
@@ -62,6 +63,7 @@ export default function Home() {
     super_deals?: ApiProduct[];
   }>({});
   const [initialLoading, setInitialLoading] = useState(true);
+  const [secondaryReady, setSecondaryReady] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   /** The whole of what `GET /api/home` answers — one snapshot, one apply. */
   type HomePayload = {
@@ -130,9 +132,14 @@ export default function Home() {
     };
   }, [fetchHome]);
 
-  // Fired alongside the critical fetch but never awaited by it: a failure here
-  // silently costs a wider chip preview, never the page.
+  // The primary answer already fills the first screen and the default product
+  // rail. Extra chip suggestions must not compete with its photographs.
   useEffect(() => {
+    if (initialLoading) return;
+    return afterCriticalPaint(() => setSecondaryReady(true));
+  }, [initialLoading]);
+  useEffect(() => {
+    if (!secondaryReady) return;
     let cancelled = false;
     api
       .get<typeof shelves>('/api/home/sections')
@@ -143,7 +150,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [secondaryReady]);
 
   // The app intro masks real bootstrap work, never a theatrical timeout.
   // A settled error counts as ready because the page then has honest retry UI.
@@ -208,21 +215,27 @@ export default function Home() {
     printer_finder: () => (!initialLoading && loadError == null ? <PrinterFinder /> : null),
     latest_products: () =>
       newProducts.length > 0 ? (
-        <Suspense fallback={<div aria-hidden="true" className="h-[330px]" />}>
-          <LatestProducts latest={newProducts} pool={chipPool} chips={chips} />
-        </Suspense>
+        <DeferredHomeSection ready={secondaryReady} fallback={<div aria-hidden="true" className="h-[330px]" />}>
+          <Suspense fallback={<div aria-hidden="true" className="h-[330px]" />}>
+            <LatestProducts latest={newProducts} pool={chipPool} chips={chips} />
+          </Suspense>
+        </DeferredHomeSection>
       ) : null,
     editorial_banners: () =>
       editorial.length > 0 ? (
-        <Suspense fallback={<div aria-hidden="true" className="aspect-[7/6] sm:aspect-[32/9] lg:aspect-[24/5]" />}>
-          <EditorialBanners cards={editorial} />
-        </Suspense>
+        <DeferredHomeSection ready={secondaryReady} fallback={<EditorialPlaceholder count={editorial.length} />}>
+          <Suspense fallback={<EditorialPlaceholder count={editorial.length} />}>
+            <EditorialBanners cards={editorial} />
+          </Suspense>
+        </DeferredHomeSection>
       ) : null,
     services: () =>
       !initialLoading ? (
-        <Suspense fallback={null}>
-          <ServicesGrid />
-        </Suspense>
+        <DeferredHomeSection ready={secondaryReady} fallback={<div aria-hidden="true" className="h-[296px] sm:h-[200px] lg:h-[180px]" />}>
+          <Suspense fallback={<div aria-hidden="true" className="h-[296px] sm:h-[200px] lg:h-[180px]" />}>
+            <ServicesGrid />
+          </Suspense>
+        </DeferredHomeSection>
       ) : null,
   };
 
@@ -318,4 +331,11 @@ export default function Home() {
       </div>
     </div>
   );
+}
+
+/** Reserve the same card geometry as the loaded editorial grid. */
+function EditorialPlaceholder({ count }: { count: number }) {
+  return <div aria-hidden="true" className={`grid gap-2 sm:gap-2.5 lg:gap-4 ${count > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+    {Array.from({ length: count }, (_, index) => <div key={index} className="aspect-[16/10] sm:aspect-[16/9] lg:aspect-[12/5]" />)}
+  </div>;
 }

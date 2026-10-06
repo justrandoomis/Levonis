@@ -250,7 +250,7 @@ test('the overlay blocks pointers, which is the entire point of it', () => {
 
 test('the overlay sits above every other layer, including an open sheet', () => {
   assert.match(appBusy, /zIndex: UI_LAYERS\.overlay \+ 100/);
-  assert.match(overlay, /export const UI_LAYERS[\s\S]*?overlay: 200/);
+  assert.match(read('../src/components/ui/overlayLayers.ts'), /export const UI_LAYERS[\s\S]*?overlay: 200/);
   // `.lv-app-intro` is z-index 121 in src/index.css; 300 covers it too.
   assert.match(read('../src/index.css'), /\.lv-app-intro \{[\s\S]*?z-index: 121;/);
 });

@@ -77,7 +77,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
     enabled: ['overview', 'orders', 'products'].includes(section) && (data?.totals.pending_costs ?? 0) > 0 && !busy && !orderId && !collections && !advanced && !legacyOpen });
   const tabs = [
     { id: 'overview', label: loc('نظرة عامة', 'Overview'), icon: LayoutGrid },
-    { id: 'orders', label: loc('الطلبات', 'Orders'), icon: Layers3 },
+    { id: 'orders', label: loc('الطلبات المستلمة', 'Delivered orders'), icon: Layers3 },
     { id: 'products', label: loc('المنتجات', 'Products'), icon: Package },
     { id: 'monthly', label: loc('تكاليف الشهر', 'Monthly costs'), icon: Megaphone },
     { id: 'staff', label: loc('الموظفون', 'Staff'), icon: Users },
@@ -207,31 +207,28 @@ function Orders({ from, to, revision, openOrder }: { from: string; to: string; r
   const { loc } = useLanguage();
   const pageSize = 100;
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
   const [offset, setOffset] = useState(0);
   const [rows, setRows] = useState<FinanceOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
-  useEffect(() => { setOffset(0); setRows([]); setTotal(0); }, [from, to, search, status]);
+  useEffect(() => { setOffset(0); setRows([]); setTotal(0); }, [from, to, search]);
   useEffect(() => {
     const controller = new AbortController();
     setBusy(true); setError('');
     const timer = setTimeout(() => {
-      const query = new URLSearchParams({ from, to, q: search, status, offset: String(offset) });
+      const query = new URLSearchParams({ from, to, q: search, offset: String(offset) });
       api.get<{ orders: FinanceOrder[]; total: number }>(`${WORKSPACE_API}/orders?${query}`, { signal: controller.signal })
         .then((r) => { if (!controller.signal.aborted) { setRows(r.orders ?? []); setTotal(r.total ?? r.orders?.length ?? 0); } })
         .catch((e) => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : String(e)); })
         .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     }, search ? 220 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [from, to, search, status, offset, revision]);
-  const filters = [ ['', loc('كل الطلبات', 'All orders')], ['delivered', loc('المستلمة', 'Delivered')], ['pending', loc('الجديدة', 'New')], ['cancelled', loc('الملغاة', 'Cancelled')] ];
-  return <Surface title={loc('الطلبات والأرباح', 'Orders & profits')} subtitle={loc('افتح الطلب لمعرفة ربح كل منتج وتعديل تكاليفه.', 'Open an order to inspect each product’s profit or adjust its costs.')} action={<Button variant="ghost" onClick={() => { window.location.href = `${WORKSPACE_API}/export.csv?from=${from}&to=${to}`; }} aria-label={loc('تصدير التقرير', 'Export report')}><ArrowDownToLine size={17} /></Button>}>
+  }, [from, to, search, offset, revision]);
+  return <Surface title={loc('أرباح الطلبات المستلمة', 'Delivered order profits')} subtitle={loc('الطلبات المكتملة بالتسليم فقط، حسب يوم التسليم. تشمل الأرباح والتكاليف أثر المرتجعات المسجلة.', 'Completed deliveries only, by delivery date. Profit and costs include recorded returns.')} action={<Button variant="ghost" onClick={() => { window.location.href = `${WORKSPACE_API}/export.csv?from=${from}&to=${to}`; }} aria-label={loc('تصدير التقرير', 'Export report')}><ArrowDownToLine size={17} /></Button>}>
     <div className="fw-toolbar"><div className="fw-search"><Search aria-hidden /><input className="fw-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={loc('ابحث برقم الطلب أو اسم الزبون', 'Search order number or customer')} aria-label={loc('البحث عن الطلب', 'Find an order')} /></div></div>
-    <div className="fw-filter-pills">{filters.map(([value, label]) => <button key={value} type="button" className="fw-pill" aria-pressed={status === value} onClick={() => setStatus(value)}>{label}</button>)}</div>
     {error && <p className="fw-error" role="alert">{error}</p>}
-    {busy && !rows.length ? <Loading text={loc('تحميل الطلبات…', 'Loading orders…')} /> : rows.length ? <div className="fw-list" aria-busy={busy}>{rows.map((o) => <OrderRow order={o} key={o.id} onClick={() => openOrder(o.order_id || o.id)} />)}</div> : <Empty title={loc('لا توجد طلبات مطابقة', 'No matching orders')} text={loc('جرّب اسمًا آخر أو اختر فترة مختلفة.', 'Try another name or date range.')} />}
+    {busy && !rows.length ? <Loading text={loc('تحميل الطلبات…', 'Loading orders…')} /> : rows.length ? <div className="fw-list" aria-busy={busy}>{rows.map((o) => <OrderRow order={o} key={o.id} onClick={() => openOrder(o.order_id || o.id)} />)}</div> : <Empty title={loc('لا توجد طلبات مستلمة مطابقة', 'No matching delivered orders')} text={loc('ابحث عن طلب مكتمل بالتسليم أو اختر فترة تسليم مختلفة.', 'Search for a completed delivery or choose another delivery date range.')} />}
     {total > pageSize && <div className="fw-pagination"><Button variant="ghost" disabled={busy || offset === 0} onClick={() => setOffset((v) => Math.max(0, v - pageSize))}>{loc('السابق', 'Previous')}</Button><span>{Math.floor(offset / pageSize) + 1} / {Math.ceil(total / pageSize)}</span><Button variant="ghost" disabled={busy || offset + rows.length >= total} onClick={() => setOffset((v) => v + pageSize)}>{loc('التالي', 'Next')}</Button></div>}
   </Surface>;
 }
@@ -241,7 +238,7 @@ function Products({ data, onOpenOrders }: { data: FinanceSummary; onOpenOrders: 
   const [q, setQ] = useState('');
   const [view, setView] = useState<'products' | 'categories'>('products');
   const rows = (view === 'products' ? data.products : data.categories)?.filter((p) => !q || p.name.toLocaleLowerCase().includes(q.toLocaleLowerCase())) ?? [];
-  return <Surface title={loc('ربح المنتجات', 'Product profit')} subtitle={loc('أداء المنتجات في الفترة المحددة، بعد نصيبها من التكاليف.', 'Performance in the selected range after each product’s cost share.')}>
+  return <Surface title={loc('ربح المنتجات', 'Product profit')} subtitle={loc('منتجات الطلبات المستلمة في الفترة المحددة، بعد المرتجعات ونصيبها من التكاليف.', 'Products from delivered orders in this range, after returns and each product’s cost share.')}>
     <div className="fw-toolbar"><div className="fw-search"><Search aria-hidden /><input className="fw-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder={loc('ابحث عن منتج أو قسم', 'Find a product or category')} /></div></div>
     <div className="fw-filter-pills"><button type="button" className="fw-pill" aria-pressed={view === 'products'} onClick={() => setView('products')}>{loc('المنتجات', 'Products')}</button><button type="button" className="fw-pill" aria-pressed={view === 'categories'} onClick={() => setView('categories')}>{loc('الأقسام', 'Categories')}</button></div>
     {rows.length ? <div className="fw-list">{rows.map((p) => <Surface key={`${p.level ?? 'product'}:${p.id}`} className="fw-line-item"><div className="fw-line-heading">
@@ -250,7 +247,7 @@ function Products({ data, onOpenOrders }: { data: FinanceSummary; onOpenOrders: 
       <div className="fw-line-metrics"><div className="fw-line-metric"><span>{loc('صافي البيع', 'Net sales')}</span><Money value={p.net_goods_iqd} /></div><div className="fw-line-metric"><span>{loc('تكلفة البضاعة', 'Goods cost')}</span><Money value={p.cogs_iqd} /></div><div className="fw-line-metric"><span>{loc('الأجور والمواد', 'Wages and materials')}</span><Money value={p.wages_iqd == null || p.materials_iqd == null ? null : p.wages_iqd + p.materials_iqd} /></div><div className="fw-line-metric"><span>{loc('نصيب الترويج', 'Promotion share')}</span><Money value={p.promotion_iqd} /></div></div>
       <Row label={loc('حصة المستثمر', 'Investor share')} value={<Money value={p.investor_iqd} />} />
       <Row label={loc('صافي المالك', 'Owner net')} value={<Money value={p.owner_net_iqd} />} prominent />
-    </Surface>)}</div> : <Empty title={loc('لا توجد منتجات في هذه الفترة', 'No products in this period')} text={loc('تظهر المنتجات المرتبطة بطلبات الفترة هنا.', 'Products sold in the selected range appear here.')} />}
+    </Surface>)}</div> : <Empty title={loc('لا توجد منتجات في هذه الفترة', 'No products in this period')} text={loc('تظهر منتجات الطلبات المستلمة خلال الفترة هنا.', 'Products from orders delivered in the selected range appear here.')} />}
     <p className="fw-note">{loc('تكلفة الترويج توزيع إداري على المنتجات، وتُحمّل على المالك فقط.', 'Promotion shares are a management allocation borne by the owner only.')}</p>
     <Button variant="ghost" onClick={onOpenOrders}><CheckCircle2 size={16} />{loc('راجع الطلبات الأصلية', 'Review source orders')}</Button>
   </Surface>;

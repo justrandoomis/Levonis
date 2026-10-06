@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { asD1, count, freshDb, get, json, row, stubApp } from './fixtures/app';
 import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
-import { getOrderProfitBase } from '../worker/lib/orderProfit';
+import { getOrderProfitBase, getOrderProfitBases } from '../worker/lib/orderProfit';
+import { enrichOrderCostProjections } from '../worker/lib/orderCostProjection';
 import { participantSources, participantSummary } from '../worker/lib/financeParticipants';
 
 function setup() {
@@ -59,7 +60,8 @@ test('active main-store orders without variant IDs forecast the exact zero-stock
   }
   const response = await get(x.app, '/f/orders?from=2026-10-01&to=2026-10-31'), list = await json(response);
   assert.equal(response.status, 200, JSON.stringify(list));
-  assert.equal(list.orders.find((order: { id: string }) => order.id === 'refill').projected_finance.gross_profit_iqd, 8000);
+  assert.deepEqual(list.orders, [], 'operational forecasts never enter the delivered-only finance list');
+  assert.equal(list.total, 0);
   assert.equal(count(x.raw, 'SELECT total_changes() n'), before, 'opening list/details cannot post or rewrite any history');
 });
 
@@ -153,17 +155,18 @@ test('multiple option groups use checkout relation ordering including authored n
   assert.equal(detail.lines[0].cogs_iqd, null);
 });
 
-test('API forecasts use a fixed batch of selection reads and never release a pending wage or write accounting', async () => {
+test('operational forecasts use a fixed batch of selection reads and never release a pending wage or write accounting', async () => {
   const x = setup(); x.addOrder('one');
   x.raw.exec(`INSERT INTO expense_categories(id,slug,name_ar) VALUES ('wages','forecast-wages','أجور');
     INSERT INTO finance_order_costs(id,order_id,order_item_id,rule_id,rule_version,rule_name,group_key,staff_id,category_id,milestone,base_iqd,qty,amount_iqd,cost_day,state,snapshot)
       VALUES ('pending-wage','one','line-one','percent',1,'Percentage','profit','staff_hussein','wages','delivered',NULL,1,NULL,'2026-10-04','pending_cost','{"rule":{"basis":"profit_percent","amount":1000}}');`);
   const list = async () => {
     x.queries.length = 0;
-    const response = await get(x.app, '/f/orders?from=2026-10-01&to=2026-10-31'), value = await json(response);
-    assert.equal(response.status, 200, JSON.stringify(value));
+    const ids = (x.raw.prepare('SELECT id FROM orders ORDER BY id').all() as Array<{ id: string }>).map(order => order.id);
+    const bases = await getOrderProfitBases(x.db, ids);
+    await enrichOrderCostProjections(x.db, bases);
     const selectionReads = x.queries.filter(sql => /FROM (?:product_option_values|product_colors|product_variants|product_option_fulfillment|product_option_transports|product_option_groups|product_color_option_links|inventory_lots)|SELECT \* FROM products WHERE id IN/.test(sql));
-    return { value, selectionReads };
+    return { value: { orders: bases }, selectionReads };
   };
   const single = await list();
   for (let i = 0; i < 24; i++) x.addOrder(`bulk-${i}`, i % 2 ? 'spool' : 'refill');

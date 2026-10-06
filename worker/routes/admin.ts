@@ -2214,7 +2214,7 @@ adminRoutes.get('/orders', async (c) => {
 
 /**
  * An explicit database cleanup action, available only after cancellation.
- * Normal cancellation continues to keep the order for 30 days; this button is
+ * Normal cancellation continues to keep the order for seven days; this button is
  * the owner's deliberate override. Fulfilled/serialized orders are refused so
  * a cleanup click cannot erase a device identity or its warranty history.
  */
@@ -2232,10 +2232,13 @@ adminRoutes.delete('/orders/:id', async (c) => {
     return c.json({ success: true, ...result });
   } catch (error) {
     if (error instanceof OrderDeletionRefusal) {
-      const ar =
-        error.code === 'ORDER_NOT_CANCELLED'
-          ? 'يجب إلغاء الطلب أولاً قبل حذفه نهائياً.'
-          : 'لا يمكن حذف هذا الطلب لأنه يحتوي على سجل تسليم أو جهاز أو ضمان.';
+      const ar = error.code === 'ORDER_NOT_CANCELLED' ? 'يجب إلغاء الطلب أولاً قبل حذفه نهائياً.'
+        : error.code === 'ORDER_CHANGED' ? 'تغير الطلب أو سجل تسويته أثناء الحذف؛ حدّث الصفحة.'
+        : error.code === 'ORDER_STOCK_PENDING' ? 'لا يمكن حذف الطلب قبل تحرير حجز المخزون وإعادة القطع المخصومة.'
+        : error.code === 'ORDER_REFUND_PENDING' ? 'لا يمكن حذف الطلب قبل إكمال إرجاع الرصيد والنقاط وتحرير الحجز.'
+        : error.code === 'ORDER_FINANCIAL_RECONCILIATION_PENDING' ? 'لا يمكن حذف الطلب قبل إكمال تسويته المالية المعلقة.'
+        : error.code === 'ORDER_HAS_FINANCIAL_HISTORY' ? 'يحتوي الطلب على سجل دفعات أو أجور أو قيود مالية يجب الاحتفاظ به.'
+        : 'لا يمكن حذف هذا الطلب لأنه يحتوي على سجل تسليم أو جهاز أو ضمان.';
       throw new HttpError(409, ar, error.code);
     }
     throw error;

@@ -800,6 +800,8 @@ export function inlineJsonScript(id: string, value: unknown): string {
 }
 
 export interface DocumentPreloads {
+  /** Opening same-origin API requests, reused by fetch(credentials: 'same-origin'). */
+  fetches?: string[];
   /** `/assets/<chunk>.js` files for `<link rel="modulepreload">`. */
   scripts: string[];
   /** `/assets/<chunk>.css` files for `<link rel="preload" as="style">`. */
@@ -832,6 +834,10 @@ export function productImagePreload(image: string | null): Pick<DocumentPreloads
  */
 export function injectDocumentPreloads(html: string, p: DocumentPreloads): string {
   const lines: string[] = [];
+  for (const href of p.fetches ?? []) {
+    if (!href.startsWith('/api/') || href.startsWith('//')) continue;
+    lines.push(`<link rel="preload" as="fetch" crossorigin href="${escapeAttribute(href)}">`);
+  }
   for (const href of p.scripts) lines.push(`<link rel="modulepreload" crossorigin href="${escapeAttribute(href)}">`);
   for (const href of p.styles) lines.push(`<link rel="preload" as="style" crossorigin href="${escapeAttribute(href)}">`);
   if (p.image) {

@@ -25,7 +25,7 @@ import { drainMatchQueue } from './printMatchingStore';
 import { runStoreOrderSweeps } from './storeOrderOps';
 import { runMerchantSweeps } from './merchantSweeps';
 import { refreshStaleMerchantBadges } from '../routes/merchantReviews';
-import { sweepCancelledOrders, type CancelledOrderSweepReport } from './orderDeletion';
+import { CANCELLED_ORDER_RETENTION_DAYS, sweepCancelledOrders, type CancelledOrderSweepReport } from './orderDeletion';
 import {
   sweepStockAlerts,
   pruneFinishedStockAlerts,
@@ -111,7 +111,7 @@ export interface DurableJobsReport {
    * would strip the protection from every other order (worker/lib/giniSweep.ts).
    */
   gini_holds: GiniHoldReport;
-  /** Cancelled, never-fulfilled orders permanently removed after 30 days. */
+  /** Cancelled, never-fulfilled orders permanently removed after seven days. */
   cancelled_order_retention: CancelledOrderSweepReport;
   /**
    * Local-courier status sync. Separate from order_stages because it is the
@@ -213,7 +213,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     order_stages: { scanned: 0, promoted: 0, skipped: 0, errors: [] },
     order_expiry: { configured: false, scanned: 0, cancelled: 0, skipped: 0, errors: 0 },
     gini_holds: { scanned: 0, cancelled: 0, skipped: 0, errors: 0 },
-    cancelled_order_retention: { retention_days: 30, scanned: 0, deleted: 0, skipped: 0, errors: 0 },
+    cancelled_order_retention: { retention_days: CANCELLED_ORDER_RETENTION_DAYS, scanned: 0, deleted: 0, skipped: 0, errors: 0 },
     delivery_sync: { configured: false, scanned: 0, moved: 0, unmapped: 0, errors: 0 },
     delivered_units: { scanned: 0, orders: 0, created: 0, errors: 0 },
     bnpl_overdue: { scanned: 0, overdue: 0, suspended: 0 },
@@ -462,11 +462,11 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     report.gini_holds = await sweepGiniHolds(env, nowIso, 100);
   });
 
-  // 11c. A cancelled order remains visible for support for exactly thirty
+  // 11c. A cancelled order remains visible for support for seven full
   //      days. Afterwards only orders that never reached fulfilment are
   //      removed; serialized/delivered records remain for warranty integrity.
   await step('cancelled_order_retention', async () => {
-    report.cancelled_order_retention = await sweepCancelledOrders(env.DB, nowIso, 30, 100);
+    report.cancelled_order_retention = await sweepCancelledOrders(env.DB, nowIso);
   });
 
   /**

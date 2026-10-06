@@ -268,7 +268,7 @@ app.use('*', async (c, next) => {
    * cannot depend on who asks. `/community/store/<ref>` is the store's page
    * on the main site, rewritten the same way.
    */
-  if (path === '/' || path.startsWith('/store-icon/') || storeHomeRef(path) !== null) {
+  if (path === '/' || path === '/products' || path.startsWith('/store-icon/') || storeHomeRef(path) !== null) {
     await next();
     return;
   }
@@ -777,6 +777,33 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
   const onStore = host.kind === 'merchant' && !!host.slug;
   const homeRef = storeHomeRef(c.req.path);
   const storeHome = onStore ? c.req.path === '/' : homeRef !== null;
+  const mainOpening = host.kind === 'main' && (c.req.path === '/' || c.req.path === '/products');
+  if (mainOpening && asset.ok && /^text\/html\b/i.test(asset.headers.get('Content-Type') || '')) {
+    try {
+      const url = new URL(c.req.url);
+      const params = new URLSearchParams();
+      for (const key of ['search', 'category']) {
+        const value = url.searchParams.get(key);
+        if (value) params.set(key, value);
+      }
+      params.set('limit', '50');
+      const openingPath = url.pathname === '/' ? '/api/home' : `/api/products?${params}`;
+      // The main-host resolve answer is public configuration, with no DB read.
+      // Start the actual viewer-priced API request in the HTML preload scanner
+      // rather than after the entry bundle has downloaded and React mounted.
+      const resolve = { success: true, kind: host.kind, store: null, root_domain: rootDomainFrom(c.env) };
+      const manifest = url.pathname === '/products' ? await viteManifest(c) : null;
+      const chunks = manifest ? chunkPreloads(manifest, 'src/pages/Products.tsx') : { scripts: [], styles: [] };
+      const html = injectDocumentPreloads(await asset.clone().text(), { ...chunks, image: null, resolve, fetches: [openingPath] });
+      const headers = new Headers(asset.headers);
+      headers.delete('Content-Length');
+      headers.set('ETag', await weakEtag(html));
+      // There are no catalogue prices or session data in this document.
+      return conditional(new Response(html, { status: asset.status, headers }), c.req.header('If-None-Match'), documentCacheControl(!!c.get('user') || headers.has('Set-Cookie')));
+    } catch {
+      return asset;
+    }
+  }
   if ((!slug && !storeHome) || !asset.ok) return asset;
   if (!/^text\/html\b/i.test(asset.headers.get('Content-Type') || '')) return asset;
 
@@ -831,7 +858,13 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
     const image = product
       ? preloadImagePath(routeKey === 'src/pages/Product.tsx' && product.preloadImage !== undefined ? product.preloadImage : product.image)
       : storeHome ? heroCoverFrom(resolve) : null;
-    html = injectDocumentPreloads(html, { ...chunks, image, resolve, ...(routeKey === 'src/pages/Product.tsx' ? productImagePreload(image) : {}) });
+    html = injectDocumentPreloads(html, {
+      ...chunks, image, resolve,
+      ...(routeKey === 'src/pages/Product.tsx' ? {
+        ...productImagePreload(image),
+        fetches: [`/api/products/${encodeURIComponent(slug!)}`],
+      } : {}),
+    });
 
     const headers = new Headers(asset.headers);
     // The body is no longer the asset that was hashed, so the asset's own

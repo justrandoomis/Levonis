@@ -1167,11 +1167,10 @@ function deadStatement(env: Env, row: AlertRow, reason: AlertDeadReason, now: st
  * lie than the clutter this removes, and it costs one row for a few days to
  * avoid.
  *
- * THIRTY DAYS, and the number is not invented here: it is the retention this
- * codebase already applies to the other thing a customer finished with — a
- * cancelled order stays visible for exactly thirty days (`sweepCancelledOrders`,
- * jobs.ts step 11c). One retention the owner already knows beats a second one
- * chosen to be clever. It is also comfortably longer than any plausible gap
+ * THIRTY DAYS remains this alert-history policy. Cancelled orders have their
+ * own seven-day retention (`sweepCancelledOrders`, jobs.ts step 11c); changing
+ * that policy does not erase a customer's older stock-alert history.
+ * Thirty days is comfortably longer than any plausible gap
  * between a notification and the person opening the app, and comfortably
  * shorter than the ninety-plus days a LIVE alert may wait — so the two can
  * never be confused.

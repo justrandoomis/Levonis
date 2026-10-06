@@ -352,6 +352,7 @@ test('a session cookie changes nothing about these documents — they never read
   const index = readFileSync(join(ROOT, 'worker/index.ts'), 'utf8');
   assert.match(index, /if \(productSlugFromPath\(path\)\) \{/);
   assert.match(index, /storeHomeRef\(path\) !== null/);
+  assert.match(index, /path === '\/products' \|\| path\.startsWith\('\/store-icon\/'\)/, 'the catalogue document never loads a session; only its API may price for the viewer');
 });
 
 test('a response that sets a cookie is not shareable, whatever else it carries', async () => {
@@ -472,7 +473,7 @@ test('a one-address bound gallery cannot change the opening image', async () => 
 
 test('every other document passes through as the asset came', async () => {
   const { call, assetCalls } = realWorker();
-  for (const [host, path] of [[APEX, '/cart'], [APEX, '/products'], [STORE_HOST, '/products'], [APEX, '/']] as const) {
+  for (const [host, path] of [[APEX, '/cart'], [STORE_HOST, '/products']] as const) {
     const res = await call(host, path);
     assert.equal(res.status, 200, `${host}${path}`);
     assert.equal(res.headers.get('ETag'), 'W/"asset"', `${host}${path}: the asset's own validator`);
@@ -484,6 +485,39 @@ test('every other document passes through as the asset came', async () => {
   const none = await call(`nostore.${APEX}`, '/');
   assert.equal(none.headers.get('ETag'), 'W/"asset"');
   assert.equal(inline(await none.text()), null);
+});
+
+test('the main homepage starts its viewer-priced API in the document without embedding catalogue data', async () => {
+  const { call, assetCalls } = realWorker();
+  const res = await call(APEX, '/');
+  const html = await res.text();
+  assert.match(html, /<link rel="preload" as="fetch" crossorigin href="\/api\/home">/);
+  assert.deepEqual(inline(html), { success: true, kind: 'main', store: null, root_domain: APEX });
+  assert.doesNotMatch(html, /display_price_iqd|viewer_tier|filament-pla/);
+  assert.equal(assetCalls.includes(MANIFEST_PATH), false, 'home adds no manifest or database dependency');
+  assert.notEqual(res.headers.get('ETag'), 'W/"asset"');
+  const cached = await call(APEX, '/', { 'If-None-Match': res.headers.get('ETag')! });
+  assert.equal(cached.status, 304);
+});
+
+test('catalogue opening hints use exactly the client search and category request, without extra parameters', async () => {
+  const { call } = realWorker();
+  const res = await call(APEX, '/products?category=cat%26x&search=PLA&debug=1&limit=1');
+  const html = await res.text();
+  assert.match(html, /href="\/api\/products\?search=PLA&amp;category=cat%26x&amp;limit=50"/);
+  assert.doesNotMatch(html, /debug=1/);
+  assert.equal(inline(html)?.kind, 'main');
+  const product = await call(APEX, '/product/filament-pla');
+  assert.match(await product.text(), /<link rel="preload" as="fetch" crossorigin href="\/api\/products\/filament-pla">/);
+});
+
+test('fetch preloads only name same-origin API paths and retain session-cookie request mode', () => {
+  const html = injectDocumentPreloads(SHELL, {
+    scripts: [], styles: [], image: null, resolve: null,
+    fetches: ['/api/home', 'https://evil.example/private', '//evil.example/api/x', '/files/private/x'],
+  });
+  assert.match(html, /as="fetch" crossorigin href="\/api\/home"/);
+  assert.doesNotMatch(html, /evil\.example|\/files\/private/);
 });
 
 test('without a manifest (an older deploy) the document is still rewritten — only the chunk links are missing', async () => {

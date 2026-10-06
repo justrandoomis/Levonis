@@ -215,9 +215,9 @@ test('the sources keep the shape: a media query for reduced motion, m.* under <M
   assert.match(header, /\{isAuthenticated && \(\s*<Suspense fallback=\{null\}>\s*<NotificationBell \/>/);
   assert.doesNotMatch(header, /^import .* from '\.\/subscription\/tierMeta';/m, 'the tier table is a static import of the Header again');
   const app = read('src/App.tsx');
-  assert.match(app, /const ready = pathname !== '\/' \|\| homeReady;/, 'the prefetch waits for the home\'s critical request');
-  assert.match(app, /document\.fonts\?\.ready/, 'the prefetch waits for the fonts');
-  assert.doesNotMatch(app, /requestIdleCallback\(run, \{ timeout/, 'the idle callback has a timeout again — it fired during the first paint on Slow 4G');
+  assert.match(app, /const ready = pathname === '\/' && homeReady;/, 'speculation needs the home data; another route\'s shell is not proof its photo is ready');
+  assert.match(app, /return afterCriticalPaint\(/, 'speculation waits for fonts and visible pictures, not just an idle JS thread');
+  assert.match(app, /!allowsSpeculativeLoads\(\)/, 'reduced-data connections do not download speculative routes');
   assert.match(app, /preload\(Products\);\s*preloadMotionFeatures\(\);/, 'idle prefetches the catalogue and the motion features, nothing else');
   assert.match(app, /document\.addEventListener\('pointerdown', onIntent, true\)/, 'Product, Cart and Addresses are fetched on the first pointer over their links');
   for (const lazy of ['EmailVerifyBanner', 'CompleteProfileSheet', 'ThemeIntroSheet']) {

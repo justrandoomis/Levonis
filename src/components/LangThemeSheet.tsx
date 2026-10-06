@@ -30,22 +30,37 @@
  * arrow press would make «English» unreachable from «العربية»); Enter, Space
  * or a click commits.
  */
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { Globe, Moon, Sun, SunMoon } from 'lucide-react';
+import { useCallback, useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent } from 'react';
+import { Globe } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import type { Language } from '../translations';
-import { Sheet } from './ui/Overlay';
-import { Segmented } from './ui/Segmented';
+import type { LangThemePanelProps } from './LangThemePanel';
+import { toast } from '../lib/toastStore';
 import { CENTER_REVEAL_MS, setThemePreference, useTheme, type ThemePreference } from '../lib/theme';
 
 /** If the exit never reports (a hidden tab does not animate), act anyway. */
 const EXIT_FALLBACK_MS = 900;
 
-const LANGS: ReadonlyArray<readonly [Language, string]> = [
-  ['ar', 'العربية'],
-  ['en', 'English'],
-  ['ckb', 'کوردی'],
-];
+type PanelComponent = ComponentType<LangThemePanelProps>;
+let loadedPanel: PanelComponent | null = null;
+let panelLoad: Promise<PanelComponent> | null = null;
+
+/** Share one download across header globes; a failed request can be retried. */
+function loadPanel(): Promise<PanelComponent> {
+  if (loadedPanel) return Promise.resolve(loadedPanel);
+  panelLoad ??= import('./LangThemePanel').then((module) => {
+    loadedPanel = module.default;
+    return loadedPanel;
+  }).catch((error: unknown) => {
+    panelLoad = null;
+    throw error;
+  });
+  return panelLoad;
+}
+
+function prewarmPanel(): void {
+  void loadPanel().catch(() => { /* The next click retries a failed intent preload. */ });
+}
 
 export interface LangThemeButtonProps {
   /**
@@ -57,15 +72,6 @@ export interface LangThemeButtonProps {
   className?: string;
 }
 
-function ThemeLabel({ icon, text }: { icon: ReactNode; text: string }) {
-  return (
-    <span className="flex flex-col items-center gap-1 py-1.5">
-      {icon}
-      <span>{text}</span>
-    </span>
-  );
-}
-
 /** The header's globe, and the «اللغة والمظهر» sheet it opens. */
 export default function LangThemeButton({ variant = 'home', className = '' }: LangThemeButtonProps) {
   const { lang, setLang, loc, dir } = useLanguage();
@@ -73,6 +79,8 @@ export default function LangThemeButton({ variant = 'home', className = '' }: La
   const titleId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [Panel, setPanel] = useState<PanelComponent | null>(() => loadedPanel);
+  const mounted = useRef(true);
   // What the rows show as chosen while the sheet is up: the tap's answer at
   // once, before the change itself (which waits for the sheet to leave).
   const [langPick, setLangPick] = useState<Language>(lang);
@@ -89,12 +97,26 @@ export default function LangThemeButton({ variant = 'home', className = '' }: La
     run?.();
   }, []);
 
-  useEffect(() => () => window.clearTimeout(fallback.current), []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; window.clearTimeout(fallback.current); };
+  }, []);
 
   const openSheet = () => {
+    // Touch browsers need an explicit opener while the sheet chunk arrives;
+    // the shared focus trap can then return here when the sheet closes.
+    buttonRef.current?.focus({ preventScroll: true });
     setLangPick(lang);
     setThemePick(preference);
     setOpen(true);
+    if (loadedPanel) { setPanel(() => loadedPanel); return; }
+    void loadPanel().then((component) => {
+      if (mounted.current) setPanel(() => component);
+    }).catch(() => {
+      if (!mounted.current) return;
+      setOpen(false);
+      toast.error(loc('تعذّر فتح اللغة والمظهر. اضغط للمحاولة مجددًا.', 'Could not open language and appearance. Tap to retry.'));
+    });
   };
 
   /** Close, and make `change` once the sheet is gone. */
@@ -152,76 +174,42 @@ export default function LangThemeButton({ variant = 'home', className = '' }: La
         ref={buttonRef}
         type="button"
         data-lang-theme-trigger={variant}
+        onPointerEnter={prewarmPanel}
+        onPointerDown={prewarmPanel}
+        onFocus={prewarmPanel}
         onClick={() => (open ? closeThen(null) : openSheet())}
+        onKeyDown={(event) => {
+          if (open && !Panel && event.key === 'Escape' && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            closeThen(null);
+          }
+        }}
         aria-label={title}
         aria-expanded={open}
+        aria-busy={open && !Panel}
         aria-haspopup="dialog"
         className={buttonClass}
       >
-        <Globe className="w-5 h-5" strokeWidth={2} aria-hidden="true" />
+        {open && !Panel ? <span aria-hidden="true" className="h-5 w-5 rounded-full border-2 border-current border-t-transparent animate-spin motion-reduce:animate-none" /> : <Globe className="w-5 h-5" strokeWidth={2} aria-hidden="true" />}
         {variant === 'dash' && <span className="text-xs font-bold uppercase hidden sm:block">{lang}</span>}
       </button>
 
-      <Sheet
+      {Panel && <Panel
         open={open}
         onClose={() => closeThen(null)}
         onExited={flush}
-        docked
-        label={title}
-        labelledBy={titleId}
-        z={220}
-        testId="lang-theme-sheet"
-        panelClassName="w-full max-w-md"
-      >
-        <div dir={dir} data-lang-theme="panel" className="flex flex-col">
-          <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-2.5">
-            <h2 id={titleId} className="text-[13px] font-bold text-white">
-              {title}
-            </h2>
-          </div>
-
-          <div className="flex flex-col gap-4 px-4 pt-4 pb-5">
-            <div onKeyDownCapture={onRowKeyDownCapture} onPointerDownCapture={onRowPointerDownCapture} data-lang-theme-row="language">
-              <p className="mb-2 flex items-center gap-2 text-[12px] font-bold text-zinc-400">
-                <Globe className="h-4 w-4" aria-hidden="true" />
-                {langLabel}
-              </p>
-              <Segmented
-                group="sheet-language"
-                label={langLabel}
-                value={langPick}
-                onChange={chooseLang}
-                dataAttr="data-lang-choice"
-                items={LANGS.map(([code, name]) => ({
-                  id: code,
-                  label: <span lang={code}>{name}</span>,
-                }))}
-              />
-            </div>
-
-            <div onKeyDownCapture={onRowKeyDownCapture} onPointerDownCapture={onRowPointerDownCapture} data-lang-theme-row="appearance">
-              <p className="mb-2 flex items-center gap-2 text-[12px] font-bold text-zinc-400">
-                <SunMoon className="h-4 w-4" aria-hidden="true" />
-                {themeLabel}
-              </p>
-              <Segmented
-                group="sheet-appearance"
-                label={themeLabel}
-                value={themePick}
-                onChange={chooseTheme}
-                dataAttr="data-theme-choice"
-                // The icon sits ABOVE the word: «حسب الجهاز» beside an icon
-                // does not fit a third of a 390px phone.
-                items={[
-                  { id: 'light', label: <ThemeLabel icon={<Sun aria-hidden="true" className="h-4 w-4" />} text={loc('فاتح', 'Light')} /> },
-                  { id: 'dark', label: <ThemeLabel icon={<Moon aria-hidden="true" className="h-4 w-4" />} text={loc('داكن', 'Dark')} /> },
-                  { id: 'system', label: <ThemeLabel icon={<SunMoon aria-hidden="true" className="h-4 w-4" />} text={loc('حسب الجهاز', 'Device')} /> },
-                ]}
-              />
-            </div>
-          </div>
-        </div>
-      </Sheet>
+        titleId={titleId}
+        title={title}
+        langLabel={langLabel}
+        themeLabel={themeLabel}
+        dir={dir}
+        langPick={langPick}
+        themePick={themePick}
+        chooseLang={chooseLang}
+        chooseTheme={chooseTheme}
+        onRowKeyDownCapture={onRowKeyDownCapture}
+        onRowPointerDownCapture={onRowPointerDownCapture}
+      />}
     </div>
   );
 }

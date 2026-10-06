@@ -11,9 +11,10 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, dirname, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { languageFlow, languageSwapMode, runLanguageSwap, LANG_SWAP_MS } from '../src/lib/langSwap';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -57,7 +58,7 @@ test('the old language dropdown is gone', () => {
 });
 
 test('the sheet is the notifications sheet: grabber, title, two rows, the theme store', () => {
-  const src = read('src/components/LangThemeSheet.tsx');
+  const src = read('src/components/LangThemeSheet.tsx') + '\n' + read('src/components/LangThemePanel.tsx');
   // The same primitive as the notifications sheet, at every width.
   assert.match(src, /import \{ Sheet \} from '\.\/ui\/Overlay'/);
   assert.match(src, /<Sheet[\s\S]{0,400}docked[\s\S]{0,300}testId="lang-theme-sheet"/);
@@ -79,6 +80,43 @@ test('the sheet is the notifications sheet: grabber, title, two rows, the theme 
   // The trigger is 44px.
   assert.match(src, /h-11 w-11/);
   assert.match(src, /min-h-11 min-w-11/);
+});
+
+test('first paint does not load the unopened settings panel or overlay primitives', () => {
+  const seen = new Set<string>();
+  function visit(file: string) {
+    if (seen.has(file)) return;
+    seen.add(file);
+    const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+    for (const statement of source.statements) {
+      if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue;
+      if (ts.isImportDeclaration(statement)) {
+        const clause = statement.importClause;
+        if (clause?.isTypeOnly) continue;
+        const bindings = clause?.namedBindings;
+        if (!clause?.name && bindings && ts.isNamedImports(bindings) && bindings.elements.every((e) => e.isTypeOnly)) continue;
+      } else if (statement.isTypeOnly) continue;
+      const specifier = statement.moduleSpecifier;
+      if (!specifier || !ts.isStringLiteral(specifier) || !specifier.text.startsWith('.')) continue;
+      const base = resolve(dirname(file), specifier.text);
+      const dependency = [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]
+        .find((candidate) => existsSync(candidate) && statSync(candidate).isFile() && /\.tsx?$/.test(candidate));
+      if (dependency) visit(dependency);
+    }
+  }
+  visit(join(ROOT, 'src/main.tsx'));
+  const closure = [...seen].map((file) => relative(ROOT, file));
+  assert.ok(closure.includes('src/components/LangThemeSheet.tsx'), 'the header control stays available at first paint');
+  for (const deferred of ['LangThemePanel.tsx', 'ui/Overlay.tsx', 'ui/Segmented.tsx']) {
+    assert.ok(!closure.includes(`src/components/${deferred}`), `${deferred} re-entered the initial static dependency graph`);
+  }
+  const trigger = read('src/components/LangThemeSheet.tsx');
+  assert.match(trigger, /import\('\.\/LangThemePanel'\)/);
+  for (const event of ['onPointerEnter', 'onPointerDown', 'onFocus']) {
+    assert.ok(trigger.includes(`${event}={prewarmPanel}`), `${event} should prepare the sheet before the click`);
+  }
+  assert.match(trigger, /aria-busy=\{open && !Panel\}/);
+  assert.match(trigger, /buttonRef\.current\?\.focus\(\{ preventScroll: true \}\)/);
 });
 
 test('a choice closes the sheet FIRST, and changes things only once it has gone', () => {

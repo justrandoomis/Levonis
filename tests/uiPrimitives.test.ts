@@ -79,7 +79,7 @@ test('Overlay keeps every hook and literal the app and the e2e scripts depend on
   for (const hook of ['data-overlay-panel', 'data-overlay-scrim', 'data-sheet-grabber', 'data-overlay-mode', 'data-overlay={testId ?? true}']) {
     assert.ok(overlay.includes(hook), `${hook} is gone`);
   }
-  assert.match(overlay, /export const UI_LAYERS[\s\S]*?overlay: 200/);
+  assert.match(read(`${UI}/overlayLayers.ts`), /export const UI_LAYERS[\s\S]*?overlay: 200/);
   assert.match(overlay, /pb-\[env\(safe-area-inset-bottom\)\]/);
   assert.match(overlay, /role="dialog"/);
   assert.match(overlay, /aria-modal=\{mode === 'modal'\}/);

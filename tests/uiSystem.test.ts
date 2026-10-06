@@ -55,14 +55,15 @@ test('language sheet and modal layers use portals and one documented stack', () 
   const overlay = read('src/components/ui/Overlay.tsx');
   const header = read('src/components/Header.tsx');
   assert.match(overlay, /UI_LAYERS/);
-  assert.match(overlay, /export function overlayLayer/);
+  assert.match(overlay, /export \{ UI_LAYERS, overlayLayer \} from '\.\/overlayLayers'/);
+  assert.match(read('src/components/ui/overlayLayers.ts'), /export function overlayLayer/);
   assert.match(overlay, /visualViewport/);
   assert.match(overlay, /document\.getElementById\('main-scroll-container'\)/);
   assert.match(overlay, /createPortal\([\s\S]+document\.body/);
   // The globe opens the «اللغة والمظهر» sheet now (tests/langThemeSheet.test.ts);
   // that sheet is the same portal-and-stack primitive.
   assert.match(header, /<LangThemeButton\b/);
-  assert.match(read('src/components/LangThemeSheet.tsx'), /<Sheet[\s\S]{0,300}testId="lang-theme-sheet"/);
+  assert.match(read('src/components/LangThemePanel.tsx'), /<Sheet[\s\S]{0,300}testId="lang-theme-sheet"/);
 });
 
 test('a modal hides the persistent nav and every legacy sheet is lifted above app chrome', () => {
@@ -71,7 +72,7 @@ test('a modal hides the persistent nav and every legacy sheet is lifted above ap
   const overlay = read('src/components/ui/Overlay.tsx');
   assert.match(nav, /data-bottom-nav/);
   assert.match(css, /data-overlay-open='true'[\s\S]{0,100}\[data-bottom-nav\]/);
-  assert.match(overlay, /z < UI_LAYERS\.overlay/);
+  assert.match(read('src/components/ui/overlayLayers.ts'), /z < UI_LAYERS\.overlay/);
   assert.match(overlay, /pb-\[env\(safe-area-inset-bottom\)\]/);
 });
 

@@ -8,6 +8,11 @@
  * identity or warranty history is not database housekeeping.
  */
 
+import { revokeOrderProductFileGrantStatements } from './fileOwnership';
+
+export const CANCELLED_ORDER_RETENTION_DAYS = 7;
+export const CANCELLED_ORDER_SWEEP_LIMIT = 5;
+
 export interface OrderDeletionDb {
   prepare(sql: string): D1PreparedStatement;
   batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]>;
@@ -32,6 +37,13 @@ type Owned = { table: string; where?: string };
 
 // Children before parents. All predicates bind the order id as ?1.
 export const ORDER_OWNED_TABLES: Owned[] = [
+  { table: 'finance_staff_order_rules' },
+  { table: 'finance_staff_basis' },
+  { table: 'finance_task_assignments' },
+  { table: 'finance_order_versions' },
+  { table: 'finance_order_snapshots' },
+  { table: 'finance_line_departments', where: 'order_item_id IN (SELECT id FROM order_items WHERE order_id=?1)' },
+  { table: 'order_item_inventory_allocations' },
   { table: 'coupon_redemptions' },
   { table: 'invoices' },
   { table: 'return_cases' },
@@ -67,13 +79,69 @@ export const ORDER_HISTORY_TABLES = [
 
 async function columnsOf(db: OrderDeletionDb, table: string): Promise<Set<string>> {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(table)) return new Set();
-  try {
-    const rows = await db.prepare(`PRAGMA table_info("${table}")`).all<{ name: string }>();
-    return new Set((rows.results ?? []).map((row) => String(row.name)));
-  } catch {
-    return new Set();
-  }
+  const rows = await db.prepare(`PRAGMA table_info("${table}")`).all<{ name: string }>();
+  return new Set((rows.results ?? []).map((row) => String(row.name)));
 }
+
+type Protection = { code: string; message: string; query: string };
+type DeletionSchema = { columns: Map<string, Set<string>>; protections: Protection[] };
+const financialTables = ['finance_order_costs','finance_order_adjustments','finance_workspace_postings','finance_order_calculations',
+  'finance_collections','finance_refund_facts','investor_finance_events','finance_investor_earnings','finance_expense_links'] as const;
+const itemEvidenceTables = ['stock_serial_links','stock_return_inspections','trade_in_claims'] as const;
+const allocationEvidenceTables = ['investor_finance_events','investor_allocation_results','lot_cost_adjustment_shares','stock_return_lot_evidence'] as const;
+
+/** One schema read set per sweep; absent newer tables are not assumed empty
+ * after they have been observed. The same predicates select candidates and
+ * fence the final batch, including when SQLite FK enforcement is unavailable. */
+async function deletionSchema(db: OrderDeletionDb): Promise<DeletionSchema> {
+  const names = new Set(['orders','order_item_units','ops_guards','warranty_claims','wallet_transactions','wallet_holds',
+    'product_file_grants','trade_in_requests','finance_posting_errors',...financialTables,...itemEvidenceTables,...allocationEvidenceTables,
+    ...ORDER_HISTORY_TABLES,...ORDER_OWNED_TABLES.map(t=>t.table)]);
+  const columns = new Map<string, Set<string>>();
+  for (const name of names) columns.set(name, await columnsOf(db, name));
+  const protections: Protection[] = [];
+  const add = (table: string, column: string, code: string, message: string, query: string) => {
+    if (columns.get(table)?.has(column)) protections.push({ code, message, query });
+  };
+  for (const table of financialTables) add(table,'order_id','ORDER_HAS_FINANCIAL_HISTORY',
+    'Linked accounting, wages, collections, refunds or investor history must be retained.',`SELECT 1 FROM ${table} WHERE order_id=?1`);
+  for (const table of itemEvidenceTables) add(table,'order_item_id','ORDER_HAS_FULFILMENT_HISTORY',
+    'Serial, return inspection or trade-in evidence must be retained.',`SELECT 1 FROM ${table} WHERE order_item_id IN (SELECT id FROM order_items WHERE order_id=?1)`);
+  add('trade_in_requests','order_id','ORDER_HAS_FULFILMENT_HISTORY','Trade-in evidence must be retained.',
+    'SELECT 1 FROM trade_in_requests WHERE order_id=?1');
+  for (const table of allocationEvidenceTables) add(table,'allocation_id','ORDER_HAS_FINANCIAL_HISTORY',
+    'Stock allocation evidence is linked to investor, cost or return history.',
+    `SELECT 1 FROM ${table} WHERE allocation_id IN (SELECT id FROM order_item_inventory_allocations WHERE order_id=?1)`);
+  add('finance_posting_errors','order_id','ORDER_FINANCIAL_RECONCILIATION_PENDING','A financial posting still requires reconciliation.',
+    'SELECT 1 FROM finance_posting_errors WHERE order_id=?1');
+  add('order_payment_settlements','order_id','ORDER_HAS_FINANCIAL_HISTORY','A recorded payment settlement must be retained.',
+    'SELECT 1 FROM order_payment_settlements WHERE order_id=?1 AND amount_iqd>0');
+  add('points_accruals','order_id','ORDER_HAS_FINANCIAL_HISTORY','Released rewards must retain their earning and reversal evidence.',
+    "SELECT 1 FROM points_accruals WHERE order_id=?1 AND (state='released' OR wallet_tx_id IS NOT NULL)");
+  add('points_reservations','order_id','ORDER_REFUND_PENDING','Committed redeemed points have not been refunded.',
+    "SELECT 1 FROM points_reservations WHERE order_id=?1 AND state='committed'");
+  add('order_item_inventory_allocations','order_id','ORDER_STOCK_PENDING','Consumed stock has not been fully restored.',
+    'SELECT 1 FROM order_item_inventory_allocations WHERE order_id=?1 GROUP BY order_item_id,lot_id HAVING SUM(CASE WHEN released_at IS NULL THEN qty ELSE -qty END)<>0');
+  add('inventory_ledger','order_id','ORDER_STOCK_PENDING','A stock reservation or deduction has not been released.',
+    `SELECT 1 FROM inventory_ledger WHERE order_id=?1 GROUP BY product_id,scope,scope_id HAVING
+      SUM(CASE WHEN kind='reserve' THEN qty WHEN kind IN ('release','deduct') THEN -qty ELSE 0 END)>0
+      OR SUM(CASE WHEN kind='deduct' THEN qty WHEN kind='restore' THEN -qty ELSE 0 END)>0`);
+  if (columns.get('orders')?.has('wallet_applied_usd_cents')) protections.push({code:'ORDER_REFUND_PENDING',message:'The cancelled wallet payment has not been refunded.',
+    query:`SELECT 1 FROM orders o WHERE o.id=?1 AND o.wallet_applied_usd_cents>0 AND NOT EXISTS(SELECT 1 FROM wallet_transactions t
+      WHERE t.id='wtx_refund_'||o.id||'_usd' AND t.user_id=o.user_id AND t.currency='USD' AND t.type='deposit' AND t.status='approved' AND t.amount>=o.wallet_applied_usd_cents)`});
+  if (columns.get('orders')?.has('points_discount_iqd')) protections.push({code:'ORDER_REFUND_PENDING',message:'The cancelled points payment has not been refunded.',
+    query:`SELECT 1 FROM orders o WHERE o.id=?1 AND o.points_discount_iqd>0 AND NOT EXISTS(SELECT 1 FROM wallet_transactions t
+      WHERE t.id='wtx_refund_'||o.id||'_pts' AND t.user_id=o.user_id AND t.currency='POINT' AND t.type='deposit' AND t.status='approved' AND t.amount>=o.points_discount_iqd)`});
+  if (columns.get('orders')?.has('gini_paid_iqd')) protections.push({code:'ORDER_HAS_FINANCIAL_HISTORY',message:'An external payment receipt must be retained.',
+    query:"SELECT 1 FROM orders WHERE id=?1 AND (gini_paid_iqd>0 OR gini_state='received')"});
+  add('wallet_holds','ref_id','ORDER_REFUND_PENDING','An active wallet hold must be released before deletion.',
+    `SELECT 1 FROM wallet_holds h JOIN orders o ON o.id=?1 WHERE h.state='active' AND (
+      (h.ref_type='order' AND h.ref_id=o.id) OR (h.ref_type='store_order' AND h.ref_id=o.user_id||':'||o.idempotency_key))`);
+  return { columns, protections };
+}
+
+const protectionCondition = (schema: DeletionSchema, idSql: string) => schema.protections
+  .map(p=>`NOT EXISTS(${p.query.replaceAll('?1',idSql)})`).join(' AND ') || '1';
 
 function changesOf(result: D1Result<unknown>): number {
   return Number((result as { meta?: { changes?: number } }).meta?.changes ?? 0);
@@ -81,12 +149,14 @@ function changesOf(result: D1Result<unknown>): number {
 
 export async function deleteCancelledOrder(
   db: OrderDeletionDb,
-  orderId: string
+  orderId: string,
+  opts: { cutoff?: string; schema?: DeletionSchema } = {}
 ): Promise<OrderDeletionResult> {
+  const schema = opts.schema ?? await deletionSchema(db);
   const row = await db
-    .prepare('SELECT id, status, delivered_at FROM orders WHERE id = ?')
+    .prepare('SELECT * FROM orders WHERE id = ?')
     .bind(orderId)
-    .first<{ id: string; status: string; delivered_at: string | null }>();
+    .first<{ id: string; status: string; delivered_at: string | null; cancelled_at?: string | null; updated_at: string; created_at: string }>();
 
   if (!row) {
     return {
@@ -112,12 +182,40 @@ export async function deleteCancelledOrder(
       'This order has delivered or serialized units and must remain for warranty and device history.'
     );
   }
+  if (schema.protections.length) {
+    const protectedRows = await db.prepare(`SELECT ${schema.protections.map((p,i)=>`EXISTS(${p.query}) AS p${i}`).join(',')}`)
+      .bind(orderId).first<Record<string, number>>();
+    const blocked = schema.protections.find((_p,i)=>protectedRows?.[`p${i}`]);
+    if (blocked) throw new OrderDeletionRefusal(blocked.code, blocked.message);
+  }
+  const timestamp = schema.columns.get('orders')?.has('cancelled_at') ? 'cancelled_at' : 'updated_at';
+  const clock = timestamp==='cancelled_at' ? row.cancelled_at ?? null : row.updated_at;
+  if (opts.cutoff && new Date(clock ?? row.updated_at ?? row.created_at).getTime()>new Date(opts.cutoff).getTime())
+    throw new OrderDeletionRefusal('ORDER_RETENTION_NOT_REACHED','Seven full days have not elapsed since cancellation.');
 
   const statements: D1PreparedStatement[] = [];
-  const ledger: Array<{ kind: 'delete' | 'unlink'; table: string }> = [];
+  const ledger: Array<{ kind: 'delete' | 'unlink' | 'guard'; table: string }> = [];
+  // A reopened/re-cancelled order or new money/stock evidence invalidates the
+  // whole batch before a child is removed, even with foreign keys disabled.
+  const effectiveClock = schema.columns.get('orders')?.has('cancelled_at') ? 'cancelled_at' : 'COALESCE(updated_at,created_at)';
+  const safety = `status='cancelled' AND delivered_at IS NULL AND ${timestamp} IS ?2
+    AND NOT EXISTS(SELECT 1 FROM order_item_units WHERE order_id=?1) AND ${protectionCondition(schema,'?1')}
+    ${opts.cutoff ? `AND julianday(${effectiveClock})<=julianday(?3)` : ''}`;
+  statements.push(db.prepare(`UPDATE orders SET status=CASE WHEN ${safety} THEN status ELSE NULL END WHERE id=?1`)
+    .bind(orderId,clock,...(opts.cutoff?[opts.cutoff]:[])));
+  ledger.push({kind:'guard',table:'orders'});
+  if (schema.columns.get('ops_guards')?.has('id')) {
+    statements.push(db.prepare("INSERT INTO ops_guards(id,ok) VALUES ('cancelled-order-delete:'||?,1)").bind(orderId));
+    ledger.push({kind:'guard',table:'ops_guards'});
+  }
+
+  if (schema.columns.get('product_file_grants')?.has('order_id')) {
+    statements.push(...revokeOrderProductFileGrantStatements(db as D1Database,orderId,{sql:"EXISTS(SELECT 1 FROM orders WHERE id=?1 AND status='cancelled')",binds:[]}));
+    ledger.push({kind:'unlink',table:'product_file_grants'},{kind:'delete',table:'product_file_grants'});
+  }
 
   for (const table of ORDER_HISTORY_TABLES) {
-    const columns = await columnsOf(db, table);
+    const columns = schema.columns.get(table)!;
     if (!columns.has('order_id')) continue;
     const clears = ['"order_id" = NULL'];
     let where = '"order_id" = ?1';
@@ -134,7 +232,7 @@ export async function deleteCancelledOrder(
   }
 
   // Warranty claims may point at an item without carrying order_id itself.
-  const warrantyClaimColumns = await columnsOf(db, 'warranty_claims');
+  const warrantyClaimColumns = schema.columns.get('warranty_claims')!;
   if (warrantyClaimColumns.has('order_item_id')) {
     const clears = ['"order_item_id" = NULL'];
     if (warrantyClaimColumns.has('unit_id')) clears.push('"unit_id" = NULL');
@@ -150,20 +248,30 @@ export async function deleteCancelledOrder(
   }
 
   for (const owned of ORDER_OWNED_TABLES) {
-    const columns = await columnsOf(db, owned.table);
-    if (!columns.has('order_id')) continue;
+    const columns = schema.columns.get(owned.table)!;
+    if (!columns.has(owned.where?'order_item_id':'order_id')) continue;
     statements.push(db.prepare(`DELETE FROM "${owned.table}" WHERE ${owned.where ?? '"order_id" = ?1'}`).bind(orderId));
     ledger.push({ kind: 'delete', table: owned.table });
   }
   statements.push(db.prepare('DELETE FROM orders WHERE id = ?1').bind(orderId));
   ledger.push({ kind: 'delete', table: 'orders' });
+  if (schema.columns.get('ops_guards')?.has('id')) {
+    statements.push(db.prepare("DELETE FROM ops_guards WHERE id='cancelled-order-delete:'||?").bind(orderId));
+    ledger.push({kind:'guard',table:'ops_guards'});
+  }
 
-  const results = await db.batch(statements);
+  let results: D1Result<unknown>[];
+  try { results = await db.batch(statements); }
+  catch (error) {
+    if (/NOT NULL constraint failed: orders.status/.test(String(error)))
+      throw new OrderDeletionRefusal('ORDER_CHANGED','The order or its financial, stock or cancellation evidence changed before deletion.');
+    throw error;
+  }
   const deleted: Record<string, number> = {};
   const unlinked: Record<string, number> = {};
   results.forEach((result, index) => {
     const entry = ledger[index];
-    if (!entry) return;
+    if (!entry || entry.kind==='guard') return;
     const target = entry.kind === 'delete' ? deleted : unlinked;
     target[entry.table] = (target[entry.table] ?? 0) + changesOf(result);
   });
@@ -188,29 +296,32 @@ export interface CancelledOrderSweepReport {
 export async function sweepCancelledOrders(
   db: OrderDeletionDb,
   nowIso: string,
-  retentionDays = 30,
-  limit = 100
+  retentionDays = CANCELLED_ORDER_RETENTION_DAYS,
+  limit = CANCELLED_ORDER_SWEEP_LIMIT
 ): Promise<CancelledOrderSweepReport> {
   const report: CancelledOrderSweepReport = { retention_days: retentionDays, scanned: 0, deleted: 0, skipped: 0, errors: 0 };
+  const boundedLimit = Number.isFinite(limit) ? Math.max(1, Math.min(CANCELLED_ORDER_SWEEP_LIMIT, Math.floor(limit))) : CANCELLED_ORDER_SWEEP_LIMIT;
   const cutoff = new Date(new Date(nowIso).getTime() - retentionDays * 86_400_000).toISOString();
-  const columns = await columnsOf(db, 'orders');
-  const cancelledAt = columns.has('cancelled_at') ? 'cancelled_at' : 'updated_at';
+  const schema = await deletionSchema(db), columns = schema.columns.get('orders')!;
+  const cancelledAt = columns.has('cancelled_at') ? 'candidate_order.cancelled_at' : 'COALESCE(candidate_order.updated_at,candidate_order.created_at)';
   const rows = await db
     .prepare(
-      `SELECT id FROM orders
-        WHERE status = 'cancelled'
-          AND delivered_at IS NULL
-          AND COALESCE(${cancelledAt}, updated_at, created_at) <= ?
-        ORDER BY COALESCE(${cancelledAt}, updated_at, created_at)
+      `SELECT candidate_order.id FROM orders candidate_order
+        WHERE candidate_order.status = 'cancelled'
+          AND candidate_order.delivered_at IS NULL
+          AND NOT EXISTS(SELECT 1 FROM order_item_units WHERE order_id=candidate_order.id)
+          AND ${protectionCondition(schema,'candidate_order.id')}
+          AND julianday(${cancelledAt}) <= julianday(?)
+        ORDER BY ${cancelledAt},candidate_order.id
         LIMIT ?`
     )
-    .bind(cutoff, limit)
+    .bind(cutoff, boundedLimit)
     .all<{ id: string }>();
 
   report.scanned = rows.results?.length ?? 0;
   for (const row of rows.results ?? []) {
     try {
-      const result = await deleteCancelledOrder(db, String(row.id));
+      const result = await deleteCancelledOrder(db, String(row.id), {cutoff,schema});
       if (result.deleted || result.already_deleted) report.deleted += 1;
       else report.skipped += 1;
     } catch (error) {

@@ -64,7 +64,8 @@ const field = (metrics, key, format) => {
 };
 
 async function runOne(url, strategy, key) {
-  const q = new URLSearchParams({ url, strategy, category: 'performance', key });
+  const q = new URLSearchParams({ url, strategy, key });
+  for (const category of ['performance', 'accessibility', 'best-practices', 'seo']) q.append('category', category);
   const res = await fetch(`${API}?${q}`, { headers: { accept: 'application/json' } });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -79,6 +80,8 @@ async function runOne(url, strategy, key) {
   return {
     url,
     score: typeof cats.performance?.score === 'number' ? Math.round(cats.performance.score * 100) : null,
+    categories: Object.fromEntries(['performance', 'accessibility', 'best-practices', 'seo'].map(name =>
+      [name, typeof cats[name]?.score === 'number' ? Math.round(cats[name].score * 100) : null])),
     fcp: ms(a['first-contentful-paint']),
     lcp: ms(a['largest-contentful-paint']),
     cls: num(a['cumulative-layout-shift']),
@@ -121,6 +124,12 @@ async function main() {
     if (r.error) { console.log(`| ${r.url} | error | ${r.error.replace(/\|/g, '/')} | | | | | | |`); continue; }
     const f = r.field.scope ? `${r.field.lcp} / ${r.field.inp} / ${r.field.cls} (${r.field.scope})` : 'no field data';
     console.log(`| ${r.url} | **${r.score ?? '—'}** | ${r.lcp} | ${r.fcp} | ${r.cls} | ${r.tbt} | ${r.si} | ${r.ttfb} | ${f} |`);
+  }
+  console.log('\n| page | Performance | Accessibility | Best practices | SEO | All above 95 |');
+  console.log('|---|---|---|---|---|---|');
+  for (const r of results.filter(result => !result.error)) {
+    const scores = Object.values(r.categories);
+    console.log(`| ${r.url} | ${scores.map(score => score ?? '—').join(' | ')} | ${scores.every(score => score !== null && score > 95) ? 'yes' : 'no'} |`);
   }
   if (opts.json) {
     const path = resolve(opts.json);
