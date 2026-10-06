@@ -186,8 +186,15 @@ export interface ShippingQuote {
   /** Auditable record of which membership rule produced a free delivery and
    *  what number it was tested against (§5: "مع مصدر السعر والإعفاء من
    *  التوصيل بصورة قابلة للتدقيق"). */
-  waiver_source: 'none' | 'pro' | 'prime' | 'promotion';
+  waiver_source: 'none' | 'pro' | 'prime' | 'wallet' | 'promotion';
   waiver_basis_iqd: number;     // the value compared against the threshold
+  /**
+   * What the wallet free-delivery rule took off («توصيل عادي مجاني — للدفع
+   * الكامل من محفظة Levo», owner brief 2026-10-06 §2). 0 unless the caller
+   * passed `walletFreeDelivery`. Never part of `membership_subsidy_iqd`: the
+   * two are different benefits, reported apart.
+   */
+  wallet_waiver_iqd: number;
   needs_config: string[];       // honest blockers (e.g. printer fee mapping)
   assumptions: string[];        // defaulted unresolved rules, surfaced
   reasons: string[];            // human-readable why lines (for the UI)
@@ -255,6 +262,19 @@ export function quoteShipping(input: {
   primeMerchandiseIqd?: number;
   /** independent promo/referral free-delivery (kept distinct from the PRO rule) */
   independentFreeDelivery?: boolean;
+  /**
+   * «توصيل عادي مجاني — للدفع الكامل من محفظة Levo» (owner brief 2026-10-06
+   * §2). The caller has ALREADY decided the order qualifies —
+   * `walletFreeDeliveryVerdict` in worker/lib/walletFreeDelivery.ts tests the
+   * admin's rules, the method, the payment and the products — so this is a
+   * plain yes. It waives the TARIFF of the chosen method (the one standard
+   * shipment component; a personal method's fee components when the admin
+   * covers personal) and never an add-on the customer chose: protected
+   * delivery stays charged. A membership waiver keeps precedence: what PRO or
+   * PREMIUM already waive stays theirs, and the wallet rule takes the rest.
+   * Ignored without `deliveryMethod` (legacy pure callers).
+   */
+  walletFreeDelivery?: boolean;
   /** The customer asked for the parcel to be protected. */
   protectedDelivery?: boolean;
   /**
@@ -561,17 +581,50 @@ export function quoteShipping(input: {
    * the quote carries the capped figure instead. An owner who never sets
    * `max_shipping_subsidy_iqd` never reaches this branch.
    */
+  /**
+   * THE WALLET RULE'S SHARE. A component it can take is any part of the
+   * method's tariff — never the protected add-on. When a membership ceiling
+   * binds, the wallet rule takes its components IN FULL and the ceiling
+   * applies to what is left (the customer qualified for free delivery; a
+   * capped membership must not make them pay part of it back). Without a
+   * binding ceiling the membership keeps every component it already waived.
+   */
+  const wallet = input.walletFreeDelivery === true && input.deliveryMethod !== undefined;
+  const walletTakes = (comp: ShippingComponent) => wallet && comp.kind !== 'protected';
   const waivedSum = components.reduce((n, comp) => n + (comp.waived ? comp.fee_iqd : 0), 0);
   const ceiling = (proEligible || primeEligible) && rule ? rule.max_subsidy_iqd : null;
+  const cap = ceiling === null ? null : Math.max(0, Math.trunc(ceiling));
   let subsidy = waivedSum;
   let capped = false;
-  if (ceiling !== null && waivedSum > Math.max(0, Math.trunc(ceiling))) {
-    subsidy = Math.max(0, Math.trunc(ceiling));
-    capped = true;
-    for (const comp of components) comp.waived = false;
-    reasons.push(`Your membership covers up to ${subsidy.toLocaleString()} IQD of delivery on this order.`);
+  let walletWaiver = 0;
+  if (cap !== null && waivedSum > cap) {
+    // Without the wallet rule `walletTakes` is false everywhere, `rest` is
+    // `waivedSum` and this is the historical capped quote exactly.
+    const rest = components.reduce((n, comp) => n + (comp.waived && !walletTakes(comp) ? comp.fee_iqd : 0), 0);
+    subsidy = Math.min(rest, cap);
+    capped = rest > cap;
+    for (const comp of components) {
+      if (walletTakes(comp)) {
+        comp.waived = true;
+        walletWaiver += comp.fee_iqd;
+      } else if (capped) comp.waived = false;
+    }
+    if (capped) reasons.push(`Your membership covers up to ${subsidy.toLocaleString()} IQD of delivery on this order.`);
+  } else if (wallet) {
+    for (const comp of components) {
+      if (!walletTakes(comp) || comp.waived) continue;
+      comp.waived = true;
+      walletWaiver += comp.fee_iqd;
+    }
   }
-  const total = before - subsidy;
+  if (walletWaiver > 0) {
+    reasons.push(
+      input.deliveryMethod === 'standard'
+        ? 'Free standard delivery — paid in full from Levo Wallet.'
+        : 'Free delivery — paid in full from Levo Wallet.'
+    );
+  }
+  const total = before - subsidy - walletWaiver;
   const advanceRaw = components.reduce(
     (n, comp) => n + (comp.advance_required && !comp.waived ? comp.fee_iqd : 0),
     0
@@ -588,9 +641,11 @@ export function quoteShipping(input: {
     ? 'pro'
     : primeEligible
       ? 'prime'
-      : independent
-        ? 'promotion'
-        : 'none';
+      : walletWaiver > 0
+        ? 'wallet'
+        : independent
+          ? 'promotion'
+          : 'none';
 
   return {
     components,
@@ -603,6 +658,7 @@ export function quoteShipping(input: {
     membership_subsidy_capped: capped,
     membership_rule_id: (proEligible || primeEligible) && rule ? rule.rule_id : null,
     waiver_source: waiverSource,
+    wallet_waiver_iqd: walletWaiver,
     waiver_basis_iqd: rule && ruleTier !== null && (proEligible || primeEligible)
       ? rule.basis_iqd
       : proEligible

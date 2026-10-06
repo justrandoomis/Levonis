@@ -119,8 +119,10 @@ interface ShippingQuoteDto {
   advance_due_iqd: number;
   pro_waiver_applied: boolean;
   prime_waiver_applied: boolean;
-  waiver_source: 'none' | 'pro' | 'prime' | 'promotion';
+  waiver_source: 'none' | 'pro' | 'prime' | 'wallet' | 'promotion';
   waiver_basis_iqd: number;
+  /** What «توصيل عادي مجاني — للدفع الكامل من محفظة Levo» took off. */
+  wallet_waiver_iqd?: number;
   needs_config: string[];
   assumptions: string[];
   reasons: string[];
@@ -330,6 +332,14 @@ interface CheckoutQuoteDto {
   cod_tax_exemption_iqd?: number;
   /** §11 — what the membership is worth on this order, itemised. */
   membership_benefits?: MembershipBenefitsDto;
+  /** «توصيل عادي مجاني — للدفع الكامل من محفظة Levo»: applied to this quote,
+   *  or — when not — whether paying the whole order from the wallet would. */
+  wallet_free_delivery?: {
+    applied: boolean;
+    waived_iqd: number;
+    rule: { catalog_id: string; min_products_iqd: number } | null;
+    available_with_wallet: boolean;
+  };
   total_iqd: number;
   due_on_delivery_iqd: number;
   tier: { tier: string; active: boolean; at_approved_default_address: boolean; pro_benefits_context: boolean };
@@ -2119,6 +2129,9 @@ export default function Checkout() {
                 const unavailable = serverFee ? !serverFee.available : false;
                 const displayedPrice = serverFee?.fee_iqd ?? selectedQuote?.total_iqd ?? null;
                 const memberWaiver = selectedQuote?.waiver_source === 'pro' || selectedQuote?.waiver_source === 'prime';
+                // The wallet rule waives the CHOSEN method's tariff only, so
+                // its sentence belongs on the selected card alone.
+                const walletWaiver = selected && selectedQuote?.waiver_source === 'wallet';
                 /**
                  * A method that does NOT end at the customer's door — read
                  * through the method's own `home_delivery` flag, with the
@@ -2179,8 +2192,13 @@ export default function Checkout() {
                             {loc('عرض مكان المخزن على الخريطة', 'See the pickup location on the map', 'شوێنی وەرگرتن لەسەر نەخشە ببینە')}
                           </a>
                         ) : selectedQuote && !isPickupMethod ? (
-                          <p className={`mt-1 text-[11px] font-medium ${memberWaiver ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                            {memberWaiver
+                          <p
+                            data-wallet-free-delivery={walletWaiver ? '' : undefined}
+                            className={`mt-1 text-[11px] font-medium ${memberWaiver || walletWaiver ? 'text-emerald-400' : 'text-zinc-400'}`}
+                          >
+                            {walletWaiver
+                              ? loc('توصيل عادي مجاني — للدفع الكامل من محفظة Levo', 'Free standard delivery — paid in full from Levo Wallet', 'گەیاندنی ئاسایی بەخۆڕایی — بۆ پارەدانی تەواو لە جزدانی Levo')
+                              : memberWaiver
                               ? loc('ميزة توصيل الأعضاء مطبّقة', 'Member delivery benefit applied', 'سوودی گەیاندنی ئەندام جێبەجێ کرا')
                               : method.id === 'standard'
                                 ? loc('رسم واحد للشحنة كاملة', 'One fee for the whole consignment')
@@ -2316,6 +2334,34 @@ export default function Checkout() {
                       {codSurchargeIqd > 0 && method.id === 'wallet' && (
                         <p data-cod-cheapest className="text-xs text-emerald-300/90 mt-1 font-normal">
                           {S.payCheapest}
+                        </p>
+                      )}
+                      {/*
+                        «توصيل عادي مجاني — للدفع الكامل من محفظة Levo». Said on
+                        the wallet card, before the choice, only when the server
+                        says paying the whole order from the wallet would earn
+                        it — and, when the wallet is already chosen, why it is
+                        not applied yet (points make the payment mixed).
+                      */}
+                      {method.id === 'wallet' && quote?.wallet_free_delivery?.available_with_wallet && (
+                        <p data-wallet-free-hint className="text-xs text-emerald-300/90 mt-1 font-normal">
+                          {isPrepaidMethod && usePoints
+                            ? loc(
+                                'استخدام النقاط يجعل الدفع مختلطاً — ادفع الطلب كاملاً من المحفظة ليصبح التوصيل العادي مجانياً',
+                                'Points make the payment mixed — pay the whole order from your wallet for free standard delivery',
+                                'خاڵەکان پارەدانەکە تێکەڵ دەکەن — هەموو داواکارییەکە لە جزدان بدە بۆ گەیاندنی ئاسایی بەخۆڕایی'
+                              )
+                            : isPrepaidMethod
+                              ? loc(
+                                  'التوصيل العادي مجاني عند الدفع الكامل من المحفظة',
+                                  'Standard delivery is free when you pay in full from your wallet',
+                                  'گەیاندنی ئاسایی بەخۆڕاییە کاتێک بە تەواوی لە جزدان پارە دەدەیت'
+                                )
+                              : loc(
+                                  'ادفع الطلب كاملاً من محفظة Levo ليصبح التوصيل العادي مجانياً',
+                                  'Pay the whole order from your Levo Wallet for free standard delivery',
+                                  'هەموو داواکارییەکە لە جزدانی Levo بدە بۆ گەیاندنی ئاسایی بەخۆڕایی'
+                                )}
                         </p>
                       )}
                     </div>
@@ -2622,25 +2668,34 @@ export default function Checkout() {
                   equivalent in the store, so it reads in Arabic there rather
                   than in invented Kurdish.
                 */
-                memberShipping && !quoteLoading ? (
-                  <p
-                    className="mt-1 text-[11.5px] leading-relaxed text-gold/90 tabular-nums"
-                    data-checkout-member-delivery={
-                      memberShipping.fee_paid_iqd === 0 ? 'free' : memberShipping.subsidy_capped ? 'capped' : 'partial'
-                    }
-                  >
-                    {memberShipping.fee_paid_iqd === 0
-                      ? loc(
-                          `التوصيل مجاني بفضل عضوية ${memberLabel}`,
-                          `Delivery is free thanks to your ${memberLabel} membership`,
-                          `گەیاندنی بێبەرامبەری ${memberLabel}`
-                        )
-                      : loc(
-                          `عضوية ${memberLabel} غطّت ${money(memberShipping.subsidy_iqd)} من أجرة التوصيل البالغة ${money(memberShipping.fee_before_benefit_iqd)}، وتدفع ${money(memberShipping.fee_paid_iqd)}`,
-                          `Your ${memberLabel} membership covered ${money(memberShipping.subsidy_iqd)} of the ${money(memberShipping.fee_before_benefit_iqd)} delivery fee — you pay ${money(memberShipping.fee_paid_iqd)}`
-                        )}
-                  </p>
-                ) : null
+                <>
+                  {memberShipping && !quoteLoading ? (
+                    <p
+                      className="mt-1 text-[11.5px] leading-relaxed text-gold/90 tabular-nums"
+                      data-checkout-member-delivery={
+                        memberShipping.fee_paid_iqd === 0 ? 'free' : memberShipping.subsidy_capped ? 'capped' : 'partial'
+                      }
+                    >
+                      {memberShipping.fee_paid_iqd === 0
+                        ? loc(
+                            `التوصيل مجاني بفضل عضوية ${memberLabel}`,
+                            `Delivery is free thanks to your ${memberLabel} membership`,
+                            `گەیاندنی بێبەرامبەری ${memberLabel}`
+                          )
+                        : loc(
+                            `عضوية ${memberLabel} غطّت ${money(memberShipping.subsidy_iqd)} من أجرة التوصيل البالغة ${money(memberShipping.fee_before_benefit_iqd)}، وتدفع ${money(memberShipping.fee_paid_iqd)}`,
+                            `Your ${memberLabel} membership covered ${money(memberShipping.subsidy_iqd)} of the ${money(memberShipping.fee_before_benefit_iqd)} delivery fee — you pay ${money(memberShipping.fee_paid_iqd)}`
+                          )}
+                    </p>
+                  ) : null}
+                  {/* «توصيل عادي مجاني — للدفع الكامل من محفظة Levo»: the
+                      rule that waived it, under the figure it explains. */}
+                  {quote?.wallet_free_delivery?.applied && !quoteLoading ? (
+                    <p className="mt-1 text-[11.5px] leading-relaxed text-emerald-400" data-checkout-wallet-delivery>
+                      {loc('توصيل عادي مجاني — للدفع الكامل من محفظة Levo', 'Free standard delivery — paid in full from Levo Wallet', 'گەیاندنی ئاسایی بەخۆڕایی — بۆ پارەدانی تەواو لە جزدانی Levo')}
+                    </p>
+                  ) : null}
+                </>
               }
             >
               <p>{loc(

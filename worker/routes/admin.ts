@@ -45,6 +45,7 @@ import { deleteCancelledOrder, OrderDeletionRefusal } from '../lib/orderDeletion
 import { reclaimOrderRedemptionsStatement } from '../lib/offers';
 import { resolveOrderExpiry } from '../lib/orderExpiry';
 import { getSetting, getSettings, normalizePayoutMethods, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
+import { validateWalletFreeDelivery } from '../lib/walletFreeDelivery';
 import { afterCatalogueWrite, afterSettingsWrite } from '../lib/edgePolicy';
 import type { CreateUnitsResult } from '../lib/deviceOps';
 import { runOrderDeliveredEffects } from '../lib/orderDeliveredEffects';
@@ -4031,10 +4032,27 @@ adminRoutes.put('/settings/:key', async (c) => {
     // or an out-of-range number is dropped rather than stored to confuse a
     // later reader.
     value = resolveDurations(value);
+  } else if (key === 'walletFreeDelivery') {
+    // «توصيل عادي مجاني — للدفع الكامل من محفظة Levo». Strict: a typo is
+    // refused, never stored (the read side falls back field by field, so a
+    // damaged row could only ever behave like the default). A rule naming a
+    // section that does not exist could never be met and would look
+    // configured, so every section is checked too.
+    const checked = validateWalletFreeDelivery(value);
+    if (!checked.ok) throw badRequest(checked.error, 'WALLET_FREE_DELIVERY_INVALID');
+    for (const rule of checked.value.rules) {
+      const exists = await c.env.DB.prepare('SELECT 1 AS ok FROM catalogs WHERE id = ?').bind(rule.catalog_id).first();
+      if (!exists) {
+        throw badRequest(`القسم غير موجود / Unknown section: ${rule.catalog_id}`, 'WALLET_FREE_DELIVERY_SECTION');
+      }
+    }
+    value = checked.value;
   }
 
   await setSetting(c.env.DB, key, value);
-  await audit(c.env.DB, adminUser.id, 'settings.update', key);
+  // A delivery fee the shop stops charging is money: the audit keeps the
+  // whole rule as saved, not just the key.
+  await audit(c.env.DB, adminUser.id, 'settings.update', key, key === 'walletFreeDelivery' ? { value } : {});
   // P2a: the cached public answers this key feeds, and the isolate's pricing inputs.
   await afterSettingsWrite(c, key);
   return c.json({ success: true });

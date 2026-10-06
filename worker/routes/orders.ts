@@ -135,6 +135,13 @@ import {
   resolveProductBenefits,
 } from '../lib/membershipBenefits';
 import type { BenefitLineInput, ProductBenefits } from '../lib/membershipBenefits';
+import {
+  walletFreeDeliveryPublic,
+  walletFreeDeliveryVerdict,
+  type WalletFreeDeliveryConfig,
+  type WalletFreeDeliveryLine,
+  type WalletFreeDeliveryOutcome,
+} from '../lib/walletFreeDelivery';
 import type { ShippingBenefit, TaxBenefit } from '@levonis/pricing/membershipBenefits';
 import type { Tier as PricingTier } from '../lib/pricing';
 import type { PreorderGiftConfig, TierStatus } from '../lib/entitlements';
@@ -1923,6 +1930,10 @@ interface CheckoutComputation {
   deliveryMethodFees: Array<{ id: string; fee_iqd: number | null; available: boolean }>;
   isPickup: boolean;
   independentFreeDelivery: boolean;
+  /** «توصيل عادي مجاني — للدفع الكامل من محفظة Levo»: the verdict the final
+   *  quote was priced with, and whether paying in full from the wallet WOULD
+   *  earn it (the checkout's hint). */
+  walletFreeDelivery: WalletFreeDeliveryOutcome;
   couponId: string | null;
   couponDiscount: number;
   couponSnapshot: string | null;
@@ -2011,6 +2022,9 @@ async function computeCheckout(
     // methods it gates, so the offered list and the hold frozen onto the row
     // come from one snapshot of the owner's settings.
     'giniPolicy',
+    // «توصيل عادي مجاني — للدفع الكامل من محفظة Levo»: read with the fees it
+    // waives, so the rule and the tariff come from one snapshot.
+    'walletFreeDelivery',
   ]);
   const delivery = (settings.checkoutDeliveryMethods as DeliveryMethod[]).find((m) => m.id === input.deliveryMethodId);
   if (!delivery) throw badRequest('Please choose a valid delivery method');
@@ -2918,6 +2932,55 @@ async function computeCheckout(
      *  discounts). */
     const memberMerchandise = Math.max(0, merchandise - lineDiscount);
 
+    /**
+     * «توصيل عادي مجاني — للدفع الكامل من محفظة Levo» (owner brief 2026-10-06
+     * §2, docs/GIFTS_QUICK_BUY.md D7–D8). What the rule sees of each line: the
+     * sections the product sits in and what the customer PAYS for it. A bundle
+     * or mystery parent carries the money of its components, so the parent is
+     * skipped and each component counts its stored share; a mystery spool is
+     * judged by its OFFER's sections, never the drawn spool's (the quote would
+     * otherwise leak the draw). A gift line pays nothing and never qualifies an
+     * order on its own. The subtotal is the order's merchandise after product
+     * and membership discounts, before coupon and delivery.
+     */
+    const walletSections = new Map<string, string[]>();
+    for (const it of shippingItems) {
+      const path = expandCategoryPath(benefitAncestry, it.category_path);
+      if (path.length) walletSections.set(it.product_id, [...new Set([...(walletSections.get(it.product_id) ?? []), ...path])]);
+    }
+    const lineById = new Map(p.lines.map((l) => [l.id, l]));
+    const parentLineIds = new Set(p.lines.flatMap((l) => (l.bundle_parent_item_id ? [l.bundle_parent_item_id] : [])));
+    const walletRuleLines: WalletFreeDeliveryLine[] = p.lines.flatMap((l) => {
+      if (parentLineIds.has(l.id)) return [];
+      if (l.bundle_parent_item_id) {
+        const parent = lineById.get(l.bundle_parent_item_id);
+        const own = l.mystery_spool ? [] : (walletSections.get(l.product_id) ?? []);
+        const offer = parent ? (walletSections.get(parent.product_id) ?? []) : [];
+        return [{ ancestry: [...new Set([...own, ...offer])], paid_iqd: Math.max(0, Math.trunc(Number(l.component_alloc_iqd) || 0)) }];
+      }
+      const ancestry = l.benefit
+        ? (ancestryFor(benefitAncestry, l.benefit.category_id, l.benefit.sub_category_id) ??
+          [l.benefit.sub_category_id, l.benefit.category_id].filter((id): id is string => !!id))
+        : (walletSections.get(l.product_id) ?? []);
+      return [{ ancestry, paid_iqd: Math.max(0, Math.trunc(l.applied_iqd * l.qty)) }];
+    });
+    const walletRuleConfig = settings.walletFreeDelivery as WalletFreeDeliveryConfig;
+    const walletVerdictAt = (methodId: string, pointsUsedIqd: number, paymentMethodId: string = input.paymentMethodId) =>
+      walletFreeDeliveryVerdict({
+        config: walletRuleConfig,
+        deliveryMethodId: methodId,
+        paymentMethodId,
+        pointsUsedIqd,
+        lines: walletRuleLines,
+        productsSubtotalIqd: memberMerchandise,
+      });
+    /**
+     * Points are settled after the coupon, and the coupon is checked against
+     * a first quote. Until the points are known the customer's own toggle
+     * stands in for them; the final quote below uses the exact figure.
+     */
+    let walletRulePoints = input.usePoints && available.points_available > 0 ? 1 : 0;
+
     /** `primeBasisIqd` is the §5 basis — merchandise after product discounts,
      *  coupons AND points, before delivery — which is a different number from
      *  the PRO rule's configurable basis. */
@@ -2958,6 +3021,7 @@ async function computeCheckout(
         ...shippingEntitlements,
         atApprovedDefaultAddress: atApprovedDefault,
         independentFreeDelivery,
+        walletFreeDelivery: methodId !== 'pickup' && walletVerdictAt(methodId, walletRulePoints).eligible,
         // The PRO rule's own basis is `basisIqd`; PREMIUM's is the after-points
         // figure the caller passes as `primeMerchandiseIqd` (§5), so the rule
         // is tested against whichever number this member's tier is judged on.
@@ -2987,6 +3051,7 @@ async function computeCheckout(
       membership_subsidy_capped: false,
       membership_rule_id: null,
       waiver_source: 'none',
+      wallet_waiver_iqd: 0,
       waiver_basis_iqd: merchandise,
       needs_config: [],
       assumptions: [],
@@ -3049,6 +3114,7 @@ async function computeCheckout(
     // Final quote with the configured threshold basis (decision row 17 default:
     // merchandise AFTER coupon discounts, before shipping) for the PRO rule, and
     // the after-coupon-and-points basis for the PRIME rule.
+    walletRulePoints = pointsDiscount;
     if (!isPickup) {
       const basis =
         configForOrder.threshold_basis === 'merchandise_after_coupon'
@@ -3373,9 +3439,21 @@ async function computeCheckout(
         : { id: m.id, fee_iqd: q.total_iqd, available: true };
     });
 
+    const walletVerdict = walletVerdictAt(delivery.id, pointsDiscount);
     return {
       shipping,
       deliveryMethodFees,
+      walletFreeDelivery: {
+        verdict: walletVerdict,
+        // The QUOTE is the authority on what was waived: an eligible order
+        // whose PRO/PREMIUM waiver already covered the fee shows the
+        // membership, not this rule (PRO/PREMIUM keep precedence).
+        applied: shipping.wallet_waiver_iqd > 0,
+        waived_iqd: shipping.wallet_waiver_iqd,
+        // Would paying the whole order from the wallet, without points, earn
+        // it on a method the rule covers? The checkout's hint, nothing more.
+        available_with_wallet: walletRuleConfig.methods.some((m) => walletVerdictAt(m, 0, 'wallet').eligible),
+      },
       couponId,
       couponDiscount,
       couponSnapshot,
@@ -3516,6 +3594,7 @@ async function computeCheckout(
     deliveryMethodFees: settled.deliveryMethodFees,
     isPickup,
     independentFreeDelivery,
+    walletFreeDelivery: settled.walletFreeDelivery,
     couponId: settled.couponId,
     couponDiscount: settled.couponDiscount,
     couponSnapshot: settled.couponSnapshot,
@@ -3956,6 +4035,12 @@ orderRoutes.post('/quote', async (c) => {
           charged_iqd: comp.codTaxIqd,
         },
       },
+      /**
+       * «توصيل عادي مجاني — للدفع الكامل من محفظة Levo»: whether THIS quote's
+       * delivery was waived by the wallet rule and, when it was not, whether
+       * paying the whole order from the wallet would earn it.
+       */
+      wallet_free_delivery: walletFreeDeliveryPublic(comp.walletFreeDelivery),
       due_on_delivery_iqd: comp.dueOnDelivery,
       tier: {
         tier: comp.tierStatus.tier,
@@ -4101,6 +4186,18 @@ orderRoutes.post('/', async (c) => {
       subsidy_iqd: comp.shipping.membership_subsidy_iqd,
       subsidy_capped: comp.shipping.membership_subsidy_capped,
       waiver_source: comp.shipping.waiver_source,
+    },
+    /**
+     * The wallet free-delivery rule as it decided THIS order — which rule,
+     * on what subtotal, and what it took off — so a question about a free
+     * delivery is answered from the row, whatever the setting says later.
+     */
+    wallet_free_delivery: {
+      applied: comp.walletFreeDelivery.applied,
+      waived_iqd: comp.walletFreeDelivery.waived_iqd,
+      reason: comp.walletFreeDelivery.verdict.reason,
+      rule: comp.walletFreeDelivery.verdict.rule,
+      products_subtotal_iqd: comp.walletFreeDelivery.verdict.products_subtotal_iqd,
     },
     cod_tax: {
       rule_id: comp.codTaxExemptionRuleId,

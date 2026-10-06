@@ -1,4 +1,5 @@
 import { normalizeHomeBento, type HomeBento } from './homeBento';
+import { WALLET_FREE_DELIVERY_DEFAULT, normalizeWalletFreeDelivery, type WalletFreeDeliveryConfig } from './walletFreeDelivery';
 import { safeParse } from './types';
 import { DEFAULT_WARRANTY_CONFIG, type WarrantyConfig } from './warrantyConfig';
 import { DEFAULT_PRICING, DEFAULT_MATERIALS, type PrintPricingConfig, type PrintMaterial } from './printPricing';
@@ -337,6 +338,17 @@ export const SETTING_DEFAULTS = {
    * admin route validates with — so what is stored is what runs.
    */
   deliveryDayPolicy: DEFAULT_DELIVERY_DAY_POLICY as DeliveryDayPolicy,
+  /**
+   * «توصيل عادي مجاني — للدفع الكامل من محفظة Levo» (owner brief 2026-10-06
+   * §2): which orders paid in full from the Levo wallet get their delivery
+   * tariff waived — on/off, the 100%-wallet condition, the covered methods
+   * (standard only by default) and one minimum per catalog section (printers
+   * from 500,000 IQD, FDM filament from the first dinar). Read through
+   * `normalizeWalletFreeDelivery`, written through the strict validator in
+   * `PUT /api/admin/settings/walletFreeDelivery`; the rule itself is
+   * worker/lib/walletFreeDelivery.ts.
+   */
+  walletFreeDelivery: WALLET_FREE_DELIVERY_DEFAULT as WalletFreeDeliveryConfig,
   cartShippingMethods: [
     { id: 'direct', titleAr: 'شحن مباشر', titleEn: 'Direct Shipping', descAr: 'يصل خلال 3-5 أيام عمل', descEn: 'Arrives in 3-5 business days' },
     { id: 'preorder_air', titleAr: 'طلب مسبق (شحن جوي)', titleEn: 'Pre-order (Air Freight)', descAr: 'يصل خلال 10-14 يوم عمل', descEn: 'Arrives in 10-14 business days' },
@@ -703,6 +715,10 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // values are the offer itself — the same thing the picker puts on screen —
   // not internal policy.
   'deliveryDayPolicy',
+  // The offer «توصيل عادي مجاني — للدفع الكامل من محفظة Levo» as the checkout
+  // explains it before a quote exists: switches, methods, section ids and
+  // minimums — the published offer, nothing internal.
+  'walletFreeDelivery',
   // NOTE: proPricingPolicy, preorderTransportDefaults, launchConfig and
   // printerGiftConfig are intentionally NOT public — internal policy data.
 ];
@@ -742,6 +758,9 @@ function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeo
   }
   if (key === 'payoutMethods') {
     return normalizePayoutMethods(value) as (typeof SETTING_DEFAULTS)[K];
+  }
+  if (key === 'walletFreeDelivery') {
+    return normalizeWalletFreeDelivery(value) as (typeof SETTING_DEFAULTS)[K];
   }
   /**
    * Merged like `bnplPolicy`, and then once more one level down. The stored

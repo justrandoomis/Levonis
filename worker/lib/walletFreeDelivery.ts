@@ -154,3 +154,24 @@ export function walletFreeDeliveryVerdict(input: {
   }
   return out('no_rule_met');
 }
+
+/** What the checkout settled about the rule for one quote or order. */
+export interface WalletFreeDeliveryOutcome {
+  verdict: WalletFreeDeliveryVerdict;
+  /** The shipping engine actually took a fee off for this rule. */
+  applied: boolean;
+  waived_iqd: number;
+  /** Paying the whole order from the wallet, without points, would earn it. */
+  available_with_wallet: boolean;
+}
+
+/** The customer-facing view on a quote: no internal reason beyond the rule's
+ *  own published terms (section and minimum). */
+export function walletFreeDeliveryPublic(o: WalletFreeDeliveryOutcome) {
+  return {
+    applied: o.applied,
+    waived_iqd: o.applied ? o.waived_iqd : 0,
+    rule: o.applied && o.verdict.rule ? { catalog_id: o.verdict.rule.catalog_id, min_products_iqd: o.verdict.rule.min_products_iqd } : null,
+    available_with_wallet: !o.applied && o.available_with_wallet,
+  };
+}

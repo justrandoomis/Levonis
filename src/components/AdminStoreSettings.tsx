@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useWallet, CheckoutDeliveryMethod, CheckoutPaymentMethod, CartShippingMethod } from '../WalletContext';
 import { api, ApiError } from '../lib/api';
 import { Plus, Trash2, Check, AlertTriangle, Lock } from 'lucide-react';
+import WalletFreeDeliveryPanel from './adminStoreSettings/WalletFreeDeliveryPanel';
 
 /**
  * THE GLOBAL SHIPPING RULES — one place, for the whole store.
@@ -180,6 +181,9 @@ export default function AdminStoreSettings() {
   // delivery of a printer. Read here so the owner can change it without a
   // deploy; the product page, cart, checkout and order detail render it.
   const [printerNote, setPrinterNote] = useState<number | null>(null);
+  // «توصيل عادي مجاني — للدفع الكامل من محفظة Levo»: the stored rule, handed to
+  // its own panel once the settings have loaded (undefined = not yet).
+  const [walletFree, setWalletFree] = useState<{ raw: unknown } | undefined>(undefined);
   const [printerNoteState, setPrinterNoteState] = useState<SaveState>('idle');
   const [printerNoteError, setPrinterNoteError] = useState<string | null>(null);
 
@@ -205,6 +209,7 @@ export default function AdminStoreSettings() {
           ...rawGini,
           conditions: { ...GINI_DEFAULTS.conditions, ...(rawGini.conditions ?? {}) },
         });
+        setWalletFree({ raw: res.settings?.walletFreeDelivery });
         const rawNote = Number(res.settings?.printerHomeDeliveryNoteIqd);
         setPrinterNote(Number.isFinite(rawNote) && rawNote >= 0 ? Math.round(rawNote) : 50000);
       } catch {
@@ -212,6 +217,7 @@ export default function AdminStoreSettings() {
           setPolicy({ ...SHIPPING_DEFAULTS });
           setGift({ ...GIFT_DEFAULTS });
           setGini({ ...GINI_DEFAULTS, conditions: { ...GINI_DEFAULTS.conditions } });
+          setWalletFree({ raw: undefined });
         }
       }
     })();
@@ -702,6 +708,8 @@ export default function AdminStoreSettings() {
           </div>
         </div>
       )}
+
+      {walletFree && <WalletFreeDeliveryPanel initial={walletFree.raw} />}
 
       {/* Global membership rules that are not prices. */}
       {gift && (
