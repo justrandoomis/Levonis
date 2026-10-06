@@ -244,6 +244,16 @@ export const HISTORY_TABLES: HistoryTable[] = [
    * keeps its model code and name, so it stays legible without the product.
    */
   { table: 'serial_inventory', columns: ['product_id', 'variant_id'] },
+  /**
+   * 0175 — A DISABLED GIFT-LEVEL ITEM IS PAST CONFIGURATION. An ACTIVE item
+   * blocks the delete (BLOCKING_REFS below), so by the time this runs only
+   * disabled items still name the product; a granted gift may point at one
+   * (`gift_entitlements.gift_item_id`) and keeps its own frozen selection and
+   * snapshot, so the item row stays and only its product link is cleared. A
+   * cleared row is never offered: the new flow reads product rows only, and the
+   * legacy box reads active rows only.
+   */
+  { table: 'gift_pool_items', columns: ['product_id'] },
 ];
 
 /**
@@ -382,6 +392,32 @@ export const BLOCKING_REFS: BlockingRef[] = [
              OR bundle_product_id = ?1
              OR option_value_id IN (SELECT id FROM product_option_values WHERE product_id = ?1)
              OR color_id IN (SELECT id FROM product_colors WHERE product_id = ?1))`,
+  },
+  /**
+   * 0175 — A GIFT LEVEL OFFERS THIS PRODUCT. An active level item is a live
+   * offer to every customer holding a gift of that level; deleting the product
+   * under it would leave them a choice that can never be ordered. Disabling
+   * the item is one click in the gifts panel, and a disabled item does not
+   * block (HISTORY_TABLES clears its link instead).
+   */
+  {
+    table: 'gift_pool_items',
+    column: 'product_id',
+    code: 'PRODUCT_IN_GIFT_LEVEL',
+    remedy: 'Disable this product in every gift level that offers it (Gifts → Levels), then delete it.',
+    where: 'active = 1',
+  },
+  /**
+   * A GIFT CHOSEN OR PINNED TO THIS PRODUCT AND NOT ORDERED YET. The customer
+   * holds it as their own; it must stay orderable until it is ordered or the
+   * admin cancels it.
+   */
+  {
+    table: 'gift_entitlements',
+    column: 'gift_product_id',
+    code: 'PRODUCT_IN_OPEN_GIFT',
+    remedy: 'A customer holds a gift of this product that is not ordered yet — cancel that gift (Gifts → Grants) or wait until it is ordered, then delete it.',
+    where: "state IN ('ready_to_redeem', 'redeemed')",
   },
 ];
 
