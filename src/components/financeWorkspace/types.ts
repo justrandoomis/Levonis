@@ -34,6 +34,9 @@ export interface ProfitTotals {
 }
 
 export interface FinanceOrder extends ProfitTotals {
+  has_financial_activity?: boolean;
+  projected_finance?: ProjectedOrderFinance;
+  review_reasons?: ProfitReviewIssue[];
   id: string;
   order_id?: string;
   status: string;
@@ -93,6 +96,37 @@ export interface FinanceCharts extends FinanceChartAmounts {
   basis: 'delivered_baghdad_day';
 }
 
+export interface ProfitReviewIssue {
+  code: string;
+  field: string;
+  source_id: string | null;
+  line_ids: string[];
+}
+export interface ProjectedOrderFinance {
+  cogs_iqd: number | null;
+  gross_profit_iqd: number | null;
+  owner_net_iqd: number | null;
+  is_estimate: true;
+}
+export interface ProjectedLineCost {
+  unit_cost_iqd: number | null;
+  total_cost_iqd: number | null;
+  source: 'confirmed_lot' | 'current_catalogue';
+  source_id: string | null;
+  as_of: string | null;
+}
+export interface ProfitCostReview {
+  source: 'fifo' | 'manual_verified' | 'recorded_snapshot' | 'snapshot' | 'unknown';
+  source_field: string;
+  snapshot_unit_iqd: number | null;
+  allocated_qty: number;
+  required_qty: number;
+  sources: Array<{ allocation_id: string; lot_id: string; incoming_id: string | null; purchase_id: string | null; qty: number; cogs_iqd: number | null; unit_cost_iqd: number | null; returned_qty?: number; returned_cogs_iqd?: number | null; late_cost_iqd?: number; retained_cogs_iqd?: number | null }>;
+  issues: ProfitReviewIssue[];
+  suggestion: null | { source: 'order_snapshot' | 'current_catalogue' | 'confirmed_lot'; unit_cost_iqd: number; total_cost_iqd: number; as_of: string | null; requires_confirmation: true };
+  can_verify: boolean;
+}
+
 export interface ProfitLine extends ProfitTotals {
   id: string;
   product_id: string | null;
@@ -113,6 +147,8 @@ export interface ProfitLine extends ProfitTotals {
   restored_cogs_iqd?: number | null;
   cost_confidence: string;
   profit_basis_iqd?: number | null;
+  cost_review?: ProfitCostReview;
+  cost_projection?: ProjectedLineCost;
 }
 
 export interface ProfitCost {
@@ -120,6 +156,14 @@ export interface ProfitCost {
   rule_name: string;
   staff_id: string | null;
   staff_name?: string;
+  staff_user_id?: string | null;
+  basis?: string | null;
+  rate?: number | null;
+  qty?: number;
+  base_iqd?: number | null;
+  line_ids?: string[];
+  review_reasons?: ProfitReviewIssue[];
+  scope_confidence?: 'line' | 'recorded' | 'all_products' | 'historical_unknown';
   amount_iqd: number | null;
   effective_amount_iqd?: number | null;
   state: string;
@@ -140,6 +184,9 @@ export interface FinancialHistory {
 }
 
 export interface OrderProfit {
+  has_financial_activity?: boolean;
+  projected_finance?: ProjectedOrderFinance;
+  can_reconcile?: boolean;
   order_id: string;
   version: number;
   order: FinanceOrder & { total_iqd?: number; shipping_iqd?: number; cod_tax_iqd?: number; shipping_benefit_iqd?: number };
@@ -186,7 +233,7 @@ export function monthRange(month: string) {
 }
 export function statusName(status: string, loc: (ar: string, en: string) => string) {
   const names: Record<string, [string, string]> = {
-    delivered: ['مستلم', 'Delivered'], cancelled: ['ملغى', 'Cancelled'], pending: ['جديد', 'New'],
+    delivered: ['مستلم', 'Delivered'], cancelled: ['ملغى', 'Cancelled'], returned: ['مرتجع', 'Returned'], refunded: ['مسترد', 'Refunded'], pending: ['جديد', 'New'],
     confirmed: ['مؤكد', 'Confirmed'], preparing: ['قيد التجهيز', 'Preparing'], out_for_delivery: ['في الطريق', 'On the way'],
     processing: ['قيد التجهيز', 'Preparing'], shipped: ['في الطريق', 'On the way'],
     completed: ['مكتمل', 'Completed'], paid: ['مدفوع', 'Paid'],

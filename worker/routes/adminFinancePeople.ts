@@ -10,7 +10,7 @@ import { baghdadDay, dateValue, fence, journalPlan, periodOpen, requireCapabilit
 import { changeWithdrawalState, effectiveStaffCostSql, heldSourceSql, participantOverview, payWithdrawal, staffPaidSql } from '../lib/financeParticipants';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { readRuleScope, type ScopedCostRule } from '../lib/financeRuleScopes';
-import { employmentDate, publicReconciliation, readStaff, readStaffReconciliation, staffDateEligible, updateStaffEmployment } from '../lib/financeEmployment';
+import { employmentDate, publicReconciliation, queueStaffReconciliation, readStaff, readStaffReconciliation, staffDateEligible, updateStaffEmployment } from '../lib/financeEmployment';
 import { effectiveWageRules, wageVersions } from '../lib/financeWageTimeline';
 import { applyWageChange, previewWageChangePage, type WageChangeInput } from '../lib/financeWageChanges';
 import { continueStaffReconciliation } from '../lib/financeStaffAccrual';
@@ -97,6 +97,25 @@ adminFinancePeopleRoutes.post('/staff/:id/reconcile',async(c)=>{
   // Each order can reconcile several financial sources. Bound browser work
   // to one order; the durable cursor and cron own the remaining pages.
   return c.json({success:true,reconciliation:await continueStaffReconciliation(c.env,c.req.param('id'),b.revision===undefined?undefined:whole(b.revision,'الإصدار',1),1)});
+});
+adminFinancePeopleRoutes.post('/staff/:id/recheck',async(c)=>{
+  const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');if(!isOwner(c.env,actor))throw forbidden('إعادة فحص الاستحقاقات للأدمن الرئيسي فقط');
+  const db=c.env.DB,id=c.req.param('id'),b=await c.req.json<Record<string,unknown>>();
+  const person=await readStaff(db,id);if(!person)throw notFound('الموظف غير موجود');
+  const expected=whole(b.revision,'نسخة الحساب',1),operation=str(b.operation_id,'رقم العملية',{min:8,max:80}),reason=str(b.reason,'سبب إعادة الفحص',{min:5,max:500});
+  const operationId=`staff-recheck:${operation}`,prior=await readStaffReconciliation(db,id);
+  if(prior?.operation_id===operationId){
+    if(prior.revision!==expected+1||prior.reason!==reason)throw conflict('رقم إعادة الفحص مستخدم بمحتوى آخر');
+    return c.json({success:true,already:true,reconciliation:publicReconciliation(prior)});
+  }
+  if(person.employment_version!==expected)throw conflict('تغيرت نسخة حساب الموظف؛ حدّث البيانات');
+  if(prior&&prior.state!=='complete')return c.json({success:true,already:true,reconciliation:publicReconciliation(prior)});
+  const statements=[...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=?) AND NOT EXISTS(SELECT 1 FROM finance_staff_reconciliations WHERE staff_id=? AND state<>\'complete\')',[id,expected,id]),
+    ...(await auditStatements(db,actor.id,'finance.staff_recheck_requested',id,{reason,operation_id:operation,previous_revision:expected})).statements];
+  try{
+    const reconciliation=await queueStaffReconciliation(db,id,actor.id,statements,true,undefined,{from:null,until:null,reason,operationId});
+    return c.json({success:true,already:false,reconciliation});
+  }catch(e){if(/CHECK constraint|UNIQUE constraint/.test(String(e)))throw conflict('تغير حساب الموظف أثناء بدء الفحص؛ حدّث البيانات');throw e;}
 });
 adminFinancePeopleRoutes.get('/accounts/:id/earnings',async(c)=>{
   await requireCapability(c.env,c.get('user')!,'pay');

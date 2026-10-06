@@ -74,6 +74,69 @@ function setup() {
   return { raw, db, failing, boss, env, self: app('employee'), app, order, staff, rule, drain, costs };
 }
 
+test('owner recheck restores historical pending wages with confirmed checkout cost, preserves overrides and payments, and replays once', async () => {
+  const { raw, boss, self, order, staff, rule, drain, costs } = setup();
+  await order('pending-source', '2026-09-22T10:00:00.000Z');
+  await order('manual-source', '2026-09-23T10:00:00.000Z');
+  // Model the old classification bug's persisted pending row before enabling
+  // the recorded checkout evidence. This is fixture setup, never a repair of
+  // production provenance or promotion of today's catalogue cost.
+  raw.exec("DELETE FROM order_item_inventory_allocations WHERE order_id='pending-source';UPDATE order_items SET cost_basis='unrecorded' WHERE order_id='pending-source'");
+  const id = await staff(); await rule(id, { basis: 'profit_percent', amount: 1000 }); await drain(id);
+  assert.equal(costs(id).find(c => c.order_id === 'pending-source')?.state, 'pending_cost');
+  const manual = costs(id).find(c => c.order_id === 'manual-source')!;
+  assert.equal((await patch(boss, `/people/costs/${manual.id}`, { amount_iqd: 4200 })).status, 200);
+  assert.equal((await post(boss, `/operations/costs/${manual.id}/approve`)).status, 200);
+  assert.equal((await post(boss, `/operations/staff/${id}/payments`, { operation_id: 'recheck-paid-history', amount_iqd: 4200, kind: 'payment' })).status, 200);
+  const previous = row(raw, 'SELECT * FROM finance_staff WHERE id=?', id)!;
+  const ruleHistory = all(raw, 'SELECT * FROM finance_wage_versions WHERE staff_id=? ORDER BY id', id);
+  const payments = all(raw, 'SELECT * FROM finance_staff_payments WHERE staff_id=?', id);
+  raw.exec("UPDATE order_items SET cost_basis='snapshot' WHERE order_id='pending-source'");
+  const body = { revision: previous.employment_version, operation_id: 'restore-confirmed-cost', reason: 'إعادة فحص مصدر التكلفة المثبت عند الطلب' };
+  const started = await post(boss, `/people/staff/${id}/recheck`, body), result = await json(started);
+  assert.equal(started.status, 200, JSON.stringify(result));
+  assert.equal(result.already, false); assert.equal(result.reconciliation.state, 'pending');
+  assert.equal(result.reconciliation.revision, Number(previous.employment_version) + 1);
+  assert.equal(costs(id).find(c => c.order_id === 'pending-source')?.state, 'pending_cost');
+  assert.equal((await json(await post(boss, `/people/staff/${id}/recheck`, body))).already, true);
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM audit_log WHERE action='finance.staff_recheck_requested' AND target=?", id), 1);
+  await drain(id);
+  assert.equal(costs(id).find(c => c.order_id === 'pending-source')?.effective_iqd, 3000);
+  assert.equal(costs(id).find(c => c.order_id === 'pending-source')?.state, 'due');
+  assert.equal(costs(id).find(c => c.order_id === 'manual-source')?.effective_iqd, 4200);
+  assert.deepEqual(all(raw, 'SELECT * FROM finance_staff_payments WHERE staff_id=?', id), payments);
+  assert.deepEqual(all(raw, 'SELECT * FROM finance_wage_versions WHERE staff_id=? ORDER BY id', id), ruleHistory);
+  const after = row(raw, 'SELECT * FROM finance_staff WHERE id=?', id)!;
+  assert.deepEqual({ ...after, employment_version: previous.employment_version }, previous);
+  const earnings = await json(await get(self, '/earnings'));
+  assert.equal(earnings.summary.available_earnings_iqd, 3000);
+  assert.equal(earnings.summary.pending_costs, 0);
+  const journalCount = count(raw, 'SELECT COUNT(*) n FROM accounting_entries');
+  assert.equal((await json(await post(boss, `/people/staff/${id}/recheck`, body))).already, true);
+  await drain(id);
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM accounting_entries'), journalCount);
+});
+
+test('staff recheck requires owner, reason and current revision and never replaces an unfinished wage job', async () => {
+  const { raw, boss, self, app, staff, rule, drain } = setup();
+  const id = await staff(); await rule(id);
+  const before = row(raw, 'SELECT * FROM finance_staff_reconciliations WHERE staff_id=?', id)!;
+  const revision = Number(before.revision);
+  const body = { revision, operation_id: 'recheck-permission-test', reason: 'إعادة فحص استحقاقات الموظف' };
+  assert.equal((await post(self, `/people/staff/${id}/recheck`, body)).status, 403);
+  assert.equal((await post(app('another', 'full'), `/people/staff/${id}/recheck`, body)).status, 403);
+  assert.equal((await post(boss, `/people/staff/${id}/recheck`, { ...body, reason: '' })).status, 400);
+  assert.equal((await post(boss, `/people/staff/${id}/recheck`, { ...body, revision: revision + 1 })).status, 409);
+  const pending = await json(await post(boss, `/people/staff/${id}/recheck`, body));
+  assert.equal(pending.already, true); assert.equal(pending.reconciliation.revision, revision);
+  assert.deepEqual(row(raw, 'SELECT * FROM finance_staff_reconciliations WHERE staff_id=?', id), before);
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM audit_log WHERE action='finance.staff_recheck_requested'"), 0);
+  await drain(id);
+  assert.equal((await post(boss, `/people/staff/${id}/recheck`, body)).status, 200);
+  assert.equal((await post(boss, `/people/staff/${id}/recheck`, { ...body, reason: 'سبب مختلف لنفس العملية' })).status, 409);
+  assert.equal((await post(boss, `/people/staff/${id}/recheck`, { ...body, operation_id: 'another-recheck-with-old-version' })).status, 409);
+});
+
 test('staff lifecycle accepts one work-start date, rejects invalid calendar dates, and restricts changes to financial administrators', async () => {
   const { raw, boss, self, staff } = setup();
   const id = await staff({ name: 'Sajjad preparation', role: 'Preparation' });
@@ -129,7 +192,7 @@ for (const basis of ['unit', 'order', 'revenue_percent']) {
   test(`retrospective ${basis} wages remain available when the delivered order only awaits inventory COGS`, async () => {
     const { raw, env, self, order, staff, rule, drain, costs } = setup();
     await order('legacy-without-fifo', '2026-09-22T10:00:00.000Z');
-    raw.exec("DELETE FROM order_item_inventory_allocations WHERE order_id='legacy-without-fifo'");
+    raw.exec("DELETE FROM order_item_inventory_allocations WHERE order_id='legacy-without-fifo';UPDATE order_items SET cost_basis='unrecorded' WHERE order_id='legacy-without-fifo'");
     await runOrderFinancialEffects(env, 'legacy-without-fifo', 'delivered');
     assert.equal(count(raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='cogs:legacy-without-fifo'"), 1);
     const id = await staff();
@@ -148,7 +211,7 @@ for (const basis of ['unit', 'order', 'revenue_percent']) {
 test('retrospective profit-percentage wages still wait for verified inventory cost', async () => {
   const { raw, env, self, order, staff, rule, drain, costs } = setup();
   await order('profit-without-fifo', '2026-09-22T10:00:00.000Z');
-  raw.exec("DELETE FROM order_item_inventory_allocations WHERE order_id='profit-without-fifo'");
+  raw.exec("DELETE FROM order_item_inventory_allocations WHERE order_id='profit-without-fifo';UPDATE order_items SET cost_basis='unrecorded' WHERE order_id='profit-without-fifo'");
   await runOrderFinancialEffects(env, 'profit-without-fifo', 'delivered');
   const id = await staff(); await rule(id, { basis: 'profit_percent', amount: 1000 }); await drain(id);
   assert.equal(costs(id)[0].state, 'pending_cost');

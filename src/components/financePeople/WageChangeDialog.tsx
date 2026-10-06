@@ -2,8 +2,7 @@ import { ApiError } from '../../lib/api';
 import { useEffect, useRef, useState } from 'react';
 import { Check, CalendarDays, ArrowRightLeft } from 'lucide-react';
 import ProductPicker from '../adminProducts/form/ProductPicker';
-import { NumberInput } from '../ui/NumberInput';
-import { Select } from '../ui/Field';
+import WageBasisFields from './WageBasisFields';
 import { api, Button, dateLabel, Dialog, Feedback, Field, Input, Money, PEOPLE, useLanguage, useMutation } from './shared';
 
 type Scope={catalog_ids:string[];product_ids:string[];excluded_product_ids:string[]};
@@ -42,9 +41,7 @@ export default function WageChangeDialog({rule,staff,catalogs,products:knownProd
     <ol className="fp-steps">{[loc('الأجر والنطاق','Pay and scope'),loc('تاريخ السريان','Effective date'),loc('معاينة الأثر','Review impact')].map((label,i)=><li key={i} aria-current={step===i?'step':undefined} data-done={step>i}>{i+1}. {label}</li>)}</ol>
     <Feedback error={op.error}/>{processed!==null&&<p role="status" className="fp-note">{loc(`جارٍ فحص الأثر · ${processed} طلب تمت مراجعته`,`Reviewing impact · ${processed} orders checked`)}</p>}
     {step===0&&<div className="fp-stack">
-      <Field label={loc('طريقة الحساب','Calculation')}><Select value={basis} onChange={e=>{setBasis(e.target.value);setAmount(null);}}><option value="unit">{loc('أجر لكل قطعة','Pay per unit')}</option><option value="order">{loc('أجر لكل طلب','Pay per order')}</option><option value="revenue_percent">{loc('نسبة من صافي المبيعات','Share of net sales')}</option><option value="profit_percent">{loc('نسبة من ربح البضاعة','Share of goods profit')}</option></Select></Field>
-      <Field label={percent?loc('النسبة الجديدة','New percentage'):loc('الأجر الجديد','New pay')}><NumberInput kind={percent?'number':'money'} value={amount} min={0} max={percent?100:undefined} unit={percent?'%':undefined} onValueChange={(v,valid)=>setAmount(valid?v:null)}/></Field>
-      {basis==='profit_percent'&&<p className="fp-note">{loc('أساس النسبة: قيمة البضاعة بعد الخصومات والمرتجعات، مطروحًا منها تكلفة القطع المثبتة. تُحسب الأجور قبل توزيع ربح المستثمر.','Profit basis: goods revenue after discounts and returns, less verified product cost. Wages are calculated before investor distribution.')}</p>}
+      <WageBasisFields basis={basis} amount={amount} onBasisChange={setBasis} onAmountChange={setAmount} cap={rule.cap_iqd} changing />
       <details className="fp-detail"><summary>{loc('الأقسام والمنتجات المشمولة','Included categories and products')}</summary><p className="fp-muted">{loc('ترك الخيارات فارغة يشمل جميع المنتجات. الاستثناءات لها الأولوية.','Leave selections empty to include all products. Exclusions take priority.')}</p><div className="fp-chips">{catalogs.map(c=><button type="button" key={c.id} className="fp-chip" aria-pressed={scope.catalog_ids.includes(c.id)} onClick={()=>toggle('catalog_ids',c.id)}>{scope.catalog_ids.includes(c.id)&&<Check size={13}/>} {name(c.id)}</button>)}</div>
       {(['product_ids','excluded_product_ids'] as const).map(key=><div className="fp-stack" key={key}><strong>{key==='product_ids'?loc('منتجات مشمولة','Included products'):loc('منتجات مستثناة','Excluded products')}</strong><div className="fp-chips">{scope[key].map(id=><button type="button" className="fp-chip" onClick={()=>toggle(key,id)} key={id}>{name(id)} ×</button>)}</div><ProductPicker value="" keepOpen excludeComposition={false} onChange={(id,p)=>{if(!id||!p)return;setProducts(old=>[...old.filter(v=>v.id!==id),p]);if(!scope[key].includes(id))toggle(key,id);}}/></div>)}</details>
       <label className="fp-check"><input type="checkbox" checked={active} onChange={e=>setActive(e.target.checked)}/>{loc('القاعدة فعالة من تاريخ السريان','Rule enabled from its effective date')}</label>

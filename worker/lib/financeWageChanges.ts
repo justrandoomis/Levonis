@@ -41,7 +41,7 @@ async function changeContext(db:D1Database,ruleId:string,input:WageChangeInput,a
 
 // Completed and interrupted previews from an older calculation must be
 // reviewed again after a deploy, even when their source rows did not change.
-const PREVIEW_CALCULATION_VERSION=2;
+const PREVIEW_CALCULATION_VERSION=3;
 type PreviewDetail={order_id:string;earning_day:string;affected:boolean;units:number;previous_iqd:number;corrected_iqd:number|null;delta_iqd:number;manual_overrides:number;pending_costs:number;investor_delta_iqd:number|null;owner_delta_iqd:number|null};
 type PreviewWork={calculation_version:number;projected:ParticipantSource[];detail:PreviewDetail[];affectedCostIds:string[];affectedInvestorIds:string[];pendingTargets:Record<string,number|null>;previous:number;corrected:number;knownCorrected:number;delta:number;units:number;unknown:number;manual:number;investorDelta:number;ownerDelta:number;profitUnknown:number;investorUnknown:number;matched:number;reviewed:number};
 type PreviewPage={cursor:string;work?:PreviewWork};

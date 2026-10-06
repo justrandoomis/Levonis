@@ -85,6 +85,13 @@ export type CostBasis = (typeof COST_BASIS)[keyof typeof COST_BASIS];
  *  constraint in migration 0095 — the two must keep agreeing. */
 export const COST_BASES: readonly CostBasis[] = Object.values(COST_BASIS);
 
+/** A sale-time snapshot is a recorded cost fact under migration 0095. Keep it
+ * distinct from an unrecorded estimate when FIFO and order overrides are added. */
+export const isConfirmedOrderCost = (confidence: unknown): boolean =>
+  confidence === 'fifo' || confidence === 'recorded_snapshot' || confidence === 'manual_verified';
+/** Unknown historical refund amounts cannot stand in for a known zero. */
+export const hasUnknownRefund = (line: Record<string, unknown>): boolean => Number(line.unknown_refund ?? 0) > 0;
+
 /** What a stored `cost_basis` means, with an unreadable value resolved to the
  *  LEAST confident answer. The same reasoning as
  *  `adminScope.normalizeAdminScope`: the one thing certain about a value we

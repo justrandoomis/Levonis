@@ -25,6 +25,24 @@ Apply requires a reason, operation ID and current preview token. It atomically s
 
 Employment-date recalculation is separate from saving the date. The previous browser loop stopped after five seconds, while a reconciliation HTTP request could attempt ten orders within the client's twenty-second timeout. A request could commit several orders before disconnecting, leaving the screen displaying an old partial balance until a refresh or the fifteen-minute scheduled runner. Keep HTTP pages bounded to one order, read durable job status after uncertain responses, and continue serially while the employee screen remains open. Refresh balances during progress and at completion; a failed job must remain visible for explicit retry. Neither a reconnect nor a revision change may replay an already-posted monetary difference.
 
+Delivery awaits its own financial posting before returning. A historical reconciliation cursor must not hide a newly posted wage when its target proves the current employment revision, delivery day and effective amount. Historical overpayment reserves remain in the balance calculation. Scheduled jobs are recovery, not the normal delivery accrual trigger; an already-open earnings screen still refreshes through its normal polling/focus behavior.
+
+Direct staff payments use the same wage-only availability budget as withdrawals, including prior paid amounts awaiting reconciliation, advances and open reservations. Approved positive cost rows alone are not a complete balance. A source-set fence protects that budget before recording a payment; investor capital and profits are not used to cover wage debt.
+
+The wage editor separates fixed IQD from percentages, then offers fixed pay per sold unit or once per eligible order. Six eligible units earn six unit wages or one order wage. Profit and sales percentages apply to the eligible products' financial base, which already includes quantity; they never multiply that result by quantity again. Per-employee order totals group distinct product/rule costs without deleting or combining their accounting records.
+
+## Cost evidence and review
+
+`cost_basis=snapshot` means a cost recorded at checkout under migration 0095. With no FIFO allocation, a valid saved integer cost is `recorded_snapshot` and can support profit-based wages. It is distinct from legacy `unrecorded` reference values and `unpriced` unknown costs. Existing FIFO allocations take precedence: incomplete quantity or missing allocation costs cannot fall back to a product snapshot. Current catalogue suggestions require explicit per-order verification and never rewrite historical costs automatically.
+
+Active orders that have not been delivered can show a separate goods-cost and goods-margin forecast from the exact saved option-value IDs and colour. Store orders do not need the marketplace `variant_id` to identify their inventory selection. The forecast names its confirmed-lot or catalogue source and never changes the recorded order cost, payable wages, investor entitlement or ledger. It is not labelled final owner profit. Cancelled orders retain their actual status rather than requiring a missing-stock review merely because no stock was issued; genuine financial or refund gaps remain reviewable.
+
+Order detail explains missing allocation quantity, unknown lot cost, unverified historical cost, return/refund gaps and pending wage reconciliation beside the relevant product. Proven snapshot costs need recalculation of previously pending wages, not manual approval of an invented cost. Existing order reconciliation and the resumable employee job preserve original entries, payments, manual overrides and idempotent adjustments.
+
+A staff-only recheck does not post the order's native goods expense. When a historical delivered order has a proven snapshot but no COGS journal, retain its accounting alert and identify the missing posting explicitly. Full order-finance retry posts that expense once; only a posted journal, a reconciled manual-cost overlay or a genuine zero cost can clear the old COGS alert. A known cost alone must not hide an unposted expense.
+
+An unknown refund amount also leaves sales/profit-based pay unknown. Both the original and timeline writers use the corrected order basis, and refreshing a legacy wage fingerprint cannot make an unrecorded refund withdrawable. Fixed pay remains independent of the refund amount. Saved wage previews from calculation version 2 must be reviewed again after these changes.
+
 Adjustments use the open posting day and separately preserve historical earning day. Manual per-order overrides remain visible and are preserved. Correcting them remains a separate order-finance action.
 
 ## Funded procurement
@@ -48,7 +66,7 @@ Old `/invest` and `/admin/invest` routes redirect to the current account or auth
 Records requiring human review:
 
 1. Pre-timeline changes without an actual effective date: preserved as history, never assigned an invented date.
-2. Unknown historical FIFO/verified costs: enter documented costs before profit-dependent entitlements become available. Fixed and sales-based wages do not depend on these costs. Earlier production diagnostics found 117 such profit-based pending wage costs.
+2. Unknown historical FIFO/verified costs: enter documented costs before profit-dependent entitlements become available. Fixed and sales-based wages do not depend on these costs. An earlier count of 117 pending profit-based wage costs predates the recorded-snapshot correction; it must not be interpreted as 117 records requiring manual cost entry. Reconcile proven saved costs first, then review the remaining explicit gaps.
 3. Older payment rows without enough evidence for a balanced per-source split: preserve the payment and expose a review count.
 4. Legacy USD investment rows without an evidenced link: retain as historical, non-withdrawable records; no assumed exchange rate.
 

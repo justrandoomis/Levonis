@@ -790,10 +790,15 @@ test('scoped overhead is allocated only to orders containing the selected depart
 });
 
 test('missing FIFO cost stays pending and posts once when the allocations become complete after revenue posting', async () => {
-  const { raw, app, env } = setup();
+  const { raw, db, app, env } = setup();
   await post(app, '/f/rules', ruleInput({ basis: 'profit_percent', amount: 1000 }));
   seedOrder(raw);
-  raw.exec("DELETE FROM order_item_inventory_allocations WHERE order_id='order'");
+  // A recorded checkout snapshot is valid cost evidence without FIFO. This
+  // scenario has neither source, even though today's catalogue has a cost.
+  raw.exec("DELETE FROM order_item_inventory_allocations WHERE order_id='order';UPDATE order_items SET cost_iqd=NULL,cost_basis='unpriced' WHERE order_id='order'");
+  const missing = await getOrderProfitBase(db, 'order');
+  assert.equal(missing.lines[0].cost_confidence, 'unknown');
+  assert.equal(missing.lines[0].cogs_iqd, null);
   await runOrderFinancialEffects(env, 'order', 'delivered');
   assert.equal(count(raw, "SELECT COUNT(*) n FROM finance_order_costs WHERE state='pending_cost'"), 1);
   assert.equal(count(raw, "SELECT COUNT(*) n FROM accounting_entries WHERE event_key='sale:order'"), 1);
