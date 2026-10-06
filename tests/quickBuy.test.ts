@@ -486,6 +486,9 @@ test('a session that cannot be submitted keeps its money held, fails after its r
   assert.equal(activeHolds(raw).length, 1, 'the money is still held, never lost and never taken');
   assert.equal(reserved(raw, 'p_pla').stock_reserved, 2);
   assert.equal(count(raw, `SELECT COUNT(*) n FROM user_notifications WHERE user_id = 'buyer' AND kind = 'quick_buy_failed'`), 1);
+  const mine = await json(await get(as(raw), '/api/quick-buy/session'));
+  assert.equal(mine.recent?.state, 'failed');
+  assert.equal(mine.recent.held_iqd, 50_000, 'the customer sees the money as still held');
 
   const admin = as(raw, 'boss', 'admin');
   const listed = await json(await get(admin, '/api/admin/quick-buy/sessions?state=failed'));

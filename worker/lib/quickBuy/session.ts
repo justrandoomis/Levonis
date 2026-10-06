@@ -235,7 +235,9 @@ export async function sessionView(db: D1Database, s: QuickBuySessionRow, nowMs =
       labels: WALLET_FREE_DELIVERY_LABEL,
     },
     total_iqd: s.total_iqd,
-    held_iqd: open ? s.held_iqd : 0,
+    // What the wallet holds for it NOW: an open session's hold, and a failed
+    // one's too — that money stays held until an admin retries or cancels it.
+    held_iqd: (open || s.state === 'failed') && s.hold_id ? s.held_iqd : 0,
     address: {
       name: pick('name'),
       phone: pick('phone'),
