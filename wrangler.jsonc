@@ -226,9 +226,10 @@
 
   "observability": { "enabled": true },
 
-  // Durable jobs: outbox delivery (email/telegram), challenge expiry.
+  // Delivered-order finance recovery runs each minute; delivery wages still
+  // post synchronously. Other durable jobs retain their fifteen-minute tick.
   // The scheduled handler is idempotent — overlapping runs are safe.
-  "triggers": { "crons": ["*/15 * * * *"] },
+  "triggers": { "crons": ["*/15 * * * *", "* * * * *"] },
 
   "env": {
     // Staging: fully separate Worker + D1 + R2. Deployed to workers.dev,
@@ -299,7 +300,7 @@
         "EMAIL_ALLOWLIST_REQUIRED": "off"
       },
       "observability": { "enabled": true },
-      "triggers": { "crons": ["*/15 * * * *"] }
+      "triggers": { "crons": ["*/15 * * * *", "* * * * *"] }
     },
 
     // ------------------------------------------------------------------ dark
@@ -412,7 +413,7 @@
       // of the G2 change set, not of a dark deploy. `pumpAfter` in `waitUntil`
       // delivers what a request just committed, so the dark end-to-end proof
       // does not wait for a tick.
-      "triggers": { "crons": ["*/15 * * * *"] }
+      "triggers": { "crons": ["*/15 * * * *", "* * * * *"] }
     }
   }
 }

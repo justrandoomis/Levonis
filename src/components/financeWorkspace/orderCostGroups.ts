@@ -22,12 +22,14 @@ export function groupOrderCosts(costs: readonly ProfitCost[]) {
   return [...groups.values()];
 }
 
-/** A retry uses existing confirmed evidence only; it never adopts a suggestion. */
-export function canReconcilePendingCosts(data: Pick<OrderProfit, 'can_reconcile' | 'order' | 'lines' | 'costs'>): boolean {
-  if (data.can_reconcile !== true || data.order.status !== 'delivered') return false;
+/** Explain server recovery only where the wage's recorded product costs are
+ * confirmed. This is not permission to post, nor proof other blockers cleared. */
+export function hasPendingWagesWithConfirmedCosts(data: Pick<OrderProfit, 'order' | 'lines' | 'costs'>): boolean {
+  if (data.order.status !== 'delivered') return false;
   return data.costs.some(cost => {
-    if (cost.state !== 'pending_cost') return false;
-    const ids = cost.line_ids ?? (cost.order_item_id ? [cost.order_item_id] : data.lines.map(line => line.id));
+    if (!cost.staff_id || cost.state !== 'pending_cost' || cost.scope_confidence === 'historical_unknown') return false;
+    if (cost.review_reasons?.some(issue => issue.code !== 'wage_reconciliation_pending')) return false;
+    const ids = cost.line_ids ?? (cost.order_item_id ? [cost.order_item_id] : []);
     const targets = data.lines.filter(line => ids.includes(line.id));
     return targets.length > 0 && targets.length === ids.length && targets.every(line => line.cogs_iqd != null && ['fifo', 'manual_verified', 'recorded_snapshot'].includes(line.cost_confidence) && !line.cost_review?.issues.length);
   });

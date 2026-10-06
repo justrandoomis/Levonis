@@ -2,9 +2,10 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Clock3, Pencil, Package, ShieldCheck } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { Button, Field, Loading, Money, Row, Sheet, Status, Surface, formatMoney } from './ui';
 import { financeDay, monthRange, statusName, WORKSPACE_API, type OrderProfit, type ProfitLine, type ProfitCost, type ProfitReviewIssue } from './types';
-import { canReconcilePendingCosts, displayedCostAmount, groupOrderCosts } from './orderCostGroups';
+import { hasPendingWagesWithConfirmedCosts, displayedCostAmount, groupOrderCosts } from './orderCostGroups';
 import { orderFinancePresentation, projectedLineCost, visibleOrderReviewReasons } from './orderFinancePresentation';
 
 const FinanceOperationsPanel = lazy(() => import('../adminOperations/FinanceOperationsPanel'));
@@ -27,20 +28,31 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
   const [advanced, setAdvanced] = useState<'collections' | 'payroll' | null>(null);
   const requestId = useRef<string>(crypto.randomUUID());
   const saveLock = useRef(false);
+  const readGeneration = useRef(0);
+  const refreshPaused = useRef(false);
+  refreshPaused.current = loading || saving || !!edit;
   const verificationIds = useRef(new Map<string, string>());
   const presentationOrder = data && { ...data.order, ...data.totals, has_financial_activity: data.has_financial_activity, projected_finance: data.projected_finance,
     review_reasons: [...data.lines.flatMap(line => line.cost_review?.issues ?? []), ...data.costs.flatMap(cost => cost.review_reasons ?? [])] };
   const view = presentationOrder && orderFinancePresentation(presentationOrder);
   useEffect(() => {
     let active = true;
+    const generation = ++readGeneration.current;
     setLoading(true);
     setError('');
     api.get<OrderProfit>(`${WORKSPACE_API}/orders/${encodeURIComponent(orderId)}`)
       .then((r) => { if (active) setData(r); })
       .catch((e) => { if (active) setError(e instanceof Error ? e.message : String(e)); })
       .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    return () => { active = false; readGeneration.current = generation + 1; };
   }, [orderId, revision]);
+  useFreshOnReturn(async () => {
+    const generation = readGeneration.current;
+    const refreshed = await api.get<OrderProfit>(`${WORKSPACE_API}/orders/${encodeURIComponent(orderId)}`, { mascot: 'silent' });
+    if (generation !== readGeneration.current || refreshPaused.current) return;
+    setData(refreshed); onChanged();
+  }, { pollWhileVisibleMs: 30_000, minIntervalMs: 30_000,
+    enabled: !!data && data.order.status === 'delivered' && data.costs.some(cost => displayedCostAmount(cost) == null) && !loading && !saving && !edit });
   const beginEdit = useCallback((field: EditableField, label: string, line_id?: string, cost_id?: string) => {
     requestId.current = crypto.randomUUID();
     setNotice('');
@@ -71,19 +83,6 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { saveLock.current = false; setSaving(false); }
   };
-  const recalculatePending = async () => {
-    if (!data || !canReconcilePendingCosts(data) || saveLock.current) return;
-    saveLock.current = true; setSaving(true); setError(''); setNotice('');
-    try {
-      await api.post(`/api/admin/finance-operations/orders/${encodeURIComponent(orderId)}/reconcile`, {});
-      const refreshed = await api.get<OrderProfit>(`${WORKSPACE_API}/orders/${encodeURIComponent(orderId)}`);
-      setData(refreshed); onChanged();
-      const pending = refreshed.costs.some((cost) => displayedCostAmount(cost) == null);
-      setNoticePending(pending);
-      setNotice(pending ? loc('تحدّثت الحسابات، وتبقى بنود معلقة؛ تظهر أسبابها أدناه.', 'The calculations refreshed; some lines remain pending with their reasons below.') : loc('اكتمل احتساب أجور هذا الطلب وتحدّثت الأرباح.', 'This order’s wages were recalculated and profits refreshed.'));
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { saveLock.current = false; setSaving(false); }
-  };
   const verifyCost = (line: ProfitLine, total: number) => {
     const key = `${orderId}:${data?.version}:${line.id}:${total}`;
     let operationId = verificationIds.current.get(key);
@@ -108,7 +107,7 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
     return_cost_missing: loc('تكلفة القطع المرتجعة غير مثبتة؛ راجع تكلفة المرتجع.', 'Returned unit costs are missing; review the return cost.'),
     refund_amount_missing: loc('مبلغ الاسترداد أو التعويض غير مثبت؛ راجع بيانات المرتجع.', 'The refund or compensation amount is missing; review the return.'),
     verified_goods_cost_required: loc('نسبة الأجر من الربح تنتظر اعتماد تكلفة المنتجات المشمولة أدناه.', 'Profit-based pay awaits verified costs for the eligible products below.'),
-    wage_reconciliation_pending: loc('الأجر ينتظر إكمال تسوية هذا الطلب.', 'This wage awaits completion of the order reconciliation.'),
+    wage_reconciliation_pending: loc('الحساب التلقائي لهذا الأجر لم يكتمل بعد. تُطبّق قاعدة الموظف المحفوظة، وتظهر أي بيانات ناقصة أو عوائق في تفاصيل الطلب وتنبيهات المحاسبة.', 'Automatic calculation of this wage is not complete yet. The saved employee rule applies; missing inputs or blockers appear in order details and accounting alerts.'),
   } as Record<string, string>)[issue.code] ?? loc('بيانات هذا البند تحتاج مراجعة قبل اعتماد الربح.', 'This line needs review before profit can be confirmed.');
   const costLines = (cost: ProfitCost) => data?.lines.filter((line) => (cost.line_ids ?? (cost.order_item_id ? [cost.order_item_id] : [])).includes(line.id)) ?? [];
   const payMethod = (cost: ProfitCost) => {
@@ -196,7 +195,7 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
         <p className="fw-note">{loc('هذا تصحيح لربح الطلب. تعديل فاتورة الزبون أو التحصيل يتم من إدارة الطلب والتحصيل؛ سعر المنتج وقواعد الطلبات الأخرى محفوظة.', 'This corrects order profit. Change the customer invoice or collection through order management and collections; catalogue prices and other orders’ rules are preserved.')}</p>
       </Surface>
       {data.costs?.length > 0 && <Surface title={loc('أجور وتكاليف هذا الطلب', 'This order’s earned costs')} subtitle={loc('إجمالي كل موظف، ثم تفاصيل أجره لكل منتج وقاعدة. تعديلات البنود تبقى مستقلة.', 'Each employee’s total, followed by product and rule details. Individual adjustments stay separate.')}>
-        {canReconcilePendingCosts(data) && <div className="fw-list"><p className="fw-note">{loc('التكلفة المثبتة متاحة لبعض الأجور المعلقة. أعد احتساب هذا الطلب باستخدام بياناته المحفوظة.', 'Confirmed costs are available for pending wages. Recalculate this order using its saved evidence.')}</p><Button busy={saving} onClick={() => void recalculatePending()}>{loc('إعادة احتساب الأجور المعلقة', 'Recalculate pending wages')}</Button></div>}
+        {hasPendingWagesWithConfirmedCosts(data) && <p className="fw-note" role="status">{loc('الأجور ذات التكلفة المثبتة يُستكمل حسابها تلقائيًا وفق قاعدة كل موظف وتاريخ استحقاقه. تتحدث النتيجة هنا دون طلب إعادة احتساب، وتبقى أي بيانات ناقصة موضحة تحت البند المعني.', 'Wages with confirmed product costs are completed automatically using each employee’s rule and earning date. Results refresh here without a recalculation request; any missing inputs remain identified under the affected entry.')}</p>}
         {groupOrderCosts(data.costs).map((group) => <details className="fw-advanced" key={group.id}>
           <summary><span className="fw-row"><span className="fw-row-label">{group.staffName || group.ruleName}</span><span className="fw-order-values">{group.knownCount > 0 && <Money value={group.knownAmount} />}{group.pendingCount > 0 && <Status tone="warning">{group.isStaff ? loc('أجر معلّق', 'Pay pending') : loc('تكلفة معلّقة', 'Cost pending')} · {group.pendingCount}</Status>}</span></span></summary>
           {group.pendingCount > 0 && <p className="fw-note">{group.knownCount > 0 ? loc('المبلغ المعروض هو الجزء المحتسب فقط؛ الإجمالي النهائي ينتظر البنود المعلقة.', 'The displayed amount is the calculated portion only; the final total awaits pending lines.') : loc('لم يُحتسب مبلغ نهائي بعد. راجع أسباب التعليق في التفاصيل أدناه.', 'No final amount is available yet. Review the pending reasons below.')}</p>}
