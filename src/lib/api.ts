@@ -928,6 +928,8 @@ export interface OrderDeliveryDate {
 }
 
 export interface ApiOrder {
+  /** What made the order (0174): the cart, a Quick Buy session, or gifts only. */
+  order_kind?: 'normal' | 'quick_buy' | 'gift';
   id: string;
   status: OrderStatus;
   address: Partial<ApiAddress>;

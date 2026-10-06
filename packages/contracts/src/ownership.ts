@@ -128,6 +128,11 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // What one order actually drew, frozen, and the candidate list it drew
     // against — per-order facts, written in the order's own batch (§1.9).
     'mystery_allocations', 'mystery_draw_audits',
+    // 0176 — «الشراء السريع». The draft of ONE ordinary order: Commerce's,
+    // because it ends as an order through Commerce's own checkout. Its money
+    // is a wallet hold and its stock an inventory reservation — both still
+    // written through the ledgers that own them.
+    'quick_buy_profiles', 'quick_buy_sessions', 'quick_buy_items', 'quick_buy_actions', 'quick_buy_events',
   ]),
   ...owned('fulfilment', ['order_status_history', 'delivery_status_map', 'order_fulfilment']),
   ...owned('ledger', [

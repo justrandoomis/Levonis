@@ -260,7 +260,7 @@ test('the waiver never touches protected delivery, and legacy callers are unchan
 });
 
 test('PRO/PREMIUM keep precedence; a binding membership ceiling never makes the customer pay back part of a waived fee', () => {
-  const items = [{ product_id: 'p_printer', qty: 1, is_printer: true }];
+  const items = [{ product_id: 'p_printer', qty: 1, is_printer: true, size_class: null }];
   const decision = (max: number | null) => ({
     rule_id: 'r1', eligible: true, threshold_iqd: 75_000, basis_iqd: 600_000, max_subsidy_iqd: max, reason: 'applied' as const,
   });

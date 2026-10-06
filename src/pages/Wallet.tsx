@@ -84,6 +84,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     pendingWithdrawals: 'سحوبات مفتوحة',
     settled: 'الرصيد المُسوّى',
     points: 'النقاط',
+    quickBuyHeld: 'منها محجوز لطلب الشراء السريع',
     addFunds: 'إضافة رصيد',
     withdraw: 'سحب رصيد',
     activity: 'العمليات',
@@ -198,6 +199,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     pendingWithdrawals: 'Open withdrawals',
     settled: 'Settled balance',
     points: 'Points',
+    quickBuyHeld: 'Of which held for your Quick Buy order',
     addFunds: 'Add funds',
     withdraw: 'Withdraw',
     activity: 'Operations',
@@ -312,6 +314,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     pendingWithdrawals: 'کێشانەوەی کراوە',
     settled: 'باڵانسی جێگیر',
     points: 'خاڵەکان',
+    quickBuyHeld: 'لەوە گیراوە بۆ داواکاری کڕینی خێرا',
     addFunds: 'زیادکردنی باڵانس',
     withdraw: 'کێشانەوە',
     activity: 'کردارەکان',
@@ -493,6 +496,8 @@ interface Balances {
    */
   iqd_settled?: number;
   iqd_held?: number;
+  /** The part of the held figure an open Quick Buy order is holding (0176). */
+  iqd_held_quick_buy?: number;
   iqd_pending_deposits?: number;
   iqd_pending_withdrawals?: number;
   usd_cents_pending_deposits: number;
@@ -1059,6 +1064,23 @@ export default function Wallet() {
             </div>
           ))}
         </dl>
+
+        {/* «محجوز لطلب الشراء السريع»: what the hold above is FOR, when an
+            open Quick Buy order is holding money — one quiet line that opens
+            the order, never a second figure competing with the balance. */}
+        {!loadError && (balances.iqd_held_quick_buy ?? 0) > 0 ? (
+          <button
+            type="button"
+            onClick={() => navigate('/orders')}
+            className="mt-2 text-zinc-400 text-[11px] font-bold whitespace-nowrap"
+            data-wallet-figure="quick-buy-held"
+          >
+            ⚡ {s.quickBuyHeld}:{' '}
+            <span dir="ltr" className="text-zinc-200 tabular-nums">
+              {fmtDinars(balances.iqd_held_quick_buy, 0)}
+            </span>
+          </button>
+        ) : null}
 
         {/* Points: a separate balance, so a separate, quiet line — label and
             value one non-breaking pair. */}

@@ -40,7 +40,10 @@ export type NotificationKind =
   | 'post_liked'
   | 'post_commented'
   | 'comment_replied'
-  | 'new_follower';
+  | 'new_follower'
+  /** «الشراء السريع»: the 30-minute order was submitted, or waits for the team. */
+  | 'quick_buy_submitted'
+  | 'quick_buy_failed';
 
 export interface NotificationRow {
   id: string;

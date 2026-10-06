@@ -321,6 +321,20 @@ walletRoutes.get('/', async (c) => {
    * rows recorded instead (worker/lib/walletOps.ts has the rule per figure).
    */
   const dinars = await getWalletDinarBreakdown(c.env.DB, user.id, exchangeRate);
+  /**
+   * «محجوز لطلب شراء سريع» — the part of `iqd_held` an open Quick Buy order
+   * is holding (0176), so the page can say what the hold is for. Display only;
+   * 0 on a database that predates the table.
+   */
+  const quickBuyHeld = await c.env.DB.prepare(
+    `SELECT COALESCE(SUM(s.held_iqd), 0) AS iqd FROM quick_buy_sessions s
+       JOIN wallet_holds h ON h.id = s.hold_id AND h.state = 'active'
+      WHERE s.user_id = ? AND s.state = 'open'`
+  )
+    .bind(user.id)
+    .first<{ iqd: number }>()
+    .then((r) => Number(r?.iqd) || 0)
+    .catch(() => 0);
 
   return c.json({
     success: true,
@@ -337,6 +351,7 @@ walletRoutes.get('/', async (c) => {
       iqd_available: balanceIqd,
       iqd_settled: dinars.iqd_settled,
       iqd_held: dinars.iqd_held,
+      iqd_held_quick_buy: quickBuyHeld,
       iqd_pending_deposits: dinars.iqd_pending_deposits,
       iqd_pending_withdrawals: dinars.iqd_pending_withdrawals,
       usd_cents_pending_deposits: breakdown.usd_cents_pending_deposits,

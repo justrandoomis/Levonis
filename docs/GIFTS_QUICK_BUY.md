@@ -173,6 +173,62 @@ After commit: `initOrderStage`, invoice, `notifyOrderPlaced`, admin announcement
 
 ---
 
+### 3.6 As built (main tree, verified by tests/quickBuy.test.ts)
+
+**Customer API** (`/api/quick-buy`, auth, every write carries `idempotencyKey` in the body or the
+`Idempotency-Key` header):
+
+| Method / path | Body | 200 result |
+|---|---|---|
+| GET `/profile` | — | `{profile: {enabled, active, needs_consent, address, address_missing, consent, required:{terms,privacy,quick_buy}}}` |
+| POST `/activate` | `{policyAcceptance:[{key,version}]×3, walletConsent:true, addressId, idempotencyKey}` | `{profile}` |
+| PUT `/profile` | `{enabled?, addressId?, idempotencyKey}` | `{profile}` |
+| GET `/session` | — | `{session: SessionView|null, recent: SessionView+{order}|null, server_now}` |
+| POST `/items` | `{productId, qty, optionId?, optionValueIds?, colorId?, warrantyPlanId?, printerStandardDeliveryAcceptance?, idempotencyKey}` | `{session, ended, added:{item_id, qty}, replay, server_now}` |
+| PATCH `/items/:id` | `{qty (0 removes), idempotencyKey}` | same |
+| DELETE `/items/:id` | `{idempotencyKey}` | same (`session:null`, `ended` = the cancelled session when it was the last line) |
+| POST `/session/cancel` | `{idempotencyKey}` | `{session:null}` |
+
+Refusal codes: 400 `POLICY_ACCEPTANCE_REQUIRED`, `QUICK_BUY_WALLET_CONSENT_REQUIRED`, `QUICK_BUY_ADDRESS_INVALID`,
+`OUT_OF_STOCK` (details.available), `VALIDATION`; 409 `QUICK_BUY_NOT_ACTIVE`, `QUICK_BUY_RECONSENT_REQUIRED`,
+`QUICK_BUY_DIRECT_ONLY`, `QUICK_BUY_UNSUPPORTED_PRODUCT`, `QUICK_BUY_INSUFFICIENT_BALANCE`
+(details.available_iqd, required_iqd), `QUICK_BUY_EXPIRED`, `QUICK_BUY_BUSY` (retry with the SAME key),
+`QUICK_BUY_PREVIOUS_PENDING`, `QUICK_BUY_NO_SESSION`, `QUICK_BUY_FULL`, `QUICK_BUY_ITEM_NOT_FOUND` (404),
+`PRINTER_STANDARD_DELIVERY_ACCEPTANCE_REQUIRED` (details.policy — the printer standard-delivery warning, once
+per session), `SHIPPING_NEEDS_CONFIG`, `IDEMPOTENCY_KEY_REUSED`.
+
+`SessionView` = `{id, state, started_at, expires_at, server_now, remaining_ms, editable, items:[{id, product_id,
+slug, name, name_ar, name_ku, image, variant, sku, qty, unit_price_iqd, line_total_iqd, option_value_ids, color_id,
+warranty_plan_id}], items_iqd, discount_iqd, shipping_iqd, shipping_before_iqd, free_delivery:{applied, label:{ar,en,ckb}},
+total_iqd, held_iqd, address:{name, phone, governorate, area, address, landmark}, delivery_method:'standard',
+order_id (submitted only), finalize_error (failed only), rev}`.
+
+**How it is priced and written.** Every change runs `computeCheckout` with a `CheckoutSource` (the session's
+lines through the cart projection, the frozen address, the session's own reserved units and held cents credited
+back, the quoted unit prices as ceilings, the session's rate) and commits ONE batch: idempotency row → session
+(fenced on `rev`, on `expires_at > now` by the database clock and on the new hold id) → lines → stock release and
+reserve (fenced on their ledger keys) → old hold released + asserted, new hold inserted under the wallet's own
+availability guard + fenced → `quick_buy_events`. The hold is `comp.walletUsdCents`, exactly what the order will
+spend.
+
+**Finalisation** (`worker/lib/quickBuy/finalize.ts`): per-minute cron + lazily from any Quick Buy request.
+Lease → `placeOrder(c, user, body, hooks)` — the cart's own order door, extracted from `POST /api/orders` with no
+change to its SQL. Hooks: reserved `orderId`; `before` = release the session hold (+assert) and the session's
+reservations (+fence), first in the batch; the order plan is credited those units (`reservedCredit` in
+`planInventory`); unit and delivery-fee ceilings; `guard` refuses a total above the hold
+(`QUICK_BUY_TOTAL_ABOVE_HOLD`); `after` flips `open → submitted` only when `expires_at <= now` (fenced) and writes
+capture/release/unreserve/submit events; consent = the activation's acceptance rows copied onto the order. The
+order is `order_kind='quick_buy'` and enters the normal workflow (stock RESERVED under the order, deducted at
+confirmation like every order). Ten failed attempts → `failed` (money still held, units still reserved, customer
+and admin told); `/api/admin/quick-buy/sessions/:id/retry|cancel`.
+
+**Admin**: `/api/admin/quick-buy/sessions?state=open|failed|submitted|cancelled`, `/sessions/:id` (with events),
+`/summary?days=30` (held now / captured / released / refunded, orders by kind) — screen «الشراء السريع» under
+التشغيل. The orders board shows «⚡ شراء سريع» / «🎁 هدية» and filters `?kind=`.
+
+**Wallet**: `iqd_held` counts a Quick Buy hold in the dinars the session agreed; `iqd_held_quick_buy` drives the
+line «منها محجوز لطلب الشراء السريع» on the wallet page.
+
 ## 4. Reports
 - Orders carry `order_kind`; finance workspace lists and filters it; the gift line is a 0 line with its cost.
 - Quick Buy money: `quick_buy_events` (hold/release/capture deltas) + `wallet_holds` (ref_type `quick_buy`). Holds post nothing to the journal; capture becomes the ordinary `wallet-advance` entry; revenue stays at delivery.

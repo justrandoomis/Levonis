@@ -1735,6 +1735,9 @@ adminRoutes.get('/orders', async (c) => {
   const dueRaw = str(c.req.query('due'), 'due', { max: 12, required: false });
   const typeRaw = str(c.req.query('type'), 'type', { max: 20, required: false });
   const status = str(c.req.query('status'), 'status', { max: 20, required: false });
+  // What made the order (0174): «طلبات الشراء السريع» / «طلبات الهدايا» apart.
+  const kindRaw = str(c.req.query('kind'), 'kind', { max: 20, required: false });
+  const kind = kindRaw ? oneOf(kindRaw, 'kind', ['normal', 'quick_buy', 'gift'] as const) : '';
   const q = str(c.req.query('q'), 'q', { max: 80, required: false });
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 30 });
   const offset = int(c.req.query('offset'), 'offset', { min: 0, max: 100_000, def: 0 });
@@ -1884,6 +1887,10 @@ adminRoutes.get('/orders', async (c) => {
     if (type) {
       clauses.push('o.shipping_type = ?');
       params.push(type);
+    }
+    if (kind) {
+      clauses.push('o.order_kind = ?');
+      params.push(kind);
     }
     if (due) {
       // `due=today` INCLUDES OVERDUE, and that is a decision rather than an

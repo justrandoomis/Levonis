@@ -42,7 +42,7 @@
 import { ChevronsRight, Loader2, Trash2 } from 'lucide-react';
 import { formatIqd, type AdminOrderRow, type OrderStatus } from '../../lib/api';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
-import { DayChip, PriceHoldBadge, ProBadge, TypeBadge, countText } from './OrderBoardBadges';
+import { DayChip, OrderKindBadge, PriceHoldBadge, ProBadge, TypeBadge, countText } from './OrderBoardBadges';
 import { DeliveryMethodBadge } from './deliveryMethod';
 
 /**
@@ -133,6 +133,7 @@ export default function OrderBoardRow({
           />
           <ProBadge order={order} />
           <PriceHoldBadge order={order} loc={loc} />
+          <OrderKindBadge order={order} loc={loc} />
         </div>
 
         <p className="truncate text-[14px] leading-[1.45] font-bold text-text-primary" dir="auto">

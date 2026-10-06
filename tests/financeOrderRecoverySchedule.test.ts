@@ -25,7 +25,9 @@ test('the minute schedule repairs historical delivered finance without an admin 
   const event = { cron: '* * * * *', scheduledTime: Date.now(), noRetry() {} } as unknown as ScheduledEvent;
 
   worker.scheduled(event, env, ctx);
-  assert.equal(waited.length, 1, 'the minute tick schedules only financial recovery');
+  // Financial recovery and Quick Buy finalisation (§13): the two time-critical
+  // jobs. Nothing else rides the minute tick.
+  assert.equal(waited.length, 2, 'the minute tick schedules financial recovery and Quick Buy finalisation only');
   await Promise.all(waited);
   assert.equal(count(raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE order_id='recovery-order'"), 0);
   assert.equal(count(raw, `SELECT SUM(l.debit_iqd-l.credit_iqd) n FROM accounting_lines l

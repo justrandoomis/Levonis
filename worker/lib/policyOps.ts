@@ -42,11 +42,22 @@ export type { PolicyKey, PolicyLang };
  * transaction below — see preparePolicyAcceptance.
  */
 export async function getRequiredCheckoutPolicies(_env: Env): Promise<PolicyRef[]> {
-  return CHECKOUT_POLICY_KEYS.flatMap((key) => {
+  return requiredPolicies(CHECKOUT_POLICY_KEYS);
+}
+
+/** The current version of each named document, from the code registry. */
+export function requiredPolicies(keys: readonly PolicyKey[]): PolicyRef[] {
+  return keys.flatMap((key) => {
     const doc = getPolicyDocument(key);
     return doc ? [{ key: doc.key, version: doc.version }] : [];
   });
 }
+
+/**
+ * «الشراء السريع» is switched on against THREE documents — the two checkout
+ * consents and the Quick Buy policy itself (owner brief §5).
+ */
+export const QUICK_BUY_POLICY_KEYS = ['terms', 'privacy', 'quick_buy'] as const satisfies readonly PolicyKey[];
 
 /** Prepare consent in the SAME transaction as the order, never ahead of it.
  * The read-time comparison produces a friendly refusal. The first statement
@@ -59,9 +70,15 @@ export async function preparePolicyAcceptance(
   userId: string,
   context: string,
   accepted: Array<{ key: string; version: number }> | undefined,
-  options: { locale?: unknown; orderId?: string | null } = {}
-): Promise<{ required: PolicyRef[]; statements: D1PreparedStatement[] }> {
-  const required = await getRequiredCheckoutPolicies(env);
+  options: {
+    locale?: unknown;
+    orderId?: string | null;
+    /** The documents consent is given to; the checkout's two by default. */
+    keys?: readonly PolicyKey[];
+  } = {}
+): Promise<{ required: PolicyRef[]; statements: D1PreparedStatement[]; acceptanceIds: Record<string, string> }> {
+  const keys = options.keys ?? CHECKOUT_POLICY_KEYS;
+  const required = requiredPolicies(keys);
   const list = Array.isArray(accepted) ? accepted : [];
   const locale: PolicyLang = options.locale === 'en' || options.locale === 'ckb' ? options.locale : 'ar';
   if (required.some((r) => !list.some((a) => a && a.key === r.key && Number(a.version) === r.version))) {
@@ -94,19 +111,22 @@ export async function preparePolicyAcceptance(
     `INSERT INTO policy_acceptances (id, user_id, policy_key, version, hash, context, accepted_at)
      SELECT ?, NULL, 'terms', 1, '', '', ?
      WHERE (SELECT COUNT(DISTINCT key) FROM policy_documents
-            WHERE status = 'published' AND key IN (${CHECKOUT_POLICY_KEYS.map(() => '?').join(',')})) != ?
+            WHERE status = 'published' AND key IN (${keys.map(() => '?').join(',')})) != ?
        ${changedDocument ? `OR (${changedDocument})` : ''}`
-  ).bind(newId('pacguard'), now, ...CHECKOUT_POLICY_KEYS, required.length,
+  ).bind(newId('pacguard'), now, ...keys, required.length,
     ...docs.flatMap((d) => [d.id, d.hash, d.key]))];
+  const acceptanceIds: Record<string, string> = {};
   for (const d of docs) {
+    const id = newId('pac');
+    acceptanceIds[d.key] = id;
     statements.push(env.DB.prepare(
       `INSERT OR IGNORE INTO policy_acceptances
        (id, user_id, policy_key, version, hash, context, accepted_at, document_id, order_id, locale, requested_locale, event)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(newId('pac'), userId, d.key, d.version, d.hash, context, now, d.id,
+    ).bind(id, userId, d.key, d.version, d.hash, context, now, d.id,
       options.orderId ?? null, d.lang, locale, options.orderId ? 'checkout.policy.accepted' : 'policy.accepted'));
   }
-  return { required, statements };
+  return { required, statements, acceptanceIds };
 }
 
 export function isPolicyAcceptanceConflict(error: unknown): boolean {

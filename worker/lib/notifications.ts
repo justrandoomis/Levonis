@@ -161,7 +161,14 @@ export type NotificationKind =
    */
   | 'request_comment'
   | 'request_question'
-  | 'request_answer';
+  | 'request_answer'
+  /**
+   * «الشراء السريع» (0176): the 30-minute Quick Buy order became a real order
+   * (`quick_buy_submitted`), or could not be submitted after every retry and
+   * waits for an administrator with its money still held (`quick_buy_failed`).
+   */
+  | 'quick_buy_submitted'
+  | 'quick_buy_failed';
 
 export interface NotificationInput {
   userId: string;

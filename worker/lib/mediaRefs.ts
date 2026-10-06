@@ -300,6 +300,12 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
     kind: 'text',
     why: 'the thumbnail on a past order; the product row may no longer exist, which is the reason the snapshot column exists at all',
   },
+  {
+    table: 'quick_buy_items',
+    column: 'image_snapshot',
+    kind: 'text',
+    why: 'the thumbnail of a line in an open Quick Buy order, as the product page showed it when it was added',
+  },
   { table: 'mystery_allocations', column: 'image_snapshot', kind: 'text', why: 'the revealed item on a past mystery draw' },
   { table: 'community_orders', column: 'offer_snapshot', kind: 'json', why: 'a merchant offer as it was accepted, images included' },
   { table: 'invoices', column: 'snapshot', kind: 'json', why: 'invoice lines keep the item image they were issued with' },
@@ -665,6 +671,21 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
 
   // -- snapshots made of text and numbers, never of a location -------------
   'orders.address_snapshot': 'a postal address',
+  // 0176 — Quick Buy. Addresses, prices, labels, ids and consent records. The
+  // item snapshot deliberately carries NO image: the session view reads the
+  // product's live image, and the order written at the end is the durable copy.
+  'quick_buy_profiles.consent_json': 'the policy acceptance ids of an activation',
+  'quick_buy_sessions.address_snapshot': 'a postal address',
+  'quick_buy_sessions.quote_json': 'the totals a wallet hold was sized from',
+  'quick_buy_sessions.consent_json': 'policy versions and acceptance ids',
+  'quick_buy_sessions.printer_ack_json': 'an accepted delivery warning (key, version, time)',
+  'quick_buy_items.option_value_ids': 'option value ids',
+  'quick_buy_items.stock_targets': 'inventory counter ids',
+  'quick_buy_items.snapshot': 'names, option labels, SKU and prices — no image',
+  'quick_buy_actions.response_json': 'an idempotent replay answer (ids and quantities)',
+  'quick_buy_actions.key': 'a request de-duplication token',
+  'quick_buy_events.action_key': 'the de-duplication token of the change that wrote the row',
+  'quick_buy_events.detail': 'a money or stock delta and its reason',
   'orders.delivery_method_snapshot': 'a delivery method and its fee',
   'orders.membership_tier_snapshot': 'a tier name',
   'orders.coupon_snapshot': 'a coupon code and its discount',

@@ -6,6 +6,7 @@ import { purchase } from './purchase';
 import { selling } from './selling';
 import { payment } from './payment';
 import { price_protection } from './price_protection';
+import { quick_buy } from './quick_buy';
 import { delivery } from './delivery';
 import { warranty } from './warranty';
 import { extended_warranty } from './extended_warranty';
@@ -40,6 +41,7 @@ const MODULES = {
   selling,
   payment,
   price_protection,
+  quick_buy,
   delivery,
   warranty,
   extended_warranty,
@@ -123,7 +125,7 @@ export const POLICY_SECTIONS = [
       en: 'Ordering, Purchase and Payment',
       ckb: 'داواکاری و کڕین و پارەدان',
     },
-    keys: ['purchase', 'selling', 'payment', 'price_protection'],
+    keys: ['purchase', 'selling', 'payment', 'price_protection', 'quick_buy'],
   },
   {
     id: 'delivery',

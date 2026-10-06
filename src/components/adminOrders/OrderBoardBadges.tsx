@@ -160,3 +160,22 @@ export function PriceHoldBadge({ order, loc }: { order: AdminOrderRow; loc: Loc 
     </span>
   );
 }
+
+/**
+ * What made the order (0174): «⚡ شراء سريع» for an order a Quick Buy session
+ * submitted after its 30 minutes, «🎁 هدية» for an order of gifts only. The
+ * ordinary cart order carries no badge. In words, never colour alone.
+ */
+export function OrderKindBadge({ order, loc }: { order: AdminOrderRow; loc: Loc }) {
+  if (order.order_kind !== 'quick_buy' && order.order_kind !== 'gift') return null;
+  return (
+    <span
+      data-order-kind={order.order_kind}
+      className="inline-flex items-center gap-1 rounded-md border border-gold/35 bg-gold/10 px-1.5 py-0.5 text-[11px] leading-[1.4] font-bold text-gold"
+    >
+      {order.order_kind === 'quick_buy'
+        ? loc('⚡ شراء سريع', '⚡ Quick Buy', '⚡ کڕینی خێرا')
+        : loc('🎁 هدية', '🎁 Gift', '🎁 دیاری')}
+    </span>
+  );
+}

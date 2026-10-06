@@ -694,9 +694,9 @@ export async function getWalletBreakdown(db: D1Database, userId: string): Promis
  *                                  floor(cents × rate / 100))
  *   open withdrawals    Σ COALESCE(declared_amount_iqd (0106), floor(cents × rate / 100))
  *   held                Σ over the holds `effectiveHoldsUsdSql` counts, each
- *                       as its withdrawal's declared dinars, or its escrow's
- *                       `gross_iqd` — what the customer agreed to — or its
- *                       cents converted
+ *                       as its withdrawal's declared dinars, its escrow's
+ *                       `gross_iqd` or its Quick Buy session's `held_iqd` —
+ *                       what the customer agreed to — or its cents converted
  *   settled             `walletIqdAvailable(settled cents, the remainders of
  *                       APPROVED rows, rate)` — the same function the header
  *                       uses, over the settled sum instead of the spendable one
@@ -745,6 +745,8 @@ export async function getWalletDinarBreakdown(
                    FROM wallet_withdrawals w WHERE w.hold_id = hx.id),
                 (SELECT CASE WHEN e.gross_iqd > 0 THEN e.gross_iqd END
                    FROM community_escrows e WHERE e.hold_id = hx.id),
+                (SELECT CASE WHEN q.held_iqd > 0 THEN q.held_iqd END
+                   FROM quick_buy_sessions q WHERE q.hold_id = hx.id),
                 (hx.amount_cents * ?2) / 100)), 0)
          FROM wallet_holds hx
          LEFT JOIN wallet_transactions htx ON htx.id = hx.tx_id
@@ -1026,6 +1028,18 @@ export function createWithdrawalHold(db: D1Database, p: CreateHoldInput): Promis
 /** Same guarantees for checkout reservations (kind='purchase'). */
 export function createPurchaseHold(db: D1Database, p: CreateHoldInput): Promise<HoldResult> {
   return createHold(db, 'purchase', p);
+}
+
+/**
+ * A purchase hold as ONE statement, for a caller whose batch also moves stock
+ * and state (Quick Buy replaces its session's hold in the same transaction as
+ * the item change, docs/GIFTS_QUICK_BUY.md D11). The same two guards as
+ * `createPurchaseHold`, inside the INSERT: it reserves money that is available
+ * at the moment it runs — so a release earlier in the same batch counts — or
+ * it writes nothing. The caller must fence on the row existing.
+ */
+export function purchaseHoldInsertStatement(db: D1Database, holdId: string, p: CreateHoldInput): D1PreparedStatement {
+  return holdInsertStatement(db, holdId, 'purchase', p);
 }
 
 /** The ledger row that carries a purchase hold's debit — one per hold, by construction. */

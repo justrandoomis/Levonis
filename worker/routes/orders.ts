@@ -107,6 +107,7 @@ import {
   planInventory,
   reservationFenceStatement,
   resolveForOrderType,
+  stockRowKey,
   type OrderType,
 } from '../lib/inventory';
 import { dailyUserHash, emitFromRequest, eventsEnabled, outboxStatement, pumpAfter, waitUntilFrom } from '../lib/eventBus';
@@ -693,6 +694,8 @@ export function orderPublic(
   return {
     id: o.id,
     status: o.status,
+    /** What made the order (0174): the cart, a Quick Buy session, or gifts only. */
+    order_kind: o.order_kind === 'quick_buy' || o.order_kind === 'gift' ? o.order_kind : 'normal',
     /** §1: which of the four journeys this order is on. */
     shipping_type: shippingType,
     /** §2/§3: where the order stands on that journey, and when it moved. */
@@ -1676,7 +1679,7 @@ function refuseAggregateDemand(lines: ComputedLine[], poolMemberIds: ReadonlySet
 // live here; they are worker/lib/entitlements.ts `pricingTierContext` now, so
 // the product page, the cart and this checkout judge PRO with ONE function.
 
-interface CheckoutInput {
+export interface CheckoutInput {
   addressId: string;
   deliveryMethodId: string;
   paymentMethodId: string; // '' allowed in quote mode
@@ -1710,7 +1713,7 @@ interface CheckoutInput {
   giniOrderNo: string;
 }
 
-interface ComputedLine {
+export interface ComputedLine {
   cart_item_id: string;
   id: string;
   product_id: string;
@@ -1858,7 +1861,7 @@ interface CheckoutBenefits {
   tax: TaxBenefit;
 }
 
-interface CheckoutComputation {
+export interface CheckoutComputation {
   address: Record<string, unknown>;
   delivery: DeliveryMethod;
   payment: CheckoutPaymentMethod | null;
@@ -1981,17 +1984,81 @@ interface CheckoutComputation {
  */
 interface CheckoutOptions {
   allocate: boolean;
+  /** Where the lines come from when they are not this user's cart. */
+  source?: CheckoutSource;
 }
 
-async function computeCheckout(
+/**
+ * «الشراء السريع» (docs/GIFTS_QUICK_BUY.md §3): the SAME checkout, fed a Quick
+ * Buy session instead of the cart. Nothing here is a second pricing rule —
+ * each field narrows one input the cart path reads from the database:
+ *
+ *   lines            the session's items, read through the cart's own
+ *                    projection (quick_buy_items carries the cart columns);
+ *   address          the address frozen when the session opened (§15);
+ *   reservedCredit   units the session already holds, so its own reservation
+ *                    never refuses it (stockRowKey → units);
+ *   walletCreditCents the session's own wallet hold, so the money it already
+ *                    reserved counts as the customer's;
+ *   unitCeilings     the unit price quoted when each line was added — the
+ *                    order never charges more (§20, D12);
+ *   shippingCeilingIqd the delivery fee quoted at the last change;
+ *   exchangeRate     the rate the hold's cents were computed at.
+ */
+export interface CheckoutSource {
+  lines?: { build: (projection: string) => string; params: unknown[] };
+  address?: Record<string, unknown>;
+  reservedCredit?: ReadonlyMap<string, number>;
+  walletCreditCents?: number;
+  unitCeilings?: ReadonlyMap<string, number>;
+  shippingCeilingIqd?: number;
+  exchangeRate?: number;
+}
+
+/** The Quick Buy price lock: a line never costs more than the unit it was
+ *  quoted at; a lower live price is honoured. Only the product's own price
+ *  moves — fees on top of it are untouched. */
+function lockUnitPrice<T extends { applied_iqd: number; unit_subtotal_iqd: number }>(r: T, ceiling: number | undefined): T {
+  if (ceiling === undefined || !Number.isFinite(ceiling) || r.unit_subtotal_iqd <= ceiling) return r;
+  const cut = Math.min(r.unit_subtotal_iqd - Math.max(0, Math.trunc(ceiling)), r.applied_iqd);
+  return {
+    ...r,
+    applied_iqd: r.applied_iqd - cut,
+    unit_subtotal_iqd: r.unit_subtotal_iqd - cut,
+    quick_buy_lock: { live_unit_iqd: r.unit_subtotal_iqd, locked_unit_iqd: r.unit_subtotal_iqd - cut },
+  } as T;
+}
+
+/** Credit a purchase's OWN reserved units back to the counters it holds them on. */
+function creditReserved(res: StockResolution, productId: string, credit: ReadonlyMap<string, number> | undefined): StockResolution {
+  if (!credit?.size || res.targets.length === 0) return res;
+  let touched = false;
+  const targets = res.targets.map((t) => {
+    const units = credit.get(stockRowKey(productId, t)) ?? 0;
+    if (units <= 0) return t;
+    touched = true;
+    return { ...t, reserved: Math.max(0, t.reserved - units) };
+  });
+  if (!touched) return res;
+  const tracked = targets.filter((t) => t.stock !== null);
+  const available =
+    res.available === null || tracked.length === 0
+      ? res.available
+      : Math.min(...tracked.map((t) => Math.max(0, (t.stock as number) - t.reserved)));
+  return { ...res, targets, available };
+}
+
+export async function computeCheckout(
   c: Context<AppContext>,
   user: SessionUser,
   input: CheckoutInput,
   options: CheckoutOptions = { allocate: false }
 ): Promise<CheckoutComputation> {
-  const address = await c.env.DB.prepare('SELECT * FROM addresses WHERE id = ? AND user_id = ?')
-    .bind(input.addressId, user.id)
-    .first<Record<string, unknown>>();
+  const address =
+    options.source?.address ??
+    (await c.env.DB.prepare('SELECT * FROM addresses WHERE id = ? AND user_id = ?')
+      .bind(input.addressId, user.id)
+      .first<Record<string, unknown>>());
   if (!address) throw badRequest('Please choose a valid delivery address');
 
   const settings = await getSettings(c.env.DB, [
@@ -2033,7 +2100,7 @@ async function computeCheckout(
     payment = (settings.checkoutPaymentMethods as CheckoutPaymentMethod[]).find((m) => m.id === input.paymentMethodId) ?? null;
     if (!payment) throw badRequest('Please choose a valid payment method');
   }
-  const exchangeRate = Number(settings.exchangeRate) || 1400;
+  const exchangeRate = options.source?.exchangeRate ?? (Number(settings.exchangeRate) || 1400);
   const shippingConfig = shippingConfigFrom(settings.shippingPolicy);
 
   // Effective tier from the memberships ledger — never the client, never the
@@ -2097,11 +2164,12 @@ async function computeCheckout(
   if (input.itemIds.length > 0) params.push(JSON.stringify(input.itemIds));
   const rows = await cartLineSelect(
     c.env.DB,
-    (projection) =>
-      `SELECT ci.id AS cart_item_id, ci.qty, ${projection}, p.*
-         FROM cart_items ci JOIN products p ON p.id = ci.product_id
-        WHERE ci.user_id = ?${filter}`,
-    params
+    options.source?.lines?.build ??
+      ((projection) =>
+        `SELECT ci.id AS cart_item_id, ci.qty, ${projection}, p.*
+           FROM cart_items ci JOIN products p ON p.id = ci.product_id
+          WHERE ci.user_id = ?${filter}`),
+    options.source?.lines?.params ?? params
   );
   if (rows.length === 0) throw badRequest('Your cart is empty');
 
@@ -2435,7 +2503,7 @@ async function computeCheckout(
           required_tiers: offerCheck.required_tiers,
         });
       }
-      const { doc, resolved, variantLabel, selectionErrors, offerId } = resolveCartLine(
+      const { doc, resolved: resolvedLive, variantLabel, selectionErrors, offerId } = resolveCartLine(
         row,
         sel,
         tierStatus.tier,
@@ -2446,6 +2514,8 @@ async function computeCheckout(
         isPrinter,
         { view: offerView, eligible: offerCheck.ok, nowMs: offerNow }
       );
+      // Quick Buy's price lock (§20, D12); the cart path passes no ceilings.
+      const resolved = lockUnitPrice(resolvedLive, options.source?.unitCeilings?.get(String(row.cart_item_id)));
       // A window with LIMITS but no price still needs its redemption row, or
       // `max_per_user` on an ordinary product would never count anything.
       if (offerView?.window && (offerId || offerView.limits)) offerSubjects.add(String(row.id));
@@ -2528,12 +2598,16 @@ async function computeCheckout(
       // never the shelf — so a model that is sold out for direct sale is still
       // pre-orderable, and a pre-order can never eat the units a direct buyer
       // is about to take.
-      const stockRes = resolveForOrderType(
-        orderType,
-        snapshot,
-        { option_value_ids: sel.optionValueIds ?? [], color_id: sel.colorId || null },
-        capacity,
-        sel.transportMethod
+      const stockRes = creditReserved(
+        resolveForOrderType(
+          orderType,
+          snapshot,
+          { option_value_ids: sel.optionValueIds ?? [], color_id: sel.colorId || null },
+          capacity,
+          sel.transportMethod
+        ),
+        String(row.id),
+        options.source?.reservedCredit
       );
       if (stockRes.error === 'VARIANT_NOT_MODELLED') {
         throw badRequest(`"${displayName}": that combination is not available for sale`, 'VARIANT_NOT_MODELLED');
@@ -2851,10 +2925,15 @@ async function computeCheckout(
    * clamped to one cent's worth. It is NEVER BELOW the old conversion, so no
    * order that quoted before can quote worse now.
    */
-  const [available, walletDust] = await Promise.all([
+  const [availableLive, walletDust] = await Promise.all([
     getAvailableBalances(c.env, user.id),
     readWalletDust(c.env.DB, user.id),
   ]);
+  // A Quick Buy session's own hold is money this purchase already reserved.
+  const walletCreditCents = Math.max(0, Math.trunc(options.source?.walletCreditCents ?? 0));
+  const available = walletCreditCents
+    ? { ...availableLive, usd_cents_available: availableLive.usd_cents_available + walletCreditCents }
+    : availableLive;
   const walletBalanceIqd = walletIqdAvailable(available.usd_cents_available, walletDust.dust_iqd, exchangeRate);
 
   // §4.2 accrual rule at the rate in force for THIS purchase instant, and the
@@ -3121,6 +3200,17 @@ async function computeCheckout(
           ? eligibleMerchandise
           : memberMerchandise;
       shipping = runQuote(basis, Math.max(0, eligibleMerchandise - pointsDiscount));
+      // Quick Buy: the delivery fee quoted at the last change is kept (D12).
+      const ceiling = options.source?.shippingCeilingIqd;
+      if (ceiling !== undefined && shipping.total_iqd > Math.max(0, Math.trunc(ceiling))) {
+        const kept = Math.max(0, Math.trunc(ceiling));
+        shipping = {
+          ...shipping,
+          total_iqd: kept,
+          advance_due_iqd: Math.min(shipping.advance_due_iqd, kept),
+          reasons: [...shipping.reasons, 'Quick Buy keeps the delivery fee quoted when the items were added.'],
+        };
+      }
     }
 
     const beforeDiscounts = Math.max(0, subtotal - lineDiscount + shipping.total_iqd - couponDiscount);
@@ -3623,7 +3713,7 @@ async function computeCheckout(
   };
 }
 
-function checkoutInputFrom(body: Record<string, unknown>, requirePayment: boolean): CheckoutInput {
+export function checkoutInputFrom(body: Record<string, unknown>, requirePayment: boolean): CheckoutInput {
   return {
     addressId: str(body.addressId, 'addressId', { min: 1, max: 60 }),
     deliveryMethodId: str(body.deliveryMethodId, 'deliveryMethodId', { min: 1, max: 60 }),
@@ -4062,7 +4152,53 @@ orderRoutes.post('/', async (c) => {
   await rateLimit(c, 'checkout', 15, 300);
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
+  return placeOrder(c, user, body);
+});
 
+/**
+ * What a Quick Buy session hands the order door when its 30 minutes end
+ * (docs/GIFTS_QUICK_BUY.md §3.4). The order is the ordinary one — the same
+ * rows, stock, wallet, finance and notices as a cart checkout — and these are
+ * the only differences:
+ *
+ *   orderId        reserved when the session opened, so two finalisers racing
+ *                  collide on orders.id and one rolls back;
+ *   source         the session's lines, frozen address, locked prices and the
+ *                  money and stock it already holds (CheckoutSource);
+ *   before         statements that free the session's hold and reservation,
+ *                  placed FIRST in the batch so the order's own spend and
+ *                  reservation, further down, see the freed balance and units;
+ *   reservedCredit the units `before` frees, credited to the order's plan;
+ *   after          the session's flip to `submitted` and its money/stock trail;
+ *   policyStatements consent: the versions the customer accepted when they
+ *                  switched Quick Buy on, recorded against this order.
+ */
+export interface QuickBuyOrderHooks {
+  sessionId: string;
+  orderId: string;
+  source: CheckoutSource;
+  reservedCredit: ReadonlyMap<string, number>;
+  before: D1PreparedStatement[];
+  after: (comp: CheckoutComputation) => D1PreparedStatement[];
+  policyStatements: (orderId: string) => Promise<D1PreparedStatement[]>;
+  /** Refuses — before anything is written — an order the session cannot pay
+   *  for out of what it held (D12: never charge more than the hold). */
+  guard?: (comp: CheckoutComputation) => void;
+}
+
+/**
+ * THE ORDER DOOR, as a function: `POST /api/orders` is this behind a rate
+ * limit, and Quick Buy's finaliser calls it with `quickBuy` so a session ends
+ * as exactly the order a cart would have made — never through a second
+ * checkout.
+ */
+export async function placeOrder(
+  c: Context<AppContext>,
+  user: SessionUser,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the request body, read field by field below
+  body: Record<string, any>,
+  quickBuy?: QuickBuyOrderHooks
+): Promise<Response> {
   const input = checkoutInputFrom(body, true);
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80 });
 
@@ -4092,7 +4228,8 @@ orderRoutes.post('/', async (c) => {
     });
   }
 
-  const comp = await computeCheckout(c, user, input, { allocate: true });
+  const comp = await computeCheckout(c, user, input, { allocate: true, source: quickBuy?.source });
+  quickBuy?.guard?.(comp);
 
   // Honest blocker (§6.3): an unpriced fee component (printer size mapping /
   // carton fee not configured by the owner yet) can NEVER be silently waived
@@ -4131,7 +4268,7 @@ orderRoutes.post('/', async (c) => {
     );
   }
 
-  const orderId = newOrderId();
+  const orderId = quickBuy?.orderId ?? newOrderId();
   const now = new Date().toISOString();
   const printerStandardRequired = requiresPrinterStandardAcceptance(comp.delivery.id,
     comp.lines.some((line) => line.is_printer) || comp.shipping.components.some((part) => part.kind === 'printer_small' || part.kind === 'printer_large'));
@@ -4158,9 +4295,13 @@ orderRoutes.post('/', async (c) => {
         version: Number(a?.version),
       }))
     : undefined;
-  const policyAcceptance = await preparePolicyAcceptance(c.env, user.id, `order:${orderId}`, acceptanceList, {
-    locale: body.policyLocale ?? langOf(c), orderId,
-  });
+  // Quick Buy was switched on against these documents by version (§5); its
+  // order records THAT consent rather than asking a closed browser for a new one.
+  const policyAcceptance = quickBuy
+    ? { statements: await quickBuy.policyStatements(orderId) }
+    : await preparePolicyAcceptance(c.env, user.id, `order:${orderId}`, acceptanceList, {
+        locale: body.policyLocale ?? langOf(c), orderId,
+      });
 
   const shippingTotal = comp.shipping.total_iqd;
   const deliveryWaived = comp.shipping.total_iqd < comp.shipping.total_before_waiver_iqd ? 1 : 0;
@@ -4277,6 +4418,9 @@ orderRoutes.post('/', async (c) => {
   const giniOrderNo = isGiniPayment ? input.giniOrderNo : '';
 
   const stmts = [
+    // Quick Buy frees the session's hold and stock FIRST, so the spend and the
+    // reservation below see the money and the units it was holding.
+    ...(quickBuy?.before ?? []),
     orderInsertStatement(c.env.DB, {
       id: orderId, user_id: user.id, address_snapshot: JSON.stringify(comp.address),
       delivery_method_id: input.deliveryMethodId, delivery_method_snapshot: deliverySnapshot,
@@ -4333,7 +4477,7 @@ orderRoutes.post('/', async (c) => {
        */
       gini_order_no: giniOrderNo, gini_paid_iqd: comp.giniPaidIqd, gini_state: giniState, gini_hold_until: giniHoldUntilIso,
       created_at: now, updated_at: now,
-    }),
+    }, quickBuy ? { order_kind: 'quick_buy', quick_buy_session_id: quickBuy.sessionId } : undefined),
   ];
 
   // Foreign-key order association and consent commit or roll back together.
@@ -4579,9 +4723,12 @@ orderRoutes.post('/', async (c) => {
     })
   );
 
-  // Remove the purchased lines from the cart.
-  for (const it of comp.lines) {
-    stmts.push(c.env.DB.prepare('DELETE FROM cart_items WHERE id = ? AND user_id = ?').bind(it.cart_item_id, user.id));
+  // Remove the purchased lines from the cart. A Quick Buy order never came
+  // from the cart, so the customer's cart is left exactly as it was.
+  if (!quickBuy) {
+    for (const it of comp.lines) {
+      stmts.push(c.env.DB.prepare('DELETE FROM cart_items WHERE id = ? AND user_id = ?').bind(it.cart_item_id, user.id));
+    }
   }
 
   // §7 stock: RESERVE and DEDUCT are planned here and appended to THIS batch,
@@ -4612,6 +4759,7 @@ orderRoutes.post('/', async (c) => {
       orderId,
       actorUserId: user.id,
       reason: 'checkout',
+      reservedCredit: quickBuy?.reservedCredit,
     });
     if (reservePlan.rejected.length > 0) {
       throw badRequest(
@@ -4686,6 +4834,7 @@ orderRoutes.post('/', async (c) => {
 
   try {
     stmts.push(...await planOrderFinanceSnapshot(c.env.DB, orderId, comp.lines.map(l => ({ id: l.id, product_id: l.product_id })), now, comp.walletApplied));
+    if (quickBuy) stmts.push(...quickBuy.after(comp));
     await c.env.DB.batch(stmts);
   } catch (e) {
     if (isPolicyAcceptanceConflict(e)) {
@@ -4925,7 +5074,7 @@ orderRoutes.post('/', async (c) => {
     invoice_no: invoice?.invoiceNo ?? null,
     shipping_quote: comp.shipping,
   });
-});
+}
 
 orderRoutes.get('/:id', async (c) => {
   const user = c.get('user')!;

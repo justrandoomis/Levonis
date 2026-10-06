@@ -17,6 +17,7 @@ import {
   Tag,
   Repeat,
   UserPlus,
+  Zap,
 } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
@@ -153,6 +154,10 @@ function kindIcon(kind: string) {
       return UserPlus;
     case 'portfolio_consent':
       return Images;
+    // «الشراء السريع»: the same bolt the product page's Quick Buy switch wears.
+    case 'quick_buy_submitted':
+    case 'quick_buy_failed':
+      return Zap;
     default:
       return Bell;
   }

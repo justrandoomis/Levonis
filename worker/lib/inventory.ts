@@ -482,6 +482,20 @@ export interface ApplyOptions {
   orderId?: string | null;
   actorUserId?: string | null;
   reason?: string;
+  /**
+   * Units that statements placed EARLIER IN THE SAME BATCH free on these rows,
+   * keyed by `stockRowKey`. Quick Buy's finalisation releases a session's
+   * reservation and takes it again under the order in one transaction; the
+   * plan-time read cannot see a release that has not run yet, so without the
+   * credit it would refuse the order its own units. It lowers only the
+   * SIMULATED `reserved`: the SQL guards still decide at commit.
+   */
+  reservedCredit?: ReadonlyMap<string, number>;
+}
+
+/** The identity of the counter row a target moves — the key `reservedCredit` uses. */
+export function stockRowKey(productId: string, target: Pick<StockTarget, 'scope' | 'scope_id'>): string {
+  return `${tableFor(target.scope)}#${target.scope === 'base' ? productId : target.scope_id}`;
 }
 
 export interface RejectedMove {
@@ -756,7 +770,7 @@ export async function planInventory(
       rejected.push({ line_id: w.move.line_id, scope: w.target.scope, scope_id: w.target.scope_id, reason: 'ROW_MISSING' });
       continue;
     }
-    const cur = sim.get(key) ?? { stock: row.stock, reserved: row.reserved };
+    const cur = sim.get(key) ?? { stock: row.stock, reserved: Math.max(0, row.reserved - (opts.reservedCredit?.get(key) ?? 0)) };
     if (!guardHolds(opts.kind, w.move.qty, { stock: cur.stock, reserved: cur.reserved })) {
       rejected.push({
         line_id: w.move.line_id,
