@@ -132,6 +132,9 @@ export const OWNED_TABLES: OwnedTable[] = [
    * it from the lots below.
    */
   { table: 'inventory_reorder_settings', by: { column: 'product_id' } },
+  // Suggested supplier prices and packed measures are editable product
+  // configuration. Actual purchase lines retain their independent snapshots.
+  { table: 'procurement_selection_cost_defaults', by: { column: 'product_id' } },
   { table: 'price_history', by: { column: 'product_id' } },
   // A competitor-price report (0093) is OWNED and not HISTORY, and the choice
   // is forced twice over. `product_id` is NOT NULL, so there is nothing to
