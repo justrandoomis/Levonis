@@ -24,13 +24,28 @@ Survey facts are cited `file:line` against `7e42c987`.
 | D12 | Prices are snapshotted per item at add time. At finalisation the customer pays **at most** what is held: shipping = min(recomputed, quoted), order-level membership discount = max(recomputed, quoted). A lower final total captures less and releases the rest. | Brief §20, §19. |
 | D13 | Finalisation runs on the existing per-minute cron (new `waitUntil` beside finance recovery) and lazily on any Quick Buy request that finds an expired open session. Edits are refused **inside the batch** by `expires_at > now`, so the lock is exact even before the cron runs. | No DO/Queue exists (index.ts:1062-1099). |
 | D14 | Quick Buy consent reuses `policy_acceptances` (context `quick_buy`) for `terms`, `privacy` and a new policy `quick_buy` (ar/en/ckb), plus the profile's stored versions. A version bump requires re-consent before the next add; an open session finalises on the consent it was started under. | Existing acceptance system (policyOps.ts). |
-| D15 | New `orders.order_kind` (`normal|quick_buy|gift`) and `orders.quick_buy_session_id`. `gift` = every line is a gift line. | Brief §21. |
+| D15 | New `orders.order_kind` (`normal|quick_buy|gift`) and `orders.quick_buy_session_id` — shared migration `0174_order_kind.sql`, landed before the lanes split so both build on it. `gift` = every line is a gift line; a mixed order stays `normal`. | Brief §21. |
 
 ---
 
 ## 1. Gifts
 
-### 1.1 Schema — `migrations/0174_gift_lifecycle.sql`
+**Prior work to reuse.** Branch `release/reviews-gifts` (commit `94e8943f`, based on the
+older live commit `22118e43`) holds a parked, unverified build of an earlier gifts brief
+(2026-09-30, `docs/REVIEWS_GIFTS.md` on that branch): gift levels from real store products,
+the gift cart line, checkout at 0 IQD, the cancel/deliver triggers, MyGifts/GiftCard, admin
+item sheet, fixtures and tests. It is a quarry, not a merge: port the parts that fit this
+document. Its decisions that still hold here: S6 (a level's items are alternatives, one
+product per entitlement; bundles and mystery offers cannot be gifts), S7 (only the product
+is free; its line fees are 0 too; delivery and COD rules apply to the order as normal), S8
+(a gift line triggers no other reward: support-code gift, referral printer reward,
+review-reward purchase proof, the PRO pre-order filament gift on a gift-only order, the
+trade-in coupon cap, offers), S9 (one trigger covers every cancel door; an order holding a
+gift line cannot be re-opened), S10 (`OrderCreated` unchanged: a gift line is
+`item_kind: 'ordinary'` with unit 0). Not carried over: the 6-digit redemption code, the
+review media/eligibility rewrite and its policy edits — this brief does not ask for them.
+
+### 1.1 Schema — `migrations/0175_gift_lifecycle.sql`
 
 `gift_entitlements` rebuilt (stash `gift_redemptions` first, as 0141/0165 precedent; recreate index):
 
@@ -107,14 +122,14 @@ Setting `walletFreeDelivery` (admin_settings, validated in `PUT /api/admin/setti
 
 ## 3. Quick Buy
 
-### 3.1 Schema — `migrations/0175_quick_buy.sql`
+### 3.1 Schema — `migrations/0176_quick_buy.sql`
 - `quick_buy_profiles(user_id PK, enabled, address_id, terms_version, privacy_version, policy_version, consented_at, wallet_consent_at, updated_at)` (no FK on address_id: a deleted address disables Quick Buy at use time instead of failing the delete).
 - `quick_buy_sessions(id PK, user_id, state open|submitted|cancelled|failed, started_at, expires_at, order_id (reserved at start, used at finalisation), address_id, address_snapshot JSON, delivery_method_id 'standard', rev, hold_id, held_iqd, held_cents, exchange_rate, items_iqd, discount_iqd, shipping_iqd, shipping_before_iqd, total_iqd, quote_json, consent_json, lease_until, finalize_attempts, finalize_error, submitted_at, cancelled_at, cancel_reason, created_at, updated_at)`;
   UNIQUE `(user_id) WHERE state='open'`; index `(expires_at) WHERE state='open'`; UNIQUE `(order_id)`.
 - `quick_buy_items(id PK, session_id, user_id, product_id, option_id, option_value_ids, color_id, warranty_plan_id, qty, unit_price_iqd, line_total_iqd, snapshot JSON, stock_targets JSON, created_at, updated_at, removed_at)`; UNIQUE live line `(session_id, product_id, option_value_ids, color_id, warranty_plan_id, unit_price_iqd) WHERE qty>0`.
 - `quick_buy_actions(user_id, key, session_id, kind, request_hash, response_json, created_at, PK(user_id,key))` — idempotency.
 - `quick_buy_events(id, session_id, user_id, kind hold|release|capture|reserve|unreserve|add|update|remove|start|submit|cancel|fail, amount_iqd, amount_cents, item_id, hold_id, order_id, detail, created_at)` — append-only.
-- `orders` + `order_kind` (`normal|quick_buy|gift`, default normal) + `quick_buy_session_id`.
+- `orders.order_kind` / `orders.quick_buy_session_id` already exist (0174).
 
 ### 3.2 Routes — `worker/routes/quickBuy.ts` at `/api/quick-buy` (auth; every write carries `idempotencyKey`)
 
