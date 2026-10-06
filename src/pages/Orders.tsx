@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Info, Repeat, Search, Store, X } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
+import { useAuth } from '../AuthContext';
 import { api } from '../lib/api';
 import type { ApiOrder } from '../lib/api';
 import { TabStrip } from '../components/ui/Tabs';
@@ -14,6 +15,15 @@ import ReviewSheet from '../components/orders/ReviewSheet';
 import PendingStoreReviews from '../components/community/reviews/StoreReviews';
 import GiftsEntry from '../components/orders/GiftsEntry';
 import { asLang } from '../components/orders/format';
+import ChunkBoundary from '../components/ChunkBoundary';
+import { refreshQuickBuySession, useQuickBuySnapshot } from '../lib/quickBuyStore';
+
+/**
+ * «شراء سريع — قيد التجميع» (docs/GIFTS_QUICK_BUY.md §3.5): the open Quick Buy
+ * session, or the order it just became, at the top of the list. A chunk of its
+ * own, fetched only when the server says there is something to show.
+ */
+const QuickBuyOrderCard = React.lazy(() => import('../components/quickBuy/QuickBuyOrderCard'));
 
 /**
  * The customer's orders, one page at a time.
@@ -338,6 +348,36 @@ export default function Orders() {
     loadCounts();
   }, [loadCounts]);
 
+  // The Quick Buy session is read again on every visit. Its card exists only
+  // while it is OPEN (owner spec §13): once submitted it is an ordinary order
+  // in the list below. The card stays mounted for the rest of a visit that saw
+  // it open, so the one transient line it leaves («تم إرسال …», a toast) can
+  // be said; a session the server could not submit gets one line of its own.
+  const { user } = useAuth();
+  const quickBuyOwner = user?.id ?? null;
+  const quickBuy = useQuickBuySnapshot(quickBuyOwner);
+  useEffect(() => {
+    void refreshQuickBuySession(quickBuyOwner);
+  }, [quickBuyOwner]);
+  const openSessionId = quickBuy.session?.state === 'open' ? quickBuy.session.id : null;
+  const [sawQuickBuyOpen, setSawQuickBuyOpen] = useState(false);
+  if (openSessionId && !sawQuickBuyOpen) setSawQuickBuyOpen(true);
+  const quickBuyShown = !!openSessionId || sawQuickBuyOpen || quickBuy.recent?.state === 'failed';
+  // When a session that was open on this page becomes an order, the order is
+  // real now: the list and the counts are read again so it appears in both.
+  const submittedOrder = quickBuy.recent?.state === 'submitted' ? quickBuy.recent.order_id : null;
+  const sawOpen = useRef<string | null>(null);
+  useEffect(() => {
+    if (openSessionId) {
+      sawOpen.current = openSessionId;
+      return;
+    }
+    if (!sawOpen.current || !submittedOrder) return;
+    sawOpen.current = null;
+    void loadFirst();
+    loadCounts();
+  }, [openSessionId, submittedOrder, loadFirst, loadCounts]);
+
   // Which products this customer already reviewed, so a delivered order
   // whose every item is reviewed does not keep offering the verb. Unknown
   // (request failed) means the verb is offered and the sheet asks the server.
@@ -522,6 +562,18 @@ export default function Orders() {
         >
           {notice}
         </p>
+
+        {/* Quick Buy first: a session that is still collecting is the one
+            thing on this page with a clock on it. */}
+        {quickBuyShown ? (
+          <ChunkBoundary compact>
+            <React.Suspense
+              fallback={openSessionId ? <div aria-hidden="true" className="lv-surface mb-4 animate-pulse" style={{ height: 168 }} /> : null}
+            >
+              <QuickBuyOrderCard />
+            </React.Suspense>
+          </ChunkBoundary>
+        ) : null}
 
         {/* The list is narrowed and says so — with the way back on the same
             line, because a filter a customer cannot see is a list that is

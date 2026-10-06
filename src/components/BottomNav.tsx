@@ -12,6 +12,17 @@ import { useCommunityAccess } from '../pages/community/access';
 import { useBottomNavSuppressed } from '../lib/bottomNavSuppress';
 
 /**
+ * «⚡ mm:ss» on the account tab while a Quick Buy session collects
+ * (./quickBuy/QuickBuyNavChip.tsx): a lazy chunk with the session store, so
+ * the first paint carries this line and nothing more. A chunk that does not
+ * arrive (a deploy mid-visit, a dropped connection) draws nothing instead of
+ * throwing out of the navigation, which sits outside every route's boundary.
+ */
+const QuickBuyNavChip = React.lazy<React.ComponentType>(() =>
+  import('./quickBuy/QuickBuyNavChip').catch(() => ({ default: () => null }))
+);
+
+/**
  * Routes on which the floating bottom nav does not render. Exported so the
  * app shell (App.tsx) can reserve bottom clearance for the nav only when it
  * is actually visible — one source of truth, no duplicated route lists.
@@ -211,6 +222,11 @@ export default function BottomNav() {
             >
               {badge > 99 ? '99+' : badge}
             </span>
+          ) : null}
+          {item.path === '/profile' && isAuthenticated ? (
+            <React.Suspense fallback={null}>
+              <QuickBuyNavChip />
+            </React.Suspense>
           ) : null}
         </span>
         <span className={`max-w-full truncate text-[9px] sm:text-[10px] ${isActive ? 'font-bold text-text-primary' : 'font-medium'}`}>{item.label}</span>

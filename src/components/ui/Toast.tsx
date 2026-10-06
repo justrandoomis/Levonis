@@ -115,19 +115,24 @@ function ToastItem({ record, paused, closeLabel }: { record: ToastRecord; paused
       <div className="min-w-0 flex-1 py-2">
         <p className="text-sm font-semibold leading-snug text-text-primary">{record.title}</p>
         {record.description && <p className="mt-0.5 text-[13px] leading-relaxed text-text-secondary">{record.description}</p>}
+        {/* THE VERB GOES UNDER THE WORDS. Beside them, on a 360px phone, a
+            two-word verb left the sentence a 100px column six lines tall
+            («رصيد محفظة Levo غير كافٍ…» beside «شحن المحفظة»). Under them it
+            is where a notification's actions sit, and the words keep the
+            width; `-ms-3` lines its label up with the title. */}
+        {record.action && (
+          <button
+            type="button"
+            onClick={() => {
+              record.action?.onClick();
+              dismiss(record.id);
+            }}
+            className="lv-button lv-button-ghost lv-button-sm -ms-3 mt-1 text-accent"
+          >
+            {record.action.label}
+          </button>
+        )}
       </div>
-      {record.action && (
-        <button
-          type="button"
-          onClick={() => {
-            record.action?.onClick();
-            dismiss(record.id);
-          }}
-          className="lv-button lv-button-ghost lv-button-sm shrink-0 text-accent"
-        >
-          {record.action.label}
-        </button>
-      )}
       <button
         type="button"
         onClick={() => dismiss(record.id)}
@@ -153,7 +158,10 @@ function useAnnouncements(list: readonly ToastRecord[]): { polite: string; asser
       // A zero-width mark alternates so an identical second message is still
       // a CHANGE the reader announces.
       flip.current = !flip.current;
-      const text = `${t.title}${t.description ? `. ${t.description}` : ''}${flip.current ? '\u200B' : ''}`;
+      // A title that is already a sentence keeps its own stop: \u00AB\u2026\u063A\u064A\u0631 \u0643\u0627\u0641\u064D.\u00BB
+      // then the figures, never \u00AB\u063A\u064A\u0631 \u0643\u0627\u0641\u064D.. \u0627\u0644\u0645\u062A\u0627\u062D\u00BB.
+      const joint = /[.!?\u061F\u2026]$/.test(t.title) ? ' ' : '. ';
+      const text = `${t.title}${t.description ? `${joint}${t.description}` : ''}${flip.current ? '\u200B' : ''}`;
       setSaid((prev) => (t.tone === 'error' ? { ...prev, assertive: text } : { ...prev, polite: text }));
     }
   }, [list]);
