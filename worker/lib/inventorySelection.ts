@@ -1,3 +1,4 @@
+import type { ProcurementSelectionDefault } from '../../packages/contracts/src/procurementCost';
 import { productImageFromRelations } from './productSelectionImage';
 import type { ImageRow,VariantRow } from './productOverlay';
 import { badRequest, notFound } from './http';
@@ -23,6 +24,10 @@ export type Selection = {
   image_url?:string;
   weight_g: number;
   volume_mm3: number;
+  packed_weight_g: number | null;
+  packed_volume_mm3: number | null;
+  procurement_defaults: ProcurementSelectionDefault[];
+  procurement_shared_colors: boolean;
   option_id?: string;
   color_id?: string;
 };
@@ -168,6 +173,8 @@ export async function productSelections(db: D1Database, productId: string): Prom
         .all<{ scope: string; scope_id: string; purchase_unit_iqd: number;cost_date:string }>()
     ).results ?? [];
   const images=(await db.prepare('SELECT * FROM product_images WHERE product_id=? ORDER BY sort_order,id').bind(productId).all<ImageRow>()).results??[];
+  const defaults = (await db.prepare(`SELECT d.*,p.currency FROM procurement_selection_cost_defaults d JOIN procurement_cost_profiles p ON p.id=d.profile_id WHERE d.product_id=?`)
+    .bind(productId).all<ProcurementSelectionDefault & { scope: string; scope_id: string }>()).results ?? [];
   const out: Selection[] = [];
   for (const cell of cells) {
     let regular = Number(p.price_iqd),
@@ -199,6 +206,14 @@ export async function productSelections(db: D1Database, productId: string): Prom
     );
     const dim = (k: string) =>
       Number(cell[`package_${k}_mm`] ?? cell[`${k}_mm`] ?? p[`package_${k}_mm`] ?? p[`${k}_mm`] ?? 0);
+    // Packaging is a separate fact from net product dimensions. Resolve the
+    // same selected override ladder, never silently substitute a net weight.
+    const packedRows = scope === 'variant' ? [cell, color, option, p] : [cell, p];
+    const packed = (key: string): number | null => {
+      const value = packedRows.map(row => row?.[key]).find(value => typeof value === 'number' && Number.isFinite(value) && value > 0);
+      return typeof value === 'number' ? value : null;
+    };
+    const packedDims = ['width', 'depth', 'height'].map(key => packed(`package_${key}_mm`));
     const name = String(p.name_ar || p.name);
     const detail =
       scope === 'variant'
@@ -224,6 +239,10 @@ export async function productSelections(db: D1Database, productId: string): Prom
       image_url:productImageFromRelations(images,{optionValueIds:option?[option.id]:scope==='option'?[cell.id]:[],colorId:color?.id??(scope==='color'?cell.id:null)},(variants.results??[]) as unknown as VariantRow[]),
       weight_g: weight,
       volume_mm3: dim('width') * dim('depth') * dim('height'),
+      procurement_shared_colors: scope === 'option' && cols.length > 1,
+      packed_weight_g: packed('package_weight_g'),
+      packed_volume_mm3: packedDims.every(value => value !== null) ? packedDims.reduce<number>((total, value) => total * value!, 1) : null,
+      procurement_defaults: defaults.filter(row => row.scope === scope && row.scope_id === scopeId).map(({ profile_id, currency, source_unit_amount, weight_g, volume_mm3, updated_at }) => ({ profile_id, currency, source_unit_amount, weight_g, volume_mm3, updated_at })),
       option_id: option?.id??(scope==='option'?cell.id:undefined),
       color_id: color?.id??(scope==='color'?cell.id:undefined),
     });

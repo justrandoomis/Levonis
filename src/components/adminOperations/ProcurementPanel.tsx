@@ -3,6 +3,8 @@ import SelectionPriceUpdate from './SelectionPriceUpdate';
 import StockSelection from './StockSelection';
 import PurchaseFundingFields, { newFunding, fundingValid, type FundingDraft, type PurchaseInvestor } from './PurchaseFundingFields';
 import { purchaseEstimate } from './purchaseEstimate';
+import { changeLineCostProfile, changePurchaseCostMode, packedMeasureInput, packedMeasureValid, restoreCostProfileSnapshot, selectionCostDraft, type ProcurementDraftLine as DraftLine } from './procurementCostDraft';
+import type { CostProfile } from '../../../packages/contracts/src/procurementCost';
 import '../adminInventory/inventory-workspace.css';
 const InvestorContractForm = lazy(() => import('../financePeople/InvestorPanel').then((m) => ({ default: m.InvestorContractForm })));
 import {
@@ -21,13 +23,6 @@ import {
   type Selection,
 } from './shared';
 
-type DraftLine = Selection & {
-  qty_ordered: number;
-  source_unit_amount: number | string;
-  invoiced_qty: number;
-  purchase_cost_mode?: 'unit' | 'total';
-  source_total_amount?: number | string;
-};
 type Charge = { title: string; amount_iqd: number; basis: string };
 type Purchase = {
   id: string;
@@ -48,6 +43,10 @@ type Detail = {
     warehouse_id: string;
     currency: string;
     exchange_rate: number;
+    cost_profile_id?: string | null;
+    cost_profile_version?: number | null;
+    shipping_basis?: 'weight' | 'volume' | null;
+    shipping_rate_iqd?: number | null;
     purchase_day: string;
     expected_day: string;
     tracking: string;
@@ -64,6 +63,7 @@ type Detail = {
       purchase_unit_iqd: number;
       purchase_total_iqd?: number;
       charges_iqd: number;
+      auto_shipping_iqd?: number;
     }
   >;
   charges: Charge[];
@@ -85,6 +85,10 @@ type Header = {
   invoice_no: string;
   currency: string;
   exchange_rate: number;
+  cost_profile_id: string | null;
+  cost_profile_version: number | null;
+  shipping_basis: 'weight' | 'volume' | null;
+  shipping_rate_iqd: number | null;
   purchase_day: string;
   expected_day: string;
   tracking: string;
@@ -93,12 +97,17 @@ type Header = {
   invoice_total_iqd: string;
   cost_state: string;
 };
+const costMoney = (value: number) => Number.isFinite(value) ? money(value) : '—';
 const newHeader = (): Header => ({
   supplier_id: '',
   warehouse_id: '',
   invoice_no: '',
   currency: 'IQD',
   exchange_rate: 1,
+  cost_profile_id: null,
+  cost_profile_version: null,
+  shipping_basis: null,
+  shipping_rate_iqd: null,
   purchase_day: today(),
   expected_day: '',
   tracking: '',
@@ -112,10 +121,11 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     op = useOperation();
   const [investmentFor, setInvestmentFor] = useState('');
   const [priceLine,setPriceLine]=useState<Detail['lines'][number]|null>(null);
-  const [config, setConfig] = useState<{ suppliers: Named[]; locations: Named[]; investors: PurchaseInvestor[] }>({
+  const [config, setConfig] = useState<{ suppliers: Named[]; locations: Named[]; investors: PurchaseInvestor[]; cost_profiles: CostProfile[] }>({
       suppliers: [],
       locations: [],
       investors: [],
+      cost_profiles: [],
     }),
     [purchases, setPurchases] = useState<Purchase[]>([]),
     [offset, setOffset] = useState(0),
@@ -149,7 +159,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
       api.get<typeof config>(`${PROCUREMENT}/config`),
       api.get<{ purchases: Purchase[] }>(`${PROCUREMENT}/documents?offset=${offset}&awaiting=${receiveOnly ? '1' : '0'}`),
     ]);
-    setConfig(cfg);
+    setConfig({ ...cfg, investors: cfg.investors ?? [], cost_profiles: cfg.cost_profiles ?? [] });
     setPurchases(r.purchases);
   }, [offset, receiveOnly]);
   const { run } = op;
@@ -182,7 +192,8 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     setHeader(
       d
         ? {
-            ...d.purchase,
+            ...newHeader(),
+            ...restoreCostProfileSnapshot(d.purchase, config.cost_profiles),
             invoice_total_iqd:
               d.purchase.invoice_total_iqd == null ? '' : String(d.purchase.invoice_total_iqd),
             invoice_no: clone ? '' : d.purchase.invoice_no,
@@ -198,7 +209,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             stock: null,
             reserved: 0,
             cost_source: 'confirmed_purchase',
-            source_total_amount: l.purchase_total_iqd == null ? Number(l.source_unit_amount) * l.qty_ordered : l.purchase_total_iqd / (d.purchase.currency === 'IQD' ? 1 : d.purchase.exchange_rate),
+            source_total_amount: l.purchase_cost_mode === 'total' ? l.source_total_amount ?? (l.purchase_total_iqd == null ? Number(l.source_unit_amount) * l.qty_ordered : l.purchase_total_iqd / (d.purchase.currency === 'IQD' ? 1 : d.purchase.exchange_rate)) : '',
             unit_cost_iqd: l.purchase_unit_iqd,
           }))
         : [],
@@ -225,6 +236,9 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
       ? await api.put<{ id: string }>(`${PROCUREMENT}/documents/${editId}`, body)
       : await api.post<{ id: string }>(`${PROCUREMENT}/documents`, body);
     localStorage.removeItem('levonis-purchase-draft-v2'); setDraftAvailable(false);
+    // Cached picker rows belong to the completed draft. A future purchase must
+    // fetch the just-saved supplier defaults, not reuse its pre-save snapshot.
+    setRecent([]);
     const d = await api.get<Detail>(`${PROCUREMENT}/documents/${r.id}`);
     // The two steps are independently idempotent. A failed receipt leaves the
     // confirmed incoming document available to resume from the shipment list.
@@ -234,16 +248,37 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     }
     await load(); await open(r.id); onChanged();
   };
-  const update = (key: keyof Header, value: string | number) => setHeader((h) => ({ ...h, [key]: value }));
+  const update = (key: keyof Header, value: string | number | null) => setHeader((h) => ({ ...h, [key]: value }));
+  const costProfile = config.cost_profiles.find((p) => p.id === header.cost_profile_id);
+  const shippingBasis = header.shipping_basis ?? costProfile?.shipping_basis;
+  const chooseCostProfile = (id: string) => {
+    const profile = config.cost_profiles.find((p) => p.id === id) ?? null;
+    setHeader((h) => ({ ...h, cost_profile_id: profile?.id ?? null, cost_profile_version: profile?.version ?? null, currency: profile?.currency ?? 'IQD', exchange_rate: profile ? profile.exchange_rate ?? NaN : 1, shipping_rate_iqd: profile?.shipping_rate_iqd ?? null, shipping_basis: profile?.shipping_basis ?? null }));
+    setLines((old) => old.map((l) => changeLineCostProfile(l, profile)));
+  };
+  const saveProfileDefaults = async () => {
+    if (!costProfile) return;
+    const { profile } = await api.put<{ profile: CostProfile }>(`${PROCUREMENT}/cost-profiles/${costProfile.id}`, { exchange_rate: header.exchange_rate, shipping_rate_iqd: header.shipping_rate_iqd, version: header.cost_profile_version });
+    setConfig((old) => ({ ...old, cost_profiles: old.cost_profiles.map((p) => p.id === profile.id ? profile : p) }));
+    setHeader((old) => old.cost_profile_id === profile.id ? { ...old, cost_profile_version: profile.version } : old);
+  };
+  const reloadProfileRates = async () => {
+    const cfg = await api.get<typeof config>(`${PROCUREMENT}/config`);
+    setConfig({ ...cfg, investors: cfg.investors ?? [], cost_profiles: cfg.cost_profiles ?? [] });
+    const profile = cfg.cost_profiles?.find((p) => p.id === header.cost_profile_id);
+    if (profile) setHeader((old) => old.cost_profile_id === profile.id ? { ...old, exchange_rate: profile.exchange_rate ?? NaN, shipping_rate_iqd: profile.shipping_rate_iqd, cost_profile_version: profile.version } : old);
+  };
+  const profileValid = !header.cost_profile_id || (!!shippingBasis && Number.isFinite(header.shipping_rate_iqd) && header.shipping_rate_iqd !== null && header.shipping_rate_iqd >= 0 && lines.every((l) => packedMeasureValid(l, shippingBasis)));
   const quantitiesValid = lines.length > 0 && lines.every((l) => Number.isSafeInteger(l.qty_ordered) && l.qty_ordered > 0 && Number.isSafeInteger(l.invoiced_qty) && l.invoiced_qty >= 0);
-  const costsValid = quantitiesValid && Number.isFinite(header.exchange_rate) && header.exchange_rate > 0 && lines.every((l) => (l.purchase_cost_mode === 'total' ? l.source_total_amount !== '' && l.source_total_amount != null && Number.isFinite(Number(l.source_total_amount)) && Number(l.source_total_amount) >= 0 : l.source_unit_amount !== '' && l.source_unit_amount != null && Number.isFinite(Number(l.source_unit_amount)) && Number(l.source_unit_amount) >= 0)) && lines.every((l) => Number.isSafeInteger(l.selling_price_iqd) && l.selling_price_iqd >= 0) && charges.every((c) => c.title.trim() && Number.isSafeInteger(c.amount_iqd) && c.amount_iqd >= 0);
-  const estimates = purchaseEstimate(lines, charges, header.currency === 'IQD' ? 1 : header.exchange_rate, funding.mode === 'investor' ? funding.profit_share_bps : 0, funding.incoming_indexes);
+  const inputsValid = quantitiesValid && profileValid && Number.isFinite(header.exchange_rate) && header.exchange_rate > 0 && lines.every((l) => (l.purchase_cost_mode === 'total' ? l.source_total_amount !== '' && l.source_total_amount != null && Number.isFinite(Number(l.source_total_amount)) && Number(l.source_total_amount) >= 0 : l.source_unit_amount !== '' && l.source_unit_amount != null && Number.isFinite(Number(l.source_unit_amount)) && Number(l.source_unit_amount) >= 0)) && lines.every((l) => Number.isSafeInteger(l.selling_price_iqd) && l.selling_price_iqd >= 0) && charges.every((c) => c.title.trim() && Number.isSafeInteger(c.amount_iqd) && c.amount_iqd >= 0);
+  const estimates = purchaseEstimate(lines, charges, header.currency === 'IQD' ? 1 : header.exchange_rate, funding.mode === 'investor' ? funding.profit_share_bps : 0, funding.incoming_indexes, header.cost_profile_id && shippingBasis ? { basis: shippingBasis, rate: header.shipping_rate_iqd ?? NaN } : undefined);
   const total = estimates.reduce((n, e) => n + e.total_iqd, 0);
+  const costsValid = inputsValid && Number.isSafeInteger(total) && total <= 1e12 && estimates.every((e) => Number.isSafeInteger(e.total_iqd) && e.total_iqd >= 0);
   const fundedCost = estimates.reduce((n, e, i) => n + (!funding.incoming_indexes || funding.incoming_indexes.includes(i) ? e.total_iqd : 0), 0);
   const allocated = funding.mode === 'investor' ? Math.min(Number(funding.agreed_iqd), fundedCost) : 0;
   const saveLocal = () => { localStorage.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive })); setDraftAvailable(true); };
-  const restoreLocal = () => { try { const d = JSON.parse(localStorage.getItem('levonis-purchase-draft-v2') || '{}'); if (!Array.isArray(d.lines)) return; setHeader(d.header); setLines(d.lines); setCharges(d.charges); setFunding(d.funding); setEditId(d.editId); setEditVersion(d.editVersion); setOperationId(d.operationId); setQuickReceive(d.quickReceive); setEditing(true); setStep(0); } catch { localStorage.removeItem('levonis-purchase-draft-v2'); } };
-  const addChoice = () => { if (!choice) return; setLines((old) => [...old, { ...choice, qty_ordered: 1, invoiced_qty: 1, purchase_cost_mode: 'unit', source_unit_amount: choice.purchase_unit_iqd == null ? '' : choice.purchase_unit_iqd / (header.currency === 'IQD' ? 1 : header.exchange_rate) }]); setRecent((old) => [choice, ...old.filter((r) => `${r.product_id}:${r.scope}:${r.scope_id}` !== `${choice.product_id}:${choice.scope}:${choice.scope_id}`)].slice(0, 6)); setChoice(null); };
+  const restoreLocal = () => { try { const d = JSON.parse(localStorage.getItem('levonis-purchase-draft-v2') || '{}'); if (!Array.isArray(d.lines)) return; setHeader({ ...newHeader(), ...restoreCostProfileSnapshot(d.header ?? {}, config.cost_profiles) }); setLines(d.lines); setCharges(d.charges ?? []); setFunding(d.funding ?? newFunding()); setEditId(d.editId); setEditVersion(d.editVersion); setOperationId(d.operationId); setQuickReceive(d.quickReceive); setEditing(true); setStep(0); } catch { localStorage.removeItem('levonis-purchase-draft-v2'); } };
+  const addChoice = () => { if (!choice) return; setLines((old) => [...old, selectionCostDraft(choice, header.cost_profile_id)]); setRecent((old) => [choice, ...old.filter((r) => `${r.product_id}:${r.scope}:${r.scope_id}` !== `${choice.product_id}:${choice.scope}:${choice.scope_id}`)].slice(0, 6)); setChoice(null); };
   return (
     <div className="inventory-workspace">
       {op.feedback}
@@ -276,11 +311,11 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               <Input label={loc('تاريخ الشراء', 'Purchase date')} type="date" value={header.purchase_day} onChange={(v) => update('purchase_day', v)} />
             </div>
             <div className="my-5 max-w-2xl">
-              <StockSelection value={choice} onChange={setChoice} />
+              <StockSelection value={choice} onChange={setChoice} showPurchaseReference={false} />
               <button type="button" className={`${T.btnSecondary} mt-3`} disabled={!choice} onClick={addChoice}>{loc('إضافة المنتج', 'Add item')}</button>
               {recent.length > 0 && <details><summary>{loc('منتجات استخدمتها الآن', 'Recent selections')}</summary><div className="flex flex-wrap gap-2">{recent.map((r) => <button key={`${r.product_id}:${r.scope}:${r.scope_id}`} type="button" className={T.btnGhost} onClick={() => setChoice(r)}>{r.label}</button>)}</div></details>}
             </div>
-            {!lines.length && <p className={`py-3 text-sm ${T.text3}`}>{loc('ابحث عن المنتج ثم حدد الخيار واللون. سنملأ آخر تكلفة وسعر البيع تلقائيًا.', 'Find the item and choose its option and colour. The latest cost and selling price fill automatically.')}</p>}
+            {!lines.length && <p className={`py-3 text-sm ${T.text3}`}>{loc('ابحث عن المنتج ثم حدد الخيار واللون. نجلب سعر البيع والوزن المعبّأ، ثم آخر سعر خام محفوظ لمسار المورد الذي تختاره في التكاليف والشحن.', 'Choose the exact item. Its selling reference and packed measurements load here; saved raw supplier prices load when you choose the route in Costs & freight.')}</p>}
             <div className="inventory-lines">{lines.map((l, i) => <article key={i} className="inventory-line">
               <div className="inventory-line-head">{l.image_url && <img src={l.image_url} alt="" className="inventory-thumb" loading="lazy" />}<div><strong>{l.label}</strong><small>{l.sku}</small></div><button type="button" className={T.btnGhost} onClick={() => setLines((a) => [...a, { ...l }])}>{loc('تكرار', 'Duplicate')}</button><button type="button" className={T.btnGhost} onClick={() => { setLines((a) => a.filter((_, j) => i !== j)); setFunding((f) => ({...f,incoming_indexes:f.incoming_indexes?.filter(j=>j!==i).map(j=>j>i?j-1:j)})); }}>{loc('حذف', 'Remove')}</button></div>
               <Input label={loc('الكمية المطلوبة', 'Quantity ordered')} type="number" min={1} value={l.qty_ordered} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, qty_ordered: v === '' ? NaN : Number(v), invoiced_qty: x.invoiced_qty === x.qty_ordered ? Number(v) : x.invoiced_qty } : x))} />
@@ -294,31 +329,52 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             </div></details>
           </>}
           {step === 2 && <>
-            <div className="inventory-fields">
-              <Select label={loc('عملة الشراء', 'Purchase currency')} value={header.currency} onChange={(v) => { if (v === header.currency) return; update('currency', v); update('exchange_rate', 1); setLines((a) => a.map((l) => ({ ...l, purchase_cost_mode: 'unit', source_total_amount: '', source_unit_amount: v === 'IQD' ? l.purchase_unit_iqd ?? '' : '' }))); }} options={['IQD', 'USD', 'CNY', 'EUR'].map((id) => ({ id, name: id }))} />
-              {header.currency !== 'IQD' && <Input label={loc('دينار لكل وحدة عملة', 'IQD per currency unit')} type="number" min={0} value={header.exchange_rate} onChange={(v) => update('exchange_rate', Number(v))} />}
-            </div>
+            <section className="inventory-line" aria-label={loc('إعدادات المورد والشحن', 'Supplier and freight settings')}>
+              <h4 className={`mb-3 font-semibold ${T.text1}`}>{loc('المورد والشحن', 'Supplier and freight')}</h4>
+              <div className="inventory-fields">
+                <Select label={loc('مسار المورد والشحن', 'Supplier and shipping route')} value={header.cost_profile_id ?? ''} onChange={chooseCostProfile} empty={loc('إدخال يدوي / مستند سابق', 'Manual entry / legacy document')} options={config.cost_profiles.map((p) => ({ id: p.id, name: loc(p.name_ar, p.name_en) }))} />
+                {header.cost_profile_id ? <div className="grid gap-1 text-sm"><span className={T.text2}>{loc('عملة شراء المورد', 'Supplier currency')}</span><strong className={T.text1}>{header.currency === 'EUR' ? loc('يورو (EUR)', 'Euro (EUR)') : loc('يوان صيني (CNY)', 'Chinese yuan (CNY)')}</strong></div> : <Select label={loc('عملة الشراء', 'Purchase currency')} value={header.currency} onChange={(v) => { if (v === header.currency) return; update('currency', v); update('exchange_rate', 1); setLines((a) => a.map((l) => ({ ...l, source_total_amount: '', source_unit_amount: '', cost_source: 'unknown' }))); }} options={['IQD', 'USD', 'CNY', 'EUR'].map((id) => ({ id, name: id }))} />}
+                {header.currency !== 'IQD' && <Input label={header.currency === 'EUR' ? loc('سعر اليورو الواحد بالدينار العراقي', 'IQD per euro') : header.currency === 'CNY' ? loc('سعر اليوان الواحد بالدينار العراقي', 'IQD per Chinese yuan') : loc('دينار لكل وحدة عملة', 'IQD per currency unit')} type="number" min={0} decimals={6} value={header.exchange_rate} onChange={(v) => update('exchange_rate', v === '' ? NaN : Number(v))} />}
+                {header.cost_profile_id && <Input label={shippingBasis === 'volume' ? loc('سعر المتر المكعب CBM بالدينار العراقي', 'Freight IQD per cubic metre (CBM)') : loc('سعر الكيلوغرام بالدينار العراقي', 'Freight IQD per kilogram')} type="number" min={0} decimals={6} value={header.shipping_rate_iqd ?? ''} onChange={(v) => update('shipping_rate_iqd', v === '' ? null : Number(v))} />}
+              </div>
+              <p className={`mt-3 text-sm ${T.text3}`}>{header.cost_profile_id ? loc('نحسب الشحن من وزن الكرتون مع التغليف أو حجمه. عند تأكيد الشراء تُحفظ الأسعار الخام والقياسات لهذا الخيار، ويُحفظ سعر الصرف والشحن لهذا المسار لاستخدامها في المشتريات القادمة.', 'Freight uses the packed carton weight or volume. Confirming saves this selection’s raw price and packed measurements, and this route’s exchange and freight rates for future purchases.') : loc('الإدخال اليدوي يحافظ على تكاليف المستندات السابقة. راجع إن كانت القيمة المحفوظة تشمل الشحن قبل إضافة تكلفة جديدة. اختر مسارًا أعلاه لحفظ أسعار المورد وحساب الشحن تلقائيًا.', 'Manual entry preserves historical document costs. Check whether a saved amount already includes shipping before adding charges. Choose a route above to remember supplier prices and calculate freight automatically.')}</p>
+              {header.cost_profile_id && <div className="mt-3 flex flex-wrap gap-2"><button type="button" className={T.btnSecondary} disabled={op.busy || !Number.isFinite(header.exchange_rate) || header.exchange_rate <= 0 || header.shipping_rate_iqd === null || !Number.isFinite(header.shipping_rate_iqd) || header.shipping_rate_iqd < 0} onClick={() => op.run(saveProfileDefaults, loc('حُفظ سعر الصرف والشحن للمشتريات القادمة', 'Exchange and freight defaults saved'))}>{loc('حفظ سعر الصرف والشحن الآن', 'Save exchange and freight defaults now')}</button><button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => op.run(reloadProfileRates, loc('حُمّل سعر الصرف والشحن المحفوظان؛ بقيت أسعار المنتجات كما أدخلتها', 'Saved exchange and freight rates loaded; entered product prices preserved'))}>{loc('إعادة تحميل سعر الصرف والشحن', 'Reload saved exchange and freight rates')}</button></div>}
+            </section>
             <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={i}>
               <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('الكمية', 'Quantity')}: {l.qty_ordered} · {loc('سعر البيع المرجعي', 'Selling reference')}: {money(l.selling_price_iqd)}</small></div></div>
-              <Select label={loc('طريقة إدخال الشراء', 'Purchase input')} value={l.purchase_cost_mode || 'unit'} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, purchase_cost_mode: v as 'unit' | 'total', source_total_amount: v === 'total' ? (x.source_unit_amount === '' ? '' : Number(x.source_unit_amount) * x.qty_ordered) : x.source_total_amount, source_unit_amount: v === 'unit' && x.source_total_amount != null ? Number(x.source_total_amount) / x.qty_ordered : x.source_unit_amount } : x))} options={[{ id: 'total', name: loc('إجمالي تكلفة شراء البند', 'Total line purchase cost') }, { id: 'unit', name: loc('تكلفة شراء القطعة', 'Unit purchase cost') }]} />
-              <div className="inventory-fields mt-3"><Input label={`${l.purchase_cost_mode === 'total' ? loc('إجمالي الشراء', 'Purchase total') : loc('تكلفة القطعة', 'Unit purchase cost')} (${header.currency})`} type="number" min={0} decimals={header.currency === 'IQD' ? 0 : 6} value={l.purchase_cost_mode === 'total' ? l.source_total_amount ?? '' : l.source_unit_amount} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, ...(x.purchase_cost_mode === 'total' ? { source_total_amount: v === '' ? '' : Number(v), source_unit_amount: v === '' ? '' : Number(v) / x.qty_ordered } : { source_unit_amount: v === '' ? '' : Number(v), source_total_amount: v === '' ? '' : Number(v) * x.qty_ordered }) } : x))} hint={l.cost_source === 'confirmed_purchase' ? `${loc('آخر شراء مؤكد لنفس الخيار واللون', 'Last confirmed purchase of this selection')} ${l.cost_date?.slice(0, 10) || ''}` : l.cost_source === 'catalogue' ? loc('التكلفة المقترحة من بطاقة المنتج', 'Suggested catalogue cost') : loc('التكلفة تحتاج إدخالًا', 'Cost needs input')} />
-              <Input label={loc('سعر البيع المرجعي للقطعة بالدينار', 'Reference unit selling price IQD')} type="number" decimals={0} min={0} value={l.selling_price_iqd} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, selling_price_iqd: v === '' ? NaN : Number(v) } : x))} /></div>
-              <p className={`mt-2 text-sm ${T.text3}`}>{loc('إجمالي الشراء / متوسط القطعة', 'Purchase total / average unit')}: {money(estimates[i]?.purchase_iqd)} / {money(estimates[i]?.purchase_iqd / l.qty_ordered)}</p>
+              {header.cost_profile_id && l.procurement_shared_colors && <p className={`mb-3 text-sm ${T.text3}`}>{loc('ألوان هذا الخيار تشترك في مخزون واحد، لذلك يشملها السعر الخام المحفوظ. لفصل تكاليف الألوان، اختر مخزونًا منفصلًا لكل خيار ولون في إعدادات المنتج.', 'This option shares one stock pool across colours, so its saved raw price applies to those colours. For separate colour costs, use stock tracked by option and colour in the product settings.')}</p>}
+              <Select label={loc('طريقة إدخال الشراء الخام', 'Raw purchase input')} value={l.purchase_cost_mode || 'unit'} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? changePurchaseCostMode(x, v as 'unit' | 'total', header.currency === 'IQD' ? 0 : 6) : x))} options={[{ id: 'total', name: loc('إجمالي سعر شراء البند الخام', 'Total raw line purchase price') }, { id: 'unit', name: loc('سعر شراء القطعة الخام', 'Raw unit purchase price') }]} />
+              <div className="inventory-fields mt-3"><Input label={`${l.purchase_cost_mode === 'total' ? loc('إجمالي سعر الشراء الخام من المورد', 'Raw supplier purchase total') : loc('سعر شراء القطعة الخام من المورد', 'Raw supplier unit price')} (${header.currency})`} type="number" min={0} decimals={header.currency === 'IQD' ? 0 : 6} value={l.purchase_cost_mode === 'total' ? l.source_total_amount ?? '' : l.source_unit_amount} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, unit_conversion_inexact: false, ...(x.purchase_cost_mode === 'total' ? { source_total_amount: v === '' ? '' : Number(v), source_unit_amount: v === '' ? '' : Number(v) / x.qty_ordered } : { source_unit_amount: v === '' ? '' : Number(v), source_total_amount: v === '' ? '' : Number((Number(v) * x.qty_ordered).toFixed(6)) }) } : x))} hint={l.cost_source === 'procurement_default' ? `${loc('آخر سعر خام محفوظ لهذا الخيار والمسار، دون شحن (متوسط القطعة عند إدخال إجمالي الفاتورة)', 'Saved raw supplier price, excluding freight (unit average when entered as an invoice total)')} ${l.cost_date?.slice(0, 10) || ''}` : l.cost_source === 'confirmed_purchase' || l.cost_source === 'catalogue' ? loc('قيمة المستند المحفوظة؛ راجع فصل الشحن عنها قبل التعديل', 'Saved document amount; verify whether freight is included before changing it') : loc('أدخل سعر المورد فقط، دون الشحن', 'Enter only the supplier price, excluding freight')} />
+              <Input label={loc('سعر البيع المرجعي للقطعة بالدينار', 'Reference unit selling price IQD')} type="number" decimals={0} min={0} value={l.selling_price_iqd} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, selling_price_iqd: v === '' ? NaN : Number(v) } : x))} />
+              {header.cost_profile_id && (shippingBasis === 'volume'
+                ? <Input label={loc('حجم كرتون القطعة مع التغليف بالمتر المكعب (CBM)', 'Packed carton volume per unit (CBM)')} type="number" min={0} decimals={9} value={l.volume_mm3 > 0 ? l.volume_mm3 / 1_000_000_000 : ''} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, volume_mm3: packedMeasureInput(v, 'volume') } : x))} hint={loc('الحجم الخارجي مع التغليف؛ ليس حجم القطعة وحدها. يُحفظ لهذا الخيار عند التأكيد.', 'Outer packed volume, not the bare item. Saved for this selection on confirmation.')} />
+                : <Input label={loc('وزن كرتون القطعة مع التغليف بالكيلوغرام', 'Packed carton weight per unit (kg)')} type="number" min={0} decimals={3} value={l.weight_g > 0 ? l.weight_g / 1_000 : ''} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, weight_g: packedMeasureInput(v, 'weight') } : x))} hint={loc('الوزن الإجمالي مع الكرتون والتغليف؛ يُحفظ لهذا الخيار عند التأكيد.', 'Gross weight including carton and packaging. Saved for this selection on confirmation.')} />)}
+              </div>
+              {l.unit_conversion_inexact && <p role="status" className={`mt-2 text-sm ${T.text2}`}>{loc('إجمالي الفاتورة لا يعطي سعر قطعة دقيقًا ضمن دقة هذه العملة. أدخل سعر القطعة، أو عد إلى إجمالي الشراء لاستعادة المبلغ الأصلي.', 'The invoice total has no exact unit price at this currency’s input precision. Enter a unit price, or return to total input to restore the original amount.')}</p>}
+              <dl className="inventory-review mt-3.5 pt-3.5 border-t border-[var(--ap-border)] tabular-nums" aria-live="polite">
+                <div><dt>{loc('شراء القطعة الخام بالدينار', 'Raw purchase per unit in IQD')}</dt><dd>{costMoney(estimates[i]?.purchase_iqd / l.qty_ordered)}</dd></div>
+                <div><dt>{loc('شحن القطعة', 'Freight per unit')}</dt><dd>{costMoney((header.cost_profile_id ? estimates[i]?.auto_shipping_iqd : estimates[i]?.freight_iqd) / l.qty_ordered)}</dd></div>
+                {header.cost_profile_id && charges.length > 0 && <div><dt>{loc('تكاليف إضافية للقطعة', 'Other charges per unit')}</dt><dd>{costMoney((estimates[i]?.freight_iqd - estimates[i]?.auto_shipping_iqd) / l.qty_ordered)}</dd></div>}
+                <div className="inventory-line"><dt>{loc('تكلفة القطعة النهائية', 'Landed unit cost')}</dt><dd><strong><output aria-label={`${loc('تكلفة القطعة النهائية', 'Landed unit cost')}: ${l.label}`}>{costMoney(estimates[i]?.unit_iqd)}</output></strong></dd></div>
+              </dl>
+              <p className={`mt-2 text-xs ${T.text3}`}>{loc('إجمالي البند مع الشحن', 'Total line cost with freight')}: {costMoney(estimates[i]?.total_iqd)} · {loc('تُقرب المجاميع إلى أقرب دينار، ومتوسط القطعة للعرض.', 'Totals round to the nearest IQD; the unit average is for display.')}</p>
               {funding.mode === 'investor' && <label className="mt-3 flex gap-2 text-sm"><input type="checkbox" checked={!funding.incoming_indexes || funding.incoming_indexes.includes(i)} onChange={(e) => setFunding((f) => { const indexes = f.incoming_indexes ?? lines.map((_, j) => j); return { ...f, incoming_indexes: e.target.checked ? [...indexes, i] : indexes.filter((j) => j !== i) }; })} />{loc('مشمول بتمويل المستثمر ونسبته', 'Include in investor funding and profit share')}</label>}
             </article>)}</div>
-            <h4 className={`mb-3 font-semibold ${T.text1}`}>{loc('تكاليف الشحنة', 'Shipment charges')}</h4>
+            <h4 className={`mb-3 font-semibold ${T.text1}`}>{header.cost_profile_id ? loc('تكاليف إضافية غير الشحن المحسوب', 'Additional charges beyond calculated freight') : loc('تكاليف الشحنة اليدوية', 'Manual shipment charges')}</h4>
+            {header.cost_profile_id && <p className={`mb-3 text-sm ${T.text3}`}>{loc('الشحن محسوب أعلاه بالفعل. أضف هنا فقط أي رسوم أخرى، مثل التخليص، لتجنب احتساب الشحن مرتين.', 'Freight is already calculated above. Add only other fees here, such as customs handling, to avoid counting freight twice.')}</p>}
             {charges.map((c, i) => <div key={i} className="inventory-line mb-3"><div className="inventory-fields">
               <Input label={loc('اسم التكلفة', 'Charge name')} value={c.title} onChange={(v) => setCharges((a) => a.map((x, j) => j === i ? { ...x, title: v } : x))} />
               <Input label={loc('إجمالي بالدينار', 'Total IQD')} type="number" min={0} value={c.amount_iqd} onChange={(v) => setCharges((a) => a.map((x, j) => j === i ? { ...x, amount_iqd: v === '' ? NaN : Number(v) } : x))} />
             </div><details className="mt-2"><summary>{loc('توزيع التكلفة', 'Charge allocation')}</summary><Select label={loc('طريقة التوزيع', 'Allocation method')} value={c.basis} onChange={(v) => setCharges((a) => a.map((x, j) => j === i ? { ...x, basis: v } : x))} options={['quantity', 'value', 'weight', 'volume'].map((id, j) => ({ id, name: [loc('الكمية', 'Quantity'), loc('القيمة', 'Value'), loc('الوزن', 'Weight'), loc('الحجم', 'Volume')][j] }))} /></details><button type="button" className={T.btnGhost} onClick={() => setCharges((a) => a.filter((_, j) => i !== j))}>{loc('حذف التكلفة', 'Remove charge')}</button></div>)}
-            <button type="button" className={T.btnSecondary} onClick={() => setCharges((a) => [...a, { title: loc('شحن', 'Shipping'), amount_iqd: 0, basis: 'quantity' }])}>{loc('إضافة شحن أو تكلفة', 'Add freight or charge')}</button>
+            <button type="button" className={T.btnSecondary} onClick={() => setCharges((a) => [...a, { title: header.cost_profile_id ? loc('رسوم إضافية', 'Additional fees') : loc('شحن', 'Shipping'), amount_iqd: 0, basis: 'quantity' }])}>{header.cost_profile_id ? loc('إضافة رسوم أخرى', 'Add other fees') : loc('إضافة شحن أو تكلفة', 'Add freight or charge')}</button>
             <details className="mt-4"><summary>{loc('تكلفة تقديرية ووزن وحجم ومرفقات واستيراد', 'Estimated cost, weights, attachments and import')}</summary><div className="inventory-fields mt-3">
               <Select label={loc('حالة التكلفة', 'Cost status')} value={header.cost_state} onChange={(v) => update('cost_state', v)} options={[{ id: 'estimated', name: loc('تقديرية؛ الاستلام ينتظر تثبيتها', 'Estimated; receiving waits for confirmation') }, { id: 'final', name: loc('نهائية ومثبتة', 'Final and confirmed') }]} />
               <Input label={loc('رابط مرفق الفاتورة HTTPS', 'Invoice attachment HTTPS URL')} value={header.attachment_url} onChange={(v) => update('attachment_url', v)} />
               <Input label={loc('مجموع الفاتورة للمطابقة (اختياري)', 'Invoice total for matching (optional)')} type="number" value={header.invoice_total_iqd} onChange={(v) => update('invoice_total_iqd', v)} />
               <Input label={loc('ملاحظات (اختياري)', 'Notes (optional)')} value={header.note} onChange={(v) => update('note', v)} />
-              {lines.map((l, i) => <div className="grid gap-2" key={i}><span className={`text-sm ${T.text2}`}>{l.label}</span><Input label={loc('وزن الوحدة بالغرام', 'Unit weight (g)')} type="number" value={l.weight_g} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, weight_g: Number(v) } : x))} /><Input label={loc('حجم الوحدة بالملم المكعب', 'Unit volume (mm³)')} type="number" value={l.volume_mm3} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, volume_mm3: Number(v) } : x))} /></div>)}
-            </div><p className={`my-3 text-xs ${T.text3}`}>CSV: sku,qty,unit_amount,weight_g,volume_mm3</p><input aria-label="CSV" type="file" accept=".csv,text/csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then(setCsv); }} /><textarea aria-label={loc('محتوى CSV', 'CSV content')} className={`${T.input} my-2 h-24 w-full`} value={csv} onChange={(e) => setCsv(e.target.value)} /><button type="button" className={T.btnSecondary} disabled={op.busy || !csv} onClick={() => op.run(async () => { const r = await api.post<{ lines: DraftLine[] }>(`${PROCUREMENT}/import-preview`, { csv }); setLines(r.lines.map((l) => ({ ...l, invoiced_qty: l.qty_ordered }))); })}>{loc('فحص واستيراد البنود', 'Validate and import lines')}</button></details>
+              {!header.cost_profile_id && lines.map((l, i) => <div className="grid gap-2" key={i}><span className={`text-sm ${T.text2}`}>{l.label}</span><Input label={loc('وزن الوحدة بالغرام', 'Unit weight (g)')} type="number" value={l.weight_g} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, weight_g: Number(v) } : x))} /><Input label={loc('حجم الوحدة بالملم المكعب', 'Unit volume (mm³)')} type="number" value={l.volume_mm3} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, volume_mm3: Number(v) } : x))} /></div>)}
+              {header.cost_profile_id && lines.map((l, i) => <div className="grid gap-2" key={i}><span className={`text-sm ${T.text2}`}>{l.label}</span>{shippingBasis === 'weight' ? <Input label={loc('حجم التغليف CBM لتوزيع الرسوم الأخرى (اختياري)', 'Packed volume CBM for other charge allocation (optional)')} type="number" min={0} decimals={9} value={l.volume_mm3 > 0 ? l.volume_mm3 / 1_000_000_000 : ''} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, volume_mm3: v === '' ? 0 : packedMeasureInput(v, 'volume') } : x))} /> : <Input label={loc('وزن التغليف بالكيلو لتوزيع الرسوم الأخرى (اختياري)', 'Packed weight kg for other charge allocation (optional)')} type="number" min={0} decimals={3} value={l.weight_g > 0 ? l.weight_g / 1_000 : ''} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, weight_g: v === '' ? 0 : packedMeasureInput(v, 'weight') } : x))} />}</div>)}
+            </div><p className={`my-3 text-xs ${T.text3}`}>CSV: sku,qty,unit_amount,weight_g,volume_mm3</p><input aria-label="CSV" type="file" accept=".csv,text/csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then(setCsv); }} /><textarea aria-label={loc('محتوى CSV', 'CSV content')} className={`${T.input} my-2 h-24 w-full`} value={csv} onChange={(e) => setCsv(e.target.value)} /><button type="button" className={T.btnSecondary} disabled={op.busy || !csv} onClick={() => op.run(async () => { const r = await api.post<{ lines: DraftLine[] }>(`${PROCUREMENT}/import-preview`, { csv, cost_profile_id: header.cost_profile_id }); setLines(r.lines.map((l) => ({ ...l, invoiced_qty: l.qty_ordered }))); })}>{loc('فحص واستيراد البنود', 'Validate and import lines')}</button></details>
           </>}
           {step === 3 && <>
             <dl className="inventory-review">
@@ -330,7 +386,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={i}><strong>{l.label}</strong><div className={`mt-2 flex flex-wrap gap-3 text-sm ${T.text2}`}><span>{loc('الكمية', 'Quantity')}: {l.qty_ordered}</span><span>{loc('تكلفة البند', 'Line cost')}: {money(estimates[i]?.total_iqd)}</span><span>{loc('تكلفة القطعة النهائية', 'Landed unit cost')}: {money(estimates[i]?.unit_iqd)}</span><span>{loc('ربح المستثمر التقديري', 'Estimated investor profit')}: {money(estimates[i]?.investor_iqd)}</span><span>{loc('ربح المتجر التقديري', 'Estimated store profit')}: {money(estimates[i]?.owner_iqd)}</span></div></article>)}</div>
             <p className={`text-sm ${T.text3}`}>{loc('احفظ مسودة إن كنت تنتظر تكلفة نهائية. تأكيد الشراء يضيف شحنة قادمة؛ اختر استلام شحنة عند وصولها.', 'Save a draft while waiting for final costs. Confirming creates an incoming shipment; receive it when it arrives.')}</p>
           </>}
-          <aside className="inventory-sticky-summary"><div className="inventory-total"><span>{loc('المجموع مع تكاليف الشحنة', 'Total landed cost')}</span><strong>{money(costsValid ? total : null)}</strong></div>{funding.mode === 'investor' && <dl className="inventory-review"><div><dt>{loc('تمويل مخصص / مستلم', 'Allocated / received')}</dt><dd>{money(allocated)} / {money(Number(funding.received_iqd))}</dd></div><div><dt>{loc('مساهمة المتجر', 'Store contribution')}</dt><dd>{money(Math.max(0, total - allocated))}</dd></div><div><dt>{loc('نقد مستلم غير مخصص', 'Unallocated received cash')}</dt><dd>{money(Math.max(0, Number(funding.received_iqd) - allocated))}</dd></div><div><dt>{loc('تمويل ينتظر الاستلام', 'Funding not yet received')}</dt><dd>{money(Math.max(0, allocated - Number(funding.received_iqd)))}</dd></div></dl>}<p className={`mt-2 text-xs ${T.text3}`}>{loc(quickReceive ? 'ستُستلم القطع الموجودة الآن بعد تأكيد التكلفة. الربح تقديري حتى التسليم والتحصيل.' : 'الشراء القادم لا يزيد المخزون المتاح. الربح تقديري حتى تسليم الطلب والتحصيل.', quickReceive ? 'On-hand units are received after confirming cost. Profit remains an estimate until delivery and collection.' : 'Incoming purchases do not increase available stock. Profit remains an estimate until delivery and collection.')}</p></aside>
+          <aside className="inventory-sticky-summary"><div className="inventory-total"><span>{loc('المجموع مع تكاليف الشحنة', 'Total landed cost')}</span><strong>{money(costsValid ? total : null)}</strong></div>{funding.mode === 'investor' && <dl className="inventory-review"><div><dt>{loc('تمويل مخصص / مستلم', 'Allocated / received')}</dt><dd>{costMoney(allocated)} / {costMoney(Number(funding.received_iqd))}</dd></div><div><dt>{loc('مساهمة المتجر', 'Store contribution')}</dt><dd>{costMoney(Math.max(0, total - allocated))}</dd></div><div><dt>{loc('نقد مستلم غير مخصص', 'Unallocated received cash')}</dt><dd>{costMoney(Math.max(0, Number(funding.received_iqd) - allocated))}</dd></div><div><dt>{loc('تمويل ينتظر الاستلام', 'Funding not yet received')}</dt><dd>{costMoney(Math.max(0, allocated - Number(funding.received_iqd)))}</dd></div></dl>}<p className={`mt-2 text-xs ${T.text3}`}>{loc(quickReceive ? 'ستُستلم القطع الموجودة الآن بعد تأكيد التكلفة. الربح تقديري حتى التسليم والتحصيل.' : 'الشراء القادم لا يزيد المخزون المتاح. الربح تقديري حتى تسليم الطلب والتحصيل.', quickReceive ? 'On-hand units are received after confirming cost. Profit remains an estimate until delivery and collection.' : 'Incoming purchases do not increase available stock. Profit remains an estimate until delivery and collection.')}</p></aside>
           <div className="inventory-footer">
             {step > 0 && <button type="button" className={T.btnSecondary} onClick={() => setStep((v) => v - 1)}>{loc('رجوع', 'Back')}</button>}
             {step < 3 ? <button type="button" className={T.btnPrimary} disabled={op.busy || !fundingValid(funding) || (step > 0 && !quantitiesValid) || (step === 2 && !costsValid)} onClick={() => setStep((v) => v + 1)}>{loc('التالي', 'Continue')}</button> : <button type="button" className={T.btnPrimary} disabled={op.busy || !costsValid || !fundingValid(funding) || (quickReceive && header.cost_state !== 'final')} onClick={() => op.run(() => save('ordered'), loc('تم تأكيد أمر الشراء', 'Purchase confirmed'))}>{loc(quickReceive ? 'تأكيد وإضافة المخزون' : 'تأكيد الشراء القادم', quickReceive ? 'Confirm and receive stock' : 'Confirm incoming purchase')}</button>}
@@ -372,7 +428,12 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             </button>
           </div>
           <div className="inventory-lines">{selected.lines.map((l) => <article className="inventory-line" key={l.line_id}>
-            <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('المطلوب / المستلم', 'Ordered / received')}: {l.qty_ordered} / {l.qty_received} · {loc('تكلفة الوحدة', 'Unit cost')}: {money(l.purchase_unit_iqd)}</small></div></div>
+            <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('المطلوب / المستلم', 'Ordered / received')}: {l.qty_ordered} / {l.qty_received}</small></div></div>
+            <dl className="inventory-review mt-3.5 pt-3.5 border-t border-[var(--ap-border)] tabular-nums">
+              <div><dt>{loc('شراء القطعة دون التكاليف الإضافية', 'Purchase per unit before added charges')}</dt><dd>{costMoney((l.purchase_total_iqd ?? l.purchase_unit_iqd * l.qty_ordered) / l.qty_ordered)}</dd></div>
+              <div><dt>{loc('شحن وتكاليف إضافية للقطعة', 'Freight and additional charges per unit')}</dt><dd>{costMoney(l.charges_iqd / l.qty_ordered)}</dd></div>
+              <div className="inventory-line"><dt>{loc('تكلفة القطعة النهائية', 'Landed unit cost')}</dt><dd><strong>{costMoney(((l.purchase_total_iqd ?? l.purchase_unit_iqd * l.qty_ordered) + l.charges_iqd) / l.qty_ordered)}</strong></dd></div>
+            </dl>
             <button type="button" className={T.btnGhost} onClick={()=>setPriceLine(l)}>{loc('تحديث سعر هذا الخيار في المتجر','Update this selection’s store price')}</button>
             <Input label={loc('الكمية التي وصلت الآن', 'Quantity arriving now')} type="number" min={0} value={receiving[l.line_id]?.qty ?? 0} onChange={(v) => setReceiving((r) => ({ ...r, [l.line_id]: { ...r[l.line_id], qty: Number(v) } }))} hint={`${loc('المتبقي للاستلام', 'Remaining to receive')}: ${l.qty_ordered - l.qty_received}`} />
             <details className="mt-2"><summary>{loc('كمية مرفوضة وتكلفة الشحنة', 'Rejected quantity and charges')}</summary><Input label={loc('المرفوض الآن', 'Rejected now')} type="number" min={0} value={receiving[l.line_id]?.rejected_qty ?? 0} onChange={(v) => setReceiving((r) => ({ ...r, [l.line_id]: { ...r[l.line_id], rejected_qty: Number(v) } }))} /><p className={`mt-2 text-xs ${T.text3}`}>{loc('نصيب البند من الشحنة', 'Line share of shipment charges')}: {money(l.charges_iqd)}</p></details>

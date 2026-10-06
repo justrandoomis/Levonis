@@ -1,4 +1,5 @@
 import { Hono, type Context } from 'hono';
+import { exactProcurementUnitDefault } from '../../packages/contracts/src/procurementCost';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, forbidden, notFound, str } from '../lib/http';
 import { isOwner, projectForAdmin } from '../lib/adminScope';
@@ -20,6 +21,7 @@ import {
 import { parsePurchaseCsv } from '../lib/purchaseCsv';
 import { planPurchaseFunding, purchaseFundingSummary, receivePurchaseFunding, type FundedPurchaseLine } from '../lib/purchaseFunding';
 import { investorFinanceInstalled } from '../lib/investorFinance';
+import { packedMeasure, procurementAllocation, procurementAmount, procurementProfiles, profileRates } from '../lib/procurementCosts';
 
 export const adminProcurementRoutes = new Hono<AppContext>();
 adminProcurementRoutes.use('*', requireAdmin);
@@ -38,9 +40,11 @@ type Line = IncomingRow & {
   line_id: string;
   label: string;
   charges_iqd: number;
+  auto_shipping_iqd: number;
   invoiced_qty: number;
   rejected_qty: number;
   source_unit_amount: number;
+  source_total_amount: number | null;
   weight_g: number;
   volume_mm3: number;
   selling_price_iqd: number | null;
@@ -75,7 +79,7 @@ async function document(db: D1Database, id: string) {
   const [lines, charges, payments] = await Promise.all([
     db
       .prepare(
-        'SELECT i.*,l.id AS line_id,l.label,l.source_unit_amount,l.weight_g,l.volume_mm3,l.selling_price_iqd,l.charges_iqd,l.invoiced_qty,l.rejected_qty,l.purchase_cost_mode FROM purchase_lines l JOIN incoming_inventory i ON i.id=l.incoming_id WHERE l.purchase_id=? ORDER BY l.id',
+        'SELECT i.*,l.id AS line_id,l.label,l.source_unit_amount,l.source_total_amount,l.weight_g,l.volume_mm3,l.selling_price_iqd,l.charges_iqd,l.auto_shipping_iqd,l.invoiced_qty,l.rejected_qty,l.purchase_cost_mode FROM purchase_lines l JOIN incoming_inventory i ON i.id=l.incoming_id WHERE l.purchase_id=? ORDER BY l.id',
       )
       .bind(id)
       .all<Line>(),
@@ -119,6 +123,9 @@ adminProcurementRoutes.post('/import-preview', async (c) => {
   const b = await bodyOf(c),
     records = parsePurchaseCsv(String(b.csv ?? '')),
     lines = [];
+  const profileId = text(b.cost_profile_id, 30);
+  if (profileId && !(await procurementProfiles(c.env.DB)).some(profile => profile.id === profileId))
+    throw badRequest('مسار التوريد غير صحيح', 'INVALID_COST_PROFILE');
   for (const r of records) {
     const products =
       (
@@ -136,24 +143,42 @@ adminProcurementRoutes.post('/import-preview', async (c) => {
     }
     if (matches.length !== 1)
       throw badRequest(`SKU ${r.sku}: اختر نسخة لها رمز فريد قبل الاستيراد`, 'CSV_SELECTION_AMBIGUOUS');
+    const saved = matches[0].procurement_defaults.find(row => row.profile_id === profileId);
     lines.push({
       ...matches[0],
       qty_ordered: whole(r.qty, 'الكمية', 1, 100000),
       source_unit_amount: decimal(r.unit_amount, 'التكلفة'),
-      weight_g: r.weight_g ? decimal(r.weight_g, 'الوزن') : matches[0].weight_g,
-      volume_mm3: r.volume_mm3 ? decimal(r.volume_mm3, 'الحجم') : matches[0].volume_mm3,
+      weight_g: r.weight_g ? packedMeasure(r.weight_g, 'الوزن') : profileId ? saved?.weight_g ?? matches[0].packed_weight_g ?? 0 : matches[0].weight_g,
+      volume_mm3: r.volume_mm3 ? packedMeasure(r.volume_mm3, 'الحجم') : profileId ? saved?.volume_mm3 ?? matches[0].packed_volume_mm3 ?? 0 : matches[0].volume_mm3,
     });
   }
   return c.json({ success: true, lines });
 });
 adminProcurementRoutes.get('/config', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'purchase');
-  const [suppliers, locations, investors] = await Promise.all([
+  const [suppliers, locations, investors, costProfiles] = await Promise.all([
     c.env.DB.prepare('SELECT id,name FROM inventory_suppliers WHERE active=1 ORDER BY name').all(),
     c.env.DB.prepare('SELECT * FROM stock_locations WHERE active=1 ORDER BY name').all(),
     c.env.DB.prepare("SELECT p.*,u.name,u.email FROM investment_profiles p JOIN users u ON u.id=p.user_id WHERE p.state='active' AND u.role='admin' AND u.admin_scope='assistant' ORDER BY u.name").all(),
+    procurementProfiles(c.env.DB),
   ]);
-  return c.json({ success: true, suppliers: suppliers.results ?? [], locations: locations.results ?? [],investors:investors.results??[] });
+  return c.json({ success: true, suppliers: suppliers.results ?? [], locations: locations.results ?? [],investors:investors.results??[], cost_profiles: costProfiles });
+});
+adminProcurementRoutes.put('/cost-profiles/:id', async (c) => {
+  const user = c.get('user')!;
+  await requireCapability(c.env, user, 'purchase');
+  const body = await bodyOf(c), id = c.req.param('id');
+  const profile = (await procurementProfiles(c.env.DB)).find(row => row.id === id);
+  if (!profile) throw badRequest('مسار التوريد غير صحيح', 'INVALID_COST_PROFILE');
+  if ((body.currency != null && body.currency !== profile.currency) ||
+      (body.shipping_basis != null && body.shipping_basis !== profile.shipping_basis))
+    throw badRequest('عملة ومسار الشحن لا يتطابقان', 'COST_PROFILE_MISMATCH');
+  const version = whole(body.version, 'version', 1), rates = profileRates(body);
+  const updated = await c.env.DB.prepare('UPDATE procurement_cost_profiles SET exchange_rate=?,shipping_rate_iqd=?,version=version+1,updated_by=?,updated_at=? WHERE id=? AND version=?')
+    .bind(rates.exchange_rate, rates.shipping_rate_iqd, user.id, new Date().toISOString(), id, version).run();
+  if (!updated.meta.changes) throw conflict('تغيرت أسعار مسار التوريد؛ حدّث البيانات وأعد المحاولة', 'COST_PROFILE_CHANGED');
+  await audit(c.env.DB, user.id, 'procurement.profile.updated', id, { ...rates, version: version + 1 });
+  return c.json({ success: true, profile: (await procurementProfiles(c.env.DB)).find(row => row.id === id) });
 });
 adminProcurementRoutes.get('/documents', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'purchase');
@@ -183,6 +208,17 @@ async function planDocument(
   id: string,
   previous?: Purchase,
 ) {
+  const profileId = text(b.cost_profile_id, 30);
+  const profile = profileId ? (await procurementProfiles(db)).find(row => row.id === profileId) : undefined;
+  if (profileId && !profile) throw badRequest('مسار التوريد غير صحيح', 'INVALID_COST_PROFILE');
+  if (profile && (b.currency !== profile.currency || (b.shipping_basis != null && b.shipping_basis !== profile.shipping_basis)))
+    throw badRequest('عملة ومسار الشحن لا يتطابقان', 'COST_PROFILE_MISMATCH');
+  const profileVersion = profile ? whole(b.cost_profile_version, 'إصدار أسعار المسار', 1) : null;
+  if (profile && profile.version !== profileVersion)
+    throw conflict('تغيرت أسعار مسار التوريد؛ حدّث البيانات وأعد المحاولة', 'COST_PROFILE_CHANGED');
+  const shippingRate = profile ? profileRates(b).shipping_rate_iqd : null;
+  if (!profile && b.shipping_rate_iqd != null && b.shipping_rate_iqd !== '')
+    throw badRequest('اختر مسار التوريد لحساب الشحن تلقائياً', 'INVALID_COST_PROFILE');
   const currency = text(b.currency, 8) || 'IQD';
   if (!['IQD', 'USD', 'CNY', 'EUR'].includes(currency)) throw badRequest('Unsupported currency');
   const rate = currency === 'IQD' ? 1 : decimal(b.exchange_rate, 'سعر الصرف', 0.000001);
@@ -197,21 +233,33 @@ async function planDocument(
     total: number;
     costMode: 'unit'|'total';
     source: number;
+    sourceTotal: number | null;
     weight: number;
     volume: number;
     invoiceQty: number;
     selling: number | null;
     charges: number;
+    autoShipping: number;
   }> = [];
   for (const v of raw) {
     const r = v as Record<string, unknown>;
     const sel = await requireSelection(db, text(r.product_id, 60), text(r.scope, 20), text(r.scope_id, 60));
+    if (profile && ((r.option_id != null && r.option_id !== '' && r.option_id !== sel.option_id) ||
+        (r.color_id != null && r.color_id !== '' && r.color_id !== sel.color_id)))
+      throw badRequest('اختر هوية المخزون المطابقة للخيار واللون؛ تكلفة الألوان المنفصلة تتطلب مخزون تركيبات', 'INVALID_SELECTION');
     const qty = whole(r.qty_ordered, 'الكمية', 1, 100000);
     const costMode=r.purchase_cost_mode==='total'?'total':'unit';
-    const entered=decimal(costMode==='total'?r.source_total_amount??r.purchase_total_iqd:r.source_unit_amount??r.purchase_unit_iqd,'تكلفة الشراء');
+    const entered=decimal(costMode==='total' ? (profile ? r.source_total_amount : r.source_total_amount??r.purchase_total_iqd) : (profile ? r.source_unit_amount : r.source_unit_amount??r.purchase_unit_iqd),'تكلفة الشراء الخام');
     if(currency==='IQD')whole(entered,'تكلفة الشراء بالدينار');
-    const total=whole(Math.round(costMode==='total'?entered*rate:Math.round(entered*rate)*qty),'إجمالي شراء البند');
+    const total = profile
+      ? procurementAmount(costMode === 'total' ? [entered, rate] : [entered, rate, qty])
+      : whole(Math.round(costMode === 'total' ? entered * rate : Math.round(entered * rate) * qty), 'إجمالي شراء البند');
     const unit=Math.floor(total/qty),source=costMode==='total'?entered/qty:entered;
+    const weight = packedMeasure(r.weight_g ?? (profile ? sel.packed_weight_g ?? 0 : sel.weight_g), 'الوزن'),
+      volume = packedMeasure(r.volume_mm3 ?? (profile ? sel.packed_volume_mm3 ?? 0 : sel.volume_mm3), 'الحجم');
+    if (profile && (profile.shipping_basis === 'weight' ? weight : volume) <= 0)
+      throw badRequest('أدخل وزن الكرتون مع التغليف أو حجمه لجميع البنود', 'PACKED_MEASUREMENT_REQUIRED');
+    const autoShipping = profile ? procurementAmount([qty, profile.shipping_basis === 'weight' ? weight : volume, shippingRate!], profile.shipping_basis === 'weight' ? 1000 : 1e9) : 0;
     lines.push({
       sel,
       qty,
@@ -219,14 +267,16 @@ async function planDocument(
       total,
       costMode,
       source,
-      weight: decimal(r.weight_g ?? sel.weight_g, 'الوزن'),
-      volume: decimal(r.volume_mm3 ?? sel.volume_mm3, 'الحجم'),
+      sourceTotal: costMode === 'total' ? entered : null,
+      weight,
+      volume,
       invoiceQty: whole(r.invoiced_qty ?? qty, 'كمية الفاتورة', 0, 100000),
       selling:
         r.selling_price_iqd === null
           ? null
           : whole(r.selling_price_iqd ?? sel.selling_price_iqd, 'سعر البيع'),
-      charges: 0,
+      charges: autoShipping,
+      autoShipping,
     });
   }
   const charges = (Array.isArray(b.charges) ? b.charges : []).map((v) => {
@@ -235,7 +285,7 @@ async function planDocument(
     if (!['quantity', 'weight', 'volume', 'value'].includes(basis))
       throw badRequest('Invalid allocation method');
     const amount = whole(r.amount_iqd, 'تكلفة الشحنة');
-    const shares = allocateExact(
+    const shares = (profile ? procurementAllocation : allocateExact)(
       amount,
       lines.map((l) =>
         basis === 'weight'
@@ -322,6 +372,10 @@ async function planDocument(
     invoice_no: text(b.invoice_no),
     currency,
     exchange_rate: rate,
+    cost_profile_id: profile?.id ?? null,
+    cost_profile_version: profileVersion,
+    shipping_rate_iqd: shippingRate,
+    shipping_basis: profile?.shipping_basis ?? null,
     purchase_day: day,
     expected_day: b.expected_day ? dateValue(b.expected_day) : null,
     warehouse_id: warehouse,
@@ -353,6 +407,13 @@ async function planDocument(
         .prepare(`INSERT INTO purchase_orders(${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`)
         .bind(...Object.values(row)),
     );
+  }
+  if (profile) {
+    // A concurrent settings save must not be silently overwritten by an older
+    // open purchase. The entire document/default transaction is fenced.
+    statements.push(...fence(db, 'EXISTS(SELECT 1 FROM procurement_cost_profiles WHERE id=? AND version=?)', [profile.id, profileVersion]));
+    if (status === 'ordered') statements.push(db.prepare('UPDATE procurement_cost_profiles SET exchange_rate=?,shipping_rate_iqd=?,version=version+1,updated_by=?,updated_at=? WHERE id=? AND version=?')
+      .bind(rate, shippingRate, actor, now, profile.id, profileVersion));
   }
   const plannedLines:FundedPurchaseLine[]=[];
   for (const l of lines) {
@@ -389,7 +450,7 @@ async function planDocument(
     statements.push(
       db
         .prepare(
-          'INSERT INTO purchase_lines(id,purchase_id,incoming_id,label,source_unit_amount,weight_g,volume_mm3,selling_price_iqd,charges_iqd,invoiced_qty,purchase_total_iqd,purchase_cost_mode) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+          'INSERT INTO purchase_lines(id,purchase_id,incoming_id,label,source_unit_amount,weight_g,volume_mm3,selling_price_iqd,charges_iqd,invoiced_qty,purchase_total_iqd,purchase_cost_mode,auto_shipping_iqd,source_total_amount) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
         )
         .bind(
           line,
@@ -404,8 +465,13 @@ async function planDocument(
           l.invoiceQty,
           l.total,
           l.costMode,
+          l.autoShipping,
+          l.sourceTotal,
         ),
     );
+    if (profile && status === 'ordered') statements.push(db.prepare(`INSERT INTO procurement_selection_cost_defaults(profile_id,product_id,scope,scope_id,source_unit_amount,weight_g,volume_mm3,updated_by,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(profile_id,product_id,scope,scope_id) DO UPDATE SET source_unit_amount=excluded.source_unit_amount,weight_g=excluded.weight_g,volume_mm3=excluded.volume_mm3,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
+      .bind(profile.id, l.sel.product_id, l.sel.scope, l.sel.scope_id, l.costMode === 'total' ? exactProcurementUnitDefault(l.sourceTotal!, l.qty) : l.source, l.weight, l.volume, actor, now));
   }
   for (const charge of charges)
     statements.push(
@@ -430,7 +496,13 @@ adminProcurementRoutes.post('/documents', async (c) => {
       throw conflict('رقم العملية مستخدم لمحتوى مختلف', 'IDEMPOTENCY_MISMATCH');
     return c.json({ success: true, id, already: true });
   }
-  await c.env.DB.batch(await planDocument(c.env.DB, b, user.id, id));
+  const statements = await planDocument(c.env.DB, b, user.id, id);
+  try { await c.env.DB.batch(statements); }
+  catch (error) {
+    if (b.cost_profile_id && /CHECK constraint/i.test(String(error)))
+      throw conflict('تغيرت بيانات الشراء أو أسعار المسار؛ حدّث البيانات وأعد المحاولة', 'COST_PROFILE_CHANGED');
+    throw error;
+  }
   await audit(c.env.DB, user.id, 'purchase.created', id, {});
   return c.json({ success: true, id });
 });

@@ -185,6 +185,7 @@ function buildFullProduct(db: DatabaseSync, id: string, slug: string, extraKey?:
     idempotency_key: `${id}-idem-${seq}`,
   });
   insert(db, 'price_history', { product_id: id, field: 'regular' });
+  insert(db, 'procurement_selection_cost_defaults', { profile_id: 'germany_land', product_id: id, scope: 'option', scope_id: `${id}-o1`, source_unit_amount: 855, weight_g: 22300, volume_mm3: 40000000, updated_by: 'user-1', updated_at: '2026-10-06T00:00:00.000Z' });
   insert(db, 'favorites', { user_id: 'user-1', product_id: id });
   insert(db, 'cart_items', { id: `${id}-cart1-${seq}`, user_id: 'user-1', product_id: id, qty: 1 });
   insert(db, 'cart_bundle_choices', { cart_item_id: `${id}-cart1-${seq}`, component_id: 'comp-1', color_id: `${id}-c1` });
@@ -247,6 +248,7 @@ test('1. a full product leaves zero owned rows, and its order history survives',
     ['product_facets', 'product_id'],
     ['product_translations', 'product_id'],
     ['inventory_ledger', 'product_id'],
+    ['procurement_selection_cost_defaults', 'product_id'],
     ['price_history', 'product_id'],
     ['favorites', 'product_id'],
     ['cart_items', 'product_id'],
@@ -266,6 +268,8 @@ test('1. a full product leaves zero owned rows, and its order history survives',
   assert.equal(item.option_id, 'p-full-o1', 'the frozen option id stays — it describes what was bought');
   assert.equal(item.name_snapshot, 'Product p-full', 'the snapshot is what a receipt reads');
   assert.equal(result.rows_unlinked_by_table.order_items, 1);
+  assert.equal(result.rows_deleted_by_table.procurement_selection_cost_defaults, 1);
+  assert.equal(count(db, 'SELECT COUNT(*) AS n FROM procurement_cost_profiles'), 3, 'shared supplier profiles survive deleting one product');
 
   // R2: every owned object removed, the vendor URL never queued.
   const cleanup = await runMediaCleanup(

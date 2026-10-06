@@ -5,9 +5,11 @@ import { api, Field, PROCUREMENT, Select, T, money, useLabels, type Selection } 
 export default function StockSelection({
   value,
   onChange,
+  showPurchaseReference = true,
 }: {
   value: Selection | null;
   onChange: (value: Selection | null) => void;
+  showPurchaseReference?: boolean;
 }) {
   const { loc } = useLabels();
   const [product, setProduct] = useState(value?.product_id ?? ''),
@@ -77,7 +79,7 @@ export default function StockSelection({
         <p className={`text-xs ${T.text3}`}>
           {loc('المتاح', 'Available')}: {value.stock === null ? '∞' : value.stock - value.reserved} ·{' '}
           {loc('سعر البيع المرجعي', 'Selling reference')}: {money(value.selling_price_iqd)}
-          {value.purchase_unit_iqd !== undefined && (
+          {showPurchaseReference && value.purchase_unit_iqd !== undefined && (
             <>
               {' '}
               · {loc('تكلفة الشراء المرجعية', 'Purchase reference')}: {value.purchase_unit_iqd == null ? loc('تحتاج إدخالًا', 'Needs input') : money(value.purchase_unit_iqd)} (

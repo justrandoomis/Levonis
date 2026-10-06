@@ -540,6 +540,10 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'upload_sessions.parts_json': 'received multipart parts {n, etag, bytes} — etags, not keys (0156)',
   'community_print_requests.primary_file_id': 'a row id in community_request_files, not a key',
   'printer_models.slicer_profile_id': 'a slicer profile identifier',
+  // 0172 supplier route identifiers contain the substring file, but reference
+  // the three fixed cost profiles, never an uploaded object or media path.
+  'procurement_selection_cost_defaults.profile_id': 'foreign key to a fixed supplier cost profile (germany_land, china_air, china_sea)',
+  'purchase_orders.cost_profile_id': 'snapshot of the supplier cost profile identity, not an R2 object or invoice attachment',
   'print_analyses.profile_revision': 'a slicer profile revision string',
   'print_analyses.orientation_key': 'which orientation was measured, e.g. z-up',
   'print_analyses.file_sha256': 'the content hash of the analysed model, not its location',

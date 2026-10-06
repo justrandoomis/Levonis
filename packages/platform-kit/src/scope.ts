@@ -74,6 +74,12 @@ export const FINANCIAL_FIELDS = [
   'oldest_unit_cost_iqd',
   'newest_unit_cost_iqd',
   'gross_profit_iqd',
+  'procurement_defaults',
+  'cost_profiles',
+  'source_unit_amount',
+  'source_total_amount',
+  'shipping_rate_iqd',
+  'auto_shipping_iqd',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;
