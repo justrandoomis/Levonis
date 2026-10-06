@@ -112,7 +112,7 @@ test('a chunk that never arrives cannot blank the shop', () => {
   // Every route tree is wrapped — the full-screen one too (P2 review: with
   // /assets/Auth-*.js aborted, /auth unmounted the root to a blank screen).
   assert.equal(
-    (APP.match(/<ChunkBoundary>/g) ?? []).length,
+    (APP.match(/<ChunkBoundary\b/g) ?? []).length,
     4,
     'the storefront routes, the full-screen routes, the main routes and the mascot each need one'
   );
