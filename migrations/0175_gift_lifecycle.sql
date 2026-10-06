@@ -15,10 +15,12 @@
 -- every byte of its eleven original columns and reads as grant_mode 'legacy'
 -- with its legacy state.
 --
--- The three triggers at the end name only columns no test drops, and are created
--- AFTER the rebuild because an ALTER … RENAME re-validates every trigger body.
--- A future rebuild of `orders`, `order_items` or `gift_entitlements` must
--- re-create them.
+-- The five triggers at the end are created AFTER the rebuild because an
+-- ALTER … RENAME re-validates every trigger body. The four on `orders` name
+-- only columns no test drops; the one on `cart_items` names
+-- `gift_entitlement_id`, which tests/checkoutSchemaResilience.test.ts drops
+-- after dropping that trigger. A future rebuild of `orders`, `order_items`,
+-- `cart_items` or `gift_entitlements` must re-create them.
 PRAGMA defer_foreign_keys = true;
 
 -- ============================================================================
@@ -251,4 +253,26 @@ WHEN OLD.status = 'cancelled' AND NEW.status <> 'cancelled'
   AND EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = NEW.id AND oi.gift_entitlement_id IS NOT NULL)
 BEGIN
   SELECT RAISE(ABORT, 'GIFT_ORDER_REOPEN_REFUSED');
+END;
+
+-- ============================================================================
+-- 7. cart_items — A GIFT LINE THAT LEAVES THE CART, BY ANY DOOR (the line's
+--    delete, «empty the cart», a confirmed replace from another add, the
+--    account's removal), puts the gift back to «redeemed» — ADDED_TO_ORDER is
+--    derived from the row — and this writes that step into the gift's audit
+--    timeline. Only while the gift is still `redeemed`: the checkout marks it
+--    `ordered` and an admin cancel marks it `cancelled` BEFORE their own delete
+--    of the line, in the same batch, and both already write their own row.
+--    A future rebuild of `cart_items` must re-create it.
+-- ============================================================================
+CREATE TRIGGER IF NOT EXISTS trg_cart_gift_line_removed
+AFTER DELETE ON cart_items FOR EACH ROW
+WHEN OLD.gift_entitlement_id IS NOT NULL
+BEGIN
+  INSERT INTO audit_log (actor_id, action, target, detail)
+  SELECT OLD.user_id, 'gift.cart_remove', g.id,
+         json_object('user_id', g.user_id, 'level', g.level, 'product_id', g.gift_product_id,
+                     'cart_item_id', OLD.id, 'from', 'added_to_order', 'to', 'redeemed')
+    FROM gift_entitlements g
+   WHERE g.id = OLD.gift_entitlement_id AND g.user_id = OLD.user_id AND g.state = 'redeemed';
 END;

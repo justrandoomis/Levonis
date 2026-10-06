@@ -60,7 +60,15 @@ test('a customer cancel returns the gift to «redeemed», and it is ordered agai
   assert.equal(row(raw, 'SELECT gift_order_seq FROM order_items WHERE order_id = ?', first.id)?.gift_order_seq, 1);
   assert.equal(giftRow(raw, id).state, 'ordered');
   assert.equal(giftRow(raw, id).order_id, second.id);
-  assert.deepEqual(auditActions(raw, id), ['gift.grant', 'gift.redeem', 'gift.order', 'gift.order_cancelled', 'gift.order']);
+  assert.deepEqual(auditActions(raw, id), [
+    'gift.grant',
+    'gift.redeem',
+    'gift.cart_add',
+    'gift.order',
+    'gift.order_cancelled',
+    'gift.cart_add',
+    'gift.order',
+  ]);
 });
 
 test('an admin cancel — by status or by stage move — returns the gift too', async () => {

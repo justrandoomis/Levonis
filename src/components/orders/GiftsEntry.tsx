@@ -1,7 +1,7 @@
 /**
- * The quiet way into /gifts — the review "rating gifts" screen, which was
- * mounted and linked from nowhere. One row; the count appears only when the
- * server said there is something to redeem.
+ * The quiet way into /gifts — «هداياي». One row; the count appears only when
+ * the server said there is something for the customer to do (choose, redeem,
+ * add to cart, or open an old review box).
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -11,10 +11,15 @@ import { useLanguage } from '../../LanguageContext';
 import { asLang } from './format';
 
 const STRINGS = {
-  ar: { title: 'هدايا التقييم', available: (n: number) => (n === 1 ? 'هدية واحدة متاحة' : n === 2 ? 'هديتان متاحتان' : `${n} هدايا متاحة`) },
-  en: { title: 'Rating gifts', available: (n: number) => (n === 1 ? '1 available' : `${n} available`) },
-  ckb: { title: 'دیاری هەڵسەنگاندن', available: (n: number) => `${n} بەردەست` },
+  ar: { title: 'هداياي', available: (n: number) => (n === 1 ? 'هدية بانتظارك' : n === 2 ? 'هديتان بانتظارك' : `${n} هدايا بانتظارك`) },
+  en: { title: 'My gifts', available: (n: number) => (n === 1 ? '1 waiting' : `${n} waiting`) },
+  ckb: { title: 'دیارییەکانم', available: (n: number) => `${n} چاوەڕێتن` },
 } as const;
+
+/** The statuses that ask the customer to act (mirrors ACTIONABLE_GIFT_STATUSES in reviews/gifts/GiftCard.tsx). */
+const ACTIONABLE = new Set(['GRANTED', 'READY_TO_REDEEM', 'REDEEMED']);
+
+type Row = { status?: string; legacy?: { state?: string } | null };
 
 export default function GiftsEntry({ className = '' }: { className?: string }) {
   const { lang } = useLanguage();
@@ -24,8 +29,12 @@ export default function GiftsEntry({ className = '' }: { className?: string }) {
   useEffect(() => {
     let alive = true;
     api
-      .get<{ gifts: Array<{ state: string }> }>('/api/reviews/gifts')
-      .then((r) => alive && setCount((r.gifts || []).filter((g) => g.state === 'available').length))
+      .get<{ gifts: Row[] }>('/api/gifts')
+      .then(
+        (r) =>
+          alive &&
+          setCount((r.gifts || []).filter((g) => ACTIONABLE.has(String(g.status)) || (g.status === 'LEGACY' && g.legacy?.state === 'available')).length)
+      )
       .catch(() => alive && setCount(null));
     return () => {
       alive = false;

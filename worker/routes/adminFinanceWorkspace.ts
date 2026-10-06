@@ -111,13 +111,14 @@ async function addInvestors(db:D1Database,bases:OrderProfitBase[],live=false){
     if(pending)b.warnings.push('investor:pending');}
   return bases;
 }
-async function selectOrders(db:D1Database,r:{from:string;to:string},opts:{q?:string;offset?:number;summary?:boolean}={}){
-  const q=opts.q??'';
+async function selectOrders(db:D1Database,r:{from:string;to:string},opts:{q?:string;offset?:number;summary?:boolean;kind?:string}={}){
+  const q=opts.q??'',kind=opts.kind??'';
   // Profit lists, counts, summaries and exports share realised deliveries.
   // A stage label, prepayment or stale delivery timestamp cannot make an
   // undelivered/cancelled order a sale; return facts still reduce each sale.
-  const condition="o.seller_type='levonis' AND o.status='delivered' AND date(o.delivered_at,'+3 hours') BETWEEN ? AND ? AND (?='' OR instr(lower(o.id||' '||COALESCE(u.name,'')),lower(?))>0)";
-  const args=[r.from,r.to,q,q];
+  // `kind` narrows the list to what made the order (0174 order_kind, D15).
+  const condition="o.seller_type='levonis' AND o.status='delivered' AND date(o.delivered_at,'+3 hours') BETWEEN ? AND ? AND (?='' OR instr(lower(o.id||' '||COALESCE(u.name,'')),lower(?))>0) AND (?='' OR COALESCE(o.order_kind,'normal')=?)";
+  const args=[r.from,r.to,q,q,kind,kind];
   const [rows,total]=await Promise.all([
     db.prepare(`SELECT o.id FROM orders o LEFT JOIN users u ON u.id=o.user_id WHERE ${condition} ORDER BY o.delivered_at DESC,o.id ${opts.summary?'':'LIMIT 100 OFFSET ?'}`).bind(...args,...(opts.summary?[]:[opts.offset??0])).all<{id:string}>(),
     db.prepare(`SELECT COUNT(*) total FROM orders o LEFT JOIN users u ON u.id=o.user_id WHERE ${condition}`).bind(...args).first<{total:number}>()]);
@@ -154,7 +155,8 @@ adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
 });
 adminFinanceWorkspaceRoutes.get('/orders',async(c)=>{
   const r=range(c.req.query('from'),c.req.query('to')),offset=whole(c.req.query('offset')??0,'الصفحة',0,100000);
-  const result=await selectOrders(c.env.DB,r,{offset,q:text(c.req.query('q'),100)});
+  const kind=text(c.req.query('kind'),20);if(kind&&!['normal','quick_buy','gift'].includes(kind))throw badRequest('نوع الطلب غير معروف');
+  const result=await selectOrders(c.env.DB,r,{offset,q:text(c.req.query('q'),100),kind});
   return c.json({success:true,orders:result.bases.map(orderRow),total:result.total,offset,range:r});
 });
 async function detail(db:D1Database,id:string,canVerify=true){

@@ -427,36 +427,21 @@ async function main() {
   const reApprove = await admin.post(`/api/reviews/admin/${reviewId}/reward`, { action: 'approve', qualityScore: 5, reason: 'Replay must not duplicate the entitlement — testing idempotency.' });
   check('re-approving the same reward rejected (no duplicate entitlement)', reApprove.status === 409, `status=${reApprove.status}`);
 
-  r = await buyerA.get('/api/reviews/gifts');
+  // 0175 (docs/GIFTS_QUICK_BUY.md §1.2): an approved printer-review reward is
+  // a LEVEL gift of the new flow — the customer chooses one of the level's
+  // real products, redeems it and orders it through the cart at 0 IQD. The
+  // legacy box (label pool, LEVEL_LOCKED, its private stock) belongs to rows
+  // granted before 0175 only.
+  r = await buyerA.get('/api/gifts');
   const myGift = (r.data?.gifts ?? []).find((g) => g.id === entId);
-  check('entitlement visible with max level 3', r.status === 200 && myGift?.max_level === 3 && myGift?.state === 'available', JSON.stringify(myGift ?? {}).slice(0, 160));
-  r = await buyerA.post(`/api/reviews/gifts/${entId}/redeem`, { level: 4 });
-  check('score 3: box 4 locked (LEVEL_LOCKED)', r.status === 400 && r.data?.code === 'LEVEL_LOCKED', JSON.stringify(r.data).slice(0, 120));
-  r = await buyerA.post(`/api/reviews/gifts/${entId}/redeem`, { level: 2 });
-  check('unstocked pool → honest GIFT_POOL_UNCONFIGURED (503), gift preserved', r.status === 503 && r.data?.code === 'GIFT_POOL_UNCONFIGURED', JSON.stringify(r.data).slice(0, 140));
-
-  r = await admin.post('/api/reviews/admin/pools', { level: 1, kind: 'accessory', label_ar: 'مغناطيسات بامبو', label_en: 'Bambu magnets', stock: 2 });
-  check('admin stocks a level-1 accessory pool item', r.status === 200 && !!r.data?.item?.id, JSON.stringify(r.data).slice(0, 140));
-  const poolsBefore = new Map(((await admin.get('/api/reviews/admin/pools')).data?.items ?? []).map((i) => [i.id, i.stock]));
-  r = await buyerA.post(`/api/reviews/gifts/${entId}/redeem`, { level: 1 });
-  const redeemedContents = JSON.stringify(r.data?.gift?.contents ?? null);
-  check('box 1 redeems once with server-chosen persisted contents', r.status === 200 && r.data?.gift?.state === 'selected' && r.data?.gift?.chosen_level === 1 && (r.data?.gift?.contents ?? []).length === 1, JSON.stringify(r.data).slice(0, 200));
-  const again = await buyerA.post(`/api/reviews/gifts/${entId}/redeem`, { level: 1 });
-  check('second redeem cannot spend again (409, or replay of the SAME selection — no reroll)',
-    again.status === 409 || (again.status === 200 && again.data?.replay === true && JSON.stringify(again.data?.gift?.contents ?? null) === redeemedContents),
-    JSON.stringify(again.data).slice(0, 140));
-  r = await admin.get('/api/reviews/admin/pools');
-  // Random selection may draw a leftover in-stock level-1 item from a
-  // previous run on a persistent DB — assert on the item the redemption
-  // actually selected (contents[].item_id), not on the one seeded above.
-  const selectedItemId = (JSON.parse(redeemedContents) ?? [])[0]?.item_id;
-  const stockAfter = ((r.data?.items ?? []).find((i) => i.id === selectedItemId))?.stock;
-  const stockBefore = poolsBefore.get(selectedItemId);
-  check('selected pool item stock decremented exactly once',
-    Number.isInteger(stockAfter) && stockAfter === Number(stockBefore) - 1,
-    `selected=${selectedItemId} before=${stockBefore} after=${stockAfter}`);
-  const foreignRedeem = await buyerB.post(`/api/reviews/gifts/${entId}/redeem`, { level: 1 });
+  check('the approval granted a level-3 gift of the new flow', r.status === 200 && myGift?.status === 'GRANTED' && myGift?.level?.n === 3 && myGift?.reason === 'review', JSON.stringify(myGift ?? {}).slice(0, 160));
+  check('the customer card never carries the internal note', !JSON.stringify(r.data ?? {}).includes('Detailed critical writing'), 'admin note leaked');
+  r = await buyerA.post(`/api/gifts/${entId}/redeem`, {});
+  check('a level gift is chosen before it is redeemed (GIFT_CHOICE_REQUIRED)', r.status === 409 && r.data?.code === 'GIFT_CHOICE_REQUIRED', JSON.stringify(r.data).slice(0, 140));
+  const foreignRedeem = await buyerB.post(`/api/gifts/${entId}/redeem`, {});
   check('IDOR: user B cannot redeem A\'s gift (404)', foreignRedeem.status === 404, `status=${foreignRedeem.status}`);
+  r = await buyerA.get('/api/reviews/gifts');
+  check('the old URL still answers (legacy boxes only)', r.status === 200 && Array.isArray(r.data?.gifts) && !(r.data?.gifts ?? []).some((g) => g.id === entId), JSON.stringify(r.data).slice(0, 120));
 
   // ============================================ points (INTEGRATED §4.2/§4.3)
   //

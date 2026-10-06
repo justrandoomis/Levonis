@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck, MessageSquare, Repeat } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck, MessageSquare, Repeat, Gift } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
 import { api } from '../lib/api';
@@ -710,6 +710,20 @@ export default function OrderDetail() {
                               <p className="text-[12px] text-zinc-400 tabular-nums mt-0.5">
                                 × {it.qty} · {money(Number(unitPrice) || 0)}
                               </p>
+                              {/* A GIFT LINE (0175): given, not bought — «هدية — 0 د.ع» with its value. */}
+                              {it.is_gift && (
+                                <p className="mt-1 flex flex-wrap items-center gap-1.5" data-order-gift-line={it.id}>
+                                  <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 w-max bg-gold/10 text-gold text-[11px] font-bold">
+                                    <Gift className="w-3 h-3 shrink-0" aria-hidden="true" />
+                                    {loc('هدية', 'Gift', 'دیاری')} — {money(0)}
+                                  </span>
+                                  {(it.pricing?.gift?.value_iqd ?? 0) > 0 && (
+                                    <span className="text-[11.5px] text-zinc-500 tabular-nums">
+                                      {loc('قيمتها', 'Worth', 'بەهاکەی')} {money(it.pricing?.gift?.value_iqd ?? 0)}
+                                    </span>
+                                  )}
+                                </p>
+                              )}
                               {extras.length > 0 && <p className="text-[11px] text-zinc-500 truncate">{extras.join(' · ')}</p>}
                             </div>
                             <p className="text-[13.5px] text-white font-bold tabular-nums shrink-0">{money(it.line_total_iqd)}</p>
@@ -822,7 +836,12 @@ export default function OrderDetail() {
                       <ChevronRight className="w-4 h-4 text-zinc-600 rtl:rotate-180 shrink-0" aria-hidden />
                     </Link>
                   )}
-                  <ReorderButton items={order.items} className="mt-1" />
+                  {/* A gift line is given, not bought: «إعادة الشراء» buys the
+                      bought lines again and never turns a gift into a paid line
+                      (0175). A gift-only order has nothing to buy again. */}
+                  {order.items.some((it) => !it.is_gift) && (
+                    <ReorderButton items={order.items.filter((it) => !it.is_gift)} className="mt-1" />
+                  )}
                   {/* «مواد الصيانة لطابعتك» (0148) — the parts that fit the
                       printer this order bought, the moment it is bought. */}
                   {(order.maintenance_parts ?? []).slice(0, 2).map((m) => (

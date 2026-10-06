@@ -221,26 +221,34 @@ function Orders({ from, to, revision, openOrder }: { from: string; to: string; r
   const { loc } = useLanguage();
   const pageSize = 100;
   const [search, setSearch] = useState('');
+  // What made the order (0174 order_kind): every kind, or one of them.
+  const [kind, setKind] = useState('');
   const [offset, setOffset] = useState(0);
   const [rows, setRows] = useState<FinanceOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
-  useEffect(() => { setOffset(0); setRows([]); setTotal(0); }, [from, to, search]);
+  useEffect(() => { setOffset(0); setRows([]); setTotal(0); }, [from, to, search, kind]);
   useEffect(() => {
     const controller = new AbortController();
     setBusy(true); setError('');
     const timer = setTimeout(() => {
-      const query = new URLSearchParams({ from, to, q: search, offset: String(offset) });
+      const query = new URLSearchParams({ from, to, q: search, offset: String(offset), ...(kind ? { kind } : {}) });
       api.get<{ orders: FinanceOrder[]; total: number }>(`${WORKSPACE_API}/orders?${query}`, { signal: controller.signal })
         .then((r) => { if (!controller.signal.aborted) { setRows(r.orders ?? []); setTotal(r.total ?? r.orders?.length ?? 0); } })
         .catch((e) => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : String(e)); })
         .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     }, search ? 220 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [from, to, search, offset, revision]);
+  }, [from, to, search, kind, offset, revision]);
   return <Surface title={loc('أرباح الطلبات المستلمة', 'Delivered order profits')} subtitle={loc('الطلبات المكتملة بالتسليم فقط، حسب يوم التسليم. تشمل الأرباح والتكاليف أثر المرتجعات المسجلة.', 'Completed deliveries only, by delivery date. Profit and costs include recorded returns.')} action={<Button variant="ghost" onClick={() => { window.location.href = `${WORKSPACE_API}/export.csv?from=${from}&to=${to}`; }} aria-label={loc('تصدير التقرير', 'Export report')}><ArrowDownToLine size={17} /></Button>}>
-    <div className="fw-toolbar"><div className="fw-search"><Search aria-hidden /><input className="fw-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={loc('ابحث برقم الطلب أو اسم الزبون', 'Search order number or customer')} aria-label={loc('البحث عن الطلب', 'Find an order')} /></div></div>
+    <div className="fw-toolbar"><div className="fw-search"><Search aria-hidden /><input className="fw-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={loc('ابحث برقم الطلب أو اسم الزبون', 'Search order number or customer')} aria-label={loc('البحث عن الطلب', 'Find an order')} /></div>
+      <select className="fw-select" style={{ width: 'auto', flexShrink: 0 }} value={kind} onChange={(e) => setKind(e.target.value)} aria-label={loc('نوع الطلب', 'Order kind')} data-finance-order-kind>
+        <option value="">{loc('كل الطلبات', 'All orders')}</option>
+        <option value="normal">{loc('طلب عادي', 'Normal')}</option>
+        <option value="quick_buy">{loc('شراء سريع', 'Quick Buy')}</option>
+        <option value="gift">{loc('طلب هدية', 'Gift order')}</option>
+      </select></div>
     {error && <p className="fw-error" role="alert">{error}</p>}
     {busy && !rows.length ? <Loading text={loc('تحميل الطلبات…', 'Loading orders…')} /> : rows.length ? <div className="fw-list" aria-busy={busy}>{rows.map((o) => <OrderRow order={o} key={o.id} onClick={() => openOrder(o.order_id || o.id)} />)}</div> : <Empty title={loc('لا توجد طلبات مستلمة مطابقة', 'No matching delivered orders')} text={loc('ابحث عن طلب مكتمل بالتسليم أو اختر فترة تسليم مختلفة.', 'Search for a completed delivery or choose another delivery date range.')} />}
     {total > pageSize && <div className="fw-pagination"><Button variant="ghost" disabled={busy || offset === 0} onClick={() => setOffset((v) => Math.max(0, v - pageSize))}>{loc('السابق', 'Previous')}</Button><span>{Math.floor(offset / pageSize) + 1} / {Math.ceil(total / pageSize)}</span><Button variant="ghost" disabled={busy || offset + rows.length >= total} onClick={() => setOffset((v) => v + pageSize)}>{loc('التالي', 'Next')}</Button></div>}

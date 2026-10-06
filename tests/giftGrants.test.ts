@@ -120,7 +120,7 @@ test('a level grant notifies the customer in three languages, is audited, and it
   assert.equal(detailRes.grant.status, 'ORDERED');
   assert.deepEqual(
     detailRes.audit.map((x: J) => x.action),
-    ['gift.grant', 'gift.choose', 'gift.redeem', 'gift.order'],
+    ['gift.grant', 'gift.choose', 'gift.redeem', 'gift.cart_add', 'gift.order'],
     'the timeline names every step'
   );
 });
@@ -148,6 +148,9 @@ test('a pinned grant — a level item or any store product — starts ready to r
   assert.equal(stored.gift_option_value_ids, '["v_pei"]');
   assert.equal(stored.gift_qty, 2);
   assert.equal(JSON.parse(stored.gift_snapshot).value_iqd, 120000, 'two units at the regular price');
+  // The air route's lead time travels as days, so each language words it itself.
+  assert.equal(byProduct.chosen.lead_time_min_days, 10);
+  assert.equal(byProduct.chosen.lead_time_max_days, 14);
 
   // NOTHING IS RESERVED BY A GRANT (D6).
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_ledger'), 0);
@@ -311,7 +314,9 @@ test('cancel: before the order only, the cart line goes with it, and the custome
   assert.equal(refused.status, 409);
   assert.equal((await json(refused)).code, 'GIFT_ALREADY_ORDERED');
   assert.equal(giftRow(raw, ordered.id).state, 'ordered');
-  assert.deepEqual(auditActions(raw, inCart.id), ['gift.grant', 'gift.redeem', 'gift.cancel']);
+  // The cart line went with the cancel: no «back to redeemed» step for a cancelled gift.
+  assert.deepEqual(auditActions(raw, inCart.id), ['gift.grant', 'gift.redeem', 'gift.cart_add', 'gift.cancel']);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'gift.cart_remove'"), 0);
 });
 
 test('a legacy review box: converted into a level grant the customer chooses from, or fulfilled the old way', async () => {

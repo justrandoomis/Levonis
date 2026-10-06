@@ -64,8 +64,10 @@ function setup(dropColumn?: string) {
     if (dropColumn === 'option_value_ids') {
       raw.exec('DROP INDEX IF EXISTS idx_cart_levonis_line_v2; DROP INDEX IF EXISTS idx_cart_levonis_line;');
     }
-    // 0175's gift line column carries its own UNIQUE index.
-    if (dropColumn === 'gift_entitlement_id') raw.exec('DROP INDEX IF EXISTS idx_cart_items_gift_line;');
+    // 0175's gift line column carries its own UNIQUE index and its removal trigger.
+    if (dropColumn === 'gift_entitlement_id') {
+      raw.exec('DROP INDEX IF EXISTS idx_cart_items_gift_line; DROP TRIGGER IF EXISTS trg_cart_gift_line_removed;');
+    }
     raw.exec(`ALTER TABLE cart_items DROP COLUMN ${dropColumn};`);
   }
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };

@@ -103,8 +103,17 @@ test('0175 seeds the five canonical levels and the three order triggers', () => 
   );
   assert.deepEqual(levels.map((l) => [l.id, l.level, l.active]), [1, 2, 3, 4, 5].map((n) => [`gift_level_${n}`, n, 1]));
   for (const l of levels) assert.ok(l.name_ar && l.name_en && l.name_ckb && l.name_ckb !== l.name_ar, `level ${l.level} is named in three languages`);
-  const triggers = all<{ name: string }>(raw, "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'trg_orders_gift_%' ORDER BY name").map((t) => t.name);
-  assert.deepEqual(triggers, ['trg_orders_gift_cancelled', 'trg_orders_gift_delivered', 'trg_orders_gift_reopen_guard', 'trg_orders_gift_undelivered']);
+  const triggers = all<{ name: string }>(
+    raw,
+    "SELECT name FROM sqlite_master WHERE type='trigger' AND (name LIKE 'trg_orders_gift_%' OR name LIKE 'trg_cart_gift_%') ORDER BY name"
+  ).map((t) => t.name);
+  assert.deepEqual(triggers, [
+    'trg_cart_gift_line_removed',
+    'trg_orders_gift_cancelled',
+    'trg_orders_gift_delivered',
+    'trg_orders_gift_reopen_guard',
+    'trg_orders_gift_undelivered',
+  ]);
 });
 
 test('the rebuilt table refuses a state that does not belong to its mode, and a manual grant needs no reward', () => {

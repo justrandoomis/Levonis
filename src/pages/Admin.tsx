@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Zap } from 'lucide-react';
+import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Zap, Gift } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supportTotal, useSupportCounts } from '../components/adminSupport/supportCounts';
 import { useAuth } from '../AuthContext';
@@ -74,6 +74,7 @@ const AdminWalletSettings = React.lazy(() => import('../components/AdminWalletSe
 const AdminStoreSettings = React.lazy(() => import('../components/AdminStoreSettings'));
 const AdminChannels = React.lazy(() => import('../components/AdminChannels'));
 const AdminReviews = React.lazy(() => import('../components/AdminReviews'));
+const AdminGifts = React.lazy(() => import('../components/adminGifts/AdminGifts'));
 const AdminKyc = React.lazy(() => import('../components/AdminKyc'));
 const AdminMemberships = React.lazy(() => import('../components/AdminMemberships'));
 /**
@@ -145,6 +146,7 @@ type AdminTab =
   | 'ads'
   | 'serials'
   | 'reviews'
+  | 'gifts'
   | 'kyc'
   | 'memberships'
   | 'support'
@@ -180,6 +182,8 @@ export default function Admin() {
   const { t, dir, loc } = useLanguage();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>(initialAdminTab);
+  /** Which gifts screen the «الهدايا» tab opens on — the reviews panel's entry points pick it. */
+  const [giftsView, setGiftsView] = useState<'levels' | 'grants'>('levels');
 
   // Keep the parent workspace alongside its own filters. A reload after a
   // network interruption must reopen the same finance/inventory/earnings tab.
@@ -246,7 +250,11 @@ export default function Admin() {
     { id: 'support', icon: LifeBuoy, label: loc('الدعم والرسائل', 'Support inbox', 'ڕیزی پشتگیری'), badge: supportWaiting, ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     { id: 'users', icon: Users, label: t('adminUsers'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     { id: 'kyc', icon: ShieldCheck, label: loc('التحقق والعناوين', 'KYC & addresses'), ...section('administration', 'الإدارة', 'Administration') },
-    { id: 'reviews', icon: Star, label: loc('المراجعات والهدايا', 'Reviews & gifts'), ...section('administration', 'الإدارة', 'Administration') },
+    { id: 'reviews', icon: Star, label: loc('المراجعات', 'Reviews', 'هەڵسەنگاندنەکان'), ...section('administration', 'الإدارة', 'Administration') },
+    // «الهدايا» (0175): five levels of real store products, grants to
+    // customers and their journey to delivery — beside the reviews whose
+    // approval grants one.
+    { id: 'gifts', icon: Gift, label: loc('الهدايا', 'Gifts', 'دیارییەکان'), ...section('administration', 'الإدارة', 'Administration') },
     /* «شكاوى الأسعار». /api/admin/price-reports has existed with a full list,
        a computed gap and an audited decision, and NOTHING in src/ called it —
        the only caller in the app was the customer's POST. An admin API with no
@@ -341,8 +349,15 @@ export default function Admin() {
         {activeTab === 'serials' && <AdminWarranties initialView="units" />}
 
         {activeTab === 'reviews' && (
-           <AdminReviews />
+           <AdminReviews
+             onOpenGifts={(view) => {
+               setGiftsView(view);
+               setActiveTab('gifts');
+             }}
+           />
         )}
+
+        {activeTab === 'gifts' && <AdminGifts initialView={giftsView} />}
 
         {activeTab === 'kyc' && (
            <AdminKyc />
