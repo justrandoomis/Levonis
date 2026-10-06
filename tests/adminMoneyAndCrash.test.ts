@@ -121,7 +121,6 @@ test('no admin screen shows a wallet amount as the ledger’s raw dollars', () =
     ['src/components/AdminOverview.tsx', 'stats.incoming_usd_cents'],
     ['src/components/AdminOverview.tsx', 'stats.outgoing_usd_cents'],
     ['src/components/AdminOverview.tsx', 'req.amount'],
-    ['src/components/AdminWalletRequests.tsx', 't.amount'],
     // The member detail prints the SERVER's dinars (`wallet_iqd`, 0108) and
     // converts the cents only for a server older than that field.
     ['src/components/adminUsers/MemberDetailModal.tsx', 'f.wallet_usd_cents'],
@@ -137,13 +136,20 @@ test('no admin screen shows a wallet amount as the ledger’s raw dollars', () =
   assert.match(member, /formatIqd\(f\.wallet_iqd\)/, 'the member detail stopped printing the server’s dinar balance');
   assert.match(member, /memberWalletIqd\(view\.financial, exchangeRate\)/);
 
+  // A transaction with recorded dinars must print that exact amount; only
+  // older rows fall through to cents conversion inside the display helper.
+  // Do not match a conversion expression in a comment as proof of rendering.
+  const requests = read('src/components/AdminWalletRequests.tsx');
+  assert.match(requests, /const display = walletTransactionDisplay\(\{\s*cents: t\.amount,\s*recordedIqd: t\.amount_iqd,/);
+  assert.match(requests, /\{formatIqd\(display\.amountIqd\)\}/, 'the recorded transaction amount is not the dinar headline');
+
   // The conversion goes through ONE helper so the four screens cannot drift.
   const api = read('src/lib/api.ts');
   assert.match(
     api,
     /export function formatWalletIqd\(cents: number, exchangeRate: number\): string \{\n\s*return formatIqd\(usdCentsToIqd\(cents, exchangeRate\)\);/
   );
-  // …at the admin's own rate, not a constant typed into a component.
+  // Unrecorded rates fall back to the configured rate, never a hardcoded one.
   for (const file of [
     'src/components/AdminOverview.tsx',
     'src/components/AdminWalletRequests.tsx',
@@ -163,8 +169,13 @@ test('the dollar figure is kept, named and quiet — not deleted', () => {
   // reviewer unable to reconcile a deposit against the ledger. The Telegram
   // review card already carries both plus the rate, for the same reason.
   const requests = read('src/components/AdminWalletRequests.tsx');
-  assert.ok(requests.includes('formatUsdCents(t.amount)'), 'the ledger value was dropped');
-  assert.match(requests, /exchangeRate\.toLocaleString\(\)\} IQD\/USD/, 'the rate is not stated');
+  assert.match(requests,
+    /<div className="text-\[11px\] text-zinc-500 tabular-nums" dir="ltr">\s*\{formatUsdCents\(t\.amount\)\} · \{display\.rate\.toLocaleString\(\)\} IQD\/USD/,
+    'the ledger dollars and chosen historical rate must remain together in the quiet secondary caption');
+  assert.match(requests, /recordedRate: t\.exchange_rate_snapshot,/);
+  assert.match(requests, /currentRate: exchangeRate,/, 'old rows still need the configured-rate fallback');
+  assert.doesNotMatch(requests, /\{exchangeRate\.toLocaleString\(\)\} IQD\/USD/,
+    'today’s rate must not replace a transaction’s recorded rate in the caption');
   const notify = read('worker/lib/walletNotify.ts');
   assert.match(notify, /الدفتر: \$\{formatUsdCents/, 'the precedent this copies has moved');
 });
