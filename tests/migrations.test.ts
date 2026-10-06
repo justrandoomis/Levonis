@@ -12,7 +12,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const run = (args: string[]) =>
   execFileSync('node', ['scripts/migrate-check.mjs', ...args], {
@@ -44,6 +46,30 @@ test('migrations apply to a fresh database and survive a second pass', () => {
   );
   assert.match(out, /foreign_key_check violations: 0/);
   assert.match(out, /orphan catalogs: 0/);
+  if (reran > 0) assert.match(out, /no trigger changed/);
+});
+
+test('migration replay refuses unpaired or mismatched trigger drops', () => {
+  const work = mkdtempSync(join(tmpdir(), 'levonis-trigger-replay-'));
+  try {
+    cpSync('migrations', join(work, 'migrations'), { recursive: true });
+    for (const sql of [
+      'DROP TRIGGER finance_line_department_no_delete;',
+      `DROP TRIGGER finance_line_department_no_delete;
+       CREATE TRIGGER wrong_replacement BEFORE DELETE ON finance_line_departments
+       BEGIN SELECT RAISE(ABORT, 'wrong replacement'); END;`,
+    ]) {
+      writeFileSync(join(work, 'migrations/9999_unpaired_trigger.sql'), sql);
+      assert.throws(() => execFileSync('node', [resolve('scripts/migrate-check.mjs'), '--twice'], {
+        cwd: work,
+        encoding: 'utf8',
+        stdio: 'pipe',
+        env: { ...process.env, MIGRATE_CHECK_DIR: join(work, 'check') },
+      }), /no statement in it is re-runnable by this harness/);
+    }
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 });
 
 test('every migration file is numbered uniquely and applied in order', () => {

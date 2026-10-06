@@ -397,10 +397,22 @@ test('the split really happened: every page and panel §10 names has a chunk of 
  * 250 KB gzip). What remains for the store pages themselves is to render
  * `m.*` under <MotionFeatures> (StorefrontProduct.tsx, StoreCta, the follow
  * pill) so the features leave their first paint too — P11.
+ *
+ * OCTOBER 6: Overlay, overlayStack and Segmented became shared lazy chunks
+ * instead of riding inside the entry. A clean pre-change build (f965e1b1)
+ * measured initial 188,739 B + store 47,510 B; the new build measures
+ * 184,237 B + 54,260 B. The three moved primitives account for 6,639 B of
+ * the apparent store growth. Keep the 47 KB store-specific cap and count
+ * EVERY moved byte in an aggregate cap: 233 KB, the upper bound already
+ * enforced by the speed report's 230 KB estimate plus its 3 KB tolerance.
+ * This does not reward moving shared UI back into the public first paint.
  */
 const STOREFRONT_BUDGET = 47 * KB;
+const STOREFRONT_APP_BUDGET = 233 * KB;
+const STOREFRONT_SHARED_UI = ['Overlay', 'overlayStack', 'Segmented'];
 /** Vendor chunks a lazy page may share; they are budgeted on their own, not against a page. */
 const isSharedVendor = (f: string) => /^vendor-/.test(f);
+const isSharedStorefrontUi = (f: string) => STOREFRONT_SHARED_UI.some((name) => f.startsWith(`${name}-`));
 
 function staticClosure(start: string): Set<string> {
   const seen = new Set<string>();
@@ -428,7 +440,7 @@ test('opening a product excludes below-fold reviews, closed purchase dialogs and
   }
 });
 
-test('the storefront pages add at most 47 KB gzip beyond the initial payload, and the other blocks stay lazy', () => {
+test('the storefront owns at most 47 KB gzip and its complete app payload stays under 233 KB, with other blocks lazy', () => {
   const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
   const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
   const initial = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
@@ -439,17 +451,24 @@ test('the storefront pages add at most 47 KB gzip beyond the initial payload, an
   });
   const beyond = new Set<string>();
   for (const page of pages) for (const f of staticClosure(page)) if (!initial.has(f)) beyond.add(f);
-  const own = [...beyond].filter((f) => !isSharedVendor(f));
+  const app = [...beyond].filter((f) => !isSharedVendor(f));
+  const sharedUi = app.filter(isSharedStorefrontUi);
+  const own = app.filter((f) => !isSharedStorefrontUi(f));
   const vendor = [...beyond].filter(isSharedVendor);
   const total = own.reduce((sum, f) => sum + gz(join(ASSETS, f)), 0);
+  const appTotal = app.reduce((sum, f) => sum + gz(join(ASSETS, f)), 0);
   const detail = own.sort().map((f) => `  ${f}: ${kb(gz(join(ASSETS, f)))}`).join('\n');
-  console.log(`bundle: storefront pages ${kb(total)} gzip beyond the initial payload\n${detail}`);
+  console.log(`bundle: storefront-specific pages ${kb(total)} gzip beyond the initial payload\n${detail}`);
+  console.log(`bundle: storefront shared UI ${sharedUi.map((f) => `${f} ${kb(gz(join(ASSETS, f)))}`).join(', ') || 'none'}`);
   console.log(`bundle: storefront pages also share ${vendor.map((f) => `${f} ${kb(gz(join(ASSETS, f)))}`).join(', ') || 'no vendor chunk'}`);
   assert.ok(total <= STOREFRONT_BUDGET, `the storefront pages add ${kb(total)} gzip, over ${kb(STOREFRONT_BUDGET)}:\n${detail}`);
   // P4: the speed tab's «ثابت للتطبيق» row (worker/lib/storeSpeed.ts STOREFRONT_FIXED_KB) IS this
   // measurement — the initial payload plus the storefront pages' own closure — so the number a
   // merchant is shown cannot drift from the build by more than 3 KB.
-  const fixed = ([...initial].reduce((sum, f) => sum + gz(join(ASSETS, f)), 0) + total) / KB;
+  const fixedBytes = [...initial].reduce((sum, f) => sum + gz(join(ASSETS, f)), 0) + appTotal;
+  assert.ok(fixedBytes <= STOREFRONT_APP_BUDGET,
+    `the storefront app payload, including all shared UI, is ${kb(fixedBytes)}, over ${kb(STOREFRONT_APP_BUDGET)}`);
+  const fixed = fixedBytes / KB;
   console.log(`bundle: a store page's fixed app weight ${fixed.toFixed(1)} KB (STOREFRONT_FIXED_KB = ${STOREFRONT_FIXED_KB})`);
   assert.ok(
     Math.abs(fixed - STOREFRONT_FIXED_KB) <= 3,
@@ -470,7 +489,7 @@ test('the storefront pages add at most 47 KB gzip beyond the initial payload, an
   for (const piece of ['workshopFacts', 'StoreVideo']) {
     assert.equal(staticClosure(chunk(piece)!).has(chunk('extra')!), false, `${piece} statically pulls in the non-classic blocks' chunk`);
   }
-  for (const lazyOnly of ['extra', 'tabViews', 'StoreDesignPanel', 'MerchantDashboardPage', 'vendor-charts', 'storeVitals', 'BackgroundMedia', 'workshopFacts', 'StoreVideo']) {
+  for (const lazyOnly of ['extra', 'tabViews', 'StoreDesignPanel', 'MerchantDashboardPage', 'vendor-charts', 'storeVitals', 'BackgroundMedia', 'workshopFacts', 'StoreVideo', 'refusalStrings', 'OwnerShareMenuItem']) {
     const found = [...beyond, ...initial].find((f) => f.startsWith(`${lazyOnly}-`));
     assert.equal(found, undefined, `${lazyOnly} is a STATIC import of a storefront page — every store visit would download it`);
   }
