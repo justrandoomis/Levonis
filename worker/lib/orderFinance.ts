@@ -498,7 +498,7 @@ export async function runOrderFinancialEffects(
         db,
         orderId,
         'cogs',
-        new Error('تكلفة البضاعة غير مكتملة؛ راجع دفعات المخزون أو تكلفة الطلب المثبتة وأعد الترحيل'),
+        new Error('تكلفة البضاعة غير مكتملة؛ راجع دفعات المخزون أو تكلفة الطلب المثبتة. يستكمل النظام الاحتساب تلقائيًا بعد تثبيتها.'),
       );
     else
       await db.prepare('DELETE FROM finance_posting_errors WHERE event_key=?').bind(`cogs:${orderId}`).run();

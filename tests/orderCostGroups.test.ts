@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canReconcilePendingCosts, displayedCostAmount, groupOrderCosts } from '../src/components/financeWorkspace/orderCostGroups';
+import { hasPendingWagesWithConfirmedCosts, displayedCostAmount, groupOrderCosts } from '../src/components/financeWorkspace/orderCostGroups';
 import type { OrderProfit, ProfitCost, ProfitLine } from '../src/components/financeWorkspace/types';
 const cost = (id: string, staff_id: string | null, amount_iqd: number | null, extra: Partial<ProfitCost> = {}): ProfitCost => ({ id, staff_id, amount_iqd, rule_name: 'Pay', state: 'due', order_item_id: `line:${id}`, center_id: null, ...extra });
 
@@ -40,39 +40,64 @@ test('unassigned material costs do not get merged into a fabricated employee', (
   assert.equal(groups.length, 2); assert.deepEqual(groups.map(g => g.knownAmount), [10, 20]);
 });
 
-const retryData = (confidence = 'recorded_snapshot', cogs: number | null = 600000): Pick<OrderProfit, 'can_reconcile' | 'order' | 'lines' | 'costs'> => ({
+const pendingData = (confidence = 'recorded_snapshot', cogs: number | null = 600000): Pick<OrderProfit, 'can_reconcile' | 'order' | 'lines' | 'costs'> => ({
   can_reconcile: true,
   order: { id: 'order', status: 'delivered', created_at: '2026-09-01' },
   lines: [{ id: 'line', product_id: 'printer', name_snapshot: 'Printer', sku_snapshot: 'SKU', qty: 1, returned_qty: 0, cost_confidence: confidence, cogs_iqd: cogs }],
   costs: [cost('pending', 'staff', null, { state: 'pending_cost', order_item_id: 'line', line_ids: ['line'] })],
 });
 
-test('explicit retry accepts confirmed recorded order costs, including a documented zero', () => {
-  for (const source of ['recorded_snapshot', 'fifo', 'manual_verified']) assert.equal(canReconcilePendingCosts(retryData(source)), true);
-  assert.equal(canReconcilePendingCosts(retryData('recorded_snapshot', 0)), true);
+test('automatic wage status recognizes confirmed recorded costs, including a documented zero', () => {
+  for (const source of ['recorded_snapshot', 'fifo', 'manual_verified']) assert.equal(hasPendingWagesWithConfirmedCosts(pendingData(source)), true);
+  assert.equal(hasPendingWagesWithConfirmedCosts(pendingData('recorded_snapshot', 0)), true);
 });
 
-test('retry never treats a catalogue or unrecorded snapshot reference as confirmed evidence', () => {
-  assert.equal(canReconcilePendingCosts(retryData('snapshot')), false);
-  assert.equal(canReconcilePendingCosts(retryData('unknown', null)), false);
-  const data = retryData(); data.can_reconcile = false;
-  assert.equal(canReconcilePendingCosts(data), false);
-  data.can_reconcile = true; data.order.status = 'shipped';
-  assert.equal(canReconcilePendingCosts(data), false);
+test('automatic status requires confirmed evidence and applies independently of admin write permissions', () => {
+  assert.equal(hasPendingWagesWithConfirmedCosts(pendingData('snapshot')), false);
+  assert.equal(hasPendingWagesWithConfirmedCosts(pendingData('unknown', null)), false);
+  const data = pendingData(); data.can_reconcile = false;
+  assert.equal(hasPendingWagesWithConfirmedCosts(data), true);
+  data.order.status = 'shipped';
+  assert.equal(hasPendingWagesWithConfirmedCosts(data), false);
 });
 
-test('retry checks the pending wage dependencies, allowing unrelated unknown lines to remain pending', () => {
-  const data = retryData();
+test('automatic status checks wage scope without claiming unrelated unknown lines are resolved', () => {
+  const data = pendingData();
   data.lines.push({ ...data.lines[0], id: 'other', cost_confidence: 'unknown', cogs_iqd: null });
-  assert.equal(canReconcilePendingCosts(data), true);
+  assert.equal(hasPendingWagesWithConfirmedCosts(data), true);
   data.costs[0].line_ids = ['line', 'other'];
-  assert.equal(canReconcilePendingCosts(data), false);
+  assert.equal(hasPendingWagesWithConfirmedCosts(data), false);
 });
 
-test('missing return facts and already-computed wages do not offer a misleading retry', () => {
-  const data = retryData();
+test('missing return facts and already-computed wages do not claim pending automatic work', () => {
+  const data = pendingData();
   data.lines[0].cost_review = { issues: [{ code: 'refund_amount_missing', field: 'refund_iqd', source_id: 'return', line_ids: ['line'] }] } as ProfitLine['cost_review'];
-  assert.equal(canReconcilePendingCosts(data), false);
+  assert.equal(hasPendingWagesWithConfirmedCosts(data), false);
   delete data.lines[0].cost_review; data.costs[0].state = 'due';
-  assert.equal(canReconcilePendingCosts(data), false);
+  assert.equal(hasPendingWagesWithConfirmedCosts(data), false);
+});
+
+
+test('unknown historical scope and missing target lines remain visible without claiming their cost inputs are confirmed', () => {
+  const data = pendingData();
+  data.costs[0].order_item_id = null;
+  delete data.costs[0].line_ids;
+  assert.equal(hasPendingWagesWithConfirmedCosts(data), false);
+  data.costs[0].line_ids = ['line'];
+  data.costs[0].scope_confidence = 'historical_unknown';
+  assert.equal(hasPendingWagesWithConfirmedCosts(data), false);
+  data.costs[0].scope_confidence = 'recorded';
+  data.costs[0].line_ids = ['missing-line'];
+  assert.equal(hasPendingWagesWithConfirmedCosts(data), false);
+  assert.equal(displayedCostAmount(data.costs[0]), null);
+});
+
+test('automatic status never replaces a specific missing-data reason or claims material costs are employee wages', () => {
+  const data = pendingData();
+  data.costs[0].review_reasons = [{ code: 'refund_amount_missing', field: 'refund_iqd', source_id: 'return', line_ids: ['line'] }];
+  assert.equal(hasPendingWagesWithConfirmedCosts(data), false);
+  data.costs[0].review_reasons = [{ code: 'wage_reconciliation_pending', field: 'finance_wage_targets.amount_iqd', source_id: 'pending', line_ids: ['line'] }];
+  assert.equal(hasPendingWagesWithConfirmedCosts(data), true);
+  data.costs[0].staff_id = null;
+  assert.equal(hasPendingWagesWithConfirmedCosts(data), false);
 });

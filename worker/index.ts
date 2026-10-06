@@ -28,6 +28,7 @@ import { conditional, weakEtag } from './lib/publicApi/cache';
 import { trustedOrigin } from './lib/appOrigin';
 import { runDurableJobs } from './lib/jobs';
 import { drainStaffReconciliations } from './lib/financeStaffAccrual';
+import { drainOrderFinanceRecovery } from './lib/financeOrderRecovery';
 import { authRoutes } from './routes/auth';
 import { productRoutes, homeRoutes } from './routes/products';
 import { cartRoutes } from './routes/cart';
@@ -945,7 +946,7 @@ export default {
   // different facts and only the second one reclaims disk.
   //
   // HOW OFTEN, AND WHAT THAT COSTS. wrangler.jsonc's `triggers.crons` fires
-  // this every fifteen minutes, in production and in both of the other
+  // the durable-jobs branch every fifteen minutes, in production and in both of the other
   // environments. So a detached image normally survives in the bucket for up
   // to one tick — under fifteen minutes — and with a backlog of N queued jobs
   // for about ceil(N / 50) ticks, because the drain takes fifty jobs per run.
@@ -1027,6 +1028,20 @@ export default {
   //     worker/lib/productDeletion.ts, not a lock here.
   scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     configureEventBus(env);
+    // Delivery itself awaits wage posting. This separate bounded recovery
+    // repairs historical pending costs and interrupted postings without an
+    // admin request, including orders whose old staff job already completed.
+    // The minute trigger is only for financial recovery. Keep notification,
+    // storage cleanup and other durable jobs on their existing cadence and
+    // separate invocation budgets.
+    if (_event.cron === '* * * * *') {
+      ctx.waitUntil(
+        drainOrderFinanceRecovery(env).catch((error) => {
+          console.error('scheduled order finance recovery rejected:', error);
+        })
+      );
+      return;
+    }
     // Employment-date recalculation survives a closed admin tab. Each tick
     // processes a bounded batch; its durable cursor resumes on the next run.
     ctx.waitUntil(

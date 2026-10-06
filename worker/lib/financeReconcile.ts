@@ -24,7 +24,7 @@ export async function reconcileFinanceOrder(db:D1Database,orderId:string,opts:{a
         !!await db.prepare("SELECT 1 FROM accounting_entries WHERE event_key=? AND state='posted'").bind(`cogs:${orderId}`).first();
       if(accounted)await db.prepare('DELETE FROM finance_posting_errors WHERE event_key=?').bind(`cogs:${orderId}`).run();
       else await db.prepare('UPDATE finance_posting_errors SET message=? WHERE event_key=?')
-        .bind('تكلفة البضاعة مثبتة، لكن قيد مصروفها المحاسبي لم يُرحّل؛ أعد ترحيل مالية الطلب من تنبيهات المحاسبة.',`cogs:${orderId}`).run();
+        .bind('تكلفة البضاعة مثبتة، لكن قيد مصروفها المحاسبي لم يُرحّل؛ يعيد النظام محاولة الترحيل تلقائيًا.',`cogs:${orderId}`).run();
     }
     await syncInvestorOrder(db,orderId,opts);
     await db.prepare('DELETE FROM finance_posting_errors WHERE event_key=?').bind(`investor:${orderId}`).run();

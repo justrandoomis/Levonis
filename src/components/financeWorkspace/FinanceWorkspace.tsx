@@ -1,6 +1,7 @@
-import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowDownToLine, ArrowUpLeft, BookOpen, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, Layers3, LayoutGrid, Megaphone, Package, RefreshCw, Search, ShieldCheck, Users, Wallet } from 'lucide-react';
 import { api } from '../../lib/api';
+import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { useLanguage } from '../../LanguageContext';
 import { Button, Empty, Loading, Money, Row, Sheet, Status, Surface } from './ui';
 import { currentMonth, financeDay, financePreset, financeRangeFromSearch, validFinanceRange, statusName, WORKSPACE_API, type FinanceOrder, type FinanceSection, type FinanceSummary } from './types';
@@ -41,6 +42,8 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
+  const [automaticRevision, setAutomaticRevision] = useState(0);
+  const summaryGeneration = useRef(0);
   const [orderId, setOrderId] = useState<string | null>(() => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('order'));
   const [collections, setCollections] = useState(false);
   const [advanced, setAdvanced] = useState(false);
@@ -55,13 +58,23 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   }, [section, range.from, range.to, month]);
   useEffect(() => {
     const controller = new AbortController();
+    const generation = ++summaryGeneration.current;
     setBusy(true); setError(''); setData(null);
     api.get<FinanceSummary>(`${WORKSPACE_API}/summary?from=${range.from}&to=${range.to}`, { signal: controller.signal })
       .then((r) => { if (!controller.signal.aborted) setData(r); })
       .catch((e) => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : String(e)); })
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
-    return () => controller.abort();
+    return () => { controller.abort(); summaryGeneration.current = generation + 1; };
   }, [range.from, range.to, revision]);
+  // These reads only display work completed by the server. They never start a
+  // financial posting and stop while hidden or while an editing sheet is open.
+  useFreshOnReturn(async () => {
+    const generation = summaryGeneration.current;
+    const updated = await api.get<FinanceSummary>(`${WORKSPACE_API}/summary?from=${range.from}&to=${range.to}`, { mascot: 'silent' });
+    if (generation !== summaryGeneration.current) return;
+    setData(updated); setAutomaticRevision(value => value + 1);
+  }, { pollWhileVisibleMs: 30_000, minIntervalMs: 30_000,
+    enabled: ['overview', 'orders', 'products'].includes(section) && (data?.totals.pending_costs ?? 0) > 0 && !busy && !orderId && !collections && !advanced && !legacyOpen });
   const tabs = [
     { id: 'overview', label: loc('نظرة عامة', 'Overview'), icon: LayoutGrid },
     { id: 'orders', label: loc('الطلبات', 'Orders'), icon: Layers3 },
@@ -97,7 +110,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
     <div className="fw-body">
       {error && <div className="fw-error" role="alert">{error}<Button variant="ghost" onClick={refresh}>{loc('إعادة المحاولة', 'Retry')}</Button></div>}
       {section === 'overview' && (busy && !data ? <Loading text={loc('تحميل أرقام الفترة…', 'Loading this period…')} /> : data && <Overview from={range.from} to={range.to} revision={revision} data={data} openOrder={setOrderId} onNavigate={setSection} onCollections={() => setCollections(true)} />)}
-      {section === 'orders' && <Orders from={range.from} to={range.to} revision={revision} openOrder={setOrderId} />}
+      {section === 'orders' && <Orders from={range.from} to={range.to} revision={revision + automaticRevision} openOrder={setOrderId} />}
       {section === 'products' && (busy && !data ? <Loading text={loc('تحميل المنتجات…', 'Loading products…')} /> : data && <Products data={data} onOpenOrders={() => setSection('orders')} />)}
       {section === 'monthly' && <MonthlyCosts key={month} month={month} onChanged={refresh} />}
       <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}>
@@ -179,7 +192,7 @@ function OrderRow({ order, onClick }: { order: FinanceOrder; onClick: () => void
     return_cost_missing: loc('تكلفة المرتجع ناقصة', 'Return cost missing'),
     refund_amount_missing: loc('مبلغ الاسترداد ناقص', 'Refund amount missing'),
     verified_goods_cost_required: loc('نسبة الأجر تنتظر التكلفة', 'Profit-based pay awaits cost'),
-    wage_reconciliation_pending: loc('تسوية الأجر معلقة', 'Wage reconciliation pending'),
+    wage_reconciliation_pending: loc('الحساب التلقائي للأجر لم يكتمل', 'Automatic wage calculation incomplete'),
   } as Record<string, string>)[issue.code] ?? loc('بيانات تحتاج مراجعة', 'Details need review')))];
   return <button type="button" className="fw-order-row" onClick={onClick}>
     <div className="fw-order-identity"><span className="fw-order-icon"><Layers3 size={18} strokeWidth={1.6} /></span><div><h3>{order.customer_name || `${loc('طلب', 'Order')} ${order.order_id || order.id}`}</h3>

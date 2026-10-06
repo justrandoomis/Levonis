@@ -43,7 +43,7 @@ test('historical recorded snapshot reconciliation retains a missing COGS posting
   const message = row<{ message: string }>(raw, "SELECT message FROM finance_posting_errors WHERE event_key='cogs:order'")!.message;
   assert.match(message, /تكلفة البضاعة مثبتة/, 'known cost must not be described as missing cost evidence');
   assert.match(message, /قيد مصروفها المحاسبي لم يُرحّل/, 'the warning must identify the missing accounting posting');
-  assert.match(message, /أعد ترحيل مالية الطلب/, 'the warning must explain how to complete the posting');
+  assert.match(message, /يعيد النظام محاولة الترحيل تلقائيًا/, 'known costs must not require an admin to start the posting retry');
   await reconcileFinanceOrder(db, 'order', { day: '2026-10-06' });
   assert.equal(count(raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='cogs:order'"), 1);
   await runOrderFinancialEffects({ DB: db } as Env, 'order', 'delivered', '2026-10-06');

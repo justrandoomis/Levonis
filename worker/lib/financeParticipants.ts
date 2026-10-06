@@ -306,7 +306,7 @@ const wageBasisSql=`json_array(
  (SELECT json_group_array(json_array(group_key,staff_id,completed_at)) FROM (SELECT * FROM finance_task_assignments WHERE order_id=? ORDER BY group_key)),
  (SELECT json_group_array(json_array(ca.id,ca.cost_id,ca.delta_iqd)) FROM finance_cost_adjustments ca JOIN finance_order_costs cc ON cc.id=ca.cost_id WHERE cc.order_id=? AND ca.kind='manual'),
  (SELECT json_group_array(json_array(id,employment_version,start_work_date)) FROM (SELECT DISTINCT s.id,s.employment_version,s.start_work_date FROM finance_staff s JOIN finance_order_costs ec ON ec.staff_id=s.id WHERE ec.order_id=? ORDER BY s.id)))`;
-function staffBasisFingerprintSql(orderSql:string,includeLate=true) {
+export function staffBasisFingerprintSql(orderSql:string,includeLate=true) {
   const simple=wageBasisSql.replace(/\?/g,orderSql);
   return includeLate?`json_array(${simple},(SELECT json_group_array(json_array(s.adjustment_id,s.allocation_id,s.unit_delta_iqd)) FROM lot_cost_adjustment_shares s JOIN order_item_inventory_allocations a ON a.id=s.allocation_id WHERE a.order_id=${orderSql}))`:simple;
 }
