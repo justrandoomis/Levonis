@@ -85,6 +85,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     settled: 'الرصيد المُسوّى',
     points: 'النقاط',
     quickBuyHeld: 'منها محجوز لطلب الشراء السريع',
+    orderQuickBuy: 'شراء سريع',
+    orderGift: 'هدية',
     addFunds: 'إضافة رصيد',
     withdraw: 'سحب رصيد',
     activity: 'العمليات',
@@ -200,6 +202,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     settled: 'Settled balance',
     points: 'Points',
     quickBuyHeld: 'Of which held for your Quick Buy order',
+    orderQuickBuy: 'Quick Buy',
+    orderGift: 'Gift',
     addFunds: 'Add funds',
     withdraw: 'Withdraw',
     activity: 'Operations',
@@ -315,6 +319,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     settled: 'باڵانسی جێگیر',
     points: 'خاڵەکان',
     quickBuyHeld: 'لەوە گیراوە بۆ داواکاری کڕینی خێرا',
+    orderQuickBuy: 'کڕینی خێرا',
+    orderGift: 'دیاری',
     addFunds: 'زیادکردنی باڵانس',
     withdraw: 'کێشانەوە',
     activity: 'کردارەکان',
@@ -410,6 +416,8 @@ interface TxView {
   receiptUrl: string | null;
   number: string;
   reviewRequested: boolean;
+  /** Set when the row pays for or refunds a Quick Buy or a gift order (0174). */
+  order_kind?: 'quick_buy' | 'gift';
   /**
    * The dinars this LEDGER ROW recorded (migration 0108), for any kind of row
    * — a checkout debit, a refund, a membership charge, an admin credit, not
@@ -1314,6 +1322,11 @@ export default function Wallet() {
                             {w?.state === 'approved' && (
                               <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-300">
                                 {s.approvedNotSent}
+                              </span>
+                            )}
+                            {tx?.order_kind && (
+                              <span data-wallet-order-kind={tx.order_kind} className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-300">
+                                {tx.order_kind === 'quick_buy' ? `⚡ ${s.orderQuickBuy}` : `🎁 ${s.orderGift}`}
                               </span>
                             )}
                             {tx?.receiptUrl && (

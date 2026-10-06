@@ -278,6 +278,24 @@ walletRoutes.get('/', async (c) => {
       exchange_rate_snapshot: number | null;
     }>();
   const metaById = new Map((depositMeta.results ?? []).map((m) => [m.tx_id, m]));
+  /**
+   * §21 «وأن تظهر للمستخدم ... العمليات بشكل مفهوم»: a payment or a refund on
+   * a Quick Buy or a gift order says so on its row. Only this user's own
+   * orders, one JSON parameter however many rows; nothing on a database that
+   * predates 0174, where every order is an ordinary one anyway.
+   */
+  const orderRefs = [...new Set((usdRows.results ?? []).map((t) => String(t.ref ?? '')).filter((r) => r.startsWith('ORD-')))];
+  const orderKinds = new Map<string, string>();
+  if (orderRefs.length > 0) {
+    const kinds = await c.env.DB.prepare(
+      `SELECT id, order_kind FROM orders
+        WHERE user_id = ? AND order_kind <> 'normal' AND id IN (SELECT value FROM json_each(?))`
+    )
+      .bind(user.id, JSON.stringify(orderRefs))
+      .all<{ id: string; order_kind: string }>()
+      .catch(() => ({ results: [] as { id: string; order_kind: string }[] }));
+    for (const k of kinds.results ?? []) orderKinds.set(k.id, k.order_kind);
+  }
 
   const decorate = (t: Record<string, unknown>) => {
     const meta = metaById.get(String(t.id));
@@ -285,6 +303,8 @@ walletRoutes.get('/', async (c) => {
       ...walletTxPublic(t),
       number: operationNumber(String(t.id)),
       reviewRequested: openReviews.has(String(t.id)),
+      /** 'quick_buy' | 'gift' for a row on such an order (0174); absent otherwise. */
+      ...(orderKinds.has(String(t.ref ?? '')) ? { order_kind: orderKinds.get(String(t.ref)) } : {}),
       depositContext: meta
         ? {
             provider: meta.provider,

@@ -3,7 +3,7 @@ import { ArrowDownToLine, ArrowUpLeft, BookOpen, CalendarDays, CheckCircle2, Che
 import { api } from '../../lib/api';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { useLanguage } from '../../LanguageContext';
-import { Button, Empty, Loading, Money, Row, Sheet, Status, Surface } from './ui';
+import { Button, Empty, Loading, Money, Row, Sheet, Status, Surface, formatMoney } from './ui';
 import { currentMonth, financeDay, financePreset, financeRangeFromSearch, validFinanceRange, statusName, WORKSPACE_API, type FinanceOrder, type FinanceSection, type FinanceSummary } from './types';
 import OrderProfitSheet from './OrderProfitSheet';
 import MonthlyCosts from './MonthlyCosts';
@@ -168,6 +168,12 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
       <Row label={loc('المصاريف العامة', 'General expenses')} value={<Money value={t.general_expenses_iqd} />} onClick={() => onNavigate('monthly')} />
       <Row label={loc('صافي المالك', 'Owner net')} value={<Money value={t.owner_period_net_iqd !== undefined ? t.owner_period_net_iqd : t.owner_net_iqd} />} prominent />
     </Surface></details>
+    {data.kinds && <Surface title={loc('حسب نوع الطلب', 'By order type', 'بەپێی جۆری داواکاری')} subtitle={loc('الطلبات المستلمة في الفترة نفسها، مقسومة حسب طريقة إنشائها.', 'The same delivered orders, split by how each was placed.', 'هەمان داواکارییە گەیەندراوەکان، بەپێی شێوازی دروستکردنیان.')}>
+      {data.kinds.map((k) => <Row key={k.kind} label={orderKindName(k.kind, loc)}
+        hint={`${k.orders_count} ${loc('طلب', 'orders', 'داواکاری')} · ${loc('صافي البيع', 'Net sales', 'فرۆشی پوخت')} ${formatMoney(k.net_goods_iqd)}`}
+        value={<Money value={k.gross_profit_iqd} />} />)}
+      <p className="fw-note">{loc('القيمة ربح البضاعة. الهدية تُطلب بـ0 د.ع وتبقى كلفة بضاعتها، فربحها السالب هو كلفة الهدايا. مبلغ الشراء السريع المحجوز في المحفظة ليس إيراداً؛ يدخل الطلب هنا بعد تسليمه فقط.', 'Values are goods profit. A gift is ordered at 0 IQD and keeps its goods cost, so its negative profit is what the gifts cost. A Quick Buy amount held in the wallet is not revenue; the order counts here only once delivered.', 'بەهاکان قازانجی کاڵایە. دیاری بە 0 دینار داوا دەکرێت و تێچووی کاڵاکەی دەمێنێتەوە، بۆیە قازانجە نەرێنییەکەی تێچووی دیارییەکانە. بڕی کڕینی خێرای گیراو لە جزدان داهات نییە؛ داواکاری تەنها دوای گەیاندن لێرە دەژمێردرێت.')}</p>
+    </Surface>}
     <div className="fw-two-columns"><Surface title={loc('أحدث الطلبات المستلمة', 'Latest delivered orders')} action={<Button variant="ghost" onClick={() => onNavigate('orders')}>{loc('عرض الكل', 'View all')}<ArrowUpLeft size={15} /></Button>}>
       {data.orders?.length ? <div className="fw-list">{data.orders.slice(0, 3).map((o) => <OrderRow order={o} key={o.id} onClick={() => openOrder(o.order_id || o.id)} />)}</div> : <Empty title={loc('لا طلبات مستلمة في الفترة', 'No delivered orders in this range')} text={loc('يمكن أن تبقى المصاريف العامة والترويج مستحقين حتى دون مبيعات.', 'General expenses and promotion may still apply without sales.')} />}
     </Surface>
@@ -179,6 +185,13 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
       <p className="fw-note">{loc('الربح يختلف عن النقد المحصل. المرتجعات وتصحيحات التكاليف تظهر في تفاصيل الطلب.', 'Profit differs from collected cash. Returns and financial corrections appear in order details.')}</p>
     </Surface></div>
   </>;
+}
+
+/** The order types of 0174, as every screen names them. */
+function orderKindName(kind: string, loc: (ar: string, en: string, ckb?: string) => string): string {
+  return kind === 'quick_buy' ? `⚡ ${loc('شراء سريع', 'Quick Buy', 'کڕینی خێرا')}`
+    : kind === 'gift' ? `🎁 ${loc('هدية', 'Gift', 'دیاری')}`
+    : loc('طلب عادي', 'Regular order', 'داواکاری ئاسایی');
 }
 
 function OrderRow({ order, onClick }: { order: FinanceOrder; onClick: () => void }) {
@@ -198,6 +211,7 @@ function OrderRow({ order, onClick }: { order: FinanceOrder; onClick: () => void
     <div className="fw-order-identity"><span className="fw-order-icon"><Layers3 size={18} strokeWidth={1.6} /></span><div><h3>{order.customer_name || `${loc('طلب', 'Order')} ${order.order_id || order.id}`}</h3>
       <p>{(order.order_id || order.id).slice(-12)} · {financeDay(order.delivered_at || order.created_at)}</p>
       <Status tone={order.status === 'delivered' ? 'positive' : 'neutral'}>{statusName(order.status, loc)}</Status>
+      {order.order_kind && order.order_kind !== 'normal' && <Status>{orderKindName(order.order_kind, loc)}</Status>}
       {view.needsReview && <><Status tone="warning">{loc('يحتاج مراجعة', 'Needs review')}</Status><p>{reasons.length ? reasons.slice(0, 2).join(' · ') : loc('افتح الطلب لمعرفة البنود المعلقة', 'Open the order to review pending lines')}{reasons.length > 2 ? ` · +${reasons.length - 2}` : ''}</p></>}
     </div></div><div className="fw-order-values">{view.amountKind === 'not_earned' ? <Status>{loc('غير مستحق', 'Not earned')}</Status> : <Money value={view.amount} />}<small>{view.amountKind === 'projected_goods_margin' ? loc('هامش البضاعة المتوقع · قبل المصاريف وغير مستحق', 'Forecast goods margin · before expenses, not earned') : view.amountKind === 'owner_net' ? loc('صافي المالك', 'Owner net') : loc('لا ربح مستحق من هذا الطلب', 'No earned profit from this order')}</small><ChevronLeft size={15} className="fw-muted" aria-hidden /></div>
   </button>;

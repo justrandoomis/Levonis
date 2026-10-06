@@ -45,6 +45,14 @@ export interface FinanceOrder extends ProfitTotals {
   customer_name?: string;
   version?: number;
   cost_confidence?: string;
+  /** What made the order (0174): the cart, a Quick Buy session, or gifts only. */
+  order_kind?: 'normal' | 'quick_buy' | 'gift';
+}
+
+/** §21: the period's delivered orders by what made them; the rows add up to the totals. */
+export interface FinanceKindTotals extends ProfitTotals {
+  kind: 'normal' | 'quick_buy' | 'gift';
+  orders_count: number;
 }
 
 export interface FinanceProduct extends ProfitTotals {
@@ -72,6 +80,8 @@ export interface FinanceSummary {
   range?: FinanceRange;
   totals: ProfitTotals;
   orders: FinanceOrder[];
+  /** Absent from a server that predates the order-kind split. */
+  kinds?: FinanceKindTotals[];
   products: FinanceProduct[];
   categories: FinanceProduct[];
   exceptions: Array<{ id?: string; order_id?: string; message?: string; type?: string }>;

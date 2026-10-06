@@ -49,6 +49,18 @@ function grouped(lines:ProfitLine[],kind:'product'|'main'|'sub'){
     const g=groups.get(key)??{name:name||'غير مصنف',lines:[]};g.lines.push(l);groups.set(key,g);}
   return [...groups].map(([id,g])=>({id,name:g.name,level:kind,qty:g.lines.reduce((v,l)=>v+l.qty,0),...sumRows(g.lines),orders_count:new Set(g.lines.map((l)=>l.order_id)).size}));
 }
+/**
+ * §21: the same delivered-order bases split by what made each order (0174) —
+ * the cart, a Quick Buy session, or gifts only. The three rows add up to the
+ * period totals. A gift order sells at 0 and still carries its goods cost, so
+ * its profit is what the gifts cost; a Quick Buy hold is never here, because
+ * a hold is not an order and an order counts only once it is delivered.
+ */
+const ORDER_KINDS=['normal','quick_buy','gift'] as const;
+function byKind(bases:OrderProfitBase[]){
+  return ORDER_KINDS.map((kind)=>{const rows=bases.filter((b)=>(ORDER_KINDS as readonly string[]).includes(s(b.order.order_kind))?b.order.order_kind===kind:kind==='normal');
+    return {kind,...sumRows(rows.map((b)=>b.totals)),orders_count:rows.length};});
+}
 /** Charts use the same delivered-order bases and full-month promotion shares as the report. */
 function chartAmounts(t:Row,general=0,unallocated=0,truncated=false){
   const revenue=n(t.retained_revenue_iqd)+n(t.shipping_income_iqd)+n(t.cod_tax_iqd);
@@ -138,7 +150,7 @@ adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
   for(const b of bases)for(const warning of b.warnings)exceptions.push({id:`${b.order_id}:${warning}`,order_id:b.order_id,type:warning.split(':')[0],message:warning.startsWith('cost:')?'تكلفة البضاعة تحتاج تثبيت FIFO أو تحققًا ماليًا خاصًا':warning==='investor:pending'?'توزيع المستثمر ينتظر التسوية':'يوجد بند مالي يحتاج مراجعة'});
   for(const b of bases)if(n(b.totals.pending_costs)>0)exceptions.push({id:`${b.order_id}:pending_cost`,order_id:b.order_id,type:'pending_cost',message:'الأجور أو المواد تنتظر تثبيت التكلفة'});
   const lines=bases.flatMap((b)=>b.lines);
-  return c.json({success:true,range:r,totals,orders:bases.map(orderRow),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sold_units'});
+  return c.json({success:true,range:r,totals,orders:bases.map(orderRow),kinds:byKind(bases),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sold_units'});
 });
 adminFinanceWorkspaceRoutes.get('/orders',async(c)=>{
   const r=range(c.req.query('from'),c.req.query('to')),offset=whole(c.req.query('offset')??0,'الصفحة',0,100000);
