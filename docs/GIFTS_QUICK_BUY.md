@@ -163,11 +163,27 @@ claim lease → recompute quote (D12) → statements:
 `orders` INSERT (shared builder, `order_kind='quick_buy'`, payment `wallet`, due 0) · `order_items` INSERTs (shared builder, from snapshots) · inventory transfer per item: `release` session reservation then `reserve` under the order (`planInventory` with the released moves credited) + reservation fence · wallet: commit the session hold with `ref=orderId` (or release + new final hold + commit when the total fell) · settlement `prepaid_at_purchase` · `planOrderFinanceSnapshot` (journal `wallet-advance`) · OrderCreated outbox · session flip `open → submitted` guarded by `expires_at <= now` and its stored `order_id` (the loser of a race hits the PK and rolls back) · events `capture`/`release`/`submit` · in-app + channel notice `quick_buy_submitted`.
 After commit: `initOrderStage`, invoice, `notifyOrderPlaced`, admin announcement — exactly as checkout (orders.ts:4758-4886). Ten failed attempts → `failed`: holds and reservations kept, admins alerted, retry/cancel from the admin panel.
 
-### 3.5 UI
-- Product page: a 44 px ⚡ toggle at the inline end of «أضف إلى السلة»; on, the main button morphs to «⚡ شراء سريع» (shared layout spring; reduced motion = cross-fade). Same selection gate as add-to-cart.
-- Not activated → Sheet (bottom, drag) with: step 1 three unchecked consents + wallet-hold consent, step 2 default address (existing addresses, inline AddressForm when none) → «تفعيل الشراء السريع» → closes back onto the product.
-- Success toast «تمت الإضافة إلى طلب الشراء السريع ⚡» + «الوقت المتبقي 28:42» + action «عرض الطلب». Insufficient balance: «رصيد محفظة Levo غير كافٍ لإتمام الشراء السريع.» + available / required.
-- My orders: top card «شراء سريع — قيد التجميع», live mm:ss from `expires_at` with server offset, items with qty stepper / remove / open product, totals, held amount, address, delivery; locked at 00:00; then «تم إرسال طلب الشراء السريع» + order link.
+### 3.5 UI (as built — owner brief §4 and §13 supersede the first sketch)
+- **Product page: one morphing control** (`src/components/quickBuy/QuickBuyBar.tsx`) for signed-in customers on
+  catalogue products. Cart mode `[⚡ 50px circle][🛒 أضف إلى السلة]`, quick mode `[⚡ شراء سريع][🛒 circle]`,
+  6px apart, the bar's width constant. ⚡ sits at the inline START — the right in ar/ckb, as the owner drew it — and
+  pushes the cart capsule toward the inline end as it grows. One motion value `p∈[0,1]` drives both widths, the
+  clipped and fading cart label, the gliding icons and the primary/accent crossfade; React commits only when the
+  motion settles. Tap: press 0.97→1, then a 450ms easeInOutCubic push; the compact 🛒 runs it in reverse. Drag: the
+  ⚡ capsule follows the finger (`p = p₀ + dx/D`), completes past 45% or on a flick faster than ~500px/s, springs
+  back otherwise; a 6px slop separates a tap from a drag and a drag never buys. Haptics: one tick at the threshold,
+  one when the morph to Quick Buy completes. The compact capsules are real buttons named «تفعيل الشراء السريع» and
+  «العودة إلى الإضافة للسلة» (en, ckb). Reduced motion: the layout changes at once and only the looks crossfade.
+  Measured: a 60-step drag with 0 long tasks and 0 React commits, frame p95 16.8ms.
+- Not activated → the press only, then the activation Sheet: three unchecked consents + the wallet-hold consent,
+  then the default address; on success the bar morphs to quick mode by itself, no second tap. A printer asks for
+  the standard-delivery warning (unticked) before it is added. Insufficient balance: «رصيد محفظة Levo غير كافٍ
+  لإتمام الشراء السريع.» with the available and required amounts — and the bar stays in quick mode.
+- My orders: the card «شراء سريع — قيد التجميع» exists **only while the session is open**: live mm:ss from
+  `expires_at` with the server offset, a progress hairline, items with qty stepper / remove, totals, held amount,
+  address, delivery; locked at 00:00. Once submitted the card disappears and the order is an ordinary order card
+  (§13) carrying only «⚡ تم إنشاؤه بالشراء السريع»; the order's page carries the same badge. A pending order the
+  wallet paid in full reads «بانتظار التأكيد», not «بانتظار الدفع».
 - Settings › «الشراء السريع»: switch, default address, consents (versions and date), re-consent.
 - Bottom nav account icon: «⚡ mm:ss» chip while a session is open.
 
