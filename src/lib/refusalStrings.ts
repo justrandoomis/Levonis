@@ -1221,6 +1221,149 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The request changed while you were working on it. Refresh and try again.',
     ckb: 'تغيّر الطلب أثناء عملك عليه. حدّث الصفحة وحاول مرة أخرى.',
   },
+
+  // ---- Reviews and printer-review gifts (docs/REVIEWS_GIFTS.md §9) ----------
+  // Copied from the plan's table verbatim, in all three columns. The review
+  // text rule, the media limits and the upload door (worker/routes/reviews.ts,
+  // worker/lib/reviews/*), the code, the choice and the gift line
+  // (worker/routes/gifts.ts, worker/routes/cart.ts, worker/routes/orders.ts).
+  // A failed gift code reads ONE sentence whatever the reason.
+  REVIEW_TEXT_TOO_SHORT: {
+    ar: 'اكتب 30 حرفًا حقيقيًا على الأقل عن تجربتك مع المنتج.',
+    en: 'Write at least 30 real characters about your experience with the product.',
+    ckb: 'لانیکەم 30 پیتی ڕاستەقینە دەربارەی ئەزموونت لەگەڵ بەرهەمەکە بنووسە.',
+  },
+  REVIEW_TEXT_TOO_LONG: {
+    ar: 'نص المراجعة أطول من 4000 حرف. اختصره قليلًا.',
+    en: 'The review is longer than 4000 characters. Please shorten it.',
+    ckb: 'دەقی هەڵسەنگاندنەکە لە 4000 پیت درێژترە. تکایە کورتی بکەرەوە.',
+  },
+  REVIEW_TEXT_REPETITIVE: {
+    ar: 'النص يبدو مكررًا أو رموزًا فقط. اكتب رأيك بكلمات حقيقية.',
+    en: 'The text looks repeated or made of symbols only. Write your opinion in real words.',
+    ckb: 'دەقەکە دووبارەکراوە یان تەنها هێمایە. بیروڕای خۆت بە وشەی ڕاستەقینە بنووسە.',
+  },
+  REVIEW_ALREADY_EXISTS: {
+    ar: 'قيّمت هذا المنتج من قبل. يمكنك تعديل مراجعتك بدل كتابة واحدة جديدة.',
+    en: 'You already reviewed this product. You can edit your review instead.',
+    ckb: 'پێشتر ئەم بەرهەمەت هەڵسەنگاندووە. دەتوانیت هەڵسەنگاندنەکەت دەستکاری بکەیت.',
+  },
+  REVIEW_NOT_EDITABLE: {
+    ar: 'لا يمكن تعديل هذه المراجعة بعد الآن.',
+    en: 'This review can no longer be edited.',
+    ckb: 'ئیتر ناتوانرێت ئەم هەڵسەنگاندنە دەستکاری بکرێت.',
+  },
+  REVIEW_MEDIA_TOO_MANY_IMAGES: {
+    ar: 'الحد 10 صور لكل مراجعة. احذف بعض الصور ثم أرسل.',
+    en: 'A review can have up to 10 photos. Remove some and send again.',
+    ckb: 'هەر هەڵسەنگاندنێک دەتوانێت تا 10 وێنەی هەبێت. هەندێکیان لابە و دووبارە بنێرە.',
+  },
+  REVIEW_MEDIA_TOO_MANY_VIDEOS: {
+    ar: 'الحد فيديوهان لكل مراجعة. احذف فيديو ثم أرسل.',
+    en: 'A review can have up to 2 videos. Remove one and send again.',
+    ckb: 'هەر هەڵسەنگاندنێک دەتوانێت تا 2 ڤیدیۆی هەبێت. یەکێکیان لابە و دووبارە بنێرە.',
+  },
+  REVIEW_MEDIA_NOT_OWNED: {
+    ar: 'تعذّر العثور على أحد الملفات المرفوعة. ارفعه مرة أخرى.',
+    en: 'One of the uploaded files could not be found. Upload it again.',
+    ckb: 'یەکێک لە فایلە بارکراوەکان نەدۆزرایەوە. دووبارە باری بکەرەوە.',
+  },
+  REVIEW_MEDIA_KIND: {
+    ar: 'أحد الملفات ليس صورة ولا فيديو. اختر ملفًا آخر.',
+    en: 'One of the files is neither a photo nor a video. Choose another file.',
+    ckb: 'یەکێک لە فایلەکان نە وێنەیە نە ڤیدیۆ. فایلێکی تر هەڵبژێرە.',
+  },
+  REVIEW_MEDIA_DUPLICATE: {
+    ar: 'أضفت الملف نفسه مرتين. احذف النسخة المكررة.',
+    en: 'You added the same file twice. Remove the duplicate.',
+    ckb: 'هەمان فایلت دوو جار زیاد کردووە. دووبارەکەی لابە.',
+  },
+  REVIEW_MEDIA_REUSED: {
+    ar: 'هذا الملف مستخدم في مراجعة سابقة لك. أضف صورًا أو فيديو من هذا المنتج.',
+    en: 'This file is already in one of your earlier reviews. Add photos or video of this product.',
+    ckb: 'ئەم فایلە لە هەڵسەنگاندنێکی پێشووتدا بەکارهاتووە. وێنە یان ڤیدیۆی ئەم بەرهەمە زیاد بکە.',
+  },
+  REVIEW_MEDIA_IN_USE: {
+    ar: 'هذا الملف مرتبط بمراجعة أخرى. ارفع ملفًا جديدًا.',
+    en: 'This file belongs to another review. Upload a new one.',
+    ckb: 'ئەم فایلە سەر بە هەڵسەنگاندنێکی ترە. فایلێکی نوێ بار بکە.',
+  },
+  REVIEW_UPLOAD_UNSUPPORTED: {
+    ar: 'نوع الملف غير مدعوم. ارفع صورة JPEG أو PNG أو WebP، أو فيديو MP4 أو MOV أو WebM.',
+    en: 'This file type is not supported. Upload a JPEG, PNG or WebP photo, or an MP4, MOV or WebM video.',
+    ckb: 'ئەم جۆرە فایلە پشتگیری ناکرێت. وێنەی JPEG یان PNG یان WebP، یان ڤیدیۆی MP4 یان MOV یان WebM بار بکە.',
+  },
+  REVIEW_UPLOAD_TOO_LARGE: {
+    ar: 'الملف أكبر من المسموح: الصورة حتى 8 ميغابايت والفيديو حتى 40 ميغابايت.',
+    en: 'The file is too large: photos up to 8 MB, videos up to 40 MB.',
+    ckb: 'فایلەکە لە ڕادەی ڕێگەپێدراو گەورەترە: وێنە تا 8 مێگابایت و ڤیدیۆ تا 40 مێگابایت.',
+  },
+  VIDEO_UNSUPPORTED: {
+    ar: 'هذا الفيديو لا يمكن تشغيله في المتصفح. صدّره بصيغة MP4 ثم أعد رفعه.',
+    en: 'This video cannot be played in a browser. Export it as MP4 and upload it again.',
+    ckb: 'ئەم ڤیدیۆیە لە وێبگەڕدا لێنادرێت. بە شێوازی MP4 دەریبکە و دووبارە باری بکەرەوە.',
+  },
+  // The three halves of HEIF_REFUSAL (worker/routes/uploads.ts), one per language.
+  IMAGE_HEIC_UNSUPPORTED: {
+    ar: 'هذه الصورة بصيغة HEIC (صيغة كاميرا الآيفون) ولا يمكن تحويلها — صدّرها بصيغة JPEG ثم أعد رفعها',
+    en: 'This is a HEIC photo (the iPhone camera format) and cannot be converted — export it as JPEG and upload again',
+    ckb: 'ئەم وێنەیە بە شێوازی HEIC ـە (شێوازی کامێرای ئایفۆن) و ناتوانرێت بگۆڕدرێت — بە JPEG دەریبکە و دووبارە بارکە',
+  },
+  GIFT_CODE_INVALID: {
+    ar: 'الكود غير صحيح أو غير صالح. تأكد من الأرقام أو تواصل مع الدعم.',
+    en: 'The code is incorrect or no longer valid. Check the digits or contact support.',
+    ckb: 'کۆدەکە هەڵەیە یان ئیتر کار ناکات. ژمارەکان بپشکنە یان پەیوەندی بە پشتگیرییەوە بکە.',
+  },
+  GIFT_NOT_FOUND: {
+    ar: 'لم نجد هذه الهدية في حسابك.',
+    en: 'We could not find this gift on your account.',
+    ckb: 'ئەم دیارییە لە هەژمارەکەتدا نەدۆزرایەوە.',
+  },
+  GIFT_NOT_REDEEMED: {
+    ar: 'أدخل كود الهدية أولًا لاستردادها.',
+    en: 'Enter the gift code first to redeem it.',
+    ckb: 'سەرەتا کۆدی دیارییەکە بنووسە بۆ وەرگرتنەوەی.',
+  },
+  GIFT_CHOICE_REQUIRED: {
+    ar: 'اختر هديتك أولًا ثم أضفها إلى السلة.',
+    en: 'Choose your gift first, then add it to the cart.',
+    ckb: 'سەرەتا دیارییەکەت هەڵبژێرە، پاشان زیادی بکە بۆ سەبەتە.',
+  },
+  GIFT_CHOICE_INVALID: {
+    ar: 'هذا الاختيار غير متاح لهذه الهدية. اختر من الخيارات المعروضة.',
+    en: 'This choice is not available for this gift. Pick one of the options shown.',
+    ckb: 'ئەم هەڵبژاردنە بۆ ئەم دیارییە بەردەست نییە. یەکێک لە هەڵبژاردنە پیشاندراوەکان هەڵبژێرە.',
+  },
+  GIFT_IN_CART: {
+    ar: 'الهدية موجودة في السلة. احذفها من السلة لتغيير اختيارك.',
+    en: 'The gift is in your cart. Remove it from the cart to change your choice.',
+    ckb: 'دیارییەکە لە سەبەتەکەدایە. لە سەبەتەکە لایبە بۆ گۆڕینی هەڵبژاردنەکەت.',
+  },
+  GIFT_ALREADY_ORDERED: {
+    ar: 'طُلبت هذه الهدية بالفعل ولا يمكن طلبها مرة أخرى.',
+    en: 'This gift has already been ordered and cannot be ordered again.',
+    ckb: 'ئەم دیارییە پێشتر داواکراوە و ناتوانرێت دووبارە داوا بکرێتەوە.',
+  },
+  GIFT_NOT_AVAILABLE: {
+    ar: 'هذه الهدية لم تعد متاحة. تواصل مع الدعم إن كان ذلك خطأ.',
+    en: 'This gift is no longer available. Contact support if this is a mistake.',
+    ckb: 'ئەم دیارییە ئیتر بەردەست نییە. ئەگەر هەڵەیە پەیوەندی بە پشتگیرییەوە بکە.',
+  },
+  GIFT_NOT_ORDERABLE: {
+    ar: 'لا يمكن طلب الهدية الآن. حدّث صفحة الهدايا ثم حاول مرة أخرى.',
+    en: 'The gift cannot be ordered right now. Refresh your gifts page and try again.',
+    ckb: 'ئێستا ناتوانرێت دیارییەکە داوا بکرێت. پەڕەی دیارییەکان نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
+  },
+  GIFT_LINE_LOCKED: {
+    ar: 'سطر الهدية ثابت: لا يمكن تغيير كميته أو خياراته. يمكنك حذفه فقط.',
+    en: 'A gift line is fixed: its quantity and options cannot change. You can only remove it.',
+    ckb: 'هێڵی دیاری جێگیرە: بڕ و هەڵبژاردنەکانی ناگۆڕدرێن. تەنها دەتوانیت لایببەیت.',
+  },
+  GIFT_SALE_TYPE_UNAVAILABLE: {
+    ar: 'نوع البيع المحدد لهذه الهدية غير متاح حاليًا. تواصل مع الدعم.',
+    en: 'The sale type set for this gift is not available right now. Contact support.',
+    ckb: 'جۆری فرۆشتنی دیاریکراو بۆ ئەم دیارییە ئێستا بەردەست نییە. پەیوەندی بە پشتگیرییەوە بکە.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

@@ -21,6 +21,10 @@
     { "table": "orders", "writer": "worker/lib/delivery/sync.ts#syncOrderDelivery", "reason": "courier status sync writes delivery_* columns; Fulfilment", "removed_in": "7b" },
     { "table": "users", "writer": "worker/lib/entitlements.ts#getTierStatus", "reason": "write-on-read tier cache (membership_tier/subscription_plan/subscription_expiry); replaced by the SubscriptionChanged consumer after a parity week", "removed_in": "6b" },
     { "table": "users", "writer": "worker/routes/rewards.ts#POST /checkin", "reason": "checkin_streak/last_checkin_day inside the points batch; moves to mission_streaks (0057_state_tables)", "removed_in": "0.5" },
-    { "table": "users", "writer": "worker/routes/admin.ts#PATCH /users/:id", "reason": "role/membership_tier/subscription_plan/admin_scope/is_investor; becomes IDENTITY.setRole (audited)", "removed_in": "9.2" }
+    { "table": "users", "writer": "worker/routes/admin.ts#PATCH /users/:id", "reason": "role/membership_tier/subscription_plan/admin_scope/is_investor; becomes IDENTITY.setRole (audited)", "removed_in": "9.2" },
+    { "table": "gift_entitlements", "writer": "worker/routes/orders.ts#POST /", "reason": "0165 (docs/REVIEWS_GIFTS.md): the checkout consumes a redeemed review gift — state 'ordered', order link, order_seq — inside the order batch; reviews-owned", "removed_in": "7.1" },
+    { "table": "cart_items", "writer": "worker/routes/gifts.ts#POST /admin/gifts/:id/cancel", "reason": "0165: cancelling a granted review gift removes its gift cart line in the same batch; commerce-owned", "removed_in": "7.1" },
+    { "table": "media_cleanup_jobs", "writer": "worker/lib/reviews/media.ts#reviewMediaStagingStatement", "reason": "0165: a review upload writes its 24 h staging-cleanup intent; files-owned queue, drained by runGuardedMediaCleanup", "removed_in": "7.1" },
+    { "table": "media_cleanup_jobs", "writer": "worker/lib/reviews/media.ts#closeReviewMediaStagingStatement", "reason": "0165: attaching review media closes its staging intent in the review's own batch; files-owned queue", "removed_in": "7.1" }
   ]
 }

@@ -59,6 +59,8 @@ import { GINI_ORDER_NO_RE } from '../../packages/pricing/src/paymentPolicy';
 import GiniCheckoutOption from '../components/checkout/GiniCheckoutOption';
 import BundleContents, { type BundleContentLine } from '../components/bundles/BundleContents';
 import AddressForm from '../components/address/AddressForm';
+import { Gift } from 'lucide-react';
+import { giftLineOf, giftLineText, type CartGiftBlock } from '../components/reviews/gifts/giftLine';
 /**
  * THE ORDER IS PLACED; THIS IS ABOUT WHAT HAPPENS NEXT.
  *
@@ -1053,11 +1055,14 @@ export default function Checkout() {
     componentTotalIqd?: number | null;
     savingPercent?: number | null;
     mysterySpools?: number | null;
+    /** A gift line (docs/REVIEWS_GIFTS.md §6.3): the server priced it at 0; the chip and its value are shown. */
+    gift?: CartGiftBlock | null;
   }> =
     quote
       ? quote.lines.map((l) => {
           const cartLine = cartById.get(l.cart_item_id);
           return {
+            gift: giftLineOf(l) ?? giftLineOf(cartLine),
             key: l.cart_item_id,
             image: l.image ?? cartLine?.image ?? '',
             name: l.name,
@@ -1091,6 +1096,7 @@ export default function Checkout() {
           };
         })
       : items.map((i) => ({
+          gift: giftLineOf(i),
           key: i.id,
           // §3/§12: the product name is English in every language and is never translated.
           image: i.image,
@@ -2366,6 +2372,19 @@ export default function Checkout() {
                       <p className="text-xs text-zinc-500 mb-1.5 font-light">{line.variant}</p>
                     )}
                     <span className="text-sm font-medium text-white tabular-nums">{money(line.lineTotal)}</span>
+                    {line.gift && (
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5" data-checkout-gift-line={line.key}>
+                        <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 w-max bg-gold/10 text-gold text-[11px] font-bold">
+                          <Gift className="w-3 h-3 shrink-0" aria-hidden="true" />
+                          {giftLineText(lang, 'badge')}
+                        </span>
+                        {line.gift.value_iqd > 0 && (
+                          <span className="text-[11.5px] text-zinc-500 tabular-nums">
+                            {giftLineText(lang, 'worth', { value: money(line.gift.value_iqd) })}
+                          </span>
+                        )}
+                      </span>
+                    )}
                     {line.mysterySpools ? (
                       <p className="mt-1 text-[11.5px] text-zinc-400">
                         {loc(

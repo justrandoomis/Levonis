@@ -555,6 +555,7 @@ const REVIEW_SCHEMA = object(
     incentivized: boolean('The reviewer received a reward for the review.'),
     automatic: boolean('An automatic rating the site records after a delivery the customer did not review.'),
     photo_count: integer('How many photos the customer attached (the photos themselves are not published through this API).'),
+    video_count: integer('How many videos the customer attached (not published through this API either).'),
     created_at: nullable(dateTime()),
   },
   'One published customer review.'
@@ -599,12 +600,18 @@ async function productReviews(req: PublicRequest) {
   const count = Number(summary?.n) || 0;
   const reviews = (list.results ?? []).map((r) => {
     const system = (r.source ?? 'user') === 'system';
+    // A review holds up to 10 photos and 2 videos (0165): each counted as what it is.
     let photos = 0;
+    let videos = 0;
     try {
       const parsed = JSON.parse(String(r.media ?? '[]'));
-      photos = Array.isArray(parsed) ? parsed.length : 0;
+      for (const m of Array.isArray(parsed) ? parsed : []) {
+        if (m && typeof m === 'object' && (m as { kind?: unknown }).kind === 'video') videos += 1;
+        else if (m && typeof m === 'object') photos += 1;
+      }
     } catch {
       photos = 0;
+      videos = 0;
     }
     return {
       rating: Math.min(5, Math.max(1, int(r.stars) ?? 5)),
@@ -614,6 +621,7 @@ async function productReviews(req: PublicRequest) {
       incentivized: !!r.has_reward,
       automatic: system,
       photo_count: photos,
+      video_count: videos,
       created_at: isoOrNull(r.created_at),
     };
   });

@@ -111,6 +111,7 @@ import { linkFromInventory } from '../lib/serialInventory';
 import { serialInventoryRoutes } from './serialInventory';
 import { catalogIndexFor } from '../lib/catalogPresentation';
 import { MAINTENANCE_ROOT_ID, maintenanceFor } from '../lib/printerFits';
+import { admitPrinterGiftForUnit } from '../lib/reviews/eligibility';
 
 export const deviceRoutes = new Hono<AppContext>();
 deviceRoutes.use('*', requireAuth);
@@ -586,6 +587,9 @@ deviceRoutes.post('/register', async (c) => {
       transferred: row.owner_user_id !== user.id,
     });
   }
+  // 0165 (docs/REVIEWS_GIFTS.md S4): a printer review written BEFORE the unit
+  // was linked enters the gift queue now. Contained — never throws.
+  await admitPrinterGiftForUnit(c.env, { userId: user.id, unitId: row.id });
 
   const fresh = (await loadDevice(c.env.DB, row.id)) ?? row;
   return c.json({
@@ -613,6 +617,8 @@ deviceRoutes.post('/units/:unitId/register', async (c) => {
   const reg = await bindUnit(c.env.DB, row.id, user.id);
   if (!reg || reg.user_id !== user.id || reg.revoked_at) throw conflict('This device is linked to another account.', 'LINKED_ELSEWHERE');
   if (!alreadyMine) await audit(c.env.DB, user.id, 'device.register', row.id, { by: 'order' });
+  // 0165 (docs/REVIEWS_GIFTS.md S4): the printer-gift admission of an earlier review. Contained.
+  await admitPrinterGiftForUnit(c.env, { userId: user.id, unitId: row.id });
   const fresh = (await loadDevice(c.env.DB, row.id)) ?? row;
   return c.json({ success: true, device: { ...devicePublic(fresh), transferred: false }, already_registered: alreadyMine });
 });

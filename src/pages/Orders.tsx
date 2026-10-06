@@ -10,10 +10,18 @@ import Spinner from '../components/ui/Spinner';
 import OrderCard from '../components/orders/OrderCard';
 import OrderCardSkeleton from '../components/orders/OrderCardSkeleton';
 import CancelOrderSheet from '../components/orders/CancelOrderSheet';
-import ReviewSheet from '../components/orders/ReviewSheet';
 import PendingStoreReviews from '../components/community/reviews/StoreReviews';
 import GiftsEntry from '../components/orders/GiftsEntry';
 import { asLang } from '../components/orders/format';
+
+/**
+ * THE REVIEW FORM IS ITS OWN CHUNK. It carries the media picker, the uploader
+ * and the gallery, none of which a customer checking a delivery needs; it is
+ * fetched while the browser is idle once a delivered order is on screen, and
+ * mounted the first time «تقييم المنتجات» is pressed.
+ */
+const loadReviewSheet = () => import('../components/orders/ReviewSheet');
+const ReviewSheet = React.lazy(loadReviewSheet);
 
 /**
  * The customer's orders, one page at a time.
@@ -177,11 +185,8 @@ const STRINGS = {
     allRated: 'هەموو داواکارییە گەیەنراوەکانت هەڵسەنگاندووە.',
     allRatedLoaded: 'هەموو داواکارییە بارکراوەکان هەڵسەنگێنراون — زیاتر بار بکە.',
     cancelledNotice: (id: string) => `داواکاری ${id} هەڵوەشێنرایەوە.`,
-    // OWNER: Sorani to be written by hand. The previous Kurdish line said the
-    // review was "awaiting approval", which the server contradicts — it
-    // publishes immediately — so the ARABIC wording stands in until you write
-    // the Sorani yourself. Nothing here is machine-translated Kurdish.
-    reviewThanks: 'شكرًا — نُشرت مراجعتك. اعتماد المكافأة قرار منفصل.',
+    // The review publishes immediately; only the gift/points decision waits.
+    reviewThanks: 'سوپاس — هەڵسەنگاندنەکەت بڵاوکرایەوە. پەسەندکردنی خەڵات بڕیارێکی جیاوازە.',
   },
 };
 
@@ -242,6 +247,7 @@ export default function Orders() {
   const [trackingFor, setTrackingFor] = useState<string | null>(null);
   const [cancelFor, setCancelFor] = useState<ApiOrder | null>(null);
   const [reviewFor, setReviewFor] = useState<ApiOrder | null>(null);
+  const [reviewMounted, setReviewMounted] = useState(false);
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
   // A filter changed mid-flight must not let the older response land last.
@@ -390,6 +396,21 @@ export default function Orders() {
     );
     loadCounts();
   };
+
+  // A delivered order on screen means the review form may be wanted next:
+  // fetch its chunk while the browser is idle, so the first tap opens it at
+  // once. Nothing is fetched for a list with nothing to rate.
+  const hasDelivered = orders.some((o) => o.status === 'delivered');
+  useEffect(() => {
+    if (!hasDelivered) return;
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(() => void loadReviewSheet().catch(() => undefined), { timeout: 4000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = window.setTimeout(() => void loadReviewSheet().catch(() => undefined), 2000);
+    return () => window.clearTimeout(t);
+  }, [hasDelivered]);
 
   const onReviewSubmitted = (productId: string) => {
     setReviewed((prev) => new Set([...(prev ?? []), productId]));
@@ -581,7 +602,10 @@ export default function Orders() {
                 trackingOpen={trackingFor === order.id}
                 onToggleTracking={() => setTrackingFor((cur) => (cur === order.id ? null : order.id))}
                 onCancel={(o) => setCancelFor(o)}
-                onReview={(o) => setReviewFor(o)}
+                onReview={(o) => {
+                  setReviewMounted(true);
+                  setReviewFor(o);
+                }}
               />
             ))}
             {search && nextBefore && <p className="text-[11.5px] text-zinc-500 text-center">{s.searchHint}</p>}
@@ -614,14 +638,18 @@ export default function Orders() {
         onClose={() => setCancelFor(null)}
         onCancelled={onCancelled}
       />
-      <ReviewSheet
-        open={reviewFor !== null}
-        onClose={() => setReviewFor(null)}
-        orderId={reviewFor?.id ?? ''}
-        items={reviewFor?.items ?? []}
-        reviewedProductIds={reviewed ?? EMPTY_SET}
-        onSubmitted={onReviewSubmitted}
-      />
+      {reviewMounted && (
+        <React.Suspense fallback={null}>
+          <ReviewSheet
+            open={reviewFor !== null}
+            onClose={() => setReviewFor(null)}
+            orderId={reviewFor?.id ?? ''}
+            items={reviewFor?.items ?? []}
+            reviewedProductIds={reviewed ?? EMPTY_SET}
+            onSubmitted={onReviewSubmitted}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 }

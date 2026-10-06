@@ -452,6 +452,13 @@ export interface StoreMediaInput {
   originalName?: string | null;
   /** Cache-Control for the stored object; the caller knows if it is public. */
   cacheControl?: string;
+  /**
+   * R2 custom metadata written with the object, passed through untouched —
+   * e.g. the review door's `sha256` of the bytes AS THEY ARRIVED (before any
+   * WebP conversion), which the attach step reads back from the object's head
+   * to refuse duplicates (docs/REVIEWS_GIFTS.md §5).
+   */
+  customMetadata?: Record<string, string>;
 }
 
 export interface StoreMediaResult {
@@ -530,6 +537,7 @@ export async function storeMedia(
             ? 'public, max-age=31536000, immutable'
             : 'private, max-age=300'),
       },
+      ...(input.customMetadata ? { customMetadata: input.customMetadata } : {}),
     }
   );
 

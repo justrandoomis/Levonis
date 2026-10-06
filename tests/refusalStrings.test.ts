@@ -175,6 +175,20 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/lib/chatCards.ts',
     'worker/routes/chats.ts',
     'worker/routes/chatCommerce.ts',
+    // Reviews and printer-review gifts (docs/REVIEWS_GIFTS.md §9): the review
+    // text rule, the media limits and the upload door; the code, the choice,
+    // the gift line in the cart and at checkout, and the 0165 triggers that
+    // RAISE the gift codes the routes map.
+    'worker/routes/reviews.ts',
+    'worker/routes/gifts.ts',
+    'worker/lib/reviews/text.ts',
+    'worker/lib/reviews/media.ts',
+    'worker/lib/reviews/eligibility.ts',
+    'packages/catalog/src/reviewRules.ts',
+    'worker/lib/gifts/cartLine.ts',
+    'worker/lib/gifts/levels.ts',
+    'worker/lib/gifts/entitlements.ts',
+    'migrations/0165_reviews_gifts.sql',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');
@@ -230,6 +244,9 @@ const DOORS = [
   // A store's product page: the add-to-cart door, where OWN_STORE_PURCHASE,
   // STORE_CLOSED and OUT_OF_STOCK land (the seller conflict opens its dialog).
   'src/pages/StorefrontProduct.tsx',
+  // /gifts (docs/REVIEWS_GIFTS.md §8 C3): the code, the choice and the gift's
+  // add-to-cart door. The table is loaded there on the first refusal only.
+  'src/components/reviews/MyGifts.tsx',
 ];
 
 test('every customer door decodes the refusal CODE rather than printing the server sentence', () => {
@@ -392,5 +409,74 @@ test('the review codes (F12) are translated, and each is emitted by its route', 
     assert.ok(!/[A-Z]{3,}_[A-Z]/.test(e.ar + e.en), `${code}: a machine code leaked into the sentence`);
     const file = emitters[code] ?? 'worker/routes/marketplace.ts';
     assert.ok(readFileSync(join(ROOT, file), 'utf8').includes(`'${code}'`), `${file} does not emit ${code}`);
+  }
+});
+
+/**
+ * REVIEWS AND PRINTER-REVIEW GIFTS (docs/REVIEWS_GIFTS.md §9) — every customer
+ * code of the release, in the three languages the plan wrote them in. Stricter
+ * than the older rows: this feature is held to real Sorani (rule D6), so a ckb
+ * sentence that is the Arabic pasted across, or carries no Kurdish letter, fails.
+ */
+const REVIEWS_GIFTS_CODES = [
+  'REVIEW_TEXT_TOO_SHORT',
+  'REVIEW_TEXT_TOO_LONG',
+  'REVIEW_TEXT_REPETITIVE',
+  'REVIEW_ALREADY_EXISTS',
+  'REVIEW_NOT_EDITABLE',
+  'REVIEW_MEDIA_TOO_MANY_IMAGES',
+  'REVIEW_MEDIA_TOO_MANY_VIDEOS',
+  'REVIEW_MEDIA_NOT_OWNED',
+  'REVIEW_MEDIA_KIND',
+  'REVIEW_MEDIA_DUPLICATE',
+  'REVIEW_MEDIA_REUSED',
+  'REVIEW_MEDIA_IN_USE',
+  'REVIEW_UPLOAD_UNSUPPORTED',
+  'REVIEW_UPLOAD_TOO_LARGE',
+  'VIDEO_UNSUPPORTED',
+  'IMAGE_HEIC_UNSUPPORTED',
+  'GIFT_CODE_INVALID',
+  'GIFT_NOT_FOUND',
+  'GIFT_NOT_REDEEMED',
+  'GIFT_CHOICE_REQUIRED',
+  'GIFT_CHOICE_INVALID',
+  'GIFT_IN_CART',
+  'GIFT_ALREADY_ORDERED',
+  'GIFT_NOT_AVAILABLE',
+  'GIFT_NOT_ORDERABLE',
+  'GIFT_LINE_LOCKED',
+  'GIFT_SALE_TYPE_UNAVAILABLE',
+] as const;
+
+/** Letters Sorani writes and Arabic does not (the ordersListUi pattern). */
+const KURDISH = /[ەۆێڕڵڤگچپژیک]/;
+
+test('the reviews and gifts codes (§9) are translated in ar, en and real Sorani', () => {
+  for (const code of REVIEWS_GIFTS_CODES) {
+    const e = REFUSAL_STRINGS[code];
+    assert.ok(e, `${code} has no sentence`);
+    for (const lang of ['ar', 'en', 'ckb'] as const) {
+      assert.ok(typeof e[lang] === 'string' && e[lang].trim().length > 0, `${code}.${lang} is empty`);
+      assert.notEqual(e[lang], code, `${code}.${lang} is the bare identifier`);
+    }
+    assert.notEqual(e.ckb, e.ar, `${code}: ckb is a copy of the Arabic`);
+    assert.notEqual(e.ckb, e.en, `${code}: ckb is a copy of the English`);
+    assert.ok(KURDISH.test(e.ckb), `${code}: the ckb sentence has no Sorani letter`);
+    for (const lang of ['ar', 'ckb'] as const) {
+      assert.ok(!/[A-Z]{3,}_[A-Z]/.test(e[lang]), `${code}.${lang} leaks a machine code into the sentence`);
+    }
+    assert.ok(!/[A-Z]{3,}_[A-Z]/.test(e.en), `${code}.en leaks a machine code into the sentence`);
+  }
+});
+
+test('a failed gift code reads one sentence, and the brand is written in Latin', () => {
+  // One generic sentence for every redeem failure (S11): the page decodes
+  // GIFT_CODE_INVALID whatever the server's reason, so the table must say it.
+  assert.equal(refusalText('GIFT_CODE_INVALID', 'ar'), 'الكود غير صحيح أو غير صالح. تأكد من الأرقام أو تواصل مع الدعم.');
+  assert.equal(apiRefusal({ code: 'GIFT_CODE_INVALID', message: 'Invalid code' }, 'ckb'), REFUSAL_STRINGS.GIFT_CODE_INVALID.ckb);
+  // The HEIC sentence is the existing three-language refusal, split per language.
+  const heif = readFileSync(join(ROOT, 'worker/routes/uploads.ts'), 'utf8');
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.ok(heif.includes(REFUSAL_STRINGS.IMAGE_HEIC_UNSUPPORTED[lang]), `IMAGE_HEIC_UNSUPPORTED.${lang} drifted from HEIF_REFUSAL`);
   }
 });

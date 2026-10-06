@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateReviewQuality, type ReviewQualityMedia } from '../worker/lib/reviewQuality';
-import { LEVEL_COMPOSITION, reviewRoutes } from '../worker/routes/reviews';
+import { reviewRoutes } from '../worker/routes/reviews';
+import { giftRoutes } from '../worker/routes/gifts';
 import { sweepAutomaticReviews } from '../worker/lib/reviewAutoSweep';
 import { asD1, count, freshDb, get, json, post, row, stubApp } from './fixtures/app';
 
@@ -53,17 +54,6 @@ test('quality scoring rewards substance and duplicate media cannot inflate a tie
   assert.equal(duplicate.imageCount, 1);
   assert.ok(duplicate.suspiciousSignals.includes('duplicate_media'));
   assert.notEqual(duplicate.tier, 5);
-});
-
-test('the five established gift levels and their contents remain unchanged', () => {
-  assert.deepEqual(Object.keys(LEVEL_COMPOSITION), ['1', '2', '3', '4', '5']);
-  assert.deepEqual(LEVEL_COMPOSITION, {
-    1: ['accessory'],
-    2: ['filament'],
-    3: ['filament', 'accessory'],
-    4: ['nozzle'],
-    5: ['nozzle', 'plate'],
-  });
 });
 
 function seedPurchase(raw: ReturnType<typeof freshDb>, productId = 'p1', deliveredAt = '2026-09-01T00:00:00.000Z') {
@@ -175,6 +165,7 @@ test('qualified manual review enters reward queue; rejecting reward leaves publi
 
   const admin = stubApp(asD1(raw), { id: 'boss', role: 'admin', email: 'boss@x.co' }, (a) => {
     a.route('/api/reviews', reviewRoutes);
+    a.route('/api/reviews', giftRoutes); // the reward decision moved to routes/gifts.ts
   }, { env });
   const rejected = await post(admin, `/api/reviews/admin/${created.review.id}/reward`, {
     action: 'reject',

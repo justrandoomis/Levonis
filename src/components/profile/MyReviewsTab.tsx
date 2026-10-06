@@ -1,14 +1,21 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { MessageSquare, Star, RefreshCw, ChevronRight } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import ReviewMediaGallery, { type ReviewMediaItem } from '../reviews/ReviewMediaGallery';
+import { reviewStrings } from '../reviews/reviewStrings';
 
 /**
  * "My reviews" profile tab — REAL data from GET /api/reviews/mine (the
  * signed-in user's reviews with moderation + reward state). Replaces the
  * previous hardcoded "coming soon" placeholder that existed despite the
  * endpoint being live. Honest loading / error+retry / empty / guest states.
+ *
+ * Each review shows its photos and videos in the one review gallery (the
+ * full-size viewer, videos that never play by themselves). The card is an
+ * article with a link to the product, not one big button: the gallery's tiles
+ * are buttons of their own and may not sit inside another.
  */
 
 interface MyReview {
@@ -24,6 +31,7 @@ interface MyReview {
   source?: 'user' | 'system';
   system_generated?: boolean;
   fallback_points_awarded?: number;
+  media?: ReviewMediaItem[];
   reward: {
     kind: 'printer_gift' | 'points' | string;
     state: string;
@@ -80,6 +88,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
   const navigate = useNavigate();
   const { lang, dir } = useLanguage();
   const s = STRINGS[lang] ?? STRINGS.ar;
+  const rs = reviewStrings(lang);
 
   const [reviews, setReviews] = useState<MyReview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -173,14 +182,12 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
         // §3/§12: the product name is English in every language and is never translated.
         const name = r.product_name || '';
         const statusCls = STATUS_STYLES[r.status] ?? 'bg-zinc-800 text-zinc-400';
+        const media = Array.isArray(r.media) ? r.media : [];
         return (
-          <button
+          <article
             key={r.id}
-            type="button"
-            onClick={() => {
-              if (r.product_slug) navigate(`/product/${r.product_slug}`);
-            }}
-            className="rounded-[10px] p-3 text-start shadow-sm border active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold bg-zinc-900 border-white/5 text-white hover:bg-white/[0.03]"
+            data-my-review={r.id}
+            className="rounded-[10px] p-3 text-start shadow-sm border bg-zinc-900 border-white/5 text-white"
           >
             <div className="flex items-center justify-between gap-2 mb-1">
               <span className="font-bold text-[13px] truncate">{name}</span>
@@ -188,7 +195,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
                 {s.status[r.status] ?? r.status}
               </span>
             </div>
-            <div className="flex items-center gap-0.5 mb-1.5" aria-label={`${r.stars}/5`}>
+            <div className="flex items-center gap-0.5 mb-1.5" role="img" aria-label={rs.starsOf(r.stars)}>
               {[1, 2, 3, 4, 5].map((i) => (
                 <Star
                   key={i}
@@ -197,9 +204,14 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
                 />
               ))}
             </div>
-            <p className="text-[12px] line-clamp-2 leading-snug mb-1.5 text-zinc-400">
+            <p className="text-[12px] line-clamp-2 leading-snug mb-1.5 text-zinc-400" dir="auto">
               {r.system_generated || r.source === 'system' ? s.systemGenerated : r.body}
             </p>
+            {media.length > 0 && (
+              <div className="mb-2">
+                <ReviewMediaGallery media={media} label={rs.galleryLabel} max={4} />
+              </div>
+            )}
             <div className="flex items-center justify-between text-[10px] text-zinc-500">
               <span>{fmtDate(r.created_at)}</span>
               <span className="flex items-center gap-1">
@@ -217,14 +229,17 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
                   </span>
                 )}
                 {r.product_slug && (
-                  <span className="flex items-center gap-0.5">
+                  <Link
+                    to={`/product/${r.product_slug}`}
+                    className="inline-flex min-h-[44px] items-center gap-0.5 rounded px-1 font-bold text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                  >
                     {s.viewProduct}
                     <ChevronRight className={`w-3 h-3 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />
-                  </span>
+                  </Link>
                 )}
               </span>
             </div>
-          </button>
+          </article>
         );
       })}
     </div>

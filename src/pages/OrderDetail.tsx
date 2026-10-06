@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck, MessageSquare, Repeat } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck, MessageSquare, Repeat, Gift } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
 import { api } from '../lib/api';
@@ -22,7 +22,6 @@ import ReorderButton from '../components/orders/ReorderButton';
 import PriceProtection from '../components/orders/PriceProtection';
 import SupportActions from '../components/orders/SupportActions';
 import CancelOrderSheet from '../components/orders/CancelOrderSheet';
-import ReviewSheet from '../components/orders/ReviewSheet';
 import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
 import StoreReceipt from '../components/orders/StoreReceipt';
 import PriceApprovalCard from '../components/orders/PriceApprovalCard';
@@ -33,6 +32,18 @@ import type { Claim } from '../components/warranty/types';
 
 /** Its own chunk: only an order with a printer that has parts draws it. */
 const MaintenanceShelf = React.lazy(() => import('../components/product/MaintenanceShelf'));
+/**
+ * The review form is its own chunk as well: fetched while the browser is idle
+ * once the order is delivered, mounted the first time «قيّم هذا المنتج» is
+ * pressed.
+ */
+const loadReviewSheet = () => import('../components/orders/ReviewSheet');
+const ReviewSheet = React.lazy(loadReviewSheet);
+
+/** A line the order paid nothing for because a gift entitlement covered it (§6.3). */
+function isGiftLine(it: unknown): boolean {
+  return !!it && (it as { is_gift?: unknown }).is_gift === true;
+}
 
 /**
  * ONE order, everything the customer can know or do about it.
@@ -85,7 +96,9 @@ const STRINGS = {
     giniNo: 'رقم الطلب في تطبيق جني',
     giniExpired: 'انتهت مهلة هذا الطلب قبل مسح باركود الاستلام وأُلغي. يمكنك إنشاء طلب جديد.',
     cancelledNotice: 'أُلغي الطلب.',
-    reviewThanks: 'شكرًا — مراجعتك بانتظار الاعتماد.',
+    // The review is LIVE the moment it is sent; only the reward waits.
+    reviewThanks: 'شكرًا — نُشرت مراجعتك. اعتماد المكافأة قرار منفصل.',
+    giftLine: 'هدية',
     linkedNotice: 'تم ربط الجهاز بحسابك.',
     dayChanged: 'تم تغيير يوم التوصيل.',
     dayFailed: 'تعذّر تغيير يوم التوصيل.',
@@ -121,7 +134,8 @@ const STRINGS = {
     giniNo: 'Gini app order number',
     giniExpired: 'The hold ran out before the receipt barcode was scanned, and the order was cancelled. You can place a new one.',
     cancelledNotice: 'The order was cancelled.',
-    reviewThanks: 'Thank you — your review is awaiting approval.',
+    reviewThanks: 'Thank you — your review is published. Reward approval is separate.',
+    giftLine: 'Gift',
     linkedNotice: 'The device is now linked to your account.',
     dayChanged: 'The delivery day was changed.',
     dayFailed: 'The delivery day could not be changed.',
@@ -157,7 +171,8 @@ const STRINGS = {
     giniNo: 'ژمارەی داواکاری لە ئەپی جینی',
     giniExpired: 'ماوەکە بەسەرچوو پێش ئەوەی باڕکۆدی وەرگرتن سکان بکرێت و داواکارییەکە هەڵوەشێندرایەوە. دەتوانیت داواکارییەکی نوێ بکەیت.',
     cancelledNotice: 'داواکارییەکە هەڵوەشێنرایەوە.',
-    reviewThanks: 'سوپاس — پێداچوونەوەکەت چاوەڕێی پەسەندکردنە.',
+    reviewThanks: 'سوپاس — هەڵسەنگاندنەکەت بڵاوکرایەوە. پەسەندکردنی خەڵات بڕیارێکی جیاوازە.',
+    giftLine: 'دیاری',
     linkedNotice: 'ئامێرەکە بە هەژمارەکەت بەسترا.',
     dayChanged: 'ڕۆژی گەیاندن گۆڕدرا.',
     dayFailed: 'ڕۆژی گەیاندن نەگۆڕدرا.',
@@ -228,6 +243,7 @@ export default function OrderDetail() {
   const [reviewed, setReviewed] = useState<ReadonlySet<string> | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewMounted, setReviewMounted] = useState(false);
   const [reviewItem, setReviewItem] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   /**
@@ -284,12 +300,31 @@ export default function OrderDetail() {
     if (!delivered) return;
     let alive = true;
     api
-      .get<{ reviews: Array<{ product_id: string | null }> }>('/api/reviews/mine')
-      .then((r) => alive && setReviewed(new Set((r.reviews || []).map((x) => x.product_id).filter((x): x is string => !!x))))
+      .get<{ reviews: Array<{ product_id: string | null; system_generated?: boolean; source?: string }> }>('/api/reviews/mine')
+      .then((r) => {
+        if (!alive) return;
+        // A SYSTEM MARKER IS NOT A REVIEW THE CUSTOMER WROTE: the seven-day
+        // sweep's rating is replaceable by the buyer, so it must not mark the
+        // line «تم التقييم» and hide the button (the same rule as Orders.tsx).
+        const mine = (r.reviews || []).filter((x) => !x.system_generated && x.source !== 'system');
+        setReviewed(new Set(mine.map((x) => x.product_id).filter((x): x is string => !!x)));
+      })
       .catch(() => alive && setReviewed(null));
     return () => {
       alive = false;
     };
+  }, [delivered]);
+
+  // A delivered order may be rated next: fetch the form's chunk while idle.
+  useEffect(() => {
+    if (!delivered) return;
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    if (w.requestIdleCallback) {
+      const idle = w.requestIdleCallback(() => void loadReviewSheet().catch(() => undefined), { timeout: 4000 });
+      return () => w.cancelIdleCallback?.(idle);
+    }
+    const t = window.setTimeout(() => void loadReviewSheet().catch(() => undefined), 2000);
+    return () => window.clearTimeout(t);
   }, [delivered]);
 
   /**
@@ -661,6 +696,15 @@ export default function OrderDetail() {
                               ) : (
                                 <p className="text-white text-[13.5px] font-bold line-clamp-2">{it.name}</p>
                               )}
+                              {isGiftLine(it) && (
+                                <span
+                                  data-gift-line={it.id}
+                                  className="mt-0.5 inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-bold text-gold"
+                                >
+                                  <Gift className="h-3 w-3" aria-hidden />
+                                  {s.giftLine}
+                                </span>
+                              )}
                               {it.variant && <p className="text-[12px] text-zinc-500 truncate">{it.variant}</p>}
                               <p className="text-[12px] text-zinc-400 tabular-nums mt-0.5">
                                 × {it.qty} · {money(Number(unitPrice) || 0)}
@@ -717,6 +761,7 @@ export default function OrderDetail() {
                                   data-rate-item={it.id}
                                   onClick={() => {
                                     setReviewItem(it.id);
+                                    setReviewMounted(true);
                                     setReviewOpen(true);
                                   }}
                                   className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-gold/40 text-gold text-[12.5px] font-bold hover:bg-gold/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
@@ -836,16 +881,18 @@ export default function OrderDetail() {
       </div>
 
       <CancelOrderSheet open={cancelOpen} orderId={order?.id ?? null} onClose={() => setCancelOpen(false)} onCancelled={onCancelled} />
-      {order && (
-        <ReviewSheet
-          open={reviewOpen}
-          onClose={() => setReviewOpen(false)}
-          orderId={order.id}
-          items={order.items}
-          initialItemId={reviewItem}
-          reviewedProductIds={reviewed ?? EMPTY_SET}
-          onSubmitted={onReviewSubmitted}
-        />
+      {order && reviewMounted && (
+        <React.Suspense fallback={null}>
+          <ReviewSheet
+            open={reviewOpen}
+            onClose={() => setReviewOpen(false)}
+            orderId={order.id}
+            items={order.items}
+            initialItemId={reviewItem}
+            reviewedProductIds={reviewed ?? EMPTY_SET}
+            onSubmitted={onReviewSubmitted}
+          />
+        </React.Suspense>
       )}
     </div>
   );

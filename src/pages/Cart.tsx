@@ -35,6 +35,8 @@ import {
 import MerchantCartView from '../components/merchant/MerchantCartView';
 import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
 import { useMoney } from '../CurrencyContext';
+import { Gift } from 'lucide-react';
+import { giftLineOf, giftLineText, type CartGiftBlock } from '../components/reviews/gifts/giftLine';
 
 /**
  * Component-local trilingual strings for the support-code block (§3.3).
@@ -1071,6 +1073,10 @@ export default function Cart() {
   const discounts = selectedItems.reduce((sum, item) => {
     const b = item.breakdown;
     if (!b) return sum;
+    // A GIFT IS NOT A DISCOUNT. Its line is 0 because an entitlement made the
+    // product free (docs/REVIEWS_GIFTS.md S7), so its regular price is shown
+    // beside the line as the gift's value — never summed as money "saved".
+    if (giftLineOf(item)) return sum;
     return sum + Math.max(0, b.regular_iqd - b.applied_iqd) * item.qty;
   }, 0);
   const totalOriginalPrice = subtotal + discounts;
@@ -1101,6 +1107,9 @@ export default function Cart() {
       else queues.set(line.product_id, [line]);
     }
     for (const item of items) {
+      // A gift line has no membership entry (the server resolves none for
+      // it), so it must not take the entry of a paid line of the same product.
+      if (giftLineOf(item)) continue;
       const next = queues.get(item.productId)?.shift();
       if (next && next.rule_id) paired.set(item.id, next);
     }
@@ -1284,6 +1293,109 @@ export default function Cart() {
   // §3/§12: the product name is English in every language and is never translated.
   const itemName = (item: CartItem) => item.name;
 
+  /**
+   * A GIFT LINE (docs/REVIEWS_GIFTS.md §6.3, S7): the product's own name,
+   * picture, option and colour, the «هدية» chip and 0 beside the gift's
+   * value — and nothing to edit. No quantity stepper, no option sheet, no
+   * shipping sheet, no warranty: the server froze all of it on the
+   * entitlement and refuses a change (GIFT_LINE_LOCKED). It can be ticked for
+   * checkout like any line, and removed — which hands the gift back to
+   * «جاهزة للطلب» on /gifts, because «in the cart» is only this row existing.
+   */
+  const giftRow = (item: CartItem, gift: CartGiftBlock) => {
+    const selected = selectedIds.has(item.id);
+    const blocked = lineBlocked(item);
+    const reason = item.availability?.reason ?? '';
+    return (
+      <div
+        key={item.id}
+        data-cart-gift-line={item.id}
+        className="max-w-full px-2.5 sm:px-4 py-3.5 flex gap-1.5 sm:gap-3 border-b border-border-subtle last:border-b-0"
+      >
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selected}
+          aria-label={itemName(item)}
+          onClick={() => toggleSelect(item.id)}
+          className="shrink-0 w-9 sm:w-11 min-h-[44px] pt-4 sm:pt-6 flex items-start justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
+        >
+          <span
+            aria-hidden="true"
+            className={`w-[22px] h-[22px] rounded-md border flex items-center justify-center transition-colors ${
+              selected ? 'bg-surface-selected border-white/30' : 'border-zinc-600'
+            }`}
+          >
+            {selected && <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} />}
+          </span>
+        </button>
+
+        <div
+          data-cart-item-image
+          className="w-[72px] h-[72px] min-[390px]:w-[80px] min-[390px]:h-[80px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-md overflow-hidden bg-zinc-900 cursor-pointer"
+          onClick={() => navigate(`/product/${item.slug}`)}
+        >
+          <SafeImage
+            src={item.image}
+            alt={itemName(item)}
+            aspect="auto"
+            className="w-full h-full"
+            bgClassName="bg-zinc-900"
+            fallbackClassName="text-zinc-600"
+          />
+        </div>
+
+        <div className="min-w-0 max-w-full flex-1 flex flex-col justify-between">
+          <div>
+            <h3 data-cart-item-title className="text-zinc-200 text-[13px] sm:text-[14px] font-medium leading-snug line-clamp-2 mb-1">{itemName(item)}</h3>
+            <div className="flex flex-wrap gap-1.5 mb-1.5">
+              <span data-cart-gift-badge className="inline-flex items-center gap-1 rounded px-2 py-1 w-max bg-gold/10 text-gold text-[12px] font-bold">
+                <Gift className="w-3 h-3 shrink-0" aria-hidden="true" />
+                {gift.level > 0 ? giftLineText(lang, 'levelBadge', { level: gift.level }) : giftLineText(lang, 'badge')}
+              </span>
+              {item.variantLabel && (
+                <span className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 w-max text-[12px] text-zinc-300">{item.variantLabel}</span>
+              )}
+              <span
+                data-cart-shipping-type={typeForTransport(item.transport_method)}
+                className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 flex items-center gap-1 w-max text-[12px] text-zinc-300"
+              >
+                {shippingLabel(item)}
+              </span>
+            </div>
+          </div>
+
+          <div className="min-w-0 flex flex-wrap items-baseline gap-1.5 mb-2 mt-1">
+            <span className="max-w-full text-white font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(0)}</span>
+            {gift.value_iqd > 0 && (
+              <span className="text-zinc-500 text-[12px] tabular-nums" data-cart-gift-value={item.id}>
+                {giftLineText(lang, 'worth', { value: money(gift.value_iqd) })}
+              </span>
+            )}
+          </div>
+          <p className="-mt-1 mb-2 text-[11.5px] leading-relaxed text-zinc-500">{giftLineText(lang, 'fixed')}</p>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-auto">
+            {blocked ? (
+              <span className="text-danger text-[12px] font-medium" data-line-blocked={item.id}>
+                {apiRefusal({ code: reason || 'GIFT_NOT_ORDERABLE' }, lang as 'ar' | 'en' | 'ckb')}
+              </span>
+            ) : (
+              <span className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-zinc-500">{giftLineText(lang, 'removeHint')}</span>
+            )}
+            <button
+              type="button"
+              onClick={() => deleteItem(item)}
+              className="lv-button lv-button-ghost min-h-[44px] px-3 text-[13px] hover:text-danger [touch-action:manipulation]"
+            >
+              {loc('حذف', 'Delete', 'سڕینەوە')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // A merchant-store cart is the same table with a different seller — and a
   // different screen, priced by /api/cart/merchant and checked out through
   // /api/store-orders instead of the platform resolver.
@@ -1366,6 +1478,8 @@ export default function Cart() {
 
           {/* Items */}
           {items.map((item) => {
+            const giftLine = giftLineOf(item);
+            if (giftLine) return giftRow(item, giftLine);
             const hasVariants = (item.options ?? []).length > 0 || (item.colors ?? []).length > 0;
             const hasShippingOptions = (item.shipping_methods ?? []).length > 0;
             const regularUnit = item.breakdown?.regular_iqd ?? null;

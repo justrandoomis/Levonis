@@ -32,7 +32,18 @@ import {
   resolveCartBundles,
   selectionFromCartRow,
   refuseIncompleteSelection,
+  giftLineFacts,
+  giftRefusalError,
 } from './cart';
+import {
+  giftCheckoutRefusalCode,
+  giftEntitlementIdOf,
+  giftPricingBlock,
+  giftTransportSnapshot,
+  giftVerdictRefusal,
+  verifyGiftCartLines,
+  type GiftPricingBlock,
+} from '../lib/gifts/cartLine';
 import type { ResolvedBundle } from '../lib/bundleRead';
 import {
   allocateComponentValue,
@@ -832,6 +843,14 @@ export function orderPublic(
         qty: it.qty,
         unit_price_iqd: it.unit_price_iqd,
         line_total_iqd: it.line_total_iqd,
+        /**
+         * A REVIEW GIFT (0165): this line was granted, not bought — 0 IQD by
+         * design, with its value in `pricing.gift.value_iqd`. Read from the
+         * row's own column; a database behind 0165 has none, and every line is
+         * then an ordinary one.
+         */
+        is_gift: typeof it.gift_entitlement_id === 'string' && it.gift_entitlement_id !== '',
+        gift_entitlement_id: typeof it.gift_entitlement_id === 'string' && it.gift_entitlement_id !== '' ? it.gift_entitlement_id : null,
         // Resolver snapshots persisted at checkout time (cost fields stripped
         // before persistence — safe for the buyer to see).
         pricing: safeParse(it.pricing_snapshot, null),
@@ -1774,7 +1793,37 @@ interface ComputedLine {
     option_value_ids: string[];
     color_id: string;
   } | null;
+  /**
+   * A REVIEW GIFT LINE (0165, docs/REVIEWS_GIFTS.md §6.3) — the entitlement
+   * that makes this ordinary product free, and the order attempt it is
+   * (`gift_entitlements.order_seq + 1`). Set only after `verifyGiftCartLines`
+   * proved the entitlement is this buyer's, ready and frozen to this line. It
+   * carries no `benefit` and no offer, so no membership rule, coupon cap or
+   * offer redemption ever reaches it; its `stock_targets` are the real ones.
+   */
+  gift?: (GiftPricingBlock & { order_seq: number }) | null;
 }
+
+/**
+ * THE GIFT VARIANT OF THE `order_items` INSERT — the ordinary column list,
+ * unchanged, plus the two 0165 columns that name the entitlement and the
+ * attempt. Used for gift lines ONLY: the ordinary INSERT below never names a
+ * 0165 column, so a Worker that lands before its migration still sells.
+ * `trg_order_items_gift_line_guard` proves, inside the order's own batch, that
+ * the entitlement is the buyer's, ready, of this product, at this attempt, and
+ * that the line is 1 × 0 IQD; `idx_order_items_gift_line` makes a second
+ * consumption of one attempt impossible.
+ */
+const GIFT_ORDER_ITEM_INSERT = `INSERT INTO order_items (id, order_id, product_id, name_snapshot, image_snapshot, option_snapshot,
+           option_id, option_value_ids, color_id, shipping_method_id, qty, unit_price_iqd, line_total_iqd,
+           pricing_snapshot, warranty_snapshot, transport_snapshot,
+           bundle_parent_item_id, bundle_component_id, component_value_iqd, component_alloc_iqd,
+           membership_discount_iqd, membership_rule_id, cost_iqd, cost_basis,
+           net_weight_g, width_mm, depth_mm, height_mm,
+           package_weight_g, package_width_mm, package_depth_mm, package_height_mm,
+           gift_entitlement_id, gift_order_seq)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 /** What the settlement resolved about this member, carried to the snapshot. */
 interface CheckoutBenefits {
@@ -2111,7 +2160,9 @@ async function computeCheckout(
   // So every database read a bundle line needs — its components, its stored
   // choices, its config, its window and its members' stock — happens once,
   // here, and all three passes then read the same resolution.
-  const compositionRows = rows.filter((r) => String(r.composition ?? '') !== '');
+  // A gift line (0165) is never a composition: it is priced by its own branch
+  // in `priceLines`, so it never enters the bundle or mystery pre-passes.
+  const compositionRows = rows.filter((r) => String(r.composition ?? '') !== '' && !giftEntitlementIdOf(r));
   /**
    * SCHEDULED SPECIAL OFFERS ON THE ORDINARY LINES (§9, §12) — read here, in
    * the pre-pass, for the same reason the composition is: `priceLines` is
@@ -2122,7 +2173,8 @@ async function computeCheckout(
    * makes "the card, the cart and the door quote the offer price" a property
    * of the code rather than of three call sites agreeing by luck.
    */
-  const ordinaryRows = rows.filter((r) => String(r.composition ?? '') === '');
+  // A gift line looks up no offer (S8): no window can price, gate or count it.
+  const ordinaryRows = rows.filter((r) => String(r.composition ?? '') === '' && !giftEntitlementIdOf(r));
   const offerNow = Date.now();
   /**
    * AN OFFER IS OPTIONAL; BEING ABLE TO PAY IS NOT.
@@ -2204,7 +2256,7 @@ async function computeCheckout(
   // them the checkout's printer delivery note would go silent the moment a
   // printer was sold inside a bundle.
   const memberIds = [...bundles.values()].flatMap((b) => b.components.map((k) => k.member_product_id));
-  const [views, printerIds, poolMemberIds, members] = await Promise.all([
+  const [views, printerIds, poolMemberIds, members, giftVerdicts] = await Promise.all([
     loadRelationsViews(
       c.env.DB,
       rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
@@ -2242,6 +2294,14 @@ async function computeCheckout(
      * three times).
      */
     loadCompositionMembers(c.env.DB, memberIds),
+    /**
+     * THE GIFT LINES (0165), verified in ONE read and re-verified here at the
+     * door whatever the cart said a minute ago: the entitlement is this
+     * buyer's, ready to order, and frozen to exactly the row in the cart. No
+     * read at all when the cart holds no gift. `priceLines` is synchronous, so
+     * the verdicts are resolved here, once, for every pass.
+     */
+    verifyGiftCartLines(c.env.DB, user.id, rows),
   ]);
 
   /**
@@ -2318,6 +2378,112 @@ async function computeCheckout(
     let physical = 0;
     for (const row of rows) {
       const displayName = String(row.name_ar || row.name);
+
+      // ---- A REVIEW GIFT LINE (0165, docs/REVIEWS_GIFTS.md §6.3) ----------
+      // An ordinary product at 0 IQD — ONLY because the entitlement was
+      // re-verified above (this buyer's, ready, frozen to this row); a row that
+      // fails that is refused here, never priced. Everything else is the
+      // ordinary line's own chain on the FROZEN selection: the real stock
+      // targets for a direct sale (reserved, deducted and released through the
+      // ledger like any line), nothing for a pre-order, the route and its lead
+      // time kept, the stated type never swapped. No benefit, no offer.
+      if (giftEntitlementIdOf(row)) {
+        const verdict = giftVerdicts.get(String(row.cart_item_id));
+        if (!verdict || !verdict.ok) {
+          const code = giftVerdictRefusal(verdict);
+          throw new HttpError(
+            409,
+            code === 'GIFT_ALREADY_ORDERED'
+              ? `"${displayName}": this gift has already been ordered and cannot be ordered again.`
+              : `"${displayName}": the gift cannot be ordered right now. Refresh your gifts page and try again.`,
+            code
+          );
+        }
+        const frozen = verdict.selection;
+        const view = views.get(String(row.id));
+        const isPrinter = printerIds.has(String(row.id));
+        const facts = giftLineFacts({
+          row,
+          frozen,
+          tier: tierStatus.tier,
+          tierActive: pricingTierActive,
+          ctx: pricingCtx,
+          view,
+          preorderPricing,
+          isPrinter,
+          coarseStock: poolMemberIds.has(String(row.id)),
+        });
+        if (facts.refusal) throw giftRefusalError(facts.refusal);
+        const stockRes = resolveForOrderType(
+          frozen.saleType,
+          snapshotFrom(view ?? EMPTY_RELATIONS, {
+            stock: facts.doc.stock,
+            reserved: Number(row.stock_reserved ?? 0),
+            low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+          }),
+          { option_value_ids: frozen.optionValueIds, color_id: frozen.colorId || null },
+          view ? capacityFrom(view, frozen.optionValueIds) : null,
+          frozen.transportMethod
+        );
+        if (stockRes.error === 'VARIANT_NOT_MODELLED') {
+          throw badRequest(`"${displayName}": that combination is not available for sale`, 'VARIANT_NOT_MODELLED');
+        }
+        if (stockRes.available !== null && stockRes.available < 1) {
+          const coarse = poolMemberIds.has(String(row.id));
+          const details = { product_id: String(row.id), requested: 1, coarse, ...(coarse ? {} : { available: stockRes.available }) };
+          if (frozen.saleType === 'pre_order') {
+            throw badRequest(`The pre-order quota for "${displayName}" is full`, 'PREORDER_CAPACITY_EXHAUSTED', details);
+          }
+          throw badRequest(`"${displayName}" is out of stock`, 'OUT_OF_STOCK', details);
+        }
+        const block = giftPricingBlock(verdict, facts.resolved.regular_iqd);
+        // The cost leaves the customer's snapshot and lands on the row (0095):
+        // a gift is a promotional cost, recorded like every other sale.
+        const { cost_iqd: giftCost, ...giftSnapshot } = facts.zeroed;
+        const giftLineCost = costSnapshot(giftCost);
+        lines.push({
+          cart_item_id: String(row.cart_item_id),
+          id: newId('oi'),
+          product_id: String(row.id),
+          option_value_ids: frozen.optionValueIds,
+          stock_targets: stockRes.targets,
+          name: String(row.name),
+          name_ar: String(row.name_ar ?? ''),
+          image: productImageForSelection(
+            facts.doc,
+            { optionValueIds: frozen.optionValueIds, colorId: frozen.colorId || null },
+            view
+          ),
+          variant: facts.variantLabel,
+          option_id: frozen.optionValueIds[0] ?? '',
+          color_id: frozen.colorId,
+          // '' like every ordinary line: the cart's `gift:` discriminator is
+          // cart identity, and `order_items.shipping_method_id` is read
+          // downstream as a delivery hint.
+          shipping_method_id: '',
+          qty: 1,
+          unit: 0,
+          line: 0,
+          applied_iqd: 0,
+          tracked: stockRes.tracked,
+          pricing_snapshot: JSON.stringify({ ...giftSnapshot, gift: block }),
+          warranty_snapshot: null,
+          transport_snapshot: giftTransportSnapshot(facts.zeroed),
+          breakdown: publicBreakdown(facts.zeroed),
+          is_printer: isPrinter,
+          pricing_basis: facts.zeroed.pricing_basis,
+          cost_iqd: giftLineCost.cost_iqd,
+          cost_basis: giftLineCost.cost_basis,
+          physical_dimensions: resolveSelectionPhysicalDimensions(facts.doc, view ?? EMPTY_RELATIONS, {
+            optionValueIds: frozen.optionValueIds,
+            colorId: frozen.colorId || null,
+          }),
+          gift: { ...block, order_seq: verdict.nextOrderSeq },
+        });
+        productIds.push(String(row.id));
+        shippingItems.push({ product_id: String(row.id), qty: 1, ...shippingFactsFrom(row.ops_policy, row) });
+        continue;
+      }
 
       // ---- A COMPOSITION LINE (§5.3, §6.1) --------------------------------
       // One PARENT line carrying the money and no stock targets, plus one
@@ -2963,7 +3129,9 @@ async function computeCheckout(
       // refuses it unless this customer's cart holds the target line bought
       // directly, and caps it at ONE unit of that line: «cap the credit at the
       // new product's price». Ordinary coupons get null and are untouched.
-      const tradeInCap = await tradeInCouponCap(c.env.DB, user.id, check.coupon_id, p.lines).catch((e: unknown) => {
+      // A gift line (0165) is never the bought target: its 0 IQD would cap the
+      // credit at nothing, and a free product earns no trade-in either way.
+      const tradeInCap = await tradeInCouponCap(c.env.DB, user.id, check.coupon_id, p.lines.filter((l) => !l.gift)).catch((e: unknown) => {
         if (e instanceof TradeInError) throw badRequest(e.message, e.code);
         throw e;
       });
@@ -3670,6 +3838,14 @@ function quoteLines(lines: ComputedLine[]) {
         line_total_iqd: l.line,
         is_printer: l.is_printer,
         breakdown: l.breakdown,
+        // A review gift (0165): 0 IQD, with what it is worth and which gift it is.
+        ...(l.gift
+          ? {
+              kind: 'gift' as const,
+              is_gift: true,
+              gift: { entitlement_id: l.gift.entitlement_id, level: l.gift.level, value_iqd: l.gift.value_iqd },
+            }
+          : {}),
         ...(kids.length
           ? {
               // The two figures the disclosure struck through and badged. On
@@ -4071,7 +4247,9 @@ orderRoutes.post('/', async (c) => {
   const gift = preorderGiftFor({
     config: comp.preorderGiftConfig as PreorderGiftConfig | null,
     proContext: comp.proContext,
-    isPreorder: orderShippingType.startsWith('preorder_'),
+    // A GIFT-ONLY order (0165, S8) buys nothing, so it earns no spool: a
+    // review gift triggers no other reward. One bought line restores it.
+    isPreorder: orderShippingType.startsWith('preorder_') && comp.lines.some((l) => !l.gift),
     dueOnDeliveryIqd: comp.dueOnDelivery,
     now,
   });
@@ -4211,6 +4389,9 @@ orderRoutes.post('/', async (c) => {
   const redemptions = new Map<string, number>();
   for (const it of comp.lines) {
     if (it.bundle_parent_item_id) continue; // a component redeems nothing of its own
+    // A gift line takes no offer (S8) — not even when a bought line of the
+    // same product does, so the gift never spends an offer allowance.
+    if (it.gift) continue;
     if (!comp.compositionSubjects.has(it.product_id)) continue;
     redemptions.set(it.product_id, (redemptions.get(it.product_id) ?? 0) + it.qty);
   }
@@ -4221,7 +4402,11 @@ orderRoutes.post('/', async (c) => {
   for (const it of comp.lines) {
     stmts.push(
       c.env.DB.prepare(
-        `INSERT INTO order_items (id, order_id, product_id, name_snapshot, image_snapshot, option_snapshot,
+        // A review gift line (0165) takes the gift variant; every other line
+        // the ordinary INSERT below, which names no 0165 column.
+        it.gift
+          ? GIFT_ORDER_ITEM_INSERT
+          : `INSERT INTO order_items (id, order_id, product_id, name_snapshot, image_snapshot, option_snapshot,
            option_id, option_value_ids, color_id, shipping_method_id, qty, unit_price_iqd, line_total_iqd,
            pricing_snapshot, warranty_snapshot, transport_snapshot,
            bundle_parent_item_id, bundle_component_id, component_value_iqd, component_alloc_iqd,
@@ -4292,9 +4477,35 @@ orderRoutes.post('/', async (c) => {
         it.physical_dimensions.package_weight_g,
         it.physical_dimensions.package_width_mm,
         it.physical_dimensions.package_depth_mm,
-        it.physical_dimensions.package_height_mm
+        it.physical_dimensions.package_height_mm,
+        // The two columns only GIFT_ORDER_ITEM_INSERT names; nothing for an ordinary line.
+        ...(it.gift ? [it.gift.entitlement_id, it.gift.order_seq] : [])
       )
     );
+    /**
+     * THE GIFT IS CONSUMED HERE, IN THE ORDER'S OWN BATCH (0165, brief §15/§17).
+     *
+     * One conditional UPDATE whose WHERE is the precondition: this buyer's gift,
+     * still ready to order, still at the attempt this checkout priced. The
+     * insert guard above has already proved the same inside this transaction,
+     * and `idx_order_items_gift_line` holds one row per attempt — so of two
+     * concurrent checkouts of one gift exactly one commits; the other's guard
+     * aborts its WHOLE batch (no order, no wallet debit, no points, no stock).
+     * A batch that fails for any other reason consumes nothing either: the
+     * gift is spent exactly when the order exists. `order_seq` moves on, so a
+     * new order after a cancellation (which returns the gift, trigger
+     * `trg_orders_cancel_returns_gift`) is attempt n+1.
+     */
+    if (it.gift) {
+      stmts.push(
+        c.env.DB.prepare(
+          `UPDATE gift_entitlements
+              SET state = 'ordered', order_id = ?1, order_item_id = ?2, ordered_at = ?3,
+                  order_seq = order_seq + 1, updated_at = ?3
+            WHERE id = ?4 AND user_id = ?5 AND state = 'redeemed_ready_to_order' AND order_seq = ?6`
+        ).bind(orderId, it.id, now, it.gift.entitlement_id, user.id, it.gift.order_seq - 1)
+      );
+    }
     // THE ALLOCATION, in the ORDER'S OWN BATCH — never a second batch and
     // never a post-response write. `PRIMARY KEY (order_item_id, spool_index)`
     // is the replay fence: a replay that somehow re-entered this path collides
@@ -4528,6 +4739,23 @@ orderRoutes.post('/', async (c) => {
   // points and all — when the count is short. A line with nothing to reserve
   // (a pre-order, an untracked product) fences at expected = 0, which passes.
   stmts.push(reservationFenceStatement(c.env.DB, orderId, 'reserve', plannedReserveRows));
+  /**
+   * THE GIFT FENCE (0165) — the same ten-line idea as the reservation fence,
+   * for the gift flips above: each is a conditional UPDATE, and a conditional
+   * UPDATE that matches nothing does not fail a batch. This counts the gifts
+   * the batch actually marked `ordered` for this order; a shortfall fires the
+   * fence's CHECK and the whole order rolls back. Only an order holding a gift
+   * writes it, so every other order's batch is exactly what it was.
+   */
+  const giftLineCount = comp.lines.filter((l) => l.gift).length;
+  if (giftLineCount > 0) {
+    stmts.push(
+      c.env.DB.prepare(
+        `INSERT INTO order_reservation_fence (order_id, kind, expected, actual)
+         SELECT ?1, 'gift', ?2, (SELECT COUNT(*) FROM gift_entitlements WHERE order_id = ?1 AND state = 'ordered')`
+      ).bind(orderId, giftLineCount)
+    );
+  }
 
   // `OrderCreated` (03-EVENTS.md §3.7) — the outbox row rides in the ORDER'S
   // OWN BATCH, so the event exists if and only if the order does. References
@@ -4643,6 +4871,31 @@ orderRoutes.post('/', async (c) => {
         throw badRequest('BNPL eligibility changed. Please review checkout.', publicCode);
       }
     }
+    /**
+     * A GIFT ANOTHER CHECKOUT CONSUMED FIRST (0165). The insert guard raises
+     * GIFT_NOT_ORDERABLE and the attempt index raises a UNIQUE; both mean this
+     * whole order rolled back and consumed nothing. Mapped BEFORE the generic
+     * CHECK branch, and after the orders-key branch above, so a same-key double
+     * tap still replays its own order. The answer says which it was: «already
+     * ordered» when one of the buyer's gifts is now in another order.
+     */
+    if (
+      giftLineCount > 0 &&
+      (msg.includes('GIFT_NOT_ORDERABLE') || (msg.includes('UNIQUE') && msg.includes('order_items.gift_entitlement_id')))
+    ) {
+      const code = await giftCheckoutRefusalCode(
+        c.env.DB,
+        user.id,
+        comp.lines.flatMap((l) => (l.gift ? [l.gift.entitlement_id] : []))
+      );
+      throw new HttpError(
+        409,
+        code === 'GIFT_ALREADY_ORDERED'
+          ? 'This gift has already been ordered and cannot be ordered again.'
+          : 'The gift cannot be ordered right now. Refresh your gifts page and try again.',
+        code
+      );
+    }
     if (msg.includes('CHECK')) {
       throw badRequest('Order could not be placed: a balance or stock level changed. Please review your cart and try again.', 'CONFLICT_RETRY');
     }
@@ -4712,6 +4965,8 @@ orderRoutes.post('/', async (c) => {
     bnpl_iqd: comp.bnplAmount, bnpl_due_at: comp.bnplDueAt,
     fulfillment_service: fulfillmentService, priority_due_at: comp.priorityDelivery.due_at,
     support_referrer: comp.supportSnapshot?.referrer_user_id ?? null,
+    // 0165: the review gifts this order consumed, by entitlement — present only when there are some.
+    ...(giftLineCount > 0 ? { gift_entitlement_ids: comp.lines.flatMap((l) => (l.gift ? [l.gift.entitlement_id] : [])) } : {}),
   });
 
   // Invoice (§3D): created after the order stands; createInvoiceForOrder

@@ -21,6 +21,10 @@
     { "table": "orders", "writer": "worker/lib/delivery/sync.ts#syncOrderDelivery" },
     { "table": "users", "writer": "worker/lib/entitlements.ts#getTierStatus" },
     { "table": "users", "writer": "worker/routes/rewards.ts#POST /checkin" },
-    { "table": "users", "writer": "worker/routes/admin.ts#PATCH /users/:id" }
+    { "table": "users", "writer": "worker/routes/admin.ts#PATCH /users/:id" },
+    { "table": "gift_entitlements", "writer": "worker/routes/orders.ts#POST /" },
+    { "table": "cart_items", "writer": "worker/routes/gifts.ts#POST /admin/gifts/:id/cancel" },
+    { "table": "media_cleanup_jobs", "writer": "worker/lib/reviews/media.ts#reviewMediaStagingStatement" },
+    { "table": "media_cleanup_jobs", "writer": "worker/lib/reviews/media.ts#closeReviewMediaStagingStatement" }
   ]
 }

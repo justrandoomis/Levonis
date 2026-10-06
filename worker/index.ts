@@ -63,6 +63,7 @@ import { telegramRoutes } from './routes/telegram';
 import { invoiceRoutes } from './routes/invoices';
 import { deviceRoutes } from './routes/devices';
 import { reviewRoutes } from './routes/reviews';
+import { giftRoutes } from './routes/gifts';
 import { returnRoutes, priceProtectionRoutes } from './routes/returns';
 import { policiesRoutes } from './routes/policies';
 import { kycRoutes } from './routes/kyc';
@@ -407,6 +408,10 @@ app.route('/api/telegram', telegramRoutes);
 app.route('/api/invoices', invoiceRoutes);
 app.route('/api/devices', deviceRoutes);
 app.route('/api/reviews', reviewRoutes);
+// The gift routes (customer gifts, redemption, the admin reward queue and
+// decision, the gift levels, granted gifts) live in routes/gifts.ts under the
+// SAME prefix — their paths never overlap the review routes' (docs/REVIEWS_GIFTS.md).
+app.route('/api/reviews', giftRoutes);
 app.route('/api/returns', returnRoutes);
 app.route('/api/price-protection', priceProtectionRoutes);
 app.route('/api/policies', policiesRoutes);

@@ -82,6 +82,9 @@ DELETE FROM product_option_groups;
 DELETE FROM product_translations;
 DELETE FROM product_imports;
 DELETE FROM price_history;
+-- 0165: gift_pool_items.product_id REFERENCES products(id) — the level items go first.
+DELETE FROM gift_pool_items;
+DELETE FROM gift_pools;
 DELETE FROM products;
 DELETE FROM community_complaint_messages;
 DELETE FROM community_complaints;
@@ -117,8 +120,6 @@ DELETE FROM wallet_transactions;
 DELETE FROM bnpl_accounts;
 DELETE FROM ticket_ledger;
 DELETE FROM reward_claims;
-DELETE FROM gift_pool_items;
-DELETE FROM gift_pools;
 DELETE FROM referral_rewards;
 DELETE FROM referral_attributions;
 DELETE FROM investor_messages;

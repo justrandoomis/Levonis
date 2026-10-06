@@ -295,6 +295,9 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
     why: 'the thumbnail on a past order; the product row may no longer exist, which is the reason the snapshot column exists at all',
   },
   { table: 'mystery_allocations', column: 'image_snapshot', kind: 'text', why: 'the revealed item on a past mystery draw' },
+  // 0165: a granted review gift keeps the product picture it was granted with
+  // (docs/REVIEWS_GIFTS.md §DB), for the same reason an order line does.
+  { table: 'gift_entitlements', column: 'gift_snapshot', kind: 'json', why: 'the gift items (names, pictures) frozen when a review gift was granted' },
   { table: 'community_orders', column: 'offer_snapshot', kind: 'json', why: 'a merchant offer as it was accepted, images included' },
   { table: 'invoices', column: 'snapshot', kind: 'json', why: 'invoice lines keep the item image they were issued with' },
 
@@ -546,6 +549,10 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'gift_entitlements.contents': 'product ids and quantities',
   'gift_redemptions.options': 'option ids',
   'gift_redemptions.contents': 'product ids and quantities',
+  'gift_entitlements.gift_option_value_ids': 'option ids',
+  'gift_pool_items.option_value_ids': 'option ids',
+  'gift_pool_items.allowed_option_value_ids': 'option ids',
+  'gift_pool_items.allowed_color_ids': 'colour ids',
   'offer_windows.required_tiers': 'membership tier names',
   'coupons.fulfillment_types': 'enum words',
   'coupons.transport_methods': 'enum words',

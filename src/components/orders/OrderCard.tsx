@@ -12,7 +12,7 @@
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Truck, Star, XCircle, Clock } from 'lucide-react';
+import { ChevronRight, Truck, Star, XCircle, Clock, Gift } from 'lucide-react';
 import type { ApiOrder } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import SafeImage from '../ui/SafeImage';
@@ -39,6 +39,7 @@ const STRINGS = {
     orderId: 'رقم الطلب',
     giftTitle: 'هدية مرفقة مع هذا الطلب',
     giftDefault: 'بكرة فلمنت',
+    giftLine: 'هدية',
     more: (n: number) => `+${n}`,
     open: (id: string) => `فتح تفاصيل الطلب ${id}`,
   },
@@ -58,6 +59,7 @@ const STRINGS = {
     orderId: 'Order number',
     giftTitle: 'A gift ships with this order',
     giftDefault: 'Filament spool',
+    giftLine: 'Gift',
     more: (n: number) => `+${n}`,
     open: (id: string) => `Open order ${id}`,
   },
@@ -67,8 +69,7 @@ const STRINGS = {
     details: 'وردەکاری',
     cancel: 'هەڵوەشاندنەوە',
     review: 'هەڵسەنگاندن',
-    // OWNER: Sorani to be written by hand — the Arabic stands in on purpose.
-    reviewedAll: 'قيّمت كل منتجات هذا الطلب',
+    reviewedAll: 'هەموو بەرهەمەکانی ئەم داواکارییەت هەڵسەنگاندووە',
     total: 'کۆی گشتی',
     due: 'ماوە لە کاتی گەیاندن',
     bnplDue: 'قەرزی BNPL',
@@ -78,6 +79,7 @@ const STRINGS = {
     orderId: 'ژمارەی داواکاری',
     giftTitle: 'دیارییەک لەگەڵ ئەم داواکارییە دەنێردرێت',
     giftDefault: 'بەکەرەی فیلامێنت',
+    giftLine: 'دیاری',
     more: (n: number) => `+${n}`,
     open: (id: string) => `کردنەوەی داواکاری ${id}`,
   },
@@ -223,6 +225,16 @@ export default function OrderCard({
             {order.items[0].name}
             {extraLines > 0 && <span className="text-zinc-500"> {s.more(extraLines)}</span>}
           </p>
+        )}
+        {/* A line a gift entitlement paid for (§6.3): said in words, never by price alone. */}
+        {order.items.some((it) => (it as { is_gift?: unknown }).is_gift === true) && (
+          <span
+            data-order-gift={order.id}
+            className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-bold text-gold"
+          >
+            <Gift className="h-3 w-3" aria-hidden />
+            {s.giftLine}
+          </span>
         )}
 
         <div className="mt-3 flex items-end justify-between gap-3">

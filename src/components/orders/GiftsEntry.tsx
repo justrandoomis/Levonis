@@ -1,7 +1,9 @@
 /**
  * The quiet way into /gifts — the review "rating gifts" screen, which was
  * mounted and linked from nowhere. One row; the count appears only when the
- * server said there is something to redeem.
+ * server said there is something for the customer to DO: a code to enter, a
+ * gift to choose, or a gift ready to go into the cart (docs/REVIEWS_GIFTS.md
+ * §8 C3). The state is the server's `ui_state`; nothing here derives it.
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -16,6 +18,15 @@ const STRINGS = {
   ckb: { title: 'دیاری هەڵسەنگاندن', available: (n: number) => `${n} بەردەست` },
 } as const;
 
+/** The `ui_state`s that wait on the customer (mirrors ACTIONABLE_GIFT_STATES in reviews/gifts/GiftCard). */
+const ACTIONABLE = new Set(['awaiting_code', 'choose_item', 'ready']);
+
+/** How many gifts ask the customer to act now — read from the server's `ui_state` only. */
+export function actionableGiftCount(gifts: ReadonlyArray<{ ui_state?: unknown }> | null | undefined): number {
+  if (!Array.isArray(gifts)) return 0;
+  return gifts.filter((g) => typeof g?.ui_state === 'string' && ACTIONABLE.has(g.ui_state)).length;
+}
+
 export default function GiftsEntry({ className = '' }: { className?: string }) {
   const { lang } = useLanguage();
   const s = STRINGS[asLang(lang)];
@@ -24,8 +35,8 @@ export default function GiftsEntry({ className = '' }: { className?: string }) {
   useEffect(() => {
     let alive = true;
     api
-      .get<{ gifts: Array<{ state: string }> }>('/api/reviews/gifts')
-      .then((r) => alive && setCount((r.gifts || []).filter((g) => g.state === 'available').length))
+      .get<{ gifts?: Array<{ ui_state?: string }> }>('/api/reviews/gifts')
+      .then((r) => alive && setCount(actionableGiftCount(r.gifts)))
       .catch(() => alive && setCount(null));
     return () => {
       alive = false;

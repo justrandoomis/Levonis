@@ -53,7 +53,6 @@ import { rememberViewed } from '../lib/recentlyViewed';
 import { useGoBack } from '../lib/useGoBack';
 import { useFreshOnReturn } from '../lib/useFreshOnReturn';
 import { setCartCount, countCartItems } from '../lib/cartCount';
-import ReviewSection from '../components/reviews/ReviewSection';
 import CheaperElsewhereSheet from '../components/product/CheaperElsewhereSheet';
 import GiniInstalmentsSheet, { giniLinkOf } from '../components/product/GiniInstalmentsSheet';
 import SafeImage from '../components/ui/SafeImage';
@@ -95,6 +94,12 @@ import PrinterFitsLine, { type FitPrinterRef } from '../components/product/Print
 
 /** Its own chunk: only a printer page with maintenance parts ever draws it. */
 const MaintenanceShelf = React.lazy(() => import('../components/product/MaintenanceShelf'));
+/**
+ * Its own chunk too: the reviews sit below the fold, and their gallery, the
+ * viewer and the review form (ReviewSheet, loaded only on «اكتب مراجعتك»)
+ * must not weigh on the product page's first paint.
+ */
+const ReviewSection = React.lazy(() => import('../components/reviews/ReviewSection'));
 
 // ------------------------------------------------------------------ strings
 
@@ -4052,7 +4057,9 @@ export default function Product() {
               ) : null}
 
               <div className="pt-2">
-                <ReviewSection productId={product.id} />
+                <React.Suspense fallback={null}>
+                  <ReviewSection productId={product.id} />
+                </React.Suspense>
               </div>
             </div>
           </div>

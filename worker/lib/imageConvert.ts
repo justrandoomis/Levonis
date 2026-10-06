@@ -376,6 +376,8 @@ export function extensionFor(mime: string): string {
     case 'image/gif': return 'gif';
     case 'image/avif': return 'avif';
     case 'video/mp4': return 'mp4';
+    // A review video recorded by a browser or an Android phone (0165).
+    case 'video/webm': return 'webm';
     default: return 'bin';
   }
 }

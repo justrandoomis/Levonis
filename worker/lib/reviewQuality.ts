@@ -1,11 +1,14 @@
 /**
- * Deterministic, auditable review-quality scoring.
+ * Deterministic, auditable review-quality scoring — ADVICE ONLY.
  *
- * This module never reads sentiment: a useful one-star review can earn the
- * same tier as a useful five-star review. It also never grants anything. It
- * only reports evidence for the existing five gift levels; the review route
- * remains authoritative for queueing and the admin remains authoritative for
- * the final tier.
+ * This module never reads sentiment and never grants or gates anything
+ * (docs/REVIEWS_GIFTS.md §0 S14). It reports facts about the text and media —
+ * a 0–100 score, the reasons behind it and anti-abuse signals — that the
+ * admin reads beside the review when choosing a printer-gift level by hand.
+ * The automatic tier that used to decide admission to the gift queue (and
+ * pre-filled the admin's level) is deleted: admission is the deterministic
+ * eligibility statement in worker/lib/reviews/eligibility.ts, and the level
+ * is the admin's decision alone.
  */
 
 export interface ReviewQualityMedia {
@@ -21,8 +24,8 @@ export interface ReviewQualityInput {
   stars: number;
   body: string;
   media: ReviewQualityMedia[];
+  /** Legacy private Instagram evidence (no longer collected for new reviews). */
   hasEvidence: boolean;
-  isPrinter: boolean;
   /** Normalized bodies from this customer's other reviews. */
   previousBodies?: string[];
   /** Trusted media digests from this customer's other reviews. */
@@ -31,7 +34,6 @@ export interface ReviewQualityInput {
 
 export interface ReviewQualityResult {
   score: number;
-  tier: 1 | 2 | 3 | 4 | 5 | null;
   reasons: string[];
   textQuality: number;
   imageCount: number;
@@ -39,7 +41,6 @@ export interface ReviewQualityResult {
   videoPresent: boolean;
   videoQuality: number;
   suspiciousSignals: string[];
-  rewardEligible: boolean;
 }
 
 /** Used by tests and duplicate detection so both paths normalize identically. */
@@ -53,36 +54,6 @@ export function normalizeReviewText(value: string): string {
 }
 
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
-
-/**
- * Maps evidence to the five EXISTING levels. The gates deliberately grow in
- * substance, not file count alone: level 3 needs three distinct useful
- * images, level 4 adds useful video, and level 5 also needs durable evidence.
- */
-function tierFor(
-  score: number,
-  textChars: number,
-  uniqueImages: ReviewQualityMedia[],
-  imageQuality: number,
-  videoPresent: boolean,
-  videoQuality: number,
-  hasEvidence: boolean
-): 1 | 2 | 3 | 4 | 5 | null {
-  if (textChars < 100 || uniqueImages.length < 1) return null;
-  if (
-    score >= 94 &&
-    uniqueImages.length >= 3 &&
-    imageQuality >= 27 &&
-    videoPresent &&
-    videoQuality >= 18 &&
-    hasEvidence
-  ) return 5;
-  if (score >= 84 && uniqueImages.length >= 3 && videoPresent && videoQuality >= 8) return 4;
-  if (score >= 70 && uniqueImages.length >= 3 && imageQuality >= 18) return 3;
-  if (score >= 58 && uniqueImages.length >= 2 && imageQuality >= 12) return 2;
-  if (score >= 45) return 1;
-  return null;
-}
 
 export function evaluateReviewQuality(input: ReviewQualityInput): ReviewQualityResult {
   const body = normalizeReviewText(input.body);
@@ -156,13 +127,9 @@ export function evaluateReviewQuality(input: ReviewQualityInput): ReviewQualityR
     (suspiciousSignals.includes('low_quality_image') ? 5 : 0) -
     (suspiciousSignals.includes('low_quality_video') ? 5 : 0);
   const score = clamp(Math.round(rawScore), 0, 100);
-  const tier = severe
-    ? null
-    : tierFor(score, textChars, uniqueImages, imageQuality, videoPresent, videoQuality, input.hasEvidence);
 
   return {
     score,
-    tier,
     reasons: [...new Set(reasons)],
     textQuality,
     imageCount: uniqueImages.length,
@@ -170,7 +137,38 @@ export function evaluateReviewQuality(input: ReviewQualityInput): ReviewQualityR
     videoPresent,
     videoQuality,
     suspiciousSignals: [...new Set(suspiciousSignals)],
-    rewardEligible: input.isPrinter && tier !== null,
   };
 }
 
+
+/**
+ * A STORED quality JSON (`reviews.quality_summary`, `review_rewards.quality_snapshot`)
+ * read back as advice. Rows written before 0165 still carry the deleted
+ * `tier` / `rewardEligible`; they are dropped here so a predicted level never
+ * reaches a screen or a notification again. Null when nothing was stored.
+ */
+export function advisoryQuality(raw: unknown): ReviewQualityResult | null {
+  let v: unknown = raw;
+  if (typeof raw === 'string') {
+    try {
+      v = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.score !== 'number') return null;
+  const list = (x: unknown): string[] => (Array.isArray(x) ? x.filter((s): s is string => typeof s === 'string') : []);
+  const num = (x: unknown): number => (typeof x === 'number' && Number.isFinite(x) ? x : 0);
+  return {
+    score: num(o.score),
+    reasons: list(o.reasons),
+    textQuality: num(o.textQuality),
+    imageCount: num(o.imageCount),
+    imageQuality: num(o.imageQuality),
+    videoPresent: o.videoPresent === true,
+    videoQuality: num(o.videoQuality),
+    suspiciousSignals: list(o.suspiciousSignals),
+  };
+}

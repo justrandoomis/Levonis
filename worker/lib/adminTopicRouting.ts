@@ -223,6 +223,12 @@ export interface OrderAnnouncementLine {
    * is read FIRST and the real name is never reachable from here.
    */
   mystery_spool?: { name_snapshot?: unknown; variant_snapshot?: unknown } | null;
+  /**
+   * A REVIEW GIFT LINE (0165) — set on the checkout's `ComputedLine` when the
+   * product was given against a review gift, not bought. Its money is 0 by
+   * design, so the line says «🎁 هدية» instead of reading as a mispriced sale.
+   */
+  gift?: unknown;
 }
 
 /**
@@ -395,7 +401,8 @@ export function orderAnnouncement(input: OrderAnnouncementInput = {}): string {
     const qtyNum = Number(l && l.qty);
     const qty = Number.isFinite(qtyNum) && qtyNum > 0 ? Math.trunc(qtyNum) : 1;
     const money = iqd(l && (l.line !== undefined && l.line !== null ? l.line : l.line_total_iqd));
-    out.push(`• ${name || 'صنف'}${variant ? ` — ${variant}` : ''} × ${qty} — ${money}`);
+    const giftMark = l && l.gift ? '🎁 هدية: ' : '';
+    out.push(`• ${giftMark}${name || 'صنف'}${variant ? ` — ${variant}` : ''} × ${qty} — ${money}`);
   }
   if (hidden > 0) out.push(`و ${groupDigits(hidden)} سطر آخر`);
 

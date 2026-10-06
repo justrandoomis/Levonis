@@ -42,6 +42,7 @@ import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
 import { classifyHost } from '../worker/lib/hosts';
 import { reviewRoutes } from '../worker/routes/reviews';
+import { giftRoutes } from '../worker/routes/gifts';
 
 type Tier = 'prime' | 'pro';
 const PLAN: Record<Tier, string> = { prime: 'prime_12mo', pro: 'pro_12mo' };
@@ -119,6 +120,7 @@ function appAs(db: D1Database, userId: string, role = 'customer') {
     await next();
   });
   a.route('/api/reviews', reviewRoutes);
+  a.route('/api/reviews', giftRoutes); // the reward decision moved to routes/gifts.ts
   a.onError((err, c) => {
     if (err instanceof HttpError) return c.json({ success: false, error: err.message, code: err.code }, err.status as 400);
     throw err;

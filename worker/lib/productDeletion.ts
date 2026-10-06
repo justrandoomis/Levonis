@@ -379,6 +379,48 @@ export const BLOCKING_REFS: BlockingRef[] = [
              OR option_value_id IN (SELECT id FROM product_option_values WHERE product_id = ?1)
              OR color_id IN (SELECT id FROM product_colors WHERE product_id = ?1))`,
   },
+  /**
+   * 0165 — THE REVIEW-GIFT LEVELS NAME REAL PRODUCTS (docs/REVIEWS_GIFTS.md).
+   * A level item is a product + its pinned model/colour; `product_id` is a
+   * foreign key, so the database would refuse anyway — this says why, and
+   * counts disabled items too because the foreign key does.
+   */
+  {
+    table: 'gift_pool_items',
+    column: 'product_id',
+    code: 'PRODUCT_IN_GIFT_LEVEL',
+    remedy: 'Remove this product from every review-gift level (disabled items included), then delete it.',
+  },
+  /**
+   * A REVIEW WITH A REWARD CANNOT DISAPPEAR UNDER IT. `reviews` is OWNED, and
+   * `review_rewards.review_id` is a NOT NULL foreign key to it, so deleting a
+   * product whose reviews carry a reward (a printer gift, points, legacy rows)
+   * always failed at the database with a raw constraint error. It is refused
+   * here with a remedy instead: hide the product, which keeps its reviews and
+   * every gift history intact.
+   */
+  {
+    table: 'review_rewards',
+    column: 'product_id',
+    code: 'PRODUCT_HAS_REVIEW_REWARDS',
+    remedy: 'Reviews of this product carry rewards or printer gifts — hide the product instead of deleting it permanently.',
+    match: `(product_id = ?1 OR review_id IN (SELECT id FROM reviews WHERE product_id = ?1))`,
+  },
+  /**
+   * A GRANTED GIFT THAT IS NOT ORDERED YET must stay orderable: its frozen
+   * item (or one of the level's alternatives) names this product. Ordered and
+   * delivered gifts are history and keep their snapshot; they do not block.
+   */
+  {
+    table: 'gift_entitlements',
+    column: 'gift_product_id',
+    code: 'PRODUCT_IN_OPEN_GIFT',
+    remedy: 'A granted review gift that has not been ordered yet offers this product — cancel that gift (Reviews & gifts → granted gifts), then delete it.',
+    where: "state IN ('code_issued', 'redeemed_ready_to_order')",
+    match: `(gift_product_id = ?1
+             OR EXISTS (SELECT 1 FROM json_each(gift_snapshot, '$.items') j
+                         WHERE json_extract(j.value, '$.product_id') = ?1))`,
+  },
 ];
 
 /**
