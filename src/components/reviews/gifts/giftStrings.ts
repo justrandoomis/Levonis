@@ -1,0 +1,306 @@
+/**
+ * «هداياي» — every sentence of the customer's gifts page, in Arabic, English
+ * and Sorani (docs/GIFTS_QUICK_BUY.md §1.3). One table so the three languages
+ * cannot drift apart: a key missing from a language is a compile error.
+ *
+ * The flow the words follow: «اختر هديتك» → «استرداد الهدية» →
+ * «تم استرداد الهدية ✓» + «أضف إلى السلة» → «في السلة» →
+ * «تم طلب هذه الهدية» + the order → «تم التسليم».
+ */
+
+export type GiftLang = 'ar' | 'en' | 'ckb';
+
+export const giftLang = (lang: string): GiftLang => (lang === 'en' || lang === 'ckb' ? lang : 'ar');
+
+const ar = {
+  title: 'هداياي',
+  intro: 'هدايا من ليفونيس: اختر هديتك واستردّها، ثم اطلبها مع سلتك بسعر 0 د.ع.',
+  refresh: 'تحديث',
+  loading: 'جارٍ تحميل هداياك…',
+  emptyTitle: 'لا توجد هدايا بعد',
+  emptyBody: 'عندما تمنحك ليفونيس هدية ستظهر هنا، وسنُعلمك فور وصولها.',
+  emptyAction: 'العودة إلى طلباتي',
+
+  stateGranted: 'اختر هديتك',
+  stateReady: 'جاهزة للاسترداد',
+  stateRedeemed: 'تم الاسترداد',
+  stateInCart: 'في السلة',
+  stateOrdered: 'تم الطلب',
+  stateFulfilled: 'تم التسليم',
+  stateCancelled: 'أُلغيت',
+  stateLegacy: 'صندوق هدية',
+
+  titleGranted: 'اختر هديتك',
+  titleReady: 'هديتك جاهزة للاسترداد',
+  titleRedeemed: 'تم استرداد الهدية',
+  titleInCart: 'الهدية في سلتك',
+  titleOrdered: 'تم طلب هذه الهدية',
+  titleFulfilled: 'تم التسليم',
+  titleCancelled: 'أُلغيت هذه الهدية',
+
+  bodyGranted: 'اختر منتجًا واحدًا من هدايا هذا المستوى.',
+  bodyReady: 'بعد الاسترداد يُثبَّت اختيارك، وتضيفها إلى سلتك بسعر 0 د.ع.',
+  bodyRedeemed: 'أضفها إلى سلتك الحالية: تُطلب مع مشترياتك بسعر 0 د.ع، وتدفع التوصيل كالمعتاد.',
+  bodyInCart: 'أكمل الطلب من السلة. إن حذفتها من السلة تعود هنا.',
+  bodyOrdered: 'هديتك في طلب قيد التجهيز. تابعه من صفحة الطلب.',
+  bodyFulfilled: 'وصلتك الهدية. نتمنى أن تعجبك!',
+  bodyCancelled: 'تواصل مع الدعم إن كان لديك سؤال عنها.',
+  noChoices: 'لا توجد هدايا متاحة في هذا المستوى الآن. سنُعلمك حين تتوفر.',
+
+  chooseThis: 'تأكيد الاختيار',
+  changeChoice: 'تغيير الاختيار',
+  keepChoice: 'إبقاء اختياري',
+  redeem: 'استرداد الهدية',
+  redeeming: 'جارٍ الاسترداد…',
+  addToCart: 'أضف إلى السلة',
+  adding: 'جارٍ الإضافة…',
+  goToCart: 'الذهاب إلى السلة',
+  viewOrder: 'عرض الطلب',
+  added: 'أُضيفت الهدية إلى سلتك.',
+
+  confirmTitle: 'استرداد الهدية؟',
+  confirmBody: 'بعد الاسترداد لا يمكن تغيير اختيارك. تُطلب الهدية مع سلتك بسعر 0 د.ع.',
+  confirmAction: 'استرداد',
+  cancel: 'إلغاء',
+
+  level: 'المستوى',
+  levelChip: 'المستوى {level}',
+  saleType: 'نوع البيع',
+  saleDirect: 'بيع مباشر',
+  salePreorder: 'طلب مسبق',
+  routeAir: 'طلب مسبق · شحن جوي',
+  routeSea: 'طلب مسبق · شحن بحري',
+  routeLand: 'طلب مسبق · شحن بري',
+  option: 'الخيار',
+  color: 'اللون',
+  qty: 'الكمية',
+  value: 'قيمتها',
+  free: '0 د.ع',
+  leadTime: 'مدة التوفير',
+  unavailable: 'غير متاحة الآن',
+  unavailableChoice: 'نفدت مؤقتًا — اختر هدية أخرى أو عُد لاحقًا.',
+  unavailableChosen: 'هذه الهدية غير متاحة الآن. يمكنك المتابعة حين تتوفر من جديد.',
+  leadDays: 'يصل خلال {min}–{max} يومًا',
+  leadDay: 'يصل خلال {n} يومًا',
+  selected: 'مختارة',
+
+  reasonReview: 'تقديرًا لمراجعتك',
+  reasonReward: 'مكافأة من ليفونيس',
+  reasonCompensation: 'تعويض من ليفونيس',
+  reasonAdminGift: 'هدية من ليفونيس',
+
+  grantedAt: 'مُنحت',
+  redeemedAt: 'استُردّت',
+  orderedAt: 'طُلبت',
+  fulfilledAt: 'سُلّمت',
+  cancelledAt: 'أُلغيت',
+  orderNo: 'الطلب {id}',
+
+  networkError: 'تعذّر الاتصال. تحقّق من الإنترنت وحاول مرة أخرى.',
+  tooManyTries: 'محاولات كثيرة. انتظر قليلًا ثم حاول مرة أخرى.',
+  actionFailed: 'تعذّر إتمام العملية. حاول مرة أخرى.',
+  sellerConflictTitle: 'سلتك من متجر آخر',
+  sellerConflictBody: 'تحتوي سلتك منتجات من متجر في مجتمع ليفو. لإضافة الهدية تُفرَّغ السلة أولًا.',
+  replaceCart: 'إفراغ السلة وإضافة الهدية',
+  shippingConflictTitle: 'نوع شحن مختلف',
+  shippingConflictBody: 'السلة الحالية تحتوي منتجات بنوع شحن مختلف. يجب إفراغ السلة لإضافة هذه الهدية.',
+};
+
+export type GiftStringKey = keyof typeof ar;
+
+const en: Record<GiftStringKey, string> = {
+  title: 'My gifts',
+  intro: 'Gifts from Levonis: choose your gift, redeem it, then order it with your cart at 0 IQD.',
+  refresh: 'Refresh',
+  loading: 'Loading your gifts…',
+  emptyTitle: 'No gifts yet',
+  emptyBody: 'When Levonis gives you a gift it appears here, and we will let you know the moment it arrives.',
+  emptyAction: 'Back to my orders',
+
+  stateGranted: 'Choose your gift',
+  stateReady: 'Ready to redeem',
+  stateRedeemed: 'Redeemed',
+  stateInCart: 'In your cart',
+  stateOrdered: 'Ordered',
+  stateFulfilled: 'Delivered',
+  stateCancelled: 'Cancelled',
+  stateLegacy: 'Gift box',
+
+  titleGranted: 'Choose your gift',
+  titleReady: 'Your gift is ready to redeem',
+  titleRedeemed: 'Gift redeemed',
+  titleInCart: 'The gift is in your cart',
+  titleOrdered: 'This gift has been ordered',
+  titleFulfilled: 'Delivered',
+  titleCancelled: 'This gift was cancelled',
+
+  bodyGranted: 'Pick one product from this level’s gifts.',
+  bodyReady: 'Redeeming fixes your choice; then add it to your cart at 0 IQD.',
+  bodyRedeemed: 'Add it to your current cart: it is ordered with your purchases at 0 IQD, and delivery is charged as usual.',
+  bodyInCart: 'Complete the order from your cart. If you remove it from the cart, it comes back here.',
+  bodyOrdered: 'Your gift is in an order being prepared. Follow it on the order page.',
+  bodyFulfilled: 'Your gift has arrived. We hope you enjoy it!',
+  bodyCancelled: 'Contact support if you have a question about it.',
+  noChoices: 'No gifts are available in this level right now. We will let you know when there are.',
+
+  chooseThis: 'Confirm choice',
+  changeChoice: 'Change choice',
+  keepChoice: 'Keep my choice',
+  redeem: 'Redeem gift',
+  redeeming: 'Redeeming…',
+  addToCart: 'Add to cart',
+  adding: 'Adding…',
+  goToCart: 'Go to cart',
+  viewOrder: 'View order',
+  added: 'The gift was added to your cart.',
+
+  confirmTitle: 'Redeem this gift?',
+  confirmBody: 'After redeeming, your choice cannot change. The gift is ordered with your cart at 0 IQD.',
+  confirmAction: 'Redeem',
+  cancel: 'Cancel',
+
+  level: 'Level',
+  levelChip: 'Level {level}',
+  saleType: 'Sale type',
+  saleDirect: 'Direct sale',
+  salePreorder: 'Pre-order',
+  routeAir: 'Pre-order · air freight',
+  routeSea: 'Pre-order · sea freight',
+  routeLand: 'Pre-order · land freight',
+  option: 'Option',
+  color: 'Colour',
+  qty: 'Quantity',
+  value: 'Worth',
+  free: '0 IQD',
+  leadTime: 'Lead time',
+  unavailable: 'Not available right now',
+  unavailableChoice: 'Out for now — pick another gift or come back later.',
+  unavailableChosen: 'This gift is not available right now. You can continue once it is back.',
+  leadDays: 'Arrives in {min}–{max} days',
+  leadDay: 'Arrives in {n} days',
+  selected: 'Selected',
+
+  reasonReview: 'Thanks for your review',
+  reasonReward: 'A reward from Levonis',
+  reasonCompensation: 'A make-good from Levonis',
+  reasonAdminGift: 'A gift from Levonis',
+
+  grantedAt: 'Granted',
+  redeemedAt: 'Redeemed',
+  orderedAt: 'Ordered',
+  fulfilledAt: 'Delivered',
+  cancelledAt: 'Cancelled',
+  orderNo: 'Order {id}',
+
+  networkError: 'Could not connect. Check your internet and try again.',
+  tooManyTries: 'Too many attempts. Wait a moment and try again.',
+  actionFailed: 'That did not go through. Please try again.',
+  sellerConflictTitle: 'Your cart is from another store',
+  sellerConflictBody: 'Your cart holds products from a Levo Community store. To add the gift, the cart is emptied first.',
+  replaceCart: 'Empty cart and add the gift',
+  shippingConflictTitle: 'A different shipping type',
+  shippingConflictBody: 'Your cart holds products with a different shipping type. It must be emptied before this gift can be added.',
+};
+
+const ckb: Record<GiftStringKey, string> = {
+  title: 'دیارییەکانم',
+  intro: 'دیاری لە Levonis ـەوە: دیارییەکەت هەڵبژێرە و وەریبگرەوە، پاشان لەگەڵ سەبەتەکەت بە 0 د.ع داوای بکە.',
+  refresh: 'نوێکردنەوە',
+  loading: 'دیارییەکانت باردەکرێن…',
+  emptyTitle: 'هێشتا هیچ دیارییەک نییە',
+  emptyBody: 'کاتێک Levonis دیارییەکت پێدەبەخشێت لێرە دەردەکەوێت، و یەکسەر ئاگادارت دەکەینەوە.',
+  emptyAction: 'گەڕانەوە بۆ داواکارییەکانم',
+
+  stateGranted: 'دیارییەکەت هەڵبژێرە',
+  stateReady: 'ئامادەیە بۆ وەرگرتنەوە',
+  stateRedeemed: 'وەرگیرایەوە',
+  stateInCart: 'لە سەبەتەکەدایە',
+  stateOrdered: 'داواکرا',
+  stateFulfilled: 'گەیەنرا',
+  stateCancelled: 'هەڵوەشێنرایەوە',
+  stateLegacy: 'سندوقی دیاری',
+
+  titleGranted: 'دیارییەکەت هەڵبژێرە',
+  titleReady: 'دیارییەکەت ئامادەیە بۆ وەرگرتنەوە',
+  titleRedeemed: 'دیارییەکە وەرگیرایەوە',
+  titleInCart: 'دیارییەکە لە سەبەتەکەتدایە',
+  titleOrdered: 'ئەم دیارییە داواکراوە',
+  titleFulfilled: 'گەیەنرا',
+  titleCancelled: 'ئەم دیارییە هەڵوەشێنرایەوە',
+
+  bodyGranted: 'یەک بەرهەم لە دیارییەکانی ئەم ئاستە هەڵبژێرە.',
+  bodyReady: 'دوای وەرگرتنەوە هەڵبژاردنەکەت جێگیر دەبێت، پاشان بە 0 د.ع زیادی بکە بۆ سەبەتەکەت.',
+  bodyRedeemed: 'زیادی بکە بۆ سەبەتەی ئێستات: لەگەڵ کڕینەکانت بە 0 د.ع داوا دەکرێت، و کرێی گەیاندن وەک هەمیشە دەدرێت.',
+  bodyInCart: 'داواکارییەکە لە سەبەتەکەوە تەواو بکە. ئەگەر لە سەبەتەکە لایببەیت دەگەڕێتەوە ئێرە.',
+  bodyOrdered: 'دیارییەکەت لە داواکارییەکدایە کە ئامادە دەکرێت. لە پەڕەی داواکارییەکەوە بەدوایدا بچۆ.',
+  bodyFulfilled: 'دیارییەکەت گەیشت. هیوادارین بەدڵت بێت!',
+  bodyCancelled: 'ئەگەر پرسیارێکت هەیە پەیوەندی بە پشتگیرییەوە بکە.',
+  noChoices: 'ئێستا هیچ دیارییەک لەم ئاستەدا بەردەست نییە. کاتێک هەبوو ئاگادارت دەکەینەوە.',
+
+  chooseThis: 'پشتڕاستکردنەوەی هەڵبژاردن',
+  changeChoice: 'گۆڕینی هەڵبژاردن',
+  keepChoice: 'هەڵبژاردنەکەم بهێڵەوە',
+  redeem: 'وەرگرتنەوەی دیاری',
+  redeeming: 'وەردەگیرێتەوە…',
+  addToCart: 'زیادکردن بۆ سەبەتە',
+  adding: 'زیاد دەکرێت…',
+  goToCart: 'چوون بۆ سەبەتە',
+  viewOrder: 'بینینی داواکاری',
+  added: 'دیارییەکە زیادکرا بۆ سەبەتەکەت.',
+
+  confirmTitle: 'دیارییەکە وەربگریتەوە؟',
+  confirmBody: 'دوای وەرگرتنەوە ناتوانیت هەڵبژاردنەکەت بگۆڕیت. دیارییەکە لەگەڵ سەبەتەکەت بە 0 د.ع داوا دەکرێت.',
+  confirmAction: 'وەرگرتنەوە',
+  cancel: 'پاشگەزبوونەوە',
+
+  level: 'ئاست',
+  levelChip: 'ئاستی {level}',
+  saleType: 'جۆری فرۆشتن',
+  saleDirect: 'فرۆشتنی ڕاستەوخۆ',
+  salePreorder: 'داواکاریی پێشوەختە',
+  routeAir: 'پێشوەختە · بە ئاسمان',
+  routeSea: 'پێشوەختە · بە دەریا',
+  routeLand: 'پێشوەختە · بە وشکانی',
+  option: 'هەڵبژاردە',
+  color: 'ڕەنگ',
+  qty: 'بڕ',
+  value: 'بەهاکەی',
+  free: '0 د.ع',
+  leadTime: 'ماوەی دابینکردن',
+  unavailable: 'ئێستا بەردەست نییە',
+  unavailableChoice: 'بۆ ئێستا نەماوە — دیارییەکی تر هەڵبژێرە یان دواتر بگەڕێرەوە.',
+  unavailableChosen: 'ئەم دیارییە ئێستا بەردەست نییە. کاتێک دووبارە بەردەست بوو دەتوانیت بەردەوام بیت.',
+  leadDays: 'لە ماوەی {min}–{max} ڕۆژدا دەگات',
+  leadDay: 'لە ماوەی {n} ڕۆژدا دەگات',
+  selected: 'هەڵبژێردراو',
+
+  reasonReview: 'سوپاس بۆ هەڵسەنگاندنەکەت',
+  reasonReward: 'خەڵاتێک لە Levonis ـەوە',
+  reasonCompensation: 'قەرەبوویەک لە Levonis ـەوە',
+  reasonAdminGift: 'دیارییەک لە Levonis ـەوە',
+
+  grantedAt: 'بەخشرا',
+  redeemedAt: 'وەرگیرایەوە',
+  orderedAt: 'داواکرا',
+  fulfilledAt: 'گەیەنرا',
+  cancelledAt: 'هەڵوەشێنرایەوە',
+  orderNo: 'داواکاری {id}',
+
+  networkError: 'پەیوەندی نەکرا. ئینتەرنێتەکەت بپشکنە و دووبارە هەوڵ بدەرەوە.',
+  tooManyTries: 'هەوڵی زۆر. کەمێک چاوەڕێ بکە و دووبارە هەوڵ بدەرەوە.',
+  actionFailed: 'کردارەکە تەواو نەبوو. دووبارە هەوڵ بدەرەوە.',
+  sellerConflictTitle: 'سەبەتەکەت هی فرۆشگایەکی ترە',
+  sellerConflictBody: 'سەبەتەکەت بەرهەمی فرۆشگایەکی کۆمەڵگەی لیڤۆی تێدایە. بۆ زیادکردنی دیارییەکە سەرەتا سەبەتەکە بەتاڵ دەکرێتەوە.',
+  replaceCart: 'بەتاڵکردنەوەی سەبەتە و زیادکردنی دیاری',
+  shippingConflictTitle: 'جۆرێکی گەیاندنی جیاواز',
+  shippingConflictBody: 'سەبەتەکەت بەرهەمی جۆری گەیاندنی جیاوازی تێدایە. پێویستە بەتاڵ بکرێتەوە بۆ زیادکردنی ئەم دیارییە.',
+};
+
+export const GIFT_STRINGS: Readonly<Record<GiftLang, Readonly<Record<GiftStringKey, string>>>> = { ar, en, ckb };
+
+/** One sentence in the reader's language, `{hole}`s filled. */
+export function giftText(lang: GiftLang, key: GiftStringKey, vars?: Record<string, string | number>): string {
+  const raw = GIFT_STRINGS[lang][key] ?? GIFT_STRINGS.ar[key];
+  if (!vars) return raw;
+  return raw.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole));
+}

@@ -1,0 +1,949 @@
+{
+ "cart": {
+  "success": true,
+  "items": [
+   {
+    "id": "ci_63ab9e60992042389097",
+    "productId": "p_plain",
+    "slug": "nozzle-cleaner",
+    "name": "Nozzle cleaner",
+    "name_ar": "منظف فوهات",
+    "image": "",
+    "qty": 1,
+    "option_id": "",
+    "color_id": "",
+    "transport_method": "",
+    "warranty_plan_id": "",
+    "shipping_method_id": "",
+    "selling_type": "direct_sale",
+    "variantLabel": "",
+    "support_gift_eligible": false,
+    "is_printer": false,
+    "cod_reprices": false,
+    "unit_price_iqd": 15000,
+    "breakdown": {
+     "applied_iqd": 15000,
+     "applied_tier": "regular",
+     "regular_iqd": 15000,
+     "prime_iqd": null,
+     "pro_iqd": null,
+     "transport": null,
+     "direct": null,
+     "pricing_basis": "direct",
+     "warranty": null,
+     "unit_subtotal_iqd": 15000,
+     "price_source": "base",
+     "errors": []
+    },
+    "stock": 3,
+    "low_stock_threshold": null,
+    "availability": {
+     "mode": "direct_sale",
+     "reason": null,
+     "selling_type": "direct_sale",
+     "stock": {
+      "tracked": true,
+      "scope": "base",
+      "on_hand": 3,
+      "reserved": 0,
+      "available": 3,
+      "max_qty": 3,
+      "low": false
+     },
+     "selection": {
+      "option_required": false,
+      "color_required": false,
+      "option_id": null,
+      "option_value_ids": [],
+      "color_id": null,
+      "complete": true,
+      "errors": []
+     },
+     "modes": [
+      {
+       "type": "direct_sale",
+       "usable": true,
+       "reason": null
+      }
+     ],
+     "preorder": {
+      "enabled": false,
+      "usable": false,
+      "reason": "PREORDER_NOT_ENABLED",
+      "transports": [],
+      "routes": [],
+      "capacity": {
+       "tracked": false,
+       "scope": null,
+       "scope_id": "",
+       "available": null,
+       "max_qty": 9999
+      }
+     },
+     "qty_ok": true
+    },
+    "selection_errors": [],
+    "option_value_ids": [],
+    "relations": null,
+    "options": [],
+    "colors": [],
+    "warranty_plans": [],
+    "preorder_transports": [],
+    "shipping_methods": [],
+    "delivery_options": null,
+    "delivery_availability": {
+     "standard": true,
+     "personal": true
+    }
+   },
+   {
+    "id": "ci_76c4870ec58945349419",
+    "kind": "gift",
+    "locked": true,
+    "productId": "p_nozzle",
+    "slug": "nozzle-kit",
+    "name": "Nozzle kit",
+    "name_ar": "طقم فوهات",
+    "image": "",
+    "qty": 1,
+    "option_id": "v_04",
+    "color_id": "c_red",
+    "transport_method": "",
+    "warranty_plan_id": "",
+    "shipping_method_id": "",
+    "selling_type": "direct_sale",
+    "variantLabel": "0.4 mm / Red",
+    "support_gift_eligible": false,
+    "is_printer": false,
+    "cod_reprices": false,
+    "unit_price_iqd": 0,
+    "breakdown": {
+     "applied_iqd": 0,
+     "applied_tier": "regular",
+     "regular_iqd": 40000,
+     "prime_iqd": null,
+     "pro_iqd": null,
+     "transport": null,
+     "direct": null,
+     "pricing_basis": "direct",
+     "warranty": null,
+     "unit_subtotal_iqd": 0,
+     "price_source": "base",
+     "errors": []
+    },
+    "gift": {
+     "id": "gift_93e1f4fd79174239a31f",
+     "level": 2,
+     "value_iqd": 40000
+    },
+    "stock": null,
+    "low_stock_threshold": null,
+    "availability": {
+     "mode": "direct_sale",
+     "reason": null,
+     "selling_type": "direct_sale",
+     "stock": {
+      "tracked": true,
+      "scope": "option",
+      "on_hand": 3,
+      "reserved": 0,
+      "available": 3,
+      "max_qty": 3,
+      "low": false
+     },
+     "selection": {
+      "option_required": true,
+      "color_required": true,
+      "option_id": "v_04",
+      "option_value_ids": [
+       "v_04"
+      ],
+      "color_id": "c_red",
+      "complete": true,
+      "errors": []
+     },
+     "modes": [
+      {
+       "type": "direct_sale",
+       "usable": true,
+       "reason": null
+      }
+     ],
+     "preorder": {
+      "enabled": false,
+      "usable": false,
+      "reason": "PREORDER_NOT_ENABLED",
+      "transports": [],
+      "routes": [],
+      "capacity": {
+       "tracked": false,
+       "scope": null,
+       "scope_id": "",
+       "available": null,
+       "max_qty": 9999
+      }
+     },
+     "qty_ok": true
+    },
+    "selection_errors": [],
+    "option_value_ids": [
+     "v_04"
+    ],
+    "relations": null,
+    "options": [],
+    "colors": [],
+    "warranty_plans": [],
+    "preorder_transports": [],
+    "shipping_methods": [],
+    "delivery_options": null,
+    "delivery_availability": {
+     "standard": true,
+     "personal": true
+    }
+   }
+  ],
+  "tier": "free",
+  "tierActive": false,
+  "membership": {
+   "tier": "free",
+   "active": false,
+   "discount_total_iqd": 0,
+   "order_discount_iqd": 0,
+   "merchandise_iqd": 15000,
+   "lines": [
+    {
+     "product_id": "p_plain",
+     "rule_id": null,
+     "scope": null,
+     "discount_mode": null,
+     "per_unit_iqd": 0,
+     "eligible_qty": 0,
+     "total_iqd": 0,
+     "capped_by": "none",
+     "applied_at": "unit"
+    }
+   ],
+   "free_shipping": [
+    {
+     "method": "standard",
+     "rule_id": null,
+     "eligible": false,
+     "threshold_iqd": null,
+     "basis_iqd": 15000,
+     "methods": null,
+     "max_subsidy_iqd": null,
+     "reason": "no_rule"
+    },
+    {
+     "method": "personal",
+     "rule_id": null,
+     "eligible": false,
+     "threshold_iqd": null,
+     "basis_iqd": 15000,
+     "methods": null,
+     "max_subsidy_iqd": null,
+     "reason": "no_rule"
+    }
+   ],
+   "cod_tax_exempt": false
+  },
+  "delivery_methods": {
+   "standard": {
+    "available": true,
+    "unavailable_product_ids": []
+   },
+   "personal": {
+    "available": true,
+    "unavailable_product_ids": []
+   },
+   "pickup": {
+    "available": true,
+    "unavailable_product_ids": []
+   }
+  },
+  "shipping_type": "direct",
+  "scope": {
+   "seller_type": "levonis",
+   "merchant_id": null,
+   "store_id": null
+  },
+  "item_count": 2
+ },
+ "order": {
+  "success": true,
+  "order": {
+   "id": "ORD-865A082CF7",
+   "status": "pending",
+   "order_kind": "normal",
+   "shipping_type": "direct",
+   "stage": "received",
+   "progress": {
+    "index": 1,
+    "total": 5
+   },
+   "stage_changed_at": "2026-10-06T20:49:29.397Z",
+   "next_stage": "confirmed",
+   "next_stage_at": null,
+   "delivery_due_day": null,
+   "delivery_day_window_end": "2026-10-13",
+   "delivery_day_schedulable": true,
+   "tracking_no": null,
+   "membership_gift": null,
+   "address": {
+    "id": "addr_b",
+    "user_id": "buyer",
+    "label": "Home",
+    "name": "Sara",
+    "phone": "+9647701234567",
+    "address": "Baghdad, Karrada 12",
+    "landmark": "",
+    "is_default": 1,
+    "created_at": "2026-10-06T20:49:29.263Z",
+    "governorate": "",
+    "area": "",
+    "notes": ""
+   },
+   "delivery_method": {
+    "id": "standard",
+    "titleAr": "توصيل عادي",
+    "titleEn": "Standard Delivery",
+    "descAr": "2-3 أيام عمل",
+    "descEn": "2-3 business days",
+    "price_iqd": 5000,
+    "icon": "Truck",
+    "home_delivery": true,
+    "quote": {
+     "components": [
+      {
+       "kind": "ordinary",
+       "fee_iqd": 5000,
+       "waived": false,
+       "units": 2,
+       "method": "standard",
+       "product_ids": [
+        "p_nozzle",
+        "p_plain"
+       ],
+       "advance_required": false
+      }
+     ],
+     "total_iqd": 5000,
+     "total_before_waiver_iqd": 5000,
+     "advance_due_iqd": 0,
+     "pro_waiver_applied": false,
+     "prime_waiver_applied": false,
+     "membership_subsidy_iqd": 0,
+     "membership_subsidy_capped": false,
+     "membership_rule_id": null,
+     "waiver_source": "none",
+     "waiver_basis_iqd": 15000,
+     "needs_config": [],
+     "assumptions": [],
+     "reasons": [
+      "One standard ordinary shipment: 5,000 IQD."
+     ]
+    },
+    "priority_delivery": {
+     "max_hours": 12,
+     "due_at": null,
+     "eligible": false,
+     "reason": "PRO_REQUIRED"
+    }
+   },
+   "payment_method_id": "cash",
+   "gini": null,
+   "subtotal_iqd": 15000,
+   "shipping_iqd": 5000,
+   "cod_tax_iqd": 0,
+   "delivery_waived": false,
+   "membership_tier_snapshot": "free",
+   "priority": 0,
+   "fulfillment_service": "standard",
+   "priority_due_at": null,
+   "bnpl_due_iqd": 0,
+   "bnpl_due_at": null,
+   "coupon": null,
+   "coupon_discount_iqd": 0,
+   "points_discount_iqd": 0,
+   "wallet_applied_iqd": 0,
+   "total_iqd": 20000,
+   "due_on_delivery_iqd": 20000,
+   "price_hold_id": null,
+   "delivered_at": null,
+   "created_at": "2026-10-06T20:49:29.397Z",
+   "updated_at": "2026-10-06T20:49:29.397Z",
+   "financial": {
+    "merchandise_iqd": 15000,
+    "fees_iqd": 0,
+    "subtotal_iqd": 15000,
+    "coupon_discount_iqd": 0,
+    "points_used": 0,
+    "points_value_iqd": 0,
+    "shipping_iqd": 5000,
+    "cod_tax_iqd": 0,
+    "delivery_waived": false,
+    "price_adjustment_iqd": 0,
+    "total_iqd": 20000,
+    "wallet_applied_iqd": 0,
+    "wallet_tx_id": null,
+    "points_tx_id": null,
+    "due_on_delivery_iqd": 20000,
+    "bnpl_due_iqd": 0,
+    "gini_paid_iqd": 0,
+    "bnpl_due_at": null,
+    "collected_iqd": 0,
+    "outstanding_iqd": 20000,
+    "payment_state": "cod_due",
+    "settlement": {
+     "collected_iqd": 0,
+     "settled_at": null,
+     "fully_settled": false
+    },
+    "points": {
+     "state": "pending",
+     "pending": 15,
+     "released": 0,
+     "available_at": "2026-10-13T20:49:29.397Z",
+     "eligible_iqd": 15000,
+     "iqd_per_point": 1000,
+     "rule_version": "v3",
+     "redeemed": 0,
+     "redemption_state": "none"
+    },
+    "support": null
+   },
+   "items": [
+    {
+     "id": "oi_85acd9fd307a45dea92e",
+     "product_id": "p_nozzle",
+     "product_slug": "nozzle-kit",
+     "is_printer": false,
+     "name": "Nozzle kit",
+     "image": "",
+     "variant": "0.4 mm / Red",
+     "qty": 1,
+     "unit_price_iqd": 0,
+     "line_total_iqd": 0,
+     "is_gift": true,
+     "gift_id": "gift_93e1f4fd79174239a31f",
+     "pricing": {
+      "regular_iqd": 40000,
+      "pro_iqd": null,
+      "prime_iqd": null,
+      "applied_iqd": 0,
+      "applied_tier": "regular",
+      "member_rule": {
+       "pro": null,
+       "prime": null
+      },
+      "price_source": "base",
+      "fulfillment": {
+       "type": "direct_sale",
+       "source": "stated",
+       "from_option_cell": false,
+       "variant_key": "0-4-mm",
+       "lead_time_text": "",
+       "lead_time_min_days": null,
+       "lead_time_max_days": null
+      },
+      "transport": null,
+      "direct": null,
+      "pricing_basis": "direct",
+      "warranty": null,
+      "unit_subtotal_iqd": 0,
+      "components": {
+       "base_iqd": 40000,
+       "option_iqd": 40000,
+       "fulfillment_iqd": 40000,
+       "transport_iqd": 40000,
+       "color_iqd": 40000,
+       "membership_adjustment_iqd": 0,
+       "transport_fee_iqd": 0,
+       "direct_fee_iqd": 0,
+       "warranty_fee_iqd": 0
+      },
+      "errors": [],
+      "gift": {
+       "gift_id": "gift_93e1f4fd79174239a31f",
+       "level": 2,
+       "value_iqd": 40000
+      }
+     },
+     "warranty": null,
+     "transport": null,
+     "selection": {
+      "option_id": "v_04",
+      "option_value_ids": [
+       "v_04"
+      ],
+      "color_id": "c_red",
+      "transport_method": "",
+      "warranty_plan_id": ""
+     }
+    },
+    {
+     "id": "oi_3530ebb825ed4eeaa002",
+     "product_id": "p_plain",
+     "product_slug": "nozzle-cleaner",
+     "is_printer": false,
+     "name": "Nozzle cleaner",
+     "image": "",
+     "variant": "",
+     "qty": 1,
+     "unit_price_iqd": 15000,
+     "line_total_iqd": 15000,
+     "is_gift": false,
+     "gift_id": null,
+     "pricing": {
+      "regular_iqd": 15000,
+      "pro_iqd": null,
+      "prime_iqd": null,
+      "applied_iqd": 15000,
+      "applied_tier": "regular",
+      "member_rule": {
+       "pro": null,
+       "prime": null
+      },
+      "price_source": "base",
+      "fulfillment": {
+       "type": "direct_sale",
+       "source": "inferred",
+       "from_option_cell": false,
+       "variant_key": "",
+       "lead_time_text": "",
+       "lead_time_min_days": null,
+       "lead_time_max_days": null
+      },
+      "transport": null,
+      "direct": null,
+      "pricing_basis": "direct",
+      "warranty": null,
+      "unit_subtotal_iqd": 15000,
+      "components": {
+       "base_iqd": 15000,
+       "option_iqd": 15000,
+       "fulfillment_iqd": 15000,
+       "transport_iqd": 15000,
+       "color_iqd": 15000,
+       "membership_adjustment_iqd": 0,
+       "transport_fee_iqd": 0,
+       "direct_fee_iqd": 0,
+       "warranty_fee_iqd": 0
+      },
+      "errors": []
+     },
+     "warranty": null,
+     "transport": null,
+     "selection": {
+      "option_id": "",
+      "option_value_ids": [],
+      "color_id": "",
+      "transport_method": "",
+      "warranty_plan_id": ""
+     }
+    }
+   ],
+   "item_count": 2,
+   "store": null,
+   "invoice": {
+    "id": "inv_cc55179faa8142e6aab6",
+    "invoice_no": "INV-2026-42E6AAB6",
+    "revision": 1,
+    "payment_status": "cod_due"
+   },
+   "maintenance_parts": [],
+   "can_cancel": true,
+   "can_review": false,
+   "receipt": null,
+   "delivery_date": {
+    "can_change": true,
+    "selected": null,
+    "window_end": "2026-10-13",
+    "reason": null,
+    "days": [
+     {
+      "day": "2026-10-06",
+      "label": "اليوم",
+      "is_today": true,
+      "is_tomorrow": false
+     },
+     {
+      "day": "2026-10-07",
+      "label": "غدًا",
+      "is_today": false,
+      "is_tomorrow": true
+     },
+     {
+      "day": "2026-10-08",
+      "label": "الخميس ٨ تشرين الأول",
+      "is_today": false,
+      "is_tomorrow": false
+     },
+     {
+      "day": "2026-10-09",
+      "label": "الجمعة ٩ تشرين الأول",
+      "is_today": false,
+      "is_tomorrow": false
+     },
+     {
+      "day": "2026-10-10",
+      "label": "السبت ١٠ تشرين الأول",
+      "is_today": false,
+      "is_tomorrow": false
+     },
+     {
+      "day": "2026-10-11",
+      "label": "الأحد ١١ تشرين الأول",
+      "is_today": false,
+      "is_tomorrow": false
+     },
+     {
+      "day": "2026-10-12",
+      "label": "الاثنين ١٢ تشرين الأول",
+      "is_today": false,
+      "is_tomorrow": false
+     },
+     {
+      "day": "2026-10-13",
+      "label": "الثلاثاء ١٣ تشرين الأول",
+      "is_today": false,
+      "is_tomorrow": false
+     }
+    ]
+   }
+  }
+ },
+ "tracking": {
+  "success": true,
+  "order_id": "ORD-865A082CF7",
+  "shipping_type": "direct",
+  "shipping_type_label": "شحن مباشر",
+  "stage": "received",
+  "stage_changed_at": "2026-10-06T20:49:29.397Z",
+  "next_stage_at": null,
+  "tracking_no": null,
+  "steps": [
+   {
+    "stage": "received",
+    "label": "تم استلام الطلب",
+    "reached": true,
+    "current": true,
+    "at": "2026-10-06T20:49:29.397Z"
+   },
+   {
+    "stage": "confirmed",
+    "label": "تم تأكيد الطلب",
+    "reached": false,
+    "current": false,
+    "at": null
+   },
+   {
+    "stage": "preparing",
+    "label": "جارٍ تجهيز الطلب",
+    "reached": false,
+    "current": false,
+    "at": null
+   },
+   {
+    "stage": "out_for_delivery",
+    "label": "في الطريق إليك",
+    "reached": false,
+    "current": false,
+    "at": null
+   },
+   {
+    "stage": "delivered",
+    "label": "تم التوصيل",
+    "reached": false,
+    "current": false,
+    "at": null
+   }
+  ]
+ },
+ "units": {
+  "success": true,
+  "order_id": "ORD-865A082CF7",
+  "units": []
+ },
+ "orders": {
+  "success": true,
+  "orders": [
+   {
+    "id": "ORD-865A082CF7",
+    "status": "pending",
+    "order_kind": "normal",
+    "shipping_type": "direct",
+    "stage": "received",
+    "progress": {
+     "index": 1,
+     "total": 5
+    },
+    "stage_changed_at": "2026-10-06T20:49:29.397Z",
+    "next_stage": "confirmed",
+    "next_stage_at": null,
+    "delivery_due_day": null,
+    "delivery_day_window_end": "2026-10-13",
+    "delivery_day_schedulable": true,
+    "tracking_no": null,
+    "membership_gift": null,
+    "address": {
+     "id": "addr_b",
+     "user_id": "buyer",
+     "label": "Home",
+     "name": "Sara",
+     "phone": "+9647701234567",
+     "address": "Baghdad, Karrada 12",
+     "landmark": "",
+     "is_default": 1,
+     "created_at": "2026-10-06T20:49:29.263Z",
+     "governorate": "",
+     "area": "",
+     "notes": ""
+    },
+    "delivery_method": {
+     "id": "standard",
+     "titleAr": "توصيل عادي",
+     "titleEn": "Standard Delivery",
+     "descAr": "2-3 أيام عمل",
+     "descEn": "2-3 business days",
+     "price_iqd": 5000,
+     "icon": "Truck",
+     "home_delivery": true,
+     "quote": {
+      "components": [
+       {
+        "kind": "ordinary",
+        "fee_iqd": 5000,
+        "waived": false,
+        "units": 2,
+        "method": "standard",
+        "product_ids": [
+         "p_nozzle",
+         "p_plain"
+        ],
+        "advance_required": false
+       }
+      ],
+      "total_iqd": 5000,
+      "total_before_waiver_iqd": 5000,
+      "advance_due_iqd": 0,
+      "pro_waiver_applied": false,
+      "prime_waiver_applied": false,
+      "membership_subsidy_iqd": 0,
+      "membership_subsidy_capped": false,
+      "membership_rule_id": null,
+      "waiver_source": "none",
+      "waiver_basis_iqd": 15000,
+      "needs_config": [],
+      "assumptions": [],
+      "reasons": [
+       "One standard ordinary shipment: 5,000 IQD."
+      ]
+     },
+     "priority_delivery": {
+      "max_hours": 12,
+      "due_at": null,
+      "eligible": false,
+      "reason": "PRO_REQUIRED"
+     }
+    },
+    "payment_method_id": "cash",
+    "gini": null,
+    "subtotal_iqd": 15000,
+    "shipping_iqd": 5000,
+    "cod_tax_iqd": 0,
+    "delivery_waived": false,
+    "membership_tier_snapshot": "free",
+    "priority": 0,
+    "fulfillment_service": "standard",
+    "priority_due_at": null,
+    "bnpl_due_iqd": 0,
+    "bnpl_due_at": null,
+    "coupon": null,
+    "coupon_discount_iqd": 0,
+    "points_discount_iqd": 0,
+    "wallet_applied_iqd": 0,
+    "total_iqd": 20000,
+    "due_on_delivery_iqd": 20000,
+    "price_hold_id": null,
+    "delivered_at": null,
+    "created_at": "2026-10-06T20:49:29.397Z",
+    "updated_at": "2026-10-06T20:49:29.397Z",
+    "financial": {
+     "merchandise_iqd": 15000,
+     "fees_iqd": 0,
+     "subtotal_iqd": 15000,
+     "coupon_discount_iqd": 0,
+     "points_used": 0,
+     "points_value_iqd": 0,
+     "shipping_iqd": 5000,
+     "cod_tax_iqd": 0,
+     "delivery_waived": false,
+     "price_adjustment_iqd": 0,
+     "total_iqd": 20000,
+     "wallet_applied_iqd": 0,
+     "wallet_tx_id": null,
+     "points_tx_id": null,
+     "due_on_delivery_iqd": 20000,
+     "bnpl_due_iqd": 0,
+     "gini_paid_iqd": 0,
+     "bnpl_due_at": null,
+     "collected_iqd": 0,
+     "outstanding_iqd": 20000,
+     "payment_state": "cod_due",
+     "settlement": {
+      "collected_iqd": 0,
+      "settled_at": null,
+      "fully_settled": false
+     },
+     "points": {
+      "state": "pending",
+      "pending": 15,
+      "released": 0,
+      "available_at": "2026-10-13T20:49:29.397Z",
+      "eligible_iqd": 15000,
+      "iqd_per_point": 1000,
+      "rule_version": "v3",
+      "redeemed": 0,
+      "redemption_state": "none"
+     },
+     "support": null
+    },
+    "items": [
+     {
+      "id": "oi_85acd9fd307a45dea92e",
+      "product_id": "p_nozzle",
+      "product_slug": "nozzle-kit",
+      "is_printer": false,
+      "name": "Nozzle kit",
+      "image": "",
+      "variant": "0.4 mm / Red",
+      "qty": 1,
+      "unit_price_iqd": 0,
+      "line_total_iqd": 0,
+      "is_gift": true,
+      "gift_id": "gift_93e1f4fd79174239a31f",
+      "pricing": {
+       "regular_iqd": 40000,
+       "pro_iqd": null,
+       "prime_iqd": null,
+       "applied_iqd": 0,
+       "applied_tier": "regular",
+       "member_rule": {
+        "pro": null,
+        "prime": null
+       },
+       "price_source": "base",
+       "fulfillment": {
+        "type": "direct_sale",
+        "source": "stated",
+        "from_option_cell": false,
+        "variant_key": "0-4-mm",
+        "lead_time_text": "",
+        "lead_time_min_days": null,
+        "lead_time_max_days": null
+       },
+       "transport": null,
+       "direct": null,
+       "pricing_basis": "direct",
+       "warranty": null,
+       "unit_subtotal_iqd": 0,
+       "components": {
+        "base_iqd": 40000,
+        "option_iqd": 40000,
+        "fulfillment_iqd": 40000,
+        "transport_iqd": 40000,
+        "color_iqd": 40000,
+        "membership_adjustment_iqd": 0,
+        "transport_fee_iqd": 0,
+        "direct_fee_iqd": 0,
+        "warranty_fee_iqd": 0
+       },
+       "errors": [],
+       "gift": {
+        "gift_id": "gift_93e1f4fd79174239a31f",
+        "level": 2,
+        "value_iqd": 40000
+       }
+      },
+      "warranty": null,
+      "transport": null,
+      "selection": {
+       "option_id": "v_04",
+       "option_value_ids": [
+        "v_04"
+       ],
+       "color_id": "c_red",
+       "transport_method": "",
+       "warranty_plan_id": ""
+      }
+     },
+     {
+      "id": "oi_3530ebb825ed4eeaa002",
+      "product_id": "p_plain",
+      "product_slug": "nozzle-cleaner",
+      "is_printer": false,
+      "name": "Nozzle cleaner",
+      "image": "",
+      "variant": "",
+      "qty": 1,
+      "unit_price_iqd": 15000,
+      "line_total_iqd": 15000,
+      "is_gift": false,
+      "gift_id": null,
+      "pricing": {
+       "regular_iqd": 15000,
+       "pro_iqd": null,
+       "prime_iqd": null,
+       "applied_iqd": 15000,
+       "applied_tier": "regular",
+       "member_rule": {
+        "pro": null,
+        "prime": null
+       },
+       "price_source": "base",
+       "fulfillment": {
+        "type": "direct_sale",
+        "source": "inferred",
+        "from_option_cell": false,
+        "variant_key": "",
+        "lead_time_text": "",
+        "lead_time_min_days": null,
+        "lead_time_max_days": null
+       },
+       "transport": null,
+       "direct": null,
+       "pricing_basis": "direct",
+       "warranty": null,
+       "unit_subtotal_iqd": 15000,
+       "components": {
+        "base_iqd": 15000,
+        "option_iqd": 15000,
+        "fulfillment_iqd": 15000,
+        "transport_iqd": 15000,
+        "color_iqd": 15000,
+        "membership_adjustment_iqd": 0,
+        "transport_fee_iqd": 0,
+        "direct_fee_iqd": 0,
+        "warranty_fee_iqd": 0
+       },
+       "errors": []
+      },
+      "warranty": null,
+      "transport": null,
+      "selection": {
+       "option_id": "",
+       "option_value_ids": [],
+       "color_id": "",
+       "transport_method": "",
+       "warranty_plan_id": ""
+      }
+     }
+    ],
+    "item_count": 2,
+    "store": null
+   }
+  ],
+  "next_before": null
+ }
+}

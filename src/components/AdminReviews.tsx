@@ -2,15 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Star,
   Check,
-  X,
   AlertTriangle,
   RefreshCw,
   Gift,
   Instagram,
   ExternalLink,
-  Plus,
-  Trash2,
-  Pencil,
   ClipboardList,
   Boxes,
 } from 'lucide-react';
@@ -18,9 +14,10 @@ import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
 
 /**
- * Admin: review/reward queue with eligibility facts and evidence viewing,
- * rubric quality scoring (independent from stars/sentiment), gift pool
- * management with real stock, and gift grant history/fulfillment.
+ * Admin: review/reward queue with eligibility facts and evidence viewing and
+ * rubric quality scoring (independent from stars/sentiment). Approving a
+ * printer-gift reward grants a LEVEL gift of the quality score (0175); the
+ * gift levels and the granted gifts are managed in src/components/adminGifts.
  * Public moderation and reward approval are SEPARATE decisions.
  */
 
@@ -275,44 +272,14 @@ interface QueueRow {
   };
 }
 
-interface PoolItem {
-  id: string;
-  level: number;
-  kind: string;
-  label_ar: string;
-  label_en: string;
-  label_ckb: string;
-  brand: string;
-  material: string;
-  color: string;
-  option_value: string;
-  compat_products: string[];
-  stock: number;
-  active: boolean;
-}
-
-interface GrantedGift {
-  id: string;
-  max_level: number;
-  chosen_level: number | null;
-  contents: Array<{ item_id: string; label_ar: string; label_en: string; option_value: string }>;
-  state: 'available' | 'selected' | 'fulfilled' | 'cancelled';
-  created_at: string;
-  redeemed_at: string | null;
-  customer: { email: string; username: string | null };
-  quality_score: number | null;
-  product: { id: string | null; name: string | null; name_ar: string | null };
-}
-
-const EMPTY_POOL_FORM = {
-  level: 1, kind: 'accessory', label_ar: '', label_en: '', label_ckb: '', brand: '', material: '',
-  color: '', option_value: '', compat: '', stock: 0, active: true,
-};
-
-export default function AdminReviews() {
+/**
+ * The review queue. The gift levels and the granted gifts moved to their own
+ * admin screen (src/components/adminGifts, 0175); the two entry points in the
+ * header open it on the matching view.
+ */
+export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'levels' | 'grants') => void } = {}) {
   const { lang, dir, loc } = useLanguage();
   const S = STRINGS[lang] ?? STRINGS.ar;
-  const [tab, setTab] = useState<'queue' | 'pools' | 'gifts'>('queue');
 
   // ---------------- queue state
   const [stateFilter, setStateFilter] = useState<'submitted' | 'revision_needed' | 'approved' | 'rejected' | 'all'>('submitted');
@@ -342,52 +309,9 @@ export default function AdminReviews() {
     }
   }, [stateFilter]);
 
-  // ---------------- pools state
-  const [pools, setPools] = useState<PoolItem[]>([]);
-  const [poolsLoading, setPoolsLoading] = useState(false);
-  const [poolsError, setPoolsError] = useState('');
-  const [poolForm, setPoolForm] = useState<typeof EMPTY_POOL_FORM>({ ...EMPTY_POOL_FORM });
-  const [editingPoolId, setEditingPoolId] = useState<string | null>(null);
-  const [poolFormOpen, setPoolFormOpen] = useState(false);
-  const [poolSaving, setPoolSaving] = useState(false);
-  const [poolFormError, setPoolFormError] = useState('');
-
-  const loadPools = useCallback(async () => {
-    setPoolsLoading(true);
-    setPoolsError('');
-    try {
-      const res = await api.get<{ items: PoolItem[] }>('/api/reviews/admin/pools');
-      setPools(res.items);
-    } catch (e) {
-      setPoolsError(e instanceof ApiError ? e.message : 'Failed to load pools');
-    } finally {
-      setPoolsLoading(false);
-    }
-  }, []);
-
-  // ---------------- gifts state
-  const [gifts, setGifts] = useState<GrantedGift[]>([]);
-  const [giftsLoading, setGiftsLoading] = useState(false);
-  const [giftsError, setGiftsError] = useState('');
-
-  const loadGifts = useCallback(async () => {
-    setGiftsLoading(true);
-    setGiftsError('');
-    try {
-      const res = await api.get<{ gifts: GrantedGift[] }>('/api/reviews/admin/gifts');
-      setGifts(res.gifts);
-    } catch (e) {
-      setGiftsError(e instanceof ApiError ? e.message : 'Failed to load gifts');
-    } finally {
-      setGiftsLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    if (tab === 'queue') loadQueue();
-    else if (tab === 'pools') loadPools();
-    else loadGifts();
-  }, [tab, loadQueue, loadPools, loadGifts]);
+    loadQueue();
+  }, [loadQueue]);
 
   // ---------------- queue actions
 
@@ -435,87 +359,6 @@ export default function AdminReviews() {
     }
   };
 
-  // ---------------- pool actions
-
-  const openPoolForm = (item?: PoolItem) => {
-    setPoolFormError('');
-    if (item) {
-      setEditingPoolId(item.id);
-      setPoolForm({
-        level: item.level, kind: item.kind, label_ar: item.label_ar, label_en: item.label_en,
-        label_ckb: item.label_ckb, brand: item.brand, material: item.material, color: item.color,
-        option_value: item.option_value, compat: item.compat_products.join(', '), stock: item.stock, active: item.active,
-      });
-    } else {
-      setEditingPoolId(null);
-      setPoolForm({ ...EMPTY_POOL_FORM });
-    }
-    setPoolFormOpen(true);
-  };
-
-  const savePool = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (poolSaving) return;
-    setPoolSaving(true);
-    setPoolFormError('');
-    const payload = {
-      level: poolForm.level,
-      kind: poolForm.kind,
-      label_ar: poolForm.label_ar,
-      label_en: poolForm.label_en,
-      label_ckb: poolForm.label_ckb,
-      brand: poolForm.brand,
-      material: poolForm.material,
-      color: poolForm.color,
-      option_value: poolForm.option_value,
-      compat_products: poolForm.compat.split(',').map((s) => s.trim()).filter(Boolean),
-      stock: poolForm.stock,
-      active: poolForm.active,
-    };
-    try {
-      if (editingPoolId) await api.put(`/api/reviews/admin/pools/${editingPoolId}`, payload);
-      else await api.post('/api/reviews/admin/pools', payload);
-      setPoolFormOpen(false);
-      await loadPools();
-    } catch (err) {
-      setPoolFormError(err instanceof ApiError ? err.message : 'Save failed');
-    } finally {
-      setPoolSaving(false);
-    }
-  };
-
-  const deletePool = async (item: PoolItem) => {
-    if (!window.confirm(S.delConfirm)) return;
-    try {
-      await api.delete(`/api/reviews/admin/pools/${item.id}`);
-      await loadPools();
-    } catch (e) {
-      setPoolsError(e instanceof ApiError ? e.message : 'Delete failed');
-    }
-  };
-
-  // ---------------- gift actions
-
-  const fulfillGift = async (g: GrantedGift) => {
-    try {
-      await api.post(`/api/reviews/admin/gifts/${g.id}/fulfill`);
-      await loadGifts();
-    } catch (e) {
-      setGiftsError(e instanceof ApiError ? e.message : 'Failed');
-    }
-  };
-
-  const cancelGift = async (g: GrantedGift) => {
-    const reason = window.prompt(S.cancelReason);
-    if (reason === null || !reason.trim()) return;
-    try {
-      await api.post(`/api/reviews/admin/gifts/${g.id}/cancel`, { reason: reason.trim() });
-      await loadGifts();
-    } catch (e) {
-      setGiftsError(e instanceof ApiError ? e.message : 'Failed');
-    }
-  };
-
   // ---------------- render helpers
 
   const FactBadge = ({ ok, label }: { ok: boolean; label: string }) => (
@@ -535,29 +378,32 @@ export default function AdminReviews() {
     <div dir={dir} className="space-y-6 text-white">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-2xl font-black">{S.title}</h2>
-        <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl">
-          {(
-            [
-              { id: 'queue', icon: ClipboardList, label: S.tabs.queue },
-              { id: 'pools', icon: Boxes, label: S.tabs.pools },
-              { id: 'gifts', icon: Gift, label: S.tabs.gifts },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                tab === t.id ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              <t.icon className="w-3.5 h-3.5" /> {t.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap bg-zinc-900 border border-zinc-800 p-1 rounded-xl">
+          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-800 text-white" aria-current="page">
+            <ClipboardList className="w-3.5 h-3.5" aria-hidden /> {S.tabs.queue}
+          </span>
+          {onOpenGifts &&
+            (
+              [
+                { view: 'levels', icon: Boxes, label: S.tabs.pools },
+                { view: 'grants', icon: Gift, label: S.tabs.gifts },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.view}
+                type="button"
+                onClick={() => onOpenGifts(t.view)}
+                data-open-gifts={t.view}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-zinc-500 hover:text-zinc-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+              >
+                <t.icon className="w-3.5 h-3.5" aria-hidden /> {t.label}
+              </button>
+            ))}
         </div>
       </div>
 
       {/* ------------------------------------------------ QUEUE */}
-      {tab === 'queue' && (
+      {(
         <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl overflow-x-auto">
@@ -850,289 +696,6 @@ export default function AdminReviews() {
         </div>
       )}
 
-      {/* ------------------------------------------------ POOLS */}
-      {tab === 'pools' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <p className="text-[12px] text-zinc-500 max-w-xl">{S.poolNote}</p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={loadPools}
-                className="p-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-zinc-300 transition-colors"
-                title={S.refresh}
-              >
-                <RefreshCw className={`w-4 h-4 ${poolsLoading ? 'animate-spin' : ''}`} />
-              </button>
-              <button
-                onClick={() => openPoolForm()}
-                className="flex items-center gap-2 bg-[#6B46FF] hover:bg-iris-deep text-snow text-sm font-bold px-4 py-2 rounded-full transition-colors"
-              >
-                <Plus className="w-4 h-4" /> {S.addItem}
-              </button>
-            </div>
-          </div>
-
-          {poolsError && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-3 text-sm">{poolsError}</div>
-          )}
-
-          {poolFormOpen && (
-            <form onSubmit={savePool} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-500 mb-1">{S.level}</label>
-                <select
-                  value={poolForm.level}
-                  onChange={(e) => setPoolForm((f) => ({ ...f, level: Number(e.target.value) }))}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
-                >
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-500 mb-1">{S.kind}</label>
-                <select
-                  value={poolForm.kind}
-                  onChange={(e) => setPoolForm((f) => ({ ...f, kind: e.target.value }))}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
-                >
-                  {['accessory', 'filament', 'nozzle', 'plate', 'other'].map((k) => (
-                    <option key={k} value={k}>{S.kindNames[k]}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-500 mb-1">{S.stock}</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={poolForm.stock}
-                  onChange={(e) => setPoolForm((f) => ({ ...f, stock: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-500 mb-1">{S.labelAr}</label>
-                <input
-                  value={poolForm.label_ar}
-                  onChange={(e) => setPoolForm((f) => ({ ...f, label_ar: e.target.value }))}
-                  required
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-500 mb-1">{S.labelEn}</label>
-                <input
-                  value={poolForm.label_en}
-                  onChange={(e) => setPoolForm((f) => ({ ...f, label_en: e.target.value }))}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-500 mb-1">{S.labelCkb}</label>
-                <input
-                  value={poolForm.label_ckb}
-                  onChange={(e) => setPoolForm((f) => ({ ...f, label_ckb: e.target.value }))}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-500 mb-1">{S.brand}</label>
-                <input
-                  value={poolForm.brand}
-                  onChange={(e) => setPoolForm((f) => ({ ...f, brand: e.target.value }))}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-500 mb-1">{S.material}</label>
-                <input
-                  value={poolForm.material}
-                  onChange={(e) => setPoolForm((f) => ({ ...f, material: e.target.value }))}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-500 mb-1">{S.color}</label>
-                <input
-                  value={poolForm.color}
-                  onChange={(e) => setPoolForm((f) => ({ ...f, color: e.target.value }))}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-500 mb-1">{S.optionValue}</label>
-                <input
-                  value={poolForm.option_value}
-                  onChange={(e) => setPoolForm((f) => ({ ...f, option_value: e.target.value }))}
-                  placeholder="0.4"
-                  dir="ltr"
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-[11px] font-bold text-zinc-500 mb-1">{S.compat}</label>
-                <input
-                  value={poolForm.compat}
-                  onChange={(e) => setPoolForm((f) => ({ ...f, compat: e.target.value }))}
-                  dir="ltr"
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="pool-active"
-                  type="checkbox"
-                  checked={poolForm.active}
-                  onChange={(e) => setPoolForm((f) => ({ ...f, active: e.target.checked }))}
-                />
-                <label htmlFor="pool-active" className="text-[12px] font-bold text-zinc-400">{S.active}</label>
-              </div>
-              {poolFormError && (
-                <div className="md:col-span-3 bg-red-500/10 border border-red-500/30 text-red-400 text-[12px] rounded-xl p-3">
-                  {poolFormError}
-                </div>
-              )}
-              <div className="md:col-span-3 flex gap-2">
-                <button
-                  type="submit"
-                  disabled={poolSaving}
-                  className="bg-[#6B46FF] hover:bg-iris-deep disabled:opacity-50 text-snow text-sm font-bold px-6 py-2 rounded-full transition-colors"
-                >
-                  {poolSaving ? S.working : S.save}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPoolFormOpen(false)}
-                  className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-bold px-6 py-2 rounded-full transition-colors"
-                >
-                  {S.cancel}
-                </button>
-              </div>
-            </form>
-          )}
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left rtl:text-right border-collapse min-w-[760px]">
-                <thead>
-                  <tr className="bg-zinc-800/50 border-b border-zinc-700 text-[11px] text-zinc-400 uppercase">
-                    <th className="py-3 px-4">{S.level}</th>
-                    <th className="py-3 px-4">{S.kind}</th>
-                    <th className="py-3 px-4">{S.labelAr}</th>
-                    <th className="py-3 px-4">{S.brand}/{S.material}/{S.color}</th>
-                    <th className="py-3 px-4">{S.optionValue.split(' ')[0]}</th>
-                    <th className="py-3 px-4">{S.stock}</th>
-                    <th className="py-3 px-4">{S.active}</th>
-                    <th className="py-3 px-4"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pools.map((it) => (
-                    <tr key={it.id} className="border-b border-zinc-800 hover:bg-zinc-800/30">
-                      <td className="py-3 px-4 font-black">{it.level}</td>
-                      <td className="py-3 px-4 text-[13px]">{S.kindNames[it.kind] ?? it.kind}</td>
-                      <td className="py-3 px-4 text-[13px]">{loc(it.label_ar, it.label_en || it.label_ar, it.label_ckb || undefined)}</td>
-                      <td className="py-3 px-4 text-[12px] text-zinc-400">
-                        {[it.brand, it.material, it.color].filter(Boolean).join(' / ') || '—'}
-                      </td>
-                      <td className="py-3 px-4 text-[12px]" dir="ltr">{it.option_value || '—'}</td>
-                      <td className={`py-3 px-4 font-bold ${it.stock === 0 ? 'text-red-400' : 'text-white'}`}>{it.stock}</td>
-                      <td className="py-3 px-4">{it.active ? <Check className="w-4 h-4 text-green-400" /> : <X className="w-4 h-4 text-zinc-600" />}</td>
-                      <td className="py-3 px-4">
-                        <div className="flex gap-1">
-                          <button onClick={() => openPoolForm(it)} className="p-1.5 text-zinc-400 hover:text-white" title={S.edit}>
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => deletePool(it)} className="p-1.5 text-zinc-400 hover:text-red-400" title={S.del}>
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {!poolsLoading && pools.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="py-10 text-center text-zinc-500">{S.empty}</td>
-                    </tr>
-                  )}
-                  {poolsLoading && pools.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="py-10 text-center text-zinc-500">{S.loading}</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ------------------------------------------------ GIFTS */}
-      {tab === 'gifts' && (
-        <div className="space-y-4">
-          <div className="flex justify-end">
-            <button
-              onClick={loadGifts}
-              className="p-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-zinc-300 transition-colors"
-              title={S.refresh}
-            >
-              <RefreshCw className={`w-4 h-4 ${giftsLoading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-          {giftsError && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-3 text-sm">{giftsError}</div>
-          )}
-          {giftsLoading && gifts.length === 0 && <div className="text-center text-zinc-500 py-10">{S.loading}</div>}
-          {!giftsLoading && gifts.length === 0 && !giftsError && (
-            <div className="text-center text-zinc-500 py-10">{S.empty}</div>
-          )}
-          {gifts.map((g) => (
-            <div key={g.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-2">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="min-w-0">
-                  <div className="text-sm font-bold truncate">{g.customer.email}</div>
-                  <div className="text-[11px] text-zinc-500 truncate">
-                    {productName(g.product)} · {S.score} {g.quality_score ?? g.max_level}/5 · {new Date(g.created_at).toLocaleDateString()}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">
-                    {S.giftStates[g.state]}
-                  </span>
-                  {g.state === 'selected' && (
-                    <button
-                      onClick={() => fulfillGift(g)}
-                      className="text-[11px] font-bold bg-green-600/80 hover:bg-green-600 px-3 py-1 rounded-full"
-                    >
-                      {S.fulfill}
-                    </button>
-                  )}
-                  {g.state === 'available' && (
-                    <button
-                      onClick={() => cancelGift(g)}
-                      className="text-[11px] font-bold bg-red-600/60 hover:bg-red-600 px-3 py-1 rounded-full"
-                    >
-                      {S.cancelGift}
-                    </button>
-                  )}
-                </div>
-              </div>
-              {g.chosen_level ? (
-                <div className="text-[12px] text-zinc-300">
-                  {S.contents} ({S.level} {g.chosen_level}):{' '}
-                  {g.contents
-                    .map((it) => loc(it.label_ar, it.label_en || it.label_ar) + (it.option_value ? ` (${it.option_value})` : ''))
-                    .join('، ')}
-                </div>
-              ) : (
-                <div className="text-[12px] text-zinc-500">{S.notRedeemed}</div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

@@ -519,6 +519,13 @@ export interface CartWarrantySnapshot {
 
 export interface CartItem {
   id: string;
+  /**
+   * 0175 — A GIFT LINE (docs/GIFTS_QUICK_BUY.md §1.2): `kind: 'gift'` (below),
+   * locked, priced 0 by the server, its value in `gift.value_iqd`. Absent on
+   * every other line.
+   */
+  locked?: boolean;
+  gift?: { id: string; level: number; value_iqd: number };
   productId: string;
   slug: string;
   name: string;
@@ -626,8 +633,8 @@ export interface CartItem {
   shipping_methods: ApiProduct['shipping_methods'];
   /** Server-derived method availability for this exact physical line. */
   delivery_availability?: { standard: boolean; personal: boolean };
-  /** 'bundle' / 'mystery' for a composition line; absent on an ordinary one. */
-  kind?: 'bundle' | 'mystery';
+  /** 'bundle' / 'mystery' for a composition line, 'gift' for a gift line (0175); absent on an ordinary one. */
+  kind?: 'bundle' | 'mystery' | 'gift';
   /**
    * THE BUNDLE, AS ONE LINE WITH ITS CONTENTS (docs/BUNDLES_MYSTERY.md §5.2).
    *
@@ -757,6 +764,8 @@ export interface OrderItemPricing {
   pricing_basis?: 'direct' | 'preorder' | string;
   unit_subtotal_iqd?: number;
   price_source?: string;
+  /** 0175: on a gift line only — the gift, and its value (regular price × qty, never charged). */
+  gift?: { gift_id: string; level: number; value_iqd: number } | null;
 }
 
 /** The exact selection bought, in the shape POST /api/cart/items accepts. */
@@ -770,6 +779,9 @@ export interface OrderItemSelection {
 
 export interface ApiOrderItem {
   id: string;
+  /** 0175: a line the customer was given (0 IQD) — its value is `pricing.gift.value_iqd`. */
+  is_gift?: boolean;
+  gift_id?: string | null;
   product_id: string | null;
   /** The product's CURRENT slug (null when the product is gone). */
   product_slug?: string | null;
@@ -930,6 +942,8 @@ export interface OrderDeliveryDate {
 export interface ApiOrder {
   id: string;
   status: OrderStatus;
+  /** D15: 'gift' when every line is a gift; 'normal' or 'quick_buy' otherwise. */
+  order_kind?: string;
   address: Partial<ApiAddress>;
   delivery_method: { id?: string; titleAr?: string; titleEn?: string; price_iqd?: number };
   payment_method_id: string;

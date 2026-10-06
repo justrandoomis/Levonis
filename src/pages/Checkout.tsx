@@ -9,7 +9,7 @@ import {
   ArrowLeft, ArrowRight, Truck, Store,
   CreditCard, Wallet, Banknote,
   Check, Sparkles, MapPin, AlertCircle,
-  Lock, CheckCircle2, Plus, Receipt, ShoppingCart, CalendarClock, Tag, Info
+  Lock, CheckCircle2, Plus, Receipt, ShoppingCart, CalendarClock, Tag, Info, Gift
 } from 'lucide-react';
 import ProAddressNotice from '../components/membership/ProAddressNotice';
 import { useWallet } from '../WalletContext';
@@ -155,6 +155,9 @@ interface CheckoutQuoteLineDto {
   saving_percent?: number | null;
   /** A MYSTERY line says how many spools and nothing else (§8.2 row 20). */
   mystery?: { revealed: boolean; spools: number } | null;
+  /** A GIFT line (0175): priced 0 by the server, which names the gift and its value. */
+  kind?: string;
+  gift?: { id: string; level: number; value_iqd: number } | null;
   breakdown?: {
     applied_iqd: number;
     unit_subtotal_iqd: number;
@@ -1075,11 +1078,15 @@ export default function Checkout() {
     componentTotalIqd?: number | null;
     savingPercent?: number | null;
     mysterySpools?: number | null;
+    /** A gift line (0175): the server priced it at 0; the «هدية» chip and its value are shown. */
+    gift?: { level: number; value_iqd: number } | null;
   }> =
     quote
       ? quote.lines.map((l) => {
           const cartLine = cartById.get(l.cart_item_id);
           return {
+            // The server alone marks a gift line, in the quote and in the cart.
+            gift: l.gift ?? (cartLine?.kind === 'gift' ? cartLine.gift ?? { level: 0, value_iqd: 0 } : null),
             key: l.cart_item_id,
             image: l.image ?? cartLine?.image ?? '',
             name: l.name,
@@ -1113,6 +1120,7 @@ export default function Checkout() {
           };
         })
       : items.map((i) => ({
+          gift: i.kind === 'gift' ? i.gift ?? { level: 0, value_iqd: 0 } : null,
           key: i.id,
           // §3/§12: the product name is English in every language and is never translated.
           image: i.image,
@@ -2412,6 +2420,19 @@ export default function Checkout() {
                       <p className="text-xs text-zinc-500 mb-1.5 font-light">{line.variant}</p>
                     )}
                     <span className="text-sm font-medium text-white tabular-nums">{money(line.lineTotal)}</span>
+                    {line.gift && (
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5" data-checkout-gift-line={line.key}>
+                        <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 w-max bg-gold/10 text-gold text-[11px] font-bold">
+                          <Gift className="w-3 h-3 shrink-0" aria-hidden="true" />
+                          {loc('هدية', 'Gift', 'دیاری')}
+                        </span>
+                        {line.gift.value_iqd > 0 && (
+                          <span className="text-[11.5px] text-zinc-500 tabular-nums">
+                            {loc(`قيمتها ${money(line.gift.value_iqd)}`, `Worth ${money(line.gift.value_iqd)}`, `بەهاکەی ${money(line.gift.value_iqd)}`)}
+                          </span>
+                        )}
+                      </span>
+                    )}
                     {line.mysterySpools ? (
                       <p className="mt-1 text-[11.5px] text-zinc-400">
                         {loc(

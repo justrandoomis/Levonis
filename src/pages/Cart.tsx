@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import {
   ArrowLeft, ArrowRight, ChevronRight, Check, X, ShoppingCart, HeartHandshake, Info, Truck,
-  ShieldCheck, FileText, Sparkles,
+  ShieldCheck, FileText, Sparkles, Gift,
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { mascot } from '../lib/mascot';
@@ -1072,6 +1072,10 @@ export default function Cart() {
   const discounts = selectedItems.reduce((sum, item) => {
     const b = item.breakdown;
     if (!b) return sum;
+    // A GIFT IS NOT A DISCOUNT (0175, S7): its line is 0 because a gift made
+    // the product free, and its value is shown beside the line — never summed
+    // as money "saved" on the bill.
+    if (item.kind === 'gift') return sum;
     return sum + Math.max(0, b.regular_iqd - b.applied_iqd) * item.qty;
   }, 0);
   const totalOriginalPrice = subtotal + discounts;
@@ -1102,6 +1106,9 @@ export default function Cart() {
       else queues.set(line.product_id, [line]);
     }
     for (const item of items) {
+      // A gift line has no membership entry (the server resolves none for
+      // it), so it must not take the entry of a bought line of the same product.
+      if (item.kind === 'gift') continue;
       const next = queues.get(item.productId)?.shift();
       if (next && next.rule_id) paired.set(item.id, next);
     }
@@ -1283,6 +1290,121 @@ export default function Cart() {
   // §3/§12: the product name is English in every language and is never translated.
   const itemName = (item: CartItem) => item.name;
 
+  /**
+   * A GIFT LINE (0175, docs/GIFTS_QUICK_BUY.md §1.2, S7): the product's own
+   * name, picture, option and route, the «هدية» chip and 0 beside the gift's
+   * value — and nothing to edit. No quantity stepper, no option sheet, no
+   * warranty: the server froze all of it on the gift and refuses a change
+   * (GIFT_LINE_LOCKED). It is ticked for checkout like any line, and removed —
+   * which hands the gift back to «تم استرداد الهدية» on /gifts, because «in
+   * the cart» is only this row existing.
+   */
+  const giftRow = (item: CartItem, gift: { level: number; value_iqd: number }) => {
+    const selected = selectedIds.has(item.id);
+    const blocked = lineBlocked(item);
+    const reason = item.availability?.reason ?? '';
+    return (
+      <div
+        key={item.id}
+        data-cart-gift-line={item.id}
+        className="max-w-full px-2.5 sm:px-4 py-3.5 flex gap-1.5 sm:gap-3 border-b border-border-subtle last:border-b-0"
+      >
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selected}
+          aria-label={itemName(item)}
+          onClick={() => toggleSelect(item.id)}
+          className="shrink-0 w-9 sm:w-11 min-h-[44px] pt-4 sm:pt-6 flex items-start justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
+        >
+          <span
+            aria-hidden="true"
+            className={`w-[22px] h-[22px] rounded-md border flex items-center justify-center transition-colors ${
+              selected ? 'bg-surface-selected border-white/30' : 'border-zinc-600'
+            }`}
+          >
+            {selected && <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} />}
+          </span>
+        </button>
+
+        <div
+          data-cart-item-image
+          className="w-[72px] h-[72px] min-[390px]:w-[80px] min-[390px]:h-[80px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-md overflow-hidden bg-zinc-900 cursor-pointer"
+          onClick={() => navigate(`/product/${item.slug}`)}
+        >
+          <SafeImage src={item.image} alt={itemName(item)} aspect="auto" className="w-full h-full" bgClassName="bg-zinc-900" fallbackClassName="text-zinc-600" />
+        </div>
+
+        <div className="min-w-0 max-w-full flex-1 flex flex-col justify-between">
+          <div>
+            <h3 data-cart-item-title className="text-zinc-200 text-[13px] sm:text-[14px] font-medium leading-snug line-clamp-2 mb-1">{itemName(item)}</h3>
+            <div className="flex flex-wrap gap-1.5 mb-1.5">
+              <span data-cart-gift-badge className="inline-flex items-center gap-1 rounded px-2 py-1 w-max bg-gold/10 text-gold text-[12px] font-bold">
+                <Gift className="w-3 h-3 shrink-0" aria-hidden="true" />
+                {gift.level > 0
+                  ? loc(`هدية · المستوى ${gift.level}`, `Gift · Level ${gift.level}`, `دیاری · ئاستی ${gift.level}`)
+                  : loc('هدية', 'Gift', 'دیاری')}
+              </span>
+              {item.variantLabel && (
+                <span className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 w-max text-[12px] text-zinc-300">
+                  <bdi>{item.variantLabel}</bdi>
+                </span>
+              )}
+              <span
+                data-cart-shipping-type={typeForTransport(item.transport_method)}
+                className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 flex items-center gap-1 w-max text-[12px] text-zinc-300"
+              >
+                {shippingLabel(item)}
+              </span>
+              {item.qty > 1 && (
+                <span className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 w-max text-[12px] text-zinc-300 tabular-nums">× {item.qty}</span>
+              )}
+            </div>
+          </div>
+
+          <div className="min-w-0 flex flex-wrap items-baseline gap-1.5 mb-2 mt-1">
+            <span className="max-w-full text-white font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(0)}</span>
+            {gift.value_iqd > 0 && (
+              <span className="text-zinc-500 text-[12px] tabular-nums" data-cart-gift-value={item.id}>
+                {loc(`قيمتها ${money(gift.value_iqd)}`, `Worth ${money(gift.value_iqd)}`, `بەهاکەی ${money(gift.value_iqd)}`)}
+              </span>
+            )}
+          </div>
+          <p className="-mt-1 mb-2 text-[11.5px] leading-relaxed text-zinc-500">
+            {loc(
+              'سطر هدية ثابت: لا تتغير كميته ولا خياراته.',
+              'A gift line is fixed: its quantity and options cannot change.',
+              'هێڵی دیاری جێگیرە: بڕ و هەڵبژاردنەکانی ناگۆڕدرێن.'
+            )}
+          </p>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-auto">
+            {blocked ? (
+              <span className="text-danger text-[12px] font-medium" data-line-blocked={item.id}>
+                {apiRefusal({ code: reason || 'GIFT_NOT_ORDERABLE' }, lang as 'ar' | 'en' | 'ckb')}
+              </span>
+            ) : (
+              <span className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-zinc-500">
+                {loc(
+                  'إن حذفتها من السلة تعود إلى «هداياي» وتبقى لك.',
+                  'If you remove it, it goes back to My gifts and stays yours.',
+                  'ئەگەر لایببەیت، دەگەڕێتەوە بۆ «دیارییەکانم» و هەر هی خۆتە.'
+                )}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => deleteItem(item)}
+              className="lv-button lv-button-ghost min-h-[44px] px-3 text-[13px] hover:text-danger [touch-action:manipulation]"
+            >
+              {loc('حذف', 'Delete', 'سڕینەوە')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // A merchant-store cart is the same table with a different seller — and a
   // different screen, priced by /api/cart/merchant and checked out through
   // /api/store-orders instead of the platform resolver.
@@ -1365,6 +1487,8 @@ export default function Cart() {
 
           {/* Items */}
           {items.map((item) => {
+            // The server alone marks a gift line (`kind: 'gift'`, locked, priced 0).
+            if (item.kind === 'gift') return giftRow(item, item.gift ?? { level: 0, value_iqd: 0 });
             const hasVariants = (item.options ?? []).length > 0 || (item.colors ?? []).length > 0;
             const hasShippingOptions = (item.shipping_methods ?? []).length > 0;
             const regularUnit = item.breakdown?.regular_iqd ?? null;

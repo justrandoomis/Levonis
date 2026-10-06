@@ -12,7 +12,7 @@
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Truck, Star, XCircle, Clock } from 'lucide-react';
+import { ChevronRight, Truck, Star, XCircle, Clock, Gift } from 'lucide-react';
 import type { ApiOrder } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import SafeImage from '../ui/SafeImage';
@@ -39,6 +39,8 @@ const STRINGS = {
     orderId: 'رقم الطلب',
     giftTitle: 'هدية مرفقة مع هذا الطلب',
     giftDefault: 'بكرة فلمنت',
+    giftLine: 'هدية',
+    giftOrder: 'طلب هدية',
     more: (n: number) => `+${n}`,
     open: (id: string) => `فتح تفاصيل الطلب ${id}`,
   },
@@ -58,6 +60,8 @@ const STRINGS = {
     orderId: 'Order number',
     giftTitle: 'A gift ships with this order',
     giftDefault: 'Filament spool',
+    giftLine: 'Gift',
+    giftOrder: 'Gift order',
     more: (n: number) => `+${n}`,
     open: (id: string) => `Open order ${id}`,
   },
@@ -78,6 +82,8 @@ const STRINGS = {
     orderId: 'ژمارەی داواکاری',
     giftTitle: 'دیارییەک لەگەڵ ئەم داواکارییە دەنێردرێت',
     giftDefault: 'بەکەرەی فیلامێنت',
+    giftLine: 'دیاری',
+    giftOrder: 'داواکاریی دیاری',
     more: (n: number) => `+${n}`,
     open: (id: string) => `کردنەوەی داواکاری ${id}`,
   },
@@ -222,6 +228,13 @@ export default function OrderCard({
           <p className="mt-3 text-[13px] text-zinc-300 truncate">
             {order.items[0].name}
             {extraLines > 0 && <span className="text-zinc-500"> {s.more(extraLines)}</span>}
+          </p>
+        )}
+        {/* 0175: a gift order (every line given at 0), or an order carrying a gift line. */}
+        {order.items.some((it) => it.is_gift) && (
+          <p data-order-card-gift className="mt-1.5 inline-flex items-center gap-1 rounded px-2 py-0.5 w-max bg-gold/10 text-gold text-[11px] font-bold">
+            <Gift className="w-3 h-3 shrink-0" aria-hidden="true" />
+            {order.order_kind === 'gift' ? s.giftOrder : `${s.giftLine} — ${money(0)}`}
           </p>
         )}
 
