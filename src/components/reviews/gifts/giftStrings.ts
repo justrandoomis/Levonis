@@ -14,11 +14,11 @@ export const giftLang = (lang: string): GiftLang => (lang === 'en' || lang === '
 
 const ar = {
   title: 'هداياي',
-  intro: 'هدايا من ليفونيس: اختر هديتك واستردّها، ثم اطلبها مع سلتك بسعر 0 د.ع.',
+  intro: 'هدايا من Levonis: اختر هديتك واستردّها، ثم اطلبها مع سلتك بسعر 0 د.ع.',
   refresh: 'تحديث',
   loading: 'جارٍ تحميل هداياك…',
   emptyTitle: 'لا توجد هدايا بعد',
-  emptyBody: 'عندما تمنحك ليفونيس هدية ستظهر هنا، وسنُعلمك فور وصولها.',
+  emptyBody: 'عندما تمنحك Levonis هدية ستظهر هنا، وسنُعلمك فور وصولها.',
   emptyAction: 'العودة إلى طلباتي',
 
   stateGranted: 'اختر هديتك',
@@ -85,9 +85,9 @@ const ar = {
   selected: 'مختارة',
 
   reasonReview: 'تقديرًا لمراجعتك',
-  reasonReward: 'مكافأة من ليفونيس',
-  reasonCompensation: 'تعويض من ليفونيس',
-  reasonAdminGift: 'هدية من ليفونيس',
+  reasonReward: 'مكافأة من Levonis',
+  reasonCompensation: 'تعويض من Levonis',
+  reasonAdminGift: 'هدية من Levonis',
 
   grantedAt: 'مُنحت',
   redeemedAt: 'استُردّت',

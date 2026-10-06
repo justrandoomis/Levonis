@@ -1302,7 +1302,7 @@ export default function Cart() {
   const giftRow = (item: CartItem, gift: { level: number; value_iqd: number }) => {
     const selected = selectedIds.has(item.id);
     const blocked = lineBlocked(item);
-    const reason = item.availability?.reason ?? '';
+    const refusalCode = item.availability?.reason ?? '';
     return (
       <div
         key={item.id}
@@ -1381,7 +1381,7 @@ export default function Cart() {
           <div className="flex flex-wrap items-center justify-between gap-2 mt-auto">
             {blocked ? (
               <span className="text-danger text-[12px] font-medium" data-line-blocked={item.id}>
-                {apiRefusal({ code: reason || 'GIFT_NOT_ORDERABLE' }, lang as 'ar' | 'en' | 'ckb')}
+                {apiRefusal({ code: refusalCode || 'GIFT_NOT_ORDERABLE' }, lang as 'ar' | 'en' | 'ckb')}
               </span>
             ) : (
               <span className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-zinc-500">
