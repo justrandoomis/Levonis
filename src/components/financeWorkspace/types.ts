@@ -45,6 +45,8 @@ export interface FinanceOrder extends ProfitTotals {
   customer_name?: string;
   version?: number;
   cost_confidence?: string;
+  /** What made the order (0174, D15): 'normal', 'quick_buy' or 'gift' (every line a gift). */
+  order_kind?: string;
 }
 
 export interface FinanceProduct extends ProfitTotals {
