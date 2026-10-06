@@ -224,11 +224,28 @@ test('THROUGH THE WORKER: a store\'s home link unfurls as the store, on the stor
   assert.notEqual(etag, '"shell"', 'the rewritten body is not the hashed asset');
 });
 
-test('THROUGH THE WORKER: the apex home is the shell untouched, with no database read', async () => {
+test('THROUGH THE WORKER: the apex home primes public opening data without changing its card or reading the database', async () => {
   const raw = seed();
   const { db, reads } = counting(asD1(raw));
   const res = await doc(APEX, '/', envOf(db));
-  assert.equal(await res.text(), SHELL);
+  const html = await res.text();
+  const head = /<head>([\s\S]*?)<\/head>/.exec(html)?.[1];
+  assert.ok(head, 'opening data is available to the HTML head scanner');
+  const preloads = head.match(/<link\b[^>]*rel="preload"[^>]*>/g) ?? [];
+  assert.equal(preloads.length, 1, 'only the opening API request is primed on the apex home');
+  assert.match(preloads[0], /\bas="fetch"/);
+  assert.match(preloads[0], /\bcrossorigin(?:\s|>)/);
+  assert.match(preloads[0], /\bhref="\/api\/home"/);
+  const resolve = /<script type="application\/json" id="lv-resolve">([^<]*)<\/script>/.exec(head);
+  assert.ok(resolve, 'the public host answer is data, not executable JavaScript');
+  assert.deepEqual(JSON.parse(resolve[1]), {
+    success: true,
+    kind: 'main',
+    store: null,
+    root_domain: APEX,
+  });
+  const originalShell = html.replace(preloads[0], '').replace(resolve[0], '').replace(/\s*(?=<\/head>)/, '\n');
+  assert.equal(originalShell, SHELL, 'the platform metadata and document body are preserved');
   assert.equal(reads.n, 0, 'not even the session: `/` is skipped like the manifest');
 });
 

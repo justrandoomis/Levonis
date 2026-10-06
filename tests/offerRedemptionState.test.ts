@@ -20,14 +20,14 @@
  * would free the slot of an order the customer has already looked inside.
  *
  * The re-claim is the other half nobody would think to test: `cancelled` is
- * not terminal. Both the admin transition table and the stage machine allow an
- * order to come BACK, and an order that comes back must take its slot with it
- * or the customer keeps the goods and the entitlement at once.
+ * not terminal for an unpaid order. Both admin doors may reopen a cancelled
+ * cash-pickup order, which must reclaim its slot. An order whose advance was
+ * refunded must instead be purchased again so its payment is collected anew.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, failingD1, stubApp, post, patch, json, row, count, type StubUser } from './fixtures/app';
+import { asD1, failingD1, stubApp, post, patch, json, row, count, spendable, type StubUser } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
 import { orderRoutes } from '../worker/routes/orders';
 import { adminRoutes } from '../worker/routes/admin';
@@ -53,13 +53,20 @@ const redemption = (raw: DatabaseSync, subjectId: string) =>
   );
 
 /** One bundle, one per customer, bought once. */
-async function boughtBundle(raw: DatabaseSync, maxPerUser: number | null = 1) {
+async function boughtBundle(raw: DatabaseSync, maxPerUser: number | null = 1, deliveryMethodId: 'standard' | 'pickup' = 'standard') {
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000, limits: { max_per_user: maxPerUser } });
   const db = asD1(raw);
   const added = await json(await post(appFor(db), '/api/cart/items', { productId: 'prd_b1', qty: 1 }));
   assert.equal(added.success, true, JSON.stringify(added));
-  const res = await json(await post(appFor(db), '/api/orders', orderBody()));
+  const res = await json(await post(appFor(db), '/api/orders', orderBody({ deliveryMethodId })));
   assert.equal(res.success, true, JSON.stringify(res));
+  if (deliveryMethodId === 'pickup') {
+    // Use an actual unpaid checkout, not a paid order with its refund deleted:
+    // these fixtures exercise entitlement reclamation after cancellation.
+    assert.deepEqual(row(raw,
+      'SELECT wallet_applied_iqd,wallet_applied_usd_cents,points_discount_iqd FROM orders WHERE id=?', res.order.id),
+    { wallet_applied_iqd: 0, wallet_applied_usd_cents: 0, points_discount_iqd: 0 });
+  }
   return { db, orderId: res.order.id as string };
 }
 
@@ -197,9 +204,9 @@ test('a mixed order holding a bundle AND a mystery frees neither', async () => {
 
 // ------------------------------------------------------------- the re-open
 
-test('re-opening a cancelled bundle order takes its slot back', async () => {
+test('re-opening an unpaid cash-pickup bundle order takes its slot back', async () => {
   const raw = seedCatalogue();
-  const { db, orderId } = await boughtBundle(raw);
+  const { db, orderId } = await boughtBundle(raw, 1, 'pickup');
 
   await json(await post(appFor(db), `/api/orders/${orderId}/cancel`, {}));
   assert.equal(redemption(raw, 'prd_b1')!.state, 'released');
@@ -213,7 +220,7 @@ test('re-opening a cancelled bundle order takes its slot back', async () => {
 
 test('a re-open whose freed slot was spent meanwhile is refused, and the order stays cancelled', async () => {
   const raw = seedCatalogue();
-  const { db, orderId } = await boughtBundle(raw);
+  const { db, orderId } = await boughtBundle(raw, 1, 'pickup');
 
   await json(await post(appFor(db), `/api/orders/${orderId}/cancel`, {}));
   // The customer spends the freed slot on a second order.
@@ -229,11 +236,16 @@ test('a re-open whose freed slot was spent meanwhile is refused, and the order s
     1,
     'the refused re-claim took the whole re-open with it'
   );
+  const env = { DB: db } as unknown as Parameters<typeof moveOrderStage>[0];
+  const moved = await moveOrderStage(env, { orderId, to: 'confirmed', source: 'manual', changedBy: 'boss' });
+  assert.equal(moved.moved, false);
+  assert.equal(moved.reason, 'OFFER_LIMIT_REACHED', 'the stage door must enforce the same spent quota');
+  assert.equal(row(raw, 'SELECT status FROM orders WHERE id=?', orderId)?.status, 'cancelled');
 });
 
-test('the stage machine re-opens with the same rule', async () => {
+test('the stage machine re-opens an unpaid cash-pickup bundle with the same rule', async () => {
   const raw = seedCatalogue();
-  const { db, orderId } = await boughtBundle(raw);
+  const { db, orderId } = await boughtBundle(raw, 1, 'pickup');
   const env = { DB: db } as unknown as Parameters<typeof moveOrderStage>[0];
 
   await json(await post(appFor(db), `/api/orders/${orderId}/cancel`, {}));
@@ -242,6 +254,27 @@ test('the stage machine re-opens with the same rule', async () => {
   const moved = await moveOrderStage(env, { orderId, to: 'confirmed', source: 'manual', changedBy: 'boss' });
   assert.equal(moved.moved, true, JSON.stringify(moved));
   assert.equal(redemption(raw, 'prd_b1')!.state, 'active', 'a stage re-open reclaims the slot too');
+});
+
+test('a bundle whose advance was refunded cannot be reopened through either door', async () => {
+  const raw = seedCatalogue();
+  const { db, orderId } = await boughtBundle(raw);
+  assert.ok(Number(row(raw, 'SELECT wallet_applied_usd_cents FROM orders WHERE id=?', orderId)?.wallet_applied_usd_cents) > 0);
+  const cancelled = await json(await post(appFor(db), `/api/orders/${orderId}/cancel`, {}));
+  assert.equal(cancelled.success, true, JSON.stringify(cancelled));
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM wallet_transactions WHERE id=? AND status='approved'", `wtx_refund_${orderId}_usd`), 1);
+  const afterRefund = spendable(raw, 'buyer');
+
+  const legacy = await json(await patch(appFor(db, admin), `/api/admin/orders/${orderId}`, { status: 'pending' }));
+  assert.equal(legacy.success, false);
+  assert.equal(legacy.code, 'REFUNDED_ORDER');
+  const env = { DB: db } as unknown as Parameters<typeof moveOrderStage>[0];
+  const stage = await moveOrderStage(env, { orderId, to: 'confirmed', source: 'manual', changedBy: 'boss' });
+  assert.equal(stage.moved, false);
+  assert.equal(stage.reason, 'REFUNDED_ORDER');
+  assert.equal(row(raw, 'SELECT status FROM orders WHERE id=?', orderId)?.status, 'cancelled');
+  assert.equal(redemption(raw, 'prd_b1')!.state, 'released');
+  assert.equal(spendable(raw, 'buyer'), afterRefund, 'neither refusal recharges nor refunds the wallet again');
 });
 
 // ------------------------------------------------------------ the mechanism

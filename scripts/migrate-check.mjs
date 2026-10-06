@@ -160,6 +160,19 @@ function isLiteralAssignment(stmt) {
     .every((pair) => /^\s*\w+\s*=\s*(-?\d+(\.\d+)?|'[^']*'|NULL)\s*$/i.test(pair));
 }
 
+/** A replacement is re-runnable as a PAIR, never as an isolated DROP. Only
+ *  accept files consisting entirely of adjacent DROP/CREATE pairs for the
+ *  same trigger; replay the complete file and compare trigger definitions. */
+function isTriggerReplacement(stmts) {
+  if (stmts.length === 0 || stmts.length % 2 !== 0) return false;
+  for (let i = 0; i < stmts.length; i += 2) {
+    const drop = /^DROP\s+TRIGGER\s+(?:IF\s+EXISTS\s+)?([A-Za-z_]\w*)\s*$/i.exec(stmts[i]);
+    const create = /^CREATE\s+TRIGGER\s+(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z_]\w*)\s/i.exec(stmts[i + 1]);
+    if (!drop || !create || drop[1].toLowerCase() !== create[1].toLowerCase()) return false;
+  }
+  return true;
+}
+
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 const target = join(OUT, 'check.sqlite');
@@ -181,7 +194,8 @@ if (twice) {
 
   const files = readdirSync('migrations').filter((f) => f.endsWith('.sql')).sort();
   const newest = files[files.length - 1];
-  const stmts = splitStatements(readFileSync(join('migrations', newest), 'utf8')).filter(isIdempotent);
+  const newestStatements = splitStatements(readFileSync(join('migrations', newest), 'utf8'));
+  const stmts = isTriggerReplacement(newestStatements) ? newestStatements : newestStatements.filter(isIdempotent);
   // A migration made only of statements this harness cannot re-run is not
   // "proven idempotent", it is UNTESTED — and printing a green line for it is
   // exactly the fake success the mandate forbids. Say so and fail.
@@ -251,11 +265,19 @@ if (twice) {
 
     const before = snapshot();
     const beforeCounts = counts();
+    const triggers = () => JSON.stringify(db.prepare(
+      "SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger' ORDER BY name"
+    ).all());
+    const beforeTriggers = triggers();
     db.exec('BEGIN');
     for (const s of stmts) db.exec(s);
     db.exec('COMMIT');
     const after = snapshot();
     const afterCounts = counts();
+    if (triggers() !== beforeTriggers) {
+      console.error(`✘ re-running ${newest} CHANGED trigger definitions`);
+      process.exit(1);
+    }
     for (const t of countable) {
       if (afterCounts[t] !== beforeCounts[t]) {
         console.error(`✘ re-running ${newest} DUPLICATED rows in ${t}: ${beforeCounts[t]} → ${afterCounts[t]}`);
@@ -267,7 +289,7 @@ if (twice) {
       }
     }
     console.log(
-      `✔ ${newest}: ${stmts.length} idempotent statement(s) re-ran — no row added, no value changed`
+      `✔ ${newest}: ${stmts.length} idempotent statement(s) re-ran — no row added, no value changed, no trigger changed`
     );
   }
 }

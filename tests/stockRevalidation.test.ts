@@ -330,8 +330,14 @@ test('the product page re-reads the price and the shelf when the customer comes 
   assert.match(src, /useFreshOnReturn\(/, 'the hook is imported but never called');
   // It must re-run the QUOTE — that is what carries both the price and
   // `liveAvailability` — rather than invent a second fetch path.
-  assert.match(src, /useFreshOnReturn\(\(\) => setQuoteToken/);
+  assert.match(src, /useFreshOnReturn\(refreshQuote,/);
+  const refresh = /const refreshQuote = useCallback\(\(\) => \{([\s\S]*?)\}, \[\]\)/.exec(src)?.[1];
+  assert.ok(refresh, 'returning to the page must invoke the shared quote refresh');
+  assert.match(refresh, /openingQuoteKey\.current = null/,
+    'a focus refresh must discard the opening detail quote so it cannot skip the server request');
+  assert.match(refresh, /setQuoteToken\(\(n\) => n \+ 1\)/,
+    'the refresh must re-run the quote effect that updates price and live availability');
   // And it must hold while the customer is mid-action, so a refresh never
   // lands under an add in flight or under a dialog they are answering.
-  assert.match(src, /useFreshOnReturn\([\s\S]{0,200}enabled: !addingToCart/);
+  assert.match(src, /useFreshOnReturn\(refreshQuote,\s*\{\s*enabled: !addingToCart && !lightbox && shippingConflict === null/);
 });
