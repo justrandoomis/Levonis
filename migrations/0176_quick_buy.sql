@@ -91,7 +91,11 @@ CREATE TABLE IF NOT EXISTS quick_buy_items (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL REFERENCES quick_buy_sessions(id),
   user_id TEXT NOT NULL REFERENCES users(id),
-  product_id TEXT NOT NULL REFERENCES products(id),
+  -- No foreign key, on purpose (worker/lib/productDeletion.ts): a line of an
+  -- OPEN or FAILED session blocks a permanent product delete (money is held
+  -- and units reserved for it); a closed session's line is frozen history that
+  -- carries its own snapshot, and must not stop the catalogue being cleaned.
+  product_id TEXT NOT NULL,
   option_id TEXT NOT NULL DEFAULT '',
   option_value_ids TEXT NOT NULL DEFAULT '[]',
   color_id TEXT NOT NULL DEFAULT '',

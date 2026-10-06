@@ -307,6 +307,14 @@ export const FROZEN_HISTORY: FrozenTable[] = [
       'Every column is NOT NULL and the row already carries name_snapshot, image_snapshot and variant_snapshot — ' +
       'it is the self-contained record of what a customer actually drew, and it is deleted only with its order.',
   },
+  {
+    table: 'quick_buy_items',
+    columns: ['product_id', 'option_id', 'color_id'],
+    why:
+      '0176. A Quick Buy line of a CLOSED session: every column is NOT NULL and the row carries its own snapshot ' +
+      '(names, option and colour labels, SKU, price, image); the order it became has its own order_items. A line ' +
+      'of an open or failed session is not history — it blocks the delete instead (BLOCKING_REFS).',
+  },
 ];
 
 /**
@@ -382,6 +390,21 @@ export const BLOCKING_REFS: BlockingRef[] = [
              OR bundle_product_id = ?1
              OR option_value_id IN (SELECT id FROM product_option_values WHERE product_id = ?1)
              OR color_id IN (SELECT id FROM product_colors WHERE product_id = ?1))`,
+  },
+  /**
+   * A CUSTOMER'S OPEN QUICK BUY ORDER HOLDS THIS PRODUCT (0176): money is held
+   * in their wallet and units are reserved for the line. Deleting the product
+   * under it would make the finaliser order less than was held, so the delete
+   * waits — at most 30 minutes, the session's window — or, for a session whose
+   * automatic submission failed, until an admin retries or cancels it.
+   */
+  {
+    table: 'quick_buy_items',
+    column: 'product_id',
+    code: 'PRODUCT_IN_QUICK_BUY',
+    remedy:
+      'A customer\'s open Quick Buy order holds this product. Wait until it is submitted (at most 30 minutes), or retry or cancel a failed one under «الشراء السريع», then delete it.',
+    where: "qty > 0 AND session_id IN (SELECT id FROM quick_buy_sessions WHERE state IN ('open', 'failed'))",
   },
 ];
 

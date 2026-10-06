@@ -266,6 +266,31 @@ test('§13: after 00:00 the order is ordinary — listed like any order, cancell
   assert.equal(row<Row>(raw, 'SELECT status FROM orders WHERE id = ?', s2.order_id)!.status, 'confirmed');
 });
 
+test('a product in an open Quick Buy order cannot be deleted under it; once submitted, the delete goes through and the session keeps its snapshot', async () => {
+  const raw = world();
+  await activate(raw);
+  assert.equal((await json(await add(raw, 'p_pla', 1))).success, true);
+  const admin = as(raw, 'boss', 'admin');
+
+  const refused = await send(admin, 'DELETE', '/api/admin/products/p_pla');
+  assert.equal(refused.status, 409);
+  assert.equal((await json(refused)).code, 'PRODUCT_IN_QUICK_BUY');
+  assert.ok(row(raw, `SELECT id FROM products WHERE id = 'p_pla'`), 'the product is still there');
+  assertMoneyAgrees(raw);
+
+  expire(raw);
+  await cron(raw);
+  const s = session(raw);
+  assert.equal(s.state, 'submitted');
+  const deleted = await send(admin, 'DELETE', '/api/admin/products/p_pla');
+  assert.equal(deleted.status, 200, JSON.stringify(await json(deleted.clone())));
+  assert.equal(row(raw, `SELECT id FROM products WHERE id = 'p_pla'`), undefined);
+  // The closed session is history: its line and snapshot stay readable.
+  const view = await json(await get(admin, `/api/admin/quick-buy/sessions/${s.id}`));
+  assert.equal(view.session.items.length, 1);
+  assert.match(view.session.items[0].name, /PLA/);
+});
+
 // ═══════════════════════════════════════════════════════ the races (§19)
 
 test('double click and network retry: one key, one change, one hold', async () => {
