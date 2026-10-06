@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api, ApiError, WalletTx, formatIqd, formatUsdCents, formatWalletIqd } from '../lib/api';
 import { useWallet } from '../WalletContext';
 import { Check, X, Wallet, FileImage, RefreshCw } from 'lucide-react';
+import { walletTransactionDisplay } from '../lib/walletTransactionDisplay';
 
 type AdminWalletTx = WalletTx & { email?: string; username?: string; userId?: string };
 
@@ -62,11 +63,10 @@ export default function AdminWalletRequests() {
    * their request approved against «50,008 د.ع» on this very card, and a
    * reviewer holding the transfer slip could not match the two numbers.
    *
-   * The recorded figure is fetched separately because the list itself comes
-   * from the legacy /api/admin/wallet-requests route, which reports the ledger
-   * row only. A request filed before 0105 is simply absent from this map and
-   * the card keeps converting — the honest answer for a dinar figure nobody
-   * ever wrote down. The ledger value and the rate stay underneath either way:
+   * This older testimony is fetched separately from the ledger row's own
+   * amount_iqd. Refunds have no deposit request, so their recorded ledger
+   * dinars take precedence; only rows with neither figure need conversion.
+   * The ledger value and recorded rate stay underneath either way:
    * approving money is a reconciliation, and both numbers belong on it.
    */
   const [declaredIqd, setDeclaredIqd] = useState<Record<string, { amount_iqd: number; exchange_rate: number | null }>>({});
@@ -252,7 +252,17 @@ export default function AdminWalletRequests() {
       )}
 
       <div className="space-y-4">
-        {filtered.map(t => (
+        {filtered.map(t => {
+          const display = walletTransactionDisplay({
+            cents: t.amount,
+            recordedIqd: t.amount_iqd,
+            recordedRate: t.exchange_rate_snapshot,
+            deposit: declaredIqd[t.id],
+            withdrawalIqd: t.withdrawal?.declared_amount_iqd,
+            withdrawalRate: t.withdrawal?.exchange_rate_snapshot,
+            currentRate: exchangeRate,
+          });
+          return (
           <div key={t.id} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -309,21 +319,10 @@ export default function AdminWalletRequests() {
 
               <div className="flex flex-col md:items-end gap-2 border-t md:border-t-0 md:border-l border-zinc-800 pt-4 md:pt-0 md:pl-6">
                 <div className="text-xl font-black text-white tabular-nums">
-                  {/* Presence decides, not truthiness: a request with no
-                      recorded dinars falls back to the conversion, and a
-                      recorded figure is printed exactly as it was filed.
-                      A DEPOSIT's figure comes from the separate testimony map
-                      (migration 0105, fetched above because the legacy list
-                      route reports the ledger row only); a WITHDRAWAL's rides
-                      on the row itself (migration 0106), because both admin
-                      lists already join `wallet_withdrawals`. This is the card
-                      a human reads before making the transfer, so it must
-                      state the amount the customer actually asked for. */}
-                  {declaredIqd[t.id]
-                    ? formatIqd(declaredIqd[t.id].amount_iqd)
-                    : t.withdrawal?.declared_amount_iqd
-                      ? formatIqd(t.withdrawal.declared_amount_iqd)
-                      : formatWalletIqd(t.amount, exchangeRate)}
+                  {/* Every ledger row, including refunds, carries its exact
+                      dinars when recorded. Older request testimony is the
+                      fallback; conversion is only for unrecorded amounts. */}
+                  {formatIqd(display.amountIqd)}
                 </div>
                 {/* The ledger value AND the rate. A reviewer approving a
                     deposit is reconciling a bank transfer against a stored
@@ -332,7 +331,7 @@ export default function AdminWalletRequests() {
                     «المبلغ: X د.ع (الدفتر: $Y — سعر الصرف Z)» for the same
                     reason. */}
                 <div className="text-[11px] text-zinc-500 tabular-nums" dir="ltr">
-                  {formatUsdCents(t.amount)} · {exchangeRate.toLocaleString()} IQD/USD
+                  {formatUsdCents(t.amount)} · {display.rate.toLocaleString()} IQD/USD
                 </div>
                 {/**
                   * THE NUMBER TO TRANSFER — because it is NOT the one above it.
@@ -474,7 +473,8 @@ export default function AdminWalletRequests() {
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
         {!loading && filtered.length === 0 && (
           <div className="text-center text-zinc-500 py-16 bg-zinc-900/50 border border-zinc-800/50 rounded-3xl border-dashed">
             No {filter !== 'all' ? filter : ''} requests found

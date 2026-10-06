@@ -129,18 +129,7 @@ const RouteFallback = ({ productHeader = false }: { productHeader?: boolean }) =
   useBusy(true, 'route');
   return (
     <div className="min-h-dvh bg-black" aria-busy="true" aria-live="polite">
-      {/* Product owns its header even while its route chunk is pending. The
-          shell's fallback yields to this anchor before paint, keeping main at
-          the same top position when Product's loading/ready header takes over.
-          Scope this to the resolved main-site product boundary: host lookup,
-          merchant storefronts and other route fallbacks keep their own chrome. */}
-      {productHeader && (
-        <div className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 pb-1.5 flex items-center">
-          <span aria-hidden="true" />
-          <MotionCharacterHome busy />
-          <span aria-hidden="true" />
-        </div>
-      )}
+      {productHeader && <MotionCharacterRouteHeader busy />}
       <span className="sr-only">…</span>
     </div>
   );
@@ -483,7 +472,7 @@ function EmailVerifyBanner() {
  * unaffected, because nothing below the mascot depends on it.
  */
 const AppIntro = React.lazy(() => import('./components/bloub/AppIntro'));
-import { MotionCharacterFallbackHeader, MotionCharacterHome, useCharacterBusy } from './components/bloub/MotionCharacterAnchor';
+import { MotionCharacterFallbackHeader, MotionCharacterRouteHeader, useCharacterBusy } from './components/bloub/MotionCharacterAnchor';
 import { homeCriticalReadyStore } from './lib/appBootstrap';
 import { preloadMotionFeatures } from './lib/motionFeatures';
 import { useBusy } from './lib/busy';
@@ -857,12 +846,14 @@ function AppContent() {
   // /referrals, /wallet and the home page. A spacer is content, and content is
   // always scrolled to.
   const navHidden = isBottomNavHidden(location.pathname) || navSuppressed;
-
+  // This main-site route owns its header while loading, ready or failed. Do
+  // not briefly add a shell strip while its anchor subscription is mounting.
+  const productRoute = /^\/product\/[^/]+\/?$/.test(pathForShell);
 
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-hidden">
       <Header />
-      {navHidden && <MotionCharacterFallbackHeader />}
+      {navHidden && !productRoute && <MotionCharacterFallbackHeader />}
       {/* Single intentional background: uniform LEVONIS black (matches
           html/body/#root in index.css). The previous diagonal gradient into
           olive-green (hex 1a210e) painted an unintended glow in the bottom
@@ -875,8 +866,10 @@ function AppContent() {
             interruption costs the person something. */}
         <CompleteProfileSheet />
         <ThemeIntroSheet />
-        <ChunkBoundary>
-        <Suspense fallback={<RouteFallback productHeader={/^\/product\/[^/]+\/?$/.test(pathForShell)} />}>
+        {/* A failed boundary survives client navigation; Home must load a new
+            document to recover, while keeping the product header in place. */}
+        <ChunkBoundary renderFallback={productRoute ? (content) => <><MotionCharacterRouteHeader reloadDocument />{content}</> : undefined}>
+        <Suspense fallback={<RouteFallback productHeader={productRoute} />}>
         <SocialProvider>
         <Routes>
           <Route path="/" element={<Home />} />

@@ -39,15 +39,28 @@ export function MotionCharacterAnchor({ kind = 'top-header', busy = false, class
  * beside it and makes the header grow. Compact keeps the tap target at 44px
  * and lets the drawn character match the controls it sits with.
  */
-export function MotionCharacterHome({ busy = false, kind = 'top-header', compact = false }: {
-  busy?: boolean; kind?: AnchorKind; compact?: boolean;
+export function MotionCharacterHome({ busy, kind, compact, reloadDocument }: {
+  busy?: boolean; kind?: AnchorKind; compact?: boolean; reloadDocument?: boolean;
 }) {
   const { t } = useLanguage();
   return (
-    <Link to="/" aria-label={t('home')} onClick={() => signalBloub('tap', 210)}
+    <Link to="/" reloadDocument={reloadDocument} aria-label={t('home')} onClick={() => signalBloub('tap', 210)}
       className={`lv-character-home${compact ? ' lv-character-home--compact' : ''} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}>
       <MotionCharacterAnchor kind={kind} busy={busy} />
     </Link>
+  );
+}
+
+/** The product route keeps the same header while its code loads or fails. */
+export function MotionCharacterRouteHeader({ busy, reloadDocument }: {
+  busy?: boolean; reloadDocument?: boolean;
+}) {
+  return (
+    <div className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 pb-1.5 flex items-center">
+      <span aria-hidden="true" />
+      <MotionCharacterHome busy={busy} reloadDocument={reloadDocument} />
+      <span aria-hidden="true" />
+    </div>
   );
 }
 
@@ -56,9 +69,10 @@ export function MotionCharacterHome({ busy = false, kind = 'top-header', compact
  *
  * A page's own header takes precedence; there is never a second Home row once
  * that header mounts. No fixed top/left guesses or covering existing controls.
- * On the main site's product route, RouteFallback already owns the product
- * header while its chunk loads. That anchor removes this shell strip before
- * paint, so the scroll container does not jump when the product mounts.
+ * The main product route omits this component synchronously: its loading,
+ * ready and failed-chunk states all own a header. Anchor registration alone
+ * cannot guarantee this on the first paint, because the external-store
+ * subscription mounts in a passive effect after the anchor's layout effect.
  *
  * IT MOUNTS EVEN WHILE A ROUTE IS STILL LOADING, and that is a deliberate
  * reversal. Suppressing it during the lazy-load window was meant to avoid a

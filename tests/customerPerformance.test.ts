@@ -2,7 +2,7 @@ import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createElement } from 'react';
+import { createElement, Fragment } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { LanguageProvider } from '../src/LanguageContext';
@@ -13,6 +13,8 @@ import PromoPhoto from '../src/components/home/v2/PromoPhoto';
 import CategoryBento from '../src/components/home/v2/CategoryBento';
 import ProductCard from '../src/components/home/ProductCard';
 import ChunkBoundary from '../src/components/ChunkBoundary';
+import { MotionCharacterFallbackHeader, MotionCharacterRouteHeader } from '../src/components/bloub/MotionCharacterAnchor';
+import { characterLayout } from '../src/components/bloub/anchors';
 import { api, type ApiProduct } from '../src/lib/api';
 import { type BentoTile } from '../src/lib/homeLayout';
 import { bentoImageSizes } from '../src/lib/homeImageSizes';
@@ -34,7 +36,7 @@ afterEach(() => {
   else Reflect.deleteProperty(globalThis, 'window');
 });
 const browser = () => Object.defineProperty(globalThis, 'window', { value: {}, configurable: true });
-const render = (child: ReturnType<typeof createElement>) => renderToStaticMarkup(createElement(LanguageProvider, { children: createElement(MemoryRouter, null, child) }));
+const render = (child: ReturnType<typeof createElement>, path = '/') => renderToStaticMarkup(createElement(LanguageProvider, { children: createElement(MemoryRouter, { initialEntries: [path] }, child) }));
 
 test('promo photo selects one responsive light/phone file and prioritizes only the chosen LCP', () => {
   const html = render(createElement(PromoPhoto, {
@@ -249,4 +251,79 @@ test('an optional chunk failure stays in its own section or dismissible dialog i
   const route = new ChunkBoundary({ children: null });
   route.state = { failed: true };
   assert.match(renderToStaticMarkup(route.render()), /min-h-dvh/, 'the route-level failure remains full-screen');
+});
+
+test('a cold product shell excludes the generic strip before any anchor registers', () => {
+  assert.equal(characterLayout.hasPageAnchor(), false, 'this regression starts with an empty anchor registry');
+  const fallback = render(createElement(MotionCharacterFallbackHeader), '/product/p2s');
+  assert.match(fallback, /data-bloub-fallback-header/);
+  assert.match(fallback, /data-bloub-anchor="top-fallback"/);
+  assert.equal(characterLayout.hasPageAnchor(), false, 'server rendering ran no registration effect');
+  // The generic fallback legitimately paints the strip before effects run.
+  // Product must therefore exclude the component before it mounts, rather
+  // than relying on a later anchor notification to remove that first frame.
+  const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
+  assert.match(app, /navHidden && !productRoute && <MotionCharacterFallbackHeader \/>/,
+    'the main shell must omit the product strip without mounting its subscription');
+});
+
+test('product loading and chunk failure retain the same header geometry and an independent Home recovery', () => {
+  const loadingHeader = render(createElement(MotionCharacterRouteHeader, { busy: true }), '/product/p2s');
+  const route = new ChunkBoundary({
+    children: null,
+    renderFallback: (content) => createElement(Fragment, null,
+      createElement(MotionCharacterRouteHeader, { reloadDocument: true }), content),
+  });
+  route.state = { failed: true };
+  const failed = render(createElement(Fragment, null, route.render()), '/product/p2s');
+  assert.ok(failed.startsWith(loadingHeader), 'failure preserves every header box and the Home target');
+  assert.equal((failed.match(/data-bloub-anchor="top-header"/g) ?? []).length, 1);
+  assert.match(loadingHeader, /<a\b[^>]*href="\/"/);
+  assert.match(failed, /role="alert"/);
+  assert.match(failed, /<button\b/, 'the boundary keeps its Reload action beside the independent Home escape');
+  assert.doesNotMatch(failed, /data-bloub-fallback-header|aria-busy="true"/);
+
+  const headerClass = /<div class="([^"]+)"/.exec(loadingHeader)?.[1];
+  assert.ok(headerClass);
+  const product = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
+  const productHeaders = [...product.matchAll(/className="(lv-character-header[^"]*)"/g)];
+  assert.equal(productHeaders.length, 2, 'both API-loading/error and ready product states own their header');
+  for (const [, classes] of productHeaders) {
+    for (const token of headerClass.split(' ')) assert.ok(classes.split(' ').includes(token), `product header lost ${token}`);
+  }
+
+  // SSR preserves the link markup but cannot distinguish a document navigation
+  // from a router transition. Pin this prop through both production components:
+  // the route boundary remains failed until a new document is loaded.
+  const anchors = readFileSync(join(ROOT, 'src/components/bloub/MotionCharacterAnchor.tsx'), 'utf8');
+  assert.match(anchors, /<MotionCharacterHome busy=\{busy\} reloadDocument=\{reloadDocument\}/);
+  assert.match(anchors, /<Link to="\/" reloadDocument=\{reloadDocument\}/);
+});
+
+test('synchronous product header ownership is scoped to the resolved main-site product route in every state', () => {
+  const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
+  const declaration = /const productRoute = (\/[^\n]+\/[a-z]*)\.test\(pathForShell\);/.exec(app);
+  assert.ok(declaration, 'the shell and both fallback states share one route decision');
+  const literal = declaration[1];
+  const delimiter = literal.lastIndexOf('/');
+  const matchesProduct = new RegExp(literal.slice(1, delimiter), literal.slice(delimiter + 1));
+  assert.match(app, /const pathForShell = location\.pathname\.toLowerCase\(\);/);
+  for (const path of ['/product/p2s', '/product/bambu-lab-p2s/', '/PRODUCT/P2S/']) {
+    assert.equal(matchesProduct.test(path.toLowerCase()), true, path);
+  }
+  for (const path of ['/', '/products', '/product', '/product/', '/product//', '/product/p2s/reviews', '/p/p2s', '/bundles/p2s', '/community/store/shop/p/p2s']) {
+    assert.equal(matchesProduct.test(path.toLowerCase()), false, path);
+  }
+  const hostHandoff = app.indexOf('if (store || unknownStore || unavailableStore) return <StorefrontApp />;');
+  assert.ok(hostHandoff >= 0 && hostHandoff < declaration.index, 'merchant and unknown hosts leave before the main-site ownership decision');
+  assert.match(app.slice(0, declaration.index), /if \(!resolved\) return <RouteFallback \/>;/,
+    'unresolved hosts keep their generic loading state');
+  assert.equal((app.match(/navHidden && !productRoute && <MotionCharacterFallbackHeader \/>/g) ?? []).length, 1,
+    'the product exception applies to only one shell');
+  assert.match(app.slice(declaration.index), /navHidden && !productRoute && <MotionCharacterFallbackHeader \/>/,
+    'the pre-mount exclusion belongs to the resolved main shell');
+  assert.match(app, /<RouteFallback productHeader=\{productRoute\} \/>/);
+  assert.match(app, /productHeader && <MotionCharacterRouteHeader busy \/>/);
+  assert.match(app, /<ChunkBoundary renderFallback=\{productRoute \? \(content\) => <><MotionCharacterRouteHeader reloadDocument \/>\{content\}<\/> : undefined\}>/,
+    'a rejected product chunk retains its header without leaving an active loading hold');
 });
