@@ -3,6 +3,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import * as T from '../adminProducts/theme';
 import { NumberInput } from '../ui/NumberInput';
+import type { ProcurementSelectionDefault } from '../../../packages/contracts/src/procurementCost';
 
 export const PROCUREMENT = '/api/admin/procurement',
   STOCK = '/api/admin/stock-operations',
@@ -32,6 +33,10 @@ export type Selection = {
   image_url?: string;
   weight_g: number;
   volume_mm3: number;
+  packed_weight_g?: number | null;
+  packed_volume_mm3?: number | null;
+  procurement_defaults?: ProcurementSelectionDefault[];
+  procurement_shared_colors?: boolean;
 };
 export function useOperation() {
   const [busy, setBusy] = useState(false),

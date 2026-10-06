@@ -184,7 +184,7 @@ export default function AdminInventory() {
 
       {/* ------------------------------------------------ 3. THE PANEL */}
       {tab === 'stock' && <StockTab s={s} onChanged={loadOverview} />}
-      {tab === 'incoming' && <IncomingTab s={s} onChanged={loadOverview} />}
+      {tab === 'incoming' && <IncomingTab s={s} onChanged={loadOverview} onNewPurchase={showsCosts ? () => begin('purchase') : undefined} />}
       {tab === 'movements' && <MovementsTab s={s} />}
       {tab === 'suppliers' && <SuppliersTab s={s} />}
       {tab === 'procurement' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…')}</p>}><ProcurementPanel key={action?.key} initialAction={action?.kind === 'purchase' ? 'purchase' : action?.kind === 'receive' ? 'receive' : undefined} onChanged={loadOverview} /></Suspense>}

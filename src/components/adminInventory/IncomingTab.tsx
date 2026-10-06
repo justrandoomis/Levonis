@@ -55,7 +55,7 @@ const STATUS_SKIN: Record<IncomingStatus, string> = {
   cancelled: T.badge.hidden,
 };
 
-export function IncomingTab({ s, onChanged }: { s: InvStrings; onChanged: () => void }) {
+export function IncomingTab({ s, onChanged, onNewPurchase }: { s: InvStrings; onChanged: () => void; onNewPurchase?: () => void }) {
   const { latin } = useLoc();
   const count = useCount();
   const [rows, setRows] = useState<IncomingPurchase[] | null>(null);
@@ -85,7 +85,7 @@ export function IncomingTab({ s, onChanged }: { s: InvStrings; onChanged: () => 
       <Notice state={notice} onClose={() => setNotice(null)} />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button type="button" className={T.btnPrimary} onClick={() => setCreating(true)}>
+        <button type="button" className={T.btnPrimary} onClick={() => onNewPurchase ? onNewPurchase() : setCreating(true)}>
           <Plus size={15} /> {s.incoming.newPurchase}
         </button>
         <select
@@ -276,7 +276,9 @@ function PurchaseDialog({ s, onClose, onDone }: { s: InvStrings; onClose: () => 
         <StockSelection value={selection} onChange={(next) => {
           setSelection(next); setProductId(next?.product_id ?? '');
           setScope(next?.scope ?? 'base'); setScopeId(next?.scope_id ?? '');
-          setUnit(next?.purchase_unit_iqd ?? null);
+          // Historical references may already contain freight. New raw supplier
+          // prices are entered explicitly or loaded by the procurement profile.
+          setUnit(null);
         }} />
         {selection && <p className={`text-[12px] ${T.text2}`}>{s.incoming.sellingPrice}: {money(selection.selling_price_iqd)}</p>}
 
