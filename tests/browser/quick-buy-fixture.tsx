@@ -293,6 +293,42 @@ function recentView() {
   return { ...viewOf(ended.meta, ended.items), order };
 }
 
+/** The order a submitted session became, as `orderPublic` lists it: an ordinary order labelled `quick_buy`. */
+function submittedOrder() {
+  const v = viewOf(ended!.meta, ended!.items);
+  const at = ended!.meta.submitted_at ?? iso(serverNow());
+  return {
+    id: ended!.meta.order_id,
+    order_kind: 'quick_buy',
+    status: 'pending',
+    address: v.address,
+    delivery_method: { id: 'standard', titleAr: 'توصيل عادي', titleEn: 'Standard delivery', price_iqd: v.shipping_iqd },
+    payment_method_id: 'wallet',
+    subtotal_iqd: v.items_iqd,
+    shipping_iqd: v.shipping_iqd,
+    cod_tax_iqd: 0,
+    points_discount_iqd: 0,
+    wallet_applied_iqd: v.total_iqd,
+    total_iqd: v.total_iqd,
+    due_on_delivery_iqd: 0,
+    created_at: at,
+    updated_at: at,
+    shipping_type: 'direct',
+    items: ended!.items.map((it) => ({
+      id: `oi_${it.id}`,
+      product_id: it.product_id,
+      product_slug: it.slug,
+      name: it.name,
+      name_ar: it.name_ar,
+      image: it.image,
+      variant: it.variant,
+      qty: it.qty,
+      unit_price_iqd: it.unit_price_iqd,
+      line_total_iqd: it.qty * it.unit_price_iqd,
+    })),
+  };
+}
+
 /** D13: any Quick Buy request that finds an expired open session submits it. */
 function finaliseIfDue(): void {
   if (!meta || meta.state !== 'open' || serverNow() < meta.expires_at) return;
@@ -465,7 +501,8 @@ function other(method: string, path: string, body: Record<string, unknown> | und
     addresses = [...addresses, { id, label: String(body?.label ?? ''), name: String(body?.name ?? ''), phone: String(body?.phone ?? ''), address: String(body?.address ?? ''), landmark: String(body?.landmark ?? ''), governorate: String(body?.governorate ?? ''), area: String(body?.area ?? ''), notes: '', is_default: addresses.length === 0 ? 1 : 0, created_at: iso(Date.now()) }];
     return ok({ id });
   }
-  if (path === '/api/orders') return ok({ orders: [], next_before: null });
+  // After its 30 minutes a session is an ORDINARY order (owner spec §13): it is in the list like any other.
+  if (path === '/api/orders') return ok({ orders: ended?.meta.state === 'submitted' ? [submittedOrder()] : [], next_before: null });
   if (path === '/api/orders/counts') return ok({ counts: {} });
   if (path === '/api/community/access') return ok({ may_enter: true, state: 'open' });
   if (path === '/api/auth/verify-email/status') return ok({ email: USER.email, verified: true, emailConfigured: true });

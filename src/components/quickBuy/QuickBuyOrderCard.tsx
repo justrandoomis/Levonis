@@ -18,12 +18,20 @@
  *     keeps the offset from `server_now`), redrawn by the shared 1 Hz beat.
  *
  * AT 00:00 EVERYTHING LOCKS — and the same when the server says the session
- * can no longer be edited (`editable: false`) or is no longer open. The store
- * asks the server once at zero; GET /session submits an expired session on
- * the spot and answers with it as `recent`, and the card turns into «تم إرسال
- * طلب الشراء السريع» with the way to `/orders/<order_id>`. A session the
- * server could not submit (`failed`, in `recent` for a day) stays on screen,
- * read-only, saying its money is still held.
+ * can no longer be edited (`editable: false`). The store asks the server once
+ * at zero; GET /session submits an expired session on the spot.
+ *
+ * AFTER THE 30 MINUTES THE ORDER IS AN ORDINARY ORDER, 100% (owner spec §13).
+ * The session closes and the cart's own checkout door creates an ordinary
+ * order — same model, statuses, cancellation, refund and notifications;
+ * `order_kind = 'quick_buy'` is a label for reports. So this card exists ONLY
+ * while the session is open: the moment the server reports it submitted, the
+ * card is gone, the page's list (read again by «طلباتي») shows the order as
+ * any other order card, and all this card leaves behind is one transient
+ * line — a toast «تم إرسال طلب الشراء السريع» with the way to
+ * `/orders/<order_id>` — and only for a customer who watched it close here.
+ * A session the server could not submit (`failed`, reported for a day) has no
+ * order to show: one line says so, and that its money is still held.
  *
  * NAMES are the reader's language (Arabic, Sorani or English, as the view
  * carries all three); the free-delivery line is the server's own label.
@@ -34,8 +42,8 @@
  * the same key again if that same write is retried.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { CheckCircle2, MapPin, RefreshCw, Trash2, Truck, X, Zap } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { MapPin, RefreshCw, Trash2, Truck, Zap } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import { useMoney } from '../../CurrencyContext';
@@ -67,24 +75,7 @@ import { useConfirm } from '../ui/ConfirmDialog';
 import { addressLine, freeDeliveryLabel, quickBuyItemName, quickBuyItemVariant } from './format';
 import { quickBuyRefusal, quickBuyStrings, type QuickBuyStrings } from './strings';
 
-const SEEN_KEY = 'levonis.quickBuy.seenOrder';
 const STEP_SETTLE_MS = 450;
-
-function readSeen(): string {
-  try {
-    return localStorage.getItem(SEEN_KEY) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-function writeSeen(orderId: string): void {
-  try {
-    localStorage.setItem(SEEN_KEY, orderId);
-  } catch {
-    /* storage blocked: the card simply hides for this visit */
-  }
-}
 
 /**
  * Quantities as the customer is choosing them, sent one write at a time.
@@ -171,34 +162,6 @@ function Row({ label, value, strong = false, tone }: { label: React.ReactNode; v
   );
 }
 
-function SubmittedCard({ orderId, t, onDismiss }: { orderId: string; t: QuickBuyStrings; onDismiss: () => void }) {
-  return (
-    <section aria-label={t.regionLabel} className="lv-surface mb-4 p-4" data-quick-buy-card="submitted">
-      <div className="flex items-start gap-3">
-        <span aria-hidden="true" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success/10 text-success">
-          <CheckCircle2 className="w-5 h-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-[15px] font-bold text-text-primary">{t.submittedTitle}</h2>
-          {/* The id is an LTR island inside the sentence, never the sentence inside an LTR island. */}
-          <p className="mt-0.5 text-[12px] text-text-muted">{t.submittedBody(`⁦${orderId}⁩`)}</p>
-          <Link to={`/orders/${encodeURIComponent(orderId)}`} className="lv-button lv-button-secondary lv-button-sm mt-3">
-            {t.viewOrder}
-          </Link>
-        </div>
-        <button
-          type="button"
-          onClick={onDismiss}
-          aria-label={t.dismiss}
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          <X aria-hidden="true" className="w-4 h-4" />
-        </button>
-      </div>
-    </section>
-  );
-}
-
 /**
  * The time left and the window as a bar — the only part of the card that
  * redraws every second (the shared beat, src/lib/secondTicker.ts). It reads
@@ -260,21 +223,38 @@ export default function QuickBuyOrderCard() {
   const m = useMotion();
   const t = quickBuyStrings(lang);
   const snap = useQuickBuySnapshot(owner);
+  const navigate = useNavigate();
   const [confirm, confirmDialog] = useConfirm();
-  const [seen, setSeen] = useState(readSeen);
   const [removing, setRemoving] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [checking, setChecking] = useState(false);
   const removeActions = useRef(new Map<string, IdempotentAction>());
   const cancelAction = useRef(new IdempotentAction());
 
-  // What the card shows: the open session; else the last one that ended, if
-  // it could not be sent (`failed` — read-only, its money still held). A
-  // submitted one becomes the «sent» card below.
-  const recentFailed = !snap.session && snap.recent?.state === 'failed' ? snap.recent : null;
-  const session: QuickBuySessionView | null =
-    snap.session && snap.session.state !== 'cancelled' ? snap.session : recentFailed;
-  const open = session?.state === 'open';
+  // The card is the OPEN session and nothing else (owner spec §13).
+  const session: QuickBuySessionView | null = snap.session?.state === 'open' ? snap.session : null;
+  const open = !!session;
+
+  // The one line a submission leaves here: a toast with the way to the order
+  // it became — for the session this card showed open, once.
+  const watched = useRef<string | null>(null);
+  const told = useRef<string | null>(null);
+  const recent = snap.recent;
+  useEffect(() => {
+    if (session) {
+      watched.current = session.id;
+      return;
+    }
+    const orderId = recent?.state === 'submitted' ? recent.order_id : null;
+    if (!recent || !orderId || recent.id !== watched.current || told.current === recent.id) return;
+    told.current = recent.id;
+    toast.success(t.submittedTitle, {
+      id: 'quick-buy',
+      // The id is an LTR island inside the sentence, never the sentence inside an LTR island.
+      description: t.submittedBody(`⁦${orderId}⁩`),
+      action: { label: t.viewOrder, onClick: () => navigate(`/orders/${encodeURIComponent(orderId)}`) },
+    });
+  }, [session, recent, t, navigate]);
   // The card re-renders when the window CLOSES, not every second: the clock
   // below owns the beat and says once when it reaches zero. A deadline that
   // had already passed when the server answered is closed from the start —
@@ -365,19 +345,14 @@ export default function QuickBuyOrderCard() {
   };
 
   // ------------------------------------------------- after the window
-  const submittedId = session ? (session.state === 'submitted' ? session.order_id : null) : snap.recent?.order_id ?? null;
-  if (!session || session.state === 'submitted') {
-    if (!submittedId || submittedId === seen) return null;
-    return (
-      <SubmittedCard
-        orderId={submittedId}
-        t={t}
-        onDismiss={() => {
-          writeSeen(submittedId);
-          setSeen(submittedId);
-        }}
-      />
-    );
+  if (!session) {
+    // Submitted: the order is in the list like any other — nothing more here.
+    // Not submitted (`failed`): no order exists, so one line says what happens.
+    return recent?.state === 'failed' ? (
+      <p role="status" className="lv-alert lv-alert-warning mb-4 text-[13px] leading-relaxed" data-quick-buy-notice="failed">
+        {t.failedNotice}
+      </p>
+    ) : null;
   }
 
   // ------------------------------------------------- the open session
@@ -385,14 +360,11 @@ export default function QuickBuyOrderCard() {
   // The server's own words for the waiver, in the reader's language (all three travel with the view).
   const freeLabel = freeDeliveryLabel(session.free_delivery, lang, t.freeDelivery);
   const itemCount = session.items.reduce((n, it) => n + (Number(it.qty) || 0), 0);
-  const failed = session.state === 'failed';
-  // The pill says what the session is doing NOW: collecting, sending (the
-  // window closed and the order is being written), or not sent.
-  const pill = failed
-    ? { text: t.notSent, cls: 'bg-warning/10 text-warning' }
-    : timeUp || !open
-      ? { text: t.sending, cls: 'bg-surface-raised text-text-secondary' }
-      : { text: t.collecting, cls: 'bg-gold/10 text-gold' };
+  // The pill says what the session is doing NOW: collecting, or sending (the
+  // window closed and the order is being written).
+  const pill = timeUp
+    ? { text: t.sending, cls: 'bg-surface-raised text-text-secondary' }
+    : { text: t.collecting, cls: 'bg-gold/10 text-gold' };
 
   return (
     <section aria-label={t.regionLabel} className="lv-surface mb-4 overflow-hidden" data-quick-buy-card={session.state}>
@@ -409,13 +381,13 @@ export default function QuickBuyOrderCard() {
           </span>
         </div>
 
-        {failed ? null : <SessionClock snap={snap} session={session} t={t} reduced={m.reduced} onTimeUp={onTimeUp} />}
+        <SessionClock snap={snap} session={session} t={t} reduced={m.reduced} onTimeUp={onTimeUp} />
 
-        {timeUp || !open ? (
-          <div role="status" className={`lv-alert ${session.state === 'failed' ? 'lv-alert-warning' : 'lv-alert-info'} mt-3 flex items-center justify-between gap-3 text-[13px]`}>
+        {timeUp ? (
+          <div role="status" className="lv-alert lv-alert-info mt-3 flex items-center justify-between gap-3 text-[13px]">
             <span className="flex min-w-0 items-center gap-2">
-              {session.state === 'open' ? <Spinner size="sm" delayMs={0} decorative /> : null}
-              {session.state === 'failed' ? t.failedState : timeUp ? t.locked : t.notEditable}
+              <Spinner size="sm" delayMs={0} decorative />
+              {t.locked}
             </span>
             <button
               type="button"
@@ -535,9 +507,7 @@ export default function QuickBuyOrderCard() {
             <Row label={t.delivery} value={money(session.shipping_iqd)} />
           )}
           <Row label={t.total} value={moneyBoth(session.total_iqd)} strong />
-          {/* The hold is the open session's figure; the server reports 0 once it
-              is not open (a failed one's money is still held, and says so above). */}
-          {open ? <Row label={t.held} value={moneyBoth(session.held_iqd)} /> : null}
+          <Row label={t.held} value={moneyBoth(session.held_iqd)} />
         </dl>
       </div>
 

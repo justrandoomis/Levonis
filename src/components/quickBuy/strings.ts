@@ -6,9 +6,9 @@
  * docs/GIFTS_QUICK_BUY.md §3.6).
  *
  * Imported only by Quick Buy's lazy chunks. The few words the app chrome
- * needs before any of them loads — the toggle, the main button, the
- * navigation chip — live in ./chromeStrings.ts so the first paint does not
- * carry this table.
+ * needs before any of them loads — the purchase bar's two capsules — live
+ * in ./chromeStrings.ts, and the navigation chip's in ./navStrings.ts, so the
+ * product's opening and the first paint do not carry this table.
  *
  * The Sorani is written by hand and reuses the shop's own wording wherever it
  * already exists: «جزدانی Levo», «پڕکردنەوەی جزدان», «گەیاندنی ئاسایی
@@ -90,7 +90,6 @@ export interface QuickBuyStrings {
   cardTitle: string;
   collecting: string;
   sending: string;
-  notSent: string;
   regionLabel: string;
   timeLeft: string;
   timerAria: (time: string) => string;
@@ -111,12 +110,11 @@ export interface QuickBuyStrings {
   deliveryMethod: string;
   standard: string;
   locked: string;
-  notEditable: string;
-  failedState: string;
+  /** The one line a session the server could not submit leaves on «طلباتي». */
+  failedNotice: string;
   refresh: string;
   submittedTitle: string;
   submittedBody: (id: string) => string;
-  dismiss: string;
   cancelSession: string;
   cancelTitle: string;
   cancelConsequence: string;
@@ -222,7 +220,6 @@ export const QUICK_BUY_STRINGS: Record<QuickBuyLang, QuickBuyStrings> = {
     cardTitle: 'شراء سريع',
     collecting: 'قيد التجميع',
     sending: 'قيد الإرسال',
-    notSent: 'تعذّر الإرسال',
     regionLabel: 'طلب الشراء السريع',
     timeLeft: 'الوقت المتبقي',
     timerAria: (time) => `الوقت المتبقي ${time}`,
@@ -243,12 +240,10 @@ export const QUICK_BUY_STRINGS: Record<QuickBuyLang, QuickBuyStrings> = {
     deliveryMethod: 'طريقة التوصيل',
     standard: 'توصيل عادي',
     locked: 'انتهى وقت التجميع — يجري إرسال طلبك…',
-    notEditable: 'لم يعد هذا الطلب قابلًا للتعديل.',
-    failedState: 'تعذّر إرسال الطلب تلقائيًا. يتابعه فريقنا، والمبلغ ما زال محجوزًا لك.',
+    failedNotice: 'تعذّر إرسال طلب الشراء السريع تلقائيًا — المبلغ ما زال محجوزًا لك ويتابعه فريقنا.',
     refresh: 'تحديث',
     submittedTitle: 'تم إرسال طلب الشراء السريع',
     submittedBody: (id) => `رقم الطلب ${id}`,
-    dismiss: 'إخفاء',
     cancelSession: 'إلغاء طلب الشراء السريع',
     cancelTitle: 'إلغاء طلب الشراء السريع؟',
     cancelConsequence: 'تُزال كل المنتجات ويعود المبلغ المحجوز إلى محفظة Levo.',
@@ -345,7 +340,6 @@ export const QUICK_BUY_STRINGS: Record<QuickBuyLang, QuickBuyStrings> = {
     cardTitle: 'Quick Buy',
     collecting: 'Collecting',
     sending: 'Sending',
-    notSent: 'Not sent',
     regionLabel: 'Quick Buy order',
     timeLeft: 'Time left',
     timerAria: (time) => `Time left ${time}`,
@@ -366,12 +360,10 @@ export const QUICK_BUY_STRINGS: Record<QuickBuyLang, QuickBuyStrings> = {
     deliveryMethod: 'Delivery',
     standard: 'Standard delivery',
     locked: 'Time’s up — sending your order…',
-    notEditable: 'This order can no longer be changed.',
-    failedState: 'We couldn’t send the order automatically. Our team is on it, and the amount is still held for you.',
+    failedNotice: 'Your Quick Buy order couldn’t be sent automatically — the amount is still held for you, and our team is on it.',
     refresh: 'Refresh',
     submittedTitle: 'Quick Buy order sent',
     submittedBody: (id) => `Order ${id}`,
-    dismiss: 'Dismiss',
     cancelSession: 'Cancel Quick Buy order',
     cancelTitle: 'Cancel this Quick Buy order?',
     cancelConsequence: 'Every item is removed and the held amount returns to your Levo Wallet.',
@@ -468,7 +460,6 @@ export const QUICK_BUY_STRINGS: Record<QuickBuyLang, QuickBuyStrings> = {
     cardTitle: 'کڕینی خێرا',
     collecting: 'کۆدەکرێتەوە',
     sending: 'دەنێردرێت',
-    notSent: 'نەنێردرا',
     regionLabel: 'داواکاری کڕینی خێرا',
     timeLeft: 'کاتی ماوە',
     timerAria: (time) => `کاتی ماوە ${time}`,
@@ -489,12 +480,10 @@ export const QUICK_BUY_STRINGS: Record<QuickBuyLang, QuickBuyStrings> = {
     deliveryMethod: 'شێوازی گەیاندن',
     standard: 'گەیاندنی ئاسایی',
     locked: 'کات تەواو بوو — داواکارییەکەت دەنێردرێت…',
-    notEditable: 'ئەم داواکارییە چیتر دەستکاری ناکرێت.',
-    failedState: 'نەتوانرا داواکارییەکە خۆکارانە بنێردرێت. تیمەکەمان بەدواداچوونی بۆ دەکات، و بڕەکە هێشتا بۆت گیراوە.',
+    failedNotice: 'نەتوانرا داواکاری کڕینی خێرا خۆکارانە بنێردرێت — بڕەکە هێشتا بۆت گیراوە و تیمەکەمان بەدواداچوونی بۆ دەکات.',
     refresh: 'نوێکردنەوە',
     submittedTitle: 'داواکاری کڕینی خێرا نێردرا',
     submittedBody: (id) => `ژمارەی داواکاری ${id}`,
-    dismiss: 'شاردنەوە',
     cancelSession: 'هەڵوەشاندنەوەی داواکاری کڕینی خێرا',
     cancelTitle: 'داواکاری کڕینی خێرا هەڵدەوەشێنیتەوە؟',
     cancelConsequence: 'هەموو بەرهەمەکان لادەبرێن و بڕی گیراو دەگەڕێتەوە بۆ جزدانی Levo.',

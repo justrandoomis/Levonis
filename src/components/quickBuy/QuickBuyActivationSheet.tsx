@@ -28,7 +28,7 @@
  *     version it was written against, one unticked acknowledgement, and
  *     «موافقة وإضافة», after which the page sends the SAME add again.
  *
- * A LAZY CHUNK, warmed by the toggle's pointerdown/focus. Built on the shop's
+ * A LAZY CHUNK, warmed when a finger or the focus reaches ⚡. Built on the shop's
  * sheet (src/components/ui/Sheet.tsx): it rises from the bottom edge on a
  * phone and is dragged from its handle only, so the long body scrolls without
  * throwing the sheet away; a centred window from `sm` up.

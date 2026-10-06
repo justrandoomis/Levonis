@@ -3,7 +3,7 @@
  * hears the time the «⚡ mm:ss» chip shows (./QuickBuyNavChip.tsx).
  *
  * Its own module because a module is never split between chunks: the chip's
- * lazy chunk carries this one sentence, while the product page's toggle words
+ * lazy chunk carries this one sentence, while the product bar's words
  * (./chromeStrings.ts) and the feature's sentences (./strings.ts) stay with
  * the screens that say them. Hand-written in all three languages.
  */

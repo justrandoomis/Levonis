@@ -92,10 +92,11 @@ import { useMoney } from '../CurrencyContext';
 import { CommunityStoreLink } from './community/access';
 import CompareBadge from '../components/compare/CompareBadge';
 import PrinterFitsLine, { type FitPrinterRef } from '../components/product/PrinterFitsLine';
-import { QuickBuyBolt, QuickBuyCtaMorph, QuickBuyToggle } from '../components/quickBuy/QuickBuyToggle';
+import { QuickBuyBar } from '../components/quickBuy/QuickBuyBar';
 import { quickBuyChrome } from '../components/quickBuy/chromeStrings';
 import type { QuickBuySheetMode } from '../components/quickBuy/quickBuyActions';
 import type { QuickBuyPrinterAcceptance, QuickBuyPrinterPolicy } from '../lib/quickBuy';
+import { afterCriticalPaint, allowsSpeculativeLoads } from '../lib/afterCriticalPaint';
 
 /** Its own chunk: only a printer page with maintenance parts ever draws it. */
 const MaintenanceShelf = React.lazy(() => import('../components/product/MaintenanceShelf'));
@@ -105,10 +106,11 @@ const CheaperElsewhereSheet = React.lazy(loadCheaperSheet);
 const GiniInstalmentsSheet = React.lazy(loadGiniSheet);
 const ReviewSection = React.lazy(() => import('../components/reviews/ReviewSection'));
 /**
- * QUICK BUY (docs/GIFTS_QUICK_BUY.md §3.5). The page statically carries only
- * the ⚡ toggle and the morphing button; the add with its sentences and
- * refusals, and the activation sheet, are chunks of their own, warmed by the
- * toggle's pointerdown and focus — the product's opening is unchanged.
+ * QUICK BUY (docs/GIFTS_QUICK_BUY.md §3.5, owner spec §4). The page statically
+ * carries only the purchase bar's two morphing capsules
+ * (src/components/quickBuy/QuickBuyBar.tsx); the add with its sentences and
+ * refusals, and the activation sheet, are chunks of their own, warmed when a
+ * finger or the focus reaches ⚡ — the product's opening is unchanged.
  */
 const loadQuickBuyActions = () => import('../components/quickBuy/quickBuyActions');
 const loadQuickBuySheet = () => import('../components/quickBuy/QuickBuyActivationSheet');
@@ -1057,8 +1059,6 @@ export default function Product() {
    * own — Quick Buy adds exactly what «أضف إلى السلة» would have added.
    */
   const [quickBuyFor, setQuickBuyFor] = useState<string | null>(null);
-  const quickBuyForRef = useRef<string | null>(null);
-  quickBuyForRef.current = quickBuyFor;
   const [quickBuyBusy, setQuickBuyBusy] = useState(false);
   const quickBuyInFlight = useRef(false);
   const [quickBuySheet, setQuickBuySheet] = useState<{
@@ -1832,40 +1832,55 @@ export default function Product() {
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
 
   // ----------------------------------------------------------- Quick Buy
-  /** The finger is on the toggle: fetch the add and the sheet before it lifts. */
+  /**
+   * The finger or the focus is on ⚡: fetch the add and the sheet, and ask
+   * whether the account is ready (remembered for a minute), before it lifts.
+   */
   const warmQuickBuy = useCallback(() => {
-    void loadQuickBuyActions().catch(() => undefined);
+    void loadQuickBuyActions()
+      .then((actions) => actions.quickBuyReadiness(user?.id))
+      .catch(() => undefined);
     void loadQuickBuySheet().catch(() => undefined);
-  }, []);
+  }, [user?.id]);
 
   const openQuickBuySheet = useCallback((mode: QuickBuySheetMode, policy?: QuickBuyPrinterPolicy) => {
     setQuickBuySheet({ open: true, mode, started: true, policy });
   }, []);
 
   /**
-   * ON morphs the button at once, then asks whether the account is ready. Not
-   * activated, a policy to accept again, or a saved address that is gone: the
-   * sheet opens HERE, over this product — Settings is never where a purchase
-   * is interrupted to.
+   * ⚡ asks before it morphs: is the account ready? Not activated, a policy to
+   * accept again, or a saved address that is gone — the sheet opens HERE,
+   * over this product (Settings is never where a purchase is interrupted to),
+   * the bar stays in cart mode, and the sheet's completion morphs it. The
+   * wallet is NOT asked: entering Quick Buy never checks the balance.
    */
-  const toggleQuickBuy = useCallback(async () => {
-    if (!product) return;
-    if (quickBuyForRef.current === product.id) {
-      setQuickBuyFor(null);
-      return;
-    }
-    const id = product.id;
-    setQuickBuyFor(id);
+  const requestQuickBuy = useCallback(async (): Promise<boolean> => {
+    if (!product) return false;
     try {
       const { quickBuyReadiness } = await loadQuickBuyActions();
       const { state } = await quickBuyReadiness(user?.id);
-      // Turned off again while the answer was on its way: ask nothing.
-      if (quickBuyForRef.current !== id) return;
-      if (state === 'activate' || state === 'reconsent' || state === 'address') openQuickBuySheet(state);
+      if (state === 'activate' || state === 'reconsent' || state === 'address') {
+        openQuickBuySheet(state);
+        return false;
+      }
     } catch {
-      // The chunk could not load; the first «شراء سريع» tries again and says so.
+      // The chunk could not load: the mode still turns on, and «شراء سريع» tries again and says so.
     }
+    return true;
   }, [product, openQuickBuySheet, user?.id]);
+
+  // The answer to «is this account ready?» is asked once the product has
+  // painted (and remembered for a minute), so the first ⚡ pushes at once
+  // instead of waiting on a round trip. Never on Save-Data or a 2G link.
+  const quickBuyProductId = isAuthenticated && source === 'catalog' ? product?.id ?? null : null;
+  useEffect(() => {
+    if (!quickBuyProductId || !allowsSpeculativeLoads()) return;
+    return afterCriticalPaint(() => {
+      void loadQuickBuyActions()
+        .then((actions) => actions.quickBuyReadiness(user?.id))
+        .catch(() => undefined);
+    });
+  }, [quickBuyProductId, user?.id]);
 
   /**
    * Closed without finishing. Not activated: Quick Buy is not on, and the
@@ -3670,52 +3685,51 @@ export default function Product() {
           : s.addToCart;
 
   /**
-   * THE BUY ROW: «أضف إلى السلة» and, at its inline end, the ⚡ toggle that
-   * turns this one button into «⚡ شراء سريع» for this product (the two
-   * labels roll through one shared spring, src/components/quickBuy/
-   * QuickBuyToggle.tsx). Same gate either way: `canBuy` — the selection, the
-   * route, the quantity and an authoritative price — so Quick Buy can never
-   * add what the cart would have refused. Signed-in catalogue products only:
-   * a guest's button already says «سجّل الدخول للشراء».
+   * THE BUY ROW. For a signed-in customer on a catalogue product it is one
+   * control with two capsules that morph into each other (owner spec §4,
+   * src/components/quickBuy/QuickBuyBar.tsx): [ ⚡ ][ 🛒 أضف إلى السلة ] ⇄
+   * [ ⚡ شراء سريع ][ 🛒 ]. Same gate either way: `canBuy` — the selection,
+   * the route, the quantity and an authoritative price — so Quick Buy can
+   * never add what the cart would have refused. Everyone else keeps the one
+   * button: a guest's already says «سجّل الدخول للشراء».
    */
   const quickBuyOn = !!product && quickBuyFor === product.id;
   const quickBuyWords = quickBuyChrome(lang);
   const showQuickBuyToggle = isAuthenticated && source === 'catalog';
-  const buyButton = (
-    <div className="flex items-stretch gap-2">
+  const cartIcon = justAdded ? <Check aria-hidden="true" className="w-5 h-5" /> : <ShoppingCart aria-hidden="true" className="w-5 h-5" />;
+  const buyButton =
+    showQuickBuyToggle && product ? (
+      <QuickBuyBar
+        key={product.id}
+        quick={quickBuyOn}
+        onQuickChange={(on) => setQuickBuyFor(on ? product.id : null)}
+        requestQuick={requestQuickBuy}
+        onWarm={warmQuickBuy}
+        cart={{
+          icon: cartIcon,
+          label: buyButtonLabel,
+          disabled: addingToCart || (isAuthenticated && !canBuy),
+          busy: addingToCart,
+          onPress: handleAddToCart,
+        }}
+        buy={{
+          disabled: quickBuyBusy || (isAuthenticated && !canBuy),
+          busy: quickBuyBusy,
+          onPress: () => void runQuickBuy(),
+        }}
+      />
+    ) : (
       <button
         type="button"
         data-testid="product-cta"
-        data-quick-buy={quickBuyOn ? 'on' : undefined}
-        onClick={quickBuyOn ? () => void runQuickBuy() : handleAddToCart}
-        onPointerDown={quickBuyOn ? warmQuickBuy : undefined}
-        disabled={quickBuyOn ? quickBuyBusy || (isAuthenticated && !canBuy) : addingToCart || (isAuthenticated && !canBuy)}
-        aria-busy={(quickBuyOn ? quickBuyBusy : addingToCart) || undefined}
-        className="lv-button lv-button-primary relative min-w-0 flex-1 overflow-hidden min-h-[50px] text-[15px] active:scale-[0.985] [touch-action:manipulation]"
+        onClick={handleAddToCart}
+        disabled={addingToCart || (isAuthenticated && !canBuy)}
+        className="lv-button lv-button-primary w-full min-h-[50px] text-[15px] active:scale-[0.985] [touch-action:manipulation]"
       >
-        <QuickBuyCtaMorph quick={quickBuyOn}>
-          {quickBuyOn ? (
-            <>
-              <QuickBuyBolt />
-              {quickBuyBusy ? quickBuyWords.ctaBusy : quickBuyWords.cta}
-            </>
-          ) : (
-            <>
-              {justAdded ? (
-                <Check aria-hidden="true" className="w-5 h-5" />
-              ) : (
-                <ShoppingCart aria-hidden="true" className="w-5 h-5" />
-              )}
-              {buyButtonLabel}
-            </>
-          )}
-        </QuickBuyCtaMorph>
+        {cartIcon}
+        {buyButtonLabel}
       </button>
-      {showQuickBuyToggle ? (
-        <QuickBuyToggle on={quickBuyOn} onToggle={() => void toggleQuickBuy()} onWarm={warmQuickBuy} busy={quickBuyBusy} />
-      ) : null}
-    </div>
-  );
+    );
 
   // ------------------------------------------------------------------ render
   return (
@@ -4540,8 +4554,11 @@ export default function Product() {
               mode={quickBuySheet.mode}
               onClose={closeQuickBuySheet}
               onActivated={() => {
-                setQuickBuyFor(product.id);
+                // The sheet slides away first; then the bar morphs to Quick
+                // Buy on its own — the customer never taps ⚡ twice.
+                const id = product.id;
                 setQuickBuySheet((now) => ({ ...now, open: false }));
+                window.setTimeout(() => setQuickBuyFor((now) => (now === null ? id : now)), 280);
               }}
               printerPolicy={quickBuySheet.policy}
               onPrinterAccept={(acceptance) => {

@@ -348,19 +348,24 @@ export default function Orders() {
     loadCounts();
   }, [loadCounts]);
 
-  // The Quick Buy session is read again on every visit; the card is drawn
-  // while one is open or its order was just sent.
+  // The Quick Buy session is read again on every visit. Its card exists only
+  // while it is OPEN (owner spec §13): once submitted it is an ordinary order
+  // in the list below. The card stays mounted for the rest of a visit that saw
+  // it open, so the one transient line it leaves («تم إرسال …», a toast) can
+  // be said; a session the server could not submit gets one line of its own.
   const { user } = useAuth();
   const quickBuyOwner = user?.id ?? null;
   const quickBuy = useQuickBuySnapshot(quickBuyOwner);
   useEffect(() => {
     void refreshQuickBuySession(quickBuyOwner);
   }, [quickBuyOwner]);
-  const quickBuyShown = (!!quickBuy.session && quickBuy.session.state !== 'cancelled') || !!quickBuy.recent;
+  const openSessionId = quickBuy.session?.state === 'open' ? quickBuy.session.id : null;
+  const [sawQuickBuyOpen, setSawQuickBuyOpen] = useState(false);
+  if (openSessionId && !sawQuickBuyOpen) setSawQuickBuyOpen(true);
+  const quickBuyShown = !!openSessionId || sawQuickBuyOpen || quickBuy.recent?.state === 'failed';
   // When a session that was open on this page becomes an order, the order is
   // real now: the list and the counts are read again so it appears in both.
-  const openSessionId = quickBuy.session?.state === 'open' ? quickBuy.session.id : null;
-  const submittedOrder = quickBuy.recent?.order_id ?? null;
+  const submittedOrder = quickBuy.recent?.state === 'submitted' ? quickBuy.recent.order_id : null;
   const sawOpen = useRef<string | null>(null);
   useEffect(() => {
     if (openSessionId) {

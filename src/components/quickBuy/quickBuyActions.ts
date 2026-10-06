@@ -1,9 +1,9 @@
 /**
  * THE PRODUCT PAGE'S QUICK BUY, AS A LAZY CHUNK (docs/GIFTS_QUICK_BUY.md §3.5).
  *
- * The page imports this on the first press of the ⚡ toggle (and warms it on
- * pointerdown and focus), so the product's opening never carries the typed
- * client, the feature's sentences or the thirteen refusals.
+ * The page imports this after it has painted, and on the first press of ⚡
+ * (warmed on pointerdown and focus), so the product's opening never carries
+ * the typed client, the feature's sentences or the refusals.
  *
  * Two questions live here:
  *
@@ -65,17 +65,26 @@ export function readinessOf(profile: QuickBuyProfile): QuickBuyReadiness {
 }
 
 /**
- * The profile as of the last minute (a toggle pressed twice asks once). A
+ * The profile as of the last minute (⚡ pressed twice asks once). A
  * failure is `unknown`: the add itself is still refused by the server if the
  * account is not ready, and that refusal opens the sheet then.
  */
-export async function quickBuyReadiness(owner: string | null | undefined): Promise<{ state: QuickBuyReadiness; profile: QuickBuyProfile | null }> {
-  try {
-    const profile = await getQuickBuyProfile(owner, { maxAgeMs: 60_000 });
-    return { state: readinessOf(profile), profile };
-  } catch {
-    return { state: 'unknown', profile: null };
-  }
+type ReadinessAnswer = { state: QuickBuyReadiness; profile: QuickBuyProfile | null };
+let asking: { owner: string; promise: Promise<ReadinessAnswer> } | null = null;
+
+export function quickBuyReadiness(owner: string | null | undefined): Promise<ReadinessAnswer> {
+  // The page asks after it paints and again when a finger lands on ⚡: one request answers both.
+  if (asking && asking.owner === (owner ?? '')) return asking.promise;
+  const promise = getQuickBuyProfile(owner, { maxAgeMs: 60_000 }).then(
+    (profile) => ({ state: readinessOf(profile), profile }),
+    () => ({ state: 'unknown' as const, profile: null })
+  );
+  const entry = { owner: owner ?? '', promise };
+  asking = entry;
+  void promise.then(() => {
+    if (asking === entry) asking = null;
+  });
+  return promise;
 }
 
 export interface QuickBuyAddContext {

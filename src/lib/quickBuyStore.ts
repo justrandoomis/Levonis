@@ -208,9 +208,13 @@ export function quickBuyRemainingMs(s: QuickBuySnapshot, now: number): number | 
   return end === null ? null : Math.max(0, end - Math.max(now, s.receivedAt));
 }
 
-/** «28:42» — minutes and seconds, two digits each, Latin digits, never negative. */
+/**
+ * «28:42» — minutes and seconds, two digits each, Latin digits, never
+ * negative. Rounded UP, as a countdown is read: «00:00» appears at the very
+ * moment the window closes and everything locks, never a second before it.
+ */
 export function formatQuickBuyClock(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000));
+  const total = Math.max(0, Math.ceil(ms / 1000));
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
 }
