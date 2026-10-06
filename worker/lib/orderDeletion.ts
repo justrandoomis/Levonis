@@ -74,6 +74,11 @@ export const ORDER_HISTORY_TABLES = [
   'policy_acceptances',
   'support_tickets',
   'reviews',
+  // 0175: a gift names the order that consumed it. A cancelled order — the
+  // only kind deleted — already returned its gift (trigger
+  // trg_orders_gift_cancelled), so this is the belt to that brace: unlinked,
+  // never deleted.
+  'gift_entitlements',
   'chats',
 ] as const;
 
@@ -219,7 +224,7 @@ export async function deleteCancelledOrder(
     if (!columns.has('order_id')) continue;
     const clears = ['"order_id" = NULL'];
     let where = '"order_id" = ?1';
-    if (table === 'reviews' && columns.has('order_item_id')) {
+    if ((table === 'reviews' || table === 'gift_entitlements') && columns.has('order_item_id')) {
       clears.push('"order_item_id" = NULL');
       where += ' OR "order_item_id" IN (SELECT id FROM order_items WHERE order_id = ?1)';
     }

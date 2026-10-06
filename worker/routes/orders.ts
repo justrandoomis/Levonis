@@ -35,7 +35,18 @@ import {
   resolveCartBundles,
   selectionFromCartRow,
   refuseIncompleteSelection,
+  giftLineFacts,
+  giftRefusalError,
 } from './cart';
+import {
+  giftCheckoutRefusalCode,
+  giftEntitlementIdOf,
+  giftPricingBlock,
+  giftTransportSnapshot,
+  giftVerdictRefusal,
+  verifyGiftCartLines,
+  type GiftPricingBlock,
+} from '../lib/gifts/cartLine';
 import type { ResolvedBundle } from '../lib/bundleRead';
 import {
   allocateComponentValue,
@@ -178,7 +189,7 @@ import {
   getOrderPointsSnapshots,
 } from '../lib/pointsOps';
 import type { PointsRule, OrderPointsSnapshot } from '../lib/pointsOps';
-import { audit } from '../lib/audit';
+import { audit, auditStatements } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { quoteShipping } from '../lib/shipping';
 import { activeCategoryDeliveryRules } from '../lib/categoryDelivery';
@@ -694,7 +705,7 @@ export function orderPublic(
   return {
     id: o.id,
     status: o.status,
-    /** What made the order (0174): the cart, a Quick Buy session, or gifts only. */
+    /** What made the order (0174, D15): the cart, a Quick Buy session, or gifts only. */
     order_kind: o.order_kind === 'quick_buy' || o.order_kind === 'gift' ? o.order_kind : 'normal',
     /** §1: which of the four journeys this order is on. */
     shipping_type: shippingType,
@@ -846,6 +857,14 @@ export function orderPublic(
         qty: it.qty,
         unit_price_iqd: it.unit_price_iqd,
         line_total_iqd: it.line_total_iqd,
+        /**
+         * A GIFT (0175): this line was granted, not bought — 0 IQD by design,
+         * with its value in `pricing.gift.value_iqd`. Read from the row's own
+         * column; a database behind 0175 has none, and every line is then an
+         * ordinary one.
+         */
+        is_gift: typeof it.gift_entitlement_id === 'string' && it.gift_entitlement_id !== '',
+        gift_id: typeof it.gift_entitlement_id === 'string' && it.gift_entitlement_id !== '' ? it.gift_entitlement_id : null,
         // Resolver snapshots persisted at checkout time (cost fields stripped
         // before persistence — safe for the buyer to see).
         pricing: safeParse(it.pricing_snapshot, null),
@@ -1766,6 +1785,15 @@ export interface ComputedLine {
    *  construction, or nothing at all. See worker/lib/financeLedger.ts. */
   cost_basis?: CostBasis;
   /**
+   * A GIFT LINE (0175, docs/GIFTS_QUICK_BUY.md §1.2) — the gift that makes this
+   * ordinary product free, and the order attempt it is (`order_seq + 1`). Set
+   * only after `verifyGiftCartLines` proved the gift is this buyer's, redeemed
+   * and frozen to this line. It carries no `benefit` and no offer, so no
+   * membership rule, coupon cap, offer or points accrual ever reaches it (S8);
+   * its `stock_targets` are the real ones (D6).
+   */
+  gift?: (GiftPricingBlock & { order_seq: number }) | null;
+  /**
    * WHAT THE MEMBERSHIP BENEFIT RESOLVER NEEDS FROM THIS LINE (§3).
    *
    * The section and sub-section come from the PRODUCT ROW, never from a cart
@@ -2246,7 +2274,9 @@ export async function computeCheckout(
   // So every database read a bundle line needs — its components, its stored
   // choices, its config, its window and its members' stock — happens once,
   // here, and all three passes then read the same resolution.
-  const compositionRows = rows.filter((r) => String(r.composition ?? '') !== '');
+  // A gift line (0175) is never a composition: it is priced by its own branch
+  // in `priceLines`, so it never enters the bundle or mystery pre-passes.
+  const compositionRows = rows.filter((r) => String(r.composition ?? '') !== '' && !giftEntitlementIdOf(r));
   /**
    * SCHEDULED SPECIAL OFFERS ON THE ORDINARY LINES (§9, §12) — read here, in
    * the pre-pass, for the same reason the composition is: `priceLines` is
@@ -2257,7 +2287,8 @@ export async function computeCheckout(
    * makes "the card, the cart and the door quote the offer price" a property
    * of the code rather than of three call sites agreeing by luck.
    */
-  const ordinaryRows = rows.filter((r) => String(r.composition ?? '') === '');
+  // A gift line looks up no offer (S8): no window can price, gate or count it.
+  const ordinaryRows = rows.filter((r) => String(r.composition ?? '') === '' && !giftEntitlementIdOf(r));
   const offerNow = Date.now();
   /**
    * AN OFFER IS OPTIONAL; BEING ABLE TO PAY IS NOT.
@@ -2339,7 +2370,7 @@ export async function computeCheckout(
   // them the checkout's printer delivery note would go silent the moment a
   // printer was sold inside a bundle.
   const memberIds = [...bundles.values()].flatMap((b) => b.components.map((k) => k.member_product_id));
-  const [views, printerIds, poolMemberIds, members] = await Promise.all([
+  const [views, printerIds, poolMemberIds, members, giftVerdicts] = await Promise.all([
     loadRelationsViews(
       c.env.DB,
       rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
@@ -2377,6 +2408,14 @@ export async function computeCheckout(
      * three times).
      */
     loadCompositionMembers(c.env.DB, memberIds),
+    /**
+     * THE GIFT LINES (0175), verified in ONE read and re-verified here at the
+     * door whatever the cart said a minute ago: the gift is this buyer's,
+     * redeemed, and frozen to exactly the row in the cart. No read at all
+     * when the cart holds no gift. `priceLines` is synchronous, so the
+     * verdicts are resolved here, once, for every pass.
+     */
+    verifyGiftCartLines(c.env.DB, user.id, rows),
   ]);
 
   /**
@@ -2453,6 +2492,99 @@ export async function computeCheckout(
     let physical = 0;
     for (const row of rows) {
       const displayName = String(row.name_ar || row.name);
+
+      // ---- A GIFT LINE (0175, docs/GIFTS_QUICK_BUY.md §1.2, D6) ----------
+      // An ordinary product at 0 IQD — ONLY because the gift was re-verified
+      // above (this buyer's, redeemed, frozen to this row); a row that fails
+      // that is refused here, never priced. Everything else is the ordinary
+      // line's own chain on the FROZEN selection: the real stock targets of
+      // the stated type (reserved, deducted and released through the ledger
+      // like any line), the route and its lead time kept, the stated type never
+      // swapped, the weight and delivery facts counted. No benefit, no offer,
+      // no points (S7, S8).
+      if (giftEntitlementIdOf(row)) {
+        const verdict = giftVerdicts.get(String(row.cart_item_id));
+        if (!verdict || !verdict.ok || !verdict.selection) {
+          const code = giftVerdictRefusal(verdict);
+          throw new HttpError(
+            409,
+            code === 'GIFT_ALREADY_ORDERED'
+              ? `"${displayName}": this gift has already been ordered and cannot be ordered again.`
+              : `"${displayName}": the gift cannot be ordered right now. Refresh your gifts page and try again.`,
+            code
+          );
+        }
+        const sel = verdict.selection;
+        const view = views.get(String(row.id));
+        const isPrinter = printerIds.has(String(row.id));
+        const coarse = poolMemberIds.has(String(row.id));
+        const facts = giftLineFacts({ row, sel, ctx: pricingCtx, view, preorderPricing, isPrinter, coarseStock: coarse });
+        if (facts.refusal) throw giftRefusalError(facts.refusal);
+        const stockRes = resolveForOrderType(
+          sel.saleType,
+          snapshotFrom(view ?? EMPTY_RELATIONS, {
+            stock: facts.doc.stock,
+            reserved: Number(row.stock_reserved ?? 0),
+            low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+          }),
+          { option_value_ids: sel.optionValueIds, color_id: sel.colorId || null },
+          view ? capacityFrom(view, sel.optionValueIds) : null,
+          sel.transportMethod
+        );
+        if (stockRes.error === 'VARIANT_NOT_MODELLED') {
+          throw badRequest(`"${displayName}": that combination is not available for sale`, 'VARIANT_NOT_MODELLED');
+        }
+        if (stockRes.available !== null && stockRes.available < sel.qty) {
+          const details = { product_id: String(row.id), requested: sel.qty, coarse, ...(coarse ? {} : { available: stockRes.available }) };
+          if (sel.saleType === 'pre_order') {
+            throw badRequest(`The pre-order quota for "${displayName}" is full`, 'PREORDER_CAPACITY_EXHAUSTED', details);
+          }
+          throw badRequest(`"${displayName}" is out of stock`, 'OUT_OF_STOCK', details);
+        }
+        const block = giftPricingBlock(verdict, facts.resolved.regular_iqd, sel.qty);
+        // The cost leaves the customer's snapshot and lands on the row (0095):
+        // a gift is a promotional cost, recorded like every other sale.
+        const { cost_iqd: giftCost, ...giftSnapshot } = facts.zeroed;
+        const giftLineCost = costSnapshot(giftCost);
+        lines.push({
+          cart_item_id: String(row.cart_item_id),
+          id: newId('oi'),
+          product_id: String(row.id),
+          option_value_ids: sel.optionValueIds,
+          stock_targets: stockRes.targets,
+          name: String(row.name),
+          name_ar: String(row.name_ar ?? ''),
+          image: productImageForSelection(facts.doc, { optionValueIds: sel.optionValueIds, colorId: sel.colorId || null }, view),
+          variant: facts.variantLabel,
+          option_id: sel.optionValueIds[0] ?? '',
+          color_id: sel.colorId,
+          // '' like every ordinary line: the cart's `gift:` discriminator is
+          // cart identity, and `order_items.shipping_method_id` is read
+          // downstream as a delivery hint.
+          shipping_method_id: '',
+          qty: sel.qty,
+          unit: 0,
+          line: 0,
+          applied_iqd: 0,
+          tracked: stockRes.tracked,
+          pricing_snapshot: JSON.stringify({ ...giftSnapshot, gift: block }),
+          warranty_snapshot: null,
+          transport_snapshot: giftTransportSnapshot(facts.zeroed),
+          breakdown: publicBreakdown(facts.zeroed),
+          is_printer: isPrinter,
+          pricing_basis: facts.zeroed.pricing_basis,
+          cost_iqd: giftLineCost.cost_iqd,
+          cost_basis: giftLineCost.cost_basis,
+          physical_dimensions: resolveSelectionPhysicalDimensions(facts.doc, view ?? EMPTY_RELATIONS, {
+            optionValueIds: sel.optionValueIds,
+            colorId: sel.colorId || null,
+          }),
+          gift: { ...block, order_seq: verdict.nextOrderSeq },
+        });
+        productIds.push(String(row.id));
+        shippingItems.push({ product_id: String(row.id), qty: sel.qty, is_printer: isPrinter, ...shippingFactsFrom(row.ops_policy, row) });
+        continue;
+      }
 
       // ---- A COMPOSITION LINE (§5.3, §6.1) --------------------------------
       // One PARENT line carrying the money and no stock targets, plus one
@@ -3896,6 +4028,8 @@ function quoteLines(lines: ComputedLine[]) {
         line_total_iqd: l.line,
         is_printer: l.is_printer,
         breakdown: l.breakdown,
+        // A gift (0175): 0 IQD, with what it is worth and which gift it is.
+        ...(l.gift ? { kind: 'gift' as const, is_gift: true, gift: { id: l.gift.gift_id, level: l.gift.level, value_iqd: l.gift.value_iqd } } : {}),
         ...(kids.length
           ? {
               // The two figures the disclosure struck through and badged. On
@@ -4384,7 +4518,9 @@ export async function placeOrder(
   const gift = preorderGiftFor({
     config: comp.preorderGiftConfig as PreorderGiftConfig | null,
     proContext: comp.proContext,
-    isPreorder: orderShippingType.startsWith('preorder_'),
+    // A GIFT-ONLY order (0175, S8) buys nothing, so it earns no spool: a gift
+    // triggers no other reward. One bought line restores it.
+    isPreorder: orderShippingType.startsWith('preorder_') && comp.lines.some((l) => !l.gift),
     dueOnDeliveryIqd: comp.dueOnDelivery,
     now,
   });
@@ -4417,6 +4553,8 @@ export async function placeOrder(
   const giniHoldUntilIso = isGiniPayment ? giniHoldUntil(now, comp.giniPolicy.hold_hours) : null;
   const giniOrderNo = isGiniPayment ? input.giniOrderNo : '';
 
+  const giftLines = comp.lines.filter((l) => l.gift);
+  const giftOnly = giftLines.length > 0 && comp.lines.every((l) => l.gift);
   const stmts = [
     // Quick Buy frees the session's hold and stock FIRST, so the spend and the
     // reservation below see the money and the units it was holding.
@@ -4477,7 +4615,14 @@ export async function placeOrder(
        */
       gini_order_no: giniOrderNo, gini_paid_iqd: comp.giniPaidIqd, gini_state: giniState, gini_hold_until: giniHoldUntilIso,
       created_at: now, updated_at: now,
-    }, quickBuy ? { order_kind: 'quick_buy', quick_buy_session_id: quickBuy.sessionId } : undefined),
+    // D15: a Quick Buy session's order is 'quick_buy' (it carries no gift
+    // line); an order whose EVERY line is a gift is a gift order; a mixed one
+    // stays 'normal' (the column's default, so nothing is written for it).
+    }, quickBuy
+      ? { order_kind: 'quick_buy', quick_buy_session_id: quickBuy.sessionId }
+      : giftOnly
+        ? { order_kind: 'gift' }
+        : undefined),
   ];
 
   // Foreign-key order association and consent commit or roll back together.
@@ -4522,6 +4667,9 @@ export async function placeOrder(
   const redemptions = new Map<string, number>();
   for (const it of comp.lines) {
     if (it.bundle_parent_item_id) continue; // a component redeems nothing of its own
+    // A gift line takes no offer (S8) — not even when a bought line of the same
+    // product does, so a gift never spends an offer allowance.
+    if (it.gift) continue;
     if (!comp.compositionSubjects.has(it.product_id)) continue;
     redemptions.set(it.product_id, (redemptions.get(it.product_id) ?? 0) + it.qty);
   }
@@ -4544,8 +4692,46 @@ export async function placeOrder(
         // §19 — WHAT THE MEMBERSHIP TOOK OFF THIS LINE, and under which rule.
         membership_discount_iqd: comp.benefits.byLine.get(it.id)?.total_iqd ?? 0,
         membership_rule_id: comp.benefits.byLine.get(it.id)?.rule_id ?? null,
-      })
+      // The two 0175 columns, on a gift line only — every other line's INSERT
+      // is the statement it always was.
+      }, it.gift ? { gift_entitlement_id: it.gift.gift_id, gift_order_seq: it.gift.order_seq } : undefined)
     );
+    /**
+     * THE GIFT IS CONSUMED HERE, IN THE ORDER'S OWN BATCH (0175, D4).
+     *
+     * One conditional UPDATE whose WHERE is the precondition: this buyer's gift,
+     * still redeemed, still at the attempt this checkout priced. The gift fence
+     * below counts the flips, and `idx_order_items_gift_line` holds one line per
+     * attempt — so of two concurrent checkouts of one gift exactly one commits;
+     * the other's WHOLE batch rolls back (no order, no wallet debit, no points,
+     * no stock). `order_seq` moves on, so a new order after a cancellation
+     * (which returns the gift, trigger `trg_orders_gift_cancelled`) is attempt
+     * n + 1.
+     */
+    if (it.gift) {
+      stmts.push(
+        c.env.DB.prepare(
+          `UPDATE gift_entitlements
+              SET state = 'ordered', order_id = ?1, order_item_id = ?2, ordered_at = ?3,
+                  order_seq = order_seq + 1, version = version + 1, updated_at = ?3
+            WHERE id = ?4 AND user_id = ?5 AND state = 'redeemed' AND order_seq = ?6`
+        ).bind(orderId, it.id, now, it.gift.gift_id, user.id, it.gift.order_seq - 1)
+      );
+      const giftAudit = await auditStatements(c.env.DB, user.id, 'gift.order', it.gift.gift_id, {
+        user_id: user.id,
+        actor: user.id,
+        order_id: orderId,
+        order_item_id: it.id,
+        level: it.gift.level,
+        product_id: it.product_id,
+        option_value_ids: it.option_value_ids,
+        color_id: it.color_id,
+        qty: it.qty,
+        value_iqd: it.gift.value_iqd,
+        order_seq: it.gift.order_seq,
+      });
+      stmts.push(...giftAudit.statements);
+    }
     // THE ALLOCATION, in the ORDER'S OWN BATCH — never a second batch and
     // never a post-response write. `PRIMARY KEY (order_item_id, spool_index)`
     // is the replay fence: a replay that somehow re-entered this path collides
@@ -4583,6 +4769,23 @@ export async function placeOrder(
     // Stock moves through the inventory ledger AFTER this batch commits (see
     // below): it needs its own idempotency-keyed batch so a retry of the whole
     // checkout is a no-op rather than a second deduction.
+  }
+
+  /**
+   * THE GIFT FENCE (0175) — the reservation fence's idea, for the gift flips
+   * above: each is a conditional UPDATE, and one that matches nothing does not
+   * fail a batch. This counts the gifts the batch actually marked `ordered` for
+   * this order; a shortfall fires the fence's CHECK and the whole order rolls
+   * back. Only an order holding a gift writes it, so every other order's batch
+   * is exactly what it was.
+   */
+  if (giftLines.length > 0) {
+    stmts.push(
+      c.env.DB.prepare(
+        `INSERT INTO order_reservation_fence (order_id, kind, expected, actual)
+         SELECT ?1, 'gift', ?2, (SELECT COUNT(*) FROM gift_entitlements WHERE order_id = ?1 AND state = 'ordered')`
+      ).bind(orderId, giftLines.length)
+    );
   }
 
   // ONE `mystery_draw_audits` ROW PER LINE (never per spool): the candidate
@@ -4900,6 +5103,34 @@ export async function placeOrder(
         throw badRequest('BNPL eligibility changed. Please review checkout.', publicCode);
       }
     }
+    /**
+     * A GIFT ANOTHER CHECKOUT CONSUMED FIRST (0175). The gift fence's CHECK or
+     * the per-attempt UNIQUE index means this whole order rolled back and
+     * consumed nothing. Mapped BEFORE the generic CHECK branch, and only when
+     * a gift is really no longer waiting — a stock race on an order that also
+     * holds a gift is still CONFLICT_RETRY.
+     */
+    if (giftLines.length > 0 && (msg.includes('CHECK') || msg.includes('UNIQUE'))) {
+      // The per-attempt index named in the error is a gift refusal even when
+      // every gift still reads `redeemed` (a line of this attempt already
+      // exists): never a generic «try again».
+      const giftCode =
+        (await giftCheckoutRefusalCode(
+          c.env.DB,
+          user.id,
+          giftLines.map((l) => l.gift!.gift_id),
+          new Map(giftLines.map((l) => [l.gift!.gift_id, l.gift!.order_seq]))
+        )) ?? (msg.includes('order_items.gift_entitlement_id') ? 'GIFT_NOT_ORDERABLE' : null);
+      if (giftCode) {
+        throw new HttpError(
+          409,
+          giftCode === 'GIFT_ALREADY_ORDERED'
+            ? 'This gift has already been ordered and cannot be ordered again.'
+            : 'The gift cannot be ordered right now. Refresh your gifts page and try again.',
+          giftCode
+        );
+      }
+    }
     if (msg.includes('CHECK')) {
       throw badRequest('Order could not be placed: a balance or stock level changed. Please review your cart and try again.', 'CONFLICT_RETRY');
     }
@@ -4969,6 +5200,8 @@ export async function placeOrder(
     bnpl_iqd: comp.bnplAmount, bnpl_due_at: comp.bnplDueAt,
     fulfillment_service: fulfillmentService, priority_due_at: comp.priorityDelivery.due_at,
     support_referrer: comp.supportSnapshot?.referrer_user_id ?? null,
+    // 0175: the gifts this order consumed — present only when there are some.
+    ...(giftLines.length > 0 ? { gift_ids: giftLines.map((l) => l.gift!.gift_id), order_kind: giftOnly ? 'gift' : 'normal' } : {}),
   });
 
   // Invoice (§3D): created after the order stands; createInvoiceForOrder

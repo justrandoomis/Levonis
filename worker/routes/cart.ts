@@ -131,6 +131,17 @@ import { supportEligibleProductIds } from '../lib/membershipOps';
 import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
 import { pricedPlans, refuseNonPrinterWarranty } from '../lib/warrantyPlans';
 import { productImageForSelection } from '../lib/productSelectionImage';
+import {
+  giftEntitlementIdOf,
+  giftLineDiscriminator,
+  giftVerdictRefusal,
+  GIFT_LINE_COLUMNS,
+  verifyGiftCartLines,
+  zeroGiftPrice,
+  type GiftLineVerdict,
+} from '../lib/gifts/cartLine';
+import { giftSelectionOf, selectionFromColumns, type GiftSelection } from '../lib/gifts/selection';
+import { changedExactlyOne, isLostRace } from '../lib/gifts/fence';
 
 export const cartRoutes = new Hono<AppContext>();
 cartRoutes.use('*', requireAuth);
@@ -711,7 +722,7 @@ async function loadCart(c: Context<AppContext>) {
   // flag. One extra query for the whole cart, never per line, and it feeds
   // no price anywhere.
   const activeIds = results.filter((r) => r.status === 'active').map((r) => String(r.id ?? ''));
-  const [eligibleIds, printerIds, poolMemberIds] = await Promise.all([
+  const [eligibleIds, printerIds, poolMemberIds, giftVerdicts] = await Promise.all([
     // A DISPLAY FLAG IS NOT WORTH A 500 (the `soft` pattern in
     // worker/routes/admin.ts, added after one `chats.order_id` lookup took the
     // whole fulfilment modal down). §3.3 says a support code has ZERO monetary
@@ -755,6 +766,13 @@ async function loadCart(c: Context<AppContext>) {
      * that: it still throws, and the stock count stays unpublished.
      */
     degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, activeIds), new Set<string>()),
+    /**
+     * THE GIFT LINES (0175), re-verified on EVERY read: a gift line is priced
+     * at 0 only while its gift is this customer's, redeemed and frozen to
+     * exactly this row. One read for the whole cart, and none at all for a
+     * cart without one — the common case costs nothing.
+     */
+    verifyGiftCartLines(c.env.DB, user.id, results),
   ]);
 
   // One batched read of every product's relational structure — never N+1.
@@ -788,7 +806,10 @@ async function loadCart(c: Context<AppContext>) {
     () =>
       loadOffers(
         c.env.DB,
-        results.filter((r) => r.status === 'active' && String(r.composition ?? '') === '').map((r) => subjectOf(String(r.id)))
+        // A gift line looks up no offer (S8): no window can price or refuse it.
+        results
+          .filter((r) => r.status === 'active' && String(r.composition ?? '') === '' && !giftEntitlementIdOf(r))
+          .map((r) => subjectOf(String(r.id)))
       ),
     new Map<string, OfferView>()
   );
@@ -829,6 +850,19 @@ async function loadCart(c: Context<AppContext>) {
     if (!doc.delivery_options.personal.enabled) unavailableDelivery.personal.add(doc.id);
   };
   for (const row of results) {
+    // A GIFT LINE, BEFORE the inactive skip: a gift whose product was hidden
+    // shows as blocked with its reason instead of vanishing from the cart.
+    if (giftEntitlementIdOf(row)) {
+      const gift = giftCartItem(row, giftVerdicts.get(String(row.cart_item_id)), {
+        ctx,
+        view: views.get(String(row.id)),
+        isPrinter: printerIds.has(String(row.id ?? '')),
+        coarseStock: poolMemberIds.has(String(row.id ?? '')),
+      });
+      if (row.status === 'active') constrainDelivery(gift.doc);
+      items.push(gift.item);
+      continue;
+    }
     if (row.status !== 'active') continue; // hidden products drop out of the cart view
     const composition = String(row.composition ?? '');
     if (composition !== '') {
@@ -1566,6 +1600,380 @@ function refuseQty(availability: SaleAvailability) {
   );
 }
 
+// ------------------------------------------------------------- gift lines
+//
+// THE GIFT AS A LINE OF THE REAL CART (owner brief 2026-10-06 §1;
+// docs/GIFTS_QUICK_BUY.md §1.2, D4, D6). A redeemed gift grants ONE real
+// catalogue product — model, colour, quantity, sale type and route frozen on
+// the gift — and it reaches the customer through this cart and the ordinary
+// checkout, never a copy of either. What makes it a gift is a server-written
+// column (`cart_items.gift_entitlement_id`) re-verified on every read; nothing
+// a client sends can make a line free.
+
+/** A refusal a gift line answers with; `code` is the client's key (src/lib/refusalStrings.ts). */
+export interface GiftLineRefusal {
+  status: 400 | 409;
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+const giftRefusal = (status: 400 | 409, code: string, message: string, details?: Record<string, unknown>): GiftLineRefusal => ({
+  status,
+  code,
+  message,
+  ...(details ? { details } : {}),
+});
+
+/** The refusal as the error a door throws. */
+export function giftRefusalError(r: GiftLineRefusal): HttpError {
+  return new HttpError(r.status, r.message, r.code, r.details);
+}
+
+/** A line that cannot be bought, said with its own code — the counters are left as they are. */
+function blockedAvailability(a: SaleAvailability, code: string): SaleAvailability {
+  return {
+    ...a,
+    mode: 'unavailable',
+    reason: code,
+    stock: { ...a.stock, max_qty: 0 },
+    preorder: { ...a.preorder, capacity: { ...a.preorder.capacity, max_qty: 0 } },
+    qty_ok: false,
+  };
+}
+
+export interface GiftLineFacts {
+  doc: ProductDoc;
+  /** The resolver's answer for the frozen selection; its `regular_iqd` is the gift's unit value. */
+  resolved: ResolvedPrice;
+  /** What the customer pays: the product and every line fee at 0 (`zeroGiftPrice`). */
+  zeroed: ResolvedPrice;
+  variantLabel: string;
+  selectionErrors: string[];
+  /** `saleAvailability` asked about the frozen type and quantity, before any refusal is written over it. */
+  described: SaleAvailability;
+  /** What the cart shows: the stated type's availability, or the refusal written over it. */
+  availability: SaleAvailability;
+  refusal: GiftLineRefusal | null;
+}
+
+/**
+ * ONE RULE FOR A GIFT LINE — the cart read, the add door and the checkout all
+ * run it, so the three can never disagree about whether a gift can be ordered.
+ *
+ * It is the ordinary line's own chain on the gift's FROZEN selection:
+ * `resolveCartLine` (model, colour, type and route rungs plus the relational
+ * `validateSelection`) at the REGULAR rung — a gift is valued at the regular
+ * price and charged nothing — then `saleAvailability` asked about the frozen
+ * type and quantity, then `unusableOrderType`: a stated type is honoured or
+ * refused, never swapped. No offer is consulted (S8).
+ *
+ * PURE: the checkout's `priceLines` runs it up to three times per request.
+ */
+export function giftLineFacts(input: {
+  row: Record<string, unknown>;
+  sel: GiftSelection;
+  ctx: PricingContext;
+  view?: ProductRelationsView;
+  preorderPricing: PreorderPricing;
+  isPrinter: boolean;
+  coarseStock: boolean;
+}): GiftLineFacts {
+  const { row, sel, view } = input;
+  const cartSel: CartSelection = {
+    optionId: sel.optionValueIds[0] ?? '',
+    optionValueIds: sel.optionValueIds,
+    colorId: sel.colorId,
+    transportMethod: sel.transportMethod,
+    fulfillmentType: sel.saleType,
+    warrantyPlanId: '',
+  };
+  const { doc, resolved, variantLabel, selectionErrors } = resolveCartLine(
+    row,
+    cartSel,
+    'free',
+    false,
+    input.ctx,
+    view,
+    input.preorderPricing,
+    input.isPrinter
+  );
+  const described = saleAvailability(doc, {
+    optionValueIds: sel.optionValueIds,
+    colorId: sel.colorId || null,
+    qty: sel.qty,
+    coarseStock: input.coarseStock,
+    transportDefaults: input.ctx.transportDefaults,
+    inventory: snapshotFrom(view ?? EMPTY_RELATIONS, {
+      stock: doc.stock,
+      reserved: Number(row.stock_reserved ?? 0),
+      low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+    }),
+    links: view?.links,
+    // The type the gift was GRANTED as — stated, never inferred.
+    preferredType: sel.saleType,
+    capacity: view ? capacityFrom(view, sel.optionValueIds) : null,
+    transportMethod: sel.transportMethod,
+  });
+  const refusal = giftLineRefusalFor(row, sel, resolved, selectionErrors, described);
+  return {
+    doc,
+    resolved,
+    zeroed: zeroGiftPrice(resolved),
+    variantLabel,
+    selectionErrors,
+    described,
+    availability: refusal ? blockedAvailability(described, refusal.code) : statedAvailability(described, sel.saleType, sel.transportMethod),
+    refusal,
+  };
+}
+
+function giftLineRefusalFor(
+  row: Record<string, unknown>,
+  sel: GiftSelection,
+  resolved: ResolvedPrice,
+  selectionErrors: string[],
+  a: SaleAvailability
+): GiftLineRefusal | null {
+  // A hidden product, or one that became a bundle: the gift cannot be sold as
+  // granted, and the customer can only ask support about it.
+  if (String(row.status ?? '') !== 'active' || String(row.composition ?? '') !== '') {
+    return giftRefusal(409, 'GIFT_NOT_AVAILABLE', 'This gift is no longer available.');
+  }
+  if (sel.saleType === 'pre_order' && !sel.transportMethod) {
+    return giftRefusal(400, 'TRANSPORT_REQUIRED', 'This pre-order gift has no shipping route.');
+  }
+  if (resolved.errors.length > 0) {
+    // The granted order type or route is no longer offered for this model.
+    if (resolved.errors.some((e) => e.startsWith('FULFILLMENT_') || e.startsWith('TRANSPORT_') || e.endsWith('_NOT_ENABLED'))) {
+      return giftRefusal(409, 'GIFT_SALE_TYPE_UNAVAILABLE', 'The sale type of this gift is not available right now.', { errors: resolved.errors });
+    }
+    return giftRefusal(409, 'GIFT_NOT_AVAILABLE', 'This gift is no longer available.', { errors: resolved.errors });
+  }
+  if (selectionErrors.length > 0 || !a.selection.complete) {
+    return giftRefusal(409, 'GIFT_NOT_AVAILABLE', 'This gift is no longer available.', { errors: [...selectionErrors, ...a.selection.errors] });
+  }
+  const stated = unusableOrderType(a, sel.saleType);
+  if (stated) return giftRefusal(400, stated.code, stated.message);
+  if (a.mode === 'unavailable') {
+    return giftRefusal(400, a.reason ?? 'UNAVAILABLE', `This gift cannot be ordered right now (${a.reason ?? 'UNAVAILABLE'})`);
+  }
+  if (!a.qty_ok) {
+    const preorder = sel.saleType === 'pre_order';
+    const remaining = preorder ? a.preorder.capacity.available : a.stock.available;
+    return giftRefusal(400, preorder ? 'PREORDER_CAPACITY_EXHAUSTED' : 'OUT_OF_STOCK', preorder ? 'The pre-order quota for this gift is full.' : 'That selection is out of stock.', {
+      requested: sel.qty,
+      ...(remaining === null ? {} : { available: remaining }),
+    });
+  }
+  return null;
+}
+
+/**
+ * ONE GIFT LINE AS `GET /api/cart` SHOWS IT: `kind: 'gift'`, `locked`, the
+ * product at 0 with its value beside it, and nothing to edit — no quantity
+ * stepper, no option, colour, route or warranty editor, no membership line,
+ * no support-gift flag. Removing it is the one thing a customer can do, and
+ * that returns the gift to «redeemed» by itself.
+ */
+function giftCartItem(
+  row: Record<string, unknown>,
+  verdict: GiftLineVerdict | undefined,
+  input: { ctx: PricingContext; view?: ProductRelationsView; isPrinter: boolean; coarseStock: boolean }
+) {
+  const sel: GiftSelection =
+    verdict?.selection ??
+    selectionFromColumns({
+      product_id: row.id,
+      option_value_ids: row.option_value_ids,
+      color_id: row.color_id,
+      qty: row.qty,
+      sale_type: row.fulfillment_type,
+      transport_method: row.transport_method,
+    }) ?? {
+      productId: String(row.id ?? ''),
+      optionValueIds: [],
+      colorId: '',
+      qty: Number(row.qty) || 1,
+      saleType: 'direct_sale',
+      transportMethod: '',
+    };
+  const facts = giftLineFacts({ row, sel, ...input, preorderPricing: 'prepaid' });
+  const verified = !!verdict?.ok;
+  const availability = verified ? facts.availability : blockedAvailability(facts.described, giftVerdictRefusal(verdict));
+  const { doc } = facts;
+  return {
+    doc,
+    item: {
+      id: row.cart_item_id,
+      kind: 'gift' as const,
+      locked: true,
+      productId: row.id,
+      slug: row.slug,
+      name: row.name,
+      name_ar: row.name_ar,
+      image: productImageForSelection(doc, { optionValueIds: sel.optionValueIds, colorId: sel.colorId || null }, input.view),
+      qty: sel.qty,
+      option_id: row.option_id,
+      color_id: row.color_id,
+      transport_method: row.transport_method,
+      warranty_plan_id: '',
+      // The `gift:` discriminator is server identity, not something to echo.
+      shipping_method_id: '',
+      selling_type: doc.selling_type,
+      variantLabel: facts.variantLabel,
+      support_gift_eligible: false,
+      is_printer: input.isPrinter,
+      cod_reprices: false,
+      unit_price_iqd: 0,
+      breakdown: publicBreakdown(facts.zeroed),
+      gift: {
+        id: giftEntitlementIdOf(row),
+        level: verdict?.level ?? 0,
+        value_iqd: Math.max(0, Math.round(facts.resolved.regular_iqd)) * sel.qty,
+      },
+      stock: input.coarseStock ? null : row.stock,
+      low_stock_threshold: input.coarseStock ? null : ((row.low_stock_threshold as number | null) ?? null),
+      availability,
+      selection_errors: facts.selectionErrors,
+      option_value_ids: sel.optionValueIds,
+      relations: null,
+      options: [],
+      colors: [],
+      warranty_plans: [],
+      preorder_transports: [],
+      shipping_methods: [],
+      delivery_options: doc.delivery_options ?? null,
+      delivery_availability: {
+        standard: !doc.delivery_options || doc.delivery_options.standard.enabled,
+        personal: !doc.delivery_options || doc.delivery_options.personal.enabled,
+      },
+    },
+  };
+}
+
+/** The non-redeemed states, as the add door answers them. */
+function giftStateRefusal(state: string): HttpError | null {
+  if (state === 'redeemed') return null;
+  if (state === 'ordered' || state === 'fulfilled') {
+    return conflict('This gift has already been ordered and cannot be ordered again.', 'GIFT_ALREADY_ORDERED');
+  }
+  if (state === 'granted' || state === 'ready_to_redeem') return conflict('Redeem the gift first, then add it to the cart.', 'GIFT_NOT_REDEEMED');
+  // Cancelled, or a legacy review box — neither is ordered through the cart.
+  return conflict('This gift is no longer available.', 'GIFT_NOT_AVAILABLE');
+}
+
+/**
+ * «أضف إلى السلة» FOR A REDEEMED GIFT.
+ *
+ * The body is `{ giftId, replaceCart? }` and NOTHING ELSE is read: the
+ * product, model, colour, quantity, sale type and route come from the gift the
+ * server froze; a price, a quantity or a flag in the body does not exist here.
+ *
+ * In order: the gift is this customer's (404 GIFT_NOT_FOUND otherwise — a
+ * foreign id and an unknown one answer alike), it is redeemed, it is not
+ * already in the cart (a second press or a replayed call answers
+ * `already_in_cart` and writes nothing), the frozen line is valid and sellable
+ * now (`giftLineFacts`, the checkout's own rule), and the cart's one-seller /
+ * one-shipping-type rules hold (`replaceCart` empties it in the same batch,
+ * exactly as for any add).
+ *
+ * A GUARDED INSERT, never an upsert: a gift line must not merge into
+ * anything, and this file keeps exactly two `ON CONFLICT … SET qty`
+ * statements. Its WHERE re-reads the gift inside the batch and the fence after
+ * it rolls the whole batch back — the emptied cart included — when the gift
+ * stopped being redeemed in between; the UNIQUE index on
+ * `gift_entitlement_id` turns a concurrent second add into `already_in_cart`.
+ */
+cartRoutes.post('/gift-items', async (c) => {
+  await rateLimit(c, 'gift_cart_add', 30, 300);
+  const user = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const giftId = str(body?.giftId ?? body?.entitlementId, 'giftId', { min: 1, max: 80 });
+  const replaceCart = body?.replaceCart === true;
+
+  const readGift = () =>
+    c.env.DB.prepare(`SELECT ${GIFT_LINE_COLUMNS} FROM gift_entitlements WHERE id = ? AND user_id = ?`)
+      .bind(giftId, user.id)
+      .first<Record<string, unknown>>();
+  const readLine = () =>
+    c.env.DB.prepare('SELECT id FROM cart_items WHERE gift_entitlement_id = ? AND user_id = ?')
+      .bind(giftId, user.id)
+      .first<{ id: string }>();
+  const answer = async (alreadyInCart: boolean) => {
+    const { items, tier, tierActive } = await loadCart(c);
+    return c.json({ success: true, items, tier, tierActive, ...(alreadyInCart ? { already_in_cart: true } : {}) });
+  };
+
+  const g = await readGift();
+  if (!g) throw new HttpError(404, 'We could not find this gift on your account.', 'GIFT_NOT_FOUND');
+  if (String(g.grant_mode ?? 'legacy') === 'legacy') throw conflict('This gift is not ordered through the cart.', 'GIFT_NOT_AVAILABLE');
+  const stateRefusal = giftStateRefusal(String(g.state ?? ''));
+  if (stateRefusal) throw stateRefusal;
+  const sel = giftSelectionOf(g);
+  if (!sel) throw conflict('The gift cannot be ordered right now.', 'GIFT_NOT_ORDERABLE');
+
+  // IDEMPOTENT: the line exists → the cart as it is, nothing written.
+  if (await readLine()) return answer(true);
+
+  const product = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(sel.productId).first<Record<string, unknown>>();
+  if (!product) throw conflict('This gift is no longer available.', 'GIFT_NOT_AVAILABLE');
+  const [{ ctx }, views, printers, poolIds] = await Promise.all([
+    cartPricing(c),
+    loadRelationsViews(c.env.DB, [{ id: sel.productId, inventory_mode: product.inventory_mode }]),
+    printerProductIds(c.env.DB, [sel.productId]),
+    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, [sel.productId]), new Set<string>()),
+  ]);
+  const facts = giftLineFacts({
+    row: product,
+    sel,
+    ctx,
+    view: views.get(sel.productId),
+    preorderPricing: 'prepaid',
+    isPrinter: printers.has(sel.productId),
+    coarseStock: poolIds.has(sel.productId),
+  });
+  if (facts.refusal) throw giftRefusalError(facts.refusal);
+
+  // ONE SHIPPING TYPE PER CART and ONE SELLER PER CART — the same function
+  // every other add obeys, typed by the gift's own route.
+  const replacing = await enforceCartScope(c, typeForTransport(sel.transportMethod), replaceCart);
+  try {
+    await c.env.DB.batch([
+      ...replacing,
+      c.env.DB.prepare(
+        `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
+                                 shipping_method_id, transport_method, fulfillment_type, warranty_plan_id, qty,
+                                 gift_entitlement_id)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?
+          WHERE EXISTS (SELECT 1 FROM gift_entitlements
+                         WHERE id = ? AND user_id = ? AND state = 'redeemed' AND gift_product_id = ?)`
+      ).bind(
+        newId('ci'), user.id, sel.productId, sel.optionValueIds[0] ?? '', optionValueIdsJson(sel.optionValueIds), sel.colorId,
+        giftLineDiscriminator(giftId), sel.transportMethod, sel.saleType, sel.qty, giftId,
+        giftId, user.id, sel.productId
+      ),
+      ...changedExactlyOne(c.env.DB),
+    ]);
+  } catch (e) {
+    // A store line landed between this door's read and its write; the 0114
+    // trigger refused the mix inside the statement.
+    if (isCartSellerAbort(e)) throw await sellerConflictRefusal(c, PLATFORM_SCOPE, 'LEVONIS');
+    const msg = e instanceof Error ? e.message : String(e);
+    // A concurrent press landed the line first: one line, and this answer says so.
+    if (msg.includes('UNIQUE') && (await readLine())) return answer(true);
+    // The gift changed state between the read and the write (ordered on another
+    // device, cancelled by the store): answered with what it is now.
+    if (isLostRace(e)) {
+      const now = await readGift();
+      if (await readLine()) return answer(true);
+      throw (now && giftStateRefusal(String(now.state ?? ''))) || conflict('The gift cannot be ordered right now.', 'GIFT_NOT_ORDERABLE');
+    }
+    throw e;
+  }
+  return answer(false);
+});
+
 cartRoutes.post('/items', async (c) => {
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
@@ -2025,6 +2433,12 @@ cartRoutes.patch('/items/:id', async (c) => {
     .bind(id, user.id)
     .first<Record<string, unknown>>();
   if (!existing) throw notFound('Cart item not found');
+  // A GIFT LINE IS FIXED (0175): its quantity, model, colour, type and route
+  // are the gift's. Nothing on it is editable from the cart — it can only be
+  // removed (DELETE), which returns the gift to «redeemed» by itself.
+  if (giftEntitlementIdOf(existing)) {
+    throw conflict('A gift line is fixed: its quantity and options cannot change. You can only remove it.', 'GIFT_LINE_LOCKED');
+  }
 
   const lineProduct = await c.env.DB.prepare('SELECT id, name, name_ar, composition FROM products WHERE id = ?')
     .bind(existing.product_id)

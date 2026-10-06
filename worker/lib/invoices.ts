@@ -104,7 +104,13 @@ export interface InvoiceSnapshotV1 {
   customer: { user_id: string; name: string; email: string };
   address: { name: string; phone: string; address: string; landmark: string };
   lines: Array<
-    InvoiceEmailLine & { order_item_id: string; product_id: string | null }
+    InvoiceEmailLine & {
+      order_item_id: string;
+      product_id: string | null;
+      /** 0175: a gift line — given at 0 IQD, `gift_value_iqd` is what it is worth. Absent on every other line. */
+      is_gift?: boolean;
+      gift_value_iqd?: number;
+    }
   >;
   totals: {
     subtotal_iqd: number;
@@ -140,12 +146,12 @@ export interface InvoiceSnapshotV1 {
  * reader summing the lines would still get the right total for the wrong
  * reason. They become an `included[]` list under the parent instead.
  */
-function invoiceLines(items: OrderItemRow[]): InvoiceSnapshotV1['lines'] {
+function invoiceLines(items: OrderItemRow[], lang: InvoiceLang = 'ar'): InvoiceSnapshotV1['lines'] {
   return items
     .filter((it) => !it.bundle_parent_item_id)
     .map((it) => {
       const kids = items.filter((k) => String(k.bundle_parent_item_id ?? '') === it.id);
-      const line = lineFromItem(it);
+      const line = lineFromItem(it, lang);
       return kids.length
         ? {
             ...line,
@@ -160,7 +166,22 @@ function invoiceLines(items: OrderItemRow[]): InvoiceSnapshotV1['lines'] {
     });
 }
 
-function lineFromItem(it: OrderItemRow): InvoiceSnapshotV1['lines'][number] {
+type InvoiceLang = 'ar' | 'en' | 'ckb';
+
+/**
+ * «هدية» — A GIFT LINE SAYS SO ON THE INVOICE (0175). The line is a real
+ * product at 0 IQD, and a receipt that printed it as a free sale without a
+ * word would read as a mistake. The word goes in front of the line's variant
+ * text, which every renderer — the email, the printable document and the
+ * account screen — already prints beside the name, so no template has to
+ * learn a new field. It is written in the language the invoice is issued in.
+ */
+const GIFT_LINE_LABEL: Record<InvoiceLang, string> = { ar: 'هدية', en: 'Gift', ckb: 'دیاری' };
+
+/** The invoice's language is the owner's, read the way the invoice email reads it. */
+const invoiceLang = (locale: unknown): InvoiceLang => localeToApi(String(locale ?? ''));
+
+function lineFromItem(it: OrderItemRow, lang: InvoiceLang = 'ar'): InvoiceSnapshotV1['lines'][number] {
   const warranty = safeParse<{ title_ar?: string; title_en?: string; fee_iqd?: number } | null>(it.warranty_snapshot, null);
   // `waived` covers both reasons a commission is not charged — the PRO waiver
   // and a pre-order paid cash on delivery (transport.waived_by explains which
@@ -174,18 +195,23 @@ function lineFromItem(it: OrderItemRow): InvoiceSnapshotV1['lines'][number] {
   // `direct`); 0 when none applied or when an active PRO was exempt, so the
   // invoice for a cash-on-delivery pre-order can show WHY its unit price is
   // the direct-sale number. Rows written before the field existed have none.
-  const pricing = safeParse<{ direct?: { surcharge_iqd?: number; waived?: boolean } | null } | null>(
-    it.pricing_snapshot,
-    null
-  );
+  const pricing = safeParse<{
+    direct?: { surcharge_iqd?: number; waived?: boolean } | null;
+    gift?: { gift_id?: unknown; value_iqd?: unknown } | null;
+  } | null>(it.pricing_snapshot, null);
   const direct = pricing?.direct ?? null;
   const effectiveDirect = direct && direct.waived !== true ? Number(direct.surcharge_iqd) || 0 : 0;
+  // Read from the line's own frozen snapshot, never a 0175 column, so an
+  // invoice is built the same on a database behind the migration.
+  const gift = pricing?.gift && typeof pricing.gift.gift_id === 'string' ? pricing.gift : null;
+  const variantText = it.option_snapshot || '';
   return {
     order_item_id: it.id,
     product_id: it.product_id,
     name: it.name_snapshot,
     image: it.image_snapshot || undefined,
-    variant: it.option_snapshot || '',
+    variant: gift ? [GIFT_LINE_LABEL[lang], variantText].filter(Boolean).join(' · ') : variantText,
+    ...(gift ? { is_gift: true, gift_value_iqd: Math.max(0, Math.round(Number(gift.value_iqd) || 0)) } : {}),
     qty: Number(it.qty) || 0,
     unit_price_iqd: Number(it.unit_price_iqd) || 0,
     line_total_iqd: Number(it.line_total_iqd) || 0,
@@ -275,7 +301,7 @@ function buildSnapshot(order: OrderRow, items: OrderItemRow[], owner: OwnerRow):
       address: String(address.address ?? ''),
       landmark: String(address.landmark ?? ''),
     },
-    lines: invoiceLines(items),
+    lines: invoiceLines(items, invoiceLang(owner.locale)),
     totals: {
       subtotal_iqd: Number(order.subtotal_iqd) || 0,
       delivery_fee_iqd: Number(order.shipping_iqd) || 0,
