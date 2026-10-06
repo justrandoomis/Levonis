@@ -343,8 +343,8 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
    * since does, for the four product paths, so a shared product link can carry
    * the product's own share card (worker/lib/socialPreview.ts).
    *
-   * The answer is that nothing moves. Those four are a HANDFUL of routes; `/`,
-   * `/products`, `/cart`, `/checkout`, `/orders`, `/auth`, every admin screen
+   * The answer is that nothing moves. Those four are a HANDFUL of routes;
+   * `/cart`, `/checkout`, `/orders`, `/auth`, every admin screen
    * and every built asset are still answered by the asset layer with the
    * Worker nowhere in the request, and this file is the only thing that gives
    * them a policy. What changes is that the product documents are covered
@@ -420,9 +420,16 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
     //   asset through untouched on the apex (no read — the session is skipped
     //   for it in worker/index.ts), and it arrives carrying dist/_headers'
     //   policy like the product documents do; `securityHeaders` never
-    //   overwrites one. Every other route — `/products`, `/cart`, `/auth`,
+    //   overwrites one. Every other route — `/cart`, `/auth`,
     //   every admin screen, every built asset — still takes its policy from
     //   dist/_headers with the Worker nowhere in the request.
+    //
+    // REVISITED FOR OPENING PRELOADS: `/products` is one exact document. On
+    // the main host it adds the route chunks and the viewer-priced API fetch
+    // hint before React boots; the root gets its opening fetch hint too.
+    // assetWithPreview retains the asset response headers, including this
+    // CSP, and inserts no prices or session data. All remaining SPA routes
+    // and built assets still use the asset layer directly.
     for (const route of routes) {
       assert.ok(
         [
@@ -437,6 +444,7 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
           '/sitemap.xml',
           '/store-icon/*',
           '/',
+          '/products',
         ].includes(route),
         `${route} was added to run_worker_first without revisiting this test`
       );

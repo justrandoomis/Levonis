@@ -6,6 +6,7 @@ import { startInstallPromptCapture } from './hooks/useInstallApp';
 import { watchForUpdates } from './components/pwa/UpdateReadyToast';
 import { initTheme } from './lib/theme';
 import { apexUrlFor } from './lib/canonicalHost';
+import { watchServiceWorkerUpdates } from './lib/serviceWorkerUpdates';
 
 /**
  * NO GOOGLE PROVIDER HERE ANY MORE.
@@ -96,6 +97,7 @@ function registerServiceWorker(): void {
         // over; see src/components/pwa/UpdateReadyToast.tsx for why sw.js
         // refuses to do it by itself.
         watchForUpdates(registration);
+        watchServiceWorkerUpdates(registration);
       })
       .catch(() => {
         // Silent by design — see above.

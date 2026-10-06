@@ -41,3 +41,9 @@ Additional pre-deployment PageSpeed results:
 Products mobile: FCP 2.6 s, LCP 4.1 s, TBT 10 ms, Speed Index 3.0 s. Report: https://pagespeed.web.dev/analysis/https-levonis-iq-com-products/t8g3dhu5lz?form_factor=mobile
 
 Workspace curl latency is not used as a site-speed benchmark: both a cached HTML document and cached home API response showed large environment/network delays. The independent PageSpeed lab is the baseline.
+
+## Update discovery
+
+An ordinary frontend build previously copied the same `sw.js` bytes, so an already-open tab could not discover that its route-chunk hashes had been superseded. The generated service worker now includes a deterministic frontend build identity, independently of the stable asset-cache generation. Returning to a visible tab checks for updates at most once per minute; a waiting update remains user-controlled so a checkout is never reloaded automatically. Existing open tabs acquire the new focus checker after their next ordinary reload.
+
+Service-worker/update/security regressions: 48 passed. The production build includes the generated identity and passes all live-marker checks.

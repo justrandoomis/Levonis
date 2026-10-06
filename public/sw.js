@@ -2,8 +2,9 @@
 /**
  * THE SERVICE WORKER. PLAIN JAVASCRIPT, SERVED VERBATIM, ON PURPOSE.
  *
- * Vite copies `public/` into `dist/` byte for byte — no Rollup, no hashing, no
- * transform — so THIS FILE IS WHAT THE BROWSER EXECUTES. It therefore contains
+ * Vite copies `public/` into `dist/`, then the build appends a content-derived
+ * frontend stamp so ordinary releases can offer an update. No Rollup or module
+ * transform runs on this script, so THIS FILE IS WHAT THE BROWSER EXECUTES. It contains
  * no `require`, no module syntax and no bare specifier of any kind: there is no
  * bundler between it and the browser to resolve one, and a service worker that
  * fails to parse is not a degraded app, it is a registration that never

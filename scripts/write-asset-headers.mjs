@@ -21,6 +21,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { assetHeadersFile } from '../worker/lib/securityPolicy.ts';
+import { stampServiceWorker } from './stamp-service-worker.mjs';
 
 /**
  * THE SAME THREE LINES AS worker/lib/socialPreview.ts (`ARABIC_FONT_PRELOAD`,
@@ -90,6 +91,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const link = earlyHintsLine();
   const text = withEarlyHints(assetHeadersFile(), link);
   writeFileSync('dist/_headers', text);
+  stampServiceWorker();
   console.log(
     `write-asset-headers: dist/_headers written (${text.split('\n').length - 1} lines${link ? ', with the Early Hints Link' : ', no manifest — no Early Hints Link'})`
   );
