@@ -96,6 +96,9 @@ export interface GiftSnapshot {
   /** regular_unit_iqd × qty: what the gift is worth, shown beside its 0 IQD line. */
   value_iqd: number;
   lead_time_text: string;
+  /** The route's (or model's) lead time in days, when the store states it — the screens word it per language. */
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
   captured_at: string;
 }
 
@@ -319,7 +322,11 @@ export function checkGiftSelection(
   return {
     ok: true,
     selection: sel,
-    snapshot: snapshotFor(p, doc, sel, Number(resolved.regular_iqd) || 0, text(resolved.fulfillment?.lead_time_text), opts.now),
+    snapshot: snapshotFor(p, doc, sel, Number(resolved.regular_iqd) || 0, {
+      text: text(resolved.fulfillment?.lead_time_text),
+      min: resolved.fulfillment?.lead_time_min_days ?? null,
+      max: resolved.fulfillment?.lead_time_max_days ?? null,
+    }, opts.now),
     availability,
   };
 }
@@ -345,7 +352,7 @@ function snapshotFor(
   doc: ProductDoc,
   sel: GiftSelection,
   regularUnitIqd: number,
-  leadTime: string,
+  leadTime: { text: string; min: number | null; max: number | null },
   now?: string
 ): GiftSnapshot {
   const row = p.row!;
@@ -386,7 +393,9 @@ function snapshotFor(
     sku: [text(row.sku), ...parts].filter(Boolean).join('-'),
     regular_unit_iqd: unit,
     value_iqd: unit * sel.qty,
-    lead_time_text: leadTime,
+    lead_time_text: leadTime.text,
+    lead_time_min_days: Number.isFinite(Number(leadTime.min)) && leadTime.min !== null ? Number(leadTime.min) : null,
+    lead_time_max_days: Number.isFinite(Number(leadTime.max)) && leadTime.max !== null ? Number(leadTime.max) : null,
     captured_at: now ?? new Date().toISOString(),
   };
 }

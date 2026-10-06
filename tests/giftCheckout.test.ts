@@ -320,6 +320,24 @@ test('a gift beside bought lines: only the bought lines are charged, and every s
   assert.match(text, /• Nozzle kit × 1 — 40,000 د\.ع/);
 });
 
+test('a gift and a bought line on the same scarce stock are judged together: refused whole, nothing consumed', async () => {
+  const raw = giftWorld();
+  const a = apps(raw);
+  const id = await giftInCart(a);
+  // v_04 holds 3: three bought units plus the gift's one ask for four.
+  const paid = await json(await post(a.buyer, '/api/cart/items', { productId: 'p_nozzle', optionValueIds: ['v_04'], colorId: 'c_red', qty: 3 }));
+  assert.equal(paid.success, true, JSON.stringify(paid));
+
+  const res = await post(a.buyer, '/api/orders', orderBody());
+  const body = await json(res);
+  assert.equal(res.status, 400, JSON.stringify(body));
+  assert.equal(body.code, 'OUT_OF_STOCK');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM orders'), 0);
+  assert.deepEqual(optionStock(raw, 'v_04'), { stock: 3, reserved: 0 }, 'not one unit reserved');
+  assert.equal(giftRow(raw, id).state, 'redeemed', 'the gift is still waiting, in the cart');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM cart_items WHERE gift_entitlement_id = ?', id), 1);
+});
+
 test('an Arabic or Sorani account reads «هدية» / «دیاری» on its invoice', async () => {
   for (const [locale, label] of [['ar', 'هدية'], ['ku', 'دیاری']] as const) {
     const raw = giftWorld();

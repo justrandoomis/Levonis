@@ -119,6 +119,9 @@ export interface GiftItemView {
   /** What the gift is worth at the regular price (never charged). */
   value_iqd: number;
   lead_time_text: string;
+  /** A pre-order's lead time in days, when stated (null otherwise). */
+  lead_time_min_days: number | null;
+  lead_time_max_days: number | null;
   /** Orderable now (stock, an active product, a selection that still exists); null = not asked. */
   available: boolean | null;
   /** The refusal code when it is not. */
@@ -239,6 +242,8 @@ function itemViewFromSnapshot(
     transport_method: sel.transportMethod,
     value_iqd: snap?.value_iqd ?? 0,
     lead_time_text: snap?.lead_time_text ?? '',
+    lead_time_min_days: typeof snap?.lead_time_min_days === 'number' ? snap.lead_time_min_days : null,
+    lead_time_max_days: typeof snap?.lead_time_max_days === 'number' ? snap.lead_time_max_days : null,
     available,
     reason,
   };

@@ -15,7 +15,7 @@
 -- every byte of its eleven original columns and reads as grant_mode 'legacy'
 -- with its legacy state.
 --
--- The three triggers at the end name only columns no test drops, and are created
+-- The four triggers at the end name only columns no test drops, and are created
 -- AFTER the rebuild because an ALTER … RENAME re-validates every trigger body.
 -- A future rebuild of `orders`, `order_items` or `gift_entitlements` must
 -- re-create them.
