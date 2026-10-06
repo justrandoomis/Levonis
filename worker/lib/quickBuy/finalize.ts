@@ -310,10 +310,12 @@ export async function finalizeQuickBuySession(env: Env, runner: FinalizeRunner, 
     await notify(db, {
       userId: session.user_id,
       kind: 'quick_buy_submitted',
-      title_ar: 'تم إرسال طلب الشراء السريع',
-      title_en: 'Your Quick Buy order was submitted',
-      body_ar: `طلبك رقم ${session.order_id} في طريقه إلى التجهيز.`,
-      body_en: `Order ${session.order_id} is on its way to preparation.`,
+      // §13: from 00:00 on it is an ordinary order — say so, and send the
+      // customer to the order itself, where every normal action lives.
+      title_ar: 'تم إنشاء طلبك من الشراء السريع',
+      title_en: 'Your Quick Buy order has been placed',
+      body_ar: `انتهت مدة الشراء السريع، وأصبح طلبك رقم ${session.order_id} طلباً عادياً تتابعه من «طلباتي» مثل أي طلب.`,
+      body_en: `The Quick Buy window has ended. Order ${session.order_id} is now a regular order — follow it in My orders like any other.`,
       link: `/orders/${session.order_id}`,
       entity_type: 'order',
       entity_id: session.order_id,

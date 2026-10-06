@@ -213,6 +213,59 @@ test('§23 scenario 1: activate in two steps, printer, filament from another pag
   assert.equal(count(raw, `SELECT COUNT(*) n FROM orders WHERE user_id = 'buyer'`), 1);
 });
 
+// ═══════════════════════════════════ §13: after 00:00 it is an ordinary order
+
+test('§13: after 00:00 the order is ordinary — listed like any order, cancelled, refunded and restocked by Orders alone; confirmed, the normal rule refuses', async () => {
+  const raw = world();
+  const walletBefore = spendable(raw, 'buyer');
+  await activate(raw);
+  assert.equal((await json(await add(raw, 'p_pla', 2))).success, true);
+  expire(raw);
+  await cron(raw);
+  const s = session(raw);
+  assert.equal(s.state, 'submitted');
+  const events = count(raw, 'SELECT COUNT(*) n FROM quick_buy_events WHERE session_id = ?', s.id);
+  const notice = row<Row>(raw, `SELECT * FROM user_notifications WHERE user_id = 'buyer' AND kind = 'quick_buy_submitted'`)!;
+  assert.match(notice.body_ar, /طلباً عادياً/);
+  assert.equal(notice.link, `/orders/${s.order_id}`);
+
+  // The customer's own list and detail: the same payload as any order; the kind is a label.
+  const list = await json(await get(as(raw), '/api/orders'));
+  const listed = list.orders.find((o: Row) => o.id === s.order_id);
+  assert.ok(listed, 'listed with the ordinary orders');
+  assert.equal(listed.status, 'pending');
+  assert.equal(listed.order_kind, 'quick_buy');
+  const detail = await json(await get(as(raw), `/api/orders/${s.order_id}`));
+  assert.equal(detail.success, true, JSON.stringify(detail));
+  assert.equal(detail.order.status, 'pending');
+
+  // The normal cancel: refund to the wallet, stock back, nothing through Quick Buy.
+  const cancelled = await post(as(raw), `/api/orders/${s.order_id}/cancel`, {});
+  assert.equal(cancelled.status, 200, JSON.stringify(await json(cancelled.clone())));
+  assert.equal(row<Row>(raw, 'SELECT status FROM orders WHERE id = ?', s.order_id)!.status, 'cancelled');
+  assert.equal(spendable(raw, 'buyer'), walletBefore, 'the wallet is whole again');
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM wallet_transactions WHERE id = ?`, `wtx_refund_${s.order_id}_usd`), 1);
+  assert.equal(reserved(raw, 'p_pla').stock_reserved, 0, 'the reservation went back with the order');
+  assert.equal(session(raw).state, 'submitted', 'the Quick Buy session is history; Orders did the cancel');
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM quick_buy_events WHERE session_id = ?', s.id), events);
+  assertMoneyAgrees(raw);
+  const summary = await json(await get(as(raw, 'boss', 'admin'), '/api/admin/quick-buy/summary'));
+  assert.equal(summary.refunded.n, 1, 'reports show the refund against Quick Buy');
+
+  // A new purchase is a new session and a new order; once the admin confirms, the normal rule applies.
+  assert.equal((await json(await add(raw, 'p_pla', 1))).success, true);
+  const s2 = session(raw);
+  assert.notEqual(s2.id, s.id);
+  assert.notEqual(s2.order_id, s.order_id);
+  expire(raw);
+  await cron(raw);
+  assert.equal((await patch(as(raw, 'boss', 'admin'), `/api/admin/orders/${s2.order_id}`, { status: 'confirmed' })).status, 200);
+  const refused = await post(as(raw), `/api/orders/${s2.order_id}/cancel`, {});
+  assert.equal(refused.status, 400);
+  assert.equal((await json(refused)).code, 'ORDER_NOT_CANCELLABLE');
+  assert.equal(row<Row>(raw, 'SELECT status FROM orders WHERE id = ?', s2.order_id)!.status, 'confirmed');
+});
+
 // ═══════════════════════════════════════════════════════ the races (§19)
 
 test('double click and network retry: one key, one change, one hold', async () => {

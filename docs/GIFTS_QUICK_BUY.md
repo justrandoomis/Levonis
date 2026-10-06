@@ -222,6 +222,14 @@ order is `order_kind='quick_buy'` and enters the normal workflow (stock RESERVED
 confirmation like every order). Ten failed attempts → `failed` (money still held, units still reserved, customer
 and admin told); `/api/admin/quick-buy/sessions/:id/retry|cancel`.
 
+**After 00:00 the order is an ordinary order (owner brief §13).** From the moment the session is submitted, the
+order is an ordinary `ORD-…` order with the same model, statuses, details page, tracking, cancellation, refund and
+notifications as a cart order. `order_kind='quick_buy'` (and `quick_buy_session_id`) only label it for reports
+and the optional badge «⚡ تم إنشاؤه بالشراء السريع»; nothing branches on them. A cancel goes through
+`POST /api/orders/:id/cancel` and its normal refund and stock return; the session stays `submitted` as history
+(tests/quickBuy.test.ts «§13»). The customer's bell notice says the order is now a regular order and links to it.
+The Quick Buy card on «طلباتي» exists only while a session is open.
+
 **Admin**: `/api/admin/quick-buy/sessions?state=open|failed|submitted|cancelled`, `/sessions/:id` (with events),
 `/summary?days=30` (held now / captured / released / refunded, orders by kind) — screen «الشراء السريع» under
 التشغيل. The orders board shows «⚡ شراء سريع» / «🎁 هدية» and filters `?kind=`.
