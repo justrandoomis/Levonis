@@ -184,8 +184,10 @@ test('acceptance: from the admin’s level to the delivered gift, with every dup
     'gift.grant',
     'gift.choose',
     'gift.redeem',
+    'gift.cart_add',
     'gift.order',
     'gift.order_cancelled',
+    'gift.cart_add',
     'gift.order',
     'gift.delivered',
   ]);

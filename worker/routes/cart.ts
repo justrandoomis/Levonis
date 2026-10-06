@@ -142,6 +142,7 @@ import {
 } from '../lib/gifts/cartLine';
 import { giftSelectionOf, selectionFromColumns, type GiftSelection } from '../lib/gifts/selection';
 import { changedExactlyOne, isLostRace } from '../lib/gifts/fence';
+import { auditStatements } from '../lib/audit';
 
 export const cartRoutes = new Hono<AppContext>();
 cartRoutes.use('*', requireAuth);
@@ -1938,6 +1939,22 @@ cartRoutes.post('/gift-items', async (c) => {
   // ONE SHIPPING TYPE PER CART and ONE SELLER PER CART — the same function
   // every other add obeys, typed by the gift's own route.
   const replacing = await enforceCartScope(c, typeForTransport(sel.transportMethod), replaceCart);
+  // «في السلة» is a step of the gift's timeline: the audit row rides in the
+  // batch, so a refused or lost add leaves none. (Its way back out — any door
+  // that deletes the line while the gift is still redeemed — is written by
+  // trigger trg_cart_gift_line_removed, migration 0175.)
+  const audit = await auditStatements(c.env.DB, user.id, 'gift.cart_add', giftId, {
+    user_id: user.id,
+    actor: user.id,
+    level: Number(g.level) || null,
+    product_id: sel.productId,
+    option_value_ids: sel.optionValueIds,
+    color_id: sel.colorId,
+    qty: sel.qty,
+    sale_type: sel.saleType,
+    transport_method: sel.transportMethod,
+    emptied_cart: replacing.length > 0,
+  });
   try {
     await c.env.DB.batch([
       ...replacing,
@@ -1954,6 +1971,7 @@ cartRoutes.post('/gift-items', async (c) => {
         giftId, user.id, sel.productId
       ),
       ...changedExactlyOne(c.env.DB),
+      ...audit.statements,
     ]);
   } catch (e) {
     // A store line landed between this door's read and its write; the 0114

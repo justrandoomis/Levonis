@@ -271,7 +271,13 @@ export default function GrantDetail({
                       <p className="text-[12px] text-[var(--ap-text-3)]">
                         {formatDateTime(a.at.includes('T') ? a.at : `${a.at.replace(' ', 'T')}Z`, lang)}
                         {a.actor ? ` · ${a.actor.name || a.actor.email}` : ` · ${t('system')}`}
-                        {typeof a.detail.order_id === 'string' ? ` · ${a.detail.order_id}` : ''}
+                        {typeof a.detail.order_id === 'string' && (
+                          <>
+                            {' · '}
+                            {/* An order number is one Latin token: isolated, and never broken at its hyphen. */}
+                            <bdi className="whitespace-nowrap">{a.detail.order_id}</bdi>
+                          </>
+                        )}
                       </p>
                     </div>
                   </li>

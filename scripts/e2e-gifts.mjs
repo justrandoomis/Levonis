@@ -200,7 +200,9 @@ try {
     await page.locator('[data-gift-grant-row="gift_ordered"]').click();
     const detail = page.locator('[data-gift-detail="gift_ordered"]');
     await detail.locator('[data-gift-timeline] li').first().waitFor();
-    check(`${tag}: the detail carries the internal note and the timeline`, (await detail.locator('textarea').last().inputValue()).includes('تأخر الطلب السابق') && (await detail.locator('[data-gift-timeline] li').count()) === 4);
+    check(`${tag}: the detail carries the internal note and the timeline`, (await detail.locator('textarea').last().inputValue()).includes('تأخر الطلب السابق') && (await detail.locator('[data-gift-timeline] li').count()) === 7);
+    // Every step reads as words in the page's language — no raw action code.
+    check(`${tag}: the timeline names the cart steps in words`, !(await detail.locator('[data-gift-timeline]').innerText()).includes('gift.'));
     await page.screenshot({ path: `${output}/${tag}-detail.png`, fullPage: true });
     await page.keyboard.press('Escape');
     await detail.waitFor({ state: 'detached' });

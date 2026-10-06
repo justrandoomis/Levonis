@@ -101,7 +101,19 @@ test('the redeemed gift is added to the cart once, locked, at 0 IQD with its val
   assert.equal(card?.status, 'ADDED_TO_ORDER');
   assert.equal(card?.cart_item_id, line.id);
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_ledger'), 0);
+
+  // The step is in the gift's audit timeline, by the customer.
+  const audit = row<{ actor_id: string; detail: string }>(raw, "SELECT actor_id, detail FROM audit_log WHERE action = 'gift.cart_add' AND target = ?", id)!;
+  assert.equal(audit.actor_id, 'buyer');
+  const detail = JSON.parse(audit.detail);
+  assert.equal(detail.product_id, 'p_nozzle');
+  assert.equal(detail.level, 2);
+  assert.equal(detail.qty, 1);
+  assert.equal(detail.emptied_cart, false);
 });
+
+const auditCount = (raw: Raw, action: string, giftId: string) =>
+  count(raw, 'SELECT COUNT(*) AS n FROM audit_log WHERE action = ? AND target = ?', action, giftId);
 
 test('a second add — sequential or concurrent — makes no second line', async () => {
   const raw = giftWorld();
@@ -125,6 +137,9 @@ test('a second add — sequential or concurrent — makes no second line', async
   assert.equal(y.status, 200, JSON.stringify(jy));
   assert.equal([jx.already_in_cart, jy.already_in_cart].filter((v) => v === true).length, 1, 'exactly one was the replay');
   assert.equal(count(raw2, 'SELECT COUNT(*) AS n FROM cart_items WHERE gift_entitlement_id = ?', id2), 1);
+  // One line, one audit row: the replays and the lost insert wrote none.
+  assert.equal(auditCount(raw, 'gift.cart_add', id), 1);
+  assert.equal(auditCount(raw2, 'gift.cart_add', id2), 1);
 });
 
 test('removing the gift line returns it to «redeemed»; it can be added again', async () => {
@@ -138,6 +153,10 @@ test('removing the gift line returns it to «redeemed»; it can be added again',
   assert.equal(giftLines(raw).length, 0);
   assert.equal(giftRow(raw, id).state, 'redeemed', 'no state was written either way');
   assert.equal((await myGift(a.buyer, id))?.status, 'REDEEMED');
+  // …and the timeline says it went back (trigger trg_cart_gift_line_removed).
+  const back = row<{ actor_id: string; detail: string }>(raw, "SELECT actor_id, detail FROM audit_log WHERE action = 'gift.cart_remove' AND target = ?", id)!;
+  assert.equal(back.actor_id, 'buyer');
+  assert.equal(JSON.parse(back.detail).cart_item_id, lineId);
 
   const readded = await json(await addGiftToCart(a.buyer, id));
   assert.equal(readded.success, true);
@@ -148,6 +167,11 @@ test('removing the gift line returns it to «redeemed»; it can be added again',
   assert.equal(giftLines(raw).length, 0);
   assert.equal((await myGift(a.buyer, id))?.status, 'REDEEMED');
   assert.equal((await addGiftToCart(a.buyer, id)).status, 200);
+  assert.deepEqual([auditCount(raw, 'gift.cart_add', id), auditCount(raw, 'gift.cart_remove', id)], [3, 2], 'every way in and out is one row');
+  // An ordinary line leaving the cart writes nothing about gifts.
+  paidLine(raw, 'ci_plain', 'p_plain', { qty: 1 });
+  await send(a.buyer, 'DELETE', '/api/cart/items/ci_plain');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'gift.cart_remove'"), 2);
 });
 
 test('an ordered or delivered gift cannot be added again (GIFT_ALREADY_ORDERED)', async () => {
@@ -352,4 +376,11 @@ test('one shipping type per cart holds for a gift, and replaceCart empties the c
   assert.equal(replaced.success, true, JSON.stringify(replaced));
   assert.deepEqual(all<{ gift_entitlement_id: string | null }>(raw, 'SELECT gift_entitlement_id FROM cart_items').map((r) => r.gift_entitlement_id), [direct]);
   assert.equal((await myGift(a.buyer, pre))?.status, 'REDEEMED', 'the removed gift is waiting again');
+  // Each side of the swap is on its gift's timeline; the refused add wrote nothing.
+  assert.deepEqual([auditCount(raw, 'gift.cart_add', pre), auditCount(raw, 'gift.cart_remove', pre)], [1, 1]);
+  assert.deepEqual([auditCount(raw, 'gift.cart_add', direct), auditCount(raw, 'gift.cart_remove', direct)], [1, 0]);
+  assert.equal(
+    JSON.parse(row<{ detail: string }>(raw, "SELECT detail FROM audit_log WHERE action = 'gift.cart_add' AND target = ?", direct)!.detail).emptied_cart,
+    true
+  );
 });

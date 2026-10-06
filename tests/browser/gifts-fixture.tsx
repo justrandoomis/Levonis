@@ -283,7 +283,10 @@ const audit = [
   { id: 1, action: 'gift.grant', actor: { id: 'boss', name: 'المدير', email: 'boss@levonis.iq' }, detail: { level: 3 }, at: '2026-10-04 08:00:00' },
   { id: 2, action: 'gift.choose', actor: { id: 'u_sara', name: 'سارة أحمد', email: 'sara@example.com' }, detail: {}, at: '2026-10-04 08:10:00' },
   { id: 3, action: 'gift.redeem', actor: { id: 'u_sara', name: 'سارة أحمد', email: 'sara@example.com' }, detail: {}, at: '2026-10-04 08:12:00' },
-  { id: 4, action: 'gift.order', actor: { id: 'u_sara', name: 'سارة أحمد', email: 'sara@example.com' }, detail: { order_id: 'ORD-7F3A21C9' }, at: '2026-10-04 08:30:00' },
+  { id: 4, action: 'gift.cart_add', actor: { id: 'u_sara', name: 'سارة أحمد', email: 'sara@example.com' }, detail: {}, at: '2026-10-04 08:13:00' },
+  { id: 5, action: 'gift.cart_remove', actor: { id: 'u_sara', name: 'سارة أحمد', email: 'sara@example.com' }, detail: {}, at: '2026-10-04 08:20:00' },
+  { id: 6, action: 'gift.cart_add', actor: { id: 'u_sara', name: 'سارة أحمد', email: 'sara@example.com' }, detail: {}, at: '2026-10-04 08:25:00' },
+  { id: 7, action: 'gift.order', actor: { id: 'u_sara', name: 'سارة أحمد', email: 'sara@example.com' }, detail: { order_id: 'ORD-7F3A21C9' }, at: '2026-10-04 08:30:00' },
 ];
 const options = {
   product: { id: 'p_nozzle', slug: 'nozzle-kit', name_en: 'Hardened Nozzle Kit 0.4', name_ar: 'طقم فوهات', name_ckb: 'کیتی نۆزڵ', image: NOZZLE_IMG, status: 'active', composition: '', price_iqd: 40000 },

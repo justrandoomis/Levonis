@@ -104,6 +104,11 @@ test('a checkout prices the gift at 0, reserves its real stock, links the line a
     'the gift fence balanced'
   );
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM cart_items'), 0, 'the cart line went with the order');
+  assert.equal(
+    count(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'gift.cart_remove'"),
+    0,
+    'ordered, not taken back out: the line left with the order, after the gift was marked ordered'
+  );
   // THE REAL COUNTER of the model, through the ordinary ledger (D6).
   assert.deepEqual(optionStock(raw, 'v_04'), { stock: 3, reserved: 1 });
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM inventory_ledger WHERE order_id = ? AND kind = 'reserve'", orderId), 1);
