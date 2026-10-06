@@ -16,17 +16,10 @@
 .inventory-workspace .inventory-line-head > div { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
 .inventory-workspace .inventory-line-head strong { font-size: 14px; overflow-wrap: anywhere; }
 .inventory-workspace .inventory-line-head small { display: block; color: var(--ap-text-3); margin-top: 3px; }
-.inventory-workspace .inventory-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.inventory-workspace .inventory-cost-profile { padding: 16px; border: 1px solid var(--ap-border); border-radius: var(--ap-radius-md); background: var(--ap-surface-1); }
-.inventory-workspace .inventory-cost-breakdown { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-top: 14px; margin-top: 14px; border-top: 1px solid var(--ap-border); }
-.inventory-workspace .inventory-cost-breakdown dt { font-size: 12px; color: var(--ap-text-3); }
-.inventory-workspace .inventory-cost-breakdown dd { margin: 4px 0 0; font-size: 15px; color: var(--ap-text-1); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.inventory-workspace .inventory-cost-breakdown .inventory-landed-unit { padding: 10px; margin: -4px; border: 1px solid var(--ap-border); border-radius: var(--ap-radius-md); background: var(--ap-surface-1); }
-.inventory-workspace .inventory-landed-unit dd { font-weight: 700; }
+.inventory-workspace :is(.inventory-fields, .inventory-review) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .inventory-workspace .inventory-total { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px; margin: 16px 0; border-radius: var(--ap-radius-md); background: var(--ap-surface-2); color: var(--ap-text-1); }
 .inventory-workspace .inventory-total strong { font-variant-numeric: tabular-nums; font-size: 19px; }
 .inventory-workspace .inventory-footer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--ap-border); }
-.inventory-workspace .inventory-review { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .inventory-workspace .inventory-review dt { color: var(--ap-text-3); font-size: 12px; }
 .inventory-workspace .inventory-review dd { color: var(--ap-text-1); font-size: 14px; margin: 3px 0 0; overflow-wrap: anywhere; }
 .inventory-workspace details > summary { min-height: 40px; display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--ap-text-2); font-size: 13px; }
@@ -60,5 +53,5 @@
   .inventory-workspace .inventory-footer button { min-height: 44px; flex: 1 1 130px; white-space: normal; line-height: 1.4; }
   .inventory-workspace .inventory-total { flex-wrap: wrap; }
 
-  .inventory-workspace .inventory-sticky-summary { position: sticky; bottom: env(safe-area-inset-bottom, 0px); padding: 10px 12px; max-height: 32dvh; overflow:auto; } .inventory-workspace .inventory-sticky-summary .inventory-review { grid-template-columns: repeat(2,minmax(0,1fr)); } .inventory-workspace .inventory-stepper { gap: 2px; }
+  .inventory-workspace .inventory-sticky-summary { bottom: env(safe-area-inset-bottom, 0px); padding: 10px 12px; max-height: 32dvh; overflow:auto; } .inventory-workspace .inventory-sticky-summary .inventory-review { grid-template-columns: repeat(2,minmax(0,1fr)); } .inventory-workspace .inventory-stepper { gap: 2px; }
 }

@@ -329,7 +329,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             </div></details>
           </>}
           {step === 2 && <>
-            <section className="inventory-cost-profile" aria-label={loc('إعدادات المورد والشحن', 'Supplier and freight settings')}>
+            <section className="inventory-line" aria-label={loc('إعدادات المورد والشحن', 'Supplier and freight settings')}>
               <h4 className={`mb-3 font-semibold ${T.text1}`}>{loc('المورد والشحن', 'Supplier and freight')}</h4>
               <div className="inventory-fields">
                 <Select label={loc('مسار المورد والشحن', 'Supplier and shipping route')} value={header.cost_profile_id ?? ''} onChange={chooseCostProfile} empty={loc('إدخال يدوي / مستند سابق', 'Manual entry / legacy document')} options={config.cost_profiles.map((p) => ({ id: p.id, name: loc(p.name_ar, p.name_en) }))} />
@@ -351,11 +351,11 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
                 : <Input label={loc('وزن كرتون القطعة مع التغليف بالكيلوغرام', 'Packed carton weight per unit (kg)')} type="number" min={0} decimals={3} value={l.weight_g > 0 ? l.weight_g / 1_000 : ''} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, weight_g: packedMeasureInput(v, 'weight') } : x))} hint={loc('الوزن الإجمالي مع الكرتون والتغليف؛ يُحفظ لهذا الخيار عند التأكيد.', 'Gross weight including carton and packaging. Saved for this selection on confirmation.')} />)}
               </div>
               {l.unit_conversion_inexact && <p role="status" className={`mt-2 text-sm ${T.text2}`}>{loc('إجمالي الفاتورة لا يعطي سعر قطعة دقيقًا ضمن دقة هذه العملة. أدخل سعر القطعة، أو عد إلى إجمالي الشراء لاستعادة المبلغ الأصلي.', 'The invoice total has no exact unit price at this currency’s input precision. Enter a unit price, or return to total input to restore the original amount.')}</p>}
-              <dl className="inventory-cost-breakdown" aria-live="polite">
+              <dl className="inventory-review mt-3.5 pt-3.5 border-t border-[var(--ap-border)] tabular-nums" aria-live="polite">
                 <div><dt>{loc('شراء القطعة الخام بالدينار', 'Raw purchase per unit in IQD')}</dt><dd>{costMoney(estimates[i]?.purchase_iqd / l.qty_ordered)}</dd></div>
                 <div><dt>{loc('شحن القطعة', 'Freight per unit')}</dt><dd>{costMoney((header.cost_profile_id ? estimates[i]?.auto_shipping_iqd : estimates[i]?.freight_iqd) / l.qty_ordered)}</dd></div>
                 {header.cost_profile_id && charges.length > 0 && <div><dt>{loc('تكاليف إضافية للقطعة', 'Other charges per unit')}</dt><dd>{costMoney((estimates[i]?.freight_iqd - estimates[i]?.auto_shipping_iqd) / l.qty_ordered)}</dd></div>}
-                <div className="inventory-landed-unit"><dt>{loc('تكلفة القطعة النهائية', 'Landed unit cost')}</dt><dd><output aria-label={`${loc('تكلفة القطعة النهائية', 'Landed unit cost')}: ${l.label}`}>{costMoney(estimates[i]?.unit_iqd)}</output></dd></div>
+                <div className="inventory-line"><dt>{loc('تكلفة القطعة النهائية', 'Landed unit cost')}</dt><dd><strong><output aria-label={`${loc('تكلفة القطعة النهائية', 'Landed unit cost')}: ${l.label}`}>{costMoney(estimates[i]?.unit_iqd)}</output></strong></dd></div>
               </dl>
               <p className={`mt-2 text-xs ${T.text3}`}>{loc('إجمالي البند مع الشحن', 'Total line cost with freight')}: {costMoney(estimates[i]?.total_iqd)} · {loc('تُقرب المجاميع إلى أقرب دينار، ومتوسط القطعة للعرض.', 'Totals round to the nearest IQD; the unit average is for display.')}</p>
               {funding.mode === 'investor' && <label className="mt-3 flex gap-2 text-sm"><input type="checkbox" checked={!funding.incoming_indexes || funding.incoming_indexes.includes(i)} onChange={(e) => setFunding((f) => { const indexes = f.incoming_indexes ?? lines.map((_, j) => j); return { ...f, incoming_indexes: e.target.checked ? [...indexes, i] : indexes.filter((j) => j !== i) }; })} />{loc('مشمول بتمويل المستثمر ونسبته', 'Include in investor funding and profit share')}</label>}
@@ -429,10 +429,10 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
           </div>
           <div className="inventory-lines">{selected.lines.map((l) => <article className="inventory-line" key={l.line_id}>
             <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('المطلوب / المستلم', 'Ordered / received')}: {l.qty_ordered} / {l.qty_received}</small></div></div>
-            <dl className="inventory-cost-breakdown">
+            <dl className="inventory-review mt-3.5 pt-3.5 border-t border-[var(--ap-border)] tabular-nums">
               <div><dt>{loc('شراء القطعة دون التكاليف الإضافية', 'Purchase per unit before added charges')}</dt><dd>{costMoney((l.purchase_total_iqd ?? l.purchase_unit_iqd * l.qty_ordered) / l.qty_ordered)}</dd></div>
               <div><dt>{loc('شحن وتكاليف إضافية للقطعة', 'Freight and additional charges per unit')}</dt><dd>{costMoney(l.charges_iqd / l.qty_ordered)}</dd></div>
-              <div className="inventory-landed-unit"><dt>{loc('تكلفة القطعة النهائية', 'Landed unit cost')}</dt><dd>{costMoney(((l.purchase_total_iqd ?? l.purchase_unit_iqd * l.qty_ordered) + l.charges_iqd) / l.qty_ordered)}</dd></div>
+              <div className="inventory-line"><dt>{loc('تكلفة القطعة النهائية', 'Landed unit cost')}</dt><dd><strong>{costMoney(((l.purchase_total_iqd ?? l.purchase_unit_iqd * l.qty_ordered) + l.charges_iqd) / l.qty_ordered)}</strong></dd></div>
             </dl>
             <button type="button" className={T.btnGhost} onClick={()=>setPriceLine(l)}>{loc('تحديث سعر هذا الخيار في المتجر','Update this selection’s store price')}</button>
             <Input label={loc('الكمية التي وصلت الآن', 'Quantity arriving now')} type="number" min={0} value={receiving[l.line_id]?.qty ?? 0} onChange={(v) => setReceiving((r) => ({ ...r, [l.line_id]: { ...r[l.line_id], qty: Number(v) } }))} hint={`${loc('المتبقي للاستلام', 'Remaining to receive')}: ${l.qty_ordered - l.qty_received}`} />

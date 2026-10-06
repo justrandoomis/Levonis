@@ -1,6 +1,6 @@
 -- Raw supplier costs and packed measurements are opt-in, forward-only defaults.
 -- Do not infer raw prices from catalogue or old purchases: those may be landed.
-CREATE TABLE procurement_cost_profiles (
+CREATE TABLE IF NOT EXISTS procurement_cost_profiles (
   id TEXT PRIMARY KEY CHECK(id IN ('germany_land','china_air','china_sea')),
   currency TEXT NOT NULL CHECK(currency IN ('EUR','CNY')),
   shipping_basis TEXT NOT NULL CHECK(shipping_basis IN ('weight','volume')),
@@ -12,9 +12,9 @@ CREATE TABLE procurement_cost_profiles (
         (id='china_air' AND currency='CNY' AND shipping_basis='weight') OR
         (id='china_sea' AND currency='CNY' AND shipping_basis='volume'))
 );
-INSERT INTO procurement_cost_profiles(id,currency,shipping_basis) VALUES
+INSERT OR IGNORE INTO procurement_cost_profiles(id,currency,shipping_basis) VALUES
   ('germany_land','EUR','weight'),('china_air','CNY','weight'),('china_sea','CNY','volume');
-CREATE TABLE procurement_selection_cost_defaults (
+CREATE TABLE IF NOT EXISTS procurement_selection_cost_defaults (
   profile_id TEXT NOT NULL REFERENCES procurement_cost_profiles(id),
   product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   scope TEXT NOT NULL CHECK(scope IN ('base','option','color','variant')),
@@ -25,7 +25,7 @@ CREATE TABLE procurement_selection_cost_defaults (
   updated_by TEXT NOT NULL REFERENCES users(id), updated_at TEXT NOT NULL,
   PRIMARY KEY(profile_id,product_id,scope,scope_id)
 );
-CREATE INDEX idx_procurement_defaults_product ON procurement_selection_cost_defaults(product_id);
+CREATE INDEX IF NOT EXISTS idx_procurement_defaults_product ON procurement_selection_cost_defaults(product_id);
 ALTER TABLE purchase_orders ADD COLUMN cost_profile_id TEXT REFERENCES procurement_cost_profiles(id);
 ALTER TABLE purchase_orders ADD COLUMN cost_profile_version INTEGER;
 ALTER TABLE purchase_orders ADD COLUMN shipping_rate_iqd REAL CHECK(shipping_rate_iqd IS NULL OR shipping_rate_iqd>=0);
