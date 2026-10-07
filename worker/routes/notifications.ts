@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { AppContext } from '../lib/types';
+import { safeParse, type AppContext } from '../lib/types';
 import { badRequest, oneOf, requireAuth, str, int } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
 import { listNotifications, markRead, unreadCount } from '../lib/notifications';
@@ -41,19 +41,29 @@ notificationRoutes.get('/', async (c) => {
   return c.json({
     success: true,
     unread,
-    notifications: items.map((n) => ({
-      id: n.id,
-      kind: n.kind,
-      title_ar: n.title_ar,
-      title_en: n.title_en,
-      body_ar: n.body_ar,
-      body_en: n.body_en,
-      link: n.link,
-      entity_type: n.entity_type,
-      entity_id: n.entity_id,
-      read: n.read_at !== null,
-      created_at: n.created_at,
-    })),
+    notifications: items.map((n) => {
+      const meta = safeParse<Record<string, unknown> | null>(n.meta, {}) ?? {};
+      return {
+        id: n.id,
+        kind: n.kind,
+        title_ar: n.title_ar,
+        title_en: n.title_en,
+        body_ar: n.body_ar,
+        body_en: n.body_en,
+        // Hand-written Sorani, when the notifier stamped it into meta (chats,
+        // discussions, offers, support, gifts, Quick Buy; stampGroupedCkb) —
+        // the same two keys the merchant feed reads; absent otherwise, and the
+        // client shows the Arabic. Nothing else leaves meta: actors and counts
+        // are bookkeeping.
+        ...(typeof meta.title_ckb === 'string' && meta.title_ckb ? { title_ckb: meta.title_ckb } : {}),
+        ...(typeof meta.body_ckb === 'string' && meta.body_ckb ? { body_ckb: meta.body_ckb } : {}),
+        link: n.link,
+        entity_type: n.entity_type,
+        entity_id: n.entity_id,
+        read: n.read_at !== null,
+        created_at: n.created_at,
+      };
+    }),
     // The cursor is the oldest row returned; absent when the page was short,
     // which is how the client knows it has reached the end.
     next_before: items.length === limit ? items[items.length - 1].created_at : null,

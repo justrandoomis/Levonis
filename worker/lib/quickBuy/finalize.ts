@@ -319,6 +319,10 @@ export async function finalizeQuickBuySession(env: Env, runner: FinalizeRunner, 
       link: `/orders/${session.order_id}`,
       entity_type: 'order',
       entity_id: session.order_id,
+      meta: {
+        title_ckb: 'داواکارییەکەت بە کڕینی خێرا دروستکرا',
+        body_ckb: `کاتی کڕینی خێرا تەواو بوو و داواکاریی ژمارە ${session.order_id} ئێستا داواکارییەکی ئاساییە؛ لە «داواکارییەکانم» وەک هەر داواکارییەکی تر بەدوایدا بچۆ.`,
+      },
       eventKey: `quick_buy_submitted:${session.id}`,
     });
     return { status: 'submitted', orderId: session.order_id };
@@ -346,6 +350,10 @@ export async function finalizeQuickBuySession(env: Env, runner: FinalizeRunner, 
       link: '/orders',
       entity_type: 'order',
       entity_id: session.order_id,
+      meta: {
+        title_ckb: 'نەتوانرا داواکاریی کڕینی خێرا بە خۆکاری بنێردرێت',
+        body_ckb: 'بڕەکە هێشتا بۆ داواکارییەکەت گیراوە و نەبڕدراوە؛ تیمی Levonis پێداچوونەوەی بۆ دەکات و پەیوەندیت پێوە دەکات.',
+      },
       eventKey: `quick_buy_failed:${session.id}`,
     });
     return { status: 'failed', code };

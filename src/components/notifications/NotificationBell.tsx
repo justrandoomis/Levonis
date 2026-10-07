@@ -176,10 +176,11 @@ interface RowProps {
 
 function Row({ n, asMenu, onOpen, expanded = false }: RowProps) {
   const { lang, loc } = useLanguage();
-  // Sorani falls back to the ARABIC text, never to English: Arabic is the
-  // source language the server stored, and it is the closer of the two.
-  const title = lang === 'en' ? n.title_en : n.title_ar;
-  const body = lang === 'en' ? n.body_en : n.body_ar;
+  // Sorani reads the Sorani the notifier wrote, and falls back to the ARABIC
+  // text, never to English: Arabic is the source language the server stored,
+  // and it is the closer of the two.
+  const title = lang === 'en' ? n.title_en : lang === 'ckb' ? n.title_ckb || n.title_ar : n.title_ar;
+  const body = lang === 'en' ? n.body_en : lang === 'ckb' ? n.body_ckb || n.body_ar : n.body_ar;
   const Icon = kindIcon(n.kind);
 
   return (

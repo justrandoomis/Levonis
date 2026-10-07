@@ -55,6 +55,9 @@ export interface NotificationRow {
   title_en: string;
   body_ar: string;
   body_en: string;
+  /** Hand-written Sorani, when the notifier wrote it; absent otherwise. */
+  title_ckb?: string;
+  body_ckb?: string;
   /** An in-app PATH (`/requests/req_123`), never an absolute URL —
    *  safe to hand straight to react-router's navigate(). May be empty. */
   link: string;

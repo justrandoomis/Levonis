@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, post, patch, put, get, send, json, row, all, count, spendable } from './fixtures/app';
 import { orderRoutes } from '../worker/routes/orders';
+import { notificationRoutes } from '../worker/routes/notifications';
 import { quickBuyRoutes, quickBuyAdminRoutes } from '../worker/routes/quickBuy';
 import { adminRoutes } from '../worker/routes/admin';
 import { QUICK_BUY_POLICY_KEYS, requiredPolicies } from '../worker/lib/policyOps';
@@ -54,6 +55,7 @@ function world(fundIqd = 2_000_000): DatabaseSync {
 const mount = (a: Parameters<Parameters<typeof stubApp>[2]>[0]) => {
   a.route('/api/quick-buy', quickBuyRoutes);
   a.route('/api/orders', orderRoutes);
+  a.route('/api/notifications', notificationRoutes);
   a.route('/api/admin/quick-buy', quickBuyAdminRoutes);
   a.route('/api/admin', adminRoutes);
 };
@@ -228,6 +230,11 @@ test('§13: after 00:00 the order is ordinary — listed like any order, cancell
   const notice = row<Row>(raw, `SELECT * FROM user_notifications WHERE user_id = 'buyer' AND kind = 'quick_buy_submitted'`)!;
   assert.match(notice.body_ar, /طلباً عادياً/);
   assert.equal(notice.link, `/orders/${s.order_id}`);
+  // The bell reads it in every language the customer may use — Sorani included.
+  const inbox = await json(await get(as(raw), '/api/notifications'));
+  const told = inbox.notifications.find((n: Row) => n.kind === 'quick_buy_submitted');
+  assert.match(told.title_ckb, /کڕینی خێرا/);
+  assert.ok(told.body_ckb.includes(s.order_id), 'the Sorani body names the order');
 
   // The customer's own list and detail: the same payload as any order; the kind is a label.
   const list = await json(await get(as(raw), '/api/orders'));
@@ -486,6 +493,8 @@ test('a session that cannot be submitted keeps its money held, fails after its r
   assert.equal(activeHolds(raw).length, 1, 'the money is still held, never lost and never taken');
   assert.equal(reserved(raw, 'p_pla').stock_reserved, 2);
   assert.equal(count(raw, `SELECT COUNT(*) n FROM user_notifications WHERE user_id = 'buyer' AND kind = 'quick_buy_failed'`), 1);
+  const failNotice = (await json(await get(as(raw), '/api/notifications'))).notifications.find((n: Row) => n.kind === 'quick_buy_failed');
+  assert.ok(failNotice.title_ckb && failNotice.body_ckb, 'the failure notice has its Sorani too');
   const mine = await json(await get(as(raw), '/api/quick-buy/session'));
   assert.equal(mine.recent?.state, 'failed');
   assert.equal(mine.recent.held_iqd, 50_000, 'the customer sees the money as still held');
