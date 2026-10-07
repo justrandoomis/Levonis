@@ -107,6 +107,15 @@ export const FINANCIAL_FIELDS = [
   'source_total_amount',
   'shipping_rate_iqd',
   'auto_shipping_iqd',
+  // What a purchase cost in total, and the currency and rate it was bought
+  // at — the supplier price in all but name. The incoming list and the
+  // inventory overview served these to assistants because none was named.
+  'incoming_purchase_total_iqd',
+  'exchange_rate_used',
+  'source_currency',
+  // Whether, and when, a confirmed purchase priced a selection.
+  'cost_source',
+  'cost_date',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;
@@ -121,7 +130,10 @@ export function stripFinancials<T>(value: T): T {
   if (value && typeof value === 'object') {
     const out: AnyRecord = {};
     for (const [k, v] of Object.entries(value as AnyRecord)) {
-      if ((FINANCIAL_FIELDS as readonly string[]).includes(k)) continue;
+      // camelCase too: the lot receipt answered unitCostIqd, shippingShareIqd
+      // and totalCostIqd, and a list of snake_case names matched none of them.
+      const snake = k.replace(/[A-Z]/g, (ch) => `_${ch.toLowerCase()}`);
+      if ((FINANCIAL_FIELDS as readonly string[]).includes(k) || (FINANCIAL_FIELDS as readonly string[]).includes(snake)) continue;
       out[k] = stripFinancials(v);
     }
     return out as unknown as T;

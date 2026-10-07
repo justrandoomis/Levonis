@@ -418,3 +418,23 @@ export const PRINT_CATALOGUE_PATHS: readonly string[] = [
 export async function afterPrintCatalogueWrite(c: Context<AppContext>): Promise<void> {
   await purgeAnonymousCache(originOf(c), PRINT_CATALOGUE_PATHS);
 }
+
+/**
+ * NO SHARED OR STORED COPY OF AN ADMIN OR CART ANSWER.
+ *
+ * Admin JSON (products, price grid, procurement, finance) and the cart carry
+ * cost or a person's own selection, and went out with no Cache-Control at
+ * all — so a proxy, a shared browser's disk cache or the back button could
+ * keep one. A route that chose its own policy (a file download, an image)
+ * keeps it; everything else is `private, no-store`. A response whose headers
+ * cannot be changed (a pass-through body) is left as it is.
+ */
+export const noStoreUnlessSet: MiddlewareHandler<AppContext> = async (c, next) => {
+  await next();
+  if (c.res.headers.has('Cache-Control')) return;
+  try {
+    c.res.headers.set('Cache-Control', SESSION_CACHE_CONTROL);
+  } catch {
+    /* immutable headers: the route answered with a fetched Response */
+  }
+};

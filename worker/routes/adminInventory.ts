@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int } from '../lib/http';
+import { assertFinancialScope } from '../lib/walletAdjust';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { projectForAdmin, canViewFinancials } from '../lib/adminScope';
@@ -336,7 +337,9 @@ adminInventoryRoutes.get('/incoming', async (c) => {
 });
 
 adminInventoryRoutes.post('/incoming', async (c) => {
-  if(await operationsInstalled(c.env.DB))await requireCapability(c.env,c.get('user')!,'purchase');
+  // A purchase states what the shop paid. Without the operations tables there
+  // is no capability to ask, and that must refuse an assistant, not admit one.
+  if(await operationsInstalled(c.env.DB))await requireCapability(c.env,c.get('user')!,'purchase');else assertFinancialScope(c);
   const user = c.get('user')!;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
 
@@ -419,6 +422,7 @@ adminInventoryRoutes.post('/incoming', async (c) => {
 });
 
 adminInventoryRoutes.patch('/incoming/:id', async (c) => {
+  if(!(await operationsInstalled(c.env.DB)))assertFinancialScope(c);
   if(await operationsInstalled(c.env.DB)){await requireCapability(c.env,c.get('user')!,'purchase');if(await c.env.DB.prepare('SELECT id FROM purchase_lines WHERE incoming_id=?').bind(c.req.param('id')).first())throw badRequest('عدّل هذا البند من أمر الشراء المرتبط به','PURCHASE_EDIT_REQUIRED');}
   const user = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { max: 60 });

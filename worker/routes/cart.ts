@@ -32,7 +32,7 @@ import { newId } from '../lib/crypto';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { AddToCartV1 } from '@levonis/contracts/events/v1/AddToCart';
 import { getSettings } from '../lib/settings';
-import { parseProductRow, type ProductDoc } from '../lib/productModel';
+import { parseProductRow, stripCostFields, type ProductDoc } from '../lib/productModel';
 import {
   applyRelations,
   capacityFrom,
@@ -480,11 +480,18 @@ export function publicBreakdown(r: ResolvedPrice) {
   };
 }
 
-const stripCost = <T extends { cost_iqd: number | null }>(x: T) => {
-  const { cost_iqd, ...rest } = x;
-  void cost_iqd;
-  return rest;
-};
+/**
+ * The storefront's own cost strip, not a local one.
+ *
+ * This used to remove `cost_iqd` from the option or colour object and stop.
+ * `applyRelations` objects also carry `cost_adjust_iqd`, and since 0073 every
+ * option holds `fulfillments[]` and every fulfilment `transports[]`, each with
+ * its own `cost_iqd`/`cost_adjust_iqd` — so any signed-in customer could add
+ * a product to the cart and read its per-model and per-route landed cost.
+ * `stripCostFields` is the recursion `projectPublic` already uses, written
+ * against one list of cost keys.
+ */
+const stripCost = stripCostFields;
 
 /** §8.2 row 18 at option-value and colour level: a pool member's per-level
  *  counters are not published, in the cart any more than in the catalogue. */

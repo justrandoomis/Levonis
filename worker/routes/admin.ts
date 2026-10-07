@@ -17,7 +17,7 @@ import { requireAdmin, badRequest, notFound, forbidden, conflict, str, int, oneO
 import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
-import { canViewFinancials, isOwner, normalizeAdminScope, userPatchRefusal } from '../lib/adminScope';
+import { canViewFinancials, isOwner, normalizeAdminScope, projectForAdmin, userPatchRefusal } from '../lib/adminScope';
 import { degradeIfSchemaMissing, isSchemaMissing } from '../lib/membershipBenefits';
 import { normalizeText } from '../lib/search/normalize';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
@@ -1102,7 +1102,10 @@ function validateProductBody(body: Record<string, unknown>) {
 
 adminRoutes.get('/products', async (c) => {
   const { results } = await c.env.DB.prepare('SELECT * FROM products ORDER BY created_at DESC').all<Record<string, unknown>>();
-  return c.json({ success: true, products: await legacyAdminProductProjection(c.env.DB, results) });
+  // The document carries every rung's cost (product, option, colour, cell,
+  // route). An assistant admin reads the catalogue, never what it cost.
+  const products = await legacyAdminProductProjection(c.env.DB, results);
+  return c.json({ success: true, products: projectForAdmin(c.env, c.get('user'), products) });
 });
 
 adminRoutes.post('/products', async (c) => {
@@ -1121,7 +1124,16 @@ adminRoutes.post('/products', async (c) => {
 
   // validateProductBody intentionally has no structural fields. A scalar-only
   // UPDATE therefore retains every stored mirror exactly as it is.
-  const p = validateProductBody(body);
+  const validated = validateProductBody(body);
+  // The validator always emits `product_cost_iqd` (null when absent) and the
+  // UPSERT binds every key it emits — so an assistant admin could set the
+  // cost, or blank it by leaving it out. Without financial scope the key is
+  // not bound at all: an UPDATE keeps the stored cost, an INSERT leaves it
+  // unset for a financial admin to fill.
+  const financial = canViewFinancials(c.env, adminUser);
+  const { product_cost_iqd: sentCost, ...scalar } = validated;
+  void sentCost;
+  const p: Omit<typeof validated, 'product_cost_iqd'> = financial ? validated : scalar;
   const id = typeof body.id === 'string' && body.id ? str(body.id, 'id', { max: 60 }) : newId('prd');
 
   // EXTENDED WARRANTY IS FOR PRINTERS (owner mandate) — on THIS legacy route
@@ -1155,7 +1167,7 @@ adminRoutes.post('/products', async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
   await afterCatalogueWrite(c, [String(row?.slug ?? p.slug ?? '')]); // the guests' listing, home and this product page (P2 review)
   const [product] = await legacyAdminProductProjection(c.env.DB, [row!]);
-  return c.json({ success: true, product });
+  return c.json({ success: true, product: projectForAdmin(c.env, adminUser, product) });
 });
 
 adminRoutes.delete('/products/:id', async (c) => {
@@ -3769,8 +3781,30 @@ adminRoutes.delete('/coupons/:id', async (c) => {
 
 // ---------------------------------------------------------------- settings
 
+/**
+ * SETTINGS THAT STATE A COST, A MARGIN, OR A RATE MONEY MOVES AT.
+ *
+ * Every admin could read and write all of these: an assistant read the margin
+ * floor and the print materials' buying prices, and could re-set the wallet's
+ * USD rate or a pre-order commission. Reading the cost-bearing three and
+ * writing any of them now needs financial scope; the rest of the settings
+ * (home, ads, shipping text…) stay with every admin.
+ */
+const COST_SETTING_KEYS: readonly string[] = ['minMarginPercent', 'printPricingConfig', 'printMaterials'];
+const MONEY_SETTING_KEYS: readonly string[] = [
+  ...COST_SETTING_KEYS,
+  'exchangeRate',
+  'proPricingPolicy',
+  'preorderTransportDefaults',
+  // Readable (the per-piece price is published on /api/print-quote/accessories
+  // by design), but it is what every print quote bills, so it is set by a
+  // financial admin.
+  'printAccessories',
+];
+
 adminRoutes.get('/settings', async (c) => {
   const settings = await getSettings(c.env.DB);
+  if (!canViewFinancials(c.env, c.get('user'))) for (const key of COST_SETTING_KEYS) delete settings[key];
   return c.json({ success: true, settings });
 });
 
@@ -3895,6 +3929,7 @@ adminRoutes.put('/settings/:key', async (c) => {
   const adminUser = c.get('user')!;
   const key = c.req.param('key') as SettingKey;
   if (!SETTING_KEYS.includes(key)) throw badRequest('Unknown setting');
+  if (MONEY_SETTING_KEYS.includes(key)) assertFinancialScope(c);
   // The farm's balancing document has exactly one write path — the route that
   // normalises it, refuses an unusable one, bumps its version and audits the
   // change per section. Storing it raw here would bypass all four.

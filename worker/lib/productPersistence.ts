@@ -2871,14 +2871,45 @@ export async function planProductSave(
       // no-op replace for them — identical to the pre-0075 behaviour.
       const [liveCells, liveRoutes] = await Promise.all([
         db
-          .prepare('SELECT id, option_id, fulfillment_type, capacity_reserved FROM product_option_fulfillment WHERE product_id = ?')
+          .prepare('SELECT id, option_id, fulfillment_type, capacity_reserved, cost_iqd, cost_adjust_iqd FROM product_option_fulfillment WHERE product_id = ?')
           .bind(productId)
-          .all<{ id: string; option_id: string; fulfillment_type: string; capacity_reserved: number | null }>(),
+          .all<{ id: string; option_id: string; fulfillment_type: string; capacity_reserved: number | null; cost_iqd: number | null; cost_adjust_iqd: number | null }>(),
         db
-          .prepare('SELECT id, fulfillment_id, method, capacity_reserved FROM product_option_transports WHERE product_id = ?')
+          .prepare('SELECT id, fulfillment_id, method, capacity_reserved, cost_iqd, cost_adjust_iqd FROM product_option_transports WHERE product_id = ?')
           .bind(productId)
-          .all<{ id: string; fulfillment_id: string; method: string; capacity_reserved: number | null }>(),
+          .all<{ id: string; fulfillment_id: string; method: string; capacity_reserved: number | null; cost_iqd: number | null; cost_adjust_iqd: number | null }>(),
       ]);
+      /**
+       * THE CELL AND ROUTE COSTS, CARRIED FORWARD FOR AN ACTOR WITHOUT MONEY.
+       *
+       * `costAttempts`/`carryCostsForward` cover the product, option and colour
+       * rungs, and nothing covered these two: a TXT file naming
+       * `options.N.direct.cost_iqd` or `options.N.preorder.cost_iqd` wrote the
+       * cost of a model's order type for an assistant admin, and a payload
+       * carrying route rows could do the same for a route. Same rule as the
+       * relations PUT (adminProductRelations.ts): the stored cost stays,
+       * whatever the file says.
+       */
+      if (!actor.money) {
+        const cellCost = new Map((liveCells.results ?? []).map((r) => [`${r.option_id}|${r.fulfillment_type}`, r] as const));
+        const cellOf = new Map((liveCells.results ?? []).map((r) => [r.id, r] as const));
+        const routeCost = new Map(
+          (liveRoutes.results ?? []).map((r) => {
+            const owner = cellOf.get(r.fulfillment_id);
+            return [owner ? `${owner.option_id}|${owner.fulfillment_type}|${r.method}` : `?${r.id}`, r] as const;
+          })
+        );
+        for (const cell of parsed) {
+          const was = cellCost.get(`${cell.option_id}|${cell.fulfillment_type}`);
+          cell.cost_iqd = was?.cost_iqd ?? null;
+          cell.cost_adjust_iqd = was?.cost_adjust_iqd ?? null;
+          for (const t of cell.transports) {
+            const wasRoute = routeCost.get(`${cell.option_id}|${cell.fulfillment_type}|${t.method}`);
+            t.cost_iqd = wasRoute?.cost_iqd ?? null;
+            t.cost_adjust_iqd = wasRoute?.cost_adjust_iqd ?? null;
+          }
+        }
+      }
       /**
        * AFTER the structure, never before it.
        *

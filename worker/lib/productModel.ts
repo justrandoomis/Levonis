@@ -963,7 +963,17 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
  * ProductDoc. Throws HttpError(400) with a precise field path on violation.
  * The same function backs the editor API and the template import pipeline.
  */
-export function validateProductDoc(body: Record<string, unknown>, opts: { requireName?: boolean } = {}): ProductDoc {
+export function validateProductDoc(
+  body: Record<string, unknown>,
+  /**
+   * `costBlind` — the caller may not see the cost. The "price must not equal
+   * the cost" rule exists to catch a cost typed into a price field, which only
+   * someone who can see the cost can do; for anyone else the cost in the
+   * document is the STORED one carried forward, and the refusal would confirm
+   * a guessed cost. So it is not judged for them at all.
+   */
+  opts: { requireName?: boolean; costBlind?: boolean } = {}
+): ProductDoc {
   const fail = (path: string, why: string): never => {
     throw badRequest(`${path}: ${why}`, 'VALIDATION');
   };
@@ -1204,6 +1214,7 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     cost: number | null,
     regularAdjust: number | null = null
   ) => {
+    if (opts.costBlind) cost = null;
     if (regular !== null && cost !== null && regular === cost) {
       fail(
         label ? `${label}.price_iqd` : 'price_iqd',
@@ -1541,7 +1552,7 @@ export function projectAdmin(doc: ProductDoc) {
  */
 const COST_KEYS = ['cost_iqd', 'cost_adjust_iqd'] as const;
 
-const stripCostFields = <T extends PriceFields>(x: T) => {
+export const stripCostFields = <T extends PriceFields>(x: T) => {
   const rest = { ...x } as Record<string, unknown>;
   for (const k of COST_KEYS) delete rest[k];
 

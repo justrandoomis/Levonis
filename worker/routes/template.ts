@@ -1402,6 +1402,8 @@ interface Analysis {
   /** §18 — the product-scoped membership rules the file states, lifted out of
    *  the text before the product parser ran (see `extractMembership`). */
   membership: ParsedMembershipRule[];
+  /** The caller may see cost — the validator judges price against cost only then. */
+  money: boolean;
 }
 
 /**
@@ -1542,6 +1544,7 @@ async function analyzeTemplate(
   const a: Analysis = {
     parsed, refs: {}, existing: null, existingView: null, merge: null, doc: null, validation_error: null, spec: null,
     membership: membership.rules,
+    money: opts.money,
   };
   if (parsed.errors.length > 0) return a;
 
@@ -1572,7 +1575,7 @@ async function analyzeTemplate(
   body.content_rev = bookkeeping.content_rev;
   body.translation_meta = bookkeeping.translation_meta;
   try {
-    const validated = validateProductDoc(body);
+    const validated = validateProductDoc(body, { costBlind: !opts.money });
     // Extended warranty is for printers only (owner mandate): the catalogs
     // this file names — or the product's stored placement when it names
     // none — decide, and the +12/+24 shape and the printer defaults
@@ -1619,7 +1622,7 @@ async function analyzeTemplate(
             // base months) are the document's now, not the file's — keep them.
             serialized: validated.serialized,
             warranty_base_months: validated.warranty_base_months,
-          });
+          }, { costBlind: !opts.money });
           reattachCells(a.doc, body);
           reattachTemplateVariants(a.doc, body);
           reattachTemplateMediaMetadata(a.doc, body);
@@ -2707,7 +2710,7 @@ async function stageTemplateMedia(
 
   let next: ProductDoc;
   try {
-    next = validateProductDoc({ ...a.doc, media: deduped });
+    next = validateProductDoc({ ...a.doc, media: deduped }, { costBlind: !a.money });
   } catch (error) {
     const first = intents[0];
     return {

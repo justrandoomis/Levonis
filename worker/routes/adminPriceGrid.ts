@@ -491,7 +491,39 @@ function ladderErrorsAfter(next: GridProductInput, changes: CellChange[]): strin
   return [...new Set(errors)];
 }
 
+/**
+ * A margin guard is a cost oracle for whoever may not see the cost.
+ *
+ * `guardsFor` still answers BELOW_COST when no minimum margin is passed, and
+ * `projectForAdmin` strips the cost from the guard but keeps its code and the
+ * proposed price — so an assistant admin could preview a bulk change at
+ * different amounts and binary-search the exact cost from where BELOW_COST
+ * appears. Without financial scope there are no guards at all: the preview,
+ * the 409 that asks for confirmation and the apply are the same at any price.
+ */
+function withoutCostSignal<T extends { guards: unknown[] }>(preview: T, financial: boolean): T {
+  return financial ? preview : { ...preview, guards: [] };
+}
+
+/**
+ * The same rule for the ladder check. `validatePriceLadder` refuses a price
+ * equal to the cost, and the cost it is handed is the STORED one — so for an
+ * assistant admin a refused preview confirms a guessed cost. Without
+ * financial scope the ladder is judged with no cost at all; the write keeps
+ * the stored cost either way (assertMayWrite refuses a cost field).
+ */
+function costBlind(input: GridProductInput, financial: boolean): GridProductInput {
+  if (financial) return input;
+  return {
+    ...input,
+    product_cost_iqd: null,
+    options: input.options.map((o) => ({ ...o, cost_iqd: null, cost_adjust_iqd: null })),
+    colors: input.colors.map((x) => ({ ...x, cost_iqd: null, cost_adjust_iqd: null })),
+  };
+}
+
 /** The refusal envelope the relations PUT uses, so the drawer and the form read one shape. */
+
 const ladderRefusal = (errors: string[]) =>
   ({ success: false, error: errors.join('\n'), code: 'VALIDATION', errors }) as const;
 
@@ -746,7 +778,7 @@ adminPriceGridRoutes.patch('/:id/price-grid', async (c) => {
 
   // The ladder is judged on the RESULT by the validator the product form's
   // save runs — a refusal here is the refusal the form would have given.
-  const ladderErrors = ladderErrorsAfter(afterChanges(loaded.input, changes), changes);
+  const ladderErrors = ladderErrorsAfter(costBlind(afterChanges(loaded.input, changes), financial), changes);
   if (ladderErrors.length) return c.json(ladderRefusal(ladderErrors), 400);
 
   // The guard is computed on the RESULT, pairing each row's new prices against
@@ -1034,10 +1066,10 @@ adminPriceGridRoutes.post('/:id/price-grid/bulk', async (c) => {
   const rows = buildGrid(loaded.input);
   const financial = canViewFinancials(c.env, admin);
   const minMargin = await getSetting(c.env.DB, 'minMarginPercent');
-  const preview = previewBulk(rows, req, financial ? minMargin : null);
+  const preview = withoutCostSignal(previewBulk(rows, req, financial ? minMargin : null), financial);
   // What the write-time ladder would say about the result — shown with the
   // preview, and a refusal at apply time.
-  const ladderErrors = preview.changes.length ? ladderErrorsAfter(afterChanges(loaded.input, preview.changes), preview.changes) : [];
+  const ladderErrors = preview.changes.length ? ladderErrorsAfter(costBlind(afterChanges(loaded.input, preview.changes), financial), preview.changes) : [];
 
   if (body.apply !== true) {
     return c.json({ success: true, preview: projectForAdmin(c.env, admin, preview), errors: ladderErrors });
@@ -1111,8 +1143,8 @@ adminPriceGridRoutes.post('/:id/price-grid/copy', async (c) => {
   const rows = buildGrid(loaded.input);
   const financial = canViewFinancials(c.env, admin);
   const minMargin = await getSetting(c.env.DB, 'minMarginPercent');
-  const preview = previewCopy(rows, req, financial ? minMargin : null);
-  const ladderErrors = preview.changes.length ? ladderErrorsAfter(afterChanges(loaded.input, preview.changes), preview.changes) : [];
+  const preview = withoutCostSignal(previewCopy(rows, req, financial ? minMargin : null), financial);
+  const ladderErrors = preview.changes.length ? ladderErrorsAfter(costBlind(afterChanges(loaded.input, preview.changes), financial), preview.changes) : [];
 
   if (body.apply !== true) {
     return c.json({ success: true, preview: projectForAdmin(c.env, admin, preview), errors: ladderErrors });

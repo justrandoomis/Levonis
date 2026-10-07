@@ -63,9 +63,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const id = user?.id ?? null;
     if (lastIdentityRef.current === id) return;
+    const previous = lastIdentityRef.current;
     lastIdentityRef.current = id;
     clearPageCache();
     clearPrimedRequests();
+    // The purchase editor parks its draft — supplier prices, freight and
+    // extras — in localStorage. It belongs to the account that typed it, so it
+    // goes when that account signs out or another signs in on this browser.
+    // Not on the first answer of a page load (previous is null then), or every
+    // reload would throw the owner's own draft away.
+    if (previous !== null) {
+      try {
+        localStorage.removeItem('levonis-purchase-draft-v2');
+      } catch {
+        /* storage blocked: nothing was stored either */
+      }
+    }
   }, [user?.id]);
 
   const refreshUser = useCallback(async () => {

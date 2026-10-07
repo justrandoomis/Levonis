@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from './lib/types';
+import { noStoreUnlessSet } from './lib/edgePolicy';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
 import { loadSessionUser, sessionFreePublicGet } from './lib/session';
 import { isAnonymousPublicMediaKey } from './lib/mediaStorage';
@@ -331,6 +332,11 @@ app.use('*', async (c, next) => {
 // as `foreign` and took the entire admin API down with a 404, while protecting
 // nobody. The same middleware guards credential changes in routes/auth.ts.
 app.use('/api/admin/*', requireMainHost);
+
+// No shared or stored copy of an admin or cart answer — see edgePolicy.ts.
+app.use('/api/admin/*', noStoreUnlessSet);
+app.use('/api/cart', noStoreUnlessSet);
+app.use('/api/cart/*', noStoreUnlessSet);
 
 app.route('/api/auth', authRoutes);
 app.route('/api/products', productRoutes);

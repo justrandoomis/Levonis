@@ -1820,7 +1820,12 @@ adminImportRoutes.post('/confirm', async (c) => {
         const refused = brandRefused.get(reserved);
         if (refused) throw new Error(refused);
         const remapped = brandRemap.get(reserved);
-        const doc = validateProductDoc(remapped ? { ...stored, brand_id: remapped } : stored);
+        // The stored payload carries the product's EXISTING cost for an
+        // assistant (importApply keeps it); judging price against it would
+        // turn a refusal into a cost oracle.
+        const doc = validateProductDoc(remapped ? { ...stored, brand_id: remapped } : stored, {
+          costBlind: !canViewFinancials(c.env, admin),
+        });
         doc.id = String(item.productId ?? '');
         const relationsBody = item.relations && typeof item.relations === 'object'
           ? (item.relations as Record<string, unknown>)
