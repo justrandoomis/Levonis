@@ -136,7 +136,7 @@ function payloads(raw: DatabaseSync): Payloads {
 const notifications = (raw: DatabaseSync) =>
   raw.prepare('SELECT * FROM user_notifications ORDER BY id').all() as Array<{
     user_id: string; kind: string; title_ar: string; title_en: string; body_ar: string;
-    link: string; entity_type: string; entity_id: string; event_key: string;
+    link: string; entity_type: string; entity_id: string; event_key: string; meta: string;
   }>;
 
 const outboxKeys = (raw: DatabaseSync) =>
@@ -292,6 +292,19 @@ test('THE FLOOR — a customer with no channel at all is still told, in the app'
   // waiting for the day the domain changes (lib/notifications.ts).
   assert.equal(rows[0].link, '/orders?status=review&needs_review=1');
   assert.equal(rows[0].link.includes('://'), false);
+  // The bell's Sorani: the same sentence the Sorani channels send, never the Arabic.
+  assert.equal(JSON.parse(rows[0].meta).title_ckb, 'داواکاری ORD-1 گەیەندرا. کاڵاکانی هەڵبسەنگێنە بۆ وەرگرتنی خاڵ.');
+});
+
+test('THE FLOOR — every status row carries its Sorani for the bell; the cancelled one keeps its number', async () => {
+  const raw = freshDb();
+  seedUser(raw, { email: null, phone: null, chat: null });
+  seedOrder(raw);
+  await notifyOrderStatus(env(raw), 'ORD-1', 'confirmed');
+  await notifyOrderStatus(env(raw), 'ORD-1', 'cancelled');
+  const byKey = Object.fromEntries(notifications(raw).map((r) => [r.event_key, JSON.parse(r.meta).title_ckb]));
+  assert.equal(byKey['order.status.confirmed:ORD-1'], 'داواکاری ORD-1 پشتڕاستکرایەوە و ئامادە دەکرێت.');
+  assert.match(byKey['order.status.cancelled:ORD-1'], /^داواکارییەکەت هەڵوەشێندرایەوە\..*\(ژمارەی داواکاری ORD-1\)$/);
 });
 
 test('THE FLOOR — the in-app row is written even when the deployment can carry no channel', async () => {

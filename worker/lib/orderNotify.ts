@@ -313,8 +313,9 @@ export async function notifyOrderStatus(
        * nothing at all about confirmed, shipped or cancelled, and their bell
        * stayed empty. The in-app row needs no channel. Same shape and same
        * reasons as the delivered row below: a PATH for the link, ar/en titles
-       * (the bell falls back to Arabic for Sorani), and the status in the
-       * event key so a reversed-and-repeated status is one row, not two.
+       * plus the same sentence's Sorani in meta (the bell reads
+       * `meta.title_ckb`; the columns have no Sorani pair), and the status in
+       * the event key so a reversed-and-repeated status is one row, not two.
        *
        * The cancelled sentence carries no number, so the in-app title adds it:
        * a bell entry reading «تم إلغاء طلبك» beside three orders says nothing.
@@ -330,6 +331,12 @@ export async function notifyOrderStatus(
           status === 'cancelled'
             ? `${COPY.en.status.cancelled(row.id)} (${COPY.en.orderLabel} ${row.id})`
             : COPY.en.status[status](row.id),
+        meta: {
+          title_ckb:
+            status === 'cancelled'
+              ? `${COPY.ckb.status.cancelled(row.id)} (${COPY.ckb.orderLabel} ${row.id})`
+              : COPY.ckb.status[status](row.id),
+        },
         link: `/orders/${encodeURIComponent(row.id)}`,
         entity_type: 'order',
         entity_id: row.id,
@@ -419,13 +426,15 @@ export async function notifyOrderDelivered(env: Env, orderId: string): Promise<v
     //
     // The title is the whole line and the body is empty: it is already one
     // short sentence, and splitting it would only repeat half of it. Stored in
-    // ar/en because the column has no Sorani pair — the bell falls back to the
-    // Arabic, deliberately, never to the English.
+    // ar/en, with the same line's Sorani in `meta.title_ckb` because the
+    // columns have no Sorani pair; the bell reads it, and a notice without one
+    // falls back to the Arabic, deliberately, never to the English.
     await notify(env.DB, {
       userId: row.user_id,
       kind: 'order_update',
       title_ar: COPY.ar.status.delivered(row.id),
       title_en: COPY.en.status.delivered(row.id),
+      meta: { title_ckb: COPY.ckb.status.delivered(row.id) },
       link: REVIEW_PATH,
       entity_type: 'order',
       entity_id: row.id,
