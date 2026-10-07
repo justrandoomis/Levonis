@@ -107,6 +107,36 @@ jobs:
           jq -r '.[0].results | (.[0] | keys_unsorted | @tsv), (.[] | [.[]] | map(tostring) | @tsv)' /tmp/census.json | column -t -s $'\t'
           jq -r '.[0].results | length | "rows: \(.)"' /tmp/census.json
 
+      # THE OWNER ROW (owner decision 2, 2026-10-07). Cost is meant for the
+      # admin row whose address is INITIAL_ADMIN_EMAIL. Before the cost gate
+      # leans on that row being verified, count — never print — whether it
+      # exists, is verified and is linked to Google, and how the other admins
+      # are scoped. The address is read from the running Worker, masked at
+      # once, and used only inside the SELECT; only counts come back.
+      - name: The owner row and the admin scopes (counts only)
+        run: |
+          set -e
+          curl -sS -f \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-staging/settings" \
+            -o /tmp/settings.json
+          OWNER=$(jq -r '[.result.bindings[] | select(.type == "plain_text" and .name == "INITIAL_ADMIN_EMAIL") | .text][0] // ""' /tmp/settings.json | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+          rm -f /tmp/settings.json
+          [ -n "$OWNER" ] && echo "::add-mask::$OWNER"
+          echo "INITIAL_ADMIN_EMAIL set: $([ -n "$OWNER" ] && echo yes || echo no)"
+          printf '%s' "$OWNER" | grep -Eq '^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$' \
+            || { echo "::error::INITIAL_ADMIN_EMAIL is empty or not a plain address — not querying with it"; exit 1; }
+          q() { npx wrangler d1 execute levonis-db-staging --remote --env staging --json --command "$1" | jq -r '.[0].results'; }
+          echo "── rows holding the owner address"
+          q "SELECT COUNT(*) AS rows_any_role,
+                    COALESCE(SUM(role = 'admin'), 0) AS admin_rows,
+                    COALESCE(SUM(role = 'admin' AND email_verified_at IS NOT NULL AND trim(email_verified_at) <> ''), 0) AS admin_verified,
+                    COALESCE(SUM(role = 'admin' AND google_sub IS NOT NULL), 0) AS admin_google_linked,
+                    COALESCE(SUM(role = 'admin' AND COALESCE(admin_scope, 'full') = 'full'), 0) AS admin_full_scope
+               FROM users WHERE lower(trim(email)) = '$OWNER'"
+          echo "── admins by scope (all admin rows)"
+          q "SELECT COALESCE(admin_scope, '(null)') AS scope, COUNT(*) AS n FROM users WHERE role = 'admin' GROUP BY 1 ORDER BY 1"
+
       - name: Where the official-source / refresh data lives (counts only)
         continue-on-error: true
         run: |
