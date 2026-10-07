@@ -75,6 +75,15 @@ test('no sentence is the code itself, and Sorani is never a copy of the Arabic',
   }
 });
 
+test('across the WHOLE table, no Sorani sentence is the Arabic or the English pasted across', () => {
+  // The rule above, for every code a customer, a merchant or a workshop can
+  // meet — not only the list above. 112 of them once carried the Arabic.
+  const copies = Object.entries(REFUSAL_STRINGS)
+    .filter(([, e]) => e.ckb === e.ar || e.ckb === e.en)
+    .map(([code]) => code);
+  assert.deepEqual(copies, [], `ckb copies the Arabic or the English: ${copies.join(', ')}`);
+});
+
 test('the Arabic and Sorani sentences carry no latin identifier fragments', () => {
   for (const code of CUSTOMER_FACING) {
     const e = REFUSAL_STRINGS[code];
@@ -427,8 +436,8 @@ test('the cart door refusal names the remainder in all three languages, never in
  * customer's cancel after the order moved on. Each used to reach its screen as
  * the server's English sentence (or no code at all). Merchant- and
  * customer-facing alike, each has an Arabic and an English sentence that says
- * what to do; the ckb column carries the Arabic until the owner writes the
- * Sorani by hand (DECISIONS row 11), so it is only required to be present.
+ * what to do, and its own Sorani (DECISIONS row 183 — the whole table is
+ * checked for copies of the Arabic above).
  */
 const REVIEW_E2E_CODES = [
   'BAD_COUPON_CODE',

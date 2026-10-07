@@ -282,7 +282,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     // same choice `Product.tsx`, `Cart.tsx` and `Checkout.tsx` make for the
     // rest of the 0075 copy. A machine translation of a refusal is not an
     // option in this repo.
-    ckb: 'اكتملت حصة الطلب المسبق لهذا الاختيار — وهذا ليس نفادًا للمخزون. جرّب طريقة شحن أخرى أو عُد لاحقًا.',
+    ckb: 'پشکی پێشداواکاری بۆ ئەم هەڵبژاردەیە تەواو بووە — ئەمە بە واتای نەمانی بەرهەم لە کۆگا نییە. ڕێگایەکی تری ناردن تاقی بکەرەوە، یان دواتر بگەڕێوە.',
   },
 
   /**
@@ -447,34 +447,34 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   VIEWER_NOT_ALLOWED: {
     ar: 'المعاينة ثلاثية الأبعاد متاحة لصاحب الطلب وللتجار الذين يمكنهم تقديم عرض عليه.',
     en: 'The 3D preview is available to the request’s owner and to merchants who can make an offer on it.',
-    ckb: 'المعاينة ثلاثية الأبعاد متاحة لصاحب الطلب وللتجار الذين يمكنهم تقديم عرض عليه.',
+    ckb: 'پێشبینینی سێ ڕەهەندی تەنها بۆ خاوەنی داواکارییەکە و ئەو بازرگانانە بەردەستە کە دەتوانن ئۆفەری لەسەر پێشکەش بکەن.',
   },
   // ---- print requests v2 (stream W5-A). OWNER: Sorani to be written by hand —
   // the ckb slot carries the Arabic until then (docs/DECISIONS.md row 11).
   SOURCE_FILE_REQUIRED: {
     ar: 'أرفق ملف المجسم الذي يدور حوله الطلب، أو اختر مصدرًا آخر.',
     en: 'Attach the model file this request is about, or choose another source.',
-    ckb: 'أرفق ملف المجسم الذي يدور حوله الطلب، أو اختر مصدرًا آخر.',
+    ckb: 'فایلی ئەو مۆدێلەی داواکارییەکە دەربارەیەتی هاوپێچ بکە، یان سەرچاوەیەکی تر هەڵبژێرە.',
   },
   SOURCE_LINK_REQUIRED: {
     ar: 'أضف رابط المجسم، أو اختر مصدرًا آخر.',
     en: 'Add the link to the model, or choose another source.',
-    ckb: 'أضف رابط المجسم، أو اختر مصدرًا آخر.',
+    ckb: 'بەستەری مۆدێلەکە زیاد بکە، یان سەرچاوەیەکی تر هەڵبژێرە.',
   },
   SOURCE_IMAGES_REQUIRED: {
     ar: 'أرفق صورة واحدة على الأقل لما تريد طباعته، أو اختر مصدرًا آخر.',
     en: 'Attach at least one picture of what you want printed, or choose another source.',
-    ckb: 'أرفق صورة واحدة على الأقل لما تريد طباعته، أو اختر مصدرًا آخر.',
+    ckb: 'لانیکەم یەک وێنە لەوەی دەتەوێت چاپ بکرێت هاوپێچ بکە، یان سەرچاوەیەکی تر هەڵبژێرە.',
   },
   DEADLINE_INVALID: {
     ar: 'اختر موعدًا من اليوم حتى سنة قادمة.',
     en: 'Choose a deadline from today to a year ahead.',
-    ckb: 'اختر موعدًا من اليوم حتى سنة قادمة.',
+    ckb: 'وادەیەک هەڵبژێرە لە ئەمڕۆوە تا ساڵێکی تر.',
   },
   DIMENSIONS_INVALID: {
     ar: 'كل بُعد بين 1 و5000 ملم. اترك الثلاثة فارغة إن لم تكن متأكدًا.',
     en: 'Each dimension must be between 1 and 5000 mm. Leave all three empty if unsure.',
-    ckb: 'كل بُعد بين 1 و5000 ملم. اترك الثلاثة فارغة إن لم تكن متأكدًا.',
+    ckb: 'هەر ڕەهەندێک دەبێت لە نێوان 1 و 5000 ملم بێت. ئەگەر دڵنیا نیت، هەر سێکیان بەتاڵ جێبهێڵە.',
   },
   REQUEST_NOT_DRAFT: {
     ar: 'نُشر هذا الطلب بالفعل. حدّث الصفحة وعدّله من صفحته.',
@@ -494,7 +494,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   BAD_URL: {
     ar: 'الرابط غير صالح. الصق رابط التصميم كاملًا مع ‎https://‎.',
     en: 'That link is not valid. Paste the full design link, including https://.',
-    ckb: 'الرابط غير صالح. الصق رابط التصميم كاملًا مع ‎https://‎.',
+    ckb: 'بەستەرەکە دروست نییە. بەستەری تەواوی دیزاینەکە لەگەڵ ‎https://‎ بلکێنە.',
   },
   INSUFFICIENT_FUNDS: {
     ar: 'رصيد محفظتك لا يغطي هذا المبلغ. اشحن المحفظة ثم حاول مرة أخرى.',
@@ -532,7 +532,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   NO_PREVIEW: {
     ar: 'لا تتوفر معاينة ثلاثية الأبعاد لهذا الملف.',
     en: 'This file has no 3D preview.',
-    ckb: 'لا تتوفر معاينة ثلاثية الأبعاد لهذا الملف.',
+    ckb: 'ئەم فایلە پێشبینینی سێ ڕەهەندیی نییە.',
   },
   // Why a merchant cannot make, edit or re-confirm an offer — the selling gate
   // in worker/lib/merchantAuth.ts, each sanction by its own code. The three the
@@ -542,7 +542,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   MERCHANT_RESTRICTED: {
     ar: 'قيّدت Levonis حساب التاجر: لا يمكنك تقديم عروض جديدة أو تأكيدها حتى يُرفع التقييد. أعمالك المقبولة مستمرة — تواصل مع الدعم.',
     en: 'Levonis has restricted your merchant account: you cannot make or re-confirm offers until the restriction is lifted. Your accepted work continues — contact support.',
-    ckb: 'قيّدت Levonis حساب التاجر: لا يمكنك تقديم عروض جديدة أو تأكيدها حتى يُرفع التقييد. أعمالك المقبولة مستمرة — تواصل مع الدعم.',
+    ckb: 'Levonis هەژماری بازرگانییەکەتی سنووردار کردووە: تا سنووردارکردنەکە لانەبرێت ناتوانیت ئۆفەری نوێ پێشکەش بکەیت یان پشتڕاستیان بکەیتەوە. کارە قبوڵکراوەکانت بەردەوام دەبن — پەیوەندی بە پشتگیری بکە.',
   },
   MERCHANT_SUSPENDED: {
     ar: 'المتجر موقوف من إدارة Levonis. تواصل مع الدعم لمعرفة التفاصيل.',
@@ -560,12 +560,12 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   STORE_FIELD_INVALID: {
     ar: 'أحد الحقول غير صالح أو أطول من المسموح. راجعه ثم احفظ.',
     en: 'One of the fields is not valid or is longer than allowed. Check it, then save.',
-    ckb: 'أحد الحقول غير صالح أو أطول من المسموح. راجعه ثم احفظ.',
+    ckb: 'یەکێک لە خانەکان دروست نییە یان لە ڕێگەپێدراو درێژترە. بیپشکنە و پاشان پاشەکەوت بکە.',
   },
   MEDIA_NOT_OWNED: {
     ar: 'اختر صورة رفعتها أنت لهذا المتجر.',
     en: 'Choose a picture you uploaded to this store.',
-    ckb: 'اختر صورة رفعتها أنت لهذا المتجر.',
+    ckb: 'وێنەیەک هەڵبژێرە کە خۆت بۆ ئەم فرۆشگایە بارت کردووە.',
   },
   STORE_PAUSED: {
     ar: 'متجرك متوقّف مؤقتًا بطلبك. أعِد فتحه من إعدادات المتجر.',
@@ -597,127 +597,127 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   CARD_NOT_IN_THREAD: {
     ar: 'هذا العنصر ليس من هذه المحادثة، فلا يمكن إرساله هنا.',
     en: 'This item is not part of this conversation, so it cannot be sent here.',
-    ckb: 'هذا العنصر ليس من هذه المحادثة، فلا يمكن إرساله هنا.',
+    ckb: 'ئەم بابەتە بەشێک نییە لەم گفتوگۆیە، بۆیە لێرە نانێردرێت.',
   },
   CARD_NOT_ALLOWED_HERE: {
     ar: 'البطاقات تُرسل في المحادثة مع متجر فقط.',
     en: 'Cards can only be sent in a conversation with a store.',
-    ckb: 'البطاقات تُرسل في المحادثة مع متجر فقط.',
+    ckb: 'کارتەکان تەنها لە گفتوگۆ لەگەڵ فرۆشگایەک دەنێردرێن.',
   },
   CARD_NOT_ALLOWED: {
     ar: 'لا يرسل البطاقات هنا إلا الزبون والمتجر.',
     en: 'Only the customer and the store send cards here.',
-    ckb: 'لا يرسل البطاقات هنا إلا الزبون والمتجر.',
+    ckb: 'لێرە تەنها کڕیار و فرۆشگاکە کارت دەنێرن.',
   },
   CARD_TYPE_UNSUPPORTED: {
     ar: 'لا يمكن إرسال هذه البطاقة بهذه الطريقة.',
     en: 'That card cannot be sent this way.',
-    ckb: 'لا يمكن إرسال هذه البطاقة بهذه الطريقة.',
+    ckb: 'ئەم کارتە بەم شێوەیە نانێردرێت.',
   },
   CUSTOM_PRODUCT_LOCKED: {
     ar: 'هذا منتج خاص صُنع لزبون واحد، ولا يُعدَّل. ألغه من المحادثة وأرسل منتجًا جديدًا.',
     en: 'This is a private product made for one customer and cannot be changed. Cancel it from the conversation and send a new one.',
-    ckb: 'هذا منتج خاص صُنع لزبون واحد، ولا يُعدَّل. ألغه من المحادثة وأرسل منتجًا جديدًا.',
+    ckb: 'ئەمە بەرهەمێکی تایبەتە کە بۆ یەک کڕیار دروستکراوە و دەستکاری ناکرێت. لە گفتوگۆکەوە هەڵیبوەشێنەرەوە و بەرهەمێکی نوێ بنێرە.',
   },
   QUOTE_ALREADY_ACCEPTED: {
     ar: 'قبل الزبون هذا العرض وطلبه قيد التنفيذ، فلا يتحول إلى منتج خاص.',
     en: 'The customer accepted this quote and its order is under way, so it cannot become a private product.',
-    ckb: 'قبل الزبون هذا العرض وطلبه قيد التنفيذ، فلا يتحول إلى منتج خاص.',
+    ckb: 'کڕیارەکە ئەم ئۆفەرەی قبوڵ کردووە و داواکارییەکەی لە جێبەجێکردندایە، بۆیە ناکرێت بە بەرهەمی تایبەت.',
   },
   STORE_NOT_SELLING: {
     ar: 'متجرك لا يبيع المنتجات الآن. فعّل البيع من إعدادات المتجر أولًا.',
     en: 'Your store is not selling products right now. Turn selling on in the store settings first.',
-    ckb: 'متجرك لا يبيع المنتجات الآن. فعّل البيع من إعدادات المتجر أولًا.',
+    ckb: 'فرۆشگاکەت ئێستا بەرهەم نافرۆشێت. سەرەتا لە ڕێکخستنەکانی فرۆشگاوە فرۆشتن چالاک بکە.',
   },
   STORE_NO_CUSTOM_REQUESTS: {
     ar: 'هذا المتجر لا يستقبل طلبات الطباعة المخصصة حاليًا.',
     en: 'This store is not taking custom print requests right now.',
-    ckb: 'هذا المتجر لا يستقبل طلبات الطباعة المخصصة حاليًا.',
+    ckb: 'ئەم فرۆشگایە ئێستا داواکاریی چاپی تایبەت وەرناگرێت.',
   },
   IMAGE_NOT_OWNED: {
     ar: 'اختر صورة رفعتها إلى متجرك.',
     en: 'Choose a picture you uploaded to your store.',
-    ckb: 'اختر صورة رفعتها إلى متجرك.',
+    ckb: 'وێنەیەک هەڵبژێرە کە بۆ فرۆشگاکەت بارت کردووە.',
   },
   CLIENT_ID_REUSED: {
     ar: 'هذا الإرسال استُخدم لرسالة أخرى. أغلق النافذة وافتحها من جديد.',
     en: 'This send was already used for another message. Close the window and open it again.',
-    ckb: 'هذا الإرسال استُخدم لرسالة أخرى. أغلق النافذة وافتحها من جديد.',
+    ckb: 'ئەم ناردنە پێشتر بۆ نامەیەکی تر بەکارهاتووە. پەنجەرەکە دابخە و دووبارە بیکەرەوە.',
   },
   PRODUCT_NOT_PUBLISHED: {
     ar: 'هذا المنتج غير منشور الآن، فلا يمكن إرساله.',
     en: 'This product is not published right now, so it cannot be sent.',
-    ckb: 'هذا المنتج غير منشور الآن، فلا يمكن إرساله.',
+    ckb: 'ئەم بەرهەمە ئێستا بڵاو نەکراوەتەوە، بۆیە نانێردرێت.',
   },
   CART_EMPTY: {
     ar: 'سلتك فارغة. أضف منتجًا ثم أكمل الطلب.',
     en: 'Your cart is empty. Add a product, then check out.',
-    ckb: 'سلتك فارغة. أضف منتجًا ثم أكمل الطلب.',
+    ckb: 'سەبەتەکەت بەتاڵە. بەرهەمێک زیاد بکە و پاشان داواکارییەکە تەواو بکە.',
   },
   CART_SELLER_CONFLICT: {
     ar: 'سلتك تضم منتجات من أكثر من بائع. أبقِ منتجات بائع واحد ثم أكمل الطلب.',
     en: 'Your cart holds items from more than one seller. Keep one seller’s items, then check out.',
-    ckb: 'سلتك تضم منتجات من أكثر من بائع. أبقِ منتجات بائع واحد ثم أكمل الطلب.',
+    ckb: 'سەبەتەکەت بەرهەمی زیاتر لە فرۆشیارێکی تێدایە. تەنها بەرهەمەکانی یەک فرۆشیار بهێڵەرەوە و پاشان داواکارییەکە تەواو بکە.',
   },
   STORE_CLOSED: {
     ar: 'هذا المتجر لا يستقبل طلبات حاليًا. جرّب لاحقًا.',
     en: 'This store is not taking orders right now. Try again later.',
-    ckb: 'هذا المتجر لا يستقبل طلبات حاليًا. جرّب لاحقًا.',
+    ckb: 'ئەم فرۆشگایە ئێستا داواکاری وەرناگرێت. دواتر هەوڵ بدەرەوە.',
   },
   OWN_STORE_PURCHASE: {
     ar: 'لا يمكنك الشراء من متجرك.',
     en: 'You cannot buy from your own store.',
-    ckb: 'لا يمكنك الشراء من متجرك.',
+    ckb: 'ناتوانیت لە فرۆشگاکەی خۆت بکڕیت.',
   },
   PRODUCT_UNAVAILABLE: {
     ar: 'أحد المنتجات لم يعد متاحًا. احذفه من السلة للمتابعة.',
     en: 'One of the items is no longer available. Remove it from the cart to continue.',
-    ckb: 'أحد المنتجات لم يعد متاحًا. احذفه من السلة للمتابعة.',
+    ckb: 'یەکێک لە بەرهەمەکان چیتر بەردەست نییە. بۆ بەردەوامبوون لە سەبەتەکە لایببە.',
   },
   OPTION_UNAVAILABLE: {
     ar: 'الخيار الذي اخترته لأحد المنتجات لم يعد متاحًا. احذف المنتج ثم أضفه من جديد.',
     en: 'An option you chose is no longer offered. Remove the item, then add it again.',
-    ckb: 'الخيار الذي اخترته لأحد المنتجات لم يعد متاحًا. احذف المنتج ثم أضفه من جديد.',
+    ckb: 'هەڵبژاردەیەک کە هەڵتبژاردووە چیتر پێشکەش ناکرێت. بەرهەمەکە لاببە و پاشان دووبارە زیادی بکەرەوە.',
   },
   OPTION_INVALID: {
     ar: 'هذا الخيار غير متاح لهذا المنتج. اختر من الخيارات المعروضة.',
     en: 'That option is not offered for this product. Choose one of the options shown.',
-    ckb: 'هذا الخيار غير متاح لهذا المنتج. اختر من الخيارات المعروضة.',
+    ckb: 'ئەم هەڵبژاردەیە بۆ ئەم بەرهەمە پێشکەش ناکرێت. یەکێک لە هەڵبژاردە پیشاندراوەکان هەڵبژێرە.',
   },
   COLOR_INVALID: {
     ar: 'هذا اللون غير متاح لهذا المنتج. اختر من الألوان المعروضة.',
     en: 'That colour is not offered for this product. Choose one of the colours shown.',
-    ckb: 'هذا اللون غير متاح لهذا المنتج. اختر من الألوان المعروضة.',
+    ckb: 'ئەم ڕەنگە بۆ ئەم بەرهەمە پێشکەش ناکرێت. یەکێک لە ڕەنگە پیشاندراوەکان هەڵبژێرە.',
   },
   COUPON_EXHAUSTED: {
     ar: 'نفد هذا الكوبون للتو. أزِله ثم أكّد الطلب.',
     en: 'This coupon has just run out. Remove it, then place the order.',
-    ckb: 'نفد هذا الكوبون للتو. أزِله ثم أكّد الطلب.',
+    ckb: 'ئەم کۆپۆنە تازە تەواو بوو. لایببە و پاشان داواکارییەکە بنێرە.',
   },
   QUOTE_CHANGED: {
     ar: 'تغيّر السعر منذ أن عُرض عليك. راجع الإجمالي الجديد ثم أكّد مرة أخرى.',
     en: 'The price changed since it was shown to you. Review the new total, then confirm again.',
-    ckb: 'تغيّر السعر منذ أن عُرض عليك. راجع الإجمالي الجديد ثم أكّد مرة أخرى.',
+    ckb: 'نرخەکە لەو کاتەوەی پیشانت درا گۆڕاوە. کۆی گشتیی نوێ ببینە و پاشان دووبارە پشتڕاستی بکەرەوە.',
   },
   STORE_PREPAID_ONLY: {
     ar: 'طلبات متاجر المجتمع تُدفع من محفظتك قبل أن يشحنها المتجر.',
     en: 'Community-store orders are paid from your wallet before the store ships them.',
-    ckb: 'طلبات متاجر المجتمع تُدفع من محفظتك قبل أن يشحنها المتجر.',
+    ckb: 'داواکارییەکانی فرۆشگاکانی کۆمەڵگا پێش ئەوەی فرۆشگاکە بیاننێرێت لە جزدانەکەتەوە پارەیان دەدرێت.',
   },
   RECEIPT_NOT_APPLICABLE: {
     ar: 'تأكيد الاستلام خاص بطلبات متاجر المجتمع.',
     en: 'Confirming receipt applies to community-store orders only.',
-    ckb: 'تأكيد الاستلام خاص بطلبات متاجر المجتمع.',
+    ckb: 'پشتڕاستکردنەوەی وەرگرتن تەنها بۆ داواکارییەکانی فرۆشگاکانی کۆمەڵگایە.',
   },
   ORDER_NOT_DELIVERED: {
     ar: 'لم يُسلَّم هذا الطلب بعد. يمكنك ذلك بعد أن تصبح حالته «تم التسليم».',
     en: 'This order has not been delivered yet. You can do this once it is marked delivered.',
-    ckb: 'لم يُسلَّم هذا الطلب بعد. يمكنك ذلك بعد أن تصبح حالته «تم التسليم».',
+    ckb: 'ئەم داواکارییە هێشتا نەگەیەندراوە. کاتێک دۆخەکەی بوو بە «گەیەندرا» دەتوانیت ئەمە بکەیت.',
   },
   STORE_ORDER_RETURN_VIA_SUPPORT: {
     ar: 'إرجاع طلبات المتاجر يتم عبر الدعم. افتح تذكرة من صفحة الطلب.',
     en: 'Returns for store orders go through support. Open a ticket from the order page.',
-    ckb: 'إرجاع طلبات المتاجر يتم عبر الدعم. افتح تذكرة من صفحة الطلب.',
+    ckb: 'گەڕاندنەوەی داواکارییەکانی فرۆشگاکان لە ڕێگەی پشتگیرییەوە دەکرێت. لە پەڕەی داواکارییەکەوە تیکێتێک بکەرەوە.',
   },
   ORDER_CHANGED: {
     ar: 'تغيّر هذا الطلب أثناء عملك عليه. حدّث الصفحة ثم حاول مرة أخرى.',
@@ -752,7 +752,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   UNAVAILABLE: {
     ar: 'هذا المنتج لم يعد متاحًا. احذفه من السلة للمتابعة.',
     en: 'This product is no longer available. Remove it from the cart to continue.',
-    ckb: 'هذا المنتج لم يعد متاحًا. احذفه من السلة للمتابعة.',
+    ckb: 'ئەم بەرهەمە چیتر بەردەست نییە. بۆ بەردەوامبوون لە سەبەتەکە لایببە.',
   },
   WALLET_ERROR: {
     ar: 'تعذّر حجز المبلغ من محفظتك الآن. لم يُخصم شيء — حاول مرة أخرى بعد قليل.',
@@ -762,7 +762,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   CART_CHANGED: {
     ar: 'تغيّرت سلتك أثناء إتمام الطلب — ربما أُكمل الطلب من نافذة أخرى. راجع «طلباتي» قبل المحاولة مجددًا.',
     en: 'Your cart changed while you were checking out — it may have been ordered from another tab. Check your orders before trying again.',
-    ckb: 'تغيّرت سلتك أثناء إتمام الطلب — ربما أُكمل الطلب من نافذة أخرى. راجع «طلباتي» قبل المحاولة مجددًا.',
+    ckb: 'سەبەتەکەت لە کاتی تەواوکردنی داواکارییەکەدا گۆڕا — لەوانەیە لە پەنجەرەیەکی ترەوە داواکرابێت. پێش ئەوەی دووبارە هەوڵ بدەیتەوە «داواکارییەکانم» ببینە.',
   },
   // Wave 2 (W2-A): the store's delivery is priced from the customer's SAVED
   // address (worker/lib/merchantDelivery.ts). The checkout draws its own panel
@@ -770,17 +770,17 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   ADDRESS_REQUIRED: {
     ar: 'أضف عنوان التوصيل لإكمال الطلب.',
     en: 'Add a delivery address to finish the order.',
-    ckb: 'أضف عنوان التوصيل لإكمال الطلب.',
+    ckb: 'بۆ تەواوکردنی داواکارییەکە ناونیشانی گەیاندن زیاد بکە.',
   },
   ADDRESS_GOVERNORATE_REQUIRED: {
     ar: 'هذا العنوان بلا محافظة. أضف المحافظة لنعرف أجرة التوصيل.',
     en: 'This address has no governorate. Add it so the delivery can be priced.',
-    ckb: 'هذا العنوان بلا محافظة. أضف المحافظة لنعرف أجرة التوصيل.',
+    ckb: 'ئەم ناونیشانە پارێزگای نییە. پارێزگاکە زیاد بکە تا کرێی گەیاندن دیاری بکرێت.',
   },
   DELIVERY_UNAVAILABLE: {
     ar: 'هذا المتجر لا يوصل إلى محافظة هذا العنوان. اختر عنوانًا آخر أو الاستلام من المتجر إن كان متاحًا.',
     en: 'This store does not deliver to that governorate. Choose another address, or pickup if the store offers it.',
-    ckb: 'هذا المتجر لا يوصل إلى محافظة هذا العنوان. اختر عنوانًا آخر أو الاستلام من المتجر إن كان متاحًا.',
+    ckb: 'ئەم فرۆشگایە بۆ پارێزگای ئەم ناونیشانە ناگەیەنێت. ناونیشانێکی تر هەڵبژێرە، یان وەرگرتن لە فرۆشگاکە ئەگەر بەردەست بێت.',
   },
   ADDRESS_NOT_FOUND: {
     ar: 'لم نجد هذا العنوان في دفتر عناوينك. اختر عنوانًا آخر.',
@@ -795,17 +795,17 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   VARIANT_REQUIRED: {
     ar: 'اختر من خيارات المنتج أولًا (المقاس أو اللون…).',
     en: 'Choose from the product’s options first (size, colour…).',
-    ckb: 'اختر من خيارات المنتج أولًا (المقاس أو اللون…).',
+    ckb: 'سەرەتا لە هەڵبژاردەکانی بەرهەمەکە هەڵبژێرە (قەبارە، ڕەنگ…).',
   },
   VARIANT_INVALID: {
     ar: 'هذا الاختيار لا يخص هذا المنتج. حدّث الصفحة واختر من جديد.',
     en: 'That choice does not belong to this product. Refresh the page and choose again.',
-    ckb: 'هذا الاختيار لا يخص هذا المنتج. حدّث الصفحة واختر من جديد.',
+    ckb: 'ئەم هەڵبژاردنە هی ئەم بەرهەمە نییە. پەڕەکە نوێ بکەرەوە و دووبارە هەڵبژێرە.',
   },
   VARIANT_UNAVAILABLE: {
     ar: 'هذا الاختيار لم يعد معروضًا للبيع. اختر خيارًا آخر.',
     en: 'That choice is no longer for sale. Choose another option.',
-    ckb: 'هذا الاختيار لم يعد معروضًا للبيع. اختر خيارًا آخر.',
+    ckb: 'ئەم هەڵبژاردنە چیتر بۆ فرۆشتن نییە. هەڵبژاردەیەکی تر هەڵبژێرە.',
   },
   // Wave 3 (W3-B): the analytics page, the order screen and the customers
   // screen (worker/routes/merchantAnalytics.ts, merchantOrders.ts,
@@ -815,32 +815,32 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   ORDER_NOT_FOUND: {
     ar: 'لا يوجد طلب بهذا الرقم في متجرك.',
     en: 'There is no order with this number in your store.',
-    ckb: 'لا يوجد طلب بهذا الرقم في متجرك.',
+    ckb: 'هیچ داواکارییەک بەم ژمارەیە لە فرۆشگاکەتدا نییە.',
   },
   CUSTOMER_NOT_FOUND: {
     ar: 'هذا الشخص ليس من زبائن متجرك.',
     en: 'This person is not a customer of your store.',
-    ckb: 'هذا الشخص ليس من زبائن متجرك.',
+    ckb: 'ئەم کەسە کڕیاری فرۆشگاکەت نییە.',
   },
   BAD_CURSOR: {
     ar: 'تغيّرت القائمة. حدّث الصفحة وحاول مرة أخرى.',
     en: 'The list changed. Refresh the page and try again.',
-    ckb: 'تغيّرت القائمة. حدّث الصفحة وحاول مرة أخرى.',
+    ckb: 'لیستەکە گۆڕا. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
   },
   BAD_RANGE: {
     ar: 'هذه الفترة غير صالحة: اختر بدايةً قبل النهاية، وبحدّ أقصى 366 يومًا.',
     en: 'That range is not valid: choose a start before the end, at most 366 days.',
-    ckb: 'هذه الفترة غير صالحة: اختر بدايةً قبل النهاية، وبحدّ أقصى 366 يومًا.',
+    ckb: 'ئەم ماوەیە دروست نییە: سەرەتایەک پێش کۆتایی هەڵبژێرە، بە زۆرترین 366 ڕۆژ.',
   },
   ANALYTICS_NOT_INCLUDED: {
     ar: 'الأرقام جزء من LEVO PLUS. جدّد الاشتراك لتعود.',
     en: 'The figures are part of LEVO PLUS. Renew to see them again.',
-    ckb: 'الأرقام جزء من LEVO PLUS. جدّد الاشتراك لتعود.',
+    ckb: 'ژمارەکان بەشێکن لە LEVO PLUS. بەشداریکردنەکەت نوێ بکەرەوە بۆ ئەوەی دووبارە بیانبینیت.',
   },
   SEARCH_QUERY_TOO_SHORT: {
     ar: 'اكتب حرفين على الأقل للبحث.',
     en: 'Type at least 2 characters to search.',
-    ckb: 'اكتب حرفين على الأقل للبحث.',
+    ckb: 'بۆ گەڕان لانیکەم 2 پیت بنووسە.',
   },
   // Shared by the workspace searches and the community's unified search
   // (worker/routes/communitySearch.ts, docs/COMMUNITY_ECOSYSTEM.md §9.3 — a
@@ -879,7 +879,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   VIDEO_QUOTA_EXCEEDED: {
     ar: 'بلغ متجرك حدّ مساحة الفيديو (1 غيغابايت). احذف فيديو لم تعد تستخدمه ثم أعد المحاولة.',
     en: 'Your store has reached its video storage limit (1 GB). Remove a video you no longer use and try again.',
-    ckb: 'بلغ متجرك حدّ مساحة الفيديو (1 غيغابايت). احذف فيديو لم تعد تستخدمه ثم أعد المحاولة.',
+    ckb: 'فرۆشگاکەت گەیشتووەتە سنووری بیرگەی ڤیدیۆ (1 گیگابایت). ڤیدیۆیەک بسڕەوە کە چیتر بەکاری ناهێنیت و دووبارە هەوڵ بدەرەوە.',
   },
   // Owner decision 2026-09-25 (review W2-5 finding 2): a published product
   // costs something, and a store's delivery fee has a platform maximum.
@@ -889,17 +889,17 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   PRODUCT_PRICE_REQUIRED: {
     ar: 'هذا المنتج بلا سعر حاليًا فلا يمكن شراؤه. أزله من السلة للمتابعة.',
     en: 'This product has no price right now, so it cannot be bought. Remove it from the cart to continue.',
-    ckb: 'هذا المنتج بلا سعر حاليًا فلا يمكن شراؤه. أزله من السلة للمتابعة.',
+    ckb: 'ئەم بەرهەمە ئێستا نرخی نییە، بۆیە ناکڕدرێت. بۆ بەردەوامبوون لە سەبەتەکە لایببە.',
   },
   DELIVERY_FEE_ABOVE_MAX: {
     ar: 'أجرة التوصيل أعلى من الحد الذي تسمح به Levonis. خفّضها ثم احفظ.',
     en: 'The delivery fee is above the maximum Levonis allows. Lower it, then save.',
-    ckb: 'أجرة التوصيل أعلى من الحد الذي تسمح به Levonis. خفّضها ثم احفظ.',
+    ckb: 'کرێی گەیاندن لە زۆرترین سنووری ڕێگەپێدراوی Levonis زیاترە. کەمی بکەرەوە و پاشان پاشەکەوت بکە.',
   },
   MERCHANT_IN_DEBT: {
     ar: 'على هذا التاجر دين للمنصة (استُرد مبلغ بعد تحويله إلى رصيده). لا يُوافَق على التحويل ولا يُسجَّل حتى يُغطّى الدين — أو ارفض الطلب ليعود المبلغ إلى رصيده.',
     en: 'This merchant owes the platform (a credit was clawed back). The payout cannot be approved or recorded until the debt is covered — or fail it to return the amount to their balance.',
-    ckb: 'على هذا التاجر دين للمنصة (استُرد مبلغ بعد تحويله إلى رصيده). لا يُوافَق على التحويل ولا يُسجَّل حتى يُغطّى الدين — أو ارفض الطلب ليعود المبلغ إلى رصيده.',
+    ckb: 'ئەم بازرگانە قەرزاری پلاتفۆرمەکەیە (بڕێک دوای خستنە سەر باڵانسەکەی گەڕێنرایەوە). تا قەرزەکە پڕ نەکرێتەوە ناردنی پارەکە پەسەند یان تۆمار ناکرێت — یان داواکارییەکە ڕەت بکەرەوە تا بڕەکە بگەڕێتەوە بۆ باڵانسەکەی.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   OFFER_NOT_ELIGIBLE: {
@@ -911,121 +911,121 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   FILE_ORIGINAL_RESTRICTED: {
     ar: 'الملف الأصلي يصلك بعد قبول عرضك. قبل ذلك تستطيع معاينة المجسم.',
     en: 'The original file is yours once your offer is accepted. Until then you can preview the model.',
-    ckb: 'الملف الأصلي يصلك بعد قبول عرضك. قبل ذلك تستطيع معاينة المجسم.',
+    ckb: 'فایلە ڕەسەنەکە دوای قبوڵکردنی ئۆفەرەکەت دەگاتە دەستت. تا ئەو کاتە دەتوانیت پێشبینینی مۆدێلەکە بکەیت.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   FILE_NOT_ALLOWED: {
     ar: 'هذا الملف للعميل وللورش التي تستطيع تنفيذ الطلب فقط.',
     en: 'This file is only for the customer and the workshops that can make the request.',
-    ckb: 'هذا الملف للعميل وللورش التي تستطيع تنفيذ الطلب فقط.',
+    ckb: 'ئەم فایلە تەنها بۆ کڕیار و ئەو وۆرکشۆپانەیە کە دەتوانن داواکارییەکە جێبەجێ بکەن.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   COSTING_NOT_ELIGIBLE: {
     ar: 'تحسب الورشة تكلفة طلب تستطيع تنفيذه فقط.',
     en: 'A workshop can only cost a request it can make.',
-    ckb: 'تحسب الورشة تكلفة طلب تستطيع تنفيذه فقط.',
+    ckb: 'وۆرکشۆپ تەنها دەتوانێت تێچووی ئەو داواکارییە حیساب بکات کە دەتوانێت جێبەجێی بکات.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   COSTING_NO_MODEL: {
     ar: 'لا يوجد مجسم ثلاثي الأبعاد في هذا الطلب لحساب تكلفته.',
     en: 'This request has no 3D model to cost.',
-    ckb: 'لا يوجد مجسم ثلاثي الأبعاد في هذا الطلب لحساب تكلفته.',
+    ckb: 'ئەم داواکارییە هیچ مۆدێلێکی سێ ڕەهەندیی نییە بۆ حیسابکردنی تێچوو.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   COSTING_NO_PRINTER: {
     ar: 'أضف طابعة أولًا لتحسب التكلفة عليها.',
     en: 'Add a printer first to cost on it.',
-    ckb: 'أضف طابعة أولًا لتحسب التكلفة عليها.',
+    ckb: 'سەرەتا چاپکەرێک زیاد بکە بۆ ئەوەی تێچووی لەسەر حیساب بکەیت.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   COSTING_RESIN_UNSUPPORTED: {
     ar: 'حساب تكلفة الريزن من الملف غير متاح بعد — اختر طابعة FDM.',
     en: 'Costing resin from the file is not available yet — pick an FDM printer.',
-    ckb: 'حساب تكلفة الريزن من الملف غير متاح بعد — اختر طابعة FDM.',
+    ckb: 'حیسابکردنی تێچووی ڕێزن لە فایلەکەوە هێشتا بەردەست نییە — چاپکەرێکی FDM هەڵبژێرە.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   COSTING_MATERIAL_REQUIRED: {
     ar: 'اختر الخامة التي ستطبع بها لتُحسب التكلفة.',
     en: 'Choose the material you will print it in to cost it.',
-    ckb: 'اختر الخامة التي ستطبع بها لتُحسب التكلفة.',
+    ckb: 'ئەو کەرەستەیە هەڵبژێرە کە پێی چاپ دەکەیت بۆ ئەوەی تێچووەکەی حیساب بکرێت.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   PRINTER_MODEL_UNKNOWN: {
     ar: 'هذه الطابعة غير موجودة في القائمة.',
     en: 'That printer is not in the list.',
-    ckb: 'هذه الطابعة غير موجودة في القائمة.',
+    ckb: 'ئەم چاپکەرە لە لیستەکەدا نییە.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   PRINTER_NOZZLE_INVALID: {
     ar: 'هذه الفوهة لا تركب على هذه الطابعة.',
     en: 'That nozzle does not fit this printer.',
-    ckb: 'هذه الفوهة لا تركب على هذه الطابعة.',
+    ckb: 'ئەم نۆزڵە لەگەڵ ئەم چاپکەرە ناگونجێت.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   PRINTER_HARDENED_UNAVAILABLE: {
     ar: 'هذه الطابعة لا تقبل فوهة مقوّاة.',
     en: 'This printer cannot take a hardened nozzle.',
-    ckb: 'هذه الطابعة لا تقبل فوهة مقوّاة.',
+    ckb: 'ئەم چاپکەرە نۆزڵی پتەوکراو وەرناگرێت.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   PRINTER_MULTICOLOR_UNAVAILABLE: {
     ar: 'هذه الطابعة لا تطبع أكثر من خامة في المرة.',
     en: 'This printer cannot print several materials at once.',
-    ckb: 'هذه الطابعة لا تطبع أكثر من خامة في المرة.',
+    ckb: 'ئەم چاپکەرە ناتوانێت لە یەک کاتدا چەند کەرەستەیەک چاپ بکات.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   PRINTER_MATERIAL_INVALID: {
     ar: 'إحدى الخامات لا تناسب تقنية هذه الطابعة.',
     en: 'One of the materials does not suit this printer’s technology.',
-    ckb: 'إحدى الخامات لا تناسب تقنية هذه الطابعة.',
+    ckb: 'یەکێک لە کەرەستەکان لەگەڵ تەکنەلۆژیای ئەم چاپکەرە ناگونجێت.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   PRINTER_DATE_INVALID: {
     ar: 'اكتب تاريخ الشراء بصيغة تاريخ.',
     en: 'Enter the purchase date as a date.',
-    ckb: 'اكتب تاريخ الشراء بصيغة تاريخ.',
+    ckb: 'بەرواری کڕین بە شێوەی بەروار بنووسە.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_INVALID: {
     ar: 'تعذّر قراءة أسطر المخزون.',
     en: 'The stock lines could not be read.',
-    ckb: 'تعذّر قراءة أسطر المخزون.',
+    ckb: 'نەتوانرا دێڕەکانی کۆگا بخوێندرێنەوە.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_TOO_MANY: {
     ar: 'عدد أسطر المخزون أكثر من المسموح.',
     en: 'There are more stock lines than allowed.',
-    ckb: 'عدد أسطر المخزون أكثر من المسموح.',
+    ckb: 'ژمارەی دێڕەکانی کۆگا لە ڕێگەپێدراو زیاترە.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_UNTRACK_CONFIRM: {
     ar: 'تفريغ المخزون يوقف تتبّعه — أكّد ذلك أولًا.',
     en: 'Emptying the stock stops tracking it — confirm that first.',
-    ckb: 'تفريغ المخزون يوقف تتبّعه — أكّد ذلك أولًا.',
+    ckb: 'بەتاڵکردنی کۆگا بەدواداچوونی ڕادەگرێت — سەرەتا ئەمە پشتڕاست بکەرەوە.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_MATERIAL_INVALID: {
     ar: 'خامة غير معروفة في المخزون.',
     en: 'An unknown material in the stock.',
-    ckb: 'خامة غير معروفة في المخزون.',
+    ckb: 'کەرەستەیەکی نەناسراو لە کۆگادا هەیە.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_COLOR_INVALID: {
     ar: 'لون غير صالح في المخزون.',
     en: 'An invalid colour in the stock.',
-    ckb: 'لون غير صالح في المخزون.',
+    ckb: 'ڕەنگێکی نادروست لە کۆگادا هەیە.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_GRAMS_INVALID: {
     ar: 'الغرامات يجب أن تكون عددًا صحيحًا.',
     en: 'Grams must be a whole number.',
-    ckb: 'الغرامات يجب أن تكون عددًا صحيحًا.',
+    ckb: 'گرامەکان دەبێت ژمارەیەکی تەواو بن.',
   },
   // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_DUPLICATE: {
     ar: 'الخامة واللون نفسهما مكرران في المخزون.',
     en: 'The same material and colour appear twice.',
-    ckb: 'الخامة واللون نفسهما مكرران في المخزون.',
+    ckb: 'هەمان کەرەستە و ڕەنگ دوو جار هاتوون.',
   },
   // Review of the live merchant platform (F12): the coupon form's refusals,
   // the custom order's lifecycle doors and a customer's cancel after the
@@ -1034,12 +1034,12 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   BAD_COUPON_CODE: {
     ar: 'رمز الكوبون من 3 إلى 30 حرفًا: أحرف إنجليزية وأرقام وشرطات فقط.',
     en: 'A coupon code is 3–30 characters: letters, numbers and hyphens only.',
-    ckb: 'رمز الكوبون من 3 إلى 30 حرفًا: أحرف إنجليزية وأرقام وشرطات فقط.',
+    ckb: 'کۆدی کۆپۆن لە 3 تا 30 پیتە: تەنها پیتی ئینگلیزی، ژمارە و هێڵی کورت (-).',
   },
   COUPON_CODE_TAKEN: {
     ar: 'لديك كوبون بهذا الرمز بالفعل. اختر رمزًا آخر.',
     en: 'You already have a coupon with this code. Choose another code.',
-    ckb: 'لديك كوبون بهذا الرمز بالفعل. اختر رمزًا آخر.',
+    ckb: 'پێشتر کۆپۆنێکت بەم کۆدە هەیە. کۆدێکی تر هەڵبژێرە.',
   },
   CUSTOM_ORDER_CANNOT_START: {
     ar: 'لا يمكن بدء العمل على هذا الطلب في حالته الحالية. حدّث الصفحة.',
@@ -1074,7 +1074,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   ORDER_NOT_CANCELLABLE: {
     ar: 'يمكن إلغاء الطلب بنفسك ما دام بانتظار التأكيد فقط. بعد ذلك تواصل مع الدعم.',
     en: 'You can cancel an order yourself only while it is waiting for confirmation. After that, contact support.',
-    ckb: 'يمكن إلغاء الطلب بنفسك ما دام بانتظار التأكيد فقط. بعد ذلك تواصل مع الدعم.',
+    ckb: 'تەنها تا ئەو کاتەی داواکارییەکە چاوەڕێی پشتڕاستکردنەوەیە دەتوانیت خۆت هەڵیبوەشێنیتەوە. دوای ئەوە پەیوەندی بە پشتگیری بکە.',
   },
   // Catalog discovery (docs/ux/CATALOG_DISCOVERY.md §6, §2): a category link
   // that names no section holding products, and the admin choosing the slug
@@ -1083,12 +1083,12 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   CATALOG_NOT_FOUND: {
     ar: 'هذه الفئة غير موجودة أو لا تحتوي منتجات حاليًا. تصفّح كل الفئات.',
     en: 'This category does not exist or has no products right now. Browse all categories.',
-    ckb: 'هذه الفئة غير موجودة أو لا تحتوي منتجات حاليًا. تصفّح كل الفئات.',
+    ckb: 'ئەم پۆلە بوونی نییە یان ئێستا هیچ بەرهەمێکی تێدا نییە. سەیری هەموو پۆلەکان بکە.',
   },
   CATALOG_SLUG_RESERVED: {
     ar: 'الرابط «all» محجوز لصفحة «كل المنتجات» داخل القسم. اختر رابطًا آخر.',
     en: 'The slug “all” is reserved for a section’s “all products” page. Choose another slug.',
-    ckb: 'الرابط «all» محجوز لصفحة «كل المنتجات» داخل القسم. اختر رابطًا آخر.',
+    ckb: 'بەستەری «all» بۆ پەڕەی «هەموو بەرهەمەکان»ی ناو بەشەکە تەرخان کراوە. بەستەرێکی تر هەڵبژێرە.',
   },
   // «تعديل السعر النهائي» (migration 0140, worker/lib/orderPriceAdjust.ts). The
   // ckb column carries the Arabic until the owner writes the Sorani by hand
@@ -1096,52 +1096,52 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   PRICE_APPROVAL_PENDING: {
     ar: 'الطلب بانتظار موافقة الزبون على السعر الجديد. اسحب الاقتراح أو انتظر قرار الزبون.',
     en: 'This order is waiting for the customer to approve a new price. Withdraw the proposal or wait for their decision.',
-    ckb: 'الطلب بانتظار موافقة الزبون على السعر الجديد. اسحب الاقتراح أو انتظر قرار الزبون.',
+    ckb: 'ئەم داواکارییە چاوەڕێی پەسەندکردنی نرخی نوێیە لەلایەن کڕیارەوە. پێشنیارەکە بکشێنەرەوە یان چاوەڕێی بڕیاری کڕیار بکە.',
   },
   PRICE_ADJUST_STAGE: {
     ar: 'يمكن تعديل السعر قبل شحن الطلب فقط.',
     en: 'The price can only be changed before the order ships.',
-    ckb: 'يمكن تعديل السعر قبل شحن الطلب فقط.',
+    ckb: 'نرخ تەنها پێش ناردنی داواکارییەکە دەگۆڕدرێت.',
   },
   PRICE_ADJUST_FINANCED: {
     ar: 'لا يمكن تعديل سعر طلب بالأقساط (BNPL أو جني).',
     en: 'An instalment order (BNPL or Gini) cannot be re-priced.',
-    ckb: 'لا يمكن تعديل سعر طلب بالأقساط (BNPL أو جني).',
+    ckb: 'نرخی داواکارییەکی قیستی (BNPL یان Gini) ناگۆڕدرێت.',
   },
   PRICE_ADJUST_STORE_ORDER: {
     ar: 'هذا طلب من متجر مجتمعي ويسعّره التاجر.',
     en: 'This is a community store order; its merchant sets the price.',
-    ckb: 'هذا طلب من متجر مجتمعي ويسعّره التاجر.',
+    ckb: 'ئەمە داواکارییەکی فرۆشگای کۆمەڵگایە؛ نرخەکەی بازرگانەکە دیاری دەکات.',
   },
   PRICE_ADJUST_COURIER_BOOKED: {
     ar: 'أُنشئت شحنة التوصيل بمبلغها. ألغِ الشحنة أولًا ثم عدّل السعر.',
     en: 'A courier shipment already carries the amount. Cancel the shipment first, then change the price.',
-    ckb: 'أُنشئت شحنة التوصيل بمبلغها. ألغِ الشحنة أولًا ثم عدّل السعر.',
+    ckb: 'باری گەیێنەر پێشتر بەم بڕە تۆمار کراوە. سەرەتا بارەکە هەڵبوەشێنەرەوە و پاشان نرخەکە بگۆڕە.',
   },
   PRICE_ADJUST_INVALID_TOTAL: {
     ar: 'أدخل مبلغًا صحيحًا بالدينار أكبر من صفر.',
     en: 'Enter a whole number of dinars above zero.',
-    ckb: 'أدخل مبلغًا صحيحًا بالدينار أكبر من صفر.',
+    ckb: 'بڕێکی تەواو بە دینار بنووسە کە لە سفر زیاتر بێت.',
   },
   PRICE_ADJUST_SAME_TOTAL: {
     ar: 'السعر الجديد يساوي السعر الحالي.',
     en: 'The new price is the same as the current one.',
-    ckb: 'السعر الجديد يساوي السعر الحالي.',
+    ckb: 'نرخە نوێیەکە هەمان نرخی ئێستایە.',
   },
   PRICE_ADJUST_UNSUPPORTED_PAYMENT: {
     ar: 'طريقة دفع هذا الطلب لا تسمح بتعديل تلقائي للسعر.',
     en: 'This order’s payment split cannot be re-priced automatically.',
-    ckb: 'طريقة دفع هذا الطلب لا تسمح بتعديل تلقائي للسعر.',
+    ckb: 'شێوازی پارەدانی ئەم داواکارییە ڕێگە نادات نرخەکەی بە خۆکاری بگۆڕدرێت.',
   },
   PRICE_ADJUST_NOT_PENDING: {
     ar: 'حُسم اقتراح السعر هذا أو سُحب. حدّث الصفحة.',
     en: 'This price proposal was already decided or withdrawn. Refresh the page.',
-    ckb: 'حُسم اقتراح السعر هذا أو سُحب. حدّث الصفحة.',
+    ckb: 'بڕیار لەسەر ئەم پێشنیاری نرخە دراوە یان کشێنراوەتەوە. پەڕەکە نوێ بکەرەوە.',
   },
   PRICE_ADJUST_STALE: {
     ar: 'تغيّر الطلب قبل حفظ القرار. حدّث الصفحة وحاول مرة أخرى.',
     en: 'The order changed before your decision was saved. Refresh and try again.',
-    ckb: 'تغيّر الطلب قبل حفظ القرار. حدّث الصفحة وحاول مرة أخرى.',
+    ckb: 'داواکارییەکە پێش پاشەکەوتکردنی بڕیارەکەت گۆڕا. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
   },
   // «الاستبدال» (migration 0143, worker/lib/tradeIn.ts). The ckb column carries
   // the Arabic until the owner writes the Sorani by hand (DECISIONS row 11).
@@ -1149,112 +1149,117 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   TRADE_IN_NOT_DELIVERED: {
     ar: 'يمكن استبدال الأجهزة من الطلبات المستلَمة فقط.',
     en: 'Only devices from delivered orders can be traded in.',
-    ckb: 'يمكن استبدال الأجهزة من الطلبات المستلَمة فقط.',
+    ckb: 'تەنها ئامێرەکانی داواکارییە گەیەندراوەکان دەگۆڕدرێنەوە.',
   },
   TRADE_IN_NOT_ELIGIBLE: {
     ar: 'هذا المنتج غير مشمول بالاستبدال. الاستبدال للطابعات وأجهزة الليزر وAMS والملحقات المشتراة من LEVONIS.',
     en: 'This item is not eligible. Trade-in covers printers, lasers, AMS units and accessories bought from LEVONIS.',
-    ckb: 'هذا المنتج غير مشمول بالاستبدال. الاستبدال للطابعات وأجهزة الليزر وAMS والملحقات المشتراة من LEVONIS.',
+    ckb: 'ئەم بەرهەمە بۆ گۆڕینەوە گونجاو نییە. گۆڕینەوە تەنها بۆ ئەو چاپکەر و ئامێری لەیزەر و AMS و ئێکسسوارانەیە کە لە LEVONIS کڕدراون.',
   },
   TRADE_IN_ALREADY_CLAIMED: {
     ar: 'هذا الجهاز ضمن طلب استبدال آخر. افتح طلباتك للاستبدال لمتابعته.',
     en: 'This device is already part of a trade-in. Open your trade-in requests to follow it.',
-    ckb: 'هذا الجهاز ضمن طلب استبدال آخر. افتح طلباتك للاستبدال لمتابعته.',
+    ckb: 'ئەم ئامێرە پێشتر بەشێکە لە داواکارییەکی گۆڕینەوە. داواکارییەکانی گۆڕینەوەت بکەرەوە بۆ بەدواداچوونی.',
   },
   TRADE_IN_RETURN_OPEN: {
     ar: 'على هذا المنتج طلب إرجاع، فلا يمكن استبداله.',
     en: 'This item has a return case, so it cannot be traded in.',
-    ckb: 'على هذا المنتج طلب إرجاع، فلا يمكن استبداله.',
+    ckb: 'ئەم بەرهەمە داواکاریی گەڕاندنەوەی لەسەرە، بۆیە ناگۆڕدرێتەوە.',
   },
   TRADE_IN_BELOW_MINIMUM: {
     ar: 'قيمة هذا المنتج أقل من الحد الأدنى للاستبدال.',
     en: 'This item is below the minimum value for a trade-in.',
-    ckb: 'قيمة هذا المنتج أقل من الحد الأدنى للاستبدال.',
+    ckb: 'بەهای ئەم بەرهەمە لە کەمترین سنووری گۆڕینەوە کەمترە.',
+  },
+  TRADE_IN_GIFT: {
+    ar: 'وصلك هذا الجهاز هدية، والاستبدال للأجهزة التي اشتريتها من LEVONIS.',
+    en: 'This device came to you as a gift. Trade-in is for devices you bought from LEVONIS.',
+    ckb: 'ئەم ئامێرە وەک دیاری پێت گەیشتووە. گۆڕینەوە بۆ ئەو ئامێرانەیە کە لە LEVONIS کڕیوتن.',
   },
   TRADE_IN_SCOPE_UNAVAILABLE: {
     ar: 'لا يمكن استبدال هذا الجزء وحده لهذا الجهاز. اختر «الجهاز كاملاً».',
     en: 'This part cannot be traded on its own for this device. Choose “the whole device”.',
-    ckb: 'لا يمكن استبدال هذا الجزء وحده لهذا الجهاز. اختر «الجهاز كاملاً».',
+    ckb: 'ئەم بەشە بە تەنها بۆ ئەم ئامێرە ناگۆڕدرێتەوە. «هەموو ئامێرەکە» هەڵبژێرە.',
   },
   TRADE_IN_DRAFT_LIMIT: {
     ar: 'لديك طلبات استبدال غير مكتملة كثيرة. أكمل أحدها أو ألغه أولاً.',
     en: 'You have too many unfinished trade-in requests. Finish or cancel one first.',
-    ckb: 'لديك طلبات استبدال غير مكتملة كثيرة. أكمل أحدها أو ألغه أولاً.',
+    ckb: 'داواکارییە تەواونەکراوەکانی گۆڕینەوەت زۆرن. سەرەتا یەکێکیان تەواو بکە یان هەڵیبوەشێنەرەوە.',
   },
   TRADE_IN_NOT_EDITABLE: {
     ar: 'أُرسل هذا الطلب ولا يمكن تعديله الآن.',
     en: 'This request was already sent and can no longer be edited.',
-    ckb: 'أُرسل هذا الطلب ولا يمكن تعديله الآن.',
+    ckb: 'ئەم داواکارییە نێردراوە و چیتر دەستکاری ناکرێت.',
   },
   TRADE_IN_INPUTS_INVALID: {
     ar: 'بعض إجابات حالة الجهاز ناقصة أو غير صحيحة. راجعها ثم أعد المحاولة.',
     en: 'Some answers about the device are missing or invalid. Check them and try again.',
-    ckb: 'بعض إجابات حالة الجهاز ناقصة أو غير صحيحة. راجعها ثم أعد المحاولة.',
+    ckb: 'هەندێک لە وەڵامەکانی دۆخی ئامێرەکە کەمن یان نادروستن. بیانپشکنە و دووبارە هەوڵ بدەرەوە.',
   },
   TRADE_IN_PHOTOS_MISSING: {
     ar: 'بعض الصور الإلزامية ناقصة. ارفع كل الزوايا المطلوبة.',
     en: 'Some required photos are missing. Upload every required angle.',
-    ckb: 'بعض الصور الإلزامية ناقصة. ارفع كل الزوايا المطلوبة.',
+    ckb: 'هەندێک لە وێنە پێویستەکان کەمن. وێنەی هەموو گۆشە داواکراوەکان بار بکە.',
   },
   TRADE_IN_PHOTO_LIMIT: {
     ar: 'وصلت للحد الأقصى من الصور لهذه الزاوية أو لهذا الطلب. احذف صورة لتضيف غيرها.',
     en: 'You reached the photo limit for this angle or request. Remove one to add another.',
-    ckb: 'وصلت للحد الأقصى من الصور لهذه الزاوية أو لهذا الطلب. احذف صورة لتضيف غيرها.',
+    ckb: 'گەیشتیتە زۆرترین ژمارەی وێنە بۆ ئەم گۆشەیە یان ئەم داواکارییە. یەکێک بسڕەوە بۆ زیادکردنی یەکێکی تر.',
   },
   TRADE_IN_PHOTO_ANGLE: {
     ar: 'هذه الزاوية لا تخص هذا الجهاز.',
     en: 'That photo angle does not apply to this device.',
-    ckb: 'هذه الزاوية لا تخص هذا الجهاز.',
+    ckb: 'ئەم گۆشەی وێنەیە پەیوەندی بەم ئامێرەوە نییە.',
   },
   TRADE_IN_TARGET_REQUIRED: {
     ar: 'اختر الجهاز الجديد أولاً.',
     en: 'Choose the new device first.',
-    ckb: 'اختر الجهاز الجديد أولاً.',
+    ckb: 'سەرەتا ئامێرە نوێیەکە هەڵبژێرە.',
   },
   TRADE_IN_TARGET_UNAVAILABLE: {
     ar: 'الجهاز الجديد الذي اخترته غير متاح للبيع المباشر الآن. اختر موديلاً أو جهازاً آخر.',
     en: 'The new device you chose is not available for direct sale right now. Choose another model or device.',
-    ckb: 'الجهاز الجديد الذي اخترته غير متاح للبيع المباشر الآن. اختر موديلاً أو جهازاً آخر.',
+    ckb: 'ئەو ئامێرە نوێیەی هەڵتبژاردووە ئێستا بۆ فرۆشتنی ڕاستەوخۆ بەردەست نییە. مۆدێل یان ئامێرێکی تر هەڵبژێرە.',
   },
   TRADE_IN_BAD_STATE: {
     ar: 'حالة الطلب لا تسمح بهذا الإجراء. حدّث الصفحة.',
     en: 'This request’s status does not allow this action. Refresh the page.',
-    ckb: 'حالة الطلب لا تسمح بهذا الإجراء. حدّث الصفحة.',
+    ckb: 'دۆخی ئەم داواکارییە ڕێگە بەم کارە نادات. پەڕەکە نوێ بکەرەوە.',
   },
   TRADE_IN_OFFER_STALE: {
     ar: 'تغيّرت القيمة منذ فتحت هذه الصفحة. حدّثها ثم قرّر من جديد.',
     en: 'The value changed since this screen was opened. Refresh and decide again.',
-    ckb: 'تغيّرت القيمة منذ فتحت هذه الصفحة. حدّثها ثم قرّر من جديد.',
+    ckb: 'بەهاکە لەو کاتەوەی ئەم پەڕەیەت کردەوە گۆڕاوە. پەڕەکە نوێ بکەرەوە و دووبارە بڕیار بدە.',
   },
   TRADE_IN_ORDER_ACTIVE: {
     ar: 'استُخدم رصيد هذا الاستبدال في طلب شراء قائم. ألغِ ذلك الطلب أولاً.',
     en: 'An order already used this trade-in credit. Cancel that order first.',
-    ckb: 'استُخدم رصيد هذا الاستبدال في طلب شراء قائم. ألغِ ذلك الطلب أولاً.',
+    ckb: 'باڵانسی ئەم گۆڕینەوەیە لە داواکارییەکی کڕینی کراوەدا بەکارهاتووە. سەرەتا ئەو داواکارییە هەڵبوەشێنەرەوە.',
   },
   TRADE_IN_NO_ORDER: {
     ar: 'لم يُنشئ الزبون طلب شراء الجهاز الجديد بعد.',
     en: 'The customer has not placed the order for the new device yet.',
-    ckb: 'لم يُنشئ الزبون طلب شراء الجهاز الجديد بعد.',
+    ckb: 'کڕیارەکە هێشتا داواکاریی کڕینی ئامێرە نوێیەکەی نەناردووە.',
   },
   TRADE_IN_INVALID_VALUE: {
     ar: 'أدخل قيمة صحيحة بالدينار.',
     en: 'Enter a whole number of dinars.',
-    ckb: 'أدخل قيمة صحيحة بالدينار.',
+    ckb: 'بەهایەکی تەواو بە دینار بنووسە.',
   },
   TRADE_IN_RULES_INVALID: {
     ar: 'بعض قيم القواعد غير صحيحة. راجع الحقول المعلَّمة.',
     en: 'Some rule values are invalid. Check the highlighted fields.',
-    ckb: 'بعض قيم القواعد غير صحيحة. راجع الحقول المعلَّمة.',
+    ckb: 'هەندێک لە بەهاکانی ڕێساکان نادروستن. خانە دیاریکراوەکان بپشکنە.',
   },
   TRADE_IN_COUPON_MISMATCH: {
     ar: 'رصيد الاستبدال يُطبَّق فقط على الجهاز الجديد المختار، بالبيع المباشر، ولصاحب الطلب. تأكد أنه في سلتك.',
     en: 'This trade-in credit applies only to the chosen new device, bought directly, by its owner. Make sure it is in your cart.',
-    ckb: 'رصيد الاستبدال يُطبَّق فقط على الجهاز الجديد المختار، بالبيع المباشر، ولصاحب الطلب. تأكد أنه في سلتك.',
+    ckb: 'باڵانسی گۆڕینەوە تەنها بۆ ئامێرە نوێ هەڵبژێردراوەکە بەکاردێت، بە فرۆشتنی ڕاستەوخۆ و بۆ خاوەنی داواکارییەکە. دڵنیابە کە لە سەبەتەکەتدایە.',
   },
   TRADE_IN_STALE: {
     ar: 'تغيّر الطلب أثناء عملك عليه. حدّث الصفحة وحاول مرة أخرى.',
     en: 'The request changed while you were working on it. Refresh and try again.',
-    ckb: 'تغيّر الطلب أثناء عملك عليه. حدّث الصفحة وحاول مرة أخرى.',
+    ckb: 'داواکارییەکە لە کاتی کارکردنت لەسەری گۆڕا. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
   },
   // ---- Community projects (worker/routes/communityPosts.ts) ----------------
   POST_MEDIA_NOT_OWNED: {
