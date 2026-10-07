@@ -478,12 +478,12 @@ function EmailVerifyBanner() {
  * downloaded, parsed and compiled before `#root` could paint — for something
  * that renders ON TOP of the shop once the shop is ready.
  *
- * Deferring it is safe in a way that deferring a route is not: the component's
- * own prop is `ready`, so it deliberately shows nothing until the page beneath
- * it has settled. The chunk therefore has the whole of that wait to arrive,
- * and `Suspense fallback={null}` is the honest fallback — the mascot's absence
- * for a few hundred milliseconds is exactly what it looks like before `ready`
- * turns true anyway.
+ * Deferring it is safe in a way that deferring a route is not: nothing on the
+ * page waits for it, and it covers nothing when it arrives — its intro is one
+ * turn of the character over a page that is already painted, never a veil in
+ * front of it (AppIntro, BOOT_PIN_MAX_MS). `Suspense fallback={null}` is the
+ * honest fallback: the mascot's absence for a few hundred milliseconds costs
+ * the shop nothing.
  *
  * Measured by rebuilding with only this line changed: the entry drops a
  * further 11.5 KB gzipped.
@@ -578,6 +578,12 @@ function StorefrontApp() {
  * authenticated shell and hostname resolution are the critical work. This
  * component is a sibling of AppContent so the SAME intro node survives the
  * unresolved-host fallback becoming the real application.
+ *
+ * Two flags, because they mean different things to the character: `ready` is
+ * shown by its FACE (it docks with a loading face while Home's data is still
+ * coming), and `shellReady` — the host and the session, never the data —
+ * decides WHERE it docks, so only that may keep it at the centre after its
+ * intro (AppIntro, BOOT_SHELL_MAX_MS).
  */
 function AppBootstrapLayer() {
   const location = useLocation();
@@ -604,7 +610,7 @@ function AppBootstrapLayer() {
   return (
     <ChunkBoundary>
       <Suspense fallback={null}>
-        <AppIntro ready={resolved && isLoaded && (!mainHomeNeedsData || homeReady)} />
+        <AppIntro ready={resolved && isLoaded && (!mainHomeNeedsData || homeReady)} shellReady={resolved && isLoaded} />
       </Suspense>
     </ChunkBoundary>
   );

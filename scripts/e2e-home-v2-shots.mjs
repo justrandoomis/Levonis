@@ -142,8 +142,12 @@ async function shoot(browser, { width, lang }) {
   await page.waitForSelector(process.env.HOME_SHOTS_WAIT || '[data-home-section="latest"]', { timeout: 45000 });
   await page
     .waitForFunction(() => {
+      // Docked is no longer "the page's data is in": the character leaves the
+      // centre after its intro and shows a slow request with its face from the
+      // dock. So wait for both — docked, and no longer wearing the loading face.
       const intro = document.querySelector('.lv-app-intro');
-      return !intro || ['docked', 'hidden'].includes(intro.getAttribute('data-phase') ?? '');
+      return !intro || (['docked', 'hidden'].includes(intro.getAttribute('data-phase') ?? '')
+        && intro.getAttribute('data-mascot-state') !== 'loading');
     }, null, { timeout: 20000 })
     .catch(() => {});
   await page.waitForTimeout(1500);

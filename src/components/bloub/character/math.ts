@@ -44,6 +44,11 @@ export const easings = {
    * rather than a value landing; an ease-out swallows two thirds of it in the
    * first fifth of the time and reads as a jolt. */
   easeInOutCubic: (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2),
+  /** Symmetrical and GENTLER than the cubic: its fastest moment is half the
+   * cubic's top speed. For a turn whose middle must still be readable — the
+   * intro's spin, where the cubic hurried the face round the back so fast that
+   * the faceless beat read as a flicker rather than as the ball turning. */
+  easeInOutSine: (t: number) => (1 - Math.cos(Math.PI * t)) / 2,
   /** Slow build. This is the anticipation curve: the character gathers itself
    * before it goes, so the departure is not the first thing that happens. */
   easeInQuad: (t: number) => t * t,

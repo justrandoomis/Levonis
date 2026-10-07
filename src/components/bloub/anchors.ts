@@ -34,9 +34,12 @@ const emit = () => { revision += 1; for (const listener of listeners) listener()
 let renderFailed = false;
 
 /**
- * Whether the character is standing in the middle of the screen as the boot
- * loader right now — `AppIntro`'s `loading` phase, visible, on a route that
- * shows it.
+ * Whether the character is the boot loader right now — the SHELL'S FIRST WAIT
+ * (the host, the session, the first route chunk) is not over yet, and the
+ * character is on a route that shows it. Not where it is standing: it can
+ * leave the centre before that wait is over (AppIntro, BOOT_SHELL_MAX_MS), or
+ * never stand there at all (a load with no intro), and it goes on showing the
+ * wait with its face from the dock (AppIntro, `preparing`).
  *
  * It exists for the busy overlay (src/components/ui/AppBusy.tsx). The shell's
  * first wait — resolving the host, reading the session — is held as a `route`

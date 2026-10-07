@@ -239,7 +239,8 @@ async function shoot(browser, { scenario, width, lang, scheme }) {
     await page.screenshot({ path: join(OUT, `${scenario}-${width}-${lang}-${scheme}-FAILED.png`) });
     throw e;
   }
-  // The app's intro veil covers the first frames; wait for it to step aside.
+  // The character's intro holds the centre for its first turn; wait for it to
+  // dock so it is not caught mid-flight over the cards.
   await page
     .waitForFunction(() => {
       const intro = document.querySelector('.lv-app-intro');

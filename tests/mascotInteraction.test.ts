@@ -29,7 +29,7 @@ import {
   type Attention,
 } from '../src/components/bloub/character/attention';
 import { applyAttention, attentionLean, POSES } from '../src/components/bloub/character/expressions';
-import { introOverlay, sampleCharacter } from '../src/components/bloub/character/engine';
+import { INTRO_BLINK, INTRO_END, INTRO_SPIN, introOverlay, sampleCharacter } from '../src/components/bloub/character/engine';
 import { classify } from '../src/components/bloub/interest';
 import { createMascotController, MASCOT_STATES, type MascotClock } from '../src/lib/mascot';
 import { requestFeedbackPolicy } from '../src/lib/mascotRequest';
@@ -252,29 +252,42 @@ test('a journey outranks a pointer: the gaze belongs to where it is going', () =
 
 /* --------------------------------------------------- §18 the first visit */
 
-test('the character OPENS rather than appearing finished', () => {
-  const shut = introOverlay(0.05);
-  assert.ok(shut && shut.lid < 0.1, 'it starts with its eyes closed');
-  const opening = introOverlay(0.45);
-  assert.ok(opening && opening.lid > shut!.lid && opening.lid < 1, 'and opens gradually');
-  const looking = introOverlay(0.84);
-  assert.ok(looking && Math.abs(looking.yaw) > 5, 'then looks around at where it finds itself');
-  const blink = introOverlay(1.13);
-  assert.ok(blink && blink.lid < 0.3, 'then blinks, which is what makes it read as an eye');
-  assert.equal(introOverlay(1.22), null, 'and then it is simply awake');
+test('the character TURNS ROUND ONCE, then blinks, rather than appearing finished', () => {
+  // The owner's reference (2026-10-07): the ball spins about its own vertical
+  // axis — the eyes go off the right edge, round the back, in from the left —
+  // and then blinks. The old opening (eyes shut, opening, a look aside, a
+  // blink) is gone with the veil it played behind. tests/mascotIntro.test.ts
+  // samples the eyes themselves; this pins the beats.
+  const rest = introOverlay(0)!;
+  assert.equal(rest.spin, 0, 'it starts facing the viewer');
+  assert.equal(rest.lid, 1, 'with its eyes open — the turn is the opening now');
+  const out = introOverlay(INTRO_SPIN * 0.3)!;
+  assert.ok(out.spin > 20 && out.spin < 90, `then turns to its right first (${out.spin.toFixed(0)}°)`);
+  const behind = introOverlay(INTRO_SPIN * 0.5)!;
+  assert.ok(Math.abs(behind.spin - 180) < 1, 'faces away halfway through');
+  const back = introOverlay(INTRO_SPIN * 0.8)!;
+  assert.ok(back.spin > 300 && back.spin < 360, 'and comes round the other side');
+  const blink = introOverlay(INTRO_SPIN + INTRO_BLINK / 2)!;
+  assert.equal(blink.spin, 0, 'the turn is whole before the blink');
+  assert.ok(blink.lid < 0.1, 'then blinks, which is what makes it read as an eye');
+  assert.equal(introOverlay(INTRO_END), null, 'and then it is simply awake');
   assert.equal(introOverlay(30), null);
 
-  // No step at the end: the last frame of the introduction is already open.
-  const last = introOverlay(1.219)!;
-  assert.ok(last.lid > 0.97 && Math.abs(last.yaw) < 0.5 && Math.abs(last.pitch) < 0.5);
+  // No step at the end: the last frame of the overlay is already the
+  // ordinary face, with the ordinary life fully handed back.
+  const last = introOverlay(INTRO_END - 0.001)!;
+  assert.ok(last.lid === 1 && last.spin === 0 && last.reach === 0 && last.calm < 0.001);
 
-  // And the lid only ever moves smoothly through it.
-  let previous = introOverlay(0)!.lid;
-  for (let i = 1; i <= 150; i++) {
-    const at = introOverlay(i / 125);
-    const lid = at ? at.lid : 1;
-    assert.ok(Math.abs(lid - previous) < 0.2, `a step of ${Math.abs(lid - previous).toFixed(3)} at ${(i / 125).toFixed(2)}s`);
-    previous = lid;
+  // The turn and the lid only ever move smoothly: at 120Hz the head never
+  // jumps more than a slow frame's worth, and never backwards.
+  let previous = introOverlay(0)!;
+  for (let i = 1; i <= 180; i++) {
+    const at = introOverlay(i / 120);
+    if (!at) break;
+    const spun = (at.spin === 0 && previous.spin > 300 ? 360 : at.spin) - previous.spin;
+    assert.ok(spun >= 0 && spun < 16, `a ${spun.toFixed(1)}° step at ${(i / 120).toFixed(3)}s`);
+    assert.ok(Math.abs(at.lid - previous.lid) < 0.3, `a lid step of ${Math.abs(at.lid - previous.lid).toFixed(3)}`);
+    previous = at;
   }
 });
 

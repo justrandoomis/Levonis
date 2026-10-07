@@ -5,7 +5,7 @@ import { useLanguage } from '../../LanguageContext';
 import BloubHome, { type CharacterHandle } from './BloubHome';
 import { mascot, type MascotState } from '../../lib/mascot';
 import { BLOUB_EVENT, bloubDuration, isBloubState, canonicalBloubState } from './events';
-import { sampleCharacter } from './character/engine';
+import { INTRO_END, INTRO_HOLD, sampleCharacter } from './character/engine';
 import {
   NO_ATTENTION, attentionFrom, engagementAfter, followAttention, releaseDelay, type Attention,
 } from './character/attention';
@@ -32,21 +32,87 @@ function centerFrame(): CharacterFrame {
 }
 
 /**
- * HOW LONG THE CHARACTER WILL WAIT FOR A PAGE THAT MAY NEVER ARRIVE.
+ * HOW LONG THE CHARACTER HOLDS THE CENTRE ON A COLD LOAD: ITS OWN INTRO, AND
+ * NOT A FRAME MORE.
  *
- * The bootstrap pin — full size, dead centre — is the right answer for the
- * first second of a cold load and the wrong answer for ever. Its only exit was
- * a readiness flag owned by a promise, so one request whose body stalled left
- * the character parked at 320px in the middle of a page the viewer had already
- * been reading for a minute, re-centring itself on every scroll and every
- * rotation. That is a UI state with an unbounded lifetime, which is a hang.
+ * This used to be a six-second ceiling on a DATA wait. The character sat dead
+ * centre, over an opaque veil, until `/api/home`, the session and the host had
+ * all settled, then flew 1.5s to its dock — so a page that had painted at
+ * one second was hidden again until the slowest request came back, and then
+ * for the flight on top. The owner, 2026-10-07: «الموقع جاهز لكن انميشن
+ * الbloub ياخذ وقت طويل» — the site is ready but the bloub takes a long time.
  *
- * The deadline is the exit: comfortably longer than any real first paint, far
- * shorter than a wait nobody is ever going to be released from. It is a SAFETY
- * NET, not the mechanism — the ordinary path still docks the moment readiness
- * settles, and a failed request settles exactly like a successful one.
+ * So the pin is now a TIME, clocked from the character's first drawn frame:
+ * one turn and a blink (`INTRO_HOLD`, character/engine.ts). The page
+ * underneath is never covered — there is no veil — and a slow DATA request is
+ * shown where it belongs, by the docked character's `loading` face
+ * (`mascot.activity('bootstrap', …)` below), not by keeping the whole screen
+ * waiting. Only a shell that does not yet know which page it is on can keep
+ * it there a little longer (BOOT_SHELL_MAX_MS). A load with no intro — a
+ * reduced-motion preference, a tab opened in the background, an intro that
+ * arrived late (BOOT_LATE_MS) — gets no hold at all.
  */
-const BOOT_PIN_MAX_MS = 6000;
+const BOOT_PIN_MAX_MS = Math.round(INTRO_HOLD * 1000);
+
+/**
+ * HOW LONG THE CENTRE MAY WAIT, AFTER THE TURN, FOR THE SHELL TO KNOW WHERE
+ * THE CHARACTER IS GOING.
+ *
+ * The dock depends on the page, and on a cold load the page is not settled
+ * until the host, the session and the route's own chunk are. A guest opening
+ * `/cart` cold was sent to the bottom bar's Home slot as its turn ended, and
+ * the session then redirected to `/auth`, which has no bottom bar: the
+ * character landed on the place the bar had been, or turned round in mid-air,
+ * and made a second 1.5s trip to the header (measured: in the bar at 3.7s,
+ * where one straight trip had it there at 3.1s). So after the turn the centre
+ * is held — no veil, the page is live — while THE SHELL is still settling: the
+ * same wait that stands the busy overlay down (`shellWaiting` — the host, the
+ * session and the route's chunk — and quiet for BOOT_QUIET_MS once it ends).
+ * The home page's DATA is not part of this: that is the face's to show.
+ *
+ * Clocked from the first drawn frame, so it is a ceiling on the whole stay at
+ * the centre, intro included, and a shell that never settles still lets the
+ * character go to whatever dock there is.
+ */
+const BOOT_SHELL_MAX_MS = 2500;
+
+/**
+ * HOW LATE AN INTRO MAY ARRIVE AND STILL PLAY.
+ *
+ * The character's code is its own chunk, loaded after the page has painted
+ * (App.tsx). On a fast connection it is drawn a quarter of a second after the
+ * first paint. On a slow one it can arrive seconds later, over a page someone
+ * is already reading — and a 200px ball turning in the middle of that text,
+ * then crossing it, is exactly «الموقع جاهز لكن انميشن الbloub ياخذ وقت
+ * طويل». Past this, or once the page has been scrolled, the character skips
+ * its intro and simply appears at its dock.
+ */
+const BOOT_LATE_MS = 1000;
+
+/**
+ * HOW LONG THE SHELL'S FIRST WAIT IS THE CHARACTER'S TO SHOW.
+ *
+ * While the host, the session or the first route chunk is still on its way,
+ * a `route` busy wait stands the overlay down (AppBusy, `introBooting`) — the
+ * character is the boot indicator, and a dimmed spinner over it on every cold
+ * load is the bug that rule fixed. The character no longer waits for that work
+ * before docking, so the stand-down cannot be tied to its phase any more; it is
+ * tied to the wait itself, latched once it ends, and given up after this long
+ * so a shell that never settles still gets the overlay's own indicator.
+ */
+const BOOT_WAIT_MAX_MS = 6000;
+
+/**
+ * HOW LONG THE SHELL HAS TO BE QUIET BEFORE ITS FIRST WAIT COUNTS AS OVER.
+ *
+ * A cold load is often a CHAIN of waits with a gap of one commit between them:
+ * `/cart` waits for the session, finds no user, redirects to `/auth`, and the
+ * sign-in chunk starts loading thirteen milliseconds later. Latching on that
+ * gap handed the second half of one cold load to the overlay, which then drew
+ * its scrim over the page at 1.3s (measured). A wait that starts inside this
+ * window is the same wait.
+ */
+const BOOT_QUIET_MS = 300;
 
 /**
  * How long the character holds its position through a lazy-route handoff.
@@ -144,7 +210,13 @@ interface Journey {
  * sat still, and every loop in the face had a fixed period a viewer learns in
  * about ten seconds.
  */
-export default function AppIntro({ ready }: { ready: boolean }) {
+export default function AppIntro({ ready, shellReady = ready }: {
+  /** Everything the first page needs, its data included. Shown by the face. */
+  ready: boolean;
+  /** The SHELL alone — the host and the session — which decides WHERE the
+   *  page is, and therefore where the character docks. Never the data. */
+  shellReady?: boolean;
+}) {
   const location = useLocation();
   const { loc } = useLanguage();
   const reduced = useMascotReducedMotion();
@@ -152,6 +224,28 @@ export default function AppIntro({ ready }: { ready: boolean }) {
   const expression = React.useSyncExternalStore(mascot.subscribe, mascot.snapshot, mascot.snapshot);
   const [failed, setFailed] = React.useState(false);
   const [pageVisible, setPageVisible] = React.useState(() => typeof document === 'undefined' || !document.hidden);
+  /** A route chunk or the session is still loading — the shell's first wait,
+   *  as far as the character's anchors know about it. */
+  const routeLoading = React.useSyncExternalStore(characterLayout.subscribe, characterLayout.pending, () => false);
+  // The SHELL, not the data: a slow `/api/home` keeps the face loading in the
+  // dock, and must not also keep the overlay standing down for six seconds
+  // over a page that is visible and live, where a tap on a slow route would
+  // get no indicator at all (BOOT_WAIT_MAX_MS).
+  const shellWaiting = !shellReady || routeLoading;
+  /** Latched: once the first wait is over, a later route wait is an ordinary
+   *  one and gets the overlay like any other. */
+  const [bootSettled, setBootSettled] = React.useState(false);
+  /**
+   * THE SAME WAIT, FOR THE LOOP: whether the shell is waiting right now, and
+   * when its wait last ended. What releases a centre held after the turn
+   * (BOOT_SHELL_MAX_MS) is the shell being QUIET, not merely settled: in the
+   * thirteen milliseconds between a cold `/cart` finding no session and
+   * `/auth` starting to load, the shell looks settled and the bottom bar is
+   * still there to dock to. A wait that ended before this mounted has been
+   * quiet all along (`-Infinity`) — unlike the overlay's latch, which cannot
+   * know that and so starts its quiet at mount.
+   */
+  const shellWait = React.useRef({ waiting: shellWaiting, endedAt: Number.NEGATIVE_INFINITY });
 
   const character = React.useRef<HTMLDivElement>(null);
   /** The wrapper the entrances animate — never the node above, whose
@@ -227,7 +321,14 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     scheduleRef.current(true);
   }, [ready]);
 
+
   React.useLayoutEffect(() => { reducedRef.current = reduced; }, [reduced]);
+
+  React.useLayoutEffect(() => {
+    const { waiting, endedAt } = shellWait.current;
+    shellWait.current = { waiting: shellWaiting, endedAt: waiting && !shellWaiting ? performance.now() : endedAt };
+    scheduleRef.current(true);
+  }, [shellWaiting]);
 
   // Tell the anchors whether there is a character to expect. They keep the
   // Home slot empty while there is, so nothing competes with it for identity.
@@ -242,12 +343,52 @@ export default function AppIntro({ ready }: { ready: boolean }) {
    * drawing a spinner over it (see `booting` in anchors.ts). Not while the
    * route hides the character: the admin panel shows no intro at all, and a
    * wait there must still get an indicator.
+   *
+   * It is the SHELL'S FIRST WAIT, not the intro's phase: the character can
+   * leave the centre before that wait is over (BOOT_SHELL_MAX_MS), and a scrim
+   * dropping over the page the moment it leaves would be the flash this rule
+   * exists to prevent (BOOT_WAIT_MAX_MS).
    */
+  React.useEffect(() => {
+    const deadline = window.setTimeout(() => setBootSettled(true), BOOT_WAIT_MAX_MS);
+    return () => window.clearTimeout(deadline);
+  }, []);
+  React.useEffect(() => {
+    if (bootSettled || shellWaiting) return;
+    const quiet = window.setTimeout(() => setBootSettled(true), BOOT_QUIET_MS);
+    return () => window.clearTimeout(quiet);
+  }, [bootSettled, shellWaiting]);
+  const preparing = !failed && !bootSettled;
   const routeHidden = isMascotHiddenRoute(location.pathname);
   React.useLayoutEffect(() => {
-    setCharacterBooting(!failed && phase === 'loading' && !routeHidden);
-  }, [failed, phase, routeHidden]);
+    setCharacterBooting(preparing && !routeHidden);
+  }, [preparing, routeHidden]);
   React.useLayoutEffect(() => () => setCharacterBooting(false), []);
+
+  /**
+   * THE FIRST APPEARANCE FADES IN (`boot`, character/entrance.ts) — pale to
+   * full while the face starts its turn, as in the owner's reference.
+   *
+   * Started in a LAYOUT effect, before the first paint: the markup is born at
+   * full opacity, and an entrance started after that paint would show the
+   * finished ball for a frame and then blink it out. A pending animation
+   * already applies its first keyframe (`fill: 'backwards'`), so the first
+   * frame anyone sees is the first frame of the fade.
+   *
+   * On a tab nobody is looking at, and under the motion preference — the two
+   * loads known here to have no intro — it is started and PAUSED on that
+   * first keyframe: the character stays invisible until its first dock, where
+   * the same fade plays (`measure`, a load with no intro). Without the pause
+   * the markup's full-opacity ball was what a background tab showed when it
+   * came back, standing in the middle of a page that had long been ready; and
+   * a reduced-motion load showed a still ball at the centre for the moment
+   * before it docked, then the same ball again in the bar. If the shell keeps
+   * it waiting for longer than a moment, the hold lets it be seen there.
+   */
+  React.useLayoutEffect(() => {
+    entrance.current = playEntrance(pose.current, 'boot', reducedRef.current, entrance.current);
+    if (document.hidden || reducedRef.current) entrance.current?.pause();
+  }, []);
 
   // The expression the controller has selected, noted the moment it changes so
   // the engine can blend out of the previous one. `sequence` is part of the
@@ -289,8 +430,16 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     const epoch = performance.now();
     let observedContainer: HTMLElement | null = null;
     let settleTimer = 0;
-    /** When measure() first REFUSED to dock, so every refusal has a deadline. */
+    /** When measure() first REFUSED to dock, so every refusal has a deadline —
+     *  and for WHICH refusal: a stopwatch started by one kind of wait must
+     *  not spend the next one's deadline. */
     let waitingSince = 0;
+    let waitingFor: 'orphan' | 'handoff' | null = null;
+    const waited = (kind: 'orphan' | 'handoff', now: number) => {
+      if (waitingFor !== kind) { waitingFor = kind; waitingSince = now; }
+      return now - waitingSince;
+    };
+    const stopWaiting = () => { waitingFor = null; waitingSince = 0; };
     const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => { refreshViewport(); schedule(false); });
 
     /**
@@ -336,7 +485,13 @@ export default function AppIntro({ ready }: { ready: boolean }) {
 
     const occupy = (element: HTMLElement | null, kind?: AnchorKind) => {
       if (element && kind) occupiedKind = kind;
-      if (occupied === element) return;
+      if (occupied === element) {
+        // The same slot, re-registered — a page's header turns `busy` off
+        // when its data lands, and the re-registration strips the mark. Now
+        // that the character docks BEFORE the data, that is the usual order.
+        if (element && !element.hasAttribute('data-bloub-occupied')) element.setAttribute('data-bloub-occupied', 'true');
+        return;
+      }
       occupied?.removeAttribute('data-bloub-occupied');
       occupied = element;
       occupied?.setAttribute('data-bloub-occupied', 'true');
@@ -414,14 +569,64 @@ export default function AppIntro({ ready }: { ready: boolean }) {
 
     let lastFrameAt = 0;
     /**
-     * When the character first appeared. Null once the opening is spent, so
-     * `introOverlay` is not called sixty times a second for the rest of the
-     * session to be told the same nothing.
+     * WHEN THE CHARACTER'S FIRST FRAME WAS DRAWN — the clock both the intro's
+     * turn and the boot hold run on, so the character can never leave in the
+     * middle of its own turn. Stamped by the loop rather than here: a mount
+     * whose first frame is held up by a busy main thread would otherwise have
+     * spent part of its turn before anyone could see it. Zero until then.
      */
-    let introAt: number | null = performance.now();
+    let firstFrameAt = 0;
+    /**
+     * WHETHER THIS LOAD HAS AN INTRO AT ALL — decided once, on the first drawn
+     * frame, and never revisited.
+     *
+     * Not under the motion preference: a head spinning in the middle of the
+     * screen is the motion it removes. Not on a tab that was opened in the
+     * background (`bornHidden`): by the time anyone looks, the page has long
+     * been ready, and a turn and a crossing then are the very wait the owner
+     * asked to remove; the turn would also hold the pointer off the face for
+     * a second and a half for nobody. And not when it arrives late
+     * (BOOT_LATE_MS). Without one, there is no hold and no crossing: the
+     * character simply appears at its first dock.
+     */
+    const bornHidden = document.hidden;
+    let withIntro = false;
+    /** False once the opening is spent, so `introOverlay` is not called sixty
+     *  times a second for the rest of the session to be told the same nothing. */
+    let introLive = false;
+    const arrivedLate = (now: number) => {
+      const paint = typeof performance.getEntriesByName === 'function'
+        ? performance.getEntriesByName('first-contentful-paint')[0] : undefined;
+      if (paint && now - paint.startTime > BOOT_LATE_MS) return true;
+      // Read before this frame writes anything (see the read phase in `tick`).
+      const scroller = document.getElementById('main-scroll-container');
+      return window.scrollY > 0 || (scroller?.scrollTop ?? 0) > 0;
+    };
+    /**
+     * What is left of the boot hold, in ms: the turn and the blink — only when
+     * there is a turn to watch — and, while the shell is still settling, up to
+     * BOOT_SHELL_MAX_MS from the first frame. That second part holds a load
+     * with no intro too: under the motion preference the still character at
+     * the centre is the only loading indicator a cold `/cart` has (the
+     * overlay stands down for it), and docking it in a bottom bar the
+     * redirect is about to remove is a dock, a vanish and a second dock where
+     * one will do. None on a tab nobody is looking at.
+     */
+    const bootHoldLeft = (now: number) => {
+      if (document.hidden || !firstFrameAt) return 0;
+      const since = now - firstFrameAt;
+      const { waiting, endedAt } = shellWait.current;
+      const cap = BOOT_SHELL_MAX_MS - since;
+      const shell = waiting ? cap : Math.min(cap, BOOT_QUIET_MS - (now - endedAt));
+      return withIntro && !reducedRef.current ? Math.max(BOOT_PIN_MAX_MS - since, shell) : shell;
+    };
 
     const tick = (now: number) => {
       rafId = running ? window.requestAnimationFrame(tick) : 0;
+      if (!firstFrameAt) {
+        firstFrameAt = now;
+        withIntro = introLive = !bornHidden && !reducedRef.current && !arrivedLate(now);
+      }
       /**
        * THE READ PHASE, AND IT IS FIRST BECAUSE THE ORDER IS THE WHOLE FIX.
        *
@@ -454,7 +659,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       // enormous step that teleports the gaze — the very thing §4 forbids.
       const dt = lastFrameAt ? Math.min(0.05, Math.max(0, (now - lastFrameAt) / 1000)) : 1 / 60;
       lastFrameAt = now;
-      if (introAt !== null && now - introAt > 1400) introAt = null;
+      if (introLive && now - firstFrameAt > INTRO_END * 1000) introLive = false;
       let travel: TravelSample | null = null;
       const journey = journeyRef.current;
       if (journey) {
@@ -476,11 +681,13 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         age: (now - b.since) / 1000,
         travel,
         attention: aimAt(now, dt),
-        // §18: the opening runs from the character's own first frame and is
-        // over inside 1.4s, before any journey can start. `introAt` is stamped
-        // when this loop is created — once per page load — so a client-side
-        // route change, which never remounts this component, cannot replay it.
-        intro: introAt === null ? null : (now - introAt) / 1000,
+        // §18: the turn runs from the character's own first frame, and the
+        // boot hold lasts at least as long — the journey to the dock starts as
+        // the blink finishes, or once the shell has settled. `firstFrameAt` is
+        // stamped once per page load, so a client-side route change, which
+        // never remounts this component, cannot replay it; and a load with no
+        // intro (`withIntro`) never starts it.
+        intro: introLive ? (now - firstFrameAt) / 1000 : null,
         reduced: reducedRef.current,
       });
       livePose.current = render.pose;
@@ -568,7 +775,10 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         observedContainer = container;
         if (observedContainer) resizeObserver?.observe(observedContainer);
       }
-      const pending = !readyRef.current || characterLayout.pending() || !!target?.busy;
+      // Readiness is shown by the FACE, wherever the character is; only a
+      // route that is still arriving can hold it in place (the handoff).
+      const routePending = characterLayout.pending() || !!target?.busy;
+      const pending = !readyRef.current || routePending;
       mascot.activity('anchor-loading', pending ? 'loading' : null);
 
       // NOTHING TO DOCK TO AT ALL, AND NOWHERE IT HAS EVER DOCKED.
@@ -593,8 +803,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
        * docked, the instant an anchor registers.
        */
       if (!target) {
-        if (!waitingSince) waitingSince = now;
-        const left = ORPHAN_GRACE_MS - (now - waitingSince);
+        const left = ORPHAN_GRACE_MS - waited('orphan', now);
         if (left > 0) { remeasureAfter(left); return; }
         occupy(null);
         journeyRef.current = null;
@@ -607,38 +816,56 @@ export default function AppIntro({ ready }: { ready: boolean }) {
        *
        * Both of these are right for a moment and indefensible for a minute,
        * and both used to be a bare `return` whose only exit was an upstream
-       * promise settling. They now share one stopwatch, so "still booting" and
-       * "a signal that is never going to arrive" stop being the same state.
+       * promise settling.
+       *
+       * 'boot' is the FIRST ARRIVAL'S, and is a time on the intro's own clock
+       * (`bootHoldLeft`): the turn and the blink, then the shell settling, up
+       * to BOOT_SHELL_MAX_MS. It always ends in a journey, never in a jump: it
+       * used to share the handoff's stopwatch, which started with the turn and
+       * ran out three seconds later with the character still at the centre —
+       * and the deadline's silent dock then teleported it 150px into a header.
+       *
+       * 'handoff' is a character already standing on a real dock while the
+       * next page's header is still arriving; past its deadline it docks
+       * silently, because it is only ever a few pixels from where it is going.
        */
-      const refusal: 'boot' | 'handoff' | null =
-        !completedRef.current && pending ? 'boot'
-          : pending && target.kind === 'top-fallback' ? 'handoff'
-            : null;
-
-      if (refusal) {
-        if (!waitingSince) waitingSince = now;
-        const left = (refusal === 'boot' ? BOOT_PIN_MAX_MS : HANDOFF_MAX_MS) - (now - waitingSince);
+      const holdLeft = completedRef.current ? 0 : bootHoldLeft(now);
+      if (holdLeft > 0) {
+        stopWaiting();
+        writeFrame(centerFrame());
+        // A load with no intro kept its fade paused, invisible, for an
+        // appearance at the dock. If the shell is still WAITING after a
+        // moment, the character is the only loading indicator meanwhile (the
+        // overlay stands down for it) and has to be seen. Not in the quiet
+        // tail after the wait has ended: it is about to appear at its dock,
+        // and showing it here first is a flash at the centre (measured: 60ms
+        // of a half-faded ball, then the same ball in the bar).
+        if (entrance.current?.playState === 'paused' && shellWait.current.waiting) {
+          const unseen = BOOT_QUIET_MS - (now - firstFrameAt);
+          if (unseen > 0) { remeasureAfter(Math.min(holdLeft, unseen)); return; }
+          entrance.current.play();
+        }
+        remeasureAfter(holdLeft);
+        return;
+      }
+      if (completedRef.current && routePending && target.kind === 'top-fallback') {
+        const left = HANDOFF_MAX_MS - waited('handoff', now);
         if (left > 0) {
-          // 'boot' holds the viewport centre; 'handoff' holds whatever the
-          // character already has, because it is standing on a real dock.
-          if (refusal === 'boot') writeFrame(centerFrame());
           remeasureAfter(left);
           return;
         }
         // Past the deadline with a real anchor in hand: dock SILENTLY. Not a
-        // journey — a first dock would plan a 0.34s wind-up and a cross-screen
-        // travel, and a mascot barging into a page the viewer has been reading
-        // for ten seconds is worse than one that was merely late.
+        // journey — a mascot barging across a page the viewer has been
+        // reading for seconds is worse than one that was merely late.
         occupy(target.element, target.kind);
         writeFrame(target.frame);
         journeyRef.current = null;
-        completedRef.current = true;
-        waitingSince = 0;
+        stopWaiting();
         setPhase('docked');
         mascot.navigationComplete();
         return;
       }
-      waitingSince = 0;
+      stopWaiting();
       const previous = occupied;
       const previousKind = occupiedKind;
       occupy(target.element, target.kind);
@@ -676,6 +903,9 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       // the measurement that puts it right, at rest.
       if (!isTravelWorthAnimating(planTravel(heading, next, { reduced: reducedRef.current }))) {
         if (!inFlight) writeFrame(next);
+        // A first dock a few pixels from the centre is still a first
+        // appearance: a fade kept paused for the dock must not stay paused.
+        if (boot && entrance.current?.playState === 'paused') entrance.current = playEntrance(pose.current, 'boot', reducedRef.current, entrance.current);
         return;
       }
 
@@ -697,10 +927,18 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         setPhase('docked');
         return;
       }
-      if (document.hidden) {
+      // A tab nobody is looking at, and a first arrival with no intro (the
+      // motion preference, a tab opened in the background, an intro that
+      // arrived late — `withIntro`), simply ARE docked: no turn came before
+      // this (only, at most, the shell's wait — see `bootHoldLeft`) and no
+      // crossing follows it. The boot fade, played HERE, is the whole of the
+      // arrival: the character appears at its dock, pale to full, rather than
+      // in the middle of a ready page.
+      if (document.hidden || (boot && (!withIntro || reducedRef.current))) {
         writeFrame(next);
         setPhase('docked');
         mascot.navigationComplete();
+        if (boot && !document.hidden) entrance.current = playEntrance(pose.current, 'boot', reducedRef.current, entrance.current);
         return;
       }
       // The gaze is told where it is going before anything moves; the travel
@@ -906,13 +1144,12 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       /* THE ADMIN PANEL HAS NO CHARACTER. It is a workbench — dense tables and
          forms — and there the mascot is a green ball parked in the top bar,
          taking the vertical space those tables need. Hidden by ROUTE rather
-         than unmounted: the journey state machine, its anchors and the veil it
-         releases all stay intact, so entering and leaving /admin costs nothing
-         and cannot strand the layer mid-travel. */
+         than unmounted: the journey state machine and its anchors stay
+         intact, so entering and leaving /admin costs nothing and cannot strand
+         the layer mid-travel. */
       data-route-hidden={isMascotHiddenRoute(location.pathname) ? 'true' : 'false'}
       data-reduced-motion={reduced ? 'true' : 'false'} data-page-visible={pageVisible ? 'true' : 'false'}
-      data-bloub-rendered={failed ? 'false' : 'true'} data-mascot-state={expression.state} aria-live="polite" aria-busy={!failed && phase === 'loading'}>
-      <div className="lv-app-intro__veil" aria-hidden="true" />
+      data-bloub-rendered={failed ? 'false' : 'true'} data-mascot-state={expression.state} aria-live="polite" aria-busy={preparing}>
       <div ref={character} className="lv-app-intro__character"
         style={{ width: CHARACTER_CANVAS, height: CHARACTER_CANVAS }}>
         <div ref={pose} className="lv-app-intro__pose" style={{ transformOrigin: ENTRANCE_ORIGIN }}>
@@ -921,7 +1158,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
           </CharacterBoundary>
         </div>
       </div>
-      {!failed && phase === 'loading' ? <span className="sr-only">{loc('جارٍ تجهيز Levonis…', 'Preparing Levonis…', 'Levonis ئامادە دەکرێت…')}</span> : null}
+      {preparing ? <span className="sr-only">{loc('جارٍ تجهيز Levonis…', 'Preparing Levonis…', 'Levonis ئامادە دەکرێت…')}</span> : null}
     </div>
   );
 }

@@ -101,15 +101,27 @@ export function planTravel(
     return { from, to, angle, distance, anticipate: 0, move: 0.2, settle: 0, total: 0.2, windup: 0, ease: travelEase, reduced: true };
   }
 
+  // THE FIRST ARRIVAL IS THE SHORT ONE. It used to be the longest — a 0.34s
+  // wind-up, the full move and a 0.4s settle, 1.5s of choreography — on the
+  // reasoning that it is the one moment the character has the viewer's whole
+  // attention. The owner's answer was that the site is ready and the bloub is
+  // still on its way (2026-10-07). By the time it leaves, the intro has
+  // already had its moment (one turn and a blink, `INTRO_HOLD`), so the boot
+  // journey gets a token gather, a brisk move and a short settle: about 0.85s
+  // for a phone's centre-to-dock drop, where it was 1.5s. Route journeys are
+  // unchanged.
+  const boot = opts.boot && !opts.continuation;
   // Duration follows distance, but sub-linearly: a journey twice as long
   // should not feel twice as slow, or crossing a tablet becomes a wait.
-  const move = clamp(0.34 + Math.sqrt(distance) * 0.022, 0.34, 0.82);
-  // The first arrival earns a longer wind-up than a page change, because it is
-  // the one moment the character has the viewer's whole attention. A
-  // continuation earns none at all: the gaze has already led, the body is
-  // already going, and there is nothing left to anticipate.
-  const anticipate = opts.continuation ? 0 : opts.boot ? 0.34 : clamp(0.13 + distance * 0.00035, 0.13, 0.26);
-  const settle = 0.4;
+  const move = boot
+    ? clamp(0.3 + Math.sqrt(distance) * 0.014, 0.3, 0.6)
+    : clamp(0.34 + Math.sqrt(distance) * 0.022, 0.34, 0.82);
+  // Above zero even for the boot: the gaze leads during this beat, and a
+  // departure with no beat at all reads as being yanked. A continuation earns
+  // none: the gaze has already led, the body is already going, and there is
+  // nothing left to anticipate.
+  const anticipate = opts.continuation ? 0 : boot ? 0.08 : clamp(0.13 + distance * 0.00035, 0.13, 0.26);
+  const settle = boot ? 0.2 : 0.4;
   return {
     from,
     to,

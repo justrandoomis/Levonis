@@ -244,7 +244,7 @@ test('the overlay blocks pointers, which is the entire point of it', () => {
   assert.match(appBusy, /touchAction: 'none'/);
   assert.ok(
     !/pointer-events-none/.test(stripComments(appBusy)),
-    'the mascot veil is pointer-events:none by design; this layer is the opposite'
+    'the mascot layer is pointer-events:none by design; this layer is the opposite'
   );
 });
 
@@ -281,12 +281,31 @@ test('a route wait during boot is the character\'s to show, never the overlay\'s
   // boot window (there are none today) would still be covered.
   assert.ok(!/standsDown = .*order/.test(code));
 
-  // The flag is the intro's own phase, and only where the intro is visible.
-  assert.match(intro, /setCharacterBooting\(!failed && phase === 'loading' && !routeHidden\);/);
+  // The flag is the SHELL'S FIRST WAIT, and only where the intro is visible.
+  // It used to be the intro's own phase, but the character no longer waits
+  // for that work before leaving the centre (BOOT_PIN_MAX_MS is one turn of
+  // its intro), and a scrim dropping over the page the moment it left would be
+  // the very flash this rule prevents. Latched once the wait is over, so a
+  // later route wait gets the overlay; given up after BOOT_WAIT_MAX_MS.
+  assert.match(intro, /setCharacterBooting\(preparing && !routeHidden\);/);
+  assert.match(intro, /const preparing = !failed && !bootSettled;/);
+  // The SHELL'S wait — the host, the session, the route chunk — and never the
+  // home page's data: a slow `/api/home` behind a page that is visible and
+  // live must not keep a slow route's tap from getting an indicator.
+  assert.match(intro, /const shellWaiting = !shellReady \|\| routeLoading;/);
+  assert.match(app, /<AppIntro ready=\{resolved && isLoaded && \(!mainHomeNeedsData \|\| homeReady\)\} shellReady=\{resolved && isLoaded\} \/>/);
+  // The deadline runs from mount and is never reset by the wait toggling.
+  assert.match(intro, /React\.useEffect\(\(\) => \{\s*const deadline = window\.setTimeout\(\(\) => setBootSettled\(true\), BOOT_WAIT_MAX_MS\);\s*return \(\) => window\.clearTimeout\(deadline\);\s*\}, \[\]\);/);
+  // And the wait is over only once the shell has been QUIET for a moment: a
+  // cold /cart redirects to /auth and starts its chunk one commit later, and
+  // latching in that gap gave the second half of one cold load the scrim.
+  assert.match(intro, /if \(bootSettled \|\| shellWaiting\) return;\s*const quiet = window\.setTimeout\(\(\) => setBootSettled\(true\), BOOT_QUIET_MS\);/);
+  assert.doesNotMatch(intro, /setBootSettled\(false\)/, 'the latch never re-arms');
   assert.match(intro, /React\.useLayoutEffect\(\(\) => \(\) => setCharacterBooting\(false\), \[\]\);/);
 
   // And the store behind it notifies, so the overlay re-renders the moment
-  // the intro docks (or its six-second pin gives up) with the wait still on.
+  // the first wait ends (or its six-second deadline gives up) with a route
+  // wait still on.
   let calls = 0;
   const stop = characterLayout.subscribe(() => { calls += 1; });
   setCharacterBooting(true);

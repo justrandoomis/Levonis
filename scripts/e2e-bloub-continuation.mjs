@@ -527,17 +527,29 @@ for(const [engineName,engine] of engines) {
     for(const width of [320,360,390,430,768,1024,1440]) for(const lang of ['ar','en']) {
       const context=await browser.newContext({viewport:{width,height:844},deviceScaleFactor:1});
       await context.addInitScript(lang=>localStorage.setItem('levo_lang',lang),lang);
+      // THE CENTRE IS HELD FOR ONE TURN OF THE INTRO, NOT FOR THE DATA
+      // (BOOT_PIN_MAX_MS in AppIntro). A round trip from here can outlast it on
+      // a loaded runner, so the first frame is read where it is drawn.
+      await context.addInitScript(()=>{const look=()=>{
+        const n=document.querySelector('.lv-app-intro__character'),i=document.querySelector('.lv-app-intro');
+        if(n&&n.style.transform&&!window.__firstFrame){const b=n.getBoundingClientRect();window.__firstFrame={x:b.x,width:b.width,phase:i?.dataset.phase};}
+        if(!window.__firstFrame)requestAnimationFrame(look);};requestAnimationFrame(look);});
       const page=await context.newPage(); const errors=[]; page.on('pageerror',e=>errors.push(e.message));
       try {
         await page.goto(base); await page.locator('svg.lv-bloub').waitFor();
         await page.evaluate(()=>{window.__originalBloub=document.querySelector('svg.lv-bloub');window.__states=[];
           new MutationObserver(()=>{const e=document.querySelector('.lv-app-intro');window.__states.push(e?.getAttribute('data-mascot-state'));}).observe(document.querySelector('.lv-app-intro'),{attributes:true,attributeFilter:['data-mascot-state']});});
         await state(page,'loading');
-        const intro=await page.locator('.lv-app-intro__character').boundingBox();
+        await page.waitForFunction(()=>window.__firstFrame);
+        const intro=await page.evaluate(()=>window.__firstFrame);
+        assert.equal(intro.phase,'loading','the first frame is the intro');
         assert.ok(intro.width>=180 && intro.width<=320,`first frame ${intro.width}`);
         assert.ok(Math.abs(intro.x+intro.width/2-width/2)<1.5);
         await animatedEyes(page);
         if(width===390&&lang==='ar') await page.screenshot({path:`${out}/${engineName}-${lang}-intro.png`});
+        // The page is not waited for: it docks with `#ready` still pending and
+        // shows the wait with its face, then settles when the work does.
+        await aligned(page,'bottom-home'); await state(page,'loading');
         await click(page,'#ready'); await aligned(page,'bottom-home'); await state(page,'idle');
         await noFaceGlow(page);
         const home=await dimensions(page,'bottom-home');

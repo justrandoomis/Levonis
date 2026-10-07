@@ -11,6 +11,13 @@
  *          a slightly wider smile.
  *   dock   it is leaving the stage for an ordinary dock. A short pop in place,
  *          so it arrives the same way it left: by appearing.
+ *   boot   the very first frame of a page load. The owner's reference fades the
+ *          ball in from pale to full and grows it a tenth while its face turns
+ *          round (the turn itself is the engine's — `introOverlay`); this is
+ *          the fade and the growth, centred on the ball. The PALENESS is a
+ *          wash of the page's own colour laid over the body inside the SVG
+ *          (`wash` below), never transparency: a see-through ball over a
+ *          painted page shows the page's buttons through it.
  *
  * WHY WAAPI KEYFRAMES AND NOT THE ENGINE. The engine draws the BODY — its
  * outline, eyes and mouth — as SVG attributes on the main thread, and that is
@@ -32,11 +39,19 @@
  * trust.
  */
 
-export type EntranceKind = 'stage' | 'dock';
+export type EntranceKind = 'stage' | 'dock' | 'boot';
 
 export interface Entrance {
   keyframes: Keyframe[];
   options: KeyframeAnimationOptions;
+  /**
+   * Played at the same instant on the drawing's `[data-bloub-wash]` — a layer
+   * of the page's colour cut to the body's outline, under the face
+   * (BloubHome). Only the boot has one. It is opacity on an SVG child, so it
+   * runs on the main thread; a stalled thread leaves it PALE, which is a
+   * solid ball, never a see-through one.
+   */
+  wash?: { keyframes: Keyframe[]; options: KeyframeAnimationOptions };
 }
 
 /**
@@ -97,6 +112,42 @@ const DOCK: Entrance = {
 };
 
 /**
+ * THE FIRST APPEARANCE: PALE TO FULL, NINE-TENTHS TO WHOLE — AND SOLID FROM
+ * ITS FOURTH FRAME.
+ *
+ * The reference fades from light grey to its full value over most of a second
+ * and grows from 0.91 while its face is still on the way round. Its ball is
+ * never see-through: it is a PALE ball, solid against the page. So the two are
+ * separate here. The wrapper's opacity only gets the ball onto the screen, in
+ * its first 57ms — four frames, which is not a pop, because what arrives is a
+ * disc of nearly the page's own colour; the paleness is the `wash`, that
+ * colour over the body at 0.85, clearing over the whole entrance. Done with opacity alone, the black «تسوّق
+ * الآن» button and the cream page showed through the ball for its first 150ms,
+ * now that there is no veil behind it.
+ *
+ * The growth is about the BALL'S centre, not the wrapper's foot-level origin:
+ * scaling around 91% would lift the ball as it grew, so each frame carries the
+ * translate that holds the centre still — the body is centred at 50% and the
+ * origin sits 41% below it.
+ */
+const BOOT_FROM = 0.9;
+const BOOT_MS = 380;
+const centred = (s: number) => at(Math.round(-(1 - s) * 4100) / 100, s);
+const BOOT: Entrance = {
+  keyframes: [
+    { offset: 0, opacity: 0, transform: centred(BOOT_FROM), easing: 'cubic-bezier(0.2, 0.6, 0.4, 1)' },
+    { offset: 0.15, opacity: 1, transform: centred(0.95), easing: SETTLE },
+    { offset: 0.75, opacity: 1, transform: centred(1) },
+    { offset: 1, opacity: 1, transform: centred(1) },
+  ],
+  options: { duration: BOOT_MS, easing: 'linear', fill: 'backwards' },
+  wash: {
+    keyframes: [{ opacity: 0.85, easing: 'cubic-bezier(0.45, 0, 0.55, 1)' }, { opacity: 0 }],
+    options: { duration: BOOT_MS, fill: 'backwards' },
+  },
+};
+
+/**
  * UNDER REDUCED MOTION IT FADES IN WHERE IT IS GOING. No scale, no hop, no
  * squash: a body that grows and bounces is exactly the vestibular motion the
  * preference asks to remove. The arrival itself is still shown — as opacity,
@@ -107,11 +158,12 @@ const DOCK: Entrance = {
 const REDUCED: Record<EntranceKind, Entrance> = {
   stage: { keyframes: [{ opacity: 0 }, { opacity: 1 }], options: { duration: 200, easing: 'ease-out', fill: 'backwards' } },
   dock: { keyframes: [{ opacity: 0 }, { opacity: 1 }], options: { duration: 150, easing: 'ease-out', fill: 'backwards' } },
+  boot: { keyframes: [{ opacity: 0 }, { opacity: 1 }], options: { duration: 150, easing: 'ease-out', fill: 'backwards' } },
 };
 
 export function entranceFor(kind: EntranceKind, reduced: boolean): Entrance {
   if (reduced) return REDUCED[kind];
-  return kind === 'stage' ? STAGE : DOCK;
+  return kind === 'stage' ? STAGE : kind === 'boot' ? BOOT : DOCK;
 }
 
 /**
@@ -130,8 +182,13 @@ export function playEntrance(
 ): Animation | null {
   previous?.cancel();
   if (!element || typeof element.animate !== 'function') return null;
-  const { keyframes, options } = entranceFor(kind, reduced);
+  const { keyframes, options, wash } = entranceFor(kind, reduced);
+  // The wash belongs to the entrance that started it: a replaced boot takes
+  // its paleness with it rather than leaving a half-washed ball behind.
+  const layer = typeof element.querySelector === 'function' ? element.querySelector<SVGElement>('[data-bloub-wash]') : null;
+  for (const running of layer?.getAnimations?.() ?? []) running.cancel();
   try {
+    if (wash && layer && typeof layer.animate === 'function') layer.animate(wash.keyframes, wash.options);
     return element.animate(keyframes, options);
   } catch {
     // An engine that rejects a keyframe (an old per-keyframe easing parser)

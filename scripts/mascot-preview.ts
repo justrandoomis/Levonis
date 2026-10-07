@@ -11,7 +11,7 @@
  * Development tooling only. Nothing in src/ imports it.
  */
 import { writeFileSync } from 'node:fs';
-import { sampleCharacter, VIEWBOX, type CharacterInput } from '../src/components/bloub/character/engine.ts';
+import { INTRO_END, INTRO_HOLD, sampleCharacter, VIEWBOX, type CharacterInput } from '../src/components/bloub/character/engine.ts';
 import { POSES } from '../src/components/bloub/character/expressions.ts';
 import { planTravel, sampleTravel } from '../src/components/bloub/character/travel.ts';
 import type { MascotState } from '../src/lib/mascot.ts';
@@ -35,7 +35,7 @@ function svg(render: ReturnType<typeof sampleCharacter>, size = 132): string {
     <path d="${render.body}" fill="url(#g)" stroke="#6E7845" stroke-width="1.1"/>
     <path d="${render.gloss}" fill="none" stroke="#98A56A" stroke-width="2.6" stroke-linecap="round" opacity="0.34"/>
     ${eyes}
-    <path d="${render.mouth}" fill="none" stroke="#F2EAD3" stroke-width="${render.mouthWeight}" stroke-linecap="round" opacity="0.92"/>
+    ${render.mouthVisible ? `<path d="${render.mouth}" fill="none" stroke="#F2EAD3" stroke-width="${render.mouthWeight}" stroke-linecap="round" opacity="0.92"/>` : ''}
     ${badge}
   </svg>`;
 }
@@ -69,6 +69,14 @@ for (const [from, to] of [['idle', 'success'], ['idle', 'error'], ['idle', 'noti
     }).join('')
   }</div>`);
 }
+
+// The first second: one turn round the vertical axis, then a blink (§18).
+sections.push(`<h2>Intro — one turn and a blink (hold ${(INTRO_HOLD * 1000).toFixed(0)}ms, overlay ends ${(INTRO_END * 1000).toFixed(0)}ms)</h2><div class="grid small">${
+  Array.from({ length: 30 }, (_, i) => {
+    const age = i / 30;
+    return cell(`${(age * 1000).toFixed(0)}ms`, svg(sampleCharacter({ t: age, state: 'loading', from: null, age: 9, travel: null, intro: age, reduced: false }), 84));
+  }).join('')
+}</div>`);
 
 // The first journey: centre of an iPad viewport down to the home dock.
 const plan = planTravel({ x: 420, y: 250, size: 300 }, { x: 560, y: 660, size: 88 }, { boot: true });

@@ -24,7 +24,7 @@ export const BLOUB_VIEWBOX = VIEWBOX;
 
 export interface CharacterHandle {
   /** Write one sampled frame onto the DOM. Called from rAF; does no work
-   * beyond six attribute writes. */
+   * beyond a handful of attribute writes, each skipped when unchanged. */
   apply(render: CharacterRender): void;
 }
 
@@ -43,7 +43,12 @@ interface Props {
 }
 
 const BloubHome = React.forwardRef<CharacterHandle, Props>(function BloubHome({ state = 'idle', reduced = false, className = '' }, ref) {
+  /** The face's clip is referenced by id, and an id must be this drawing's
+   *  own: two characters on one page (the preview sheet) must not clip one
+   *  face to the other's body. Sanitised because `url(#…)` is CSS. */
+  const clip = `levonis-bloub-face-${React.useId().replace(/[^A-Za-z0-9_-]/g, '')}`;
   const body = React.useRef<SVGPathElement>(null);
+  const outline = React.useRef<SVGPathElement>(null);
   const gloss = React.useRef<SVGPathElement>(null);
   const bounce = React.useRef<SVGPathElement>(null);
   const mouth = React.useRef<SVGPathElement>(null);
@@ -66,10 +71,22 @@ const BloubHome = React.forwardRef<CharacterHandle, Props>(function BloubHome({ 
     return {
       apply(r) {
         put(body.current, 'body', 'd', r.body);
+        // The face's clip is the same outline, written on the same frame: a
+        // clip a frame behind the body would trim a turning eye a pixel off
+        // the silhouette.
+        put(outline.current, 'outline', 'd', r.body);
         put(gloss.current, 'gloss', 'd', r.gloss);
         put(bounce.current, 'bounce', 'd', r.bounce);
         put(mouth.current, 'mouth', 'd', r.mouth);
         put(mouth.current, 'mouthWeight', 'stroke-width', String(r.mouthWeight));
+        // Only the intro's turn ever takes the face round the side, and then
+        // the mouth goes before the eyes rather than sliding round the edge of
+        // the head as a "v".
+        const mouthShown = r.mouthVisible ? '' : 'none';
+        if (mouth.current && written.current.mouthV !== mouthShown) {
+          written.current.mouthV = mouthShown;
+          mouth.current.style.display = mouthShown;
+        }
         const eyes = [eyeA.current, eyeB.current];
         for (let i = 0; i < 2; i++) {
           const node = eyes[i];
@@ -147,6 +164,22 @@ const BloubHome = React.forwardRef<CharacterHandle, Props>(function BloubHome({ 
           <stop offset="0" stopColor="#8f9a63" stopOpacity="0.16" />
           <stop offset="1" stopColor="#8f9a63" stopOpacity="0" />
         </radialGradient>
+        {/*
+          THE BODY'S OWN OUTLINE, AS A CLIP FOR THE FACE.
+
+          No ordinary look takes an eye anywhere near the silhouette (the gaze
+          clamp keeps 2.8 units of body round the ink). The intro's turn does,
+          on purpose: like the owner's reference, the eyes slide right up to
+          the edge and are CUT OFF by it as they go round, rather than
+          shrinking to nothing short of it. This is what cuts them — and what
+          guarantees that no state, at any size, can ever draw an eye outside
+          the ball. A <path> written with the body every frame, not a <use> of
+          it: an engine that cannot resolve the reference would clip the whole
+          face away.
+        */}
+        <clipPath id={clip}>
+          <path ref={outline} d={FIRST.body} />
+        </clipPath>
       </defs>
 
       {/* No stroke. The brief is explicit that the character has no outer
@@ -168,19 +201,31 @@ const BloubHome = React.forwardRef<CharacterHandle, Props>(function BloubHome({ 
           The eyes did not glow, the body around them did. What actually makes
           the cream sit IN the olive is already here and costs nothing — the
           fill gradient behind them and the gloss lens passing over their tops. */}
-      <ellipse ref={eyeA} data-bloub-eye="0" rx={FIRST.eyes[0].rx} ry={FIRST.eyes[0].ry} transform={FIRST.eyes[0].matrix} fill="#f7efda" />
-      <ellipse ref={eyeB} data-bloub-eye="1" rx={FIRST.eyes[1].rx} ry={FIRST.eyes[1].ry} transform={FIRST.eyes[1].matrix} fill="#f7efda" />
+      {/* THE WASH: the page's own colour over the body and under the face,
+          at rest invisible. Only the boot entrance animates it
+          (character/entrance.ts), from pale to nothing, so the first
+          appearance is a PALE ball — solid against the page, as in the
+          owner's reference — rather than a see-through one with the page's
+          buttons showing through it. The face stays on top, as the
+          reference's white eyes do. */}
+      <rect data-bloub-wash x="0" y="0" width="100" height="100" clipPath={`url(#${clip})`}
+        opacity="0" style={{ fill: 'var(--color-canvas, #e3dacb)' }} />
 
-      <path
-        ref={mouth}
-        data-bloub-mouth
-        d={FIRST.mouth}
-        fill="none"
-        stroke="#f7efda"
-        strokeOpacity="0.92"
-        strokeWidth={FIRST.mouthWeight}
-        strokeLinecap="round"
-      />
+      <g data-bloub-face clipPath={`url(#${clip})`}>
+        <ellipse ref={eyeA} data-bloub-eye="0" rx={FIRST.eyes[0].rx} ry={FIRST.eyes[0].ry} transform={FIRST.eyes[0].matrix} fill="#f7efda" />
+        <ellipse ref={eyeB} data-bloub-eye="1" rx={FIRST.eyes[1].rx} ry={FIRST.eyes[1].ry} transform={FIRST.eyes[1].matrix} fill="#f7efda" />
+
+        <path
+          ref={mouth}
+          data-bloub-mouth
+          d={FIRST.mouth}
+          fill="none"
+          stroke="#f7efda"
+          strokeOpacity="0.92"
+          strokeWidth={FIRST.mouthWeight}
+          strokeLinecap="round"
+        />
+      </g>
 
       {/* Unread work waiting. The only mark the character wears that is not
           part of its face — everything else it has to say, it says with the

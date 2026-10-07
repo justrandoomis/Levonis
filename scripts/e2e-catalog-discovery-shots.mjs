@@ -118,8 +118,12 @@ const SCENES = [
 async function settle(page) {
   await page
     .waitForFunction(() => {
+      // Docked is no longer "the page's data is in": the character leaves the
+      // centre after its intro and shows a slow request with its face from the
+      // dock. So wait for both — docked, and no longer wearing the loading face.
       const intro = document.querySelector('.lv-app-intro');
-      return !intro || ['docked', 'hidden'].includes(intro.getAttribute('data-phase') ?? '');
+      return !intro || (['docked', 'hidden'].includes(intro.getAttribute('data-phase') ?? '')
+        && intro.getAttribute('data-mascot-state') !== 'loading');
     }, null, { timeout: 20000 })
     .catch(() => {});
 }

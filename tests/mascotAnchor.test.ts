@@ -159,8 +159,11 @@ test('every refusal to dock has a deadline', () => {
   // settled left it parked there for the life of the tab, re-centring itself
   // on every resize. A UI state with an unbounded lifetime is a hang.
   const src = code('src/components/bloub/AppIntro.tsx');
-  for (const deadline of ['BOOT_PIN_MAX_MS', 'HANDOFF_MAX_MS', 'ORPHAN_GRACE_MS']) {
-    assert.match(src, new RegExp(`const ${deadline} = \\d+`), `${deadline} must be a named constant`);
+  for (const deadline of ['BOOT_PIN_MAX_MS', 'BOOT_SHELL_MAX_MS', 'BOOT_WAIT_MAX_MS', 'HANDOFF_MAX_MS', 'ORPHAN_GRACE_MS']) {
+    // A literal, or — for the boot pin, which is the intro's own length — a
+    // value derived from the engine's named constant, never an inline number
+    // buried in the refusal.
+    assert.match(src, new RegExp(`const ${deadline} = (\\d+|Math\\.round\\([A-Z_]+ \\* 1000\\));`), `${deadline} must be a named constant`);
     assert.ok(src.split(deadline).length > 2, `${deadline} is declared but never consulted`);
   }
   assert.match(src, /remeasureAfter/, 'a refusal has to wake itself up again');
