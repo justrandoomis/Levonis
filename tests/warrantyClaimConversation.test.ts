@@ -195,6 +195,11 @@ test('a stage move tells the claimant where the claim stands — with the reason
     assert.equal(rows[0].link, `/warranty?claim=${claimId}`);
     assert.match(rows[0].body_ar, /مرفوضة/);
     assert.match(rows[0].body_ar, /metal tool/, 'the customer is owed the reason, behind their login');
+    // The bell's Sorani uses the claim card's own stage word, and keeps the reason.
+    const ckb = JSON.parse(all<{ meta: string }>(raw, "SELECT meta FROM user_notifications WHERE kind = 'warranty_stage'")[0].meta);
+    assert.equal(ckb.title_ckb, 'نوێکارییەک لەسەر داواکاریی گەرەنتی');
+    assert.match(ckb.body_ckb, /ڕەتکراوەتەوە/);
+    assert.match(ckb.body_ckb, /هۆکار: The nozzle was forced with a metal tool/);
 
     const out = outboxFor(raw, `claim.stage:${claimId}:rejected:`);
     assert.ok(out.length >= 1, 'the decision reaches the claimant outside the site too');

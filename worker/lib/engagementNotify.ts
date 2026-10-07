@@ -112,14 +112,9 @@ const COPY = {
     offerTitle: 'ئۆفەرێکی نوێ بۆ داواکاریەکەت',
     totalLabel: 'کۆی گشتی',
     feeLabel: 'لەوە بۆ گەیاندن',
-    // OWNER: the Sorani for the three complaint lines is yours to write by
-    // hand. They carry the ARABIC text on purpose — no Kurdish is generated
-    // here, and Arabic is the closer of the two for a Sorani reader (the same
-    // choice src/components/notifications/NotificationBell.tsx already makes
-    // when it falls back).
-    complaintSubject: (id: string) => `رد على شكواك ${id}`, // OWNER: Sorani by hand.
-    complaintShort: (id: string) => `وصلك رد من إدارة \u2068Levonis\u2069 على شكواك ${id}. افتح «تذاكري» في صفحة الدعم لقراءته.`, // OWNER: Sorani by hand.
-    complaintTitle: 'رد على شكواك', // OWNER: Sorani by hand.
+    complaintSubject: (id: string) => `وەڵامێک بۆ سکاڵاکەت ${id}`,
+    complaintShort: (id: string) => `ئیدارەی \u2068Levonis\u2069 وەڵامی سکاڵاکەتی ${id} دایەوە. لە پەڕەی پشتگیری «تیکێتەکانم» بکەرەوە بۆ خوێندنەوەی.`,
+    complaintTitle: 'وەڵامێک بۆ سکاڵاکەت',
   },
 } as const;
 
@@ -314,6 +309,7 @@ export async function notifyComplaintReply(
       // attachment-only reply has no text, so it says an answer arrived.
       body_ar: replyText || COPY.ar.complaintShort(complaint.id),
       body_en: replyText || COPY.en.complaintShort(complaint.id),
+      meta: { title_ckb: COPY.ckb.complaintTitle, body_ckb: replyText || COPY.ckb.complaintShort(complaint.id) },
       /**
        * THE THREAD, NOW THAT THERE IS ONE. This was '' because no customer
        * screen read a complaint, and the bell clamps a body to two lines — so
@@ -357,7 +353,7 @@ export function warrantyClaimLink(claimId: string): string {
  * (src/components/warranty/strings.ts `stageLabels`), so the message and the
  * screen it opens say the same word for the same step.
  */
-const CLAIM_STAGE_LABEL: Record<'ar' | 'en', Record<string, string>> = {
+const CLAIM_STAGE_LABEL: Record<EmailLang, Record<string, string>> = {
   ar: {
     received: 'مُستلَمة',
     diagnosing: 'قيد الفحص',
@@ -376,6 +372,15 @@ const CLAIM_STAGE_LABEL: Record<'ar' | 'en', Record<string, string>> = {
     replaced: 'Replacement',
     resolved: 'Resolved',
   },
+  ckb: {
+    received: 'وەرگیراوە',
+    diagnosing: 'لە پشکنیندایە',
+    approved: 'پەسەندکراوە',
+    rejected: 'ڕەتکراوەتەوە',
+    repairing: 'لە چاککردنەوەدایە',
+    replaced: 'گۆڕدراوەتەوە',
+    resolved: 'تەواوبووە',
+  },
 };
 
 /**
@@ -385,9 +390,6 @@ const CLAIM_STAGE_LABEL: Record<'ar' | 'en', Record<string, string>> = {
  * subject and the printer. The printer's name is the identifier they will
  * recognise on a lock screen, and unlike the subject it is not their own
  * prose travelling through a third party.
- *
- * Sorani carries the ARABIC text on purpose, exactly as the complaint lines
- * above do: no Kurdish sentence is generated here. OWNER: Sorani by hand.
  */
 const CLAIM_COPY = {
   ar: {
@@ -410,12 +412,20 @@ const CLAIM_COPY = {
     stageSubject: (p: string) => `Warranty claim update — ${p}`,
     reasonLabel: 'Reason',
   },
+  ckb: {
+    replyTitle: 'وەڵامێک لە تیمی گەرەنتی',
+    replyBody: (p: string) => `تیمی گەرەنتی وەڵامی داواکارییەکەتی دایەوە دەربارەی «${p}». لە ناوەندی گەرەنتی «داواکارییەکانم» بکەرەوە بۆ خوێندنەوە و وەڵامدانەوەی.`,
+    replySubject: (p: string) => `وەڵام لەسەر داواکاریی گەرەنتی — ${p}`,
+    stageTitle: 'نوێکارییەک لەسەر داواکاریی گەرەنتی',
+    stageBody: (p: string, label: string) => `داواکارییەکەت دەربارەی «${p}» بوو بە: ${label}.`,
+    stageOpen: 'لە ناوەندی گەرەنتی «داواکارییەکانم» بکەرەوە بۆ وردەکاری.',
+    stageSubject: (p: string) => `نوێکاری لەسەر داواکاریی گەرەنتی — ${p}`,
+    reasonLabel: 'هۆکار',
+  },
 } as const;
 
-/** 'ckb' reads the Arabic copy — see CLAIM_COPY. */
-const claimCopyFor = (lang: EmailLang) => (lang === 'en' ? CLAIM_COPY.en : CLAIM_COPY.ar);
-const claimStageLabelFor = (lang: EmailLang, stage: string) =>
-  (lang === 'en' ? CLAIM_STAGE_LABEL.en : CLAIM_STAGE_LABEL.ar)[stage] ?? stage;
+const claimCopyFor = (lang: EmailLang) => CLAIM_COPY[lang];
+const claimStageLabelFor = (lang: EmailLang, stage: string) => CLAIM_STAGE_LABEL[lang][stage] ?? stage;
 
 interface ClaimHead {
   id: string;
@@ -467,7 +477,7 @@ export async function notifyClaimReply(env: Env, claimId: string, messageId: str
     const product = claimProduct(head);
     const eventKey = `claim.reply:${messageId}`;
     // The in-app row first and unconditionally — the floor for a customer with
-    // no linked channel. Sorani falls back to the Arabic in the bell.
+    // no linked channel; its Sorani rides in meta for the bell.
     await notify(env.DB, {
       userId: head.user_id,
       kind: 'warranty_reply',
@@ -475,6 +485,7 @@ export async function notifyClaimReply(env: Env, claimId: string, messageId: str
       title_en: CLAIM_COPY.en.replyTitle,
       body_ar: CLAIM_COPY.ar.replyBody(product),
       body_en: CLAIM_COPY.en.replyBody(product),
+      meta: { title_ckb: CLAIM_COPY.ckb.replyTitle, body_ckb: CLAIM_COPY.ckb.replyBody(product) },
       link: warrantyClaimLink(head.id),
       entity_type: 'claim',
       entity_id: head.id,
@@ -516,7 +527,7 @@ export async function notifyClaimStage(
     const product = claimProduct(head);
     const reason = String(opts.reason ?? '').trim();
     const eventKey = `claim.stage:${head.id}:${stage}:${opts.at}`;
-    const inApp = (lang: 'ar' | 'en') => {
+    const inApp = (lang: EmailLang) => {
       const c = CLAIM_COPY[lang];
       const line = c.stageBody(product, CLAIM_STAGE_LABEL[lang][stage] ?? stage);
       return reason ? `${line} ${c.reasonLabel}: ${reason}` : line;
@@ -531,7 +542,7 @@ export async function notifyClaimStage(
       link: warrantyClaimLink(head.id),
       entity_type: 'claim',
       entity_id: head.id,
-      meta: { stage },
+      meta: { stage, title_ckb: CLAIM_COPY.ckb.stageTitle, body_ckb: inApp('ckb') },
       eventKey,
     });
     const lang = await localeOf(env, head.user_id);

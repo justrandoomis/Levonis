@@ -753,7 +753,7 @@ async function fireGroup(
     body: chatBody,
     // Only when APP_ORIGIN is configured: a relative path in a WhatsApp message
     // is text, not a link, and a half-built absolute URL is worse than none.
-    details: url ? [{ label: lang === 'en' ? 'Link' : 'الرابط', value: url }] : undefined,
+    details: url ? [{ label: lang === 'en' ? 'Link' : lang === 'ckb' ? 'بەستەر' : 'الرابط', value: url }] : undefined,
   };
 
   const firedAt = now;
@@ -785,7 +785,7 @@ async function fireGroup(
       link: path,
       entity_type: 'product',
       entity_id: group.product_id,
-      meta: { alert_ids: mine.map((m) => m.row.id) },
+      meta: { alert_ids: mine.map((m) => m.row.id), title_ckb: title.ckb, body_ckb: body.ckb },
       eventKey: base,
     }).stmt
   );

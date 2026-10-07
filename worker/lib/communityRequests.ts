@@ -367,7 +367,12 @@ export async function staleOfferNotifications(
         link: merchantHref.request(requestId),
         entity_type: 'offer',
         entity_id: o.id,
-        meta: { request_id: requestId, revision },
+        meta: {
+          request_id: requestId,
+          revision,
+          title_ckb: 'ئەو داواکارییەی ئۆفەرت لەسەر پێشکەش کردبوو گۆڕا',
+          body_ckb: `کڕیارەکە دوای ئۆفەرەکەت وردەکارییەکانی داواکاریی ${requestId}ی گۆڕی، بۆیە ئۆفەرەکەت چیتر قبوڵ ناکرێت. گۆڕانکارییەکە ببینە، پاشان ئۆفەرەکەت پشتڕاست بکەرەوە، دەستکاری بکە یان بیکشێنەرەوە.`,
+        },
         eventKey: `offer_stale:${o.id}:${revision}`,
       }).stmt
   );

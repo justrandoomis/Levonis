@@ -786,6 +786,10 @@ async function askConsent(env: Env, postId: string, customerId: string, authorNa
     title_en: 'A workshop wants to show your part in its portfolio',
     body_ar: `${authorName}: «${title}» — افتح لتوافق أو ترفض.`,
     body_en: `${authorName}: “${title}” — open to allow or decline.`,
+    meta: {
+      title_ckb: 'وۆرکشۆپێک دەیەوێت پارچەکەت لە پێشانگای کارەکانیدا پیشان بدات',
+      body_ckb: `${authorName}: «${title}» — بیکەرەوە بۆ ڕازیبوون یان ڕەتکردنەوە.`,
+    },
     link: postHref(postId),
     entity_type: 'community_post',
     entity_id: postId,
@@ -1065,6 +1069,10 @@ communityPostRoutes.post('/posts/:id/consent', requireAuth, async (c) => {
     title_en: decision === 'granted' ? 'The customer allowed showing their part' : 'The customer declined to have their part shown',
     body_ar: decision === 'granted' ? 'يمكنك نشر المشروع الآن.' : 'أزل ربط الطلب أو الصور لتنشر المشروع.',
     body_en: decision === 'granted' ? 'You can publish the project now.' : 'Unlink the job or its pictures to publish.',
+    meta: {
+      title_ckb: decision === 'granted' ? 'کڕیارەکە ڕازی بوو پارچەکەی پیشان بدرێت' : 'کڕیارەکە ڕازی نەبوو پارچەکەی پیشان بدرێت',
+      body_ckb: decision === 'granted' ? 'ئێستا دەتوانیت پڕۆژەکە بڵاو بکەیتەوە.' : 'بۆ بڵاوکردنەوەی پڕۆژەکە، بەستنەوەی داواکارییەکە یان وێنەکان لاببە.',
+    },
     link: postHref(id),
     entity_type: 'community_post',
     entity_id: id,

@@ -262,7 +262,11 @@ export async function proposePriceAdjustment(env: Env, input: ProposeInput): Pro
     link: orderPath(input.orderId),
     entity_type: 'order',
     entity_id: input.orderId,
-    meta: { price_adjustment_id: id },
+    meta: {
+      price_adjustment_id: id,
+      title_ckb: `پێویستە نرخی نوێی داواکاریی ${input.orderId} پەسەند بکەیت`,
+      body_ckb: `${iqdText(plan.oldTotalIqd, 'ckb')} ← ${iqdText(plan.newTotalIqd, 'ckb')} — ${input.reason}`,
+    },
     eventKey: `order.price_adjust:${id}`,
   });
 
@@ -681,11 +685,7 @@ export function iqdText(n: number, lang: EmailLang | 'ar' | 'en'): string {
   return lang === 'en' ? `${v} IQD` : `${v} د.ع`;
 }
 
-/**
- * The customer's copy. Arabic and English only: Sorani is never
- * machine-written (docs/DECISIONS.md row 11) — a ckb reader gets the Arabic.
- * OWNER: Sorani to be written by hand.
- */
+/** The customer's copy, in the three languages the customer may read. */
 const CUSTOMER_COPY = {
   ar: {
     subject: (o: string) => `مطلوب موافقتك على السعر الجديد لطلبك ${o}`,
@@ -711,9 +711,21 @@ const CUSTOMER_COPY = {
     reject: '✖️ Reject',
     open: '🔗 Open the order',
   },
+  ckb: {
+    subject: (o: string) => `پێویستە نرخی نوێی داواکاریی ${o} پەسەند بکەیت`,
+    body: (o: string, from: string, to: string, reason: string) =>
+      `نرخی کۆتایی داواکاریی ${o} لە ${from} گۆڕدرا بۆ ${to}.\nهۆکار: ${reason}\nتا نرخە نوێیەکە پەسەند نەکەیت یان ڕەتی نەکەیتەوە، ئامادەکردنی داواکارییەکە بەردەوام نابێت.`,
+    due: 'پارەی کاتی وەرگرتن دوای پەسەندکردن',
+    refund: 'دەگەڕێتەوە بۆ جزدانەکەت',
+    note: 'وردەکاری',
+    cta: 'نرخەکە ببینە و پەسەندی بکە',
+    approve: '✅ نرخە نوێیەکە پەسەند دەکەم',
+    reject: '✖️ ڕەتکردنەوە',
+    open: '🔗 کردنەوەی داواکارییەکە',
+  },
 } as const;
 
-const copyFor = (lang: EmailLang) => CUSTOMER_COPY[lang === 'en' ? 'en' : 'ar'];
+const copyFor = (lang: EmailLang) => CUSTOMER_COPY[lang];
 
 /** Telegram refuses callback_data over 64 bytes; ours is ~34. */
 export const PRICE_CALLBACK_PREFIX = 'pa:';
@@ -819,17 +831,20 @@ export async function notifyCustomerOfProposal(env: Env, a: PriceAdjustmentRow):
 
 /** The line a decided Telegram prompt ends with. */
 function outcomeStamp(a: PriceAdjustmentRow, lang: EmailLang): string {
-  const en = lang === 'en';
-  const L = en ? 'en' : 'ar';
+  const pick = (ar: string, en: string, ckb: string) => (lang === 'en' ? en : lang === 'ckb' ? ckb : ar);
   switch (a.state) {
-    case 'approved':
-      return en ? `✅ Approved — the new total is ${iqdText(a.new_total_iqd, L)}.` : `✅ تمت الموافقة — الإجمالي الجديد ${iqdText(a.new_total_iqd, L)}.`;
-    case 'rejected':
-      return en ? `✖️ Rejected — the order stays at ${iqdText(a.old_total_iqd, L)}.` : `✖️ تم الرفض — بقي الطلب على ${iqdText(a.old_total_iqd, L)}.`;
+    case 'approved': {
+      const total = iqdText(a.new_total_iqd, lang);
+      return pick(`✅ تمت الموافقة — الإجمالي الجديد ${total}.`, `✅ Approved — the new total is ${total}.`, `✅ پەسەند کرا — کۆی گشتیی نوێ ${total}.`);
+    }
+    case 'rejected': {
+      const total = iqdText(a.old_total_iqd, lang);
+      return pick(`✖️ تم الرفض — بقي الطلب على ${total}.`, `✖️ Rejected — the order stays at ${total}.`, `✖️ ڕەت کرایەوە — داواکارییەکە لەسەر ${total} مایەوە.`);
+    }
     case 'withdrawn':
-      return en ? 'The shop withdrew this price proposal.' : 'سحب المتجر اقتراح السعر هذا.';
+      return pick('سحب المتجر اقتراح السعر هذا.', 'The shop withdrew this price proposal.', 'فرۆشگاکە ئەم پێشنیاری نرخەی کشاندەوە.');
     default:
-      return en ? 'This proposal is closed.' : 'أُغلق هذا الاقتراح.';
+      return pick('أُغلق هذا الاقتراح.', 'This proposal is closed.', 'ئەم پێشنیارە داخرا.');
   }
 }
 
@@ -936,7 +951,7 @@ export async function handlePriceAdjustCallback(env: Env, cb: PriceCallback): Pr
   const chatId = cb.message?.chat?.id;
   const messageId = cb.message?.message_id;
   if (!parsed || fromId === null || typeof chatId !== 'number' || typeof messageId !== 'number') {
-    if (cb.id) await answerCallbackQuery(env, cb.id, 'زر غير صالح.', true);
+    if (cb.id) await answerCallbackQuery(env, cb.id, 'زر غير صالح. / Invalid button. / دوگمەکە دروست نییە.', true);
     return 'ignored';
   }
   const a = await loadAdjustment(env.DB, parsed.adjustmentId);
@@ -949,7 +964,7 @@ export async function handlePriceAdjustCallback(env: Env, cb: PriceCallback): Pr
         .first<{ user_id: string }>()
     : null;
   if (!a || !owner) {
-    await answerCallbackQuery(env, cb.id, 'هذا الزر لصاحب الطلب فقط. / This button is for the order’s owner only.', true);
+    await answerCallbackQuery(env, cb.id, 'هذا الزر لصاحب الطلب فقط. / This button is for the order’s owner only. / ئەم دوگمەیە تەنها بۆ خاوەنی داواکارییەکەیە.', true);
     await auditStatements(env.DB, null, 'order.price_adjust.telegram_denied', a?.order_id ?? parsed.adjustmentId, {
       adjustment_id: parsed.adjustmentId,
       telegram_user_id: fromId,
@@ -960,7 +975,6 @@ export async function handlePriceAdjustCallback(env: Env, cb: PriceCallback): Pr
     return a ? 'not_owner' : 'not_found';
   }
   const lang = await customerLang(env, a.user_id);
-  const en = lang === 'en';
   const original = typeof cb.message?.text === 'string' && cb.message.text ? cb.message.text : undefined;
 
   let res: DecideOutcome;
@@ -973,7 +987,12 @@ export async function handlePriceAdjustCallback(env: Env, cb: PriceCallback): Pr
     });
   } catch (e) {
     if (e instanceof PriceAdjustError && e.code === 'PRICE_ADJUST_STALE') {
-      await answerCallbackQuery(env, cb.id, en ? 'The order changed — open it on the site.' : 'تغيّر الطلب — افتحه في الموقع.', true);
+      await answerCallbackQuery(
+        env,
+        cb.id,
+        lang === 'en' ? 'The order changed — open it on the site.' : lang === 'ckb' ? 'داواکارییەکە گۆڕا — لە ماڵپەڕەکەدا بیکەرەوە.' : 'تغيّر الطلب — افتحه في الموقع.',
+        true
+      );
       return 'stale';
     }
     throw e;

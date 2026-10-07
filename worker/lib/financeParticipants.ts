@@ -238,7 +238,7 @@ export async function changeWithdrawalState(db: D1Database, id: string, actor: s
     statements.push(db.prepare("UPDATE finance_order_costs SET state='approved' WHERE state='due' AND id IN (SELECT source_id FROM finance_withdrawal_allocations WHERE withdrawal_id=? AND source_kind='staff')").bind(id));
   }
 
-  statements.push(notifyStatement(db,{userId:w.user_id,kind:action==='approve'?'payout_available':'payout_failed',title_ar:action==='approve'?'اعتماد طلب سحب الأرباح':'تحديث طلب سحب الأرباح',title_en:'Earnings withdrawal updated',body_ar:action==='approve'?'تم اعتماد الطلب وهو بانتظار التسديد':'أعيد المبلغ غير المسدد إلى الرصيد المتاح',link:'/earnings',entity_type:'payout',entity_id:id,eventKey:`finance-withdrawal:${id}:${state}`}).stmt,
+  statements.push(notifyStatement(db,{userId:w.user_id,kind:action==='approve'?'payout_available':'payout_failed',title_ar:action==='approve'?'اعتماد طلب سحب الأرباح':'تحديث طلب سحب الأرباح',title_en:'Earnings withdrawal updated',body_ar:action==='approve'?'تم اعتماد الطلب وهو بانتظار التسديد':'أعيد المبلغ غير المسدد إلى الرصيد المتاح',meta:{title_ckb:action==='approve'?'داواکاریی ڕاکێشانی قازانج پەسەند کرا':'نوێکاری لەسەر داواکاریی ڕاکێشانی قازانج',body_ckb:action==='approve'?'داواکارییەکە پەسەند کرا و چاوەڕێی پارەدانە':'ئەو بڕەی نەدرابوو گەڕایەوە بۆ باڵانسی بەردەست'},link:'/earnings',entity_type:'payout',entity_id:id,eventKey:`finance-withdrawal:${id}:${state}`}).stmt,
     ...(await auditStatements(db,actor,`finance.withdrawal_${state}`,id,{note})).statements);
   await commitParticipantStatements(db,statements); return {already:false};
 }
@@ -291,7 +291,7 @@ export async function payWithdrawal(db: D1Database, actor: string, withdrawalId:
     db.prepare("UPDATE finance_withdrawals SET paid_iqd=paid_iqd+?,state=CASE WHEN paid_iqd+?=amount_iqd THEN 'paid' ELSE 'part_paid' END,version=version+1,updated_at=?,reference=?,receipt_url=? WHERE id=?").bind(amount,amount,now,input.reference,input.receipt_url,withdrawalId),
     ...paymentLines.map(line=>db.prepare('INSERT INTO finance_withdrawal_payment_lines(payment_id,source_kind,source_id,amount_iqd) VALUES (?,?,?,?)').bind(input.id,line.kind,line.source,line.amount)),
     ...journalPlan(db,{key:`earnings-withdrawal:${input.id}`,day,title:'تسديد أرباح مستحقة',source:'finance_withdrawal',sourceId:withdrawalId,actor},[...Array.from(journalTotals,([account,debit])=>({account,debit})),{account:'1000',credit:amount}]).statements,
-    notifyStatement(db,{userId:w.user_id,kind:'payout_paid',title_ar:'تم تسديد أرباحك',title_en:'Earnings paid',body_ar:`تم تسديد ${amount.toLocaleString('en-US')} د.ع`,link:'/earnings',entity_type:'payout',entity_id:withdrawalId,eventKey:`finance-withdrawal-paid:${input.id}`}).stmt,
+    notifyStatement(db,{userId:w.user_id,kind:'payout_paid',title_ar:'تم تسديد أرباحك',title_en:'Earnings paid',body_ar:`تم تسديد ${amount.toLocaleString('en-US')} د.ع`,meta:{title_ckb:'قازانجەکەت درا',body_ckb:`${amount.toLocaleString('en-US')} د.ع درا`},link:'/earnings',entity_type:'payout',entity_id:withdrawalId,eventKey:`finance-withdrawal-paid:${input.id}`}).stmt,
     ...(await auditStatements(db,actor,'finance.withdrawal_paid',withdrawalId,{amount_iqd:amount,reference:input.reference,receipt_url:input.receipt_url})).statements);
   await commitParticipantStatements(db,statements);return {already:false};
 }

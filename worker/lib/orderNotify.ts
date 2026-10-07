@@ -185,12 +185,12 @@ interface OrderRow extends NotifyLangRow {
  * A STORE ORDER'S DELIVERED LINE (review F7). A community store's order earns
  * no Levonis review points, and its money waits for the customer's «استلمت
  * طلبي» (or three days) — so the line asks for THAT, promises nothing, and
- * opens the order itself. Sorani: the Arabic, until the owner writes it by
- * hand (DECISIONS row 11). OWNER: Sorani to be written by hand.
+ * opens the order itself — in the three languages.
  */
 const STORE_DELIVERED = {
   ar: { line: (order: string) => `وصل طلبك ${order}. استلمت طلبك؟ أكّد الاستلام.`, cta: 'أكّد الاستلام' },
   en: { line: (order: string) => `Order ${order} was delivered. Got your order? Confirm receipt.`, cta: 'Confirm receipt' },
+  ckb: { line: (order: string) => `داواکارییەکەت ${order} گەیشت. وەرتگرت؟ وەرگرتن پشتڕاست بکەرەوە.`, cta: 'وەرگرتن پشتڕاست بکەرەوە' },
 } as const;
 
 function storeOrderPath(orderId: string): string {
@@ -396,8 +396,7 @@ export async function notifyOrderDelivered(env: Env, orderId: string): Promise<v
     const t = COPY[notificationLang(row)];
     const eventKey = `order.status.delivered:${row.id}`;
     if (row.seller_type === 'merchant') {
-      const lang = notificationLang(row);
-      const copy = lang === 'en' ? STORE_DELIVERED.en : STORE_DELIVERED.ar;
+      const copy = STORE_DELIVERED[notificationLang(row)];
       const path = storeOrderPath(row.id);
       const origin = (env.APP_ORIGIN || '').trim().replace(/\/+$/, '');
       await notify(env.DB, {
@@ -405,6 +404,7 @@ export async function notifyOrderDelivered(env: Env, orderId: string): Promise<v
         kind: 'order_update',
         title_ar: STORE_DELIVERED.ar.line(row.id),
         title_en: STORE_DELIVERED.en.line(row.id),
+        meta: { title_ckb: STORE_DELIVERED.ckb.line(row.id) },
         link: path,
         entity_type: 'order',
         entity_id: row.id,
@@ -427,8 +427,7 @@ export async function notifyOrderDelivered(env: Env, orderId: string): Promise<v
     // The title is the whole line and the body is empty: it is already one
     // short sentence, and splitting it would only repeat half of it. Stored in
     // ar/en, with the same line's Sorani in `meta.title_ckb` because the
-    // columns have no Sorani pair; the bell reads it, and a notice without one
-    // falls back to the Arabic, deliberately, never to the English.
+    // columns have no Sorani pair; the bell reads it.
     await notify(env.DB, {
       userId: row.user_id,
       kind: 'order_update',

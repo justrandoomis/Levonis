@@ -141,6 +141,14 @@ test('F4: start and delivered reach the customer once each; delivered names «أ
   assert.match(title_ar, /أكّد الاستلام/);
   assert.ok(d.auto_complete_at, 'the owner set five days');
   assert.match(delivered[0].body_en, /completes automatically on \d{1,2} \w+/);
+  // Both rows say it in Sorani too, the date included.
+  for (const key of [`custom_order:${a.orderId}:started`, `custom_order:${a.orderId}:delivered`]) {
+    const meta = JSON.parse(row<{ meta: string }>(raw, 'SELECT meta FROM user_notifications WHERE event_key = ?', key)!.meta);
+    assert.ok(meta.title_ckb && meta.body_ckb, `${key} has its Sorani`);
+  }
+  const deliveredCkb = JSON.parse(row<{ meta: string }>(raw, 'SELECT meta FROM user_notifications WHERE event_key = ?', `custom_order:${a.orderId}:delivered`)!.meta);
+  assert.match(deliveredCkb.body_ckb, /وەرگرتن پشتڕاست بکەرەوە/);
+  assert.match(deliveredCkb.body_ckb, /بە خۆکاری تەواو دەبێت/);
 });
 
 test('F4 + F9 + F12: a merchant dispute, then a partial refund — both told, the money announced, the job counted as completed at the kept part', async () => {

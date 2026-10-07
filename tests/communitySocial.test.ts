@@ -113,6 +113,7 @@ test('a like is a row: PUT twice → 1, DELETE twice → 0, the counter is the t
   // The stub session carries no display name, so the actor reads as the handle.
   assert.equal(heard[0].title_en, 'eve liked your project “Articulated dragon”');
   assert.equal(JSON.parse(heard[0].meta).count, 1);
+  assert.equal(JSON.parse(heard[0].meta).title_ckb, 'eve حەزی لە پڕۆژەکەت «Articulated dragon» کرد', 'the bell has its Sorani');
   // Liking one's own post says nothing to oneself.
   await put(as(raw, SARA), `/api/community/posts/${id}/like`);
   assert.equal(notes(raw, 'sara', 'post_liked').length, 1);
@@ -134,6 +135,7 @@ test('a burst of likes is ONE notification whose count climbs, retitled, and bac
   assert.equal(meta.last_actor.id, 'omar');
   assert.equal(heard[0].title_en, '3 people liked your project “Articulated dragon”');
   assert.equal(heard[0].title_ar, 'أعجب 3 أشخاص بمشروعك «Articulated dragon»');
+  assert.equal(meta.title_ckb, '3 کەس حەزیان لە پڕۆژەکەت «Articulated dragon» کرد', 'the Sorani names the same count');
   assert.equal(heard[0].read_at, null, 'the row came back unread');
   assert.equal(heard[0].event_key, `post_liked:${id}`);
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = 'sara'"), 1);
@@ -191,6 +193,8 @@ test('comment ownership: the author removes their own, the post\'s author remove
   // The post's author hears «علّق» once per burst; the one replied to hears «ردّ».
   assert.equal(JSON.parse(notes(raw, 'sara', 'post_commented')[0].meta).count, 2);
   assert.equal(notes(raw, 'eve', 'comment_replied')[0].title_en, 'ali replied to your comment');
+  assert.equal(JSON.parse(notes(raw, 'eve', 'comment_replied')[0].meta).title_ckb, 'ali وەڵامی کۆمێنتەکەتی دایەوە');
+  assert.match(JSON.parse(notes(raw, 'sara', 'post_commented')[0].meta).title_ckb, /^2 کەس کۆمێنتیان لەسەر پڕۆژەکەت/);
   // A reply to a reply is filed under the thread's root.
   ageComments(raw);
   const deep = await post(as(raw, OMAR), `/api/community/posts/${id}/comments`, { body: 'Same question', parent_id: c2.id });
@@ -269,6 +273,7 @@ test('follow: a row, a page, never oneself; the target hears once per burst', as
   assert.equal(heard.length, 1);
   assert.equal(JSON.parse(heard[0].meta).count, 2);
   assert.equal(heard[0].title_ar, 'بدأ شخصان بمتابعتك');
+  assert.equal(JSON.parse(heard[0].meta).title_ckb, '2 کەس دەستیان کرد بە شوێنکەوتنی تۆ');
 
   // The creator page and the list carry the numbers and the viewer's mark.
   const page = (await json(await get(as(raw, EVE), '/api/community/creators/sara'))).creator;

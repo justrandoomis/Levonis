@@ -42,7 +42,7 @@ import { requireAuth, badRequest, notFound, unauthorized, str, int, oneOf, jsonO
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
-import { notifyGrouped, peopleAr } from '../lib/notifications';
+import { notifyGrouped, peopleAr, stampGroupedCkb } from '../lib/notifications';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { feedCursor } from '../lib/feedCursor';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
@@ -116,7 +116,7 @@ communitySocialRoutes.put('/posts/:id/like', requireAuth, async (c) => {
   const res = await c.env.DB.prepare('INSERT OR IGNORE INTO community_likes (user_id, post_id) VALUES (?, ?)').bind(user.id, id).run();
   if (res.meta.changes > 0 && p.author_id !== user.id && !(await mutedBy(c.env.DB, p.author_id, user.id))) {
     const title = String(p.title ?? '');
-    await notifyGrouped(c.env.DB, {
+    const written = await notifyGrouped(c.env.DB, {
       userId: p.author_id,
       kind: 'post_liked',
       groupKey: `post_liked:${id}`,
@@ -129,6 +129,12 @@ communitySocialRoutes.put('/posts/:id/like', requireAuth, async (c) => {
       entity_type: 'community_post',
       entity_id: id,
     });
+    if (written) {
+      const who = user.name || user.username || '';
+      await stampGroupedCkb(c.env.DB, written.id, {
+        title_ckb: written.count === 1 ? `${who} حەزی لە پڕۆژەکەت ${quoteAr(title)} کرد` : `${written.count} کەس حەزیان لە پڕۆژەکەت ${quoteAr(title)} کرد`,
+      });
+    }
   }
   const counts = await postCounts(c, id);
   return c.json({ success: true, liked: true, likes: counts.likes });
@@ -396,7 +402,7 @@ communitySocialRoutes.post('/posts/:id/comments', requireAuth, async (c) => {
   // neither hears a person they muted.
   const replyTo = parent ? String(parent.author_id) : null;
   if (replyTo && replyTo !== user.id && !(await mutedBy(c.env.DB, replyTo, user.id))) {
-    await notifyGrouped(c.env.DB, {
+    const written = await notifyGrouped(c.env.DB, {
       userId: replyTo,
       kind: 'comment_replied',
       groupKey: `comment_replied:${String(parent!.id)}`,
@@ -410,9 +416,15 @@ communitySocialRoutes.post('/posts/:id/comments', requireAuth, async (c) => {
       entity_type: 'community_comment',
       entity_id: String(parent!.id),
     });
+    if (written) {
+      await stampGroupedCkb(c.env.DB, written.id, {
+        title_ckb: written.count === 1 ? `${actor.name} وەڵامی کۆمێنتەکەتی دایەوە` : `${written.count} کەس وەڵامی کۆمێنتەکەتیان دایەوە`,
+        body_ckb: excerpt,
+      });
+    }
   }
   if (postAuthor !== user.id && postAuthor !== replyTo && !(await mutedBy(c.env.DB, postAuthor, user.id))) {
-    await notifyGrouped(c.env.DB, {
+    const written = await notifyGrouped(c.env.DB, {
       userId: postAuthor,
       kind: 'post_commented',
       groupKey: `post_commented:${id}`,
@@ -426,6 +438,15 @@ communitySocialRoutes.post('/posts/:id/comments', requireAuth, async (c) => {
       entity_type: 'community_post',
       entity_id: id,
     });
+    if (written) {
+      await stampGroupedCkb(c.env.DB, written.id, {
+        title_ckb:
+          written.count === 1
+            ? `${actor.name} کۆمێنتی لەسەر پڕۆژەکەت ${quoteAr(title)} نووسی`
+            : `${written.count} کەس کۆمێنتیان لەسەر پڕۆژەکەت ${quoteAr(title)} نووسی`,
+        body_ckb: excerpt,
+      });
+    }
   }
   const made = await loadComment(c, commentId);
   return c.json({ success: true, comment: commentPublic(made!, user, postAuthor) }, 201);
@@ -486,7 +507,7 @@ communitySocialRoutes.put('/users/:id/follow', requireAuth, async (c) => {
     // The link is the follower's page only when that page exists (a customer
     // with a username has none) — never a link that lands on a 404.
     const me = personHref(await personRow(c, user.id));
-    await notifyGrouped(c.env.DB, {
+    const written = await notifyGrouped(c.env.DB, {
       userId: id,
       kind: 'new_follower',
       groupKey: `new_follower:${id}`,
@@ -499,6 +520,12 @@ communitySocialRoutes.put('/users/:id/follow', requireAuth, async (c) => {
       entity_type: 'user',
       entity_id: user.id,
     });
+    if (written) {
+      const who = user.name || user.username || '';
+      await stampGroupedCkb(c.env.DB, written.id, {
+        title_ckb: written.count === 1 ? `${who} دەستی کرد بە شوێنکەوتنی تۆ` : `${written.count} کەس دەستیان کرد بە شوێنکەوتنی تۆ`,
+      });
+    }
   }
   return c.json({ success: true, following: true, followers: await followersOf(c, id) });
 });

@@ -20,12 +20,14 @@
  *     order card and its «أكّد الاستلام» live;
  *   - is TOTAL: never throws into the route that called it.
  *
- * Sorani: ar/en only; the bell shows a Sorani reader the Arabic (DECISIONS
- * row 11). OWNER: Sorani to be written by hand.
+ * Every line is in the three languages: the in-app rows carry their Sorani in
+ * `meta.title_ckb` / `meta.body_ckb` (the columns hold ar/en), which both
+ * bells read, and the outside channels speak the customer's own language.
  */
 import type { Env } from './types';
+import type { EmailLang } from './emailTemplates';
 import { notify } from './notifications';
-import { notifyCustomer, type CustomerMessage } from './customerNotify';
+import { notifyCustomer, notificationLang, NOTIFY_LANG_SELECT, type CustomerMessage, type NotifyLangRow } from './customerNotify';
 import { notifyMerchant, notifyPayoutAvailable, type MerchantNotifyResult } from './merchantNotify';
 import { merchantHref } from '@levonis/contracts/merchantRoutes';
 
@@ -59,16 +61,30 @@ export function customOrderCustomerLink(requestId: string): string {
   return `/requests/${encodeURIComponent(requestId)}`;
 }
 
-/** «١٢ أكتوبر» / «12 Oct» — the date only, in UTC (the clock the sweep runs on). */
-function day(isoTs: string, lang: 'ar' | 'en'): string {
+/** «١٢ أكتوبر» / «12 Oct» / «تشرینی یەکەم 12» — the date only, in UTC (the clock the sweep runs on). */
+function day(isoTs: string, lang: EmailLang): string {
   const d = new Date(isoTs);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'ar-IQ-u-nu-latn', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  const locale = lang === 'en' ? 'en-GB' : lang === 'ckb' ? 'ckb-IQ-u-nu-latn' : 'ar-IQ-u-nu-latn';
+  return d.toLocaleDateString(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' });
 }
 
-async function customerLang(env: Env, userId: string): Promise<'ar' | 'en'> {
-  const row = await env.DB.prepare('SELECT locale FROM users WHERE id = ?').bind(userId).first<{ locale: string | null }>();
-  return row?.locale === 'en' ? 'en' : 'ar';
+/** The language this customer reads notices in — the rule every customer notice uses (customerNotify.ts). */
+async function customerLang(env: Env, userId: string): Promise<EmailLang> {
+  const row = await env.DB.prepare(`SELECT ${NOTIFY_LANG_SELECT} FROM users u WHERE u.id = ?`)
+    .bind(userId)
+    .first<NotifyLangRow>()
+    .catch(() => null);
+  return row ? notificationLang(row) : 'ar';
+}
+
+interface CustomerCopy {
+  title_ar: string;
+  title_en: string;
+  title_ckb: string;
+  body_ar: string;
+  body_en: string;
+  body_ckb: string;
 }
 
 /** The in-app row and the outside channels, for the customer of one order. */
@@ -76,7 +92,7 @@ async function tellCustomer(
   env: Env,
   o: OrderFacts,
   event: string,
-  copy: { title_ar: string; title_en: string; body_ar: string; body_en: string },
+  copy: CustomerCopy,
   meta: Record<string, unknown> = {}
 ): Promise<boolean> {
   const eventKey = `custom_order:${o.id}:${event}`;
@@ -91,15 +107,15 @@ async function tellCustomer(
     link,
     entity_type: 'custom_order',
     entity_id: o.id,
-    meta: { ...meta, event, request_id: o.request_id },
+    meta: { ...meta, event, request_id: o.request_id, title_ckb: copy.title_ckb, body_ckb: copy.body_ckb },
     eventKey,
   });
   // A replay wrote nothing in-app, and queues nothing outside either.
   if (!id) return false;
   const lang = await customerLang(env, o.customer_id);
   const msg: CustomerMessage = {
-    subject: lang === 'en' ? copy.title_en : copy.title_ar,
-    body: lang === 'en' ? copy.body_en : copy.body_ar,
+    subject: lang === 'en' ? copy.title_en : lang === 'ckb' ? copy.title_ckb : copy.title_ar,
+    body: lang === 'en' ? copy.body_en : lang === 'ckb' ? copy.body_ckb : copy.body_ar,
   };
   await notifyCustomer(env, o.customer_id, eventKey, msg);
   return true;
@@ -113,8 +129,10 @@ export async function notifyCustomOrderStarted(env: Env, orderId: string): Promi
     return await tellCustomer(env, o, 'started', {
       title_ar: 'بدأت الورشة العمل على طلبك',
       title_en: 'The workshop started work on your order',
+      title_ckb: 'وۆرکشۆپەکە دەستی کرد بە کارکردن لەسەر داواکارییەکەت',
       body_ar: `بدأ تنفيذ الطلب ${iso(o.id)}. مبلغك محجوز لدى Levonis حتى تؤكّد الاستلام.`,
       body_en: `Work on order ${o.id} has started. Levonis holds your money until you confirm receipt.`,
+      body_ckb: `کارکردن لەسەر داواکاریی ${iso(o.id)} دەستی پێکرد. پارەکەت لەلای Levonis ڕاگیراوە تا وەرگرتن پشتڕاست دەکەیتەوە.`,
     });
   } catch (e) {
     console.error('custom order started notice failed', orderId, e instanceof Error ? e.message : String(e));
@@ -138,12 +156,16 @@ export async function notifyCustomOrderDelivered(env: Env, orderId: string): Pro
       {
         title_ar: 'سلّمت الورشة طلبك — أكّد الاستلام',
         title_en: 'The workshop delivered your order — confirm receipt',
+        title_ckb: 'وۆرکشۆپەکە داواکارییەکەتی گەیاند — وەرگرتن پشتڕاست بکەرەوە',
         body_ar: auto
           ? `إذا وصلك الطلب ${iso(o.id)} كما اتفقتما فاضغط «أكّد الاستلام». إن لم تؤكّد ولم تفتح نزاعًا يكتمل الطلب تلقائيًا في ${iso(day(auto, 'ar'))}.`
           : `إذا وصلك الطلب ${iso(o.id)} كما اتفقتما فاضغط «أكّد الاستلام»، أو افتح نزاعًا إن كانت هناك مشكلة.`,
         body_en: auto
           ? `If order ${o.id} arrived as agreed, tap "Confirm receipt". Unless you confirm or open a dispute, it completes automatically on ${day(auto, 'en')}.`
           : `If order ${o.id} arrived as agreed, tap "Confirm receipt" — or open a dispute if something is wrong.`,
+        body_ckb: auto
+          ? `ئەگەر داواکاریی ${iso(o.id)} وەک ڕێککەوتبوون گەیشت، «وەرگرتن پشتڕاست بکەرەوە» دابگرە. ئەگەر پشتڕاستی نەکەیتەوە و ناکۆکییەک نەکەیتەوە، داواکارییەکە لە ${iso(day(auto, 'ckb'))} بە خۆکاری تەواو دەبێت.`
+          : `ئەگەر داواکاریی ${iso(o.id)} وەک ڕێککەوتبوون گەیشت، «وەرگرتن پشتڕاست بکەرەوە» دابگرە، یان ئەگەر کێشەیەک هەیە ناکۆکییەک بکەرەوە.`,
       },
       { auto_complete_at: auto }
     );
@@ -164,6 +186,10 @@ export async function notifyCustomOrderCancelledByCustomer(env: Env, orderId: st
       title_en: `The customer cancelled custom order ${o.id} — do not start work`,
       body_ar: 'أُعيد المبلغ المحجوز إلى محفظة الزبون، ولم يعد ملف التصميم متاحًا لك.',
       body_en: 'The held money went back to the customer’s wallet, and the design file is no longer available to you.',
+      meta: {
+        title_ckb: `کڕیارەکە داواکاریی تایبەتی ${iso(o.id)} هەڵوەشاندەوە — دەست بە کار مەکە`,
+        body_ckb: 'پارە ڕاگیراوەکە گەڕێندرایەوە بۆ جزدانی کڕیار، و فایلی دیزاینەکە چیتر بۆ تۆ بەردەست نییە.',
+      },
       link: merchantHref.customOrder(o.id),
       entity_type: 'custom_order',
       entity_id: o.id,
@@ -190,8 +216,10 @@ export async function notifyCustomOrderDisputedByMerchant(env: Env, orderId: str
       {
         title_ar: `فتحت الورشة نزاعًا على الطلب ${iso(o.id)}`,
         title_en: `The workshop opened a dispute on order ${o.id}`,
+        title_ckb: `وۆرکشۆپەکە ناکۆکییەکی لەسەر داواکاریی ${iso(o.id)} کردەوە`,
         body_ar: 'مبلغك يبقى محجوزًا لدى Levonis حتى تقرّر الإدارة. سيتواصل معك الفريق إن احتاج إلى ردك.',
         body_en: 'Your money stays held by Levonis until the admin team decides. The team will contact you if they need your side.',
+        body_ckb: 'پارەکەت لەلای Levonis ڕاگیراو دەمێنێتەوە تا تیمی بەڕێوەبردن بڕیار دەدات. ئەگەر پێویستیان بە وەڵامی تۆ بوو، تیمەکە پەیوەندیت پێوە دەکات.',
       },
       { complaint_id: complaintId }
     );
@@ -235,32 +263,47 @@ export async function notifyEscrowResolved(
         ? {
             title_ar: `قرّرت Levonis النزاع على الطلب ${iso(o.id)}`,
             title_en: `Levonis decided the dispute on order ${o.id}`,
+            title_ckb: `Levonis بڕیاری لەسەر ناکۆکیی داواکاریی ${iso(o.id)} دا`,
             body_ar: 'قرّرت الإدارة تحويل المبلغ إلى الورشة، واكتمل الطلب.',
             body_en: 'The admin team released the money to the workshop, and the order is complete.',
+            body_ckb: 'تیمی بەڕێوەبردن بڕیاری دا پارەکە بۆ وۆرکشۆپەکە بنێردرێت، و داواکارییەکە تەواو بوو.',
           }
         : p.decision === 'refund'
           ? {
               title_ar: `أُعيد إليك مبلغ الطلب ${iso(o.id)}`,
               title_en: `Order ${o.id} was refunded to you`,
+              title_ckb: `پارەی داواکاریی ${iso(o.id)} بۆت گەڕێندرایەوە`,
               body_ar: `قرّرت الإدارة إعادة المبلغ كاملًا (${iso(refund)} د.ع) إلى محفظتك.`,
               body_en: `The admin team refunded the full amount (${refund} IQD) to your wallet.`,
+              body_ckb: `تیمی بەڕێوەبردن بڕیاری دا هەموو بڕەکە (${iso(refund)} د.ع) بگەڕێنرێتەوە بۆ جزدانەکەت.`,
             }
           : {
               title_ar: `أُعيد إليك جزء من مبلغ الطلب ${iso(o.id)}`,
               title_en: `Part of order ${o.id} was refunded to you`,
+              title_ckb: `بەشێک لە پارەی داواکاریی ${iso(o.id)} بۆت گەڕێندرایەوە`,
               body_ar: `قرّرت الإدارة إعادة ${iso(refund)} د.ع إلى محفظتك، وتحويل الباقي إلى الورشة.`,
               body_en: `The admin team refunded ${refund} IQD to your wallet and released the rest to the workshop.`,
+              body_ckb: `تیمی بەڕێوەبردن بڕیاری دا ${iso(refund)} د.ع بگەڕێنرێتەوە بۆ جزدانەکەت، و ئەوەی ماوە بۆ وۆرکشۆپەکە بنێردرێت.`,
             };
     await tellCustomer(env, o, `resolved:${p.decision}`, customerCopy, { decision: p.decision, refunded_iqd: p.refundedIqd });
 
     const merchantBody =
       p.decision === 'release'
-        ? { ar: 'قرّرت الإدارة تحويل المبلغ إليك، واكتمل الطلب.', en: 'The admin team released the money to you, and the order is complete.' }
+        ? {
+            ar: 'قرّرت الإدارة تحويل المبلغ إليك، واكتمل الطلب.',
+            en: 'The admin team released the money to you, and the order is complete.',
+            ckb: 'تیمی بەڕێوەبردن بڕیاری دا پارەکە بۆ تۆ بنێردرێت، و داواکارییەکە تەواو بوو.',
+          }
         : p.decision === 'refund'
-          ? { ar: 'قرّرت الإدارة إعادة المبلغ كاملًا إلى الزبون.', en: 'The admin team refunded the full amount to the customer.' }
+          ? {
+              ar: 'قرّرت الإدارة إعادة المبلغ كاملًا إلى الزبون.',
+              en: 'The admin team refunded the full amount to the customer.',
+              ckb: 'تیمی بەڕێوەبردن بڕیاری دا هەموو بڕەکە بگەڕێنرێتەوە بۆ کڕیار.',
+            }
           : {
               ar: `قرّرت الإدارة إعادة ${iso(refund)} د.ع إلى الزبون وتحويل الباقي إليك.`,
               en: `The admin team refunded ${refund} IQD to the customer and released the rest to you.`,
+              ckb: `تیمی بەڕێوەبردن بڕیاری دا ${iso(refund)} د.ع بگەڕێنرێتەوە بۆ کڕیار و ئەوەی ماوە بۆ تۆ بنێردرێت.`,
             };
     await notifyMerchant(env, { merchantId: o.merchant_id }, {
       kind: 'dispute_resolved',
@@ -271,7 +314,12 @@ export async function notifyEscrowResolved(
       link: merchantHref.customOrder(o.id),
       entity_type: 'custom_order',
       entity_id: o.id,
-      meta: { decision: p.decision, refunded_iqd: p.refundedIqd },
+      meta: {
+        decision: p.decision,
+        refunded_iqd: p.refundedIqd,
+        title_ckb: `Levonis بڕیاری لەسەر ناکۆکیی داواکاریی ${iso(o.id)} دا`,
+        body_ckb: merchantBody.ckb,
+      },
       eventKey: `custom_order:${o.id}:resolved:${p.decision}`,
     });
     if (credited > 0) {
