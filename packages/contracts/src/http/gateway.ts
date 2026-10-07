@@ -22,7 +22,7 @@ export type RouteTarget =
 export type RouteHosts = 'main' | 'root' | 'all';
 
 /** What a caller must prove before the gateway forwards (`01-TARGET.md` §3.5). */
-export type RouteRequires = 'none' | 'auth' | 'investor' | 'admin' | 'admin:full';
+export type RouteRequires = 'none' | 'auth' | 'investor' | 'admin' | 'admin:full' | 'admin:owner';
 
 /**
  * `ROUTE_OVERRIDES` kill switch: `"<prefix>=<target>,…"`, parsed into this.

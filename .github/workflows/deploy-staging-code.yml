@@ -147,6 +147,14 @@ jobs:
           done < /tmp/vars.tsv
           echo "count=$(wc -l < /tmp/vars.tsv)" >> "$GITHUB_OUTPUT"
 
+          # THE OWNER IS THIS ADDRESS (owner decision 2, DECISIONS row 185).
+          # Every cost predicate recognises the owner by INITIAL_ADMIN_EMAIL; an
+          # empty value means nobody can open a cost screen — and an empty var
+          # is dropped from vars.tsv above, so it would also stay empty after
+          # this deploy. Refused here, before anything is migrated or shipped.
+          awk -F'\t' '$1 == "INITIAL_ADMIN_EMAIL" && $2 != "" { found = 1 } END { exit found ? 0 : 1 }' /tmp/vars.tsv \
+            || { echo "::error::INITIAL_ADMIN_EMAIL is empty on the worker — the owner (the only account that may see cost) would be locked out. Set it before deploying. / متغير INITIAL_ADMIN_EMAIL فارغ؛ لن يستطيع المالك فتح أي شاشة تكلفة."; exit 1; }
+
       - name: Resolve the staging database id into wrangler.jsonc
         id: db
         run: |
@@ -160,6 +168,26 @@ jobs:
         env:
           STAGING_DB_ID: ${{ steps.db.outputs.staging_db_id }}
         run: node scripts/set-deploy-ids.mjs --env staging
+
+      # THE OWNER ROW, READ-ONLY (owner decision 2; critique A10). Cost is
+      # honoured only for the verified admin row whose address is
+      # INITIAL_ADMIN_EMAIL. Exactly one such row must exist, with its address
+      # verified, or this deploy would lock the owner out of every cost screen.
+      # One SELECT of two counts; the address is never printed (it is masked
+      # above, and only the counts come back).
+      - name: The owner account exists and is verified (read-only)
+        run: |
+          set -e
+          OWNER=$(awk -F'\t' '$1 == "INITIAL_ADMIN_EMAIL" { print $2; exit }' /tmp/vars.tsv | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+          printf '%s' "$OWNER" | grep -Eq '^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$' \
+            || { echo "::error::INITIAL_ADMIN_EMAIL is not a plain email address — refusing to query with it"; exit 1; }
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
+            --command "SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN email_verified_at IS NOT NULL AND trim(email_verified_at) <> '' THEN 1 ELSE 0 END), 0) AS verified FROM users WHERE role = 'admin' AND lower(trim(email)) = '$OWNER'" \
+            > /tmp/owner-row.json 2>/tmp/owner-row.err || {
+              echo "::error::could not read the owner row — the check below will stop the deploy"
+              sed -n '1,20p' /tmp/owner-row.err || true
+            }
+          node scripts/live-cost-probes.mjs --owner-row /tmp/owner-row.json
 
       - name: Build the frontend
         env:
@@ -189,6 +217,8 @@ jobs:
             echo '```'
             echo "wrangler d1 time-travel restore levonis-db-staging --bookmark $BM"
             echo '```'
+            echo "**استعادة نقطة الرجوع تمحو كل ما كُتب بعدها (طلبات، محافظ). لا تُستعمل بعد أي كتابة حية؛ الإصلاح يكون بدفع إلى الأمام.**"
+            echo "Restoring this bookmark erases everything written after it (orders, wallets). Never use it after any live write — fix forward instead (docs/WORKERS.md)."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Apply any pending migrations BEFORE the code that needs them
@@ -656,6 +686,14 @@ jobs:
           curl -s --max-time 25 "https://levonis-iq.com/api/memberships/plans" \
             | jq -c '[.plans[] | {id, tier, duration_months, price_iqd}]'
           [ "$fail" = "0" ] || { echo "::error::an endpoint did not answer 200 after the deploy"; exit 1; }
+
+      # COST PRIVACY, READ-ONLY (owner decision 2, DECISIONS row 185). Every
+      # scripts/live-cost-probes.d/*.json file — one per programme step — is a
+      # list of ANONYMOUS GETs: the cost routers must refuse a stranger, and
+      # the storefront's product answers must carry their integer prices and
+      # no cost, supplier, rate or profit key. No cookie, no write.
+      - name: Cost-privacy probes, read-only
+        run: node scripts/live-cost-probes.mjs --base https://levonis-iq.com
 
       # The two failures the first production verification found, checked on
       # every deploy from now on. Both were invisible to `npm run check`.

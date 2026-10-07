@@ -435,7 +435,8 @@ app.route('/api/admin/taxonomy', adminTaxonomyRoutes);
 // §52 puts the assistant admin IN the warehouse — they count units, receive
 // shipments and correct a miscount — and OUTSIDE every cost attached to them.
 // The split is per FIELD, not per route, so the door stays open and every
-// payload leaves through `projectForAdmin`.
+// payload leaves through `projectForAdmin`, which keeps the cost for the owner
+// alone (owner decision 2 — full-scope admins included).
 app.route('/api/admin/inventory', adminInventoryRoutes);
 app.route('/api/admin/procurement', adminProcurementRoutes);
 app.route('/api/admin/stock-operations', adminStockOperationsRoutes);

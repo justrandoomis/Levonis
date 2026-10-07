@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int } from '../lib/http';
-import { assertFinancialScope } from '../lib/walletAdjust';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { projectForAdmin, canViewFinancials } from '../lib/adminScope';
+import { projectForAdmin, canViewCost, canWriteCost } from '../lib/adminScope';
+import { assertCostWrite } from '../lib/costAccess';
 import { isInventoryMode, STOCK_SCOPES, type StockScope } from '../lib/inventory';
 import {
   ADJUST_REASONS,
@@ -29,7 +29,8 @@ import { requireSelection } from '../lib/inventorySelection';
  *
  * §52: an assistant admin runs the warehouse — they need to see that twenty
  * units are on the shelf, four are reserved and ten are on their way. They may
- * not see what any of it cost. So every payload leaves through
+ * not see what any of it cost — nor may a full-scope admin: cost is the
+ * owner's alone (owner decision 2). So every payload leaves through
  * `projectForAdmin`, which strips `FINANCIAL_FIELDS` recursively, and the cost
  * columns are named in that list (worker/lib/adminScope.ts) rather than
  * omitted by hand at each site — a hand-omitted field is one somebody adds
@@ -339,7 +340,8 @@ adminInventoryRoutes.get('/incoming', async (c) => {
 adminInventoryRoutes.post('/incoming', async (c) => {
   // A purchase states what the shop paid. Without the operations tables there
   // is no capability to ask, and that must refuse an assistant, not admit one.
-  if(await operationsInstalled(c.env.DB))await requireCapability(c.env,c.get('user')!,'purchase');else assertFinancialScope(c);
+  // A purchase states what it cost: a cost WRITE on both branches (owner decision 2).
+  if(await operationsInstalled(c.env.DB))await requireCapability(c.env,c.get('user')!,'purchase');else assertCostWrite(c);
   const user = c.get('user')!;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
 
@@ -422,7 +424,7 @@ adminInventoryRoutes.post('/incoming', async (c) => {
 });
 
 adminInventoryRoutes.patch('/incoming/:id', async (c) => {
-  if(!(await operationsInstalled(c.env.DB)))assertFinancialScope(c);
+  if(!(await operationsInstalled(c.env.DB)))assertCostWrite(c);
   if(await operationsInstalled(c.env.DB)){await requireCapability(c.env,c.get('user')!,'purchase');if(await c.env.DB.prepare('SELECT id FROM purchase_lines WHERE incoming_id=?').bind(c.req.param('id')).first())throw badRequest('عدّل هذا البند من أمر الشراء المرتبط به','PURCHASE_EDIT_REQUIRED');}
   const user = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { max: 60 });
@@ -665,7 +667,7 @@ adminInventoryRoutes.post('/adjustments', async (c) => {
     operationId,
     actorUserId: user.id,
     expectedStock: body.expected_stock === undefined ? undefined : int(body.expected_stock, 'expected_stock', { min: 0 }),
-    unitCostIqd: canViewFinancials(c.env, user) ? statedInt(body.unit_cost_iqd, 'unit_cost_iqd') : null,
+    unitCostIqd: canWriteCost(c.env, user) ? statedInt(body.unit_cost_iqd, 'unit_cost_iqd') : null,
   });
   if (plan.already) return c.json({ success: true, already: true });
   await c.env.DB.batch(plan.statements);
@@ -722,7 +724,9 @@ adminInventoryRoutes.post('/suppliers', async (c) => {
  * PREVIEW and it changes no price (§49).
  */
 adminInventoryRoutes.get('/incoming/:id/profit-preview', async (c) => {
-  if (!canViewFinancials(c.env, c.get('user'))) throw notFound('Not found');
+  // The owner only (decision 2). It stays a 404 rather than a 403 so the
+  // route answers a non-owner exactly as it answers a missing purchase.
+  if (!canViewCost(c.env, c.get('user'))) throw notFound('Not found');
   const id = str(c.req.param('id'), 'id', { max: 60 });
   const row = await c.env.DB.prepare(
     `SELECT i.*, p.price_iqd FROM incoming_inventory i LEFT JOIN products p ON p.id = i.product_id WHERE i.id = ?`

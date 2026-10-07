@@ -28,9 +28,10 @@
  * somebody adds next month" is how this kind of hole is actually opened.
  * `tests/financeReport.test.ts` asserts the refusal for an assistant.
  *
- * THE OWNER CAN NEVER BE LOCKED OUT. `canViewFinancials` answers true for
- * INITIAL_ADMIN_EMAIL whatever `admin_scope` says, which is what stops a
- * compromised assistant from taking the owner's own numbers away from them.
+ * THE OWNER CAN NEVER BE LOCKED OUT. `canViewCost` answers true for the
+ * verified INITIAL_ADMIN_EMAIL admin whatever `admin_scope` says, which is
+ * what stops a compromised assistant from taking the owner's own numbers away
+ * from them.
  *
  * ---------------------------------------------------------------------------
  * 2. WHY THE QUERIES LIVE HERE AND THE ARITHMETIC DOES NOT.
@@ -71,8 +72,9 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { HttpError, badRequest, int, oneOf, requireAdmin } from '../lib/http';
-import { canViewFinancials } from '../lib/adminScope';
+import { badRequest, int, oneOf, requireAdmin } from '../lib/http';
+import { requireCostRead } from '../lib/costAccess';
+import { limitByMethod } from '../lib/ratelimit';
 import { baghdadDay } from '../lib/baghdadTime';
 import {
   GRANULARITIES,
@@ -110,22 +112,12 @@ export const adminFinanceReportRoutes = new Hono<AppContext>();
 adminFinanceReportRoutes.use('*', requireAdmin);
 
 /**
- * §11 at the door. The message is bilingual because the person reading it is an
- * assistant admin on an Arabic panel who needs to know this is a permission,
- * not a bug — and the code is the same `FINANCIAL_SCOPE_REQUIRED` the farm
- * admin already uses (worker/routes/farmAdmin.ts), so one client-side handler
- * covers every financial refusal on the platform.
+ * §11 at the door (owner decision 2): profit reports are the owner's alone.
+ * Every non-owner — full-scope admins included — gets the one generic
+ * COST_ACCESS_DENIED every cost surface answers, in ar / en, rendered by code
+ * in the viewer's language. The rate limit runs before the guard.
  */
-adminFinanceReportRoutes.use('*', async (c, next) => {
-  if (!canViewFinancials(c.env, c.get('user'))) {
-    throw new HttpError(
-      403,
-      'تقارير الأرباح للمالك أو الدور المالي فقط / Profit reports need the owner or a financial admin',
-      'FINANCIAL_SCOPE_REQUIRED'
-    );
-  }
-  await next();
-});
+adminFinanceReportRoutes.use('*', limitByMethod(['finance-read', 600], ['finance-write', 120]), requireCostRead);
 
 // ------------------------------------------------------------ schema probe
 

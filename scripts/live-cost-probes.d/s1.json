@@ -1,0 +1,75 @@
+{
+  "step": "S1 — owner-only cost predicates (0177), owner decision 2",
+  "vars": {
+    "slug": {
+      "from": "/api/products?limit=1",
+      "pick": "products.0.slug"
+    }
+  },
+  "probes": [
+    {
+      "path": "/api/admin/finance-workspace/summary",
+      "status": [
+        401
+      ]
+    },
+    {
+      "path": "/api/admin/products/x/price-history",
+      "status": [
+        401
+      ]
+    },
+    {
+      "path": "/api/admin/finance/report/summary",
+      "status": [
+        401
+      ]
+    },
+    {
+      "path": "/api/admin/investment-finance/profiles",
+      "status": [
+        401
+      ]
+    },
+    {
+      "path": "/api/products?limit=3",
+      "status": [
+        200
+      ],
+      "forbidKeys": "cost|supplier|replacement|target|profit|margin|premium_rule|rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
+      "forbidPattern": "MANUAL_OVERRIDE|PRICING_PRIVATE",
+      "requireIntegerKeys": [
+        "price_iqd"
+      ]
+    },
+    {
+      "path": "/api/products/{slug}",
+      "status": [
+        200
+      ],
+      "forbidKeys": "cost|supplier|replacement|target|profit|margin|premium_rule|rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
+      "forbidPattern": "MANUAL_OVERRIDE|PRICING_PRIVATE",
+      "requireIntegerKeys": [
+        "price_iqd"
+      ]
+    },
+    {
+      "path": "/api/public/v1/products/{slug}",
+      "status": [
+        200
+      ],
+      "forbidKeys": "cost|supplier|replacement|target|profit|margin|premium_rule|rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
+      "forbidPattern": "MANUAL_OVERRIDE|PRICING_PRIVATE"
+    },
+    {
+      "path": "/api/home",
+      "status": [
+        200
+      ],
+      "forbidKeys": "cost|supplier|replacement|target_profit|profit|premium_rule|rule_id|fx_|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
+      "forbidPattern": "MANUAL_OVERRIDE|PRICING_PRIVATE",
+      "note": "`margin` is not forbidden here on purpose: settings.printServicePricing.margin_percent is the PUBLISHED print-calculator markup (worker/lib/settings.ts PUBLIC_SETTING_KEYS, a deliberate decision), not a product cost. Owner review item, not an S1 change."
+    }
+  ],
+  "note": "Anonymous GETs only (master plan §4.0). Key regexes are critique A9's; `pricing_mode` is anchored so the public `pricing_modes` (sale modes on a product page) is not mistaken for the private engine flag."
+}

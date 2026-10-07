@@ -151,7 +151,7 @@ async function main() {
     const r = await client.post('/api/auth/register', { email, username: user, name: 'Perm Tester', password });
     check(`${client.label} account created`, r.status === 200, JSON.stringify(r.data).slice(0, 120));
   }
-  sql(`UPDATE users SET role='admin', admin_scope='full' WHERE email='${ownerEmail}'`);
+  sql(`UPDATE users SET role='admin', admin_scope='full' WHERE email='${ownerEmail}'; UPDATE users SET admin_scope='full' WHERE email='${ownerEmail}'`);
   sql(`UPDATE users SET role='admin', admin_scope='assistant' WHERE email='${asstEmail}'`);
   await settle();
   for (const [client, email] of [

@@ -1,4 +1,4 @@
-import type { Context } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import type { AppContext } from './types';
 import { tooMany } from './http';
 import { sha256Hex } from './crypto';
@@ -63,3 +63,47 @@ export async function rateLimit(
 
   if (row && row.count > limit) throw tooMany();
 }
+
+/**
+ * ONE CHARGE PER BUCKET PER REQUEST. Doors nest: `/api/admin/finance`'s
+ * `use('*')` also runs on `/api/admin/finance/report/*`, whose own router
+ * wears the same door — so one owner GET of the profit report was counted
+ * twice against the budget every finance router shares. The request object is
+ * the same through every mounted router, so it keys the buckets already
+ * charged for it.
+ */
+const charged = new WeakMap<Request, Set<string>>();
+function firstCharge(c: Context<AppContext>, bucket: string): boolean {
+  const raw = c.req.raw;
+  let seen = charged.get(raw);
+  if (!seen) {
+    seen = new Set();
+    charged.set(raw, seen);
+  }
+  if (seen.has(bucket)) return false;
+  seen.add(bucket);
+  return true;
+}
+
+/**
+ * A rate limit worn on the route declaration (S1). Mounted BEFORE the cost
+ * guard on a router door, so a refused caller still spends budget: probing a
+ * cost router id by id costs the prober, not the database.
+ */
+export const limitRoute = (bucket: string, limit: number, windowSeconds = 3600): MiddlewareHandler<AppContext> =>
+  async (c, next) => {
+    if (firstCharge(c, bucket)) await rateLimit(c, bucket, limit, windowSeconds);
+    await next();
+  };
+
+/** One bucket for reads (GET, HEAD), another for every write, on the same door. */
+export const limitByMethod = (
+  read: readonly [string, number],
+  write: readonly [string, number],
+  windowSeconds = 3600
+): MiddlewareHandler<AppContext> =>
+  async (c, next) => {
+    const [bucket, limit] = c.req.method === 'GET' || c.req.method === 'HEAD' ? read : write;
+    if (firstCharge(c, bucket)) await rateLimit(c, bucket, limit, windowSeconds);
+    await next();
+  };

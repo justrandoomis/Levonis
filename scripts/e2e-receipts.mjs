@@ -83,7 +83,7 @@ async function main() {
   const admin = new Client(), buyer = new Client();
   const adminEmail = `rca-${rnd}@test.local`, buyerEmail = `rcb-${rnd}@test.local`;
   await admin.post('/api/auth/register', { email: adminEmail, username: `rca${rnd}`, name: 'A', password });
-  sql(`UPDATE users SET role='admin' WHERE email='${adminEmail}'`);
+  sql(`UPDATE users SET role='admin' WHERE email='${adminEmail}'; UPDATE users SET admin_scope='full' WHERE email='${adminEmail}'`);
   await settle();
   let signedIn = false;
   for (let i = 0; i < 5 && !signedIn; i++) {

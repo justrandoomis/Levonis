@@ -71,9 +71,9 @@ export interface CheapestBaseDoc {
 
 export interface CheapestBaseOptions {
   /**
-   * §11: whether the reader may see cost. When false, no warning names or
-   * implies the cost figure — an assistant admin reads these in the export's
-   * comments and in the apply preview.
+   * §11: whether the reader may see cost (the owner, decision 2). When false
+   * the cost takes no part in the decision at all — no warning names or
+   * implies it, and the result is the same whatever the stored cost is.
    */
   money?: boolean;
 }
@@ -205,11 +205,16 @@ export function normalizeCheapestBase<T extends CheapestBaseDoc>(
           `(فرقه عن الأساسي ${iqd(floor - 1)}) — بقي السعر الأساسي ${iqd(base)}؛ عدّل سعر العضوية أولًا.`
       );
       newBase = base;
-    } else if (input.product_cost_iqd !== null && newBase === input.product_cost_iqd) {
+    } else if (money && input.product_cost_iqd !== null && newBase === input.product_cost_iqd) {
+      // ONLY FOR A READER WHO MAY SEE COST (decision 2). For anyone else the
+      // cost in the document is the STORED one carried forward, and a move
+      // that stops — or a warning that appears — exactly when the cheapest
+      // price equals it confirms a guessed cost. So the rule is not judged for
+      // them at all: the same decision at any cost. Resolved prices do not
+      // move either way (only the representation changes), and the validator
+      // judges the base cost-blind for the same reader.
       warnings.push(
-        money
-          ? `price_iqd: أرخص صنف (${iqd(newBase)} د.ع) يساوي كلفة المنتج، ولا يجوز أن يساوي سعر البيع الكلفة — بقي السعر الأساسي ${iqd(base)}.`
-          : `price_iqd: تعذّر جعل الأساسي هو الأرخص (${iqd(newBase)} د.ع) بسبب قاعدة تسعير داخلية — بقي السعر الأساسي ${iqd(base)}؛ يراجعها مدير مالي.`
+        `price_iqd: أرخص صنف (${iqd(newBase)} د.ع) يساوي كلفة المنتج، ولا يجوز أن يساوي سعر البيع الكلفة — بقي السعر الأساسي ${iqd(base)}.`
       );
       newBase = base;
     }

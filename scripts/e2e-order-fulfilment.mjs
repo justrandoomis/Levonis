@@ -163,7 +163,7 @@ async function main() {
   const admin = new Client();
   const adminEmail = `orda-${rnd}@test.local`;
   await admin.post('/api/auth/register', { email: adminEmail, username: `orda${rnd}`, name: 'Order Admin', password });
-  sql(`UPDATE users SET role='admin' WHERE email='${adminEmail}'`);
+  sql(`UPDATE users SET role='admin' WHERE email='${adminEmail}'; UPDATE users SET admin_scope='full' WHERE email='${adminEmail}'`);
   await settle();
   await admin.post('/api/auth/login', { email: adminEmail, password });
 

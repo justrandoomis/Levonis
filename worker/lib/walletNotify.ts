@@ -436,8 +436,8 @@ export interface AdminActor {
  * later restricted them) would keep pressing «موافقة» on real money. Demoting
  * an admin to assistant must revoke the button, not just the screen.
  *
- * THE OWNER IS EXEMPT, exactly as `canViewFinancials` exempts them: the
- * INITIAL_ADMIN_EMAIL account is always financial and can never be demoted, so
+ * THE OWNER IS EXEMPT, exactly as `canMoveMoney` exempts them: the
+ * INITIAL_ADMIN_EMAIL account always holds money scope and can never be demoted, so
  * a stray `admin_scope = 'assistant'` on that row must not lock the owner out
  * of their own bot. The `?2 <> ''` fence is what stops an UNSET env var from
  * turning into "matches any account with an empty email".

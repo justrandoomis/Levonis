@@ -56,21 +56,17 @@ export default function TelegramIdentities() {
    * A RESTRICTED ADMIN IS NOT OFFERED THIS, AND THIS IS NOT THE GATE.
    *
    * Binding a Telegram identity hands out the authority to APPROVE PAYMENT
-   * PROOFS from the bot — `resolveAdminActor` (worker/lib/walletNotify.ts:411)
+   * PROOFS from the bot — `resolveAdminActor` (worker/lib/walletNotify.ts)
    * turns a bound numeric id into the actor that decides a deposit. That is
-   * financial authority by any reading of §11, so a restricted assistant must
-   * not be handing it out.
+   * MONEY authority, so a restricted assistant must not be handing it out.
    *
-   * SAY PLAINLY WHAT THIS IS AND IS NOT. `POST /api/telegram/admin/tg-identities`
-   * is guarded by `requireAdmin` ALONE — it has no `canViewFinancials` check —
-   * and `resolveAdminActor` matches on `users.role = 'admin'` without reading
-   * `admin_scope` either. So today an assistant who reached that endpoint by
-   * hand would succeed, and this constant would not have stopped them. It is a
-   * refusal to OFFER the act, not a refusal to permit it; the server-side gate
-   * belongs in worker/routes/telegram.ts, which this change does not own, and
-   * it is reported as unresolved rather than papered over here.
+   * The gate is on the server: every `/api/telegram/admin/tg-identities`
+   * route runs `requireFinancialAdmin`, which is `canMoveMoney` (the owner
+   * and full-scope admins; owner decision 2 keeps money actions with them).
+   * This constant only declines to OFFER the act, on the server's own hint
+   * compared with `=== true`, so a hint the session lacks offers nothing.
    */
-  const mayBind = user?.can_view_financials !== false;
+  const mayBind = user?.can_move_money === true;
   const [rows, setRows] = useState<TelegramIdentity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

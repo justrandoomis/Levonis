@@ -102,7 +102,7 @@ async function main() {
     password,
   });
   check('admin account created', r.status === 200, JSON.stringify(r.data).slice(0, 120));
-  sql(`UPDATE users SET role='admin' WHERE email='${email}'`);
+  sql(`UPDATE users SET role='admin' WHERE email='${email}'; UPDATE users SET admin_scope='full' WHERE email='${email}'`);
   r = await admin.post('/api/auth/login', { email, password });
   check('admin signed in', r.status === 200);
 

@@ -40,7 +40,8 @@
  * from the caller: when a relations body is planned it is DERIVED from the
  * planned rows, so it can never outlive the rows it mirrors.
  *
- * §11 applies throughout: an actor without financial scope can neither read
+ * §11 applies throughout: an actor without cost access (owner decision 2:
+ * everyone but the owner, `actor.money = canWriteCost`) can neither read
  * nor write a cost — the stored costs are carried forward, on create as on
  * update, into the row, the rows and the JSON mirror alike.
  */
@@ -595,6 +596,21 @@ export async function planRelationsWriteFrom(
   const existing = snap.existing;
   const errors: string[] = [];
   const warnings: string[] = [];
+  /**
+   * THE LADDER IS JUDGED COST-BLIND FOR EVERYONE BUT THE OWNER (decision 2).
+   *
+   * `validatePriceLadder` refuses a price equal to the cost, and the cost a
+   * non-owner's rows carry is the STORED one — the template merge copies the
+   * stored options and colours with their cost (templateRelations.ts
+   * `priceBag`), and the CSV import carries a variant's stored cost forward. A
+   * refusal that appears only when a guessed price equals that cost confirms
+   * the guess, and /template/parse writes nothing, so it could be asked
+   * again and again. Without cost write the rule is not judged at all — the
+   * same answer at any price — and the write keeps the stored cost either way
+   * (the `CASE money` columns below). The rule exists to catch a cost typed
+   * into a price field, which only someone who sees the cost can do.
+   */
+  const judged = (p: PriceInput): PriceInput => (money ? p : { ...p, cost_iqd: null, cost_adjust_iqd: null });
 
   const [valueDimensionsInstalled, colorDimensionsInstalled, variantDimensionsInstalled] =
     await Promise.all([
@@ -633,7 +649,7 @@ export async function planRelationsWriteFrom(
       requireDimensionSchema(valueDimensionsInstalled, v, where);
       const prices = readPrices(v, where);
       const dimensions = readPhysicalDimensionOverrides(v, where);
-      errors.push(...validatePriceLadder(prices, where, baseLadder));
+      errors.push(...validatePriceLadder(judged(prices), where, baseLadder));
       const name = str(v.name_en, `${where}.name_en`, { max: 80 });
       // 0043. Unknown words become '' (inherit) rather than an error: this
       // endpoint is also how an old client saves an old product, and refusing
@@ -753,7 +769,7 @@ export async function planRelationsWriteFrom(
     // the same rule the product form, the import and the Quick Edit apply.
     errors.push(
       ...validatePriceLadder(
-        prices,
+        judged(prices),
         where,
         baseLadder,
         optionLaddersFor(
@@ -815,7 +831,7 @@ export async function planRelationsWriteFrom(
     }
     const prices = readPrices(v, where);
     const dimensions = readPhysicalDimensionOverrides(v, where);
-    errors.push(...validatePriceLadder(prices, where));
+    errors.push(...validatePriceLadder(judged(prices), where));
     // The key is computed here, never taken from the client (§11: "لا تثق في
     // سعر أو عضوية أو شحن مرسل من الواجهة").
     const key = comboKey({ option_value_ids: optionIds, color_id: colorId });
@@ -2260,6 +2276,17 @@ export interface ProductWriteIntent {
    */
   printerFits?: string[];
   actor: { adminId: string; money: boolean };
+  /**
+   * §11, names only: the cost fields THIS REQUEST itself carried (a TXT
+   * file's `product_cost_iqd` / `options.N.cost_iqd` lines). For an actor
+   * without cost write these — and only these — are reported in
+   * `costRefused`, and the stored cost is kept. The report is decided from
+   * the request alone, never by comparing with the stored value: an answer
+   * that changed when a guess matched the stored cost would confirm it.
+   * Absent = the caller reports nothing (it has refused or ignored the
+   * fields itself).
+   */
+  costSent?: string[];
   /** Rows for product_translations; undefined = leave them. */
   translations?: TranslationInput[];
   /** Register the document's hashtags in the vocabulary (default true). */
@@ -2317,9 +2344,10 @@ export interface ProductSavePlan {
    *  error — see the guard beside the block that fills this in. */
   searchTokens: number;
   translations: { written: number; review_needed: string[] } | null;
-  /** Cost fields an actor without financial scope asked to change: refused,
-   *  carried forward, and named here so a caller can report them as
-   *  PRESERVED rather than applied (docs/TXT_IMPORT_PARITY.md, root cause 8). */
+  /** Cost fields the request carried (`intent.costSent`) for an actor without
+   *  cost write: refused, carried forward, and named here so a caller can
+   *  report them as PRESERVED rather than applied (docs/TXT_IMPORT_PARITY.md,
+   *  root cause 8). Never derived from the stored value. */
   costRefused: string[];
   warnings: string[];
   money: boolean;
@@ -2357,25 +2385,6 @@ export async function preflightProductSave(db: D1Database, intent: ProductWriteI
     },
     { relationMediaMetadata: 'deferred' }
   );
-}
-
-/** Costs an actor without financial scope tried to change — reported, never
- *  written. Adjustments count too: a signed cost move is a cost. */
-function costAttempts(doc: ProductDoc, prev: ProductDoc | null): string[] {
-  const out: string[] = [];
-  if ((doc.product_cost_iqd ?? null) !== (prev?.product_cost_iqd ?? null)) out.push('product_cost_iqd');
-  for (const [kind, next, before] of [
-    ['option', doc.options, prev?.options ?? []],
-    ['color', doc.colors, prev?.colors ?? []],
-  ] as const) {
-    const prevById = new Map(before.map((x) => [x.id, x]));
-    for (const x of next) {
-      const p = prevById.get(x.id);
-      if ((x.cost_iqd ?? null) !== (p?.cost_iqd ?? null)) out.push(`${kind}:${x.id}.cost_iqd`);
-      if ((x.cost_adjust_iqd ?? null) !== (p?.cost_adjust_iqd ?? null)) out.push(`${kind}:${x.id}.cost_adjust_iqd`);
-    }
-  }
-  return out;
 }
 
 /** Puts the stored costs back on a document (null where nothing is stored) so
@@ -2540,10 +2549,15 @@ export async function planProductSave(
     doc.selling_type = 'bundle';
   }
 
-  // ---- §11: cost is written by financial scope only ----------------------
+  // ---- §11: cost is written with cost write only (the owner, decision 2) ---
+  //
+  // What is REPORTED comes from the request (`costSent`), never from a
+  // comparison with the stored cost — "refused" for a different number and
+  // silence for the stored one was an equality oracle on the cost. What is
+  // WRITTEN is the stored cost, always.
   const costRefused: string[] = [];
   if (doc && !actor.money) {
-    costRefused.push(...costAttempts(doc, prev));
+    costRefused.push(...new Set(intent.costSent ?? []));
     if (costRefused.length) {
       warnings.push(
         'الكلفة لا تُعدَّل من هذا الحساب — أُبقيت كما هي / cost is not editable by this account; the stored value was kept'
@@ -2882,7 +2896,7 @@ export async function planProductSave(
       /**
        * THE CELL AND ROUTE COSTS, CARRIED FORWARD FOR AN ACTOR WITHOUT MONEY.
        *
-       * `costAttempts`/`carryCostsForward` cover the product, option and colour
+       * `carryCostsForward` covers the product, option and colour
        * rungs, and nothing covered these two: a TXT file naming
        * `options.N.direct.cost_iqd` or `options.N.preorder.cost_iqd` wrote the
        * cost of a model's order type for an assistant admin, and a payload

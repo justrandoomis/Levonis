@@ -105,7 +105,7 @@ async function main() {
   await buyer.post('/api/auth/register', { email: buyerEmail, username: `stg${rnd}`, name: 'Stage Buyer', password });
   await buyer.post('/api/auth/login', { email: buyerEmail, password });
   await admin.post('/api/auth/register', { email: adminEmail, username: `stga${rnd}`, name: 'Stage Admin', password });
-  sqlCmd(`UPDATE users SET role='admin' WHERE email='${adminEmail}'`);
+  sqlCmd(`UPDATE users SET role='admin' WHERE email='${adminEmail}'; UPDATE users SET admin_scope='full' WHERE email='${adminEmail}'`);
   await settle();
   await admin.post('/api/auth/login', { email: adminEmail, password });
 

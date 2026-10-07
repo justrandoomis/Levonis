@@ -94,7 +94,7 @@ async function main() {
     'admin registered',
     (await call('/api/auth/register', { email, username: `iu${rnd}`, name: 'Import UI', password })) === 200
   );
-  sql(`UPDATE users SET role='admin' WHERE email='${email}'`);
+  sql(`UPDATE users SET role='admin' WHERE email='${email}'; UPDATE users SET admin_scope='full' WHERE email='${email}'`);
   check('admin signed in', (await call('/api/auth/login', { email, password })) === 200);
 
   const browser = await chromium.launch({

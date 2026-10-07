@@ -81,7 +81,10 @@ class Client {
  *   PROMOTE_CMD='npx wrangler d1 execute levonis-db-staging --remote --command {SQL}'
  */
 function promoteAdmin(email) {
-  const sql = `UPDATE users SET role='admin' WHERE email='${email}'`;
+  // Two statements: since 0177 a promotion is stored as 'assistant' by the
+  // users_promotion_starts_assistant trigger; the second UPDATE does not
+  // touch role, so it keeps this suite's admin at full (money) scope.
+  const sql = `UPDATE users SET role='admin' WHERE email='${email}'; UPDATE users SET admin_scope='full' WHERE email='${email}'`;
   const tpl = process.env.PROMOTE_CMD || 'npx wrangler d1 execute levonis-db --local --command {SQL}';
   const cmd = tpl.replace('{SQL}', JSON.stringify(sql));
   execSync(cmd, { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });

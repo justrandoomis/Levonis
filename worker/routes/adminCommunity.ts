@@ -63,7 +63,7 @@ import { maskPhone, normalizePhone } from '../lib/phone';
 import { refreshMerchantRating } from './merchantReviews';
 import { COMPLAINT_AWAITS_DESK_SQL } from './adminChats';
 import { requireFinancialScope } from '../lib/walletAdjust';
-import { canViewFinancials } from '../lib/adminScope';
+import { canMoveMoney } from '../lib/adminScope';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { reconcileRefundUnrefunded, reconcileReverseCredit, storeOrderMoneyDrift } from '../lib/storeOrderOps';
 
@@ -89,7 +89,7 @@ const nowIso = () => new Date().toISOString();
  * volume, and `fees` as null (the panel hides the tile).
  */
 adminCommunityRoutes.get('/overview', async (c) => {
-  const financial = canViewFinancials(c.env, c.get('user'));
+  const financial = canMoveMoney(c.env, c.get('user'));
   const [merchants, stores, products, requests, offers, orders, escrows, complaints, storeSales] = await Promise.all([
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
@@ -203,7 +203,8 @@ const UPLOAD_QUOTA_BOUNDS: Record<string, [number, number]> = {
  * them needs no route of its own: the generic GET /api/admin/settings serves
  * every SETTING_DEFAULTS key, these two included.) A file
  * ceiling moves no money, so any admin may set it; the commission keys below
- * keep their `requireFinancialScope`. Registered AHEAD of that handler: a
+ * keep their `requireFinancialScope` (money scope: owner or full admin; no
+ * cost is shown there). Registered AHEAD of that handler: a
  * body carrying `uploadLimits` / `uploadQuotas` is handled here, audited as
  * `admin.upload_limits`, and the fee keys — if the same body carries any —
  * are handed on to the financial handler with `next()`. A body with neither

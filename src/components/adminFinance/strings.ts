@@ -25,10 +25,12 @@ export function financeStrings(loc: Loc) {
       'A sale becomes profit on the day it reaches the customer, in Baghdad time — not the day it was ordered or paid. A refund is deducted from the month it was decided in.',
       'فرۆشتنێک لەو ڕۆژەدا دەبێتە قازانج کە دەگاتە کڕیار، بە کاتی بەغدا — نەک ڕۆژی داواکردن یان پارەدان.'
     ),
+    // Owner decision 2: cost and profit are the main admin's alone — a full
+    // («financial») admin is refused here exactly like an assistant.
     ownerOnly: loc(
-      'هذه الشاشة للمالك أو للدور المالي فقط. مساعد الأدمن لا يرى التكلفة ولا الربح — لا هنا ولا في أي رد من الخادم.',
-      'This screen is for the owner or a financial admin only. An assistant admin sees no cost and no profit — not here and not in any server response.',
-      'ئەم شاشەیە تەنها بۆ خاوەن یان ڕۆڵی دارایییە.'
+      'هذه الشاشة للأدمن الرئيسي (المالك) فقط. لا يرى أي أدمن آخر — مساعداً كان أو بصلاحية كاملة — التكلفة ولا الربح، لا هنا ولا في أي رد من الخادم.',
+      'This screen is for the main admin (the owner) only. No other admin — assistant or full — sees cost or profit, here or in any server response.',
+      'ئەم شاشەیە تەنها بۆ ئەدمینی سەرەکییە (خاوەن). هیچ ئەدمینێکی تر — یاریدەدەر بێت یان بە دەسەڵاتی تەواو — تێچوون و قازانج نابینێت، نە لێرە و نە لە هیچ وەڵامێکی ڕاژەکار.'
     ),
 
     // ------------------------------------------------------- the period row
@@ -244,9 +246,9 @@ export function financeStrings(loc: Loc) {
       'یەک خاڵ هێڵ دروست ناکات. ماوەیەکی درێژتر هەڵبژێرە، یان دابەشکردنێکی بچووکتر، تا ئاراستەکە ببینیت.'
     ),
     forbidden: loc(
-      'هذه الشاشة تحتاج صلاحية مالية. حساب المساعد لا يرى التكلفة ولا الربح.',
-      'This screen needs financial permission. An assistant account sees no cost and no profit.',
-      'ئەم شاشەیە ڕێپێدانی دارایی پێویستە.'
+      'هذه الشاشة للأدمن الرئيسي (المالك) وحده. لا يرى أي أدمن آخر — مساعداً كان أو بصلاحية كاملة — التكلفة ولا الربح.',
+      'This screen is the main admin’s (the owner’s) alone. No other admin — assistant or full — sees cost or profit.',
+      'ئەم شاشەیە تەنها هی ئەدمینی سەرەکییە (خاوەن). هیچ ئەدمینێکی تر — یاریدەدەر بێت یان بە دەسەڵاتی تەواو — تێچوون و قازانج نابینێت.'
     ),
     loadFailed: loc('تعذّر تحميل التقرير المالي.', 'Could not load the financial report.', 'نەتوانرا ڕاپۆرتی دارایی باربکرێت.'),
     retry: loc('إعادة المحاولة', 'Try again', 'دووبارە هەوڵ بدە'),

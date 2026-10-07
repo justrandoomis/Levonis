@@ -70,6 +70,7 @@ import { useAuth } from '../AuthContext';
 import { useMoney } from '../CurrencyContext';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, listSessions, revokeSession, revokeOtherSessions, type ApiSession } from '../lib/api';
+import { apiRefusal, refusalText } from '../lib/refusalStrings';
 import TelegramLink from '../components/security/TelegramLink';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { useCapabilities } from '../hooks/useCapabilities';
@@ -808,7 +809,9 @@ export default function Settings() {
       setShowEmailForm(false);
     } catch (err) {
       // Failure recovery: the typed values stay so nothing is retyped.
-      setEmailFormError(err instanceof ApiError ? err.message : s.loadFailed);
+      // By code, in the reader's language (OWNER_EMAIL_LOCKED, the change
+      // refusals) — never the raw "ar / en" server sentence.
+      setEmailFormError(err instanceof ApiError ? apiRefusal(err, lang, err.message) : s.loadFailed);
     } finally {
       emailLock.current = false;
       setEmailFormBusy(false);
@@ -1262,7 +1265,13 @@ export default function Settings() {
                   </button>
                 ) : null}
 
-                {emailStatus?.emailConfigured ? (
+                {/* The owner's address IS the owner (INITIAL_ADMIN_EMAIL, the one
+                    account that sees cost): the server refuses to change it
+                    (OWNER_EMAIL_LOCKED), so the form is not offered — the
+                    reason is said instead. */}
+                {emailStatus?.emailConfigured && user?.is_owner === true ? (
+                  <p className="mt-3 text-[12px] text-zinc-500">{refusalText('OWNER_EMAIL_LOCKED', lang)}</p>
+                ) : emailStatus?.emailConfigured ? (
                   <div className="mt-3">
                     <button
                       type="button"

@@ -67,7 +67,7 @@ import { resolveTemplateFamilies, type CatalogRow } from './adminTaxonomy';
 import { createPendingBrand, inactiveBrandWarning, loadRefRows, matchPrinterRef, matchRef, planBrandCreate } from '../lib/templateRefs';
 import { loadPrinterFitIds, printerOptions, printerSlugs } from '../lib/printerFits';
 import { ambiguousMessage } from '../lib/importApply';
-import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
+import { canViewCost, canWriteCost, projectForAdmin } from '../lib/adminScope';
 import { getSetting } from '../lib/settings';
 import { rateLimit } from '../lib/ratelimit';
 import { newId, sha256Hex } from '../lib/crypto';
@@ -80,6 +80,7 @@ import {
   generateBlankTemplate,
   toDocBody,
   touchesPricingStructure,
+  templateCostKeys,
   withScopedKeys,
   docToEntries,
   translationBookkeeping,
@@ -2141,7 +2142,7 @@ templateRoutes.get('/export/:productId', async (c) => {
       inventoryMode: loaded.view.inventory_mode,
       // §11, the same gate the CSV export has always applied: an assistant
       // admin downloads the product without its cost, not the whole cost sheet.
-      includeCost: canViewFinancials(c.env, c.get('user')!),
+      includeCost: canViewCost(c.env, c.get('user')!),
     })}\n${benefits}\n`,
     `levonis-product-${doc.id}.txt`
   );
@@ -2276,7 +2277,9 @@ templateRoutes.post('/parse', async (c) => {
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
   const text = str(body.text, 'text', { min: 1, max: MAX_TEMPLATE_CHARS });
 
-  const money = canViewFinancials(c.env, c.get('user'));
+  // Cost WRITE decides refusals and carry-forward; cost READ decides what the
+  // preview shows (owner decision 2: both are the owner's alone).
+  const money = canWriteCost(c.env, c.get('user'));
   const a = await analyzeTemplate(c.env.DB, text, undefined, { money });
   const needsReview = [...(a.merge?.needs_review ?? a.refs.needs_review ?? [])];
   // The refusals that live in the PLAN — stranded pre-order capacity above all
@@ -2332,7 +2335,7 @@ templateRoutes.post('/parse', async (c) => {
     preview: a.doc ? projectAdmin(a.doc) : null,
     diff: a.doc
       ? computeDiff(a.existing, a.doc, {
-          includeCost: canViewFinancials(c.env, c.get('user')),
+          includeCost: canViewCost(c.env, c.get('user')),
           beforeMode: a.existingView?.inventory_mode ?? null,
           afterMode: plannedInventoryMode(a, !!a.existing),
         })
@@ -2383,14 +2386,14 @@ templateRoutes.post('/section-preview', async (c) => {
   const source = sectionSource(body);
   const loaded = await loadProductDocWithView(c.env.DB, productId);
   if (!loaded) throw notFound('Product not found');
-  const money = canViewFinancials(c.env, c.get('user'));
+  const money = canWriteCost(c.env, c.get('user'));
   const section = sectionTemplate(source.text, productId, null);
   const a = await analyzeTemplate(c.env.DB, section.text, productId, { money });
   // What the save will write: the stored product, section 7 from the file.
   if (a.doc && a.existing) a.doc = sectionOnlyDoc(a.doc, a.existing);
   const planned = await plannedRefusal(c.env.DB, a, { adminId: c.get('user')!.id, money });
   const diffOpts = {
-    includeCost: money,
+    includeCost: canViewCost(c.env, c.get('user')),
     beforeMode: a.existingView?.inventory_mode ?? null,
     afterMode: a.existingView?.inventory_mode ?? null,
   };
@@ -2855,7 +2858,7 @@ templateRoutes.post('/apply', async (c) => {
   // Always re-parse server-side — client-prebuilt documents are never trusted.
   // Update mode follows the template's product_id; draft mode forces a create
   // merge (a stray product_id is ignored — create means a new identity).
-  const money = canViewFinancials(c.env, adminUser);
+  const money = canWriteCost(c.env, adminUser);
   let a = await analyzeTemplate(c.env.DB, text, mode === 'update' ? undefined : null, { money });
   if (a.parsed.errors.length > 0) {
     return c.json(
@@ -3179,6 +3182,10 @@ templateRoutes.post('/apply', async (c) => {
       // 0148 — «يناسب الطابعات»: written only when the file states the key.
       printerFits: a.refs.printer_fit_ids,
       actor: { adminId: adminUser.id, money },
+      // §11: the cost lines the FILE carried — what is reported refused for
+      // an account without cost write, decided without reading the stored
+      // cost (templateCostKeys).
+      costSent: money ? [] : templateCostKeys(a.parsed),
       // The file carries its own Arabic and Kurdish; the translation table
       // still gets the English-sourced rows the form path writes.
       translations: translationInputsOf(doc),
@@ -3213,8 +3220,13 @@ templateRoutes.post('/apply', async (c) => {
    */
   const costHeld = plan.costRefused.includes('product_cost_iqd');
   const appliedFields = costHeld ? merge.applied_fields.filter((k) => k !== 'product_cost_iqd') : merge.applied_fields;
+  // A `product_cost_iqd=__NULL__` line was not a clear either: the stored
+  // cost stayed, so it is preserved, never "cleared".
+  const clearedFields = costHeld ? merge.cleared_fields.filter((k) => k !== 'product_cost_iqd') : merge.cleared_fields;
   const preservedFields =
-    costHeld && merge.applied_fields.includes('product_cost_iqd')
+    costHeld &&
+    (merge.applied_fields.includes('product_cost_iqd') || merge.cleared_fields.includes('product_cost_iqd')) &&
+    !merge.preserved_fields.includes('product_cost_iqd')
       ? [...merge.preserved_fields, 'product_cost_iqd']
       : merge.preserved_fields;
 
@@ -3229,7 +3241,7 @@ templateRoutes.post('/apply', async (c) => {
           duplicate_choice: duplicateChoice,
           fingerprint,
           applied: appliedFields,
-          cleared: merge.cleared_fields,
+          cleared: clearedFields,
           cost_refused: plan.costRefused,
           unknown_keys: a.parsed.unknown_keys,
           relations: plan.relations?.summary ?? null,
@@ -3408,7 +3420,7 @@ templateRoutes.post('/apply', async (c) => {
     product_id: doc.id,
     product: projectAdmin(stored.document),
     applied_fields: appliedFields,
-    cleared_fields: merge.cleared_fields,
+    cleared_fields: clearedFields,
     preserved_fields: preservedFields,
     cost_refused: plan.costRefused,
     unknown_keys: a.parsed.unknown_keys,
@@ -3486,7 +3498,7 @@ templateRoutes.post('/parse-zip', async (c) => {
 
   const decoder = new TextDecoder('utf-8');
   const files: Array<Record<string, unknown>> = [];
-  const money = canViewFinancials(c.env, c.get('user'));
+  const money = canWriteCost(c.env, c.get('user'));
   const actor = { adminId: c.get('user')!.id, money };
   // Each entry is parsed independently — one bad file never fails the rest.
   for (const name of names) {

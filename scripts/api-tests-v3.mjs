@@ -63,7 +63,10 @@ function sqlExec(sql) {
   execSync(tpl.replace('{SQL}', JSON.stringify(sql)), { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });
 }
 function promoteAdmin(email) {
-  sqlExec(`UPDATE users SET role='admin' WHERE email='${email}'`);
+  // Two statements: since 0177 a promotion is stored as 'assistant' by the
+  // users_promotion_starts_assistant trigger; the second UPDATE does not
+  // touch role, so it keeps this suite's admin at full (money) scope.
+  sqlExec(`UPDATE users SET role='admin' WHERE email='${email}'; UPDATE users SET admin_scope='full' WHERE email='${email}'`);
 }
 
 // ------------------------------------------------------------- file fixtures

@@ -427,15 +427,32 @@ export function peopleAr(n: number): string {
   return `${n} شخصًا`;
 }
 
+/**
+ * THE OWNER'S WITHDRAWAL NOTICES, AS A CLAUSE THAT HIDES THEM.
+ *
+ * «طلب سحب بقيمة X د.ع» goes to the owner alone since S1 — a profit-percent
+ * wage withdrawal reveals profit (owner decision 2; financeParticipants.ts
+ * adminNotices). Rows written BEFORE S1 went to every full and NULL-scope
+ * admin and are still in their bells, so every reader that may not see cost
+ * reads the inbox through this clause. It matches the admin notice only — the
+ * one that links to the finance screen — never the participant's own
+ * «اعتماد طلب سحب الأرباح» (same kind, links to /earnings). NULL-safe: a row
+ * with no entity or link is never hidden by it.
+ */
+export const HIDE_OWNER_FINANCE_NOTICES_SQL = `NOT (kind = 'payout_available'
+      AND COALESCE(entity_type, '') = 'payout'
+      AND COALESCE(link, '') LIKE '/admin?tab=finance%')`;
+
 export async function listNotifications(
   db: D1Database,
   userId: string,
-  opts: { limit?: number; before?: string; unreadOnly?: boolean } = {}
+  opts: { limit?: number; before?: string; unreadOnly?: boolean; hideOwnerFinance?: boolean } = {}
 ): Promise<NotificationRow[]> {
   const limit = Math.min(Math.max(opts.limit ?? 30, 1), 100);
   const clauses = ['user_id = ?'];
   const binds: unknown[] = [userId];
   if (opts.unreadOnly) clauses.push('read_at IS NULL');
+  if (opts.hideOwnerFinance) clauses.push(HIDE_OWNER_FINANCE_NOTICES_SQL);
   if (opts.before) {
     clauses.push('created_at < ?');
     binds.push(opts.before);
@@ -454,9 +471,17 @@ export async function listNotifications(
   return results ?? [];
 }
 
-export async function unreadCount(db: D1Database, userId: string): Promise<number> {
+export async function unreadCount(
+  db: D1Database,
+  userId: string,
+  opts: { hideOwnerFinance?: boolean } = {}
+): Promise<number> {
   const row = await db
-    .prepare('SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = ? AND read_at IS NULL')
+    .prepare(
+      `SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = ? AND read_at IS NULL${
+        opts.hideOwnerFinance ? ` AND ${HIDE_OWNER_FINANCE_NOTICES_SQL}` : ''
+      }`
+    )
     .bind(userId)
     .first<{ n: number }>();
   return Number(row?.n ?? 0);

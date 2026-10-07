@@ -263,7 +263,7 @@ async function main() {
   const admin = new C('admin');
   const aEmail = `pa-${rnd}@test.local`;
   await admin.post('/api/auth/register', { email: aEmail, username: `pa${rnd}`, name: 'Admin', password: 'print-e2e-12345' });
-  sql(`UPDATE users SET role='admin' WHERE email='${aEmail}'`);
+  sql(`UPDATE users SET role='admin' WHERE email='${aEmail}'; UPDATE users SET admin_scope='full' WHERE email='${aEmail}'`);
   await sleep(700);
   await admin.post('/api/auth/login', { email: aEmail, password: 'print-e2e-12345' });
 

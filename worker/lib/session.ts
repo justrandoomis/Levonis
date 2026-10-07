@@ -3,6 +3,8 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import type { AppContext, SessionUser } from './types';
 import { randomToken, sha256Hex } from './crypto';
 import { rootDomainFrom, sessionCookieDomain } from './hosts';
+import { PRIVATE_DELEGATION_ENABLED, isOwner } from './adminScope';
+import { loadPrivateGrants } from './costAccess';
 
 /** The session cookie's name. Exported because the caching rule of §14 has to
  *  ask "does this request carry a session?" BEFORE the session is resolved —
@@ -160,6 +162,18 @@ export async function loadSessionUser(c: Context<AppContext>): Promise<void> {
    * server is unchanged.
    */
   const { session_id, session_expires, session_created, password_hash, ...user } = row;
+  /**
+   * PRIVATE GRANTS ARE ALWAYS SET HERE, NEVER READ OFF THE ROW (0177, owner
+   * decision 2). `u.*` cannot carry a `private_grants` column today, but if a
+   * column of that name ever appeared it would reach the cost predicates
+   * through this object; assigning it unconditionally closes that door. While
+   * PRIVATE_DELEGATION_ENABLED is false the list is empty for everyone and the
+   * grants table is never read.
+   */
+  (user as Record<string, unknown>).private_grants =
+    PRIVATE_DELEGATION_ENABLED && user.role === 'admin' && !isOwner(c.env, user as unknown as SessionUser)
+      ? await loadPrivateGrants(c.env.DB, String(user.id))
+      : [];
   c.set('user', user as unknown as SessionUser);
   c.set('sessionId', String(session_id));
   c.set('sessionCreatedAt', session_created ? String(session_created) : null);

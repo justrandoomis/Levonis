@@ -285,8 +285,10 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'farm_profiles', 'farm_ledger', 'farm_printers', 'farm_spools', 'farm_jobs', 'farm_assignments', 'farm_events', 'farm_daily',
     'farm_achievements', 'farm_requests', 'farm_config',
   ]),
-  ...owned('config', ['admin_settings', 'feature_flags', 'config_versions', 'ops_permissions']),
-  ...owned('audit', ['audit_log', 'audit_events', 'audit_chain_heads']),
+  // 0177 (owner decision 2): `admin_private_grants` is access configuration
+  // beside `ops_permissions`; `security_events` is the owner's refusal log.
+  ...owned('config', ['admin_settings', 'feature_flags', 'config_versions', 'ops_permissions', 'admin_private_grants']),
+  ...owned('audit', ['audit_log', 'audit_events', 'audit_chain_heads', 'security_events']),
   ...owned('analytics', [
     'merchant_store_analytics_daily', 'analytics_events', 'analytics_daily_platform', 'analytics_daily_merchant',
     // The three composition facts no other table records — a detail-page view,

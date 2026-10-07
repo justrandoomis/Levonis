@@ -105,7 +105,7 @@ async function main() {
   const admin = new Client();
   const adminEmail = `tla-${rnd}@test.local`;
   await admin.post('/api/auth/register', { email: adminEmail, username: `tla${rnd}`, name: 'A', password });
-  sql(`UPDATE users SET role='admin' WHERE email='${adminEmail}'`);
+  sql(`UPDATE users SET role='admin' WHERE email='${adminEmail}'; UPDATE users SET admin_scope='full' WHERE email='${adminEmail}'`);
   await settle();
   // The sign-in is CONFIRMED, not assumed. `wrangler d1 execute --local`
   // re-binds the database under the running server, and /api/health can

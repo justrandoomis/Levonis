@@ -26,7 +26,10 @@ function item(db: DatabaseSync, id: string, product: string, price: number, extr
 }
 async function reports(db: DatabaseSync) {
   resetFinanceSchemaMemo();
-  const app = stubApp(asD1(db), { id: 'owner', email: 'owner@test.local', role: 'admin' }, (a) => a.route('/api/admin/finance/report', adminFinanceReportRoutes));
+  // The OWNER (owner decision 2: profit reports are the owner's alone).
+  const app = stubApp(asD1(db), { id: 'owner', email: 'owner@test.local', role: 'admin' }, (a) => a.route('/api/admin/finance/report', adminFinanceReportRoutes), {
+    env: { INITIAL_ADMIN_EMAIL: 'owner@test.local' },
+  });
   const result = await Promise.all(['summary', 'products', 'categories'].map(async (route) => {
     const response = await get(app, `/api/admin/finance/report/${route}?from=${day}&to=${day}&granularity=range`);
     const body = await json(response); assert.equal(response.status, 200, JSON.stringify(body)); return body;

@@ -1522,9 +1522,9 @@ export interface ExportOpts {
   /**
    * Whether the caller may see cost.
    *
-   * §11 says cost appears in NO API, HTML or export an assistant admin can
-   * reach, and the CSV path has always honoured it (adminImport.ts passes
-   * `canViewFinancials`). This flag did not exist, so the TXT export wrote
+   * §11 says cost appears in NO API, HTML or export anyone but the owner can
+   * reach (owner decision 2), and the CSV path has always honoured it
+   * (adminImport.ts passes `canViewCost`). This flag did not exist, so the TXT export wrote
    * `product_cost_iqd`, `options.N.cost_iqd` and the colour equivalents
    * unconditionally — an assistant could download the whole cost sheet as a
    * .txt. Defaults to true, so the blank-template generator, which describes
@@ -2386,6 +2386,43 @@ export function generateBlankTemplate(): string {
   }
   lines.push('');
   return lines.join('\n');
+}
+
+/** A cost line, at any level: `product_cost_iqd`, `cost_iqd`, `cost_adjust_iqd`. */
+const COST_KEY_RE = /^(?:product_)?cost(?:_adjust)?_iqd$/;
+
+/**
+ * EVERY COST LINE THIS FILE CARRIES, by key — `product_cost_iqd`,
+ * `options.1.cost_iqd`, `options.1.direct.cost_iqd`, `colors.2.cost_adjust_iqd`
+ * — whatever its value (`__NULL__` included).
+ *
+ * For an account without cost write (everyone but the owner, decision 2) this
+ * list IS the cost the apply refuses and carries forward (`costSent` →
+ * `costRefused`). It is read from the file alone: deciding "refused" by
+ * comparing the file with the stored cost answered differently when a guess
+ * was right, which confirmed the guess. A non-owner's export has no cost
+ * line, so every one here is a line they added.
+ */
+export function templateCostKeys(parsed: ParsedTemplate): string[] {
+  const out: string[] = [];
+  const scan = (prefix: string, fields: Record<string, ParsedField> | undefined) => {
+    for (const key of Object.keys(fields ?? {})) {
+      if (COST_KEY_RE.test(key)) out.push(prefix ? `${prefix}.${key}` : key);
+    }
+  };
+  scan('', parsed.fields);
+  for (const [group, items] of Object.entries(parsed.groups)) {
+    for (const item of items) {
+      const at = `${group}.${item.index}`;
+      scan(at, item.fields);
+      for (const row of item.rows ?? []) scan(`${at}.rows.${row.index}`, row.fields);
+      for (const [cellName, cell] of Object.entries(item.cells ?? {})) {
+        scan(`${at}.${cellName}`, cell.fields);
+        for (const entry of cell.list ?? []) scan(`${at}.${cellName}.${entry.index}`, entry.fields);
+      }
+    }
+  }
+  return out;
 }
 
 /**

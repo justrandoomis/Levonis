@@ -68,8 +68,10 @@ function seedColour(raw: DatabaseSync, id: string, linked: string[], cols: Recor
 function adminApp(db: D1Database) {
   const app = new Hono<AppContext>();
   app.use('*', async (c, next) => {
-    c.set('user', { id: 'boss', role: 'admin', email: 'a@x.co' } as never);
-    c.env = { DB: db, INITIAL_ADMIN_EMAIL: '' } as never;
+    // The OWNER (owner decision 2: only the owner reads or writes cost), with
+    // a verified address — the grid's cost column is the owner's alone.
+    c.set('user', { id: 'boss', role: 'admin', email: 'a@x.co', email_verified_at: '2026-01-01T00:00:00.000Z' } as never);
+    c.env = { DB: db, INITIAL_ADMIN_EMAIL: 'a@x.co' } as never;
     await next();
   });
   app.route('/api/admin/products', adminPriceGridRoutes);

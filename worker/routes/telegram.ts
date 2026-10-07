@@ -33,7 +33,7 @@ import {
   startDeepLink,
 } from '../lib/telegram';
 import { setPrimaryChannelStatements } from '../lib/channelReadiness';
-import { canViewFinancials } from '../lib/adminScope';
+import { canMoveMoney } from '../lib/adminScope';
 import {
   BINDABLE_TOPIC_KEYS,
   adminBotConfigured,
@@ -868,7 +868,7 @@ function maskBotToken(env: Env, s: string): string {
  * financial scope, and saying so is how they know to ask the owner.
  */
 async function requireFinancialAdmin(c: Context<AppContext>, next: Next) {
-  if (!canViewFinancials(c.env, c.get('user'))) {
+  if (!canMoveMoney(c.env, c.get('user'))) {
     throw forbidden('Telegram payment-approval authority is restricted to financial admins');
   }
   await next();

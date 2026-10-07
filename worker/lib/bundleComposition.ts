@@ -956,7 +956,7 @@ export interface ComponentPreview {
   line_value_iqd: number;
   available: number | null;
   shipping_type: ShippingType;
-  /** Admin-only: `projectForAdmin` strips it for an assistant admin (§11.4). */
+  /** Owner-only: `projectForAdmin` strips it for every other admin (§11.4, owner decision 2). */
   cost_iqd: number | null;
 }
 

@@ -273,7 +273,8 @@ test('an assistant admin is refused on EVERY expense route, read and write alike
     assert.equal(res.status, 403, `${method} ${path} must refuse an assistant, got ${res.status}`);
     const body = await json(res);
     assert.equal(body.success, false);
-    assert.equal(body.code, 'FORBIDDEN');
+    // Owner decision 2: the one generic cost refusal, the same on every route.
+    assert.equal(body.code, 'COST_ACCESS_DENIED');
   }
   // …and the assistant's attempts wrote nothing at all.
   assert.deepEqual(all(raw, 'SELECT id FROM operating_expenses'), []);

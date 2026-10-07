@@ -194,14 +194,18 @@ export default function Admin() {
   }, [activeTab]);
 
   /**
-   * A COURTESY, NOT THE GATE. The three finance endpoints refuse an assistant
-   * admin on the SERVER with FINANCIAL_SCOPE_REQUIRED, before a query runs
-   * (mandate §11). Hiding the tab only spares that person a screen they can
-   * never use; `undefined` — an older session payload with no such field —
-   * deliberately shows the tab and lets the server answer, because guessing
-   * "no" would take the owner's own numbers away from them.
+   * A COURTESY, NOT THE GATE. The finance, payroll, investor and profit
+   * routers refuse every caller but the owner on the SERVER with
+   * COST_ACCESS_DENIED, before a query runs (owner decision 2) — full-scope
+   * admins included. Hiding the tab only spares them a screen they can never
+   * use.
+   *
+   * `=== true`, ON PURPOSE (step S1). A hint the session payload does not
+   * carry — an older server, a failed field — must HIDE the screen: a cost
+   * screen shown to the wrong person is the failure this programme exists to
+   * prevent, and the owner's next /api/auth/me carries the flag.
    */
-  const canSeeFinance = user?.can_view_financials !== false;
+  const canSeeFinance = user?.can_view_cost === true;
 
   /** People waiting in the support console, for the sidebar badge. */
   const supportWaiting = supportTotal(useSupportCounts());

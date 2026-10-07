@@ -97,7 +97,10 @@ function sqlFails(sql) {
   try { sqlExec(sql); return false; } catch { return true; }
 }
 function promoteAdmin(email) {
-  sqlExec(`UPDATE users SET role='admin' WHERE email='${email}'`);
+  // Two statements: since 0177 a promotion is stored as 'assistant' by the
+  // users_promotion_starts_assistant trigger; the second UPDATE does not
+  // touch role, so it keeps this suite's admin at full (money) scope.
+  sqlExec(`UPDATE users SET role='admin' WHERE email='${email}'; UPDATE users SET admin_scope='full' WHERE email='${email}'`);
 }
 
 const sha256Hex = (s) => createHash('sha256').update(s).digest('hex');

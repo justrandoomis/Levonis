@@ -689,6 +689,9 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'quick_buy_items.stock_targets': 'inventory counter ids',
   'quick_buy_items.snapshot': 'names, option labels, SKU and prices — no image',
   'quick_buy_actions.response_json': 'an idempotent replay answer (ids and quantities)',
+  // 0177 — owner decision 2 (cost access and the security-event log).
+  'admin_private_grants.grant_key': 'ids/codes/integers; no media (PRICING_PRIVATE_READ or PRICING_PRIVATE_WRITE)',
+  'security_events.detail': 'ids/codes/integers; no media (allowlisted refusal context, never a body or a value)',
   'quick_buy_actions.key': 'a request de-duplication token',
   'quick_buy_events.action_key': 'the de-duplication token of the change that wrote the row',
   'quick_buy_events.detail': 'a money or stock delta and its reason',

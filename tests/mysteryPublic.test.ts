@@ -47,6 +47,8 @@ import { seedCatalogue, orderBody } from './lib/bundles';
 import { POOL_PRODUCTS } from './lib/mysteryOffer';
 
 const boss: StubUser = { id: 'boss', role: 'admin', email: 'a@x.co' };
+/** `boss` is the OWNER here: cost and the profit report are the owner's alone (owner decision 2). */
+const OWNER_ENV = { env: { INITIAL_ADMIN_EMAIL: 'a@x.co' } };
 /** NO MEMBERSHIP ROW ANYWHERE. `seedCatalogue` gives 'buyer' none, which is
  *  the entire point: every assertion below is made by somebody who has never
  *  paid for a tier. */
@@ -59,13 +61,13 @@ const appAs = (db: unknown, user: StubUser | null) =>
     a.route('/api/products', productRoutes);
     a.route('/api/bundles', bundlesRoutes);
     a.route('/api/admin/mystery', adminMysteryRoutes);
-  });
+  }, OWNER_ENV);
 
 const financeApp = (db: unknown) => {
   // The probe memoises a POSITIVE answer per isolate, and one test process is
   // one isolate holding many databases (see `probeSchema`).
   resetFinanceSchemaMemo();
-  return stubApp(db, boss, (a) => a.route('/api/admin/finance/report', adminFinanceReportRoutes));
+  return stubApp(db, boss, (a) => a.route('/api/admin/finance/report', adminFinanceReportRoutes), OWNER_ENV);
 };
 
 const put = (a: App, path: string, body: unknown) =>

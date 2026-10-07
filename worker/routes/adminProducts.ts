@@ -20,7 +20,7 @@ import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, notFound, int, str, forbidden, pickFrom, HttpError } from '../lib/http';
+import { requireAdmin, badRequest, notFound, int, str, pickFrom, HttpError } from '../lib/http';
 import { audit } from '../lib/audit';
 import { purgeCatalogueAfterWrite } from '../lib/edgePolicy';
 import { newId } from '../lib/crypto';
@@ -39,10 +39,13 @@ import { getSettings } from '../lib/settings';
 import { transportDefaultsFrom } from './products';
 import {
   attemptedFinancialWrites,
-  canViewFinancials,
+  canMoveMoney,
+  canViewCost,
+  canWriteCost,
   carryStoredCostForward,
   projectForAdmin,
 } from '../lib/adminScope';
+import { costDenied } from '../lib/costAccess';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
 import { bundlesUsing, compositionConflict } from '../lib/bundleComposition';
 import {
@@ -97,7 +100,8 @@ adminProductsRoutes.use('*', requireAdmin);
 // this colo's cache (worker/lib/edgePolicy.ts) instead of ageing out.
 adminProductsRoutes.use('*', purgeCatalogueAfterWrite);
 
-adminProductsRoutes.post('/:id/selection-price',async c=>{const user=c.get('user')!;if(!canViewFinancials(c.env,user))throw forbidden('تحديث سعر البيع من الشراء يتطلب صلاحية مالية');const result=await updateSelectionPrice(c.env.DB,c.req.param('id'),await c.req.json<Record<string,unknown>>(),user.id);c.set('catalogueSlug',result.slug);return c.json({success:true,...result});});
+// Pricing a selection from its purchase writes a price derived from cost: the owner's (decision 2).
+adminProductsRoutes.post('/:id/selection-price',async c=>{const user=c.get('user')!;if(!canWriteCost(c.env,user))throw costDenied();const result=await updateSelectionPrice(c.env.DB,c.req.param('id'),await c.req.json<Record<string,unknown>>(),user.id);c.set('catalogueSlug',result.slug);return c.json({success:true,...result});});
 
 // ---------------------------------------------------------------- helpers
 
@@ -761,7 +765,9 @@ adminProductsRoutes.get('/stats', async (c) => {
     return { day, orders: Number(r?.orders ?? 0), units: Number(r?.units ?? 0) };
   });
 
-  const financial = canViewFinancials(c.env, c.get('user'));
+  // Revenue is a MONEY figure, not a cost (owner decision 2 keeps it with
+  // full-scope admins).
+  const financial = canMoveMoney(c.env, c.get('user'));
   return c.json({
     success: true,
     totals: {
@@ -1218,15 +1224,15 @@ adminProductsRoutes.post('/', async (c) => {
     }
   }
 
-  // §11 is an authorization rule in BOTH directions: an assistant admin can
-  // neither read cost nor write it. Rather than silently dropping the field
-  // (which would let a stale panel wipe a real cost), the request is refused
-  // when it actually tries to change one.
-  if (!canViewFinancials(c.env, admin)) {
-    const attempted = attemptedFinancialWrites(body, doc, prev);
-    if (attempted.length) {
-      throw forbidden(`You do not have access to product cost. Fields refused: ${attempted.join(', ')}`);
-    }
+  // §11 is an authorization rule in BOTH directions: nobody but the owner
+  // reads cost or writes it (owner decision 2). A request that CARRIES a cost
+  // value is refused — with the field NAMES, so the form can say which inputs
+  // were refused, and never a value. The decision reads the request alone,
+  // never the stored cost: refusing only a number that differs from it told
+  // a non-owner when a guess was right.
+  if (!canWriteCost(c.env, admin)) {
+    const attempted = attemptedFinancialWrites(body);
+    if (attempted.length) throw costDenied({ fields: attempted });
     // Carry the stored cost forward untouched so an assistant's save cannot
     // blank a value they were never shown.
     carryStoredCostForward(doc, prev);
@@ -1337,7 +1343,7 @@ adminProductsRoutes.post('/', async (c) => {
     printerFits: Array.isArray(body.printer_fit_ids)
       ? (body.printer_fit_ids as unknown[]).filter((x): x is string => typeof x === 'string')
       : undefined,
-    actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
+    actor: { adminId: admin.id, money: canWriteCost(c.env, admin) },
     translations: localized.fields,
   };
 
@@ -1884,7 +1890,7 @@ adminProductsRoutes.put('/:id/catalogs', async (c) => {
     prev: parseProductRow(existingRow),
     relations: null,
     catalogIds: (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string'),
-    actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
+    actor: { adminId: admin.id, money: canWriteCost(c.env, admin) },
   });
   await saveProductAtomic(c.env.DB, plan, [{ action: 'product_v2.catalogs', detail: { catalog_ids: plan.catalogIds ?? [] } }]);
   return c.json({ success: true, catalog_ids: await catalogIdsFor(c.env.DB, id) });
@@ -1933,7 +1939,7 @@ adminProductsRoutes.post('/:id/quote', async (c) => {
 
   // §11: cost is financial data. An assistant admin gets the same quote with
   // it removed — the check is here, on the server, not in the panel.
-  const quoteResolved = canViewFinancials(c.env, c.get('user'))
+  const quoteResolved = canViewCost(c.env, c.get('user'))
     ? resolved
     : { ...resolved, cost_iqd: undefined };
   return c.json({

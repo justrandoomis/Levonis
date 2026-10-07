@@ -1,8 +1,9 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { safeParse, type AppContext } from '../lib/types';
 import { badRequest, oneOf, requireAuth, str, int } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
 import { listNotifications, markRead, unreadCount } from '../lib/notifications';
+import { canViewCost } from '../lib/adminScope';
 import { channelReadiness, setPrimaryChannelStatements, type ChannelId } from '../lib/channelReadiness';
 
 /** The four channels the schema's CHECK admits (migration 0092). Declared here
@@ -25,6 +26,13 @@ const CHANNEL_IDS = ['inapp', 'telegram', 'whatsapp', 'email'] as const satisfie
 export const notificationRoutes = new Hono<AppContext>();
 notificationRoutes.use('*', requireAuth);
 
+/**
+ * Withdrawal notices written before S1 reached every full and NULL-scope
+ * admin; they stay in the table but never leave it for anyone but the owner
+ * (lib/notifications.ts HIDE_OWNER_FINANCE_NOTICES_SQL, owner decision 2).
+ */
+const inboxOpts = (c: Context<AppContext>) => ({ hideOwnerFinance: !canViewCost(c.env, c.get('user')) });
+
 notificationRoutes.get('/', async (c) => {
   const user = c.get('user')!;
   const q = c.req.query();
@@ -35,8 +43,9 @@ notificationRoutes.get('/', async (c) => {
       limit,
       before: before || undefined,
       unreadOnly: q.unread === '1',
+      ...inboxOpts(c),
     }),
-    unreadCount(c.env.DB, user.id),
+    unreadCount(c.env.DB, user.id, inboxOpts(c)),
   ]);
   return c.json({
     success: true,
@@ -73,7 +82,7 @@ notificationRoutes.get('/', async (c) => {
 /** Just the badge. Cheap enough to poll, and backed by a partial index. */
 notificationRoutes.get('/unread-count', async (c) => {
   const user = c.get('user')!;
-  return c.json({ success: true, unread: await unreadCount(c.env.DB, user.id) });
+  return c.json({ success: true, unread: await unreadCount(c.env.DB, user.id, inboxOpts(c)) });
 });
 
 notificationRoutes.post('/read', async (c) => {
@@ -81,7 +90,7 @@ notificationRoutes.post('/read', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const id = str(body.id, 'id', { max: 60, required: false }) ?? '';
   const changed = await markRead(c.env.DB, user.id, id || undefined);
-  return c.json({ success: true, marked: changed, unread: await unreadCount(c.env.DB, user.id) });
+  return c.json({ success: true, marked: changed, unread: await unreadCount(c.env.DB, user.id, inboxOpts(c)) });
 });
 
 // ---------------------------------------------------------------------------

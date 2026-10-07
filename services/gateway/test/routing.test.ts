@@ -189,7 +189,7 @@ test('the narrow rows win over their prefix, and only for their method', () => {
   assert.equal(resolve('/api/admin/orders', 'GET', 7)!.target, 'COMMERCE');
 });
 
-test('assistant stock picker reads pass while every other procurement path retains the financial gate', () => {
+test('assistant stock picker reads pass while every other procurement path is the owner\'s alone (decision 2)', () => {
   const selection = '/api/admin/procurement/selections/product-1';
   for (const method of ['GET', 'HEAD']) {
     const rule = matchRoute(selection, method)!;
@@ -200,7 +200,7 @@ test('assistant stock picker reads pass while every other procurement path retai
     assert.equal(resolve(selection, method, 5)!.target, 'CATALOG');
   }
   for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
-    assert.equal(matchRoute(selection, method)!.requires, 'admin:full');
+    assert.equal(matchRoute(selection, method)!.requires, 'admin:owner');
   }
   for (const path of [
     '/api/admin/procurement',
@@ -213,8 +213,34 @@ test('assistant stock picker reads pass while every other procurement path retai
     '/api/admin/procurement/selections-extra/product-1',
   ]) {
     for (const method of ['GET', 'HEAD', 'POST']) {
-      assert.equal(matchRoute(path, method)!.requires, 'admin:full', `${method} ${path}`);
+      assert.equal(matchRoute(path, method)!.requires, 'admin:owner', `${method} ${path}`);
     }
+  }
+});
+
+test('receiving stays open to a receive holder at the edge — through the cost-free view and the receive POST only', () => {
+  for (const method of ['GET', 'HEAD']) {
+    for (const path of ['/api/admin/procurement/receiving', '/api/admin/procurement/receiving/purchase-1']) {
+      assert.equal(matchRoute(path, method)!.requires, 'admin', `${method} ${path}`);
+      assert.equal(matchRoute(path, method)!.owner, 'CATALOG');
+    }
+    for (const path of ['/api/admin/investment-finance/lots', '/api/admin/investment-finance/lots/lot-1']) {
+      assert.equal(matchRoute(path, method)!.requires, 'admin', `${method} ${path}`);
+      assert.equal(matchRoute(path, method)!.owner, 'LEDGER');
+    }
+  }
+  assert.equal(matchRoute('/api/admin/procurement/documents/purchase-1/receive', 'POST')!.requires, 'admin');
+  // …and nothing beside them opens.
+  for (const [path, method] of [
+    ['/api/admin/procurement/documents/purchase-1/receive', 'GET'],
+    ['/api/admin/procurement/documents/purchase-1', 'GET'],
+    ['/api/admin/procurement/receiving/purchase-1/extra', 'GET'],
+    ['/api/admin/procurement/receiving', 'POST'],
+    ['/api/admin/investment-finance/lots/lot-1/contracts', 'GET'],
+    ['/api/admin/investment-finance/lots', 'POST'],
+    ['/api/admin/investment-finance/lot-cost-adjustments', 'POST'],
+  ] as const) {
+    assert.equal(matchRoute(path, method)!.requires, 'admin:owner', `${method} ${path}`);
   }
 });
 
@@ -251,4 +277,20 @@ test('targetFor applies the override to the PATH, not only to the matched prefix
   const overrides = parseOverrides('/api/products/abc=CORE', ROUTE_TARGETS);
   assert.equal(targetFor(rule, 5, overrides, '/api/products/abc'), 'CORE');
   assert.equal(targetFor(rule, 5, overrides, '/api/products/other'), 'CATALOG');
+});
+
+test('every cost surface is the owner\'s alone at the edge (owner decision 2)', () => {
+  for (const path of [
+    '/api/admin/finance/report/summary',
+    '/api/admin/finance-workspace/summary',
+    '/api/admin/finance-people/staff',
+    '/api/admin/investment-finance/contracts',
+    '/api/admin/finance-operations/config',
+    '/api/admin/finance/expenses',
+    '/api/admin/investment-profiles',
+    '/api/admin/invest/summary',
+    '/api/admin/security/overview',
+  ]) {
+    assert.equal(matchRoute(path, 'GET')!.requires, 'admin:owner', path);
+  }
 });

@@ -197,7 +197,7 @@ async function main() {
   const refUsername = `uiref${rnd}`;
   let r = await admin.post('/api/auth/register', { email: adminEmail, username: `uiadm${rnd}`, name: 'UI Admin', password: 'ui-admin-pass-1' });
   if (r.status !== 200) { console.error('FATAL: admin registration failed', r.status, JSON.stringify(r.data).slice(0, 200)); process.exit(1); }
-  sqlExec(`UPDATE users SET role='admin' WHERE email='${adminEmail}'`);
+  sqlExec(`UPDATE users SET role='admin' WHERE email='${adminEmail}'; UPDATE users SET admin_scope='full' WHERE email='${adminEmail}'`);
   await admin.get('/api/auth/me');
 
   r = await referrer.post('/api/auth/register', { email: `ui-ref-${rnd}@test.local`, username: refUsername, name: 'UI Referrer', password: 'ui-ref-pass-1' });

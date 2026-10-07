@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, forbidden, notFound, str } from '../lib/http';
-import { isOwner, canViewFinancials } from '../lib/adminScope';
+import { isOwner } from '../lib/adminScope';
+import { requireCostRead } from '../lib/costAccess';
+import { limitByMethod } from '../lib/ratelimit';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import {
@@ -26,9 +28,12 @@ import { nextEmploymentDay, queueStaffReconciliation, readStaff, updateStaffEmpl
 
 export const adminFinanceOperationsRoutes = new Hono<AppContext>();
 adminFinanceOperationsRoutes.use('*', requireAdmin);
+// THE DOOR (owner decision 2): payroll, withdrawals and profit are cost — the
+// owner's alone, full-scope admins included. The rate limit runs before the
+// guard, so a refused caller still spends budget.
+adminFinanceOperationsRoutes.use('*', limitByMethod(['finance-read', 600], ['finance-write', 120]), requireCostRead);
 const text = (v: unknown, max = 200) => str(v, 'text', { max, required: false }) ?? '';
 adminFinanceOperationsRoutes.get('/config', async (c) => {
-  if (!canViewFinancials(c.env, c.get('user')!)) throw forbidden('هذه الشاشة تتطلب صلاحية مالية');
   const db = c.env.DB;
   const [staff, centers, categories, catalogs, accounts, permissions, admins, groups] = await Promise.all([
     db.prepare('SELECT * FROM finance_staff ORDER BY name').all(),

@@ -338,7 +338,10 @@ test('owner can read committed reconciliation progress after a lost response, re
   const endpoint = `/people/staff/${id}/reconcile`;
   const financialAdmin = app('financial-admin', 'full');
   assert.equal((await json(await get(boss, '/people/staff'))).can_manage_staff, true);
-  assert.equal((await json(await get(financialAdmin, '/people/staff'))).can_manage_staff, false);
+  // Owner decision 2: payroll is cost — a full-scope admin is refused at the door.
+  const refused = await get(financialAdmin, '/people/staff');
+  assert.equal(refused.status, 403);
+  assert.equal((await json(refused)).code, 'COST_ACCESS_DENIED');
   assert.equal((await get(self, endpoint)).status, 403);
   assert.equal((await get(financialAdmin, endpoint)).status, 403);
   assert.equal((await get(boss, '/people/staff/missing/reconcile')).status, 404);

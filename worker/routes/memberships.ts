@@ -9,7 +9,7 @@ import {
 } from '../lib/walletOps';
 import type { AppContext, Env, SessionUser } from '../lib/types';
 import { requireAuth, requireAdmin, requireMainHost, badRequest, forbidden, notFound, oneOf, str, int, HttpError } from '../lib/http';
-import { canViewFinancials } from '../lib/adminScope';
+import { canMoveMoney } from '../lib/adminScope';
 import { sha256Hex } from '../lib/crypto';
 import { getSetting, setSetting, SETTING_DEFAULTS } from '../lib/settings';
 import {
@@ -1281,7 +1281,7 @@ membershipsRoutes.put('/admin/bnpl/:userId', async (c) => {
    * A user interface that stops OFFERING the control is not this boundary: the
    * request can still be sent. The boundary has to be here, in the handler.
    */
-  if (!canViewFinancials(c.env, admin)) {
+  if (!canMoveMoney(c.env, admin)) {
     throw forbidden('Setting a credit limit is a financial decision / تحديد سقف الائتمان قرار مالي');
   }
   const userId = str(c.req.param('userId'), 'userId', { min: 1, max: 80 });

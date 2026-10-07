@@ -2,8 +2,10 @@ import { participantReport } from '../lib/financeParticipantReports';
 import { isConfirmedOrderCost } from '../lib/financeLedger';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { badRequest, conflict, forbidden, notFound, requireAdmin, str, unavailable } from '../lib/http';
-import { canViewFinancials, isOwner } from '../lib/adminScope';
+import { badRequest, conflict, notFound, requireAdmin, str, unavailable } from '../lib/http';
+import { canViewCost, isOwner } from '../lib/adminScope';
+import { requireCostRead } from '../lib/costAccess';
+import { limitByMethod } from '../lib/ratelimit';
 import { newId } from '../lib/crypto';
 import { auditStatements } from '../lib/audit';
 import { baghdadDay, dateValue, decimal, fence, periodOpen, requireCapability, whole } from '../lib/operations';
@@ -20,8 +22,11 @@ const n=(v:unknown)=>Number(v??0),s=(v:unknown)=>String(v??'');
 const text=(v:unknown,max=200)=>str(v,'النص',{max,required:false})??'';
 export const adminFinanceWorkspaceRoutes=new Hono<AppContext>();
 adminFinanceWorkspaceRoutes.use('*',requireAdmin);
+// THE DOOR (owner decision 2): payroll, withdrawals and profit are cost — the
+// owner's alone, full-scope admins included. The rate limit runs before the
+// guard, so a refused caller still spends budget.
+adminFinanceWorkspaceRoutes.use('*', limitByMethod(['finance-read', 600], ['finance-write', 120]), requireCostRead);
 adminFinanceWorkspaceRoutes.use('*',async(c,next)=>{
-  if(!canViewFinancials(c.env,c.get('user')!))throw forbidden('هذه الشاشة تتطلب صلاحية مالية');
   if(!await workspaceInstalled(c.env.DB))throw unavailable('تحديث مساحة العمل المالية لم يطبق بعد');
   await next();
 });
@@ -176,8 +181,10 @@ async function reconcileWorkspace(db:D1Database,id:string,actor:string,day:strin
 adminFinanceWorkspaceRoutes.get('/orders/:id',async(c)=>{
   const actor=c.get('user')!;
   const permissions=(await c.env.DB.prepare("SELECT capability,allowed FROM ops_permissions WHERE user_id=? AND capability IN ('accounting','rules')").bind(actor.id).all<{capability:string;allowed:number}>()).results??[];
-  const canVerify=isOwner(c.env,actor)||permissions.find(p=>p.capability==='accounting')?.allowed!==0;
-  const canReconcile=isOwner(c.env,actor)||permissions.find(p=>p.capability==='rules')?.allowed!==0;
+  // Owner, or (only once delegation exists) a cost grantee with an explicit
+  // permission row: a missing row no longer means allowed (owner decision 2).
+  const canVerify=isOwner(c.env,actor)||(canViewCost(c.env,actor)&&permissions.find(p=>p.capability==='accounting')?.allowed===1);
+  const canReconcile=isOwner(c.env,actor)||(canViewCost(c.env,actor)&&permissions.find(p=>p.capability==='rules')?.allowed===1);
   return c.json({success:true,...await detail(c.env.DB,c.req.param('id'),canVerify),can_reconcile:canReconcile});
 });
 adminFinanceWorkspaceRoutes.post('/orders/:id/adjustments',async(c)=>{

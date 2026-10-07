@@ -40,7 +40,7 @@ import type { AppContext, Env } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, forbidden, str } from '../lib/http';
 import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { canViewFinancials } from '../lib/adminScope';
+import { canViewCost, canWriteCost } from '../lib/adminScope';
 import { rateLimit } from '../lib/ratelimit';
 import { HEIF_REFUSAL, isHeifBytes, sniff } from './uploads';
 import { IMAGE_SOURCE_CAP } from '../lib/imageConvert';
@@ -299,7 +299,8 @@ adminImportRoutes.get('/template', async (c) => {
   const rawCategory = c.req.query('category');
   const format = c.req.query('format') === 'zip' ? 'zip' : 'csv';
   const withExample = c.req.query('example') !== '0';
-  const money = canViewFinancials(c.env, admin);
+  // Cost columns in a download are a cost READ: the owner's (decision 2).
+  const money = canViewCost(c.env, admin);
 
   // TWO WAYS IN, TWO SHAPES. `?type=` downloads the template for a product
   // type straight away — the owner's «ويكون حسب نوع المنتج» — and `?category=`
@@ -733,7 +734,7 @@ async function exportProducts(
 
 adminImportRoutes.get('/export', async (c) => {
   const admin = c.get('user')!;
-  const money = canViewFinancials(c.env, admin);
+  const money = canViewCost(c.env, admin);
   const format = c.req.query('format') === 'zip' ? 'zip' : 'csv';
   const idsParam = (c.req.query('ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
@@ -1359,7 +1360,8 @@ interface PreviewRow {
 adminImportRoutes.post('/preview', async (c) => {
   await rateLimit(c, 'import_preview', 40, 3600);
   const admin = c.get('user')!;
-  const money = canViewFinancials(c.env, admin);
+  // Writing a cost from a file is a cost WRITE.
+  const money = canWriteCost(c.env, admin);
   const { file, categoryId } = await readUpload(c);
   if (!categoryId) throw badRequest('category: choose the section this file belongs to');
 
@@ -1693,7 +1695,7 @@ function importItemCheckpointStatement(
 
 adminImportRoutes.post('/confirm', async (c) => {
   const admin = c.get('user')!;
-  const money = canViewFinancials(c.env, admin);
+  const money = canWriteCost(c.env, admin);
   const body = (await c.req.json().catch(() => ({}))) as { import_id?: unknown };
   const importId = str(body.import_id, 'import_id', { min: 1, max: 60 });
 
@@ -1824,7 +1826,7 @@ adminImportRoutes.post('/confirm', async (c) => {
         // assistant (importApply keeps it); judging price against it would
         // turn a refusal into a cost oracle.
         const doc = validateProductDoc(remapped ? { ...stored, brand_id: remapped } : stored, {
-          costBlind: !canViewFinancials(c.env, admin),
+          costBlind: !canViewCost(c.env, admin),
         });
         doc.id = String(item.productId ?? '');
         const relationsBody = item.relations && typeof item.relations === 'object'

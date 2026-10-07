@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import type { AppContext, Env, SessionUser } from '../lib/types';
-import { requireAdmin, badRequest, notFound, forbidden, str, int } from '../lib/http';
+import { requireAdmin, badRequest, notFound, str, int } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
+import { canViewCost, canWriteCost, projectForAdmin } from '../lib/adminScope';
+import { costDenied } from '../lib/costAccess';
 import { getSetting } from '../lib/settings';
 import { normalizeAvailability, deriveSaleTypes, type AvailabilityType } from '../lib/availability';
 import { normalizeSaleTypes } from '../lib/productModel';
@@ -498,7 +499,8 @@ function ladderErrorsAfter(next: GridProductInput, changes: CellChange[]): strin
  * `projectForAdmin` strips the cost from the guard but keeps its code and the
  * proposed price — so an assistant admin could preview a bulk change at
  * different amounts and binary-search the exact cost from where BELOW_COST
- * appears. Without financial scope there are no guards at all: the preview,
+ * appears. Without cost access (everyone but the owner, decision 2) there are
+ * no guards at all: the preview,
  * the 409 that asks for confirmation and the apply are the same at any price.
  */
 function withoutCostSignal<T extends { guards: unknown[] }>(preview: T, financial: boolean): T {
@@ -508,8 +510,8 @@ function withoutCostSignal<T extends { guards: unknown[] }>(preview: T, financia
 /**
  * The same rule for the ladder check. `validatePriceLadder` refuses a price
  * equal to the cost, and the cost it is handed is the STORED one — so for an
- * assistant admin a refused preview confirms a guessed cost. Without
- * financial scope the ladder is judged with no cost at all; the write keeps
+ * assistant admin a refused preview confirms a guessed cost. Without cost
+ * access the ladder is judged with no cost at all; the write keeps
  * the stored cost either way (assertMayWrite refuses a cost field).
  */
 function costBlind(input: GridProductInput, financial: boolean): GridProductInput {
@@ -548,13 +550,13 @@ function historyStatements(
 // -------------------------------------------------------------- projections
 
 /**
- * An assistant admin never sees a cost cell, a cost adjustment or a profit, in
- * the grid as anywhere else. The COST COLUMN IS REMOVED rather than blanked, so
+ * Nobody but the owner sees a cost cell, a cost adjustment or a profit, in the
+ * grid as anywhere else (owner decision 2 — full-scope admins included). The COST COLUMN IS REMOVED rather than blanked, so
  * the client renders three columns instead of four and no zero is ever mistaken
  * for a real cost.
  */
 function projectGrid(env: Env, user: SessionUser | null | undefined, rows: GridRow[]) {
-  if (canViewFinancials(env, user)) return rows;
+  if (canViewCost(env, user)) return rows;
   return rows.map((r) => {
     const cells = { ...r.cells } as Partial<GridRow['cells']>;
     delete cells.cost;
@@ -573,9 +575,7 @@ function projectGrid(env: Env, user: SessionUser | null | undefined, rows: GridR
 }
 
 function assertMayWrite(env: Env, user: SessionUser | null | undefined, fields: Field[]) {
-  if (fields.includes('cost') && !canViewFinancials(env, user)) {
-    throw forbidden('Cost is restricted to financial admins');
-  }
+  if (fields.includes('cost') && !canWriteCost(env, user)) throw costDenied({ fields: ['cost'] });
 }
 
 const readFields = (v: unknown): Field[] => {
@@ -615,7 +615,7 @@ adminPriceGridRoutes.get('/:id/price-grid', async (c) => {
   const productId = c.req.param('id');
   const loaded = await loadProduct(c.env.DB, productId);
   const rows = buildGrid(loaded.input);
-  const financial = canViewFinancials(c.env, admin);
+  const financial = canViewCost(c.env, admin);
   const minMargin = await getSetting(c.env.DB, 'minMarginPercent');
 
   const variants = new Map<string, string>();
@@ -674,7 +674,7 @@ adminPriceGridRoutes.patch('/:id/price-grid', async (c) => {
   const loaded = await loadProduct(c.env.DB, productId);
   const rows = buildGrid(loaded.input);
   const byKey = new Map(rows.map((r) => [`${r.level}:${r.id}`, r]));
-  const financial = canViewFinancials(c.env, admin);
+  const financial = canViewCost(c.env, admin);
   const minMargin = await getSetting(c.env.DB, 'minMarginPercent');
 
   const patches: CellPatch[] = [];
@@ -1064,7 +1064,7 @@ adminPriceGridRoutes.post('/:id/price-grid/bulk', async (c) => {
   const req: BulkRequest = { op, fields, value, scope: readScope(body.scope) };
   const loaded = await loadProduct(c.env.DB, productId);
   const rows = buildGrid(loaded.input);
-  const financial = canViewFinancials(c.env, admin);
+  const financial = canViewCost(c.env, admin);
   const minMargin = await getSetting(c.env.DB, 'minMarginPercent');
   const preview = withoutCostSignal(previewBulk(rows, req, financial ? minMargin : null), financial);
   // What the write-time ladder would say about the result — shown with the
@@ -1141,7 +1141,7 @@ adminPriceGridRoutes.post('/:id/price-grid/copy', async (c) => {
 
   const loaded = await loadProduct(c.env.DB, productId);
   const rows = buildGrid(loaded.input);
-  const financial = canViewFinancials(c.env, admin);
+  const financial = canViewCost(c.env, admin);
   const minMargin = await getSetting(c.env.DB, 'minMarginPercent');
   const preview = withoutCostSignal(previewCopy(rows, req, financial ? minMargin : null), financial);
   const ladderErrors = preview.changes.length ? ladderErrorsAfter(costBlind(afterChanges(loaded.input, preview.changes), financial), preview.changes) : [];
@@ -1338,13 +1338,13 @@ adminPriceGridRoutes.post('/:id/price-grid/undo', async (c) => {
 });
 
 /**
- * The price timeline. Financial admins only: it carries cost moves, and a cost
+ * The price timeline. The owner only (decision 2): it carries cost moves, and a cost
  * is a cost whether it is current or historical. It is never served on any
  * public route, and no storefront code calls it.
  */
 adminPriceGridRoutes.get('/:id/price-history', async (c) => {
   const admin = c.get('user')!;
-  if (!canViewFinancials(c.env, admin)) throw forbidden('Price history is restricted to financial admins');
+  if (!canViewCost(c.env, admin)) throw costDenied();
   const productId = c.req.param('id');
   const limit = int(c.req.query().limit, 'limit', { min: 1, max: 200, def: 60 });
   const offset = int(c.req.query().offset, 'offset', { min: 0, max: 100_000, def: 0 });
@@ -1400,7 +1400,7 @@ adminPriceGridRoutes.get('/:id/price-history', async (c) => {
  */
 adminPriceGridRoutes.post('/:id/price-grid/cost-change', async (c) => {
   const admin = c.get('user')!;
-  if (!canViewFinancials(c.env, admin)) throw forbidden('Cost is restricted to financial admins');
+  if (!canViewCost(c.env, admin)) throw costDenied();
   const productId = c.req.param('id');
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const parsed = parseAmount(body.new_cost_iqd);

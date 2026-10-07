@@ -26,7 +26,12 @@
  * an adjustment, recorded on the movement, and it stays there.
  *
  * ---------------------------------------------------------------------------
- * AN ASSISTANT ADMIN IS WELCOME HERE AND SEES NO MONEY.
+ * EVERY ADMIN BUT THE OWNER IS WELCOME HERE AND SEES NO COST.
+ *
+ * Owner decision 2 (2026-10-07): cost reaches the main admin only — full-scope
+ * admins included in the "no". The procurement and lot-report tabs (purchase
+ * costs, valuation) show only for `can_view_cost === true` AND a payload that
+ * actually carries the valuation; either missing hides them.
  *
  * Unlike the profit screen — which refuses them at the door, because there is
  * no useful non-financial part of a profit report — this one is theirs to use:
@@ -40,6 +45,7 @@ import { ArrowLeftRight, Boxes, CalendarClock, ClipboardCheck, Layers, PackagePl
 import * as T from '../adminProducts/theme';
 import '../adminProducts/theme.css';
 import { fetchInventoryOverview, type InventoryOverview } from '../../lib/api';
+import { useAuth } from '../../AuthContext';
 import { Money, Notice, Stat, errMsg, useCount, useLoc, type NoticeState } from './shared';
 import { inventoryStrings } from './strings';
 import { StockTab } from './StockTab';
@@ -48,22 +54,26 @@ import { MovementsTab } from './MovementsTab';
 import { SuppliersTab } from './SuppliersTab';
 import './inventory-workspace.css';
 const ProcurementPanel=lazy(()=>import('../adminOperations/ProcurementPanel'));
+const PurchaseReceivePanel=lazy(()=>import('../adminOperations/PurchaseReceivePanel'));
 const StockOperationsPanel=lazy(()=>import('../adminOperations/StockOperationsPanel'));
 const InventoryLotPanel=lazy(()=>import('./InventoryLotPanel'));
 
-type Tab = 'stock' | 'incoming' | 'movements' | 'suppliers' | 'procurement' | 'operations' | 'reports';
+type Tab = 'stock' | 'incoming' | 'movements' | 'suppliers' | 'procurement' | 'receiving' | 'operations' | 'reports';
 
 export default function AdminInventory() {
   const { dir, loc, latin } = useLoc();
   const count = useCount();
   const s = useMemo(() => inventoryStrings(loc), [loc]);
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('stock');
   const [overview, setOverview] = useState<InventoryOverview | null>(null);
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [action, setAction] = useState<{ kind: 'purchase' | 'receive' | 'count' | 'transfer'; key: number } | null>(null);
   const begin = (kind: 'purchase' | 'receive' | 'count' | 'transfer') => {
     setAction((old) => ({ kind, key: (old?.key ?? 0) + 1 }));
-    setTab(kind === 'purchase' || kind === 'receive' ? (showsCosts ? 'procurement' : 'incoming') : 'operations');
+    // Every admin but the owner receives through the cost-free receiving view
+    // (PurchaseReceivePanel); the purchase register is the owner's.
+    setTab(kind === 'purchase' || kind === 'receive' ? (showsCosts ? 'procurement' : 'receiving') : 'operations');
   };
 
   const loadOverview = useCallback(async () => {
@@ -76,14 +86,16 @@ export default function AdminInventory() {
 
   useEffect(() => { loadOverview(); }, [loadOverview]);
 
-  // The server removed the money for an assistant admin; the strip drops the
-  // cards rather than printing them empty.
-  const showsCosts = overview !== null && 'inventory_value_iqd' in overview;
+  // The server removed the cost for every admin but the owner; the strip drops
+  // the cards rather than printing them empty. The hint is compared with
+  // `=== true` too, so a session without it never opens the cost tabs.
+  const showsCosts = user?.can_view_cost === true && overview !== null && 'inventory_value_iqd' in overview;
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'stock', label: s.tabs.stock },
     ...(showsCosts ? [{ id: 'procurement' as const, label: loc('أوامر الشراء والشحنات', 'Purchase orders and shipments', 'داواکاریی کڕین و بارەکان') }] : []),
     ...(showsCosts ? [{ id: 'reports' as const, label: loc('تقارير ودفعات المخزون', 'Inventory reports and lots') }] : []),
+    ...(!showsCosts ? [{ id: 'receiving' as const, label: loc('استلام الشحنات', 'Receive shipments', 'وەرگرتنی بارەکان') }] : []),
     { id: 'operations', label: loc('الجرد والمستودعات', 'Counts and warehouses', 'ژماردن و کۆگاکان') },
     { id: 'incoming', label: loc('المشتريات المنفردة السابقة', 'Legacy individual purchases', 'کڕینە تاکە کۆنەکان') },
     { id: 'movements', label: s.tabs.movements },
@@ -188,6 +200,7 @@ export default function AdminInventory() {
       {tab === 'movements' && <MovementsTab s={s} />}
       {tab === 'suppliers' && <SuppliersTab s={s} />}
       {tab === 'procurement' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…')}</p>}><ProcurementPanel key={action?.key} initialAction={action?.kind === 'purchase' ? 'purchase' : action?.kind === 'receive' ? 'receive' : undefined} onChanged={loadOverview} /></Suspense>}
+      {tab === 'receiving' && !showsCosts && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><PurchaseReceivePanel key={action?.key} onChanged={loadOverview} /></Suspense>}
       {tab === 'operations' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…')}</p>}><StockOperationsPanel key={action?.key} initialTab={action?.kind === 'count' ? 'counts' : action?.kind === 'transfer' ? 'locations' : undefined} onChanged={loadOverview} /></Suspense>}
       {tab === 'reports' && showsCosts && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…')}</p>}><InventoryLotPanel onChanged={loadOverview} onOperations={() => { setAction(null); setTab('operations'); }} /></Suspense>}
     </div>

@@ -9,7 +9,7 @@ import type { AppContext } from '../src/edge/types';
 import { signHop } from '../src/hop';
 import { buildPrincipal } from '../src/principal';
 import { healthReport, isHealthProbe, legacyHealthBody } from '../src/health';
-import { canViewFinancials, scopeFor, stripFinancials, meetsRequirement } from '../src/scope';
+import { canViewCostPrincipal, hasMoneyScopePrincipal, projectForPrincipal, scopeFor, stripFinancials, meetsRequirement } from '../src/scope';
 import { HOP_HEADER, HOST_HEADER } from '@levonis/contracts/http/common';
 import { KitError } from '../src/errors';
 import { ringOf, testIdentity } from './_keys';
@@ -96,12 +96,19 @@ test('capabilities: longest prefix wins, admin surfaces are apex-only, money/PII
   assert.equal(capabilityDenial(wallet, principal('admin', 'owner'), 'foreign'), null, 'a foreign host is treated as the main site so a probe learns nothing');
 });
 
-test('scope over the principal: owner and full see money, assistant does not; stripping is recursive', () => {
+test('scope over the principal: owner and full move money, only the owner sees cost (decision 2); stripping is recursive', () => {
   assert.equal(scopeFor({ role: 'admin', admin_scope: null, isOwner: false }), 'full', 'NULL is unrestricted so the migration could not demote a live admin');
   assert.equal(scopeFor({ role: 'admin', admin_scope: 'assistant', isOwner: true }), 'owner', 'the owner can never be restricted');
   assert.equal(scopeFor({ role: 'customer', admin_scope: 'full', isOwner: false }), null);
-  assert.ok(canViewFinancials(principal('admin', 'owner')) && canViewFinancials(principal('admin', 'full')));
-  assert.ok(!canViewFinancials(principal('admin', 'assistant')) && !canViewFinancials(principal('customer')));
+  assert.ok(hasMoneyScopePrincipal(principal('admin', 'owner')) && hasMoneyScopePrincipal(principal('admin', 'full')));
+  assert.ok(!hasMoneyScopePrincipal(principal('admin', 'assistant')) && !hasMoneyScopePrincipal(principal('customer')));
+  assert.ok(canViewCostPrincipal(principal('admin', 'owner')));
+  assert.ok(!canViewCostPrincipal(principal('admin', 'full')), 'a full admin moves money but never sees a cost');
+  assert.ok(!canViewCostPrincipal(principal('admin', 'assistant')) && !canViewCostPrincipal(principal('customer')));
+  assert.deepEqual(projectForPrincipal(principal('admin', 'full'), { price_iqd: 1, cost_iqd: 2 }), { price_iqd: 1 });
+  assert.deepEqual(projectForPrincipal(principal('admin', 'owner'), { price_iqd: 1, cost_iqd: 2 }), { price_iqd: 1, cost_iqd: 2 });
+  assert.ok(meetsRequirement(principal('admin', 'owner'), 'admin:owner'));
+  assert.ok(!meetsRequirement(principal('admin', 'full'), 'admin:owner') && meetsRequirement(principal('admin', 'full'), 'admin:full'));
   assert.deepEqual(stripFinancials({ price_iqd: 1, cost_iqd: 2, options: [{ id: 'o', cost_iqd: 3, profit_iqd: 4 }] }), { price_iqd: 1, options: [{ id: 'o' }] });
   assert.ok(meetsRequirement(principal('admin', 'assistant'), 'admin') && !meetsRequirement(principal('admin', 'assistant'), 'admin:full'));
 });

@@ -112,7 +112,11 @@ export interface MemberFinancial {
 }
 
 export interface MemberDetailResponse {
+  /** In THIS response an alias of money scope (lifetime value, wallet, BNPL
+   *  limit are money, not cost — owner decision 2); see `can_move_money`. */
   can_view_financials: boolean;
+  /** Owner or full-scope admin; absent from a server older than S1. */
+  can_move_money?: boolean;
   member: MemberDetail;
   financial?: MemberFinancial;
 }

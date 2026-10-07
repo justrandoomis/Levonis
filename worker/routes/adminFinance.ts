@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
-import type { Context, Next } from 'hono';
+import type { Context } from 'hono';
 import type { AppContext, Env } from '../lib/types';
-import { requireAdmin, badRequest, forbidden, notFound, str, int } from '../lib/http';
+import { requireAdmin, badRequest, notFound, str, int } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { canViewFinancials } from '../lib/adminScope';
+import { requireCostRead } from '../lib/costAccess';
+import { limitByMethod } from '../lib/ratelimit';
 import { baghdadDay, isDay } from '../lib/baghdadTime';
 import {
   DEFAULT_EXPENSE_CATEGORIES,
@@ -81,20 +82,16 @@ export const adminFinanceRoutes = new Hono<AppContext>();
 adminFinanceRoutes.use('*', requireAdmin);
 
 /**
- * THE FINANCIAL SCOPE, ON EVERY METHOD AND EVERY PATH.
+ * THE COST DOOR, ON EVERY METHOD AND EVERY PATH (owner decision 2): expenses
+ * and profit are the owner's alone, full-scope admins included.
  *
  * 403 and not 404: the caller IS an administrator and the route DOES exist for
- * them as a person — what they lack is financial scope, and saying so is how an
- * assistant knows to ask the owner rather than report a broken panel. This is
- * the same answer `adminPriceGrid` gives for price history and for cost.
+ * them as a person — what they lack is cost access, and saying so (one generic
+ * COST_ACCESS_DENIED, the same everywhere) is how an admin knows to ask the
+ * owner rather than report a broken panel. The rate limit runs before the
+ * guard, so a refused caller still spends budget.
  */
-async function requireFinancialAdmin(c: Context<AppContext>, next: Next) {
-  if (!canViewFinancials(c.env, c.get('user'))) {
-    throw forbidden('Expenses and profit detail are restricted to financial admins');
-  }
-  await next();
-}
-adminFinanceRoutes.use('*', requireFinancialAdmin);
+adminFinanceRoutes.use('*', limitByMethod(['finance-read', 600], ['finance-write', 120]), requireCostRead);
 
 /** The server's own Baghdad day. Never a client's: a day a client can choose is
  *  a period a client can move money into. */

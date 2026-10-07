@@ -42,7 +42,7 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, int, str, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { auditStatements } from '../lib/audit';
-import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
+import { canWriteCost, projectForAdmin } from '../lib/adminScope';
 import { parseProductRow, projectAdmin, validateProductDoc, type ProductDoc } from '../lib/productModel';
 import {
   localizeRespectingAuthored,
@@ -786,7 +786,7 @@ async function writeOffer(c: Context<AppContext>, mode: 'create' | 'update', pro
     doc,
     prev,
     relations: null,
-    actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
+    actor: { adminId: admin.id, money: canWriteCost(c.env, admin) },
     translations: localized.fields,
     // The bundles panel and this one are the only writers allowed to create a
     // composition row, and both supply the composition in the same plan.
@@ -1032,7 +1032,7 @@ adminMysteryRoutes.post('/offers/:productId/duplicate', async (c) => {
     doc,
     prev: null,
     relations: null,
-    actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
+    actor: { adminId: admin.id, money: canWriteCost(c.env, admin) },
     allowComposition: true,
   };
   await preflightProductSave(c.env.DB, saveIntent);

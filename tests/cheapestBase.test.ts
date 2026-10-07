@@ -319,13 +319,26 @@ test('a colour that no active option offers is kept, and told that — not that 
   assert.ok(warnings.some((w) => w.includes('لا يتوفر لأي خيار فعّال')), warnings.join('\n'));
 });
 
-test('§11: an assistant admin is not told the cost through the "equals the cost" warning', () => {
-  const before = product(60_000, [opt('a', { regular_price_iqd: 50_000 })], [], { product_cost_iqd: 50_000 });
-  const forOwner = normalizeCheapestBase(before, { money: true });
-  const forAssistant = normalizeCheapestBase(before, { money: false });
-  assert.ok(forOwner.warnings.some((w) => w.includes('كلفة')));
-  assert.ok(!forAssistant.warnings.some((w) => w.includes('كلفة') || w.includes('50,000 د.ع) يساوي')), forAssistant.warnings.join('\n'));
-  assert.equal(forAssistant.base_after, 60_000, 'same decision, different words');
+test('§11 / decision 2: without cost access the decision ignores the cost — no oracle, no warning', () => {
+  // The cost a non-owner's document carries is the STORED one. A base that
+  // stops moving (or a warning that appears) exactly when the cheapest price
+  // equals it would confirm a guessed cost, so for them the cost takes no
+  // part: a guess equal to the stored cost and one that is not get the same
+  // answer, word for word.
+  const equal = product(60_000, [opt('a', { regular_price_iqd: 50_000 })], [], { product_cost_iqd: 50_000 });
+  const other = product(60_000, [opt('a', { regular_price_iqd: 50_000 })], [], { product_cost_iqd: 41_000 });
+  const forOwner = normalizeCheapestBase(equal, { money: true });
+  assert.ok(forOwner.warnings.some((w) => w.includes('كلفة')), 'the owner is still told');
+  assert.equal(forOwner.base_after, 60_000, 'and the owner\'s base still refuses to land on the cost');
+  const a = normalizeCheapestBase(equal, { money: false });
+  const b = normalizeCheapestBase(other, { money: false });
+  assert.deepEqual(
+    { base: a.base_after, changed: a.changed, warnings: a.warnings },
+    { base: b.base_after, changed: b.changed, warnings: b.warnings },
+    'the same answer whatever the stored cost is'
+  );
+  assert.equal(a.base_after, 50_000);
+  assert.ok(!a.warnings.some((w) => w.includes('كلفة') || w.includes('قاعدة')), a.warnings.join('\n'));
 });
 
 // -------------------------------------------------- the validator's half

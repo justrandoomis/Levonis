@@ -144,7 +144,15 @@ export interface StubUser {
   username?: string;
   admin_scope?: string | null;
   is_investor?: number;
+  /** Defaults to a stamped address. Cost is honoured only for the VERIFIED
+   *  owner (critique A10), so a test proving the unverified case sets null. */
+  email_verified_at?: string | null;
+  /** 0177 private grants. Ignored while PRIVATE_DELEGATION_ENABLED is false. */
+  private_grants?: string[];
 }
+
+/** The owner of every stubApp: its env names `boss@x.co` as INITIAL_ADMIN_EMAIL. */
+export const OWNER: StubUser = { id: 'usr_owner', role: 'admin', email: 'boss@x.co' };
 
 export type Mount = (app: Hono<AppContext>) => void;
 
@@ -157,12 +165,24 @@ export function stubApp(
   db: unknown,
   user: StubUser | null,
   mount: Mount,
-  opts: { host?: string; env?: Record<string, unknown> } = {}
+  opts: { host?: string; env?: Record<string, unknown>; sessionAgeSeconds?: number } = {}
 ) {
   const a = new Hono<AppContext>();
   a.use('*', async (c, next) => {
     c.set('host', classifyHost(opts.host ?? APEX, APEX));
-    c.set('user', user ? ({ admin_scope: null, username: user.id, is_investor: 0, ...user } as never) : (null as never));
+    // A signed-in stub is a FRESH sign-in unless the test says otherwise: an
+    // owner's scope elevation asks for one younger than ten minutes (S1).
+    c.set('sessionCreatedAt', user ? new Date(Date.now() - (opts.sessionAgeSeconds ?? 0) * 1000).toISOString() : null);
+    // …and it has a session id, as loadSessionUser sets one for every signed-in
+    // request: a route that binds it (Telegram's link status) must not crash on
+    // `undefined` in a test the real Worker would answer.
+    c.set('sessionId', user ? `stub-session-${user.id}` : null);
+    c.set(
+      'user',
+      user
+        ? ({ admin_scope: null, username: user.id, is_investor: 0, email_verified_at: '2026-01-01T00:00:00.000Z', ...user } as never)
+        : (null as never)
+    );
     c.env = { DB: db, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ...(opts.env ?? {}) } as never;
     await next();
   });

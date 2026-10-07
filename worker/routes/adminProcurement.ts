@@ -229,6 +229,78 @@ adminProcurementRoutes.get('/documents/:id', async (c) => {
   return c.json({ success: true, ...(await document(c.env.DB, c.req.param('id'))) });
 });
 
+/**
+ * RECEIVING A SHIPMENT, WITHOUT ITS COST — the `receive` holder's view of a
+ * purchase order (owner decision 2).
+ *
+ * The purchase register and the document are cost (purchase price, charges,
+ * payments, funding: `purchase` capability, the owner). Receiving is not:
+ * `POST /documents/:id/receive` stays an operations route (`receive`), as it
+ * was for full admins before S1 — and a receiver must be able to find the
+ * shipment and its lines to use it. These two answers are an ALLOWLIST built
+ * column by column, not a stripped document: who sent it, what was ordered,
+ * how much has arrived. No purchase price, charge, payment, funding, FX rate,
+ * invoice total or selling price is selected at all. Only shipments still
+ * awaiting receipt are listed or opened.
+ */
+const AWAITING_RECEIPT = "('ordered','partial')";
+type ReceivingHead = {
+  id: string;
+  invoice_no: string;
+  status: string;
+  purchase_day: string;
+  expected_day: string | null;
+  cost_state: string;
+  supplier_name: string | null;
+  warehouse_name: string | null;
+};
+const RECEIVING_HEAD_SQL = `SELECT p.id,p.invoice_no,p.status,p.purchase_day,p.expected_day,p.cost_state,
+    s.name AS supplier_name,w.name AS warehouse_name
+  FROM purchase_orders p LEFT JOIN inventory_suppliers s ON s.id=p.supplier_id
+  LEFT JOIN stock_locations w ON w.id=p.warehouse_id`;
+/** `ready` says whether the owner has fixed the final cost — receiving waits for it — without saying what it is. */
+const receivingHead = (p: ReceivingHead) => ({
+  id: p.id,
+  invoice_no: p.invoice_no,
+  status: p.status,
+  purchase_day: p.purchase_day,
+  expected_day: p.expected_day,
+  supplier_name: p.supplier_name,
+  warehouse_name: p.warehouse_name,
+  ready: p.cost_state === 'final',
+});
+adminProcurementRoutes.get('/receiving', async (c) => {
+  await requireCapability(c.env, c.get('user')!, 'receive');
+  const { results } = await c.env.DB.prepare(
+    `${RECEIVING_HEAD_SQL} WHERE p.status IN ${AWAITING_RECEIPT} ORDER BY p.created_at DESC LIMIT 100`,
+  ).all<ReceivingHead>();
+  return c.json({ success: true, purchases: (results ?? []).map(receivingHead) });
+});
+adminProcurementRoutes.get('/receiving/:id', async (c) => {
+  await requireCapability(c.env, c.get('user')!, 'receive');
+  const id = text(c.req.param('id'), 60);
+  const head = await c.env.DB.prepare(`${RECEIVING_HEAD_SQL} WHERE p.id=? AND p.status IN ${AWAITING_RECEIPT}`)
+    .bind(id)
+    .first<ReceivingHead>();
+  if (!head) throw notFound('Purchase not found');
+  const { results } = await c.env.DB.prepare(
+    `SELECT l.id AS line_id,l.label,l.rejected_qty,i.product_id,i.scope,i.scope_id,i.qty_ordered,i.qty_received
+       FROM purchase_lines l JOIN incoming_inventory i ON i.id=l.incoming_id WHERE l.purchase_id=? ORDER BY l.id`,
+  )
+    .bind(id)
+    .all<{
+      line_id: string;
+      label: string;
+      rejected_qty: number;
+      product_id: string | null;
+      scope: string;
+      scope_id: string;
+      qty_ordered: number;
+      qty_received: number;
+    }>();
+  return c.json({ success: true, purchase: receivingHead(head), lines: results ?? [] });
+});
+
 async function planDocument(
   db: D1Database,
   b: Record<string, unknown>,

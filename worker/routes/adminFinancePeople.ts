@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, conflict, forbidden, notFound, requireAdmin, str } from '../lib/http';
-import { canViewFinancials, isOwner } from '../lib/adminScope';
+import { isOwner } from '../lib/adminScope';
+import { requireCostRead } from '../lib/costAccess';
+import { limitByMethod } from '../lib/ratelimit';
 import { auditStatements } from '../lib/audit';
 import { staffPeriodReport } from '../lib/financeParticipantReports';
 import { financeRange, financeRangeArgs, inFinanceRangeSql } from '../lib/financeRange';
@@ -17,7 +19,10 @@ import { continueStaffReconciliation } from '../lib/financeStaffAccrual';
 
 export const adminFinancePeopleRoutes = new Hono<AppContext>();
 adminFinancePeopleRoutes.use('*',requireAdmin);
-adminFinancePeopleRoutes.use('*',async(c,next)=>{if(!canViewFinancials(c.env,c.get('user')!))throw forbidden('هذه الشاشة تتطلب صلاحية مالية');await next();});
+// THE DOOR (owner decision 2): payroll, withdrawals and profit are cost — the
+// owner's alone, full-scope admins included. The rate limit runs before the
+// guard, so a refused caller still spends budget.
+adminFinancePeopleRoutes.use('*', limitByMethod(['finance-read', 600], ['finance-write', 120]), requireCostRead);
 const text=(v:unknown,max=200)=>str(v,'النص',{max,required:false})??'';
 for(const action of ['preview','apply'] as const)adminFinancePeopleRoutes.post(`/rules/:id/${action}`,async c=>{
   const user=c.get('user')!;if(!isOwner(c.env,user))throw forbidden('تغيير الأجر والتسوية الرجعية للأدمن الرئيسي فقط');

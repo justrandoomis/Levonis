@@ -20,7 +20,15 @@
  *
  * Every `ckb` is its own Sorani, never the Arabic pasted across
  * (docs/DECISIONS.md row 183); the test walks the whole table for copies.
+ *
+ * The pricing programme's refusals (owner decision 2: cost is the owner's
+ * alone; the engine, batch and profit codes after it) live in their own
+ * contract, `packages/contracts/src/costRefusals.ts`, so the server's
+ * `serverMessage(code)` and this table read the very same three sentences.
+ * It is spread in at the end of the table.
  */
+import { COST_REFUSALS } from '../../packages/contracts/src/costRefusals';
+
 export interface RefusalStrings {
   ar: string;
   en: string;
@@ -1608,6 +1616,8 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The sale type set for this gift is not available right now. Contact support.',
     ckb: 'جۆری فرۆشتنی دیاریکراو بۆ ئەم دیارییە ئێستا بەردەست نییە. پەیوەندی بە پشتگیرییەوە بکە.',
   },
+  // ---- the pricing programme's refusal contract (S1, master plan §6.1) -----
+  ...COST_REFUSALS,
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

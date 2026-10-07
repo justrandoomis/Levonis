@@ -148,7 +148,7 @@ async function main() {
   check('a new player registers and holds a session at once', r.status === 200 && !!player.cookie, `status=${r.status}`);
   r = await admin.post('/api/auth/register', { email: adminEmail, username: `farmadm${rnd}`, name: 'Farm Admin', password: 'farm-admin-pass-1' });
   check('an admin account registers', r.status === 200 && !!admin.cookie, `status=${r.status}`);
-  sql(`UPDATE users SET role='admin' WHERE email='${adminEmail}'`);
+  sql(`UPDATE users SET role='admin' WHERE email='${adminEmail}'; UPDATE users SET admin_scope='full' WHERE email='${adminEmail}'`);
   r = await admin.get('/api/auth/me');
   check('and is promoted through the controlled bootstrap', r.data?.user?.isAdmin === true, short(r.data));
   check('a guest is refused the farm state', (await anon.get('/api/farm/state')).status === 401);

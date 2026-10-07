@@ -109,7 +109,7 @@ async function main() {
 
   console.log('0. an admin session');
   check('admin registered', (await api('POST', '/api/auth/register', { email, username: `pt${rnd}`, name: 'PT', password })).status === 200);
-  sql(`UPDATE users SET role='admin' WHERE email='${email}'`);
+  sql(`UPDATE users SET role='admin' WHERE email='${email}'; UPDATE users SET admin_scope='full' WHERE email='${email}'`);
   check('admin signed in', (await api('POST', '/api/auth/login', { email, password })).status === 200);
 
   // ------------------------------------------------------------- 3. template

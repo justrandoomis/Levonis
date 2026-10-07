@@ -45,7 +45,7 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, int, str, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
-import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
+import { canWriteCost, projectForAdmin } from '../lib/adminScope';
 import {
   primaryMedia,
   projectAdmin,
@@ -579,7 +579,7 @@ async function planSave(
     catalogIds: Array.isArray(opts.body.catalog_ids)
       ? (opts.body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string')
       : undefined,
-    actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
+    actor: { adminId: admin.id, money: canWriteCost(c.env, admin) },
     translations: localized.fields,
     // The ONE writer allowed to create or edit a composition row. The product
     // form, the TXT template and the CSV importer inherit the refusal.
@@ -785,7 +785,7 @@ adminBundlesRoutes.post('/:productId/duplicate', async (c) => {
     doc,
     prev: null,
     relations: null,
-    actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
+    actor: { adminId: admin.id, money: canWriteCost(c.env, admin) },
     allowComposition: true,
   };
   await preflightProductSave(c.env.DB, saveIntent);

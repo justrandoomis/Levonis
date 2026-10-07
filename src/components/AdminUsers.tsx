@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
+import { useAuth } from '../AuthContext';
+import { apiRefusal } from '../lib/refusalStrings';
 import { Search, Edit2, Shield, User, Store, Check, CreditCard, TrendingUp, Lock, Link2 } from 'lucide-react';
 import { Overlay } from './ui/Overlay';
 import { Segmented } from './ui/Segmented';
@@ -21,14 +23,14 @@ interface AdminUserRow {
   subscription_expiry: number;
   created_at: string;
   /**
-   * NULL/'full' = unrestricted, 'assistant' = no cost, no margin, no supplier
-   * price (worker/lib/adminScope.ts). It is already on the wire — GET
-   * /api/admin/users selects it — and it was simply never rendered, so an
-   * owner looking at this table could not tell a restricted assistant from a
-   * full financial administrator. Who can see the money is the single most
-   * important fact about an admin row; it now has a badge.
+   * NULL/'full' = money actions, 'assistant' = catalogue and operations
+   * (worker/lib/adminScope.ts). NEITHER sees a cost: cost is the main admin's
+   * alone (owner decision 2). Who can move money is the most important fact
+   * about an admin row after who owns the shop; it has a badge.
    */
   admin_scope?: AdminScope;
+  /** The main admin (INITIAL_ADMIN_EMAIL), the one account that sees cost. */
+  is_owner?: boolean;
 }
 
 /** Which of the three jobs this screen is doing. */
@@ -41,7 +43,11 @@ const ROLE_STYLES: Record<string, string> = {
 };
 
 export default function AdminUsers() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const { user: viewer } = useAuth();
+  // Investor status is the owner's to change (INVESTOR_FLAG_OWNER_ONLY, owner
+  // decision 2): the checkbox is offered — and the field sent — by the owner only.
+  const mayFlagInvestor = viewer?.is_owner === true;
   const s = useUsersStrings();
   const [view, setView] = useState<UsersView>('members');
   const [users, setUsers] = useState<AdminUserRow[]>([]);
@@ -136,15 +142,21 @@ export default function AdminUsers() {
     setSaving(true);
     setSaveError(null);
     try {
-      await api.patch(`/api/admin/users/${updatedUser.id}`, {
+      const res = await api.patch<{ admin_scope?: AdminScope }>(`/api/admin/users/${updatedUser.id}`, {
         role: updatedUser.role,
         membership_tier: updatedUser.membership_tier,
-        is_investor: !!updatedUser.is_investor,
+        ...(mayFlagInvestor ? { is_investor: !!updatedUser.is_investor } : {}),
       });
-      setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
+      // THE ROW SHOWS WHAT THE SERVER STORED (critique G-4). A promotion is
+      // stored as 'assistant' by the 0177 trigger; writing back the local row
+      // — whose scope is still the customer's NULL — would badge a brand-new
+      // assistant «كامل (بلا تكاليف)» until the page is reloaded.
+      const scope = res && 'admin_scope' in res ? (res.admin_scope ?? null) : updatedUser.admin_scope;
+      setUsers(users.map(u => u.id === updatedUser.id ? { ...updatedUser, admin_scope: scope } : u));
       setEditingUser(null);
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err.message : 'Failed to update user');
+      // By code, in the admin's own language — never the raw "ar / en" sentence.
+      setSaveError(err instanceof ApiError ? apiRefusal(err, lang, err.message) : 'Failed to update user');
     } finally {
       setSaving(false);
     }
@@ -288,15 +300,19 @@ export default function AdminUsers() {
                         {u.role}
                       </span>
                       {/*
-                        WHO CAN SEE THE MONEY, on the row. `admin_scope` was
-                        already being selected by the server and thrown away
-                        here, so a table of administrators gave no way to tell a
-                        restricted assistant from a full financial admin — the
-                        one distinction §11 is entirely about. A padlock is not
-                        decoration: it is the answer to "does this person see
-                        cost?".
+                        WHO OWNS THE SHOP, AND WHO CAN MOVE MONEY, on the row.
+                        The main admin is the only account that sees cost (owner
+                        decision 2) and gets its own badge; every other admin is
+                        «كامل (بلا تكاليف)» or a padlocked assistant. The
+                        padlock is not decoration: it is the answer to "can this
+                        person move money?".
                       */}
-                      {u.role === 'admin' && (
+                      {u.role === 'admin' && u.is_owner === true && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-mint/10 text-mint border-mint/30">
+                          {s.ownerBadge}
+                        </span>
+                      )}
+                      {u.role === 'admin' && u.is_owner !== true && (
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
                             u.admin_scope === 'assistant'
@@ -485,17 +501,19 @@ export default function AdminUsers() {
                 </select>
               </div>
 
-              <label className="flex items-center gap-3 cursor-pointer bg-zinc-800/50 border border-zinc-700 rounded-xl px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={!!editorUser.is_investor}
-                  onChange={(e) => setEditingUser({...editorUser, is_investor: e.target.checked ? 1 : 0})}
-                  className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 accent-mint"
-                />
-                <span className="text-white font-medium flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-mint" /> Investor
-                </span>
-              </label>
+              {mayFlagInvestor && (
+                <label className="flex items-center gap-3 cursor-pointer bg-zinc-800/50 border border-zinc-700 rounded-xl px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={!!editorUser.is_investor}
+                    onChange={(e) => setEditingUser({...editorUser, is_investor: e.target.checked ? 1 : 0})}
+                    className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 accent-mint"
+                  />
+                  <span className="text-white font-medium flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-mint" /> Investor
+                  </span>
+                </label>
+              )}
 
               {saveError && (
                 <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-sm font-medium">

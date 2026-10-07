@@ -33,18 +33,28 @@ function setup() {
       VALUES (?,?,'petg','PETG Basic',?,18000,?,NULL,'unpriced',?,?,?)`)
       .run(`line-${id}`, id, qty, qty * 18000, option, JSON.stringify([option]), color);
   };
+  // THE RATE LIMIT IS NOT HISTORY. The finance door counts every request in
+  // `rate_limits` (S1, limitByMethod before the cost guard), so a read now
+  // writes one counter row. The temp triggers count those writes, and
+  // `history()` is every other change — each counted write costs 2 changes:
+  // the counter row and the tally row.
+  raw.exec(`CREATE TEMP TABLE rate_limit_writes(n INTEGER NOT NULL); INSERT INTO rate_limit_writes VALUES (0);
+    CREATE TEMP TRIGGER rate_limit_writes_ins AFTER INSERT ON main.rate_limits BEGIN UPDATE rate_limit_writes SET n = n + 1; END;
+    CREATE TEMP TRIGGER rate_limit_writes_upd AFTER UPDATE ON main.rate_limits BEGIN UPDATE rate_limit_writes SET n = n + 1; END;
+    CREATE TEMP TRIGGER rate_limit_writes_del AFTER DELETE ON main.rate_limits BEGIN UPDATE rate_limit_writes SET n = n + 1; END;`);
+  const history = () => count(raw, 'SELECT total_changes() n') - 2 * count(raw, 'SELECT n FROM rate_limit_writes');
   const app = stubApp(db, { id: 'boss', email: 'boss@x.co', role: 'admin', admin_scope: 'full' }, a => a.route('/f', adminFinanceWorkspaceRoutes));
   const detail = async (id: string) => {
     const response = await get(app, `/f/orders/${id}`), value = await json(response);
     assert.equal(response.status, 200, JSON.stringify(value));
     return value;
   };
-  return { raw, db, queries, app, addOrder, detail };
+  return { raw, db, queries, app, addOrder, detail, history };
 }
 
 test('active main-store orders without variant IDs forecast the exact zero-stock option/colour while preserving historical unknown cost', async () => {
   const x = setup(); x.addOrder('refill'); x.addOrder('spool', 'spool'); x.addOrder('white', 'refill', 'white');
-  const before = count(x.raw, 'SELECT total_changes() n');
+  const before = x.history();
   for (const [id, cost] of [['refill', 10000], ['spool', 12500], ['white', 6000]] as const) {
     const detail = await x.detail(id), line = detail.lines[0];
     assert.equal(detail.order.status, 'pending');
@@ -62,7 +72,7 @@ test('active main-store orders without variant IDs forecast the exact zero-stock
   assert.equal(response.status, 200, JSON.stringify(list));
   assert.deepEqual(list.orders, [], 'operational forecasts never enter the delivered-only finance list');
   assert.equal(list.total, 0);
-  assert.equal(count(x.raw, 'SELECT total_changes() n'), before, 'opening list/details cannot post or rewrite any history');
+  assert.equal(x.history(), before, 'opening list/details cannot post or rewrite any history');
 });
 
 test('unallocated unpriced or insufficient stock uses only the exact catalogue estimate; a fully priced queue is a separate forecast source', async () => {
@@ -95,7 +105,7 @@ test('real partial or unpriced FIFO cannot be replaced by a catalogue forecast o
     INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,scope_id,qty,unit_cost_iqd,cogs_iqd,idempotency_key) VALUES
       ('partial-issued','partial','line-partial','issued','variant','refill-black',1,7000,7000,'forecast-partial'),
       ('unknown-issued','unpriced','line-unpriced','issued','variant','refill-black',1,NULL,NULL,'forecast-unknown');`);
-  const before = count(x.raw, 'SELECT total_changes() n');
+  const before = x.history();
   for (const [id, issue] of [['partial', 'fifo_quantity_incomplete'], ['unpriced', 'fifo_cost_missing']] as const) {
     const detail = await x.detail(id);
     assert.equal(detail.has_financial_activity, true);
@@ -105,13 +115,13 @@ test('real partial or unpriced FIFO cannot be replaced by a catalogue forecast o
     assert.equal(detail.projected_finance.gross_profit_iqd, null);
     assert.ok(detail.lines[0].cost_review.issues.some((value: { code: string }) => value.code === issue));
   }
-  assert.equal(count(x.raw, 'SELECT total_changes() n'), before);
+  assert.equal(x.history(), before);
 });
 
 test('terminal orders never create a new forecast and a delivered unknown cost remains unverified', async () => {
   const x = setup();
   for (const status of ['delivered', 'cancelled']) x.addOrder(status, 'refill', 'black', status);
-  const before = count(x.raw, 'SELECT total_changes() n');
+  const before = x.history();
   for (const status of ['delivered', 'cancelled']) {
     const detail = await x.detail(status);
     assert.equal(detail.order.status, status);
@@ -124,7 +134,7 @@ test('terminal orders never create a new forecast and a delivered unknown cost r
       assert.equal(detail.lines[0].cost_review.suggestion.requires_confirmation, true);
     }
   }
-  assert.equal(count(x.raw, 'SELECT total_changes() n'), before);
+  assert.equal(x.history(), before);
 });
 
 test('unknown costs and invalid selections remain null while a genuine zero stays known', async () => {
@@ -170,7 +180,7 @@ test('operational forecasts use a fixed batch of selection reads and never relea
   };
   const single = await list();
   for (let i = 0; i < 24; i++) x.addOrder(`bulk-${i}`, i % 2 ? 'spool' : 'refill');
-  const before = count(x.raw, 'SELECT total_changes() n'), many = await list();
+  const before = x.history(), many = await list();
   assert.equal(many.value.orders.length, 25);
   assert.equal(many.selectionReads.length, single.selectionReads.length, 'selection queries must not grow per order');
   assert.equal(many.selectionReads.length, 9);
@@ -181,5 +191,5 @@ test('operational forecasts use a fixed batch of selection reads and never relea
   assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM accounting_entries'), 0);
   assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM finance_order_adjustments'), 0);
   assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM finance_staff_payments'), 0);
-  assert.equal(count(x.raw, 'SELECT total_changes() n'), before);
+  assert.equal(x.history(), before);
 });

@@ -1,5 +1,6 @@
 import { badRequest, conflict, forbidden, unavailable } from './http';
-import { canViewFinancials, isOwner } from './adminScope';
+import { canViewCost, canWriteCost, isOwner } from './adminScope';
+import { costDenied } from './costAccess';
 import type { Env, SessionUser } from './types';
 import { newId } from './crypto';
 
@@ -48,9 +49,26 @@ export async function requireCapability(env: Env, user: SessionUser, capability:
       'تحديث عمليات المخزون والمالية لم يطبق على قاعدة البيانات بعد',
       'OPERATIONS_NOT_CONFIGURED',
     );
+  /**
+   * THE FINANCIAL CAPABILITIES ARE COST (owner decision 2). Purchasing,
+   * compensation rules, payroll, accounting and period close all read or
+   * write cost, so they need cost access — the owner — before any permission
+   * row is consulted. For a non-owner (a grantee, once delegation exists) a
+   * financial capability is DENY BY DEFAULT: a missing row is a refusal, the
+   * opposite of the operations rule below. `purchase` writes cost, so it
+   * needs cost write as well.
+   */
+  if (FINANCIAL_CAPABILITIES.includes(capability)) {
+    if (!canViewCost(env, user) || (capability === 'purchase' && !canWriteCost(env, user))) throw costDenied();
+    if (isOwner(env, user)) return;
+    const row = await env.DB.prepare('SELECT allowed FROM ops_permissions WHERE user_id=? AND capability=?')
+      .bind(user.id, capability)
+      .first<{ allowed: number }>();
+    if (row?.allowed !== 1) throw costDenied();
+    return;
+  }
   if (isOwner(env, user)) return;
-  const financial = ['purchase', 'rules', 'pay', 'accounting', 'close'].includes(capability);
-  if (financial && !canViewFinancials(env, user)) throw forbidden('هذه العملية تتطلب صلاحية مالية');
+  // Operations (receive, count, transfer): unchanged — a missing row allows.
   const permission = await env.DB.prepare(
     'SELECT allowed FROM ops_permissions WHERE user_id=? AND capability=?',
   )
@@ -58,6 +76,9 @@ export async function requireCapability(env: Env, user: SessionUser, capability:
     .first<{ allowed: number }>();
   if (permission?.allowed === 0) throw forbidden('ليس لديك صلاحية لهذه العملية');
 }
+
+/** The capabilities that read or write cost: owner only (decision 2). */
+export const FINANCIAL_CAPABILITIES: readonly Capability[] = ['purchase', 'rules', 'pay', 'accounting', 'close'];
 export function fence(db: D1Database, sqlCondition: string, args: unknown[] = []): D1PreparedStatement[] {
   const id = newId('guard');
   return [

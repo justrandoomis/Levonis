@@ -68,7 +68,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { getBalances } from '../lib/wallet';
 import { ENTITLEMENT_MINIMUM_TIER, benefits, getTierStatus, type MembershipEntitlement } from '../lib/entitlements';
 import { bnplEligibility } from '../lib/bnpl';
-import { canViewFinancials } from '../lib/adminScope';
+import { canMoveMoney } from '../lib/adminScope';
 import { coverageState, maskSerial } from '../lib/deviceOps';
 import { compareProducts, type CompareRow } from '../lib/compareSpecs';
 import {
@@ -3096,7 +3096,7 @@ supportRoutes.get('/admin/members/:userId', async (c) => {
    * every figure of money optional and the window's one `Money` call site
    * renders «محجوب» where nothing arrived, so no screen changes here.
    */
-  const financial = canViewFinancials(c.env, c.get('user'));
+  const financial = canMoveMoney(c.env, c.get('user'));
   const user = await db
     .prepare('SELECT id, email, username, name, role, created_at FROM users WHERE id = ?')
     .bind(userId)
@@ -3162,7 +3162,10 @@ supportRoutes.get('/admin/members/:userId', async (c) => {
 
   return c.json({
     success: true,
+    // An alias of MONEY in this response (owner decision 2): the member's
+    // wallet and membership money, never a cost.
     can_view_financials: financial,
+    can_move_money: financial,
     member: {
       user: { id: user.id, email: user.email, username: user.username, name: user.name, role: user.role, created_at: user.created_at },
       // 1) Subscription payment/term — separate from everything else. The TERM

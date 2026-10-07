@@ -2,6 +2,8 @@ import { investmentLegacy } from '../lib/investmentLegacy';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { isOwner } from '../lib/adminScope';
+import { requireCostRead } from '../lib/costAccess';
+import { limitByMethod } from '../lib/ratelimit';
 import { badRequest, conflict, forbidden, notFound, str } from '../lib/http';
 import { auditStatements } from '../lib/audit';
 import { fence, requireCapability, whole } from '../lib/operations';
@@ -10,6 +12,15 @@ import { participantSources, participantSummary } from '../lib/financeParticipan
 import { purchaseFundingSummary, type InvestorProfile } from '../lib/purchaseFunding';
 
 export const adminInvestmentProfilesRoutes=new Hono<AppContext>();
+/**
+ * THE DOOR (owner decision 2). Investor profiles, their capital and the legacy
+ * register are cost: the owner's alone. Path-scoped rather than `use('*')`
+ * because this router is mounted at the ROOT of /api/admin/investment-finance,
+ * where a `*` door would also close the lot routes a receiving assistant uses.
+ * The rate limit runs before the guard, so a refused caller spends budget.
+ */
+const profilesDoor = [limitByMethod(['finance-read', 600], ['finance-write', 120]), requireCostRead] as const;
+for (const path of ['/profiles', '/profiles/*', '/legacy', '/legacy/*']) adminInvestmentProfilesRoutes.use(path, ...profilesDoor);
 adminInvestmentProfilesRoutes.get('/profiles',async c=>{
   await requireCapability(c.env,c.get('user')!,'accounting');const db=c.env.DB,range=financeRange(c.req.query());
   const profiles=(await db.prepare('SELECT p.*,u.name,u.email FROM investment_profiles p JOIN users u ON u.id=p.user_id ORDER BY p.state,u.name').all<InvestorProfile&{name:string;email:string}>()).results??[];

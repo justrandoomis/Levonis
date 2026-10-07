@@ -96,7 +96,9 @@ test('the screen says when the printer genuinely cannot move the price — from 
 
 test('the admin editor is mounted under print pricing and writes the audited route', () => {
   const admin = read('src/components/adminCommunity/PrintPricingAdmin.tsx');
-  assert.match(admin, /\{tab === 'printers' && <PrinterModelsEditor t=\{t\} \/>\}/);
+  // The owner's alone (decision 2): the tab is offered on can_view_cost === true.
+  assert.match(admin, /\{tab === 'printers' && ownerCost && <PrinterModelsEditor t=\{t\} \/>\}/);
+  assert.match(admin, /const ownerCost = user\?\.can_view_cost === true;/);
   const editor = read('src/components/adminCommunity/PrinterModelsEditor.tsx');
   assert.match(editor, /api\.get<ListResponse & \{ success: boolean \}>\('\/api\/admin\/print-quote\/printer-models'\)/);
   assert.match(editor, /api\.patch\(`\/api\/admin\/print-quote\/printer-models\/\$\{encodeURIComponent\(m\.id\)\}`, body\)/);

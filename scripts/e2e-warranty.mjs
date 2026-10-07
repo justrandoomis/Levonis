@@ -133,7 +133,7 @@ async function main() {
   const password = 'warranty-pass-1';
   let r = await admin.post('/api/auth/register', { email: adminEmail, username: `wra${rnd}`, name: 'Warranty Admin', password });
   check('admin account', r.status === 200, JSON.stringify(r.data).slice(0, 140));
-  sql(`UPDATE users SET role='admin' WHERE email='${adminEmail}'`);
+  sql(`UPDATE users SET role='admin' WHERE email='${adminEmail}'; UPDATE users SET admin_scope='full' WHERE email='${adminEmail}'`);
   await settle();
   await admin.post('/api/auth/login', { email: adminEmail, password });
 

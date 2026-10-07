@@ -22,7 +22,7 @@ import type { AppContext } from '../lib/types';
 import type { Context } from 'hono';
 import { HttpError, badRequest, conflict, notFound, requireAdmin, str, int } from '../lib/http';
 import { audit } from '../lib/audit';
-import { canViewFinancials } from '../lib/adminScope';
+import { canMoveMoney } from '../lib/adminScope';
 import { getSetting, setSetting } from '../lib/settings';
 import {
   FARM_CONFIG_DEFAULTS, FARM_CONFIG_SECTIONS, farmConfigProblems, normalizeFarmConfig, publicFarmConfig,
@@ -41,7 +41,7 @@ const isSection = (v: string): v is FarmConfigSection => (FARM_CONFIG_SECTIONS a
 export const FINANCIAL_SECTIONS: readonly FarmConfigSection[] = ['limits', 'rewards'] as const;
 
 function requireFinancial(c: Context<AppContext>): void {
-  if (!canViewFinancials(c.env, c.get('user'))) {
+  if (!canMoveMoney(c.env, c.get('user'))) {
     throw new HttpError(
       403,
       'هذا الإجراء للمالك أو الدور المالي فقط / This action needs the owner or a financial admin',

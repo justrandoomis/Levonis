@@ -26,8 +26,9 @@
  * worker/lib/adminScope.ts §11: «cost وجميع تفاصيل الربح متاحة فقط
  * للمالك/الدور المالي. مساعد الأدمن العادي لا يراها في API ولا في HTML ولا في
  * export». A cost, a margin, an expense and a net profit are all "تفاصيل
- * الربح". Every route that reads or writes any of it calls
- * `canViewFinancials` first — on the SERVER, before serialization, so reading
+ * الربح", and owner decision 2 (2026-10-07) gives them to the owner alone.
+ * Every route that reads or writes any of it calls `canViewCost` (a router
+ * door, `requireCostRead`) first — on the SERVER, before serialization, so reading
  * the raw API response, the HTML or a downloaded file reveals nothing.
  *
  * This module holds no route and no authorization of its own: it is the shapes

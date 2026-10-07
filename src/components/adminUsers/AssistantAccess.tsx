@@ -14,20 +14,18 @@
  * after.
  *
  * ---------------------------------------------------------------------------
- * ONE PATCH, NOT TWO — the window this closes.
+ * EVERY NEW ADMIN STARTS AS AN ASSISTANT (owner decision 2, 2026-10-07).
  *
- * Promoting an account and restricting it are two column writes, and doing
- * them as two requests opens a window between them in which the new admin is
- * `role='admin'` with `admin_scope` NULL. NULL IS UNRESTRICTED (adminScope.ts
- * documents why: migration 0021 could not be allowed to demote every live
- * admin). So a two-request grant creates, for as long as the second request
- * takes — or forever, if it fails, or if the browser is closed between them —
- * a FULL FINANCIAL ADMIN out of an account that was meant never to see a cost.
+ * The database decides that, not this component: migration 0177's trigger
+ * `users_promotion_starts_assistant` stores 'assistant' on every promotion,
+ * whatever the writer, and the PATCH route writes it too. The grant below
+ * still names `admin_scope: 'assistant'` so the request says what it means.
  *
- * `PATCH /api/admin/users/:id` writes every changed column in ONE UPDATE, so
- * sending `role` and `admin_scope` together closes that window in the database
- * rather than in this component's control flow. That is why there is no
- * "promote, then restrict" path here, and why there must never be one.
+ * Widening an assistant to «كامل (بلا تكاليف)» is the MAIN ADMIN's act alone
+ * (SCOPE_ELEVATION_OWNER_ONLY for anyone else, and a sign-in younger than ten
+ * minutes for the owner — REAUTH_REQUIRED otherwise), so that button is shown
+ * to the owner only, on the server hint `is_owner === true`. Full access moves
+ * money and still sees no cost: cost is the owner's alone.
  *
  * ---------------------------------------------------------------------------
  * THE LOOKUP IS PART OF THE SAFETY, not a convenience.
@@ -42,7 +40,9 @@
 import React, { useState } from 'react';
 import { Lock, Search, Shield, ShieldCheck, ShieldOff, TriangleAlert, UserPlus, X } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
+import { useLanguage } from '../../LanguageContext';
 import { api, ApiError } from '../../lib/api';
+import { apiRefusal, refusalText } from '../../lib/refusalStrings';
 import { useUsersStrings } from './strings';
 import { Pill, Row, Section, dayLabelOf } from './ui';
 import type { UserLookupResult } from './types';
@@ -53,10 +53,15 @@ type GrantAction = 'grant' | 'lift' | 'remove';
 export default function AssistantAccess({ onChanged }: { onChanged?: () => void }) {
   const s = useUsersStrings();
   const { user } = useAuth();
-  // A UI HINT, NEVER THE DECISION. `userPatchRefusal` in worker/lib/adminScope.ts
-  // refuses a restricted admin's grant regardless of what this component
-  // renders; this only spares the admin a 403 they could not have predicted.
-  const mayGrant = user?.can_view_financials !== false;
+  const { lang } = useLanguage();
+  // UI HINTS, NEVER THE DECISION. `userPatchRefusal` in worker/lib/adminScope.ts
+  // refuses regardless of what this component renders; these only spare the
+  // admin a 403 they could not have predicted. Both are compared with
+  // `=== true`, so a hint the session lacks offers nothing.
+  //   mayGrant  appointing or removing an admin needs money scope
+  //   mayLift   widening to «كامل (بلا تكاليف)» is the owner's alone
+  const mayGrant = user?.can_move_money === true;
+  const mayLift = user?.is_owner === true;
 
   const [emailInput, setEmailInput] = useState('');
   const [found, setFound] = useState<UserLookupResult | null>(null);
@@ -92,26 +97,34 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
     setError(null);
     setNotice(null);
     try {
-      // Each body names EVERY column the act changes, so the server writes them
-      // in one UPDATE (see the header — a two-step grant would mint a full
-      // financial admin in the gap).
+      // Each body names every column the act changes. `lift` sends the explicit
+      // 'full', not the legacy NULL, so the stored value says what was granted.
       const body =
         action === 'grant'
           ? { role: 'admin', admin_scope: 'assistant' }
           : action === 'lift'
-            ? { admin_scope: null }
+            ? { admin_scope: 'full' }
             : { role: 'customer', admin_scope: null };
-      await api.patch(`/api/admin/users/${encodeURIComponent(found.id)}`, body);
+      const res = await api.patch<{ admin_scope?: 'full' | 'assistant' | null }>(
+        `/api/admin/users/${encodeURIComponent(found.id)}`,
+        body
+      );
+      // THE ROW'S SCOPE, as the server read it back after the write (critique
+      // G-4) — not the one this component asked for.
+      const stored = res && 'admin_scope' in res ? (res.admin_scope ?? null) : action === 'grant' ? 'assistant' : action === 'lift' ? 'full' : null;
       setFound({
         ...found,
         role: action === 'remove' ? 'customer' : 'admin',
-        admin_scope: action === 'grant' ? 'assistant' : null,
+        admin_scope: action === 'remove' ? null : stored,
       });
       setNotice(s.grantDone);
       setConfirming(null);
       onChanged?.();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Update failed');
+      // The refusal in the admin's own language, by code — PROMOTION_STARTS_ASSISTANT,
+      // SCOPE_ELEVATION_OWNER_ONLY, REAUTH_REQUIRED, ROLE_CHANGE_DENIED… are all in
+      // REFUSAL_STRINGS through the programme's refusal contract.
+      setError(err instanceof ApiError ? apiRefusal(err, lang, err.message) : 'Update failed');
     } finally {
       setBusy(null);
     }
@@ -157,6 +170,14 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
           </div>
         </div>
       </Section>
+
+      <p
+        data-testid="new-admin-note"
+        className="flex items-start gap-2 rounded-xl border border-iris/30 bg-iris/10 p-3 text-xs font-medium leading-relaxed text-zinc-200"
+      >
+        <Shield className="mt-0.5 h-4 w-4 shrink-0" />
+        {s.newAdminNote}
+      </p>
 
       {!mayGrant && (
         <p className="flex items-start gap-2 rounded-xl border border-gilt/30 bg-gilt/10 p-3 text-xs font-medium leading-relaxed text-gilt">
@@ -238,18 +259,30 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
                   onClick={() => void apply('grant')}
                 />
               )}
-              {isAdmin && isAssistant && (
-                <ActionButton
-                  tone="warn"
-                  icon={<ShieldCheck className="h-4 w-4" />}
-                  label={s.actLift}
-                  busy={busy === 'lift'}
-                  busyLabel={s.saving}
-                  confirm={confirming === 'lift' ? s.confirmLift : null}
-                  onClick={() => (confirming === 'lift' ? void apply('lift') : setConfirming('lift'))}
-                  onCancel={() => setConfirming(null)}
-                  cancelLabel={s.cancel}
-                />
+              {isAdmin && isAssistant && mayLift && (
+                <div data-testid="grant-lift">
+                  <ActionButton
+                    tone="warn"
+                    icon={<ShieldCheck className="h-4 w-4" />}
+                    label={s.actLift}
+                    busy={busy === 'lift'}
+                    busyLabel={s.saving}
+                    confirm={confirming === 'lift' ? s.confirmLift : null}
+                    onClick={() => (confirming === 'lift' ? void apply('lift') : setConfirming('lift'))}
+                    onCancel={() => setConfirming(null)}
+                    cancelLabel={s.cancel}
+                  />
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-400">{s.liftExplains}</p>
+                </div>
+              )}
+              {isAdmin && isAssistant && !mayLift && (
+                <p
+                  data-testid="grant-lift-owner-only"
+                  className="flex items-start gap-2 rounded-xl border border-zinc-700 bg-zinc-800/60 p-3 text-xs font-medium leading-relaxed text-zinc-400"
+                >
+                  <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+                  {refusalText('SCOPE_ELEVATION_OWNER_ONLY', lang)}
+                </p>
               )}
               {isAdmin && (
                 <ActionButton

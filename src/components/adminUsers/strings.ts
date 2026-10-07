@@ -116,7 +116,9 @@ export function useUsersStrings() {
     ownerBadge: loc('مالك الموقع', 'Site owner', 'خاوەنی ماڵپەڕ'),
     selfBadge: loc('حسابك', 'Your account', 'هەژماری تۆ'),
     assistantBadge: loc('مساعد أدمن', 'Assistant admin', 'یاریدەدەری بەڕێوەبەر'),
-    fullBadge: loc('أدمن مالي كامل', 'Full financial admin', 'بەڕێوەبەری دارایی تەواو'),
+    // «كامل (بلا تكاليف)» — owner decision 2: a full admin moves money and
+    // sees no cost, so the badge says both halves (security spec §6).
+    fullBadge: loc('كامل (بلا تكاليف)', 'Full (no costs)', 'تەواو (بەبێ تێچوون)'),
 
     // ------------------------------------------- balance & points by hand
     // «خصم رصيد وإضافة رصيد يدوي أو خصم النقاط وإضافة نقاط». Sentences carry
@@ -177,13 +179,25 @@ export function useUsersStrings() {
     looking: loc('جارٍ البحث...', 'Searching...', 'گەڕان...'),
     confirmWho: loc('تأكَّد من الحساب قبل التغيير', 'Confirm the account before changing anything', 'دڵنیابە لە هەژمار پێش گۆڕان'),
     actGrant: loc('عيّن مساعدًا', 'Make assistant', 'کردن بە یاریدەدەر'),
-    actLift: loc('ارفع القيد (صلاحية مالية كاملة)', 'Lift the restriction (full financial access)', 'لابردنی سنوور (دەسەڵاتی دارایی تەواو)'),
+    // Offered to the owner only: widening a scope is the main admin's act
+    // (the server refuses anyone else with SCOPE_ELEVATION_OWNER_ONLY).
+    actLift: loc('منح صلاحية كاملة (بلا تكاليف)', 'Give full access (no costs)', 'دەسەڵاتی تەواو بدە (بەبێ تێچوون)'),
+    liftExplains: loc(
+      'الصلاحية الكاملة تسمح بإجراءات المحفظة والاسترداد، ولا تكشف أي تكلفة.',
+      'Full access allows wallet and refund actions; it never reveals a cost.',
+      'دەسەڵاتی تەواو ڕێگە بە کارەکانی جزدان و گەڕاندنەوەی پارە دەدات، بەڵام هیچ تێچوونێک ئاشکرا ناکات.'
+    ),
+    newAdminNote: loc(
+      'يبدأ كل أدمن جديد مساعداً بلا صلاحية رؤية التكاليف.',
+      'Every new admin starts as an assistant with no access to costs.',
+      'هەموو بەڕێوەبەرێکی نوێ وەک یاریدەدەر دەست پێدەکات و دەسەڵاتی بینینی تێچوونی نییە.'
+    ),
     actRemove: loc('اسحب صلاحية الأدمن', 'Remove admin access', 'لابردنی دەسەڵاتی بەڕێوەبەر'),
     grantDone: loc('تم تحديث الصلاحية', 'Access updated', 'دەسەڵات نوێکرایەوە'),
     confirmLift: loc(
-      'رفع القيد يمنح هذا الحساب رؤية التكلفة والربح وكل الأرقام المالية. متأكد؟',
-      'Lifting the restriction gives this account the cost, the profit and every financial number. Are you sure?',
-      'لابردنی سنوور دەسەڵاتی دارایی تەواو دەدات. دڵنیایت؟'
+      'الصلاحية الكاملة تسمح لهذا الحساب بإجراءات المحفظة والاسترداد والمدفوعات، ولا تكشف له أي تكلفة أو ربح. متأكد؟',
+      'Full access lets this account perform wallet, refund and payout actions; it reveals no cost or profit. Are you sure?',
+      'دەسەڵاتی تەواو ڕێگە بەم هەژمارە دەدات کارەکانی جزدان و گەڕاندنەوەی پارە و پارەدان بکات، بەڵام هیچ تێچوون یان قازانجێکی بۆ ئاشکرا ناکات. دڵنیایت؟'
     ),
     confirmRemove: loc(
       'سيفقد هذا الحساب الوصول إلى لوحة الإدارة بالكامل. متأكد؟',
@@ -197,9 +211,9 @@ export function useUsersStrings() {
     ),
     selfLocked: loc('لا يمكنك سحب صلاحيتك من نفسك.', 'You cannot remove your own administrator role.', 'ناتوانیت دەسەڵاتی خۆت لابەریت.'),
     needFinancial: loc(
-      'حسابك مقيَّد كمساعد، ولا يمكنه منح أو سحب صلاحيات الأدمن. هذا الإجراء للمالك أو للأدمن المالي فقط.',
-      'Your account is a restricted assistant and cannot grant or revoke admin access. This is for the owner or a financial admin only.',
-      'هەژمارەکەت سنووردارە و ناتوانێت دەسەڵات ببەخشێت.'
+      'حسابك مقيَّد كمساعد، ولا يمكنه منح أو سحب صلاحيات الأدمن. هذا الإجراء للمالك أو لأدمن بصلاحية كاملة فقط.',
+      'Your account is a restricted assistant and cannot grant or revoke admin access. This is for the owner or a full-access admin only.',
+      'هەژمارەکەت وەک یاریدەدەر سنووردارە و ناتوانێت دەسەڵاتی بەڕێوەبەر بدات یان لابەرێت. ئەم کارە تەنها بۆ خاوەن یان بەڕێوەبەرێکی خاوەن دەسەڵاتی تەواوە.'
     ),
 
     // ------------------------------------------------------ telegram bridge

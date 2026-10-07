@@ -63,7 +63,7 @@
 import type { Context, Next } from 'hono';
 import type { AppContext } from './types';
 import { HttpError } from './http';
-import { canViewFinancials } from './adminScope';
+import { canMoveMoney } from './adminScope';
 import { sha256Hex } from './crypto';
 import { auditStatements } from './audit';
 import {
@@ -78,9 +78,16 @@ import {
 } from './walletOps';
 import type { Env } from './types';
 
-/** The 403 every money-moving admin route answers an assistant-scope admin. */
+/**
+ * The 403 every money-moving admin route answers an assistant-scope admin.
+ *
+ * MONEY, NOT COST (owner decision 2). The owner and full/NULL-scope admins move
+ * money — wallet credits, refunds, payouts — exactly as before S1; none of
+ * these screens shows a cost. Cost has its own owner-only gate
+ * (worker/lib/costAccess.ts).
+ */
 export function assertFinancialScope(c: Context<AppContext>): void {
-  if (!canViewFinancials(c.env, c.get('user'))) {
+  if (!canMoveMoney(c.env, c.get('user'))) {
     throw new HttpError(
       403,
       'هذا الإجراء للمالك أو الدور المالي فقط / This action needs the owner or a financial admin',

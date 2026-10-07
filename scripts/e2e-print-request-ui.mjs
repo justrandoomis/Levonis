@@ -395,7 +395,7 @@ async function main() {
   const admin = mk();
   const aEmail = `pui-a-${rnd}@test.local`;
   await admin.post('/api/auth/register', { email: aEmail, username: `pua${rnd}`, name: 'Admin UI', password: pw });
-  sql(`UPDATE users SET role='admin' WHERE email='${aEmail}'`);
+  sql(`UPDATE users SET role='admin' WHERE email='${aEmail}'; UPDATE users SET admin_scope='full' WHERE email='${aEmail}'`);
   await admin.post('/api/auth/login', { email: aEmail, password: pw });
 
   // The same job, priced before and after the owner moves the price of PETG.

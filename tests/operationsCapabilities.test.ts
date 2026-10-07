@@ -9,6 +9,7 @@ function setup(assistant = false) {
   const raw = freshDb();
   raw.exec(`INSERT INTO users(id,email,role,admin_scope) VALUES
     ('operator','operator@example.test','admin',${assistant ? "'assistant'" : "'full'"}),
+    ('usr_owner','boss@x.co','admin',NULL),
     ('buyer','buyer@example.test','customer',NULL);
     INSERT INTO products(id,name,name_ar,slug,sku,price_iqd,product_cost_iqd,stock,inventory_mode)
     VALUES ('printer','Printer','طابعة','cap-printer','CAP-PRINTER',50000,10000,1,'BASE');
@@ -23,10 +24,16 @@ function setup(assistant = false) {
     a.route('/s', adminStockOperationsRoutes);
     a.route('/f', adminFinanceOperationsRoutes);
   });
+  // The OWNER of every stubApp (INITIAL_ADMIN_EMAIL boss@x.co): payroll and
+  // wages are cost, the owner's alone (owner decision 2).
+  const owner = stubApp(asD1(raw), { id: 'usr_owner', email: 'boss@x.co', role: 'admin' }, (a) => {
+    a.route('/s', adminStockOperationsRoutes);
+    a.route('/f', adminFinanceOperationsRoutes);
+  });
   const permission = (capability: string, allowed: number) => raw.prepare(
     'INSERT INTO ops_permissions(user_id,capability,allowed) VALUES (?,?,?) ON CONFLICT(user_id,capability) DO UPDATE SET allowed=excluded.allowed',
   ).run('operator', capability, allowed);
-  return { raw, app, permission };
+  return { raw, app, owner, permission };
 }
 
 function lot(raw: ReturnType<typeof freshDb>, id: string, remaining = 0) {
@@ -84,44 +91,55 @@ test('trace lot search is bounded and paginated, and denied receiving cannot rea
   assert.equal((await get(app, '/s/trace')).status, 403);
 });
 
-test('payment staff can review, approve and settle wages with cost-rule access denied', async () => {
-  const { raw, app, permission } = setup();
+test('a full-scope operator with the pay permission is refused payroll at the cost door; the owner reviews, approves and settles wages', async () => {
+  const { raw, app, owner, permission } = setup();
   permission('rules', 0);
   permission('pay', 1);
   cost(raw, 'earned');
   cost(raw, 'free', 'staff_sajjad', 0);
   cost(raw, 'unknown', 'staff_sajjad', null);
-  assert.equal((await get(app, '/f/rules')).status, 403);
-  assert.equal((await get(app, '/f/costs')).status, 403);
-  const res = await get(app, '/f/payroll?staff_id=staff_sajjad');
+  // Owner decision 2: a wage is cost, so no permission row opens it to a
+  // full-scope admin — every finance-operations route refuses, writes nothing.
+  for (const path of ['/f/rules', '/f/costs', '/f/payroll?staff_id=staff_sajjad']) {
+    const refused = await get(app, path);
+    assert.equal(refused.status, 403, path);
+    assert.equal((await json(refused)).code, 'COST_ACCESS_DENIED');
+  }
+  assert.equal((await post(app, '/f/costs/earned/approve')).status, 403);
+  assert.equal(row<{ state: string }>(raw, "SELECT state FROM finance_order_costs WHERE id='earned'")?.state, 'due');
+  const res = await get(owner, '/f/payroll?staff_id=staff_sajjad');
   const payroll = await json(res);
   assert.equal(res.status, 200);
   assert.equal(payroll.costs.length, 3);
   assert.equal(payroll.costs.find((c: { id: string }) => c.id === 'free').amount_iqd, 0);
   assert.equal(payroll.costs.find((c: { id: string }) => c.id === 'unknown').amount_iqd, null);
   assert.equal(payroll.staff.find((s: { id: string }) => s.id === 'staff_sajjad').due_iqd, 5000);
-  assert.equal((await post(app, '/f/costs/earned/approve')).status, 200);
-  const paid = await post(app, '/f/staff/staff_sajjad/payments', {
+  assert.equal((await post(owner, '/f/costs/earned/approve')).status, 200);
+  const paid = await post(owner, '/f/staff/staff_sajjad/payments', {
     operation_id: crypto.randomUUID(), amount_iqd: 2000, kind: 'payment',
   });
   assert.equal(paid.status, 200, JSON.stringify(await json(paid)));
-  const updated = await json(await get(app, '/f/payroll?staff_id=staff_sajjad'));
+  const updated = await json(await get(owner, '/f/payroll?staff_id=staff_sajjad'));
   assert.equal(updated.costs.find((c: { id: string }) => c.id === 'earned').paid_iqd, 2000);
   assert.equal(row<{ state: string }>(raw, "SELECT state FROM finance_order_costs WHERE id='earned'")?.state, 'approved');
 });
 
-test('payroll costs retain staff filtering and 100-row pages without granting rule reads', async () => {
-  const { raw, app, permission } = setup();
+test('payroll costs retain staff filtering and 100-row pages for the owner, and a full operator stays refused', async () => {
+  const { raw, app, owner, permission } = setup();
   permission('rules', 0);
   for (let i = 0; i < 105; i++) cost(raw, `cost-${String(i).padStart(3, '0')}`);
   cost(raw, 'other-person', 'staff_hussein');
-  const first = await json(await get(app, '/f/payroll?staff_id=staff_sajjad'));
-  const next = await json(await get(app, '/f/payroll?staff_id=staff_sajjad&offset=100'));
+  const first = await json(await get(owner, '/f/payroll?staff_id=staff_sajjad'));
+  const next = await json(await get(owner, '/f/payroll?staff_id=staff_sajjad&offset=100'));
   assert.equal(first.costs.length, 100);
   assert.equal(next.costs.length, 5);
   assert.equal(new Set([...first.costs, ...next.costs].map((c: { id: string }) => c.id)).size, 105);
   assert.ok([...first.costs, ...next.costs].every((c: { staff_id: string }) => c.staff_id === 'staff_sajjad'));
-  assert.equal((await get(app, '/f/payroll?offset=100001')).status, 400);
+  assert.equal((await get(owner, '/f/payroll?offset=100001')).status, 400);
+  // A permission row neither opens nor closes payroll for a full-scope admin:
+  // the cost door refuses first (owner decision 2).
+  permission('pay', 1);
+  assert.equal((await get(app, '/f/payroll')).status, 403);
   permission('pay', 0);
   assert.equal((await get(app, '/f/payroll')).status, 403);
 });

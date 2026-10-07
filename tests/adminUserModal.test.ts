@@ -441,7 +441,7 @@ test('the grant screen says in Arabic what an assistant can and cannot do, and s
   assert.match(grant, /cannotList/);
   // One request, both columns — the window in the header of AssistantAccess.
   assert.match(grant, /\{ role: 'admin', admin_scope: 'assistant' \}/);
-  assert.match(grant, /api\.patch\(`\/api\/admin\/users\/\$\{encodeURIComponent\(found\.id\)\}`, body\)/);
+  assert.match(grant, /api\.patch<[^>]*>\(\s*`\/api\/admin\/users\/\$\{encodeURIComponent\(found\.id\)\}`,\s*body\s*\)/);
   // The lookup must happen before anything can be pressed.
   assert.match(grant, /users\/lookup\?email=/);
   assert.doesNotMatch(code(GRANT), /window\.confirm/, 'a confirmation the admin cannot read in their own language is not one');
@@ -492,18 +492,25 @@ test('no financial figure is computed before the gate in the detail handler', ()
 test('a restricted admin is not OFFERED the Telegram binding — and the screen says the server is the gate', () => {
   const tg = code(TG);
   // Binding an identity hands out payment-proof approval authority, which is
-  // money. A restricted assistant must not be handing it out.
-  assert.match(tg, /const mayBind = user\?\.can_view_financials !== false;/);
+  // MONEY (owner decision 2 keeps it with the owner and full-scope admins).
+  // The hint is compared with `=== true`: a session without it offers nothing.
+  assert.match(tg, /const mayBind = user\?\.can_move_money === true;/);
   assert.match(tg, /\{!mayBind \? \(/);
   assert.match(tg, /\{mayBind && !r\.revoked_at &&/, 'revoking is the same authority as granting');
 
   // AND THE COMMENT IS PART OF THE FIX. `code()` strips prose, so this reads
-  // the raw file on purpose: a client-side gate that does not admit it is not
-  // an authorization boundary is worse than no gate, because the next reader
-  // assumes the server is covered. It is not — see `unresolved`.
+  // the raw file on purpose: a client-side gate must say where the real gate
+  // is, or the next reader assumes it is this one.
   const prose = src(TG);
-  assert.match(prose, /requireAdmin` ALONE/);
+  assert.match(prose, /requireFinancialAdmin/);
+  assert.match(prose, /canMoveMoney/);
   assert.match(prose, /resolveAdminActor/);
+  // …and that real gate exists on every identity route.
+  const route = src('worker/routes/telegram.ts');
+  for (const m of ["get('/admin/tg-identities'", "post('/admin/tg-identities'", "post('/admin/tg-identities/:telegramUserId/revoke'"]) {
+    assert.match(route, new RegExp(`telegramRoutes\\.${m.replace(/[()/:.]/g, (ch) => `\\${ch}`)}, requireAdmin, requireFinancialAdmin,`), m);
+  }
+  assert.match(route, /async function requireFinancialAdmin[\s\S]{0,200}canMoveMoney\(c\.env, c\.get\('user'\)\)/);
 });
 
 test('the member window keeps its own scroll, its own safe area and a route back to the editor', () => {

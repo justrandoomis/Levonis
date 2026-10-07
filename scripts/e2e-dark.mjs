@@ -330,7 +330,7 @@ async function phaseGateway() {
       }, 'admin');
       eq(reg.status, 200, `register (body: ${reg.text.slice(0, 200)})`);
       journal.adminId = reg.body?.user?.id ?? null;
-      sql('core', `UPDATE users SET role='admin' WHERE email='${journal.adminEmail}'`);
+      sql('core', `UPDATE users SET role='admin' WHERE email='${journal.adminEmail}'; UPDATE users SET admin_scope='full' WHERE email='${journal.adminEmail}'`);
       // The session was minted before the promotion, so sign in again: the role
       // is read from `users` on every request, but this proves it end to end.
       const login = await json('/api/auth/login', { email: journal.adminEmail, password: 'correct-horse-9' }, 'admin');

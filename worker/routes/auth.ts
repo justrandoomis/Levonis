@@ -26,6 +26,7 @@ import { createSession, destroySession, destroyAllSessions, loadSessionUser , FR
 import { verifyGoogleIdToken } from '../lib/google';
 import { identifierKey, rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
+import { isOwner, ownerOnly } from '../lib/costAccess';
 import { emitEvent, emitFromRequest, eventsEnabled } from '../lib/eventBus';
 import { UserCreatedV1 } from '@levonis/contracts/events/v1/UserCreated';
 import { ReferralUsedV1 } from '@levonis/contracts/events/v1/ReferralUsed';
@@ -551,7 +552,7 @@ authRoutes.post('/register', async (c) => {
   await tryAttributeReferral(c.env, id, referralCode);
   await createSession(c, id);
   const user = await getFullUser(c.env.DB, id);
-  return c.json({ success: true, user: publicUser(user!) });
+  return c.json({ success: true, user: publicUser(user!, c.env) });
 });
 
 // ------------------------------------------------ email-first sign-up: finish
@@ -722,7 +723,7 @@ authRoutes.post('/signup/complete', async (c) => {
   await createSession(c, id);
   await audit(c.env.DB, id, 'auth.signup_completed', id, usernameDropped ? { username_dropped: true } : {});
   const user = await getFullUser(c.env.DB, id);
-  return c.json({ success: true, user: publicUser(user!), username_dropped: usernameDropped });
+  return c.json({ success: true, user: publicUser(user!, c.env), username_dropped: usernameDropped });
 });
 
 /**
@@ -817,7 +818,7 @@ authRoutes.post('/login', async (c) => {
 
   await createSession(c, row.id);
   const user = await getFullUser(c.env.DB, row.id);
-  return c.json({ success: true, user: publicUser(user!) });
+  return c.json({ success: true, user: publicUser(user!, c.env) });
 });
 
 /**
@@ -937,7 +938,18 @@ export async function resolveGoogleIdentity(
   ) {
     const adminExists = await env.DB.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").first();
     if (!adminExists) {
-      await env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(row.id).run();
+      // TWO STATEMENTS, ONE BATCH (0177, owner decision 2). Every promotion to
+      // admin fires `users_promotion_starts_assistant`, which stores
+      // 'assistant' — the owner's bootstrap included. The second statement
+      // touches only admin_scope, so the trigger does not fire again and the
+      // owner row is left NULL. The owner is decided by address in every
+      // predicate before any scope is read, so even a row the trigger did
+      // leave at 'assistant' keeps every owner power; this keeps the row
+      // honest as well.
+      await env.DB.batch([
+        env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(row.id),
+        env.DB.prepare('UPDATE users SET admin_scope = NULL WHERE id = ?').bind(row.id),
+      ]);
       await audit(env.DB, row.id, 'auth.initial_admin_bootstrap', row.id, { email: identity.email });
     }
   }
@@ -964,7 +976,7 @@ authRoutes.post('/google', async (c) => {
   const row = await resolveGoogleIdentity(c.env, identity, referralCode);
   await createSession(c, row.id);
   const user = await getFullUser(c.env.DB, row.id);
-  return c.json({ success: true, user: publicUser(user!) });
+  return c.json({ success: true, user: publicUser(user!, c.env) });
 });
 
 /**
@@ -1036,7 +1048,7 @@ authRoutes.post('/google/link', requireMainHost, requireAuth, async (c) => {
   await audit(c.env.DB, me.id, 'auth.google_linked', me.id, { same_email: identity.email === row.email });
 
   const user = await getFullUser(c.env.DB, me.id);
-  return c.json({ success: true, user: publicUser(user!), same_email: identity.email === row.email });
+  return c.json({ success: true, user: publicUser(user!, c.env), same_email: identity.email === row.email });
 });
 
 /**
@@ -1066,7 +1078,7 @@ authRoutes.get('/referrer-info', async (c) => {
 authRoutes.get('/me', async (c) => {
   const user = c.get('user');
   if (!user) return c.json({ success: true, user: null });
-  return c.json({ success: true, user: publicUser(user) });
+  return c.json({ success: true, user: publicUser(user, c.env) });
 });
 
 authRoutes.post('/logout', async (c) => {
@@ -1687,7 +1699,7 @@ authRoutes.post('/telegram/complete', async (c) => {
     await createSession(c, linkability.userId);
     const user = await getFullUser(c.env.DB, linkability.userId);
     if (!user) throw badRequest(GENERIC_AUTH_FAIL_MSG, 'AUTH_FAILED');
-    return c.json({ success: true, user: publicUser(user), created: false });
+    return c.json({ success: true, user: publicUser(user, c.env), created: false });
   }
 
   // signup — the account is created HERE, first time, in ONE transaction
@@ -1831,7 +1843,7 @@ authRoutes.post('/telegram/complete', async (c) => {
   // can honestly invite the user to add one — never pretending otherwise.
   return c.json({
     success: true,
-    user: publicUser(user!),
+    user: publicUser(user!, c.env),
     created: true,
     email_placeholder: realEmail === null,
   });
@@ -1978,7 +1990,7 @@ authRoutes.post('/signup/otp-complete', async (c) => {
   const user = await getFullUser(c.env.DB, id);
   return c.json({
     success: true,
-    user: publicUser(user!),
+    user: publicUser(user!, c.env),
     created: true,
     email_placeholder: isPhone && realEmail === null,
   });
@@ -2081,6 +2093,13 @@ authRoutes.post('/verify-email/confirm', async (c) => {
   if (!row) throw badRequest(genericMsg, 'BAD_TOKEN');
   if (row.used) throw badRequest(genericMsg, 'TOKEN_USED');
   if (new Date(row.expires_at).getTime() < Date.now()) throw badRequest(genericMsg, 'TOKEN_EXPIRED');
+  if (row.new_email) {
+    // A change requested before the owner lock existed must not land either.
+    const holder = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?')
+      .bind(row.user_id)
+      .first<{ email: string }>();
+    if (holder && isOwner(c.env, holder)) throw ownerOnly('OWNER_EMAIL_LOCKED');
+  }
 
   // Atomic one-use consumption — concurrent confirms cannot both pass.
   const consumed = await c.env.DB.prepare(
@@ -2136,6 +2155,11 @@ authRoutes.post('/verify-email/confirm', async (c) => {
 authRoutes.post('/change-email', requireMainHost, requireAuth, async (c) => {
   await rateLimit(c, 'change-email', 5, 3600);
   const user = c.get('user')!;
+  // THE OWNER'S ADDRESS IS THE OWNER (owner decision 2). Every cost predicate
+  // recognises the owner by INITIAL_ADMIN_EMAIL, so moving this account to
+  // another address would lock the owner out of every cost screen — refused
+  // before the body is even read.
+  if (isOwner(c.env, user)) throw ownerOnly('OWNER_EMAIL_LOCKED');
   const body = await c.req.json().catch(() => ({}));
   const newMail = email(body.newEmail);
   if (!emailConfigured(c.env)) {
@@ -2547,7 +2571,7 @@ authRoutes.post('/otp/verify', async (c) => {
   await createSession(c, account.id);
   const user = await getFullUser(c.env.DB, account.id);
   if (!user) throw fail();
-  return c.json({ success: true, user: publicUser(user) });
+  return c.json({ success: true, user: publicUser(user, c.env) });
 });
 
 /** `a***@example.com` — enough for staff to recognise an address in an audit

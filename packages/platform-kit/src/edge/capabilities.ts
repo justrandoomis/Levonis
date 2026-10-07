@@ -13,7 +13,7 @@ import type { HostKind, Principal } from '@levonis/contracts/rpc/common';
 import { meetsRequirement } from '../scope';
 
 export type HostRule = 'main' | 'root' | 'all';
-export type Requirement = 'none' | 'auth' | 'investor' | 'admin' | 'admin:full';
+export type Requirement = 'none' | 'auth' | 'investor' | 'admin' | 'admin:full' | 'admin:owner';
 export type RateClass = 'ip' | 'user' | 'auth' | 'money' | 'write' | 'upload' | 'admin-write' | 'public-read' | 'webhook';
 
 export interface Capability {
@@ -80,6 +80,6 @@ export function capabilityDenial(rule: Capability, principal: Principal | null, 
   if (!principal || principal.role === 'anonymous') return { status: 401, body: { success: false, error: 'Authentication required', code: 'UNAUTHORIZED' } };
   if (meetsRequirement(principal, rule.requires)) return null;
   const error =
-    rule.requires === 'investor' ? 'Investor access required' : rule.requires === 'admin' ? 'Administrator access required' : rule.requires === 'admin:full' ? 'Financial administrator access required' : 'Not allowed';
+    rule.requires === 'investor' ? 'Investor access required' : rule.requires === 'admin' ? 'Administrator access required' : rule.requires === 'admin:full' ? 'Financial administrator access required' : rule.requires === 'admin:owner' ? 'Main administrator access required' : 'Not allowed';
   return { status: 403, body: { success: false, error, code: 'FORBIDDEN' } };
 }

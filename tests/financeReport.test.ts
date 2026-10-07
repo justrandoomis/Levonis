@@ -623,7 +623,7 @@ test('an assistant admin is refused every financial endpoint, before any query',
     const res = await get(a, path);
     assert.equal(res.status, 403, path);
     const body = await json(res);
-    assert.equal(body.code, 'FINANCIAL_SCOPE_REQUIRED');
+    assert.equal(body.code, 'COST_ACCESS_DENIED');
     // Nothing financial leaked into the refusal itself.
     const text = JSON.stringify(body);
     assert.ok(!text.includes('cogs'));

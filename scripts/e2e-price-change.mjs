@@ -77,7 +77,7 @@ async function main() {
   const password = 'price-change-12345';
   const aEmail = `pc-${rnd}@test.local`;
   await admin.post('/api/auth/register', { email: aEmail, username: `pc${rnd}`, name: 'Admin', password });
-  sql(`UPDATE users SET role='admin' WHERE email='${aEmail}'`);
+  sql(`UPDATE users SET role='admin' WHERE email='${aEmail}'; UPDATE users SET admin_scope='full' WHERE email='${aEmail}'`);
   await sleep(800);
   let r = await admin.post('/api/auth/login', { email: aEmail, password });
   check('admin signed in', r.status === 200);

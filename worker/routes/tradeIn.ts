@@ -34,7 +34,7 @@ import { HttpError, badRequest, int, notFound, oneOf, requireAdmin, requireAuth,
 import { rateLimit } from '../lib/ratelimit';
 import { newId } from '../lib/crypto';
 import { requireFinancialScope } from '../lib/walletAdjust';
-import { canViewFinancials } from '../lib/adminScope';
+import { canMoveMoney } from '../lib/adminScope';
 import { buildMediaKey, deleteMediaObject, putMediaObject } from '../lib/mediaStorage';
 import { convertToWebp, extensionFor, isConvertibleToWebp } from '../lib/imageConvert';
 import { rasterDimensions } from '../lib/imageMetadata';
@@ -403,7 +403,7 @@ adminTradeInRoutes.get('/requests/:id', async (c) => {
   const req = await adminRequest(c);
   const view = await requestView(c.env, req, 'admin');
   const customer = await c.env.DB.prepare('SELECT id, name, email, phone_e164, username FROM users WHERE id = ?').bind(req.user_id).first();
-  return c.json({ success: true, request: view, customer, financial_scope: canViewFinancials(c.env, c.get('user')) });
+  return c.json({ success: true, request: view, customer, financial_scope: canMoveMoney(c.env, c.get('user')) });
 });
 
 adminTradeInRoutes.post('/requests/:id/inspect', async (c) => {
@@ -457,7 +457,7 @@ adminTradeInRoutes.get('/rules', async (c) => {
     success: true,
     rules: Object.fromEntries(TRADE_IN_FAMILIES.map((f) => [f, { ...publicRules(book[f]), id: book[f].id, note: book[f].note, created_at: book[f].created_at }])),
     history,
-    financial_scope: canViewFinancials(c.env, c.get('user')),
+    financial_scope: canMoveMoney(c.env, c.get('user')),
   });
 });
 

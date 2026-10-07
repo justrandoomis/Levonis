@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, forbidden, notFound, str } from '../lib/http';
-import { canViewFinancials, isOwner, projectForAdmin } from '../lib/adminScope';
+import { canViewCost, isOwner, projectForAdmin } from '../lib/adminScope';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { baghdadDay, dateValue, fence, journalPlan, periodOpen, requireCapability, whole } from '../lib/operations';
@@ -97,7 +97,7 @@ adminInvestmentFinanceRoutes.get('/lots',async c=>{
     COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id=l.id ORDER BY version DESC LIMIT 1),l.unit_cost_iqd) AS effective_unit_cost_iqd,
     pl.purchase_id FROM inventory_lots l LEFT JOIN products p ON p.id=l.product_id LEFT JOIN inventory_lot_locations loc ON loc.lot_id=l.id LEFT JOIN stock_locations w ON w.id=loc.location_id LEFT JOIN purchase_lines pl ON pl.incoming_id=l.incoming_id
     WHERE (?='' OR instr(lower(COALESCE(p.name,'')||' '||COALESCE(p.name_ar,'')||' '||COALESCE(p.sku,'')||' '||l.id),lower(?))>0) ORDER BY l.received_at,l.id LIMIT 200 OFFSET ?`).bind(q,q,offset).all<Record<string,unknown>>()).results??[];
-  if(!canViewFinancials(c.env,user))return c.json({success:true,lots:lots.map(l=>({id:l.id,product_id:l.product_id,scope:l.scope,scope_id:l.scope_id,qty_received:l.qty_received,qty_remaining:l.qty_remaining,incoming_id:l.incoming_id,received_at:l.received_at,name:l.name,name_ar:l.name_ar,sku:l.sku,location_id:l.location_id,location_name:l.location_name})),limit:200,offset});
+  if(!canViewCost(c.env,user))return c.json({success:true,lots:lots.map(l=>({id:l.id,product_id:l.product_id,scope:l.scope,scope_id:l.scope_id,qty_received:l.qty_received,qty_remaining:l.qty_remaining,incoming_id:l.incoming_id,received_at:l.received_at,name:l.name,name_ar:l.name_ar,sku:l.sku,location_id:l.location_id,location_name:l.location_name})),limit:200,offset});
   const contracts=(await db.prepare('SELECT c.*,u.name AS user_name FROM investment_contracts c JOIN users u ON u.id=c.user_id').all<InvestmentContract>()).results??[];
   return c.json({success:true,lots:lots.map(l=>({...l,contracts:contracts.filter(k=>k.incoming_id===l.incoming_id)})),limit:200,offset});
 });
@@ -105,7 +105,7 @@ adminInvestmentFinanceRoutes.get('/lots/:id',async c=>{
   const user=c.get('user')!;await requireCapability(c.env,user,'receive');const db=c.env.DB,id=c.req.param('id');
   const lot=await db.prepare(`SELECT l.*,p.name,p.name_ar,COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id=l.id ORDER BY version DESC LIMIT 1),l.unit_cost_iqd) AS effective_unit_cost_iqd FROM inventory_lots l LEFT JOIN products p ON p.id=l.product_id WHERE l.id=?`).bind(id).first<Record<string,unknown>>();if(!lot)throw notFound('Lot not found');
   const allocations=(await db.prepare('SELECT a.id,a.order_id,a.order_item_id,a.qty,a.cogs_iqd,a.unit_cost_iqd,a.released_at,o.status FROM order_item_inventory_allocations a JOIN orders o ON o.id=a.order_id WHERE a.lot_id=? ORDER BY a.id').bind(id).all()).results??[];
-  if(!canViewFinancials(c.env,user))return c.json(projectForAdmin(c.env,user,{success:true,lot:{id:lot.id,product_id:lot.product_id,scope:lot.scope,scope_id:lot.scope_id,qty_remaining:lot.qty_remaining,incoming_id:lot.incoming_id,received_at:lot.received_at,name:lot.name,name_ar:lot.name_ar},allocations}));
+  if(!canViewCost(c.env,user))return c.json(projectForAdmin(c.env,user,{success:true,lot:{id:lot.id,product_id:lot.product_id,scope:lot.scope,scope_id:lot.scope_id,qty_remaining:lot.qty_remaining,incoming_id:lot.incoming_id,received_at:lot.received_at,name:lot.name,name_ar:lot.name_ar},allocations}));
   const [contracts,adjustments]=await Promise.all([db.prepare("SELECT c.*,u.name AS user_name FROM investment_contracts c JOIN users u ON u.id=c.user_id WHERE incoming_id=? AND c.state='active'").bind(lot.incoming_id).all(),db.prepare(`SELECT v.adjustment_id,v.lot_id,v.version,a.adjustment_day,a.title,v.unit_cost_iqd AS new_unit_cost_iqd,
     v.unit_cost_iqd-COALESCE((SELECT p.unit_cost_iqd FROM inventory_lot_cost_versions p WHERE p.lot_id=v.lot_id AND p.version<v.version ORDER BY p.version DESC LIMIT 1),l.unit_cost_iqd) AS unit_delta_iqd,
     (SELECT SUM(s.amount_iqd) FROM lot_cost_adjustment_shares s WHERE s.adjustment_id=v.adjustment_id AND s.lot_id=v.lot_id) AS amount_iqd,

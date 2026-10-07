@@ -48,7 +48,7 @@ test('every admin path the core mounts is apex-only in the routing table', () =>
     const rule = matchRoute(p, 'POST');
     if (!rule) offenders.push(`${p}: no rule`);
     else if (rule.hosts !== 'main') offenders.push(`${p}: hosts=${rule.hosts}`);
-    else if (rule.requires !== 'admin' && rule.requires !== 'admin:full') offenders.push(`${p}: requires=${rule.requires}`);
+    else if (rule.requires !== 'admin' && rule.requires !== 'admin:full' && rule.requires !== 'admin:owner') offenders.push(`${p}: requires=${rule.requires}`);
   }
   assert.deepEqual(offenders, [], `admin surfaces without a main-host, admin-gated rule:\n${offenders.join('\n')}`);
 });

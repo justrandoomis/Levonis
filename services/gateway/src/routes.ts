@@ -149,18 +149,27 @@ export const ROUTES: readonly RouteRule[] = [
   // that already carry their cost basis, plus the expense ledger the owner
   // types in. It sits with Analytics for the same reason the row above does.
   //
-  // `admin:full`, NOT `admin`, AND THAT IS THE POINT OF THE ROW. Mandate §11
-  // puts the assistant admin outside every financial figure, and both routes
-  // enforce it themselves with `canViewFinancials`. Declaring it here as well
-  // means the edge refuses an assistant's session before the request is ever
-  // forwarded — the gate stops being one service's discipline and becomes the
-  // door's. The longer prefix is listed first so it cannot be shadowed.
-  { prefix: '/api/admin/finance/report', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin:full', rateClass: 'admin-write' },
-  { prefix: '/api/admin/finance-workspace', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin:full', rateClass: 'admin-write' },
-  { prefix: '/api/admin/finance-people', hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'admin:full', rateClass: 'money' },
-  { prefix: '/api/admin/investment-finance', hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'admin:full', rateClass: 'money' },
+  // `admin:owner`, NOT `admin` OR `admin:full`, AND THAT IS THE POINT OF THE
+  // ROW. Owner decision 2 (2026-10-07) puts every cost figure with the owner
+  // alone — full-scope admins included — and every one of these routers
+  // enforces it itself with `requireCostRead` at its door. Declaring it here as
+  // well means the edge refuses a non-owner's session before the request is
+  // ever forwarded — the gate stops being one service's discipline and becomes
+  // the door's. The longer prefix is listed first so it cannot be shadowed.
+  { prefix: '/api/admin/finance/report', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin:owner', rateClass: 'admin-write' },
+  { prefix: '/api/admin/finance-workspace', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin:owner', rateClass: 'admin-write' },
+  { prefix: '/api/admin/finance-people', hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'admin:owner', rateClass: 'money' },
+  // The lot list and one lot stay open to a `receive` holder — the core
+  // answers them a cost-free allowlist (adminInvestmentFinance.ts) — so the
+  // owner-only prefix below must not shut the stock screens at the edge.
+  { prefix: '/api/admin/investment-finance/lots', pattern: /^\/api\/admin\/investment-finance\/lots(\/[^/]+)?$/, methods: ['GET', 'HEAD'], hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'admin', rateClass: 'money' },
+  { prefix: '/api/admin/investment-finance', hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'admin:owner', rateClass: 'money' },
   { prefix: '/api/finance-earnings', hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'auth', rateClass: 'money' },
-  { prefix: '/api/admin/finance', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin:full', rateClass: 'admin-write' },
+  { prefix: '/api/admin/finance', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin:owner', rateClass: 'admin-write' },
+  // The owner's security console (S2: security events, private grants). Owner
+  // only, like the cost rows above; listed ahead of its router so the edge
+  // never forwards a non-owner's session to it.
+  { prefix: '/api/admin/security', hosts: 'main', owner: 'ADMIN', flipPhase: 9, requires: 'admin:owner', rateClass: 'admin-write' },
   { prefix: '/api/admin/products-v2', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/products', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/taxonomy', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
@@ -181,7 +190,13 @@ export const ROUTES: readonly RouteRule[] = [
   // read response is projected for assistants by the core; all purchasing
   // documents and writes keep the financial gate below.
   { prefix: '/api/admin/procurement/selections', pattern: /^\/api\/admin\/procurement\/selections\/[^/]+$/, methods: ['GET', 'HEAD'], hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
-  { prefix: '/api/admin/procurement', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin:full', rateClass: 'admin-write' },
+  // Receiving a shipment stays an operations act (security spec §1.2: the
+  // receive POST is OP): a `receive` holder finds it through the core's
+  // cost-free receiving view and posts the receive. Everything else under the
+  // prefix — register, document, config, payments — is the owner's.
+  { prefix: '/api/admin/procurement/receiving', pattern: /^\/api\/admin\/procurement\/receiving(\/[^/]+)?$/, methods: ['GET', 'HEAD'], hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
+  { prefix: '/api/admin/procurement/documents', pattern: /^\/api\/admin\/procurement\/documents\/[^/]+\/receive$/, methods: ['POST'], hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
+  { prefix: '/api/admin/procurement', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin:owner', rateClass: 'admin-write' },
   { prefix: '/api/admin/stock-operations', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/template', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'upload' },
   { prefix: '/api/admin/import', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'upload' },
@@ -278,7 +293,7 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/support/admin', hosts: 'main', owner: 'SUPPORT', flipPhase: 4, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/support', hosts: 'main', owner: 'SUPPORT', flipPhase: 4, requires: 'auth', rateClass: 'write' },
   { prefix: '/api/invest', hosts: 'main', owner: 'INVEST', flipPhase: 4, requires: 'investor', rateClass: 'user' },
-  { prefix: '/api/admin/invest', hosts: 'main', owner: 'INVEST', flipPhase: 4, requires: 'admin:full', rateClass: 'admin-write' },
+  { prefix: '/api/admin/invest', hosts: 'main', owner: 'INVEST', flipPhase: 4, requires: 'admin:owner', rateClass: 'admin-write' },
   { prefix: '/api/farm', hosts: 'main', owner: 'FARM', flipPhase: 4, requires: 'none', rateClass: 'user', note: 'the leaderboard is the one public route' },
   { prefix: '/api/admin/farm', hosts: 'main', owner: 'FARM', flipPhase: 4, requires: 'admin:full', rateClass: 'admin-write', note: 'grants coins' },
   { prefix: '/api/admin/settings', hosts: 'main', owner: 'CONFIG', flipPhase: 4, requires: 'admin', rateClass: 'admin-write' },

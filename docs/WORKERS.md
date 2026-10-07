@@ -34,6 +34,25 @@ Settings → Build) removes that red check; a build variable
 `LEVONIS_ALLOW_WORKERS_BUILDS=1` re-opens it in an emergency. Workflow 51 is
 manual only. The history below explains why.
 
+### The restore point is not an undo button (critique H6, DECISIONS row 185)
+
+Every run of workflow 7 records a Time Travel bookmark before it migrates, and
+prints the restore command. **Restoring it erases everything written after it
+— orders, wallet transactions, gifts.** The live site takes writes the moment
+the deploy lands, so the rule is: **fix forward** (a `git revert` or a fix,
+pushed through workflow 7 — safe because every migration is additive). A
+restore is allowed only when a read-only check shows nothing was written after
+the bookmark: `SELECT MAX(created_at) FROM orders` and the same on
+`wallet_transactions` are both older than the bookmark time.
+
+### Cost-privacy checks (owner decision 2, DECISIONS row 185)
+
+Before anything is migrated, workflow 7 refuses an empty `INITIAL_ADMIN_EMAIL`
+and checks, read-only, that exactly one admin account holds that address and
+that it is verified (cost is honoured only for that account). After the deploy,
+«Cost-privacy probes, read-only» runs `scripts/live-cost-probes.mjs` over every
+`scripts/live-cost-probes.d/*.json`: anonymous GETs only, no cookie, no write.
+
 ## THE LIVE WORKER HAD TWO DEPLOYERS, AND ONLY ONE OF THEM RAN MIGRATIONS
 
 This table used to have no "Deployed by" column at all, and that omission has

@@ -34,7 +34,7 @@ const rnd = Math.random().toString(36).slice(2, 7);
 const sql = (s) => execSync(`npx wrangler d1 execute levonis-db --local --command ${JSON.stringify(s)}`, { cwd: '/home/user/Levonis', stdio: 'pipe' });
 const email = `at-${rnd}@test.local`, pass = 'adm-tabs-12345';
 await fetch(`${BASE}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, username: `at${rnd}`, name: 'A', password: pass }) });
-sql(`UPDATE users SET role='admin' WHERE email='${email}'`);
+sql(`UPDATE users SET role='admin' WHERE email='${email}'; UPDATE users SET admin_scope='full' WHERE email='${email}'`);
 await new Promise(r => setTimeout(r, 900));
 const login = await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pass }) });
 const pair = (login.headers.get('set-cookie') || '').split(';')[0];

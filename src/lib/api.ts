@@ -305,9 +305,28 @@ export interface ApiUser {
   subscription_plan: 'free' | 'plus' | 'pro';
   /** Effective membership tier resolved from the memberships ledger. */
   membership_tier: 'free' | 'plus' | 'pro' | 'prime';
-  /** NULL for a non-admin. 'assistant' = no financial data (mandate §11). */
+  /** NULL for a non-admin. 'assistant' = catalogue and operations only;
+   *  'full' = money actions too. NEITHER sees a cost (owner decision 2). */
   admin_scope?: 'full' | 'assistant' | null;
-  /** UI hint only — the SERVER decides and strips cost either way. */
+  /**
+   * SERVER HINTS, NEVER THE GATE (owner decision 2, step S1). Each is the very
+   * predicate the routes apply, computed by `publicUser` on the server, so a
+   * hint can never disagree with the rule. Read them ONLY as `=== true`: a
+   * flag an older server does not send is `undefined`, and `undefined` must
+   * hide the screen, not show it. The server refuses regardless.
+   *
+   *   is_owner        the main admin (INITIAL_ADMIN_EMAIL)
+   *   can_view_cost   cost, profit, finance, payroll, investors — the owner only
+   *   can_write_cost  cost inputs, procurement costs — the owner only
+   *   can_move_money  wallet credits, refunds, payouts — owner and full admins
+   */
+  is_owner?: boolean;
+  can_view_cost?: boolean;
+  can_write_cost?: boolean;
+  can_move_money?: boolean;
+  /** LEGACY ALIAS OF `can_view_cost` (not of money), kept so a client build
+   *  from before S1 hides the finance tab from a full admin. New code reads
+   *  `can_view_cost`. */
   can_view_financials?: boolean;
   subscription_expiry: number;
   locale: 'en' | 'ar' | 'ku';
@@ -2203,14 +2222,14 @@ export function fetchNotifyChannels(opts?: RequestOptions): Promise<NotifyChanne
  * ---------------------------------------------------------------------------
  * EVERY BYTE BEHIND HERE IS COST AND MARGIN DETAIL.
  *
- * Mandate §11, quoted in full in worker/lib/adminScope.ts: «cost وجميع تفاصيل
- * الربح متاحة فقط للمالك/الدور المالي. مساعد الأدمن العادي لا يراها في API ولا
- * في HTML ولا في export». The three endpoints below refuse an assistant admin
- * at the door with `FINANCIAL_SCOPE_REQUIRED` — the WHOLE router, before a
- * query runs, because there is no safe subset of a profit report. Nothing on
- * the client may re-derive a financial number from a non-financial endpoint to
- * work around that, and `ApiUser.can_view_financials` is a UI HINT for hiding
- * a tab nobody can use — never the gate itself.
+ * Owner decision 2 (2026-10-07), quoted in worker/lib/adminScope.ts: cost
+ * data reaches the main admin ONLY. The three endpoints below refuse every
+ * other caller — assistant AND full-scope admins — at the door with
+ * `COST_ACCESS_DENIED`, the WHOLE router, before a query runs, because there
+ * is no safe subset of a profit report. Nothing on the client may re-derive a
+ * financial number from a non-financial endpoint to work around that, and
+ * `ApiUser.can_view_cost` is a UI HINT for hiding a tab nobody else can use —
+ * never the gate itself.
  *
  * ---------------------------------------------------------------------------
  * TWO PROFITS, AND THE TYPE SYSTEM IS WHERE THEY STOP BEING MERGED.

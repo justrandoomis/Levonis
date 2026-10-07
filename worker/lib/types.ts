@@ -1,6 +1,7 @@
 import type { HostInfo } from './hosts';
 import { computeCompletion } from './profileCompletion';
 import { maskPhone } from './phone';
+import { canMoveMoney, canViewCost, canWriteCost, isOwner, normalizeAdminScope } from './adminScope';
 
 export interface Env {
   DB: D1Database;
@@ -158,9 +159,16 @@ export interface SessionUser {
   /** Effective tier cache written by getTierStatus from the memberships
    *  ledger. Unconstrained column, so it can carry 'prime'. */
   membership_tier: 'free' | 'plus' | 'pro' | 'prime';
-  /** NULL/'full' = unrestricted admin; 'assistant' = no financial data
-   *  anywhere (migration 0021, mandate §11). */
+  /** NULL/'full' = money actions only; 'assistant' = catalogue and
+   *  operations (migration 0021). NEITHER sees a cost: cost is the owner's
+   *  alone (owner decision 2, worker/lib/adminScope.ts). */
   admin_scope: string | null;
+  /** When the account's address was proven (0003). The owner is honoured for
+   *  cost only once it is set (`canViewCost`, critique A10). */
+  email_verified_at?: string | null;
+  /** 0177 private grants, set ONLY by the session loader and always [] while
+   *  PRIVATE_DELEGATION_ENABLED is false. Never read off a row. */
+  private_grants?: readonly string[];
   subscription_expiry: number;
   subscription_cost_iqd: number;
   subscription_days: number;
@@ -234,7 +242,8 @@ function completionSummary(u: SessionUser) {
 }
 
 /** Shape sent to the frontend — never includes password_hash or google_sub. */
-export function publicUser(u: SessionUser) {
+export function publicUser(u: SessionUser, env: Pick<Env, 'INITIAL_ADMIN_EMAIL'>) {
+  const ownerEnv = env as Env;
   return {
     id: u.id,
     email: u.email,
@@ -248,10 +257,19 @@ export function publicUser(u: SessionUser) {
     // reads. A PRIME member is 'free' in the legacy field and 'prime' here.
     subscription_plan: u.subscription_plan,
     membership_tier: u.membership_tier ?? u.subscription_plan ?? 'free',
-    // Sent so the admin UI can hide financial panels it would not be allowed
-    // to fill anyway. The SERVER is what actually enforces the rule.
-    admin_scope: u.role === 'admin' ? (u.admin_scope ?? 'full') : null,
-    can_view_financials: u.role === 'admin' && u.admin_scope !== 'assistant',
+    // HINTS ONLY (owner decision 2): the admin UI hides panels it would not
+    // be allowed to fill anyway. The SERVER refuses regardless. Each flag is
+    // the very predicate the routes use, owner folded in first, so a hint can
+    // never disagree with the rule; the client compares with `=== true`, so
+    // a flag an older server does not send hides the screen.
+    admin_scope: u.role === 'admin' ? (normalizeAdminScope(u.admin_scope) ?? 'full') : null,
+    is_owner: u.role === 'admin' && isOwner(ownerEnv, u),
+    can_view_cost: canViewCost(ownerEnv, u),
+    can_write_cost: canWriteCost(ownerEnv, u),
+    can_move_money: canMoveMoney(ownerEnv, u),
+    // LEGACY ALIAS OF COST, not of money: a client build from before S1 reads
+    // this to show the finance tab, and must hide it from a full admin now.
+    can_view_financials: canViewCost(ownerEnv, u),
     subscription_expiry: u.subscription_expiry,
     locale: localeToApi(u.locale),
     avatar_key: u.avatar_key,

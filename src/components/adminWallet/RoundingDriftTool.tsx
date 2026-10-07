@@ -56,7 +56,9 @@ export default function RoundingDriftTool() {
   const [done, setDone] = useState<string | null>(null);
   const [notApplied, setNotApplied] = useState<Array<{ user_id: string; name: string; status: string }>>([]);
 
-  if (user?.can_view_financials === false) return null;
+  // MONEY, not cost (owner decision 2): the owner and full-scope admins. A
+  // missing hint hides the tool; the server refuses an assistant regardless.
+  if (user?.can_move_money !== true) return null;
 
   const check = async () => {
     setBusy(true);

@@ -23,7 +23,7 @@ import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { HttpError, notFound, requireAdmin, requireAuth, str } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
-import { canViewFinancials } from '../lib/adminScope';
+import { canMoveMoney } from '../lib/adminScope';
 import { requireFinancialScope } from '../lib/walletAdjust';
 import { processOutbox } from '../lib/outbox';
 import {
@@ -90,7 +90,7 @@ adminOrderPriceRoutes.get('/:id/price-adjustment', async (c) => {
   // figure: ask the planner with a total that cannot collide with the current one.
   const probe = planFor(order, Math.min(PRICE_ADJUST_MAX_IQD, (Number(order.total_iqd) || 0) + 1));
   const paymentBlocker = probe.ok ? null : probe.code === 'PRICE_ADJUST_FINANCED' || probe.code === 'PRICE_ADJUST_UNSUPPORTED_PAYMENT' ? probe.code : null;
-  const financial = canViewFinancials(c.env, c.get('user'));
+  const financial = canMoveMoney(c.env, c.get('user'));
   return c.json({
     success: true,
     order: {

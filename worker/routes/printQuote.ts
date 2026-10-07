@@ -37,6 +37,7 @@ import { audit } from '../lib/audit';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { sha256Hex } from '../lib/crypto';
+import { requireCostRead, requireCostWrite } from '../lib/costAccess';
 import { classifyAttachment } from '../lib/attachments';
 import { buildMediaKey, getMediaObject, putMediaObject } from '../lib/mediaStorage';
 import { storeForUser } from '../lib/merchantAuth';
@@ -1880,6 +1881,15 @@ async function readTools(db: D1Database, v: unknown): Promise<ToolAssignment[]> 
  */
 export const adminPrintQuoteRoutes = new Hono<AppContext>();
 adminPrintQuoteRoutes.use('*', requireAdmin);
+/**
+ * COST, THE OWNER'S ALONE (owner decision 2). A model's purchase price,
+ * residual value and maintenance rate are what each machine cost the shop,
+ * and the list answers `platform_machine_hour_iqd`, which is read out of
+ * `printPricingConfig` — a cost setting `GET /api/admin/settings` already
+ * strips for everyone but the owner. So the whole editor is behind the cost
+ * door, before any row is read; the write also needs cost write.
+ */
+adminPrintQuoteRoutes.use('*', requireCostRead);
 
 /** The editable columns, their bounds, and whether they hold whole numbers. */
 export const PRINTER_MODEL_ECONOMICS: ReadonlyArray<{
@@ -1932,7 +1942,7 @@ adminPrintQuoteRoutes.get('/printer-models', async (c) => {
   });
 });
 
-adminPrintQuoteRoutes.patch('/printer-models/:id', async (c) => {
+adminPrintQuoteRoutes.patch('/printer-models/:id', requireCostWrite, async (c) => {
   const admin = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;

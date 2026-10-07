@@ -4,7 +4,7 @@ import { requireAdmin, badRequest, notFound, str, int, HttpError } from '../lib/
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { parseProductRow } from '../lib/productModel';
-import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
+import { canWriteCost, projectForAdmin } from '../lib/adminScope';
 import { liveValues, loadProductRelations } from '../lib/productRelations';
 import {
   cellKey,
@@ -331,7 +331,7 @@ adminProductRelationsRoutes.put('/:id/relations', async (c) => {
     doc: null,
     prev: parseProductRow(existingRow),
     relations: body,
-    actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
+    actor: { adminId: admin.id, money: canWriteCost(c.env, admin) },
   };
 
   // Verification acquires a durable object guard. Run the shared planner on
@@ -652,10 +652,10 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
    * saves, and the whole-set replace writes the missing cost as NULL: the one
    * account forbidden from reading a cost is the one that can destroy it, and
    * silently. Every other write door in this codebase carries costs forward
-   * for an actor without financial scope rather than trusting the payload; so
-   * does this one now.
+   * for an actor without cost write (everyone but the owner, decision 2)
+   * rather than trusting the payload; so does this one now.
    */
-  if (!canViewFinancials(c.env, admin)) {
+  if (!canWriteCost(c.env, admin)) {
     const storedCell = new Map(
       (rel.fulfillments ?? []).map((f) => [cellKey(f.option_id, String(f.fulfillment_type)), f] as const)
     );

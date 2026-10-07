@@ -8,16 +8,18 @@
  * the two decisions that rule is made of, so a regression fails in `npm run
  * test:unit` rather than only in a suite that needs a running worker:
  *
- *   canViewFinancials       WHO may see money
+ *   canViewCost / canMoveMoney  WHO may see cost (the owner, decision 2) and
+ *                           who may move money (owner, full and NULL scope)
  *   stripFinancials         WHAT is removed, at every depth
- *   attemptedFinancialWrites  what a request actually TRIED to change —
- *                           where absent must not be read as "set to null"
+ *   attemptedFinancialWrites  which cost fields a request CARRIED — decided
+ *                           from the request alone, never the stored value
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   attemptedFinancialWrites,
-  canViewFinancials,
+  canMoveMoney,
+  canViewCost,
   carryStoredCostForward,
   isOwner,
   normalizeAdminScope,
@@ -34,35 +36,50 @@ const user = (over: Partial<SessionUser>): SessionUser =>
     email: 'someone@example.com',
     role: 'customer',
     admin_scope: null,
+    email_verified_at: '2026-01-01T00:00:00.000Z',
     ...over,
   }) as SessionUser;
 
 // ------------------------------------------------------------------- who
 
-test('a customer never sees financials, admin flag or not', () => {
-  assert.equal(canViewFinancials(env, user({ role: 'customer' })), false);
-  assert.equal(canViewFinancials(env, user({ role: 'merchant', admin_scope: 'full' })), false);
-  assert.equal(canViewFinancials(env, null), false);
-  assert.equal(canViewFinancials(env, undefined), false);
+test('a customer never sees cost or moves money, admin flag or not', () => {
+  for (const pred of [canViewCost, canMoveMoney]) {
+    assert.equal(pred(env, user({ role: 'customer' })), false);
+    assert.equal(pred(env, user({ role: 'merchant', admin_scope: 'full' })), false);
+    assert.equal(pred(env, null), false);
+    assert.equal(pred(env, undefined), false);
+  }
 });
 
-test('an admin with no scope is unrestricted — the migration must not demote anyone', () => {
+test('an admin with no scope keeps MONEY — the migration must not demote anyone — and sees NO cost (decision 2)', () => {
   // 0021 added the column with NULL for every existing admin. NULL meaning
   // "assistant" would have silently locked the owner out on deploy day.
-  assert.equal(canViewFinancials(env, user({ role: 'admin', admin_scope: null })), true);
-  assert.equal(canViewFinancials(env, user({ role: 'admin', admin_scope: 'full' })), true);
+  assert.equal(canMoveMoney(env, user({ role: 'admin', admin_scope: null })), true);
+  assert.equal(canMoveMoney(env, user({ role: 'admin', admin_scope: 'full' })), true);
+  // Owner decision 2 (2026-10-07): cost is the owner's alone.
+  assert.equal(canViewCost(env, user({ role: 'admin', admin_scope: null })), false);
+  assert.equal(canViewCost(env, user({ role: 'admin', admin_scope: 'full' })), false);
 });
 
-test('an assistant admin does not see financials', () => {
-  assert.equal(canViewFinancials(env, user({ role: 'admin', admin_scope: 'assistant' })), false);
+test('an assistant admin neither sees cost nor moves money', () => {
+  assert.equal(canMoveMoney(env, user({ role: 'admin', admin_scope: 'assistant' })), false);
+  assert.equal(canViewCost(env, user({ role: 'admin', admin_scope: 'assistant' })), false);
 });
 
-test('the owner is financial even if their row says assistant', () => {
+test('the owner sees cost and moves money even if their row says assistant', () => {
   // A compromised assistant must not be able to lock the owner out of their
-  // own numbers, so the owner check wins over the stored scope.
+  // own numbers, so the owner check wins over the stored scope — and the 0177
+  // promotion trigger leaves 'assistant' on a bootstrapped owner row.
   const owner = user({ role: 'admin', email: 'Owner@LEVONIS-IQ.com', admin_scope: 'assistant' });
   assert.equal(isOwner(env, owner), true, 'the owner match is case- and space-insensitive');
-  assert.equal(canViewFinancials(env, owner), true);
+  assert.equal(canViewCost(env, owner), true);
+  assert.equal(canMoveMoney(env, owner), true);
+});
+
+test('cost is honoured only for the VERIFIED owner address (critique A10)', () => {
+  const unverified = user({ role: 'admin', email: 'owner@levonis-iq.com', email_verified_at: null });
+  assert.equal(canViewCost(env, unverified), false);
+  assert.equal(canMoveMoney(env, unverified), true, 'money is decided by address and scope, as before');
 });
 
 test('with no INITIAL_ADMIN_EMAIL configured nobody is the owner', () => {
@@ -100,13 +117,13 @@ test('an ABSENT scope is unrestricted; an UNRECOGNISED one is not', () => {
   assert.equal(normalizeAdminScope({}), 'assistant');
 });
 
-test('an unparseable scope cannot see financials', () => {
+test('an unparseable scope cannot move money', () => {
   // The consequence of the rule above, at the call site that matters.
-  assert.equal(canViewFinancials(env, user({ role: 'admin', admin_scope: 'nonsense' })), false);
-  assert.equal(canViewFinancials(env, user({ role: 'admin', admin_scope: 'assisstant' })), false);
+  assert.equal(canMoveMoney(env, user({ role: 'admin', admin_scope: 'nonsense' })), false);
+  assert.equal(canMoveMoney(env, user({ role: 'admin', admin_scope: 'assisstant' })), false);
   // ...and the documented default is untouched.
-  assert.equal(canViewFinancials(env, user({ role: 'admin', admin_scope: null })), true);
-  assert.equal(canViewFinancials(env, user({ role: 'admin', admin_scope: 'full' })), true);
+  assert.equal(canMoveMoney(env, user({ role: 'admin', admin_scope: null })), true);
+  assert.equal(canMoveMoney(env, user({ role: 'admin', admin_scope: 'full' })), true);
 });
 
 // ------------------------------------------------------------------ what
@@ -143,14 +160,18 @@ test('stripFinancials leaves the original payload untouched', () => {
   assert.equal(payload.product_cost_iqd, 7, 'the caller-owned object was mutated');
 });
 
-test('projectForAdmin strips for an assistant and passes through for a full admin', () => {
+test('projectForAdmin strips for an assistant AND a full admin, and passes through for the owner only', () => {
   const payload = { product_cost_iqd: 613377, price_iqd: 900000 };
   const asAssistant = projectForAdmin(env, user({ role: 'admin', admin_scope: 'assistant' }), payload);
   assert.equal('product_cost_iqd' in asAssistant, false);
   assert.equal(asAssistant.price_iqd, 900000);
 
   const asFull = projectForAdmin(env, user({ role: 'admin', admin_scope: 'full' }), payload);
-  assert.equal(asFull.product_cost_iqd, 613377);
+  assert.equal('product_cost_iqd' in asFull, false, 'decision 2: a full admin sees no cost');
+  assert.equal(asFull.price_iqd, 900000);
+
+  const asOwner = projectForAdmin(env, user({ role: 'admin', email: 'owner@levonis-iq.com' }), payload);
+  assert.equal(asOwner.product_cost_iqd, 613377);
 });
 
 // ---------------------------------------------------------------- writes
@@ -173,7 +194,7 @@ test('a save that never mentions cost attempts nothing — the bug this exists f
   // save outright and left an assistant unable to edit the NAME of any priced
   // product. Absent is not an attempt.
   const raw = { id: 'p1', name_en: 'Renamed by the assistant', options: [{ id: 'o1' }], colors: [{ id: 'c1' }] };
-  assert.deepEqual(attemptedFinancialWrites(raw, strippedDoc(), stored), []);
+  assert.deepEqual(attemptedFinancialWrites(raw), []);
 });
 
 test('and that save keeps every stored cost exactly as it was', () => {
@@ -184,55 +205,55 @@ test('and that save keeps every stored cost exactly as it was', () => {
   assert.equal(doc.colors[0].cost_iqd, 27113);
 });
 
-test('sending a DIFFERENT product cost is an attempt, and is named', () => {
-  const raw = { id: 'p1', product_cost_iqd: 1 };
-  const doc = { ...strippedDoc(), product_cost_iqd: 1 };
-  assert.deepEqual(attemptedFinancialWrites(raw, doc, stored), ['product_cost_iqd']);
+test('sending a product cost is an attempt, and is named', () => {
+  assert.deepEqual(attemptedFinancialWrites({ id: 'p1', product_cost_iqd: 1 }), ['product_cost_iqd']);
 });
 
-test('sending the SAME product cost back is not an attempt to change it', () => {
-  const raw = { id: 'p1', product_cost_iqd: 613377 };
-  const doc = { ...strippedDoc(), product_cost_iqd: 613377 };
-  assert.deepEqual(attemptedFinancialWrites(raw, doc, stored), []);
+test('sending the STORED cost back is refused exactly like any other number — no equality oracle', () => {
+  // The old rule refused only a number that DIFFERED from the stored one, so
+  // a non-owner could send guesses and read 200 for the right one. The
+  // decision now reads the request alone: a right guess and a wrong one get
+  // the same refusal, naming the same field.
+  const right = attemptedFinancialWrites({ id: 'p1', product_cost_iqd: 613377 });
+  const wrong = attemptedFinancialWrites({ id: 'p1', product_cost_iqd: 612377 });
+  assert.deepEqual(right, ['product_cost_iqd']);
+  assert.deepEqual(right, wrong);
 });
 
-test('explicitly sending null over a stored cost IS an attempt to blank it', () => {
-  // The one case absent and present must be told apart: a client that really
-  // says {"product_cost_iqd": null} is trying to erase a number it never saw.
-  const raw = { id: 'p1', product_cost_iqd: null };
-  assert.deepEqual(attemptedFinancialWrites(raw, strippedDoc(), stored), ['product_cost_iqd']);
+test('an explicit null is carried forward, not refused — whatever is stored', () => {
+  // The product form fills a missing field from its blank document, so a
+  // non-owner's save posts `product_cost_iqd: null`. Refusing it blocked every
+  // save of a priced product; refusing it only when a cost was stored told the
+  // caller whether one exists. It is neither: carryStoredCostForward keeps the
+  // stored number.
+  assert.deepEqual(attemptedFinancialWrites({ id: 'p1', product_cost_iqd: null }), []);
+  assert.deepEqual(attemptedFinancialWrites({ id: 'p1', product_cost_iqd: '' }), []);
+  const doc = strippedDoc();
+  carryStoredCostForward(doc, stored);
+  assert.equal(doc.product_cost_iqd, 613377);
 });
 
-test('option and colour cost are checked per id, and named per id', () => {
+test('option and colour cost are checked per id, adjustments included, and named per id', () => {
   const raw = {
     id: 'p1',
-    options: [{ id: 'o1', cost_iqd: 9 }],
-    colors: [{ id: 'c1', cost_iqd: 27113 }], // unchanged
+    options: [{ id: 'o1', cost_iqd: 9 }, { id: 'o2', cost_adjust_iqd: -500 }],
+    colors: [{ id: 'c1', cost_iqd: 27113 }], // the stored value: still an attempt
   };
-  const doc: CostBearing = {
-    product_cost_iqd: null,
-    options: [{ id: 'o1', cost_iqd: 9 }],
-    colors: [{ id: 'c1', cost_iqd: 27113 }],
-  };
-  assert.deepEqual(attemptedFinancialWrites(raw, doc, stored), ['option:o1.cost_iqd']);
+  assert.deepEqual(attemptedFinancialWrites(raw), ['option:o1.cost_iqd', 'option:o2.cost_adjust_iqd', 'color:c1.cost_iqd']);
 });
 
-test('a brand-new option carrying a cost is an attempt even with nothing stored', () => {
-  const raw = { id: 'p1', options: [{ id: 'oNEW', cost_iqd: 500 }] };
-  const doc: CostBearing = { product_cost_iqd: null, options: [{ id: 'oNEW', cost_iqd: 500 }], colors: [] };
-  assert.deepEqual(attemptedFinancialWrites(raw, doc, stored), ['option:oNEW.cost_iqd']);
+test('a brand-new option carrying a cost is an attempt', () => {
+  assert.deepEqual(attemptedFinancialWrites({ id: 'p1', options: [{ id: 'oNEW', cost_iqd: 500 }] }), ['option:oNEW.cost_iqd']);
 });
 
-test('creating a product with a cost is an attempt (prev is null)', () => {
-  const raw = { product_cost_iqd: 100 };
-  const doc: CostBearing = { product_cost_iqd: 100, options: [], colors: [] };
-  assert.deepEqual(attemptedFinancialWrites(raw, doc, null), ['product_cost_iqd']);
+test('creating a product with a cost is an attempt', () => {
+  assert.deepEqual(attemptedFinancialWrites({ product_cost_iqd: 100 }), ['product_cost_iqd']);
 });
 
 test('a malformed body cannot crash the check or smuggle a cost past it', () => {
-  const doc: CostBearing = { product_cost_iqd: null, options: [], colors: [] };
-  assert.deepEqual(attemptedFinancialWrites({ options: 'not-an-array' }, doc, stored), []);
-  assert.deepEqual(attemptedFinancialWrites({ options: [null, 5, { cost_iqd: 1 }] }, doc, stored), []);
+  assert.deepEqual(attemptedFinancialWrites({ options: 'not-an-array' }), []);
+  // A row with no id still carries a cost: it is refused, named by position.
+  assert.deepEqual(attemptedFinancialWrites({ options: [null, 5, { cost_iqd: 1 }] }), ['option:#2.cost_iqd']);
 });
 
 test('carryStoredCostForward nulls a cost that has no stored counterpart', () => {

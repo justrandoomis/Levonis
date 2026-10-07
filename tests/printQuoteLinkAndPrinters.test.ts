@@ -56,7 +56,7 @@ function stlBytes(): Uint8Array {
   return new Uint8Array(buf);
 }
 
-function appWithBucket(raw: Raw, user: { id: string; role: string } | null = null): App {
+function appWithBucket(raw: Raw, user: { id: string; role: string; email?: string; admin_scope?: string | null } | null = null): App {
   const bytes = stlBytes();
   const bucket = {
     put: async () => ({}),
@@ -208,7 +208,8 @@ test('the admin enters the X1 Carbon\'s economics, and the X1C and the H2D stop 
   raw.prepare(`UPDATE print_materials SET default_iqd_per_kg = 22000 WHERE id = 'pla'`).run();
   raw.prepare(`INSERT INTO users (id, email, name, password_hash, role) VALUES ('boss','boss@x.co','Boss','x','admin')`).run();
   const guest = appWithBucket(raw);
-  const admin = appWithBucket(raw, { id: 'boss', role: 'admin' });
+  // The owner (the stub env names boss@x.co): machine economics are cost (decision 2).
+  const admin = appWithBucket(raw, { id: 'boss', role: 'admin', email: 'boss@x.co' });
 
   // The premise, on the seed: the same file, the same dinar.
   const x1cBefore = await fileQuote(guest, 'bbl-x1c', 'tok-a');
@@ -261,7 +262,8 @@ test('the admin enters the X1 Carbon\'s economics, and the X1C and the H2D stop 
 test('the editor refuses what it cannot honour, and clears with an explicit null', async () => {
   const raw = freshDb();
   raw.prepare(`INSERT INTO users (id, email, name, password_hash, role) VALUES ('boss','boss@x.co','Boss','x','admin')`).run();
-  const admin = appWithBucket(raw, { id: 'boss', role: 'admin' });
+  // The owner (the stub env names boss@x.co): machine economics are cost (decision 2).
+  const admin = appWithBucket(raw, { id: 'boss', role: 'admin', email: 'boss@x.co' });
   const path = '/api/admin/print-quote/printer-models/bbl-x1c';
 
   for (const [bad, code] of [
@@ -294,4 +296,18 @@ test('the editor is admin-only', async () => {
   assert.equal((await customer.request('/api/admin/print-quote/printer-models')).status, 403);
   assert.equal((await patch(customer, '/api/admin/print-quote/printer-models/bbl-x1c', { purchase_iqd: 1 })).status, 403);
   assert.equal((await appWithBucket(raw).request('/api/admin/print-quote/printer-models')).status, 401);
+});
+
+test('owner decision 2: a machine\'s purchase price and the platform machine-hour rate are COST — a full admin is refused', async () => {
+  const raw = freshDb();
+  for (const admin_scope of ['full', null, 'assistant']) {
+    const admin = appWithBucket(raw, { id: 'usr_full', role: 'admin', email: 'full@x.co', admin_scope });
+    const list = await admin.request('/api/admin/print-quote/printer-models');
+    assert.equal(list.status, 403, `scope ${admin_scope}`);
+    assert.equal((await json(list)).code, 'COST_ACCESS_DENIED');
+    const write = await patch(admin, '/api/admin/print-quote/printer-models/bbl-x1c', { purchase_iqd: 1 });
+    assert.equal(write.status, 403);
+    assert.equal((await json(write)).code, 'COST_ACCESS_DENIED');
+  }
+  assert.equal(row<{ p: number | null }>(raw, "SELECT purchase_iqd p FROM printer_models WHERE id='bbl-x1c'")!.p, null, 'nothing was written');
 });

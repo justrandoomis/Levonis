@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, str } from '../lib/http';
-import { projectForAdmin, canViewFinancials } from '../lib/adminScope';
+import { projectForAdmin, canWriteCost } from '../lib/adminScope';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { planAtomicAdjustment } from '../lib/inventoryAdjustment';
@@ -228,7 +228,7 @@ adminStockOperationsRoutes.post('/counts', async (c) => {
           s.scope_id,
           s.stock,
           whole(r.counted_qty, 'الكمية الفعلية', 0, 100000),
-          canViewFinancials(c.env, user)
+          canWriteCost(c.env, user)
             ? r.unit_cost_iqd == null
               ? s.unit_cost_iqd
               : whole(r.unit_cost_iqd, 'التكلفة')

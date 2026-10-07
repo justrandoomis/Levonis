@@ -152,7 +152,7 @@ async function main() {
   let r = await admin.post('/api/auth/register', { email, username: `oav${rnd}`, name: 'Opt Avail', password });
   check('admin registered', r.status === 200, `${r.status}`);
   const { execSync } = await import('node:child_process');
-  execSync(`npx wrangler d1 execute levonis-db --local --command ${JSON.stringify(`UPDATE users SET role='admin' WHERE email='${email}'`)}`, { stdio: 'pipe' });
+  execSync(`npx wrangler d1 execute levonis-db --local --command ${JSON.stringify(`UPDATE users SET role='admin' WHERE email='${email}'; UPDATE users SET admin_scope='full' WHERE email='${email}'`)}`, { stdio: 'pipe' });
   r = await admin.post('/api/auth/login', { email, password });
   check('admin signed in', r.status === 200, `${r.status}`);
 

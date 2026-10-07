@@ -148,10 +148,11 @@ export default function ProductForm({
    * خصم البريميوم» — so its field is gone, not hidden.
    */
   const proPaused = useProPaused();
-  // §11: cost is only rendered for a financial admin. The SERVER refuses to
-  // read or write it either way — this only avoids showing an input that
-  // would be rejected.
-  const canSeeCost = user?.can_view_financials !== false;
+  // Cost is rendered for the owner only (owner decision 2). The SERVER strips
+  // it from every non-owner read and refuses every non-owner write either
+  // way — this only avoids showing an input that would be rejected. `=== true`
+  // so a hint the session lacks hides the fields instead of showing them.
+  const canSeeCost = user?.can_view_cost === true;
 
   const [doc, setDoc] = useState<EditorDoc>(() => blankDoc());
   const [rel, setRel] = useState<RelationsState>(() => emptyRelations());

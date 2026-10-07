@@ -2,7 +2,7 @@
  * Admin scope over the principal (`01-TARGET.md` §3.4, ADR-002 (a)): Identity
  * folds the owner rule into the signed `scope` claim (`owner | full |
  * assistant | null`), so no service needs `INITIAL_ADMIN_EMAIL` to decide who
- * may see money. `normalizeAdminScope`, `FINANCIAL_FIELDS` and
+ * may see cost (the owner only) or move money (owner or full). `normalizeAdminScope`, `FINANCIAL_FIELDS` and
  * `stripFinancials` are byte-identical copies of `worker/lib/adminScope.ts`
  * (pinned by `tests/edgeParity.test.ts`).
  */
@@ -18,7 +18,7 @@ export type AdminScope = 'full' | 'assistant';
  * everything ELSE also meant full: `'assisstant'` with a typo, a value written
  * by an older build, a half-finished manual UPDATE, or anything a future
  * migration adds and this function has not learned yet all fell through the
- * same `return null`, and `canViewFinancials` reads that as "not an
+ * same `return null`, and the scope predicate read that as "not an
  * assistant" — so a scope nobody recognised granted the cost, the margin and
  * the supplier price.
  *
@@ -89,6 +89,144 @@ export const FINANCIAL_FIELDS = [
   // Whether, and when, a confirmed purchase priced a selection.
   'cost_source',
   'cost_date',
+  // S1 (owner decision 2, master plan §2.3 C17): THE NAMING CONTRACT for every
+  // private pricing, batch and profit key the programme adds. A private key
+  // that is not in this list fails review. Reserved here before any table
+  // carries them, so a later step cannot ship one unstripped. Never add
+  // breakdown, rounding_iqd, pricing, valuation, exchange_rate,
+  // exchange_rate_snapshot, shipping_cost or amount_iqd: each is a public or
+  // wallet field elsewhere, and stripping it would break those screens.
+  // -- supplier, rates and private shipping measures (security spec 4.1)
+  'supplier_cost',
+  'supplier_cost_original',
+  'supplier_currency',
+  'converted_supplier_cost_iqd',
+  'fx_rate',
+  'fx_rates',
+  'fx_rate_snapshot',
+  'exchange_rate_at_purchase',
+  'shipping_profile',
+  'shipping_rate',
+  'shipping_rates',
+  'shipping_rate_snapshot',
+  'shipping_rate_at_purchase',
+  'shipping_cost_iqd',
+  'actual_shipping_cost_iqd',
+  'additional_cost_iqd',
+  'actual_additional_cost_iqd',
+  'pricing_weight_g',
+  'shipping_weight_g',
+  'shipping_length_mm',
+  'shipping_width_mm',
+  'shipping_height_mm',
+  'shipping_cbm',
+  'manual_cbm',
+  'calculated_cbm',
+  'effective_cbm',
+  'cbm_used',
+  'weight_used_g',
+  // -- replacement cost, target profit and the profit figures
+  'replacement_cost_iqd',
+  'current_replacement_cost_iqd',
+  'current_replacement_cost_snapshot_iqd',
+  'target_profit_iqd',
+  'direct_sale_premium_iqd',
+  'estimated_cost_iqd',
+  'estimated_profit_iqd',
+  'actual_profit_iqd',
+  'actual_unit_cost_iqd',
+  'actual_total_cost_iqd',
+  'actual_landed_cost_per_unit_iqd',
+  'landed_cost_iqd',
+  'replacement_margin_iqd',
+  'net_profit_iqd',
+  'shipping_cost_allocated_iqd',
+  'other_order_costs_allocated_iqd',
+  'store_borne_shipping_iqd',
+  'store_borne_cod_iqd',
+  'pricing_inputs',
+  'pricing_rules',
+  'pricing_breakdown',
+  'cost_breakdown',
+  'pricing_missing',
+  'pricing_revision_detail',
+  'rounding_step_iqd',
+  'min_margin_percent',
+  'min_profit_iqd',
+  // -- engine model
+  'supplier_cost_delta',
+  'supplier_amount',
+  'fx_version',
+  'shipping_version',
+  'supplier_cost_iqd',
+  'target_rule_id',
+  'premium_rule_id',
+  'pricing_costs',
+  // -- engine runs
+  'breakdown_json',
+  // -- import and template
+  'pricing_private',
+  'pricing_token',
+  // -- inventory and batches
+  'supplier_line_total_original',
+  'weight_g_used',
+  'volume_mm3_used',
+  'freight_unit_iqd',
+  'additional_unit_iqd',
+  'receipt_unit_cost_iqd',
+  'effective_unit_cost_iqd',
+  'next_unit_cost_iqd',
+  'next_free_unit_cost_iqd',
+  'expected_profit_iqd',
+  'preorder_margin_iqd',
+  'owner_costs',
+  'remaining_amount_iqd',
+  'sold_amount_iqd',
+  'restated_amount_iqd',
+  'recognized_iqd',
+  'unit_delta_iqd',
+  'period_corrections',
+  'inventory_cost_corrections_iqd',
+  'derived_snapshot',
+  'supplier_hint',
+  // -- orders and profit
+  'estimated_unit_cost_iqd',
+  'estimated_net_revenue_iqd',
+  'replacement_unit_cost_iqd',
+  'target_profit_unit_iqd',
+  'direct_premium_unit_iqd',
+  'fx_snapshot_json',
+  'shipping_rate_snapshot_json',
+  'supplier_cost_snapshot_json',
+  'estimated_unit_cost',
+  'estimated_profit',
+  'actual_unit_cost',
+  'actual_total_cost',
+  'current_replacement_cost_snapshot',
+  'target_profit_snapshot',
+  'direct_premium_snapshot',
+  'replacement_margin_at_sale',
+  'estimate_vs_actual_variance',
+  'cost_variance',
+  'fx_snapshot',
+  'supplier_cost_snapshot',
+  'store_borne_delivery_expected',
+  'recorded_catalogue_cost',
+  'gross_profit',
+  'net_profit',
+  'preorder_estimated_cogs_iqd',
+  'restored_cogs_iqd',
+  // -- critique A6: columns of the engine tables and the run DTO that the
+  // -- lists above did not name
+  'source_ref',
+  'direct_premium_iqd',
+  'preorder_base_iqd',
+  'computed_price_iqd',
+  'effective_weight_g',
+  'rate_iqd',
+  'below_target',
+  'stored_iqd',
+  'computed_iqd',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;
@@ -121,21 +259,34 @@ export function scopeFor(input: { role: string; admin_scope: unknown; isOwner: b
   return normalizeAdminScope(input.admin_scope) === 'assistant' ? 'assistant' : 'full';
 }
 
-/** True when this principal may see cost, margin and other financial detail. */
-export function canViewFinancials(p: Principal | null | undefined): boolean {
+/**
+ * MONEY scope over the principal (owner decision 2, S1): the owner or a 'full'
+ * admin may move money (refunds, wallet credits, payouts). It reveals no cost.
+ * The old name `canViewFinancials` is gone so nobody reads it as "may see cost".
+ */
+export function hasMoneyScopePrincipal(p: Principal | null | undefined): boolean {
   if (!p || p.role !== 'admin') return false;
   return p.scope === 'owner' || p.scope === 'full';
 }
 
 export const isOwnerPrincipal = (p: Principal | null | undefined): boolean => !!p && p.role === 'admin' && p.scope === 'owner';
 
-/** Applies the rule in one call at a route boundary. */
+/** COST over the principal: the owner only (decision 2; delegation is off). */
+export const canViewCostPrincipal = (p: Principal | null | undefined): boolean => isOwnerPrincipal(p);
+
+/** Applies the COST rule in one call at a route boundary: everyone but the owner gets the payload stripped. */
 export function projectForPrincipal<T>(p: Principal | null | undefined, payload: T): T {
-  return canViewFinancials(p) ? payload : stripFinancials(payload);
+  return canViewCostPrincipal(p) ? payload : stripFinancials(payload);
 }
 
-/** `admin:full` in the capability table = an admin whose scope is not `assistant`. */
-export function meetsRequirement(p: Principal | null | undefined, requires: 'none' | 'auth' | 'investor' | 'admin' | 'admin:full'): boolean {
+/**
+ * `admin:full` in the capability table = an admin with money scope (owner or
+ * 'full'); `admin:owner` = the owner alone — every cost surface.
+ */
+export function meetsRequirement(
+  p: Principal | null | undefined,
+  requires: 'none' | 'auth' | 'investor' | 'admin' | 'admin:full' | 'admin:owner'
+): boolean {
   switch (requires) {
     case 'none':
       return true;
@@ -146,6 +297,8 @@ export function meetsRequirement(p: Principal | null | undefined, requires: 'non
     case 'admin':
       return !!p && p.role === 'admin';
     case 'admin:full':
-      return canViewFinancials(p);
+      return hasMoneyScopePrincipal(p);
+    case 'admin:owner':
+      return isOwnerPrincipal(p);
   }
 }

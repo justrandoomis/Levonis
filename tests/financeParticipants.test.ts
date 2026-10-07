@@ -13,8 +13,10 @@ import type { Env } from '../worker/lib/types';
 
 function setup() {
   const raw=freshDb();
-  raw.exec(`INSERT INTO users(id,email,name,role,admin_scope) VALUES
-    ('boss','boss@x.co','Owner','admin','full'),('staff','staff@x.co','Sajjad','admin','assistant'),('other','other@x.co','Other','customer',NULL);
+  // The owner's row carries a verified address: withdrawal notices go to the
+  // verified owner only (owner decision 2, critique A10).
+  raw.exec(`INSERT INTO users(id,email,name,role,admin_scope,email_verified_at) VALUES
+    ('boss','boss@x.co','Owner','admin','full','2026-01-01T00:00:00.000Z'),('staff','staff@x.co','Sajjad','admin','assistant',NULL),('other','other@x.co','Other','customer',NULL,NULL);
     UPDATE finance_staff SET user_id='staff' WHERE id='staff_sajjad';
     INSERT INTO expense_categories(id,slug,name_ar) VALUES ('wages','test-wages','أجور');
     INSERT INTO products(id,name,slug,price_iqd,stock) VALUES ('p','Printer','participant-printer',50000,3);
@@ -36,7 +38,7 @@ test('self earnings exposes only the signed-in participant; assistants cannot qu
   const empty=await json(await get(make('other'),'/e'));assert.equal(empty.summary.available_iqd,0);
   assert.equal((await get(boss,'/a/accounts?q=staff')).status,200);assert.equal(count(raw,'SELECT COUNT(*) n FROM finance_withdrawals'),0);
 });
-test('withdrawal reserves earnings once and notifies financial administrators only',async()=>{
+test('withdrawal reserves earnings once and notifies the owner only',async()=>{
   const {raw,cost,self}=setup();cost();assert.equal((await request(self)).status,200);assert.equal((await request(self)).status,200);
   const data=await json(await get(self,'/e'));assert.equal(data.summary.available_iqd,3000);assert.equal(data.summary.held_iqd,7000);assert.equal(data.summary.paid_iqd,0);
   assert.equal(count(raw,'SELECT COUNT(*) n FROM finance_withdrawals'),1);assert.equal(count(raw,"SELECT COUNT(*) n FROM user_notifications WHERE user_id='boss'"),1);

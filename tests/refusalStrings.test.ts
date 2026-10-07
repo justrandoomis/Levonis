@@ -19,6 +19,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { REFUSAL_STRINGS, apiRefusal, refusalText, stockRefusal } from '../src/lib/refusalStrings';
+import { isCostRefusalCode } from '../packages/contracts/src/costRefusals';
 
 /** §15.3, verbatim: "the customer-facing subset of the tables above". */
 const CUSTOMER_FACING = [
@@ -230,8 +231,10 @@ test('every code the table translates is one the server can actually emit', () =
   const orphans = Object.keys(REFUSAL_STRINGS).filter(
     // The mystery engine is a later slice; its codes are translated ahead of it
     // deliberately, so the strings land with the table rather than after the
-    // first customer has seen one in English.
-    (code) => !emitted.includes(code) && !code.startsWith('MYSTERY_')
+    // first customer has seen one in English. The pricing programme's contract
+    // (packages/contracts/src/costRefusals.ts) is the same case: S1 lands every
+    // step's codes at once, and tests/programmeRefusals.test.ts owns them.
+    (code) => !emitted.includes(code) && !code.startsWith('MYSTERY_') && !isCostRefusalCode(code)
   );
   assert.deepEqual(orphans, [], `translated codes no route can emit: ${orphans.join(', ')}`);
 });

@@ -13,11 +13,12 @@ import { closeDepositNotification, enqueueUserDepositStatusNotification } from '
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAdmin, badRequest, notFound, forbidden, conflict, str, int, oneOf, jsonArray, email, HttpError } from '../lib/http';
+import { requireAdmin, badRequest, notFound, conflict, str, int, oneOf, jsonArray, email, HttpError } from '../lib/http';
 import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { rateLimit } from '../lib/ratelimit';
-import { canViewFinancials, isOwner, normalizeAdminScope, projectForAdmin, userPatchRefusal } from '../lib/adminScope';
+import { limitRoute, rateLimit } from '../lib/ratelimit';
+import { canMoveMoney, canViewCost, canWriteCost, isOwner, normalizeAdminScope, projectForAdmin, userPatchElevates, userPatchRefusal } from '../lib/adminScope';
+import { assertCostRead, assertCostWrite, requireFreshSession } from '../lib/costAccess';
 import { degradeIfSchemaMissing, isSchemaMissing } from '../lib/membershipBenefits';
 import { normalizeText } from '../lib/search/normalize';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
@@ -116,9 +117,10 @@ import { supportInboxCounts } from './adminChats';
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
 // Investment administration exposes capital and profit amounts, even in the
-// legacy manual register. Personal earnings have their own owner-scoped router.
+// legacy manual register: COST, the owner's alone (owner decision 2).
+// Personal earnings have their own owner-scoped router.
 adminRoutes.use('/invest/*', async (c, next) => {
-  assertFinancialScope(c);
+  assertCostRead(c);
   c.header('Deprecation','true');
   if(c.req.method!=='GET')return c.json({success:false,error:{code:'LEGACY_INVESTMENT_READ_ONLY',message:'سجل الاستثمار القديم للقراءة فقط؛ استخدم المستثمرين ودفعات الشراء في المالية'}},410);
   await next();
@@ -314,12 +316,15 @@ adminRoutes.get('/overview', async (c) => {
     db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 10').all<Record<string, unknown>>(),
   ]);
 
-  // §11: revenue and wallet flow are financial data. An assistant admin sees
-  // the operational counts and nothing about money.
-  const money = canViewFinancials(c.env, c.get('user'));
+  // §11: revenue and wallet flow are MONEY figures, not cost (owner decision
+  // 2): the owner and full-scope admins see them, an assistant admin sees the
+  // operational counts only. `can_view_financials` here stays an alias of
+  // MONEY for the overview's money tiles; the cost hint lives on publicUser.
+  const money = canMoveMoney(c.env, c.get('user'));
   return c.json({
     success: true,
     can_view_financials: money,
+    can_move_money: money,
     stats: {
       orders_total: orders?.total ?? 0,
       orders_pending: orders?.pending ?? 0,
@@ -429,7 +434,10 @@ adminRoutes.post('/telegram/test', async (c) => {
  */
 adminRoutes.post('/providers/test', async (c) => {
   const adminUser = c.get('user')!;
-  if (normalizeAdminScope(adminUser.admin_scope) === 'assistant') {
+  // MONEY scope, owner folded in: a test send costs money and quota. The
+  // owner passes whatever their row's scope says (the 0177 promotion trigger
+  // can leave 'assistant' on a bootstrapped owner).
+  if (!canMoveMoney(c.env, adminUser)) {
     throw new HttpError(403, 'A restricted admin account cannot send provider tests', 'SCOPE_FORBIDDEN');
   }
   // Deliberately tight. Each call is a real message to a real person and, on
@@ -540,9 +548,13 @@ adminRoutes.get('/users', async (c) => {
   }
   sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
-  const { results } = await c.env.DB.prepare(sql).bind(...params).all();
+  const { results } = await c.env.DB.prepare(sql).bind(...params).all<{ role: string; email: string }>();
   const total = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM users').first<{ n: number }>();
-  return c.json({ success: true, users: results, total: total?.n ?? 0 });
+  // `is_owner` beside each row (the lookup and the detail already say it), so
+  // the table can tell the main admin from a «كامل (بلا تكاليف)» admin: the
+  // owner sees cost, a full admin never does (owner decision 2).
+  const users = (results ?? []).map((u) => ({ ...u, is_owner: u.role === 'admin' && isOwner(c.env, u) }));
+  return c.json({ success: true, users, total: total?.n ?? 0 });
 });
 
 /**
@@ -662,7 +674,9 @@ adminRoutes.get('/users/lookup', async (c) => {
 adminRoutes.get('/users/:id/detail', async (c) => {
   const admin = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
-  const financial = canViewFinancials(c.env, admin);
+  // MONEY, not cost: lifetime value, wallet and BNPL limit are what the member
+  // sees too. `can_view_financials` in this response is an alias of money.
+  const financial = canMoveMoney(c.env, admin);
 
   const row = await c.env.DB
     .prepare(
@@ -842,7 +856,7 @@ adminRoutes.get('/users/:id/detail', async (c) => {
   if (!financial) {
     // §11 in its strongest form: nothing financial was ever read, so there is
     // nothing here to strip, to forget to strip, or to find in the raw JSON.
-    return c.json({ success: true, can_view_financials: false, member });
+    return c.json({ success: true, can_view_financials: false, can_move_money: false, member });
   }
 
   const [value, wallet, walletDust, exchangeRateSetting, outstanding] = await Promise.all([
@@ -878,6 +892,7 @@ adminRoutes.get('/users/:id/detail', async (c) => {
   return c.json({
     success: true,
     can_view_financials: true,
+    can_move_money: true,
     member,
     financial: {
       lifetime_value_iqd: Number(value?.lifetime_iqd) || 0,
@@ -891,14 +906,14 @@ adminRoutes.get('/users/:id/detail', async (c) => {
   });
 });
 
-adminRoutes.patch('/users/:id', async (c) => {
+adminRoutes.patch('/users/:id', limitRoute('admin-user-patch', 60), async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
   const target = await c.env.DB
-    .prepare('SELECT id, role, email, is_investor FROM users WHERE id = ?')
+    .prepare('SELECT id, role, email, is_investor, admin_scope FROM users WHERE id = ?')
     .bind(id)
-    .first<{ id: string; role: string; email: string; is_investor: number }>();
+    .first<{ id: string; role: string; email: string; is_investor: number; admin_scope: string | null }>();
   if (!target) throw notFound('User not found');
 
   // Validate first, decide second, write third. Every value below is checked
@@ -908,21 +923,28 @@ adminRoutes.patch('/users/:id', async (c) => {
   const isInvestor = body.is_investor === undefined ? undefined : Boolean(body.is_investor);
   const scope = body.admin_scope === undefined ? undefined : normalizeAdminScope(body.admin_scope);
 
-  // Who may change whom — worker/lib/adminScope.ts. Promoting to, or demoting
-  // from, administrator is granting or revoking financial access (a fresh
-  // admin has admin_scope NULL = full), so it follows the same rule as
-  // admin_scope itself; the owner can never be demoted; nobody demotes
-  // themselves; and a value equal to the stored one is not an attempt, because
-  // the panel echoes the whole row on every save.
-  const refusal = userPatchRefusal(c.env, admin, target, { role, is_investor: isInvestor, admin_scope: scope });
-  if (refusal) throw forbidden(refusal);
+  // Who may change whom — worker/lib/adminScope.ts (owner decision 2): every
+  // new admin starts as an assistant; only the owner widens a scope or
+  // changes investor status; the owner can never be demoted or restricted;
+  // nobody demotes themselves; and a value equal to the stored one is not an
+  // attempt, because the panel echoes the whole row on every save.
+  const changes = { role, is_investor: isInvestor, admin_scope: scope };
+  const refusal = userPatchRefusal(c.env, admin, target, changes);
+  if (refusal) throw new HttpError(refusal.status, refusal.message, refusal.code);
+  // Widening a scope is the owner's act and needs a sign-in younger than ten
+  // minutes: a stolen cookie must not be able to mint money access.
+  if (userPatchElevates(target, changes)) requireFreshSession(c);
 
+  const promotion = target.role !== 'admin' && role === 'admin';
   const updates: string[] = [];
   const params: unknown[] = [];
   if (role !== undefined) {
     updates.push('role = ?');
     params.push(role);
   }
+  // EVERY NEW ADMIN STARTS AS AN ASSISTANT, written by the route as well as by
+  // the 0177 trigger, so it holds on a database the migration has not reached.
+  if (promotion) updates.push("admin_scope = 'assistant'");
   // Admins set the tier through membership_tier; subscription_plan is kept in
   // sync for its legal domain only (a PRIME member is 'free' there — see
   // migration 0018). getTierStatus overwrites both from the memberships
@@ -939,51 +961,63 @@ adminRoutes.patch('/users/:id', async (c) => {
     updates.push('subscription_plan = ?');
     params.push(tier === 'prime' ? 'free' : tier);
   }
-  if (scope !== undefined) {
-    updates.push('admin_scope = ?');
-    params.push(scope);
-  }
   if (isInvestor !== undefined) {
     updates.push('is_investor = ?');
     params.push(isInvestor ? 1 : 0);
   }
-  if (updates.length === 0) throw badRequest('Nothing to update');
-  params.push(id);
-  await c.env.DB.prepare(`UPDATE users SET ${updates.join(', ')}, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`)
-    .bind(...params)
-    .run();
+  if (updates.length === 0 && scope === undefined) throw badRequest('Nothing to update');
   /**
-   * THE AUDIT RECORDS WHAT CHANGED, NOT WHAT WAS SENT.
+   * THE ROLE AND THE SCOPE ARE TWO STATEMENTS IN ONE BATCH (critique D5).
    *
-   * This logged the raw request body, which is whatever the caller chose to
-   * put in it: fields this route ignores, fields a future client adds, and —
-   * the reason it matters — anything an attacker appends to a request they are
-   * otherwise allowed to make. An audit trail that stores unvalidated input is
-   * a place to hide things in, and it is read by the people investigating
-   * exactly that.
-   *
-   * The columns this handler actually wrote are already assembled above, so
-   * the record is built from THOSE.
+   * The promotion trigger is AFTER UPDATE OF role: a single statement setting
+   * role and admin_scope together would have its scope overwritten by the
+   * trigger the moment it landed, and the response would claim a scope the
+   * row does not hold. The role statement goes first; the scope statement
+   * (an owner elevation in the same request, a restriction, or a scope sent
+   * with a demotion) touches only admin_scope, so the trigger does not fire
+   * again.
    */
+  const statements: D1PreparedStatement[] = [];
+  if (updates.length) {
+    statements.push(
+      c.env.DB.prepare(`UPDATE users SET ${updates.join(', ')}, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`).bind(
+        ...params,
+        id
+      )
+    );
+  }
+  if (scope !== undefined) {
+    statements.push(
+      c.env.DB.prepare("UPDATE users SET admin_scope = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?").bind(scope, id)
+    );
+  }
+  await c.env.DB.batch(statements);
+  /**
+   * THE AUDIT AND THE ANSWER RECORD WHAT THE ROW HOLDS (critique G-4).
+   *
+   * Not what was sent, and not what the handler meant to write: the database
+   * has the last word (the promotion trigger), so the stored scope is read
+   * back and that is what the trail and the response say. An audit that
+   * stores unvalidated input is a place to hide things in, and it is read by
+   * the people investigating exactly that.
+   */
+  const stored = await c.env.DB
+    .prepare('SELECT role, admin_scope, is_investor FROM users WHERE id = ?')
+    .bind(id)
+    .first<{ role: string; admin_scope: string | null; is_investor: number }>();
+  const storedScope = stored?.role === 'admin' ? normalizeAdminScope(stored.admin_scope) : null;
+  const fields = updates.map((u) => u.split(' ')[0]);
+  if (scope !== undefined && !fields.includes('admin_scope')) fields.push('admin_scope');
   await audit(c.env.DB, admin.id, 'admin.user_update', id, {
-    // The COLUMN NAMES this statement actually set, paired with the values the
-    // handler validated. `tier` is block-scoped to its own branch, so the
-    // membership change is read back out of the bound parameters rather than
-    // reaching for a variable that may not exist.
-    fields: updates.map((u) => u.split(' ')[0]),
+    // The COLUMN NAMES the statements actually set.
+    fields,
     role: role ?? undefined,
-    // `?? undefined` HERE WAS A HOLE IN THE ONE AUDIT THAT MATTERS MOST.
-    // Revoking a restriction means writing admin_scope = NULL, which IS the
-    // act of handing an account full financial access — and `scope ?? undefined`
-    // turned that null into undefined, which JSON.stringify drops. The record
-    // then said the column changed and refused to say to what, so the grant and
-    // the revoke were indistinguishable in the trail an investigator reads.
-    // Only ABSENT (the field was never sent) may become undefined; a deliberate
-    // null is a value and is recorded as one.
-    admin_scope: scope === undefined ? undefined : scope,
+    // A deliberate NULL (legacy full) is a value and is recorded as one; only
+    // a scope nobody touched is left out.
+    admin_scope: scope === undefined && !promotion ? undefined : stored?.admin_scope ?? null,
     is_investor: isInvestor ?? undefined,
   });
-  return c.json({ success: true });
+  return c.json({ success: true, admin_scope: storedScope });
 });
 
 // ---------------------------------------------------------------- products
@@ -1129,8 +1163,8 @@ adminRoutes.post('/products', async (c) => {
   // UPSERT binds every key it emits — so an assistant admin could set the
   // cost, or blank it by leaving it out. Without financial scope the key is
   // not bound at all: an UPDATE keeps the stored cost, an INSERT leaves it
-  // unset for a financial admin to fill.
-  const financial = canViewFinancials(c.env, adminUser);
+  // unset for the owner to fill (cost WRITE, owner decision 2).
+  const financial = canWriteCost(c.env, adminUser);
   const { product_cost_iqd: sentCost, ...scalar } = validated;
   void sentCost;
   const p: Omit<typeof validated, 'product_cost_iqd'> = financial ? validated : scalar;
@@ -1531,7 +1565,8 @@ function backgroundWork(c: Context<AppContext>, work: Promise<unknown>): void {
  */
 adminRoutes.post('/wallet/credit', async (c) => {
   const adminUser = c.get('user')!;
-  if (!canViewFinancials(c.env, adminUser)) {
+  // MONEY (owner decision 2 keeps it with full-scope admins): no cost shown.
+  if (!canMoveMoney(c.env, adminUser)) {
     throw new HttpError(
       403,
       'هذا الإجراء للمالك أو الدور المالي فقط / This action needs the owner or a financial admin',
@@ -3786,9 +3821,12 @@ adminRoutes.delete('/coupons/:id', async (c) => {
  *
  * Every admin could read and write all of these: an assistant read the margin
  * floor and the print materials' buying prices, and could re-set the wallet's
- * USD rate or a pre-order commission. Reading the cost-bearing three and
- * writing any of them now needs financial scope; the rest of the settings
- * (home, ads, shipping text…) stay with every admin.
+ * USD rate or a pre-order commission. Owner decision 2 splits them:
+ *   COST_SETTING_KEYS   the margin floor and the print buying prices — read
+ *                       and written by the owner only;
+ *   the other money keys  written with money scope (owner or full admin),
+ *                       readable by every admin.
+ * The rest of the settings (home, ads, shipping text…) stay with every admin.
  */
 const COST_SETTING_KEYS: readonly string[] = ['minMarginPercent', 'printPricingConfig', 'printMaterials'];
 const MONEY_SETTING_KEYS: readonly string[] = [
@@ -3804,7 +3842,7 @@ const MONEY_SETTING_KEYS: readonly string[] = [
 
 adminRoutes.get('/settings', async (c) => {
   const settings = await getSettings(c.env.DB);
-  if (!canViewFinancials(c.env, c.get('user'))) for (const key of COST_SETTING_KEYS) delete settings[key];
+  if (!canViewCost(c.env, c.get('user'))) for (const key of COST_SETTING_KEYS) delete settings[key];
   return c.json({ success: true, settings });
 });
 
@@ -3929,7 +3967,10 @@ adminRoutes.put('/settings/:key', async (c) => {
   const adminUser = c.get('user')!;
   const key = c.req.param('key') as SettingKey;
   if (!SETTING_KEYS.includes(key)) throw badRequest('Unknown setting');
-  if (MONEY_SETTING_KEYS.includes(key)) assertFinancialScope(c);
+  // COST keys are the owner's (decision 2); the other money keys need money
+  // scope. The audit below never stores a cost key's value.
+  if (COST_SETTING_KEYS.includes(key)) assertCostWrite(c);
+  else if (MONEY_SETTING_KEYS.includes(key)) assertFinancialScope(c);
   // The farm's balancing document has exactly one write path — the route that
   // normalises it, refuses an unusable one, bumps its version and audits the
   // change per section. Storing it raw here would bypass all four.

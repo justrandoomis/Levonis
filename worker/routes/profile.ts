@@ -199,7 +199,7 @@ profileRoutes.patch('/', async (c) => {
   }
 
   const updated = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(user.id).first();
-  return c.json({ success: true, user: publicUser(updated as never) });
+  return c.json({ success: true, user: publicUser(updated as never, c.env) });
 });
 
 // Onboarding and profile completion ------------------------------------------
@@ -281,7 +281,7 @@ profileRoutes.post('/completion/dismiss', async (c) => {
     ).bind(user.id),
   ]);
   const updated = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(user.id).first();
-  return c.json({ success: true, user: publicUser(updated as never) });
+  return c.json({ success: true, user: publicUser(updated as never, c.env) });
 });
 
 /**
@@ -318,7 +318,7 @@ profileRoutes.post('/onboarding', async (c) => {
     .run();
 
   const updated = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(user.id).first();
-  return c.json({ success: true, user: publicUser(updated as never) });
+  return c.json({ success: true, user: publicUser(updated as never, c.env) });
 });
 
 // Favorites ("Collection") ----------------------------------------------------

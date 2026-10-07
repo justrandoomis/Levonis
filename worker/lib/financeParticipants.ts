@@ -9,7 +9,7 @@ import { badRequest, conflict, notFound } from './http';
 import { baghdadDay, fence, journalPlan, periodOpen } from './operations';
 import { auditStatements } from './audit';
 import { notifyStatement } from './notifications';
-import { canViewFinancials, isOwner } from './adminScope';
+import { PRIVATE_DELEGATION_ENABLED, canViewCost, isOwner } from './adminScope';
 import type { Env, SessionUser } from './types';
 import { employmentInstalled, investorEmploymentPendingSql, nextEmploymentDay, staffDateEligible } from './financeEmployment';
 
@@ -187,13 +187,24 @@ export async function commitParticipantStatements(db: D1Database, statements: D1
     throw e;
   }
 }
+/**
+ * Who hears about a withdrawal request: the screen it links to is owner-only
+ * (a profit-percent wage reveals profit, owner decision 2), so the owner — and,
+ * only if delegation is ever switched on, a cost grantee holding an explicit
+ * `pay` permission row. Never a full or assistant admin.
+ */
 async function adminNotices(env: Env, id: string, amount: number) {
-  const admins = await env.DB.prepare("SELECT id,email,role,admin_scope,(SELECT allowed FROM ops_permissions p WHERE p.user_id=users.id AND p.capability='pay') AS pay_allowed FROM users WHERE role='admin'").all<SessionUser&{pay_allowed:number|null}>();
-  return (admins.results ?? []).filter((u) => canViewFinancials(env,u) && (isOwner(env,u) || u.pay_allowed!==0)).map((u) => notifyStatement(env.DB, {
-    userId: u.id, kind: 'payout_available', title_ar: 'طلب سحب أرباح جديد', title_en: 'New earnings withdrawal request',
-    body_ar: `طلب سحب بقيمة ${amount.toLocaleString('en-US')} د.ع جاهز للمراجعة`, link: '/admin?tab=finance&section=withdrawals',
-    entity_type: 'payout', entity_id: id, eventKey: `finance-withdrawal:${id}`,
-  }).stmt);
+  const admins = await env.DB.prepare("SELECT id,email,email_verified_at,role,admin_scope,(SELECT allowed FROM ops_permissions p WHERE p.user_id=users.id AND p.capability='pay') AS pay_allowed FROM users WHERE role='admin'").all<SessionUser&{pay_allowed:number|null}>();
+  const shown = amount.toLocaleString('en-US');
+  return (admins.results ?? [])
+    .filter((u) => canViewCost(env, u) && (isOwner(env, u) || (PRIVATE_DELEGATION_ENABLED && u.pay_allowed === 1)))
+    .map((u) => notifyStatement(env.DB, {
+      userId: u.id, kind: 'payout_available', title_ar: 'طلب سحب أرباح جديد', title_en: 'New earnings withdrawal request',
+      body_ar: `طلب سحب بقيمة ${shown} د.ع جاهز للمراجعة`, body_en: `A withdrawal request of ${shown} IQD is ready for review`,
+      link: '/admin?tab=finance&section=withdrawals',
+      entity_type: 'payout', entity_id: id, eventKey: `finance-withdrawal:${id}`,
+      meta: { title_ckb: 'داواکارییەکی نوێی کێشانەوەی قازانج', body_ckb: `داواکارییەکی کێشانەوە بە بڕی ${shown} دینار ئامادەیە بۆ پێداچوونەوە` },
+    }).stmt);
 }
 export async function requestWithdrawal(env: Env, userId: string, id: string, amount: number, balanceType:BalanceType='earnings') {
   const db = env.DB;

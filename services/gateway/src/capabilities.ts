@@ -96,8 +96,15 @@ export interface GuardInput {
  * authentication, then role, then scope.
  */
 export function guard(input: GuardInput): Denial | null {
-  const requires = needsFinancialScope(input.path, input.method) && input.rule.requires !== 'none' ? 'admin:full' : input.rule.requires;
-  const hostRule: RouteHosts = requires === 'admin' || requires === 'admin:full' ? 'main' : input.rule.hosts;
+  // An owner-only row (every cost surface, owner decision 2) is never widened
+  // to the money scope by the prefix rule below.
+  const requires =
+    input.rule.requires === 'admin:owner'
+      ? 'admin:owner'
+      : needsFinancialScope(input.path, input.method) && input.rule.requires !== 'none'
+        ? 'admin:full'
+        : input.rule.requires;
+  const hostRule: RouteHosts = requires === 'admin' || requires === 'admin:full' || requires === 'admin:owner' ? 'main' : input.rule.hosts;
   if (!hostAllowedFor(hostRule, input.host)) return { status: 404, body: { success: false, error: 'Not found' } };
   if (!input.enforceIdentity || requires === 'none') return null;
   const p = input.principal;
@@ -106,7 +113,7 @@ export function guard(input: GuardInput): Denial | null {
   const error =
     requires === 'investor' ? 'Investor access required'
       : requires === 'admin' ? 'Administrator access required'
-        : requires === 'admin:full' ? 'Administrator access required'
+        : requires === 'admin:full' || requires === 'admin:owner' ? 'Administrator access required'
           : 'Not allowed';
   return { status: 403, body: { success: false, error, code: 'FORBIDDEN' } };
 }

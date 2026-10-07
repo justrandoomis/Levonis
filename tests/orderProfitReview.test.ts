@@ -98,9 +98,11 @@ test('order review distinguishes a recorded sale-time cost from unrecorded or un
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_order_adjustments'), before);
   assert.equal((await getOrderProfitBase(db, 'order')).totals.cogs_iqd, null);
   raw.exec("INSERT INTO ops_permissions(user_id,capability,allowed) VALUES ('financial','accounting',0),('financial','rules',0)");
-  const denied = await json(await get(app(false), '/f/orders/order'));
-  assert.equal(denied.lines[0].cost_review.can_verify, false);
-  assert.equal(denied.can_reconcile, false);
+  // Owner decision 2: the workspace is the owner's alone — a full-scope admin
+  // is refused at the door whatever its permission rows say.
+  const denied = await get(app(false), '/f/orders/order');
+  assert.equal(denied.status, 403);
+  assert.equal((await json(denied)).code, 'COST_ACCESS_DENIED');
 });
 
 test('order-level scoped review uses recorded line evidence and does not blame unrelated unpriced products', async () => {

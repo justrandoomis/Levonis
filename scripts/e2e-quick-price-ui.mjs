@@ -128,7 +128,7 @@ async function main() {
   };
 
   check('admin registered', (await call('/api/auth/register', { email, username: `qu${rnd}`, name: 'QP UI', password })).status === 200);
-  sql(`UPDATE users SET role='admin' WHERE email='${email}'`);
+  sql(`UPDATE users SET role='admin' WHERE email='${email}'; UPDATE users SET admin_scope='full' WHERE email='${email}'`);
   check('admin signed in', (await call('/api/auth/login', { email, password })).status === 200);
 
   const slug = `qp-ui-${rnd}`;

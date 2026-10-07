@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import PrinterModelsEditor from './PrinterModelsEditor';
 import { api, ApiError, formatIqd } from '../../lib/api';
+import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import type { PrintProcess, PrintQuality } from '../../lib/printApi';
 
@@ -514,10 +515,18 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
   const rtl = (dir ?? ctxDir) === 'rtl';
   const t = useCallback<T>((ar: string, en: string) => (rtl ? ar : en), [rtl]);
 
+  // COST TABS ARE THE OWNER'S (owner decision 2). `printPricingConfig` and
+  // `printMaterials` are cost settings the server strips for everyone else,
+  // and the printer economics editor is behind the cost door — so the three
+  // tabs that show them are offered on the server hint alone, compared with
+  // `=== true` (a missing hint hides them). Match weights and model sites
+  // stay with every admin.
+  const { user } = useAuth();
+  const ownerCost = user?.can_view_cost === true;
   // 'printers' is not a settings key: the model cards are rows of their own,
   // written one model at a time by an audited route, so the tab sits outside
   // the four-keys save machinery below.
-  const [tab, setTab] = useState<Tab | 'printers'>('pricing');
+  const [tab, setTab] = useState<Tab | 'printers'>(ownerCost ? 'pricing' : 'weights');
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState('');
   /** The last state read from the server — the yardstick the dirty flag uses. */
@@ -604,13 +613,14 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
     [load, t]
   );
 
+  const COST_TABS: ReadonlySet<Tab | 'printers'> = new Set(['pricing', 'printers', 'materials']);
   const TABS: Array<{ id: Tab | 'printers'; label: string; icon: React.ElementType }> = [
-    { id: 'pricing', label: t('التسعير', 'Pricing'), icon: Sliders },
-    { id: 'printers', label: t('الطابعات', 'Printers'), icon: Printer },
-    { id: 'materials', label: t('المواد', 'Materials'), icon: Boxes },
-    { id: 'weights', label: t('أوزان المطابقة', 'Match weights'), icon: Scale },
-    { id: 'providers', label: t('مواقع الموديلات', 'Model sites'), icon: Link2 },
-  ];
+    { id: 'pricing' as const, label: t('التسعير', 'Pricing'), icon: Sliders },
+    { id: 'printers' as const, label: t('الطابعات', 'Printers'), icon: Printer },
+    { id: 'materials' as const, label: t('المواد', 'Materials'), icon: Boxes },
+    { id: 'weights' as const, label: t('أوزان المطابقة', 'Match weights'), icon: Scale },
+    { id: 'providers' as const, label: t('مواقع الموديلات', 'Model sites'), icon: Link2 },
+  ].filter((s) => ownerCost || !COST_TABS.has(s.id));
 
   if (loading) return <Spin />;
   if (loadErr) return <Err text={loadErr} />;
@@ -646,7 +656,7 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
         ))}
       </div>
 
-      {tab === 'pricing' && (
+      {tab === 'pricing' && ownerCost && (
         <PricingPanel
           t={t}
           value={draft.pricing}
@@ -654,8 +664,8 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
           bar={bar('pricing')}
         />
       )}
-      {tab === 'printers' && <PrinterModelsEditor t={t} />}
-      {tab === 'materials' && (
+      {tab === 'printers' && ownerCost && <PrinterModelsEditor t={t} />}
+      {tab === 'materials' && ownerCost && (
         <MaterialsPanel
           t={t}
           value={draft.materials}

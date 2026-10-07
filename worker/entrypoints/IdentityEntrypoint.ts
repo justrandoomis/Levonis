@@ -32,6 +32,8 @@ import { signCompact, importSigningKey } from '@levonis/platform-kit/keys';
 import { placeholders } from '@levonis/platform-kit/inList';
 import { CoreEntrypoint } from './base';
 import { maskPhone } from '../lib/phone';
+import { scopeFor } from '@levonis/platform-kit/scope';
+import { canViewCost } from '../lib/adminScope';
 
 interface SessionRow {
   user_id: string;
@@ -56,11 +58,23 @@ export class IdentityEntrypoint extends CoreEntrypoint {
     if (!row) return { principal: null, reason: 'NOT_FOUND' };
     const exp = Date.parse(row.expires_at);
     if (!(exp > Date.now())) return { principal: null, reason: 'EXPIRED' };
+    // `email` and `email_verified_at` are read to FOLD THE OWNER into the
+    // scope claim and are never put in it: no service needs
+    // INITIAL_ADMIN_EMAIL to tell the owner apart (owner decision 2).
     const user = await env.DB.prepare(
-      `SELECT id, role, admin_scope, is_investor, membership_tier, locale FROM users WHERE id = ?`
+      `SELECT id, role, email, email_verified_at, admin_scope, is_investor, membership_tier, locale FROM users WHERE id = ?`
     )
       .bind(row.user_id)
-      .first<{ id: string; role: string; admin_scope: string | null; is_investor: number; membership_tier: string | null; locale: string }>();
+      .first<{
+        id: string;
+        role: string;
+        email: string;
+        email_verified_at: string | null;
+        admin_scope: string | null;
+        is_investor: number;
+        membership_tier: string | null;
+        locale: string;
+      }>();
     if (!user) return { principal: null, reason: 'NOT_FOUND' };
     const iat = Math.floor(Date.now() / 1000);
     const claims = {
@@ -68,7 +82,15 @@ export class IdentityEntrypoint extends CoreEntrypoint {
       sub: user.id,
       sid_hash: input.sid_hash,
       role: user.role as 'customer' | 'merchant' | 'admin',
-      scope: user.role === 'admin' ? ((user.admin_scope as 'full' | 'assistant' | null) ?? 'full') : null,
+      // owner > full > assistant, exactly as the core decides it: the owner is
+      // the verified INITIAL_ADMIN_EMAIL admin whatever the row's scope says
+      // (the 0177 promotion trigger leaves 'assistant' on a bootstrapped
+      // owner), and an unrecognised scope is an assistant, never 'full'.
+      scope: scopeFor({
+        role: user.role,
+        admin_scope: user.admin_scope,
+        isOwner: canViewCost(env, user as never),
+      }),
       investor: !!user.is_investor,
       tier: user.membership_tier ?? null,
       locale: user.locale === 'ku' ? ('ckb' as const) : user.locale === 'ar' ? ('ar' as const) : ('en' as const),
