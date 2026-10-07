@@ -1,0 +1,117 @@
+# ---------------------------------------------------------------------------
+# A READ-ONLY CENSUS OF THE LIVE CATALOGUE'S PRICING DATA — SHAPES, NOT VALUES.
+#
+# The legacy migration of the live products into the pricing engine (owner
+# brief of 2026-10-07, docs/DECISIONS.md row 184) is designed from facts about
+# what each product actually carries: how many options, colours and exact
+# SKUs, which levels hold a cost, a fixed price or an adjustment, which order
+# types and routes exist, and which levels have package measurements.
+#
+# PRIVACY RULE: this prints COUNTS and YES/NO FLAGS only. No cost, price,
+# rate, weight or dimension VALUE is selected, so nothing private reaches the
+# Actions log (brief §32: cost data never in logs). Product slugs are public.
+#
+# READ-ONLY: every statement is a SELECT. Nothing is written, deployed or
+# migrated.
+# ---------------------------------------------------------------------------
+name: 59 - Pricing legacy census (read-only, counts only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  census:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: Resolve the live database id into wrangler.jsonc
+        id: db
+        run: |
+          set -e
+          ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-db-staging") | .uuid')
+          [ -n "$ID" ] || { echo "::error::levonis-db-staging not found"; exit 1; }
+          echo "::add-mask::$ID"
+          echo "staging_db_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Fill it in
+        env:
+          STAGING_DB_ID: ${{ steps.db.outputs.staging_db_id }}
+        run: node scripts/set-deploy-ids.mjs --env staging
+
+      - name: Catalogue totals (counts only)
+        run: |
+          set -e
+          q() { npx wrangler d1 execute levonis-db-staging --remote --env staging --json --command "$1" | jq -r '.[0].results'; }
+          echo "── products by status (official catalogue, compositions apart)"
+          q "SELECT status, (composition <> '') AS is_composition, COUNT(*) AS n FROM products GROUP BY 1,2 ORDER BY 1,2"
+          echo "── level row counts"
+          q "SELECT (SELECT COUNT(*) FROM product_option_values) AS option_values,
+                    (SELECT COUNT(*) FROM product_colors) AS colors,
+                    (SELECT COUNT(*) FROM product_variants) AS variants,
+                    (SELECT COUNT(*) FROM product_option_fulfillment) AS cells,
+                    (SELECT COUNT(*) FROM product_option_transports) AS routes,
+                    (SELECT COUNT(*) FROM procurement_selection_cost_defaults) AS procurement_defaults,
+                    (SELECT COUNT(*) FROM inventory_lots) AS lots"
+
+      - name: Per product — shapes and presence flags (no values)
+        run: |
+          set -e
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json --command "
+            SELECT p.slug,
+                   p.status,
+                   p.inventory_mode AS inv_mode,
+                   p.sale_types,
+                   (p.product_cost_iqd IS NOT NULL) AS p_cost,
+                   (COALESCE(p.direct_surcharge_iqd,0) > 0) AS p_direct_fee,
+                   (SELECT COUNT(*) FROM json_each(CASE WHEN json_valid(p.preorder_transports) THEN p.preorder_transports ELSE '[]' END) j WHERE json_extract(j.value, '$.commission_iqd') IS NOT NULL) AS p_route_fee,
+                   (p.package_weight_g IS NOT NULL) AS p_pkg_w,
+                   (p.package_width_mm IS NOT NULL AND p.package_depth_mm IS NOT NULL AND p.package_height_mm IS NOT NULL) AS p_pkg_dims,
+                   (p.net_weight_g IS NOT NULL) AS p_net_w,
+                   (SELECT COUNT(*) FROM product_option_groups g WHERE g.product_id = p.id) AS groups,
+                   (SELECT COUNT(*) FROM product_option_values v WHERE v.product_id = p.id AND v.active = 1) AS opts,
+                   (SELECT COUNT(*) FROM product_option_values v WHERE v.product_id = p.id AND v.active = 1 AND v.cost_iqd IS NOT NULL) AS opt_cost,
+                   (SELECT COUNT(*) FROM product_option_values v WHERE v.product_id = p.id AND v.active = 1 AND v.cost_adjust_iqd IS NOT NULL) AS opt_cost_adj,
+                   (SELECT COUNT(*) FROM product_option_values v WHERE v.product_id = p.id AND v.active = 1 AND v.regular_price_iqd IS NOT NULL) AS opt_fixed,
+                   (SELECT COUNT(*) FROM product_option_values v WHERE v.product_id = p.id AND v.active = 1 AND v.regular_adjust_iqd IS NOT NULL) AS opt_adj,
+                   (SELECT COUNT(*) FROM product_option_values v WHERE v.product_id = p.id AND v.active = 1 AND v.package_weight_g IS NOT NULL) AS opt_pkg_w,
+                   (SELECT COUNT(*) FROM product_colors c WHERE c.product_id = p.id AND c.active = 1) AS cols,
+                   (SELECT COUNT(*) FROM product_colors c WHERE c.product_id = p.id AND c.active = 1 AND (c.cost_iqd IS NOT NULL OR c.cost_adjust_iqd IS NOT NULL)) AS col_cost,
+                   (SELECT COUNT(*) FROM product_colors c WHERE c.product_id = p.id AND c.active = 1 AND (c.regular_price_iqd IS NOT NULL OR c.regular_adjust_iqd IS NOT NULL)) AS col_price,
+                   (SELECT COUNT(*) FROM product_colors c WHERE c.product_id = p.id AND c.active = 1 AND c.package_weight_g IS NOT NULL) AS col_pkg_w,
+                   (SELECT COUNT(*) FROM product_variants x WHERE x.product_id = p.id AND x.active = 1) AS skus,
+                   (SELECT COUNT(*) FROM product_variants x WHERE x.product_id = p.id AND x.active = 1 AND x.regular_price_iqd IS NOT NULL) AS sku_price,
+                   (SELECT COUNT(*) FROM product_variants x WHERE x.product_id = p.id AND x.active = 1 AND x.cost_iqd IS NOT NULL) AS sku_cost,
+                   (SELECT COUNT(*) FROM product_variants x WHERE x.product_id = p.id AND x.active = 1 AND x.package_weight_g IS NOT NULL) AS sku_pkg_w,
+                   (SELECT COUNT(*) FROM product_option_fulfillment f WHERE f.product_id = p.id AND f.fulfillment_type = 'direct_sale' AND f.enabled = 1) AS direct_cells,
+                   (SELECT COUNT(*) FROM product_option_fulfillment f WHERE f.product_id = p.id AND f.fulfillment_type = 'pre_order' AND f.enabled = 1) AS pre_cells,
+                   (SELECT COUNT(*) FROM product_option_fulfillment f WHERE f.product_id = p.id AND f.enabled = 1 AND (f.regular_price_iqd IS NOT NULL OR f.regular_adjust_iqd IS NOT NULL)) AS cell_price,
+                   (SELECT COUNT(*) FROM product_option_fulfillment f WHERE f.product_id = p.id AND f.enabled = 1 AND (f.cost_iqd IS NOT NULL OR f.cost_adjust_iqd IS NOT NULL)) AS cell_cost,
+                   (SELECT COUNT(*) FROM product_option_transports t WHERE t.product_id = p.id AND t.enabled = 1) AS routes,
+                   (SELECT GROUP_CONCAT(DISTINCT t.method) FROM product_option_transports t WHERE t.product_id = p.id AND t.enabled = 1) AS route_methods,
+                   (SELECT COUNT(*) FROM product_option_transports t WHERE t.product_id = p.id AND t.enabled = 1 AND t.surcharge_iqd IS NOT NULL) AS route_fee,
+                   (SELECT COUNT(*) FROM product_option_transports t WHERE t.product_id = p.id AND t.enabled = 1 AND (t.regular_price_iqd IS NOT NULL OR t.regular_adjust_iqd IS NOT NULL)) AS route_price,
+                   (SELECT COUNT(*) FROM procurement_selection_cost_defaults d WHERE d.product_id = p.id) AS proc_defaults,
+                   (SELECT COUNT(*) FROM inventory_lots l WHERE l.product_id = p.id) AS lots
+              FROM products p
+             WHERE p.composition = ''
+             ORDER BY p.status, p.slug" > /tmp/census.json
+          jq -r '.[0].results | (.[0] | keys_unsorted | @tsv), (.[] | [.[]] | map(tostring) | @tsv)' /tmp/census.json | column -t -s $'\t'
+          jq -r '.[0].results | length | "rows: \(.)"' /tmp/census.json
+
+      - name: Where the official-source / refresh data lives (counts only)
+        continue-on-error: true
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --env staging --json --command "$1" | jq -r '.[0].results'; }
+          echo "── products with any import/refresh history"
+          q "SELECT COUNT(DISTINCT target) AS products_with_template_apply FROM audit_log WHERE action IN ('template.apply','product.import.apply')"
+          echo "── import batches"
+          q "SELECT state, COUNT(*) AS n FROM product_imports GROUP BY state"
