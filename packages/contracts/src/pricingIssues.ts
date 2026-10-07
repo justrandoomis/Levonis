@@ -135,7 +135,7 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
   },
   TARGET_PROFIT_MISSING: {
     severity: 'error',
-    label: { ar: 'الربح المستهدف غير مضبوط', en: 'Target profit is not set', ckb: 'قازانجی ئامانج دانەنراوە' },
+    label: { ar: 'الحد الأدنى للربح غير مضبوط', en: 'Minimum target profit is not set', ckb: 'کەمترین قازانجی مەبەست دانەنراوە' },
   },
   DIRECT_PREMIUM_MISSING: {
     severity: 'error',
@@ -264,9 +264,9 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
   PINNED_BELOW_TARGET: {
     severity: 'warning',
     label: {
-      ar: 'سعر مثبت يدوياً أقل من الربح المستهدف',
-      en: 'A manually pinned price is below the target profit',
-      ckb: 'نرخێکی جێگیرکراوی دەستی لە قازانجی ئامانج کەمترە',
+      ar: 'سعر مثبت يدوياً يعطي ربحاً أقل من الحد الأدنى للربح',
+      en: 'A manually pinned price gives less than the minimum target profit',
+      ckb: 'نرخێکی جێگیرکراوی دەستی قازانجێکی کەمتر لە کەمترین قازانجی مەبەست دەدات',
     },
   },
   PRICING_CATEGORY_DIFFERS: {
@@ -296,9 +296,9 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
   TARGET_PROFIT_BLOCKED: {
     severity: 'error',
     label: {
-      ar: 'الربح المستهدف موقوف حتى تقرر',
-      en: 'The target profit is on hold until you decide',
-      ckb: 'قازانجی ئامانج ڕاگیراوە تا تۆ بڕیار دەدەیت',
+      ar: 'الحد الأدنى للربح موقوف حتى تقرر',
+      en: 'The minimum target profit is on hold until you decide',
+      ckb: 'کەمترین قازانجی مەبەست ڕاگیراوە تا تۆ بڕیار دەدەیت',
     },
   },
   SHIPPING_FIELD_UNRESOLVED: {

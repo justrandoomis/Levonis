@@ -56,7 +56,14 @@ export const PRICING_FIELD_LABELS = {
   shipping_cost_iqd: { ar: 'تكلفة الشحن', en: 'Shipping cost', ckb: 'تێچووی ناردن' },
   replacement_exact: { ar: 'تكلفة الاستبدال الحالية (دقيقة)', en: 'Current replacement cost (exact)', ckb: 'تێچووی ئێستای جێگرتنەوە (ورد)' },
   replacement_cost_iqd: { ar: 'تكلفة الاستبدال الحالية', en: 'Current replacement cost', ckb: 'تێچووی ئێستای جێگرتنەوە' },
-  target_profit_iqd: { ar: 'الربح المستهدف (مبلغ ثابت)', en: 'Target profit (fixed amount)', ckb: 'قازانجی ئامانج (بڕی جێگیر)' },
+  // Owner clarification 2026-10-07: the MINIMUM profit above the current
+  // replacement cost (price >= replacement + this); actual profit from a
+  // batch may be higher and is never forced down to it.
+  target_profit_iqd: {
+    ar: 'الحد الأدنى للربح (فوق تكلفة الاستبدال الحالية)',
+    en: 'Minimum target profit (above current replacement cost)',
+    ckb: 'کەمترین قازانجی مەبەست (لەسەر تێچووی ئێستای جێگرتنەوە)',
+  },
   direct_premium_iqd: { ar: 'علاوة البيع المباشر', en: 'Direct sale premium', ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ' },
   rounding_step_iqd: { ar: 'خطوة التقريب', en: 'Rounding step', ckb: 'هەنگاوی خڕکردنەوە' },
   rounding_added_iqd: { ar: 'زيادة التقريب للأعلى', en: 'Added by rounding up', ckb: 'زیادکراو بە خڕکردنەوە بۆ سەرەوە' },
