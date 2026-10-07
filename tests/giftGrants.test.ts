@@ -418,6 +418,37 @@ test('approving a printer-review reward grants a LEVEL gift of the quality score
   assert.equal(all(raw, "SELECT id FROM audit_log WHERE action = 'gift.grant'").length, 2);
 });
 
+test('a review reward is never granted into a level the owner switched off: refused, nothing written, and another score goes through', async () => {
+  const raw = giftWorld();
+  const a = apps(raw);
+  raw.exec(`
+    INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,preorder_transports,images)
+      VALUES ('p_printer','p1s','P1S','طابعة P1S',900000,'active',5,'[]','[]','direct_sale','["direct_sale"]','[]','[]');
+    INSERT INTO reviews (id,user_id,product_id,stars,body,status,source)
+      VALUES ('rv_1','buyer','p_printer',5,'A detailed review of this printer with photos and a video.','published','user');
+    INSERT INTO review_rewards (id,review_id,user_id,kind,state,quality_score,quality_snapshot)
+      VALUES ('rr_1','rv_1','buyer','printer_gift','submitted',5,'{"score":95,"tier":5,"reasons":[],"suspiciousSignals":[],"rewardEligible":true}');
+    UPDATE gift_pools SET active = 0 WHERE id = 'gift_level_5';
+  `);
+  const approve = (qualityScore: number) =>
+    post(a.admin, '/api/reviews/admin/rv_1/reward', { action: 'approve', qualityScore, reason: 'Excellent detailed review with media' });
+
+  const refused = await approve(5);
+  const body = await json(refused);
+  assert.equal(refused.status, 409, JSON.stringify(body));
+  assert.equal(body.code, 'GIFT_LEVEL_INACTIVE');
+  assert.equal(body.details?.level, 5, 'the admin is told which level');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM gift_entitlements WHERE reward_id = 'rr_1'"), 0);
+  assert.equal(row(raw, "SELECT state FROM review_rewards WHERE id = 'rr_1'")?.state, 'submitted', 'still waiting for a decision');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'gift_granted'"), 0);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action IN ('gift.grant','review.reward')"), 0);
+
+  const granted = await approve(4);
+  const out = await json(granted);
+  assert.equal(granted.status, 200, JSON.stringify(out));
+  assert.equal(giftRow(raw, out.entitlement_id).level, 4);
+});
+
 test('a grant’s detail carries its audit timeline; another admin door answers 404 for an unknown gift', async () => {
   const raw = giftWorld();
   const a = apps(raw);

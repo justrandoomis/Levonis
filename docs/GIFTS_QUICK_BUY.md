@@ -92,6 +92,8 @@ Admin (requireAdmin) under `/api/gifts/admin`:
 - `GET /levels`, `PUT /levels/:n` (names/descriptions/active), `POST /levels/:n/items`, `PUT /items/:id`, `DELETE /items/:id` (soft: active=0).
 - `GET /grants?state&level&reason&user&q&cursor`, `POST /grants` `{userId, mode:'level'|'product', level, itemId?|product?:{productId, optionValueIds, colorId, qty, saleType, transportMethod?}, reason, note, idempotencyKey}`, `PATCH /grants/:id` `{note?, reason?}`, `POST /grants/:id/cancel {reason}`, `POST /grants/:id/convert` (legacy available → granted), `POST /grants/:id/fulfill` (legacy selected only), `GET /grants/:id/audit`.
 - The review reward approval (`POST /api/reviews/admin/:id/reward`, printer gift) creates a `level` grant with `reason='review'`, `level = qualityScore`.
+  A level the owner switched off is refused (409 `GIFT_LEVEL_INACTIVE`, `details.level`), as on «منح هدية»; the admin approves with another score or switches the level on. An empty level is allowed: the customer's card says «لا توجد هدايا متاحة في هذا المستوى الآن» until the level has products.
+- Product save (`planRelations`): an option value, colour or combination named by an active level item, a gift in `ready_to_redeem`/`redeemed`, or an open/failed Quick Buy line is DEACTIVATED instead of deleted, exactly as one a live order names — the same holders that block deleting the whole product (`productDeletion.ts`).
 
 Every write: one batch with `auditStatements` (`gift.grant`, `gift.choose`, `gift.redeem`, `gift.order`, `gift.cancel`, `gift.note`, `gift.convert`, `gift.fulfill`, `gift.level.update`, `gift.item.*`), detail = level, product, user, actor. The customer is notified on grant (`gift_granted`).
 

@@ -55,6 +55,7 @@ const STRINGS = {
     rubricLabel: 'سبب التقييم وفق المعايير (إلزامي)',
     rubricPlaceholder: 'فائدة الكتابة، الوضوح، ملاءمة الصور/الفيديو، الاكتمال...',
     approveGift: 'اعتماد ومنح الهدية',
+    levelOff: (n: number) => `المستوى ${n} من الهدايا موقوف — اختر درجة جودة أخرى، أو فعّل المستوى من «مخزون الهدايا» أولاً.`,
     approvePoints: (n: number) => `اعتماد ومنح ${n.toLocaleString()} نقطة`,
     pointsUnconfigured: 'قيمة نقاط المراجعة غير مُعدّة (reviewPointsConfig) — لا يمكن اعتماد مكافأة نقاط حتى إعدادها. لا أرقام مُختلقة.',
     rejectReward: 'رفض المكافأة',
@@ -125,6 +126,7 @@ const STRINGS = {
     rubricLabel: 'Rubric reason (required)',
     rubricPlaceholder: 'Useful writing, clarity, relevant images/video, completeness...',
     approveGift: 'Approve & grant gift',
+    levelOff: (n: number) => `Gift level ${n} is switched off — choose another quality score, or switch the level on in “Gift pools” first.`,
     approvePoints: (n: number) => `Approve & award ${n.toLocaleString()} points`,
     pointsUnconfigured: 'Review-points value is NOT configured (reviewPointsConfig) — points rewards cannot be approved until it is set. No invented numbers.',
     rejectReward: 'Reject reward',
@@ -193,6 +195,7 @@ const STRINGS = {
     rubricLabel: 'هۆکاری نمرەدان بەپێی پێوەرەکان (پێویستە)',
     rubricPlaceholder: 'سوودی نووسین، ڕوونی، گونجانی وێنە/ڤیدیۆ، تەواوی...',
     approveGift: 'پەسەندکردن و بەخشینی دیاری',
+    levelOff: (n: number) => `ئاستی ${n}ی دیارییەکان ڕاگیراوە — نمرەیەکی تری کوالیتی هەڵبژێرە، یان سەرەتا ئاستەکە لە «کۆگای دیارییەکان» چالاک بکە.`,
     approvePoints: (n: number) => `پەسەندکردن و بەخشینی ${n.toLocaleString()} خاڵ`,
     pointsUnconfigured: 'بەهای خاڵی پێداچوونەوە ڕێکنەخراوە (reviewPointsConfig) — ناتوانرێت خەڵاتی خاڵ پەسەند بکرێت هەتا ڕێکدەخرێت.',
     rejectReward: 'ڕەتکردنەوەی خەڵات',
@@ -353,7 +356,13 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
       await api.post(`/api/reviews/admin/${row.review_id}/reward`, payload);
       await loadQueue();
     } catch (e) {
-      setRowError({ id: row.review_id, message: e instanceof ApiError ? e.message : 'Failed' });
+      const message =
+        e instanceof ApiError && e.code === 'GIFT_LEVEL_INACTIVE'
+          ? S.levelOff(Number(e.details?.level ?? payload.qualityScore))
+          : e instanceof ApiError
+            ? e.message
+            : 'Failed';
+      setRowError({ id: row.review_id, message });
     } finally {
       setBusyId(null);
     }

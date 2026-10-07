@@ -281,10 +281,12 @@ export const ladderOf = (doc: Pick<ProductDoc, 'price_iqd' | 'prime_price_iqd' |
 });
 
 /** An order line still open against this product — the combinations a
- *  variant must not be deleted from under. */
+ *  variant must not be deleted from under — or a selection a customer HOLDS
+ *  that is not an order line yet (a gift, an open Quick Buy). */
 interface LiveLine {
   option_value_ids: string[];
   color_id: string;
+  source: 'order' | 'held';
 }
 
 /**
@@ -376,38 +378,60 @@ export async function loadRelationsSnapshot(
  * list would silently downgrade «never delete a variant tied to a live order»
  * to a delete (docs/TXT_IMPORT_PARITY.md).
  */
+const ORDER_LINES_SQL = `SELECT oi.option_value_ids, oi.option_id, oi.color_id
+           FROM order_items oi JOIN orders o ON o.id = oi.order_id
+          WHERE oi.product_id = ? AND o.status <> 'cancelled'`;
+
+/**
+ * The selections a customer HOLDS that are not order lines yet, read by the
+ * same rules that block deleting the whole product (productDeletion.ts): an
+ * active gift level item (0175), a gift chosen or pinned and not ordered
+ * (0175), and a line of a Quick Buy that has not become its order (0176).
+ * Deleting the option value or colour one of them names would leave it
+ * pointing at nothing, so it is retained exactly as an order line's is. Each
+ * is read on its own, so a database without the table loses nothing else.
+ */
+const HELD_SELECTIONS_SQL = [
+  `SELECT option_value_ids, color_id FROM gift_pool_items WHERE product_id = ? AND active = 1`,
+  `SELECT gift_option_value_ids AS option_value_ids, gift_color_id AS color_id
+     FROM gift_entitlements WHERE gift_product_id = ? AND state IN ('ready_to_redeem', 'redeemed')`,
+  `SELECT option_value_ids, color_id FROM quick_buy_items
+    WHERE product_id = ? AND qty > 0
+      AND session_id IN (SELECT id FROM quick_buy_sessions WHERE state IN ('open', 'failed'))`,
+];
+
 async function loadLiveLines(
   db: D1Database,
   productId: string
 ): Promise<{ lines: LiveLine[]; unavailable: boolean }> {
-  try {
-    const { results } = await db
-      .prepare(
-        `SELECT oi.option_value_ids, oi.option_id, oi.color_id
-           FROM order_items oi JOIN orders o ON o.id = oi.order_id
-          WHERE oi.product_id = ? AND o.status <> 'cancelled'`
-      )
-      .bind(productId)
-      .all<{ option_value_ids: string | null; option_id: string | null; color_id: string | null }>();
-    const mapped = results.map((r) => {
-      let ids: string[] = [];
-      try {
-        const parsed = JSON.parse(r.option_value_ids || '[]');
-        ids = Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string' && !!x) : [];
-      } catch {
-        ids = [];
+  const lines: LiveLine[] = [];
+  let unavailable = false;
+  const read = async (sql: string, source: LiveLine['source']) => {
+    try {
+      const { results } = await db
+        .prepare(sql)
+        .bind(productId)
+        .all<{ option_value_ids: string | null; option_id?: string | null; color_id: string | null }>();
+      for (const r of results) {
+        let ids: string[] = [];
+        try {
+          const parsed = JSON.parse(r.option_value_ids || '[]');
+          ids = Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string' && !!x) : [];
+        } catch {
+          ids = [];
+        }
+        if (ids.length === 0 && r.option_id) ids = [r.option_id];
+        lines.push({ option_value_ids: ids.sort(), color_id: r.color_id ?? '', source });
       }
-      if (ids.length === 0 && r.option_id) ids = [r.option_id];
-      return { option_value_ids: ids.sort(), color_id: r.color_id ?? '' };
-    });
-    return { lines: mapped, unavailable: false };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error('live order lines unavailable', msg);
-    // "the column/table does not exist" is the documented pre-0023 case.
-    const preMigration = /no such table|no such column/i.test(msg);
-    return { lines: [], unavailable: !preMigration };
-  }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(source === 'order' ? 'live order lines unavailable' : 'held gift / Quick Buy selections unavailable', msg);
+      // "the column/table does not exist" is the documented pre-migration case.
+      if (!/no such table|no such column/i.test(msg)) unavailable = true;
+    }
+  };
+  await Promise.all([read(ORDER_LINES_SQL, 'order'), ...HELD_SELECTIONS_SQL.map((sql) => read(sql, 'held'))]);
+  return { lines, unavailable };
 }
 
 /** The snapshot of a product that does not exist yet. */
@@ -1003,17 +1027,25 @@ export async function planRelationsWriteFrom(
   // keeps its identity, and the caller is told. The rule used to cover
   // variants only, so `options=__CLEAR__` on a product with a delivered order
   // erased the very option value the order line names.
-  const liveKeys = new Set(
-    snap.liveLines.map((l) => comboKey({ option_value_ids: l.option_value_ids, color_id: l.color_id || null }))
-  );
+  // The same holds for a selection a customer has not ordered yet — a gift, an
+  // open Quick Buy (loadLiveLines) — and the warning says which it was.
+  const keysOf = (ls: LiveLine[]) =>
+    new Set(ls.map((l) => comboKey({ option_value_ids: l.option_value_ids, color_id: l.color_id || null })));
+  const orderLines = snap.liveLines.filter((l) => l.source === 'order');
+  const liveKeys = keysOf(snap.liveLines);
   const liveValueIds = new Set(snap.liveLines.flatMap((l) => l.option_value_ids));
   const liveColorIds = new Set(snap.liveLines.map((l) => l.color_id).filter(Boolean));
+  const orderKeys = keysOf(orderLines);
+  const orderValueIds = new Set(orderLines.flatMap((l) => l.option_value_ids));
+  const orderColorIds = new Set(orderLines.map((l) => l.color_id).filter(Boolean));
   const retainedVariants = snap.existingVariants.filter(
     (v) => !keptVariants.has(v.id) && (v.reserved ?? 0) === 0 && liveKeys.has(v.combo_key)
   );
   for (const v of retainedVariants) {
     warnings.push(
-      `Combination "${v.combo_key}" is named by a live order and was deactivated instead of deleted / التركيبة مرتبطة بطلب حيّ فعُطِّلت بدل حذفها`
+      orderKeys.has(v.combo_key)
+        ? `Combination "${v.combo_key}" is named by a live order and was deactivated instead of deleted / التركيبة مرتبطة بطلب حيّ فعُطِّلت بدل حذفها`
+        : `Combination "${v.combo_key}" is held by a customer's gift or an open Quick Buy and was deactivated instead of deleted / التركيبة محجوزة لهدية زبون أو لشراء سريع مفتوح فعُطِّلت بدل حذفها`
     );
   }
   const retainedValues = existing.values.filter(
@@ -1021,7 +1053,9 @@ export async function planRelationsWriteFrom(
   );
   for (const v of retainedValues) {
     warnings.push(
-      `Option "${v.name_en}" is named by a live order and was deactivated instead of deleted / الخيار مرتبط بطلب حيّ فعُطِّل بدل حذفه`
+      orderValueIds.has(v.id)
+        ? `Option "${v.name_en}" is named by a live order and was deactivated instead of deleted / الخيار مرتبط بطلب حيّ فعُطِّل بدل حذفه`
+        : `Option "${v.name_en}" is held by a customer's gift or an open Quick Buy and was deactivated instead of deleted / الخيار محجوز لهدية زبون أو لشراء سريع مفتوح فعُطِّل بدل حذفه`
     );
   }
   const retainedColors = existing.colors.filter(
@@ -1029,7 +1063,9 @@ export async function planRelationsWriteFrom(
   );
   for (const col of retainedColors) {
     warnings.push(
-      `Colour "${col.name_en}" is named by a live order and was deactivated instead of deleted / اللون مرتبط بطلب حيّ فعُطِّل بدل حذفه`
+      orderColorIds.has(col.id)
+        ? `Colour "${col.name_en}" is named by a live order and was deactivated instead of deleted / اللون مرتبط بطلب حيّ فعُطِّل بدل حذفه`
+        : `Colour "${col.name_en}" is held by a customer's gift or an open Quick Buy and was deactivated instead of deleted / اللون محجوز لهدية زبون أو لشراء سريع مفتوح فعُطِّل بدل حذفه`
     );
   }
 

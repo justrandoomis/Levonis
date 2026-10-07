@@ -5,6 +5,7 @@ import { getTierStatus } from '../lib/entitlements';
 import { applyMultiplierX100, multiplierLabel, rewardMultiplierX100 } from '../lib/pointsMultiplier';
 import { safeParse } from '../lib/types';
 import {
+  HttpError,
   requireAuth,
   requireAdmin,
   badRequest,
@@ -19,7 +20,7 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit, auditStatements } from '../lib/audit';
 import { notifyGiftGranted, planGrant } from '../lib/gifts/grant';
-import { changedExactlyOne, isLostRace } from '../lib/gifts/model';
+import { changedExactlyOne, isLostRace, loadLevels } from '../lib/gifts/model';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { parseByteRange, sniff } from './uploads';
 import { getMediaObject, headMediaObject, storeMedia } from '../lib/mediaStorage';
@@ -1299,6 +1300,12 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
         `Printer-gift checklist incomplete: ${legacyMissing.join(', ')} — use "request changes" instead`,
         'CHECKLIST_INCOMPLETE'
       );
+    }
+    // The rule of the admin's «منح هدية» (routes/gifts.ts): a level the owner
+    // switched off is granted by no one — not by hand, not by a review. The
+    // admin approves with another quality score, or switches the level on.
+    if (!(await loadLevels(c.env.DB)).get(score)!.view.active) {
+      throw new HttpError(409, `Gift level ${score} is switched off — approve with another quality score, or switch the level on first.`, 'GIFT_LEVEL_INACTIVE', { level: score });
     }
     /**
      * THE APPROVAL GRANTS A LEVEL GIFT OF THE NEW FLOW (docs/GIFTS_QUICK_BUY.md

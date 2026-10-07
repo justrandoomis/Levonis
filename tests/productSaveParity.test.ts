@@ -782,6 +782,77 @@ colors.1.hex=#ff0000
   );
 });
 
+test('an option value or colour a gift or an open Quick Buy still holds is deactivated, never deleted; one nothing holds is deleted', async () => {
+  const { raw, app } = setup();
+  const id = (
+    await apply(
+      app,
+      `template_version=2
+slug=held-rows
+name_ar=محجوز
+name_en=Held Rows
+status=draft
+price_iqd=100000
+brand=bambu
+options.1.id=opt_keep
+options.1.group=Model
+options.1.name_en=Keep
+options.2.id=opt_level
+options.2.group=Model
+options.2.name_en=Level
+options.3.id=opt_pinned
+options.3.group=Model
+options.3.name_en=Pinned
+options.4.id=opt_qb
+options.4.group=Model
+options.4.name_en=Quick
+options.5.id=opt_free
+options.5.group=Model
+options.5.name_en=Free
+colors.1.id=col_level
+colors.1.name_en=Red
+colors.1.hex=#ff0000
+colors.2.id=col_free
+colors.2.name_en=Blue
+colors.2.hex=#0000ff
+`
+    )
+  ).body.product_id as string;
+  raw.exec(`INSERT INTO users (id, email, role) VALUES ('u1','c@x.co','customer');
+    INSERT INTO gift_pool_items (id, level, label_ar, product_id, option_value_ids, color_id, sale_type, active) VALUES
+      ('gpi_live', 2, 'هدية', '${id}', '["opt_level"]', 'col_level', 'direct_sale', 1),
+      ('gpi_off', 2, 'هدية موقوفة', '${id}', '["opt_free"]', 'col_free', 'direct_sale', 0);
+    INSERT INTO gift_entitlements (id, user_id, max_level, chosen_level, level, state, grant_mode, reason,
+                                   gift_product_id, gift_option_value_ids, gift_sale_type) VALUES
+      ('ge_pinned', 'u1', 1, 1, 1, 'ready_to_redeem', 'product', 'admin_gift', '${id}', '["opt_pinned"]', 'direct_sale');
+    INSERT INTO quick_buy_sessions (id, user_id, state, started_at, expires_at, order_id, address_id, address_snapshot, exchange_rate) VALUES
+      ('qbs_open', 'u1', 'open', '2026-10-06T10:00:00Z', '2026-10-06T10:30:00Z', 'ORD-QB0000001', 'addr', '{}', 1400);
+    INSERT INTO quick_buy_items (id, session_id, user_id, product_id, qty, unit_price_iqd, option_value_ids) VALUES
+      ('qbi_1', 'qbs_open', 'u1', '${id}', 1, 100000, '["opt_qb"]');`);
+
+  const group = String((await json(await get(app, `/api/admin/products/${id}/relations`))).groups[0].id);
+  const res = await put(app, `/api/admin/products/${id}/relations`, {
+    inventory_mode: 'BASE',
+    groups: [{ id: group, name_en: 'Model', sort: 0, active: true, values: [{ id: 'opt_keep', name_en: 'Keep', sort: 0, active: true }] }],
+    colors: [],
+    variants: [],
+    images: [],
+  });
+  const body = await json(res);
+  assert.equal(res.status, 200, JSON.stringify(body));
+  for (const held of ['opt_level', 'opt_pinned', 'opt_qb']) {
+    const v = row(raw, 'SELECT active FROM product_option_values WHERE id = ?', held);
+    assert.ok(v, `${held}: still exists — the gift or the Quick Buy line still names it`);
+    assert.equal(Number(v!.active), 0, `${held}: deactivated instead`);
+  }
+  assert.equal(Number(row(raw, "SELECT active FROM product_colors WHERE id = 'col_level'")!.active), 0);
+  assert.equal(row(raw, "SELECT id FROM product_option_values WHERE id = 'opt_free'"), undefined, 'a switched-off gift item holds nothing');
+  assert.equal(row(raw, "SELECT id FROM product_colors WHERE id = 'col_free'"), undefined);
+  const warnings = body.warnings as string[];
+  assert.equal(warnings.filter((w) => w.includes("held by a customer's gift or an open Quick Buy")).length, 4, JSON.stringify(warnings));
+  assert.ok(!warnings.some((w) => w.includes('live order')), 'no order names them, and the warning does not say one does');
+});
+
 test('a group a retained option value still belongs to is deactivated, not cascaded away', async () => {
   const { raw, app } = setup();
   const id = (
