@@ -17,6 +17,9 @@
  * something to do — un-tick the optional part, choose again, come back when the
  * offer opens — because a refusal that only states a fact leaves them stuck on
  * the screen it appeared on.
+ *
+ * Every `ckb` is its own Sorani, never the Arabic pasted across
+ * (docs/DECISIONS.md row 183); the test walks the whole table for copies.
  */
 export interface RefusalStrings {
   ar: string;
@@ -276,12 +279,6 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   PREORDER_CAPACITY_EXHAUSTED: {
     ar: 'اكتملت حصة الطلب المسبق لهذا الاختيار — وهذا ليس نفادًا للمخزون. جرّب طريقة شحن أخرى أو عُد لاحقًا.',
     en: 'The pre-order quota for this selection is full — this is not a sold-out shelf. Try another shipping route, or come back later.',
-    // NO SORANI IS INVENTED HERE. The Kurdish for this sentence is the owner's
-    // to write by hand; until they do, the ARABIC above is what a Kurdish
-    // reader gets, which is this app's own documented fallback (`loc`) and the
-    // same choice `Product.tsx`, `Cart.tsx` and `Checkout.tsx` make for the
-    // rest of the 0075 copy. A machine translation of a refusal is not an
-    // option in this repo.
     ckb: 'پشکی پێشداواکاری بۆ ئەم هەڵبژاردەیە تەواو بووە — ئەمە بە واتای نەمانی بەرهەم لە کۆگا نییە. ڕێگایەکی تری ناردن تاقی بکەرەوە، یان دواتر بگەڕێوە.',
   },
 
@@ -359,11 +356,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
 
   // ---- custom requests, offers and their escrow (merchant platform wave 1) --
   // Raised by worker/routes/marketplace.ts and printRequests.ts. Each says
-  // what the customer or merchant can DO next. NO SORANI IS INVENTED HERE
-  // (docs/DECISIONS.md row 11): until the owner writes it by hand, the ckb slot
-  // carries the ARABIC — the app's documented fallback, the same choice
-  // PREORDER_CAPACITY_EXHAUSTED above makes.
-  // OWNER: Sorani to be written by hand for every entry in this block.
+  // what the customer or merchant can DO next.
   OFFER_CHANGED: {
     ar: 'غيّر التاجر هذا العرض بعد أن فتحته. راجع الشروط الجديدة قبل القبول.',
     en: 'The merchant changed this offer after you opened it. Review the new terms before accepting.',
@@ -449,8 +442,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The 3D preview is available to the request’s owner and to merchants who can make an offer on it.',
     ckb: 'پێشبینینی سێ ڕەهەندی تەنها بۆ خاوەنی داواکارییەکە و ئەو بازرگانانە بەردەستە کە دەتوانن ئۆفەری لەسەر پێشکەش بکەن.',
   },
-  // ---- print requests v2 (stream W5-A). OWNER: Sorani to be written by hand —
-  // the ckb slot carries the Arabic until then (docs/DECISIONS.md row 11).
+  // ---- print requests v2 (stream W5-A).
   SOURCE_FILE_REQUIRED: {
     ar: 'أرفق ملف المجسم الذي يدور حوله الطلب، أو اختر مصدرًا آخر.',
     en: 'Attach the model file this request is about, or choose another source.',
@@ -523,7 +515,6 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   },
   // Wave 1 review (F2, the older NO_PREVIEW): the merchant's «ابدأ العمل» on an
   // order whose money is not held, and a model with no 3D preview.
-  // OWNER: Sorani to be written by hand for both (the ckb slot carries the Arabic).
   ESCROW_NOT_HELD: {
     ar: 'المبلغ غير محجوز لهذا الطلب، لذلك لا يمكن بدء العمل. تواصل مع الدعم.',
     en: 'The money for this order is not held, so work cannot start. Contact support.',
@@ -556,7 +547,6 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   },
   // Store settings (review of the settings screen, 2026-09-28): the screen
   // marks the field itself; these are the sentence any other door shows.
-  // OWNER: Sorani to be written by hand for both (the ckb slot carries the Arabic).
   STORE_FIELD_INVALID: {
     ar: 'أحد الحقول غير صالح أو أطول من المسموح. راجعه ثم احفظ.',
     en: 'One of the fields is not valid or is longer than allowed. Check it, then save.',
@@ -587,13 +577,9 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
 
   // ---- community-store cart, checkout and orders (merchant platform wave 1) --
   // Raised by worker/routes/cart.ts, storeOrders.ts, orders.ts, returns.ts and
-  // the merchant's order door in merchant.ts. Same rule as the block above: NO
-  // SORANI IS INVENTED — the ckb slot carries the ARABIC until the owner writes
-  // it by hand (docs/DECISIONS.md row 11).
-  // OWNER: Sorani to be written by hand for every entry in this block.
+  // the merchant's order door in merchant.ts.
   // The store's conversation (docs/COMMUNITY_COMMERCE_CHAT.md): a card names an
-  // entity of THIS thread or it is refused. OWNER: Sorani to be written by hand
-  // for every entry in this block (the ckb slot carries the Arabic).
+  // entity of THIS thread or it is refused.
   CARD_NOT_IN_THREAD: {
     ar: 'هذا العنصر ليس من هذه المحادثة، فلا يمكن إرساله هنا.',
     en: 'This item is not part of this conversation, so it cannot be sent here.',
@@ -789,9 +775,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   },
   // Wave 2 (W2-F): a product sold by VARIANT is added as one of its variants
   // (worker/routes/cart.ts). The storefront product page picks one before the
-  // add, so these meet a stale page or another door. The ckb column carries
-  // the Arabic until the owner writes the Sorani by hand (DECISIONS row 11),
-  // as the entries above do. OWNER: Sorani to be written by hand.
+  // add, so these meet a stale page or another door.
   VARIANT_REQUIRED: {
     ar: 'اختر من خيارات المنتج أولًا (المقاس أو اللون…).',
     en: 'Choose from the product’s options first (size, colour…).',
@@ -809,9 +793,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   },
   // Wave 3 (W3-B): the analytics page, the order screen and the customers
   // screen (worker/routes/merchantAnalytics.ts, merchantOrders.ts,
-  // merchantCustomers.ts). Merchant-facing; the ckb column carries the Arabic
-  // until the owner writes the Sorani by hand (DECISIONS row 11).
-  // OWNER: Sorani to be written by hand for every entry in this block.
+  // merchantCustomers.ts). Merchant-facing.
   ORDER_NOT_FOUND: {
     ar: 'لا يوجد طلب بهذا الرقم في متجرك.',
     en: 'There is no order with this number in your store.',
@@ -858,11 +840,9 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ckb: 'نەتوانرا شتی هاوشێوەی ئەم بابەتە پێشنیار بکرێت.',
   },
   // Review W2-5 (admin payout queue): approve / paid refused while a claw-back
-  // left the merchant owing the platform. Admin-facing; the ckb column carries
-  // the Arabic until the owner writes the Sorani by hand (DECISIONS row 11).
-  // OWNER: Sorani to be written by hand.
+  // left the merchant owing the platform. Admin-facing.
   // Review W2-5 p3: public store media (uploads purpose=community). Merchant-
-  // facing; ckb carries the Arabic. OWNER: Sorani to be written by hand.
+  // facing.
   STORE_REQUIRED: {
     ar: 'افتح متجرك أولًا — صور المتجر وفيديوهاته تخصّ متجرًا.',
     en: 'Open your store first — store pictures and videos belong to a store.',
@@ -884,8 +864,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   // Owner decision 2026-09-25 (review W2-5 finding 2): a published product
   // costs something, and a store's delivery fee has a platform maximum.
   // PRODUCT_PRICE_REQUIRED reaches a customer at checkout (a product left at
-  // 0 IQD is not for sale) and a merchant in the editor. The ckb column
-  // carries the Arabic. OWNER: Sorani to be written by hand.
+  // 0 IQD is not for sale) and a merchant in the editor.
   PRODUCT_PRICE_REQUIRED: {
     ar: 'هذا المنتج بلا سعر حاليًا فلا يمكن شراؤه. أزله من السلة للمتابعة.',
     en: 'This product has no price right now, so it cannot be bought. Remove it from the cart to continue.',
@@ -901,127 +880,106 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This merchant owes the platform (a credit was clawed back). The payout cannot be approved or recorded until the debt is covered — or fail it to return the amount to their balance.',
     ckb: 'ئەم بازرگانە قەرزاری پلاتفۆرمەکەیە (بڕێک دوای خستنە سەر باڵانسەکەی گەڕێنرایەوە). تا قەرزەکە پڕ نەکرێتەوە ناردنی پارەکە پەسەند یان تۆمار ناکرێت — یان داواکارییەکە ڕەت بکەرەوە تا بڕەکە بگەڕێتەوە بۆ باڵانسەکەی.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   OFFER_NOT_ELIGIBLE: {
     ar: 'ورشتك لا تستطيع تنفيذ هذا الطلب كما هو الآن — راجع الأسباب في بطاقة «ورشتك».',
     en: 'Your workshop cannot make this request as it stands — see the reasons on the “Your workshop” card.',
     ckb: 'وۆرکشۆپەکەت ناتوانێت ئەم داواکارییە وەک ئێستا هەیە جێبەجێ بکات — هۆکارەکان لە کارتی «وۆرکشۆپەکەت» ببینە.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   FILE_ORIGINAL_RESTRICTED: {
     ar: 'الملف الأصلي يصلك بعد قبول عرضك. قبل ذلك تستطيع معاينة المجسم.',
     en: 'The original file is yours once your offer is accepted. Until then you can preview the model.',
     ckb: 'فایلە ڕەسەنەکە دوای قبوڵکردنی ئۆفەرەکەت دەگاتە دەستت. تا ئەو کاتە دەتوانیت پێشبینینی مۆدێلەکە بکەیت.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   FILE_NOT_ALLOWED: {
     ar: 'هذا الملف للعميل وللورش التي تستطيع تنفيذ الطلب فقط.',
     en: 'This file is only for the customer and the workshops that can make the request.',
     ckb: 'ئەم فایلە تەنها بۆ کڕیار و ئەو وۆرکشۆپانەیە کە دەتوانن داواکارییەکە جێبەجێ بکەن.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   COSTING_NOT_ELIGIBLE: {
     ar: 'تحسب الورشة تكلفة طلب تستطيع تنفيذه فقط.',
     en: 'A workshop can only cost a request it can make.',
     ckb: 'وۆرکشۆپ تەنها دەتوانێت تێچووی ئەو داواکارییە حیساب بکات کە دەتوانێت جێبەجێی بکات.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   COSTING_NO_MODEL: {
     ar: 'لا يوجد مجسم ثلاثي الأبعاد في هذا الطلب لحساب تكلفته.',
     en: 'This request has no 3D model to cost.',
     ckb: 'ئەم داواکارییە هیچ مۆدێلێکی سێ ڕەهەندیی نییە بۆ حیسابکردنی تێچوو.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   COSTING_NO_PRINTER: {
     ar: 'أضف طابعة أولًا لتحسب التكلفة عليها.',
     en: 'Add a printer first to cost on it.',
     ckb: 'سەرەتا چاپکەرێک زیاد بکە بۆ ئەوەی تێچووی لەسەر حیساب بکەیت.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   COSTING_RESIN_UNSUPPORTED: {
     ar: 'حساب تكلفة الريزن من الملف غير متاح بعد — اختر طابعة FDM.',
     en: 'Costing resin from the file is not available yet — pick an FDM printer.',
     ckb: 'حیسابکردنی تێچووی ڕێزن لە فایلەکەوە هێشتا بەردەست نییە — چاپکەرێکی FDM هەڵبژێرە.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   COSTING_MATERIAL_REQUIRED: {
     ar: 'اختر الخامة التي ستطبع بها لتُحسب التكلفة.',
     en: 'Choose the material you will print it in to cost it.',
     ckb: 'ئەو کەرەستەیە هەڵبژێرە کە پێی چاپ دەکەیت بۆ ئەوەی تێچووەکەی حیساب بکرێت.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   PRINTER_MODEL_UNKNOWN: {
     ar: 'هذه الطابعة غير موجودة في القائمة.',
     en: 'That printer is not in the list.',
     ckb: 'ئەم چاپکەرە لە لیستەکەدا نییە.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   PRINTER_NOZZLE_INVALID: {
     ar: 'هذه الفوهة لا تركب على هذه الطابعة.',
     en: 'That nozzle does not fit this printer.',
     ckb: 'ئەم نۆزڵە لەگەڵ ئەم چاپکەرە ناگونجێت.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   PRINTER_HARDENED_UNAVAILABLE: {
     ar: 'هذه الطابعة لا تقبل فوهة مقوّاة.',
     en: 'This printer cannot take a hardened nozzle.',
     ckb: 'ئەم چاپکەرە نۆزڵی پتەوکراو وەرناگرێت.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   PRINTER_MULTICOLOR_UNAVAILABLE: {
     ar: 'هذه الطابعة لا تطبع أكثر من خامة في المرة.',
     en: 'This printer cannot print several materials at once.',
     ckb: 'ئەم چاپکەرە ناتوانێت لە یەک کاتدا چەند کەرەستەیەک چاپ بکات.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   PRINTER_MATERIAL_INVALID: {
     ar: 'إحدى الخامات لا تناسب تقنية هذه الطابعة.',
     en: 'One of the materials does not suit this printer’s technology.',
     ckb: 'یەکێک لە کەرەستەکان لەگەڵ تەکنەلۆژیای ئەم چاپکەرە ناگونجێت.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   PRINTER_DATE_INVALID: {
     ar: 'اكتب تاريخ الشراء بصيغة تاريخ.',
     en: 'Enter the purchase date as a date.',
     ckb: 'بەرواری کڕین بە شێوەی بەروار بنووسە.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_INVALID: {
     ar: 'تعذّر قراءة أسطر المخزون.',
     en: 'The stock lines could not be read.',
     ckb: 'نەتوانرا دێڕەکانی کۆگا بخوێندرێنەوە.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_TOO_MANY: {
     ar: 'عدد أسطر المخزون أكثر من المسموح.',
     en: 'There are more stock lines than allowed.',
     ckb: 'ژمارەی دێڕەکانی کۆگا لە ڕێگەپێدراو زیاترە.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_UNTRACK_CONFIRM: {
     ar: 'تفريغ المخزون يوقف تتبّعه — أكّد ذلك أولًا.',
     en: 'Emptying the stock stops tracking it — confirm that first.',
     ckb: 'بەتاڵکردنی کۆگا بەدواداچوونی ڕادەگرێت — سەرەتا ئەمە پشتڕاست بکەرەوە.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_MATERIAL_INVALID: {
     ar: 'خامة غير معروفة في المخزون.',
     en: 'An unknown material in the stock.',
     ckb: 'کەرەستەیەکی نەناسراو لە کۆگادا هەیە.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_COLOR_INVALID: {
     ar: 'لون غير صالح في المخزون.',
     en: 'An invalid colour in the stock.',
     ckb: 'ڕەنگێکی نادروست لە کۆگادا هەیە.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_GRAMS_INVALID: {
     ar: 'الغرامات يجب أن تكون عددًا صحيحًا.',
     en: 'Grams must be a whole number.',
     ckb: 'گرامەکان دەبێت ژمارەیەکی تەواو بن.',
   },
-  // OWNER: Sorani to be written by hand (W5-B — eligibility, files, costing, printers, stock).
   STOCK_DUPLICATE: {
     ar: 'الخامة واللون نفسهما مكرران في المخزون.',
     en: 'The same material and colour appear twice.',
@@ -1029,8 +987,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   },
   // Review of the live merchant platform (F12): the coupon form's refusals,
   // the custom order's lifecycle doors and a customer's cancel after the
-  // order moved on. The ckb column carries the Arabic.
-  // OWNER: Sorani to be written by hand.
+  // order moved on.
   BAD_COUPON_CODE: {
     ar: 'رمز الكوبون من 3 إلى 30 حرفًا: أحرف إنجليزية وأرقام وشرطات فقط.',
     en: 'A coupon code is 3–30 characters: letters, numbers and hyphens only.',
@@ -1078,8 +1035,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   },
   // Catalog discovery (docs/ux/CATALOG_DISCOVERY.md §6, §2): a category link
   // that names no section holding products, and the admin choosing the slug
-  // the listing reserves. The ckb column carries the Arabic until the owner
-  // writes the Sorani by hand (DECISIONS row 11). OWNER: Sorani to be written by hand.
+  // the listing reserves.
   CATALOG_NOT_FOUND: {
     ar: 'هذه الفئة غير موجودة أو لا تحتوي منتجات حاليًا. تصفّح كل الفئات.',
     en: 'This category does not exist or has no products right now. Browse all categories.',
@@ -1090,9 +1046,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The slug “all” is reserved for a section’s “all products” page. Choose another slug.',
     ckb: 'بەستەری «all» بۆ پەڕەی «هەموو بەرهەمەکان»ی ناو بەشەکە تەرخان کراوە. بەستەرێکی تر هەڵبژێرە.',
   },
-  // «تعديل السعر النهائي» (migration 0140, worker/lib/orderPriceAdjust.ts). The
-  // ckb column carries the Arabic until the owner writes the Sorani by hand
-  // (DECISIONS row 11). OWNER: Sorani to be written by hand.
+  // «تعديل السعر النهائي» (migration 0140, worker/lib/orderPriceAdjust.ts).
   PRICE_APPROVAL_PENDING: {
     ar: 'الطلب بانتظار موافقة الزبون على السعر الجديد. اسحب الاقتراح أو انتظر قرار الزبون.',
     en: 'This order is waiting for the customer to approve a new price. Withdraw the proposal or wait for their decision.',
@@ -1143,9 +1097,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The order changed before your decision was saved. Refresh and try again.',
     ckb: 'داواکارییەکە پێش پاشەکەوتکردنی بڕیارەکەت گۆڕا. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
   },
-  // «الاستبدال» (migration 0143, worker/lib/tradeIn.ts). The ckb column carries
-  // the Arabic until the owner writes the Sorani by hand (DECISIONS row 11).
-  // OWNER: Sorani to be written by hand.
+  // «الاستبدال» (migration 0143, worker/lib/tradeIn.ts).
   TRADE_IN_NOT_DELIVERED: {
     ar: 'يمكن استبدال الأجهزة من الطلبات المستلَمة فقط.',
     en: 'Only devices from delivered orders can be traded in.',

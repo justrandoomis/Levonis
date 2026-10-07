@@ -281,14 +281,13 @@ test('the quota sentence is DECODED from refusalStrings, not copied into the pag
   assert.match(CART_SRC, /loc\('نفد المخزون', 'Out of stock', 'کۆگا بەتاڵە'\)/);
 });
 
-test('NO SORANI IS INVENTED for any of the four pre-order refusals', () => {
+test('the four pre-order refusals in Sorani: three reuse Product.tsx word for word, the quota has its own', () => {
   /**
    * Three of the four are sentences src/pages/Product.tsx has carried by hand
-   * in all three languages since 0073; the table now holds that same wording
-   * so the two screens cannot drift. The fourth — the quota — has no Kurdish
-   * anybody has written, so its `ckb` IS the Arabic, which is this app's
-   * documented fallback and the choice the entry states in its own comment.
-   * What must never appear is a machine translation.
+   * in all three languages since 0073; the table holds that same wording so
+   * the two screens cannot drift. The fourth — the quota — had no Kurdish, so
+   * its `ckb` used to be the Arabic; it now has its own Sorani
+   * (docs/DECISIONS.md row 183: a ckb slot never carries the Arabic).
    */
   const productSrc = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
   for (const code of ['PREORDER_NOT_ENABLED', 'NO_TRANSPORT_OFFERED', 'TRANSPORT_COMMISSION_UNCONFIGURED']) {
@@ -298,11 +297,12 @@ test('NO SORANI IS INVENTED for any of the four pre-order refusals', () => {
     const ar = apiRefusal({ code }, 'ar');
     assert.ok(productSrc.includes(ar), `${code}'s Arabic is the one already hand-written in Product.tsx`);
   }
-  assert.equal(
-    apiRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED' }, 'ckb'),
-    apiRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED' }, 'ar'),
-    'the quota sentence falls back to the Arabic rather than inventing Kurdish'
-  );
+  const quota = apiRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED' }, 'ckb');
+  assert.notEqual(quota, apiRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED' }, 'ar'), 'the quota sentence is not the Arabic pasted across');
+  // Same promise as the Arabic: not a sold-out shelf, and the two ways out.
+  assert.match(quota, /پێشداواکاری/);
+  assert.match(quota, /ڕێگایەکی تری ناردن/);
+  assert.match(quota, /دواتر بگەڕێوە/);
 });
 
 test('a pre-order line with NO USABLE ROUTE is not told its shelf is empty', async () => {
