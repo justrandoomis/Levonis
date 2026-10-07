@@ -16,13 +16,25 @@ and `33382596554`. None of it is inferred from what a URL returns.
 
 | Hostname | Worker | Status | Database | Bucket | Deployed by |
 | --- | --- | --- | --- | --- | --- |
-| `levonis-iq.com` | **`levonis-staging`** | **LIVE** | `levonis-db-staging` | `levonis-files-staging` | **workflow 7 AND the Cloudflare Git integration — see below** |
+| `levonis-iq.com` | **`levonis-staging`** | **LIVE** | `levonis-db-staging` | `levonis-files-staging` | **workflow 7 only, on every push to the default branch** (the Git integration's build refuses — see below) |
 | `*.levonis-iq.com` (merchant subdomains) | **`levonis-staging`** | **LIVE** | same | same | same |
 | `studio.levonis-iq.com` | **`levonis-studio-staging`** | **LIVE** | `levonis-studio-db-staging` | `levonis-studio-files-staging` | workflow 8 |
 | — none — | `levonis-studio` | alternate, workers.dev only | `levonis-studio-db` | `levonis-studio-files` | workflow 5 |
 | — none — | `levonis` | **does not exist on the account** | — | — | — |
 
-## THE LIVE WORKER HAS TWO DEPLOYERS, AND ONLY ONE OF THEM RUNS MIGRATIONS
+## SINCE 2026-10-07: ONE DEPLOYER (DECISIONS row 184)
+
+Workflow 7 runs on every push to the default branch: tests → migrations
+proven on a throwaway database → restore point → live migrations → deploy →
+probes. The Cloudflare Git integration below still starts a build on every
+push, but `scripts/prepare-deploy-config.mjs` now refuses inside Workers
+Builds, so its dashboard deploy command never runs (its check shows red).
+Disconnecting it in the dashboard (Workers & Pages → levonis-staging →
+Settings → Build) removes that red check; a build variable
+`LEVONIS_ALLOW_WORKERS_BUILDS=1` re-opens it in an emergency. Workflow 51 is
+manual only. The history below explains why.
+
+## THE LIVE WORKER HAD TWO DEPLOYERS, AND ONLY ONE OF THEM RAN MIGRATIONS
 
 This table used to have no "Deployed by" column at all, and that omission has
 a date attached: **2026-09-17**. A push to the default branch put a Worker

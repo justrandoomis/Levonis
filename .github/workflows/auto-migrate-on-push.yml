@@ -38,16 +38,21 @@
 # workflow failing. And when it does fail, the Worker's own cron says so:
 # worker/lib/schemaDriftAlarm.ts messages the admin Telegram group, on a path
 # that shares no infrastructure with GitHub Actions.
-name: 51 - Auto-apply migrations on push (live database)
+#
+# ---------------------------------------------------------------------------
+# NO LONGER TRIGGERED BY A PUSH (owner decision, docs/DECISIONS.md row 184).
+#
+# Workflow 7 now runs on every push to the default branch and applies the
+# pending migrations itself — after the full test suite, after proving them
+# on a throwaway database, behind a restore point and before the deploy. Two
+# jobs queued in the shared `staging-deploy` group by the same push could
+# cancel each other's pending run (a newer queued job cancels the pending
+# one), so this one steps aside. It stays as a hand crank for a database
+# that drifted for any reason.
+# ---------------------------------------------------------------------------
+name: 51 - Apply migrations to the live database (manual)
 
 on:
-  push:
-    # GitHub cannot interpolate default_branch in a trigger filter. Observe
-    # branch pushes here, and open the live database only behind the job guard.
-    branches: ['**']
-    paths:
-      - 'migrations/**'
-      - '.github/workflows/auto-migrate-on-push.yml'
   # So the mechanism can be exercised without inventing a migration, and so a
   # run that failed can be retried without an empty commit.
   workflow_dispatch:

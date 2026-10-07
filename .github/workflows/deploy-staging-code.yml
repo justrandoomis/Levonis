@@ -40,7 +40,34 @@
 # secret to compare. Unset, this workflow touches no secret at all.
 name: 7 - Deploy LIVE main site levonis-staging (keeps vars, no test data)
 
+# ---------------------------------------------------------------------------
+# THE ONLY PATH TO THE LIVE SITE (owner decision, docs/DECISIONS.md row 184).
+#
+# Every push to the default branch runs this, in this order and with no step
+# skippable: typecheck + lint + every unit suite → the migrations proven on a
+# throwaway database → a Time Travel restore point → the pending migrations
+# applied to the live database → the deploy → the live probes below. A red
+# step stops everything after it, so untested code never reaches
+# levonis-iq.com and code never reaches it ahead of its database.
+#
+# Cloudflare Workers Builds (the dashboard Git integration) used to deploy
+# every push on its own, with no tests and no migrations. Its build now
+# refuses (scripts/prepare-deploy-config.mjs), so its deploy command never
+# runs; disconnecting it in the dashboard only removes its red check.
+#
+# Workflow 51 no longer runs on push: this workflow applies the migrations
+# itself, and two jobs queued in the same `staging-deploy` group by one push
+# could cancel each other's pending run.
+# ---------------------------------------------------------------------------
 on:
+  push:
+    # GitHub cannot interpolate default_branch in a trigger filter. Observe
+    # branch pushes here, and deploy only behind the job guard below.
+    branches: ['**']
+    # A change to prose alone has nothing to deploy.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   workflow_dispatch:
     inputs:
       confirm:
@@ -48,10 +75,13 @@ on:
         required: true
         default: ''
 
-concurrency: staging-deploy
-
 jobs:
   deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    # Job-level, not workflow-level: a feature-branch push skips this job and
+    # must not enter the live deploy lock. Shared with workflows 6 and 51. A
+    # newer push supersedes a deploy still waiting; a running one finishes.
+    concurrency: staging-deploy
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -59,7 +89,10 @@ jobs:
     steps:
       - name: Check the confirmation
         run: |
-          [ "${{ github.event.inputs.confirm }}" = "DEPLOY-CODE" ] \
+          # A push to the default branch IS the confirmation (owner decision,
+          # DECISIONS row 184); a manual run still has to type it.
+          [ "${{ github.event_name }}" = "push" ] \
+            || [ "${{ github.event.inputs.confirm }}" = "DEPLOY-CODE" ] \
             || { echo "::error::type DEPLOY-CODE to confirm"; exit 1; }
 
       - uses: actions/checkout@v4
@@ -132,6 +165,12 @@ jobs:
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
         run: npm run build
+
+      # Before the live database is opened at all — the proof workflow 51 ran
+      # when it was the automatic path: every file applied to a fresh SQLite,
+      # the newest applied twice, the affected tables compared row by row.
+      - name: Prove the migrations on a throwaway database first
+        run: node scripts/migrate-check.mjs --twice
 
       # Migrations first: code must never be ahead of its database again.
       # This is the exact failure that took the storefront down on 2026-08-30.

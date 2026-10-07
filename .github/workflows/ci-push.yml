@@ -1,26 +1,22 @@
 # ---------------------------------------------------------------------------
-# CHECKS EVERY PUSH TO THE DEFAULT BRANCH, AND EVERY PULL REQUEST.
+# CHECKS EVERY PULL REQUEST AND EVERY PUSH TO ANY OTHER BRANCH.
 #
-# Cloudflare Workers Builds deploys every push to claude/new-session-2hq4ci
-# straight to levonis-iq.com, with no tests (docs/WORKERS.md). Until now the
-# unit suite ran only inside "7 - Deploy LIVE main site", which is manual —
-# so a push could go live with a red suite and nothing would say so.
-#
-# This workflow does not deploy and does not gate the Workers Builds deploy
-# (only switching that integration off in Cloudflare can). What it does is
-# make a red push visible on the commit within minutes, with the same two
-# commands workflow 7 runs before it deploys: `npm run check` and
-# `npm run test:unit`, which includes the authorization and cost-leak suites
-# (tests/costLeaksPhase0.test.ts, tests/adminScope.test.ts, …).
+# The default branch is checked by workflow 7 itself, which runs these same
+# two commands — `npm run check` and `npm run test:unit`, including the
+# authorization and cost-leak suites (tests/costLeaksPhase0.test.ts,
+# tests/costRoleMatrix.test.ts, …) — before it migrates and deploys. This
+# workflow does not deploy.
 #
 # Read-only: no secrets, no Cloudflare token, no writes.
 # ---------------------------------------------------------------------------
-name: CI - check and unit tests on push
+name: CI - check and unit tests (pull requests and other branches)
 
 on:
-  push:
-    branches: [claude/new-session-2hq4ci]
+  # Pushes to the default branch run the same two commands inside workflow 7,
+  # before it migrates and deploys; this covers what that does not.
   pull_request:
+  push:
+    branches-ignore: [claude/new-session-2hq4ci]
 
 permissions:
   contents: read

@@ -6,30 +6,37 @@
   is committed there and pushed with `git push origin claude/new-session-2hq4ci`.
   No feature branches, no merges, no pull requests. Never force-push it.
 
-## EVERY PUSH TO THAT BRANCH IS A LIVE DEPLOY
+## EVERY PUSH TO THAT BRANCH IS A LIVE DEPLOY — THROUGH WORKFLOW 7 ONLY
 
-The live Worker (`levonis-staging`, serving levonis-iq.com) has two deployers
-(`docs/WORKERS.md`):
+Owner decision (`docs/DECISIONS.md` row 184): the live Worker
+(`levonis-staging`, serving levonis-iq.com) is deployed only by workflow
+«7 - Deploy LIVE main site levonis-staging»
+(`.github/workflows/deploy-staging-code.yml`). It runs on every push to the
+default branch (prose-only pushes under `docs/` or `*.md` are skipped), in
+this order, and stops at the first red step:
 
-- **Cloudflare Workers Builds** deploys every push to the default branch, at
-  once, **without running tests and without applying migrations**.
-- Workflow «7 - Deploy LIVE main site levonis-staging»
-  (`.github/workflows/deploy-staging-code.yml`, input `confirm: DEPLOY-CODE`)
-  runs the checks and tests, records a Time Travel bookmark, applies pending
-  migrations, then deploys.
+    npm run check + npm run test:unit
+    → migrations proven on a throwaway database (migrate-check --twice)
+    → Time Travel restore point
+    → pending migrations applied to the live database
+    → deploy (existing vars carried forward)
+    → live probes
+
+Cloudflare Workers Builds (the dashboard Git integration) is switched off from
+the repository: its build refuses in `scripts/prepare-deploy-config.mjs`, so
+its deploy command never runs. Workflow 51 is manual only.
 
 So, before every push:
 
-1. Run `npm run check` and `npm run test:unit` and push only when both are
-   green. A push is not a draft.
-2. Code that needs a new migration must not reach the branch before the
-   migration is applied. Push the migration alone first («51 - Auto-apply
-   migrations on push» applies `migrations/**` on push), wait for it to
-   succeed, then push the code. Every new read of a new table or column also
-   tolerates its absence, because the Worker can still go live ahead of its
-   migration.
-3. Large or risky changes still go through workflow 7 with the owner's
-   approval.
+1. Run `npm run check` and `npm run test:unit` locally and push only when
+   both are green. A red push is caught by workflow 7 and never deployed, but
+   it blocks every push behind it until fixed.
+2. A migration and the code that needs it may ship in the same push —
+   workflow 7 applies the migration before it deploys. Every new read of a
+   new table or column still tolerates its absence (a manual redeploy of an
+   older commit, or Workers Builds re-opened in an emergency, can run code
+   against an older database).
+3. After a push, follow workflow 7 to green and check the live site.
 
 ## Languages
 

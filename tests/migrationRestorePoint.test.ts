@@ -77,11 +77,42 @@ printf 'reached-migrations\n' >> "$GITHUB_OUTPUT"
   });
 }
 
-test('automatic live migrations follow the current default branch and permit explicit dispatch', () => {
+test('the push path to the live database is workflow 7 alone: tests, then migrations, then deploy (DECISIONS row 184)', () => {
+  const deploy = readWorkflow('deploy-staging-code.yml');
+  assert.match(deploy, /push:\s*(?:#[^\n]*\n\s*)*branches: \['\*\*'\]/);
+  assert.match(deploy, /deploy:\n\s+if: \$\{\{ github\.event_name == 'workflow_dispatch' \|\| github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\) \}\}/);
+  assert.match(deploy, /^ {4}concurrency: staging-deploy$/m);
+  assert.ok(!/^concurrency:/m.test(deploy), 'a skipped feature-branch job must not enter the workflow-level live deploy lock');
+  assert.ok(!/^\s+pull_request:/m.test(deploy), 'pull requests must not deploy or migrate');
+  // The order is the decision: the suite, then the throwaway proof, then the
+  // restore point, then the live migrations, then the deploy.
+  const at = (needle: string) => {
+    const i = deploy.indexOf(needle);
+    assert.ok(i >= 0, `workflow 7 lost: ${needle}`);
+    return i;
+  };
+  const order = [
+    'npm run test:unit',
+    'node scripts/migrate-check.mjs --twice',
+    '- name: Record a Time Travel bookmark (restore point)',
+    'node scripts/apply-remote-migrations.mjs',
+    'npx wrangler deploy --env staging',
+  ].map(at);
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'tests → proof → restore point → migrations → deploy');
+});
+
+test('workflow 51 no longer runs on push — two jobs in the same lock from one push could cancel each other', () => {
   const workflow = readWorkflow('auto-migrate-on-push.yml');
-  assert.match(workflow, /push:\s*(?:#[^\n]*\n\s*)*branches: \['\*\*'\]/);
-  assert.match(workflow, /migrate:\n\s+if: \$\{\{ github\.event_name == 'workflow_dispatch' \|\| github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\) \}\}/);
+  assert.ok(!/^\s+push:/m.test(workflow), 'workflow 51 must not be triggered by a push any more');
+  assert.match(workflow, /^\s+workflow_dispatch:/m, 'it stays as the manual hand crank');
   assert.match(workflow, /^ {4}concurrency: staging-deploy$/m);
-  assert.ok(!/^concurrency:/m.test(workflow), 'a skipped feature job must not enter the workflow-level live deploy lock');
   assert.ok(!/^\s+pull_request:/m.test(workflow), 'pull requests must not trigger live migration');
+});
+
+test('the Workers Builds path refuses its own build, so its deploy command never runs', () => {
+  const src = readFileSync(new URL('../scripts/prepare-deploy-config.mjs', import.meta.url), 'utf8');
+  const detect = src.indexOf('if (!inWorkersBuilds) process.exit(0);');
+  const refuse = src.indexOf("if (process.env.LEVONIS_ALLOW_WORKERS_BUILDS !== '1') {");
+  assert.ok(detect >= 0 && refuse > detect, 'the refusal sits right after Workers Builds is detected');
+  assert.match(src.slice(refuse, refuse + 800), /process\.exit\(1\)/, 'and it fails the build');
 });

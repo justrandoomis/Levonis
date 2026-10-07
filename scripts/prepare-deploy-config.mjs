@@ -62,6 +62,24 @@ const inWorkersBuilds =
 
 if (!inWorkersBuilds) process.exit(0);
 
+// ------------------------------------------------- this path is switched off
+// OWNER DECISION 2026-10-07 (docs/DECISIONS.md row 184): the live Worker is
+// deployed ONLY by workflow 7, which runs every test, applies the migrations
+// and then deploys. This dashboard path deployed every push with neither. Its
+// deploy command is dashboard-controlled, but it only runs after `npm run
+// build` succeeds — so the build refuses here, and nothing is deployed.
+// A build variable LEVONIS_ALLOW_WORKERS_BUILDS=1, set deliberately in the
+// dashboard, re-opens it (an emergency door, not a default).
+if (process.env.LEVONIS_ALLOW_WORKERS_BUILDS !== '1') {
+  console.error(
+    'prepare-deploy-config: Workers Builds deploys are switched off by the owner (docs/DECISIONS.md row 184).\n' +
+      '  The live site is deployed by GitHub workflow "7 - Deploy LIVE main site levonis-staging",\n' +
+      '  which runs on every push: tests, then migrations, then deploy, then verification.\n' +
+      '  Refusing this build so the dashboard deploy command never runs.'
+  );
+  process.exit(1);
+}
+
 console.log('prepare-deploy-config: Cloudflare Workers Builds detected.');
 // Names only — never values. This makes the next build log self-documenting
 // if Cloudflare changes which variables it injects.
