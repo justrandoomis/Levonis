@@ -7,6 +7,9 @@
   "exports": {
     "./*": "./src/*.ts"
   },
+  "dependencies": {
+    "@levonis/contracts": "*"
+  },
   "scripts": {
     "check": "tsc --noEmit -p tsconfig.json",
     "test": "tsx --test test/*.test.ts"

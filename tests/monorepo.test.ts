@@ -2,7 +2,8 @@
  * The monorepo layout and package purity (`02-MIGRATION-PLAN.md` §1.1, ADR-004):
  * root workspaces are `packages/*` and `services/*`; every package has a
  * manifest, a tsconfig and a README; `@levonis/pricing` and `@levonis/shipping`
- * are PURE (relative imports only, no bindings, no fetch, no Hono); the
+ * are PURE (relative imports only — the engine maths' one declared contracts
+ * import aside — no bindings, no fetch, no Hono); the
  * contracts import nothing but themselves; the platform kit imports only the
  * contracts, hono and its own modules — never `worker/` or `services/`; and the
  * core's moved libraries are one-line re-exports so every import path still works.
@@ -10,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { importSpecifiers, tsFiles } from './lib/boundaries';
 
@@ -56,11 +57,27 @@ test('root workspaces and per-package manifests', () => {
   assert.deepEqual(readdirSync(join(ROOT, 'packages')).sort(), [...ALL_PACKAGES].sort(), 'a new package needs a row in this test and in 02-MIGRATION-PLAN.md §1.1');
 });
 
+// The ONE cross-package edge a pure package may take: the pricing engine's maths
+// (`costToPrice`, master plan v2 E1, ENG §4.2) reuses the contracts' exact decimal
+// arithmetic — the same parser every procurement estimate uses — and the one
+// readiness-code list (C22). The contracts are pure too (they import only
+// themselves), so purity holds; the dependency is declared in the manifest.
+const PURE_PACKAGE_IMPORTS: Record<string, readonly string[]> = {
+  'packages/pricing/src/costToPrice.ts': ['@levonis/contracts/procurementCost', '@levonis/contracts/pricingIssues'],
+};
+
+test('the pricing engine maths declares its one contracts dependency', () => {
+  const manifest = JSON.parse(read('packages/pricing/package.json')) as { dependencies?: Record<string, string> };
+  assert.deepEqual(manifest.dependencies, { '@levonis/contracts': '*' });
+  for (const file of Object.keys(PURE_PACKAGE_IMPORTS)) assert.ok(existsSync(join(ROOT, file)), `${file} exists`);
+});
+
 test('pricing, shipping and storeLayout are pure: relative imports only, no bindings, no fetch, no framework', () => {
   for (const name of PURE_PACKAGES) {
     for (const file of tsFiles(join(ROOT, 'packages', name, 'src'))) {
       const src = readFileSync(file, 'utf8');
-      for (const spec of importSpecifiers(src)) assert.ok(spec.startsWith('./') || spec.startsWith('../'), `${file}: non-relative import ${spec}`);
+      const allowed = PURE_PACKAGE_IMPORTS[relative(ROOT, file).split(sep).join('/')] ?? [];
+      for (const spec of importSpecifiers(src)) assert.ok(spec.startsWith('./') || spec.startsWith('../') || allowed.includes(spec), `${file}: non-relative import ${spec}`);
       for (const spec of importSpecifiers(src)) assert.ok(!spec.includes('worker/') && !spec.includes('services/') && !spec.includes('..' + '/' + '..' + '/'), `${file}: escapes the package (${spec})`);
       assert.ok(!/\b(D1Database|R2Bucket|KVNamespace|DurableObject|fetch\s*\(|from ['"]hono|cloudflare:)/.test(src), `${file}: impure (bindings, fetch or Hono)`);
     }

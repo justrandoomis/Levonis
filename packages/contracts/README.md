@@ -31,6 +31,9 @@ validators, no runtime dependency; imports nothing outside the package.
 | `http/analytics` | `/api/v1/analytics/*` — the overview counters (field-for-field the ones `admin.ts:125-159` returns today) and the daily platform/merchant series |
 | `http/ads` | `/api/v1/ads/admin/*` — provider status and breakers, the seeded event map, deliveries (`sandbox`/`no_consent`) and flag flips |
 | `http/notifications` | `/api/notifications/*` pinned to today's core responses, plus the admin delivery view and the webhook ack |
+| `procurementCost` | procurement estimate wire types and decimal-exact arithmetic; for the pricing engine also `parseProcurementDecimal` (the validator every pricing decimal goes through: canonical text in the 0179 CHECK grammar, digit limits, sign and minimum), `ProcurementExact` (BigInt `num/den`) with `procurementExact`, `add`/`mul`/`div`/`ceil`/`compare`, and `procurementExactText` (canonical decimal) |
+| `pricingIssues` | the one readiness-code list of the pricing engine (`PRICING_ISSUE_CODES`, master plan v2 §2.3) with severity and owner-only ar/en/ckb labels; `pricingIssueLabel(s)` fills `{currency}`/`{profile}`/`{field}`; `pricingMissingEntry` builds a `missing_json` entry and `pricingMissingEntriesOf` turns one engine issue into its entries |
+| `pricingFieldLabels` | owner-only ar/en/ckb labels for every private pricing field, shipping profile, sale channel, rule/input scope and input origin |
 
 Events in v1 today: the 17 of `03-EVENTS.md` §3 plus the 11 §4 events the
 Phase 1–3 subscriptions seed names (`UserUpdated`, `SessionRevoked`,
