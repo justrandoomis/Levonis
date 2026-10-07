@@ -607,15 +607,19 @@ function DeviceStep({
   const reasonText = (u: EligibleUnit) => {
     switch (u.reason) {
       case 'TRADE_IN_ALREADY_CLAIMED':
-        return u.open_request_id ? L('ضمن طلب استبدال قائم', 'In an open trade-in') : L('استُبدل سابقاً', 'Already traded in');
+        return u.open_request_id
+          ? loc('ضمن طلب استبدال قائم', 'In an open trade-in', 'لە داواکارییەکی کراوەی گۆڕینەوەدایە')
+          : loc('استُبدل سابقاً', 'Already traded in', 'پێشتر گۆڕدراوەتەوە');
       case 'TRADE_IN_RETURN_OPEN':
-        return L('عليه طلب إرجاع', 'Has a return case');
+        return loc('عليه طلب إرجاع', 'Has a return case', 'داواکاریی گەڕاندنەوەی لەسەرە');
       case 'TRADE_IN_BELOW_MINIMUM':
-        return L('أقل من الحد الأدنى للاستبدال', 'Below the trade-in minimum');
+        return loc('أقل من الحد الأدنى للاستبدال', 'Below the trade-in minimum', 'لە کەمترین سنووری گۆڕینەوە کەمترە');
       case 'TRADE_IN_NOT_DELIVERED':
-        return L('لم يُستلم بعد', 'Not delivered yet');
+        return loc('لم يُستلم بعد', 'Not delivered yet', 'هێشتا نەگەیەندراوە');
+      case 'TRADE_IN_GIFT':
+        return loc('وصلك هدية — الاستبدال للأجهزة المشتراة', 'A gift — trade-in is for devices you bought', 'دیارییە — گۆڕینەوە بۆ ئامێرە کڕدراوەکانە');
       default:
-        return L('غير متاح للاستبدال', 'Not available');
+        return loc('غير متاح للاستبدال', 'Not available', 'بۆ گۆڕینەوە بەردەست نییە');
     }
   };
   return (

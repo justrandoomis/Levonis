@@ -126,6 +126,7 @@ export type TradeInCode =
   | 'TRADE_IN_ALREADY_CLAIMED'
   | 'TRADE_IN_RETURN_OPEN'
   | 'TRADE_IN_BELOW_MINIMUM'
+  | 'TRADE_IN_GIFT'
   | 'TRADE_IN_SCOPE_UNAVAILABLE'
   | 'TRADE_IN_DRAFT_LIMIT'
   | 'TRADE_IN_NOT_EDITABLE'
@@ -162,6 +163,7 @@ const MESSAGES: Record<TradeInCode, string> = {
   TRADE_IN_ALREADY_CLAIMED: 'This device is already part of a trade-in.',
   TRADE_IN_RETURN_OPEN: 'This item has a return case, so it cannot be traded in.',
   TRADE_IN_BELOW_MINIMUM: 'This item is below the minimum value for a trade-in.',
+  TRADE_IN_GIFT: 'This device came as a gift. Trade-in is for devices bought from LEVONIS.',
   TRADE_IN_SCOPE_UNAVAILABLE: 'That part of this device cannot be traded on its own.',
   TRADE_IN_DRAFT_LIMIT: 'You have too many unfinished trade-in requests. Finish or cancel one first.',
   TRADE_IN_NOT_EDITABLE: 'This request was already sent and can no longer be edited.',
@@ -447,6 +449,8 @@ interface LineRow {
   warranty_snapshot: string | null;
   membership_discount_iqd: number | null;
   coupon_discount_iqd: number | null;
+  /** Set when the line is a gift ordered at 0 IQD (0175). */
+  gift_entitlement_id: string | null;
   status: string;
   ordered_at: string;
   order_delivered_at: string | null;
@@ -462,7 +466,7 @@ interface LineRow {
 
 const LINE_SQL = `SELECT oi.id AS item_id, oi.order_id, oi.product_id, oi.name_snapshot, oi.image_snapshot, oi.option_snapshot,
          oi.option_id, oi.option_value_ids, oi.qty, oi.unit_price_iqd, oi.warranty_snapshot,
-         oi.membership_discount_iqd, oi.coupon_discount_iqd,
+         oi.membership_discount_iqd, oi.coupon_discount_iqd, oi.gift_entitlement_id,
          o.status, o.created_at AS ordered_at, o.delivered_at AS order_delivered_at,
          p.slug, p.name, p.name_ar, p.template_family, p.category_id, p.sub_category_id, p.ops_policy, p.price_iqd
     FROM order_items oi
@@ -589,7 +593,12 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
           base_iqd: unknownSplit ? (role === 'device' ? paid : 0) : role === 'ams' ? split.ams_base_iqd : deviceBase,
         }));
         let reason: TradeInCode | null = null;
-        if (line.status !== 'delivered') reason = 'TRADE_IN_NOT_DELIVERED';
+        // A GIFT WAS NOT BOUGHT. «only devices bought HERE» and «the price he
+        // paid» (the header): a device that came as a gift (0175) was paid
+        // nothing, so it is listed with the reason rather than valued at 0 or
+        // turned away as «below the minimum».
+        if (line.gift_entitlement_id) reason = 'TRADE_IN_GIFT';
+        else if (line.status !== 'delivered') reason = 'TRADE_IN_NOT_DELIVERED';
         else if (returnSet.has(line.item_id)) reason = 'TRADE_IN_RETURN_OPEN';
         else if (unknownSplit && scope !== 'whole') reason = 'TRADE_IN_SCOPE_UNAVAILABLE';
         else if (roles.some((r) => claimedParts.has(r))) reason = 'TRADE_IN_ALREADY_CLAIMED';
@@ -1241,6 +1250,10 @@ export async function submitRequest(env: Env, userId: string, id: string): Promi
       title_en: 'We received your trade-in request',
       body_ar: `التقدير الأولي ${iqdText(estimate.total_iqd, 'ar')} — القيمة النهائية بعد الفحص.`,
       body_en: `Preliminary estimate ${iqdText(estimate.total_iqd, 'en')} — the final value follows the inspection.`,
+      meta: {
+        title_ckb: 'داواکاریی گۆڕینەوەکەت وەرگیرا',
+        body_ckb: `خەمڵاندنی سەرەتایی ${iqdText(estimate.total_iqd, 'ckb')} — بەهای کۆتایی دوای پشکنین دیاری دەکرێت.`,
+      },
       link: requestPath(id),
       entity_type: 'trade_in',
       entity_id: id,
@@ -1314,6 +1327,7 @@ export async function cancelRequest(
         title_en: 'Your trade-in request was cancelled',
         body_ar: reason,
         body_en: reason,
+        meta: { title_ckb: 'داواکاریی گۆڕینەوەکەت هەڵوەشێندرایەوە', body_ckb: reason },
         link: requestPath(req.id),
         entity_type: 'trade_in',
         entity_id: req.id,
@@ -1349,6 +1363,7 @@ export async function markInspected(env: Env, req: RequestRow, adminId: string):
         kind: 'trade_in',
         title_ar: 'بدأ فحص جهازك',
         title_en: 'We are inspecting your device',
+        meta: { title_ckb: 'پشکنینی ئامێرەکەت دەستی پێکرد' },
         link: requestPath(req.id),
         entity_type: 'trade_in',
         entity_id: req.id,
@@ -1434,6 +1449,10 @@ async function fixValue(
       title_en: 'Your trade-in value is fixed — complete the payment',
       body_ar: `قيمة جهازك ${iqdText(s.trade_in_value_iqd, 'ar')}. المطلوب للجهاز الجديد ${iqdText(s.difference_iqd, 'ar')} + التوصيل.`,
       body_en: `Your device is worth ${iqdText(s.trade_in_value_iqd, 'en')}. You pay ${iqdText(s.difference_iqd, 'en')} for the new device, plus delivery.`,
+      meta: {
+        title_ckb: 'بەهای گۆڕینەوە جێگیر کرا — پارەدان تەواو بکە',
+        body_ckb: `بەهای ئامێرەکەت ${iqdText(s.trade_in_value_iqd, 'ckb')}. بۆ ئامێرە نوێیەکە ${iqdText(s.difference_iqd, 'ckb')} دەدەیت، لەگەڵ کرێی گەیاندن.`,
+      },
       link: requestPath(req.id),
       entity_type: 'trade_in',
       entity_id: req.id,
@@ -1502,7 +1521,11 @@ export async function changeValue(env: Env, req: RequestRow, adminId: string, va
         link: requestPath(req.id),
         entity_type: 'trade_in',
         entity_id: req.id,
-        meta: { offer_no: offer },
+        meta: {
+          offer_no: offer,
+          title_ckb: 'بەهایەکی نوێ بۆ ئامێرەکەت — پێویستە بڕیار بدەیت',
+          body_ckb: `${iqdText(est, 'ckb')} ← ${iqdText(value, 'ckb')}${reason ? ` — ${reason}` : ''}. جیاوازی بۆ ئامێرە نوێیەکە ${iqdText(s.difference_iqd, 'ckb')}.`,
+        },
         eventKey: `trade_in:${req.id}:offer:${offer}`,
       }).stmt,
       ...(await auditStatements(db, adminId, 'trade_in.change_value', req.id, { value_iqd: value, estimated_iqd: est, reason, offer_no: offer })).statements,
@@ -1633,6 +1656,7 @@ export async function completeRequest(env: Env, req: RequestRow, adminId: string
         kind: 'trade_in',
         title_ar: 'اكتمل الاستبدال',
         title_en: 'Your trade-in is complete',
+        meta: { title_ckb: 'گۆڕینەوەکە تەواو بوو' },
         link: requestPath(req.id),
         entity_type: 'trade_in',
         entity_id: req.id,
@@ -1877,11 +1901,7 @@ async function customerLang(env: Env, userId: string): Promise<EmailLang> {
   return row ? notificationLang(row) : 'ar';
 }
 
-/**
- * The customer's copy. Arabic and English only: Sorani is never machine-
- * written (docs/DECISIONS.md row 11) — a ckb reader gets the Arabic.
- * OWNER: Sorani to be written by hand.
- */
+/** The customer's copy, in the three languages the customer may read. */
 const COPY = {
   ar: {
     subject: 'قيمة جديدة لجهازك — مطلوب موافقتك',
@@ -1907,9 +1927,21 @@ const COPY = {
     rejected: '✖️ You declined; the request is closed.',
     closed: 'This offer is no longer open.',
   },
+  ckb: {
+    subject: 'بەهایەکی نوێ بۆ ئامێرەکەت — پێویستە بڕیار بدەیت',
+    body: (name: string, from: string, to: string, reason: string, diff: string) =>
+      `ئامێرەکەتمان (${name}) پشکنی و بەهای گۆڕینەوەکەیمان کرد بە ${to} لە جیاتی خەمڵاندنی سەرەتایی ${from}.${reason ? `\nهۆکار: ${reason}` : ''}\nبۆ ئامێرە نوێیەکە دوای گۆڕینەوە ${diff} دەدەیت (کرێی گەیاندن جیایە).\nڕازی بە بۆ ئەوەی بەردەوام بین، یان ڕەتی بکەرەوە و داواکارییەکە دادەخەین.`,
+    accept: '✅ ڕازیم بە بەهاکە',
+    reject: '✖️ ڕەتی دەکەمەوە',
+    open: '🔗 کردنەوەی داواکارییەکە',
+    cta: 'بەهاکە ببینە و بڕیار بدە',
+    accepted: (v: string) => `✅ ڕازی بوویت — بەهای ئامێرەکەت ${v}. لە پەڕەی داواکارییەکەوە پارەدان تەواو بکە.`,
+    rejected: '✖️ بەهاکەت ڕەت کردەوە و داواکارییەکە داخرا.',
+    closed: 'ئەم ئۆفەرە چیتر کراوە نییە.',
+  },
 } as const;
 
-const copyFor = (lang: EmailLang) => COPY[lang === 'en' ? 'en' : 'ar'];
+const copyFor = (lang: EmailLang) => COPY[lang];
 
 /** Telegram refuses callback_data over 64 bytes; ours is ~36. */
 export const TRADE_IN_CALLBACK_PREFIX = 'ti:';

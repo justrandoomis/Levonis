@@ -271,6 +271,26 @@ test('only this customer’s delivered LEVONIS devices are offered; another’s 
   assert.deepEqual(violations, []);
 });
 
+test('a printer that came as a GIFT is listed with that reason and cannot be traded in — it was never bought', async () => {
+  const raw = seed();
+  // A P1S ordered at 0 IQD through a gift (0175), delivered with the rest.
+  raw.exec(`INSERT INTO order_items (id,order_id,product_id,name_snapshot,image_snapshot,option_snapshot,qty,unit_price_iqd,line_total_iqd,option_id,option_value_ids,gift_entitlement_id,gift_order_seq)
+    VALUES ('oi_gift','ORD-DLV','p_p1s','Bambu Lab P1S','','',1,0,0,'','[]','ge_review_1',1)`);
+  const a = customerApp(raw);
+  const res = await json(await get(a, '/api/trade-in/eligible'));
+  const gift = (res.units as Array<{ order_item_id: string; available: boolean; reason: string | null }>).find((u) => u.order_item_id === 'oi_gift');
+  assert.ok(gift, 'listed, so the customer sees why — not silently missing');
+  assert.equal(gift!.available, false);
+  assert.equal(gift!.reason, 'TRADE_IN_GIFT', 'the gift reason, not «below the minimum»');
+  const open = await post(a, '/api/trade-in/requests', { order_item_id: 'oi_gift', unit_index: 1, scope: 'whole' });
+  assert.equal(open.status, 409);
+  assert.equal((await json(open)).code, 'TRADE_IN_GIFT');
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM trade_in_requests WHERE user_id = 'cust'`), 0, 'nothing was opened');
+  // The bought devices beside it are unaffected.
+  const bought = (res.units as Array<{ order_item_id: string; available: boolean }>).filter((u) => u.order_item_id !== 'oi_gift');
+  assert.ok(bought.every((u) => u.available), 'the Combo and the resin printer stay tradeable');
+});
+
 test('a part cannot be traded twice: the AMS alone blocks the whole Combo, not its printer; cancelling frees it', async () => {
   const raw = seed();
   const a = customerApp(raw);
@@ -539,6 +559,10 @@ test('the accepted value is credited ONCE, on the target line only, for its owne
   assert.equal(done.request.status, 'completed');
   // Completed keeps its claim for ever: the AMS of this unit is traded.
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM trade_in_claims WHERE request_id = ?', id), 1);
+  // Every step the customer was told about, the bell can say in Sorani too.
+  const told = raw.prepare(`SELECT event_key, meta FROM user_notifications WHERE user_id = 'cust' AND kind = 'trade_in'`).all() as Array<{ event_key: string; meta: string }>;
+  assert.ok(told.length >= 3, `submitted, value and completion at least: ${told.map((t) => t.event_key).join(', ')}`);
+  for (const t of told) assert.ok(String(JSON.parse(t.meta).title_ckb ?? '').length > 0, `${t.event_key} has its Sorani title`);
   assert.deepEqual(violations, []);
 });
 
