@@ -361,6 +361,28 @@ export const COST_REFUSALS = {
     en: "A fixed offer price can't be used on an automatically priced product; use a percentage or amount discount.",
     ckb: 'نرخی جێگیری ئۆفەر بۆ بەرهەمێکی نرخدانانی خۆکار ناگونجێت؛ داشکاندنی ڕێژەیی یان بڕێکی دیاریکراو بەکاربهێنە.',
   },
+
+  // ---- master plan v2 check §3.9: codes later steps raise ------------------
+  PRICING_CLEAR_INCOMPLETE_CONFIRM: {
+    ar: 'مسح هذه القيمة يترك تسعير المنتج غير مكتمل، فلا يستطيع النظام حساب سعره بعد الآن. أكّد ذلك صراحةً إن كنت تقصده.',
+    en: "Clearing this value leaves the product's pricing incomplete, and the system can no longer calculate its price. Confirm explicitly if you mean it.",
+    ckb: 'سڕینەوەی ئەم بەهایە نرخدانانی بەرهەمەکە ناتەواو دەهێڵێتەوە و ئیتر سیستەمەکە ناتوانێت نرخەکەی هەژمار بکات. ئەگەر مەبەستتە، بە ڕوونی پشتڕاستی بکەرەوە.',
+  },
+  PRICING_MEASURES_UNCONFIRMED: {
+    ar: 'وزن هذا المنتج أو أبعاده مأخوذة من المواصفات العامة ولم تؤكَّد بعد. راجعها وأكّدها قبل تفعيل التسعير التلقائي.',
+    en: "This product's weight or dimensions come from its public specifications and are not confirmed yet. Review and confirm them before turning on automatic pricing.",
+    ckb: 'کێش یان ئەندازەکانی ئەم بەرهەمە لە تایبەتمەندییە گشتییەکانەوە وەرگیراون و هێشتا پشتڕاست نەکراونەتەوە. پێش چالاککردنی نرخدانانی خۆکار بیانپشکنە و پشتڕاستیان بکەرەوە.',
+  },
+  PRICING_GATE_ITEMS_MISSING: {
+    ar: 'لم تُقبل كل بنود التفعيل الأول للتسعير التلقائي. راجع كل بند وأشّر عليه، ثم أكّد من جديد.',
+    en: 'Not every item for the first activation of automatic pricing was accepted. Review and tick each item, then confirm again.',
+    ckb: 'هەموو بڕگەکانی یەکەم چالاککردنی نرخدانانی خۆکار قبوڵ نەکراون. هەر بڕگەیەک بپشکنە و نیشانەی لێ بدە، پاشان دووبارە پشتڕاستی بکەرەوە.',
+  },
+  PRICING_GATE_NOT_CONFIRMED: {
+    ar: 'لم يؤكّد الأدمن الرئيسي بعد بنود التفعيل الأول للتسعير التلقائي، فلا يمكن تفعيله لأي منتج قبل ذلك.',
+    en: 'The main admin has not yet confirmed the first-activation items for automatic pricing, so it cannot be turned on for any product before that.',
+    ckb: 'بەڕێوەبەری سەرەکی هێشتا بڕگەکانی یەکەم چالاککردنی نرخدانانی خۆکاری پشتڕاست نەکردووەتەوە، بۆیە پێش ئەوە بۆ هیچ بەرهەمێک چالاک ناکرێت.',
+  },
 } as const satisfies Record<string, CostRefusal>;
 
 export type CostRefusalCode = keyof typeof COST_REFUSALS;

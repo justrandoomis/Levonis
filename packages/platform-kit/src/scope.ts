@@ -227,6 +227,38 @@ export const FINANCIAL_FIELDS = [
   'below_target',
   'stored_iqd',
   'computed_iqd',
+  // -- master plan v2 check (C2-A6, 2026-10-07): the legacy migration's 0181
+  // -- columns, the engine's exact intermediates, the run hashes (each one is
+  // -- a cost oracle: a hash over cost answers "is it still X?") and the
+  // -- value JSON of pricing_audit and pricing_previews. pricing_audit names
+  // -- its before/after columns pricing_before_json / pricing_after_json:
+  // -- plain before_json / after_json are membership-benefit and finance
+  // -- history fields elsewhere and must never join this list (F18).
+  'old_option_costs_json',
+  'old_color_costs_json',
+  'old_cells_json',
+  'old_routes_json',
+  'old_procurement_json',
+  'old_physical_json',
+  'resolver_cost_iqd',
+  'variant_cost_iqd',
+  'target_iqd',
+  'premium_iqd',
+  'inherited_premium_iqd',
+  'target_plan_json',
+  'premium_plan_json',
+  'legacy_hash',
+  'eval_fingerprint',
+  'result_hash',
+  'supplier_cost_exact',
+  'shipping_cost_exact',
+  'replacement_exact',
+  'rounding_added_iqd',
+  'pricing_before_json',
+  'pricing_after_json',
+  'summary_json',
+  'change_json',
+  'samples_json',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

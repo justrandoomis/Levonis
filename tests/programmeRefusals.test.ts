@@ -91,6 +91,13 @@ const REQUIRED: Record<string, readonly string[]> = {
     'PREORDER_LINK_SKIP_OWNER_ONLY',
     'OFFER_FIXED_NOT_FOR_ENGINE',
   ],
+  // L3 `confirm_incomplete`, L4 `measures_confirmed`, and GATE (C52).
+  'master plan v2 check §3.9': [
+    'PRICING_CLEAR_INCOMPLETE_CONFIRM',
+    'PRICING_MEASURES_UNCONFIRMED',
+    'PRICING_GATE_ITEMS_MISSING',
+    'PRICING_GATE_NOT_CONFIRMED',
+  ],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

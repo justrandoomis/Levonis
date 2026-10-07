@@ -60,7 +60,27 @@ const AREAS: Record<string, readonly string[]> = {
     'replacement_cost_iqd', 'target_profit_iqd', 'direct_premium_iqd', 'preorder_base_iqd', 'computed_price_iqd',
     'effective_weight_g', 'shipping_cbm', 'effective_cbm', 'rate_iqd', 'below_target', 'stored_iqd', 'computed_iqd',
   ],
+  // Master plan v2 check (C2-A6): 0181's legacy columns, the engine's exact
+  // intermediates, the run hashes (cost oracles) and the value JSON of
+  // pricing_audit and pricing_previews. Added in S1 because L1 and R1 may not
+  // edit adminScope.ts or scope.ts.
+  V2CHECK: [
+    'old_option_costs_json', 'old_color_costs_json', 'old_cells_json', 'old_routes_json', 'old_procurement_json',
+    'old_physical_json', 'resolver_cost_iqd', 'variant_cost_iqd', 'target_iqd', 'premium_iqd', 'inherited_premium_iqd',
+    'target_plan_json', 'premium_plan_json', 'legacy_hash', 'eval_fingerprint', 'result_hash', 'supplier_cost_exact',
+    'shipping_cost_exact', 'replacement_exact', 'rounding_added_iqd', 'pricing_before_json', 'pricing_after_json',
+    'summary_json', 'change_json', 'samples_json',
+  ],
 };
+
+/**
+ * PRIVATE, BUT NOT IN THE NET (master plan v2 §2.3). A private column whose
+ * name collides with a public or wallet field elsewhere stays out of
+ * FINANCIAL_FIELDS and is kept out of every non-owner DTO by allowlist
+ * instead. Each entry says where the collision is. Later steps add here — not
+ * to adminScope.ts — when a grep of the public DTOs finds a collision.
+ */
+const PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {};
 
 /**
  * NEVER private names (F18, security spec §4.1, critique A6): each is a public
@@ -68,7 +88,12 @@ const AREAS: Record<string, readonly string[]> = {
  * private value under one of them would slip through. A private column must
  * be named by what it is (`direct_premium_iqd`, not `amount_iqd`).
  */
-const FORBIDDEN = ['breakdown', 'rounding_iqd', 'pricing', 'valuation', 'exchange_rate', 'exchange_rate_snapshot', 'shipping_cost', 'amount_iqd'];
+const FORBIDDEN = [
+  'breakdown', 'rounding_iqd', 'pricing', 'valuation', 'exchange_rate', 'exchange_rate_snapshot', 'shipping_cost', 'amount_iqd',
+  // membership_benefit_versions and the finance history tables: the benefit
+  // editor's version list reads them (src/components/adminBenefits).
+  'before_json', 'after_json',
+];
 
 /** The cost names that predate S1 and must stay. */
 const LEGACY = ['cost_iqd', 'product_cost_iqd', 'margin_iqd', 'margin_percent', 'supplier_price_iqd', 'cost_adjust_iqd', 'profit_iqd', 'unit_cost_iqd', 'exchange_rate_used', 'source_currency'];
@@ -89,6 +114,11 @@ test('the names that predate S1 are still there', () => {
 
 test('none of the forbidden names is in the list (F18)', () => {
   assert.deepEqual(FORBIDDEN.filter((k) => LIST.has(k)), []);
+});
+
+test('a name is either in the net or registered as private-but-not-in-the-net, never both', () => {
+  assert.deepEqual(Object.keys(PRIVATE_NON_FINANCIAL).filter((k) => LIST.has(k)), []);
+  for (const [k, why] of Object.entries(PRIVATE_NON_FINANCIAL)) assert.ok(why.trim().length > 0, `${k} needs its reason`);
 });
 
 test('no duplicates, every name snake_case — the camelCase match is the stripper’s job', () => {
