@@ -15,7 +15,7 @@ import { ApiError } from '../../../lib/api';
 import { useLanguage } from '../../../LanguageContext';
 import { refusalText } from '../../../lib/refusalStrings';
 import { serialStrings } from './strings';
-import { MissingUnit } from './SerialsBlockerCard';
+import { MissingUnit, missingLabel } from './SerialsBlockerCard';
 import type { GateMissing } from './types';
 
 export interface GateRefusal {
@@ -88,6 +88,7 @@ export default function SerialGateRefusal({
                   <button
                     type="button"
                     onClick={() => onGoTo(m)}
+                    aria-label={`${s.goToUnit} · ${missingLabel(m, lang)}`}
                     className="inline-flex shrink-0 items-center gap-1 min-h-[44px] px-3 rounded-full text-[12.5px] font-semibold text-text-primary hover:bg-surface-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
                     data-serial-goto={`${m.order_item_id}:${m.unit_index}`}
                   >

@@ -115,6 +115,8 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
     setTab('order');
     setFocusRequest((f) => ({ key: slotKey(m), n: (f?.n ?? 0) + 1 }));
   }, []);
+  /** Carried out once: a remount of the tab must not scroll to an old unit again (UX review #4). */
+  const clearFocusRequest = useCallback(() => setFocusRequest(null), []);
   /** After the gate refused a move: the blocker card should list what the server just counted. */
   const refreshSerials = useCallback(() => {
     void serialsApi
@@ -143,7 +145,8 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
         onClick={() => goToSerial(firstEmpty)}
         title={s.chipGoTo}
         aria-label={`${s.chipSerials(done, mine.length)} — ${s.chipGoTo}`}
-        className={`mt-2 inline-flex items-center gap-1.5 min-h-[32px] rounded-full px-2.5 text-[12px] font-semibold tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold ${
+        // A 32 px pill with a 44 px tap (apple-design §6, UX review #17).
+        className={`relative before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] mt-2 inline-flex items-center gap-1.5 min-h-[32px] rounded-full px-2.5 text-[12px] font-semibold tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold ${
           complete ? 'bg-success/10 text-success hover:bg-success/15' : 'bg-surface-selected text-text-secondary hover:text-text-primary'
         }`}
         data-serial-chip={itemId}
@@ -632,6 +635,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
               onSerialsChanged={setSerials}
               onOpenSerial={openSerialPage}
               focusRequest={focusRequest}
+              onFocusHandled={clearFocusRequest}
             />
 
             {detail.admin_note && (

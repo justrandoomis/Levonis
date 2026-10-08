@@ -528,11 +528,18 @@ export async function applyPatch(db: D1Database, serialNorm: string, patch: Inve
  * sale (that is the order screen's reassign/replace, with its own reason).
  */
 export async function setVoid(db: D1Database, serialNorm: string, voided: boolean, reason: string): Promise<void> {
+  // 0177 (integrity review #10): never void a device a preparation binding
+  // holds — checked IN the write, so a scan landing after the route's read
+  // cannot leave a live binding on a voided asset.
+  const installed = voided && (await serialAssignmentsInstalled(db));
+  const notBound = installed
+    ? ' AND NOT EXISTS (SELECT 1 FROM serial_assignments sa WHERE sa.serial_norm = serial_inventory.serial_norm AND sa.released_at IS NULL AND sa.activated_at IS NULL)'
+    : '';
   const res = voided
     ? await db
         .prepare(
           `UPDATE serial_inventory SET voided_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), void_reason = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-            WHERE serial_norm = ? AND voided_at IS NULL`
+            WHERE serial_norm = ? AND voided_at IS NULL${notBound}`
         )
         .bind(reason, serialNorm)
         .run()
@@ -544,8 +551,11 @@ export async function setVoid(db: D1Database, serialNorm: string, voided: boolea
         .bind(serialNorm)
         .run();
   if (!res.meta.changes) {
-    const exists = await db.prepare('SELECT 1 AS x FROM serial_inventory WHERE serial_norm = ?').bind(serialNorm).first();
+    const exists = await db.prepare('SELECT voided_at FROM serial_inventory WHERE serial_norm = ?').bind(serialNorm).first<{ voided_at: string | null }>();
     if (!exists) throw new HttpError(404, 'Serial not in inventory', 'SERIAL_NOT_IN_INVENTORY');
+    if (installed && !exists.voided_at) {
+      throw new HttpError(409, 'هذا الرقم التسلسلي مرتبط حالياً بطلب آخر.', 'SERIAL_IN_USE');
+    }
     throw conflict(voided ? 'Already void' : 'Not void', voided ? 'SERIAL_ALREADY_VOID' : 'SERIAL_NOT_VOID');
   }
 }
@@ -731,7 +741,8 @@ export async function linkFromInventory(db: D1Database, userId: string, norm: st
   // 0177: a serial bound to an order unit at preparation is that order's
   // device, even before delivery — never a typed-in claim on someone else's
   // older unit (Audit A conflict 4). The same one answer as every refusal.
-  if (await serialAssignmentsInstalled(db)) {
+  const installed = await serialAssignmentsInstalled(db);
+  if (installed) {
     const live = await db
       .prepare('SELECT 1 AS x FROM serial_assignments WHERE serial_norm = ? AND released_at IS NULL LIMIT 1')
       .bind(inv.serial_norm)
@@ -759,11 +770,15 @@ export async function linkFromInventory(db: D1Database, userId: string, norm: st
   if (!unit) return { kind: 'refused', reason: 'no_matching_purchase', serial_norm: inv.serial_norm };
 
   // ON CONFLICT DO NOTHING covers both races: the serial taken by another
-  // unit (PRIMARY KEY) and this unit given another serial (UNIQUE unit_id).
-  // The re-read decides.
+  // unit (PRIMARY KEY) and this unit given another serial (UNIQUE unit_id);
+  // and (0177, integrity review #3) a preparation scan that bound this serial
+  // after the read above is checked IN the insert. The re-read decides.
+  const unbound = installed
+    ? ' WHERE NOT EXISTS (SELECT 1 FROM serial_assignments sa WHERE sa.serial_norm = ?1 AND sa.released_at IS NULL)'
+    : ' WHERE 1';
   await db
     .prepare(
-      `INSERT INTO device_serials (serial_norm, serial_raw, unit_id, assigned_by, note) VALUES (?, ?, ?, ?, 'inventory')
+      `INSERT INTO device_serials (serial_norm, serial_raw, unit_id, assigned_by, note) SELECT ?1, ?2, ?3, ?4, 'inventory'${unbound}
        ON CONFLICT DO NOTHING`
     )
     .bind(inv.serial_norm, inv.serial_raw, unit.id, userId)

@@ -112,6 +112,8 @@ import { canonicalSerial, refuse as serialRefuse, serialAssignmentsInstalled } f
 import { lineDevicePolicy, serializationContext } from '../lib/serialPolicy';
 import { auditStatements } from '../lib/audit';
 import { isOwner } from '../lib/adminScope';
+import { fence } from '../lib/operations';
+import { isLostRace } from '../lib/gifts/fence';
 import { serialInventoryRoutes } from './serialInventory';
 import { catalogIndexFor } from '../lib/catalogPresentation';
 import { MAINTENANCE_ROOT_ID, maintenanceFor } from '../lib/printerFits';
@@ -1376,7 +1378,19 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
   if (bySerial && bySerial.unit_id === unitId) {
     return c.json({ success: true, serial: bySerial.serial_raw, unchanged: true });
   }
+  const owner = isOwner(c.env, admin);
   if (installed) {
+    // A DELIVERED order's OPEN unit only (integrity review #5): a cancelled
+    // order's closed unit is no device of anyone's, and a delivery moved back
+    // to in transit is the preparation rules' (and, with a courier shipment,
+    // H2's freeze) — never a side door around them.
+    const state = await c.env.DB.prepare(
+      `SELECT o.status, u.warranty_closed_at, u.replaced_by_unit_id FROM order_item_units u LEFT JOIN orders o ON o.id = u.order_id WHERE u.id = ?`
+    )
+      .bind(unitId)
+      .first<{ status: string | null; warranty_closed_at: string | null; replaced_by_unit_id: string | null }>();
+    if (state?.status !== 'delivered') throw serialRefuse(409, 'ORDER_NOT_PREPARABLE', { status: state?.status ?? null, reason: 'not_delivered' });
+    if (state.warranty_closed_at || state.replaced_by_unit_id) throw serialRefuse(409, 'UNIT_NOT_OPEN');
     // A serial promised to another order at preparation is that order's device.
     const pending = await c.env.DB.prepare(
       `SELECT order_id FROM serial_assignments WHERE serial_norm = ? AND released_at IS NULL AND activated_at IS NULL
@@ -1384,7 +1398,7 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
     )
       .bind(norm, unit.order_item_id, unit.unit_index)
       .first<{ order_id: string | null }>();
-    if (pending) throw serialRefuse(409, 'SERIAL_IN_USE', isOwner(c.env, admin) ? { order_id: pending.order_id } : {});
+    if (pending) throw serialRefuse(409, 'SERIAL_IN_USE', owner ? { order_id: pending.order_id } : {});
   }
 
   const conflicting = !!bySerial || !!byUnit;
@@ -1399,13 +1413,31 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
   }
   if (conflicting && reason.length < 5) throw badRequest('A reason (min 5 characters) is required for reassignment');
   // §11: taking a device off a unit whose warranty is still open moves a
-  // customer's warranty — Main Admin only.
-  if (bySerial && !bySerial.warranty_closed_at && !bySerial.replaced_by_unit_id && !isOwner(c.env, admin)) {
+  // customer's warranty — Main Admin only. That is BOTH directions: the
+  // serial's previous unit, and (integrity review #2) this unit's own serial,
+  // which a replacement detaches from an open warranty and frees for sale.
+  if (bySerial && !bySerial.warranty_closed_at && !bySerial.replaced_by_unit_id && !owner) {
     throw serialRefuse(403, 'OWNER_ONLY');
   }
+  if (installed && byUnit && byUnit.serial_norm !== norm && !owner) throw serialRefuse(403, 'OWNER_ONLY');
 
   const now = new Date().toISOString();
   const stmts: D1PreparedStatement[] = [];
+  if (installed) {
+    // Re-asserted INSIDE the write (integrity review #3, #5): still a
+    // delivered order's open unit, and no preparation scan bound this serial
+    // to another order's unit since the read above.
+    stmts.push(
+      ...fence(
+        c.env.DB,
+        `EXISTS (SELECT 1 FROM order_item_units u JOIN orders o ON o.id = u.order_id
+                  WHERE u.id = ? AND o.status = 'delivered' AND u.warranty_closed_at IS NULL AND u.replaced_by_unit_id IS NULL)
+          AND NOT EXISTS (SELECT 1 FROM serial_assignments WHERE serial_norm = ? AND released_at IS NULL AND activated_at IS NULL
+                            AND NOT (order_item_id = ? AND unit_index = ? AND part = 'device'))`,
+        [unitId, norm, unit.order_item_id, unit.unit_index]
+      )
+    );
+  }
   if (byUnit && byUnit.serial_norm !== norm) {
     // Detach the unit's previous serial (unit_id is UNIQUE). The removed
     // mapping is preserved in the audit entry below.
@@ -1467,6 +1499,7 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
     await c.env.DB.batch(stmts);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    if (isLostRace(e)) throw serialRefuse(409, 'SERIAL_RACE');
     if (msg.includes('UNIQUE') || msg.includes('PRIMARY KEY')) {
       throw conflict('The serial assignment changed concurrently — reload and retry');
     }
@@ -1720,6 +1753,11 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
 
   const guard = 'EXISTS (SELECT 1 FROM order_item_units WHERE id = ?1)'; // new unit was created in this batch
   const stmts: D1PreparedStatement[] = [
+    // 0177 (integrity review #3): the replacement serial is still bound to no
+    // order unit — checked IN the write, not only by the read above.
+    ...(installed && newSerialNorm
+      ? fence(c.env.DB, 'NOT EXISTS (SELECT 1 FROM serial_assignments WHERE serial_norm = ? AND released_at IS NULL)', [newSerialNorm])
+      : []),
     // Conditional create: no-op if a concurrent replacement won the race.
     c.env.DB.prepare(
       `INSERT INTO order_item_units (id, order_id, order_item_id, product_id, owner_user_id, unit_index,
@@ -1801,17 +1839,20 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
     }
   }
 
+  // The unit insert's own result, wherever the fence put it.
+  const createIndex = installed && newSerialNorm ? 2 : 0;
   let results: D1Result[];
   try {
     results = await c.env.DB.batch(stmts);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    if (isLostRace(e)) throw serialRefuse(409, 'SERIAL_IN_USE', {});
     if (msg.includes('UNIQUE') || msg.includes('PRIMARY KEY')) {
       throw conflict('A conflicting serial/unit change happened concurrently — reload and retry');
     }
     throw e;
   }
-  if ((results[0]?.meta?.changes ?? 0) === 0) throw conflict('This unit was already replaced');
+  if ((results[createIndex]?.meta?.changes ?? 0) === 0) throw conflict('This unit was already replaced');
 
   await audit(c.env.DB, admin.id, 'device.unit_replace', unitId, {
     reason,

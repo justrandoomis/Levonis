@@ -23,6 +23,7 @@ import React, { Suspense, useCallback, useEffect, useId, useRef, useState } from
 import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, Check, Keyboard, RotateCcw, ShieldAlert, X } from 'lucide-react';
 import { ApiError } from '../../../lib/api';
+import { refusalText } from '../../../lib/refusalStrings';
 import { useLanguage } from '../../../LanguageContext';
 import { useMotion } from '../../../lib/motion';
 import { Sheet } from '../../ui/Sheet';
@@ -37,7 +38,12 @@ import type { LinkResult, OverrideKind, ScanTarget } from './types';
 
 const BarcodeScanner = React.lazy(() => import('../../scanner/BarcodeScanner'));
 
-/** How long the success state stays on screen before the sheet slides away. */
+/**
+ * How long the success state stays on screen before the sheet slides away —
+ * unless the link carries a warning (a device cancelled after it left, a
+ * resale whose warranty the owner may restart): that stays until «تم», since
+ * a sentence that vanishes in 0.65 s was never read (UX review #7).
+ */
 const CLOSE_AFTER_SUCCESS_MS = 650;
 
 type Phase = 'scan' | 'checking' | 'done' | 'refused';
@@ -51,6 +57,12 @@ export interface SerialScanSheetProps {
   onClose: () => void;
   onExited?: () => void;
   onLinked: (res: LinkResult, read: ReadPayload) => void;
+}
+
+/** After the commit that mounts the element a focus call needs. */
+function afterFrame(fn: () => void) {
+  if (typeof globalThis.requestAnimationFrame === 'function') globalThis.requestAnimationFrame(() => fn());
+  else globalThis.setTimeout(fn, 0);
 }
 
 export default function SerialScanSheet({ orderId, target, viewerOwner, initialRefusal, onClose, onExited, onLinked }: SerialScanSheetProps) {
@@ -71,6 +83,18 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
   const [overrideBusy, setOverrideBusy] = useState(false);
   const closeTimer = useRef<number | null>(null);
   const manualRef = useRef<HTMLInputElement | null>(null);
+  // Where the keyboard goes when a control it was on disappears (UX review
+  // #3): a Bluetooth reader on a tablet must never type into <body>.
+  const scanAgainRef = useRef<HTMLButtonElement | null>(null);
+  const overrideBtnRef = useRef<HTMLButtonElement | null>(null);
+  const reasonRef = useRef<HTMLTextAreaElement | null>(null);
+  const useReaderRef = useRef<HTMLButtonElement | null>(null);
+  const doneRef = useRef<HTMLButtonElement | null>(null);
+  /** After «امسح مجددًا»: back into the typed field when the last read was typed. */
+  const refocusTyped = useRef(false);
+  /** After «امسح مجددًا» on a camera read: «استخدم قارئًا» holds the focus while the camera starts. */
+  const rescanCamera = useRef(false);
+  const lang3 = (lang === 'en' || lang === 'ckb' ? lang : 'ar') as 'ar' | 'en' | 'ckb';
   const tracker = useRef(new WedgeTracker());
   const inFlight = useRef(false);
 
@@ -84,9 +108,13 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
     }
     tracker.current.reset();
     setResult(null);
-    setOverrideOpen(false);
+    // Opened from the slot's «استثناء المالك»: the exception form is what was
+    // asked for — one tap, not two (UX review #8).
+    setOverrideOpen(!!initialRefusal);
     setReason('');
     setMode('carry');
+    refocusTyped.current = false;
+    rescanCamera.current = false;
     if (initialRefusal) {
       setRead(initialRefusal.read);
       setError(initialRefusal.error);
@@ -115,7 +143,7 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
       // The light tap and the chime ride the server's answer, never the read.
       scanFeedback('added');
       onLinked(res, payload);
-      closeTimer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
+      if (res.warnings.length === 0) closeTimer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
     },
     [onClose, onLinked]
   );
@@ -172,6 +200,10 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
     manualRef.current = el;
     keyHandler.current = null;
     if (!el) return;
+    if (refocusTyped.current) {
+      refocusTyped.current = false;
+      el.focus({ preventScroll: true });
+    }
     const onKey = (e: KeyboardEvent) => {
       if (isTerminator(e.key, tracker.current.inBurst)) {
         if (e.key === 'Tab') {
@@ -190,9 +222,31 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
     tracker.current.reset();
     setError(null);
     setOverrideOpen(false);
+    // The button itself unmounts: a typed read goes back to the typed field
+    // (once the lazy scanner mounts it), a camera read to «استخدم قارئًا».
+    refocusTyped.current = !!read && read.source !== 'camera';
+    rescanCamera.current = !refocusTyped.current;
     setPhase('scan');
     setAttempt((a) => a + 1);
   };
+
+  // A refusal unmounts the scanner (and its focused field): «امسح مجددًا» takes
+  // the focus, so Enter / Space re-arms and a screen reader lands on the verdict.
+  useEffect(() => {
+    if (phase === 'refused' && !overrideOpen) afterFrame(() => scanAgainRef.current?.focus({ preventScroll: true }));
+    if (phase === 'done' && result && result.warnings.length > 0) afterFrame(() => doneRef.current?.focus({ preventScroll: true }));
+    if (phase === 'scan' && rescanCamera.current) {
+      rescanCamera.current = false;
+      afterFrame(() => useReaderRef.current?.focus({ preventScroll: true }));
+    }
+  }, [phase, attempt, overrideOpen, result]);
+  // The exception form opens on its reason; closing it returns to its button.
+  const overrideWasOpen = useRef(false);
+  useEffect(() => {
+    if (overrideOpen) afterFrame(() => reasonRef.current?.focus({ preventScroll: true }));
+    else if (overrideWasOpen.current && phase === 'refused') afterFrame(() => overrideBtnRef.current?.focus({ preventScroll: true }));
+    overrideWasOpen.current = overrideOpen;
+  }, [overrideOpen, phase]);
 
   const kind: OverrideKind | null = viewerOwner ? overrideFor(error) : null;
   const details = (error instanceof ApiError ? error.details : null) as Record<string, unknown> | null;
@@ -271,14 +325,20 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
               {/* The circle beside is the ✓ of «✓ تم ربط الرقم التسلسلي»; an
                   existing device is two facts, so two ticked lines (§13). */}
               {result.outcome === 'existing' ? (
-                <ul className="space-y-0.5">
-                  {[s.existingLine1, s.existingLine2].map((line) => (
-                    <li key={line} className="flex items-center gap-1.5 text-[14px] font-bold text-text-primary" data-serial-existing-line>
-                      <Check className="h-3.5 w-3.5 shrink-0 text-success" strokeWidth={3} aria-hidden />
-                      {line}
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  {/* §31's one sentence (critique-1 #32), then §13's two facts, quieter. */}
+                  <p className="text-[14px] font-bold text-text-primary" data-serial-existing-sentence>
+                    {refusalText('SERIAL_EXISTING_LINKED', lang3, s.existingLine1)}
+                  </p>
+                  <ul className="mt-0.5 space-y-0.5">
+                    {[s.existingLine1, s.existingLine2].map((line) => (
+                      <li key={line} className="flex items-center gap-1.5 text-[12.5px] text-text-secondary" data-serial-existing-line>
+                        <Check className="h-3 w-3 shrink-0 text-success" strokeWidth={3} aria-hidden />
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                </>
               ) : (
                 <p className="text-[14px] font-bold text-text-primary">{result.outcome === 'already' ? s.already : s.linkedLine}</p>
               )}
@@ -292,6 +352,17 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
                   {s.warnings[w] ?? w}
                 </p>
               ))}
+              {result.warnings.length > 0 && (
+                <button
+                  ref={doneRef}
+                  type="button"
+                  onClick={onClose}
+                  className="mt-2.5 inline-flex items-center min-h-[44px] px-5 rounded-full bg-text-primary text-surface text-[13.5px] font-bold transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                  data-serial-done
+                >
+                  {s.done}
+                </button>
+              )}
             </div>
           </motion.div>
         )}
@@ -342,6 +413,7 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <button
+                ref={scanAgainRef}
                 type="button"
                 onClick={scanAgain}
                 className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-full bg-text-primary text-surface text-[13.5px] font-bold transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
@@ -352,6 +424,7 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
               </button>
               {kind && !overrideOpen && (
                 <button
+                  ref={overrideBtnRef}
                   type="button"
                   onClick={() => setOverrideOpen(true)}
                   className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-full border border-border-subtle bg-surface text-text-primary text-[13.5px] font-semibold transition-colors hover:bg-surface-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
@@ -377,6 +450,7 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
                     {s.reasonLabel}
                   </label>
                   <textarea
+                    ref={reasonRef}
                     id={reasonId}
                     rows={2}
                     minLength={5}
@@ -491,6 +565,7 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
             >
               {phase === 'scan' && (
                 <button
+                  ref={useReaderRef}
                   type="button"
                   onClick={() => manualRef.current?.focus()}
                   className="inline-flex items-center gap-1.5 min-h-[44px] text-[13px] font-semibold text-text-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold rounded-lg"

@@ -218,6 +218,7 @@ export default function WarrantySection({
   onSerialsChanged,
   onOpenSerial,
   focusRequest,
+  onFocusHandled,
 }: {
   orderId: string;
   /**
@@ -232,6 +233,7 @@ export default function WarrantySection({
   onSerialsChanged?: (next: OrderSerials) => void;
   onOpenSerial?: (serial: string) => void;
   focusRequest?: { key: string; n: number } | null;
+  onFocusHandled?: () => void;
 }) {
   const { lang, dir } = useLanguage();
   const t = lang === 'en' ? STR.en : STR.ar;
@@ -498,6 +500,7 @@ export default function WarrantySection({
           onChanged={(next) => onSerialsChanged?.(next)}
           onOpenSerial={onOpenSerial}
           focusRequest={focusRequest}
+          onFocusHandled={onFocusHandled}
           orderStatus={orderStatus}
         />
       ) : loading && !data ? (

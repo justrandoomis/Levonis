@@ -32,7 +32,7 @@ export interface SerialSlotView {
   product_name: string;
   variant_label: string | null;
   assignment: SlotAssignment | null;
-  previous: null | { serial_display: string; serial_full?: string; released_at: string; reason: string; free: boolean };
+  previous: null | { assignment_id?: string; serial_display: string; serial_full?: string; released_at: string; reason: string; free: boolean };
   flags: string[];
 }
 

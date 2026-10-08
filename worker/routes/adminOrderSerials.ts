@@ -7,7 +7,7 @@
  * own paths so it stays closed if it is ever mounted elsewhere.
  *
  *   GET  /:id/serials            the order's slots (the order detail carries the same `serials`)
- *   POST /:id/serials/scan       { order_item_id, unit_index, part?, code, ean?, box_sn?, source, op_id }
+ *   POST /:id/serials/scan       { order_item_id, unit_index, part?, code | previous_assignment_id, ean?, box_sn?, source, op_id }
  *   POST /:id/serials/change     { assignment_id, code, ean?, box_sn?, source, op_id }
  *   POST /:id/serials/unlink     { assignment_id, reason? }        (owner only outside the window, with a reason)
  *   POST /:id/serials/override   { order_item_id, unit_index, part?, code, ean?, box_sn?, kind, reason, warranty_mode?, op_id }
@@ -67,30 +67,74 @@ adminOrderSerialRoutes.get('/:id/serials', async (c) => {
   return c.json({ success: true, serials: view });
 });
 
-adminOrderSerialRoutes.post('/:id/serials/scan', async (c) => {
-  const user = c.get('user')!;
-  await requireCapability(c.env, user, 'receive');
-  const b = await body(c);
-  const res = await linkSerial(c.env, serialActor(c.env, user), {
-    orderId: orderIdOf(c),
-    orderItemId: str(b.order_item_id, 'order_item_id', { min: 1, max: 80 }),
-    unitIndex: int(b.unit_index, 'unit_index', { min: 1, max: 500 }),
-    part: b.part === undefined ? 'device' : str(b.part, 'part', { max: 10 }),
-    code: codeOf(b),
-    ean: b.ean,
-    boxSn: b.box_sn,
-    source: oneOf(b.source ?? 'manual', 'source', SOURCES),
-    opId: opOf(b),
-  });
-  return c.json(res);
-});
-
 /**
  * Deploy-ahead: the doors that read an assignment before linking say what is
  * true — the feature is not on this database yet — rather than «not found».
  */
 async function requireInstalled(c: Context<AppContext>) {
   if (!(await serialAssignmentsInstalled(c.env.DB))) throw refuse(503, 'SERIALS_NOT_INSTALLED');
+}
+
+/**
+ * §30 «أعد ربطه» by the released binding's id (UX review #16): the slot's
+ * previous serial, re-linked without the client holding it — so an assistant,
+ * who only ever sees the masked form, can re-link a device that is still free.
+ * Only a binding of THIS order on THIS unit; the link then runs every rule.
+ */
+async function previousSerialOf(c: Context<AppContext>, orderId: string, itemId: string, unitIndex: number, previousId: string): Promise<string> {
+  await requireInstalled(c);
+  const prev = await c.env.DB.prepare(
+    `SELECT serial_raw FROM serial_assignments
+      WHERE id = ? AND order_id = ? AND order_item_id = ? AND unit_index = ? AND released_at IS NOT NULL`
+  )
+    .bind(previousId, orderId, itemId, unitIndex)
+    .first<{ serial_raw: string }>();
+  if (!prev) throw refuse(404, 'SERIAL_ASSIGNMENT_NOT_FOUND');
+  return prev.serial_raw;
+}
+
+adminOrderSerialRoutes.post('/:id/serials/scan', async (c) => {
+  const user = c.get('user')!;
+  await requireCapability(c.env, user, 'receive');
+  const b = await body(c);
+  const orderId = orderIdOf(c);
+  const orderItemId = str(b.order_item_id, 'order_item_id', { min: 1, max: 80 });
+  const unitIndex = int(b.unit_index, 'unit_index', { min: 1, max: 500 });
+  const previousId = typeof b.previous_assignment_id === 'string' && b.previous_assignment_id ? b.previous_assignment_id.slice(0, 80) : '';
+  const res = await linkSerial(c.env, serialActor(c.env, user), {
+    orderId,
+    orderItemId,
+    unitIndex,
+    part: b.part === undefined ? 'device' : str(b.part, 'part', { max: 10 }),
+    code: previousId ? await previousSerialOf(c, orderId, orderItemId, unitIndex, previousId) : codeOf(b),
+    ean: b.ean,
+    boxSn: b.box_sn,
+    source: previousId ? 'relink' : oneOf(b.source ?? 'manual', 'source', SOURCES),
+    opId: opOf(b),
+  });
+  return c.json(res);
+});
+
+/**
+ * The slot a door names by assignment id. A RETRY of a change or an override
+ * that already succeeded finds its old assignment released — so the op_id's
+ * own link is looked up first and answers the retry (integrity review #9),
+ * instead of «not found».
+ */
+async function targetOf(c: Context<AppContext>, orderId: string, assignmentId: string, opId: string) {
+  const replay = await c.env.DB.prepare('SELECT order_item_id, unit_index, part FROM serial_assignments WHERE idempotency_key = ? AND order_id = ?')
+    .bind(`scan:${opId}`, orderId)
+    .first<{ order_item_id: string; unit_index: number; part: string }>()
+    .catch(() => null);
+  if (replay) return replay;
+  const row = await c.env.DB.prepare(
+    'SELECT order_item_id, unit_index, part FROM serial_assignments WHERE id = ? AND order_id = ? AND released_at IS NULL'
+  )
+    .bind(assignmentId, orderId)
+    .first<{ order_item_id: string; unit_index: number; part: string }>()
+    .catch(() => null);
+  if (!row) throw refuse(404, 'SERIAL_ASSIGNMENT_NOT_FOUND');
+  return row;
 }
 
 adminOrderSerialRoutes.post('/:id/serials/change', async (c) => {
@@ -100,13 +144,8 @@ adminOrderSerialRoutes.post('/:id/serials/change', async (c) => {
   const b = await body(c);
   const orderId = orderIdOf(c);
   const assignmentId = str(b.assignment_id, 'assignment_id', { min: 1, max: 80 });
-  const row = await c.env.DB.prepare(
-    'SELECT order_item_id, unit_index, part FROM serial_assignments WHERE id = ? AND order_id = ? AND released_at IS NULL'
-  )
-    .bind(assignmentId, orderId)
-    .first<{ order_item_id: string; unit_index: number; part: string }>()
-    .catch(() => null);
-  if (!row) throw refuse(404, 'SERIAL_ASSIGNMENT_NOT_FOUND');
+  const opId = opOf(b);
+  const row = await targetOf(c, orderId, assignmentId, opId);
   const res = await linkSerial(c.env, serialActor(c.env, user), {
     orderId,
     orderItemId: row.order_item_id,
@@ -116,7 +155,7 @@ adminOrderSerialRoutes.post('/:id/serials/change', async (c) => {
     ean: b.ean,
     boxSn: b.box_sn,
     source: oneOf(b.source ?? 'manual', 'source', SOURCES),
-    opId: opOf(b),
+    opId,
     replaceAssignmentId: assignmentId,
   });
   return c.json(res);
@@ -147,16 +186,10 @@ adminOrderSerialRoutes.post('/:id/serials/override', async (c) => {
   const mode = b.warranty_mode === undefined || b.warranty_mode === null ? undefined : oneOf(b.warranty_mode, 'warranty_mode', ['carry', 'restart'] as const);
   const orderId = orderIdOf(c);
   const assignmentId = typeof b.assignment_id === 'string' && b.assignment_id ? b.assignment_id : undefined;
+  const opId = opOf(b);
   let target = { order_item_id: '', unit_index: 0, part: 'device' };
   if (assignmentId) {
-    const row = await c.env.DB.prepare(
-      'SELECT order_item_id, unit_index, part FROM serial_assignments WHERE id = ? AND order_id = ? AND released_at IS NULL'
-    )
-      .bind(assignmentId, orderId)
-      .first<{ order_item_id: string; unit_index: number; part: string }>()
-      .catch(() => null);
-    if (!row) throw refuse(404, 'SERIAL_ASSIGNMENT_NOT_FOUND');
-    target = row;
+    target = await targetOf(c, orderId, assignmentId, opId);
   } else {
     target = {
       order_item_id: str(b.order_item_id, 'order_item_id', { min: 1, max: 80 }),
@@ -173,7 +206,7 @@ adminOrderSerialRoutes.post('/:id/serials/override', async (c) => {
       ean: b.ean,
       boxSn: b.box_sn,
       source: 'manual',
-      opId: opOf(b),
+      opId,
       replaceAssignmentId: assignmentId,
     override: { kind, reason, ...(mode ? { warrantyMode: mode } : {}) },
   });

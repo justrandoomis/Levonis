@@ -324,7 +324,9 @@ function SerialsChip({
       data-order-id={order.id}
       onClick={() => onOpen(order.id)}
       title={title}
-      aria-label={title}
+      // The accessible name starts with what the chip SAYS (voice control: «tap
+      // Serials»), then the sentence (UX review #9).
+      aria-label={`${sl(loc, 'boardChip')} ${serials.linked}/${serials.required} · ${title}`}
       className={`lv-button lv-button-secondary lv-button-sm press-scale gap-1 tabular-nums ${tone}`}
     >
       {done ? <Check className="h-4 w-4 shrink-0" aria-hidden /> : <ScanLine className="h-4 w-4 shrink-0" aria-hidden />}

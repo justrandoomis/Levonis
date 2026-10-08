@@ -96,6 +96,12 @@ export function eventLabel(e: StoryEvent, s: SerialStrings): string {
       return s.action.warrantyMode(typeof d.to === 'string' ? s.modes[d.to] ?? d.to : '');
     case 'serial.prep_gate_override':
       return s.action.gateOverride(reason);
+    case 'serial.prep_gate_breach':
+      return s.action.gateBreach;
+    case 'serial.warranty_reopened':
+      return s.action.reopened;
+    case 'serial.detached':
+      return s.action.detached;
     default:
       if (e.action.startsWith('device.unit_warranty') || e.action.startsWith('device.unit_delivery')) return s.action.warrantyChanged;
       if (e.action.startsWith('device.')) return s.action.deviceEvent;
@@ -169,9 +175,13 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
   const resaleOpen =
     owner && !!story?.current_order && !story.current_order.activated && (story.warranty.mode === 'carry' || story.warranty.mode === 'restart');
 
+  // What may be copied is what this viewer may see whole: with a story, only
+  // its `serial` (absent for an assistant — UX review #1); without one (the
+  // database before 0177), the inventory row as it always was.
+  const copyable = story ? story.serial ?? null : data?.row?.serial ?? null;
   const copy = () => {
-    if (!story?.serial && !data?.row?.serial) return;
-    void navigator.clipboard?.writeText(story?.serial ?? data?.row?.serial ?? '');
+    if (!copyable) return;
+    void navigator.clipboard?.writeText(copyable);
     setCopied(true);
     globalThis.setTimeout(() => setCopied(false), 1200);
   };
@@ -260,7 +270,7 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
                   </span>
                 )}
               </div>
-              {(story?.serial || data.row?.serial) && (
+              {copyable && (
                 <button
                   type="button"
                   onClick={copy}
@@ -408,8 +418,13 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
                         maxLength={500}
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
+                        aria-describedby={`${reasonId}-hint`}
                         className="w-full rounded-xl border border-border-subtle bg-surface-raised px-3 py-2 text-[14px] text-text-primary outline-none focus:border-gold resize-none"
                       />
+                      {/* Why «حفظ» waits, said next to the field (UX review #17). */}
+                      <p id={`${reasonId}-hint`} className="mt-0.5 text-[11.5px] text-text-secondary">
+                        {s.reasonHint}
+                      </p>
                     </div>
                     <button
                       type="submit"

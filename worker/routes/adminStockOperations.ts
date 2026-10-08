@@ -8,6 +8,7 @@ import { audit } from '../lib/audit';
 import { planAtomicAdjustment } from '../lib/inventoryAdjustment';
 import { requireSelection, selectionStock } from '../lib/inventorySelection';
 import { baghdadDay, fence, journalPlan, requireCapability, whole } from '../lib/operations';
+import { changedExactlyOne, isLostRace } from '../lib/gifts/fence';
 import { normalizeSerial } from '../lib/deviceOps';
 import { counterTarget } from '../lib/inventoryReceiving';
 import type { StockScope } from '../lib/inventory';
@@ -475,13 +476,18 @@ adminStockOperationsRoutes.post('/serial-link', async (c) => {
   }
   // 0177 (critique M13): ONE serial→order-item link. A serial bound to an
   // order unit at preparation belongs to THAT line; this door may record its
-  // lot, never point it at another line.
-  if (item && (await serialAssignmentsInstalled(db))) {
-    const live = await db
-      .prepare('SELECT order_item_id FROM serial_assignments WHERE serial_norm=? AND released_at IS NULL')
+  // lot, never point it at another line — and (integrity review #4) the lot it
+  // records must be one THAT line was allocated, item or no item: otherwise
+  // the device ships from a lot the accounting never took it from (§27).
+  let bound: { id: string; order_item_id: string | null; lot_id: string | null; activated_at: string | null } | null = null;
+  if (await serialAssignmentsInstalled(db)) {
+    bound = await db
+      .prepare('SELECT id, order_item_id, lot_id, activated_at FROM serial_assignments WHERE serial_norm=? AND released_at IS NULL')
       .bind(serial)
-      .first<{ order_item_id: string | null }>();
-    if (live && live.order_item_id !== item) throw conflict('الرقم التسلسلي مربوط بوحدة في طلب آخر؛ لا يُربط ببند مختلف', 'SERIAL_IN_USE');
+      .first<{ id: string; order_item_id: string | null; lot_id: string | null; activated_at: string | null }>();
+    if (bound && item && bound.order_item_id !== item) throw conflict('الرقم التسلسلي مربوط بوحدة في طلب آخر؛ لا يُربط ببند مختلف', 'SERIAL_IN_USE');
+    if (bound?.order_item_id && !(await lineHoldsLot(db, bound.order_item_id, lot)))
+      throw badRequest('دفعة الرقم التسلسلي ليست ضمن الدفعات المصروفة لهذا الطلب', 'SERIAL_BATCH_MISMATCH');
   }
   const match = await db
     .prepare(
@@ -504,18 +510,71 @@ adminStockOperationsRoutes.post('/serial-link', async (c) => {
   // critique-1 #7): a lot whose units all came back is not this line's any more.
   if (item && !(await lineHoldsLot(db, item, lot)))
     throw badRequest('دفعة الرقم التسلسلي ليست ضمن الدفعات المصروفة لهذا الطلب');
-  await db.batch([
-    ...fence(
-      db,
-      '(SELECT COUNT(*) FROM stock_serial_links WHERE lot_id=?)<?-(SELECT COALESCE(SUM(qty),0) FROM stock_transfers WHERE source_lot_id=? AND target_lot_id<>source_lot_id)',
-      [lot, match.qty_received, lot],
-    ),
-    db
-      .prepare(
-        'INSERT INTO stock_serial_links(serial_norm,lot_id,order_item_id,linked_by,linked_at) VALUES (?,?,?,?,?)',
-      )
-      .bind(serial, lot, item, user.id, new Date().toISOString()),
-  ]);
+  // A serial bound at preparation and not delivered yet takes this verified
+  // lot in the same batch (lot_source 'serial_link', the gate's evidence). If
+  // the lot already holds as many of this line's serials as it was allocated,
+  // one whose lot was only INFERRED from the allocation trades places with
+  // it; a lot full of verified serials refuses.
+  const line = bound?.order_item_id ?? null;
+  const pending = bound && !bound.activated_at && line ? bound : null;
+  const NET = (itemRef: string, lotRef: string) =>
+    `(SELECT COALESCE(SUM(CASE WHEN released_at IS NULL THEN qty ELSE -qty END),0) FROM order_item_inventory_allocations WHERE order_item_id=${itemRef} AND lot_id=${lotRef})`;
+  const bindingStatements: D1PreparedStatement[] = pending
+    ? [
+        db
+          .prepare(
+            `UPDATE serial_assignments SET lot_id=?1, lot_source='allocation',
+                    allocation_id=(SELECT MIN(id) FROM order_item_inventory_allocations WHERE order_item_id=?2 AND lot_id=?1 AND released_at IS NULL)
+              WHERE ?1 IS NOT NULL AND ?1<>?3
+                AND id=(SELECT x.id FROM serial_assignments x
+                         WHERE x.order_item_id=?2 AND x.lot_id=?3 AND x.lot_source='allocation' AND x.released_at IS NULL AND x.id<>?4 LIMIT 1)
+                AND (SELECT COUNT(*) FROM serial_assignments y WHERE y.order_item_id=?2 AND y.lot_id=?3 AND y.released_at IS NULL AND y.id<>?4)
+                    >= ${NET('?2', '?3')}`,
+          )
+          .bind(pending.lot_id, line, lot, pending.id),
+        db
+          .prepare(
+            `UPDATE serial_assignments SET lot_id=?1, lot_source='serial_link',
+                    allocation_id=(SELECT MIN(id) FROM order_item_inventory_allocations WHERE order_item_id=?2 AND lot_id=?1 AND released_at IS NULL)
+              WHERE id=?3 AND released_at IS NULL AND activated_at IS NULL`,
+          )
+          .bind(lot, line, pending.id),
+        ...changedExactlyOne(db),
+        // `fence` binds its own id first: plain `?` placeholders only.
+        ...fence(db, `(SELECT COUNT(*) FROM serial_assignments WHERE order_item_id=? AND lot_id=? AND released_at IS NULL) <= ${NET('?', '?')}`, [
+          line,
+          lot,
+          line,
+          lot,
+        ]),
+      ]
+    : [];
+  try {
+    await db.batch([
+      ...fence(
+        db,
+        '(SELECT COUNT(*) FROM stock_serial_links WHERE lot_id=?)<?-(SELECT COALESCE(SUM(qty),0) FROM stock_transfers WHERE source_lot_id=? AND target_lot_id<>source_lot_id)',
+        [lot, match.qty_received, lot],
+      ),
+      db
+        .prepare(
+          'INSERT INTO stock_serial_links(serial_norm,lot_id,order_item_id,linked_by,linked_at) VALUES (?,?,?,?,?)',
+        )
+        .bind(serial, lot, item, user.id, new Date().toISOString()),
+      ...bindingStatements,
+    ]);
+  } catch (e) {
+    if (pending && isLostRace(e)) {
+      // Which fence: the binding moved under us, or the lot is full of verified serials.
+      const still = await db
+        .prepare('SELECT 1 AS x FROM serial_assignments WHERE id=? AND released_at IS NULL AND activated_at IS NULL')
+        .bind(pending.id)
+        .first();
+      if (!still) throw conflict('تغيّر ربط الرقم التسلسلي أثناء العملية — أعد المحاولة', 'SERIAL_RACE');
+      throw badRequest('هذه الدفعة استوفت وحداتها لهذا البند بأرقام موثقة — خذ القطعة من دفعة أخرى مصروفة له', 'SERIAL_BATCH_MISMATCH');
+    }
+    throw e;
+  }
   return c.json({ success: true });
 });
 adminStockOperationsRoutes.post('/return-inspections', async (c) => {

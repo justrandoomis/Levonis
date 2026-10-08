@@ -3235,24 +3235,24 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
   }
 
   const now = new Date().toISOString();
-  await c.env.DB.prepare(
+  const storeShipment = c.env.DB.prepare(
     `UPDATE orders SET delivery_provider = ?, delivery_remote_id = ?, delivery_tracking_no = ?,
             delivery_status_id = ?, delivery_status_text = ?, delivery_synced_at = ?, delivery_error = ''
       WHERE id = ?`
-  )
-    .bind(driver.provider, res.value.remoteId, res.value.trackingNo, res.value.statusId, res.value.statusText, now, id)
-    .run();
+  ).bind(driver.provider, res.value.remoteId, res.value.trackingNo, res.value.statusId, res.value.statusText, now, id);
+  // The owner's gate override rides the SAME batch that stores the shipment
+  // it allowed (integrity review #12): the shipment is never on the order
+  // without the override's audit row, and a failed audit is not swallowed.
+  if (serialGate.overridden) await c.env.DB.batch([storeShipment, ...serialGate.statements]);
+  else await storeShipment.run();
   await audit(c.env.DB, adminUser.id, 'delivery.shipment_create', id, {
     provider: driver.provider, remote_id: res.value.remoteId, tracking_no: res.value.trackingNo,
   });
-  // The owner's gate override, now that the shipment it allowed exists; and
-  // the re-check H2 asks for — an unlink that landed while the courier was
+  // The re-check H2 asks for — an unlink that landed while the courier was
   // being called is recorded and reported, never silently shipped. (From here
   // on S1 refuses staff edits: the order has a delivery_remote_id.)
   let serialNotes: string[] | undefined;
-  if (serialGate.overridden) {
-    await c.env.DB.batch(serialGate.statements).catch((e) => console.error('serial gate override audit failed', e));
-  } else if (serialGate.statements.length) {
+  if (!serialGate.overridden && serialGate.statements.length) {
     const after = await serialGateState(c.env, id);
     if (after.applies && after.missing.length) {
       serialNotes = ['SERIALS_MISSING_AFTER_SHIPMENT'];

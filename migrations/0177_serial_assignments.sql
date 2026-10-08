@@ -21,7 +21,8 @@
 -- trade_in_claims: (order_item_id, unit_index, part).
 --
 -- ADDITIVE ONLY: one table and its indexes, one trigger, one catalogs column
--- and three order_item_units columns, every one NULL or defaulted. No existing
+-- and three order_item_units columns (and one partial index on them), every
+-- one NULL or defaulted. No existing
 -- order, order_item, wallet, unit or receipt row changes when this applies.
 -- Every CHECK list already holds the values later phases name, because a CHECK
 -- cannot be widened without a table rebuild (the 0162 ops_permissions lesson).
@@ -125,15 +126,24 @@ ALTER TABLE order_item_units ADD COLUMN warranty_closed_reason TEXT
   CHECK (warranty_closed_reason IS NULL OR warranty_closed_reason IN
          ('returned','returned_unsellable','owner_override','order_cancelled','traded_in','replaced'));
 ALTER TABLE order_item_units ADD COLUMN return_case_id TEXT;
+-- The few units an undone delivery + cancel closed: a re-delivery re-opens
+-- them, and the activation sweep finds a delivered order still holding one
+-- through this index rather than a scan of every unit.
+CREATE INDEX IF NOT EXISTS idx_units_closed_order_cancelled
+  ON order_item_units(order_id) WHERE warranty_closed_reason = 'order_cancelled';
 
 -- §12/§24: release on cancel BY EVERY DOOR (stage flip, legacy PATCH, the
 -- customer, the expiry and Gini sweeps, store ops), atomically with the status
 -- flip — the 0175 gift pattern. A delivered order is never cancelled
 -- (canMoveStage); a delivery that was undone (delivered→shipped) and then
 -- cancelled has units: their warranty is closed 'order_cancelled' (dates
--- kept; a re-delivery of the same unit re-opens it), the live receipt voided
--- and the account link revoked, so the serial is not left bound to a sale
--- that did not happen. The trigger names only columns no test drops.
+-- kept), the live receipt voided and the account link revoked, so the serial
+-- is not left bound to a sale that did not happen. A re-delivery of the order
+-- re-opens each such unit, with or without a new scan, and gives back the
+-- account link and (same device) the receipt this trigger took
+-- (worker/lib/serialAssignments.ts `reopenUnitStatements`, which matches them
+-- by `revoked_at` / `voided_at` ≥ the closure stamped here). The trigger
+-- names only columns no test drops.
 CREATE TRIGGER IF NOT EXISTS trg_orders_serial_assignments_cancelled
 AFTER UPDATE OF status ON orders FOR EACH ROW
 WHEN NEW.status = 'cancelled' AND OLD.status NOT IN ('cancelled','delivered')

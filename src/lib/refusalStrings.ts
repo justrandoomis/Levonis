@@ -1685,6 +1685,11 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: "Serials can't be linked at this stage of the order.",
     ckb: 'لەم قۆناغەی داواکارییەکەدا ناتوانرێت ژمارەی زنجیرەیی ببەسترێت.',
   },
+  UNIT_NOT_OPEN: {
+    ar: 'ضمان هذه الوحدة مغلق (أُعيد الجهاز أو أُلغي الطلب أو استُبدل) — لا يُربط بها رقم تسلسلي.',
+    en: 'This unit’s warranty is closed (the device came back, the order was cancelled or it was replaced) — no serial can be linked to it.',
+    ckb: 'گەرەنتیی ئەم یەکەیە داخراوە (ئامێرەکە گەڕێندرایەوە، داواکارییەکە هەڵوەشێندرایەوە یان گۆڕدرا) — هیچ ژمارەیەکی زنجیرەیی پێیەوە نابەسترێت.',
+  },
   SERIAL_NOT_REQUIRED: {
     ar: 'هذا المنتج لا يحتاج رقمًا تسلسليًا.',
     en: "This product doesn't need a serial number.",

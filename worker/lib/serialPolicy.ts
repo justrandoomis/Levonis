@@ -89,17 +89,24 @@ function policyWalkSql(seed: string): string {
  * serial — is the owner's call like the flag itself (critique-1 #23).
  */
 export async function placementSerialized(db: D1Database, catalogIds: readonly string[], categoryIds: readonly (string | null | undefined)[]): Promise<boolean> {
-  const placed = [...new Set(catalogIds.filter((id) => typeof id === 'string' && id !== ''))];
-  if (placed.length) {
-    const printer = await db
-      .prepare('SELECT 1 AS x FROM catalogs WHERE is_printer_catalog = 1 AND id IN (SELECT value FROM json_each(?)) LIMIT 1')
-      .bind(JSON.stringify(placed))
-      .first();
-    if (printer) return true;
-  }
-  if (!(await anySectionSerialPolicy(db))) return false;
-  const all = [...new Set([...placed, ...categoryIds.filter((id): id is string => typeof id === 'string' && id !== '')])];
+  // The classification IS a placement: the save folds category_id /
+  // sub_category_id into product_catalogs (`withClassificationPlacements`),
+  // and the printer rules read them too (`applyPrinterWarrantyRules`). So the
+  // printer test runs over both (regressions review #3) — a non-owner filing a
+  // filament under the printer section by its category alone is a change.
+  const all = [
+    ...new Set([
+      ...catalogIds.filter((id) => typeof id === 'string' && id !== ''),
+      ...categoryIds.filter((id): id is string => typeof id === 'string' && id !== ''),
+    ]),
+  ];
   if (!all.length) return false;
+  const printer = await db
+    .prepare('SELECT 1 AS x FROM catalogs WHERE is_printer_catalog = 1 AND id IN (SELECT value FROM json_each(?)) LIMIT 1')
+    .bind(JSON.stringify(all))
+    .first();
+  if (printer) return true;
+  if (!(await anySectionSerialPolicy(db))) return false;
   const row = await db
     .prepare(`SELECT ${policyWalkSql('c.id IN (SELECT value FROM json_each(?1))')} AS pol`)
     .bind(JSON.stringify(all))

@@ -37,6 +37,7 @@ import { requireAdmin, requireMainHost, badRequest, str, int } from '../lib/http
 import type { Context } from 'hono';
 import { audit } from '../lib/audit';
 import { refuse as serialRefuse, serialActor, serialAssignmentsInstalled, serialStory, setWarrantyMode } from '../lib/serialAssignments';
+import { maskSerial } from '../lib/deviceOps';
 import { normalizeEan, normalizeSerial, buildBulkRow, BULK_MAX_LINES } from '@levonis/catalog/deviceSerials';
 import {
   INVENTORY_STATUSES,
@@ -303,7 +304,8 @@ function serialParam(raw: string): string {
 serialInventoryRoutes.get('/:serial', async (c) => {
   const norm = serialParam(c.req.param('serial'));
   const row = await loadInventoryRow(c.env.DB, norm);
-  const story = await serialStory(c.env, serialActor(c.env, c.get('user')!), norm).catch((e) => {
+  const actor = serialActor(c.env, c.get('user')!);
+  const story = await serialStory(c.env, actor, norm).catch((e) => {
     console.error('serial story unavailable', e instanceof Error ? e.message : String(e));
     return null;
   });
@@ -322,9 +324,24 @@ serialInventoryRoutes.get('/:serial', async (c) => {
   )
     .bind(norm, row.unit_id)
     .all<Record<string, unknown>>();
+  // With the story (0177), the page follows the owner default everywhere on
+  // it (UX review #1, critique L7): an assistant gets the masked serial and no
+  // order number in the row too, not only in the story. Before the migration
+  // the row is exactly what it always was.
+  const pub = inventoryRowPublic(row);
+  const shownRow =
+    story && !actor.fullSerial
+      ? {
+          ...pub,
+          serial: maskSerial(pub.serial),
+          serial_norm: maskSerial(pub.serial_norm),
+          box_sn: pub.box_sn ? maskSerial(pub.box_sn) : pub.box_sn,
+          unit: pub.unit ? { ...pub.unit, order_id: null } : null,
+        }
+      : pub;
   return c.json({
     success: true,
-    row: inventoryRowPublic(row),
+    row: shownRow,
     history: story
       ? story.history
       : results.map((h) => ({

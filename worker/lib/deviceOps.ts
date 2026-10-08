@@ -194,7 +194,7 @@ export interface CreateUnitsResult {
   /** The preparation serials bound to the new units (migration 0177), or
    *  null when that step did not run. Its own batch: a failure here never
    *  costs a unit (critique H3). */
-  activation?: { pending: number; activated: number; released_policy: number; conflicts: number } | null;
+  activation?: { pending: number; activated: number; released_policy: number; conflicts: number; reopened: number } | null;
 }
 
 /**
@@ -300,9 +300,9 @@ export async function createUnitsOnDelivery(
     console.error('serial activation failed for order', orderId, e instanceof Error ? e.message : String(e));
   }
   const result: CreateUnitsResult = { serialized_items: serializedItems, planned_units: planned, created };
-  // Reported only when there was something to activate, so the result of an
-  // order with no preparation serials is exactly what it always was.
-  if (activation && activation.pending > 0) result.activation = activation;
+  // Reported only when there was something to activate or re-open, so the
+  // result of an order with no preparation serials is exactly what it always was.
+  if (activation && (activation.pending > 0 || activation.reopened > 0)) result.activation = activation;
   return result;
 }
 

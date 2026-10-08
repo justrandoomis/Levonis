@@ -267,5 +267,5 @@ test('M5 a slot whose line is no longer serialized at delivery releases its seri
   w.raw.exec(`UPDATE catalogs SET serial_policy = 'inherit' WHERE id = 'ct_ams'`);
   await deliver(w, 'ORD-M5');
   assert.equal(row(w.raw, "SELECT release_reason FROM serial_assignments WHERE order_id = 'ORD-M5'")!.release_reason, 'policy_changed');
-  assert.deepEqual(await activateOrderSerials(w.env, 'ORD-M5'), { pending: 0, activated: 0, released_policy: 0, conflicts: 0 });
+  assert.deepEqual(await activateOrderSerials(w.env, 'ORD-M5'), { pending: 0, activated: 0, released_policy: 0, conflicts: 0, reopened: 0 });
 });

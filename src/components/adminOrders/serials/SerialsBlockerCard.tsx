@@ -21,7 +21,7 @@ export function missingLabel(m: GateMissing, lang: string): string {
  */
 export function MissingUnit({ m, lang }: { m: GateMissing; lang: string }) {
   return (
-    <span className="min-w-0 break-words" aria-label={missingLabel(m, lang)}>
+    <span className="min-w-0 break-words">
       <span className="block text-[13px] font-semibold text-text-primary">
         <bdi>{m.product_name}</bdi>
       </span>
@@ -58,6 +58,8 @@ export default function SerialsBlockerCard({
             <button
               type="button"
               onClick={() => onGoTo(m)}
+              // Every row's button says WHICH unit (UX review #12): «اذهب إلى الوحدة» × n is no answer.
+              aria-label={`${s.goToUnit} · ${missingLabel(m, lang)}`}
               className="inline-flex shrink-0 items-center gap-1 min-h-[44px] px-3 rounded-full text-[12.5px] font-semibold text-text-primary hover:bg-surface-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
               data-serial-goto={`${m.order_item_id}:${m.unit_index}`}
             >

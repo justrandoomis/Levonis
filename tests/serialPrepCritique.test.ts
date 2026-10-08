@@ -92,7 +92,15 @@ test('M2 a typo corrected after delivery on a prep-scanned unit: the old binding
   const first = await json(await scan(w, 'adm', 'ORD-TY', 'l1', 1, SN));
   await deliver(w, 'ORD-TY');
   const unit = unitOf(w, 'ORD-TY');
-  const fix = await post(w.as('adm'), `/api/devices/admin/units/${unit.id}/serial`, { serial: SN2, reassign: true, reason: 'typo at the packing desk' });
+  // The unit's warranty is open: replacing its serial frees the old one for
+  // sale, so it is the owner's (integrity review #2) — a full-scope admin and
+  // an assistant are refused and nothing moves.
+  for (const who of ['adm', 'ast'] as const) {
+    const refused = await json(await post(w.as(who), `/api/devices/admin/units/${unit.id}/serial`, { serial: SN2, reassign: true, reason: 'typo at the packing desk' }));
+    assert.equal(refused.code, 'OWNER_ONLY', who);
+  }
+  assert.equal(row(w.raw, 'SELECT serial_norm FROM device_serials WHERE unit_id = ?', unit.id)!.serial_norm, SN);
+  const fix = await post(w.as('boss'), `/api/devices/admin/units/${unit.id}/serial`, { serial: SN2, reassign: true, reason: 'typo at the packing desk' });
   assert.equal(fix.status, 200, await fix.clone().text());
   const rows = all<R>(w.raw, 'SELECT id, serial_norm, unit_id, source, released_at, release_reason FROM serial_assignments WHERE unit_id = ? ORDER BY linked_at', unit.id);
   assert.equal(rows.length, 2, 'both rows keep the unit as history');
@@ -106,7 +114,7 @@ test('M2 a typo corrected after delivery on a prep-scanned unit: the old binding
   order(w.raw, 'ORD-NX', [{ id: 'ln', product: 'pA1' }]);
   assert.equal((await scan(w, 'adm', 'ORD-NX', 'ln', 1, SN)).status, 200);
   // A second correction on the same unit is no wall either.
-  assert.equal((await post(w.as('adm'), `/api/devices/admin/units/${unit.id}/serial`, { serial: SN3, reassign: true, reason: 'second look at the label' })).status, 200);
+  assert.equal((await post(w.as('boss'), `/api/devices/admin/units/${unit.id}/serial`, { serial: SN3, reassign: true, reason: 'second look at the label' })).status, 200);
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM serial_assignments WHERE unit_id = ? AND released_at IS NULL', unit.id), 1);
 });
 

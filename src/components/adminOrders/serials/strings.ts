@@ -27,6 +27,12 @@ export interface SerialStrings {
   link: string;
   linking: string;
   linked: string;
+  /** Screen readers: an empty unit this viewer cannot fill (the screen shows «—»). */
+  notLinked: string;
+  /** Screen readers: a masked serial, read as its last digits rather than «star star star star». */
+  endingIn: Fmt<[string]>;
+  /** A reader's second scan that arrived while the first was being checked, and could not be placed. */
+  queuedDropped: string;
   change: string;
   remove: string;
   more: Fmt<[number]>;
@@ -65,6 +71,8 @@ export interface SerialStrings {
   useScanner: string;
   checking: string;
   linkedLine: string;
+  /** Closes the sheet when a link carries a warning worth reading (it does not close on its own then). */
+  done: string;
   existingLine1: string;
   existingLine2: string;
   already: string;
@@ -160,6 +168,11 @@ export interface SerialStrings {
     warrantyChanged: string;
     warrantyMode: Fmt<[string]>;
     gateOverride: Fmt<[string]>;
+    /** A re-delivery after an undone delivery + cancel re-opened the warranty. */
+    reopened: string;
+    /** The serial left a warranty unit it no longer is (re-delivered with another device). */
+    detached: string;
+    gateBreach: string;
     deviceEvent: string;
     receiptEvent: string;
   };
@@ -192,9 +205,12 @@ const ar: SerialStrings = {
   scanShort: 'امسح',
   inputPlaceholder: 'امسح بالقارئ أو اكتب الرقم',
   inputLabel: (p, n) => `الرقم التسلسلي لـ${p} · الوحدة ${n}`,
-  openCamera: (p, n) => `فتح الكاميرا لمسح ${p} · الوحدة ${n}`,
+  openCamera: (p, n) => `امسح الرقم التسلسلي · ${p} · الوحدة ${n}`,
   link: 'ربط',
   linking: 'جارٍ الربط…',
+  notLinked: 'غير مرتبطة برقم تسلسلي',
+  endingIn: (d) => `رقم مخفي ينتهي بـ ${d}`,
+  queuedDropped: 'وصلت قراءة ثانية أثناء الفحص ولم تُربط — امسحها مجددًا إن لزم.',
   linked: 'تم ربط الرقم التسلسلي',
   change: 'تغيير',
   remove: 'إزالة',
@@ -222,7 +238,7 @@ const ar: SerialStrings = {
   chipSerials: (l, r) => `الأرقام ${l}/${r}`,
   chipGoTo: 'اذهب إلى أرقام هذا المنتج',
   boardChip: 'الأرقام',
-  boardChipTitle: (l, r) => `${l} من ${r} وحدات مرتبطة برقم تسلسلي — افتح الطلب`,
+  boardChipTitle: (l, r) => `الوحدات المرتبطة برقم تسلسلي: ${l} من ${r} — افتح الطلب`,
   boardHeld: 'النقل التالي بانتظار الأرقام التسلسلية',
   flags: {
     ALLOCATION_MISSING: 'لم تُصرف دفعة مخزون لهذا البند بعد.',
@@ -243,6 +259,7 @@ const ar: SerialStrings = {
   useScanner: 'استخدم قارئًا أو لوحة مفاتيح',
   checking: 'جارٍ التحقق…',
   linkedLine: 'تم ربط الرقم التسلسلي بالطلب.',
+  done: 'تم',
   existingLine1: 'الرقم التسلسلي موجود مسبقاً',
   existingLine2: 'تم ربطه الآن بهذا الطلب',
   already: 'هذا الرقم مربوط بهذه الوحدة بالفعل.',
@@ -314,7 +331,7 @@ const ar: SerialStrings = {
   warrantyStart: 'بداية الضمان',
   warrantyEnd: 'نهاية الضمان',
   atDelivery: 'عند التسليم',
-  remaining: (n) => `متبقٍ ${n} يومًا`,
+  remaining: (n) => (n === 1 ? 'متبقٍ يوم واحد' : n === 2 ? 'متبقٍ يومان' : n >= 3 && n <= 10 ? `متبقٍ ${n} أيام` : `متبقٍ ${n} يومًا`),
   mode: 'طريقة الضمان',
   modes: { new: 'جديد مع هذا البيع', carry: 'يستمر من البيع الأول', restart: 'يبدأ من جديد' },
   batch: 'الدفعة',
@@ -377,6 +394,9 @@ const ar: SerialStrings = {
     warrantyChanged: 'تغيير في الضمان',
     warrantyMode: (m) => `طريقة الضمان عند إعادة البيع: ${m}`,
     gateOverride: (r) => `شُحن رغم نقص الأرقام (المالك): ${r}`,
+    reopened: 'سُلّم مجددًا · فُتح الضمان من جديد',
+    detached: 'فُكّ عن وحدة ضمان سابقة',
+    gateBreach: 'شُحن وفيه أرقام ناقصة — سُجّل للمالك',
     deviceEvent: 'حدث على وحدة الضمان',
     receiptEvent: 'حدث على وصل الضمان',
   },
@@ -409,9 +429,12 @@ const en: SerialStrings = {
   scanShort: 'Scan',
   inputPlaceholder: 'Scan with a reader or type the number',
   inputLabel: (p, n) => `Serial number for ${p} · Unit ${n}`,
-  openCamera: (p, n) => `Open the camera to scan ${p} · Unit ${n}`,
+  openCamera: (p, n) => `Scan Serial · ${p} · Unit ${n}`,
   link: 'Link',
   linking: 'Linking…',
+  notLinked: 'No serial linked',
+  endingIn: (d) => `Hidden serial ending in ${d}`,
+  queuedDropped: 'A second scan arrived while checking and was not linked — scan it again if needed.',
   linked: 'Serial linked',
   change: 'Change',
   remove: 'Remove',
@@ -419,7 +442,7 @@ const en: SerialStrings = {
   cancel: 'Cancel',
   removeTitle: 'Remove the serial from this unit?',
   removeBody: 'The device stays on record with its warranty and history; only this link is released, and the release is logged.',
-  removeOutsideBody: 'The order is past preparation — removing now is an owner exception and needs a reason, recorded in the device history.',
+  removeOutsideBody: 'The order is outside the preparation stage — removing now is an owner exception and needs a reason, recorded in the device history.',
   removeConfirm: 'Remove link',
   removed: 'Serial removed from the unit.',
   warrantyAtDelivery: 'Warranty starts at delivery',
@@ -429,7 +452,7 @@ const en: SerialStrings = {
   previousTaken: (s) => `Linked before cancellation: ${s} — now linked to another order; scan a different device`,
   relink: 'Link again',
   readOnly: 'Serials can be linked only while the order is being prepared.',
-  ownerOutsideHint: 'The order is past preparation — linking now is an owner exception, and its reason is asked for after the scan.',
+  ownerOutsideHint: 'The order is outside the preparation stage — linking now is an owner exception, and its reason is asked for after the scan.',
   shipmentLocked: 'A courier shipment exists — only the owner can change serials now.',
   progress: (l, r) => `${l} of ${r} linked`,
   allLinked: 'All serials linked',
@@ -439,7 +462,7 @@ const en: SerialStrings = {
   chipSerials: (l, r) => `Serials ${l}/${r}`,
   chipGoTo: 'Go to this product’s serials',
   boardChip: 'Serials',
-  boardChipTitle: (l, r) => `${l} of ${r} units have a serial linked — open the order`,
+  boardChipTitle: (l, r) => `Units with a serial linked: ${l} of ${r} — open the order`,
   boardHeld: 'The next move waits for the serials',
   flags: {
     ALLOCATION_MISSING: 'No stock batch has been issued to this line yet.',
@@ -460,6 +483,7 @@ const en: SerialStrings = {
   useScanner: 'Use a scanner or keyboard',
   checking: 'Checking…',
   linkedLine: 'Serial number linked to the order.',
+  done: 'Done',
   existingLine1: 'Serial already on record',
   existingLine2: 'Now linked to this order',
   already: 'This serial is already linked to this unit.',
@@ -531,7 +555,7 @@ const en: SerialStrings = {
   warrantyStart: 'Warranty start',
   warrantyEnd: 'Warranty end',
   atDelivery: 'At delivery',
-  remaining: (n) => `${n} days left`,
+  remaining: (n) => (n === 1 ? '1 day left' : `${n} days left`),
   mode: 'Warranty mode',
   modes: { new: 'New with this sale', carry: 'Carried from the first sale', restart: 'Restarts' },
   batch: 'Batch',
@@ -594,6 +618,9 @@ const en: SerialStrings = {
     warrantyChanged: 'Warranty changed',
     warrantyMode: (m) => `Warranty on resale: ${m}`,
     gateOverride: (r) => `Shipped with serials missing (owner): ${r}`,
+    reopened: 'Delivered again · warranty reopened',
+    detached: 'Detached from a former warranty unit',
+    gateBreach: 'Shipped with serials missing — recorded for the owner',
     deviceEvent: 'Warranty unit event',
     receiptEvent: 'Warranty receipt event',
   },
@@ -626,9 +653,12 @@ const ckb: SerialStrings = {
   scanShort: 'سکان',
   inputPlaceholder: 'بە خوێنەرەوە سکان بکە یان ژمارەکە بنووسە',
   inputLabel: (p, n) => `ژمارەی زنجیرەیی بۆ ${p} · یەکەی ${n}`,
-  openCamera: (p, n) => `کامێرا بکەرەوە بۆ سکانی ${p} · یەکەی ${n}`,
+  openCamera: (p, n) => `سکانی ژمارەی زنجیرەیی · ${p} · یەکەی ${n}`,
   link: 'بەستن',
   linking: 'دەبەسترێت…',
+  notLinked: 'هیچ ژمارەیەکی زنجیرەیی پێوە نەبەستراوە',
+  endingIn: (d) => `ژمارەیەکی شاراوە کە بە ${d} کۆتایی دێت`,
+  queuedDropped: 'خوێندنەوەیەکی دووەم لە کاتی پشکنیندا گەیشت و نەبەسترا — ئەگەر پێویستە دووبارە سکانی بکە.',
   linked: 'ژمارەی زنجیرەیی بەسترا',
   change: 'گۆڕین',
   remove: 'لابردن',
@@ -636,7 +666,7 @@ const ckb: SerialStrings = {
   cancel: 'پاشگەزبوونەوە',
   removeTitle: 'ژمارەکە لەم یەکەیە لاببرێت؟',
   removeBody: 'ئامێرەکە بە گەرەنتی و مێژووەکەیەوە لە کۆگادا تۆمارکراو دەمێنێتەوە؛ تەنها ئەم بەستنەوەیە ئازاد دەکرێت و لە مێژوودا تۆمار دەکرێت.',
-  removeOutsideBody: 'داواکارییەکە لە قۆناغی ئامادەکردن تێپەڕیوە — لابردن ئێستا ڕێگەپێدانی خاوەنە و هۆکارێکی دەوێت کە لە مێژووی ئامێرەکەدا تۆمار دەکرێت.',
+  removeOutsideBody: 'داواکارییەکە لە دەرەوەی قۆناغی ئامادەکردندایە — لابردن ئێستا ڕێگەپێدانی خاوەنە و هۆکارێکی دەوێت کە لە مێژووی ئامێرەکەدا تۆمار دەکرێت.',
   removeConfirm: 'بەستنەوەکە لاببە',
   removed: 'ژمارەکە لە یەکەکە لابرا.',
   warrantyAtDelivery: 'گەرەنتی لە کاتی گەیاندندا دەست پێدەکات',
@@ -646,7 +676,7 @@ const ckb: SerialStrings = {
   previousTaken: (s) => `پێش هەڵوەشاندنەوە بەسترابوو: ${s} — ئێستا بە داواکارییەکی ترەوە بەستراوە؛ ئامێرێکی تر سکان بکە`,
   relink: 'دووبارە ببەستەوە',
   readOnly: 'بەستنی ژمارەکان تەنها لە کاتی ئامادەکردنی داواکارییەکەدا دەکرێت.',
-  ownerOutsideHint: 'داواکارییەکە لە قۆناغی ئامادەکردن تێپەڕیوە — بەستن ئێستا ڕێگەپێدانی خاوەنە، و هۆکارەکەی دوای سکان داوا دەکرێت.',
+  ownerOutsideHint: 'داواکارییەکە لە دەرەوەی قۆناغی ئامادەکردندایە — بەستن ئێستا ڕێگەپێدانی خاوەنە، و هۆکارەکەی دوای سکان داوا دەکرێت.',
   shipmentLocked: 'بارنامەی گەیاندن دروستکراوە — ئێستا تەنها خاوەن دەتوانێت ژمارەکان بگۆڕێت.',
   progress: (l, r) => `${l} لە ${r} بەستراون`,
   allLinked: 'هەموو ژمارەکان بەستراون',
@@ -656,7 +686,7 @@ const ckb: SerialStrings = {
   chipSerials: (l, r) => `ژمارەکان ${l}/${r}`,
   chipGoTo: 'بڕۆ بۆ ژمارەکانی ئەم بەرهەمە',
   boardChip: 'ژمارەکان',
-  boardChipTitle: (l, r) => `${l} لە ${r} یەکە ژمارەی زنجیرەییان پێوە بەستراوە — داواکارییەکە بکەرەوە`,
+  boardChipTitle: (l, r) => `ئەو یەکانەی ژمارەی زنجیرەییان پێوە بەستراوە: ${l} لە ${r} — داواکارییەکە بکەرەوە`,
   boardHeld: 'گواستنەوەی داهاتوو چاوەڕێی ژمارە زنجیرەییەکانە',
   flags: {
     ALLOCATION_MISSING: 'هێشتا هیچ وەجبەیەکی کۆگا بۆ ئەم بەندە دەرنەکراوە.',
@@ -677,6 +707,7 @@ const ckb: SerialStrings = {
   useScanner: 'خوێنەرەوە یان تەختەکلیل بەکاربهێنە',
   checking: 'پشکنین…',
   linkedLine: 'ژمارە زنجیرەییەکە بە داواکارییەکەوە بەسترا.',
+  done: 'تەواو',
   existingLine1: 'ژمارە زنجیرەییەکە پێشتر تۆمارکراوە',
   existingLine2: 'ئێستا بەم داواکارییەوە بەسترا',
   already: 'ئەم ژمارەیە پێشتر بەم یەکەیەوە بەستراوە.',
@@ -714,7 +745,7 @@ const ckb: SerialStrings = {
   inUseHere: (n) => `ئێستا بە یەکەی ${n}ەوە بەستراوە.`,
   failed: 'بەستن سەرنەکەوت — پەیوەندییەکە بپشکنە و دووبارە هەوڵ بدەوە.',
   blockerIntro: 'ئەو یەکانەی هێشتا ماون:',
-  missingListedAbove: (n) => `${n} یەکە ماون — لە سەرەوەی پەڕەکەدا ناویان هاتووە.`,
+  missingListedAbove: (n) => (n === 1 ? 'یەکەیەک ماوە — لە سەرەوەی پەڕەکەدا ناوی هاتووە.' : `${n} یەکە ماون — لە سەرەوەی پەڕەکەدا ناویان هاتووە.`),
   goToUnit: 'بڕۆ بۆ یەکەکە',
   lotConflict: 'ژمارەیەکی بەستراو لە وەجبەیەکە کە ئیتر بۆ ئەم بەندە دەرنەکراوە — دووبارە سکانی بکە.',
   ownerProceed: 'بێ ژمارەکان بەردەوام بە (خاوەن)',
@@ -761,7 +792,7 @@ const ckb: SerialStrings = {
   loading: 'بار دەکرێت…',
   retry: 'دووبارە هەوڵ بدەوە',
   resaleTitle: 'گەرەنتی لە کاتی دووبارە فرۆشتن',
-  resaleHint: 'ئامێرێکی گەڕێنراوە کە بە داواکارییەکی نوێوە بەستراوە: «بەردەوام بێت» کۆتایی گەرەنتییە ڕەسەنەکەی دەپارێزێت، و «لە سەرەتاوە» ماوەیەکی تەواو دەداتە کڕیار.',
+  resaleHint: 'ئامێرێکی گەڕێنراوە کە بە داواکارییەکی نوێوە بەستراوە: «بەردەوام بێت» کۆتایی گەرەنتییە ڕەسەنەکەی دەپارێزێت، و «لە سەرەتاوە دەست پێبکاتەوە» ماوەیەکی تەواو دەداتە کڕیار.',
   save: 'پاشەکەوتکردن',
   saved: 'پاشەکەوتکرا',
   status: {
@@ -811,6 +842,9 @@ const ckb: SerialStrings = {
     warrantyChanged: 'گەرەنتی گۆڕدرا',
     warrantyMode: (m) => `گەرەنتی لە کاتی دووبارە فرۆشتن: ${m}`,
     gateOverride: (r) => `بێ ژمارەکان نێردرا (خاوەن): ${r}`,
+    reopened: 'دووبارە گەیەنرایەوە · گەرەنتییەکە دووبارە کرایەوە',
+    detached: 'لە یەکەیەکی گەرەنتیی پێشوو جیاکرایەوە',
+    gateBreach: 'بە ژمارەی ناتەواوەوە نێردرا — بۆ خاوەن تۆمارکرا',
     deviceEvent: 'ڕووداوێک لەسەر یەکەی گەرەنتی',
     receiptEvent: 'ڕووداوێک لەسەر پسوولەی گەرەنتی',
   },

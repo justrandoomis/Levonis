@@ -116,7 +116,7 @@ test('the order\'s life runs exactly as at HEAD: the gate cannot hold it, delive
 test('the library answers «nothing to do» on every entry point — never a throw', async () => {
   const w = before();
   order(w.raw, 'ORD-L', [{ id: 'l1', product: 'pA1' }]);
-  assert.deepEqual(await activateOrderSerials(w.env, 'ORD-L'), { pending: 0, activated: 0, released_policy: 0, conflicts: 0 });
+  assert.deepEqual(await activateOrderSerials(w.env, 'ORD-L'), { pending: 0, activated: 0, released_policy: 0, conflicts: 0, reopened: 0 });
   assert.deepEqual(await sweepUnactivatedSerials(w.env, 10), { scanned: 0, activated: 0, errors: 0 });
   assert.deepEqual(await sweepReturnedSerials(w.env, 10), { scanned: 0, closed: 0, errors: 0 });
   assert.equal((await orderSerialsView(w.env, ACTOR, 'ORD-L')).installed, false);

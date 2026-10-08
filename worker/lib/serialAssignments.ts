@@ -75,6 +75,7 @@ export const SERIAL_TEXT = {
   UNIT_ALREADY_LINKED: 'هذه الوحدة مربوطة برقم آخر — استخدم «تغيير».',
   ORDER_NOT_PREPARABLE: 'لا يمكن ربط الأرقام التسلسلية في هذه المرحلة من الطلب.',
   SERIAL_NOT_REQUIRED: 'هذا المنتج لا يحتاج رقمًا تسلسليًا.',
+  UNIT_NOT_OPEN: 'ضمان هذه الوحدة مغلق (أُعيد الجهاز أو أُلغي الطلب أو استُبدل) — لا يُربط بها رقم تسلسلي.',
   SERIAL_INVALID: 'هذا ليس رقمًا تسلسليًا صالحًا — امسح «Product SN» أو اكتبه كما هو مطبوع.',
   SERIAL_NOT_AVAILABLE: 'هذا الجهاز غير متاح للبيع (ملغى أو في الحجر أو مستبدل).',
   SERIAL_UNLINKED: 'أُزيل الرقم التسلسلي من الوحدة.',
@@ -434,6 +435,8 @@ interface Binding {
   warranty_base_months: number | null;
   warranty_ext_months: number;
   policy_version: string;
+  /** The unit's order status now — a unit an undone-delivery cancel closed is open again once that order is re-delivered. */
+  order_status: string | null;
 }
 
 export interface LotFacts {
@@ -520,8 +523,8 @@ async function bindingOf(db: D1Database, norm: string): Promise<Binding | null> 
     .prepare(
       `SELECT d.unit_id, u.order_id, u.order_item_id, u.unit_index, u.owner_user_id, u.delivered_at, u.warranty_end_at,
               u.warranty_closed_at, u.warranty_closed_reason, u.replaced_by_unit_id,
-              u.warranty_base_months, u.warranty_ext_months, u.policy_version
-         FROM device_serials d JOIN order_item_units u ON u.id = d.unit_id
+              u.warranty_base_months, u.warranty_ext_months, u.policy_version, o.status AS order_status
+         FROM device_serials d JOIN order_item_units u ON u.id = d.unit_id LEFT JOIN orders o ON o.id = u.order_id
         WHERE d.serial_norm = ?`
     )
     .bind(norm)
@@ -588,6 +591,8 @@ export interface LinkResult {
   warnings: string[];
 }
 
+type LiveRow = AssignmentRow & { o_status: string | null; o_remote: string; o_stage: string | null; o_shipping: string | null };
+
 interface LinkContext {
   order: OrderFacts | null;
   line: LineFacts | null;
@@ -595,7 +600,7 @@ interface LinkContext {
   asset: { serial_norm: string; serial_raw: string; product_id: string | null; variant_id: string | null; voided_at: string | null; box_sn: string; source: string } | null;
   boxOwner: string | null;
   boxIsSerial: boolean;
-  live: Array<AssignmentRow & { o_status: string | null; o_remote: string }>;
+  live: Array<LiveRow>;
   slotLive: AssignmentRow | null;
   binding: Binding | null;
   receipt: { id: string; unit_id: string; order_id: string | null } | null;
@@ -679,12 +684,12 @@ async function readLinkContext(db: D1Database, req: LinkRequest, norm: string, b
     db
       .prepare(
         `SELECT ${ASSIGNMENT_COLS.split(',').map((c) => `a.${c.trim()}`).join(', ')}, o.status AS o_status,
-                COALESCE(o.delivery_remote_id,'') AS o_remote
+                COALESCE(o.delivery_remote_id,'') AS o_remote, o.stage AS o_stage, o.shipping_type AS o_shipping
            FROM serial_assignments a LEFT JOIN orders o ON o.id = a.order_id
           WHERE a.serial_norm = ? AND a.released_at IS NULL`
       )
       .bind(norm)
-      .all<AssignmentRow & { o_status: string | null; o_remote: string }>()
+      .all<LiveRow>()
       .then((r) => r.results ?? []),
     db
       .prepare(
@@ -749,10 +754,21 @@ interface LinkPlan {
   allocationId: string | null;
   lotFence: boolean;
   warnings: string[];
-  adopts: boolean;
 }
 
-const OPEN_UNIT = (b: Binding | null) => !!b && !b.warranty_closed_at && !b.replaced_by_unit_id;
+/**
+ * A unit closed `order_cancelled` (an undone delivery, then a cancel) whose
+ * order is DELIVERED again is a delivered device whatever its columns still
+ * say: the re-delivery re-opens it (`reopenRedeliveredUnits`), and until that
+ * step has run it must not read as a free device (integrity review #1).
+ */
+const REDELIVERED = (b: Pick<Binding, 'warranty_closed_reason' | 'order_status'> | null) =>
+  !!b && b.warranty_closed_reason === 'order_cancelled' && b.order_status === 'delivered';
+const OPEN_UNIT = (b: Binding | null) => !!b && !b.replaced_by_unit_id && (!b.warranty_closed_at || REDELIVERED(b));
+/** The SQL twin of OPEN_UNIT for a unit `u` (device_serials → order_item_units). */
+export const openUnitSql = (u: string) =>
+  `(${u}.replaced_by_unit_id IS NULL AND (${u}.warranty_closed_at IS NULL OR (${u}.warranty_closed_reason = 'order_cancelled'
+     AND EXISTS (SELECT 1 FROM orders ro WHERE ro.id = ${u}.order_id AND ro.status = 'delivered'))))`;
 const UNSELLABLE = (b: Binding | null) =>
   !!b && (!!b.replaced_by_unit_id || b.warranty_closed_reason === 'returned_unsellable' || b.warranty_closed_reason === 'replaced');
 
@@ -832,8 +848,15 @@ async function classifyLink(db: D1Database, ctx: LinkContext, req: LinkRequest, 
       throw refuse(409, 'SERIAL_IN_USE_THIS_ORDER', { order_item_id: pending.order_item_id, unit_index: pending.unit_index });
     }
     if (ov === 'take_from_order') {
-      // L13: never strand a parcel already with the courier.
-      if ((pending as { o_remote?: string }).o_remote) throw refuse(409, 'OVERRIDE_UNAVAILABLE', { reason: 'other_order_shipped' });
+      // L13: never strand a parcel already with the courier. And only from an
+      // order still on the shelf (integrity review #6): a delivered order whose
+      // activation has not run yet, or one already out for delivery, holds a
+      // device that left — that is `delivered_device`, once it has activated.
+      if (pending.o_remote) throw refuse(409, 'OVERRIDE_UNAVAILABLE', { reason: 'other_order_shipped' });
+      if (pending.o_status === 'delivered') throw refuse(409, 'OVERRIDE_UNAVAILABLE', { reason: 'other_order_delivered' });
+      if (!serialScanWindow(pending.o_shipping ?? '', pending.o_stage ?? '', pending.o_status ?? '')) {
+        throw refuse(409, 'OVERRIDE_UNAVAILABLE', { reason: 'other_order_outside_window' });
+      }
       releaseOther = pending;
     } else {
       throw refuse(409, 'SERIAL_IN_USE', actor.owner ? { order_id: pending.order_id ?? pending.order_ref } : {});
@@ -907,7 +930,13 @@ async function classifyLink(db: D1Database, ctx: LinkContext, req: LinkRequest, 
   let lotSource: LinkPlan['lotSource'] = null;
   let allocationId: string | null = null;
   let lotFence = false;
-  const open = ctx.lots.filter((l) => l.net > 0);
+  // A change releases the slot's old row in the same batch, so that row does
+  // not hold its lot here (integrity review #8: a fully allocated line was
+  // refused SERIAL_BATCH_MISMATCH on every change).
+  const replacing = req.replaceAssignmentId && ctx.slotLive?.id === req.replaceAssignmentId ? ctx.slotLive : null;
+  const open = ctx.lots
+    .filter((l) => l.net > 0)
+    .map((l) => (replacing?.lot_id && replacing.lot_id === l.lot_id ? { ...l, taken: Math.max(0, l.taken - 1) } : l));
   const expected = open.map((l) => ({ id: l.lot_id, received_at: l.received_at, location: l.location }));
   if (sl) {
     if (sl.lot_product_id && sl.lot_product_id !== line.product_id) throw refuse(400, 'SERIAL_PRODUCT_MISMATCH', { via: 'lot' });
@@ -957,7 +986,6 @@ async function classifyLink(db: D1Database, ctx: LinkContext, req: LinkRequest, 
     allocationId,
     lotFence,
     warnings,
-    adopts: !asset || !asset.product_id,
   };
 }
 
@@ -1073,7 +1101,9 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
       db
         .prepare(
           `UPDATE serial_assignments SET released_at = ?, released_by = ?, release_reason = 'owner_override', release_note = ?
-            WHERE id = ? AND released_at IS NULL AND activated_at IS NULL`
+            WHERE id = ? AND released_at IS NULL AND activated_at IS NULL
+              AND EXISTS (SELECT 1 FROM orders o WHERE o.id = serial_assignments.order_id AND ${scanWindowSql('o')}
+                            AND COALESCE(o.delivery_remote_id,'') = '')`
         )
         .bind(now, actor.id, (ov?.reason ?? '').slice(0, 500), plan.releaseOther.id),
       ...changedExactlyOne(db),
@@ -1095,7 +1125,7 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, '') ON CONFLICT(serial_norm) DO NOTHING`
       )
       .bind(norm, raw, line.product_id, lineVariant, boxSn, ean, req.source === 'manual' ? 'manual' : 'scan', actor.id),
-    rawAudit(db, actor.id, 'serial_inventory.add', norm, { source: 'prep_scan', via: req.source, product_id: line.product_id, variant_id: lineVariant, order_id: order.id, serials: [norm] }, 'changes() = 1')
+    rawAudit(db, actor.id, 'serial_inventory.add', norm, { source: 'prep_scan', via: req.source, product_id: line.product_id, variant_id: lineVariant, order_id: order.id, serials: [norm], op: key }, 'changes() = 1')
   );
   // S4 — the asset is usable and is this product / option, and is not another box's SN.
   stmts.push(
@@ -1115,7 +1145,8 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
       ...fence(
         db,
         `NOT EXISTS (SELECT 1 FROM device_serials d JOIN order_item_units u ON u.id = d.unit_id
-                      WHERE d.serial_norm = ? AND (u.warranty_closed_at IS NULL OR u.warranty_closed_reason IN ('returned_unsellable','replaced')))
+                      WHERE d.serial_norm = ? AND (${openUnitSql('u')} OR u.replaced_by_unit_id IS NOT NULL
+                                                   OR u.warranty_closed_reason IN ('returned_unsellable','replaced')))
           AND NOT EXISTS (SELECT 1 FROM warranty_receipts w WHERE w.serial_norm = ? AND w.status IN ('draft','active'))
           AND NOT EXISTS (SELECT 1 FROM serial_assignments x WHERE x.serial_norm = ? AND x.released_at IS NULL AND x.activated_at IS NOT NULL)`,
         [norm, norm, norm]
@@ -1126,16 +1157,27 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
     stmts.push(...fence(db, `EXISTS (SELECT 1 FROM device_serials d WHERE d.serial_norm = ? AND d.unit_id = ?)
                               OR NOT EXISTS (SELECT 1 FROM device_serials d WHERE d.serial_norm = ?)`, [norm, plan.priorUnitId, norm]));
   }
-  // S6/S7 — an asset filed under no product adopts the line's (audited).
+  // S6/S7 — an asset filed under no product adopts the line's (audited), and
+  // one filed under the product with no option adopts the line's option. Two
+  // statements, so the batch itself records whether THIS link filed the
+  // product (critique L13: the pre-read cannot know — another door may file
+  // it between the read and this batch).
   stmts.push(
     db
       .prepare(
-        `UPDATE serial_inventory SET product_id = COALESCE(product_id, ?1), variant_id = COALESCE(variant_id, ?2),
+        `UPDATE serial_inventory SET product_id = ?1, variant_id = COALESCE(variant_id, ?2),
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-          WHERE serial_norm = ?3 AND (product_id IS NULL OR (variant_id IS NULL AND ?2 IS NOT NULL))`
+          WHERE serial_norm = ?3 AND product_id IS NULL`
       )
       .bind(line.product_id, lineVariant, norm),
-    rawAudit(db, actor.id, 'serial_inventory.update', norm, { source: 'prep_scan', to: { product_id: line.product_id, variant_id: lineVariant }, order_id: order.id }, 'changes() = 1')
+    rawAudit(db, actor.id, 'serial_inventory.update', norm, { source: 'prep_scan', to: { product_id: line.product_id, variant_id: lineVariant }, order_id: order.id, adopted: 'product', op: key }, 'changes() = 1'),
+    db
+      .prepare(
+        `UPDATE serial_inventory SET variant_id = ?2, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+          WHERE serial_norm = ?3 AND product_id = ?1 AND variant_id IS NULL AND ?2 IS NOT NULL`
+      )
+      .bind(line.product_id, lineVariant, norm),
+    rawAudit(db, actor.id, 'serial_inventory.update', norm, { source: 'prep_scan', to: { variant_id: lineVariant }, order_id: order.id, adopted: 'variant', op: key }, 'changes() = 1')
   );
   // S8 — the lot still owes this line a unit (taken < net), so two serials can
   // never claim one allocated unit (Audit C2's capacity gap).
@@ -1157,13 +1199,19 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
         `INSERT INTO serial_assignments (id, serial_norm, serial_raw, order_id, order_item_id, order_ref, unit_index, part, part_index,
             product_id, variant_id, lot_id, lot_source, allocation_id, source, warranty_mode, prior_unit_id,
             override_kind, override_reason, adopted_product, idempotency_key, linked_by, linked_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19,
+                 EXISTS (SELECT 1 FROM audit_log l
+                          WHERE l.target = ?2 AND l.action IN ('serial_inventory.add','serial_inventory.update')
+                            AND (CASE WHEN json_valid(l.detail) THEN json_extract(l.detail, '$.op') END) = ?20
+                            AND (l.action = 'serial_inventory.add'
+                                 OR (CASE WHEN json_valid(l.detail) THEN json_extract(l.detail, '$.adopted') END) = 'product')),
+                 ?20, ?21, ?22)`
       )
       .bind(
         id, norm, raw, order.id, line.id, order.id, req.unitIndex, part, partIndex,
         line.product_id, lineVariant, plan.lotId, plan.lotSource, plan.allocationId,
         ov ? 'owner_override' : req.source, plan.mode, plan.priorUnitId,
-        ov?.kind ?? null, ov ? ov.reason : null, plan.adopts ? 1 : 0, key, actor.id, now
+        ov?.kind ?? null, ov ? ov.reason : null, key, actor.id, now
       )
   );
   // S10 — §25: who, what, which unit, previous and new assignment, why.
@@ -1372,36 +1420,102 @@ export interface ActivationResult {
   activated: number;
   released_policy: number;
   conflicts: number;
+  /** Units an undone-delivery cancel closed that this re-delivery re-opened without a new scan. */
+  reopened: number;
+}
+
+/** A SQL string literal (ids built by this file; quotes doubled all the same). */
+const lit = (v: string) => `'${String(v).replace(/'/g, "''")}'`;
+
+/**
+ * RE-OPEN A UNIT AN UNDONE-DELIVERY CANCEL CLOSED (integrity review #1,
+ * regressions review #1/#2). The cancel trigger closed it `order_cancelled`
+ * (dates kept), voided its live receipt and revoked its account link; the
+ * re-delivery hands the customer a device again, so each of those comes back:
+ *   - the account link the cancel revoked (revoked at or after the closure —
+ *     a release the holder made earlier stays released). Left revoked, it
+ *     would read as «released by its holder» and anyone typing the serial
+ *     could take the device (devices.ts /register);
+ *   - the receipt the cancel voided — only for the SAME device (`serialNorm`)
+ *     and only while neither the unit nor the serial has another live one;
+ *   - `serial.warranty_reopened` history, then the unit itself.
+ * `when` is an SQL condition every statement carries.
+ */
+function reopenUnitStatements(db: D1Database, unitId: string, serialNorm: string | null, when: string, detail: Record<string, unknown>): D1PreparedStatement[] {
+  const closedAt = `(SELECT cu.warranty_closed_at FROM order_item_units cu WHERE cu.id = ?1 AND cu.warranty_closed_reason = 'order_cancelled')`;
+  const stmts: D1PreparedStatement[] = [
+    db
+      .prepare(`UPDATE device_registrations SET revoked_at = NULL WHERE unit_id = ?1 AND revoked_at IS NOT NULL AND revoked_at >= ${closedAt} AND ${when}`)
+      .bind(unitId),
+  ];
+  if (serialNorm) {
+    stmts.push(
+      db
+        .prepare(
+          `UPDATE warranty_receipts
+              SET status = CASE WHEN issued_at IS NOT NULL THEN 'active' ELSE 'draft' END, void_reason = '', voided_at = NULL,
+                  voided_by = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+            WHERE id = (SELECT w.id FROM warranty_receipts w
+                         WHERE w.unit_id = ?1 AND w.serial_norm = ?2 AND w.status = 'void' AND w.void_reason = 'order_cancelled'
+                           AND w.voided_at >= ${closedAt}
+                         ORDER BY w.voided_at DESC LIMIT 1)
+              AND NOT EXISTS (SELECT 1 FROM warranty_receipts x WHERE x.unit_id = ?1 AND x.status IN ('draft','active'))
+              AND NOT EXISTS (SELECT 1 FROM warranty_receipts x WHERE x.serial_norm = ?2 AND x.status IN ('draft','active'))
+              AND ${when}`
+        )
+        .bind(unitId, serialNorm)
+    );
+  }
+  stmts.push(
+    db
+      .prepare(
+        `INSERT INTO audit_log (actor_id, action, target, detail)
+         SELECT NULL, 'serial.warranty_reopened', ?2, ?3
+          WHERE EXISTS (SELECT 1 FROM order_item_units WHERE id = ?1 AND warranty_closed_reason = 'order_cancelled') AND ${when}`
+      )
+      .bind(unitId, serialNorm ?? unitId, JSON.stringify({ unit_id: unitId, ...detail }).slice(0, 4000)),
+    db
+      .prepare(`UPDATE order_item_units SET warranty_closed_at = NULL, warranty_closed_reason = NULL WHERE id = ?1 AND warranty_closed_reason = 'order_cancelled' AND ${when}`)
+      .bind(unitId)
+  );
+  return stmts;
 }
 
 /**
  * Binds each live, not-yet-activated assignment of a delivered order to the
  * warranty unit delivery created for its slot. One batch PER ASSIGNMENT
  * (critique H3 — one bad row never blocks the others or the units), each
- * statement conditioned so a replay writes nothing twice:
+ * statement conditioned so a replay writes nothing twice, and the batch
+ * fenced so it commits whole or not at all (integrity review #11):
  *   A0  a unit re-delivered after an undone delivery + cancel loses the OLD
- *       serial it was given before (that serial was released by the trigger);
+ *       serial it was given before (that serial was released by the
+ *       trigger), audited;
  *   A3  device_serials → this unit (moves only off a CLOSED or replaced unit,
- *       or the unit an owner override named — never off an open warranty);
+ *       or the unit an owner override named — never off an open warranty,
+ *       and never off a cancel-closed unit whose order is delivered again);
  *   R   the device's previous ACTIVE assignment is released (owner_override /
  *       reassigned) once the pointer really moved;
- *   A6  activated — only if device_serials really points at this unit;
- *   then, each only when A6 activated THIS row:
+ *   A6  activated — only if device_serials really points at this unit; the
+ *       fence after it rolls A0–R back otherwise;
  *   A1  carry: the original end, `carried:'original_end'` + `resale_of`
  *       (critique H4: the three readers of that marker keep it on a later
  *       delivery-date correction);
  *   A4  an owner override closes the superseded unit (dates kept), voids its
  *       live receipt and revokes its account link;
- *   AR  a unit closed by an undone-delivery cancel re-opens (L3);
+ *   AR  a unit closed by an undone-delivery cancel re-opens — its account
+ *       link and (same device) its receipt with it (`reopenUnitStatements`);
  *   A5  the serial-verified lot onto order_item_units.inventory_lot_id (L12);
  *   A2  `serial.warranty_activated` history.
  * A slot that got no unit because its line is no longer serialized releases
  * its assignment (`policy_changed`, M5). A row that does not activate counts
- * an attempt; the sweep stops after five (a conflict is the owner's).
+ * an attempt; the sweep stops after five (a conflict is the owner's). Then
+ * every unit an undone-delivery cancel closed that has NO new serial is
+ * re-opened too (`reopenRedeliveredUnits`) — the gate ships off, so a
+ * re-delivery without a re-scan is the common case.
  */
 export async function activateOrderSerials(env: Env, orderId: string): Promise<ActivationResult> {
   const db = env.DB;
-  const out: ActivationResult = { pending: 0, activated: 0, released_policy: 0, conflicts: 0 };
+  const out: ActivationResult = { pending: 0, activated: 0, released_policy: 0, conflicts: 0, reopened: 0 };
   if (!(await serialAssignmentsInstalled(db))) return out;
   const order = await db.prepare("SELECT id, status, delivered_at FROM orders WHERE id = ?").bind(orderId).first<{ id: string; status: string; delivered_at: string | null }>();
   if (!order || !order.delivered_at) return out;
@@ -1410,8 +1524,7 @@ export async function activateOrderSerials(env: Env, orderId: string): Promise<A
     .bind(orderId)
     .all<AssignmentRow>();
   out.pending = rows.length;
-  if (!rows.length) return out;
-  const { slots } = await serialRequiredSlots(db, orderId);
+  const { slots } = rows.length ? await serialRequiredSlots(db, orderId) : { slots: [] as SerialSlot[] };
   for (const a of rows) {
     const unit = await db
       .prepare('SELECT id FROM order_item_units WHERE order_item_id = ? AND unit_index = ?')
@@ -1441,6 +1554,7 @@ export async function activateOrderSerials(env: Env, orderId: string): Promise<A
       out.conflicts++;
     }
   }
+  if (order.status === 'delivered') out.reopened = await reopenRedeliveredUnits(db, orderId);
   return out;
 }
 
@@ -1453,10 +1567,20 @@ async function activateOne(db: D1Database, a: AssignmentRow, unitId: string, ord
   const prior = a.prior_unit_id
     ? await db.prepare('SELECT * FROM order_item_units WHERE id = ?').bind(a.prior_unit_id).first<UnitRow & { warranty_end_at: string | null }>()
     : null;
-  const ACT = `EXISTS (SELECT 1 FROM serial_assignments WHERE id = '${a.id.replace(/'/g, "''")}' AND activated_at = '${now}' AND unit_id = '${unitId.replace(/'/g, "''")}')`;
+  const ACT = `EXISTS (SELECT 1 FROM serial_assignments WHERE id = ${lit(a.id)} AND activated_at = ${lit(now)} AND unit_id = ${lit(unitId)})`;
   const overrideMove = a.override_kind === 'delivered_device' || a.override_kind === 'unavailable';
   const stmts: D1PreparedStatement[] = [
-    // A0
+    // A0 — audited before it goes (the old serial is a free device again).
+    db
+      .prepare(
+        `INSERT INTO audit_log (actor_id, action, target, detail)
+         SELECT NULL, 'serial.detached', d.serial_norm,
+                json_object('unit_id', ?1, 'order_id', ?4, 'reason', 'redelivered_with_another_serial', 'assignment_id', ?3)
+           FROM device_serials d WHERE d.unit_id = ?1 AND d.serial_norm <> ?2
+            AND EXISTS (SELECT 1 FROM order_item_units WHERE id = ?1 AND warranty_closed_reason = 'order_cancelled')
+            AND EXISTS (SELECT 1 FROM serial_assignments WHERE id = ?3 AND released_at IS NULL AND activated_at IS NULL)`
+      )
+      .bind(unitId, a.serial_norm, a.id, orderId),
     db
       .prepare(
         `DELETE FROM device_serials WHERE unit_id = ?1 AND serial_norm <> ?2
@@ -1473,7 +1597,7 @@ async function activateOne(db: D1Database, a: AssignmentRow, unitId: string, ord
             AND NOT EXISTS (SELECT 1 FROM device_serials d WHERE d.unit_id = ?3)
          ON CONFLICT(serial_norm) DO UPDATE SET unit_id = excluded.unit_id, serial_raw = excluded.serial_raw,
             assigned_by = excluded.assigned_by, assigned_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), note = excluded.note
-          WHERE device_serials.unit_id IN (SELECT id FROM order_item_units WHERE warranty_closed_at IS NOT NULL OR replaced_by_unit_id IS NOT NULL)
+          WHERE device_serials.unit_id IN (SELECT mu.id FROM order_item_units mu WHERE NOT ${openUnitSql('mu')})
              OR (?7 = 1 AND device_serials.unit_id = ?8)`
       )
       .bind(a.serial_norm, a.serial_raw, unitId, a.linked_by, `prep_scan:${a.id}`, a.id, overrideMove ? 1 : 0, a.prior_unit_id ?? ''),
@@ -1494,6 +1618,8 @@ async function activateOne(db: D1Database, a: AssignmentRow, unitId: string, ord
             AND EXISTS (SELECT 1 FROM device_serials d WHERE d.serial_norm = ?4 AND d.unit_id = ?2)`
       )
       .bind(now, unitId, a.id, a.serial_norm),
+    // All or nothing: a row that did not activate leaves no trace of A0–R.
+    ...fence(db, ACT),
   ];
   // A1 carry
   if (a.warranty_mode === 'carry' && prior) {
@@ -1516,7 +1642,7 @@ async function activateOne(db: D1Database, a: AssignmentRow, unitId: string, ord
     );
   }
   // AR re-delivery of a unit an undone-delivery cancel closed
-  stmts.push(db.prepare(`UPDATE order_item_units SET warranty_closed_at = NULL, warranty_closed_reason = NULL WHERE id = ? AND warranty_closed_reason = 'order_cancelled' AND ${ACT}`).bind(unitId));
+  stmts.push(...reopenUnitStatements(db, unitId, a.serial_norm, ACT, { order_id: orderId, assignment_id: a.id, via: 'scan' }));
   // A5 the verified lot — never an inferred one (L12)
   if (a.lot_id && a.lot_source === 'serial_link') {
     stmts.push(db.prepare(`UPDATE order_item_units SET inventory_lot_id = ? WHERE id = ? AND inventory_lot_id IS NULL AND ${ACT}`).bind(a.lot_id, unitId));
@@ -1537,21 +1663,121 @@ async function activateOne(db: D1Database, a: AssignmentRow, unitId: string, ord
   try {
     await db.batch(stmts);
   } catch (e) {
-    console.error('serial activation failed', a.id, e instanceof Error ? e.message : String(e));
-    return false;
+    // The fence (the row did not activate: a conflict, or a concurrent run
+    // got there first) is not a failure to log; anything else is.
+    if (!isLostRace(e)) console.error('serial activation failed', a.id, e instanceof Error ? e.message : String(e));
   }
   const after = await db.prepare('SELECT activated_at FROM serial_assignments WHERE id = ?').bind(a.id).first<{ activated_at: string | null }>();
   return !!after?.activated_at;
 }
 
-/** Delivered orders whose serials never activated — the cron's repair, bounded. */
+/**
+ * The re-delivered units that got NO new serial (integrity review #1): each
+ * unit of this delivered order that an undone-delivery cancel closed and
+ * whose slot holds no live binding is re-opened, in its own batch, fenced on
+ * exactly that state. Its old device:
+ *   - still pointed at it and free (no live binding anywhere, not void) →
+ *     kept: an activated `relink` binding records it, its receipt comes back;
+ *   - since bound elsewhere, or void → its pointer leaves the unit (audited
+ *     `serial.detached`): the customer's warranty is open, the serial is not
+ *     theirs to claim;
+ *   - none → the unit simply re-opens.
+ * A batch that loses a race changes nothing; the activation sweep retries.
+ */
+async function reopenRedeliveredUnits(db: D1Database, orderId: string): Promise<number> {
+  const { results } = await db
+    .prepare(
+      `SELECT u.id, u.order_item_id, u.unit_index, u.product_id, d.serial_norm, d.serial_raw,
+              EXISTS (SELECT 1 FROM serial_assignments x WHERE x.serial_norm = d.serial_norm AND x.released_at IS NULL) AS serial_live,
+              (SELECT si.voided_at FROM serial_inventory si WHERE si.serial_norm = d.serial_norm) AS voided_at
+         FROM order_item_units u LEFT JOIN device_serials d ON d.unit_id = u.id
+        WHERE u.order_id = ? AND u.warranty_closed_reason = 'order_cancelled'
+          AND NOT EXISTS (SELECT 1 FROM serial_assignments a WHERE a.released_at IS NULL
+                           AND (a.unit_id = u.id OR (a.order_item_id = u.order_item_id AND a.unit_index = u.unit_index AND a.part = 'device')))`
+    )
+    .bind(orderId)
+    .all<{ id: string; order_item_id: string; unit_index: number; product_id: string | null; serial_norm: string | null; serial_raw: string | null; serial_live: number; voided_at: string | null }>();
+  let reopened = 0;
+  for (const u of results ?? []) {
+    const when = `EXISTS (SELECT 1 FROM orders wo WHERE wo.id = ${lit(orderId)} AND wo.status = 'delivered')`;
+    const stmts: D1PreparedStatement[] = [
+      ...fence(
+        db,
+        `EXISTS (SELECT 1 FROM orders o WHERE o.id = ? AND o.status = 'delivered')
+          AND EXISTS (SELECT 1 FROM order_item_units cu WHERE cu.id = ? AND cu.warranty_closed_reason = 'order_cancelled')
+          AND NOT EXISTS (SELECT 1 FROM serial_assignments a WHERE a.released_at IS NULL
+                           AND (a.unit_id = ? OR (a.order_item_id = ? AND a.unit_index = ? AND a.part = 'device')))`,
+        [orderId, u.id, u.id, u.order_item_id, u.unit_index]
+      ),
+    ];
+    const keep = !!u.serial_norm && Number(u.serial_live) !== 1 && !u.voided_at;
+    if (u.serial_norm && keep) {
+      const id = newId('sa');
+      const now = nowIso();
+      stmts.push(
+        ...fence(
+          db,
+          `EXISTS (SELECT 1 FROM device_serials d WHERE d.serial_norm = ? AND d.unit_id = ?)
+            AND NOT EXISTS (SELECT 1 FROM serial_assignments x WHERE x.serial_norm = ? AND x.released_at IS NULL)`,
+          [u.serial_norm, u.id, u.serial_norm]
+        ),
+        db
+          .prepare(
+            `INSERT INTO serial_inventory (serial_norm, serial_raw, product_id, source, created_by, note)
+             VALUES (?, ?, ?, 'manual', 'system', '') ON CONFLICT(serial_norm) DO NOTHING`
+          )
+          .bind(u.serial_norm, u.serial_raw || u.serial_norm, u.product_id),
+        db
+          .prepare(
+            `INSERT INTO serial_assignments (id, serial_norm, serial_raw, order_id, order_item_id, order_ref, unit_index, part,
+                product_id, source, idempotency_key, linked_by, linked_at, unit_id, activated_at)
+             SELECT ?1, ?2, ?3, cu.order_id, cu.order_item_id, cu.order_id, cu.unit_index, 'device', cu.product_id, 'relink',
+                    'reopen:' || ?1, 'system', ?4, cu.id, ?4
+               FROM order_item_units cu WHERE cu.id = ?5 AND cu.unit_index BETWEEN 1 AND 1000`
+          )
+          .bind(id, u.serial_norm, u.serial_raw || u.serial_norm, now, u.id),
+        ...reopenUnitStatements(db, u.id, u.serial_norm, when, { order_id: orderId, assignment_id: id, serial_kept: true, via: 'redelivery' })
+      );
+    } else {
+      if (u.serial_norm) {
+        stmts.push(
+          rawAudit(db, null, 'serial.detached', u.serial_norm, {
+            unit_id: u.id, order_id: orderId, reason: u.voided_at ? 'void' : 'held_elsewhere',
+          }, `EXISTS (SELECT 1 FROM device_serials d WHERE d.serial_norm = ${lit(u.serial_norm)} AND d.unit_id = ${lit(u.id)})`),
+          db.prepare('DELETE FROM device_serials WHERE unit_id = ? AND serial_norm = ?').bind(u.id, u.serial_norm)
+        );
+      }
+      stmts.push(...reopenUnitStatements(db, u.id, null, when, { order_id: orderId, serial_kept: false, via: 'redelivery' }));
+    }
+    try {
+      await db.batch(stmts);
+      reopened++;
+    } catch (e) {
+      if (!isLostRace(e) && !/UNIQUE constraint failed/.test(e instanceof Error ? e.message : String(e))) {
+        console.error('re-opening a re-delivered unit failed', u.id, e instanceof Error ? e.message : String(e));
+      }
+    }
+  }
+  return reopened;
+}
+
+/**
+ * Delivered orders whose serials never activated, or whose undone-delivery
+ * units were not re-opened yet — the cron's repair, bounded.
+ */
 export async function sweepUnactivatedSerials(env: Env, limit = 50): Promise<{ scanned: number; activated: number; errors: number }> {
   const out = { scanned: 0, activated: 0, errors: 0 };
   if (!(await serialAssignmentsInstalled(env.DB))) return out;
   const { results } = await env.DB.prepare(
-    `SELECT DISTINCT o.id, o.delivered_at FROM serial_assignments a JOIN orders o ON o.id = a.order_id
-      WHERE a.released_at IS NULL AND a.activated_at IS NULL AND a.activation_attempts < 5
-        AND o.status = 'delivered' AND o.delivered_at IS NOT NULL
+    `SELECT o.id, o.delivered_at FROM orders o
+      WHERE o.status = 'delivered' AND o.delivered_at IS NOT NULL
+        AND o.id IN (SELECT a.order_id FROM serial_assignments a
+                      WHERE a.released_at IS NULL AND a.activated_at IS NULL AND a.activation_attempts < 5
+                     UNION
+                     SELECT u.order_id FROM order_item_units u
+                      WHERE u.warranty_closed_reason = 'order_cancelled'
+                        AND NOT EXISTS (SELECT 1 FROM serial_assignments x WHERE x.released_at IS NULL
+                                         AND (x.unit_id = u.id OR (x.order_item_id = u.order_item_id AND x.unit_index = u.unit_index))))
       LIMIT ?`
   )
     .bind(Math.min(Math.max(Math.trunc(limit), 1), 200))
@@ -1562,7 +1788,7 @@ export async function sweepUnactivatedSerials(env: Env, limit = 50): Promise<{ s
   for (const o of results) {
     try {
       const r = await createUnitsOnDelivery(env, o.id, o.delivered_at);
-      out.activated += r.activation?.activated ?? 0;
+      out.activated += (r.activation?.activated ?? 0) + (r.activation?.reopened ?? 0);
     } catch (e) {
       out.errors++;
       console.error('serial activation sweep failed for order', o.id, e instanceof Error ? e.message : String(e));
@@ -1607,20 +1833,27 @@ export async function serialGateState(env: Env, orderId: string): Promise<GateSt
   const appliesToOrder = setting.enabled && (!setting.since || Date.parse(order.created_at) >= Date.parse(setting.since));
   const { results: live } = await db
     .prepare(
-      `SELECT a.id, a.order_item_id, a.unit_index, a.lot_id, a.lot_source FROM serial_assignments a
+      `SELECT a.id, a.order_item_id, a.unit_index, a.lot_id, a.lot_source,
+              (SELECT sl.lot_id FROM stock_serial_links sl WHERE sl.serial_norm = a.serial_norm) AS linked_lot
+         FROM serial_assignments a
         WHERE a.order_id = ? AND a.released_at IS NULL AND a.part = 'device'`
     )
     .bind(orderId)
-    .all<{ id: string; order_item_id: string; unit_index: number; lot_id: string | null; lot_source: string | null }>();
+    .all<{ id: string; order_item_id: string; unit_index: number; lot_id: string | null; lot_source: string | null; linked_lot: string | null }>();
   const have = new Set(live.map((a) => `${a.order_item_id}:${a.unit_index}`));
   const missing = slots.filter((s) => !have.has(`${s.order_item_id}:${s.unit_index}`)).map((s) => ({ order_item_id: s.order_item_id, unit_index: s.unit_index, part: s.part, product_name: s.product_name }));
-  // M1: at dispatch, a serial whose OWN lot (serial_link) is no longer among
-  // the line's live allocations (a re-confirm re-allocated FIFO elsewhere).
+  // M1: at dispatch, a serial whose OWN lot is no longer among the line's live
+  // allocations (a re-confirm re-allocated FIFO elsewhere) — its own lot being
+  // the one verified at the scan, or the one the receiving desk linked it to
+  // since (integrity review #4: a lot recorded after the scan is compared too).
   const lotConflicts: GateState['lot_conflicts'] = [];
+  const lotsOf = new Map<string, LotFacts[]>();
   for (const a of live) {
-    if (a.lot_source !== 'serial_link' || !a.lot_id) continue;
-    const lots = await lineLots(db, a.order_item_id);
-    if (lots.length && !lots.some((l) => l.lot_id === a.lot_id && l.net > 0)) lotConflicts.push({ assignment_id: a.id, order_item_id: a.order_item_id, unit_index: a.unit_index });
+    const own = a.lot_source === 'serial_link' && a.lot_id ? a.lot_id : a.linked_lot;
+    if (!own) continue;
+    if (!lotsOf.has(a.order_item_id)) lotsOf.set(a.order_item_id, await lineLots(db, a.order_item_id));
+    const lots = lotsOf.get(a.order_item_id)!;
+    if (lots.length && !lots.some((l) => l.lot_id === own && l.net > 0)) lotConflicts.push({ assignment_id: a.id, order_item_id: a.order_item_id, unit_index: a.unit_index });
   }
   const counts = new Map<string, number>();
   for (const s of slots) counts.set(s.order_item_id, (counts.get(s.order_item_id) ?? 0) + 1);
@@ -1684,7 +1917,9 @@ export async function serialGateForMove(
   if (reason) {
     if (!actor.owner) throw refuse(403, 'OWNER_ONLY');
     if (reason.length < 5 || reason.length > 500) throw refuse(400, 'OVERRIDE_REASON_REQUIRED');
-    if (!blocked) return { statements: [], overridden: false };
+    // Nothing to override: the move still carries the fence, so an unlink
+    // racing it is caught exactly as without a reason (integrity review #7).
+    if (!blocked) return { statements: serialGateFence(env.DB, state.required), overridden: false };
     const audit = await auditStatements(env.DB, actor.id, 'serial.prep_gate_override', orderId, {
       reason, to_stage: toStage, missing: state.missing, lot_conflicts: state.lot_conflicts,
     });
@@ -1723,7 +1958,17 @@ export async function returnedUnits(
     )
     .bind(kase.order_item_id)
     .all<{ id: string; serial_norm: string | null; assigned: number }>();
-  const serials = Array.isArray(input.serials) ? input.serials.map((s) => normalizeSerial(String(s ?? ''))).filter(Boolean) : [];
+  // The ONE canonicaliser (critique H1, integrity review #14): `SN 0391…`, a
+  // QR payload or a box SN filed with its asset reads as the device it names.
+  // A legacy key it would refuse (shorter, other characters) still matches
+  // the unit it is stored on — attribution only ever reads this line's units.
+  const serials: string[] = [];
+  for (const raw of Array.isArray(input.serials) ? input.serials : []) {
+    const text = String(raw ?? '').slice(0, 200);
+    if (!text.trim()) continue;
+    const norm = await canonicalSerial(db, text).then((c) => c.norm, () => normalizeSerial(stripSerialPrefix(text)));
+    if (norm) serials.push(norm);
+  }
   if (serials.length) {
     const units: string[] = [];
     for (const s of serials) {
@@ -1951,7 +2196,7 @@ export interface OrderSerialsView {
   slots: Array<
     SerialSlot & {
       assignment: SlotView['assignment'];
-      previous: null | { serial_display: string; serial_full?: string; released_at: string; reason: string; free: boolean };
+      previous: null | { assignment_id: string; serial_display: string; serial_full?: string; released_at: string; reason: string; free: boolean };
       flags: string[];
     }
   >;
@@ -1969,7 +2214,7 @@ export async function orderSerialsView(env: Env, actor: SerialActor, orderId: st
     db.prepare(`SELECT ${ASSIGNMENT_COLS} FROM serial_assignments WHERE order_id = ? AND released_at IS NULL`).bind(orderId).all<AssignmentRow>(),
     db
       .prepare(
-        `SELECT a.order_item_id, a.unit_index, a.part, a.serial_norm, a.serial_raw, a.released_at, a.release_reason,
+        `SELECT a.id, a.order_item_id, a.unit_index, a.part, a.serial_norm, a.serial_raw, a.released_at, a.release_reason,
                 (EXISTS (SELECT 1 FROM serial_assignments x WHERE x.serial_norm = a.serial_norm AND x.released_at IS NULL)
                  OR EXISTS (SELECT 1 FROM device_serials d JOIN order_item_units u ON u.id = d.unit_id
                              WHERE d.serial_norm = a.serial_norm AND u.warranty_closed_at IS NULL)) AS taken
@@ -1978,7 +2223,7 @@ export async function orderSerialsView(env: Env, actor: SerialActor, orderId: st
           ORDER BY a.released_at DESC`
       )
       .bind(orderId)
-      .all<{ order_item_id: string; unit_index: number; part: string; serial_norm: string; serial_raw: string; released_at: string; release_reason: string; taken: number }>(),
+      .all<{ id: string; order_item_id: string; unit_index: number; part: string; serial_norm: string; serial_raw: string; released_at: string; release_reason: string; taken: number }>(),
   ]);
   const live = liveRes.results ?? [];
   const prev = prevRes.results ?? [];
@@ -2015,7 +2260,7 @@ export async function orderSerialsView(env: Env, actor: SerialActor, orderId: st
       ...s,
       assignment: view.assignment,
       previous: p
-        ? { serial_display: shown(p.serial_raw, actor), ...(actor.fullSerial ? { serial_full: p.serial_raw } : {}), released_at: p.released_at, reason: p.release_reason, free: Number(p.taken) !== 1 }
+        ? { assignment_id: p.id, serial_display: shown(p.serial_raw, actor), ...(actor.fullSerial ? { serial_full: p.serial_raw } : {}), released_at: p.released_at, reason: p.release_reason, free: Number(p.taken) !== 1 }
         : null,
       flags,
     });
@@ -2047,6 +2292,24 @@ export async function orderSerialsView(env: Env, actor: SerialActor, orderId: st
  * Privacy (L7): order ids and the full serial for the owner and full-scope
  * admins only; an assistant sees the masked serial and no order numbers.
  */
+/** Detail keys that hold an order number, and keys that hold a serial (this device's or another's). */
+const ORDER_KEYS = ['order_id', 'other_order_id', 'previous_order_id', 'to_order_id'];
+const SERIAL_KEYS = ['new_serial', 'serial', 'serial_norm', 'serial_raw', 'detached_serial', 'detached_serial_raw', 'legacy_serial', 'new_serial_norm', 'old_serial'];
+
+/**
+ * A history row as an assistant may see it (UX review #1, critique L7): no
+ * order numbers, and every serial in it masked — a «change» row names the
+ * OTHER device's full serial, which the page itself never shows them.
+ */
+export function maskedDetail(detail: Record<string, unknown>, actor: Pick<SerialActor, 'fullSerial'>): Record<string, unknown> {
+  if (actor.fullSerial) return detail;
+  const out = { ...detail };
+  for (const k of ORDER_KEYS) if (k in out) out[k] = null;
+  for (const k of SERIAL_KEYS) if (typeof out[k] === 'string') out[k] = maskSerial(out[k] as string);
+  if (Array.isArray(out.serials)) out.serials = out.serials.map((v) => (typeof v === 'string' ? maskSerial(v) : v));
+  return out;
+}
+
 export async function serialStory(env: Env, actor: SerialActor, norm: string) {
   const db = env.DB;
   const installed = await serialAssignmentsInstalled(db);
@@ -2137,10 +2400,7 @@ export async function serialStory(env: Env, actor: SerialActor, norm: string) {
     lot: live?.lot_id ? { id: live.lot_id, source: live.lot_source } : null,
     history: [
       ...history.map((h) => {
-        const detail = safeParse<Record<string, unknown>>(h.detail, {});
-        if (!actor.fullSerial) {
-          for (const k of ['order_id', 'other_order_id', 'previous_order_id']) if (k in detail) detail[k] = null;
-        }
+        const detail = maskedDetail(safeParse<Record<string, unknown>>(h.detail, {}), actor);
         const orderId = safeParse<Record<string, unknown>>(h.detail, {}).order_id;
         const inferred = !h.actor_id && typeof orderId === 'string' ? cancelledBy.get(orderId) : undefined;
         return {

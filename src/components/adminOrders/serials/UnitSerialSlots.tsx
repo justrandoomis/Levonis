@@ -28,6 +28,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react';
 import { Camera, Check, CheckCircle2, CircleAlert, History, Link2, RotateCcw, ScanLine, ShieldAlert } from 'lucide-react';
 import { ApiError } from '../../../lib/api';
+import { refusalText } from '../../../lib/refusalStrings';
 import { useLanguage } from '../../../LanguageContext';
 import { useMotion } from '../../../lib/motion';
 import { useToast } from '../../ui/Toast';
@@ -69,13 +70,21 @@ export interface SerialSlotsPanelProps {
   onOpenSerial?: (serial: string) => void;
   /** «اذهب إلى الوحدة» from the blocker: the slot to bring into view (`n` re-triggers). */
   focusRequest?: { key: string; n: number } | null;
+  /**
+   * Called once the request above was carried out, so the holder can clear it:
+   * a request that outlives its moment would scroll and steal the focus again
+   * on every remount of this tab (UX review #4).
+   */
+  onFocusHandled?: () => void;
   /** The order's legacy status: outside the window the owner may still link — as an exception. */
   orderStatus?: string;
 }
 
-export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChanged, onOpenSerial, focusRequest, orderStatus }: SerialSlotsPanelProps) {
+export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChanged, onOpenSerial, focusRequest, onFocusHandled, orderStatus }: SerialSlotsPanelProps) {
   const { lang, dir } = useLanguage();
   const s = serialStrings(lang);
+  const motionPrefs = useMotion();
+  const l3 = (lang === 'en' || lang === 'ckb' ? lang : 'ar') as 'ar' | 'en' | 'ckb';
   const toast = useToast();
   const [confirm, confirmDialog] = useConfirm();
   const [prompt, promptDialog] = usePrompt();
@@ -100,17 +109,24 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
   const [sheet, setSheet] = useState<{ target: ScanTarget; initialRefusal: SlotError | null } | null>(null);
   const [justLinked, setJustLinked] = useState<string | null>(null);
   const trackers = useRef(new Map<string, WedgeTracker>());
+  /**
+   * A reader's burst that arrives while its unit is still being checked (the
+   * operator already moved to the next box): kept, and linked to the next
+   * empty unit once the first link lands — never silently dropped (UX #5).
+   */
+  const queueTrackers = useRef(new Map<string, WedgeTracker>());
+  const queuedRead = useRef<{ from: string; text: string; source: ReadPayload['source'] } | null>(null);
   const inputs = useRef(new Map<string, HTMLInputElement>());
   const rows = useRef(new Map<string, HTMLElement>());
   const afterSheet = useRef<string | null>(null);
   const serialsRef = useRef(serials);
   serialsRef.current = serials;
 
-  const trackerFor = (key: string) => {
-    let t = trackers.current.get(key);
+  const trackerFor = (key: string, map = trackers.current) => {
+    let t = map.get(key);
     if (!t) {
       t = new WedgeTracker();
-      trackers.current.set(key, t);
+      map.set(key, t);
     }
     return t;
   };
@@ -139,7 +155,7 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
   }, [orderId, onChanged]);
 
   const applyLink = useCallback(
-    (res: LinkResult, read: ReadPayload) => {
+    (res: LinkResult, read: ReadPayload, fromSheet = false) => {
       const key = slotKey(res.slot);
       onChanged(withSlot(serialsRef.current, res.slot, res.slot.assignment));
       setErrors((e) => {
@@ -148,15 +164,20 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
         return rest;
       });
       setJustLinked(key);
-      toast.success(res.outcome === 'existing' ? `${s.existingLine1} · ${s.existingLine2}` : s.linkedLine, {
-        id: `serial-${key}`,
-        description: res.slot.assignment?.serial_display,
-      });
-      for (const w of res.warnings) toast.info(s.warnings[w] ?? w, { id: `serial-${key}-${w}` });
+      // The camera sheet showed its own verdict (and keeps a warning on screen
+      // until «تم»): a toast on top would say it twice (UX review #7).
+      if (!fromSheet) {
+        // §31's one sentence for a device already on record (critique-1 #32).
+        toast.success(res.outcome === 'existing' ? refusalText('SERIAL_EXISTING_LINKED', l3, s.existingLine1) : s.linkedLine, {
+          id: `serial-${key}`,
+          description: res.slot.assignment?.serial_display,
+        });
+        for (const w of res.warnings) toast.info(s.warnings[w] ?? w, { id: `serial-${key}-${w}` });
+      }
       refresh();
       return read;
     },
-    [onChanged, refresh, s, toast]
+    [onChanged, refresh, s, toast, l3]
   );
 
   /** The next empty unit after `key`, in screen order. */
@@ -182,6 +203,7 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
       void _gone;
       return rest;
     });
+    let follow: { slot: SerialSlotView; text: string; source: ReadPayload['source'] } | null = null;
     try {
       const res = await serialsApi.scan(orderId, slot, read, newOpId());
       setDrafts((d) => ({ ...d, [key]: '' }));
@@ -191,16 +213,29 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
       // A reader fills Unit 1, Unit 2, Unit 3 without a mouse — but never
       // advances past a box SN (the device serial of that box comes next).
       const next = source !== 'relink' && !looksLikeBoxSn(text) ? nextEmpty(key) : null;
+      const queued = queuedRead.current?.from === key ? queuedRead.current : null;
+      if (queued) queuedRead.current = null;
+      const nextSlot = next ? (serialsRef.current.slots ?? []).find((x) => slotKey(x) === next) ?? null : null;
+      if (queued && nextSlot) follow = { slot: nextSlot, text: queued.text, source: queued.source };
+      else if (queued && !looksLikeBoxSn(text)) toast.info(s.queuedDropped, { id: `serial-queued-${key}` });
       // Otherwise the cursor stays on this unit (its field is gone now that
       // it is linked), so the keyboard never falls back to the page.
       afterPaint(() => (next ? inputs.current.get(next) : rows.current.get(key))?.focus({ preventScroll: !next }));
     } catch (e) {
       setErrors((prev) => ({ ...prev, [key]: { error: e, read } }));
       scanFeedback(e instanceof ApiError && e.code === 'SERIAL_INVALID' ? 'invalid' : 'exists');
+      // The read that came in behind a refused one has no unit to go to: say so.
+      if (queuedRead.current?.from === key) {
+        queuedRead.current = null;
+        toast.info(s.queuedDropped, { id: `serial-queued-${key}` });
+      }
       afterPaint(() => inputs.current.get(key)?.select());
     } finally {
       setBusyKey(key, false);
+      queueTrackers.current.get(key)?.reset();
     }
+    // The burst that waited: into the next empty unit, through the same door.
+    if (follow) void submitField(follow.slot, { text: follow.text, source: follow.source });
   };
 
   const openSheet = (slot: SerialSlotView, replace?: SlotAssignment, initialRefusal: SlotError | null = null) => {
@@ -246,7 +281,8 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
       onChanged(withSlot(serialsRef.current, slot, null));
       toast.success(s.removed, { id: `serial-${key}` });
       refresh();
-      afterPaint(() => inputs.current.get(key)?.focus() ?? rows.current.get(key)?.focus());
+      // The field when it is there (a reader's next scan goes into it), else the row.
+      afterPaint(() => (inputs.current.get(key) ?? rows.current.get(key))?.focus());
     } catch (e) {
       const r = serialRefusal(e, lang);
       toast.error(r.text, { description: r.detail ?? undefined });
@@ -255,14 +291,40 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
     }
   };
 
-  // «اذهب إلى الوحدة»: bring the slot into view and put the cursor in it.
+  /** §30 «أعد ربطه»: the slot's previous serial, by its released binding (works masked too). */
+  const relink = async (slot: SerialSlotView) => {
+    const prev = slot.previous;
+    if (!prev) return;
+    const key = slotKey(slot);
+    if (busy.has(key)) return;
+    const read: ReadPayload = { code: prev.serial_full ?? prev.serial_display, source: 'relink', ...(prev.assignment_id ? { previous_assignment_id: prev.assignment_id } : {}) };
+    setBusyKey(key, true);
+    try {
+      const res = await serialsApi.scan(orderId, slot, read, newOpId());
+      scanFeedback('added');
+      applyLink(res, read);
+      afterPaint(() => rows.current.get(key)?.focus({ preventScroll: true }));
+    } catch (e) {
+      setErrors((p) => ({ ...p, [key]: { error: e, read } }));
+      scanFeedback('exists');
+    } finally {
+      setBusyKey(key, false);
+    }
+  };
+
+  // «اذهب إلى الوحدة»: bring the slot into view and put the cursor in it —
+  // once: the holder clears the request, so a remount never replays it.
+  const focusHandled = useRef(onFocusHandled);
+  focusHandled.current = onFocusHandled;
   useEffect(() => {
     if (!focusRequest) return;
     const el = rows.current.get(focusRequest.key);
     if (!el) return;
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    // A JS `behavior` wins over the CSS reduced-motion rule, so it is chosen here.
+    el.scrollIntoView({ block: 'center', behavior: motionPrefs.reduced ? 'auto' : 'smooth' });
     afterPaint(() => (inputs.current.get(focusRequest.key) ?? el).focus({ preventScroll: true }));
-  }, [focusRequest]);
+    focusHandled.current?.();
+  }, [focusRequest, motionPrefs.reduced]);
 
   // The «just linked» glow is a moment, not a state.
   useEffect(() => {
@@ -344,8 +406,19 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
                     }}
                     onKey={(e) => {
                       // While this unit is being checked its field is read-only:
-                      // keys typed now are not part of the value it will send.
-                      if (busy.has(key)) return;
+                      // keys typed now are not part of the value it will send —
+                      // but a READER's burst is the next box: it waits in line.
+                      if (busy.has(key)) {
+                        const q = trackerFor(key, queueTrackers.current);
+                        if (isTerminator(e.key, q.inBurst)) {
+                          e.preventDefault();
+                          const r = q.finish('');
+                          if (r.text && r.source === 'scanner') queuedRead.current = { from: key, text: r.text, source: r.source };
+                          return;
+                        }
+                        q.push(e.nativeEvent);
+                        return;
+                      }
                       const t = trackerFor(key);
                       if (isTerminator(e.key, t.inBurst)) {
                         if (e.key === 'Tab') {
@@ -361,7 +434,7 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
                     onCamera={() => openSheet(slot)}
                     onChange={(a) => openSheet(slot, a)}
                     onRemove={(a) => void remove(slot, a)}
-                    onRelink={(serial) => void submitField(slot, { text: serial, source: 'relink' })}
+                    onRelink={() => void relink(slot)}
                     onOverride={(err) => openSheet(slot, undefined, err)}
                     onOpenSerial={onOpenSerial}
                     inputRef={(el) => {
@@ -395,7 +468,7 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
           afterSheet.current = null;
           if (key) (inputs.current.get(key) ?? rows.current.get(key))?.focus({ preventScroll: false });
         }}
-        onLinked={(res, read) => applyLink(res, read)}
+        onLinked={(res, read) => applyLink(res, read, true)}
       />
       {confirmDialog}
       {promptDialog}
@@ -448,7 +521,7 @@ function SlotRow({
   onCamera: () => void;
   onChange: (a: SlotAssignment) => void;
   onRemove: (a: SlotAssignment) => void;
-  onRelink: (serial: string) => void;
+  onRelink: () => void;
   onOverride: (err: SlotError) => void;
   onOpenSerial?: (serial: string) => void;
   inputRef: (el: HTMLInputElement | null) => void;
@@ -500,7 +573,7 @@ function SlotRow({
                   </button>
                 ) : (
                   <p className="font-mono tabular-nums text-[14px] text-text-primary break-all" data-serial-value>
-                    <span dir="ltr">{a.serial_display}</span>
+                    <SerialText value={a.serial_display} s={s} />
                   </p>
                 )}
               </div>
@@ -596,6 +669,8 @@ function SlotRow({
               {busy ? (
                 <span className="inline-flex h-9 items-center gap-1.5 px-3 text-[12.5px] font-semibold text-text-secondary" role="status">
                   <Spinner size="sm" delayMs={0} decorative />
+                  {/* Narrow phones show the spinner only; a screen reader still hears it (UX #10). */}
+                  <span className="sr-only min-[400px]:hidden">{s.linking}</span>
                   <span className="hidden min-[400px]:inline">{s.linking}</span>
                 </span>
               ) : draft.trim() ? (
@@ -624,7 +699,10 @@ function SlotRow({
             </div>
           </form>
         ) : (
-          <p className="min-w-0 flex-1 text-[13px] text-text-secondary">—</p>
+          <p className="min-w-0 flex-1 text-[13px] text-text-secondary">
+            <span aria-hidden>—</span>
+            <span className="sr-only">{s.notLinked}</span>
+          </p>
         )}
       </div>
 
@@ -636,12 +714,12 @@ function SlotRow({
             <span className="min-w-0 break-words">
               {slot.previous.free ? s.previous(slot.previous.serial_display) : s.previousTaken(slot.previous.serial_display)}
             </span>
-            {slot.previous.free && slot.previous.serial_full && canCapture && (
+            {slot.previous.free && (slot.previous.assignment_id || slot.previous.serial_full) && canCapture && (
               <button
                 type="button"
-                onClick={() => onRelink(slot.previous!.serial_full!)}
+                onClick={onRelink}
                 disabled={busy}
-                className="inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-full border border-border-subtle text-[12px] font-semibold text-text-primary hover:bg-surface-selected disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                className={`inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-full border border-border-subtle text-[12px] font-semibold text-text-primary hover:bg-surface-selected disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold ${HIT_44}`}
                 data-serial-relink
               >
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden />
@@ -663,7 +741,7 @@ function SlotRow({
             <button
               type="button"
               onClick={() => onOverride(error)}
-              className="mt-1.5 ms-5 inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full border border-border-subtle text-[12px] font-semibold text-text-primary hover:bg-surface-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+              className={`mt-1.5 ms-5 inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full border border-border-subtle text-[12px] font-semibold text-text-primary hover:bg-surface-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold ${HIT_44}`}
               data-serial-owner-override={overrideKind}
             >
               <ShieldAlert className="h-3.5 w-3.5" aria-hidden />
@@ -683,6 +761,26 @@ function SlotRow({
         </ul>
       )}
     </li>
+  );
+}
+
+/**
+ * A compact control that still takes a 44 px tap (apple-design §6, UX #17):
+ * an invisible band above and below, the pill itself unchanged.
+ */
+export const HIT_44 = "relative before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']";
+
+/** A serial as text; a masked one is read as its last digits, not «star star star star». */
+function SerialText({ value, s }: { value: string; s: SerialStrings }) {
+  const masked = /^\*+(.{1,4})$/.exec(value);
+  if (!masked) return <span dir="ltr">{value}</span>;
+  return (
+    <>
+      <span dir="ltr" aria-hidden>
+        {value}
+      </span>
+      <span className="sr-only">{s.endingIn(masked[1])}</span>
+    </>
   );
 }
 

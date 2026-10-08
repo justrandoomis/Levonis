@@ -42,14 +42,23 @@ export interface ReadPayload {
   ean?: string | null;
   box_sn?: string | null;
   source: LinkSource;
+  /**
+   * «أعد ربطه» (§30): the released binding whose serial to link again. The
+   * server reads the serial itself, so a viewer who only sees it masked (an
+   * assistant) can re-link it (UX review #16); `code` is then only a label.
+   */
+  previous_assignment_id?: string;
 }
 
-const clean = (r: ReadPayload) => ({
-  code: r.code,
-  ...(r.ean ? { ean: r.ean } : {}),
-  ...(r.box_sn && normalizeSerial(r.box_sn) !== normalizeSerial(r.code) ? { box_sn: r.box_sn } : {}),
-  source: r.source,
-});
+const clean = (r: ReadPayload) =>
+  r.previous_assignment_id
+    ? { previous_assignment_id: r.previous_assignment_id, source: 'relink' as const }
+    : {
+        code: r.code,
+        ...(r.ean ? { ean: r.ean } : {}),
+        ...(r.box_sn && normalizeSerial(r.box_sn) !== normalizeSerial(r.code) ? { box_sn: r.box_sn } : {}),
+        source: r.source,
+      };
 
 export const serialsApi = {
   // A background re-read after a link the screen already shows: the mascot stays out of it.

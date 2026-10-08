@@ -202,7 +202,7 @@ export function classifyLabel(codes: readonly DecodedCode[]): LabelRead {
 /** The most lines one bulk paste may carry (the server re-checks). */
 export const BULK_MAX_LINES = 1000;
 
-export type BulkRowProblem = SerialProblem | 'EAN_INVALID' | 'BOX_SN_INVALID';
+export type BulkRowProblem = SerialProblem | 'EAN_INVALID' | 'BOX_SN_INVALID' | 'SERIAL_LOOKS_LIKE_BOX';
 
 export interface BulkRow {
   /** 1-based line number in the pasted text. */
@@ -277,6 +277,15 @@ export function buildBulkRow(
   const boxRaw = String(fields.box_sn ?? '').trim();
   const boxNorm = normalizeSerial(boxRaw);
   let problem: BulkRowProblem | null = serialProblem(serialRaw);
+  // The same reading as every other door (serial-scan critique H1): a product
+  // barcode of ANY length (EAN-8, UPC-A, EAN-13, ITF-14) and a box SN are not
+  // device serials — filed as one, the device would get a second asset the
+  // moment its real Product SN is scanned.
+  if (!problem) {
+    const kind = classifyCode({ text: serialRaw }).kind;
+    if (kind === 'ean') problem = 'SERIAL_LOOKS_LIKE_EAN';
+    else if (kind === 'box_sn') problem = 'SERIAL_LOOKS_LIKE_BOX';
+  }
   if (!problem && ean === null) problem = 'EAN_INVALID';
   if (!problem && boxRaw && (boxNorm.length < 4 || boxNorm.length > 60 || !/^[A-Z0-9]+$/.test(boxNorm))) problem = 'BOX_SN_INVALID';
   return {
