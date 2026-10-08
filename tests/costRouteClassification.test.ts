@@ -38,7 +38,22 @@ import { pathToFileURL } from 'node:url';
 import { ROOT } from './fixtures/d1';
 import { asD1, stubApp, type StubUser } from './fixtures/app';
 import { codeOf } from './fixtures/source';
-import { BASE_MOUNTS, OWNER, ROLES, call, concrete, resolveBody, seededCopy, type Router, type WriteBody } from './fixtures/roleMatrix';
+import {
+  BASE_MOUNTS,
+  OWNER,
+  OWNER_UNVERIFIED,
+  ROLES,
+  call,
+  concrete,
+  leaks,
+  resolveBody,
+  seededCopy,
+  seededCopyUnverifiedOwner,
+  type Router,
+  type WriteBody,
+} from './fixtures/roleMatrix';
+import { serverMessage } from '../packages/contracts/src/costRefusals';
+import type { DatabaseSync } from 'node:sqlite';
 import { noStoreUnlessSet } from '../worker/lib/edgePolicy';
 import { ruleOf, type MountClass, type RouteClassFile, type RouteRule } from './routeClass/_types';
 
@@ -139,8 +154,8 @@ const fakePath = (e: Entry) => `${e.mount.prefix}${e.path.replace(/:([A-Za-z_]+)
 const TAMPER = '?include=cost&expand=all&fields=cost_iqd&role=owner&admin_scope=full';
 
 /** The router on its prefix, behind the same no-store layer worker/index.ts mounts on /api/admin/*. */
-function mountApp(e: Pick<Entry, 'mount'>, user: StubUser | null) {
-  return stubApp(asD1(seededCopy()), user, (a) => {
+function mountApp(e: Pick<Entry, 'mount'>, user: StubUser | null, seed: () => DatabaseSync = seededCopy) {
+  return stubApp(asD1(seed()), user, (a) => {
     a.use('/api/admin/*', noStoreUnlessSet);
     a.route(e.mount.prefix, e.mount.router);
   });
@@ -240,9 +255,77 @@ test('COST: every non-owner admin is refused at the guard — one answer for a r
           if (status === 403 && codeOfBody(res.body) !== 'COST_ACCESS_DENIED') {
             problems.push(`${role} ${e.method} ${path}: code ${codeOfBody(res.body)}`);
           }
+          // The sentence too, byte for byte: the amendment added a second
+          // answer for the owner's own session and changed nothing here.
+          if (status === 403 && (res.body as { error?: unknown } | null)?.error !== serverMessage('COST_ACCESS_DENIED')) {
+            problems.push(`${role} ${e.method} ${path}: the COST_ACCESS_DENIED sentence changed`);
+          }
         }
         const [a, b, c] = answers.map((x) => JSON.stringify(x.body));
         if (a !== b || a !== c) problems.push(`${role} ${e.method} ${e.mount.prefix}${e.path}: the refusal differs between a real id, a fake id and a tampered query`);
+      }
+    }
+  }
+  assert.deepEqual(problems, []);
+});
+
+test('COST, DECISIONS row 185 amendment: the owner before the address is verified hears OWNER_EMAIL_UNVERIFIED at every cost route — one answer for a real id, an invented one and a tampered query, and no cost in it', async () => {
+  const cost = await entries((e) => e.rule.cls === 'cost_read' || e.rule.cls === 'cost_write');
+  assert.ok(cost.length >= 90);
+  const problems: string[] = [];
+  const byMount = new Map<MountClass, Entry[]>();
+  for (const e of cost) byMount.set(e.mount, [...(byMount.get(e.mount) ?? []), e]);
+  for (const [mount, list] of byMount) {
+    const app = mountApp({ mount }, OWNER_UNVERIFIED, seededCopyUnverifiedOwner);
+    for (const e of list) {
+      const answers: string[] = [];
+      for (const path of [realPath(e), fakePath(e), `${realPath(e)}${TAMPER}`]) {
+        const res = await call(app, e.method, path, {});
+        answers.push(JSON.stringify(res.body));
+        // Every cost route, the profit preview's 404 included: the way out, with nothing about the target.
+        if (res.status !== 403 || codeOfBody(res.body) !== 'OWNER_EMAIL_UNVERIFIED') {
+          problems.push(`${e.method} ${path}: ${res.status} ${codeOfBody(res.body)}`);
+        }
+        for (const l of leaks(res.body)) problems.push(`${e.method} ${path}: cost in the refusal ${l}`);
+      }
+      if (answers[0] !== answers[1] || answers[0] !== answers[2]) {
+        problems.push(`${e.method} ${e.mount.prefix}${e.path}: the answer differs between a real id, a fake id and a tampered query`);
+      }
+    }
+  }
+  assert.deepEqual(problems, []);
+});
+
+test('COST: nobody but the owner-address admin can ever hear OWNER_EMAIL_UNVERIFIED — not a guest, a customer, a merchant, another admin, or a non-admin row holding the owner address in any spelling', async () => {
+  const cost = await entries((e) => e.rule.cls === 'cost_read' || e.rule.cls === 'cost_write');
+  const callers: Array<[string, StubUser | null]> = [
+    ['guest', null],
+    ['customer', ROLES.customer],
+    ['merchant', ROLES.merchant],
+    ['assistant', ROLES.assistant],
+    ['full', ROLES.full],
+    ['unverified full admin', { ...ROLES.full!, email_verified_at: null }],
+    ['customer with the owner address', { id: 'u1', role: 'customer', email: 'boss@x.co', email_verified_at: null }],
+    ['merchant with the owner address, upper case', { id: 'u_m', role: 'merchant', email: 'BOSS@X.CO', email_verified_at: null }],
+    ['customer with the owner address, padded', { id: 'u1', role: 'customer', email: '  Boss@x.co ', email_verified_at: null }],
+    ['admin with a lookalike address', { id: 'usr_full', role: 'admin', email: 'boss@x.co.evil', admin_scope: 'full', email_verified_at: null }],
+  ];
+  const problems: string[] = [];
+  // One route per mount is enough for the non-admins (requireAdmin stops them
+  // before any cost door); every route for the admins.
+  const byMount = new Map<MountClass, Entry[]>();
+  for (const e of cost) byMount.set(e.mount, [...(byMount.get(e.mount) ?? []), e]);
+  for (const [who, user] of callers) {
+    const admin = user?.role === 'admin';
+    for (const [mount, list] of byMount) {
+      const app = mountApp({ mount }, user, seededCopyUnverifiedOwner);
+      for (const e of admin ? list : list.slice(0, 1)) {
+        const res = await call(app, e.method, realPath(e), {});
+        if (codeOfBody(res.body) === 'OWNER_EMAIL_UNVERIFIED') problems.push(`${who} ${e.method} ${realPath(e)}`);
+        if (res.status >= 200 && res.status < 300) problems.push(`${who} ${e.method} ${realPath(e)}: answered ${res.status}`);
+        if (admin && e.rule.refusal?.status !== 404 && codeOfBody(res.body) !== 'COST_ACCESS_DENIED') {
+          problems.push(`${who} ${e.method} ${realPath(e)}: ${res.status} ${codeOfBody(res.body)} (want COST_ACCESS_DENIED)`);
+        }
       }
     }
   }

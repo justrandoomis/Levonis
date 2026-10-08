@@ -66,7 +66,7 @@ test('C1: none of the alias names the area specs invented exists, in code or as 
 
 test('the predicates are DEFINED in worker/lib/adminScope.ts and nowhere else', () => {
   const def = (name: string) => new RegExp(`(function\\s+${name}\\s*[(<]|(const|let|var)\\s+${name}\\s*[=:])`);
-  for (const name of ['canViewCost', 'canWriteCost', 'canMoveMoney', 'viewerClass', 'hasPrivateGrant', 'projectForAdmin']) {
+  for (const name of ['canViewCost', 'canWriteCost', 'canMoveMoney', 'viewerClass', 'hasPrivateGrant', 'projectForAdmin', 'isUnverifiedOwner']) {
     const where = ALL.filter((f) => def(name).test(code(f)));
     assert.deepEqual(where, ['worker/lib/adminScope.ts'], `${name} is defined once`);
   }
@@ -112,6 +112,21 @@ test('C2: a non-owner hears COST_ACCESS_DENIED, and none of the dropped codes ex
   ];
   const re = new RegExp(`['"\`](${dropped.join('|')})['"\`]`);
   assert.deepEqual(ALL.filter((f) => re.test(code(f))), [], 'a dropped refusal code is in use');
+});
+
+test('DECISIONS row 185 amendment: every cost refusal goes through costRefusal — no door throws costDenied() itself', () => {
+  // `costRefusal` answers the owner's unverified session with the way out
+  // (OWNER_EMAIL_UNVERIFIED) and everyone else with the very same
+  // COST_ACCESS_DENIED. A door that called costDenied() directly would lock
+  // the owner out without a word, so only costAccess.ts may name it.
+  const direct = ALL.filter((f) => f.startsWith('worker/') && f !== 'worker/lib/costAccess.ts' && /\bcostDenied\s*\(/.test(code(f)));
+  assert.deepEqual(direct, []);
+  const access = code('worker/lib/costAccess.ts');
+  assert.match(access, /return isUnverifiedOwner\(env, user\) \? ownerEmailUnverified\(details\) : costDenied\(details\);/);
+  assert.match(access, /if \(!canViewCost\(c\.env, user\)\) throw costRefusal\(c\.env, user\);/);
+  assert.match(access, /if \(!canWriteCost\(c\.env, user\)\) throw costRefusal\(c\.env, user, \{ fields \}\);/);
+  // The one cost read that 404s a non-owner gives the owner's unverified session the way out instead.
+  assert.match(code('worker/routes/adminInventory.ts'), /if \(isUnverifiedOwner\(c\.env, c\.get\('user'\)\)\) throw ownerEmailUnverified\(\);\s*throw notFound\('Not found'\);/);
 });
 
 // ------------------------------------------------------------- the doors

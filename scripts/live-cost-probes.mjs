@@ -34,16 +34,10 @@
  *   node scripts/live-cost-probes.mjs --base https://…      (another origin)
  *   node scripts/live-cost-probes.mjs --dir path/to/probes  (another probe folder)
  *
- * THE OWNER ROW (critique A10). Workflow 7 also runs, BEFORE anything is
- * migrated or deployed,
- *
- *   node scripts/live-cost-probes.mjs --owner-row <wrangler-d1-json-output>
- *
- * over one read-only SELECT of two counts (admin rows holding the owner's
- * address, and how many of them are verified). Exactly one verified row passes;
- * anything else — none, two, unverified, an unreadable answer — stops the
- * deploy, because cost is honoured only for that verified row and shipping
- * without it would lock the owner out of every cost screen.
+ * NO OWNER-ROW CHECK (DECISIONS row 185 amendment, 2026-10-08). The deploy no
+ * longer reads the users table: an owner whose address is not verified yet is
+ * refused cost with OWNER_EMAIL_UNVERIFIED and verifies from the admin
+ * screens, so there is nothing to stop a deploy for.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -131,34 +125,6 @@ export function loadProbeFiles(dir) {
     .map((file) => ({ file, spec: JSON.parse(readFileSync(join(dir, file), 'utf8')) }));
 }
 
-/**
- * The verdict on the owner row: null when exactly one verified admin row holds
- * INITIAL_ADMIN_EMAIL, otherwise the reason. Wrangler prefixes its JSON with
- * banner lines, so the parse starts at the first bracket.
- */
-export function ownerRowVerdict(raw) {
-  const start = String(raw ?? '').indexOf('[');
-  if (start === -1) return 'the owner row could not be read (no JSON in the query output)';
-  let rows;
-  try {
-    const parsed = JSON.parse(String(raw).slice(start));
-    rows = (Array.isArray(parsed) ? parsed : [parsed]).flatMap((r) => r?.results ?? []);
-  } catch {
-    return 'the owner row could not be read (the query output is not JSON)';
-  }
-  const row = rows[0];
-  if (!row) return 'the owner row could not be read (no result row)';
-  const n = Number(row.n);
-  const verified = Number(row.verified);
-  if (!Number.isFinite(n) || !Number.isFinite(verified)) return 'the owner row could not be read (no counts)';
-  if (n === 0) return 'no admin account holds INITIAL_ADMIN_EMAIL — the owner has not been bootstrapped, or the address is wrong';
-  if (n > 1) return `${n} admin accounts hold INITIAL_ADMIN_EMAIL — exactly one may`;
-  if (verified !== 1) {
-    return 'the owner account has no verified address — sign in once with Google (or confirm the address) and run this workflow again';
-  }
-  return null;
-}
-
 async function get(base, path) {
   const res = await fetch(new URL(path, base), {
     method: 'GET',
@@ -175,23 +141,6 @@ async function main() {
     const i = args.indexOf(name);
     return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
   };
-  const ownerRowFile = flag('--owner-row', '');
-  if (ownerRowFile) {
-    let raw = '';
-    try {
-      raw = readFileSync(ownerRowFile, 'utf8');
-    } catch {
-      raw = '';
-    }
-    const why = ownerRowVerdict(raw);
-    if (why) {
-      console.log(`::error::${why}`);
-      console.log('::error::حساب المالك (INITIAL_ADMIN_EMAIL) غير موجود أو غير موثّق؛ لن يستطيع المالك فتح شاشات التكلفة، لذلك توقف النشر.');
-      process.exit(1);
-    }
-    console.log('owner row: exactly one verified admin account holds INITIAL_ADMIN_EMAIL');
-    process.exit(0);
-  }
   const base = flag('--base', 'https://levonis-iq.com');
   const dir = resolve(flag('--dir', join(HERE, 'live-cost-probes.d')));
   const files = loadProbeFiles(dir);

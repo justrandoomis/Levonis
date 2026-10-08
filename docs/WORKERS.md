@@ -48,10 +48,16 @@ the bookmark: `SELECT MAX(created_at) FROM orders` and the same on
 ### Cost-privacy checks (owner decision 2, DECISIONS row 185)
 
 Before anything is migrated, workflow 7 refuses an empty `INITIAL_ADMIN_EMAIL`
-and checks, read-only, that exactly one admin account holds that address and
-that it is verified (cost is honoured only for that account). After the deploy,
-«Cost-privacy probes, read-only» runs `scripts/live-cost-probes.mjs` over every
-`scripts/live-cost-probes.d/*.json`: anonymous GETs only, no cookie, no write.
+(it reads the worker's vars only — the deploy never reads the `users` table,
+DECISIONS row 185 amendment of 2026-10-08). Cost is honoured only for the admin
+account holding that address once the address is verified; until then the site
+itself tells the owner so (`403 OWNER_EMAIL_UNVERIFIED`) and the admin screens
+offer the verification email (connecting Google on the same address, or signing
+in with an already-connected Google, verifies it too).
+The session reads the stamp on every request, so cost opens on the next request
+after it, with no redeploy. After the deploy, «Cost-privacy probes, read-only»
+runs `scripts/live-cost-probes.mjs` over every `scripts/live-cost-probes.d/*.json`:
+anonymous GETs only, no cookie, no write.
 
 ## THE LIVE WORKER HAD TWO DEPLOYERS, AND ONLY ONE OF THEM RAN MIGRATIONS
 

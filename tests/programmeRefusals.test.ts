@@ -41,6 +41,9 @@ const REQUIRED: Record<string, readonly string[]> = {
     'GRANT_EXISTS',
   ],
   'S1 user PATCH (security spec §5.2)': ['SELF_DEMOTE', 'OWNER_LOCKED'],
+  // The owner chose the most secure option: the verified-owner rule stays, and
+  // an unverified owner is told how to verify instead of being locked out.
+  'DECISIONS row 185 amendment (2026-10-08)': ['OWNER_EMAIL_UNVERIFIED'],
   'critique G-34': ['PRODUCT_CURRENTLY_UNAVAILABLE'],
   'ENG §6.3': ['ENGINE_MANAGED', 'ENGINE_MANAGED_PRICES_KEPT', 'PREMIUM_NOT_ON_STEP'],
   'RUN §6': ['PRICING_INCOMPLETE_KEPT_HIDDEN', 'PRICING_PREVIEW_STALE', 'PRICING_PREVIEW_EXPIRED', 'PRICING_ENGINE_PAUSED', 'COMPOSITION_NOT_PRICEABLE'],
@@ -184,6 +187,7 @@ test('the access refusals carry no number, id or field value — one oracle-free
     'INVESTOR_FLAG_OWNER_ONLY',
     'ROLE_CHANGE_DENIED',
     'OWNER_EMAIL_LOCKED',
+    'OWNER_EMAIL_UNVERIFIED',
     'REAUTH_REQUIRED',
   ] as const) {
     assert.doesNotMatch(serverMessage(code), /[0-9٠-٩]/, code);
@@ -225,4 +229,22 @@ test('critique G-34: the add and quote doors say exactly «هذا المنتج �
   assert.ok(existing, 'PRODUCT_UNAVAILABLE keeps its own table entry');
   assert.notDeepEqual(existing, COST_REFUSALS.PRODUCT_CURRENTLY_UNAVAILABLE, 'the cart wording stays the cart wording');
   assert.equal(PRODUCT_UNAVAILABLE_SERVER_MESSAGE, 'هذا المنتج غير متوفر حالياً. / This product is currently unavailable.');
+});
+
+test('OWNER_EMAIL_UNVERIFIED names the way out in all three languages, in the contract’s own terms', () => {
+  const { ar, en, ckb } = COST_REFUSALS.OWNER_EMAIL_UNVERIFIED;
+  // Not the "main admin only" sentence: a different answer, said only to the owner's own session.
+  assert.notEqual(serverMessage('OWNER_EMAIL_UNVERIFIED'), serverMessage('COST_ACCESS_DENIED'));
+  // Verify the email…
+  assert.match(ar, /أكّد بريدك الإلكتروني/);
+  assert.match(en, /Verify your email/);
+  assert.match(ckb, /ئیمەیڵەکەت پشتڕاست بکەرەوە/);
+  // …or Google on the same address.
+  for (const s of [ar, en, ckb]) assert.match(s, /Google/);
+  // C32 terminology: main admin «بەڕێوەبەری سەرەکی», cost «تێچوو».
+  assert.match(ckb, /بەڕێوەبەری سەرەکی/);
+  assert.match(ckb, /تێچوو/);
+  assert.notEqual(ckb, ar);
+  assert.notEqual(ckb, en);
+  assert.deepEqual(REFUSAL_STRINGS.OWNER_EMAIL_UNVERIFIED, COST_REFUSALS.OWNER_EMAIL_UNVERIFIED);
 });

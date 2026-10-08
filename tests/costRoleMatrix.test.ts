@@ -30,17 +30,31 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BASE_MOUNTS, OWNER, ROLES, getPaths, sweepGets, type RoleName, type SweepResult } from './fixtures/roleMatrix';
+import {
+  BASE_MOUNTS,
+  OWNER,
+  OWNER_UNVERIFIED,
+  ROLES,
+  getPaths,
+  seededCopyUnverifiedOwner,
+  sweepGets,
+  type RoleName,
+  type SweepResult,
+} from './fixtures/roleMatrix';
 
 const PATHS = getPaths();
 
 /** One sweep per role, computed once and shared by the tests that read it. */
 const cache = new Map<string, Promise<SweepResult>>();
-function sweep(role: RoleName | 'owner'): Promise<SweepResult> {
+function sweep(role: RoleName | 'owner' | 'owner_unverified'): Promise<SweepResult> {
   let p = cache.get(role);
   if (!p) {
-    const user = role === 'owner' ? OWNER : ROLES[role];
-    p = sweepGets({ roles: { [role]: user } }).then((r) => r[role]!);
+    // The owner before the address is verified reads a database whose owner
+    // row carries no stamp either (DECISIONS row 185 amendment).
+    p =
+      role === 'owner_unverified'
+        ? sweepGets({ roles: { [role]: OWNER_UNVERIFIED }, seed: seededCopyUnverifiedOwner }).then((r) => r[role]!)
+        : sweepGets({ roles: { [role]: role === 'owner' ? OWNER : ROLES[role] } }).then((r) => r[role]!);
     cache.set(role, p);
   }
   return p;
@@ -75,6 +89,32 @@ for (const role of Object.keys(ROLES) as RoleName[]) {
     assert.deepEqual(r.leaks, [], `cost reached ${role}:\n${r.leaks.join('\n')}`);
   });
 }
+
+test('DECISIONS row 185 amendment — the owner BEFORE the address is verified: no GET answer or refusal carries a cost, and every cost door says OWNER_EMAIL_UNVERIFIED', async () => {
+  const r = await sweep('owner_unverified');
+  assert.ok(r.answered >= 150, `only ${r.answered} routes answered the unverified owner — the sweep is not reaching anything`);
+  assert.deepEqual(r.leaks, [], `cost reached the unverified owner:\n${r.leaks.join('\n')}`);
+  // Never the generic refusal: every door that refuses this session names the way out.
+  const generic = Object.entries(r.codes).filter(([, c]) => c === 'COST_ACCESS_DENIED').map(([p]) => p);
+  assert.deepEqual(generic, [], 'a cost door answered the unverified owner with COST_ACCESS_DENIED instead of OWNER_EMAIL_UNVERIFIED');
+  const owner = await sweep('owner');
+  const problems: string[] = [];
+  let wayOut = 0;
+  for (const path of owner.costSeen) {
+    const status = r.statuses[path];
+    if (status === undefined || status >= 500) problems.push(`${path}: ${status}`);
+    else if (status === 403) {
+      if (r.codes[path] !== 'OWNER_EMAIL_UNVERIFIED') problems.push(`${path}: 403 ${r.codes[path]}`);
+      else wayOut += 1;
+    }
+  }
+  assert.deepEqual(problems, []);
+  assert.ok(wayOut >= 5, `the unverified owner was shown the way out on only ${wayOut} of the owner's cost screens`);
+  // The finance screens are shut to this session, every one of them, with the way out.
+  const finance = PATHS.filter((p) => /^\/api\/admin\/(finance|finance-workspace|finance-people|finance-operations)(\/|$)/.test(p));
+  const open = finance.filter((p) => r.statuses[p] !== 403 || r.codes[p] !== 'OWNER_EMAIL_UNVERIFIED');
+  assert.deepEqual(open, []);
+});
 
 test('the owner sees the seeded costs where they live: the product, the lot, the order, the finance screens', async () => {
   const r = await sweep('owner');

@@ -144,7 +144,7 @@ function clearTokenFromUrl(): void {
 }
 
 export default function EmailVerifyBanner() {
-  const { isAuthenticated, isLoaded } = useAuth();
+  const { isAuthenticated, isLoaded, refreshUser } = useAuth();
   const { lang } = useLanguage();
   const t = STRINGS[lang] ?? STRINGS.ar;
 
@@ -241,7 +241,13 @@ export default function EmailVerifyBanner() {
       await api.post('/api/auth/verify-email/confirm', { token });
       setConfirmState('done');
       clearTokenFromUrl();
-      if (isAuthenticated) loadStatus();
+      if (isAuthenticated) {
+        loadStatus();
+        // The session's hints come from the row as it is now: for the owner,
+        // the confirmed address opens cost on this very read (can_view_cost),
+        // with no new sign-in (DECISIONS row 185 amendment).
+        void refreshUser();
+      }
     } catch {
       setConfirmState('failed');
     }

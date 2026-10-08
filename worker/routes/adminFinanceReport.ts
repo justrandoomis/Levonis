@@ -31,7 +31,9 @@
  * THE OWNER CAN NEVER BE LOCKED OUT. `canViewCost` answers true for the
  * verified INITIAL_ADMIN_EMAIL admin whatever `admin_scope` says, which is
  * what stops a compromised assistant from taking the owner's own numbers away
- * from them.
+ * from them. Before the address is verified the owner hears
+ * OWNER_EMAIL_UNVERIFIED at this door — the way in, not a lockout (DECISIONS
+ * row 185 amendment).
  *
  * ---------------------------------------------------------------------------
  * 2. WHY THE QUERIES LIVE HERE AND THE ARITHMETIC DOES NOT.

@@ -35,6 +35,7 @@ import { honestyNotices, isEstimated, type Notice } from './honesty';
 import { defaultGranularity, presetRange, rangeProblem, type PresetId } from './period';
 import { financeStrings } from './strings';
 import ExpenseLedger from './ExpenseLedger';
+import OwnerCostVerifyCard from '../auth/OwnerCostVerifyCard';
 const FinanceWorkspace = lazy(() => import('../financeWorkspace/FinanceWorkspace'));
 const FinanceOperationsPanel=lazy(()=>import('../adminOperations/FinanceOperationsPanel'));
 
@@ -181,6 +182,12 @@ export function LegacyAdminFinance() {
   const problem = period.preset === 'custom' ? rangeProblem(draft.from, draft.to) : null;
 
   // ------------------------------------------------------------- the refusal
+  // The owner's own session before the address is verified is told how to
+  // open this screen, by CODE (DECISIONS row 185 amendment) — every other 403
+  // keeps the "main admin only" sentence below.
+  if (error instanceof ApiError && error.status === 403 && error.code === 'OWNER_EMAIL_UNVERIFIED') {
+    return <OwnerCostVerifyCard />;
+  }
   if (error instanceof ApiError && error.status === 403) {
     return (
       <section dir={dir} className="mx-auto max-w-[36rem] py-14 text-center">

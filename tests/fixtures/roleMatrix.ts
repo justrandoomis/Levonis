@@ -301,6 +301,16 @@ export const ROLES: Readonly<Record<RoleName, StubUser | null>> = {
   support_assistant: { id: 'usr_support', role: 'admin', email: 'support@x.co', admin_scope: 'assistant' },
 };
 
+/**
+ * THE OWNER'S OWN SESSION BEFORE THE ADDRESS IS VERIFIED (DECISIONS row 185,
+ * amendment of 2026-10-08). The owner's address on the admin row, no
+ * verification stamp: sees NO cost anywhere — exactly like a non-owner — and
+ * hears OWNER_EMAIL_UNVERIFIED (the way out) where the others hear
+ * COST_ACCESS_DENIED. Not in ROLES: it needs its own database
+ * (`seededCopyUnverifiedOwner`), whose owner row carries no stamp either.
+ */
+export const OWNER_UNVERIFIED: StubUser = { ...OWNER, email_verified_at: null };
+
 /** The admin roles, the ones that get past `requireAdmin`. */
 export const ADMIN_ROLES: readonly RoleName[] = ['assistant', 'full', 'legacy_null', 'grantee_off', 'support_assistant'];
 
@@ -388,6 +398,13 @@ export function seededCopy(): DatabaseSync {
   resetPolicyCorpusMemo();
   const raw = new DatabaseSync(file);
   raw.exec('PRAGMA foreign_keys = ON;');
+  return raw;
+}
+
+/** A seeded copy whose owner row has no verification stamp — the database `OWNER_UNVERIFIED` reads. */
+export function seededCopyUnverifiedOwner(): DatabaseSync {
+  const raw = seededCopy();
+  raw.exec("UPDATE users SET email_verified_at = NULL WHERE id = 'usr_owner'");
   return raw;
 }
 
@@ -563,7 +580,12 @@ export interface SweepResult {
   costSeen: string[];
   /** Every path's status, for "what did THIS role get where the owner saw cost". */
   statuses: Record<string, number>;
+  /** The refusal code of every non-2xx answer that carried one. */
+  codes: Record<string, string>;
 }
+
+const refusalCodeOf = (body: unknown): string | undefined =>
+  body && typeof body === 'object' && typeof (body as { code?: unknown }).code === 'string' ? (body as { code: string }).code : undefined;
 
 const filtered = (path: string, body: unknown, extra: LeakExtra | undefined, notACost: readonly NotACost[]) =>
   leaks(body, extra).filter((l) => !notACost.some((x) => x.path.test(path) && x.leak.test(l)));
@@ -582,11 +604,17 @@ export async function sweepGets(opts: SweepOptions = {}): Promise<Record<string,
   const out: Record<string, SweepResult> = {};
   for (const [role, user] of Object.entries(roles)) {
     const app = appFor(seed(), user ?? null, mounts);
-    const result: SweepResult = { answered: 0, leaks: [], costSeen: [], statuses: {} };
+    const result: SweepResult = { answered: 0, leaks: [], costSeen: [], statuses: {}, codes: {} };
     for (const path of paths) {
       const { status, body } = await call(app, 'GET', path);
       result.statuses[path] = status;
-      if (status < 200 || status >= 300) continue;
+      if (status < 200 || status >= 300) {
+        const code = refusalCodeOf(body);
+        if (code) result.codes[path] = code;
+        // A refusal carries no cost either — walked like an answer.
+        for (const l of filtered(path, body, opts.extra, notACost)) result.leaks.push(`${path}  ${l}`);
+        continue;
+      }
       result.answered += 1;
       const found = filtered(path, body, opts.extra, notACost);
       if (found.length) result.costSeen.push(path);
@@ -622,6 +650,8 @@ export async function resolveBody(app: MatrixApp, body: WriteBody): Promise<unkn
 export interface WriteSweepResult {
   /** Requests made. */
   called: number;
+  /** Every refusal code answered, as `<METHOD path>` → code. */
+  codes: Record<string, string>;
   /** Requests that answered 2xx. */
   succeeded: number;
   /** Requests that hung past the timeout. */
@@ -651,7 +681,7 @@ export async function sweepWrites(opts: SweepOptions & { bodies?: WriteBodies; f
   const out: Record<string, WriteSweepResult> = {};
   for (const [role, user] of Object.entries(roles)) {
     const app = appFor(seed(), user ?? null, mounts);
-    const result: WriteSweepResult = { called: 0, succeeded: 0, timedOut: [], leaks: [] };
+    const result: WriteSweepResult = { called: 0, codes: {}, succeeded: 0, timedOut: [], leaks: [] };
     for (const r of routes) {
       const given = opts.bodies?.[r.key];
       const bodies: WriteBody[] = [{}];
@@ -668,6 +698,10 @@ export async function sweepWrites(opts: SweepOptions & { bodies?: WriteBodies; f
             continue;
           }
           if (res.status >= 200 && res.status < 300) result.succeeded += 1;
+          else {
+            const code = refusalCodeOf(res.body);
+            if (code) result.codes[`${r.method} ${path}`] = code;
+          }
           for (const l of filtered(path, res.body, opts.extra, notACost)) result.leaks.push(`${r.method} ${path}  ${l}`);
         }
       }

@@ -152,6 +152,10 @@ jobs:
           # empty value means nobody can open a cost screen — and an empty var
           # is dropped from vars.tsv above, so it would also stay empty after
           # this deploy. Refused here, before anything is migrated or shipped.
+          # This reads the worker's vars only. The deploy never reads the users
+          # table (DECISIONS row 185 amendment, 2026-10-08): an owner whose
+          # address is not verified yet is told so by the site itself
+          # (OWNER_EMAIL_UNVERIFIED) and verifies from the admin screens.
           awk -F'\t' '$1 == "INITIAL_ADMIN_EMAIL" && $2 != "" { found = 1 } END { exit found ? 0 : 1 }' /tmp/vars.tsv \
             || { echo "::error::INITIAL_ADMIN_EMAIL is empty on the worker — the owner (the only account that may see cost) would be locked out. Set it before deploying. / متغير INITIAL_ADMIN_EMAIL فارغ؛ لن يستطيع المالك فتح أي شاشة تكلفة."; exit 1; }
 
@@ -168,26 +172,6 @@ jobs:
         env:
           STAGING_DB_ID: ${{ steps.db.outputs.staging_db_id }}
         run: node scripts/set-deploy-ids.mjs --env staging
-
-      # THE OWNER ROW, READ-ONLY (owner decision 2; critique A10). Cost is
-      # honoured only for the verified admin row whose address is
-      # INITIAL_ADMIN_EMAIL. Exactly one such row must exist, with its address
-      # verified, or this deploy would lock the owner out of every cost screen.
-      # One SELECT of two counts; the address is never printed (it is masked
-      # above, and only the counts come back).
-      - name: The owner account exists and is verified (read-only)
-        run: |
-          set -e
-          OWNER=$(awk -F'\t' '$1 == "INITIAL_ADMIN_EMAIL" { print $2; exit }' /tmp/vars.tsv | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
-          printf '%s' "$OWNER" | grep -Eq '^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$' \
-            || { echo "::error::INITIAL_ADMIN_EMAIL is not a plain email address — refusing to query with it"; exit 1; }
-          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
-            --command "SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN email_verified_at IS NOT NULL AND trim(email_verified_at) <> '' THEN 1 ELSE 0 END), 0) AS verified FROM users WHERE role = 'admin' AND lower(trim(email)) = '$OWNER'" \
-            > /tmp/owner-row.json 2>/tmp/owner-row.err || {
-              echo "::error::could not read the owner row — the check below will stop the deploy"
-              sed -n '1,20p' /tmp/owner-row.err || true
-            }
-          node scripts/live-cost-probes.mjs --owner-row /tmp/owner-row.json
 
       - name: Build the frontend
         env:

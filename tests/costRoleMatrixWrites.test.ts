@@ -23,7 +23,15 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROOT } from './fixtures/d1';
-import { ROLES, sweepWrites, writeRoutes, type RoleName, type WriteBodies } from './fixtures/roleMatrix';
+import {
+  OWNER_UNVERIFIED,
+  ROLES,
+  seededCopyUnverifiedOwner,
+  sweepWrites,
+  writeRoutes,
+  type RoleName,
+  type WriteBodies,
+} from './fixtures/roleMatrix';
 import { ruleOf, type RouteClassFile } from './routeClass/_types';
 
 const ADMINS: ReadonlySet<RoleName> = new Set(['assistant', 'full', 'legacy_null', 'grantee_off', 'support_assistant']);
@@ -70,3 +78,17 @@ for (const role of Object.keys(ROLES) as RoleName[]) {
     assert.deepEqual(result.timedOut, [], `writes that hung for ${role}`);
   });
 }
+
+test('DECISIONS row 185 amendment — the owner BEFORE the address is verified: no write answer carries a cost, and no refusal is the generic one', async () => {
+  const result = (
+    await sweepWrites({ roles: { owner_unverified: OWNER_UNVERIFIED }, seed: seededCopyUnverifiedOwner, bodies: await bodies() })
+  ).owner_unverified!;
+  assert.ok(result.called > 300, `only ${result.called} calls made`);
+  // The owner's money, catalogue and operations writes still work; cost writes do not.
+  assert.ok(result.succeeded >= 40, `only ${result.succeeded} writes succeeded for the unverified owner`);
+  assert.deepEqual(result.leaks, [], `cost reached the unverified owner through a write:\n${result.leaks.join('\n')}`);
+  assert.deepEqual(result.timedOut, []);
+  const codes = Object.entries(result.codes);
+  assert.deepEqual(codes.filter(([, c]) => c === 'COST_ACCESS_DENIED').map(([k]) => k), [], 'a cost door hid the way out');
+  assert.ok(codes.filter(([, c]) => c === 'OWNER_EMAIL_UNVERIFIED').length >= 20, 'the cost writes refuse with the way out');
+});

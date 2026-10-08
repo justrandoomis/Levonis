@@ -45,6 +45,7 @@ const hints = (u: SessionUser) => {
     can_write_cost: p.can_write_cost,
     can_move_money: p.can_move_money,
     can_view_financials: p.can_view_financials,
+    owner_email_unverified: p.owner_email_unverified,
   };
 };
 
@@ -56,6 +57,7 @@ test("a full admin: money yes, cost no — and the legacy flag follows COST, not
     can_write_cost: false,
     can_move_money: true,
     can_view_financials: false,
+    owner_email_unverified: false,
   });
 });
 
@@ -67,6 +69,7 @@ test('a legacy NULL-scope admin is shown as full and gets the same hints', () =>
     can_write_cost: false,
     can_move_money: true,
     can_view_financials: false,
+    owner_email_unverified: false,
   });
 });
 
@@ -78,15 +81,44 @@ test("the owner, even with the 'assistant' the promotion trigger may leave on th
     can_write_cost: true,
     can_move_money: true,
     can_view_financials: true,
+    owner_email_unverified: false,
   });
 });
 
-test('an owner address that is not verified is the owner, moves money, and is not trusted with cost (critique A10)', () => {
-  const h = hints(user({ role: 'admin', email: 'boss@x.co', email_verified_at: null }));
-  assert.equal(h.is_owner, true);
-  assert.equal(h.can_move_money, true);
-  assert.equal(h.can_view_cost, false);
-  assert.equal(h.can_view_financials, false);
+test('an owner address that is not verified is the owner, moves money, is not trusted with cost (critique A10) — and is shown the way out', () => {
+  for (const stamp of [null, '', '   ', undefined]) {
+    const h = hints(user({ role: 'admin', email: 'boss@x.co', email_verified_at: stamp as never }));
+    assert.equal(h.is_owner, true);
+    assert.equal(h.can_move_money, true);
+    assert.equal(h.can_view_cost, false);
+    assert.equal(h.can_write_cost, false);
+    assert.equal(h.can_view_financials, false);
+    assert.equal(h.owner_email_unverified, true, `stamp ${JSON.stringify(stamp)}`);
+  }
+  // Stamped: cost opens and the prompt is gone, on the very same row.
+  const after = hints(user({ role: 'admin', email: 'boss@x.co', email_verified_at: VERIFIED }));
+  assert.equal(after.can_view_cost, true);
+  assert.equal(after.owner_email_unverified, false);
+});
+
+test('the way-out hint is on the owner-address ADMIN session only — never a customer, merchant or other admin, whatever the spelling', () => {
+  for (const email of ['boss@x.co', 'BOSS@X.CO', '  boss@x.co ', 'Boss@x.Co']) {
+    for (const role of ['customer', 'merchant'] as const) {
+      const h = hints(user({ role, email, email_verified_at: null }));
+      assert.equal(h.owner_email_unverified, false, `${role} ${email}`);
+      assert.equal(h.can_view_cost, false);
+    }
+  }
+  for (const email of ['boss@x.co.evil', 'xboss@x.co', 'boss@x.com', 'boss+1@x.co', 'boss@xx.co', '']) {
+    for (const admin_scope of ['full', 'assistant', null]) {
+      const h = hints(user({ role: 'admin', email, admin_scope, email_verified_at: null }));
+      assert.equal(h.owner_email_unverified, false, `admin ${email}`);
+      assert.equal(h.can_view_cost, false);
+    }
+  }
+  // A blank INITIAL_ADMIN_EMAIL makes nobody the owner, and nobody gets the prompt.
+  const blank = publicUser(user({ role: 'admin', email: '', email_verified_at: null }), { INITIAL_ADMIN_EMAIL: '' } as Env);
+  assert.equal(blank.owner_email_unverified, false);
 });
 
 test("an unrecognised scope ('assisstant') is an assistant: shown as one, and no money", () => {
@@ -97,6 +129,7 @@ test("an unrecognised scope ('assisstant') is an assistant: shown as one, and no
     can_write_cost: false,
     can_move_money: false,
     can_view_financials: false,
+    owner_email_unverified: false,
   });
 });
 
@@ -113,6 +146,7 @@ test('a customer, a merchant, and a customer row holding the owner address: ever
       can_write_cost: false,
       can_move_money: false,
       can_view_financials: false,
+      owner_email_unverified: false,
     });
   }
 });
@@ -126,7 +160,7 @@ test('a grant on the session changes no hint while delegation is off', () => {
 test('every hint is a real boolean — the client compares with === true, so undefined would hide, never show', () => {
   for (const u of [user({ role: 'customer' }), user({ role: 'admin', admin_scope: 'full' }), user({ role: 'admin', email: 'boss@x.co' })]) {
     const h = hints(u);
-    for (const k of ['is_owner', 'can_view_cost', 'can_write_cost', 'can_move_money', 'can_view_financials'] as const) {
+    for (const k of ['is_owner', 'can_view_cost', 'can_write_cost', 'can_move_money', 'can_view_financials', 'owner_email_unverified'] as const) {
       assert.equal(typeof h[k], 'boolean', k);
     }
   }
@@ -146,6 +180,13 @@ test('GET /api/auth/me carries the hints the server computed for this session', 
   assert.equal(owner.can_view_cost, true);
   assert.equal(owner.can_write_cost, true);
   assert.equal(owner.can_move_money, true);
+  assert.equal(owner.owner_email_unverified, false);
   // Never a grant list, never the verification stamp: the hints are the answer.
   assert.equal('private_grants' in owner, false);
+  assert.equal('email_verified_at' in owner, false);
+  const unverified = await me({ id: 'usr_owner', role: 'admin', email: 'boss@x.co', email_verified_at: null });
+  assert.equal(unverified.is_owner, true);
+  assert.equal(unverified.can_view_cost, false);
+  assert.equal(unverified.owner_email_unverified, true, 'the owner’s own session carries the way out');
+  assert.equal(full.owner_email_unverified, false);
 });

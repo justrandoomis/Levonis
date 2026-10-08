@@ -66,6 +66,8 @@ const AdminOverview = React.lazy(() => import('../components/AdminOverview'));
  * screen only the owner can open.
  */
 const AdminFinance = React.lazy(() => import('../components/adminFinance/AdminFinance'));
+/** The owner's way to open cost before the account's address is verified (DECISIONS row 185 amendment). */
+const OwnerCostVerifyCard = React.lazy(() => import('../components/auth/OwnerCostVerifyCard'));
 const MyEarnings = React.lazy(() => import('../components/financePeople/MyEarnings'));
 const AdminInventory = React.lazy(() => import('../components/adminInventory/AdminInventory'));
 const AdminUsers = React.lazy(() => import('../components/AdminUsers'));
@@ -206,6 +208,14 @@ export default function Admin() {
    * prevent, and the owner's next /api/auth/me carries the flag.
    */
   const canSeeFinance = user?.can_view_cost === true;
+  /**
+   * THE OWNER, BEFORE THE ADDRESS IS VERIFIED (DECISIONS row 185, amendment
+   * of 2026-10-08). Cost stays shut on the server (OWNER_EMAIL_UNVERIFIED),
+   * but the owner is not left looking for a tab that vanished: the entry stays
+   * in the sidebar and opens the card that sends the verification email. The
+   * hint is on the owner's own session only, compared with `=== true`.
+   */
+  const ownerMustVerify = !canSeeFinance && user?.owner_email_unverified === true;
 
   /** People waiting in the support console, for the sidebar badge. */
   const supportWaiting = supportTotal(useSupportCounts());
@@ -220,7 +230,7 @@ export default function Admin() {
     // is the owner's to write by hand; a Kurdish-reading admin gets the Arabic.
     // OWNER: Sorani to be written by hand.
     { id: 'trade_in', icon: Repeat, label: loc('الاستبدال (Trade-in)', 'Trade-in'), ...section('operations', 'التشغيل', 'Operations') },
-    ...(canSeeFinance
+    ...(canSeeFinance || ownerMustVerify
       ? [{ id: 'finance', icon: TrendingUp, label: loc('الأرباح والتكاليف', 'Profit & costs', 'قازانج و تێچوون'), ...section('operations', 'التشغيل', 'Operations') }]
       : []),
     { id: 'earnings', icon: Wallet, label: loc('أرباحي', 'My earnings'), ...section('operations', 'التشغيل', 'Operations') },
@@ -303,6 +313,9 @@ export default function Admin() {
         {activeTab === 'finance' && canSeeFinance && (
           <AdminFinance />
         )}
+
+        {/* No cost value is fetched here: the card only offers the email. */}
+        {activeTab === 'finance' && ownerMustVerify && <OwnerCostVerifyCard />}
 
         {activeTab === 'earnings' && <MyEarnings />}
 

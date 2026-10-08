@@ -48,6 +48,7 @@ import { fetchInventoryOverview, type InventoryOverview } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { Money, Notice, Stat, errMsg, useCount, useLoc, type NoticeState } from './shared';
 import { inventoryStrings } from './strings';
+import OwnerCostVerifyCard from '../auth/OwnerCostVerifyCard';
 import { StockTab } from './StockTab';
 import { IncomingTab } from './IncomingTab';
 import { MovementsTab } from './MovementsTab';
@@ -112,6 +113,11 @@ export default function AdminInventory() {
       </div>
 
       <Notice state={notice} onClose={() => setNotice(null)} />
+
+      {/* The owner before the address is verified: purchases, values and lot
+          costs stay shut, and this says how to open them (DECISIONS row 185
+          amendment). Counting and receiving below work as for any admin. */}
+      {user?.owner_email_unverified === true && <OwnerCostVerifyCard compact />}
 
       <div className="inventory-start" aria-label={loc('ابدأ عملية مخزون', 'Start an inventory operation')}>
         {showsCosts && <button type="button" onClick={() => begin('purchase')} className="inventory-action">

@@ -1,6 +1,6 @@
 import { badRequest, conflict, forbidden, unavailable } from './http';
 import { canViewCost, canWriteCost, isOwner } from './adminScope';
-import { costDenied } from './costAccess';
+import { costRefusal } from './costAccess';
 import type { Env, SessionUser } from './types';
 import { newId } from './crypto';
 
@@ -59,12 +59,12 @@ export async function requireCapability(env: Env, user: SessionUser, capability:
    * needs cost write as well.
    */
   if (FINANCIAL_CAPABILITIES.includes(capability)) {
-    if (!canViewCost(env, user) || (capability === 'purchase' && !canWriteCost(env, user))) throw costDenied();
+    if (!canViewCost(env, user) || (capability === 'purchase' && !canWriteCost(env, user))) throw costRefusal(env, user);
     if (isOwner(env, user)) return;
     const row = await env.DB.prepare('SELECT allowed FROM ops_permissions WHERE user_id=? AND capability=?')
       .bind(user.id, capability)
       .first<{ allowed: number }>();
-    if (row?.allowed !== 1) throw costDenied();
+    if (row?.allowed !== 1) throw costRefusal(env, user);
     return;
   }
   if (isOwner(env, user)) return;

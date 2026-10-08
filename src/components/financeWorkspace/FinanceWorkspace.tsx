@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowDownToLine, ArrowUpLeft, BookOpen, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, Layers3, LayoutGrid, Megaphone, Package, RefreshCw, Search, ShieldCheck, Users, Wallet } from 'lucide-react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
+import OwnerCostVerifyCard from '../auth/OwnerCostVerifyCard';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { useLanguage } from '../../LanguageContext';
 import { Button, Empty, Loading, Money, Row, Sheet, Status, Surface, formatMoney } from './ui';
@@ -41,6 +42,9 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   const [data, setData] = useState<FinanceSummary | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
+  // The owner's own session before the address is verified (DECISIONS row 185
+  // amendment): the refusal is rendered BY CODE as the way to open this screen.
+  const [mustVerify, setMustVerify] = useState(false);
   const [revision, setRevision] = useState(0);
   const [automaticRevision, setAutomaticRevision] = useState(0);
   const summaryGeneration = useRef(0);
@@ -62,7 +66,11 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
     setBusy(true); setError(''); setData(null);
     api.get<FinanceSummary>(`${WORKSPACE_API}/summary?from=${range.from}&to=${range.to}`, { signal: controller.signal })
       .then((r) => { if (!controller.signal.aborted) setData(r); })
-      .catch((e) => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : String(e)); })
+      .catch((e) => {
+        if (controller.signal.aborted) return;
+        if (e instanceof ApiError && e.code === 'OWNER_EMAIL_UNVERIFIED') setMustVerify(true);
+        else setError(e instanceof Error ? e.message : String(e));
+      })
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => { controller.abort(); summaryGeneration.current = generation + 1; };
   }, [range.from, range.to, revision]);
@@ -85,6 +93,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
     { id: 'settlements', label: loc('السحب والتسويات', 'Withdrawals'), icon: Wallet },
     { id: 'accounting', label: loc('المحاسبة', 'Accounting'), icon: BookOpen },
   ] as const;
+  if (mustVerify) return <OwnerCostVerifyCard />;
   return <div className="fw fw-workspace" dir={dir} data-finance-workspace>
     <header className="fw-header"><div><div className="fw-eyebrow">LEVONIS / {loc('الإدارة المالية', 'Finance')}</div><h1>{loc('المال والأرباح', 'Money & profit')}</h1>
       <p>{loc('راقب الأداء، وافهم التكاليف، وراجع حصتك من كل طلب.', 'Track performance, understand costs and review your share of every order.')}</p></div>

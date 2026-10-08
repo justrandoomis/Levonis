@@ -1,7 +1,7 @@
 import type { HostInfo } from './hosts';
 import { computeCompletion } from './profileCompletion';
 import { maskPhone } from './phone';
-import { canMoveMoney, canViewCost, canWriteCost, isOwner, normalizeAdminScope } from './adminScope';
+import { canMoveMoney, canViewCost, canWriteCost, isOwner, isUnverifiedOwner, normalizeAdminScope } from './adminScope';
 
 export interface Env {
   DB: D1Database;
@@ -164,7 +164,9 @@ export interface SessionUser {
    *  alone (owner decision 2, worker/lib/adminScope.ts). */
   admin_scope: string | null;
   /** When the account's address was proven (0003). The owner is honoured for
-   *  cost only once it is set (`canViewCost`, critique A10). */
+   *  cost only once it is set (`canViewCost`, critique A10); until then the
+   *  owner is told how to set it (OWNER_EMAIL_UNVERIFIED). Read fresh from
+   *  `users` on every request by the session loader (`u.*`). */
   email_verified_at?: string | null;
   /** 0177 private grants, set ONLY by the session loader and always [] while
    *  PRIVATE_DELEGATION_ENABLED is false. Never read off a row. */
@@ -270,6 +272,15 @@ export function publicUser(u: SessionUser, env: Pick<Env, 'INITIAL_ADMIN_EMAIL'>
     // LEGACY ALIAS OF COST, not of money: a client build from before S1 reads
     // this to show the finance tab, and must hide it from a full admin now.
     can_view_financials: canViewCost(ownerEnv, u),
+    // THE WAY OUT, ON THE OWNER'S OWN SESSION ONLY (DECISIONS row 185,
+    // amendment of 2026-10-08): true for the INITIAL_ADMIN_EMAIL admin row
+    // whose address is not verified yet — the one account that would see
+    // cost once it is. The admin screens then offer the verification email
+    // instead of hiding cost without a word. publicUser only ever serializes
+    // the caller's own account, so it says nothing about anybody else; it is
+    // false for every other caller and turns false (and can_view_cost true)
+    // on the first request after the stamp.
+    owner_email_unverified: isUnverifiedOwner(ownerEnv, u),
     subscription_expiry: u.subscription_expiry,
     locale: localeToApi(u.locale),
     avatar_key: u.avatar_key,

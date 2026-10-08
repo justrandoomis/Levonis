@@ -14,6 +14,9 @@
  * 403 `COST_ACCESS_DENIED` with the same generic sentence whatever the route,
  * whether the id exists or not, and with no number, id or field value in it
  * (brief 1 §31, §32, §38): there is nothing to learn from the refusal itself.
+ * The one exception is the owner's own session before the address is
+ * verified: it hears OWNER_EMAIL_UNVERIFIED, the way to open cost
+ * (`costRefusal`, DECISIONS row 185 amendment).
  */
 import type { Context, MiddlewareHandler } from 'hono';
 import { HttpError } from './http';
@@ -24,6 +27,7 @@ import {
   canViewCost,
   canWriteCost,
   isOwner,
+  isUnverifiedOwner,
   viewerClass,
   type CostSubject,
   type PrivateGrant,
@@ -44,6 +48,7 @@ export {
   canViewCost,
   canWriteCost,
   isOwner,
+  isUnverifiedOwner,
   viewerClass,
   type CostSubject,
   type PrivateGrant,
@@ -63,6 +68,41 @@ export function costDenied(details?: { fields?: string[] }): HttpError {
   );
 }
 
+/**
+ * 403 OWNER_EMAIL_UNVERIFIED — the owner's own session, while the account's
+ * address is not verified yet (DECISIONS row 185, amendment of 2026-10-08).
+ * The same shape as `costDenied` (field NAMES on a write, nothing on a read),
+ * and a sentence that names the way out instead of "main admin only".
+ */
+export function ownerEmailUnverified(details?: { fields?: string[] }): HttpError {
+  return new HttpError(
+    403,
+    serverMessage('OWNER_EMAIL_UNVERIFIED'),
+    'OWNER_EMAIL_UNVERIFIED',
+    details?.fields && details.fields.length ? { fields: details.fields } : undefined
+  );
+}
+
+/**
+ * THE COST REFUSAL, BY CALLER. Every cost door and assert throws this, never
+ * `costDenied` directly, so that:
+ *
+ *   - the owner's admin row whose address is not verified yet hears
+ *     OWNER_EMAIL_UNVERIFIED — how to open cost, not a lockout;
+ *   - EVERY OTHER CALLER hears exactly the COST_ACCESS_DENIED it heard before,
+ *     the same bytes for a real target and an invented one. The choice reads
+ *     the caller's own session only (role, address, stamp), never the target,
+ *     so it adds no oracle: nobody but the owner's own session can tell the
+ *     two answers apart.
+ */
+export function costRefusal(
+  env: Env,
+  user: CostSubject | null | undefined,
+  details?: { fields?: string[] }
+): HttpError {
+  return isUnverifiedOwner(env, user) ? ownerEmailUnverified(details) : costDenied(details);
+}
+
 export type OwnerOnlyCode =
   | 'OWNER_ONLY'
   | 'SCOPE_ELEVATION_OWNER_ONLY'
@@ -75,14 +115,16 @@ export function ownerOnly(code: OwnerOnlyCode = 'OWNER_ONLY'): HttpError {
   return new HttpError(403, serverMessage(code), code);
 }
 
-/** Throws COST_ACCESS_DENIED unless this session may READ cost (the owner). */
+/** Throws the cost refusal (`costRefusal`) unless this session may READ cost (the owner). */
 export function assertCostRead(c: Context<AppContext>): void {
-  if (!canViewCost(c.env, c.get('user'))) throw costDenied();
+  const user = c.get('user');
+  if (!canViewCost(c.env, user)) throw costRefusal(c.env, user);
 }
 
-/** Throws COST_ACCESS_DENIED unless this session may WRITE cost (the owner). */
+/** Throws the cost refusal (`costRefusal`) unless this session may WRITE cost (the owner). */
 export function assertCostWrite(c: Context<AppContext>, fields?: string[]): void {
-  if (!canWriteCost(c.env, c.get('user'))) throw costDenied({ fields });
+  const user = c.get('user');
+  if (!canWriteCost(c.env, user)) throw costRefusal(c.env, user, { fields });
 }
 
 /** Router door for a cost router: mount after the rate limit, before any id is read. */

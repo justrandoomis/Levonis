@@ -99,6 +99,7 @@ import { WarrantySection } from './form/WarrantySection';
 import { ConditionSection } from './form/ConditionSection';
 import { DimensionsSection } from './form/DimensionsSection';
 import { InventorySummary } from './form/InventorySummary';
+import OwnerCostVerifyCard from '../auth/OwnerCostVerifyCard';
 import PricePreview from './PricePreview';
 import MembershipDiscountSection from './form/MembershipDiscountSection';
 import { useProPaused } from '../../lib/proPause';
@@ -1298,6 +1299,9 @@ export default function ProductForm({
             Renders nothing for a product with no batches, or for an assistant
             admin whose payload carries no costs. */}
         {canSeeCost && doc.id && <InventorySummary productId={doc.id} />}
+        {/* The owner before the address is verified: no cost input, and the
+            way to open it (DECISIONS row 185 amendment). */}
+        {!canSeeCost && user?.owner_email_unverified === true && <OwnerCostVerifyCard compact />}
 
         {/* Stored by the template as `original_price_iqd` (the struck-through
             "was" price). No input here by design — but it is stored, it is

@@ -37,6 +37,18 @@ export const COST_REFUSALS = {
     en: 'This information is available to the main admin only.',
     ckb: 'ئەم زانیارییانە تەنها بۆ بەڕێوەبەری سەرەکی بەردەستن.',
   },
+  // The owner's own address on an admin row that is NOT yet verified (DECISIONS
+  // row 185, amendment of 2026-10-08). Only that one session can ever receive
+  // it; everyone else keeps COST_ACCESS_DENIED, byte for byte. It names the
+  // way out: verify the address, or connect Google on it (POST
+  // /api/auth/google/link stamps the same address; a sign-in with an
+  // already-connected Google stamps it too — an unconnected, unverified
+  // account is never merged with Google, by design).
+  OWNER_EMAIL_UNVERIFIED: {
+    ar: 'بيانات التكلفة تُفتح للأدمن الرئيسي بعد تأكيد بريد حسابه. أكّد بريدك الإلكتروني لفتحها، أو اربط Google على البريد نفسه من إعدادات حسابك (أو سجّل الدخول به إن كان مربوطًا).',
+    en: "Cost data opens for the main admin once the account's email is verified. Verify your email to open it, or connect Google on the same address in your account settings (or sign in with it if it is already connected).",
+    ckb: 'زانیارییەکانی تێچوو بۆ بەڕێوەبەری سەرەکی دەکرێنەوە دوای پشتڕاستکردنەوەی ئیمەیڵی هەژمارەکە. ئیمەیڵەکەت پشتڕاست بکەرەوە بۆ کردنەوەیان، یان لە ڕێکخستنەکانی هەژمارەکەتەوە Google لەسەر هەمان ئیمەیڵ ببەستەوە (یان ئەگەر پێشتر بەستراوە، پێی بچۆ ژوورەوە).',
+  },
   OWNER_ONLY: {
     ar: 'هذا الإجراء للأدمن الرئيسي فقط.',
     en: 'Only the main admin can do this.',

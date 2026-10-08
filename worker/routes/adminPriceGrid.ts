@@ -4,7 +4,7 @@ import { requireAdmin, badRequest, notFound, str, int } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { canViewCost, canWriteCost, projectForAdmin } from '../lib/adminScope';
-import { costDenied } from '../lib/costAccess';
+import { costRefusal } from '../lib/costAccess';
 import { getSetting } from '../lib/settings';
 import { normalizeAvailability, deriveSaleTypes, type AvailabilityType } from '../lib/availability';
 import { normalizeSaleTypes } from '../lib/productModel';
@@ -575,7 +575,7 @@ function projectGrid(env: Env, user: SessionUser | null | undefined, rows: GridR
 }
 
 function assertMayWrite(env: Env, user: SessionUser | null | undefined, fields: Field[]) {
-  if (fields.includes('cost') && !canWriteCost(env, user)) throw costDenied({ fields: ['cost'] });
+  if (fields.includes('cost') && !canWriteCost(env, user)) throw costRefusal(env, user, { fields: ['cost'] });
 }
 
 const readFields = (v: unknown): Field[] => {
@@ -1344,7 +1344,7 @@ adminPriceGridRoutes.post('/:id/price-grid/undo', async (c) => {
  */
 adminPriceGridRoutes.get('/:id/price-history', async (c) => {
   const admin = c.get('user')!;
-  if (!canViewCost(c.env, admin)) throw costDenied();
+  if (!canViewCost(c.env, admin)) throw costRefusal(c.env, admin);
   const productId = c.req.param('id');
   const limit = int(c.req.query().limit, 'limit', { min: 1, max: 200, def: 60 });
   const offset = int(c.req.query().offset, 'offset', { min: 0, max: 100_000, def: 0 });
@@ -1400,7 +1400,7 @@ adminPriceGridRoutes.get('/:id/price-history', async (c) => {
  */
 adminPriceGridRoutes.post('/:id/price-grid/cost-change', async (c) => {
   const admin = c.get('user')!;
-  if (!canViewCost(c.env, admin)) throw costDenied();
+  if (!canViewCost(c.env, admin)) throw costRefusal(c.env, admin);
   const productId = c.req.param('id');
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const parsed = parseAmount(body.new_cost_iqd);

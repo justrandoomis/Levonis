@@ -11,7 +11,9 @@
  *                                and shipping data; profit, COGS, margins,
  *                                price history; finance, payroll, investors.
  *                                THE OWNER ONLY (INITIAL_ADMIN_EMAIL, with a
- *                                verified address). A private grant
+ *                                verified address; until it is verified the
+ *                                owner is told so, OWNER_EMAIL_UNVERIFIED,
+ *                                and sees no cost). A private grant
  *                                (0177 admin_private_grants) is honoured only
  *                                while PRIVATE_DELEGATION_ENABLED is true, and
  *                                it is false: decision 2 delegates nothing.
@@ -110,15 +112,41 @@ export function hasPrivateGrant(
   return !!user && user.role === 'admin' && Array.isArray(user.private_grants) && user.private_grants.includes(grant);
 }
 
+/** A real verification stamp: a non-blank string. NULL, '' and '   ' are none. */
+function hasVerifiedAddress(user: Pick<CostSubject, 'email_verified_at'>): boolean {
+  return typeof user.email_verified_at === 'string' && user.email_verified_at.trim() !== '';
+}
+
 /**
  * THE OWNER, PROVEN. Owner status is the address (critique A10): it is honoured
  * for cost only on an admin row whose address has been verified, so an
  * address that is somehow freed and re-registered does not inherit the costs
- * before anyone has proved they hold the mailbox. Workflow 7 refuses to deploy
- * when the owner row is missing or unverified.
+ * before anyone has proved they hold the mailbox. The owner chose this, the
+ * most secure option (DECISIONS row 185, amendment of 2026-10-08).
+ *
+ * NO LOCKOUT, A WAY OUT. The deploy does not check the owner row (it never
+ * reads `users`). An owner whose address is not verified yet is refused every
+ * cost surface with OWNER_EMAIL_UNVERIFIED instead of the generic refusal
+ * (`isUnverifiedOwner`, `costRefusal` in costAccess.ts), the admin screens
+ * offer the existing verification email, and connecting Google on the same
+ * address (or signing in with an already-connected Google) stamps it too.
+ * The session loader reads the row on every request, so cost opens on the
+ * very next request after the stamp — no redeploy, no new sign-in.
  */
 function isVerifiedOwner(env: Env, user: CostSubject): boolean {
-  return isOwner(env, user) && typeof user.email_verified_at === 'string' && user.email_verified_at.trim() !== '';
+  return isOwner(env, user) && hasVerifiedAddress(user);
+}
+
+/**
+ * The owner's address on an ADMIN row whose address is not verified yet — the
+ * one caller who is told how to open cost (OWNER_EMAIL_UNVERIFIED) rather than
+ * refused with COST_ACCESS_DENIED. Never true for a non-admin row holding the
+ * address, for any other admin, or while INITIAL_ADMIN_EMAIL is blank; never
+ * true once the address is verified (the owner then sees cost).
+ */
+export function isUnverifiedOwner(env: Env, user: CostSubject | null | undefined): boolean {
+  if (!user || user.role !== 'admin') return false;
+  return isOwner(env, user) && !hasVerifiedAddress(user);
 }
 
 /** COST READ: owner only (decision 2). The owner is decided before anything else is read. */

@@ -36,6 +36,9 @@ const SCREENS = {
   printPricing: 'src/components/adminCommunity/PrintPricingAdmin.tsx',
   receiving: 'src/components/adminOperations/PurchaseReceivePanel.tsx',
   settings: 'src/pages/Settings.tsx',
+  finance: 'src/components/adminFinance/AdminFinance.tsx',
+  verifyCard: 'src/components/auth/OwnerCostVerifyCard.tsx',
+  verifyBanner: 'src/components/auth/EmailVerifyBanner.tsx',
 } as const;
 
 test('no screen decides anything from the legacy `can_view_financials` hint any more', () => {
@@ -47,16 +50,84 @@ test('no screen decides anything from the legacy `can_view_financials` hint any 
 test('no hint is read fail-open (`!== false` or `=== false`, where undefined would pass)', () => {
   for (const file of Object.values(SCREENS)) {
     const code = codeOf(file);
-    assert.doesNotMatch(code, /(is_owner|can_view_cost|can_write_cost|can_move_money)\s*!==\s*false/, `${file}: fail-open`);
-    assert.doesNotMatch(code, /(is_owner|can_view_cost|can_write_cost|can_move_money)\s*===\s*false/, `${file}: fail-open`);
+    assert.doesNotMatch(code, /(is_owner|can_view_cost|can_write_cost|can_move_money|owner_email_unverified)\s*!==\s*false/, `${file}: fail-open`);
+    assert.doesNotMatch(code, /(is_owner|can_view_cost|can_write_cost|can_move_money|owner_email_unverified)\s*===\s*false/, `${file}: fail-open`);
   }
 });
 
 test('the finance tab is the owner’s: can_view_cost === true, and the tab body is gated as well as the sidebar', () => {
   const code = codeOf(SCREENS.admin);
   assert.match(code, /const canSeeFinance = user\?\.can_view_cost === true;/);
-  assert.match(code, /\.\.\.\(canSeeFinance\s*\?\s*\[\{ id: 'finance'/);
-  assert.match(code, /activeTab === 'finance' && canSeeFinance &&/);
+  assert.match(code, /\.\.\.\(canSeeFinance \|\| ownerMustVerify\s*\?\s*\[\{ id: 'finance'/);
+  assert.match(code, /activeTab === 'finance' && canSeeFinance &&\s*\(\s*<AdminFinance \/>/);
+});
+
+// ------------------------------------------------- DECISIONS row 185 amendment
+
+test('the owner before the address is verified keeps the finance entry, and it opens the verify card — never the finance screen', () => {
+  const code = codeOf(SCREENS.admin);
+  // The hint, === true, and only when cost is not already open.
+  assert.match(code, /const ownerMustVerify = !canSeeFinance && user\?\.owner_email_unverified === true;/);
+  assert.match(code, /activeTab === 'finance' && ownerMustVerify && <OwnerCostVerifyCard \/>/);
+  // The card never mounts AdminFinance and fetches no cost.
+  const card = codeOf(SCREENS.verifyCard);
+  assert.doesNotMatch(card, /AdminFinance|\/api\/admin\//, 'the card reads no admin (cost) route');
+  assert.doesNotMatch(card, /\b(localStorage|sessionStorage|indexedDB)\b/);
+});
+
+test('the card offers ONE primary action into the existing verification flow, and re-reads the session to open cost without a reload', () => {
+  const card = codeOf(SCREENS.verifyCard);
+  assert.match(card, /api\.post<\{ verified\?: boolean \}>\('\/api\/auth\/verify-email\/send'\)/);
+  assert.equal((card.match(/variant="primary"/g) ?? []).length, 1, 'one primary action');
+  assert.match(card, /refusalText\('OWNER_EMAIL_UNVERIFIED', lang\)/, 'the body is the refusal contract’s own sentence');
+  assert.match(card, /window\.addEventListener\('focus', reread\)/);
+  assert.match(card, /document\.addEventListener\('visibilitychange', reread\)/);
+  assert.match(card, /await refreshUser\(\)/);
+  // The confirm button of the emailed link refreshes the session, so the hints flip at once.
+  const banner = codeOf(SCREENS.verifyBanner);
+  assert.match(banner, /await api\.post\('\/api\/auth\/verify-email\/confirm', \{ token \}\);[\s\S]{0,400}void refreshUser\(\);/);
+});
+
+test('the OWNER_EMAIL_UNVERIFIED refusal is rendered BY CODE with the same action; every other 403 keeps "main admin only"', () => {
+  const finance = codeOf(SCREENS.finance);
+  const byCode = finance.indexOf("error.code === 'OWNER_EMAIL_UNVERIFIED'");
+  const generic = finance.indexOf('{s.forbidden}');
+  assert.ok(byCode > 0 && generic > byCode, 'the by-code branch comes before the generic refusal');
+  assert.match(finance, /error\.code === 'OWNER_EMAIL_UNVERIFIED'\) \{\s*return <OwnerCostVerifyCard \/>;/);
+});
+
+test('the finance workspace (the screen AdminFinance opens) renders OWNER_EMAIL_UNVERIFIED by code as the card', () => {
+  const ws = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx');
+  assert.match(ws, /if \(e instanceof ApiError && e\.code === 'OWNER_EMAIL_UNVERIFIED'\) setMustVerify\(true\);/);
+  assert.match(ws, /if \(mustVerify\) return <OwnerCostVerifyCard \/>;/);
+});
+
+test('the product form and the inventory show the compact prompt on the hint, === true', () => {
+  assert.match(codeOf(SCREENS.productForm), /\{!canSeeCost && user\?\.owner_email_unverified === true && <OwnerCostVerifyCard compact \/>\}/);
+  assert.match(codeOf(SCREENS.inventory), /\{user\?\.owner_email_unverified === true && <OwnerCostVerifyCard compact \/>\}/);
+});
+
+test('the card speaks ar, en and real Sorani — ckb never the Arabic or the English, cost «تێچوو»', () => {
+  const src = sourceOf(SCREENS.verifyCard);
+  const block = (lang: string) => {
+    const at = src.indexOf(`  ${lang}: {`);
+    assert.ok(at > 0, lang);
+    return src.slice(at, src.indexOf('\n  },', at));
+  };
+  const strings = (b: string) => [...b.matchAll(/(\w+): (?:\(email: string\) =>\s*)?[`'](.+?)[`'],?\n/g)].map((m) => [m[1]!, m[2]!] as const);
+  const ar = new Map(strings(block('ar')));
+  const en = new Map(strings(block('en')));
+  const ckb = new Map(strings(block('ckb')));
+  assert.ok(ckb.size >= 10, `only ${ckb.size} Sorani strings read`);
+  assert.deepEqual([...ckb.keys()].sort(), [...ar.keys()].sort());
+  assert.deepEqual([...en.keys()].sort(), [...ar.keys()].sort());
+  for (const [k, v] of ckb) {
+    assert.notEqual(v, ar.get(k), `${k}: the Sorani is the Arabic`);
+    assert.notEqual(v, en.get(k), `${k}: the Sorani is the English`);
+    assert.match(v, /[ڕڵێۆەگچپژ]/, `${k}: no Sorani letter`);
+    assert.doesNotMatch(v, /[ةىيك]/, `${k}: an Arabic-only letter in the Sorani`);
+  }
+  assert.match(ckb.get('title')!, /تێچوو/);
 });
 
 test('the legacy investment link sends only the owner to the investors section', () => {
@@ -162,7 +233,7 @@ test('the users table tells the owner from a full admin', () => {
 
 test('the session type documents the hints and the legacy alias', () => {
   const api = sourceOf('src/lib/api.ts');
-  for (const k of ['is_owner?: boolean;', 'can_view_cost?: boolean;', 'can_write_cost?: boolean;', 'can_move_money?: boolean;', 'can_view_financials?: boolean;']) {
+  for (const k of ['is_owner?: boolean;', 'can_view_cost?: boolean;', 'can_write_cost?: boolean;', 'can_move_money?: boolean;', 'can_view_financials?: boolean;', 'owner_email_unverified?: boolean;']) {
     assert.ok(api.includes(k), k);
   }
 });

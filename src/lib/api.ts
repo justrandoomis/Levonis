@@ -324,6 +324,13 @@ export interface ApiUser {
   can_view_cost?: boolean;
   can_write_cost?: boolean;
   can_move_money?: boolean;
+  /**
+   * The owner's OWN session while the account's address is not verified yet
+   * (DECISIONS row 185, amendment of 2026-10-08): cost stays shut, and the
+   * cost screens show `OwnerCostVerifyCard` — the way to open it — instead of
+   * hiding without a word. Read as `=== true`; false for everyone else.
+   */
+  owner_email_unverified?: boolean;
   /** LEGACY ALIAS OF `can_view_cost` (not of money), kept so a client build
    *  from before S1 hides the finance tab from a full admin. New code reads
    *  `can_view_cost`. */

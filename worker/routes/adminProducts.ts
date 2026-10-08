@@ -45,7 +45,7 @@ import {
   carryStoredCostForward,
   projectForAdmin,
 } from '../lib/adminScope';
-import { costDenied } from '../lib/costAccess';
+import { costRefusal } from '../lib/costAccess';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
 import { bundlesUsing, compositionConflict } from '../lib/bundleComposition';
 import {
@@ -101,7 +101,7 @@ adminProductsRoutes.use('*', requireAdmin);
 adminProductsRoutes.use('*', purgeCatalogueAfterWrite);
 
 // Pricing a selection from its purchase writes a price derived from cost: the owner's (decision 2).
-adminProductsRoutes.post('/:id/selection-price',async c=>{const user=c.get('user')!;if(!canWriteCost(c.env,user))throw costDenied();const result=await updateSelectionPrice(c.env.DB,c.req.param('id'),await c.req.json<Record<string,unknown>>(),user.id);c.set('catalogueSlug',result.slug);return c.json({success:true,...result});});
+adminProductsRoutes.post('/:id/selection-price',async c=>{const user=c.get('user')!;if(!canWriteCost(c.env,user))throw costRefusal(c.env,user);const result=await updateSelectionPrice(c.env.DB,c.req.param('id'),await c.req.json<Record<string,unknown>>(),user.id);c.set('catalogueSlug',result.slug);return c.json({success:true,...result});});
 
 // ---------------------------------------------------------------- helpers
 
@@ -1232,7 +1232,7 @@ adminProductsRoutes.post('/', async (c) => {
   // a non-owner when a guess was right.
   if (!canWriteCost(c.env, admin)) {
     const attempted = attemptedFinancialWrites(body);
-    if (attempted.length) throw costDenied({ fields: attempted });
+    if (attempted.length) throw costRefusal(c.env, admin, { fields: attempted });
     // Carry the stored cost forward untouched so an assistant's save cannot
     // blank a value they were never shown.
     carryStoredCostForward(doc, prev);

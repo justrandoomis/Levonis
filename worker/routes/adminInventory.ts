@@ -3,8 +3,8 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { projectForAdmin, canViewCost, canWriteCost } from '../lib/adminScope';
-import { assertCostWrite } from '../lib/costAccess';
+import { projectForAdmin, canViewCost, canWriteCost, isUnverifiedOwner } from '../lib/adminScope';
+import { assertCostWrite, ownerEmailUnverified } from '../lib/costAccess';
 import { isInventoryMode, STOCK_SCOPES, type StockScope } from '../lib/inventory';
 import {
   ADJUST_REASONS,
@@ -725,8 +725,14 @@ adminInventoryRoutes.post('/suppliers', async (c) => {
  */
 adminInventoryRoutes.get('/incoming/:id/profit-preview', async (c) => {
   // The owner only (decision 2). It stays a 404 rather than a 403 so the
-  // route answers a non-owner exactly as it answers a missing purchase.
-  if (!canViewCost(c.env, c.get('user'))) throw notFound('Not found');
+  // route answers a non-owner exactly as it answers a missing purchase. The
+  // owner's own session before the address is verified is told how to open
+  // it instead (OWNER_EMAIL_UNVERIFIED) — the same answer for a real and an
+  // invented id, so it says nothing about the purchase either.
+  if (!canViewCost(c.env, c.get('user'))) {
+    if (isUnverifiedOwner(c.env, c.get('user'))) throw ownerEmailUnverified();
+    throw notFound('Not found');
+  }
   const id = str(c.req.param('id'), 'id', { max: 60 });
   const row = await c.env.DB.prepare(
     `SELECT i.*, p.price_iqd FROM incoming_inventory i LEFT JOIN products p ON p.id = i.product_id WHERE i.id = ?`

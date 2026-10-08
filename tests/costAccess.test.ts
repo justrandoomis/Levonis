@@ -26,6 +26,7 @@ import {
   canViewCost,
   canWriteCost,
   hasPrivateGrant,
+  isUnverifiedOwner,
   projectForAdmin,
   viewerClass,
   type CostSubject,
@@ -34,7 +35,9 @@ import {
   assertCostRead,
   assertCostWrite,
   costDenied,
+  costRefusal,
   loadPrivateGrants,
+  ownerEmailUnverified,
   ownerOnly,
   pricingUnavailable,
   requireCostRead,
@@ -131,6 +134,22 @@ const ROWS: Row[] = [
     cls: 'owner',
   },
   {
+    who: 'owner address with an empty-string verification stamp',
+    user: subject({ role: 'admin', email: 'owner@levonis-iq.com', email_verified_at: '' }),
+    view: false,
+    write: false,
+    money: true,
+    cls: 'owner',
+  },
+  {
+    who: 'owner row read without the stamp column at all',
+    user: subject({ role: 'admin', email: 'owner@levonis-iq.com', email_verified_at: undefined }),
+    view: false,
+    write: false,
+    money: true,
+    cls: 'owner',
+  },
+  {
     // A blank INITIAL_ADMIN_EMAIL must grant NOBODY, least of all an admin with a blank address.
     who: 'INITIAL_ADMIN_EMAIL blank, admin with a blank address',
     user: subject({ role: 'admin', email: '', admin_scope: 'full' }),
@@ -158,8 +177,41 @@ for (const r of ROWS) {
     assert.equal(canWriteCost(e, r.user), r.write, 'canWriteCost');
     assert.equal(canMoveMoney(e, r.user), r.money, 'canMoveMoney');
     assert.equal(viewerClass(e, r.user), r.cls, 'viewerClass');
+    // The way out is the owner's alone, and only while cost is shut to them.
+    assert.equal(isUnverifiedOwner(e, r.user), r.cls === 'owner' && !r.view, 'isUnverifiedOwner');
   });
 }
+
+test('DECISIONS row 185 amendment: the unverified owner sees no cost until the stamp, then sees it — whatever the stamp looked like before', () => {
+  const owner = (email_verified_at: string | null | undefined) =>
+    subject({ role: 'admin', email: 'owner@levonis-iq.com', admin_scope: 'assistant', email_verified_at });
+  for (const stamp of [null, undefined, '', '   ', '\t\n']) {
+    assert.equal(canViewCost(env, owner(stamp)), false, `view, stamp ${JSON.stringify(stamp)}`);
+    assert.equal(canWriteCost(env, owner(stamp)), false, `write, stamp ${JSON.stringify(stamp)}`);
+    assert.equal(isUnverifiedOwner(env, owner(stamp)), true);
+    assert.deepEqual(projectForAdmin(env, owner(stamp), costlyDoc), { id: 'p1', price_iqd: 900_000, options: [{ id: 'o1' }] });
+  }
+  const stamped = owner(VERIFIED);
+  assert.equal(canViewCost(env, stamped), true);
+  assert.equal(canWriteCost(env, stamped), true);
+  assert.equal(isUnverifiedOwner(env, stamped), false);
+});
+
+test('isUnverifiedOwner is the owner-address ADMIN row only: never a customer or merchant with the address, never another admin', () => {
+  for (const email of ['owner@levonis-iq.com', 'OWNER@LEVONIS-IQ.COM', '  owner@levonis-iq.com ']) {
+    for (const role of ['customer', 'merchant'] as const) {
+      assert.equal(isUnverifiedOwner(env, subject({ role, email, email_verified_at: null })), false, `${role} ${email}`);
+    }
+    // The same address, any case or padding, on the admin row IS the owner (isOwner trims and folds case).
+    assert.equal(isUnverifiedOwner(env, subject({ role: 'admin', email, email_verified_at: null })), true, `admin ${email}`);
+  }
+  for (const email of ['owner@levonis-iq.com.evil', 'xowner@levonis-iq.com', 'owner@levonis-iq.co', 'owner+1@levonis-iq.com', '']) {
+    assert.equal(isUnverifiedOwner(env, subject({ role: 'admin', email, email_verified_at: null })), false, email);
+  }
+  assert.equal(isUnverifiedOwner(env, null), false);
+  assert.equal(isUnverifiedOwner({ INITIAL_ADMIN_EMAIL: '' } as unknown as Env, subject({ role: 'admin', email: '', email_verified_at: null })), false);
+  assert.equal(isUnverifiedOwner({} as unknown as Env, subject({ role: 'admin', email: 'owner@levonis-iq.com', email_verified_at: null })), false);
+});
 
 test('THE DECISION IN ONE LINE: a full or NULL-scope non-owner moves money and never sees a cost', () => {
   for (const admin_scope of ['full', null] as const) {
@@ -253,6 +305,33 @@ test('COST_ACCESS_DENIED is one generic answer: no id, no number, field NAMES on
   assert.equal(ownerOnly().code, 'OWNER_ONLY');
 });
 
+test('costRefusal: OWNER_EMAIL_UNVERIFIED for the unverified owner alone; every other caller gets the EXACT COST_ACCESS_DENIED', () => {
+  const unverified = subject({ role: 'admin', email: 'owner@levonis-iq.com', email_verified_at: null });
+  const e = costRefusal(env, unverified);
+  assert.equal(e.status, 403);
+  assert.equal(e.code, 'OWNER_EMAIL_UNVERIFIED');
+  assert.equal(e.message, serverMessage('OWNER_EMAIL_UNVERIFIED'));
+  assert.equal(e.details, undefined, 'a read refusal carries nothing');
+  assert.deepEqual(costRefusal(env, unverified, { fields: ['product_cost_iqd'] }).details, { fields: ['product_cost_iqd'] }, 'names only on a write');
+  assert.deepEqual(ownerEmailUnverified(), e);
+
+  const same = (a: HttpError, b: HttpError) =>
+    assert.deepEqual({ s: a.status, m: a.message, c: a.code, d: a.details }, { s: b.status, m: b.message, c: b.code, d: b.details });
+  const others: Array<CostSubject | null> = [
+    null,
+    subject({ role: 'customer' }),
+    subject({ role: 'customer', email: 'owner@levonis-iq.com', email_verified_at: null }),
+    subject({ role: 'merchant', email: ' OWNER@levonis-iq.com', email_verified_at: null }),
+    subject({ role: 'admin', email: 'full@x.co', admin_scope: 'full', email_verified_at: null }),
+    subject({ role: 'admin', email: 'a@x.co', admin_scope: 'assistant', email_verified_at: null }),
+    subject({ role: 'admin', email: 'owner@levonis-iq.com.evil', email_verified_at: null }),
+  ];
+  for (const u of others) {
+    same(costRefusal(env, u), costDenied());
+    same(costRefusal(env, u, { fields: ['cost_iqd'] }), costDenied({ fields: ['cost_iqd'] }));
+  }
+});
+
 test('pricingUnavailable answers by viewer: customer wording, admin "incomplete", the missing list for the owner only', () => {
   const missing = [{ level: 'variant' as const, id: 'v1', field: 'supplier_cost' }];
   const owner = subject({ role: 'admin', email: 'owner@levonis-iq.com' });
@@ -324,6 +403,24 @@ test('the doors: the owner passes, a full admin gets COST_ACCESS_DENIED, a full 
   assert.equal((await get(doorApp({ ...owner, role: 'customer' }), '/t/owner')).status, 403, 'the owner address on a customer row is nothing');
 });
 
+test('the doors, for the owner before the address is verified: OWNER_EMAIL_UNVERIFIED at every cost door, a field NAME on a write, and the stamp opens them', async () => {
+  const unverified = { id: 'usr_owner', role: 'admin', email: 'boss@x.co', admin_scope: 'assistant', email_verified_at: null };
+  for (const p of ['/t/read', '/t/write', '/t/assert-read', '/t/assert-write']) {
+    const res = await get(doorApp(unverified), p);
+    assert.equal(res.status, 403, p);
+    const body = await json(res);
+    assert.equal(body.code, 'OWNER_EMAIL_UNVERIFIED', p);
+    assert.equal(body.error, serverMessage('OWNER_EMAIL_UNVERIFIED'));
+    if (p === '/t/assert-write') assert.deepEqual(body.details, { fields: ['cost_iqd'] });
+    else assert.equal(body.details, undefined);
+    assert.equal((await get(doorApp({ ...unverified, email_verified_at: VERIFIED }), p)).status, 200, `${p} once stamped`);
+  }
+  // A full admin's refusal is untouched, byte for byte.
+  const full = { id: 'usr_full', role: 'admin', email: 'full@x.co', admin_scope: 'full', email_verified_at: null };
+  const text = await (await get(doorApp(full), '/t/read')).text();
+  assert.equal(text, JSON.stringify({ success: false, error: serverMessage('COST_ACCESS_DENIED'), code: 'COST_ACCESS_DENIED' }));
+});
+
 test('requireFreshSession: a sign-in younger than ten minutes passes, an older one is REAUTH_REQUIRED', async () => {
   const owner = { id: 'usr_owner', role: 'admin', email: 'boss@x.co' };
   assert.equal((await get(doorApp(owner, { sessionAgeSeconds: 60 }), '/t/fresh')).status, 200);
@@ -392,7 +489,7 @@ test('critique G-3: every predicate decides the OWNER before it reads a stored s
 
   const types = readFileSync(join(ROOT, 'worker/lib/types.ts'), 'utf8');
   const pub = types.slice(types.indexOf('export function publicUser('));
-  for (const hint of ['is_owner: u.role === \'admin\' && isOwner(ownerEnv, u)', 'can_view_cost: canViewCost(ownerEnv, u)', 'can_write_cost: canWriteCost(ownerEnv, u)', 'can_move_money: canMoveMoney(ownerEnv, u)', 'can_view_financials: canViewCost(ownerEnv, u)']) {
+  for (const hint of ['is_owner: u.role === \'admin\' && isOwner(ownerEnv, u)', 'can_view_cost: canViewCost(ownerEnv, u)', 'can_write_cost: canWriteCost(ownerEnv, u)', 'can_move_money: canMoveMoney(ownerEnv, u)', 'can_view_financials: canViewCost(ownerEnv, u)', 'owner_email_unverified: isUnverifiedOwner(ownerEnv, u)']) {
     assert.ok(pub.includes(hint), `publicUser derives ${hint.split(':')[0]} from the predicate itself`);
   }
 });

@@ -3,11 +3,13 @@
  * "Live verification", critiques A9, A10, G-36. Step S1.
  *
  * Workflow 7 runs scripts/live-cost-probes.mjs after every deploy (anonymous
- * GETs only) and, before anything is migrated, checks that exactly one
- * verified admin row holds INITIAL_ADMIN_EMAIL. A probe that cannot fail is
- * worse than none, so the verdicts are pinned here on fixed bodies, every
- * probe file is held to its shape, and the workflow is held to the order of
- * its steps.
+ * GETs only) and, before anything is migrated, refuses an empty
+ * INITIAL_ADMIN_EMAIL. It no longer reads the users table at all (DECISIONS
+ * row 185 amendment, 2026-10-08): an owner whose address is not verified yet
+ * is told so by the site (OWNER_EMAIL_UNVERIFIED) and verifies from the admin
+ * screens. A probe that cannot fail is worse than none, so the verdicts are
+ * pinned here on fixed bodies, every probe file is held to its shape, and the
+ * workflow is held to the order of its steps.
  *
  * Run: node --import tsx --test tests/liveCostProbes.test.ts
  */
@@ -17,7 +19,8 @@ import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { sourceOf } from './fixtures/source';
 // @ts-expect-error - plain ESM script shared with workflow 7, no types
-import { fillPath, judge, loadProbeFiles, ownerRowVerdict, pick } from '../scripts/live-cost-probes.mjs';
+import * as probesScript from '../scripts/live-cost-probes.mjs';
+const { fillPath, judge, loadProbeFiles, pick } = probesScript;
 
 interface Probe {
   path: string;
@@ -44,15 +47,11 @@ test('judge: a wrong status, a forbidden key at any depth, a forbidden pattern a
   assert.deepEqual(judge({ path: '/a', status: [401] }, 401, '{"success":false}'), []);
 });
 
-test('ownerRowVerdict: exactly one verified admin row passes; none, two, unverified or unreadable stop the deploy (A10)', () => {
-  const out = (n: number, verified: number) => `banner line\n${JSON.stringify([{ results: [{ n, verified }], success: true }])}`;
-  assert.equal(ownerRowVerdict(out(1, 1)), null);
-  assert.match(String(ownerRowVerdict(out(0, 0))), /no admin account/);
-  assert.match(String(ownerRowVerdict(out(2, 2))), /2 admin accounts/);
-  assert.match(String(ownerRowVerdict(out(1, 0))), /no verified address/);
-  for (const bad of ['', 'not json', '[]', '[{"results":[]}]', '[{"results":[{"n":"x"}]}]']) {
-    assert.notEqual(ownerRowVerdict(bad), null, `unreadable: ${bad}`);
-  }
+test('the owner-row mode is gone: the script exports no owner verdict and never reads a users row', () => {
+  assert.equal('ownerRowVerdict' in probesScript, false);
+  const src = sourceOf('scripts/live-cost-probes.mjs');
+  assert.doesNotMatch(src, /--owner-row/);
+  assert.doesNotMatch(src, /\bFROM users\b/i);
 });
 
 test('pick and fillPath: a slug is read from a live answer; an unresolved variable refuses the probe', () => {
@@ -99,18 +98,23 @@ test('s1.json: the cost routers refuse a stranger; the storefront answers carry 
 
 // ------------------------------------------------------------- the workflow
 
-test('workflow 7: an empty INITIAL_ADMIN_EMAIL is refused, the owner row is checked before migrations, the probes run after the live verify', () => {
+test('workflow 7: an empty INITIAL_ADMIN_EMAIL is still refused, no step reads the users table, the probes run after the live verify', () => {
   const yml = sourceOf('.github/workflows/deploy-staging-code.yml');
-  assert.match(yml, /\$1 == "INITIAL_ADMIN_EMAIL" && \$2 != ""/, 'the vars step refuses an empty owner address');
-  const ownerRow = yml.indexOf('node scripts/live-cost-probes.mjs --owner-row');
+  // The vars check stays: it reads the worker vars workflow 7 already reads.
+  const refuse = yml.indexOf('$1 == "INITIAL_ADMIN_EMAIL" && $2 != ""');
   const migrate = yml.indexOf('- name: Apply any pending migrations BEFORE the code that needs them');
+  assert.ok(refuse > 0, 'the vars step refuses an empty owner address');
+  assert.ok(migrate > 0 && refuse < migrate, 'and it does so before anything is migrated');
+  // DECISIONS row 185 amendment: the deploy never reads users.
+  assert.doesNotMatch(yml, /The owner account exists and is verified/);
+  assert.doesNotMatch(yml, /--owner-row/);
+  const commands = [...yml.matchAll(/--command "([^"]+)"/g)].map((m) => m[1]!);
+  assert.ok(commands.length > 0, 'the read-only checks are still found');
+  for (const sql of commands) assert.doesNotMatch(sql, /\busers\b/i, `a deploy step reads users: ${sql.slice(0, 80)}`);
+  assert.doesNotMatch(yml.replace(/^\s*#.*$/gm, ''), /\bFROM users\b/i, 'no uncommented line of workflow 7 selects from users');
+  // The anonymous cost-privacy probes stay, after the live verification.
   const verify = yml.indexOf('- name: Verify the live site, read-only');
   const probes = yml.indexOf('- name: Cost-privacy probes, read-only');
-  assert.ok(ownerRow > 0 && migrate > 0 && ownerRow < migrate, 'the owner row is read before anything is migrated');
   assert.ok(verify > 0 && probes > verify, 'the probes run after the live verification');
   assert.match(yml.slice(probes, probes + 300), /run: node scripts\/live-cost-probes\.mjs --base https:\/\/levonis-iq\.com/);
-  // Read-only: the owner-row query is one SELECT.
-  const query = /--command "([^"]+)"/.exec(yml.slice(ownerRow - 1200, ownerRow))?.[1] ?? '';
-  assert.match(query, /^SELECT /);
-  assert.doesNotMatch(query, /\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b/i);
 });
