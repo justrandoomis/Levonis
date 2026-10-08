@@ -143,6 +143,8 @@ const COST_ROUTERS: Array<{ file: string; router: string; guard: RegExp; paths?:
   { file: 'worker/routes/adminFinanceWorkspace.ts', router: 'adminFinanceWorkspaceRoutes', guard: /requireCostRead/ },
   { file: 'worker/routes/adminFinancePeople.ts', router: 'adminFinancePeopleRoutes', guard: /requireCostRead/ },
   { file: 'worker/routes/adminFinanceOperations.ts', router: 'adminFinanceOperationsRoutes', guard: /requireCostRead/ },
+  // Pricing engine MVP P1: «التسعير والشحن», owner only and read only.
+  { file: 'worker/routes/adminPricing.ts', router: 'adminPricingRoutes', guard: /requireCostRead/ },
   // Path-scoped on purpose: it is mounted at the root of investment-finance.
   {
     file: 'worker/routes/adminInvestmentProfiles.ts',

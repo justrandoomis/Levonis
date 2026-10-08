@@ -94,6 +94,8 @@ const REQUIRED: Record<string, readonly string[]> = {
     'PREORDER_LINK_SKIP_OWNER_ONLY',
     'OFFER_FIXED_NOT_FOR_ENGINE',
   ],
+  // MVP plan V14: §6.1's PRICING_INPUT_INVALID, landed with P1's what-if validation.
+  'MVP plan V14 (P1)': ['PRICING_INPUT_INVALID'],
   // L3 `confirm_incomplete`, L4 `measures_confirmed`, and GATE (C52).
   'master plan v2 check §3.9': [
     'PRICING_CLEAR_INCOMPLETE_CONFIRM',

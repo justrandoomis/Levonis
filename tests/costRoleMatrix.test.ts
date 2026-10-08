@@ -177,3 +177,27 @@ test('the finance screens are the owner’s alone: full and legacy admins are re
   }
   assert.ok(finance.filter((p) => owner.statuses[p] === 200).length > 15, 'the owner reaches them');
 });
+
+test('«التسعير والشحن» (pricing engine MVP P1): the owner reads cost there; every other admin is refused at its door with COST_ACCESS_DENIED; customers and guests never reach it', async () => {
+  const detail = '/api/admin/pricing/products/p_a1';
+  const routes = ['/api/admin/pricing/overview', detail];
+  assert.ok(routes.every((p) => PATHS.includes(p)), 'the sweep enumerates the pricing router');
+  const owner = await sweep('owner');
+  for (const p of routes) assert.equal(owner.statuses[p], 200, `the owner reads ${p}`);
+  assert.ok(owner.costSeen.includes(detail), 'the owner sees the costly product’s landed cost there');
+  for (const role of ['assistant', 'full', 'legacy_null', 'grantee_off', 'support_assistant'] as const) {
+    const r = await sweep(role);
+    for (const p of routes) {
+      assert.equal(r.statuses[p], 403, `${role} ${p}`);
+      assert.equal(r.codes[p], 'COST_ACCESS_DENIED', `${role} ${p}`);
+    }
+  }
+  for (const role of ['customer', 'merchant', 'employee', 'investor'] as const) {
+    const r = await sweep(role);
+    for (const p of routes) assert.equal(r.statuses[p], 403, `${role} ${p}`);
+  }
+  const guest = await sweep('guest');
+  for (const p of routes) assert.equal(guest.statuses[p], 401, `guest ${p}`);
+  const unverified = await sweep('owner_unverified');
+  for (const p of routes) assert.equal(unverified.codes[p], 'OWNER_EMAIL_UNVERIFIED', `unverified owner ${p}`);
+});

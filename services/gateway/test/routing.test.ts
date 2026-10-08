@@ -58,6 +58,7 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/admin/taxonomy': 'CATALOG',
   '/api/admin/inventory': 'CATALOG',
   '/api/admin/procurement': 'CATALOG',
+  '/api/admin/pricing': 'CATALOG',
   '/api/admin/stock-operations': 'CATALOG',
   '/api/admin/finance-operations': 'ANALYTICS',
   '/api/admin/finance-workspace': 'ANALYTICS',
@@ -289,6 +290,8 @@ test('every cost surface is the owner\'s alone at the edge (owner decision 2)', 
     '/api/admin/investment-profiles',
     '/api/admin/invest/summary',
     '/api/admin/security/overview',
+    '/api/admin/pricing/overview',
+    '/api/admin/pricing/products/p1/what-if',
   ]) {
     assert.equal(matchRoute(path, 'GET')!.requires, 'admin:owner', path);
   }

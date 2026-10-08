@@ -1088,10 +1088,10 @@ test('skuComboKey is byte-identical to the product_variants comboKey (worker/lib
 
 /* ---------------------------------------------------- confidentiality -- */
 
-test('the pricing formula never ships to the browser: src/ imports neither costToPrice nor ruleResolution', () => {
+test('the pricing formula never ships to the browser: src/ imports neither costToPrice, ruleResolution nor legacyTargets', () => {
   for (const file of tsFiles(join(ROOT, 'src'))) {
     for (const spec of importSpecifiers(readFileSync(file, 'utf8'))) {
-      assert.ok(!/costToPrice|ruleResolution/.test(spec), `${file} imports ${spec}`);
+      assert.ok(!/costToPrice|ruleResolution|legacyTargets|pricingEngine/.test(spec), `${file} imports ${spec}`);
     }
   }
 });

@@ -197,6 +197,10 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/admin/procurement/receiving', pattern: /^\/api\/admin\/procurement\/receiving(\/[^/]+)?$/, methods: ['GET', 'HEAD'], hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/procurement/documents', pattern: /^\/api\/admin\/procurement\/documents\/[^/]+\/receive$/, methods: ['POST'], hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/procurement', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin:owner', rateClass: 'admin-write' },
+  // «التسعير والشحن» (pricing engine MVP): costs, the minimum profit and the
+  // rates are the owner's alone (decision 2), so the edge shuts the whole door
+  // to everyone else, as the core does with requireCostRead.
+  { prefix: '/api/admin/pricing', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin:owner', rateClass: 'admin-write' },
   { prefix: '/api/admin/stock-operations', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/template', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'upload' },
   { prefix: '/api/admin/import', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'upload' },

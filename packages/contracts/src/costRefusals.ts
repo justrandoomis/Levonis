@@ -378,6 +378,14 @@ export const COST_REFUSALS = {
     en: 'That batch belongs to another product.',
     ckb: 'ئەو وەجبەیە هی بەرهەمێکی ترە.',
   },
+  // MVP plan V14: the one §6.1 code S1 did not land, added by the first route
+  // that validates a pricing input (P1's what-if). `{field}` is the field's
+  // NAME, filled from `details.field` — never its value.
+  PRICING_INPUT_INVALID: {
+    ar: 'قيمة غير صالحة في الحقل «{field}».',
+    en: 'Invalid value in “{field}”.',
+    ckb: 'بەهایەکی نادروست لە خانەی «{field}».',
+  },
   CENTRAL_RATES_MOVED: {
     ar: 'أسعار الصرف والشحن المركزية تُعدّل من شاشة «التسعير والشحن» فقط.',
     en: 'Central exchange and shipping rates are edited only on the Pricing & Shipping screen.',

@@ -425,6 +425,17 @@ export const FINANCIAL_FIELDS = [
   'summary_json',
   'change_json',
   'samples_json',
+  // -- pricing engine MVP P1 («التسعير والشحن», owner-only router): what a
+  // -- guest pays today per channel next to the old landed cost — paid minus a
+  // -- derived profit IS the cost, so each figure is private — the placed
+  // -- legacy rules, a reason's figure, and a what-if's change against today.
+  'today_item_iqd',
+  'today_fee_iqd',
+  'today_prepaid_iqd',
+  'today_cod_iqd',
+  'change_iqd',
+  'legacy_rules',
+  'legacy_reason_iqd',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

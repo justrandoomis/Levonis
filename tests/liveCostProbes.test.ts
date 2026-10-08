@@ -167,6 +167,23 @@ test('s1.json against the local Worker with PRO resumed: the product pages carry
   assert.deepEqual(failures, []);
 });
 
+// ------------------------------------------------------------- pricing.json (MVP P1)
+
+test('pricing.json (MVP P1): the owner’s pricing workspace refuses a stranger — the probes, and the local Worker answering them', async () => {
+  const pricing = files.find((f) => f.file === 'pricing.json');
+  assert.ok(pricing, 'scripts/live-cost-probes.d/pricing.json exists');
+  const paths = pricing!.spec.probes.map((p) => p.path);
+  assert.ok(paths.includes('/api/admin/pricing/overview'));
+  for (const p of pricing!.spec.probes) assert.deepEqual(p.status, [401], p.path);
+  const raw = freshDb();
+  seedCostlyProduct(raw);
+  const env = { DB: asD1(raw), STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
+  for (const p of pricing!.spec.probes) {
+    const res = await worker.fetch(new Request(`https://${APEX}${p.path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
+    assert.deepEqual(judge(p, res.status, await res.text()), [], p.path);
+  }
+});
+
 // ------------------------------------------------------------- the workflow
 
 test('workflow 7: an empty INITIAL_ADMIN_EMAIL is still refused, no step reads the users table, the probes run after the live verify', () => {

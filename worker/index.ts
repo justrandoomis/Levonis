@@ -69,6 +69,7 @@ import { adminFinanceRoutes } from './routes/adminFinance';
 import { adminFinanceReportRoutes } from './routes/adminFinanceReport';
 import { adminInventoryRoutes } from './routes/adminInventory';
 import { adminProcurementRoutes } from './routes/adminProcurement';
+import { adminPricingRoutes } from './routes/adminPricing';
 import { adminStockOperationsRoutes } from './routes/adminStockOperations';
 import { adminFinanceOperationsRoutes } from './routes/adminFinanceOperations';
 import { adminFinanceWorkspaceRoutes } from './routes/adminFinanceWorkspace';
@@ -441,6 +442,11 @@ app.route('/api/admin/taxonomy', adminTaxonomyRoutes);
 // alone (owner decision 2 — full-scope admins included).
 app.route('/api/admin/inventory', adminInventoryRoutes);
 app.route('/api/admin/procurement', adminProcurementRoutes);
+// «التسعير والشحن» (pricing engine MVP, P1): the owner's read-only pricing
+// workspace — today's prices, the minimum profit and premium the old prices
+// carry, and the what-if calculator. Owner only at its own door
+// (requireCostRead) and at the gateway (`admin:owner`); it writes nothing.
+app.route('/api/admin/pricing', adminPricingRoutes);
 app.route('/api/admin/stock-operations', adminStockOperationsRoutes);
 app.route('/api/admin/finance-operations', adminFinanceOperationsRoutes);
 app.route('/api/admin/finance-workspace', adminFinanceWorkspaceRoutes);

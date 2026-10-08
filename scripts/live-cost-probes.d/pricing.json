@@ -1,0 +1,17 @@
+{
+  "step": "Pricing engine MVP P1 — «التسعير والشحن», the owner's read-only pricing workspace (owner decision 2)",
+  "probes": [
+    {
+      "path": "/api/admin/pricing/overview",
+      "status": [
+        401
+      ]
+    },
+    {
+      "path": "/api/admin/pricing/products/x",
+      "status": [
+        401
+      ]
+    }
+  ]
+}
