@@ -6,7 +6,8 @@
  * way the server does: `{profile}` from every profile route; `{session, ended,
  * added, replay, server_now}` from every line write; GET /session's open
  * `session` or, when none is open, the last `recent` one (submitted with its
- * order, or failed); idempotency keys (a replay returns the stored answer, a
+ * order, or cancelled `not_submitted` with nothing held — the system gave up
+ * on it and refunded it, DECISIONS row 188); idempotency keys (a replay returns the stored answer, a
  * different request under the same key is IDEMPOTENCY_KEY_REUSED, a refused
  * request writes nothing); a 30-minute session on a server clock that is
  * deliberately SKEWED from the device's (`skew`, minutes); the refusals with
@@ -19,7 +20,10 @@
  *   lang      ar | en | ckb                                    (ar)
  *   theme     dark | light                                     (dark)
  *   profile   inactive | active | reconsent | addressMissing  (inactive)
- *   session   none | open | locked | failed | submitted        (none)
+ *   session   none | open | locked | not_submitted | failed | submitted  (none)
+ *             not_submitted: cancelled by the system, money back (row 188);
+ *             failed: a row parked by the release before row 188, which the
+ *             UI no longer speaks about (the next cron tick refunds it)
  *   remaining seconds left on an open/locked session           (1722 → 28:42)
  *   balance   ok | low  (low: every add is refused for the wallet)
  *   addresses number of saved addresses                        (2)
@@ -193,12 +197,13 @@ interface Item {
 interface Meta {
   id: string; state: 'open' | 'submitted' | 'cancelled' | 'failed'; started_at: number; expires_at: number;
   printer_ack: boolean; order_id: string | null; submitted_at: string | null;
+  cancel_reason: string | null;
 }
 
 let items: Item[] = [];
 let meta: Meta | null = null;
 let rev = 0;
-/** The last session that ended (submitted or failed), with its lines, as GET /session reports it. */
+/** The last session that ended (submitted, not submitted, or a leftover `failed`), with its lines, as GET /session reports it. */
 let ended: { meta: Meta; items: Item[] } | null = null;
 let seq = 0;
 const sessionMode = params.get('session') ?? 'none';
@@ -206,7 +211,7 @@ const remainingS = Number(params.get('remaining') ?? 1722);
 
 function startSession(endsIn: number, state: Meta['state'] = 'open'): void {
   const end = serverNow() + endsIn;
-  meta = { id: `qbs_${++seq}`, state, started_at: end - WINDOW_MS, expires_at: end, printer_ack: false, order_id: null, submitted_at: null };
+  meta = { id: `qbs_${++seq}`, state, started_at: end - WINDOW_MS, expires_at: end, printer_ack: false, order_id: null, submitted_at: null, cancel_reason: null };
   rev = 1;
 }
 
@@ -223,10 +228,15 @@ if (sessionMode === 'open' || sessionMode === 'locked') {
   startSession(sessionMode === 'open' ? remainingS * 1000 : -5000);
   items = [{ ...LINE_A1 }, { ...LINE_PLA }];
 }
-if (sessionMode === 'failed' || sessionMode === 'submitted') {
-  startSession(-60_000, sessionMode);
+if (sessionMode === 'failed' || sessionMode === 'submitted' || sessionMode === 'not_submitted') {
+  startSession(-60_000, sessionMode === 'not_submitted' ? 'cancelled' : sessionMode);
   ended = {
-    meta: { ...meta!, order_id: sessionMode === 'submitted' ? 'LV-260107' : null, submitted_at: sessionMode === 'submitted' ? iso(serverNow() - 60_000) : null },
+    meta: {
+      ...meta!,
+      order_id: sessionMode === 'submitted' ? 'LV-260107' : null,
+      submitted_at: sessionMode === 'submitted' ? iso(serverNow() - 60_000) : null,
+      cancel_reason: sessionMode === 'not_submitted' ? 'not_submitted' : null,
+    },
     items: [{ ...LINE_A1 }, { ...LINE_PLA }],
   };
   meta = null;
@@ -275,12 +285,15 @@ function viewOf(m: Meta, lines: Item[]) {
     shipping_before_iqd: SHIPPING_FEE,
     free_delivery: { applied: free, label: free ? WALLET_FREE_DELIVERY_LABEL.ar : null, labels: WALLET_FREE_DELIVERY_LABEL },
     total_iqd: total,
-    held_iqd: open ? total : 0,
+    // As built: an open session holds its total; a leftover `failed` row still
+    // holds it until the cron refunds it; a cancelled one holds nothing.
+    held_iqd: open || m.state === 'failed' ? total : 0,
     address: { name: a.name, phone: a.phone, governorate: a.governorate, area: a.area, address: a.address, landmark: a.landmark },
     delivery_method: 'standard',
     order_id: m.state === 'submitted' ? m.order_id : null,
     submitted_at: m.submitted_at,
     finalize_error: m.state === 'failed' ? 'QUICK_BUY_TOTAL_ABOVE_HOLD' : null,
+    cancel_reason: m.state === 'cancelled' ? m.cancel_reason : null,
     rev,
   };
 }

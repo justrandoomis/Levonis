@@ -10,8 +10,9 @@
  * SAME idempotency key, the orders card (server clock against a skewed device
  * clock, one PATCH per settled stepper, removal as PATCH {qty: 0}), the lock at
  * 00:00 and the one refresh at zero, the session becoming an ordinary order
- * (owner spec §13: no card after submission, one transient toast), a failed
- * submission's one line, the printer standard-delivery warning (same request,
+ * (owner spec §13: no card after submission, one transient toast), a
+ * submission the system gave up on — cancelled and refunded, one line
+ * (DECISIONS row 188), the printer standard-delivery warning (same request,
  * same key, with the acceptance), a deleted address, Settings, re-consent and
  * the inline address form. Screenshots of each state.
  *
@@ -253,14 +254,30 @@ const scenarios = {
     await page.close();
   },
 
-  // A session the server could not submit: no card, no order — one line.
+  // A session the server could not submit: the system cancelled it and gave the
+  // money back (DECISIONS row 188). No card, no order — one line that says so.
+  async notsubmitted(browser) {
+    const page = await open(browser, 'view=orders&profile=active&session=not_submitted');
+    const sel = '[data-quick-buy-notice="not-submitted"]';
+    const said = await page.waitForSelector(sel, { timeout: 8000 }).then(() => true, () => false);
+    const card = await page.$('[data-quick-buy-card]');
+    const txt = said ? await page.$eval(sel, (n) => n.textContent.trim()) : '';
+    const back = { ar: /عاد المبلغ المحجوز كاملًا إلى محفظتك/, en: /full held amount is back in your wallet/, ckb: /گەڕایەوە بۆ جزدانەکەت/ }[lang];
+    check('not submitted: one line that it was cancelled and the money is back, and no card', said && !card && back.test(txt), txt);
+    check('not submitted: no word that the money is still held or that a team will step in', said && !/(ما زال محجوز|still held|هێشتا .*گیراوە|فريق|team|تیم)/.test(txt), txt);
+    await shot(page, 'orders-not-submitted');
+    check('no page errors', page.errors.length === 0, page.errors.join(' || '));
+    await page.close();
+  },
+
+  // A row parked `failed` by the release before row 188: the next cron tick
+  // refunds it, so the page says nothing about it in the meantime.
   async failed(browser) {
     const page = await open(browser, 'view=orders&profile=active&session=failed');
-    const said = await page.waitForSelector('[data-quick-buy-notice="failed"]', { timeout: 8000 }).then(() => true, () => false);
+    await page.waitForTimeout(800);
     const card = await page.$('[data-quick-buy-card]');
-    const txt = said ? await page.$eval('[data-quick-buy-notice="failed"]', (n) => n.textContent.trim()) : '';
-    check('failed: one line that the money is still held, and no card', said && !card && /(محجوز|held|گیراوە)/.test(txt), txt);
-    await shot(page, 'orders-failed');
+    const notice = await page.$('[data-quick-buy-notice]');
+    check('a leftover failed row shows no card and no notice', !card && !notice, `card=${!!card} notice=${!!notice}`);
     check('no page errors', page.errors.length === 0, page.errors.join(' || '));
     await page.close();
   },

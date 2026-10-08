@@ -163,7 +163,7 @@ Removing the last item cancels the session (release everything, no new hold).
 ### 3.4 Finalisation — `finalizeQuickBuySession(env, id)` (cron + lazy), one batch
 claim lease → recompute quote (D12) → statements:
 `orders` INSERT (shared builder, `order_kind='quick_buy'`, payment `wallet`, due 0) · `order_items` INSERTs (shared builder, from snapshots) · inventory transfer per item: `release` session reservation then `reserve` under the order (`planInventory` with the released moves credited) + reservation fence · wallet: commit the session hold with `ref=orderId` (or release + new final hold + commit when the total fell) · settlement `prepaid_at_purchase` · `planOrderFinanceSnapshot` (journal `wallet-advance`) · OrderCreated outbox · session flip `open → submitted` guarded by `expires_at <= now` and its stored `order_id` (the loser of a race hits the PK and rolls back) · events `capture`/`release`/`submit` · in-app + channel notice `quick_buy_submitted`.
-After commit: `initOrderStage`, invoice, `notifyOrderPlaced`, admin announcement — exactly as checkout (orders.ts:4758-4886). Ten failed attempts → **cancelled** (`cancel_reason='not_submitted'`): one fenced batch releases the hold and every reservation and writes `fail`/`release`/`cancel`; the customer's bell says so in ar/en/ckb (`quick_buy_failed`, key `quick_buy_not_submitted:<session>`). No administrator is alerted or needed (DECISIONS row 188). If that batch cannot land, the lease is cleared and the next tick goes straight back to it — never to a late order attempt. A row left `failed` by the earlier release is swept the same way, ten a tick.
+After commit: `initOrderStage`, invoice, `notifyOrderPlaced`, admin announcement — exactly as checkout (orders.ts:4758-4886). Ten failed attempts → **cancelled** (`cancel_reason='not_submitted'`). A refused attempt leases the session for 45 s (`QUICK_BUY_RETRY_SPACING_S`, the database's clock), so the next one waits about a minute whoever triggers it — the cron or a burst of the customer's own page loads — and a brief glitch cannot spend all ten in a second: one fenced batch releases the hold and every reservation and writes `fail`/`release`/`cancel`; the customer's bell says so in ar/en/ckb (`quick_buy_failed`, key `quick_buy_not_submitted:<session>`). No administrator is alerted or needed (DECISIONS row 188). If that batch cannot land, the lease is cleared and the next tick goes straight back to it — never to a late order attempt. A row left `failed` by the earlier release is swept the same way, ten a tick.
 
 ### 3.5 UI (as built — owner brief §4 and §13 supersede the first sketch)
 - **Product page: one morphing control** (`src/components/quickBuy/QuickBuyBar.tsx`) for signed-in customers on
@@ -239,8 +239,8 @@ reservations (+fence), first in the batch; the order plan is credited those unit
 (`QUICK_BUY_TOTAL_ABOVE_HOLD`); `after` flips `open → submitted` only when `expires_at <= now` (fenced) and writes
 capture/release/unreserve/submit events; consent = the activation's acceptance rows copied onto the order. The
 order is `order_kind='quick_buy'` and enters the normal workflow (stock RESERVED under the order, deducted at
-confirmation like every order). Ten failed attempts → cancelled `not_submitted`: hold and units released in one
-fenced batch, the customer told in three languages, no order, no admin step (DECISIONS row 188). The earlier claim
+confirmation like every order). Ten failed attempts, about a minute apart (a refused attempt leases the session for 45 s) → cancelled
+`not_submitted`: hold and units released in one fenced batch, the customer told in three languages, no order, no admin step (DECISIONS row 188). The earlier claim
 that admins are alerted was never true of the code and the admin retry/cancel routes are gone.
 
 **After 00:00 the order is an ordinary order (owner brief §13).** From the moment the session is submitted, the

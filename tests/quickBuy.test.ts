@@ -542,6 +542,66 @@ test('DECISIONS row 188: a session the system cannot submit is cancelled after i
   assertMoneyAgrees(raw);
 });
 
+test('a brief glitch at expiry does not spend the attempts: a burst of customer page loads makes one attempt, the next waits about a minute, and the order goes through once the glitch ends', async () => {
+  const raw = world();
+  const before = spendable(raw, 'buyer');
+  await activate(raw);
+  await json(await add(raw, 'p_pla', 2));
+  // A refusal that lasts a moment (here: the product briefly not on sale).
+  raw.exec(`UPDATE products SET status = 'draft' WHERE id = 'p_pla'`);
+  expire(raw);
+  // The customer browses: every page that shows the Quick Buy chip reads the
+  // session, and a new quick purchase tries to finalise the old one first.
+  for (let i = 0; i < 2 * QUICK_BUY_FINALIZE_MAX_ATTEMPTS; i++) {
+    assert.equal((await get(as(raw), '/api/quick-buy/session')).status, 200);
+  }
+  const busy = await add(raw, 'p_nozzle', 1);
+  assert.equal(busy.status, 409);
+  assert.equal((await json(busy)).code, 'QUICK_BUY_PREVIOUS_PENDING', 'the customer is told it is being sent');
+  assert.deepEqual(await cron(raw), [], 'the cron tick in the same minute waits too');
+
+  let s = session(raw);
+  assert.equal(s.state, 'open', 'not cancelled within seconds');
+  assert.equal(s.finalize_attempts, 1, 'twenty reads, one purchase and a tick spent ONE attempt');
+  assert.equal(activeHolds(raw).length, 1);
+  assert.equal(reserved(raw, 'p_pla').stock_reserved, 2);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM user_notifications WHERE kind = 'quick_buy_failed'`), 0);
+  // The next attempt is about a minute away by the database clock — under the
+  // cron's minute so the next tick is never skipped.
+  assert.equal(
+    count(
+      raw,
+      `SELECT COUNT(*) n FROM quick_buy_sessions WHERE id = ?
+          AND lease_until > strftime('%Y-%m-%dT%H:%M:%fZ','now','+30 seconds')
+          AND lease_until < strftime('%Y-%m-%dT%H:%M:%fZ','now','+60 seconds')`,
+      s.id
+    ),
+    1,
+    `lease_until ${s.lease_until}`
+  );
+
+  // A minute later the cron tries again — one attempt — and is refused again.
+  const minutePasses = () => raw.exec(`UPDATE quick_buy_sessions SET lease_until = strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 second') WHERE id = '${s.id}'`);
+  minutePasses();
+  const [second] = await cron(raw);
+  assert.equal(second.status, 'retry', JSON.stringify(second));
+  assert.equal(session(raw).finalize_attempts, 2);
+  for (let i = 0; i < 5; i++) await get(as(raw), '/api/quick-buy/session');
+  assert.equal(session(raw).finalize_attempts, 2, 'reads in between still spend nothing');
+
+  // The glitch ends: the next minute's attempt places the ordinary order.
+  raw.exec(`UPDATE products SET status = 'active' WHERE id = 'p_pla'`);
+  minutePasses();
+  const [third] = await cron(raw);
+  assert.equal(third.status, 'submitted', JSON.stringify(third));
+  s = session(raw);
+  assert.equal(s.state, 'submitted');
+  assert.equal(s.finalize_attempts, 3);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM orders WHERE user_id = 'buyer'`), 1);
+  assertMoneyAgrees(raw);
+  assert.ok(spendable(raw, 'buyer') < before, 'the order is paid from the wallet');
+});
+
 test('DECISIONS row 188: a give-up that cannot land leaves the session open and lease-free; the next tick goes straight back to the release, never to a late order', async () => {
   const raw = world();
   const before = spendable(raw, 'buyer');

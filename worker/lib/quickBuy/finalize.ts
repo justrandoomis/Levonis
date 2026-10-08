@@ -46,6 +46,7 @@ import {
   parseJson,
   QUICK_BUY_FINALIZE_MAX_ATTEMPTS,
   QUICK_BUY_LEASE_MS,
+  QUICK_BUY_RETRY_SPACING_S,
   SQL_NOW,
   type HeldTarget,
   type QuickBuyItemRow,
@@ -420,14 +421,23 @@ export async function finalizeQuickBuySession(env: Env, runner: FinalizeRunner, 
   // `session` was read AFTER the claim, so its count already includes this attempt.
   const terminal = session.finalize_attempts >= QUICK_BUY_FINALIZE_MAX_ATTEMPTS;
   // The lease is kept through a give-up, so no other finaliser starts an order
-  // attempt while the release is being written.
+  // attempt while the release is being written. Otherwise it is shortened to
+  // the retry spacing, by the database's clock: the next attempt comes about a
+  // minute later whoever asks first — the attempts count minutes, not requests.
   await db
     .prepare(
       `UPDATE quick_buy_sessions
-          SET finalize_error = ?, lease_until = CASE WHEN ? = 1 THEN lease_until ELSE NULL END, updated_at = ${SQL_NOW}
+          SET finalize_error = ?,
+              lease_until = CASE WHEN ? = 1 THEN lease_until ELSE strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?) END,
+              updated_at = ${SQL_NOW}
         WHERE id = ? AND state = 'open'`
     )
-    .bind(`${code}${result.ok ? '' : `: ${result.message}`}`.slice(0, 500), terminal ? 1 : 0, session.id)
+    .bind(
+      `${code}${result.ok ? '' : `: ${result.message}`}`.slice(0, 500),
+      terminal ? 1 : 0,
+      `+${QUICK_BUY_RETRY_SPACING_S} seconds`,
+      session.id
+    )
     .run();
   if (!terminal) return { status: 'retry', code };
   return settleGiveUp(db, session, code);

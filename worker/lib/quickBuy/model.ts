@@ -11,11 +11,19 @@ export const QUICK_BUY_WINDOW_MS = 30 * 60 * 1000;
 export const QUICK_BUY_MAX_LINES = 20;
 export const QUICK_BUY_MAX_QTY = 99;
 /** The cron retries a session that could not be submitted this many times
- *  (once a minute); after the last attempt it is cancelled and everything it
- *  held is released, with no administrator in the loop (DECISIONS row 188). */
+ *  (about once a minute — see QUICK_BUY_RETRY_SPACING_S); after the last
+ *  attempt it is cancelled and everything it held is released, with no
+ *  administrator in the loop (DECISIONS row 188). */
 export const QUICK_BUY_FINALIZE_MAX_ATTEMPTS = 10;
 /** How long one finaliser owns a session before another may take it over. */
 export const QUICK_BUY_LEASE_MS = 2 * 60 * 1000;
+/** After a refused attempt the session is leased for this long, so the next
+ *  attempt waits for it WHOEVER triggers it: the per-minute cron or a burst of
+ *  the customer's own page loads (each lazily finalises an expired session).
+ *  Without it ten quick reads could spend all ten attempts in a second and a
+ *  brief glitch would cancel the order. A little under a minute, so the next
+ *  cron tick always finds it free even when a tick runs a few seconds late. */
+export const QUICK_BUY_RETRY_SPACING_S = 45;
 
 /** The database's own clock, for every in-batch comparison against `expires_at`. */
 export const SQL_NOW = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
