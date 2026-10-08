@@ -238,7 +238,13 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'print_actuals', 'print_failures', 'printer_calibration_stats',
   ]),
   ...owned('reviews', ['reviews', 'review_rewards', 'gift_entitlements', 'gift_pool_items', 'gift_redemptions', 'gift_pools', 'review_media']),
-  ...owned('devices', ['order_item_units', 'device_serials', 'device_registrations', 'warranty_claims', 'claim_messages', 'warranty_receipts', 'serial_inventory', 'stock_serial_links']),
+  ...owned('devices', [
+    'order_item_units', 'device_serials', 'device_registrations', 'warranty_claims', 'claim_messages', 'warranty_receipts', 'serial_inventory', 'stock_serial_links',
+    // 0177 — a serial bound to an order unit at preparation, before delivery
+    // creates the warranty unit (worker/lib/serialAssignments.ts). The
+    // device's own history, so Devices' — like device_serials beside it.
+    'serial_assignments',
+  ]),
   ...owned('chat', [
     'chats', 'chat_participants', 'chat_messages', 'chat_typing_presence',
     // 0158 — what the server learned about a pasted URL, once, for every

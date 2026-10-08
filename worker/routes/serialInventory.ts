@@ -34,7 +34,9 @@ import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAdmin, requireMainHost, badRequest, str, int } from '../lib/http';
+import type { Context } from 'hono';
 import { audit } from '../lib/audit';
+import { refuse as serialRefuse, serialActor, serialAssignmentsInstalled, serialStory, setWarrantyMode } from '../lib/serialAssignments';
 import { normalizeEan, normalizeSerial, buildBulkRow, BULK_MAX_LINES } from '@levonis/catalog/deviceSerials';
 import {
   INVENTORY_STATUSES,
@@ -289,10 +291,26 @@ function serialParam(raw: string): string {
   return norm;
 }
 
+/**
+ * THE §16 SERIAL / WARRANTY PAGE lives here (critique-1 #24: extend the
+ * existing door, do not build a second one). `story` (migration 0177) adds
+ * the derived status, the current and previous orders, the warranty and its
+ * mode, the lot, and the whole timeline — the asset's own rows, every
+ * `serial.*` row, `device.*` on EVERY unit the serial was ever bound to and
+ * its receipts' `warranty.*`. A device known only to device_serials (sold
+ * before the inventory existed) answers too, with `row: null`.
+ */
 serialInventoryRoutes.get('/:serial', async (c) => {
   const norm = serialParam(c.req.param('serial'));
   const row = await loadInventoryRow(c.env.DB, norm);
-  if (!row) return c.json({ success: false, error: 'Serial not in inventory', code: 'SERIAL_NOT_IN_INVENTORY' }, 404);
+  const story = await serialStory(c.env, serialActor(c.env, c.get('user')!), norm).catch((e) => {
+    console.error('serial story unavailable', e instanceof Error ? e.message : String(e));
+    return null;
+  });
+  if (!row) {
+    if (story) return c.json({ success: true, row: null, history: story.history, story });
+    return c.json({ success: false, error: 'Serial not in inventory', code: 'SERIAL_NOT_IN_INVENTORY' }, 404);
+  }
   // The row's own story (serial_inventory.*) and, once it is on a unit, the
   // device's (device.* on that unit) — one list, newest first.
   const { results } = await c.env.DB.prepare(
@@ -307,15 +325,54 @@ serialInventoryRoutes.get('/:serial', async (c) => {
   return c.json({
     success: true,
     row: inventoryRowPublic(row),
-    history: results.map((h) => ({
-      id: h.id,
-      action: h.action,
-      created_at: h.created_at,
-      actor: h.actor_id ? { id: h.actor_id, email: h.email ?? null, username: h.username ?? null } : null,
-      detail: safeParse<Record<string, unknown>>(h.detail, {}),
-    })),
+    history: story
+      ? story.history
+      : results.map((h) => ({
+          id: h.id,
+          action: h.action,
+          created_at: h.created_at,
+          actor: h.actor_id ? { id: h.actor_id, email: h.email ?? null, username: h.username ?? null } : null,
+          detail: safeParse<Record<string, unknown>>(h.detail, {}),
+        })),
+    ...(story ? { story } : {}),
   });
 });
+
+/**
+ * Owner — how a returned device's warranty runs when it is sold again
+ * (§14): `carry` keeps the original end (owner default), `restart` gives the
+ * new buyer a full period. Only while its new assignment is not delivered.
+ */
+serialInventoryRoutes.post('/:serial/warranty-mode', async (c) => {
+  const norm = serialParam(c.req.param('serial'));
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const mode = body.mode === 'restart' ? 'restart' : body.mode === 'carry' ? 'carry' : null;
+  if (!mode) throw badRequest('mode must be carry or restart', 'MODE_INVALID');
+  const res = await setWarrantyMode(c.env, serialActor(c.env, c.get('user')!), norm, mode, typeof body.reason === 'string' ? body.reason : '');
+  return c.json(res);
+});
+
+/**
+ * ONCE A SERIAL HAS HISTORY (a preparation binding or a warranty unit), its
+ * product, its box SN and its void state are the OWNER's to change (§4.13): a
+ * re-filed product would make the next scan refuse the right box, a moved box
+ * SN would let one box be two assets, and voiding a device mid-sale would
+ * strand an order. Voiding is refused for everyone while a preparation
+ * binding is live — unlink it first. Notes and model text stay open.
+ */
+async function guardSerialHistory(c: Context<AppContext>, norm: string, op: 'patch' | 'void' | 'restore') {
+  const db = c.env.DB;
+  const installed = await serialAssignmentsInstalled(db);
+  const [unit, assignment, live] = await Promise.all([
+    db.prepare('SELECT 1 AS x FROM device_serials WHERE serial_norm = ?').bind(norm).first(),
+    installed ? db.prepare('SELECT 1 AS x FROM serial_assignments WHERE serial_norm = ? LIMIT 1').bind(norm).first() : Promise.resolve(null),
+    installed
+      ? db.prepare('SELECT 1 AS x FROM serial_assignments WHERE serial_norm = ? AND released_at IS NULL AND activated_at IS NULL').bind(norm).first()
+      : Promise.resolve(null),
+  ]);
+  if (op === 'void' && live) throw serialRefuse(409, 'SERIAL_IN_USE', {});
+  if ((unit || assignment) && !serialActor(c.env, c.get('user')!).owner) throw serialRefuse(403, 'OWNER_ONLY');
+}
 
 serialInventoryRoutes.patch('/:serial', async (c) => {
   const admin = c.get('user')!;
@@ -325,6 +382,10 @@ serialInventoryRoutes.patch('/:serial', async (c) => {
   const before = await loadInventoryRow(c.env.DB, norm);
   if (!before) return c.json({ success: false, error: 'Serial not in inventory', code: 'SERIAL_NOT_IN_INVENTORY' }, 404);
   const product = 'product_id' in body ? await verifyProductChoice(c.env.DB, body.product_id, body.variant_id) : undefined;
+  // Only a CHANGE of the guarded fields is an attempt.
+  const productChanges = !!product && (product.product_id !== before.product_id || product.variant_id !== before.variant_id);
+  const boxChanges = patch.box_sn !== undefined && patch.box_sn !== before.box_sn;
+  if (productChanges || boxChanges) await guardSerialHistory(c, norm, 'patch');
   await applyPatch(c.env.DB, norm, { ...patch, product });
   await audit(c.env.DB, admin.id, 'serial_inventory.update', norm, {
     from: {
@@ -344,6 +405,7 @@ for (const [path, voided] of [['/:serial/void', true], ['/:serial/restore', fals
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
     if (reason.length < 3) throw badRequest('A reason is required', 'REASON_REQUIRED');
+    await guardSerialHistory(c, norm, voided ? 'void' : 'restore');
     await setVoid(c.env.DB, norm, voided, reason);
     await audit(c.env.DB, admin.id, voided ? 'serial_inventory.void' : 'serial_inventory.restore', norm, { reason });
     const row = await loadInventoryRow(c.env.DB, norm);

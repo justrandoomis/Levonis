@@ -1159,13 +1159,16 @@ export interface OrderUnitPublic {
   warranty: {
     start_at: string | null;
     end_at: string | null;
-    state: 'active' | 'expired' | 'needs_config' | 'not_delivered';
+    /** `closed` (0177): the device came back on a return — its dates are kept, it no longer covers. */
+    state: 'active' | 'expired' | 'needs_config' | 'not_delivered' | 'closed';
     remaining_days: number | null;
   };
   /** Whether the buyer holds it, another account does, or nobody yet. */
   linked: 'mine' | 'other' | 'none';
   receipt_no: string | null;
   replaced: boolean;
+  /** 0177: the device came back on a return; absent from an older server. */
+  returned?: boolean;
 }
 
 export interface OrderTrackingStep {

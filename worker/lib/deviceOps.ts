@@ -25,8 +25,7 @@ import type { Env } from './types';
 import { safeParse } from './types';
 import { addMonths } from './membershipOps';
 import { newId } from './crypto';
-import { printerProductIds } from './printerIdentity';
-import { effectiveDevicePolicy } from './warrantyPlans';
+import { anySectionSerialPolicy, serializationContext, lineDevicePolicy, serializedProductSql } from './serialPolicy';
 
 // ---------------------------------------------------------------- policy
 
@@ -138,13 +137,20 @@ export function computeCoverage(
   };
 }
 
-export type CoverageState = 'active' | 'expired' | 'needs_config' | 'not_delivered';
+export type CoverageState = 'active' | 'expired' | 'needs_config' | 'not_delivered' | 'closed';
 
+/**
+ * `closedAt` (order_item_units.warranty_closed_at, migration 0177): a unit
+ * whose device came back on a return — or was superseded by an owner
+ * override — is CLOSED. Its dates are kept and shown; it no longer covers.
+ */
 export function coverageState(
   deliveredAt: string | null,
   endAt: string | null,
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  closedAt: string | null = null
 ): { state: CoverageState; remaining_days: number | null } {
+  if (closedAt) return { state: 'closed', remaining_days: null };
   if (!deliveredAt) return { state: 'not_delivered', remaining_days: null };
   if (!endAt) return { state: 'needs_config', remaining_days: null };
   const endMs = Date.parse(endAt);
@@ -185,6 +191,10 @@ export interface CreateUnitsResult {
   serialized_items: number;
   planned_units: number;
   created: number;
+  /** The preparation serials bound to the new units (migration 0177), or
+   *  null when that step did not run. Its own batch: a failure here never
+   *  costs a unit (critique H3). */
+  activation?: { pending: number; activated: number; released_policy: number; conflicts: number } | null;
 }
 
 /**
@@ -221,11 +231,12 @@ export async function createUnitsOnDelivery(
     .bind(orderId)
     .all<UnitSourceRow>();
 
-  // Which lines are printers, by the owner's catalog flag — one query for the
-  // whole order. A printer is serialized and 12-month based by default, so a
-  // plan sold on a printer whose ops_policy was never configured still gets
-  // the unit rows it was sold for.
-  const printerIds = await printerProductIds(
+  // Which lines are printers, by the owner's catalog flag, and which sit in a
+  // section whose serial policy says 'required' (0177) — two batched reads for
+  // the whole order (worker/lib/serialPolicy.ts). A printer is serialized and
+  // 12-month based by default, so a plan sold on a printer whose ops_policy
+  // was never configured still gets the unit rows it was sold for.
+  const policyCtx = await serializationContext(
     env.DB,
     items.map((it) => (it.product_id === null ? '' : String(it.product_id)))
   );
@@ -234,7 +245,7 @@ export async function createUnitsOnDelivery(
   let serializedItems = 0;
   let planned = 0;
   for (const it of items) {
-    const policy = effectiveDevicePolicy(it.ops_policy, it.product_id !== null && printerIds.has(String(it.product_id)));
+    const policy = lineDevicePolicy(it.ops_policy, it.product_id, policyCtx);
     if (!policy.serialized) continue;
     serializedItems++;
     const snap = safeParse<WarrantySnapshotLite | null>(it.warranty_snapshot, null);
@@ -273,10 +284,26 @@ export async function createUnitsOnDelivery(
       );
     }
   }
-  if (stmts.length === 0) return { serialized_items: serializedItems, planned_units: 0, created: 0 };
-  const results = await env.DB.batch(stmts);
-  const created = results.reduce((n, r) => n + (r.meta?.changes ?? 0), 0);
-  return { serialized_items: serializedItems, planned_units: planned, created };
+  let created = 0;
+  if (stmts.length > 0) {
+    const results = await env.DB.batch(stmts);
+    created = results.reduce((n, r) => n + (r.meta?.changes ?? 0), 0);
+  }
+  // The serials scanned at preparation → these units (§8). A SEPARATE batch,
+  // after the units committed, so nothing new can ever cost a customer their
+  // warranty units; contained, and retried by the activation sweep.
+  let activation: CreateUnitsResult['activation'] = null;
+  try {
+    const { activateOrderSerials } = await import('./serialAssignments');
+    activation = await activateOrderSerials(env, orderId);
+  } catch (e) {
+    console.error('serial activation failed for order', orderId, e instanceof Error ? e.message : String(e));
+  }
+  const result: CreateUnitsResult = { serialized_items: serializedItems, planned_units: planned, created };
+  // Reported only when there was something to activate, so the result of an
+  // order with no preparation serials is exactly what it always was.
+  if (activation && activation.pending > 0) result.activation = activation;
+  return result;
 }
 
 /**
@@ -311,7 +338,10 @@ export interface DeliveredUnitsSweep {
 }
 
 export async function sweepDeliveredOrdersWithoutUnits(env: Env, limit = 50): Promise<DeliveredUnitsSweep> {
-  const serialized = `(CASE WHEN json_valid(p.ops_policy) THEN json_extract(p.ops_policy, '$.serialized') END)`;
+  // The SQL twin of `lineDevicePolicy` (worker/lib/serialPolicy.ts): one
+  // definition of the section walk, spliced here and into the batched reader.
+  // The section walk is spliced in only once the owner has set a section policy.
+  const serializedLine = serializedProductSql('oi.product_id', 'p.ops_policy', await anySectionSerialPolicy(env.DB));
   const { results } = await env.DB.prepare(
     `SELECT o.id, o.delivered_at
        FROM orders o
@@ -324,11 +354,7 @@ export async function sweepDeliveredOrdersWithoutUnits(env: Env, limit = 50): Pr
             JOIN products p ON p.id = oi.product_id
            WHERE oi.order_id = o.id
              AND oi.qty > 0
-             AND (${serialized} = 1
-                  OR (${serialized} IS NOT 0
-                      AND EXISTS (SELECT 1 FROM product_catalogs pc
-                                    JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
-                                   WHERE pc.product_id = oi.product_id))))
+             AND ${serializedLine})
       ORDER BY o.delivered_at DESC
       LIMIT ?`
   )

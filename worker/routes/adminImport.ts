@@ -40,7 +40,7 @@ import type { AppContext, Env } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, forbidden, str } from '../lib/http';
 import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { canViewCost, canWriteCost } from '../lib/adminScope';
+import { canViewCost, canWriteCost, isOwner } from '../lib/adminScope';
 import { rateLimit } from '../lib/ratelimit';
 import { HEIF_REFUSAL, isHeifBytes, sniff } from './uploads';
 import { IMAGE_SOURCE_CAP } from '../lib/imageConvert';
@@ -1407,6 +1407,7 @@ adminImportRoutes.post('/preview', async (c) => {
       newId,
       money,
       specFieldIds: shape.specFields.map((f) => f.id),
+      owner: isOwner(c.env, admin),
     });
     const row: PreviewRow = {
       key: p.key,

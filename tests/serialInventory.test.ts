@@ -65,7 +65,10 @@ function appAs(db: D1Database, user: { id: string; role: string }, host = 'levon
   a.use('*', async (c, next) => {
     c.set('user', { id: user.id, role: user.role, email: `${user.id}@x.co` } as never);
     c.set('host', classifyHost(host, 'levonis-iq.com'));
-    c.env = { DB: db, APP_ORIGIN: 'https://levonis-iq.com', STORE_ROOT_DOMAIN: 'levonis-iq.com' } as never;
+    // `boss` is the Main Admin (INITIAL_ADMIN_EMAIL): once a serial has a unit
+    // or a preparation binding, voiding it or re-filing its product is the
+    // owner's (0177, §4.13) — tests/serialPrepScan.test.ts covers the refusal.
+    c.env = { DB: db, APP_ORIGIN: 'https://levonis-iq.com', STORE_ROOT_DOMAIN: 'levonis-iq.com', INITIAL_ADMIN_EMAIL: 'boss@x.co' } as never;
     await next();
   });
   a.route('/api/devices', deviceRoutes);

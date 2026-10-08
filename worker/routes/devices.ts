@@ -108,6 +108,10 @@ import {
   type WarrantySnapshotLite,
 } from '../lib/deviceOps';
 import { linkFromInventory } from '../lib/serialInventory';
+import { canonicalSerial, refuse as serialRefuse, serialAssignmentsInstalled } from '../lib/serialAssignments';
+import { lineDevicePolicy, serializationContext } from '../lib/serialPolicy';
+import { auditStatements } from '../lib/audit';
+import { isOwner } from '../lib/adminScope';
 import { serialInventoryRoutes } from './serialInventory';
 import { catalogIndexFor } from '../lib/catalogPresentation';
 import { MAINTENANCE_ROOT_ID, maintenanceFor } from '../lib/printerFits';
@@ -164,6 +168,8 @@ function isoOrBad(v: unknown, name: string): string {
 }
 
 interface DeviceRow extends UnitRow {
+  /** 0177: the unit's warranty was closed (a return); null before the migration. */
+  warranty_closed_at?: string | null;
   registered_at?: string | null;
   revoked_at?: string | null;
   reg_user_id?: string | null;
@@ -180,7 +186,8 @@ interface DeviceRow extends UnitRow {
 }
 
 function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string } = {}) {
-  const cov = coverageState(row.delivered_at, row.warranty_end_at);
+  // A returned device reads «closed» — its dates stay on the card (§14).
+  const cov = coverageState(row.delivered_at, row.warranty_end_at, Date.now(), row.warranty_closed_at ?? null);
   // The order belongs to the BUYER. A later holder (a transferred device) gets
   // the device and its coverage, never the buyer's order identifiers — the
   // orders routes would 404 them anyway, and an id is still a fact about
@@ -243,6 +250,12 @@ function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string
   };
 }
 
+/** The unit columns plus, once migration 0177 has applied, its closure (a returned device). */
+async function deviceSelect(db: D1Database): Promise<string> {
+  const closed = (await serialAssignmentsInstalled(db)) ? 'u.warranty_closed_at' : 'NULL AS warranty_closed_at';
+  return DEVICE_SELECT.replace('u.replacement_of_unit_id, u.created_at,', `u.replacement_of_unit_id, u.created_at, ${closed},`);
+}
+
 const DEVICE_SELECT = `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u.owner_user_id, u.unit_index,
             u.delivered_at, u.warranty_base_months, u.warranty_ext_months, u.warranty_start_at,
             u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id, u.created_at,
@@ -260,7 +273,7 @@ const DEVICE_SELECT = `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u
 
 /** Loads one unit with everything devicePublic needs, by unit id. */
 async function loadDevice(db: D1Database, unitId: string): Promise<DeviceRow | null> {
-  return db.prepare(`${DEVICE_SELECT} WHERE u.id = ?`).bind(unitId).first<DeviceRow>();
+  return db.prepare(`${await deviceSelect(db)} WHERE u.id = ?`).bind(unitId).first<DeviceRow>();
 }
 
 interface AdminAccount {
@@ -450,7 +463,7 @@ function afterResponse(c: Context<AppContext>, work: Promise<void>): void {
 deviceRoutes.get('/mine', async (c) => {
   const user = c.get('user')!;
   const { results } = await c.env.DB.prepare(
-    `${DEVICE_SELECT}
+    `${await deviceSelect(c.env.DB)}
       WHERE r.user_id = ? AND r.revoked_at IS NULL
       ORDER BY r.registered_at DESC
       LIMIT 100`
@@ -492,9 +505,12 @@ deviceRoutes.get('/mine', async (c) => {
  */
 deviceRoutes.get('/eligible', async (c) => {
   const user = c.get('user')!;
+  // 0177: a device that came back (its unit closed by a return) is no longer
+  // the buyer's to add — the shop holds it again.
+  const open = (await serialAssignmentsInstalled(c.env.DB)) ? 'AND u.warranty_closed_at IS NULL' : '';
   const { results } = await c.env.DB.prepare(
-    `${DEVICE_SELECT}
-      WHERE u.owner_user_id = ? AND u.delivered_at IS NOT NULL AND u.replaced_by_unit_id IS NULL
+    `${await deviceSelect(c.env.DB)}
+      WHERE u.owner_user_id = ? AND u.delivered_at IS NOT NULL AND u.replaced_by_unit_id IS NULL ${open}
         -- "not actively linked by me" — spelled out, because NOT (NULL = ?)
         -- is NULL in SQL and would drop every never-linked unit.
         AND (r.unit_id IS NULL OR r.revoked_at IS NOT NULL OR r.user_id <> ?)
@@ -562,7 +578,9 @@ deviceRoutes.post('/register', async (c) => {
   // Unknown, undelivered, replaced, held by another account, OR never released
   // by its buyer → the SAME answer. The holder, the buyer and the order are
   // never revealed.
-  if (!unitId || !row || !row.delivered_at || row.replaced_by_unit_id) throw SERIAL_NO_MATCH();
+  // A unit whose warranty was closed (the device came back on a return, 0177)
+  // answers exactly like a serial that matches nothing.
+  if (!unitId || !row || !row.delivered_at || row.replaced_by_unit_id || row.warranty_closed_at) throw SERIAL_NO_MATCH();
   // A device that was never linked belongs to the account that bought it. A
   // stranger may take a device only after its holder — or an admin — RELEASED
   // it (a revoked registration), which is the transfer the owner described.
@@ -1313,13 +1331,27 @@ deviceRoutes.post('/admin/units/backfill-delivered', async (c) => {
 
 // -------------------------------------------------------- serial assignment
 
+/**
+ * Assign / reassign a serial on a DELIVERED unit — the post-delivery door.
+ *
+ * HARDENED for 0177 (§4.13, no second path around the preparation rules):
+ *   - the value goes through the ONE canonicaliser (`canonicalSerial`): an
+ *     EAN, a box SN nobody filed, a receipt or anything under 6 characters is
+ *     refused with its problem — the 4-character floor is gone;
+ *   - a serial bound to another order's unit at preparation (a live, not yet
+ *     delivered assignment) is refused SERIAL_IN_USE;
+ *   - moving a serial OFF a unit whose warranty is open is the owner's call;
+ *   - the asset row exists afterwards (serial_inventory, source 'manual') and
+ *     an activated `post_delivery` assignment records the binding, releasing
+ *     the bindings it displaces — so the one-live-binding indexes cover this
+ *     door too; and the audit row is written INSIDE the batch.
+ */
 deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
   const admin = c.get('user')!;
   const unitId = c.req.param('unitId');
   const body = await c.req.json().catch(() => ({}));
-  const serialRaw = str(body.serial, 'serial', { min: 4, max: 80 });
-  const norm = normalizeSerial(serialRaw);
-  if (norm.length < 4) throw badRequest('Serial is too short after normalization');
+  str(body.serial, 'serial', { min: 1, max: 80 });
+  const { norm, raw: serialRaw } = await canonicalSerial(c.env.DB, body.serial);
   const reassign = body.reassign === true;
   const reason = str(body.reason, 'reason', { max: 500, required: false });
 
@@ -1327,11 +1359,15 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
     .bind(unitId)
     .first<UnitRow>();
   if (!unit) throw notFound('Unit not found');
+  const installed = await serialAssignmentsInstalled(c.env.DB);
 
   const [bySerial, byUnit] = await Promise.all([
-    c.env.DB.prepare('SELECT serial_norm, serial_raw, unit_id FROM device_serials WHERE serial_norm = ?')
+    c.env.DB.prepare(
+      `SELECT d.serial_norm, d.serial_raw, d.unit_id, u.replaced_by_unit_id${installed ? ', u.warranty_closed_at' : ', NULL AS warranty_closed_at'}
+         FROM device_serials d JOIN order_item_units u ON u.id = d.unit_id WHERE d.serial_norm = ?`
+    )
       .bind(norm)
-      .first<{ serial_norm: string; serial_raw: string; unit_id: string }>(),
+      .first<{ serial_norm: string; serial_raw: string; unit_id: string; replaced_by_unit_id: string | null; warranty_closed_at: string | null }>(),
     c.env.DB.prepare('SELECT serial_norm, serial_raw, unit_id FROM device_serials WHERE unit_id = ?')
       .bind(unitId)
       .first<{ serial_norm: string; serial_raw: string; unit_id: string }>(),
@@ -1339,6 +1375,16 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
 
   if (bySerial && bySerial.unit_id === unitId) {
     return c.json({ success: true, serial: bySerial.serial_raw, unchanged: true });
+  }
+  if (installed) {
+    // A serial promised to another order at preparation is that order's device.
+    const pending = await c.env.DB.prepare(
+      `SELECT order_id FROM serial_assignments WHERE serial_norm = ? AND released_at IS NULL AND activated_at IS NULL
+          AND NOT (order_item_id = ? AND unit_index = ? AND part = 'device')`
+    )
+      .bind(norm, unit.order_item_id, unit.unit_index)
+      .first<{ order_id: string | null }>();
+    if (pending) throw serialRefuse(409, 'SERIAL_IN_USE', isOwner(c.env, admin) ? { order_id: pending.order_id } : {});
   }
 
   const conflicting = !!bySerial || !!byUnit;
@@ -1352,7 +1398,13 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
     );
   }
   if (conflicting && reason.length < 5) throw badRequest('A reason (min 5 characters) is required for reassignment');
+  // §11: taking a device off a unit whose warranty is still open moves a
+  // customer's warranty — Main Admin only.
+  if (bySerial && !bySerial.warranty_closed_at && !bySerial.replaced_by_unit_id && !isOwner(c.env, admin)) {
+    throw serialRefuse(403, 'OWNER_ONLY');
+  }
 
+  const now = new Date().toISOString();
   const stmts: D1PreparedStatement[] = [];
   if (byUnit && byUnit.serial_norm !== norm) {
     // Detach the unit's previous serial (unit_id is UNIQUE). The removed
@@ -1377,6 +1429,40 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
       )
     );
   }
+  if (installed) {
+    // The bindings this displaces (critique-1 #5): the unit's previous
+    // serial and the serial's previous unit — released, never deleted.
+    stmts.push(
+      c.env.DB.prepare(
+        `UPDATE serial_assignments SET released_at = ?1, released_by = ?2,
+                release_reason = CASE WHEN unit_id = ?3 THEN 'changed' ELSE 'reassigned' END, release_note = ?4
+          WHERE released_at IS NULL AND (unit_id = ?3 OR (serial_norm = ?5 AND activated_at IS NOT NULL)
+                OR (order_item_id = ?6 AND unit_index = ?7 AND part = 'device'))`
+      ).bind(now, admin.id, unitId, (reason || 'post-delivery entry').slice(0, 500), norm, unit.order_item_id, unit.unit_index),
+      c.env.DB.prepare(
+        `INSERT INTO serial_inventory (serial_norm, serial_raw, product_id, source, created_by, note)
+         VALUES (?, ?, ?, 'manual', ?, '') ON CONFLICT(serial_norm) DO NOTHING`
+      ).bind(norm, serialRaw, unit.product_id, admin.id),
+      c.env.DB.prepare(
+        `INSERT INTO serial_assignments (id, serial_norm, serial_raw, order_id, order_item_id, order_ref, unit_index, part,
+            product_id, source, idempotency_key, linked_by, linked_at, unit_id, activated_at)
+         SELECT ?1, ?2, ?3, u.order_id, u.order_item_id, u.order_id, u.unit_index, 'device', u.product_id, 'post_delivery',
+                'post:' || ?1, ?4, ?5, u.id, ?5
+           FROM order_item_units u WHERE u.id = ?6 AND u.unit_index BETWEEN 1 AND 1000`
+      ).bind(newId('sa'), norm, serialRaw, admin.id, now, unitId)
+    );
+  }
+  stmts.push(
+    ...(
+      await auditStatements(c.env.DB, admin.id, conflicting ? 'device.serial_reassign' : 'device.serial_assign', unitId, {
+        serial_norm: norm,
+        from_unit: bySerial?.unit_id ?? null,
+        detached_serial: byUnit && byUnit.serial_norm !== norm ? byUnit.serial_norm : null,
+        detached_serial_raw: byUnit && byUnit.serial_norm !== norm ? byUnit.serial_raw : null,
+        reason,
+      })
+    ).statements
+  );
   try {
     await c.env.DB.batch(stmts);
   } catch (e) {
@@ -1386,13 +1472,6 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
     }
     throw e;
   }
-  await audit(c.env.DB, admin.id, conflicting ? 'device.serial_reassign' : 'device.serial_assign', unitId, {
-    serial_norm: norm,
-    from_unit: bySerial?.unit_id ?? null,
-    detached_serial: byUnit && byUnit.serial_norm !== norm ? byUnit.serial_norm : null,
-    detached_serial_raw: byUnit && byUnit.serial_norm !== norm ? byUnit.serial_raw : null,
-    reason,
-  });
   return c.json({ success: true, serial: serialRaw });
 });
 
@@ -1592,9 +1671,12 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
   const unitId = c.req.param('unitId');
   const body = await c.req.json().catch(() => ({}));
   const reason = str(body.reason, 'reason', { min: 5, max: 500 });
-  const newSerialRaw = str(body.new_serial, 'new_serial', { max: 80, required: false });
-  const newSerialNorm = newSerialRaw ? normalizeSerial(newSerialRaw) : '';
-  if (newSerialRaw && newSerialNorm.length < 4) throw badRequest('new_serial is too short after normalization');
+  const typedNewSerial = str(body.new_serial, 'new_serial', { max: 80, required: false });
+  // 0177: the one canonicaliser, as at preparation (an EAN or a box SN is not a device).
+  const canonical = typedNewSerial ? await canonicalSerial(c.env.DB, typedNewSerial) : null;
+  const newSerialRaw = canonical?.raw ?? '';
+  const newSerialNorm = canonical?.norm ?? '';
+  const installed = await serialAssignmentsInstalled(c.env.DB);
   const deliveredAt = body.delivered_at ? isoOrBad(body.delivered_at, 'delivered_at') : new Date().toISOString();
 
   const unit = await c.env.DB.prepare(`SELECT ${UNIT_COLS} FROM order_item_units WHERE id = ?`)
@@ -1606,6 +1688,14 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
   if (newSerialNorm) {
     const taken = await c.env.DB.prepare('SELECT unit_id FROM device_serials WHERE serial_norm = ?').bind(newSerialNorm).first();
     if (taken) throw conflict('The replacement serial is already assigned — resolve that first');
+    // Critique M4: a serial promised to another order at preparation is not
+    // a spare to hand out — the same device would be promised twice.
+    if (installed) {
+      const pending = await c.env.DB.prepare('SELECT order_id FROM serial_assignments WHERE serial_norm = ? AND released_at IS NULL')
+        .bind(newSerialNorm)
+        .first<{ order_id: string | null }>();
+      if (pending) throw serialRefuse(409, 'SERIAL_IN_USE', isOwner(c.env, admin) ? { order_id: pending.order_id } : {});
+    }
   }
 
   const activeReg = await c.env.DB.prepare(
@@ -1683,6 +1773,32 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
         unitId
       )
     );
+  }
+  if (installed) {
+    // 0177: the replaced device's binding ends ('replaced'); the replacement
+    // device gets its asset row and an activated binding to the new unit, so
+    // the one-live-binding indexes cover this door too.
+    stmts.push(
+      c.env.DB.prepare(
+        `UPDATE serial_assignments SET released_at = ?2, released_by = ?3, release_reason = 'replaced', release_note = ?4
+          WHERE unit_id = ?5 AND released_at IS NULL AND ${guard}`
+      ).bind(newUnitId, nowIso, admin.id, reason.slice(0, 500), unitId)
+    );
+    if (newSerialNorm) {
+      stmts.push(
+        c.env.DB.prepare(
+          `INSERT INTO serial_inventory (serial_norm, serial_raw, product_id, source, created_by, note)
+           SELECT ?2, ?3, ?4, 'manual', ?5, '' WHERE ${guard} ON CONFLICT(serial_norm) DO NOTHING`
+        ).bind(newUnitId, newSerialNorm, newSerialRaw, unit.product_id, admin.id),
+        c.env.DB.prepare(
+          `INSERT INTO serial_assignments (id, serial_norm, serial_raw, order_id, order_item_id, order_ref, unit_index, part,
+              product_id, source, idempotency_key, linked_by, linked_at, unit_id, activated_at)
+           SELECT ?2, ?3, ?4, u.order_id, u.order_item_id, u.order_id, u.unit_index, 'device', u.product_id, 'replacement',
+                  'replace:' || ?1, ?5, ?6, u.id, ?6
+             FROM order_item_units u WHERE u.id = ?1 AND u.unit_index BETWEEN 1 AND 1000`
+        ).bind(newUnitId, newId('sa'), newSerialNorm, newSerialRaw, admin.id, nowIso)
+      );
+    }
   }
 
   let results: D1Result[];
@@ -1936,6 +2052,13 @@ deviceRoutes.post('/admin/products/:id/ops-policy', async (c) => {
   const changes: { serialized?: boolean; warranty_base_months?: number | null } = {};
   if (body.serialized !== undefined) {
     if (typeof body.serialized !== 'boolean') throw badRequest('serialized must be true or false');
+    // §29: whether a product needs a serial at preparation is the owner's.
+    // Only a CHANGE is an attempt — echoing the stored answer is not
+    // (worker/lib/adminScope.ts, the same rule as cost fields).
+    if (!isOwner(c.env, admin)) {
+      const effective = lineDevicePolicy(product.ops_policy, id, await serializationContext(c.env.DB, [id])).serialized;
+      if (effective !== body.serialized) throw serialRefuse(403, 'OWNER_ONLY');
+    }
     changes.serialized = body.serialized;
   }
   if (body.warranty_base_months !== undefined) {

@@ -44,11 +44,16 @@ import {
   type BulkRow,
   type ModelHint,
 } from '@levonis/catalog/deviceSerials';
-import { printerProductIds } from './printerIdentity';
-import { effectiveDevicePolicy } from './warrantyPlans';
+import { serialAssignmentsInstalled, serializationContext, lineDevicePolicy } from './serialPolicy';
 
-export type InventoryStatus = 'in_stock' | 'sold' | 'registered' | 'void';
-export const INVENTORY_STATUSES: readonly InventoryStatus[] = ['in_stock', 'sold', 'registered', 'void'];
+/**
+ * 0177 adds three derived states: `reserved` (a live, not yet delivered
+ * preparation assignment — RESERVED_FOR_ORDER), `returned` (its last unit was
+ * closed by a return: available again, history kept) and `unavailable`
+ * (returned unsellable, or replaced). Still DERIVED, never stored.
+ */
+export type InventoryStatus = 'in_stock' | 'reserved' | 'sold' | 'registered' | 'returned' | 'unavailable' | 'void';
+export const INVENTORY_STATUSES: readonly InventoryStatus[] = ['in_stock', 'reserved', 'sold', 'registered', 'returned', 'unavailable', 'void'];
 export type InventorySource = 'manual' | 'bulk' | 'scan';
 
 /**
@@ -61,12 +66,37 @@ export const INSERT_CHUNK = 200;
 
 // ------------------------------------------------------------------- reads
 
-/** The derived status, from the row and the device tables it joins. */
-export const STATUS_SQL = `CASE
+/**
+ * THE DERIVED STATUS (0139: stored status is forbidden), from the row and the
+ * device tables it joins: `si` = serial_inventory, `ds` = device_serials,
+ * `r` = device_registrations. Extended by migration 0177 with the serial
+ * assignments and the closed-unit states; until that migration has applied it
+ * is exactly the original rule (deploy-ahead).
+ */
+export function serialStatusSql(installed: boolean): string {
+  if (!installed) {
+    return `CASE
     WHEN si.voided_at IS NOT NULL THEN 'void'
     WHEN ds.unit_id IS NULL THEN 'in_stock'
     WHEN r.user_id IS NOT NULL AND r.revoked_at IS NULL THEN 'registered'
     ELSE 'sold' END`;
+  }
+  return `CASE
+    WHEN si.voided_at IS NOT NULL THEN 'void'
+    WHEN EXISTS (SELECT 1 FROM serial_assignments sa WHERE sa.serial_norm = si.serial_norm
+                    AND sa.released_at IS NULL AND sa.activated_at IS NULL) THEN 'reserved'
+    WHEN ds.unit_id IS NULL THEN 'in_stock'
+    WHEN EXISTS (SELECT 1 FROM order_item_units su WHERE su.id = ds.unit_id
+                    AND (su.replaced_by_unit_id IS NOT NULL OR su.warranty_closed_reason IN ('returned_unsellable','replaced'))) THEN 'unavailable'
+    WHEN EXISTS (SELECT 1 FROM order_item_units su WHERE su.id = ds.unit_id
+                    AND su.warranty_closed_reason IN ('returned','traded_in')) THEN 'returned'
+    WHEN EXISTS (SELECT 1 FROM order_item_units su WHERE su.id = ds.unit_id AND su.warranty_closed_at IS NOT NULL) THEN 'in_stock'
+    WHEN r.user_id IS NOT NULL AND r.revoked_at IS NULL THEN 'registered'
+    ELSE 'sold' END`;
+}
+
+/** The original derived status (kept for readers that predate 0177). */
+export const STATUS_SQL = serialStatusSql(false);
 
 const LIST_FROM = `FROM serial_inventory si
   LEFT JOIN device_serials ds ON ds.serial_norm = si.serial_norm
@@ -76,9 +106,9 @@ const LIST_FROM = `FROM serial_inventory si
   LEFT JOIN users hu ON hu.id = r.user_id AND r.revoked_at IS NULL
   LEFT JOIN users cu ON cu.id = si.created_by`;
 
-const LIST_COLS = `si.serial_norm, si.serial_raw, si.model_code, si.model_name, si.product_id, si.variant_id,
+const listCols = (installed: boolean) => `si.serial_norm, si.serial_raw, si.model_code, si.model_name, si.product_id, si.variant_id,
   si.box_sn, si.ean, si.source, si.note, si.voided_at, si.void_reason, si.created_by, si.created_at, si.updated_at,
-  ${STATUS_SQL} AS status,
+  ${serialStatusSql(installed)} AS status,
   ds.unit_id, u.order_id, u.delivered_at,
   r.user_id AS holder_id, r.registered_at, hu.email AS holder_email, hu.username AS holder_username,
   p.name AS p_name, p.name_ar AS p_name_ar,
@@ -156,7 +186,7 @@ export interface ListFilter {
 /** `LIKE` with the user's text taken literally, bounded in bytes for D1 (worker/lib/sqlLike.ts). */
 const likeArg = (s: string): string => likePattern(s, 'contains');
 
-function filterSql(f: ListFilter): { where: string[]; args: unknown[] } {
+function filterSql(f: ListFilter, installed: boolean): { where: string[]; args: unknown[] } {
   const where: string[] = [];
   const args: unknown[] = [];
   const q = (f.q ?? '').trim();
@@ -172,7 +202,7 @@ function filterSql(f: ListFilter): { where: string[]; args: unknown[] } {
     args.push(n, n, n, t, t, t, t, t, t);
   }
   if (f.status) {
-    where.push(`${STATUS_SQL} = ?`);
+    where.push(`${serialStatusSql(installed)} = ?`);
     args.push(f.status);
   }
   if (f.product_id) {
@@ -204,14 +234,15 @@ export function decodeCursor(raw: string | undefined | null): Cursor | null {
 
 /** One keyset page, newest first. */
 export async function listInventory(db: D1Database, f: ListFilter, cursor: Cursor | null, limit: number) {
-  const { where, args } = filterSql(f);
+  const installed = await serialAssignmentsInstalled(db);
+  const { where, args } = filterSql(f, installed);
   if (cursor) {
     where.push('(si.created_at < ? OR (si.created_at = ? AND si.serial_norm < ?))');
     args.push(cursor.created_at, cursor.created_at, cursor.serial_norm);
   }
   const { results } = await db
     .prepare(
-      `SELECT ${LIST_COLS} ${LIST_FROM}
+      `SELECT ${listCols(installed)} ${LIST_FROM}
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY si.created_at DESC, si.serial_norm DESC
         LIMIT ?`
@@ -228,16 +259,17 @@ export async function listInventory(db: D1Database, f: ListFilter, cursor: Curso
 
 /** Counts per derived status for the filter (search/product), ignoring the status filter itself. */
 export async function inventoryCounts(db: D1Database, f: ListFilter): Promise<Record<InventoryStatus | 'all', number>> {
-  const { where, args } = filterSql({ ...f, status: '' });
+  const installed = await serialAssignmentsInstalled(db);
+  const { where, args } = filterSql({ ...f, status: '' }, installed);
   const { results } = await db
     .prepare(
-      `SELECT ${STATUS_SQL} AS status, COUNT(*) AS n ${LIST_FROM}
+      `SELECT ${serialStatusSql(installed)} AS status, COUNT(*) AS n ${LIST_FROM}
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         GROUP BY 1`
     )
     .bind(...args)
     .all<{ status: InventoryStatus; n: number }>();
-  const out: Record<InventoryStatus | 'all', number> = { all: 0, in_stock: 0, sold: 0, registered: 0, void: 0 };
+  const out: Record<InventoryStatus | 'all', number> = { all: 0, in_stock: 0, reserved: 0, sold: 0, registered: 0, returned: 0, unavailable: 0, void: 0 };
   for (const r of results) {
     out[r.status] = Number(r.n);
     out.all += Number(r.n);
@@ -266,7 +298,8 @@ export function csvCell(v: unknown): string {
 }
 
 export async function loadInventoryRow(db: D1Database, serialNorm: string) {
-  return db.prepare(`SELECT ${LIST_COLS} ${LIST_FROM} WHERE si.serial_norm = ?`).bind(serialNorm).first<ListRow>();
+  const installed = await serialAssignmentsInstalled(db);
+  return db.prepare(`SELECT ${listCols(installed)} ${LIST_FROM} WHERE si.serial_norm = ?`).bind(serialNorm).first<ListRow>();
 }
 
 // -------------------------------------------------------- catalogue checks
@@ -303,8 +336,7 @@ export async function verifyProductChoice(db: D1Database, productId: unknown, va
     const v = await db.prepare('SELECT id FROM product_variants WHERE id = ? AND product_id = ?').bind(vid, pid).first<{ id: string }>();
     if (!v) throw badRequest('That variant is not one of this product', 'SERIAL_VARIANT_MISMATCH');
   }
-  const printers = await printerProductIds(db, [pid]);
-  const serialized = effectiveDevicePolicy(p.ops_policy, printers.has(pid)).serialized;
+  const serialized = lineDevicePolicy(p.ops_policy, pid, await serializationContext(db, [pid])).serialized;
   return { product_id: pid, variant_id: vid || null, name: p.name, serialized };
 }
 
@@ -363,10 +395,11 @@ export async function previewRows(db: D1Database, rows: BulkRow[]): Promise<Prev
   const assigned = new Set<string>();
   if (norms.length) {
     const list = JSON.stringify(norms);
+    const installed = await serialAssignmentsInstalled(db);
     const [inv, dev] = await Promise.all([
       db
         .prepare(
-          `SELECT si.serial_norm, ${STATUS_SQL} AS status
+          `SELECT si.serial_norm, ${serialStatusSql(installed)} AS status
              FROM serial_inventory si
              LEFT JOIN device_serials ds ON ds.serial_norm = si.serial_norm
              LEFT JOIN device_registrations r ON r.unit_id = ds.unit_id
@@ -670,7 +703,7 @@ export type InventoryLinkResult =
   | { kind: 'attached'; unit_id: string; serial_norm: string }
   /** The input was a BOX SN whose product serial is already on a unit. */
   | { kind: 'resolved'; serial_norm: string; unit_id: string }
-  | { kind: 'refused'; reason: 'unknown' | 'void' | 'no_product' | 'no_matching_purchase' | 'race'; serial_norm: string | null };
+  | { kind: 'refused'; reason: 'unknown' | 'void' | 'no_product' | 'no_matching_purchase' | 'race' | 'reserved'; serial_norm: string | null };
 
 /**
  * A serial with no `device_serials` row → the caller's device, or a reason
@@ -695,6 +728,16 @@ export async function linkFromInventory(db: D1Database, userId: string, norm: st
   }
   if (inv.voided_at) return { kind: 'refused', reason: 'void', serial_norm: inv.serial_norm };
   if (!inv.product_id) return { kind: 'refused', reason: 'no_product', serial_norm: inv.serial_norm };
+  // 0177: a serial bound to an order unit at preparation is that order's
+  // device, even before delivery — never a typed-in claim on someone else's
+  // older unit (Audit A conflict 4). The same one answer as every refusal.
+  if (await serialAssignmentsInstalled(db)) {
+    const live = await db
+      .prepare('SELECT 1 AS x FROM serial_assignments WHERE serial_norm = ? AND released_at IS NULL LIMIT 1')
+      .bind(inv.serial_norm)
+      .first();
+    if (live) return { kind: 'refused', reason: 'reserved', serial_norm: inv.serial_norm };
+  }
 
   // The caller's own delivered, unreplaced unit of this product that carries
   // no serial yet and that no OTHER account holds — the oldest first, so two

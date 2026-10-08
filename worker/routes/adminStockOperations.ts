@@ -1,3 +1,4 @@
+import { serialAssignmentsInstalled } from '../lib/serialPolicy';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, str } from '../lib/http';
@@ -444,6 +445,18 @@ adminStockOperationsRoutes.get('/trace', async (c) => {
     }),
   );
 });
+/** Whether an order line still holds units of a lot: its allocations netted (release rows subtract). */
+async function lineHoldsLot(db: D1Database, itemId: string, lotId: string): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT COALESCE(SUM(CASE WHEN released_at IS NULL THEN qty ELSE -qty END),0) AS net
+         FROM order_item_inventory_allocations WHERE order_item_id=? AND lot_id=?`,
+    )
+    .bind(itemId, lotId)
+    .first<{ net: number }>();
+  return Number(row?.net ?? 0) > 0;
+}
+
 adminStockOperationsRoutes.post('/serial-link', async (c) => {
   const user = c.get('user')!;
   await requireCapability(c.env, user, 'receive');
@@ -459,6 +472,16 @@ adminStockOperationsRoutes.post('/serial-link', async (c) => {
   if (prior) {
     if (prior.lot_id === lot && prior.order_item_id === item) return c.json({ success: true, already: true });
     throw conflict('الرقم التسلسلي مرتبط بالفعل؛ راجع سجل الجهاز قبل تغييره');
+  }
+  // 0177 (critique M13): ONE serial→order-item link. A serial bound to an
+  // order unit at preparation belongs to THAT line; this door may record its
+  // lot, never point it at another line.
+  if (item && (await serialAssignmentsInstalled(db))) {
+    const live = await db
+      .prepare('SELECT order_item_id FROM serial_assignments WHERE serial_norm=? AND released_at IS NULL')
+      .bind(serial)
+      .first<{ order_item_id: string | null }>();
+    if (live && live.order_item_id !== item) throw conflict('الرقم التسلسلي مربوط بوحدة في طلب آخر؛ لا يُربط ببند مختلف', 'SERIAL_IN_USE');
   }
   const match = await db
     .prepare(
@@ -476,15 +499,10 @@ adminStockOperationsRoutes.post('/serial-link', async (c) => {
       .first())
   )
     throw badRequest('المنتج لا يطابق بند الطلب');
-  if (
-    item &&
-    !(await db
-      .prepare(
-        'SELECT id FROM order_item_inventory_allocations WHERE order_item_id=? AND lot_id=? AND released_at IS NULL',
-      )
-      .bind(item, lot)
-      .first())
-  )
+  // The line's NET allocation on this lot (a release row subtracts — the same
+  // netting as cogsByLine and the preparation scan's fence; serial-scan
+  // critique-1 #7): a lot whose units all came back is not this line's any more.
+  if (item && !(await lineHoldsLot(db, item, lot)))
     throw badRequest('دفعة الرقم التسلسلي ليست ضمن الدفعات المصروفة لهذا الطلب');
   await db.batch([
     ...fence(
@@ -538,7 +556,9 @@ adminStockOperationsRoutes.post('/return-inspections', async (c) => {
   const evidence:D1PreparedStatement[]=[];
   if(await investorFinanceInstalled(db)){
     let requested=Array.isArray(b.allocations)?b.allocations:[];
-    if(!requested.length&&kase.unit_id&&qty===1){const linked=await db.prepare(`SELECT a.id FROM device_serials d JOIN stock_serial_links s ON s.serial_norm=d.serial_norm JOIN order_item_inventory_allocations a ON a.lot_id=s.lot_id WHERE d.unit_id=? AND a.order_item_id=? AND a.released_at IS NULL`).bind(kase.unit_id,item).first<{id:string}>();if(linked)requested=[{allocation_id:linked.id,qty:1}];}
+    if(!requested.length&&kase.unit_id&&qty===1){const linked=await db.prepare(`SELECT a.id FROM device_serials d JOIN stock_serial_links s ON s.serial_norm=d.serial_norm JOIN order_item_inventory_allocations a ON a.lot_id=s.lot_id WHERE d.unit_id=? AND a.order_item_id=? AND a.released_at IS NULL`).bind(kase.unit_id,item).first<{id:string}>()
+      // 0177 §28: the lot the preparation scan verified, recorded on the unit at delivery.
+      ??await db.prepare(`SELECT a.id FROM order_item_units u JOIN order_item_inventory_allocations a ON a.lot_id=u.inventory_lot_id WHERE u.id=? AND a.order_item_id=? AND a.released_at IS NULL`).bind(kase.unit_id,item).first<{id:string}>();if(linked)requested=[{allocation_id:linked.id,qty:1}];}
     const allocations=(await db.prepare(`SELECT a.id,a.lot_id,a.qty,EXISTS(SELECT 1 FROM investment_contracts c WHERE c.incoming_id=l.incoming_id AND c.state='active') AS funded,
       (SELECT COALESCE(SUM(e.qty),0) FROM stock_return_lot_evidence e JOIN return_cases r ON r.id=e.return_case_id WHERE e.allocation_id=a.id AND r.state<>'rejected') AS claimed
       FROM order_item_inventory_allocations a JOIN inventory_lots l ON l.id=a.lot_id WHERE a.order_item_id=? AND a.released_at IS NULL`).bind(item).all<{id:string;lot_id:string;qty:number;funded:number;claimed:number}>()).results??[];
@@ -588,7 +608,7 @@ adminStockOperationsRoutes.post('/scan',async c=>{
   const code=text(b.code,160).trim(),serial=await db.prepare('SELECT * FROM stock_serial_links WHERE serial_norm=?').bind(normalizeSerial(code)).first<{lot_id:string;serial_norm:string;order_item_id:string|null}>();
   const lot=await db.prepare('SELECT l.*,p.name,p.name_ar FROM inventory_lots l LEFT JOIN products p ON p.id=l.product_id WHERE l.id=?').bind(serial?.lot_id??code).first<Record<string,unknown>>();if(!lot)throw notFound('الرمز غير مرتبط بدفعة أو رقم جهاز موثق');
   if((b.product_id&&b.product_id!==lot.product_id)||(b.scope&&b.scope!==lot.scope)||(b.scope_id!==undefined&&b.scope_id!==lot.scope_id))throw badRequest('الرمز لا يطابق المنتج أو الخيار أو اللون المختار','SCAN_SELECTION_MISMATCH');
-  if(b.order_item_id&&!await db.prepare('SELECT id FROM order_item_inventory_allocations WHERE order_item_id=? AND lot_id=? AND released_at IS NULL').bind(text(b.order_item_id,60),lot.id).first())throw badRequest('الدفعة ليست من أصل هذا الطلب','SCAN_ORDER_MISMATCH');
+  if(b.order_item_id&&!await lineHoldsLot(db,text(b.order_item_id,60),String(lot.id)))throw badRequest('الدفعة ليست من أصل هذا الطلب','SCAN_ORDER_MISMATCH');
   return c.json(projectForAdmin(c.env,user,{success:true,lot,serial,match:true}));
 });
 

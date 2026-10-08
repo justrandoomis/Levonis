@@ -12,6 +12,7 @@ import type { SweepReport } from './orderStageOps';
 import { alwaseetDriver } from './delivery/alwaseet';
 import { sweepDeliveryStatuses } from './delivery/sync';
 import { sweepDeliveredOrdersWithoutUnits, type DeliveredUnitsSweep } from './deviceOps';
+import { sweepReturnedSerials, sweepUnactivatedSerials } from './serialAssignments';
 import { getSetting } from './settings';
 import { sweepExpiredOrders } from './orderExpirySweep';
 import type { OrderExpiryReport } from './orderExpirySweep';
@@ -128,6 +129,14 @@ export interface DurableJobsReport {
    * `sweepDeliveredOrdersWithoutUnits`. Empty once the history is repaired.
    */
   delivered_units: DeliveredUnitsSweep;
+  /**
+   * 0177 — preparation serials of delivered orders that have not reached
+   * their warranty unit yet (activation is its own batch after the units);
+   * and refund cases whose returned devices' warranties are still open
+   * (the return route is not one transaction). worker/lib/serialAssignments.ts.
+   */
+  serial_activation: { scanned: number; activated: number; errors: number };
+  serial_returns: { scanned: number; closed: number; errors: number };
   /** PRO BNPL accounts whose oldest unpaid instalment passed its due date. */
   bnpl_overdue: BnplOverdueReport;
   /** Seven-day system ratings; these never create reward records. */
@@ -219,6 +228,8 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     cancelled_order_refunds: { scanned: 0, repaired: 0, skipped: 0, errors: 0 },
     delivery_sync: { configured: false, scanned: 0, moved: 0, unmapped: 0, errors: 0 },
     delivered_units: { scanned: 0, orders: 0, created: 0, errors: 0 },
+    serial_activation: { scanned: 0, activated: 0, errors: 0 },
+    serial_returns: { scanned: 0, closed: 0, errors: 0 },
     bnpl_overdue: { scanned: 0, overdue: 0, suspended: 0 },
     automatic_reviews: { scanned: 0, created: 0, skipped: 0 },
     stock_alerts: { scanned: 0, matched: 0, notified: 0, dead: 0, deferred: 0 },
@@ -520,6 +531,14 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   //      sync itself never revisits. Bounded; an empty pass once repaired.
   await step('delivered_units', async () => {
     report.delivered_units = await sweepDeliveredOrdersWithoutUnits(env, 50);
+  });
+  // 12c. Preparation serials (0177) → their delivered units, and returned
+  //      devices' warranties closed — both bounded, both no-ops before 0177.
+  await step('serial_activation', async () => {
+    report.serial_activation = await sweepUnactivatedSerials(env, 50);
+  });
+  await step('serial_returns', async () => {
+    report.serial_returns = await sweepReturnedSerials(env, 50);
   });
 
   // 13. Enforce overdue PRO BNPL balances. This is an account-credit action,

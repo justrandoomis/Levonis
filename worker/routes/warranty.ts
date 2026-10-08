@@ -506,6 +506,15 @@ warrantyAdminRoutes.post('/', async (c) => {
       'SERIAL_REQUIRED'
     );
   }
+  // 1b. A unit whose device came back (a return) or was superseded by an
+  //     owner override is CLOSED (0177): its dates stay as history, but no
+  //     new paper may promise coverage on it.
+  if (unit.warranty_closed_at) {
+    throw conflict(
+      'أُغلق ضمان هذه الوحدة (مرتجع) — لا يُصدر لها وصل. / This unit\'s warranty was closed (returned) — no receipt can be issued.',
+      'WARRANTY_CLOSED'
+    );
+  }
   // 2. A cancelled order never delivered a device.
   if (unit.order_status === 'cancelled' && !unit.order_delivered_at) {
     throw conflict('الطلب ملغى ولم يُسلَّم — لا يُفعَّل ضمان له. / The order was cancelled before delivery; no warranty is issued for it.', 'ORDER_CANCELLED');

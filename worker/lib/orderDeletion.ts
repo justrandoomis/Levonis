@@ -80,6 +80,11 @@ export const ORDER_HISTORY_TABLES = [
   // never deleted.
   'gift_entitlements',
   'chats',
+  // 0177: a serial's preparation binding is the DEVICE's history (released
+  // 'order_cancelled' by trg_orders_serial_assignments_cancelled before any
+  // cancelled order reaches here). Unlinked — order_id and order_item_id
+  // cleared, `order_ref` keeps the ORD- id for the timeline — never deleted.
+  'serial_assignments',
 ] as const;
 
 async function columnsOf(db: OrderDeletionDb, table: string): Promise<Set<string>> {
@@ -99,7 +104,7 @@ const allocationEvidenceTables = ['investor_finance_events','investor_allocation
  * after they have been observed. The same predicates select candidates and
  * fence the final batch, including when SQLite FK enforcement is unavailable. */
 async function deletionSchema(db: OrderDeletionDb): Promise<DeletionSchema> {
-  const names = new Set(['orders','order_item_units','ops_guards','warranty_claims','wallet_transactions','wallet_holds',
+  const names = new Set(['orders','order_item_units','ops_guards','warranty_claims','wallet_transactions','wallet_holds','serial_assignments',
     'product_file_grants','trade_in_requests','finance_posting_errors',...financialTables,...itemEvidenceTables,...allocationEvidenceTables,
     ...ORDER_HISTORY_TABLES,...ORDER_OWNED_TABLES.map(t=>t.table)]);
   const columns = new Map<string, Set<string>>();
@@ -114,6 +119,10 @@ async function deletionSchema(db: OrderDeletionDb): Promise<DeletionSchema> {
     'Serial, return inspection or trade-in evidence must be retained.',`SELECT 1 FROM ${table} WHERE order_item_id IN (SELECT id FROM order_items WHERE order_id=?1)`);
   add('trade_in_requests','order_id','ORDER_HAS_FULFILMENT_HISTORY','Trade-in evidence must be retained.',
     'SELECT 1 FROM trade_in_requests WHERE order_id=?1');
+  // 0177: a LIVE serial binding means a device is still promised by this
+  // order. The cancel trigger releases them all, so this is the second guard.
+  add('serial_assignments','order_id','ORDER_HAS_FULFILMENT_HISTORY','A serial is still bound to this order.',
+    'SELECT 1 FROM serial_assignments WHERE order_id=?1 AND released_at IS NULL');
   for (const table of allocationEvidenceTables) add(table,'allocation_id','ORDER_HAS_FINANCIAL_HISTORY',
     'Stock allocation evidence is linked to investor, cost or return history.',
     `SELECT 1 FROM ${table} WHERE allocation_id IN (SELECT id FROM order_item_inventory_allocations WHERE order_id=?1)`);
@@ -224,7 +233,7 @@ export async function deleteCancelledOrder(
     if (!columns.has('order_id')) continue;
     const clears = ['"order_id" = NULL'];
     let where = '"order_id" = ?1';
-    if ((table === 'reviews' || table === 'gift_entitlements') && columns.has('order_item_id')) {
+    if ((table === 'reviews' || table === 'gift_entitlements' || table === 'serial_assignments') && columns.has('order_item_id')) {
       clears.push('"order_item_id" = NULL');
       where += ' OR "order_item_id" IN (SELECT id FROM order_items WHERE order_id = ?1)';
     }

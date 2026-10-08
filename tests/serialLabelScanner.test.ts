@@ -225,3 +225,12 @@ test('the reader library is reachable only through the scanner\'s dynamic import
   const policy = read('worker/lib/securityPolicy.ts');
   assert.match(policy, /camera=\(self\)/);
 });
+
+test('a printed prefix with only a space («SN 0391…») is stripped like «SN: …» — never a second asset `SN0391…` (serial-scan critique H1)', () => {
+  assert.deepEqual(classifyCode({ text: `SN ${SN}` }), { kind: 'serial', value: SN });
+  assert.deepEqual(classifyCode({ text: `S/N ${SN}` }), { kind: 'serial', value: SN });
+  assert.deepEqual(classifyCode({ text: `Product SN: ${SN}` }), { kind: 'serial', value: SN });
+  assert.equal(classifyLabel([{ text: `SN ${SN}` }, { text: BOX }]).productSn, SN);
+  // A separator is required: a serial that merely starts with S and N is kept whole.
+  assert.deepEqual(classifyCode({ text: 'SN1234ABCD' }), { kind: 'serial', value: 'SN1234ABCD' });
+});

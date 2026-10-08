@@ -269,7 +269,13 @@ export function resolveProduct(
   p: ParsedProduct,
   existing: ExistingShape | null,
   maps: ImportMaps,
-  opts: { newId: (prefix: string) => string; money: boolean; specFieldIds?: string[] }
+  opts: {
+    newId: (prefix: string) => string;
+    money: boolean;
+    specFieldIds?: string[];
+    /** False for every admin but the owner: a `serialized` cell that changes the answer is refused (§29, 0177). Absent = not checked. */
+    owner?: boolean;
+  }
 ): ResolvedProduct {
   const issues: RowIssue[] = [];
   const productId = existing?.id ?? opts.newId('prd');
@@ -772,6 +778,17 @@ export function resolveProduct(
     warranty_base_months: p.warranty_base_months ?? storedOps.warranty_base_months,
     serialized: p.serialized ?? storedOps.serialized,
   };
+  // §29 (serial scan, 0177): whether a product's units need a serial at
+  // preparation is the OWNER's — the same rule as the product form and the
+  // ops-policy route. Only a CHANGE is an attempt: an empty cell keeps what is
+  // stored, and a cell that repeats the stored (or printer-default) answer
+  // passes. Refused by line, so the sheet says which row to fix.
+  if (opts.owner === false && p.serialized !== null && p.serialized !== undefined) {
+    const before = storedOps.serialized ?? isPrinter;
+    if (p.serialized !== before) {
+      issues.push(err(p.line, 'serialized: only the owner can change whether this product needs a serial number — leave the cell empty to keep it'));
+    }
+  }
   // Extended warranty is for printers only (owner mandate). The rules and the
   // printer defaults (serialized, 12-month base) are applied here so the
   // PREVIEW refuses a warranty row on a non-printer with its line number; the

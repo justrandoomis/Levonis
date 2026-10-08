@@ -349,6 +349,17 @@ export const SETTING_DEFAULTS = {
    * worker/lib/walletFreeDelivery.ts.
    */
   walletFreeDelivery: WALLET_FREE_DELIVERY_DEFAULT as WalletFreeDeliveryConfig,
+  /**
+   * §19 THE SERIAL PREPARATION GATE — «تبقى أرقام تسلسلية غير مرتبطة لهذا
+   * الطلب» (serial-scan brief 2026-10-07, worker/lib/serialAssignments.ts).
+   * When on, an order created at or after `since` cannot move into
+   * out_for_delivery / delivered, nor get a courier shipment, while a unit that
+   * requires a serial has none linked. SHIPS OFF (owner default): the owner
+   * switches it on, and switching it on stamps `since` = now when none is
+   * given, so orders already in flight are never blocked. Owner-only to write
+   * (PUT /api/admin/settings/serialPrepGate).
+   */
+  serialPrepGate: { enabled: false, since: null } as SerialPrepGate,
   cartShippingMethods: [
     { id: 'direct', titleAr: 'شحن مباشر', titleEn: 'Direct Shipping', descAr: 'يصل خلال 3-5 أيام عمل', descEn: 'Arrives in 3-5 business days' },
     { id: 'preorder_air', titleAr: 'طلب مسبق (شحن جوي)', titleEn: 'Pre-order (Air Freight)', descAr: 'يصل خلال 10-14 يوم عمل', descEn: 'Arrives in 10-14 business days' },
@@ -723,7 +734,24 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // printerGiftConfig are intentionally NOT public — internal policy data.
 ];
 
+/** The serial preparation gate as stored: a switch and its cutover. */
+export interface SerialPrepGate {
+  enabled: boolean;
+  /** ISO timestamp; orders created before it are never gated. null = every order. */
+  since: string | null;
+}
+
+/** Any stored shape → a well-formed gate. Unknown or broken input reads as OFF. */
+export function normalizeSerialPrepGate(value: unknown): SerialPrepGate {
+  const o = typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const since = typeof o.since === 'string' && Number.isFinite(Date.parse(o.since)) ? new Date(Date.parse(o.since)).toISOString() : null;
+  return { enabled: o.enabled === true, since };
+}
+
 function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeof SETTING_DEFAULTS)[K] {
+  if (key === 'serialPrepGate') {
+    return normalizeSerialPrepGate(value) as (typeof SETTING_DEFAULTS)[K];
+  }
   if (key === 'homeBento') {
     return normalizeHomeBento(value) as (typeof SETTING_DEFAULTS)[K];
   }

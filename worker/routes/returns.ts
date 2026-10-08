@@ -35,6 +35,7 @@
  *    channel (wallet) is flagged as a configurable default (row 22).
  */
 
+import { applyReturnSerials, returnedUnits, serialAssignmentsInstalled } from '../lib/serialAssignments';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
@@ -630,6 +631,12 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
   // as the order-cancel flow).
   if (to === 'resolved' && resolution === 'refund') {
     await validateInvestorReturnEvidence(c.env.DB, id);
+    // 0177 §14: serials scanned at inspection (or explicit unit ids) must be
+    // devices of THIS line and THIS buyer — refused before any money moves
+    // (critique M6: the customer's own unit pick is never trusted alone).
+    if ((body.serials !== undefined || body.unit_ids !== undefined) && (await serialAssignmentsInstalled(c.env.DB))) {
+      await returnedUnits(c.env.DB, kase, { serials: body.serials, unit_ids: body.unit_ids });
+    }
   }
   const flip = await c.env.DB.prepare(
     `UPDATE return_cases SET state = ?, resolution = COALESCE(?, resolution),
@@ -847,6 +854,19 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
     catch(e) { await recordFinancialFailure(c.env.DB,kase.order_id,'refund',e).catch(()=>undefined); }
   }
 
+  // §14 THE DEVICE CAME BACK: its warranty unit closes (dates kept), the live
+  // receipt is voided, the account link revoked, the serial's assignment
+  // released 'returned' — one batch (worker/lib/serialAssignments.ts). The
+  // route is not one transaction, so `sweepReturnedSerials` retries it.
+  let serialsResult: { closed: string[]; unattributed: boolean } | null = null;
+  if (to === 'resolved' && resolution === 'refund') {
+    try {
+      serialsResult = await applyReturnSerials(c.env, kase, { serials: body.serials, unit_ids: body.unit_ids }, admin.id, restock);
+    } catch (e) {
+      console.error('return serial hook failed', id, e instanceof Error ? e.message : String(e));
+    }
+  }
+
   await audit(c.env.DB, admin.id, 'return.transition', id, {
     from, to, resolution, reason,
     refund: refundResult
@@ -868,6 +888,7 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
     case: casePublic(row!),
     ...(refundResult ? { refund: refundResult } : {}),
     ...(pointsResult ? { points_reversal: pointsResult } : {}),
+    ...(serialsResult ? { serials: serialsResult } : {}),
   });
 });
 

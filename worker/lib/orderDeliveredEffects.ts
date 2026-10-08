@@ -56,6 +56,10 @@ export interface DeliveredEffectsResult {
 export const DEVICE_UNITS_WARNING =
   'Device units were not created — retry from Admin → Serials & Devices (backfill), otherwise warranty clocks for this order are missing.';
 
+/** 0177: units exist, but a serial scanned at preparation did not reach its unit yet. */
+export const SERIAL_ACTIVATION_WARNING =
+  'A serial linked at preparation did not reach its warranty unit yet — it is retried automatically; check the order\'s serials if it persists.';
+
 export async function runOrderDeliveredEffects(
   env: Env,
   orderId: string,
@@ -102,6 +106,7 @@ export async function runOrderDeliveredEffects(
       .bind(orderId)
       .first<{ delivered_at: string | null }>();
     deviceUnits = await createUnitsOnDelivery(env, orderId, row?.delivered_at || new Date().toISOString());
+    if (deviceUnits.activation && deviceUnits.activation.conflicts > 0) deviceUnitsWarning = SERIAL_ACTIVATION_WARNING;
   } catch (e) {
     console.error('device unit creation failed for order', orderId, e instanceof Error ? e.message : String(e));
     // Honest partial outcome: the order IS delivered, units are missing.

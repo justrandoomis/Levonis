@@ -30,6 +30,7 @@
  * believes are on the shelf.
  */
 
+import { isLostRace } from './gifts/fence';
 import type { Env } from './types';
 import { safeParse } from './types';
 import type { ShippingType } from './shippingType';
@@ -112,7 +113,7 @@ export interface MoveResult {
   /** Honest partial outcomes — the move happened, something beside it did not. */
   notes: string[];
   /** Why a move was refused, when moved === false. */
-  reason?: 'ILLEGAL_MOVE' | 'RACED' | 'NOT_FOUND' | 'OFFER_LIMIT_REACHED' | 'PRICE_APPROVAL_PENDING' | 'REFUNDED_ORDER' | 'GIFT_ORDER_REOPEN_REFUSED';
+  reason?: 'ILLEGAL_MOVE' | 'RACED' | 'NOT_FOUND' | 'OFFER_LIMIT_REACHED' | 'PRICE_APPROVAL_PENDING' | 'REFUNDED_ORDER' | 'GIFT_ORDER_REOPEN_REFUSED' | 'SERIALS_REQUIRED';
 }
 
 export interface MoveOptions {
@@ -136,6 +137,13 @@ export interface MoveOptions {
    * Absent for the sweep and the courier sync, which keep the cron.
    */
   defer?: (work: Promise<unknown>) => void;
+  /**
+   * Statements that ride the flip's own transaction, right after it — the
+   * serial preparation gate's fence (worker/lib/serialAssignments.ts,
+   * critique H2) or the owner's gate-override audit row. A guard that fails
+   * aborts the whole move and the result says `SERIALS_REQUIRED`.
+   */
+  guardStatements?: D1PreparedStatement[];
 }
 
 export function newHistoryId(orderId: string, at: string): string {
@@ -401,6 +409,9 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   // a re-claim. Cancellation returns the wallet, points, stock and offer slot
   // in this same transaction, just like the customer and legacy status doors.
   const moveStatements = [flipStatement];
+  // The serial gate's fence, inside the flip's transaction (H2).
+  const guards = opts.guardStatements ?? [];
+  if (guards.length) moveStatements.push(...guards);
   const refundedSql = `SELECT 1 FROM wallet_transactions t WHERE t.user_id=?1 AND t.ref=?2
     AND t.type='deposit' AND t.status='approved'
     AND t.id IN ('wtx_refund_'||?2||'_usd','wtx_refund_'||?2||'_pts')`;
@@ -448,6 +459,14 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
       return {
         moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
         next_stage: null, next_stage_at: null, notes: [], reason: 'OFFER_LIMIT_REACHED',
+      };
+    }
+    // The serial gate's fence (ops_guards CHECK ok=1): a serial was unlinked
+    // between the door's read and this flip — nothing moved.
+    if (guards.length && isLostRace(e)) {
+      return {
+        moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'SERIALS_REQUIRED',
       };
     }
     if (isPriceHoldAbort(e)) {

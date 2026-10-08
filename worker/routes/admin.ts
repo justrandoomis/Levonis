@@ -15,7 +15,7 @@ import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAdmin, badRequest, notFound, conflict, str, int, oneOf, jsonArray, email, HttpError } from '../lib/http';
 import { newId, sha256Hex } from '../lib/crypto';
-import { audit } from '../lib/audit';
+import { audit, auditStatements } from '../lib/audit';
 import { limitRoute, rateLimit } from '../lib/ratelimit';
 import { canMoveMoney, canViewCost, canWriteCost, isOwner, normalizeAdminScope, projectForAdmin, userPatchElevates, userPatchRefusal } from '../lib/adminScope';
 import { assertCostRead, assertCostWrite, requireFreshSession } from '../lib/costAccess';
@@ -45,7 +45,7 @@ import { assertFinancialScope } from '../lib/walletAdjust';
 import { deleteCancelledOrder, OrderDeletionRefusal } from '../lib/orderDeletion';
 import { reclaimOrderRedemptionsStatement } from '../lib/offers';
 import { resolveOrderExpiry } from '../lib/orderExpiry';
-import { getSetting, getSettings, normalizePayoutMethods, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
+import { getSetting, getSettings, normalizePayoutMethods, normalizeSerialPrepGate, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { validateWalletFreeDelivery } from '../lib/walletFreeDelivery';
 import { afterCatalogueWrite, afterSettingsWrite } from '../lib/edgePolicy';
 import type { CreateUnitsResult } from '../lib/deviceOps';
@@ -85,6 +85,15 @@ import {
   giniStateOf,
 } from '../lib/gini';
 import { moveOrderStage, stagePath, stageRowFrom, sweepDueStages } from '../lib/orderStageOps';
+import {
+  orderSerialsView,
+  serialActor,
+  serialGateForMove,
+  serialGateState,
+  serialsRequiredError,
+  refuse as serialRefuse,
+} from '../lib/serialAssignments';
+import { isLostRace } from '../lib/gifts/fence';
 import { isPriceHeld, PRICE_APPROVAL_PENDING_MESSAGE } from '../lib/priceHold';
 import { ALWASEET, alwaseetDriver, resolveWire } from '../lib/delivery/alwaseet';
 import {
@@ -2340,7 +2349,7 @@ adminRoutes.get('/orders/:id', async (c) => {
     }
   };
 
-  const [{ results: items }, snaps, units, invoice, chat, stageHistory] = await Promise.all([
+  const [{ results: items }, snaps, units, invoice, chat, stageHistory, serials] = await Promise.all([
     c.env.DB.prepare(`${ORDER_ITEMS_SELECT} WHERE oi.order_id = ? ORDER BY oi.rowid`).bind(id).all<Record<string, unknown>>(),
     soft('points', () => getOrderPointsSnapshots(c.env, [id]), new Map()),
     // Serialized units matter on the fulfilment screen: a printer that needs a
@@ -2382,6 +2391,14 @@ adminRoutes.get('/orders/:id', async (c) => {
         ).results ?? [],
       [] as { stage: string; changed_at: string }[]
     ),
+    // «Scan Serial» per physical unit (0177): the slots, what is linked, the
+    // §19 gate and the re-open suggestions. `installed:false` until the
+    // migration has applied — the screen then shows the legacy line only.
+    soft(
+      'serials',
+      () => orderSerialsView(c.env, serialActor(c.env, c.get('user')!), id),
+      { installed: false } as Awaited<ReturnType<typeof orderSerialsView>> | { installed: false }
+    ),
   ]);
 
   // The address as STORED ON THE ORDER, not the customer's current address —
@@ -2418,6 +2435,7 @@ adminRoutes.get('/orders/:id', async (c) => {
       })),
       invoice: invoice ?? null,
       chat_id: chat?.id ?? null,
+      serials,
       // The tracking path, so the fulfilment modal shows where the parcel is
       // and offers only the moves that are actually legal from here. The
       // panel holds no copy of the path — one authority, on the server.
@@ -2444,6 +2462,7 @@ adminRoutes.get('/orders/:id', async (c) => {
             ...v,
             label_ar: stageLabel(v.stage, shippingType, 'ar'),
             label_en: stageLabel(v.stage, shippingType, 'en'),
+            label_ckb: stageLabel(v.stage, shippingType, 'ckb'),
           })),
           available: [...path, 'cancelled' as OrderStage]
             .filter((to) => canMoveStage(stage, to, shippingType))
@@ -2452,6 +2471,7 @@ adminRoutes.get('/orders/:id', async (c) => {
               source: STAGE_SOURCE[to],
               label_ar: stageLabel(to, shippingType, 'ar'),
               label_en: stageLabel(to, shippingType, 'en'),
+              label_ckb: stageLabel(to, shippingType, 'ckb'),
             })),
           history: stageHistory,
         };
@@ -2654,6 +2674,7 @@ adminRoutes.get('/orders/:id/stages', async (c) => {
       ...v,
       label_ar: stageLabel(v.stage, order.shipping_type, 'ar'),
       label_en: stageLabel(v.stage, order.shipping_type, 'en'),
+      label_ckb: stageLabel(v.stage, order.shipping_type, 'ckb'),
     })),
     // What the admin may actually pick. Computed here so a panel can render
     // the real options instead of the whole path greyed out — the six-option
@@ -2665,6 +2686,7 @@ adminRoutes.get('/orders/:id/stages', async (c) => {
         source: STAGE_SOURCE[to],
         label_ar: stageLabel(to, order.shipping_type, 'ar'),
         label_en: stageLabel(to, order.shipping_type, 'en'),
+        label_ckb: stageLabel(to, order.shipping_type, 'ckb'),
       })),
     history: history ?? [],
   });
@@ -3124,6 +3146,18 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
       gini_order_no: String(order.gini_order_no ?? ''),
     });
   }
+  // §19 THE SERIAL GATE at the real point of no return (critique H2): a
+  // courier shipment hands the parcel over, and the courier sync then moves
+  // the order without any gate. The owner may override with a reason.
+  const deliveryBody = ((await c.req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
+  const serialGate = await serialGateForMove(
+    c.env,
+    serialActor(c.env, adminUser),
+    id,
+    String(order.status ?? ''),
+    'out_for_delivery',
+    str(deliveryBody.serials_override_reason, 'serials_override_reason', { max: 500, required: false })
+  );
   const address = safeParse<Record<string, unknown>>(order.address_snapshot, {});
   // THE COURIER GETS THE PARENT NAME AND THE PHYSICAL COUNT (§6.3). A courier
   // is a third party: they carry one box holding one bundle, and listing its
@@ -3190,6 +3224,22 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
   await audit(c.env.DB, adminUser.id, 'delivery.shipment_create', id, {
     provider: driver.provider, remote_id: res.value.remoteId, tracking_no: res.value.trackingNo,
   });
+  // The owner's gate override, now that the shipment it allowed exists; and
+  // the re-check H2 asks for — an unlink that landed while the courier was
+  // being called is recorded and reported, never silently shipped. (From here
+  // on S1 refuses staff edits: the order has a delivery_remote_id.)
+  let serialNotes: string[] | undefined;
+  if (serialGate.overridden) {
+    await c.env.DB.batch(serialGate.statements).catch((e) => console.error('serial gate override audit failed', e));
+  } else if (serialGate.statements.length) {
+    const after = await serialGateState(c.env, id);
+    if (after.applies && after.missing.length) {
+      serialNotes = ['SERIALS_MISSING_AFTER_SHIPMENT'];
+      await c.env.DB.batch(
+        (await auditStatements(c.env.DB, adminUser.id, 'serial.prep_gate_breach', id, { missing: after.missing, remote_id: res.value.remoteId })).statements
+      ).catch((e) => console.error('serial gate breach audit failed', e));
+    }
+  }
 
   // The stage is NOT advanced here. "لا تستخدم Timer للانتقال إلى في الطريق
   // إليك" — creating a shipment is not the courier picking it up, and only
@@ -3199,6 +3249,7 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
     provider: driver.provider,
     remote_id: res.value.remoteId,
     tracking_no: res.value.trackingNo,
+    ...(serialNotes ? { notes: serialNotes } : {}),
   });
 });
 
@@ -3357,6 +3408,18 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
   if (!(to in STAGE_SOURCE)) throw badRequest(`Unknown stage "${to}"`);
   const note = str(body.note, 'note', { max: 500, required: false });
   await refuseUnscannedGini(c, id, STAGE_LEGACY_STATUS[to]);
+  // §19 THE SERIAL GATE (0177; ships OFF): a forward move into a hand-over
+  // stage needs every serial-required unit linked. The pre-read gives the
+  // missing list; the fence rides the flip itself (critique H2). The owner may
+  // pass `serials_override_reason` instead, audited in the same batch.
+  const serialGate = await serialGateForMove(
+    c.env,
+    serialActor(c.env, adminUser),
+    id,
+    String((await c.env.DB.prepare('SELECT status FROM orders WHERE id = ?').bind(id).first<{ status: string }>())?.status ?? ''),
+    to,
+    str(body.serials_override_reason, 'serials_override_reason', { max: 500, required: false })
+  );
 
   // A COMMUNITY-STORE ORDER is cancelled by its own operation and is never
   // re-opened (see `adminStoreOrderMove` below); every other stage move of it
@@ -3378,9 +3441,11 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
     // The customer's message about this move leaves right after the response
     // rather than at the next outbox cron (worker/lib/orderNotify.ts).
     defer: (work) => c.executionCtx.waitUntil(work),
+    guardStatements: serialGate.statements,
   });
   if (!res.moved) {
     if (res.reason === 'NOT_FOUND') throw notFound('Order not found');
+    if (res.reason === 'SERIALS_REQUIRED') throw serialsRequiredError(await serialGateState(c.env, id));
     if (res.reason === 'RACED') throw badRequest('The order changed while you were editing — reload and retry');
     if (res.reason === 'REFUNDED_ORDER') throw badRequest('تم إرجاع رصيد هذا الطلب؛ لا يمكن إعادة فتحه. أنشئ طلباً جديداً ليتم احتساب الدفعة من جديد.', 'REFUNDED_ORDER');
     if (res.reason === 'GIFT_ORDER_REOPEN_REFUSED') throw giftReopenRefusal();
@@ -3460,6 +3525,16 @@ adminRoutes.patch('/orders/:id', async (c) => {
   if (String(order.seller_type ?? '') === 'merchant') {
     if (await adminStoreOrderMove(c, order, next, adminNote)) return c.json({ success: true });
   }
+  // §19 the serial gate, on the stage this status lands on (a pre-order's
+  // `shipped` is `handed_to_carrier`, which the gate does not guard).
+  const serialGate = await serialGateForMove(
+    c.env,
+    serialActor(c.env, adminUser),
+    id,
+    from,
+    stageForLegacyStatus(next, asShippingType(order.shipping_type)),
+    str(body.serials_override_reason, 'serials_override_reason', { max: 500, required: false })
+  );
 
   // delivered_at is stamped in the SAME conditional update as the status flip
   // so a concurrent transition can never produce a delivered order without it.
@@ -3547,6 +3622,13 @@ adminRoutes.patch('/orders/:id', async (c) => {
         );
       }
       if (msg.includes('GIFT_ORDER_REOPEN_REFUSED')) throw giftReopenRefusal();
+      throw e;
+    }
+  } else if (serialGate.statements.length) {
+    try {
+      flipped = (await c.env.DB.batch([flipStmt, ...serialGate.statements]))[0]?.meta.changes ?? 0;
+    } catch (e) {
+      if (isLostRace(e)) throw serialsRequiredError(await serialGateState(c.env, id));
       throw e;
     }
   } else {
@@ -3994,7 +4076,15 @@ adminRoutes.put('/settings/:key', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   let value = body.value as unknown;
 
-  if (key === 'exchangeRate') {
+  if (key === 'serialPrepGate') {
+    // §19/§29 — the serial preparation gate is the owner's switch (owner
+    // default: ships OFF). Switching it on without a cutover stamps `since` =
+    // now, so orders already in flight are never blocked.
+    if (!isOwner(c.env, adminUser)) throw serialRefuse(403, 'OWNER_ONLY');
+    const gate = normalizeSerialPrepGate(value);
+    if (gate.enabled && !gate.since) gate.since = new Date().toISOString();
+    value = gate;
+  } else if (key === 'exchangeRate') {
     value = int(value, 'exchangeRate', { min: 1, max: 1_000_000 });
   } else if (key === 'currency') {
     value = oneOf(value, 'currency', ['IQD', 'USD'] as const);
@@ -4150,7 +4240,7 @@ adminRoutes.put('/settings/:key', async (c) => {
   await setSetting(c.env.DB, key, value);
   // A delivery fee the shop stops charging is money: the audit keeps the
   // whole rule as saved, not just the key.
-  await audit(c.env.DB, adminUser.id, 'settings.update', key, key === 'walletFreeDelivery' ? { value } : {});
+  await audit(c.env.DB, adminUser.id, 'settings.update', key, key === 'walletFreeDelivery' || key === 'serialPrepGate' ? { value } : {});
   // P2a: the cached public answers this key feeds, and the isolate's pricing inputs.
   await afterSettingsWrite(c, key);
   return c.json({ success: true });

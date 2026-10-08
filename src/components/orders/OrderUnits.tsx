@@ -25,6 +25,7 @@ const STRINGS = {
     expired: (d: string) => `انتهى الضمان في ${d}`,
     needsConfig: 'مدة الضمان غير مُعدّة — تواصل مع الدعم',
     notDelivered: 'يبدأ الضمان عند التسليم',
+    returned: 'أُعيد هذا الجهاز وأُغلق ضمانه',
     register: 'تسجيل الضمان',
     registering: 'جارٍ التسجيل…',
     linkedMine: 'مرتبط بحسابك',
@@ -41,6 +42,7 @@ const STRINGS = {
     expired: (d: string) => `Warranty expired ${d}`,
     needsConfig: 'Coverage duration not configured — contact support',
     notDelivered: 'Coverage starts at delivery',
+    returned: 'This device was returned and its warranty is closed',
     register: 'Register warranty',
     registering: 'Registering…',
     linkedMine: 'Linked to your account',
@@ -57,6 +59,7 @@ const STRINGS = {
     expired: (d: string) => `گەرەنتی لە ${d} تەواو بووە`,
     needsConfig: 'ماوەی گەرەنتی ڕێکنەخراوە — پەیوەندی بە پشتگیری بکە',
     notDelivered: 'گەرەنتی لە کاتی گەیاندن دەست پێدەکات',
+    returned: 'ئەم ئامێرە گەڕێنرایەوە و گەرەنتییەکەی داخرا',
     register: 'تۆمارکردنی گەرەنتی',
     registering: 'تۆمارکردن…',
     linkedMine: 'بەستراوە بە هەژمارەکەت',
@@ -101,8 +104,11 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
               ? { icon: <ShieldOff className="w-3.5 h-3.5" aria-hidden />, cls: 'text-red-300', text: s.expired(formatDate(w.end_at, lang)) }
               : w.state === 'needs_config'
                 ? { icon: <ShieldAlert className="w-3.5 h-3.5" aria-hidden />, cls: 'text-amber-300', text: s.needsConfig }
-                : { icon: <Clock className="w-3.5 h-3.5" aria-hidden />, cls: 'text-zinc-400', text: s.notDelivered };
-        const canRegister = u.linked === 'none' && !u.replaced && !!u.delivered_at;
+                : w.state === 'closed'
+                  ? { icon: <ShieldOff className="w-3.5 h-3.5" aria-hidden />, cls: 'text-zinc-400', text: s.returned }
+                  : { icon: <Clock className="w-3.5 h-3.5" aria-hidden />, cls: 'text-zinc-400', text: s.notDelivered };
+        // A returned device (0177) is the shop's again: nothing to register.
+        const canRegister = u.linked === 'none' && !u.replaced && !u.returned && w.state !== 'closed' && !!u.delivered_at;
         const err = errors[u.unit_id];
         return (
           <li key={u.unit_id} data-unit-id={u.unit_id} data-unit-linked={u.linked} className="rounded-xl border border-zinc-800 bg-black/30 p-3">

@@ -202,6 +202,7 @@ import { initOrderStage, orderEndsAtTheDoor, stagePath, stageRowFrom } from '../
 import { stageLabel, stagesFor, stageForLegacyStatus } from '../lib/orderStages';
 import type { OrderStage } from '../lib/orderStages';
 import { coverageState, maskSerial } from '../lib/deviceOps';
+import { serialAssignmentsInstalled } from '../lib/serialPolicy';
 import type { ShippingType } from '../lib/shippingType';
 import type { PolicyRef } from '../lib/policyOps';
 import { createInvoiceForOrder } from '../lib/invoices';
@@ -5507,6 +5508,8 @@ interface OrderUnitRow extends Record<string, unknown> {
   warranty_start_at: string | null;
   warranty_end_at: string | null;
   replaced_by_unit_id: string | null;
+  /** 0177: set when the device came back on a return; NULL before the migration. */
+  warranty_closed_at: string | null;
   serial_raw: string | null;
   reg_user_id: string | null;
   receipt_no: string | null;
@@ -5537,9 +5540,12 @@ orderRoutes.get('/:id/units', async (c) => {
     .first<{ id: string; user_id: string }>();
   if (!order || (order.user_id !== user.id && user.role !== 'admin')) throw notFound('Order not found');
 
+  // 0177: a unit whose device came back on a return is CLOSED — its dates
+  // stay on screen, its coverage reads «returned» (deploy-ahead: NULL before).
+  const closedCol = (await serialAssignmentsInstalled(c.env.DB)) ? 'u.warranty_closed_at' : 'NULL AS warranty_closed_at';
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.order_item_id, u.unit_index, u.product_id, u.delivered_at, u.warranty_start_at,
-            u.warranty_end_at, u.replaced_by_unit_id,
+            u.warranty_end_at, u.replaced_by_unit_id, ${closedCol},
             s.serial_raw, r.user_id AS reg_user_id, wr.receipt_no,
             oi.name_snapshot, oi.image_snapshot,
             p.slug, p.name AS p_name, p.name_ar AS p_name_ar
@@ -5556,7 +5562,7 @@ orderRoutes.get('/:id/units', async (c) => {
     .all<OrderUnitRow>();
 
   const units = results.map((r) => {
-    const cov = coverageState(r.delivered_at, r.warranty_end_at);
+    const cov = coverageState(r.delivered_at, r.warranty_end_at, Date.now(), r.warranty_closed_at ?? null);
     return {
       unit_id: r.id,
       order_item_id: r.order_item_id,
@@ -5586,6 +5592,8 @@ orderRoutes.get('/:id/units', async (c) => {
       // A replaced device's coverage lives on its replacement; the screen
       // offers no "register" for a unit that is no longer the customer's.
       replaced: !!r.replaced_by_unit_id,
+      // The device came back on a return (0177): nothing to register.
+      returned: !!r.warranty_closed_at,
     };
   });
   return c.json({ success: true, order_id: id, units });

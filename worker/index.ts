@@ -54,6 +54,7 @@ import { robotsRoute, sitemapRoute } from './routes/seo';
 import { miscRoutes } from './routes/misc';
 import { adminRoutes } from './routes/admin';
 import { adminOrderPriceRoutes, orderPriceRoutes } from './routes/orderPriceAdjust';
+import { adminOrderSerialRoutes } from './routes/adminOrderSerials';
 import { adminTradeInRoutes, tradeInRoutes } from './routes/tradeIn';
 import { adminProductsRoutes } from './routes/adminProducts';
 import { templateRoutes } from './routes/template';
@@ -356,6 +357,9 @@ app.route('/api/quick-buy', quickBuyRoutes);
 // proposal on one order's price. Their own routers, beside their siblings.
 app.route('/api/orders', orderPriceRoutes);
 app.route('/api/admin/orders', adminOrderPriceRoutes);
+// Serials at preparation (0177): scan / change / unlink / owner override per
+// physical unit of an order (worker/lib/serialAssignments.ts).
+app.route('/api/admin/orders', adminOrderSerialRoutes);
 // «الاستبدال» (0143): a delivered LEVONIS device traded against a new one —
 // the customer's wizard and requests, and the admin's review and rules.
 app.route('/api/trade-in', tradeInRoutes);

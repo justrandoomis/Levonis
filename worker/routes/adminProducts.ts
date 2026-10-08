@@ -43,10 +43,13 @@ import {
   canViewCost,
   canWriteCost,
   carryStoredCostForward,
+  isOwner,
   projectForAdmin,
 } from '../lib/adminScope';
 import { costRefusal } from '../lib/costAccess';
-import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
+import { applyPrinterWarrantyRules, readOpsWarranty } from '../lib/warrantyPlans';
+import { lineDevicePolicy, placementSerialized, serializationContext } from '../lib/serialPolicy';
+import { refuse as serialRefuse } from '../lib/serialAssignments';
 import { bundlesUsing, compositionConflict } from '../lib/bundleComposition';
 import {
   deleteProductPermanently,
@@ -181,6 +184,25 @@ export async function uniqueSlugIn(
     if (!(await taken(cand))) return cand;
   }
   return `${base}-${newId().slice(0, 6)}`;
+}
+
+/**
+ * §29 (serial scan, 0177; critique-1 #23): refuses, for anyone but the owner,
+ * a new placement that would flip whether a product with no `serialized`
+ * word of its own needs a serial at preparation (a printer catalog, or a
+ * section whose serial policy is 'required'). A product with its own word
+ * keeps it wherever it is filed, so nothing is asked of it.
+ */
+async function refuseSerializedDrift(
+  db: D1Database,
+  prev: { id: string; ops_policy: unknown },
+  catalogIds: string[],
+  categoryIds: Array<string | null | undefined>
+): Promise<void> {
+  if (readOpsWarranty(prev.ops_policy).serialized !== null) return;
+  const before = lineDevicePolicy(prev.ops_policy, prev.id, await serializationContext(db, [prev.id])).serialized;
+  const after = await placementSerialized(db, catalogIds, categoryIds);
+  if (before !== after) throw serialRefuse(403, 'OWNER_ONLY', { field: 'serialized', via: 'placement' });
 }
 
 async function catalogIdsFor(db: D1Database, productId: string): Promise<string[]> {
@@ -1251,6 +1273,31 @@ adminProductsRoutes.post('/', async (c) => {
     carryStoredCostForward(doc, prev);
   }
 
+  // §29 (serial scan, 0177): whether a product needs a serial at preparation
+  // — and gets a warranty unit at delivery — is the OWNER's. Only a CHANGE of
+  // the effective answer is an attempt: the form echoes the stored value on
+  // every save, and that must keep working for any admin.
+  if (prev && typeof body.serialized === 'boolean' && !isOwner(c.env, admin)) {
+    const before = lineDevicePolicy(prev.ops_policy, prev.id, await serializationContext(c.env.DB, [prev.id])).serialized;
+    if (body.serialized !== before) throw serialRefuse(403, 'OWNER_ONLY');
+  }
+  // …and so is RE-FILING a product whose own word is silent (critique-1 #23):
+  // its answer then comes from its placement, so moving it into or out of a
+  // printer catalog or a 'required' section is the same change by another door.
+  if (prev && !isOwner(c.env, admin) && typeof body.serialized !== 'boolean') {
+    const recategorised = doc.category_id !== prev.category_id || doc.sub_category_id !== prev.sub_category_id;
+    if (Array.isArray(body.catalog_ids) || recategorised) {
+      await refuseSerializedDrift(
+        c.env.DB,
+        prev,
+        Array.isArray(body.catalog_ids)
+          ? (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string')
+          : await catalogIdsFor(c.env.DB, prev.id),
+        [doc.category_id, doc.sub_category_id]
+      );
+    }
+  }
+
   // The stored ops_policy rides along under the two device fields the form
   // edits, so a save from a client that never saw size_class cannot erase it.
   if (prev) doc.ops_policy = { ...prev.ops_policy, ...doc.ops_policy };
@@ -1896,11 +1943,21 @@ adminProductsRoutes.put('/:id/catalogs', async (c) => {
   if (!existingRow) throw notFound('Product not found');
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   if (!Array.isArray(body.catalog_ids)) throw badRequest('catalog_ids must be an array of catalog ids');
+  const prevDoc = parseProductRow(existingRow);
+  // §29 (0177): a placement that changes whether the product needs a serial is the owner's.
+  if (!isOwner(c.env, admin)) {
+    await refuseSerializedDrift(
+      c.env.DB,
+      prevDoc,
+      (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string'),
+      [prevDoc.category_id, prevDoc.sub_category_id]
+    );
+  }
   // The placement alone, through the same contract as every other write.
   const plan = await planProductSave(c.env.DB, {
     mode: 'update',
     doc: null,
-    prev: parseProductRow(existingRow),
+    prev: prevDoc,
     relations: null,
     catalogIds: (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string'),
     actor: { adminId: admin.id, money: canWriteCost(c.env, admin) },

@@ -1618,6 +1618,148 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   },
   // ---- the pricing programme's refusal contract (S1, master plan §6.1) -----
   ...COST_REFUSALS,
+  // ---- Serials at order preparation (0177; owner brief 2026-10-07) ---------
+  // Admin screens: the order's «Scan Serial» slots, the camera sheet, the
+  // §19 gate and the serial page. The Arabic is the brief's own (§31, §19);
+  // worker/lib/serialAssignments.ts sends the code. OWNER_ONLY and
+  // IDEMPOTENCY_MISMATCH are the programme contract's codes (COST_REFUSALS,
+  // spread above): the serial doors raise them and the client renders the
+  // contract's three sentences, so they are not redefined here.
+  SERIAL_LINKED: {
+    ar: 'تم ربط الرقم التسلسلي بالطلب.',
+    en: 'Serial number linked to the order.',
+    ckb: 'ژمارە زنجیرەییەکە بە داواکارییەکەوە بەسترا.',
+  },
+  SERIAL_EXISTING_LINKED: {
+    ar: 'الرقم موجود مسبقاً وتم ربطه بهذا الطلب.',
+    en: 'This serial was already on record and is now linked to this order.',
+    ckb: 'ژمارەکە پێشتر تۆمارکرابوو و ئێستا بەم داواکارییەوە بەسترا.',
+  },
+  SERIAL_IN_USE: {
+    ar: 'هذا الرقم التسلسلي مرتبط بطلب آخر.',
+    en: 'This serial number is linked to another order.',
+    ckb: 'ئەم ژمارە زنجیرەییە بە داواکارییەکی ترەوە بەستراوە.',
+  },
+  SERIAL_DELIVERED: {
+    ar: 'هذا الجهاز تم تسليمه مسبقاً.',
+    en: 'This device has already been delivered.',
+    ckb: 'ئەم ئامێرە پێشتر گەیەنراوە.',
+  },
+  SERIAL_PRODUCT_MISMATCH: {
+    ar: 'الرقم التسلسلي لا يطابق هذا المنتج.',
+    en: 'This serial number does not match this product.',
+    ckb: 'ژمارە زنجیرەییەکە لەگەڵ ئەم بەرهەمە ناگونجێت.',
+  },
+  SERIALS_REQUIRED: {
+    ar: 'تبقى أرقام تسلسلية غير مرتبطة لهذا الطلب.',
+    en: 'Some units of this order still have no serial number linked.',
+    ckb: 'هێشتا ژمارەی زنجیرەیی بە هەندێک یەکەی ئەم داواکارییەوە نەبەستراون.',
+  },
+  SERIAL_OPTION_MISMATCH: {
+    ar: 'الرقم التسلسلي لا يطابق الخيار المطلوب من هذا المنتج.',
+    en: 'This serial belongs to a different option of this product.',
+    ckb: 'ئەم ژمارە زنجیرەییە هی جۆرێکی تری ئەم بەرهەمەیە.',
+  },
+  SERIAL_MODEL_MISMATCH: {
+    ar: 'الرقم التسلسلي يعود لطراز آخر غير هذا المنتج.',
+    en: 'This serial belongs to a different model than this product.',
+    ckb: 'ئەم ژمارە زنجیرەییە هی مۆدێلێکی ترە، نەک ئەم بەرهەمە.',
+  },
+  SERIAL_BATCH_MISMATCH: {
+    ar: 'هذا الجهاز من دفعة غير الدفعة المصروفة لهذا الطلب — خذ القطعة من الدفعة المحددة.',
+    en: 'This device is from a different batch than the one issued to this order — take the unit from the batch shown.',
+    ckb: 'ئەم ئامێرە لە وەجبەیەکی ترە، نەک ئەو وەجبەیەی بۆ ئەم داواکارییە دەرکراوە — یەکەکە لە وەجبە دیاریکراوەکە هەڵبگرە.',
+  },
+  SERIAL_IN_USE_THIS_ORDER: {
+    ar: 'هذا الرقم مربوط بوحدة أخرى في الطلب نفسه.',
+    en: 'This serial is already on another unit of this order.',
+    ckb: 'ئەم ژمارەیە پێشتر بە یەکەیەکی تری هەمان داواکارییەوە بەستراوە.',
+  },
+  UNIT_ALREADY_LINKED: {
+    ar: 'هذه الوحدة مربوطة برقم آخر — استخدم «تغيير».',
+    en: 'This unit already has a serial — use Change.',
+    ckb: 'ئەم یەکەیە پێشتر ژمارەیەکی پێوە بەستراوە — «گۆڕین» بەکاربهێنە.',
+  },
+  ORDER_NOT_PREPARABLE: {
+    ar: 'لا يمكن ربط الأرقام التسلسلية في هذه المرحلة من الطلب.',
+    en: "Serials can't be linked at this stage of the order.",
+    ckb: 'لەم قۆناغەی داواکارییەکەدا ناتوانرێت ژمارەی زنجیرەیی ببەسترێت.',
+  },
+  SERIAL_NOT_REQUIRED: {
+    ar: 'هذا المنتج لا يحتاج رقمًا تسلسليًا.',
+    en: "This product doesn't need a serial number.",
+    ckb: 'ئەم بەرهەمە پێویستی بە ژمارەی زنجیرەیی نییە.',
+  },
+  SERIAL_INVALID: {
+    ar: 'هذا ليس رقمًا تسلسليًا صالحًا — امسح «Product SN» أو اكتبه كما هو مطبوع.',
+    en: "That isn't a valid serial number — scan the Product SN or type it as printed.",
+    ckb: 'ئەمە ژمارەیەکی زنجیرەیی دروست نییە — «Product SN» سکان بکە یان وەک چاپکراوە بینووسە.',
+  },
+  SERIAL_NOT_AVAILABLE: {
+    ar: 'هذا الجهاز غير متاح للبيع (ملغى أو في الحجر أو مستبدل).',
+    en: "This device isn't available for sale (voided, quarantined or replaced).",
+    ckb: 'ئەم ئامێرە بۆ فرۆشتن بەردەست نییە (هەڵوەشێنراوە، لە کەرەنتینەدایە یان گۆڕدراوەتەوە).',
+  },
+  SERIAL_UNLINKED: {
+    ar: 'أُزيل الرقم التسلسلي من الوحدة.',
+    en: 'Serial removed from the unit.',
+    ckb: 'ژمارە زنجیرەییەکە لە یەکەکە لابرا.',
+  },
+  SERIAL_ALREADY_ACTIVATED: {
+    ar: 'سُلّم هذا الجهاز وبدأ ضمانه — الطريق الآن مرتجع أو استثناء المالك.',
+    en: 'This device was delivered and its warranty has started — use a return or an owner override.',
+    ckb: 'ئەم ئامێرە گەیەنراوە و گەرەنتییەکەی دەستی پێکردووە — گەڕاندنەوە یان ڕێگەپێدانی خاوەن بەکاربهێنە.',
+  },
+  SERIAL_ASSIGNMENT_NOT_FOUND: {
+    ar: 'لم يُعثر على هذا الربط في الطلب.',
+    en: 'This serial link was not found on the order.',
+    ckb: 'ئەم بەستنەوەیە لە داواکارییەکەدا نەدۆزرایەوە.',
+  },
+  SERIAL_LINK_RELEASED: {
+    ar: 'أُزيل هذا الربط بعد المسح — امسح الرقم مجددًا.',
+    en: 'This link was removed after the scan — scan the serial again.',
+    ckb: 'ئەم بەستنەوەیە دوای سکانەکە لابرا — ژمارەکە دووبارە سکان بکە.',
+  },
+  OVERRIDE_REASON_REQUIRED: {
+    ar: 'اكتب سبب الاستثناء (5 أحرف على الأقل).',
+    en: 'Write the reason for the override (at least 5 characters).',
+    ckb: 'هۆکاری ئەم ڕێگەپێدانە بنووسە (لانیکەم ٥ پیت).',
+  },
+  OVERRIDE_UNAVAILABLE: {
+    ar: 'هذا الاستثناء غير متاح لهذه الحالة.',
+    en: "This override isn't available in this case.",
+    ckb: 'ئەم ڕێگەپێدانە بۆ ئەم حاڵەتە بەردەست نییە.',
+  },
+  SERIAL_RACE: {
+    ar: 'تغيّر الطلب أثناء المسح — أعد المحاولة.',
+    en: 'The order changed while scanning — try again.',
+    ckb: 'داواکارییەکە لە کاتی سکانکردندا گۆڕا — دووبارە هەوڵ بدەوە.',
+  },
+  SERIALS_NOT_INSTALLED: {
+    ar: 'ميزة ربط الأرقام التسلسلية لم تُفعّل على قاعدة البيانات بعد.',
+    en: "Serial linking isn't installed on the database yet.",
+    ckb: 'تایبەتمەندی بەستنی ژمارەی زنجیرەیی هێشتا لەسەر بنکەدراوەکە دانەمەزراوە.',
+  },
+  WARRANTY_CLOSED: {
+    ar: 'أُغلق ضمان هذه الوحدة (مرتجع) — لا يُصدر لها وصل.',
+    en: "This unit's warranty was closed (returned) — no receipt can be issued.",
+    ckb: 'گەرەنتی ئەم یەکەیە داخراوە (گەڕێنراوەتەوە) — پسووڵەی بۆ دەرناکرێت.',
+  },
+  RETURN_SERIAL_MISMATCH: {
+    ar: 'هذا الرقم التسلسلي ليس جهازًا من هذا البند لدى هذا الزبون.',
+    en: "This serial isn't a device of this line for this customer.",
+    ckb: 'ئەم ژمارە زنجیرەییە ئامێرێکی ئەم بەندەی ئەم کڕیارە نییە.',
+  },
+  RETURN_UNIT_MISMATCH: {
+    ar: 'هذه الوحدة ليست وحدة مفتوحة من هذا البند.',
+    en: "This unit isn't an open unit of this line.",
+    ckb: 'ئەم یەکەیە یەکەیەکی کراوەی ئەم بەندە نییە.',
+  },
+  ITEM_NOT_IN_ORDER: {
+    ar: 'هذا المنتج ليس ضمن هذا الطلب.',
+    en: 'This item is not part of this order.',
+    ckb: 'ئەم بەرهەمە بەشێک نییە لەم داواکارییە.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

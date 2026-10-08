@@ -130,9 +130,16 @@ export interface DecodedCode {
   y?: number;
 }
 
-/** Strips a printed prefix a QR/Data Matrix payload may carry (`SN: …`, `S/N: …`, `Product SN: …`). */
+/**
+ * Strips a printed prefix a QR/Data Matrix payload, a wedge read or a typed
+ * value may carry: `SN: …`, `S/N: …`, `Product SN: …` — and `SN 0391…` with
+ * only a space (serial-scan critique H1: without the colon it normalised to
+ * `SN0391…`, a second asset for one device). A separator is required, so a
+ * serial that merely starts with S and N is kept. worker/lib/serialAssignments.ts
+ * `stripSerialPrefix` is the server's copy of this rule.
+ */
 function stripSnPrefix(text: string): string {
-  return text.replace(/^\s*(?:product\s*)?s\s*\/?\s*n\s*[:：#]\s*/i, '').trim();
+  return text.replace(/^\s*(?:product\s*)?s\s*\/?\s*n(?:\s*[:：#]\s*|\s+)(?=\S)/i, '').trim();
 }
 
 /** What one decoded value is, on its own. */

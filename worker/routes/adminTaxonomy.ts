@@ -4,7 +4,10 @@ import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { HttpError, requireAdmin, badRequest, notFound, str, int, oneOf } from '../lib/http';
 import { newId, } from '../lib/crypto';
-import { audit } from '../lib/audit';
+import { audit, auditStatements } from '../lib/audit';
+import { isOwner } from '../lib/adminScope';
+import { refuse as serialRefuse } from '../lib/serialAssignments';
+import { catalogSerialPolicySql, serialAssignmentsInstalled } from '../lib/serialPolicy';
 import {
   FAMILIES,
   groupsForSection,
@@ -443,6 +446,12 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
       : body.is_printer_catalog
         ? 1
         : 0;
+  // §29 (serial scan, 0177): the printer flag decides which products need a
+  // serial at preparation and get a warranty unit — the owner's call. Only a
+  // CHANGE is an attempt (an edit that echoes the stored flag passes).
+  if (Number(existing?.is_printer_catalog ?? 0) !== isPrinter && !isOwner(c.env, admin)) {
+    throw serialRefuse(403, 'OWNER_ONLY');
+  }
 
   const wantedSlug =
     typeof body.slug === 'string' && body.slug.trim()
@@ -532,6 +541,43 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
   });
   const fresh = await c.env.DB.prepare('SELECT * FROM catalogs WHERE id = ?').bind(id).first<CatalogRow>();
   return c.json({ success: true, catalog: fresh, created: !existing });
+});
+
+/**
+ * §29 SERIAL TRACKING BY SECTION (migration 0177) — owner only.
+ *
+ * `{ policy: 'inherit' | 'required' | 'off' }`. Resolved AT READ TIME
+ * (worker/lib/serialPolicy.ts): a product's own ops_policy.serialized wins;
+ * otherwise the nearest section on its branch that is not 'inherit';
+ * otherwise the printer flag. A section never switches a printer off, and
+ * nothing is written onto products — a re-filed product reads its new answer
+ * at once. This is how the owner turns the AMS family on: 'required' on the
+ * section that holds the AMS products (no name is ever inferred).
+ */
+adminTaxonomyRoutes.put('/catalogs/:id/serial-policy', async (c) => {
+  const admin = c.get('user')!;
+  if (!isOwner(c.env, admin)) throw serialRefuse(403, 'OWNER_ONLY');
+  if (!(await serialAssignmentsInstalled(c.env.DB))) throw serialRefuse(503, 'SERIALS_NOT_INSTALLED');
+  const id = c.req.param('id');
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const policy = oneOf(body.policy, 'policy', ['inherit', 'required', 'off'] as const);
+  const before = await c.env.DB.prepare('SELECT id, serial_policy FROM catalogs WHERE id = ?')
+    .bind(id)
+    .first<{ id: string; serial_policy: string }>();
+  if (!before) throw notFound('Catalog not found');
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE catalogs SET serial_policy = ? WHERE id = ?').bind(policy, id),
+    ...(await auditStatements(c.env.DB, admin.id, 'catalog.serial_policy', id, { from: before.serial_policy, to: policy })).statements,
+  ]);
+  // Which products this section now asks a serial of (non-printers whose own
+  // policy is silent) — for the owner's confirmation line, not stored anywhere.
+  const { results } = await c.env.DB.prepare(
+    `SELECT p.id FROM products p
+      WHERE ${catalogSerialPolicySql('p.id')} = 2
+        AND (CASE WHEN json_valid(p.ops_policy) THEN json_extract(p.ops_policy, '$.serialized') END) IS NULL
+      LIMIT 500`
+  ).all<{ id: string }>();
+  return c.json({ success: true, catalog_id: id, policy, requires_serial: results.map((r) => r.id) });
 });
 
 /**
