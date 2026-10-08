@@ -882,7 +882,26 @@ authRoutes.post('/login', async (c) => {
     const rehashed = await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?')
       .bind(newHash, row.id, row.password_hash)
       .run();
-    if (Number(rehashed.meta?.changes ?? 0) > 0) checkedHash = newHash;
+    if (Number(rehashed.meta?.changes ?? 0) > 0) {
+      checkedHash = newHash;
+    } else {
+      // Someone else replaced the old hash first — most often a second sign-in
+      // with this same password (two tabs, two devices) whose rehash won. The
+      // password is checked again against what the row holds NOW, and the
+      // session requires that hash: a concurrent rehash of the same password
+      // signs in as before, while a purge (NULL) or a different password set
+      // in between still refuses it.
+      const current = await c.env.DB.prepare('SELECT password_hash FROM users WHERE id = ?')
+        .bind(row.id)
+        .first<{ password_hash: string | null }>();
+      if (
+        current?.password_hash &&
+        current.password_hash !== row.password_hash &&
+        (await verifyPassword(password, current.password_hash))
+      ) {
+        checkedHash = current.password_hash;
+      }
+    }
   }
 
   await createSession(c, row.id, {
