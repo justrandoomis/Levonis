@@ -139,12 +139,15 @@ export interface QuickBuySessionView {
   /** Set once the session became an order (submitted only). */
   order_id: string | null;
   submitted_at?: string | null;
-  /** Why the automatic submission gave up (failed only). */
+  /** Why the automatic submission gave up (a `failed` row left from before DECISIONS row 188). */
   finalize_error?: string | null;
+  /** Why a cancelled session closed; `not_submitted` = the system gave up on it and refunded it. */
+  cancel_reason?: string | null;
   rev: number;
 }
 
-/** The last session that ended — submitted or failed, within a day — with its order when there is one. */
+/** The last session that ended within a day — submitted, or cancelled because
+ *  it could not be submitted — with its order when there is one. */
 export type QuickBuyRecent = QuickBuySessionView & {
   order?: { id: string; status: string; total_iqd: number } | null;
 };

@@ -110,7 +110,8 @@ export interface QuickBuyStrings {
   deliveryMethod: string;
   standard: string;
   locked: string;
-  /** The one line a session the server could not submit leaves on «طلباتي». */
+  /** The one line a session the server could not submit — and so cancelled
+   *  and refunded by itself (DECISIONS row 188) — leaves on «طلباتي». */
   failedNotice: string;
   refresh: string;
   submittedTitle: string;
@@ -240,7 +241,7 @@ export const QUICK_BUY_STRINGS: Record<QuickBuyLang, QuickBuyStrings> = {
     deliveryMethod: 'طريقة التوصيل',
     standard: 'توصيل عادي',
     locked: 'انتهى وقت التجميع — يجري إرسال طلبك…',
-    failedNotice: 'تعذّر إرسال طلب الشراء السريع تلقائيًا — المبلغ ما زال محجوزًا لك ويتابعه فريقنا.',
+    failedNotice: 'تعذّر إرسال طلب الشراء السريع تلقائيًا، فأُلغي ولم يُخصم منك شيء — عاد المبلغ المحجوز كاملًا إلى محفظتك.',
     refresh: 'تحديث',
     submittedTitle: 'تم إرسال طلب الشراء السريع',
     submittedBody: (id) => `رقم الطلب ${id}`,
@@ -360,7 +361,7 @@ export const QUICK_BUY_STRINGS: Record<QuickBuyLang, QuickBuyStrings> = {
     deliveryMethod: 'Delivery',
     standard: 'Standard delivery',
     locked: 'Time’s up — sending your order…',
-    failedNotice: 'Your Quick Buy order couldn’t be sent automatically — the amount is still held for you, and our team is on it.',
+    failedNotice: 'Your Quick Buy order couldn’t be sent automatically, so it was cancelled and nothing was charged — the full held amount is back in your wallet.',
     refresh: 'Refresh',
     submittedTitle: 'Quick Buy order sent',
     submittedBody: (id) => `Order ${id}`,
@@ -480,7 +481,7 @@ export const QUICK_BUY_STRINGS: Record<QuickBuyLang, QuickBuyStrings> = {
     deliveryMethod: 'شێوازی گەیاندن',
     standard: 'گەیاندنی ئاسایی',
     locked: 'کات تەواو بوو — داواکارییەکەت دەنێردرێت…',
-    failedNotice: 'نەتوانرا داواکاری کڕینی خێرا خۆکارانە بنێردرێت — بڕەکە هێشتا بۆت گیراوە و تیمەکەمان بەدواداچوونی بۆ دەکات.',
+    failedNotice: 'نەتوانرا داواکاری کڕینی خێرا خۆکارانە بنێردرێت، بۆیە هەڵوەشێنرایەوە و هیچ پارەیەکت لێ نەبڕدرا — هەموو بڕی گیراو گەڕایەوە بۆ جزدانەکەت.',
     refresh: 'نوێکردنەوە',
     submittedTitle: 'داواکاری کڕینی خێرا نێردرا',
     submittedBody: (id) => `ژمارەی داواکاری ${id}`,

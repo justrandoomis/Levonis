@@ -23,6 +23,14 @@
  * It runs from the per-minute cron (the browser may be closed, §13) and lazily
  * from any Quick Buy request that finds an expired session. A lease keeps two
  * finalisers apart; the order key keeps even a lost lease harmless.
+ *
+ * NO ADMINISTRATOR IN THE LOOP (owner, 2026-10-08, DECISIONS row 188). A
+ * session the order door refuses on every attempt (a product withdrawn in the
+ * window, a final total above the hold, a long outage) is not parked for a
+ * person to retry: after its last attempt it is CANCELLED with reason
+ * `not_submitted` — the hold released, the units back on the shelf, no order —
+ * and the customer is told the whole amount is back in their wallet. A
+ * session parked `failed` by an earlier release is swept the same way.
  */
 import { Hono, type Context } from 'hono';
 import type { AppContext, Env, SessionUser } from '../types';
@@ -32,6 +40,7 @@ import { planInventory } from '../inventory';
 import { notify } from '../notifications';
 import { assertHoldStateStatement, releaseHoldStatement } from '../walletOps';
 import { auditStatements } from '../audit';
+import { changedExactlyOne } from '../gifts/fence';
 import { placeOrder, type QuickBuyOrderHooks } from '../../routes/orders';
 import {
   parseJson,
@@ -49,10 +58,14 @@ export type FinalizeOutcome =
   | { status: 'skipped' }
   | { status: 'cancelled' }
   | { status: 'retry'; code: string }
-  | { status: 'failed'; code: string };
+  /** Given up after the last attempt: cancelled, the hold and the units released, the customer told. */
+  | { status: 'not_submitted'; code: string };
+
+/** `cancel_reason` of a session the system could not submit and cancelled by itself. */
+export const QUICK_BUY_NOT_SUBMITTED = 'not_submitted';
 
 export interface FinalizeRunner {
-  /** A live request context (lazy finalisation, admin retry). */
+  /** A live request context (lazy finalisation). */
   c?: Context<AppContext>;
   /** The cron's execution context, when there is no request. */
   ctx?: ExecutionContext;
@@ -112,12 +125,19 @@ async function runOrderDoor(
 }
 
 /** Free everything a session holds and close it. Used when nothing is left to
- *  order and when an administrator cancels a session that could not be submitted. */
+ *  order and when the system gives up on a session it could not submit. */
 export async function releaseSession(
   db: D1Database,
   session: QuickBuySessionRow,
   items: readonly QuickBuyItemRow[],
-  opts: { state: 'cancelled'; reason: string; actorId: string; fromStates: Array<QuickBuySessionRow['state']> }
+  opts: {
+    state: 'cancelled';
+    reason: string;
+    actorId: string;
+    fromStates: Array<QuickBuySessionRow['state']>;
+    /** Rows that must land with the release or not at all (the `fail` event of a give-up). */
+    extra?: D1PreparedStatement[];
+  }
 ): Promise<boolean> {
   const moves = items
     .filter((it) => it.reserved_qty > 0)
@@ -136,6 +156,12 @@ export async function releaseSession(
           WHERE id = ? AND rev = ? AND state IN (${placeholders})`
       )
       .bind(opts.state, opts.reason, session.id, session.rev, ...opts.fromStates),
+    // THIS batch moved the session — not one that closed it first. Without it a
+    // second release of the same `rev` (two cron ticks racing) found the state
+    // already `cancelled`, passed the fence below and wrote a second `release`
+    // and `cancel` into the money trail (the stock ledger's keys and the hold's
+    // own state kept the units and the money themselves from moving twice).
+    ...changedExactlyOne(db),
     ...fence(db, '(SELECT state FROM quick_buy_sessions WHERE id = ?) = ?', [session.id, opts.state]),
     db.prepare(`UPDATE quick_buy_items SET reserved_qty = 0, updated_at = ${SQL_NOW} WHERE session_id = ?`).bind(session.id),
     ...(plan ? [...plan.statements, ...planFence(db, plan)] : []),
@@ -156,13 +182,69 @@ export async function releaseSession(
       })
     );
   }
-  stmts.push(eventStatement(db, { session_id: session.id, user_id: session.user_id, kind: 'cancel', detail: { reason: opts.reason, by: opts.actorId } }));
+  stmts.push(
+    ...(opts.extra ?? []),
+    eventStatement(db, { session_id: session.id, user_id: session.user_id, kind: 'cancel', detail: { reason: opts.reason, by: opts.actorId } })
+  );
   try {
     await db.batch(stmts);
     return true;
   } catch {
     return false;
   }
+}
+
+/** The code a stored `finalize_error` («CODE: message») starts with. */
+const codeOf = (finalizeError: string | null) => (finalizeError ?? '').split(':')[0].trim() || 'QUICK_BUY_NOT_SUBMITTED';
+
+/**
+ * GIVE UP ON A SESSION THE SYSTEM COULD NOT SUBMIT — the step an administrator
+ * used to take from the Quick Buy tab, now automatic (DECISIONS row 188).
+ * One batch: the session closes `cancelled` / `not_submitted`, the wallet hold
+ * is released and asserted, every reserved unit goes back, and the trail
+ * records `fail` (when it has not already), `release` and `cancel`. Then the
+ * customer's bell says so in Arabic, English and Sorani — once per session.
+ *
+ * Fenced on the session's `rev` and state, so two ticks (or a tick and a
+ * request) cannot both release it; the loser returns false and changes nothing.
+ */
+async function giveUp(
+  db: D1Database,
+  session: QuickBuySessionRow,
+  code: string,
+  from: 'open' | 'failed'
+): Promise<boolean> {
+  const items = await liveItems(db, session.id);
+  const ok = await releaseSession(db, session, items, {
+    state: 'cancelled',
+    reason: QUICK_BUY_NOT_SUBMITTED,
+    actorId: session.user_id,
+    fromStates: [from],
+    // A `failed` row wrote its `fail` event when it was parked.
+    extra: from === 'open' ? [eventStatement(db, { session_id: session.id, user_id: session.user_id, kind: 'fail', detail: { code } })] : [],
+  });
+  if (!ok) return false;
+  await notify(db, {
+    userId: session.user_id,
+    kind: 'quick_buy_failed',
+    title_ar: 'أُلغي طلب الشراء السريع وعاد المبلغ إلى محفظتك',
+    title_en: 'Your Quick Buy order was cancelled and the amount is back in your wallet',
+    body_ar:
+      'تعذّر إرسال طلب الشراء السريع تلقائياً، فأُلغي ولم يُخصم منك شيء. عاد المبلغ المحجوز كاملاً إلى رصيدك المتاح، ويمكنك الشراء من جديد متى شئت.',
+    body_en:
+      'Your Quick Buy order could not be submitted automatically, so it was cancelled and nothing was charged. The full held amount is back in your available balance — you can buy again any time.',
+    link: '/wallet',
+    // The order id reserved when the session opened; no order row ever carries it.
+    entity_type: 'order',
+    entity_id: session.order_id,
+    meta: {
+      title_ckb: 'داواکاریی کڕینی خێرا هەڵوەشێنرایەوە و بڕەکە گەڕایەوە بۆ جزدانەکەت',
+      body_ckb:
+        'نەتوانرا داواکاریی کڕینی خێراکەت بە خۆکاری بنێردرێت، بۆیە هەڵوەشێنرایەوە و هیچ پارەیەکت لێ نەبڕدرا. هەموو بڕە گیراوەکە گەڕایەوە بۆ باڵانسی بەردەستت و دەتوانیت هەر کاتێک بتەوێت دووبارە بکڕیت.',
+    },
+    eventKey: `quick_buy_not_submitted:${session.id}`,
+  });
+  return true;
 }
 
 /**
@@ -184,6 +266,12 @@ export async function finalizeQuickBuySession(env: Env, runner: FinalizeRunner, 
   if (!claim.meta.changes) return { status: 'skipped' };
   const session = await loadSession(db, sessionId);
   if (!session || session.state !== 'open') return { status: 'skipped' };
+  // Past its last attempt: the give-up below did not land last time (the
+  // session moved, or the batch failed). Straight back to it — no new order
+  // attempt days later that the customer did not decide on.
+  if (session.finalize_attempts > QUICK_BUY_FINALIZE_MAX_ATTEMPTS) {
+    return settleGiveUp(db, session, codeOf(session.finalize_error));
+  }
   const [user, items] = await Promise.all([
     db.prepare('SELECT * FROM users WHERE id = ?').bind(session.user_id).first<SessionUser>(),
     liveItems(db, session.id),
@@ -283,7 +371,8 @@ export async function finalizeQuickBuySession(env: Env, runner: FinalizeRunner, 
       // The locks above keep every unit price and the delivery fee at or under
       // what was quoted; this is the last line for anything they cannot see
       // (a membership discount that lapsed in the window). Never charge more
-      // than the hold — the session waits for an administrator instead.
+      // than the hold — the session is retried, and after its last attempt
+      // cancelled with the whole hold returned (DECISIONS row 188).
       if (comp.totalIqd > session.held_iqd || comp.walletUsdCents > session.held_cents) {
         throw new HttpError(
           409,
@@ -330,38 +419,61 @@ export async function finalizeQuickBuySession(env: Env, runner: FinalizeRunner, 
   const code = result.ok ? 'QUICK_BUY_NOT_SUBMITTED' : result.code;
   // `session` was read AFTER the claim, so its count already includes this attempt.
   const terminal = session.finalize_attempts >= QUICK_BUY_FINALIZE_MAX_ATTEMPTS;
+  // The lease is kept through a give-up, so no other finaliser starts an order
+  // attempt while the release is being written.
   await db
     .prepare(
       `UPDATE quick_buy_sessions
-          SET lease_until = NULL, finalize_error = ?, state = CASE WHEN ? = 1 THEN 'failed' ELSE state END, updated_at = ${SQL_NOW}
+          SET finalize_error = ?, lease_until = CASE WHEN ? = 1 THEN lease_until ELSE NULL END, updated_at = ${SQL_NOW}
         WHERE id = ? AND state = 'open'`
     )
     .bind(`${code}${result.ok ? '' : `: ${result.message}`}`.slice(0, 500), terminal ? 1 : 0, session.id)
     .run();
-  if (terminal) {
-    await db.batch([eventStatement(db, { session_id: session.id, user_id: session.user_id, kind: 'fail', detail: { code } })]).catch(() => undefined);
-    await notify(db, {
-      userId: session.user_id,
-      kind: 'quick_buy_failed',
-      title_ar: 'تعذّر إرسال طلب الشراء السريع تلقائياً',
-      title_en: 'Your Quick Buy order could not be submitted automatically',
-      body_ar: 'المبلغ ما زال محجوزاً لطلبك ولم يُخصم، وسيراجعه فريق Levonis ويتواصل معك.',
-      body_en: 'The amount is still held for your order and was not charged; the Levonis team will review it and contact you.',
-      link: '/orders',
-      entity_type: 'order',
-      entity_id: session.order_id,
-      meta: {
-        title_ckb: 'نەتوانرا داواکاریی کڕینی خێرا بە خۆکاری بنێردرێت',
-        body_ckb: 'بڕەکە هێشتا بۆ داواکارییەکەت گیراوە و نەبڕدراوە؛ تیمی Levonis پێداچوونەوەی بۆ دەکات و پەیوەندیت پێوە دەکات.',
-      },
-      eventKey: `quick_buy_failed:${session.id}`,
-    });
-    return { status: 'failed', code };
-  }
+  if (!terminal) return { status: 'retry', code };
+  return settleGiveUp(db, session, code);
+}
+
+/** The give-up of an OPEN session after its last attempt; when it cannot land,
+ *  the lease is cleared and the next tick comes straight back to it. */
+async function settleGiveUp(db: D1Database, session: QuickBuySessionRow, code: string): Promise<FinalizeOutcome> {
+  if (await giveUp(db, session, code, 'open')) return { status: 'not_submitted', code };
+  await db
+    .prepare(`UPDATE quick_buy_sessions SET lease_until = NULL, updated_at = ${SQL_NOW} WHERE id = ? AND state = 'open'`)
+    .bind(session.id)
+    .run();
   return { status: 'retry', code };
 }
 
-/** The cron's half of D13: every session whose time has run out, oldest first, bounded. */
+/**
+ * A session parked `failed` before DECISIONS row 188 (when an administrator
+ * was meant to retry or cancel it) still holds its money and its units. The
+ * cron gives it up exactly like a session that reaches its last attempt now:
+ * cancelled, everything released, the customer told. A straight refund, not
+ * one more try — an order charged days later is not what the customer chose.
+ */
+async function releaseParkedSessions(db: D1Database, limit: number): Promise<FinalizeOutcome[]> {
+  let parked: QuickBuySessionRow[] = [];
+  try {
+    const { results } = await db
+      .prepare(`SELECT * FROM quick_buy_sessions WHERE state = 'failed' ORDER BY updated_at, id LIMIT ?`)
+      .bind(limit)
+      .all<QuickBuySessionRow>();
+    parked = results ?? [];
+  } catch (e) {
+    if (/no such table/i.test(e instanceof Error ? e.message : String(e))) return [];
+    throw e;
+  }
+  const out: FinalizeOutcome[] = [];
+  for (const s of parked) {
+    const code = codeOf(s.finalize_error);
+    const ok = await giveUp(db, s, code, 'failed').catch(() => false);
+    out.push(ok ? { status: 'not_submitted', code } : { status: 'retry', code });
+  }
+  return out;
+}
+
+/** The cron's half of D13: every session whose time has run out, oldest first,
+ *  bounded — then, as bounded, any session still parked `failed` (row 188). */
 export async function finalizeDueQuickBuySessions(env: Env, ctx: ExecutionContext, limit = 10): Promise<FinalizeOutcome[]> {
   let due: Array<{ id: string }> = [];
   try {
@@ -382,5 +494,6 @@ export async function finalizeDueQuickBuySessions(env: Env, ctx: ExecutionContex
   for (const s of due) {
     out.push(await finalizeQuickBuySession(env, { ctx }, s.id).catch((e) => ({ status: 'retry' as const, code: String(e).slice(0, 120) })));
   }
+  out.push(...(await releaseParkedSessions(env.DB, limit)));
   return out;
 }

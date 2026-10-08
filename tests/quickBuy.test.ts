@@ -14,10 +14,12 @@ import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, post, patch, put, get, send, json, row, all, count, spendable } from './fixtures/app';
 import { orderRoutes } from '../worker/routes/orders';
 import { notificationRoutes } from '../worker/routes/notifications';
-import { quickBuyRoutes, quickBuyAdminRoutes } from '../worker/routes/quickBuy';
+import { quickBuyRoutes } from '../worker/routes/quickBuy';
 import { adminRoutes } from '../worker/routes/admin';
 import { QUICK_BUY_POLICY_KEYS, requiredPolicies } from '../worker/lib/policyOps';
-import { finalizeDueQuickBuySessions } from '../worker/lib/quickBuy/finalize';
+import { finalizeDueQuickBuySessions, releaseSession } from '../worker/lib/quickBuy/finalize';
+import { liveItems, sessionView } from '../worker/lib/quickBuy/session';
+import { QUICK_BUY_FINALIZE_MAX_ATTEMPTS, type QuickBuySessionRow } from '../worker/lib/quickBuy/model';
 import type { Env } from '../worker/lib/types';
 
 const RATE = 1400;
@@ -56,7 +58,6 @@ const mount = (a: Parameters<Parameters<typeof stubApp>[2]>[0]) => {
   a.route('/api/quick-buy', quickBuyRoutes);
   a.route('/api/orders', orderRoutes);
   a.route('/api/notifications', notificationRoutes);
-  a.route('/api/admin/quick-buy', quickBuyAdminRoutes);
   a.route('/api/admin', adminRoutes);
 };
 const as = (raw: DatabaseSync, id = 'buyer', role: 'customer' | 'admin' = 'customer') =>
@@ -93,10 +94,10 @@ const expire = (raw: DatabaseSync, user = 'buyer') =>
   raw
     .prepare(`UPDATE quick_buy_sessions SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 second') WHERE user_id = ? AND state = 'open'`)
     .run(user);
-const cron = (raw: DatabaseSync) => {
+const cron = (raw: DatabaseSync, db: unknown = asD1(raw)) => {
   const waited: Promise<unknown>[] = [];
   const ctx = { waitUntil: (p: Promise<unknown>) => { waited.push(p.catch(() => undefined)); }, passThroughOnException() {} } as unknown as ExecutionContext;
-  return finalizeDueQuickBuySessions({ DB: asD1(raw) } as Env, ctx).then(async (out) => {
+  return finalizeDueQuickBuySessions({ DB: db } as Env, ctx).then(async (out) => {
     await Promise.all(waited);
     return out;
   });
@@ -256,8 +257,7 @@ test('§13: after 00:00 the order is ordinary — listed like any order, cancell
   assert.equal(session(raw).state, 'submitted', 'the Quick Buy session is history; Orders did the cancel');
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM quick_buy_events WHERE session_id = ?', s.id), events);
   assertMoneyAgrees(raw);
-  const summary = await json(await get(as(raw, 'boss', 'admin'), '/api/admin/quick-buy/summary'));
-  assert.equal(summary.refunded.n, 1, 'reports show the refund against Quick Buy');
+  assert.equal(row<Row>(raw, 'SELECT order_kind FROM orders WHERE id = ?', s.order_id)!.order_kind, 'quick_buy', 'reports still read the refund against Quick Buy (order_kind)');
 
   // A new purchase is a new session and a new order; once the admin confirms, the normal rule applies.
   assert.equal((await json(await add(raw, 'p_pla', 1))).success, true);
@@ -293,9 +293,9 @@ test('a product in an open Quick Buy order cannot be deleted under it; once subm
   assert.equal(deleted.status, 200, JSON.stringify(await json(deleted.clone())));
   assert.equal(row(raw, `SELECT id FROM products WHERE id = 'p_pla'`), undefined);
   // The closed session is history: its line and snapshot stay readable.
-  const view = await json(await get(admin, `/api/admin/quick-buy/sessions/${s.id}`));
-  assert.equal(view.session.items.length, 1);
-  assert.match(view.session.items[0].name, /PLA/);
+  const view = await sessionView(asD1(raw) as unknown as D1Database, row<QuickBuySessionRow>(raw, 'SELECT * FROM quick_buy_sessions WHERE id = ?', s.id)!);
+  assert.equal(view.items.length, 1);
+  assert.match(view.items[0].name, /PLA/);
 });
 
 // ═══════════════════════════════════════════════════════ the races (§19)
@@ -459,13 +459,12 @@ test('a re-consent is required after a policy version moves, and direct sale onl
   assert.equal((await json(bundle)).code, 'QUICK_BUY_DIRECT_ONLY');
 });
 
-test('two finalisers at once make one order; the admin sees open sessions read-only until then', async () => {
+test('two finalisers at once make one order; nothing reaches the admin before the 30 minutes end', async () => {
   const raw = world();
   await activate(raw);
   await json(await add(raw, 'p_pla', 1));
   const admin = as(raw, 'boss', 'admin');
-  const open = await json(await get(admin, '/api/admin/quick-buy/sessions?state=open'));
-  assert.equal(open.sessions.length, 1);
+  assert.equal((await json(await get(admin, '/api/admin/orders?scope=all'))).orders.length, 0, 'the board is empty while the session collects');
   assert.equal(count(raw, `SELECT COUNT(*) n FROM orders`), 0, 'nothing reaches the order queue before the 30 minutes end');
   expire(raw);
   await Promise.all([cron(raw), cron(raw), get(as(raw), '/api/quick-buy/session')]);
@@ -474,63 +473,189 @@ test('two finalisers at once make one order; the admin sees open sessions read-o
   assertMoneyAgrees(raw);
 });
 
-test('a session that cannot be submitted keeps its money held, fails after its retries, and the admin cancels or retries it', async () => {
+test('DECISIONS row 188: a session the system cannot submit is cancelled after its last attempt — hold released, units back, wallet whole, the customer told in three languages, no order and no admin step', async () => {
   const raw = world();
   const before = spendable(raw, 'buyer');
   await activate(raw);
+  const profileBefore = row<Row>(raw, `SELECT * FROM quick_buy_profiles WHERE user_id = 'buyer'`)!;
   await json(await add(raw, 'p_pla', 2));
+  assert.equal(reserved(raw, 'p_pla').stock_reserved, 2);
   // The product is withdrawn mid-session: the order door refuses it every time.
   raw.exec(`UPDATE products SET status = 'draft' WHERE id = 'p_pla'`);
   expire(raw);
-  for (let i = 0; i < 10; i++) {
-    await cron(raw);
+  for (let i = 1; i < QUICK_BUY_FINALIZE_MAX_ATTEMPTS; i++) {
+    const [outcome] = await cron(raw);
+    assert.equal(outcome.status, 'retry', `attempt ${i} is retried`);
+    raw.exec(`UPDATE quick_buy_sessions SET lease_until = NULL WHERE user_id = 'buyer'`);
+    assert.equal(session(raw).state, 'open', 'the money stays held while attempts remain');
+    assert.equal(activeHolds(raw).length, 1);
+  }
+  const [last] = await cron(raw);
+  assert.equal(last.status, 'not_submitted', JSON.stringify(last));
+
+  const s = session(raw);
+  assert.equal(s.state, 'cancelled', 'never parked `failed` for an administrator');
+  assert.equal(s.cancel_reason, 'not_submitted');
+  assert.equal(s.finalize_attempts, QUICK_BUY_FINALIZE_MAX_ATTEMPTS);
+  assert.equal(s.lease_until, null);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM quick_buy_sessions WHERE state = 'failed'`), 0);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM orders`), 0, 'no order exists');
+  assertMoneyAgrees(raw);
+  assert.equal(activeHolds(raw).length, 0, 'the hold is released');
+  assert.equal(spendable(raw, 'buyer'), before, 'the wallet is whole again');
+  assert.equal(reserved(raw, 'p_pla').stock_reserved, 0, 'every reserved unit is back on the shelf');
+  assert.equal(count(raw, `SELECT COALESCE(SUM(reserved_qty),0) n FROM quick_buy_items WHERE session_id = ?`, s.id), 0);
+  const trail = all<{ kind: string }>(raw, `SELECT kind FROM quick_buy_events WHERE session_id = ? ORDER BY created_at, rowid`, s.id).map((e) => e.kind);
+  for (const k of ['fail', 'release', 'cancel']) assert.ok(trail.includes(k), `the trail records ${k}: ${trail.join(',')}`);
+  assert.equal(trail.filter((k) => k === 'fail').length, 1);
+
+  // The customer is told once, in Arabic, English and Sorani — and not that a team will call.
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM user_notifications WHERE user_id = 'buyer' AND kind = 'quick_buy_failed'`), 1);
+  const notice = (await json(await get(as(raw), '/api/notifications'))).notifications.find((n: Row) => n.kind === 'quick_buy_failed');
+  assert.match(notice.title_ar, /أُلغي/);
+  assert.match(notice.body_ar, /عاد المبلغ المحجوز كاملاً/);
+  assert.match(notice.body_en, /back in your available balance/);
+  assert.ok(notice.title_ckb && notice.body_ckb, 'the notice has its Sorani');
+  assert.match(notice.body_ckb, /هەڵوەشێنرایەوە/);
+  assert.notEqual(notice.body_ckb, notice.body_ar, 'the Sorani is not a copy of the Arabic');
+  assert.notEqual(notice.title_ckb, notice.title_ar);
+  for (const text of [notice.body_ar, notice.body_en, notice.body_ckb]) assert.ok(!/فريق|team|تیم/.test(text), `no promise of a person stepping in: ${text}`);
+  assert.equal(notice.link, '/wallet');
+
+  // «طلباتي» says it once, from the session view; the money is no longer shown as held.
+  const mine = await json(await get(as(raw), '/api/quick-buy/session'));
+  assert.equal(mine.session, null);
+  assert.equal(mine.recent?.state, 'cancelled');
+  assert.equal(mine.recent.cancel_reason, 'not_submitted');
+  assert.equal(mine.recent.held_iqd, 0);
+
+  // The customer's own Quick Buy settings are untouched, and a later tick changes nothing.
+  assert.deepEqual(row<Row>(raw, `SELECT * FROM quick_buy_profiles WHERE user_id = 'buyer'`), profileBefore);
+  await cron(raw);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM user_notifications WHERE user_id = 'buyer' AND kind = 'quick_buy_failed'`), 1);
+  assert.equal(spendable(raw, 'buyer'), before);
+  assert.equal(reserved(raw, 'p_pla').stock_reserved, 0);
+
+  // A new purchase works as before: Quick Buy is still on.
+  raw.exec(`UPDATE products SET status = 'active' WHERE id = 'p_pla'`);
+  assert.equal((await json(await add(raw, 'p_pla', 1))).success, true);
+  assertMoneyAgrees(raw);
+});
+
+test('DECISIONS row 188: a give-up that cannot land leaves the session open and lease-free; the next tick goes straight back to the release, never to a late order', async () => {
+  const raw = world();
+  const before = spendable(raw, 'buyer');
+  await activate(raw);
+  await json(await add(raw, 'p_pla', 1));
+  raw.exec(`UPDATE products SET status = 'draft' WHERE id = 'p_pla'`);
+  expire(raw);
+  // The last attempt's release loses a race: something moves the session's rev just before its batch.
+  const db = asD1(raw) as unknown as { batch: (s: unknown[]) => Promise<unknown> };
+  const realBatch = db.batch.bind(db);
+  let sabotage = false;
+  db.batch = async (stmts: unknown[]) => {
+    if (sabotage) {
+      sabotage = false;
+      raw.exec(`UPDATE quick_buy_sessions SET rev = rev + 1 WHERE user_id = 'buyer' AND state = 'open'`);
+    }
+    return realBatch(stmts);
+  };
+  for (let i = 1; i < QUICK_BUY_FINALIZE_MAX_ATTEMPTS; i++) {
+    await cron(raw, db);
     raw.exec(`UPDATE quick_buy_sessions SET lease_until = NULL WHERE user_id = 'buyer'`);
   }
-  const failed = session(raw);
-  assert.equal(failed.state, 'failed');
-  assert.equal(failed.finalize_attempts, 10);
-  assert.equal(count(raw, `SELECT COUNT(*) n FROM orders`), 0);
-  assert.equal(activeHolds(raw).length, 1, 'the money is still held, never lost and never taken');
-  assert.equal(reserved(raw, 'p_pla').stock_reserved, 2);
-  assert.equal(count(raw, `SELECT COUNT(*) n FROM user_notifications WHERE user_id = 'buyer' AND kind = 'quick_buy_failed'`), 1);
-  const failNotice = (await json(await get(as(raw), '/api/notifications'))).notifications.find((n: Row) => n.kind === 'quick_buy_failed');
-  assert.ok(failNotice.title_ckb && failNotice.body_ckb, 'the failure notice has its Sorani too');
-  const mine = await json(await get(as(raw), '/api/quick-buy/session'));
-  assert.equal(mine.recent?.state, 'failed');
-  assert.equal(mine.recent.held_iqd, 50_000, 'the customer sees the money as still held');
+  sabotage = true;
+  const [lost] = await cron(raw, db);
+  assert.equal(lost.status, 'retry', JSON.stringify(lost));
+  let s = session(raw);
+  assert.equal(s.state, 'open');
+  assert.equal(s.lease_until, null, 'the lease is cleared for the next tick');
+  assert.equal(activeHolds(raw).length, 1, 'nothing half-released');
+  assert.equal(reserved(raw, 'p_pla').stock_reserved, 1);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM user_notifications WHERE kind = 'quick_buy_failed'`), 0, 'no notice for a release that did not happen');
 
-  const admin = as(raw, 'boss', 'admin');
-  const listed = await json(await get(admin, '/api/admin/quick-buy/sessions?state=failed'));
-  assert.equal(listed.sessions.length, 1);
-  const summary = await json(await get(admin, '/api/admin/quick-buy/summary'));
-  assert.equal(summary.held_now.iqd, 50_000, 'held, and reported as held — not as revenue');
-  assert.equal(summary.captured.iqd, 0);
-
-  // Product back on sale: the admin's retry submits it as the ordinary order.
+  // The product is back on sale — and still no order: the session is past its last attempt.
   raw.exec(`UPDATE products SET status = 'active' WHERE id = 'p_pla'`);
-  const retried = await json(await post(admin, `/api/admin/quick-buy/sessions/${failed.id}/retry`, {}));
-  assert.equal(retried.outcome.status, 'submitted', JSON.stringify(retried));
-  assertMoneyAgrees(raw);
-  const after = await json(await get(admin, '/api/admin/quick-buy/summary'));
-  assert.equal(after.held_now.iqd, 0);
-  assert.equal(after.captured.iqd, 50_000);
-  assert.ok(after.orders_by_kind.some((k: { kind: string; n: number }) => k.kind === 'quick_buy' && k.n === 1));
+  const [settled] = await cron(raw, db);
+  assert.equal(settled.status, 'not_submitted', JSON.stringify(settled));
+  s = session(raw);
+  assert.equal(s.state, 'cancelled');
+  assert.equal(s.cancel_reason, 'not_submitted');
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM orders`), 0, 'no order days later that the customer did not decide on');
+  assert.equal(spendable(raw, 'buyer'), before);
+  assert.equal(reserved(raw, 'p_pla').stock_reserved, 0);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM quick_buy_events WHERE session_id = ? AND kind = 'fail'`, s.id), 1);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM user_notifications WHERE kind = 'quick_buy_failed'`), 1);
+});
 
-  // A second customer's failed session is cancelled instead: everything comes back.
+test('DECISIONS row 188: a session parked `failed` by the earlier release is cancelled and refunded on the next tick, told under a key of its own, exactly once', async () => {
+  const raw = world();
+  await activate(raw);
   await activate(raw, 'other', 'addr_o');
   const otherBefore = spendable(raw, 'other');
   await json(await add(raw, 'p_nozzle', 1, {}, 'other'));
-  raw.exec(`UPDATE quick_buy_sessions SET state = 'failed', expires_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 second') WHERE user_id = 'other'`);
-  const otherSession = session(raw, 'other');
-  const cancelled = await post(admin, `/api/admin/quick-buy/sessions/${otherSession.id}/cancel`, {});
-  assert.equal(cancelled.status, 200);
-  assert.equal(session(raw, 'other').state, 'cancelled');
+  // As the old code left it: `failed`, money held, units reserved, the old notice already sent.
+  raw.exec(`UPDATE quick_buy_sessions
+               SET state = 'failed', finalize_attempts = 10, lease_until = NULL,
+                   finalize_error = 'VALIDATION: product unavailable',
+                   expires_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 days')
+             WHERE user_id = 'other'`);
+  const parked = session(raw, 'other');
+  raw.exec(`INSERT INTO user_notifications (id, user_id, kind, title_ar, title_en, link, event_key)
+            VALUES ('ntf_old', 'other', 'quick_buy_failed', 'قديم', 'old', '/orders', 'quick_buy_failed:${parked.id}')`);
+  assert.equal(activeHolds(raw, 'other').length, 1);
+  assert.equal(reserved(raw, 'p_nozzle').stock_reserved, 1);
+
+  // The buyer's own healthy session ends in the same tick, untouched by the
+  // sweep — and two ticks race for the parked one: exactly one releases it.
+  await json(await add(raw, 'p_pla', 1));
+  expire(raw);
+  const outcomes = (await Promise.all([cron(raw), cron(raw)])).flat();
+  assert.equal(outcomes.filter((o) => o.status === 'not_submitted').length, 1, JSON.stringify(outcomes));
+  assert.equal(outcomes.filter((o) => o.status === 'submitted').length, 1, JSON.stringify(outcomes));
+  assert.equal(session(raw).state, 'submitted');
+
+  const s = session(raw, 'other');
+  assert.equal(s.state, 'cancelled');
+  assert.equal(s.cancel_reason, 'not_submitted');
+  assert.equal(activeHolds(raw, 'other').length, 0);
+  assert.equal(spendable(raw, 'other'), otherBefore, 'the wallet is whole again');
+  assert.equal(reserved(raw, 'p_nozzle').stock_reserved, 0);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM orders WHERE user_id = 'other'`), 0);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM quick_buy_events WHERE session_id = ? AND kind = 'fail'`, s.id), 0, 'its fail was written when it was parked');
+  const notices = all<Row>(raw, `SELECT * FROM user_notifications WHERE user_id = 'other' AND kind = 'quick_buy_failed' ORDER BY created_at, id`);
+  assert.equal(notices.length, 2, 'the old «held» notice, then the new «cancelled, money back» one');
+  const fresh = notices.find((n) => n.event_key === `quick_buy_not_submitted:${s.id}`)!;
+  assert.ok(fresh, JSON.stringify(notices));
+  assert.match(JSON.parse(fresh.meta).body_ckb, /گەڕایەوە/);
+
+  // Two more ticks (or two at once): nothing moves twice.
+  await Promise.all([cron(raw), cron(raw)]);
   assert.equal(spendable(raw, 'other'), otherBefore);
   assert.equal(reserved(raw, 'p_nozzle').stock_reserved, 0);
-  assert.ok(spendable(raw, 'buyer') < before);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM user_notifications WHERE user_id = 'other' AND kind = 'quick_buy_failed'`), 2);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM quick_buy_events WHERE session_id = ? AND kind = 'release'`, s.id), 1);
 });
 
-test('the order is never charged above the hold: a higher final total waits for the team instead', async () => {
+test('two releases of the same session (two ticks racing on one read): the second changes nothing — one release in the money trail', async () => {
+  const raw = world();
+  await activate(raw, 'other', 'addr_o');
+  const before = spendable(raw, 'other');
+  await json(await add(raw, 'p_nozzle', 1, {}, 'other'));
+  raw.exec(`UPDATE quick_buy_sessions SET state = 'failed' WHERE user_id = 'other'`);
+  const s = session(raw, 'other') as QuickBuySessionRow;
+  const db = asD1(raw) as unknown as D1Database;
+  const items = await liveItems(db, s.id);
+  const opts = { state: 'cancelled' as const, reason: 'not_submitted', actorId: 'other', fromStates: ['failed' as const] };
+  assert.equal(await releaseSession(db, s, items, opts), true);
+  assert.equal(await releaseSession(db, s, items, opts), false, 'the stale second release is refused whole');
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM quick_buy_events WHERE session_id = ? AND kind = 'release'`, s.id), 1);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM quick_buy_events WHERE session_id = ? AND kind = 'cancel'`, s.id), 1);
+  assert.equal(reserved(raw, 'p_nozzle').stock_reserved, 0);
+  assert.equal(spendable(raw, 'other'), before);
+});
+
+test('the order is never charged above the hold: a higher final total is retried, never captured', async () => {
   const raw = world();
   await activate(raw);
   await json(await add(raw, 'p_pla', 2));

@@ -235,8 +235,9 @@ export async function sessionView(db: D1Database, s: QuickBuySessionRow, nowMs =
       labels: WALLET_FREE_DELIVERY_LABEL,
     },
     total_iqd: s.total_iqd,
-    // What the wallet holds for it NOW: an open session's hold, and a failed
-    // one's too — that money stays held until an admin retries or cancels it.
+    // What the wallet holds for it NOW: an open session's hold, and a `failed`
+    // one's too — a row parked before DECISIONS row 188 keeps its hold until
+    // the next minute's sweep cancels it and returns the money.
     held_iqd: (open || s.state === 'failed') && s.hold_id ? s.held_iqd : 0,
     address: {
       name: pick('name'),
@@ -250,6 +251,8 @@ export async function sessionView(db: D1Database, s: QuickBuySessionRow, nowMs =
     order_id: s.state === 'submitted' ? s.order_id : null,
     submitted_at: s.submitted_at,
     finalize_error: s.state === 'failed' ? s.finalize_error : null,
+    /** Why a cancelled session closed — `not_submitted` when the system gave up on it and refunded it. */
+    cancel_reason: s.state === 'cancelled' ? s.cancel_reason : null,
     rev: s.rev,
   };
 }

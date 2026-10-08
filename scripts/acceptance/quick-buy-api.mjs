@@ -113,11 +113,14 @@ check('stock reserved under the order (printer 1, filament 1)', reservedNow.ever
 const ledger = one(`SELECT COUNT(*) n FROM inventory_ledger WHERE order_id = '${done.order_id}' AND kind = 'reserve'`);
 check('the reservation is the order\'s', Number(ledger.n) === 2, JSON.stringify(ledger));
 
-// 8. The admin sees it in the normal list, labelled.
-r = await call('owner', 'GET', '/api/admin/orders?scope=all&kind=quick_buy');
-check('admin lists it under Quick Buy', (r.data?.orders ?? []).some((o) => o.id === done.order_id), JSON.stringify(r).slice(0, 300));
+// 8. The admin sees it in the normal list, as an ordinary order — and Quick Buy
+//    has no admin surface of its own any more (DECISIONS row 188).
+r = await call('owner', 'GET', '/api/admin/orders?scope=all');
+check('admin lists it with the ordinary orders', (r.data?.orders ?? []).some((o) => o.id === done.order_id), JSON.stringify(r).slice(0, 300));
 r = await call('owner', 'GET', '/api/admin/quick-buy/summary');
-check('admin summary: captured once, released ≥ 1', r.data?.captured?.n === 1 && r.data?.released?.n >= 1, JSON.stringify(r.data));
+check('no admin Quick Buy route', r.status === 404, JSON.stringify(r).slice(0, 200));
+const trail = one(`SELECT SUM(kind = 'capture') captured, SUM(kind = 'release') released FROM quick_buy_events WHERE session_id = '${s1.id}'`);
+check('money trail: captured once, released ≥ 1', Number(trail?.captured) === 1 && Number(trail?.released) >= 1, JSON.stringify(trail));
 
 // 9. The customer: an ordinary order; the bell says so.
 r = await call('sara', 'GET', '/api/orders');

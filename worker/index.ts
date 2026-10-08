@@ -137,8 +137,9 @@ import { adminMysteryRoutes } from './routes/mystery';
 import { adminOffersRoutes } from './routes/offers';
 import { adminCompositionAnalyticsRoutes } from './routes/bundles';
 import { farmRoutes } from './routes/farm';
-// «الشراء السريع» (0176): the customer surface and the read-mostly admin window.
-import { quickBuyRoutes, quickBuyAdminRoutes } from './routes/quickBuy';
+// «الشراء السريع» (0176): the customer surface only — the system runs every
+// session to its order without an administrator (DECISIONS row 188).
+import { quickBuyRoutes } from './routes/quickBuy';
 import { finalizeDueQuickBuySessions } from './lib/quickBuy/finalize';
 import { publicApiRoutes } from './routes/publicApi';
 import { farmAdminRoutes } from './routes/farmAdmin';
@@ -414,9 +415,6 @@ app.route('/api/public/v1', publicApiRoutes);
 app.route('/api/price-reports', priceReportRoutes);
 app.route('/api', miscRoutes);
 app.route('/api/admin', adminRoutes);
-// Under /api/admin/* so the apex-only host guard covers it; its own
-// requireAdmin as well. Nothing in it confirms or ships a session (§14).
-app.route('/api/admin/quick-buy', quickBuyAdminRoutes);
 // The farm's balancing console. Under /api/admin/* on purpose: the apex-only
 // host guard above covers it, and the generic settings PUT refuses its key so
 // this normalising, versioned, audited route is the only way to change it.
@@ -1096,6 +1094,8 @@ export default {
       // «الشراء السريع» (§13): a session whose 30 minutes have ended becomes
       // its order on the next tick even if every browser is closed. Time-
       // critical like the recovery above, and bounded (10 sessions a tick).
+      // The same tick cancels and refunds a session the order door refused on
+      // every attempt — no administrator in the loop (DECISIONS row 188).
       ctx.waitUntil(
         finalizeDueQuickBuySessions(env, ctx).catch((error) => {
           console.error('scheduled quick buy finalisation rejected:', error);

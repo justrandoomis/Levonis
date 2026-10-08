@@ -11,7 +11,8 @@ export const QUICK_BUY_WINDOW_MS = 30 * 60 * 1000;
 export const QUICK_BUY_MAX_LINES = 20;
 export const QUICK_BUY_MAX_QTY = 99;
 /** The cron retries a session that could not be submitted this many times
- *  (once a minute) before it is marked `failed` for an administrator. */
+ *  (once a minute); after the last attempt it is cancelled and everything it
+ *  held is released, with no administrator in the loop (DECISIONS row 188). */
 export const QUICK_BUY_FINALIZE_MAX_ATTEMPTS = 10;
 /** How long one finaliser owns a session before another may take it over. */
 export const QUICK_BUY_LEASE_MS = 2 * 60 * 1000;
@@ -19,6 +20,8 @@ export const QUICK_BUY_LEASE_MS = 2 * 60 * 1000;
 /** The database's own clock, for every in-batch comparison against `expires_at`. */
 export const SQL_NOW = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
 
+/** `failed` is no longer written (DECISIONS row 188); a row left in it from an
+ *  earlier release is cancelled and refunded by the next cron tick. */
 export type QuickBuyState = 'open' | 'submitted' | 'cancelled' | 'failed';
 
 export interface QuickBuySessionRow {

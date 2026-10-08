@@ -44,6 +44,14 @@ import type { QuickBuyProfile, QuickBuyRecent, QuickBuySessionResponse, QuickBuy
 
 export const QUICK_BUY_SESSION_PATH = '/api/quick-buy/session';
 
+/**
+ * A session the server could not turn into its order after every retry. The
+ * system cancels it and releases its hold and units by itself (DECISIONS row
+ * 188 — nobody at Levonis has to act), and «طلباتي» says so in one line.
+ */
+export const isQuickBuyNotSubmitted = (s: Pick<QuickBuySessionView, 'state' | 'cancel_reason'> | null | undefined): boolean =>
+  s?.state === 'cancelled' && s.cancel_reason === 'not_submitted';
+
 /** The signed-in account's id, as `useAuth().user?.id` gives it. */
 export type QuickBuyOwner = string | null | undefined;
 
@@ -54,7 +62,7 @@ export interface QuickBuySnapshot {
   loaded: boolean;
   /** The session as the server last described it; null when none is open. */
   session: QuickBuySessionView | null;
-  /** The last submitted Quick Buy order, while the server still mentions it. */
+  /** The last Quick Buy that ended (its order, or its not-submitted refund), while the server still mentions it. */
   recent: QuickBuyRecent | null;
   /** Server clock minus device clock, from that answer's `server_now`, in ms. */
   offsetMs: number;

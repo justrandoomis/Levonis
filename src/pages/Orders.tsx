@@ -16,7 +16,7 @@ import PendingStoreReviews from '../components/community/reviews/StoreReviews';
 import GiftsEntry from '../components/orders/GiftsEntry';
 import { asLang } from '../components/orders/format';
 import ChunkBoundary from '../components/ChunkBoundary';
-import { refreshQuickBuySession, useQuickBuySnapshot } from '../lib/quickBuyStore';
+import { isQuickBuyNotSubmitted, refreshQuickBuySession, useQuickBuySnapshot } from '../lib/quickBuyStore';
 
 /**
  * «شراء سريع — قيد التجميع» (docs/GIFTS_QUICK_BUY.md §3.5): the open Quick Buy
@@ -352,7 +352,8 @@ export default function Orders() {
   // while it is OPEN (owner spec §13): once submitted it is an ordinary order
   // in the list below. The card stays mounted for the rest of a visit that saw
   // it open, so the one transient line it leaves («تم إرسال …», a toast) can
-  // be said; a session the server could not submit gets one line of its own.
+  // be said; a session the server could not submit — cancelled and refunded
+  // by the system itself (DECISIONS row 188) — gets one line of its own.
   const { user } = useAuth();
   const quickBuyOwner = user?.id ?? null;
   const quickBuy = useQuickBuySnapshot(quickBuyOwner);
@@ -362,7 +363,7 @@ export default function Orders() {
   const openSessionId = quickBuy.session?.state === 'open' ? quickBuy.session.id : null;
   const [sawQuickBuyOpen, setSawQuickBuyOpen] = useState(false);
   if (openSessionId && !sawQuickBuyOpen) setSawQuickBuyOpen(true);
-  const quickBuyShown = !!openSessionId || sawQuickBuyOpen || quickBuy.recent?.state === 'failed';
+  const quickBuyShown = !!openSessionId || sawQuickBuyOpen || isQuickBuyNotSubmitted(quickBuy.recent);
   // When a session that was open on this page becomes an order, the order is
   // real now: the list and the counts are read again so it appears in both.
   const submittedOrder = quickBuy.recent?.state === 'submitted' ? quickBuy.recent.order_id : null;

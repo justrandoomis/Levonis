@@ -84,7 +84,6 @@ export const NB = {
   ORDER_FLOW:
     'order status, stages, delivery and documents; answers the order’s public fields — its cost lines and COGS are read only by the finance routers (classified cost_read)',
   SETTINGS: 'settings documents of the shop (home, ads, farm, warranty, membership rules); cost settings are refused per key (classified in admin.ts PUT /settings/:key)',
-  QUICK_BUY: 'quick-buy session state; answers the session, never a cost',
   REFUSED_FIRST:
     'the handler refuses before it reads the body for every caller the sweep runs (no seeded row in the state it needs); the refusal is walked',
   OWNER_ACT: 'refused to every non-owner before the body is read',

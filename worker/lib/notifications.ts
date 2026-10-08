@@ -170,7 +170,8 @@ export type NotificationKind =
   /**
    * «الشراء السريع» (0176): the 30-minute Quick Buy order became a real order
    * (`quick_buy_submitted`), or could not be submitted after every retry and
-   * waits for an administrator with its money still held (`quick_buy_failed`).
+   * was cancelled with its whole hold returned to the wallet
+   * (`quick_buy_failed`, DECISIONS row 188 — no administrator in the loop).
    */
   | 'quick_buy_submitted'
   | 'quick_buy_failed';

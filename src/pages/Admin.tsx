@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Zap, Gift } from 'lucide-react';
+import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Gift } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supportTotal, useSupportCounts } from '../components/adminSupport/supportCounts';
 import { useAuth } from '../AuthContext';
@@ -95,7 +95,6 @@ const AdminMemberships = React.lazy(() => import('../components/AdminMemberships
  */
 const SupportQueue = React.lazy(() => import('../components/adminSupport/SupportQueue'));
 const PriceReportsPanel = React.lazy(() => import('../components/adminPriceReports/PriceReportsPanel'));
-const AdminQuickBuy = React.lazy(() => import('../components/adminQuickBuy/AdminQuickBuy'));
 // What a PREMIUM or a PRO membership is WORTH at a checkout — the rules of
 // `membership_benefit_rules`, the simulator that prices a basket through the
 // checkout's own functions, and the version history (docs/MEMBERSHIP_BENEFITS.md
@@ -153,7 +152,6 @@ type AdminTab =
   | 'memberships'
   | 'support'
   | 'price_reports'
-  | 'quick_buy'
   | 'membership_benefits'
   | 'coupons'
   | 'delivery'
@@ -224,7 +222,6 @@ export default function Admin() {
   const sidebarItems = [
     { id: 'overview', icon: LayoutDashboard, label: loc('نظرة عامة', 'Overview', 'پێداچوونەوە'), ...section('operations', 'التشغيل', 'Operations', 'بەڕێوەبردن') },
     { id: 'orders', icon: ClipboardList, label: loc('الطلبات', 'Orders', 'داواکارییەکان'), ...section('operations', 'التشغيل', 'Operations') },
-    { id: 'quick_buy', icon: Zap, label: loc('الشراء السريع', 'Quick Buy', 'کڕینی خێرا'), ...section('operations', 'التشغيل', 'Operations') },
     // «الاستبدال (Trade-in)» — under Operations beside the orders it turns
     // into: a request the desk reviews, inspects and values. The Kurdish label
     // is the owner's to write by hand; a Kurdish-reading admin gets the Arabic.
@@ -389,8 +386,6 @@ export default function Admin() {
         )}
 
         {activeTab === 'price_reports' && <PriceReportsPanel />}
-
-        {activeTab === 'quick_buy' && <AdminQuickBuy />}
 
         {activeTab === 'membership_benefits' && <AdminBenefits />}
 

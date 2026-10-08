@@ -41,7 +41,7 @@ import { productRoutes, homeRoutes } from '../../worker/routes/products';
 import { bundlesRoutes, adminCompositionAnalyticsRoutes } from '../../worker/routes/bundles';
 import { cartRoutes } from '../../worker/routes/cart';
 import { orderRoutes } from '../../worker/routes/orders';
-import { quickBuyRoutes, quickBuyAdminRoutes } from '../../worker/routes/quickBuy';
+import { quickBuyRoutes } from '../../worker/routes/quickBuy';
 import { compareRoutes } from '../../worker/routes/compare';
 import { catalogRoutes } from '../../worker/routes/catalog';
 import { printerFinderRoutes } from '../../worker/routes/printerFinder';
@@ -186,7 +186,6 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/public/v1', publicApiRoutes as Router],
   ['/api', miscRoutes as Router],
   ['/api/admin', adminRoutes as Router],
-  ['/api/admin/quick-buy', quickBuyAdminRoutes as Router],
   ['/api/admin/farm', farmAdminRoutes as Router],
   ['/api/print-quote', printQuoteRoutes as Router],
   ['/api/admin/print-quote', adminPrintQuoteRoutes as Router],

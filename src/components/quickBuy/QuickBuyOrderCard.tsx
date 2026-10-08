@@ -30,8 +30,9 @@
  * any other order card, and all this card leaves behind is one transient
  * line — a toast «تم إرسال طلب الشراء السريع» with the way to
  * `/orders/<order_id>` — and only for a customer who watched it close here.
- * A session the server could not submit (`failed`, reported for a day) has no
- * order to show: one line says so, and that its money is still held.
+ * A session the server could not submit is cancelled by the system and its
+ * whole hold returned (DECISIONS row 188); for a day one line says so — there
+ * is no order to show and nothing for anyone at Levonis to do.
  *
  * NAMES are the reader's language (Arabic, Sorani or English, as the view
  * carries all three); the free-delivery line is the server's own label.
@@ -59,6 +60,7 @@ import {
 } from '../../lib/quickBuy';
 import {
   formatQuickBuyClock,
+  isQuickBuyNotSubmitted,
   quickBuyDeadline,
   quickBuyRemainingMs,
   refreshQuickBuySession,
@@ -347,9 +349,9 @@ export default function QuickBuyOrderCard() {
   // ------------------------------------------------- after the window
   if (!session) {
     // Submitted: the order is in the list like any other — nothing more here.
-    // Not submitted (`failed`): no order exists, so one line says what happens.
-    return recent?.state === 'failed' ? (
-      <p role="status" className="lv-alert lv-alert-warning mb-4 text-[13px] leading-relaxed" data-quick-buy-notice="failed">
+    // Not submitted: cancelled and refunded by the system, so one line says so.
+    return isQuickBuyNotSubmitted(recent) ? (
+      <p role="status" className="lv-alert lv-alert-warning mb-4 text-[13px] leading-relaxed" data-quick-buy-notice="not-submitted">
         {t.failedNotice}
       </p>
     ) : null;

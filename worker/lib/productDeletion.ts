@@ -405,15 +405,17 @@ export const BLOCKING_REFS: BlockingRef[] = [
    * A CUSTOMER'S OPEN QUICK BUY ORDER HOLDS THIS PRODUCT (0176): money is held
    * in their wallet and units are reserved for the line. Deleting the product
    * under it would make the finaliser order less than was held, so the delete
-   * waits — at most 30 minutes, the session's window — or, for a session whose
-   * automatic submission failed, until an admin retries or cancels it.
+   * waits — at most 30 minutes, the session's window, plus the few minutes the
+   * system takes to submit it or, when it cannot, to cancel it and release
+   * everything by itself (DECISIONS row 188). A `failed` row left from before
+   * that release still counts until the next minute's sweep releases it.
    */
   {
     table: 'quick_buy_items',
     column: 'product_id',
     code: 'PRODUCT_IN_QUICK_BUY',
     remedy:
-      'A customer\'s open Quick Buy order holds this product. Wait until it is submitted (at most 30 minutes), or retry or cancel a failed one under «الشراء السريع», then delete it.',
+      'A customer\'s open Quick Buy order holds this product. Wait until the system submits it or, if it cannot, cancels it by itself (at most 30 minutes plus a few), then delete it.',
     where: "qty > 0 AND session_id IN (SELECT id FROM quick_buy_sessions WHERE state IN ('open', 'failed'))",
   },
   /**

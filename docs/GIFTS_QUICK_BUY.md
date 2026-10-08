@@ -19,7 +19,7 @@ Survey facts are cited `file:line` against `7e42c987`.
 | D7 | Wallet free delivery waives only the **standard** shipment component. Add-ons (protected delivery) and every other method are untouched. New `waiver_source='wallet'`; PRO/PRIME keep precedence when they also apply. | Brief §2. |
 | D8 | «100% wallet» = payment method `wallet` and no points used (points are a separate instrument). An order whose paid products total is 0 (gift-only) never qualifies. A rule is met when the order contains a line from the rule's catalog subtree **and** the order's paid products subtotal (after product/membership discounts, before coupon and delivery) is ≥ the rule minimum. | Brief: «مجموع المنتجات فيها». |
 | D9 | **Quick Buy is direct sale only** in v1 (no pre-order, bundle, mystery, merchant products), standard delivery only, wallet only, no coupons/points. | One order, one shipping type, nothing to choose at checkout. |
-| D10 | **The Quick Buy order row is created at finalisation.** During the 30 minutes the session (`quick_buy_sessions` + `quick_buy_items`) is the draft; nothing appears in the admin queue (brief §14) and no existing order sweep can touch it. | Every reader of `orders` stays correct by construction. |
+| D10 | **The Quick Buy order row is created at finalisation.** During the 30 minutes the session (`quick_buy_sessions` + `quick_buy_items`) is the draft; nothing appears in the admin queue (brief §14) and no existing order sweep can touch it. **Amended 2026-10-08 (DECISIONS row 188): Quick Buy has no admin surface at all** — no tab, no `/api/admin/quick-buy`, no board badge; a session the order door refuses on every attempt is cancelled by the system with its whole hold and its units released, never parked for an administrator. | Every reader of `orders` stays correct by construction; the owner: «لا حاجة لهذه الإعدادات والتعقيد». |
 | D11 | **One wallet hold per session**, replaced (release old + insert new, one batch) on every change, so the held amount always equals the session total. An append-only `quick_buy_events` log records the **delta** of every hold/release/capture for reports. | `wallet_holds` has no partial release (walletOps.ts 1179). |
 | D12 | Prices are snapshotted per item at add time. At finalisation the customer pays **at most** what is held: shipping = min(recomputed, quoted), order-level membership discount = max(recomputed, quoted). A lower final total captures less and releases the rest. | Brief §20, §19. |
 | D13 | Finalisation runs on the existing per-minute cron (new `waitUntil` beside finance recovery) and lazily on any Quick Buy request that finds an expired open session. Edits are refused **inside the batch** by `expires_at > now`, so the lock is exact even before the cron runs. | No DO/Queue exists (index.ts:1062-1099). |
@@ -146,7 +146,7 @@ Setting `walletFreeDelivery` (admin_settings, validated in `PUT /api/admin/setti
 | DELETE `/items/:id` | `{idempotencyKey}` | `{session}` | — |
 | POST `/session/cancel` | `{idempotencyKey}` | `{session:null}` | — |
 
-Admin (`/api/admin/quick-buy`): `GET /sessions?state=open|failed|submitted` (read-only), `POST /sessions/:id/retry`, `POST /sessions/:id/cancel` (failed only). Nothing confirms, prepares or ships a session.
+Admin: **none** (removed 2026-10-08, DECISIONS row 188). The admin meets a Quick Buy only as the ordinary order it becomes; nothing confirms, prepares, ships, retries or cancels a session by hand.
 
 `SessionView` = `{id, state, started_at, expires_at, remaining_ms, server_now, items:[{id, product_id, name, image, option_label, color_label, sku, qty, unit_price_iqd, line_total_iqd, max_qty}], items_iqd, discount_iqd, shipping_iqd, shipping_before_iqd, free_delivery:{applied, label}, total_iqd, held_iqd, address:{name, phone, governorate, area, address, landmark}, delivery_method:'standard', order_id (after submit), rev}`.
 
@@ -163,7 +163,7 @@ Removing the last item cancels the session (release everything, no new hold).
 ### 3.4 Finalisation — `finalizeQuickBuySession(env, id)` (cron + lazy), one batch
 claim lease → recompute quote (D12) → statements:
 `orders` INSERT (shared builder, `order_kind='quick_buy'`, payment `wallet`, due 0) · `order_items` INSERTs (shared builder, from snapshots) · inventory transfer per item: `release` session reservation then `reserve` under the order (`planInventory` with the released moves credited) + reservation fence · wallet: commit the session hold with `ref=orderId` (or release + new final hold + commit when the total fell) · settlement `prepaid_at_purchase` · `planOrderFinanceSnapshot` (journal `wallet-advance`) · OrderCreated outbox · session flip `open → submitted` guarded by `expires_at <= now` and its stored `order_id` (the loser of a race hits the PK and rolls back) · events `capture`/`release`/`submit` · in-app + channel notice `quick_buy_submitted`.
-After commit: `initOrderStage`, invoice, `notifyOrderPlaced`, admin announcement — exactly as checkout (orders.ts:4758-4886). Ten failed attempts → `failed`: holds and reservations kept, admins alerted, retry/cancel from the admin panel.
+After commit: `initOrderStage`, invoice, `notifyOrderPlaced`, admin announcement — exactly as checkout (orders.ts:4758-4886). Ten failed attempts → **cancelled** (`cancel_reason='not_submitted'`): one fenced batch releases the hold and every reservation and writes `fail`/`release`/`cancel`; the customer's bell says so in ar/en/ckb (`quick_buy_failed`, key `quick_buy_not_submitted:<session>`). No administrator is alerted or needed (DECISIONS row 188). If that batch cannot land, the lease is cleared and the next tick goes straight back to it — never to a late order attempt. A row left `failed` by the earlier release is swept the same way, ten a tick.
 
 ### 3.5 UI (as built — owner brief §4 and §13 supersede the first sketch)
 - **Product page: one morphing control** (`src/components/quickBuy/QuickBuyBar.tsx`) for signed-in customers on
@@ -219,7 +219,9 @@ per session), `SHIPPING_NEEDS_CONFIG`, `IDEMPOTENCY_KEY_REUSED`.
 slug, name, name_ar, name_ku, image, variant, sku, qty, unit_price_iqd, line_total_iqd, option_value_ids, color_id,
 warranty_plan_id}], items_iqd, discount_iqd, shipping_iqd, shipping_before_iqd, free_delivery:{applied, label:{ar,en,ckb}},
 total_iqd, held_iqd, address:{name, phone, governorate, area, address, landmark}, delivery_method:'standard',
-order_id (submitted only), finalize_error (failed only), rev}`.
+order_id (submitted only), finalize_error (a legacy `failed` row only), cancel_reason (cancelled only; `not_submitted` = the
+system gave up and refunded), rev}`. `recent` also carries a session cancelled `not_submitted` within the last day, for the one
+line on «طلباتي».
 
 **How it is priced and written.** Every change runs `computeCheckout` with a `CheckoutSource` (the session's
 lines through the cart projection, the frozen address, the session's own reserved units and held cents credited
@@ -237,8 +239,9 @@ reservations (+fence), first in the batch; the order plan is credited those unit
 (`QUICK_BUY_TOTAL_ABOVE_HOLD`); `after` flips `open → submitted` only when `expires_at <= now` (fenced) and writes
 capture/release/unreserve/submit events; consent = the activation's acceptance rows copied onto the order. The
 order is `order_kind='quick_buy'` and enters the normal workflow (stock RESERVED under the order, deducted at
-confirmation like every order). Ten failed attempts → `failed` (money still held, units still reserved, customer
-and admin told); `/api/admin/quick-buy/sessions/:id/retry|cancel`.
+confirmation like every order). Ten failed attempts → cancelled `not_submitted`: hold and units released in one
+fenced batch, the customer told in three languages, no order, no admin step (DECISIONS row 188). The earlier claim
+that admins are alerted was never true of the code and the admin retry/cancel routes are gone.
 
 **After 00:00 the order is an ordinary order (owner brief §13).** From the moment the session is submitted, the
 order is an ordinary `ORD-…` order with the same model, statuses, details page, tracking, cancellation, refund and
@@ -248,9 +251,11 @@ and the optional badge «⚡ تم إنشاؤه بالشراء السريع»; no
 (tests/quickBuy.test.ts «§13»). The customer's bell notice says the order is now a regular order and links to it.
 The Quick Buy card on «طلباتي» exists only while a session is open.
 
-**Admin**: `/api/admin/quick-buy/sessions?state=open|failed|submitted|cancelled`, `/sessions/:id` (with events),
-`/summary?days=30` (held now / captured / released / refunded, orders by kind) — screen «الشراء السريع» under
-التشغيل. The orders board shows «⚡ شراء سريع» / «🎁 هدية» and filters `?kind=`.
+**Admin**: nothing of its own (owner, 2026-10-08, DECISIONS row 188 — the screen «الشراء السريع», its summary and
+`/api/admin/quick-buy` are removed). A finalised Quick Buy order is an ordinary order everywhere the admin looks: the
+board (no Quick Buy badge — only «🎁 هدية» remains), its counts, the Telegram announcement, the finance reports. Only
+the reports keep `order_kind` («الأرباح والتكاليف» breaks orders down by kind; `/api/admin/orders?kind=` still
+filters, with no button on the board).
 
 **Wallet**: `iqd_held` counts a Quick Buy hold in the dinars the session agreed; `iqd_held_quick_buy` drives the
 line «منها محجوز لطلب الشراء السريع» on the wallet page.

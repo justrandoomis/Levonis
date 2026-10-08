@@ -225,8 +225,8 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/trade-in', hosts: 'main', owner: 'COMMERCE', flipPhase: 7, requires: 'auth', rateClass: 'user' },
   { prefix: '/api/admin/trade-in', hosts: 'main', owner: 'COMMERCE', flipPhase: 7, requires: 'admin', rateClass: 'admin-write' },
   // 0176 Quick Buy: a 30-minute wallet-held order that ends through the cart's own checkout (docs/GIFTS_QUICK_BUY.md §3).
+  // Customer only — it has no admin surface (DECISIONS row 188).
   { prefix: '/api/quick-buy', hosts: 'main', owner: 'COMMERCE', flipPhase: 7, requires: 'auth', rateClass: 'money' },
-  { prefix: '/api/admin/quick-buy', hosts: 'main', owner: 'COMMERCE', flipPhase: 7, requires: 'admin', rateClass: 'admin-write' },
 
   // ------------------------------------------------------------------ money
   { prefix: '/api/wallet/admin', hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'admin:full', rateClass: 'admin-write' },

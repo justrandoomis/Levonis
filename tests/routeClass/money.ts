@@ -1,6 +1,6 @@
 /**
- * ROUTE CLASSIFICATION — order price adjustment, trade-in, quick buy, wallet
- * adjustment and the printer farm (owner decision 2, step S1; the vocabulary
+ * ROUTE CLASSIFICATION — order price adjustment, trade-in, wallet adjustment
+ * and the printer farm (owner decision 2, step S1; the vocabulary
  * is in ./_types.ts, the test is tests/costRouteClassification.test.ts).
  *
  * MONEY, NOT COST. Decision 2 restricts cost data; it leaves moving money with
@@ -12,11 +12,9 @@
  * is what Levonis pays for a used device it may resell.
  */
 import type { RouteClassFile } from './_types';
-import { NB } from './_types';
 import { adminWalletAdjustRoutes } from '../../worker/routes/adminWalletAdjust';
 import { farmAdminRoutes } from '../../worker/routes/farmAdmin';
 import { adminOrderPriceRoutes } from '../../worker/routes/orderPriceAdjust';
-import { quickBuyAdminRoutes } from '../../worker/routes/quickBuy';
 import { adminTradeInRoutes } from '../../worker/routes/tradeIn';
 
 export default {
@@ -48,19 +46,6 @@ export default {
         'GET /rules': 'op',
         'PUT /rules/:family': 'money',
         'POST /rules/:family/test': { cls: 'op', noBody: 'tries a valuation rule of one device family on a sample; needs a family the role fixture does not seed' },
-      },
-    },
-    {
-      prefix: '/api/admin/quick-buy',
-      name: 'quickBuyAdminRoutes',
-      router: quickBuyAdminRoutes,
-      writes: NB.QUICK_BUY,
-      routes: {
-        'GET /sessions': 'op',
-        'GET /summary': 'op',
-        'GET /sessions/:id': 'op',
-        'POST /sessions/:id/retry': 'op',
-        'POST /sessions/:id/cancel': 'op',
       },
     },
     {
