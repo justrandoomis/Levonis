@@ -41,6 +41,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus, FileUp } from 'lucide-react';
 import { api, ApiError, failureText, formatIqd } from '../../lib/api';
 import { refusalIssues } from './applyResult';
+import { contractRefusal, refusalLang } from '../../lib/refusalStrings';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { emptyDimensions } from '../../lib/productTypes';
@@ -814,7 +815,10 @@ export default function ProductForm({
         return;
       }
       const lines = e instanceof ApiError ? refusalIssues((e.body ?? e.details ?? {}) as Parameters<typeof refusalIssues>[0]) : [];
-      const base = failureText(e, 'فشل الحفظ / save failed');
+      // A refusal of the programme contract (OWNER_ONLY: the product's serial
+      // answer is the owner's) in the reader's language, Sorani included; any
+      // other failure reads exactly as before.
+      const base = contractRefusal(e, refusalLang(lang), failureText(e, 'فشل الحفظ / save failed'));
       setSaveErr(lines.length ? `${base}: ${lines.join(' · ')}` : base);
     } finally {
       setSaving(false);

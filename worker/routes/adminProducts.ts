@@ -48,7 +48,7 @@ import {
 } from '../lib/adminScope';
 import { costRefusal } from '../lib/costAccess';
 import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
-import { reparentSerialFlips, serializedWriteVerdict } from '../lib/serialPolicy';
+import { printerFlagSerialFlips, reparentSerialFlips, serializedWriteVerdict } from '../lib/serialPolicy';
 import { refuse as serialRefuse } from '../lib/serialAssignments';
 import { bundlesUsing, compositionConflict } from '../lib/bundleComposition';
 import {
@@ -394,11 +394,9 @@ adminProductsRoutes.post('/catalogs', async (c) => {
     if (!parent) throw badRequest('parent_id: unknown catalog');
   }
   const sort = int(body.sort, 'sort', { min: -100_000, max: 100_000, def: 0 });
-  // §29 (serial scan, 0178): the printer flag is the owner's, through this
-  // catalog editor as through the taxonomy one (adminTaxonomy POST /catalogs).
-  if (body.is_printer_catalog && !isOwner(c.env, admin)) {
-    throw serialRefuse(403, 'OWNER_ONLY', { field: 'is_printer_catalog' });
-  }
+  // §29 (serial scan, 0178): the printer flag is the owner's only where it
+  // FLIPS a product's answer (`printerFlagSerialFlips`, landing round 3 F1).
+  // A new catalog holds no product, so its flag is anyone's to set.
   const id = newId('cat');
   const base = slugToken(nameEn) || slugToken(nameAr) || `catalog-${id.slice(-6)}`;
   const slug = await uniqueSlugIn(c.env.DB, 'catalogs', base, null);
@@ -462,17 +460,19 @@ adminProductsRoutes.patch('/catalogs/:id', async (c) => {
     params.push(body.active ? 1 : 0); // deactivate only — catalogs are never deleted
   }
   if (!sets.length) throw badRequest('Nothing to update');
-  // §29 (serial scan, 0178): the printer flag, and a re-parent that flips
-  // whether the products filed under this catalog need a serial, are the
-  // owner's — the same rule as the taxonomy editor. Only a CHANGE is an
-  // attempt: an edit that echoes the stored flag or parent passes.
+  // §29 (serial scan, 0178): a printer flag or a re-parent that FLIPS
+  // whether a product filed under this catalog needs a serial is the
+  // owner's — the same rule as the taxonomy editor. Only a change that flips
+  // at least one product is an attempt: an echo, or a flag on a catalog whose
+  // products all keep their answer, passes (landing round 3 F1).
   if (!isOwner(c.env, admin) && (body.is_printer_catalog !== undefined || body.parent_id !== undefined)) {
     const current = await c.env.DB.prepare('SELECT is_printer_catalog, parent_id FROM catalogs WHERE id = ?')
       .bind(id)
       .first<{ is_printer_catalog: number | null; parent_id: string | null }>();
     if (current) {
       if (body.is_printer_catalog !== undefined && Number(current.is_printer_catalog ?? 0) !== (body.is_printer_catalog ? 1 : 0)) {
-        throw serialRefuse(403, 'OWNER_ONLY', { field: 'is_printer_catalog' });
+        const flips = await printerFlagSerialFlips(c.env.DB, id, !!body.is_printer_catalog);
+        if (flips > 0) throw serialRefuse(403, 'OWNER_ONLY', { field: 'is_printer_catalog', via: 'printer_flag', products: flips });
       }
       const parentId = typeof body.parent_id === 'string' && body.parent_id ? body.parent_id : null;
       if (body.parent_id !== undefined && (current.parent_id ?? null) !== parentId) {

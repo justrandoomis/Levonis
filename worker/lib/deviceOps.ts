@@ -185,6 +185,8 @@ interface UnitSourceRow extends Record<string, unknown> {
   qty: number;
   warranty_snapshot: string | null;
   ops_policy: string | null;
+  /** 1 when other lines of the order hang off this one (a bundle or mystery PARENT). */
+  is_bundle_parent: number;
 }
 
 export interface CreateUnitsResult {
@@ -222,8 +224,16 @@ export async function createUnitsOnDelivery(
     .first<{ id: string; user_id: string }>();
   if (!order) return { serialized_items: 0, planned_units: 0, created: 0 };
 
+  // A bundle PARENT is never a device of its own (landing round 3, F7): it
+  // is the composition row — stock NULL, no options, never reserved — and
+  // the physical items are its COMPONENT lines, which carry the real product
+  // and get their units here. The preparation slots and the board skip the
+  // parent the same way (`serialRequiredSlots`, `boardSerialCounts`), so a
+  // parent filed under a printer catalog or carrying `serialized` can never
+  // add warranty units on top of its components'.
   const { results: items } = await env.DB.prepare(
-    `SELECT oi.id AS item_id, oi.product_id, oi.qty, oi.warranty_snapshot, p.ops_policy
+    `SELECT oi.id AS item_id, oi.product_id, oi.qty, oi.warranty_snapshot, p.ops_policy,
+            EXISTS (SELECT 1 FROM order_items c WHERE c.bundle_parent_item_id = oi.id) AS is_bundle_parent
        FROM order_items oi
        LEFT JOIN products p ON p.id = oi.product_id
       WHERE oi.order_id = ?`
@@ -245,6 +255,7 @@ export async function createUnitsOnDelivery(
   let serializedItems = 0;
   let planned = 0;
   for (const it of items) {
+    if (Number(it.is_bundle_parent) === 1) continue;
     const policy = lineDevicePolicy(it.ops_policy, it.product_id, policyCtx);
     if (!policy.serialized) continue;
     serializedItems++;
@@ -318,8 +329,9 @@ export async function createUnitsOnDelivery(
  *
  * The selection is the SQL twin of the rule `createUnitsOnDelivery` applies
  * per line (`effectiveDevicePolicy`): ops_policy says serialized:true, or the
- * product sits in a printer catalog and ops_policy does not say false. It must
- * match exactly — a candidate that yields no unit would be picked again every
+ * product sits in a printer catalog and ops_policy does not say false — and
+ * the line is not a bundle parent (it never gets units). It must match
+ * exactly — a candidate that yields no unit would be picked again every
  * run. Only orders with NO unit rows at all are candidates; an order with some
  * units has already been through `createUnitsOnDelivery`, and the per-order
  * backfill in Admin → Serials covers anything odder than that.
@@ -354,6 +366,7 @@ export async function sweepDeliveredOrdersWithoutUnits(env: Env, limit = 50): Pr
             JOIN products p ON p.id = oi.product_id
            WHERE oi.order_id = o.id
              AND oi.qty > 0
+             AND NOT EXISTS (SELECT 1 FROM order_items k WHERE k.bundle_parent_item_id = oi.id)
              AND ${serializedLine})
       ORDER BY o.delivered_at DESC
       LIMIT ?`

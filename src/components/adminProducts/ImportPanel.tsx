@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { contractRefusal, refusalLang, type Lang } from '../../lib/refusalStrings';
 import { btnPrimary, btnSecondary, inputCls, ErrorBanner } from './ui';
 import { downloadAdminFile, DownloadError } from './download';
 import { readIssueText, readIssueEntry, bucketise, issueWhere, type ImportIssue } from './importIssues';
@@ -629,7 +630,7 @@ export default function ImportPanel({
     if (!file && !pasted.trim()) { setErr(t.pickFileFirst); return; }
     setBusy('check');
     try {
-      setCheck(isTable ? await checkTable(file!, sectionId, t) : await checkTxt(file, pasted, t));
+      setCheck(isTable ? await checkTable(file!, sectionId, t) : await checkTxt(file, pasted, t, refusalLang(lang)));
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : String(e));
       setCheck(null);
@@ -1096,14 +1097,21 @@ function planOf(spec: ApplySpecReport | null | undefined, mode: string | undefin
   };
 }
 
-async function checkTxt(file: File | null, pasted: string, t: Strings): Promise<CheckResult> {
-  if (file && file.name.toLowerCase().endsWith('.zip')) return checkTxtArchive(file, t);
+/**
+ * A file's validation refusal as the admin reads it: the programme
+ * contract's codes (OWNER_ONLY — a serial answer that is the owner's) in the
+ * reader's language, Sorani included; any other message as the server wrote it.
+ */
+const validationText = (v: { message: string; code?: string }, lang: Lang) => contractRefusal(v, lang, v.message);
+
+async function checkTxt(file: File | null, pasted: string, t: Strings, lang: Lang): Promise<CheckResult> {
+  if (file && file.name.toLowerCase().endsWith('.zip')) return checkTxtArchive(file, t, lang);
 
   const text = file ? await file.text() : pasted;
   const res = await api.post<ParseResponse>('/api/admin/template/parse', { text });
   const issues: ImportIssue[] = [
     ...res.errors.map((e) => readIssueEntry(e, { product: file?.name ?? 'template', severity: 'error' })),
-    ...(res.validation_error ? [readIssueEntry({ line: 0, key: '', message: res.validation_error.message }, { product: file?.name ?? 'template' })] : []),
+    ...(res.validation_error ? [readIssueEntry({ line: 0, key: '', message: validationText(res.validation_error, lang) }, { product: file?.name ?? 'template' })] : []),
     ...res.needs_review.map((n) =>
       readIssueEntry({ line: n.line, key: n.key, message: `${t.needsReview}: ${n.message} «${n.value}»` }, { product: file?.name ?? 'template' })
     ),
@@ -1146,7 +1154,7 @@ async function checkTxt(file: File | null, pasted: string, t: Strings): Promise<
   };
 }
 
-async function checkTxtArchive(file: File, t: Strings): Promise<CheckResult> {
+async function checkTxtArchive(file: File, t: Strings, lang: Lang): Promise<CheckResult> {
   // Local unzip first: without the per-file text there is nothing to apply.
   const texts = new Map<string, string>();
   const notes: string[] = [];
@@ -1176,7 +1184,7 @@ async function checkTxtArchive(file: File, t: Strings): Promise<CheckResult> {
     const text = texts.get(f.name) ?? '';
     const issues: ImportIssue[] = [
       ...f.errors.map((e) => readIssueEntry(e, { product: f.name, severity: 'error' })),
-      ...(f.validation_error ? [readIssueEntry({ line: 0, key: '', message: f.validation_error.message }, { product: f.name })] : []),
+      ...(f.validation_error ? [readIssueEntry({ line: 0, key: '', message: validationText(f.validation_error, lang) }, { product: f.name })] : []),
       ...f.needs_review.map((n) =>
         readIssueEntry({ line: n.line, key: n.key, message: `${t.needsReview}: ${n.message} «${n.value}»` }, { product: f.name })
       ),

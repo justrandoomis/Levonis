@@ -108,7 +108,7 @@ import {
   type WarrantySnapshotLite,
 } from '../lib/deviceOps';
 import { linkFromInventory } from '../lib/serialInventory';
-import { canonicalSerial, refuse as serialRefuse, serialAssignmentsInstalled } from '../lib/serialAssignments';
+import { canonicalSerial, maskedDetail, refuse as serialRefuse, serialActor, serialAssignmentsInstalled } from '../lib/serialAssignments';
 import { lineDevicePolicy, serializationContext, serializedWriteVerdict } from '../lib/serialPolicy';
 import { auditStatements } from '../lib/audit';
 import { isOwner } from '../lib/adminScope';
@@ -1259,6 +1259,12 @@ deviceRoutes.get('/admin/units', async (c) => {
  */
 deviceRoutes.get('/admin/units/:unitId/history', async (c) => {
   const unitId = c.req.param('unitId');
+  // The serial page's privacy, on the same rows (landing round 3, F5): a
+  // `device.serial_reassign` names the OTHER device's serial and the order it
+  // came from, which an assistant's serial page never shows them. The same
+  // viewer rule (`serialActor` → canMoveMoney) and the same masking
+  // (`maskedDetail`); the owner and full-scope admins read them whole.
+  const actor = serialActor(c.env, c.get('user')!);
   const unit = await c.env.DB.prepare('SELECT id FROM order_item_units WHERE id = ?').bind(unitId).first<{ id: string }>();
   if (!unit) throw notFound('Unit not found');
   const { results } = await c.env.DB.prepare(
@@ -1278,7 +1284,7 @@ deviceRoutes.get('/admin/units/:unitId/history', async (c) => {
       actor: h.actor_id
         ? { id: h.actor_id, email: h.email ?? null, username: h.username ?? null, name: h.name ?? null }
         : null,
-      detail: safeParse<Record<string, unknown>>(h.detail, {}),
+      detail: maskedDetail(safeParse<Record<string, unknown>>(h.detail, {}), actor),
     })),
   });
 });

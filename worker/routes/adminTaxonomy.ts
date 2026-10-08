@@ -7,7 +7,7 @@ import { newId, } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
 import { isOwner } from '../lib/adminScope';
 import { refuse as serialRefuse } from '../lib/serialAssignments';
-import { catalogSerialPolicySql, reparentSerialFlips, serialAssignmentsInstalled } from '../lib/serialPolicy';
+import { catalogSerialPolicySql, printerFlagSerialFlips, reparentSerialFlips, serialAssignmentsInstalled } from '../lib/serialPolicy';
 import {
   FAMILIES,
   groupsForSection,
@@ -447,10 +447,13 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
         ? 1
         : 0;
   // §29 (serial scan, 0178): the printer flag decides which products need a
-  // serial at preparation and get a warranty unit — the owner's call. Only a
-  // CHANGE is an attempt (an edit that echoes the stored flag passes).
-  if (Number(existing?.is_printer_catalog ?? 0) !== isPrinter && !isOwner(c.env, admin)) {
-    throw serialRefuse(403, 'OWNER_ONLY');
+  // serial at preparation and get a warranty unit — the owner's call where it
+  // FLIPS one (landing round 3 F1, `printerFlagSerialFlips`): an echo, a new
+  // section (it holds no product yet) and a section whose products all keep
+  // their answer are anyone's.
+  if (existing && Number(existing.is_printer_catalog ?? 0) !== isPrinter && !isOwner(c.env, admin)) {
+    const flips = await printerFlagSerialFlips(c.env.DB, id, isPrinter === 1);
+    if (flips > 0) throw serialRefuse(403, 'OWNER_ONLY', { field: 'is_printer_catalog', via: 'printer_flag', products: flips });
   }
   // …and so is RE-PARENTING a section (regressions review #3): a product filed
   // under it with no word of its own inherits its serial policy through the

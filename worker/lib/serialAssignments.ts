@@ -92,6 +92,7 @@ export const SERIAL_TEXT = {
   IDEMPOTENCY_MISMATCH: serverMessage('IDEMPOTENCY_MISMATCH'),
   SERIAL_RACE: 'تغيّر الطلب أثناء المسح — أعد المحاولة.',
   SERIALS_NOT_INSTALLED: 'ميزة ربط الأرقام التسلسلية لم تُفعّل على قاعدة البيانات بعد.',
+  SERIAL_STORY_UNAVAILABLE: 'تعذّرت قراءة سجل هذا الرقم التسلسلي الآن — أعد المحاولة بعد قليل.',
   ORDER_NOT_FOUND: 'الطلب غير موجود.',
   ITEM_NOT_IN_ORDER: 'هذا المنتج ليس ضمن هذا الطلب.',
   RETURN_SERIAL_MISMATCH: 'هذا الرقم التسلسلي ليس جهازًا من هذا البند لدى هذا الزبون.',

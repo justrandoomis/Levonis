@@ -110,6 +110,41 @@ export interface ExistingShape {
    * which is the honest answer for a product that has no cells.
    */
   fulfillments?: ExistingCellRow[];
+  /**
+   * Its stored placements (`product_catalogs`), so a sheet row keeps the
+   * EXTRA ones — a printer catalog held beside a plain section, say — and
+   * replaces only the section pair it states (`importPlacements`). Optional:
+   * a caller that does not load them writes exactly the sheet's pair, as
+   * before.
+   */
+  placements?: string[];
+}
+
+/**
+ * THE PLACEMENTS A SHEET ROW WRITES (landing round 3, F2).
+ *
+ * A sheet states a product's section and sub-section, nothing else about its
+ * shelves. The confirm used to REPLACE `product_catalogs` with exactly that
+ * pair, so a placement the form or the merchandising screens added — a
+ * printer catalog held as an extra shelf beside a plain section — was
+ * silently deleted, and the product stopped being a printer. Now, for a
+ * product that exists: its stored placements, minus the section pair it had,
+ * plus the pair the sheet states. The extras stay (as the product form keeps
+ * them: it posts back the `catalog_ids` it loaded, and the TXT template
+ * leaves them alone unless it names `catalogs`); only the old section moves.
+ * A new product gets exactly the sheet's pair. The preview judges §29 on
+ * this same set, and the confirm recomputes it from the LIVE row.
+ */
+export function importPlacements(
+  stored: { placements: readonly string[]; category_id: string | null; sub_category_id: string | null } | null,
+  categoryId: string | null,
+  subCategoryId: string | null
+): string[] {
+  const sheet = [categoryId, subCategoryId].filter((x): x is string => typeof x === 'string' && x !== '');
+  if (!stored) return [...new Set(sheet)];
+  const oldPair = new Set([stored.category_id, stored.sub_category_id].filter((x): x is string => typeof x === 'string' && x !== ''));
+  const kept = stored.placements.filter((id) => typeof id === 'string' && id !== '' && !oldPair.has(id));
+  return [...new Set([...kept, ...sheet])];
 }
 
 /**
@@ -190,11 +225,13 @@ export const IMPORT_SERIAL_REFILE_OWNER_ONLY =
 
 /**
  * §29 FOR A NON-OWNER'S SHEET ROW (S1 review #2, regressions review #2).
- * `resolveProduct` is pure and cannot see the section policies or what the
- * product is filed under today, so the preview route asks here, through the
- * same `serializedWriteVerdict` as the product form. The confirm writes the
- * row's placement as exactly `catalogIds` (the sheet's section and
- * sub-section), so that is the placement judged. Returns the row's error, or
+ * `resolveProduct` is pure and cannot see the section policies, so the
+ * preview route asks here, through the same `serializedWriteVerdict` as the
+ * product form — and the confirm asks again against the LIVE row (round 3,
+ * F4). The confirm writes the row's placement as exactly `catalogIds`
+ * (`importPlacements`: the stored extras kept, the section pair the sheet
+ * states), so that is the placement judged. `p.serialized` is the row's own
+ * cell (null = empty, keep the stored word). Returns the row's error, or
  * null; when the row only echoes an inherited answer, the document keeps the
  * stored word instead of pinning the echo as the product's own.
  */
@@ -416,11 +453,24 @@ export function resolveProduct(
     }
   }
   if (!categoryId) issues.push(err(p.line, 'category: القسم الرئيسي مطلوب'));
-  // A sheet that names no section keeps the stored one — and its flag.
-  if (!p.category && !p.sub_category) {
-    for (const ref of maps.catalogs.values()) {
-      if ((ref.id === categoryId || ref.id === subCategoryId) && ref.is_printer_catalog) isPrinter = true;
-    }
+  // The shelves the confirm writes (F2): the stored extras kept, the section
+  // pair the sheet states. A sheet that names no section keeps the stored
+  // one — and its flag — and a printer catalog held as an EXTRA placement is
+  // a printer catalog too, exactly as the confirm's
+  // `applyPrinterWarrantyRules` will read it.
+  const catalogIds = importPlacements(
+    existing
+      ? {
+          placements: existing.placements ?? [],
+          category_id: (existing.doc.category_id as string | null) ?? null,
+          sub_category_id: (existing.doc.sub_category_id as string | null) ?? null,
+        }
+      : null,
+    categoryId,
+    subCategoryId
+  );
+  for (const ref of maps.catalogs.values()) {
+    if (catalogIds.includes(ref.id) && ref.is_printer_catalog) isPrinter = true;
   }
 
   const family =
@@ -1257,7 +1307,7 @@ export function resolveProduct(
     action: existing ? 'update' : 'create',
     doc,
     relations,
-    catalogIds: [...new Set([categoryId, subCategoryId].filter((x): x is string => !!x))],
+    catalogIds,
     printerFits,
     membership: p.membership_rules,
     issues,

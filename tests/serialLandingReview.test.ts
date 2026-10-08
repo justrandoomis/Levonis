@@ -10,6 +10,8 @@
  *   S1 #4   a non-owner's echo never pins an inherited answer
  *   Mig #1  OWNER_ONLY / IDEMPOTENCY_MISMATCH speak the contract's sentence
  *   Mig #3  re-parenting a section is the owner's when it flips a product
+ *           (the printer flag the same, since round 3 —
+ *           tests/serialLandingReview2.test.ts)
  *
  * Run: node --import tsx --test tests/serialLandingReview.test.ts
  */
@@ -183,7 +185,10 @@ test('S1 #2 / migration #2: a sheet that RE-FILES a silent product into or out o
   // The filament, its serialized cell empty, filed under the printers.
   const into = await preview(importApp(w, 'adm'), sheet({ key: 'sp-pla', name: 'PLA spool', category: 'sp-printers', serialized: '' }));
   assert.ok(into.rows[0].errors.some((e) => e.includes(IMPORT_SERIAL_REFILE_OWNER_ONLY)), JSON.stringify(into.rows[0]));
-  // A printer re-filed as an accessory.
+  // A printer re-filed as an accessory. Its printer catalog is its SECTION
+  // here (as on live rows): round 3 (F2) keeps a placement the sheet does not
+  // state, so only a section the sheet replaces can take the printer away.
+  w.raw.exec(`UPDATE products SET category_id = 'ct_print' WHERE id = 'pA1'`);
   const out = await preview(importApp(w, 'ast'), sheet({ key: 'sp-a1', name: 'Bambu Lab A1 Combo', category: 'sp-acc', serialized: '' }));
   assert.ok(out.rows[0].errors.some((e) => e.includes(IMPORT_SERIAL_REFILE_OWNER_ONLY)), JSON.stringify(out.rows[0]));
   // Between two sections that agree, anyone may; and the owner may re-file.
@@ -282,7 +287,9 @@ test('migration #1: OWNER_ONLY and IDEMPOTENCY_MISMATCH carry the programme cont
   // Every serial door that refuses a non-owner says the same sentence as S1's `ownerOnly()`.
   const w = world();
   const doors: Array<Response | Promise<Response>> = [
-    post(w.as('adm'), '/api/admin/taxonomy/catalogs', { id: 'ct_acc', name_en: 'Accessories', is_printer_catalog: true }),
+    // (round 3, F1: the flag is refused only where it flips a product — the
+    // filament section holds a silent one.)
+    post(w.as('adm'), '/api/admin/taxonomy/catalogs', { id: 'ct_fil', name_en: 'Filament', is_printer_catalog: true }),
     post(w.as('adm'), '/api/devices/admin/products/pAMS/ops-policy', { serialized: true }),
   ];
   for (const res of await Promise.all(doors)) {
@@ -325,20 +332,22 @@ test('migration #3 variant: the products-v2 catalog editor guards the printer fl
   const w = world();
   w.raw.exec(`INSERT INTO catalogs (id, parent_id, slug, name_ar, name_en, serial_policy) VALUES ('ct_req', NULL, 'sp-req', 'أجهزة', 'Devices', 'required')`);
   for (const who of ['adm', 'ast'] as const) {
-    // The printer flag: every product filed there would start needing a serial.
-    const flag = await patch(w.as(who), '/api/admin/products-v2/catalogs/ct_acc', { is_printer_catalog: true });
+    // The printer flag: the filament filed there would start needing a serial.
+    // (Round 3, F1: only a flag that FLIPS a product is refused — a new
+    // catalog holds none, so creating one with the flag is anyone's.)
+    const flag = await patch(w.as(who), '/api/admin/products-v2/catalogs/ct_fil', { is_printer_catalog: true });
     assert.equal(flag.status, 403, `${who}: ${await flag.clone().text()}`);
     assert.equal((await json(flag)).code, 'OWNER_ONLY');
     const born = await post(w.as(who), '/api/admin/products-v2/catalogs', { name_ar: 'طابعات جديدة', name_en: 'New printers', is_printer_catalog: true });
-    assert.equal(born.status, 403, who);
+    assert.equal(born.status, 200, `${who}: ${await born.clone().text()}`);
     // The re-parent that flips the filament.
     const move = await patch(w.as(who), '/api/admin/products-v2/catalogs/ct_fil', { parent_id: 'ct_req' });
     assert.equal(move.status, 403, who);
     assert.equal((await json(move)).details?.via, 'reparent');
   }
-  assert.equal(row<{ n: number }>(w.raw, "SELECT is_printer_catalog AS n FROM catalogs WHERE id = 'ct_acc'")!.n, 0);
+  assert.equal(row<{ n: number }>(w.raw, "SELECT is_printer_catalog AS n FROM catalogs WHERE id = 'ct_fil'")!.n, 0);
   assert.equal(row<{ p: string }>(w.raw, "SELECT parent_id AS p FROM catalogs WHERE id = 'ct_fil'")!.p, 'ct_acc');
-  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM catalogs WHERE name_en = 'New printers'"), 0);
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM catalogs WHERE name_en = 'New printers' AND is_printer_catalog = 1"), 2);
   // An echo, a rename and an ordinary section are anyone's; the owner may do all of it.
   assert.equal((await patch(w.as('adm'), '/api/admin/products-v2/catalogs/ct_acc', { is_printer_catalog: false, name_en: 'Accessories+' })).status, 200);
   assert.equal((await post(w.as('ast'), '/api/admin/products-v2/catalogs', { name_ar: 'قسم', name_en: 'Plain section' })).status, 200);

@@ -9,6 +9,7 @@ import { AlertTriangle, CheckCircle2, Info, RefreshCw, X } from 'lucide-react';
 import * as T from '../adminProducts/theme';
 import { Modal } from '../adminProducts/ui';
 import { api, ApiError } from '../../lib/api';
+import { contractRefusal, refusalLang } from '../../lib/refusalStrings';
 import { useLanguage } from '../../LanguageContext';
 
 // ------------------------------------------------------------------- types
@@ -130,7 +131,17 @@ export async function loadTaxonomy(): Promise<TaxonomyData> {
   };
 }
 
-export const errMsg = (e: unknown): string => (e instanceof ApiError ? e.message : e instanceof Error ? e.message : String(e));
+/**
+ * The sentence an admin reads for a failed request. With the page's `lang`,
+ * a refusal of the programme contract (`OWNER_ONLY` from a printer flag or a
+ * re-parent that flips a product's serial answer) speaks the reader's
+ * language, Sorani included (`contractRefusal`); every other message is the
+ * server's own, exactly as before.
+ */
+export const errMsg = (e: unknown, lang?: string): string => {
+  const raw = e instanceof ApiError ? e.message : e instanceof Error ? e.message : String(e);
+  return lang ? contractRefusal(e, refusalLang(lang), raw) : raw;
+};
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'info';
 export interface NoticeState {
@@ -402,7 +413,7 @@ export function Dialog({
   danger?: boolean;
   testId?: string;
 }) {
-  const { loc } = useLoc();
+  const { loc, lang } = useLoc();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const save = async () => {
@@ -411,7 +422,7 @@ export function Dialog({
     try {
       await onSave();
     } catch (e) {
-      setErr(errMsg(e));
+      setErr(errMsg(e, lang));
     } finally {
       setBusy(false);
     }

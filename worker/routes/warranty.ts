@@ -28,6 +28,7 @@ import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { getSetting, setSetting } from '../lib/settings';
 import { normalizeSerial, unitTotalMonths, type UnitRow } from '../lib/deviceOps';
+import { maskedDetail, serialActor } from '../lib/serialAssignments';
 // The one definition of "a claim that is still open" lives with the claim
 // workflow that writes those stages; this screen must not grow a second one
 // that quietly drifts from it.
@@ -298,6 +299,12 @@ warrantyAdminRoutes.get('/', async (c) => {
 /** One receipt, with the audit trail of everything ever done to it. */
 warrantyAdminRoutes.get('/:id', async (c) => {
   const id = c.req.param('id');
+  // The serial page's privacy on the receipt's trail (landing round 3, F5):
+  // `warranty.replaced` names the replacement's serial and the replaced one,
+  // `warranty.reissued` the corrected serial, and rows carry order numbers.
+  // An assistant gets them masked (`maskedDetail`, viewer by `serialActor`);
+  // the owner and full-scope admins read them whole.
+  const actor = serialActor(c.env, c.get('user')!);
   const row = await c.env.DB.prepare(`SELECT ${RECEIPT_COLS} FROM warranty_receipts WHERE id = ? OR receipt_no = ?`)
     .bind(id, id)
     .first<WarrantyReceiptRow>();
@@ -312,7 +319,7 @@ warrantyAdminRoutes.get('/:id', async (c) => {
   return c.json({
     success: true,
     receipt: adminView(row, nowIso()),
-    history: history.map((h) => ({ ...h, detail: safeParse<Record<string, unknown>>(h.detail, {}) })),
+    history: history.map((h) => ({ ...h, detail: maskedDetail(safeParse<Record<string, unknown>>(h.detail, {}), actor) })),
   });
 });
 

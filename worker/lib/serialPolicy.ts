@@ -27,7 +27,7 @@
  * DEPLOY-AHEAD. The column arrives with migration 0178. Until it has applied,
  * every reader answers "no section policy", which is exactly HEAD behaviour.
  */
-import { effectiveDevicePolicy, readOpsWarranty, type EffectiveDevicePolicy } from './warrantyPlans';
+import { effectiveDevicePolicy, mergeOpsPolicy, readOpsWarranty, type EffectiveDevicePolicy } from './warrantyPlans';
 import { printerProductIds } from './printerIdentity';
 
 export type CatalogSerialPolicy = 'required' | 'off';
@@ -182,6 +182,63 @@ export async function serializedWriteVerdict(
 }
 
 /**
+ * §29 FOR THE TWO COMPOSITION EDITORS (landing round 3, F7): the bundles
+ * panel and the mystery-offer panel store a product row through
+ * `validateProductDoc` / `planProductSave` like the form, and took
+ * `serialized`, `ops_policy`, `catalog_ids` and `category_id` from any admin.
+ * The same `serializedWriteVerdict`, judged on what the save will actually
+ * write:
+ *   - the word: a body that says nothing about `serialized` (the panels
+ *     never send it) is no attempt — the stored word is kept, never wiped —
+ *     and one that does is judged like the form's;
+ *   - the filing: `catalog_ids` when this editor writes them
+ *     (`writesCatalogs`), else the stored shelves, with the classification
+ *     the document carries.
+ * Returns the refusal (`flag` / `placement`) or null; on null the document
+ * carries the word to store (the stored one for an echo, as on every door).
+ */
+export async function compositionSerializedVerdict(
+  db: D1Database,
+  doc: { serialized: boolean | null; ops_policy: Record<string, unknown>; category_id: string | null; sub_category_id: string | null },
+  prev: { id: string; ops_policy: unknown; category_id: string | null; sub_category_id: string | null } | null,
+  body: Record<string, unknown>,
+  opts: { writesCatalogs: boolean }
+): Promise<'flag' | 'placement' | null> {
+  const bodyOps =
+    body.ops_policy && typeof body.ops_policy === 'object' && !Array.isArray(body.ops_policy)
+      ? (body.ops_policy as Record<string, unknown>)
+      : null;
+  const mentions = 'serialized' in body || (bodyOps !== null && 'serialized' in bodyOps);
+  const stored = prev ? readOpsWarranty(prev.ops_policy).serialized : null;
+  const requested = mentions ? readOpsWarranty(mergeOpsPolicy(doc.ops_policy ?? {}, { serialized: doc.serialized })).serialized : stored;
+  const sent =
+    opts.writesCatalogs && Array.isArray(body.catalog_ids)
+      ? (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string')
+      : null;
+  const refiled = !prev || (doc.category_id ?? null) !== (prev.category_id ?? null) || (doc.sub_category_id ?? null) !== (prev.sub_category_id ?? null);
+  let catalogIds = sent;
+  if (!catalogIds && refiled && prev) {
+    const { results } = await db
+      .prepare('SELECT catalog_id FROM product_catalogs WHERE product_id = ?')
+      .bind(prev.id)
+      .all<{ catalog_id: string }>();
+    catalogIds = (results ?? []).map((r) => String(r.catalog_id));
+  }
+  const verdict = await serializedWriteVerdict(db, {
+    prev: prev ? { id: prev.id, ops_policy: prev.ops_policy } : null,
+    requested,
+    placement: sent || refiled ? { catalogIds: catalogIds ?? [], categoryIds: [doc.category_id, doc.sub_category_id] } : undefined,
+  });
+  if (verdict.refuse) return verdict.refuse;
+  doc.serialized = verdict.keep;
+  const ops: Record<string, unknown> = { ...(doc.ops_policy ?? {}) };
+  if (verdict.keep === null) delete ops.serialized;
+  else ops.serialized = verdict.keep;
+  doc.ops_policy = ops;
+  return null;
+}
+
+/**
  * RE-PARENTING A SECTION is a §29 change too (regressions review #3): every
  * product filed under it whose own word is silent, and that is not a printer,
  * inherits through the new parent from then on. Returns how many of those
@@ -220,6 +277,56 @@ export async function reparentSerialFlips(db: D1Database, sectionId: string, new
       .bind(JSON.stringify(silent.slice(i, i + 200)), sectionId, newParentId)
       .all<{ before: number | null; after: number | null }>();
     for (const r of rows ?? []) if ((Number(r.before) === 2) !== (Number(r.after) === 2)) flips++;
+  }
+  return flips;
+}
+
+/**
+ * THE PRINTER FLAG is a §29 change only when it flips something (landing
+ * review round 3, F1): how many products filed under `catalogId` would change
+ * their EFFECTIVE answer if its `is_printer_catalog` became `nextFlag`.
+ *
+ * Counted like `reparentSerialFlips`: a product filed under the catalog — by
+ * `product_catalogs` or by its own classification (`category_id` /
+ * `sub_category_id`, which every save folds into its placements) — whose own
+ * `serialized` word is silent. The flag is NOT inherited down the tree
+ * (`printerProductIds` reads the direct placement), so descendants are not
+ * counted. Before = the answer `lineDevicePolicy` gives today; after = the
+ * same rule with this one catalog's flag replaced: a printer through ANOTHER
+ * printer catalog stays a printer, and a non-printer falls back to its section
+ * policy. An empty catalog, or one whose products all carry their own word,
+ * flips nothing (0). The caller compares the flag first: an echo is not asked.
+ */
+export async function printerFlagSerialFlips(db: D1Database, catalogId: string, nextFlag: boolean): Promise<number> {
+  const { results } = await db
+    .prepare(
+      `SELECT DISTINCT p.id AS pid, p.ops_policy FROM products p
+        WHERE p.id IN (SELECT pc.product_id FROM product_catalogs pc WHERE pc.catalog_id = ?1)
+           OR p.category_id = ?1
+           OR p.sub_category_id = ?1`
+    )
+    .bind(catalogId)
+    .all<{ pid: string; ops_policy: string | null }>();
+  const silent = (results ?? []).filter((r) => readOpsWarranty(r.ops_policy).serialized === null).map((r) => String(r.pid));
+  if (!silent.length) return 0;
+  const ctx = await serializationContext(db, silent);
+  const elsewhere = new Set<string>();
+  for (let i = 0; i < silent.length; i += 200) {
+    const { results: rows } = await db
+      .prepare(
+        `SELECT DISTINCT pc.product_id FROM product_catalogs pc
+           JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
+          WHERE pc.catalog_id <> ?1 AND pc.product_id IN (SELECT value FROM json_each(?2))`
+      )
+      .bind(catalogId, JSON.stringify(silent.slice(i, i + 200)))
+      .all<{ product_id: string }>();
+    for (const r of rows ?? []) elsewhere.add(String(r.product_id));
+  }
+  let flips = 0;
+  for (const id of silent) {
+    const before = lineDevicePolicy('{}', id, ctx).serialized;
+    const after = nextFlag || elsewhere.has(id) ? true : ctx.catalog.get(id) === 'required';
+    if (before !== after) flips++;
   }
   return flips;
 }

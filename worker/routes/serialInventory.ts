@@ -36,7 +36,7 @@ import { safeParse } from '../lib/types';
 import { requireAdmin, requireMainHost, badRequest, str, int } from '../lib/http';
 import type { Context } from 'hono';
 import { audit } from '../lib/audit';
-import { refuse as serialRefuse, serialActor, serialAssignmentsInstalled, serialStory, setWarrantyMode } from '../lib/serialAssignments';
+import { maskedDetail, refuse as serialRefuse, serialActor, serialAssignmentsInstalled, serialStory, setWarrantyMode } from '../lib/serialAssignments';
 import { maskSerial } from '../lib/deviceOps';
 import { normalizeEan, normalizeSerial, buildBulkRow, BULK_MAX_LINES } from '@levonis/catalog/deviceSerials';
 import {
@@ -305,10 +305,22 @@ serialInventoryRoutes.get('/:serial', async (c) => {
   const norm = serialParam(c.req.param('serial'));
   const row = await loadInventoryRow(c.env.DB, norm);
   const actor = serialActor(c.env, c.get('user')!);
-  const story = await serialStory(c.env, actor, norm).catch((e) => {
-    console.error('serial story unavailable', e instanceof Error ? e.message : String(e));
-    return null;
-  });
+  // WHO SEES THE WHOLE SERIAL is decided by the viewer alone (and, before
+  // migration 0178, by HEAD's rule: the row as it always was) — never by
+  // whether the story happened to load (landing round 3, F6). A story that
+  // fails on a migrated database is a 503 the page can retry, never an
+  // unmasked 200.
+  const installed = await serialAssignmentsInstalled(c.env.DB);
+  const masked = installed && !actor.fullSerial;
+  let story: Awaited<ReturnType<typeof serialStory>> = null;
+  if (installed) {
+    try {
+      story = await serialStory(c.env, actor, norm);
+    } catch (e) {
+      console.error('serial story unavailable', e instanceof Error ? e.message : String(e));
+      throw serialRefuse(503, 'SERIAL_STORY_UNAVAILABLE');
+    }
+  }
   if (!row) {
     if (story) return c.json({ success: true, row: null, history: story.history, story });
     return c.json({ success: false, error: 'Serial not in inventory', code: 'SERIAL_NOT_IN_INVENTORY' }, 404);
@@ -330,7 +342,7 @@ serialInventoryRoutes.get('/:serial', async (c) => {
   // the row is exactly what it always was.
   const pub = inventoryRowPublic(row);
   const shownRow =
-    story && !actor.fullSerial
+    masked
       ? {
           ...pub,
           serial: maskSerial(pub.serial),
@@ -344,13 +356,16 @@ serialInventoryRoutes.get('/:serial', async (c) => {
     row: shownRow,
     history: story
       ? story.history
-      : results.map((h) => ({
-          id: h.id,
-          action: h.action,
-          created_at: h.created_at,
-          actor: h.actor_id ? { id: h.actor_id, email: h.email ?? null, username: h.username ?? null } : null,
-          detail: safeParse<Record<string, unknown>>(h.detail, {}),
-        })),
+      : results.map((h) => {
+          const detail = safeParse<Record<string, unknown>>(h.detail, {});
+          return {
+            id: h.id,
+            action: h.action,
+            created_at: h.created_at,
+            actor: h.actor_id ? { id: h.actor_id, email: h.email ?? null, username: h.username ?? null } : null,
+            detail: masked ? maskedDetail(detail, actor) : detail,
+          };
+        }),
     ...(story ? { story } : {}),
   });
 });

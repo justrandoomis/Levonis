@@ -39,7 +39,8 @@ applied. Code: `worker/lib/serialAssignments.ts` (the rules),
 | `POST /api/admin/orders/:id/serials/change` | same | `{assignment_id, code, …, op_id}` — the old binding is released in the same batch; a failed new link leaves it intact. A retry with the same `op_id` answers the link it made (`already`), as does the override's. |
 | `POST /api/admin/orders/:id/serials/unlink` | same; owner only outside the window or once a courier shipment exists (reason 5–500) | targets the assignment id, so a replay can never release a newer link. |
 | `POST /api/admin/orders/:id/serials/override` | owner only, reason 5–500 | `kind: take_from_order · delivered_device · unavailable · outside_window · batch · model_family`, optional `warranty_mode: carry · restart`; audited inside the batch. |
-| `GET /api/devices/admin/serial-inventory/:serial` | admin | the §16 page: `story` (status, current/previous orders, warranty, lot, full timeline); order ids and the full serial for the owner and full-scope admins only — in the `row` too, and every serial a history line names (another device's in a «change», a replaced or corrected serial, a box SN — at any depth of the row) is masked for an assistant. Answers devices known only to `device_serials` too. |
+| `GET /api/devices/admin/serial-inventory/:serial` | admin | the §16 page: `story` (status, current/previous orders, warranty, lot, full timeline); order ids and the full serial for the owner and full-scope admins only — in the `row` too, and every serial a history line names (another device's in a «change», a replaced or corrected serial, a box SN — at any depth of the row) is masked for an assistant. Who sees the whole serial is decided by the viewer alone (and, before 0178, HEAD's row); a story that fails to read answers 503 `SERIAL_STORY_UNAVAILABLE`, never an unmasked page. Answers devices known only to `device_serials` too. |
+| `GET /api/devices/admin/units/:unitId/history`, `GET /api/admin/warranties/:id` | admin | the unit's and the receipt's audit trail, masked for an assistant exactly as the serial page masks its history (`maskedDetail`, viewer by `serialActor`): another device's serial, a replaced or corrected serial and order numbers. Owner and full-scope admins read them whole. |
 | `POST /api/devices/admin/units/:unitId/serial` | admin; owner to take a serial off an open warranty, in EITHER direction (the serial's old unit, or this unit's own serial) | a delivered order's open unit only (`ORDER_NOT_PREPARABLE` / `UNIT_NOT_OPEN`), the one canonicaliser, no live preparation binding elsewhere — re-checked inside the batch. |
 | `POST /api/devices/admin/units/:unitId/replace` | admin | the replacement serial's bindings are re-checked inside the batch. |
 | `POST /api/admin/stock-operations/serial-link` | `receive` | a serial with a live binding takes only a lot that binding's line was allocated (`SERIAL_BATCH_MISMATCH`); a pending binding takes it as its verified lot in the same batch (an inferred lot on that lot trades places; a lot full of verified serials refuses). |
@@ -125,24 +126,63 @@ bundle parents never have slots.
 Resolved at read time, never written onto products: the product's own
 `ops_policy.serialized`, else a printer catalog (always on), else the nearest
 section on its branch with `serial_policy ≠ inherit` ('required' wins across
-branches), else off. Owner only: the section policy, the printer flag (in
-both catalog editors: `POST /api/admin/taxonomy/catalogs` and
-`POST|PATCH /api/admin/products-v2/catalogs`), the product's flag, a re-filing
-that flips the answer for a product with no word of its own, and moving a
+branches), else off. Owner only: the section policy, the product's flag, a
+re-filing that flips the answer for a product with no word of its own, a
+printer flag that flips one (both catalog editors: `POST
+/api/admin/taxonomy/catalogs` and `PATCH /api/admin/products-v2/catalogs/:id`
+— `printerFlagSerialFlips`: a product filed under that catalog, by placement or
+by its section, whose own word is silent and that is not a printer through
+another catalog; the flag is not inherited down the tree), and moving a
 section under a parent whose policy flips one of its products
-(`reparentSerialFlips`, both editors). Every product door judges a non-owner's
-write by ONE rule, `serializedWriteVerdict` (worker/lib/serialPolicy.ts): the
-form on create and on update (by `serialized` or `ops_policy.serialized`), the
-ops-policy route, the placement route, the import sheet (its preview, with the
-section policies and the filing the confirm will write — `serialImportIssue`)
-and the TXT template. A non-owner never changes the product's own word: an
-echo of the effective answer passes and is NOT written down, so a product that
+(`reparentSerialFlips`, both editors). A printer flag that flips nothing — an
+echo, an empty catalog, one whose products all carry their own word, and every
+NEW catalog (it holds no product) — is anyone's. Every product door judges a
+non-owner's write by ONE rule, `serializedWriteVerdict`
+(worker/lib/serialPolicy.ts): the form on create and on update (by
+`serialized` or `ops_policy.serialized`), the ops-policy route, the placement
+route, the import sheet, the TXT template, and the two composition editors —
+the bundles panel and the mystery-offer panel (`compositionSerializedVerdict`:
+a body that does not mention `serialized` keeps the stored word; the filing is
+the `catalog_ids` the bundles panel writes, else the stored shelves, with the
+document's section). A non-owner never changes the product's own word: an echo
+of the effective answer passes and is NOT written down, so a product that
 inherits its answer keeps following its section.
 
-Refusals: 403 `OWNER_ONLY` with `details.via` = `flag`, `placement` or
-`reparent`; the import sheet refuses by line in ar / en / ckb
-(`IMPORT_SERIALIZED_OWNER_ONLY`, `IMPORT_SERIAL_REFILE_OWNER_ONLY`); the
-template preview shows it as its validation error (code `OWNER_ONLY`).
+ONE OTHER DOOR changes the effective answer, and it predates this feature
+(live, `printerWarrantyRules` in worker/lib/warrantyPlans.ts): grading a
+product open-box, used or refurbished fills `serialized = true` when its word
+is silent, so a used / open-box / refurbished grade turns tracking ON for a
+product with no word of its own — whoever saves the grade, through the form,
+the import sheet or the TXT template. The owner can set it off on the product.
+It is kept as it is; see the owner questions below.
+
+The import sheet (round 3): a row writes the product's stored placements minus
+the section pair it had, plus the pair the sheet states (`importPlacements`) —
+an extra shelf (a printer catalog held beside a plain section) is never
+dropped by a price row, and a new product gets exactly the sheet's pair. The
+preview judges §29 on that set (`serialImportIssue`); the confirm re-reads the
+LIVE row — its shelves, and every `ops_policy` key the row's own cells did not
+set (`serialized` only when the row's cell set it) — and re-judges a
+non-owner's row against it, failing that row alone, by line, with the
+preview's sentence.
+
+Refusals: 403 `OWNER_ONLY` with `details.via` = `flag`, `placement`,
+`reparent` or `printer_flag` (`details.products` = how many products flip);
+the import sheet refuses by line in ar / en / ckb
+(`IMPORT_SERIALIZED_OWNER_ONLY`, `IMPORT_SERIAL_REFILE_OWNER_ONLY`), at the
+preview and again at the confirm; the template preview shows it as its
+validation error (code `OWNER_ONLY`). The admin screens that print these — the
+taxonomy dialog, the product form, the section-update sheet and the import
+window's TXT check — render the code from the contract in ar / en / ckb
+(`contractRefusal`, src/lib/refusalStrings.ts) and keep the server's own
+sentence for every other code.
+
+Bundle and mystery PARENT lines never get warranty units of their own: the
+parent is the composition row (no stock, no options, never reserved) and the
+physical items are its component lines, which carry the real product. So
+delivery (`createUnitsOnDelivery`) and its SQL twin, the delivered-units
+sweep, skip a line other lines hang off — the same predicate as the
+preparation slots and the board.
 
 ## Owner defaults (changeable later, no migration)
 
@@ -226,6 +266,8 @@ both policy controls.
 - Open `warranty_claims` on a returned unit are left to the claims workflow.
 - Re-open does not take stock again (pre-existing, DECISIONS 184(15)); the slot shows `STOCK_NOT_RETAKEN`.
 
+- A used / open-box / refurbished grade turns serial tracking ON for a product with no `serialized` word of its own (live before this feature; see §29 above). Should a NON-owner's used grade still turn tracking on, or should that be the owner's call like every other door that flips the answer?
+
 ## Live checks after the deploy (read-only)
 
 ```sql
@@ -257,6 +299,7 @@ Every case runs the real routes over the real migrations (`tests/fixtures/serial
 | `serialPrepDeployAhead` | the code on the database one migration behind: every new door 503, HEAD behaviour everywhere else, and the feature live the moment the migration lands (no cached «not installed») |
 | `serialPolicy`, `serialPrepBoard`, `serialPrepUi` | §29 policy; the board chip; the screens (wedge, sources, strings, Sorani) |
 | `serialLandingReview` | the landing reviews' findings, one test each by name: a new product's flag (form create), the echo that must not pin an inherited answer, the import sheet's section policy and re-filing, the TXT template, the serial page masked at every depth (and the rebuilt «added» row's id), the contract's one sentence, re-parenting a section, the products-v2 catalog editor's printer flag and re-parent |
+| `serialLandingReview2` | round 3, one test per finding: the printer flag judged by its flips (empty catalog, worded products, a silent product, create); the import keeping extra placements (price row, owner, a move) and re-reading the live row at confirm (an owner's later word survives; a row the live row refuses fails alone); OWNER_ONLY in ar / en / ckb on the admin screens; the unit history and the warranty receipt masked; the serial page's 503 when its story fails; the bundle and mystery editors' §29 check; no units for a bundle parent (delivery and the sweep) |
 | `serialPrepReview` | the three reviews' findings, one test each by name: re-delivery without a scan, the registration a cancel revoked, the post-delivery / replacement / void doors re-checked inside their writes, a lot recorded after the scan, take-from-order's window, the fence under an unneeded reason, a change on a full line, op_id retries, atomic activation, in-batch adoption, the canonicaliser on returns and bulk add, placement by category, the masked serial page, re-link by binding; and the screens (focus, the queued burst, warnings until «تم», accessible names, plurals) |
 
 ## Renumbering

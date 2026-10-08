@@ -72,6 +72,7 @@ import {
 import {
   EXTERNAL_IMAGE_REFUSAL,
   fulfillmentPayloadFrom,
+  importPlacements,
   isOwnedMediaUrl,
   normKey,
   relationValues,
@@ -122,7 +123,7 @@ import {
   planProductSave,
   saveProductAtomic,
 } from '../lib/productPersistence';
-import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
+import { applyPrinterWarrantyRules, readOpsWarranty } from '../lib/warrantyPlans';
 import { serializationContext, type VerdictCache } from '../lib/serialPolicy';
 import { withClassificationPlacements } from '../lib/catalogMembership';
 import { isActiveProductImageRow } from '../lib/productOverlay';
@@ -1219,6 +1220,12 @@ async function loadExisting(db: D1Database, keys: string[]): Promise<Map<string,
     .prepare(`SELECT * FROM product_option_transports WHERE product_id IN (${idPh}) ORDER BY sort, id`)
     .bind(...ids)
     .all<Record<string, unknown>>();
+  // The stored shelves (F2): a sheet row keeps the extra ones and replaces
+  // only the section pair it states (`importPlacements`).
+  const { results: placementRows } = await db
+    .prepare(`SELECT product_id, catalog_id FROM product_catalogs WHERE product_id IN (${idPh}) ORDER BY position, catalog_id`)
+    .bind(...ids)
+    .all<{ product_id: string; catalog_id: string }>();
   const routesByCell = new Map<string, ExistingRouteRow[]>();
   for (const t of routeRows) {
     const owner = String(t.fulfillment_id ?? '');
@@ -1280,6 +1287,7 @@ async function loadExisting(db: D1Database, keys: string[]): Promise<Map<string,
                 : [],
           } satisfies ExistingCellRow;
         }),
+      placements: placementRows.filter((r) => String(r.product_id) === id).map((r) => String(r.catalog_id)),
     };
     // SKU wins over slug when both match different products.
     if (doc.sku) out.set(doc.sku, shape);
@@ -1456,6 +1464,14 @@ adminImportRoutes.post('/preview', async (c) => {
       // §18 — carried into the stored payload so the confirm writes exactly
       // what the preview showed, through `saveBenefitRule` and nothing else.
       membership: r.membership,
+      // F4 — the device keys the row's OWN cells set. The confirm writes
+      // these and re-reads every other key of ops_policy from the live row,
+      // so an owner's change made after this preview is never undone by it.
+      cells: {
+        serialized: p.serialized,
+        warranty_base_months: p.warranty_base_months,
+        delivery_options: p.delivery_options !== null,
+      },
     });
   }
 
@@ -1707,6 +1723,74 @@ function importItemCheckpointStatement(
     .bind(importId, itemIndex, row.key, row.line, row.product_id, row.action, row.name, row.reason, token);
 }
 
+/**
+ * F2 — the shelves a confirmed row writes, from the LIVE stored set: the
+ * product's current placements minus the section pair it has now, plus the
+ * pair the sheet states (`importPlacements`). A new product — or one deleted
+ * since the preview — gets exactly the preview's set.
+ */
+async function confirmLivePlacements(
+  db: D1Database,
+  productId: string,
+  prevDoc: ProductDoc | null,
+  doc: ProductDoc,
+  previewed: string[]
+): Promise<string[]> {
+  if (!prevDoc) return previewed;
+  const { results } = await db
+    .prepare('SELECT catalog_id FROM product_catalogs WHERE product_id = ? ORDER BY position, catalog_id')
+    .bind(productId)
+    .all<{ catalog_id: string }>();
+  return importPlacements(
+    {
+      placements: (results ?? []).map((r) => String(r.catalog_id)),
+      category_id: prevDoc.category_id ?? null,
+      sub_category_id: prevDoc.sub_category_id ?? null,
+    },
+    doc.category_id ?? null,
+    doc.sub_category_id ?? null
+  );
+}
+
+/**
+ * F4 — ops_policy as the confirm writes it: the LIVE row's keys underneath,
+ * and on top only what the row's own cells set (`serialized`,
+ * `warranty_base_months`, the delivery options). The preview stored the
+ * whole policy as it was then, so without this a confirm erased whatever the
+ * owner set in between — a `serialized: true` among it. The printer and
+ * condition defaults are applied afterwards, as on every door
+ * (`applyPrinterWarrantyRules`). A payload written before `cells` existed
+ * reads its document's values as the cells (the old behaviour for those
+ * keys). Returns the row's `serialized` cell (null = empty).
+ */
+function mergeLiveDeviceKeys(
+  doc: ProductDoc,
+  prevRow: Record<string, unknown> | null,
+  prevDoc: ProductDoc | null,
+  rawCells: unknown
+): boolean | null {
+  const cells =
+    rawCells && typeof rawCells === 'object' && !Array.isArray(rawCells)
+      ? (rawCells as { serialized?: unknown; warranty_base_months?: unknown; delivery_options?: unknown })
+      : null;
+  const cellSerialized = cells
+    ? typeof cells.serialized === 'boolean'
+      ? cells.serialized
+      : null
+    : doc.serialized;
+  const cellMonths = cells
+    ? typeof cells.warranty_base_months === 'number'
+      ? cells.warranty_base_months
+      : null
+    : doc.warranty_base_months;
+  const live = readOpsWarranty(prevRow?.ops_policy ?? {});
+  if (prevDoc) doc.ops_policy = { ...live.policy };
+  doc.serialized = cellSerialized ?? (prevDoc ? live.serialized : null);
+  doc.warranty_base_months = cellMonths ?? (prevDoc ? live.warranty_base_months : null);
+  if (prevDoc && cells && cells.delivery_options !== true) doc.delivery_options = prevDoc.delivery_options ?? null;
+  return cellSerialized;
+}
+
 adminImportRoutes.post('/confirm', async (c) => {
   const admin = c.get('user')!;
   const money = canWriteCost(c.env, admin);
@@ -1877,14 +1961,32 @@ adminImportRoutes.post('/confirm', async (c) => {
         // lifetime covers the actual product batch.
         await verifyAndNormalizeProductMedia(c.env, doc, relationImages);
 
-        const catalogIds = withClassificationPlacements((item.catalogIds as string[]) ?? [], doc);
-        await applyPrinterWarrantyRules(c.env.DB, doc, catalogIds);
-        if (isCreate) doc.slug = await uniqueProductSlug(c.env.DB, doc.name_en || key || productId);
-
         const prevRow = isCreate
           ? null
           : await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>();
         const prevDoc = prevRow ? parseProductRow(prevRow) : null;
+        // F2 / F4 — THE LIVE ROW, NOT THE PREVIEW'S SNAPSHOT, decides what
+        // the sheet did not say: the shelves beside the section pair, and
+        // every ops_policy key the row's cells did not set.
+        const placed = await confirmLivePlacements(c.env.DB, productId, prevDoc, doc, (item.catalogIds as string[]) ?? []);
+        const cellSerialized = mergeLiveDeviceKeys(doc, prevRow, prevDoc, item.cells);
+        // §29 again, against the live row: the preview's verdict may be
+        // minutes old, and the owner may have spoken since (F4). Same refusal,
+        // same sentence as the preview's, failing this row only.
+        if (!isOwner(c.env, admin)) {
+          const issue = await serialImportIssue(
+            c.env.DB,
+            { line, serialized: cellSerialized },
+            prevDoc ? { id: productId, doc: { ops_policy: prevDoc.ops_policy ?? {} } } : null,
+            { doc: doc as unknown as Record<string, unknown>, catalogIds: placed }
+          );
+          if (issue) throw new Error(`سطر ${issue.line}: ${issue.message}`);
+          if (doc.serialized === null) delete doc.ops_policy.serialized;
+          else doc.ops_policy.serialized = doc.serialized;
+        }
+        const catalogIds = withClassificationPlacements(placed, doc);
+        await applyPrinterWarrantyRules(c.env.DB, doc, catalogIds);
+        if (isCreate) doc.slug = await uniqueProductSlug(c.env.DB, doc.name_en || key || productId);
         const localized = localizeRespectingAuthored(doc, prevDoc);
         const plan = await planProductSave(c.env.DB, {
           mode: isCreate ? 'create' : 'update',

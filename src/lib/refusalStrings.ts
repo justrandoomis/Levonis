@@ -27,7 +27,7 @@
  * `serverMessage(code)` and this table read the very same three sentences.
  * It is spread in at the end of the table.
  */
-import { COST_REFUSALS } from '../../packages/contracts/src/costRefusals';
+import { COST_REFUSALS, isCostRefusalCode } from '../../packages/contracts/src/costRefusals';
 
 export interface RefusalStrings {
   ar: string;
@@ -1745,6 +1745,14 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: "Serial linking isn't installed on the database yet.",
     ckb: 'تایبەتمەندی بەستنی ژمارەی زنجیرەیی هێشتا لەسەر بنکەدراوەکە دانەمەزراوە.',
   },
+  // The serial page could not read this serial's story (a transient read
+  // failure). Refused rather than answered without it: the story is what
+  // decides the masking, and the page never falls back to the whole serial.
+  SERIAL_STORY_UNAVAILABLE: {
+    ar: 'تعذّرت قراءة سجل هذا الرقم التسلسلي الآن — أعد المحاولة بعد قليل.',
+    en: "This serial's record could not be read right now — try again shortly.",
+    ckb: 'تۆماری ئەم ژمارە زنجیرەییە ئێستا نەخوێندرایەوە — کەمێکی تر دووبارە هەوڵ بدەوە.',
+  },
   WARRANTY_CLOSED: {
     ar: 'أُغلق ضمان هذه الوحدة (مرتجع) — لا يُصدر لها وصل.',
     en: "This unit's warranty was closed (returned) — no receipt can be issued.",
@@ -1802,6 +1810,31 @@ export function apiRefusal(err: unknown, lang: Lang, fallback = ''): string {
   const counted = stockRefusal(err, lang);
   if (counted) return counted;
   return refusalText(code, lang, message || fallback);
+}
+
+/** The site's language as this table's key — Arabic unless English or Sorani. */
+export const refusalLang = (lang: string | null | undefined): Lang => (lang === 'en' || lang === 'ckb' ? lang : 'ar');
+
+/**
+ * ADMIN SCREENS: THE PROGRAMME CONTRACT'S REFUSALS, BY CODE (serial landing
+ * round 3, F3).
+ *
+ * A contract code (`OWNER_ONLY`, `IDEMPOTENCY_MISMATCH`, the cost codes —
+ * packages/contracts/src/costRefusals.ts) reaches the client with ONE server
+ * sentence, «Arabic / English» (`serverMessage`): printed raw, a Sorani admin
+ * read no Sorani at all. This renders those codes in the reader's language
+ * from the same contract. Any other code keeps the server's own sentence —
+ * on these screens the server's message is often the more specific one (a
+ * field, a line) — so nothing else a screen shows changes: `shown` is what
+ * the screen printed before (default: the error's own message), returned
+ * untouched for any other code. Duck-typed like `apiRefusal`: an
+ * `ApiError`, or a `{ code, message }` validation object.
+ */
+export function contractRefusal(err: unknown, lang: Lang, shown?: string): string {
+  const e = err as { code?: unknown; message?: unknown } | null;
+  const said = shown ?? (e && typeof e.message === 'string' ? e.message : '');
+  if (e && isCostRefusalCode(e.code)) return refusalText(e.code, lang, said);
+  return said;
 }
 
 /** The codes whose refusal can carry a remainder worth naming. `QTY_UNAVAILABLE`

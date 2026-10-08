@@ -75,11 +75,12 @@ test('§29 the delivered-units sweep follows the section policy and never re-pic
 
 test('§29 owner-only: section policy, the printer flag, a product\'s serialized flag — and an echo is not an attempt', async () => {
   const w = world();
-  // The printer flag.
-  const flag = await post(w.as('adm'), '/api/admin/taxonomy/catalogs', { id: 'ct_acc', name_en: 'Accessories', is_printer_catalog: true });
+  // The printer flag — refused where it flips a product (landing round 3,
+  // F1): the filament section holds a silent one.
+  const flag = await post(w.as('adm'), '/api/admin/taxonomy/catalogs', { id: 'ct_fil', name_en: 'Filament', is_printer_catalog: true });
   assert.equal(flag.status, 403);
   assert.equal((await json(flag)).code, 'OWNER_ONLY');
-  assert.equal((await post(w.as('adm'), '/api/admin/taxonomy/catalogs', { id: 'ct_acc', name_en: 'Accessories', is_printer_catalog: false })).status, 200, 'an echo passes');
+  assert.equal((await post(w.as('adm'), '/api/admin/taxonomy/catalogs', { id: 'ct_fil', name_en: 'Filament', is_printer_catalog: false })).status, 200, 'an echo passes');
   // The explicit ops-policy door.
   const off = await post(w.as('adm'), '/api/devices/admin/products/pAMS/ops-policy', { serialized: true });
   assert.equal((await json(off)).code, 'OWNER_ONLY');

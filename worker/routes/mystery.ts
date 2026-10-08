@@ -42,7 +42,9 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, int, str, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { auditStatements } from '../lib/audit';
-import { canWriteCost, projectForAdmin } from '../lib/adminScope';
+import { canWriteCost, isOwner, projectForAdmin } from '../lib/adminScope';
+import { compositionSerializedVerdict } from '../lib/serialPolicy';
+import { refuse as serialRefuse } from '../lib/serialAssignments';
 import { parseProductRow, projectAdmin, validateProductDoc, type ProductDoc } from '../lib/productModel';
 import {
   localizeRespectingAuthored,
@@ -759,6 +761,14 @@ async function writeOffer(c: Context<AppContext>, mode: 'create' | 'update', pro
 
   const id = prev ? prev.id : newId('prd');
   const doc = mysteryDocFrom(b, id);
+  // §29 (serial scan, 0178; landing round 3 F7): the offer row's serial word
+  // and its classification are judged like every product door's. This panel
+  // never writes `catalog_ids` (the plan carries none), so only the stored
+  // shelves and the document's classification are the filing.
+  if (!isOwner(c.env, admin)) {
+    const refused = await compositionSerializedVerdict(c.env.DB, doc, prev, b, { writesCatalogs: false });
+    if (refused) throw serialRefuse(403, 'OWNER_ONLY', { field: 'serialized', via: refused });
+  }
   if (prev) {
     doc.slug = prev.slug;
   } else {

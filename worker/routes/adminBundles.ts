@@ -45,7 +45,9 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, int, str, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
-import { canWriteCost, projectForAdmin } from '../lib/adminScope';
+import { canWriteCost, isOwner, projectForAdmin } from '../lib/adminScope';
+import { compositionSerializedVerdict } from '../lib/serialPolicy';
+import { refuse as serialRefuse } from '../lib/serialAssignments';
 import {
   primaryMedia,
   projectAdmin,
@@ -680,6 +682,13 @@ async function writeBundle(c: Context<AppContext>, mode: 'create' | 'update', pr
   const kind: 'bundle' | 'mystery' = prev ? (prev.composition as 'bundle' | 'mystery') : 'bundle';
   const id = prev ? prev.id : newId('prd');
   const doc = bundleDocFrom(body, kind, id);
+  // §29 (serial scan, 0178; landing round 3 F7): whether this row's units
+  // need a serial — its own word, or the filing this save writes — is the
+  // owner's, through this panel as through the product form.
+  if (!isOwner(c.env, admin)) {
+    const refused = await compositionSerializedVerdict(c.env.DB, doc, prev, body, { writesCatalogs: true });
+    if (refused) throw serialRefuse(403, 'OWNER_ONLY', { field: 'serialized', via: refused });
+  }
   // Links stay stable: an update keeps its stored slug unless the admin asks.
   if (prev) {
     if (body.allow_slug_change === true && typeof body.slug === 'string' && slugToken(body.slug)) {

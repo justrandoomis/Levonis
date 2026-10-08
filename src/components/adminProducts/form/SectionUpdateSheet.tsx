@@ -20,6 +20,8 @@ import React, { useCallback, useRef, useState } from 'react';
 import { AlertTriangle, Check, Download, FileUp, RefreshCw } from 'lucide-react';
 import { Modal } from '../ui';
 import { api, ApiError } from '../../../lib/api';
+import { contractRefusal, refusalLang } from '../../../lib/refusalStrings';
+import { useLanguage } from '../../../LanguageContext';
 import { downloadAdminFile, DownloadError } from '../download';
 import { btnGhost, btnPrimary } from './formUi';
 
@@ -33,7 +35,7 @@ interface Preview {
   updated_at: string | null;
   errors: Array<{ line: number; key: string; message: string }>;
   warnings: string[];
-  validation_error: { message: string; errors?: unknown[] } | null;
+  validation_error: { message: string; code?: string; errors?: unknown[] } | null;
   lines: number;
   changes: Change[];
   ignored_keys: string[];
@@ -130,6 +132,11 @@ export default function SectionUpdateSheet({
   /** After a save: the editor reloads the product (keeping its other unsaved edits) and shows this line. */
   onSaved: (note: string) => void;
 }) {
+  // A refusal of the programme contract (OWNER_ONLY — the product's serial
+  // answer is the owner's) is shown by CODE in the reader's language, Sorani
+  // included; every other message stays the server's own.
+  const { lang } = useLanguage();
+  const said = (e: unknown, shown: string) => contractRefusal(e, refusalLang(lang), shown);
   const fileRef = useRef<HTMLInputElement>(null);
   const [downloading, setDownloading] = useState<'txt' | 'csv' | null>(null);
   const [downloadNote, setDownloadNote] = useState<{ ok: boolean; text: string } | null>(null);
@@ -172,12 +179,12 @@ export default function SectionUpdateSheet({
         });
         setPreview(res);
       } catch (e) {
-        setProblem(e instanceof ApiError ? e.message : 'تعذّرت المقارنة — أعد المحاولة');
+        setProblem(e instanceof ApiError ? contractRefusal(e, refusalLang(lang), e.message) : 'تعذّرت المقارنة — أعد المحاولة');
       } finally {
         setChecking(false);
       }
     },
-    [productId]
+    [productId, lang]
   );
 
   const pick = async (f: File | undefined) => {
@@ -210,7 +217,7 @@ export default function SectionUpdateSheet({
       if (e instanceof ApiError && e.code === 'STALE') {
         setProblem('تغيّر المنتج بعد المقارنة — أعد المقارنة ثم احفظ.');
       } else {
-        setProblem(e instanceof ApiError ? e.message : 'تعذّر الحفظ — أعد المحاولة');
+        setProblem(e instanceof ApiError ? said(e, e.message) : 'تعذّر الحفظ — أعد المحاولة');
       }
     } finally {
       setSaving(false);
@@ -327,7 +334,7 @@ export default function SectionUpdateSheet({
                 )}
                 {preview.validation_error && (
                   <p className="text-[12px] text-red-400 break-words" role="alert">
-                    {preview.validation_error.message}
+                    {said(preview.validation_error, preview.validation_error.message)}
                   </p>
                 )}
                 {!blocked && preview.changes.length === 0 && (
