@@ -654,8 +654,14 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
    * silently. Every other write door in this codebase carries costs forward
    * for an actor without cost write (everyone but the owner, decision 2)
    * rather than trusting the payload; so does this one now.
+   *
+   * `cost_loaded: false` is the same carry for the owner: the panel read these
+   * cells while its session could not see cost (the owner before the address
+   * was verified, DECISIONS row 185 amendment), so their blanks mean "not
+   * shown", and the owner verifying in another tab must not turn them into a
+   * write. The flag only narrows what is written.
    */
-  if (!canWriteCost(c.env, admin)) {
+  if (!canWriteCost(c.env, admin) || body.cost_loaded === false) {
     const storedCell = new Map(
       (rel.fulfillments ?? []).map((f) => [cellKey(f.option_id, String(f.fulfillment_type)), f] as const)
     );

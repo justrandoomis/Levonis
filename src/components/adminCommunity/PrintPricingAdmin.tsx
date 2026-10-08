@@ -25,11 +25,12 @@
  * two more pricing switches.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle, Boxes, Check, Link2, Loader2, Plus, Printer, RotateCcw, Scale, Sliders, Trash2,
 } from 'lucide-react';
 import PrinterModelsEditor from './PrinterModelsEditor';
+import OwnerCostVerifyCard from '../auth/OwnerCostVerifyCard';
 import { api, ApiError, formatIqd } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
@@ -522,11 +523,24 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
   // `=== true` (a missing hint hides them). Match weights and model sites
   // stay with every admin.
   const { user } = useAuth();
-  const ownerCost = user?.can_view_cost === true;
+  const sessionCost = user?.can_view_cost === true;
+  /**
+   * WHETHER THE SETTINGS ON SCREEN WERE READ WITH THEIR COST (DECISIONS row
+   * 185 amendment). Read while the session could not see cost — the owner
+   * before the address was verified — the two cost keys arrive stripped and
+   * the panels fill them with DEFAULTS. If the owner verifies in another tab,
+   * showing those defaults as the cost tabs would invite a save that writes
+   * them over the real configuration. So the cost tabs appear only once the
+   * cost slices have been read again by a session that sees cost.
+   */
+  const [costRead, setCostRead] = useState(false);
+  const sessionCostRef = useRef(sessionCost);
+  sessionCostRef.current = sessionCost;
+  const ownerCost = sessionCost && costRead;
   // 'printers' is not a settings key: the model cards are rows of their own,
   // written one model at a time by an audited route, so the tab sits outside
   // the four-keys save machinery below.
-  const [tab, setTab] = useState<Tab | 'printers'>(ownerCost ? 'pricing' : 'weights');
+  const [tab, setTab] = useState<Tab | 'printers'>(sessionCost ? 'pricing' : 'weights');
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState('');
   /** The last state read from the server — the yardstick the dirty flag uses. */
@@ -535,7 +549,8 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
   const [savingTab, setSavingTab] = useState<Tab | ''>('');
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const load = useCallback(async (only?: Tab) => {
+  const load = useCallback(async (only?: Tab | 'cost') => {
+    const withCost = sessionCostRef.current;
     const res = await api.get<{ settings: Record<string, unknown> }>('/api/admin/settings');
     const next: Loaded = {
       pricing: readPricing(res.settings.printPricingConfig),
@@ -546,8 +561,10 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
     setSaved(next);
     // A section reset must not throw away edits parked in the other three,
     // so a targeted refetch replaces one slice and leaves the rest alone.
+    if (!only || only === 'cost') setCostRead(withCost);
     setDraft((cur) => {
       if (!cur || !only) return next;
+      if (only === 'cost') return { ...cur, pricing: next.pricing, materials: next.materials };
       if (only === 'pricing') return { ...cur, pricing: next.pricing };
       if (only === 'materials') return { ...cur, materials: next.materials };
       if (only === 'weights') return { ...cur, weights: next.weights };
@@ -569,6 +586,15 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
     const id = setTimeout(() => setToast(null), 4500);
     return () => clearTimeout(id);
   }, [toast]);
+
+  // Cost opened while this screen was open: read the two cost slices again
+  // (edits parked in match weights and model sites stay as they are).
+  useEffect(() => {
+    if (!sessionCost || costRead || loading) return;
+    load('cost').catch((e: unknown) => setToast({ ok: false, text: errText(e, t) }));
+    // `t` only words the error; see the first load above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionCost, costRead, loading, load]);
 
   const dirty = useCallback(
     (which: Tab) => JSON.stringify(sectionValue(draft, which)) !== JSON.stringify(sectionValue(saved, which)),
@@ -637,6 +663,9 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
 
   return (
     <div className="text-white">
+      {/* The owner before the address is verified: the three cost tabs are not
+          offered — and this is the way to open them. */}
+      {user?.owner_email_unverified === true && <OwnerCostVerifyCard compact />}
       <div className="flex gap-1.5 overflow-x-auto hide-scrollbar mb-5 pb-1">
         {TABS.map((s) => (
           <button

@@ -37,6 +37,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowLeftRight, Check, History, Loader2, RotateCcw, Percent, X } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { useAuth } from '../../AuthContext';
+import OwnerCostVerifyCard from '../auth/OwnerCostVerifyCard';
 import * as T from './theme';
 import { Field as FormField, Money, Qty, Toggle } from './form/formUi';
 import {
@@ -426,6 +428,7 @@ export default function QuickPricePanel({
 }) {
   const { lang } = useLanguage();
   const t = STRINGS[lang === 'en' ? 'en' : 'ar'];
+  const { user } = useAuth();
 
   const [data, setData] = useState<GridResponse | null>(null);
   const [relations, setRelations] = useState<RelationsState | null>(null);
@@ -477,6 +480,23 @@ export default function QuickPricePanel({
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * THE OWNER VERIFIED WHILE THIS PANEL WAS OPEN (DECISIONS row 185
+   * amendment). The cost column and the history tab follow the PAYLOAD's
+   * `can_view_cost`, which was read without cost; with nothing typed yet the
+   * panel simply reads the product again, once, and the cost arrives. With
+   * cells typed it waits — the fulfilment save keeps every stored cost
+   * (`cost_loaded: false`) either way.
+   */
+  const costReloadTried = useRef<string | null>(null);
+  const sessionSeesCost = user?.can_view_cost === true;
+  useEffect(() => {
+    if (!sessionSeesCost || !data || data.can_view_cost || loading || dirtyCount > 0 || relationsDirty) return;
+    if (costReloadTried.current === productId) return;
+    costReloadTried.current = productId;
+    void load();
+  }, [sessionSeesCost, data, loading, dirtyCount, relationsDirty, productId, load]);
 
   useEffect(() => {
     if (!toast) return;
@@ -646,6 +666,10 @@ export default function QuickPricePanel({
         fulfillments,
         direct_stock: directStock,
         ...(directStock.length > 0 ? { inventory_mode: inventoryMode } : {}),
+        // Read without cost (the payload said so): the cells' blank costs mean
+        // "not shown", and the server keeps the stored ones — even if this
+        // session has since been allowed cost (DECISIONS row 185 amendment).
+        ...(data.can_view_cost ? {} : { cost_loaded: false }),
       });
       const fresh = relationsFromWire(
         await api.get<RelationsResponse>(`/api/admin/products/${productId}/relations`)
@@ -762,6 +786,10 @@ export default function QuickPricePanel({
           </button>
         ))}
       </div>
+
+      {/* The owner before the address is verified: no cost column, no history
+          tab — and the way to open them. */}
+      {!data.can_view_cost && user?.owner_email_unverified === true && <OwnerCostVerifyCard compact />}
 
       {error && (
         <p className="text-[12.5px] text-[var(--ap-danger)] mb-2" data-qp="error">

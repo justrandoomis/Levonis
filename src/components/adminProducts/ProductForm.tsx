@@ -99,7 +99,7 @@ import { WarrantySection } from './form/WarrantySection';
 import { ConditionSection } from './form/ConditionSection';
 import { DimensionsSection } from './form/DimensionsSection';
 import { InventorySummary } from './form/InventorySummary';
-import OwnerCostVerifyCard from '../auth/OwnerCostVerifyCard';
+import OwnerCostVerifyCard, { CostOpensAfterSave } from '../auth/OwnerCostVerifyCard';
 import PricePreview from './PricePreview';
 import MembershipDiscountSection from './form/MembershipDiscountSection';
 import { useProPaused } from '../../lib/proPause';
@@ -132,6 +132,15 @@ interface CatalogNode extends CatalogV2 {
   effective_template_family: 'devices' | 'materials' | null;
 }
 
+/**
+ * Whether a served product document carries its cost. The server removes every
+ * cost KEY for a session that may not see cost (`stripFinancials`), and a
+ * document served to the owner always has `product_cost_iqd` (null or a number).
+ */
+function carriesCost(product: object): boolean {
+  return Object.prototype.hasOwnProperty.call(product, 'product_cost_iqd');
+}
+
 export default function ProductForm({
   productId,
   onBack,
@@ -154,6 +163,20 @@ export default function ProductForm({
   // way — this only avoids showing an input that would be rejected. `=== true`
   // so a hint the session lacks hides the fields instead of showing them.
   const canSeeCost = user?.can_view_cost === true;
+  /**
+   * WHETHER THE DOCUMENT ON SCREEN WAS READ WITH ITS COST (DECISIONS row 185
+   * amendment). The server removes every cost key from a document it serves
+   * to a session that may not see cost, so a document read by the owner before
+   * the address was verified holds blanks that mean "not shown". The session
+   * can turn cost-capable while this form stays open (verified in another
+   * tab); its blanks must then never be shown as the cost, or saved as one.
+   * Cost inputs show only when both are true, an untouched form re-reads the
+   * product, and a save of a form read without cost says so
+   * (`cost_loaded: false`), which keeps every stored cost on the server.
+   * A new product has nothing stored to lose.
+   */
+  const [costLoaded, setCostLoaded] = useState(true);
+  const costShown = canSeeCost && costLoaded;
 
   const [doc, setDoc] = useState<EditorDoc>(() => blankDoc());
   const [rel, setRel] = useState<RelationsState>(() => emptyRelations());
@@ -356,6 +379,7 @@ export default function ProductForm({
       const rs = hydrateRelations(r, p.product);
       setDoc(d);
       setRel(rs);
+      setCostLoaded(carriesCost(p.product));
       setLoadedUpdatedAt(p.product.updated_at ?? '');
       setLoadedBasePrice(typeof d.price_iqd === 'number' ? d.price_iqd : null);
       setPinnedDismissed(false);
@@ -379,11 +403,14 @@ export default function ProductForm({
   relRef.current = rel;
   const baselineRef = useRef(baseline);
   baselineRef.current = baseline;
+  const costLoadedRef = useRef(costLoaded);
+  costLoadedRef.current = costLoaded;
   const reloadKeepingEdits = useCallback(
     async (id: string) => {
       const before = baselineRef.current ? (JSON.parse(baselineRef.current) as { d: EditorDoc; rs: RelationsState }) : null;
       const mine = docRef.current;
       const myRel = relRef.current;
+      const mineCostLoaded = costLoadedRef.current;
       const section = new Set<string>(['spec_fields', 'spec_groups', 'labels', 'content_blocks', 'usage_guide', 'how_to_use', 'how_to_use_ar', 'how_to_use_ckb', 'printer_fit_ids']);
       const edited = before
         ? (Object.keys(mine) as Array<keyof EditorDoc>).filter(
@@ -400,6 +427,9 @@ export default function ProductForm({
         });
       }
       if (relEdited) setRel(myRel);
+      // Structure edited on a form read without cost carries its blanks back
+      // in: the form stays "read without cost" until it is saved.
+      if (relEdited && !mineCostLoaded) setCostLoaded(false);
     },
     [loadProduct]
   );
@@ -411,6 +441,7 @@ export default function ProductForm({
       const rs = emptyRelations();
       setDoc(d);
       setRel(rs);
+      setCostLoaded(true);
       setBaseline(JSON.stringify({ d, rs }));
       setLoading(false);
     }
@@ -483,6 +514,21 @@ export default function ProductForm({
   }, [brands, brandSearch, doc.brand_id]);
 
   const dirty = baseline !== '' && JSON.stringify({ d: doc, rs: rel }) !== baseline;
+  /**
+   * Cost opened while this form was open (the owner verified the address in
+   * another tab): an untouched form simply re-reads the product, once per
+   * product, so the cost inputs appear filled with the stored values. A form
+   * with edits keeps them; its save keeps every stored cost and the read-back
+   * brings the cost in (`CostOpensAfterSave` says so meanwhile).
+   */
+  const costReloadTried = useRef<string | null>(null);
+  const reloadId = productId || doc.id || '';
+  useEffect(() => {
+    if (!canSeeCost || costLoaded || !reloadId || loading || dirty) return;
+    if (costReloadTried.current === reloadId) return;
+    costReloadTried.current = reloadId;
+    void loadProduct(reloadId);
+  }, [canSeeCost, costLoaded, reloadId, loading, dirty, loadProduct]);
   // The note of a file update stands until the next edit.
   useEffect(() => {
     if (dirty) setFileUpdateNote(null);
@@ -639,6 +685,9 @@ export default function ProductForm({
         // server skips the stale check when no expectation is stated, which is
         // exactly what "keep my version" means.
         expected_updated_at: overwrite ? undefined : loadedUpdatedAt || undefined,
+        // Read without cost: the blanks this form holds are "not shown", and
+        // the server keeps every stored cost (see `costLoaded`).
+        ...(next.id && !costLoaded ? { cost_loaded: false } : {}),
       };
       const res = await api.post<SaveResponse & {
         translation_review_needed?: string[];
@@ -669,6 +718,7 @@ export default function ProductForm({
 
       const freshDoc = res.product ? toEditorDoc(res.product) : next;
       setDoc(freshDoc);
+      if (res.product) setCostLoaded(carriesCost(res.product));
       setLoadedUpdatedAt(res.product?.updated_at ?? loadedUpdatedAt);
       // The baseline is what the SERVER now holds — document and structure —
       // so the form is clean after a save instead of showing the read-back's
@@ -1287,7 +1337,7 @@ export default function ProductForm({
               </Grid>
             </TierPriceDisclosure>
           )}
-          {canSeeCost && (
+          {costShown && (
             <Field ar="التكلفة" en="Cost" tip="إداري فقط — لا تظهر للعميل ولا لمساعد الأدمن، ولا في أي تصدير. تُستخدم للمنتجات التي لا دفعات شراء لها؛ ما على الرف قد يحمل تكاليف أخرى.">
               <Money value={doc.product_cost_iqd} onChange={(v) => setDoc((d) => ({ ...d, product_cost_iqd: v }))} />
             </Field>
@@ -1302,6 +1352,9 @@ export default function ProductForm({
         {/* The owner before the address is verified: no cost input, and the
             way to open it (DECISIONS row 185 amendment). */}
         {!canSeeCost && user?.owner_email_unverified === true && <OwnerCostVerifyCard compact />}
+        {/* Verified while this form was open, with edits not saved yet: the
+            cost appears after the save (which keeps every stored cost). */}
+        {canSeeCost && !costLoaded && <CostOpensAfterSave />}
 
         {/* Stored by the template as `original_price_iqd` (the struck-through
             "was" price). No input here by design — but it is stored, it is
@@ -1586,7 +1639,7 @@ export default function ProductForm({
             cost: doc.product_cost_iqd,
           }}
           baseDimensions={doc.dimensions ?? emptyDimensions()}
-          canSeeCost={canSeeCost}
+          canSeeCost={costShown}
           errors={showErrors ? errors : {}}
         />
       </SectionCard>

@@ -112,13 +112,20 @@ test('the card speaks ar, en and real Sorani — ckb never the Arabic or the Eng
   const block = (lang: string) => {
     const at = src.indexOf(`  ${lang}: {`);
     assert.ok(at > 0, lang);
-    return src.slice(at, src.indexOf('\n  },', at));
+    // Up to and including the last entry's own newline, so it is read too.
+    return src.slice(at, src.indexOf('\n  },', at) + 1);
   };
-  const strings = (b: string) => [...b.matchAll(/(\w+): (?:\(email: string\) =>\s*)?[`'](.+?)[`'],?\n/g)].map((m) => [m[1]!, m[2]!] as const);
+  // Plain and `(s: number) =>` sentences, and the ones that hold the address
+  // as an element (`(e: Email) => (<>…</>)`) — every sentence, not the easy ones.
+  const strings = (b: string) => [
+    ...[...b.matchAll(/(\w+): (?:\((?:email: string|s: number)\) =>\s*)?[`'](.+?)[`'],?\n/g)].map((m) => [m[1]!, m[2]!] as const),
+    ...[...b.matchAll(/(\w+): \(e: Email\) => \(\s*<>\s*([\s\S]+?)\s*<\/>/g)].map((m) => [m[1]!, m[2]!.replace(/\s+/g, ' ')] as const),
+  ];
   const ar = new Map(strings(block('ar')));
   const en = new Map(strings(block('en')));
   const ckb = new Map(strings(block('ckb')));
-  assert.ok(ckb.size >= 10, `only ${ckb.size} Sorani strings read`);
+  assert.ok(ckb.size >= 15, `only ${ckb.size} Sorani strings read`);
+  for (const k of ['sent', 'notConfigured', 'cooldown', 'resend', 'checkFailed', 'afterSave']) assert.ok(ckb.has(k), `${k} was read`);
   assert.deepEqual([...ckb.keys()].sort(), [...ar.keys()].sort());
   assert.deepEqual([...en.keys()].sort(), [...ar.keys()].sort());
   for (const [k, v] of ckb) {
@@ -149,7 +156,12 @@ test('the inventory cost tabs need the hint AND a payload that carries the valua
 
 test('the print-pricing cost tabs (pricing, printers, materials) open for the owner only', () => {
   const code = codeOf(SCREENS.printPricing);
-  assert.match(code, /const ownerCost = user\?\.can_view_cost === true;/);
+  assert.match(code, /const sessionCost = user\?\.can_view_cost === true;/);
+  // …and only once the cost slices were READ by a session that sees cost: the
+  // owner verifying while this screen is open must not be shown the defaults
+  // the stripped read filled in (DECISIONS row 185 amendment).
+  assert.match(code, /const ownerCost = sessionCost && costRead;/);
+  assert.match(code, /if \(!only \|\| only === 'cost'\) setCostRead\(withCost\);/);
   assert.match(code, /\.filter\(\(s\) => ownerCost \|\| !COST_TABS\.has\(s\.id\)\)/);
   for (const t of ['pricing', 'printers', 'materials']) {
     assert.match(code, new RegExp(`tab === '${t}' && ownerCost &&`), `${t}: the body is gated as well as the tab`);
@@ -254,4 +266,77 @@ test('critique G-31: no owner cost screen keeps data in browser storage (localSt
   assert.ok(files.length > 20, `only ${files.length} owner-screen files scanned`);
   const offenders = files.filter((f) => /\b(localStorage|sessionStorage|indexedDB)\b/.test(codeOf(f)));
   assert.deepEqual(offenders, [], 'a cost screen must not leave cost on the device');
+});
+
+// ------------------------------------------------- review of the amendment (2026-10-08)
+
+test('the card never sends the owner to a Google control that does not exist, and says plainly when email cannot be sent', () => {
+  const src = sourceOf(SCREENS.verifyCard);
+  const strings = src.slice(src.indexOf('const STRINGS = {'), src.indexOf('} as const;'));
+  assert.doesNotMatch(strings, /settings|إعدادات|ڕێکخستنەکانی هەژمار/i, 'Settings has no Google link button');
+  assert.match(strings, /EMAIL_API_KEY and EMAIL_FROM/, 'the 503 state names what is missing');
+  assert.match(strings, /If Google is already connected to/);
+  // With no email service the state is known up front, from the status route.
+  const card = codeOf(SCREENS.verifyCard);
+  assert.match(card, /s\?\.emailConfigured === false\) setState\('not_configured'\)/);
+});
+
+test('the card waits a minute between sends, relabels the button «Resend», and says only the newest link works', () => {
+  const card = codeOf(SCREENS.verifyCard);
+  assert.match(card, /const RESEND_COOLDOWN_S = 60;/);
+  assert.match(card, /disabled=\{cooldown > 0\}/);
+  assert.match(card, /const sendLabel = sentOnce \? t\.resend : t\.send;/);
+  assert.match(sourceOf(SCREENS.verifyCard), /Only the link in the newest email works\./);
+});
+
+test('the status line is always in the accessibility tree, so "sent" and "failed" are announced', () => {
+  const card = codeOf(SCREENS.verifyCard);
+  assert.doesNotMatch(card, /empty:hidden/);
+  assert.equal((card.match(/role="status" aria-live="polite" className=\{message \? `[^`]+` : 'sr-only'\}/g) ?? []).length, 2);
+});
+
+test('«check now» asks the server and says so when it could not — never "not verified yet" for a failed request', () => {
+  const card = codeOf(SCREENS.verifyCard);
+  const recheck = card.slice(card.indexOf('const recheck = useCallback'), card.indexOf('const message'));
+  assert.match(recheck, /api\.get<VerifyStatus>\('\/api\/auth\/verify-email\/status'\)/);
+  assert.match(recheck, /if \(s\?\.verified === true\) \{\s*await refreshUser\(\);/);
+  assert.match(recheck, /catch \{\s*setState\('check_failed'\);/);
+});
+
+test('the emailed link for the owner’s address says "sign in first" by code, not "invalid link"', () => {
+  const banner = codeOf(SCREENS.verifyBanner);
+  assert.match(banner, /e\.code === 'VERIFY_SIGN_IN_REQUIRED'\) setConfirmState\('sign_in'\)/);
+  assert.match(banner, /refusalText\('VERIFY_SIGN_IN_REQUIRED', lang\)/);
+});
+
+test('the product form never shows, or saves, the blanks of a document read without cost', () => {
+  const code = codeOf(SCREENS.productForm);
+  // Whether the document carried its cost is read from the document itself.
+  assert.match(code, /return Object\.prototype\.hasOwnProperty\.call\(product, 'product_cost_iqd'\);/);
+  assert.match(code, /setCostLoaded\(carriesCost\(p\.product\)\);/);
+  assert.match(code, /if \(res\.product\) setCostLoaded\(carriesCost\(res\.product\)\);/);
+  // Cost inputs need the hint AND a document read with cost.
+  assert.match(code, /const costShown = canSeeCost && costLoaded;/);
+  assert.match(code, /\{costShown && \(\s*<Field ar="التكلفة" en="Cost"/);
+  assert.match(code, /canSeeCost=\{costShown\}/);
+  // A save of a document read without cost says so; the server then keeps every stored cost.
+  assert.match(code, /\.\.\.\(next\.id && !costLoaded \? \{ cost_loaded: false \} : \{\}\)/);
+  // An untouched form re-reads the product once when cost opens; one with edits says the cost comes after the save.
+  assert.match(code, /if \(!canSeeCost \|\| costLoaded \|\| !reloadId \|\| loading \|\| dirty\) return;/);
+  assert.match(code, /\{canSeeCost && !costLoaded && <CostOpensAfterSave \/>\}/);
+});
+
+test('the quick price panel and print pricing: a read without cost is never saved as one, and the prompt shows there too', () => {
+  const quick = codeOf('src/components/adminProducts/QuickPricePanel.tsx');
+  assert.match(quick, /\.\.\.\(data\.can_view_cost \? \{\} : \{ cost_loaded: false \}\)/);
+  assert.match(quick, /\{!data\.can_view_cost && user\?\.owner_email_unverified === true && <OwnerCostVerifyCard compact \/>\}/);
+  const print = codeOf(SCREENS.printPricing);
+  assert.match(print, /\{user\?\.owner_email_unverified === true && <OwnerCostVerifyCard compact \/>\}/);
+  assert.match(print, /if \(only === 'cost'\) return \{ \.\.\.cur, pricing: next\.pricing, materials: next\.materials \};/);
+  // The server side of the same rule: a flagged save is written like an assistant's.
+  const save = codeOf('worker/routes/adminProducts.ts');
+  assert.match(save, /const costBlind = prev !== null && body\.cost_loaded === false;/);
+  assert.match(save, /actor: \{ adminId: admin\.id, money: writesCost \}/);
+  const cells = codeOf('worker/routes/adminProductRelations.ts');
+  assert.match(cells, /if \(!canWriteCost\(c\.env, admin\) \|\| body\.cost_loaded === false\) \{/);
 });

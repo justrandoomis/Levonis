@@ -43,7 +43,7 @@ const REQUIRED: Record<string, readonly string[]> = {
   'S1 user PATCH (security spec §5.2)': ['SELF_DEMOTE', 'OWNER_LOCKED'],
   // The owner chose the most secure option: the verified-owner rule stays, and
   // an unverified owner is told how to verify instead of being locked out.
-  'DECISIONS row 185 amendment (2026-10-08)': ['OWNER_EMAIL_UNVERIFIED'],
+  'DECISIONS row 185 amendment (2026-10-08)': ['OWNER_EMAIL_UNVERIFIED', 'VERIFY_SIGN_IN_REQUIRED'],
   'critique G-34': ['PRODUCT_CURRENTLY_UNAVAILABLE'],
   'ENG §6.3': ['ENGINE_MANAGED', 'ENGINE_MANAGED_PRICES_KEPT', 'PREMIUM_NOT_ON_STEP'],
   'RUN §6': ['PRICING_INCOMPLETE_KEPT_HIDDEN', 'PRICING_PREVIEW_STALE', 'PRICING_PREVIEW_EXPIRED', 'PRICING_ENGINE_PAUSED', 'COMPOSITION_NOT_PRICEABLE'],
@@ -188,6 +188,7 @@ test('the access refusals carry no number, id or field value — one oracle-free
     'ROLE_CHANGE_DENIED',
     'OWNER_EMAIL_LOCKED',
     'OWNER_EMAIL_UNVERIFIED',
+    'VERIFY_SIGN_IN_REQUIRED',
     'REAUTH_REQUIRED',
   ] as const) {
     assert.doesNotMatch(serverMessage(code), /[0-9٠-٩]/, code);
@@ -239,12 +240,30 @@ test('OWNER_EMAIL_UNVERIFIED names the way out in all three languages, in the co
   assert.match(ar, /أكّد بريدك الإلكتروني/);
   assert.match(en, /Verify your email/);
   assert.match(ckb, /ئیمەیڵەکەت پشتڕاست بکەرەوە/);
-  // …or Google on the same address.
+  // …or a sign-in with Google ALREADY connected to the same address — never a
+  // "connect Google in your settings" control, which the settings page lacks.
   for (const s of [ar, en, ckb]) assert.match(s, /Google/);
+  assert.match(en, /if Google is already connected to the same address/);
+  assert.doesNotMatch(en, /settings/i);
+  assert.doesNotMatch(ar, /إعدادات/);
+  assert.doesNotMatch(ckb, /ڕێکخستن/);
   // C32 terminology: main admin «بەڕێوەبەری سەرەکی», cost «تێچوو».
   assert.match(ckb, /بەڕێوەبەری سەرەکی/);
   assert.match(ckb, /تێچوو/);
   assert.notEqual(ckb, ar);
   assert.notEqual(ckb, en);
   assert.deepEqual(REFUSAL_STRINGS.OWNER_EMAIL_UNVERIFIED, COST_REFUSALS.OWNER_EMAIL_UNVERIFIED);
+});
+
+test('VERIFY_SIGN_IN_REQUIRED tells the holder of the owner’s link to confirm it signed in to that account, in all three languages', () => {
+  const { ar, en, ckb } = COST_REFUSALS.VERIFY_SIGN_IN_REQUIRED;
+  assert.match(ar, /سجّل الدخول/);
+  assert.match(en, /Sign in to it in this browser/);
+  assert.match(ckb, /بچۆ ژوورەوە/);
+  assert.match(ckb, /بەڕێوەبەری سەرەکی/);
+  assert.match(ckb, SORANI_ONLY);
+  assert.doesNotMatch(ckb, ARABIC_ONLY);
+  assert.notEqual(ckb, ar);
+  assert.notEqual(ckb, en);
+  assert.deepEqual(REFUSAL_STRINGS.VERIFY_SIGN_IN_REQUIRED, COST_REFUSALS.VERIFY_SIGN_IN_REQUIRED);
 });

@@ -40,14 +40,24 @@ export const COST_REFUSALS = {
   // The owner's own address on an admin row that is NOT yet verified (DECISIONS
   // row 185, amendment of 2026-10-08). Only that one session can ever receive
   // it; everyone else keeps COST_ACCESS_DENIED, byte for byte. It names the
-  // way out: verify the address, or connect Google on it (POST
-  // /api/auth/google/link stamps the same address; a sign-in with an
-  // already-connected Google stamps it too — an unconnected, unverified
-  // account is never merged with Google, by design).
+  // way out: verify the address (the admin screens send the existing
+  // verification email), or sign in with Google when Google is ALREADY
+  // connected to that same address — a sign-in stamps it. An unconnected,
+  // unverified account is never merged with Google, by design, and the
+  // settings page has no Google link button, so the sentence offers neither.
   OWNER_EMAIL_UNVERIFIED: {
-    ar: 'بيانات التكلفة تُفتح للأدمن الرئيسي بعد تأكيد بريد حسابه. أكّد بريدك الإلكتروني لفتحها، أو اربط Google على البريد نفسه من إعدادات حسابك (أو سجّل الدخول به إن كان مربوطًا).',
-    en: "Cost data opens for the main admin once the account's email is verified. Verify your email to open it, or connect Google on the same address in your account settings (or sign in with it if it is already connected).",
-    ckb: 'زانیارییەکانی تێچوو بۆ بەڕێوەبەری سەرەکی دەکرێنەوە دوای پشتڕاستکردنەوەی ئیمەیڵی هەژمارەکە. ئیمەیڵەکەت پشتڕاست بکەرەوە بۆ کردنەوەیان، یان لە ڕێکخستنەکانی هەژمارەکەتەوە Google لەسەر هەمان ئیمەیڵ ببەستەوە (یان ئەگەر پێشتر بەستراوە، پێی بچۆ ژوورەوە).',
+    ar: 'بيانات التكلفة تُفتح للأدمن الرئيسي بعد تأكيد بريد حسابه. أكّد بريدك الإلكتروني لفتحها، أو سجّل الدخول بحساب Google إن كان مربوطًا بالبريد نفسه.',
+    en: "Cost data opens for the main admin once the account's email is verified. Verify your email to open it, or sign in with Google if Google is already connected to the same address.",
+    ckb: 'زانیارییەکانی تێچوو بۆ بەڕێوەبەری سەرەکی دەکرێنەوە دوای پشتڕاستکردنەوەی ئیمەیڵی هەژمارەکە. ئیمەیڵەکەت پشتڕاست بکەرەوە بۆ کردنەوەیان، یان ئەگەر Google پێشتر بە هەمان ئیمەیڵەوە بەستراوە، بە Google بچۆ ژوورەوە.',
+  },
+  // A verification link for the owner's address — the one that opens cost —
+  // is confirmed only from a session of the account it belongs to (DECISIONS
+  // row 185 amendment). Said only to the holder of a valid, unused link, so it
+  // tells nobody anything their mailbox did not; the link stays unused.
+  VERIFY_SIGN_IN_REQUIRED: {
+    ar: 'بريد الأدمن الرئيسي يُؤكَّد من حسابه وهو مسجّل الدخول فقط. سجّل الدخول إلى ذلك الحساب في هذا المتصفح، ثم افتح رابط التأكيد من الرسالة مرة أخرى.',
+    en: "The main admin's email is confirmed only from that account while it is signed in. Sign in to it in this browser, then open the confirmation link from the email again.",
+    ckb: 'ئیمەیڵی بەڕێوەبەری سەرەکی تەنها لە هەژمارەکەی خۆیەوە و لە کاتی چوونەژوورەوەدا پشتڕاست دەکرێتەوە. لەم وێبگەڕەدا بچۆ ژوورەوەی ئەو هەژمارە، پاشان دووبارە بەستەری پشتڕاستکردنەوە لە ئیمەیڵەکەوە بکەرەوە.',
   },
   OWNER_ONLY: {
     ar: 'هذا الإجراء للأدمن الرئيسي فقط.',

@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
+import { refusalText } from '../../lib/refusalStrings';
 
 /**
  * Email verification banner (final-phase §3A).
@@ -181,7 +182,7 @@ export default function EmailVerifyBanner() {
   const headerClearance = onHomeRoute
     ? 'mt-[calc(var(--app-header-height,132px)+0.75rem)]'
     : 'mt-3';
-  const [confirmState, setConfirmState] = useState<'idle' | 'confirming' | 'done' | 'failed'>('idle');
+  const [confirmState, setConfirmState] = useState<'idle' | 'confirming' | 'done' | 'failed' | 'sign_in'>('idle');
 
   const loadStatus = useCallback(() => {
     api
@@ -248,8 +249,12 @@ export default function EmailVerifyBanner() {
         // with no new sign-in (DECISIONS row 185 amendment).
         void refreshUser();
       }
-    } catch {
-      setConfirmState('failed');
+    } catch (e) {
+      // The owner's address (the one that opens cost) is confirmed only from
+      // a session of its own account (DECISIONS row 185 amendment). The link
+      // is still unused: sign in here, then open it again.
+      if (e instanceof ApiError && e.code === 'VERIFY_SIGN_IN_REQUIRED') setConfirmState('sign_in');
+      else setConfirmState('failed');
     }
   };
 
@@ -260,7 +265,11 @@ export default function EmailVerifyBanner() {
     return (
       <div className={`${headerClearance} mx-3 rounded-2xl border border-warning/30 bg-warning/[0.08] p-4 text-sm`}>
         <p className="font-bold text-yellow-500 mb-1">{t.confirmTitle}</p>
-        {confirmState === 'failed' ? (
+        {confirmState === 'sign_in' ? (
+          <p role="status" className="text-text-secondary leading-relaxed">
+            {refusalText('VERIFY_SIGN_IN_REQUIRED', lang)}
+          </p>
+        ) : confirmState === 'failed' ? (
           <>
             <p className="text-red-400 mb-1">{t.confirmFailed}</p>
             <p className="text-gray-400 text-xs">{t.confirmFailedHint}</p>

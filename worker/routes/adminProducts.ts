@@ -1230,11 +1230,24 @@ adminProductsRoutes.post('/', async (c) => {
   // were refused, and never a value. The decision reads the request alone,
   // never the stored cost: refusing only a number that differs from it told
   // a non-owner when a guess was right.
+  //
+  // A FORM THAT NEVER SAW THE COST KEEPS IT (DECISIONS row 185 amendment of
+  // 2026-10-08). `cost_loaded: false` says the editor read this document while
+  // its session could not see cost — the owner before the address was
+  // verified — so every cost it holds is a blank that means "not shown", not
+  // "clear it". The owner can verify in another tab and come back to the same
+  // form, now allowed to write cost; that save is written like an assistant's:
+  // the stored product, option, colour, variant, order-type and route costs all
+  // stay. The flag can only narrow what a save writes, never widen it.
+  const costBlind = prev !== null && body.cost_loaded === false;
+  const writesCost = canWriteCost(c.env, admin) && !costBlind;
   if (!canWriteCost(c.env, admin)) {
     const attempted = attemptedFinancialWrites(body);
     if (attempted.length) throw costRefusal(c.env, admin, { fields: attempted });
     // Carry the stored cost forward untouched so an assistant's save cannot
     // blank a value they were never shown.
+    carryStoredCostForward(doc, prev);
+  } else if (costBlind) {
     carryStoredCostForward(doc, prev);
   }
 
@@ -1343,7 +1356,7 @@ adminProductsRoutes.post('/', async (c) => {
     printerFits: Array.isArray(body.printer_fit_ids)
       ? (body.printer_fit_ids as unknown[]).filter((x): x is string => typeof x === 'string')
       : undefined,
-    actor: { adminId: admin.id, money: canWriteCost(c.env, admin) },
+    actor: { adminId: admin.id, money: writesCost },
     translations: localized.fields,
   };
 

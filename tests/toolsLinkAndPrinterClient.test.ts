@@ -98,7 +98,8 @@ test('the admin editor is mounted under print pricing and writes the audited rou
   const admin = read('src/components/adminCommunity/PrintPricingAdmin.tsx');
   // The owner's alone (decision 2): the tab is offered on can_view_cost === true.
   assert.match(admin, /\{tab === 'printers' && ownerCost && <PrinterModelsEditor t=\{t\} \/>\}/);
-  assert.match(admin, /const ownerCost = user\?\.can_view_cost === true;/);
+  assert.match(admin, /const sessionCost = user\?\.can_view_cost === true;/);
+  assert.match(admin, /const ownerCost = sessionCost && costRead;/);
   const editor = read('src/components/adminCommunity/PrinterModelsEditor.tsx');
   assert.match(editor, /api\.get<ListResponse & \{ success: boolean \}>\('\/api\/admin\/print-quote\/printer-models'\)/);
   assert.match(editor, /api\.patch\(`\/api\/admin\/print-quote\/printer-models\/\$\{encodeURIComponent\(m\.id\)\}`, body\)/);

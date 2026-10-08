@@ -52,8 +52,11 @@ Before anything is migrated, workflow 7 refuses an empty `INITIAL_ADMIN_EMAIL`
 DECISIONS row 185 amendment of 2026-10-08). Cost is honoured only for the admin
 account holding that address once the address is verified; until then the site
 itself tells the owner so (`403 OWNER_EMAIL_UNVERIFIED`) and the admin screens
-offer the verification email (connecting Google on the same address, or signing
-in with an already-connected Google, verifies it too).
+offer the verification email (a sign-in with Google already connected to the
+same address verifies it too). The emailed link for the owner's address is
+confirmed only while signed in to that same account, in the same browser
+(`403 VERIFY_SIGN_IN_REQUIRED` otherwise, the link left unused). With no email
+service configured (`EMAIL_API_KEY`, `EMAIL_FROM`) the card says so.
 The session reads the stamp on every request, so cost opens on the next request
 after it, with no redeploy. After the deploy, «Cost-privacy probes, read-only»
 runs `scripts/live-cost-probes.mjs` over every `scripts/live-cost-probes.d/*.json`:

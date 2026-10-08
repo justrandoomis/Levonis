@@ -127,11 +127,15 @@ function hasVerifiedAddress(user: Pick<CostSubject, 'email_verified_at'>): boole
  * NO LOCKOUT, A WAY OUT. The deploy does not check the owner row (it never
  * reads `users`). An owner whose address is not verified yet is refused every
  * cost surface with OWNER_EMAIL_UNVERIFIED instead of the generic refusal
- * (`isUnverifiedOwner`, `costRefusal` in costAccess.ts), the admin screens
- * offer the existing verification email, and connecting Google on the same
- * address (or signing in with an already-connected Google) stamps it too.
- * The session loader reads the row on every request, so cost opens on the
- * very next request after the stamp — no redeploy, no new sign-in.
+ * (`isUnverifiedOwner`, `costRefusal` in costAccess.ts), and the admin
+ * screens offer the existing verification email; a sign-in with Google
+ * already connected to the same address stamps it too. The emailed link for
+ * this address is confirmed only from a session of the account it belongs to
+ * (VERIFY_SIGN_IN_REQUIRED, worker/routes/auth.ts), so a row that took the
+ * address while it was free cannot be verified by the real owner's click. A
+ * blank stamp ('' or spaces) is no stamp here and in every auth writer. The
+ * session loader reads the row on every request, so cost opens on the very
+ * next request after the stamp — no redeploy, no new sign-in.
  */
 function isVerifiedOwner(env: Env, user: CostSubject): boolean {
   return isOwner(env, user) && hasVerifiedAddress(user);

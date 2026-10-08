@@ -27,6 +27,7 @@ import { verifyGoogleIdToken } from '../lib/google';
 import { identifierKey, rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { isOwner, ownerOnly } from '../lib/costAccess';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { emitEvent, emitFromRequest, eventsEnabled } from '../lib/eventBus';
 import { UserCreatedV1 } from '@levonis/contracts/events/v1/UserCreated';
 import { ReferralUsedV1 } from '@levonis/contracts/events/v1/ReferralUsed';
@@ -77,6 +78,23 @@ export const authRoutes = new Hono<AppContext>();
 
 const PASSWORD_MIN = 8;
 const PASSWORD_MAX = 128;
+
+/**
+ * ONE MEANING OF "VERIFIED", THE SAME AS THE COST RULE'S.
+ *
+ * `hasVerifiedAddress` (worker/lib/adminScope.ts) counts only a non-blank
+ * stamp: NULL, '' and '   ' are no stamp, so the owner whose row carries a
+ * blank one is refused cost with OWNER_EMAIL_UNVERIFIED. Every writer and
+ * every reader here has to agree with it, or that owner is shown the way out
+ * and every way out answers "verified" while leaving the blank in place —
+ * `COALESCE` keeps any non-NULL value, '' included. No code path writes a
+ * blank stamp; a manual or imported edit could.
+ */
+function isStamped(v: string | null | undefined): boolean {
+  return typeof v === 'string' && v.trim() !== '';
+}
+/** First real stamp wins; a blank one is replaced like a NULL. Binds one `?` (the stamp). */
+const STAMP_ONCE = "COALESCE(NULLIF(trim(email_verified_at), ''), ?)";
 
 /**
  * A syntactically valid but unmatchable PBKDF2 record (all-zero salt and
@@ -862,7 +880,7 @@ export async function resolveGoogleIdentity(
       // the reverse. So linking requires the existing account to have proven
       // the address itself (email_verified_at), and the refusal names the
       // exact recovery path instead of merging.
-      if (!byEmail.email_verified_at) {
+      if (!isStamped(byEmail.email_verified_at)) {
         throw new HttpError(
           409,
           'يوجد حساب بهذا البريد لم يُوثَّق بريده بعد، ولن نربطه بحساب Google تلقائيًا. سجّل الدخول بكلمة المرور ووثّق بريدك، ثم سيُربط Google تلقائيًا. / ' +
@@ -924,7 +942,7 @@ export async function resolveGoogleIdentity(
   // account's own matching address as verified (first stamp wins; existing
   // stamps and other accounts are never touched — no bulk verification).
   await env.DB.prepare(
-    'UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ? AND email = ?'
+    `UPDATE users SET email_verified_at = ${STAMP_ONCE} WHERE id = ? AND email = ?`
   )
     .bind(new Date().toISOString(), row.id, identity.email)
     .run();
@@ -1041,7 +1059,7 @@ authRoutes.post('/google/link', requireMainHost, requireAuth, async (c) => {
 
   // Same-address proof only — never stamp a different address as verified.
   await c.env.DB.prepare(
-    'UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ? AND email = ?'
+    `UPDATE users SET email_verified_at = ${STAMP_ONCE} WHERE id = ? AND email = ?`
   )
     .bind(new Date().toISOString(), me.id, identity.email)
     .run();
@@ -2045,7 +2063,7 @@ authRoutes.get('/verify-email/status', requireAuth, async (c) => {
   return c.json({
     success: true,
     email: row?.email ?? user.email,
-    verified: !!row?.email_verified_at,
+    verified: isStamped(row?.email_verified_at),
     emailConfigured: emailConfigured(c.env),
   });
 });
@@ -2064,7 +2082,7 @@ authRoutes.post('/verify-email/send', requireAuth, async (c) => {
     .bind(user.id)
     .first<{ email: string; email_verified_at: string | null; locale: string }>();
   if (!row) throw unauthorized();
-  if (row.email_verified_at) return c.json({ success: true, verified: true });
+  if (isStamped(row.email_verified_at)) return c.json({ success: true, verified: true });
   if (row.email.toLowerCase().endsWith('@telegram.local')) {
     // Telegram-signup placeholder address — non-routable by construction, so
     // "sending a verification message" could never be true. Refuse honestly
@@ -2093,12 +2111,31 @@ authRoutes.post('/verify-email/confirm', async (c) => {
   if (!row) throw badRequest(genericMsg, 'BAD_TOKEN');
   if (row.used) throw badRequest(genericMsg, 'TOKEN_USED');
   if (new Date(row.expires_at).getTime() < Date.now()) throw badRequest(genericMsg, 'TOKEN_EXPIRED');
-  if (row.new_email) {
-    // A change requested before the owner lock existed must not land either.
-    const holder = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?')
-      .bind(row.user_id)
-      .first<{ email: string }>();
-    if (holder && isOwner(c.env, holder)) throw ownerOnly('OWNER_EMAIL_LOCKED');
+  const holder = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?')
+    .bind(row.user_id)
+    .first<{ email: string }>();
+  // A change requested before the owner lock existed must not land either.
+  if (row.new_email && holder && isOwner(c.env, holder)) throw ownerOnly('OWNER_EMAIL_LOCKED');
+
+  /**
+   * THE ADDRESS THAT OPENS COST IS CONFIRMED FROM ITS OWN SESSION (DECISIONS
+   * row 185, amendment of 2026-10-08 — the owner chose the most secure option).
+   *
+   * Everywhere else a link in the mailbox is the whole proof. For the owner's
+   * address (INITIAL_ADMIN_EMAIL) it is not enough: the stamp is what opens
+   * cost, and a link can be sent to the owner's mailbox by whoever holds a row
+   * with that address (one registered while the address was free) or asks to
+   * move a row onto it. One click by the real owner, who expects a "verify your
+   * email" message, would then hand that row the cost. So a token that would
+   * leave the owner's address verified — on the row that holds it now, or on
+   * the row an email change would move it to — is confirmed only by a request
+   * that carries a session of that same account. The owner pressed "send" from
+   * that session, so the same browser confirms in one tap; any other browser is
+   * told to sign in first, and the link stays unused.
+   */
+  const verifiedAddress = row.new_email ?? holder?.email ?? null;
+  if (verifiedAddress && isOwner(c.env, { email: verifiedAddress }) && c.get('user')?.id !== row.user_id) {
+    throw new HttpError(403, serverMessage('VERIFY_SIGN_IN_REQUIRED'), 'VERIFY_SIGN_IN_REQUIRED');
   }
 
   // Atomic one-use consumption — concurrent confirms cannot both pass.
@@ -2127,7 +2164,7 @@ authRoutes.post('/verify-email/confirm', async (c) => {
       throw e;
     }
   } else {
-    await c.env.DB.prepare('UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?')
+    await c.env.DB.prepare(`UPDATE users SET email_verified_at = ${STAMP_ONCE} WHERE id = ?`)
       .bind(now, row.user_id)
       .run();
   }
@@ -2554,9 +2591,9 @@ authRoutes.post('/otp/verify', async (c) => {
 
   // Receiving the code IS the mailbox proof, so an account that signed in this
   // way has a verified address whether or not it ever clicked a link.
-  if (channel === 'email' && !account.email_verified_at) {
+  if (channel === 'email' && !isStamped(account.email_verified_at)) {
     await c.env.DB.prepare(
-      "UPDATE users SET email_verified_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND email_verified_at IS NULL"
+      "UPDATE users SET email_verified_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND (email_verified_at IS NULL OR trim(email_verified_at) = '')"
     )
       .bind(account.id)
       .run();
