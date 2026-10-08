@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Gift } from 'lucide-react';
+import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Gift, Calculator } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supportTotal, useSupportCounts } from '../components/adminSupport/supportCounts';
 import { useAuth } from '../AuthContext';
@@ -66,6 +66,12 @@ const AdminOverview = React.lazy(() => import('../components/AdminOverview'));
  * screen only the owner can open.
  */
 const AdminFinance = React.lazy(() => import('../components/adminFinance/AdminFinance'));
+/**
+ * «التسعير والشحن» — the owner's pricing preview (MVP plan §6 P1): today's
+ * prices, the minimum profit the old prices carry, and «كم سيصبح السعر؟».
+ * Its own chunk, mounted for `can_write_cost === true` only; it writes nothing.
+ */
+const AdminPricing = React.lazy(() => import('../components/adminPricing/AdminPricing'));
 /** The owner's way to open cost before the account's address is verified (DECISIONS row 185 amendment). */
 const OwnerCostVerifyCard = React.lazy(() => import('../components/auth/OwnerCostVerifyCard'));
 const MyEarnings = React.lazy(() => import('../components/financePeople/MyEarnings'));
@@ -132,6 +138,7 @@ type AdminTab =
   | 'orders'
   | 'trade_in'
   | 'products'
+  | 'pricing'
   | 'bundles'
   | 'mystery'
   | 'mystery_pools'
@@ -166,7 +173,7 @@ type AdminTab =
  * else opens the overview. Existing financial links without a parent tab
  * reopen finance, preserving their report section and date range.
  */
-const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'finance', 'inventory', 'earnings'];
+const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'finance', 'inventory', 'earnings', 'pricing'];
 
 function initialAdminTab(): AdminTab {
   try {
@@ -214,6 +221,15 @@ export default function Admin() {
    * hint is on the owner's own session only, compared with `=== true`.
    */
   const ownerMustVerify = !canSeeFinance && user?.owner_email_unverified === true;
+  /**
+   * «التسعير والشحن» READS COST AND IS WHERE COST WILL BE WRITTEN (P3), so it
+   * follows the cost-INPUT hint: `can_write_cost === true`, the owner only,
+   * fail-closed like every S1 hint. The owner before the address is verified
+   * keeps the entry and meets the verification card instead — the same
+   * pattern as the finance tab. The router refuses everyone else regardless.
+   */
+  const canSeePricing = user?.can_write_cost === true;
+  const pricingMustVerify = !canSeePricing && user?.owner_email_unverified === true;
 
   /** People waiting in the support console, for the sidebar badge. */
   const supportWaiting = supportTotal(useSupportCounts());
@@ -239,6 +255,9 @@ export default function Admin() {
     { id: 'inventory', icon: Warehouse, label: loc('إدارة المخزون', 'Inventory', 'بەڕێوەبردنی کۆگا'), ...section('operations', 'التشغيل', 'Operations') },
     { id: 'wallet_requests', icon: Bell, label: loc('طلبات المحفظة', 'Wallet requests'), ...section('operations', 'التشغيل', 'Operations') },
     { id: 'products', icon: Package, label: t('adminProducts'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') },
+    ...(canSeePricing || pricingMustVerify
+      ? [{ id: 'pricing', icon: Calculator, label: loc('التسعير والشحن', 'Pricing & shipping', 'نرخدانان و ناردنی بەرهەم'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') }]
+      : []),
     { id: 'bundles', icon: Boxes, label: loc('الباقات', 'Bundles'), ...section('catalog', 'الكتالوج', 'Catalog') },
     { id: 'mystery', icon: Dice5, label: loc('العروض العشوائية', 'Mystery offers', 'ئۆفەرە نهێنییەکان'), ...section('catalog', 'الكتالوج', 'Catalog') },
     { id: 'mystery_pools', icon: Layers, label: loc('مجموعات السحب', 'Mystery pools', 'کۆمەڵەکانی هەڵبژاردن'), ...section('catalog', 'الكتالوج', 'Catalog') },
@@ -294,7 +313,7 @@ export default function Admin() {
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
       <Toaster />
-      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'serials' || activeTab === 'membership_benefits' || activeTab === 'trade_in' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
+      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'pricing' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'serials' || activeTab === 'membership_benefits' || activeTab === 'trade_in' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
         <React.Suspense fallback={<PanelFallback dir={dir} />}>
 
         {activeTab === 'overview' && (
@@ -323,6 +342,11 @@ export default function Admin() {
         {activeTab === 'products' && (
           <AdminProducts />
         )}
+
+        {activeTab === 'pricing' && canSeePricing && <AdminPricing />}
+
+        {/* No cost value is fetched here either: the card only offers the email. */}
+        {activeTab === 'pricing' && pricingMustVerify && <OwnerCostVerifyCard />}
 
         {activeTab === 'bundles' && <AdminBundles />}
         {activeTab === 'mystery' && <AdminMystery />}
