@@ -20,7 +20,7 @@ import { deleteCancelledOrder } from '../worker/lib/orderDeletion';
 type W = ReturnType<typeof world>;
 const scanBody = (item: string, unit: number, code: string, opId = op()) => ({ order_item_id: item, unit_index: unit, code, source: 'camera', op_id: opId });
 
-test('§24 two staff, one serial, two orders, at the same moment: exactly one wins', async () => {
+test('§32.18/§24 two staff, one serial, two orders, at the same moment: exactly one wins', async () => {
   const w = world({ serial: true });
   order(w.raw, 'ORD-A', [{ id: 'la', product: 'pA1' }]);
   order(w.raw, 'ORD-B', [{ id: 'lb', product: 'pA1' }]);

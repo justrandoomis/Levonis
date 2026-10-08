@@ -14,7 +14,10 @@
  * the accessories; pPLA a filament.
  */
 import type { DatabaseSync } from 'node:sqlite';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { freshDb, dbThrough, asD1, stubApp, type StubUser } from './app';
+import { ROOT } from './d1';
 import { serialD1 } from './serialD1';
 import { adminOrderSerialRoutes } from '../../worker/routes/adminOrderSerials';
 import { adminRoutes } from '../../worker/routes/admin';
@@ -24,6 +27,20 @@ import { returnRoutes } from '../../worker/routes/returns';
 import { warrantyAdminRoutes } from '../../worker/routes/warranty';
 import { adminProductsRoutes } from '../../worker/routes/adminProducts';
 import { orderRoutes } from '../../worker/routes/orders';
+import { adminStockOperationsRoutes } from '../../worker/routes/adminStockOperations';
+
+/**
+ * The serial-scan migration's own file, found by NAME: it lands under
+ * whatever number is free at landing (renumbered after the pricing S1
+ * migrations), and no test may pin the number it happens to carry today.
+ */
+export const SERIAL_MIGRATION = (() => {
+  const f = readdirSync(join(ROOT, 'migrations')).find((x) => /^\d{4}_serial_assignments\.sql$/.test(x));
+  if (!f) throw new Error('migrations/NNNN_serial_assignments.sql is missing');
+  return f;
+})();
+/** The database one migration before it — what a deploy-ahead Worker runs against (`dbThrough`). */
+export const BEFORE_SERIALS = String(Number(SERIAL_MIGRATION.slice(0, 4)) - 1).padStart(4, '0');
 
 export const SN = '03919D580607841';
 export const SN2 = '03919D580607842';
@@ -99,22 +116,64 @@ export function order(
   }
 }
 
+/** The routes the serial scan touches, mounted in worker/index.ts's order. */
+export function mountSerialWorld(a: Parameters<Parameters<typeof stubApp>[2]>[0]) {
+  a.route('/api/admin/orders', adminOrderSerialRoutes);
+  a.route('/api/admin/taxonomy', adminTaxonomyRoutes);
+  a.route('/api/admin/warranties', warrantyAdminRoutes);
+  a.route('/api/admin/products-v2', adminProductsRoutes);
+  a.route('/api/admin/stock-operations', adminStockOperationsRoutes);
+  a.route('/api/admin', adminRoutes);
+  a.route('/api/devices', deviceRoutes);
+  a.route('/api/returns', returnRoutes);
+  a.route('/api/orders', orderRoutes);
+}
+
+/**
+ * THE WORST INTERLEAVING, ON PURPOSE. Request B runs every read it makes and
+ * then stops at its first batch; request A runs to the end; then B's batch
+ * lands on the state A left. Both passed their pre-reads against the same
+ * old state, so only what B re-asserts INSIDE its batch (the fences, the
+ * partial unique indexes) can stop it. Deterministic, unlike two promises
+ * racing, which always resolve in the same order here.
+ */
+export async function afterReadsOf(
+  w: { db: D1Database },
+  bWho: keyof typeof USERS,
+  b: (app: ReturnType<typeof stubApp>) => Response | Promise<Response>,
+  a: () => Response | Promise<Response>
+): Promise<{ a: Response; b: Response; bReachedBatch: boolean }> {
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  let reached = false;
+  let signal!: () => void;
+  const atBatch = new Promise<void>((r) => (signal = r));
+  const held = {
+    prepare: (sql: string) => w.db.prepare(sql),
+    batch: async (stmts: D1PreparedStatement[]) => {
+      if (!reached) {
+        reached = true;
+        signal();
+        await gate;
+      }
+      return w.db.batch(stmts);
+    },
+  } as unknown as D1Database;
+  const pending = Promise.resolve(b(stubApp(held, USERS[bWho], mountSerialWorld)));
+  await Promise.race([atBatch, pending.catch(() => undefined)]);
+  const aRes = await a();
+  release();
+  const bRes = await pending;
+  return { a: aRes, b: bRes, bReachedBatch: reached };
+}
+
 /** `serial`: the single-writer adapter (tests/fixtures/serialD1.ts) for tests that race two requests. */
 export function world(opts: { through?: string; serial?: boolean } = {}) {
   const raw = opts.through ? dbThrough(opts.through) : freshDb();
   seed(raw);
   const db = opts.serial ? serialD1(raw) : asD1(raw);
-  const mount = (a: Parameters<Parameters<typeof stubApp>[2]>[0]) => {
-    a.route('/api/admin/orders', adminOrderSerialRoutes);
-    a.route('/api/admin/taxonomy', adminTaxonomyRoutes);
-    a.route('/api/admin/warranties', warrantyAdminRoutes);
-    a.route('/api/admin/products-v2', adminProductsRoutes);
-    a.route('/api/admin', adminRoutes);
-    a.route('/api/devices', deviceRoutes);
-    a.route('/api/returns', returnRoutes);
-    a.route('/api/orders', orderRoutes);
-  };
-  const as = (who: keyof typeof USERS) => stubApp(db, USERS[who], mount);
+  /** `env` adds Worker bindings for this app only (the courier's credentials, say). */
+  const as = (who: keyof typeof USERS, env?: Record<string, unknown>) => stubApp(db, USERS[who], mountSerialWorld, env ? { env } : {});
   return { raw, db, as, env: { DB: db, INITIAL_ADMIN_EMAIL: 'boss@x.co' } as never };
 }
 

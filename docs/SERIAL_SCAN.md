@@ -193,8 +193,27 @@ SELECT serial_norm FROM device_serials WHERE serial_norm GLOB '*[^0-9A-Z]*';
 SELECT serial_norm FROM warranty_receipts WHERE status IN ('draft','active') AND serial_norm GLOB '*[^0-9A-Z]*';
 ```
 
+## Tests
+
+Every case runs the real routes over the real migrations (`tests/fixtures/serialPrep.ts`).
+
+| File | What it proves |
+|---|---|
+| `serialPrepScan` | §32.1, 2, 4, 5, 6/7, 13, 14, 15, 16, 17, 19; the window and its SQL twin; the hardened doors; old-form keys (M7) |
+| `serialPrepBrief` | the brief's twenty tests as one map (a §32 item with no test fails the suite); §32.3 through the gate to three warranty units, §32.6 with the stock return, §32.9 receipt-only, §32.11 camera pixels → route, §32.12 USB / Bluetooth reader on an Arabic layout, §32.13 typing, §32.14 after delivery, §32.17 the lot, §32.20 the whole timeline with actors and the §25 keys |
+| `serialReturnWarranty` | §32.8 activation, H3, §32.9 delivered devices, §32.10 return, quarantine, M6, L3, M5 |
+| `serialPrepCanonical` | H1: one canonicaliser for the four sources and the change / override / post-delivery / replacement doors; one asset for every written form; box ↔ serial collisions, inside the batch too; L10, L16 |
+| `serialPrepGate` | H2: serials freeze for staff once a courier shipment exists (also when it lands mid-batch); the courier door refuses before the courier is called, the owner's reason is audited, an unlink during the call is recorded as a breach; the legacy door's in-batch fence; what is and is not gated; the switch; M1 lot conflicts; M8, M9 |
+| `serialPrepRaces`, `serialPrepConcurrency` | §32.18 and §24: requests run concurrently, and each race also deterministically both ways (`afterReadsOf`: B reads, A commits, B's batch lands) — same serial on N orders, one slot two serials, scan vs cancel, scan vs a stage move, change vs remove, remove vs the gated move, the owner's take vs staff, a double tap, three activations at once |
+| `serialPrepPrivacy` | masked serial for assistants on every serial surface, order numbers to the owner only (§10, §11), every exception and policy write owner-only, the `receive` capability, customers locked out, no cost figure or cost field in any serial answer |
+| `serialPrepCritique` | H4, M2, M3, M4, M13, M15, M1 / L14 flags, L6 |
+| `serialPrepDeployAhead` | the code on the database one migration behind: every new door 503, HEAD behaviour everywhere else, and the feature live the moment the migration lands (no cached «not installed») |
+| `serialPolicy`, `serialPrepBoard`, `serialPrepUi` | §29 policy; the board chip; the screens (wedge, sources, strings, Sorani) |
+
 ## Renumbering
 
 Only the file name and `worker/lib/schemaVersion.ts` (`EXPECTED_MIGRATION`,
-`EXPECTED_MIGRATION_COUNT`) carry the number; the deploy-ahead tests build the
-pre-migration database with `dbThrough('0176')`.
+`EXPECTED_MIGRATION_COUNT`) carry the number. The tests find the migration by
+its name (`SERIAL_MIGRATION` / `BEFORE_SERIALS` in
+`tests/fixtures/serialPrep.ts`), so the deploy-ahead tests keep building the
+database one migration before it with no edit.

@@ -13,7 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { json, post, put, get } from './fixtures/app';
-import { world, order, op, SN, SN2 } from './fixtures/serialPrep';
+import { world, order, op, SN, SN2, BEFORE_SERIALS } from './fixtures/serialPrep';
 
 type BoardRow = { id: string; serials?: { required: number; linked: number; gate: boolean; holds_next: boolean }; quick_next?: { stage: string } | null };
 
@@ -71,7 +71,7 @@ test('the owner\'s gate: the row says the next move is held — and stops saying
 });
 
 test('deploy-ahead: before migration 0177 the board answers exactly as before, with no serial field', async () => {
-  const w = world({ through: '0176' });
+  const w = world({ through: BEFORE_SERIALS });
   order(w.raw, 'ORD-OLD', [{ id: 'oa', product: 'pA1' }]);
   const res = await get(w.as('adm'), '/api/admin/orders?scope=all');
   assert.equal(res.status, 200);

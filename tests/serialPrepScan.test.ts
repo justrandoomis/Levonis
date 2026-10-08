@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { json, post, patch, put, get, all, row, count } from './fixtures/app';
-import { world, order, op, SN, SN2, SN3, BOX, EAN } from './fixtures/serialPrep';
+import { world, order, op, SN, SN2, SN3, BOX, EAN, BEFORE_SERIALS } from './fixtures/serialPrep';
 import {
   classifyScanInput,
   scanWindowSql,
@@ -466,7 +466,7 @@ test('M7 a device stored under a pre-2026-09-26 key (Arabic-Indic digits) is sti
 // ------------------------------------------------------------------ deploy-ahead
 
 test('deploy-ahead: before migration 0177 the screen still opens, the doors answer 503, and delivery is HEAD behaviour', async () => {
-  const w = world({ through: '0176' });
+  const w = world({ through: BEFORE_SERIALS });
   order(w.raw, 'ORD-0', [{ id: 'l1', product: 'pA1' }]);
   const detail = await get(w.as('adm'), '/api/admin/orders/ORD-0');
   assert.equal(detail.status, 200);

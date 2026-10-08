@@ -34,6 +34,7 @@ import {
   orderSerialsView,
   refuse,
   serialActor,
+  serialAssignmentsInstalled,
   unlinkSerial,
   type LinkSource,
   type OverrideKind,
@@ -84,9 +85,18 @@ adminOrderSerialRoutes.post('/:id/serials/scan', async (c) => {
   return c.json(res);
 });
 
+/**
+ * Deploy-ahead: the doors that read an assignment before linking say what is
+ * true — the feature is not on this database yet — rather than «not found».
+ */
+async function requireInstalled(c: Context<AppContext>) {
+  if (!(await serialAssignmentsInstalled(c.env.DB))) throw refuse(503, 'SERIALS_NOT_INSTALLED');
+}
+
 adminOrderSerialRoutes.post('/:id/serials/change', async (c) => {
   const user = c.get('user')!;
   await requireCapability(c.env, user, 'receive');
+  await requireInstalled(c);
   const b = await body(c);
   const orderId = orderIdOf(c);
   const assignmentId = str(b.assignment_id, 'assignment_id', { min: 1, max: 80 });
@@ -129,6 +139,7 @@ adminOrderSerialRoutes.post('/:id/serials/override', async (c) => {
   const actor = serialActor(c.env, user);
   // §11/§25: Main Admin only, a mandatory reason, the full audit.
   if (!actor.owner) throw refuse(403, 'OWNER_ONLY');
+  await requireInstalled(c);
   const b = await body(c);
   const reason = typeof b.reason === 'string' ? b.reason.trim() : '';
   if (reason.length < 5 || reason.length > 500) throw refuse(400, 'OVERRIDE_REASON_REQUIRED');
