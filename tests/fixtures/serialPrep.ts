@@ -1,5 +1,5 @@
 /**
- * The serial-scan world (migration 0177): a real database with every
+ * The serial-scan world (migration 0178): a real database with every
  * migration, the real routes mounted as worker/index.ts mounts them, and only
  * the session stubbed (tests/fixtures/app.ts). Shared by the serialPrep*
  * tests.

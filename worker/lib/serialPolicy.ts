@@ -13,7 +13,7 @@
  *      default; a section can never switch a printer off (a printer that sells
  *      an extended plan must record it on a unit);
  *   3. the nearest section on the product's branch whose `serial_policy` is
- *      not 'inherit' (migration 0177): 'required' → serialized, 'off' → not.
+ *      not 'inherit' (migration 0178): 'required' → serialized, 'off' → not.
  *      Branches are walked leaf → root over every placement
  *      (`product_catalogs`) and the product's own classification
  *      (`category_id` / `sub_category_id`); across branches 'required' wins;
@@ -24,7 +24,7 @@
  * and can never drift. AMS products are not inferred from their names — the
  * owner sets 'required' on the section that holds them (owner default).
  *
- * DEPLOY-AHEAD. The column arrives with migration 0177. Until it has applied,
+ * DEPLOY-AHEAD. The column arrives with migration 0178. Until it has applied,
  * every reader answers "no section policy", which is exactly HEAD behaviour.
  */
 import { effectiveDevicePolicy, readOpsWarranty, type EffectiveDevicePolicy } from './warrantyPlans';
@@ -35,7 +35,7 @@ export type CatalogSerialPolicy = 'required' | 'off';
 const installed = new WeakMap<object, true>();
 
 /**
- * Has migration 0177 applied? Cached per database binding ONLY when true
+ * Has migration 0178 applied? Cached per database binding ONLY when true
  * (critique-1 #29): a cached `false` would keep answering 503 after the
  * migration landed under a live isolate.
  */
@@ -175,7 +175,7 @@ export function lineDevicePolicy(opsPolicy: unknown, productId: string | null | 
 /**
  * The SQL twin of `lineDevicePolicy(...).serialized`, for a WHERE clause.
  * `pid` names the product id, `ops` the ops_policy text. With `withCatalog`
- * false (migration 0177 not applied yet) it is HEAD's rule exactly.
+ * false (migration 0178 not applied yet) it is HEAD's rule exactly.
  */
 export function serializedProductSql(pid: string, ops: string, withCatalog: boolean): string {
   const ser = `(CASE WHEN json_valid(${ops}) THEN json_extract(${ops}, '$.serialized') END)`;

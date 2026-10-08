@@ -245,7 +245,7 @@ export const HISTORY_TABLES: HistoryTable[] = [
    */
   { table: 'serial_inventory', columns: ['product_id', 'variant_id'] },
   /**
-   * 0177 — a serial bound to an order unit at preparation. `product_id` /
+   * 0178 — a serial bound to an order unit at preparation. `product_id` /
    * `variant_id` record what the line was when the box was scanned; the
    * serial, the order unit and the timeline stay legible without them.
    */

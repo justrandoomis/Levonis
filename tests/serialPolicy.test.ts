@@ -1,6 +1,6 @@
 /**
  * §29 «requires_serial_number» — one flag, resolved at read time (migration
- * 0177, worker/lib/serialPolicy.ts): the product's own word, then the printer
+ * 0178, worker/lib/serialPolicy.ts): the product's own word, then the printer
  * flag, then the nearest section policy on its branch. The SQL twin used by
  * the delivered-units sweep must agree with the TypeScript rule on every
  * product, or the sweep would pick an order again on every run.

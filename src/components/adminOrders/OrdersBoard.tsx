@@ -365,7 +365,7 @@ export default function OrdersBoard() {
       setNotice(loc(`تم النقل إلى: ${next.label}`, `Moved to: ${next.label}`, `گوازرایەوە بۆ: ${next.label}`));
       await loadOrders();
     } catch (e) {
-      // §19 (0177): the serial gate's refusal reads in the admin's language
+      // §19 (0178): the serial gate's refusal reads in the admin's language
       // and says how many units still need a serial; the order's own window
       // names them and leads to each one.
       const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';

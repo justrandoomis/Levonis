@@ -1,5 +1,5 @@
 /**
- * «الأرقام n/m» ON THE ORDERS BOARD (serial scan, migration 0177; spec §5.5)
+ * «الأرقام n/m» ON THE ORDERS BOARD (serial scan, migration 0178; spec §5.5)
  * — through the real board route over the real migrations.
  *
  * The row says how many of the units on the shelf carry their serial, with
@@ -70,7 +70,7 @@ test('the owner\'s gate: the row says the next move is held — and stops saying
   assert.deepEqual(rows.get('ORD-G1')?.serials, { required: 2, linked: 2, gate: true, holds_next: false });
 });
 
-test('deploy-ahead: before migration 0177 the board answers exactly as before, with no serial field', async () => {
+test('deploy-ahead: before migration 0178 the board answers exactly as before, with no serial field', async () => {
   const w = world({ through: BEFORE_SERIALS });
   order(w.raw, 'ORD-OLD', [{ id: 'oa', product: 'pA1' }]);
   const res = await get(w.as('adm'), '/api/admin/orders?scope=all');

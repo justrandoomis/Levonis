@@ -2195,7 +2195,7 @@ adminRoutes.get('/orders', async (c) => {
   // list is the screen staff scan before opening one — and the projection
   // marks each one `pending_customer_reveal` until the customer's milestone.
   const adminMystery = await mysteryViewFor(c.env.DB, ids, 'admin');
-  // «الأرقام n/m» (serial scan, 0177; spec §5.5): the page's serial counts in
+  // «الأرقام n/m» (serial scan, 0178; spec §5.5): the page's serial counts in
   // three reads, empty before the migration or on any failure.
   const serialCounts = await boardSerialCounts(c.env, results);
   const lang = langOf(c);
@@ -2412,7 +2412,7 @@ adminRoutes.get('/orders/:id', async (c) => {
         ).results ?? [],
       [] as { stage: string; changed_at: string }[]
     ),
-    // «Scan Serial» per physical unit (0177): the slots, what is linked, the
+    // «Scan Serial» per physical unit (0178): the slots, what is linked, the
     // §19 gate and the re-open suggestions. `installed:false` until the
     // migration has applied — the screen then shows the legacy line only.
     soft(
@@ -3429,7 +3429,7 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
   if (!(to in STAGE_SOURCE)) throw badRequest(`Unknown stage "${to}"`);
   const note = str(body.note, 'note', { max: 500, required: false });
   await refuseUnscannedGini(c, id, STAGE_LEGACY_STATUS[to]);
-  // §19 THE SERIAL GATE (0177; ships OFF): a forward move into a hand-over
+  // §19 THE SERIAL GATE (0178; ships OFF): a forward move into a hand-over
   // stage needs every serial-required unit linked. The pre-read gives the
   // missing list; the fence rides the flip itself (critique H2). The owner may
   // pass `serials_override_reason` instead, audited in the same batch.

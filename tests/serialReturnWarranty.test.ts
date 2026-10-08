@@ -1,5 +1,5 @@
 /**
- * Serial → warranty at DELIVERY, and back on a RETURN (migration 0177; owner
+ * Serial → warranty at DELIVERY, and back on a RETURN (migration 0178; owner
  * brief §8, §11, §12, §14, §28, §30; §32 tests 8, 9, 10, 19, 20).
  *
  * The warranty record stays `order_item_units`, created at delivery with the

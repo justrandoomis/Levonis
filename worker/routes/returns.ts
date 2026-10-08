@@ -631,7 +631,7 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
   // as the order-cancel flow).
   if (to === 'resolved' && resolution === 'refund') {
     await validateInvestorReturnEvidence(c.env.DB, id);
-    // 0177 §14: serials scanned at inspection (or explicit unit ids) must be
+    // 0178 §14: serials scanned at inspection (or explicit unit ids) must be
     // devices of THIS line and THIS buyer — refused before any money moves
     // (critique M6: the customer's own unit pick is never trusted alone).
     if ((body.serials !== undefined || body.unit_ids !== undefined) && (await serialAssignmentsInstalled(c.env.DB))) {

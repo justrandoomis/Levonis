@@ -64,6 +64,7 @@ import { adminImportRoutes } from '../../worker/routes/adminImport';
 import { adminProductRelationsRoutes } from '../../worker/routes/adminProductRelations';
 import { adminPriceGridRoutes } from '../../worker/routes/adminPriceGrid';
 import { adminOrderPriceRoutes, orderPriceRoutes } from '../../worker/routes/orderPriceAdjust';
+import { adminOrderSerialRoutes } from '../../worker/routes/adminOrderSerials';
 import { adminMembershipBenefitRoutes } from '../../worker/routes/adminMembershipBenefits';
 import { adminFinanceOperationsRoutes } from '../../worker/routes/adminFinanceOperations';
 import { adminFinanceWorkspaceRoutes } from '../../worker/routes/adminFinanceWorkspace';
@@ -161,6 +162,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/quick-buy', quickBuyRoutes as Router],
   ['/api/orders', orderPriceRoutes as Router],
   ['/api/admin/orders', adminOrderPriceRoutes as Router],
+  ['/api/admin/orders', adminOrderSerialRoutes as Router],
   ['/api/trade-in', tradeInRoutes as Router],
   ['/api/admin/trade-in', adminTradeInRoutes as Router],
   ['/api/wallet', walletRoutes as Router],

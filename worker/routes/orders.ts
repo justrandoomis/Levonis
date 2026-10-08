@@ -5508,7 +5508,7 @@ interface OrderUnitRow extends Record<string, unknown> {
   warranty_start_at: string | null;
   warranty_end_at: string | null;
   replaced_by_unit_id: string | null;
-  /** 0177: set when the device came back on a return; NULL before the migration. */
+  /** 0178: set when the device came back on a return; NULL before the migration. */
   warranty_closed_at: string | null;
   serial_raw: string | null;
   reg_user_id: string | null;
@@ -5540,7 +5540,7 @@ orderRoutes.get('/:id/units', async (c) => {
     .first<{ id: string; user_id: string }>();
   if (!order || (order.user_id !== user.id && user.role !== 'admin')) throw notFound('Order not found');
 
-  // 0177: a unit whose device came back on a return is CLOSED — its dates
+  // 0178: a unit whose device came back on a return is CLOSED — its dates
   // stay on screen, its coverage reads «returned» (deploy-ahead: NULL before).
   const closedCol = (await serialAssignmentsInstalled(c.env.DB)) ? 'u.warranty_closed_at' : 'NULL AS warranty_closed_at';
   const { results } = await c.env.DB.prepare(
@@ -5592,7 +5592,7 @@ orderRoutes.get('/:id/units', async (c) => {
       // A replaced device's coverage lives on its replacement; the screen
       // offers no "register" for a unit that is no longer the customer's.
       replaced: !!r.replaced_by_unit_id,
-      // The device came back on a return (0177): nothing to register.
+      // The device came back on a return (0178): nothing to register.
       returned: !!r.warranty_closed_at,
     };
   });

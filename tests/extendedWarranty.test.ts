@@ -146,7 +146,7 @@ function appAs(db: D1Database, userId: string, role: 'customer' | 'admin' = 'cus
     // routes answer only there.
     c.set('host', classifyHost('levonis-iq.com', 'levonis-iq.com'));
     // `owner@x.co` is the Main Admin (INITIAL_ADMIN_EMAIL): since the serial
-    // scan brief (0177, §29) only the owner changes whether a product needs a serial.
+    // scan brief (0178, §29) only the owner changes whether a product needs a serial.
     c.env = { DB: db, APP_ORIGIN: 'https://levonis-iq.com', STORE_ROOT_DOMAIN: 'levonis-iq.com', INITIAL_ADMIN_EMAIL: 'owner@x.co' } as never;
     await next();
   });
@@ -720,7 +720,7 @@ test('the legacy POST /api/admin/products runs the printer guard: a filament wit
 
 test('POST /api/devices/admin/products/:id/ops-policy cannot switch off serialization on a printer with active plans', async () => {
   const { db, raw } = setup();
-  // §29 (0177): switching serialization is the owner's; another admin is refused outright.
+  // §29 (0178): switching serialization is the owner's; another admin is refused outright.
   const notOwner = await post(appAs(db, 'adm', 'admin'), '/api/devices/admin/products/p_x1/ops-policy', { serialized: false });
   assert.equal(notOwner.status, 403);
   assert.equal((await json(notOwner)).code, 'OWNER_ONLY');

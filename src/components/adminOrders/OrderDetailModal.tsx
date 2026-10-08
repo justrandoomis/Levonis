@@ -51,7 +51,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   const [showBreakdown, setShowBreakdown] = useState(false);
   const { user } = useAuth();
   const viewerOwner = !!user?.is_owner;
-  // «Scan Serial» (0177): the slots live in the order detail and are patched
+  // «Scan Serial» (0178): the slots live in the order detail and are patched
   // in place by each link, so the blocker, the chips and the slots agree.
   const [serials, setSerials] = useState<OrderSerials | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ key: string; n: number } | null>(null);

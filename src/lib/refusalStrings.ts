@@ -1618,7 +1618,7 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   },
   // ---- the pricing programme's refusal contract (S1, master plan §6.1) -----
   ...COST_REFUSALS,
-  // ---- Serials at order preparation (0177; owner brief 2026-10-07) ---------
+  // ---- Serials at order preparation (0178; owner brief 2026-10-07) ---------
   // Admin screens: the order's «Scan Serial» slots, the camera sheet, the
   // §19 gate and the serial page. The Arabic is the brief's own (§31, §19);
   // worker/lib/serialAssignments.ts sends the code. OWNER_ONLY and

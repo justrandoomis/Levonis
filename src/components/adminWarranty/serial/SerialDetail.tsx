@@ -7,7 +7,7 @@
  * serial inventory, a unit in «أجهزة الطلبات», and a linked slot on the order
  * screen. It reads the EXISTING serial door (GET
  * /api/devices/admin/serial-inventory/:serial, extended with `story` by
- * migration 0177 — critique-1 #24: no second page), so a device known only to
+ * migration 0178 — critique-1 #24: no second page), so a device known only to
  * the warranty records answers too.
  *
  * Grouped lists in the settings style: what the device is, where it stands,
@@ -177,7 +177,7 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
 
   // What may be copied is what this viewer may see whole: with a story, only
   // its `serial` (absent for an assistant — UX review #1); without one (the
-  // database before 0177), the inventory row as it always was.
+  // database before 0178), the inventory row as it always was.
   const copyable = story ? story.serial ?? null : data?.row?.serial ?? null;
   const copy = () => {
     if (!copyable) return;

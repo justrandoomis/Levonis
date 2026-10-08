@@ -507,7 +507,7 @@ warrantyAdminRoutes.post('/', async (c) => {
     );
   }
   // 1b. A unit whose device came back (a return) or was superseded by an
-  //     owner override is CLOSED (0177): its dates stay as history, but no
+  //     owner override is CLOSED (0178): its dates stay as history, but no
   //     new paper may promise coverage on it.
   if (unit.warranty_closed_at) {
     throw conflict(

@@ -25,7 +25,7 @@ export interface CatalogNode {
   sort: number;
   is_printer_catalog: boolean;
   active: boolean;
-  /** §29 serial tracking for the section's products (migration 0177); absent before it. */
+  /** §29 serial tracking for the section's products (migration 0178); absent before it. */
   serial_policy?: 'inherit' | 'required' | 'off';
   template_family: TemplateFamily | null;
   effective_template_family: TemplateFamily | null;

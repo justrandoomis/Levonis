@@ -273,7 +273,7 @@ export function resolveProduct(
     newId: (prefix: string) => string;
     money: boolean;
     specFieldIds?: string[];
-    /** False for every admin but the owner: a `serialized` cell that changes the answer is refused (§29, 0177). Absent = not checked. */
+    /** False for every admin but the owner: a `serialized` cell that changes the answer is refused (§29, 0178). Absent = not checked. */
     owner?: boolean;
   }
 ): ResolvedProduct {
@@ -778,7 +778,7 @@ export function resolveProduct(
     warranty_base_months: p.warranty_base_months ?? storedOps.warranty_base_months,
     serialized: p.serialized ?? storedOps.serialized,
   };
-  // §29 (serial scan, 0177): whether a product's units need a serial at
+  // §29 (serial scan, 0178): whether a product's units need a serial at
   // preparation is the OWNER's — the same rule as the product form and the
   // ops-policy route. Only a CHANGE is an attempt: an empty cell keeps what is
   // stored, and a cell that repeats the stored (or printer-default) answer

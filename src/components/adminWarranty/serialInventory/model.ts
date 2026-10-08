@@ -8,7 +8,27 @@ import type { BulkRowProblem } from '../../../../packages/catalog/src/deviceSeri
 
 export const INVENTORY_BASE = '/api/devices/admin/serial-inventory';
 
-/** Derived on the server; `reserved`, `returned` and `unavailable` arrive with migration 0177 (serial scan at preparation). */
+/**
+ * SORANI FOR THE TWO BULK-ADD PROBLEMS THE SERIAL SCAN ADDED (docs/SERIAL_SCAN.md;
+ * DECISIONS row 183: a ckb slot is its own Sorani, never the Arabic). The bulk
+ * add now refuses a product barcode of any length and a box-SN-shaped value in
+ * the serial column. This panel's own table is ar/en (a pre-existing gap:
+ * Sorani readers get its Arabic), so these two are read through
+ * `problemText` — in the serial-scan words of
+ * src/components/adminOrders/serials/strings.ts (box «سندووق», serial
+ * «ژمارەی زنجیرەیی», product barcode «بارکۆدی بەرهەم»).
+ */
+export const PROBLEMS_CKB: Readonly<Partial<Record<BulkRowProblem, string>>> = {
+  SERIAL_LOOKS_LIKE_EAN: 'ئەمە بارکۆدی بەرهەمە (EAN)، نەک ژمارەی زنجیرەیی',
+  SERIAL_LOOKS_LIKE_BOX: 'ئەمە ژمارەی سندووقە (Box SN) — «Product SN» بنووسە',
+};
+
+/** One bulk-add problem in the reader's language: the Sorani above when there is one, else the panel's table. */
+export function problemText(t: InventoryStrings, lang: string, problem: string): string | undefined {
+  return (lang === 'ckb' ? PROBLEMS_CKB[problem as BulkRowProblem] : undefined) ?? t.problems[problem];
+}
+
+/** Derived on the server; `reserved`, `returned` and `unavailable` arrive with migration 0178 (serial scan at preparation). */
 export type InventoryStatus = 'in_stock' | 'reserved' | 'sold' | 'registered' | 'returned' | 'unavailable' | 'void';
 export type PreviewOutcome = 'new' | 'new_assigned' | 'exists' | 'duplicate_in_batch' | 'invalid';
 

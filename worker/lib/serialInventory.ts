@@ -47,7 +47,7 @@ import {
 import { serialAssignmentsInstalled, serializationContext, lineDevicePolicy } from './serialPolicy';
 
 /**
- * 0177 adds three derived states: `reserved` (a live, not yet delivered
+ * 0178 adds three derived states: `reserved` (a live, not yet delivered
  * preparation assignment — RESERVED_FOR_ORDER), `returned` (its last unit was
  * closed by a return: available again, history kept) and `unavailable`
  * (returned unsellable, or replaced). Still DERIVED, never stored.
@@ -69,7 +69,7 @@ export const INSERT_CHUNK = 200;
 /**
  * THE DERIVED STATUS (0139: stored status is forbidden), from the row and the
  * device tables it joins: `si` = serial_inventory, `ds` = device_serials,
- * `r` = device_registrations. Extended by migration 0177 with the serial
+ * `r` = device_registrations. Extended by migration 0178 with the serial
  * assignments and the closed-unit states; until that migration has applied it
  * is exactly the original rule (deploy-ahead).
  */
@@ -95,7 +95,7 @@ export function serialStatusSql(installed: boolean): string {
     ELSE 'sold' END`;
 }
 
-/** The original derived status (kept for readers that predate 0177). */
+/** The original derived status (kept for readers that predate 0178). */
 export const STATUS_SQL = serialStatusSql(false);
 
 const LIST_FROM = `FROM serial_inventory si
@@ -528,7 +528,7 @@ export async function applyPatch(db: D1Database, serialNorm: string, patch: Inve
  * sale (that is the order screen's reassign/replace, with its own reason).
  */
 export async function setVoid(db: D1Database, serialNorm: string, voided: boolean, reason: string): Promise<void> {
-  // 0177 (integrity review #10): never void a device a preparation binding
+  // 0178 (integrity review #10): never void a device a preparation binding
   // holds — checked IN the write, so a scan landing after the route's read
   // cannot leave a live binding on a voided asset.
   const installed = voided && (await serialAssignmentsInstalled(db));
@@ -738,7 +738,7 @@ export async function linkFromInventory(db: D1Database, userId: string, norm: st
   }
   if (inv.voided_at) return { kind: 'refused', reason: 'void', serial_norm: inv.serial_norm };
   if (!inv.product_id) return { kind: 'refused', reason: 'no_product', serial_norm: inv.serial_norm };
-  // 0177: a serial bound to an order unit at preparation is that order's
+  // 0178: a serial bound to an order unit at preparation is that order's
   // device, even before delivery — never a typed-in claim on someone else's
   // older unit (Audit A conflict 4). The same one answer as every refusal.
   const installed = await serialAssignmentsInstalled(db);
@@ -771,7 +771,7 @@ export async function linkFromInventory(db: D1Database, userId: string, norm: st
 
   // ON CONFLICT DO NOTHING covers both races: the serial taken by another
   // unit (PRIMARY KEY) and this unit given another serial (UNIQUE unit_id);
-  // and (0177, integrity review #3) a preparation scan that bound this serial
+  // and (0178, integrity review #3) a preparation scan that bound this serial
   // after the read above is checked IN the insert. The re-read decides.
   const unbound = installed
     ? ' WHERE NOT EXISTS (SELECT 1 FROM serial_assignments sa WHERE sa.serial_norm = ?1 AND sa.released_at IS NULL)'

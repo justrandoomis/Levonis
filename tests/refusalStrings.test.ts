@@ -215,7 +215,7 @@ test('every code the table translates is one the server can actually emit', () =
     // Gifts (0175, docs/GIFTS_QUICK_BUY.md §1): choose, redeem, the gift line
     // in the cart and at checkout.
     'worker/routes/gifts.ts',
-    // Serials at order preparation (0177): the slots, the camera sheet, the
+    // Serials at order preparation (0178): the slots, the camera sheet, the
     // §19 gate, the serial page and the hardened device doors.
     'worker/lib/serialAssignments.ts',
     'worker/routes/adminOrderSerials.ts',

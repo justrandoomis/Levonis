@@ -6,7 +6,7 @@ Bluetooth scanner, or typing. Design: the serial-scan spec with both critiques
 applied. Code: `worker/lib/serialAssignments.ts` (the rules),
 `worker/lib/serialPolicy.ts` (which products need a serial),
 `worker/routes/adminOrderSerials.ts` (the doors), migration
-`0177_serial_assignments.sql`.
+`0178_serial_assignments.sql`.
 
 ## Not a second serial or warranty system
 
@@ -32,9 +32,9 @@ applied. Code: `worker/lib/serialAssignments.ts` (the rules),
 
 | Route | Who | Notes |
 |---|---|---|
-| `GET /api/admin/orders/:id` | admin | adds `serials` (slots, linked, gate, re-open suggestions) through `soft()`; `installed:false` before 0177. |
+| `GET /api/admin/orders/:id` | admin | adds `serials` (slots, linked, gate, re-open suggestions) through `soft()`; `installed:false` before 0178. |
 | `GET /api/admin/orders/:id/serials` | admin | the same view alone. |
-| `GET /api/admin/orders` (the board) | admin | each shelf row adds `serials: {required, linked, gate, holds_next}`; absent before 0177. |
+| `GET /api/admin/orders` (the board) | admin | each shelf row adds `serials: {required, linked, gate, holds_next}`; absent before 0178. |
 | `POST /api/admin/orders/:id/serials/scan` | admin with the `receive` capability | `{order_item_id, unit_index, part?, code, ean?, box_sn?, source, op_id}` → `outcome: created · existing · already`. «أعد ربطه» sends `previous_assignment_id` (a released binding of this order and unit) instead of `code`, so an assistant re-links a serial it only sees masked. |
 | `POST /api/admin/orders/:id/serials/change` | same | `{assignment_id, code, …, op_id}` — the old binding is released in the same batch; a failed new link leaves it intact. A retry with the same `op_id` answers the link it made (`already`), as does the override's. |
 | `POST /api/admin/orders/:id/serials/unlink` | same; owner only outside the window or once a courier shipment exists (reason 5–500) | targets the assignment id, so a replay can never release a newer link. |
@@ -132,10 +132,23 @@ answer is never an attempt.
 
 1. A Combo carries ONE serial — the box Product SN. `part='ams'` / `part_index` exist in the schema; the routes refuse them until the owner decides.
 2. AMS: no name inference. The owner sets `required` on the section holding AMS products.
-3. The owner (INITIAL_ADMIN_EMAIL) and full-scope admins see the full serial; assistants the masked form.
+3. The owner (INITIAL_ADMIN_EMAIL) and full-scope (or legacy NULL-scope) admins see the full serial; assistants the masked form. On S1 this is `canMoveMoney` (`serialActor.fullSerial`, worker/lib/serialAssignments.ts): a serial is no cost, so the owner-only cost predicates do not decide it.
 4. Resale of a returned device carries the original warranty end; `restart` only by the owner (a purchased plan on the new line raises `RESTART_SUGGESTED`, never a silent restart).
 5. The preparation gate ships OFF; the owner switches it on with a cutover date.
 6. Serial-policy writes are owner-only.
+
+**Who "the owner" is (S1, DECISIONS row 185).** Every owner-only serial act —
+the exceptions (`/serials/override`, unlink outside the window), the serial
+policy (`PUT /api/admin/taxonomy/catalogs/:id/serial-policy`, product and
+import `serialized`), the §19 gate setting, warranty restart — uses S1's rule
+for owner-only acts that carry no cost: `isOwner` on an admin row
+(`requireOwner`, `userPatchRefusal`), not the verified-owner rule of cost
+(`canViewCost`). No serial answer carries a cost, a lot cost or a margin
+(`serialPrepPrivacy`; the GET and write sweeps of `tests/costRoleMatrix*.test.ts`).
+The refusal code is the programme contract's `OWNER_ONLY` (its three sentences
+in `packages/contracts/src/costRefusals.ts`); the server's Arabic sentence is
+the serial one. The router is classified in `tests/routeClass/serials.ts`
+(`op`, the override `owner`) and the policy route in `tests/routeClass/catalogue.ts`.
 
 ## Screens
 
@@ -189,7 +202,7 @@ both policy controls.
 
 - The serial INVENTORY list (and «أجهزة الطلبات») still shows assistants the whole serial, as before this feature: the list is keyed by the serial and assistants register stock there. Masking it is the owner's call; the serial page itself now follows owner default 3 everywhere on it.
 - The inventory's bulk add now refuses a product barcode of any length and a box-SN-shaped value in the serial column (the same reading as the scan). A non-Bambu device whose real serial looks like a Bambu box SN (`B` + 4 digits + a letter …) can no longer be filed — say so if the shop sells such brands. The post-delivery and replacement doors read through the same canonicaliser (no `/ . _`, 6 characters at least).
-- The inventory panel has no Sorani table (pre-existing: Sorani readers get its Arabic); its two new bulk problems follow that panel.
+- The inventory panel has no Sorani table (pre-existing: Sorani readers get its Arabic). Its two new bulk problems (a product barcode, a box SN in the serial column) carry their own Sorani (`PROBLEMS_CKB` / `problemText` in `src/components/adminWarranty/serialInventory/model.ts`).
 
 - Trade-in completion does not close the traded unit yet (`traded_in` is in the CHECK list): reselling a traded-in device needs the owner's `delivered_device` override.
 - Phase 2 (with the inventory programme): the owner batch re-pin that moves the accounting allocation; until then the owner's `batch` exception records the mismatch without re-pinning.

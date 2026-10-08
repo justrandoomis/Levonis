@@ -107,7 +107,7 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
                 : w.state === 'closed'
                   ? { icon: <ShieldOff className="w-3.5 h-3.5" aria-hidden />, cls: 'text-zinc-400', text: s.returned }
                   : { icon: <Clock className="w-3.5 h-3.5" aria-hidden />, cls: 'text-zinc-400', text: s.notDelivered };
-        // A returned device (0177) is the shop's again: nothing to register.
+        // A returned device (0178) is the shop's again: nothing to register.
         const canRegister = u.linked === 'none' && !u.replaced && !u.returned && w.state !== 'closed' && !!u.delivered_at;
         const err = errors[u.unit_id];
         return (

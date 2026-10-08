@@ -294,7 +294,7 @@ function serialParam(raw: string): string {
 
 /**
  * THE §16 SERIAL / WARRANTY PAGE lives here (critique-1 #24: extend the
- * existing door, do not build a second one). `story` (migration 0177) adds
+ * existing door, do not build a second one). `story` (migration 0178) adds
  * the derived status, the current and previous orders, the warranty and its
  * mode, the lot, and the whole timeline — the asset's own rows, every
  * `serial.*` row, `device.*` on EVERY unit the serial was ever bound to and
@@ -324,7 +324,7 @@ serialInventoryRoutes.get('/:serial', async (c) => {
   )
     .bind(norm, row.unit_id)
     .all<Record<string, unknown>>();
-  // With the story (0177), the page follows the owner default everywhere on
+  // With the story (0178), the page follows the owner default everywhere on
   // it (UX review #1, critique L7): an assistant gets the masked serial and no
   // order number in the row too, not only in the story. Before the migration
   // the row is exactly what it always was.

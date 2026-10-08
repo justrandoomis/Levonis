@@ -64,6 +64,9 @@ export default {
         'GET /search-vocabulary': 'op',
         'POST /search-vocabulary': 'op',
         'DELETE /search-vocabulary/:term': 'op',
+        // §29 serial tracking by section (0178): the owner's switch alone, the
+        // same `isOwner` rule as S1's other owner-only acts that carry no cost.
+        'PUT /catalogs/:id/serial-policy': { cls: 'owner', refusal: { status: 403, code: 'OWNER_ONLY' } },
       },
     },
     {

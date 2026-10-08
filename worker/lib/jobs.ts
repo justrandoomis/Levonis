@@ -130,7 +130,7 @@ export interface DurableJobsReport {
    */
   delivered_units: DeliveredUnitsSweep;
   /**
-   * 0177 — preparation serials of delivered orders that have not reached
+   * 0178 — preparation serials of delivered orders that have not reached
    * their warranty unit yet (activation is its own batch after the units);
    * and refund cases whose returned devices' warranties are still open
    * (the return route is not one transaction). worker/lib/serialAssignments.ts.
@@ -532,8 +532,8 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   await step('delivered_units', async () => {
     report.delivered_units = await sweepDeliveredOrdersWithoutUnits(env, 50);
   });
-  // 12c. Preparation serials (0177) → their delivered units, and returned
-  //      devices' warranties closed — both bounded, both no-ops before 0177.
+  // 12c. Preparation serials (0178) → their delivered units, and returned
+  //      devices' warranties closed — both bounded, both no-ops before 0178.
   await step('serial_activation', async () => {
     report.serial_activation = await sweepUnactivatedSerials(env, 50);
   });

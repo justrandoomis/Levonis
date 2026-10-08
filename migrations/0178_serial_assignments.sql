@@ -1,10 +1,10 @@
 -- ============================================================================
---  0177 — SERIAL ASSIGNMENTS AT ORDER PREPARATION
+--  0178 — SERIAL ASSIGNMENTS AT ORDER PREPARATION
 --  (owner brief 2026-10-07 «ربط كل طابعة/AMS بالرقم التسلسلي الحقيقي أثناء
 --  التجهيز», 33 sections; design docs/… serial-spec + both critiques)
 -- ============================================================================
 --
--- RENUMBERING. This file is self-contained: nothing outside it names "0177"
+-- RENUMBERING. This file is self-contained: nothing outside it names "0178"
 -- except worker/lib/schemaVersion.ts (EXPECTED_MIGRATION) and the comments
 -- that cite it. Landing it after another migration means renaming the file
 -- and that one constant; no other file or row carries the number.

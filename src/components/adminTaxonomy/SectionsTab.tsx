@@ -443,7 +443,7 @@ function SectionDialog({
   const [sort, setSort] = useState(String(node?.sort ?? 0));
   const [printer, setPrinter] = useState(node?.is_printer_catalog ?? false);
   const [active, setActiveState] = useState(node?.active ?? true);
-  // §29 (0177): the section's serial policy and the printer flag are the
+  // §29 (0178): the section's serial policy and the printer flag are the
   // owner's; everyone else sees both with a lock (the server refuses them).
   const { user } = useAuth();
   const owner = !!user?.is_owner;

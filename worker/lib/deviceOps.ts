@@ -140,7 +140,7 @@ export function computeCoverage(
 export type CoverageState = 'active' | 'expired' | 'needs_config' | 'not_delivered' | 'closed';
 
 /**
- * `closedAt` (order_item_units.warranty_closed_at, migration 0177): a unit
+ * `closedAt` (order_item_units.warranty_closed_at, migration 0178): a unit
  * whose device came back on a return — or was superseded by an owner
  * override — is CLOSED. Its dates are kept and shown; it no longer covers.
  */
@@ -191,7 +191,7 @@ export interface CreateUnitsResult {
   serialized_items: number;
   planned_units: number;
   created: number;
-  /** The preparation serials bound to the new units (migration 0177), or
+  /** The preparation serials bound to the new units (migration 0178), or
    *  null when that step did not run. Its own batch: a failure here never
    *  costs a unit (critique H3). */
   activation?: { pending: number; activated: number; released_policy: number; conflicts: number; reopened: number } | null;
@@ -232,7 +232,7 @@ export async function createUnitsOnDelivery(
     .all<UnitSourceRow>();
 
   // Which lines are printers, by the owner's catalog flag, and which sit in a
-  // section whose serial policy says 'required' (0177) — two batched reads for
+  // section whose serial policy says 'required' (0178) — two batched reads for
   // the whole order (worker/lib/serialPolicy.ts). A printer is serialized and
   // 12-month based by default, so a plan sold on a printer whose ops_policy
   // was never configured still gets the unit rows it was sold for.

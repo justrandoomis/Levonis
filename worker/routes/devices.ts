@@ -170,7 +170,7 @@ function isoOrBad(v: unknown, name: string): string {
 }
 
 interface DeviceRow extends UnitRow {
-  /** 0177: the unit's warranty was closed (a return); null before the migration. */
+  /** 0178: the unit's warranty was closed (a return); null before the migration. */
   warranty_closed_at?: string | null;
   registered_at?: string | null;
   revoked_at?: string | null;
@@ -252,7 +252,7 @@ function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string
   };
 }
 
-/** The unit columns plus, once migration 0177 has applied, its closure (a returned device). */
+/** The unit columns plus, once migration 0178 has applied, its closure (a returned device). */
 async function deviceSelect(db: D1Database): Promise<string> {
   const closed = (await serialAssignmentsInstalled(db)) ? 'u.warranty_closed_at' : 'NULL AS warranty_closed_at';
   return DEVICE_SELECT.replace('u.replacement_of_unit_id, u.created_at,', `u.replacement_of_unit_id, u.created_at, ${closed},`);
@@ -507,7 +507,7 @@ deviceRoutes.get('/mine', async (c) => {
  */
 deviceRoutes.get('/eligible', async (c) => {
   const user = c.get('user')!;
-  // 0177: a device that came back (its unit closed by a return) is no longer
+  // 0178: a device that came back (its unit closed by a return) is no longer
   // the buyer's to add — the shop holds it again.
   const open = (await serialAssignmentsInstalled(c.env.DB)) ? 'AND u.warranty_closed_at IS NULL' : '';
   const { results } = await c.env.DB.prepare(
@@ -580,7 +580,7 @@ deviceRoutes.post('/register', async (c) => {
   // Unknown, undelivered, replaced, held by another account, OR never released
   // by its buyer → the SAME answer. The holder, the buyer and the order are
   // never revealed.
-  // A unit whose warranty was closed (the device came back on a return, 0177)
+  // A unit whose warranty was closed (the device came back on a return, 0178)
   // answers exactly like a serial that matches nothing.
   if (!unitId || !row || !row.delivered_at || row.replaced_by_unit_id || row.warranty_closed_at) throw SERIAL_NO_MATCH();
   // A device that was never linked belongs to the account that bought it. A
@@ -1336,7 +1336,7 @@ deviceRoutes.post('/admin/units/backfill-delivered', async (c) => {
 /**
  * Assign / reassign a serial on a DELIVERED unit — the post-delivery door.
  *
- * HARDENED for 0177 (§4.13, no second path around the preparation rules):
+ * HARDENED for 0178 (§4.13, no second path around the preparation rules):
  *   - the value goes through the ONE canonicaliser (`canonicalSerial`): an
  *     EAN, a box SN nobody filed, a receipt or anything under 6 characters is
  *     refused with its problem — the 4-character floor is gone;
@@ -1705,7 +1705,7 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const reason = str(body.reason, 'reason', { min: 5, max: 500 });
   const typedNewSerial = str(body.new_serial, 'new_serial', { max: 80, required: false });
-  // 0177: the one canonicaliser, as at preparation (an EAN or a box SN is not a device).
+  // 0178: the one canonicaliser, as at preparation (an EAN or a box SN is not a device).
   const canonical = typedNewSerial ? await canonicalSerial(c.env.DB, typedNewSerial) : null;
   const newSerialRaw = canonical?.raw ?? '';
   const newSerialNorm = canonical?.norm ?? '';
@@ -1753,7 +1753,7 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
 
   const guard = 'EXISTS (SELECT 1 FROM order_item_units WHERE id = ?1)'; // new unit was created in this batch
   const stmts: D1PreparedStatement[] = [
-    // 0177 (integrity review #3): the replacement serial is still bound to no
+    // 0178 (integrity review #3): the replacement serial is still bound to no
     // order unit — checked IN the write, not only by the read above.
     ...(installed && newSerialNorm
       ? fence(c.env.DB, 'NOT EXISTS (SELECT 1 FROM serial_assignments WHERE serial_norm = ? AND released_at IS NULL)', [newSerialNorm])
@@ -1813,7 +1813,7 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
     );
   }
   if (installed) {
-    // 0177: the replaced device's binding ends ('replaced'); the replacement
+    // 0178: the replaced device's binding ends ('replaced'); the replacement
     // device gets its asset row and an activated binding to the new unit, so
     // the one-live-binding indexes cover this door too.
     stmts.push(

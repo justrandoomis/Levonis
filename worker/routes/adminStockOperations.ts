@@ -474,7 +474,7 @@ adminStockOperationsRoutes.post('/serial-link', async (c) => {
     if (prior.lot_id === lot && prior.order_item_id === item) return c.json({ success: true, already: true });
     throw conflict('الرقم التسلسلي مرتبط بالفعل؛ راجع سجل الجهاز قبل تغييره');
   }
-  // 0177 (critique M13): ONE serial→order-item link. A serial bound to an
+  // 0178 (critique M13): ONE serial→order-item link. A serial bound to an
   // order unit at preparation belongs to THAT line; this door may record its
   // lot, never point it at another line — and (integrity review #4) the lot it
   // records must be one THAT line was allocated, item or no item: otherwise
@@ -616,7 +616,7 @@ adminStockOperationsRoutes.post('/return-inspections', async (c) => {
   if(await investorFinanceInstalled(db)){
     let requested=Array.isArray(b.allocations)?b.allocations:[];
     if(!requested.length&&kase.unit_id&&qty===1){const linked=await db.prepare(`SELECT a.id FROM device_serials d JOIN stock_serial_links s ON s.serial_norm=d.serial_norm JOIN order_item_inventory_allocations a ON a.lot_id=s.lot_id WHERE d.unit_id=? AND a.order_item_id=? AND a.released_at IS NULL`).bind(kase.unit_id,item).first<{id:string}>()
-      // 0177 §28: the lot the preparation scan verified, recorded on the unit at delivery.
+      // 0178 §28: the lot the preparation scan verified, recorded on the unit at delivery.
       ??await db.prepare(`SELECT a.id FROM order_item_units u JOIN order_item_inventory_allocations a ON a.lot_id=u.inventory_lot_id WHERE u.id=? AND a.order_item_id=? AND a.released_at IS NULL`).bind(kase.unit_id,item).first<{id:string}>();if(linked)requested=[{allocation_id:linked.id,qty:1}];}
     const allocations=(await db.prepare(`SELECT a.id,a.lot_id,a.qty,EXISTS(SELECT 1 FROM investment_contracts c WHERE c.incoming_id=l.incoming_id AND c.state='active') AS funded,
       (SELECT COALESCE(SUM(e.qty),0) FROM stock_return_lot_evidence e JOIN return_cases r ON r.id=e.return_case_id WHERE e.allocation_id=a.id AND r.state<>'rejected') AS claimed

@@ -9,7 +9,7 @@ import { Overlay } from './ui/Overlay';
 import { dateLocale } from './orders/format';
 import UnitHistory from './adminWarranty/UnitHistory';
 
-// The §16 serial / warranty page (serial scan, 0177), opened from a unit's serial.
+// The §16 serial / warranty page (serial scan, 0178), opened from a unit's serial.
 const SerialDetail = React.lazy(() => import('./adminWarranty/serial/SerialDetail'));
 
 /**
@@ -337,7 +337,7 @@ interface AdminDevice {
     end_at: string | null;
     base_months: number | null;
     ext_months: number;
-    /** `closed` (migration 0177): the warranty ended by a return or a cancelled sale — its dates are kept. */
+    /** `closed` (migration 0178): the warranty ended by a return or a cancelled sale — its dates are kept. */
     state: 'active' | 'expired' | 'needs_config' | 'not_delivered' | 'closed';
     remaining_days: number | null;
   };

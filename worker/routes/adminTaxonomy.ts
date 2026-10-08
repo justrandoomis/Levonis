@@ -446,7 +446,7 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
       : body.is_printer_catalog
         ? 1
         : 0;
-  // §29 (serial scan, 0177): the printer flag decides which products need a
+  // §29 (serial scan, 0178): the printer flag decides which products need a
   // serial at preparation and get a warranty unit — the owner's call. Only a
   // CHANGE is an attempt (an edit that echoes the stored flag passes).
   if (Number(existing?.is_printer_catalog ?? 0) !== isPrinter && !isOwner(c.env, admin)) {
@@ -544,7 +544,7 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
 });
 
 /**
- * §29 SERIAL TRACKING BY SECTION (migration 0177) — owner only.
+ * §29 SERIAL TRACKING BY SECTION (migration 0178) — owner only.
  *
  * `{ policy: 'inherit' | 'required' | 'off' }`. Resolved AT READ TIME
  * (worker/lib/serialPolicy.ts): a product's own ops_policy.serialized wins;

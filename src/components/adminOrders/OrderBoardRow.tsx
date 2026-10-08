@@ -240,7 +240,7 @@ export default function OrderBoardRow({
         {/* A price-held order does not move (0140) — the server would refuse
             with PRICE_APPROVAL_PENDING, so the button is not offered. */}
         {/*
-          «الأرقام n/m» (serial scan, 0177; spec §5.5) — how many of the units
+          «الأرقام n/m» (serial scan, 0178; spec §5.5) — how many of the units
           on this order's shelf carry their serial. It opens the order, where
           each unit has its slot. When the owner's §19 gate would refuse the
           one-tap move below, the chip says so and the button is not drawn: a

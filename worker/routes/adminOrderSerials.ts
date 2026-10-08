@@ -1,5 +1,5 @@
 /**
- * Admin — SERIALS AT ORDER PREPARATION (migration 0177; owner brief
+ * Admin — SERIALS AT ORDER PREPARATION (migration 0178; owner brief
  * 2026-10-07). The doors of worker/lib/serialAssignments.ts.
  *
  * Mounted at /api/admin/orders beside the price-adjustment router (the

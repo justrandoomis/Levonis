@@ -56,7 +56,7 @@ export interface DeliveredEffectsResult {
 export const DEVICE_UNITS_WARNING =
   'Device units were not created — retry from Admin → Serials & Devices (backfill), otherwise warranty clocks for this order are missing.';
 
-/** 0177: units exist, but a serial scanned at preparation did not reach its unit yet. */
+/** 0178: units exist, but a serial scanned at preparation did not reach its unit yet. */
 export const SERIAL_ACTIVATION_WARNING =
   'A serial linked at preparation did not reach its warranty unit yet — it is retried automatically; check the order\'s serials if it persists.';
 

@@ -130,7 +130,7 @@ interface TemplateGroup {
 interface CatalogNode extends CatalogV2 {
   parent_id: string | null;
   effective_template_family: 'devices' | 'materials' | null;
-  /** §29 serial tracking by section (migration 0177); absent before it. */
+  /** §29 serial tracking by section (migration 0178); absent before it. */
   serial_policy?: 'inherit' | 'required' | 'off';
 }
 

@@ -357,7 +357,7 @@ app.route('/api/quick-buy', quickBuyRoutes);
 // proposal on one order's price. Their own routers, beside their siblings.
 app.route('/api/orders', orderPriceRoutes);
 app.route('/api/admin/orders', adminOrderPriceRoutes);
-// Serials at preparation (0177): scan / change / unlink / owner override per
+// Serials at preparation (0178): scan / change / unlink / owner override per
 // physical unit of an order (worker/lib/serialAssignments.ts).
 app.route('/api/admin/orders', adminOrderSerialRoutes);
 // «الاستبدال» (0143): a delivered LEVONIS device traded against a new one —

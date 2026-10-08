@@ -187,7 +187,7 @@ export async function uniqueSlugIn(
 }
 
 /**
- * §29 (serial scan, 0177; critique-1 #23): refuses, for anyone but the owner,
+ * §29 (serial scan, 0178; critique-1 #23): refuses, for anyone but the owner,
  * a new placement that would flip whether a product with no `serialized`
  * word of its own needs a serial at preparation (a printer catalog, or a
  * section whose serial policy is 'required'). A product with its own word
@@ -1273,7 +1273,7 @@ adminProductsRoutes.post('/', async (c) => {
     carryStoredCostForward(doc, prev);
   }
 
-  // §29 (serial scan, 0177): whether a product needs a serial at preparation
+  // §29 (serial scan, 0178): whether a product needs a serial at preparation
   // — and gets a warranty unit at delivery — is the OWNER's. Only a CHANGE of
   // the effective answer is an attempt: the form echoes the stored value on
   // every save, and that must keep working for any admin.
@@ -1944,7 +1944,7 @@ adminProductsRoutes.put('/:id/catalogs', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   if (!Array.isArray(body.catalog_ids)) throw badRequest('catalog_ids must be an array of catalog ids');
   const prevDoc = parseProductRow(existingRow);
-  // §29 (0177): a placement that changes whether the product needs a serial is the owner's.
+  // §29 (0178): a placement that changes whether the product needs a serial is the owner's.
   if (!isOwner(c.env, admin)) {
     await refuseSerializedDrift(
       c.env.DB,

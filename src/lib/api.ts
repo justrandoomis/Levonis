@@ -336,13 +336,6 @@ export interface ApiUser {
    *  from before S1 hides the finance tab from a full admin. New code reads
    *  `can_view_cost`. */
   can_view_financials?: boolean;
-  /**
-   * The Main Admin (INITIAL_ADMIN_EMAIL). A UI HINT that draws the owner's
-   * controls (serial policy, the serial gate, serial exceptions) as editable
-   * and everyone else's as read-only with a lock — every one of those routes
-   * re-checks on the server and answers OWNER_ONLY otherwise.
-   */
-  is_owner?: boolean;
   subscription_expiry: number;
   locale: 'en' | 'ar' | 'ku';
   avatar_key: string | null;
@@ -1167,7 +1160,7 @@ export interface OrderUnitPublic {
   warranty: {
     start_at: string | null;
     end_at: string | null;
-    /** `closed` (0177): the device came back on a return — its dates are kept, it no longer covers. */
+    /** `closed` (0178): the device came back on a return — its dates are kept, it no longer covers. */
     state: 'active' | 'expired' | 'needs_config' | 'not_delivered' | 'closed';
     remaining_days: number | null;
   };
@@ -1175,7 +1168,7 @@ export interface OrderUnitPublic {
   linked: 'mine' | 'other' | 'none';
   receipt_no: string | null;
   replaced: boolean;
-  /** 0177: the device came back on a return; absent from an older server. */
+  /** 0178: the device came back on a return; absent from an older server. */
   returned?: boolean;
 }
 
@@ -1275,7 +1268,7 @@ export interface AdminOrderRow extends ApiOrder {
    */
   quick_next?: { stage: string; label: string; source: 'manual' | 'automatic' | 'delivery_api' } | null;
   /**
-   * «الأرقام n/m» (serial scan, migration 0177): units that need a serial and
+   * «الأرقام n/m» (serial scan, migration 0178): units that need a serial and
    * how many carry one, while the order is on the shelf. Absent for an order
    * with none, before the migration, and from an older server. `holds_next`:
    * the owner's §19 gate would refuse `quick_next` right now.
@@ -1380,7 +1373,7 @@ export interface AdminOrderDetail extends ApiOrder {
    */
   tracking?: AdminOrderTracking;
   /**
-   * «Scan Serial» per physical unit (migration 0177): the slots, what is
+   * «Scan Serial» per physical unit (migration 0178): the slots, what is
    * linked, the §19 gate and the re-open suggestions. `installed:false` until
    * the migration has applied, and absent from an older server — the screen
    * then shows the legacy units line only.

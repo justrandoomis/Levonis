@@ -19,7 +19,7 @@ import { Segmented } from '../../ui/Segmented';
 import { serialProblem } from '../../../../packages/catalog/src/deviceSerials';
 import { scanFeedback } from '../../scanner/feedback';
 import FilingFields, { EMPTY_FILING, type FilingState } from './FilingFields';
-import { inventoryApi, refusalText, type InventoryStrings, type PreviewOutcome, type PreviewResponse } from './model';
+import { inventoryApi, problemText, refusalText, type InventoryStrings, type PreviewOutcome, type PreviewResponse } from './model';
 
 type Mode = 'single' | 'bulk';
 
@@ -73,7 +73,7 @@ export default function ManualEntry({
     if (oneBusy) return;
     const problem = serialProblem(one.serial);
     if (problem) {
-      setOneError(t.problems[problem] ?? t.genericError);
+      setOneError(problemText(t, lang, problem) ?? t.genericError);
       scanFeedback('invalid');
       return;
     }
@@ -96,7 +96,7 @@ export default function ManualEntry({
         setOneError(`${t.alreadyRegistered}${at}`);
       } else {
         scanFeedback('invalid');
-        setOneError((res.problem && t.problems[res.problem]) || t.notASerial);
+        setOneError((res.problem && problemText(t, lang, res.problem)) || t.notASerial);
       }
     } catch (err) {
       setOneError(refusalText(err, t));
@@ -266,7 +266,7 @@ export default function ManualEntry({
                           <span className={`${T.badgeBase} ${OUTCOME_TONE[r.outcome]}`}>{t.outcomes[r.outcome]}</span>
                           {(r.problem || r.duplicate_of) && (
                             <span className="ms-2 text-[11.5px] text-[var(--ap-text-3)]">
-                              {r.problem ? t.problems[r.problem] ?? r.problem : t.duplicateOf(r.duplicate_of as number)}
+                              {r.problem ? problemText(t, lang, r.problem) ?? r.problem : t.duplicateOf(r.duplicate_of as number)}
                             </span>
                           )}
                         </td>

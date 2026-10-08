@@ -695,7 +695,7 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'quick_buy_actions.key': 'a request de-duplication token',
   'quick_buy_events.action_key': 'the de-duplication token of the change that wrote the row',
   'quick_buy_events.detail': 'a money or stock delta and its reason',
-  // 0177 — serial assignments at preparation: a serial, an order unit, a lot id.
+  // 0178 — serial assignments at preparation: a serial, an order unit, a lot id.
   'serial_assignments.idempotency_key': 'a scan de-duplication token (scan:<op_id>)',
   'orders.delivery_method_snapshot': 'a delivery method and its fee',
   'orders.membership_tier_snapshot': 'a tier name',

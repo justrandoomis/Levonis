@@ -66,7 +66,7 @@ export function WarrantySection({
   onSerializedChange: (v: boolean) => void;
   onBaseMonthsChange: (v: number | null) => void;
   /**
-   * §29 (serial scan, 0177): whether a product needs a serial at preparation
+   * §29 (serial scan, 0178): whether a product needs a serial at preparation
    * — and gets a warranty unit at delivery — is the OWNER's call; the server
    * refuses anyone else's change (OWNER_ONLY). Others see it with a lock.
    */

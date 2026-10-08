@@ -1,5 +1,5 @@
 /**
- * SERIAL ASSIGNMENTS AT ORDER PREPARATION (migration 0177; owner brief
+ * SERIAL ASSIGNMENTS AT ORDER PREPARATION (migration 0178; owner brief
  * 2026-10-07, 33 sections) — the server half.
  *
  * WHAT EXISTS AND IS REUSED, NOT REBUILT:
@@ -33,7 +33,7 @@
  *       their warranty units.
  *
  * DEPLOY-AHEAD. Everything reads `serialAssignmentsInstalled` first: before
- * migration 0177 the write routes answer 503 SERIALS_NOT_INSTALLED, the order
+ * migration 0178 the write routes answer 503 SERIALS_NOT_INSTALLED, the order
  * detail says `installed:false`, and activation, the gate and the return hook
  * are no-ops — HEAD behaviour exactly.
  */
@@ -44,7 +44,7 @@ import { newId } from './crypto';
 import { auditStatements } from './audit';
 import { fence } from './operations';
 import { changedExactlyOne, isLostRace } from './gifts/fence';
-import { isOwner, normalizeAdminScope } from './adminScope';
+import { canMoveMoney, isOwner } from './adminScope';
 import { comboKey } from './inventory';
 import { getSetting } from './settings';
 import { maskSerial, unitTotalMonths, coverageState, type UnitRow } from './deviceOps';
@@ -104,15 +104,27 @@ export const refuse = (status: number, code: SerialCode, details?: Record<string
 
 export interface SerialActor {
   id: string;
-  /** INITIAL_ADMIN_EMAIL — the Main Admin of the brief. */
+  /**
+   * INITIAL_ADMIN_EMAIL on an admin row — the Main Admin of the brief. S1's
+   * rule for owner-only acts that carry no cost (`requireOwner`,
+   * `userPatchRefusal` in worker/lib/adminScope.ts): `isOwner` and the admin
+   * role. NOT the verified-owner rule of cost (`canViewCost`) — no serial door
+   * answers a cost, so an owner whose address is not verified yet still makes
+   * the serial exceptions.
+   */
   owner: boolean;
-  /** The owner and full-scope admins see the whole serial; assistants the masked form. */
+  /**
+   * The owner and full-scope (or legacy NULL-scope) admins see the whole
+   * serial; assistants the masked form. That is exactly S1's `canMoveMoney`
+   * (the owner first, then any admin whose scope is not 'assistant') — a
+   * serial is no cost, so the cost predicates do not decide it.
+   */
   fullSerial: boolean;
 }
 
 export function serialActor(env: Env, user: SessionUser): SerialActor {
-  const owner = isOwner(env, user);
-  return { id: user.id, owner, fullSerial: owner || (user.role === 'admin' && normalizeAdminScope(user.admin_scope) !== 'assistant') };
+  const owner = user.role === 'admin' && isOwner(env, user);
+  return { id: user.id, owner, fullSerial: canMoveMoney(env, user) };
 }
 
 const shown = (raw: string, actor: Pick<SerialActor, 'fullSerial'>) => (actor.fullSerial ? raw : maskSerial(raw));
@@ -2121,7 +2133,7 @@ const BOARD_SERIAL_STATUSES = new Set(['confirmed', 'processing']);
  * never one `serialRequiredSlots` per row. The same predicate as every other
  * door (`lineDevicePolicy`; bundle parents and community-store orders
  * excluded; 500 per line at most), so the chip and the order window agree.
- * Empty before migration 0177 and on any failure: a chip is never worth a
+ * Empty before migration 0178 and on any failure: a chip is never worth a
  * board that does not load.
  */
 export async function boardSerialCounts(

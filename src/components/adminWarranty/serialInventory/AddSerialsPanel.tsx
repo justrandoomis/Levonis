@@ -38,7 +38,7 @@ import { primeScannerAudio, scanFeedback, type ScanFeedback } from '../../scanne
 import type { ScanRead } from '../../scanner/BarcodeScanner';
 import ManualEntry from './ManualEntry';
 import LinkProductDialog, { type LinkTarget } from './LinkProductDialog';
-import { inventoryApi, refusalText, type InventoryRow, type InventoryStrings } from './model';
+import { inventoryApi, problemText, refusalText, type InventoryRow, type InventoryStrings } from './model';
 
 const BarcodeScanner = React.lazy(() => import('../../scanner/BarcodeScanner'));
 
@@ -333,7 +333,7 @@ export default function AddSerialsPanel({
               </p>
             )}
             {(last.state === 'invalid' || last.state === 'error') && last.problem && (
-              <p className="mt-0.5 text-[12px] text-[var(--ap-text-2)]">{t.problems[last.problem] ?? last.problem}</p>
+              <p className="mt-0.5 text-[12px] text-[var(--ap-text-2)]">{problemText(t, lang, last.problem) ?? last.problem}</p>
             )}
             {last.state === 'added' && last.needsProduct && (
               <button
