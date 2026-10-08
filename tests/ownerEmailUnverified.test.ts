@@ -13,10 +13,11 @@
  *   - the session loader reads `email_verified_at` from `users` on every
  *     request (`SELECT u.* … JOIN users`), so the session that confirms the
  *     emailed link (POST /api/auth/verify-email/confirm) sees cost on the very
- *     next request — the same cookie, no new sign-in, no redeploy. A sign-in
- *     with Google that proves the address opens a session of its own, and that
- *     one sees cost; the sessions opened BEFORE that first proof end with it
- *     (review finding C1, worker/lib/emailStamp.ts, tests/ownerFirstProof.test.ts).
+ *     next request — the same cookie, no new sign-in, no redeploy. That warned
+ *     link is the only way the address is first proven: a code sign-in or a
+ *     Google sign-in signs the owner in with cost still shut and the card
+ *     still shown, and the link confirmed from that session opens it (review
+ *     finding C1, worker/lib/emailStamp.ts, tests/ownerFirstProof.test.ts).
  *
  * This file drives the real session loader, the real auth routes and the real
  * cost routers over one database; tests/costRouteClassification.test.ts and
@@ -177,31 +178,93 @@ test('the email link: the SAME session sees cost on the next request after POST 
   // POSTs it — for the owner's address, from the owner's own session.
   const token = 'verify-token-for-the-owner-0123456789abcdef';
   await tokenFor(raw, 'usr_owner', token);
-  const confirmed = await call(a, cookie, 'POST', '/api/auth/verify-email/confirm', { token });
+  // The first press without the acceptance is asked what the proof ends; nothing changes.
+  const asked = await call(a, cookie, 'POST', '/api/auth/verify-email/confirm', { token });
+  assert.equal(asked.status, 409, asked.text);
+  assert.equal(asked.json.code, 'OWNER_FIRST_PROOF_REQUIRED');
+  assert.equal(await tokenUsed(raw, token), 0);
+  await assertShut(a, cookie);
+  const confirmed = await call(a, cookie, 'POST', '/api/auth/verify-email/confirm', { token, accept_owner_first_proof: true });
   assert.equal(confirmed.status, 200, confirmed.text);
   assert.ok(row<{ email_verified_at: string | null }>(raw, 'SELECT email_verified_at FROM users WHERE id = ?', 'usr_owner')?.email_verified_at);
 
   await assertOpen(a, cookie);
 });
 
-test('Google: a sign-in with the already-connected Google stamps the address, and the session it opens sees cost', async () => {
+test('Google: a sign-in with the already-connected Google does NOT verify the owner’s address — cost stays shut on every session until the warned link is confirmed', async () => {
   const raw = seededCopyUnverifiedOwner();
   raw.exec("UPDATE users SET google_sub = 'google-owner-sub' WHERE id = 'usr_owner'");
   const a = app(raw);
   const cookie = await sessionFor(raw, 'usr_owner');
   await assertShut(a, cookie);
 
-  // worker/routes/auth.ts: Google's verified identity stamps THIS account's matching address.
+  // worker/routes/auth.ts: the Google identity resolves the row, but never stamps the owner's unproven address.
   const env = { DB: asD1(raw), INITIAL_ADMIN_EMAIL: OWNER_EMAIL } as unknown as Env;
   await resolveGoogleIdentity(env, { sub: 'google-owner-sub', email: OWNER_EMAIL, name: 'Owner' });
+  assert.equal(row<{ v: string | null }>(raw, 'SELECT email_verified_at AS v FROM users WHERE id = ?', 'usr_owner')?.v, null);
 
-  // The session opened before the first proof ended with it (review finding C1);
-  // POST /google opens the sign-in's own session right after, and that one sees cost.
-  assert.equal(await me(a, cookie), null, 'the older session ended');
-  await assertOpen(a, await sessionFor(raw, 'usr_owner'));
+  // POST /google opens the sign-in's own session right after: shut, with the card; the older one is untouched.
+  const google = await sessionFor(raw, 'usr_owner');
+  await assertShut(a, google);
+  await assertShut(a, cookie);
+
+  // The warned link, confirmed from the session Google opened, opens cost there.
+  const token = 'verify-after-google-sign-in-0123456789ab';
+  await tokenFor(raw, 'usr_owner', token);
+  const confirmed = await call(a, google, 'POST', '/api/auth/verify-email/confirm', { token, accept_owner_first_proof: true });
+  assert.equal(confirmed.status, 200, confirmed.text);
+  await assertOpen(a, google);
+  assert.equal(await me(a, cookie), null, 'the session from before the first proof ended with it');
 });
 
-test('Google never merges into an unverified, unconnected account — the stamp comes from the email link or from a Google already connected', async () => {
+test('a code sign-in to the owner’s unproven address asks first — no session, nothing changed, the code kept; accepted, the same code proves it, opens cost and its own session', async () => {
+  const raw = seededCopyUnverifiedOwner();
+  const a = app(raw);
+  const older = await sessionFor(raw, 'usr_owner');
+  const id = `aotp_${Math.random().toString(36).slice(2)}`;
+  raw
+    .prepare('INSERT INTO auth_otp (id, channel, destination, purpose, user_id, verifier, max_attempts, expires_at) VALUES (?,?,?,?,?,?,?,?)')
+    .run(id, 'email', OWNER_EMAIL, 'signin', 'usr_owner', await sha256Hex(`${id}:246810`), 5, new Date(Date.now() + 600_000).toISOString());
+  const verify = (body: Record<string, unknown>) =>
+    a.request(
+      `${ORIGIN}/api/auth/otp/verify`,
+      {
+        method: 'POST',
+        headers: { 'CF-Connecting-IP': '1.2.3.4', 'content-type': 'application/json', origin: ORIGIN },
+        body: JSON.stringify({ channel: 'email', identifier: OWNER_EMAIL, code: '246810', ...body }),
+      },
+      undefined,
+      EXECUTION
+    );
+  const sessions = () => row<{ n: number }>(raw, "SELECT COUNT(*) AS n FROM sessions WHERE user_id = 'usr_owner'")?.n;
+
+  const asked = await verify({});
+  assert.equal(asked.status, 409, await asked.clone().text());
+  const askedBody = (await asked.json()) as Record<string, unknown>;
+  assert.equal(askedBody.code, 'OWNER_FIRST_PROOF_REQUIRED');
+  assert.equal(askedBody.error, serverMessage('OWNER_FIRST_PROOF_REQUIRED'));
+  assert.equal(/levonis_session=/.test(asked.headers.get('set-cookie') ?? ''), false, 'no session opened');
+  assert.equal(sessions(), 1);
+  assert.equal(row<{ c: string | null }>(raw, 'SELECT consumed_at AS c FROM auth_otp WHERE id = ?', id)?.c, null, 'the code is kept');
+  assert.equal(row<{ v: string | null }>(raw, 'SELECT email_verified_at AS v FROM users WHERE id = ?', 'usr_owner')?.v, null);
+  assert.equal(row<{ p: string | null }>(raw, 'SELECT password_hash AS p FROM users WHERE id = ?', 'usr_owner')?.p, 'h', 'nothing removed');
+  await assertShut(a, older);
+
+  const res = await verify({ accept_owner_first_proof: true });
+  assert.equal(res.status, 200, await res.clone().text());
+  const body = (await res.json()) as Record<string, unknown>;
+  assert.deepEqual(body.owner_first_proof, { sessions_ended: 1 });
+  const set = /levonis_session=([^;]+)/.exec(res.headers.get('set-cookie') ?? '')?.[1];
+  assert.ok(set, 'the accepted code opened a session');
+  const cookie = `levonis_session=${set}`;
+  assert.ok(row<{ v: string | null }>(raw, 'SELECT email_verified_at AS v FROM users WHERE id = ?', 'usr_owner')?.v);
+  assert.equal(row<{ p: string | null }>(raw, 'SELECT password_hash AS p FROM users WHERE id = ?', 'usr_owner')?.p, null);
+  assert.equal(await me(a, older), null, 'the session from before the proof ended with it');
+  assert.equal(sessions(), 1, 'only the session the proof opened');
+  await assertOpen(a, cookie);
+});
+
+test('Google never merges into an unverified, unconnected account, and the owner’s address is proven by the email link alone', async () => {
   const raw = seededCopyUnverifiedOwner();
   const env = { DB: asD1(raw), INITIAL_ADMIN_EMAIL: OWNER_EMAIL } as unknown as Env;
   await assert.rejects(
@@ -209,13 +272,17 @@ test('Google never merges into an unverified, unconnected account — the stamp 
     (e: unknown) => e instanceof HttpError && e.code === 'EMAIL_NOT_VERIFIED'
   );
   assert.equal(row<{ v: string | null }>(raw, 'SELECT email_verified_at AS v FROM users WHERE id = ?', 'usr_owner')?.v, null);
-  // …which is why the refusal offers Google only when it is ALREADY connected,
-  // and never a "connect Google in your settings" control that does not exist.
-  assert.match(serverMessage('OWNER_EMAIL_UNVERIFIED'), /sign in with Google if Google is already connected to the same address/);
+  // A connected Google does not verify the owner's address either (worker/lib/emailStamp.ts),
+  // so the refusal offers the link only — no Google sign-in, and never a
+  // "connect Google in your settings" control that does not exist.
+  assert.match(serverMessage('OWNER_EMAIL_UNVERIFIED'), /Verify your email with the link in the verification email/);
+  assert.doesNotMatch(serverMessage('OWNER_EMAIL_UNVERIFIED'), /sign in with Google|already connected/i);
   assert.doesNotMatch(serverMessage('OWNER_EMAIL_UNVERIFIED'), /settings|إعدادات/i);
-  // The link route stamps only the SAME address Google proved.
+  // The link route stamps only the SAME address Google proved, through the guarded sign-in stamp.
   const link = codeOf('worker/routes/auth.ts').slice(codeOf('worker/routes/auth.ts').indexOf("authRoutes.post('/google/link'"));
-  assert.match(link.slice(0, 4000), /UPDATE users SET email_verified_at = \$\{STAMP_ONCE\} WHERE id = \? AND email = \?/);
+  assert.match(link.slice(0, 4000), /await signInStamp\(c\.env\.DB, c\.env, me\.id, identity\.email\)\.run\(\);/);
+  const lib = codeOf('worker/lib/emailStamp.ts');
+  assert.match(lib.slice(lib.indexOf('export function signInStamp')), /WHERE id = \? AND email = \?/);
 });
 
 test('the session loader reads the stamp fresh on every request (no cached user row)', () => {
@@ -275,7 +342,7 @@ test('the owner’s link is confirmed only from the owner’s own session — no
 
   // The owner's own session confirms it, and cost opens.
   const owner = await sessionFor(raw, 'usr_owner');
-  const ok = await call(a, owner, 'POST', '/api/auth/verify-email/confirm', { token });
+  const ok = await call(a, owner, 'POST', '/api/auth/verify-email/confirm', { token, accept_owner_first_proof: true });
   assert.equal(ok.status, 200, ok.text);
   await assertOpen(a, owner);
 });
@@ -337,14 +404,17 @@ for (const blank of ['', '   ']) {
     assert.equal(status.json.verified, false, 'status does not call a blank stamp verified');
     const token = `blank-stamp-link-${blank.length}-0123456789abcdef`;
     await tokenFor(raw, 'usr_owner', token);
-    const confirmed = await call(a, cookie, 'POST', '/api/auth/verify-email/confirm', { token });
+    // A blank stamp is no stamp: confirming is the first proof, asked like any other.
+    const asked = await call(a, cookie, 'POST', '/api/auth/verify-email/confirm', { token });
+    assert.equal(asked.json.code, 'OWNER_FIRST_PROOF_REQUIRED');
+    const confirmed = await call(a, cookie, 'POST', '/api/auth/verify-email/confirm', { token, accept_owner_first_proof: true });
     assert.equal(confirmed.status, 200, confirmed.text);
     const stamp = row<{ v: string | null }>(raw, 'SELECT email_verified_at AS v FROM users WHERE id = ?', 'usr_owner')?.v;
     assert.ok(stamp && stamp.trim() !== '', `the blank was replaced (got ${JSON.stringify(stamp)})`);
     await assertOpen(a, cookie);
   });
 
-  test(`a blank stamp (${JSON.stringify(blank)}) is replaced by a sign-in with the already-connected Google`, async () => {
+  test(`a blank stamp (${JSON.stringify(blank)}) is NOT replaced by a sign-in with the already-connected Google — the owner stays shut until the link`, async () => {
     const raw = seededCopyUnverifiedOwner();
     raw.prepare("UPDATE users SET email_verified_at = ?, google_sub = 'google-owner-sub' WHERE id = 'usr_owner'").run(blank);
     const a = app(raw);
@@ -352,10 +422,10 @@ for (const blank of ['', '   ']) {
     await assertShut(a, cookie);
     const env = { DB: asD1(raw), INITIAL_ADMIN_EMAIL: OWNER_EMAIL } as unknown as Env;
     await resolveGoogleIdentity(env, { sub: 'google-owner-sub', email: OWNER_EMAIL, name: 'Owner' });
-    // A blank stamp is no stamp, so this is the first proof: the older session
-    // ends, and the session the sign-in opens sees cost.
-    assert.equal(await me(a, cookie), null, 'the older session ended');
-    await assertOpen(a, await sessionFor(raw, 'usr_owner'));
+    // A blank stamp is no stamp, so the row is unproven: the Google sign-in leaves it so.
+    assert.equal(row<{ v: string | null }>(raw, 'SELECT email_verified_at AS v FROM users WHERE id = ?', 'usr_owner')?.v, blank);
+    await assertShut(a, cookie);
+    await assertShut(a, await sessionFor(raw, 'usr_owner'));
   });
 }
 
@@ -364,7 +434,10 @@ test('the send route does not answer "verified" for a whitespace stamp (it would
   const send = src.slice(src.indexOf("authRoutes.post('/verify-email/send'"), src.indexOf("authRoutes.post('/verify-email/confirm'"));
   assert.match(send, /if \(isStamped\(row\.email_verified_at\)\) return c\.json\(\{ success: true, verified: true \}\);/);
   const otp = src.slice(src.indexOf("authRoutes.post('/otp/verify'"));
-  assert.match(otp, /AND \(email_verified_at IS NULL OR trim\(email_verified_at\) = ''\)/);
+  assert.match(otp, /if \(channel === 'email' && !isStamped\(account\.email_verified_at\)\) \{\s*if \(accepted && isOwner\(c\.env, account\)\) \{[\s\S]{0,600}?\} else \{\s*await signInStamp\(/);
+  // The sign-in stamp replaces a blank like a NULL (STAMP_ONCE).
+  const lib = codeOf('worker/lib/emailStamp.ts');
+  assert.match(lib.slice(lib.indexOf('export function signInStamp')), /SET email_verified_at = \$\{STAMP_ONCE\}/);
   // No writer is left that keeps a blank: every stamp goes through STAMP_ONCE or sets a fresh value.
   assert.doesNotMatch(src, /COALESCE\(email_verified_at, \?\)/);
 });

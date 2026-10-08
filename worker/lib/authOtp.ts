@@ -218,7 +218,15 @@ export async function verifyAuthOtp(
   channel: AuthOtpChannel,
   destination: string,
   code: string,
-  purpose: AuthOtpPurpose = 'signin'
+  purpose: AuthOtpPurpose = 'signin',
+  /**
+   * `consume: false` checks the code — the attempt is still claimed, so a
+   * check counts against the same five guesses — and leaves a correct code
+   * unspent. For the one caller that must ask the person something before the
+   * code may do anything (the owner's first proof, routes/auth.ts /otp/verify)
+   * and then accept the same code again.
+   */
+  opts: { consume?: boolean } = {}
 ): Promise<VerifyOtpOutcome> {
   const trimmed = String(code ?? '').trim();
   const row = await env.DB.prepare(
@@ -245,6 +253,7 @@ export async function verifyAuthOtp(
   if (!timingSafeEqual(enc.encode(expected), enc.encode(row.verifier))) {
     return { ok: false, reason: 'wrong_code' };
   }
+  if (opts.consume === false) return { ok: true, user_id: row.user_id, challenge_id: row.id };
 
   const consume = await env.DB.prepare(
     "UPDATE auth_otp SET consumed_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND consumed_at IS NULL"

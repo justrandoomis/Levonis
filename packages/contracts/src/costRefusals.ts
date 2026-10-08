@@ -40,23 +40,41 @@ export const COST_REFUSALS = {
   // The owner's own address on an admin row that is NOT yet verified (DECISIONS
   // row 185, amendment of 2026-10-08). Only that one session can ever receive
   // it; everyone else keeps COST_ACCESS_DENIED, byte for byte. It names the
-  // way out: verify the address (the admin screens send the existing
-  // verification email), or sign in with Google when Google is ALREADY
-  // connected to that same address — a sign-in stamps it. An unconnected,
-  // unverified account is never merged with Google, by design, and the
-  // settings page has no Google link button, so the sentence offers neither.
+  // way out: verify the address with the link in the verification email (the
+  // admin screens send it). The first proof of this address is made only after
+  // the person accepted what it ends (OWNER_FIRST_PROOF_REQUIRED below: the
+  // link, or a code sign-in to this address); a Google sign-in leaves it
+  // unproven (worker/lib/emailStamp.ts) — so the sentence offers no Google,
+  // and never a "connect Google in your settings" control, which does not
+  // exist.
   //
   // The last sentence says, BEFORE the owner verifies, what the first proof
   // ends (worker/lib/emailStamp.ts, review finding C1): every other session,
-  // the password, the Telegram link, the phone sign-in and any other Google
-  // account — whoever took the address while it was free must not keep a way
-  // in. Only someone already signed in to this row reads it, so it carries no
-  // "ignore it if you did not ask" advice: that belongs to the email and to
-  // VERIFY_SIGN_IN_REQUIRED, which a stranger to the row can read.
+  // the password, the Telegram link, the phone sign-in and any Google account
+  // under another address — whoever took the address while it was free must
+  // not keep a way in. Google on this same address is cleared too but links
+  // again at its next sign-in (the row is proven by then), so the sentence
+  // does not tell the owner Google is lost. Only someone already signed in to
+  // this row reads it, so it carries no "ignore it if you did not ask" advice:
+  // that belongs to the email and to VERIFY_SIGN_IN_REQUIRED, which a stranger
+  // to the row can read.
   OWNER_EMAIL_UNVERIFIED: {
-    ar: 'بيانات التكلفة تُفتح للأدمن الرئيسي بعد تأكيد بريد حسابه. أكّد بريدك الإلكتروني لفتحها، أو سجّل الدخول بحساب Google إن كان مربوطًا بالبريد نفسه. أول تأكيد يُنهي جلسات هذا الحساب على الأجهزة الأخرى ويزيل كلمة مروره وربط تيليغرام والدخول بالهاتف وأي حساب Google آخر؛ بعده تدخل برمز يصل إلى هذا البريد، ولك أن تعيّن كلمة مرور جديدة.',
-    en: "Cost data opens for the main admin once the account's email is verified. Verify your email to open it, or sign in with Google if Google is already connected to the same address. The first verification ends this account's sessions on other devices and removes its password, Telegram link, phone sign-in and any other Google account; after it you sign in with a code sent to this email, and you can set a new password.",
-    ckb: 'زانیارییەکانی تێچوو بۆ بەڕێوەبەری سەرەکی دەکرێنەوە دوای پشتڕاستکردنەوەی ئیمەیڵی هەژمارەکە. ئیمەیڵەکەت پشتڕاست بکەرەوە بۆ کردنەوەیان، یان ئەگەر Google پێشتر بە هەمان ئیمەیڵەوە بەستراوە، بە Google بچۆ ژوورەوە. یەکەم پشتڕاستکردنەوە دانیشتنەکانی ئەم هەژمارە لە ئامێرەکانی تر کۆتایی پێدەهێنێت و وشەی نهێنی و بەستنەوەی تێلێگرام و چوونەژوورەوە بە ژمارەی مۆبایل و هەر هەژمارێکی تری Google لادەبات؛ دوای ئەوە بە کۆدێک دەچیتە ژوورەوە کە بۆ ئەم ئیمەیڵە دەنێردرێت، و دەتوانیت وشەی نهێنییەکی نوێ دابنێیت.',
+    ar: 'بيانات التكلفة تُفتح للأدمن الرئيسي بعد تأكيد بريد حسابه. أكّد بريدك الإلكتروني برابط رسالة التأكيد لفتحها. أول تأكيد يُنهي جلسات هذا الحساب على الأجهزة الأخرى ويزيل كلمة مروره وربط تيليغرام والدخول بالهاتف وأي حساب Google ببريد آخر؛ بعده تدخل برمز يصل إلى هذا البريد أو بـGoogle على البريد نفسه، ولك أن تعيّن كلمة مرور جديدة.',
+    en: "Cost data opens for the main admin once the account's email is verified. Verify your email with the link in the verification email to open it. The first verification ends this account's sessions on other devices and removes its password, Telegram link, phone sign-in and any Google account with a different email; after it you sign in with a code sent to this email or with Google on this same email, and you can set a new password.",
+    ckb: 'زانیارییەکانی تێچوو بۆ بەڕێوەبەری سەرەکی دەکرێنەوە دوای پشتڕاستکردنەوەی ئیمەیڵی هەژمارەکە. بۆ کردنەوەیان، بە بەستەری ناو ئیمەیڵی پشتڕاستکردنەوە ئیمەیڵەکەت پشتڕاست بکەرەوە. یەکەم پشتڕاستکردنەوە دانیشتنەکانی ئەم هەژمارە لە ئامێرەکانی تر کۆتایی پێدەهێنێت و وشەی نهێنی و بەستنەوەی تێلێگرام و چوونەژوورەوە بە ژمارەی مۆبایل و هەر هەژمارێکی Google بە ئیمەیڵێکی تر لادەبات؛ دوای ئەوە بە کۆدێک کە بۆ ئەم ئیمەیڵە دەنێردرێت یان بە Google بە هەمان ئیمەیڵ دەچیتە ژوورەوە، و دەتوانیت وشەی نهێنییەکی نوێ دابنێیت.',
+  },
+  // The FIRST proof of the owner's address — the emailed link, or a sign-in
+  // code to that address — is made only by a request that says the person
+  // accepted what it ends (`accept_owner_first_proof: true`); without it the
+  // route answers this, changes nothing, and keeps the link or the code
+  // unspent (worker/lib/emailStamp.ts, rule 3). Decided by the server for any
+  // row and any token, so no page state can skip the warning. Read only by the
+  // holder of a valid link or code — the mailbox — so it tells nobody anything
+  // their mailbox did not. The page shows it with a confirm and a cancel.
+  OWNER_FIRST_PROOF_REQUIRED: {
+    ar: 'هذا أول تأكيد لبريد الأدمن الرئيسي. يُنهي جلسات هذا الحساب على الأجهزة الأخرى ويزيل كلمة مروره وربط تيليغرام والدخول بالهاتف وأي حساب Google ببريد آخر؛ بعده تدخل برمز يصل إلى هذا البريد أو بـGoogle على البريد نفسه. أكّد للمتابعة، أو ألغِ ليبقى كل شيء كما هو.',
+    en: "This is the first verification of the main admin's email. It ends this account's sessions on other devices and removes its password, Telegram link, phone sign-in and any Google account with a different email; after it you sign in with a code sent to this email or with Google on this same email. Confirm to continue, or cancel to leave everything as it is.",
+    ckb: 'ئەمە یەکەم پشتڕاستکردنەوەی ئیمەیڵی بەڕێوەبەری سەرەکییە. دانیشتنەکانی ئەم هەژمارە لە ئامێرەکانی تر کۆتایی پێدەهێنێت و وشەی نهێنی و بەستنەوەی تێلێگرام و چوونەژوورەوە بە ژمارەی مۆبایل و هەر هەژمارێکی Google بە ئیمەیڵێکی تر لادەبات؛ دوای ئەوە بە کۆدێک کە بۆ ئەم ئیمەیڵە دەنێردرێت یان بە Google بە هەمان ئیمەیڵ دەچیتە ژوورەوە. بۆ بەردەوامبوون پشتڕاستی بکەرەوە، یان هەڵیبوەشێنەوە تا هەموو شتێک وەک خۆی بمێنێتەوە.',
   },
   // A verification link for the owner's address — the one that opens cost —
   // is confirmed only from a session of the account it belongs to (DECISIONS
@@ -65,8 +83,9 @@ export const COST_REFUSALS = {
   //
   // The last sentence is for the real owner opening a message somebody ELSE
   // asked for (review finding C1): a row that took the address while it was
-  // free can send it, and "sign in" would then be a code sign-in that proves
-  // the mailbox for THAT row. Ignoring it leaves the row unproven.
+  // free can send it, and "sign in" would then be a code sign-in into THAT
+  // row (which asks, with OWNER_FIRST_PROOF_REQUIRED, before it proves
+  // anything). Ignoring it leaves the row unproven.
   VERIFY_SIGN_IN_REQUIRED: {
     ar: 'بريد الأدمن الرئيسي يُؤكَّد من حسابه وهو مسجّل الدخول فقط. سجّل الدخول إلى ذلك الحساب في هذا المتصفح، ثم افتح رابط التأكيد من الرسالة مرة أخرى. إن لم تطلب هذه الرسالة، فتجاهلها ولا تسجّل الدخول.',
     en: "The main admin's email is confirmed only from that account while it is signed in. Sign in to it in this browser, then open the confirmation link from the email again. If you did not ask for this email, ignore it and do not sign in.",

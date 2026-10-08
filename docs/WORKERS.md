@@ -52,18 +52,27 @@ Before anything is migrated, workflow 7 refuses an empty `INITIAL_ADMIN_EMAIL`
 DECISIONS row 185 amendment of 2026-10-08). Cost is honoured only for the admin
 account holding that address once the address is verified; until then the site
 itself tells the owner so (`403 OWNER_EMAIL_UNVERIFIED`) and the admin screens
-offer the verification email (a sign-in with Google already connected to the
-same address verifies it too). The emailed link for the owner's address is
+offer the verification email. The emailed link for the owner's address is
 confirmed only while signed in to that same account, in the same browser
 (`403 VERIFY_SIGN_IN_REQUIRED` otherwise, the link left unused). With no email
 service configured (`EMAIL_API_KEY`, `EMAIL_FROM`) the card says so.
 The session reads the stamp on every request, so cost opens on the next request
 after it, with no redeploy. The first verification of that address ends every
 other way into the account in the same batch (`worker/lib/emailStamp.ts`): its
-other sessions, its password, phone, Telegram link, any Google account that is
-not the proof, and pending reset links. After it the owner signs in with a code
-sent to the address and can set a new password; the card says so beforehand and
-the page says so afterwards. After the deploy, «Cost-privacy probes, read-only»
+other sessions, its password, phone, Telegram link, Google account and pending
+reset links (Google on the same address links again at its next sign-in). After
+it the owner signs in with a code sent to the address and can set a new
+password; the page says so beforehand and afterwards. That first verification
+is made only once the person accepted what it ends, and the server decides it:
+the emailed link and a sign-in code to the address each prove it only with
+`accept_owner_first_proof: true`, and otherwise answer
+`409 OWNER_FIRST_PROOF_REQUIRED`, change nothing and keep the link or code
+unspent. An accepted code proves and opens its session in the same request, so
+no squatter can end the owner's session before the proof. A Google sign-in or
+link never stamps the owner's address while it is unverified (`signInStamp`).
+Every write that adds a way into an account, and every session opened after a
+credential check, re-reads that check in its own statement
+(`worker/lib/session.ts`). After the deploy, «Cost-privacy probes, read-only»
 runs `scripts/live-cost-probes.mjs` over every `scripts/live-cost-probes.d/*.json`:
 anonymous GETs only, no cookie, no write.
 

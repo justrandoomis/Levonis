@@ -5,7 +5,12 @@ import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import { refusalText } from '../../lib/refusalStrings';
-import { OWNER_FIRST_PROOF_STRINGS, ownerFirstProofOf, type OwnerFirstProof } from '../../lib/ownerFirstProof';
+import {
+  OWNER_FIRST_PROOF_REQUIRED,
+  OWNER_FIRST_PROOF_STRINGS,
+  ownerFirstProofOf,
+  type OwnerFirstProof,
+} from '../../lib/ownerFirstProof';
 
 /**
  * Email verification banner (final-phase §3A).
@@ -183,9 +188,21 @@ export default function EmailVerifyBanner() {
   const headerClearance = onHomeRoute
     ? 'mt-[calc(var(--app-header-height,132px)+0.75rem)]'
     : 'mt-3';
-  const [confirmState, setConfirmState] = useState<'idle' | 'confirming' | 'done' | 'failed' | 'sign_in'>('idle');
+  const [confirmState, setConfirmState] = useState<'idle' | 'confirming' | 'done' | 'failed' | 'sign_in' | 'cancelled'>('idle');
   /** Set when this confirmation was the first proof of the main admin's address (lib/ownerFirstProof.ts). */
   const [firstProof, setFirstProof] = useState<OwnerFirstProof | null>(null);
+  /**
+   * The server answered OWNER_FIRST_PROOF_REQUIRED: this link would be the
+   * first proof of the main admin's address and the press did not say the
+   * person had read what that ends. The card now shows the server's sentence
+   * and a confirm that sends `accept_owner_first_proof`. The server decides
+   * this for any row and any link, so a card that showed no warning (a
+   * non-admin row, an email change, `/me` not answered yet) still cannot make
+   * the proof without one.
+   */
+  const [askFirstProof, setAskFirstProof] = useState(false);
+  /** The before-sentence is on the card above the button, so a press under it is the acceptance. */
+  const warnedBefore = user?.owner_email_unverified === true;
 
   const loadStatus = useCallback(() => {
     api
@@ -238,11 +255,15 @@ export default function EmailVerifyBanner() {
     }
   };
 
-  const confirm = async () => {
+  const confirm = async (acceptFirstProof: boolean) => {
     if (confirmState === 'confirming' || confirmState === 'done') return;
     setConfirmState('confirming');
     try {
-      const res = await api.post<{ owner_first_proof?: unknown }>('/api/auth/verify-email/confirm', { token });
+      const res = await api.post<{ owner_first_proof?: unknown }>('/api/auth/verify-email/confirm', {
+        token,
+        ...(acceptFirstProof ? { accept_owner_first_proof: true } : {}),
+      });
+      setAskFirstProof(false);
       // The first proof of the main admin's address ended every other way into
       // the account; the card below says what, in place.
       setFirstProof(ownerFirstProofOf(res));
@@ -262,14 +283,25 @@ export default function EmailVerifyBanner() {
       // never asked for the message, ignore it and do not sign in (the
       // sentence says both, review finding C1).
       if (e instanceof ApiError && e.code === 'VERIFY_SIGN_IN_REQUIRED') setConfirmState('sign_in');
-      else setConfirmState('failed');
+      else if (e instanceof ApiError && e.code === OWNER_FIRST_PROOF_REQUIRED) {
+        // Nothing changed and the link is still unused: ask, then confirm again.
+        setAskFirstProof(true);
+        setConfirmState('idle');
+      } else setConfirmState('failed');
     }
+  };
+
+  /** "Leave everything as it is": the link stays unused and the card goes. */
+  const cancelFirstProof = () => {
+    setAskFirstProof(false);
+    setConfirmState('cancelled');
+    clearTokenFromUrl();
   };
 
   // ---------------------------------------------------------------- render
 
   // Confirm card takes precedence: the user followed the email link.
-  if (token && confirmState !== 'done') {
+  if (token && confirmState !== 'done' && confirmState !== 'cancelled') {
     return (
       <div className={`${headerClearance} mx-3 rounded-2xl border border-warning/30 bg-warning/[0.08] p-4 text-sm`}>
         <p className="font-bold text-yellow-500 mb-1">{t.confirmTitle}</p>
@@ -282,12 +314,39 @@ export default function EmailVerifyBanner() {
             <p className="text-red-400 mb-1">{t.confirmFailed}</p>
             <p className="text-gray-400 text-xs">{t.confirmFailedHint}</p>
           </>
+        ) : askFirstProof ? (
+          <>
+            {/* The server's own sentence: what this first proof ends. */}
+            <p role="alert" data-owner-first-proof="ask" className="text-text-secondary leading-relaxed mb-3">
+              {refusalText(OWNER_FIRST_PROOF_REQUIRED, lang)}
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void confirm(true)}
+                disabled={confirmState === 'confirming'}
+                className="w-full sm:w-auto rounded-xl bg-yellow-600 px-5 py-2.5 font-bold text-black disabled:opacity-60"
+              >
+                {confirmState === 'confirming' ? t.confirming : (OWNER_FIRST_PROOF_STRINGS[lang] ?? OWNER_FIRST_PROOF_STRINGS.ar).acceptConfirm}
+              </button>
+              <button
+                type="button"
+                onClick={cancelFirstProof}
+                disabled={confirmState === 'confirming'}
+                className="min-h-11 px-3 text-text-secondary underline underline-offset-2 disabled:opacity-60"
+              >
+                {(OWNER_FIRST_PROOF_STRINGS[lang] ?? OWNER_FIRST_PROOF_STRINGS.ar).cancel}
+              </button>
+            </div>
+          </>
         ) : (
           <>
             <p className="text-gray-300 mb-3">{t.confirmHint}</p>
             {/* The owner's own unverified session is about to make the first
                 proof of the main admin's address: say what it ends before the
-                press (lib/ownerFirstProof.ts, worker/lib/emailStamp.ts). */}
+                press (lib/ownerFirstProof.ts, worker/lib/emailStamp.ts). The
+                press under it says so to the server; without it the server
+                asks (askFirstProof above). */}
             {user?.owner_email_unverified === true && (
               <p data-owner-first-proof="before" className="text-text-secondary text-xs leading-relaxed mb-3">
                 {(OWNER_FIRST_PROOF_STRINGS[lang] ?? OWNER_FIRST_PROOF_STRINGS.ar).before}
@@ -295,7 +354,7 @@ export default function EmailVerifyBanner() {
             )}
             <button
               type="button"
-              onClick={confirm}
+              onClick={() => void confirm(warnedBefore)}
               disabled={confirmState === 'confirming'}
               className="w-full sm:w-auto rounded-xl bg-yellow-600 px-5 py-2.5 font-bold text-black disabled:opacity-60"
             >

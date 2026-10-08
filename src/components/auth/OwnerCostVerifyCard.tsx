@@ -28,19 +28,20 @@ import { Button } from '../ui/Button';
  * owner who verified in another tab, and the card also re-reads the session
  * whenever the window regains focus — the server reads `email_verified_at`
  * fresh on every request, so cost opens on the next read with no new sign-in
- * and no redeploy. A sign-in with Google ALREADY connected to the same address
- * stamps it too; there is no Google link button in Settings, so nothing here
- * sends the owner looking for one.
+ * and no redeploy. A Google sign-in never proves this address (a sign-in code
+ * to it does, after the same question the link asks — worker/lib/emailStamp.ts),
+ * so nothing here offers Google, nor a Google link button Settings does not
+ * have.
  *
  * THE FIRST PROOF ENDS EVERY OTHER WAY IN (review finding C1 and its review,
- * worker/lib/emailStamp.ts). Confirming the link from THIS session keeps it;
- * a code or Google sign-in elsewhere proves the address with a session of its
- * own, and this one — opened before the proof — ends, so the re-read finds no
- * user and the app asks for a sign-in. The same proof removes the account's
- * password, Telegram link, phone sign-in and any other Google account, so
- * whoever took the address while it was free keeps no way in. The refusal
- * sentence this card shows says so BEFORE the owner presses send, and the
- * confirm card and the sign-in say it again afterwards (lib/ownerFirstProof.ts).
+ * worker/lib/emailStamp.ts). Confirming the link from THIS session keeps it
+ * and ends the account's other sessions; the same proof removes its password,
+ * Telegram link, phone sign-in and any Google account under another address,
+ * so whoever took the address while it was free keeps no way in. The refusal
+ * sentence this card shows says so BEFORE the owner presses send, the confirm
+ * card says it again above its button — and the server refuses the proof
+ * until a press says the person read it (OWNER_FIRST_PROOF_REQUIRED) — and
+ * afterwards in place (lib/ownerFirstProof.ts).
  *
  * The status line is always in the accessibility tree (visually hidden while
  * empty), so "sent" and "failed" are announced when they appear.
@@ -80,8 +81,8 @@ const STRINGS = {
     ),
     notConfigured: (e: Email) => (
       <>
-        خدمة البريد غير مهيّأة على الخادم بعد (EMAIL_API_KEY و EMAIL_FROM)، فلا يمكن إرسال رسالة التأكيد الآن. وإن كان
-        حساب Google مربوطًا بـ {e} فتسجيل الدخول به يؤكّد البريد.
+        خدمة البريد غير مهيّأة على الخادم بعد (EMAIL_API_KEY و EMAIL_FROM)، فلا يمكن إرسال رسالة التأكيد إلى {e} الآن.
+        تُفتح بيانات التكلفة بعد تهيئتها وتأكيد البريد من رابط الرسالة.
       </>
     ),
     tooMany: 'محاولات كثيرة — انتظر قليلًا ثم أعد المحاولة.',
@@ -108,7 +109,7 @@ const STRINGS = {
     notConfigured: (e: Email) => (
       <>
         The server has no email service set up yet (EMAIL_API_KEY and EMAIL_FROM), so the verification email cannot be
-        sent now. If Google is already connected to {e}, signing in with it verifies the address.
+        sent to {e} now. Cost data opens once it is set up and you confirm the link in that email.
       </>
     ),
     tooMany: 'Too many attempts — wait a moment and try again.',
@@ -136,8 +137,8 @@ const STRINGS = {
     notConfigured: (e: Email) => (
       <>
         خزمەتگوزاری ئیمەیڵ هێشتا لەسەر سێرڤەرەکە ڕێکنەخراوە (EMAIL_API_KEY و EMAIL_FROM)، بۆیە ئێستا ناتوانرێت ئیمەیڵی
-        پشتڕاستکردنەوە بنێردرێت. ئەگەر Google پێشتر بەم ئیمەیڵە بەستراوە: {e}، چوونەژوورەوە بە Google ئیمەیڵەکە پشتڕاست
-        دەکاتەوە.
+        پشتڕاستکردنەوە بۆ {e} بنێردرێت. زانیارییەکانی تێچوو دەکرێنەوە کاتێک ڕێکدەخرێت و
+        بە بەستەری ناو ئەو ئیمەیڵە پشتڕاستی دەکەیتەوە.
       </>
     ),
     tooMany: 'هەوڵی زۆر — کەمێک چاوەڕوان بە و دووبارە هەوڵبدەرەوە.',
@@ -230,7 +231,7 @@ export default function OwnerCostVerifyCard({ compact = false }: OwnerCostVerify
     if (cooldown > 0) return;
     try {
       const res = await api.post<{ verified?: boolean }>('/api/auth/verify-email/send');
-      // Already verified (another tab, a Google sign-in): the session just needs re-reading.
+      // Already verified (another tab): the session just needs re-reading.
       if (res?.verified === true) {
         await refreshUser();
         return;

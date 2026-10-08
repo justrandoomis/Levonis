@@ -128,8 +128,10 @@ function hasVerifiedAddress(user: Pick<CostSubject, 'email_verified_at'>): boole
  * reads `users`). An owner whose address is not verified yet is refused every
  * cost surface with OWNER_EMAIL_UNVERIFIED instead of the generic refusal
  * (`isUnverifiedOwner`, `costRefusal` in costAccess.ts), and the admin
- * screens offer the existing verification email; a sign-in with Google
- * already connected to the same address stamps it too. The emailed link for
+ * screens offer the existing verification email. That link, or a sign-in
+ * code to this address, first proves it only once the person accepted what
+ * the proof ends (OWNER_FIRST_PROOF_REQUIRED); a Google sign-in leaves it
+ * unproven (worker/lib/emailStamp.ts). The emailed link for
  * this address is confirmed only from a session of the account it belongs to
  * (VERIFY_SIGN_IN_REQUIRED, worker/routes/auth.ts), so a row that took the
  * address while it was free cannot be verified by the real owner's click. A

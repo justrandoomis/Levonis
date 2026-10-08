@@ -5,6 +5,8 @@ import { randomToken, sha256Hex } from './crypto';
 import { rootDomainFrom, sessionCookieDomain } from './hosts';
 import { PRIVATE_DELEGATION_ENABLED, isOwner } from './adminScope';
 import { loadPrivateGrants } from './costAccess';
+import { HttpError } from './http';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 
 /** The session cookie's name. Exported because the caching rule of §14 has to
  *  ask "does this request carry a session?" BEFORE the session is resolved —
@@ -107,16 +109,64 @@ function cookieOptions(c: Context<AppContext>) {
   };
 }
 
-export async function createSession(c: Context<AppContext>, userId: string): Promise<void> {
+/**
+ * A condition the session's own INSERT re-reads: the way in that a sign-in
+ * just checked is still on the row (`EXISTS (SELECT 1 FROM users WHERE id = ?
+ * AND password_hash = ?)`). `sql` uses plain `?` placeholders only, bound by
+ * `binds` in order.
+ */
+export interface SessionCondition {
+  sql: string;
+  binds: unknown[];
+}
+
+/**
+ * Opens a session for `userId` and sets its cookie.
+ *
+ * `stillHolds` — WHEN A SIGN-IN CHECKED A CREDENTIAL FIRST. A sign-in reads
+ * the row, checks the password (or the Google account, the Telegram link, the
+ * phone) and only then opens the session; in between, the first proof of the
+ * owner's address can end that very way into the row
+ * (worker/lib/emailStamp.ts). A session opened after that, on the strength
+ * of a check made before it, would hand the squatter the row the proof just
+ * took back — with cost. So the INSERT carries the check again in its own
+ * WHERE, read in the same write: when the way in is gone, no session is
+ * written and the sign-in is refused (REAUTH_REQUIRED) instead.
+ */
+export async function createSession(c: Context<AppContext>, userId: string, stillHolds?: SessionCondition): Promise<void> {
   const token = randomToken(32);
   const id = await sha256Hex(token);
   const expires = new Date(Date.now() + SESSION_TTL_DAYS * 86_400_000);
-  await c.env.DB.prepare(
-    'INSERT INTO sessions (id, user_id, expires_at, user_agent) VALUES (?, ?, ?, ?)'
-  )
-    .bind(id, userId, expires.toISOString(), (c.req.header('User-Agent') || '').slice(0, 255))
-    .run();
+  const values = [id, userId, expires.toISOString(), (c.req.header('User-Agent') || '').slice(0, 255)];
+  const res = stillHolds
+    ? await c.env.DB.prepare(
+        `INSERT INTO sessions (id, user_id, expires_at, user_agent) SELECT ?, ?, ?, ? WHERE ${stillHolds.sql}`
+      )
+        .bind(...values, ...stillHolds.binds)
+        .run()
+    : await c.env.DB.prepare('INSERT INTO sessions (id, user_id, expires_at, user_agent) VALUES (?, ?, ?, ?)')
+        .bind(...values)
+        .run();
+  if (stillHolds && Number(res.meta?.changes ?? 0) === 0) {
+    throw new HttpError(401, serverMessage('REAUTH_REQUIRED'), 'REAUTH_REQUIRED');
+  }
   setCookie(c, COOKIE_NAME, token, { ...cookieOptions(c), expires });
+}
+
+/**
+ * The request's own session is still live — for a write that adds a way into
+ * the signed-in account (a Google link, a password, a Telegram link, a phone).
+ * Such a route checks the session when the request arrives and writes only
+ * after reading its body and checking its inputs; the first proof of the
+ * owner's address can end that session in between (worker/lib/emailStamp.ts),
+ * and a write that lands afterwards would give whoever held it a way back in.
+ * Put this in the write's own WHERE. `?` placeholders, bound by `binds`.
+ */
+export function liveSessionCondition(c: Context<AppContext>, userId: string): SessionCondition {
+  return {
+    sql: 'EXISTS (SELECT 1 FROM sessions WHERE id = ? AND user_id = ?)',
+    binds: [c.get('sessionId') ?? '', userId],
+  };
 }
 
 export async function loadSessionUser(c: Context<AppContext>): Promise<void> {

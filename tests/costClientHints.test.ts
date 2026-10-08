@@ -85,7 +85,7 @@ test('the card offers ONE primary action into the existing verification flow, an
   assert.match(card, /await refreshUser\(\)/);
   // The confirm button of the emailed link refreshes the session, so the hints flip at once.
   const banner = codeOf(SCREENS.verifyBanner);
-  assert.match(banner, /await api\.post<\{ owner_first_proof\?: unknown \}>\('\/api\/auth\/verify-email\/confirm', \{ token \}\);[\s\S]{0,600}void refreshUser\(\);/);
+  assert.match(banner, /await api\.post<\{ owner_first_proof\?: unknown \}>\('\/api\/auth\/verify-email\/confirm', \{\s*token,\s*\.\.\.\(acceptFirstProof \? \{ accept_owner_first_proof: true \} : \{\}\),\s*\}\);[\s\S]{0,700}void refreshUser\(\);/);
 });
 
 test('the OWNER_EMAIL_UNVERIFIED refusal is rendered BY CODE with the same action; every other 403 keeps "main admin only"', () => {
@@ -275,7 +275,9 @@ test('the card never sends the owner to a Google control that does not exist, an
   const strings = src.slice(src.indexOf('const STRINGS = {'), src.indexOf('} as const;'));
   assert.doesNotMatch(strings, /settings|إعدادات|ڕێکخستنەکانی هەژمار/i, 'Settings has no Google link button');
   assert.match(strings, /EMAIL_API_KEY and EMAIL_FROM/, 'the 503 state names what is missing');
-  assert.match(strings, /If Google is already connected to/);
+  // A Google sign-in never verifies the owner's address (worker/lib/emailStamp.ts),
+  // so the card offers no Google path at all, not even with email unavailable.
+  assert.doesNotMatch(strings, /Google/);
   // With no email service the state is known up front, from the status route.
   const card = codeOf(SCREENS.verifyCard);
   assert.match(card, /s\?\.emailConfigured === false\) setState\('not_configured'\)/);

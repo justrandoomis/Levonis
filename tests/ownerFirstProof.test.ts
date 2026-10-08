@@ -14,21 +14,39 @@
  *       in ar, en and real Sorani: if you did not ask for this, ignore it and
  *       do not sign in. OWNER_EMAIL_UNVERIFIED — read only by someone already
  *       signed in to that row — says instead what the first proof will end;
- *   (b) whichever path FIRST stamps a row holding the owner's address — a code
- *       sign-in, the emailed link (plain or an email change), a Google sign-in
- *       or a Google link — ends, in the same batch, every other way into that
- *       row: its other sessions (only the session doing the stamping stays),
- *       its password, phone and Telegram link, any Google account that is not
- *       the proof, and its outstanding reset and verification links.
+ *   (b) the FIRST stamp of a row holding the owner's address ends, in the
+ *       same batch, every other way into that row: its other sessions (only
+ *       the session doing the stamping stays), its password, phone, Telegram
+ *       link and Google account, and its outstanding reset and verification
+ *       links.
  *
  *       The review of the first version of (b) proved why the credentials go
  *       too: it ended the squatter's sessions only, and the squatter signed
  *       straight back in with the password (and the Google account) the squat
  *       row had all along — and saw cost. Its probe is kept here
  *       (squatReentry), now as the assertion that every one of those doors is
- *       shut. The routes that prove return `owner_first_proof` so the page can
+ *       shut. The confirm route returns `owner_first_proof` so the card can
  *       say what ended.
  *
+ *   (c) that first proof is made only once the person accepted what it ends,
+ *       and the SERVER decides that (the review of the fix): the emailed link
+ *       (plain or an email change, from the account's own session) and a
+ *       sign-in code to the address each prove it only with
+ *       `accept_owner_first_proof: true`, and otherwise answer 409
+ *       OWNER_FIRST_PROOF_REQUIRED, change nothing and keep the link or code
+ *       unspent — for any row holding the address, whatever its role. An
+ *       accepted code proves and opens its session in one request, so a
+ *       squatter has no owner session to end before the proof (the review's
+ *       probe A). A Google sign-in and a Google link on the owner's unproven
+ *       row sign in or link as for any account: no stamp, nothing removed.
+ *       Every other address, and an owner row already proven, is stamped by
+ *       them as before.
+ *
+ *   (d) a request that passed its check BEFORE the purge cannot write a way
+ *       back in AFTER it (the review's probe B): the Google link, a password,
+ *       a Telegram link re-read the request's session in their own write, and
+ *       a sign-in's session re-reads the credential it was opened on.
+
  * C2 — the session rule of /verify-email/confirm applies only when the token
  * would change something (an email change, or a holder not stamped yet). An
  * already-verified owner who opens an old plain link gets the ordinary
@@ -48,9 +66,10 @@ import { Hono } from 'hono';
 import type { AppContext, Env } from '../worker/lib/types';
 import { HttpError, requireMainHost } from '../worker/lib/http';
 import { classifyHost, rootDomainFrom } from '../worker/lib/hosts';
-import { loadSessionUser } from '../worker/lib/session';
+import { createSession, loadSessionUser } from '../worker/lib/session';
 import { hashPassword, sha256Hex } from '../worker/lib/crypto';
 import { authRoutes, resolveGoogleIdentity } from '../worker/routes/auth';
+import { telegramRoutes } from '../worker/routes/telegram';
 import { renderVerifyEmail } from '../worker/lib/emailTemplates';
 import { COST_REFUSALS, serverMessage } from '../packages/contracts/src/costRefusals';
 import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
@@ -68,6 +87,13 @@ const MAIL = { EMAIL_API_KEY: 're_test', EMAIL_FROM: 'LEVONIS <no-reply@levonis-
 // ---------------------------------------------------------------------------
 // Harness: worker/index.ts's order for these routes.
 
+/**
+ * What lands BETWEEN the session check of the next request to `path` and its
+ * route — the window a request opened before the owner's first proof writes
+ * in after it (the review's probe B). Runs once.
+ */
+let between: { path: string; run: () => Promise<void> } | null = null;
+
 function app(raw: DatabaseSync, over: Record<string, unknown> = {}) {
   const d1 = asD1(raw);
   const a = new Hono<AppContext>();
@@ -82,10 +108,16 @@ function app(raw: DatabaseSync, over: Record<string, unknown> = {}) {
     } as unknown as Env;
     c.set('host', classifyHost(c.req.header('Host'), rootDomainFrom(c.env)));
     await loadSessionUser(c);
+    if (between && new URL(c.req.url).pathname === between.path) {
+      const b = between;
+      between = null;
+      await b.run();
+    }
     await next();
   });
   a.use('/api/admin/*', requireMainHost);
   a.route('/api/auth', authRoutes);
+  a.route('/api/telegram', telegramRoutes);
   a.onError((err, c) => {
     if (err instanceof HttpError) return c.json({ success: false, error: err.message, code: err.code }, err.status as 400);
     return c.json({ success: false, error: String(err) }, 500);
@@ -181,14 +213,20 @@ const tokenUsed = async (raw: DatabaseSync, token: string) =>
   row<{ used: number }>(raw, 'SELECT used FROM email_verification_tokens WHERE token_hash = ?', await sha256Hex(token))?.used;
 
 /** A sign-in code for `destination` as /otp/start would store it (verifier = sha256(id:code)). */
-async function codeFor(raw: DatabaseSync, userId: string, destination: string, code: string) {
+async function codeFor(raw: DatabaseSync, userId: string, destination: string, code: string): Promise<string> {
   const id = `aotp_${Math.random().toString(36).slice(2)}`;
   raw
     .prepare(
       'INSERT INTO auth_otp (id, channel, destination, purpose, user_id, verifier, max_attempts, expires_at) VALUES (?,?,?,?,?,?,?,?)'
     )
     .run(id, 'email', destination, 'signin', userId, await sha256Hex(`${id}:${code}`), 5, new Date(Date.now() + 600_000).toISOString());
+  return id;
 }
+const codeSpent = (raw: DatabaseSync, id: string) =>
+  row<{ c: string | null }>(raw, 'SELECT consumed_at AS c FROM auth_otp WHERE id = ?', id)?.c != null;
+/** The code sign-in to `identifier`, asking (no flag) or accepting the first proof. */
+const signInByCode = (a: App, identifier: string, code: string, accept = false) =>
+  call(a, '', 'POST', '/api/auth/otp/verify', { channel: 'email', identifier, code, ...(accept ? { accept_owner_first_proof: true } : {}) });
 
 /**
  * The A10 world: the real owner's account moved to another, verified address,
@@ -288,9 +326,19 @@ test('C1a (review copy finding): OWNER_EMAIL_UNVERIFIED, read only inside the ow
   assert.doesNotMatch(ckb, IGNORE.ckb);
   assert.doesNotMatch(en, /do not sign in/i);
   // Before the owner presses send: the first verification ends the other
-  // sessions and removes the password, Telegram, phone and any other Google.
-  assert.match(en, /The first verification ends this account's sessions on other devices and removes its password, Telegram link, phone sign-in and any other Google account/);
-  assert.match(en, /sign in with a code sent to this email, and you can set a new password\./);
+  // sessions and removes the password, Telegram, phone and any Google account
+  // under another address — Google on this same address links again, so the
+  // sentence does not say Google is lost (review U3).
+  assert.match(en, /The first verification ends this account's sessions on other devices and removes its password, Telegram link, phone sign-in and any Google account with a different email/);
+  // The way out is the link: a Google sign-in does not verify this address, so
+  // the sentence offers none (nor a "connect Google" control).
+  assert.match(en, /Verify your email with the link in the verification email/);
+  assert.doesNotMatch(en, /sign in with Google|already connected/i);
+  assert.doesNotMatch(ar, /سجّل الدخول بحساب Google|مربوطًا/);
+  assert.doesNotMatch(ckb, /بە Google بچۆ ژوورەوە|بەستراوە/);
+  assert.match(ar, /وأي حساب Google ببريد آخر/);
+  assert.match(ckb, /هەر هەژمارێکی Google بە ئیمەیڵێکی تر/);
+  assert.match(en, /sign in with a code sent to this email or with Google on this same email, and you can set a new password\./);
   assert.match(ar, /أول تأكيد يُنهي جلسات هذا الحساب على الأجهزة الأخرى ويزيل كلمة مروره وربط تيليغرام والدخول بالهاتف/);
   assert.match(ckb, /یەکەم پشتڕاستکردنەوە/);
   assert.match(ckb, /وشەی نهێنی/);
@@ -351,7 +399,7 @@ test('C1a: the confirm card renders the refusal by code, so the new sentence rea
 // ===========================================================================
 // C1 (b) — the first proof ends every older session of that row.
 
-test('C1b (probe P3): the real owner’s code sign-in proves the squat row — the squatter’s older session ends and never sees cost', async () => {
+test('C1c (probe P3): the real owner’s code sign-in asks before it proves the squat row — nothing ends, no session; accepted, the same code ends every older session and opens cost for the mailbox holder only', async () => {
   const raw = squatWorld();
   const a = app(raw);
   const squatter = await sessionFor(raw, 'usr_squat');
@@ -359,20 +407,29 @@ test('C1b (probe P3): the real owner’s code sign-in proves the squat row — t
   const bystander = await sessionFor(raw, 'usr_full');
   assert.equal((await me(a, squatter.cookie))?.can_view_cost, false);
 
-  await codeFor(raw, 'usr_squat', OWNER_EMAIL, '123456');
-  const v = await call(a, '', 'POST', '/api/auth/otp/verify', { channel: 'email', identifier: OWNER_EMAIL, code: '123456' });
-  assert.equal(v.status, 200, v.text);
-  assert.ok(stamp(raw, 'usr_squat'), 'the code proved the mailbox and stamped the row');
+  const code = await codeFor(raw, 'usr_squat', OWNER_EMAIL, '123456');
+  const asked = await signInByCode(a, OWNER_EMAIL, '123456');
+  assert.equal(asked.status, 409, asked.text);
+  assert.equal(asked.json.code, 'OWNER_FIRST_PROOF_REQUIRED');
+  assert.equal(asked.json.error, serverMessage('OWNER_FIRST_PROOF_REQUIRED'));
+  assert.equal(asked.newCookie, null, 'no session opened');
+  assert.equal(codeSpent(raw, code), false, 'the code is kept for the confirm');
+  assert.equal(stamp(raw, 'usr_squat'), null);
+  assert.equal(ended(raw, 'usr_squat'), 0);
+  assert.equal(passwordOf(raw, 'usr_squat'), 'squat-hash');
+  assert.equal(sessionIds(raw, 'usr_squat').length, 2, 'nothing ended');
 
+  const v = await signInByCode(a, OWNER_EMAIL, '123456', true);
+  assert.equal(v.status, 200, v.text);
+  assert.ok(v.newCookie, 'the accepted code opened its own session');
+  assert.ok(stamp(raw, 'usr_squat'), 'the code proved the mailbox and stamped the row');
+  assert.equal(codeSpent(raw, code), true);
   // Every session that existed before the proof is gone…
   assert.equal(await me(a, squatter.cookie), null, 'the squatter’s session ended');
   assert.equal(await me(a, squatter2.cookie), null);
-  // …and only the session the code opened remains — it is the mailbox holder’s.
-  assert.ok(v.newCookie);
-  assert.deepEqual(sessionIds(raw, 'usr_squat').length, 1);
+  // …and only the session the proof opened remains — it is the mailbox holder’s.
+  assert.equal(sessionIds(raw, 'usr_squat').length, 1);
   assert.equal((await me(a, v.newCookie!))?.can_view_cost, true);
-  // The squat row's password went with its sessions (see squatReentry below);
-  // no other account is signed out or touched.
   assert.equal(passwordOf(raw, 'usr_squat'), null);
   assert.equal(passwordOf(raw, 'usr_full'), 'h');
   assert.equal((await me(a, bystander.cookie))?.id, 'usr_full');
@@ -380,7 +437,30 @@ test('C1b (probe P3): the real owner’s code sign-in proves the squat row — t
   assert.deepEqual(v.json.owner_first_proof, { sessions_ended: 2 }, 'the answer says what ended');
 });
 
-test('C1b (probe squatReentry): after the owner’s first proof, no way the squatter put on the row opens a session — password, Google, Telegram, phone, a reset link', async () => {
+test('review probe A: the squatter has no owner session to end — the asking step opens none, and the accepted code proves and signs in in one request', async () => {
+  const raw = squatWorld();
+  const a = app(raw, MAIL);
+  raw.prepare("UPDATE users SET password_hash = ? WHERE id = 'usr_squat'").run(await hashPassword('squatter-pass-123'));
+  const sq = await call(a, '', 'POST', '/api/auth/login', { identifier: OWNER_EMAIL, password: 'squatter-pass-123' });
+  assert.equal(sq.status, 200, sq.text);
+
+  await codeFor(raw, 'usr_squat', OWNER_EMAIL, '123456');
+  assert.equal((await signInByCode(a, OWNER_EMAIL, '123456')).status, 409);
+  // What the squatter can see and end: its own session, nothing of the owner's.
+  const seen = await call(a, sq.newCookie!, 'GET', '/api/auth/sessions');
+  assert.equal((seen.json.sessions as unknown[]).length, 1, 'only the squatter’s own session is listed');
+  const rv = await call(a, sq.newCookie!, 'POST', '/api/auth/sessions/revoke-others', {});
+  assert.equal(rv.json.revoked, 0, 'nothing of the owner’s to revoke');
+
+  const v = await signInByCode(a, OWNER_EMAIL, '123456', true);
+  assert.equal(v.status, 200, v.text);
+  assert.equal((await me(a, v.newCookie!))?.can_view_cost, true, 'the owner is in, with cost');
+  assert.equal(await me(a, sq.newCookie!), null, 'the squatter is out');
+  // And the squatter cannot end the owner's session now: it has none left to do it from.
+  assert.equal((await call(a, sq.newCookie!, 'POST', '/api/auth/sessions/revoke-others', {})).status, 401);
+});
+
+test('C1b (probe squatReentry): after the owner’s first proof — an accepted code — no way the squatter put on the row opens a session: password, Google, Telegram, phone, a reset link', async () => {
   const raw = squatWorld();
   const a = app(raw, MAIL);
   // The squatter's own ways in, all set up before the owner ever proved the mailbox.
@@ -394,9 +474,19 @@ test('C1b (probe squatReentry): after the owner’s first proof, no way the squa
   assert.equal(before.status, 200, before.text);
   assert.equal((await me(a, before.newCookie!))?.can_view_cost, false, 'no cost before the proof');
 
-  // The real owner signs in by code: the mailbox is proven for the first time.
+  // The real owner's code is asked first: that alone proves nothing and takes nothing.
   await codeFor(raw, 'usr_squat', OWNER_EMAIL, '123456');
-  const v = await call(a, '', 'POST', '/api/auth/otp/verify', { channel: 'email', identifier: OWNER_EMAIL, code: '123456' });
+  const asked = await signInByCode(a, OWNER_EMAIL, '123456');
+  assert.equal(asked.status, 409, asked.text);
+  const untouched = waysIn(raw, 'usr_squat');
+  assert.equal(untouched.google, 'squatter-own-google-sub');
+  assert.equal(untouched.phone, '+9647700000001');
+  assert.equal(untouched.telegram, 1);
+  assert.equal(untouched.resets, 1);
+  assert.ok(untouched.password);
+
+  // Accepted, the same code proves the mailbox for the first time.
+  const v = await signInByCode(a, OWNER_EMAIL, '123456', true);
   assert.equal(v.status, 200, v.text);
   assert.deepEqual(v.json.owner_first_proof, { sessions_ended: 2 });
   assert.equal((await me(a, v.newCookie!))?.can_view_cost, true, 'the mailbox holder sees cost');
@@ -455,6 +545,62 @@ test('C1b: a code sign-in that is NOT a first proof of the owner’s address end
   assert.equal(passwordOf(raw, 'usr_full'), 'h', 'an ordinary address keeps every way in');
 });
 
+test('C1c: a code sign-in on the owner’s unproven row asks first — no stamp, nothing removed, no session; accepted, the same code proves it, ends the older session and opens cost', async () => {
+  const raw = seededCopyUnverifiedOwner();
+  raw.exec("UPDATE users SET google_sub = 'google-owner-sub' WHERE id = 'usr_owner'");
+  linkTelegram(raw, 'usr_owner', '+9647700000009', 777009);
+  await resetTokenFor(raw, 'usr_owner', 'owner-reset-before-0123456789abcdef');
+  const a = app(raw);
+  const older = await sessionFor(raw, 'usr_owner');
+  const doors = waysIn(raw, 'usr_owner');
+  assert.deepEqual(doors, { password: 'h', google: 'google-owner-sub', phone: '+9647700000009', telegram: 1, resets: 1 });
+
+  const code = await codeFor(raw, 'usr_owner', OWNER_EMAIL, '424242');
+  const asked = await signInByCode(a, OWNER_EMAIL, '424242');
+  assert.equal(asked.status, 409, asked.text);
+  assert.equal(asked.json.code, 'OWNER_FIRST_PROOF_REQUIRED');
+  assert.equal(asked.newCookie, null);
+  assert.equal(stamp(raw, 'usr_owner'), null, 'not stamped');
+  assert.deepEqual(waysIn(raw, 'usr_owner'), doors, 'no credential removed, no reset link spent');
+  assert.equal(sessionIds(raw, 'usr_owner').length, 1, 'no session ended, none opened');
+  assert.equal(codeSpent(raw, code), false);
+  const u0 = await me(a, older.cookie);
+  assert.equal(u0?.can_view_cost, false);
+  assert.equal(u0?.owner_email_unverified, true, 'the card is still shown');
+
+  const v = await signInByCode(a, OWNER_EMAIL, '424242', true);
+  assert.equal(v.status, 200, v.text);
+  assert.ok(stamp(raw, 'usr_owner'));
+  assert.deepEqual(v.json.owner_first_proof, { sessions_ended: 1 });
+  assert.equal(await me(a, older.cookie), null, 'the older session ended');
+  assert.equal(sessionIds(raw, 'usr_owner').length, 1, 'only the session the code opened');
+  assert.deepEqual(waysIn(raw, 'usr_owner'), { password: null, google: null, phone: null, telegram: 0, resets: 0 });
+  const u = await me(a, v.newCookie!);
+  assert.equal(u?.can_view_cost, true);
+  assert.equal(u?.owner_email_unverified, false);
+  assert.equal(ended(raw, 'usr_owner'), 1);
+  // The code is spent: the same six digits again are just a wrong code.
+  assert.equal((await signInByCode(a, OWNER_EMAIL, '424242', true)).status, 401);
+
+  // Google on this same address links again at its next sign-in (the row is proven now): it was never "lost" (review U3).
+  const g = await call(a, '', 'POST', '/api/auth/google', { credential: await googleCredential('google-owner-sub', OWNER_EMAIL) });
+  assert.equal(g.status, 200, g.text);
+  assert.equal((g.json.user as { id?: string })?.id, 'usr_owner');
+  assert.equal(waysIn(raw, 'usr_owner').google, 'google-owner-sub');
+});
+
+test('C1c: a wrong code to the owner’s unproven address is just a wrong code — the asking step needs the right one, and checking spends an attempt', async () => {
+  const raw = seededCopyUnverifiedOwner();
+  const a = app(raw);
+  const code = await codeFor(raw, 'usr_owner', OWNER_EMAIL, '135790');
+  const wrong = await signInByCode(a, OWNER_EMAIL, '000000');
+  assert.equal(wrong.status, 401);
+  assert.equal(wrong.json.code, 'OTP_FAILED', 'no 409 for a code that is not right: no oracle on the owner’s address');
+  assert.equal((await signInByCode(a, OWNER_EMAIL, '135790')).status, 409);
+  assert.equal(row<{ n: number }>(raw, 'SELECT attempts AS n FROM auth_otp WHERE id = ?', code)?.n, 2, 'each check counts against the five');
+  assert.equal(codeSpent(raw, code), false);
+});
+
 test('C1b: the emailed link — the confirming session keeps cost, every other session of the owner row ends', async () => {
   const raw = seededCopyUnverifiedOwner();
   const a = app(raw);
@@ -462,7 +608,17 @@ test('C1b: the emailed link — the confirming session keeps cost, every other s
   const older = await sessionFor(raw, 'usr_owner');
   const bystander = await sessionFor(raw, 'usr_full');
   await tokenFor(raw, 'usr_owner', 'c1b-link-owner-0123456789abcdef');
-  const r = await call(a, confirming.cookie, 'POST', '/api/auth/verify-email/confirm', { token: 'c1b-link-owner-0123456789abcdef' });
+  // Without the acceptance: asked, nothing ended, the link unused.
+  const asked = await call(a, confirming.cookie, 'POST', '/api/auth/verify-email/confirm', { token: 'c1b-link-owner-0123456789abcdef' });
+  assert.equal(asked.status, 409, asked.text);
+  assert.equal(asked.json.code, 'OWNER_FIRST_PROOF_REQUIRED');
+  assert.equal(await tokenUsed(raw, 'c1b-link-owner-0123456789abcdef'), 0);
+  assert.equal((await me(a, older.cookie))?.id, 'usr_owner');
+  assert.equal(passwordOf(raw, 'usr_owner'), 'h');
+  const r = await call(a, confirming.cookie, 'POST', '/api/auth/verify-email/confirm', {
+    token: 'c1b-link-owner-0123456789abcdef',
+    accept_owner_first_proof: true,
+  });
   assert.equal(r.status, 200, r.text);
   assert.equal((await me(a, confirming.cookie))?.can_view_cost, true, 'the same session opens cost');
   assert.equal(await me(a, older.cookie), null, 'the older session ended');
@@ -486,7 +642,10 @@ test('C1b: an email change onto the owner’s address ends the row’s other ses
   // A reset link mailed to the OLD address before the move would otherwise set
   // a password on the row that now holds the owner's address.
   await resetTokenFor(raw, 'usr_full', 'c1b-move-old-reset-0123456789abcdef');
-  const r = await call(a, confirming.cookie, 'POST', '/api/auth/verify-email/confirm', { token: 'c1b-move-0123456789abcdefghij' });
+  const r = await call(a, confirming.cookie, 'POST', '/api/auth/verify-email/confirm', {
+    token: 'c1b-move-0123456789abcdefghij',
+    accept_owner_first_proof: true,
+  });
   assert.equal(r.status, 200, r.text);
   assert.equal(row<{ e: string }>(raw, 'SELECT email AS e FROM users WHERE id = ?', 'usr_full')?.e, OWNER_EMAIL);
   assert.equal(await me(a, older.cookie), null, 'the session from before the move ended');
@@ -501,7 +660,10 @@ test('C1b: an email change onto the owner’s address ends the row’s other ses
   const c2 = await sessionFor(raw2, 'usr_full');
   const o2 = await sessionFor(raw2, 'usr_full');
   await tokenFor(raw2, 'usr_full', 'c1b-move-taken-0123456789abcdef', OWNER_EMAIL);
-  const refused = await call(b, c2.cookie, 'POST', '/api/auth/verify-email/confirm', { token: 'c1b-move-taken-0123456789abcdef' });
+  const refused = await call(b, c2.cookie, 'POST', '/api/auth/verify-email/confirm', {
+    token: 'c1b-move-taken-0123456789abcdef',
+    accept_owner_first_proof: true,
+  });
   assert.equal(refused.status, 409, refused.text);
   assert.equal((await me(b, o2.cookie))?.id, 'usr_full', 'nothing ended: the batch rolled back');
   assert.equal(row<{ e: string }>(raw2, 'SELECT email AS e FROM users WHERE id = ?', 'usr_full')?.e, 'full@x.co');
@@ -509,7 +671,7 @@ test('C1b: an email change onto the owner’s address ends the row’s other ses
 });
 
 for (const blank of [null, '', '   '] as const) {
-  test(`C1b: a Google sign-in with the already-connected Google (stamp ${JSON.stringify(blank)}) ends the older session; the sign-in’s own session sees cost`, async () => {
+  test(`C1c: a Google sign-in with the already-connected Google (stamp ${JSON.stringify(blank)}) signs in as for any account — no stamp, nothing removed, cost still shut`, async () => {
     const raw = seededCopyUnverifiedOwner();
     raw.prepare("UPDATE users SET email_verified_at = ?, google_sub = 'google-owner-sub' WHERE id = 'usr_owner'").run(blank);
     const a = app(raw);
@@ -517,22 +679,34 @@ for (const blank of [null, '', '   '] as const) {
     assert.equal((await me(a, older.cookie))?.owner_email_unverified, true);
 
     const env = { DB: asD1(raw), INITIAL_ADMIN_EMAIL: OWNER_EMAIL } as unknown as Env;
-    await resolveGoogleIdentity(env, { sub: 'google-owner-sub', email: OWNER_EMAIL, name: 'Owner' });
-    const s = stamp(raw, 'usr_owner');
-    assert.ok(s && s.trim() !== '', 'stamped');
-    assert.equal(await me(a, older.cookie), null, 'the session from before the proof ended');
-    // POST /google opens the sign-in's session right after resolving: it sees cost.
+    const signedIn = await resolveGoogleIdentity(env, { sub: 'google-owner-sub', email: OWNER_EMAIL, name: 'Owner' });
+    assert.equal(signedIn.id, 'usr_owner', 'the sign-in resolves the row as for any account');
+    assert.equal(stamp(raw, 'usr_owner'), blank, 'the stamp is left exactly as it was');
+    assert.equal((await me(a, older.cookie))?.id, 'usr_owner', 'the older session survives');
+    assert.equal(passwordOf(raw, 'usr_owner'), 'h', 'the password stays');
+    assert.equal(waysIn(raw, 'usr_owner').google, 'google-owner-sub');
+    // POST /google opens the sign-in's session right after resolving: cost stays shut, the card shows.
     const fresh = await sessionFor(raw, 'usr_owner');
     const user = await me(a, fresh.cookie);
-    assert.equal(user?.can_view_cost, true);
-    assert.equal(user?.owner_email_unverified, false);
-    // The Google account is the proof and stays; the password goes.
-    assert.equal(passwordOf(raw, 'usr_owner'), null);
-    assert.equal(waysIn(raw, 'usr_owner').google, 'google-owner-sub');
+    assert.equal(user?.can_view_cost, false);
+    assert.equal(user?.owner_email_unverified, true);
+    assert.equal(ended(raw, 'usr_owner'), 0);
   });
 }
 
-test('C1b: POST /google end to end — the older session ends, the response’s cookie sees cost; a second Google sign-in ends nothing', async () => {
+test('C1c: INITIAL_ADMIN_EMAIL in any case or spacing is the owner’s address to the sign-in stamp; a blank one means no owner, and the sign-in stamps as for any address', async () => {
+  const raw = seededCopyUnverifiedOwner();
+  raw.exec("UPDATE users SET google_sub = 'google-owner-sub' WHERE id = 'usr_owner'");
+  const spelled = { DB: asD1(raw), INITIAL_ADMIN_EMAIL: '  BOSS@X.CO ' } as unknown as Env;
+  await resolveGoogleIdentity(spelled, { sub: 'google-owner-sub', email: OWNER_EMAIL, name: 'Owner' });
+  assert.equal(stamp(raw, 'usr_owner'), null);
+  const none = { DB: asD1(raw), INITIAL_ADMIN_EMAIL: '' } as unknown as Env;
+  await resolveGoogleIdentity(none, { sub: 'google-owner-sub', email: OWNER_EMAIL, name: 'Owner' });
+  assert.ok(stamp(raw, 'usr_owner'), 'with no owner configured it is an ordinary address');
+  assert.equal(passwordOf(raw, 'usr_owner'), 'h', 'and nothing is purged');
+});
+
+test('C1c: POST /google end to end on the owner’s unproven row — signed in, no stamp, nothing ended; the accepted link from the Google session proves it; a later Google sign-in ends nothing', async () => {
   const raw = seededCopyUnverifiedOwner();
   raw.exec("UPDATE users SET google_sub = 'google-owner-sub' WHERE id = 'usr_owner'");
   const a = app(raw);
@@ -540,18 +714,39 @@ test('C1b: POST /google end to end — the older session ends, the response’s 
   const r = await call(a, '', 'POST', '/api/auth/google', { credential: await googleCredential('google-owner-sub', OWNER_EMAIL) });
   assert.equal(r.status, 200, r.text);
   assert.ok(r.newCookie);
-  assert.equal(await me(a, older.cookie), null);
-  assert.equal((await me(a, r.newCookie!))?.can_view_cost, true);
-  assert.deepEqual(r.json.owner_first_proof, { sessions_ended: 1 });
+  assert.equal(r.json.owner_first_proof, undefined, 'no first proof, nothing to announce');
+  assert.equal(stamp(raw, 'usr_owner'), null, 'not stamped');
+  assert.equal((await me(a, older.cookie))?.id, 'usr_owner', 'no session ended');
+  assert.equal(passwordOf(raw, 'usr_owner'), 'h', 'no credential removed');
+  const u = await me(a, r.newCookie!);
+  assert.equal(u?.can_view_cost, false);
+  assert.equal(u?.owner_email_unverified, true, 'the card is still shown');
+  assert.equal(ended(raw, 'usr_owner'), 0);
 
+  // The warned link, from the session Google opened: stamped, the purge, cost opens.
+  await tokenFor(raw, 'usr_owner', 'c1c-google-then-link-0123456789abcd');
+  const c = await call(a, r.newCookie!, 'POST', '/api/auth/verify-email/confirm', {
+    token: 'c1c-google-then-link-0123456789abcd',
+    accept_owner_first_proof: true,
+  });
+  assert.equal(c.status, 200, c.text);
+  assert.ok(stamp(raw, 'usr_owner'));
+  assert.deepEqual(c.json.owner_first_proof, { sessions_ended: 1 });
+  assert.equal(await me(a, older.cookie), null, 'the older session ended');
+  assert.equal((await me(a, r.newCookie!))?.can_view_cost, true);
+  // The link is the proof, not Google: the Google link is cleared with the password.
+  assert.deepEqual(waysIn(raw, 'usr_owner'), { password: null, google: null, phone: null, telegram: 0, resets: 0 });
+
+  // The row is proven now: a Google sign-in on this same address links that Google again and ends nothing (the card says so).
   const again = await call(a, '', 'POST', '/api/auth/google', { credential: await googleCredential('google-owner-sub', OWNER_EMAIL) });
   assert.equal(again.status, 200, again.text);
+  assert.equal(again.json.owner_first_proof, undefined);
+  assert.equal(waysIn(raw, 'usr_owner').google, 'google-owner-sub');
   assert.equal((await me(a, r.newCookie!))?.can_view_cost, true, 'a proven row is not signed out by the next sign-in');
-  assert.equal(again.json.owner_first_proof, undefined, 'only the first proof says so');
   assert.equal(ended(raw, 'usr_owner'), 1);
 });
 
-test('C1b: POST /google/link — the linking session is kept, every other session of the owner row ends', async () => {
+test('C1c: POST /google/link on the owner’s unproven row links as for any account — no stamp, the other session stays; the accepted link from the linking session then proves it', async () => {
   const raw = seededCopyUnverifiedOwner();
   // An account without a password links on its session alone (the route's rule).
   raw.exec("UPDATE users SET password_hash = NULL WHERE id = 'usr_owner'");
@@ -560,26 +755,76 @@ test('C1b: POST /google/link — the linking session is kept, every other sessio
   const older = await sessionFor(raw, 'usr_owner');
   const r = await call(a, linking.cookie, 'POST', '/api/auth/google/link', { credential: await googleCredential('google-link-sub', OWNER_EMAIL) });
   assert.equal(r.status, 200, r.text);
-  assert.equal((await me(a, linking.cookie))?.can_view_cost, true);
+  assert.equal(r.json.owner_first_proof, undefined);
+  assert.equal(stamp(raw, 'usr_owner'), null, 'not stamped');
+  assert.equal(waysIn(raw, 'usr_owner').google, 'google-link-sub', 'linked');
+  assert.equal((await me(a, older.cookie))?.id, 'usr_owner', 'no session ended');
+  assert.equal(sessionIds(raw, 'usr_owner').length, 2);
+  const u = await me(a, linking.cookie);
+  assert.equal(u?.can_view_cost, false);
+  assert.equal(u?.owner_email_unverified, true);
+  assert.equal(ended(raw, 'usr_owner'), 0);
+
+  await tokenFor(raw, 'usr_owner', 'c1c-link-then-confirm-0123456789ab');
+  const c = await call(a, linking.cookie, 'POST', '/api/auth/verify-email/confirm', {
+    token: 'c1c-link-then-confirm-0123456789ab',
+    accept_owner_first_proof: true,
+  });
+  assert.equal(c.status, 200, c.text);
+  assert.deepEqual(c.json.owner_first_proof, { sessions_ended: 1 });
   assert.equal(await me(a, older.cookie), null);
   assert.deepEqual(sessionIds(raw, 'usr_owner'), [linking.id]);
-  // The Google account just linked is the proof and stays.
-  assert.equal(waysIn(raw, 'usr_owner').google, 'google-link-sub');
-  assert.deepEqual(r.json.owner_first_proof, { sessions_ended: 1 });
+  assert.equal((await me(a, linking.cookie))?.can_view_cost, true);
+  assert.equal(waysIn(raw, 'usr_owner').google, null, 'the Google just linked is not the proof, so it is cleared too (and links again at its next sign-in)');
 });
 
-test('C1b: every stamping path goes through the one purge, in a batch with the stamp', () => {
+test('C1c: on an owner row already proven, a Google link and a Google sign-in keep the stamp and end nothing', async () => {
+  const raw = seededCopyUnverifiedOwner();
+  raw.exec("UPDATE users SET password_hash = NULL, email_verified_at = '2026-10-01T00:00:00.000Z' WHERE id = 'usr_owner'");
+  const a = app(raw);
+  const linking = await sessionFor(raw, 'usr_owner');
+  const older = await sessionFor(raw, 'usr_owner');
+  const l = await call(a, linking.cookie, 'POST', '/api/auth/google/link', { credential: await googleCredential('google-proven-sub', OWNER_EMAIL) });
+  assert.equal(l.status, 200, l.text);
+  const g = await call(a, '', 'POST', '/api/auth/google', { credential: await googleCredential('google-proven-sub', OWNER_EMAIL) });
+  assert.equal(g.status, 200, g.text);
+  assert.equal(stamp(raw, 'usr_owner'), '2026-10-01T00:00:00.000Z', 'the first stamp stays');
+  assert.equal((await me(a, older.cookie))?.can_view_cost, true);
+  assert.equal(waysIn(raw, 'usr_owner').google, 'google-proven-sub');
+  assert.equal(ended(raw, 'usr_owner'), 0);
+});
+
+test('C1c: only the link and an accepted code run the purge — each only past its 409; every other sign-in stamp goes through signInStamp, which refuses the unproven owner row in its own WHERE', () => {
   const src = codeOf('worker/routes/auth.ts');
-  for (const via of ['google', 'google_link', 'email_change', 'email_link', 'otp']) {
+  for (const via of ['email_change', 'email_link', 'otp']) {
     assert.match(src, new RegExp(`stampAndRecord\\([\\s\\S]{0,600}?'${via}'\\s*\\)`), via);
   }
-  // No stamp is written outside it (the sign-up INSERTs create rows with no sessions yet).
-  const writes = src.match(/UPDATE users SET (email = \?, )?email_verified_at/g) ?? [];
-  const wrapped = src.match(/stampAndRecord\(/g) ?? [];
-  assert.equal(writes.length, 5);
-  assert.equal(wrapped.length, 6, 'five calls and the definition');
+  assert.equal((src.match(/stampAndRecord\(/g) ?? []).length, 4, 'three calls (the plain link, the email change, the accepted code) and the definition');
+  // No other stamp is written in the routes (the sign-up INSERTs create rows with no sessions yet).
+  assert.equal((src.match(/UPDATE users SET (email = \?, )?email_verified_at/g) ?? []).length, 3);
+  // Each proving route refuses the first proof without the acceptance, before anything is spent.
+  const confirm = src.slice(src.indexOf("authRoutes.post('/verify-email/confirm'"), src.indexOf("authRoutes.post('/change-email'"));
+  assert.ok(
+    confirm.indexOf("body.accept_owner_first_proof !== true") > 0 &&
+      confirm.indexOf("body.accept_owner_first_proof !== true") < confirm.indexOf('UPDATE email_verification_tokens SET used = 1'),
+    'the link is asked before the token is spent'
+  );
+  const otp = src.slice(src.indexOf("authRoutes.post('/otp/verify'"));
+  assert.match(otp.slice(0, 9000), /const holdBack = !!before && isOwner\(c\.env, before\) && !isStamped\(before\.email_verified_at\) && !accepted;/);
+  assert.match(otp.slice(0, 9000), /verifyAuthOtp\(c\.env, channel, destination, code, 'signin', \{ consume: !holdBack \}\)/);
+  assert.match(otp.slice(0, 9000), /if \(accepted && isOwner\(c\.env, account\)\) \{\s*proof = await stampAndRecord\(/);
+  // The three sign-ins that prove a mailbox otherwise stamp through the one guarded statement.
+  assert.equal((src.match(/signInStamp\(/g) ?? []).length, 3);
+  const google = src.slice(src.indexOf('export async function resolveGoogleIdentity'), src.indexOf("authRoutes.post('/google'"));
+  assert.match(google, /await signInStamp\(env\.DB, env, row\.id, identity\.email\)\.run\(\);/);
+  const link = src.slice(src.indexOf("authRoutes.post('/google/link'"));
+  assert.match(link.slice(0, 6000), /await signInStamp\(c\.env\.DB, c\.env, me\.id, identity\.email\)\.run\(\);/);
+  assert.match(otp.slice(0, 9000), /await signInStamp\(c\.env\.DB, c\.env, account\.id, account\.email\)\.run\(\);/);
   const lib = codeOf('worker/lib/emailStamp.ts');
   assert.match(lib, /db\.batch\(\[\.\.\.purge, stamp\]\)/);
+  const fn = lib.slice(lib.indexOf('export function signInStamp'), lib.indexOf('export interface StampTarget'));
+  assert.match(fn, /SET email_verified_at = \$\{STAMP_ONCE\}\s+WHERE id = \? AND email = \?\s+AND NOT \(\? <> '' AND lower\(trim\(email\)\) = \?\s+AND \(email_verified_at IS NULL OR trim\(email_verified_at\) = ''\)\)/);
+  assert.doesNotMatch(fn, /purge|batch/, 'a sign-in stamp carries no purge');
 });
 
 // ===========================================================================
@@ -676,15 +921,25 @@ test('probe P4: an ordinary email change confirms without a session; the link is
   assert.equal(again.json.code, 'TOKEN_USED');
 });
 
-test('probe P5: a blank stamp is replaced by a code sign-in; a blank INITIAL_ADMIN_EMAIL means no owner rule at all', async () => {
+test('probe P5: a blank stamp is replaced by a code sign-in on any other address, and on the owner’s only once accepted; a blank INITIAL_ADMIN_EMAIL means no owner rule at all', async () => {
   const raw = seededCopyUnverifiedOwner();
-  raw.exec("UPDATE users SET email_verified_at = '   ' WHERE id = 'usr_owner'");
+  raw.exec("UPDATE users SET email_verified_at = '   ' WHERE id IN ('usr_owner', 'usr_full')");
   const a = app(raw);
-  await codeFor(raw, 'usr_owner', OWNER_EMAIL, '654321');
-  const v = await call(a, '', 'POST', '/api/auth/otp/verify', { channel: 'email', identifier: OWNER_EMAIL, code: '654321' });
+  await codeFor(raw, 'usr_full', 'full@x.co', '654321');
+  const v = await call(a, '', 'POST', '/api/auth/otp/verify', { channel: 'email', identifier: 'full@x.co', code: '654321' });
   assert.equal(v.status, 200, v.text);
-  const s = stamp(raw, 'usr_owner');
+  const s = stamp(raw, 'usr_full');
   assert.ok(s && s.trim() !== '', JSON.stringify(s));
+  // The owner's blank is no stamp, so the row is unproven: the code asks first, and proves nothing until accepted.
+  await codeFor(raw, 'usr_owner', OWNER_EMAIL, '765432');
+  const o = await signInByCode(a, OWNER_EMAIL, '765432');
+  assert.equal(o.status, 409, o.text);
+  assert.equal(stamp(raw, 'usr_owner'), '   ');
+  assert.equal(passwordOf(raw, 'usr_owner'), 'h');
+  const accepted = await signInByCode(a, OWNER_EMAIL, '765432', true);
+  assert.equal(accepted.status, 200, accepted.text);
+  const proven = stamp(raw, 'usr_owner');
+  assert.ok(proven && proven.trim() !== '', 'the blank is replaced by the accepted proof');
 
   const raw2 = seededCopyUnverifiedOwner();
   const b = app(raw2, { INITIAL_ADMIN_EMAIL: '' });
@@ -693,6 +948,11 @@ test('probe P5: a blank stamp is replaced by a code sign-in; a blank INITIAL_ADM
   const r = await call(b, '', 'POST', '/api/auth/verify-email/confirm', { token: 'p5-blank-env-0123456789abcdef' });
   assert.equal(r.status, 200, r.text);
   assert.equal((await me(b, older.cookie))?.id, 'usr_owner', 'with no owner address configured, nothing is purged');
+  // …and a code sign-in stamps that address like any other.
+  raw2.exec("UPDATE users SET email_verified_at = NULL WHERE id = 'usr_owner'");
+  await codeFor(raw2, 'usr_owner', OWNER_EMAIL, '876543');
+  assert.equal((await call(b, '', 'POST', '/api/auth/otp/verify', { channel: 'email', identifier: OWNER_EMAIL, code: '876543' })).status, 200);
+  assert.ok(stamp(raw2, 'usr_owner'));
 });
 
 // ===========================================================================
@@ -713,7 +973,7 @@ test('C1b: every purge statement binds exactly the parameters it names — D1 re
   const env = { INITIAL_ADMIN_EMAIL: OWNER_EMAIL } as unknown as Env;
   for (const target of [
     { userId: 'u', kind: 'stamp', address: OWNER_EMAIL, keepSessionId: null },
-    { userId: 'u', kind: 'stamp', address: OWNER_EMAIL, keepSessionId: 'sid', keepGoogleSub: 'sub' },
+    { userId: 'u', kind: 'stamp', address: OWNER_EMAIL, keepSessionId: 'sid' },
     { userId: 'u', kind: 'move', address: OWNER_EMAIL, keepSessionId: 'sid' },
   ] as const) {
     seen.length = 0;
@@ -736,40 +996,64 @@ test('C1b: every purge statement binds exactly the parameters it names — D1 re
 // ===========================================================================
 // What the page says afterwards (review finding 5): ar, en and real Sorani.
 
-test('the first proof is told to the person who made it — the confirm card in place, every sign-in in a toast', () => {
+test('the first proof is told to the person who made it — before (the server’s own question) and after (the confirm card in place, a toast after a code sign-in)', () => {
   // The words.
   for (const lang of ['ar', 'en', 'ckb'] as const) {
     const t = OWNER_FIRST_PROOF_STRINGS[lang];
-    assert.ok(t.title.length > 5, lang);
     assert.match(t.body(3), /\(3\)/, `${lang}: the count of ended sessions`);
+    assert.deepEqual(Object.keys(t).sort(), ['acceptConfirm', 'acceptSignIn', 'before', 'body', 'cancel', 'title'], lang);
+    for (const k of ['acceptConfirm', 'acceptSignIn', 'cancel', 'title'] as const) assert.ok(t[k].trim(), `${lang}.${k}`);
   }
-  assert.match(OWNER_FIRST_PROOF_STRINGS.en.body(2), /the password, the Telegram link, phone sign-in and any other Google account/);
+  // Google on this same address links again, so the words say "any Google account with a different email" (review U3).
+  assert.match(OWNER_FIRST_PROOF_STRINGS.en.body(2), /the password, the Telegram link, phone sign-in and any Google account with a different email/);
+  assert.match(OWNER_FIRST_PROOF_STRINGS.en.body(2), /or with Google on this same email/);
+  assert.match(OWNER_FIRST_PROOF_STRINGS.ar.body(2), /وأي حساب Google ببريد آخر/);
   const ckb = OWNER_FIRST_PROOF_STRINGS.ckb;
-  assert.match(ckb.title + ckb.body(1), SORANI_ONLY);
-  assert.doesNotMatch(ckb.title + ckb.body(1), ARABIC_ONLY, 'Sorani writes ی and ک');
+  assert.match(ckb.body(1), /هەر هەژمارێکی Google بە ئیمەیڵێکی تر/);
+  for (const k of ['before', 'acceptConfirm', 'acceptSignIn', 'cancel', 'title'] as const) {
+    assert.match(ckb[k], SORANI_ONLY, `ckb.${k}`);
+    assert.doesNotMatch(ckb[k], ARABIC_ONLY, `ckb.${k}: Sorani writes ی and ک`);
+    assert.notEqual(ckb[k], OWNER_FIRST_PROOF_STRINGS.ar[k], `ckb.${k} is not the Arabic`);
+  }
+  assert.match(ckb.body(1), SORANI_ONLY);
+  assert.doesNotMatch(ckb.body(1), ARABIC_ONLY, 'Sorani writes ی and ک');
   assert.notEqual(ckb.body(1), OWNER_FIRST_PROOF_STRINGS.ar.body(1));
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.doesNotMatch(OWNER_FIRST_PROOF_STRINGS[lang].before + OWNER_FIRST_PROOF_STRINGS[lang].body(1), /and Google sign-in|والدخول بـGoogle\.|چوونەژوورەوە بە Google لادەبات/);
+  }
   // Before the press, on the confirm card of the owner's own unverified session.
-  assert.match(OWNER_FIRST_PROOF_STRINGS.en.before, /Confirming ends this account's sessions on other devices and removes its password, Telegram link, phone sign-in and any other Google account/);
+  assert.match(OWNER_FIRST_PROOF_STRINGS.en.before, /Confirming ends this account's sessions on other devices and removes its password, Telegram link, phone sign-in and any Google account with a different email/);
   assert.match(OWNER_FIRST_PROOF_STRINGS.ar.before, /التأكيد يُنهي جلسات هذا الحساب/);
-  assert.match(ckb.before, SORANI_ONLY);
-  assert.doesNotMatch(ckb.before, ARABIC_ONLY);
-  assert.notEqual(ckb.before, OWNER_FIRST_PROOF_STRINGS.ar.before);
   // The field is read only when the server sent it.
   assert.deepEqual(ownerFirstProofOf({ owner_first_proof: { sessions_ended: 2 } }), { sessions_ended: 2 });
   assert.deepEqual(ownerFirstProofOf({ owner_first_proof: { sessions_ended: 'x' } }), { sessions_ended: 0 });
   for (const none of [null, undefined, {}, { user: {} }, { owner_first_proof: null }]) assert.equal(ownerFirstProofOf(none), null);
 
-  // Where it is said.
+  // The confirm card: the before-sentence, a press under it is the acceptance;
+  // otherwise the server's 409 is shown with a confirm that accepts and a cancel.
   const banner = codeOf('src/components/auth/EmailVerifyBanner.tsx');
   assert.match(banner, /setFirstProof\(ownerFirstProofOf\(res\)\);/);
   assert.match(banner, /OWNER_FIRST_PROOF_STRINGS\[lang\] \?\? OWNER_FIRST_PROOF_STRINGS\.ar\)\.body\(firstProof\.sessions_ended\)/);
   assert.match(banner, /\{user\?\.owner_email_unverified === true && \(\s*<p data-owner-first-proof="before"[^>]*>\s*\{\(OWNER_FIRST_PROOF_STRINGS\[lang\] \?\? OWNER_FIRST_PROOF_STRINGS\.ar\)\.before\}/);
+  assert.match(banner, /const warnedBefore = user\?\.owner_email_unverified === true;/);
+  assert.match(banner, /onClick=\{\(\) => void confirm\(warnedBefore\)\}/);
+  assert.match(banner, /e\.code === OWNER_FIRST_PROOF_REQUIRED\) \{[\s\S]{0,200}?setAskFirstProof\(true\);/);
+  assert.match(banner, /refusalText\(OWNER_FIRST_PROOF_REQUIRED, lang\)/);
+  assert.match(banner, /onClick=\{\(\) => void confirm\(true\)\}/);
+  // The code sign-in: the 409 keeps the code, shows the server's sentence, and the confirm re-sends it with the flag.
   const code = codeOf('src/components/auth/CodeAuth.tsx');
-  assert.match(code, /await refreshUser\(\);\s*announceOwnerFirstProof\(res\);/);
-  const ctx = codeOf('src/AuthContext.tsx');
-  assert.match(ctx, /if \(data\.owner_first_proof\) void import\('\.\/lib\/ownerFirstProof'\)\.then\(\(m\) => m\.announceOwnerFirstProof\(data\)\);/);
-  const authPage = codeOf('src/pages/Auth.tsx');
-  assert.match(authPage, /const res = await api\.post\('\/api\/auth\/google', \{ credential, referralCode: referral \}\);\s*await refreshUser\(\);\s*announceOwnerFirstProof\(res\);/);
+  assert.match(code, /\.\.\.\(acceptFirstProof \? \{ accept_owner_first_proof: true \} : \{\}\)/);
+  assert.match(code, /e\.code === OWNER_FIRST_PROOF_REQUIRED\) \{[\s\S]{0,200}?setAskFirstProof\(true\);\s*return;/);
+  assert.match(code, /refusalText\(OWNER_FIRST_PROOF_REQUIRED, lang\)/);
+  assert.match(code, /onClick=\{\(\) => void verify\(true\)\}/);
+  assert.match(code, /announceOwnerFirstProof\(res\);/);
+  const lib = codeOf('src/lib/ownerFirstProof.ts');
+  assert.match(lib, /export const OWNER_FIRST_PROOF_REQUIRED = 'OWNER_FIRST_PROOF_REQUIRED';/);
+  assert.match(lib, /toast\.info\(t\.title, \{ description: t\.body, duration: Infinity, id: 'owner-first-proof' \}\)/);
+  // Google never makes the proof, so the Google sign-in carries nothing of it.
+  for (const f of ['src/AuthContext.tsx', 'src/pages/Auth.tsx']) {
+    assert.doesNotMatch(codeOf(f), /announceOwnerFirstProof|owner_first_proof|ownerFirstProof/, f);
+  }
 });
 
 // ===========================================================================
@@ -798,6 +1082,7 @@ test('probes R1–R3: a first proof of any other address ends no session and tak
   const asstOld = await sessionFor(raw, 'usr_asst');
   const l = await call(a, linking.cookie, 'POST', '/api/auth/google/link', { credential: await googleCredential('g-asst', 'asst@x.co') });
   assert.equal(l.status, 200, l.text);
+  assert.ok(stamp(raw, 'usr_asst'), 'a Google link still proves an ordinary address');
   assert.equal(l.json.owner_first_proof, undefined);
   assert.equal((await me(a, asstOld.cookie))?.id, 'usr_asst');
   raw.exec("UPDATE users SET email_verified_at = NULL WHERE id = 'u_m'");
@@ -820,15 +1105,200 @@ test('probes R1–R3: a first proof of any other address ends no session and tak
   assert.equal(ended(raw, 'usr_full') + ended(raw, 'usr_asst') + ended(raw, 'u_m'), 0, 'no first-proof audit for any of them');
 });
 
-test('C1b: an owner account Google has just created had no other way in — nothing is reported or audited', async () => {
+test('C1c: an owner account Google has just created is created proven — it had no other way in, so nothing is purged or audited', async () => {
   const raw = seededCopyUnverifiedOwner();
   raw.exec("UPDATE users SET email = 'owner-moved@x.co', email_verified_at = '2026-01-01T00:00:00.000Z' WHERE id = 'usr_owner'");
   const env = { DB: asD1(raw), INITIAL_ADMIN_EMAIL: OWNER_EMAIL } as unknown as Env;
-  const out: { ownerFirstProof?: unknown } = {};
-  const created = await resolveGoogleIdentity(env, { sub: 'brand-new-owner-sub', email: OWNER_EMAIL, name: 'Owner' }, '', out as never);
+  const created = await resolveGoogleIdentity(env, { sub: 'brand-new-owner-sub', email: OWNER_EMAIL, name: 'Owner' });
   assert.notEqual(created.id, 'usr_owner');
-  assert.ok(stamp(raw, created.id), 'stamped by the sign-in');
-  assert.equal(out.ownerFirstProof, null, 'no toast saying a password was removed from an account that never had one');
+  assert.ok(stamp(raw, created.id), 'stamped as it was created (a fresh install’s bootstrap opens cost at once)');
   assert.equal(ended(raw, created.id), 0);
-  assert.equal(waysIn(raw, created.id).google, 'brand-new-owner-sub', 'the proving Google account stays');
+  assert.equal(waysIn(raw, created.id).google, 'brand-new-owner-sub', 'the Google account it was created with stays');
+});
+
+// ===========================================================================
+// The review of the fix, finding 3 / U2: the server — not the page — decides
+// that the person was told. Any row holding the address, whatever its role,
+// and an email change onto it, are asked before the proof.
+
+test('review finding 3 (probe C): a non-admin row holding the owner’s address — no card hint, yet the link is asked before it purges', async () => {
+  const raw = squatWorld();
+  raw.exec("UPDATE users SET role = 'customer', phone_e164 = '+9647700000019', google_sub = 'gsub-x' WHERE id = 'usr_squat'");
+  const a = app(raw);
+  const s = await sessionFor(raw, 'usr_squat');
+  const older = await sessionFor(raw, 'usr_squat');
+  assert.notEqual((await me(a, s.cookie))?.owner_email_unverified, true, 'the page has no reason to warn');
+  await tokenFor(raw, 'usr_squat', 'probe-c-nonadmin-link-0123456789ab');
+  const asked = await call(a, s.cookie, 'POST', '/api/auth/verify-email/confirm', { token: 'probe-c-nonadmin-link-0123456789ab' });
+  assert.equal(asked.status, 409, asked.text);
+  assert.equal(asked.json.code, 'OWNER_FIRST_PROOF_REQUIRED');
+  assert.equal(await tokenUsed(raw, 'probe-c-nonadmin-link-0123456789ab'), 0);
+  assert.deepEqual(waysIn(raw, 'usr_squat'), { password: 'squat-hash', google: 'gsub-x', phone: '+9647700000019', telegram: 0, resets: 0 });
+  assert.equal((await me(a, older.cookie))?.id, 'usr_squat');
+  const ok = await call(a, s.cookie, 'POST', '/api/auth/verify-email/confirm', {
+    token: 'probe-c-nonadmin-link-0123456789ab',
+    accept_owner_first_proof: true,
+  });
+  assert.equal(ok.status, 200, ok.text);
+  assert.deepEqual(ok.json.owner_first_proof, { sessions_ended: 1 });
+  assert.deepEqual(waysIn(raw, 'usr_squat'), { password: null, google: null, phone: null, telegram: 0, resets: 0 });
+});
+
+test('review finding 3 (probe D): a verified admin row moving onto the free owner address is asked before the move purges it', async () => {
+  const raw = seededCopyUnverifiedOwner();
+  raw.exec("UPDATE users SET email = 'owner-moved@x.co', email_verified_at = '2026-01-01T00:00:00.000Z', phone_e164 = '+9647700000029', google_sub = 'g-moved' WHERE id = 'usr_owner'");
+  const a = app(raw);
+  const s = await sessionFor(raw, 'usr_owner');
+  const older = await sessionFor(raw, 'usr_owner');
+  assert.equal((await me(a, s.cookie))?.owner_email_unverified, false, 'the current address is not the owner’s, so the page has no warning');
+  await tokenFor(raw, 'usr_owner', 'probe-d-move-onto-owner-0123456789', OWNER_EMAIL);
+  const asked = await call(a, s.cookie, 'POST', '/api/auth/verify-email/confirm', { token: 'probe-d-move-onto-owner-0123456789' });
+  assert.equal(asked.status, 409, asked.text);
+  assert.equal(asked.json.code, 'OWNER_FIRST_PROOF_REQUIRED');
+  assert.equal(row<{ e: string }>(raw, 'SELECT email AS e FROM users WHERE id = ?', 'usr_owner')?.e, 'owner-moved@x.co', 'not moved');
+  assert.equal(passwordOf(raw, 'usr_owner'), 'h');
+  assert.equal((await me(a, older.cookie))?.id, 'usr_owner');
+  const ok = await call(a, s.cookie, 'POST', '/api/auth/verify-email/confirm', {
+    token: 'probe-d-move-onto-owner-0123456789',
+    accept_owner_first_proof: true,
+  });
+  assert.equal(ok.status, 200, ok.text);
+  assert.equal(row<{ e: string }>(raw, 'SELECT email AS e FROM users WHERE id = ?', 'usr_owner')?.e, OWNER_EMAIL);
+  assert.deepEqual(ok.json.owner_first_proof, { sessions_ended: 1 });
+  assert.equal((await me(a, s.cookie))?.can_view_cost, true);
+});
+
+test('review finding 3: a confirm that proves nothing new needs no acceptance — an ordinary address, an already-proven owner', async () => {
+  const raw = seededCopyUnverifiedOwner();
+  raw.exec("UPDATE users SET email_verified_at = NULL WHERE id = 'u1'; UPDATE users SET email_verified_at = '2026-10-01T00:00:00.000Z' WHERE id = 'usr_owner'");
+  const a = app(raw);
+  await tokenFor(raw, 'u1', 'f3-ordinary-0123456789abcdefgh');
+  assert.equal((await call(a, '', 'POST', '/api/auth/verify-email/confirm', { token: 'f3-ordinary-0123456789abcdefgh' })).status, 200);
+  const owner = await sessionFor(raw, 'usr_owner');
+  await tokenFor(raw, 'usr_owner', 'f3-proven-owner-0123456789abcd');
+  assert.equal((await call(a, owner.cookie, 'POST', '/api/auth/verify-email/confirm', { token: 'f3-proven-owner-0123456789abcd' })).status, 200);
+  // And a code sign-in to the proven owner address signs in at once.
+  await codeFor(raw, 'usr_owner', OWNER_EMAIL, '112233');
+  const v = await signInByCode(a, OWNER_EMAIL, '112233');
+  assert.equal(v.status, 200, v.text);
+  assert.equal(v.json.owner_first_proof, undefined);
+  assert.equal((await me(a, owner.cookie))?.can_view_cost, true, 'nothing ended');
+});
+
+// ===========================================================================
+// The review of the fix, finding 2 (probe B): a request that passed its check
+// BEFORE the purge writes no way back in AFTER it. `between` lands the owner's
+// accepted code between the squatter request's session check and its route.
+
+async function ownerProvesByCode(a: App, raw: DatabaseSync, code: string): Promise<string> {
+  await codeFor(raw, 'usr_squat', OWNER_EMAIL, code);
+  const v = await signInByCode(a, OWNER_EMAIL, code, true);
+  assert.equal(v.status, 200, v.text);
+  assert.ok(v.json.owner_first_proof, 'the purge ran');
+  return v.newCookie!;
+}
+
+test('probe B: a Google link whose session was checked before the purge links nothing after it — and the squatter’s Google never reaches cost', async () => {
+  const raw = squatWorld();
+  const a = app(raw);
+  raw.prepare("UPDATE users SET password_hash = ? WHERE id = 'usr_squat'").run(await hashPassword('squatter-pass-123'));
+  const sq = await sessionFor(raw, 'usr_squat');
+  let ownerCookie = '';
+  between = { path: '/api/auth/google/link', run: async () => void (ownerCookie = await ownerProvesByCode(a, raw, '515151')) };
+  const r = await call(a, sq.cookie, 'POST', '/api/auth/google/link', {
+    credential: await googleCredential('squatter-google-sub', 'squatter@gmail.com'),
+    currentPassword: 'squatter-pass-123',
+  });
+  assert.equal(r.status, 401, r.text);
+  assert.equal(r.json.code, 'REAUTH_REQUIRED');
+  assert.equal(waysIn(raw, 'usr_squat').google, null, 'no Google written onto the proven row');
+  const g = await call(a, '', 'POST', '/api/auth/google', { credential: await googleCredential('squatter-google-sub', 'squatter@gmail.com') });
+  assert.notEqual((g.json.user as { id?: string })?.id, 'usr_squat');
+  assert.equal((await me(a, ownerCookie))?.can_view_cost, true, 'the owner is untouched');
+});
+
+test('probe B: a password change whose session was checked before the purge sets nothing after it — and does not sign the owner out', async () => {
+  const raw = squatWorld();
+  const a = app(raw);
+  const sq = await sessionFor(raw, 'usr_squat'); // fresh: a first password would be allowed on it
+  let ownerCookie = '';
+  between = { path: '/api/auth/change-password', run: async () => void (ownerCookie = await ownerProvesByCode(a, raw, '525252')) };
+  const r = await call(a, sq.cookie, 'POST', '/api/auth/change-password', { currentPassword: '', newPassword: 'squatter-new-pass-1' });
+  assert.equal(r.status, 401, r.text);
+  assert.equal(r.json.code, 'REAUTH_REQUIRED');
+  assert.equal(passwordOf(raw, 'usr_squat'), null, 'no password written onto the proven row');
+  assert.equal(r.newCookie, null, 'no session opened');
+  const u = await me(a, ownerCookie);
+  assert.equal(u?.id, 'usr_squat');
+  assert.equal(u?.can_view_cost, true, 'the owner’s own session survives');
+  const login = await call(a, '', 'POST', '/api/auth/login', { identifier: OWNER_EMAIL, password: 'squatter-new-pass-1' });
+  assert.equal(login.status, 401);
+});
+
+test('probe B: a Telegram link confirmed by a session checked before the purge writes no link and no phone after it', async () => {
+  const raw = squatWorld();
+  const a = app(raw);
+  const sq = await sessionFor(raw, 'usr_squat');
+  raw
+    .prepare(
+      "INSERT INTO link_challenges (id, purpose, user_id, session_ref, phone_entered, state, telegram_user_id, chat_id, expires_at) VALUES (?, 'link', 'usr_squat', ?, '+9647700000039', 'phone_verified', 777039, 777039, ?)"
+    )
+    .run('chal_probe_b', sq.id, new Date(Date.now() + 600_000).toISOString());
+  between = { path: '/api/telegram/link/confirm', run: async () => void (await ownerProvesByCode(a, raw, '535353')) };
+  const r = await call(a, sq.cookie, 'POST', '/api/telegram/link/confirm', {});
+  assert.equal(r.status, 400, r.text);
+  assert.deepEqual(waysIn(raw, 'usr_squat'), { password: null, google: null, phone: null, telegram: 0, resets: 0 });
+});
+
+test('probe B: the same writes still work for a session that is live — the guard only refuses a session the proof ended', async () => {
+  const raw = seededCopyUnverifiedOwner();
+  raw.exec("UPDATE users SET password_hash = NULL WHERE id = 'usr_full'");
+  const a = app(raw);
+  const s = await sessionFor(raw, 'usr_full');
+  const l = await call(a, s.cookie, 'POST', '/api/auth/google/link', { credential: await googleCredential('g-full-live', 'full@x.co') });
+  assert.equal(l.status, 200, l.text);
+  const p = await call(a, s.cookie, 'POST', '/api/auth/change-password', { currentPassword: '', newPassword: 'full-new-pass-123' });
+  assert.equal(p.status, 200, p.text);
+  assert.ok(p.newCookie, 'a fresh session for this device');
+  assert.equal((await call(a, '', 'POST', '/api/auth/login', { identifier: 'full@x.co', password: 'full-new-pass-123' })).status, 200);
+});
+
+test('probe B: a sign-in opens its session only while the way in it checked is still on the row', async () => {
+  const raw = seededCopyUnverifiedOwner();
+  const d1 = asD1(raw);
+  const a = new Hono<AppContext>();
+  a.use('*', async (c, next) => {
+    c.env = { DB: d1 } as unknown as Env;
+    await next();
+  });
+  a.post('/open/:hash', async (c) => {
+    await createSession(c, 'usr_full', {
+      sql: 'EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)',
+      binds: ['usr_full', c.req.param('hash')],
+    });
+    return c.json({ ok: true });
+  });
+  a.onError((err, c) => (err instanceof HttpError ? c.json({ code: err.code }, err.status as 401) : c.json({ e: String(err) }, 500)));
+  const before = sessionIds(raw, 'usr_full').length;
+  const gone = await a.request('https://levonis-iq.com/open/no-longer-the-hash', { method: 'POST' });
+  assert.equal(gone.status, 401);
+  assert.equal(((await gone.json()) as { code: string }).code, 'REAUTH_REQUIRED');
+  assert.equal(gone.headers.get('set-cookie'), null, 'no cookie');
+  assert.equal(sessionIds(raw, 'usr_full').length, before, 'no session row');
+  const live = await a.request('https://levonis-iq.com/open/h', { method: 'POST' });
+  assert.equal(live.status, 200);
+  assert.match(live.headers.get('set-cookie') ?? '', /levonis_session=/);
+  assert.equal(sessionIds(raw, 'usr_full').length, before + 1);
+
+  // Every sign-in that checks a credential before its session passes that credential to it.
+  const src = codeOf('worker/routes/auth.ts');
+  const login = src.slice(src.indexOf("authRoutes.post('/login'"), src.indexOf('export async function resolveGoogleIdentity'));
+  assert.match(login, /UPDATE users SET password_hash = \? WHERE id = \? AND password_hash = \?/, 'the rehash never puts a cleared password back');
+  assert.match(login, /createSession\(c, row\.id, \{\s*sql: 'EXISTS \(SELECT 1 FROM users WHERE id = \? AND password_hash = \?\)',\s*binds: \[row\.id, checkedHash\],/);
+  const google = src.slice(src.indexOf("authRoutes.post('/google'"), src.indexOf("authRoutes.post('/google/link'"));
+  assert.match(google, /createSession\(c, row\.id, \{\s*sql: 'EXISTS \(SELECT 1 FROM users WHERE id = \? AND google_sub = \?\)',\s*binds: \[row\.id, identity\.sub\],/);
+  const tg = src.slice(src.indexOf("authRoutes.post('/telegram/complete'"));
+  assert.match(tg.slice(0, 9000), /createSession\(c, linkability\.userId, \{ sql: linkLive, binds: \[linkability\.userId, ch\.telegram_user_id\] \}\)/);
+  const otp = src.slice(src.indexOf("authRoutes.post('/otp/verify'"));
+  assert.match(otp.slice(0, 9000), /createSession\(c, account\.id, \{\s*sql: `EXISTS \(SELECT 1 FROM users WHERE id = \? AND \$\{channel === 'email' \? 'email' : 'phone_e164'\} = \?\)`,/);
 });

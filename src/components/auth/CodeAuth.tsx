@@ -8,7 +8,8 @@ import OtpBoxes from './OtpBoxes';
 import PhoneField, { emptyPhoneValue, type PhoneValue } from './PhoneField';
 import AuthTextField from './AuthTextField';
 import FillButton, { lengthProgress } from './FillButton';
-import { announceOwnerFirstProof } from '../../lib/ownerFirstProof';
+import { refusalText } from '../../lib/refusalStrings';
+import { OWNER_FIRST_PROOF_REQUIRED, OWNER_FIRST_PROOF_STRINGS, announceOwnerFirstProof } from '../../lib/ownerFirstProof';
 
 /**
  * SIGNING IN WITH A CODE — email or WhatsApp, no password.
@@ -38,6 +39,15 @@ import { announceOwnerFirstProof } from '../../lib/ownerFirstProof';
  * here. A person who turns out to already have an account on that number is
  * simply signed in — they proved the number, which is all signing in ever
  * required.
+ *
+ * ONE CODE ASKS BEFORE IT SIGNS IN: a code to the main admin's address while
+ * that address is still unproven. Signing in with it is the address's first
+ * proof, which ends every other way into the account (worker/lib/emailStamp.ts),
+ * so the server checks the code, keeps it unspent, and answers 409
+ * OWNER_FIRST_PROOF_REQUIRED with what the proof ends. This screen shows that
+ * sentence with a confirm and a cancel; the confirm sends the same code again
+ * with `accept_owner_first_proof`, and the toast afterwards says what ended
+ * (lib/ownerFirstProof.ts). Nobody else ever sees this step.
  */
 
 const STRINGS = {
@@ -247,6 +257,8 @@ export default function CodeAuth({
   const [notice, setNotice] = useState('');
   const [notConfigured, setNotConfigured] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  /** The server asked before a first proof of the main admin's address (see the note above). */
+  const [askFirstProof, setAskFirstProof] = useState(false);
 
   const mounted = useRef(true);
   useEffect(() => {
@@ -357,7 +369,7 @@ export default function CodeAuth({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const verify = useCallback(async () => {
+  const verify = useCallback(async (acceptFirstProof = false) => {
     if (code.length !== 6 || busy || !identifier) return;
     setBusy(true);
     setError('');
@@ -370,8 +382,11 @@ export default function CodeAuth({
         // the way it always has — a failure. Sign-up is the only caller that
         // asks for the other answer.
         ...(signup ? { allow_signup: true } : {}),
+        // Sent only from the confirm under the server's own sentence.
+        ...(acceptFirstProof ? { accept_owner_first_proof: true } : {}),
       });
       if (!mounted.current) return;
+      setAskFirstProof(false);
       // A ticket means there was no account on this destination, so the next
       // question is what to call the one about to exist. There is no session
       // yet and nothing to refresh.
@@ -381,9 +396,8 @@ export default function CodeAuth({
         return;
       }
       await refreshUser();
-      // A code that was the first proof of the main admin's address ended every
-      // other way into the account (worker/lib/emailStamp.ts): say so before
-      // the page moves on. Silent for every other sign-in.
+      // The code was the first proof of the main admin's address, accepted a
+      // moment ago: say what it ended before the page moves on.
       announceOwnerFirstProof(res);
       if (!mounted.current) return;
       setPhase('done');
@@ -391,6 +405,12 @@ export default function CodeAuth({
       else navigate('/');
     } catch (e) {
       if (!mounted.current) return;
+      if (e instanceof ApiError && e.code === OWNER_FIRST_PROOF_REQUIRED) {
+        // The code was right and is still unspent: ask, and keep it for the confirm.
+        setAskFirstProof(true);
+        return;
+      }
+      setAskFirstProof(false);
       setError(describeError(e));
       // The code is spent either way (an attempt was claimed server-side), so
       // clearing it is honest rather than tidy — retyping the same six digits
@@ -503,6 +523,45 @@ export default function CodeAuth({
             />
           </div>
         </form>
+      </div>
+    );
+  }
+
+  if (phase === 'code' && askFirstProof) {
+    const fp = OWNER_FIRST_PROOF_STRINGS[lang] ?? OWNER_FIRST_PROOF_STRINGS.ar;
+    return (
+      <div>
+        <div className="lv-alert lv-alert-warning flex items-start gap-2" role="alert" data-owner-first-proof="ask">
+          <AlertCircle aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0" />
+          <span className="leading-relaxed">{refusalText(OWNER_FIRST_PROOF_REQUIRED, lang)}</span>
+        </div>
+        <div className="lv-cta">
+          <button
+            type="button"
+            id="code-accept-first-proof"
+            onClick={() => void verify(true)}
+            disabled={busy}
+            className="lv-btn-gold disabled:opacity-60"
+          >
+            {busy ? s.verifying : fp.acceptSignIn}
+          </button>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setAskFirstProof(false);
+              setPhase('target');
+              setCode('');
+              setError('');
+              setNotice('');
+            }}
+            disabled={busy}
+            className="lv-link disabled:opacity-50"
+          >
+            {fp.cancel}
+          </button>
+        </div>
       </div>
     );
   }

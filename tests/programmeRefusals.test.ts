@@ -43,7 +43,7 @@ const REQUIRED: Record<string, readonly string[]> = {
   'S1 user PATCH (security spec §5.2)': ['SELF_DEMOTE', 'OWNER_LOCKED'],
   // The owner chose the most secure option: the verified-owner rule stays, and
   // an unverified owner is told how to verify instead of being locked out.
-  'DECISIONS row 185 amendment (2026-10-08)': ['OWNER_EMAIL_UNVERIFIED', 'VERIFY_SIGN_IN_REQUIRED'],
+  'DECISIONS row 185 amendment (2026-10-08)': ['OWNER_EMAIL_UNVERIFIED', 'VERIFY_SIGN_IN_REQUIRED', 'OWNER_FIRST_PROOF_REQUIRED'],
   'critique G-34': ['PRODUCT_CURRENTLY_UNAVAILABLE'],
   'ENG §6.3': ['ENGINE_MANAGED', 'ENGINE_MANAGED_PRICES_KEPT', 'PREMIUM_NOT_ON_STEP'],
   'RUN §6': ['PRICING_INCOMPLETE_KEPT_HIDDEN', 'PRICING_PREVIEW_STALE', 'PRICING_PREVIEW_EXPIRED', 'PRICING_ENGINE_PAUSED', 'COMPOSITION_NOT_PRICEABLE'],
@@ -189,6 +189,7 @@ test('the access refusals carry no number, id or field value — one oracle-free
     'OWNER_EMAIL_LOCKED',
     'OWNER_EMAIL_UNVERIFIED',
     'VERIFY_SIGN_IN_REQUIRED',
+    'OWNER_FIRST_PROOF_REQUIRED',
     'REAUTH_REQUIRED',
   ] as const) {
     assert.doesNotMatch(serverMessage(code), /[0-9٠-٩]/, code);
@@ -240,10 +241,16 @@ test('OWNER_EMAIL_UNVERIFIED names the way out in all three languages, in the co
   assert.match(ar, /أكّد بريدك الإلكتروني/);
   assert.match(en, /Verify your email/);
   assert.match(ckb, /ئیمەیڵەکەت پشتڕاست بکەرەوە/);
-  // …or a sign-in with Google ALREADY connected to the same address — never a
-  // "connect Google in your settings" control, which the settings page lacks.
-  for (const s of [ar, en, ckb]) assert.match(s, /Google/);
-  assert.match(en, /if Google is already connected to the same address/);
+  // …with the link in the verification email, the only way the owner's address
+  // is first proven (worker/lib/emailStamp.ts): no Google or code sign-in is
+  // offered, and never a "connect Google in your settings" control, which the
+  // settings page lacks. Google is named only among what that proof removes.
+  assert.match(en, /Verify your email with the link in the verification email/);
+  assert.match(ar, /برابط رسالة التأكيد/);
+  assert.match(ckb, /بە بەستەری ناو ئیمەیڵی پشتڕاستکردنەوە/);
+  assert.doesNotMatch(en, /sign in with Google|already connected/i);
+  assert.doesNotMatch(ar, /سجّل الدخول بحساب Google|مربوطًا/);
+  assert.doesNotMatch(ckb, /بە Google بچۆ ژوورەوە|بەستراوە/);
   assert.doesNotMatch(en, /settings/i);
   assert.doesNotMatch(ar, /إعدادات/);
   assert.doesNotMatch(ckb, /ڕێکخستن/);
@@ -266,4 +273,23 @@ test('VERIFY_SIGN_IN_REQUIRED tells the holder of the owner’s link to confirm 
   assert.notEqual(ckb, ar);
   assert.notEqual(ckb, en);
   assert.deepEqual(REFUSAL_STRINGS.VERIFY_SIGN_IN_REQUIRED, COST_REFUSALS.VERIFY_SIGN_IN_REQUIRED);
+});
+
+test('OWNER_FIRST_PROOF_REQUIRED says what the first proof ends and asks to confirm or cancel — ar, en and real Sorani', () => {
+  const { ar, en, ckb } = COST_REFUSALS.OWNER_FIRST_PROOF_REQUIRED;
+  assert.match(en, /^This is the first verification of the main admin's email\./);
+  assert.match(en, /removes its password, Telegram link, phone sign-in and any Google account with a different email/);
+  assert.match(en, /Confirm to continue, or cancel to leave everything as it is\.$/);
+  assert.match(ar, /هذا أول تأكيد لبريد الأدمن الرئيسي/);
+  assert.match(ar, /وأي حساب Google ببريد آخر/);
+  assert.match(ar, /أكّد للمتابعة، أو ألغِ ليبقى كل شيء كما هو\.$/);
+  assert.match(ckb, /بەڕێوەبەری سەرەکی/);
+  assert.match(ckb, /هەر هەژمارێکی Google بە ئیمەیڵێکی تر/);
+  assert.match(ckb, SORANI_ONLY);
+  assert.doesNotMatch(ckb, ARABIC_ONLY);
+  assert.notEqual(ckb, ar);
+  assert.notEqual(ckb, en);
+  // Google on the same address is not "lost": it links again (review U3).
+  assert.match(en, /or with Google on this same email/);
+  assert.deepEqual(REFUSAL_STRINGS.OWNER_FIRST_PROOF_REQUIRED, COST_REFUSALS.OWNER_FIRST_PROOF_REQUIRED);
 });

@@ -34,6 +34,7 @@ import {
 } from '../lib/telegram';
 import { setPrimaryChannelStatements } from '../lib/channelReadiness';
 import { canMoveMoney } from '../lib/adminScope';
+import { liveSessionCondition } from '../lib/session';
 import {
   BINDABLE_TOPIC_KEYS,
   adminBotConfigured,
@@ -301,12 +302,20 @@ telegramRoutes.post('/link/confirm', requireAuth, async (c) => {
   }
 
   const now = nowIso();
+  const live = liveSessionCondition(c, user.id);
   let results: D1Result[];
   try {
     results = await c.env.DB.batch([
       // The link is written only if the challenge is still verified,
       // unconsumed and unexpired at commit time (the batch is one
       // transaction — no check-then-write race).
+      //
+      // And only while the session that started it is still live
+      // (`liveSessionCondition`, worker/lib/session.ts): the first proof of the
+      // owner's address ends every older session of that row and revokes its
+      // Telegram link (worker/lib/emailStamp.ts) — a link written after that,
+      // by a request whose session was checked before it, would be a way back
+      // into the row the proof just took back.
       c.env.DB.prepare(
         `INSERT INTO telegram_links (user_id, telegram_user_id, chat_id, phone_e164, verified_at)
          SELECT ?1, ?2, ?3, ?4, ?5
@@ -314,19 +323,20 @@ telegramRoutes.post('/link/confirm', requireAuth, async (c) => {
             SELECT 1 FROM link_challenges
              WHERE id = ?6 AND consumed_at IS NULL AND state = 'phone_verified' AND expires_at > ?5
           )
+            AND EXISTS (SELECT 1 FROM sessions WHERE id = ?7 AND user_id = ?1)
          ON CONFLICT(user_id) DO UPDATE SET
            telegram_user_id = excluded.telegram_user_id,
            chat_id = excluded.chat_id,
            phone_e164 = excluded.phone_e164,
            verified_at = excluded.verified_at,
            revoked_at = NULL`
-      ).bind(user.id, ch.telegram_user_id, ch.chat_id, ch.phone_entered, now, ch.id),
+      ).bind(user.id, ch.telegram_user_id, ch.chat_id, ch.phone_entered, now, ch.id, live.binds[0]),
       // Single-use consumption (conditional — concurrent confirms cannot
-      // both transition).
+      // both transition), under the same live-session condition.
       c.env.DB.prepare(
         `UPDATE link_challenges SET consumed_at = ?, state = 'linked'
-          WHERE id = ? AND consumed_at IS NULL AND state = 'phone_verified'`
-      ).bind(now, ch.id),
+          WHERE id = ? AND consumed_at IS NULL AND state = 'phone_verified' AND ${live.sql}`
+      ).bind(now, ch.id, ...live.binds),
     ]);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -391,9 +401,10 @@ telegramRoutes.post('/link/confirm', requireAuth, async (c) => {
     await c.env.DB.prepare(
       `UPDATE users SET phone_e164 = ?1
         WHERE id = ?2 AND phone_e164 IS NULL
-          AND NOT EXISTS (SELECT 1 FROM users WHERE phone_e164 = ?1)`
+          AND NOT EXISTS (SELECT 1 FROM users WHERE phone_e164 = ?1)
+          AND EXISTS (SELECT 1 FROM sessions WHERE id = ?3 AND user_id = ?2)`
     )
-      .bind(ch.phone_entered, user.id)
+      .bind(ch.phone_entered, user.id, live.binds[0])
       .run();
   } catch (e) {
     console.error('phone_e164 self-heal failed for user', user.id, e instanceof Error ? e.message : String(e));
