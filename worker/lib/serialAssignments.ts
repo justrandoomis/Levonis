@@ -1855,6 +1855,89 @@ export async function sweepReturnedSerials(env: Env, limit = 50): Promise<{ scan
 }
 
 // ======================================================================
+//  The orders board (spec §5.5) — «الأرقام n/m» on each row.
+// ======================================================================
+
+export interface BoardSerialCount {
+  /** Units of this order that need a serial (the slot rule of `serialRequiredSlots`). */
+  required: number;
+  /** Of those, how many carry a live serial now. */
+  linked: number;
+  /** The owner's §19 gate holds THIS order (switched on, created after the cutover). */
+  gate: boolean;
+}
+
+/** Statuses a board row carries the count for: on the shelf, before dispatch. */
+const BOARD_SERIAL_STATUSES = new Set(['confirmed', 'processing']);
+
+/**
+ * The board's per-row serial count, for a whole page in three reads (the
+ * page's lines with their policy, the policy context, the live bindings) —
+ * never one `serialRequiredSlots` per row. The same predicate as every other
+ * door (`lineDevicePolicy`; bundle parents and community-store orders
+ * excluded; 500 per line at most), so the chip and the order window agree.
+ * Empty before migration 0177 and on any failure: a chip is never worth a
+ * board that does not load.
+ */
+export async function boardSerialCounts(
+  env: Env,
+  orders: ReadonlyArray<{ id?: unknown; status?: unknown; seller_type?: unknown; created_at?: unknown }>
+): Promise<Map<string, BoardSerialCount>> {
+  const out = new Map<string, BoardSerialCount>();
+  const eligible = orders.filter((o) => BOARD_SERIAL_STATUSES.has(String(o.status ?? '')) && String(o.seller_type ?? '') !== 'merchant');
+  if (!eligible.length) return out;
+  try {
+    const db = env.DB;
+    if (!(await serialAssignmentsInstalled(db))) return out;
+    const ids = JSON.stringify(eligible.map((o) => String(o.id)));
+    const [linesRes, liveRes, gate] = await Promise.all([
+      db
+        .prepare(
+          `SELECT oi.id, oi.order_id, oi.product_id, oi.qty, p.ops_policy,
+                  EXISTS (SELECT 1 FROM order_items c WHERE c.bundle_parent_item_id = oi.id) AS is_bundle_parent
+             FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
+            WHERE oi.order_id IN (SELECT value FROM json_each(?))`
+        )
+        .bind(ids)
+        .all<{ id: string; order_id: string; product_id: string | null; qty: number; ops_policy: string | null; is_bundle_parent: number }>(),
+      db
+        .prepare(
+          `SELECT order_id, order_item_id, unit_index FROM serial_assignments
+            WHERE order_id IN (SELECT value FROM json_each(?)) AND released_at IS NULL AND part = 'device'`
+        )
+        .bind(ids)
+        .all<{ order_id: string; order_item_id: string; unit_index: number }>(),
+      getSetting(db, 'serialPrepGate'),
+    ]);
+    const lines = linesRes.results ?? [];
+    const live = liveRes.results ?? [];
+    const ctx = await serializationContext(db, lines.map((l) => String(l.product_id ?? '')));
+    const need = new Map<string, number>();
+    for (const l of lines) {
+      if (!l.product_id || Number(l.is_bundle_parent) === 1) continue;
+      if (!lineDevicePolicy(l.ops_policy, l.product_id, ctx).serialized) continue;
+      need.set(l.id, Math.min(Math.max(Number(l.qty) || 0, 0), 500));
+    }
+    for (const o of eligible) {
+      const id = String(o.id);
+      const required = lines.reduce((n, l) => n + (l.order_id === id ? need.get(l.id) ?? 0 : 0), 0);
+      if (required === 0) continue;
+      const linked = new Set(
+        live
+          .filter((a) => a.order_id === id && Number(a.unit_index) <= (need.get(a.order_item_id) ?? 0))
+          .map((a) => `${a.order_item_id}:${a.unit_index}`)
+      ).size;
+      const created = Date.parse(String(o.created_at ?? ''));
+      const gateOn = gate.enabled && (!gate.since || (Number.isFinite(created) && created >= Date.parse(gate.since)));
+      out.set(id, { required, linked, gate: gateOn });
+    }
+    return out;
+  } catch {
+    return new Map();
+  }
+}
+
+// ======================================================================
 //  The order screen (§1, §16, §21, §30) — the `serials` enrichment.
 // ======================================================================
 

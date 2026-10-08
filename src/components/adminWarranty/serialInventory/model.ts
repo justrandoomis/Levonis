@@ -8,7 +8,8 @@ import type { BulkRowProblem } from '../../../../packages/catalog/src/deviceSeri
 
 export const INVENTORY_BASE = '/api/devices/admin/serial-inventory';
 
-export type InventoryStatus = 'in_stock' | 'sold' | 'registered' | 'void';
+/** Derived on the server; `reserved`, `returned` and `unavailable` arrive with migration 0177 (serial scan at preparation). */
+export type InventoryStatus = 'in_stock' | 'reserved' | 'sold' | 'registered' | 'returned' | 'unavailable' | 'void';
 export type PreviewOutcome = 'new' | 'new_assigned' | 'exists' | 'duplicate_in_batch' | 'invalid';
 
 export interface InventoryRow {
@@ -172,8 +173,11 @@ export const STR = {
     search: 'ابحث برقم تسلسلي، رقم علبة، EAN، موديل، منتج، بريد أو طلب…',
     all: 'الكل',
     in_stock: 'في المخزون',
+    reserved: 'محجوز لطلب',
     sold: 'مُباع — غير مربوط',
     registered: 'مربوط بحساب',
+    returned: 'مُرتجع',
+    unavailable: 'غير متاح',
     void: 'ملغى',
     serial: 'الرقم التسلسلي',
     model: 'الموديل',
@@ -356,8 +360,11 @@ export const STR = {
     search: 'Search serial, box SN, EAN, model, product, email or order…',
     all: 'All',
     in_stock: 'In stock',
+    reserved: 'Reserved for an order',
     sold: 'Sold — not linked',
     registered: 'Linked to an account',
+    returned: 'Returned',
+    unavailable: 'Unavailable',
     void: 'Void',
     serial: 'Serial',
     model: 'Model',

@@ -1,5 +1,6 @@
 import { beginRequestFeedback, type MascotFeedback } from './mascotRequest';
 import { noteCartResponse } from './cartCount';
+import type { OrderSerials } from '../components/adminOrders/serials/types';
 /**
  * Typed API client. All requests go to the Worker backend with cookie
  * credentials; the browser never builds SQL and never holds tokens.
@@ -335,6 +336,13 @@ export interface ApiUser {
    *  from before S1 hides the finance tab from a full admin. New code reads
    *  `can_view_cost`. */
   can_view_financials?: boolean;
+  /**
+   * The Main Admin (INITIAL_ADMIN_EMAIL). A UI HINT that draws the owner's
+   * controls (serial policy, the serial gate, serial exceptions) as editable
+   * and everyone else's as read-only with a lock — every one of those routes
+   * re-checks on the server and answers OWNER_ONLY otherwise.
+   */
+  is_owner?: boolean;
   subscription_expiry: number;
   locale: 'en' | 'ar' | 'ku';
   avatar_key: string | null;
@@ -1266,6 +1274,13 @@ export interface AdminOrderRow extends ApiOrder {
    * courier's rather than presenting them as ordinary.
    */
   quick_next?: { stage: string; label: string; source: 'manual' | 'automatic' | 'delivery_api' } | null;
+  /**
+   * «الأرقام n/m» (serial scan, migration 0177): units that need a serial and
+   * how many carry one, while the order is on the shelf. Absent for an order
+   * with none, before the migration, and from an older server. `holds_next`:
+   * the owner's §19 gate would refuse `quick_next` right now.
+   */
+  serials?: { required: number; linked: number; gate: boolean; holds_next: boolean };
 }
 
 /** The whole board in one answer: a page, its totals, and what it understood. */
@@ -1364,6 +1379,13 @@ export interface AdminOrderDetail extends ApiOrder {
    * degrades on rather than 500ing.
    */
   tracking?: AdminOrderTracking;
+  /**
+   * «Scan Serial» per physical unit (migration 0177): the slots, what is
+   * linked, the §19 gate and the re-open suggestions. `installed:false` until
+   * the migration has applied, and absent from an older server — the screen
+   * then shows the legacy units line only.
+   */
+  serials?: OrderSerials;
 }
 
 export interface AdminOrderTracking {
@@ -1389,12 +1411,14 @@ export interface AdminOrderTracking {
     at: string | null;
     label_ar: string;
     label_en: string;
+    label_ckb?: string;
   }>;
   available: Array<{
     stage: string;
     source: 'manual' | 'automatic' | 'delivery_api';
     label_ar: string;
     label_en: string;
+    label_ckb?: string;
   }>;
   history: Array<{
     stage: string;

@@ -25,6 +25,8 @@ export interface CatalogNode {
   sort: number;
   is_printer_catalog: boolean;
   active: boolean;
+  /** §29 serial tracking for the section's products (migration 0177); absent before it. */
+  serial_policy?: 'inherit' | 'required' | 'off';
   template_family: TemplateFamily | null;
   effective_template_family: TemplateFamily | null;
   product_count: number;
@@ -346,7 +348,7 @@ export function FieldRow({
   );
 }
 
-export function Check({ id, label, checked, onChange, hint }: { id: string; label: string; checked: boolean; onChange: (v: boolean) => void; hint?: string }) {
+export function Check({ id, label, checked, onChange, hint, disabled = false }: { id: string; label: string; checked: boolean; onChange: (v: boolean) => void; hint?: string; disabled?: boolean }) {
   // The hint sits OUTSIDE the <label>: text inside it joins the checkbox's
   // accessible name, so "مفعّل" would be announced as the whole paragraph.
   const hintId = `${id}-hint`;
@@ -357,9 +359,10 @@ export function Check({ id, label, checked, onChange, hint }: { id: string; labe
           id={id}
           type="checkbox"
           checked={checked}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
           aria-describedby={hint ? hintId : undefined}
-          className="mt-0.5 h-4 w-4 accent-[var(--ap-accent)]"
+          className="mt-0.5 h-4 w-4 accent-[var(--ap-accent)] disabled:opacity-50"
         />
         <span className="min-w-0 text-[13px] text-[var(--ap-text-1)]">{label}</span>
       </label>

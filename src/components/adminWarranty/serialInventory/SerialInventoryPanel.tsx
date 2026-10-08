@@ -20,6 +20,9 @@ import { usePrompt } from '../../ui/PromptDialog';
 import AddSerialsPanel, { ICON_BTN_44 } from './AddSerialsPanel';
 import EditSerialDialog from './EditSerialDialog';
 import LinkProductDialog, { type LinkTarget } from './LinkProductDialog';
+import SerialDetail from '../serial/SerialDetail';
+import SerialGateCard from '../serial/SerialGateCard';
+import { serialStrings } from '../../adminOrders/serials/strings';
 import {
   INVENTORY_BASE,
   STR,
@@ -30,21 +33,30 @@ import {
   type InventoryStrings,
 } from './model';
 
-const FILTERS: Array<InventoryStatus | 'all'> = ['all', 'in_stock', 'sold', 'registered', 'void'];
+const FILTERS: Array<InventoryStatus | 'all'> = ['all', 'in_stock', 'reserved', 'sold', 'registered', 'returned', 'unavailable', 'void'];
 
 const STATUS_TONE: Record<InventoryStatus, string> = {
   in_stock: 'text-[var(--ap-info)] bg-[var(--ap-info-bg)] border-[var(--ap-info-border)]',
+  reserved: 'text-[var(--ap-accent-text)] bg-[var(--ap-accent-soft)] border-[var(--ap-accent-border)]',
   sold: 'text-[var(--ap-warning)] bg-[var(--ap-warning-bg)] border-[var(--ap-warning-border)]',
   registered: 'text-[var(--ap-success)] bg-[var(--ap-success-bg)] border-[var(--ap-success-border)]',
+  returned: 'text-[var(--ap-warning)] bg-[var(--ap-warning-bg)] border-[var(--ap-warning-border)]',
+  unavailable: 'text-[var(--ap-danger)] bg-[var(--ap-danger-bg)] border-[var(--ap-danger-border)]',
   void: 'text-[var(--ap-text-3)] bg-[var(--ap-surface-2)] border-[var(--ap-border)]',
 };
+
+/** The status in the reader's language — Sorani from the serial-scan words (this panel's own table is ar/en). */
+function statusLabel(status: InventoryStatus, t: InventoryStrings, lang: string): string {
+  return lang === 'ckb' ? serialStrings('ckb').status[status] ?? t[status] : t[status];
+}
 
 const shortDate = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : '—');
 
 function StatusBadge({ row, t }: { row: InventoryRow; t: InventoryStrings }) {
+  const { lang } = useLanguage();
   return (
-    <span className={`${T.badgeBase} ${STATUS_TONE[row.status]}`} data-serial-status={row.status}>
-      {t[row.status]}
+    <span className={`${T.badgeBase} ${STATUS_TONE[row.status] ?? STATUS_TONE.void}`} data-serial-status={row.status}>
+      {statusLabel(row.status, t, lang)}
     </span>
   );
 }
@@ -67,38 +79,6 @@ function Whereabouts({ row, t }: { row: InventoryRow; t: InventoryStrings }) {
   );
 }
 
-function HistoryList({ serialNorm, t }: { serialNorm: string; t: InventoryStrings }) {
-  const [rows, setRows] = useState<Awaited<ReturnType<typeof inventoryApi.detail>>['history'] | null>(null);
-  const [err, setErr] = useState(false);
-  useEffect(() => {
-    let live = true;
-    inventoryApi
-      .detail(serialNorm)
-      .then((r) => live && setRows(r.history))
-      .catch(() => live && setErr(true));
-    return () => {
-      live = false;
-    };
-  }, [serialNorm]);
-  if (err) return <p className="text-[12px] text-[var(--ap-danger)]">{t.genericError}</p>;
-  if (!rows) return <p className="text-[12px] text-[var(--ap-text-3)]">{t.loading}</p>;
-  if (!rows.length) return <p className="text-[12px] text-[var(--ap-text-3)]">{t.historyEmpty}</p>;
-  return (
-    <ol className="space-y-1.5" data-serial-history>
-      {rows.map((h) => (
-        <li key={h.id} className="text-[12px] text-[var(--ap-text-2)] flex flex-wrap gap-x-2">
-          <span className="font-semibold text-[var(--ap-text-1)]">{t.actionsNames[h.action] ?? h.action}</span>
-          <span dir="ltr" className="text-[var(--ap-text-3)]">
-            {h.created_at.slice(0, 16).replace('T', ' ')}
-          </span>
-          {h.actor && <span dir="ltr">{h.actor.email ?? h.actor.username}</span>}
-          {typeof h.detail.reason === 'string' && <span>— {h.detail.reason}</span>}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 export default function SerialInventoryPanel() {
   const { lang, dir } = useLanguage();
   const t = lang === 'en' ? STR.en : STR.ar;
@@ -116,7 +96,8 @@ export default function SerialInventoryPanel() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<InventoryRow | null>(null);
   const [linking, setLinking] = useState<LinkTarget | null>(null);
-  const [openHistory, setOpenHistory] = useState<string | null>(null);
+  // The §16 serial / warranty page, as a sheet over the list.
+  const [detail, setDetail] = useState<string | null>(null);
 
   const params = useCallback(
     (after?: string | null) => {
@@ -206,10 +187,11 @@ export default function SerialInventoryPanel() {
       <button
         type="button"
         className={ICON_BTN_44}
-        onClick={() => setOpenHistory((h) => (h === row.serial_norm ? null : row.serial_norm))}
-        aria-expanded={openHistory === row.serial_norm}
-        aria-label={`${openHistory === row.serial_norm ? t.hideHistory : t.history} ${row.serial}`}
-        title={t.history}
+        onClick={() => setDetail(row.serial_norm)}
+        aria-haspopup="dialog"
+        aria-label={`${serialStrings(lang).pageTitle} ${row.serial}`}
+        title={serialStrings(lang).pageTitle}
+        data-serial-open-detail={row.serial_norm}
       >
         <History className="w-4 h-4" aria-hidden />
       </button>
@@ -287,6 +269,8 @@ export default function SerialInventoryPanel() {
         </div>
       </header>
 
+      <SerialGateCard />
+
       <AddSerialsPanel t={t} open={adding} onClose={() => setAdding(false)} onSaved={() => void load()} />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -305,7 +289,7 @@ export default function SerialInventoryPanel() {
         <div className="flex flex-wrap gap-1.5" role="group" aria-label={t.status}>
           {FILTERS.map((f) => (
             <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={`${T.chip} h-11 px-3`} data-serial-filter={f}>
-              {f === 'all' ? t.all : t[f]}
+              {f === 'all' ? t.all : statusLabel(f, t, lang)}
               {counts && <span className={`${T.kbd} ms-1`}>{counts[f] ?? 0}</span>}
             </button>
           ))}
@@ -360,11 +344,6 @@ export default function SerialInventoryPanel() {
                   <div className="min-w-0">{!row.product && linkButton(row)}</div>
                   {actions(row)}
                 </div>
-                {openHistory === row.serial_norm && (
-                  <div className="mt-2 border-t border-[var(--ap-hairline)] pt-2">
-                    <HistoryList serialNorm={row.serial_norm} t={t} />
-                  </div>
-                )}
               </li>
             ))}
           </ul>
@@ -427,13 +406,6 @@ export default function SerialInventoryPanel() {
                       </td>
                       <td className="px-1 py-1">{actions(row)}</td>
                     </tr>
-                    {openHistory === row.serial_norm && (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-3 bg-[var(--ap-surface-2)]">
-                          <HistoryList serialNorm={row.serial_norm} t={t} />
-                        </td>
-                      </tr>
-                    )}
                   </React.Fragment>
                 ))}
               </tbody>
@@ -472,6 +444,7 @@ export default function SerialInventoryPanel() {
           }}
         />
       )}
+      <SerialDetail serial={detail} onClose={() => setDetail(null)} />
       {promptDialog}
     </div>
   );

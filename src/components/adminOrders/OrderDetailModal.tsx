@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import WarrantySection from '../adminWarranty/WarrantySection';
-import { X, ChevronDown, MessageSquare, ClipboardList, Package, Receipt, ShieldCheck, Tag, Truck } from 'lucide-react';
+import { X, ChevronDown, MessageSquare, ClipboardList, Package, Receipt, ScanLine, ShieldCheck, Tag, Truck, Check } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
+import { useAuth } from '../../AuthContext';
 import { api, formatIqd, type AdminOrderDetail } from '../../lib/api';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
 import { useMotion } from '../../lib/motion';
@@ -18,6 +19,14 @@ import OrderStagePanel from './OrderStagePanel';
 import GiniReceiptPanel from './GiniReceiptPanel';
 import OrderStatusCorrection from './OrderStatusCorrection';
 import PriceAdjustPanel from './PriceAdjustPanel';
+import SerialsBlockerCard from './serials/SerialsBlockerCard';
+import { serialStrings } from './serials/strings';
+import { slotKey } from './serials/UnitSerialSlots';
+import { serialsApi } from './serials/serialsApi';
+import type { GateMissing, OrderSerials } from './serials/types';
+
+// The §16 serial / warranty page, opened from a linked slot's serial.
+const SerialDetail = React.lazy(() => import('../adminWarranty/serial/SerialDetail'));
 
 /**
  * The order fulfilment screen.
@@ -40,6 +49,15 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const { user } = useAuth();
+  const viewerOwner = !!user?.is_owner;
+  // «Scan Serial» (0177): the slots live in the order detail and are patched
+  // in place by each link, so the blocker, the chips and the slots agree.
+  const [serials, setSerials] = useState<OrderSerials | null>(null);
+  const [focusRequest, setFocusRequest] = useState<{ key: string; n: number } | null>(null);
+  const [serialPage, setSerialPage] = useState<string | null>(null);
+  const [serialPageMounted, setSerialPageMounted] = useState(false);
+  const s = serialStrings(lang);
 
   // THE WINDOW OWNS ITS OWN CLOSING, so it can be seen leaving.
   //
@@ -75,6 +93,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
     try {
       const data = await api.get<{ order: AdminOrderDetail }>(`/api/admin/orders/${orderId}`);
       setDetail(data.order);
+      setSerials(data.order.serials && data.order.serials.installed ? data.order.serials : null);
     } catch (e) {
       setError(e);
     } finally {
@@ -90,6 +109,50 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   // no modal. The key listener that used to live here is deleted: `Overlay`
   // owns Escape for every window in the app, and two listeners on the same key
   // would have closed this one twice over.
+
+  /** «اذهب إلى الوحدة»: the order tab, scrolled to that unit's slot, the cursor in it. */
+  const goToSerial = useCallback((m: Pick<GateMissing, 'order_item_id' | 'unit_index'>) => {
+    setTab('order');
+    setFocusRequest((f) => ({ key: slotKey(m), n: (f?.n ?? 0) + 1 }));
+  }, []);
+  /** After the gate refused a move: the blocker card should list what the server just counted. */
+  const refreshSerials = useCallback(() => {
+    void serialsApi
+      .view(orderId)
+      .then((v) => {
+        if (v?.installed) setSerials(v);
+      })
+      .catch(() => undefined);
+  }, [orderId]);
+  const serialsListedAbove = !!serials?.installed && !!serials.gate?.applies && (serials.missing?.length ?? 0) > 0;
+  const openSerialPage = useCallback((serial: string) => {
+    setSerialPageMounted(true);
+    setSerialPage(serial);
+  }, []);
+  /** The line's serial progress, for the chip on its card (before delivery only). */
+  const serialChip = (itemId: string) => {
+    if (!serials?.installed || detail?.status === 'delivered') return null;
+    const mine = (serials.slots ?? []).filter((x) => x.order_item_id === itemId);
+    if (mine.length === 0) return null;
+    const done = mine.filter((x) => x.assignment).length;
+    const firstEmpty = mine.find((x) => !x.assignment) ?? mine[0];
+    const complete = done === mine.length;
+    return (
+      <button
+        type="button"
+        onClick={() => goToSerial(firstEmpty)}
+        title={s.chipGoTo}
+        aria-label={`${s.chipSerials(done, mine.length)} — ${s.chipGoTo}`}
+        className={`mt-2 inline-flex items-center gap-1.5 min-h-[32px] rounded-full px-2.5 text-[12px] font-semibold tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold ${
+          complete ? 'bg-success/10 text-success hover:bg-success/15' : 'bg-surface-selected text-text-secondary hover:text-text-primary'
+        }`}
+        data-serial-chip={itemId}
+      >
+        {complete ? <Check className="h-3.5 w-3.5" aria-hidden /> : <ScanLine className="h-3.5 w-3.5" aria-hidden />}
+        {s.chipSerials(done, mine.length)}
+      </button>
+    );
+  };
 
   const addr = detail?.address ?? {};
   const govId = String(addr.governorate ?? '');
@@ -209,12 +272,24 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
             {detail.gini ? (
               <GiniReceiptPanel orderId={orderId} gini={detail.gini} dir={dir} onScanned={load} />
             ) : null}
+            {/* §19 THE SERIAL GATE, above the path it blocks — only while the
+                owner's gate applies to this order. Null otherwise. */}
+            <SerialsBlockerCard serials={serials} onGoTo={goToSerial} />
             {detail.tracking ? (
               // Moving a stage reloads the whole detail, because the move
               // changes the available list, the history and the legacy
               // status underneath — refreshing only the panel would leave
               // the rest of the modal describing the previous state.
-              <OrderStagePanel orderId={orderId} tracking={detail.tracking} dir={dir} onMoved={load} />
+              <OrderStagePanel
+                orderId={orderId}
+                tracking={detail.tracking}
+                dir={dir}
+                onMoved={load}
+                viewerOwner={viewerOwner}
+                onGoToSerial={goToSerial}
+                serialsListedAbove={serialsListedAbove}
+                onSerialGateRefused={refreshSerials}
+              />
             ) : (
               // The tracking block is an enrichment and degrades like the
               // others: an honest note beats a 500 on the whole screen.
@@ -226,7 +301,15 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 placed UNDER the path it corrects — and it renders even when
                 the tracking enrichment failed, because that is exactly when
                 an admin has nothing else to move the order with. */}
-            <OrderStatusCorrection orderId={orderId} status={detail.status} onChanged={load} />
+            <OrderStatusCorrection
+              orderId={orderId}
+              status={detail.status}
+              onChanged={load}
+              viewerOwner={viewerOwner}
+              onGoToSerial={goToSerial}
+              serialsListedAbove={serialsListedAbove}
+              onSerialGateRefused={refreshSerials}
+            />
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
@@ -483,6 +566,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                           {' · '}
                           <span className="text-zinc-300">{formatIqd(it.line_total_iqd)}</span>
                         </p>
+                        {serialChip(it.id)}
                         {units.length > 0 && (
                           <p className="text-[11px] text-zinc-500 mt-1">
                             {loc('وحدات مسلسلة', 'Serialized units', 'یەکە ژمارەدارەکان')}: {units.length}
@@ -524,6 +608,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                               <span className="min-w-0 flex-1 break-words">
                                 {k.name}
                                 {k.variant && <PackingSelection value={k.variant} />}
+                                {serialChip(k.order_item_id)}
                               </span>
                             </li>
                             ))}
@@ -539,7 +624,15 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 under the goods it belongs to rather than in the print bar:
                 each unit needs its serial typed before anything can be
                 generated, and that is data entry, not printing. */}
-            <WarrantySection orderId={orderId} />
+            <WarrantySection
+              orderId={orderId}
+              serials={serials}
+              orderStatus={detail.status}
+              viewerOwner={viewerOwner}
+              onSerialsChanged={setSerials}
+              onOpenSerial={openSerialPage}
+              focusRequest={focusRequest}
+            />
 
             {detail.admin_note && (
               <section>
@@ -596,6 +689,11 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
           </div>
         )}
       </div>
+      {serialPageMounted && (
+        <React.Suspense fallback={null}>
+          <SerialDetail serial={serialPage} onClose={() => setSerialPage(null)} />
+        </React.Suspense>
+      )}
     </Overlay>
   );
 }

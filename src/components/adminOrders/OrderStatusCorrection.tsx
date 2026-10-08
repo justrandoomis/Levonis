@@ -22,6 +22,9 @@
 import { useState } from 'react';
 import { api, ApiError, type OrderStatus } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { apiRefusal } from '../../lib/refusalStrings';
+import SerialGateRefusal, { gateRefusalOf, type GateRefusal } from './serials/SerialGateRefusal';
+import type { GateMissing } from './serials/types';
 
 /**
  * Mirrors ORDER_TRANSITIONS in worker/routes/admin.ts. It used to be a one-way
@@ -51,15 +54,30 @@ export default function OrderStatusCorrection({
   orderId,
   status,
   onChanged,
+  viewerOwner = false,
+  onGoToSerial,
+  serialsListedAbove = false,
+  onSerialGateRefused,
 }: {
   orderId: string;
   status: OrderStatus;
   onChanged: () => void | Promise<void>;
+  /** The Main Admin may move an order past the §19 serial gate, with a reason. */
+  viewerOwner?: boolean;
+  /** «اذهب إلى الوحدة» — open the unit's serial slot on the order tab. */
+  onGoToSerial?: (m: GateMissing) => void;
+  /** The order's serial blocker card already names the missing units on this tab. */
+  serialsListedAbove?: boolean;
+  /** The gate refused a move: the screen re-reads its serial view so the blocker is current. */
+  onSerialGateRefused?: () => void;
 }) {
-  const { loc } = useLanguage();
+  const { lang, loc } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
+  // §19 (serial scan): a shipped/delivered move the serial gate refused — the
+  // missing units, and for the owner the reason to move it anyway.
+  const [gate, setGate] = useState<(GateRefusal & { to: OrderStatus }) | null>(null);
 
   const label = (st: OrderStatus) => {
     const entry = STATUS_LABEL[st];
@@ -69,7 +87,7 @@ export default function OrderStatusCorrection({
   const next = ORDER_TRANSITIONS[status] ?? [];
   if (next.length === 0) return null;
 
-  const change = async (to: OrderStatus) => {
+  const change = async (to: OrderStatus, serialsOverrideReason?: string) => {
     if (busy) return;
     if (to === 'cancelled') {
       const ok = window.confirm(
@@ -83,7 +101,7 @@ export default function OrderStatusCorrection({
     }
     // Backing out of a delivered order does not un-grant what delivery
     // granted. The server says so in its response; asking first is fairer.
-    if (status === 'delivered') {
+    if (status === 'delivered' && !serialsOverrideReason) {
       const ok = window.confirm(
         loc(
           `إرجاع الطلب ${orderId} من «تم التسليم»؟ النقاط الممنوحة وسجلات الأجهزة وتواريخ بدء الضمان لا تُلغى.`,
@@ -96,11 +114,13 @@ export default function OrderStatusCorrection({
     setBusy(true);
     setError('');
     setNote('');
+    if (!serialsOverrideReason) setGate(null);
     try {
       const res = await api.patch<{ stock_note?: string; reversal_note?: string }>(
         `/api/admin/orders/${orderId}`,
-        { status: to }
+        { status: to, ...(serialsOverrideReason ? { serials_override_reason: serialsOverrideReason } : {}) }
       );
+      setGate(null);
       // What the move did to stock, and what a reversal did NOT undo. Both are
       // the server's own sentences and neither is worth swallowing.
       if (res.stock_note || res.reversal_note) {
@@ -108,7 +128,17 @@ export default function OrderStatusCorrection({
       }
       await onChanged();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : loc('تعذّر تحديث الحالة', 'Failed to update the status', 'دۆخ نوێ نەکرایەوە'));
+      const refused = gateRefusalOf(e);
+      if (refused) {
+        onSerialGateRefused?.();
+        setGate({ ...refused, to });
+        return;
+      }
+      setError(
+        e instanceof ApiError
+          ? apiRefusal(e, lang === 'en' || lang === 'ckb' ? lang : 'ar', e.message)
+          : loc('تعذّر تحديث الحالة', 'Failed to update the status', 'دۆخ نوێ نەکرایەوە')
+      );
     } finally {
       setBusy(false);
     }
@@ -137,6 +167,18 @@ export default function OrderStatusCorrection({
         <p role="alert" className="lv-alert lv-alert-danger text-[12px] leading-[1.6] text-text-primary">
           {error}
         </p>
+      )}
+      {gate && (
+        <SerialGateRefusal
+          refusal={gate}
+          listedAbove={serialsListedAbove}
+          viewerOwner={viewerOwner}
+          busy={busy}
+          proceedLabel={label(gate.to)}
+          onGoTo={onGoToSerial}
+          onOverride={(reason) => void change(gate.to, reason)}
+          testId={gate.to}
+        />
       )}
       {note && <p className="lv-alert lv-alert-warning text-[12px] leading-[1.6] text-text-primary">{note}</p>}
 

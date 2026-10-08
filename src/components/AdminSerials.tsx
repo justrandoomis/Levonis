@@ -9,6 +9,9 @@ import { Overlay } from './ui/Overlay';
 import { dateLocale } from './orders/format';
 import UnitHistory from './adminWarranty/UnitHistory';
 
+// The §16 serial / warranty page (serial scan, 0177), opened from a unit's serial.
+const SerialDetail = React.lazy(() => import('./adminWarranty/serial/SerialDetail'));
+
 /**
  * Admin — serialized devices: order-units view with serial entry, per-unit
  * delivery correction, replacement, and the warranty-claims workflow. Every
@@ -60,6 +63,7 @@ const STRINGS = {
     stExpired: 'منتهي',
     stNeedsConfig: 'بحاجة إعداد',
     stNotDelivered: 'غير مُسلَّم',
+    stClosed: 'الضمان مُغلق',
     daysLeft: (n: number) => `${n} يوم متبقٍ`,
     claimsEmpty: 'لا توجد مطالبات.',
     priorityBadge: 'أولوية PRO',
@@ -156,6 +160,7 @@ const STRINGS = {
     stExpired: 'Expired',
     stNeedsConfig: 'Needs config',
     stNotDelivered: 'Not delivered',
+    stClosed: 'Warranty closed',
     daysLeft: (n: number) => `${n} days left`,
     claimsEmpty: 'No claims.',
     priorityBadge: 'PRO priority',
@@ -252,6 +257,7 @@ const STRINGS = {
     stExpired: 'بەسەرچووە',
     stNeedsConfig: 'پێویستی بە ڕێکخستنە',
     stNotDelivered: 'نەگەیەنراوە',
+    stClosed: 'گەرەنتی داخراوە',
     daysLeft: (n: number) => `${n} ڕۆژ ماوە`,
     claimsEmpty: 'هیچ داواکارییەک نییە.',
     priorityBadge: 'پێشینەیی PRO',
@@ -331,7 +337,8 @@ interface AdminDevice {
     end_at: string | null;
     base_months: number | null;
     ext_months: number;
-    state: 'active' | 'expired' | 'needs_config' | 'not_delivered';
+    /** `closed` (migration 0177): the warranty ended by a return or a cancelled sale — its dates are kept. */
+    state: 'active' | 'expired' | 'needs_config' | 'not_delivered' | 'closed';
     remaining_days: number | null;
   };
   replaced_by_unit_id: string | null;
@@ -443,7 +450,7 @@ function CoverageBadge({ device, s }: { device: AdminDevice; s: (typeof STRINGS)
       ? 'bg-green-500/10 text-green-400 border-green-500/30'
       : st === 'expired'
         ? 'bg-red-500/10 text-red-400 border-red-500/30'
-        : st === 'needs_config'
+        : st === 'needs_config' || st === 'closed'
           ? 'bg-orange-500/10 text-orange-400 border-orange-500/30'
           : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/30';
   const label =
@@ -453,7 +460,9 @@ function CoverageBadge({ device, s }: { device: AdminDevice; s: (typeof STRINGS)
         ? s.stExpired
         : st === 'needs_config'
           ? s.stNeedsConfig
-          : s.stNotDelivered;
+          : st === 'closed'
+            ? s.stClosed
+            : s.stNotDelivered;
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[11px] font-bold whitespace-nowrap ${cls}`}>{label}</span>;
 }
 
@@ -481,6 +490,9 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
   const [unitsNotice, setUnitsNotice] = useState('');
   const [serialDrafts, setSerialDrafts] = useState<Record<string, string>>({});
   const [busyUnit, setBusyUnit] = useState<string | null>(null);
+  const [serialPage, setSerialPage] = useState<string | null>(null);
+  // Mounted from the first open on, so the sheet can play its exit.
+  const [serialPageMounted, setSerialPageMounted] = useState(false);
   // «مَن غيّر ومتى» — a unit's audit trail, opened per row, refetched after
   // every change this screen makes so the row just written is in it.
   const [historyOpen, setHistoryOpen] = useState<Record<string, boolean>>({});
@@ -873,7 +885,18 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                 </td>
                 <td className="py-3 px-4">
                   {u.serial ? (
-                    <div className="font-mono text-sm text-white break-all">{u.serial}</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSerialPageMounted(true);
+                        setSerialPage(u.serial);
+                      }}
+                      aria-haspopup="dialog"
+                      className="font-mono text-sm text-white break-all text-start underline decoration-zinc-700 underline-offset-4 hover:decoration-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold rounded"
+                      data-unit-serial-page={u.unit_id}
+                    >
+                      {u.serial}
+                    </button>
                   ) : null}
                   {!u.replaced_by_unit_id && (
                     <div className="flex items-center gap-1.5 mt-1">
@@ -1519,6 +1542,11 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
             </button>
           )}
         </div>
+      )}
+      {serialPageMounted && (
+        <React.Suspense fallback={null}>
+          <SerialDetail serial={serialPage} onClose={() => setSerialPage(null)} />
+        </React.Suspense>
       )}
     </div>
   );

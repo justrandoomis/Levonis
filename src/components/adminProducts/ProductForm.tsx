@@ -130,6 +130,8 @@ interface TemplateGroup {
 interface CatalogNode extends CatalogV2 {
   parent_id: string | null;
   effective_template_family: 'devices' | 'materials' | null;
+  /** §29 serial tracking by section (migration 0177); absent before it. */
+  serial_policy?: 'inherit' | 'required' | 'off';
 }
 
 /**
@@ -610,6 +612,28 @@ export default function ProductForm({
       ),
     [catalogs, doc.category_id, doc.sub_category_id, doc.catalog_ids]
   );
+  // §29: the nearest section on any of this product's branches that says
+  // something about serials — leaf to root, 'required' winning across
+  // branches. The same walk the server makes (worker/lib/serialPolicy.ts
+  // catalogSerialPolicySql), so the form says what the order screen will do.
+  const sectionSerial = useMemo(() => {
+    const byId = new Map(catalogs.map((c) => [c.id, c]));
+    const starts = [...new Set([doc.sub_category_id, doc.category_id, ...doc.catalog_ids].filter(Boolean) as string[])];
+    let found: { policy: 'required' | 'off'; sectionName: string } | null = null;
+    for (const start of starts) {
+      let node = byId.get(start);
+      for (let hop = 0; node && hop < 16; hop++) {
+        if (node.serial_policy === 'required' || node.serial_policy === 'off') {
+          if (!found || (found.policy === 'off' && node.serial_policy === 'required')) {
+            found = { policy: node.serial_policy, sectionName: node.name_ar || node.name_en };
+          }
+          break;
+        }
+        node = node.parent_id ? byId.get(node.parent_id) : undefined;
+      }
+    }
+    return found ?? { policy: null, sectionName: null };
+  }, [catalogs, doc.category_id, doc.sub_category_id, doc.catalog_ids]);
   const warrantyInput = useMemo(
     () => ({
       isPrinter: isPrinterCatalog,
@@ -887,8 +911,9 @@ export default function ProductForm({
   const extraCatalogs = doc.catalog_ids
     .filter((id) => id !== doc.category_id && id !== doc.sub_category_id)
     .map((id) => catalogs.find((c) => c.id === id)?.name_ar || catalogs.find((c) => c.id === id)?.name_en || id);
-  const warrantyHiddenValues =
-    !isPrinterCatalog && doc.warranty_plans.length === 0 && (doc.warranty_base_months !== null || doc.serialized !== null);
+  // Serial tracking has its own control for every product now (§29); only the
+  // base months of a non-printer are kept without an editor.
+  const warrantyHiddenValues = !isPrinterCatalog && doc.warranty_plans.length === 0 && doc.warranty_base_months !== null;
 
   return (
     // min-w-0 on the outer column is what keeps a long value from widening the
@@ -1578,9 +1603,7 @@ export default function ProductForm({
             plans is told the save will be refused and offered a clear. */}
         {warrantyHiddenValues && (
           <p className="text-[11px] text-zinc-400 mb-3" data-form="warranty-preserved">
-            محفوظ من الملف: {doc.warranty_base_months !== null ? `ضمان أساسي ${doc.warranty_base_months} شهرًا` : ''}
-            {doc.warranty_base_months !== null && doc.serialized !== null ? ' · ' : ''}
-            {doc.serialized !== null ? (doc.serialized ? 'جهاز مُرقَّم' : 'بلا تسجيل وحدات') : ''} — محرره يظهر لأقسام الطابعات فقط.
+            محفوظ من الملف: {`ضمان أساسي ${doc.warranty_base_months} شهرًا`} — محرره يظهر لأقسام الطابعات فقط.
           </p>
         )}
         {doc.payment_options.length > 0 && (
@@ -1626,6 +1649,8 @@ export default function ProductForm({
           errors={showErrors ? errors : {}}
           onPlansChange={(next) => setDoc((d) => ({ ...d, warranty_plans: next }))}
           onSerializedChange={(v) => setDoc((d) => ({ ...d, serialized: v }))}
+          canEditSerial={!!user?.is_owner}
+          sectionSerial={sectionSerial}
           onBaseMonthsChange={(v) => setDoc((d) => ({ ...d, warranty_base_months: v }))}
         />
 

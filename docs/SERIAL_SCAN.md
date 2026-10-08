@@ -1,4 +1,4 @@
-# Serial scan at order preparation — server
+# Serial scan at order preparation — server and screens
 
 Owner brief 2026-10-07 (33 sections): every printer / AMS unit in an order is
 bound to its real serial while the order is prepared, by camera, a USB or
@@ -34,6 +34,7 @@ applied. Code: `worker/lib/serialAssignments.ts` (the rules),
 |---|---|---|
 | `GET /api/admin/orders/:id` | admin | adds `serials` (slots, linked, gate, re-open suggestions) through `soft()`; `installed:false` before 0177. |
 | `GET /api/admin/orders/:id/serials` | admin | the same view alone. |
+| `GET /api/admin/orders` (the board) | admin | each shelf row adds `serials: {required, linked, gate, holds_next}`; absent before 0177. |
 | `POST /api/admin/orders/:id/serials/scan` | admin with the `receive` capability | `{order_item_id, unit_index, part?, code, ean?, box_sn?, source, op_id}` → `outcome: created · existing · already`. |
 | `POST /api/admin/orders/:id/serials/change` | same | `{assignment_id, code, …, op_id}` — the old binding is released in the same batch; a failed new link leaves it intact. |
 | `POST /api/admin/orders/:id/serials/unlink` | same; owner only outside the window or once a courier shipment exists (reason 5–500) | targets the assignment id, so a replay can never release a newer link. |
@@ -122,6 +123,54 @@ answer is never an attempt.
 4. Resale of a returned device carries the original warranty end; `restart` only by the owner (a purchased plan on the new line raises `RESTART_SUGGESTED`, never a silent restart).
 5. The preparation gate ships OFF; the owner switches it on with a cutover date.
 6. Serial-policy writes are owner-only.
+
+## Screens
+
+Every word is in ar / en / ckb (`src/components/adminOrders/serials/strings.ts`;
+refusals by code from `src/lib/refusalStrings.ts`, with the brief's Arabic).
+
+- **Order window → «الضمان والأرقام التسلسلية»** (`UnitSerialSlots`, rendered by
+  `adminWarranty/WarrantySection` before delivery): one row per physical unit.
+  An empty unit is ONE capsule control: a field that takes a USB / Bluetooth /
+  keyboard-style reader or typing (Enter, or Tab from a reader), with the
+  camera button inside it. A reader's burst is rebuilt from the physical keys
+  (`wedge.ts`), so an Arabic or Sorani keyboard layout cannot garble it. After
+  a link the cursor moves to the next empty unit, never after a BOX SN. A
+  linked unit shows ✓, the serial (whole or masked, as the server decided),
+  «تغيير» / «إزالة» and its chips (warranty starts at delivery, a returned
+  device's carried end, the batch). Each line card carries a «الأرقام n/m» chip.
+- **Camera sheet** (`SerialScanSheet`): the shared lazy `BarcodeScanner` in a
+  bottom sheet pulled down by its header; guide frame, torch where the camera
+  has one, tap to focus, photo fallback, typed field, «استخدم قارئًا أو لوحة
+  مفاتيح». One read, then the camera stops; the sound and the light tap follow
+  the SERVER's answer. A refusal stays with «امسح مجددًا»; the owner also gets
+  the matching exception with a mandatory reason.
+- **Stages tab**: the §19 blocker card (only while the gate applies) lists the
+  missing units with «اذهب إلى الوحدة»; a refused stage move or legacy status
+  correction shows the same refusal, and the owner may proceed with a reason.
+- **Serial / warranty page** (`adminWarranty/serial/SerialDetail`, a sheet):
+  from a linked unit, the units view and the serial inventory. Identity,
+  whereabouts, warranty, batch (no cost) and the whole history.
+- **Policy**: product form «تتبّع الرقم التسلسلي» and the section editor's
+  three-way policy, editable by the owner only (others see a lock); the gate
+  switch with its cutover date sits on the serial inventory panel.
+- **Orders board**: each row on the shelf (confirmed / processing) carries
+  «الأرقام n/m» (`boardSerialCounts` — three reads for the whole page, the same
+  slot rule as the order window). It opens the order. When the owner's gate
+  would refuse the row's one-tap move (`holds_next`), the chip turns amber and
+  the move button is not drawn.
+
+**Pressed and photographed**: `tests/browser/serial-prep.html` mounts the real
+screens on canned answers that follow the server's contract, and
+`scripts/e2e-serial-prep.mjs` drives them in Arabic, English and Sorani, dark
+and light, 390 and 1280 px (the Sorani pass with reduced motion): a reader's
+burst, the BOX SN rule, refusals and the owner's exceptions, the camera sheet —
+including a real camera read through Chromium's fake device filming a label —
+the serial page, remove, re-open, the gate, the board chip, the gate switch and
+both policy controls.
+
+    npx vite --port 4191 --host 127.0.0.1 &
+    node --import tsx scripts/e2e-serial-prep.mjs
 
 ## Known limits / owner questions
 

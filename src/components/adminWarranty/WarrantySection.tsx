@@ -18,8 +18,13 @@ import {
 } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { apiRefusal } from '../../lib/refusalStrings';
+import { serialProblem } from '../../../packages/catalog/src/deviceSerials';
 import { openWarrantyDoc, popupBlockedMessage } from './printDoc';
 import UnitHistory from './UnitHistory';
+import UnitSerialSlots from '../adminOrders/serials/UnitSerialSlots';
+import { serialStrings } from '../adminOrders/serials/strings';
+import type { OrderSerials } from '../adminOrders/serials/types';
 
 export interface WarrantyUnitRow {
   id: string;
@@ -199,9 +204,39 @@ const STR = {
 const dateInput = (iso: string | null): string => (iso ? iso.slice(0, 10) : '');
 const toIso = (day: string): string => (day ? new Date(`${day}T00:00:00.000Z`).toISOString() : '');
 
-export default function WarrantySection({ orderId }: { orderId: string }) {
+/** The section's own heading in Sorani (the rest of this table predates the requirement). */
+const CKB_HEAD = {
+  title: 'گەرەنتی و ژمارە زنجیرەییەکان',
+  subtitle: 'پسوولەی گەرەنتی جیا بۆ هەر ئامێرێک، بەستراو بە ژمارە زنجیرەییەکەیەوە.',
+};
+
+export default function WarrantySection({
+  orderId,
+  serials,
+  orderStatus,
+  viewerOwner = false,
+  onSerialsChanged,
+  onOpenSerial,
+  focusRequest,
+}: {
+  orderId: string;
+  /**
+   * BEFORE DELIVERY this section is where each device's serial is scanned —
+   * one slot per physical unit (owner brief 2026-10-07; critique-1 #26: the
+   * per-device section, not a second one beside it). After delivery it is the
+   * per-unit warranty rows it always was.
+   */
+  serials?: OrderSerials | null;
+  orderStatus?: string;
+  viewerOwner?: boolean;
+  onSerialsChanged?: (next: OrderSerials) => void;
+  onOpenSerial?: (serial: string) => void;
+  focusRequest?: { key: string; n: number } | null;
+}) {
   const { lang, dir } = useLanguage();
   const t = lang === 'en' ? STR.en : STR.ar;
+  const head = lang === 'ckb' ? CKB_HEAD : t;
+  const rl = (lang === 'en' || lang === 'ckb' ? lang : 'ar') as 'ar' | 'en' | 'ckb';
   const [data, setData] = useState<OrderWarrantyResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -290,8 +325,11 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
   /** Saves the serial through the DEVICE route — the one place serials live. */
   const saveSerial = async (unit: WarrantyUnitRow) => {
     const serial = (drafts[unit.id]?.serial ?? '').trim();
-    if (serial.length < 4) {
-      setErr(t.needSerial);
+    // The device route runs the one server canonicaliser (6–40 letters and
+    // digits, never an EAN or a receipt); say so before the round trip.
+    const problem = serialProblem(serial);
+    if (problem) {
+      setErr(problem === 'SERIAL_EMPTY' ? t.needSerial : serialStrings(lang).problems[problem] ?? t.needSerial);
       return;
     }
     const key = `serial:${unit.id}`;
@@ -314,10 +352,10 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
           await api.post(`/api/devices/admin/units/${unit.id}/serial`, { serial, reassign: true, reason: reason.trim() });
           await load();
         } catch (e2) {
-          setErr(e2 instanceof ApiError ? e2.message : String(e2));
+          setErr(e2 instanceof ApiError ? apiRefusal(e2, rl, e2.message) : String(e2));
         }
       } else {
-        setErr(e instanceof ApiError ? e.message : String(e));
+        setErr(e instanceof ApiError ? apiRefusal(e, rl, e.message) : String(e));
       }
     } finally {
       setBusy(key, false);
@@ -428,13 +466,17 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
           ? 'bg-red-500/10 text-red-300 border-red-500/30'
           : 'bg-zinc-700/40 text-zinc-300 border-zinc-600';
 
+  // Before delivery, with serial-required units: the «Scan Serial» slots.
+  const preDelivery =
+    !!serials?.installed && (serials.slots?.length ?? 0) > 0 && orderStatus !== 'delivered' && !(data && data.units.length > 0);
+
   return (
-    <section data-warranty-section dir={dir}>
+    <section data-warranty-section dir={dir} data-warranty-mode={preDelivery ? 'serial-slots' : 'units'}>
       <h3 className="text-[13px] font-bold text-zinc-400 mb-1 flex items-center gap-2">
         <ShieldCheck className="w-4 h-4" aria-hidden />
-        {t.title}
+        {head.title}
       </h3>
-      <p className="text-[12px] text-zinc-500 mb-2">{t.subtitle}</p>
+      {!preDelivery && <p className="text-[12px] text-zinc-500 mb-2">{head.subtitle}</p>}
 
       {err && (
         <div className="mb-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300" role="alert">
@@ -448,7 +490,17 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
         </div>
       )}
 
-      {loading && !data ? (
+      {preDelivery && serials ? (
+        <UnitSerialSlots
+          orderId={orderId}
+          serials={serials}
+          viewerOwner={viewerOwner}
+          onChanged={(next) => onSerialsChanged?.(next)}
+          onOpenSerial={onOpenSerial}
+          focusRequest={focusRequest}
+          orderStatus={orderStatus}
+        />
+      ) : loading && !data ? (
         <p className="text-zinc-500 text-[13px]">{t.loading}</p>
       ) : !data || data.units.length === 0 ? (
         data && data.order.status === 'delivered' && data.order.delivered_at ? (

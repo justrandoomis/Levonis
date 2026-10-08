@@ -22,8 +22,11 @@
  */
 
 import React from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { Lock, ScanLine, ShieldCheck } from 'lucide-react';
 import { formatIqd } from '../../../lib/api';
+import { useLanguage } from '../../../LanguageContext';
+import { Segmented } from '../../ui/Segmented';
+import { serialStrings } from '../../adminOrders/serials/strings';
 import type { WarrantyPlanV2 } from '../../../lib/productTypes';
 import { Banner, Field, Grid, Money, Percent, Qty, Toggle, btnGhost } from './formUi';
 import { FEE_PERCENT_HINT, PRINTER_BASE_MONTHS, PRINTER_EXTENSION_MONTHS, warrantyFee } from './model';
@@ -49,6 +52,8 @@ export function WarrantySection({
   onPlansChange,
   onSerializedChange,
   onBaseMonthsChange,
+  canEditSerial = false,
+  sectionSerial,
 }: {
   isPrinter: boolean;
   plans: WarrantyPlanV2[];
@@ -60,13 +65,112 @@ export function WarrantySection({
   onPlansChange: (next: WarrantyPlanV2[]) => void;
   onSerializedChange: (v: boolean) => void;
   onBaseMonthsChange: (v: number | null) => void;
+  /**
+   * §29 (serial scan, 0177): whether a product needs a serial at preparation
+   * — and gets a warranty unit at delivery — is the OWNER's call; the server
+   * refuses anyone else's change (OWNER_ONLY). Others see it with a lock.
+   */
+  canEditSerial?: boolean;
+  /** The nearest section policy on this product's branches (read at render, like the server does). */
+  sectionSerial?: { policy: 'required' | 'off' | null; sectionName: string | null };
 }) {
   const base = baseMonths ?? PRINTER_BASE_MONTHS;
   const effectiveSerialized = serialized ?? true;
 
   if (!isPrinter) {
-    if (plans.length === 0) return null;
     return (
+      <>
+        <SerialTracking serialized={serialized} canEdit={canEditSerial} section={sectionSerial} onChange={onSerializedChange} />
+        {plans.length > 0 && <LegacyPlansBanner plans={plans} onPlansChange={onPlansChange} />}
+      </>
+    );
+  }
+  return (
+    <PrinterWarranty
+      base={base}
+      plans={plans}
+      serialized={serialized}
+      effectiveSerialized={effectiveSerialized}
+      baseMonths={baseMonths}
+      priceIqd={priceIqd}
+      errors={errors}
+      onPlansChange={onPlansChange}
+      onSerializedChange={onSerializedChange}
+      onBaseMonthsChange={onBaseMonthsChange}
+      canEditSerial={canEditSerial}
+    />
+  );
+}
+
+/**
+ * «تتبّع الرقم التسلسلي» for a product that is NOT in a printer section (§29):
+ * the AMS family and anything else the owner wants scanned at preparation.
+ * Its own answer wins; with none, the nearest section policy decides, then
+ * the accessory default (no serial). Two choices, because the server keeps a
+ * product's own answer once given (mergeOpsPolicy) — the source line says
+ * where today's answer comes from.
+ */
+function SerialTracking({
+  serialized,
+  canEdit = false,
+  section,
+  onChange,
+}: {
+  serialized: boolean | null;
+  canEdit?: boolean;
+  section?: { policy: 'required' | 'off' | null; sectionName: string | null };
+  onChange: (v: boolean) => void;
+}) {
+  const { lang } = useLanguage();
+  const s = serialStrings(lang);
+  const effective = serialized ?? section?.policy === 'required';
+  const source =
+    serialized !== null
+      ? s.policyOwn
+      : section?.policy && section.sectionName
+        ? s.policyFromSection(section.sectionName)
+        : s.policyDefault;
+  return (
+    <div className="mb-3 min-w-0 rounded-xl border border-zinc-700/70 bg-zinc-900/40 p-3" data-form="serial-tracking" data-serial-effective={effective ? 'required' : 'off'}>
+      <div className="flex items-start gap-2 mb-2.5 min-w-0">
+        <ScanLine className="w-4 h-4 text-text-secondary shrink-0 mt-0.5" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <h4 className="text-[12.5px] font-bold text-white">{s.policyTitle}</h4>
+          <p className="text-[11px] text-zinc-400 leading-snug">{s.policyHint}</p>
+        </div>
+        {!canEdit && (
+          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-zinc-400" data-serial-policy-locked>
+            <Lock className="h-3.5 w-3.5" aria-hidden />
+            {s.policyOwnerOnly}
+          </span>
+        )}
+      </div>
+      {canEdit ? (
+        <Segmented
+          group="product-serial-tracking"
+          label={s.policyTitle}
+          value={effective ? 'required' : 'off'}
+          onChange={(id) => onChange(id === 'required')}
+          size="sm"
+          dataAttr="data-serial-policy"
+          items={[
+            { id: 'required', label: s.policyRequired },
+            { id: 'off', label: s.policyOff },
+          ]}
+        />
+      ) : (
+        <p className="text-[13px] font-semibold text-white">{effective ? s.policyEffectiveOn : s.policyEffectiveOff}</p>
+      )}
+      {/* Where today's answer comes from; the locked view has just said what it is. */}
+      <p className="mt-1.5 text-[11px] text-zinc-400" data-serial-policy-source>
+        {canEdit ? `${effective ? s.policyEffectiveOn : s.policyEffectiveOff} · ${source}` : source}
+      </p>
+    </div>
+  );
+}
+
+function LegacyPlansBanner({ plans, onPlansChange }: { plans: WarrantyPlanV2[]; onPlansChange: (next: WarrantyPlanV2[]) => void }) {
+  return (
       <div className="mb-3 min-w-0" data-form="warranty-not-printer">
         <Banner kind="warn">
           الضمان الممدد للطابعات فقط. هذا المنتج ليس في قسم طابعات ويحمل {plans.length} خطة ضمان قديمة — سيُرفض الحفظ حتى
@@ -78,8 +182,36 @@ export function WarrantySection({
           </div>
         </Banner>
       </div>
-    );
-  }
+  );
+}
+
+function PrinterWarranty({
+  base,
+  plans,
+  serialized,
+  effectiveSerialized,
+  baseMonths,
+  priceIqd,
+  errors,
+  onPlansChange,
+  onSerializedChange,
+  onBaseMonthsChange,
+  canEditSerial = false,
+}: {
+  base: number;
+  plans: WarrantyPlanV2[];
+  serialized: boolean | null;
+  effectiveSerialized: boolean;
+  baseMonths: number | null;
+  priceIqd: number | null;
+  errors: FormErrors;
+  onPlansChange: (next: WarrantyPlanV2[]) => void;
+  onSerializedChange: (v: boolean) => void;
+  onBaseMonthsChange: (v: number | null) => void;
+  canEditSerial?: boolean;
+}) {
+  const { lang } = useLanguage();
+  const ss = serialStrings(lang);
 
   const planFor = (ext: number) =>
     plans.find((p) => p.duration_kind === 'extension' && p.duration_months === ext) ?? null;
@@ -155,9 +287,16 @@ export function WarrantySection({
           <Toggle
             checked={effectiveSerialized}
             onChange={onSerializedChange}
+            disabled={!canEditSerial}
             label={effectiveSerialized ? 'تُسجَّل وحدة لكل جهاز' : 'بلا تسجيل وحدات'}
             sub={serialized === null ? 'افتراضي' : undefined}
           />
+          {!canEditSerial && (
+            <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-zinc-400" data-serial-policy-locked>
+              <Lock className="h-3 w-3" aria-hidden />
+              {ss.policyOwnerOnly}
+            </span>
+          )}
         </Field>
       </Grid>
 

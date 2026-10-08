@@ -75,6 +75,23 @@ export interface BarcodeScannerProps {
    * session list stay in view on a phone.
    */
   embedded?: boolean;
+  /**
+   * Single mode: do NOT play the «captured» chime on the read. The caller
+   * sounds the SERVER's verdict instead (the order screen's serial scan: a
+   * success chime for a link that was made, the error tone for a serial that
+   * belongs to another order) — a cheerful sound before a refusal teaches the
+   * wrong thing (serial spec §5.2, Audit B §8).
+   */
+  deferFeedback?: boolean;
+  /**
+   * Single mode: once the product SN is read, keep looking a moment longer
+   * for the same label's EAN and BOX SN, so the server can check the product
+   * and refuse a box read as a device (critique-2 L2). Never longer than
+   * COMPANION_WAIT_MS; a photo is read whole and never waits.
+   */
+  waitForCompanions?: boolean;
+  /** The typed fallback's input, for a caller that focuses it (a Bluetooth reader on a tablet). */
+  manualInputRef?: React.Ref<HTMLInputElement>;
 }
 
 type CameraState = 'starting' | 'slow' | 'on' | 'paused' | 'denied' | 'unavailable' | 'insecure' | 'failed' | 'stopped';
@@ -111,6 +128,9 @@ export default function BarcodeScanner({
   children,
   verdict,
   embedded = false,
+  deferFeedback = false,
+  waitForCompanions = false,
+  manualInputRef,
 }: BarcodeScannerProps) {
   const { lang } = useLanguage();
   const s = SCANNER_STRINGS[lang] ?? SCANNER_STRINGS.ar;
@@ -168,10 +188,10 @@ export default function BarcodeScanner({
       doneRef.current = true;
       stopStream();
       setCamera('stopped');
-      scanFeedback('captured');
+      if (!deferFeedback) scanFeedback('captured');
       onReadRef.current(read);
     },
-    [stopStream]
+    [stopStream, deferFeedback]
   );
 
   /** What a tick's worth of codes means, in each mode. */
@@ -183,7 +203,15 @@ export default function BarcodeScanner({
       const raw = win.recent(now);
       const read = classifyLabel(raw);
       if (mode === 'single') {
-        if (read.receipt || read.productSn) return finish({ ...read, raw });
+        if (read.receipt) return finish({ ...read, raw });
+        if (read.productSn) {
+          if (waitForCompanions && !fromPhoto && !(read.ean && read.boxSn)) {
+            const first = snFirstSeenRef.current.get(read.productSn) ?? now;
+            snFirstSeenRef.current.set(read.productSn, first);
+            if (now - first < COMPANION_WAIT_MS) return;
+          }
+          return finish({ ...read, raw });
+        }
         if (read.boxSn) {
           boxSinceRef.current ??= now;
           if (fromPhoto || now - boxSinceRef.current >= BOX_ONLY_AFTER_MS) return finish({ ...read, raw });
@@ -208,8 +236,8 @@ export default function BarcodeScanner({
       }
       const first = snFirstSeenRef.current.get(sn) ?? now;
       snFirstSeenRef.current.set(sn, first);
-      const waitForCompanions = !fromPhoto && engineRef.current?.kind === 'library' && !(read.ean && read.boxSn);
-      if (waitForCompanions && now - first < COMPANION_WAIT_MS) return;
+      const waitHere = !fromPhoto && engineRef.current?.kind === 'library' && !(read.ean && read.boxSn);
+      if (waitHere && now - first < COMPANION_WAIT_MS) return;
       const answer = onReadRef.current({ ...read, raw });
       snQuietRef.current.set(sn, now);
       snFirstSeenRef.current.delete(sn);
@@ -231,7 +259,7 @@ export default function BarcodeScanner({
         deliver(answer as ScanFeedback | void);
       }
     },
-    [finish, mode, showFlash]
+    [finish, mode, showFlash, waitForCompanions]
   );
 
   const loop = useCallback(() => {
@@ -586,6 +614,7 @@ export default function BarcodeScanner({
                 {s.manualLabel}
               </label>
               <input
+                ref={manualInputRef}
                 id={manualId}
                 value={manual}
                 onChange={(e) => setManual(e.target.value)}

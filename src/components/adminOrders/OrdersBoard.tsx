@@ -101,6 +101,8 @@ import OrderDetailModal from './OrderDetailModal';
 import OrderBoardRow from './OrderBoardRow';
 import OrderSearchField from './OrderSearchField';
 import { countText } from './OrderBoardBadges';
+import { apiRefusal, refusalText } from '../../lib/refusalStrings';
+import { gateRefusalOf } from './serials/SerialGateRefusal';
 
 /** Unchanged from the board this replaces: thirty rows and their items in two
  *  queries, rather than two hundred rows and two hundred and one. */
@@ -360,12 +362,20 @@ export default function OrdersBoard() {
     setNotice(null);
     try {
       await api.patch(`/api/admin/orders/${order.id}/stage`, { stage: next.stage });
-      /* OWNER: Sorani to be written by hand — `loc(ar, en)` falls back to the
-         Arabic text for a Kurdish reader rather than inventing Kurdish. */
-      setNotice(loc(`تم النقل إلى: ${next.label}`, `Moved to: ${next.label}`));
+      setNotice(loc(`تم النقل إلى: ${next.label}`, `Moved to: ${next.label}`, `گوازرایەوە بۆ: ${next.label}`));
       await loadOrders();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : loc('تعذّر تحديث الحالة', 'Failed to update the status') /* OWNER: Sorani by hand. */);
+      // §19 (0177): the serial gate's refusal reads in the admin's language
+      // and says how many units still need a serial; the order's own window
+      // names them and leads to each one.
+      const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
+      const gate = gateRefusalOf(e);
+      if (gate) {
+        const n = gate.missing.length;
+        setError(`${refusalText('SERIALS_REQUIRED', l, e instanceof Error ? e.message : '')}${n ? ` (${n})` : ''}`);
+        return;
+      }
+      setError(e instanceof ApiError ? apiRefusal(e, l, e.message) : loc('تعذّر تحديث الحالة', 'Failed to update the status', 'دۆخ نوێ نەکرایەوە'));
     } finally {
       setAdvancing(null);
     }

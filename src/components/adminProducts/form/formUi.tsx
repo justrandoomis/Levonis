@@ -593,19 +593,23 @@ export function Toggle({
   onChange,
   label,
   sub,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
   sub?: string;
+  /** Shown and readable, not switchable (a setting another role owns). */
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`flex items-center justify-between gap-3 w-full min-w-0 h-10 px-2.5 rounded-lg border text-[13px] text-start transition-colors ${
+      className={`flex items-center justify-between gap-3 w-full min-w-0 h-10 px-2.5 rounded-lg border text-[13px] text-start transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
         checked ? 'bg-iris/10 border-iris/50 text-white' : 'bg-zinc-800/40 border-zinc-700 text-zinc-300'
       }`}
     >

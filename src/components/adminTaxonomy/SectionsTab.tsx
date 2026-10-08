@@ -6,10 +6,13 @@
  * or sub-sections still use it, and says so).
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Plus, Pencil, Trash2, Power, CornerDownRight, Printer, Image as ImageIcon, Upload, RefreshCw, Truck, GalleryHorizontal, ArrowUp, ArrowDown, Moon, Sun, Monitor, Smartphone } from 'lucide-react';
+import { Plus, Pencil, Trash2, Power, CornerDownRight, Printer, Image as ImageIcon, Upload, RefreshCw, Truck, GalleryHorizontal, ArrowUp, ArrowDown, Moon, Sun, Monitor, Smartphone, Lock, ScanLine } from 'lucide-react';
 import { SectionDeliveryDialog, deliveryRuleSummary } from './SectionDeliveryDialog';
 import * as T from '../adminProducts/theme';
 import { ApiError, api } from '../../lib/api';
+import { useAuth } from '../../AuthContext';
+import { Segmented } from '../ui/Segmented';
+import { serialStrings } from '../adminOrders/serials/strings';
 import { Modal } from '../adminProducts/ui';
 import {
   bannerSet,
@@ -172,6 +175,14 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
               {nameOf(c, lang)}
               {c.is_printer_catalog && (
                 <Printer className="inline w-3.5 h-3.5 ms-1.5 text-[var(--ap-text-3)] align-[-2px]" aria-label={loc('قسم طابعات', 'Printer section')} />
+              )}
+              {(c.serial_policy === 'required' || c.serial_policy === 'off') && (
+                <span className="ms-1.5 align-[1px]" data-tax-serial-policy={c.serial_policy}>
+                  <Badge tone={c.serial_policy === 'required' ? 'accent' : 'neutral'}>
+                    <ScanLine className="inline w-3 h-3 me-1 align-[-2px]" aria-hidden />
+                    {c.serial_policy === 'required' ? serialStrings(lang).sectionBadgeRequired : serialStrings(lang).sectionBadgeOff}
+                  </Badge>
+                </span>
               )}
             </div>
             <div className="text-[11.5px] text-[var(--ap-text-3)] truncate">
@@ -432,6 +443,14 @@ function SectionDialog({
   const [sort, setSort] = useState(String(node?.sort ?? 0));
   const [printer, setPrinter] = useState(node?.is_printer_catalog ?? false);
   const [active, setActiveState] = useState(node?.active ?? true);
+  // §29 (0177): the section's serial policy and the printer flag are the
+  // owner's; everyone else sees both with a lock (the server refuses them).
+  const { user } = useAuth();
+  const owner = !!user?.is_owner;
+  const ss = serialStrings(lang);
+  const policyInstalled = node ? node.serial_policy !== undefined : roots.some((r) => r.serial_policy !== undefined);
+  const policy0 = node?.serial_policy ?? 'inherit';
+  const [serialPolicy, setSerialPolicy] = useState<'inherit' | 'required' | 'off'>(policy0);
   // The category page's description (0136). Written by hand in each language;
   // an empty one is simply not shown — the page never invents a line.
   const [descAr, setDescAr] = useState(node?.description_ar ?? '');
@@ -453,6 +472,7 @@ function SectionDialog({
     family !== (node?.template_family ?? '') ||
     sort !== String(node?.sort ?? 0) ||
     printer !== (node?.is_printer_catalog ?? false) ||
+    serialPolicy !== policy0 ||
     active !== (node?.active ?? true) ||
     descAr !== (node?.description_ar ?? '') ||
     descEn !== (node?.description_en ?? '') ||
@@ -488,7 +508,12 @@ function SectionDialog({
           description_ckb: descCkb.trim(),
         };
         if (slug.trim()) body.slug = slug.trim();
-        const res = await api.post<{ created: boolean; catalog: { name_ar: string; name_en: string } }>('/api/admin/taxonomy/catalogs', body);
+        const res = await api.post<{ created: boolean; catalog: { id: string; name_ar: string; name_en: string } }>('/api/admin/taxonomy/catalogs', body);
+        // The serial policy has its own owner-only door, applied right after
+        // the section exists (a new one has no id before this).
+        if (owner && policyInstalled && serialPolicy !== policy0 && res.catalog?.id) {
+          await api.put(`/api/admin/taxonomy/catalogs/${encodeURIComponent(res.catalog.id)}/serial-policy`, { policy: serialPolicy });
+        }
         await onSaved(res.created, nameOf(res.catalog, lang));
       }}
     >
@@ -559,9 +584,53 @@ function SectionDialog({
           <input id="sec-sort" type="number" min={0} className={`${T.input} w-full`} value={sort} onChange={(e) => setSort(e.target.value)} />
         </FieldRow>
         <div className="grid gap-2.5 content-end">
-          <Check id="sec-printer" label={loc('قسم طابعات', 'Printer section')} hint={loc('يُستخدم في صفحات الطابعات والملحقات', 'Used by the printers and accessories pages')} checked={printer} onChange={setPrinter} />
+          <Check
+            id="sec-printer"
+            label={loc('قسم طابعات', 'Printer section', 'بەشی چاپکەرەکان')}
+            hint={owner ? loc('يُستخدم في صفحات الطابعات والملحقات', 'Used by the printers and accessories pages', 'لە پەڕەکانی چاپکەر و پاشکۆکاندا بەکاردێت') : ss.policyOwnerOnly}
+            checked={printer}
+            onChange={setPrinter}
+            disabled={!owner}
+          />
           <Check id="sec-active" label={loc('مفعّل', 'Active')} hint={loc('القسم المعطّل لا يظهر في النموذج ولا في القالب', 'An inactive section is offered neither by the form nor by the template')} checked={active} onChange={setActiveState} />
         </div>
+        {policyInstalled && (
+          <div className="sm:col-span-2 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] bg-[var(--ap-surface-2)] p-3 space-y-2" data-tax-serial-policy-editor>
+            <div className="flex items-start justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--ap-text-1)]">
+                <ScanLine className="h-4 w-4 text-[var(--ap-text-3)]" aria-hidden />
+                {ss.sectionPolicyTitle}
+              </p>
+              {!owner && (
+                <span className="inline-flex shrink-0 items-center gap-1 text-[11.5px] text-[var(--ap-text-3)]">
+                  <Lock className="h-3.5 w-3.5" aria-hidden />
+                  {ss.policyOwnerOnly}
+                </span>
+              )}
+            </div>
+            <p className="text-[11.5px] leading-relaxed text-[var(--ap-text-3)]">{ss.sectionPolicyHint}</p>
+            {owner ? (
+              <Segmented
+                group="section-serial-policy"
+                label={ss.sectionPolicyTitle}
+                value={serialPolicy}
+                onChange={(id) => setSerialPolicy(id as 'inherit' | 'required' | 'off')}
+                size="sm"
+                dataAttr="data-tax-serial-policy-choice"
+                items={[
+                  { id: 'inherit', label: ss.policyInherit },
+                  { id: 'required', label: ss.policyRequired },
+                  { id: 'off', label: ss.policyOff },
+                ]}
+              />
+            ) : (
+              <p className="text-[13px] text-[var(--ap-text-1)]">
+                {serialPolicy === 'required' ? ss.policyRequired : serialPolicy === 'off' ? ss.policyOff : ss.policyInherit}
+              </p>
+            )}
+            {printer && serialPolicy === 'off' && <p className="text-[11.5px] text-[var(--ap-warning)]">{ss.printerNeverOff}</p>}
+          </div>
+        )}
         {/* OWNER: Sorani to be written by hand (the labels below carry ar/en only). */}
         <div className="sm:col-span-2 grid gap-3.5" data-tax-descriptions>
           <FieldRow

@@ -138,7 +138,13 @@ function SheetV2({
   const detentRef = useRef(detent);
   detentRef.current = detent;
   const y = useMotionValue(0);
-  const h = useMotionValue<number | string>('auto');
+  // Born at its opening height. A sheet MOUNTED already open (a lazily loaded
+  // page that opens on its first render) gets its panel in that same render,
+  // before the layout effect below runs; the effect's set then lands before
+  // the panel subscribes to `h`, and the repeat set of the same number is a
+  // no-op — so the panel kept `auto` and grew past the screen. Starting at the
+  // right value makes the first frame correct with no effect at all.
+  const h = useMotionValue<number | string>(phone && start ? sizes[start] : 'auto');
   const panelRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef<() => void>(onClose);
   const drag = useRef<Drag | null>(null);

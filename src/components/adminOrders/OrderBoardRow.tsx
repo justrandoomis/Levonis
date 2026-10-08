@@ -39,8 +39,9 @@
  * is the same mistake as a header of coloured chips — see the note on «تجهيز»
  * below, which this shares.
  */
-import { ChevronsRight, Loader2, Trash2 } from 'lucide-react';
+import { Check, ChevronsRight, Loader2, ScanLine, Trash2 } from 'lucide-react';
 import { formatIqd, type AdminOrderRow, type OrderStatus } from '../../lib/api';
+import { SERIAL_STRINGS } from './serials/strings';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
 import { DayChip, OrderKindBadge, PriceHoldBadge, ProBadge, TypeBadge, countText } from './OrderBoardBadges';
 import { DeliveryMethodBadge } from './deliveryMethod';
@@ -238,7 +239,18 @@ export default function OrderBoardRow({
         */}
         {/* A price-held order does not move (0140) — the server would refuse
             with PRICE_APPROVAL_PENDING, so the button is not offered. */}
-        {order.quick_next && !order.price_hold_id && (
+        {/*
+          «الأرقام n/m» (serial scan, 0177; spec §5.5) — how many of the units
+          on this order's shelf carry their serial. It opens the order, where
+          each unit has its slot. When the owner's §19 gate would refuse the
+          one-tap move below, the chip says so and the button is not drawn: a
+          button that can only answer SERIALS_REQUIRED is the lie the note
+          above refuses to tell.
+        */}
+        {order.serials && order.serials.required > 0 && (
+          <SerialsChip order={order} serials={order.serials} loc={loc} latin={latin} onOpen={onOpen} />
+        )}
+        {order.quick_next && !order.price_hold_id && !order.serials?.holds_next && (
           <button
             type="button"
             data-action="quick-advance"
@@ -249,20 +261,16 @@ export default function OrderBoardRow({
             title={
               order.quick_next.source === 'manual'
                 ? order.quick_next.label
-                : /* OWNER: NO SORANI IS WRITTEN HERE. `loc(ar, en)` with the
-                     third argument omitted hands a Kurdish reader the ARABIC
-                     sentence, which is the house fallback; an invented Kurdish
-                     one on the button that MOVES a live order would be worse
-                     than an Arabic one the reader can follow. Both strings
-                     below are yours to write by hand. */
-                  loc(
+                : loc(
                     `${order.quick_next.label} — عادةً تحدّدها شركة التوصيل أو النظام`,
-                    `${order.quick_next.label} — normally set by the courier or the system`
+                    `${order.quick_next.label} — normally set by the courier or the system`,
+                    `${order.quick_next.label} — بەزۆری کۆمپانیای گەیاندن یان سیستەمەکە دیاری دەکات`
                   )
             }
             aria-label={loc(
               `نقل الطلب إلى: ${order.quick_next.label}`,
-              `Move order to: ${order.quick_next.label}`
+              `Move order to: ${order.quick_next.label}`,
+              `داواکارییەکە بگوازەرەوە بۆ: ${order.quick_next.label}`
             )}
             className={`lv-button lv-button-secondary lv-button-sm press-scale max-w-[11rem] justify-start gap-1 ${
               order.quick_next.source === 'manual' ? '' : 'border-dashed'
@@ -278,5 +286,52 @@ export default function OrderBoardRow({
         )}
       </div>
     </article>
+  );
+}
+
+/** One of the three languages' serial-scan lines, through the row's own `loc`. */
+const sl = <K extends keyof (typeof SERIAL_STRINGS)['ar']>(loc: (ar: string, en: string, ckb?: string) => string, k: K, ...args: number[]): string => {
+  const pick = (lang: 'ar' | 'en' | 'ckb') => {
+    const v = SERIAL_STRINGS[lang][k] as unknown;
+    return typeof v === 'function' ? String((v as (...a: number[]) => string)(...args)) : String(v);
+  };
+  return loc(pick('ar'), pick('en'), pick('ckb'));
+};
+
+function SerialsChip({
+  order,
+  serials,
+  loc,
+  latin,
+  onOpen,
+}: {
+  order: AdminOrderRow;
+  serials: NonNullable<AdminOrderRow['serials']>;
+  loc: (ar: string, en: string, ckb?: string) => string;
+  latin: boolean;
+  onOpen: (id: string) => void;
+}) {
+  const done = serials.linked >= serials.required;
+  // ONE cue per state (apple-design §3): green with a check when complete,
+  // amber only when the owner's gate actually holds this order, neutral
+  // otherwise — a missing serial that holds nothing is not a warning.
+  const tone = done ? 'text-success' : serials.gate ? 'text-warning' : 'text-text-secondary';
+  const title = `${sl(loc, 'boardChipTitle', serials.linked, serials.required)}${serials.holds_next ? ` · ${sl(loc, 'boardHeld')}` : ''}`;
+  return (
+    <button
+      type="button"
+      data-serial-board-chip={done ? 'complete' : serials.gate ? 'held' : 'open'}
+      data-order-id={order.id}
+      onClick={() => onOpen(order.id)}
+      title={title}
+      aria-label={title}
+      className={`lv-button lv-button-secondary lv-button-sm press-scale gap-1 tabular-nums ${tone}`}
+    >
+      {done ? <Check className="h-4 w-4 shrink-0" aria-hidden /> : <ScanLine className="h-4 w-4 shrink-0" aria-hidden />}
+      <span>{sl(loc, 'boardChip')}</span>
+      <span dir="ltr">
+        {countText(serials.linked, latin)}/{countText(serials.required, latin)}
+      </span>
+    </button>
   );
 }

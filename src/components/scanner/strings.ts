@@ -1,9 +1,11 @@
 import type { Language } from '../../translations';
 
 /**
- * The scanner's words. The Sorani lines that already existed for the warranty
- * scanner (src/components/warranty/strings.ts) are reused VERBATIM; every new
- * line carries the Arabic until the Sorani is written by hand (DECISIONS row 11).
+ * The scanner's words, in all three languages. The Sorani lines that already
+ * existed for the warranty scanner (src/components/warranty/strings.ts) are
+ * reused verbatim; the rest were written for the serial scan at order
+ * preparation (2026-10-07) — a `ckb` line never carries the Arabic
+ * (docs/DECISIONS.md row 183; serial spec §5.8).
  */
 export interface ScannerStrings {
   title: string;
@@ -102,23 +104,36 @@ const en: ScannerStrings = {
   registering: 'Registering…',
 };
 
-// OWNER: Sorani to be written by hand. The lines that existed before are the
-// warranty scanner's own hand-written Sorani, reused verbatim; every other
-// line is the Arabic on purpose.
 const ckb: ScannerStrings = {
-  ...ar,
   title: 'سکانکردنی کۆد',
   close: 'داخستن',
   starting: 'کامێرا دەکرێتەوە…',
   slow: 'هێشتا چاوەڕوانی مۆڵەتی کامێراین — دەتوانیت ژمارەکە بنووسیت یان وێنەیەک هەڵبژێریت.',
   looking: 'کۆدەکە لەناو چوارچێوەکە ڕابگرە.',
+  lookingLabel: 'لەیبڵی سندووقەکە بە تەواوی لەناو چوارچێوەکە دابنێ — ژمارە زنجیرەیی و بارکۆدەکانی سندووق پێکەوە دەخوێنرێنەوە.',
   denied: 'ڕێگە بە کامێرا نەدرا — لەبری ئەوە ژمارەکە بنووسە.',
+  deniedHelp: 'بۆ ڕێگەدانەوە: ڕێکخستنەکانی وێبگەڕ ← مۆڵەتەکانی ماڵپەڕ ← کامێرا، پاشان دووبارە هەوڵ بدەوە.',
   unavailable: 'کامێرا لەم ئامێرە بەردەست نییە — ژمارەکە بنووسە یان وێنەیەک هەڵبژێرە.',
+  insecure: 'کامێرا تەنها لەسەر پەیوەندییەکی پارێزراو (https) کار دەکات — ژمارەکە بنووسە یان وێنەیەک هەڵبژێرە.',
   failed: 'کامێرا نەکرایەوە — ژمارەکە بنووسە یان وێنەیەک هەڵبژێرە.',
+  paused: 'کامێرا ڕاگیرا چونکە پەڕەکە دیار نییە — خۆی دەگەڕێتەوە.',
   nothing: 'هیچ کۆدێک لە وێنەکە نەدۆزرایەوە — وێنەیەکی ڕوونتر تاقی بکەرەوە یان ژمارەکە بنووسە.',
   decoding: 'وێنەکە دەخوێنرێتەوە…',
   choosePhoto: 'وێنەیەک هەڵبژێرە',
   captured: 'کۆد گیرا — پشکنین…',
+  aimAtSn: 'ئەمە بارکۆدی سندووق یان EAN ـە — کامێرا بەرەو ئەو بارکۆدە بکە کە لەژێر هێڵی «Product SN» دایە.',
+  boxOnly: 'تەنها ژمارەی سندووق (BOX SN) خوێندرایەوە — ئەگەر بارکۆدی «Product SN» دەرنەکەوت، ئەوە بەکاردێت.',
+  torchOn: 'هەڵکردنی ڕووناکی',
+  torchOff: 'کوژاندنەوەی ڕووناکی',
+  tapToFocus: 'دەست لە وێنەکە بدە بۆ ڕوونکردنەوە، و لەیبڵەکە کەمێک نزیک یان دوور بکەرەوە تا هێڵەکان ڕوون دەبنەوە.',
+  manualLabel: 'یان ژمارەکە بە دەست بنووسە',
+  manualPlaceholder: 'وەک لەسەر لەیبڵەکە چاپکراوە',
+  manualSubmit: 'بەردەوامبە',
+  retry: 'دووبارە هەوڵ بدەوە',
+  added: 'زیادکرا',
+  duplicate: 'دووبارەیە',
+  invalid: 'نادروستە',
+  registering: 'تۆمار دەکرێت…',
 };
 
 export const SCANNER_STRINGS: Record<Language, ScannerStrings> = { ar, en, ckb };

@@ -86,6 +86,8 @@ import {
 } from '../lib/gini';
 import { moveOrderStage, stagePath, stageRowFrom, sweepDueStages } from '../lib/orderStageOps';
 import {
+  boardSerialCounts,
+  gateGuardsMove,
   orderSerialsView,
   serialActor,
   serialGateForMove,
@@ -2193,11 +2195,30 @@ adminRoutes.get('/orders', async (c) => {
   // list is the screen staff scan before opening one — and the projection
   // marks each one `pending_customer_reveal` until the customer's milestone.
   const adminMystery = await mysteryViewFor(c.env.DB, ids, 'admin');
+  // «الأرقام n/m» (serial scan, 0177; spec §5.5): the page's serial counts in
+  // three reads, empty before the migration or on any failure.
+  const serialCounts = await boardSerialCounts(c.env, results);
   const lang = langOf(c);
   const out = results.map((o) => {
     const day = typeof o.delivery_due_day === 'string' ? o.delivery_due_day : '';
+    const next = quickNextOf(o, lang);
+    const sc = serialCounts.get(String(o.id));
     return {
-      ...quickNextOf(o, lang),
+      ...next,
+      /**
+       * Units needing a serial and how many have one, while the order is on
+       * the shelf. `holds_next`: the owner's §19 gate would refuse the row's
+       * one-tap move right now — the row shows the count instead of a button
+       * that can only answer SERIALS_REQUIRED.
+       */
+      ...(sc
+        ? {
+            serials: {
+              ...sc,
+              holds_next: sc.gate && sc.linked < sc.required && !!next.quick_next && gateGuardsMove(String(o.status ?? ''), next.quick_next.stage),
+            },
+          }
+        : {}),
       ...orderPublic(o, byOrder.get(String(o.id)) ?? [], undefined, adminMystery),
       email: o.email,
       username: o.username,
