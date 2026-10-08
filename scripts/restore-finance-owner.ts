@@ -14,7 +14,10 @@ export function ownerRestorationPlan(bindings: Binding[], candidates: OwnerCandi
   if (candidates.length !== 1) throw new Error('The account must resolve uniquely');
   const target = candidates[0];
   if (target.username.toLowerCase() !== username || target.role !== 'admin' || ![null, '', 'full'].includes(target.admin_scope)) throw new Error('The selected account must already be an unrestricted administrator');
-  if (!target.email_verified_at || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target.email)) throw new Error('The administrator must have a verified email');
+  // A stamp is a non-blank string, as the cost rule reads it (isStamped, worker/lib/emailStamp.ts):
+  // '' and '   ' are none, so they never bind the owner address to a row the cost rule calls unverified.
+  const stamped = typeof target.email_verified_at === 'string' && target.email_verified_at.trim() !== '';
+  if (!stamped || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target.email)) throw new Error('The administrator must have a verified email');
   if (new Set(bindings.map(b => b.name)).size !== bindings.length) throw new Error('Duplicate binding names');
   const current = bindings.find(b => b.name === ownerKey), email = target.email.trim().toLowerCase();
   if (current && current.type !== 'plain_text') throw new Error('Owner binding is not readable plain text; refusing to overwrite it');

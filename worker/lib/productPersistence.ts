@@ -315,6 +315,39 @@ export interface RelationsSnapshot {
    *  not "none", and the planner refuses deletions rather than silently
    *  dropping a row an open order names. */
   liveLinesUnavailable: boolean;
+  /**
+   * COSTS HELD ONLY IN THE DOCUMENT (S1 review L2). A legacy product's options
+   * and colours can live only in `products.options` / `products.colors`, with
+   * their costs, and no relation row. A save without cost write (an assistant,
+   * or the owner's `cost_loaded: false`) creates those rows for the first time
+   * and has no cost to give them; the planner takes it from here, by id,
+   * instead of writing NULL into the row and the mirror. Set by
+   * `planProductSave` from the stored document (`documentRowCosts`).
+   * Absent = none known.
+   */
+  documentCosts?: DocumentRowCosts;
+}
+
+/** A row cost a product document holds for an option value or a colour id. */
+export interface DocumentRowCost {
+  cost_iqd: number | null;
+  cost_adjust_iqd: number | null;
+}
+export interface DocumentRowCosts {
+  values: Map<string, DocumentRowCost>;
+  colors: Map<string, DocumentRowCost>;
+}
+
+/** The option and colour costs a stored document holds, by id. */
+export function documentRowCosts(doc: Pick<ProductDoc, 'options' | 'colors'>): DocumentRowCosts {
+  const cost = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const read = (list: ReadonlyArray<{ id: string; cost_iqd?: unknown; cost_adjust_iqd?: unknown }> | undefined) =>
+    new Map(
+      (Array.isArray(list) ? list : [])
+        .filter((row) => row && typeof row.id === 'string' && row.id !== '')
+        .map((row) => [row.id, { cost_iqd: cost(row.cost_iqd), cost_adjust_iqd: cost(row.cost_adjust_iqd) }] as const)
+    );
+  return { values: read(doc.options), colors: read(doc.colors) };
 }
 
 /** The product's current state from the database. `over` substitutes the
@@ -542,6 +575,13 @@ export interface RequestedRelations {
     bytes: number | null;
   }>;
   facet_ids: string[] | null;
+  /**
+   * S1 review L2: the cost each row this save CREATES carries from the stored
+   * document when the actor has no cost write (see `carriedCost` in the
+   * planner). The mirror reads it so the JSON keeps the same cost the row got.
+   * Absent with cost write.
+   */
+  carried_costs?: DocumentRowCosts;
 }
 
 export type RelationsPlan =
@@ -591,11 +631,31 @@ export async function planRelationsWriteFrom(
   // A key another product already owns («refill-1kg» in two filament files)
   // becomes this product's own id, links included (relationIdScope.ts) —
   // before any rule below reads an id, so every rule sees the ids it writes.
-  const { body } = await scopeForeignRelationIds(db, productId, requestBody);
+  const { body, renamed } = await scopeForeignRelationIds(db, productId, requestBody);
   const baseLadder = snap.baseLadder;
   const existing = snap.existing;
   const errors: string[] = [];
   const warnings: string[] = [];
+  /**
+   * THE COST A ROW THIS SAVE CREATES CARRIES WITHOUT COST WRITE (S1 review
+   * L2). A row that exists keeps its own cost (the upsert leaves `cost_*` out
+   * of its UPDATE). A row that does not exist yet — a legacy product whose
+   * structure lived only in the document — takes the cost the document held
+   * for the same id (through a foreign-id rename too), never NULL. With cost
+   * write the payload is the answer, as before.
+   */
+  const carriedCost = (kind: 'values' | 'colors', stored: ReadonlyArray<{ id: string }>) => {
+    const fromDocument = snap.documentCosts?.[kind];
+    if (money || !fromDocument) return { get: (_id: string): DocumentRowCost | undefined => undefined };
+    const storedIds = new Set(stored.map((row) => row.id));
+    const originalOf = new Map(renamed.filter((r) => r.kind === kind).map((r) => [r.to, r.from] as const));
+    return {
+      get: (id: string): DocumentRowCost | undefined =>
+        storedIds.has(id) ? undefined : fromDocument.get(id) ?? fromDocument.get(originalOf.get(id) ?? ''),
+    };
+  };
+  const carriedValueCost = carriedCost('values', existing.values);
+  const carriedColorCost = carriedCost('colors', existing.colors);
   /**
    * THE LADDER IS JUDGED COST-BLIND FOR EVERYONE BUT THE OWNER (decision 2).
    *
@@ -1486,9 +1546,9 @@ export async function planRelationsWriteFrom(
           v.id, productId, v.group_id, v.name_en, v.sku_part, v.image, v.sort, v.active,
           v.stock, v.low_stock_threshold,
           v.prices.regular_price_iqd, v.prices.prime_price_iqd, v.prices.pro_price_iqd,
-          money ? v.prices.cost_iqd : null,
+          money ? v.prices.cost_iqd : carriedValueCost.get(v.id)?.cost_iqd ?? null,
           v.prices.regular_adjust_iqd, v.prices.prime_adjust_iqd, v.prices.pro_adjust_iqd,
-          money ? v.prices.cost_adjust_iqd : null,
+          money ? v.prices.cost_adjust_iqd : carriedValueCost.get(v.id)?.cost_adjust_iqd ?? null,
           v.availability_type, v.lead_time_text, v.lead_time_min_days, v.lead_time_max_days,
           v.variant_key, v.variant_label,
           v.name_ar ?? '', v.name_ckb ?? '',
@@ -1587,9 +1647,9 @@ export async function planRelationsWriteFrom(
           col.id, productId, col.name_en, col.hex, col.image, col.sku_part, col.sort, col.active,
           col.stock, col.low_stock_threshold,
           col.prices.regular_price_iqd, col.prices.prime_price_iqd, col.prices.pro_price_iqd,
-          money ? col.prices.cost_iqd : null,
+          money ? col.prices.cost_iqd : carriedColorCost.get(col.id)?.cost_iqd ?? null,
           col.prices.regular_adjust_iqd, col.prices.prime_adjust_iqd, col.prices.pro_adjust_iqd,
-          money ? col.prices.cost_adjust_iqd : null,
+          money ? col.prices.cost_adjust_iqd : carriedColorCost.get(col.id)?.cost_adjust_iqd ?? null,
           col.name_ar ?? '', col.name_ckb ?? '',
           ...dimensionValues(col, colorDimensionsInstalled),
           col.name_ar === undefined ? 0 : 1, col.name_ckb === undefined ? 0 : 1,
@@ -1752,6 +1812,14 @@ export async function planRelationsWriteFrom(
     ],
     images: imageInputs,
     facet_ids: facetIds,
+    ...(money
+      ? {}
+      : {
+          carried_costs: {
+            values: new Map(valueInputs.flatMap((v) => { const c = carriedValueCost.get(v.id); return c ? [[v.id, c] as const] : []; })),
+            colors: new Map(colorInputs.flatMap((col) => { const c = carriedColorCost.get(col.id); return c ? [[col.id, c] as const] : []; })),
+          },
+        }),
   };
 
   return {
@@ -1808,8 +1876,11 @@ function plannedRelationsView(
   const storedImage = new Map(snap.existingImages.map((i) => [i.id, i]));
   const keep = (given: string | undefined, stored: string | null | undefined): string =>
     given !== undefined ? given : stored ?? '';
-  const cost = (given: number | null, stored: number | null | undefined): number | null =>
-    money ? given : stored ?? null;
+  // Without cost write: the stored row's cost, else — a row this save creates
+  // for a legacy, document-only option or colour — the cost the document held
+  // (`req.carried_costs`), never NULL for a cost nobody here could see.
+  const cost = (given: number | null, stored: number | null | undefined, carried?: number | null): number | null =>
+    money ? given : stored !== undefined ? stored ?? null : carried ?? null;
   const dimensions = (
     given: PhysicalDimensionOverrides,
     stored: PhysicalDimensionOverrides | undefined
@@ -1848,11 +1919,11 @@ function plannedRelationsView(
         regular_price_iqd: v.prices.regular_price_iqd,
         prime_price_iqd: v.prices.prime_price_iqd,
         pro_price_iqd: v.prices.pro_price_iqd,
-        cost_iqd: cost(v.prices.cost_iqd, stored?.cost_iqd),
+        cost_iqd: cost(v.prices.cost_iqd, stored ? stored.cost_iqd ?? null : undefined, req.carried_costs?.values.get(v.id)?.cost_iqd),
         regular_adjust_iqd: v.prices.regular_adjust_iqd,
         prime_adjust_iqd: v.prices.prime_adjust_iqd,
         pro_adjust_iqd: v.prices.pro_adjust_iqd,
-        cost_adjust_iqd: cost(v.prices.cost_adjust_iqd, stored?.cost_adjust_iqd),
+        cost_adjust_iqd: cost(v.prices.cost_adjust_iqd, stored ? stored.cost_adjust_iqd ?? null : undefined, req.carried_costs?.values.get(v.id)?.cost_adjust_iqd),
         availability_type: v.availability_type,
         lead_time_text: v.lead_time_text,
         lead_time_text_ar: keep(v.lead_time_text_ar, stored?.lead_time_text_ar),
@@ -1883,11 +1954,11 @@ function plannedRelationsView(
         regular_price_iqd: c.prices.regular_price_iqd,
         prime_price_iqd: c.prices.prime_price_iqd,
         pro_price_iqd: c.prices.pro_price_iqd,
-        cost_iqd: cost(c.prices.cost_iqd, stored?.cost_iqd),
+        cost_iqd: cost(c.prices.cost_iqd, stored ? stored.cost_iqd ?? null : undefined, req.carried_costs?.colors.get(c.id)?.cost_iqd),
         regular_adjust_iqd: c.prices.regular_adjust_iqd,
         prime_adjust_iqd: c.prices.prime_adjust_iqd,
         pro_adjust_iqd: c.prices.pro_adjust_iqd,
-        cost_adjust_iqd: cost(c.prices.cost_adjust_iqd, stored?.cost_adjust_iqd),
+        cost_adjust_iqd: cost(c.prices.cost_adjust_iqd, stored ? stored.cost_adjust_iqd ?? null : undefined, req.carried_costs?.colors.get(c.id)?.cost_adjust_iqd),
         ...dimensions(c, stored),
       };
     }),
@@ -2606,6 +2677,9 @@ export async function planProductSave(
       intent.mode === 'create'
         ? snapshotForCreate(doc!)
         : await loadRelationsSnapshot(db, productId, doc ? { ladder: ladderOf(doc), saleTypes: doc.sale_types } : {});
+    // Without cost write, a row created for a legacy document-only option or
+    // colour takes the cost the stored document holds (S1 review L2).
+    if (prev && !actor.money) snap.documentCosts = documentRowCosts(prev);
     // The base stock a document states must still cover what is reserved.
     if (doc && doc.stock !== null && doc.stock < snap.baseReserved) {
       throw badRequest(

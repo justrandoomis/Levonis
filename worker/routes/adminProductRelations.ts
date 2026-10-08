@@ -4,7 +4,7 @@ import { requireAdmin, badRequest, notFound, str, int, HttpError } from '../lib/
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { parseProductRow } from '../lib/productModel';
-import { canWriteCost, projectForAdmin } from '../lib/adminScope';
+import { canViewCost, canWriteCost, projectForAdmin } from '../lib/adminScope';
 import { liveValues, loadProductRelations } from '../lib/productRelations';
 import {
   cellKey,
@@ -210,9 +210,17 @@ adminProductRelationsRoutes.get('/:id/relations', async (c) => {
     if (isValidProductImageQuarantine(quarantine)) quarantinedImages.push(quarantine);
   }
 
+  // WHETHER THIS ANSWER CARRIES ITS COSTS, said by the answer itself (as the
+  // price grid's `can_view_cost` does). The editor reads the product and its
+  // relations in parallel; an address verified between the two answers leaves
+  // one read with cost and one without, and only the answers themselves can
+  // say which. The form treats its costs as loaded only when BOTH say so —
+  // otherwise its blank row costs would be saved as NULL.
+  const financial = canViewCost(c.env, c.get('user'));
   return c.json(
     projectForAdmin(c.env, c.get('user'), {
       success: true,
+      can_view_cost: financial,
       product: {
         id: product.id,
         inventory_mode: product.inventory_mode,

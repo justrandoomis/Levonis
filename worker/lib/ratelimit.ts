@@ -96,6 +96,32 @@ export const limitRoute = (bucket: string, limit: number, windowSeconds = 3600):
     await next();
   };
 
+/**
+ * A ROUTE WITH ITS OWN BUCKET IN PLACE OF THE DOOR'S. Charges `bucket`, then
+ * marks every bucket in `replaces` as already charged for this request, so the
+ * door's `limitByMethod` / `limitRoute` further down the chain spends nothing.
+ * Mounted on the route BEFORE the door (and still before the cost guard, so a
+ * refused caller spends this bucket instead).
+ *
+ * Why: the staff reconciliation runner pages one order per POST, 1.2 s apart.
+ * On the door's shared write budget (120 an hour, per user) a recalculation of
+ * more than 120 orders locked the owner out of every finance write —
+ * withdrawals, staff payments, expenses, closing a period — until the hour
+ * turned. Paging gets its own, larger bucket; the shared one still stops abuse
+ * of every other write route.
+ */
+export const limitInstead = (
+  bucket: string,
+  limit: number,
+  replaces: readonly string[],
+  windowSeconds = 3600
+): MiddlewareHandler<AppContext> =>
+  async (c, next) => {
+    if (firstCharge(c, bucket)) await rateLimit(c, bucket, limit, windowSeconds);
+    for (const other of replaces) firstCharge(c, other);
+    await next();
+  };
+
 /** One bucket for reads (GET, HEAD), another for every write, on the same door. */
 export const limitByMethod = (
   read: readonly [string, number],

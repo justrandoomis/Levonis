@@ -5,6 +5,7 @@ import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import { refusalText } from '../../lib/refusalStrings';
+import { OWNER_FIRST_PROOF_STRINGS, ownerFirstProofOf, type OwnerFirstProof } from '../../lib/ownerFirstProof';
 
 /**
  * Email verification banner (final-phase §3A).
@@ -145,7 +146,7 @@ function clearTokenFromUrl(): void {
 }
 
 export default function EmailVerifyBanner() {
-  const { isAuthenticated, isLoaded, refreshUser } = useAuth();
+  const { isAuthenticated, isLoaded, refreshUser, user } = useAuth();
   const { lang } = useLanguage();
   const t = STRINGS[lang] ?? STRINGS.ar;
 
@@ -183,6 +184,8 @@ export default function EmailVerifyBanner() {
     ? 'mt-[calc(var(--app-header-height,132px)+0.75rem)]'
     : 'mt-3';
   const [confirmState, setConfirmState] = useState<'idle' | 'confirming' | 'done' | 'failed' | 'sign_in'>('idle');
+  /** Set when this confirmation was the first proof of the main admin's address (lib/ownerFirstProof.ts). */
+  const [firstProof, setFirstProof] = useState<OwnerFirstProof | null>(null);
 
   const loadStatus = useCallback(() => {
     api
@@ -239,7 +242,10 @@ export default function EmailVerifyBanner() {
     if (confirmState === 'confirming' || confirmState === 'done') return;
     setConfirmState('confirming');
     try {
-      await api.post('/api/auth/verify-email/confirm', { token });
+      const res = await api.post<{ owner_first_proof?: unknown }>('/api/auth/verify-email/confirm', { token });
+      // The first proof of the main admin's address ended every other way into
+      // the account; the card below says what, in place.
+      setFirstProof(ownerFirstProofOf(res));
       setConfirmState('done');
       clearTokenFromUrl();
       if (isAuthenticated) {
@@ -252,7 +258,9 @@ export default function EmailVerifyBanner() {
     } catch (e) {
       // The owner's address (the one that opens cost) is confirmed only from
       // a session of its own account (DECISIONS row 185 amendment). The link
-      // is still unused: sign in here, then open it again.
+      // is still unused: sign in here, then open it again — or, for whoever
+      // never asked for the message, ignore it and do not sign in (the
+      // sentence says both, review finding C1).
       if (e instanceof ApiError && e.code === 'VERIFY_SIGN_IN_REQUIRED') setConfirmState('sign_in');
       else setConfirmState('failed');
     }
@@ -277,6 +285,14 @@ export default function EmailVerifyBanner() {
         ) : (
           <>
             <p className="text-gray-300 mb-3">{t.confirmHint}</p>
+            {/* The owner's own unverified session is about to make the first
+                proof of the main admin's address: say what it ends before the
+                press (lib/ownerFirstProof.ts, worker/lib/emailStamp.ts). */}
+            {user?.owner_email_unverified === true && (
+              <p data-owner-first-proof="before" className="text-text-secondary text-xs leading-relaxed mb-3">
+                {(OWNER_FIRST_PROOF_STRINGS[lang] ?? OWNER_FIRST_PROOF_STRINGS.ar).before}
+              </p>
+            )}
             <button
               type="button"
               onClick={confirm}
@@ -294,7 +310,14 @@ export default function EmailVerifyBanner() {
   if (token && confirmState === 'done') {
     return (
       <div className={`${headerClearance} mx-3 rounded-2xl border border-success/30 bg-success/[0.08] p-4 text-sm flex items-start justify-between gap-3`}>
-        <p className="text-green-400">{t.confirmed}</p>
+        <div className="min-w-0">
+          <p className="text-green-400">{t.confirmed}</p>
+          {firstProof && (
+            <p role="status" className="mt-1.5 text-text-secondary leading-relaxed">
+              {(OWNER_FIRST_PROOF_STRINGS[lang] ?? OWNER_FIRST_PROOF_STRINGS.ar).body(firstProof.sessions_ended)}
+            </p>
+          )}
+        </div>
         <button
           type="button"
           onClick={dismiss}

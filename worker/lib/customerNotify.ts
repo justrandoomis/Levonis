@@ -65,6 +65,7 @@ import { emailAllowsRecipient } from './emailSend';
 import { enqueue, enqueueStatement, type OutboxMessage } from './outbox';
 import { emailLang, escapeHtml, type EmailLang } from './emailTemplates';
 import { isPlaceholderEmail } from './profileCompletion';
+import { isStamped } from './emailStamp';
 import { isE164 } from './wasender';
 
 export type CustomerChannel = 'email' | 'whatsapp' | 'telegram';
@@ -231,7 +232,8 @@ function emptyReach(userId: string): CustomerReach {
 /** One row → one reach. Shared by the single and the bulk lookup so the two
  *  can never drift into disagreeing about what "reachable" means. */
 function reachFromRow(row: ReachRow): CustomerReach {
-  const mail = row.email && row.email_verified_at && !isPlaceholderEmail(row.email) ? row.email : null;
+  // A blank stamp ('' or spaces) is no stamp — the same answer the cost rule gives (worker/lib/emailStamp.ts).
+  const mail = row.email && isStamped(row.email_verified_at) && !isPlaceholderEmail(row.email) ? row.email : null;
   return {
     user_id: row.id,
     lang: notificationLang(row),

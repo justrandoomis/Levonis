@@ -62,6 +62,8 @@ interface Copy {
   verifyCta: string;
   verifyExpiry: string;
   verifyIgnore: string;
+  /** Only on a link for the owner's address (INITIAL_ADMIN_EMAIL), which opens cost (review finding C1). */
+  verifyOwnerWarn: string;
   linkFallback: string;
   resetSubject: string;
   resetIntro: string;
@@ -131,6 +133,7 @@ const COPY_AR: Copy = {
   verifyCta: 'تأكيد البريد الإلكتروني',
   verifyExpiry: 'هذا الرابط صالح لمدة 24 ساعة ويُستخدم مرة واحدة فقط. فتح الرابط وحده لا يؤكد البريد — يلزم الضغط على زر التأكيد في الصفحة.',
   verifyIgnore: 'إذا لم تنشئ حسابًا في LEVONIS، تجاهل هذه الرسالة بأمان.',
+  verifyOwnerWarn: 'إن لم تطلب هذا، فتجاهله ولا تسجّل الدخول.',
   linkFallback: 'إن لم يعمل الزر، انسخ الرابط التالي إلى المتصفح:',
   resetSubject: 'إعادة تعيين كلمة المرور — LEVONIS',
   resetIntro: 'وصلنا طلب لإعادة تعيين كلمة المرور لحسابك في LEVONIS.',
@@ -210,6 +213,7 @@ const COPY_EN: Copy = {
   verifyExpiry:
     'This link is valid for 24 hours and can be used once. Opening the link alone does not verify anything — you must press the confirm button on the page.',
   verifyIgnore: 'If you did not create a LEVONIS account, you can safely ignore this email.',
+  verifyOwnerWarn: 'If you did not ask for this, ignore it and do not sign in.',
   linkFallback: 'If the button does not work, copy this link into your browser:',
   resetSubject: 'Reset your LEVONIS password',
   resetIntro: 'We received a request to reset your LEVONIS password.',
@@ -291,6 +295,7 @@ const COPY_CKB: Copy = {
   verifyExpiry:
     'ئەم بەستەرە بۆ ٢٤ کاتژمێر کارایە و تەنها جارێک بەکاردێت. تەنها کردنەوەی بەستەرەکە پشتڕاستکردنەوە نییە — پێویستە دوگمەی پشتڕاستکردنەوە لە پەڕەکەدا دابگریت.',
   verifyIgnore: 'ئەگەر هەژماری LEVONIS ت دروست نەکردووە، ئەم پەیامە پشتگوێ بخە.',
+  verifyOwnerWarn: 'ئەگەر داوای ئەمەت نەکردووە، پشتگوێی بخە و مەچۆ ژوورەوە.',
   linkFallback: 'ئەگەر دوگمەکە کار نەکات، ئەم بەستەرە لە وێبگەڕەکەت دابنێ:',
   resetSubject: 'دانانەوەی وشەی نهێنی — LEVONIS',
   resetIntro: 'داواکارییەک گەیشت بۆ دانانەوەی وشەی نهێنی هەژمارەکەت لە LEVONIS.',
@@ -409,17 +414,33 @@ function rawLink(link: string, label: string): string {
 
 // -------------------------------------------------------- auth templates
 
-export function renderVerifyEmail(lang: EmailLang, link: string): RenderedEmail {
+/**
+ * `ownerAddress`: the link verifies the owner's address (INITIAL_ADMIN_EMAIL),
+ * the one that opens cost. Whoever holds a row with that address can make this
+ * message land in the owner's mailbox, so it says, right under the button and
+ * at full size: if you did not ask for this, ignore it and do not sign in.
+ */
+export function renderVerifyEmail(lang: EmailLang, link: string, opts: { ownerAddress?: boolean } = {}): RenderedEmail {
   const t = COPY[lang];
+  const owner = opts.ownerAddress === true;
   const html = shell(
     lang,
     para(t.verifyIntro) +
       ctaButton(t.verifyCta, link) +
+      (owner ? para(t.verifyOwnerWarn) : '') +
       para(t.verifyExpiry, { small: true }) +
       para(t.verifyIgnore, { small: true }) +
       rawLink(link, t.linkFallback)
   );
-  const text = [t.verifyIntro, '', `${t.verifyCta}: ${link}`, '', t.verifyExpiry, t.verifyIgnore].join('\n');
+  const text = [
+    t.verifyIntro,
+    '',
+    `${t.verifyCta}: ${link}`,
+    ...(owner ? ['', t.verifyOwnerWarn] : []),
+    '',
+    t.verifyExpiry,
+    t.verifyIgnore,
+  ].join('\n');
   return { subject: t.verifySubject, html, text };
 }
 

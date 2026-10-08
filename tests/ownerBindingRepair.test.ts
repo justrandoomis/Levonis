@@ -8,7 +8,7 @@ test('restoration needs exact confirmation, a unique verified existing full admi
   assert.throws(() => ownerRestorationPlan(bindings,[admin],admin.username,''));
   assert.throws(() => ownerRestorationPlan(bindings,[],admin.username,'SET-OWNER:owner.name'));
   assert.throws(() => ownerRestorationPlan(bindings,[admin,admin],admin.username,'SET-OWNER:owner.name'));
-  for (const replacement of [{ role: 'customer' }, { admin_scope: 'assistant' }, { admin_scope: 'unknown' }, { email_verified_at: null }, { username: 'other' }]) {
+  for (const replacement of [{ role: 'customer' }, { admin_scope: 'assistant' }, { admin_scope: 'unknown' }, { email_verified_at: null }, { email_verified_at: '' }, { email_verified_at: '   ' }, { username: 'other' }]) {
     assert.throws(() => ownerRestorationPlan(bindings,[{ ...admin,...replacement }],admin.username,'SET-OWNER:owner.name'));
   }
   assert.throws(() => ownerRestorationPlan([...bindings.slice(0,2), {name:'INITIAL_ADMIN_EMAIL',type:'plain_text',text:'different@example.com'}],[admin],admin.username,'SET-OWNER:owner.name'));

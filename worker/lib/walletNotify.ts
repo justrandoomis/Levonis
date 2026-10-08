@@ -20,6 +20,7 @@ import {
 import { resolveAdminDestination, threadExtra } from './telegramAdmin';
 import { operationNumber } from './walletOps';
 import { getMediaObject, headMediaObject } from './mediaStorage';
+import { isStamped } from './emailStamp';
 
 /**
  * Wallet ⇄ Telegram notification and approval-token mechanics
@@ -509,10 +510,11 @@ interface DepositFacts {
 }
 
 /** A Telegram-signup placeholder address is not a contact channel, and an
- *  unverified address is not a verified one (§12.3). */
+ *  unverified address is not a verified one (§12.3) — a blank stamp ('' or
+ *  spaces) included, as everywhere else (worker/lib/emailStamp.ts). */
 function verifiedEmail(email: string, verifiedAt: string | null): string | null {
   if (!email || email.endsWith('@telegram.local')) return null;
-  return verifiedAt ? email : null;
+  return isStamped(verifiedAt) ? email : null;
 }
 
 /**

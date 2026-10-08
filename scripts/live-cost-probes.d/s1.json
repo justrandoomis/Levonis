@@ -36,7 +36,7 @@
       "status": [
         200
       ],
-      "forbidKeys": "cost|supplier|replacement|target|profit|margin|premium_rule|rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
+      "forbidKeys": "cost|supplier|replacement|target|profit|margin|premium_rule|(target|premium)_rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
       "forbidPattern": "MANUAL_OVERRIDE|PRICING_PRIVATE",
       "requireIntegerKeys": [
         "price_iqd"
@@ -47,7 +47,7 @@
       "status": [
         200
       ],
-      "forbidKeys": "cost|supplier|replacement|target|profit|margin|premium_rule|rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
+      "forbidKeys": "cost|supplier|replacement|target|profit|margin|premium_rule|(target|premium)_rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
       "forbidPattern": "MANUAL_OVERRIDE|PRICING_PRIVATE",
       "requireIntegerKeys": [
         "price_iqd"
@@ -58,7 +58,7 @@
       "status": [
         200
       ],
-      "forbidKeys": "cost|supplier|replacement|target|profit|margin|premium_rule|rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
+      "forbidKeys": "cost|supplier|replacement|target|profit|margin|premium_rule|(target|premium)_rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
       "forbidPattern": "MANUAL_OVERRIDE|PRICING_PRIVATE"
     },
     {
@@ -66,10 +66,10 @@
       "status": [
         200
       ],
-      "forbidKeys": "cost|supplier|replacement|target_profit|profit|premium_rule|rule_id|fx_|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
+      "forbidKeys": "cost|supplier|replacement|target_profit|profit|premium_rule|(target|premium)_rule_id|fx_|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
       "forbidPattern": "MANUAL_OVERRIDE|PRICING_PRIVATE",
       "note": "`margin` is not forbidden here on purpose: settings.printServicePricing.margin_percent is the PUBLISHED print-calculator markup (worker/lib/settings.ts PUBLIC_SETTING_KEYS, a deliberate decision), not a product cost. Owner review item, not an S1 change."
     }
   ],
-  "note": "Anonymous GETs only (master plan §4.0). Key regexes are critique A9's; `pricing_mode` is anchored so the public `pricing_modes` (sale modes on a product page) is not mistaken for the private engine flag."
+  "note": "Anonymous GETs only (master plan §4.0). Key regexes are critique A9's; `pricing_mode` is anchored so the public `pricing_modes` (sale modes on a product page) is not mistaken for the private engine flag. A bare `rule_id` is NOT forbidden: the product page's `membership_preview.pro.rule_id` names the public PRO/PRIME discount rule a customer is shown, not a cost, and once PRO is resumed every product page carries it. The cost-rule ids (`target_rule_id`, `premium_rule_id`, adminScope FINANCIAL_FIELDS) are forbidden by name."
 }

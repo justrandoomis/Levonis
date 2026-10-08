@@ -32,6 +32,16 @@ import { Button } from '../ui/Button';
  * stamps it too; there is no Google link button in Settings, so nothing here
  * sends the owner looking for one.
  *
+ * THE FIRST PROOF ENDS EVERY OTHER WAY IN (review finding C1 and its review,
+ * worker/lib/emailStamp.ts). Confirming the link from THIS session keeps it;
+ * a code or Google sign-in elsewhere proves the address with a session of its
+ * own, and this one — opened before the proof — ends, so the re-read finds no
+ * user and the app asks for a sign-in. The same proof removes the account's
+ * password, Telegram link, phone sign-in and any other Google account, so
+ * whoever took the address while it was free keeps no way in. The refusal
+ * sentence this card shows says so BEFORE the owner presses send, and the
+ * confirm card and the sign-in say it again afterwards (lib/ownerFirstProof.ts).
+ *
  * The status line is always in the accessibility tree (visually hidden while
  * empty), so "sent" and "failed" are announced when they appear.
  *

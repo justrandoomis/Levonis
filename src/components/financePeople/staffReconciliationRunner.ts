@@ -2,7 +2,12 @@ export type StaffReconciliation = {
   staff_id: string; revision: number; state: 'pending' | 'running' | 'complete' | 'failed';
   cursor: string; processed_orders: number; adjusted_orders: number; error?: string | null; updated_at: string;
 };
-export type ReconciliationActivity = { busy: boolean; error?: string; retrying?: boolean };
+/**
+ * `deferred`: this tab stopped paging because the server's paging budget is
+ * spent (429). Not a failure — the cron keeps the job moving and this tab
+ * looks again after `RATE_LIMIT_REST_MS`.
+ */
+export type ReconciliationActivity = { busy: boolean; error?: string; retrying?: boolean; deferred?: boolean };
 type Entry = { job: StaffReconciliation; next: number; failures: number; blocked: boolean; readFirst: boolean; retryFailed: boolean };
 type Options = {
   advance: (job: StaffReconciliation) => Promise<StaffReconciliation>;
@@ -12,7 +17,25 @@ type Options = {
   onActivity: (staffId: string, activity: ReconciliationActivity) => void;
   now?: () => number;
   schedule?: (callback: () => void, delay: number) => () => void;
+  /** Whether an error is the server's rate limit. Default: an error whose `status` is 429 (ApiError). */
+  rateLimited?: (error: unknown) => boolean;
 };
+
+/**
+ * How long the runner rests after a 429 before it asks again. The paging
+ * budget (`finance-reconcile`, worker/routes/adminFinancePeople.ts) is an
+ * hourly window; a fixed rest rather than "the top of the hour" keeps a
+ * skewed clock from costing a whole extra hour, and an early ask costs one
+ * refused request.
+ */
+export const RATE_LIMIT_REST_MS = 10 * 60_000;
+/**
+ * A progress refresh re-reads the whole staff list (GET /staff), which spends
+ * the finance READ budget (600 an hour, shared with every finance screen).
+ * Once per 30 s while paging — at most 120 an hour — and always at the end.
+ */
+export const REFRESH_INTERVAL_MS = 30_000;
+const statusOf = (error: unknown) => (error && typeof error === 'object' && 'status' in error ? (error as { status?: unknown }).status : undefined);
 
 const runnable = (entry: Entry) => !entry.blocked && entry.job.state !== 'complete' && (entry.job.state === 'pending' || entry.job.state === 'running' || entry.retryFailed);
 const progressed = (before: StaffReconciliation, after: StaffReconciliation) => after.revision !== before.revision || after.cursor !== before.cursor || after.processed_orders !== before.processed_orders || after.state !== before.state;
@@ -22,8 +45,11 @@ const older = (next: StaffReconciliation, current: StaffReconciliation) => next.
 export function createStaffReconciliationRunner(options: Options) {
   const now = options.now ?? Date.now;
   const schedule = options.schedule ?? ((callback, delay) => { const timer = setTimeout(callback, delay); return () => clearTimeout(timer); });
+  const rateLimited = options.rateLimited ?? ((error: unknown) => statusOf(error) === 429);
   const entries = new Map<string, Entry>();
-  let enabled = false, active = false, cancelTimer: (() => void) | undefined, lastRefresh = 0, pagesSinceRefresh = 0;
+  // `restUntil`: the paging budget is per account, so one 429 rests every job.
+  // `rested`: a rest happened and the list has not been read since it ended.
+  let enabled = false, active = false, cancelTimer: (() => void) | undefined, lastRefresh = Number.NEGATIVE_INFINITY, restUntil = 0, rested = false;
 
   function accept(job: StaffReconciliation) {
     const previous = entries.get(job.staff_id);
@@ -46,21 +72,30 @@ export function createStaffReconciliationRunner(options: Options) {
     cancelTimer?.(); cancelTimer = undefined;
     if (!enabled || active) return;
     const next = [...entries.values()].filter(runnable).sort((a, b) => a.next - b.next)[0];
-    if (next) cancelTimer = schedule(() => { cancelTimer = undefined; void tick(); }, Math.max(0, next.next - now()));
+    if (next) cancelTimer = schedule(() => { cancelTimer = undefined; void tick(); }, Math.max(0, Math.max(next.next, restUntil) - now()));
   }
   async function refresh(final: boolean) {
-    if (!enabled || !final && pagesSinceRefresh < 5 && now() - lastRefresh < 5000) return;
+    if (!enabled || !final && now() - lastRefresh < REFRESH_INTERVAL_MS) return;
     await options.refresh(final);
-    lastRefresh = now(); pagesSinceRefresh = 0;
+    lastRefresh = now();
   }
   async function tick() {
     if (!enabled || active) return;
     let entry = [...entries.values()].filter(runnable).sort((a, b) => a.next - b.next)[0];
-    if (!entry || entry.next > now()) { queue(); return; }
+    if (!entry || entry.next > now() || restUntil > now()) { queue(); return; }
     const staffId = entry.job.staff_id;
     active = true;
     options.onActivity(staffId, { busy: true });
     try {
+      if (rested) {
+        // THE REST IS OVER. The cron kept paging (or finished) meanwhile, so
+        // the list is read once before the next page: the notice shows the
+        // server's count, not the one this tab stopped at. A failed read
+        // changes nothing — the page below brings the job's state anyway.
+        rested = false;
+        await refresh(false).catch(() => undefined);
+        if (!enabled) return;
+      }
       if (entry.readFirst) {
         const current = await options.read(staffId);
         if (!enabled) return;
@@ -79,11 +114,20 @@ export function createStaffReconciliationRunner(options: Options) {
       // Another administrator may have changed the revision during this page.
       // accept() keeps that newer revision and discards the older response.
       entry.next = now() + (progressed(previous, entry.job) ? 1200 : 5000);
-      pagesSinceRefresh += 1;
       await refresh(entry.job.state === 'complete' || entry.job.state === 'failed');
       if (enabled) options.onActivity(staffId, { busy: false, error: entry.job.state === 'failed' ? entry.job.error || undefined : undefined });
     } catch (error) {
       if (!enabled) return;
+      if (rateLimited(error)) {
+        // THE BUDGET IS SPENT, NOTHING FAILED. A 429 is answered before the
+        // route runs, so no page was written and there is nothing to read
+        // back. The cron (drainStaffReconciliations) owns the remaining pages;
+        // this tab rests quietly — no error, no failure count, no retry
+        // button — and looks again later.
+        restUntil = now() + RATE_LIMIT_REST_MS; rested = true;
+        options.onActivity(staffId, { busy: false, deferred: true });
+        return;
+      }
       const previous = entry.job;
       let verified = false;
       try {
@@ -119,6 +163,9 @@ export function createStaffReconciliationRunner(options: Options) {
     sync(jobs: readonly StaffReconciliation[]) { for (const job of jobs) accept(job); queue(); },
     retry(job: StaffReconciliation) {
       const entry = accept(job);
+      // The owner asked: one more request, even during a rest. Another 429
+      // simply rests again.
+      restUntil = 0;
       entry.blocked = false; entry.failures = 0; entry.retryFailed = true; entry.readFirst = true; entry.next = now();
       queue();
     },

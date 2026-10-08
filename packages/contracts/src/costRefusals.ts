@@ -45,19 +45,32 @@ export const COST_REFUSALS = {
   // connected to that same address — a sign-in stamps it. An unconnected,
   // unverified account is never merged with Google, by design, and the
   // settings page has no Google link button, so the sentence offers neither.
+  //
+  // The last sentence says, BEFORE the owner verifies, what the first proof
+  // ends (worker/lib/emailStamp.ts, review finding C1): every other session,
+  // the password, the Telegram link, the phone sign-in and any other Google
+  // account — whoever took the address while it was free must not keep a way
+  // in. Only someone already signed in to this row reads it, so it carries no
+  // "ignore it if you did not ask" advice: that belongs to the email and to
+  // VERIFY_SIGN_IN_REQUIRED, which a stranger to the row can read.
   OWNER_EMAIL_UNVERIFIED: {
-    ar: 'بيانات التكلفة تُفتح للأدمن الرئيسي بعد تأكيد بريد حسابه. أكّد بريدك الإلكتروني لفتحها، أو سجّل الدخول بحساب Google إن كان مربوطًا بالبريد نفسه.',
-    en: "Cost data opens for the main admin once the account's email is verified. Verify your email to open it, or sign in with Google if Google is already connected to the same address.",
-    ckb: 'زانیارییەکانی تێچوو بۆ بەڕێوەبەری سەرەکی دەکرێنەوە دوای پشتڕاستکردنەوەی ئیمەیڵی هەژمارەکە. ئیمەیڵەکەت پشتڕاست بکەرەوە بۆ کردنەوەیان، یان ئەگەر Google پێشتر بە هەمان ئیمەیڵەوە بەستراوە، بە Google بچۆ ژوورەوە.',
+    ar: 'بيانات التكلفة تُفتح للأدمن الرئيسي بعد تأكيد بريد حسابه. أكّد بريدك الإلكتروني لفتحها، أو سجّل الدخول بحساب Google إن كان مربوطًا بالبريد نفسه. أول تأكيد يُنهي جلسات هذا الحساب على الأجهزة الأخرى ويزيل كلمة مروره وربط تيليغرام والدخول بالهاتف وأي حساب Google آخر؛ بعده تدخل برمز يصل إلى هذا البريد، ولك أن تعيّن كلمة مرور جديدة.',
+    en: "Cost data opens for the main admin once the account's email is verified. Verify your email to open it, or sign in with Google if Google is already connected to the same address. The first verification ends this account's sessions on other devices and removes its password, Telegram link, phone sign-in and any other Google account; after it you sign in with a code sent to this email, and you can set a new password.",
+    ckb: 'زانیارییەکانی تێچوو بۆ بەڕێوەبەری سەرەکی دەکرێنەوە دوای پشتڕاستکردنەوەی ئیمەیڵی هەژمارەکە. ئیمەیڵەکەت پشتڕاست بکەرەوە بۆ کردنەوەیان، یان ئەگەر Google پێشتر بە هەمان ئیمەیڵەوە بەستراوە، بە Google بچۆ ژوورەوە. یەکەم پشتڕاستکردنەوە دانیشتنەکانی ئەم هەژمارە لە ئامێرەکانی تر کۆتایی پێدەهێنێت و وشەی نهێنی و بەستنەوەی تێلێگرام و چوونەژوورەوە بە ژمارەی مۆبایل و هەر هەژمارێکی تری Google لادەبات؛ دوای ئەوە بە کۆدێک دەچیتە ژوورەوە کە بۆ ئەم ئیمەیڵە دەنێردرێت، و دەتوانیت وشەی نهێنییەکی نوێ دابنێیت.',
   },
   // A verification link for the owner's address — the one that opens cost —
   // is confirmed only from a session of the account it belongs to (DECISIONS
   // row 185 amendment). Said only to the holder of a valid, unused link, so it
   // tells nobody anything their mailbox did not; the link stays unused.
+  //
+  // The last sentence is for the real owner opening a message somebody ELSE
+  // asked for (review finding C1): a row that took the address while it was
+  // free can send it, and "sign in" would then be a code sign-in that proves
+  // the mailbox for THAT row. Ignoring it leaves the row unproven.
   VERIFY_SIGN_IN_REQUIRED: {
-    ar: 'بريد الأدمن الرئيسي يُؤكَّد من حسابه وهو مسجّل الدخول فقط. سجّل الدخول إلى ذلك الحساب في هذا المتصفح، ثم افتح رابط التأكيد من الرسالة مرة أخرى.',
-    en: "The main admin's email is confirmed only from that account while it is signed in. Sign in to it in this browser, then open the confirmation link from the email again.",
-    ckb: 'ئیمەیڵی بەڕێوەبەری سەرەکی تەنها لە هەژمارەکەی خۆیەوە و لە کاتی چوونەژوورەوەدا پشتڕاست دەکرێتەوە. لەم وێبگەڕەدا بچۆ ژوورەوەی ئەو هەژمارە، پاشان دووبارە بەستەری پشتڕاستکردنەوە لە ئیمەیڵەکەوە بکەرەوە.',
+    ar: 'بريد الأدمن الرئيسي يُؤكَّد من حسابه وهو مسجّل الدخول فقط. سجّل الدخول إلى ذلك الحساب في هذا المتصفح، ثم افتح رابط التأكيد من الرسالة مرة أخرى. إن لم تطلب هذه الرسالة، فتجاهلها ولا تسجّل الدخول.',
+    en: "The main admin's email is confirmed only from that account while it is signed in. Sign in to it in this browser, then open the confirmation link from the email again. If you did not ask for this email, ignore it and do not sign in.",
+    ckb: 'ئیمەیڵی بەڕێوەبەری سەرەکی تەنها لە هەژمارەکەی خۆیەوە و لە کاتی چوونەژوورەوەدا پشتڕاست دەکرێتەوە. لەم وێبگەڕەدا بچۆ ژوورەوەی ئەو هەژمارە، پاشان دووبارە بەستەری پشتڕاستکردنەوە لە ئیمەیڵەکەوە بکەرەوە. ئەگەر داوای ئەم ئیمەیڵەت نەکردووە، پشتگوێی بخە و مەچۆ ژوورەوە.',
   },
   OWNER_ONLY: {
     ar: 'هذا الإجراء للأدمن الرئيسي فقط.',

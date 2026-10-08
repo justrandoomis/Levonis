@@ -28,6 +28,7 @@ import { identifierKey, rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { isOwner, ownerOnly } from '../lib/costAccess';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
+import { isStamped, runStamp, STAMP_ONCE, type OwnerFirstProof, type StampTarget } from '../lib/emailStamp';
 import { emitEvent, emitFromRequest, eventsEnabled } from '../lib/eventBus';
 import { UserCreatedV1 } from '@levonis/contracts/events/v1/UserCreated';
 import { ReferralUsedV1 } from '@levonis/contracts/events/v1/ReferralUsed';
@@ -88,13 +89,40 @@ const PASSWORD_MAX = 128;
  * every reader here has to agree with it, or that owner is shown the way out
  * and every way out answers "verified" while leaving the blank in place —
  * `COALESCE` keeps any non-NULL value, '' included. No code path writes a
- * blank stamp; a manual or imported edit could.
+ * blank stamp; a manual or imported edit could. `isStamped` and `STAMP_ONCE`
+ * live in worker/lib/emailStamp.ts so every other reader of the column (the
+ * notifiers, the invoice mailer, channel readiness) shares them.
+ *
+ * Every stamp below goes through `stampAndRecord`: when it is the FIRST proof
+ * of the owner's address it ends, in the same batch, every other way into
+ * that row — its other sessions, its password, phone, Telegram link, any
+ * Google account that is not the proof, and its outstanding reset and
+ * verification links (worker/lib/emailStamp.ts, review finding C1 and its
+ * review). The result is audited and handed back, and each route that proves
+ * returns it as `owner_first_proof` so the page can tell the person what ended.
  */
-function isStamped(v: string | null | undefined): boolean {
-  return typeof v === 'string' && v.trim() !== '';
+async function stampAndRecord(
+  env: Env,
+  target: StampTarget,
+  stamp: D1PreparedStatement,
+  via: string
+): Promise<OwnerFirstProof | null> {
+  const proof = await runStamp(env.DB, env, target, stamp);
+  if (proof) {
+    await audit(env.DB, target.userId, 'auth.owner_first_proof', target.userId, {
+      via,
+      sessions_ended: proof.sessionsEnded,
+      kept_current: target.keepSessionId !== null,
+      kept_google: !!target.keepGoogleSub,
+    });
+  }
+  return proof;
 }
-/** First real stamp wins; a blank one is replaced like a NULL. Binds one `?` (the stamp). */
-const STAMP_ONCE = "COALESCE(NULLIF(trim(email_verified_at), ''), ?)";
+
+/** The `owner_first_proof` field of a proving route's answer: present only when the purge fired. */
+function firstProofField(proof: OwnerFirstProof | null): { owner_first_proof?: { sessions_ended: number } } {
+  return proof ? { owner_first_proof: { sessions_ended: proof.sessionsEnded } } : {};
+}
 
 /**
  * A syntactically valid but unmatchable PBKDF2 record (all-zero salt and
@@ -856,7 +884,9 @@ authRoutes.post('/login', async (c) => {
 export async function resolveGoogleIdentity(
   env: Env,
   identity: { sub: string; email: string; name?: string },
-  referralCode = ''
+  referralCode = '',
+  /** Filled with what a first proof of the owner's address ended (worker/lib/emailStamp.ts). */
+  out: { ownerFirstProof?: OwnerFirstProof | null } = {}
 ): Promise<SessionUser> {
   // Match by google_sub first (stable), then link by verified email.
   let row = await env.DB.prepare('SELECT * FROM users WHERE google_sub = ?')
@@ -941,11 +971,20 @@ export async function resolveGoogleIdentity(
   // true, so a Google sign-in proves ownership of that address: stamp THIS
   // account's own matching address as verified (first stamp wins; existing
   // stamps and other accounts are never touched — no bulk verification).
-  await env.DB.prepare(
-    `UPDATE users SET email_verified_at = ${STAMP_ONCE} WHERE id = ? AND email = ?`
-  )
-    .bind(new Date().toISOString(), row.id, identity.email)
-    .run();
+  // The caller opens this sign-in's session only afterwards, so when this is
+  // the first proof of the owner's address every session of the row predates
+  // it and ends here (keepSessionId: null); this Google account is the proof
+  // and stays, every other way into the row ends.
+  out.ownerFirstProof = await stampAndRecord(
+    env,
+    { userId: row.id, kind: 'stamp', address: identity.email, keepSessionId: null, keepGoogleSub: identity.sub },
+    env.DB.prepare(`UPDATE users SET email_verified_at = ${STAMP_ONCE} WHERE id = ? AND email = ?`).bind(
+      new Date().toISOString(),
+      row.id,
+      identity.email
+    ),
+    'google'
+  );
 
   // Controlled initial-admin bootstrap: promote only on a VERIFIED Google
   // identity matching INITIAL_ADMIN_EMAIL, and only while no admin exists.
@@ -991,10 +1030,11 @@ authRoutes.post('/google', async (c) => {
     throw unauthorized(e instanceof Error ? e.message : 'Google sign-in failed');
   }
 
-  const row = await resolveGoogleIdentity(c.env, identity, referralCode);
+  const proved: { ownerFirstProof?: OwnerFirstProof | null } = {};
+  const row = await resolveGoogleIdentity(c.env, identity, referralCode, proved);
   await createSession(c, row.id);
   const user = await getFullUser(c.env.DB, row.id);
-  return c.json({ success: true, user: publicUser(user!, c.env) });
+  return c.json({ success: true, user: publicUser(user!, c.env), ...firstProofField(proved.ownerFirstProof ?? null) });
 });
 
 /**
@@ -1058,15 +1098,34 @@ authRoutes.post('/google/link', requireMainHost, requireAuth, async (c) => {
   if (linked.meta.changes === 0) throw conflict('This account is already linked to a different Google account');
 
   // Same-address proof only — never stamp a different address as verified.
-  await c.env.DB.prepare(
-    `UPDATE users SET email_verified_at = ${STAMP_ONCE} WHERE id = ? AND email = ?`
-  )
-    .bind(new Date().toISOString(), me.id, identity.email)
-    .run();
+  // The session doing the linking and the Google account being linked are
+  // kept; when this is the first proof of the owner's address every other way
+  // into the row ends in the same batch.
+  const proof = await stampAndRecord(
+    c.env,
+    {
+      userId: me.id,
+      kind: 'stamp',
+      address: identity.email,
+      keepSessionId: c.get('sessionId') ?? null,
+      keepGoogleSub: identity.sub,
+    },
+    c.env.DB.prepare(`UPDATE users SET email_verified_at = ${STAMP_ONCE} WHERE id = ? AND email = ?`).bind(
+      new Date().toISOString(),
+      me.id,
+      identity.email
+    ),
+    'google_link'
+  );
   await audit(c.env.DB, me.id, 'auth.google_linked', me.id, { same_email: identity.email === row.email });
 
   const user = await getFullUser(c.env.DB, me.id);
-  return c.json({ success: true, user: publicUser(user!, c.env), same_email: identity.email === row.email });
+  return c.json({
+    success: true,
+    user: publicUser(user!, c.env),
+    same_email: identity.email === row.email,
+    ...firstProofField(proof),
+  });
 });
 
 /**
@@ -2047,7 +2106,11 @@ async function issueEmailVerification(
   // The link only OPENS a page; confirmation is a separate explicit POST, so
   // a mail scanner following the link can never consume the token.
   const link = `${trustedOrigin(c)}/?verify_email=${token}`;
-  const msg = renderVerifyEmail(lang, link);
+  // The owner's address (INITIAL_ADMIN_EMAIL) opens cost, and whoever holds a
+  // row with it can make this message land in the owner's mailbox. That
+  // message says, beside the button: if you did not ask for this, ignore it
+  // and do not sign in (review finding C1).
+  const msg = renderVerifyEmail(lang, link, { ownerAddress: isOwner(c.env, { email: to }) });
   await enqueue(c.env, `email_verify:${tokenHash}`, { kind: 'email', to, subject: msg.subject, html: msg.html, text: msg.text });
   c.executionCtx.waitUntil(processOutbox(c.env, 3));
 }
@@ -2111,9 +2174,9 @@ authRoutes.post('/verify-email/confirm', async (c) => {
   if (!row) throw badRequest(genericMsg, 'BAD_TOKEN');
   if (row.used) throw badRequest(genericMsg, 'TOKEN_USED');
   if (new Date(row.expires_at).getTime() < Date.now()) throw badRequest(genericMsg, 'TOKEN_EXPIRED');
-  const holder = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?')
+  const holder = await c.env.DB.prepare('SELECT email, email_verified_at FROM users WHERE id = ?')
     .bind(row.user_id)
-    .first<{ email: string }>();
+    .first<{ email: string; email_verified_at: string | null }>();
   // A change requested before the owner lock existed must not land either.
   if (row.new_email && holder && isOwner(c.env, holder)) throw ownerOnly('OWNER_EMAIL_LOCKED');
 
@@ -2131,12 +2194,29 @@ authRoutes.post('/verify-email/confirm', async (c) => {
    * the row an email change would move it to — is confirmed only by a request
    * that carries a session of that same account. The owner pressed "send" from
    * that session, so the same browser confirms in one tap; any other browser is
-   * told to sign in first, and the link stays unused.
+   * told to sign in first — or, when nobody there asked for the message, to
+   * ignore it and not sign in — and the link stays unused.
+   *
+   * ONLY WHEN THE TOKEN WOULD CHANGE SOMETHING (review finding C2). A plain
+   * link for a holder that is already stamped changes nothing — the stamp is
+   * kept as it is (`STAMP_ONCE`) — so an owner who opens an old link anywhere
+   * gets the ordinary "verified" answer instead of being asked to sign in for
+   * a no-op. An email change (`new_email`) always changes the row.
    */
   const verifiedAddress = row.new_email ?? holder?.email ?? null;
-  if (verifiedAddress && isOwner(c.env, { email: verifiedAddress }) && c.get('user')?.id !== row.user_id) {
+  const changesSomething = !!row.new_email || !isStamped(holder?.email_verified_at);
+  if (
+    changesSomething &&
+    verifiedAddress &&
+    isOwner(c.env, { email: verifiedAddress }) &&
+    c.get('user')?.id !== row.user_id
+  ) {
     throw new HttpError(403, serverMessage('VERIFY_SIGN_IN_REQUIRED'), 'VERIFY_SIGN_IN_REQUIRED');
   }
+  // The confirming session, when it is this account's own, survives the proof;
+  // when this is the first proof of the owner's address every other way into
+  // the row ends in the same batch as the stamp (worker/lib/emailStamp.ts).
+  const keepSessionId = c.get('user')?.id === row.user_id ? (c.get('sessionId') ?? null) : null;
 
   // Atomic one-use consumption — concurrent confirms cannot both pass.
   const consumed = await c.env.DB.prepare(
@@ -2147,29 +2227,36 @@ authRoutes.post('/verify-email/confirm', async (c) => {
   if (consumed.meta.changes === 0) throw badRequest(genericMsg, 'TOKEN_USED');
 
   const now = new Date().toISOString();
+  let proof: OwnerFirstProof | null;
   if (row.new_email) {
     // Email-change verification (issued by POST /change-email): applying the
     // new address and its verified stamp is one statement, so the account
     // never holds an unverified address with a verified stamp;
     // UNIQUE(users.email) rejects an address taken in the meantime.
     try {
-      await c.env.DB.prepare(
-        "UPDATE users SET email = ?, email_verified_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?"
-      )
-        .bind(row.new_email, now, row.user_id)
-        .run();
+      proof = await stampAndRecord(
+        c.env,
+        { userId: row.user_id, kind: 'move', address: row.new_email, keepSessionId },
+        c.env.DB.prepare(
+          "UPDATE users SET email = ?, email_verified_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?"
+        ).bind(row.new_email, now, row.user_id),
+        'email_change'
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes('UNIQUE')) throw conflict('This email is already used by another account');
       throw e;
     }
   } else {
-    await c.env.DB.prepare(`UPDATE users SET email_verified_at = ${STAMP_ONCE} WHERE id = ?`)
-      .bind(now, row.user_id)
-      .run();
+    proof = await stampAndRecord(
+      c.env,
+      { userId: row.user_id, kind: 'stamp', address: holder?.email ?? '', keepSessionId },
+      c.env.DB.prepare(`UPDATE users SET email_verified_at = ${STAMP_ONCE} WHERE id = ?`).bind(now, row.user_id),
+      'email_link'
+    );
   }
   await audit(c.env.DB, row.user_id, 'auth.email_verified', row.user_id, row.new_email ? { email_changed: true } : {});
-  return c.json({ success: true, verified: true });
+  return c.json({ success: true, verified: true, ...firstProofField(proof) });
 });
 
 /**
@@ -2591,12 +2678,23 @@ authRoutes.post('/otp/verify', async (c) => {
 
   // Receiving the code IS the mailbox proof, so an account that signed in this
   // way has a verified address whether or not it ever clicked a link.
+  // This sign-in opens its session only below, so when the code is the first
+  // proof of the owner's address every session the row already has predates
+  // the proof, and every other way into the row (password, phone, Telegram,
+  // Google) ends with them in the same batch (worker/lib/emailStamp.ts, C1):
+  // whoever held the address before the mailbox was proven must not inherit
+  // cost from the real owner's code — not through an old session, and not by
+  // signing in again with the password they set.
+  let proof: OwnerFirstProof | null = null;
   if (channel === 'email' && !isStamped(account.email_verified_at)) {
-    await c.env.DB.prepare(
-      "UPDATE users SET email_verified_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND (email_verified_at IS NULL OR trim(email_verified_at) = '')"
-    )
-      .bind(account.id)
-      .run();
+    proof = await stampAndRecord(
+      c.env,
+      { userId: account.id, kind: 'stamp', address: account.email, keepSessionId: null },
+      c.env.DB.prepare(
+        "UPDATE users SET email_verified_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND (email_verified_at IS NULL OR trim(email_verified_at) = '')"
+      ).bind(account.id),
+      'otp'
+    );
   }
 
   await audit(c.env.DB, account.id, 'auth.otp_login', `user:${account.id}`, {
@@ -2608,7 +2706,7 @@ authRoutes.post('/otp/verify', async (c) => {
   await createSession(c, account.id);
   const user = await getFullUser(c.env.DB, account.id);
   if (!user) throw fail();
-  return c.json({ success: true, user: publicUser(user, c.env) });
+  return c.json({ success: true, user: publicUser(user, c.env), ...firstProofField(proof) });
 });
 
 /** `a***@example.com` — enough for staff to recognise an address in an audit

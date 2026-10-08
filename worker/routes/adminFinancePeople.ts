@@ -3,7 +3,7 @@ import type { AppContext } from '../lib/types';
 import { badRequest, conflict, forbidden, notFound, requireAdmin, str } from '../lib/http';
 import { isOwner } from '../lib/adminScope';
 import { requireCostRead } from '../lib/costAccess';
-import { limitByMethod } from '../lib/ratelimit';
+import { limitByMethod, limitInstead } from '../lib/ratelimit';
 import { auditStatements } from '../lib/audit';
 import { staffPeriodReport } from '../lib/financeParticipantReports';
 import { financeRange, financeRangeArgs, inFinanceRangeSql } from '../lib/financeRange';
@@ -22,6 +22,15 @@ adminFinancePeopleRoutes.use('*',requireAdmin);
 // THE DOOR (owner decision 2): payroll, withdrawals and profit are cost — the
 // owner's alone, full-scope admins included. The rate limit runs before the
 // guard, so a refused caller still spends budget.
+//
+// PAGING HAS ITS OWN BUCKET. The reconciliation runner POSTs one order per
+// page to /reconcile; on the shared write budget a recalculation of more than
+// 120 orders locked the owner out of every finance write until the hour
+// turned. /reconcile and /recheck spend `finance-reconcile` INSTEAD of
+// `finance-write` (registered before the door, so the door finds the write
+// bucket already charged). A runner that still hits this limit stops quietly
+// and leaves the rest to the cron (drainStaffReconciliations).
+adminFinancePeopleRoutes.on('POST', ['/staff/:id/reconcile', '/staff/:id/recheck'], limitInstead('finance-reconcile', 3600, ['finance-write']));
 adminFinancePeopleRoutes.use('*', limitByMethod(['finance-read', 600], ['finance-write', 120]), requireCostRead);
 const text=(v:unknown,max=200)=>str(v,'النص',{max,required:false})??'';
 for(const action of ['preview','apply'] as const)adminFinancePeopleRoutes.post(`/rules/:id/${action}`,async c=>{

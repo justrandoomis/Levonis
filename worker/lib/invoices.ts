@@ -1,6 +1,7 @@
 import type { Env } from './types';
 import { localeToApi, safeParse } from './types';
 import { newId } from './crypto';
+import { isStamped } from './emailStamp';
 import { enqueue, processOutbox } from './outbox';
 import {
   renderOrderInvoiceEmail,
@@ -435,7 +436,8 @@ async function enqueueInvoiceEmail(
   const msg = renderOrderInvoiceEmail(lang, invoiceEmailData(snapshot, invoiceNo, revision, issuedAt), ordersUrl);
   const message = { kind: 'email' as const, to: owner.email, subject: msg.subject, html: msg.html, text: msg.text };
 
-  if (!owner.email_verified_at) {
+  // A blank stamp ('' or spaces) is no stamp (worker/lib/emailStamp.ts).
+  if (!isStamped(owner.email_verified_at)) {
     await enqueue(env, eventKey, message, {
       state: 'skipped',
       note: 'recipient email not verified — invoice email skipped',

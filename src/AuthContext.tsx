@@ -97,9 +97,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loginWithGoogle = useCallback(async (credential: string) => {
-    const data = await api.post<{ user: ApiUser }>('/api/auth/google', { credential });
+    const data = await api.post<{ user: ApiUser; owner_first_proof?: unknown }>('/api/auth/google', { credential });
     clearPrimedRequests();
     setUser(data.user);
+    // The first proof of the main admin's address ended every other way into
+    // the account: say so (lib/ownerFirstProof.ts). Loaded only then, so the
+    // entry chunk does not carry the sentence for everyone else.
+    if (data.owner_first_proof) void import('./lib/ownerFirstProof').then((m) => m.announceOwnerFirstProof(data));
   }, []);
 
   const register = useCallback(async (username: string, name: string, email: string, password: string) => {

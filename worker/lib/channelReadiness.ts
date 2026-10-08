@@ -77,6 +77,7 @@ import { isPlaceholderEmail } from './profileCompletion';
 import { maskPhone } from './phone';
 import { getBotUsername, telegramCanDeliver } from './telegram';
 import { isE164, wasenderConfigured } from './wasender';
+import { isStamped } from './emailStamp';
 
 export type ChannelId = 'inapp' | 'telegram' | 'whatsapp' | 'email';
 
@@ -456,7 +457,8 @@ export async function channelReadiness(env: Env, userId: string): Promise<Channe
     const raw = (row?.email || '').trim();
     const placeholder = isPlaceholderEmail(raw);
     const real = raw.length > 0 && !placeholder;
-    const verified = real && !!row?.email_verified_at;
+    // A blank stamp ('' or spaces) is no stamp (worker/lib/emailStamp.ts).
+    const verified = real && isStamped(row?.email_verified_at);
     // The per-recipient staging guard. Without this the readiness answer is
     // wrong on exactly the deployment that exists to stop a wrong answer.
     const allowed = real ? emailAllowsRecipient(env, raw) : true;

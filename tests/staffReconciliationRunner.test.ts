@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createStaffReconciliationRunner, type ReconciliationActivity, type StaffReconciliation } from '../src/components/financePeople/staffReconciliationRunner';
+import { codeOf } from './fixtures/source';
+import { createStaffReconciliationRunner, RATE_LIMIT_REST_MS, REFRESH_INTERVAL_MS, type ReconciliationActivity, type StaffReconciliation } from '../src/components/financePeople/staffReconciliationRunner';
 
 const job = (n = 0, state: StaffReconciliation['state'] = 'running', revision = 1): StaffReconciliation => ({ staff_id: 'employee', revision, state, cursor: String(n), processed_orders: n, adjusted_orders: n, updated_at: `2026-10-05T20:00:${String(n).padStart(2, '0')}Z` });
 const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
@@ -26,7 +27,7 @@ test('loaded pending jobs continue beyond the old three-page limit and refresh t
   f.runner.sync([job(0, 'pending')]); f.runner.start();
   for (let n = 0; n < 8; n++) await f.next();
   assert.equal(calls, 8); assert.equal(f.jobs.at(-1)?.state, 'complete');
-  assert.equal(f.refreshed, 3, 'refreshes first page, after five more pages, and completion, not every page');
+  assert.equal(f.refreshed, 2, 'refreshes after the first page and at completion, not every page');
   assert.equal(f.timers.size, 0);
 });
 
@@ -106,4 +107,96 @@ test('a failed recovery GET must succeed before another reconciliation POST', as
   f.runner.sync([job()]); assert.equal(f.timers.size, 0, 'does not run before the owner capability starts it'); f.runner.start(); await f.next();
   assert.equal(writes, 1); assert.equal(reads, 1); assert.equal(f.delay, 5000);
   await f.next(); assert.equal(reads, 2); assert.equal(writes, 2); assert.equal(f.jobs.at(-1)?.state, 'complete');
+});
+
+// ---- the finance budgets (S1 review D1) ------------------------------------
+//
+// One POST per order, 1.2 s apart: on the shared finance write budget (120 an
+// hour) a long recalculation locked the owner out of every finance write. The
+// server now pages on its own bucket; when even that is spent the runner
+// leaves the job to the cron instead of reporting a failure.
+
+const limited = () => Object.assign(new Error('Too many requests, try again later'), { status: 429 });
+
+test('a 429 is not a failure: no read-back, no error, no failure count — the runner rests and resumes', async () => {
+  let calls = 0, reads = 0;
+  const f = fixture(async (j) => { calls++; if (calls === 2) throw limited(); return job(j.processed_orders + 1, calls === 3 ? 'complete' : 'running'); }, async () => { reads++; return job(1); });
+  f.runner.sync([job(0, 'pending')]); f.runner.start();
+  await f.next(); assert.equal(calls, 1);
+  await f.next(); assert.equal(calls, 2);
+  assert.equal(reads, 0, 'a refused request wrote nothing, so nothing is read back');
+  assert.deepEqual(f.activities.at(-1), { busy: false, deferred: true }, 'quiet: no error and no retry button');
+  assert.equal(f.delay, RATE_LIMIT_REST_MS, 'rests, leaving the pages to the cron meanwhile');
+  await f.next(); assert.equal(calls, 3); assert.equal(f.jobs.at(-1)?.state, 'complete');
+  assert.equal(f.activities.at(-1)?.error, undefined);
+});
+
+test('when a rest ends the staff list is read once before the next page, so the cron’s progress shows', async () => {
+  let calls = 0;
+  const order: string[] = [];
+  const f = fixture(
+    async (j) => { calls++; order.push('page'); if (calls === 2) throw limited(); return job(j.processed_orders + 1); },
+    async () => job(),
+    async () => { order.push('refresh'); }
+  );
+  f.runner.sync([job(0, 'pending')]); f.runner.start();
+  await f.next(); await f.next();
+  assert.deepEqual(order, ['page', 'refresh', 'page'], 'the first page refreshes; the refused one does not');
+  await f.next();
+  assert.deepEqual(order, ['page', 'refresh', 'page', 'refresh', 'page'], 'the rest ended: one list read, then the page');
+  await f.next();
+  assert.equal(order.filter((x) => x === 'refresh').length, 2, 'and only once — the 30 s throttle applies again');
+});
+
+test('repeated 429s never block the job for a manual retry the way three failures do', async () => {
+  let calls = 0;
+  const f = fixture(async () => { calls++; throw limited(); });
+  f.runner.sync([job()]); f.runner.start();
+  for (let i = 0; i < 5; i++) await f.next();
+  assert.equal(calls, 5); assert.equal(f.timers.size, 1, 'still scheduled after five refusals');
+  assert.ok(f.activities.every((a) => !a.error && a.retrying === undefined));
+});
+
+test('one 429 rests every job: the paging budget is per account, not per employee', async () => {
+  const touched: string[] = [];
+  const f = fixture(async (j) => { touched.push(j.staff_id); if (touched.length === 1) throw limited(); return { ...j, state: 'complete' }; });
+  f.runner.sync([job(), { ...job(), staff_id: 'second' }]); f.runner.start();
+  await f.next();
+  assert.deepEqual(touched, ['employee']);
+  assert.equal(f.delay, RATE_LIMIT_REST_MS, 'the second employee waits for the same rest');
+  await f.next(); await f.next();
+  assert.deepEqual(touched.sort(), ['employee', 'employee', 'second']);
+});
+
+test('an explicit retry during a rest asks once; another 429 rests again quietly', async () => {
+  let calls = 0;
+  const f = fixture(async () => { calls++; throw limited(); }, async () => job());
+  f.runner.sync([job()]); f.runner.start(); await f.next();
+  assert.equal(f.delay, RATE_LIMIT_REST_MS);
+  f.runner.retry(job()); assert.equal(f.delay, 0, 'the owner asked');
+  await f.next(); assert.equal(calls, 2); assert.equal(f.delay, RATE_LIMIT_REST_MS);
+  assert.deepEqual(f.activities.at(-1), { busy: false, deferred: true });
+});
+
+test('an hour of paging refreshes the staff list at most once per 30 s, inside the finance read budget', async () => {
+  let calls = 0;
+  const f = fixture(async (j) => { calls++; return job(j.processed_orders + 1); });
+  f.runner.sync([job(0, 'pending')]); f.runner.start();
+  const pages = Math.floor(3_600_000 / 1200);
+  for (let n = 0; n < pages; n++) await f.next();
+  assert.equal(calls, pages);
+  assert.ok(f.refreshed <= 3_600_000 / REFRESH_INTERVAL_MS + 1, `${f.refreshed} refreshes in an hour`);
+  assert.ok(f.refreshed < 600 / 4, 'leaves most of the 600-an-hour read budget to the finance screens');
+});
+
+test('the People panel says a rested recalculation goes on in the background — in ar, en and Sorani — instead of a frozen "Calculating"', () => {
+  const panel = codeOf('src/components/financePeople/PeoplePanel.tsx');
+  const notice = /\{activity\?\.deferred && job\.state !== 'failed' && <p className="fp-muted">\{loc\('([^']+)', '([^']+)', '([^']+)'\)\}<\/p>\}/.exec(panel);
+  assert.ok(notice, 'the deferred flag is rendered');
+  const [, ar, en, ckb] = notice;
+  assert.match(en, /keeps calculating in the background/);
+  assert.match(ar, /في الخلفية/);
+  assert.match(ckb, /[ڕڵێۆەڤگچپژ]/, 'real Sorani');
+  assert.doesNotMatch(ckb, /[ةىيك]/, 'Sorani writes ی and ک');
+  assert.notEqual(ckb, ar);
 });

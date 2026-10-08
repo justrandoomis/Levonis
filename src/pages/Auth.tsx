@@ -7,6 +7,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
+import { announceOwnerFirstProof } from '../lib/ownerFirstProof';
 import AuthShell from '../components/auth/AuthShell';
 import AuthDivider from '../components/auth/AuthDivider';
 import CountryPicker from '../components/auth/CountryPicker';
@@ -1044,8 +1045,9 @@ export default function Auth() {
       if (referral) {
         // Same server route the context uses, plus the referral code the
         // person chose (server-resolved; unknown codes never block).
-        await api.post('/api/auth/google', { credential, referralCode: referral });
+        const res = await api.post('/api/auth/google', { credential, referralCode: referral });
         await refreshUser();
+        announceOwnerFirstProof(res);
       } else {
         await loginWithGoogle(credential);
       }

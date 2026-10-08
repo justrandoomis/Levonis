@@ -8,6 +8,7 @@ import OtpBoxes from './OtpBoxes';
 import PhoneField, { emptyPhoneValue, type PhoneValue } from './PhoneField';
 import AuthTextField from './AuthTextField';
 import FillButton, { lengthProgress } from './FillButton';
+import { announceOwnerFirstProof } from '../../lib/ownerFirstProof';
 
 /**
  * SIGNING IN WITH A CODE — email or WhatsApp, no password.
@@ -361,7 +362,7 @@ export default function CodeAuth({
     setBusy(true);
     setError('');
     try {
-      const res = await api.post<{ signup?: boolean; ticket?: string }>('/api/auth/otp/verify', {
+      const res = await api.post<{ signup?: boolean; ticket?: string; owner_first_proof?: unknown }>('/api/auth/otp/verify', {
         channel,
         identifier,
         code,
@@ -380,6 +381,10 @@ export default function CodeAuth({
         return;
       }
       await refreshUser();
+      // A code that was the first proof of the main admin's address ended every
+      // other way into the account (worker/lib/emailStamp.ts): say so before
+      // the page moves on. Silent for every other sign-in.
+      announceOwnerFirstProof(res);
       if (!mounted.current) return;
       setPhase('done');
       if (onSuccess) onSuccess(false);

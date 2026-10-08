@@ -11,10 +11,12 @@
  *     OWNER_EMAIL_UNVERIFIED (not the generic COST_ACCESS_DENIED) and carries
  *     the `owner_email_unverified` hint, and receives no cost value anywhere;
  *   - the session loader reads `email_verified_at` from `users` on every
- *     request (`SELECT u.* … JOIN users`), so the SAME session — the same
- *     cookie, no new sign-in, no redeploy — sees cost on the very next request
- *     after the stamp, whether the stamp comes from the email link
- *     (POST /api/auth/verify-email/confirm) or from Google.
+ *     request (`SELECT u.* … JOIN users`), so the session that confirms the
+ *     emailed link (POST /api/auth/verify-email/confirm) sees cost on the very
+ *     next request — the same cookie, no new sign-in, no redeploy. A sign-in
+ *     with Google that proves the address opens a session of its own, and that
+ *     one sees cost; the sessions opened BEFORE that first proof end with it
+ *     (review finding C1, worker/lib/emailStamp.ts, tests/ownerFirstProof.test.ts).
  *
  * This file drives the real session loader, the real auth routes and the real
  * cost routers over one database; tests/costRouteClassification.test.ts and
@@ -182,7 +184,7 @@ test('the email link: the SAME session sees cost on the next request after POST 
   await assertOpen(a, cookie);
 });
 
-test('Google: a sign-in with the already-connected Google stamps the address, and the same session then sees cost', async () => {
+test('Google: a sign-in with the already-connected Google stamps the address, and the session it opens sees cost', async () => {
   const raw = seededCopyUnverifiedOwner();
   raw.exec("UPDATE users SET google_sub = 'google-owner-sub' WHERE id = 'usr_owner'");
   const a = app(raw);
@@ -193,7 +195,10 @@ test('Google: a sign-in with the already-connected Google stamps the address, an
   const env = { DB: asD1(raw), INITIAL_ADMIN_EMAIL: OWNER_EMAIL } as unknown as Env;
   await resolveGoogleIdentity(env, { sub: 'google-owner-sub', email: OWNER_EMAIL, name: 'Owner' });
 
-  await assertOpen(a, cookie);
+  // The session opened before the first proof ended with it (review finding C1);
+  // POST /google opens the sign-in's own session right after, and that one sees cost.
+  assert.equal(await me(a, cookie), null, 'the older session ended');
+  await assertOpen(a, await sessionFor(raw, 'usr_owner'));
 });
 
 test('Google never merges into an unverified, unconnected account — the stamp comes from the email link or from a Google already connected', async () => {
@@ -347,7 +352,10 @@ for (const blank of ['', '   ']) {
     await assertShut(a, cookie);
     const env = { DB: asD1(raw), INITIAL_ADMIN_EMAIL: OWNER_EMAIL } as unknown as Env;
     await resolveGoogleIdentity(env, { sub: 'google-owner-sub', email: OWNER_EMAIL, name: 'Owner' });
-    await assertOpen(a, cookie);
+    // A blank stamp is no stamp, so this is the first proof: the older session
+    // ends, and the session the sign-in opens sees cost.
+    assert.equal(await me(a, cookie), null, 'the older session ended');
+    await assertOpen(a, await sessionFor(raw, 'usr_owner'));
   });
 }
 

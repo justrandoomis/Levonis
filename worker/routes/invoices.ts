@@ -7,6 +7,7 @@ import { requireAuth, requireAdmin, notFound, badRequest, conflict, str, int, on
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { newId } from '../lib/crypto';
+import { isStamped } from '../lib/emailStamp';
 import { enqueue, processOutbox } from '../lib/outbox';
 import {
   createInvoiceRevision,
@@ -150,7 +151,8 @@ invoiceRoutes.post('/:id/resend', requireAdmin, async (c) => {
     .bind(row.owner_user_id)
     .first<{ id: string; email: string; name: string; locale: string; email_verified_at: string | null }>();
   if (!owner) throw notFound('Order owner not found');
-  if (!owner.email_verified_at) {
+  // A blank stamp ('' or spaces) is no stamp (worker/lib/emailStamp.ts).
+  if (!isStamped(owner.email_verified_at)) {
     throw badRequest('The customer has not verified their email address — invoice email cannot be sent', 'RECIPIENT_UNVERIFIED');
   }
 

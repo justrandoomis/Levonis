@@ -130,6 +130,9 @@ interface GridResponse {
   can_view_cost: boolean;
 }
 
+/** The relations answer says whether it carried its row costs (as the grid's own answer does). */
+type RelationsRead = RelationsResponse & { can_view_cost?: boolean };
+
 interface SaveResponse {
   changed: number;
   batch_id: string;
@@ -464,10 +467,16 @@ export default function QuickPricePanel({
     try {
       const [res, relResponse] = await Promise.all([
         api.get<GridResponse>(`/api/admin/products/${productId}/price-grid`),
-        api.get<RelationsResponse>(`/api/admin/products/${productId}/relations`),
+        api.get<RelationsRead>(`/api/admin/products/${productId}/relations`),
       ]);
       const nextRelations = withQuickFulfillmentDefaults(relationsFromWire(relResponse), res.product.sale_types ?? []);
-      setData(res);
+      // BOTH ANSWERS OR NEITHER. The grid and the relations are read in
+      // parallel; an address verified between the two leaves one answer with
+      // cost and one without. The panel's `can_view_cost` is the AND of the
+      // two, so the cost column, the history tab and the fulfilment save's
+      // `cost_loaded: false` all follow the answer that did NOT carry cost —
+      // and the re-read below brings both in.
+      setData({ ...res, can_view_cost: res.can_view_cost === true && relResponse.can_view_cost === true });
       setRelations(nextRelations);
       setRelationsBaseline(JSON.stringify(nextRelations));
     } catch (e) {
@@ -671,12 +680,13 @@ export default function QuickPricePanel({
         // session has since been allowed cost (DECISIONS row 185 amendment).
         ...(data.can_view_cost ? {} : { cost_loaded: false }),
       });
-      const fresh = relationsFromWire(
-        await api.get<RelationsResponse>(`/api/admin/products/${productId}/relations`)
-      );
+      const freshRead = await api.get<RelationsRead>(`/api/admin/products/${productId}/relations`);
+      const fresh = relationsFromWire(freshRead);
       setRelations(fresh);
       setRelationsBaseline(JSON.stringify(fresh));
-      setData((d) => d ? { ...d, product: { ...d.product, sale_types: Array.from(new Set([
+      // The read-back is an answer too: a structure on screen without its costs
+      // keeps the panel "read without cost" until both are read again.
+      setData((d) => d ? { ...d, can_view_cost: d.can_view_cost && freshRead.can_view_cost === true, product: { ...d.product, sale_types: Array.from(new Set([
         ...(d.product.sale_types ?? []).filter((type) => type === 'bundle'),
         ...fresh.groups.flatMap((g) => g.values.flatMap((v) =>
           v.fulfillments.filter((f) => f.enabled).map((f) => f.fulfillment_type)

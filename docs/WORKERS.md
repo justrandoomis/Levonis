@@ -58,7 +58,12 @@ confirmed only while signed in to that same account, in the same browser
 (`403 VERIFY_SIGN_IN_REQUIRED` otherwise, the link left unused). With no email
 service configured (`EMAIL_API_KEY`, `EMAIL_FROM`) the card says so.
 The session reads the stamp on every request, so cost opens on the next request
-after it, with no redeploy. After the deploy, «Cost-privacy probes, read-only»
+after it, with no redeploy. The first verification of that address ends every
+other way into the account in the same batch (`worker/lib/emailStamp.ts`): its
+other sessions, its password, phone, Telegram link, any Google account that is
+not the proof, and pending reset links. After it the owner signs in with a code
+sent to the address and can set a new password; the card says so beforehand and
+the page says so afterwards. After the deploy, «Cost-privacy probes, read-only»
 runs `scripts/live-cost-probes.mjs` over every `scripts/live-cost-probes.d/*.json`:
 anonymous GETs only, no cookie, no write.
 

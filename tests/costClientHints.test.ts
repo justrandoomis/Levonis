@@ -85,7 +85,7 @@ test('the card offers ONE primary action into the existing verification flow, an
   assert.match(card, /await refreshUser\(\)/);
   // The confirm button of the emailed link refreshes the session, so the hints flip at once.
   const banner = codeOf(SCREENS.verifyBanner);
-  assert.match(banner, /await api\.post\('\/api\/auth\/verify-email\/confirm', \{ token \}\);[\s\S]{0,400}void refreshUser\(\);/);
+  assert.match(banner, /await api\.post<\{ owner_first_proof\?: unknown \}>\('\/api\/auth\/verify-email\/confirm', \{ token \}\);[\s\S]{0,600}void refreshUser\(\);/);
 });
 
 test('the OWNER_EMAIL_UNVERIFIED refusal is rendered BY CODE with the same action; every other 403 keeps "main admin only"', () => {
@@ -313,8 +313,9 @@ test('the product form never shows, or saves, the blanks of a document read with
   const code = codeOf(SCREENS.productForm);
   // Whether the document carried its cost is read from the document itself.
   assert.match(code, /return Object\.prototype\.hasOwnProperty\.call\(product, 'product_cost_iqd'\);/);
-  assert.match(code, /setCostLoaded\(carriesCost\(p\.product\)\);/);
-  assert.match(code, /if \(res\.product\) setCostLoaded\(carriesCost\(res\.product\)\);/);
+  // …and from the relations answer too: both have to carry it (the mixed-read race).
+  assert.match(code, /setCostLoaded\(carriesCost\(p\.product\) && relationsCarryCost\(r\)\);/);
+  assert.match(code, /if \(res\.product\) setCostLoaded\(carriesCost\(res\.product\) && relationsCarryCost\(fresh\)\);/);
   // Cost inputs need the hint AND a document read with cost.
   assert.match(code, /const costShown = canSeeCost && costLoaded;/);
   assert.match(code, /\{costShown && \(\s*<Field ar="التكلفة" en="Cost"/);

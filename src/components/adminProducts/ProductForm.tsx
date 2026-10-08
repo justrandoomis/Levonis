@@ -141,6 +141,19 @@ function carriesCost(product: object): boolean {
   return Object.prototype.hasOwnProperty.call(product, 'product_cost_iqd');
 }
 
+/** The relations answer says whether it carried its row costs (option, colour, order type, route). */
+type RelationsRead = RelationsResponse & { can_view_cost?: boolean };
+/**
+ * Whether a structure read carried its costs. The product and its relations
+ * are two requests in parallel: an address verified between them leaves one
+ * answer with cost and one without, so each answer is asked, and only a read
+ * where BOTH say so counts as loaded. `=== true`: an answer from a server that
+ * predates the flag is read as "without cost", which only ever keeps costs.
+ */
+function relationsCarryCost(relations: RelationsRead): boolean {
+  return relations.can_view_cost === true;
+}
+
 export default function ProductForm({
   productId,
   onBack,
@@ -364,32 +377,47 @@ export default function ProductForm({
     []
   );
 
+  /** The product and its structure, read in parallel. Nothing on screen changes. */
+  const readProduct = useCallback(async (id: string) => {
+    const [p, r] = await Promise.all([
+      api.get<ProductResponse>(`/api/admin/products-v2/${id}`),
+      api.get<RelationsRead>(`/api/admin/products/${id}/relations`),
+    ]);
+    return { p, r };
+  }, []);
+  /**
+   * Bumped whenever the form takes a new baseline (a load, a background swap,
+   * a save). A background read started before one of those is older than what
+   * the form now holds, and is dropped.
+   */
+  const baselineGeneration = useRef(0);
+  const applyProduct = useCallback(({ p, r }: { p: ProductResponse; r: RelationsRead }) => {
+    const d = toEditorDoc(p.product);
+    // Rows when they exist, else the document's own options / colours /
+    // media — the precedence the storefront sells by. A product whose
+    // structure lives only in the document is shown, and told so.
+    const rs = hydrateRelations(r, p.product);
+    baselineGeneration.current += 1;
+    setDoc(d);
+    setRel(rs);
+    // Both answers, never the first one alone (see `relationsCarryCost`).
+    setCostLoaded(carriesCost(p.product) && relationsCarryCost(r));
+    setLoadedUpdatedAt(p.product.updated_at ?? '');
+    setLoadedBasePrice(typeof d.price_iqd === 'number' ? d.price_iqd : null);
+    setPinnedDismissed(false);
+    setBaseline(JSON.stringify({ d, rs }));
+  }, []);
   const loadProduct = useCallback(async (id: string) => {
     setLoading(true);
     setLoadErr(null);
     try {
-      const [p, r] = await Promise.all([
-        api.get<ProductResponse>(`/api/admin/products-v2/${id}`),
-        api.get<RelationsResponse>(`/api/admin/products/${id}/relations`),
-      ]);
-      const d = toEditorDoc(p.product);
-      // Rows when they exist, else the document's own options / colours /
-      // media — the precedence the storefront sells by. A product whose
-      // structure lives only in the document is shown, and told so.
-      const rs = hydrateRelations(r, p.product);
-      setDoc(d);
-      setRel(rs);
-      setCostLoaded(carriesCost(p.product));
-      setLoadedUpdatedAt(p.product.updated_at ?? '');
-      setLoadedBasePrice(typeof d.price_iqd === 'number' ? d.price_iqd : null);
-      setPinnedDismissed(false);
-      setBaseline(JSON.stringify({ d, rs }));
+      applyProduct(await readProduct(id));
     } catch (e) {
       setLoadErr(e instanceof ApiError ? e.message : 'تعذّر تحميل المنتج / failed to load');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [readProduct, applyProduct]);
 
   /**
    * AFTER «تحديث البيانات» SAVED: the product is read back, and the admin's
@@ -523,12 +551,29 @@ export default function ProductForm({
    */
   const costReloadTried = useRef<string | null>(null);
   const reloadId = productId || doc.id || '';
+  const reloadIdRef = useRef(reloadId);
+  reloadIdRef.current = reloadId;
   useEffect(() => {
     if (!canSeeCost || costLoaded || !reloadId || loading || dirty) return;
     if (costReloadTried.current === reloadId) return;
     costReloadTried.current = reloadId;
-    void loadProduct(reloadId);
-  }, [canSeeCost, costLoaded, reloadId, loading, dirty, loadProduct]);
+    // A BACKGROUND READ, NOT A RELOAD: `loadProduct` shows the spinner, which
+    // unmounts the form and with it every edit held outside the document and
+    // structure (the membership discount section keeps its own). The read is
+    // swapped in only if, when it lands, the form is the same product, still
+    // untouched, and has taken no newer baseline (a save meanwhile) — else it
+    // is dropped and the save keeps every stored cost (`cost_loaded: false`).
+    const generation = baselineGeneration.current;
+    void readProduct(reloadId)
+      .then((read) => {
+        if (reloadIdRef.current !== reloadId || baselineGeneration.current !== generation) return;
+        const clean = JSON.stringify({ d: docRef.current, rs: relRef.current }) === baselineRef.current;
+        if (clean) applyProduct(read);
+      })
+      .catch(() => {
+        // Nothing changes: the form keeps working and says the cost comes after the save.
+      });
+  }, [canSeeCost, costLoaded, reloadId, loading, dirty, readProduct, applyProduct]);
   // The note of a file update stands until the next edit.
   useEffect(() => {
     if (dirty) setFileUpdateNote(null);
@@ -718,11 +763,13 @@ export default function ProductForm({
 
       const freshDoc = res.product ? toEditorDoc(res.product) : next;
       setDoc(freshDoc);
-      if (res.product) setCostLoaded(carriesCost(res.product));
+      // The echo and the structure read-back are two answers too.
+      if (res.product) setCostLoaded(carriesCost(res.product) && relationsCarryCost(fresh));
       setLoadedUpdatedAt(res.product?.updated_at ?? loadedUpdatedAt);
       // The baseline is what the SERVER now holds — document and structure —
       // so the form is clean after a save instead of showing the read-back's
       // own normalisation (sort numbers, derived stock level) as unsaved work.
+      baselineGeneration.current += 1;
       setBaseline(JSON.stringify({ d: freshDoc, rs: savedRel }));
       setShowErrors(false);
       onListChanged();

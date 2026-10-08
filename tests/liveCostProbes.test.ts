@@ -18,9 +18,13 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { sourceOf } from './fixtures/source';
+import { APEX, asD1, ctx, freshDb } from './fixtures/app';
+import { seedCostlyProduct } from './fixtures/costlyProduct';
+import { LIVE_PRODUCTS, seedLiveCatalog } from './fixtures/liveCatalog';
+import worker from '../worker/index';
 // @ts-expect-error - plain ESM script shared with workflow 7, no types
 import * as probesScript from '../scripts/live-cost-probes.mjs';
-const { fillPath, judge, loadProbeFiles, pick } = probesScript;
+const { fillPath, judge, loadProbeFiles, pick, walkKeys } = probesScript;
 
 interface Probe {
   path: string;
@@ -94,6 +98,73 @@ test('s1.json: the cost routers refuse a stranger; the storefront answers carry 
   // A product page and the public API are probed too, by a live slug.
   assert.ok(probe('/api/products/{slug}') && probe('/api/public/v1/products/{slug}'));
   assert.equal(s1.spec.vars?.slug?.from, '/api/products?limit=1');
+});
+
+// ------------------------------------------------------------- the membership rule a page shows (S1 review D2)
+//
+// A bare `rule_id` was forbidden on every storefront probe. The product page
+// answers `membership_preview.pro.rule_id` — the id of the PRO/PRIME discount
+// rule the customer is shown (membershipBenefits.ts), not a cost — so the day
+// the owner resumes PRO, workflow 7 would turn red AFTER deploying, on a page
+// that leaks nothing. The cost-rule ids are forbidden by name instead.
+
+const STOREFRONT = ['/api/products?limit=3', '/api/products/{slug}', '/api/public/v1/products/{slug}', '/api/home'];
+
+test('s1.json: a membership rule id passes every storefront probe; target_rule_id and premium_rule_id still fail', () => {
+  for (const path of STOREFRONT) {
+    const keys = new RegExp(probe(path)!.forbidKeys!, 'i');
+    assert.equal(keys.test('rule_id'), false, `${path}: membership_preview.pro.rule_id is not a cost`);
+    for (const k of ['target_rule_id', 'premium_rule_id']) assert.ok(keys.test(k), `${path}: the probe would miss ${k}`);
+  }
+  const page = probe('/api/products/{slug}')!;
+  const shown = { product: { slug: 'a1', price_iqd: 900000, membership_preview: { pro: { rule_id: 'mbr_rule_pro', price_iqd: 850000 }, prime: { rule_id: 'mbr_rule_prime', price_iqd: 880000 } } } };
+  assert.deepEqual(judge(page, 200, JSON.stringify(shown)), []);
+  for (const k of ['target_rule_id', 'premium_rule_id']) {
+    const leak = { product: { slug: 'a1', price_iqd: 900000, pricing: { [k]: 'tr_1' } } };
+    assert.match(judge(page, 200, JSON.stringify(leak)).join('\n'), new RegExp(`forbidden key ${k} \\(at product\\.pricing\\.${k}\\)`));
+  }
+});
+
+/** Every s1.json probe, judged against the local Worker on the live catalogue — the run workflow 7 makes, before it deploys. */
+async function probeLocally(proResumed: boolean) {
+  const raw = freshDb();
+  raw.exec('PRAGMA foreign_keys = OFF;');
+  seedCostlyProduct(raw);
+  seedLiveCatalog(raw);
+  if (proResumed) raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
+  const env = { DB: asD1(raw), STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
+  const get = async (path: string) => {
+    const res = await worker.fetch(new Request(`https://${APEX}${path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
+    return { status: res.status, text: await res.text() };
+  };
+  const vars: Record<string, string> = {};
+  for (const [name, def] of Object.entries(s1.spec.vars ?? {})) vars[name] = pick(JSON.parse((await get(def.from)).text), def.pick);
+  const failures: string[] = [];
+  for (const p of s1.spec.probes) {
+    const path = fillPath(p.path, vars);
+    const { status, text } = await get(path);
+    failures.push(...(judge(p, status, text) as string[]).map((f) => `${path}: ${f}`));
+  }
+  // Every live product page, not only the first slug.
+  const page = probe('/api/products/{slug}')!;
+  let membershipRuleIds = 0;
+  for (const product of LIVE_PRODUCTS) {
+    const { status, text } = await get(`/api/products/${product.slug}`);
+    failures.push(...(judge(page, status, text) as string[]).map((f) => `/api/products/${product.slug}: ${f}`));
+    if (status === 200) for (const { path } of walkKeys(JSON.parse(text)) as Iterable<{ path: string }>) if (/membership_preview\.pro\.rule_id$/.test(path)) membershipRuleIds++;
+  }
+  return { failures, membershipRuleIds };
+}
+
+test('s1.json against the local Worker, PRO paused as migrated: every probe passes', async () => {
+  const { failures } = await probeLocally(false);
+  assert.deepEqual(failures, []);
+});
+
+test('s1.json against the local Worker with PRO resumed: the product pages carry membership_preview.pro.rule_id and every probe still passes', async () => {
+  const { failures, membershipRuleIds } = await probeLocally(true);
+  assert.ok(membershipRuleIds > 0, 'not vacuous: the resumed pages do show the PRO rule id');
+  assert.deepEqual(failures, []);
 });
 
 // ------------------------------------------------------------- the workflow
