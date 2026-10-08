@@ -67,7 +67,7 @@ import { resolveTemplateFamilies, type CatalogRow } from './adminTaxonomy';
 import { createPendingBrand, inactiveBrandWarning, loadRefRows, matchPrinterRef, matchRef, planBrandCreate } from '../lib/templateRefs';
 import { loadPrinterFitIds, printerOptions, printerSlugs } from '../lib/printerFits';
 import { ambiguousMessage } from '../lib/importApply';
-import { canViewCost, canWriteCost, projectForAdmin } from '../lib/adminScope';
+import { canViewCost, canWriteCost, isOwner, projectForAdmin } from '../lib/adminScope';
 import { getSetting } from '../lib/settings';
 import { rateLimit } from '../lib/ratelimit';
 import { newId, sha256Hex } from '../lib/crypto';
@@ -95,7 +95,9 @@ import {
   type TemplateMediaFetchIntent,
 } from '../lib/template';
 import { normalizeCheapestBase } from '../lib/cheapestBase';
-import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
+import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
+import { serializedWriteVerdict } from '../lib/serialPolicy';
+import { refuse as serialRefuse } from '../lib/serialAssignments';
 import {
   parseProductRow,
   validateProductDoc,
@@ -1534,7 +1536,11 @@ async function analyzeTemplate(
   db: D1Database,
   text: string,
   target?: string | null,
-  opts: { money: boolean } = { money: true }
+  opts: {
+    money: boolean;
+    /** False for every admin but the owner: §29 is judged (`serializedWriteVerdict`). Absent = not judged. */
+    owner?: boolean;
+  } = { money: true }
 ): Promise<Analysis> {
   // §18 — the membership keys are lifted out FIRST, so the product parser
   // never sees a key it would have to file under `unknown_keys`, and a rule the
@@ -1577,6 +1583,14 @@ async function analyzeTemplate(
   body.translation_meta = bookkeeping.translation_meta;
   try {
     const validated = validateProductDoc(body, { costBlind: !opts.money });
+    // §29 (serial scan, 0178): whether the product needs a serial — by the
+    // file's `serialized` line or by where the file files it — is the
+    // OWNER's, through this door as through the form and the import sheet.
+    // Judged BEFORE the printer defaults below fill a silent word in, so a
+    // printer or a used unit the system defaults is not mistaken for a
+    // request. Inside the try: a refusal is a validation_error the preview
+    // shows (code OWNER_ONLY), not a 500.
+    if (opts.owner === false) await judgeTemplateSerialized(db, a, validated);
     // Extended warranty is for printers only (owner mandate): the catalogs
     // this file names — or the product's stored placement when it names
     // none — decide, and the +12/+24 shape and the printer defaults
@@ -1656,6 +1670,42 @@ async function analyzeTemplate(
     merge.warnings.push(...a.spec.warnings);
   }
   return a;
+}
+
+/**
+ * §29 for a non-owner's template (the TXT door): the one rule of
+ * `serializedWriteVerdict`. A refusal throws `OWNER_ONLY`; an echo of an
+ * inherited answer leaves the stored word in place instead of pinning it.
+ * The document's ops_policy is replaced, never edited in place — on an update
+ * it is the stored product's own object.
+ */
+async function judgeTemplateSerialized(db: D1Database, a: Analysis, validated: ProductDoc): Promise<void> {
+  const prev = a.existing;
+  const requested = readOpsWarranty(mergeOpsPolicy(validated.ops_policy ?? {}, { serialized: validated.serialized })).serialized;
+  const refiled = !prev || validated.category_id !== prev.category_id || validated.sub_category_id !== prev.sub_category_id;
+  let catalogIds = a.refs.catalog_ids;
+  if (catalogIds === undefined && refiled && prev) {
+    const { results } = await db
+      .prepare('SELECT catalog_id FROM product_catalogs WHERE product_id = ?')
+      .bind(prev.id)
+      .all<{ catalog_id: string }>();
+    catalogIds = (results ?? []).map((r) => String(r.catalog_id));
+  }
+  const verdict = await serializedWriteVerdict(db, {
+    prev: prev ? { id: prev.id, ops_policy: prev.ops_policy } : null,
+    requested,
+    placement:
+      catalogIds !== undefined || refiled
+        ? { catalogIds: catalogIds ?? [], categoryIds: [validated.category_id, validated.sub_category_id] }
+        : undefined,
+  });
+  if (verdict.refuse) throw serialRefuse(403, 'OWNER_ONLY', { field: 'serialized', via: verdict.refuse, section: 'warranty' });
+  if (requested === verdict.keep) return;
+  const ops: Record<string, unknown> = { ...(validated.ops_policy ?? {}) };
+  if (verdict.keep === null) delete ops.serialized;
+  else ops.serialized = verdict.keep;
+  validated.ops_policy = ops;
+  validated.serialized = verdict.keep;
 }
 
 /** The mode the apply will store, so the preview's diff can say it. */
@@ -2280,7 +2330,7 @@ templateRoutes.post('/parse', async (c) => {
   // Cost WRITE decides refusals and carry-forward; cost READ decides what the
   // preview shows (owner decision 2: both are the owner's alone).
   const money = canWriteCost(c.env, c.get('user'));
-  const a = await analyzeTemplate(c.env.DB, text, undefined, { money });
+  const a = await analyzeTemplate(c.env.DB, text, undefined, { money, owner: isOwner(c.env, c.get('user')) });
   const needsReview = [...(a.merge?.needs_review ?? a.refs.needs_review ?? [])];
   // The refusals that live in the PLAN — stranded pre-order capacity above all
   // — said before the owner presses apply, never after.
@@ -2388,7 +2438,7 @@ templateRoutes.post('/section-preview', async (c) => {
   if (!loaded) throw notFound('Product not found');
   const money = canWriteCost(c.env, c.get('user'));
   const section = sectionTemplate(source.text, productId, null);
-  const a = await analyzeTemplate(c.env.DB, section.text, productId, { money });
+  const a = await analyzeTemplate(c.env.DB, section.text, productId, { money, owner: isOwner(c.env, c.get('user')) });
   // What the save will write: the stored product, section 7 from the file.
   if (a.doc && a.existing) a.doc = sectionOnlyDoc(a.doc, a.existing);
   const planned = await plannedRefusal(c.env.DB, a, { adminId: c.get('user')!.id, money });
@@ -2411,7 +2461,7 @@ templateRoutes.post('/section-preview', async (c) => {
   let ignoredChanges: Array<{ field: string; before: string | null; after: string | null }> = [];
   if (section.ignored.length > 0) {
     try {
-      const whole = await analyzeTemplate(c.env.DB, source.text, productId, { money });
+      const whole = await analyzeTemplate(c.env.DB, source.text, productId, { money, owner: isOwner(c.env, c.get('user')) });
       if (whole.doc) {
         ignoredChanges = computeDiff(whole.existing, whole.doc, diffOpts).filter((d) => !isSectionKey(d.field));
       }
@@ -2859,7 +2909,7 @@ templateRoutes.post('/apply', async (c) => {
   // Update mode follows the template's product_id; draft mode forces a create
   // merge (a stray product_id is ignored — create means a new identity).
   const money = canWriteCost(c.env, adminUser);
-  let a = await analyzeTemplate(c.env.DB, text, mode === 'update' ? undefined : null, { money });
+  let a = await analyzeTemplate(c.env.DB, text, mode === 'update' ? undefined : null, { money, owner: isOwner(c.env, adminUser) });
   if (a.parsed.errors.length > 0) {
     return c.json(
       {
@@ -2922,7 +2972,7 @@ templateRoutes.post('/apply', async (c) => {
     }
     if (dup && duplicateChoice === 'update_existing') {
       // Re-run the merge against the existing product (omitted-preserved).
-      a = await analyzeTemplate(c.env.DB, text, dup.id, { money });
+      a = await analyzeTemplate(c.env.DB, text, dup.id, { money, owner: isOwner(c.env, adminUser) });
       if (a.parsed.errors.length > 0) {
         return c.json(
           { success: false, error: 'Template has errors — nothing was written', code: 'TEMPLATE_ERRORS', errors: a.parsed.errors },
@@ -3504,7 +3554,7 @@ templateRoutes.post('/parse-zip', async (c) => {
   for (const name of names) {
     try {
       const text = decoder.decode(entries[name]);
-      const a = await analyzeTemplate(c.env.DB, text, undefined, { money });
+      const a = await analyzeTemplate(c.env.DB, text, undefined, { money, owner: isOwner(c.env, c.get('user')) });
       // The same pre-flight the single-file /parse makes: a file whose PLAN the
       // apply will refuse — a quota cut below the units a cell is holding, most
       // of all — is not `ready_to_apply`. An archive is where that goes unread

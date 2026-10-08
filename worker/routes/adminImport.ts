@@ -76,6 +76,7 @@ import {
   normKey,
   relationValues,
   resolveProduct,
+  serialImportIssue,
   splitComboKey,
   type CatalogRef,
   type ExistingCellRow,
@@ -122,6 +123,7 @@ import {
   saveProductAtomic,
 } from '../lib/productPersistence';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
+import { serializationContext, type VerdictCache } from '../lib/serialPolicy';
 import { withClassificationPlacements } from '../lib/catalogMembership';
 import { isActiveProductImageRow } from '../lib/productOverlay';
 
@@ -1401,14 +1403,25 @@ adminImportRoutes.post('/preview', async (c) => {
   const fileIssues: RowIssue[] = [];
   const byKey = new Map<string, PreviewRow>();
 
+  const owner = isOwner(c.env, admin);
+  // §29 reads, once for the whole sheet: every stored product's printer flag
+  // and section policy, and each distinct placement resolved once.
+  const serialCache: VerdictCache | undefined = owner
+    ? undefined
+    : { ctx: await serializationContext(c.env.DB, [...existing.values()].map((e) => e.id)), placements: new Map() };
   for (const p of parsed.products) {
     const stored = existing.get(p.key) ?? null;
     const r = resolveProduct(p, stored, maps, {
       newId,
       money,
       specFieldIds: shape.specFields.map((f) => f.id),
-      owner: isOwner(c.env, admin),
     });
+    // §29: whether the product needs a serial — by its own `serialized` cell
+    // or by where the sheet files it — is the owner's (S1 review #2).
+    if (!owner) {
+      const serialIssue = await serialImportIssue(c.env.DB, p, stored, r, serialCache);
+      if (serialIssue) r.issues.push(serialIssue);
+    }
     const row: PreviewRow = {
       key: p.key,
       line: p.line,

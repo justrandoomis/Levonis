@@ -109,7 +109,7 @@ import {
 } from '../lib/deviceOps';
 import { linkFromInventory } from '../lib/serialInventory';
 import { canonicalSerial, refuse as serialRefuse, serialAssignmentsInstalled } from '../lib/serialAssignments';
-import { lineDevicePolicy, serializationContext } from '../lib/serialPolicy';
+import { lineDevicePolicy, serializationContext, serializedWriteVerdict } from '../lib/serialPolicy';
 import { auditStatements } from '../lib/audit';
 import { isOwner } from '../lib/adminScope';
 import { fence } from '../lib/operations';
@@ -2094,20 +2094,25 @@ deviceRoutes.post('/admin/products/:id/ops-policy', async (c) => {
   if (body.serialized !== undefined) {
     if (typeof body.serialized !== 'boolean') throw badRequest('serialized must be true or false');
     // §29: whether a product needs a serial at preparation is the owner's.
-    // Only a CHANGE is an attempt — echoing the stored answer is not
-    // (worker/lib/adminScope.ts, the same rule as cost fields).
+    // Only a CHANGE of the effective answer is an attempt — echoing it is
+    // not, and an echo is not written down as the product's own word either
+    // (S1 review #4): a product that inherits its answer from its section
+    // keeps inheriting it. The one rule: `serializedWriteVerdict`.
     if (!isOwner(c.env, admin)) {
-      const effective = lineDevicePolicy(product.ops_policy, id, await serializationContext(c.env.DB, [id])).serialized;
-      if (effective !== body.serialized) throw serialRefuse(403, 'OWNER_ONLY');
+      const verdict = await serializedWriteVerdict(c.env.DB, { prev: product, requested: body.serialized });
+      if (verdict.refuse) throw serialRefuse(403, 'OWNER_ONLY', { field: 'serialized', via: verdict.refuse });
+    } else {
+      changes.serialized = body.serialized;
     }
-    changes.serialized = body.serialized;
   }
   if (body.warranty_base_months !== undefined) {
     // null = explicitly NOT configured → units render honest needs_config.
     changes.warranty_base_months =
       body.warranty_base_months === null ? null : int(body.warranty_base_months, 'warranty_base_months', { min: 1, max: 240 });
   }
-  if (Object.keys(changes).length === 0) throw badRequest('Nothing to update — send serialized and/or warranty_base_months');
+  if (Object.keys(changes).length === 0 && body.serialized === undefined) {
+    throw badRequest('Nothing to update — send serialized and/or warranty_base_months');
+  }
   // The ONE writer of these keys — shared with the product document's own
   // serializer (worker/lib/productModel.ts), so the admin form, the TXT/CSV
   // imports and this route can never spell them differently.
@@ -2133,10 +2138,16 @@ deviceRoutes.post('/admin/products/:id/ops-policy', async (c) => {
     if (issues.length) throw badRequest(issues.join(' | '), WARRANTY_PLAN_INVALID);
   }
 
-  await c.env.DB.prepare("UPDATE products SET ops_policy = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
-    .bind(JSON.stringify(policy), id)
-    .run();
-  await audit(c.env.DB, admin.id, 'device.ops_policy', id, changes);
+  // A non-owner's echo alone changes nothing, so nothing is written or audited.
+  if (Object.keys(changes).length > 0) {
+    await c.env.DB.prepare("UPDATE products SET ops_policy = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
+      .bind(JSON.stringify(policy), id)
+      .run();
+    await audit(c.env.DB, admin.id, 'device.ops_policy', id, changes);
+  }
   // Applies to FUTURE deliveries only — existing units keep their snapshots.
-  return c.json({ success: true, ops_policy: { serialized: policy.serialized === true, warranty_base_months: policy.warranty_base_months ?? null } });
+  // `serialized` is the EFFECTIVE answer (the product's word, else its
+  // printer flag or section), the one preparation and delivery read.
+  const effective = lineDevicePolicy(policy, id, await serializationContext(c.env.DB, [id])).serialized;
+  return c.json({ success: true, ops_policy: { serialized: effective, warranty_base_months: policy.warranty_base_months ?? null } });
 });

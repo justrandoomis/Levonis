@@ -37,6 +37,7 @@ import { WarrantySection as ProductWarrantySection } from '../../src/components/
 import { SectionsTab } from '../../src/components/adminTaxonomy/SectionsTab';
 import type { CatalogNode } from '../../src/components/adminTaxonomy/shared';
 import type { AdminOrderRow } from '../../src/lib/api';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import '../../src/index.css';
 import '../../src/components/adminProducts/theme.css';
 
@@ -355,7 +356,7 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     else target = slotOf(String(body.order_item_id), Number(body.unit_index));
     if (!target) return refused(404, 'ITEM_NOT_IN_ORDER', 'هذا المنتج ليس ضمن هذا الطلب.');
     if (kind === 'override') {
-      if (!owner) return refused(403, 'OWNER_ONLY', 'هذا الاستثناء للمالك فقط.');
+      if (!owner) return refused(403, 'OWNER_ONLY', serverMessage('OWNER_ONLY'));
       if (String(body.reason ?? '').trim().length < 5) return refused(400, 'OVERRIDE_REASON_REQUIRED', 'اكتب سبب الاستثناء (5 أحرف على الأقل).');
     }
     const code = norm(String(body.code ?? ''));
@@ -400,7 +401,7 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const missing = serialsView().missing;
     if (gateOn && forward && missing.length && !body.serials_override_reason)
       return refused(409, 'SERIALS_REQUIRED', 'تبقى أرقام تسلسلية غير مرتبطة لهذا الطلب.', { missing, lot_conflicts: [] });
-    if (body.serials_override_reason && !owner) return refused(403, 'OWNER_ONLY', 'هذا الاستثناء للمالك فقط.');
+    if (body.serials_override_reason && !owner) return refused(403, 'OWNER_ONLY', serverMessage('OWNER_ONLY'));
     return ok({});
   }
 
@@ -413,18 +414,18 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     return ok({ row: null, history: [], story: st });
   }
   if (/^\/api\/devices\/admin\/serial-inventory\/[^/]+\/warranty-mode$/.test(p)) {
-    if (!owner) return refused(403, 'OWNER_ONLY', 'هذا الاستثناء للمالك فقط.');
+    if (!owner) return refused(403, 'OWNER_ONLY', serverMessage('OWNER_ONLY'));
     return ok({ mode: body.mode });
   }
   if (p === '/api/admin/settings' && method === 'GET') return ok({ settings: { serialPrepGate: gate } });
   if (p === '/api/admin/settings/serialPrepGate' && method === 'PUT') {
-    if (!owner) return refused(403, 'OWNER_ONLY', 'هذا الاستثناء للمالك فقط.');
+    if (!owner) return refused(403, 'OWNER_ONLY', serverMessage('OWNER_ONLY'));
     const v = (body.value ?? {}) as { enabled?: boolean; since?: string | null };
     gate = { enabled: !!v.enabled, since: v.enabled ? v.since ?? new Date().toISOString() : gate.since };
     return ok({});
   }
   if (/^\/api\/admin\/taxonomy\/catalogs\/[^/]+\/serial-policy$/.test(p)) {
-    if (!owner) return refused(403, 'OWNER_ONLY', 'هذا الاستثناء للمالك فقط.');
+    if (!owner) return refused(403, 'OWNER_ONLY', serverMessage('OWNER_ONLY'));
     return ok({ policy: body.policy, requires_serial: ['p_ams'] });
   }
   if (p === '/api/admin/taxonomy/catalogs' && method === 'POST') return ok({ created: false, catalog: { id: String(body.id ?? 'ct_new'), name_ar: String(body.name_ar ?? ''), name_en: String(body.name_en ?? '') } });

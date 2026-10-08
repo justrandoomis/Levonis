@@ -39,7 +39,7 @@ applied. Code: `worker/lib/serialAssignments.ts` (the rules),
 | `POST /api/admin/orders/:id/serials/change` | same | `{assignment_id, code, …, op_id}` — the old binding is released in the same batch; a failed new link leaves it intact. A retry with the same `op_id` answers the link it made (`already`), as does the override's. |
 | `POST /api/admin/orders/:id/serials/unlink` | same; owner only outside the window or once a courier shipment exists (reason 5–500) | targets the assignment id, so a replay can never release a newer link. |
 | `POST /api/admin/orders/:id/serials/override` | owner only, reason 5–500 | `kind: take_from_order · delivered_device · unavailable · outside_window · batch · model_family`, optional `warranty_mode: carry · restart`; audited inside the batch. |
-| `GET /api/devices/admin/serial-inventory/:serial` | admin | the §16 page: `story` (status, current/previous orders, warranty, lot, full timeline); order ids and the full serial for the owner and full-scope admins only — in the `row` too, and every serial a history line names (another device's in a «change») is masked for an assistant. Answers devices known only to `device_serials` too. |
+| `GET /api/devices/admin/serial-inventory/:serial` | admin | the §16 page: `story` (status, current/previous orders, warranty, lot, full timeline); order ids and the full serial for the owner and full-scope admins only — in the `row` too, and every serial a history line names (another device's in a «change», a replaced or corrected serial, a box SN — at any depth of the row) is masked for an assistant. Answers devices known only to `device_serials` too. |
 | `POST /api/devices/admin/units/:unitId/serial` | admin; owner to take a serial off an open warranty, in EITHER direction (the serial's old unit, or this unit's own serial) | a delivered order's open unit only (`ORDER_NOT_PREPARABLE` / `UNIT_NOT_OPEN`), the one canonicaliser, no live preparation binding elsewhere — re-checked inside the batch. |
 | `POST /api/devices/admin/units/:unitId/replace` | admin | the replacement serial's bindings are re-checked inside the batch. |
 | `POST /api/admin/stock-operations/serial-link` | `receive` | a serial with a live binding takes only a lot that binding's line was allocated (`SERIAL_BATCH_MISMATCH`); a pending binding takes it as its verified lot in the same batch (an inferred lot on that lot trades places; a lot full of verified serials refuses). |
@@ -50,7 +50,9 @@ applied. Code: `worker/lib/serialAssignments.ts` (the rules),
 | `POST /api/returns/admin/:id/transition` | as before | optional `serials[]` (scanned at inspection) or `unit_ids[]`; answers `serials:{closed, unattributed}`. |
 
 Every refusal is a code with the brief's Arabic sentence (§31, §9, §10, §11,
-§17, §19) — never a trace; the screen localises by code
+§17, §19) — the programme contract's two codes, `OWNER_ONLY` and
+`IDEMPOTENCY_MISMATCH`, with the contract's own sentence — never a trace; the
+screen localises by code
 (`src/lib/refusalStrings.ts`, ar / en / ckb).
 
 ## The scan (one atomic batch)
@@ -123,10 +125,24 @@ bundle parents never have slots.
 Resolved at read time, never written onto products: the product's own
 `ops_policy.serialized`, else a printer catalog (always on), else the nearest
 section on its branch with `serial_policy ≠ inherit` ('required' wins across
-branches), else off. Owner only: the section policy, the printer flag, the
-product's flag (form, ops-policy route, import sheet), and a re-filing that
-flips the answer for a product with no word of its own. An echo of the stored
-answer is never an attempt.
+branches), else off. Owner only: the section policy, the printer flag (in
+both catalog editors: `POST /api/admin/taxonomy/catalogs` and
+`POST|PATCH /api/admin/products-v2/catalogs`), the product's flag, a re-filing
+that flips the answer for a product with no word of its own, and moving a
+section under a parent whose policy flips one of its products
+(`reparentSerialFlips`, both editors). Every product door judges a non-owner's
+write by ONE rule, `serializedWriteVerdict` (worker/lib/serialPolicy.ts): the
+form on create and on update (by `serialized` or `ops_policy.serialized`), the
+ops-policy route, the placement route, the import sheet (its preview, with the
+section policies and the filing the confirm will write — `serialImportIssue`)
+and the TXT template. A non-owner never changes the product's own word: an
+echo of the effective answer passes and is NOT written down, so a product that
+inherits its answer keeps following its section.
+
+Refusals: 403 `OWNER_ONLY` with `details.via` = `flag`, `placement` or
+`reparent`; the import sheet refuses by line in ar / en / ckb
+(`IMPORT_SERIALIZED_OWNER_ONLY`, `IMPORT_SERIAL_REFILE_OWNER_ONLY`); the
+template preview shows it as its validation error (code `OWNER_ONLY`).
 
 ## Owner defaults (changeable later, no migration)
 
@@ -146,8 +162,9 @@ for owner-only acts that carry no cost: `isOwner` on an admin row
 (`canViewCost`). No serial answer carries a cost, a lot cost or a margin
 (`serialPrepPrivacy`; the GET and write sweeps of `tests/costRoleMatrix*.test.ts`).
 The refusal code is the programme contract's `OWNER_ONLY` (its three sentences
-in `packages/contracts/src/costRefusals.ts`); the server's Arabic sentence is
-the serial one. The router is classified in `tests/routeClass/serials.ts`
+in `packages/contracts/src/costRefusals.ts`), and the server sends the
+contract's one sentence for it (`serverMessage`, as S1's `ownerOnly()` does) —
+`IDEMPOTENCY_MISMATCH` the same: one code, one sentence, from every door. The router is classified in `tests/routeClass/serials.ts`
 (`op`, the override `owner`) and the policy route in `tests/routeClass/catalogue.ts`.
 
 ## Screens
@@ -239,6 +256,7 @@ Every case runs the real routes over the real migrations (`tests/fixtures/serial
 | `serialPrepCritique` | H4, M2, M3, M4, M13, M15, M1 / L14 flags, L6 |
 | `serialPrepDeployAhead` | the code on the database one migration behind: every new door 503, HEAD behaviour everywhere else, and the feature live the moment the migration lands (no cached «not installed») |
 | `serialPolicy`, `serialPrepBoard`, `serialPrepUi` | §29 policy; the board chip; the screens (wedge, sources, strings, Sorani) |
+| `serialLandingReview` | the landing reviews' findings, one test each by name: a new product's flag (form create), the echo that must not pin an inherited answer, the import sheet's section policy and re-filing, the TXT template, the serial page masked at every depth (and the rebuilt «added» row's id), the contract's one sentence, re-parenting a section, the products-v2 catalog editor's printer flag and re-parent |
 | `serialPrepReview` | the three reviews' findings, one test each by name: re-delivery without a scan, the registration a cancel revoked, the post-delivery / replacement / void doors re-checked inside their writes, a lot recorded after the scan, take-from-order's window, the fence under an unneeded reason, a change on a full line, op_id retries, atomic activation, in-batch adoption, the canonicaliser on returns and bulk add, placement by category, the masked serial page, re-link by binding; and the screens (focus, the queued burst, warnings until «تم», accessible names, plurals) |
 
 ## Renumbering

@@ -7,7 +7,7 @@ import { newId, } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
 import { isOwner } from '../lib/adminScope';
 import { refuse as serialRefuse } from '../lib/serialAssignments';
-import { catalogSerialPolicySql, serialAssignmentsInstalled } from '../lib/serialPolicy';
+import { catalogSerialPolicySql, reparentSerialFlips, serialAssignmentsInstalled } from '../lib/serialPolicy';
 import {
   FAMILIES,
   groupsForSection,
@@ -451,6 +451,15 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
   // CHANGE is an attempt (an edit that echoes the stored flag passes).
   if (Number(existing?.is_printer_catalog ?? 0) !== isPrinter && !isOwner(c.env, admin)) {
     throw serialRefuse(403, 'OWNER_ONLY');
+  }
+  // …and so is RE-PARENTING a section (regressions review #3): a product filed
+  // under it with no word of its own inherits its serial policy through the
+  // new parent, so a move under a 'required' or 'off' branch is the section
+  // policy changed by another door. Only a move that flips at least one
+  // product's answer is an attempt.
+  if (existing && (existing.parent_id ?? null) !== parentId && !isOwner(c.env, admin)) {
+    const flips = await reparentSerialFlips(c.env.DB, id, parentId);
+    if (flips > 0) throw serialRefuse(403, 'OWNER_ONLY', { field: 'parent_id', via: 'reparent', products: flips });
   }
 
   const wantedSlug =

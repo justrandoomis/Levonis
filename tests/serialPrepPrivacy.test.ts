@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import { json, post, patch, put, get, row, count } from './fixtures/app';
 import { world, order, op, SN, SN2, SN3 } from './fixtures/serialPrep';
 import { OVERRIDE_KINDS } from '../worker/lib/serialAssignments';
+import { serverMessage } from '../packages/contracts/src/costRefusals';
 
 type W = ReturnType<typeof world>;
 type Who = 'boss' | 'adm' | 'ast';
@@ -140,7 +141,8 @@ test('§11/§25 every exception kind is the owner\'s: a full-scope admin and an 
       assert.equal(r.status, 403, `${who} · ${kind}`);
       const body = await json(r);
       assert.equal(body.code, 'OWNER_ONLY');
-      assert.equal(body.error, 'هذا الاستثناء للمالك فقط.');
+      // The programme contract's one sentence for the code (migration review #1).
+      assert.equal(body.error, serverMessage('OWNER_ONLY'));
     }
   }
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM serial_assignments'), 0);

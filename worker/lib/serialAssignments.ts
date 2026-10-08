@@ -45,6 +45,7 @@ import { auditStatements } from './audit';
 import { fence } from './operations';
 import { changedExactlyOne, isLostRace } from './gifts/fence';
 import { canMoveMoney, isOwner } from './adminScope';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { comboKey } from './inventory';
 import { getSetting } from './settings';
 import { maskSerial, unitTotalMonths, coverageState, type UnitRow } from './deviceOps';
@@ -82,10 +83,13 @@ export const SERIAL_TEXT = {
   SERIAL_ALREADY_ACTIVATED: 'سُلّم هذا الجهاز وبدأ ضمانه — الطريق الآن مرتجع أو استثناء المالك.',
   SERIAL_ASSIGNMENT_NOT_FOUND: 'لم يُعثر على هذا الربط في الطلب.',
   SERIAL_LINK_RELEASED: 'أُزيل هذا الربط بعد المسح — امسح الرقم مجددًا.',
-  OWNER_ONLY: 'هذا الاستثناء للمالك فقط.',
+  // The programme contract's codes speak the contract's ONE server sentence
+  // (packages/contracts/src/costRefusals.ts, as `ownerOnly()` does in
+  // worker/lib/costAccess.ts): one code, one sentence, from every door.
+  OWNER_ONLY: serverMessage('OWNER_ONLY'),
   OVERRIDE_REASON_REQUIRED: 'اكتب سبب الاستثناء (5 أحرف على الأقل).',
   OVERRIDE_UNAVAILABLE: 'هذا الاستثناء غير متاح لهذه الحالة.',
-  IDEMPOTENCY_MISMATCH: 'استُخدمت هذه العملية لمحتوى مختلف — أعد المسح.',
+  IDEMPOTENCY_MISMATCH: serverMessage('IDEMPOTENCY_MISMATCH'),
   SERIAL_RACE: 'تغيّر الطلب أثناء المسح — أعد المحاولة.',
   SERIALS_NOT_INSTALLED: 'ميزة ربط الأرقام التسلسلية لم تُفعّل على قاعدة البيانات بعد.',
   ORDER_NOT_FOUND: 'الطلب غير موجود.',
@@ -2304,22 +2308,40 @@ export async function orderSerialsView(env: Env, actor: SerialActor, orderId: st
  * Privacy (L7): order ids and the full serial for the owner and full-scope
  * admins only; an assistant sees the masked serial and no order numbers.
  */
-/** Detail keys that hold an order number, and keys that hold a serial (this device's or another's). */
-const ORDER_KEYS = ['order_id', 'other_order_id', 'previous_order_id', 'to_order_id'];
-const SERIAL_KEYS = ['new_serial', 'serial', 'serial_norm', 'serial_raw', 'detached_serial', 'detached_serial_raw', 'legacy_serial', 'new_serial_norm', 'old_serial'];
+/**
+ * Detail keys that hold an order number, and keys that hold a serial (this
+ * device's or another's) — a string, a list of them, or an object whose every
+ * string is one (`corrected_serial: { from, to }`). A box Product SN is a
+ * serial too: the page masks the inventory row's `box_sn` the same way.
+ */
+const ORDER_KEYS = new Set(['order_id', 'other_order_id', 'previous_order_id', 'to_order_id']);
+const SERIAL_KEYS = new Set([
+  'new_serial', 'serial', 'serial_norm', 'serial_raw', 'detached_serial', 'detached_serial_raw', 'legacy_serial', 'new_serial_norm', 'old_serial',
+  'replaced_serial', 'corrected_serial', 'serials', 'box_sn',
+]);
+
+function maskDeep(value: unknown, isSerial: boolean, depth: number): unknown {
+  if (typeof value === 'string') return isSerial ? maskSerial(value) : value;
+  if (depth > 6 || value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map((v) => maskDeep(v, isSerial, depth + 1));
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out[k] = ORDER_KEYS.has(k) ? null : maskDeep(v, isSerial || SERIAL_KEYS.has(k), depth + 1);
+  }
+  return out;
+}
 
 /**
  * A history row as an assistant may see it (UX review #1, critique L7): no
  * order numbers, and every serial in it masked — a «change» row names the
- * OTHER device's full serial, which the page itself never shows them.
+ * OTHER device's full serial, which the page itself never shows them. At
+ * every depth (S1 review #3): `warranty.reissued` nests the corrected serial
+ * under `corrected_serial.{from,to}`, `serial_inventory.update` the box SN
+ * under `from` / `to`.
  */
 export function maskedDetail(detail: Record<string, unknown>, actor: Pick<SerialActor, 'fullSerial'>): Record<string, unknown> {
   if (actor.fullSerial) return detail;
-  const out = { ...detail };
-  for (const k of ORDER_KEYS) if (k in out) out[k] = null;
-  for (const k of SERIAL_KEYS) if (typeof out[k] === 'string') out[k] = maskSerial(out[k] as string);
-  if (Array.isArray(out.serials)) out.serials = out.serials.map((v) => (typeof v === 'string' ? maskSerial(v) : v));
-  return out;
+  return maskDeep(detail, false, 0) as Record<string, unknown>;
 }
 
 export async function serialStory(env: Env, actor: SerialActor, norm: string) {
@@ -2428,7 +2450,7 @@ export async function serialStory(env: Env, actor: SerialActor, norm: string) {
         };
       }),
       ...(!added && asset
-        ? [{ id: `added:${norm}`, action: 'serial_inventory.add', created_at: asset.created_at, actor: asset.created_by ? { id: asset.created_by, email: null, username: null } : null, detail: { source: asset.source, rebuilt: true } }]
+        ? [{ id: `added:${shown(norm, actor)}`, action: 'serial_inventory.add', created_at: asset.created_at, actor: asset.created_by ? { id: asset.created_by, email: null, username: null } : null, detail: { source: asset.source, rebuilt: true } }]
         : []),
     ],
   };

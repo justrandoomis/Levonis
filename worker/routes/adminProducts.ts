@@ -47,8 +47,8 @@ import {
   projectForAdmin,
 } from '../lib/adminScope';
 import { costRefusal } from '../lib/costAccess';
-import { applyPrinterWarrantyRules, readOpsWarranty } from '../lib/warrantyPlans';
-import { lineDevicePolicy, placementSerialized, serializationContext } from '../lib/serialPolicy';
+import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
+import { reparentSerialFlips, serializedWriteVerdict } from '../lib/serialPolicy';
 import { refuse as serialRefuse } from '../lib/serialAssignments';
 import { bundlesUsing, compositionConflict } from '../lib/bundleComposition';
 import {
@@ -191,7 +191,9 @@ export async function uniqueSlugIn(
  * a new placement that would flip whether a product with no `serialized`
  * word of its own needs a serial at preparation (a printer catalog, or a
  * section whose serial policy is 'required'). A product with its own word
- * keeps it wherever it is filed, so nothing is asked of it.
+ * keeps it wherever it is filed, so nothing is asked of it. The one rule is
+ * `serializedWriteVerdict` (worker/lib/serialPolicy.ts), with the stored word
+ * as the request: the placement route changes the filing and nothing else.
  */
 async function refuseSerializedDrift(
   db: D1Database,
@@ -199,10 +201,12 @@ async function refuseSerializedDrift(
   catalogIds: string[],
   categoryIds: Array<string | null | undefined>
 ): Promise<void> {
-  if (readOpsWarranty(prev.ops_policy).serialized !== null) return;
-  const before = lineDevicePolicy(prev.ops_policy, prev.id, await serializationContext(db, [prev.id])).serialized;
-  const after = await placementSerialized(db, catalogIds, categoryIds);
-  if (before !== after) throw serialRefuse(403, 'OWNER_ONLY', { field: 'serialized', via: 'placement' });
+  const verdict = await serializedWriteVerdict(db, {
+    prev,
+    requested: readOpsWarranty(prev.ops_policy).serialized,
+    placement: { catalogIds, categoryIds },
+  });
+  if (verdict.refuse) throw serialRefuse(403, 'OWNER_ONLY', { field: 'serialized', via: 'placement' });
 }
 
 async function catalogIdsFor(db: D1Database, productId: string): Promise<string[]> {
@@ -390,6 +394,11 @@ adminProductsRoutes.post('/catalogs', async (c) => {
     if (!parent) throw badRequest('parent_id: unknown catalog');
   }
   const sort = int(body.sort, 'sort', { min: -100_000, max: 100_000, def: 0 });
+  // §29 (serial scan, 0178): the printer flag is the owner's, through this
+  // catalog editor as through the taxonomy one (adminTaxonomy POST /catalogs).
+  if (body.is_printer_catalog && !isOwner(c.env, admin)) {
+    throw serialRefuse(403, 'OWNER_ONLY', { field: 'is_printer_catalog' });
+  }
   const id = newId('cat');
   const base = slugToken(nameEn) || slugToken(nameAr) || `catalog-${id.slice(-6)}`;
   const slug = await uniqueSlugIn(c.env.DB, 'catalogs', base, null);
@@ -453,6 +462,25 @@ adminProductsRoutes.patch('/catalogs/:id', async (c) => {
     params.push(body.active ? 1 : 0); // deactivate only — catalogs are never deleted
   }
   if (!sets.length) throw badRequest('Nothing to update');
+  // §29 (serial scan, 0178): the printer flag, and a re-parent that flips
+  // whether the products filed under this catalog need a serial, are the
+  // owner's — the same rule as the taxonomy editor. Only a CHANGE is an
+  // attempt: an edit that echoes the stored flag or parent passes.
+  if (!isOwner(c.env, admin) && (body.is_printer_catalog !== undefined || body.parent_id !== undefined)) {
+    const current = await c.env.DB.prepare('SELECT is_printer_catalog, parent_id FROM catalogs WHERE id = ?')
+      .bind(id)
+      .first<{ is_printer_catalog: number | null; parent_id: string | null }>();
+    if (current) {
+      if (body.is_printer_catalog !== undefined && Number(current.is_printer_catalog ?? 0) !== (body.is_printer_catalog ? 1 : 0)) {
+        throw serialRefuse(403, 'OWNER_ONLY', { field: 'is_printer_catalog' });
+      }
+      const parentId = typeof body.parent_id === 'string' && body.parent_id ? body.parent_id : null;
+      if (body.parent_id !== undefined && (current.parent_id ?? null) !== parentId) {
+        const flips = await reparentSerialFlips(c.env.DB, id, parentId);
+        if (flips > 0) throw serialRefuse(403, 'OWNER_ONLY', { field: 'parent_id', via: 'reparent', products: flips });
+      }
+    }
+  }
   const res = await c.env.DB.prepare(`UPDATE catalogs SET ${sets.join(', ')} WHERE id = ?`)
     .bind(...params, id)
     .run();
@@ -1273,34 +1301,41 @@ adminProductsRoutes.post('/', async (c) => {
     carryStoredCostForward(doc, prev);
   }
 
-  // §29 (serial scan, 0178): whether a product needs a serial at preparation
-  // — and gets a warranty unit at delivery — is the OWNER's. Only a CHANGE of
-  // the effective answer is an attempt: the form echoes the stored value on
-  // every save, and that must keep working for any admin.
-  if (prev && typeof body.serialized === 'boolean' && !isOwner(c.env, admin)) {
-    const before = lineDevicePolicy(prev.ops_policy, prev.id, await serializationContext(c.env.DB, [prev.id])).serialized;
-    if (body.serialized !== before) throw serialRefuse(403, 'OWNER_ONLY');
-  }
-  // …and so is RE-FILING a product whose own word is silent (critique-1 #23):
-  // its answer then comes from its placement, so moving it into or out of a
-  // printer catalog or a 'required' section is the same change by another door.
-  if (prev && !isOwner(c.env, admin) && typeof body.serialized !== 'boolean') {
-    const recategorised = doc.category_id !== prev.category_id || doc.sub_category_id !== prev.sub_category_id;
-    if (Array.isArray(body.catalog_ids) || recategorised) {
-      await refuseSerializedDrift(
-        c.env.DB,
-        prev,
-        Array.isArray(body.catalog_ids)
-          ? (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string')
-          : await catalogIdsFor(c.env.DB, prev.id),
-        [doc.category_id, doc.sub_category_id]
-      );
-    }
-  }
-
   // The stored ops_policy rides along under the two device fields the form
   // edits, so a save from a client that never saw size_class cannot erase it.
   if (prev) doc.ops_policy = { ...prev.ops_policy, ...doc.ops_policy };
+
+  // §29 (serial scan, 0178): whether a product needs a serial at preparation
+  // — and gets a warranty unit at delivery — is the OWNER's, on a create as
+  // on an update (S1 review #1), whichever key carries it (`serialized`, or
+  // `ops_policy.serialized`). Only a CHANGE of the effective answer is an
+  // attempt: the form echoes the stored value on every save, and that must
+  // keep working for any admin — but an echo of an INHERITED answer is not
+  // written down as the product's own (S1 review #4). RE-FILING a product
+  // whose own word is silent is the same change by another door (critique-1
+  // #23): its answer comes from its placement. One rule for every product
+  // door: `serializedWriteVerdict`.
+  if (!isOwner(c.env, admin)) {
+    const recategorised = !prev || doc.category_id !== prev.category_id || doc.sub_category_id !== prev.sub_category_id;
+    const sentCatalogs = Array.isArray(body.catalog_ids)
+      ? (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string')
+      : null;
+    const verdict = await serializedWriteVerdict(c.env.DB, {
+      prev: prev ? { id: prev.id, ops_policy: prev.ops_policy } : null,
+      requested: readOpsWarranty(mergeOpsPolicy(doc.ops_policy ?? {}, { serialized: doc.serialized })).serialized,
+      placement:
+        sentCatalogs || recategorised
+          ? {
+              catalogIds: sentCatalogs ?? (prev ? await catalogIdsFor(c.env.DB, prev.id) : []),
+              categoryIds: [doc.category_id, doc.sub_category_id],
+            }
+          : undefined,
+    });
+    if (verdict.refuse) throw serialRefuse(403, 'OWNER_ONLY', { field: 'serialized', via: verdict.refuse });
+    doc.serialized = verdict.keep;
+    if (verdict.keep === null) delete doc.ops_policy.serialized;
+    else doc.ops_policy.serialized = verdict.keep;
+  }
 
   // THE SAME GUARD FOR THE CONDITION DOCUMENT.
   //

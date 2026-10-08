@@ -12,7 +12,7 @@ import { world } from './fixtures/serialPrep';
 import { lineDevicePolicy, serializationContext, serializedProductSql, anySectionSerialPolicy } from '../worker/lib/serialPolicy';
 import { sweepDeliveredOrdersWithoutUnits } from '../worker/lib/deviceOps';
 import { templateShape, parseImport, blankTemplate } from '../worker/lib/importCsv';
-import { normKey, resolveProduct } from '../worker/lib/importApply';
+import { IMPORT_SERIALIZED_OWNER_ONLY, normKey, resolveProduct, serialImportIssue } from '../worker/lib/importApply';
 import type { CatalogRef, ImportMaps } from '../worker/lib/importApply';
 
 const PRODUCTS = ['pA1', 'pX2D', 'pAMS', 'pPLA', 'pAMS2', 'pNone'];
@@ -114,27 +114,35 @@ test('§29/critique-1 #23 re-filing a product whose own word is silent is the ow
   assert.equal((await put(w.as('adm'), '/api/admin/products-v2/pAMS/catalogs', { catalog_ids: ['ct_print'] })).status, 200);
 });
 
-test('§29 an import sheet that changes `serialized` is refused by line for anyone but the owner; an echo passes', () => {
+test('§29 an import sheet that changes `serialized` is refused by line for anyone but the owner; an echo passes', async () => {
+  // `resolveProduct` is pure; the preview route asks `serialImportIssue` (with
+  // the database: section policies, the stored filing) for every non-owner
+  // row — tests/serialLandingReview.test.ts drives the route itself.
+  const w = world();
   const shape = templateShape('printer', [], { includeCost: true });
   const parsed = parseImport(blankTemplate(shape, true), shape).products[0];
   const printers: CatalogRef = {
-    id: 'cat_printers', parent_id: null, slug: 'printers', name_en: 'Printers', name_ar: 'الطابعات', template_family: 'devices', is_printer_catalog: true,
+    id: 'ct_print', parent_id: null, slug: 'sp-printers', name_en: 'Printers', name_ar: 'طابعات', template_family: 'devices', is_printer_catalog: true,
   };
   const maps: ImportMaps = {
     brands: new Map(),
     catalogs: new Map([[normKey('Printers'), printers]]),
     facets: new Map(),
-    familyOf: new Map([['cat_printers', 'devices']]),
+    familyOf: new Map([['ct_print', 'devices']]),
     images: new Map(),
     productSlugs: new Map(),
   };
   let n = 0;
   const newId = (prefix: string) => `${prefix}_${++n}`;
-  const issuesOf = (serialized: boolean | null, owner: boolean) =>
-    resolveProduct({ ...parsed, category: 'Printers', serialized }, null, maps, { newId, money: true, owner }).issues.filter((i) => /^serialized: only the owner/.test(i.message));
-  assert.equal(issuesOf(false, false).length, 1, 'switching a printer off is refused');
-  assert.equal(issuesOf(false, false)[0].severity, 'error');
-  assert.equal(issuesOf(true, false).length, 0, 'the printer default, echoed');
-  assert.equal(issuesOf(null, false).length, 0, 'an empty cell keeps what is stored');
-  assert.equal(issuesOf(false, true).length, 0, 'the owner may');
+  const issueOf = async (serialized: boolean | null) => {
+    const p = { ...parsed, category: 'Printers', serialized };
+    const r = resolveProduct(p, null, maps, { newId, money: true });
+    assert.equal(r.issues.some((i) => /owner|المالك/.test(i.message)), false, 'the pure resolver judges nothing about who may');
+    return serialImportIssue(w.db, p, null, r);
+  };
+  const off = await issueOf(false);
+  assert.equal(off?.message, IMPORT_SERIALIZED_OWNER_ONLY, 'switching a printer off is refused');
+  assert.equal(off?.severity, 'error');
+  assert.equal(await issueOf(true), null, 'the printer default, echoed');
+  assert.equal(await issueOf(null), null, 'an empty cell keeps what is stored');
 });

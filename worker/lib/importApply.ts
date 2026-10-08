@@ -40,6 +40,7 @@ import type { AvailabilityType } from './availability';
 import { normalizeHashtag } from './hashtags';
 import type { ParsedMembershipRule, ParsedProduct, RowIssue } from './importCsv';
 import { printerWarrantyRules, readOpsWarranty } from './warrantyPlans';
+import { serializedWriteVerdict, type VerdictCache } from './serialPolicy';
 import { parseConditionDoc, type ConditionDoc } from './condition';
 import { DIMENSION_FIELDS, parseDimensions } from './productModel';
 import { isOwnedMediaUrl } from './mediaStorage';
@@ -174,6 +175,56 @@ export interface ImportMaps {
   };
 }
 
+/**
+ * §29 (serial scan, 0178) — the two refusals a non-owner's sheet row can
+ * meet, by line, in the three languages of the panel.
+ */
+export const IMPORT_SERIALIZED_OWNER_ONLY =
+  'serialized: تغيير حاجة هذا المنتج إلى رقم تسلسلي للمالك فقط — اترك الخانة فارغة لإبقاء المحفوظ / ' +
+  'only the owner can change whether this product needs a serial number — leave the cell empty to keep it / ' +
+  'تەنها خاوەن دەتوانێت بگۆڕێت کە ئەم بەرهەمە پێویستی بە ژمارەی زنجیرەیی هەیە یان نا — خانەکە بەتاڵ بهێڵەرەوە بۆ ئەوەی ئەوەی هەڵگیراوە بمێنێتەوە';
+export const IMPORT_SERIAL_REFILE_OWNER_ONLY =
+  'category: نقل هذا المنتج إلى هذا القسم يغيّر حاجته إلى رقم تسلسلي — هذا للمالك فقط / ' +
+  'filing this product under this section changes whether it needs a serial number — only the owner can do that / ' +
+  'دانانی ئەم بەرهەمە لەژێر ئەم بەشەدا دەیگۆڕێت کە پێویستی بە ژمارەی زنجیرەیی هەیە یان نا — تەنها خاوەن دەتوانێت ئەمە بکات';
+
+/**
+ * §29 FOR A NON-OWNER'S SHEET ROW (S1 review #2, regressions review #2).
+ * `resolveProduct` is pure and cannot see the section policies or what the
+ * product is filed under today, so the preview route asks here, through the
+ * same `serializedWriteVerdict` as the product form. The confirm writes the
+ * row's placement as exactly `catalogIds` (the sheet's section and
+ * sub-section), so that is the placement judged. Returns the row's error, or
+ * null; when the row only echoes an inherited answer, the document keeps the
+ * stored word instead of pinning the echo as the product's own.
+ */
+export async function serialImportIssue(
+  db: D1Database,
+  p: Pick<ParsedProduct, 'line' | 'serialized'>,
+  existing: Pick<ExistingShape, 'id' | 'doc'> | null,
+  r: Pick<ResolvedProduct, 'doc' | 'catalogIds'>,
+  cache?: VerdictCache
+): Promise<RowIssue | null> {
+  const stored = readOpsWarranty(existing?.doc.ops_policy ?? {}).serialized;
+  const requested = p.serialized ?? stored;
+  const verdict = await serializedWriteVerdict(
+    db,
+    {
+      prev: existing ? { id: existing.id, ops_policy: existing.doc.ops_policy ?? {} } : null,
+      requested,
+      placement: {
+        catalogIds: r.catalogIds,
+        categoryIds: [r.doc.category_id as string | null | undefined, r.doc.sub_category_id as string | null | undefined],
+      },
+    },
+    cache
+  );
+  if (verdict.refuse === 'flag') return err(p.line, IMPORT_SERIALIZED_OWNER_ONLY);
+  if (verdict.refuse === 'placement') return err(p.line, IMPORT_SERIAL_REFILE_OWNER_ONLY);
+  if (requested !== verdict.keep) r.doc.serialized = verdict.keep;
+  return null;
+}
+
 /** The message an ambiguous cell earns, in the sheet's own language.
  *  EXPORTED because the TXT import refuses an ambiguous brand/section name for
  *  exactly the same reason, and two hand-written copies of one sentence drift. */
@@ -273,8 +324,6 @@ export function resolveProduct(
     newId: (prefix: string) => string;
     money: boolean;
     specFieldIds?: string[];
-    /** False for every admin but the owner: a `serialized` cell that changes the answer is refused (§29, 0178). Absent = not checked. */
-    owner?: boolean;
   }
 ): ResolvedProduct {
   const issues: RowIssue[] = [];
@@ -779,16 +828,10 @@ export function resolveProduct(
     serialized: p.serialized ?? storedOps.serialized,
   };
   // §29 (serial scan, 0178): whether a product's units need a serial at
-  // preparation is the OWNER's — the same rule as the product form and the
-  // ops-policy route. Only a CHANGE is an attempt: an empty cell keeps what is
-  // stored, and a cell that repeats the stored (or printer-default) answer
-  // passes. Refused by line, so the sheet says which row to fix.
-  if (opts.owner === false && p.serialized !== null && p.serialized !== undefined) {
-    const before = storedOps.serialized ?? isPrinter;
-    if (p.serialized !== before) {
-      issues.push(err(p.line, 'serialized: only the owner can change whether this product needs a serial number — leave the cell empty to keep it'));
-    }
-  }
+  // preparation is the OWNER's. That needs the section policies and the
+  // stored filing, which this pure function does not read, so the preview
+  // route judges it (`serialImportIssue` below, through the same
+  // `serializedWriteVerdict` as the product form) — S1 review #2.
   // Extended warranty is for printers only (owner mandate). The rules and the
   // printer defaults (serialized, 12-month base) are applied here so the
   // PREVIEW refuses a warranty row on a non-printer with its line number; the
