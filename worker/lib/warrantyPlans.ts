@@ -122,7 +122,7 @@ export interface WarrantyGuardDoc {
  * The printer rules, synchronously, once printer-ness is known. Returns the
  * issues as messages (empty = fine) and, for a printer, fills the two
  * defaults the mandate implies: serialized (a printer is a device we track
- * per unit) and the 12-month base. Shared by the async guard below and by the
+ * per unit — new or used) and the 12-month base. Shared by the async guard below and by the
  * CSV resolver, which knows the catalog flag without a query.
  */
 export function printerWarrantyRules(doc: WarrantyGuardDoc, isPrinter: boolean): string[] {
@@ -148,10 +148,15 @@ export function printerWarrantyRules(doc: WarrantyGuardDoc, isPrinter: boolean):
         `warranty_plans: extended warranty is not sold on a used or refurbished unit — it carries ${doc.condition.warranty_months} month(s) of LEVONIS warranty (${WARRANTY_NOT_EXTENDABLE})`
       );
     }
-    // The owner's choice IS the base, and a used device is still tracked per
-    // unit so its certificate can name the months it actually carries.
+    // The owner's choice IS the base. A used PRINTER is tracked per unit, so
+    // its certificate can name the months it actually carries; a used
+    // non-printer follows its section policy (`catalogs.serial_policy`) or the
+    // owner's own setting — an AMS section set to «required» covers AMS-like
+    // devices — and ordinary accessories stay off (owner decision 4,
+    // 2026-10-09; DECISIONS row 192). No name matching (serialPolicy.ts), and
+    // nothing already stored is changed: an explicit word is always kept.
     doc.warranty_base_months = doc.condition.warranty_months;
-    if (doc.serialized === null) doc.serialized = true;
+    if (doc.serialized === null && isPrinter) doc.serialized = true;
     return issues;
   }
 

@@ -689,19 +689,30 @@ test('R2: the owner\'s writes carry no fence — his placement lands whatever ch
   }
 });
 
-test('R2: the fence leaves the pre-existing used-grade door exactly as it was — a non-owner\'s grade on a product with no word still writes `serialized: true`', async () => {
-  // docs/SERIAL_SCAN.md §29 and the owner question there: a used / open-box /
-  // refurbished grade turns tracking on for a product with no word of its
-  // own, whoever saves it. The answer fence must not turn that into a 409.
-  const w = world();
-  assert.equal(await effective(w, 'pPLA'), false);
-  const res = await post(w.as('adm'), '/api/admin/products-v2', {
-    id: 'pPLA', name_en: 'PLA spool', name_ar: 'خيط PLA', price_iqd: 25000, status: 'draft',
-    condition: { kind: 'used', grade: 'good', warranty_months: 1 },
-  });
-  assert.equal(res.status, 200, await res.clone().text());
-  assert.equal(opsOf(w, 'pPLA').serialized, true);
-  assert.equal(await effective(w, 'pPLA'), true);
+test('R2 under owner decision 4: a non-owner\'s grade on an accessory with no word writes no `serialized` (no 409); on a printer it still writes `true`, and the fence lets it through', async () => {
+  // docs/SERIAL_SCAN.md §29: until owner decision 4 (2026-10-09) a used /
+  // open-box / refurbished grade turned tracking on for ANY product with no
+  // word of its own. Now only a printer's grade does — and a printer already
+  // answers «needs a serial», so the word it writes flips nothing and the
+  // answer fence must not turn it into a 409.
+  for (const who of ['adm', 'ast'] as const) {
+    const w = world();
+    assert.equal(await effective(w, 'pPLA'), false);
+    const res = await post(w.as(who), '/api/admin/products-v2', {
+      id: 'pPLA', name_en: 'PLA spool', name_ar: 'خيط PLA', price_iqd: 25000, status: 'draft',
+      condition: { kind: 'used', grade: 'good', warranty_months: 1 },
+    });
+    assert.equal(res.status, 200, `${who}: ${await res.clone().text()}`);
+    assert.equal('serialized' in opsOf(w, 'pPLA'), false, `${who}: no word written on the accessory`);
+    assert.equal(await effective(w, 'pPLA'), false);
+    const printer = await post(w.as(who), '/api/admin/products-v2', {
+      id: 'pA1', name_en: 'Bambu Lab A1 Combo', name_ar: 'طابعة A1 كومبو', price_iqd: 899000, status: 'draft',
+      condition: { kind: 'refurbished', grade: 'excellent', warranty_months: 12 },
+    });
+    assert.equal(printer.status, 200, `${who}: ${await printer.clone().text()}`);
+    assert.equal(opsOf(w, 'pA1').serialized, true, `${who}: the used printer is tracked`);
+    assert.equal(await effective(w, 'pA1'), true);
+  }
 });
 
 test('R2: SERIAL_FILING_CHANGED has its three sentences in the contract, and the admin screens render it by code', () => {

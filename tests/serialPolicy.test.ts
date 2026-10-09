@@ -3,15 +3,19 @@
  * 0178, worker/lib/serialPolicy.ts): the product's own word, then the printer
  * flag, then the nearest section policy on its branch. The SQL twin used by
  * the delivered-units sweep must agree with the TypeScript rule on every
- * product, or the sweep would pick an order again on every run.
+ * product, or the sweep would pick an order again on every run. Owner
+ * decision 4 (2026-10-09): a used / open-box / refurbished grade turns
+ * tracking on by itself for a printer only (the tests at the end).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { json, post, put, row, count } from './fixtures/app';
-import { world } from './fixtures/serialPrep';
+import { json, post, put, get, patch, row, count, stubApp, ctx, type App } from './fixtures/app';
+import { world, order, USERS } from './fixtures/serialPrep';
+import { adminImportRoutes } from '../worker/routes/adminImport';
+import { applyPrinterWarrantyRules } from '../worker/lib/warrantyPlans';
 import { lineDevicePolicy, serializationContext, serializedProductSql, anySectionSerialPolicy } from '../worker/lib/serialPolicy';
 import { sweepDeliveredOrdersWithoutUnits } from '../worker/lib/deviceOps';
-import { templateShape, parseImport, blankTemplate } from '../worker/lib/importCsv';
+import { templateShape, parseImport, blankTemplate, toCsv } from '../worker/lib/importCsv';
 import { IMPORT_SERIALIZED_OWNER_ONLY, normKey, resolveProduct, serialImportIssue } from '../worker/lib/importApply';
 import type { CatalogRef, ImportMaps } from '../worker/lib/importApply';
 
@@ -146,4 +150,130 @@ test('§29 an import sheet that changes `serialized` is refused by line for anyo
   assert.equal(off?.severity, 'error');
   assert.equal(await issueOf(true), null, 'the printer default, echoed');
   assert.equal(await issueOf(null), null, 'an empty cell keeps what is stored');
+});
+
+// ====================================================================== owner decision 4
+
+/**
+ * OWNER DECISION 4 (2026-10-09; DECISIONS row 192): serial tracking turns on
+ * by itself for a used / open-box / refurbished device that needs a serial —
+ * a printer — and not for an ordinary accessory. An AMS-like device gets it
+ * from a section set to «required» or from the owner's own setting; nothing
+ * already stored is changed.
+ */
+type World = ReturnType<typeof world>;
+const USED = { kind: 'used', grade: 'good', warranty_months: 1 };
+const opsOf = (w: World, id: string) => JSON.parse(String(row<{ ops_policy: string }>(w.raw, 'SELECT ops_policy FROM products WHERE id = ?', id)!.ops_policy)) as Record<string, unknown>;
+async function effective(w: World, id: string): Promise<boolean> {
+  const p = row<{ ops_policy: string }>(w.raw, 'SELECT ops_policy FROM products WHERE id = ?', id)!;
+  return lineDevicePolicy(p.ops_policy, id, await serializationContext(w.db, [id])).serialized;
+}
+const DOCS: Record<string, { name_en: string; name_ar: string; price_iqd: number }> = {
+  pA1: { name_en: 'Bambu Lab A1 Combo', name_ar: 'طابعة A1 كومبو', price_iqd: 899000 },
+  pAMS: { name_en: 'Bambu Lab AMS Lite', name_ar: 'AMS لايت', price_iqd: 399000 },
+  pPLA: { name_en: 'PLA spool', name_ar: 'خيط PLA', price_iqd: 25000 },
+};
+const grade = (w: World, who: keyof typeof USERS, id: string) =>
+  post(w.as(who), '/api/admin/products-v2', { id, ...DOCS[id], status: 'draft', condition: USED });
+
+test('owner decision 4, the product form: a graded printer is tracked, a graded accessory is not, a graded AMS follows its «required» section — for the owner and an assistant alike', async () => {
+  for (const who of ['boss', 'ast'] as const) {
+    const w = world();
+    w.raw.exec(`UPDATE catalogs SET serial_policy = 'required' WHERE id = 'ct_ams'`);
+    for (const id of ['pA1', 'pAMS', 'pPLA']) {
+      const r = await grade(w, who, id);
+      assert.equal(r.status, 200, `${who} ${id}: ${await r.clone().text()}`);
+    }
+    assert.equal(opsOf(w, 'pA1').serialized, true, `${who}: a used printer is tracked per unit`);
+    assert.equal(await effective(w, 'pA1'), true);
+    assert.equal('serialized' in opsOf(w, 'pAMS'), false, `${who}: the AMS keeps following its section, nothing pinned`);
+    assert.equal(await effective(w, 'pAMS'), true, `${who}: …which says «required»`);
+    assert.equal('serialized' in opsOf(w, 'pPLA'), false, `${who}: an ordinary accessory gets no word`);
+    assert.equal(await effective(w, 'pPLA'), false, `${who}: and needs no serial`);
+    // The owner's explicit word survives a re-grade, either way.
+    w.raw.exec(`UPDATE products SET ops_policy = '{"serialized":true}' WHERE id = 'pPLA'`);
+    assert.equal((await grade(w, 'boss', 'pPLA')).status, 200);
+    assert.equal(opsOf(w, 'pPLA').serialized, true, 'an explicit word is kept');
+  }
+});
+
+test('owner decision 4: a graded accessory asks for no serial at preparation and gets no warranty unit at delivery; a graded AMS in a «required» section does', async () => {
+  const w = world();
+  w.raw.exec(`UPDATE catalogs SET serial_policy = 'required' WHERE id = 'ct_ams'`);
+  for (const id of ['pAMS', 'pPLA']) assert.equal((await grade(w, 'boss', id)).status, 200, id);
+  order(w.raw, 'ORD-USED', [{ id: 'lp', product: 'pPLA', qty: 2 }, { id: 'la', product: 'pAMS' }]);
+  const view = (await json(await get(w.as('adm'), '/api/admin/orders/ORD-USED/serials'))).serials;
+  assert.deepEqual(view.slots.map((s: { order_item_id: string }) => s.order_item_id), ['la'], 'one slot: the AMS');
+  assert.equal(view.required, 1);
+  assert.equal((await patch(w.as('boss'), '/api/admin/orders/ORD-USED/stage', { stage: 'delivered' })).status, 200);
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM order_item_units WHERE order_item_id = 'lp'"), 0, 'no unit for the accessory');
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM order_item_units WHERE order_item_id = 'la'"), 1, 'a unit for the AMS');
+});
+
+const IMPORT_HEAD = ['row_type', 'key', 'name', 'status', 'category', 'sub_category', 'price_iqd', 'serialized', 'condition_kind', 'condition_grade', 'condition_warranty_months'];
+const usedSheet = (...rows: Array<Record<string, string>>) =>
+  toCsv([
+    IMPORT_HEAD,
+    ...rows.map((r) =>
+      IMPORT_HEAD.map(
+        (h) => ({ row_type: 'product', status: 'draft', price_iqd: '100000', serialized: '', condition_kind: 'used', condition_grade: 'good', condition_warranty_months: '1', ...r })[h] ?? ''
+      )
+    ),
+  ]);
+const importApp = (w: World, who: keyof typeof USERS): App => stubApp(w.db, USERS[who], (a) => a.route('/api/admin/import', adminImportRoutes));
+async function importSheet(app: App, csv: string) {
+  const form = new FormData();
+  form.set('file', new File([csv], 'data.csv', { type: 'text/csv' }));
+  form.set('category', 'ct_acc');
+  const res = await app.request('/api/admin/import/preview', { method: 'POST', body: form, headers: { 'CF-Connecting-IP': '1.2.3.4' } }, undefined, ctx);
+  const preview = await json(res);
+  assert.equal(res.status, 200, JSON.stringify(preview));
+  const done = await app.request(
+    '/api/admin/import/confirm',
+    { method: 'POST', body: JSON.stringify({ import_id: preview.import_id }), headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' } },
+    undefined,
+    ctx
+  );
+  return { preview, done: await json(done) };
+}
+
+test('owner decision 4: the import sheet (preview and confirm) and the guard behind the TXT template give the form\'s answers — a graded printer tracked, a graded accessory not', async () => {
+  const w = world();
+  w.raw.exec(`
+    UPDATE catalogs SET template_family = 'devices' WHERE id IN ('ct_acc','ct_print');
+    UPDATE products SET category_id = 'ct_print' WHERE id = 'pA1';
+    UPDATE products SET category_id = 'ct_acc', sub_category_id = 'ct_fil' WHERE id = 'pPLA';
+  `);
+  // The import sheet, as a non-owner: both rows pass the preview and are written.
+  const { preview, done } = await importSheet(
+    importApp(w, 'adm'),
+    usedSheet(
+      { key: 'sp-a1', name: 'Bambu Lab A1 Combo', category: 'sp-printers' },
+      { key: 'sp-pla', name: 'PLA spool', category: 'sp-acc', sub_category: 'sp-fil' }
+    )
+  );
+  for (const r of preview.rows as Array<{ key: string; action: string; errors: string[] }>) assert.deepEqual(r.errors, [], JSON.stringify(r));
+  assert.equal(done.success, true, JSON.stringify(done));
+  for (const id of ['pA1', 'pPLA']) {
+    const doc = JSON.parse(String(row<{ condition_doc: string }>(w.raw, 'SELECT condition_doc FROM products WHERE id = ?', id)!.condition_doc));
+    assert.equal(doc.kind, 'used', `${id}: the grade was written`);
+  }
+  assert.equal(opsOf(w, 'pA1').serialized, true, 'a used printer is tracked');
+  assert.equal(await effective(w, 'pA1'), true);
+  assert.equal('serialized' in opsOf(w, 'pPLA'), false, 'a used accessory gets no word');
+  assert.equal(await effective(w, 'pPLA'), false);
+
+  // The TXT template, the product form, the admin product route and the
+  // import confirm all call applyPrinterWarrantyRules (the TXT template's own
+  // keys carry no grade today, so it reaches the rule only with what the
+  // document holds). The same answers from the guard itself:
+  const condition = { kind: 'used', grade: 'good', warranty_months: 1 } as never;
+  const guarded = async (id: string, catalogIds: string[]) => {
+    const doc = { id, category_id: null, sub_category_id: null, warranty_plans: [], serialized: null as boolean | null, warranty_base_months: null, condition };
+    await applyPrinterWarrantyRules(w.db, doc, catalogIds);
+    return doc.serialized;
+  };
+  assert.equal(await guarded('pA1', ['ct_print']), true);
+  assert.equal(await guarded('pPLA', ['ct_fil']), null);
+  assert.equal(await guarded('pAMS', ['ct_ams']), null, 'an AMS is not inferred: its section decides at read time');
 });

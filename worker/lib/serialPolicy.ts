@@ -427,9 +427,10 @@ export interface SerialAnswerFence {
  * word is one the write was allowed to store — the
  * stored word the verdict kept (unchanged since the read: the first check
  * holds the answer it gave), or the one pre-existing door that writes a word,
- * a used / open-box / refurbished grade on a product with none
- * (`printerWarrantyRules`, docs/SERIAL_SCAN.md §29), which this fence leaves
- * exactly as it was. The word itself is NOT fenced: a door that copied
+ * a used / open-box / refurbished grade on a PRINTER with none
+ * (`printerWarrantyRules`, docs/SERIAL_SCAN.md §29) — a printer already
+ * answers «needs a serial», so the word it writes changes no answer; since
+ * owner decision 4 (2026-10-09) a graded non-printer gets no word at all. The word itself is NOT fenced: a door that copied
  * `ops_policy` from its first read can write the owner's previous word back
  * if the owner changes it in that same moment (docs/SERIAL_SCAN.md, Known
  * limits — same-moment saves).

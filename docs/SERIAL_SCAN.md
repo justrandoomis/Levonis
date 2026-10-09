@@ -156,13 +156,22 @@ document's section). A non-owner never changes the product's own word: an echo
 of the effective answer passes and is NOT written down, so a product that
 inherits its answer keeps following its section.
 
-ONE OTHER DOOR changes the effective answer, and it predates this feature
-(live, `printerWarrantyRules` in worker/lib/warrantyPlans.ts): grading a
-product open-box, used or refurbished fills `serialized = true` when its word
-is silent, so a used / open-box / refurbished grade turns tracking ON for a
-product with no word of its own — whoever saves the grade, through the form,
-the import sheet or the TXT template. The owner can set it off on the product.
-It is kept as it is; see the owner questions below.
+USED / OPEN BOX / REFURBISHED (owner decision 4, 2026-10-09; DECISIONS row
+192). `printerWarrantyRules` in worker/lib/warrantyPlans.ts fills
+`serialized = true` on a graded product whose word is silent ONLY when it is
+a printer — and a printer already answers «needs a serial», so that fill
+changes no answer. A graded non-printer gets no word: its section policy or
+the owner's own setting decides at read time — an AMS section set to
+«required» covers AMS-like devices — and an ordinary accessory stays off.
+No name matching (AMS is never inferred), whoever saves the grade, through
+the form, the import sheet or the admin product route. Nothing stored is
+bulk-changed: a product that already carries `serialized = true` from an
+earlier grade keeps it until the owner switches it off on the product. The
+product form shows one read-only line under the grade («تتبّع الرقم
+التسلسلي: مفعّل — لأنه طابعة» …, `gradedSerialAnswer` in
+src/components/adminProducts/form/ConditionSection.tsx), and the section
+editor says that a used device needing a serial needs its section set to
+«مطلوب».
 
 The import sheet (round 3): a row writes the product's stored placements minus
 the section pair it had, plus the pair the sheet states (`importPlacements`) —
@@ -199,8 +208,8 @@ sets on both sides mean the write flipped nothing, whatever ran in between and
 whichever input changed (a placement, a flag, a policy, a parent, the owner's
 word). After a product write, a product that carries its OWN word passes the second
 check: its answer is that word, which no placement, flag, policy or parent can
-move — the stored word the verdict kept, or the used-grade fill below, which
-the fence leaves exactly as it was. The word itself is not fenced: a save that
+move — the stored word the verdict kept, or the used-printer fill above, which
+writes the answer the printer already had. The word itself is not fenced: a save that
 read the product just before the owner changed its word can write the old word
 back (see Known limits). A lost race answers 409 `SERIAL_FILING_CHANGED` (the contract's three
 sentences; the admin screens render it by code), and an import row fails
@@ -313,7 +322,8 @@ both policy controls.
 
 - SAME-MOMENT SAVES (round-4 review, accepted as known limits): the fences above stop a non-owner's write from FLIPPING an answer through placements, flags, policies or parents, but several doors still write fields they read a few milliseconds earlier, so a non-owner's save that runs at the same moment as an owner's change can carry the old value back — the classic last-save-wins of every save in the shop, not something a non-owner can aim. Known cases: the product form, bundles, mystery offers and the TXT template copy `ops_policy` from their first read, so the owner's new `serialized` word can be written back (the own-word exception of the answer fence lets it through); both catalog editors rewrite `is_printer_catalog` and `parent_id` from their own read on every save, including a plain rename or the «active» toggle, so an owner's flag or move made in that moment can be undone; an import row that names no section can write back a section pair the owner changed between the confirm's re-read and that row's batch (the shelves stay the owner's, so section and shelves can disagree until the next save); deleting an empty catalog is not fenced against a product filed into it in the same moment (the placement cascades away); and the catalog-edit verdict counts a product filed under a catalog only by `category_id` (no shelf row) as becoming a printer, which the resolver never does — an extra 403 for a non-owner, never a wrong answer. Closing them means the same value-compared write condition on each door (`WHERE … AND ops_policy IS ?`, `… AND is_printer_catalog = ? AND parent_id IS ?`) with a retry message.
 
-- A used / open-box / refurbished grade turns serial tracking ON for a product with no `serialized` word of its own (live before this feature; see §29 above). Should a NON-owner's used grade still turn tracking on, or should that be the owner's call like every other door that flips the answer?
+- ANSWERED (owner decision 4, 2026-10-09; DECISIONS row 192): a used / open-box / refurbished grade turns serial tracking on by itself for a printer only; every other graded product follows its section policy or the owner's own setting (§29 above). Products graded before the decision that already carry `serialized = true` are not changed; the owner may review them.
+- The TXT template carries no grade: its export writes no `condition_*` lines for a product, and an update through it writes `condition_doc` back to new (`{}`), un-grading a used listing (pre-existing; seen while testing decision 4, not changed here). Grade products through the form or the import sheet until it is fixed.
 
 ## Live checks after the deploy (read-only)
 
@@ -345,9 +355,10 @@ Every case runs the real routes over the real migrations (`tests/fixtures/serial
 | `serialVisibilityRoles` | decision 1 (row 192): the matrix of owner / full / assistant / preparer / support over every admin serial surface, order numbers by `canMoveMoney`; customers, merchants and visitors unchanged; `receive` on every intake door, edits on their old gates, the owner never locked out; every exception owner-only and audited; no cost to the newly unmasked roles; the predicate and its static nets |
 | `serialPrepCritique` | H4, M2, M3, M4, M13, M15, M1 / L14 flags, L6 |
 | `serialPrepDeployAhead` | the code on the database one migration behind: every new door 503, HEAD behaviour everywhere else, and the feature live the moment the migration lands (no cached «not installed») |
-| `serialPolicy`, `serialPrepBoard`, `serialPrepUi` | §29 policy; the board chip; the screens (wedge, sources, strings, Sorani) |
+| `serialPolicy`, `serialPrepBoard`, `serialPrepUi` | §29 policy, and decision 4 (a graded printer tracked, a graded accessory not, a graded AMS by its «required» section — the form, the import sheet, the shared guard; no preparation slot and no unit for a graded accessory); the board chip; the screens (wedge, sources, strings, Sorani, the graded listing's tracking line and the section hint) |
+| `conditionRules` | the grade's warranty rules, and decision 4 at the rule itself: a grade fills `serialized` for a printer only; an explicit word is never overwritten |
 | `serialLandingReview` | the landing reviews' findings, one test each by name: a new product's flag (form create), the echo that must not pin an inherited answer, the import sheet's section policy and re-filing, the TXT template, the serial page masked at every depth (and the rebuilt «added» row's id), the contract's one sentence, re-parenting a section, the products-v2 catalog editor's printer flag and re-parent |
-| `serialLandingReview2` | round 3, one test per finding: the printer flag judged by its flips (empty catalog, worded products, a silent product, create); the import keeping extra placements (price row, owner, a move) and re-reading the live row at confirm (an owner's later word survives; a row the live row refuses fails alone); OWNER_ONLY in ar / en / ckb on the admin screens; the unit history and the warranty receipt masked; the serial page's 503 when its story fails; the bundle and mystery editors' §29 check; no units for a bundle parent (delivery and the sweep). Round 4: a flag and a re-parent judged as one edit (refused together, the halves alone as before, a whole that flips nothing passes, the owner); the write-time fence both ways (`afterReadsOf`: placement vs printer flag on both catalog editors, the product form), no fence and no new statement on the owner's writes, the used-grade door unchanged, `SERIAL_FILING_CHANGED`'s three sentences; the import confirm failing only the row whose ops_policy changed under it; a sheet with no section keeping the live filing |
+| `serialLandingReview2` | round 3, one test per finding: the printer flag judged by its flips (empty catalog, worded products, a silent product, create); the import keeping extra placements (price row, owner, a move) and re-reading the live row at confirm (an owner's later word survives; a row the live row refuses fails alone); OWNER_ONLY in ar / en / ckb on the admin screens; the unit history and the warranty receipt masked; the serial page's 503 when its story fails; the bundle and mystery editors' §29 check; no units for a bundle parent (delivery and the sweep). Round 4: a flag and a re-parent judged as one edit (refused together, the halves alone as before, a whole that flips nothing passes, the owner); the write-time fence both ways (`afterReadsOf`: placement vs printer flag on both catalog editors, the product form), no fence and no new statement on the owner's writes, the used-grade door under decision 4 (a graded accessory gets no word, a graded printer still writes `true` and passes the fence), `SERIAL_FILING_CHANGED`'s three sentences; the import confirm failing only the row whose ops_policy changed under it; a sheet with no section keeping the live filing |
 | `serialPrepReview` | the three reviews' findings, one test each by name: re-delivery without a scan, the registration a cancel revoked, the post-delivery / replacement / void doors re-checked inside their writes, a lot recorded after the scan, take-from-order's window, the fence under an unneeded reason, a change on a full line, op_id retries, atomic activation, in-batch adoption, the canonicaliser on returns and bulk add, placement by category, the masked serial page, re-link by binding; and the screens (focus, the queued burst, warnings until «تم», accessible names, plurals) |
 
 ## Renumbering

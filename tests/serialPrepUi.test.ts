@@ -30,6 +30,7 @@ import { looksLikeBoxSn, overrideFor, serialRefusal } from '../src/components/ad
 import { gateRefusalOf } from '../src/components/adminOrders/serials/SerialGateRefusal';
 import { withSlot } from '../src/components/adminOrders/serials/UnitSerialSlots';
 import { eventLabel } from '../src/components/adminWarranty/serial/SerialDetail';
+import { gradedSerialAnswer } from '../src/components/adminProducts/form/ConditionSection';
 import { ApiError } from '../src/lib/api';
 import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
 
@@ -261,6 +262,32 @@ test('every serial-scan line exists in all three languages, and the Sorani is So
   assert.equal(REFUSAL_STRINGS.SERIALS_REQUIRED.ar, 'تبقى أرقام تسلسلية غير مرتبطة لهذا الطلب.');
   assert.equal(REFUSAL_STRINGS.SERIAL_IN_USE.ar, 'هذا الرقم التسلسلي مرتبط بطلب آخر.');
   assert.equal(REFUSAL_STRINGS.SERIAL_PRODUCT_MISMATCH.ar, 'الرقم التسلسلي لا يطابق هذا المنتج.');
+});
+
+test('owner decision 4 on the product form: a graded listing says whether serial tracking is on and why — the product, the printer, the section, the default — in the server\'s order', () => {
+  const none = { policy: null, sectionName: null };
+  assert.deepEqual(gradedSerialAnswer({ own: null, isPrinter: true, section: none }), { on: true, source: 'printer' });
+  assert.deepEqual(gradedSerialAnswer({ own: null, isPrinter: false, section: none }), { on: false, source: 'default' }, 'an ordinary accessory stays off');
+  assert.deepEqual(gradedSerialAnswer({ own: null, isPrinter: false, section: { policy: 'required', sectionName: 'AMS' } }), { on: true, source: 'section' });
+  assert.deepEqual(gradedSerialAnswer({ own: null, isPrinter: false, section: { policy: 'off', sectionName: 'Filament' } }), { on: false, source: 'section' });
+  assert.deepEqual(gradedSerialAnswer({ own: false, isPrinter: true, section: none }), { on: false, source: 'product' }, 'the product\'s own word wins');
+  assert.deepEqual(gradedSerialAnswer({ own: true, isPrinter: false, section: { policy: 'off', sectionName: 'x' } }), { on: true, source: 'product' });
+  // The words, in three languages; the hint quotes the section control's own label.
+  const { ar, en, ckb } = SERIAL_STRINGS;
+  assert.equal(ar.usedSerialLine(ar.usedStateOn, ar.usedSourcePrinter), 'تتبّع الرقم التسلسلي: مفعّل — لأنه طابعة');
+  assert.equal(en.usedSerialLine(en.usedStateOff, en.usedSourceDefault), 'Serial tracking: off — the default');
+  assert.equal(ckb.usedSerialLine(ckb.usedStateOn, ckb.usedSourceSection('AMS')), 'بەدواداچوونی ژمارەی زنجیرەیی: چالاکە — سیاسەتی بەشی «AMS»');
+  assert.ok(ar.sectionUsedHint.includes(`«${ar.policyRequired}»`), ar.sectionUsedHint);
+  assert.ok(en.sectionUsedHint.includes(`“${en.policyRequired}”`), en.sectionUsedHint);
+  assert.ok(ckb.sectionUsedHint.includes(`«${ckb.policyRequired}»`), ckb.sectionUsedHint);
+  for (const line of [ckb.usedStateOn, ckb.usedStateOff, ckb.usedSourceProduct, ckb.usedSourcePrinter, ckb.usedSourceSection('x'), ckb.usedSourceDefault, ckb.sectionUsedHint, ckb.usedSerialLine('a', 'b')]) {
+    assert.doesNotMatch(line, /[ةىيك]/, `no Arabic-only letter in the Sorani: «${line}»`);
+  }
+  // Wired: the form passes what decides it, the line shows on a graded listing only, the section editor shows the hint.
+  assert.match(read('src/components/adminProducts/ProductForm.tsx'), /serialTracking=\{\{ own: doc\.serialized \?\? null, isPrinter: isPrinterCatalog, section: sectionSerial \}\}/);
+  const cond = read('src/components/adminProducts/form/ConditionSection.tsx');
+  assert.ok(cond.indexOf('data-graded-serial-tracking') > cond.indexOf('{condition && ('), 'the line sits inside the graded block');
+  assert.match(read('src/components/adminTaxonomy/SectionsTab.tsx'), /\{ss\.sectionUsedHint\}/);
 });
 
 test('the scanner\'s Sorani is complete — no line spreads the Arabic any more (spec §5.8, DECISIONS row 183)', () => {

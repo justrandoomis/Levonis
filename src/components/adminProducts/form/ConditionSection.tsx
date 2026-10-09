@@ -1,5 +1,8 @@
 import React from 'react';
+import { ScanLine } from 'lucide-react';
 import { Field, Grid } from './formUi';
+import { useLanguage } from '../../../LanguageContext';
+import { serialStrings } from '../../adminOrders/serials/strings';
 import {
   CONDITION_GRADES_UI,
   CONDITION_KINDS_UI,
@@ -26,7 +29,30 @@ import {
  * The section states the two consequences in plain words, because they are
  * decisions the owner is making on the customer's behalf and a form that hides
  * them is a form that lets them be made by accident.
+ *
+ * SERIAL TRACKING OF A GRADED LISTING (owner decision 4, 2026-10-09): a used
+ * printer is tracked per unit; a used non-printer follows its section policy
+ * or the product's own setting, and an ordinary accessory stays off. One
+ * read-only line says which, computed from what the form already holds — the
+ * same order the server resolves it in (worker/lib/serialPolicy.ts), so the
+ * form says what the order screen will do. The setting itself is changed in
+ * the warranty block above (the owner's).
  */
+
+export interface GradedSerialTracking {
+  /** The product's own `serialized` word, or null when it has none. */
+  own: boolean | null;
+  isPrinter: boolean;
+  section: { policy: 'required' | 'off' | null; sectionName: string | null };
+}
+
+/** The answer and where it comes from: the product's word, the printer flag, the nearest section, the default. */
+export function gradedSerialAnswer(t: GradedSerialTracking): { on: boolean; source: 'product' | 'printer' | 'section' | 'default' } {
+  if (t.own !== null) return { on: t.own, source: 'product' };
+  if (t.isPrinter) return { on: true, source: 'printer' };
+  if (t.section.policy && t.section.sectionName) return { on: t.section.policy === 'required', source: 'section' };
+  return { on: false, source: 'default' };
+}
 
 const EMPTY: ConditionEntry = {
   kind: 'open_box',
@@ -47,9 +73,12 @@ export function ConditionSection({
   condition,
   onChange,
   inUsedSection = false,
+  serialTracking,
 }: {
   condition: ConditionEntry | null;
   onChange: (next: ConditionEntry | null) => void;
+  /** What decides serial tracking for this product (owner decision 4); the line shows only on a graded listing. */
+  serialTracking?: GradedSerialTracking;
   /**
    * The product is filed under «المستعمل» (0147). A unit there with no
    * condition would be sold as NEW — no grade, no hours, a new printer's
@@ -60,6 +89,19 @@ export function ConditionSection({
   const set = <K extends keyof ConditionEntry>(key: K, value: ConditionEntry[K]) => {
     onChange({ ...(condition ?? EMPTY), [key]: value });
   };
+  const { lang } = useLanguage();
+  const ss = serialStrings(lang);
+  const tracking = serialTracking ? gradedSerialAnswer(serialTracking) : null;
+  const trackingSource =
+    !tracking || !serialTracking
+      ? ''
+      : tracking.source === 'product'
+        ? ss.usedSourceProduct
+        : tracking.source === 'printer'
+          ? ss.usedSourcePrinter
+          : tracking.source === 'section'
+            ? ss.usedSourceSection(serialTracking.section.sectionName ?? '')
+            : ss.usedSourceDefault;
 
   return (
     <div>
@@ -104,6 +146,18 @@ export function ConditionSection({
             الرأي (يبقى مشمولاً إذا وصل تالفاً أو كان خاطئاً)، ولا تُباع عليه خطط
             ضمان ممدّد — الضمان هو ما تختاره هنا.
           </p>
+
+          {tracking && (
+            <p
+              role="status"
+              data-graded-serial-tracking={tracking.on ? 'on' : 'off'}
+              data-graded-serial-source={tracking.source}
+              className="mb-3 flex items-start gap-1.5 text-[12px] leading-relaxed text-zinc-300"
+            >
+              <ScanLine className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" aria-hidden />
+              <span className="min-w-0">{ss.usedSerialLine(tracking.on ? ss.usedStateOn : ss.usedStateOff, trackingSource)}</span>
+            </p>
+          )}
 
           <Grid cols={3}>
             <Field ar="درجة الحالة" en="Grade" htmlFor="condition-grade">

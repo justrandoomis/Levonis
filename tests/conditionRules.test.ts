@@ -65,12 +65,13 @@ test('a used NON-printer is graded too, and still sells no coverage', () => {
   const doc = guard({ condition: usedDoc(1) });
   assert.deepEqual(printerWarrantyRules(doc as never, false), []);
   assert.equal(doc.warranty_base_months, 1);
+  assert.equal(doc.serialized, null, 'owner decision 4: grading an accessory does not switch serial tracking on');
 
   const withPlan = guard({ condition: usedDoc(1), warranty_plans: [EXTENSION] });
   assert.match(printerWarrantyRules(withPlan as never, false)[0], new RegExp(WARRANTY_NOT_EXTENDABLE));
 });
 
-test('a used device is serialized, so its certificate can name its months', () => {
+test('a used PRINTER is serialized, so its certificate can name its months', () => {
   const doc = guard({ condition: usedDoc(1) });
   printerWarrantyRules(doc as never, true);
   assert.equal(doc.serialized, true);
@@ -79,4 +80,31 @@ test('a used device is serialized, so its certificate can name its months', () =
   const unserialized = guard({ condition: usedDoc(1), serialized: false });
   printerWarrantyRules(unserialized as never, false);
   assert.equal(unserialized.serialized, false);
+});
+
+test('owner decision 4 (2026-10-09): a grade turns tracking on for a printer only; a non-printer keeps its own word or none', () => {
+  for (const kind of ['open_box', 'used', 'refurbished'] as const) {
+    const condition = parseConditionDoc({ kind, grade: 'good', warranty_months: 1 });
+    // A printer with no word of its own: tracked per unit.
+    const printer = guard({ condition });
+    printerWarrantyRules(printer as never, true);
+    assert.equal(printer.serialized, true, `${kind} printer`);
+    // An accessory (or an AMS — no name matching here) with no word: unset,
+    // so its section policy or the owner's own setting decides at read time.
+    const accessory = guard({ condition });
+    printerWarrantyRules(accessory as never, false);
+    assert.equal(accessory.serialized, null, `${kind} accessory`);
+    // An explicit word is never overwritten, either way.
+    for (const word of [true, false]) {
+      for (const isPrinter of [true, false]) {
+        const own = guard({ condition, serialized: word });
+        printerWarrantyRules(own as never, isPrinter);
+        assert.equal(own.serialized, word, `${kind} · printer ${isPrinter} · own word ${word}`);
+      }
+    }
+  }
+  // A NEW accessory is untouched too (the rule this decision must not disturb).
+  const fresh = guard();
+  printerWarrantyRules(fresh as never, false);
+  assert.equal(fresh.serialized, null);
 });

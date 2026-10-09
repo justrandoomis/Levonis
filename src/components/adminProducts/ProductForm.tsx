@@ -1667,6 +1667,7 @@ export default function ProductForm({
             condition={doc.condition ?? null}
             onChange={(next) => setDoc((d) => ({ ...d, condition: next }))}
             inUsedSection={inUsedSection}
+            serialTracking={{ own: doc.serialized ?? null, isPrinter: isPrinterCatalog, section: sectionSerial }}
           />
         </div>
 

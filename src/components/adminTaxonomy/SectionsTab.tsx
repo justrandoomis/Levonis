@@ -609,6 +609,8 @@ function SectionDialog({
               )}
             </div>
             <p className="text-[11.5px] leading-relaxed text-[var(--ap-text-3)]">{ss.sectionPolicyHint}</p>
+            {/* Owner decision 4 (2026-10-09): a used printer is tracked by itself; any other used device by its section. */}
+            <p className="text-[11.5px] leading-relaxed text-[var(--ap-text-3)]" data-tax-serial-used-hint>{ss.sectionUsedHint}</p>
             {owner ? (
               <Segmented
                 group="section-serial-policy"

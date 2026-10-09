@@ -195,6 +195,17 @@ export interface SerialStrings {
   sectionBadgeRequired: string;
   sectionBadgeOff: string;
   printerNeverOff: string;
+  // ---- a graded (used / open box / refurbished) listing (owner decision 4) --
+  /** The read-only line under the grade: «Serial tracking: {state} — {source}». */
+  usedSerialLine: Fmt<[string, string]>;
+  usedStateOn: string;
+  usedStateOff: string;
+  usedSourceProduct: string;
+  usedSourcePrinter: string;
+  usedSourceSection: Fmt<[string]>;
+  usedSourceDefault: string;
+  /** Beside the section's serial policy: what a used device that needs a serial asks of it. */
+  sectionUsedHint: string;
 }
 
 const ar: SerialStrings = {
@@ -419,6 +430,14 @@ const ar: SerialStrings = {
   sectionBadgeRequired: 'رقم تسلسلي مطلوب',
   sectionBadgeOff: 'بلا رقم تسلسلي',
   printerNeverOff: 'الطابعات تبقى مُرقّمة دائمًا مهما كان إعداد القسم.',
+  usedSerialLine: (state, source) => `تتبّع الرقم التسلسلي: ${state} — ${source}`,
+  usedStateOn: 'مفعّل',
+  usedStateOff: 'غير مفعّل',
+  usedSourceProduct: 'إعداد المنتج',
+  usedSourcePrinter: 'لأنه طابعة',
+  usedSourceSection: (n) => `سياسة القسم «${n}»`,
+  usedSourceDefault: 'الافتراضي',
+  sectionUsedHint: 'للأجهزة المستعملة التي تحتاج رقمًا تسلسليًا (مثل AMS) اجعل سياسة قسمها «مطلوب»؛ الملحقات العادية لا تحتاجه.',
 };
 
 const en: SerialStrings = {
@@ -643,6 +662,14 @@ const en: SerialStrings = {
   sectionBadgeRequired: 'Serial required',
   sectionBadgeOff: 'No serial',
   printerNeverOff: 'Printers always stay serialized, whatever the section says.',
+  usedSerialLine: (state, source) => `Serial tracking: ${state} — ${source}`,
+  usedStateOn: 'on',
+  usedStateOff: 'off',
+  usedSourceProduct: 'the product’s own setting',
+  usedSourcePrinter: 'because it is a printer',
+  usedSourceSection: (n) => `the “${n}” section policy`,
+  usedSourceDefault: 'the default',
+  sectionUsedHint: 'For used devices that need a serial (such as an AMS), set their section’s policy to “Required”; ordinary accessories do not need one.',
 };
 
 const ckb: SerialStrings = {
@@ -867,6 +894,14 @@ const ckb: SerialStrings = {
   sectionBadgeRequired: 'ژمارەی زنجیرەیی پێویستە',
   sectionBadgeOff: 'بێ ژمارەی زنجیرەیی',
   printerNeverOff: 'چاپکەرەکان هەمیشە ژمارەدار دەمێننەوە، هەرچی ڕێکخستنی بەشەکە بێت.',
+  usedSerialLine: (state, source) => `بەدواداچوونی ژمارەی زنجیرەیی: ${state} — ${source}`,
+  usedStateOn: 'چالاکە',
+  usedStateOff: 'ناچالاکە',
+  usedSourceProduct: 'ڕێکخستنی خودی بەرهەمەکە',
+  usedSourcePrinter: 'چونکە چاپکەرە',
+  usedSourceSection: (n) => `سیاسەتی بەشی «${n}»`,
+  usedSourceDefault: 'بنەڕەت',
+  sectionUsedHint: 'بۆ ئامێرە بەکارهاتووەکان کە ژمارەی زنجیرەییان پێویستە (وەک AMS)، سیاسەتی بەشەکەیان بکە بە «پێویستە»؛ پاشکۆ ئاساییەکان پێویستیان پێی نییە.',
 };
 
 export const SERIAL_STRINGS: Record<Language, SerialStrings> = { ar, en, ckb };
