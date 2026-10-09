@@ -124,9 +124,9 @@ export function Eyebrow({ children, id }: { children: React.ReactNode; id?: stri
 }
 
 /** An LTR island for a decimal or a measure, tabular, so it never reorders in Arabic. */
-export function Figure({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+export function Figure({ children, className = '', title }: { children: React.ReactNode; className?: string; title?: string }) {
   return (
-    <bdi dir="ltr" className={`whitespace-nowrap tabular-nums ${className}`}>
+    <bdi dir="ltr" title={title} className={`whitespace-nowrap tabular-nums ${className}`}>
       {children}
     </bdi>
   );
@@ -140,6 +140,17 @@ export function Figure({ children, className = '' }: { children: React.ReactNode
  */
 export function PricingFailure({ error, lang, onRetry, fallback }: { error: unknown; lang: Language; onRetry?: () => void; fallback: string }) {
   if (error instanceof ApiError && error.code === 'OWNER_EMAIL_UNVERIFIED') return <OwnerCostVerifyCard />;
+  // A database the new code arrived ahead of (503 PRICING_NOT_INSTALLED): a calm
+  // notice in the contract's words — not «a server error» with a Retry that
+  // cannot help until the migration runs (FX-1 UX review #3).
+  if (error instanceof ApiError && error.code === 'PRICING_NOT_INSTALLED') {
+    return (
+      <div role="status" data-pricing-not-installed className="lv-alert lv-alert-info flex items-start gap-3">
+        <Info aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-info" />
+        <p className="text-[14px] leading-relaxed text-text-primary">{apiRefusal(error, lang, fallback)}</p>
+      </div>
+    );
+  }
   if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 401 && error.status !== 404) {
     return (
       <div role="alert" data-pricing-refusal={error.code ?? error.status} className="lv-alert lv-alert-danger flex items-start gap-3">

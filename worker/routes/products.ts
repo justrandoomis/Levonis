@@ -19,7 +19,7 @@ import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../
 import { ProductViewedV1 } from '@levonis/contracts/events/v1/ProductViewed';
 import { notFound, int, str } from '../lib/http';
 import { getSetting, getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
-import { getDisplayUsdRate } from '../lib/fx/displayRate';
+import { getPublicDisplayRate } from '../lib/fx/displayRate';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { parseProductRow, projectPublic, projectAdmin } from '../lib/productModel';
 import type { ProductDoc } from '../lib/productModel';
@@ -4268,8 +4268,8 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
   const ctxPromise = pricingCtx(c);
   const settingsPromise = getSettings(c.env.DB, PUBLIC_SETTING_KEYS);
   // The display currency's rate (FX plan §8): the one public FX figure, in the first wave.
-  const displayRatePromise = getDisplayUsdRate(c.env.DB);
-  const [settings, discounted, latest, openBoxRows, categories, brands, ctx, displayUsdRate] = await Promise.all([
+  const displayRatePromise = getPublicDisplayRate(c.env.DB);
+  const [settings, discounted, latest, openBoxRows, categories, brands, ctx, display] = await Promise.all([
     settingsPromise,
     /**
      * THE DISCOUNTS STRIP SELECTED ON A RETIRED CONCEPT, so it was always empty.
@@ -4371,7 +4371,7 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
     ...raw,
     homeBanners: normalizeHomeBanners(raw.homeBanners),
     homeSectionItems: normalizeSectionItems(raw.homeSectionItems),
-    displayUsdRate,
+    ...display,
   };
 
   // THE HOME CARDS PRICE FROM THE SAME PLACE THE CART DOES. Without the

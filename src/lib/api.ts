@@ -1531,6 +1531,8 @@ export interface PublicSettings {
    * display then falls back to `exchangeRate`. The only FX figure that is public.
    */
   displayUsdRate?: string | null;
+  /** True when that rate is the provider's figure (credited to IQWealth); false when the owner typed it (FX-1 review #10). */
+  displayUsdRateAttributed?: boolean | null;
   currency: 'IQD' | 'USD';
   adVideoUrl: string;
   paymentMethods: ManualPaymentMethod[];

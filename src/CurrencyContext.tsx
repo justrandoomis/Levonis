@@ -142,6 +142,8 @@ export interface DisplayRate {
   /** IQD per 1 USD, exact decimal text. */
   text: string;
   source: DisplayRateSource;
+  /** The shop's rate is the provider's figure (credited to IQWealth); false when the owner typed it. */
+  attributed?: boolean;
 }
 
 /**
@@ -157,10 +159,11 @@ export function resolveDisplayRate(input: {
   displayUsdRate: unknown;
   exchangeRate: unknown;
   cached: string | null;
+  attributed?: boolean;
 }): DisplayRate | null {
   if (input.settingsLoaded) {
     const shop = usableRate(input.displayUsdRate);
-    if (shop) return { text: shop, source: 'shop' };
+    if (shop) return { text: shop, source: 'shop', attributed: input.attributed !== false };
     const wallet = typeof input.exchangeRate === 'number' ? usableRate(String(input.exchangeRate)) : null;
     return wallet ? { text: wallet, source: 'wallet' } : null;
   }
@@ -235,7 +238,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     () => readStored() ?? DEFAULT_DISPLAY_CURRENCY
   );
   const [cached] = useState<string | null>(() => readCachedDisplayRate());
-  const { exchangeRate, displayUsdRate } = useWallet();
+  const { exchangeRate, displayUsdRate, displayUsdRateAttributed: attributed } = useWallet();
 
   const setCurrency = useCallback((next: DisplayCurrency) => {
     setCurrencyState(next);
@@ -256,8 +259,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   // `undefined` until the settings arrive; null when the server sends none.
   const settingsLoaded = displayUsdRate !== undefined;
   const rate = useMemo(
-    () => resolveDisplayRate({ settingsLoaded, displayUsdRate, exchangeRate, cached }),
-    [settingsLoaded, displayUsdRate, exchangeRate, cached]
+    () => resolveDisplayRate({ settingsLoaded, displayUsdRate, exchangeRate, cached, attributed }),
+    [settingsLoaded, displayUsdRate, exchangeRate, cached, attributed]
   );
 
   // The next first paint starts from the rate prices were just shown at

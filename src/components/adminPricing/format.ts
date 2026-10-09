@@ -8,6 +8,7 @@
  * tab does without loading the tab's words.
  */
 import type { Language } from '../../translations';
+import { roundDecimalText } from '../../lib/rateText';
 
 type Lang = Language;
 
@@ -67,3 +68,35 @@ export const readDecimal = (text: string | null | undefined, lang: Lang) => loca
 /** A whole number (grams, millimetres, a count) for reading in the reader's digits. */
 export const readWhole = (n: number | null | undefined, lang: Lang) => localizeDigits(groupWhole(n), lang);
 
+
+/**
+ * THE EXCHANGE-RATE PANEL WRITES ITS FIGURES IN LATIN DIGITS — «1,873.655»,
+ * «0.149202», «3.6», «12» — in every language, and every number in it (rates,
+ * percentages, counts, the digits of a date) the same way, so a card never
+ * mixes two digit systems (FX-1 UX review #1, #10). On an Arabic system the
+ * localized form of a rate with a fraction put U+066C (thousands) and U+066B
+ * (decimal) side by side, which Cairo draws almost alike: EUR/IQD
+ * «١٬٨٧٣٫٦٥٥» read as 1,873,655. A rate is a technical figure written as
+ * the provider, the bank and the customer menu (src/lib/rateText.ts) write
+ * it; the P1 product sheet keeps its dinars in the reader's digits.
+ */
+export const fxFigure = (text: string | null | undefined): string => groupDecimal(text);
+export const fxCount = (n: number | null | undefined): string => groupWhole(n);
+
+/** A figure as SHOWN: rounded for reading when `places` says so («≈»), the exact text kept for a tooltip. */
+export interface ShownFigure {
+  text: string;
+  exact: string;
+  approx: boolean;
+}
+
+/**
+ * `places` null: the server's text, grouped. A number: rounded half up to
+ * that many decimals AS TEXT (never through a float) — CNY/USD carries ten
+ * decimals and EUR/IQD three, which no one reads (UX review #1).
+ */
+export function shownFigure(text: string, places: number | null): ShownFigure {
+  if (places === null) return { text: groupDecimal(text), exact: groupDecimal(text), approx: false };
+  const rounded = roundDecimalText(text, places);
+  return { text: groupDecimal(rounded), exact: groupDecimal(text), approx: rounded !== text };
+}

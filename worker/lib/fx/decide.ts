@@ -17,10 +17,13 @@
  *       fetch is validated.
  *    6  no applied rate yet → held, FIRST_VALUE.
  *    7  back to automatic beyond T → held, BACK_TO_AUTO.
- *    8  within T of a value the owner rejected in the last 24 h → DEFERRED.
+ *    8  a HOLD (6, 7, 10–12) within T of a value the owner rejected in the
+ *       last 24 h → DEFERRED instead: no hold, no bell. It never stops an
+ *       apply or the dead band (FX-1 review C1, C2).
  *    9  inside the dead band → UNCHANGED (a pending candidate is cleared).
  *   10  beyond T of a → held, ANOMALY.
- *   11  beyond T of r24 → held, ANOMALY_24H.
+ *   11  beyond T of r24 → held, ANOMALY_24H; r24 is the anchor when the
+ *       owner confirmed a rate in the last 24 h (FX-1 review C5).
  *   12  beyond D of the anchor → held, DRIFT.
  *   13  otherwise APPLIED (the anchor does not move).
  *
@@ -160,6 +163,8 @@ export interface DecisionContext {
 export const FUTURE_TOLERANCE_MS = 5 * 60_000;
 export const REJECT_MEMORY_MS = 24 * HOUR_MS;
 export const BELL_EVERY_MS = 24 * HOUR_MS;
+/** The 24-hour guard's window (step 11). */
+export const R24_WINDOW_MS = 24 * HOUR_MS;
 /** The fixed sanity band on USD/IQD, as the pricing_fx_rates CHECK has it (critique F1). */
 export const USD_IQD_SANITY = { min: '500', max: '10000' } as const;
 
@@ -318,20 +323,32 @@ export function decide(row: FxPairRow, outcome: PairOutcome, ctx: DecisionContex
     );
   };
 
-  // 6. No applied rate yet.
-  if (a === null) return hold('FIRST_VALUE');
   const T = row.anomaly_threshold_pct;
-  // 7. Back to automatic beyond the step threshold.
-  if (trigger === 'back_to_auto' && movesMoreThanPct(c, a, T)) return hold('BACK_TO_AUTO');
-  // 8. A value the owner rejected in the last 24 hours is not re-held (critique M4.2).
-  if (row.rejected_rate !== null && row.rejected_at !== null) {
+  /**
+   * 8. A value the owner rejected in the last 24 hours is not HELD again — no
+   * hold, no bell (critique M4.2). The memory turns a would-be hold (steps 6,
+   * 7, 10–12) into DEFERRED and nothing else: an ordinary move every guard
+   * would apply still applies, and the dead band still clears. Checked before
+   * step 9 it froze every move near the rejected value for a day; checked
+   * after step 6 a rejected FIRST value was re-held and re-rung at the next
+   * tick (FX-1 correctness review C1, C2).
+   */
+  const rejectedRecently = (): boolean => {
+    if (row.rejected_rate === null || row.rejected_at === null) return false;
     const at = Date.parse(row.rejected_at);
-    if (Number.isFinite(at) && nowMs - at < REJECT_MEMORY_MS && !movesMoreThanPct(c, row.rejected_rate, T)) {
-      return base('DEFERRED', 'FX_REJECTED_RECENTLY', { ...validated, last_error_code: 'FX_REJECTED_RECENTLY' }, [
-        log(row, trigger, { event: 'deferred', result: 'DEFERRED', error_code: 'FX_REJECTED_RECENTLY', pending_rate: c, ...quoteLog }),
-      ]);
-    }
-  }
+    return Number.isFinite(at) && nowMs - at < REJECT_MEMORY_MS && !movesMoreThanPct(c, row.rejected_rate, T);
+  };
+  const holdUnlessRejected = (reason: FxPendingReason): FxDecision =>
+    rejectedRecently()
+      ? base('DEFERRED', 'FX_REJECTED_RECENTLY', { ...validated, last_error_code: 'FX_REJECTED_RECENTLY' }, [
+          log(row, trigger, { event: 'deferred', result: 'DEFERRED', error_code: 'FX_REJECTED_RECENTLY', pending_rate: c, ...quoteLog }),
+        ])
+      : hold(reason);
+
+  // 6. No applied rate yet.
+  if (a === null) return holdUnlessRejected('FIRST_VALUE');
+  // 7. Back to automatic beyond the step threshold.
+  if (trigger === 'back_to_auto' && movesMoreThanPct(c, a, T)) return holdUnlessRejected('BACK_TO_AUTO');
   // 9. The dead band (Q6): only a check is recorded; a pending candidate is cleared.
   if (sameRate(c, a) || movesLessThanPct(c, a, row.min_change_pct)) {
     const logs = [log(row, trigger, { event: 'check', result: 'UNCHANGED', ...quoteLog })];
@@ -343,13 +360,22 @@ export function decide(row: FxPairRow, outcome: PairOutcome, ctx: DecisionContex
     return base('UNCHANGED', null, { ...validated, ...clear }, logs, { ownerVisible: row.pending_effective_rate !== null });
   }
   // 10. One-step guard.
-  if (movesMoreThanPct(c, a, T)) return hold('ANOMALY');
-  // 11. 24-hour guard (critiques F1, M4.1).
+  if (movesMoreThanPct(c, a, T)) return holdUnlessRejected('ANOMALY');
+  // 11. 24-hour guard (critiques F1, M4.1). It bounds AUTOMATIC movement in a
+  // day. A rate the owner confirmed inside the window (an approval, a manual
+  // rate, «تأكيد السعر الحالي») is that window's reference: measured from the
+  // rate in force 24 hours ago, the next ordinary tick after an approved jump
+  // was held again in the same direction (FX-1 correctness review C5). The
+  // anchor moves only by the owner's confirmations (an adjustment shifts it
+  // by its own change and keeps its time), so a stale session cannot reset
+  // the window with a no-op save.
   const anchor = row.drift_anchor_rate ?? a;
-  const r24 = ctx.r24[row.pair] ?? anchor;
-  if (movesMoreThanPct(c, r24, T)) return hold('ANOMALY_24H');
+  const anchorAt = row.drift_anchor_at ? Date.parse(row.drift_anchor_at) : NaN;
+  const confirmedInWindow = row.drift_anchor_rate !== null && Number.isFinite(anchorAt) && nowMs - anchorAt < R24_WINDOW_MS;
+  const r24 = confirmedInWindow ? anchor : ctx.r24[row.pair] ?? anchor;
+  if (movesMoreThanPct(c, r24, T)) return holdUnlessRejected('ANOMALY_24H');
   // 12. Drift from the owner's last confirmation (critique F1).
-  if (movesMoreThanPct(c, anchor, row.drift_threshold_pct)) return hold('DRIFT');
+  if (movesMoreThanPct(c, anchor, row.drift_threshold_pct)) return holdUnlessRejected('DRIFT');
   // 13. Applied.
   const logs = [
     log(row, trigger, { event: 'apply', result: 'APPLIED', effective_after: c, change_ppm: changePpm(a, c), ...quoteLog }),
@@ -374,6 +400,23 @@ export function decide(row: FxPairRow, outcome: PairOutcome, ctx: DecisionContex
     logs,
     { effectiveAfter: c, effectiveChanged: true, ownerVisible: true }
   );
+}
+
+/**
+ * decide(), but ONE PAIR'S PROBLEM NEVER COSTS ANOTHER ITS UPDATE (critique
+ * H1): a decision that throws — an arithmetic refusal no validation caught —
+ * becomes a recorded INVALID / FX_DECIDE_FAILED for that pair alone (fetch
+ * health, failing_since, a log row, the lease released), instead of aborting
+ * the whole run unrecorded with every claimed pair's lease left held (FX-1
+ * review: security #1, correctness C6). Only the error's NAME is logged.
+ */
+export function decideSafely(row: FxPairRow, outcome: PairOutcome, ctx: DecisionContext, clock: FxClock, trigger: FxTrigger): FxDecision {
+  try {
+    return decide(row, outcome, ctx, clock, trigger);
+  } catch (e) {
+    console.error('fx: decision failed:', row.pair, e instanceof Error ? e.name : 'unknown');
+    return decide(row, { kind: 'invalid', code: 'FX_DECIDE_FAILED' }, ctx, clock, trigger);
+  }
 }
 
 export const PENDING_CLEARED: PairSet = {

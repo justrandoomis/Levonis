@@ -140,14 +140,20 @@ export interface LargeChange {
 }
 
 /**
- * The owner's earlier acts on USD/IQD in the last 24 hours, from the private
- * log (`idx_fx_rate_log_owner`). Shipping rates and the ECB pairs are held to
- * the per-act rule only: their history carries no value outside FX-2's
- * pricing_audit.
+ * The owner's acts on USD/IQD in the last 24 hours — the earlier ones from the
+ * private log (`idx_fx_rate_log_owner`) PLUS THE ACT BEING MADE — compared
+ * with 15% (§7.8: "the sum of |change| … over the owner's acts in the last 24
+ * hours … is compared with large_change_pct"). Summing only the earlier acts
+ * let two acts of 14% move the rate 30% in an hour with neither the
+ * confirmation nor a fresh sign-in (FX-1 correctness review C3); with the act
+ * included, a stolen session moves the rate at most 15% in a day. Shipping
+ * rates and the ECB pairs are held to the per-act rule only: their history
+ * carries no value outside FX-2's pricing_audit.
  */
 export async function largeChange(db: D1Database, pair: FxPairId, before: string | null, after: string | null, now: Date): Promise<LargeChange> {
-  const act = before !== null && after !== null && !sameRate(before, after) && ratioExceedsPct(sumOfMoves([{ before, after }]), LARGE_CHANGE_PCT);
-  if (pair !== 'USD_IQD' || after === null || (before !== null && sameRate(before, after))) return { act, cumulative: false };
+  const moving = before !== null && after !== null && !sameRate(before, after);
+  const act = moving && ratioExceedsPct(sumOfMoves([{ before: before!, after: after! }]), LARGE_CHANGE_PCT);
+  if (pair !== 'USD_IQD' || !moving) return { act, cumulative: false };
   const { results } = await db
     .prepare(
       `SELECT effective_before, effective_after FROM fx_rate_log
@@ -158,7 +164,7 @@ export async function largeChange(db: D1Database, pair: FxPairId, before: string
     .bind(iso(now.getTime() - 24 * HOUR_MS))
     .all<{ effective_before: string; effective_after: string }>();
   const moves = (results ?? []).filter((r) => !sameRate(r.effective_before, r.effective_after)).map((r) => ({ before: r.effective_before, after: r.effective_after }));
-  return { act, cumulative: moves.length > 0 && ratioExceedsPct(sumOfMoves(moves), LARGE_CHANGE_PCT) };
+  return { act, cumulative: moves.length > 0 && ratioExceedsPct(sumOfMoves([...moves, { before: before!, after: after! }]), LARGE_CHANGE_PCT) };
 }
 
 // ------------------------------------------------------------- planning helpers
@@ -294,12 +300,17 @@ export function planReview(row: FxPairRow, raw: unknown, ctx: ActContext): Plann
   if (decision === 'keep_manual') {
     if (row.effective_rate === null) throw fxRefusal(409, 'FX_RATE_NOT_SET');
     const a = row.effective_rate;
+    // A MODE CHANGE, whichever door it comes through: §7.8 puts `mode` among
+    // the settings that always need a fresh sign-in, and `PUT /settings
+    // {mode:'MANUAL'}` asks for one — so this does too, and rings the same
+    // guard-change notice (FX-1 security review #2).
     return {
       ...act(
         row,
         { mode: 'MANUAL', manual_rate: a, ...anchorTo(a, ctx), ...PENDING_CLEARED },
         [ownerLog(row, { event: 'mode_change', result: 'MANUAL', pending_rate: pending })],
-        { action: 'fx.review.keep_manual', target: row.pair, detail: { pair: row.pair } }
+        { action: 'fx.review.keep_manual', target: row.pair, detail: { pair: row.pair } },
+        { guard: true, attention: [{ pair: row.pair, kind: 'guard_change', key: `fx:${row.pair}:guard:${iso(ctx.now)}` }] }
       ),
       confirm,
       decision,
@@ -414,6 +425,16 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
     if (!usd) throw inputInvalid('adjustment_iqd_per_usd');
     const adj = signedDecimal(b.adjustment_iqd_per_usd, 'adjustment_iqd_per_usd', 5, 4);
     if (adj !== row.adjustment) {
+      const bounds = { pair: row.pair, bound_min: boundMin, bound_max: boundMax };
+      // THE CANDIDATE STAYS A PLAUSIBLE RATE, in every mode and before the
+      // first approval too (FX-1 review: security #1, correctness C6 — a −2000
+      // typed for −20 was stored, then every scheduler run threw on a
+      // negative candidate). With a validated market figure, market + the
+      // new adjustment must lie within the bounds; with none yet, the
+      // adjustment must stay above −bound_min, so no market the bounds accept
+      // can give a rate of zero or below.
+      if (row.market_rate !== null) assertInBounds(bounds, usdIqdCandidate(row.market_rate, adj));
+      else if (addProcurementExact(procurementExact(boundMin), procurementExact(adj, { signed: true })).num <= 0n) throw fxRefusal(400, 'FX_RATE_OUT_OF_BOUNDS');
       set.adjustment = adj;
       fields.push('adjustment_iqd_per_usd');
       // The effective rate moves BY the change of the adjustment: effective + (new − old).
@@ -422,8 +443,18 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
       // a jump the guard is holding (that would walk around §30).
       if (row.mode === 'AUTO' && mode === 'AUTO' && row.effective_rate !== null) {
         effective = shiftedBy(row.effective_rate, row.adjustment, adj);
-        assertInBounds({ pair: row.pair, bound_min: boundMin, bound_max: boundMax }, effective);
-        Object.assign(set, effectiveTo(row, effective, ctx, row.effective_source ?? 'provider'), anchorTo(effective, ctx));
+        assertInBounds(bounds, effective);
+        // THE ANCHOR MOVES BY THE SAME CHANGE, AND KEEPS ITS TIME: the drift
+        // guard keeps measuring the MARKET's move since the owner's last
+        // confirmation. Setting it to the new effective rate (as before) made
+        // two adjustment saves (+0.0001, then back) do what «تأكيد السعر
+        // الحالي» does — re-base the drift guard — without the fresh sign-in
+        // that act always needs (FX-1 security review #2).
+        const anchor = row.drift_anchor_rate !== null ? shiftedBy(row.drift_anchor_rate, row.adjustment, adj) : effective;
+        Object.assign(set, effectiveTo(row, effective, ctx, row.effective_source ?? 'provider'), {
+          drift_anchor_rate: anchor,
+          ...(row.drift_anchor_at === null ? { drift_anchor_at: iso(ctx.now) } : {}),
+        });
       }
       if (row.pending_effective_rate !== null && row.pending_market_rate !== null) {
         pendingEffective = usdIqdCandidate(row.pending_market_rate, adj);

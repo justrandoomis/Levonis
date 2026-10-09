@@ -144,7 +144,8 @@ function Row({ label, value, strong = false, muted = false, negative = false }: 
 }
 
 export default function PaymentBreakdown({ order, financial }: { order: ApiOrder; financial: OrderFinancial }) {
-  const { money, moneyBoth } = useMoney();
+  // What the wallet paid is a WALLET AMOUNT: at the wallet's own rate, never the market's (Q5; FX-1 review #6).
+  const { money, moneyBoth, walletMoney } = useMoney();
   const { lang } = useLanguage();
   const s = STRINGS[asLang(lang)];
   const f = financial;
@@ -202,7 +203,7 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
             since day one and the customer's own summary did not. It is the
             SERVER's stored figure, never `total − outstanding`. */}
         {(f.gini_paid_iqd ?? 0) > 0 && <Row label={s.giniPaid} value={money(f.gini_paid_iqd ?? 0)} negative />}
-        {f.wallet_applied_iqd > 0 && <Row label={s.wallet} value={money(f.wallet_applied_iqd)} negative />}
+        {f.wallet_applied_iqd > 0 && <Row label={s.wallet} value={walletMoney(f.wallet_applied_iqd)} negative />}
         {f.collected_iqd !== null && f.collected_iqd !== undefined && <Row label={s.collected} value={money(f.collected_iqd)} />}
         {f.outstanding_iqd > 0 && <Row label={f.payment_state === 'bnpl_due' ? s.bnplOutstanding : s.outstanding} value={money(f.outstanding_iqd)} />}
         {/* The "nothing to itemise" fallback, which a Gini order HAS something

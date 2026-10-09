@@ -23,6 +23,12 @@ import type { FxCheckResult, FxPairId, FxPendingReason, FxStatus } from './api';
 type Lang = Language;
 type One = (a: string) => string;
 type Two = (a: string, b: string) => string;
+type Three = (a: string, b: string, c: string) => string;
+
+/** How an error code of the history or the card is said (UX review #11): a group, never the raw code. */
+export type FxErrorGroup = 'key' | 'keyRejected' | 'quota' | 'limit' | 'timeout' | 'unreachable' | 'stale' | 'invalid' | 'bounds' | 'rejected' | 'save' | 'other';
+/** What «تحديث الآن» found, from the server's report (UX review #4). */
+export type FxRefreshOutcome = 'applied' | 'held' | 'unchanged' | 'failed' | 'limit' | 'busy' | 'observed';
 
 export interface FxStrings {
   title: string;
@@ -35,12 +41,13 @@ export interface FxStrings {
   tracking: string;
   trackingEcb: string;
   intOff: string;
-  int6: string;
-  int12: string;
-  int24: string;
-  int6Short: string;
-  int12Short: string;
-  int24Short: string;
+  /** Every interval takes its hours as a figure written by the panel (`fxCount`), never a digit baked in (UX review #10). */
+  int6: One;
+  int12: One;
+  int24: One;
+  int6Short: One;
+  int12Short: One;
+  int24Short: One;
   modeAuto: string;
   modeManual: string;
   marketSell: string;
@@ -64,6 +71,8 @@ export interface FxStrings {
   keyMissing: string;
   reviewTitle: string;
   reviewFirst: string;
+  /** The first-value sheet's body: what approving does — not the title again (UX review #15). */
+  reviewFirstBody: string;
   reviewBody: (next: string, old: string, pct: string, limit: string) => string;
   reviewOpen: string;
   pendingNew: string;
@@ -71,15 +80,20 @@ export interface FxStrings {
   pendingMarket: string;
   change: string;
   reason: string;
-  reasons: Readonly<Record<FxPendingReason, One>>;
+  reasons: Readonly<Record<FxPendingReason, Two>>;
+  /** A held value's reason in a few words, for the history (no limit). */
+  reasonName: Readonly<Record<FxPendingReason, string>>;
   waitingSince: One;
-  rejectedRecently: Two;
+  rejectedRecently: Three;
   approve: string;
   reject: string;
   keepManual: string;
+  /** Said before the act, beside it: keep-as-manual changes the mode, so it asks for a fresh sign-in. */
+  keepManualHint: string;
   refresh: string;
   refreshing: string;
   refreshBudget: Two;
+  refreshOutcome: Readonly<Record<FxRefreshOutcome, string>>;
   manual: string;
   manualLabel: string;
   manualSave: string;
@@ -104,11 +118,19 @@ export interface FxStrings {
   invalidPct: string;
   invalidAdjustment: string;
   reauth: string;
-  largeChange: string;
+  /** The way through a fresh-sign-in refusal (UX review #2). */
+  signInAgain: string;
+  /** 409 PRICING_CHANGED on this panel: it already reloaded itself (UX review #5). */
+  panelChanged: string;
+  largeChange: One;
   largeConfirm: string;
   loadFailed: string;
   loading: string;
   unknown: string;
+  /** A pair with no value yet, in one line instead of eight «غير معروف» (UX review #15). */
+  notSetUp: One;
+  notSetUpNoDate: string;
+  errorText: Readonly<Record<FxErrorGroup, string>>;
   history: string;
   historyTitle: string;
   historyEmpty: string;
@@ -134,7 +156,7 @@ export interface FxStrings {
 export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
   ar: {
     title: 'أسعار الصرف',
-    intro: 'السعر المعتمد هنا هو سعر المتجر: به يقرأ الزبائن الأسعار بالدولار، وبه يحسب الحاسب. لا يتغيّر سعر أي منتج في هذا التحديث.',
+    intro: 'السعر المعتمد هو سعر المتجر: به تُعرض الأسعار بالدولار للزبائن، وتستخدمه حاسبة التسعير. تغيير سعر الصرف هنا لا يغيّر أسعار المنتجات حاليًا.',
     pairName: { USD_IQD: 'الدولار ← الدينار', EUR_USD: 'اليورو ← الدولار', CNY_USD: 'اليوان ← الدولار' },
     srcParallel: 'المصدر: السوق الموازية العراقية',
     srcEcb: 'المصدر: البنك المركزي الأوروبي (السعر المرجعي اليومي)',
@@ -143,12 +165,12 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     tracking: 'التتبع التلقائي للدولار',
     trackingEcb: 'التتبع التلقائي',
     intOff: 'متوقف',
-    int6: 'كل 6 ساعات',
-    int12: 'كل 12 ساعة',
-    int24: 'كل 24 ساعة',
-    int6Short: '6 ساعات',
-    int12Short: '12 ساعة',
-    int24Short: '24 ساعة',
+    int6: (n) => `كل ${n} ساعات`,
+    int12: (n) => `كل ${n} ساعة`,
+    int24: (n) => `كل ${n} ساعة`,
+    int6Short: (n) => `${n} ساعات`,
+    int12Short: (n) => `${n} ساعة`,
+    int24Short: (n) => `${n} ساعة`,
     modeAuto: 'تلقائي',
     modeManual: 'يدوي',
     marketSell: 'سعر البيع في السوق',
@@ -164,7 +186,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     lastCheck: 'آخر فحص',
     published: 'وقت نشر المصدر',
     lkg: 'آخر سعر موثوق',
-    anchor: 'آخر سعر اعتمدته',
+    anchor: 'آخر سعر أكّدته',
     nextCheck: 'الفحص القادم',
     status: 'الحالة',
     st: {
@@ -175,9 +197,10 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
       NOT_CONFIGURED: 'لم يُضبط بعد',
     },
     noRateYet: 'لا يوجد سعر معتمد بعد',
-    keyMissing: 'مفتاح IQWealth غير مضبوط، فلا يُجلب سعر الدولار تلقائيًا حتى يُضبط.',
+    keyMissing: 'مفتاح IQWealth غير مضبوط، فلا يُجلب سعر الدولار تلقائيًا. يضبطه من يدير خادم المتجر، سرًّا في إعدادات Cloudflare؛ وحتى ذلك الحين عيّن سعرًا يدويًا.',
     reviewTitle: 'تغيّر كبير في السعر',
     reviewFirst: 'أول سعر من المصدر — يحتاج اعتمادك مرة واحدة',
+    reviewFirstBody: 'هذا أول سعر يصل من المصدر. اعتماده يجعله السعر المعتمد ومرجع الابتعاد المسموح، ومن بعده يُتابَع المصدر تلقائيًا ضمن حدود الحماية. لا يتغيّر شيء حتى تقرر.',
     reviewBody: (next, old, pct, limit) =>
       `السعر الجديد ${next} يختلف عن المعتمد ${old} بنسبة ${pct}٪، وهي أكثر من حد ${limit}٪. لم يُطبَّق ولم يتغير أي سعر حتى تقرر.`,
     reviewOpen: 'راجع السعر الجديد',
@@ -189,18 +212,35 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     reasons: {
       FIRST_VALUE: () => 'أول سعر من المصدر',
       ANOMALY: (limit) => `قفزة أكبر من ${limit}٪ في خطوة واحدة`,
-      ANOMALY_24H: (limit) => `تغيّر أكبر من ${limit}٪ خلال 24 ساعة`,
-      DRIFT: (limit) => `ابتعاد أكبر من ${limit}٪ عن آخر سعر اعتمدته`,
+      ANOMALY_24H: (limit, hours) => `تغيّر أكبر من ${limit}٪ خلال ${hours} ساعة`,
+      DRIFT: (limit) => `ابتعاد أكبر من ${limit}٪ عن آخر سعر أكّدته`,
       BACK_TO_AUTO: (limit) => `العودة إلى التلقائي بفرق أكبر من ${limit}٪`,
     },
+    reasonName: {
+      FIRST_VALUE: 'أول سعر من المصدر',
+      ANOMALY: 'قفزة في خطوة واحدة',
+      ANOMALY_24H: 'تغيّر كبير خلال يوم',
+      DRIFT: 'ابتعاد عن آخر سعر أكّدته',
+      BACK_TO_AUTO: 'العودة إلى التلقائي',
+    },
     waitingSince: (date) => `بانتظارك منذ ${date}`,
-    rejectedRecently: (rate, date) => `رفضت ${rate} في ${date} — لن يُعرض عليك مجددًا قبل 24 ساعة`,
+    rejectedRecently: (rate, date, hours) => `رفضتَ ${rate} في ${date} — لن يُعرض عليك مجددًا قبل مرور ${hours} ساعة`,
     approve: 'اعتماد السعر الجديد',
     reject: 'رفض والإبقاء على الحالي',
     keepManual: 'أبقِ سعري الحالي يدويًا',
+    keepManualHint: '«أبقِ سعري الحالي يدويًا» يوقف التتبع التلقائي، فيطلب تسجيل دخول حديثًا.',
     refresh: 'تحديث الآن',
     refreshing: 'جارٍ التحديث…',
     refreshBudget: (used, limit) => `التحديثات اليوم: ${used} من ${limit}`,
+    refreshOutcome: {
+      applied: 'طُبّق سعر جديد.',
+      held: 'وصل سعر جديد يحتاج مراجعتك.',
+      unchanged: 'تم الفحص — لا تغيير.',
+      failed: 'تعذّر جلب سعر — بقي آخر سعر موثوق.',
+      limit: 'بلغت حد الفحص لليوم — يعود الفحص التلقائي في موعده.',
+      busy: 'يجري فحص آخر الآن — أعد المحاولة بعد لحظات.',
+      observed: 'رُصد سعر السوق — سعرك اليدوي لم يتغيّر.',
+    },
     manual: 'تعيين سعر يدوي',
     manualLabel: 'السعر اليدوي',
     manualSave: 'اعتماد السعر اليدوي',
@@ -209,11 +249,11 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     useObserved: (rate) => `استخدم ${rate} سعرًا يدويًا`,
     observedAt: (date) => `رُصد في ${date}`,
     confirmCurrent: 'تأكيد السعر الحالي',
-    confirmCurrentHint: 'يصبح السعر الحالي هو مرجع الابتعاد المسموح.',
+    confirmCurrentHint: 'يصبح السعر الحالي مرجع الابتعاد المسموح. يطلب تسجيل دخول حديثًا.',
     guards: 'إعدادات الحماية',
     guardsHint: 'حفظ هذه الإعدادات يطلب تسجيل دخول حديثًا.',
     threshold: 'التغيّر الذي يحتاج مراجعتك (٪)',
-    drift: 'الابتعاد المسموح عن آخر سعر اعتمدته (٪)',
+    drift: 'الابتعاد المسموح عن آخر سعر أكّدته (٪)',
     minChange: 'تجاهل التغيّر الأصغر من (٪)',
     boundMin: 'أدنى سعر معقول',
     boundMax: 'أعلى سعر معقول',
@@ -225,11 +265,29 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     invalidPct: 'اكتب نسبة مئوية صحيحة.',
     invalidAdjustment: 'اكتب عددًا من الدنانير، موجبًا أو سالبًا.',
     reauth: 'لحماية الأسعار، سجّل الدخول مجددًا ثم أعد المحاولة',
-    largeChange: 'هذا تغيير كبير (أكثر من 15٪). أكّده صراحةً إن كان مقصودًا.',
+    signInAgain: 'سجّل الدخول مجددًا',
+    panelChanged: 'تغيّرت الأسعار منذ فتحتَ اللوحة، فحدّثناها — راجعها ثم أعد المحاولة.',
+    largeChange: (pct) => `هذا تغيير كبير (أكثر من ${pct}٪). أكّده صراحةً إن كان مقصودًا؛ وسيُطلب منك تسجيل دخول حديث.`,
     largeConfirm: 'نعم، أؤكد التغيير الكبير',
     loadFailed: 'تعذّر تحميل أسعار الصرف.',
     loading: 'جارٍ تحميل أسعار الصرف…',
     unknown: 'غير معروف',
+    notSetUp: (date) => `لم يصل أول سعر بعد. الفحص القادم: ${date}؛ وحين يصل يُعرض عليك لتعتمده.`,
+    notSetUpNoDate: 'لم يصل أول سعر بعد. اضغط «تحديث الآن» أو عيّن سعرًا يدويًا.',
+    errorText: {
+      key: 'مفتاح IQWealth غير مضبوط',
+      keyRejected: 'رفض IQWealth المفتاح',
+      quota: 'نفدت حصة المصدر لليوم',
+      limit: 'بلغ حد الفحص لليوم',
+      timeout: 'لم يُجب المصدر في الوقت',
+      unreachable: 'تعذّر الوصول إلى المصدر أو قراءة جوابه',
+      stale: 'بيانات المصدر قديمة',
+      invalid: 'أرسل المصدر رقمًا غير صالح — لم يُطبَّق',
+      bounds: 'خارج الحدود المعقولة — لم يُطبَّق',
+      rejected: 'قريب من سعر رفضته — لن يُعرض الآن',
+      save: 'تعذّر الحفظ — يُعاد في الفحص القادم',
+      other: 'سبب آخر',
+    },
     history: 'السجل',
     historyTitle: 'سجل أسعار الصرف',
     historyEmpty: 'لا يوجد شيء في السجل بعد.',
@@ -285,7 +343,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
   },
   en: {
     title: 'Exchange rates',
-    intro: "The effective rate here is the shop's rate: customers read dollar prices at it, and the calculator uses it. No product price changes in this update.",
+    intro: "The effective rate is the shop's rate: customers see dollar prices at it, and the pricing calculator uses it. Changing an exchange rate here does not change product prices for now.",
     pairName: { USD_IQD: 'USD → IQD', EUR_USD: 'EUR → USD', CNY_USD: 'CNY → USD' },
     srcParallel: 'Source: Iraqi parallel market',
     srcEcb: 'Source: European Central Bank (daily reference rate)',
@@ -294,12 +352,12 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     tracking: 'Automatic USD tracking',
     trackingEcb: 'Automatic tracking',
     intOff: 'Off',
-    int6: 'Every 6 hours',
-    int12: 'Every 12 hours',
-    int24: 'Every 24 hours',
-    int6Short: '6 hours',
-    int12Short: '12 hours',
-    int24Short: '24 hours',
+    int6: (n) => `Every ${n} hours`,
+    int12: (n) => `Every ${n} hours`,
+    int24: (n) => `Every ${n} hours`,
+    int6Short: (n) => `${n} hours`,
+    int12Short: (n) => `${n} hours`,
+    int24Short: (n) => `${n} hours`,
     modeAuto: 'Automatic',
     modeManual: 'Manual',
     marketSell: 'Market sell',
@@ -326,9 +384,10 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
       NOT_CONFIGURED: 'Not set up yet',
     },
     noRateYet: 'No effective rate yet',
-    keyMissing: 'The IQWealth key is not set, so the dollar rate is not fetched automatically until it is.',
+    keyMissing: "The IQWealth key is not set, so the dollar rate is not fetched automatically. Whoever runs the shop's server sets it, as a secret in the Cloudflare settings; until then, set a manual rate.",
     reviewTitle: 'Large rate change',
     reviewFirst: 'First value from the source — needs your approval once',
+    reviewFirstBody: 'This is the first value from the source. Approving it makes it the effective rate and the reference for the allowed drift; after that the source is followed automatically, within the safety limits. Nothing changes until you decide.',
     reviewBody: (next, old, pct, limit) =>
       `The new rate ${next} differs from the effective ${old} by ${pct}%, above the ${limit}% limit. It was not applied, and no price changes until you decide.`,
     reviewOpen: 'Review the new rate',
@@ -340,18 +399,35 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     reasons: {
       FIRST_VALUE: () => 'First value from the source',
       ANOMALY: (limit) => `A jump of more than ${limit}% in one step`,
-      ANOMALY_24H: (limit) => `A change of more than ${limit}% within 24 hours`,
+      ANOMALY_24H: (limit, hours) => `A change of more than ${limit}% within ${hours} hours`,
       DRIFT: (limit) => `More than ${limit}% away from the last rate you confirmed`,
       BACK_TO_AUTO: (limit) => `Back to automatic with a difference above ${limit}%`,
     },
+    reasonName: {
+      FIRST_VALUE: 'First value from the source',
+      ANOMALY: 'A jump in one step',
+      ANOMALY_24H: 'A large change within a day',
+      DRIFT: 'Drift from the last rate you confirmed',
+      BACK_TO_AUTO: 'Back to automatic',
+    },
     waitingSince: (date) => `Waiting for you since ${date}`,
-    rejectedRecently: (rate, date) => `You rejected ${rate} on ${date} — it will not be offered again for 24 hours`,
+    rejectedRecently: (rate, date, hours) => `You rejected ${rate} on ${date} — it will not be offered again for ${hours} hours`,
     approve: 'Apply the new rate',
     reject: 'Reject and keep the current rate',
     keepManual: 'Keep my current rate as manual',
+    keepManualHint: '“Keep my current rate as manual” turns automatic tracking off, so it asks for a recent sign-in.',
     refresh: 'Refresh now',
     refreshing: 'Refreshing…',
     refreshBudget: (used, limit) => `Refreshes today: ${used} of ${limit}`,
+    refreshOutcome: {
+      applied: 'A new rate was applied.',
+      held: 'A new rate is waiting for your review.',
+      unchanged: 'Checked — no change.',
+      failed: 'A rate could not be fetched — the last known good rate stays.',
+      limit: "Today's check limit is reached — the automatic check runs at its usual time.",
+      busy: 'Another check is running — try again in a moment.',
+      observed: 'The market rate was observed — your manual rate did not change.',
+    },
     manual: 'Set a manual rate',
     manualLabel: 'Manual rate',
     manualSave: 'Apply the manual rate',
@@ -360,7 +436,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     useObserved: (rate) => `Use ${rate} as my manual rate`,
     observedAt: (date) => `Observed on ${date}`,
     confirmCurrent: 'Confirm the current rate',
-    confirmCurrentHint: 'The current rate becomes the reference for the allowed drift.',
+    confirmCurrentHint: 'The current rate becomes the reference for the allowed drift. Asks for a recent sign-in.',
     guards: 'Safety settings',
     guardsHint: 'Saving these settings asks for a fresh sign-in.',
     threshold: 'Change that needs your review (%)',
@@ -376,11 +452,29 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     invalidPct: 'Type a valid percentage.',
     invalidAdjustment: 'Type a number of dinars, positive or negative.',
     reauth: 'To protect prices, sign in again, then retry',
-    largeChange: 'This is a large change (more than 15%). Confirm it explicitly if you meant it.',
+    signInAgain: 'Sign in again',
+    panelChanged: 'The rates changed since you opened the panel, so we reloaded it — check them, then try again.',
+    largeChange: (pct) => `This is a large change (more than ${pct}%). Confirm it explicitly if you meant it; it also asks for a recent sign-in.`,
     largeConfirm: 'Yes, confirm the large change',
     loadFailed: 'Could not load the exchange rates.',
     loading: 'Loading the exchange rates…',
     unknown: 'Unknown',
+    notSetUp: (date) => `No value has arrived yet. Next check: ${date}. When it arrives, it is offered to you for approval.`,
+    notSetUpNoDate: 'No value has arrived yet. Press “Refresh now” or set a manual rate.',
+    errorText: {
+      key: 'The IQWealth key is not set',
+      keyRejected: 'IQWealth refused the key',
+      quota: "The source's daily quota is used up",
+      limit: "Today's check limit was reached",
+      timeout: 'The source did not answer in time',
+      unreachable: 'The source could not be reached or read',
+      stale: "The source's data is old",
+      invalid: 'The source sent an invalid figure — not applied',
+      bounds: 'Outside the plausible range — not applied',
+      rejected: 'Close to a rate you rejected — not offered for now',
+      save: 'Could not be saved — retried at the next check',
+      other: 'Another reason',
+    },
     history: 'History',
     historyTitle: 'Exchange-rate history',
     historyEmpty: 'Nothing in the history yet.',
@@ -436,7 +530,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
   },
   ckb: {
     title: 'نرخەکانی ئاڵوگۆڕ',
-    intro: 'نرخی کارپێکراوی ئێرە نرخی فرۆشگایە: کڕیاران نرخەکان بە دۆلار پێی دەخوێننەوە و ژمێرەرەکەش بەکاری دەهێنێت. لەم نوێکردنەوەیەدا نرخی هیچ بەرهەمێک ناگۆڕێت.',
+    intro: 'نرخی کارپێکراو نرخی فرۆشگایە: نرخەکان بە دۆلار پێی بۆ کڕیاران پیشان دەدرێن و ژمێرەری نرخدانانیش بەکاری دەهێنێت. گۆڕینی نرخی ئاڵوگۆڕ لێرە بۆ ئێستا نرخی بەرهەمەکان ناگۆڕێت.',
     pairName: { USD_IQD: 'دۆلار ← دینار', EUR_USD: 'یۆرۆ ← دۆلار', CNY_USD: 'یوان ← دۆلار' },
     srcParallel: 'سەرچاوە: بازاڕی هاوتەریبی عێراق',
     srcEcb: 'سەرچاوە: بانکی ناوەندیی ئەورووپا (نرخی سەرچاوەی ڕۆژانە)',
@@ -445,12 +539,12 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     tracking: 'بەدواداچوونی خۆکاری دۆلار',
     trackingEcb: 'بەدواداچوونی خۆکار',
     intOff: 'ڕاگیراو',
-    int6: 'هەر ٦ کاتژمێر جارێک',
-    int12: 'هەر ١٢ کاتژمێر جارێک',
-    int24: 'هەر ٢٤ کاتژمێر جارێک',
-    int6Short: '٦ کاتژمێر',
-    int12Short: '١٢ کاتژمێر',
-    int24Short: '٢٤ کاتژمێر',
+    int6: (n) => `هەر ${n} کاتژمێر جارێک`,
+    int12: (n) => `هەر ${n} کاتژمێر جارێک`,
+    int24: (n) => `هەر ${n} کاتژمێر جارێک`,
+    int6Short: (n) => `${n} کاتژمێر`,
+    int12Short: (n) => `${n} کاتژمێر`,
+    int24Short: (n) => `${n} کاتژمێر`,
     modeAuto: 'خۆکار',
     modeManual: 'دەستی',
     marketSell: 'نرخی فرۆشتن لە بازاڕ',
@@ -466,7 +560,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     lastCheck: 'دوایین پشکنین',
     published: 'کاتی بڵاوکردنەوەی سەرچاوە',
     lkg: 'دوایین نرخی متمانەپێکراو',
-    anchor: 'دوایین نرخێک کە پەسەندت کرد',
+    anchor: 'دوایین نرخێک کە پشتڕاستت کردەوە',
     nextCheck: 'پشکنینی داهاتوو',
     status: 'دۆخ',
     st: {
@@ -477,9 +571,10 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
       NOT_CONFIGURED: 'هێشتا ڕێکنەخراوە',
     },
     noRateYet: 'هێشتا نرخی کارپێکراو نییە',
-    keyMissing: 'کلیلی IQWealth دانەنراوە، بۆیە نرخی دۆلار بە خۆکاری وەرناگیرێت تا دادەنرێت.',
+    keyMissing: 'کلیلی IQWealth دانەنراوە، بۆیە نرخی دۆلار بە خۆکاری وەرناگیرێت. ئەو کەسەی سێرڤەری فرۆشگا بەڕێوە دەبات وەک نهێنییەک لە ڕێکخستنەکانی Cloudflare دایدەنێت؛ تا ئەو کاتە نرخێکی دەستی دابنێ.',
     reviewTitle: 'گۆڕانێکی گەورە لە نرخدا',
     reviewFirst: 'یەکەم نرخ لە سەرچاوەوە — یەکجار پێویستی بە پەسەندکردنی تۆیە',
+    reviewFirstBody: 'ئەمە یەکەم نرخە کە لە سەرچاوەوە گەیشتووە. پەسەندکردنی دەیکاتە نرخی کارپێکراو و سەرچاوەی دوورکەوتنەوەی ڕێگەپێدراو؛ دوای ئەوە سەرچاوەکە بە خۆکاری و لە نێو سنوورەکانی پاراستندا بەدواداچوونی بۆ دەکرێت. هیچ شتێک ناگۆڕێت تا تۆ بڕیار دەدەیت.',
     reviewBody: (next, old, pct, limit) =>
       `نرخە نوێیەکە ${next} لەگەڵ نرخی کارپێکراو ${old} بە ڕێژەی ${pct}٪ جیاوازە، کە لە سنووری ${limit}٪ زیاترە. جێبەجێ نەکراوە و هیچ نرخێک ناگۆڕێت تا تۆ بڕیار دەدەیت.`,
     reviewOpen: 'پێداچوونەوە بە نرخە نوێیەکەدا بکە',
@@ -491,19 +586,37 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     reasons: {
       FIRST_VALUE: () => 'یەکەم نرخ لە سەرچاوەوە',
       ANOMALY: (limit) => `بازدانێکی زیاتر لە ${limit}٪ لە یەک هەنگاودا`,
-      ANOMALY_24H: (limit) => `گۆڕانێکی زیاتر لە ${limit}٪ لە ماوەی ٢٤ کاتژمێردا`,
-      DRIFT: (limit) => `زیاتر لە ${limit}٪ دوور لە دوایین نرخێک کە پەسەندت کرد`,
+      ANOMALY_24H: (limit, hours) => `گۆڕانێکی زیاتر لە ${limit}٪ لە ماوەی ${hours} کاتژمێردا`,
+      DRIFT: (limit) => `زیاتر لە ${limit}٪ دوور لە دوایین نرخێک کە پشتڕاستت کردەوە`,
       BACK_TO_AUTO: (limit) => `گەڕانەوە بۆ خۆکار بە جیاوازییەکی زیاتر لە ${limit}٪`,
+    },
+    reasonName: {
+      FIRST_VALUE: 'یەکەم نرخ لە سەرچاوەوە',
+      ANOMALY: 'بازدانێک لە یەک هەنگاودا',
+      ANOMALY_24H: 'گۆڕانێکی گەورە لە ماوەی ڕۆژێکدا',
+      DRIFT: 'دوورکەوتنەوە لە دوایین نرخێک کە پشتڕاستت کردەوە',
+      BACK_TO_AUTO: 'گەڕانەوە بۆ خۆکار',
     },
     // «لە … بەدواوە», not «لە …ەوە»: the date ends in a clock time, and a suffix glued to digits reorders.
     waitingSince: (date) => `لە ${date} بەدواوە چاوەڕێی تۆیە`,
-    rejectedRecently: (rate, date) => `لە ${date} ڕەتت کردەوە ${rate} — تا ٢٤ کاتژمێر دووبارە پێشنیار ناکرێتەوە`,
+    // The object before the verb («نرخی … ڕەتت کردەوە»), as Sorani orders it (UX review #15).
+    rejectedRecently: (rate, date, hours) => `نرخی ${rate} لە ${date} ڕەتت کردەوە — تا ${hours} کاتژمێر دووبارە پێشنیار ناکرێتەوە`,
     approve: 'نرخە نوێیەکە جێبەجێ بکە',
     reject: 'ڕەتی بکەرەوە و نرخی ئێستا بهێڵەوە',
     keepManual: 'نرخی ئێستام وەک دەستی بهێڵەوە',
+    keepManualHint: '«نرخی ئێستام وەک دەستی بهێڵەوە» بەدواداچوونی خۆکار ڕادەگرێت، بۆیە چوونەژوورەوەیەکی نوێ دەخوازێت.',
     refresh: 'ئێستا نوێی بکەرەوە',
     refreshing: 'نوێ دەکرێتەوە…',
     refreshBudget: (used, limit) => `نوێکردنەوەکانی ئەمڕۆ: ${used} لە ${limit}`,
+    refreshOutcome: {
+      applied: 'نرخێکی نوێ جێبەجێ کرا.',
+      held: 'نرخێکی نوێ چاوەڕێی پێداچوونەوەی تۆیە.',
+      unchanged: 'پشکنرا — هیچ گۆڕانێک نییە.',
+      failed: 'نەتوانرا نرخێک وەربگیرێت — دوایین نرخی متمانەپێکراو ماوەتەوە.',
+      limit: 'سنووری پشکنینی ئەمڕۆ تەواو بوو — پشکنینی خۆکار لە کاتی خۆیدا دەکرێت.',
+      busy: 'پشکنینێکی تر ئێستا دەکرێت — دوای چەند چرکەیەک دووبارە هەوڵ بدەرەوە.',
+      observed: 'نرخی بازاڕ بینرا — نرخە دەستییەکەت نەگۆڕا.',
+    },
     manual: 'نرخێکی دەستی دابنێ',
     manualLabel: 'نرخی دەستی',
     manualSave: 'نرخە دەستییەکە جێبەجێ بکە',
@@ -512,11 +625,11 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     useObserved: (rate) => `${rate} وەک نرخی دەستیم بەکاربهێنە`,
     observedAt: (date) => `لە ${date} بینرا`,
     confirmCurrent: 'نرخی ئێستا پشتڕاست بکەرەوە',
-    confirmCurrentHint: 'نرخی ئێستا دەبێتە سەرچاوەی دوورکەوتنەوەی ڕێگەپێدراو.',
+    confirmCurrentHint: 'نرخی ئێستا دەبێتە سەرچاوەی دوورکەوتنەوەی ڕێگەپێدراو. چوونەژوورەوەیەکی نوێ دەخوازێت.',
     guards: 'ڕێکخستنەکانی پاراستن',
     guardsHint: 'پاشەکەوتکردنی ئەم ڕێکخستنانە چوونەژوورەوەیەکی نوێ دەخوازێت.',
     threshold: 'ئەو گۆڕانەی پێویستی بە پێداچوونەوەی تۆیە (٪)',
-    drift: 'ئەو دوورکەوتنەوەیەی ڕێگەپێدراوە لە دوایین نرخێک کە پەسەندت کرد (٪)',
+    drift: 'ئەو دوورکەوتنەوەیەی ڕێگەپێدراوە لە دوایین نرخێک کە پشتڕاستت کردەوە (٪)',
     minChange: 'گوێ مەدە بە گۆڕانی بچووکتر لە (٪)',
     boundMin: 'نزمترین نرخی گونجاو',
     boundMax: 'بەرزترین نرخی گونجاو',
@@ -528,11 +641,29 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     invalidPct: 'ڕێژەیەکی سەدی دروست بنووسە.',
     invalidAdjustment: 'ژمارەیەک دینار بنووسە، پۆزەتیڤ یان نێگەتیڤ.',
     reauth: 'بۆ پاراستنی نرخەکان، دووبارە بچۆ ژوورەوە و پاشان هەوڵ بدەرەوە',
-    largeChange: 'ئەمە گۆڕانێکی گەورەیە (زیاتر لە ١٥٪). ئەگەر مەبەستت بوو، بە ڕوونی پشتڕاستی بکەرەوە.',
+    signInAgain: 'دووبارە بچۆ ژوورەوە',
+    panelChanged: 'نرخەکان لەو کاتەوەی تابلۆکەت کردەوە گۆڕاون، بۆیە نوێمان کردەوە — سەیریان بکە و پاشان دووبارە هەوڵ بدەرەوە.',
+    largeChange: (pct) => `ئەمە گۆڕانێکی گەورەیە (زیاتر لە ${pct}٪). ئەگەر مەبەستت بوو، بە ڕوونی پشتڕاستی بکەرەوە؛ چوونەژوورەوەیەکی نوێش دەخوازێت.`,
     largeConfirm: 'بەڵێ، گۆڕانە گەورەکە پشتڕاست دەکەمەوە',
     loadFailed: 'نەتوانرا نرخەکانی ئاڵوگۆڕ باربکرێن.',
     loading: 'نرخەکانی ئاڵوگۆڕ بار دەکرێن…',
     unknown: 'نەزانراو',
+    notSetUp: (date) => `هێشتا یەکەم نرخ نەگەیشتووە. پشکنینی داهاتوو: ${date}؛ کاتێک گەیشت، بۆ پەسەندکردن پیشانت دەدرێت.`,
+    notSetUpNoDate: 'هێشتا یەکەم نرخ نەگەیشتووە. «ئێستا نوێی بکەرەوە» دابگرە یان نرخێکی دەستی دابنێ.',
+    errorText: {
+      key: 'کلیلی IQWealth دانەنراوە',
+      keyRejected: 'IQWealth کلیلەکەی ڕەتکردەوە',
+      quota: 'بەشی ڕۆژانەی سەرچاوە تەواو بوو',
+      limit: 'سنووری پشکنینی ئەمڕۆ تەواو بوو',
+      timeout: 'سەرچاوە لە کاتی خۆیدا وەڵامی نەدایەوە',
+      unreachable: 'نەتوانرا بگەینە سەرچاوە یان وەڵامەکەی بخوێنینەوە',
+      stale: 'زانیاریی سەرچاوە کۆنە',
+      invalid: 'سەرچاوە ژمارەیەکی نادروستی نارد — جێبەجێ نەکرا',
+      bounds: 'لە دەرەوەی مەودای گونجاوە — جێبەجێ نەکرا',
+      rejected: 'نزیکە لە نرخێک کە ڕەتت کردەوە — بۆ ئێستا پێشنیار ناکرێت',
+      save: 'پاشەکەوت نەکرا — لە پشکنینی داهاتوودا دووبارە هەوڵ دەدرێتەوە',
+      other: 'هۆکارێکی تر',
+    },
     history: 'مێژوو',
     historyTitle: 'مێژووی نرخەکانی ئاڵوگۆڕ',
     historyEmpty: 'هێشتا هیچ شتێک لە مێژوودا نییە.',
@@ -589,6 +720,36 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
 };
 
 export const fxStrings = (lang: Lang): FxStrings => FX_STRINGS[lang] ?? FX_STRINGS.ar;
+
+/**
+ * An error code of the history or the card, said in words (UX review #11):
+ * the server writes codes from a closed family (worker/lib/fx/providers,
+ * decide.ts, scheduler.ts); a code this client does not know is «another
+ * reason», never printed raw.
+ */
+export function fxErrorGroup(code: string): FxErrorGroup {
+  if (code === 'KEY_MISSING' || code === 'KEY_MALFORMED') return 'key';
+  if (code === 'KEY_REJECTED') return 'keyRejected';
+  if (code === 'QUOTA') return 'quota';
+  if (code === 'PROVIDER_BUDGET') return 'limit';
+  if (code === 'TIMEOUT') return 'timeout';
+  if (code === 'NETWORK' || code === 'REDIRECT_REFUSED' || code === 'TOO_LARGE' || code === 'PARSE' || /^HTTP_\d{3}$/.test(code)) return 'unreachable';
+  if (code === 'STALE' || code === 'FX_TOO_OLD' || code === 'FX_NOT_MONOTONIC') return 'stale';
+  if (code === 'FX_RATE_OUT_OF_BOUNDS') return 'bounds';
+  if (code === 'FX_REJECTED_RECENTLY') return 'rejected';
+  if (code === 'FX_FUTURE' || code === 'FX_UNIT_CHANGED' || code === 'FX_PUBLICATION_CONFLICT' || code.startsWith('FX_INVALID_')) return 'invalid';
+  if (code === 'COMMIT_REFUSED' || code === 'FX_COMMIT_CONFLICT' || code === 'FX_STATEMENT_BUDGET' || code === 'FX_DERIVED_STALE' || code === 'FX_VERSION_DISCIPLINE' || code === 'FX_DECIDE_FAILED') return 'save';
+  return 'other';
+}
+
+/** A history row's code in words: a held value's reason by name, any other code by its group. */
+export function fxCodeText(s: FxStrings, code: string): string {
+  if (code in s.reasonName) return s.reasonName[code as FxPendingReason];
+  return s.errorText[fxErrorGroup(code)];
+}
+
+/** «الدولار ← الدينار» → «الدولار»: the pair's source currency, as the pair's own name writes it (the history filter). */
+export const pairShortName = (name: string): string => name.split(/\s*[←→]\s*/)[0] || name;
 
 /** The event's words, or the code itself when a later push adds one this client does not know. */
 export const fxEventLabel = (s: FxStrings, event: string) => s.events[event] ?? event;

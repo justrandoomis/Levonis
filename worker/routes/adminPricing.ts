@@ -197,7 +197,12 @@ async function commitAct(c: Context<AppContext>, planned: PlannedAct, rows: read
     if (/CHECK constraint failed/i.test(e instanceof Error ? e.message : String(e))) throw fxRefusal(400, 'FX_RATE_OUT_OF_BOUNDS');
     throw e;
   }
-  if (plan.displayRateChanged) await purgeCatalogueFromJob(c.env, [], { settings: true, origin: originOf(c) });
+  // The public settings carry the USD rate AND whether it is the provider's figure or one the owner
+  // typed (`displayUsdRateAttributed`, FX-1 review #10): a change of either purges them.
+  const usdSourceChanged = planned.changes.some(
+    (ch) => ch.pair === 'USD_IQD' && ch.set.effective_source !== undefined && ch.set.effective_source !== ch.row.effective_source
+  );
+  if (plan.displayRateChanged || usdSourceChanged) await purgeCatalogueFromJob(c.env, [], { settings: true, origin: originOf(c) });
   if (planned.attention.length) await notifyOwnerFx(c.env, planned.attention);
 }
 
@@ -215,10 +220,19 @@ adminPricingRoutes.get('/rates/history', async (c) => {
     if (!Number.isFinite(ms)) throw inputInvalid('before');
     before = iso(ms);
   }
+  // The cursor is (created_at, row): one batch stamps all its rows with the
+  // same time, so `before` alone dropped the rest of a batch at a page edge
+  // (FX-1 correctness review C4). `before_id` is the last row's id.
+  const beforeIdRaw = c.req.query('before_id');
+  let beforeId: string | null = null;
+  if (beforeIdRaw !== undefined && beforeIdRaw !== '') {
+    if (before === null || !/^[A-Za-z0-9_-]{1,80}$/.test(beforeIdRaw)) throw inputInvalid('before_id');
+    beforeId = beforeIdRaw;
+  }
   const limitRaw = c.req.query('limit');
   const limit = limitRaw === undefined || limitRaw === '' ? 50 : Number(limitRaw);
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw inputInvalid('limit');
-  const items = await loadHistory(c.env.DB, { pair, before, limit });
+  const items = await loadHistory(c.env.DB, { pair, before, beforeId, limit });
   if (items === null) throw fxNotInstalled();
   return c.json({ success: true, items: items.map(historyItemDto) });
 });
@@ -288,6 +302,8 @@ adminPricingRoutes.post('/rates/fx/:pair/review', async (c) => {
   const now = new Date();
   const rows = await fxRows(c.env.DB);
   const planned = planReview(pairRow(rows, pair), body, { actor: c.get('user')!.id, now });
+  // «أبقِ سعري الحالي يدويًا» changes the mode: a fresh sign-in, always (§7.8; FX-1 security review #2).
+  if (planned.guard) requireFreshSession(c);
   if (planned.decision === 'approve') {
     await priceMovingGate(c, true);
     await largeChangeGate(c, pair, planned.move, planned.confirm, now);

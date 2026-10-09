@@ -375,7 +375,14 @@ export interface FxRatesAnswer {
   reprice_blocked: number;
   stale_products: number;
   /** Only on «تحديث الآن». */
-  report?: { checked: FxPairId[]; lease_held: FxPairId[]; budget_deferred: FxPairId[] };
+  report?: FxRefreshReport;
+}
+
+/** What «تحديث الآن» did, pair by pair — codes only, never a figure (worker/routes/adminPricing.ts). */
+export interface FxRefreshReport {
+  checked: Array<{ pair: FxPairId; result: FxCheckResult; code: string | null }>;
+  lease_held: FxPairId[];
+  budget_deferred: FxPairId[];
 }
 
 export interface FxHistoryItem {
@@ -412,10 +419,21 @@ export interface FxSettingsBody {
 
 export const fetchFxRates = (opts?: RequestOptions) => api.get<FxRatesAnswer>(`${PRICING_API}/rates`, opts);
 
-export function fetchFxHistory(q: { pair?: FxPairId | null; before?: string | null; limit?: number }, opts?: RequestOptions): Promise<{ success: true; items: FxHistoryItem[] }> {
+/**
+ * The history, a page at a time. The cursor is the last row's time AND id:
+ * one batch stamps all its rows with the same time, so a time alone dropped
+ * the rest of a batch at a page edge (FX-1 review C4).
+ */
+export function fetchFxHistory(
+  q: { pair?: FxPairId | null; before?: { created_at: string; id: string } | null; limit?: number },
+  opts?: RequestOptions
+): Promise<{ success: true; items: FxHistoryItem[] }> {
   const p = new URLSearchParams();
   if (q.pair) p.set('pair', q.pair);
-  if (q.before) p.set('before', q.before);
+  if (q.before) {
+    p.set('before', q.before.created_at);
+    p.set('before_id', q.before.id);
+  }
   p.set('limit', String(Math.min(100, Math.max(1, Math.floor(q.limit ?? 30)))));
   return api.get<{ success: true; items: FxHistoryItem[] }>(`${PRICING_API}/rates/history?${p.toString()}`, opts);
 }

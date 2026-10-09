@@ -4,7 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import type { Language } from '../translations';
 import type { ThemePreference } from '../lib/theme';
 import { useOptionalMoney, type DisplayCurrency } from '../CurrencyContext';
-import { groupRateText } from '../lib/rateText';
+import { wholeRateText } from '../lib/rateText';
 import { Sheet } from './ui/Overlay';
 import { Segmented } from './ui/Segmented';
 
@@ -80,8 +80,11 @@ function RowLabel({ icon, children }: { icon: ReactNode; children: ReactNode }) 
  * Under the currency row: what the choice does («للعرض فقط»), and — while
  * dollars are chosen and a rate is known — the rate itself, named as THE
  * SHOP'S rate, because it includes the owner's adjustment (critique L8). The
- * IQWealth attribution is given only when the rate really is the shop's
- * automatic one; the wallet's fallback rate is «a rate set by the shop».
+ * IQWealth attribution is given only when the rate really is the provider's
+ * figure (`displayUsdRateAttributed`); a rate the owner typed and the
+ * wallet's fallback rate are «a rate set by the shop» (FX-1 review #10). The
+ * rate reads in whole dinars after «≈» — four decimals there were false
+ * precision (UX review #15); the conversion itself uses the exact text.
  */
 export function CurrencyCaptions({ pick }: { pick: DisplayCurrency }) {
   const { lang, loc } = useLanguage();
@@ -89,7 +92,7 @@ export function CurrencyCaptions({ pick }: { pick: DisplayCurrency }) {
   const rate = pick === 'USD' ? money?.rate ?? null : null;
   const unit = lang === 'en' ? 'IQD' : lang === 'ckb' ? 'دینار' : 'د.ع';
   const figure = rate ? (
-    <bdi dir="ltr" className="whitespace-nowrap tabular-nums">1 $ ≈ {groupRateText(rate.text)} {unit}</bdi>
+    <bdi dir="ltr" className="whitespace-nowrap tabular-nums">1 $ ≈ {wholeRateText(rate.text)} {unit}</bdi>
   ) : null;
   return (
     <div className="mt-2 space-y-1 text-[12px] leading-relaxed text-zinc-400" data-currency-captions>
@@ -100,7 +103,7 @@ export function CurrencyCaptions({ pick }: { pick: DisplayCurrency }) {
           'تەنها بۆ پیشاندانە — پارەدان و پسوولە بە دینارە'
         )}
       </p>
-      {figure && rate?.source === 'shop' && (
+      {figure && rate?.source === 'shop' && rate.attributed !== false && (
         <p data-currency-rate="shop">
           {figure}
           {' — '}
@@ -117,7 +120,7 @@ export function CurrencyCaptions({ pick }: { pick: DisplayCurrency }) {
           </a>
         </p>
       )}
-      {figure && rate && rate.source !== 'shop' && (
+      {figure && rate && (rate.source !== 'shop' || rate.attributed === false) && (
         <p data-currency-rate="fixed">
           {figure}
           {' — '}

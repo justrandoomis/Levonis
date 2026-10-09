@@ -17,6 +17,7 @@ import { changePctText } from '@levonis/pricing/fxChain';
 import { nextCheckAt, PROVIDER_DAY_CAP } from './schedule';
 import { FX_PAIRS, type FxPairId, type FxPairRow } from './pairs';
 import { FX_REFRESH_GLOBAL_LIMIT } from './limits';
+import { REJECT_MEMORY_MS } from './decide';
 
 export interface FxLogRow {
   id: string;
@@ -64,6 +65,13 @@ export function historyItemDto(r: FxLogRow) {
   };
 }
 
+/** The rejection memory of decide() step 8 still holds (24 hours). */
+function rejectionActive(r: Pick<FxPairRow, 'rejected_rate' | 'rejected_at'>, now: Date): boolean {
+  if (r.rejected_rate === null || r.rejected_at === null) return false;
+  const at = Date.parse(r.rejected_at);
+  return Number.isFinite(at) && now.getTime() - at < REJECT_MEMORY_MS;
+}
+
 function pairDto(r: FxPairRow, observed: FxLogRow | undefined, now: Date) {
   const usd = r.pair === 'USD_IQD';
   return {
@@ -104,8 +112,11 @@ function pairDto(r: FxPairRow, observed: FxLogRow | undefined, now: Date) {
             change_pct: r.effective_rate === null ? null : changePctText(r.effective_rate, r.pending_effective_rate),
           },
     // The plan's `{rate, at}` under the net's name: a rate under a generic key
-    // would pass the FINANCIAL_FIELDS strip (naming contract C17).
-    rejected: r.rejected_rate === null ? null : { rejected_rate: r.rejected_rate, rejected_at: r.rejected_at },
+    // would pass the FINANCIAL_FIELDS strip (naming contract C17). Only while
+    // the memory holds (24 hours): the row keeps the last rejection for ever,
+    // and the panel said «won't be offered again for 24 hours» for ever
+    // (FX-1 correctness review #9).
+    rejected: rejectionActive(r, now) ? { rejected_rate: r.rejected_rate!, rejected_at: r.rejected_at } : null,
     // L14: while MANUAL, what a refresh observed — offered as «استخدم … سعرًا يدويًا».
     last_observed:
       r.mode === 'MANUAL' && observed && observed.pending_rate !== null

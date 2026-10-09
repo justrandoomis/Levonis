@@ -87,7 +87,8 @@ const STRINGS = {
 } as const;
 
 export default function PriceProtection({ order }: { order: ApiOrder }) {
-  const { money } = useMoney();
+  // A price-protection credit lands in the wallet: a WALLET AMOUNT, at the wallet's own rate (Q5; FX-1 review #6).
+  const { money, walletMoney } = useMoney();
   const { lang } = useLanguage();
   const s = STRINGS[asLang(lang)];
   const delivered = order.status === 'delivered';
@@ -182,7 +183,7 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
                 </div>
                 <p className="mt-1 text-[11.5px] text-zinc-500 tabular-nums">
                   {s.paid} {money(c.original_unit_iqd)} · {s.observed} {money(c.observed_unit_iqd)}
-                  {c.credited_iqd > 0 && ` · ${s.credited} ${money(c.credited_iqd)}`}
+                  {c.credited_iqd > 0 && ` · ${s.credited} ${walletMoney(c.credited_iqd)}`}
                   {' · '}
                   {s.requestedAt} {formatDate(c.requested_at, lang)}
                 </p>

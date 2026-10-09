@@ -29,7 +29,7 @@ import { CALLS_PER_CLAIM, PROVIDER_DAY_CAP, isDue } from './schedule';
 import { fetchEcb, type EcbQuote } from './providers/ecb';
 import { FX_INVOCATION_STATEMENT_BUDGET, statementBudget, type StatementBudget } from './budget';
 import { HOUR_MS, PAIR_COLUMNS, iso, loadPairs, type FxCheckResult, type FxPairId, type FxPairRow } from './pairs';
-import { decide, type DecisionContext, type FxAttention, type FxClock, type FxDecision, type FxTrigger, type PairOutcome } from './decide';
+import { decideSafely, type DecisionContext, type FxAttention, type FxClock, type FxDecision, type FxTrigger, type PairOutcome } from './decide';
 import { isFenceMiss, planFxCommit, refusalCodeOf } from './commit';
 import { toStatements } from './write';
 import { notifyOwnerFx } from './notify';
@@ -280,7 +280,8 @@ async function commitWithOneRetry(
   const attention: FxAttention[] = [];
   const planOf = (decisions: FxDecision[], rows: FxPairRow[], all: FxPairRow[]) =>
     planFxCommit(decisions, rows, all, { fence: 'lease', token, actor: actorId, nowIso, newLogId, trigger: opts.trigger });
-  const decideAll = (rows: FxPairRow[]) => rows.map((r) => decide(r, outcomes.get(r.pair)!, ctx, clock, opts.trigger));
+  // decideSafely: a pair whose decision throws is recorded INVALID alone; the run and the other pairs go on (H1).
+  const decideAll = (rows: FxPairRow[]) => rows.map((r) => decideSafely(r, outcomes.get(r.pair)!, ctx, clock, opts.trigger));
 
   const tryBatch = async (decisions: FxDecision[], rows: FxPairRow[], all: FxPairRow[]): Promise<'ok' | 'fence' | 'error' | 'budget' | { error: unknown }> => {
     const plan = planOf(decisions, rows, all);

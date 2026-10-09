@@ -70,7 +70,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldCheck, Mail, KeyRound, Link2, FileText, LifeBuoy, Loader2, Check, Coins, CheckCircle2, Download, Sun, Moon, SunMoon } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useMoney } from '../CurrencyContext';
-import { groupRateText } from '../lib/rateText';
+import { groupRateText, wholeRateText } from '../lib/rateText';
+import { IQWEALTH_URL } from '../components/LangThemePanel';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, listSessions, revokeSession, revokeOtherSessions, type ApiSession } from '../lib/api';
 import { apiRefusal, refusalText } from '../lib/refusalStrings';
@@ -159,7 +160,9 @@ const STRINGS = {
     currency: 'العملة',
     currencyNote: 'اختر العملة التي تقرأ بها الأسعار. الدفاتر والطلبات تبقى بالدينار العراقي، ولن تُعاد تسعير طلبات مؤكدة.',
     currencyRate: (rate: string) => `سعر الصرف: 1 دولار = ${rate} دينار — يحدده المتجر.`,
-    currencyRateShop: (rate: string) => `سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر المتجر بناءً على السوق الموازية، للعرض فقط.`,
+    currencyRateShop: (rate: string) => `سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر المتجر للعرض فقط، بناءً على بيانات`,
+    currencyRateSet: (rate: string) => `سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر يحدده المتجر، للعرض فقط.`,
+    currencyRateLink: 'IQWealth',
     currencyConvertedNote: 'الأسعار بالدولار تحويل تقريبي بهذا السعر. المبلغ المسحوب من بطاقتك أو المدفوع عند الاستلام هو الدينار، ولذلك يبقى الدينار ظاهراً عند الدفع.',
     pushTitle: 'إشعارات المتصفح (Web Push)',
     pushUnsupported: 'غير مدعوم في هذا المتصفح', pushBlocked: 'محظورة من إعدادات المتصفح',
@@ -243,7 +246,9 @@ const STRINGS = {
     currency: 'Currency',
     currencyNote: 'Choose the currency you read prices in. The ledgers and your orders stay in Iraqi dinar, and no confirmed order is ever re-priced.',
     currencyRate: (rate: string) => `Exchange rate: $1 = ${rate} IQD — set by the shop.`,
-    currencyRateShop: (rate: string) => `Exchange rate: 1 dollar ≈ ${rate} dinars — the shop's rate based on the parallel market, display only.`,
+    currencyRateShop: (rate: string) => `Exchange rate: 1 dollar ≈ ${rate} dinars — the shop's rate, display only, based on`,
+    currencyRateSet: (rate: string) => `Exchange rate: 1 dollar ≈ ${rate} dinars — a rate set by the shop, display only.`,
+    currencyRateLink: 'IQWealth data',
     currencyConvertedNote: 'Dollar prices are an approximate conversion at that rate. What is charged is the dinar, which is why the dinar stays on screen at checkout.',
     pushTitle: 'Browser notifications (Web Push)',
     pushUnsupported: 'Not supported in this browser', pushBlocked: 'Blocked in browser settings',
@@ -329,8 +334,10 @@ const STRINGS = {
     langSaved: 'زمان لە هەژمارەکەت پاشەکەوتکرا.', langSaveFailed: 'نەتوانرا زمان لەسەر ڕاژەکار پاشەکەوت بکرێت — تەنها بۆ ئەم وێبگەڕە جێبەجێ دەبێت.',
     currency: 'دراو',
     currencyNote: 'ئەو دراوە هەڵبژێرە کە نرخەکانی پێ دەخوێنیتەوە. دەفتەر و داواکارییەکانت بە دیناری عێراقی دەمێننەوە، و هیچ داواکارییەکی پەسەندکراو دووبارە نرخ نادرێت.',
-    currencyRate: (rate: string) => `نرخی ئاڵوگۆڕ: ١ دۆلار = ${rate} دینار — لەلایەن فرۆشگاوە دانراوە.`,
-    currencyRateShop: (rate: string) => `نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخی فرۆشگا لەسەر بنەمای بازاڕی هاوتەریب، تەنها بۆ پیشاندان.`,
+    currencyRate: (rate: string) => `نرخی ئاڵوگۆڕ: 1 دۆلار = ${rate} دینار — لەلایەن فرۆشگاوە دانراوە.`,
+    currencyRateShop: (rate: string) => `نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخی فرۆشگا، تەنها بۆ پیشاندان، لەسەر بنەمای زانیاریی`,
+    currencyRateSet: (rate: string) => `نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخێک کە فرۆشگا دایناوە، تەنها بۆ پیشاندان.`,
+    currencyRateLink: 'IQWealth',
     currencyConvertedNote: 'نرخەکانی دۆلار گۆڕینێکی نزیکەیەن بەو نرخە. ئەوەی وەردەگیرێت دینارە، بۆیە لە کاتی پارەدان دینار لەسەر شاشە دەمێنێتەوە.',
     pushTitle: 'ئاگادارکردنەوەی وێبگەڕ (Web Push)',
     pushUnsupported: 'لەم وێبگەڕەدا پشتگیری نەکراوە', pushBlocked: 'لە ڕێکخستنی وێبگەڕ ڕێگری کراوە',
@@ -1137,12 +1144,35 @@ export default function Settings() {
                 <p className="mt-2 text-[12px] text-zinc-500 leading-relaxed">{s.currencyNote}</p>
                 {/* THE SHOP'S RATE once the owner has approved one (plan §13):
                     the effective USD/IQD, named as the shop's because it
-                    includes the owner's adjustment (critique L8). Until then,
-                    the old sentence at the wallet's rate. No rate known yet —
-                    prices read in dinars, so no sentence. */}
+                    includes the owner's adjustment, and credited to IQWealth
+                    with the link its terms ask for — as the menu does
+                    (critique L8, Appendix A; FX-1 UX review #9) — but only
+                    when it IS the provider's figure: a rate the owner typed
+                    is «a rate set by the shop» (review #10). Whole dinars
+                    after «≈» (review #15). Until a rate is approved, the old
+                    sentence at the wallet's rate. No rate known yet — prices
+                    read in dinars, so no sentence. */}
                 {rate ? (
                   <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed" data-currency-rate-source={rate.source}>
-                    {rate.source === 'shop' ? s.currencyRateShop(groupRateText(rate.text)) : s.currencyRate(groupRateText(rate.text))}
+                    {rate.source === 'shop' && rate.attributed !== false ? (
+                      <>
+                        {s.currencyRateShop(wholeRateText(rate.text))}{' '}
+                        <a
+                          href={IQWEALTH_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          data-iqwealth-attribution
+                          className="rounded-sm font-semibold text-zinc-300 underline decoration-zinc-500 underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                        >
+                          {s.currencyRateLink}
+                          <span aria-hidden="true">↗</span>
+                        </a>
+                      </>
+                    ) : rate.source === 'shop' ? (
+                      s.currencyRateSet(wholeRateText(rate.text))
+                    ) : (
+                      s.currencyRate(groupRateText(rate.text))
+                    )}
                   </p>
                 ) : null}
                 {converted ? (

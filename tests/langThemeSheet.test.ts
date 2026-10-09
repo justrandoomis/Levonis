@@ -307,7 +307,7 @@ function inLanguage<T>(lang: 'ar' | 'en' | 'ckb', fn: () => T): T {
   }
 }
 
-async function captions(lang: 'ar' | 'en' | 'ckb', pick: 'IQD' | 'USD', rate: { text: string; source: 'shop' | 'wallet' | 'cache' } | null) {
+async function captions(lang: 'ar' | 'en' | 'ckb', pick: 'IQD' | 'USD', rate: { text: string; source: 'shop' | 'wallet' | 'cache'; attributed?: boolean } | null) {
   const { createElement } = await import('react');
   const { renderToStaticMarkup } = await import('react-dom/server');
   const { LanguageProvider } = await import('../src/LanguageContext');
@@ -332,7 +332,9 @@ test('the currency captions: display only, then the SHOP’s rate with the IQWea
   for (const lang of ['ar', 'en', 'ckb'] as const) {
     const html = await captions(lang, 'USD', shop);
     for (const w of want[lang]) assert.ok(html.includes(w), `${lang}: «${w}» missing in ${html}`);
-    assert.ok(html.includes('1 $ ≈ 1,703.9167'), `${lang}: the rate as the server wrote it`);
+    // Whole dinars after «≈»: four decimals there were false precision (FX-1 UX review #15).
+    assert.ok(html.includes('1 $ ≈ 1,704'), `${lang}: the shop's rate in whole dinars`);
+    assert.ok(!html.includes('1,703.9167'), `${lang}: no false precision`);
     // The link: IQWealth's own site, a new tab, no opener, no referrer.
     assert.match(html, /<a href="https:\/\/iraqsm\.com" target="_blank" rel="noopener noreferrer" data-iqwealth-attribution="true"/);
     assert.match(html, /data-currency-rate="shop"/);
@@ -346,6 +348,12 @@ test('the currency captions: a rate the shop sets by hand is never credited to I
   assert.match(wallet, /data-currency-rate="fixed"/);
   assert.match(wallet, /a rate set by the shop/);
   assert.doesNotMatch(wallet, /iraqsm|IQWealth/);
+  // A rate the OWNER typed (a manual USD rate) is the shop's — never credited to IQWealth (FX-1 review #10).
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const typed = await captions(lang, 'USD', { text: '1650', source: 'shop', attributed: false });
+    assert.match(typed, /data-currency-rate="fixed"/, lang);
+    assert.doesNotMatch(typed, /iraqsm|IQWealth/, lang);
+  }
   const dinars = await captions('en', 'IQD', { text: '1703.9167', source: 'shop' });
   assert.match(dinars, /Display only/);
   assert.doesNotMatch(dinars, /data-currency-rate=/);

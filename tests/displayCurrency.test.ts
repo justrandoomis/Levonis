@@ -138,7 +138,9 @@ test('no usable rate → dinars, never $0.00', () => {
 test('the rate source: displayUsdRate first; exchangeRate only while it is null; the cached rate only before the settings arrive', () => {
   const r = (displayUsdRate: unknown, settingsLoaded = true, cached: string | null = null, exchangeRate: unknown = 1400) =>
     resolveDisplayRate({ settingsLoaded, displayUsdRate, exchangeRate, cached });
-  assert.deepEqual(r('1703.9167'), { text: '1703.9167', source: 'shop' });
+  assert.deepEqual(r('1703.9167'), { text: '1703.9167', source: 'shop', attributed: true });
+  // A rate the owner typed is still the shop's rate — just not credited to IQWealth (FX-1 review #10).
+  assert.deepEqual(resolveDisplayRate({ settingsLoaded: true, displayUsdRate: '1650', exchangeRate: 1400, cached: null, attributed: false }), { text: '1650', source: 'shop', attributed: false });
   assert.deepEqual(r(null), { text: '1400', source: 'wallet' }, 'not approved yet: today’s rate, nothing regresses');
   assert.deepEqual(r(undefined), { text: '1400', source: 'wallet' }, 'an older server');
   assert.deepEqual(r('garbage'), { text: '1400', source: 'wallet' });
@@ -148,10 +150,11 @@ test('the rate source: displayUsdRate first; exchangeRate only while it is null;
   assert.equal(r(undefined, false, null), null);
   // The context reads WalletContext's `displayUsdRate` (undefined until the settings arrive).
   const ctx = read('src/CurrencyContext.tsx');
-  assert.match(ctx, /const \{ exchangeRate, displayUsdRate \} = useWallet\(\);/);
+  assert.match(ctx, /const \{ exchangeRate, displayUsdRate, displayUsdRateAttributed: attributed \} = useWallet\(\);/);
   assert.match(ctx, /const settingsLoaded = displayUsdRate !== undefined;/);
   assert.match(read('src/WalletContext.tsx'), /displayUsdRate: settings \? \(settings\.displayUsdRate \?\? null\) : undefined,/);
   assert.match(read('src/lib/api.ts'), /displayUsdRate\?: string \| null;/);
+  assert.match(read('src/WalletContext.tsx'), /displayUsdRateAttributed: settings\?\.displayUsdRateAttributed !== false,/);
 });
 
 test('the last good display rate is cached per device as {rate, at}; a stale, future or broken entry is ignored; storage that throws is fine', () => {
@@ -362,11 +365,17 @@ test('the settings row is a real switch and states the rate it converts at', () 
   // A conversion whose rate is not on screen is a number the reader cannot
   // check, and the disclosure only appears while a conversion is being shown.
   // The shop's rate once the owner approved one (named as the shop's, critique
-  // L8); the old sentence at the wallet's rate until then; none without a rate.
-  assert.match(src, /\{rate\.source === 'shop' \? s\.currencyRateShop\(groupRateText\(rate\.text\)\) : s\.currencyRate\(groupRateText\(rate\.text\)\)\}/);
-  assert.ok(src.includes('سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر المتجر بناءً على السوق الموازية، للعرض فقط.'));
-  assert.ok(src.includes("Exchange rate: 1 dollar ≈ ${rate} dinars — the shop's rate based on the parallel market, display only."));
-  assert.ok(src.includes('نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخی فرۆشگا لەسەر بنەمای بازاڕی هاوتەریب، تەنها بۆ پیشاندان.'));
+  // L8) and credited to IQWealth with its link, as the menu does (Appendix A
+  // L8; FX-1 UX review #9) — only when it is the provider's figure; a typed
+  // rate is «a rate set by the shop» (review #10); whole dinars after «≈»
+  // (review #15). The old sentence at the wallet's rate until then; none without a rate.
+  assert.match(src, /rate\.source === 'shop' && rate\.attributed !== false \? \(/);
+  assert.match(src, /\{s\.currencyRateShop\(wholeRateText\(rate\.text\)\)\}\{' '\}\s*<a\s+href=\{IQWEALTH_URL\}\s+target="_blank"\s+rel="noopener noreferrer"/);
+  assert.match(src, /s\.currencyRateSet\(wholeRateText\(rate\.text\)\)/);
+  assert.match(src, /s\.currencyRate\(groupRateText\(rate\.text\)\)/);
+  assert.ok(src.includes('سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر المتجر للعرض فقط، بناءً على بيانات'));
+  assert.ok(src.includes("Exchange rate: 1 dollar ≈ ${rate} dinars — the shop's rate, display only, based on"));
+  assert.ok(src.includes('نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخی فرۆشگا، تەنها بۆ پیشاندان، لەسەر بنەمای زانیاریی'));
   assert.match(src, /\{converted \? \([\s\S]{0,200}currencyConvertedNote/);
   // The old copy said there was no such setting. It must not still say so.
   assert.ok(!src.includes('لا يوجد إعداد عملة عرض'), 'the row still denies the setting exists');

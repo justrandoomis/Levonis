@@ -69,10 +69,18 @@ export async function loadRatesReadModel(db: D1Database, now: Date): Promise<Rat
 export interface HistoryQuery {
   pair: FxPairId | null;
   before: string | null;
+  /** The last row's id: with `before`, the cursor is (created_at, rowid) — rows of one batch share a time. */
+  beforeId?: string | null;
   limit: number;
 }
 
-/** The private history, newest first, paged by `created_at` (at most 100 a page). */
+/**
+ * The private history, newest first (created_at, then insertion order), at
+ * most 100 a page. The cursor is the last row's `created_at` AND id: one
+ * batch stamps all its rows with the same time, so a time-only cursor
+ * dropped the rest of a batch at a page edge (FX-1 correctness review C4).
+ * An id this pair's history does not hold falls back to the time alone.
+ */
 export async function loadHistory(db: D1Database, q: HistoryQuery): Promise<FxLogRow[] | null> {
   const where: string[] = [];
   const binds: unknown[] = [];
@@ -80,7 +88,10 @@ export async function loadHistory(db: D1Database, q: HistoryQuery): Promise<FxLo
     where.push('pair = ?');
     binds.push(q.pair);
   }
-  if (q.before) {
+  if (q.before && q.beforeId) {
+    where.push('(created_at < ? OR (created_at = ? AND rowid < COALESCE((SELECT rowid FROM fx_rate_log WHERE id = ?), 0)))');
+    binds.push(q.before, q.before, q.beforeId);
+  } else if (q.before) {
     where.push('created_at < ?');
     binds.push(q.before);
   }

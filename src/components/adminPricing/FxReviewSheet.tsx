@@ -23,9 +23,9 @@ import { Button } from '../ui/Button';
 import type { Language } from '../../translations';
 import { reviewFxRate, type FxPairDto, type FxRatesAnswer } from './api';
 import type { FxStrings } from './fxStrings';
-import { Fact, FxMessage, fxDate, pctText, RateLine, useFxAct } from './fxParts';
+import { Fact, FX_DAY_HOURS, FxFigure, FxMessage, fxDate, pctText, RATE_SHOWN_PLACES, RateLine, useFxAct } from './fxParts';
 import { signedPct } from './FxPairCard';
-import { readDecimal } from './format';
+import { fxFigure, shownFigure } from './format';
 import { Figure } from './parts';
 
 export interface FxReviewSheetProps {
@@ -41,6 +41,7 @@ export interface FxReviewSheetProps {
 export default function FxReviewSheet({ pair: p, onClose, lang, dir, s, onAnswer, onStale }: FxReviewSheetProps) {
   const titleId = useId();
   const bodyId = useId();
+  const keepHintId = useId();
   const { busy, message, run, clear } = useFxAct({ lang, s, onAnswer, onStale });
   const pending = p?.pending ?? null;
   const open = !!p && !!pending;
@@ -97,9 +98,22 @@ export default function FxReviewSheet({ pair: p, onClose, lang, dir, s, onAnswer
               </Button>
             )}
             {p.effective_rate && (
-              <Button variant="ghost" loading={busy === 'keep_manual'} disabled={!!busy && busy !== 'keep_manual'} onClick={() => decide('keep_manual')} data-fx-decision="keep_manual">
+              <Button
+                variant="ghost"
+                loading={busy === 'keep_manual'}
+                disabled={!!busy && busy !== 'keep_manual'}
+                onClick={() => decide('keep_manual')}
+                aria-describedby={keepHintId}
+                data-fx-decision="keep_manual"
+              >
                 {s.keepManual}
               </Button>
+            )}
+            {/* Said before the act: it turns tracking off, so it asks for a fresh sign-in (UX review #2). */}
+            {p.effective_rate && (
+              <p id={keepHintId} className="text-[12px] leading-relaxed text-text-muted sm:basis-full" data-fx-keep-manual-hint>
+                {s.keepManualHint}
+              </p>
             )}
           </div>
         ) : null
@@ -109,41 +123,42 @@ export default function FxReviewSheet({ pair: p, onClose, lang, dir, s, onAnswer
         <div className="px-4 pb-4 pt-3" dir={dir} data-fx-review={p.pair}>
           <p className="text-[13px] font-semibold text-text-muted">{s.pairName[p.pair]}</p>
           <p id={bodyId} className="mt-2 text-[14px] leading-relaxed text-text-secondary">
+            {/* The first value: what approving it does — the title already says what it is (UX review #15). */}
             {first || !p.effective_rate || !pending.change_pct
-              ? s.reviewFirst
+              ? s.reviewFirstBody
               : s.reviewBody(
-                  readDecimal(pending.effective_rate, lang),
-                  readDecimal(p.effective_rate, lang),
-                  readDecimal(pctText(pending.change_pct).replace(/^-/, ''), lang),
-                  readDecimal(limit ?? '', lang)
+                  shownFigure(pending.effective_rate, RATE_SHOWN_PLACES[p.pair]).text,
+                  shownFigure(p.effective_rate, RATE_SHOWN_PLACES[p.pair]).text,
+                  fxFigure(pctText(pending.change_pct).replace(/^-/, '')),
+                  fxFigure(limit ?? '')
                 )}
           </p>
 
           <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-border-subtle/70 p-3">
             <Fact label={s.pendingNew} wide>
               <span className="text-[18px] font-black">
-                <RateLine pair={p.pair} rate={pending.effective_rate} lang={lang} />
+                <RateLine pair={p.pair} rate={pending.effective_rate} />
               </span>
             </Fact>
             <Fact label={s.pendingCurrent}>
-              {p.effective_rate ? <RateLine pair={p.pair} rate={p.effective_rate} lang={lang} /> : <span className="font-normal text-text-muted">{s.noRateYet}</span>}
+              {p.effective_rate ? <RateLine pair={p.pair} rate={p.effective_rate} /> : <span className="font-normal text-text-muted">{s.noRateYet}</span>}
             </Fact>
             <Fact label={s.change}>
               <Figure>{signedPct(pending.change_pct, lang)}</Figure>
             </Fact>
             {p.pair === 'USD_IQD' && pending.market_rate && (
               <Fact label={s.pendingMarket}>
-                <Figure>{readDecimal(pending.market_rate, lang)}</Figure>
+                <FxFigure rate={pending.market_rate} />
               </Fact>
             )}
             {p.pair === 'USD_IQD' && (
               <Fact label={s.adjustment}>
-                <Figure>{readDecimal(p.adjustment_iqd_per_usd ?? '0', lang)}</Figure>
+                <FxFigure rate={p.adjustment_iqd_per_usd ?? '0'} />
               </Fact>
             )}
             {pending.reason && (
               <Fact label={s.reason} wide>
-                <span className="font-medium">{s.reasons[pending.reason](readDecimal(limit ?? '', lang))}</span>
+                <span className="font-medium">{s.reasons[pending.reason](fxFigure(limit ?? ''), FX_DAY_HOURS)}</span>
               </Fact>
             )}
             {pending.published_at && <Fact label={s.published}>{fxDate(pending.published_at, lang)}</Fact>}

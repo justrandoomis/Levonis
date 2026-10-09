@@ -5,7 +5,7 @@ import { getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
 import { rateLimit } from '../lib/ratelimit';
 import { readSchemaStatus } from '../lib/schemaVersion';
 import { anonymousCached } from '../lib/edgePolicy';
-import { getDisplayUsdRate } from '../lib/fx/displayRate';
+import { getPublicDisplayRate } from '../lib/fx/displayRate';
 
 export const miscRoutes = new Hono<AppContext>();
 
@@ -44,13 +44,14 @@ miscRoutes.get('/health', async (c) => {
  * `displayUsdRate` (FX programme plan §8, §13): the shop's effective USD/IQD
  * as decimal text — the ONE public FX figure, read beside the settings in the
  * same wave — or null until the owner approves the first value (and on a
- * database without migration 0179). Nothing else from FX is public. A changed
- * rate purges this answer (worker/lib/fx/scheduler.ts, purgeCatalogueFromJob).
+ * database without migration 0179) — with `displayUsdRateAttributed`, whether
+ * that figure is the provider's (credited to IQWealth) or one the owner typed.
+ * Nothing else from FX is public. A changed rate or source purges this answer (worker/lib/fx/scheduler.ts, purgeCatalogueFromJob).
  */
 miscRoutes.get('/settings/public', (c) =>
   anonymousCached(c, {}, async () => {
-    const [settings, displayUsdRate] = await Promise.all([getSettings(c.env.DB, PUBLIC_SETTING_KEYS), getDisplayUsdRate(c.env.DB)]);
-    return c.json({ success: true, settings: { ...settings, displayUsdRate } });
+    const [settings, display] = await Promise.all([getSettings(c.env.DB, PUBLIC_SETTING_KEYS), getPublicDisplayRate(c.env.DB)]);
+    return c.json({ success: true, settings: { ...settings, ...display } });
   })
 );
 

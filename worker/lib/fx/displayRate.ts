@@ -8,18 +8,39 @@
  * figure that is: no provider, market, adjustment, pending or history value
  * ever reaches `/api/settings/public` or `/api/home`.
  *
+ * Beside it, one flag and no figure: `displayUsdRateAttributed` — true when
+ * the rate came from the provider's data (applied or approved, even if since
+ * frozen as manual), false when the owner TYPED it (a manual rate). The
+ * customer menu and Settings credit IQWealth («based on IQWealth data») only
+ * when it is true; a typed rate is «a rate set by the shop» (FX-1 review #10).
+ * It says nothing the effective rate does not already show over a few days.
+ *
  * Null until the owner approves the first USD/IQD value, and null on a
  * database without migration 0179 (the client then falls back to the wallet's
- * `exchangeRate`, so nothing regresses the day this lands). Never throws.
+ * `exchangeRate`, so nothing regresses the day this lands). Never throws. One
+ * statement, read in the same wave as the settings.
  */
 const DECIMAL = /^[0-9]+(\.[0-9]+)?$/;
 
-export async function getDisplayUsdRate(db: D1Database): Promise<string | null> {
+export interface PublicDisplayRate {
+  displayUsdRate: string | null;
+  displayUsdRateAttributed: boolean | null;
+}
+
+export async function getPublicDisplayRate(db: D1Database): Promise<PublicDisplayRate> {
   try {
-    const row = await db.prepare("SELECT rate_iqd FROM pricing_fx_rates WHERE currency = 'USD'").first<{ rate_iqd: unknown }>();
+    const row = await db
+      .prepare("SELECT rate_iqd, (SELECT effective_source FROM fx_rate_pairs WHERE pair = 'USD_IQD') AS source FROM pricing_fx_rates WHERE currency = 'USD'")
+      .first<{ rate_iqd: unknown; source: unknown }>();
     const rate = row?.rate_iqd;
-    return typeof rate === 'string' && DECIMAL.test(rate) && rate.length <= 32 ? rate : null;
+    const ok = typeof rate === 'string' && DECIMAL.test(rate) && rate.length <= 32;
+    return ok ? { displayUsdRate: rate, displayUsdRateAttributed: row?.source !== 'manual' } : { displayUsdRate: null, displayUsdRateAttributed: null };
   } catch {
-    return null;
+    return { displayUsdRate: null, displayUsdRateAttributed: null };
   }
+}
+
+/** The figure alone. */
+export async function getDisplayUsdRate(db: D1Database): Promise<string | null> {
+  return (await getPublicDisplayRate(db)).displayUsdRate;
 }

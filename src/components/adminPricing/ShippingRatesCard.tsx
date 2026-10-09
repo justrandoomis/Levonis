@@ -9,7 +9,7 @@
  * card left open across another save answers 409 instead of overwriting it.
  * (From FX-5 a save reprices behind a preview; in FX-1 nothing is repriced.)
  */
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Pencil } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Field, Input } from '../ui/Field';
@@ -18,9 +18,8 @@ import { iqdUnit } from '../../lib/money';
 import { saveShippingRate, type FxRatesAnswer, type FxShippingDto } from './api';
 import type { FxStrings } from './fxStrings';
 import { shippingRateInput } from './fxInput';
-import { FxMessage, fxDate, useFxAct } from './fxParts';
-import { readDecimal } from './format';
-import { Figure } from './parts';
+import { FxFigure, FxMessage, fxDate, useFxAct } from './fxParts';
+import { fxFigure } from './format';
 
 export interface ShippingRatesCardProps {
   shipping: FxShippingDto[];
@@ -54,6 +53,14 @@ function ShippingRow({ row, lang, s, onAnswer, onStale }: { row: FxShippingDto; 
   const [error, setError] = useState<string | null>(null);
   const label = s.ship[row.profile];
   const suggestion = row.procurement_suggestion && row.procurement_suggestion !== row.rate_iqd ? row.procurement_suggestion : null;
+  // Focus goes back to «تعديل» when the editor closes, never to <body> (UX review #7).
+  const editRef = useRef<HTMLButtonElement>(null);
+  const [focusEdit, setFocusEdit] = useState(false);
+  useEffect(() => {
+    if (!focusEdit) return;
+    editRef.current?.focus();
+    setFocusEdit(false);
+  }, [focusEdit]);
 
   const save = async () => {
     const rate_iqd = shippingRateInput(draft);
@@ -65,7 +72,10 @@ function ShippingRow({ row, lang, s, onAnswer, onStale }: { row: FxShippingDto; 
     const ok = await run('save', (confirm_large_change) =>
       saveShippingRate(row.profile, { version: row.version, rate_iqd, ...(confirm_large_change ? { confirm_large_change: true } : {}) })
     );
-    if (ok) setEditing(false);
+    if (ok) {
+      setEditing(false);
+      setFocusEdit(true);
+    }
   };
 
   return (
@@ -75,13 +85,14 @@ function ShippingRow({ row, lang, s, onAnswer, onStale }: { row: FxShippingDto; 
         <span className="flex items-center gap-2">
           {row.rate_iqd ? (
             <span className="text-[14px] font-semibold text-text-primary">
-              <Figure>{readDecimal(row.rate_iqd, lang)}</Figure> {iqdUnit(lang)}
+              <FxFigure rate={row.rate_iqd} /> {iqdUnit(lang)}
             </span>
           ) : (
             <span className="text-[13px] font-semibold text-warning">{s.shipNotSet}</span>
           )}
           {!editing && (
             <Button
+              ref={editRef}
               size="sm"
               variant="ghost"
               icon={<Pencil aria-hidden="true" className="h-3.5 w-3.5" />}
@@ -106,7 +117,7 @@ function ShippingRow({ row, lang, s, onAnswer, onStale }: { row: FxShippingDto; 
           }}
         >
           <Field label={s.shipRateLabel} error={error}>
-            <Input ltr inputMode="decimal" autoComplete="off" value={draft} onChange={(e) => setDraft(e.target.value)} />
+            <Input autoFocus ltr inputMode="decimal" autoComplete="off" value={draft} onChange={(e) => setDraft(e.target.value)} />
           </Field>
           {suggestion && (
             <button
@@ -115,7 +126,7 @@ function ShippingRow({ row, lang, s, onAnswer, onStale }: { row: FxShippingDto; 
               className="min-h-[44px] rounded-md text-start text-[13px] font-semibold text-text-secondary underline decoration-border-subtle underline-offset-2 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               data-shipping-suggestion
             >
-              {s.shipUseSuggestion(readDecimal(suggestion, lang))}
+              {s.shipUseSuggestion(fxFigure(suggestion))}
             </button>
           )}
           <div className="flex gap-2">
@@ -128,6 +139,7 @@ function ShippingRow({ row, lang, s, onAnswer, onStale }: { row: FxShippingDto; 
               onClick={() => {
                 setEditing(false);
                 setError(null);
+                setFocusEdit(true);
               }}
             >
               {s.cancel}

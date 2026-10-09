@@ -11,8 +11,9 @@
  *   limits       both refresh buckets (10 an hour, 40 a day), charged by the
  *                refresh AND by a return to automatic (F4)
  *   fresh        guard settings, mode, interval and «تأكيد السعر الحالي» need a
- *                sign-in within 10 minutes; three 13% manual sets in 24 h — the
- *                third needs it AND confirm_large_change (F3)
+ *                sign-in within 10 minutes; 13% manual sets in 24 h — the act
+ *                being made counts, so the second needs it AND
+ *                confirm_large_change (F3; FX-1 review C3)
  *   door         401 / 403 FORBIDDEN / 403 COST_ACCESS_DENIED; private,
  *                no-store on every answer; a cross-origin write refused
  *   install      a database without 0179: 503 PRICING_NOT_INSTALLED for the owner
@@ -292,19 +293,26 @@ test('settings refuse what the row could not hold: dead band ≥ threshold, drif
   assert.equal((await json(interval)).code, 'FX_PAIR_MANUAL');
 });
 
-test('three manual sets of 13% within 24 h: the third needs a fresh session and confirm_large_change (F3, §7.8)', async () => {
+test('manual sets of 13% within 24 h: the act being made counts, so the second — and the third — need a fresh session and confirm_large_change (F3, §7.8; FX-1 review C3)', async () => {
   const stale = world({ sessionAgeSeconds: STALE });
   applyRate(stale.raw, 'USD_IQD', '1660');
   const set = (rate: string, extra: Record<string, unknown> = {}, app = stale.app) => put(app, `${BASE}/rates/fx/USD_IQD/manual`, { owner_version: ownerVersion(stale.raw), rate, ...extra });
   assert.equal((await set('1875.8')).status, 200, 'first 13%');
-  assert.equal((await set('2119.654')).status, 200, 'second 13%: the earlier acts total 13%');
-  const third = await set('2395.209');
-  assert.equal(third.status, 409);
-  assert.equal((await json(third)).code, 'PRICING_LARGE_CHANGE_CONFIRM');
-  const confirmedButStale = await set('2395.209', { confirm_large_change: true });
+  // 13% + 13% = 26% in a day: above 15% with the act itself counted.
+  const second = await set('2119.654');
+  assert.equal(second.status, 409, 'second 13%');
+  assert.equal((await json(second)).code, 'PRICING_LARGE_CHANGE_CONFIRM');
+  const confirmedButStale = await set('2119.654', { confirm_large_change: true });
   assert.equal(confirmedButStale.status, 401);
   assert.equal((await json(confirmedButStale)).code, 'REAUTH_REQUIRED');
   const fresh = world({ raw: stale.raw, sessionAgeSeconds: FRESH });
+  assert.equal((await set('2119.654', { confirm_large_change: true }, fresh.app)).status, 200);
+  // The third (the plan's own case) needs both as well.
+  const third = await set('2395.209');
+  assert.equal(third.status, 409);
+  assert.equal((await json(third)).code, 'PRICING_LARGE_CHANGE_CONFIRM');
+  const thirdStale = await set('2395.209', { confirm_large_change: true });
+  assert.equal((await json(thirdStale)).code, 'REAUTH_REQUIRED');
   assert.equal((await set('2395.209', { confirm_large_change: true }, fresh.app)).status, 200);
   assert.equal(pairOf(stale.raw, 'USD_IQD').effective_rate, '2395.209');
   // A single act above 15% needs the same, whatever the history.

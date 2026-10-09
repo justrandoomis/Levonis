@@ -58,6 +58,8 @@ interface WalletContextType {
    * `exchangeRate`. Never used for money: the wallet keeps `exchangeRate`.
    */
   displayUsdRate: string | null | undefined;
+  /** Whether that rate is the provider's figure (false: the owner typed it) — who the menu credits. */
+  displayUsdRateAttributed: boolean;
   /**
    * THE DOOR CHARGE, as two numbers: what one block costs and how big a block
    * is. Read from the same public settings the exchange rate comes from, and
@@ -215,6 +217,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     cartShippingMethods: settings?.cartShippingMethods ?? [],
     exchangeRate: settings?.exchangeRate ?? 1400,
     displayUsdRate: settings ? (settings.displayUsdRate ?? null) : undefined,
+    displayUsdRateAttributed: settings?.displayUsdRateAttributed !== false,
     codTaxPerBlockIqd: codTaxRate.perBlockIqd,
     codTaxBlockIqd: codTaxRate.blockIqd,
     currency: settings?.currency ?? 'IQD',

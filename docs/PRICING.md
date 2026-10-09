@@ -48,15 +48,29 @@ throughout, never a float.
   either side changes, in the same batch (a trigger refuses a stale derived
   row).
 - **The guard**: a rate waits for the owner's approval when it is the first
-  value, jumps more than 3% in one step, moves more than 3% within 24 hours,
-  or drifts more than 6% from the last confirmed rate. Moves below the dead
-  band (0.5% USD/IQD, 0.3% EUR and CNY) are ignored. A failing source keeps
-  the last known good rate; a rate is never 0.
+  value, jumps more than 3% in one step, moves more than 3% within 24 hours
+  (measured from the rate the owner confirmed, when that was inside the
+  24 hours), or drifts more than 6% from the last confirmed rate. An
+  adjustment moves that confirmed rate by its own change and never re-bases
+  it. A value the owner rejected is not held again for 24 hours, and the
+  rejection never stops an ordinary move. Moves below the dead band (0.5%
+  USD/IQD, 0.3% EUR and CNY) are ignored. A failing source keeps the last
+  known good rate; a rate is never 0; a candidate out of bounds (an
+  adjustment typed wrong) is recorded INVALID for that pair alone.
+- **The owner's acts**: a change of mode (keep-as-manual included), interval,
+  threshold or bounds, and «تأكيد السعر الحالي», need a sign-in from the last
+  10 minutes. On USD/IQD, the owner's acts of the last 24 hours — the act
+  being made included — above 15% need the explicit confirmation and that
+  fresh sign-in too. An adjustment that would make the rate implausible is
+  refused (400 `FX_RATE_OUT_OF_BOUNDS`).
 - **The wallet keeps its own rate**: `exchangeRate` (1,400, DECISIONS row 6)
   stays the wallet's and escrow's rate. FX reads never touch it.
 - **Public**: only the effective USD/IQD, as `displayUsdRate` (decimal text or
-  `null`) in `/api/settings/public` and `/api/home`, for the display currency.
-  Every other FX figure is the verified owner's (`/api/admin/pricing/rates*`).
+  `null`) in `/api/settings/public` and `/api/home`, for the display currency,
+  with one flag and no figure, `displayUsdRateAttributed`: false when the
+  owner typed the rate, so the menu and Settings credit IQWealth only for its
+  own figure. Every other FX figure is the verified owner's
+  (`/api/admin/pricing/rates*`).
 - **FX-1 moves no price.** Repricing from a rate change is FX-5.
 
 **One scheduler, one cron.** `0 */6 * * *` runs `runFxScheduler`

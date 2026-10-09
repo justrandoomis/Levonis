@@ -122,9 +122,14 @@ export function changePctText(before: string, after: string): string {
   return negative && text !== '0' ? `-${text}` : text;
 }
 
-/** True when a decimal text lies within [min, max]. */
+/**
+ * True when a decimal text lies within [min, max]. The value is read SIGNED:
+ * a candidate `market + adjustment` can be zero or negative (a typed −2000 for
+ * −20), and that is an out-of-bounds rate to record — never a RangeError that
+ * aborts the whole scheduler run (FX-1 review: security #1, correctness C6).
+ */
 export function withinBounds(value: string, min: string, max: string): boolean {
-  const v = ex(value);
+  const v = exSigned(value);
   return compareProcurementExact(v, ex(min)) >= 0 && compareProcurementExact(v, ex(max)) <= 0;
 }
 

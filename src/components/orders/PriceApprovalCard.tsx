@@ -46,7 +46,8 @@ export default function PriceApprovalCard({
 }) {
   const { loc, lang } = useLanguage();
   const L = (lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar') as Lang;
-  const { money, moneyBoth } = useMoney();
+  // A wallet refund is a WALLET AMOUNT: at the wallet's own rate, never the market's (Q5; FX-1 review #6).
+  const { money, moneyBoth, walletMoney } = useMoney();
   const [pending, setPending] = useState<PendingAdjustment | null>(null);
   const [asking, setAsking] = useState<'approve' | 'reject' | null>(null);
   const [error, setError] = useState('');
@@ -142,7 +143,7 @@ export default function PriceApprovalCard({
           {pending.wallet_refund_iqd > 0 && (
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-text-muted text-[12px]">{loc('يُعاد إلى محفظتك', 'Back to your wallet')}</dt>
-              <dd className="tabular-nums text-success font-bold">{money(pending.wallet_refund_iqd)}</dd>
+              <dd className="tabular-nums text-success font-bold">{walletMoney(pending.wallet_refund_iqd)}</dd>
             </div>
           )}
         </dl>
@@ -168,8 +169,8 @@ export default function PriceApprovalCard({
           asking === 'approve'
             ? pending.wallet_refund_iqd > 0
               ? loc(
-                  `يصبح إجمالي طلبك ${money(pending.new_total_iqd)} ويُعاد ${money(pending.wallet_refund_iqd)} إلى محفظتك فورًا.`,
-                  `Your order total becomes ${money(pending.new_total_iqd)} and ${money(pending.wallet_refund_iqd)} goes back to your wallet now.`
+                  `يصبح إجمالي طلبك ${money(pending.new_total_iqd)} ويُعاد ${walletMoney(pending.wallet_refund_iqd)} إلى محفظتك فورًا.`,
+                  `Your order total becomes ${money(pending.new_total_iqd)} and ${walletMoney(pending.wallet_refund_iqd)} goes back to your wallet now.`
                 )
               : loc(
                   `يصبح إجمالي طلبك ${money(pending.new_total_iqd)} وتدفع ${money(pending.new_due_iqd)} عند الاستلام.`,

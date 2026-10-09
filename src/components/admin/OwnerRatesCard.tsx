@@ -23,7 +23,7 @@ import { StatusChip, type Tone } from '../ui/Badge';
 import { Skeleton } from '../ui/Skeleton';
 import { fetchFxRates, type FxRatesAnswer, type FxStatus } from '../adminPricing/api';
 import { fxStrings } from '../adminPricing/fxStrings';
-import { readDecimal, readWhole } from '../adminPricing/format';
+import { fxCount, shownFigure } from '../adminPricing/format';
 
 const TONE: Readonly<Record<FxStatus, Tone>> = {
   OK: 'success',
@@ -34,6 +34,8 @@ const TONE: Readonly<Record<FxStatus, Tone>> = {
 };
 
 const UNITS = { USD_IQD: ['USD', 'IQD'], EUR_USD: ['EUR', 'USD'], CNY_USD: ['CNY', 'USD'] } as const;
+/** As the pricing tab shows them (fxParts RATE_SHOWN_PLACES — not imported, so the overview loads no tab code): CNY/USD to six decimals. */
+const SHOWN_PLACES = { USD_IQD: null, EUR_USD: null, CNY_USD: 6 } as const;
 
 export default function OwnerRatesCard({ onOpen }: { onOpen?: () => void }) {
   const { lang, dir } = useLanguage();
@@ -65,7 +67,7 @@ export default function OwnerRatesCard({ onOpen }: { onOpen?: () => void }) {
           <Landmark aria-hidden="true" className="h-4 w-4 text-text-muted" />
           {s.ownerCardTitle}
         </h2>
-        {waiting > 0 && <StatusChip tone="warning">{s.ownerCardReview(readWhole(waiting, lang))}</StatusChip>}
+        {waiting > 0 && <StatusChip tone="warning">{s.ownerCardReview(fxCount(waiting))}</StatusChip>}
       </div>
       {!data ? (
         <div className="mt-3 space-y-2" aria-hidden="true">
@@ -77,20 +79,23 @@ export default function OwnerRatesCard({ onOpen }: { onOpen?: () => void }) {
         <ul className="mt-3 divide-y divide-border-subtle/60">
           {data.pairs.map((p) => {
             const [from, to] = UNITS[p.pair];
+            const f = p.effective_rate ? shownFigure(p.effective_rate, SHOWN_PLACES[p.pair]) : null;
             return (
               <li key={p.pair} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2" data-owner-rate={p.pair}>
                 <span className="text-[13px] font-semibold text-text-secondary">{s.pairName[p.pair]}</span>
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="text-[14px] font-bold text-text-primary">
-                    {p.effective_rate ? (
-                      <bdi dir="ltr" className="whitespace-nowrap tabular-nums">
-                        {readDecimal('1', lang)} {from} = {readDecimal(p.effective_rate, lang)} {to}
+                    {f ? (
+                      // Latin digits, like every figure of the rates panel (UX review #1).
+                      <bdi dir="ltr" className="whitespace-nowrap tabular-nums" title={f.approx ? `1 ${from} = ${f.exact} ${to}` : undefined}>
+                        1 {from} {f.approx ? '≈' : '='} {f.text} {to}
                       </bdi>
                     ) : (
                       <span className="text-[13px] font-medium text-text-muted">{s.ownerCardEmpty}</span>
                     )}
                   </span>
-                  <StatusChip tone={TONE[p.status]}>{s.st[p.status]}</StatusChip>
+                  {/* A manual rate is «يدوي», not «يعمل» (UX review #6). */}
+                  {p.mode === 'MANUAL' ? <StatusChip tone="neutral">{s.modeManual}</StatusChip> : <StatusChip tone={TONE[p.status]}>{s.st[p.status]}</StatusChip>}
                 </span>
               </li>
             );

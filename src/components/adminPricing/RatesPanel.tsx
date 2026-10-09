@@ -27,13 +27,13 @@ import { isAborted } from '../../lib/api';
 import type { Language } from '../../translations';
 import { fetchFxRates, refreshFxRates, type FxPairDto, type FxRatesAnswer } from './api';
 import { fxStrings } from './fxStrings';
-import { FxMessage, useFxAct } from './fxParts';
+import { FxMessage, refreshMessage, useFxAct } from './fxParts';
 import FxPairCard from './FxPairCard';
 import FxReviewSheet from './FxReviewSheet';
 import FxHistorySheet from './FxHistorySheet';
 import ShippingRatesCard from './ShippingRatesCard';
 import { PricingFailure } from './parts';
-import { readWhole } from './format';
+import { fxCount } from './format';
 
 export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' | 'ltr' }) {
   const s = fxStrings(lang);
@@ -89,7 +89,7 @@ export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' |
               icon={<RefreshCw aria-hidden="true" className="h-4 w-4" />}
               loading={refresh.busy === 'refresh'}
               loadingLabel={s.refreshing}
-              onClick={() => refresh.run('refresh', () => refreshFxRates())}
+              onClick={() => refresh.run('refresh', () => refreshFxRates(), (answer) => refreshMessage(answer.report, s))}
               data-fx-refresh
             >
               {s.refresh}
@@ -99,7 +99,7 @@ export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' |
       </div>
       {data && (
         <p className="mt-1 text-[12px] text-text-muted" data-fx-refresh-budget>
-          {s.refreshBudget(readWhole(data.refresh_budget.used_today, lang), readWhole(data.refresh_budget.limit, lang))}
+          {s.refreshBudget(fxCount(data.refresh_budget.used_today), fxCount(data.refresh_budget.limit))}
         </p>
       )}
       <FxMessage message={refresh.message} s={s} />
@@ -109,13 +109,17 @@ export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' |
           <PricingFailure error={error} lang={lang} onRetry={() => setReload((n) => n + 1)} fallback={s.loadFailed} />
         </div>
       ) : !data ? (
-        <div className="mt-4 grid gap-3 md:grid-cols-2" aria-hidden="true">
-          <p className="sr-only" role="status">
+        // The status is announced; the skeleton beside it is decoration (UX review #8:
+        // inside the aria-hidden wrapper the status was never read out).
+        <div className="mt-4">
+          <p className="sr-only" role="status" data-fx-loading>
             {s.loading}
           </p>
-          <Skeleton className="h-64 w-full md:col-span-2" />
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-48 w-full" />
+          <div className="grid gap-3 md:grid-cols-2" aria-hidden="true">
+            <Skeleton className="h-64 w-full md:col-span-2" />
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-48 w-full" />
+          </div>
         </div>
       ) : (
         <div className="mt-4 grid gap-3 md:grid-cols-2">

@@ -531,7 +531,11 @@ async function planDocument(
   // never through `header` above, which rewrites every key on every save and
   // would replace the purchase-time rates with today's. NULL is a rate not
   // known then. Skipped on a database without migration 0179.
-  if (status === 'ordered') statements.push(...(await fxSnapshotStatements(db, id, now)));
+  // ONLY WHEN THIS SAVE ORDERS IT — a new document saved as ordered, or a
+  // draft confirmed: a document already ordered before 0179 has NULL rates
+  // (UNKNOWN), and its next edit must not record the edit day's rates as its
+  // purchase-time rates (FX-1 correctness review C7; FX-6's L10 reads them).
+  if (status === 'ordered' && previous?.status !== 'ordered') statements.push(...(await fxSnapshotStatements(db, id, now)));
   if (profile) {
     // A concurrent settings save must not be silently overwritten by an older
     // open purchase. The entire document/default transaction is fenced.
