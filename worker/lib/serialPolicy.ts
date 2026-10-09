@@ -423,13 +423,16 @@ export interface SerialAnswerFence {
  *
  * ONE EXCEPTION AFTER A PRODUCT WRITE: a product that leaves the write
  * carrying its OWN `serialized` word passes the second check. Its answer is
- * then that word, which no placement, flag, policy or parent can move, so no
- * race reaches it; and the word is one the write was allowed to store — the
+ * then that word, which no placement, flag, policy or parent can move; and the
+ * word is one the write was allowed to store — the
  * stored word the verdict kept (unchanged since the read: the first check
  * holds the answer it gave), or the one pre-existing door that writes a word,
  * a used / open-box / refurbished grade on a product with none
  * (`printerWarrantyRules`, docs/SERIAL_SCAN.md §29), which this fence leaves
- * exactly as it was.
+ * exactly as it was. The word itself is NOT fenced: a door that copied
+ * `ops_policy` from its first read can write the owner's previous word back
+ * if the owner changes it in that same moment (docs/SERIAL_SCAN.md, Known
+ * limits — same-moment saves).
  *
  * Non-owners only: the owner's writes carry no fence. Before migration 0178
  * the twin has no section layer to read (`withCatalog` false), exactly HEAD's

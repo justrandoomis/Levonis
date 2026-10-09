@@ -197,9 +197,11 @@ moves — for the two catalog editors. A D1 batch is one transaction, so equal
 sets on both sides mean the write flipped nothing, whatever ran in between and
 whichever input changed (a placement, a flag, a policy, a parent, the owner's
 word). After a product write, a product that carries its OWN word passes the second
-check: its answer is that word, which no race can move — the stored word the
-verdict kept, or the used-grade fill below, which the fence leaves exactly as
-it was. A lost race answers 409 `SERIAL_FILING_CHANGED` (the contract's three
+check: its answer is that word, which no placement, flag, policy or parent can
+move — the stored word the verdict kept, or the used-grade fill below, which
+the fence leaves exactly as it was. The word itself is not fenced: a save that
+read the product just before the owner changed its word can write the old word
+back (see Known limits). A lost race answers 409 `SERIAL_FILING_CHANGED` (the contract's three
 sentences; the admin screens render it by code), and an import row fails
 alone with `IMPORT_ROW_CHANGED_RETRY`. A create has no answer to keep and is
 not fenced. The owner's writes carry no fence and no new read.
@@ -307,6 +309,8 @@ both policy controls.
 - Re-open does not take stock again (pre-existing, DECISIONS 184(15)); the slot shows `STOCK_NOT_RETAKEN`.
 - The product import's D1 budget (pre-existing, measured by the round-3 review, NOT introduced by this branch): the preview's `loadExisting` binds more than 100 parameters in one statement once a sheet holds more than about 50 rows, over D1's per-statement limit; the confirm prepares about 58–62 statements per row. Round 4 adds, per non-owner update row, one read and four in-batch fence statements (the answer fence), and per update row of any importer two more (the ops_policy fence). Large sheets are bounded by these, not by `MAX_PRODUCTS`; splitting a sheet is the workaround until the import is batched.
 - The ops-policy route (`POST /api/devices/admin/products/:id/ops-policy`) writes the whole `ops_policy` from its own read, like the import did before round 4: a non-owner's `warranty_base_months` written in the same moment as the owner's word can carry the old word back. Not changed in round 4 (the finding was the import's); the same fence would close it.
+
+- SAME-MOMENT SAVES (round-4 review, accepted as known limits): the fences above stop a non-owner's write from FLIPPING an answer through placements, flags, policies or parents, but several doors still write fields they read a few milliseconds earlier, so a non-owner's save that runs at the same moment as an owner's change can carry the old value back — the classic last-save-wins of every save in the shop, not something a non-owner can aim. Known cases: the product form, bundles, mystery offers and the TXT template copy `ops_policy` from their first read, so the owner's new `serialized` word can be written back (the own-word exception of the answer fence lets it through); both catalog editors rewrite `is_printer_catalog` and `parent_id` from their own read on every save, including a plain rename or the «active» toggle, so an owner's flag or move made in that moment can be undone; an import row that names no section can write back a section pair the owner changed between the confirm's re-read and that row's batch (the shelves stay the owner's, so section and shelves can disagree until the next save); deleting an empty catalog is not fenced against a product filed into it in the same moment (the placement cascades away); and the catalog-edit verdict counts a product filed under a catalog only by `category_id` (no shelf row) as becoming a printer, which the resolver never does — an extra 403 for a non-owner, never a wrong answer. Closing them means the same value-compared write condition on each door (`WHERE … AND ops_policy IS ?`, `… AND is_printer_catalog = ? AND parent_id IS ?`) with a retry message.
 
 - A used / open-box / refurbished grade turns serial tracking ON for a product with no `serialized` word of its own (live before this feature; see §29 above). Should a NON-owner's used grade still turn tracking on, or should that be the owner's call like every other door that flips the answer?
 
