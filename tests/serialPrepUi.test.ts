@@ -30,7 +30,7 @@ import { looksLikeBoxSn, overrideFor, serialRefusal } from '../src/components/ad
 import { gateRefusalOf } from '../src/components/adminOrders/serials/SerialGateRefusal';
 import { withSlot } from '../src/components/adminOrders/serials/UnitSerialSlots';
 import { eventLabel } from '../src/components/adminWarranty/serial/SerialDetail';
-import { gradedSerialAnswer } from '../src/components/adminProducts/form/ConditionSection';
+import { gradedSerialAnswer, nearestSectionSerial } from '../src/components/adminProducts/form/ConditionSection';
 import { refusalText as inventoryRefusal, STR as INVENTORY_STR } from '../src/components/adminWarranty/serialInventory/model';
 import { SERIAL_WRITE_NOT_ALLOWED_TEXT } from '../worker/lib/operations';
 import { ApiError } from '../src/lib/api';
@@ -290,6 +290,40 @@ test('owner decision 4 on the product form: a graded listing says whether serial
   const cond = read('src/components/adminProducts/form/ConditionSection.tsx');
   assert.ok(cond.indexOf('data-graded-serial-tracking') > cond.indexOf('{condition && ('), 'the line sits inside the graded block');
   assert.match(read('src/components/adminTaxonomy/SectionsTab.tsx'), /\{ss\.sectionUsedHint\}/);
+});
+
+test('owner decision 4, review fixes: a saved printer is on because it is a printer, the section is named in the reader\'s language, and an off-by-default graded listing says how to turn it on', () => {
+  const none = { policy: null, sectionName: null };
+  // Every saved printer carries `true` (the server's printer default writes it) — that is the printer speaking.
+  assert.deepEqual(gradedSerialAnswer({ own: true, isPrinter: true, section: none }), { on: true, source: 'printer' });
+  assert.deepEqual(gradedSerialAnswer({ own: true, isPrinter: true, section: { policy: 'off', sectionName: 'x' } }), { on: true, source: 'printer' });
+  // Only an explicit `false` on a printer is the product's own setting; a non-printer's word is always its own.
+  assert.deepEqual(gradedSerialAnswer({ own: false, isPrinter: true, section: none }), { on: false, source: 'product' });
+  assert.deepEqual(gradedSerialAnswer({ own: true, isPrinter: false, section: none }), { on: true, source: 'product' });
+
+  // The nearest section, leaf to root, 'required' winning across branches — named per language.
+  const cats = [
+    { id: 'root', parent_id: null, serial_policy: 'inherit' as const, name_ar: 'الملحقات', name_en: 'Accessories', name_ckb: 'پاشکۆکان' },
+    { id: 'ams', parent_id: 'root', serial_policy: 'required' as const, name_ar: 'أنظمة AMS', name_en: 'AMS systems', name_ckb: 'سیستەمەکانی AMS' },
+    { id: 'leaf', parent_id: 'ams', serial_policy: 'inherit' as const, name_ar: 'AMS Lite', name_en: 'AMS Lite', name_ckb: '' },
+    { id: 'fil', parent_id: null, serial_policy: 'off' as const, name_ar: 'الخيوط', name_en: 'Filament', name_ckb: '' },
+  ];
+  assert.deepEqual(nearestSectionSerial(cats, ['leaf'], 'ar'), { policy: 'required', sectionName: 'أنظمة AMS' });
+  assert.deepEqual(nearestSectionSerial(cats, ['leaf'], 'en'), { policy: 'required', sectionName: 'AMS systems' });
+  assert.deepEqual(nearestSectionSerial(cats, ['leaf'], 'ckb'), { policy: 'required', sectionName: 'سیستەمەکانی AMS' });
+  assert.deepEqual(nearestSectionSerial(cats, ['fil'], 'ckb'), { policy: 'off', sectionName: 'الخيوط' }, 'no Sorani name: the admin\'s Arabic');
+  assert.deepEqual(nearestSectionSerial(cats, ['fil', null, 'leaf'], 'en'), { policy: 'required', sectionName: 'AMS systems' }, 'required wins across branches');
+  assert.deepEqual(nearestSectionSerial(cats, ['root', undefined], 'en'), { policy: null, sectionName: null });
+  const form = read('src/components/adminProducts/ProductForm.tsx');
+  assert.match(form, /nearestSectionSerial\(catalogs, \[doc\.sub_category_id, doc\.category_id, \.\.\.doc\.catalog_ids\], lang\)/);
+  assert.doesNotMatch(form, /sectionName: node\.name_ar \|\| node\.name_en/, 'no Arabic-first name left in the form');
+
+  // A graded listing that is off only by default carries the section editor's own hint (an AMS is missed otherwise).
+  const cond = read('src/components/adminProducts/form/ConditionSection.tsx');
+  const hint = cond.indexOf('data-graded-serial-hint');
+  assert.ok(hint > cond.indexOf('data-graded-serial-tracking'), 'the hint sits under the tracking line');
+  assert.match(cond.slice(hint - 200, hint + 200), /tracking\?\.source === 'default'/);
+  assert.match(cond.slice(hint, hint + 200), /\{ss\.sectionUsedHint\}/);
 });
 
 test('owner decision 1, review fixes: a revoked «الاستلام» is refused as SERIAL_WRITE_NOT_ALLOWED and every serial screen says why in three languages', () => {

@@ -97,7 +97,7 @@ import {
 import { OptionsSection } from './form/OptionsSection';
 import { UsageGuideSection } from './form/UsageGuideSection';
 import { WarrantySection } from './form/WarrantySection';
-import { ConditionSection } from './form/ConditionSection';
+import { ConditionSection, nearestSectionSerial } from './form/ConditionSection';
 import { DimensionsSection } from './form/DimensionsSection';
 import { InventorySummary } from './form/InventorySummary';
 import OwnerCostVerifyCard, { CostOpensAfterSave } from '../auth/OwnerCostVerifyCard';
@@ -613,28 +613,12 @@ export default function ProductForm({
       ),
     [catalogs, doc.category_id, doc.sub_category_id, doc.catalog_ids]
   );
-  // §29: the nearest section on any of this product's branches that says
-  // something about serials — leaf to root, 'required' winning across
-  // branches. The same walk the server makes (worker/lib/serialPolicy.ts
-  // catalogSerialPolicySql), so the form says what the order screen will do.
-  const sectionSerial = useMemo(() => {
-    const byId = new Map(catalogs.map((c) => [c.id, c]));
-    const starts = [...new Set([doc.sub_category_id, doc.category_id, ...doc.catalog_ids].filter(Boolean) as string[])];
-    let found: { policy: 'required' | 'off'; sectionName: string } | null = null;
-    for (const start of starts) {
-      let node = byId.get(start);
-      for (let hop = 0; node && hop < 16; hop++) {
-        if (node.serial_policy === 'required' || node.serial_policy === 'off') {
-          if (!found || (found.policy === 'off' && node.serial_policy === 'required')) {
-            found = { policy: node.serial_policy, sectionName: node.name_ar || node.name_en };
-          }
-          break;
-        }
-        node = node.parent_id ? byId.get(node.parent_id) : undefined;
-      }
-    }
-    return found ?? { policy: null, sectionName: null };
-  }, [catalogs, doc.category_id, doc.sub_category_id, doc.catalog_ids]);
+  // §29: the nearest section that says something about serials, named in the
+  // form's language — the server's walk (nearestSectionSerial, ConditionSection.tsx).
+  const sectionSerial = useMemo(
+    () => nearestSectionSerial(catalogs, [doc.sub_category_id, doc.category_id, ...doc.catalog_ids], lang),
+    [catalogs, doc.category_id, doc.sub_category_id, doc.catalog_ids, lang]
+  );
   const warrantyInput = useMemo(
     () => ({
       isPrinter: isPrinterCatalog,

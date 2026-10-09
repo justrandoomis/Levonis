@@ -169,9 +169,20 @@ bulk-changed: a product that already carries `serialized = true` from an
 earlier grade keeps it until the owner switches it off on the product. The
 product form shows one read-only line under the grade («تتبّع الرقم
 التسلسلي: مفعّل — لأنه طابعة» …, `gradedSerialAnswer` in
-src/components/adminProducts/form/ConditionSection.tsx), and the section
-editor says that a used device needing a serial needs its section set to
-«مطلوب».
+src/components/adminProducts/form/ConditionSection.tsx; a printer is «لأنه
+طابعة» unless its own word is `false`, and the section is named in the form's
+language), and the section editor says that a used device needing a serial
+needs its section set to «مطلوب» — the same hint shows under a graded listing
+that is off only by default.
+
+BEFORE THE PUSH (owner, decision 4): no section ships `required` (migration
+0178 seeds none). A used AMS graded after the push in a section still on
+«وراثة» gets no preparation slot, no unit at delivery and no warranty
+receipt, while the warranty policy (v3) promises a used device the period
+stated on its page and its receipt. Set every section that holds AMS units or
+another device that needs a serial to «مطلوب» before (or with) the push — the
+read-only query under «Live checks» lists them. Products graded before the
+push keep the `true` they already carry.
 
 The import sheet (round 3): a row writes the product's stored placements minus
 the section pair it had, plus the pair the sheet states (`importPlacements`) —
@@ -337,6 +348,14 @@ SELECT COUNT(*) FROM serial_assignments a JOIN orders o ON o.id = a.order_id WHE
 -- critique M7: keys stored before the normaliser's last rules (the scan treats them as the same device)
 SELECT serial_norm FROM device_serials WHERE serial_norm GLOB '*[^0-9A-Z]*';
 SELECT serial_norm FROM warranty_receipts WHERE status IN ('draft','active') AND serial_norm GLOB '*[^0-9A-Z]*';
+-- owner decision 4 (run BEFORE the push too): every non-printer section holding an AMS product, with its
+-- serial policy — each one still 'inherit' must be set to «مطلوب» or a used AMS graded there is not tracked
+SELECT c.id, c.name_ar, c.serial_policy, COUNT(DISTINCT p.id) AS products
+  FROM catalogs c
+  JOIN products p ON p.id IN (SELECT pc.product_id FROM product_catalogs pc WHERE pc.catalog_id = c.id)
+                  OR c.id IN (p.category_id, p.sub_category_id)
+ WHERE c.is_printer_catalog = 0 AND (p.name LIKE '%AMS%' OR p.name_ar LIKE '%AMS%')
+ GROUP BY c.id ORDER BY c.serial_policy, c.name_ar;
 -- owner decision 1: admins whose «الاستلام» is off — each is refused every serial write door
 SELECT user_id FROM ops_permissions WHERE capability = 'receive' AND allowed = 0;
 ```
@@ -357,7 +376,7 @@ Every case runs the real routes over the real migrations (`tests/fixtures/serial
 | `serialVisibilityRoles` | decision 1 (row 192): the matrix of owner / full / assistant / preparer / support over every admin serial surface, order numbers by `canMoveMoney`; the receipt's own `order_id` pinned as the documented exception; customers, merchants and visitors unchanged; `receive` on every serial write door — a replacement naming a new serial and the preparation unlink included — refused as `SERIAL_WRITE_NOT_ALLOWED`, edits on their old gates, the owner never locked out; every exception owner-only and audited; no cost to the newly unmasked roles; the predicate and its static nets |
 | `serialPrepCritique` | H4, M2, M3, M4, M13, M15, M1 / L14 flags, L6 |
 | `serialPrepDeployAhead` | the code on the database one migration behind: every new door 503, HEAD behaviour everywhere else, and the feature live the moment the migration lands (no cached «not installed») |
-| `serialPolicy`, `serialPrepBoard`, `serialPrepUi` | §29 policy, and decision 4 (a graded printer tracked, a graded accessory not, a graded AMS by its «required» section — the form, the import sheet, the shared guard; no preparation slot and no unit for a graded accessory); the board chip; the screens (wedge, sources, strings, Sorani, the graded listing's tracking line and the section hint; `SERIAL_WRITE_NOT_ALLOWED` in three languages on the inventory panel, the camera sheet, «أجهزة الطلبات» and the warranty section) |
+| `serialPolicy`, `serialPrepBoard`, `serialPrepUi` | §29 policy, and decision 4 (a graded printer tracked, a graded accessory not, a graded AMS by its «required» section — the form, the import sheet, the shared guard; no preparation slot and no unit for a graded accessory); the board chip; the screens (wedge, sources, strings, Sorani, the graded listing's tracking line — a saved printer «because it is a printer», the section named per language, the hint when off by default — and the section hint; `SERIAL_WRITE_NOT_ALLOWED` in three languages on the inventory panel, the camera sheet, «أجهزة الطلبات» and the warranty section) |
 | `conditionRules` | the grade's warranty rules, and decision 4 at the rule itself: a grade fills `serialized` for a printer only; an explicit word is never overwritten |
 | `serialLandingReview` | the landing reviews' findings, one test each by name: a new product's flag (form create), the echo that must not pin an inherited answer, the import sheet's section policy and re-filing, the TXT template, the serial page masked at every depth (and the rebuilt «added» row's id), the contract's one sentence, re-parenting a section, the products-v2 catalog editor's printer flag and re-parent |
 | `serialLandingReview2` | round 3, one test per finding: the printer flag judged by its flips (empty catalog, worded products, a silent product, create); the import keeping extra placements (price row, owner, a move) and re-reading the live row at confirm (an owner's later word survives; a row the live row refuses fails alone); OWNER_ONLY in ar / en / ckb on the admin screens; the unit history and the warranty receipt masked; the serial page's 503 when its story fails; the bundle and mystery editors' §29 check; no units for a bundle parent (delivery and the sweep). Round 4: a flag and a re-parent judged as one edit (refused together, the halves alone as before, a whole that flips nothing passes, the owner); the write-time fence both ways (`afterReadsOf`: placement vs printer flag on both catalog editors, the product form), no fence and no new statement on the owner's writes, the used-grade door under decision 4 (a graded accessory gets no word, a graded printer still writes `true` and passes the fence), `SERIAL_FILING_CHANGED`'s three sentences; the import confirm failing only the row whose ops_policy changed under it; a sheet with no section keeping the live filing |

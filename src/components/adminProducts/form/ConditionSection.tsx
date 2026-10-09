@@ -46,12 +46,61 @@ export interface GradedSerialTracking {
   section: { policy: 'required' | 'off' | null; sectionName: string | null };
 }
 
-/** The answer and where it comes from: the product's word, the printer flag, the nearest section, the default. */
+/**
+ * The answer and where it comes from: the product's word, the printer flag,
+ * the nearest section, the default. A printer is tracked unless its own word
+ * is `false` — and every saved printer carries `true`, written by the server's
+ * printer default (worker/lib/warrantyPlans.ts), not by a hand — so a printer
+ * whose word is `true` is on BECAUSE it is a printer; only an explicit `false`
+ * on a printer is the product's own setting speaking.
+ */
 export function gradedSerialAnswer(t: GradedSerialTracking): { on: boolean; source: 'product' | 'printer' | 'section' | 'default' } {
+  if (t.isPrinter && t.own !== false) return { on: true, source: 'printer' };
   if (t.own !== null) return { on: t.own, source: 'product' };
-  if (t.isPrinter) return { on: true, source: 'printer' };
   if (t.section.policy && t.section.sectionName) return { on: t.section.policy === 'required', source: 'section' };
   return { on: false, source: 'default' };
+}
+
+/** What the section walk reads of a catalog node. */
+export interface SectionSerialNode {
+  id: string;
+  parent_id: string | null;
+  serial_policy?: 'inherit' | 'required' | 'off';
+  name_ar: string;
+  name_en: string;
+  name_ckb?: string;
+}
+
+/**
+ * §29: the nearest section on any of this product's branches that says
+ * something about serials — leaf to root, 'required' winning across branches.
+ * The same walk the server makes (worker/lib/serialPolicy.ts
+ * catalogSerialPolicySql), so the form says what the order screen will do. The
+ * section is NAMED in the reader's language (the admin's own names, Arabic
+ * when a translation is missing), never Arabic on an English or Sorani form.
+ */
+export function nearestSectionSerial(
+  catalogs: readonly SectionSerialNode[],
+  starts: readonly (string | null | undefined)[],
+  lang: string,
+): GradedSerialTracking['section'] {
+  const byId = new Map(catalogs.map((c) => [c.id, c]));
+  const nameOf = (n: SectionSerialNode) =>
+    lang === 'en' ? n.name_en || n.name_ar : lang === 'ckb' ? n.name_ckb || n.name_ar : n.name_ar || n.name_en;
+  let found: { policy: 'required' | 'off'; sectionName: string } | null = null;
+  for (const start of new Set(starts.filter(Boolean) as string[])) {
+    let node = byId.get(start);
+    for (let hop = 0; node && hop < 16; hop++) {
+      if (node.serial_policy === 'required' || node.serial_policy === 'off') {
+        if (!found || (found.policy === 'off' && node.serial_policy === 'required')) {
+          found = { policy: node.serial_policy, sectionName: nameOf(node) };
+        }
+        break;
+      }
+      node = node.parent_id ? byId.get(node.parent_id) : undefined;
+    }
+  }
+  return found ?? { policy: null, sectionName: null };
 }
 
 const EMPTY: ConditionEntry = {
@@ -156,6 +205,13 @@ export function ConditionSection({
             >
               <ScanLine className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" aria-hidden />
               <span className="min-w-0">{ss.usedSerialLine(tracking.on ? ss.usedStateOn : ss.usedStateOff, trackingSource)}</span>
+            </p>
+          )}
+          {/* Off only by default: a used device that needs a serial (an AMS) is
+              missed unless its section says so — the section editor's own hint. */}
+          {tracking?.source === 'default' && (
+            <p data-graded-serial-hint className="-mt-2 mb-3 text-[11.5px] leading-relaxed text-zinc-400">
+              {ss.sectionUsedHint}
             </p>
           )}
 
