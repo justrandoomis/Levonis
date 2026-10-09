@@ -115,6 +115,26 @@ export default {
           cls: 'cost_write',
           why: '«قبول القيم المرحّلة»: the values the old prices carry, stored as migrated rules (fenced on legacy_hash)',
         },
+        // The writer stage (owner decision 8; USD design §6.1-§6.5): the stale list, its preview, the
+        // bulk save of previewed prices and the way back to manual — behind the same door, each write
+        // with assertCostWrite.
+        'GET /save-list': {
+          cls: 'cost_read',
+          why: 'engine products whose stored price was computed at a rate that moved, and complete-but-manual products (the counts the pricing page and the rates panel show)',
+        },
+        'POST /save-list/preview': {
+          cls: 'cost_read',
+          body: { product_ids: ['p_a1'] },
+          why: 'each listed product’s six figures and preview hash: prices in memory, writes nothing; POST only for its body',
+        },
+        'POST /products/save-bulk': {
+          cls: 'cost_write',
+          why: 'writes the previewed engine prices of up to 20 products, each its own fenced batch carrying its preview hash',
+        },
+        'POST /products/:id/manual': {
+          cls: 'cost_write',
+          why: '«رجوع إلى التسعير اليدوي»: the product leaves the engine (fenced on write_seq); every price stays as written',
+        },
       },
     },
   ],

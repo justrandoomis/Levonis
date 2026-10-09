@@ -300,10 +300,27 @@ test('the storefront never recomputes: only the owner pricing router, the engine
   };
   const ENGINE = /from\s+['"][^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain)['"]/;
   const allowed = (f: string) => f.startsWith('worker/lib/pricingEngine/') || f.startsWith('worker/lib/fx/') || f === 'worker/routes/adminPricing.ts';
-  const importers = [...walk(join(ROOT, 'worker')), ...walk(join(ROOT, 'src')), ...walk(join(ROOT, 'services'))]
-    .map((f) => ({ f: relative(ROOT, f).split('\\').join('/'), src: readFileSync(f, 'utf8') }))
-    .filter(({ src }) => ENGINE.test(src))
-    .map(({ f }) => f);
+  const files = [...walk(join(ROOT, 'worker')), ...walk(join(ROOT, 'src')), ...walk(join(ROOT, 'services'))].map((f) => ({
+    f: relative(ROOT, f).split('\\').join('/'),
+    src: readFileSync(f, 'utf8'),
+  }));
+  const importers = files.filter(({ src }) => ENGINE.test(src)).map(({ f }) => f);
   assert.ok(importers.includes('worker/routes/adminPricing.ts'), 'not vacuous');
-  assert.deepEqual(importers.filter((f) => !allowed(f)), []);
+  // Owner decision 6 (ODP §5.1 item 10): checkout and the price-protection claim read the engine's
+  // STORED results through two helpers that compute no price — the order line's snapshot and the
+  // claim's observations. They import those two helpers only, and the helpers import no price computer.
+  const DECISION6: Readonly<Record<string, readonly string[]>> = {
+    'worker/routes/orders.ts': ['../lib/pricingEngine/orderBasis'],
+    'worker/routes/returns.ts': ['../lib/pricingEngine/orderBasis', '../lib/pricingEngine/protectionBasis'],
+  };
+  for (const [f, helpers] of Object.entries(DECISION6)) {
+    const src = files.find((x) => x.f === f)!.src;
+    const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]).sort();
+    assert.deepEqual(engine, [...helpers].sort(), f);
+  }
+  for (const helper of ['worker/lib/pricingEngine/orderBasis.ts', 'worker/lib/pricingEngine/protectionBasis.ts']) {
+    const src = files.find((x) => x.f === helper)!.src;
+    assert.doesNotMatch(src, /from\s+['"][^'"]*(?:\/costToPrice|\/fxChain|\/ruleResolution|\/engineWrite|\/writer|\/procurementPreview)['"]/, helper);
+  }
+  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6)), []);
 });

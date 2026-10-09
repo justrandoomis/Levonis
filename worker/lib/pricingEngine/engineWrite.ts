@@ -97,6 +97,34 @@ export const PRICE_IMAGE_SQL = `SELECT
 
 const imageBinds = (pid: string) => [pid, pid, pid, pid, pid, pid];
 
+/**
+ * THE RATES A PRICE WAS COMPUTED AT, as one SQL condition the batch fences on
+ * (USD design §6.4: every write is fenced on the rates it read). The
+ * `config_version` fence alone is not enough: a route reads the rates FIRST and
+ * the product's store (with its `config_version`) after, so a rate committed in
+ * between — or during a bulk save's loop, which reads the rates once — would
+ * leave a fresh `config_version` beside a price computed at the superseded
+ * rate. Every central rate is compared by VALUE (`IS`, so a missing rate stays
+ * missing): only the last confirmed rates ever reach a stored price.
+ */
+export const RATES_FENCE_SQL = `(SELECT rate_iqd FROM pricing_fx_rates WHERE currency = 'USD') IS ?
+  AND (SELECT rate_iqd FROM pricing_fx_rates WHERE currency = 'EUR') IS ?
+  AND (SELECT rate_iqd FROM pricing_fx_rates WHERE currency = 'CNY') IS ?
+  AND (SELECT effective_rate FROM fx_rate_pairs WHERE pair = 'USD_IQD') IS ?
+  AND (SELECT rate_iqd FROM pricing_shipping_rates WHERE profile = 'GERMANY_LAND') IS ?
+  AND (SELECT rate_iqd FROM pricing_shipping_rates WHERE profile = 'CHINA_AIR') IS ?
+  AND (SELECT rate_iqd FROM pricing_shipping_rates WHERE profile = 'CHINA_SEA') IS ?`;
+
+export const rateFenceBinds = (r: PricingRates): Array<string | null> => [
+  r.central.fx.USD?.rate ?? null,
+  r.central.fx.EUR?.rate ?? null,
+  r.central.fx.CNY?.rate ?? null,
+  r.usd_iqd,
+  r.central.shipping.GERMANY_LAND?.rate ?? null,
+  r.central.shipping.CHINA_AIR?.rate ?? null,
+  r.central.shipping.CHINA_SEA?.rate ?? null,
+];
+
 export async function priceImageOf(db: D1Database, productId: string): Promise<string> {
   const r = await db.prepare(`${PRICE_IMAGE_SQL} AS image`).bind(...imageBinds(productId)).first<{ image: string }>();
   return String(r?.image ?? '');
@@ -577,6 +605,8 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
     ...batchHead(db, ev.stored, o.now),
     ...fence(db, 'EXISTS(SELECT 1 FROM pricing_engine_control WHERE id = 1 AND paused = 0)'),
     ...fence(db, `(${PRICE_IMAGE_SQL}) = ?`, [...imageBinds(pid), ev.image]),
+    // The central rates exactly as this evaluation read them: never a rate superseded since.
+    ...fence(db, RATES_FENCE_SQL, rateFenceBinds(ev.rates)),
     db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(`engine-price:${pid}`),
     ...(adopt ? [db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(`pricing-mode:${pid}`)] : []),
     ...inputStatements(db, pid, inputWrites, o.actor, o.now),

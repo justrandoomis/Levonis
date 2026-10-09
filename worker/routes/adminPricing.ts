@@ -951,6 +951,10 @@ const productNames = (loaded: LoadedProduct) => ({
 
 adminPricingRoutes.get('/save-list', async (c) => {
   const db = c.env.DB;
+  // Deploy-ahead of 0181 (CLAUDE.md rule 2): without the engine's tables no product is engine-priced
+  // and none holds stored pricing data, so both lists are truthfully empty — the rates panel (FX-1)
+  // and «التسعير والشحن» keep answering exactly as on a migrated database with no engine product.
+  if (!(await engineCoreInstalled(db))) return c.json({ success: true, stale: { count: 0, items: [] }, ready: { count: 0, items: [] } });
   const rates = await engineRates(db);
   const { results } = await db
     .prepare("SELECT s.product_id, s.mode, s.opted_out_at FROM product_pricing_state s JOIN products p ON p.id = s.product_id WHERE COALESCE(p.composition, '') = '' ORDER BY s.product_id")
