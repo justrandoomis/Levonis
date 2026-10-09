@@ -33,12 +33,16 @@ export const FX_SENTINELS = [
 
 export function seedFxSentinels(raw: DatabaseSync): void {
   const at = '2026-10-08T12:00:00.000Z';
+  // The rejection memory lasts 24 hours from the ROUTE's wall clock, so the rejected candidate is
+  // stamped an hour ago: a fixed date dropped it from GET /rates once the day had passed (from
+  // 2026-10-09 12:00 UTC the sweep no longer reached it).
+  const rejectedAt = new Date(Date.now() - 3_600_000).toISOString();
   raw.exec(`
     UPDATE fx_rate_pairs SET market_rate='1666.6666', market_buy='1650.165', official_rate='1310.1313', market_adjustment_iqd='37.2501',
            effective_rate='${FX_PUBLIC_RATE}', effective_version=1, effective_source='provider', effective_applied_at='${at}',
            last_known_good_rate='${FX_PUBLIC_RATE}', last_known_good_at='${at}', drift_anchor_rate='1680.4321', drift_anchor_at='${at}',
            published_at='${at}', fetch_status='OK', pending_market_rate='1777.7777', pending_effective_rate='1815.0278',
-           pending_reason='ANOMALY', pending_observed_at='${at}', pending_published_at='${at}', rejected_rate='1999.9999', rejected_at='${at}',
+           pending_reason='ANOMALY', pending_observed_at='${at}', pending_published_at='${at}', rejected_rate='1999.9999', rejected_at='${rejectedAt}',
            status='REVIEW_REQUIRED'
      WHERE pair='USD_IQD';
     UPDATE fx_rate_pairs SET market_rate='1.0987', source_usd_per_eur='1.0987', source_cny_per_eur='7.7777', effective_rate='1.0987',
