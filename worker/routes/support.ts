@@ -69,7 +69,9 @@ import { getBalances } from '../lib/wallet';
 import { ENTITLEMENT_MINIMUM_TIER, benefits, getTierStatus, type MembershipEntitlement } from '../lib/entitlements';
 import { bnplEligibility } from '../lib/bnpl';
 import { canMoveMoney } from '../lib/adminScope';
-import { coverageState, maskSerial } from '../lib/deviceOps';
+import { maskSerial } from '../lib/deviceOps';
+import { tradedInSql, unitCoverage, unitIdentity } from '../lib/deviceCustody';
+import { serialAssignmentsInstalled } from '../lib/serialPolicy';
 import { compareProducts, type CompareRow } from '../lib/compareSpecs';
 import {
   PRODUCT_COLUMNS as COMPARE_PRODUCT_COLUMNS,
@@ -1139,6 +1141,7 @@ interface DeviceLite extends Record<string, unknown> {
   id: string;
   delivered_at: string | null;
   warranty_end_at: string | null;
+  policy_version: string | null;
   serial_raw: string | null;
   name_snapshot: string | null;
   p_name: string | null;
@@ -1146,17 +1149,24 @@ interface DeviceLite extends Record<string, unknown> {
   p_name_ku: string | null;
 }
 
+/**
+ * The devices the support card may talk about: the caller's live links, minus
+ * a device that came back to Levonis — traded in (owner decision 3, derived)
+ * or returned (its unit closed, 0178) — even where its link outlived that.
+ */
 async function ownDevices(db: D1Database, userId: string): Promise<DeviceLite[]> {
+  const notClosed = (await serialAssignmentsInstalled(db)) ? 'AND u.warranty_closed_at IS NULL' : '';
   const { results } = await db
     .prepare(
-      `SELECT u.id, u.delivered_at, u.warranty_end_at, s.serial_raw, oi.name_snapshot,
+      `SELECT u.id, u.delivered_at, u.warranty_end_at, u.policy_version, s.serial_raw, oi.name_snapshot,
               p.name AS p_name, p.name_ar AS p_name_ar, p.name_ku AS p_name_ku
          FROM device_registrations r
          JOIN order_item_units u ON u.id = r.unit_id
          LEFT JOIN device_serials s ON s.unit_id = u.id
          LEFT JOIN order_items oi ON oi.id = u.order_item_id
          LEFT JOIN products p ON p.id = u.product_id
-        WHERE r.user_id = ? AND r.revoked_at IS NULL
+        WHERE r.user_id = ? AND r.revoked_at IS NULL ${notClosed}
+          AND ${tradedInSql('u')} IS NULL
         ORDER BY r.registered_at DESC
         LIMIT 10`
     )
@@ -1176,9 +1186,11 @@ function pickName(loc: Locale, d: { p_name: string | null; p_name_ar: string | n
 }
 
 function deviceCard(d: DeviceLite, loc: Locale): AssistantCard {
-  const cov = coverageState(d.delivered_at, d.warranty_end_at);
+  const cov = unitCoverage(d);
+  // Covered by the used-sale period once the original warranty is over: its end is the date to say.
+  const until = cov.via === 'used_sale' ? unitIdentity(d.policy_version).used_sale?.end_at ?? d.warranty_end_at : d.warranty_end_at;
   let w: string;
-  if (cov.state === 'active') w = tr(loc, 'w_active', { days: cov.remaining_days ?? 0, date: fmtDate(d.warranty_end_at) });
+  if (cov.state === 'active') w = tr(loc, 'w_active', { days: cov.remaining_days ?? 0, date: fmtDate(until) });
   else if (cov.state === 'expired') w = tr(loc, 'w_expired', { date: fmtDate(d.warranty_end_at) });
   else if (cov.state === 'not_delivered') w = tr(loc, 'w_not_delivered');
   else w = tr(loc, 'w_needs_config');

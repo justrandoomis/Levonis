@@ -113,6 +113,7 @@ import { lineDevicePolicy, serializationContext, serializedWriteVerdict } from '
 import { auditStatements } from '../lib/audit';
 import { isOwner } from '../lib/adminScope';
 import { fence, requireSerialWrite } from '../lib/operations';
+import { custodyHistory, tradedInSql, unitCoverage, unitIdentity, type CustodyStep } from '../lib/deviceCustody';
 import { isLostRace } from '../lib/gifts/fence';
 import { serialInventoryRoutes } from './serialInventory';
 import { catalogIndexFor } from '../lib/catalogPresentation';
@@ -132,6 +133,18 @@ deviceRoutes.route('/admin/serial-inventory', serialInventoryRoutes);
 // exists or whose it is. The client shows its own localized copy off the code.
 export const SERIAL_NOT_FOUND_OR_IN_USE = 'غير موجود أو مستخدم مسبقًا. / Not found or already in use.';
 const SERIAL_NO_MATCH = () => new HttpError(404, SERIAL_NOT_FOUND_OR_IN_USE, 'SERIAL_NOT_FOUND_OR_IN_USE');
+
+/**
+ * THE DEVICE CAME BACK TO LEVONIS (owner decision 3, 2026-10-09): a unit
+ * returned or traded in is no longer its buyer's — it cannot be linked to the
+ * account or claimed from it. Said to the buyer on the doors that already
+ * know the unit is theirs (the unit id came from their own list); a typed
+ * serial still gets the one non-enumerating answer above. The client shows
+ * its own copy by code (src/lib/refusalStrings.ts).
+ */
+export const DEVICE_NOT_WITH_CUSTOMER_TEXT =
+  'هذا الجهاز عاد إلى Levonis (باسترجاع أو استبدال)، فلا يمكن ربطه بهذا الحساب أو المطالبة عليه منه. / This device came back to Levonis (a return or a trade-in), so it cannot be linked to this account or claimed from it.';
+const DEVICE_NOT_WITH_CUSTOMER = () => conflict(DEVICE_NOT_WITH_CUSTOMER_TEXT, 'DEVICE_NOT_WITH_CUSTOMER');
 
 /**
  * What the customer typed or scanned: a serial, a receipt number
@@ -172,6 +185,8 @@ function isoOrBad(v: unknown, name: string): string {
 interface DeviceRow extends UnitRow {
   /** 0178: the unit's warranty was closed (a return); null before the migration. */
   warranty_closed_at?: string | null;
+  /** Owner decision 3: when the unit was traded in to Levonis (derived), or null. */
+  traded_in_at?: string | null;
   registered_at?: string | null;
   revoked_at?: string | null;
   reg_user_id?: string | null;
@@ -187,9 +202,17 @@ interface DeviceRow extends UnitRow {
   p_name_ku?: string | null;
 }
 
-function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string } = {}) {
-  // A returned device reads «closed» — its dates stay on the card (§14).
-  const cov = coverageState(row.delivered_at, row.warranty_end_at, Date.now(), row.warranty_closed_at ?? null);
+function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string; history?: CustodyStep[] } = {}) {
+  // A returned device reads «closed» — its dates stay on the card (§14). A
+  // resale on a used listing is covered while EITHER its original warranty
+  // or its used-sale cover is in force (warranty policy v4).
+  const cov = unitCoverage(row, Date.now(), row.warranty_closed_at ?? null);
+  const identity = unitIdentity(row.policy_version);
+  const history = opts.history ?? [];
+  // The FIRST delivery of the device: the origin a resold unit names, or —
+  // for a resale written before the origin was recorded — the first step of
+  // its custody, read through `resale_of` (owner decision 3).
+  const originStart = identity.carried ? identity.origin_start_at ?? history.find((h) => h.kind === 'first')?.at ?? null : null;
   // The order belongs to the BUYER. A later holder (a transferred device) gets
   // the device and its coverage, never the buyer's order identifiers — the
   // orders routes would 404 them anyway, and an id is still a fact about
@@ -215,13 +238,22 @@ function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string
     delivered_at: row.delivered_at,
     registered_at: row.registered_at ?? null,
     warranty: {
-      start_at: row.warranty_start_at,
+      start_at: originStart ?? row.warranty_start_at,
       end_at: row.warranty_end_at,
       base_months: row.warranty_base_months,
       ext_months: row.warranty_ext_months,
       state: cov.state,
       remaining_days: cov.remaining_days,
+      // Owner decision 3: the warranty this device carries from its first
+      // sale (`carried`, from `origin_start_at`), and the used-sale cover of
+      // this sale shown apart from it.
+      carried: identity.carried,
+      origin_start_at: originStart,
+      used_sale: identity.used_sale,
     },
+    traded_in_at: row.traded_in_at ?? null,
+    // Dates only — no order, no person (a later holder must not learn who had it).
+    history,
     replaced_by_unit_id: row.replaced_by_unit_id ?? null,
     replacement_of_unit_id: row.replacement_of_unit_id ?? null,
     // WHO HOLDS IT — admin only. `DEVICE_SELECT` has carried `reg_user_id`
@@ -262,7 +294,7 @@ const DEVICE_SELECT = `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u
             u.delivered_at, u.warranty_base_months, u.warranty_ext_months, u.warranty_start_at,
             u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id, u.created_at,
             r.registered_at, r.revoked_at, r.user_id AS reg_user_id, s.serial_raw,
-            wr.receipt_no, wr.status AS receipt_status,
+            wr.receipt_no, wr.status AS receipt_status, ${tradedInSql('u')} AS traded_in_at,
             (SELECT COUNT(*) FROM warranty_claims wc WHERE wc.unit_id = u.id AND NOT (${CLOSED_CLAIM_SQL})) AS open_claims,
             oi.name_snapshot, oi.image_snapshot,
             p.slug, p.name AS p_name, p.name_ar AS p_name_ar, p.name_ku AS p_name_ku
@@ -276,6 +308,16 @@ const DEVICE_SELECT = `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u
 /** Loads one unit with everything devicePublic needs, by unit id. */
 async function loadDevice(db: D1Database, unitId: string): Promise<DeviceRow | null> {
   return db.prepare(`${await deviceSelect(db)} WHERE u.id = ?`).bind(unitId).first<DeviceRow>();
+}
+
+/** Each unit's custody, dates only (worker/lib/deviceCustody.ts). Contained: a failed read shows no history, never an error. */
+async function historiesOf(db: D1Database, rows: DeviceRow[]): Promise<Map<string, CustodyStep[]>> {
+  try {
+    return await custodyHistory(db, rows);
+  } catch (e) {
+    console.error('device custody history not read', e instanceof Error ? e.message : String(e));
+    return new Map();
+  }
 }
 
 interface AdminAccount {
@@ -324,8 +366,9 @@ async function adminUnitsWithAccounts(db: D1Database, rows: DeviceRow[]) {
   }
   const byId = new Map(people.map((x) => [x.id, x]));
   const person = (id: string | null | undefined): AdminAccount | null => (id ? byId.get(id) ?? null : null);
+  const histories = await historiesOf(db, rows);
   return rows.map((r) => ({
-    ...devicePublic(r, { admin: true }),
+    ...devicePublic(r, { admin: true, history: histories.get(r.id) }),
     buyer: person(r.owner_user_id),
     holder: r.reg_user_id && !r.revoked_at ? person(r.reg_user_id) : null,
   }));
@@ -467,11 +510,15 @@ deviceRoutes.get('/mine', async (c) => {
   const { results } = await c.env.DB.prepare(
     `${await deviceSelect(c.env.DB)}
       WHERE r.user_id = ? AND r.revoked_at IS NULL
+        -- Owner decision 3: a device traded in to Levonis is no longer the
+        -- holder's, even where a trade-in completed before its link was revoked.
+        AND ${tradedInSql('u')} IS NULL
       ORDER BY r.registered_at DESC
       LIMIT 100`
   )
     .bind(user.id)
     .all<DeviceRow>();
+  const histories = await historiesOf(c.env.DB, results);
   const tier = await getTierStatus(c.env.DB, user.id);
   // 0148 — «مواد الصيانة المتوافقة»: each device's MODEL (a used unit reads as
   // its model) and how many maintenance parts fit it, so the card offers the
@@ -486,7 +533,7 @@ deviceRoutes.get('/mine', async (c) => {
     devices: results.map((r) => {
       const m = r.product_id ? maintenance.get(String(r.product_id)) : undefined;
       return {
-        ...devicePublic(r, { viewerId: user.id }),
+        ...devicePublic(r, { viewerId: user.id, history: histories.get(r.id) }),
         transferred: r.owner_user_id !== user.id,
         maintenance: m ? { printer_slug: m.slug, count: m.count } : null,
       };
@@ -513,6 +560,8 @@ deviceRoutes.get('/eligible', async (c) => {
   const { results } = await c.env.DB.prepare(
     `${await deviceSelect(c.env.DB)}
       WHERE u.owner_user_id = ? AND u.delivered_at IS NOT NULL AND u.replaced_by_unit_id IS NULL ${open}
+        -- Owner decision 3: a device traded in to Levonis is the shop's again.
+        AND ${tradedInSql('u')} IS NULL
         -- "not actively linked by me" — spelled out, because NOT (NULL = ?)
         -- is NULL in SQL and would drop every never-linked unit.
         AND (r.unit_id IS NULL OR r.revoked_at IS NOT NULL OR r.user_id <> ?)
@@ -521,10 +570,11 @@ deviceRoutes.get('/eligible', async (c) => {
   )
     .bind(user.id, user.id)
     .all<DeviceRow>();
+  const histories = await historiesOf(c.env.DB, results);
   return c.json({
     success: true,
     units: results.map((r) => ({
-      ...devicePublic(r),
+      ...devicePublic(r, { history: histories.get(r.id) }),
       linked_elsewhere: !!(r.reg_user_id && r.reg_user_id !== user.id && !r.revoked_at),
     })),
   });
@@ -582,7 +632,10 @@ deviceRoutes.post('/register', async (c) => {
   // never revealed.
   // A unit whose warranty was closed (the device came back on a return, 0178)
   // answers exactly like a serial that matches nothing.
-  if (!unitId || !row || !row.delivered_at || row.replaced_by_unit_id || row.warranty_closed_at) throw SERIAL_NO_MATCH();
+  // A unit TRADED IN to Levonis (owner decision 3) is no longer anyone's to
+  // take by typing its serial or receipt — the trader's included: its warranty
+  // stays with the device for its next buyer, and only that sale links it.
+  if (!unitId || !row || !row.delivered_at || row.replaced_by_unit_id || row.warranty_closed_at || row.traded_in_at) throw SERIAL_NO_MATCH();
   // A device that was never linked belongs to the account that bought it. A
   // stranger may take a device only after its holder — or an admin — RELEASED
   // it (a revoked registration), which is the transfer the owner described.
@@ -608,9 +661,10 @@ deviceRoutes.post('/register', async (c) => {
   }
 
   const fresh = (await loadDevice(c.env.DB, row.id)) ?? row;
+  const history = (await historiesOf(c.env.DB, [fresh])).get(fresh.id);
   return c.json({
     success: true,
-    device: { ...devicePublic(fresh, { viewerId: user.id }), transferred: fresh.owner_user_id !== user.id },
+    device: { ...devicePublic(fresh, { viewerId: user.id, history }), transferred: fresh.owner_user_id !== user.id },
     already_registered: alreadyMine,
   });
 });
@@ -624,6 +678,9 @@ deviceRoutes.post('/units/:unitId/register', async (c) => {
   if (!row || row.owner_user_id !== user.id) throw notFound('Device not found on your account');
   if (!row.delivered_at) throw badRequest('This device is not delivered yet — it can be linked after delivery', 'NOT_DELIVERED');
   if (row.replaced_by_unit_id) throw badRequest('This device was replaced — the replacement carries the coverage', 'UNIT_REPLACED');
+  // Owner decision 3: a device that came back — traded in, or returned (its
+  // unit closed, 0178) — is the shop's again; its buyer cannot re-link it.
+  if (row.traded_in_at || row.warranty_closed_at) throw DEVICE_NOT_WITH_CUSTOMER();
   if (row.reg_user_id && row.reg_user_id !== user.id && !row.revoked_at) {
     // The buyer already knows this device exists; saying WHY it cannot be
     // linked is honest, and still names nobody.
@@ -634,7 +691,8 @@ deviceRoutes.post('/units/:unitId/register', async (c) => {
   if (!reg || reg.user_id !== user.id || reg.revoked_at) throw conflict('This device is linked to another account.', 'LINKED_ELSEWHERE');
   if (!alreadyMine) await audit(c.env.DB, user.id, 'device.register', row.id, { by: 'order' });
   const fresh = (await loadDevice(c.env.DB, row.id)) ?? row;
-  return c.json({ success: true, device: { ...devicePublic(fresh), transferred: false }, already_registered: alreadyMine });
+  const history = (await historiesOf(c.env.DB, [fresh])).get(fresh.id);
+  return c.json({ success: true, device: { ...devicePublic(fresh, { history }), transferred: false }, already_registered: alreadyMine });
 });
 
 /**
@@ -714,7 +772,8 @@ deviceRoutes.get('/claims/:id', async (c) => {
       ? c.env.DB.prepare(`SELECT ${UNIT_COLS} FROM order_item_units WHERE id = ?`).bind(claim.unit_id).first<UnitRow>()
       : Promise.resolve(null),
   ]);
-  const cov = unit ? coverageState(unit.delivered_at, unit.warranty_end_at) : null;
+  // Covered while the original warranty OR a used-sale cover is in force (policy v4).
+  const cov = unit ? unitCoverage(unit) : null;
   /**
    * THE CLAIMANT HAS NOW SEEN THE THREAD — the read marker behind «رد جديد من
    * الفريق» on the claim card (0111). Only the claimant: an admin opening a
@@ -772,7 +831,7 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
     `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u.owner_user_id, u.unit_index,
             u.delivered_at, u.warranty_base_months, u.warranty_ext_months, u.warranty_start_at,
             u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id, u.created_at,
-            r.revoked_at AS reg_revoked, r.user_id AS reg_user,
+            r.revoked_at AS reg_revoked, r.user_id AS reg_user, ${tradedInSql('u')} AS traded_in_at,
             oi.name_snapshot, p.name AS p_name, p.name_ar AS p_name_ar
        FROM order_item_units u
        LEFT JOIN device_registrations r ON r.unit_id = u.id
@@ -781,12 +840,15 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
       WHERE u.id = ?`
   )
     .bind(unitId)
-    .first<UnitRow & { reg_revoked: string | null; reg_user: string | null; name_snapshot: string | null; p_name: string | null; p_name_ar: string | null }>();
+    .first<UnitRow & { reg_revoked: string | null; reg_user: string | null; traded_in_at: string | null; name_snapshot: string | null; p_name: string | null; p_name_ar: string | null }>();
   // The account that HOLDS the device (its active registration) may claim on
   // it; the buyer who has not linked it yet is told to link it first; anyone
   // else sees nothing.
   const holds = !!unit && unit.reg_user === user.id && !unit.reg_revoked;
   if (!unit || (!holds && unit.owner_user_id !== user.id)) throw notFound('Device not found on your account');
+  // Owner decision 3: a device traded in to Levonis is not claimed from the
+  // account that traded it — its warranty goes on with the device.
+  if (unit.traded_in_at) throw DEVICE_NOT_WITH_CUSTOMER();
   if (!holds) {
     throw badRequest('Register this device first (Warranty → Add device), then open the claim from it.', 'NOT_REGISTERED');
   }
@@ -866,8 +928,9 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
     .run();
 
   // The coverage the customer is shown is read from the unit, so it is the
-  // same answer on a first submit and on a replay of it.
-  const cov = coverageState(unit.delivered_at, unit.warranty_end_at);
+  // same answer on a first submit and on a replay of it — covered while the
+  // original warranty or a used-sale cover is in force (policy v4).
+  const cov = unitCoverage(unit);
   const warrantyFacts = {
     // The buyer's order id is the buyer's to see; a later holder gets the
     // coverage facts alone.
@@ -1533,11 +1596,13 @@ deviceRoutes.patch('/admin/units/:unitId/delivery', async (c) => {
 
   // Recomputes ONLY this unit's window (partial-shipment correction). No
   // duplicate grants: dates are recomputed in place, nothing is re-issued.
+  // A unit that carries a warranty keeps its start and end (owner decision 3,
+  // S9): only its own used-sale cover moves with the corrected date.
   const win = recomputeUnitWindow(unit, deliveredAt);
   await c.env.DB.prepare(
-    'UPDATE order_item_units SET delivered_at = ?, warranty_start_at = ?, warranty_end_at = ? WHERE id = ?'
+    'UPDATE order_item_units SET delivered_at = ?, warranty_start_at = ?, warranty_end_at = ?, policy_version = COALESCE(?, policy_version) WHERE id = ?'
   )
-    .bind(deliveredAt, win.start_at, win.end_at, unitId)
+    .bind(deliveredAt, win.start_at, win.end_at, win.policy_version ?? null, unitId)
     .run();
   await audit(c.env.DB, admin.id, 'device.unit_delivery_correct', unitId, {
     reason,

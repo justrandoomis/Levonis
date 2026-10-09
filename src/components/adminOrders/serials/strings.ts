@@ -43,8 +43,8 @@ export interface SerialStrings {
   removeConfirm: string;
   removed: string;
   warrantyAtDelivery: string;
+  /** A device that came back (returned or traded in), resold: its ORIGINAL warranty carries (owner decision 3). */
   returnedCarry: Fmt<[string]>;
-  returnedRestart: string;
   previous: Fmt<[string]>;
   previousTaken: Fmt<[string]>;
   relink: string;
@@ -83,7 +83,8 @@ export interface SerialStrings {
   reasonHint: string;
   warrantyMode: string;
   modeCarry: string;
-  modeRestart: string;
+  /** Owner decision 3: an owner exception that resells a device carries its original warranty — there is nothing to choose. */
+  carryOnly: string;
   confirmOverride: string;
   otherOrder: Fmt<[string]>;
   expectedLots: string;
@@ -167,6 +168,8 @@ export interface SerialStrings {
     returned: string;
     warrantyChanged: string;
     warrantyMode: Fmt<[string]>;
+    /** Owner decision 3: traded in to Levonis — the warranty stays with the device. */
+    tradedIn: string;
     gateOverride: Fmt<[string]>;
     /** A re-delivery after an undone delivery + cancel re-opened the warranty. */
     reopened: string;
@@ -233,8 +236,7 @@ const ar: SerialStrings = {
   removeConfirm: 'إزالة الربط',
   removed: 'أُزيل الرقم من الوحدة.',
   warrantyAtDelivery: 'الضمان يبدأ عند التسليم',
-  returnedCarry: (d) => `جهاز مُرتجع — يستمر ضمانه حتى ${d}`,
-  returnedRestart: 'جهاز مُرتجع — يبدأ ضمانه من جديد عند التسليم',
+  returnedCarry: (d) => `جهاز عاد إلى Levonis — يستمر ضمانه الأصلي حتى ${d}`,
   previous: (s) => `كان مربوطًا قبل الإلغاء: ${s}`,
   previousTaken: (s) => `كان مربوطًا قبل الإلغاء: ${s} — صار مربوطًا بطلب آخر، امسح جهازًا آخر`,
   relink: 'أعد ربطه',
@@ -258,7 +260,6 @@ const ar: SerialStrings = {
     SERIAL_MISSING_AT_DELIVERY: 'سُلّمت هذه الوحدة بلا رقم تسلسلي.',
   },
   warnings: {
-    RESTART_SUGGESTED: 'للبند خطة ضمان مشتراة — للمالك أن يبدأ الضمان من جديد من صفحة الرقم.',
     BATCH_OVERRIDDEN: 'سُجِّل اختلاف الدفعة باستثناء المالك.',
     ALLOCATION_MISSING: 'لم تُصرف دفعة مخزون لهذا البند بعد.',
     STOCK_NOT_RETAKEN: 'أُعيد مخزون هذا البند عند الإلغاء ولم يُصرف مجددًا.',
@@ -288,7 +289,7 @@ const ar: SerialStrings = {
   reasonHint: '٥ أحرف على الأقل — يُسجَّل في سجل الجهاز باسمك.',
   warrantyMode: 'الضمان عند البيع من جديد',
   modeCarry: 'يستمر',
-  modeRestart: 'يبدأ من جديد',
+  carryOnly: 'يستمر الضمان الأصلي مع الجهاز بتاريخي بدايته ونهايته — لا يُعاد بدؤه (قرار المالك).',
   confirmOverride: 'اربط باستثناء المالك',
   otherOrder: (id) => `الطلب: ${id}`,
   expectedLots: 'الدفعات المصروفة لهذا البند:',
@@ -355,7 +356,7 @@ const ar: SerialStrings = {
   loading: 'جارٍ التحميل…',
   retry: 'إعادة المحاولة',
   resaleTitle: 'الضمان عند إعادة البيع',
-  resaleHint: 'جهاز مُرتجع مربوط بطلب جديد: «يستمر» يحفظ نهاية ضمانه الأصلية، و«يبدأ من جديد» يعطي المشتري مدة كاملة.',
+  resaleHint: 'جهاز عاد إلى Levonis مربوط بطلب جديد: يستمر ضمانه الأصلي بتاريخي بدايته ونهايته، ولا يُعاد بدؤه (قرار المالك).',
   save: 'حفظ',
   saved: 'حُفظ',
   status: {
@@ -382,6 +383,7 @@ const ar: SerialStrings = {
     changed: 'استُبدل برقم آخر',
     owner_override: 'استثناء المالك',
     returned: 'أُرجع',
+    traded_in: 'استُبدل لدى Levonis (Trade-in)',
     policy_changed: 'تغيّرت سياسة الرقم',
     replaced: 'استُبدل الجهاز',
     reassigned: 'نُقل إلى وحدة أخرى',
@@ -404,6 +406,7 @@ const ar: SerialStrings = {
     returned: 'أُرجع',
     warrantyChanged: 'تغيير في الضمان',
     warrantyMode: (m) => `طريقة الضمان عند إعادة البيع: ${m}`,
+    tradedIn: 'استُبدل لدى Levonis — يبقى ضمانه مع الجهاز',
     gateOverride: (r) => `شُحن رغم نقص الأرقام (المالك): ${r}`,
     reopened: 'سُلّم مجددًا · فُتح الضمان من جديد',
     detached: 'فُكّ عن وحدة ضمان سابقة',
@@ -465,8 +468,7 @@ const en: SerialStrings = {
   removeConfirm: 'Remove link',
   removed: 'Serial removed from the unit.',
   warrantyAtDelivery: 'Warranty starts at delivery',
-  returnedCarry: (d) => `Returned device — warranty continues to ${d}`,
-  returnedRestart: 'Returned device — its warranty restarts at delivery',
+  returnedCarry: (d) => `Came back to Levonis — its original warranty continues to ${d}`,
   previous: (s) => `Linked before cancellation: ${s}`,
   previousTaken: (s) => `Linked before cancellation: ${s} — now linked to another order; scan a different device`,
   relink: 'Link again',
@@ -490,7 +492,6 @@ const en: SerialStrings = {
     SERIAL_MISSING_AT_DELIVERY: 'This unit was delivered without a serial.',
   },
   warnings: {
-    RESTART_SUGGESTED: 'This line has a purchased warranty plan — the owner can restart the warranty from the serial page.',
     BATCH_OVERRIDDEN: 'Batch mismatch recorded under the owner’s override.',
     ALLOCATION_MISSING: 'No stock batch has been issued to this line yet.',
     STOCK_NOT_RETAKEN: 'This line’s stock was returned at cancellation and not taken again.',
@@ -520,7 +521,7 @@ const en: SerialStrings = {
   reasonHint: 'At least 5 characters — recorded in the device history under your name.',
   warrantyMode: 'Warranty on resale',
   modeCarry: 'Continue',
-  modeRestart: 'Restart',
+  carryOnly: 'The original warranty continues with the device, with its original start and end — it is never restarted (owner decision).',
   confirmOverride: 'Link with owner override',
   otherOrder: (id) => `Order: ${id}`,
   expectedLots: 'Batches issued to this line:',
@@ -587,7 +588,7 @@ const en: SerialStrings = {
   loading: 'Loading…',
   retry: 'Retry',
   resaleTitle: 'Warranty on resale',
-  resaleHint: 'A returned device linked to a new order: “Continue” keeps its original warranty end, “Restart” gives the buyer a full period.',
+  resaleHint: 'A device that came back to Levonis, linked to a new order: its original warranty continues with its original start and end; it is never restarted (owner decision).',
   save: 'Save',
   saved: 'Saved',
   status: {
@@ -614,6 +615,7 @@ const en: SerialStrings = {
     changed: 'Replaced by another serial',
     owner_override: 'Owner override',
     returned: 'Returned',
+    traded_in: 'Traded in to Levonis',
     policy_changed: 'Serial policy changed',
     replaced: 'Device replaced',
     reassigned: 'Moved to another unit',
@@ -636,6 +638,7 @@ const en: SerialStrings = {
     returned: 'Returned',
     warrantyChanged: 'Warranty changed',
     warrantyMode: (m) => `Warranty on resale: ${m}`,
+    tradedIn: 'Traded in to Levonis — its warranty stays with the device',
     gateOverride: (r) => `Shipped with serials missing (owner): ${r}`,
     reopened: 'Delivered again · warranty reopened',
     detached: 'Detached from a former warranty unit',
@@ -697,8 +700,7 @@ const ckb: SerialStrings = {
   removeConfirm: 'بەستنەوەکە لاببە',
   removed: 'ژمارەکە لە یەکەکە لابرا.',
   warrantyAtDelivery: 'گەرەنتی لە کاتی گەیاندندا دەست پێدەکات',
-  returnedCarry: (d) => `ئامێری گەڕێنراوە — گەرەنتییەکەی تا ${d} بەردەوام دەبێت`,
-  returnedRestart: 'ئامێری گەڕێنراوە — گەرەنتییەکەی لە کاتی گەیاندندا لە سەرەتاوە دەست پێدەکاتەوە',
+  returnedCarry: (d) => `ئامێرێک کە گەڕاوەتەوە بۆ Levonis — گەرەنتییە ڕەسەنەکەی تا ${d} بەردەوام دەبێت`,
   previous: (s) => `پێش هەڵوەشاندنەوە بەسترابوو: ${s}`,
   previousTaken: (s) => `پێش هەڵوەشاندنەوە بەسترابوو: ${s} — ئێستا بە داواکارییەکی ترەوە بەستراوە؛ ئامێرێکی تر سکان بکە`,
   relink: 'دووبارە ببەستەوە',
@@ -722,7 +724,6 @@ const ckb: SerialStrings = {
     SERIAL_MISSING_AT_DELIVERY: 'ئەم یەکەیە بێ ژمارەی زنجیرەیی گەیەنرا.',
   },
   warnings: {
-    RESTART_SUGGESTED: 'ئەم بەندە پلانی گەرەنتی کڕدراوی هەیە — خاوەن دەتوانێت لە پەڕەی ژمارەکەوە گەرەنتییەکە لە سەرەتاوە دەست پێبکاتەوە.',
     BATCH_OVERRIDDEN: 'جیاوازی وەجبە بە ڕێگەپێدانی خاوەن تۆمارکرا.',
     ALLOCATION_MISSING: 'هێشتا هیچ وەجبەیەکی کۆگا بۆ ئەم بەندە دەرنەکراوە.',
     STOCK_NOT_RETAKEN: 'کۆگای ئەم بەندە لە کاتی هەڵوەشاندنەوەدا گەڕایەوە و دووبارە دەرنەکراوەتەوە.',
@@ -752,7 +753,7 @@ const ckb: SerialStrings = {
   reasonHint: 'لانیکەم ٥ پیت — بە ناوی تۆوە لە مێژووی ئامێرەکەدا تۆمار دەکرێت.',
   warrantyMode: 'گەرەنتی لە کاتی دووبارە فرۆشتن',
   modeCarry: 'بەردەوام بێت',
-  modeRestart: 'لە سەرەتاوە دەست پێبکاتەوە',
+  carryOnly: 'گەرەنتییە ڕەسەنەکە بە ڕێکەوتی سەرەتا و کۆتایی خۆیەوە لەگەڵ ئامێرەکە بەردەوام دەبێت — هەرگیز لە سەرەتاوە دەست پێناکاتەوە (بڕیاری خاوەن).',
   confirmOverride: 'بە ڕێگەپێدانی خاوەن ببەستەوە',
   otherOrder: (id) => `داواکاری: ${id}`,
   expectedLots: 'ئەو وەجبانەی بۆ ئەم بەندە دەرکراون:',
@@ -819,7 +820,7 @@ const ckb: SerialStrings = {
   loading: 'بار دەکرێت…',
   retry: 'دووبارە هەوڵ بدەوە',
   resaleTitle: 'گەرەنتی لە کاتی دووبارە فرۆشتن',
-  resaleHint: 'ئامێرێکی گەڕێنراوە کە بە داواکارییەکی نوێوە بەستراوە: «بەردەوام بێت» کۆتایی گەرەنتییە ڕەسەنەکەی دەپارێزێت، و «لە سەرەتاوە دەست پێبکاتەوە» ماوەیەکی تەواو دەداتە کڕیار.',
+  resaleHint: 'ئامێرێک کە گەڕاوەتەوە بۆ Levonis و بە داواکارییەکی نوێوە بەستراوە: گەرەنتییە ڕەسەنەکەی بە ڕێکەوتی سەرەتا و کۆتایی خۆیەوە بەردەوام دەبێت، و هەرگیز لە سەرەتاوە دەست پێناکاتەوە (بڕیاری خاوەن).',
   save: 'پاشەکەوتکردن',
   saved: 'پاشەکەوتکرا',
   status: {
@@ -846,6 +847,7 @@ const ckb: SerialStrings = {
     changed: 'بە ژمارەیەکی تر گۆڕدرا',
     owner_override: 'ڕێگەپێدانی خاوەن',
     returned: 'گەڕێنرایەوە',
+    traded_in: 'لای Levonis گۆڕدرایەوە',
     policy_changed: 'سیاسەتی ژمارە گۆڕا',
     replaced: 'ئامێرەکە گۆڕدرایەوە',
     reassigned: 'گوازرایەوە بۆ یەکەیەکی تر',
@@ -868,6 +870,7 @@ const ckb: SerialStrings = {
     returned: 'گەڕێنرایەوە',
     warrantyChanged: 'گەرەنتی گۆڕدرا',
     warrantyMode: (m) => `گەرەنتی لە کاتی دووبارە فرۆشتن: ${m}`,
+    tradedIn: 'لای Levonis گۆڕدرایەوە — گەرەنتییەکەی لەگەڵ ئامێرەکە دەمێنێتەوە',
     gateOverride: (r) => `بێ ژمارەکان نێردرا (خاوەن): ${r}`,
     reopened: 'دووبارە گەیەنرایەوە · گەرەنتییەکە دووبارە کرایەوە',
     detached: 'لە یەکەیەکی گەرەنتیی پێشوو جیاکرایەوە',

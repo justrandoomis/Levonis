@@ -377,9 +377,11 @@ serialInventoryRoutes.get('/:serial', async (c) => {
 });
 
 /**
- * Owner — how a returned device's warranty runs when it is sold again
- * (§14): `carry` keeps the original end (owner default), `restart` gives the
- * new buyer a full period. Only while its new assignment is not delivered.
+ * Owner — how a returned or traded-in device's warranty runs when it is sold
+ * again (§14). Since owner decision 3 (2026-10-09) it always CARRIES the
+ * original start and end: `restart` is refused (409 WARRANTY_RESTART_RETIRED);
+ * `carry` puts back a binding saved as `restart` before the decision. Only
+ * while its new assignment is not delivered.
  */
 serialInventoryRoutes.post('/:serial/warranty-mode', async (c) => {
   const norm = serialParam(c.req.param('serial'));

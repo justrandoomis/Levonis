@@ -1163,6 +1163,10 @@ export interface OrderUnitPublic {
     /** `closed` (0178): the device came back on a return — its dates are kept, it no longer covers. */
     state: 'active' | 'expired' | 'needs_config' | 'not_delivered' | 'closed';
     remaining_days: number | null;
+    /** Owner decision 3: a resold device's warranty runs from its first delivery (absent from an older server). */
+    carried?: boolean;
+    origin_start_at?: string | null;
+    used_sale?: { months: number; start_at: string; end_at: string } | null;
   };
   /** Whether the buyer holds it, another account does, or nobody yet. */
   linked: 'mine' | 'other' | 'none';
@@ -1170,6 +1174,8 @@ export interface OrderUnitPublic {
   replaced: boolean;
   /** 0178: the device came back on a return; absent from an older server. */
   returned?: boolean;
+  /** Owner decision 3: when it was traded in to Levonis — its warranty stays with the device. */
+  traded_in_at?: string | null;
 }
 
 export interface OrderTrackingStep {

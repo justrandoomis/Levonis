@@ -223,6 +223,9 @@ test('every code the table translates is one the server can actually emit', () =
     // Owner decision 1 (row 192): every serial write door refuses a revoked
     // «الاستلام» with SERIAL_WRITE_NOT_ALLOWED (`requireSerialWrite`).
     'worker/lib/operations.ts',
+    // Owner decision 3 (row 193): a device that came back to Levonis cannot be
+    // re-linked or claimed from its buyer's account (DEVICE_NOT_WITH_CUSTOMER).
+    'worker/routes/devices.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

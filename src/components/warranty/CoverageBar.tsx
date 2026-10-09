@@ -1,10 +1,11 @@
 import React from 'react';
-import { ShieldCheck, ShieldOff, ShieldPlus, Clock, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, ShieldOff, ShieldPlus, Clock, AlertTriangle, History, PackageCheck } from 'lucide-react';
 import type { Language } from '../../translations';
 import type { Device } from './types';
 import { fmtDate, fmtInt } from './types';
 import type { WarrantyStrings } from './strings';
 import { monthsLabel } from '../orders/format';
+import { warrantyTimeLeft } from '../../../packages/pricing/src/warrantyTime';
 
 /**
  * THE WARRANTY TIMELINE. A hairline from the delivery date to the end date,
@@ -16,6 +17,11 @@ import { monthsLabel } from '../orders/format';
  * dates that are printed under it, and every non-active state (expired, not
  * delivered, awaiting configuration) is drawn as its own honest shape rather
  * than a bar pretending to be partly full.
+ *
+ * A RESOLD DEVICE (owner decision 3, 2026-10-09) carries its original
+ * warranty: the line starts at its FIRST delivery and says so; a used-sale
+ * cover is its own line, never folded into the original. What is left reads
+ * in calendar months and days («11 months 0 days»), not rounded up.
  */
 export function CoverageBar({
   warranty,
@@ -31,8 +37,14 @@ export function CoverageBar({
   className?: string;
 }) {
   const state = warranty.state;
-  const startIso = warranty.start_at ?? deliveredAt;
-  const endIso = warranty.end_at;
+  const used = warranty.used_sale ?? null;
+  const nowIso = new Date().toISOString();
+  // Covered by the used-sale period alone once the original warranty is over:
+  // the line then draws that period, so it is never a full bar reading «active».
+  const onUsedSale = state === 'active' && !!used && !!warranty.end_at && Date.parse(warranty.end_at) <= Date.now();
+  const startIso = onUsedSale ? used!.start_at : warranty.start_at ?? deliveredAt;
+  const endIso = onUsedSale ? used!.end_at : warranty.end_at;
+  const continuesFrom = warranty.carried && warranty.origin_start_at ? warranty.origin_start_at : null;
 
   let fraction = 0;
   if (startIso && endIso) {
@@ -52,6 +64,7 @@ export function CoverageBar({
   const Icon = active ? ShieldCheck : expired ? ShieldOff : needsConfig ? AlertTriangle : Clock;
   const label = active ? s.stActive : expired ? s.stExpired : needsConfig ? s.stNeedsConfig : s.stNotDelivered;
   const remaining = warranty.remaining_days;
+  const left = warrantyTimeLeft(endIso, nowIso);
   const showTodayLabel = active && fraction > 0.14 && fraction < 0.86;
   const pct = `${Math.round(fraction * 1000) / 10}%`;
   // A PURCHASED extension (the +12 / +24 bought with the printer): the
@@ -70,8 +83,8 @@ export function CoverageBar({
           <span className="truncate">{label}</span>
         </span>
         {active && remaining !== null && (
-          <span className="text-[12px] font-bold text-gold tabular-nums whitespace-nowrap shrink-0">
-            {s.daysLeft(remaining, fmtInt(remaining, lang))}
+          <span className="text-[12px] font-bold text-gold tabular-nums whitespace-nowrap shrink-0" data-warranty-left={`${left.months}m${left.days}d`}>
+            {left.months > 0 ? s.left(fmtInt(left.months, lang), fmtInt(left.days, lang)) : s.daysLeft(remaining, fmtInt(remaining, lang))}
           </span>
         )}
       </div>
@@ -122,6 +135,20 @@ export function CoverageBar({
           {s.warrantyEnd} <span className="text-zinc-400">{fmtDate(endIso, lang)}</span>
         </span>
       </div>
+
+      {continuesFrom && (
+        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-400 tabular-nums min-w-0" data-coverage-continues={continuesFrom}>
+          <History aria-hidden="true" className="w-3 h-3 shrink-0 text-gold" />
+          <span className="truncate">{s.continuesFrom(fmtDate(continuesFrom, lang))}</span>
+        </p>
+      )}
+
+      {used && (
+        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-400 tabular-nums min-w-0" data-coverage-used-sale={used.months}>
+          <PackageCheck aria-hidden="true" className="w-3 h-3 shrink-0 text-gold" />
+          <span className="truncate">{s.usedSale(fmtInt(used.months, lang), fmtDate(used.end_at, lang))}</span>
+        </p>
+      )}
 
       {showSplit && (
         <p

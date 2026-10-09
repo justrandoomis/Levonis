@@ -18,7 +18,9 @@
  *       NOTHING), bind it, warranty PENDING_DELIVERY (derived, no clock);
  *   §9/§13 an existing asset with no live binding: a new assignment row;
  *   §10 live on another order: refused (the order number to the owner only);
- *   §11 delivered under an open warranty: refused, owner override only;
+ *   §11 delivered under an open warranty: refused, owner override only — a
+ *       device TRADED IN to Levonis is not «delivered» any more: staff resell
+ *       it and it carries its original warranty (owner decision 3);
  *   §17 product / option / EAN / serial-family mismatch: refused;
  *   §18 one serial per slot, one slot per serial;
  *   §19 the preparation gate (setting `serialPrepGate`, ships OFF);
@@ -48,9 +50,11 @@ import { canMoveMoney, canSeeFullSerial, isOwner } from './adminScope';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { comboKey } from './inventory';
 import { getSetting } from './settings';
-import { maskSerial, unitTotalMonths, coverageState, type UnitRow } from './deviceOps';
+import { maskSerial, coverageState, type UnitRow } from './deviceOps';
 import { resolveLabelProduct, serialStatusSql, type InventoryStatus } from './serialInventory';
 import { serialAssignmentsInstalled, serializationContext, lineDevicePolicy } from './serialPolicy';
+import { carriedWindow, tradedInSql, unitIdentity } from './deviceCustody';
+import { parseConditionDoc } from './condition';
 import { classifyCode, normalizeEan, normalizeSerial, serialModelHint, serialProblem } from '@levonis/catalog/deviceSerials';
 
 export { serialAssignmentsInstalled } from './serialPolicy';
@@ -100,6 +104,8 @@ export const SERIAL_TEXT = {
   ITEM_NOT_IN_ORDER: 'هذا المنتج ليس ضمن هذا الطلب.',
   RETURN_SERIAL_MISMATCH: 'هذا الرقم التسلسلي ليس جهازًا من هذا البند لدى هذا الزبون.',
   RETURN_UNIT_MISMATCH: 'هذه الوحدة ليست وحدة مفتوحة من هذا البند.',
+  // Owner decision 3 (2026-10-09): a resold device carries its original warranty; nothing restarts it.
+  WARRANTY_RESTART_RETIRED: 'لا يُعاد بدء الضمان أبدًا: يبقى الضمان الأصلي مع الرقم التسلسلي من تاريخ أول تسليم (قرار المالك).',
 } as const;
 export type SerialCode = keyof typeof SERIAL_TEXT;
 
@@ -205,6 +211,8 @@ export interface LineFacts {
   ops_policy: string | null;
   p_name: string | null;
   p_name_ar: string | null;
+  /** The listing's condition (open box / used / refurbished) — its `new_product_id` names the device's own product (S12). */
+  condition_doc?: string | null;
   bundle_parent_item_id: string | null;
   is_bundle_parent: number;
 }
@@ -237,7 +245,7 @@ export async function readOrderLines(db: D1Database, orderId: string): Promise<L
       `SELECT oi.id, oi.product_id, oi.qty, COALESCE(oi.name_snapshot,'') AS name_snapshot,
               COALESCE(oi.option_snapshot,'') AS option_snapshot, COALESCE(oi.option_value_ids,'[]') AS option_value_ids,
               COALESCE(oi.color_id,'') AS color_id, oi.warranty_snapshot, p.ops_policy, p.name AS p_name, p.name_ar AS p_name_ar,
-              oi.bundle_parent_item_id,
+              p.condition_doc, oi.bundle_parent_item_id,
               EXISTS (SELECT 1 FROM order_items c WHERE c.bundle_parent_item_id = oi.id) AS is_bundle_parent
          FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
         WHERE oi.order_id = ? ORDER BY oi.rowid`
@@ -455,10 +463,13 @@ interface Binding {
   unit_index: number;
   owner_user_id: string;
   delivered_at: string | null;
+  warranty_start_at: string | null;
   warranty_end_at: string | null;
   warranty_closed_at: string | null;
   warranty_closed_reason: string | null;
   replaced_by_unit_id: string | null;
+  /** Owner decision 3: when the unit was traded in to Levonis (derived, `tradedInSql`), or null. */
+  traded_in_at: string | null;
   warranty_base_months: number | null;
   warranty_ext_months: number;
   policy_version: string;
@@ -548,8 +559,8 @@ const ASSIGNMENT_COLS = `id, serial_norm, serial_raw, order_id, order_item_id, o
 async function bindingOf(db: D1Database, norm: string): Promise<Binding | null> {
   return db
     .prepare(
-      `SELECT d.unit_id, u.order_id, u.order_item_id, u.unit_index, u.owner_user_id, u.delivered_at, u.warranty_end_at,
-              u.warranty_closed_at, u.warranty_closed_reason, u.replaced_by_unit_id,
+      `SELECT d.unit_id, u.order_id, u.order_item_id, u.unit_index, u.owner_user_id, u.delivered_at, u.warranty_start_at, u.warranty_end_at,
+              u.warranty_closed_at, u.warranty_closed_reason, u.replaced_by_unit_id, ${tradedInSql('u')} AS traded_in_at,
               u.warranty_base_months, u.warranty_ext_months, u.policy_version, o.status AS order_status
          FROM device_serials d JOIN order_item_units u ON u.id = d.unit_id LEFT JOIN orders o ON o.id = u.order_id
         WHERE d.serial_norm = ?`
@@ -586,8 +597,12 @@ export interface LinkRequest {
   opId: string;
   /** Change: the live assignment this link replaces, in the same batch. */
   replaceAssignmentId?: string;
-  /** Owner only (the route checks): kind, reason, and the resale warranty mode. */
-  override?: { kind: OverrideKind; reason: string; warrantyMode?: 'carry' | 'restart' };
+  /**
+   * Owner only (the route checks): kind and reason. A resold device always
+   * CARRIES its original warranty (owner decision 3): `restart` is refused at
+   * the door (WARRANTY_RESTART_RETIRED), so the only mode left is `carry`.
+   */
+  override?: { kind: OverrideKind; reason: string; warrantyMode?: 'carry' };
 }
 
 export interface SlotView {
@@ -774,7 +789,7 @@ interface LinkPlan {
   staffWindow: boolean;
   releaseOther: AssignmentRow | null;
   priorUnitId: string | null;
-  mode: 'new' | 'carry' | 'restart';
+  mode: 'new' | 'carry';
   skipDeliveredFence: boolean;
   lotId: string | null;
   lotSource: 'serial_link' | 'allocation' | null;
@@ -798,6 +813,16 @@ export const openUnitSql = (u: string) =>
      AND EXISTS (SELECT 1 FROM orders ro WHERE ro.id = ${u}.order_id AND ro.status = 'delivered'))))`;
 const UNSELLABLE = (b: Binding | null) =>
   !!b && (!!b.replaced_by_unit_id || b.warranty_closed_reason === 'returned_unsellable' || b.warranty_closed_reason === 'replaced');
+
+/**
+ * S12 (owner decision 3): the NEW product a condition listing (open box /
+ * used / refurbished) is a copy of — `condition_doc.new_product_id`. A device
+ * filed under that product may be sold on the listing: a traded-in printer is
+ * resold as used without an owner exception. Null for a new product.
+ */
+export function conditionNewProduct(line: Pick<LineFacts, 'condition_doc'> | null | undefined): string | null {
+  return parseConditionDoc(line?.condition_doc ?? null)?.new_product_id ?? null;
+}
 
 /**
  * Every refusal, in the brief's order of importance, from what was read.
@@ -845,24 +870,30 @@ async function classifyLink(db: D1Database, ctx: LinkContext, req: LinkRequest, 
 
   // ---- the asset (S4) ----------------------------------------------------
   const asset = ctx.asset;
+  // S12: the device filed under the new product a condition listing copies
+  // is that listing's device too (its options are another product's, so the
+  // option check does not apply to it).
+  const usedOf = conditionNewProduct(line);
+  const viaCondition = !!asset?.product_id && asset.product_id !== line.product_id && asset.product_id === usedOf;
   if (asset?.voided_at) throw refuse(409, 'SERIAL_NOT_AVAILABLE', { reason: 'void' });
-  if (asset?.product_id && asset.product_id !== line.product_id) throw refuse(400, 'SERIAL_PRODUCT_MISMATCH');
-  if (asset?.variant_id && ctx.variant && asset.variant_id !== ctx.variant.variant_id) throw refuse(400, 'SERIAL_OPTION_MISMATCH');
+  if (asset?.product_id && asset.product_id !== line.product_id && !viaCondition) throw refuse(400, 'SERIAL_PRODUCT_MISMATCH');
+  if (!viaCondition && asset?.variant_id && ctx.variant && asset.variant_id !== ctx.variant.variant_id) throw refuse(400, 'SERIAL_OPTION_MISMATCH');
   // H1: a serial that is some other asset's BOX SN, or a box SN that is some
   // other asset's serial, is the same physical box read twice.
   if (ctx.boxOwner) throw refuse(400, 'SERIAL_INVALID', { problem: 'BOX_SN' });
   if (boxSn && ctx.boxIsSerial) throw refuse(400, 'SERIAL_INVALID', { problem: 'BOX_SN_IS_SERIAL' });
   if (ean) {
     const hit = await resolveLabelProduct(db, ean, '');
-    if (hit && hit.product.id !== line.product_id) throw refuse(400, 'SERIAL_PRODUCT_MISMATCH', { via: 'ean' });
-    if (hit && hit.variant_id && ctx.variant && hit.variant_id !== ctx.variant.variant_id) {
+    const eanViaCondition = !!hit && hit.product.id !== line.product_id && hit.product.id === usedOf;
+    if (hit && hit.product.id !== line.product_id && !eanViaCondition) throw refuse(400, 'SERIAL_PRODUCT_MISMATCH', { via: 'ean' });
+    if (hit && !eanViaCondition && hit.variant_id && ctx.variant && hit.variant_id !== ctx.variant.variant_id) {
       throw refuse(400, 'SERIAL_OPTION_MISMATCH', { via: 'ean' });
     }
   }
   // M11/§17 serial model metadata: a known prefix family that the product's
   // name contradicts. Not for an asset the owner already filed under this
   // product — that filing IS the owner's answer.
-  if (!(asset?.product_id && asset.product_id === line.product_id) && ov !== 'model_family') {
+  if (!(asset?.product_id && (asset.product_id === line.product_id || viaCondition)) && ov !== 'model_family') {
     const conflict = serialFamilyConflict(norm, [line.p_name, line.p_name_ar, line.name_snapshot]);
     if (conflict) throw refuse(400, 'SERIAL_MODEL_MISMATCH', { ...conflict });
   }
@@ -912,14 +943,25 @@ async function classifyLink(db: D1Database, ctx: LinkContext, req: LinkRequest, 
   const b = ctx.binding;
   const active = ctx.live.find((a) => !!a.activated_at) ?? null;
   let priorUnitId: string | null = null;
-  let mode: 'new' | 'carry' | 'restart' = 'new';
+  let mode: 'new' | 'carry' = 'new';
   let skipDeliveredFence = false;
   const warnings: string[] = [];
   const delivered = OPEN_UNIT(b) || !!active || !!ctx.receipt;
+  // A resold device ALWAYS carries its original warranty (owner decision 3,
+  // 2026-10-09): every branch below that names a previous unit carries it,
+  // and nothing here restarts one (`restart` is refused at its doors).
   if (UNSELLABLE(b)) {
     if (ov !== 'unavailable') throw refuse(409, 'SERIAL_NOT_AVAILABLE', { reason: b?.replaced_by_unit_id ? 'replaced' : 'unsellable' });
     priorUnitId = b!.unit_id;
-    mode = req.override?.warrantyMode ?? 'carry';
+    mode = 'carry';
+    skipDeliveredFence = true;
+  } else if (b && b.traded_in_at) {
+    // S4: a device TRADED IN to Levonis is the shop's to sell again — a normal
+    // resale, no owner exception. Its unit was never closed (the warranty
+    // stays with the serial); the new sale carries that same warranty, and
+    // the batch re-checks that the serial still points at that unit.
+    priorUnitId = b.unit_id;
+    mode = 'carry';
     skipDeliveredFence = true;
   } else if (delivered) {
     if (ov !== 'delivered_device') {
@@ -934,18 +976,16 @@ async function classifyLink(db: D1Database, ctx: LinkContext, req: LinkRequest, 
       throw err;
     }
     priorUnitId = b?.unit_id ?? active?.unit_id ?? ctx.receipt?.unit_id ?? null;
-    mode = req.override?.warrantyMode ?? 'carry';
+    mode = 'carry';
     skipDeliveredFence = true;
   } else if (b && (b.warranty_closed_reason === 'returned' || b.warranty_closed_reason === 'traded_in')) {
-    // §14 resale of a returned device: the SAME warranty identity continues —
-    // its original end carries (owner default). A purchased plan on the new
-    // line does not restart it silently (M15): the owner decides.
+    // §14 resale of a returned device — the twin of the trade-in branch: the
+    // SAME warranty identity continues with its original start and end. A
+    // paid extension on the new line adds its months to that end (S6); it
+    // never restarts the warranty (owner decision 3).
     priorUnitId = b.unit_id;
     mode = 'carry';
-    const snap = safeParse<{ plan_id?: string } | null>(line.warranty_snapshot, null);
-    if (snap?.plan_id) warnings.push('RESTART_SUGGESTED');
   }
-  if (req.override?.warrantyMode && (ov === 'delivered_device' || ov === 'unavailable')) mode = req.override.warrantyMode;
 
   // ---- the slot (§18) ----------------------------------------------------
   if (ctx.slotLive && ctx.slotLive.serial_norm !== norm && ctx.slotLive.id !== req.replaceAssignmentId) {
@@ -966,7 +1006,7 @@ async function classifyLink(db: D1Database, ctx: LinkContext, req: LinkRequest, 
     .map((l) => (replacing?.lot_id && replacing.lot_id === l.lot_id ? { ...l, taken: Math.max(0, l.taken - 1) } : l));
   const expected = open.map((l) => ({ id: l.lot_id, received_at: l.received_at, location: l.location }));
   if (sl) {
-    if (sl.lot_product_id && sl.lot_product_id !== line.product_id) throw refuse(400, 'SERIAL_PRODUCT_MISMATCH', { via: 'lot' });
+    if (sl.lot_product_id && sl.lot_product_id !== line.product_id && sl.lot_product_id !== usedOf) throw refuse(400, 'SERIAL_PRODUCT_MISMATCH', { via: 'lot' });
     const mine = open.find((l) => l.lot_id === sl.lot_id) ?? null;
     if (open.length && mine && mine.taken < mine.net) {
       lotId = sl.lot_id;
@@ -1154,15 +1194,19 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
       .bind(norm, raw, line.product_id, lineVariant, boxSn, ean, req.source === 'manual' ? 'manual' : 'scan', actor.id),
     rawAudit(db, actor.id, 'serial_inventory.add', norm, { source: 'prep_scan', via: req.source, product_id: line.product_id, variant_id: lineVariant, order_id: order.id, serials: [norm], op: key }, 'changes() = 1')
   );
-  // S4 — the asset is usable and is this product / option, and is not another box's SN.
+  // S4 — the asset is usable and is this product / option (or, S12, the new
+  // product this condition listing copies — its options are that product's),
+  // and is not another box's SN.
+  const usedOf = conditionNewProduct(line);
   stmts.push(
     ...fence(
       db,
       `EXISTS (SELECT 1 FROM serial_inventory si WHERE si.serial_norm = ? AND si.voided_at IS NULL
-                  AND (si.product_id IS NULL OR si.product_id = ?)
-                  AND (si.variant_id IS NULL OR ? IS NULL OR si.variant_id = ?))
+                  AND ((si.product_id IS NULL OR si.product_id = ?)
+                        AND (si.variant_id IS NULL OR ? IS NULL OR si.variant_id = ?)
+                       OR (? IS NOT NULL AND si.product_id = ?)))
         AND NOT EXISTS (SELECT 1 FROM serial_inventory b WHERE b.box_sn = ? AND b.box_sn <> '' AND b.serial_norm <> ?)`,
-      [norm, line.product_id, lineVariant, lineVariant, norm, norm]
+      [norm, line.product_id, lineVariant, lineVariant, usedOf, usedOf, norm, norm]
     )
   );
   // S5 — not a delivered device under any open warranty (legacy devices with
@@ -1180,7 +1224,8 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
       )
     );
   } else if (plan.priorUnitId) {
-    // The override names the device's warranty unit it read; it must still be that one.
+    // The override — or a traded-in resale (S4) — names the device's warranty
+    // unit it read; it must still be that one.
     stmts.push(...fence(db, `EXISTS (SELECT 1 FROM device_serials d WHERE d.serial_norm = ? AND d.unit_id = ?)
                               OR NOT EXISTS (SELECT 1 FROM device_serials d WHERE d.serial_norm = ?)`, [norm, plan.priorUnitId, norm]));
   }
@@ -1327,7 +1372,7 @@ export async function slotView(db: D1Database, actor: SerialActor, row: Assignme
     row.unit_id
       ? db.prepare('SELECT delivered_at, warranty_end_at, warranty_closed_at, warranty_closed_reason FROM order_item_units WHERE id = ?').bind(row.unit_id).first<{ delivered_at: string | null; warranty_end_at: string | null; warranty_closed_at: string | null; warranty_closed_reason: string | null }>()
       : Promise.resolve(null),
-    row.prior_unit_id && row.warranty_mode === 'carry'
+    row.prior_unit_id && (row.warranty_mode === 'carry' || row.warranty_mode === 'restart')
       ? db.prepare('SELECT warranty_end_at FROM order_item_units WHERE id = ?').bind(row.prior_unit_id).first<{ warranty_end_at: string | null }>()
       : Promise.resolve(null),
   ]);
@@ -1350,7 +1395,8 @@ export async function slotView(db: D1Database, actor: SerialActor, row: Assignme
       source: row.source,
       lot: lot ? { id: lot.id, received_at: lot.received_at ?? null, location: lot.location ?? null } : null,
       lot_source: row.lot_source,
-      warranty: { state, mode: row.warranty_mode, carries_until: prior?.warranty_end_at ?? null },
+      // A binding saved as `restart` before owner decision 3 carries at delivery like every resale.
+      warranty: { state, mode: row.warranty_mode === 'restart' ? 'carry' : row.warranty_mode, carries_until: prior?.warranty_end_at ?? null },
       override_kind: row.override_kind,
     },
   };
@@ -1418,11 +1464,18 @@ export async function unlinkSerial(
   return { success: true, code: 'SERIAL_UNLINKED', message: SERIAL_TEXT.SERIAL_UNLINKED, slot: await slotView(db, actor, null, at) };
 }
 
-/** Owner: how a resold device's warranty starts at delivery (carry = original end, restart = new). */
+/**
+ * Owner: how a resold device's warranty runs at delivery. Since owner
+ * decision 3 (2026-10-09) the only answer is `carry` — the original start
+ * and end continue; `restart` is refused (WARRANTY_RESTART_RETIRED). The
+ * door stays so a binding saved as `restart` before the decision can be put
+ * back to `carry` by hand (activation carries it either way).
+ */
 export async function setWarrantyMode(env: Env, actor: SerialActor, norm: string, mode: 'carry' | 'restart', reason: string) {
   const db = env.DB;
   if (!(await serialAssignmentsInstalled(db))) throw refuse(503, 'SERIALS_NOT_INSTALLED');
   if (!actor.owner) throw refuse(403, 'OWNER_ONLY');
+  if (mode === 'restart') throw refuse(409, 'WARRANTY_RESTART_RETIRED');
   if (reason.trim().length < 5) throw refuse(400, 'OVERRIDE_REASON_REQUIRED');
   const row = await db
     .prepare(`SELECT ${ASSIGNMENT_COLS} FROM serial_assignments WHERE serial_norm = ? AND released_at IS NULL AND activated_at IS NULL`)
@@ -1518,17 +1571,24 @@ function reopenUnitStatements(db: D1Database, unitId: string, serialNorm: string
  *       serial it was given before (that serial was released by the
  *       trigger), audited;
  *   A3  device_serials → this unit (moves only off a CLOSED or replaced unit,
- *       or the unit an owner override named — never off an open warranty,
+ *       the unit an owner override named, or a unit TRADED IN to Levonis —
+ *       owner decision 3, S5 — never off an open warranty a customer holds,
  *       and never off a cancel-closed unit whose order is delivered again);
  *   R   the device's previous ACTIVE assignment is released (owner_override /
  *       reassigned) once the pointer really moved;
  *   A6  activated — only if device_serials really points at this unit; the
  *       fence after it rolls A0–R back otherwise;
- *   A1  carry: the original end, `carried:'original_end'` + `resale_of`
- *       (critique H4: the three readers of that marker keep it on a later
+ *   A1  carry (owner decision 3, S6): the SAME warranty — the previous
+ *       unit's start and end (+ a paid extension the new line bought), base
+ *       and ext, `carried:'original_end'` + `resale_of` + the origin, and a
+ *       condition listing's `used_sale` kept apart (`carriedWindow`; critique
+ *       H4: the readers of that marker keep start and end on a later
  *       delivery-date correction);
- *   A4  an owner override closes the superseded unit (dates kept), voids its
- *       live receipt and revokes its account link;
+ *   S7  a resale of a traded-in or returned device: the previous unit is NOT
+ *       closed; its live receipt becomes `replaced` (`resold`) and a link
+ *       left on it is revoked;
+ *   A4  an owner override of any other open unit closes the superseded unit
+ *       (dates kept), voids its live receipt and revokes its account link;
  *   AR  a unit closed by an undone-delivery cancel re-opens — its account
  *       link and (same device) its receipt with it (`reopenUnitStatements`);
  *   A5  the serial-verified lot onto order_item_units.inventory_lot_id (L12);
@@ -1592,10 +1652,16 @@ async function bumpAttempt(db: D1Database, id: string) {
 async function activateOne(db: D1Database, a: AssignmentRow, unitId: string, orderId: string): Promise<boolean> {
   const now = nowIso();
   const prior = a.prior_unit_id
-    ? await db.prepare('SELECT * FROM order_item_units WHERE id = ?').bind(a.prior_unit_id).first<UnitRow & { warranty_end_at: string | null }>()
+    ? await db
+        .prepare(`SELECT u.*, ${tradedInSql('u')} AS traded_in_at FROM order_item_units u WHERE u.id = ?`)
+        .bind(a.prior_unit_id)
+        .first<UnitRow & { warranty_end_at: string | null; traded_in_at: string | null }>()
     : null;
   const ACT = `EXISTS (SELECT 1 FROM serial_assignments WHERE id = ${lit(a.id)} AND activated_at = ${lit(now)} AND unit_id = ${lit(unitId)})`;
   const overrideMove = a.override_kind === 'delivered_device' || a.override_kind === 'unavailable';
+  // Owner decision 3: a device traded in to Levonis moves to its new sale
+  // without an exception, and its previous unit is never closed (S5, S7).
+  const priorTradedIn = !!prior?.traded_in_at && !prior.replaced_by_unit_id && prior.id !== unitId;
   const stmts: D1PreparedStatement[] = [
     // A0 — audited before it goes (the old serial is a free device again).
     db
@@ -1625,7 +1691,9 @@ async function activateOne(db: D1Database, a: AssignmentRow, unitId: string, ord
          ON CONFLICT(serial_norm) DO UPDATE SET unit_id = excluded.unit_id, serial_raw = excluded.serial_raw,
             assigned_by = excluded.assigned_by, assigned_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), note = excluded.note
           WHERE device_serials.unit_id IN (SELECT mu.id FROM order_item_units mu WHERE NOT ${openUnitSql('mu')})
-             OR (?7 = 1 AND device_serials.unit_id = ?8)`
+             OR (?7 = 1 AND device_serials.unit_id = ?8)
+             OR (device_serials.unit_id = ?8 AND EXISTS (SELECT 1 FROM order_item_units tu WHERE tu.id = ?8
+                   AND tu.replaced_by_unit_id IS NULL AND ${tradedInSql('tu')} IS NOT NULL))`
       )
       .bind(a.serial_norm, a.serial_raw, unitId, a.linked_by, `prep_scan:${a.id}`, a.id, overrideMove ? 1 : 0, a.prior_unit_id ?? ''),
     // R
@@ -1648,20 +1716,62 @@ async function activateOne(db: D1Database, a: AssignmentRow, unitId: string, ord
     // All or nothing: a row that did not activate leaves no trace of A0–R.
     ...fence(db, ACT),
   ];
-  // A1 carry
-  if (a.warranty_mode === 'carry' && prior) {
-    const pv = JSON.stringify({
-      v: 1,
-      carried: 'original_end',
-      resale_of: prior.id,
-      base: prior.warranty_base_months,
-      ext: prior.warranty_ext_months,
-      total: unitTotalMonths(prior),
-    });
-    stmts.push(db.prepare(`UPDATE order_item_units SET warranty_end_at = ?, policy_version = ? WHERE id = ? AND ${ACT}`).bind(prior.warranty_end_at ?? null, pv, unitId));
+  // A1 carry (S6, owner decision 3): the SAME warranty — the previous unit's
+  // start and end (plus a paid extension the new line bought), its base and
+  // extension, the origin named, and this sale's used-device cover kept
+  // apart. A binding saved as `restart` before the decision carries too. The
+  // delivery hook already wrote this window when the binding was live then
+  // (S8); a unit that carries from this prior is left exactly as it is, so
+  // the new line's extension is never added twice.
+  if ((a.warranty_mode === 'carry' || a.warranty_mode === 'restart') && prior && prior.id !== unitId) {
+    const fresh = await db
+      .prepare(
+        `SELECT u.warranty_ext_months, u.delivered_at, u.policy_version, p.condition_doc
+           FROM order_item_units u LEFT JOIN products p ON p.id = u.product_id WHERE u.id = ?`
+      )
+      .bind(unitId)
+      .first<{ warranty_ext_months: number | null; delivered_at: string | null; policy_version: string; condition_doc: string | null }>();
+    const already = fresh ? unitIdentity(fresh.policy_version) : null;
+    if (fresh && !(already?.carried && already.resale_of === prior.id)) {
+      const win = carriedWindow(
+        {
+          id: prior.id,
+          delivered_at: prior.delivered_at,
+          warranty_start_at: prior.warranty_start_at,
+          warranty_end_at: prior.warranty_end_at ?? null,
+          warranty_base_months: prior.warranty_base_months,
+          warranty_ext_months: Number(prior.warranty_ext_months) || 0,
+          policy_version: prior.policy_version,
+        },
+        { ext_months: Number(fresh.warranty_ext_months) || 0, delivered_at: fresh.delivered_at, condition_doc: fresh.condition_doc }
+      );
+      stmts.push(
+        db
+          .prepare(
+            `UPDATE order_item_units SET warranty_start_at = COALESCE(?, warranty_start_at), warranty_end_at = ?, warranty_base_months = ?,
+                    warranty_ext_months = ?, policy_version = ? WHERE id = ? AND ${ACT}`
+          )
+          .bind(win.start_at, win.end_at, win.base_months, win.ext_months, win.policy_version, unitId)
+      );
+    }
   }
-  // A4 the superseded unit of an owner override
-  if (overrideMove && a.prior_unit_id && a.prior_unit_id !== unitId) {
+  // S7 a resale of a traded-in or returned device: the previous unit is NOT
+  // closed (its dates are the device's warranty history); its live receipt is
+  // superseded by the new sale's (`replaced`, `resold`) and any account link
+  // still on it is revoked.
+  if (prior && prior.id !== unitId && (priorTradedIn || !overrideMove)) {
+    stmts.push(
+      db
+        .prepare(
+          `UPDATE warranty_receipts SET status = 'replaced', void_reason = 'resold', replaced_at = ?1, updated_at = ?1
+            WHERE unit_id = ?2 AND status IN ('draft','active') AND ${ACT}`
+        )
+        .bind(now, prior.id),
+      db.prepare(`UPDATE device_registrations SET revoked_at = ? WHERE unit_id = ? AND revoked_at IS NULL AND ${ACT}`).bind(now, prior.id)
+    );
+  }
+  // A4 the superseded unit of an owner override (not a traded-in device: decision 3)
+  if (overrideMove && !priorTradedIn && a.prior_unit_id && a.prior_unit_id !== unitId) {
     stmts.push(
       db.prepare(`UPDATE order_item_units SET warranty_closed_at = ?, warranty_closed_reason = 'owner_override' WHERE id = ? AND warranty_closed_at IS NULL AND ${ACT}`).bind(now, a.prior_unit_id),
       db.prepare(`UPDATE warranty_receipts SET status = 'void', void_reason = 'owner_override', voided_at = ?1, updated_at = ?1 WHERE unit_id = ?2 AND status IN ('draft','active') AND ${ACT}`).bind(now, a.prior_unit_id),
@@ -2442,8 +2552,12 @@ export async function serialStory(env: Env, actor: SerialActor, norm: string) {
       .map((a) => ({ order_id: orderOf(a), released_at: a.released_at, reason: a.release_reason, linked_at: a.linked_at })),
     warranty: {
       state: warrantyState,
-      start_at: unit?.delivered_at ?? null,
+      // The warranty's own start — for a resold device the FIRST delivery
+      // (owner decision 3): the unit's carried start, or the origin an older
+      // resale names, never the resale's delivery.
+      start_at: unit ? unitIdentity(unit.policy_version).origin_start_at ?? unit.warranty_start_at ?? unit.delivered_at : null,
       end_at: unit?.warranty_end_at ?? null,
+      traded_in_at: unit?.traded_in_at ?? null,
       remaining_days: unit && !unit.warranty_closed_at ? cov?.remaining_days ?? null : null,
       mode: live?.warranty_mode ?? null,
       closed_reason: unit?.warranty_closed_reason ?? null,

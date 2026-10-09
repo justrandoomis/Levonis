@@ -17,15 +17,19 @@
  * honest 'needs_config' coverage state (decision register row 18) — a
  * duration is never silently assumed.
  *
- * Clocks: warranty_start_at = the authenticated per-unit delivered_at.
- * Registration NEVER starts, restarts or extends any clock.
+ * Clocks: warranty_start_at = the authenticated per-unit delivered_at — except
+ * for a device sold AGAIN (returned or traded in, owner decision 3,
+ * 2026-10-09), whose unit carries its first sale's start and end
+ * (`carriedWindow`, worker/lib/deviceCustody.ts). Registration NEVER starts,
+ * restarts or extends any clock, and nothing restarts a carried one.
  */
 
 import type { Env } from './types';
 import { safeParse } from './types';
 import { addMonths } from './membershipOps';
 import { newId } from './crypto';
-import { anySectionSerialPolicy, serializationContext, lineDevicePolicy, serializedProductSql } from './serialPolicy';
+import { anySectionSerialPolicy, serializationContext, lineDevicePolicy, serializedProductSql, serialAssignmentsInstalled } from './serialPolicy';
+import { carriedWindow, type PriorUnit } from './deviceCustody';
 
 // ---------------------------------------------------------------- policy
 
@@ -185,6 +189,8 @@ interface UnitSourceRow extends Record<string, unknown> {
   qty: number;
   warranty_snapshot: string | null;
   ops_policy: string | null;
+  /** The listing's condition (open box / used / refurbished), for a resale's used-sale cover. */
+  condition_doc?: string | null;
   /** 1 when other lines of the order hang off this one (a bundle or mystery PARENT). */
   is_bundle_parent: number;
 }
@@ -232,7 +238,7 @@ export async function createUnitsOnDelivery(
   // parent filed under a printer catalog or carrying `serialized` can never
   // add warranty units on top of its components'.
   const { results: items } = await env.DB.prepare(
-    `SELECT oi.id AS item_id, oi.product_id, oi.qty, oi.warranty_snapshot, p.ops_policy,
+    `SELECT oi.id AS item_id, oi.product_id, oi.qty, oi.warranty_snapshot, p.ops_policy, p.condition_doc,
             EXISTS (SELECT 1 FROM order_items c WHERE c.bundle_parent_item_id = oi.id) AS is_bundle_parent
        FROM order_items oi
        LEFT JOIN products p ON p.id = oi.product_id
@@ -240,6 +246,13 @@ export async function createUnitsOnDelivery(
   )
     .bind(orderId)
     .all<UnitSourceRow>();
+
+  // S8 (owner decision 3): a slot whose live preparation binding CARRIES a
+  // previous unit's warranty (a resold device) is born with that window — the
+  // original start and end — so no reset window ever exists between this
+  // batch and the activation batch, even when activation fails and waits for
+  // the sweep. The activation writes the same values again (carriedWindow).
+  const carried = await carriedPriors(env.DB, orderId);
 
   // Which lines are printers, by the owner's catalog flag, and which sit in a
   // section whose serial policy says 'required' (0178) — two batched reads for
@@ -272,6 +285,10 @@ export async function createUnitsOnDelivery(
     });
     for (let i = 1; i <= qty; i++) {
       planned++;
+      const prior = carried.get(`${it.item_id}:${i}`);
+      const win = prior
+        ? carriedWindow(prior, { ext_months: cov.ext_months, delivered_at: deliveredAtIso, condition_doc: it.condition_doc })
+        : null;
       stmts.push(
         env.DB.prepare(
           `INSERT INTO order_item_units (id, order_id, order_item_id, product_id, owner_user_id, unit_index,
@@ -286,11 +303,11 @@ export async function createUnitsOnDelivery(
           order.user_id,
           i,
           deliveredAtIso,
-          cov.base_months,
-          cov.ext_months,
-          deliveredAtIso,
-          cov.end_at,
-          policyVersion
+          win ? win.base_months : cov.base_months,
+          win ? win.ext_months : cov.ext_months,
+          win ? win.start_at ?? deliveredAtIso : deliveredAtIso,
+          win ? win.end_at : cov.end_at,
+          win ? win.policy_version : policyVersion
         )
       );
     }
@@ -315,6 +332,44 @@ export async function createUnitsOnDelivery(
   // result of an order with no preparation serials is exactly what it always was.
   if (activation && (activation.pending > 0 || activation.reopened > 0)) result.activation = activation;
   return result;
+}
+
+/**
+ * The previous units the live, not-yet-activated `carry` bindings of this
+ * order name, by slot (`order_item_id:unit_index`). Empty before migration
+ * 0178 (deploy-ahead) and when nothing is carried. A legacy pending
+ * `restart` binding carries too: the owner retired restarting (decision 3).
+ */
+async function carriedPriors(db: D1Database, orderId: string): Promise<Map<string, PriorUnit>> {
+  const out = new Map<string, PriorUnit>();
+  if (!(await serialAssignmentsInstalled(db))) return out;
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT a.order_item_id, a.unit_index, pu.id, pu.delivered_at, pu.warranty_start_at, pu.warranty_end_at,
+                pu.warranty_base_months, pu.warranty_ext_months, pu.policy_version
+           FROM serial_assignments a JOIN order_item_units pu ON pu.id = a.prior_unit_id
+          WHERE a.order_id = ? AND a.released_at IS NULL AND a.activated_at IS NULL AND a.part = 'device'
+            AND a.warranty_mode IN ('carry','restart')`
+      )
+      .bind(orderId)
+      .all<PriorUnit & { order_item_id: string; unit_index: number }>();
+    for (const r of results ?? []) {
+      out.set(`${r.order_item_id}:${r.unit_index}`, {
+        id: r.id,
+        delivered_at: r.delivered_at,
+        warranty_start_at: r.warranty_start_at,
+        warranty_end_at: r.warranty_end_at,
+        warranty_base_months: r.warranty_base_months,
+        warranty_ext_months: Number(r.warranty_ext_months) || 0,
+        policy_version: r.policy_version,
+      });
+    }
+  } catch (e) {
+    // A failed read costs only the head start: activation still carries the window.
+    console.error('carried windows not read for order', orderId, e instanceof Error ? e.message : String(e));
+  }
+  return out;
 }
 
 /**
@@ -418,15 +473,26 @@ export function unitTotalMonths(unit: Pick<UnitRow, 'warranty_base_months' | 'wa
 }
 
 /**
- * Recomputes ONE unit's window for a corrected delivered_at. Replacement
- * units that carry the original device's end date (policy_version.carried =
- * 'original_end') keep that end date — only delivered_at/start move.
- * Returns the recomputed end.
+ * Recomputes ONE unit's window for a corrected delivered_at. A unit that
+ * CARRIES a warranty (policy_version.carried = 'original_end': a replacement,
+ * or a resold device — owner decision 3) keeps BOTH its start and its end:
+ * the warranty runs from the original delivery, which this correction does
+ * not touch (S9). Only a resale's own used-sale cover moves with its delivery
+ * date (`policy_version`, returned when it changed).
  */
-export function recomputeUnitWindow(unit: UnitRow, newDeliveredAtIso: string): { start_at: string; end_at: string | null } {
-  const pv = safeParse<{ carried?: string }>(unit.policy_version, {});
+export function recomputeUnitWindow(unit: UnitRow, newDeliveredAtIso: string): { start_at: string; end_at: string | null; policy_version?: string } {
+  const pv = safeParse<{ carried?: string; used_sale?: { months?: unknown } }>(unit.policy_version, {});
   if (pv.carried === 'original_end') {
-    return { start_at: newDeliveredAtIso, end_at: unit.warranty_end_at };
+    const months = Number(pv.used_sale?.months);
+    const moved =
+      pv.used_sale && Number.isInteger(months) && months > 0
+        ? JSON.stringify({ ...pv, used_sale: { months, start_at: newDeliveredAtIso, end_at: addMonths(newDeliveredAtIso, months) } })
+        : undefined;
+    return {
+      start_at: unit.warranty_start_at ?? newDeliveredAtIso,
+      end_at: unit.warranty_end_at,
+      ...(moved ? { policy_version: moved } : {}),
+    };
   }
   const total = unitTotalMonths(unit);
   return { start_at: newDeliveredAtIso, end_at: total !== null ? addMonths(newDeliveredAtIso, total) : null };

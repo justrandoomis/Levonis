@@ -45,11 +45,32 @@ import type { PolicyDocument } from './types';
  *     so the clauses that carried them are published instead of withheld.
  *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
  *     by number, an article of this document that is itself withheld.
+ *
+ * VERSION 4 — WHY IT MOVED (owner, decision 3, 2026-10-09; DECISIONS row
+ * 193). The archive keeps version 3 byte for byte. A trade-in does not close
+ * a device's warranty: it stays with the same serial and runs from the
+ * original order's delivery date, and a resale passes on what remains of that
+ * same warranty — never a new one, never from zero. Every new sentence is
+ * what the code now does:
+ *   * 5.19 (appended): the trade-in leaves the warranty open
+ *     (worker/lib/tradeIn.ts `completeRequest` never touches the unit's dates,
+ *     closure or receipt) and ends the trader's link on the trade-in date (the
+ *     same batch revokes it; worker/lib/deviceCustody.ts derives the state);
+ *     the resale carries the original start and end (`carriedWindow`, written
+ *     at delivery and at activation — worker/lib/deviceOps.ts,
+ *     worker/lib/serialAssignments.ts); a paid extension the new buyer buys is
+ *     added to the original end (the same function); `restart` is refused.
+ *   * The used-device clause (appended): the original warranty continues, the
+ *     used-sale period is stored and shown apart (`used_sale`), neither
+ *     shortens nor restarts the other, and a claim is accepted while either is
+ *     in force (`unitCoverage`, read by the claim and device screens).
+ * Article numbering is unchanged; the new lines cite only 5.19. It is not a
+ * consent document: nothing is asked again.
  */
 export const warranty: PolicyDocument = {
   key: 'warranty',
-  version: 3,
-  effective_at: '2026-09-23',
+  version: 4,
+  effective_at: '2026-10-09',
   title: {
     ar: 'ضمان القطع',
     en: 'Parts Warranty',
@@ -76,7 +97,7 @@ export const warranty: PolicyDocument = {
 - لا تبدأ المدة من تاريخ الطلب، ولا من تاريخ الدفع، ولا من تاريخ الشحن، ولا من تاريخ فتح الصندوق.
 - تُحسب المدة لكل وحدة على حدة. إذا سُلمت وحدات الطلب الواحد في تواريخ مختلفة فلكل وحدة تاريخ انتهاء مختلف.
 - تسجيل الجهاز في حساب الزبون لا يبدأ المدة ولا يمددها ولا يعيدها من جديد. التسجيل وسيلة للوصول إلى خدمات المطالبة، لا حدثٌ يحرك الضمان.
-- الأجهزة المستعملة أو المجددة أو المعروضة بوصف Open Box تحمل المدة المعلنة في صفحتها وفي وصلها، وهي شهر واحد أو اثنا عشر شهرًا حسب ما حدده المتجر لتلك الوحدة، ولا تقبل أي تمديد مدفوع.
+- الأجهزة المستعملة أو المجددة أو المعروضة بوصف Open Box تحمل المدة المعلنة في صفحتها وفي وصلها، وهي شهر واحد أو اثنا عشر شهرًا حسب ما حدده المتجر لتلك الوحدة، ولا تقبل أي تمديد مدفوع. وإذا كان للجهاز ضمان أصلي ما زال ساريًا من بيعه الأول فإنه يستمر كما هو وفق المادة 5.19، وتُعرض مدة بيع المستعمل منفصلةً عنه، ولا تُنقص إحداهما الأخرى ولا تعيد بدءها، وتُقبل المطالبة ما دامت إحداهما سارية.
 - إذا اشترى الزبون تمديدًا للضمان قبل إتمام الطلب فالمدة الإجمالية هي أربعة وعشرون أو ستة وثلاثون شهرًا حسب التمديد المشترى، وتُطبَّق عليها هذه الوثيقة نفسها بحروفها، مع ما ورد في وثيقة تمديد الضمان.
 
 ### 5.3 ما يغطيه الضمان
@@ -205,6 +226,8 @@ export const warranty: PolicyDocument = {
 ### 5.19 انتقال الجهاز إلى مالك آخر
 الضمان مرتبط بالوحدة لا بالشخص، ويكمل مدته الأصلية عند انتقال الجهاز. ينتقل الضمان بشرط أن يفك المالك الأول ارتباط الجهاز بحسابه وأن يسجله المالك الجديد باسمه. الجهاز الذي يبقى مسجلًا باسم غير حائزه لا تُقبل عليه مطالبة من الحائز. لا يبدأ الانتقال مدة جديدة ولا يمدد المدة القائمة.
 
+وإذا عاد الجهاز إلى Levonis باستبدال (Trade-in) فلا يُغلق ضمانه: يبقى مرتبطًا بالرقم التسلسلي نفسه ويُحسب من تاريخ تسليم الطلب الأصلي، وينتهي ارتباطه بحساب المالك السابق من تاريخ الاستبدال. وإذا أُعيد بيعه انتقل إلى المشتري الجديد ما بقي من الضمان الأصلي نفسه بتاريخي بدايته ونهايته الأصليين، ولا يبدأ ضمان جديد ولا يُحسب الضمان من الصفر. وإذا اشترى المشتري الجديد تمديدًا مدفوعًا حيث يُعرض، أُضيفت مدته إلى نهاية الضمان الأصلي.
+
 ### 5.20 التعارض والنفاذ واللغة
 - هذه الوثيقة جزء من سياسات Levonis، وتُقرأ مع وثيقة الاسترجاع ووثيقة تمديد الضمان ووثيقة خدمات ما بعد البيع.
 - إذا تعارض نص هذه الوثيقة مع وعد شفهي أو رسالة من موظف أو منشور تسويقي، فنص هذه الوثيقة هو المعتمد.
@@ -232,7 +255,7 @@ The warranty period is twelve calendar months, starting from the recorded delive
 - The period does not start from the order date, the payment date, the shipping date, or the date the box was opened.
 - The period is counted per unit. If units of one order are delivered on different dates, each unit has a different expiry date.
 - Registering the device in the customer account does not start, extend or restart the period. Registration is the way to reach claim services; it is not an event that moves the warranty.
-- Used, refurbished or Open Box devices carry the period stated on their page and on their receipt, being one month or twelve months as the store set for that unit, and they accept no paid extension.
+- Used, refurbished or Open Box devices carry the period stated on their page and on their receipt, being one month or twelve months as the store set for that unit, and they accept no paid extension. Where the device still carries an original warranty from its first sale, that warranty continues unchanged under article 5.19; the used-sale period is shown separately, neither shortens nor restarts the other, and a claim is accepted while either is in force.
 - If the customer bought a warranty extension before placing the order, the total period is twenty-four or thirty-six months according to the extension purchased. This same document applies to it word for word, together with the Extended Warranty document.
 
 ### 5.3 What the warranty covers
@@ -361,6 +384,8 @@ The liability of the store under this document is confined to repairing or repla
 ### 5.19 Transfer of the device to another owner
 The warranty attaches to the unit, not to the person, and continues its original period when the device changes hands. It transfers on condition that the first owner unlinks the device from their account and the new owner registers it in their own name. A device still registered to someone other than its holder does not accept a claim from that holder. A transfer starts no new period and extends no existing one.
 
+If the device returns to Levonis through a trade-in, its warranty is not closed: it stays with the same serial number and runs from the delivery date of the original order, and it stops being linked to the previous owner's account on the trade-in date. If the device is resold, the new buyer receives what remains of that same original warranty, with its original start and end dates; no new warranty starts and the warranty is never counted again from zero. Where the new buyer buys a paid extension that is offered, its months are added to the original end date.
+
 ### 5.20 Conflict, effect and language
 - This document forms part of the Levonis policies and is read together with the Returns document, the Extended Warranty document and the After-Sale Services document.
 - Where the text of this document conflicts with an oral promise, a message from a member of staff, or a marketing post, the text of this document prevails.
@@ -388,7 +413,7 @@ The warranty attaches to the unit, not to the person, and continues its original
 - ماوەکە لە بەرواری داواکاری، لە بەرواری پارەدان، لە بەرواری نێردن یان لە بەرواری کردنەوەی سندوقەکە دەست پێناکات.
 - ماوەکە بۆ هەر یەکەیەک بە جیا دەژمێردرێت. ئەگەر یەکەکانی یەک داواکاری لە بەرواری جیاواز بگەیەنرێن، هەر یەکەیەک بەرواری کۆتایی جیاوازی هەیە.
 - تۆمارکردنی ئامێر لە هەژماری کڕیار ماوەکە دەست پێناکات، درێژی ناکاتەوە و لە سەرەتاوە نایگەڕێنێتەوە. تۆمارکردن ڕێگایە بۆ گەیشتن بە خزمەتگوزاری داواکاری، نەک ڕووداوێک کە گەرەنتی بجوڵێنێت.
-- ئامێری بەکارهاتوو یان چاککراوەوە یان ئەوانەی بە Open Box دەفرۆشرێن ئەو ماوەیە هەڵدەگرن کە لە پەڕەکەی و لە پسوولەکەی ڕاگەیەنراوە، واتە یەک مانگ یان دوانزە مانگ بەپێی ئەوەی فرۆشگا بۆ ئەو یەکەیە دیاری کردووە، و هیچ درێژکردنەوەیەکی پارەدراو وەرناگرن.
+- ئامێری بەکارهاتوو یان چاککراوەوە یان ئەوانەی بە Open Box دەفرۆشرێن ئەو ماوەیە هەڵدەگرن کە لە پەڕەکەی و لە پسوولەکەی ڕاگەیەنراوە، واتە یەک مانگ یان دوانزە مانگ بەپێی ئەوەی فرۆشگا بۆ ئەو یەکەیە دیاری کردووە، و هیچ درێژکردنەوەیەکی پارەدراو وەرناگرن. ئەگەر ئامێرەکە هێشتا گەرەنتییەکی ڕەسەنی کارپێکراوی لە فرۆشتنی یەکەمیەوە هەبێت، ئەو گەرەنتییە بەپێی ماددەی 5.19 وەک خۆی بەردەوام دەبێت؛ ماوەی فرۆشتنی بەکارهاتوو بە جیا پیشان دەدرێت، هیچیان ئەوی تر کورت ناکاتەوە و لە سەرەتاوە دەستی پێناکاتەوە، و داواکاری وەردەگیرێت تا یەکێکیان کارپێکراو بێت.
 - ئەگەر کڕیار پێش تەواوکردنی داواکارییەکە درێژکردنەوەی گەرەنتی کڕیبێت، کۆی ماوەکە بیست و چوار یان سی و شەش مانگە بەپێی ئەو درێژکردنەوەیەی کڕیویەتی، و هەمان ئەم بەڵگەنامەیە بە وشە لەسەری جێبەجێ دەبێت، لەگەڵ بەڵگەنامەی درێژکردنەوەی گەرەنتی.
 
 ### 5.3 ئەوەی گەرەنتی دایدەپۆشێت
@@ -516,6 +541,8 @@ The warranty attaches to the unit, not to the person, and continues its original
 
 ### 5.19 گواستنەوەی ئامێر بۆ خاوەنێکی تر
 گەرەنتی بە یەکەکەوە بەستراوە نەک بە کەسەکەوە، و لە کاتی گواستنەوەی ئامێرەکەدا هەمان ماوەی سەرەکی تەواو دەکات. گەرەنتی دەگوازرێتەوە بەو مەرجەی خاوەنی یەکەم ئامێرەکە لە هەژمارەکەی خۆی بکاتەوە و خاوەنی نوێ بە ناوی خۆی تۆماری بکات. ئەو ئامێرەی بە ناوی کەسێکی جیاواز لە هەڵگرەکەی تۆمارکراو بمێنێتەوە، داواکاری لە هەڵگرەکەوە لەسەری وەرناگیرێت. گواستنەوە هیچ ماوەیەکی نوێ دەست پێناکات و ماوەی هەبووش درێژ ناکاتەوە.
+
+ئەگەر ئامێرەکە بە گۆڕینەوە (Trade-in) بگەڕێتەوە بۆ Levonis، گەرەنتییەکەی داناخرێت: بە هەمان ژمارەی زنجیرەییەوە بەستراو دەمێنێتەوە و لە ڕێکەوتی گەیاندنی داواکارییە ڕەسەنەکەوە هەژمار دەکرێت، و لە ڕێکەوتی گۆڕینەوەکەوە پەیوەندیی بە هەژماری خاوەنی پێشووەوە نامێنێت. ئەگەر ئامێرەکە دووبارە بفرۆشرێتەوە، ئەوەی لە هەمان گەرەنتیی ڕەسەن ماوە بە ڕێکەوتی سەرەتا و کۆتایی ڕەسەنی خۆیەوە دەگوازرێتەوە بۆ کڕیاری نوێ؛ هیچ گەرەنتییەکی نوێ دەست پێناکات و گەرەنتییەکە هەرگیز لە سفرەوە هەژمار ناکرێتەوە. ئەگەر کڕیاری نوێ درێژکردنەوەیەکی پارەدراو بکڕێت لە شوێنێک کە پێشکەش کراوە، مانگەکانی بۆ ڕێکەوتی کۆتایی ڕەسەن زیاد دەکرێن.
 
 ### 5.20 ناکۆکی و جێبەجێبوون و زمان
 - ئەم بەڵگەنامەیە بەشێکە لە سیاسەتەکانی Levonis، و لەگەڵ بەڵگەنامەی گەڕاندنەوە و بەڵگەنامەی درێژکردنەوەی گەرەنتی و بەڵگەنامەی خزمەتگوزاری دوای فرۆشتن دەخوێندرێتەوە.

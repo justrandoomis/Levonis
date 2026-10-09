@@ -271,6 +271,20 @@ test('only this customer’s delivered LEVONIS devices are offered; another’s 
   assert.deepEqual(violations, []);
 });
 
+test('S14: the warranty shown is the DEVICE\'s — the unit\'s end first, then a receipt\'s; a printer with no configured base still carries its 12 months', async () => {
+  const raw = seed();
+  // A receipt printed before a correction says less than the device record does.
+  raw.exec(`INSERT INTO warranty_receipts (id, receipt_no, unit_id, order_id, order_item_id, serial_norm, serial_raw, status, warranty_end_at)
+            VALUES ('wr_old','WR-2025-0926-001','unit_combo','ORD-DLV','oi_combo','SN1','SN1','active','2026-09-26T00:00:00.000Z')`);
+  const units = (await json(await get(customerApp(raw), '/api/trade-in/eligible'))).units as Array<{ order_item_id: string; warranty_end_at: string | null }>;
+  assert.equal(units.find((u) => u.order_item_id === 'oi_combo')!.warranty_end_at, '2027-09-26T00:00:00.000Z', 'the unit, not the paper');
+  // No unit at all (a resin printer delivered before units existed): the printer's 12-month default from delivery.
+  raw.exec(`UPDATE catalogs SET is_printer_catalog = 1 WHERE id = 'cat_printers_resin';
+            INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('p_resin','cat_printers_resin',1)`);
+  const resin = ((await json(await get(customerApp(raw), '/api/trade-in/eligible'))).units as Array<{ order_item_id: string; warranty_end_at: string | null }>).find((u) => u.order_item_id === 'oi_resin')!;
+  assert.equal(resin.warranty_end_at, '2026-09-26T00:00:00.000Z');
+});
+
 test('a printer that came as a GIFT is listed with that reason and cannot be traded in — it was never bought', async () => {
   const raw = seed();
   // A P1S ordered at 0 IQD through a gift (0175), delivered with the rest.
@@ -555,8 +569,17 @@ test('the accepted value is credited ONCE, on the target line only, for its owne
   assert.equal((await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/complete`))).code, 'TRADE_IN_NO_ORDER');
   const placed2 = await post(a, '/api/orders', await checkoutBody({ couponCode: re.coupon_code }));
   assert.equal(placed2.status, 200, await placed2.clone().text());
+  raw.exec(`INSERT INTO device_registrations (unit_id, user_id) VALUES ('unit_combo','cust')`);
   const done = await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/complete`));
   assert.equal(done.request.status, 'completed');
+  // Owner decision 3 (row 193): this was the AMS alone — the printer stays
+  // with Sara: still linked, its warranty untouched, no custody written.
+  assert.equal(row<{ revoked_at: string | null }>(raw, "SELECT revoked_at FROM device_registrations WHERE unit_id = 'unit_combo'")!.revoked_at, null);
+  assert.deepEqual(
+    row(raw, "SELECT warranty_closed_at, warranty_end_at FROM order_item_units WHERE id = 'unit_combo'"),
+    { warranty_closed_at: null, warranty_end_at: '2027-09-26T00:00:00.000Z' }
+  );
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'serial.traded_in'"), 0);
   // Completed keeps its claim for ever: the AMS of this unit is traded.
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM trade_in_claims WHERE request_id = ?', id), 1);
   // Every step the customer was told about, the bell can say in Sorani too.

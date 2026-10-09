@@ -85,9 +85,11 @@ import { catalogIndexFor, productTypeOf, type CatalogIndex } from './catalogPres
 import { parseProductRow } from './productModel';
 import { resolveUnitPrice } from './pricing';
 import { applyRelations, capacityFrom, loadRelationsView, snapshotFrom } from './productOverlay';
-import { isPrinterProduct } from './printerIdentity';
+import { isPrinterProduct, printerProductIds } from './printerIdentity';
 import { parseOpsPolicy } from './deviceOps';
 import { addMonths } from './membershipOps';
+import { effectiveBaseMonths } from './warrantyPlans';
+import { serialAssignmentsInstalled } from './serialPolicy';
 import { benefitFallbackFor, pricingCtxForUser, quoteOptionValueIds, saleAvailability } from '../routes/products';
 import {
   DEFAULT_RULE_SETS,
@@ -536,6 +538,9 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
       .all<OptionValueRow>(),
     loadRuleBook(db),
   ]);
+  // S14: a printer with no configured base still carries the 12-month default
+  // (the same answer delivery wrote on its unit).
+  const printers = await printerProductIds(db, lines.map((l) => l.product_id));
   const returnSet = new Set((returns.results ?? []).map((r) => r.order_item_id));
   const valuesByProduct = new Map<string, OptionValueRow[]>();
   for (const v of values.results ?? []) {
@@ -565,7 +570,7 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
           referenceIqd: rules.ams.ams_reference_iqd,
         })
       : { method: 'none' as const, share_bp: null, ams_base_iqd: 0 };
-    const opsMonths = parseOpsPolicy(line.ops_policy).base_months;
+    const opsMonths = effectiveBaseMonths(parseOpsPolicy(line.ops_policy).base_months, printers.has(line.product_id));
     const qty = Math.min(Math.max(1, Number(line.qty) || 1), MAX_UNITS_PER_LINE);
     for (let unitIndex = 1; unitIndex <= qty; unitIndex++) {
       const unit = (units.results ?? []).find((u) => u.order_item_id === line.item_id && u.unit_index === unitIndex) ?? null;
@@ -573,9 +578,12 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
         (receipts.results ?? []).find((r) => r.order_item_id === line.item_id && unit && r.unit_id === unit.id) ??
         (qty === 1 ? (receipts.results ?? []).find((r) => r.order_item_id === line.item_id) : undefined);
       const deliveredAt = unit?.delivered_at || line.order_delivered_at || null;
+      // S14 (owner decision 3): the DEVICE record owns the warranty — the
+      // unit's end first (a resold device carries its original end there),
+      // then the receipt's paper, then the configured base from delivery.
       const warrantyEnd =
-        receipt?.warranty_end_at ||
         unit?.warranty_end_at ||
+        receipt?.warranty_end_at ||
         (deliveredAt && opsMonths ? addMonths(deliveredAt, opsMonths) : null);
       const unitClaims = (claims.results ?? []).filter((c) => c.order_item_id === line.item_id && c.unit_index === unitIndex);
       const claimedParts = new Set(unitClaims.map((c) => c.part));
@@ -1635,6 +1643,60 @@ export async function checkoutCredit(env: Env, req: RequestRow): Promise<{ code:
   return { code, order_id: null };
 }
 
+/**
+ * THE DEVICE LEAVES THE TRADER, ITS WARRANTY DOES NOT (owner decision 3,
+ * 2026-10-09; DECISIONS row 193). For a `whole` or `printer_only` trade-in the
+ * completion batch, behind the request's own fence:
+ *   - revokes the unit's live account link (the trader no longer holds it);
+ *   - releases its activated serial binding as `traded_in`
+ *     (`trade_in:<request id>`), so the serial is the shop's to sell again;
+ *   - records `serial.traded_in` with the unit's dates.
+ * It NEVER touches `warranty_closed_at`, the warranty dates or the receipt:
+ * the warranty stays with the serial and runs from the original delivery.
+ * The traded-in state itself is derived from this request's `completed`
+ * status (worker/lib/deviceCustody.ts) — nothing else marks the unit.
+ * An `ams_only` trade-in leaves the device with the customer: nothing moves.
+ */
+async function custodyStatements(env: Env, req: RequestRow, adminId: string, now: string): Promise<D1PreparedStatement[]> {
+  if (req.scope === 'ams_only') return [];
+  const db = env.DB;
+  const unit = await db
+    .prepare(
+      `SELECT u.id, u.warranty_start_at, u.warranty_end_at, d.serial_norm
+         FROM order_item_units u LEFT JOIN device_serials d ON d.unit_id = u.id
+        WHERE u.order_item_id = ? AND u.unit_index = ?`
+    )
+    .bind(req.order_item_id, req.unit_index)
+    .first<{ id: string; warranty_start_at: string | null; warranty_end_at: string | null; serial_norm: string | null }>();
+  if (!unit) return [];
+  const stmts: D1PreparedStatement[] = [
+    db.prepare('UPDATE device_registrations SET revoked_at = ? WHERE unit_id = ? AND revoked_at IS NULL').bind(now, unit.id),
+  ];
+  if (await serialAssignmentsInstalled(db)) {
+    stmts.push(
+      db
+        .prepare(
+          `UPDATE serial_assignments SET released_at = ?1, released_by = ?2, release_reason = 'traded_in', release_note = ?3
+            WHERE unit_id = ?4 AND released_at IS NULL AND activated_at IS NOT NULL`
+        )
+        .bind(now, adminId, `trade_in:${req.id}`, unit.id)
+    );
+  }
+  stmts.push(
+    ...(
+      await auditStatements(db, adminId, 'serial.traded_in', unit.serial_norm || unit.id, {
+        request_id: req.id,
+        unit_id: unit.id,
+        scope: req.scope,
+        start_at: unit.warranty_start_at,
+        end_at: unit.warranty_end_at,
+        traded_in_at: now,
+      })
+    ).statements
+  );
+  return stmts;
+}
+
 export async function completeRequest(env: Env, req: RequestRow, adminId: string): Promise<RequestRow> {
   const db = env.DB;
   if (!canTransition(req.status, 'completed')) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
@@ -1644,6 +1706,7 @@ export async function completeRequest(env: Env, req: RequestRow, adminId: string
   if ((req.credit_iqd ?? 0) > 0 && !live) throw refuse('TRADE_IN_NO_ORDER');
   const now = new Date().toISOString();
   const token = randomToken(12);
+  const custody = await custodyStatements(env, req, adminId, now);
   try {
     await db.batch([
       db
@@ -1663,6 +1726,8 @@ export async function completeRequest(env: Env, req: RequestRow, adminId: string
         eventKey: `trade_in:${req.id}:completed`,
       }).stmt,
       ...(await auditStatements(db, adminId, 'trade_in.complete', req.id, { order_id: live?.order_id ?? null })).statements,
+      // After the fence: a completion that lost its race moves no device.
+      ...custody,
     ]);
   } catch (e) {
     if (isAbort(e)) throw refuse('TRADE_IN_STALE');

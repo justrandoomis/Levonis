@@ -55,6 +55,7 @@ test('H4 a resold device keeps its ORIGINAL end through a later delivery-date co
   const after = unitOf(w, 'ORD-222');
   assert.equal(after.delivered_at, earlier);
   assert.equal(after.warranty_end_at, u1.warranty_end_at, 'never a full new warranty from a date correction');
+  assert.equal(after.warranty_start_at, u1.warranty_start_at, 'S9: the carried START stays too — the warranty runs from the first delivery');
   const months = await patch(w.as('boss'), `/api/devices/admin/units/${u2.id}/warranty`, { base_months: 24, reason: 'goodwill extension' });
   assert.equal(months.status, 409);
   assert.equal((await json(months)).code, 'CARRIED_END');
@@ -62,26 +63,30 @@ test('H4 a resold device keeps its ORIGINAL end through a later delivery-date co
 
 // ------------------------------------------------------------------ M15
 
-test('M15 a purchased plan on the resale line does not restart the warranty silently: RESTART_SUGGESTED, carry kept, the owner decides', async () => {
+test('M15 / owner decision 3 a purchased plan on the resale line never restarts the warranty: no warning, carry, restart refused for everyone, the plan\'s months added to the ORIGINAL end', async () => {
   const w = world();
   const u1 = await soldAndReturned(w);
   order(w.raw, 'ORD-333', [{ id: 'l3', product: 'pA1' }]);
   w.raw.exec(`UPDATE order_items SET warranty_snapshot = '{"plan_id":"wp_ext12","duration_kind":"extension","duration_months":12,"total_months":24,"base_months":12}' WHERE id = 'l3'`);
   const s = await json(await scan(w, 'ast', 'ORD-333', 'l3', 1, SN));
-  assert.deepEqual(s.warnings, ['RESTART_SUGGESTED']);
-  assert.equal(s.slot.assignment.warranty.mode, 'carry', 'staff never restart a warranty');
+  assert.deepEqual(s.warnings, [], 'nothing to suggest: the warranty is never restarted');
+  assert.equal(s.slot.assignment.warranty.mode, 'carry');
   assert.equal(s.slot.assignment.warranty.carries_until, u1.warranty_end_at);
-  // The owner's decision, with a reason, audited.
-  const noReason = await json(await post(w.as('boss'), `/api/devices/admin/serial-inventory/${SN}/warranty-mode`, { mode: 'restart', reason: 'ok' }));
-  assert.equal(noReason.code, 'OVERRIDE_REASON_REQUIRED');
-  const set = await json(await post(w.as('boss'), `/api/devices/admin/serial-inventory/${SN}/warranty-mode`, { mode: 'restart', reason: 'the buyer paid for the 24-month plan' }));
-  assert.equal(set.mode, 'restart');
-  const audit = JSON.parse(row<{ detail: string }>(w.raw, "SELECT detail FROM audit_log WHERE action = 'serial.warranty_mode' AND target = ?", SN)!.detail);
-  assert.deepEqual({ from: audit.from, to: audit.to }, { from: 'carry', to: 'restart' });
+  // Not even the owner restarts it (row 193); nothing is written.
+  const restart = await post(w.as('boss'), `/api/devices/admin/serial-inventory/${SN}/warranty-mode`, { mode: 'restart', reason: 'the buyer paid for the 24-month plan' });
+  assert.equal(restart.status, 409);
+  assert.equal((await json(restart)).code, 'WARRANTY_RESTART_RETIRED');
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'serial.warranty_mode'"), 0);
   await deliver(w, 'ORD-333');
   const u3 = unitOf(w, 'ORD-333');
-  assert.equal(u3.warranty_end_at, addMonths(String(u3.delivered_at), 24), 'the purchased plan, from this delivery');
-  assert.notEqual(JSON.parse(String(u3.policy_version)).carried, 'original_end');
+  assert.equal(u3.warranty_start_at, u1.warranty_start_at, 'the original start');
+  assert.equal(u3.warranty_end_at, addMonths(String(u1.warranty_end_at), 12), 'the purchased months, added to the ORIGINAL end');
+  assert.equal(u3.warranty_base_months, u1.warranty_base_months);
+  assert.equal(Number(u3.warranty_ext_months), Number(u1.warranty_ext_months) + 12);
+  const pv = JSON.parse(String(u3.policy_version));
+  assert.equal(pv.carried, 'original_end');
+  assert.equal(pv.origin_unit_id, u1.id);
+  assert.equal(pv.origin_start_at, u1.warranty_start_at);
 });
 
 // ------------------------------------------------------------------ M2 / critique-1 #4, #5

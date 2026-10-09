@@ -482,6 +482,9 @@ export function warrantyMonthsLeft(endIso: string | null, nowIso: string): numbe
   return Math.ceil((end - now) / DAY_MS / MONTH_DAYS);
 }
 
+/** Display-only time left (months, then days) — its own module so the warranty screens need not load this one. */
+export { warrantyTimeLeft } from './warrantyTime';
+
 // ============================================================ photos
 
 export interface PhotoAngle {

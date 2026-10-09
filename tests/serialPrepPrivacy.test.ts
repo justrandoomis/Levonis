@@ -175,8 +175,12 @@ test('owner default 6: the serial policy, the gate switch and a resale\'s warran
   const audit = JSON.parse(row<{ detail: string }>(w.raw, "SELECT detail FROM audit_log WHERE action = 'catalog.serial_policy' AND target = 'ct_ams'")!.detail);
   assert.deepEqual(audit, { from: 'inherit', to: 'required' });
   assert.equal((await put(w.as('boss'), '/api/admin/taxonomy/catalogs/ct_ams/serial-policy', { policy: 'sometimes' })).status, 400);
-  // The warranty mode needs a resale to act on.
-  const notResale = await json(await post(w.as('boss'), `/api/devices/admin/serial-inventory/${SN}/warranty-mode`, { mode: 'restart', reason: 'goodwill for the buyer' }));
+  // Owner decision 3 (row 193): nobody restarts a warranty, the owner included —
+  // and the mode that is left (`carry`) needs a resale to act on.
+  const restart = await post(w.as('boss'), `/api/devices/admin/serial-inventory/${SN}/warranty-mode`, { mode: 'restart', reason: 'goodwill for the buyer' });
+  assert.equal(restart.status, 409);
+  assert.equal((await json(restart)).code, 'WARRANTY_RESTART_RETIRED');
+  const notResale = await json(await post(w.as('boss'), `/api/devices/admin/serial-inventory/${SN}/warranty-mode`, { mode: 'carry', reason: 'goodwill for the buyer' }));
   assert.equal(notResale.code, 'SERIAL_ASSIGNMENT_NOT_FOUND');
 });
 

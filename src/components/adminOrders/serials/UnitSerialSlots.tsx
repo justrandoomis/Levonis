@@ -608,8 +608,6 @@ function SlotRow({
               {a.warranty.state === 'PENDING_DELIVERY' &&
                 (a.warranty.mode === 'carry' && a.warranty.carries_until ? (
                   <Chip tone="warn">{s.returnedCarry(shortDate(a.warranty.carries_until, lang))}</Chip>
-                ) : a.warranty.mode === 'restart' ? (
-                  <Chip tone="warn">{s.returnedRestart}</Chip>
                 ) : (
                   <Chip>{s.warrantyAtDelivery}</Chip>
                 ))}

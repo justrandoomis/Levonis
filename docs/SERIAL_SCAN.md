@@ -38,14 +38,14 @@ applied. Code: `worker/lib/serialAssignments.ts` (the rules),
 | `POST /api/admin/orders/:id/serials/scan` | admin with the `receive` capability (`requireSerialWrite`; refused as `SERIAL_WRITE_NOT_ALLOWED`, translated on every serial screen) | `{order_item_id, unit_index, part?, code, ean?, box_sn?, source, op_id}` → `outcome: created · existing · already`. «أعد ربطه» sends `previous_assignment_id` (a released binding of this order and unit) instead of `code`, so the screen re-links a free device without sending its serial. |
 | `POST /api/admin/orders/:id/serials/change` | same | `{assignment_id, code, …, op_id}` — the old binding is released in the same batch; a failed new link leaves it intact. A retry with the same `op_id` answers the link it made (`already`), as does the override's. |
 | `POST /api/admin/orders/:id/serials/unlink` | same; owner only outside the window or once a courier shipment exists (reason 5–500) | targets the assignment id, so a replay can never release a newer link. |
-| `POST /api/admin/orders/:id/serials/override` | owner only, reason 5–500 | `kind: take_from_order · delivered_device · unavailable · outside_window · batch · model_family`, optional `warranty_mode: carry · restart`; audited inside the batch. |
+| `POST /api/admin/orders/:id/serials/override` | owner only, reason 5–500 | `kind: take_from_order · delivered_device · unavailable · outside_window · batch · model_family`, optional `warranty_mode: carry` (`restart` → 409 `WARRANTY_RESTART_RETIRED`, owner decision 3); audited inside the batch. |
 | `GET /api/devices/admin/serial-inventory/:serial` | admin | the §16 page: `story` (status, current/previous orders, warranty, lot, full timeline). The whole serial for EVERY admin — the owner, full scope and assistants (owner decision 1, 2026-10-09; DECISIONS row 192), in the `row`, the story and every serial a history line names. Order ids for the owner and full-scope admins only (`orderRefs` = `canMoveMoney`, option A) — in the `row` too and at any depth of a history row. The serial-masking half of `maskedDetail` stays in the code as defence in depth and is shown to no admin today. What the viewer sees is decided by the viewer alone (and, before 0178, HEAD's row); a story that fails to read answers 503 `SERIAL_STORY_UNAVAILABLE`, never an unfiltered page. Answers devices known only to `device_serials` too. |
 | `GET /api/devices/admin/units/:unitId/history`, `GET /api/admin/warranties/:id` | admin | the unit's and the receipt's audit trail, filtered exactly as the serial page filters its history (`maskedDetail`, viewer by `serialActor`): every admin reads the serials whole (decision 1); an assistant gets no order numbers. |
 | `POST /api/devices/admin/serial-inventory/commit`, `/scan`, `/link-ean` | admin with the `receive` capability (`requireSerialWrite`, decision 1) | the inventory's intake doors: adding a serial follows `receive` like the preparation scan (the owner always passes, a missing row allows, `allowed = 0` refuses). `/preview`, `PATCH /:serial`, `/:serial/void` and `/:serial/restore` keep their own gates. |
 | `POST /api/devices/admin/units/:unitId/serial` | admin with the `receive` capability (decision 1); owner to take a serial off an open warranty, in EITHER direction (the serial's old unit, or this unit's own serial) | a delivered order's open unit only (`ORDER_NOT_PREPARABLE` / `UNIT_NOT_OPEN`), the one canonicaliser, no live preparation binding elsewhere — re-checked inside the batch. |
 | `POST /api/devices/admin/units/:unitId/replace` | admin; with `new_serial`, admin with the `receive` capability (`requireSerialWrite`, decision 1 — naming a new serial adds it: its asset row and an activated binding) | the replacement serial's bindings are re-checked inside the batch. A replacement with no new serial keeps the gate it always had. |
 | `POST /api/admin/stock-operations/serial-link` | `receive` | a serial with a live binding takes only a lot that binding's line was allocated (`SERIAL_BATCH_MISMATCH`); a pending binding takes it as its verified lot in the same batch (an inferred lot on that lot trades places; a lot full of verified serials refuses). |
-| `POST /api/devices/admin/serial-inventory/:serial/warranty-mode` | owner | `carry` (original end, default) or `restart` for a resold returned device, while its new binding is not delivered. |
+| `POST /api/devices/admin/serial-inventory/:serial/warranty-mode` | owner | `carry` only (puts back a binding saved as `restart` before owner decision 3); `restart` → 409 `WARRANTY_RESTART_RETIRED`. Activation carries a legacy `restart` binding anyway. |
 | `PUT /api/admin/taxonomy/catalogs/:id/serial-policy` | owner | `inherit · required · off`. |
 | `PUT /api/admin/settings/serialPrepGate` | owner | `{enabled, since}`; switching on without `since` stamps now. |
 | `PATCH /api/admin/orders/:id/stage`, `PATCH /api/admin/orders/:id`, `POST /api/admin/orders/:id/delivery` | as before | the §19 gate; optional `serials_override_reason` (owner). |
@@ -87,9 +87,17 @@ or not at all (the old serial A0 detaches is audited and rolls back with a
 binding that could not be made), after the units committed,
 so nothing new can cost a customer their warranty units. It moves
 `device_serials` to the new unit (only off a closed / replaced unit or the unit
-an owner override named), marks the assignment activated only if the pointer
-really moved, and then: carry (`carried:'original_end'` + `resale_of`),
-closes an overridden prior unit (receipt voided, registration revoked),
+an owner override named, or a TRADED-IN unit — owner decision 3), marks the
+assignment activated only if the pointer really moved, and then: carry — the
+previous unit's start and end (plus a paid extension the new line bought),
+base and ext, `carried:'original_end'` + `resale_of` + `origin_unit_id` /
+`origin_start_at`, and the used-sale cover of a condition listing kept apart
+(`used_sale`) — written by `carriedWindow` (worker/lib/deviceCustody.ts), which
+`createUnitsOnDelivery` already used to give the unit that window at birth
+(S8: no reset window between the two batches); a traded-in or returned prior
+unit is NOT closed, its live receipt becomes `replaced` (`resold`) and any
+link left on it is revoked; an owner override of any other open unit closes it
+(receipt voided, registration revoked),
 re-opens a unit closed by an undone-delivery cancel, writes the serial-verified
 lot to `order_item_units.inventory_lot_id`, and audits
 `serial.warranty_activated`. A slot whose line is no longer serialized releases
@@ -252,14 +260,14 @@ preparation slots and the board.
 1. A Combo carries ONE serial — the box Product SN. `part='ams'` / `part_index` exist in the schema; the routes refuse them until the owner decides.
 2. AMS: no name inference. The owner sets `required` on the section holding AMS products.
 3. Every admin — the owner (INITIAL_ADMIN_EMAIL), full-scope (or legacy NULL-scope) admins and assistants (the preparer, support) — sees the full serial (owner decision 1, 2026-10-09; DECISIONS row 192): `canSeeFullSerial` in worker/lib/adminScope.ts (`serialActor.fullSerial`). A serial is no cost, so the owner-only cost predicates never decide it. Order numbers on the serial page and in serial histories stay with `canMoveMoney` (`serialActor.orderRefs`; option A). Adding, changing or removing a serial follows the `receive` capability on every door that writes one — the preparation scan, change and unlink, the inventory's commit, scan and link-EAN, the post-delivery assign, and a warranty replacement that names a new serial (`requireSerialWrite`, worker/lib/operations.ts) — refused as `SERIAL_WRITE_NOT_ALLOWED`, which every serial screen renders in ar / en / ckb; sensitive edits and exceptions keep their gates and their audit. Customers and visitors see the masked serial as before.
-4. Resale of a returned device carries the original warranty end; `restart` only by the owner (a purchased plan on the new line raises `RESTART_SUGGESTED`, never a silent restart).
+4. Resale carries the original start and end; there is no restart (owner decision 3, 2026-10-09; DECISIONS row 193). A returned or traded-in device sold again keeps the SAME warranty — start, end, base and ext — with its origin named; a paid extension the new line buys is added to the original end; a used listing's own months are a separate `used_sale` cover (a claim is accepted while either runs). `restart` is refused everywhere (409 `WARRANTY_RESTART_RETIRED`), the owner included.
 5. The preparation gate ships OFF; the owner switches it on with a cutover date.
 6. Serial-policy writes are owner-only.
 
 **Who "the owner" is (S1, DECISIONS row 185).** Every owner-only serial act —
 the exceptions (`/serials/override`, unlink outside the window), the serial
 policy (`PUT /api/admin/taxonomy/catalogs/:id/serial-policy`, product and
-import `serialized`), the §19 gate setting, warranty restart — uses S1's rule
+import `serialized`), the §19 gate setting, the resale warranty mode (`carry` only since decision 3) — uses S1's rule
 for owner-only acts that carry no cost: `isOwner` on an admin row
 (`requireOwner`, `userPatchRefusal`), not the verified-owner rule of cost
 (`canViewCost`). No serial answer carries a cost, a lot cost or a margin
@@ -324,7 +332,7 @@ both policy controls.
 - The inventory's bulk add now refuses a product barcode of any length and a box-SN-shaped value in the serial column (the same reading as the scan). A non-Bambu device whose real serial looks like a Bambu box SN (`B` + 4 digits + a letter …) can no longer be filed — say so if the shop sells such brands. The post-delivery and replacement doors read through the same canonicaliser (no `/ . _`, 6 characters at least).
 - The inventory panel has no Sorani table (pre-existing: Sorani readers get its Arabic). Its two new bulk problems (a product barcode, a box SN in the serial column) carry their own Sorani (`PROBLEMS_CKB` / `problemText` in `src/components/adminWarranty/serialInventory/model.ts`).
 
-- Trade-in completion does not close the traded unit yet (`traded_in` is in the CHECK list): reselling a traded-in device needs the owner's `delivered_device` override.
+- ANSWERED (owner decision 3, 2026-10-09; DECISIONS row 193): a trade-in does NOT close the unit — `warranty_closed_reason = 'traded_in'` is never written (the value stays in the CHECK list, unused). The traded-in state is DERIVED from `trade_in_requests` (status `completed`, scope not `ams_only`; `tradedInSql` in worker/lib/deviceCustody.ts), so trade-ins completed before the decision count too. Completion (whole / printer_only) revokes the trader's link and releases the activated binding as `traded_in` (`trade_in:<id>`), with `serial.traded_in` history, in the request's own fenced batch; the warranty dates, closure and receipt are never touched. Every customer door then treats the unit as the shop's (`/mine`, `/eligible`, `/register` by serial or receipt — the one non-enumerating answer, the trader included —, `/units/:id/register` and claims → 409 `DEVICE_NOT_WITH_CUSTOMER`, the support card); the inventory reads it `returned`; staff resell it without an exception (`classifyLink`), on the new product's listing or a condition listing of it (`condition_doc.new_product_id`, S12). `printer_only` is treated like `whole` (the serial is the printer's). The serial check at trade-in (plan S13) is NOT built: it would add a mandatory staff step the owner did not ask for.
 - Phase 2 (with the inventory programme): the owner batch re-pin that moves the accounting allocation; until then the owner's `batch` exception records the mismatch without re-pinning.
 - Open `warranty_claims` on a returned unit are left to the claims workflow.
 - Re-open does not take stock again (pre-existing, DECISIONS 184(15)); the slot shows `STOCK_NOT_RETAKEN`.
@@ -358,6 +366,23 @@ SELECT c.id, c.name_ar, c.serial_policy, COUNT(DISTINCT p.id) AS products
  GROUP BY c.id ORDER BY c.serial_policy, c.name_ar;
 -- owner decision 1: admins whose «الاستلام» is off — each is refused every serial write door
 SELECT user_id FROM ops_permissions WHERE capability = 'receive' AND allowed = 0;
+-- owner decision 3 census (run BEFORE the push too; nothing is changed by it — a real
+-- reset window found here is a per-unit audited correction the owner decides, never a bulk update):
+-- C1 completed trade-ins whose device is still linked to an account (every door now refuses them anyway)
+SELECT t.id, t.scope, t.completed_at, u.id AS unit_id, r.user_id
+  FROM trade_in_requests t
+  JOIN order_item_units u ON u.order_item_id = t.order_item_id AND u.unit_index = t.unit_index
+  JOIN device_registrations r ON r.unit_id = u.id AND r.revoked_at IS NULL
+ WHERE t.status = 'completed' AND t.scope <> 'ams_only';
+-- C2 resales whose window moved (a carried unit whose start is not its previous unit's start)
+SELECT u.id, u.warranty_start_at, pu.warranty_start_at AS original_start, u.warranty_end_at, pu.warranty_end_at AS original_end
+  FROM order_item_units u JOIN order_item_units pu ON pu.id = json_extract(u.policy_version, '$.resale_of')
+ WHERE json_valid(u.policy_version) AND json_extract(u.policy_version, '$.carried') = 'original_end'
+   AND (u.warranty_start_at IS NOT pu.warranty_start_at OR u.warranty_end_at < pu.warranty_end_at);
+-- C3 any binding ever saved as `restart` (activated = a warranty that was restarted)
+SELECT id, serial_norm, order_id, activated_at FROM serial_assignments WHERE warranty_mode = 'restart';
+-- printer_only trade-ins (treated like `whole`; raise with the owner if any)
+SELECT COUNT(*) FROM trade_in_requests WHERE status = 'completed' AND scope = 'printer_only';
 ```
 
 ## Tests
@@ -367,6 +392,7 @@ Every case runs the real routes over the real migrations (`tests/fixtures/serial
 | File | What it proves |
 |---|---|
 | `serialPrepScan` | §32.1, 2, 4, 5, 6/7, 13, 14, 15, 16, 17, 19; the window and its SQL twin; the hardened doors; old-form keys (M7) |
+| `tradeInWarrantyContinuity` | owner decision 3: the trade-in leaves the warranty open (11 months / 335 days on day 30), revokes the link, releases the binding `traded_in`, one fenced batch; every customer door refuses the traded-in device; AMS-only leaves it; resale on a used listing without an exception carries start, end, base, ext and origin, replaces the old receipt, keeps `used_sale` apart (a claim accepted while either runs), a second resale keeps the origin; +12 bought → original end + 12; restart refused; S8 no reset window; S9; completion `op` for every admin |
 | `serialPrepBrief` | the brief's twenty tests as one map (a §32 item with no test fails the suite); §32.3 through the gate to three warranty units, §32.6 with the stock return, §32.9 receipt-only, §32.11 camera pixels → route, §32.12 USB / Bluetooth reader on an Arabic layout, §32.13 typing, §32.14 after delivery, §32.17 the lot, §32.20 the whole timeline with actors and the §25 keys |
 | `serialReturnWarranty` | §32.8 activation, H3, §32.9 delivered devices, §32.10 return, quarantine, M6, L3, M5 |
 | `serialPrepCanonical` | H1: one canonicaliser for the four sources and the change / override / post-delivery / replacement doors; one asset for every written form; box ↔ serial collisions, inside the batch too; L10, L16 |

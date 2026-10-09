@@ -82,6 +82,18 @@ export interface WarrantyStrings {
    *  nothing summed in the browser. */
   extendedBadge: string;
   coverageSplit: (base: string, ext: string) => string;
+  /** Owner decision 3 (2026-10-09): a resold device's warranty runs from its FIRST delivery, never from zero. */
+  continuesFrom: (date: string) => string;
+  /** The used-sale cover of a resale on a used listing — shown apart from the original warranty. */
+  usedSale: (months: string, end: string) => string;
+  /** What is left of the warranty, in calendar months and then days. */
+  left: (months: string, days: string) => string;
+  /** The device's custody, dates only: first delivery, trade-in or return, resale. */
+  historyTitle: string;
+  hFirst: string;
+  hTradedIn: string;
+  hReturned: string;
+  hResold: string;
   transferredBadge: string;
   replacedBadge: string;
   openClaimsBadge: (n: number, formatted: string) => string;
@@ -215,6 +227,14 @@ const ar: WarrantyStrings = {
   },
   extendedBadge: 'ضمان ممدد',
   coverageSplit: (base, ext) => `${base} ضمان أساسي + ${ext} تمديد مدفوع`,
+  continuesFrom: (d) => `يستمر من أول تسليم في ${d}`,
+  usedSale: (m, e) => `تغطية بيع المستعمل: ${m} شهر حتى ${e}`,
+  left: (m, d) => `المتبقي: ${m} شهر و${d} يوم`,
+  historyTitle: 'سجلّ الجهاز',
+  hFirst: 'أول تسليم',
+  hTradedIn: 'استُبدل لدى Levonis',
+  hReturned: 'أُعيد إلى Levonis',
+  hResold: 'أُعيد بيعه',
   transferredBadge: 'منقولة إليك',
   replacedBadge: 'مُستبدَل',
   openClaimsBadge: (n, f) => (n === 1 ? 'مطالبة مفتوحة' : n === 2 ? 'مطالبتان مفتوحتان' : `${f} مطالبات مفتوحة`),
@@ -349,6 +369,14 @@ const en: WarrantyStrings = {
   daysLeft: (n, f) => (n === 1 ? '1 day left' : `${f} days left`),
   extendedBadge: 'Extended warranty',
   coverageSplit: (base, ext) => `${base} base warranty + ${ext} purchased extension`,
+  continuesFrom: (d) => `Continues from the first delivery on ${d}`,
+  usedSale: (m, e) => `Used-sale cover: ${m} month(s) until ${e}`,
+  left: (m, d) => `${m} months ${d} days left`,
+  historyTitle: 'Device history',
+  hFirst: 'First delivered',
+  hTradedIn: 'Traded in to Levonis',
+  hReturned: 'Returned to Levonis',
+  hResold: 'Resold',
   transferredBadge: 'Transferred to you',
   replacedBadge: 'Replaced',
   openClaimsBadge: (n, f) => (n === 1 ? '1 open claim' : `${f} open claims`),
@@ -480,6 +508,14 @@ const ckb: WarrantyStrings = {
   daysLeft: (_n, f) => `${f} ڕۆژ ماوە`,
   extendedBadge: 'گەرەنتی درێژکراوە',
   coverageSplit: (base, ext) => `${base} گەرەنتی بنەڕەتی + ${ext} درێژکردنەوەی کڕدراو`,
+  continuesFrom: (d) => `لە یەکەم گەیاندنەوە لە ${d} بەردەوامە`,
+  usedSale: (m, e) => `پاراستنی فرۆشتنی بەکارهاتوو: ${m} مانگ تا ${e}`,
+  left: (m, d) => `ماوە: ${m} مانگ و ${d} ڕۆژ`,
+  historyTitle: 'مێژووی ئامێر',
+  hFirst: 'یەکەم گەیاندن',
+  hTradedIn: 'لای Levonis گۆڕدرایەوە',
+  hReturned: 'گەڕێنرایەوە بۆ Levonis',
+  hResold: 'دووبارە فرۆشرایەوە',
   transferredBadge: 'بۆ تۆ گوازراوەتەوە',
   replacedBadge: 'گۆڕدراوەتەوە',
   openClaimsBadge: (_n, f) => `${f} داواکاری کراوە`,

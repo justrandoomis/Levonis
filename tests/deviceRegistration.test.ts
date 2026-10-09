@@ -163,6 +163,26 @@ test('"from my previous orders": only delivered, unlinked, unreplaced units of t
   assert.equal((await post(b, '/api/devices/units/u2/register', {})).status, 400, 'not delivered yet');
 });
 
+test('a device that came back — returned (its unit closed) or traded in — cannot be re-linked by its buyer through «من طلباتي» (owner decision 3)', async () => {
+  const { raw, db } = setup();
+  const b = appAs(db, buyer);
+  // Returned: the return closed the unit and revoked the link (0178).
+  raw.exec(`UPDATE order_item_units SET warranty_closed_at = ${NOW}, warranty_closed_reason = 'returned' WHERE id = 'u1'`);
+  const returned = await post(b, '/api/devices/units/u1/register', {});
+  assert.equal(returned.status, 409);
+  assert.equal((await json(returned)).code, 'DEVICE_NOT_WITH_CUSTOMER');
+  assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM device_registrations WHERE unit_id = 'u1'").get()!.n, 0, 'nothing was linked');
+  // Traded in: the unit stays open (its warranty goes on with the device) but it is not the buyer's.
+  raw.exec(`UPDATE order_item_units SET warranty_closed_at = NULL, warranty_closed_reason = NULL WHERE id = 'u1';
+            INSERT INTO trade_in_requests (id, user_id, status, order_id, order_item_id, unit_index, family, scope, created_at, updated_at, completed_at)
+              VALUES ('tin_00000000000000000abc','buyer','completed','ORD-1','oi1',1,'fdm','whole',${NOW},${NOW},${NOW})`);
+  const traded = await post(b, '/api/devices/units/u1/register', {});
+  assert.equal(traded.status, 409);
+  assert.equal((await json(traded)).code, 'DEVICE_NOT_WITH_CUSTOMER');
+  assert.equal((await json(await b.request('/api/devices/eligible'))).units.length, 0, 'not offered either');
+  assert.equal((await post(b, '/api/devices/register', { serial: 'SN-1234-ABCD' })).status, 404, 'nor by its serial');
+});
+
 test('device and warranty views keep an empty order image after the catalogue gains one', async () => {
   const { db, raw } = setup();
   const b = appAs(db, buyer);

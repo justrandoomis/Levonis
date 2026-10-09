@@ -201,8 +201,9 @@ import { cartShippingType, typeForTransport, SHIPPING_TYPE_LABELS } from '../lib
 import { initOrderStage, orderEndsAtTheDoor, stagePath, stageRowFrom } from '../lib/orderStageOps';
 import { stageLabel, stagesFor, stageForLegacyStatus } from '../lib/orderStages';
 import type { OrderStage } from '../lib/orderStages';
-import { coverageState, maskSerial } from '../lib/deviceOps';
+import { maskSerial } from '../lib/deviceOps';
 import { serialAssignmentsInstalled } from '../lib/serialPolicy';
+import { tradedInSql, unitCoverage, unitIdentity } from '../lib/deviceCustody';
 import type { ShippingType } from '../lib/shippingType';
 import type { PolicyRef } from '../lib/policyOps';
 import { createInvoiceForOrder } from '../lib/invoices';
@@ -5510,6 +5511,9 @@ interface OrderUnitRow extends Record<string, unknown> {
   replaced_by_unit_id: string | null;
   /** 0178: set when the device came back on a return; NULL before the migration. */
   warranty_closed_at: string | null;
+  /** Owner decision 3: when the device was traded in to Levonis (derived), or null. */
+  traded_in_at: string | null;
+  policy_version: string | null;
   serial_raw: string | null;
   reg_user_id: string | null;
   receipt_no: string | null;
@@ -5545,7 +5549,7 @@ orderRoutes.get('/:id/units', async (c) => {
   const closedCol = (await serialAssignmentsInstalled(c.env.DB)) ? 'u.warranty_closed_at' : 'NULL AS warranty_closed_at';
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.order_item_id, u.unit_index, u.product_id, u.delivered_at, u.warranty_start_at,
-            u.warranty_end_at, u.replaced_by_unit_id, ${closedCol},
+            u.warranty_end_at, u.replaced_by_unit_id, ${closedCol}, ${tradedInSql('u')} AS traded_in_at, u.policy_version,
             s.serial_raw, r.user_id AS reg_user_id, wr.receipt_no,
             oi.name_snapshot, oi.image_snapshot,
             p.slug, p.name AS p_name, p.name_ar AS p_name_ar
@@ -5562,7 +5566,8 @@ orderRoutes.get('/:id/units', async (c) => {
     .all<OrderUnitRow>();
 
   const units = results.map((r) => {
-    const cov = coverageState(r.delivered_at, r.warranty_end_at, Date.now(), r.warranty_closed_at ?? null);
+    const cov = unitCoverage(r, Date.now(), r.warranty_closed_at ?? null);
+    const identity = unitIdentity(r.policy_version);
     return {
       unit_id: r.id,
       order_item_id: r.order_item_id,
@@ -5584,6 +5589,11 @@ orderRoutes.get('/:id/units', async (c) => {
         end_at: r.warranty_end_at,
         state: cov.state,
         remaining_days: cov.remaining_days,
+        // Owner decision 3: a resold device's warranty runs from its first
+        // delivery; a used-sale cover is shown apart from it.
+        carried: identity.carried,
+        origin_start_at: identity.origin_start_at,
+        used_sale: identity.used_sale,
       },
       // Relative to the order's OWNER: for the customer that is themselves;
       // for an admin it says whether the buyer linked their own device.
@@ -5594,6 +5604,9 @@ orderRoutes.get('/:id/units', async (c) => {
       replaced: !!r.replaced_by_unit_id,
       // The device came back on a return (0178): nothing to register.
       returned: !!r.warranty_closed_at,
+      // Traded in to Levonis (owner decision 3): nothing to register either;
+      // its warranty stays with the device until `warranty.end_at`.
+      traded_in_at: r.traded_in_at ?? null,
     };
   });
   return c.json({ success: true, order_id: id, units });

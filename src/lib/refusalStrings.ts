@@ -1784,6 +1784,17 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Adding, changing or removing a serial number needs the “Receiving” permission, which is turned off for your account — ask the owner.',
     ckb: 'زیادکردن، گۆڕین یان لابردنی ژمارەی زنجیرەیی پێویستی بە دەسەڵاتی «وەرگرتن» هەیە، کە بۆ هەژمارەکەت ڕاگیراوە — لە خاوەنی فرۆشگا داوای بکە.',
   },
+  // ---- Trade-in keeps the original warranty (owner decision 3, 2026-10-09) --
+  DEVICE_NOT_WITH_CUSTOMER: {
+    ar: 'هذا الجهاز عاد إلى Levonis (باسترجاع أو استبدال)، فلا يمكن ربطه بهذا الحساب أو المطالبة عليه منه.',
+    en: 'This device came back to Levonis (a return or a trade-in), so it cannot be linked to this account or claimed from it.',
+    ckb: 'ئەم ئامێرە گەڕاوەتەوە بۆ Levonis (بە گەڕاندنەوە یان گۆڕینەوە)، بۆیە ناتوانرێت بەم هەژمارەوە ببەسترێتەوە یان لێیەوە داوای لەسەر بکرێت.',
+  },
+  WARRANTY_RESTART_RETIRED: {
+    ar: 'لا يُعاد بدء الضمان أبدًا: يبقى الضمان الأصلي مع الرقم التسلسلي من تاريخ أول تسليم (قرار المالك).',
+    en: 'A warranty is never restarted: the original warranty stays with the serial from the first delivery date (owner decision).',
+    ckb: 'گەرەنتی هەرگیز لە سەرەتاوە دەست پێناکاتەوە: گەرەنتییە ڕەسەنەکە لەگەڵ ژمارە زنجیرەییەکە لە ڕێکەوتی یەکەم گەیاندنەوە دەمێنێتەوە (بڕیاری خاوەن).',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

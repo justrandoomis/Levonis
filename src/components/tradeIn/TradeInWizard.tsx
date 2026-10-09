@@ -44,6 +44,7 @@ import {
   checklistOf,
   familyCountsHours,
   missingPhotoAngles,
+  warrantyTimeLeft,
 } from '../../../packages/pricing/src/tradeIn';
 import {
   type ComponentInputs,
@@ -423,7 +424,14 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
               <FactRow label={L('مدة الاستخدام', 'In use for')} value={durationText(facts.usage_days ?? 0, L)} />
               <FactRow
                 label={L('المتبقي من الضمان', 'Warranty left')}
-                value={facts.warranty_remaining_months > 0 ? loc(`${facts.warranty_remaining_months} شهر`, `${facts.warranty_remaining_months} months`) : L('منتهٍ', 'Expired')}
+                value={(() => {
+                  // Owner decision 3: calendar months and days from the device's own
+                  // end date — «11 شهر و0 يوم», not a rounded-up 12 (display only).
+                  const left = warrantyTimeLeft(source.warranty_end_at, new Date().toISOString());
+                  return left.months > 0 || left.days > 0
+                    ? loc(`${left.months} شهر و${left.days} يوم`, `${left.months} months ${left.days} days`, `${left.months} مانگ و ${left.days} ڕۆژ`)
+                    : L('منتهٍ', 'Expired');
+                })()}
                 strong
               />
             </dl>

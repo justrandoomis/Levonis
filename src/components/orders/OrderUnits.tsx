@@ -6,6 +6,11 @@
  * typed (POST /api/devices/units/:unitId/register). It never touches the
  * coverage dates — the clock started at delivery — so the button promises
  * only the link, and the row shows the link only after the server confirms.
+ *
+ * A device traded in to Levonis (owner decision 3, 2026-10-09) is no longer
+ * the buyer's: no register button, and the row says its warranty stays with
+ * the device until its original end. Refusals read in the reader's language
+ * by code (src/lib/refusalStrings.ts).
  */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -15,6 +20,7 @@ import type { OrderUnitPublic } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import Spinner from '../ui/Spinner';
 import { asLang, daysLeftLabel, formatDate } from './format';
+import { apiRefusal } from '../../lib/refusalStrings';
 
 const STRINGS = {
   ar: {
@@ -26,6 +32,7 @@ const STRINGS = {
     needsConfig: 'مدة الضمان غير مُعدّة — تواصل مع الدعم',
     notDelivered: 'يبدأ الضمان عند التسليم',
     returned: 'أُعيد هذا الجهاز وأُغلق ضمانه',
+    tradedIn: (d: string, end: string) => `استُبدل في ${d} — يبقى ضمانه مع الجهاز حتى ${end}`,
     register: 'تسجيل الضمان',
     registering: 'جارٍ التسجيل…',
     linkedMine: 'مرتبط بحسابك',
@@ -43,6 +50,7 @@ const STRINGS = {
     needsConfig: 'Coverage duration not configured — contact support',
     notDelivered: 'Coverage starts at delivery',
     returned: 'This device was returned and its warranty is closed',
+    tradedIn: (d: string, end: string) => `Traded in on ${d} — its warranty stays with the device until ${end}`,
     register: 'Register warranty',
     registering: 'Registering…',
     linkedMine: 'Linked to your account',
@@ -60,6 +68,7 @@ const STRINGS = {
     needsConfig: 'ماوەی گەرەنتی ڕێکنەخراوە — پەیوەندی بە پشتگیری بکە',
     notDelivered: 'گەرەنتی لە کاتی گەیاندن دەست پێدەکات',
     returned: 'ئەم ئامێرە گەڕێنرایەوە و گەرەنتییەکەی داخرا',
+    tradedIn: (d: string, end: string) => `لە ${d} گۆڕدرایەوە — گەرەنتییەکەی لەگەڵ ئامێرەکە دەمێنێتەوە تا ${end}`,
     register: 'تۆمارکردنی گەرەنتی',
     registering: 'تۆمارکردن…',
     linkedMine: 'بەستراوە بە هەژمارەکەت',
@@ -84,7 +93,7 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
       await api.post(`/api/devices/units/${encodeURIComponent(u.unit_id)}/register`, {});
       onLinked(u.unit_id);
     } catch (e) {
-      setErrors((prev) => ({ ...prev, [u.unit_id]: e instanceof Error && e.message ? e.message : s.failed }));
+      setErrors((prev) => ({ ...prev, [u.unit_id]: apiRefusal(e, asLang(lang), s.failed) }));
     } finally {
       setBusyId(null);
     }
@@ -97,8 +106,9 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
     <ul className="mt-3 flex flex-col gap-2" data-order-units>
       {units.map((u) => {
         const w = u.warranty;
-        const coverage =
-          w.state === 'active'
+        const coverage = u.traded_in_at
+          ? { icon: <ShieldCheck className="w-3.5 h-3.5" aria-hidden />, cls: 'text-zinc-400', text: s.tradedIn(formatDate(u.traded_in_at, lang), formatDate(w.end_at, lang)) }
+          : w.state === 'active'
             ? { icon: <ShieldCheck className="w-3.5 h-3.5" aria-hidden />, cls: 'text-emerald-300', text: `${s.coveredUntil(formatDate(w.end_at, lang))}${w.remaining_days !== null ? ` · ${daysLeftLabel(w.remaining_days, lang)}` : ''}` }
             : w.state === 'expired'
               ? { icon: <ShieldOff className="w-3.5 h-3.5" aria-hidden />, cls: 'text-red-300', text: s.expired(formatDate(w.end_at, lang)) }
@@ -107,8 +117,8 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
                 : w.state === 'closed'
                   ? { icon: <ShieldOff className="w-3.5 h-3.5" aria-hidden />, cls: 'text-zinc-400', text: s.returned }
                   : { icon: <Clock className="w-3.5 h-3.5" aria-hidden />, cls: 'text-zinc-400', text: s.notDelivered };
-        // A returned device (0178) is the shop's again: nothing to register.
-        const canRegister = u.linked === 'none' && !u.replaced && !u.returned && w.state !== 'closed' && !!u.delivered_at;
+        // A returned (0178) or traded-in (owner decision 3) device is the shop's again: nothing to register.
+        const canRegister = u.linked === 'none' && !u.replaced && !u.returned && !u.traded_in_at && w.state !== 'closed' && !!u.delivered_at;
         const err = errors[u.unit_id];
         return (
           <li key={u.unit_id} data-unit-id={u.unit_id} data-unit-linked={u.linked} className="rounded-xl border border-zinc-800 bg-black/30 p-3">
@@ -126,7 +136,7 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
                     <span className="font-normal text-zinc-500"> · {s.noSerial}</span>
                   )}
                 </p>
-                <p className={`mt-0.5 text-[11.5px] inline-flex items-center gap-1.5 ${coverage.cls}`} data-warranty-state={w.state}>
+                <p className={`mt-0.5 text-[11.5px] inline-flex items-center gap-1.5 ${coverage.cls}`} data-warranty-state={u.traded_in_at ? 'traded_in' : w.state}>
                   {coverage.icon}
                   {coverage.text}
                 </p>

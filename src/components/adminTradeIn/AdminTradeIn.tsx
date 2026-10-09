@@ -31,6 +31,7 @@ import { api, ApiError, failureText } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { FAMILY_LABELS, OPTIONAL_PHOTO, REQUIRED_PHOTOS, STATUS_LABELS, TRADE_IN_FAMILIES, checklistOf, tradeInSettlement, type TradeInFamily, type TradeInStatus } from '../../../packages/pricing/src/tradeIn';
 import type { RequestView } from '../tradeIn/model';
+import { warrantyTimeLeft } from '../../../packages/pricing/src/warrantyTime';
 import RulesEditor from './RulesEditor';
 
 interface Row {
@@ -397,7 +398,17 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
                   <Fact k={L('السعر المدفوع', 'Paid')} v={iqd(r.source.paid_iqd)} />
                   <Fact k={L('نهاية الضمان', 'Warranty ends')} v={day(r.source.warranty_end_at, lang)} />
                   <Fact k={L('مدة الاستخدام', 'In use')} v={loc(`${r.estimate?.usage_months ?? 0} شهر`, `${r.estimate?.usage_months ?? 0} months`)} />
-                  <Fact k={L('المتبقي من الضمان', 'Warranty left')} v={loc(`${r.estimate?.warranty_remaining_months ?? 0} شهر`, `${r.estimate?.warranty_remaining_months ?? 0} months`)} />
+                  {(() => {
+                    // Owner decision 3: what is left, in calendar months and days, from the
+                    // device's own end date (the valuation keeps its own rounding — a money rule).
+                    const left = warrantyTimeLeft(r.source.warranty_end_at, new Date().toISOString());
+                    return (
+                      <Fact
+                        k={L('المتبقي من الضمان', 'Warranty left')}
+                        v={loc(`${left.months} شهر و${left.days} يوم`, `${left.months} months ${left.days} days`, `${left.months} مانگ و ${left.days} ڕۆژ`)}
+                      />
+                    );
+                  })()}
                   {r.source.ams_split && r.is_combo ? (
                     <Fact
                       k={L('حصة AMS', 'AMS share')}

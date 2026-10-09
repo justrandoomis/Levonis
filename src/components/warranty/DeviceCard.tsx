@@ -8,7 +8,7 @@ import SafeImage from '../ui/SafeImage';
 import { Anchored } from '../ui/Overlay';
 import { CoverageBar } from './CoverageBar';
 import type { Device } from './types';
-import { productName, fmtInt } from './types';
+import { productName, fmtInt, fmtDate } from './types';
 import type { WarrantyStrings } from './strings';
 import { BTN_SECONDARY, CARD, FOCUS, LINK_QUIET } from './ui';
 
@@ -133,6 +133,25 @@ export function DeviceCard({
       </div>
 
       <CoverageBar warranty={device.warranty} deliveredAt={device.delivered_at} lang={lang} s={s} className="mt-5" />
+
+      {/* THE DEVICE'S CUSTODY (owner decision 3) — dates only, never who:
+          first delivered, traded in or returned to Levonis, resold. Shown
+          once there is more than the one delivery to tell. */}
+      {(device.history?.length ?? 0) > 1 && (
+        <div className="mt-3" data-device-history>
+          <p className="text-[11px] font-bold text-zinc-500">{s.historyTitle}</p>
+          <ol className="mt-1 flex flex-col gap-0.5">
+            {device.history!.map((h, i) => (
+              <li key={`${h.kind}-${i}`} className="flex items-baseline justify-between gap-3 text-[11px] text-zinc-400 tabular-nums" data-history-kind={h.kind}>
+                <span className="truncate">
+                  {h.kind === 'first' ? s.hFirst : h.kind === 'traded_in' ? s.hTradedIn : h.kind === 'returned' ? s.hReturned : s.hResold}
+                </span>
+                <span className="shrink-0 text-zinc-500">{fmtDate(h.at, lang)}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         {!replaced && (

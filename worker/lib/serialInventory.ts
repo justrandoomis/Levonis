@@ -45,6 +45,7 @@ import {
   type ModelHint,
 } from '@levonis/catalog/deviceSerials';
 import { serialAssignmentsInstalled, serializationContext, lineDevicePolicy } from './serialPolicy';
+import { tradedInSql } from './deviceCustody';
 
 /**
  * 0178 adds three derived states: `reserved` (a live, not yet delivered
@@ -71,7 +72,9 @@ export const INSERT_CHUNK = 200;
  * device tables it joins: `si` = serial_inventory, `ds` = device_serials,
  * `r` = device_registrations. Extended by migration 0178 with the serial
  * assignments and the closed-unit states; until that migration has applied it
- * is exactly the original rule (deploy-ahead).
+ * is exactly the original rule (deploy-ahead). A device traded in to Levonis
+ * (owner decision 3, derived — worker/lib/deviceCustody.ts) is back in stock:
+ * `returned`, though its unit is never closed.
  */
 export function serialStatusSql(installed: boolean): string {
   if (!installed) {
@@ -90,6 +93,7 @@ export function serialStatusSql(installed: boolean): string {
                     AND (su.replaced_by_unit_id IS NOT NULL OR su.warranty_closed_reason IN ('returned_unsellable','replaced'))) THEN 'unavailable'
     WHEN EXISTS (SELECT 1 FROM order_item_units su WHERE su.id = ds.unit_id
                     AND su.warranty_closed_reason IN ('returned','traded_in')) THEN 'returned'
+    WHEN EXISTS (SELECT 1 FROM order_item_units su WHERE su.id = ds.unit_id AND ${tradedInSql('su')} IS NOT NULL) THEN 'returned'
     WHEN EXISTS (SELECT 1 FROM order_item_units su WHERE su.id = ds.unit_id AND su.warranty_closed_at IS NOT NULL) THEN 'in_stock'
     WHEN r.user_id IS NOT NULL AND r.revoked_at IS NULL THEN 'registered'
     ELSE 'sold' END`;

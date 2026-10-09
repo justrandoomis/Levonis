@@ -11,6 +11,7 @@
  *   POST /:id/serials/change     { assignment_id, code, ean?, box_sn?, source, op_id }
  *   POST /:id/serials/unlink     { assignment_id, reason? }        (owner only outside the window, with a reason)
  *   POST /:id/serials/override   { order_item_id, unit_index, part?, code, ean?, box_sn?, kind, reason, warranty_mode?, op_id }
+ *                                (warranty_mode: `carry` only — `restart` is 409 WARRANTY_RESTART_RETIRED, owner decision 3)
  *
  * WHO. Any admin may scan, change and unlink while the order is being
  * prepared, unless the owner revoked their `receive` operations capability
@@ -189,6 +190,9 @@ adminOrderSerialRoutes.post('/:id/serials/override', async (c) => {
   if (reason.length < 5 || reason.length > 500) throw refuse(400, 'OVERRIDE_REASON_REQUIRED');
   const kind = oneOf(b.kind, 'kind', OVERRIDE_KINDS) as OverrideKind;
   const mode = b.warranty_mode === undefined || b.warranty_mode === null ? undefined : oneOf(b.warranty_mode, 'warranty_mode', ['carry', 'restart'] as const);
+  // Owner decision 3 (2026-10-09): a resold device carries its original
+  // warranty; nobody restarts one, the owner included.
+  if (mode === 'restart') throw refuse(409, 'WARRANTY_RESTART_RETIRED');
   const orderId = orderIdOf(c);
   const assignmentId = typeof b.assignment_id === 'string' && b.assignment_id ? b.assignment_id : undefined;
   const opId = opOf(b);
@@ -213,7 +217,7 @@ adminOrderSerialRoutes.post('/:id/serials/override', async (c) => {
       source: 'manual',
       opId,
       replaceAssignmentId: assignmentId,
-    override: { kind, reason, ...(mode ? { warrantyMode: mode } : {}) },
+    override: { kind, reason, ...(mode === 'carry' ? { warrantyMode: mode } : {}) },
   });
   return c.json(res);
 });

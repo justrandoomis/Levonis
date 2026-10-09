@@ -518,7 +518,11 @@ test('UX #6/#9/#10/#11/#12/#17: the §31 sentence, names that start with what is
   assert.match(src('src/components/adminOrders/OrderBoardRow.tsx'), /aria-label=\{`\$\{sl\(loc, 'boardChip'\)\}/, '#9 the board chip');
   assert.match(slots, /\$\{HIT_44\}/, '#17 «أعد ربطه» and the exception take a 44 px tap');
   assert.match(src('src/components/adminOrders/OrderDetailModal.tsx'), /before:-inset-y-1\.5/, '#17 the line chip too');
-  assert.match(src('src/components/adminWarranty/serial/SerialDetail.tsx'), /aria-describedby=\{`\$\{reasonId\}-hint`\}/, '#17 the resale reason says why «حفظ» waits');
+  // Owner decision 3 (row 193): a resale always carries its original warranty, so the
+  // serial page no longer offers a choice (and no «حفظ» to wait for) — it says what happens.
+  const detailSrc = src('src/components/adminWarranty/serial/SerialDetail.tsx');
+  assert.doesNotMatch(detailSrc, /id: 'restart'/, '#17 no restart choice is left on the serial page');
+  assert.match(detailSrc, /data-serial-resale[\s\S]*s\.resaleHint[\s\S]*s\.modes\.carry/, '#17 the resale section states the carried warranty');
 });
 
 test('UX #14/#15: singular and dual forms, the label quoted as the button says it, «outside the preparation stage» in every language', () => {
@@ -532,8 +536,11 @@ test('UX #14/#15: singular and dual forms, the label quoted as the button says i
   assert.ok(!ar.boardChipTitle(0, 1).includes('1 وحدات'), 'no «0 من 1 وحدات»');
   assert.notEqual(ckb.missingListedAbove(1), ckb.missingListedAbove(2), 'Sorani has its singular');
   assert.ok(ckb.missingListedAbove(1).includes('ناوی هاتووە') && !ckb.missingListedAbove(1).includes('ناویان'));
-  assert.ok(ckb.resaleHint.includes(`«${ckb.modeRestart}»`) && ckb.resaleHint.includes(`«${ckb.modeCarry}»`));
-  assert.ok(ar.resaleHint.includes(`«${ar.modeRestart}»`) && ar.resaleHint.includes(`«${ar.modeCarry}»`));
+  // Owner decision 3: the resale hint states the one rule — the original warranty carries, never restarted.
+  assert.ok(!('modeRestart' in ar) && !('modeRestart' in en) && !('modeRestart' in ckb), 'no restart label is left');
+  assert.ok(ar.resaleHint.includes('ولا يُعاد بدؤه') && ar.carryOnly.includes('لا يُعاد بدؤه'));
+  assert.ok(en.resaleHint.includes('never restarted') && en.carryOnly.includes('never restarted'));
+  assert.ok(ckb.resaleHint.includes('هەرگیز لە سەرەتاوە دەست پێناکاتەوە') && ckb.carryOnly.includes('هەرگیز لە سەرەتاوە دەست پێناکاتەوە'));
   for (const s of [en.ownerOutsideHint, en.removeOutsideBody]) assert.match(s, /outside the preparation stage/);
   for (const s of [ckb.ownerOutsideHint, ckb.removeOutsideBody]) assert.ok(s.includes('دەرەوەی قۆناغی ئامادەکردن'));
   for (const s of [ar.ownerOutsideHint, ar.removeOutsideBody]) assert.ok(s.includes('خارج مرحلة التجهيز'));

@@ -15,18 +15,16 @@
  * when. PRIVACY: the server already decided what this viewer may see (the
  * whole serial for every admin — owner decision 1, 2026-10-09; the order
  * numbers for the owner and full-scope admins only, none for an assistant),
- * and no cost ever travels here. The one control is the owner's: how a returned device's
- * warranty runs when it is sold again (§14).
+ * and no cost ever travels here. A device that came back and is sold again carries
+ * its original warranty (owner decision 3, 2026-10-09) — the page says so; nothing
+ * is chosen here any more (§14).
  */
 import React, { useCallback, useEffect, useId, useState } from 'react';
-import { Check, Copy, History as HistoryIcon, Lock, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import { Check, Copy, History as HistoryIcon, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import { api, ApiError } from '../../../lib/api';
 import { useLanguage } from '../../../LanguageContext';
-import { useAuth } from '../../../AuthContext';
 import { Sheet } from '../../ui/Sheet';
-import { Segmented } from '../../ui/Segmented';
 import Spinner from '../../ui/Spinner';
-import { useToast } from '../../ui/Toast';
 import { serialStrings, type SerialStrings } from '../../adminOrders/serials/strings';
 import { dateTime, serialRefusal, shortDate } from '../../adminOrders/serials/serialsApi';
 import type { SerialStatus, SerialStory, StoryEvent, WarrantyState } from '../../adminOrders/serials/types';
@@ -94,6 +92,8 @@ export function eventLabel(e: StoryEvent, s: SerialStrings): string {
       return s.action.returned;
     case 'serial.warranty_mode':
       return s.action.warrantyMode(typeof d.to === 'string' ? s.modes[d.to] ?? d.to : '');
+    case 'serial.traded_in':
+      return s.action.tradedIn;
     case 'serial.prep_gate_override':
       return s.action.gateOverride(reason);
     case 'serial.prep_gate_breach':
@@ -130,19 +130,12 @@ function relative(iso: string, lang: string): string {
 export default function SerialDetail({ serial, onClose }: { serial: string | null; onClose: () => void }) {
   const { lang, dir } = useLanguage();
   const s = serialStrings(lang);
-  const toast = useToast();
-  const { user } = useAuth();
-  const owner = !!user?.is_owner;
   const titleId = useId();
-  const reasonId = useId();
 
   const [data, setData] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [copied, setCopied] = useState(false);
-  const [mode, setMode] = useState<'carry' | 'restart'>('carry');
-  const [reason, setReason] = useState('');
-  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async (sn: string) => {
     setLoading(true);
@@ -150,8 +143,6 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
     try {
       const res = await api.get<DetailResponse>(`/api/devices/admin/serial-inventory/${encodeURIComponent(sn)}`);
       setData(res);
-      const wm = res.story?.warranty.mode;
-      setMode(wm === 'restart' ? 'restart' : 'carry');
     } catch (e) {
       setData(null);
       setError(e);
@@ -162,7 +153,6 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
 
   useEffect(() => {
     if (!serial) return;
-    setReason('');
     void load(serial);
   }, [serial, load]);
 
@@ -172,8 +162,6 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
   const history = story?.history ?? data?.history ?? [];
   const productName = (p: { name: string; name_ar: string } | null | undefined) => (p ? (lang === 'en' ? p.name || p.name_ar : p.name_ar || p.name) : null);
   const product = productName(story?.product ?? data?.row?.product);
-  const resaleOpen =
-    owner && !!story?.current_order && !story.current_order.activated && (story.warranty.mode === 'carry' || story.warranty.mode === 'restart');
 
   // What may be copied is what this viewer may see whole: with a story, only
   // its `serial` (every admin since owner decision 1; absent for a viewer the
@@ -187,21 +175,6 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
     globalThis.setTimeout(() => setCopied(false), 1200);
   };
 
-  const saveMode = async () => {
-    if (!serial || reason.trim().length < 5 || saving) return;
-    setSaving(true);
-    try {
-      await api.post(`/api/devices/admin/serial-inventory/${encodeURIComponent(serial)}/warranty-mode`, { mode, reason: reason.trim() });
-      toast.success(s.saved);
-      setReason('');
-      await load(serial);
-    } catch (e) {
-      const r = serialRefusal(e, lang);
-      toast.error(r.text);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const warrantyState: WarrantyState | null = story?.warranty.state ?? null;
   const pending = warrantyState === 'PENDING_DELIVERY';
@@ -371,74 +344,20 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
                       )
                     }
                   />
-                  {story.warranty.mode && <Row label={s.mode} value={s.modes[story.warranty.mode] ?? story.warranty.mode} />}
+                  {story.warranty.mode && <Row label={s.mode} value={s.modes[story.warranty.mode === 'restart' ? 'carry' : story.warranty.mode] ?? story.warranty.mode} />}
                 </Group>
               </section>
             )}
 
-            {/* -------------------------------------- owner: resale warranty */}
+            {/* --------------------------------------------- resale warranty */}
+            {/* Owner decision 3 (2026-10-09): a device that came back and is
+                sold again CARRIES its original warranty — start and end. There
+                is nothing to choose any more, so this says what will happen. */}
             {story?.current_order && !story.current_order.activated && (story.warranty.mode === 'carry' || story.warranty.mode === 'restart') && (
               <section className="rounded-2xl border border-border-subtle bg-surface p-4 space-y-2.5" data-serial-resale>
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-[14px] font-semibold text-text-primary">{s.resaleTitle}</p>
-                  {!owner && (
-                    <span className="inline-flex items-center gap-1 text-[11.5px] text-text-secondary">
-                      <Lock className="h-3.5 w-3.5" aria-hidden />
-                      {s.policyOwnerOnly}
-                    </span>
-                  )}
-                </div>
+                <p className="text-[14px] font-semibold text-text-primary">{s.resaleTitle}</p>
                 <p className="text-[12px] leading-relaxed text-text-secondary">{s.resaleHint}</p>
-                {resaleOpen ? (
-                  <form
-                    className="space-y-2.5"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void saveMode();
-                    }}
-                  >
-                    <Segmented
-                      group={`serial-resale-${titleId}`}
-                      label={s.resaleTitle}
-                      value={mode}
-                      onChange={(id) => setMode(id as 'carry' | 'restart')}
-                      size="sm"
-                      items={[
-                        { id: 'carry', label: s.modeCarry },
-                        { id: 'restart', label: s.modeRestart },
-                      ]}
-                    />
-                    <div>
-                      <label htmlFor={reasonId} className="block text-[12px] font-semibold text-text-secondary mb-1">
-                        {s.reasonLabel}
-                      </label>
-                      <textarea
-                        id={reasonId}
-                        rows={2}
-                        minLength={5}
-                        maxLength={500}
-                        value={reason}
-                        onChange={(e) => setReason(e.target.value)}
-                        aria-describedby={`${reasonId}-hint`}
-                        className="w-full rounded-xl border border-border-subtle bg-surface-raised px-3 py-2 text-[14px] text-text-primary outline-none focus:border-gold resize-none"
-                      />
-                      {/* Why «حفظ» waits, said next to the field (UX review #17). */}
-                      <p id={`${reasonId}-hint`} className="mt-0.5 text-[11.5px] text-text-secondary">
-                        {s.reasonHint}
-                      </p>
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={reason.trim().length < 5 || saving || mode === story.warranty.mode}
-                      className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-full bg-gold text-accent-contrast text-[13.5px] font-bold disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
-                    >
-                      {saving && <Spinner size="sm" delayMs={0} decorative />}
-                      {s.save}
-                    </button>
-                  </form>
-                ) : (
-                  <p className="text-[13px] text-text-primary">{s.modes[story.warranty.mode] ?? story.warranty.mode}</p>
-                )}
+                <p className="text-[13px] text-text-primary">{s.modes.carry}</p>
               </section>
             )}
 

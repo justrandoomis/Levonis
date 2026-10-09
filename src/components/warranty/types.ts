@@ -29,13 +29,22 @@ export interface Device {
   delivered_at: string | null;
   registered_at: string | null;
   warranty: {
+    /** For a resold device: its FIRST delivery (owner decision 3). */
     start_at: string | null;
     end_at: string | null;
     base_months: number | null;
     ext_months: number;
     state: WarrantyState;
     remaining_days: number | null;
+    /** The warranty carried from the device's first sale (absent from an older server). */
+    carried?: boolean;
+    origin_start_at?: string | null;
+    /** The used-sale cover of this sale, apart from the original warranty. */
+    used_sale?: { months: number; start_at: string; end_at: string } | null;
   };
+  /** Dates only: first delivery, trade-in or return, resale (absent from an older server). */
+  history?: Array<{ kind: 'first' | 'traded_in' | 'returned' | 'resold' | (string & {}); at: string }>;
+  traded_in_at?: string | null;
   replaced_by_unit_id: string | null;
   replacement_of_unit_id: string | null;
   receipt: { receipt_no: string; status: string } | null;

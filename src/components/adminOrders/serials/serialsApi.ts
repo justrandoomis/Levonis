@@ -74,7 +74,7 @@ export const serialsApi = {
     orderId: string,
     target: { order_item_id: string; unit_index: number; part: string; assignment_id?: string },
     read: ReadPayload,
-    o: { kind: OverrideKind; reason: string; warranty_mode?: 'carry' | 'restart' },
+    o: { kind: OverrideKind; reason: string; warranty_mode?: 'carry' },
     opId: string
   ) =>
     api.post<LinkResult>(`${base(orderId)}/override`, {

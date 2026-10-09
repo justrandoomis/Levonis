@@ -187,9 +187,15 @@ test('§32.10/§14 return after delivery: the unit closes with its dates, receip
   await deliver(w, 'ORD-222');
   const u2 = unitOf(w, 'ORD-222');
   assert.equal(u2.warranty_end_at, u1.warranty_end_at);
+  // Owner decision 3 (row 193): the SAME warranty — its start and its months too, never a fresh window.
+  assert.equal(u2.warranty_start_at, u1.warranty_start_at, 'the original start carries');
+  assert.equal(u2.warranty_base_months, u1.warranty_base_months, 'the original base carries');
+  assert.equal(Number(u2.warranty_ext_months), Number(u1.warranty_ext_months));
   const pv = JSON.parse(String(u2.policy_version));
   assert.equal(pv.carried, 'original_end', 'H4: the marker every reader already honours');
   assert.equal(pv.resale_of, u1.id);
+  assert.equal(pv.origin_unit_id, u1.id);
+  assert.equal(pv.origin_start_at, u1.warranty_start_at);
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM serial_inventory WHERE serial_norm = ?', SN), 1, 'one asset, ever');
   // A new receipt can be issued for the new unit (the old one was voided).
   const wr = await post(w.as('boss'), '/api/admin/warranties', { unit_id: u2.id });

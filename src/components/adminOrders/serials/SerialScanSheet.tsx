@@ -27,7 +27,6 @@ import { refusalText } from '../../../lib/refusalStrings';
 import { useLanguage } from '../../../LanguageContext';
 import { useMotion } from '../../../lib/motion';
 import { Sheet } from '../../ui/Sheet';
-import { Segmented } from '../../ui/Segmented';
 import Spinner from '../../ui/Spinner';
 import { scanFeedback } from '../../scanner/feedback';
 import type { ScanRead } from '../../scanner/BarcodeScanner';
@@ -40,9 +39,9 @@ const BarcodeScanner = React.lazy(() => import('../../scanner/BarcodeScanner'));
 
 /**
  * How long the success state stays on screen before the sheet slides away —
- * unless the link carries a warning (a device cancelled after it left, a
- * resale whose warranty the owner may restart): that stays until «تم», since
- * a sentence that vanishes in 0.65 s was never read (UX review #7).
+ * unless the link carries a warning (a device cancelled after it left, stock
+ * not taken again): that stays until «تم», since a sentence that vanishes in
+ * 0.65 s was never read (UX review #7).
  */
 const CLOSE_AFTER_SUCCESS_MS = 650;
 
@@ -79,7 +78,6 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
   const [error, setError] = useState<unknown>(null);
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [reason, setReason] = useState('');
-  const [mode, setMode] = useState<'carry' | 'restart'>('carry');
   const [overrideBusy, setOverrideBusy] = useState(false);
   const closeTimer = useRef<number | null>(null);
   const manualRef = useRef<HTMLInputElement | null>(null);
@@ -112,7 +110,6 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
     // asked for — one tap, not two (UX review #8).
     setOverrideOpen(!!initialRefusal);
     setReason('');
-    setMode('carry');
     refocusTyped.current = false;
     rescanCamera.current = false;
     if (initialRefusal) {
@@ -260,7 +257,8 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
         orderId,
         { order_item_id: target.order_item_id, unit_index: target.unit_index, part: target.part, assignment_id: target.replaceAssignmentId },
         read,
-        { kind, reason: reason.trim(), ...(kind === 'delivered_device' || kind === 'unavailable' ? { warranty_mode: mode } : {}) },
+        // A resold device always carries its original warranty (owner decision 3): no mode to choose.
+        { kind, reason: reason.trim() },
         newOpId()
       );
       succeed(res, read);
@@ -466,17 +464,10 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
                   </p>
                 </div>
                 {(kind === 'delivered_device' || kind === 'unavailable') && (
-                  <Segmented
-                    group={`serial-override-mode-${reasonId}`}
-                    label={s.warrantyMode}
-                    value={mode}
-                    onChange={(id) => setMode(id as 'carry' | 'restart')}
-                    size="sm"
-                    items={[
-                      { id: 'carry', label: s.modeCarry },
-                      { id: 'restart', label: s.modeRestart },
-                    ]}
-                  />
+                  <p className="text-[12px] leading-relaxed text-text-secondary" data-serial-override-carry>
+                    <span className="font-semibold text-text-primary">{s.warrantyMode}: </span>
+                    {s.carryOnly}
+                  </p>
                 )}
                 <div className="flex flex-wrap gap-2">
                   <button

@@ -28,6 +28,7 @@ import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { getSetting, setSetting } from '../lib/settings';
 import { normalizeSerial, unitTotalMonths, type UnitRow } from '../lib/deviceOps';
+import { custodyHistory, unitIdentity } from '../lib/deviceCustody';
 import { maskedDetail, serialActor } from '../lib/serialAssignments';
 // The one definition of "a claim that is still open" lives with the claim
 // workflow that writes those stages; this screen must not grow a second one
@@ -547,9 +548,18 @@ warrantyAdminRoutes.post('/', async (c) => {
   // authenticated delivery), and the admin may state a different start when
   // the sale was a counter handover the device record cannot know about.
   const months = int(body.months, 'months', { min: 1, max: 240, def: unitTotalMonths(unitRow) ?? cfg.default_months });
+  // A RESOLD device prints its ORIGINAL warranty (owner decision 3): the
+  // first delivery its unit carries — or, for a resale recorded before the
+  // origin was, the first delivery its `resale_of` chain reaches.
+  const identity = unitIdentity(unit.policy_version);
+  let originStart = identity.carried ? identity.origin_start_at : null;
+  if (identity.carried && !originStart) {
+    const steps = (await custodyHistory(c.env.DB, [{ id: unitId, delivered_at: (unit.delivered_at as string | null) ?? null, policy_version: unit.policy_version }])).get(unitId) ?? [];
+    originStart = steps.find((st) => st.kind === 'first')?.at ?? null;
+  }
   const startAt =
     optionalIso(body.warranty_start_at, 'warranty_start_at') ||
-    String(unit.warranty_start_at ?? unit.delivered_at ?? unit.order_delivered_at ?? unit.order_created_at ?? nowIso());
+    String(originStart ?? unit.warranty_start_at ?? unit.delivered_at ?? unit.order_delivered_at ?? unit.order_created_at ?? nowIso());
   const win = warrantyWindow(startAt, months);
   // The DEVICE record owns the coverage; the receipt prints it. When the admin
   // states neither end, the unit's own stored end wins over a recomputed one —
@@ -592,6 +602,11 @@ warrantyAdminRoutes.post('/', async (c) => {
   const activate = body.activate !== false; // draft only when explicitly asked
   const id = newId('wr');
   const now = nowIso();
+  // The used-sale cover of a resale on a condition listing is printed beside
+  // the original warranty, never merged into it (policy v4, used-device clause).
+  const used = identity.used_sale;
+  const coverageAr = used ? `${cfg.coverage_ar}\nتغطية بيع المستعمل: ${used.months} شهر حتى ${used.end_at.slice(0, 10)}` : cfg.coverage_ar;
+  const coverageEn = used ? `${cfg.coverage_en}\nUsed-sale cover: ${used.months} month(s) until ${used.end_at.slice(0, 10)}` : cfg.coverage_en;
 
   // The number is allocated against the unique index: two admins pressing
   // Generate in the same second retry rather than share a number.
@@ -635,8 +650,8 @@ warrantyAdminRoutes.post('/', async (c) => {
           cfg.type_ar,
           cfg.type_en,
           months,
-          cfg.coverage_ar,
-          cfg.coverage_en,
+          coverageAr,
+          coverageEn,
           JSON.stringify(cfg.terms),
           JSON.stringify(cfg.retailer),
           win.start_at,
