@@ -1,9 +1,10 @@
 /**
  * FX SENTINELS (FX programme plan §14.2 S1): every private field of the 0179
  * tables seeded with a value no public number can equal — the market sell
- * 1666.6666, the owner's adjustment 37.2501, held and rejected candidates, the
- * drift anchor, the ECB figures, the derived EUR/CNY dinar rates, a shipping
- * rate and the history. The ONE public figure is the effective USD/IQD
+ * 1666.6666, the owner's adjustment 37.2501 (and the 29.8642 it replaced, in a
+ * settings_change row's old → new), held and rejected candidates, the drift
+ * anchor, the ECB figures, the derived EUR/CNY dinar rates, a shipping rate
+ * and the history. The ONE public figure is the effective USD/IQD
  * (1703.9167 = 1666.6666 + 37.2501): the top bar's `displayUsdRate`.
  */
 import type { DatabaseSync } from 'node:sqlite';
@@ -14,7 +15,9 @@ export const FX_SENTINELS = [
   '1666.6666', // USD/IQD market sell
   '1650.165', // market buy
   '1310.1313', // CBI official
-  '37.2501', // the owner's adjustment
+  '37.2501', // the owner's adjustment (market_adjustment_iqd)
+  '29.8642', // the adjustment before the owner's last change (a settings_change row's settings_diff)
+  '1696.5308', // the effective rate under that older adjustment (the settings_change row's effective_before)
   '1680.4321', // the drift anchor (last owner-confirmed)
   '1777.7777', // a held market figure
   '1815.0278', // a held effective candidate
@@ -54,5 +57,8 @@ export function seedFxSentinels(raw: DatabaseSync): void {
       VALUES ('fxl_s1', 'USD_IQD', 'review_held', 'cron', 'iqwealth', '1777.7777', '${FX_PUBLIC_RATE}', '${FX_PUBLIC_RATE}', '1815.0278', 65432, '${at}', 'REVIEW_HELD', '${at}', '37.2501'),
              ('fxl_s2', 'USD_IQD', 'apply', 'cron', 'iqwealth', '1666.6666', '1680.4321', '${FX_PUBLIC_RATE}', NULL, 13955, '${at}', 'APPLIED', '2026-10-08T06:00:00.000Z', '37.2501'),
              ('fxl_s3', 'EUR_USD', 'apply', 'cron', 'ecb', '1.0987', '1.0911', '1.0987', NULL, 6965, '2026-10-08T00:00:00.000Z', 'APPLIED', '2026-10-08T06:00:00.000Z', NULL);
+    INSERT INTO fx_rate_log (id, pair, event, trigger_kind, provider, effective_before, effective_after, result, actor_id, created_at, market_adjustment_iqd, settings_diff)
+      VALUES ('fxl_sdiff', 'USD_IQD', 'settings_change', 'owner', 'owner', '1696.5308', '${FX_PUBLIC_RATE}', 'APPLIED', 'usr_owner', '2026-10-08T05:00:00.000Z', '37.2501',
+              '[{"field":"market_adjustment_iqd","before":"29.8642","after":"37.2501"}]');
   `);
 }
