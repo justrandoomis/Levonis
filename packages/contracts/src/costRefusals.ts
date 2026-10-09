@@ -490,10 +490,14 @@ export const COST_REFUSALS = {
     en: 'This pair has no effective rate yet — approve one or set a manual rate first',
     ckb: 'هێشتا هیچ نرخێکی کارپێکراو بۆ ئەم جووتە نییە — سەرەتا نرخێک پەسەند بکە یان نرخێکی دەستی دابنێ',
   },
+  // A pricing refusal, read on «التسعير والشحن»: the Arabic says «الحساب»,
+  // never «تحويل» — that is the word decision 8 retired (a product is saved,
+  // never switched; DECISIONS row 191), and the tab must not carry it in any
+  // sense (tests/pricingMigrationLabels.test.ts).
   PRICING_FX_RATE_MISSING: {
-    ar: 'لا يوجد سعر دولار معتمد بعد، فلا يمكن تحويل الدينار',
-    en: 'There is no effective USD rate yet, so dinars cannot be converted',
-    ckb: 'هێشتا نرخی کارپێکراوی دۆلار نییە، بۆیە دینار ناگۆڕدرێت',
+    ar: 'لا يوجد سعر دولار معتمد بعد، فلا يمكن الحساب بين الدينار والدولار',
+    en: 'There is no effective USD rate yet, so amounts cannot be worked out between dinars and dollars',
+    ckb: 'هێشتا نرخی کارپێکراوی دۆلار نییە، بۆیە بڕەکان لە نێوان دینار و دۆلاردا هەژمار ناکرێن',
   },
   FX_SNAPSHOT_IMMUTABLE: {
     ar: 'لقطة التحويل من الدينار لا تتغير إلا بتعديل جديد منك',
