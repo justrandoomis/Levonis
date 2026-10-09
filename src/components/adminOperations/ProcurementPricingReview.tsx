@@ -1,0 +1,160 @@
+import { useState } from 'react';
+import { useLanguage } from '../../LanguageContext';
+import { ApiError } from '../../lib/api';
+import { COST_REFUSALS } from '../../../packages/contracts/src/costRefusals';
+import { T, money } from './shared';
+import { applyPurchase, type PricingChoices, type PricingPreview, type PricingProduct } from './procurementPricing';
+import { channelName, issueText, procurementPricingStrings, profileName } from './procurementPricingStrings';
+
+/**
+ * THE REVIEW STEP'S «معاينة الأسعار الجديدة قبل الحفظ» (USD design §5.4, §6.3;
+ * owner decision 8's six figures): per product, per model × channel, the
+ * current replacement cost, the minimum profit, the new pre-order price, the
+ * Direct Sale Extra, the new direct sale price, and old → new — with the
+ * per-product choices and the notices the server raised. Every figure is the
+ * server's; the screen formats.
+ */
+export default function ProcurementPricingReview({ preview, busy, usePurchase, prefer, onUsePurchase, onPrefer }: {
+  preview: PricingPreview | null;
+  busy: boolean;
+  usePurchase: Record<string, boolean>;
+  prefer: Record<string, boolean>;
+  onUsePurchase: (productId: string, value: boolean) => void;
+  onPrefer: (productId: string, value: boolean) => void;
+}) {
+  const { lang } = useLanguage();
+  const s = procurementPricingStrings(lang);
+  if (!preview) return busy ? <p role="status" className={`mt-4 text-sm ${T.text3}`}>{s.computing}</p> : null;
+  return (
+    <section aria-labelledby="pricing-preview-title" className="mt-4 grid gap-3" data-pricing-review>
+      <h4 id="pricing-preview-title" className={`font-semibold ${T.text1}`}>{s.previewTitle}</h4>
+      {preview.rates.review_pending && preview.rates.usd_iqd_rate && <p role="status" className="rounded-[var(--ap-radius-md)] border border-[var(--ap-warning-border)] bg-[var(--ap-warning-bg)] px-3 py-2.5 text-[13px] text-[var(--ap-text-1)]">{s.reviewBanner(preview.rates.usd_iqd_rate)}</p>}
+      {preview.rates.derived_stale && <p role="alert" className="text-[13px] text-[var(--ap-danger)]">{COST_REFUSALS.FX_DERIVED_STALE[lang]}</p>}
+      {preview.products.map((p) => (
+        <ProductPreview key={p.product_id} p={p} use={usePurchase[p.product_id] !== false} prefer={prefer[p.product_id] === true} onUse={(v) => onUsePurchase(p.product_id, v)} onPrefer={(v) => onPrefer(p.product_id, v)} />
+      ))}
+      <p className={`text-[12px] ${T.text3}`}>{s.savePc}</p>
+    </section>
+  );
+}
+
+function ProductPreview({ p, use, prefer, onUse, onPrefer }: { p: PricingProduct; use: boolean; prefer: boolean; onUse: (v: boolean) => void; onPrefer: (v: boolean) => void }) {
+  const { lang } = useLanguage();
+  const s = procurementPricingStrings(lang);
+  const arrow = lang === 'en' ? '→' : '←';
+  const modelName = (r: PricingProduct['rows'][number]) => (lang === 'en' ? r.name_en || r.name_ar : lang === 'ckb' ? r.name_ckb || r.name_ar : r.name_ar || r.name_en) || '—';
+  const notices: string[] = [];
+  if (p.reason === 'estimated') notices.push(s.estimated);
+  if (p.shadowed.length) notices.push(s.shadowed);
+  for (const x of p.proposals) notices.push(s.proposedProfile(profileName(x.shipping_profile, lang)));
+  if (p.cod_priced_as_direct) notices.push(s.cod);
+  if (p.missing_codes.length) notices.push(s.incomplete(p.missing_codes.map((c) => issueText(c, lang)).join(lang === 'en' ? '; ' : '؛ ')));
+  return (
+    <article className="inventory-line" data-pricing-product={p.product_id}>
+      <strong className={T.text1}>{p.label}</strong>
+      {p.feeds && <label className="mt-2 flex gap-2 text-sm"><input type="checkbox" checked={use} onChange={(e) => onUse(e.target.checked)} />{s.usePurchase}</label>}
+      {p.entries.some((e) => e.narrow) && <label className="mt-1 flex gap-2 text-sm"><input type="checkbox" checked={prefer} onChange={(e) => onPrefer(e.target.checked)} />{s.preferPurchase}</label>}
+      {notices.length > 0 && <ul className={`mt-2 grid gap-1 text-[13px] ${T.text2}`}>{notices.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+      {p.rows.length > 0 && (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[640px] text-start text-[13px] tabular-nums">
+            <thead>
+              <tr className={T.text3}>
+                {[s.colModel, s.colChannel, s.colReplacement, s.colMinProfit, s.colNewPreorder, s.colExtra, s.colNewDirect, s.colOldNew].map((h) => (
+                  <th key={h} scope="col" className="border-b border-[var(--ap-border)] px-2 py-1.5 text-start font-medium">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {p.rows.map((r) => {
+                const direct = r.channel === 'direct_sale';
+                const fig = (v: React.ReactNode) => <bdi dir="ltr" className="whitespace-nowrap">{v}</bdi>;
+                return (
+                  <tr key={`${r.option_id}:${r.channel}`} className="border-b border-[var(--ap-border)] align-top">
+                    <td className="px-2 py-1.5">{modelName(r)}</td>
+                    <td className="px-2 py-1.5">{channelName(r.channel, lang)}</td>
+                    <td className="px-2 py-1.5">{fig(money(r.replacement_cost_iqd))}</td>
+                    <td className="px-2 py-1.5">{fig(r.target_profit_usd ? `$${r.target_profit_usd}` : money(r.target_profit_iqd))}</td>
+                    <td className="px-2 py-1.5">{fig(direct ? money(r.preorder_base_iqd) : money(r.computed_price_iqd))}</td>
+                    <td className="px-2 py-1.5">{fig(direct ? money(r.direct_sale_extra_iqd) : '—')}</td>
+                    <td className="px-2 py-1.5">{fig(direct ? money(r.computed_price_iqd) : '—')}</td>
+                    <td className="px-2 py-1.5">
+                      {r.computed_price_iqd == null
+                        ? <span className={T.text3}>{r.issue_codes.map((c) => issueText(c, lang)).join(lang === 'en' ? '; ' : '؛ ') || '—'}</span>
+                        : fig(`${money(r.today_prepaid_iqd)} ${arrow} ${money(r.computed_price_iqd)}`)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </article>
+  );
+}
+
+/**
+ * A SAVED purchase's pricing state (USD design §5.4 "Saved-document view",
+ * §6.3 step 3): a product whose cost was not applied yet offers «اعتمدها
+ * الآن»; a failed apply after the confirm offers «إعادة المحاولة» with the
+ * values just typed; a cost from a cancelled purchase says so.
+ */
+export function SavedPurchasePricing({ preview, purchaseId, failures, choices, onDone }: {
+  preview: PricingPreview | null;
+  purchaseId: string;
+  failures: Array<{ product_id: string; label: string; message: string; purchase_id: string }>;
+  choices: PricingChoices;
+  onDone: () => Promise<void> | void;
+}) {
+  const { lang } = useLanguage();
+  const s = procurementPricingStrings(lang);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const run = async (productId: string, withChoices: PricingChoices) => {
+    const product = preview?.products.find((p) => p.product_id === productId);
+    if (!product) return;
+    setBusy(productId);
+    setError('');
+    try {
+      try {
+        await applyPurchase(productId, purchaseId, product.preview_hash, withChoices);
+      } catch (e) {
+        // The choices typed before the save differ from this view's: the refusal carries the fresh hash.
+        const fresh = e instanceof ApiError && e.code === 'PRICING_PREVIEW_STALE' ? (e.details?.preview as { preview_hash?: string } | null)?.preview_hash : undefined;
+        if (!fresh) throw e;
+        await applyPurchase(productId, purchaseId, fresh, withChoices);
+      }
+      await onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy('');
+    }
+  };
+  const pending = (preview?.products ?? []).filter((p) => p.feeds && p.eligible && !p.applied && p.entries.some((e) => Object.keys(e.changes).length > 0));
+  const cancelled = (preview?.products ?? []).filter((p) => p.cancelled_source);
+  const ownFailures = failures.filter((f) => f.purchase_id === purchaseId);
+  if (!pending.length && !cancelled.length && !ownFailures.length) return null;
+  const empty: PricingChoices = { minimums: [], optIn: [], usePurchase: {}, prefer: {} };
+  return (
+    <section className="mb-4 grid gap-2" data-saved-pricing>
+      {ownFailures.length > 0 && <p role="alert" className="text-[13px] text-[var(--ap-danger)]">{s.partial(String(ownFailures.length))}</p>}
+      {ownFailures.map((f) => (
+        <div key={f.product_id} className="flex flex-wrap items-center gap-2 text-sm">
+          <span className={T.text1}>{f.label}</span>
+          <button type="button" className={T.btnSecondary} disabled={!!busy} onClick={() => run(f.product_id, choices)}>{s.retry}</button>
+        </div>
+      ))}
+      {pending.filter((p) => !ownFailures.some((f) => f.product_id === p.product_id)).map((p) => (
+        <div key={p.product_id} className="flex flex-wrap items-center gap-2 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] bg-[var(--ap-surface-1)] px-3 py-2 text-sm">
+          <span className={T.text1}>{p.label}</span>
+          <span className={T.text2}>{s.notApplied}</span>
+          <button type="button" className={T.btnSecondary} disabled={!!busy} onClick={() => run(p.product_id, empty)}>{s.applyNow}</button>
+        </div>
+      ))}
+      {cancelled.map((p) => <p key={p.product_id} role="status" className={`text-sm ${T.text2}`}>{p.label} — {s.cancelledSource}</p>)}
+      {error && <p role="alert" className="text-[13px] text-[var(--ap-danger)]">{error}</p>}
+    </section>
+  );
+}

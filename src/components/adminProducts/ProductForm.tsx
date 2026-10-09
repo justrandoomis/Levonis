@@ -44,6 +44,7 @@ import { refusalIssues } from './applyResult';
 import { contractRefusal, refusalLang } from '../../lib/refusalStrings';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
+import { UsdPricingOptionsPanel, UsdPricingProductPanel, UsdPricingProvider } from './form/UsdPricingSection';
 import { emptyDimensions } from '../../lib/productTypes';
 import type { BrandV2, CatalogV2 } from '../../lib/productTypes';
 import {
@@ -907,6 +908,8 @@ export default function ProductForm({
     // min-w-0 on the outer column is what keeps a long value from widening the
     // whole admin page, and there is no bottom padding: this screen owns its
     // own bottom edge (see the effect above and the save bar below).
+    // «التسعير بالدولار والشحن»: one state for its two mount points (sections ٣ and ٥).
+    <UsdPricingProvider productId={doc.id || null} enabled={canSeeCost}>
     <div ref={columnRef} className="min-w-0 w-full max-w-[880px] mx-auto px-3">
       <div className="flex items-center gap-2 py-3 min-w-0">
         <button type="button" onClick={onBack} className={`${btnGhost} h-10 px-2.5`} aria-label="رجوع">
@@ -1416,6 +1419,12 @@ export default function ProductForm({
             cost appears after the save (which keeps every stored cost). */}
         {canSeeCost && !costLoaded && <CostOpensAfterSave />}
 
+        {/* The owner's USD pricing and shipping for the product (supplier cost in
+            its currency, route, weight or volume, extras, minimum profit in USD,
+            Direct Sale Extra) and its 4-cell summary. Saved through the pricing
+            door, never with this form's document. */}
+        {canSeeCost && <UsdPricingProductPanel />}
+
         {/* Stored by the template as `original_price_iqd` (the struck-through
             "was" price). No input here by design — but it is stored, it is
             carried by every save, and it is shown so it is never mistaken for
@@ -1703,6 +1712,8 @@ export default function ProductForm({
           canSeeCost={costShown}
           errors={showErrors ? errors : {}}
         />
+        {/* Each saved model's own USD pricing (empty = the product's) and its 4-cell summary. */}
+        {canSeeCost && <UsdPricingOptionsPanel formModelIds={rel.groups.flatMap((g) => g.values.filter((v) => v.active).map((v) => v.id))} />}
       </SectionCard>
 
       {/* 6 ───────────────────────────────────────────────────────── images */}
@@ -2030,6 +2041,7 @@ export default function ProductForm({
         </React.Suspense>
       )}
     </div>
+    </UsdPricingProvider>
   );
 }
 

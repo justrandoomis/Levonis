@@ -37,6 +37,9 @@ export type Selection = {
   packed_volume_mm3?: number | null;
   procurement_defaults?: ProcurementSelectionDefault[];
   procurement_shared_colors?: boolean;
+  /** The selection's option (a variant's first option): the minimum profit's level before FX-7. */
+  option_id?: string;
+  color_id?: string;
 };
 export function useOperation() {
   const [busy, setBusy] = useState(false),

@@ -71,7 +71,7 @@ export default function PurchaseLineCosts({ label, qty, rawLabel, raw, freight, 
           </dt>
           <dd>{shown(extras)}</dd>
         </div>
-        <div className="inventory-line"><dt>{loc('تكلفة القطعة النهائية', 'Landed unit cost', 'تێچووی کۆتایی هەر پارچەیەک')}</dt><dd><strong><output aria-label={`${loc('تكلفة القطعة النهائية', 'Landed unit cost', 'تێچووی کۆتایی هەر پارچەیەک')}: ${label}`}>{shown(final)}</output></strong></dd></div>
+        <div className="inventory-line"><dt>{loc('تكلفة القطعة الفعلية لهذه الشحنة', 'This shipment’s landed unit cost', 'تێچووی ڕاستەقینەی هەر پارچەیەک لەم بارەدا')}</dt><dd><strong><output aria-label={`${loc('تكلفة القطعة الفعلية لهذه الشحنة', 'This shipment’s landed unit cost', 'تێچووی ڕاستەقینەی هەر پارچەیەک لەم بارەدا')}: ${label}`}>{shown(final)}</output></strong></dd></div>
       </dl>
       <div id={panel} hidden={!open} className={open ? 'mt-3 grid gap-2.5 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] bg-[var(--ap-surface-1)] p-3 text-[12px] text-[var(--ap-text-3)]' : undefined} role="region" aria-label={`${extrasLabel} — ${label}`}>
         {charges.length === 0 ? (
