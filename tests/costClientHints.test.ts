@@ -320,7 +320,8 @@ test('the product form never shows, or saves, the blanks of a document read with
   assert.match(code, /if \(res\.product\) setCostLoaded\(carriesCost\(res\.product\) && relationsCarryCost\(fresh\)\);/);
   // Cost inputs need the hint AND a document read with cost.
   assert.match(code, /const costShown = canSeeCost && costLoaded;/);
-  assert.match(code, /\{costShown && \(\s*<Field ar="التكلفة" en="Cost"/);
+  // The owner's dinar cost field, now labelled as the legacy cost (USD pricing, owner brief 2026-10-09).
+  assert.match(code, /\{costShown && \(\s*<Field ar=\{us\.legacyCost\} en=\{lang === 'en' \? '' : usEn\.legacyCost\}/);
   assert.match(code, /canSeeCost=\{costShown\}/);
   // A save of a document read without cost says so; the server then keeps every stored cost.
   assert.match(code, /\.\.\.\(next\.id && !costLoaded \? \{ cost_loaded: false \} : \{\}\)/);

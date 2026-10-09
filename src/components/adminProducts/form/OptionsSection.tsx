@@ -78,6 +78,7 @@ export function OptionsSection({
   baseDimensions,
   canSeeCost,
   errors,
+  valueExtra,
 }: {
   rel: RelationsState;
   setRel: (fn: (r: RelationsState) => RelationsState) => void;
@@ -89,6 +90,8 @@ export function OptionsSection({
   baseDimensions: ProductDimensionsV2;
   canSeeCost: boolean;
   errors: Record<string, string>;
+  /** Rendered at the end of each model's card (the owner's USD pricing of that model); absent for everyone else. */
+  valueExtra?: (value: FormValue) => React.ReactNode;
 }) {
   // Every mutation re-derives the inventory source, so the explainer strip,
   // the section summary and the saved wire all tell the same story.
@@ -593,6 +596,7 @@ export function OptionsSection({
                     label={`أبعاد ${v.name_en || 'الخيار'} / Option dimensions`}
                     onChange={(dimensions) => patchValue(g.id, v.id, { dimensions })}
                   />
+                  {valueExtra?.(v)}
                 </div>
               ))}
               <button type="button" onClick={() => addValue(g.id)} className={`${btnGhost} h-8 px-2.5 text-[12px]`}>

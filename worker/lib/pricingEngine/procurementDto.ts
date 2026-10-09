@@ -7,7 +7,7 @@
  * tests/procurementPricingKeys (via tests/financialFieldsUnion.test.ts).
  */
 import type { PricingRates } from './rates';
-import type { LineSummary, ProductPreview } from './procurementPreview';
+import type { LineSummary, PricedModel, ProductPreview } from './procurementPreview';
 import type { PurchaseLineForPricing } from './fromPurchase';
 import { INPUT_FIELD_NAMES, type InputFields, type StoredRuleRow } from './store';
 import { ruleDto } from './dto';
@@ -87,6 +87,37 @@ export function minimumProfitsDto(productId: string, rules: readonly StoredRuleR
     }));
 }
 
+/**
+ * Owner decision 8's six figures per model × channel (the current replacement
+ * cost, the minimum profit, the new pre-order price, the Direct Sale Extra,
+ * the new direct price, old → new), field by field.
+ */
+export function previewRowsDto(models: readonly PricedModel[]) {
+  return models.flatMap((m) =>
+    m.channels
+      .filter((c) => c.ok)
+      .map((c) => {
+        const price = m.result?.channels.find((x) => x.channel === c.channel) ?? null;
+        return {
+          option_id: m.option_id,
+          ...m.names,
+          channel: c.channel,
+          today_prepaid_iqd: c.prepaid_iqd,
+          today_cod_iqd: c.cod_iqd,
+          cod_priced_as_direct: c.cod_as_direct,
+          computed_price_iqd: price?.computed_price_iqd ?? null,
+          change_iqd: price && c.prepaid_iqd !== null ? price.computed_price_iqd - c.prepaid_iqd : null,
+          replacement_cost_iqd: price?.replacement_cost_iqd ?? null,
+          target_profit_usd: price?.target_profit_usd ?? null,
+          target_profit_iqd: price?.target_profit_iqd ?? null,
+          direct_sale_extra_iqd: price?.direct_sale_extra_iqd ?? null,
+          preorder_base_iqd: price?.preorder_base_iqd ?? null,
+          issue_codes: m.result ? [...new Set(m.result.issues.filter((i) => i.severity === 'error' && i.channel === c.channel).map((i) => i.code))].sort() : [],
+        };
+      })
+  );
+}
+
 export function productPreviewDto(p: ProductPreview, extra: { applied?: boolean; cancelled_source?: boolean; rules: readonly StoredRuleRow[] }) {
   return {
     product_id: p.product_id,
@@ -112,29 +143,7 @@ export function productPreviewDto(p: ProductPreview, extra: { applied?: boolean;
     })),
     proposals: p.derived.proposals.map((x) => ({ scope: x.scope, scope_id: x.scope_id, shipping_profile: x.shipping_profile })),
     shadowed: p.derived.shadowed.map((x) => ({ scope: x.scope, scope_id: x.scope_id, field: x.field })),
-    rows: p.models.flatMap((m) =>
-      m.channels
-        .filter((c) => c.ok)
-        .map((c) => {
-          const price = m.result?.channels.find((x) => x.channel === c.channel) ?? null;
-          return {
-            option_id: m.option_id,
-            ...m.names,
-            channel: c.channel,
-            today_prepaid_iqd: c.prepaid_iqd,
-            today_cod_iqd: c.cod_iqd,
-            cod_priced_as_direct: c.cod_as_direct,
-            computed_price_iqd: price?.computed_price_iqd ?? null,
-            change_iqd: price && c.prepaid_iqd !== null ? price.computed_price_iqd - c.prepaid_iqd : null,
-            replacement_cost_iqd: price?.replacement_cost_iqd ?? null,
-            target_profit_usd: price?.target_profit_usd ?? null,
-            target_profit_iqd: price?.target_profit_iqd ?? null,
-            direct_sale_extra_iqd: price?.direct_sale_extra_iqd ?? null,
-            preorder_base_iqd: price?.preorder_base_iqd ?? null,
-            issue_codes: m.result ? [...new Set(m.result.issues.filter((i) => i.severity === 'error' && i.channel === c.channel).map((i) => i.code))].sort() : [],
-          };
-        })
-    ),
+    rows: previewRowsDto(p.models),
     missing_codes: [...p.missing_codes],
     cod_priced_as_direct: p.cod_as_direct,
     minimum_profits: minimumProfitsDto(p.product_id, extra.rules),

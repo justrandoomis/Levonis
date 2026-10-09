@@ -202,6 +202,30 @@ export const INPUT_FIELD_NAMES = [
   'shipping_length_mm', 'shipping_width_mm', 'shipping_height_mm', 'manual_cbm', 'additional_cost_iqd',
 ] as const satisfies readonly (keyof InputFields)[];
 
+/**
+ * The IQD convenience input's snapshot (FX plan §12; USD design §5.3 row 1):
+ * the dinars the owner typed, converted ONCE at save to canonical USD
+ * (`supplier_cost_amount`, currency USD) at the effective U of that moment.
+ * Server-computed only — a request never carries these values.
+ */
+export interface IqdSnapshot {
+  original_input_amount: string;
+  conversion_rate_snapshot: string;
+  conversion_fx_version: number;
+  converted_at: string;
+}
+
+/** A stored row's IQD conversion snapshot, or null (a row priced in its source currency). */
+export function storedIqdOf(row: Partial<StoredInputRow> | null | undefined): IqdSnapshot | null {
+  if (!row || row.supplier_input_mode !== 'IQD_CONVERTED' || !row.original_input_amount || !row.conversion_rate_snapshot || !row.converted_at) return null;
+  return {
+    original_input_amount: row.original_input_amount,
+    conversion_rate_snapshot: row.conversion_rate_snapshot,
+    conversion_fx_version: Number(row.conversion_fx_version ?? 0),
+    converted_at: row.converted_at,
+  };
+}
+
 /** One owner-row write: the fields that change (absent = kept), at one scope. */
 export interface InputWrite {
   scope: InputScope;
@@ -209,10 +233,12 @@ export interface InputWrite {
   existing: StoredInputRow | null;
   set: Partial<InputFields>;
   source_ref: string;
+  /** Set when this write converts typed dinars (the supplier cost is then that conversion's USD). */
+  iqd?: IqdSnapshot;
 }
 
 /** The row an input write leaves, with the supplier-mode columns the 0181 CHECKs demand. */
-export function nextInputRow(w: InputWrite): InputFields & { supplier_input_mode: StoredInputRow['supplier_input_mode']; clears_iqd_snapshot: boolean } {
+export function nextInputRow(w: InputWrite): InputFields & { supplier_input_mode: StoredInputRow['supplier_input_mode']; clears_iqd_snapshot: boolean; iqd: IqdSnapshot | null } {
   const base: InputFields = {
     supplier_cost_amount: w.existing?.supplier_cost_amount ?? null,
     supplier_cost_delta: w.existing?.supplier_cost_delta ?? null,
@@ -232,16 +258,20 @@ export function nextInputRow(w: InputWrite): InputFields & { supplier_input_mode
   const supplierTouched = 'supplier_cost_amount' in w.set || 'supplier_cost_delta' in w.set || 'supplier_cost_currency' in w.set;
   const hasSupplier = next.supplier_cost_amount != null || next.supplier_cost_delta != null;
   const wasConverted = w.existing?.supplier_input_mode === 'IQD_CONVERTED';
+  if (w.iqd && hasSupplier) return { ...next, supplier_input_mode: 'IQD_CONVERTED', clears_iqd_snapshot: false, iqd: w.iqd };
   const mode: StoredInputRow['supplier_input_mode'] = !hasSupplier ? null : wasConverted && !supplierTouched ? 'IQD_CONVERTED' : 'SOURCE_CURRENCY';
-  return { ...next, supplier_input_mode: mode, clears_iqd_snapshot: wasConverted && mode !== 'IQD_CONVERTED' };
+  return { ...next, supplier_input_mode: mode, clears_iqd_snapshot: wasConverted && mode !== 'IQD_CONVERTED', iqd: null };
 }
 
 /** True when a write changes nothing of the stored row. */
 export function inputWriteIsNoop(w: InputWrite): boolean {
+  if (w.iqd) return false;
   if (!w.existing) return INPUT_FIELD_NAMES.every((k) => w.set[k] == null);
   const next = nextInputRow(w);
   return INPUT_FIELD_NAMES.every((k) => (next[k] ?? null) === (w.existing![k] ?? null)) && next.supplier_input_mode === w.existing.supplier_input_mode;
 }
+
+const IQD_COLUMNS = 'original_input_amount, original_input_currency, conversion_rate_snapshot, conversion_fx_version, canonical_supplier_cost_usd, converted_at';
 
 export function inputStatements(db: D1Database, productId: string, writes: readonly InputWrite[], actor: string, now: string): D1PreparedStatement[] {
   const out: D1PreparedStatement[] = [];
@@ -250,20 +280,25 @@ export function inputStatements(db: D1Database, productId: string, writes: reado
     const next = nextInputRow(w);
     const scopeId = w.scope === 'base' ? '' : w.scope_id;
     const values = INPUT_FIELD_NAMES.map((k) => next[k] ?? null);
+    // A conversion stores its snapshot beside the canonical USD (0181: canonical = supplier_cost_amount).
+    const iqd = next.iqd;
+    const iqdValues = iqd ? [iqd.original_input_amount, iqd.conversion_rate_snapshot, iqd.conversion_fx_version, next.supplier_cost_amount, iqd.converted_at] : [];
     if (!w.existing) {
       out.push(
         db
           .prepare(
-            `INSERT INTO pricing_inputs (product_id, scope, scope_id, origin, ${INPUT_FIELD_NAMES.join(', ')}, supplier_input_mode, source_ref, version, updated_by, updated_at)
-             VALUES (?, ?, ?, 'MANUAL_OVERRIDE', ${INPUT_FIELD_NAMES.map(() => '?').join(', ')}, ?, ?, 1, ?, ?)`
+            `INSERT INTO pricing_inputs (product_id, scope, scope_id, origin, ${INPUT_FIELD_NAMES.join(', ')}, supplier_input_mode${iqd ? `, ${IQD_COLUMNS}` : ''}, source_ref, version, updated_by, updated_at)
+             VALUES (?, ?, ?, 'MANUAL_OVERRIDE', ${INPUT_FIELD_NAMES.map(() => '?').join(', ')}, ?${iqd ? ", ?, 'IQD', ?, ?, ?, ?" : ''}, ?, 1, ?, ?)`
           )
-          .bind(productId, w.scope, scopeId, ...values, next.supplier_input_mode, w.source_ref, actor, now)
+          .bind(productId, w.scope, scopeId, ...values, next.supplier_input_mode, ...iqdValues, w.source_ref, actor, now)
       );
       continue;
     }
-    const snapshot = next.clears_iqd_snapshot
-      ? ', original_input_amount = NULL, original_input_currency = NULL, conversion_rate_snapshot = NULL, conversion_fx_version = NULL, canonical_supplier_cost_usd = NULL, converted_at = NULL'
-      : '';
+    const snapshot = iqd
+      ? ", original_input_amount = ?, original_input_currency = 'IQD', conversion_rate_snapshot = ?, conversion_fx_version = ?, canonical_supplier_cost_usd = ?, converted_at = ?"
+      : next.clears_iqd_snapshot
+        ? ', original_input_amount = NULL, original_input_currency = NULL, conversion_rate_snapshot = NULL, conversion_fx_version = NULL, canonical_supplier_cost_usd = NULL, converted_at = NULL'
+        : '';
     out.push(
       db
         .prepare(
@@ -271,7 +306,7 @@ export function inputStatements(db: D1Database, productId: string, writes: reado
                   source_ref = ?, version = version + 1, updated_by = ?, updated_at = ?
             WHERE product_id = ? AND scope = ? AND scope_id = ? AND origin = 'MANUAL_OVERRIDE' AND version = ?`
         )
-        .bind(...values, next.supplier_input_mode, w.source_ref, actor, now, productId, w.scope, scopeId, w.existing.version)
+        .bind(...values, next.supplier_input_mode, ...iqdValues, w.source_ref, actor, now, productId, w.scope, scopeId, w.existing.version)
     );
   }
   return out;
@@ -397,11 +432,12 @@ export function pricingAuditStatement(
     );
 }
 
-/** The stored values of an input row, for the audit (owner-only table). */
-export function inputImage(row: Partial<InputFields> | null): Partial<InputFields> | null {
+/** The stored values of an input row, for the audit (owner-only table), with an IQD conversion's snapshot. */
+export function inputImage(row: (Partial<InputFields> & { iqd?: IqdSnapshot | null }) | null): (Partial<InputFields> & { iqd?: IqdSnapshot }) | null {
   if (!row) return null;
-  const out: Partial<InputFields> = {};
+  const out: Partial<InputFields> & { iqd?: IqdSnapshot } = {};
   for (const k of INPUT_FIELD_NAMES) if (row[k] != null) (out as Record<string, unknown>)[k] = row[k];
+  if (row.iqd) out.iqd = { ...row.iqd };
   return out;
 }
 

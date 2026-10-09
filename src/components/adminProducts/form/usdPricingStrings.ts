@@ -1,9 +1,11 @@
 /**
  * «التسعير بالدولار والشحن» IN THE PRODUCT FORM — EVERY WORD, IN ARABIC,
  * ENGLISH AND SORANI (owner brief 2026-10-09; docs/DECISIONS.md row 183: a
- * `ckb` slot never carries the Arabic). The 4-cell bar and its «تفاصيل» keep
- * the procurement card's words (src/components/adminOperations/
- * procurementPricingStrings.ts); these are the form's own fields and notes.
+ * `ckb` slot never carries the Arabic). The 4-cell bar, its «تفاصيل» and the
+ * six-figure table keep the procurement card's words (src/components/
+ * adminOperations/procurementPricingStrings.ts); these are the form's own
+ * fields and notes — section ٣ «الأسعار», each model in section ٥ «الخيارات
+ * والألوان», and section ٨ «المعاينة والحفظ».
  * ckb uses the pricing terms: shipping «ناردن», product «بەرهەم» (never
  * «گواستنەوە» or «کاڵا»: tests/procurementPricingStrings.test.ts).
  *
@@ -13,17 +15,38 @@ import type { Language } from '../../../translations';
 
 type Fill = (v: string) => string;
 type Fill2 = (a: string, b: string) => string;
+type Fill3 = (a: string, b: string, c: string) => string;
 
 export interface UsdPricingFormStrings {
   formTitle: string;
   formIntro: string;
   productLevel: string;
   supplierCost: string;
+  supplierCostIqd: string;
   supplierCurrency: string;
+  currencyIqd: string;
+  iqdHint: string;
+  iqdWillConvert: Fill2;
+  convertedOn: Fill3;
+  reconvert: Fill;
+  iqdInvalid: string;
   route: string;
   routeNone: string;
   weightKg: string;
-  volumeCbm: string;
+  boxWidth: string;
+  boxDepth: string;
+  boxHeight: string;
+  measureFromForm: string;
+  boxIncomplete: string;
+  cbmComputed: Fill;
+  manualCbm: string;
+  manualCbmHint: string;
+  measureAdopted: string;
+  measureWillAdopt: string;
+  measureDiffers: Fill2;
+  measurePricingOnly: Fill;
+  adoptMeasure: string;
+  measureInherits: string;
   additional: string;
   minProfit: string;
   minProfitHint: string;
@@ -33,22 +56,35 @@ export interface UsdPricingFormStrings {
   save: string;
   saveHint: string;
   saved: string;
+  savedWithProduct: string;
+  pricingNotSaved: Fill;
+  reviewConversion: string;
   unsaved: string;
   discard: string;
-  saveFirst: string;
-  optionsTitle: string;
-  optionsIntro: string;
-  newOptionsSaveFirst: string;
+  summaryAfterFirstSave: string;
   edit: string;
   modelsSummary: Fill2;
   pricesLater: string;
-  weightInvalid: string;
   decimalInvalid: string;
   extraInvalid: string;
   pricingWeightWins: string;
-  convertedNote: Fill2;
   loading: string;
   retry: string;
+  storePrice: string;
+  storePriceEngine: string;
+  storePriceManual: string;
+  legacyCost: string;
+  legacyCostTip: string;
+  modelTitle: string;
+  customerPrice: Fill;
+  directPrice: Fill;
+  modelBlocked: string;
+  coloursFollow: string;
+  modelSavedLater: string;
+  previewTitle: string;
+  previewNote: string;
+  previewIncludesDrafts: string;
+  previewEmpty: string;
 }
 
 const ar: UsdPricingFormStrings = {
@@ -56,11 +92,31 @@ const ar: UsdPricingFormStrings = {
   formIntro: 'تكلفة المورد بعملته، ومسار الشحن والوزن أو الحجم، والتكاليف الإضافية، والحد الأدنى للربح بالدولار. يُحسب السعر النهائي للزبون من هذه القيم.',
   productLevel: 'المنتج (كل الموديلات)',
   supplierCost: 'تكلفة المورد للقطعة',
+  supplierCostIqd: 'تكلفة المورد بالدينار',
   supplierCurrency: 'عملة المورد',
+  currencyIqd: 'دينار (يُحوَّل مرة واحدة إلى USD)',
+  iqdHint: 'دنانير كاملة؛ تُحوَّل إلى الدولار مرة واحدة عند الحفظ بسعر الدولار المعتمد، ولا تتغير بعدها مع السعر',
+  iqdWillConvert: (usd, rate) => `يُحفظ $${usd} بسعر ${rate} د.ع للدولار`,
+  convertedOn: (amount, rate, date) => `${amount} د.ع حُوّلت مرة واحدة بسعر ${rate} في ${date}`,
+  reconvert: (rate) => `حوّل مرة أخرى بسعر اليوم ${rate}`,
+  iqdInvalid: 'أدخل مبلغًا صحيحًا بالدينار أكبر من صفر',
   route: 'مسار الشحن الأساسي',
   routeNone: '— بلا مسار —',
   weightKg: 'الوزن مع التغليف (كغم)',
-  volumeCbm: 'الحجم مع التغليف (CBM)',
+  boxWidth: 'عرض الصندوق (سم)',
+  boxDepth: 'عمق الصندوق (سم)',
+  boxHeight: 'ارتفاع الصندوق (سم)',
+  measureFromForm: 'الحقل نفسه في «الأبعاد والوزن»: يُحفظ مع المنتج، ويُعتمد للتسعير عند الحفظ',
+  boxIncomplete: 'أكمل أبعاد الصندوق الثلاثة ليُحسب الحجم',
+  cbmComputed: (cbm) => `الحجم المحسوب من الصندوق: ${cbm} CBM`,
+  manualCbm: 'حجم يدوي (CBM) — اختياري',
+  manualCbmHint: 'يتقدّم على الحجم المحسوب من الصندوق؛ اتركه فارغًا ليُحسب من الأبعاد',
+  measureAdopted: 'معتمد للتسعير',
+  measureWillAdopt: 'يُعتمد للتسعير عند الحفظ',
+  measureDiffers: (pricing, form) => `التسعير يستعمل ${pricing} المحفوظة للتسعير، وقياس الصندوق في المنتج ${form}`,
+  measurePricingOnly: (pricing) => `التسعير يستعمل ${pricing} المحفوظة للتسعير`,
+  adoptMeasure: 'اعتمد قياس الصندوق للتسعير',
+  measureInherits: 'يرث قياس المنتج',
   additional: 'تكاليف إضافية للقطعة (د.ع)',
   minProfit: 'الحد الأدنى للربح (USD)',
   minProfitHint: 'أقل ربح بالدولار فوق التكلفة الحالية؛ اتركه فارغًا ليرث',
@@ -68,24 +124,37 @@ const ar: UsdPricingFormStrings = {
   extraHint: 'بالدينار ومن مضاعفات 1,000؛ تُضاف للبيع المباشر بعد التقريب',
   inheritPlaceholder: (v) => `يرث: ${v}`,
   save: 'حفظ التسعير بالدولار',
-  saveHint: 'يُحفظ مستقلًا عن زر حفظ المنتج',
+  saveHint: 'يُحفظ أيضًا مع زر «نشر» أو «مسودة» أسفل الصفحة',
   saved: 'حُفظت بيانات التسعير',
+  savedWithProduct: 'حُفظ التسعير بالدولار مع المنتج',
+  pricingNotSaved: (m) => `حُفظ المنتج، ولم يُحفظ التسعير بالدولار: ${m}`,
+  reviewConversion: 'راجع تحويل الدينار في المعاينة، ثم احفظ التسعير',
   unsaved: 'تغييرات غير محفوظة',
   discard: 'تجاهل التغييرات',
-  saveFirst: 'احفظ المنتج أولًا، ثم أدخل تسعيره بالدولار هنا',
-  optionsTitle: 'التسعير بالدولار لكل موديل',
-  optionsIntro: 'الحقل الفارغ يرث قيمة المنتج. الألوان تتبع تسعير موديلها حتى يتوفر تسعير كل لون على حدة.',
-  newOptionsSaveFirst: 'الموديلات الجديدة تظهر هنا بعد حفظ المنتج',
+  summaryAfterFirstSave: 'يظهر الملخص بعد الحفظ الأول للمنتج؛ تُحفظ هذه القيم معه',
   edit: 'تعديل',
   modelsSummary: (ok, all) => `${ok} من ${all} موديلات محسوبة السعر — الملخص لكل موديل في «الخيارات والألوان»`,
   pricesLater: 'هذه بيانات التسعير فقط؛ يبقى سعر المتجر كما هو حتى يُعتمد السعر الجديد',
-  weightInvalid: 'أدخل وزنًا أكبر من صفر بثلاث منازل عشرية على الأكثر',
   decimalInvalid: 'أدخل رقمًا أكبر من صفر',
   extraInvalid: 'أدخل مبلغًا بالدينار من مضاعفات 1,000',
   pricingWeightWins: 'وزن التسعير المحفوظ يُستعمل بدل هذا الوزن',
-  convertedNote: (amount, rate) => `أُدخلت ${amount} د.ع وحُوّلت مرة واحدة بسعر ${rate}`,
   loading: 'جارٍ تحميل التسعير…',
   retry: 'إعادة المحاولة',
+  storePrice: 'سعر المتجر الحالي',
+  storePriceEngine: 'يكتبه محرك التسعير من «التسعير بالدولار والشحن» أدناه؛ لا يُعدَّل يدويًا',
+  storePriceManual: 'يبقى السعر يدويًا حتى يُعتمد هذا المنتج في محرك التسعير',
+  legacyCost: 'التكلفة القديمة (د.ع)',
+  legacyCostTip: 'إداري فقط. تُستعمل في الأرباح للمنتجات التي لا دفعات شراء لها؛ لا يقرؤها التسعير بالدولار.',
+  modelTitle: 'التسعير بالدولار لهذا الموديل',
+  customerPrice: (p) => `سعر الزبون المحسوب: ${p}`,
+  directPrice: (p) => `البيع المباشر: ${p}`,
+  modelBlocked: 'لم يُحسب السعر بعد — افتح «تعديل»',
+  coloursFollow: 'ألوان هذا الموديل تتبع تسعيره حتى يتوفر تسعير كل لون على حدة',
+  modelSavedLater: 'موديل جديد: يُحفظ تسعيره بعد حفظ المنتج، ويظهر ملخصه بعدها',
+  previewTitle: 'الأسعار الجديدة لكل موديل وطريقة بيع',
+  previewNote: 'معاينة فقط: لا تُكتب أسعار الزبون في هذه المرحلة، ويبقى سعر المتجر كما هو',
+  previewIncludesDrafts: 'تشمل تغييرات التسعير غير المحفوظة',
+  previewEmpty: 'لا يوجد موديل معروض للبيع الآن',
 };
 
 const en: UsdPricingFormStrings = {
@@ -93,11 +162,31 @@ const en: UsdPricingFormStrings = {
   formIntro: 'The supplier cost in its currency, the shipping route and weight or volume, additional costs and the minimum profit in USD. The final customer price is computed from these values.',
   productLevel: 'Product (every model)',
   supplierCost: 'Supplier cost per piece',
+  supplierCostIqd: 'Supplier cost in IQD',
   supplierCurrency: 'Supplier currency',
+  currencyIqd: 'IQD (converted once to USD)',
+  iqdHint: 'Whole dinars; converted to USD once when saved, at the effective dollar rate, and not changed by later rate moves',
+  iqdWillConvert: (usd, rate) => `Saved as $${usd} at ${rate} IQD per dollar`,
+  convertedOn: (amount, rate, date) => `${amount} IQD converted once at ${rate} on ${date}`,
+  reconvert: (rate) => `Convert again at today’s rate ${rate}`,
+  iqdInvalid: 'Enter a whole amount in dinars above zero',
   route: 'Base shipping route',
   routeNone: '— No route —',
   weightKg: 'Packed weight (kg)',
-  volumeCbm: 'Packed volume (CBM)',
+  boxWidth: 'Box width (cm)',
+  boxDepth: 'Box depth (cm)',
+  boxHeight: 'Box height (cm)',
+  measureFromForm: 'The same field as in “Dimensions & weight”: saved with the product, and adopted for pricing on save',
+  boxIncomplete: 'Fill in all three box dimensions to compute the volume',
+  cbmComputed: (cbm) => `Volume from the box: ${cbm} CBM`,
+  manualCbm: 'Manual volume (CBM) — optional',
+  manualCbmHint: 'Wins over the volume from the box; leave it empty to use the dimensions',
+  measureAdopted: 'Adopted for pricing',
+  measureWillAdopt: 'Adopted for pricing when saved',
+  measureDiffers: (pricing, form) => `Pricing uses the stored ${pricing}; the product’s box says ${form}`,
+  measurePricingOnly: (pricing) => `Pricing uses the stored ${pricing}`,
+  adoptMeasure: 'Use the box measurement for pricing',
+  measureInherits: 'Inherits the product’s measurement',
   additional: 'Additional costs per piece (IQD)',
   minProfit: 'Minimum profit (USD)',
   minProfitHint: 'The least profit in USD above today’s cost; leave it empty to inherit',
@@ -105,24 +194,37 @@ const en: UsdPricingFormStrings = {
   extraHint: 'In dinars, a multiple of 1,000; added to direct sale after rounding',
   inheritPlaceholder: (v) => `Inherits: ${v}`,
   save: 'Save USD pricing',
-  saveHint: 'Saved separately from the product’s save button',
+  saveHint: 'Also saved with “Publish” or “Draft” at the bottom of the page',
   saved: 'Pricing data saved',
+  savedWithProduct: 'USD pricing saved with the product',
+  pricingNotSaved: (m) => `The product was saved, but the USD pricing was not: ${m}`,
+  reviewConversion: 'Check the dinar conversion in the preview, then save the pricing',
   unsaved: 'Unsaved changes',
   discard: 'Discard changes',
-  saveFirst: 'Save the product first, then enter its USD pricing here',
-  optionsTitle: 'USD pricing per model',
-  optionsIntro: 'An empty field inherits the product’s value. Colours follow their model’s pricing until per-colour pricing is available.',
-  newOptionsSaveFirst: 'New models appear here after the product is saved',
+  summaryAfterFirstSave: 'The summary appears after the product’s first save; these values are saved with it',
   edit: 'Edit',
   modelsSummary: (ok, all) => `${ok} of ${all} models priced — each model’s summary is under “Options & colours”`,
   pricesLater: 'This is pricing data only; the store price stays as it is until the new price is applied',
-  weightInvalid: 'Enter a weight above zero with at most three decimals',
   decimalInvalid: 'Enter a number above zero',
   extraInvalid: 'Enter an amount in dinars that is a multiple of 1,000',
   pricingWeightWins: 'The stored pricing weight is used instead of this weight',
-  convertedNote: (amount, rate) => `${amount} IQD was entered and converted once at ${rate}`,
   loading: 'Loading pricing…',
   retry: 'Retry',
+  storePrice: 'Current store price',
+  storePriceEngine: 'Written by the pricing engine from “USD pricing and shipping” below; not edited by hand',
+  storePriceManual: 'The price stays manual until this product is adopted by the pricing engine',
+  legacyCost: 'Legacy cost (IQD)',
+  legacyCostTip: 'Admin only. Used by profit for products with no purchase batches; the USD pricing does not read it.',
+  modelTitle: 'USD pricing for this model',
+  customerPrice: (p) => `Computed customer price: ${p}`,
+  directPrice: (p) => `Direct sale: ${p}`,
+  modelBlocked: 'Not priced yet — open “Edit”',
+  coloursFollow: 'This model’s colours follow its pricing until per-colour pricing is available',
+  modelSavedLater: 'A new model: its pricing is saved after the product is saved, and its summary appears then',
+  previewTitle: 'New prices per model and sale channel',
+  previewNote: 'Preview only: customer prices are not written at this stage, and the store price stays as it is',
+  previewIncludesDrafts: 'Includes unsaved pricing changes',
+  previewEmpty: 'No model is on sale now',
 };
 
 const ckb: UsdPricingFormStrings = {
@@ -130,11 +232,31 @@ const ckb: UsdPricingFormStrings = {
   formIntro: 'تێچووی دابینکەر بە دراوەکەی خۆی، ڕێگای ناردن و کێش یان قەبارە، تێچووە زیادەکان و کەمترین قازانجی مەبەست بە دۆلار. نرخی کۆتایی بۆ کڕیار لەم بەهایانە هەژمار دەکرێت.',
   productLevel: 'بەرهەم (هەموو مۆدێلەکان)',
   supplierCost: 'تێچووی دابینکەر بۆ هەر پارچەیەک',
+  supplierCostIqd: 'تێچووی دابینکەر بە دینار',
   supplierCurrency: 'دراوی دابینکەر',
+  currencyIqd: 'دینار (یەکجار دەگۆڕدرێت بۆ USD)',
+  iqdHint: 'دیناری تەواو؛ لە کاتی پاشەکەوتکردندا یەکجار بە نرخی کارپێکراوی دۆلار دەگۆڕدرێت بۆ دۆلار، و دواتر بە گۆڕانی نرخ ناگۆڕێت',
+  iqdWillConvert: (usd, rate) => `وەک $${usd} پاشەکەوت دەکرێت، بە نرخی ${rate} د.ع بۆ هەر دۆلارێک`,
+  convertedOn: (amount, rate, date) => `${amount} د.ع یەکجار بە نرخی ${rate} لە ${date} گۆڕدرا`,
+  reconvert: (rate) => `دووبارە بە نرخی ئەمڕۆ ${rate} بیگۆڕە`,
+  iqdInvalid: 'بڕێکی تەواو بە دینار لە سەرووی سفر بنووسە',
   route: 'ڕێگای بنەڕەتیی ناردن',
   routeNone: '— بێ ڕێگا —',
   weightKg: 'کێش لەگەڵ پاکێج (کگم)',
-  volumeCbm: 'قەبارە لەگەڵ پاکێج (CBM)',
+  boxWidth: 'پانیی سندوقەکە (سم)',
+  boxDepth: 'قووڵیی سندوقەکە (سم)',
+  boxHeight: 'بەرزیی سندوقەکە (سم)',
+  measureFromForm: 'هەمان خانەی «پێوانەکان و کێش»: لەگەڵ بەرهەمەکە پاشەکەوت دەکرێت، و لە کاتی پاشەکەوتکردندا بۆ نرخدانان پەسەند دەکرێت',
+  boxIncomplete: 'هەر سێ پێوانەی سندوقەکە پڕ بکەرەوە بۆ ئەوەی قەبارە هەژمار بکرێت',
+  cbmComputed: (cbm) => `قەبارە لە سندوقەکەوە: ${cbm} CBM`,
+  manualCbm: 'قەبارەی دەستی (CBM) — ئارەزوومەندانە',
+  manualCbmHint: 'لە قەبارەی سندوقەکە پێشتر دێت؛ بەتاڵی بهێڵەوە بۆ ئەوەی لە پێوانەکان هەژمار بکرێت',
+  measureAdopted: 'بۆ نرخدانان پەسەندکراوە',
+  measureWillAdopt: 'لە کاتی پاشەکەوتکردندا بۆ نرخدانان پەسەند دەکرێت',
+  measureDiffers: (pricing, form) => `نرخدانان ${pricing}ی پاشەکەوتکراو بەکاردەهێنێت، و پێوانەی سندوقی بەرهەمەکە ${form}ە`,
+  measurePricingOnly: (pricing) => `نرخدانان ${pricing}ی پاشەکەوتکراو بەکاردەهێنێت`,
+  adoptMeasure: 'پێوانەی سندوقەکە بۆ نرخدانان بەکاربهێنە',
+  measureInherits: 'پێوانەی بەرهەمەکە وەردەگرێت',
   additional: 'تێچووە زیادەکان بۆ هەر پارچەیەک (د.ع)',
   minProfit: 'کەمترین قازانجی مەبەست (USD)',
   minProfitHint: 'کەمترین قازانج بە دۆلار لە سەرووی تێچووی ئێستا؛ بەتاڵی بهێڵەوە بۆ ئەوەی لە ئاستی سەرەوە وەربگیرێت',
@@ -142,24 +264,37 @@ const ckb: UsdPricingFormStrings = {
   extraHint: 'بە دینار و چەندجارەی 1,000؛ دوای خڕکردنەوە بۆ فرۆشتنی ڕاستەوخۆ زیاد دەکرێت',
   inheritPlaceholder: (v) => `وەرگیراو: ${v}`,
   save: 'پاشەکەوتکردنی نرخدانان بە دۆلار',
-  saveHint: 'جیا لە دوگمەی پاشەکەوتکردنی بەرهەمەکە پاشەکەوت دەکرێت',
+  saveHint: 'لەگەڵ دوگمەی «بڵاوکردنەوە» یان «ڕەشنووس»ی خوارەوەی پەڕەکەش پاشەکەوت دەکرێت',
   saved: 'زانیارییەکانی نرخدانان پاشەکەوت کران',
+  savedWithProduct: 'نرخدانان بە دۆلار لەگەڵ بەرهەمەکە پاشەکەوت کرا',
+  pricingNotSaved: (m) => `بەرهەمەکە پاشەکەوت کرا، بەڵام نرخدانان بە دۆلار پاشەکەوت نەکرا: ${m}`,
+  reviewConversion: 'گۆڕینی دینار لە پێشبینینەکەدا بپشکنە، پاشان نرخدانانەکە پاشەکەوت بکە',
   unsaved: 'گۆڕانکاریی پاشەکەوتنەکراو',
   discard: 'وازهێنان لە گۆڕانکارییەکان',
-  saveFirst: 'سەرەتا بەرهەمەکە پاشەکەوت بکە، پاشان نرخدانانی بە دۆلار لێرە بنووسە',
-  optionsTitle: 'نرخدانان بە دۆلار بۆ هەر مۆدێلێک',
-  optionsIntro: 'خانەی بەتاڵ بەهای بەرهەمەکە وەردەگرێت. ڕەنگەکان نرخدانانی مۆدێلەکەیان پەیڕەو دەکەن تا نرخدانانی هەر ڕەنگێک بە جیا بەردەست دەبێت.',
-  newOptionsSaveFirst: 'مۆدێلە نوێیەکان دوای پاشەکەوتکردنی بەرهەمەکە لێرە دەردەکەون',
+  summaryAfterFirstSave: 'پوختەکە دوای یەکەم پاشەکەوتکردنی بەرهەمەکە دەردەکەوێت؛ ئەم بەهایانە لەگەڵیدا پاشەکەوت دەکرێن',
   edit: 'دەستکاری',
   modelsSummary: (ok, all) => `${ok} لە ${all} مۆدێل نرخیان هەژمار کراوە — پوختەی هەر مۆدێلێک لە «هەڵبژاردەکان و ڕەنگەکان»`,
   pricesLater: 'ئەمە تەنها زانیاریی نرخدانانە؛ نرخی فرۆشگا وەک خۆی دەمێنێتەوە تا نرخە نوێیەکە جێبەجێ دەکرێت',
-  weightInvalid: 'کێشێکی سەرووی سفر بنووسە بە زۆرترین سێ ژمارەی دوای فاریزە',
   decimalInvalid: 'ژمارەیەکی سەرووی سفر بنووسە',
   extraInvalid: 'بڕێک بە دینار بنووسە کە چەندجارەی 1,000 بێت',
   pricingWeightWins: 'کێشی نرخدانانی پاشەکەوتکراو لە جیاتی ئەم کێشە بەکاردێت',
-  convertedNote: (amount, rate) => `${amount} د.ع نووسرا و یەکجار بە نرخی ${rate} گۆڕدرا`,
   loading: 'نرخدانان بار دەکرێت…',
   retry: 'دووبارە هەوڵبدەرەوە',
+  storePrice: 'نرخی ئێستای فرۆشگا',
+  storePriceEngine: 'بزوێنەری نرخدانان لە «نرخدانان بە دۆلار و ناردن»ی خوارەوە دەینووسێت؛ بە دەست دەستکاری ناکرێت',
+  storePriceManual: 'نرخەکە دەستی دەمێنێتەوە تا ئەم بەرهەمە لە بزوێنەری نرخداناندا پەسەند دەکرێت',
+  legacyCost: 'تێچووی کۆن (د.ع)',
+  legacyCostTip: 'تەنها بۆ بەڕێوەبەر. لە قازانجدا بۆ ئەو بەرهەمانە بەکاردێت کە هیچ وەجبەیەکی کڕینیان نییە؛ نرخدانان بە دۆلار نایخوێنێتەوە.',
+  modelTitle: 'نرخدانان بە دۆلار بۆ ئەم مۆدێلە',
+  customerPrice: (p) => `نرخی هەژمارکراوی کڕیار: ${p}`,
+  directPrice: (p) => `فرۆشتنی ڕاستەوخۆ: ${p}`,
+  modelBlocked: 'هێشتا نرخ هەژمار نەکراوە — «دەستکاری» بکەرەوە',
+  coloursFollow: 'ڕەنگەکانی ئەم مۆدێلە نرخدانانەکەی پەیڕەو دەکەن تا نرخدانانی هەر ڕەنگێک بە جیا بەردەست دەبێت',
+  modelSavedLater: 'مۆدێلی نوێ: نرخدانانەکەی دوای پاشەکەوتکردنی بەرهەمەکە پاشەکەوت دەکرێت و پوختەکەی ئەو کاتە دەردەکەوێت',
+  previewTitle: 'نرخە نوێیەکان بۆ هەر مۆدێل و ڕێگایەکی فرۆشتن',
+  previewNote: 'تەنها پێشبینین: لەم قۆناغەدا نرخی کڕیار نانووسرێت و نرخی فرۆشگا وەک خۆی دەمێنێتەوە',
+  previewIncludesDrafts: 'گۆڕانکارییە پاشەکەوتنەکراوەکانی نرخدانان لەخۆ دەگرێت',
+  previewEmpty: 'ئێستا هیچ مۆدێلێک بۆ فرۆشتن پیشان نادرێت',
 };
 
 export const USD_PRICING_FORM_STRINGS: Readonly<Record<Language, UsdPricingFormStrings>> = { ar, en, ckb };

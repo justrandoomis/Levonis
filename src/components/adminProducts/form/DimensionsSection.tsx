@@ -57,7 +57,7 @@ export function inheritedMeasurementPlaceholder(
   return `Inherited / من الأعلى · ${formatted} ${unit}`;
 }
 
-function MeasurementInput({
+export function MeasurementInput({
   value,
   inherited,
   scale,

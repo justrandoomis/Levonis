@@ -209,7 +209,8 @@ interface ProductInput {
   stored: ProductPricingData;
 }
 
-function canonical(value: unknown): string {
+/** Canonical JSON (keys sorted, undefined dropped): the basis of every preview hash. */
+export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') {
     return `{${Object.keys(value as Record<string, unknown>)
@@ -236,20 +237,7 @@ export async function previewProduct(p: PurchaseForPricing, input: ProductInput,
   const inputs = mergedInputs(stored.inputs, derived.entries.map((e) => e.write));
   const rules: PricingRuleRow[] = mergedRules(stored, ruleWrites);
   const legacy = evaluateLegacy(pid, input.loaded.doc, input.loaded.view, ctx);
-  const u = rates?.usd_iqd ?? null;
-  const models = legacy.models.map((m) => {
-    const channels = m.channels.filter((c) => c.ok).map((c) => c.channel);
-    if (!rates || !channels.length) return { option_id: m.option_id, names: namesOf(m.option), channels: m.channels, result: null };
-    const at = ruleTargetOf(pid, m.option_id);
-    const result = priceSku({
-      chain: chainOf(inputs, m.option_id),
-      rates: rates.central,
-      channels,
-      target: resolveRuleAt(rules, 'target_profit', at, { usdIqdRate: u }),
-      extra: channels.includes('direct_sale') ? resolveRuleAt(rules, 'direct_sale_extra', at) : null,
-    });
-    return { option_id: m.option_id, names: namesOf(m.option), channels: m.channels, result };
-  });
+  const models = priceModels(pid, legacy.models, inputs, rules, rates);
   const missing = rates ? [...new Set(models.flatMap((m) => (m.result ? uniqueCodes(m.result.issues) : [])))].sort() : ['FX_RATE_MISSING'];
   const feeds = productLines.some((l) => lineFeeds(p, l, optIn));
   const reason = purchaseIneligibility({ status: p.status, cost_state: p.cost_state, lines: productLines });
@@ -292,6 +280,38 @@ export async function previewProduct(p: PurchaseForPricing, input: ProductInput,
     missing_codes: missing,
     cod_as_direct: legacy.models.some((m) => m.channels.some((c) => c.ok && c.cod_as_direct)),
   };
+}
+
+/** One model priced by E1 on every channel it sells today (the six decision-8 figures come from here). */
+export type PricedModel = ProductPreview['models'][number];
+
+/**
+ * Every model of a product priced by E1 on each channel it sells today, from
+ * the inputs and rules given (stored, or with drafts laid over) at the
+ * versioned reader's central rates — the procurement review and the product
+ * form's «المعاينة والحفظ» alike. Read only.
+ */
+export function priceModels(
+  productId: string,
+  models: readonly ModelToday[],
+  inputs: ReadonlyArray<Partial<StoredInputRow>>,
+  rules: readonly PricingRuleRow[],
+  rates: PricingRates | null
+): PricedModel[] {
+  const u = rates?.usd_iqd ?? null;
+  return models.map((m) => {
+    const channels = m.channels.filter((c) => c.ok).map((c) => c.channel);
+    if (!rates || !channels.length) return { option_id: m.option_id, names: namesOf(m.option), channels: m.channels, result: null };
+    const at = ruleTargetOf(productId, m.option_id);
+    const result = priceSku({
+      chain: chainOf(inputs, m.option_id),
+      rates: rates.central,
+      channels,
+      target: resolveRuleAt(rules, 'target_profit', at, { usdIqdRate: u }),
+      extra: channels.includes('direct_sale') ? resolveRuleAt(rules, 'direct_sale_extra', at) : null,
+    });
+    return { option_id: m.option_id, names: namesOf(m.option), channels: m.channels, result };
+  });
 }
 
 function namesOf(option: { name_ar?: string; name_en?: string; name_ckb?: string } | null) {

@@ -91,6 +91,7 @@ import {
   ruleImage,
   ruleStatements,
   ruleWriteIsNoop,
+  storedIqdOf,
   type ProductPricingData,
   type RuleWrite,
 } from '../lib/pricingEngine/store';
@@ -102,7 +103,7 @@ import { evaluateLegacy } from '../lib/pricingEngine/legacy';
 import { legacyHashOf } from '../lib/pricingEngine/legacyHash';
 import { parseProcurementDraft } from '../lib/procurementDraft';
 import { committedPurchaseForPricing, draftForPricing } from '../lib/pricingEngine/purchaseRead';
-import { parseProductInputs, productInputsAnswer } from '../lib/pricingEngine/productInputs';
+import { formPreviewHash, parseProductInputs, productInputsAnswer } from '../lib/pricingEngine/productInputs';
 
 export const adminPricingRoutes = new Hono<AppContext>();
 
@@ -677,39 +678,54 @@ async function productInputsContext(c: Context<AppContext>) {
 
 adminPricingRoutes.get('/products/:id/inputs', async (c) => {
   const { rates, loaded, stored, ctx } = await productInputsContext(c);
-  return c.json(productInputsAnswer(loaded, stored, ctx, rates));
+  return c.json(await productInputsAnswer(loaded, stored, ctx, rates));
 });
 
 adminPricingRoutes.post('/products/:id/preview', async (c) => {
   const body = strictBody(await jsonObject(c), ['draft']);
   const { rates, loaded, stored, ctx } = await productInputsContext(c);
-  const draft = parseProductInputs(strictBody(body.draft ?? {}, ['inputs', 'rules']), loaded, stored);
-  return c.json(productInputsAnswer(loaded, stored, ctx, rates, draft));
+  const draft = parseProductInputs(strictBody(body.draft ?? {}, ['inputs', 'rules']), loaded, stored, { rates, now: new Date().toISOString() });
+  return c.json(await productInputsAnswer(loaded, stored, ctx, rates, draft));
 });
 
 const FORM_STATEMENT_CAP = 200;
 
 adminPricingRoutes.put('/products/:id/inputs', async (c) => {
   assertCostWrite(c);
-  const body = strictBody(await jsonObject(c), ['inputs_seq', 'inputs', 'rules']);
+  const body = strictBody(await jsonObject(c), ['inputs_seq', 'inputs', 'rules', 'preview_hash']);
   const { db, rates, loaded, stored, ctx } = await productInputsContext(c);
   if (rates.derived_stale) throw fxRefusal(409, 'FX_DERIVED_STALE');
   const pid = loaded.id;
   if (typeof body.inputs_seq !== 'number' || !Number.isSafeInteger(body.inputs_seq) || body.inputs_seq < 0) throw inputInvalid('inputs_seq');
   // Fenced on what the owner looked at: a purchase applied or a second tab saved since is a fresh look.
   if (body.inputs_seq !== (stored.state?.inputs_seq ?? 0)) throw fxRefusal(409, 'PRICING_CHANGED');
-  const draft = parseProductInputs(body, loaded, stored);
+  const now = new Date().toISOString();
+  const draft = parseProductInputs(body, loaded, stored, { rates, now });
+  // Typed dinars convert at the rate the owner was shown (FX plan §12): the preview's hash, recomputed now.
+  if (draft.iqd.length) {
+    if (typeof body.preview_hash !== 'string' || !/^[0-9a-f]{64}$/.test(body.preview_hash)) throw inputInvalid('preview_hash');
+    if (body.preview_hash !== (await formPreviewHash(pid, draft.iqd, rates))) throw fxRefusal(409, 'PRICING_PREVIEW_STALE');
+  }
   const inputWrites = draft.inputs.filter((w) => !inputWriteIsNoop(w));
   const ruleWrites = draft.rules.filter((w) => !ruleWriteIsNoop(w));
   if (inputWrites.length || ruleWrites.length) {
     const actor = c.get('user')!.id;
-    const now = new Date().toISOString();
     const statements = [
       ...batchHead(db, stored, now),
       ...inputStatements(db, pid, inputWrites, actor, now),
       ...ruleStatements(db, pid, ruleWrites, actor, now),
       ...inputWrites.map((w) =>
-        pricingAuditStatement(db, { entity: 'input', entity_key: `${w.scope}:${w.scope_id}`, product_id: pid, action: 'update', before: inputImage(w.existing), after: inputImage(nextInputRow(w)), summary: { source: 'product_form' }, actor, now })
+        pricingAuditStatement(db, {
+          entity: 'input',
+          entity_key: `${w.scope}:${w.scope_id}`,
+          product_id: pid,
+          action: 'update',
+          before: inputImage(w.existing ? { ...w.existing, iqd: storedIqdOf(w.existing) } : null),
+          after: inputImage(nextInputRow(w)),
+          summary: { source: 'product_form' },
+          actor,
+          now,
+        })
       ),
       ...ruleWrites.map((w) =>
         pricingAuditStatement(db, { entity: 'rule', entity_key: `${w.kind}:${w.scope}:${w.scope_id}`, product_id: pid, action: 'rule_set', before: ruleImage(w.existing), after: ruleImage(w.next), summary: { source: 'product_form' }, actor, now })
@@ -726,7 +742,7 @@ adminPricingRoutes.put('/products/:id/inputs', async (c) => {
     }
   }
   const after = await loadProductPricing(db, pid);
-  return c.json(productInputsAnswer(loaded, after, ctx, rates));
+  return c.json(await productInputsAnswer(loaded, after, ctx, rates));
 });
 
 adminPricingRoutes.post('/products/:id/targets/adopt', async (c) => {

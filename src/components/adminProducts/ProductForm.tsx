@@ -44,9 +44,19 @@ import { refusalIssues } from './applyResult';
 import { contractRefusal, refusalLang } from '../../lib/refusalStrings';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
-import { UsdPricingOptionsPanel, UsdPricingProductPanel, UsdPricingProvider } from './form/UsdPricingSection';
+import {
+  UsdPricingModelRow,
+  UsdPricingOptionsFooter,
+  UsdPricingPreview,
+  UsdPricingProductPanel,
+  UsdPricingProvider,
+  useUsdPricingState,
+  type FormModel,
+  type UsdPricingFormContext,
+} from './form/UsdPricingSection';
+import { USD_PRICING_FORM_STRINGS, usdPricingFormStrings } from './form/usdPricingStrings';
 import { emptyDimensions } from '../../lib/productTypes';
-import type { BrandV2, CatalogV2 } from '../../lib/productTypes';
+import type { BrandV2, CatalogV2, ProductDimensionsV2 } from '../../lib/productTypes';
 import {
   blankDoc,
   defaultProductDeliveryOptions,
@@ -637,6 +647,69 @@ export default function ProductForm({
     [isPrinterCatalog, doc.warranty_plans, doc.serialized, doc.warranty_base_months]
   );
 
+  // ------------------------------------------------- «التسعير بالدولار والشحن»
+  // The owner's USD pricing lives in this form (sections ٣, ٥ and ٨) and saves
+  // through the pricing door with this form's own save. Its measure is the
+  // form's package measurement — the same state as «الأبعاد والوزن», never a
+  // second copy (form/UsdPricingSection.tsx). Inert for everyone but the owner.
+  const savedMeasures = useMemo(() => {
+    const options: Record<string, ProductDimensionsV2 | undefined> = {};
+    try {
+      const b = baseline ? (JSON.parse(baseline) as { d: EditorDoc; rs: RelationsState }) : null;
+      for (const g of b?.rs.groups ?? []) for (const v of g.values) options[v.id] = v.dimensions;
+      return { base: b?.d.dimensions ?? null, options };
+    } catch {
+      return { base: null, options };
+    }
+  }, [baseline]);
+  const pricingModels = useMemo<FormModel[]>(
+    () =>
+      rel.groups.flatMap((g) =>
+        g.values
+          .filter((v) => v.active !== false)
+          .map((v) => ({
+            id: v.id,
+            name_en: v.name_en,
+            name_ar: v.name_ar,
+            name_ckb: v.name_ckb,
+            sells_direct: v.fulfillments.some((f) => f.fulfillment_type === 'direct_sale' && f.enabled),
+          }))
+      ),
+    [rel.groups]
+  );
+  const optionDimensions = useMemo(
+    () => Object.fromEntries(rel.groups.flatMap((g) => g.values.map((v) => [v.id, v.dimensions] as const))),
+    [rel.groups]
+  );
+  const setPricingMeasure = useCallback((scope: 'base' | 'option', id: string, patch: Partial<ProductDimensionsV2>) => {
+    if (scope === 'base') {
+      setDoc((d) => ({ ...d, dimensions: { ...(d.dimensions ?? emptyDimensions()), ...patch } }));
+      return;
+    }
+    setRel((r) => ({
+      ...r,
+      groups: r.groups.map((g) => ({
+        ...g,
+        values: g.values.map((v) => (v.id === id ? { ...v, dimensions: { ...(v.dimensions ?? emptyDimensions()), ...patch } } : v)),
+      })),
+    }));
+  }, []);
+  const pricingForm = useMemo<UsdPricingFormContext>(
+    () => ({
+      baseDimensions: doc.dimensions,
+      optionDimensions,
+      savedBaseDimensions: savedMeasures.base,
+      savedOptionDimensions: savedMeasures.options,
+      models: pricingModels,
+      productSellsDirect: doc.sale_types.includes('direct_sale' as SaleType),
+      setMeasure: setPricingMeasure,
+    }),
+    [doc.dimensions, optionDimensions, savedMeasures, pricingModels, doc.sale_types, setPricingMeasure]
+  );
+  const pricing = useUsdPricingState({ productId: doc.id || null, enabled: canSeeCost, form: pricingForm });
+  const us = usdPricingFormStrings(lang);
+  const usEn = USD_PRICING_FORM_STRINGS.en;
+
   const errors: FormErrors = useMemo(
     () =>
       validateForm({
@@ -724,6 +797,8 @@ export default function ProductForm({
     setSaving(true);
     setSaveErr(null);
     setSaveNote(null);
+    // The owner's USD pricing as typed now; it follows the product through the pricing door.
+    const pricingSnap = pricing.snapshot();
     try {
       // The document WITHOUT its derived copies of the structure: `options`,
       // `colors` and `media` have no editor here, and the server rebuilds the
@@ -782,6 +857,15 @@ export default function ProductForm({
       baselineGeneration.current += 1;
       setBaseline(JSON.stringify({ d: freshDoc, rs: savedRel }));
       setShowErrors(false);
+      // The pricing after the product (the models it names exist now); a refusal
+      // there keeps the typed values and never fails the product's own save.
+      if (pricingSnap && savedId) {
+        const priced = await pricing.saveAfterProduct(savedId, pricingSnap);
+        const warned = res.warnings?.length ? res.warnings.join(' · ') : '';
+        if (priced.message) setSaveNote([warned, priced.message].filter(Boolean).join(' · '));
+      } else if (canSeeCost && savedId) {
+        pricing.reload();
+      }
       onListChanged();
       if (!productId && savedId) {
         // Reload so the new id is reflected everywhere (relations, preview).
@@ -908,8 +992,8 @@ export default function ProductForm({
     // min-w-0 on the outer column is what keeps a long value from widening the
     // whole admin page, and there is no bottom padding: this screen owns its
     // own bottom edge (see the effect above and the save bar below).
-    // «التسعير بالدولار والشحن»: one state for its two mount points (sections ٣ and ٥).
-    <UsdPricingProvider productId={doc.id || null} enabled={canSeeCost}>
+    // «التسعير بالدولار والشحن»: one state for its mount points (sections ٣, ٥ and ٨).
+    <UsdPricingProvider value={pricing}>
     <div ref={columnRef} className="min-w-0 w-full max-w-[880px] mx-auto px-3">
       <div className="flex items-center gap-2 py-3 min-w-0">
         <button type="button" onClick={onBack} className={`${btnGhost} h-10 px-2.5`} aria-label="رجوع">
@@ -1347,11 +1431,20 @@ export default function ProductForm({
       >
         {showErrors && errors.prices && <Banner kind="error">{errors.prices}</Banner>}
         <Grid cols={3}>
+          {/* An engine-priced product's price is the engine's (the owner sees it
+              as «سعر المتجر الحالي», read only); every other product — and every
+              other admin — keeps the editable «السعر» exactly as before. */}
+          {canSeeCost && pricing.engine ? (
+            <Field ar={us.storePrice} en={lang === 'en' ? '' : usEn.storePrice} hint={us.storePriceEngine}>
+              <TextInput readOnly aria-readonly="true" data-form="store-price-engine" value={doc.price_iqd === null ? '—' : formatIqd(doc.price_iqd)} />
+            </Field>
+          ) : (
           <Field
             ar="السعر"
             en="Price"
             required
             error={err('price_iqd')}
+            hint={canSeeCost && pricing.answer && doc.id ? us.storePriceManual : undefined}
             tip="الخيار أو اللون الذي له سعر خاص يستبدل هذا السعر ولا يُضاف إليه. إن غيّرت هذا الرقم وكانت هناك أسعار خاصة، ستُسأل عمّا تفعل بها."
           >
             <Money
@@ -1367,6 +1460,7 @@ export default function ProductForm({
               />
             )}
           </Field>
+          )}
           {/*
             THE SAME FOLD AS EVERY OPTION AND COLOUR ROW, so one control means
             one thing everywhere in this form. The product row is the one rung
@@ -1400,8 +1494,10 @@ export default function ProductForm({
               </Grid>
             </TierPriceDisclosure>
           )}
+          {/* The owner's old dinar cost, shown as what it is now: the legacy cost
+              profit falls back to; the USD pricing below never reads it. */}
           {costShown && (
-            <Field ar="التكلفة" en="Cost" tip="إداري فقط — لا تظهر للعميل ولا لمساعد الأدمن، ولا في أي تصدير. تُستخدم للمنتجات التي لا دفعات شراء لها؛ ما على الرف قد يحمل تكاليف أخرى.">
+            <Field ar={us.legacyCost} en={lang === 'en' ? '' : usEn.legacyCost} tip={us.legacyCostTip}>
               <Money value={doc.product_cost_iqd} onChange={(v) => setDoc((d) => ({ ...d, product_cost_iqd: v }))} />
             </Field>
           )}
@@ -1711,9 +1807,18 @@ export default function ProductForm({
           baseDimensions={doc.dimensions ?? emptyDimensions()}
           canSeeCost={costShown}
           errors={showErrors ? errors : {}}
+          // Each model's own USD pricing (empty = the product's), its computed
+          // customer price and its 4-cell summary, inside the model's card.
+          valueExtra={
+            canSeeCost
+              ? (v) => {
+                  const model = pricingModels.find((m) => m.id === v.id);
+                  return model ? <UsdPricingModelRow model={model} /> : null;
+                }
+              : undefined
+          }
         />
-        {/* Each saved model's own USD pricing (empty = the product's) and its 4-cell summary. */}
-        {canSeeCost && <UsdPricingOptionsPanel formModelIds={rel.groups.flatMap((g) => g.values.filter((v) => v.active).map((v) => v.id))} />}
+        {canSeeCost && <UsdPricingOptionsFooter />}
       </SectionCard>
 
       {/* 6 ───────────────────────────────────────────────────────── images */}
@@ -1937,6 +2042,8 @@ export default function ProductForm({
           <Row k="الخيارات / الألوان" v={`${valueCount} / ${rel.colors.length}`} />
           <Row k="الصور" v={String(rel.images.length)} />
         </div>
+        {/* Owner decision 8's six figures per model × channel, with the unsaved pricing. */}
+        {canSeeCost && <UsdPricingPreview />}
         {previewOpen && (
           <div className="mt-3 rounded-lg border border-zinc-800 bg-black/30 p-3 min-w-0">
             <pre className="text-[11px] text-zinc-400 overflow-x-auto" dir="ltr">

@@ -3,7 +3,7 @@ import { useLanguage } from '../../LanguageContext';
 import { ApiError } from '../../lib/api';
 import { COST_REFUSALS } from '../../../packages/contracts/src/costRefusals';
 import { T, money } from './shared';
-import { applyPurchase, type PricingChoices, type PricingPreview, type PricingProduct } from './procurementPricing';
+import { applyPurchase, type PricingChoices, type PricingPreview, type PricingPreviewRow, type PricingProduct } from './procurementPricing';
 import { channelName, issueText, procurementPricingStrings, profileName } from './procurementPricingStrings';
 
 /**
@@ -41,8 +41,6 @@ export default function ProcurementPricingReview({ preview, busy, usePurchase, p
 function ProductPreview({ p, use, prefer, onUse, onPrefer }: { p: PricingProduct; use: boolean; prefer: boolean; onUse: (v: boolean) => void; onPrefer: (v: boolean) => void }) {
   const { lang } = useLanguage();
   const s = procurementPricingStrings(lang);
-  const arrow = lang === 'en' ? '→' : '←';
-  const modelName = (r: PricingProduct['rows'][number]) => (lang === 'en' ? r.name_en || r.name_ar : lang === 'ckb' ? r.name_ckb || r.name_ar : r.name_ar || r.name_en) || '—';
   const notices: string[] = [];
   if (p.reason === 'estimated') notices.push(s.estimated);
   if (p.shadowed.length) notices.push(s.shadowed);
@@ -55,42 +53,57 @@ function ProductPreview({ p, use, prefer, onUse, onPrefer }: { p: PricingProduct
       {p.feeds && <label className="mt-2 flex gap-2 text-sm"><input type="checkbox" checked={use} onChange={(e) => onUse(e.target.checked)} />{s.usePurchase}</label>}
       {p.entries.some((e) => e.narrow) && <label className="mt-1 flex gap-2 text-sm"><input type="checkbox" checked={prefer} onChange={(e) => onPrefer(e.target.checked)} />{s.preferPurchase}</label>}
       {notices.length > 0 && <ul className={`mt-2 grid gap-1 text-[13px] ${T.text2}`}>{notices.map((n, i) => <li key={i}>{n}</li>)}</ul>}
-      {p.rows.length > 0 && (
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[640px] text-start text-[13px] tabular-nums">
-            <thead>
-              <tr className={T.text3}>
-                {[s.colModel, s.colChannel, s.colReplacement, s.colMinProfit, s.colNewPreorder, s.colExtra, s.colNewDirect, s.colOldNew].map((h) => (
-                  <th key={h} scope="col" className="border-b border-[var(--ap-border)] px-2 py-1.5 text-start font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {p.rows.map((r) => {
-                const direct = r.channel === 'direct_sale';
-                const fig = (v: React.ReactNode) => <bdi dir="ltr" className="whitespace-nowrap">{v}</bdi>;
-                return (
-                  <tr key={`${r.option_id}:${r.channel}`} className="border-b border-[var(--ap-border)] align-top">
-                    <td className="px-2 py-1.5">{modelName(r)}</td>
-                    <td className="px-2 py-1.5">{channelName(r.channel, lang)}</td>
-                    <td className="px-2 py-1.5">{fig(money(r.replacement_cost_iqd))}</td>
-                    <td className="px-2 py-1.5">{fig(r.target_profit_usd ? `$${r.target_profit_usd}` : money(r.target_profit_iqd))}</td>
-                    <td className="px-2 py-1.5">{fig(direct ? money(r.preorder_base_iqd) : money(r.computed_price_iqd))}</td>
-                    <td className="px-2 py-1.5">{fig(direct ? money(r.direct_sale_extra_iqd) : '—')}</td>
-                    <td className="px-2 py-1.5">{fig(direct ? money(r.computed_price_iqd) : '—')}</td>
-                    <td className="px-2 py-1.5">
-                      {r.computed_price_iqd == null
-                        ? <span className={T.text3}>{r.issue_codes.map((c) => issueText(c, lang)).join(lang === 'en' ? '; ' : '؛ ') || '—'}</span>
-                        : fig(`${money(r.today_prepaid_iqd)} ${arrow} ${money(r.computed_price_iqd)}`)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {p.rows.length > 0 && <PricingRowsTable rows={p.rows} />}
     </article>
+  );
+}
+
+/**
+ * Owner decision 8's six figures per model × channel — the current
+ * replacement cost, the minimum profit, the new pre-order price, the Direct
+ * Sale Extra, the new direct sale price, and old → new — as the server
+ * answered them (the procurement review and the product form's «المعاينة
+ * والحفظ» alike). It formats; it never computes.
+ */
+export function PricingRowsTable({ rows }: { rows: readonly PricingPreviewRow[] }) {
+  const { lang } = useLanguage();
+  const s = procurementPricingStrings(lang);
+  const arrow = lang === 'en' ? '→' : '←';
+  const modelName = (r: PricingPreviewRow) => (lang === 'en' ? r.name_en || r.name_ar : lang === 'ckb' ? r.name_ckb || r.name_ar : r.name_ar || r.name_en) || '—';
+  return (
+    <div className="mt-3 overflow-x-auto" data-pricing-rows>
+      <table className="w-full min-w-[640px] text-start text-[13px] tabular-nums">
+        <thead>
+          <tr className={T.text3}>
+            {[s.colModel, s.colChannel, s.colReplacement, s.colMinProfit, s.colNewPreorder, s.colExtra, s.colNewDirect, s.colOldNew].map((h) => (
+              <th key={h} scope="col" className="border-b border-[var(--ap-border)] px-2 py-1.5 text-start font-medium">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const direct = r.channel === 'direct_sale';
+            const fig = (v: React.ReactNode) => <bdi dir="ltr" className="whitespace-nowrap">{v}</bdi>;
+            return (
+              <tr key={`${r.option_id}:${r.channel}`} className="border-b border-[var(--ap-border)] align-top">
+                <td className="px-2 py-1.5">{modelName(r)}</td>
+                <td className="px-2 py-1.5">{channelName(r.channel, lang)}</td>
+                <td className="px-2 py-1.5">{fig(money(r.replacement_cost_iqd))}</td>
+                <td className="px-2 py-1.5">{fig(r.target_profit_usd ? `$${r.target_profit_usd}` : money(r.target_profit_iqd))}</td>
+                <td className="px-2 py-1.5">{fig(direct ? money(r.preorder_base_iqd) : money(r.computed_price_iqd))}</td>
+                <td className="px-2 py-1.5">{fig(direct ? money(r.direct_sale_extra_iqd) : '—')}</td>
+                <td className="px-2 py-1.5">{fig(direct ? money(r.computed_price_iqd) : '—')}</td>
+                <td className="px-2 py-1.5">
+                  {r.computed_price_iqd == null
+                    ? <span className={T.text3}>{r.issue_codes.map((c) => issueText(c, lang)).join(lang === 'en' ? '; ' : '؛ ') || '—'}</span>
+                    : fig(`${money(r.today_prepaid_iqd)} ${arrow} ${money(r.computed_price_iqd)}`)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
