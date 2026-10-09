@@ -59,13 +59,28 @@ throughout, never a float.
 - **EUR/IQD and CNY/IQD**: computed centrally in `pricing_fx_rates` whenever
   either side changes, in the same batch (a trigger refuses a stale derived
   row).
-- **The guard**: a rate waits for the owner's approval when it is the first
-  value, jumps more than 3% in one step, moves more than 3% within 24 hours
-  (measured from the rate the owner confirmed, when that was inside the
-  24 hours), or drifts more than 6% from the last confirmed rate. An
-  adjustment moves that confirmed rate by its own change and never re-bases
-  it. A value the owner rejected is not held again for 24 hours, and the
-  rejection never stops an ordinary move. A failing source keeps the last
+- **The guard** (owner decision 11): a rate waits for the owner's approval —
+  status `REVIEW_REQUIRED`, the last confirmed / last known good rate stays
+  in force, nothing is repriced — when it is the first value, jumps more than
+  3% in one step, moves more than 3% against **any** rate in force during the
+  last 24 hours, or drifts more than 6% from the **Confirmed Rate**
+  (`drift_anchor_rate` / `drift_anchor_at`: the last rate the owner approved,
+  set by hand or confirmed with «تأكيد السعر الحالي»; the panel calls it «آخر
+  سعر أكّدته»). The 24-hour references are the rate in force 24 hours ago and
+  every `effective_after` written since (`fx_rate_log`, one indexed read of at
+  most 200 rows); when the owner confirmed a rate inside the window, the
+  Confirmed Rate replaces the first and only the rates after it count — an
+  approval makes the new rate the Confirmed Rate and later measurement starts
+  from it. A USD/IQD reference written under another adjustment is re-based
+  onto today's (`rate − then + now`), so an adjustment change is never a
+  market jump. It **fails closed**: more than 200 rates in the window is held
+  `ANOMALY_24H`; a window the statement budget did not let the scheduler read
+  applies nothing that tick (`DEFERRED` / `FX_GUARD_UNREAD`, one log row, no
+  bell). Exactly 3% (or 6%) applies; above it is held. An adjustment moves
+  the Confirmed Rate by its own change and never re-bases it. A value the
+  owner rejected is not held again for 24 hours, the rejection keeps the
+  Confirmed Rate and the last known good, and it never stops an ordinary
+  move. A failing source keeps the last
   known good rate; a rate is never 0; a candidate out of bounds (an
   adjustment typed wrong) is recorded INVALID for that pair alone.
 - **Small moves are ignored** (owner decision 10): below the dead band —

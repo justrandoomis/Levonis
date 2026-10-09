@@ -198,7 +198,7 @@ test('planFxCommit is pure and ordered: fences first (claimed pairs, then all th
   const raw = allApproved();
   const rows = (await loadPairs(asD1(raw)))!;
   const usd = { ...rows[0]!, lease_token: 'tok', version: rows[0]!.version };
-  const d = decide(usd, { kind: 'quote', market: '1670', buy: null, official: null, sourceUsdPerEur: null, sourceCnyPerEur: null, publishedAtMs: at(-1).getTime() }, { r24: { USD_IQD: null } }, { now: at(0) }, 'refresh');
+  const d = decide(usd, { kind: 'quote', market: '1670', buy: null, official: null, sourceUsdPerEur: null, sourceCnyPerEur: null, publishedAtMs: at(-1).getTime() }, { r24: { USD_IQD: null }, window: { USD_IQD: [] } }, { now: at(0) }, 'refresh');
   let n = 0;
   const plan = planFxCommit([d], [usd], rows, { fence: 'lease', token: 'tok', actor: null, nowIso: at(0).toISOString(), newLogId: () => `id${++n}`, trigger: 'refresh' });
   const kinds = plan.statements.map((s) => (s.kind === 'fence' ? `fence:${/effective_version/.test(s.condition) ? 'all' : 'pair'}` : s.sql.trim().split(/\s+/).slice(0, 3).join(' ')));

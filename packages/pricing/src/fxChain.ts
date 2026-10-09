@@ -69,6 +69,18 @@ export function composeIqdRates(
   };
 }
 
+/**
+ * A USD/IQD rate that was in force under an earlier adjustment, measured as
+ * if the adjustment in force NOW had applied then: rate − then + now, exact
+ * (owner decision 11). The 24-hour guard compares the market's move, not the
+ * owner's: after +20 → +60, the 1,680 of yesterday reads 1,720, and a market
+ * that did not move is not a 3% jump. Null when the result is not above zero.
+ */
+export function rebaseOnAdjustment(rate: string, adjustmentThen: string, adjustmentNow: string): string | null {
+  const v = addProcurementExact(sub(ex(rate), exSigned(adjustmentThen)), exSigned(adjustmentNow));
+  return v.num > 0n ? procurementExactText(v) : null;
+}
+
 /** The current USD cost of a supplier input: USD as is, EUR × E, CNY × C; null when its rate is missing. */
 export function currentUsdCost(
   input: { amount: string; currency: FxSourceCurrency },

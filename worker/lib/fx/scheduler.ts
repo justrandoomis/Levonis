@@ -28,8 +28,8 @@ import { iqwealthKeyState, iqwealthRequest, type IqwealthQuote, type ProviderOut
 import { CALLS_PER_CLAIM, PROVIDER_DAY_CAP, isDue } from './schedule';
 import { fetchEcb, type EcbQuote } from './providers/ecb';
 import { FX_INVOCATION_STATEMENT_BUDGET, statementBudget, type StatementBudget } from './budget';
-import { HOUR_MS, PAIR_COLUMNS, iso, loadPairs, type FxCheckResult, type FxPairId, type FxPairRow } from './pairs';
-import { adjustmentOf, decideSafely, type DecisionContext, type FxAttention, type FxClock, type FxDecision, type FxTrigger, type PairOutcome } from './decide';
+import { PAIR_COLUMNS, iso, loadPairs, type FxCheckResult, type FxPairId, type FxPairRow } from './pairs';
+import { R24_WINDOW_MS, WINDOW_MAX_ROWS, adjustmentOf, decideSafely, type DecisionContext, type FxAttention, type FxClock, type FxDecision, type FxTrigger, type PairOutcome } from './decide';
 import { isFenceMiss, planFxCommit, refusalCodeOf } from './commit';
 import { toStatements } from './write';
 import { notifyOwnerFx } from './notify';
@@ -163,23 +163,53 @@ async function claimLease(
   return claimed;
 }
 
-/** r24 per claimed pair: the `effective_after` of the newest log row at or before now − 24 h (one indexed read each). */
+/**
+ * What the 24-hour guard measures against, per claimed AUTO pair (owner
+ * decision 11), in two indexed reads (idx_fx_rate_log_pair), each charged to
+ * the budget:
+ *   r24     the `effective_after` of the newest log row at or before now − 24 h,
+ *           with the adjustment it carried;
+ *   window  every `effective_after` written after now − 24 h — at most
+ *           WINDOW_MAX_ROWS; one more is 'overflow'.
+ * FAIL CLOSED: a read the budget refuses leaves the pair 'unread' and its
+ * decision applies nothing. (It used to fall back to the anchor silently.)
+ */
 async function loadDecisionContext(db: D1Database, claimed: readonly FxPairRow[], now: Date, budget: StatementBudget): Promise<DecisionContext> {
-  const cutoff = iso(now.getTime() - 24 * HOUR_MS);
+  const cutoff = iso(now.getTime() - R24_WINDOW_MS);
   const r24: DecisionContext['r24'] = {};
+  const window: DecisionContext['window'] = {};
   for (const row of claimed) {
-    if (row.mode !== 'AUTO' || !budget.spend(1)) continue;
+    if (row.mode !== 'AUTO') continue;
+    if (!budget.spend(1)) {
+      window[row.pair] = 'unread';
+      continue;
+    }
     const hit = await db
       .prepare(
-        `SELECT effective_after FROM fx_rate_log
+        `SELECT effective_after, market_adjustment_iqd FROM fx_rate_log
           WHERE pair = ? AND created_at <= ? AND effective_after IS NOT NULL
           ORDER BY created_at DESC, rowid DESC LIMIT 1`
       )
       .bind(row.pair, cutoff)
-      .first<{ effective_after: string }>();
-    r24[row.pair] = hit?.effective_after ?? null;
+      .first<{ effective_after: string; market_adjustment_iqd: string | null }>();
+    r24[row.pair] = hit ? { rate: hit.effective_after, adj: hit.market_adjustment_iqd } : null;
+    if (!budget.spend(1)) {
+      window[row.pair] = 'unread';
+      continue;
+    }
+    const { results } = await db
+      .prepare(
+        `SELECT effective_after, market_adjustment_iqd, created_at FROM fx_rate_log
+          WHERE pair = ? AND created_at > ? AND effective_after IS NOT NULL
+          ORDER BY created_at DESC, rowid DESC LIMIT ?`
+      )
+      .bind(row.pair, cutoff, WINDOW_MAX_ROWS + 1)
+      .all<{ effective_after: string; market_adjustment_iqd: string | null; created_at: string }>();
+    const rows = results ?? [];
+    window[row.pair] =
+      rows.length > WINDOW_MAX_ROWS ? 'overflow' : rows.map((r) => ({ rate: r.effective_after, adj: r.market_adjustment_iqd, at: r.created_at }));
   }
-  return { r24 };
+  return { r24, window };
 }
 
 /** One pair's view of the two provider answers. A rejected promise is a NETWORK failure. */

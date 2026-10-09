@@ -24,6 +24,7 @@ import {
   ratioExceedsPct,
   usdIqdCandidate,
   withinBounds,
+  rebaseOnAdjustment,
 } from '../packages/pricing/src/fxChain';
 import { ceilToPlaces, floorToPlaces, procurementExact, procurementExactText, quotientProcurementExact, mulProcurementExact, ceilProcurementExact } from '../packages/contracts/src/procurementCost';
 
@@ -118,4 +119,13 @@ test('display figures: ppm floored, percent signed and rounded half away from ze
   const sum = sumOfMoves([{ before: '1660', after: '1875.8' }, { before: '1875.8', after: '1631.946' }]);
   assert.equal(ratioExceedsPct(sum, '15'), true);
   assert.equal(ratioExceedsPct(sumOfMoves([{ before: '100', after: '113' }]), '15'), false);
+});
+
+test('a rate written under another adjustment, re-based onto today\'s: rate − then + now, exact; null when it would not stay above zero (owner decision 11)', () => {
+  assert.equal(rebaseOnAdjustment('1680', '20', '60'), '1720');
+  assert.equal(rebaseOnAdjustment('1680', '-20', '0'), '1700');
+  assert.equal(rebaseOnAdjustment('1703.9167', '37.2501', '0'), '1666.6666');
+  assert.equal(rebaseOnAdjustment('1680', '20', '20'), '1680', 'the same adjustment changes nothing');
+  assert.equal(rebaseOnAdjustment('10', '20', '0'), null);
+  assert.equal(rebaseOnAdjustment('20', '20', '0'), null, 'zero is not a rate');
 });

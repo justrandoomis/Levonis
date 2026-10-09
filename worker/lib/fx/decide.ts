@@ -1,10 +1,11 @@
 /**
  * THE DECISION — one pair, one provider outcome, pure (FX programme plan §5.2).
  *
- * Let a = the effective rate, anchor = the last OWNER-CONFIRMED rate, r24 = the
- * rate in force 24 hours ago (the anchor when nothing is that old), T the
- * anomaly threshold, D the drift threshold, M the dead band. The steps run in
- * order and the first that matches decides:
+ * Let a = the effective rate, anchor = the last OWNER-CONFIRMED rate (the
+ * Confirmed Rate), r24 = the rate in force 24 hours ago (the anchor when
+ * nothing is that old), W = every rate in force inside the last 24 hours, T
+ * the anomaly threshold, D the drift threshold, M the dead band. The steps run
+ * in order and the first that matches decides:
  *
  *    1  MANUAL — a refresh only OBSERVES (a log row); nothing owner-visible moves.
  *    2  the provider failed → FAILED / STALE / NOT_CONFIGURED; effective, last
@@ -22,8 +23,17 @@
  *       apply or the dead band (FX-1 review C1, C2).
  *    9  inside the dead band → UNCHANGED (a pending candidate is cleared).
  *   10  beyond T of a → held, ANOMALY.
- *   11  beyond T of r24 → held, ANOMALY_24H; r24 is the anchor when the
- *       owner confirmed a rate in the last 24 h (FX-1 review C5).
+ *   11  beyond T of ANY rate in force during the last 24 hours → held,
+ *       ANOMALY_24H (owner decision 11). The references are r24 — the anchor
+ *       instead when the owner confirmed a rate inside the window (FX-1
+ *       review C5) — and every rate of W after the window's start (after the
+ *       confirmation when there is one: an approval restarts the measurement
+ *       from the Confirmed Rate). A USD/IQD reference taken under another
+ *       adjustment is re-based onto today's (rate − then + now), so an
+ *       adjustment change is never a market jump. FAILS CLOSED: a window
+ *       longer than one read takes ('overflow') is held ANOMALY_24H; a window
+ *       or r24 the statement budget did not let us read ('unread') applies
+ *       nothing this tick — DEFERRED / FX_GUARD_UNREAD, no bell.
  *   12  beyond D of the anchor → held, DRIFT.
  *   13  otherwise APPLIED (the anchor does not move).
  *
@@ -35,6 +45,7 @@ import {
   changePpm,
   movesLessThanPct,
   movesMoreThanPct,
+  rebaseOnAdjustment,
   sameRate,
   usdIqdCandidate,
   withinBounds,
@@ -163,10 +174,38 @@ export interface FxDecision {
   attention: FxAttention | null;
 }
 
-/** The 24-hour reference of each claimed pair: the effective rate in force 24 h ago, or null. */
-export interface DecisionContext {
-  r24: Partial<Record<FxPairId, string | null>>;
+/** A rate in force at some moment, with the USD/IQD adjustment it carried (null: an ECB pair, or not known). */
+export interface RateInForce {
+  rate: string;
+  adj: string | null;
 }
+
+/** One rate in force inside the 24-hour window: a history row's `effective_after`, when it was written. */
+export interface WindowRate extends RateInForce {
+  at: string;
+}
+
+/**
+ * The window as read: its rates (newest first), 'overflow' when it holds more
+ * rows than one read takes (WINDOW_MAX_ROWS), or 'unread' when the statement
+ * budget refused the read.
+ */
+export type WindowRead = readonly WindowRate[] | 'overflow' | 'unread';
+
+/**
+ * What step 11 measures against, per claimed AUTO pair (owner decision 11):
+ *   r24     the rate in force 24 h ago; null when nothing is that old (the
+ *           anchor stands in); ABSENT when it was not read;
+ *   window  every rate in force inside the last 24 hours; absent = 'unread'.
+ * Absent is never "nothing moved": the guard then applies nothing (fail closed).
+ */
+export interface DecisionContext {
+  r24: Partial<Record<FxPairId, RateInForce | null>>;
+  window: Partial<Record<FxPairId, WindowRead>>;
+}
+
+/** The most window rows one read takes; one more is 'overflow' — held, never guessed (owner decision 11). */
+export const WINDOW_MAX_ROWS = 200;
 
 export const FUTURE_TOLERANCE_MS = 5 * 60_000;
 export const REJECT_MEMORY_MS = 24 * HOUR_MS;
@@ -371,19 +410,43 @@ export function decide(row: FxPairRow, outcome: PairOutcome, ctx: DecisionContex
   }
   // 10. One-step guard.
   if (movesMoreThanPct(c, a, T)) return holdUnlessRejected('ANOMALY');
-  // 11. 24-hour guard (critiques F1, M4.1). It bounds AUTOMATIC movement in a
-  // day. A rate the owner confirmed inside the window (an approval, a manual
-  // rate, «تأكيد السعر الحالي») is that window's reference: measured from the
+  // 11. 24-hour guard (owner decision 11; critiques F1, M4.1). It bounds
+  // AUTOMATIC movement in a day: more than T against ANY rate in force during
+  // the last 24 hours waits for the owner. Measured against r24 alone, a
+  // staircase 1,680 → 1,632 → 1,680 → 1,728 (each step under 3%, each within
+  // 3% of 1,680) applied a 5.9% move inside one day.
+  // A rate the owner confirmed inside the window (an approval, a manual rate,
+  // «تأكيد السعر الحالي») replaces r24 and starts the window: measured from the
   // rate in force 24 hours ago, the next ordinary tick after an approved jump
   // was held again in the same direction (FX-1 correctness review C5). The
-  // anchor moves only by the owner's confirmations (an adjustment shifts it
-  // by its own change and keeps its time), so a stale session cannot reset
-  // the window with a no-op save.
+  // anchor moves only by the owner's confirmations (an adjustment shifts it by
+  // its own change and keeps its time), so a stale session cannot reset the
+  // window with a no-op save.
   const anchor = row.drift_anchor_rate ?? a;
   const anchorAt = row.drift_anchor_at ? Date.parse(row.drift_anchor_at) : NaN;
   const confirmedInWindow = row.drift_anchor_rate !== null && Number.isFinite(anchorAt) && nowMs - anchorAt < R24_WINDOW_MS;
-  const r24 = confirmedInWindow ? anchor : ctx.r24[row.pair] ?? anchor;
-  if (movesMoreThanPct(c, r24, T)) return holdUnlessRejected('ANOMALY_24H');
+  const window = ctx.window[row.pair];
+  const r24 = ctx.r24[row.pair];
+  // FAIL CLOSED: a window (or an r24 it needs) that could not be read applies nothing this tick.
+  if (window === undefined || window === 'unread' || (!confirmedInWindow && r24 === undefined)) {
+    return base('DEFERRED', 'FX_GUARD_UNREAD', { ...validated, last_error_code: 'FX_GUARD_UNREAD' }, [
+      log(row, trigger, { event: 'deferred', result: 'DEFERRED', error_code: 'FX_GUARD_UNREAD', pending_rate: c, ...quoteLog }),
+    ]);
+  }
+  // More rates in a day than one read takes is itself abnormal: held, never guessed.
+  if (window === 'overflow') return holdUnlessRejected('ANOMALY_24H');
+  // USD/IQD: a reference taken under another adjustment is re-based onto today's.
+  const adjNow = adjustmentOf(row);
+  const rebased = (ref: RateInForce): string | null =>
+    adjNow === null || ref.adj === null ? ref.rate : rebaseOnAdjustment(ref.rate, ref.adj, adjNow);
+  const since = confirmedInWindow ? anchorAt : nowMs - R24_WINDOW_MS;
+  const references: (string | null)[] = [confirmedInWindow || !r24 ? anchor : rebased(r24)];
+  for (const w of window) {
+    const at = Date.parse(w.at);
+    if (Number.isFinite(at) && at > since) references.push(rebased(w));
+  }
+  // A reference that cannot be re-based (it would not stay above zero) is a hold too.
+  if (references.some((ref) => ref === null || movesMoreThanPct(c, ref, T))) return holdUnlessRejected('ANOMALY_24H');
   // 12. Drift from the owner's last confirmation (critique F1).
   if (movesMoreThanPct(c, anchor, row.drift_threshold_pct)) return holdUnlessRejected('DRIFT');
   // 13. Applied.

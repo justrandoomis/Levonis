@@ -26,9 +26,9 @@ type Two = (a: string, b: string) => string;
 type Three = (a: string, b: string, c: string) => string;
 
 /** How an error code of the history or the card is said (UX review #11): a group, never the raw code. */
-export type FxErrorGroup = 'key' | 'keyRejected' | 'quota' | 'limit' | 'timeout' | 'unreachable' | 'stale' | 'invalid' | 'bounds' | 'rejected' | 'save' | 'other';
+export type FxErrorGroup = 'key' | 'keyRejected' | 'quota' | 'limit' | 'timeout' | 'unreachable' | 'stale' | 'invalid' | 'bounds' | 'rejected' | 'save' | 'unverified' | 'other';
 /** What «تحديث الآن» found, from the server's report (UX review #4). */
-export type FxRefreshOutcome = 'applied' | 'held' | 'unchanged' | 'failed' | 'limit' | 'busy' | 'observed';
+export type FxRefreshOutcome = 'applied' | 'held' | 'unchanged' | 'failed' | 'limit' | 'busy' | 'observed' | 'unverified';
 
 export interface FxStrings {
   title: string;
@@ -252,6 +252,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
       limit: 'بلغت حد الفحص لليوم — يعود الفحص التلقائي في موعده.',
       busy: 'يجري فحص آخر الآن — أعد المحاولة بعد لحظات.',
       observed: 'رُصد سعر السوق — سعرك اليدوي لم يتغيّر.',
+      unverified: 'تعذّر التحقق من حدود اليوم — لم يُطبَّق سعر، ويُعاد في الفحص القادم.',
     },
     manual: 'تعيين سعر يدوي',
     manualLabel: 'السعر اليدوي',
@@ -298,6 +299,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
       bounds: 'خارج الحدود المعقولة — لم يُطبَّق',
       rejected: 'قريب من سعر رفضته — لن يُعرض الآن',
       save: 'تعذّر الحفظ — يُعاد في الفحص القادم',
+      unverified: 'تعذّر التحقق من حدود اليوم — لم يُطبَّق، ويُعاد في الفحص القادم',
       other: 'سبب آخر',
     },
     fieldMode: 'طريقة التحديث',
@@ -444,6 +446,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
       limit: "Today's check limit is reached — the automatic check runs at its usual time.",
       busy: 'Another check is running — try again in a moment.',
       observed: 'The market rate was observed — your manual rate did not change.',
+      unverified: "The day's limits could not be checked — nothing applied; checked again next time.",
     },
     manual: 'Set a manual rate',
     manualLabel: 'Manual rate',
@@ -490,6 +493,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
       bounds: 'Outside the plausible range — not applied',
       rejected: 'Close to a rate you rejected — not offered for now',
       save: 'Could not be saved — retried at the next check',
+      unverified: "The day's limits could not be checked — not applied; checked again next time",
       other: 'Another reason',
     },
     fieldMode: 'Update mode',
@@ -638,6 +642,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
       limit: 'سنووری پشکنینی ئەمڕۆ تەواو بوو — پشکنینی خۆکار لە کاتی خۆیدا دەکرێت.',
       busy: 'پشکنینێکی تر ئێستا دەکرێت — دوای چەند چرکەیەک دووبارە هەوڵ بدەرەوە.',
       observed: 'نرخی بازاڕ بینرا — نرخە دەستییەکەت نەگۆڕا.',
+      unverified: 'سنوورەکانی ڕۆژ پشکنین نەکران — هیچ نرخێک جێبەجێ نەکرا، لە پشکنینی داهاتوودا دووبارە دەکرێتەوە.',
     },
     manual: 'نرخێکی دەستی دابنێ',
     manualLabel: 'نرخی دەستی',
@@ -684,6 +689,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
       bounds: 'لە دەرەوەی مەودای گونجاوە — جێبەجێ نەکرا',
       rejected: 'نزیکە لە نرخێک کە ڕەتت کردەوە — بۆ ئێستا پێشنیار ناکرێت',
       save: 'پاشەکەوت نەکرا — لە پشکنینی داهاتوودا دووبارە هەوڵ دەدرێتەوە',
+      unverified: 'سنوورەکانی ڕۆژ پشکنین نەکران — جێبەجێ نەکرا، لە پشکنینی داهاتوودا دووبارە دەکرێتەوە',
       other: 'هۆکارێکی تر',
     },
     fieldMode: 'شێوازی نوێکردنەوە',
@@ -763,6 +769,7 @@ export function fxErrorGroup(code: string): FxErrorGroup {
   if (code === 'FX_RATE_OUT_OF_BOUNDS') return 'bounds';
   if (code === 'FX_REJECTED_RECENTLY') return 'rejected';
   if (code === 'FX_FUTURE' || code === 'FX_UNIT_CHANGED' || code === 'FX_PUBLICATION_CONFLICT' || code.startsWith('FX_INVALID_')) return 'invalid';
+  if (code === 'FX_GUARD_UNREAD') return 'unverified';
   if (code === 'COMMIT_REFUSED' || code === 'FX_COMMIT_CONFLICT' || code === 'FX_STATEMENT_BUDGET' || code === 'FX_DERIVED_STALE' || code === 'FX_VERSION_DISCIPLINE' || code === 'FX_DECIDE_FAILED') return 'save';
   return 'other';
 }

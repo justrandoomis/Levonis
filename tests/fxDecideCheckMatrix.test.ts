@@ -132,7 +132,7 @@ async function runMatrix(pair: FxPairId, a: string, held: string, outcomes: Reco
         if (!leasedElsewhere) raw.exec(`UPDATE fx_rate_pairs SET lease_token='ours', lease_until='2026-10-08T13:02:00.000Z', version=version+1 WHERE pair='${pair}'`);
         const all = (await loadPairs(db))!;
         const row = all.find((r) => r.pair === pair)!;
-        const d = decide(row, outcome, { r24: { [pair]: null } }, { now: NOW, scheduledTime: new Date('2026-10-08T12:00:00.000Z') }, trigger);
+        const d = decide(row, outcome, { r24: { [pair]: null }, window: { [pair]: [] } }, { now: NOW, scheduledTime: new Date('2026-10-08T12:00:00.000Z') }, trigger);
         let n = 0;
         const plan = planFxCommit([d], [row], all, { fence: 'lease', token: 'ours', actor: null, nowIso: NOW.toISOString(), newLogId: () => `m${++n}`, trigger });
         const label = `${pair} ${stateName} × ${outcomeName} × ${trigger} → ${d.result}`;

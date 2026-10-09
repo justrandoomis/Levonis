@@ -250,7 +250,13 @@ test('anomaly: 1,660 → 1,720 (+3.6%) held; pricing_fx_rates unchanged; approve
     assert.equal(derivedOf(raw).USD!.rate_iqd, decision === 'approve' ? '1720' : '1660');
     assert.equal(row.status, 'OK');
     if (decision === 'approve') assert.equal(row.drift_anchor_rate, '1720', 'an approval re-anchors');
-    else assert.equal(row.rejected_rate, '1720');
+    else {
+      assert.equal(row.rejected_rate, '1720');
+      // A rejection keeps the Last Confirmed Rate and the Last Known Good (owner decision 11).
+      assert.equal(row.drift_anchor_rate, '1660', 'the Confirmed Rate stays');
+      assert.equal(row.drift_anchor_at, at(-48).toISOString(), 'and keeps its time');
+      assert.equal(row.last_known_good_rate, '1660', 'the last known good stays');
+    }
   }
 });
 

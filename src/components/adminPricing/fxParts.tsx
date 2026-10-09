@@ -153,15 +153,17 @@ export function refreshMessage(report: FxRefreshReport | undefined, s: FxStrings
     else if (c.result === 'APPLIED') said.add('applied');
     else if (c.result === 'FAILED' || c.result === 'STALE' || c.result === 'INVALID' || c.result === 'NOT_CONFIGURED') said.add('failed');
     else if (c.result === 'DEFERRED' && c.code === 'PROVIDER_BUDGET') said.add('limit');
+    // The 24-hour guard could not read its window: nothing applied, and the owner is told so (owner decision 11).
+    else if (c.result === 'DEFERRED' && c.code === 'FX_GUARD_UNREAD') said.add('unverified');
     else if (c.result === 'OBSERVED') said.add('observed');
     else said.add('unchanged');
   }
   if ((report?.budget_deferred ?? []).length) said.add('limit');
   if ((report?.lease_held ?? []).length) said.add('busy');
   if (said.size === 0) said.add('unchanged');
-  const order: FxRefreshOutcome[] = ['held', 'applied', 'failed', 'limit', 'busy', 'observed', 'unchanged'];
+  const order: FxRefreshOutcome[] = ['held', 'applied', 'failed', 'unverified', 'limit', 'busy', 'observed', 'unchanged'];
   const outcomes = order.filter((o) => said.has(o) && !(o === 'unchanged' && said.size > 1));
-  const warn = outcomes.some((o) => o === 'held' || o === 'failed' || o === 'limit' || o === 'busy');
+  const warn = outcomes.some((o) => o === 'held' || o === 'failed' || o === 'unverified' || o === 'limit' || o === 'busy');
   return { tone: warn ? 'warning' : 'success', text: outcomes.map((o) => s.refreshOutcome[o]).join(' ') };
 }
 

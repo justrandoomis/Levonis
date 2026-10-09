@@ -142,13 +142,13 @@ test('decideSafely: a decision that throws is recorded INVALID / FX_DECIDE_FAILE
   const broken = { ...row, anomaly_threshold_pct: 'not-a-number' };
   const quote = { kind: 'quote' as const, market: '1700', buy: null, official: null, sourceUsdPerEur: null, sourceCnyPerEur: null, publishedAtMs: Date.parse('2026-10-08T05:55:00Z') };
   const clock = { now: new Date('2026-10-08T06:00:30Z'), scheduledTime: new Date('2026-10-08T06:00:00Z') };
-  assert.throws(() => decide(broken, quote, { r24: {} }, clock, 'cron'));
+  assert.throws(() => decide(broken, quote, { r24: {}, window: {} }, clock, 'cron'));
   const errors: unknown[][] = [];
   const orig = console.error;
   console.error = (...a: unknown[]) => void errors.push(a);
   let d;
   try {
-    d = decideSafely(broken, quote, { r24: {} }, clock, 'cron');
+    d = decideSafely(broken, quote, { r24: {}, window: {} }, clock, 'cron');
   } finally {
     console.error = orig;
   }
@@ -180,7 +180,7 @@ test('an adjustment never re-bases the drift guard: two saves (+0.0001, back to 
   // 1,770 is 1.1% from the rate in force but 6.6% from the owner's confirmation: still DRIFT.
   const usd = (await loadPairs(asD1(raw)))!.find((r) => r.pair === 'USD_IQD')!;
   const quote = { kind: 'quote' as const, market: '1770', buy: null, official: null, sourceUsdPerEur: null, sourceCnyPerEur: null, publishedAtMs: Date.parse('2026-10-09T05:55:00Z') };
-  const d = decide(usd, quote, { r24: { USD_IQD: '1750' } }, { now: new Date('2026-10-09T06:00:30Z'), scheduledTime: new Date('2026-10-09T06:00:00Z') }, 'cron');
+  const d = decide(usd, quote, { r24: { USD_IQD: { rate: '1750', adj: '0' } }, window: { USD_IQD: [] } }, { now: new Date('2026-10-09T06:00:30Z'), scheduledTime: new Date('2026-10-09T06:00:00Z') }, 'cron');
   assert.equal(d.result, 'REVIEW_HELD');
   assert.equal(d.code, 'DRIFT');
 });
