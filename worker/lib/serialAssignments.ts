@@ -91,6 +91,9 @@ export const SERIAL_TEXT = {
   OVERRIDE_UNAVAILABLE: 'هذا الاستثناء غير متاح لهذه الحالة.',
   IDEMPOTENCY_MISMATCH: serverMessage('IDEMPOTENCY_MISMATCH'),
   SERIAL_RACE: 'تغيّر الطلب أثناء المسح — أعد المحاولة.',
+  // A non-owner's catalog edit or product save lost the in-batch answer fence
+  // (landing round 4, R2: `serialAnswerFence`) — the contract's sentence.
+  SERIAL_FILING_CHANGED: serverMessage('SERIAL_FILING_CHANGED'),
   SERIALS_NOT_INSTALLED: 'ميزة ربط الأرقام التسلسلية لم تُفعّل على قاعدة البيانات بعد.',
   SERIAL_STORY_UNAVAILABLE: 'تعذّرت قراءة سجل هذا الرقم التسلسلي الآن — أعد المحاولة بعد قليل.',
   ORDER_NOT_FOUND: 'الطلب غير موجود.',

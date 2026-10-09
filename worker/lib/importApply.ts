@@ -222,6 +222,16 @@ export const IMPORT_SERIAL_REFILE_OWNER_ONLY =
   'category: نقل هذا المنتج إلى هذا القسم يغيّر حاجته إلى رقم تسلسلي — هذا للمالك فقط / ' +
   'filing this product under this section changes whether it needs a serial number — only the owner can do that / ' +
   'دانانی ئەم بەرهەمە لەژێر ئەم بەشەدا دەیگۆڕێت کە پێویستی بە ژمارەی زنجیرەیی هەیە یان نا — تەنها خاوەن دەتوانێت ئەمە بکات';
+/**
+ * A confirmed row whose product changed between the confirm's re-read and its
+ * write (serial landing round 4, R2 / R3): its batch is fenced on the
+ * ops_policy it re-read and, for a non-owner, on the product's serial answer,
+ * so the row is not written and fails alone; the rest of the sheet is.
+ */
+export const IMPORT_ROW_CHANGED_RETRY =
+  'تغيّر هذا المنتج أثناء تطبيق الملف، فلم يُكتب هذا السطر — ارفع الملف من جديد لتطبيقه / ' +
+  'this product changed while the sheet was being applied, so this row was not written — upload the sheet again to apply it / ' +
+  'ئەم بەرهەمە لە کاتی جێبەجێکردنی فایلەکەدا گۆڕا، بۆیە ئەم دێڕە نەنووسرا — فایلەکە دووبارە باربکەرەوە بۆ جێبەجێکردنی';
 
 /**
  * §29 FOR A NON-OWNER'S SHEET ROW (S1 review #2, regressions review #2).

@@ -46,7 +46,8 @@ import { requireAdmin, badRequest, notFound, int, str, oneOf, HttpError } from '
 import { newId } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
 import { canWriteCost, isOwner, projectForAdmin } from '../lib/adminScope';
-import { compositionSerializedVerdict } from '../lib/serialPolicy';
+import { compositionSerializedVerdict, serialAnswerFence, type SerialAnswerFence } from '../lib/serialPolicy';
+import { isLostRace } from '../lib/gifts/fence';
 import { refuse as serialRefuse } from '../lib/serialAssignments';
 import {
   primaryMedia,
@@ -685,9 +686,12 @@ async function writeBundle(c: Context<AppContext>, mode: 'create' | 'update', pr
   // §29 (serial scan, 0178; landing round 3 F7): whether this row's units
   // need a serial — its own word, or the filing this save writes — is the
   // owner's, through this panel as through the product form.
+  // The save re-checks the stored row's answer inside its batch (round 4 R2).
+  let answerGuard: SerialAnswerFence | null = null;
   if (!isOwner(c.env, admin)) {
     const refused = await compositionSerializedVerdict(c.env.DB, doc, prev, body, { writesCatalogs: true });
     if (refused) throw serialRefuse(403, 'OWNER_ONLY', { field: 'serialized', via: refused });
+    if (prev) answerGuard = await serialAnswerFence(c.env.DB, { productId: prev.id });
   }
   // Links stay stable: an update keeps its stored slug unless the admin asks.
   if (prev) {
@@ -717,12 +721,18 @@ async function writeBundle(c: Context<AppContext>, mode: 'create' | 'update', pr
   await verifyAndNormalizeProductMedia(c.env, doc);
 
   const { plan, preview, warnings } = await planSave(c, { doc, prev, body, kind });
-  await saveProductAtomic(c.env.DB, plan, [
-    {
-      action: prev ? 'bundle.update' : 'bundle.create',
-      detail: { slug: doc.slug, status: doc.status, price_iqd: doc.price_iqd, components: preview.components.length },
-    },
-  ]);
+  if (answerGuard) plan.statements = answerGuard.around(plan.statements);
+  try {
+    await saveProductAtomic(c.env.DB, plan, [
+      {
+        action: prev ? 'bundle.update' : 'bundle.create',
+        detail: { slug: doc.slug, status: doc.status, price_iqd: doc.price_iqd, components: preview.components.length },
+      },
+    ]);
+  } catch (e) {
+    if (answerGuard && isLostRace(e)) throw serialRefuse(409, 'SERIAL_FILING_CHANGED');
+    throw e;
+  }
 
   const stored = await reloadForVerification(c.env.DB, id);
   const mismatches = stored ? verifyApplied(plan, stored, { documentKeys: null }) : [];

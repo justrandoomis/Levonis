@@ -7,7 +7,18 @@ import { newId, } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
 import { isOwner } from '../lib/adminScope';
 import { refuse as serialRefuse } from '../lib/serialAssignments';
-import { catalogSerialPolicySql, printerFlagSerialFlips, reparentSerialFlips, serialAssignmentsInstalled } from '../lib/serialPolicy';
+import {
+  catalogEditRefusal,
+  catalogEditScope,
+  catalogEditSerialFlips,
+  catalogSerialPolicySql,
+  isCatalogEdit,
+  serialAnswerFence,
+  serialAssignmentsInstalled,
+  type CatalogEdit,
+  type SerialAnswerFence,
+} from '../lib/serialPolicy';
+import { isLostRace } from '../lib/gifts/fence';
 import {
   FAMILIES,
   groupsForSection,
@@ -363,13 +374,26 @@ async function renameAndReindex(
   db: D1Database,
   update: D1PreparedStatement,
   renamed: boolean,
-  scope: { sql: string; params: unknown[] }
+  scope: { sql: string; params: unknown[] },
+  guard: SerialAnswerFence | null = null
 ): Promise<void> {
-  if (!renamed || !(await searchIndexInstalled(db))) {
+  const reindex = renamed && (await searchIndexInstalled(db));
+  // A non-owner's printer flag or move carries the §29 answer fence in the
+  // same batch (serial landing round 4, R2); the owner's never does.
+  if (guard) {
+    try {
+      await db.batch(guard.around(reindex ? [update, planSearchRestamp(db, scope)] : [update]));
+    } catch (e) {
+      if (isLostRace(e)) throw serialRefuse(409, 'SERIAL_FILING_CHANGED');
+      throw e;
+    }
+  } else if (!reindex) {
     await update.run();
     return;
+  } else {
+    await db.batch([update, planSearchRestamp(db, scope)]);
   }
-  await db.batch([update, planSearchRestamp(db, scope)]);
+  if (!reindex) return;
   try {
     await backfillSearchIndex(db, { limit: 50, scope });
   } catch (e) {
@@ -448,21 +472,23 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
         : 0;
   // §29 (serial scan, 0178): the printer flag decides which products need a
   // serial at preparation and get a warranty unit — the owner's call where it
-  // FLIPS one (landing round 3 F1, `printerFlagSerialFlips`): an echo, a new
-  // section (it holds no product yet) and a section whose products all keep
-  // their answer are anyone's.
-  if (existing && Number(existing.is_printer_catalog ?? 0) !== isPrinter && !isOwner(c.env, admin)) {
-    const flips = await printerFlagSerialFlips(c.env.DB, id, isPrinter === 1);
-    if (flips > 0) throw serialRefuse(403, 'OWNER_ONLY', { field: 'is_printer_catalog', via: 'printer_flag', products: flips });
-  }
-  // …and so is RE-PARENTING a section (regressions review #3): a product filed
-  // under it with no word of its own inherits its serial policy through the
-  // new parent, so a move under a 'required' or 'off' branch is the section
-  // policy changed by another door. Only a move that flips at least one
-  // product's answer is an attempt.
-  if (existing && (existing.parent_id ?? null) !== parentId && !isOwner(c.env, admin)) {
-    const flips = await reparentSerialFlips(c.env.DB, id, parentId);
-    if (flips > 0) throw serialRefuse(403, 'OWNER_ONLY', { field: 'parent_id', via: 'reparent', products: flips });
+  // FLIPS one (landing round 3 F1): an echo, a new section (it holds no
+  // product yet) and a section whose products all keep their answer are
+  // anyone's. …and so is RE-PARENTING a section (regressions review #3): a
+  // product filed under it with no word of its own inherits its serial policy
+  // through the new parent. A save that changes both is ONE edit, judged as a
+  // whole (round 4 R1, `catalogEditSerialFlips`), and the write re-checks
+  // inside its batch that it flipped nothing (R2, `serialAnswerFence`).
+  let guard: SerialAnswerFence | null = null;
+  if (existing && !isOwner(c.env, admin)) {
+    const edit: CatalogEdit = {};
+    if (Number(existing.is_printer_catalog ?? 0) !== isPrinter) edit.flag = isPrinter === 1;
+    if ((existing.parent_id ?? null) !== parentId) edit.parentId = parentId;
+    if (isCatalogEdit(edit)) {
+      const flips = await catalogEditSerialFlips(c.env.DB, id, edit);
+      if (flips > 0) throw serialRefuse(403, 'OWNER_ONLY', catalogEditRefusal(edit, flips));
+      guard = await serialAnswerFence(c.env.DB, catalogEditScope(id, edit));
+    }
   }
 
   const wantedSlug =
@@ -508,7 +534,8 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
       namesChanged(existing, { name_ar: nameAr, name_en: nameEn, name_ckb: nameCkb }),
       // The two columns the index reads a section name through
       // (`searchDocsForRows`): the main section and the sub-section.
-      { sql: 'p.category_id = ? OR p.sub_category_id = ?', params: [id, id] }
+      { sql: 'p.category_id = ? OR p.sub_category_id = ?', params: [id, id] },
+      guard
     );
   } else {
     await c.env.DB

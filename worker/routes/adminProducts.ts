@@ -48,7 +48,17 @@ import {
 } from '../lib/adminScope';
 import { costRefusal } from '../lib/costAccess';
 import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
-import { printerFlagSerialFlips, reparentSerialFlips, serializedWriteVerdict } from '../lib/serialPolicy';
+import {
+  catalogEditRefusal,
+  catalogEditScope,
+  catalogEditSerialFlips,
+  isCatalogEdit,
+  serialAnswerFence,
+  serializedWriteVerdict,
+  type CatalogEdit,
+  type SerialAnswerFence,
+} from '../lib/serialPolicy';
+import { isLostRace } from '../lib/gifts/fence';
 import { refuse as serialRefuse } from '../lib/serialAssignments';
 import { bundlesUsing, compositionConflict } from '../lib/bundleComposition';
 import {
@@ -200,13 +210,16 @@ async function refuseSerializedDrift(
   prev: { id: string; ops_policy: unknown },
   catalogIds: string[],
   categoryIds: Array<string | null | undefined>
-): Promise<void> {
+): Promise<SerialAnswerFence> {
   const verdict = await serializedWriteVerdict(db, {
     prev,
     requested: readOpsWarranty(prev.ops_policy).serialized,
     placement: { catalogIds, categoryIds },
   });
   if (verdict.refuse) throw serialRefuse(403, 'OWNER_ONLY', { field: 'serialized', via: 'placement' });
+  // The verdict read the flags and policies of the old and new shelves; the
+  // write re-checks the product's answer inside its batch (round 4 R2).
+  return serialAnswerFence(db, { productId: prev.id });
 }
 
 async function catalogIdsFor(db: D1Database, productId: string): Promise<string[]> {
@@ -464,27 +477,44 @@ adminProductsRoutes.patch('/catalogs/:id', async (c) => {
   // whether a product filed under this catalog needs a serial is the
   // owner's — the same rule as the taxonomy editor. Only a change that flips
   // at least one product is an attempt: an echo, or a flag on a catalog whose
-  // products all keep their answer, passes (landing round 3 F1).
+  // products all keep their answer, passes (landing round 3 F1). A request
+  // that changes both is judged as ONE edit (round 4 R1), and the write
+  // re-checks inside its batch that it flipped nothing (R2,
+  // `serialAnswerFence`). The owner's edit is neither judged nor fenced.
+  let guard: SerialAnswerFence | null = null;
   if (!isOwner(c.env, admin) && (body.is_printer_catalog !== undefined || body.parent_id !== undefined)) {
     const current = await c.env.DB.prepare('SELECT is_printer_catalog, parent_id FROM catalogs WHERE id = ?')
       .bind(id)
       .first<{ is_printer_catalog: number | null; parent_id: string | null }>();
     if (current) {
+      const edit: CatalogEdit = {};
       if (body.is_printer_catalog !== undefined && Number(current.is_printer_catalog ?? 0) !== (body.is_printer_catalog ? 1 : 0)) {
-        const flips = await printerFlagSerialFlips(c.env.DB, id, !!body.is_printer_catalog);
-        if (flips > 0) throw serialRefuse(403, 'OWNER_ONLY', { field: 'is_printer_catalog', via: 'printer_flag', products: flips });
+        edit.flag = !!body.is_printer_catalog;
       }
       const parentId = typeof body.parent_id === 'string' && body.parent_id ? body.parent_id : null;
-      if (body.parent_id !== undefined && (current.parent_id ?? null) !== parentId) {
-        const flips = await reparentSerialFlips(c.env.DB, id, parentId);
-        if (flips > 0) throw serialRefuse(403, 'OWNER_ONLY', { field: 'parent_id', via: 'reparent', products: flips });
+      if (body.parent_id !== undefined && (current.parent_id ?? null) !== parentId) edit.parentId = parentId;
+      if (isCatalogEdit(edit)) {
+        const flips = await catalogEditSerialFlips(c.env.DB, id, edit);
+        if (flips > 0) throw serialRefuse(403, 'OWNER_ONLY', catalogEditRefusal(edit, flips));
+        guard = await serialAnswerFence(c.env.DB, catalogEditScope(id, edit));
       }
     }
   }
-  const res = await c.env.DB.prepare(`UPDATE catalogs SET ${sets.join(', ')} WHERE id = ?`)
-    .bind(...params, id)
-    .run();
-  if (res.meta.changes === 0) throw notFound('Catalog not found');
+  const update = c.env.DB.prepare(`UPDATE catalogs SET ${sets.join(', ')} WHERE id = ?`).bind(...params, id);
+  let changes: number;
+  if (guard) {
+    const stmts = guard.around([update]);
+    try {
+      const results = await c.env.DB.batch(stmts);
+      changes = Number(results[stmts.indexOf(update)]?.meta?.changes ?? 0);
+    } catch (e) {
+      if (isLostRace(e)) throw serialRefuse(409, 'SERIAL_FILING_CHANGED');
+      throw e;
+    }
+  } else {
+    changes = (await update.run()).meta.changes;
+  }
+  if (changes === 0) throw notFound('Catalog not found');
   await audit(c.env.DB, admin.id, 'catalog.update', id, body);
   const row = await c.env.DB.prepare('SELECT * FROM catalogs WHERE id = ?').bind(id).first<Record<string, unknown>>();
   return c.json({ success: true, catalog: catalogOut(row!) });
@@ -1315,6 +1345,7 @@ adminProductsRoutes.post('/', async (c) => {
   // whose own word is silent is the same change by another door (critique-1
   // #23): its answer comes from its placement. One rule for every product
   // door: `serializedWriteVerdict`.
+  let answerGuard: SerialAnswerFence | null = null;
   if (!isOwner(c.env, admin)) {
     const recategorised = !prev || doc.category_id !== prev.category_id || doc.sub_category_id !== prev.sub_category_id;
     const sentCatalogs = Array.isArray(body.catalog_ids)
@@ -1335,6 +1366,10 @@ adminProductsRoutes.post('/', async (c) => {
     doc.serialized = verdict.keep;
     if (verdict.keep === null) delete doc.ops_policy.serialized;
     else doc.ops_policy.serialized = verdict.keep;
+    // …and the save re-checks the stored product's answer inside its batch
+    // (round 4 R2): a flag, placement or word changed since these reads
+    // cannot make this save flip it. A create has no answer to keep.
+    if (prev) answerGuard = await serialAnswerFence(c.env.DB, { productId: prev.id });
   }
 
   // THE SAME GUARD FOR THE CONDITION DOCUMENT.
@@ -1498,6 +1533,7 @@ adminProductsRoutes.post('/', async (c) => {
     throw e;
   }
 
+  if (answerGuard) plan.statements = answerGuard.around(plan.statements);
   try {
     await saveProductAtomic(c.env.DB, plan, [
       {
@@ -1512,6 +1548,7 @@ adminProductsRoutes.post('/', async (c) => {
       },
     ]);
   } catch (e) {
+    if (answerGuard && isLostRace(e)) throw serialRefuse(409, 'SERIAL_FILING_CHANGED');
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('UNIQUE') && msg.includes('slug')) throw badRequest('slug: already used by another product', 'SLUG_TAKEN');
     // The race backstop for the named SKU check in `planProductSave` — the
@@ -1979,15 +2016,16 @@ adminProductsRoutes.put('/:id/catalogs', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   if (!Array.isArray(body.catalog_ids)) throw badRequest('catalog_ids must be an array of catalog ids');
   const prevDoc = parseProductRow(existingRow);
-  // §29 (0178): a placement that changes whether the product needs a serial is the owner's.
-  if (!isOwner(c.env, admin)) {
-    await refuseSerializedDrift(
-      c.env.DB,
-      prevDoc,
-      (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string'),
-      [prevDoc.category_id, prevDoc.sub_category_id]
-    );
-  }
+  // §29 (0178): a placement that changes whether the product needs a serial
+  // is the owner's — judged on the reads, and fenced in the write (round 4 R2).
+  const guard = isOwner(c.env, admin)
+    ? null
+    : await refuseSerializedDrift(
+        c.env.DB,
+        prevDoc,
+        (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string'),
+        [prevDoc.category_id, prevDoc.sub_category_id]
+      );
   // The placement alone, through the same contract as every other write.
   const plan = await planProductSave(c.env.DB, {
     mode: 'update',
@@ -1997,7 +2035,13 @@ adminProductsRoutes.put('/:id/catalogs', async (c) => {
     catalogIds: (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string'),
     actor: { adminId: admin.id, money: canWriteCost(c.env, admin) },
   });
-  await saveProductAtomic(c.env.DB, plan, [{ action: 'product_v2.catalogs', detail: { catalog_ids: plan.catalogIds ?? [] } }]);
+  if (guard) plan.statements = guard.around(plan.statements);
+  try {
+    await saveProductAtomic(c.env.DB, plan, [{ action: 'product_v2.catalogs', detail: { catalog_ids: plan.catalogIds ?? [] } }]);
+  } catch (e) {
+    if (guard && isLostRace(e)) throw serialRefuse(409, 'SERIAL_FILING_CHANGED');
+    throw e;
+  }
   return c.json({ success: true, catalog_ids: await catalogIdsFor(c.env.DB, id) });
 });
 

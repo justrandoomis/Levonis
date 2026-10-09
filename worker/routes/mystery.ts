@@ -43,7 +43,8 @@ import { requireAdmin, badRequest, notFound, int, str, oneOf, HttpError } from '
 import { newId } from '../lib/crypto';
 import { auditStatements } from '../lib/audit';
 import { canWriteCost, isOwner, projectForAdmin } from '../lib/adminScope';
-import { compositionSerializedVerdict } from '../lib/serialPolicy';
+import { compositionSerializedVerdict, serialAnswerFence, type SerialAnswerFence } from '../lib/serialPolicy';
+import { isLostRace } from '../lib/gifts/fence';
 import { refuse as serialRefuse } from '../lib/serialAssignments';
 import { parseProductRow, projectAdmin, validateProductDoc, type ProductDoc } from '../lib/productModel';
 import {
@@ -765,9 +766,12 @@ async function writeOffer(c: Context<AppContext>, mode: 'create' | 'update', pro
   // and its classification are judged like every product door's. This panel
   // never writes `catalog_ids` (the plan carries none), so only the stored
   // shelves and the document's classification are the filing.
+  // The save re-checks the stored row's answer inside its batch (round 4 R2).
+  let answerGuard: SerialAnswerFence | null = null;
   if (!isOwner(c.env, admin)) {
     const refused = await compositionSerializedVerdict(c.env.DB, doc, prev, b, { writesCatalogs: false });
     if (refused) throw serialRefuse(403, 'OWNER_ONLY', { field: 'serialized', via: refused });
+    if (prev) answerGuard = await serialAnswerFence(c.env.DB, { productId: prev.id });
   }
   if (prev) {
     doc.slug = prev.slug;
@@ -860,8 +864,14 @@ async function writeOffer(c: Context<AppContext>, mode: 'create' | 'update', pro
     },
   });
   plan.statements.push(...auditRows);
+  if (answerGuard) plan.statements = answerGuard.around(plan.statements);
 
-  await saveProductAtomic(c.env.DB, plan);
+  try {
+    await saveProductAtomic(c.env.DB, plan);
+  } catch (e) {
+    if (answerGuard && isLostRace(e)) throw serialRefuse(409, 'SERIAL_FILING_CHANGED');
+    throw e;
+  }
   const stored = await reloadForVerification(c.env.DB, id);
   const mismatches = stored ? verifyApplied(plan, stored, { documentKeys: null }) : [];
   return c.json({

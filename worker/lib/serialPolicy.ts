@@ -29,6 +29,7 @@
  */
 import { effectiveDevicePolicy, mergeOpsPolicy, readOpsWarranty, type EffectiveDevicePolicy } from './warrantyPlans';
 import { printerProductIds } from './printerIdentity';
+import { fence } from './operations';
 
 export type CatalogSerialPolicy = 'required' | 'off';
 
@@ -71,7 +72,8 @@ export function catalogSerialPolicySql(pid: string, parentOf = 'cur.parent_id'):
 /**
  * The branch walk itself, seeded by `seed` (a WHERE over `catalogs c`).
  * `parentOf` names the parent of the walk's current section (`cur`); only the
- * "what if this section moved" reader (`reparentSerialFlips`) passes another.
+ * "what if this section moved" reader (`catalogSerialPolicies` with a `move`,
+ * for `catalogEditSerialFlips`) passes another.
  */
 function policyWalkSql(seed: string, parentOf = 'cur.parent_id'): string {
   return `(WITH RECURSIVE sp_walk(cid, pol, depth) AS (
@@ -239,96 +241,219 @@ export async function compositionSerializedVerdict(
 }
 
 /**
- * RE-PARENTING A SECTION is a §29 change too (regressions review #3): every
- * product filed under it whose own word is silent, and that is not a printer,
- * inherits through the new parent from then on. Returns how many of those
- * products would change their answer if `sectionId` moved under
- * `newParentId` — the same walk as `catalogSerialPolicySql`, evaluated with
- * that one parent link replaced. 0 on a shop with no section policy at all
- * (the printer flag is never inherited, so nothing can flip).
+ * ONE CATALOG EDIT, AS THE TWO CATALOG EDITORS JUDGE IT (landing round 4,
+ * R1): only the keys that CHANGE. `flag` is the new `is_printer_catalog`,
+ * `parentId` the new parent (null = the root). A request that changes both is
+ * ONE edit: judging each change against the current value of the other let a
+ * non-owner switch a printer catalog off and move it out of a 'required'
+ * branch in the same request — each half flipped nothing on its own.
  */
-export async function reparentSerialFlips(db: D1Database, sectionId: string, newParentId: string | null): Promise<number> {
-  if (!(await anySectionSerialPolicy(db))) return 0;
-  const { results } = await db
-    .prepare(
-      `WITH RECURSIVE sub(id, depth) AS (
-         SELECT ?1, 0
-         UNION ALL
-         SELECT c.id, s.depth + 1 FROM catalogs c JOIN sub s ON c.parent_id = s.id WHERE s.depth < 16)
-       SELECT DISTINCT p.id AS pid, p.ops_policy FROM products p
-        WHERE p.id IN (SELECT pc.product_id FROM product_catalogs pc WHERE pc.catalog_id IN (SELECT id FROM sub))
-           OR p.category_id IN (SELECT id FROM sub)
-           OR p.sub_category_id IN (SELECT id FROM sub)`
-    )
-    .bind(sectionId)
-    .all<{ pid: string; ops_policy: string | null }>();
-  const filed = (results ?? []).filter((r) => readOpsWarranty(r.ops_policy).serialized === null).map((r) => String(r.pid));
-  if (!filed.length) return 0;
-  const printers = await printerProductIds(db, filed);
-  const silent = filed.filter((id) => !printers.has(id));
-  let flips = 0;
-  for (let i = 0; i < silent.length; i += 200) {
-    const { results: rows } = await db
-      .prepare(
-        `SELECT ${catalogSerialPolicySql('j.value')} AS before,
-                ${catalogSerialPolicySql('j.value', 'CASE WHEN cur.id = ?2 THEN ?3 ELSE cur.parent_id END')} AS after
-           FROM json_each(?1) j`
-      )
-      .bind(JSON.stringify(silent.slice(i, i + 200)), sectionId, newParentId)
-      .all<{ before: number | null; after: number | null }>();
-    for (const r of rows ?? []) if ((Number(r.before) === 2) !== (Number(r.after) === 2)) flips++;
-  }
-  return flips;
+export interface CatalogEdit {
+  flag?: boolean;
+  parentId?: string | null;
 }
 
+export const isCatalogEdit = (edit: CatalogEdit): boolean => edit.flag !== undefined || edit.parentId !== undefined;
+
 /**
- * THE PRINTER FLAG is a §29 change only when it flips something (landing
- * review round 3, F1): how many products filed under `catalogId` would change
- * their EFFECTIVE answer if its `is_printer_catalog` became `nextFlag`.
- *
- * Counted like `reparentSerialFlips`: a product filed under the catalog — by
- * `product_catalogs` or by its own classification (`category_id` /
- * `sub_category_id`, which every save folds into its placements) — whose own
- * `serialized` word is silent. The flag is NOT inherited down the tree
- * (`printerProductIds` reads the direct placement), so descendants are not
- * counted. Before = the answer `lineDevicePolicy` gives today; after = the
- * same rule with this one catalog's flag replaced: a printer through ANOTHER
- * printer catalog stays a printer, and a non-printer falls back to its section
- * policy. An empty catalog, or one whose products all carry their own word,
- * flips nothing (0). The caller compares the flag first: an echo is not asked.
+ * The products filed under catalog `key` (an SQL expression), by placement
+ * (`product_catalogs`) or by their own classification (`category_id` /
+ * `sub_category_id`, which every save folds into its placements) — with
+ * `subtree`, under any section below it as well. Spliced into a WHERE over
+ * `products p`.
  */
-export async function printerFlagSerialFlips(db: D1Database, catalogId: string, nextFlag: boolean): Promise<number> {
-  const { results } = await db
-    .prepare(
-      `SELECT DISTINCT p.id AS pid, p.ops_policy FROM products p
-        WHERE p.id IN (SELECT pc.product_id FROM product_catalogs pc WHERE pc.catalog_id = ?1)
-           OR p.category_id = ?1
-           OR p.sub_category_id = ?1`
-    )
-    .bind(catalogId)
-    .all<{ pid: string; ops_policy: string | null }>();
-  const silent = (results ?? []).filter((r) => readOpsWarranty(r.ops_policy).serialized === null).map((r) => String(r.pid));
-  if (!silent.length) return 0;
-  const ctx = await serializationContext(db, silent);
-  const elsewhere = new Set<string>();
-  for (let i = 0; i < silent.length; i += 200) {
-    const { results: rows } = await db
+function filedUnderSql(key: string, subtree: boolean): string {
+  const under = subtree
+    ? `(WITH RECURSIVE sub(id, depth) AS (
+          SELECT ${key}, 0
+          UNION ALL
+          SELECT c.id, s.depth + 1 FROM catalogs c JOIN sub s ON c.parent_id = s.id WHERE s.depth < 16)
+        SELECT id FROM sub)`
+    : `(SELECT ${key})`;
+  return `(p.id IN (SELECT pc.product_id FROM product_catalogs pc WHERE pc.catalog_id IN ${under})
+           OR p.category_id IN ${under} OR p.sub_category_id IN ${under})`;
+}
+
+/** Among `ids`, the products that are printers through a printer catalog OTHER than `catalogId`. */
+async function printersElsewhere(db: D1Database, catalogId: string, ids: readonly string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { results } = await db
       .prepare(
         `SELECT DISTINCT pc.product_id FROM product_catalogs pc
            JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
           WHERE pc.catalog_id <> ?1 AND pc.product_id IN (SELECT value FROM json_each(?2))`
       )
-      .bind(catalogId, JSON.stringify(silent.slice(i, i + 200)))
+      .bind(catalogId, JSON.stringify(ids.slice(i, i + 200)))
       .all<{ product_id: string }>();
-    for (const r of rows ?? []) elsewhere.add(String(r.product_id));
+    for (const r of results ?? []) out.add(String(r.product_id));
   }
+  return out;
+}
+
+/**
+ * §29 FOR A CATALOG EDIT — how many products would change their EFFECTIVE
+ * answer if `edit` were applied to `catalogId` as a whole (landing round 4,
+ * R1; the one function both catalog editors call). Every affected product is
+ * resolved twice by the one resolver, `lineDevicePolicy`: once under today's
+ * context (`serializationContext`) and once under the same context with BOTH
+ * changes applied together —
+ *   - the printer flag: a product filed directly under the catalog (by
+ *     placement or by its section) becomes a printer when the flag turns on,
+ *     and stays one when it turns off only through ANOTHER printer catalog.
+ *     The flag is not inherited down the tree, so only those are touched;
+ *   - the parent: every product filed under the catalog or a section below it
+ *     resolves its section policy through the new parent
+ *     (`catalogSerialPolicies` with that one link replaced). A shop with no
+ *     section policy at all cannot flip by a move.
+ * A product with its own `serialized` word keeps it wherever it is filed and
+ * is never counted. An edit of one key gives exactly what round 3 gave for it
+ * (`printerFlagSerialFlips` / `reparentSerialFlips` below are those calls).
+ */
+export async function catalogEditSerialFlips(db: D1Database, catalogId: string, edit: CatalogEdit): Promise<number> {
+  const flag = edit.flag !== undefined;
+  const move = edit.parentId !== undefined && (await anySectionSerialPolicy(db));
+  if (!flag && !move) return 0;
+  const { results } = await db
+    .prepare(
+      `SELECT p.id AS pid, p.ops_policy, ${filedUnderSql('?1', false)} AS direct
+         FROM products p WHERE ${filedUnderSql('?1', move)}`
+    )
+    .bind(catalogId)
+    .all<{ pid: string; ops_policy: string | null; direct: number }>();
+  const silent = (results ?? []).filter((r) => readOpsWarranty(r.ops_policy).serialized === null);
+  if (!silent.length) return 0;
+  const ids = silent.map((r) => String(r.pid));
+  const before = await serializationContext(db, ids);
+  const after: SerializationContext = { printers: new Set(before.printers), catalog: before.catalog };
+  if (flag) {
+    const direct = silent.filter((r) => Number(r.direct) === 1).map((r) => String(r.pid));
+    const elsewhere = await printersElsewhere(db, catalogId, direct);
+    for (const id of direct) {
+      if (edit.flag || elsewhere.has(id)) after.printers.add(id);
+      else after.printers.delete(id);
+    }
+  }
+  if (move) after.catalog = await catalogSerialPolicies(db, ids, { sectionId: catalogId, parentId: edit.parentId ?? null });
   let flips = 0;
-  for (const id of silent) {
-    const before = lineDevicePolicy('{}', id, ctx).serialized;
-    const after = nextFlag || elsewhere.has(id) ? true : ctx.catalog.get(id) === 'required';
-    if (before !== after) flips++;
+  for (const id of ids) {
+    if (lineDevicePolicy('{}', id, before).serialized !== lineDevicePolicy('{}', id, after).serialized) flips++;
   }
   return flips;
+}
+
+/** The OWNER_ONLY details of a refused catalog edit: which keys, and how many products flip. */
+export function catalogEditRefusal(edit: CatalogEdit, flips: number): Record<string, unknown> {
+  if (edit.flag !== undefined && edit.parentId !== undefined) {
+    return { field: 'is_printer_catalog', fields: ['is_printer_catalog', 'parent_id'], via: 'printer_flag_and_reparent', products: flips };
+  }
+  if (edit.flag !== undefined) return { field: 'is_printer_catalog', via: 'printer_flag', products: flips };
+  return { field: 'parent_id', via: 'reparent', products: flips };
+}
+
+/**
+ * RE-PARENTING A SECTION alone (regressions review #3): how many products
+ * filed under it, or under a section below it, would change their answer if
+ * `sectionId` moved under `newParentId`. 0 on a shop with no section policy
+ * at all (the printer flag is never inherited, so nothing can flip).
+ */
+export function reparentSerialFlips(db: D1Database, sectionId: string, newParentId: string | null): Promise<number> {
+  return catalogEditSerialFlips(db, sectionId, { parentId: newParentId });
+}
+
+/**
+ * THE PRINTER FLAG alone (landing review round 3, F1): how many products filed
+ * under `catalogId` would change their EFFECTIVE answer if its
+ * `is_printer_catalog` became `nextFlag`. An empty catalog, or one whose
+ * products all carry their own word, flips nothing (0). The caller compares
+ * the flag first: an echo is not asked.
+ */
+export function printerFlagSerialFlips(db: D1Database, catalogId: string, nextFlag: boolean): Promise<number> {
+  return catalogEditSerialFlips(db, catalogId, { flag: nextFlag });
+}
+
+/**
+ * WHERE A WRITE CAN MOVE THE SERIAL ANSWER: one product (a product door
+ * re-files it, or rewrites its ops_policy), or the products filed under a
+ * catalog — under its whole subtree when the edit moves it (the printer flag
+ * reaches only the catalog's own products).
+ */
+export type AnswerScope = { productId: string } | { catalogId: string; subtree: boolean };
+
+export const catalogEditScope = (catalogId: string, edit: CatalogEdit): AnswerScope => ({
+  catalogId,
+  subtree: edit.parentId !== undefined,
+});
+
+export interface SerialAnswerFence {
+  /** `stmts` with the fence in front of them and behind them, for ONE batch. */
+  around(stmts: D1PreparedStatement[]): D1PreparedStatement[];
+}
+
+/**
+ * THE ANSWER FENCE (landing round 4, R2) — a non-owner's write may never
+ * change a product's effective answer, and the verdict that said so was
+ * reached on reads that can be stale by the time the write lands: a placement
+ * into an empty catalog and that catalog's printer flag, each judged before
+ * the other committed, together flipped a product though each alone flipped
+ * nothing. So a non-owner's write re-asserts the invariant INSIDE its own
+ * batch.
+ *
+ * WHAT IS FENCED: the set of products in `scope` whose effective answer is
+ * "needs a serial", resolved by the resolver's SQL twin
+ * (`serializedProductSql`, the very predicate the delivered-units sweep runs).
+ * It is read here, and the batch re-checks it twice — before the write's
+ * statements and after them: the set must still be the one read (same size,
+ * every member read still in it).
+ *
+ * WHY THAT IS SUFFICIENT, whatever ran in between: a D1 batch is one
+ * transaction, so the two checks see the database just before and just after
+ * this write and nothing else. The write does not change who is in scope (a
+ * catalog edit moves no product; a product door's scope is that product), so
+ * equal sets on both sides mean no product in scope changed its answer, and a
+ * product outside it cannot: the printer flag reaches only the catalog's own
+ * products, a move only the walks that start in its subtree, a placement only
+ * its own product. It does not depend on which reads the verdict made, so no
+ * input the verdict happened to read needs a fence of its own — a placement,
+ * a flag, a section policy, a parent link or the owner's word changed in
+ * between all show up as a different set. The verdict stays the early,
+ * readable 403; the fence is the guarantee. A lost race aborts the whole
+ * batch (`ops_guards.ok` is CHECK(ok = 1), `isLostRace`), and the door
+ * answers 409 SERIAL_FILING_CHANGED.
+ *
+ * ONE EXCEPTION AFTER A PRODUCT WRITE: a product that leaves the write
+ * carrying its OWN `serialized` word passes the second check. Its answer is
+ * then that word, which no placement, flag, policy or parent can move, so no
+ * race reaches it; and the word is one the write was allowed to store — the
+ * stored word the verdict kept (unchanged since the read: the first check
+ * holds the answer it gave), or the one pre-existing door that writes a word,
+ * a used / open-box / refurbished grade on a product with none
+ * (`printerWarrantyRules`, docs/SERIAL_SCAN.md §29), which this fence leaves
+ * exactly as it was.
+ *
+ * Non-owners only: the owner's writes carry no fence. Before migration 0178
+ * the twin has no section layer to read (`withCatalog` false), exactly HEAD's
+ * rule.
+ */
+export async function serialAnswerFence(db: D1Database, scope: AnswerScope): Promise<SerialAnswerFence> {
+  const withCatalog = await serialAssignmentsInstalled(db);
+  const key = 'productId' in scope ? scope.productId : scope.catalogId;
+  const where = (k: string) => ('productId' in scope ? `p.id = ${k}` : filedUnderSql(k, scope.subtree));
+  const answer = serializedProductSql('p.id', 'p.ops_policy', withCatalog);
+  const { results } = await db
+    .prepare(`SELECT p.id AS id FROM products p WHERE ${where('?1')} AND ${answer}`)
+    .bind(key)
+    .all<{ id: string }>();
+  const ids = (results ?? []).map((r) => String(r.id));
+  // `fence` binds its guard id as ?1, so the condition's own arguments start at ?2.
+  const count = (extra: string) => `(SELECT COUNT(*) FROM products p WHERE ${where('?2')} AND ${answer}${extra})`;
+  const unchanged = `${count('')} = ?4 AND ${count(' AND p.id IN (SELECT value FROM json_each(?3))')} = ?4`;
+  const after =
+    'productId' in scope
+      ? `(EXISTS (SELECT 1 FROM products p WHERE p.id = ?2 AND ${serializedWordSql('p.ops_policy')} IN (0, 1)) OR (${unchanged}))`
+      : unchanged;
+  const args = [key, JSON.stringify(ids), ids.length];
+  return { around: (stmts) => [...fence(db, unchanged, args), ...stmts, ...fence(db, after, args)] };
 }
 
 /**
@@ -346,16 +471,27 @@ export async function anySectionSerialPolicy(db: D1Database): Promise<boolean> {
   }
 }
 
-/** The resolved section policy of every product in `productIds` that has one. */
-export async function catalogSerialPolicies(db: D1Database, productIds: Iterable<string>): Promise<Map<string, CatalogSerialPolicy>> {
+/**
+ * The resolved section policy of every product in `productIds` that has one.
+ * `move` answers "what if `sectionId` hung under `parentId`" — the same walk
+ * with that one parent link replaced (`catalogEditSerialFlips`).
+ */
+export async function catalogSerialPolicies(
+  db: D1Database,
+  productIds: Iterable<string>,
+  move?: { sectionId: string; parentId: string | null }
+): Promise<Map<string, CatalogSerialPolicy>> {
   const ids = [...new Set([...productIds].filter((id) => typeof id === 'string' && id !== ''))];
   const out = new Map<string, CatalogSerialPolicy>();
   if (!ids.length || !(await anySectionSerialPolicy(db))) return out;
+  const parentOf = move ? 'CASE WHEN cur.id = ?2 THEN ?3 ELSE cur.parent_id END' : undefined;
   for (let i = 0; i < ids.length; i += 200) {
-    const { results } = await db
-      .prepare(`SELECT j.value AS pid, ${catalogSerialPolicySql('j.value')} AS pol FROM json_each(?) j`)
-      .bind(JSON.stringify(ids.slice(i, i + 200)))
-      .all<{ pid: string; pol: number | null }>();
+    const chunk = JSON.stringify(ids.slice(i, i + 200));
+    const stmt = db.prepare(`SELECT j.value AS pid, ${catalogSerialPolicySql('j.value', parentOf)} AS pol FROM json_each(?1) j`);
+    const { results } = await (move ? stmt.bind(chunk, move.sectionId, move.parentId) : stmt.bind(chunk)).all<{
+      pid: string;
+      pol: number | null;
+    }>();
     for (const r of results ?? []) {
       if (Number(r.pol) === 2) out.set(String(r.pid), 'required');
       else if (Number(r.pol) === 1) out.set(String(r.pid), 'off');
@@ -389,13 +525,16 @@ export function lineDevicePolicy(opsPolicy: unknown, productId: string | null | 
   return { ...base, serialized: ctx.catalog.get(pid) === 'required' };
 }
 
+/** The product's own `serialized` word in SQL: 1, 0, or NULL (silent). */
+const serializedWordSql = (ops: string) => `(CASE WHEN json_valid(${ops}) THEN json_extract(${ops}, '$.serialized') END)`;
+
 /**
  * The SQL twin of `lineDevicePolicy(...).serialized`, for a WHERE clause.
  * `pid` names the product id, `ops` the ops_policy text. With `withCatalog`
  * false (migration 0178 not applied yet) it is HEAD's rule exactly.
  */
 export function serializedProductSql(pid: string, ops: string, withCatalog: boolean): string {
-  const ser = `(CASE WHEN json_valid(${ops}) THEN json_extract(${ops}, '$.serialized') END)`;
+  const ser = serializedWordSql(ops);
   const printer = `EXISTS (SELECT 1 FROM product_catalogs spc
                        JOIN catalogs spcc ON spcc.id = spc.catalog_id AND spcc.is_printer_catalog = 1
                       WHERE spc.product_id = ${pid})`;

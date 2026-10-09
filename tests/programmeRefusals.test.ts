@@ -101,6 +101,9 @@ const REQUIRED: Record<string, readonly string[]> = {
     'PRICING_GATE_ITEMS_MISSING',
     'PRICING_GATE_NOT_CONFIRMED',
   ],
+  // A non-owner's catalog edit or product save that lost its in-batch answer
+  // fence (worker/lib/serialPolicy.ts `serialAnswerFence`).
+  'serial scan landing round 4 (R2)': ['SERIAL_FILING_CHANGED'],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

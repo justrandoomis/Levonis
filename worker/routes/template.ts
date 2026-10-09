@@ -96,7 +96,9 @@ import {
 } from '../lib/template';
 import { normalizeCheapestBase } from '../lib/cheapestBase';
 import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
-import { serializedWriteVerdict } from '../lib/serialPolicy';
+import { serialAnswerFence, serializedWriteVerdict } from '../lib/serialPolicy';
+import { isLostRace } from '../lib/gifts/fence';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { refuse as serialRefuse } from '../lib/serialAssignments';
 import {
   parseProductRow,
@@ -3280,6 +3282,16 @@ templateRoutes.post('/apply', async (c) => {
       ? [...merge.preserved_fields, 'product_cost_iqd']
       : merge.preserved_fields;
 
+  // §29 for a non-owner's update (serial landing round 4, R2): the verdict
+  // (`judgeTemplateSerialized`) ran on reads that may be stale by now, so the
+  // batch re-checks the stored product's answer before and after its writes.
+  // A create has no answer to keep; the owner's apply is never fenced.
+  const answerGuard =
+    isUpdate && a.existing && !isOwner(c.env, adminUser)
+      ? await serialAnswerFence(c.env.DB, { productId: a.existing.id })
+      : null;
+  if (answerGuard) plan.statements = answerGuard.around(plan.statements);
+
   // ---- ONE batch: everything lands, or nothing does --------------------
   try {
     await saveProductAtomic(c.env.DB, plan, [
@@ -3302,6 +3314,15 @@ templateRoutes.post('/apply', async (c) => {
   } catch (e) {
     // The write did not happen — free the fingerprint so a corrected retry
     // is not mistaken for a double submission.
+    if (answerGuard && isLostRace(e)) {
+      return refused(409, {
+        code: 'SERIAL_FILING_CHANGED',
+        error: serverMessage('SERIAL_FILING_CHANGED'),
+        section: 'warranty',
+        field: 'serialized',
+        errors: [serverMessage('SERIAL_FILING_CHANGED')],
+      });
+    }
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('UNIQUE') && msg.includes('products.sku')) {
       // The race backstop for the named check in `planProductSave`: two

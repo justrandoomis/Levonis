@@ -437,6 +437,18 @@ export const COST_REFUSALS = {
     en: 'The main admin has not yet confirmed the first-activation items for automatic pricing, so it cannot be turned on for any product before that.',
     ckb: 'بەڕێوەبەری سەرەکی هێشتا بڕگەکانی یەکەم چالاککردنی نرخدانانی خۆکاری پشتڕاست نەکردووەتەوە، بۆیە پێش ئەوە بۆ هیچ بەرهەمێک چالاک ناکرێت.',
   },
+
+  // ---- serial scan at preparation (landing round 4, R2) --------------------
+  // A non-owner's catalog edit or product save re-checks, inside its own
+  // batch, that no product's need for a serial changed under it
+  // (`serialAnswerFence`, worker/lib/serialPolicy.ts). When something else
+  // changed the sections or the products filed under them between its reads
+  // and its write, nothing is written and the admin is asked to reload.
+  SERIAL_FILING_CHANGED: {
+    ar: 'تغيّرت الأقسام أو المنتجات المصنّفة فيها أثناء الحفظ، فلم يُحفظ شيء. أعد تحميل الصفحة ثم حاول مرة أخرى.',
+    en: 'The sections, or the products filed under them, changed while saving, so nothing was saved. Reload the page and try again.',
+    ckb: 'بەشەکان، یان ئەو بەرهەمانەی لەژێریاندا دانراون، لە کاتی پاشەکەوتکردندا گۆڕان، بۆیە هیچ پاشەکەوت نەکرا. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
+  },
 } as const satisfies Record<string, CostRefusal>;
 
 export type CostRefusalCode = keyof typeof COST_REFUSALS;

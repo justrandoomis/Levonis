@@ -130,13 +130,20 @@ branches), else off. Owner only: the section policy, the product's flag, a
 re-filing that flips the answer for a product with no word of its own, a
 printer flag that flips one (both catalog editors: `POST
 /api/admin/taxonomy/catalogs` and `PATCH /api/admin/products-v2/catalogs/:id`
-— `printerFlagSerialFlips`: a product filed under that catalog, by placement or
-by its section, whose own word is silent and that is not a printer through
-another catalog; the flag is not inherited down the tree), and moving a
-section under a parent whose policy flips one of its products
-(`reparentSerialFlips`, both editors). A printer flag that flips nothing — an
-echo, an empty catalog, one whose products all carry their own word, and every
-NEW catalog (it holds no product) — is anyone's. Every product door judges a
+— a product filed under that catalog, by placement or by its section, whose
+own word is silent and that is not a printer through another catalog; the flag
+is not inherited down the tree), and moving a section under a parent whose
+policy flips one of its products. Both editors judge a save as ONE edit
+(round 4, `catalogEditSerialFlips`): every product under the catalog is
+resolved by `lineDevicePolicy` before and after with the new flag AND the new
+parent applied together, so switching a printer catalog off and moving it out
+of a 'required' branch in one request is refused when the two together flip a
+product (`details.via = printer_flag_and_reparent`), and passes when together
+they flip nothing. A save that changes one of them is judged exactly as in
+round 3 (`printerFlagSerialFlips` / `reparentSerialFlips` are that call with
+one key). A printer flag that flips nothing — an echo, an empty catalog, one
+whose products all carry their own word, and every NEW catalog (it holds no
+product) — is anyone's. Every product door judges a
 non-owner's write by ONE rule, `serializedWriteVerdict`
 (worker/lib/serialPolicy.ts): the form on create and on update (by
 `serialized` or `ops_policy.serialized`), the ops-policy route, the placement
@@ -164,10 +171,43 @@ preview judges §29 on that set (`serialImportIssue`); the confirm re-reads the
 LIVE row — its shelves, and every `ops_policy` key the row's own cells did not
 set (`serialized` only when the row's cell set it) — and re-judges a
 non-owner's row against it, failing that row alone, by line, with the
-preview's sentence.
+preview's sentence. Round 4: a row whose cells name NO section (the columns
+absent or empty — the preview records it in `cells.section`) keeps the LIVE
+section pair and shelves, so a re-filing made after the preview is never
+undone, and the re-check judges exactly that filing; a row that names a
+section moves the product as before. Each row's write is conditioned on the
+`ops_policy` it re-read (a fence first in that row's batch): a word written
+between the re-read and the write fails that row alone with
+`IMPORT_ROW_CHANGED_RETRY` (ar / en / ckb, «upload the sheet again»), never
+the word; the rest of the sheet is written. This applies to every importer —
+it is a lost-write guard, not a §29 refusal.
+
+WRITE-TIME FENCES (round 4). The verdicts above are reached on reads, and two
+non-owner requests each judged before the other committed could together flip
+a product (a placement into an empty catalog while its printer flag is
+switched on). Every non-owner write a verdict allows now re-asserts the
+invariant INSIDE its own batch (`serialAnswerFence`, worker/lib/serialPolicy.ts):
+the set of products in scope whose effective answer is «needs a serial» —
+by the resolver's SQL twin, `serializedProductSql` — is read with the
+verdict, and the batch checks it is still that set just before and just after
+its own statements. Scope: the product, for the product doors (placement
+route, form update, bundles and mystery editors, TXT template update, each
+import row); the products filed under the catalog — under its subtree when it
+moves — for the two catalog editors. A D1 batch is one transaction, so equal
+sets on both sides mean the write flipped nothing, whatever ran in between and
+whichever input changed (a placement, a flag, a policy, a parent, the owner's
+word). After a product write, a product that carries its OWN word passes the second
+check: its answer is that word, which no race can move — the stored word the
+verdict kept, or the used-grade fill below, which the fence leaves exactly as
+it was. A lost race answers 409 `SERIAL_FILING_CHANGED` (the contract's three
+sentences; the admin screens render it by code), and an import row fails
+alone with `IMPORT_ROW_CHANGED_RETRY`. A create has no answer to keep and is
+not fenced. The owner's writes carry no fence and no new read.
 
 Refusals: 403 `OWNER_ONLY` with `details.via` = `flag`, `placement`,
-`reparent` or `printer_flag` (`details.products` = how many products flip);
+`reparent`, `printer_flag` or `printer_flag_and_reparent` (`details.products`
+= how many products flip); 409 `SERIAL_FILING_CHANGED` for a non-owner write
+that lost its in-batch fence;
 the import sheet refuses by line in ar / en / ckb
 (`IMPORT_SERIALIZED_OWNER_ONLY`, `IMPORT_SERIAL_REFILE_OWNER_ONLY`), at the
 preview and again at the confirm; the template preview shows it as its
@@ -257,7 +297,7 @@ both policy controls.
 
 ## Known limits / owner questions
 
-- The serial INVENTORY list (and «أجهزة الطلبات») still shows assistants the whole serial, as before this feature: the list is keyed by the serial and assistants register stock there. Masking it is the owner's call; the serial page itself now follows owner default 3 everywhere on it.
+- The serial INVENTORY list, «أجهزة الطلبات», and the WARRANTY RECEIPTS — the receipts list (`GET /api/admin/warranties`) and one receipt's own record (`GET /api/admin/warranties/:id`, its `receipt`: `serial_raw`, `serial_norm`, `order_id`) — still show assistants the whole serial and the order number, as before this feature: the list is keyed by the serial and assistants register stock there, and the receipts are found by serial, phone or order. They are the accepted exceptions pending ONE owner question: should assistants see full serials (and order numbers) on these screens? Until it is answered they stay as they are. So the round-3 masking of the receipt's and the unit's HISTORY (`maskedDetail`) is defence in depth — it keeps another device's serial, a replaced or corrected serial and older order numbers out of an assistant's history view — not a complete boundary: the same response's `receipt` names the receipt's own serial and order, and a replaced receipt's number opens that receipt whole. The serial page itself follows owner default 3 everywhere on it.
 - The inventory's bulk add now refuses a product barcode of any length and a box-SN-shaped value in the serial column (the same reading as the scan). A non-Bambu device whose real serial looks like a Bambu box SN (`B` + 4 digits + a letter …) can no longer be filed — say so if the shop sells such brands. The post-delivery and replacement doors read through the same canonicaliser (no `/ . _`, 6 characters at least).
 - The inventory panel has no Sorani table (pre-existing: Sorani readers get its Arabic). Its two new bulk problems (a product barcode, a box SN in the serial column) carry their own Sorani (`PROBLEMS_CKB` / `problemText` in `src/components/adminWarranty/serialInventory/model.ts`).
 
@@ -265,6 +305,8 @@ both policy controls.
 - Phase 2 (with the inventory programme): the owner batch re-pin that moves the accounting allocation; until then the owner's `batch` exception records the mismatch without re-pinning.
 - Open `warranty_claims` on a returned unit are left to the claims workflow.
 - Re-open does not take stock again (pre-existing, DECISIONS 184(15)); the slot shows `STOCK_NOT_RETAKEN`.
+- The product import's D1 budget (pre-existing, measured by the round-3 review, NOT introduced by this branch): the preview's `loadExisting` binds more than 100 parameters in one statement once a sheet holds more than about 50 rows, over D1's per-statement limit; the confirm prepares about 58–62 statements per row. Round 4 adds, per non-owner update row, one read and four in-batch fence statements (the answer fence), and per update row of any importer two more (the ops_policy fence). Large sheets are bounded by these, not by `MAX_PRODUCTS`; splitting a sheet is the workaround until the import is batched.
+- The ops-policy route (`POST /api/devices/admin/products/:id/ops-policy`) writes the whole `ops_policy` from its own read, like the import did before round 4: a non-owner's `warranty_base_months` written in the same moment as the owner's word can carry the old word back. Not changed in round 4 (the finding was the import's); the same fence would close it.
 
 - A used / open-box / refurbished grade turns serial tracking ON for a product with no `serialized` word of its own (live before this feature; see §29 above). Should a NON-owner's used grade still turn tracking on, or should that be the owner's call like every other door that flips the answer?
 
@@ -299,7 +341,7 @@ Every case runs the real routes over the real migrations (`tests/fixtures/serial
 | `serialPrepDeployAhead` | the code on the database one migration behind: every new door 503, HEAD behaviour everywhere else, and the feature live the moment the migration lands (no cached «not installed») |
 | `serialPolicy`, `serialPrepBoard`, `serialPrepUi` | §29 policy; the board chip; the screens (wedge, sources, strings, Sorani) |
 | `serialLandingReview` | the landing reviews' findings, one test each by name: a new product's flag (form create), the echo that must not pin an inherited answer, the import sheet's section policy and re-filing, the TXT template, the serial page masked at every depth (and the rebuilt «added» row's id), the contract's one sentence, re-parenting a section, the products-v2 catalog editor's printer flag and re-parent |
-| `serialLandingReview2` | round 3, one test per finding: the printer flag judged by its flips (empty catalog, worded products, a silent product, create); the import keeping extra placements (price row, owner, a move) and re-reading the live row at confirm (an owner's later word survives; a row the live row refuses fails alone); OWNER_ONLY in ar / en / ckb on the admin screens; the unit history and the warranty receipt masked; the serial page's 503 when its story fails; the bundle and mystery editors' §29 check; no units for a bundle parent (delivery and the sweep) |
+| `serialLandingReview2` | round 3, one test per finding: the printer flag judged by its flips (empty catalog, worded products, a silent product, create); the import keeping extra placements (price row, owner, a move) and re-reading the live row at confirm (an owner's later word survives; a row the live row refuses fails alone); OWNER_ONLY in ar / en / ckb on the admin screens; the unit history and the warranty receipt masked; the serial page's 503 when its story fails; the bundle and mystery editors' §29 check; no units for a bundle parent (delivery and the sweep). Round 4: a flag and a re-parent judged as one edit (refused together, the halves alone as before, a whole that flips nothing passes, the owner); the write-time fence both ways (`afterReadsOf`: placement vs printer flag on both catalog editors, the product form), no fence and no new statement on the owner's writes, the used-grade door unchanged, `SERIAL_FILING_CHANGED`'s three sentences; the import confirm failing only the row whose ops_policy changed under it; a sheet with no section keeping the live filing |
 | `serialPrepReview` | the three reviews' findings, one test each by name: re-delivery without a scan, the registration a cancel revoked, the post-delivery / replacement / void doors re-checked inside their writes, a lot recorded after the scan, take-from-order's window, the fence under an unneeded reason, a change on a full line, op_id retries, atomic activation, in-batch adoption, the canonicaliser on returns and bulk add, placement by category, the masked serial page, re-link by binding; and the screens (focus, the queued burst, warnings until «تم», accessible names, plurals) |
 
 ## Renumbering

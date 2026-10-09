@@ -79,6 +79,7 @@ import {
   resolveProduct,
   serialImportIssue,
   splitComboKey,
+  IMPORT_ROW_CHANGED_RETRY,
   type CatalogRef,
   type ExistingCellRow,
   type ExistingRouteRow,
@@ -124,7 +125,9 @@ import {
   saveProductAtomic,
 } from '../lib/productPersistence';
 import { applyPrinterWarrantyRules, readOpsWarranty } from '../lib/warrantyPlans';
-import { serializationContext, type VerdictCache } from '../lib/serialPolicy';
+import { serialAnswerFence, serializationContext, type SerialAnswerFence, type VerdictCache } from '../lib/serialPolicy';
+import { fence } from '../lib/operations';
+import { isLostRace } from '../lib/gifts/fence';
 import { withClassificationPlacements } from '../lib/catalogMembership';
 import { isActiveProductImageRow } from '../lib/productOverlay';
 
@@ -1471,6 +1474,10 @@ adminImportRoutes.post('/preview', async (c) => {
         serialized: p.serialized,
         warranty_base_months: p.warranty_base_months,
         delivery_options: p.delivery_options !== null,
+        // Round 4 R4 — whether the row's own cells named a section. A row
+        // that named none keeps the LIVE section pair and shelves at the
+        // confirm: a re-filing made after this preview is never undone by it.
+        section: Boolean(p.category || p.sub_category),
       },
     });
   }
@@ -1728,15 +1735,31 @@ function importItemCheckpointStatement(
  * product's current placements minus the section pair it has now, plus the
  * pair the sheet states (`importPlacements`). A new product — or one deleted
  * since the preview — gets exactly the preview's set.
+ *
+ * Round 4 R4 — a row whose cells named NO section (`cells.section` false: the
+ * columns absent or empty) states nothing about the filing, so the document
+ * takes the LIVE pair and the shelves stay exactly as stored. The preview's
+ * pair was only the stored one at preview time; writing it back reverted a
+ * re-filing made in between. A payload written before `cells.section`
+ * existed keeps round 3's behaviour.
  */
 async function confirmLivePlacements(
   db: D1Database,
   productId: string,
   prevDoc: ProductDoc | null,
   doc: ProductDoc,
-  previewed: string[]
+  previewed: string[],
+  rawCells: unknown
 ): Promise<string[]> {
   if (!prevDoc) return previewed;
+  const namedSection =
+    rawCells && typeof rawCells === 'object' && !Array.isArray(rawCells) && (rawCells as { section?: unknown }).section === false
+      ? false
+      : true;
+  if (!namedSection) {
+    doc.category_id = prevDoc.category_id ?? null;
+    doc.sub_category_id = prevDoc.sub_category_id ?? null;
+  }
   const { results } = await db
     .prepare('SELECT catalog_id FROM product_catalogs WHERE product_id = ? ORDER BY position, catalog_id')
     .bind(productId)
@@ -1968,11 +1991,12 @@ adminImportRoutes.post('/confirm', async (c) => {
         // F2 / F4 — THE LIVE ROW, NOT THE PREVIEW'S SNAPSHOT, decides what
         // the sheet did not say: the shelves beside the section pair, and
         // every ops_policy key the row's cells did not set.
-        const placed = await confirmLivePlacements(c.env.DB, productId, prevDoc, doc, (item.catalogIds as string[]) ?? []);
+        const placed = await confirmLivePlacements(c.env.DB, productId, prevDoc, doc, (item.catalogIds as string[]) ?? [], item.cells);
         const cellSerialized = mergeLiveDeviceKeys(doc, prevRow, prevDoc, item.cells);
         // §29 again, against the live row: the preview's verdict may be
         // minutes old, and the owner may have spoken since (F4). Same refusal,
         // same sentence as the preview's, failing this row only.
+        let answerGuard: SerialAnswerFence | null = null;
         if (!isOwner(c.env, admin)) {
           const issue = await serialImportIssue(
             c.env.DB,
@@ -1983,6 +2007,10 @@ adminImportRoutes.post('/confirm', async (c) => {
           if (issue) throw new Error(`سطر ${issue.line}: ${issue.message}`);
           if (doc.serialized === null) delete doc.ops_policy.serialized;
           else doc.ops_policy.serialized = doc.serialized;
+          // …and the row's batch re-checks the product's answer before and
+          // after its writes (round 4 R2): nothing that changed since these
+          // reads can make this row flip it.
+          if (prevDoc) answerGuard = await serialAnswerFence(c.env.DB, { productId });
         }
         const catalogIds = withClassificationPlacements(placed, doc);
         await applyPrinterWarrantyRules(c.env.DB, doc, catalogIds);
@@ -2010,6 +2038,22 @@ adminImportRoutes.post('/confirm', async (c) => {
           (item.membership as ParsedMembershipRule[]) ?? []
         );
         plan.statements.push(...membership.statements);
+        if (answerGuard) plan.statements = answerGuard.around(plan.statements);
+        // Round 4 R3 — the ops_policy written above is the LIVE row's, re-read
+        // a moment ago, with the row's own cells on top. The write is
+        // conditioned on that row still holding exactly what was re-read: a
+        // word the owner wrote in between aborts this row's batch, never the
+        // owner's word. A fence first in the batch is the same condition as
+        // `UPDATE … WHERE id = ? AND ops_policy IS ?` plus a changed-one-row
+        // check: the batch is one transaction, so nothing lands between the
+        // two. Every row is its own batch, so a lost race fails that row
+        // alone; the rest of the sheet is written.
+        if (prevRow) {
+          plan.statements = [
+            ...fence(c.env.DB, 'EXISTS (SELECT 1 FROM products WHERE id = ? AND ops_policy IS ?)', [productId, prevRow.ops_policy ?? null]),
+            ...plan.statements,
+          ];
+        }
 
         outcome = {
           key,
@@ -2024,7 +2068,13 @@ adminImportRoutes.post('/confirm', async (c) => {
         // statement. The row is also the crash-resume completion marker.
         plan.statements.push(importItemCheckpointStatement(c.env.DB, importId, index, lease.token, outcome));
         await requireImportApplyLease(c.env.DB, importId, lease.token);
-        await saveProductAtomic(c.env.DB, plan);
+        try {
+          await saveProductAtomic(c.env.DB, plan);
+        } catch (e) {
+          // R2 / R3: the product changed under this row — not written, retry.
+          if (isLostRace(e)) throw new Error(`سطر ${line}: ${IMPORT_ROW_CHANGED_RETRY}`);
+          throw e;
+        }
         checkpoints.set(index, {
           import_id: importId,
           item_index: index,
