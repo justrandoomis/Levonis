@@ -67,6 +67,9 @@ const PURE_PACKAGE_IMPORTS: Record<string, readonly string[]> = {
   // The FX chain (FX programme plan §3, §36) converts with the same exact
   // decimal arithmetic, never a float: the same edge, one module.
   'packages/pricing/src/fxChain.ts': ['@levonis/contracts/procurementCost'],
+  // A minimum profit in USD (owner brief 2026-10-09) is ranked and converted
+  // (amount × U) with the same exact arithmetic: the same edge, one module.
+  'packages/pricing/src/ruleResolution.ts': ['@levonis/contracts/procurementCost'],
 };
 
 test('the pricing engine maths declares its one contracts dependency', () => {

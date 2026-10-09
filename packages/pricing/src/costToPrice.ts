@@ -8,13 +8,23 @@
  *     R_exact       = supplierExact + shippingExact + additional
  *     R             = ceil(R_exact);   supplier_cost_iqd = ceil(supplierExact)
  *     shipping_cost_iqd = R − supplier_cost_iqd − additional       [C2-M4]
- *     pre-order     = ceil_step(R_exact + T)     step 1,000 IQD    [LD4]
+ *     T_exact       = amount_usd × U   (a USD minimum profit, owner brief 2026-10-09)
+ *                   | amount_iqd       (a migrated dinar amount not yet converted)
+ *     pre-order     = ceil_step(R_exact + T_exact)   step 1,000 IQD    [LD4]
  *     direct        = pre-order(default profile) + P,  P % step = 0 else DIRECT_SALE_EXTRA_NOT_ON_STEP [C2-M5]
  *
- * So `price − R_exact ≥ T` ALWAYS (the owner's rule: rounding never takes profit
- * below target), every price is a multiple of the step, and the rounding adds
- * less than one step. Nothing is a float: decimals are BigInt rationals from
- * `@levonis/contracts/procurementCost`, rounded once, up.
+ * So `price − P − R_exact ≥ T_exact` ALWAYS (the owner's rule: rounding, the
+ * exchange rate or freight never take profit below the minimum), every price is
+ * a multiple of the step, and the rounding adds less than one step. Nothing is a
+ * float: decimals are BigInt rationals from `@levonis/contracts/procurementCost`,
+ * rounded once, up.
+ *
+ * THE USD CHAIN (USD design §2.1-§2.2). E1 is fed USD = U, EUR = E×U, CNY = C×U
+ * (`fxChain.composeIqdRates`), so R_exact = U × K where K is the Current Total
+ * Cost in USD, and ceil_step(F × U) = ceil_step(R_exact + T × U) for the Final
+ * Price in USD F = K + T. The USD figures each channel carries (K, F, freight and
+ * extras ÷ U) are rounded UP at 6 decimals for DISPLAY and AUDIT ONLY: nothing
+ * recomputes a price from them, because ceil6 can move F × U across a step.
  *
  * Missing or contradictory inputs return issue CODES, never a number (brief 1
  * §38): a channel with any error-severity issue gets no price at all. A zero
@@ -57,16 +67,24 @@
 import {
   addProcurementExact,
   ceilProcurementExact,
+  ceilToPlaces,
   compareProcurementExact,
   divProcurementExact,
   mulProcurementExact,
   parseProcurementDecimal,
   procurementExact,
   procurementExactText,
+  quotientProcurementExact,
   type ProcurementExact,
 } from '@levonis/contracts/procurementCost';
 import type { PricingIssueCode } from '@levonis/contracts/pricingIssues';
-import { isValidRuleAmount, type PricingRuleKind, type RuleResolution } from './ruleResolution';
+import {
+  isValidRuleAmount,
+  parseUsdRuleAmount,
+  targetProfitExactIqd,
+  type PricingRuleKind,
+  type RuleResolution,
+} from './ruleResolution';
 import {
   PROFILE_BASIS,
   SKU_CHANNELS,
@@ -622,9 +640,29 @@ export interface ReplacementCost {
   replacement_cost_iqd: number;
 }
 
+/** USD figures are rounded UP at this many decimals (display and audit only). */
+export const USD_DISPLAY_PLACES = 6;
+
 export interface ChannelPrice extends ReplacementCost {
   channel: SkuChannel;
+  /** floor(target_profit_iqd_exact): the whole-dinar backstop the 0181 CHECKs hold. */
   target_profit_iqd: number;
+  /** The deciding minimum profit in USD (canonical text); null when it is a migrated dinar amount. */
+  target_profit_usd: string | null;
+  /** T_exact in dinars: amount_usd × U, or the dinar amount — exact decimal text. */
+  target_profit_iqd_exact: string;
+  /** ceil6(supplier_cost_exact ÷ U); null without a USD rate (a dinar target only). Display. */
+  supplier_cost_usd: string | null;
+  /** ceil6(shipping_cost_exact ÷ U). Display. */
+  shipping_cost_usd: string | null;
+  /** ceil6(additional_cost_iqd ÷ U). Display. */
+  additional_cost_usd: string | null;
+  /** K = ceil6(R_exact ÷ U), the Current Total Cost in USD. Display. */
+  current_total_cost_usd: string | null;
+  /** F = K + (target_profit_usd ?? ceil6(T_exact ÷ U)). Display and audit ONLY (never re-priced from). */
+  final_price_usd: string | null;
+  /** The U the USD figures and a USD minimum profit used; null without one. */
+  usd_iqd_rate: string | null;
   target_rule_id: string;
   target_rule_version: number;
   /** direct_sale only. */
@@ -632,9 +670,10 @@ export interface ChannelPrice extends ReplacementCost {
   extra_rule_id: string | null;
   extra_rule_version: number | null;
   rounding_step_iqd: number;
-  /** ceil_step(R_exact + T) on this channel's profile (for direct_sale: the default profile). */
+  /** ceil_step(R_exact + T_exact) on this channel's profile (for direct_sale: the default profile). */
   preorder_base_iqd: number;
-  /** computed − R − T − P: what rounding up added, 0 ≤ it < one step. */
+  /** pre-order base − ceil(R_exact + T_exact): what rounding up added, 0 ≤ it < one step
+   * (with a whole-dinar target this is computed − R − T − P, as before). */
   rounding_added_iqd: number;
   computed_price_iqd: number;
 }
@@ -684,14 +723,22 @@ export function isOnStep(amount: number, step: number = ROUNDING_STEP_IQD): bool
   return Number.isSafeInteger(amount) && amount % Number(assertStep(step)) === 0;
 }
 
-/** Pre-order price = ceil_step(R_exact + T) (LD4). `replacement` is the EXACT
- * replacement cost (a rational, a decimal text, or whole IQD), never negative;
- * with T > 0 the price is therefore always at least one step — never 0. */
-export function preorderPrice(replacement: ProcurementExact | number | bigint | string, targetProfitIqd: number, step: number = ROUNDING_STEP_IQD): number {
-  if (!Number.isSafeInteger(targetProfitIqd) || targetProfitIqd <= 0) throw new RangeError('Target profit must be a positive whole number of IQD');
+/** Pre-order price = ceil_step(R_exact + T_exact) (LD4). `replacement` is the EXACT
+ * replacement cost (a rational, a decimal text, or whole IQD), never negative.
+ * The target is an exact rational > 0 — a USD minimum profit × U need not be
+ * whole dinars (USD design §2.2) — given like the replacement: a rational, a
+ * decimal text, or whole IQD (a fractional JS number is refused, never a float).
+ * With T > 0 the price is therefore always at least one step — never 0. */
+export function preorderPrice(
+  replacement: ProcurementExact | number | bigint | string,
+  targetProfit: ProcurementExact | number | bigint | string,
+  step: number = ROUNDING_STEP_IQD
+): number {
+  const t = exactOf(targetProfit);
+  if (t.num <= 0n) throw new RangeError('Target profit must be above zero');
   const r = exactOf(replacement);
   if (r.num < 0n) throw new RangeError('The replacement cost is never negative');
-  const price = ceilStep(addProcurementExact(r, procurementExact(BigInt(targetProfitIqd))), step);
+  const price = ceilStep(addProcurementExact(r, t), step);
   if (price < step) throw new RangeError('A price is at least one rounding step');
   return price;
 }
@@ -851,6 +898,33 @@ export function priceSku(input: PriceSkuInput): SkuPricingResult {
   invariant(extra === null || extra.kind === 'direct_sale_extra', 'extra is a direct_sale_extra resolution');
 
   if (target.status === 'active' && target.tie) warn({ code: 'RULE_TIE', rule_kind: 'target_profit', rule_id: target.rule.id });
+
+  // The minimum profit's currency (USD design §2.2). A USD amount needs U on
+  // EVERY channel, whatever the supplier currency; a dinar amount does not.
+  const usdEntry = input.rates.fx.USD;
+  const usdRate = rateOf(usdEntry);
+  const targetUsd = target.status === 'active' ? (target.amount_usd ?? null) : null;
+  const targetUsdExact = targetUsd !== null ? parseUsdRuleAmount(targetUsd) : null;
+  const targetProblems: Problem[] = [];
+  let targetExact: ProcurementExact | null = null;
+  if (target.status === 'active') {
+    if (targetUsd !== null) {
+      if (!targetUsdExact || target.amount_iqd != null) targetProblems.push({ code: 'TARGET_PROFIT_BLOCKED', rule_kind: 'target_profit', rule_id: target.rule.id }); // fail closed
+      else if (!usdRate) targetProblems.push({ code: 'FX_RATE_MISSING', currency: 'USD' });
+      else {
+        if (!usdEntry!.confirmed) {
+          const p: Problem = { code: 'FX_RATE_UNCONFIRMED', currency: 'USD' };
+          if (input.allowUnconfirmedRates === true) warn(p);
+          else targetProblems.push(p);
+        }
+        targetExact = targetProfitExactIqd(target, usdRate.text);
+        // A tie MIXING a USD and a dinar row was ranked at a rate: it must be this one,
+        // or a lower minimum could have won the tie.
+        if (target.ranked_at_usd_iqd != null)
+          invariant(compareProcurementExact(procurementExact(target.ranked_at_usd_iqd), usdRate.exact) === 0, 'a mixed tie is ranked at the rate it is priced at');
+      }
+    } else if (isValidRuleAmount('target_profit', target.amount_iqd)) targetExact = procurementExact(target.amount_iqd);
+  }
   if (wanted.includes('direct_sale') && extra?.status === 'active' && extra.tie)
     warn({ code: 'RULE_TIE', rule_kind: 'direct_sale_extra', rule_id: extra.rule.id });
 
@@ -859,6 +933,7 @@ export function priceSku(input: PriceSkuInput): SkuPricingResult {
     const errors: Problem[] = [];
     if (target.status !== 'active')
       errors.push({ code: target.code, rule_kind: 'target_profit', ...(target.status === 'blocked' ? { rule_id: target.rule.id } : {}) });
+    else if (targetUsd !== null) errors.push(...targetProblems);
     else if (!isValidRuleAmount('target_profit', target.amount_iqd))
       errors.push({ code: 'TARGET_PROFIT_BLOCKED', rule_kind: 'target_profit', rule_id: target.rule.id }); // fail closed
 
@@ -881,7 +956,7 @@ export function priceSku(input: PriceSkuInput): SkuPricingResult {
       computed.warnings.forEach(warn);
     }
 
-    if (errors.length || !computed?.cost || !computed.exact || target.status !== 'active') {
+    if (errors.length || !computed?.cost || !computed.exact || target.status !== 'active' || !targetExact) {
       const seen = new Set<string>();
       for (const p of errors) {
         const key = JSON.stringify(p);
@@ -893,30 +968,62 @@ export function priceSku(input: PriceSkuInput): SkuPricingResult {
     }
 
     const cost = computed.cost;
-    const T = target.amount_iqd;
     const P = extraIqd ?? 0;
-    const base = preorderPrice(computed.exact, T, step);
+    let base: number;
+    try {
+      base = preorderPrice(computed.exact, targetExact, step);
+    } catch (e) {
+      if (!(e instanceof RangeError)) throw e;
+      issues.push({ code: 'AMOUNT_TOO_LARGE', severity: 'error', channel });
+      continue;
+    }
     const price = base + P;
     if (!Number.isSafeInteger(price) || price > MAX_FINAL_PRICE_IQD) {
       issues.push({ code: 'AMOUNT_TOO_LARGE', severity: 'error', channel });
       continue;
     }
-    const rounding = price - cost.replacement_cost_iqd - T - P;
+    const preExact = addProcurementExact(computed.exact, targetExact);
+    const rounding = toNumber(BigInt(base) - ceilProcurementExact(preExact), 'Rounding');
+    const targetFloor = toNumber(targetExact.num / targetExact.den, 'Target profit');
 
-    // The owner's rules, asserted against the EXACT replacement cost.
+    // The owner's rules, asserted against the EXACT replacement cost and the EXACT minimum profit.
     const margin = addProcurementExact(procurementExact(BigInt(price - P)), { num: -computed.exact.num, den: computed.exact.den });
-    invariant(compareProcurementExact(margin, procurementExact(BigInt(T))) >= 0, 'price − extra − R_exact ≥ target');
+    invariant(compareProcurementExact(margin, targetExact) >= 0, 'price − extra − R_exact ≥ target');
     invariant(price % step === 0 && price >= step, 'price is a positive multiple of the step');
     invariant(rounding >= 0 && rounding < step, 'rounding adds less than one step');
     invariant(
       cost.supplier_cost_iqd + cost.shipping_cost_iqd + cost.additional_cost_iqd === cost.replacement_cost_iqd && cost.shipping_cost_iqd >= 0,
       'supplier + shipping + additional = R'
     );
+    // The 0181 storage backstops (USD design §2.4), provable from the two above.
+    invariant(price - cost.replacement_cost_iqd >= targetFloor && targetFloor > 0, 'computed − R ≥ floor(T)');
+    const slack = price - cost.replacement_cost_iqd - targetFloor - P;
+    invariant(slack >= 0 && slack <= step, 'computed − R − floor(T) − P is within one step');
+
+    // Display and audit figures in USD, rounded UP at 6 decimals (never re-priced from).
+    const usd = usdRate
+      ? (() => {
+          const perUsd = (x: ProcurementExact) => ceilToPlaces(quotientProcurementExact(x, usdRate.exact), USD_DISPLAY_PLACES);
+          const k = perUsd(computed.exact);
+          const t = targetUsdExact ?? perUsd(targetExact);
+          return {
+            supplier_cost_usd: procurementExactText(perUsd(procurementExact(cost.supplier_cost_exact))),
+            shipping_cost_usd: procurementExactText(perUsd(procurementExact(cost.shipping_cost_exact))),
+            additional_cost_usd: procurementExactText(perUsd(procurementExact(BigInt(cost.additional_cost_iqd)))),
+            current_total_cost_usd: procurementExactText(k),
+            final_price_usd: procurementExactText(addProcurementExact(k, t)),
+            usd_iqd_rate: usdRate.text,
+          };
+        })()
+      : { supplier_cost_usd: null, shipping_cost_usd: null, additional_cost_usd: null, current_total_cost_usd: null, final_price_usd: null, usd_iqd_rate: null };
 
     channels.push({
       channel,
       ...cost,
-      target_profit_iqd: T,
+      target_profit_iqd: targetFloor,
+      target_profit_usd: targetUsdExact ? procurementExactText(targetUsdExact) : null,
+      target_profit_iqd_exact: procurementExactText(targetExact),
+      ...usd,
       target_rule_id: target.rule.id,
       target_rule_version: target.rule.version,
       direct_sale_extra_iqd: channel === 'direct_sale' ? P : null,

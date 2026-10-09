@@ -234,7 +234,7 @@ export function runWhatIf(evaluation: ProductEvaluation, req: WhatIfRequest, ref
           chain,
           rates: central,
           channels,
-          target: resolveRuleAt(evaluation.rules, 'target_profit', at),
+          target: resolveRuleAt(evaluation.rules, 'target_profit', at, { usdIqdRate: central.fx.USD?.rate ?? null }),
           extra: channels.includes('direct_sale') ? resolveRuleAt(evaluation.rules, 'direct_sale_extra', at) : null,
           allowUnconfirmedRates: true,
         })

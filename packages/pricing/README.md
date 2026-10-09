@@ -5,7 +5,8 @@ The pure pricing engine, moved verbatim out of `worker/lib` in Phase 1.1 of
 Catalog deployable from Phase 5 (`01-TARGET.md` §1.2 row 4). No I/O, no
 Cloudflare bindings, no Hono, no imports outside this package — except the
 engine maths' one declared dependency, `costToPrice` → `@levonis/contracts`
-(`procurementCost` exact arithmetic, `pricingIssues` codes), which is as pure
+(`procurementCost` exact arithmetic, `pricingIssues` codes; `fxChain` and
+`ruleResolution` take the same exact arithmetic), which is as pure
 (`tests/monorepo.test.ts` pins it).
 
 The core files `worker/lib/<module>.ts` are one-line re-exports, so every
@@ -28,8 +29,8 @@ the core path).
 | `warrantyPlanMath` | fee arithmetic, total months, read-time device-policy defaults (the pure half of `worker/lib/warrantyPlans.ts`, which re-exports every symbol) |
 | `json` | `safeParse` — the one JSON helper the resolver needs (a copy of the core's) |
 | `skuChannel` | the SKU × channel identity of engine prices: `direct_sale | pre_order_air | pre_order_sea | pre_order_land`, route → profile (air → CHINA_AIR, sea → CHINA_SEA, land → GERMANY_LAND), `skuComboKey` (byte-identical to `product_variants.combo_key`), `parseSkuComboKey`, the `sku:<combo_key>@<channel>` history key |
-| `costToPrice` | the pricing engine's exact maths (master plan v2 §2.4): input resolution over product → option → colour → SKU, effective weight and CBM, `R_exact`, `ceil_step(R_exact + T)` (+ the Direct Sale Extra), the private breakdown, readiness codes. **Never imported by `src/`** (the formula is confidential) |
-| `ruleResolution` | `resolveRuleAt`: target profit and Direct Sale Extra, most specific wins (sku > colour > option > product > category ancestors > global), INHERIT skipped, BLOCKED stops, a tie takes the maximum with `RULE_TIE` |
+| `costToPrice` | the pricing engine's exact maths (master plan v2 §2.4): input resolution over product → option → colour → SKU, effective weight and CBM, `R_exact`, `ceil_step(R_exact + T_exact)` (+ the Direct Sale Extra after rounding), where `T_exact` = the minimum profit in USD × U (owner brief 2026-10-09) or a migrated dinar amount; the private breakdown, the display-only USD figures (K, F, freight and extras ÷ U, rounded up at 6 decimals), readiness codes. **Never imported by `src/`** (the formula is confidential) |
+| `ruleResolution` | `resolveRuleAt`: minimum profit (USD, or a migrated dinar amount) and Direct Sale Extra (whole dinars), most specific wins (sku > colour > option > product > category ancestors > global), INHERIT skipped, BLOCKED stops, a tie takes the maximum in dinars at U with `RULE_TIE`; `canonicalUsdRuleAmount` normalises the owner's typing |
 | `legacyTargets` | the owner's answer B, applied (master plan v2 §2.5): per model and route, the minimum profit `(item + route fee) − landed cost` and the Direct Sale Extra `P_dir − paid_base` the old prices carry, with their statuses (routes that disagree → CONFLICT, never averaged; direct-only → extra 0; no cost → unresolved; review cases), placement at product or option scope, and the round trip through `ceilStep` and `resolveRuleAt`. **Never imported by `src/`** |
 
 Import a module by subpath: `import { resolveUnitPrice } from '@levonis/pricing/pricing'`.

@@ -144,7 +144,7 @@ function missingOf(productId: string, chain: SkuInputChain, channels: SkuChannel
     chain,
     rates,
     channels,
-    target: resolveRuleAt(rules, 'target_profit', at),
+    target: resolveRuleAt(rules, 'target_profit', at, { usdIqdRate: rates.fx.USD?.rate ?? null }),
     extra: channels.includes('direct_sale') ? resolveRuleAt(rules, 'direct_sale_extra', at) : null,
     allowUnconfirmedRates: true,
   });

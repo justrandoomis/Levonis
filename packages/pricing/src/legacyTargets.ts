@@ -550,7 +550,8 @@ function roundTrip(productId: string, w: Working, rules: readonly PricingRuleRow
   if (w.target.state !== 'MIGRATED') return null;
   const at = { product_id: productId, option_value_ids: w.option_id ? [w.option_id] : [], color_id: null, ancestry: [] };
   const t = resolveRuleAt(rules, 'target_profit', at);
-  if (t.status !== 'active' || t.amount_iqd !== w.target.value_iqd) return false;
+  // Migrated values are whole dinars: a USD minimum profit (amount_iqd null) never round-trips here.
+  if (t.status !== 'active' || t.amount_iqd === null || t.amount_iqd !== w.target.value_iqd) return false;
   const within = (price: number, paid: number) => price >= paid && price <= paid + ROUNDING_STEP_IQD - 1;
   for (const r of w.routes) {
     if (r.cost_iqd === null) return false;
@@ -558,7 +559,7 @@ function roundTrip(productId: string, w: Working, rules: readonly PricingRuleRow
   }
   if (w.direct && w.extra.state === 'MIGRATED') {
     const p = resolveRuleAt(rules, 'direct_sale_extra', at);
-    if (p.status !== 'active' || p.amount_iqd !== w.extra.value_iqd) return false;
+    if (p.status !== 'active' || p.amount_iqd === null || p.amount_iqd !== w.extra.value_iqd) return false;
     if (w.direct_cost_for_roundtrip === null) return false;
     if (!within(ceilStep(w.direct_cost_for_roundtrip + t.amount_iqd) + p.amount_iqd, w.direct.paid_iqd)) return false;
   }

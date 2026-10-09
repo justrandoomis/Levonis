@@ -150,11 +150,17 @@ function modelDto(m: ModelEvaluation) {
   };
 }
 
-/** A placed rule, named by its kind (never `amount_iqd`). */
+/** A placed rule, named by its kind (never `amount_iqd`). A USD minimum profit
+ * (0181) adds `target_profit_usd`; a migrated dinar rule's answer is unchanged. */
 export function ruleDto(r: PricingRuleRow) {
   const base = { scope: r.scope, scope_id: r.scope_id, state: r.state, source: r.source ?? 'LEGACY_MIGRATION' };
   return r.kind === 'target_profit'
-    ? { kind: 'target_profit' as const, ...base, target_profit_iqd: r.amount_iqd }
+    ? {
+        kind: 'target_profit' as const,
+        ...base,
+        target_profit_iqd: r.amount_iqd,
+        ...(r.amount_usd != null ? { target_profit_usd: r.amount_usd } : {}),
+      }
     : { kind: 'direct_sale_extra' as const, ...base, direct_sale_extra_iqd: r.amount_iqd };
 }
 
