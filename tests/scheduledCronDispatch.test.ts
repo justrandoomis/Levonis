@@ -21,6 +21,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import worker from '../worker/index';
+import { CRON_DISPATCH, cronJobs } from '../worker/lib/cronSchedules';
 import { resetEventBus } from '../worker/lib/eventBus';
 import { asD1, freshDb } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
@@ -55,6 +56,17 @@ test('every cron wrangler.jsonc declares is one scheduled() knows: a new trigger
   for (const schedule of schedules) assert.deepEqual(schedule.filter((cron) => !(cron in KNOWN)), []);
 });
 
+test('the dispatch table scheduled() reads is exactly the strings this file knows, spelled the same', () => {
+  // worker/lib/cronSchedules.ts holds the strings so worker/index.ts never
+  // carries a cron step (tests/storefrontIsolation.test.ts says why). This
+  // file spells them literally on purpose: a typo there fails here.
+  assert.deepEqual([...CRON_DISPATCH.keys()].sort(), Object.keys(KNOWN).sort());
+  assert.equal(cronJobs('* * * * *'), 'minute');
+  assert.equal(cronJobs('*/15 * * * *'), 'quarter_hour');
+  // A Map, not an object: an inherited property name is not a cron it knows.
+  for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) assert.equal(cronJobs(name), null, name);
+});
+
 test('each known cron string runs its own jobs and nothing else', async () => {
   for (const [cron, jobs] of Object.entries(KNOWN)) {
     const env = { DB: asD1(freshDb()) } as Env;
@@ -83,6 +95,7 @@ test('an unknown cron string runs nothing: no job, no database access, one warni
     '* * * * * *',
     '*/5 * * * *',
     '0 * * * *',
+    'constructor', // an inherited property name finds nothing in the table
   ];
   for (const cron of unknown) {
     const touched: string[] = [];

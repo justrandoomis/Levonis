@@ -19,10 +19,62 @@ import { ROOT } from './fixtures/d1';
 
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
-/** Code with comments removed — prose describing a rule is not the rule. */
+/**
+ * Code with comments removed — prose describing a rule is not the rule.
+ *
+ * A comment is recognised only OUTSIDE a string literal. The one-line pattern
+ * this used to be could not tell the two apart: it opened at the slash-star
+ * inside the STRING '/api/admin/*' and closed at the first star-slash after
+ * it. When FX-0 spelled a cron step (every fifteen minutes) further down
+ * worker/index.ts, about 44 KB of mounts, the admin host guard among them,
+ * vanished from the assertions below; only the positive matches noticed.
+ *
+ * One left-to-right pass, first match wins at each position:
+ *   - a quoted string (single, double or template) is copied through whole;
+ *   - a block comment goes;
+ *   - a comment that is a whole line goes;
+ *   - a trailing line comment STAYS, as it always did, but is consumed as one
+ *     piece, so a quote or a slash-star inside it opens nothing.
+ * The first test below checks the result on worker/index.ts, so a future
+ * over-strip fails there by name instead of emptying the others quietly.
+ */
+const STRING_OR_COMMENT =
+  /('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\[\s\S])*`)|(\/\*[\s\S]*?\*\/|^[ \t]*\/\/.*$)|\/\/.*$/gm;
 function code(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  // Group 1 is a string, group 2 a comment that goes; a trailing comment is neither.
+  return source.replace(STRING_OR_COMMENT, (m: string, _string?: string, comment?: string) => (comment === undefined ? m : ''));
 }
+
+// ------------------------------------------------------------ the stripper
+
+/** Lines that mount a router or a middleware: `app.route(` / `app.use(` at the start. */
+const mountLines = (source: string) => source.match(/^[ \t]*app\.(?:route|use)\(/gm)?.length ?? 0;
+
+/**
+ * worker/index.ts mounts well over a hundred routers and guards today. The
+ * floor is far enough below that to survive ordinary churn and far enough
+ * above zero that a stripper (or this count's own pattern) gone wrong cannot
+ * pass by finding nothing.
+ */
+const MIN_INDEX_MOUNTS = 100;
+
+test('worker/index.ts survives comment stripping whole: every mount line is still there', () => {
+  const raw = read('worker/index.ts');
+  const all = mountLines(raw);
+  assert.ok(all >= MIN_INDEX_MOUNTS, `only ${all} mount lines in worker/index.ts; expected at least ${MIN_INDEX_MOUNTS}`);
+  // The stripper above: a comment line never starts with `app.`, so it may
+  // remove none of these.
+  const stripped = code(raw);
+  assert.equal(mountLines(stripped), all, 'the comment stripper ate code: a mount line is missing after it');
+  // A star-slash is a block comment's end and nothing else in this file. Two
+  // other suites (edgeCachePolicy, mediaCleanupSchedule) still strip it with
+  // the old one-line pattern, which opens at the slash-star inside
+  // '/api/admin/*'; a cron step or any other string carrying the pair belongs
+  // in a module of its own (the cron strings are worker/lib/cronSchedules.ts).
+  assert.doesNotMatch(stripped, /\*\//, 'a star-slash outside a comment in worker/index.ts');
+  const naive = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.equal(mountLines(naive), all, 'the one-line pattern other suites use on worker/index.ts now eats its mounts');
+});
 
 // ------------------------------------------------- the apex-only admin guard
 

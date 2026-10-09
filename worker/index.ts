@@ -146,6 +146,8 @@ import { finalizeDueQuickBuySessions } from './lib/quickBuy/finalize';
 import { publicApiRoutes } from './routes/publicApi';
 import { farmAdminRoutes } from './routes/farmAdmin';
 import { configureEventBus } from './lib/eventBus';
+// The cron strings scheduled() knows live there, not here: see that module.
+import { cronJobs } from './lib/cronSchedules';
 import { safeErrorCode } from './lib/membershipBenefits';
 import { gatewayAssertion } from './entrypoints/gatewayAssertion';
 
@@ -1092,19 +1094,24 @@ export default {
   // plan F13). Cron triggers are Worker settings, not part of a version: after
   // a dashboard rollback or `wrangler rollback` the triggers of the NEWER
   // commit stay. Before this rule every string that was not the minute fell
-  // into the fifteen-minute jobs, so a later trigger (the FX `0 */6 * * *`)
-  // would have run them a second time on a rolled-back Worker. Each string
-  // here is one entry of wrangler.jsonc's `triggers.crons`, in all three
-  // environments (tests/scheduledCronDispatch.test.ts holds both sides).
+  // into the fifteen-minute jobs, so a later trigger (the FX six-hour one)
+  // would have run them a second time on a rolled-back Worker. The strings
+  // and the exact-match table are worker/lib/cronSchedules.ts: each one is an
+  // entry of wrangler.jsonc's `triggers.crons`, in all three environments
+  // (tests/scheduledCronDispatch.test.ts holds both sides). They are kept
+  // out of this file on purpose: a cron step is spelled with the pair that
+  // closes a block comment, and this file keeps that pair for real comment
+  // terminators only (tests/storefrontIsolation.test.ts holds it).
   scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     configureEventBus(env);
+    const jobs = cronJobs(_event.cron);
     // Delivery itself awaits wage posting. This separate bounded recovery
     // repairs historical pending costs and interrupted postings without an
     // admin request, including orders whose old staff job already completed.
     // The minute trigger is only for financial recovery. Keep notification,
     // storage cleanup and other durable jobs on their existing cadence and
     // separate invocation budgets.
-    if (_event.cron === '* * * * *') {
+    if (jobs === 'minute') {
       ctx.waitUntil(
         drainOrderFinanceRecovery(env).catch((error) => {
           console.error('scheduled order finance recovery rejected:', error);
@@ -1122,7 +1129,7 @@ export default {
       );
       return;
     }
-    if (_event.cron !== '*/15 * * * *') {
+    if (jobs !== 'quarter_hour') {
       // A trigger this commit does not know: nothing runs. The string is a
       // config value, never a private one.
       console.warn('scheduled: unknown cron, nothing run:', JSON.stringify(_event.cron));
