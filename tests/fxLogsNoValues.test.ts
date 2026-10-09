@@ -109,7 +109,7 @@ test('S3: every owner rates route — answers and refusals — logs no value, an
       () => put(app, '/api/admin/pricing/rates/fx/USD_IQD/manual', { owner_version: 999, rate: '1703.9167' }),
       () => put(app, '/api/admin/pricing/rates/fx/USD_IQD/manual', { owner_version: 1, rate: '1666.6666x' }),
       () => put(app, '/api/admin/pricing/rates/fx/USD_IQD/manual', { owner_version: 1, rate: '12345.678' }),
-      () => put(app, '/api/admin/pricing/rates/fx/USD_IQD/settings', { owner_version: 1, adjustment_iqd_per_usd: '37.2501x' }),
+      () => put(app, '/api/admin/pricing/rates/fx/USD_IQD/settings', { owner_version: 1, market_adjustment_iqd: '37.2501x' }),
       () => put(app, '/api/admin/pricing/rates/fx/USD_IQD/settings', { owner_version: 1, bound_min: '1777.7777' }),
       () => post(app, '/api/admin/pricing/rates/fx/USD_IQD/review', { owner_version: 1, decision: 'approve' }),
       () => post(app, '/api/admin/pricing/rates/fx/refresh', { pairs: ['USD_IQD'] }),

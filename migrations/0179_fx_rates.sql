@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS fx_rate_pairs (
   official_rate          TEXT CHECK (official_rate IS NULL OR (official_rate GLOB '[0-9]*' AND official_rate NOT GLOB '*[^0-9.]*' AND official_rate NOT GLOB '*.*.*' AND official_rate NOT GLOB '*.' AND length(official_rate) <= 32 AND CAST(official_rate AS REAL) > 0)),  -- CBI, USD_IQD only
   source_usd_per_eur     TEXT CHECK (source_usd_per_eur IS NULL OR (source_usd_per_eur GLOB '[0-9]*' AND source_usd_per_eur NOT GLOB '*[^0-9.]*' AND source_usd_per_eur NOT GLOB '*.*.*' AND source_usd_per_eur NOT GLOB '*.' AND length(source_usd_per_eur) <= 16 AND CAST(source_usd_per_eur AS REAL) > 0)),
   source_cny_per_eur     TEXT CHECK (source_cny_per_eur IS NULL OR (source_cny_per_eur GLOB '[0-9]*' AND source_cny_per_eur NOT GLOB '*[^0-9.]*' AND source_cny_per_eur NOT GLOB '*.*.*' AND source_cny_per_eur NOT GLOB '*.' AND length(source_cny_per_eur) <= 16 AND CAST(source_cny_per_eur AS REAL) > 0)),
-  adjustment             TEXT NOT NULL DEFAULT '0' CHECK ((ltrim(adjustment,'+-') GLOB '[0-9]*' AND ltrim(adjustment,'+-') NOT GLOB '*[^0-9.]*' AND ltrim(adjustment,'+-') NOT GLOB '*.*.*' AND ltrim(adjustment,'+-') NOT GLOB '*.' AND length(adjustment) - length(ltrim(adjustment,'+-')) <= 1 AND length(adjustment) <= 16)),       -- IQD per USD (Q1)
+  market_adjustment_iqd  TEXT NOT NULL DEFAULT '0' CHECK ((ltrim(market_adjustment_iqd,'+-') GLOB '[0-9]*' AND ltrim(market_adjustment_iqd,'+-') NOT GLOB '*[^0-9.]*' AND ltrim(market_adjustment_iqd,'+-') NOT GLOB '*.*.*' AND ltrim(market_adjustment_iqd,'+-') NOT GLOB '*.' AND length(market_adjustment_iqd) - length(ltrim(market_adjustment_iqd,'+-')) <= 1 AND length(market_adjustment_iqd) <= 16)),       -- fixed IQD added to the market sell of 1 USD; never a percentage (owner decision 5, 2026-10-09)
   manual_rate            TEXT CHECK (manual_rate IS NULL OR (manual_rate GLOB '[0-9]*' AND manual_rate NOT GLOB '*[^0-9.]*' AND manual_rate NOT GLOB '*.*.*' AND manual_rate NOT GLOB '*.' AND length(manual_rate) <= 32 AND CAST(manual_rate AS REAL) > 0)),
   -- THE rate in use (= what pricing_fx_rates was built from)
   effective_rate         TEXT CHECK (effective_rate IS NULL OR (effective_rate GLOB '[0-9]*' AND effective_rate NOT GLOB '*[^0-9.]*' AND effective_rate NOT GLOB '*.*.*' AND effective_rate NOT GLOB '*.' AND length(effective_rate) <= 32 AND CAST(effective_rate AS REAL) > 0)),
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS fx_rate_pairs (
   updated_at             TEXT NOT NULL,
   CHECK ((pair = 'USD_IQD') = (provider = 'iqwealth')),
   CHECK ((pair = 'USD_IQD' AND interval_hours IN (6, 12)) OR (pair <> 'USD_IQD' AND interval_hours = 24)),
-  CHECK (pair = 'USD_IQD' OR adjustment = '0'),
+  CHECK (pair = 'USD_IQD' OR market_adjustment_iqd = '0'),
   CHECK (pair = 'USD_IQD' OR (market_buy IS NULL AND official_rate IS NULL)),
   CHECK (pair <> 'USD_IQD' OR (source_usd_per_eur IS NULL AND source_cny_per_eur IS NULL)),
   CHECK (mode = 'AUTO' OR (manual_rate IS NOT NULL AND effective_rate = manual_rate)),
@@ -139,7 +139,15 @@ CREATE TABLE IF NOT EXISTS fx_rate_log (
   error_code        TEXT CHECK (error_code IS NULL OR (length(error_code) <= 40 AND error_code NOT GLOB '*[^A-Z0-9_]*')),
   repriced_products INTEGER CHECK (repriced_products IS NULL OR repriced_products >= 0),   -- FX-5
   actor_id          TEXT,
-  created_at        TEXT NOT NULL
+  created_at        TEXT NOT NULL,
+  -- USD/IQD: the owner's fixed adjustment in force for this row (owner decision 5), so the history
+  -- says which adjustment a rate carried and the 24-hour guard can measure the MARKET's move
+  -- across an adjustment change. NULL on the ECB pairs.
+  market_adjustment_iqd TEXT CHECK (market_adjustment_iqd IS NULL OR (ltrim(market_adjustment_iqd,'+-') GLOB '[0-9]*' AND ltrim(market_adjustment_iqd,'+-') NOT GLOB '*[^0-9.]*' AND ltrim(market_adjustment_iqd,'+-') NOT GLOB '*.*.*' AND ltrim(market_adjustment_iqd,'+-') NOT GLOB '*.' AND length(market_adjustment_iqd) - length(ltrim(market_adjustment_iqd,'+-')) <= 1 AND length(market_adjustment_iqd) <= 16)),
+  -- settings_change rows: [{field, before, after}] of every setting the act changed (owner decision
+  -- 10: the history shows old → new). Values live here, never in audit_log.
+  settings_diff     TEXT CHECK (settings_diff IS NULL OR (json_valid(settings_diff) AND substr(settings_diff, 1, 1) = '[' AND length(settings_diff) <= 1000)),
+  CHECK (pair = 'USD_IQD' OR market_adjustment_iqd IS NULL)
 );
 CREATE INDEX IF NOT EXISTS idx_fx_rate_log_pair ON fx_rate_log(pair, created_at);
 CREATE INDEX IF NOT EXISTS idx_fx_rate_log_owner ON fx_rate_log(created_at) WHERE trigger_kind = 'owner';

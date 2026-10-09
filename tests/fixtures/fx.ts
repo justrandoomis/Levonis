@@ -109,10 +109,17 @@ export function applyRate(raw: DatabaseSync, pair: FxPairId, rate: string, at = 
     .run(rate, at, rate, at, rate, at, pair === 'USD_IQD' ? rate : rate, publishedAt, pair);
   raw
     .prepare(
-      `INSERT INTO fx_rate_log (id, pair, event, trigger_kind, provider, effective_before, effective_after, result, created_at)
-       VALUES (?, ?, 'review_approved', 'owner', 'owner', ?, ?, 'APPLIED', ?)`
+      `INSERT INTO fx_rate_log (id, pair, event, trigger_kind, provider, effective_before, effective_after, result, created_at, market_adjustment_iqd)
+       VALUES (?, ?, 'review_approved', 'owner', 'owner', ?, ?, 'APPLIED', ?, ?)`
     )
-    .run(`fxl_seed_${pair}_${Math.random().toString(36).slice(2)}`, pair, (r.effective_rate as string | null) ?? null, rate, at);
+    .run(
+      `fxl_seed_${pair}_${Math.random().toString(36).slice(2)}`,
+      pair,
+      (r.effective_rate as string | null) ?? null,
+      rate,
+      at,
+      pair === 'USD_IQD' ? (r.market_adjustment_iqd as string) : null
+    );
   syncDerived(raw);
 }
 

@@ -83,6 +83,18 @@ export const readWhole = (n: number | null | undefined, lang: Lang) => localizeD
 export const fxFigure = (text: string | null | undefined): string => groupDecimal(text);
 export const fxCount = (n: number | null | undefined): string => groupWhole(n);
 
+/**
+ * The owner's adjustment for reading (`market_adjustment_iqd`, dinars per
+ * dollar): «20», «−20», «0» — the server's text in Latin digits, a minus only
+ * when it lowers the rate («market + adjustment = effective» already says «+»).
+ */
+export function adjustmentFigure(text: string): string {
+  const neg = text.startsWith('-');
+  const abs = text.replace(/^[+-]/, '');
+  if (/^0+(\.0+)?$/.test(abs)) return '0';
+  return `${neg ? '−' : ''}${fxFigure(abs)}`;
+}
+
 /** A figure as SHOWN: rounded for reading when `places` says so («≈»), the exact text kept for a tooltip. */
 export interface ShownFigure {
   text: string;

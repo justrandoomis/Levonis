@@ -6,7 +6,8 @@
  * Extra). Inventory: the actual IQD paid, never re-converted.
  *
  * The three source rates:
- *   U = IQD per 1 USD (USD_IQD, the Iraqi parallel market plus the owner's adjustment)
+ *   U = IQD per 1 USD (USD_IQD, the Iraqi parallel market plus the owner's fixed
+ *       `market_adjustment_iqd`: dinars per dollar, never a percentage — owner decision 5)
  *   E = USD per 1 EUR (EUR_USD, the ECB reference)
  *   C = USD per 1 CNY (CNY_USD, ECB USD ÷ ECB CNY, rounded UP at the 10th decimal)
  *
@@ -44,9 +45,13 @@ export function crossRateCnyUsd(usdPerEur: string, cnyPerEur: string): string {
   return procurementExactText(ceilToPlaces(quotientProcurementExact(ex(usdPerEur), ex(cnyPerEur)), FX_RATE_PLACES.CNY_USD));
 }
 
-/** U = market sell + the owner's signed adjustment (IQD per USD, Q1), exact. */
-export function usdIqdCandidate(marketSell: string, adjustment: string): string {
-  return procurementExactText(addProcurementExact(ex(marketSell), exSigned(adjustment)));
+/**
+ * U = market sell + `market_adjustment_iqd`, exact: a FIXED number of dinars
+ * per dollar, signed, never a percentage (owner decision 5, 2026-10-09).
+ * Market 1,660 + 20 = 1,680.
+ */
+export function usdIqdCandidate(marketSell: string, marketAdjustmentIqd: string): string {
+  return procurementExactText(addProcurementExact(ex(marketSell), exSigned(marketAdjustmentIqd)));
 }
 
 /** The effective IQD rates E1 reads: USD = U, EUR = E × U, CNY = C × U — each null when an input is missing. */

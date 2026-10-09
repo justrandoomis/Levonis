@@ -79,12 +79,12 @@ test('a negative or zero candidate is out of bounds, never a RangeError', () => 
 test('the owner\'s door: an adjustment that would make the rate implausible is 400 FX_RATE_OUT_OF_BOUNDS — before any value, while MANUAL, and with a first value pending (never a 500)', async () => {
   // No value yet, no market figure: the adjustment must stay above −bound_min.
   const none = world({ sessionAgeSeconds: STALE });
-  let res = await put(none.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(none.raw), adjustment_iqd_per_usd: '-2000' });
+  let res = await put(none.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(none.raw), market_adjustment_iqd: '-2000' });
   assert.equal(res.status, 400);
   assert.equal((await json(res)).code, 'FX_RATE_OUT_OF_BOUNDS');
-  assert.equal(pairOf(none.raw, 'USD_IQD').adjustment, '0', 'nothing stored');
+  assert.equal(pairOf(none.raw, 'USD_IQD').market_adjustment_iqd, '0', 'nothing stored');
   // −20 (what was meant) is accepted.
-  res = await put(none.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(none.raw), adjustment_iqd_per_usd: '-20' });
+  res = await put(none.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(none.raw), market_adjustment_iqd: '-20' });
   assert.equal(res.status, 200);
 
   // A first value pending (the cron held 1,660): −2000 is a 400, not an unhandled RangeError.
@@ -92,7 +92,7 @@ test('the owner\'s door: an adjustment that would make the rate implausible is 4
   const m = market({ sell: 1660 });
   await tick(pend.raw, m, at(0));
   assert.equal(pairOf(pend.raw, 'USD_IQD').pending_reason, 'FIRST_VALUE');
-  res = await put(pend.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(pend.raw), adjustment_iqd_per_usd: '-2000' });
+  res = await put(pend.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(pend.raw), market_adjustment_iqd: '-2000' });
   assert.equal(res.status, 400);
   assert.equal((await json(res)).code, 'FX_RATE_OUT_OF_BOUNDS');
 
@@ -100,7 +100,7 @@ test('the owner\'s door: an adjustment that would make the rate implausible is 4
   const man = world();
   applyRate(man.raw, 'USD_IQD', '1660');
   assert.equal((await put(man.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(man.raw), mode: 'MANUAL' })).status, 200);
-  res = await put(man.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(man.raw), adjustment_iqd_per_usd: '-1700' });
+  res = await put(man.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(man.raw), market_adjustment_iqd: '-1700' });
   assert.equal(res.status, 400);
   assert.equal((await json(res)).code, 'FX_RATE_OUT_OF_BOUNDS');
 });
@@ -109,7 +109,7 @@ test('a candidate out of bounds is RECORDED: INVALID / FX_RATE_OUT_OF_BOUNDS, fa
   const raw = freshDb();
   raw.exec(OWNER_ROW_SQL);
   // An adjustment the door now refuses, as a row written before this fix could carry it.
-  raw.exec("UPDATE fx_rate_pairs SET adjustment = '-2000' WHERE pair = 'USD_IQD'");
+  raw.exec("UPDATE fx_rate_pairs SET market_adjustment_iqd = '-2000' WHERE pair = 'USD_IQD'");
   const m = market({ sell: 1660 });
   const report = await tick(raw, m, at(0));
   assert.equal(report.skipped, undefined, `the run completed: ${JSON.stringify(report)}`);
@@ -168,12 +168,12 @@ test('an adjustment never re-bases the drift guard: two saves (+0.0001, back to 
                  last_known_good_rate='1750', market_rate='1750' WHERE pair='USD_IQD'`).run();
   const { app } = world({ raw, sessionAgeSeconds: STALE });
   const anchorAt = pairOf(raw, 'USD_IQD').drift_anchor_at;
-  assert.equal((await put(app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(raw), adjustment_iqd_per_usd: '0.0001' })).status, 200);
+  assert.equal((await put(app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(raw), market_adjustment_iqd: '0.0001' })).status, 200);
   let row = pairOf(raw, 'USD_IQD');
   assert.equal(row.effective_rate, '1750.0001');
   assert.equal(row.drift_anchor_rate, '1660.0001', 'the anchor moves by the same change');
   assert.equal(row.drift_anchor_at, anchorAt, 'and keeps its time');
-  assert.equal((await put(app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(raw), adjustment_iqd_per_usd: '0' })).status, 200);
+  assert.equal((await put(app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(raw), market_adjustment_iqd: '0' })).status, 200);
   row = pairOf(raw, 'USD_IQD');
   assert.equal(row.effective_rate, '1750');
   assert.equal(row.drift_anchor_rate, '1660', 'not the effective rate: only «تأكيد السعر الحالي» (fresh sign-in) does that');

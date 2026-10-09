@@ -6,7 +6,7 @@
       "status": [
         200
       ],
-      "forbidKeys": "market|adjust|provider|pending|last_known|anomaly|drift|bound_(min|max)|rejected|official_rate|effective_rate|manual_rate|cross_rate|usd_iqd|eur_usd|cny_usd|source_(usd|cny)|iqwealth|fx_|rate_iqd|supplier|cost",
+      "forbidKeys": "market|adjust|settings_diff|provider|pending|last_known|anomaly|drift|bound_(min|max)|rejected|official_rate|effective_rate|manual_rate|cross_rate|usd_iqd|eur_usd|cny_usd|source_(usd|cny)|iqwealth|fx_|rate_iqd|supplier|cost",
       "forbidPattern": "iraqsm|IRAQ_PARALLEL_FX|ecb\\.europa",
       "valuePatterns": {
         "displayUsdRate": "^[0-9]{1,6}(\\.[0-9]{1,8})?$"
@@ -17,7 +17,7 @@
       "status": [
         200
       ],
-      "forbidKeys": "market|adjust|provider|pending|last_known|anomaly|drift|bound_(min|max)|rejected|official_rate|effective_rate|manual_rate|cross_rate|usd_iqd|eur_usd|cny_usd|source_(usd|cny)|iqwealth|fx_|rate_iqd|supplier|cost",
+      "forbidKeys": "market|adjust|settings_diff|provider|pending|last_known|anomaly|drift|bound_(min|max)|rejected|official_rate|effective_rate|manual_rate|cross_rate|usd_iqd|eur_usd|cny_usd|source_(usd|cny)|iqwealth|fx_|rate_iqd|supplier|cost",
       "forbidPattern": "iraqsm|IRAQ_PARALLEL_FX|ecb\\.europa",
       "valuePatterns": {
         "displayUsdRate": "^[0-9]{1,6}(\\.[0-9]{1,8})?$"

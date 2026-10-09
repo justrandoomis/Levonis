@@ -153,7 +153,7 @@ export default function FxReviewSheet({ pair: p, onClose, lang, dir, s, onAnswer
             )}
             {p.pair === 'USD_IQD' && (
               <Fact label={s.adjustment}>
-                <FxFigure rate={p.adjustment_iqd_per_usd ?? '0'} />
+                <FxFigure rate={p.market_adjustment_iqd ?? '0'} />
               </Fact>
             )}
             {pending.reason && (

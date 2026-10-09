@@ -54,8 +54,13 @@ export interface FxStrings {
   marketBuy: string;
   official: string;
   marketEcb: string;
+  /** USD/IQD `market_adjustment_iqd`: a FIXED number of dinars per dollar, never a percentage (owner decision 5). */
   adjustment: string;
   adjustmentHint: string;
+  /** «market + adjustment = effective», each figure the server's, shown only when it holds (`formula_holds`). */
+  formula: Three;
+  /** A manual rate is final: the adjustment is not added to it. */
+  manualFinal: string;
   effective: string;
   effectiveIqd: Readonly<Record<'EUR' | 'CNY', string>>;
   computedNote: string;
@@ -131,6 +136,11 @@ export interface FxStrings {
   notSetUp: One;
   notSetUpNoDate: string;
   errorText: Readonly<Record<FxErrorGroup, string>>;
+  /** The history's old → new lines (owner decision 10): the names of the two settings no other label covers. */
+  fieldMode: string;
+  fieldInterval: string;
+  /** The adjustment in force on a history row, in one word. */
+  adjustmentShort: string;
   history: string;
   historyTitle: string;
   historyEmpty: string;
@@ -177,8 +187,10 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     marketBuy: 'سعر الشراء في السوق',
     official: 'السعر الرسمي (البنك المركزي العراقي)',
     marketEcb: 'السعر المرجعي اليومي',
-    adjustment: 'التعديل (دينار لكل دولار)',
-    adjustmentHint: 'يُضاف إلى سعر البيع في السوق؛ اكتب رقمًا سالبًا للخصم.',
+    adjustment: 'زيادة ثابتة على سعر السوق (دينار لكل دولار)',
+    adjustmentHint: 'مبلغ ثابت بالدينار يُضاف إلى سعر بيع الدولار في السوق، وليس نسبة. اكتب رقمًا سالبًا للخصم.',
+    formula: (market, adj, effective) => `سعر السوق ${market} + الزيادة ${adj} = السعر المعتمد ${effective}`,
+    manualFinal: 'السعر اليدوي نهائي، ولا تُضاف إليه الزيادة.',
     effective: 'السعر المعتمد',
     effectiveIqd: { EUR: 'اليورو بالدينار (محسوب)', CNY: 'اليوان بالدينار (محسوب)' },
     computedNote: 'محسوب من سعر الدولار المعتمد',
@@ -288,6 +300,9 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
       save: 'تعذّر الحفظ — يُعاد في الفحص القادم',
       other: 'سبب آخر',
     },
+    fieldMode: 'طريقة التحديث',
+    fieldInterval: 'تكرار الفحص',
+    adjustmentShort: 'الزيادة',
     history: 'السجل',
     historyTitle: 'سجل أسعار الصرف',
     historyEmpty: 'لا يوجد شيء في السجل بعد.',
@@ -364,8 +379,10 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     marketBuy: 'Market buy',
     official: 'Official rate (CBI)',
     marketEcb: 'Daily reference rate',
-    adjustment: 'Adjustment (IQD per USD)',
-    adjustmentHint: 'Added to the market sell rate; type a negative number to lower it.',
+    adjustment: 'Market adjustment (fixed IQD per USD)',
+    adjustmentHint: 'A fixed number of dinars added to the market sell rate of one dollar — not a percentage. Type a negative number to lower it.',
+    formula: (market, adj, effective) => `Market ${market} + adjustment ${adj} = effective ${effective}`,
+    manualFinal: 'A manual rate is final; the adjustment is not added to it.',
     effective: 'Effective rate',
     effectiveIqd: { EUR: 'EUR in IQD (computed)', CNY: 'CNY in IQD (computed)' },
     computedNote: 'Computed from the effective dollar rate',
@@ -475,6 +492,9 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
       save: 'Could not be saved — retried at the next check',
       other: 'Another reason',
     },
+    fieldMode: 'Update mode',
+    fieldInterval: 'Check interval',
+    adjustmentShort: 'Adjustment',
     history: 'History',
     historyTitle: 'Exchange-rate history',
     historyEmpty: 'Nothing in the history yet.',
@@ -551,8 +571,10 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     marketBuy: 'نرخی کڕین لە بازاڕ',
     official: 'نرخی فەرمی (بانکی ناوەندیی عێراق)',
     marketEcb: 'نرخی سەرچاوەی ڕۆژانە',
-    adjustment: 'ڕێکخستن (دینار بۆ هەر دۆلارێک)',
-    adjustmentHint: 'بۆ نرخی فرۆشتنی بازاڕ زیاد دەکرێت؛ بۆ کەمکردنەوە ژمارەیەکی نێگەتیڤ بنووسە.',
+    adjustment: 'زیادەی جێگیر لەسەر نرخی بازاڕ (دینار بۆ هەر دۆلارێک)',
+    adjustmentHint: 'بڕێکی جێگیری دینارە کە بۆ نرخی فرۆشتنی یەک دۆلار لە بازاڕدا زیاد دەکرێت — ڕێژەی سەدی نییە. بۆ کەمکردنەوە ژمارەیەکی نێگەتیڤ بنووسە.',
+    formula: (market, adj, effective) => `نرخی بازاڕ ${market} + زیادە ${adj} = نرخی کارپێکراو ${effective}`,
+    manualFinal: 'نرخی دەستی کۆتاییە و زیادەکەی بۆ زیاد ناکرێت.',
     effective: 'نرخی کارپێکراو',
     effectiveIqd: { EUR: 'یۆرۆ بە دینار (هەژمارکراو)', CNY: 'یوان بە دینار (هەژمارکراو)' },
     computedNote: 'لە نرخی کارپێکراوی دۆلارەوە هەژمارکراوە',
@@ -664,6 +686,9 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
       save: 'پاشەکەوت نەکرا — لە پشکنینی داهاتوودا دووبارە هەوڵ دەدرێتەوە',
       other: 'هۆکارێکی تر',
     },
+    fieldMode: 'شێوازی نوێکردنەوە',
+    fieldInterval: 'ماوەی نێوان پشکنینەکان',
+    adjustmentShort: 'زیادە',
     history: 'مێژوو',
     historyTitle: 'مێژووی نرخەکانی ئاڵوگۆڕ',
     historyEmpty: 'هێشتا هیچ شتێک لە مێژوودا نییە.',

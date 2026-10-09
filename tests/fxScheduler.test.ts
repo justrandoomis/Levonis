@@ -343,7 +343,7 @@ test('approve after an adjustment change applies pending market + the current ad
   await tick(raw, m, at(0));
   await ownerCommit(
     raw,
-    (rows) => planSettings(rows[0]!, { owner_version: rows[0]!.owner_version, adjustment_iqd_per_usd: '20' }, { actor: 'usr_owner', now: at(1) })!,
+    (rows) => planSettings(rows[0]!, { owner_version: rows[0]!.owner_version, market_adjustment_iqd: '20' }, { actor: 'usr_owner', now: at(1) })!,
     at(1)
   );
   let row = pairOf(raw, 'USD_IQD');

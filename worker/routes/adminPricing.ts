@@ -32,7 +32,7 @@
  * reads and writes of the exchange rates and the central shipping rates:
  *   GET  /rates                          the three pairs, the derived IQD rates, shipping, budgets
  *   GET  /rates/history?pair&before&limit the private history (≤ 100 a page)
- *   PUT  /rates/fx/:pair/settings        mode, interval, adjustment, thresholds, bounds
+ *   PUT  /rates/fx/:pair/settings        mode, interval, market_adjustment_iqd, thresholds, bounds
  *   PUT  /rates/fx/:pair/manual          a manual rate
  *   POST /rates/fx/:pair/confirm         «تأكيد السعر الحالي» (the drift anchor)
  *   POST /rates/fx/refresh               «تحديث الآن»

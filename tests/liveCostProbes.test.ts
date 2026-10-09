@@ -212,7 +212,7 @@ test('fx.json (FX-1): the public settings and the home carry only the effective 
   assert.ok(pub.valuePatterns?.displayUsdRate, 'the public figure is held to decimal text or null');
   // The regex catches every private FX name of the 0179 tables and the rates DTO…
   const keys = new RegExp(pub.forbidKeys!, 'i');
-  for (const k of ['market_rate', 'market_buy', 'adjustment_iqd_per_usd', 'provider', 'pending_effective_rate', 'last_known_good_rate', 'anomaly_threshold_pct', 'drift_anchor_rate', 'bound_min', 'rejected_rate', 'official_rate', 'effective_rate', 'effective_rates_iqd', 'manual_rate', 'cross_rate', 'usd_iqd_rate', 'source_usd_per_eur', 'fx_usd_iqd_at_purchase', 'rate_iqd', 'supplier_cost_amount', 'current_supplier_cost_iqd']) {
+  for (const k of ['market_rate', 'market_buy', 'adjustment_iqd_per_usd', 'market_adjustment_iqd', 'settings_diff', 'provider', 'pending_effective_rate', 'last_known_good_rate', 'anomaly_threshold_pct', 'drift_anchor_rate', 'bound_min', 'rejected_rate', 'official_rate', 'effective_rate', 'effective_rates_iqd', 'manual_rate', 'cross_rate', 'usd_iqd_rate', 'source_usd_per_eur', 'fx_usd_iqd_at_purchase', 'rate_iqd', 'supplier_cost_amount', 'current_supplier_cost_iqd']) {
     assert.ok(keys.test(k), `the probe would miss ${k}`);
   }
   // …and not the public ones.

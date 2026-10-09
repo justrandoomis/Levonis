@@ -10,8 +10,11 @@
  * fence and is recorded SUPERSEDED).
  *
  *   manual set     mode MANUAL, manual = effective = v, the drift anchor = v
- *   adjustment     USD/IQD: the effective rate moves by the change of the
- *                  adjustment (never onto a market figure held for review),
+ *   adjustment     USD/IQD `market_adjustment_iqd`: a FIXED number of dinars
+ *                  per dollar, never a percentage (owner decision 5: market
+ *                  1,660 + 20 = 1,680). The effective rate moves by the
+ *                  change of the adjustment (never onto a market figure held
+ *                  for review),
  *                  the anchor moves with it, a pending candidate is re-based
  *                  to its own market figure + the new adjustment
  *   approve        USD/IQD: pending MARKET + the CURRENT adjustment
@@ -20,7 +23,10 @@
  *   reject         the candidate is remembered for 24 hours (M4.2)
  *   keep manual    mode MANUAL at the current effective rate
  *   confirm        «تأكيد السعر الحالي»: the anchor = the effective rate
- *   settings       thresholds, dead band, bounds, mode, interval
+ *   settings       thresholds, dead band, bounds, mode, interval; the
+ *                  settings_change row keeps every changed field as
+ *                  {field, before, after} (owner decision 10: the history
+ *                  shows old → new)
  *
  * BODIES are allow-lists: an extra key is 400 UNKNOWN_FIELD; a bad value is
  * PRICING_INPUT_INVALID naming the field, never echoing the value. Decimals
@@ -32,7 +38,7 @@ import { changePpm, ratioExceedsPct, sameRate, sumOfMoves, usdIqdCandidate, with
 import { HttpError } from '../http';
 import { inputInvalid } from '../pricingEngine/whatIf';
 import { FX_PAIRS, HOUR_MS, isFxPair, iso, type FxPairId, type FxPairRow } from './pairs';
-import { PENDING_CLEARED, USD_IQD_SANITY, type FxAttention, type FxLogDraft, type PairSet } from './decide';
+import { PENDING_CLEARED, USD_IQD_SANITY, adjustmentOf, type FxAttention, type FxLogDraft, type PairSet } from './decide';
 import type { PairChange } from './commit';
 
 /** The MVP's large-change line (G17): an act, or the owner's acts of the last 24 hours, above 15% (§7.8). */
@@ -184,6 +190,8 @@ const ownerLog = (row: FxPairRow, partial: Partial<FxLogDraft> & Pick<FxLogDraft
   change_ppm: null,
   published_at: null,
   error_code: null,
+  market_adjustment_iqd: adjustmentOf(row),
+  settings_diff: null,
   ...partial,
 });
 
@@ -320,7 +328,7 @@ export function planReview(row: FxPairRow, raw: unknown, ctx: ActContext): Plann
   const observed = row.pending_observed_at ? Date.parse(row.pending_observed_at) : NaN;
   if (!Number.isFinite(observed) || ctx.now.getTime() - observed > REVIEW_MAX_AGE_MS[row.pair]) throw fxRefusal(409, 'FX_REVIEW_STALE');
   // M4.3: USD/IQD applies the pending MARKET figure plus the adjustment in force NOW.
-  const v = row.pair === 'USD_IQD' && row.pending_market_rate !== null ? usdIqdCandidate(row.pending_market_rate, row.adjustment) : pending;
+  const v = row.pair === 'USD_IQD' && row.pending_market_rate !== null ? usdIqdCandidate(row.pending_market_rate, row.market_adjustment_iqd) : pending;
   assertInBounds(row, v);
   const nowIso = iso(ctx.now);
   return {
@@ -354,7 +362,7 @@ export const SETTINGS_KEYS = [
   'owner_version',
   'mode',
   'interval_hours',
-  'adjustment_iqd_per_usd',
+  'market_adjustment_iqd',
   'anomaly_threshold_pct',
   'drift_threshold_pct',
   'min_change_pct',
@@ -364,6 +372,23 @@ export const SETTINGS_KEYS = [
   'confirm_large_change',
 ] as const;
 const GUARD_FIELDS = ['mode', 'interval_hours', 'anomaly_threshold_pct', 'drift_threshold_pct', 'min_change_pct', 'bound_min', 'bound_max'] as const;
+/** The fields a settings_change row's diff may name, in the order it lists them. */
+export const SETTINGS_DIFF_FIELDS = [
+  'mode',
+  'interval_hours',
+  'market_adjustment_iqd',
+  'anomaly_threshold_pct',
+  'drift_threshold_pct',
+  'min_change_pct',
+  'bound_min',
+  'bound_max',
+] as const;
+export type SettingsDiffField = (typeof SETTINGS_DIFF_FIELDS)[number];
+export interface SettingsDiffEntry {
+  field: SettingsDiffField;
+  before: string;
+  after: string;
+}
 
 export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (PlannedAct & { confirm: boolean; fields: string[] }) | null {
   const b = strictBody(raw, SETTINGS_KEYS);
@@ -418,13 +443,16 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
     fields.push('bound_max');
   }
 
-  // ---- the adjustment (USD/IQD only, Q1: signed dinars per dollar)
+  // ---- the adjustment (USD/IQD only): a FIXED number of dinars per dollar,
+  // signed, never a percentage (owner decision 5) — '0.5%' or '2e1' is 400
+  // PRICING_INPUT_INVALID naming the field.
   let effective = row.effective_rate;
   let pendingEffective = row.pending_effective_rate;
-  if (b.adjustment_iqd_per_usd !== undefined) {
-    if (!usd) throw inputInvalid('adjustment_iqd_per_usd');
-    const adj = signedDecimal(b.adjustment_iqd_per_usd, 'adjustment_iqd_per_usd', 5, 4);
-    if (adj !== row.adjustment) {
+  let adjustmentAfter = row.market_adjustment_iqd;
+  if (b.market_adjustment_iqd !== undefined) {
+    if (!usd) throw inputInvalid('market_adjustment_iqd');
+    const adj = signedDecimal(b.market_adjustment_iqd, 'market_adjustment_iqd', 5, 4);
+    if (adj !== row.market_adjustment_iqd) {
       const bounds = { pair: row.pair, bound_min: boundMin, bound_max: boundMax };
       // THE CANDIDATE STAYS A PLAUSIBLE RATE, in every mode and before the
       // first approval too (FX-1 review: security #1, correctness C6 — a −2000
@@ -435,14 +463,15 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
       // can give a rate of zero or below.
       if (row.market_rate !== null) assertInBounds(bounds, usdIqdCandidate(row.market_rate, adj));
       else if (addProcurementExact(procurementExact(boundMin), procurementExact(adj, { signed: true })).num <= 0n) throw fxRefusal(400, 'FX_RATE_OUT_OF_BOUNDS');
-      set.adjustment = adj;
-      fields.push('adjustment_iqd_per_usd');
+      set.market_adjustment_iqd = adj;
+      adjustmentAfter = adj;
+      fields.push('market_adjustment_iqd');
       // The effective rate moves BY the change of the adjustment: effective + (new − old).
       // Not «latest market + new adjustment»: the latest validated market figure
       // may be a candidate held for review, and an adjustment must never apply
       // a jump the guard is holding (that would walk around §30).
       if (row.mode === 'AUTO' && mode === 'AUTO' && row.effective_rate !== null) {
-        effective = shiftedBy(row.effective_rate, row.adjustment, adj);
+        effective = shiftedBy(row.effective_rate, row.market_adjustment_iqd, adj);
         assertInBounds(bounds, effective);
         // THE ANCHOR MOVES BY THE SAME CHANGE, AND KEEPS ITS TIME: the drift
         // guard keeps measuring the MARKET's move since the owner's last
@@ -450,7 +479,7 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
         // two adjustment saves (+0.0001, then back) do what «تأكيد السعر
         // الحالي» does — re-base the drift guard — without the fresh sign-in
         // that act always needs (FX-1 security review #2).
-        const anchor = row.drift_anchor_rate !== null ? shiftedBy(row.drift_anchor_rate, row.adjustment, adj) : effective;
+        const anchor = row.drift_anchor_rate !== null ? shiftedBy(row.drift_anchor_rate, row.market_adjustment_iqd, adj) : effective;
         Object.assign(set, effectiveTo(row, effective, ctx, row.effective_source ?? 'provider'), {
           drift_anchor_rate: anchor,
           ...(row.drift_anchor_at === null ? { drift_anchor_at: iso(ctx.now) } : {}),
@@ -480,16 +509,56 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
       Object.assign(set, { mode: 'AUTO', manual_rate: null });
       backToAuto = true;
     }
-    logs.push(ownerLog(row, { event: 'mode_change', result: mode, effective_after: effective }));
   }
   if (fields.length === 0) return null;
-  if (fields.some((f) => f !== 'mode')) {
-    logs.unshift(
+  // THE HISTORY SAYS OLD → NEW (owner decision 10): every changed field, as
+  // the exact text before and after, on the act's own row of the private log.
+  const before: Record<SettingsDiffField, string> = {
+    mode: row.mode,
+    interval_hours: String(row.interval_hours),
+    market_adjustment_iqd: row.market_adjustment_iqd,
+    anomaly_threshold_pct: row.anomaly_threshold_pct,
+    drift_threshold_pct: row.drift_threshold_pct,
+    min_change_pct: row.min_change_pct,
+    bound_min: row.bound_min,
+    bound_max: row.bound_max,
+  };
+  const after: Record<SettingsDiffField, string> = {
+    mode,
+    interval_hours: String(set.interval_hours ?? row.interval_hours),
+    market_adjustment_iqd: adjustmentAfter,
+    anomaly_threshold_pct: anomaly,
+    drift_threshold_pct: drift,
+    min_change_pct: dead,
+    bound_min: boundMin,
+    bound_max: boundMax,
+  };
+  const diff = (only?: SettingsDiffField): string =>
+    JSON.stringify(
+      SETTINGS_DIFF_FIELDS.filter((f) => (only ? f === only : fields.includes(f))).map((f): SettingsDiffEntry => ({ field: f, before: before[f], after: after[f] }))
+    );
+  const settingsRow = fields.some((f) => f !== 'mode');
+  if (settingsRow) {
+    logs.push(
       ownerLog(row, {
         event: 'settings_change',
         result: 'APPLIED',
         effective_after: effective,
         change_ppm: row.effective_rate && effective && !sameRate(row.effective_rate, effective) ? changePpm(row.effective_rate, effective) : null,
+        market_adjustment_iqd: usd ? adjustmentAfter : null,
+        settings_diff: diff(),
+      })
+    );
+  }
+  if (mode !== row.mode) {
+    // A mode-only act carries its own old → new; beside a settings_change row the mode is already in that row's diff.
+    logs.push(
+      ownerLog(row, {
+        event: 'mode_change',
+        result: mode,
+        effective_after: effective,
+        market_adjustment_iqd: usd ? adjustmentAfter : null,
+        settings_diff: settingsRow ? null : diff('mode'),
       })
     );
   }

@@ -8,6 +8,11 @@
  * by its code, never dropped), which pair by its name, who or what caused it,
  * why in words (an error code is never printed raw, UX review #11), and the
  * rate before and after — the server's text, in the panel's Latin digits.
+ *
+ * A settings change lists every setting it changed, old → new (owner decision
+ * 10: «تغيّرت الإعدادات» alone said nothing), each under the name the safety
+ * settings already use; a USD/IQD row that moved or held a rate says which
+ * adjustment was in force (owner decision 5).
  */
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, X } from 'lucide-react';
@@ -16,11 +21,47 @@ import { Button } from '../ui/Button';
 import { Segmented } from '../ui/Segmented';
 import { isAborted } from '../../lib/api';
 import type { Language } from '../../translations';
-import { FX_PAIR_IDS, fetchFxHistory, type FxHistoryItem, type FxPairId } from './api';
+import { FX_PAIR_IDS, fetchFxHistory, type FxHistoryItem, type FxPairId, type FxSettingsDiffItem } from './api';
 import { fxCodeText, fxEventLabel, pairShortName, type FxStrings } from './fxStrings';
 import { FxFigure, fxDate, fxRefusalText, RATE_SHOWN_PLACES } from './fxParts';
+import { adjustmentFigure, fxCount, fxFigure } from './format';
 
 const PAGE = 30;
+
+/** The events whose USD/IQD row shows the adjustment in force (a rate moved or was held). */
+const RATE_EVENTS = new Set(['apply', 'review_held', 'review_approved', 'manual_set']);
+
+/**
+ * One line of a settings change, in words: the setting's own label and its
+ * value before and after — the server's exact text, the mode and the interval
+ * said in words, every figure in the panel's Latin digits. A setting this
+ * client does not know is shown by its name, never dropped.
+ */
+export function settingsDiffLine(s: FxStrings, item: FxSettingsDiffItem): { label: string; before: string; after: string } {
+  const value = (v: string): string => {
+    switch (item.field) {
+      case 'mode':
+        return v === 'MANUAL' ? s.modeManual : v === 'AUTO' ? s.modeAuto : v;
+      case 'interval_hours':
+        return v === '6' ? s.int6Short(fxCount(6)) : v === '12' ? s.int12Short(fxCount(12)) : v === '24' ? s.int24Short(fxCount(24)) : v;
+      case 'market_adjustment_iqd':
+        return adjustmentFigure(v);
+      default:
+        return fxFigure(v);
+    }
+  };
+  const labels: Record<string, string> = {
+    mode: s.fieldMode,
+    interval_hours: s.fieldInterval,
+    market_adjustment_iqd: s.adjustment,
+    anomaly_threshold_pct: s.threshold,
+    drift_threshold_pct: s.drift,
+    min_change_pct: s.minChange,
+    bound_min: s.boundMin,
+    bound_max: s.boundMax,
+  };
+  return { label: labels[item.field] ?? item.field, before: value(item.before), after: value(item.after) };
+}
 
 
 export interface FxHistorySheetProps {
@@ -141,6 +182,26 @@ export default function FxHistorySheet({ open, onClose, lang, dir, s }: FxHistor
               {it.pending_rate && !it.effective_after && (
                 <p className="mt-1 text-[12.5px] text-text-secondary">
                   {s.pendingNew}: <FxFigure rate={it.pending_rate} places={RATE_SHOWN_PLACES[it.pair]} />
+                </p>
+              )}
+              {it.settings_diff && it.settings_diff.length > 0 && (
+                <ul className="mt-1.5 space-y-0.5" data-fx-history-diff>
+                  {it.settings_diff.map((d) => {
+                    const line = settingsDiffLine(s, d);
+                    return (
+                      <li key={d.field} className="flex flex-wrap items-center gap-1.5 text-[12.5px] text-text-secondary" data-fx-diff-field={d.field}>
+                        <span>{line.label}:</span>
+                        <bdi dir="ltr" className="tabular-nums text-text-muted">{line.before}</bdi>
+                        <Arrow aria-hidden="true" className="h-3 w-3 text-text-muted" />
+                        <bdi dir="ltr" className="font-semibold tabular-nums text-text-primary">{line.after}</bdi>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {it.pair === 'USD_IQD' && it.market_adjustment_iqd !== null && RATE_EVENTS.has(it.event) && (
+                <p className="mt-0.5 text-[12px] text-text-muted" data-fx-history-adjustment>
+                  {s.adjustmentShort}: <bdi dir="ltr" className="tabular-nums">{adjustmentFigure(it.market_adjustment_iqd)}</bdi>
                 </p>
               )}
             </li>

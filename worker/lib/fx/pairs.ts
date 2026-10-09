@@ -2,7 +2,8 @@
  * THE THREE SOURCE PAIRS (FX programme plan §4.1, migration 0179) — their
  * vocabulary and the one read of their rows.
  *
- *   USD_IQD  IQD per 1 USD  (Iraqi parallel market via IQWealth, plus the owner's adjustment)
+ *   USD_IQD  IQD per 1 USD  (Iraqi parallel market via IQWealth, plus the owner's fixed
+ *            `market_adjustment_iqd` — dinars per dollar, never a percentage: owner decision 5)
  *   EUR_USD  USD per 1 EUR  (ECB daily reference)
  *   CNY_USD  USD per 1 CNY  (ECB USD ÷ ECB CNY)
  *
@@ -67,7 +68,8 @@ export interface FxPairRow {
   official_rate: string | null;
   source_usd_per_eur: string | null;
   source_cny_per_eur: string | null;
-  adjustment: string;
+  /** USD/IQD: fixed dinars added to the market sell of 1 USD (owner decision 5); '0' on the ECB pairs. */
+  market_adjustment_iqd: string;
   manual_rate: string | null;
   effective_rate: string | null;
   effective_version: number;
@@ -114,7 +116,7 @@ export interface FxPairRow {
 /** Every column of `fx_rate_pairs`, by name — the explicit list every read uses. */
 export const PAIR_COLUMNS = [
   'pair', 'provider', 'mode', 'interval_hours', 'market_rate', 'market_buy', 'official_rate', 'source_usd_per_eur',
-  'source_cny_per_eur', 'adjustment', 'manual_rate', 'effective_rate', 'effective_version', 'effective_source',
+  'source_cny_per_eur', 'market_adjustment_iqd', 'manual_rate', 'effective_rate', 'effective_version', 'effective_source',
   'effective_applied_at', 'effective_applied_by', 'last_known_good_rate', 'last_known_good_at', 'drift_anchor_rate',
   'drift_anchor_at', 'published_at', 'last_checked_at', 'last_check_result', 'last_successful_at', 'last_cron_success_at',
   'fetch_status', 'status', 'last_error_code', 'failing_since', 'pending_market_rate', 'pending_effective_rate',

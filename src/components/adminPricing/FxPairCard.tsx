@@ -13,7 +13,9 @@
  *     or 12 hours (USD) / every 24 hours (ECB) — a choice, then «حفظ»;
  *   - a manual rate; back to automatic; «استخدم {rate} سعرًا يدويًا» after a
  *     refresh while manual (critique L14);
- *   - the adjustment (USD only, signed dinars per dollar, Q1);
+ *   - the adjustment (USD only, `market_adjustment_iqd`: a FIXED number of
+ *     dinars per dollar, never a percentage — owner decision 5), with the sum
+ *     «market + adjustment = effective» when it holds (`formula_holds`);
  *   - «تأكيد السعر الحالي», which moves the drift anchor (critique F1);
  *   - the safety settings, collapsed, behind a fresh sign-in (critique F3);
  *   - a held value is decided in the review sheet (FxReviewSheet).
@@ -31,7 +33,7 @@ import { confirmFxRate, saveFxSettings, setFxManual, type FxPairDto, type FxRate
 import type { FxStrings } from './fxStrings';
 import { adjustmentInput, fxRateInput, pctInput } from './fxInput';
 import { DERIVED_IQD_SHOWN_PLACES, Fact, FX_DAY_HOURS, FxFigure, FxMessage, FX_STATUS_TONE, fxDate, pctText, RATE_SHOWN_PLACES, RateLine, useFxAct } from './fxParts';
-import { fxCount, fxFigure } from './format';
+import { adjustmentFigure, fxCount, fxFigure } from './format';
 import { iqdUnit } from '../../lib/money';
 
 type Tracking = 'off' | '6' | '12' | '24';
@@ -68,7 +70,7 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
   const [manualOpen, setManualOpen] = useState(false);
   const [manual, setManual] = useState('');
   const [manualError, setManualError] = useState<string | null>(null);
-  const [adjustment, setAdjustment] = useState(p.adjustment_iqd_per_usd ?? '0');
+  const [adjustment, setAdjustment] = useState(p.market_adjustment_iqd ?? '0');
   const [adjustmentError, setAdjustmentError] = useState<string | null>(null);
   const [guards, setGuards] = useState(() => guardDraft(p));
   const [guardErrors, setGuardErrors] = useState<Partial<Record<keyof GuardDraft, string>>>({});
@@ -87,7 +89,7 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
   // A new answer from the server is the truth: the drafts follow it.
   useEffect(() => {
     setTracking(trackingOf(p));
-    setAdjustment(p.adjustment_iqd_per_usd ?? '0');
+    setAdjustment(p.market_adjustment_iqd ?? '0');
     setGuards(guardDraft(p));
   }, [p]);
 
@@ -132,7 +134,7 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
     }
     setAdjustmentError(null);
     void run('adjustment', (confirm_large_change) =>
-      saveFxSettings(p.pair, { ...base, adjustment_iqd_per_usd: adj, ...(confirm_large_change ? { confirm_large_change: true } : {}) })
+      saveFxSettings(p.pair, { ...base, market_adjustment_iqd: adj, ...(confirm_large_change ? { confirm_large_change: true } : {}) })
     );
   };
 
@@ -321,7 +323,7 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
         <Fact label={usd ? s.marketSell : s.marketEcb}>{fig(p.market_rate)}</Fact>
         {usd && <Fact label={s.marketBuy}>{fig(p.market_buy)}</Fact>}
         {usd && <Fact label={s.official}>{fig(p.official_rate)}</Fact>}
-        {usd && <Fact label={s.adjustment}>{plain(p.adjustment_iqd_per_usd)}</Fact>}
+        {usd && <Fact label={s.adjustment}>{plain(p.market_adjustment_iqd)}</Fact>}
         <Fact label={s.lkg}>{fig(p.last_known_good_rate)}</Fact>
         <Fact label={s.anchor}>{fig(p.drift_anchor_rate)}</Fact>
         <Fact label={s.lastUpdate}>{when(p.effective_applied_at)}</Fact>
@@ -339,6 +341,14 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
         {p.mode === 'AUTO' && <Fact label={s.nextCheck}>{when(p.next_check_at)}</Fact>}
       </dl>
       )}
+      {/* «سعر السوق 1,660 + الزيادة 20 = السعر المعتمد 1,680» (owner decision 5) — the server's three
+          figures, shown only when the server says the sum holds: inside the dead band, while a value
+          is held, or on a manual rate it does not, and no sum is better than a wrong one. */}
+      {usd && !notSetUp && p.formula_holds && p.market_rate && p.effective_rate && (
+        <p className="mt-3 text-[12.5px] leading-relaxed text-text-secondary" data-fx-formula>
+          {s.formula(fxFigure(p.market_rate), adjustmentFigure(p.market_adjustment_iqd ?? '0'), fxFigure(p.effective_rate))}
+        </p>
+      )}
 
       {usd && (
         <div className="mt-4 border-t border-border-subtle/60 pt-4" data-fx-adjustment>
@@ -346,12 +356,17 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
             <Field label={s.adjustment} hint={s.adjustmentHint} error={adjustmentError} className="min-w-[12rem] max-w-sm flex-1">
               <Input ltr inputMode="decimal" autoComplete="off" value={adjustment} onChange={(e) => setAdjustment(e.target.value)} />
             </Field>
-            {adjustmentInput(adjustment) !== (p.adjustment_iqd_per_usd ?? '0') && (
+            {adjustmentInput(adjustment) !== (p.market_adjustment_iqd ?? '0') && (
               <Button variant="secondary" loading={busy === 'adjustment'} onClick={saveAdjustment} className="mb-[22px]" data-fx-save-adjustment>
                 {s.save}
               </Button>
             )}
           </div>
+          {p.mode === 'MANUAL' && (
+            <p className="mt-1 text-[12px] leading-relaxed text-text-muted" data-fx-manual-final>
+              {s.manualFinal}
+            </p>
+          )}
         </div>
       )}
 

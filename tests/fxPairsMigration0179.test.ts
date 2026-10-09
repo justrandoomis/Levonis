@@ -110,11 +110,11 @@ test('the shipping basis is fixed per profile, the rate is decimal text > 0, and
   refused(db, `UPDATE pricing_shipping_rates SET rate_iqd='0' WHERE profile='CHINA_AIR'`, /CHECK constraint failed/);
   refused(db, `UPDATE pricing_shipping_rates SET rate_iqd='1e3' WHERE profile='CHINA_AIR'`, /CHECK constraint failed/);
   ok(db, `UPDATE pricing_shipping_rates SET rate_iqd='12000.5', version=version+1 WHERE profile='CHINA_AIR'`);
-  refused(db, `UPDATE fx_rate_pairs SET adjustment='20' WHERE pair='EUR_USD'`, /CHECK constraint failed: pair = 'USD_IQD' OR adjustment = '0'/);
+  refused(db, `UPDATE fx_rate_pairs SET market_adjustment_iqd='20' WHERE pair='EUR_USD'`, /CHECK constraint failed: pair = 'USD_IQD' OR market_adjustment_iqd = '0'/);
   refused(db, `UPDATE fx_rate_pairs SET interval_hours=6 WHERE pair='EUR_USD'`, /CHECK constraint failed/);
   refused(db, `UPDATE fx_rate_pairs SET interval_hours=24 WHERE pair='USD_IQD'`, /CHECK constraint failed/);
-  ok(db, `UPDATE fx_rate_pairs SET adjustment='-20.5' WHERE pair='USD_IQD'`);
-  refused(db, `UPDATE fx_rate_pairs SET adjustment='--20' WHERE pair='USD_IQD'`, /CHECK constraint failed/);
+  ok(db, `UPDATE fx_rate_pairs SET market_adjustment_iqd='-20.5' WHERE pair='USD_IQD'`);
+  refused(db, `UPDATE fx_rate_pairs SET market_adjustment_iqd='--20' WHERE pair='USD_IQD'`, /CHECK constraint failed/);
   refused(db, `UPDATE fx_rate_pairs SET market_rate='0' WHERE pair='USD_IQD'`, /CHECK constraint failed/);
 });
 
@@ -124,4 +124,49 @@ test('the purchase snapshot columns exist after 0179 and not before; a 0177 data
   const before = dbThrough('0177');
   assert.equal(hasColumn(before, 'purchase_orders', 'fx_snapshot_at'), false, 'a 0177 database does not have them');
   assert.throws(() => before.prepare('SELECT 1 FROM fx_rate_pairs').get(), /no such table/);
+});
+
+// ------------------------------------------------------------- owner decision 5 (2026-10-09)
+
+test('decision 5: the adjustment is `market_adjustment_iqd`, a signed number of dinars — never a percentage; the old `adjustment` column is gone', () => {
+  const db = freshDb();
+  assert.ok(hasColumn(db, 'fx_rate_pairs', 'market_adjustment_iqd'));
+  assert.equal(hasColumn(db, 'fx_rate_pairs', 'adjustment'), false, 'the old column name is gone');
+  assert.equal(row<{ v: string }>(db, "SELECT market_adjustment_iqd v FROM fx_rate_pairs WHERE pair='USD_IQD'")!.v, '0', 'seeded 0: the owner types it');
+  for (const good of ['20', '+20', '-20', '20.1234', '0']) ok(db, `UPDATE fx_rate_pairs SET market_adjustment_iqd='${good}' WHERE pair='USD_IQD'`);
+  for (const bad of ['0.5%', '2e1', '--20', '20.', '1,000', '', '12345678901234567']) {
+    refused(db, `UPDATE fx_rate_pairs SET market_adjustment_iqd='${bad}' WHERE pair='USD_IQD'`, /CHECK constraint failed/);
+  }
+  refused(db, `UPDATE fx_rate_pairs SET market_adjustment_iqd='20' WHERE pair='CNY_USD'`, /CHECK constraint failed: pair = 'USD_IQD' OR market_adjustment_iqd = '0'/);
+});
+
+test('decision 5: every history row can say which adjustment was in force — USD/IQD only (NULL on the ECB pairs), in the same grammar', () => {
+  const db = freshDb();
+  assert.ok(hasColumn(db, 'fx_rate_log', 'market_adjustment_iqd'));
+  const ins = (id: string, pair: string, adj: string) =>
+    `INSERT INTO fx_rate_log (id,pair,event,trigger_kind,result,created_at,market_adjustment_iqd) VALUES ('${id}','${pair}','check','cron','UNCHANGED','${NOW}',${adj})`;
+  ok(db, ins('a1', 'USD_IQD', "'20'"));
+  ok(db, ins('a2', 'USD_IQD', "'-12.5'"));
+  ok(db, ins('a3', 'USD_IQD', 'NULL'));
+  ok(db, ins('a4', 'EUR_USD', 'NULL'));
+  refused(db, ins('a5', 'EUR_USD', "'0'"), /CHECK constraint failed/);
+  refused(db, ins('a6', 'CNY_USD', "'20'"), /CHECK constraint failed/);
+  refused(db, ins('a7', 'USD_IQD', "'0.5%'"), /CHECK constraint failed/);
+  refused(db, ins('a8', 'USD_IQD', "'1e2'"), /CHECK constraint failed/);
+});
+
+test('decision 10: a settings_change row keeps old → new as a JSON array of at most 1,000 characters; anything else is refused', () => {
+  const db = freshDb();
+  assert.ok(hasColumn(db, 'fx_rate_log', 'settings_diff'));
+  const ins = (id: string, diff: string) =>
+    db.prepare(`INSERT INTO fx_rate_log (id,pair,event,trigger_kind,result,created_at,settings_diff) VALUES (?, 'USD_IQD','settings_change','owner','APPLIED',?, ?)`).run(id, NOW, diff);
+  ins('d1', JSON.stringify([{ field: 'min_change_pct', before: '0.5', after: '0.8' }]));
+  ins('d2', '[]');
+  assert.throws(() => ins('d3', '[{"field":'), /CHECK constraint failed/, 'invalid JSON');
+  assert.throws(() => ins('d4', '{"field":"min_change_pct"}'), /CHECK constraint failed/, 'an object, not an array');
+  assert.throws(() => ins('d5', '"min_change_pct"'), /CHECK constraint failed/, 'a string, not an array');
+  const long = JSON.stringify([{ field: 'bound_min', before: '1'.repeat(500), after: '2'.repeat(500) }]);
+  assert.ok(long.length > 1000);
+  assert.throws(() => ins('d6', long), /CHECK constraint failed/, 'over 1,000 characters');
+  assert.equal(count(db, "SELECT COUNT(*) n FROM fx_rate_log WHERE event = 'settings_change'"), 2);
 });

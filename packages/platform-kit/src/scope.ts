@@ -311,7 +311,10 @@ export const FINANCIAL_FIELDS = [
   'last_known_good_rate',
   'pending_market_rate',
   'pending_effective_rate',
-  'adjustment_iqd_per_usd',
+  'adjustment_iqd_per_usd', // the retired wire name of market_adjustment_iqd, kept in the net
+  'market_adjustment_iqd',
+  // -- the settings_change rows of the FX history: old → new of every setting, the adjustment and bounds included
+  'settings_diff',
   'drift_anchor_rate',
   'rejected_rate',
   'last_observed',

@@ -13,7 +13,7 @@
  * name of the derived rates — `effective_iqd` is a staff-wage name elsewhere
  * (critique F14c).
  */
-import { changePctText } from '@levonis/pricing/fxChain';
+import { changePctText, sameRate, usdIqdCandidate } from '@levonis/pricing/fxChain';
 import { nextCheckAt, PROVIDER_DAY_CAP } from './schedule';
 import { FX_PAIRS, type FxPairId, type FxPairRow } from './pairs';
 import { FX_REFRESH_GLOBAL_LIMIT } from './limits';
@@ -35,10 +35,41 @@ export interface FxLogRow {
   error_code: string | null;
   repriced_products: number | null;
   created_at: string;
+  market_adjustment_iqd: string | null;
+  settings_diff: string | null;
 }
 
 export const LOG_COLUMNS =
-  'id, pair, event, trigger_kind, provider, market_rate, effective_before, effective_after, pending_rate, change_ppm, published_at, result, error_code, repriced_products, created_at';
+  'id, pair, event, trigger_kind, provider, market_rate, effective_before, effective_after, pending_rate, change_ppm, published_at, result, error_code, repriced_products, created_at, market_adjustment_iqd, settings_diff';
+
+/** One `{field, before, after}` of a settings_change row, as the owner's history reads it. */
+export interface SettingsDiffItem {
+  field: string;
+  before: string;
+  after: string;
+}
+
+/**
+ * The stored diff as a list — every entry three strings, nothing else — or
+ * null. The column's CHECK holds a JSON array; anything else read here is
+ * dropped rather than served (the history never fails on one bad row).
+ */
+export function settingsDiffOf(text: string | null): SettingsDiffItem[] | null {
+  if (text === null) return null;
+  try {
+    const raw: unknown = JSON.parse(text);
+    if (!Array.isArray(raw)) return null;
+    const out: SettingsDiffItem[] = [];
+    for (const e of raw) {
+      if (e && typeof e === 'object' && typeof e.field === 'string' && typeof e.before === 'string' && typeof e.after === 'string') {
+        out.push({ field: e.field, before: e.before, after: e.after });
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
 
 const ATTRIBUTION: Readonly<Record<'iqwealth' | 'ecb', { text: string; url: string }>> = {
   iqwealth: { text: 'IQWealth', url: 'https://iraqsm.com' },
@@ -62,7 +93,19 @@ export function historyItemDto(r: FxLogRow) {
     error_code: r.error_code,
     repriced_products: r.repriced_products,
     created_at: r.created_at,
+    market_adjustment_iqd: r.pair === 'USD_IQD' ? r.market_adjustment_iqd : null,
+    settings_diff: settingsDiffOf(r.settings_diff),
   };
+}
+
+/** USD/IQD in AUTO, and effective = market sell + market_adjustment_iqd exactly. */
+function formulaHolds(r: FxPairRow): boolean {
+  if (r.mode !== 'AUTO' || r.market_rate === null || r.effective_rate === null) return false;
+  try {
+    return sameRate(usdIqdCandidate(r.market_rate, r.market_adjustment_iqd), r.effective_rate);
+  } catch {
+    return false;
+  }
 }
 
 /** The rejection memory of decide() step 8 still holds (24 hours). */
@@ -83,7 +126,14 @@ function pairDto(r: FxPairRow, observed: FxLogRow | undefined, now: Date) {
     market_rate: r.market_rate,
     market_buy: usd ? r.market_buy : null,
     official_rate: usd ? r.official_rate : null,
-    adjustment_iqd_per_usd: usd ? r.adjustment : null,
+    market_adjustment_iqd: usd ? r.market_adjustment_iqd : null,
+    // «سعر السوق + الزيادة = السعر المعتمد» is shown only when it is TRUE of
+    // the figures on the card (owner decision 5): AUTO, and the effective rate
+    // is exactly the last validated market sell plus the adjustment. A move
+    // inside the dead band, a held value or a manual rate makes it false, and
+    // the panel then shows no sum rather than a wrong one. A flag, no figure:
+    // the client never computes a rate.
+    formula_holds: usd && formulaHolds(r),
     manual_rate: r.manual_rate,
     effective_rate: r.effective_rate,
     effective_version: r.effective_version,

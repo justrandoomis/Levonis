@@ -72,7 +72,8 @@ const pairOf = (over: Partial<FxPairDto> = {}): FxPairDto => ({
   market_rate: '1660',
   market_buy: '1655',
   official_rate: '1310',
-  adjustment_iqd_per_usd: '15',
+  market_adjustment_iqd: '15',
+  formula_holds: true,
   manual_rate: null,
   effective_rate: '1675',
   effective_version: 3,
@@ -121,8 +122,8 @@ const card = (p: FxPairDto, lang: (typeof LANGS)[number] = 'ar', rates = ratesOf
 // ------------------------------------------------------------- #1 digits and precision
 
 test('UX #1: on an Arabic phone every figure of the rates panel is Latin — no U+066B/U+066C side by side; EUR/IQD in whole dinars; CNY/USD to six decimals, the exact text in the tooltip', () => {
-  const eur = pairOf({ pair: 'EUR_USD', provider: 'ecb', market_rate: '1.1186', market_buy: null, official_rate: null, adjustment_iqd_per_usd: null, effective_rate: '1.1186', last_known_good_rate: '1.1186', drift_anchor_rate: '1.1186', interval_hours: 24 });
-  const cny = pairOf({ pair: 'CNY_USD', provider: 'ecb', market_rate: '0.1392023689', market_buy: null, official_rate: null, adjustment_iqd_per_usd: null, effective_rate: '0.1392023689', last_known_good_rate: '0.1392023689', drift_anchor_rate: '0.1392023689', interval_hours: 24 });
+  const eur = pairOf({ pair: 'EUR_USD', provider: 'ecb', market_rate: '1.1186', market_buy: null, official_rate: null, market_adjustment_iqd: null, effective_rate: '1.1186', last_known_good_rate: '1.1186', drift_anchor_rate: '1.1186', interval_hours: 24 });
+  const cny = pairOf({ pair: 'CNY_USD', provider: 'ecb', market_rate: '0.1392023689', market_buy: null, official_rate: null, market_adjustment_iqd: null, effective_rate: '0.1392023689', last_known_good_rate: '0.1392023689', drift_anchor_rate: '0.1392023689', interval_hours: 24 });
   const derived = { USD: { rate_iqd: '1675', version: 3, updated_at: null }, EUR: { rate_iqd: '1873.655', version: 2, updated_at: null }, CNY: { rate_iqd: '233.1639679075', version: 2, updated_at: null } };
   for (const lang of LANGS) {
     const html = withArabicDigits(() => card(eur, lang, ratesOf([eur], derived)) + card(cny, lang, ratesOf([cny], derived)));

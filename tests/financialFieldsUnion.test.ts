@@ -91,6 +91,8 @@ const AREAS: Record<string, readonly string[]> = {
     'converted_at', 'usd_iqd_rate', 'usd_fx_version', 'cross_rate', 'cross_fx_version', 'market_rate', 'market_buy', 'official_rate',
     'source_usd_per_eur', 'source_cny_per_eur', 'manual_rate', 'effective_rate', 'effective_rates_iqd', 'last_known_good_rate',
     'pending_market_rate', 'pending_effective_rate', 'adjustment_iqd_per_usd', 'drift_anchor_rate', 'rejected_rate', 'last_observed',
+    // owner decision 5: the adjustment's own name (the old wire name above stays in the net); decision 10: the history's old → new
+    'market_adjustment_iqd', 'settings_diff',
     'preview_hash', 'supplier_cost_view', 'current_usd', 'current_iqd', 'rate_used', 'iqd_snapshot', 'procurement_suggestion',
     'supplier_cost_mode', 'current_shipping_cost_iqd', 'current_additional_costs_iqd', 'supplier_cost_usd_at_purchase',
     'usd_iqd_rate_at_purchase', 'eur_usd_rate_at_purchase', 'cny_usd_rate_at_purchase', 'historical_usd_equivalent',
@@ -196,6 +198,7 @@ const FX_PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
   EUR: 'a container: the dinar rate of the euro, under rate_iqd (FINANCIAL_FIELDS)',
   CNY: 'a container: the dinar rate of the yuan, under rate_iqd (FINANCIAL_FIELDS)',
   USD_IQD: "a container: the USD/IQD provider's calls today and its cap — counts",
+  formula_holds: 'yes/no: the USD/IQD in force is exactly the market sell plus market_adjustment_iqd (owner decision 5) — never a figure',
 };
 
 /**

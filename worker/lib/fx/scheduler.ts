@@ -29,7 +29,7 @@ import { CALLS_PER_CLAIM, PROVIDER_DAY_CAP, isDue } from './schedule';
 import { fetchEcb, type EcbQuote } from './providers/ecb';
 import { FX_INVOCATION_STATEMENT_BUDGET, statementBudget, type StatementBudget } from './budget';
 import { HOUR_MS, PAIR_COLUMNS, iso, loadPairs, type FxCheckResult, type FxPairId, type FxPairRow } from './pairs';
-import { decideSafely, type DecisionContext, type FxAttention, type FxClock, type FxDecision, type FxTrigger, type PairOutcome } from './decide';
+import { adjustmentOf, decideSafely, type DecisionContext, type FxAttention, type FxClock, type FxDecision, type FxTrigger, type PairOutcome } from './decide';
 import { isFenceMiss, planFxCommit, refusalCodeOf } from './commit';
 import { toStatements } from './write';
 import { notifyOwnerFx } from './notify';
@@ -151,10 +151,10 @@ async function claimLease(
           .bind(nowIso, actorId ?? 'system:fx', nowIso, row.pair, nowIso),
         db
           .prepare(
-            `INSERT INTO fx_rate_log (id, pair, event, trigger_kind, provider, effective_before, effective_after, result, error_code, actor_id, created_at)
-             VALUES (?, ?, 'deferred', ?, ?, ?, ?, 'DEFERRED', 'PROVIDER_BUDGET', ?, ?)`
+            `INSERT INTO fx_rate_log (id, pair, event, trigger_kind, provider, effective_before, effective_after, result, error_code, actor_id, created_at, market_adjustment_iqd)
+             VALUES (?, ?, 'deferred', ?, ?, ?, ?, 'DEFERRED', 'PROVIDER_BUDGET', ?, ?, ?)`
           )
-          .bind(`fxl_${crypto.randomUUID()}`, row.pair, trigger, providerOf(row.pair), row.effective_rate, row.effective_rate, actorId, nowIso),
+          .bind(`fxl_${crypto.randomUUID()}`, row.pair, trigger, providerOf(row.pair), row.effective_rate, row.effective_rate, actorId, nowIso, adjustmentOf(row)),
       ]);
     } catch (e) {
       console.error('fx: budget deferral not recorded:', e instanceof Error ? e.name : 'unknown');
@@ -210,6 +210,9 @@ export function quoteFor(
 
 const newLogId = () => `fxl_${crypto.randomUUID()}`;
 
+/** A raw log insert's adjustment: USD/IQD's own, NULL on the ECB pairs (the log CHECK). */
+const ADJUSTMENT_IN_FORCE = "CASE WHEN pair = 'USD_IQD' THEN market_adjustment_iqd ELSE NULL END";
+
 interface CommitDone {
   report: FxRunReport;
   attention: FxAttention[];
@@ -236,8 +239,8 @@ async function recordRefused(db: D1Database, row: FxPairRow, token: string, code
         .bind(nowIso, code, actorId ?? 'system:fx', nowIso, row.pair, token),
       db
         .prepare(
-          `INSERT INTO fx_rate_log (id, pair, event, trigger_kind, provider, effective_before, effective_after, result, error_code, actor_id, created_at)
-           SELECT ?, ?, ?, ?, ?, effective_rate, effective_rate, ?, ?, ?, ? FROM fx_rate_pairs WHERE pair = ?`
+          `INSERT INTO fx_rate_log (id, pair, event, trigger_kind, provider, effective_before, effective_after, result, error_code, actor_id, created_at, market_adjustment_iqd)
+           SELECT ?, ?, ?, ?, ?, effective_rate, effective_rate, ?, ?, ?, ?, ${ADJUSTMENT_IN_FORCE} FROM fx_rate_pairs WHERE pair = ?`
         )
         .bind(newLogId(), row.pair, deferred ? 'deferred' : 'commit_refused', trigger, providerOf(row.pair), result, code, actorId, nowIso, row.pair),
     ]);
@@ -252,8 +255,8 @@ async function recordSuperseded(db: D1Database, pair: FxPairId, nowIso: string, 
   try {
     await db
       .prepare(
-        `INSERT INTO fx_rate_log (id, pair, event, trigger_kind, provider, effective_before, effective_after, result, actor_id, created_at)
-         SELECT ?, ?, 'superseded', ?, ?, effective_rate, effective_rate, 'SUPERSEDED', ?, ? FROM fx_rate_pairs WHERE pair = ?`
+        `INSERT INTO fx_rate_log (id, pair, event, trigger_kind, provider, effective_before, effective_after, result, actor_id, created_at, market_adjustment_iqd)
+         SELECT ?, ?, 'superseded', ?, ?, effective_rate, effective_rate, 'SUPERSEDED', ?, ?, ${ADJUSTMENT_IN_FORCE} FROM fx_rate_pairs WHERE pair = ?`
       )
       .bind(newLogId(), pair, trigger, providerOf(pair), actorId, nowIso, pair)
       .run();

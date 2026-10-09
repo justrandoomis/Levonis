@@ -60,6 +60,6 @@ test('S1: the public answers carry the display rate and nothing else of FX; the 
   for (const path of ['/', '/p/a1', '/api/settings/public', '/api/home', '/api/home/sections', '/api/products', '/api/products/a1', '/api/public/v1/products']) {
     const { text } = await fetchText(path);
     for (const s of FX_SENTINELS) assert.equal(text.includes(s), false, `${path} carries ${s}`);
-    assert.doesNotMatch(text, /market_rate|adjustment_iqd_per_usd|pending_effective|last_known_good|drift_anchor|iqwealth|rate_iqd"/, path);
+    assert.doesNotMatch(text, /market_rate|adjustment_iqd_per_usd|market_adjustment_iqd|settings_diff|pending_effective|last_known_good|drift_anchor|iqwealth|rate_iqd"/, path);
   }
 });

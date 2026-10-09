@@ -320,8 +320,10 @@ export interface FxPairDto {
   market_rate: string | null;
   market_buy: string | null;
   official_rate: string | null;
-  /** USD/IQD only: signed dinars per dollar (Q1). */
-  adjustment_iqd_per_usd: string | null;
+  /** USD/IQD only: a FIXED number of dinars per dollar added to the market sell, signed, never a percentage (owner decision 5). */
+  market_adjustment_iqd: string | null;
+  /** USD/IQD: true when effective = market sell + adjustment exactly, so the card may show the sum (never computed here). */
+  formula_holds: boolean;
   manual_rate: string | null;
   effective_rate: string | null;
   effective_version: number;
@@ -401,6 +403,28 @@ export interface FxHistoryItem {
   error_code: string | null;
   repriced_products: number | null;
   created_at: string;
+  /** USD/IQD: the adjustment in force for this row (owner decision 5); null on the ECB pairs. */
+  market_adjustment_iqd: string | null;
+  /** settings_change rows: every changed setting, old → new (owner decision 10); null otherwise. */
+  settings_diff: FxSettingsDiffItem[] | null;
+}
+
+/** The settings a history row's diff may name (worker/lib/fx/ownerActs.ts SETTINGS_DIFF_FIELDS). */
+export type FxSettingsField =
+  | 'mode'
+  | 'interval_hours'
+  | 'market_adjustment_iqd'
+  | 'anomaly_threshold_pct'
+  | 'drift_threshold_pct'
+  | 'min_change_pct'
+  | 'bound_min'
+  | 'bound_max';
+
+/** One changed setting: the exact text before and after. */
+export interface FxSettingsDiffItem {
+  field: FxSettingsField | string;
+  before: string;
+  after: string;
 }
 
 /** The body of a settings act: `owner_version` plus only the fields the owner changed. */
@@ -408,7 +432,7 @@ export interface FxSettingsBody {
   owner_version: number;
   mode?: FxMode;
   interval_hours?: 6 | 12;
-  adjustment_iqd_per_usd?: string;
+  market_adjustment_iqd?: string;
   anomaly_threshold_pct?: string;
   drift_threshold_pct?: string;
   min_change_pct?: string;

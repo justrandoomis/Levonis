@@ -66,7 +66,7 @@ export interface PlanOptions {
 
 const WRITABLE = new Set<keyof PairSet>([
   'mode', 'interval_hours', 'market_rate', 'market_buy', 'official_rate', 'source_usd_per_eur', 'source_cny_per_eur',
-  'adjustment', 'manual_rate', 'effective_rate', 'effective_version', 'effective_source', 'effective_applied_at',
+  'market_adjustment_iqd', 'manual_rate', 'effective_rate', 'effective_version', 'effective_source', 'effective_applied_at',
   'effective_applied_by', 'last_known_good_rate', 'last_known_good_at', 'drift_anchor_rate', 'drift_anchor_at',
   'published_at', 'last_checked_at', 'last_check_result', 'last_successful_at', 'last_cron_success_at', 'fetch_status',
   'last_error_code', 'failing_since', 'pending_market_rate', 'pending_effective_rate', 'pending_published_at',
@@ -76,8 +76,8 @@ const WRITABLE = new Set<keyof PairSet>([
 
 const LOG_INSERT = `INSERT INTO fx_rate_log
   (id, pair, event, trigger_kind, provider, market_rate, effective_before, effective_after, pending_rate, change_ppm,
-   published_at, result, error_code, repriced_products, actor_id, created_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`;
+   published_at, result, error_code, repriced_products, actor_id, created_at, market_adjustment_iqd, settings_diff)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`;
 
 const DERIVED_UPDATE = `UPDATE pricing_fx_rates
    SET rate_iqd = ?, usd_iqd_rate = ?, cross_rate = ?, usd_version = ?, cross_version = ?,
@@ -121,7 +121,7 @@ function logInsert(pair: FxPairId, draft: FxLogDraft, opts: PlanOptions): Planne
     params: [
       opts.newLogId(), pair, draft.event, draft.trigger_kind, draft.provider, draft.market_rate, draft.effective_before,
       draft.effective_after, draft.pending_rate, draft.change_ppm, draft.published_at, draft.result.slice(0, 20),
-      draft.error_code, opts.actor, opts.nowIso,
+      draft.error_code, opts.actor, opts.nowIso, pair === 'USD_IQD' ? draft.market_adjustment_iqd : null, draft.settings_diff,
     ],
   };
 }

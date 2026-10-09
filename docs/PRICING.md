@@ -40,8 +40,16 @@ throughout, never a float.
   (`GET https://iraqsm.com/api/v1/fx`, the Worker secret
   `IRAQ_PARALLEL_FX_API_KEY`, read in one place:
   `worker/lib/fx/providers/iqwealth.ts`). Automatic every 6 or 12 hours, or OFF
-  with a manual rate. The owner's signed adjustment (dinars per dollar) is
-  added on top.
+  with a manual rate. The owner's adjustment, `market_adjustment_iqd`, is a
+  **fixed number of dinars per dollar, never a percentage** (owner decision 5,
+  2026-10-09): market 1,660 + 20 = an effective 1 USD = 1,680 IQD. It is
+  signed (a negative number lowers the rate), added to the market sell, and
+  never added to a manual rate (a manual rate is final). Every row of the
+  private history (`fx_rate_log.market_adjustment_iqd`) records the
+  adjustment in force for USD/IQD (NULL on the ECB pairs). The body key is
+  `market_adjustment_iqd`; the retired `adjustment_iqd_per_usd` is refused
+  (400 `UNKNOWN_FIELD`) and stays in FINANCIAL_FIELDS. «0.5%», an exponent or
+  more than 4 decimals is 400 `PRICING_INPUT_INVALID` naming the field.
 - **EUR/USD and CNY/USD**: the ECB daily reference rates, once a day. CNY/USD
   = (USD per EUR) ÷ (CNY per EUR), rounded up at 10 places.
 - **EUR/IQD and CNY/IQD**: computed centrally in `pricing_fx_rates` whenever
@@ -53,10 +61,22 @@ throughout, never a float.
   24 hours), or drifts more than 6% from the last confirmed rate. An
   adjustment moves that confirmed rate by its own change and never re-bases
   it. A value the owner rejected is not held again for 24 hours, and the
-  rejection never stops an ordinary move. Moves below the dead band (0.5%
-  USD/IQD, 0.3% EUR and CNY) are ignored. A failing source keeps the last
+  rejection never stops an ordinary move. A failing source keeps the last
   known good rate; a rate is never 0; a candidate out of bounds (an
   adjustment typed wrong) is recorded INVALID for that pair alone.
+- **Small moves are ignored** (owner decision 10): below the dead band —
+  `min_change_pct`, seeded 0.5% USD/IQD, 0.3% EUR/USD and CNY/USD, strictly
+  below (exactly 0.5% is a move) — a check records one `check` row and one
+  `fx.check` audit and nothing else: no `pricing_fx_rates` revision, no
+  product price (from FX-5: no repricing, no final_price write) and no cache
+  purge. Such a tick also clears a value held for review, since the market is
+  back near the rate in force; that is neither a repricing nor a purge. The
+  owner edits each band at `PUT /api/admin/pricing/rates/fx/:pair/settings`
+  (owner only, a fresh sign-in, 0 to 5 and below the 3% guard); the
+  `settings_change` history row keeps every changed setting as
+  `settings_diff = [{field, before, after}]` (the adjustment and the bounds
+  included — values live in the private log, never in `audit_log`), and the
+  history sheet shows each one old → new.
 - **The owner's acts**: a change of mode (keep-as-manual included), interval,
   threshold or bounds, and «تأكيد السعر الحالي», need a sign-in from the last
   10 minutes. On USD/IQD, the owner's acts of the last 24 hours — the act

@@ -84,7 +84,7 @@ export interface PairSet {
   official_rate?: string | null;
   source_usd_per_eur?: string | null;
   source_cny_per_eur?: string | null;
-  adjustment?: string;
+  market_adjustment_iqd?: string;
   manual_rate?: string | null;
   effective_rate?: string | null;
   effective_version?: number;
@@ -131,7 +131,15 @@ export interface FxLogDraft {
   published_at: string | null;
   result: string;
   error_code: string | null;
+  /** USD/IQD: the adjustment in force for this row (owner decision 5); null on the ECB pairs. */
+  market_adjustment_iqd: string | null;
+  /** settings_change rows only: `[{field, before, after}]` as JSON text (owner decision 10). */
+  settings_diff: string | null;
 }
+
+/** USD/IQD's adjustment in force on `row` — what a log row of it records; null for an ECB pair. */
+export const adjustmentOf = (row: Pick<FxPairRow, 'pair' | 'market_adjustment_iqd'>): string | null =>
+  row.pair === 'USD_IQD' ? row.market_adjustment_iqd : null;
 
 /** Why the owner's bell rings — never a figure. */
 export interface FxAttention {
@@ -174,8 +182,8 @@ const providerOf = (p: FxPairId): 'iqwealth' | 'ecb' => (p === 'USD_IQD' ? 'iqwe
 const triggerKindOf = (t: FxTrigger): FxTriggerKind => t;
 
 /** The candidate a quote gives this pair. */
-export function candidateOf(row: Pick<FxPairRow, 'pair' | 'adjustment'>, market: string): string {
-  return row.pair === 'USD_IQD' ? usdIqdCandidate(market, row.adjustment) : market;
+export function candidateOf(row: Pick<FxPairRow, 'pair' | 'market_adjustment_iqd'>, market: string): string {
+  return row.pair === 'USD_IQD' ? usdIqdCandidate(market, row.market_adjustment_iqd) : market;
 }
 
 /** Re-ring the bell for a candidate still waiting, at most every 24 hours (critique M4.4). */
@@ -197,6 +205,8 @@ function log(row: FxPairRow, trigger: FxTrigger, partial: Partial<FxLogDraft> & 
     change_ppm: null,
     published_at: null,
     error_code: null,
+    market_adjustment_iqd: adjustmentOf(row),
+    settings_diff: null,
     ...partial,
   };
 }
