@@ -11,8 +11,9 @@
  *
  * A settings change lists every setting it changed, old → new (owner decision
  * 10: «تغيّرت الإعدادات» alone said nothing), each under the name the safety
- * settings already use; a USD/IQD row that moved or held a rate says which
- * adjustment was in force (owner decision 5).
+ * settings already use; a USD/IQD row where the market moved or held a rate
+ * says which adjustment was in force (owner decision 5) — a manual rate never
+ * does, it has none.
  */
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, X } from 'lucide-react';
@@ -28,8 +29,12 @@ import { adjustmentFigure, fxCount, fxFigure } from './format';
 
 const PAGE = 30;
 
-/** The events whose USD/IQD row shows the adjustment in force (a rate moved or was held). */
-const RATE_EVENTS = new Set(['apply', 'review_held', 'review_approved', 'manual_set']);
+/**
+ * The events whose USD/IQD row shows the adjustment in force: the market moved
+ * a rate or one was held. Never a manual rate — it is final and the adjustment
+ * is not in it (the server records none on its rows either; FX-1A review #4).
+ */
+export const RATE_EVENTS: ReadonlySet<string> = new Set(['apply', 'review_held', 'review_approved']);
 
 /**
  * One line of a settings change, in words: the setting's own label and its

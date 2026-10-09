@@ -83,9 +83,13 @@ test('the owner\'s door: an adjustment that would make the rate implausible is 4
   assert.equal(res.status, 400);
   assert.equal((await json(res)).code, 'FX_RATE_OUT_OF_BOUNDS');
   assert.equal(pairOf(none.raw, 'USD_IQD').market_adjustment_iqd, '0', 'nothing stored');
-  // −20 (what was meant) is accepted.
+  // −20 (what was meant) is a valid value: on this stale session it asks for a fresh sign-in (an
+  // adjustment always does), and a fresh one stores it.
   res = await put(none.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(none.raw), market_adjustment_iqd: '-20' });
+  assert.equal((await json(res)).code, 'REAUTH_REQUIRED');
+  res = await put(world({ raw: none.raw }).app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(none.raw), market_adjustment_iqd: '-20' });
   assert.equal(res.status, 200);
+  assert.equal(pairOf(none.raw, 'USD_IQD').market_adjustment_iqd, '-20');
 
   // A first value pending (the cron held 1,660): −2000 is a 400, not an unhandled RangeError.
   const pend = world({ sessionAgeSeconds: STALE });
@@ -160,13 +164,17 @@ test('decideSafely: a decision that throws is recorded INVALID / FX_DECIDE_FAILE
 
 // ------------------------------------------------------------- security #2
 
-test('an adjustment never re-bases the drift guard: two saves (+0.0001, back to 0) on a stale session leave the anchor at the owner\'s confirmation, and a DRIFT hold stays a hold', async () => {
+test('an adjustment never re-bases the drift guard: a stale session cannot save one at all, and two saves (+0.0001, back to 0) leave the anchor at the owner\'s confirmation, and a DRIFT hold stays a hold', async () => {
   const raw = freshDb();
   raw.exec(OWNER_ROW_SQL);
   applyRate(raw, 'USD_IQD', '1660');
   raw.prepare(`UPDATE fx_rate_pairs SET effective_rate='1750', effective_version=effective_version+1, effective_source='provider',
                  last_known_good_rate='1750', market_rate='1750' WHERE pair='USD_IQD'`).run();
-  const { app } = world({ raw, sessionAgeSeconds: STALE });
+  const stale = world({ raw, sessionAgeSeconds: STALE });
+  const refused = await put(stale.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(raw), market_adjustment_iqd: '0.0001' });
+  assert.equal((await json(refused)).code, 'REAUTH_REQUIRED', 'an adjustment always asks for a fresh sign-in');
+  // Even with one, an adjustment is not «تأكيد السعر الحالي».
+  const { app } = world({ raw });
   const anchorAt = pairOf(raw, 'USD_IQD').drift_anchor_at;
   assert.equal((await put(app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(raw), market_adjustment_iqd: '0.0001' })).status, 200);
   let row = pairOf(raw, 'USD_IQD');

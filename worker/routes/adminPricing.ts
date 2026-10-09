@@ -248,7 +248,11 @@ adminPricingRoutes.put('/rates/fx/:pair/settings', async (c) => {
   const planned = planSettings(pairRow(rows, pair), body, { actor: c.get('user')!.id, now });
   if (!planned) return ratesAnswer(c);
   // §7.8: a guard setting, the mode or the interval weaken or move the guard without moving a price — always a fresh sign-in.
-  if (planned.guard) requireFreshSession(c);
+  // THE ADJUSTMENT TOO, always (owner decision 5; WP-FX1A role table): it moves the effective USD
+  // rate, and with it the public displayUsdRate, by a fixed number of dinars with no market guard
+  // in between — on a stale session, up to 15% a day. Asked here, not through GUARD_FIELDS: it is
+  // not a guard setting, so it rings no guard-change notice.
+  if (planned.guard || planned.fields.includes('market_adjustment_iqd')) requireFreshSession(c);
   await priceMovingGate(c, planned.move !== null);
   await largeChangeGate(c, pair, planned.move, planned.confirm, now);
   // Back to automatic fetches at once: it charges the refresh buckets like «تحديث الآن» (critique F4).

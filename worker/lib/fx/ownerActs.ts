@@ -21,7 +21,8 @@
  *                  (critique M4.3); refused 409 FX_REVIEW_STALE when the
  *                  candidate was observed more than 24 h (USD) / 72 h (ECB) ago
  *   reject         the candidate is remembered for 24 hours (M4.2)
- *   keep manual    mode MANUAL at the current effective rate
+ *   keep manual    mode MANUAL at the current effective rate; its mode_change
+ *                  row says old → new like a settings mode change
  *   confirm        «تأكيد السعر الحالي»: the anchor = the effective rate
  *   settings       thresholds, dead band, bounds, mode, interval; the
  *                  settings_change row keeps every changed field as
@@ -258,7 +259,8 @@ export function planManualSet(row: FxPairRow, raw: unknown, ctx: ActContext): Pl
     ...act(
       row,
       set,
-      [ownerLog(row, { event: 'manual_set', result: 'APPLIED', effective_after: v, change_ppm: row.effective_rate && changed ? changePpm(row.effective_rate, v) : null })],
+      // A manual rate is final: its row carries no adjustment (FX-1A review #4).
+      [ownerLog(row, { event: 'manual_set', result: 'APPLIED', effective_after: v, change_ppm: row.effective_rate && changed ? changePpm(row.effective_rate, v) : null, market_adjustment_iqd: null })],
       { action: 'fx.manual.set', target: row.pair, detail: { pair: row.pair } },
       { move: { before: row.effective_rate, after: v } }
     ),
@@ -316,7 +318,16 @@ export function planReview(row: FxPairRow, raw: unknown, ctx: ActContext): Plann
       ...act(
         row,
         { mode: 'MANUAL', manual_rate: a, ...anchorTo(a, ctx), ...PENDING_CLEARED },
-        [ownerLog(row, { event: 'mode_change', result: 'MANUAL', pending_rate: pending })],
+        // Old → new like every mode change (owner decision 10; FX-1A review #3); the rate is manual from here, so no adjustment.
+        [
+          ownerLog(row, {
+            event: 'mode_change',
+            result: 'MANUAL',
+            pending_rate: pending,
+            market_adjustment_iqd: null,
+            settings_diff: JSON.stringify([{ field: 'mode', before: row.mode, after: 'MANUAL' } satisfies SettingsDiffEntry]),
+          }),
+        ],
         { action: 'fx.review.keep_manual', target: row.pair, detail: { pair: row.pair } },
         { guard: true, attention: [{ pair: row.pair, kind: 'guard_change', key: `fx:${row.pair}:guard:${iso(ctx.now)}` }] }
       ),
@@ -545,7 +556,8 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
         result: 'APPLIED',
         effective_after: effective,
         change_ppm: row.effective_rate && effective && !sameRate(row.effective_rate, effective) ? changePpm(row.effective_rate, effective) : null,
-        market_adjustment_iqd: usd ? adjustmentAfter : null,
+        // The adjustment the rate in force carries: none on a manual rate, before or after this act (FX-1A review #4).
+        market_adjustment_iqd: usd && row.mode === 'AUTO' && mode === 'AUTO' ? adjustmentAfter : null,
         settings_diff: diff(),
       })
     );
@@ -557,7 +569,8 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
         event: 'mode_change',
         result: mode,
         effective_after: effective,
-        market_adjustment_iqd: usd ? adjustmentAfter : null,
+        // Either side of a mode change is a manual rate: no adjustment in it.
+        market_adjustment_iqd: null,
         settings_diff: settingsRow ? null : diff('mode'),
       })
     );

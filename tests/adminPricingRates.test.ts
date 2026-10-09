@@ -233,7 +233,7 @@ test('MANUAL↔AUTO toggling stops fetching after the 40th call of the day (F4):
   }
 });
 
-test('fresh sign-in: threshold, drift, dead band, bounds, mode or interval change without one → 401 REAUTH_REQUIRED; the adjustment alone does not need it', async () => {
+test('fresh sign-in: threshold, drift, dead band, bounds, mode, interval or adjustment change without one → 401 REAUTH_REQUIRED', async () => {
   const stale = world({ sessionAgeSeconds: STALE });
   applyRate(stale.raw, 'USD_IQD', '1660');
   for (const body of [
@@ -244,14 +244,16 @@ test('fresh sign-in: threshold, drift, dead band, bounds, mode or interval chang
     { bound_max: '3500' },
     { mode: 'MANUAL' },
     { interval_hours: 12 },
+    // The adjustment moves the effective (and public) USD rate: a fresh sign-in too (WP-FX1A role table).
+    { market_adjustment_iqd: '20' },
   ]) {
     const res = await put(stale.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(stale.raw), ...body });
     assert.equal(res.status, 401, JSON.stringify(body));
     assert.equal((await json(res)).code, 'REAUTH_REQUIRED');
   }
   assert.equal(pairOf(stale.raw, 'USD_IQD').anomaly_threshold_pct, '3', 'nothing changed');
-  const adj = await put(stale.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(stale.raw), market_adjustment_iqd: '20' });
-  assert.equal(adj.status, 200);
+  assert.equal(pairOf(stale.raw, 'USD_IQD').market_adjustment_iqd, '0', 'nothing changed');
+  assert.equal(pairOf(stale.raw, 'USD_IQD').effective_rate, '1660', 'nothing changed');
   const fresh = world({ sessionAgeSeconds: FRESH });
   const ok = await put(fresh.app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(fresh.raw), anomaly_threshold_pct: '4', drift_threshold_pct: '8' });
   assert.equal(ok.status, 200);

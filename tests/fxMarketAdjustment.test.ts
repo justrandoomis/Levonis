@@ -8,8 +8,12 @@
  *                public display rate all read 1,680
  *   change       +20 → +60 moves the effective rate 1,680 → 1,720 and the
  *                drift anchor with it, keeping the anchor's time
- *   history      every log row says which adjustment was in force: USD/IQD
- *                carries it, the ECB pairs carry NULL
+ *   history      every log row says which adjustment its rate carries:
+ *                USD/IQD's own — the raw rows of a provider-budget deferral,
+ *                a refused commit and a superseded fetch included — the ECB
+ *                pairs NULL, and a manual rate NULL (it is final; the
+ *                adjustment is not in it), «أبقِ سعري الحالي يدويًا» with its
+ *                old → new
  *   input        «0.5%», an exponent or five decimals → 400
  *                PRICING_INPUT_INVALID naming market_adjustment_iqd; the old
  *                body key → 400 UNKNOWN_FIELD; a refusal writes nothing
@@ -24,12 +28,14 @@ import type { DatabaseSync } from 'node:sqlite';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { OWNER, asD1, count, freshDb, get, json, post, put, stubApp } from './fixtures/app';
-import { OWNER_ROW_SQL, applyRate, derivedOf, fxEnv, logsOf, market, pairOf } from './fixtures/fx';
+import { OWNER_ROW_SQL, applyRate, derivedOf, fxEnv, logsOf, market, ownerCommit, pairOf } from './fixtures/fx';
 import { adminPricingRoutes } from '../worker/routes/adminPricing';
 import { miscRoutes } from '../worker/routes/misc';
 import { runFxScheduler } from '../worker/lib/fx/scheduler';
+import { planManualSet, planSettings } from '../worker/lib/fx/ownerActs';
 import { LanguageProvider } from '../src/LanguageContext';
 import FxPairCard from '../src/components/adminPricing/FxPairCard';
+import { RATE_EVENTS } from '../src/components/adminPricing/FxHistorySheet';
 import { FX_STRINGS } from '../src/components/adminPricing/fxStrings';
 import type { FxPairDto, FxRatesAnswer } from '../src/components/adminPricing/api';
 
@@ -114,7 +120,7 @@ test('+20 → +60: the effective rate moves 1,680 → 1,720, the anchor moves wi
   assert.equal(p.formula_holds, true, '1,660 + 60 = 1,720');
 });
 
-test('every log row says which adjustment was in force: USD/IQD carries it, EUR/USD and CNY/USD carry NULL — on applies, holds, failures and budget deferrals', async () => {
+test('every log row says which adjustment was in force: USD/IQD carries it, EUR/USD and CNY/USD carry NULL — on holds and failures', async () => {
   const raw = freshDb();
   raw.exec(OWNER_ROW_SQL);
   raw.exec("UPDATE fx_rate_pairs SET market_adjustment_iqd = '-12.5' WHERE pair = 'USD_IQD'");
@@ -132,6 +138,104 @@ test('every log row says which adjustment was in force: USD/IQD carries it, EUR/
   const ecb = [...logsOf(raw, 'EUR_USD'), ...logsOf(raw, 'CNY_USD')];
   assert.ok(ecb.length >= 2);
   assert.ok(ecb.every((l) => l.market_adjustment_iqd === null), 'every ECB row is NULL');
+});
+
+test('the raw rows carry it too: a provider-budget deferral, a refused commit and a superseded fetch each record the adjustment in force — and none on a manual rate', async () => {
+  const T = new Date('2026-10-08T06:00:00.000Z');
+  const approved = () => {
+    const raw = freshDb();
+    raw.exec(OWNER_ROW_SQL);
+    raw.exec("UPDATE fx_rate_pairs SET market_adjustment_iqd = '20' WHERE pair = 'USD_IQD'");
+    applyRate(raw, 'USD_IQD', '1680');
+    return raw;
+  };
+  const last = (raw: DatabaseSync) => logsOf(raw, 'USD_IQD').at(-1)!;
+
+  // The provider's day cap: the claim is refused and a raw 'deferred' row is written (scheduler claimLease).
+  const budget = approved();
+  budget.exec("UPDATE fx_rate_pairs SET provider_calls_day = '2026-10-08', provider_calls_count = 149 WHERE pair = 'USD_IQD'");
+  const m1 = market({ sell: 1690 });
+  m1.state.at = T;
+  await runFxScheduler(fxEnv(budget), { now: new Date(T.getTime() + 60_000), scheduledTime: T }, { trigger: 'cron', fetchImpl: m1.f.fetch });
+  assert.deepEqual([last(budget).error_code, last(budget).market_adjustment_iqd], ['PROVIDER_BUDGET', '20'], 'a provider-budget deferral');
+  // The same refusal on a MANUAL pair (a refresh): the rate in force is manual, so no adjustment.
+  budget.exec("UPDATE fx_rate_pairs SET mode = 'MANUAL', manual_rate = effective_rate WHERE pair = 'USD_IQD'");
+  await runFxScheduler(fxEnv(budget), { now: new Date(T.getTime() + 120_000) }, { trigger: 'refresh', pairs: ['USD_IQD'], fetchImpl: m1.f.fetch });
+  assert.deepEqual([last(budget).error_code, last(budget).market_adjustment_iqd], ['PROVIDER_BUDGET', null], 'a provider-budget deferral on a manual rate');
+
+  // A commit a trigger refuses twice: the raw 'commit_refused' row (scheduler recordRefused).
+  const refused = approved();
+  refused.exec("CREATE TRIGGER test_rate_guard BEFORE UPDATE OF rate_iqd ON pricing_fx_rates WHEN NEW.currency = 'USD' BEGIN SELECT RAISE(ABORT, 'ROLLBACK_GUARD'); END;");
+  const m2 = market({ sell: 1690 });
+  m2.state.at = T;
+  await runFxScheduler(fxEnv(refused), { now: new Date(T.getTime() + 60_000), scheduledTime: T }, { trigger: 'cron', fetchImpl: m2.f.fetch });
+  assert.deepEqual([last(refused).event, last(refused).market_adjustment_iqd], ['commit_refused', '20'], 'a refused commit');
+
+  // The owner writes the pair while it is fetched: the raw 'superseded' row (scheduler recordSuperseded)
+  // carries the adjustment in force AFTER the owner's write — +30 — and none when that write made it manual.
+  for (const [write, want] of [
+    [(now: Date) => (rows: Parameters<Parameters<typeof ownerCommit>[1]>[0]) => planSettings(rows[0]!, { owner_version: rows[0]!.owner_version, market_adjustment_iqd: '30' }, { actor: 'usr_owner', now })!, '30'],
+    [(now: Date) => (rows: Parameters<Parameters<typeof ownerCommit>[1]>[0]) => planManualSet(rows[0]!, { owner_version: rows[0]!.owner_version, rate: '1700' }, { actor: 'usr_owner', now }), null],
+  ] as const) {
+    const raw = approved();
+    const m = market({ sell: 1690 });
+    m.state.at = T;
+    let raced = false;
+    const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (!raced) {
+        raced = true;
+        await ownerCommit(raw, write(T), T);
+      }
+      return m.f.fetch(input, init);
+    }) as typeof fetch;
+    const report = await runFxScheduler(fxEnv(raw), { now: new Date(T.getTime() + 60_000) }, { trigger: 'refresh', pairs: ['USD_IQD'], fetchImpl });
+    assert.equal(report.checked[0]!.result, 'SUPERSEDED');
+    assert.deepEqual([last(raw).event, last(raw).market_adjustment_iqd], ['superseded', want], `a superseded fetch (${want ?? 'manual'})`);
+  }
+});
+
+test('a manual rate carries no adjustment: «أبقِ سعري الحالي يدويًا» (with its old → new), a refresh while manual, a settings change while manual and a manual set all record NULL; the history sheet never shows an adjustment under a manual rate', async () => {
+  const { raw, app } = world();
+  raw.exec("UPDATE fx_rate_pairs SET market_adjustment_iqd = '20' WHERE pair = 'USD_IQD'");
+  applyRate(raw, 'USD_IQD', '1680');
+  raw.exec("UPDATE fx_rate_pairs SET market_rate = '1660' WHERE pair = 'USD_IQD'");
+  // 1,720 + 20 = 1,740: +3.6% on 1,680, held for review.
+  await refreshNow(raw, 1720);
+  assert.equal(pairOf(raw, 'USD_IQD').pending_reason, 'ANOMALY');
+  assert.equal(logsOf(raw, 'USD_IQD').at(-1)!.market_adjustment_iqd, '20', 'a held market rate carries the adjustment');
+
+  // «أبقِ سعري الحالي يدويًا» from the review sheet: a mode change, said old → new like PUT /settings says it.
+  const kept = await post(app, `${BASE}/rates/fx/USD_IQD/review`, { owner_version: ownerVersion(raw), decision: 'keep_manual' });
+  assert.equal(kept.status, 200);
+  let row = logsOf(raw, 'USD_IQD').at(-1)!;
+  assert.equal(row.event, 'mode_change');
+  assert.deepEqual(JSON.parse(String(row.settings_diff)), [{ field: 'mode', before: 'AUTO', after: 'MANUAL' }], 'keep-as-manual says old → new');
+  assert.equal(row.market_adjustment_iqd, null, 'the rate is manual from here');
+  const history = await json(await get(app, `${BASE}/rates/history?pair=USD_IQD`));
+  const item = history.items.find((i: { id: string }) => i.id === row.id);
+  assert.deepEqual(item.settings_diff, [{ field: 'mode', before: 'AUTO', after: 'MANUAL' }], 'the history sheet gets the diff');
+
+  // A refresh while manual only observes; the candidate it saw includes the adjustment, the manual rate does not.
+  await refreshNow(raw, 1700);
+  row = logsOf(raw, 'USD_IQD').at(-1)!;
+  assert.deepEqual([row.event, row.pending_rate, row.market_adjustment_iqd], ['observed', '1720', null]);
+
+  // The adjustment changed while manual: the diff keeps it, the rate (still the manual 1,680) carries none.
+  assert.equal((await put(app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(raw), market_adjustment_iqd: '30' })).status, 200);
+  row = logsOf(raw, 'USD_IQD').at(-1)!;
+  assert.equal(row.event, 'settings_change');
+  assert.equal(row.effective_after, '1680', 'a manual rate is final');
+  assert.deepEqual(JSON.parse(String(row.settings_diff)), [{ field: 'market_adjustment_iqd', before: '20', after: '30' }]);
+  assert.equal(row.market_adjustment_iqd, null);
+
+  // A manual set.
+  assert.equal((await put(app, `${BASE}/rates/fx/USD_IQD/manual`, { owner_version: ownerVersion(raw), rate: '1700' })).status, 200);
+  row = logsOf(raw, 'USD_IQD').at(-1)!;
+  assert.deepEqual([row.event, row.effective_after, row.market_adjustment_iqd], ['manual_set', '1700', null]);
+
+  // The history sheet shows «الزيادة» only where the market moved or held a rate.
+  assert.equal(RATE_EVENTS.has('manual_set'), false);
+  assert.deepEqual([...RATE_EVENTS].sort(), ['apply', 'review_approved', 'review_held']);
 });
 
 test('the door takes dinars only: «0.5%», an exponent, five decimals → 400 PRICING_INPUT_INVALID {field: market_adjustment_iqd}; the old key → 400 UNKNOWN_FIELD; a refusal writes nothing', async () => {

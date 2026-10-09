@@ -140,9 +140,10 @@ CREATE TABLE IF NOT EXISTS fx_rate_log (
   repriced_products INTEGER CHECK (repriced_products IS NULL OR repriced_products >= 0),   -- FX-5
   actor_id          TEXT,
   created_at        TEXT NOT NULL,
-  -- USD/IQD: the owner's fixed adjustment in force for this row (owner decision 5), so the history
+  -- USD/IQD: the owner's fixed adjustment this row's rate carries (owner decision 5), so the history
   -- says which adjustment a rate carried and the 24-hour guard can measure the MARKET's move
-  -- across an adjustment change. NULL on the ECB pairs.
+  -- across an adjustment change. NULL on the ECB pairs, and NULL on a manual rate (final; the
+  -- adjustment is never added to it).
   market_adjustment_iqd TEXT CHECK (market_adjustment_iqd IS NULL OR (ltrim(market_adjustment_iqd,'+-') GLOB '[0-9]*' AND ltrim(market_adjustment_iqd,'+-') NOT GLOB '*[^0-9.]*' AND ltrim(market_adjustment_iqd,'+-') NOT GLOB '*.*.*' AND ltrim(market_adjustment_iqd,'+-') NOT GLOB '*.' AND length(market_adjustment_iqd) - length(ltrim(market_adjustment_iqd,'+-')) <= 1 AND length(market_adjustment_iqd) <= 16)),
   -- settings_change rows: [{field, before, after}] of every setting the act changed (owner decision
   -- 10: the history shows old → new). Values live here, never in audit_log.

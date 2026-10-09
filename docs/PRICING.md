@@ -50,7 +50,9 @@ throughout, never a float.
   signed (a negative number lowers the rate), added to the market sell, and
   never added to a manual rate (a manual rate is final). Every row of the
   private history (`fx_rate_log.market_adjustment_iqd`) records the
-  adjustment in force for USD/IQD (NULL on the ECB pairs). The body key is
+  adjustment its USD/IQD rate carries — NULL on the ECB pairs, and NULL on a
+  manual rate, which carries none (so the history never shows an adjustment
+  under it and the 24-hour guard never re-bases it). The body key is
   `market_adjustment_iqd`; the retired `adjustment_iqd_per_usd` is refused
   (400 `UNKNOWN_FIELD`) and stays in FINANCIAL_FIELDS. «0.5%», an exponent or
   more than 4 decimals is 400 `PRICING_INPUT_INVALID` naming the field.
@@ -99,8 +101,12 @@ throughout, never a float.
   included — values live in the private log, never in `audit_log`), and the
   history sheet shows each one old → new.
 - **The owner's acts**: a change of mode (keep-as-manual included), interval,
-  threshold or bounds, and «تأكيد السعر الحالي», need a sign-in from the last
-  10 minutes. On USD/IQD, the owner's acts of the last 24 hours — the act
+  threshold or bounds, a change of the adjustment, and «تأكيد السعر الحالي»,
+  need a sign-in from the last 10 minutes (a stale session: 401
+  `REAUTH_REQUIRED`, nothing written). The adjustment is not a guard setting
+  (it rings no guard-change notice), but it moves the effective USD/IQD — and
+  the public `displayUsdRate` — with no market guard in between, so a stale
+  session cannot use it. On USD/IQD, the owner's acts of the last 24 hours — the act
   being made included — above 15% need the explicit confirmation and that
   fresh sign-in too. An adjustment that would make the rate implausible is
   refused (400 `FX_RATE_OUT_OF_BOUNDS`).

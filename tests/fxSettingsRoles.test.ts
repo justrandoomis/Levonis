@@ -7,10 +7,12 @@
  * (decision 5) and `PUT … {owner_version, min_change_pct: '0.8'}` (decision
  * 10, a guard setting).
  *
- *   verified owner      200 — the band needs a fresh sign-in (401
- *                       REAUTH_REQUIRED on a stale session); the adjustment
- *                       alone does not, as before (FX-1 moves no price; once a
- *                       product is engine-priced it does, §7.8)
+ *   verified owner      200 — both need a fresh sign-in: on a stale session
+ *                       each is 401 REAUTH_REQUIRED and writes nothing. The
+ *                       band is a guard setting (§7.8); the adjustment moves
+ *                       the effective USD rate and the public displayUsdRate
+ *                       with no market guard in between (the WP-FX1A role
+ *                       table; FX-1A review: security #1, correctness #2)
  *   unverified owner    403 OWNER_EMAIL_UNVERIFIED (canWriteCost)
  *   full admin, legacy NULL scope, assistant, the 'assisstant' typo
  *                       403 COST_ACCESS_DENIED
@@ -99,14 +101,20 @@ test('verified owner: both writes answer 200 and land — the adjustment as fixe
   assert.equal(count(raw, "SELECT COUNT(*) n FROM audit_log WHERE action = 'fx.settings.update'"), 2);
 });
 
-test('verified owner on a stale session: the band (a guard setting) → 401 REAUTH_REQUIRED and nothing changes; the adjustment alone still lands', async () => {
+test('verified owner on a stale session: the band AND the adjustment → 401 REAUTH_REQUIRED; nothing changes, nothing is logged or audited, the public rate does not move', async () => {
   const { raw, app } = world(OWNER, STALE);
   const before = snapshot(raw);
   const [adj, band] = BODIES(raw);
-  const refused = await put(app, `${BASE}/rates/fx/USD_IQD/settings`, band);
-  assert.equal(refused.status, 401);
-  assert.equal((await json(refused)).code, 'REAUTH_REQUIRED');
-  assert.deepEqual(snapshot(raw), before, 'a refused band change writes nothing');
-  assert.equal((await put(app, `${BASE}/rates/fx/USD_IQD/settings`, adj)).status, 200);
-  assert.equal(pairOf(raw, 'USD_IQD').market_adjustment_iqd, '20');
+  for (const [body, what] of [
+    [band, 'the band'],
+    [adj, 'the adjustment'],
+  ] as const) {
+    const refused = await put(app, `${BASE}/rates/fx/USD_IQD/settings`, body);
+    assert.equal(refused.status, 401, what);
+    assert.equal(refused.headers.get('cache-control'), 'private, no-store');
+    assert.equal((await json(refused)).code, 'REAUTH_REQUIRED', what);
+    assert.deepEqual(snapshot(raw), before, `${what}: a refused change writes nothing`);
+  }
+  assert.equal(pairOf(raw, 'USD_IQD').effective_rate, '1660', 'the effective (and public) rate stays');
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM user_notifications WHERE kind = 'fx_attention'"), 0, 'no bell');
 });
