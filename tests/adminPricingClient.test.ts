@@ -102,10 +102,15 @@ test('it speaks to /api/admin/pricing alone — the preview’s three, the owner
     'put ${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/manual',
     'put ${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/settings',
     'put ${PRICING_API}/rates/shipping/${encodeURIComponent(profile)}',
+    // Owner decision 8: the stale list — its count, the previews (a read) and the one bulk save after them.
+    'get ${PRICING_API}/save-list',
+    'post ${PRICING_API}/save-list/preview',
+    'post ${PRICING_API}/products/save-bulk',
   ].sort());
-  // The one write that is not a rate is none: the product preview still writes nothing.
+  // The product preview still writes nothing: the writes are the rates' and the stale list's bulk save.
   for (const [, method, path] of api.matchAll(/api\.(put|patch|delete|post)<[^>]+>\(`([^`]+)`/g)) {
     if (method === 'post' && path!.endsWith('/what-if')) continue;
+    if (method === 'post' && (path === '${PRICING_API}/save-list/preview' || path === '${PRICING_API}/products/save-bulk')) continue;
     assert.match(path!, /^\$\{PRICING_API\}\/rates\//, `a write outside the rates routes: ${method} ${path}`);
   }
   for (const file of [...files, 'src/components/admin/OwnerRatesCard.tsx']) {

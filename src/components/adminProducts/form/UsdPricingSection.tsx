@@ -32,8 +32,16 @@
  * when «نشر» / «مسودة» is pressed (the product document never carries a private
  * value), or alone with «حفظ التسعير بالدولار». Every figure on screen is the
  * server's (E1 at the central rates, `POST …/preview` while typing); the screen
- * formats and never computes money. Saving writes the pricing DATA only: the
- * store price stays as it is until the engine adopts the product (next stage).
+ * formats and never computes money.
+ *
+ * THE SAVE THAT WRITES PRICES SHOWS THEM FIRST (owner decision 8). While the
+ * product stays incomplete a save stores the pricing data only and the store
+ * price stays manual. The save that leaves it complete — or any save of an
+ * engine-priced product — is held by the server (409 with the preview); the
+ * sheet (`UsdPricingSaveSheet`) shows the new prices, and «حفظ» sends the same
+ * body with the preview's hash (and the tick above 15%), which adopts the
+ * engine and writes the prices in that one batch. A product save that changed
+ * nothing here but completed the product opens the same sheet.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Check, Loader2, Save } from 'lucide-react';
@@ -43,8 +51,10 @@ import { contractRefusal, refusalLang } from '../../../lib/refusalStrings';
 import type { ProductDimensionsV2 } from '../../../lib/productTypes';
 import PricingSummaryBar from '../../adminOperations/PricingSummaryBar';
 import { PricingRowsTable } from '../../adminOperations/ProcurementPricingReview';
-import type { PricingPreviewRow, PricingSummary } from '../../adminOperations/procurementPricing';
-import { procurementPricingStrings, profileName } from '../../adminOperations/procurementPricingStrings';
+import type { EngineAdoption, PricingPreviewRow, PricingSummary } from '../../adminOperations/procurementPricing';
+import { issueText, procurementPricingStrings, profileName } from '../../adminOperations/procurementPricingStrings';
+import EngineSaveSheet from '../../adminOperations/EngineSaveSheet';
+import { engineSaveStrings } from '../../adminOperations/engineSaveStrings';
 import { money } from '../../adminOperations/shared';
 import { MeasurementInput, formatScaledInteger } from './DimensionsSection';
 import { Banner, Field, Grid, Money, Select, TextInput, btnGhost, btnPrimary } from './formUi';
@@ -101,13 +111,17 @@ export interface UsdPricingAnswer {
   product_id: string;
   mode: 'manual' | 'engine';
   inputs_seq: number;
+  /** The price writes' counter (an engine product's way back to manual is fenced on it). */
+  write_seq?: number;
   rates: { usd_iqd_rate: string | null; review_pending: boolean; derived_stale: boolean };
   scopes: ScopeAnswer[];
   models: ModelAnswer[];
   /** Owner decision 8's six figures per model × channel. */
   rows: PricingPreviewRow[];
-  /** What a save converting typed dinars carries (the rate this answer was computed at). */
+  /** What the save carries: the engine write's hash when it writes prices, else the dinar conversion's. */
   preview_hash: string;
+  /** What saving these drafts does to the product's prices (owner decision 8): adopt, reprice or data only. */
+  adoption?: EngineAdoption | null;
 }
 
 // ------------------------------------------------------------------ the form's measures
@@ -339,6 +353,28 @@ export interface PricingSnapshot {
   invalid: boolean;
 }
 
+/**
+ * A save the server held for the owner's look at the new prices (owner decision
+ * 8: 409 PRICING_PREVIEW_REQUIRED / _STALE / PRICING_LARGE_CHANGE_CONFIRM carry
+ * the preview). The same body goes again with the preview's hash on «حفظ».
+ */
+export interface PricingReview {
+  pid: string;
+  body: { inputs_seq: number; inputs: unknown[]; rules: unknown[] };
+  hash: string;
+  adoption: EngineAdoption;
+  error: string;
+}
+
+const REVIEW_CODES = new Set(['PRICING_PREVIEW_REQUIRED', 'PRICING_PREVIEW_STALE', 'PRICING_LARGE_CHANGE_CONFIRM']);
+
+/** The preview a held save carries, when it writes prices (else null: the refusal stands). */
+export function heldPreview(e: unknown): UsdPricingAnswer | null {
+  if (!(e instanceof ApiError) || !REVIEW_CODES.has(e.code ?? '')) return null;
+  const shown = (e.details as { preview?: UsdPricingAnswer } | undefined)?.preview;
+  return shown && shown.adoption?.kind && typeof shown.preview_hash === 'string' && shown.preview_hash ? shown : null;
+}
+
 export interface UsdPricingState {
   enabled: boolean;
   productId: string | null;
@@ -367,11 +403,29 @@ export interface UsdPricingState {
   snapshot: () => PricingSnapshot | null;
   /** After the product's save: the snapshot through the pricing door for the saved id. */
   saveAfterProduct: (productId: string, snap: PricingSnapshot) => Promise<{ ok: boolean; message: string }>;
+  /** After a product save with no pricing drafts: the fresh answer, and the preview when that save completed the product. */
+  afterProductSaved: (productId: string) => Promise<void>;
+  /** The held save awaiting the owner's look at the new prices (the sheet). */
+  review: PricingReview | null;
+  reviewBusy: boolean;
+  confirmReview: (confirmLarge: boolean) => Promise<void>;
+  cancelReview: () => void;
+  /** «رجوع إلى التسعير اليدوي»: the prices stay exactly as they are and are edited by hand again. */
+  exitEngine: () => Promise<void>;
 }
 
-export function useUsdPricingState({ productId, enabled, form }: { productId: string | null; enabled: boolean; form: UsdPricingFormContext }): UsdPricingState {
+export function useUsdPricingState({ productId, enabled, form, onPricesWritten }: {
+  productId: string | null;
+  enabled: boolean;
+  form: UsdPricingFormContext;
+  /** The engine wrote the product's prices: the form reads the product again (its prices and the lock). */
+  onPricesWritten?: (productId: string) => void;
+}): UsdPricingState {
   const { lang } = useLanguage();
   const s = usdPricingFormStrings(lang);
+  const es = engineSaveStrings(lang);
+  const [review, setReview] = useState<PricingReview | null>(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
   const [stored, setStored] = useState<UsdPricingAnswer | null>(null);
   const [preview, setPreview] = useState<{ wire: string; answer: UsdPricingAnswer } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, ScopeDraft>>({});
@@ -455,8 +509,11 @@ export function useUsdPricingState({ productId, enabled, form }: { productId: st
   }, [live, productId, wire, previewTick, message]);
 
   const shown = wire ? (preview?.answer ?? answer) : answer;
-  /** The hash of the preview that showed exactly these drafts (a dinar conversion needs it). */
-  const hashFor = useCallback((w: string) => (preview && preview.wire === w ? preview.answer.preview_hash : null), [preview]);
+  /**
+   * The hash of the preview that showed exactly these drafts (a dinar conversion needs it). A save that writes
+   * prices never rides on the live preview: it goes without a hash, and the server answers with the sheet.
+   */
+  const hashFor = useCallback((w: string) => (preview && preview.wire === w && !preview.answer.adoption?.kind ? preview.answer.preview_hash : null), [preview]);
 
   const setDraft = useCallback((scope: 'base' | 'option', id: string, patch: ScopeDraft) => {
     setNotice('');
@@ -472,13 +529,22 @@ export function useUsdPricingState({ productId, enabled, form }: { productId: st
   const putDrafts = useCallback(async (pid: string, snap: Record<string, ScopeDraft>, hash: string | null, base: UsdPricingAnswer | null) => {
     const current = base ?? (await api.get<UsdPricingAnswer>(`${PRICING}/products/${encodeURIComponent(pid)}/inputs`, { mascot: 'silent' }));
     const body = draftWire(snap, current);
-    if (!body.inputs.length && !body.rules.length) return { answer: current, sent: false };
-    const r = await api.put<UsdPricingAnswer>(
-      `${PRICING}/products/${encodeURIComponent(pid)}/inputs`,
-      { inputs_seq: current.inputs_seq, ...body, ...(hash && wireHasIqd(body) ? { preview_hash: hash } : {}) },
-      { mascot: 'silent' }
-    );
-    return { answer: r, sent: true };
+    if (!body.inputs.length && !body.rules.length) return { answer: current, sent: false, review: null };
+    const wire = { inputs_seq: current.inputs_seq, ...body };
+    try {
+      const r = await api.put<UsdPricingAnswer>(
+        `${PRICING}/products/${encodeURIComponent(pid)}/inputs`,
+        { ...wire, ...(hash && wireHasIqd(body) ? { preview_hash: hash } : {}) },
+        { mascot: 'silent' }
+      );
+      return { answer: r, sent: true, review: null };
+    } catch (e) {
+      // Owner decision 8: this save writes prices — the server holds it and answers with the preview.
+      const shown = heldPreview(e);
+      if (!shown) throw e;
+      const held: PricingReview = { pid, body: wire, hash: shown.preview_hash, adoption: shown.adoption!, error: '' };
+      return { answer: current, sent: false, review: held };
+    }
   }, []);
 
   /** Drafts for models the server does not know yet (unsaved) stay; the rest were saved. */
@@ -494,7 +560,9 @@ export function useUsdPricingState({ productId, enabled, form }: { productId: st
   const failed = useCallback(
     async (e: unknown, pid: string) => {
       const stale = e instanceof ApiError && (e.code === 'PRICING_PREVIEW_STALE' || (e.code === 'PRICING_INPUT_INVALID' && (e.details as { field?: string } | undefined)?.field === 'preview_hash'));
-      setError(stale ? `${message(e)} — ${s.reviewConversion}` : message(e));
+      // An engine product never loses its price: a save that would leave it incomplete is refused, naming what is missing.
+      const missing = e instanceof ApiError && e.code === 'PRICING_ENGINE_INCOMPLETE' ? ((e.details as { missing_codes?: string[] } | undefined)?.missing_codes ?? []) : [];
+      setError(stale ? `${message(e)} — ${s.reviewConversion}` : missing.length ? `${message(e)} — ${missing.map((c) => issueText(c, lang)).join(lang === 'en' ? '; ' : '؛ ')}` : message(e));
       if (stale) setPreviewTick((t) => t + 1);
       // Someone else saved first (a purchase applied, another tab): show the fresh values, keep the typed ones.
       if (e instanceof ApiError && e.code === 'PRICING_CHANGED') {
@@ -505,7 +573,7 @@ export function useUsdPricingState({ productId, enabled, form }: { productId: st
         }
       }
     },
-    [message, s.reviewConversion]
+    [message, s.reviewConversion, lang]
   );
 
   const saveRef = useRef(false);
@@ -515,7 +583,11 @@ export function useUsdPricingState({ productId, enabled, form }: { productId: st
     setSaving(true);
     setError('');
     try {
-      const { answer: r } = await putDrafts(productId, effective, hashFor(wire), stored);
+      const { answer: r, review: held } = await putDrafts(productId, effective, hashFor(wire), stored);
+      if (held) {
+        setReview(held);
+        return;
+      }
       setStored(r);
       setPreview(null);
       setDrafts((all) => keepUnsent(all, r));
@@ -545,7 +617,13 @@ export function useUsdPricingState({ productId, enabled, form }: { productId: st
       setSaving(true);
       setError('');
       try {
-        const { answer: r, sent } = await putDrafts(pid, snap.drafts, snap.hash, null);
+        const { answer: r, sent, review: held } = await putDrafts(pid, snap.drafts, snap.hash, null);
+        if (held) {
+          // The product is saved; its new prices wait for the owner's look (the sheet), the drafts stay.
+          setStored(r);
+          setReview(held);
+          return { ok: true, message: '' };
+        }
         setStored(r);
         setPreview(null);
         setDrafts((all) => keepUnsent(all, r));
@@ -562,6 +640,83 @@ export function useUsdPricingState({ productId, enabled, form }: { productId: st
     },
     [putDrafts, keepUnsent, failed, message, s, lang]
   );
+
+  /** A product save with no pricing drafts: when it completed the product (or its rates moved), the sheet. */
+  const afterProductSaved = useCallback(
+    async (pid: string) => {
+      try {
+        const r = await api.get<UsdPricingAnswer>(`${PRICING}/products/${encodeURIComponent(pid)}/inputs`, { mascot: 'silent' });
+        setStored(r);
+        setPreview(null);
+        if (r.adoption?.kind && r.adoption.needs_write && r.adoption.complete && r.preview_hash)
+          setReview({ pid, body: { inputs_seq: r.inputs_seq, inputs: [], rules: [] }, hash: r.preview_hash, adoption: r.adoption, error: '' });
+      } catch (e) {
+        if (!isAborted(e)) setError(message(e));
+      }
+    },
+    [message]
+  );
+
+  const reviewRef = useRef(false);
+  const confirmReview = useCallback(
+    async (confirmLarge: boolean) => {
+      const held = review;
+      if (!held || reviewRef.current) return;
+      reviewRef.current = true;
+      setReviewBusy(true);
+      try {
+        const r = await api.put<UsdPricingAnswer>(
+          `${PRICING}/products/${encodeURIComponent(held.pid)}/inputs`,
+          { ...held.body, preview_hash: held.hash, ...(confirmLarge ? { confirm_large_change: true } : {}) },
+          { mascot: 'silent' }
+        );
+        setReview(null);
+        setStored(r);
+        setPreview(null);
+        setError('');
+        setDrafts((all) => keepUnsent(all, r));
+        setNotice(held.adoption.kind === 'adopt' ? es.savedAdopted : es.savedRepriced);
+        onPricesWritten?.(held.pid);
+      } catch (e) {
+        const fresh = heldPreview(e);
+        if (fresh) {
+          // The data or a rate moved since the sheet opened: the fresh preview replaces it, with the reason.
+          setReview({ ...held, hash: fresh.preview_hash, adoption: fresh.adoption!, error: message(e) });
+        } else if (e instanceof ApiError && e.code === 'REAUTH_REQUIRED') {
+          setReview({ ...held, error: es.reauth });
+        } else {
+          setReview(null);
+          await failed(e, held.pid);
+        }
+      } finally {
+        reviewRef.current = false;
+        setReviewBusy(false);
+      }
+    },
+    [review, keepUnsent, es, onPricesWritten, message, failed]
+  );
+  const cancelReview = useCallback(() => {
+    // Nothing more is written: the typed values stay as drafts, the store price as it is.
+    setReview(null);
+    setTick((t) => t + 1);
+  }, []);
+
+  const exitEngine = useCallback(async () => {
+    if (!stored || stored.mode !== 'engine' || !productId || saveRef.current) return;
+    saveRef.current = true;
+    setSaving(true);
+    setError('');
+    try {
+      await api.post<{ success: boolean }>(`${PRICING}/products/${encodeURIComponent(productId)}/manual`, { write_seq: stored.write_seq ?? 0 }, { mascot: 'silent' });
+      setTick((t) => t + 1);
+      onPricesWritten?.(productId);
+    } catch (e) {
+      await failed(e, productId);
+    } finally {
+      saveRef.current = false;
+      setSaving(false);
+    }
+  }, [stored, productId, onPricesWritten, failed]);
 
   return {
     enabled,
@@ -585,6 +740,12 @@ export function useUsdPricingState({ productId, enabled, form }: { productId: st
     reload: () => setTick((t) => t + 1),
     snapshot,
     saveAfterProduct,
+    afterProductSaved,
+    review,
+    reviewBusy,
+    confirmReview,
+    cancelReview,
+    exitEngine,
   };
 }
 
@@ -804,6 +965,20 @@ function SaveRow() {
       )}
       {st.dirty && <button type="button" className={btnGhost} disabled={st.saving} onClick={st.discard}>{s.discard}</button>}
       <span className="text-[11px] text-zinc-500">{st.dirty ? `${s.unsaved} · ${s.saveHint}` : s.saveHint}</span>
+      {st.dirty && st.shown?.adoption?.kind && st.shown.adoption.complete && <span className="text-[11px] text-amber-300" data-engine-ready>{engineSaveStrings(lang).readyHint}</span>}
+      {st.productId && st.engine && !st.dirty && (
+        <button
+          type="button"
+          className={btnGhost}
+          disabled={st.saving}
+          onClick={() => {
+            if (window.confirm(engineSaveStrings(lang).exitConfirm)) void st.exitEngine();
+          }}
+          data-engine-exit
+        >
+          {engineSaveStrings(lang).exit}
+        </button>
+      )}
       {st.notice && <span role="status" className="text-[12px] text-emerald-400">{st.notice}</span>}
     </div>
   );
@@ -933,6 +1108,23 @@ export function UsdPricingOptionsFooter() {
       <Status />
       <SaveRow />
     </div>
+  );
+}
+
+/** The writer's preview sheet (owner decision 8), mounted once by the form: open while a save waits for the owner's look. */
+export function UsdPricingSaveSheet() {
+  const st = useUsdPricing();
+  if (!st || !st.review) return null;
+  const label = st.review.adoption.rows[0]?.name_ar ?? '';
+  return (
+    <EngineSaveSheet
+      key={st.review.hash}
+      products={[{ product_id: st.review.pid, label, adoption: st.review.adoption }]}
+      busy={st.reviewBusy}
+      error={st.review.error}
+      onConfirm={(confirmLarge) => void st.confirmReview(confirmLarge)}
+      onCancel={st.cancelReview}
+    />
   );
 }
 

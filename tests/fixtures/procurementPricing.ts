@@ -20,7 +20,7 @@ export const OWNER_USER: StubUser = { id: 'usr_owner', role: 'admin', email: 'bo
 export const AMS = 'lp_08';
 export const AMS_MODEL = 'lp_08_o0';
 
-export function pricingWorld(opts: { rates?: boolean; raw?: DatabaseSync; user?: StubUser | null } = {}) {
+export function pricingWorld(opts: { rates?: boolean; raw?: DatabaseSync; user?: StubUser | null; sessionAgeSeconds?: number } = {}) {
   const raw = opts.raw ?? freshDb();
   if (!opts.raw) {
     raw.exec(OWNER_ROW_SQL);
@@ -36,11 +36,16 @@ export function pricingWorld(opts: { rates?: boolean; raw?: DatabaseSync; user?:
               UPDATE pricing_shipping_rates SET rate_iqd = '400000', version = version + 1 WHERE profile = 'CHINA_SEA';`);
   }
   const user = opts.user === undefined ? OWNER_USER : opts.user;
-  const app = stubApp(asD1(raw), user, (a) => {
-    a.use('/api/admin/*', noStoreUnlessSet);
-    a.route('/api/admin/pricing', adminPricingRoutes);
-    a.route('/api/admin/procurement', adminProcurementRoutes);
-  });
+  const app = stubApp(
+    asD1(raw),
+    user,
+    (a) => {
+      a.use('/api/admin/*', noStoreUnlessSet);
+      a.route('/api/admin/pricing', adminPricingRoutes);
+      a.route('/api/admin/procurement', adminProcurementRoutes);
+    },
+    opts.sessionAgeSeconds === undefined ? {} : { sessionAgeSeconds: opts.sessionAgeSeconds }
+  );
   const profileVersion = (id = 'germany_land') =>
     Number((raw.prepare('SELECT version FROM procurement_cost_profiles WHERE id = ?').get(id) as { version: number }).version);
   /** The brief's purchase: 2 × AMS HT at EUR 450, 2.5 kg packed, Germany by land (the document's own rate 1,760 IQD/EUR). */

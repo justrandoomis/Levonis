@@ -275,6 +275,8 @@ export interface ListingResponse {
 
 export interface ProductResponse {
   product: ProductDocV2 & { catalog_ids: string[]; printer_fit_ids?: string[] };
+  /** The engine prices this product (owner decision 8): its price cells are read only. Absent on an older server. */
+  engine_managed?: boolean;
 }
 
 export interface SaveResponse {

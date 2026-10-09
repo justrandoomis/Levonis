@@ -34,6 +34,7 @@
  * the file still applies.
  */
 
+import { engineDbRefusal } from '../lib/pricingDbRefusals';
 import { Hono } from 'hono';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
 import type { AppContext, Env } from '../lib/types';
@@ -2109,7 +2110,9 @@ adminImportRoutes.post('/confirm', async (c) => {
           action: 'failed',
           name: key,
           product_id: productId,
-          reason: error instanceof Error ? error.message : String(error),
+          // An engine-priced product's row refused by the database's price lock reads as the
+          // trilingual ENGINE_MANAGED sentence, never the driver's text (owner decision 8).
+          reason: engineDbRefusal(error)?.message ?? (error instanceof Error ? error.message : String(error)),
         };
         // Planning/verification failed before a product write, or D1 rolled
         // the attempted product batch back. Persist that terminal result under

@@ -21,6 +21,7 @@ import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig, 
 import { addDays, baghdadDay, baghdadDayOf, isDay } from '../lib/baghdadTime';
 import { COMPOSED_SNAPSHOT, costSnapshot, type CostBasis } from '../lib/financeLedger';
 import { orderInsertStatement, orderItemInsertStatement } from '../lib/orderRows';
+import { engineBasisOf } from '../lib/pricingEngine/orderBasis';
 import {
   MAX_DELIVERY_DAYS,
   dayLabel,
@@ -4679,7 +4680,31 @@ export async function placeOrder(
     stmts.push(offerRedemptionStatement(c.env.DB, subjectOf(productId), user.id, orderId, qty));
   }
 
+  /**
+   * OWNER DECISION 6: AN ENGINE-PRICED LINE CARRIES THE ENGINE PRICE AND THE
+   * RATE IT WAS BOUGHT AT (migration 0181 §12; ODP §5.1 item 10). Only a line
+   * whose regular price is exactly its model's stored engine price gets the six
+   * columns; a gift, a bundle component, a mystery spool and every manual-priced
+   * line keep the exact INSERT they always had. Feature-detected (no engine
+   * tables, no snapshot). Written once, frozen by trigger, never read by
+   * accounting — the price protection claim alone reads it.
+   */
+  const engineBasis = await engineBasisOf(
+    c.env.DB,
+    comp.lines
+      .filter((it) => !it.gift && !it.mystery_spool && !it.bundle_parent_item_id && it.benefit)
+      .map((it) => ({
+        key: it.id,
+        product_id: it.product_id,
+        option_id: it.option_id,
+        pricing_basis: it.pricing_basis,
+        route: (safeParse<{ method?: unknown } | null>(it.transport_snapshot, null)?.method as string | undefined) ?? null,
+        regular_iqd: it.benefit!.regular_unit_iqd,
+      }))
+  );
+
   for (const it of comp.lines) {
+    const basis = engineBasis.get(it.id);
     stmts.push(
       orderItemInsertStatement(c.env.DB, orderId, {
         ...it,
@@ -4694,9 +4719,9 @@ export async function placeOrder(
         // §19 — WHAT THE MEMBERSHIP TOOK OFF THIS LINE, and under which rule.
         membership_discount_iqd: comp.benefits.byLine.get(it.id)?.total_iqd ?? 0,
         membership_rule_id: comp.benefits.byLine.get(it.id)?.rule_id ?? null,
-      // The two 0175 columns, on a gift line only — every other line's INSERT
-      // is the statement it always was.
-      }, it.gift ? { gift_entitlement_id: it.gift.gift_id, gift_order_seq: it.gift.order_seq } : undefined)
+      // The two 0175 columns, on a gift line only — and the six 0181 columns on an
+      // engine-priced line only; every other line's INSERT is the statement it always was.
+      }, it.gift ? { gift_entitlement_id: it.gift.gift_id, gift_order_seq: it.gift.order_seq } : basis ? { ...basis } : undefined)
     );
     /**
      * THE GIFT IS CONSUMED HERE, IN THE ORDER'S OWN BATCH (0175, D4).

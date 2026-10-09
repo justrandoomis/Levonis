@@ -4,7 +4,8 @@
  *
  * «علاوة» left the customer's text as new versions of the four documents
  * that carried it — purchase 6, faq 5, membership 5, price_protection 4 —
- * and of no other. The consent documents (terms 4, privacy 3, quick_buy 1)
+ * and of no other. (price_protection has since moved to 5 for owner decision
+ * 6, the same day and with the same consent rule.) The consent documents (terms 4, privacy 3, quick_buy 1)
  * contain no such word and did not move: bumping one would re-ask every
  * checkout and switch off every Quick Buy profile, for a wording change in a
  * document nobody signs. So this file proves both halves on the real routes:
@@ -43,6 +44,8 @@ import { seedCatalogue, orderBody } from './lib/bundles';
 
 const EFFECTIVE = '2026-10-09';
 const MOVED = { purchase: 6, faq: 5, membership: 5, price_protection: 4 } as const;
+/** What each reworded document reads today: price_protection moved again, to 5, for owner decision 6 (DECISIONS row 196). */
+const CURRENT = { ...MOVED, price_protection: 5 } as const;
 const CONSENT = { terms: 4, privacy: 3, quick_buy: 1 } as const;
 const NAME = { ar: 'زيادة البيع المباشر', en: 'Direct Sale Extra', ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ' } as const;
 const LANGS = ['ar', 'en', 'ckb'] as const;
@@ -59,7 +62,7 @@ const policyApp = (raw: DatabaseSync, user: StubUser | null) =>
 
 test('only the four reworded documents moved, all on one date; the consent documents and the consent sets did not', () => {
   const version = (key: string) => POLICY_DOCUMENTS.find((d) => d.key === key)!;
-  for (const [key, v] of Object.entries(MOVED)) {
+  for (const [key, v] of Object.entries(CURRENT)) {
     assert.equal(version(key).version, v, key);
     assert.equal(version(key).effective_at, EFFECTIVE, `${key}: one date for the whole change, the day it was published`);
   }
@@ -76,7 +79,7 @@ test('every role reads the same new versions and the same text, in all three lan
     const list = await json(await get(policyApp(raw, user), '/api/policies'));
     assert.equal(list.success, true, `${role}: ${JSON.stringify(list)}`);
     const versions = Object.fromEntries((list.policies as Array<{ key: string; version: number }>).map((p) => [p.key, p.version]));
-    for (const [key, v] of Object.entries({ ...MOVED, ...CONSENT })) assert.equal(versions[key], v, `${role}: ${key}`);
+    for (const [key, v] of Object.entries({ ...CURRENT, ...CONSENT })) assert.equal(versions[key], v, `${role}: ${key}`);
     const fingerprint: string[] = [JSON.stringify(list.policies)];
 
     for (const lang of LANGS) {
@@ -91,7 +94,7 @@ test('every role reads the same new versions and the same text, in all three lan
     }
     for (const key of ['faq', 'membership', 'price_protection'] as const) {
       const res = await json(await get(policyApp(raw, user), `/api/policies/${key}?lang=en`));
-      assert.equal(res.policy.version, MOVED[key], `${role}: ${key}`);
+      assert.equal(res.policy.version, CURRENT[key], `${role}: ${key}`);
       fingerprint.push(res.policy.hash);
     }
     seen.set(role, fingerprint.join('\n'));

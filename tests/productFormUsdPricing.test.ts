@@ -97,7 +97,8 @@ const formOf = (over: Partial<UsdPricingFormContext> = {}): UsdPricingFormContex
 const stateOf = (answer: UsdPricingAnswer, over: Partial<UsdPricingState> = {}): UsdPricingState => ({
   enabled: true, productId: 'p1', form: formOf(), answer, shown: answer, drafts: {}, effective: {}, dirty: false, invalid: false, busy: false,
   saving: false, notInstalled: false, error: '', notice: '', engine: false, setDraft: () => {}, discard: () => {}, save: async () => {},
-  reload: () => {}, snapshot: () => null, saveAfterProduct: async () => ({ ok: true, message: '' }), ...over,
+  reload: () => {}, snapshot: () => null, saveAfterProduct: async () => ({ ok: true, message: '' }),
+  afterProductSaved: async () => {}, review: null, reviewBusy: false, confirmReview: async () => {}, cancelReview: () => {}, exitEngine: async () => {}, ...over,
 });
 const withState = (state: UsdPricingState, el: Parameters<typeof renderToStaticMarkup>[0]) => render(createElement(UsdPricingProvider, { value: state, children: el }));
 
@@ -200,13 +201,13 @@ test('section ٣ offers the four currencies and the dinar input; section ٨ show
 
 test('the product form: every mount point is the owner’s, the document never carries a private value, the pricing saves after the product', () => {
   const form = codeOf('src/components/adminProducts/ProductForm.tsx');
-  assert.match(form, /useUsdPricingState\(\{ productId: doc\.id \|\| null, enabled: canSeeCost, form: pricingForm \}\)/);
+  assert.match(form, /useUsdPricingState\(\{\s*productId: doc\.id \|\| null,\s*enabled: canSeeCost,\s*form: pricingForm,/);
   assert.match(form, /\{canSeeCost && <UsdPricingProductPanel \/>\}/);
   assert.match(form, /\{canSeeCost && <UsdPricingOptionsFooter \/>\}/);
   assert.match(form, /\{canSeeCost && <UsdPricingPreview \/>\}/);
   assert.match(form, /valueExtra=\{\s*canSeeCost\s*\?/);
   // An engine-priced product's price is read only for the owner; everyone else keeps «السعر».
-  assert.match(form, /\{canSeeCost && pricing\.engine \? \(\s*<Field ar=\{us\.storePrice\}[\s\S]{0,200}<TextInput readOnly/);
+  assert.match(form, /\{\(canSeeCost && pricing\.engine\) \|\| engineManaged \? \(\s*<Field ar=\{us\.storePrice\}[\s\S]{0,200}<TextInput readOnly/);
   assert.match(form, /<Field\s+ar="السعر"\s+en="Price"\s+required/);
   assert.match(form, /<Field ar=\{us\.legacyCost\}/);
   // The pricing follows the product's save, through the pricing door, from a snapshot taken before it.
@@ -218,10 +219,11 @@ test('the product form: every mount point is the owner’s, the document never c
   assert.doesNotMatch(form, /supplier_cost_amount|supplier_cost_iqd|minimum_target_profit_usd|direct_sale_extra_iqd|conversion_rate_snapshot/);
 
   const section = codeOf('src/components/adminProducts/form/UsdPricingSection.tsx');
-  // Every request of the section goes to the pricing door.
+  // Every request of the section goes to the pricing door (the writer adds the held save's confirm, the read after a
+  // product save and «رجوع إلى التسعير اليدوي»).
   const paths = [...section.matchAll(/\.(?:get|post|put)<[^>]*>\(\s*`([^`]*)`/g)].map((m) => m[1]);
-  assert.equal(paths.length, 5, String(paths));
-  assert.equal((section.match(/\bapi\s*\.\s*(?:get|post|put|patch|delete)\b/g) ?? []).length, 5, 'no request outside the five above');
+  assert.equal(paths.length, 8, String(paths));
+  assert.equal((section.match(/\bapi\s*\.\s*(?:get|post|put|patch|delete)\b/g) ?? []).length, 8, 'no request outside the eight above');
   for (const p of paths) assert.match(p!, /^\$\{PRICING\}\/products\//);
   assert.match(section, /const PRICING = '\/api\/admin\/pricing';/);
   // The options card renders the section's row for each model, and nothing for anyone else.

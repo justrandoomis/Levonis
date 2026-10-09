@@ -22,9 +22,11 @@
  * The open product is kept in the address (`?product=`) so a reload reopens it.
  *
  * THE PRODUCT PREVIEW WRITES NOTHING: two GETs and a POST that only answers
- * a question. The one section that writes is the exchange-rate panel above it
- * (FX-1, RatesPanel): the owner's rates, through their own owner-only routes —
- * and no product price moves with them until automatic pricing (FX-5).
+ * a question. Two sections write: the exchange-rate panel above it (FX-1,
+ * RatesPanel), the owner's rates through their own owner-only routes; and the
+ * stale list (EngineSaveList, owner decision 8), which saves the new prices of
+ * the products a changed rate left behind — after their preview, in one bulk
+ * request. No price moves with a rate on its own until automatic pricing (FX-5).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../../LanguageContext';
@@ -34,6 +36,7 @@ import { PreviewBanner, PricingFailure } from './parts';
 import PricingProducts, { type StatusFilter } from './PricingProducts';
 import ProductPricingSheet from './ProductPricingSheet';
 import RatesPanel from './RatesPanel';
+import EngineSaveList from './EngineSaveList';
 import { pricingStrings } from './strings';
 
 const PRODUCT_PARAM = 'product';
@@ -151,6 +154,9 @@ export default function AdminPricing() {
       {!productId && <RatesPanel lang={lang} dir={dir} />}
 
       <PreviewBanner lang={lang} body={s.previewBody} />
+
+      {/* Owner decision 8: the products whose new prices wait for one save (stale rates, complete but manual). */}
+      {!productId && <EngineSaveList lang={lang} />}
 
       {productId ? (
         <ProductPricingSheet key={productId} id={productId} lang={lang} dir={dir} s={s} onBack={back} />

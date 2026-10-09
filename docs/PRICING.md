@@ -198,6 +198,57 @@ nothing:
   suggestion are in both FINANCIAL_FIELDS copies; `usd_basis` and the counts are
   registered as private keys that carry no amount.
 
+## The writer: engine prices in the existing price fields (DECISIONS row 196)
+
+Owner decision 8, migration `0181_pricing_engine_core.sql`. There is no
+separate activation step: **the save that leaves a product complete adopts the
+engine** and writes its prices in that same batch.
+
+- **The preview first.** A save that would write prices, sent without the
+  preview's hash (or with the dinar conversion's hash only), answers 409
+  `PRICING_PREVIEW_REQUIRED` carrying the six figures per model × channel; the
+  same save with that `preview_hash` writes. Data or a rate that moved since
+  the preview answers 409 `PRICING_PREVIEW_STALE` with the fresh preview. A
+  price moving more than 15% needs `confirm_large_change: true` and a fresh
+  sign-in (`REAUTH_REQUIRED` otherwise); a fall above 30% is flagged. An
+  incomplete manual product stores its data and keeps its manual price; an
+  engine product never saves into an incomplete state
+  (`PRICING_ENGINE_INCOMPLETE`).
+- **Where the prices go** (`worker/lib/pricingEngine/writer.ts`): each route
+  row its engine price with route surcharge 0, the direct-sale cell the
+  pre-order price plus the Direct Sale Extra, the pre-order cell the highest
+  route, the option row the highest of its cells, `products.price_iqd` the
+  lowest. The plan is verified against the cart's own resolver before anything
+  is written (any mismatch = nothing written). The final price in USD is kept
+  beside it in `pricing_sku_costs`, owner only.
+- **One write** (`engineWrite.ts`): one atomic batch per product, fenced on the
+  product's pricing state, idempotent on the preview hash, audited (values in
+  `pricing_audit`, ids and counts in `audit_log`), at most 200 statements. Only
+  the last CONFIRMED central rates price; a rate held for review never does.
+- **The doors**: the product form (`PUT …/products/:id/inputs`), a confirmed
+  purchase that completes the product (`…/apply-purchase`, after the review
+  showed the prices), and the stale list on «التسعير والشحن» (`GET /save-list`,
+  `POST /save-list/preview`, `POST /products/save-bulk`, up to 20 at once).
+  `POST …/products/:id/manual` takes a product back to manual pricing with its
+  prices exactly as they are.
+- **ENGINE_MANAGED.** On an engine product the old dinar writers refuse with
+  `ENGINE_MANAGED` (the product's price, the option price cells, the quick
+  price grid and its undo, the selection price, the CSV import); the
+  database's value-compared lock is the enforcement. Cost stays editable.
+- **Not yet**: automatic repricing when a rate changes (FX-5; until then the
+  products appear in the stale list), and colour / SKU-level prices (FX-7; a
+  product priced per colour or variant, or with more than one option group, is
+  refused `PRICE_SHAPE_UNSUPPORTED` and stays manual).
+
+**Price protection on the USD base price (owner decision 6, policy v5).** An
+order line bought at an engine price snapshots its base price in USD and the
+USD/IQD it was bought at (`order_items.price_basis = 'engine'`). A claim on an
+order created on or after 2026-10-09 pays per unit the lower of (the USD drop ×
+that purchase rate) and the actual dinar drop; a drop that comes from the
+exchange rate alone pays nothing (`FX_ONLY_DROP`). A line bought at a manual
+price keeps the dinar rule. Orders created earlier keep the rule they were
+bought under (`worker/lib/pricingEngine/protectionBasis.ts`).
+
 ## The four price fields
 
 At **product**, **option** and **color** level:

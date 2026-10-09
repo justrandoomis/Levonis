@@ -48,6 +48,7 @@ import {
   projectForAdmin,
 } from '../lib/adminScope';
 import { costRefusal } from '../lib/costAccess';
+import { productEngineManaged, refuseEngineManaged } from '../lib/engineInstalled';
 import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
 import {
   catalogEditRefusal,
@@ -115,7 +116,7 @@ adminProductsRoutes.use('*', requireAdmin);
 adminProductsRoutes.use('*', purgeCatalogueAfterWrite);
 
 // Pricing a selection from its purchase writes a price derived from cost: the owner's (decision 2).
-adminProductsRoutes.post('/:id/selection-price',async c=>{const user=c.get('user')!;if(!canWriteCost(c.env,user))throw costRefusal(c.env,user);const result=await updateSelectionPrice(c.env.DB,c.req.param('id'),await c.req.json<Record<string,unknown>>(),user.id);c.set('catalogueSlug',result.slug);return c.json({success:true,...result});});
+adminProductsRoutes.post('/:id/selection-price',async c=>{const user=c.get('user')!;if(!canWriteCost(c.env,user))throw costRefusal(c.env,user);await refuseEngineManaged(c.env.DB,c.req.param('id'));const result=await updateSelectionPrice(c.env.DB,c.req.param('id'),await c.req.json<Record<string,unknown>>(),user.id);c.set('catalogueSlug',result.slug);return c.json({success:true,...result});});
 
 // ---------------------------------------------------------------- helpers
 
@@ -1206,6 +1207,9 @@ adminProductsRoutes.get('/:id', async (c) => {
     // §11: an assistant admin gets the same document with every financial
     // field removed on the SERVER — reading the raw response reveals nothing.
     product: projectForAdmin(c.env, c.get('user'), stored.document),
+    // Owner decision 8: the engine prices this product — its price cells are read only in the form
+    // (a flag, not a cost: every admin may know it, and the old price writers refuse).
+    engine_managed: await productEngineManaged(c.env.DB, id),
   });
 });
 

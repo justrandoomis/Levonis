@@ -78,6 +78,66 @@ export interface PricingPreviewRow {
   issue_codes: string[];
 }
 
+/** One model × channel of the writer's preview (owner decision 8): the six figures and the flags. */
+export interface EngineAdoptionRow {
+  option_id: string;
+  name_ar: string;
+  name_en: string;
+  name_ckb: string;
+  channel: string;
+  today_prepaid_iqd: number | null;
+  computed_price_iqd: number;
+  change_iqd: number | null;
+  change_pct: string | null;
+  large: boolean;
+  drop_flag: boolean;
+  replacement_cost_iqd: number;
+  target_profit_usd: string | null;
+  target_profit_iqd: number;
+  preorder_base_iqd: number;
+  direct_sale_extra_iqd: number | null;
+  final_price_usd: string | null;
+  route_fee_removed: boolean;
+  pro_before_iqd: number | null;
+  pro_after_iqd: number | null;
+  prime_before_iqd: number | null;
+  prime_after_iqd: number | null;
+}
+
+/** What a save would do to a product's prices: adopt (a manual product it completes), reprice (an engine product), or data only (kind null). */
+export interface EngineAdoption {
+  kind: 'adopt' | 'reprice' | null;
+  mode: 'manual' | 'engine';
+  complete: boolean;
+  missing_codes: string[];
+  needs_write: boolean;
+  preview_hash: string | null;
+  large_change: boolean;
+  drop_flag: boolean;
+  legacy_step: boolean;
+  cod_priced_as_direct: boolean;
+  review_pending: boolean;
+  usd_iqd_rate: string | null;
+  rows: EngineAdoptionRow[];
+}
+
+/** The writer's rows as the six-figure table reads them. */
+export const adoptionRows = (a: EngineAdoption): PricingPreviewRow[] =>
+  a.rows.map((r) => ({ ...r, today_cod_iqd: null, cod_priced_as_direct: false, issue_codes: [] }));
+
+/** Whether an apply writes prices (the purchase completes the product, or it is engine-priced). */
+export const writesPrices = (a: EngineAdoption | null | undefined): a is EngineAdoption => !!a?.kind && a.complete && a.needs_write;
+
+/**
+ * The prices two previews would write are the same (model × channel → price). A refused apply's fresh
+ * preview is taken without a second look only then — new prices are never written unseen.
+ */
+export function samePrices(a: EngineAdoption | null | undefined, b: EngineAdoption | null | undefined): boolean {
+  const key = (x: EngineAdoption | null | undefined) =>
+    writesPrices(x) ? x.rows.map((r) => `${r.option_id}|${r.channel}|${r.computed_price_iqd}`).sort().join(',') : '';
+  return key(a) === key(b);
+}
+
 export interface PricingMinimumProfit {
   scope: 'product' | 'option';
   scope_id: string;
@@ -106,6 +166,8 @@ export interface PricingProduct {
   missing_codes: string[];
   cod_priced_as_direct: boolean;
   minimum_profits: PricingMinimumProfit[];
+  /** What applying this purchase does to the product's prices (owner decision 8). */
+  adoption?: EngineAdoption | null;
 }
 
 export interface PricingPreview {
@@ -144,12 +206,17 @@ export function previewSaved(purchaseId: string, choices: PricingChoices, signal
   return api.post<PricingPreview>(`${PRICING}/procurement/preview`, { purchase_id: purchaseId, pricing: pricingBody(choices) }, { signal, mascot: 'silent' });
 }
 
-/** Apply one product (inputs and the typed minimum profits) from a saved purchase. */
-export function applyPurchase(productId: string, purchaseId: string, previewHash: string, choices: PricingChoices) {
+/**
+ * Apply one product (inputs and the typed minimum profits) from a saved purchase — and, when that leaves
+ * the product complete, its new prices in the same batch (owner decision 8); a change above 15% needs the
+ * owner's tick (`confirmLarge`) and a fresh sign-in.
+ */
+export function applyPurchase(productId: string, purchaseId: string, previewHash: string, choices: PricingChoices, confirmLarge = false) {
   const body = pricingBody(choices);
-  return api.post<{ success: boolean; already: boolean; rows_changed: number }>(`${PRICING}/products/${encodeURIComponent(productId)}/apply-purchase`, {
+  return api.post<{ success: boolean; already: boolean; rows_changed: number; priced?: boolean; entered?: boolean }>(`${PRICING}/products/${encodeURIComponent(productId)}/apply-purchase`, {
     purchase_id: purchaseId,
     preview_hash: previewHash,
+    ...(confirmLarge ? { confirm_large_change: true } : {}),
     use_purchase: choices.usePurchase[productId] !== false,
     prefer_purchase_values: choices.prefer[productId] === true,
     manual_line_opt_in: choices.optIn.filter((k) => k.startsWith(`${productId}:`)),

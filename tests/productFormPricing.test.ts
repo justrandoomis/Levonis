@@ -203,11 +203,16 @@ test('the shipping box travels whole (the form’s package measurements) and pri
 
 test('decision 8’s six figures per model × channel ride every answer — the preview’s with the drafts, and the preview writes nothing', async () => {
   const w = pricingWorld();
-  const saved = await w.putInputs(AMS, {
-    inputs_seq: 0,
+  const complete = {
     inputs: [{ scope: 'base', supplier_cost_amount: '450', supplier_cost_currency: 'EUR', ...LAND }],
     rules: [BRIEF_RULE, { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 25_000 }],
-  });
+  };
+  // The save that completes the product shows the six figures first (owner decision 8), then adopts with their hash.
+  const first = await w.putInputs(AMS, { inputs_seq: 0, ...complete });
+  assert.equal(first.status, 409, JSON.stringify(first.body));
+  assert.equal(first.body.code, 'PRICING_PREVIEW_REQUIRED');
+  assert.equal((first.body.details.preview.rows as unknown[]).length, 2);
+  const saved = await w.putInputs(AMS, { inputs_seq: 0, ...complete, preview_hash: first.body.details.preview.preview_hash, confirm_large_change: true });
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   const rows = (await w.getInputs(AMS)).body.rows as Array<Record<string, unknown>>;
   assert.deepEqual(rows.map((r) => r.channel).sort(), ['direct_sale', 'pre_order_land']);

@@ -58,7 +58,8 @@ test('the list holds every readiness code of master plan v2 §2.3 (v1, [C2], v2)
   const c2 = ['FX_RATE_UNCONFIRMED', 'SHIPPING_RATE_UNCONFIRMED', 'CHANNEL_INCOMPLETE', 'PRICE_DROP_REVIEW', 'PINNED_BELOW_TARGET', 'PRICING_CATEGORY_DIFFERS', 'RULE_ORPHANED', 'DIRECT_SALE_EXTRA_NOT_ON_STEP'];
   const v2 = ['TARGET_PROFIT_BLOCKED', 'SHIPPING_FIELD_UNRESOLVED', 'SKU_INPUTS_UNREVIEWED', 'INPUT_ORPHANED', 'MEASURE_FROM_PUBLIC_SPEC'];
   const check = ['DIRECT_SALE_EXTRA_BLOCKED']; // master-plan-v2-check (1)7
-  assert.deepEqual([...PRICING_ISSUE_CODES], [...v1, ...c2, ...v2, ...check]);
+  const writer = ['PRICE_SHAPE_UNSUPPORTED', 'FX_DERIVED_STALE', 'PRICING_ENGINE_PAUSED']; // the writer (owner decision 8)
+  assert.deepEqual([...PRICING_ISSUE_CODES], [...v1, ...c2, ...v2, ...check, ...writer]);
   assert.equal(new Set(PRICING_ISSUE_CODES).size, PRICING_ISSUE_CODES.length);
   assert.deepEqual(Object.keys(PRICING_ISSUES).sort(), [...PRICING_ISSUE_CODES].sort());
   assert.equal(isPricingIssueCode('RULE_TIE'), true);

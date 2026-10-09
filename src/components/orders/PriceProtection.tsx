@@ -27,6 +27,8 @@ interface Claim {
   observed_unit_iqd: number;
   qty: number;
   credited_iqd: number;
+  /** Owner decision 6: what the claim covers per unit when part of the fall came from the exchange rate. */
+  eligible_unit_iqd?: number | null;
   state: 'requested' | 'approved' | 'rejected' | 'credited' | string;
   requested_at: string;
   decided_at: string | null;
@@ -51,6 +53,7 @@ const STRINGS = {
     observed: 'السعر الملاحَظ',
     credited: 'المقيَّد',
     requestedAt: 'قُدِّمت في',
+    covered: (n: string) => `المشمول: ${n} — والباقي من تغيّر سعر الصرف`,
   },
   en: {
     title: 'Price protection',
@@ -67,6 +70,7 @@ const STRINGS = {
     observed: 'Observed price',
     credited: 'Credited',
     requestedAt: 'Requested',
+    covered: (n: string) => `Covered: ${n} — the rest came from the exchange rate`,
   },
   ckb: {
     title: 'پاراستنی نرخ',
@@ -83,6 +87,7 @@ const STRINGS = {
     observed: 'نرخی بینراو',
     credited: 'دراوە',
     requestedAt: 'داواکراوە لە',
+    covered: (n: string) => `ئەوەی دەگرێتەوە: ${n} — ئەوی تر لە گۆڕانی نرخی ئاڵوگۆڕەوە هات`,
   },
 } as const;
 
@@ -187,6 +192,12 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
                   {' · '}
                   {s.requestedAt} {formatDate(c.requested_at, lang)}
                 </p>
+                {/* Owner decision 6 (policy v5 §11.8): a part of the fall that was only the exchange rate is not covered. */}
+                {typeof c.eligible_unit_iqd === 'number' && c.eligible_unit_iqd < c.original_unit_iqd - c.observed_unit_iqd && (
+                  <p className="mt-1 text-[11.5px] text-amber-300/90 tabular-nums" data-pp-covered>
+                    {s.covered(money(c.eligible_unit_iqd))}
+                  </p>
+                )}
               </li>
             ))}
           </ul>

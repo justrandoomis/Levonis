@@ -88,6 +88,8 @@ export interface PricingStateRow {
   mode: 'manual' | 'engine';
   inputs_seq: number;
   write_seq: number;
+  /** Set when the owner took the product back to manual pricing (a later save then adopts only when asked). */
+  opted_out_at?: string | null;
 }
 
 /** Everything the engine stores about one product, read in one snapshot. */
@@ -109,7 +111,7 @@ export async function loadProductsPricing(db: D1Database, ids: readonly string[]
   const unique = [...new Set(ids)];
   const list = JSON.stringify(unique);
   const [state, inputs, rules, control] = await db.batch([
-    db.prepare('SELECT product_id, mode, inputs_seq, write_seq FROM product_pricing_state WHERE product_id IN (SELECT value FROM json_each(?))').bind(list),
+    db.prepare('SELECT product_id, mode, inputs_seq, write_seq, opted_out_at FROM product_pricing_state WHERE product_id IN (SELECT value FROM json_each(?))').bind(list),
     db.prepare(`SELECT ${INPUT_COLUMNS.join(', ')} FROM pricing_inputs WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY product_id, scope, scope_id, origin`).bind(list),
     db
       .prepare(`SELECT ${RULE_COLUMNS.join(', ')} FROM pricing_rules WHERE product_id IS NULL OR product_id IN (SELECT value FROM json_each(?)) ORDER BY id`)
@@ -318,6 +320,8 @@ export interface RuleWrite {
   scope: Extract<PricingRuleScope, 'product' | 'option'>;
   scope_id: string;
   existing: StoredRuleRow | null;
+  /** The id a NEW row takes (assigned up front so the engine's stored results can name it); absent = minted at write. */
+  new_id?: string;
   next: {
     state: PricingRuleState;
     amount_usd: string | null;
@@ -351,7 +355,7 @@ export function ruleStatements(db: D1Database, productId: string, writes: readon
             `INSERT INTO pricing_rules (id, kind, scope, catalog_id, product_id, scope_id, state, amount_usd, amount_iqd, source, legacy_result_id, version, updated_by, updated_at)
              VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
           )
-          .bind(newId('prule'), w.kind, w.scope, productId, scopeId, w.next.state, w.next.amount_usd, w.next.amount_iqd, w.next.source, w.next.legacy_result_id, actor, now)
+          .bind(w.new_id ?? newId('prule'), w.kind, w.scope, productId, scopeId, w.next.state, w.next.amount_usd, w.next.amount_iqd, w.next.source, w.next.legacy_result_id, actor, now)
       );
       continue;
     }
@@ -400,10 +404,12 @@ export function batchTail(db: D1Database, productId: string): D1PreparedStatemen
 export function pricingAuditStatement(
   db: D1Database,
   row: {
-    entity: 'input' | 'rule' | 'product_write';
+    /** Set when another row of the batch names this one (product_pricing_state.activation_audit_id). */
+    id?: string;
+    entity: 'input' | 'rule' | 'product_write' | 'sku_price' | 'engine_mode';
     entity_key: string;
     product_id: string;
-    action: 'input_from_purchase' | 'rule_set' | 'legacy_accept' | 'update';
+    action: 'input_from_purchase' | 'rule_set' | 'legacy_accept' | 'update' | 'engine_entry' | 'reprice_owner' | 'rule_convert' | 'engine_exit';
     before?: unknown;
     after?: unknown;
     summary?: Record<string, unknown>;
@@ -418,7 +424,7 @@ export function pricingAuditStatement(
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
-      newId('paud'),
+      row.id ?? newId('paud'),
       row.entity,
       row.entity_key,
       row.product_id,

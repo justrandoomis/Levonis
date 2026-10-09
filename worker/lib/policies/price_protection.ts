@@ -56,10 +56,22 @@ import type { PolicyDocument } from './types';
  * is version 5, published in the same push as the code that applies it
  * (DECISIONS row 191; tests/priceProtectionLegacyRule.test.ts pins today's
  * rule so that 10.4 provably describes it).
+ *
+ * VERSION 5 — WHY IT MOVED (owner, decision 6 of 2026-10-09). The archive keeps
+ * version 4 byte for byte. Published with the code that applies it: a product
+ * priced on a dollar basis is protected on its base price in USD, and a fall
+ * in its dinar price caused only by the dollar–dinar exchange rate is not
+ * protected (new §1.2 definition, §2.5 sentence, §10.4 paragraph, §11.8, and
+ * the exchange rate in §12.3). The rule follows the order's date (§13.1:
+ * amendments are not retroactive): it reaches only lines bought at an engine
+ * price, which no order created before this version can carry. Version 4's
+ * §2.3 wording (the Direct Sale Extra, never a premium) is unchanged. The new
+ * lines cite only chapter 10 and article 5.5, neither of which is withheld
+ * (./render.ts).
  */
 export const price_protection: PolicyDocument = {
   key: 'price_protection',
-  version: 4,
+  version: 5,
   effective_at: '2026-10-09',
   title: {
     ar: 'سياسة الأسعار وتغييرها وإلغاء الطلب',
@@ -80,6 +92,7 @@ export const price_protection: PolicyDocument = {
 - خطأ التسعير الظاهر: رقم يظهر لأي قارئ عاقل أنه ليس السعر المقصود.
 - نافذة العرض: المدة المعلنة بين بداية العرض ونهايته.
 - حماية السعر: مطالبة الزبون بفرق السعر عن قطعة سُلِّمت إليه ثم انخفض سعرها خلال سبعة أيام.
+- السعر الأساسي بالدولار: سعر المنتج المسعَّر على أساس الدولار معبَّرًا عنه بالدولار، أي سعره بالدينار مقسومًا على سعر الصرف الذي حُسب به.
 
 ### 1.3 النص المعتمد
 النص العربي هو المعتمد، والنسختان الإنكليزية والكردية ترجمتان أمينتان له بالترقيم نفسه.
@@ -102,7 +115,7 @@ export const price_protection: PolicyDocument = {
 يُحفظ مع الطلب سعره ومزاياه كما كانت لحظة الشراء. وتغيير الأسعار أو الإعدادات أو نسب المزايا لاحقاً لا يُعيد حساب طلب سابق، صعوداً أو نزولاً.
 
 ### 2.5 العملة
-الأسعار بالدينار العراقي، ويُثبَّت سعر صرف المحفظة على الطلب لحظة إنشائه.
+الأسعار بالدينار العراقي، ويُثبَّت سعر صرف المحفظة على الطلب لحظة إنشائه. وأسعار المنتجات المسعَّرة على أساس الدولار تُحسب بالدينار بسعر صرف المتجر، وهو غير سعر صرف المحفظة.
 
 ## 3. تغيّر السعر بين السلة وإتمام الطلب
 
@@ -250,7 +263,7 @@ export const price_protection: PolicyDocument = {
 لا تُقبل مطالبة حماية السعر قبل تسليم القطعة. والقطعة التي لم تُسلَّم يخضع سعرها للفصل الخامس والفصل السادس.
 
 ### 10.4 كيف يُحتسب الفرق
-يُقارَن ما دفعه الزبون فعلاً عن الوحدة بأدنى سعرين: السعر الذي يدفعه اليوم مشترٍ من فئة السعر نفسها، وأدنى سعر مسجل للقطعة نفسها خلال مدة الحماية. ويُضرب الفرق في الكمية المشتراة.
+للمنتج المسعَّر على أساس الدولار، يُقارَن سعره الأساسي بالدولار يوم الشراء بأدنى سعر أساسي له بالدولار خلال مدة الحماية، ويُحوَّل الفرق إلى الدينار بسعر الصرف الذي اشتُريت به القطعة، ولا يتجاوز ما يُصرف الفرقَ الفعلي بالدينار. وللمنتج المسعَّر بالدينار مباشرةً يُقارَن ما دفعه الزبون فعلاً عن الوحدة بأدنى سعرين: السعر الذي يدفعه اليوم مشترٍ من فئة السعر نفسها، وأدنى سعر مسجل للقطعة نفسها خلال مدة الحماية. وفي الحالتين يُضرب الفرق في الكمية المشتراة.
 
 ### 10.5 المقارنة بفئة السعر نفسها
 يُقارَن مشتري السعر الاعتيادي بالسعر الاعتيادي، ومشتري سعر PRO بسعر PRO أو الاعتيادي أيهما أدنى. ولا يُقارَن مشترٍ اعتيادي بسعر مقصور على عضوية لا يملكها.
@@ -296,6 +309,9 @@ export const price_protection: PolicyDocument = {
 ### 11.7 بضاعة تجار المجتمع
 حماية السعر هنا تخص بضاعة المتجر الرسمي. وتسعير بضاعة تجار مجتمع ليفو يخص التاجر، ويُراجَع معه وفق سياسة البيع.
 
+### 11.8 تغيّر سعر الصرف
+لا تشمل الحماية انخفاض السعر بالدينار الناتج عن تغيّر سعر صرف الدولار مقابل الدينار. مثال: منتج سعره الأساسي 500 دولار بقي 500 دولار، وتغيّر الصرف من 1,600 إلى 1,500 دينار للدولار فانخفض سعره بالدينار؛ هذا ليس انخفاضًا في سعر المنتج ولا تعويض عنه. أما إذا انخفض السعر الأساسي نفسه من 500 إلى 480 دولارًا فالفرق 20 دولارًا انخفاض حقيقي تشمله الحماية.
+
 ## 12. الإبلاغ والاعتراض
 
 ### 12.1 كيف تُقدَّم المطالبة
@@ -305,7 +321,7 @@ export const price_protection: PolicyDocument = {
 للزبون الاعتراض على رفض مطالبته أو على قرار إلغاء طلبه أو على تصحيح سعره، عبر الدعم، خلال {{DISPUTE_RESPONSE_DAYS}} يوماً من إبلاغه بالقرار.
 
 ### 12.3 ما يُبنى عليه القرار
-يُبنى القرار على سجلات النظام: لقطة سعر الطلب، وسجل تغيّر الأسعار، وتاريخ التسليم، وما سبق صرفه عن القطعة.
+يُبنى القرار على سجلات النظام: لقطة سعر الطلب وسعر الصرف الذي حُسب به، وسجل تغيّر الأسعار، وتاريخ التسليم، وما سبق صرفه عن القطعة.
 
 ### 12.4 حفظ الأسباب
 يُسجَّل سبب كل قبول ورفض وإلغاء وتصحيح، ويُطلع الزبون عليه عند طلبه.
@@ -337,6 +353,7 @@ This document sets out how a price is determined, when the Store may change it o
 - A manifest pricing error: a figure that any reasonable reader can see is not the intended price.
 - The offer window: the declared period between an offer's start and its end.
 - Price protection: the customer's claim for the price difference on an item delivered to them whose price then fell within seven days.
+- Base price in USD: the price of a product priced on a dollar basis, expressed in dollars — its dinar price divided by the exchange rate it was computed at.
 
 ### 1.3 Authoritative text
 The Arabic text is authoritative; the English and Kurdish versions are faithful translations of it under the same numbering.
@@ -359,7 +376,7 @@ The price is stated by its components: the merchandise value, the transport comm
 The order's price and benefits as at the moment of purchase are stored with it. Later changes to prices, settings or benefit rates do not recompute an earlier order, upwards or downwards.
 
 ### 2.5 Currency
-Prices are in Iraqi dinars, and the wallet exchange rate is fixed onto the order at the moment it is created.
+Prices are in Iraqi dinars, and the wallet exchange rate is fixed onto the order at the moment it is created. Prices of products priced on a dollar basis are converted to dinars at the shop's exchange rate, which is not the wallet exchange rate.
 
 ## 3. A Price that Changes Between the Cart and Checkout
 
@@ -507,7 +524,7 @@ The seven days run from the documented actual delivery of the item. The claim mu
 A price-protection claim is not accepted before the item has been delivered. The price of an undelivered item is governed by chapters 5 and 6.
 
 ### 10.4 How the difference is computed
-What the customer actually paid per unit is compared against the lower of two prices: the price a buyer of the same price class would pay today, and the lowest price recorded for the same item within the protection period. The difference is multiplied by the quantity purchased.
+For a product priced on a dollar basis, its base price in USD on the day of purchase is compared with its lowest base price in USD within the protection period; the difference is converted to dinars at the exchange rate the item was bought at, and what is paid out never exceeds the actual dinar difference. For a product priced directly in dinars, what the customer actually paid per unit is compared against the lower of two prices: the price a buyer of the same price class would pay today, and the lowest price recorded for the same item within the protection period. In both cases the difference is multiplied by the quantity purchased.
 
 ### 10.5 Comparison within the same price class
 An ordinary-price buyer is compared against the ordinary price; a PRO-price buyer is compared against the PRO price or the ordinary price, whichever is lower. An ordinary buyer is never compared against a price confined to a membership they do not hold.
@@ -553,6 +570,9 @@ The fall in price of another product, however similar, does not count, nor a pri
 ### 11.7 Community merchants' goods
 Price protection here concerns the official store's goods. The pricing of Levo community merchants' goods is the merchant's, and is taken up with them under the Selling Policy.
 
+### 11.8 Exchange-rate moves
+Protection does not extend to a fall in the dinar price caused by a change in the dollar–dinar exchange rate. Example: a product whose base price stays 500 USD while the rate moves from 1,600 to 1,500 dinars per dollar has a lower dinar price; that is not a fall in the product's price and earns no compensation. If the base price itself falls from 500 to 480 USD, the 20 USD difference is a real fall and is protected.
+
 ## 12. Filing and Objecting
 
 ### 12.1 How a claim is filed
@@ -562,7 +582,7 @@ A price-protection claim is filed from the order record in the customer's accoun
 The customer may object to the refusal of a claim, to a decision cancelling their order, or to a correction of its price, through support, within {{DISPUTE_RESPONSE_DAYS}} days of being informed of the decision.
 
 ### 12.3 What the decision rests on
-The decision rests on the system's records: the order's price snapshot, the price-change history, the date of delivery, and what has previously been paid out on the item.
+The decision rests on the system's records: the order's price snapshot and the exchange rate it was computed at, the price-change history, the date of delivery, and what has previously been paid out on the item.
 
 ### 12.4 Reasons are preserved
 The reason for every acceptance, refusal, cancellation and correction is recorded, and is disclosed to the customer on request.
@@ -594,6 +614,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 - هەڵەی نرخاندنی ئاشکرا: ژمارەیەک کە هەر خوێنەرێکی ژیر دەبینێت ئەو نرخە نییە کە مەبەست بووە.
 - پەنجەرەی ئۆفەر: ئەو ماوە ڕاگەیەنراوەی نێوان دەستپێک و کۆتایی ئۆفەرەکە.
 - پاراستنی نرخ: داواکاری کڕیار بۆ جیاوازی نرخی کاڵایەک کە بۆی گەیەنراوە و پاشان لە ماوەی حەوت ڕۆژدا نرخەکەی داشکاوە.
+- نرخی بنەڕەتی بە دۆلار: نرخی ئەو بەرهەمەی لەسەر بنەمای دۆلار نرخی بۆ دانراوە، بە دۆلار، واتە نرخەکەی بە دینار دابەش بەسەر ئەو نرخی ئاڵوگۆڕەی پێی هەژمار کراوە.
 
 ### 1.3 دەقی پەسەندکراو
 دەقی عەرەبی پەسەندکراوە، و وەشانی ئینگلیزی و کوردی وەرگێڕانی دڵسۆزی ئەون بە هەمان ژمارەگوزاری.
@@ -616,7 +637,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 نرخ و سوودەکانی داواکارییەکە وەک لە ساتی کڕیندا بوون لەگەڵیدا هەڵدەگیرێن. گۆڕانی نرخ یان ڕێکخستن یان ڕێژەی سوودەکان لە دواتردا داواکارییەکی پێشووتر دووبارە حساب ناکاتەوە، نە بەرەو سەرەوە و نە بەرەو خوارەوە.
 
 ### 2.5 دراو
-نرخەکان بە دیناری عێراقین، و نرخی ئاڵوگۆڕی جزدان لە ساتی دروستبوونی داواکارییەکەدا لەسەری جێگیر دەکرێت.
+نرخەکان بە دیناری عێراقین، و نرخی ئاڵوگۆڕی جزدان لە ساتی دروستبوونی داواکارییەکەدا لەسەری جێگیر دەکرێت. نرخی ئەو بەرهەمانەی لەسەر بنەمای دۆلار نرخیان بۆ دانراوە بە نرخی ئاڵوگۆڕی فرۆشگا دەکرێنە دینار، کە جیاوازە لە نرخی ئاڵوگۆڕی جزدان.
 
 ## 3. گۆڕانی نرخ لە نێوان سەبەتە و تەواوکردنی داواکاری
 
@@ -764,7 +785,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 داواکاری پاراستنی نرخ پێش گەیاندنی کاڵاکە وەرناگیرێت. نرخی کاڵایەکی نەگەیەنراو بەندە بە بەشی پێنجەم و شەشەم.
 
 ### 10.4 جیاوازییەکە چۆن حساب دەکرێت
-ئەوەی کڕیار بە ڕاستی بۆ هەر یەکەیەک داویەتی بەرامبەر نزمترینی دوو نرخ دەکرێت: ئەو نرخەی ئەمڕۆ کڕیارێکی هەمان چینی نرخ دەیدات، و نزمترین نرخی تۆمارکراوی هەمان کاڵا لە ماوەی پاراستنەکەدا. جیاوازییەکە لە بڕی کڕدراو دەدرێت.
+بۆ بەرهەمێک کە لەسەر بنەمای دۆلار نرخی بۆ دانراوە، نرخی بنەڕەتی بە دۆلاری ڕۆژی کڕین بەراورد دەکرێت لەگەڵ نزمترین نرخی بنەڕەتی بە دۆلار لە ماوەی پاراستنەکەدا، و جیاوازییەکە بەو نرخی ئاڵوگۆڕەی کاڵاکەی پێ کڕدراوە دەکرێتە دینار، و ئەوەی دەدرێت لە جیاوازیی ڕاستەقینە بە دینار زیاتر نابێت. بۆ بەرهەمێک کە ڕاستەوخۆ بە دینار نرخی بۆ دانراوە، ئەوەی کڕیار بە ڕاستی بۆ هەر یەکەیەک داویەتی بەراورد دەکرێت لەگەڵ نزمترینی دوو نرخ: ئەو نرخەی ئەمڕۆ کڕیارێکی هەمان چینی نرخ دەیدات، و نزمترین نرخی تۆمارکراوی هەمان کاڵا لە ماوەی پاراستنەکەدا. لە هەردوو حاڵەتدا جیاوازییەکە لە بڕی کڕدراو دەدرێت.
 
 ### 10.5 بەراورد لە ناو هەمان چینی نرخدا
 کڕیاری نرخی ئاسایی بەرامبەر نرخی ئاسایی دەکرێت؛ کڕیاری نرخی PRO بەرامبەر نرخی PRO یان نرخی ئاسایی دەکرێت، هەر کامیان نزمتر بێت. کڕیارێکی ئاسایی هەرگیز بەرامبەر نرخێک ناکرێت کە بۆ ئەندامێتییەک تەرخانە کە خاوەنی نییە.
@@ -810,6 +831,9 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 ### 11.7 کاڵای بازرگانانی کۆمەڵگا
 پاراستنی نرخ لێرەدا تایبەتە بە کاڵای فرۆشگا فەرمییەکە. نرخاندنی کاڵای بازرگانانی کۆمەڵگای لیڤۆ هی بازرگانە، و بەپێی سیاسەتی فرۆشتن لەگەڵ ئەودا لێکۆڵینەوەی لەگەڵ دەکرێت.
 
+### 11.8 گۆڕانی نرخی ئاڵوگۆڕ
+پاراستنەکە ئەو داشکانەی نرخ بە دینار ناگرێتەوە کە لە گۆڕانی نرخی ئاڵوگۆڕی دۆلار بەرامبەر دینارەوە دێت. نموونە: بەرهەمێک نرخی بنەڕەتیی 500 دۆلار بێت و هەر 500 دۆلار بمێنێتەوە، و نرخی ئاڵوگۆڕ لە 1,600 بۆ 1,500 دینار بۆ هەر دۆلارێک بگۆڕێت و نرخەکەی بە دینار دابەزێت؛ ئەمە داشکانی نرخی بەرهەمەکە نییە و قەرەبووی بۆ نییە. بەڵام ئەگەر خودی نرخی بنەڕەتی لە 500 بۆ 480 دۆلار دابەزێت، جیاوازیی 20 دۆلار داشکانێکی ڕاستەقینەیە و پاراستنەکە دەیگرێتەوە.
+
 ## 12. پێشکەشکردن و ناڕەزایی
 
 ### 12.1 داواکارییەکە چۆن پێشکەش دەکرێت
@@ -819,7 +843,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 کڕیار دەتوانێت لە ماوەی {{DISPUTE_RESPONSE_DAYS}} ڕۆژدا لە ئاگادارکردنەوەی بڕیارەکەوە، لە ڕێگەی پشتیوانییەوە، ناڕەزایی لە ڕەتکردنەوەی داواکارییەکەی یان لە بڕیاری هەڵوەشاندنەوەی داواکارییەکەی یان لە ڕاستکردنەوەی نرخەکەی دەرببڕێت.
 
 ### 12.3 بڕیارەکە لەسەر چی بنیات دەنرێت
-بڕیارەکە لەسەر تۆمارەکانی سیستەم بنیات دەنرێت: وێنەی نرخی داواکارییەکە، مێژووی گۆڕانی نرخەکان، بەرواری گەیاندن، و ئەوەی پێشتر لەسەر کاڵاکە دراوە.
+بڕیارەکە لەسەر تۆمارەکانی سیستەم بنیات دەنرێت: وێنەی نرخی داواکارییەکە و ئەو نرخی ئاڵوگۆڕەی پێی هەژمار کراوە، مێژووی گۆڕانی نرخەکان، بەرواری گەیاندن، و ئەوەی پێشتر لەسەر کاڵاکە دراوە.
 
 ### 12.4 هۆکارەکان دەپارێزرێن
 هۆکاری هەر وەرگرتن و ڕەتکردنەوە و هەڵوەشاندنەوە و ڕاستکردنەوەیەک تۆمار دەکرێت، و لە کاتی داواکردنیدا بۆ کڕیار ئاشکرا دەکرێت.

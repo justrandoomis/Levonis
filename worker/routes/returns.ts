@@ -64,6 +64,8 @@ import { typeForTransport } from '../lib/shippingType';
 import { pumpAfter, waitUntilFrom } from '../lib/eventBus';
 import { announceAfterResponse, orderTopic } from '../lib/adminTopicRouting';
 import { parseConditionDoc, returnRefusal } from '../lib/condition';
+import { channelOfLine } from '../lib/pricingEngine/orderBasis';
+import { claimBasis, engineObservations, takesUsdBaseRule, usdIqdInForceAt } from '../lib/pricingEngine/protectionBasis';
 import { CONDITION_DOC_DEFAULT_SQL, isConditionColumnMissing } from '../lib/conditionProjection';
 
 const WINDOW_MS = 7 * 86_400_000;
@@ -976,6 +978,8 @@ interface ClaimRow extends Record<string, unknown> {
   requested_at: string;
   decided_by: string | null;
   decided_at: string | null;
+  /** Migration 0181 (owner decision 6): what a v5 claim covers per unit; NULL on every older claim. */
+  eligible_unit_iqd?: number | null;
 }
 
 function claimPublic(r: ClaimRow, extra: Record<string, unknown> = {}) {
@@ -989,10 +993,26 @@ function claimPublic(r: ClaimRow, extra: Record<string, unknown> = {}) {
     credited_iqd: r.credited_iqd,
     state: r.state,
     policy: safeParse(r.policy_snapshot, {}),
+    // Owner decision 6: the dinars a claim covers per unit when part of the fall came from the exchange
+    // rate (the customer's «المشمول» line); never a USD figure, a rate or a supplier value.
+    eligible_unit_iqd: r.eligible_unit_iqd ?? null,
     requested_at: r.requested_at,
     decided_at: r.decided_at,
     ...extra,
   };
+}
+
+/** Migration 0181's claim columns (owner decision 6), detected once per isolate; only "present" is remembered. */
+let claimColumnsPresent = false;
+async function claimBasisColumns(db: D1Database): Promise<boolean> {
+  if (claimColumnsPresent) return true;
+  try {
+    await db.prepare('SELECT eligible_unit_iqd, basis FROM price_protection_claims LIMIT 0').all();
+    claimColumnsPresent = true;
+  } catch {
+    return false;
+  }
+  return true;
 }
 
 /** Prior protection credits already granted for the same order item. */
@@ -1017,7 +1037,7 @@ priceProtectionRoutes.post('/claims', async (c) => {
     // `o.shipping_type` is read for ONE reason: the admin notification below
     // has to land in the pre-order queue or the direct queue, and it must use
     // the order's own stored type rather than guess from the claim.
-    `SELECT oi.*, o.user_id AS owner_id, o.status, o.delivered_at, o.shipping_type
+    `SELECT oi.*, o.user_id AS owner_id, o.status, o.delivered_at, o.shipping_type, o.created_at AS order_created_at
        FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE oi.id = ?`
   )
@@ -1183,11 +1203,46 @@ priceProtectionRoutes.post('/claims', async (c) => {
     .bind(item.product_id, ...variantKeys, ...fields, windowFrom, windowTo)
     .first<{ m: number | null }>();
 
-  const candidates = [currentApplied];
-  if (hist && hist.m !== null && Number.isInteger(hist.m) && hist.m >= 0) candidates.push(hist.m);
-  const observedUnit = Math.min(...candidates);
-
-  const perUnitDrop = Math.max(0, originalUnit - observedUnit);
+  /**
+   * OWNER DECISION 6: AN FX-ONLY DROP IS NOT PRICE PROTECTION (policy v5
+   * §10.4, §11.8; worker/lib/pricingEngine/protectionBasis.ts). The engine's
+   * own observations of this line's model × channel (`sku:` history, with the
+   * USD/IQD each was computed at, and today's engine price) join the
+   * comparison: for an order created before v5 as plain dinars (the old rule,
+   * never missing a real engine drop); from v5 on restated at the rate the
+   * line was bought at, so a fall that is only the exchange rate pays nothing,
+   * and what is paid never exceeds the actual dinar drop.
+   */
+  const transportMethod = safeParse<{ method?: unknown } | null>(item.transport_snapshot as string | null, null)?.method;
+  const engineSnapshot =
+    item.price_basis === 'engine' && typeof item.usd_iqd_at_purchase === 'string' && Number.isSafeInteger(Number(item.engine_regular_iqd))
+      ? { regular_iqd: Number(item.engine_regular_iqd), usd_iqd_at_purchase: item.usd_iqd_at_purchase, base_usd_at_purchase: (item.base_usd_at_purchase as string | null) ?? null }
+      : null;
+  const lineChannel =
+    (engineSnapshot && typeof item.engine_channel === 'string' ? item.engine_channel : null) ??
+    channelOfLine({ pricing_basis: (pricing as { pricing_basis?: string } | null)?.pricing_basis === 'preorder' ? 'preorder' : 'direct', route: typeof transportMethod === 'string' ? transportMethod : null });
+  const observations = lineChannel
+    ? await engineObservations(c.env.DB, String(item.product_id), optionId, lineChannel as Parameters<typeof engineObservations>[3], { from: windowFrom, to: windowTo })
+    : { history: [], today: null };
+  const v5 = takesUsdBaseRule(item.order_created_at as string | null);
+  const decision = claimBasis({
+    v5,
+    engine: engineSnapshot,
+    orderUsdIqd: v5 && !engineSnapshot ? await usdIqdInForceAt(c.env.DB, String(item.order_created_at)) : null,
+    paidUnit: originalUnit,
+    todayApplied: currentApplied,
+    manualMin: hist && hist.m !== null && Number.isInteger(hist.m) && hist.m >= 0 ? hist.m : null,
+    engineHistory: observations.history,
+    engineToday: observations.today,
+  });
+  if (!decision.ok && decision.code === 'FX_ONLY_DROP') {
+    throw badRequest('The dinar price fell only because the dollar exchange rate moved — price protection does not cover exchange-rate moves', 'FX_ONLY_DROP');
+  }
+  if (!decision.ok) {
+    throw badRequest('No eligible price drop was found for this item within the window', 'NO_ELIGIBLE_DROP');
+  }
+  const observedUnit = decision.observed_unit;
+  const perUnitDrop = decision.eligible_unit ?? Math.max(0, originalUnit - observedUnit);
   if (perUnitDrop <= 0) {
     throw badRequest('No eligible price drop was found for this item within the window', 'NO_ELIGIBLE_DROP');
   }
@@ -1214,13 +1269,30 @@ priceProtectionRoutes.post('/claims', async (c) => {
     computed_eligible_iqd: computed,
     compensation_channel: 'wallet (configurable default — owner decision pending, docs/DECISIONS.md row 22)',
   });
-  await c.env.DB.prepare(
-    `INSERT INTO price_protection_claims (id, user_id, order_id, order_item_id, original_unit_iqd,
-       observed_unit_iqd, qty, credited_iqd, state, policy_snapshot)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'requested', ?)`
-  )
-    .bind(id, user.id, String(item.order_id), orderItemId, originalUnit, observedUnit, qty, policySnapshot)
-    .run();
+  // A v5 claim stores what it covers and its basis in their own columns (0181), never in the snapshot
+  // the customer reads; every older claim — and every claim on a database without 0181 — is the exact
+  // INSERT it always was.
+  if (decision.eligible_unit !== null && (await claimBasisColumns(c.env.DB))) {
+    await c.env.DB.prepare(
+      `INSERT INTO price_protection_claims (id, user_id, order_id, order_item_id, original_unit_iqd,
+         observed_unit_iqd, qty, credited_iqd, state, policy_snapshot,
+         eligible_unit_iqd, basis, usd_iqd_at_purchase, base_usd_at_purchase, base_usd_observed)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'requested', ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        id, user.id, String(item.order_id), orderItemId, originalUnit, observedUnit, qty, policySnapshot,
+        decision.eligible_unit, decision.basis, engineSnapshot?.usd_iqd_at_purchase ?? null, engineSnapshot?.base_usd_at_purchase ?? null, decision.base_usd_observed
+      )
+      .run();
+  } else {
+    await c.env.DB.prepare(
+      `INSERT INTO price_protection_claims (id, user_id, order_id, order_item_id, original_unit_iqd,
+         observed_unit_iqd, qty, credited_iqd, state, policy_snapshot)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'requested', ?)`
+    )
+      .bind(id, user.id, String(item.order_id), orderItemId, originalUnit, observedUnit, qty, policySnapshot)
+      .run();
+  }
 
   await audit(c.env.DB, user.id, 'price_protection.claim', id, {
     order_item_id: orderItemId, original: originalUnit, observed: observedUnit, computed_iqd: computed,
@@ -1312,7 +1384,9 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, async (c) =
   }
 
   // Approve: re-derive the credit under the cumulative cap NOW.
-  const eligibleTotal = Math.max(0, (claim.original_unit_iqd - claim.observed_unit_iqd) * claim.qty);
+  // Owner decision 6 (integrity H1): a v5 claim credits what it covers, never original − observed.
+  const perUnit = claim.eligible_unit_iqd ?? claim.original_unit_iqd - claim.observed_unit_iqd;
+  const eligibleTotal = Math.max(0, perUnit * claim.qty);
   const prior = await priorCreditedIqd(c.env.DB, claim.order_item_id, id);
   const credit = Math.max(0, Math.min(eligibleTotal - prior, eligibleTotal));
   if (credit <= 0) {

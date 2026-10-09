@@ -20,6 +20,8 @@
  * It lives beside the accounting code, not in `pricingEngine/`, because it
  * names `order_items`: the engine module never does (tests/pricingCurrencyRoles).
  */
+import { serverMessage } from '@levonis/contracts/costRefusals';
+import { HttpError } from './http';
 
 const PRESENT = new WeakMap<object, Set<string>>();
 
@@ -74,4 +76,31 @@ export async function engineColumnInstalled<T extends EngineCoreTable>(
   } catch {
     return false;
   }
+}
+
+/**
+ * Is this product's price the engine's? (`product_pricing_state.mode =
+ * 'engine'`; owner decision 8 adopts a product at its completing save.) A
+ * database without 0181 has no engine product: false. Not a cost — every
+ * admin may know it (the form says so, and the old price writers refuse).
+ */
+export async function productEngineManaged(db: D1Database, productId: string): Promise<boolean> {
+  try {
+    const row = await db.prepare("SELECT 1 AS x FROM product_pricing_state WHERE product_id = ? AND mode = 'engine'").bind(productId).first<{ x: number }>();
+    return !!row;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The old dinar price writers (the quick-price grid, the selection price)
+ * refuse an engine-priced product up front with ENGINE_MANAGED, in the
+ * viewer's language, before planning anything. The database's value-compared
+ * locks (migration 0181 §10) stay the backstop for every other path — the
+ * product form, the relations and fulfilment saves, the TXT and CSV imports —
+ * where an unchanged price still saves.
+ */
+export async function refuseEngineManaged(db: D1Database, productId: string): Promise<void> {
+  if (await productEngineManaged(db, productId)) throw new HttpError(409, serverMessage('ENGINE_MANAGED'), 'ENGINE_MANAGED');
 }

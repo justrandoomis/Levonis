@@ -591,6 +591,12 @@ export const FINANCIAL_FIELDS = [
   'document_rate',
   'iqd_converted',
   'minimum_profits',
+  // -- the writer's preview (owner decision 8): what a PRO and a PRIME member pay before and after
+  // -- the engine writes the product's prices (the fee waivers and typed member prices it removes).
+  'pro_before_iqd',
+  'pro_after_iqd',
+  'prime_before_iqd',
+  'prime_after_iqd',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

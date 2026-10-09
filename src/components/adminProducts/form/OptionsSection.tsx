@@ -79,6 +79,7 @@ export function OptionsSection({
   canSeeCost,
   errors,
   valueExtra,
+  pricesLocked = false,
 }: {
   rel: RelationsState;
   setRel: (fn: (r: RelationsState) => RelationsState) => void;
@@ -92,6 +93,14 @@ export function OptionsSection({
   errors: Record<string, string>;
   /** Rendered at the end of each model's card (the owner's USD pricing of that model); absent for everyone else. */
   valueExtra?: (value: FormValue) => React.ReactNode;
+  /**
+   * The engine prices this product (owner decision 8): every price cell —
+   * each model's, each colour's, the direct-sale increase and the route
+   * increases — shows the price the engine wrote and cannot be typed into (the
+   * database refuses a changed price with ENGINE_MANAGED anyway). Cost, stock
+   * and everything else stay editable.
+   */
+  pricesLocked?: boolean;
 }) {
   // Every mutation re-derives the inventory source, so the explainer strip,
   // the section summary and the saved wire all tell the same story.
@@ -531,6 +540,7 @@ export function OptionsSection({
                   )}
                   <FulfillmentEditor
                     value={v}
+                    locked={pricesLocked}
                     onChange={(fulfillments) => patchValue(g.id, v.id, { fulfillments })}
                     onValueChange={(patch) => patchValue(g.id, v.id, patch)}
                     error={errors[`value_availability:${v.id}`]}
@@ -578,6 +588,7 @@ export function OptionsSection({
                         beneath={base}
                         level="option"
                         canSeeCost={canSeeCost}
+                        locked={pricesLocked}
                         onChange={(patch) => patchValue(g.id, v.id, patch)}
                       />
                       <Field ar="مفعّل" en="Active">
@@ -688,6 +699,7 @@ export function OptionsSection({
                   beneath={beneathColor(c)}
                   level="color"
                   canSeeCost={canSeeCost}
+                  locked={pricesLocked}
                   onChange={(patch) => patchColor(c.id, patch)}
                   spread={colorSpread(c)}
                 />
@@ -883,10 +895,13 @@ function PriceCell({
   charged,
   viaRegular,
   onCommit,
+  locked = false,
 }: {
   label_ar: string;
   label_en: string;
   tip?: string;
+  /** The engine's price, read only (owner decision 8). */
+  locked?: boolean;
   cell: Cell;
   /** What this tier is ACTUALLY charged — `chargedAt`, which includes the
    *  resolver's own fallback for a member tier that has no price anywhere. */
@@ -914,8 +929,14 @@ function PriceCell({
         id={inputId}
         value={charged}
         onChange={onCommit}
+        disabled={locked}
         placeholder={landing === null ? 'يرث / inherit' : `يرث ${fmt(landing)}`}
       />
+      {locked && (
+        <p className="mt-1 text-[10px] text-sky-300/90 truncate" data-price-mode="engine">
+          سعر محرك التسعير · Engine price · نرخی بزوێنەری نرخدانان
+        </p>
+      )}
       {/* THE PROVENANCE LINE. Never hidden, and never guessed: `cell.mode` is
           `priceMode`'s answer for this exact row, so the sentence under the box
           is the same fact the resolver acts on. */}
@@ -952,7 +973,7 @@ function PriceCell({
         {/* Returning to inheritance is a BUTTON, not a blanked field. Blanking
             works too (both halves go null), but an admin should not have to
             discover that. */}
-        {cell.mode !== 'inherit' && (
+        {cell.mode !== 'inherit' && !locked && (
           <button
             type="button"
             onClick={() => onCommit(null)}
@@ -1020,6 +1041,7 @@ function PriceCells({
   spread,
   canSeeCost,
   onChange,
+  locked = false,
 }: {
   prices: FormPrices;
   /** What this row inherits: the product base for an option, the option's own
@@ -1038,6 +1060,8 @@ function PriceCells({
   spread?: number[];
   canSeeCost: boolean;
   onChange: (patch: Partial<FormPrices>) => void;
+  /** The engine prices this product: the price cells read only (never the cost). */
+  locked?: boolean;
 }) {
   const cells = rowCells(prices as PriceFields, beneath);
   // The MODE, the adjustment and the inherited value come from the cells; the
@@ -1054,6 +1078,8 @@ function PriceCells({
     charged: charges[field].charged,
     viaRegular: charges[field].viaRegular,
     onCommit: commit(field),
+    // Cost is never the engine's to set: it stays editable.
+    locked: locked && field !== 'cost',
   });
   const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const memberMarks = tierPriceMarks(cells, charges);
@@ -1115,8 +1141,11 @@ function FulfillmentEditor({
   onChange,
   onValueChange,
   error,
+  locked = false,
 }: {
   value: FormValue;
+  /** The engine prices this product: the direct-sale and route increases are its own, read only. */
+  locked?: boolean;
   onChange: (next: FormFulfillment[]) => void;
   onValueChange: (patch: Partial<FormValue>) => void;
   error?: string;
@@ -1164,10 +1193,11 @@ function FulfillmentEditor({
               <Field ar="زيادة البيع المباشر" en="Direct Sale Extra" hint="تخص هذا الخيار فقط وتُضاف إلى سعره الأساسي">
                 <Money
                   value={direct.regular_adjust_iqd ?? null}
+                  disabled={locked}
                   onChange={(regular_adjust_iqd) =>
                     replaceCell({ ...direct, regular_price_iqd: null, regular_adjust_iqd })
                   }
-                  placeholder="بلا زيادة"
+                  placeholder={locked ? 'سعر محرك التسعير' : 'بلا زيادة'}
                 />
               </Field>
             </div>
@@ -1198,6 +1228,7 @@ function FulfillmentEditor({
                         <div className="mt-1.5">
                           <Money
                             value={current.surcharge_iqd}
+                            disabled={locked}
                             onChange={(surcharge_iqd) => replaceRoute({ ...current, surcharge_iqd })}
                             placeholder="بلا زيادة"
                           />

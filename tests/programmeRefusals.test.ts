@@ -141,6 +141,8 @@ const REQUIRED: Record<string, readonly string[]> = {
   'USD design §10 (0181)': ['PRICING_MODE_ENGINE_ONLY', 'ORDER_SNAPSHOT_IMMUTABLE'],
   // USD design §3.1, §5.4: apply-purchase on a purchase that is not confirmed with a final cost.
   'USD design §5.4 (Inputs)': ['PRICING_PURCHASE_NOT_ELIGIBLE'],
+  // USD design §6.1 (the writer, owner decision 8): a save that would leave an engine product incomplete.
+  'USD design §6.1 (Writer)': ['PRICING_ENGINE_INCOMPLETE'],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

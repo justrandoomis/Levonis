@@ -21,7 +21,8 @@
  *     holds their text, so they cannot be re-hashed here; they record what
  *     the archive's `hash` column should hold for them. The ledger starts
  *     with the versions current before purchase 6, faq 5, membership 5 and
- *     price_protection 4.
+ *     price_protection 4; price_protection 5 (owner decision 6, DECISIONS
+ *     row 196) followed with the pricing engine's writer.
  *
  * Adding a version: bump it in its module, run this file, and copy the
  * `key@version:lang → hash` lines the failure prints into the fixture.
@@ -100,14 +101,32 @@ test('the ledger is what the archive stores: a fresh sync writes exactly these h
   for (const r of rows) assert.equal(r.hash, LEDGER[`${r.key}@${Number(r.version)}:${r.lang}`], `${r.key}@${r.version}:${r.lang}`);
 });
 
+/** The current version of each document decision 7 reworded: price_protection moved again, to 5, for decision 6. */
+const CURRENT_AFTER_DECISION_6: Readonly<Record<string, number>> = { purchase: 6, faq: 5, membership: 5, price_protection: 5 };
+
 test('the four documents decision 7 reworded moved to new versions, and their previous versions stay in the ledger', () => {
   const MOVED: ReadonlyArray<[string, number]> = [['purchase', 6], ['faq', 5], ['membership', 5], ['price_protection', 4]];
   for (const [key, version] of MOVED) {
-    assert.equal(POLICY_DOCUMENTS.find((d) => d.key === key)!.version, version, key);
+    assert.equal(POLICY_DOCUMENTS.find((d) => d.key === key)!.version, CURRENT_AFTER_DECISION_6[key], key);
     for (const lang of POLICY_LANGS) {
       assert.ok(`${key}@${version}:${lang}` in LEDGER, `${key}@${version}:${lang}`);
       assert.ok(`${key}@${version - 1}:${lang}` in LEDGER, `${key}@${version - 1}:${lang} left the ledger`);
       assert.notEqual(LEDGER[`${key}@${version}:${lang}`], LEDGER[`${key}@${version - 1}:${lang}`], `${key}/${lang}: the new version is the old text`);
     }
   }
+});
+
+test('decision 6 moved price_protection to version 5 with the code that applies it; version 4 stays in the ledger as the archive holds it', () => {
+  const doc = POLICY_DOCUMENTS.find((d) => d.key === 'price_protection')!;
+  assert.equal(doc.version, 5);
+  for (const lang of POLICY_LANGS) {
+    assert.ok(`price_protection@5:${lang}` in LEDGER, `price_protection@5:${lang}`);
+    assert.ok(`price_protection@4:${lang}` in LEDGER, `price_protection@4:${lang} left the ledger`);
+    assert.notEqual(LEDGER[`price_protection@5:${lang}`], LEDGER[`price_protection@4:${lang}`], `${lang}: version 5 is version 4's text`);
+  }
+  // The decision-6 article is in every language; version 4's §2.3 wording is kept.
+  assert.match(doc.body.ar, /### 11\.8 تغيّر سعر الصرف/);
+  assert.match(doc.body.en, /### 11\.8 Exchange-rate moves/);
+  assert.match(doc.body.ckb, /### 11\.8 گۆڕانی نرخی ئاڵوگۆڕ/);
+  assert.ok(doc.body.en.includes('the transport commission or the Direct Sale Extra'));
 });

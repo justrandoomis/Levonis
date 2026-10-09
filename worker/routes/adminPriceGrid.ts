@@ -5,6 +5,7 @@ import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { canViewCost, canWriteCost, projectForAdmin } from '../lib/adminScope';
 import { costRefusal } from '../lib/costAccess';
+import { refuseEngineManaged } from '../lib/engineInstalled';
 import { getSetting } from '../lib/settings';
 import { normalizeAvailability, deriveSaleTypes, type AvailabilityType } from '../lib/availability';
 import { normalizeSaleTypes } from '../lib/productModel';
@@ -698,6 +699,8 @@ adminPriceGridRoutes.patch('/:id/price-grid', async (c) => {
     admin,
     patches.map((p) => p.field)
   );
+  // An engine-priced product's prices are the engine's (owner decision 8): only its cost cells edit here.
+  if (patches.some((p) => p.field !== 'cost')) await refuseEngineManaged(c.env.DB, productId);
 
   const changes: CellChange[] = [];
   const afterOf = new Map<string, Partial<Record<Field, number | null>>>();
@@ -1049,6 +1052,7 @@ adminPriceGridRoutes.post('/:id/price-grid/bulk', async (c) => {
   if (!BULK_OPS.includes(op)) throw badRequest(`op must be one of: ${BULK_OPS.join(', ')}`, 'BAD_OP');
   const fields = readFields(body.fields);
   assertMayWrite(c.env, admin, fields);
+  if (fields.some((f) => f !== 'cost')) await refuseEngineManaged(c.env.DB, productId);
 
   let value: number | null = null;
   if (op !== 'inherit') {
@@ -1122,6 +1126,7 @@ adminPriceGridRoutes.post('/:id/price-grid/copy', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const fields = readFields(body.fields);
   assertMayWrite(c.env, admin, fields);
+  if (fields.some((f) => f !== 'cost')) await refuseEngineManaged(c.env.DB, productId);
 
   const side = (v: unknown, label: string): CopyRequest['from'] => {
     if (!v || typeof v !== 'object') throw badRequest(`${label} is required`, 'BAD_COPY_SIDE');
@@ -1212,6 +1217,7 @@ adminPriceGridRoutes.post('/:id/price-grid/undo', async (c) => {
   const productId = c.req.param('id');
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const batchId = str(body.batch_id, 'batch_id', { min: 3, max: 64 });
+  await refuseEngineManaged(c.env.DB, productId);
 
   const { results } = await c.env.DB.prepare(
     `SELECT variant_key, field, old_iqd, new_iqd, old_mode, old_adjust_iqd

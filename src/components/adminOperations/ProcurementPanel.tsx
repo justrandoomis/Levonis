@@ -8,7 +8,7 @@ import { chargeDraft, chargeProblems, chargesAfterRouteChange, chargeWire, looks
 import PurchaseLineCosts, { type ExtraChargeView } from './PurchaseLineCosts';
 import PricingSummaryBar from './PricingSummaryBar';
 import ProcurementPricingReview, { SavedPurchasePricing } from './ProcurementPricingReview';
-import { applyPurchase, hasSomethingToApply, previewDraft, previewSaved, type PricingChoices, type PricingPreview, type PricingSummary } from './procurementPricing';
+import { applyPurchase, hasSomethingToApply, previewDraft, previewSaved, samePrices, type PricingChoices, type PricingPreview, type PricingProduct, type PricingSummary } from './procurementPricing';
 import { procurementPricingStrings } from './procurementPricingStrings';
 import { ApiError, isAborted } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
@@ -141,6 +141,8 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     [optIn, setOptIn] = useState<string[]>([]),
     [usePurchase, setUsePurchase] = useState<Record<string, boolean>>({}),
     [preferValues, setPreferValues] = useState<Record<string, boolean>>({}),
+    // Owner decision 8: the owner's tick per product whose new prices move more than 15%.
+    [confirmLarge, setConfirmLarge] = useState<Record<string, boolean>>({}),
     [applyFailures, setApplyFailures] = useState<Array<{ product_id: string; label: string; message: string; purchase_id: string }>>([]),
     [savedPricing, setSavedPricing] = useState<PricingPreview | null>(null);
   const [investmentFor, setInvestmentFor] = useState('');
@@ -257,6 +259,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     setOptIn([]);
     setUsePurchase({});
     setPreferValues({});
+    setConfirmLarge({});
     setPricing(null);
     setPricingError('');
     setApplyFailures([]);
@@ -298,11 +301,14 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
       let hash = product.preview_hash;
       for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
-          await applyPurchase(product.product_id, purchaseId, hash, own);
+          await applyPurchase(product.product_id, purchaseId, hash, own, confirmLarge[product.product_id] === true);
           applied += 1;
           break;
         } catch (e) {
-          const fresh = e instanceof ApiError && e.code === 'PRICING_PREVIEW_STALE' ? (e.details?.preview as { preview_hash?: string } | null)?.preview_hash : undefined;
+          // The committed purchase reads a fresh hash; it is taken only when the prices it writes are the ones the
+          // review showed (owner decision 8: never new prices unseen) — else the saved view offers them again.
+          const shown = e instanceof ApiError && e.code === 'PRICING_PREVIEW_STALE' ? (e.details?.preview as PricingProduct | null) : null;
+          const fresh = shown?.preview_hash && samePrices(shown.adoption, product.adoption) ? shown.preview_hash : undefined;
           if (attempt === 0 && fresh) { hash = fresh; continue; }
           failures.push({ product_id: product.product_id, label: product.label, message: e instanceof Error ? e.message : String(e), purchase_id: purchaseId });
           break;
@@ -576,7 +582,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               <div><dt>{loc('التكلفة', 'Cost status', 'دۆخی تێچوو')}</dt><dd>{header.cost_state === 'final' ? loc('نهائية', 'Final', 'کۆتایی') : loc('تقديرية؛ لا تستلم بعد', 'Estimated; receipt is blocked', 'خەمڵێنراو؛ هێشتا وەرمەگرە')}</dd></div>
             </dl>
             <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={i}><strong>{l.label}</strong><div className={`mt-2 flex flex-wrap gap-3 text-sm ${T.text2}`}><span>{loc('الكمية', 'Quantity', 'بڕ')}: {l.qty_ordered}</span><span>{loc('تكلفة البند', 'Line cost', 'تێچووی بەند')}: {money(estimates[i]?.total_iqd)}</span><span>{ps.landedRow}: {money(estimates[i]?.unit_iqd)}</span><span>{loc('ربح المستثمر التقديري', 'Estimated investor profit', 'قازانجی خەمڵێنراوی وەبەرهێنەر')}: {money(estimates[i]?.investor_iqd)}</span><span>{loc('ربح المتجر التقديري', 'Estimated store profit', 'قازانجی خەمڵێنراوی فرۆشگا')}: {money(estimates[i]?.owner_iqd)}</span></div><PricingSummaryBar summary={summaryOf(i)} label={l.label} busy={pricingBusy && !summaryOf(i)} notInstalled={pricingOff} /></article>)}</div>
-            {!pricingOff && <ProcurementPricingReview preview={pricing} busy={pricingBusy} usePurchase={usePurchase} prefer={preferValues} onUsePurchase={(id, v) => setUsePurchase((m) => ({ ...m, [id]: v }))} onPrefer={(id, v) => setPreferValues((m) => ({ ...m, [id]: v }))} />}
+            {!pricingOff && <ProcurementPricingReview preview={pricing} busy={pricingBusy} usePurchase={usePurchase} prefer={preferValues} onUsePurchase={(id, v) => setUsePurchase((m) => ({ ...m, [id]: v }))} onPrefer={(id, v) => setPreferValues((m) => ({ ...m, [id]: v }))} confirmLarge={confirmLarge} onConfirmLarge={(id, v) => setConfirmLarge((m) => ({ ...m, [id]: v }))} />}
             <p className={`text-sm ${T.text3}`}>{loc('احفظ مسودة إن كنت تنتظر تكلفة نهائية. تأكيد الشراء يضيف شحنة قادمة؛ اختر استلام شحنة عند وصولها.', 'Save a draft while waiting for final costs. Confirming creates an incoming shipment; receive it when it arrives.', 'ئەگەر چاوەڕێی تێچووی کۆتایی دەکەیت ڕەشنووس پاشەکەوت بکە. پشتڕاستکردنەوەی کڕین بارێکی چاوەڕوانکراو زیاد دەکات؛ کاتێک گەیشت وەرگرتنی بار هەڵبژێرە.')}</p>
           </>}
           <aside className="inventory-sticky-summary"><div className="inventory-total"><span>{loc('المجموع مع تكاليف الشحنة', 'Total landed cost', 'کۆی گشتی لەگەڵ تێچووەکانی بار')}</span><strong>{money(costsValid ? total : null)}</strong></div>{funding.mode === 'investor' && <dl className="inventory-review"><div><dt>{loc('تمويل مخصص / مستلم', 'Allocated / received', 'پارەدارکردنی تەرخانکراو / وەرگیراو')}</dt><dd>{costMoney(allocated)} / {costMoney(Number(funding.received_iqd))}</dd></div><div><dt>{loc('مساهمة المتجر', 'Store contribution', 'بەشداریی فرۆشگا')}</dt><dd>{costMoney(Math.max(0, total - allocated))}</dd></div><div><dt>{loc('نقد مستلم غير مخصص', 'Unallocated received cash', 'پارەی نەختی وەرگیراوی تەرخاننەکراو')}</dt><dd>{costMoney(Math.max(0, Number(funding.received_iqd) - allocated))}</dd></div><div><dt>{loc('تمويل ينتظر الاستلام', 'Funding not yet received', 'پارەدارکردنی چاوەڕێی وەرگرتن')}</dt><dd>{costMoney(Math.max(0, allocated - Number(funding.received_iqd)))}</dd></div></dl>}<p className={`mt-2 text-xs ${T.text3}`}>{(quickReceive ? loc('ستُستلم القطع الموجودة الآن بعد تأكيد التكلفة. الربح تقديري حتى التسليم والتحصيل.', 'On-hand units are received after confirming cost. Profit remains an estimate until delivery and collection.', 'پارچە ئامادەکان دوای پشتڕاستکردنەوەی تێچوو وەردەگیرێن. قازانج خەمڵێنراوە تا گەیاندن و وەرگرتنی پارە.') : loc('الشراء القادم لا يزيد المخزون المتاح. الربح تقديري حتى تسليم الطلب والتحصيل.', 'Incoming purchases do not increase available stock. Profit remains an estimate until delivery and collection.', 'کڕینی چاوەڕوانکراو کۆگای بەردەست زیاد ناکات. قازانج خەمڵێنراوە تا گەیاندنی داواکاری و وەرگرتنی پارە.'))}</p></aside>
@@ -620,7 +626,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               {loc('إغلاق', 'Close')}
             </button>
           </div>
-          <SavedPurchasePricing preview={savedPricing} purchaseId={selected.purchase.id} failures={applyFailures} choices={choices} onDone={async () => { setApplyFailures((f) => f.filter((x) => x.purchase_id !== selected.purchase.id)); await loadSavedPricing(selected.purchase.id, selected.purchase.status); }} />
+          <SavedPurchasePricing preview={savedPricing} purchaseId={selected.purchase.id} failures={applyFailures} choices={choices} confirmLarge={confirmLarge} onDone={async () => { setApplyFailures((f) => f.filter((x) => x.purchase_id !== selected.purchase.id)); await loadSavedPricing(selected.purchase.id, selected.purchase.status); }} />
           <div className="inventory-lines">{selected.lines.map((l) => <article className="inventory-line" key={l.line_id}>
             <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('المطلوب / المستلم', 'Ordered / received')}: {l.qty_ordered} / {l.qty_received}</small></div></div>
             <PurchaseLineCosts

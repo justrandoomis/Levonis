@@ -34,6 +34,7 @@ import FxHistorySheet from './FxHistorySheet';
 import ShippingRatesCard from './ShippingRatesCard';
 import { PricingFailure } from './parts';
 import { fxCount } from './format';
+import EngineSaveList from './EngineSaveList';
 
 export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' | 'ltr' }) {
   const s = fxStrings(lang);
@@ -43,6 +44,8 @@ export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' |
   const [reload, setReload] = useState(0);
   const [reviewPair, setReviewPair] = useState<FxPairDto['pair'] | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Every rate act answers with the rates: the stale list's count follows it (owner decision 8).
+  const [ratesSeq, setRatesSeq] = useState(0);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -57,7 +60,10 @@ export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' |
     return () => ac.abort();
   }, [reload]);
 
-  const onAnswer = useCallback((answer: FxRatesAnswer) => setData(answer), []);
+  const onAnswer = useCallback((answer: FxRatesAnswer) => {
+    setData(answer);
+    setRatesSeq((n) => n + 1);
+  }, []);
   const onStale = useCallback(() => setReload((n) => n + 1), []);
   const refresh = useFxAct({ lang, s, onAnswer, onStale });
 
@@ -133,6 +139,9 @@ export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' |
           </div>
         </div>
       )}
+
+      {/* A confirmed rate that moved leaves engine prices behind: their count and the one-click preview + save. */}
+      {data && <EngineSaveList lang={lang} compact reloadKey={ratesSeq} />}
 
       <FxReviewSheet pair={reviewing && reviewing.pending ? reviewing : null} onClose={() => setReviewPair(null)} lang={lang} dir={dir} s={s} onAnswer={onAnswer} onStale={onStale} />
       <FxHistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} lang={lang} dir={dir} s={s} />

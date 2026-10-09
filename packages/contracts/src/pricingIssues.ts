@@ -78,6 +78,10 @@ export const PRICING_ISSUE_CODES = [
   'MEASURE_FROM_PUBLIC_SPEC',
   // v2 check (1)7: a BLOCKED Direct Sale Extra rule has its own code (TARGET_PROFIT_BLOCKED names the target only)
   'DIRECT_SALE_EXTRA_BLOCKED',
+  // The writer (owner decision 8): what keeps a product's prices from being written exactly.
+  'PRICE_SHAPE_UNSUPPORTED',
+  'FX_DERIVED_STALE',
+  'PRICING_ENGINE_PAUSED',
 ] as const;
 
 export type PricingIssueCode = (typeof PRICING_ISSUE_CODES)[number];
@@ -339,6 +343,30 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
       ar: 'زيادة البيع المباشر موقوفة حتى تقرر',
       en: 'The Direct Sale Extra is on hold until you decide',
       ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ ڕاگیراوە تا تۆ بڕیار دەدەیت',
+    },
+  },
+  PRICE_SHAPE_UNSUPPORTED: {
+    severity: 'error',
+    label: {
+      ar: 'لون أو نسخة أو مجموعة خيارات ثانية تحمل سعرًا خاصًا؛ أزله ليُسعَّر المنتج تلقائيًا',
+      en: 'A colour, a variant or a second option group carries its own price; remove it so the product can be priced automatically',
+      ckb: 'ڕەنگێک یان جۆرێک یان کۆمەڵە هەڵبژاردەیەکی دووەم نرخی تایبەتی خۆی هەیە؛ لای ببە بۆ ئەوەی بەرهەمەکە بە خۆکاری نرخی بۆ دابنرێت',
+    },
+  },
+  FX_DERIVED_STALE: {
+    severity: 'error',
+    label: {
+      ar: 'أسعار الصرف المشتقة لا تطابق الأسعار المعتمدة؛ أعد تحديث الأسعار أولًا',
+      en: 'The derived exchange rates do not match the approved ones; refresh the rates first',
+      ckb: 'نرخە دەرهێنراوەکانی ئاڵوگۆڕ لەگەڵ نرخە پەسەندکراوەکان ناگونجێن؛ سەرەتا نرخەکان نوێ بکەرەوە',
+    },
+  },
+  PRICING_ENGINE_PAUSED: {
+    severity: 'error',
+    label: {
+      ar: 'التسعير التلقائي متوقف مؤقتًا',
+      en: 'Automatic pricing is paused',
+      ckb: 'نرخدانانی خۆکار بۆ ماوەیەک ڕاگیراوە',
     },
   },
 };

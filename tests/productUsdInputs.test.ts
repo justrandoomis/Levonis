@@ -91,10 +91,17 @@ test('PUT: the brief’s example from the form — $500 / +$120 / $620 / 992,000
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_audit WHERE product_id = ?', AMS), 2);
 });
 
+/** A save that completes (or reprices) the product shows its preview first (owner decision 8): read it, then save with its hash. */
+async function saveThroughPreview(w: ReturnType<typeof pricingWorld>, body: Record<string, unknown>) {
+  const r = await w.putInputs(AMS, body);
+  if (r.status !== 409 || r.body.code !== 'PRICING_PREVIEW_REQUIRED') return r;
+  return w.putInputs(AMS, { ...body, preview_hash: r.body.details.preview.preview_hash, confirm_large_change: true });
+}
+
 test('a model’s own value beats the product’s; null hands it back; the Direct Sale Extra joins the direct price after rounding', async () => {
   const w = pricingWorld();
   const first = await w.putInputs(AMS, { inputs_seq: 0, inputs: [BRIEF_BASE], rules: [BRIEF_RULE] });
-  const own = await w.putInputs(AMS, {
+  const own = await saveThroughPreview(w, {
     inputs_seq: first.body.inputs_seq,
     inputs: [{ scope: 'option', scope_id: AMS_MODEL, supplier_cost_amount: '600', supplier_cost_currency: 'USD' }],
     rules: [{ kind: 'direct_sale_extra', scope: 'option', scope_id: AMS_MODEL, amount_iqd: 25_000 }],
@@ -111,7 +118,7 @@ test('a model’s own value beats the product’s; null hands it back; the Direc
   assert.equal(option.pricing_inputs.supplier_cost_amount, '600');
   assert.equal(option.direct_sale_extra_iqd, 25_000);
 
-  const back = await w.putInputs(AMS, { inputs_seq: own.body.inputs_seq, inputs: [{ scope: 'option', scope_id: AMS_MODEL, supplier_cost_amount: null }] });
+  const back = await saveThroughPreview(w, { inputs_seq: own.body.inputs_seq, inputs: [{ scope: 'option', scope_id: AMS_MODEL, supplier_cost_amount: null }] });
   assert.equal(back.status, 200, JSON.stringify(back.body));
   assert.equal(back.body.models[0].pricing_summary.preorder_base_iqd, 992_000);
   const optionRow = row<Record<string, unknown>>(w.raw, "SELECT supplier_cost_amount, supplier_cost_currency, supplier_input_mode FROM pricing_inputs WHERE scope = 'option'")!;

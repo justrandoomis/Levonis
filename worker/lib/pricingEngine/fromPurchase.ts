@@ -405,7 +405,7 @@ export function mergedRules(stored: ProductPricingData, writes: readonly RuleWri
     const scopeId = w.scope === 'product' ? '' : w.scope_id;
     const at = rows.findIndex((r) => r.product_id === stored.product_id && r.kind === w.kind && r.scope === w.scope && r.scope_id === scopeId);
     const next = {
-      id: at >= 0 ? rows[at]!.id : `draft:${w.kind}:${w.scope}:${scopeId}`,
+      id: at >= 0 ? rows[at]!.id : (w.new_id ?? `draft:${w.kind}:${w.scope}:${scopeId}`),
       kind: w.kind,
       scope: w.scope,
       catalog_id: null,

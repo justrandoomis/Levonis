@@ -55,6 +55,14 @@ const INPUTS_PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
   // The P1 names these answers reuse (registered in tests/financialFieldsUnion.test.ts too).
   issue_codes: 'E1 readiness CODES of one bar or one model × channel',
   cod_priced_as_direct: 'yes/no: cash on delivery re-prices the pre-order from the direct ladder',
+  // The writer's preview (owner decision 8).
+  adoption: 'a container: what the save would do to the prices (adopt / reprice / data only), every figure under a FINANCIAL_FIELDS key',
+  needs_write: 'yes/no: the save would write a price',
+  write_seq: 'a counter of the product’s price writes (the fence of «رجوع إلى التسعير اليدوي») — a count, never an amount',
+  large_change: 'yes/no: a price moves more than 15% (the tick and a fresh sign-in)',
+  drop_flag: 'yes/no: a price falls more than 30%',
+  legacy_step: 'yes/no: the migrated minimum, rounded up to the cent, moves a price one step',
+  route_fee_removed: 'yes/no: the old route fee is folded into the engine price',
 };
 
 function workerCorpus(): string {

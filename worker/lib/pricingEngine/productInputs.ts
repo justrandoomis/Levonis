@@ -56,7 +56,18 @@ import { parseRuleWrites } from './ownerRules';
 import { mergedRules } from './fromPurchase';
 import { canonical, modelSummary, priceModels } from './procurementPreview';
 import { previewRowsDto, ratesHeadDto, summaryDto } from './procurementDto';
-import { nextInputRow, ownerRow, ruleAt, type InputFields, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow } from './store';
+import { inputWriteIsNoop, nextInputRow, ownerRow, ruleAt, ruleWriteIsNoop, type InputFields, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow } from './store';
+import {
+  engineEvaluationDto,
+  evaluateEngineWrite,
+  loadEngineControl,
+  loadStoredSkuCosts,
+  priceImageOf,
+  withRuleIds,
+  type EngineControl,
+  type EngineEvaluation,
+  type StoredSkuCost,
+} from './engineWrite';
 
 /** The fields the product form edits (the pricing weight stays as stored). */
 export const FORM_INPUT_FIELDS = [
@@ -220,6 +231,55 @@ export async function formPreviewHash(productId: string, iqd: readonly IqdEntry[
   );
 }
 
+/** What an engine write reads beyond the store: the price image, the control row, the stored engine results. */
+export interface EngineReads {
+  image: string;
+  control: EngineControl;
+  storedCosts: StoredSkuCost[];
+}
+
+export async function loadEngineReads(db: D1Database, productId: string): Promise<EngineReads> {
+  const [image, control, storedCosts] = await Promise.all([priceImageOf(db, productId), loadEngineControl(db), loadStoredSkuCosts(db, [productId])]);
+  return { image, control, storedCosts };
+}
+
+/** The drafts that change something (a no-op write is never sent, nor hashed); new rule rows get their ids. */
+export function effectiveWrites(draft: ProductInputsDraft): { inputWrites: InputWrite[]; ruleWrites: RuleWrite[] } {
+  return { inputWrites: draft.inputs.filter((w) => !inputWriteIsNoop(w)), ruleWrites: withRuleIds(draft.rules.filter((w) => !ruleWriteIsNoop(w))) };
+}
+
+/**
+ * Owner decision 8 for the product form: the engine's evaluation of the store
+ * with the drafts laid over — adopt (a manual product the save leaves
+ * complete), reprice (an engine product), or data only.
+ */
+export async function productEngineEvaluation(
+  loaded: LoadedProduct,
+  stored: ProductPricingData,
+  ctx: PricingContext,
+  rates: PricingRates | null,
+  draft: ProductInputsDraft,
+  reads: EngineReads,
+  opts: { adopt?: boolean; writes?: { inputWrites: InputWrite[]; ruleWrites: RuleWrite[] } } = {}
+): Promise<EngineEvaluation> {
+  const writes = opts.writes ?? effectiveWrites(draft);
+  return evaluateEngineWrite({
+    loaded,
+    stored,
+    ctx,
+    rates,
+    control: reads.control,
+    inputs: draftInputs(stored.inputs, writes.inputWrites),
+    inputWrites: writes.inputWrites,
+    ruleWrites: writes.ruleWrites,
+    iqd: draft.iqd.map((e) => [e.scope, e.scope_id, e.amount, e.reconvert] as const),
+    image: reads.image,
+    storedCosts: reads.storedCosts,
+    // A product the owner took back to manual pricing adopts again only when asked.
+    allowAdopt: !stored.state?.opted_out_at || opts.adopt === true,
+  });
+}
+
 /** The store's owner rows as they would be after the drafts (exactly the row a write leaves). */
 function draftInputs(stored: readonly StoredInputRow[], writes: readonly InputWrite[]): Array<Partial<StoredInputRow>> {
   const rows: Array<Partial<StoredInputRow>> = stored.map((r) => ({ ...r }));
@@ -276,9 +336,13 @@ export async function productInputsAnswer(
   stored: ProductPricingData,
   ctx: PricingContext,
   rates: PricingRates | null,
-  draft: ProductInputsDraft = { inputs: [], rules: [], iqd: [] }
+  draft: ProductInputsDraft = { inputs: [], rules: [], iqd: [] },
+  reads: EngineReads | null = null,
+  opts: { adopt?: boolean; evaluation?: EngineEvaluation } = {}
 ) {
   const pid = loaded.id;
+  // Owner decision 8: what a save of these drafts would do to the product's prices, and the hash it must carry.
+  const evaluation = opts.evaluation ?? (reads ? await productEngineEvaluation(loaded, stored, ctx, rates, draft, reads, { adopt: opts.adopt }) : null);
   const inputs = draftInputs(stored.inputs, draft.inputs);
   // «تفاصيل» reads an IQD conversion's provenance from the rows as they would be after the drafts.
   const drafted: ProductPricingData = { ...stored, inputs: inputs as StoredInputRow[] };
@@ -338,12 +402,17 @@ export async function productInputsAnswer(
     product_id: pid,
     mode: engine ? ('engine' as const) : ('manual' as const),
     inputs_seq: stored.state?.inputs_seq ?? 0,
+    // The price writes' counter: «رجوع إلى التسعير اليدوي» is fenced on it.
+    write_seq: stored.state?.write_seq ?? 0,
     rates: ratesHeadDto(rates),
     scopes: [scopeDto('base', '', names(null)), ...options.map((o) => scopeDto('option', o.id, names(o)))],
     models,
     // Owner decision 8's six figures per model × channel, priced as the drafts would leave the store.
     rows: previewRowsDto(priceModels(pid, legacy.models, inputs, rules, rates)),
-    // A save that converts typed dinars carries this (the rate it was shown at).
-    preview_hash: await formPreviewHash(pid, draft.iqd, rates),
+    // The save's own preview (owner decision 8): adopt / reprice / data only, the six figures, the flags.
+    adoption: evaluation ? engineEvaluationDto(evaluation) : null,
+    // What the save carries: the engine write's hash when the save writes prices, else the hash of
+    // the typed dinars' conversion (the rate it was shown at).
+    preview_hash: evaluation?.kind && evaluation.complete && evaluation.hash ? evaluation.hash : await formPreviewHash(pid, draft.iqd, rates),
   };
 }

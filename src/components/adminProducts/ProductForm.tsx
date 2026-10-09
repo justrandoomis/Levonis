@@ -50,6 +50,7 @@ import {
   UsdPricingPreview,
   UsdPricingProductPanel,
   UsdPricingProvider,
+  UsdPricingSaveSheet,
   useUsdPricingState,
   type FormModel,
   type UsdPricingFormContext,
@@ -203,6 +204,8 @@ export default function ProductForm({
    * A new product has nothing stored to lose.
    */
   const [costLoaded, setCostLoaded] = useState(true);
+  // Owner decision 8: the engine prices this product — its price cells are read only (every admin).
+  const [engineManaged, setEngineManaged] = useState(false);
   const costShown = canSeeCost && costLoaded;
 
   const [doc, setDoc] = useState<EditorDoc>(() => blankDoc());
@@ -416,6 +419,7 @@ export default function ProductForm({
     setRel(rs);
     // Both answers, never the first one alone (see `relationsCarryCost`).
     setCostLoaded(carriesCost(p.product) && relationsCarryCost(r));
+    setEngineManaged(p.engine_managed === true);
     setLoadedUpdatedAt(p.product.updated_at ?? '');
     setLoadedBasePrice(typeof d.price_iqd === 'number' ? d.price_iqd : null);
     setPinnedDismissed(false);
@@ -706,7 +710,13 @@ export default function ProductForm({
     }),
     [doc.dimensions, optionDimensions, savedMeasures, pricingModels, doc.sale_types, setPricingMeasure]
   );
-  const pricing = useUsdPricingState({ productId: doc.id || null, enabled: canSeeCost, form: pricingForm });
+  const pricing = useUsdPricingState({
+    productId: doc.id || null,
+    enabled: canSeeCost,
+    form: pricingForm,
+    // The engine wrote the prices: read the product again (its prices and the lock), keeping unsaved edits.
+    onPricesWritten: (id) => void reloadKeepingEdits(id),
+  });
   const us = usdPricingFormStrings(lang);
   const usEn = USD_PRICING_FORM_STRINGS.en;
 
@@ -864,7 +874,8 @@ export default function ProductForm({
         const warned = res.warnings?.length ? res.warnings.join(' · ') : '';
         if (priced.message) setSaveNote([warned, priced.message].filter(Boolean).join(' · '));
       } else if (canSeeCost && savedId) {
-        pricing.reload();
+        // No pricing typed: when this save completed the product (owner decision 8), the new prices are shown first.
+        await pricing.afterProductSaved(savedId);
       }
       onListChanged();
       if (!productId && savedId) {
@@ -1434,7 +1445,7 @@ export default function ProductForm({
           {/* An engine-priced product's price is the engine's (the owner sees it
               as «سعر المتجر الحالي», read only); every other product — and every
               other admin — keeps the editable «السعر» exactly as before. */}
-          {canSeeCost && pricing.engine ? (
+          {(canSeeCost && pricing.engine) || engineManaged ? (
             <Field ar={us.storePrice} en={lang === 'en' ? '' : usEn.storePrice} hint={us.storePriceEngine}>
               <TextInput readOnly aria-readonly="true" data-form="store-price-engine" value={doc.price_iqd === null ? '—' : formatIqd(doc.price_iqd)} />
             </Field>
@@ -1807,6 +1818,8 @@ export default function ProductForm({
           baseDimensions={doc.dimensions ?? emptyDimensions()}
           canSeeCost={costShown}
           errors={showErrors ? errors : {}}
+          // Owner decision 8: an engine-priced product's price cells show the engine's price, read only.
+          pricesLocked={engineManaged || (canSeeCost && pricing.engine)}
           // Each model's own USD pricing (empty = the product's), its computed
           // customer price and its 4-cell summary, inside the model's card.
           valueExtra={
@@ -2044,6 +2057,7 @@ export default function ProductForm({
         </div>
         {/* Owner decision 8's six figures per model × channel, with the unsaved pricing. */}
         {canSeeCost && <UsdPricingPreview />}
+        {canSeeCost && <UsdPricingSaveSheet />}
         {previewOpen && (
           <div className="mt-3 rounded-lg border border-zinc-800 bg-black/30 p-3 min-w-0">
             <pre className="text-[11px] text-zinc-400 overflow-x-auto" dir="ltr">

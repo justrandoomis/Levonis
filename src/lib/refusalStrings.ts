@@ -193,6 +193,18 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ckb: 'پاکێج بە تەواوی پارێزراو نییە لە نرخدا — پارچەکانی بە جیا پارێزراون.',
   },
 
+  // ---- price protection (owner decision 6; policy price_protection v5 §11.8) ----
+  FX_ONLY_DROP: {
+    ar: 'انخفض السعر بالدينار بسبب تغيّر سعر صرف الدولار فقط، ولم ينخفض سعر المنتج الأساسي بالدولار — حماية السعر لا تشمل تغيّر الصرف.',
+    en: "The dinar price fell only because the dollar exchange rate moved; the product's own price in dollars did not fall — price protection does not cover exchange-rate moves.",
+    ckb: 'نرخی دینار تەنها بەهۆی گۆڕانی نرخی ئاڵوگۆڕی دۆلارەوە دابەزی؛ نرخی بنەڕەتی بەرهەمەکە بە دۆلار دانەبەزی — پاراستنی نرخ گۆڕانی ئاڵوگۆڕ ناگرێتەوە.',
+  },
+  NO_ELIGIBLE_DROP: {
+    ar: 'لم نجد انخفاضًا في سعر هذه القطعة خلال مدة الحماية.',
+    en: 'No eligible price drop was found for this item within the protection period.',
+    ckb: 'هیچ داشکانێکی گونجاومان لە نرخی ئەم پارچەیەدا لە ماوەی پاراستنەکەدا نەدۆزییەوە.',
+  },
+
   // ---- the mystery offer (§15.3) -----------------------------------------
   MYSTERY_NO_ELIGIBLE_STOCK: {
     ar: 'لا يوجد مخزون متاح لهذا العرض الآن.',

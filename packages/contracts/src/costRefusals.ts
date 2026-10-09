@@ -343,10 +343,17 @@ export const COST_REFUSALS = {
     en: 'The pricing system is being updated; try again shortly.',
     ckb: 'سیستەمی نرخدانان نوێ دەکرێتەوە؛ کەمێکی تر هەوڵ بدەرەوە.',
   },
+  // Owner decision 8: a save that writes prices shows them first — the answer carries the preview.
   PRICING_PREVIEW_REQUIRED: {
-    ar: 'هذا التغيير يمسّ منتجات كثيرة؛ عاينه أولاً ثم طبّقه.',
-    en: 'This change affects many products; preview it first, then apply it.',
-    ckb: 'ئەم گۆڕانکارییە کار لە زۆر بەرهەم دەکات؛ سەرەتا پێشبینینی بکە، پاشان جێبەجێی بکە.',
+    ar: 'هذا الحفظ يغيّر الأسعار؛ راجع الأسعار الجديدة أولاً ثم احفظ.',
+    en: 'This save changes prices; review the new prices first, then save.',
+    ckb: 'ئەم پاشەکەوتکردنە نرخەکان دەگۆڕێت؛ سەرەتا نرخە نوێیەکان ببینە، پاشان پاشەکەوت بکە.',
+  },
+  // An engine-priced product never loses its price: a change that would leave it incomplete is refused.
+  PRICING_ENGINE_INCOMPLETE: {
+    ar: 'هذا التغيير يترك منتجًا مسعَّرًا تلقائيًا بلا بيانات تسعير كاملة؛ أكمل البيانات أو أرجعه إلى التسعير اليدوي.',
+    en: 'This change would leave an automatically priced product without complete pricing data; complete the data or return it to manual pricing.',
+    ckb: 'ئەم گۆڕانکارییە بەرهەمێکی نرخدانراوی خۆکار بەبێ زانیاریی تەواوی نرخدانان بەجێدەهێڵێت؛ زانیارییەکان تەواو بکە یان بیگەڕێنەوە بۆ نرخدانانی دەستی.',
   },
   PRICING_PREVIEW_BUSY: {
     ar: 'المعاينة قيد الحساب في نافذة أخرى؛ انتظر لحظة.',

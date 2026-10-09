@@ -1,7 +1,8 @@
 /**
  * «التسعير والشحن» P1 — THE OWNER'S PRICING PREVIEW, ITS WIRE (MVP plan §6 P1).
  *
- * Three calls, all to /api/admin/pricing, all read-only on the server:
+ * The product preview's three calls, all to /api/admin/pricing, all read-only
+ * on the server (the rates routes and the stale list follow below):
  *
  *   GET  /overview?page=N            the products, 20 a page, and the §2.3 counts
  *   GET  /products/:id               today's prices per model × channel, the old
@@ -23,6 +24,7 @@
  */
 import { api, type RequestOptions } from '../../lib/api';
 import type { PricingMigrationStatus, LegacyValueState } from '../../../packages/contracts/src/pricingMigrationLabels';
+import type { EngineAdoption } from '../adminOperations/procurementPricing';
 
 export const PRICING_API = '/api/admin/pricing';
 
@@ -479,3 +481,60 @@ export const reviewFxRate = (pair: FxPairId, body: { owner_version: number; deci
 
 export const saveShippingRate = (profile: PricingProfile, body: { version: number; rate_iqd: string; confirm_large_change?: boolean }) =>
   api.put<FxRatesAnswer>(`${PRICING_API}/rates/shipping/${encodeURIComponent(profile)}`, body);
+
+// ============================================================= The stale list (owner decision 8; USD design §6.5)
+//
+//   GET  /save-list               engine products whose stored price was computed at a
+//                                 confirmed rate that changed since (stale), and
+//                                 complete-but-manual products (ready) — counts and names
+//   POST /save-list/preview       {product_ids} (≤ 20): each product's preview and hash — reads only
+//   POST /products/save-bulk      {items:[{product_id, preview_hash}], confirm_large_change?} — the
+//                                 one price write of this screen, after that preview; each product
+//                                 its own atomic, fenced, audited batch on the server
+//
+// Every figure is the server's. Automatic repricing on a rate change is the
+// next package (FX-5): until then a changed rate lists the products here.
+
+/** The most products one preview or bulk save carries (the server's own bound). */
+export const ENGINE_BULK_MAX = 20;
+
+export interface SaveListItem extends PricingNames {
+  product_id: string;
+  slug: string;
+  /** What moved: a supplier currency (USD / EUR / CNY) or a shipping profile. */
+  reasons: string[];
+}
+
+export interface SaveListAnswer {
+  success: boolean;
+  stale: { count: number; items: SaveListItem[] };
+  ready: { count: number; items: SaveListItem[] };
+}
+
+export interface SaveListPreviewItem extends PricingNames {
+  product_id: string;
+  slug: string;
+  preview: EngineAdoption;
+}
+
+export interface BulkSaveResult {
+  product_id: string;
+  status: 'saved' | 'already' | 'unchanged' | 'refused';
+  code?: string;
+}
+
+export function fetchSaveList(signal?: AbortSignal): Promise<SaveListAnswer> {
+  return api.get<SaveListAnswer>(`${PRICING_API}/save-list`, { signal, mascot: 'silent' });
+}
+
+export function previewSaveList(productIds: readonly string[]): Promise<{ success: boolean; items: SaveListPreviewItem[] }> {
+  return api.post<{ success: boolean; items: SaveListPreviewItem[] }>(`${PRICING_API}/save-list/preview`, { product_ids: productIds.slice(0, ENGINE_BULK_MAX) }, { mascot: 'silent' });
+}
+
+export function saveBulk(items: ReadonlyArray<{ product_id: string; preview_hash: string }>, confirmLarge: boolean): Promise<{ success: boolean; results: BulkSaveResult[] }> {
+  const body = { items: items.slice(0, ENGINE_BULK_MAX), ...(confirmLarge ? { confirm_large_change: true } : {}) };
+  return api.post<{ success: boolean; results: BulkSaveResult[] }>(`${PRICING_API}/products/save-bulk`, body, { mascot: 'silent' });
+}
+
+/** The products one preview takes: the stale ones first (their stored price is already behind), then the ready ones. */
+export const firstBatch = (list: SaveListAnswer): string[] => [...list.stale.items, ...list.ready.items].map((i) => i.product_id).slice(0, ENGINE_BULK_MAX);
