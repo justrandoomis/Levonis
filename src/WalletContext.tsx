@@ -54,8 +54,9 @@ interface WalletContextType {
    * THE SHOP'S EFFECTIVE USD/IQD, as decimal text — the display currency's
    * rate (FX programme plan §13). `undefined` until the settings arrive;
    * `null` when the server sends none (the owner has not approved a first
-   * value, or an older server), and the display then falls back to
-   * `exchangeRate`. Never used for money: the wallet keeps `exchangeRate`.
+   * value, or an older server), and prices then read in dinars — never at
+   * `exchangeRate` (owner decision 9: the wallet's 1,400 is not a market
+   * rate). Never used for money: the wallet keeps `exchangeRate`.
    */
   displayUsdRate: string | null | undefined;
   /** Whether that rate is the provider's figure (false: the owner typed it) — who the menu credits. */

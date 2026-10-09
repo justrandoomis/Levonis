@@ -36,6 +36,7 @@ import { applyRelations, loadRelationsView } from '../lib/productOverlay';
 import { pinnedRows, repriceRow, type PinnedPriceRow, type RepriceMode } from '../lib/pinnedPrices';
 import type { Tier } from '../lib/pricing';
 import { getSettings } from '../lib/settings';
+import { getDisplayUsdRate, iqdToUsdCentsAtRate } from '../lib/fx/displayRate';
 import { transportDefaultsFrom } from './products';
 import {
   attemptedFinancialWrites,
@@ -2047,8 +2048,12 @@ adminProductsRoutes.put('/:id/catalogs', async (c) => {
 
 /**
  * Admin price preview: full resolver output INCLUDING cost fields, plus a
- * USD preview from the configured exchange rate. `tier` may be supplied to
- * preview what a member of that tier would pay (server data only otherwise).
+ * USD preview at THE SHOP'S display rate — the effective USD/IQD customers
+ * read dollars at (`getDisplayUsdRate`, public by design), never the wallet's
+ * `exchangeRate` (owner decision 9: 1,400 is the wallet's own rate). Before
+ * the owner approves a first USD/IQD value `usd_preview` is null. `tier` may
+ * be supplied to preview what a member of that tier would pay (server data
+ * only otherwise).
  */
 adminProductsRoutes.post('/:id/quote', async (c) => {
   const id = c.req.param('id');
@@ -2067,7 +2072,10 @@ adminProductsRoutes.post('/:id/quote', async (c) => {
   const tier: Tier =
     body.tier === 'plus' || body.tier === 'pro' || body.tier === 'prime' ? body.tier : 'free';
 
-  const settings = await getSettings(c.env.DB, ['proPricingPolicy', 'preorderTransportDefaults', 'exchangeRate']);
+  const [settings, displayRate] = await Promise.all([
+    getSettings(c.env.DB, ['proPricingPolicy', 'preorderTransportDefaults']),
+    getDisplayUsdRate(c.env.DB),
+  ]);
   const resolved = resolveUnitPrice({
     product: doc,
     optionId: typeof body.optionId === 'string' && body.optionId ? body.optionId : null,
@@ -2080,11 +2088,13 @@ adminProductsRoutes.post('/:id/quote', async (c) => {
     transportDefaults: transportDefaultsFrom(settings.preorderTransportDefaults),
   });
 
-  const rate =
-    typeof settings.exchangeRate === 'number' && Number.isFinite(settings.exchangeRate) && settings.exchangeRate > 0
-      ? settings.exchangeRate
-      : 1400;
-  const toUsd = (iqd: number) => Math.round((iqd / rate) * 100) / 100;
+  // Exact, floored to the cent as the storefront reads it; null without a shop rate.
+  const toUsd = (iqd: number, rate: string): number | null => {
+    const cents = iqdToUsdCentsAtRate(iqd, rate);
+    return cents === null ? null : cents / 100;
+  };
+  const applied = displayRate === null ? null : toUsd(resolved.applied_iqd, displayRate);
+  const subtotal = displayRate === null ? null : toUsd(resolved.unit_subtotal_iqd, displayRate);
 
   // §11: cost is financial data. An assistant admin gets the same quote with
   // it removed — the check is here, on the server, not in the panel.
@@ -2095,11 +2105,10 @@ adminProductsRoutes.post('/:id/quote', async (c) => {
     success: true,
     quote: {
       ...quoteResolved,
-      usd_preview: {
-        exchange_rate_iqd_per_usd: rate,
-        applied_usd: toUsd(resolved.applied_iqd),
-        unit_subtotal_usd: toUsd(resolved.unit_subtotal_iqd),
-      },
+      usd_preview:
+        displayRate !== null && applied !== null && subtotal !== null
+          ? { exchange_rate_iqd_per_usd: displayRate, applied_usd: applied, unit_subtotal_usd: subtotal }
+          : null,
     },
   });
 });

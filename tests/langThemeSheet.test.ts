@@ -307,7 +307,7 @@ function inLanguage<T>(lang: 'ar' | 'en' | 'ckb', fn: () => T): T {
   }
 }
 
-async function captions(lang: 'ar' | 'en' | 'ckb', pick: 'IQD' | 'USD', rate: { text: string; source: 'shop' | 'wallet' | 'cache'; attributed?: boolean } | null) {
+async function captions(lang: 'ar' | 'en' | 'ckb', pick: 'IQD' | 'USD', rate: { text: string; source: 'shop' | 'cache'; attributed?: boolean } | null) {
   const { createElement } = await import('react');
   const { renderToStaticMarkup } = await import('react-dom/server');
   const { LanguageProvider } = await import('../src/LanguageContext');
@@ -344,10 +344,11 @@ test('the currency captions: display only, then the SHOP’s rate with the IQWea
 });
 
 test('the currency captions: a rate the shop sets by hand is never credited to IQWealth; dinars show no rate line', async () => {
-  const wallet = await captions('en', 'USD', { text: '1400', source: 'wallet' });
-  assert.match(wallet, /data-currency-rate="fixed"/);
-  assert.match(wallet, /a rate set by the shop/);
-  assert.doesNotMatch(wallet, /iraqsm|IQWealth/);
+  // The shop rate this device remembered from its last visit, shown before the settings arrive: the shop's, not credited.
+  const cached = await captions('en', 'USD', { text: '1703.9167', source: 'cache' });
+  assert.match(cached, /data-currency-rate="fixed"/);
+  assert.match(cached, /a rate set by the shop/);
+  assert.doesNotMatch(cached, /iraqsm|IQWealth/);
   // A rate the OWNER typed (a manual USD rate) is the shop's — never credited to IQWealth (FX-1 review #10).
   for (const lang of ['ar', 'en', 'ckb'] as const) {
     const typed = await captions(lang, 'USD', { text: '1650', source: 'shop', attributed: false });
@@ -357,7 +358,25 @@ test('the currency captions: a rate the shop sets by hand is never credited to I
   const dinars = await captions('en', 'IQD', { text: '1703.9167', source: 'shop' });
   assert.match(dinars, /Display only/);
   assert.doesNotMatch(dinars, /data-currency-rate=/);
-  // No usable rate at all: the caption only, never «1 $ ≈ 0».
+  // No usable rate at all: the caption only, never «1 $ ≈ 0» — and never the wallet's 1,400 (owner decision 9).
   const none = await captions('ar', 'USD', null);
-  assert.doesNotMatch(none, /≈/);
+  assert.doesNotMatch(none, /≈|1,400|1400/);
+});
+
+test('dollars chosen before the shop has a rate: prices read in dinars and the menu says why, in all three languages (owner decision 9)', async () => {
+  const want = {
+    ar: 'القراءة بالدولار متاحة بعد اعتماد سعر المتجر؛ الأسعار تُعرض بالدينار الآن.',
+    en: 'The dollar reading is available once the shop&#x27;s rate is approved; prices show in dinars for now.',
+    ckb: 'خوێندنەوە بە دۆلار دوای پەسەندکردنی نرخی فرۆشگاکە بەردەست دەبێت؛ ئێستا نرخەکان بە دینار پیشان دەدرێن.',
+  } as const;
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const pending = await captions(lang, 'USD', null);
+    assert.match(pending, /data-currency-usd-pending/, lang);
+    assert.ok(pending.includes(want[lang]), `${lang}: «${want[lang]}» missing in ${pending}`);
+    assert.doesNotMatch(pending, /data-currency-rate=/, lang);
+    // With a shop rate, or with dinars chosen, the note is not shown.
+    assert.doesNotMatch(await captions(lang, 'USD', { text: '1680', source: 'shop' }), /data-currency-usd-pending/, lang);
+    assert.doesNotMatch(await captions(lang, 'IQD', null), /data-currency-usd-pending/, lang);
+  }
+  assert.notEqual(want.ckb, want.ar);
 });

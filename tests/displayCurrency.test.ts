@@ -135,22 +135,26 @@ test('no usable rate → dinars, never $0.00', () => {
   assert.equal(currencyValue('IQD', noop, shop('1500')).money(1_500_000), formatIqd(1_500_000));
 });
 
-test('the rate source: displayUsdRate first; exchangeRate only while it is null; the cached rate only before the settings arrive', () => {
-  const r = (displayUsdRate: unknown, settingsLoaded = true, cached: string | null = null, exchangeRate: unknown = 1400) =>
-    resolveDisplayRate({ settingsLoaded, displayUsdRate, exchangeRate, cached });
+test('the rate source: displayUsdRate, or nothing (dinars) — NEVER the wallet rate (owner decision 9); the cached shop rate only before the settings arrive', () => {
+  const r = (displayUsdRate: unknown, settingsLoaded = true, cached: string | null = null) => resolveDisplayRate({ settingsLoaded, displayUsdRate, cached });
   assert.deepEqual(r('1703.9167'), { text: '1703.9167', source: 'shop', attributed: true });
   // A rate the owner typed is still the shop's rate — just not credited to IQWealth (FX-1 review #10).
-  assert.deepEqual(resolveDisplayRate({ settingsLoaded: true, displayUsdRate: '1650', exchangeRate: 1400, cached: null, attributed: false }), { text: '1650', source: 'shop', attributed: false });
-  assert.deepEqual(r(null), { text: '1400', source: 'wallet' }, 'not approved yet: today’s rate, nothing regresses');
-  assert.deepEqual(r(undefined), { text: '1400', source: 'wallet' }, 'an older server');
-  assert.deepEqual(r('garbage'), { text: '1400', source: 'wallet' });
-  assert.equal(r(null, true, null, 0), null, 'no usable rate anywhere');
-  // Before the settings: the last rate this device showed prices at, or nothing (dinars) — never a hard-coded 1,400.
+  assert.deepEqual(resolveDisplayRate({ settingsLoaded: true, displayUsdRate: '1650', cached: null, attributed: false }), { text: '1650', source: 'shop', attributed: false });
+  // Not approved yet, an older server, garbage: prices read in dinars. The wallet's 1,400 is not a market reading.
+  for (const none of [null, undefined, 'garbage', '0', '1e3', 1400, '1,680']) {
+    assert.equal(r(none), null, `${String(none)}: dinars, never a wallet source`);
+  }
+  // Even with a cached rate on the device: once the settings say «none», the cache is not used.
+  assert.equal(r(null, true, '1700'), null);
+  // Before the settings: the last SHOP rate this device showed prices at, or nothing (dinars) — never a hard-coded 1,400.
   assert.deepEqual(r(undefined, false, '1700'), { text: '1700', source: 'cache' });
   assert.equal(r(undefined, false, null), null);
-  // The context reads WalletContext's `displayUsdRate` (undefined until the settings arrive).
+  // The input has no wallet rate at all: the resolver cannot reach it.
   const ctx = read('src/CurrencyContext.tsx');
-  assert.match(ctx, /const \{ exchangeRate, displayUsdRate, displayUsdRateAttributed: attributed \} = useWallet\(\);/);
+  assert.doesNotMatch(ctx.slice(ctx.indexOf('export function resolveDisplayRate'), ctx.indexOf('interface CurrencyContextValue')), /exchangeRate:|'wallet'/);
+  assert.doesNotMatch(ctx, /source: 'wallet'|\| 'wallet'/);
+  // The context reads WalletContext's `displayUsdRate` (undefined until the settings arrive) — and not its exchangeRate.
+  assert.match(ctx, /const \{ displayUsdRate, displayUsdRateAttributed: attributed \} = useWallet\(\);/);
   assert.match(ctx, /const settingsLoaded = displayUsdRate !== undefined;/);
   assert.match(read('src/WalletContext.tsx'), /displayUsdRate: settings \? \(settings\.displayUsdRate \?\? null\) : undefined,/);
   assert.match(read('src/lib/api.ts'), /displayUsdRate\?: string \| null;/);
@@ -184,8 +188,8 @@ test('the last good display rate is cached per device as {rate, at}; a stale, fu
   } finally {
     g.localStorage = saved;
   }
-  // The context caches the rate prices were shown at — never the cache itself, and only when it changed.
-  assert.match(read('src/CurrencyContext.tsx'), /if \(rate && rate\.source !== 'cache' && rate\.text !== cached\) rememberDisplayRate\(rate\.text\);/);
+  // The context caches the SHOP rate prices were shown at — never the cache itself, never another source, and only when it changed.
+  assert.match(read('src/CurrencyContext.tsx'), /if \(rate && rate\.source === 'shop' && rate\.text !== cached\) rememberDisplayRate\(rate\.text\);/);
 });
 
 test('two tabs agree: a storage event for the preference key moves this tab too', () => {
@@ -368,11 +372,12 @@ test('the settings row is a real switch and states the rate it converts at', () 
   // L8) and credited to IQWealth with its link, as the menu does (Appendix A
   // L8; FX-1 UX review #9) — only when it is the provider's figure; a typed
   // rate is «a rate set by the shop» (review #10); whole dinars after «≈»
-  // (review #15). The old sentence at the wallet's rate until then; none without a rate.
+  // (review #15). Never the wallet's rate (owner decision 9): without a shop rate, dollars wait and the row says so.
   assert.match(src, /rate\.source === 'shop' && rate\.attributed !== false \? \(/);
   assert.match(src, /\{s\.currencyRateShop\(wholeRateText\(rate\.text\)\)\}\{' '\}\s*<a\s+href=\{IQWEALTH_URL\}\s+target="_blank"\s+rel="noopener noreferrer"/);
   assert.match(src, /s\.currencyRateSet\(wholeRateText\(rate\.text\)\)/);
-  assert.match(src, /s\.currencyRate\(groupRateText\(rate\.text\)\)/);
+  assert.doesNotMatch(src, /s\.currencyRate\(|groupRateText/, 'the old sentence at the wallet rate is gone');
+  assert.match(src, /\) : currency === 'USD' \? \(\s*<p[^>]*data-currency-usd-pending>\s*\{s\.usdPending\}/);
   assert.ok(src.includes('سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر المتجر للعرض فقط، بناءً على بيانات'));
   assert.ok(src.includes("Exchange rate: 1 dollar ≈ ${rate} dinars — the shop's rate, display only, based on"));
   assert.ok(src.includes('نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخی فرۆشگا، تەنها بۆ پیشاندان، لەسەر بنەمای زانیاریی'));
@@ -383,7 +388,7 @@ test('the settings row is a real switch and states the rate it converts at', () 
 
 test('all three dictionaries carry the new currency strings', () => {
   const src = read('src/pages/Settings.tsx');
-  for (const key of ['currency', 'currencyNote', 'currencyRate', 'currencyRateShop', 'currencyConvertedNote']) {
+  for (const key of ['currency', 'currencyNote', 'currencyRateShop', 'currencyRateSet', 'usdPending', 'currencyConvertedNote']) {
     assert.equal(
       (src.match(new RegExp(`^ *${key}:`, 'gm')) ?? []).length,
       3,

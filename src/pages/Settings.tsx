@@ -70,7 +70,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldCheck, Mail, KeyRound, Link2, FileText, LifeBuoy, Loader2, Check, Coins, CheckCircle2, Download, Sun, Moon, SunMoon } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useMoney } from '../CurrencyContext';
-import { groupRateText, wholeRateText } from '../lib/rateText';
+import { wholeRateText } from '../lib/rateText';
 import { IQWEALTH_URL } from '../components/LangThemePanel';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, listSessions, revokeSession, revokeOtherSessions, type ApiSession } from '../lib/api';
@@ -159,7 +159,7 @@ const STRINGS = {
     langSaved: 'حُفظت اللغة في حسابك.', langSaveFailed: 'تعذر حفظ اللغة على الخادم — التغيير مطبّق في هذا المتصفح فقط.',
     currency: 'العملة',
     currencyNote: 'اختر العملة التي تقرأ بها الأسعار. الدفاتر والطلبات تبقى بالدينار العراقي، ولن تُعاد تسعير طلبات مؤكدة.',
-    currencyRate: (rate: string) => `سعر الصرف: 1 دولار = ${rate} دينار — يحدده المتجر.`,
+    usdPending: 'القراءة بالدولار متاحة بعد اعتماد سعر المتجر؛ الأسعار تُعرض بالدينار الآن.',
     currencyRateShop: (rate: string) => `سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر المتجر للعرض فقط، بناءً على بيانات`,
     currencyRateSet: (rate: string) => `سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر يحدده المتجر، للعرض فقط.`,
     currencyRateLink: 'IQWealth',
@@ -245,7 +245,7 @@ const STRINGS = {
     langSaved: 'Language saved to your account.', langSaveFailed: 'Could not save the language on the server — it applies to this browser only.',
     currency: 'Currency',
     currencyNote: 'Choose the currency you read prices in. The ledgers and your orders stay in Iraqi dinar, and no confirmed order is ever re-priced.',
-    currencyRate: (rate: string) => `Exchange rate: $1 = ${rate} IQD — set by the shop.`,
+    usdPending: "The dollar reading is available once the shop's rate is approved; prices show in dinars for now.",
     currencyRateShop: (rate: string) => `Exchange rate: 1 dollar ≈ ${rate} dinars — the shop's rate, display only, based on`,
     currencyRateSet: (rate: string) => `Exchange rate: 1 dollar ≈ ${rate} dinars — a rate set by the shop, display only.`,
     currencyRateLink: 'IQWealth data',
@@ -334,7 +334,7 @@ const STRINGS = {
     langSaved: 'زمان لە هەژمارەکەت پاشەکەوتکرا.', langSaveFailed: 'نەتوانرا زمان لەسەر ڕاژەکار پاشەکەوت بکرێت — تەنها بۆ ئەم وێبگەڕە جێبەجێ دەبێت.',
     currency: 'دراو',
     currencyNote: 'ئەو دراوە هەڵبژێرە کە نرخەکانی پێ دەخوێنیتەوە. دەفتەر و داواکارییەکانت بە دیناری عێراقی دەمێننەوە، و هیچ داواکارییەکی پەسەندکراو دووبارە نرخ نادرێت.',
-    currencyRate: (rate: string) => `نرخی ئاڵوگۆڕ: 1 دۆلار = ${rate} دینار — لەلایەن فرۆشگاوە دانراوە.`,
+    usdPending: 'خوێندنەوە بە دۆلار دوای پەسەندکردنی نرخی فرۆشگاکە بەردەست دەبێت؛ ئێستا نرخەکان بە دینار پیشان دەدرێن.',
     currencyRateShop: (rate: string) => `نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخی فرۆشگا، تەنها بۆ پیشاندان، لەسەر بنەمای زانیاریی`,
     currencyRateSet: (rate: string) => `نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخێک کە فرۆشگا دایناوە، تەنها بۆ پیشاندان.`,
     currencyRateLink: 'IQWealth',
@@ -1148,10 +1148,12 @@ export default function Settings() {
                     with the link its terms ask for — as the menu does
                     (critique L8, Appendix A; FX-1 UX review #9) — but only
                     when it IS the provider's figure: a rate the owner typed
-                    is «a rate set by the shop» (review #10). Whole dinars
-                    after «≈» (review #15). Until a rate is approved, the old
-                    sentence at the wallet's rate. No rate known yet — prices
-                    read in dinars, so no sentence. */}
+                    is «a rate set by the shop» (review #10), and so is the
+                    shop rate this device remembered from its last visit,
+                    shown before the settings arrive. Whole dinars after «≈»
+                    (review #15). NEVER the wallet's rate (owner decision 9):
+                    until the owner approves a rate, dollars are not offered —
+                    prices read in dinars and a dollar reader is told why. */}
                 {rate ? (
                   <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed" data-currency-rate-source={rate.source}>
                     {rate.source === 'shop' && rate.attributed !== false ? (
@@ -1168,11 +1170,13 @@ export default function Settings() {
                           <span aria-hidden="true">↗</span>
                         </a>
                       </>
-                    ) : rate.source === 'shop' ? (
-                      s.currencyRateSet(wholeRateText(rate.text))
                     ) : (
-                      s.currencyRate(groupRateText(rate.text))
+                      s.currencyRateSet(wholeRateText(rate.text))
                     )}
+                  </p>
+                ) : currency === 'USD' ? (
+                  <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed" data-currency-usd-pending>
+                    {s.usdPending}
                   </p>
                 ) : null}
                 {converted ? (

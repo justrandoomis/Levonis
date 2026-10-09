@@ -3223,6 +3223,12 @@ export default function Checkout() {
               from `quote.points`: the spendable balance, the redemption cap
               (points pay for merchandise, never for shipping or fees) and what
               this order earns back.
+
+              A point is a dinar (1 pt = 1 IQD), so the balance and the cap read
+              in DINARS whatever the display currency (`walletCharge`): at the
+              market rate they were a dollar figure no point balance holds, and
+              the wallet beside them reads at the wallet's own rate (owner
+              decision 9).
             */}
             {(quote?.points.balance ?? pointBalance) > 0 || pointsDiscount > 0 ? (
               <div className="pt-1">
@@ -3232,9 +3238,9 @@ export default function Checkout() {
                       {loc('استخدام النقاط', 'Use points', 'بەکارهێنانی خاڵ')}
                     </span>
                     <span className="block text-[11.5px] text-zinc-500 tabular-nums">
-                      {loc('الرصيد', 'Balance', 'باڵانس')}: {money(quote?.points.balance ?? pointBalance)}
+                      {loc('الرصيد', 'Balance', 'باڵانس')}: {walletCharge(quote?.points.balance ?? pointBalance)}
                       {quote?.points.eligible_merchandise_iqd != null
-                        ? ` · ${loc('الحد الأقصى لهذا الطلب', 'Max for this order', 'زۆرترین بۆ ئەم داواکارییە')} ${money(quote.points.eligible_merchandise_iqd)}`
+                        ? ` · ${loc('الحد الأقصى لهذا الطلب', 'Max for this order', 'زۆرترین بۆ ئەم داواکارییە')} ${walletCharge(quote.points.eligible_merchandise_iqd)}`
                         : ''}
                     </span>
                   </span>

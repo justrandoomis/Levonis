@@ -81,10 +81,13 @@ function RowLabel({ icon, children }: { icon: ReactNode; children: ReactNode }) 
  * dollars are chosen and a rate is known — the rate itself, named as THE
  * SHOP'S rate, because it includes the owner's adjustment (critique L8). The
  * IQWealth attribution is given only when the rate really is the provider's
- * figure (`displayUsdRateAttributed`); a rate the owner typed and the
- * wallet's fallback rate are «a rate set by the shop» (FX-1 review #10). The
- * rate reads in whole dinars after «≈» — four decimals there were false
- * precision (UX review #15); the conversion itself uses the exact text.
+ * figure (`displayUsdRateAttributed`); a rate the owner typed, and the shop
+ * rate this device remembered from its last visit, are «a rate set by the
+ * shop» (FX-1 review #10). The rate reads in whole dinars after «≈» — four
+ * decimals there were false precision (UX review #15); the conversion itself
+ * uses the exact text. The wallet's rate is never shown here (owner decision
+ * 9): with dollars chosen and no shop rate yet, prices read in dinars and the
+ * caption says the dollar reading comes once the shop's rate is approved.
  */
 export function CurrencyCaptions({ pick }: { pick: DisplayCurrency }) {
   const { lang, loc } = useLanguage();
@@ -125,6 +128,15 @@ export function CurrencyCaptions({ pick }: { pick: DisplayCurrency }) {
           {figure}
           {' — '}
           {loc('سعر يحدده المتجر', 'a rate set by the shop', 'نرخێک کە فرۆشگا دایناوە')}
+        </p>
+      )}
+      {pick === 'USD' && !rate && (
+        <p data-currency-usd-pending>
+          {loc(
+            'القراءة بالدولار متاحة بعد اعتماد سعر المتجر؛ الأسعار تُعرض بالدينار الآن.',
+            "The dollar reading is available once the shop's rate is approved; prices show in dinars for now.",
+            'خوێندنەوە بە دۆلار دوای پەسەندکردنی نرخی فرۆشگاکە بەردەست دەبێت؛ ئێستا نرخەکان بە دینار پیشان دەدرێن.'
+          )}
         </p>
       )}
     </div>

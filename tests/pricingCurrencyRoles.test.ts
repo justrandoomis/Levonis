@@ -47,9 +47,10 @@ test('no accounting write path reads the central rates: only the FX module, the 
 
 test('the FX module is imported only by the cron, the pricing workspace, the public display rate and the money-free edge seam', () => {
   const importers = worker.filter(({ f, src }) => !f.startsWith('worker/lib/fx/') && /from\s+['"][^'"]*\/fx\/[^'"]+['"]/.test(src)).map(({ f }) => f).sort();
-  assert.deepEqual(importers, ['worker/index.ts', 'worker/routes/adminPricing.ts', 'worker/routes/misc.ts', 'worker/routes/products.ts']);
-  // The storefront routes import the ONE display-rate reader, nothing else of FX.
-  for (const f of ['worker/routes/misc.ts', 'worker/routes/products.ts']) {
+  assert.deepEqual(importers, ['worker/index.ts', 'worker/routes/adminPricing.ts', 'worker/routes/adminProducts.ts', 'worker/routes/misc.ts', 'worker/routes/products.ts']);
+  // The storefront routes and the admin price preview (owner decision 9: the shop's rate, never the
+  // wallet's) import the ONE display-rate reader, nothing else of FX.
+  for (const f of ['worker/routes/misc.ts', 'worker/routes/products.ts', 'worker/routes/adminProducts.ts']) {
     const src = worker.find((w) => w.f === f)!.src;
     const fx = [...src.matchAll(/from\s+['"]([^'"]*\/fx\/[^'"]+)['"]/g)].map((m) => m[1]);
     assert.deepEqual(fx, ['../lib/fx/displayRate'], f);

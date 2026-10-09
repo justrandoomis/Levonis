@@ -246,12 +246,15 @@ export default function PricePreview({
                 admin
               />
             )}
-            <Row
-              ar="بالدولار (تقريبي)"
-              en={`USD @ ${quote.usd_preview.exchange_rate_iqd_per_usd}`}
-              v={`$${quote.usd_preview.unit_subtotal_usd.toFixed(2)}`}
-              dim
-            />
+            {/* At the shop's display rate; hidden until the owner approves one (never the wallet's rate). */}
+            {quote.usd_preview && (
+              <Row
+                ar="بالدولار (تقريبي)"
+                en={`USD @ ${quote.usd_preview.exchange_rate_iqd_per_usd}`}
+                v={`$${quote.usd_preview.unit_subtotal_usd.toFixed(2)}`}
+                dim
+              />
+            )}
           </div>
         </div>
       )}

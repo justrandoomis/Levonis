@@ -7,8 +7,12 @@ Unit tests pinning every rule: `tests/pricing.test.ts` (`npm run test:unit`).
 ## Currency model
 
 - **IQD is canonical** for every entered monetary value (integer dinars).
-- **USD is derived** for display from the single admin setting
-  `exchangeRate`, defined as **1 USD = X IQD**.
+- **The wallet's rate** is the admin setting `exchangeRate`, defined as
+  **1 USD = X IQD** (1,400, DECISIONS row 6). It is the Levo Wallet's own
+  rate — every wallet screen and operation — and nothing else. The
+  storefront's dollar reading uses the shop's market rate instead
+  (`displayUsdRate`, below); the two never stand in for each other (owner
+  decision 9).
 - Wallet balances are stored as integer **USD cents**; conversions IQD→cents
   use `ceil(iqd × 100 / X)` (rounding up so the wallet never undercharges);
   cents→IQD displays use `floor(cents × X / 100)`. Formatting never changes
@@ -83,8 +87,19 @@ throughout, never a float.
   being made included — above 15% need the explicit confirmation and that
   fresh sign-in too. An adjustment that would make the rate implausible is
   refused (400 `FX_RATE_OUT_OF_BOUNDS`).
-- **The wallet keeps its own rate**: `exchangeRate` (1,400, DECISIONS row 6)
-  stays the wallet's and escrow's rate. FX reads never touch it.
+- **The wallet keeps its own rate** (owner decision 9): `exchangeRate`
+  (1 USD = 1,400 IQD, DECISIONS row 6) stays the rate of every wallet screen
+  and operation — deposits, wallet payments at checkout, refunds, escrow,
+  Quick Buy, memberships — and a market update never changes it (market
+  1,670 beside wallet 1,400 is the normal state). No wallet, escrow, Quick
+  Buy, membership or checkout code imports the FX module or names its
+  tables, and no FX or engine code reads `exchangeRate`
+  (`tests/walletRateSeparation.test.ts`). The display currency never falls
+  back to it: before the owner approves the first USD/IQD value,
+  `displayUsdRate` is null and the storefront reads in dinars with a note
+  that the dollar reading comes once the shop's rate is approved. The admin
+  product price preview reads the shop's rate too (`usd_preview` null before
+  that approval). Checkout's points line reads in dinars (1 point = 1 IQD).
 - **Public**: only the effective USD/IQD, as `displayUsdRate` (decimal text or
   `null`) in `/api/settings/public` and `/api/home`, for the display currency,
   with one flag and no figure, `displayUsdRateAttributed`: false when the

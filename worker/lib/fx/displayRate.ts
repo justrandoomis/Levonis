@@ -16,8 +16,9 @@
  * It says nothing the effective rate does not already show over a few days.
  *
  * Null until the owner approves the first USD/IQD value, and null on a
- * database without migration 0179 (the client then falls back to the wallet's
- * `exchangeRate`, so nothing regresses the day this lands). Never throws. One
+ * database without migration 0179: the client then reads prices in dinars,
+ * never at the wallet's `exchangeRate` (owner decision 9 — the wallet's
+ * 1 USD = 1,400 IQD is its own rate, not a market reading). Never throws. One
  * statement, read in the same wave as the settings.
  */
 const DECIMAL = /^[0-9]+(\.[0-9]+)?$/;
@@ -43,4 +44,21 @@ export async function getPublicDisplayRate(db: D1Database): Promise<PublicDispla
 /** The figure alone. */
 export async function getDisplayUsdRate(db: D1Database): Promise<string | null> {
   return (await getPublicDisplayRate(db)).displayUsdRate;
+}
+
+/**
+ * IQD → US cents at the display rate, exactly — the same floor the browser
+ * reads with (`iqdToUsdCentsExact`, src/lib/displayRate.ts): U = n / 10^k, so
+ * cents = floor(|iqd| × 100 × 10^k / n), the sign put back. Null for an
+ * unusable rate or dinar figure — never 0 for "unknown". For the admin price
+ * preview (owner decision 9: it reads the shop's rate, never the wallet's).
+ */
+export function iqdToUsdCentsAtRate(iqd: number, rateText: string): number | null {
+  const m = /^([0-9]{1,12})(?:\.([0-9]{1,12}))?$/.exec(rateText);
+  if (!m || !Number.isFinite(iqd)) return null;
+  const frac = m[2] ?? '';
+  const den = BigInt(m[1]! + frac);
+  if (den === 0n) return null;
+  const cents = Number((BigInt(Math.floor(Math.abs(iqd))) * 100n * 10n ** BigInt(frac.length)) / den);
+  return Number.isSafeInteger(cents) ? (iqd < 0 ? -cents : cents) : null;
 }

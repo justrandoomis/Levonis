@@ -48,16 +48,18 @@ import { iqdToUsdCentsExact, readCachedDisplayRate, rememberDisplayRate, usableR
  * charged without telling anyone.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * THE RATE IS THE SHOP'S, NOT THE WALLET'S (FX programme plan §13, D7, Q5).
+ * THE RATE IS THE SHOP'S, NEVER THE WALLET'S (FX programme plan §13, D7, Q5;
+ * owner decision 9, 2026-10-09).
  *
  * `money()` divides by `settings.displayUsdRate`: the effective USD/IQD — the
- * Iraqi parallel-market sell plus the owner's adjustment, once approved — as
- * decimal text, converted exactly (src/lib/displayRate.ts). Until the owner
- * approves the first value the server sends null, and the wallet's own
- * `exchangeRate` is used exactly as before, so nothing regresses the day the
- * automatic rate lands. Before the settings arrive, the last rate this device
- * showed prices at is used (`levonis.displayRate.v1`); with none, a dollar
- * reader sees DINARS — never «$0.00» and never a hard-coded 1,400.
+ * Iraqi parallel-market sell plus the owner's fixed adjustment, once approved
+ * — as decimal text, converted exactly (src/lib/displayRate.ts). The wallet's
+ * `exchangeRate` (1 USD = 1,400 IQD) is a different rate with a different
+ * job and is NEVER a fallback here: until the owner approves the first value
+ * the server sends null and a dollar reader sees DINARS, with a note that the
+ * dollar reading comes once the shop's rate is approved. Before the settings
+ * arrive, the last SHOP rate this device showed prices at is used
+ * (`levonis.displayRate.v1`); with none, dinars — never «$0.00», never 1,400.
  *
  * WALLET FIGURES KEEP THE WALLET'S RATE ON EVERY SCREEN (critique M2). The
  * wallet's ledger is USD cents converted at `exchangeRate` (1,400), and a
@@ -129,13 +131,11 @@ export function formatUsdFromIqd(iqd: number, rate: number): string {
   return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-/** Where the rate on screen came from. */
+/** Where the rate on screen came from. Never the wallet: its `exchangeRate` is not a market rate (owner decision 9). */
 export type DisplayRateSource =
   /** The shop's effective USD/IQD (`displayUsdRate`). */
   | 'shop'
-  /** The wallet's `exchangeRate` — only while the server sends no `displayUsdRate`. */
-  | 'wallet'
-  /** The last rate this device showed prices at, before the settings arrive. */
+  /** The last shop rate this device showed prices at, before the settings arrive. */
   | 'cache';
 
 export interface DisplayRate {
@@ -147,25 +147,24 @@ export interface DisplayRate {
 }
 
 /**
- * THE RATE A DOLLAR PRICE IS READ AT, decided in one place (plan §13):
+ * THE RATE A DOLLAR PRICE IS READ AT, decided in one place (plan §13, owner
+ * decision 9):
  *   1. the settings are in and carry a usable `displayUsdRate` → the shop's rate;
  *   2. the settings are in without one (null: not approved yet; absent: an
- *      older server) → the wallet's `exchangeRate`;
- *   3. the settings are not in yet → the last rate this device used;
+ *      older server) → null: prices read in DINARS. The wallet's
+ *      `exchangeRate` is the wallet's own rate, never a market reading;
+ *   3. the settings are not in yet → the last shop rate this device used;
  *   4. nothing usable → null, and every price reads in dinars.
  */
 export function resolveDisplayRate(input: {
   settingsLoaded: boolean;
   displayUsdRate: unknown;
-  exchangeRate: unknown;
   cached: string | null;
   attributed?: boolean;
 }): DisplayRate | null {
   if (input.settingsLoaded) {
     const shop = usableRate(input.displayUsdRate);
-    if (shop) return { text: shop, source: 'shop', attributed: input.attributed !== false };
-    const wallet = typeof input.exchangeRate === 'number' ? usableRate(String(input.exchangeRate)) : null;
-    return wallet ? { text: wallet, source: 'wallet' } : null;
+    return shop ? { text: shop, source: 'shop', attributed: input.attributed !== false } : null;
   }
   const cached = usableRate(input.cached);
   return cached ? { text: cached, source: 'cache' } : null;
@@ -238,7 +237,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     () => readStored() ?? DEFAULT_DISPLAY_CURRENCY
   );
   const [cached] = useState<string | null>(() => readCachedDisplayRate());
-  const { exchangeRate, displayUsdRate, displayUsdRateAttributed: attributed } = useWallet();
+  const { displayUsdRate, displayUsdRateAttributed: attributed } = useWallet();
 
   const setCurrency = useCallback((next: DisplayCurrency) => {
     setCurrencyState(next);
@@ -259,14 +258,16 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   // `undefined` until the settings arrive; null when the server sends none.
   const settingsLoaded = displayUsdRate !== undefined;
   const rate = useMemo(
-    () => resolveDisplayRate({ settingsLoaded, displayUsdRate, exchangeRate, cached, attributed }),
-    [settingsLoaded, displayUsdRate, exchangeRate, cached, attributed]
+    () => resolveDisplayRate({ settingsLoaded, displayUsdRate, cached, attributed }),
+    [settingsLoaded, displayUsdRate, cached, attributed]
   );
 
-  // The next first paint starts from the rate prices were just shown at
-  // (written only when it differs from what this device already holds).
+  // The next first paint starts from the SHOP rate prices were just shown at
+  // (written only when it differs from what this device already holds). Only
+  // the shop's own rate is ever remembered: a first paint never reads dollars
+  // at a rate that was not the shop's.
   useEffect(() => {
-    if (rate && rate.source !== 'cache' && rate.text !== cached) rememberDisplayRate(rate.text);
+    if (rate && rate.source === 'shop' && rate.text !== cached) rememberDisplayRate(rate.text);
   }, [rate, cached]);
 
   const value = useMemo<CurrencyContextValue>(() => currencyValue(currency, setCurrency, rate), [currency, setCurrency, rate]);

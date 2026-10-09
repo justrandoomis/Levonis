@@ -307,11 +307,16 @@ export interface CatalogsResponse { catalogs: CatalogV2[] }
 export interface QuoteResponse {
   quote: ResolvedPriceV2 & {
     cost_iqd?: number | null;
+    /**
+     * At the shop's display rate (decimal text, the effective USD/IQD customers
+     * read dollars at); null until the owner approves a first rate. Never the
+     * wallet's rate (owner decision 9).
+     */
     usd_preview: {
-      exchange_rate_iqd_per_usd: number;
+      exchange_rate_iqd_per_usd: string;
       applied_usd: number;
       unit_subtotal_usd: number;
-    };
+    } | null;
   };
 }
 
