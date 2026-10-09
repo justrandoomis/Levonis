@@ -41,7 +41,7 @@ export default {
       },
     },
     /**
-     * SERIAL FORMATS BY BRAND AND PRODUCT (migration 0181, owner decision 2).
+     * SERIAL FORMATS BY BRAND AND PRODUCT (migration 0180, owner decision 2).
      * The rules every serial door judges by: READ by every admin who writes
      * serials (`op` — a rule is a format, never a cost), WRITTEN by the owner
      * alone, refused to every other admin with 403 OWNER_ONLY before the body

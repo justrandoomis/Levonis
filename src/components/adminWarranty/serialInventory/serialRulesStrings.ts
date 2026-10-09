@@ -1,6 +1,6 @@
 /**
  * THE WORDS OF «صيغ الأرقام التسلسلية» — the owner's serial formats by brand
- * and product (owner decision 2, 2026-10-09; migration 0181;
+ * and product (owner decision 2, 2026-10-09; migration 0180;
  * ./SerialRulesTab.tsx). Its OWN table in Arabic, English and Sorani, unlike
  * the inventory panel beside it: every line here is new, and a `ckb` slot is
  * written in Sorani, never a copy of the Arabic (docs/DECISIONS.md row 183).
@@ -88,7 +88,7 @@ const ar: SerialRulesStrings = {
   tabTitle: 'صيغ الأرقام التسلسلية',
   intro:
     'يُحكم كل رقم تسلسلي بقاعدة منتجه، ثم بقاعدة علامته التجارية، ثم بالقاعدة العامة (أحرف وأرقام، 6–40). شكل رقم علبة Bambu Lab لا يرفض رقمًا إلا على منتجات Bambu Lab.',
-  notInstalled: 'تعمل القواعد بعد تطبيق الترحيل 0181 على قاعدة البيانات؛ حتى ذلك الحين تبقى القاعدة الحالية لكل المنتجات.',
+  notInstalled: 'تعمل القواعد بعد تطبيق الترحيل 0180 على قاعدة البيانات؛ حتى ذلك الحين تبقى القاعدة الحالية لكل المنتجات.',
   readOnly: 'للعرض فقط — المالك وحده يعدّل القواعد.',
   loading: 'جارٍ تحميل القواعد…',
   loadFailed: 'تعذّر تحميل القواعد.',
@@ -181,7 +181,7 @@ const en: SerialRulesStrings = {
   tabTitle: 'Serial formats',
   intro:
     'Every serial is judged by its product’s rule, then its brand’s rule, then the generic rule (letters and digits, 6–40). The Bambu Lab box-number shape refuses a serial only on Bambu Lab products.',
-  notInstalled: 'The rules start working once migration 0181 is applied to the database; until then every product keeps today’s rule.',
+  notInstalled: 'The rules start working once migration 0180 is applied to the database; until then every product keeps today’s rule.',
   readOnly: 'Read only — only the owner edits the rules.',
   loading: 'Loading the rules…',
   loadFailed: 'The rules could not be loaded.',
@@ -274,7 +274,7 @@ const ckb: SerialRulesStrings = {
   tabTitle: 'شێوازەکانی ژمارەی زنجیرەیی',
   intro:
     'هەر ژمارەیەکی زنجیرەیی بە یاسای بەرهەمەکەی، پاشان بە یاسای براندەکەی، پاشان بە یاسای گشتی (پیت و ژمارە، 6–40) هەڵدەسەنگێنرێت. شێوەی ژمارەی سندووقی Bambu Lab تەنها لە بەرهەمەکانی Bambu Lab ژمارەیەک ڕەتدەکاتەوە.',
-  notInstalled: 'یاساکان دوای جێبەجێکردنی کۆچی 0181 لەسەر بنکەدراوەکە کار دەکەن؛ تا ئەو کاتە هەموو بەرهەمێک یاسای ئێستای دەمێنێت.',
+  notInstalled: 'یاساکان دوای جێبەجێکردنی کۆچی 0180 لەسەر بنکەدراوەکە کار دەکەن؛ تا ئەو کاتە هەموو بەرهەمێک یاسای ئێستای دەمێنێت.',
   readOnly: 'تەنها بۆ بینین — تەنها خاوەن یاساکان دەستکاری دەکات.',
   loading: 'یاساکان بار دەکرێن…',
   loadFailed: 'نەتوانرا یاساکان بار بکرێن.',

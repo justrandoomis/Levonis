@@ -86,7 +86,7 @@ export interface LinkResult {
   assignment_id: string;
   slot: { order_item_id: string; unit_index: number; part: string; assignment: SlotAssignment | null };
   warnings: string[];
-  /** The format rule that judged the serial and its warnings (owner decision 2); null before 0181 and on a replay. */
+  /** The format rule that judged the serial and its warnings (owner decision 2); null before 0180 and on a replay. */
   format?: LinkFormatWire | null;
 }
 

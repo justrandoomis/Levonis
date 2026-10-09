@@ -164,7 +164,7 @@ const shortDate = (iso: string | null): string => (iso ? iso.slice(0, 10) : '—
 const SerialInventoryPanel = React.lazy(() => import('./serialInventory/SerialInventoryPanel'));
 // «الأجهزة والتسلسلات» (order units, warranty claims), merged into this tab.
 const AdminSerials = React.lazy(() => import('../AdminSerials'));
-// «صيغ الأرقام التسلسلية» (0181, owner decision 2) — beside the inventory, its own chunk.
+// «صيغ الأرقام التسلسلية» (0180, owner decision 2) — beside the inventory, its own chunk.
 const SerialRulesTab = React.lazy(() => import('./serialInventory/SerialRulesTab'));
 
 type WarrantyView = 'receipts' | 'serials' | 'serial_rules' | 'units' | 'claims';

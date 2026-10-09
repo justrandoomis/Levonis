@@ -1,5 +1,5 @@
 -- ============================================================================
---  0181 — SERIAL FORMAT RULES BY BRAND AND PRODUCT
+--  0180 — SERIAL FORMAT RULES BY BRAND AND PRODUCT
 --  (owner decision 2, 2026-10-09: «صيغ الأرقام التسلسلية حسب العلامة والمنتج»
 --  docs/DECISIONS.md row 195)
 -- ============================================================================
@@ -25,13 +25,7 @@
 -- global (serial_norm is the primary key that joins the inventory and the
 -- warranty tables), and the hard checks stay for every brand.
 --
--- RENUMBERING. Built as 0180, renamed 0181 because the pricing engine's
--- 0180_pricing_engine_core.sql ships first. Outside this file "0181" is named
--- by worker/lib/schemaVersion.ts (EXPECTED_MIGRATION, with
--- EXPECTED_MIGRATION_COUNT), the owner screen's «not installed» line
--- (src/components/adminWarranty/serialInventory/serialRulesStrings.ts) and
--- the comments that cite it; the tests find this file by NAME
--- (tests/fixtures/serialPrep.ts RULES_MIGRATION / BEFORE_RULES).
+-- NUMBERING. Ships as 0180, ahead of the pricing engine (which takes 0181).
 --
 -- ADDITIVE ONLY: one new table, two partial unique indexes and two seed rows
 -- in the new table. No existing row of any other table changes. Every

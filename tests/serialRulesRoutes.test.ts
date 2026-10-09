@@ -1,6 +1,6 @@
 /**
  * /api/admin/serial-rules — THE OWNER'S SERIAL FORMATS (owner decision 2,
- * 2026-10-09; migration 0181; worker/routes/adminSerialRules.ts).
+ * 2026-10-09; migration 0180; worker/routes/adminSerialRules.ts).
  *
  *   READ  every admin who writes serials (the scan sheet and the inventory
  *         camera need the rules) — never a cost, so `op`;
@@ -8,7 +8,7 @@
  *         no row changed and no audit row; the owner's write lands WITH its
  *         audit row in one batch; a stale version is 409 and writes neither;
  *         an invalid rule is 400 with the field to fix;
- *   BEFORE 0181 the reads say `installed: false` and every serial door keeps
+ *   BEFORE 0180 the reads say `installed: false` and every serial door keeps
  *         today's rule; the writes say 503.
  *
  * Run: node --import tsx --test tests/serialRulesRoutes.test.ts
@@ -256,7 +256,7 @@ test('the dry run: a verdict per serial and the impact on that brand\'s inventor
   assert.equal(tooMany.status, 400);
 });
 
-test('DEPLOY-AHEAD: before 0181 the reads say installed:false (the owner\'s lists still work), every product keeps today\'s rule, the writes are 503', async () => {
+test('DEPLOY-AHEAD: before 0180 the reads say installed:false (the owner\'s lists still work), every product keeps today\'s rule, the writes are 503', async () => {
   const w = rulesWorld({ through: BEFORE_RULES });
   const b = await json(await get(appFor(w.db, USERS.ast), BASE));
   assert.equal(b.installed, false);

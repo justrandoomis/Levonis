@@ -1,6 +1,6 @@
 /**
  * BRAND- AND PRODUCT-AWARE SERIAL FORMATS AT EVERY DOOR (owner decision 2,
- * 2026-10-09; migration 0181; worker/lib/serialRules.ts).
+ * 2026-10-09; migration 0180; worker/lib/serialRules.ts).
  *
  * The owner: «لا تعتمد على شكل سيريال Bambu وحده لمنع الإضافة … Bambu لها
  * قواعدها، Snapmaker لها قواعدها» — the shop sells Bambu Lab and Snapmaker (a
@@ -11,7 +11,7 @@
  * inventory camera. The Bambu box refusal and the model check stay hard for
  * Bambu; another brand's serial of the Bambu box shape is accepted WITH A
  * WARNING that is shown and written into the audit in the same batch. Before
- * migration 0181, today's behaviour exactly.
+ * migration 0180, today's behaviour exactly.
  *
  * Run: node --import tsx --test tests/serialBrandRules.test.ts
  */
@@ -155,13 +155,13 @@ test('no brand → the generic rule; Creality is never refused for an A1-looking
   assert.equal((await json(await scan(w, 'adm', 'ORD-G2', 'la', 1, '03000A123456789'))).code, 'SERIAL_MODEL_MISMATCH');
 });
 
-test('DEPLOY-AHEAD: before 0181 every product keeps today\'s rule exactly — the box refusal and the old model check everywhere, no format in the answer or the audit', async () => {
+test('DEPLOY-AHEAD: before 0180 every product keeps today\'s rule exactly — the box refusal and the old model check everywhere, no format in the answer or the audit', async () => {
   const w = brandWorld({ through: BEFORE_RULES });
   order(w.raw, 'ORD-D', [{ id: 'lu', product: 'pU1' }, { id: 'lx', product: 'pX1C' }, { id: 'lk', product: 'pK1C' }]);
   const u1 = await json(await scan(w, 'adm', 'ORD-D', 'lu', 1, BOX));
   assert.equal(u1.code, 'SERIAL_INVALID');
   assert.equal(u1.details.problem, 'BOX_ONLY', "today's behaviour: the box refusal for every brand");
-  assert.equal((await json(await scan(w, 'adm', 'ORD-D', 'lx', 1, '00M00A123456789'))).code, 'SERIAL_MODEL_MISMATCH', 'the X1C defect waits for 0181');
+  assert.equal((await json(await scan(w, 'adm', 'ORD-D', 'lx', 1, '00M00A123456789'))).code, 'SERIAL_MODEL_MISMATCH', 'the X1C defect waits for 0180');
   assert.equal((await json(await scan(w, 'adm', 'ORD-D', 'lk', 1, '039ABCDEF012345'))).code, 'SERIAL_MODEL_MISMATCH');
   const u1Serial = 'U1SERIAL00000001';
   const ok = await json(await scan(w, 'adm', 'ORD-D', 'lu', 1, u1Serial));

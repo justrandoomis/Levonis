@@ -1,6 +1,6 @@
 /**
  * WHAT A SERIAL'S FORMAT RULE SAID, IN THE READER'S LANGUAGE (owner decision
- * 2, 2026-10-09; migration 0181). The server judges every serial by the rule
+ * 2, 2026-10-09; migration 0180). The server judges every serial by the rule
  * of its product — the product's own, else its brand's, else the generic
  * rule (worker/lib/serialRules.ts) — and sends its notes as codes
  * (packages/catalog/src/serialRules.ts `FormatNote`). These are the

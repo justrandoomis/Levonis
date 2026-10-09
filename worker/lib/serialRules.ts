@@ -1,6 +1,6 @@
 /**
  * SERIAL FORMAT RULES — the Worker's half (owner decision 2, 2026-10-09;
- * migration 0181 `serial_brand_rules`; docs/DECISIONS.md row 195). The format
+ * migration 0180 `serial_brand_rules`; docs/DECISIONS.md row 195). The format
  * itself, the parser and the evaluator are pure and shared with the screens:
  * packages/catalog/src/serialRules.ts.
  *
@@ -10,7 +10,7 @@
  * which rule judges the serial they hold — the product's own rule, else its
  * brand's (`products.brand_id`), else GENERIC_RULE — in ONE query each.
  *
- * DEPLOY-AHEAD. Before migration 0181 has applied, every answer is
+ * DEPLOY-AHEAD. Before migration 0180 has applied, every answer is
  * LEGACY_RULE: today's behaviour exactly (the Bambu box refusal and the
  * five-prefix family check for every product, no warnings). Whether the
  * table exists is cached per database binding ONLY when true — the pattern
@@ -33,7 +33,7 @@ export { GENERIC_RULE, LEGACY_RULE };
 
 const installed = new WeakMap<object, true>();
 
-/** Has migration 0181 applied? Cached only when true. */
+/** Has migration 0180 applied? Cached only when true. */
 export async function serialRulesInstalled(db: D1Database): Promise<boolean> {
   if (installed.has(db as object)) return true;
   try {
@@ -159,7 +159,7 @@ const RULE_RANK = `(r.scope <> 'product')`;
 /**
  * THE rule that judges a serial filed under this product: its own rule, else
  * its brand's, else GENERIC_RULE. No product (Bulk Add without one, an
- * unidentified label): GENERIC_RULE. Before 0181, or when the read fails:
+ * unidentified label): GENERIC_RULE. Before 0180, or when the read fails:
  * LEGACY_RULE.
  */
 export async function ruleForProduct(db: D1Database, productId: string | null | undefined): Promise<SerialRule> {
@@ -183,7 +183,7 @@ export async function ruleForProduct(db: D1Database, productId: string | null | 
 /**
  * `ruleForProduct` for many products in ONE query (the order screen's slots).
  * The key '' holds the rule of a slot with no product — GENERIC_RULE, or
- * LEGACY_RULE before 0181 — the same answer `ruleForProduct(db, null)` gives.
+ * LEGACY_RULE before 0180 — the same answer `ruleForProduct(db, null)` gives.
  */
 export async function rulesForProducts(db: D1Database, productIds: ReadonlyArray<string | null | undefined>): Promise<Map<string, SerialRule>> {
   const ids = [...new Set(productIds.map((x) => (typeof x === 'string' ? x.trim() : '')).filter(Boolean))].slice(0, 500);
@@ -286,7 +286,7 @@ export type PublicRule = ReturnType<typeof publicRule>;
 
 /**
  * The `format` block of an audit detail: which rule judged the serial, at
- * which version, and what it said. Null before 0181 (the legacy rule), so
+ * which version, and what it said. Null before 0180 (the legacy rule), so
  * today's audit rows stay exactly as they were.
  */
 export function formatAudit(rule: SerialRule, warnings: ReadonlyArray<{ code: string }>): { rule_id: string; rule_version: number; warnings: string[] } | null {

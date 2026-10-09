@@ -108,7 +108,7 @@ export const SERIAL_TEXT = {
   RETURN_UNIT_MISMATCH: 'هذه الوحدة ليست وحدة مفتوحة من هذا البند.',
   // Owner decision 3 (2026-10-09): a resold device carries its original warranty; nothing restarts it.
   WARRANTY_RESTART_RETIRED: 'لا يُعاد بدء الضمان أبدًا: يبقى الضمان الأصلي مع الرقم التسلسلي من تاريخ أول تسليم (قرار المالك).',
-  // Owner decision 2 (2026-10-09; migration 0181, worker/lib/serialRules.ts):
+  // Owner decision 2 (2026-10-09; migration 0180, worker/lib/serialRules.ts):
   // the owner's serial formats per brand and per product. A rule in `enforce`
   // refuses a serial its format does not match; every other mismatch is a
   // warning. The owner-only screen's own refusals follow.
@@ -354,7 +354,7 @@ export function stripSerialPrefix(text: string): string {
  * product it is scanned for (owner decision 2). A value shaped like a Bambu
  * box number is a BOX SN only under a rule that names that shape — Bambu
  * Lab's, or LEGACY_RULE (today's reading, the default) before migration
- * 0181; for every other brand it is the serial itself.
+ * 0180; for every other brand it is the serial itself.
  */
 export function classifyScanInput(code: unknown, rule: SerialRule = LEGACY_RULE): ScanInput {
   const text = stripSerialPrefix(String(code ?? '').slice(0, 200));
@@ -709,7 +709,7 @@ export interface LinkResult {
   /**
    * The serial format rule that judged this link and what it said (owner
    * decision 2): its warnings are shown in amber and written into the
-   * `serial.linked` audit row. Null before migration 0181 and on a replay.
+   * `serial.linked` audit row. Null before migration 0180 and on a replay.
    */
   format: LinkFormat | null;
 }

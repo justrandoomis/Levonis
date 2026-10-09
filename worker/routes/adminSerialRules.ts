@@ -1,6 +1,6 @@
 /**
  * Admin — SERIAL FORMATS BY BRAND AND PRODUCT (owner decision 2, 2026-10-09;
- * migration 0181 `serial_brand_rules`; docs/DECISIONS.md row 195). The screen
+ * migration 0180 `serial_brand_rules`; docs/DECISIONS.md row 195). The screen
  * is «صيغ الأرقام التسلسلية» beside the serial inventory
  * (src/components/adminWarranty/serialInventory/SerialRulesTab.tsx).
  *
@@ -35,7 +35,7 @@
  * character set and box shape, and no pattern-looking string anywhere —
  * 400 SERIAL_RULE_INVALID {field, reason}.
  *
- * DEPLOY-AHEAD. Before migration 0181: GET answers `installed: false` (the
+ * DEPLOY-AHEAD. Before migration 0180: GET answers `installed: false` (the
  * brand lists still work — they read no new table), the writes answer 503
  * SERIAL_RULES_NOT_INSTALLED, and every serial door judges by today's rule.
  */

@@ -21,7 +21,7 @@ import { classifyCode } from '../packages/catalog/src/deviceSerials';
 import { GENERIC_RULE, LEGACY_RULE } from '../packages/catalog/src/serialRules';
 import { ruleFromRow, type RuleRow } from '../worker/lib/serialRules';
 
-/** The Bambu Lab rule exactly as migration 0181 seeds it (owner decision 2). */
+/** The Bambu Lab rule exactly as migration 0180 seeds it (owner decision 2). */
 const bambuRule = () => {
   const w = world();
   return ruleFromRow(row<RuleRow>(w.raw, "SELECT * FROM serial_brand_rules WHERE id = 'sbr_bambu_lab'")!);
@@ -74,7 +74,7 @@ test('H1 the pure rule: one device in every written form is one key; what is not
   assert.equal(stripSerialPrefix('SN '), 'SN', 'a bare prefix is not stripped down to nothing');
 
   // Owner decision 2: the box-number shape is a box SN only under a rule that
-  // names it — Bambu Lab's seed, and LEGACY_RULE (today's reading, before 0181).
+  // names it — Bambu Lab's seed, and LEGACY_RULE (today's reading, before 0180).
   // Every other value is judged the same under every rule.
   const bambu = bambuRule();
   for (const rule of [bambu, LEGACY_RULE, GENERIC_RULE]) {

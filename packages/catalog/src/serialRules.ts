@@ -1,6 +1,6 @@
 /**
  * SERIAL FORMAT RULES — BRAND- AND PRODUCT-AWARE (owner decision 2,
- * 2026-10-09; migration 0181 `serial_brand_rules`; docs/DECISIONS.md row 195).
+ * 2026-10-09; migration 0180 `serial_brand_rules`; docs/DECISIONS.md row 195).
  *
  * The owner: the shop sells Bambu Lab and Snapmaker (the focus — a Snapmaker
  * product is already live), and also Creality, Anycubic and ELEGOO. The Bambu
@@ -15,7 +15,7 @@
  *   3. GENERIC_RULE below — letters and digits, 6–40, never a refusal for
  *      looking like a Bambu box number (a warning, LOOKS_LIKE_BAMBU_BOX).
  * With no product known (Bulk Add without a product, an unidentified label)
- * the generic rule applies. Before migration 0181 has applied, LEGACY_RULE is
+ * the generic rule applies. Before migration 0180 has applied, LEGACY_RULE is
  * every product's rule: today's behaviour exactly (the Bambu box refusal and
  * the five-prefix family check for every brand, no warnings).
  *
@@ -151,7 +151,7 @@ export const GENERIC_RULE: SerialRule = Object.freeze({
 }) as SerialRule;
 
 /**
- * TODAY'S RULE, for every product, until migration 0181 has applied — the
+ * TODAY'S RULE, for every product, until migration 0180 has applied — the
  * behaviour before owner decision 2, kept exactly: the Bambu box number is
  * refused on every door, and the five prefixes the code always knew name a
  * family on a 15-character serial for the model check. No warnings.

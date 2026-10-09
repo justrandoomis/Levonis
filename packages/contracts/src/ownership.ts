@@ -250,7 +250,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // creates the warranty unit (worker/lib/serialAssignments.ts). The
     // device's own history, so Devices' — like device_serials beside it.
     'serial_assignments',
-    // 0181 — the owner's serial FORMAT rules per brand and per product (owner
+    // 0180 — the owner's serial FORMAT rules per brand and per product (owner
     // decision 2; worker/lib/serialRules.ts). They judge what may become a
     // device's serial, so Devices' — read by every serial door.
     'serial_brand_rules',

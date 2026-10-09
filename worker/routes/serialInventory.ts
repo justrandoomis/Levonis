@@ -126,7 +126,7 @@ serialInventoryRoutes.get('/export', async (c) => {
  * product it is filed under — read from the body's product id WITHOUT
  * verifying it, so the refusals keep today's order (`verifyProductChoice`
  * still answers an unknown product right after) — and the generic rule with
- * no product. LEGACY_RULE before migration 0181.
+ * no product. LEGACY_RULE before migration 0180.
  */
 const batchRule = (db: D1Database, body: Record<string, unknown>) =>
   ruleForProduct(db, typeof body.product_id === 'string' ? body.product_id : null);
@@ -233,7 +233,7 @@ serialInventoryRoutes.post('/scan', async (c) => {
   // OWNER DECISION 2: THE PRODUCT FIRST, THEN THE VERDICT. A value shaped
   // like a Bambu box number is a box number only under a Bambu rule, so the
   // product — the admin's choice, else the label's own — is identified
-  // before the row is judged. Before migration 0181 the rule is today's for
+  // before the row is judged. Before migration 0180 the rule is today's for
   // every product, and nothing is read for it.
   let rule: SerialRule = LEGACY_RULE;
   let identified: Awaited<ReturnType<typeof identifyLabel>> | null = null;

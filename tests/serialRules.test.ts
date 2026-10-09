@@ -1,6 +1,6 @@
 /**
  * SERIAL FORMAT RULES — THE PURE HALF (owner decision 2, 2026-10-09;
- * migration 0181; packages/catalog/src/serialRules.ts).
+ * migration 0180; packages/catalog/src/serialRules.ts).
  *
  * The owner: the shop sells Bambu Lab and Snapmaker (and Creality, Anycubic,
  * ELEGOO); the Bambu serial shape alone never refuses a serial; each brand
@@ -41,7 +41,7 @@ const SN16 = '03919D5806078412';
 const BOX = 'B07119G5811000AB';
 const EAN = '6977252425445';
 
-/** The two seed rules exactly as migration 0181 stores them. */
+/** The two seed rules exactly as migration 0180 stores them. */
 function seeds(): { bambu: SerialRule; snapmaker: SerialRule } {
   const raw = freshDb();
   const read = (id: string) => ruleFromRow(row<RuleRow>(raw, 'SELECT * FROM serial_brand_rules WHERE id = ?', id)!);
@@ -212,8 +212,8 @@ test('the model check: the Bambu rule with its aliases fixes X1C; another brand 
   assert.equal(serialFamilyConflict('00M00A123456789', ['Bambu Lab X1C'], bambu), null, 'a real X1C on «X1C»: no conflict');
   assert.equal(serialFamilyConflict('00M00A123456789', ['Bambu Lab X1 Carbon Combo'], bambu), null, '…and on «X1 Carbon»');
   assert.ok(serialFamilyConflict('00M00A123456789', ['Bambu Lab A1 Combo'], bambu), 'an X1C serial on an A1 is still another model');
-  // Today's rule (before 0181) keeps today's behaviour, defect included.
-  assert.ok(serialFamilyConflict('00M00A123456789', ['Bambu Lab X1C'], LEGACY_RULE), 'LEGACY: the X1C defect, unchanged until 0181');
+  // Today's rule (before 0180) keeps today's behaviour, defect included.
+  assert.ok(serialFamilyConflict('00M00A123456789', ['Bambu Lab X1C'], LEGACY_RULE), 'LEGACY: the X1C defect, unchanged until 0180');
   assert.ok(serialFamilyConflict('00M00A123456789', ['Bambu Lab X1C']), 'no rule named: LEGACY_RULE');
   // Another brand is never refused for its first characters.
   assert.equal(serialFamilyConflict('039ABCDEF012345', ['Creality K1C'], GENERIC_RULE), null);

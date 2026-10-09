@@ -1,6 +1,6 @@
 /**
  * «صيغ الأرقام التسلسلية» — THE OWNER'S SERIAL FORMATS BY BRAND AND PRODUCT
- * (owner decision 2, 2026-10-09; migration 0181; DECISIONS row 195). A view
+ * (owner decision 2, 2026-10-09; migration 0180; DECISIONS row 195). A view
  * beside the serial inventory in «الضمانات والأجهزة».
  *
  * The owner: the shop sells Bambu Lab and Snapmaker, and Creality, Anycubic

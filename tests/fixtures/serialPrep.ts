@@ -14,9 +14,9 @@
  * under a printer catalog; pAMS «Bambu Lab AMS Lite» under an AMS section of
  * the accessories; pPLA a filament. The three Bambu products carry the
  * Bambu Lab brand (`brd_bambu`, slug `bambu-lab`), and the migration's Bambu
- * seed rule (0181, owner decision 2) is bound to it as the live database will
+ * seed rule (0180, owner decision 2) is bound to it as the live database will
  * be — so the Bambu box-number refusal and family check keep judging them.
- * A database built before 0181 (`through`) has no rule table: every product
+ * A database built before 0180 (`through`) has no rule table: every product
  * is judged by today's rule there.
  */
 import type { DatabaseSync } from 'node:sqlite';
@@ -51,7 +51,7 @@ export const BEFORE_SERIALS = String(Number(SERIAL_MIGRATION.slice(0, 4)) - 1).p
 
 /**
  * The serial-format-rules migration (owner decision 2), found by NAME for the
- * same reason: it is 0181 on top of FX-1's 0179, and lands under whatever
+ * same reason: it is 0180 on top of FX-1's 0179, and lands under whatever
  * number is free if another migration lands first.
  */
 export const RULES_MIGRATION = (() => {
@@ -100,10 +100,10 @@ export function seed(raw: DatabaseSync) {
 }
 
 /**
- * The 0181 seed binds itself to a `bambu-lab` brand that exists WHEN THE
+ * The 0180 seed binds itself to a `bambu-lab` brand that exists WHEN THE
  * MIGRATION RUNS; a test database gets its brands afterwards, so this binds
  * it the way the owner's one tap («اربطها بعلامة تجارية») would. A no-op on a
- * database built before 0181.
+ * database built before 0180.
  */
 export function bindBambuSeed(raw: DatabaseSync, brandId = 'brd_bambu') {
   const has = raw.prepare("SELECT 1 AS x FROM sqlite_master WHERE type='table' AND name='serial_brand_rules'").get();
@@ -152,7 +152,7 @@ export function order(
 /** The routes the serial scan touches, mounted in worker/index.ts's order. */
 export function mountSerialWorld(a: Parameters<Parameters<typeof stubApp>[2]>[0]) {
   a.route('/api/admin/orders', adminOrderSerialRoutes);
-  // 0181 (owner decision 2): the serial format rules every door above judges by.
+  // 0180 (owner decision 2): the serial format rules every door above judges by.
   a.route('/api/admin/serial-rules', adminSerialRulesRoutes);
   a.route('/api/admin/taxonomy', adminTaxonomyRoutes);
   a.route('/api/admin/warranties', warrantyAdminRoutes);

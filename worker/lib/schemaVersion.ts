@@ -43,7 +43,7 @@
  * fails otherwise, which is the point: the value exists so that a deploy can
  * notice its own database is behind, and a stale value notices nothing.
  */
-export const EXPECTED_MIGRATION = '0181_serial_brand_rules.sql';
+export const EXPECTED_MIGRATION = '0180_serial_brand_rules.sql';
 
 /**
  * How many migration files this code expects to have been applied.
