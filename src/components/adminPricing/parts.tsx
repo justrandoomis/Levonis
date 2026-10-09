@@ -28,7 +28,7 @@ const VALUE_TONE: Readonly<Record<LegacyValueState, Tone>> = {
   MIGRATED: 'success',
   TARGET_PROFIT_UNRESOLVED: 'warning',
   TARGET_PROFIT_REVIEW_REQUIRED: 'warning',
-  DIRECT_PREMIUM_REVIEW_REQUIRED: 'warning',
+  DIRECT_SALE_EXTRA_REVIEW_REQUIRED: 'warning',
   NOT_APPLICABLE: 'neutral',
   CONFLICT: 'danger',
 };

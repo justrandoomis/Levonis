@@ -297,6 +297,10 @@ export const FINANCIAL_FIELDS = [
   'current_replacement_cost_snapshot_iqd',
   'target_profit_iqd',
   'direct_sale_premium_iqd',
+  // FX-0 (FX plan §11): "Direct Sale Extra" replaces "premium". Each new
+  // name sits beside its old one, and the old one STAYS: a renamed field is
+  // private under both names (defence in depth).
+  'direct_sale_extra_iqd',
   'estimated_cost_iqd',
   'estimated_profit_iqd',
   'actual_profit_iqd',
@@ -327,6 +331,8 @@ export const FINANCIAL_FIELDS = [
   'supplier_cost_iqd',
   'target_rule_id',
   'premium_rule_id',
+  'extra_rule_id',
+  'extra_rule_version',
   'pricing_costs',
   // -- engine runs
   'breakdown_json',
@@ -361,6 +367,7 @@ export const FINANCIAL_FIELDS = [
   'replacement_unit_cost_iqd',
   'target_profit_unit_iqd',
   'direct_premium_unit_iqd',
+  'direct_sale_extra_unit_iqd',
   'fx_snapshot_json',
   'shipping_rate_snapshot_json',
   'supplier_cost_snapshot_json',
@@ -371,6 +378,7 @@ export const FINANCIAL_FIELDS = [
   'current_replacement_cost_snapshot',
   'target_profit_snapshot',
   'direct_premium_snapshot',
+  'direct_sale_extra_snapshot',
   'replacement_margin_at_sale',
   'estimate_vs_actual_variance',
   'cost_variance',

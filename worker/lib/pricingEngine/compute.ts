@@ -3,7 +3,7 @@
  *
  *   - today's price of every model × channel, prepaid and cash on delivery
  *     (legacy.ts, the cart's own resolver call);
- *   - the minimum profit and the direct-sale premium the old prices carry
+ *   - the minimum profit and the Direct Sale Extra the old prices carry
  *     (answer B, packages/pricing/src/legacyTargets.ts), and where they would
  *     be placed;
  *   - what the engine would still miss, from E1 itself: `priceSku` run on the
@@ -78,9 +78,9 @@ const EXPECTED_IN_P1: ReadonlySet<PricingIssueCode> = new Set<PricingIssueCode>(
 const FROM_LEGACY: ReadonlySet<PricingIssueCode> = new Set<PricingIssueCode>([
   'TARGET_PROFIT_MISSING',
   'TARGET_PROFIT_BLOCKED',
-  'DIRECT_PREMIUM_MISSING',
-  'DIRECT_PREMIUM_BLOCKED',
-  'PREMIUM_NOT_ON_STEP',
+  'DIRECT_SALE_EXTRA_MISSING',
+  'DIRECT_SALE_EXTRA_BLOCKED',
+  'DIRECT_SALE_EXTRA_NOT_ON_STEP',
 ]);
 
 const positive = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v > 0;
@@ -145,7 +145,7 @@ function missingOf(productId: string, chain: SkuInputChain, channels: SkuChannel
     rates,
     channels,
     target: resolveRuleAt(rules, 'target_profit', at),
-    premium: channels.includes('direct_sale') ? resolveRuleAt(rules, 'direct_premium', at) : null,
+    extra: channels.includes('direct_sale') ? resolveRuleAt(rules, 'direct_sale_extra', at) : null,
     allowUnconfirmedRates: true,
   });
   const seen = new Set<string>();
@@ -203,13 +203,13 @@ export function evaluateProduct(loaded: LoadedProduct, ctx: PricingContext, refe
     else holding.add(code);
   };
   for (const m of considered) {
-    for (const r of [...m.legacy.target.reasons, ...m.legacy.premium.reasons]) legacyCode(r.code);
+    for (const r of [...m.legacy.target.reasons, ...m.legacy.extra.reasons]) legacyCode(r.code);
     // Offered but priced on no channel: its values are held (BLOCKED markers)
     // for the channel setup alone — NEEDS_MANUAL_REVIEW, from the channel check below.
     const unpricedHold = m.legacy.mix === 'NOT_SELLABLE' && m.channels.length > 0;
-    if (!unpricedHold && (m.legacy.target.state === 'CONFLICT' || m.legacy.premium.state === 'CONFLICT')) statuses.push('CONFLICT');
-    else if (!unpricedHold && (m.legacy.target.state !== 'MIGRATED' || m.legacy.premium.state === 'DIRECT_PREMIUM_REVIEW_REQUIRED')) {
-      // A held premium rolls up with the profit (master plan v2 check (1)7).
+    if (!unpricedHold && (m.legacy.target.state === 'CONFLICT' || m.legacy.extra.state === 'CONFLICT')) statuses.push('CONFLICT');
+    else if (!unpricedHold && (m.legacy.target.state !== 'MIGRATED' || m.legacy.extra.state === 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED')) {
+      // A held Direct Sale Extra rolls up with the profit (master plan v2 check (1)7).
       statuses.push('TARGET_PROFIT_REVIEW_REQUIRED');
     }
     if (m.channels.some((c) => !c.ok)) {

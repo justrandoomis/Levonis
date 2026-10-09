@@ -9,9 +9,9 @@
  *   2. per model, what a customer pays TODAY on each channel: the item price,
  *      the old route fee, prepaid and cash on delivery, and the old landed cost
  *      (answer B: it already included shipping);
- *   3. the minimum target profit and the direct-sale premium the old prices
+ *   3. the minimum target profit and the Direct Sale Extra the old prices
  *      carry, each with its state, its reasons with their figures (the route
- *      fee counted in), and — for a conflict or an off-step premium — the
+ *      fee counted in), and — for a conflict or an off-step Direct Sale Extra — the
  *      values the owner can choose between; never an average;
  *   4. the shipping measures the product page states (suggestions, not
  *      confirmed), and what the new price still needs;
@@ -64,7 +64,7 @@ function figureParams(f: Pick<PricingReasonFigure, 'route' | 'legacy_reason_iqd'
  */
 function productReasonItems(codes: string[], models: PricingModel[], lang: Language): ReasonItem[] {
   return codes.map((code) => {
-    const figures = models.flatMap((m) => [...m.target.reason_figures, ...m.premium.reason_figures]).filter((f) => f.code === code);
+    const figures = models.flatMap((m) => [...m.target.reason_figures, ...m.direct_sale_extra.reason_figures]).filter((f) => f.code === code);
     if (!figures.length) return { code };
     const routes = [...new Set(figures.map((f) => f.route).filter((r): r is PricingRoute => r !== null))];
     const amounts = [...new Set(figures.map((f) => f.legacy_reason_iqd).filter((n): n is number => n !== null))].sort((a, b) => a - b);
@@ -244,8 +244,8 @@ export function ModelSection({ model, lang, s, defaultOpen, single }: { model: P
     const f = model.target.reason_figures.find((x) => x.code === code);
     return f ? { code, params: figureParams(f, lang) } : { code };
   });
-  const premiumReasons: ReasonItem[] = model.premium.reason_codes.map((code) => {
-    const f = model.premium.reason_figures.find((x) => x.code === code);
+  const extraReasons: ReasonItem[] = model.direct_sale_extra.reason_codes.map((code) => {
+    const f = model.direct_sale_extra.reason_figures.find((x) => x.code === code);
     return f ? { code, params: figureParams(f, lang) } : { code };
   });
 
@@ -271,13 +271,13 @@ export function ModelSection({ model, lang, s, defaultOpen, single }: { model: P
             s={s}
           />
           <DerivedValue
-            title={s.premium}
-            value={model.premium.direct_premium_iqd}
-            state={model.premium.migration_state}
-            reasons={premiumReasons}
-            candidates={model.premium.candidates.map((c) => ({ kind: c.kind, route: c.route, value: c.direct_premium_iqd }))}
+            title={s.directSaleExtra}
+            value={model.direct_sale_extra.direct_sale_extra_iqd}
+            state={model.direct_sale_extra.migration_state}
+            reasons={extraReasons}
+            candidates={model.direct_sale_extra.candidates.map((c) => ({ kind: c.kind, route: c.route, value: c.direct_sale_extra_iqd }))}
             extra={
-              model.base_route && model.premium.migration_state !== 'NOT_APPLICABLE' ? (
+              model.base_route && model.direct_sale_extra.migration_state !== 'NOT_APPLICABLE' ? (
                 <p className="mt-1 text-[12px] text-text-muted">
                   {s.baseRoute}: {channelLabel(routeChannel(model.base_route), lang)}
                 </p>
@@ -371,9 +371,9 @@ export function ModelSection({ model, lang, s, defaultOpen, single }: { model: P
             <span>
               {s.minProfit}: <Money iqd={model.target.target_profit_iqd} className="font-semibold text-text-secondary" />
             </span>
-            {model.premium.migration_state !== 'NOT_APPLICABLE' && (
+            {model.direct_sale_extra.migration_state !== 'NOT_APPLICABLE' && (
               <span>
-                {s.premium}: <Money iqd={model.premium.direct_premium_iqd} className="font-semibold text-text-secondary" />
+                {s.directSaleExtra}: <Money iqd={model.direct_sale_extra.direct_sale_extra_iqd} className="font-semibold text-text-secondary" />
               </span>
             )}
           </span>
@@ -394,12 +394,12 @@ function worstState(m: PricingModel): PricingModel['target']['migration_state'] 
     'CONFLICT',
     'TARGET_PROFIT_UNRESOLVED',
     'TARGET_PROFIT_REVIEW_REQUIRED',
-    'DIRECT_PREMIUM_REVIEW_REQUIRED',
+    'DIRECT_SALE_EXTRA_REVIEW_REQUIRED',
     'MIGRATED',
     'NOT_APPLICABLE',
   ];
   const a = order.indexOf(m.target.migration_state);
-  const b = order.indexOf(m.premium.migration_state);
+  const b = order.indexOf(m.direct_sale_extra.migration_state);
   return order[Math.min(a < 0 ? 99 : a, b < 0 ? 99 : b)] ?? m.target.migration_state;
 }
 

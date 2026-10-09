@@ -80,7 +80,7 @@ const withRates = (patch: { fx?: CentralRates['fx']; shipping?: CentralRates['sh
   shipping: { ...RATES.shipping, ...patch.shipping },
 });
 
-const active = (amount: number, kind: 'target_profit' | 'direct_premium' = 'target_profit', id = kind === 'target_profit' ? 'rule_t' : 'rule_p'): RuleResolution => ({
+const active = (amount: number, kind: 'target_profit' | 'direct_sale_extra' = 'target_profit', id = kind === 'target_profit' ? 'rule_t' : 'rule_p'): RuleResolution => ({
   status: 'active',
   kind,
   amount_iqd: amount,
@@ -89,7 +89,7 @@ const active = (amount: number, kind: 'target_profit' | 'direct_premium' = 'targ
   candidates: [{ id, version: 3, scope: 'product', scope_id: '', catalog_id: null }],
 });
 const T = (amount: number) => active(amount, 'target_profit');
-const P = (amount: number) => active(amount, 'direct_premium');
+const P = (amount: number) => active(amount, 'direct_sale_extra');
 const base = (source: PricingInputRow, override?: PricingInputRow): SkuInputChain => ({ base: { source, override } });
 
 const price = (input: Partial<PriceSkuInput> & Pick<PriceSkuInput, 'chain'>): SkuPricingResult =>
@@ -157,7 +157,7 @@ test('owner decision 3: a calculated 1,073,420 rounds UP — never down — and 
   assert.ok(p - 873_420 >= 200_000);
   assert.equal(isOnStep(50_000), true);
   assert.equal(isOnStep(50_500), false);
-  assert.throws(() => directPrice(1_074_000, 50_500), /PREMIUM_NOT_ON_STEP/, 'a premium off the step is refused, never rounded');
+  assert.throws(() => directPrice(1_074_000, 50_500), /DIRECT_SALE_EXTRA_NOT_ON_STEP/, 'an extra off the step is refused, never rounded');
   assert.throws(() => preorderPrice(800_000, 0), RangeError, 'a target of 0 is no target [C2-M2]');
 });
 
@@ -165,7 +165,7 @@ test('owner decision 3 through the engine: FX rises, the PRICE moves and the tar
   // USD 500 × 1,500 = 750,000 + 1 kg air at 50,000/kg = 800,000.
   const rates = withRates({ shipping: { CHINA_AIR: rate('50000') } });
   const chain = (usd: string) => base({ supplier_cost: usd, supplier_currency: 'USD', shipping_weight_g: 1000, shipping_profile: 'CHINA_AIR' });
-  const input = { rates, channels: ['direct_sale', 'pre_order_air'] as SkuChannel[], target: T(200_000), premium: P(50_000) };
+  const input = { rates, channels: ['direct_sale', 'pre_order_air'] as SkuChannel[], target: T(200_000), extra: P(50_000) };
   const before = priceSku({ ...input, chain: chain('500') });
   assert.equal(channel(before, 'pre_order_air').replacement_cost_iqd, 800_000);
   assert.equal(channel(before, 'pre_order_air').computed_price_iqd, 1_000_000);
@@ -178,7 +178,7 @@ test('owner decision 3 through the engine: FX rises, the PRICE moves and the tar
   assert.equal(air.computed_price_iqd - air.replacement_cost_iqd, 200_000);
   const direct = channel(after, 'direct_sale');
   assert.equal(direct.preorder_base_iqd, 1_075_000);
-  assert.equal(direct.direct_premium_iqd, 50_000);
+  assert.equal(direct.direct_sale_extra_iqd, 50_000);
   assert.equal(direct.computed_price_iqd, 1_125_000);
   assert.equal(after.ok, true);
 });
@@ -231,7 +231,7 @@ test('reference vectors (ENG §4.2.2): EUR/Germany, CNY air, CNY sea box and man
     rates: RATES,
     channels: ['direct_sale', 'pre_order_land'],
     target: T(200_000),
-    premium: P(50_000),
+    extra: P(50_000),
   });
   assertWellFormed(eur);
   const land = channel(eur, 'pre_order_land');
@@ -349,7 +349,7 @@ test('property: 100,000 random SKUs — price = ceil_step(R_exact + T) (+P), par
     const optionDelta = rnd() < 0.3 ? decimal(0, 500, 2) : null;
     const colorDelta = rnd() < 0.3 ? decimal(0, 50, 2) : null;
     const target = int(1, 2_000_000);
-    const premium = int(0, 500) * 1000;
+    const extra = int(0, 500) * 1000;
     const additional = rnd() < 0.5 ? null : int(0, 500_000);
     const step = rnd() < 0.9 ? 1000 : [1, 250, 5000][int(0, 2)];
 
@@ -375,8 +375,8 @@ test('property: 100,000 random SKUs — price = ceil_step(R_exact + T) (+P), par
     };
     const route = PROFILE_BASIS[profile] === 'volume' ? 'sea' : profile === 'CHINA_AIR' ? 'air' : 'land';
     const rates: CentralRates = withRates({ fx: { [currency]: rate(fxText) }, shipping: { [profile]: rate(shipText) } });
-    const P_ = premium - (premium % step);
-    const r = priceSku({ chain, rates, channels: ['direct_sale', channelOfRoute(route)], target: T(target), premium: P(P_), step });
+    const P_ = extra - (extra % step);
+    const r = priceSku({ chain, rates, channels: ['direct_sale', channelOfRoute(route)], target: T(target), extra: P(P_), step });
 
     // The oracle.
     let amount = q(supplierText);
@@ -391,7 +391,7 @@ test('property: 100,000 random SKUs — price = ceil_step(R_exact + T) (+P), par
     assert.equal(r.ok, true, `#${i}: ${JSON.stringify(r.issues)}`);
     assert.equal(r.channels.length, 2);
     for (const c of r.channels) {
-      const premiumHere = c.channel === 'direct_sale' ? P_ : 0;
+      const extraHere = c.channel === 'direct_sale' ? P_ : 0;
       assert.equal(BigInt(c.replacement_cost_iqd), R, `#${i} R = ceil(R_exact)`);
       assert.equal(qCmp(q(c.replacement_exact), Rx), 0, `#${i} replacement_exact is exact`);
       assert.equal(BigInt(c.supplier_cost_iqd), qCeil(S), `#${i} supplier = ceil(exact)`);
@@ -399,12 +399,12 @@ test('property: 100,000 random SKUs — price = ceil_step(R_exact + T) (+P), par
       assert.ok(c.shipping_cost_iqd >= 0 && BigInt(c.shipping_cost_iqd) <= qCeil(H), `#${i} 0 ≤ shipping ≤ ceil(exact shipping)`);
       assert.equal(BigInt(c.preorder_base_iqd), B, `#${i} pre-order = ceil_step(R_exact + T)`);
       assert.equal(BigInt(c.preorder_base_iqd), qCeil(qDiv(qInt(R + BigInt(target)), BigInt(step))) * BigInt(step), `#${i} ≡ ceil_step(R + T)`);
-      assert.equal(c.computed_price_iqd, c.preorder_base_iqd + premiumHere, `#${i} (+P)`);
+      assert.equal(c.computed_price_iqd, c.preorder_base_iqd + extraHere, `#${i} (+P)`);
       assert.equal(c.computed_price_iqd % step, 0, `#${i} on the step`);
-      // price − premium − R_exact ≥ T, exactly.
-      assert.ok(qCmp(qAdd(qInt(c.computed_price_iqd - premiumHere), [-Rx[0], Rx[1]]), qInt(target)) >= 0, `#${i} profit ≥ target`);
+      // price − extra − R_exact ≥ T, exactly.
+      assert.ok(qCmp(qAdd(qInt(c.computed_price_iqd - extraHere), [-Rx[0], Rx[1]]), qInt(target)) >= 0, `#${i} profit ≥ target`);
       assert.ok(c.rounding_added_iqd >= 0 && c.rounding_added_iqd < step, `#${i} rounding < one step`);
-      assert.equal(c.rounding_added_iqd, c.computed_price_iqd - c.replacement_cost_iqd - target - premiumHere);
+      assert.equal(c.rounding_added_iqd, c.computed_price_iqd - c.replacement_cost_iqd - target - extraHere);
       assert.equal(c.rounding_step_iqd, step);
       priced++;
     }
@@ -416,7 +416,7 @@ test('property: 100,000 random SKUs — price = ceil_step(R_exact + T) (+P), par
 
 test('missing inputs return codes, never a number; a zero supplier cost is missing [C1-G24]', () => {
   const all = SKU_CHANNELS;
-  const none = priceSku({ chain: {}, rates: RATES, channels: all, target: T(200_000), premium: P(50_000) });
+  const none = priceSku({ chain: {}, rates: RATES, channels: all, target: T(200_000), extra: P(50_000) });
   assertWellFormed(none);
   assert.equal(none.ok, false);
   assert.deepEqual(none.channels, []);
@@ -509,10 +509,10 @@ test('rates: missing or zero → FX/SHIPPING_RATE_MISSING; unconfirmed blocks a 
   assert.equal(preview.ok, true);
 });
 
-test('rules: missing or BLOCKED target stops every channel; the premium only matters for direct_sale; PREMIUM_NOT_ON_STEP [C2-M5]', () => {
+test('rules: missing or BLOCKED target stops every channel; the extra only matters for direct_sale; DIRECT_SALE_EXTRA_NOT_ON_STEP [C2-M5]', () => {
   const chain = base({ supplier_cost: '500', supplier_currency: 'USD', shipping_weight_g: 1000, shipping_profile: 'CHINA_AIR' });
   const input = { chain, rates: RATES, channels: ['direct_sale', 'pre_order_air', 'pre_order_land'] as SkuChannel[] };
-  const missing = priceSku({ ...input, target: { status: 'missing', kind: 'target_profit', code: 'TARGET_PROFIT_MISSING' }, premium: P(50_000) });
+  const missing = priceSku({ ...input, target: { status: 'missing', kind: 'target_profit', code: 'TARGET_PROFIT_MISSING' }, extra: P(50_000) });
   assertWellFormed(missing);
   assert.deepEqual(missing.channels, []);
   for (const c of input.channels) assert.deepEqual(codes(missing, c), ['TARGET_PROFIT_MISSING']);
@@ -522,25 +522,25 @@ test('rules: missing or BLOCKED target stops every channel; the premium only mat
   });
   assert.deepEqual(codes(blocked, 'pre_order_air'), ['TARGET_PROFIT_BLOCKED']);
 
-  const noPremium = priceSku({ ...input, target: T(200_000) });
-  assert.deepEqual(codes(noPremium), ['DIRECT_PREMIUM_MISSING']);
-  assert.deepEqual(noPremium.channels.map((c) => c.channel), ['pre_order_air', 'pre_order_land'], 'pre-order channels still priced');
-  assert.equal(noPremium.issues[0].channel, 'direct_sale');
+  const noExtra = priceSku({ ...input, target: T(200_000) });
+  assert.deepEqual(codes(noExtra), ['DIRECT_SALE_EXTRA_MISSING']);
+  assert.deepEqual(noExtra.channels.map((c) => c.channel), ['pre_order_air', 'pre_order_land'], 'pre-order channels still priced');
+  assert.equal(noExtra.issues[0].channel, 'direct_sale');
 
-  const offStep = priceSku({ ...input, target: T(200_000), premium: P(50_500) });
-  assert.deepEqual(codes(offStep, 'direct_sale'), ['PREMIUM_NOT_ON_STEP']);
-  const stepChange = priceSku({ ...input, target: T(200_000), premium: P(1_000), step: 5_000 });
-  assert.deepEqual(codes(stepChange, 'direct_sale'), ['PREMIUM_NOT_ON_STEP'], 'a step change never silently rounds an old premium');
+  const offStep = priceSku({ ...input, target: T(200_000), extra: P(50_500) });
+  assert.deepEqual(codes(offStep, 'direct_sale'), ['DIRECT_SALE_EXTRA_NOT_ON_STEP']);
+  const stepChange = priceSku({ ...input, target: T(200_000), extra: P(1_000), step: 5_000 });
+  assert.deepEqual(codes(stepChange, 'direct_sale'), ['DIRECT_SALE_EXTRA_NOT_ON_STEP'], 'a step change never silently rounds an old extra');
   assert.equal(channel(stepChange, 'pre_order_air').computed_price_iqd % 5_000, 0);
 
-  const zero = priceSku({ ...input, target: T(200_000), premium: P(0) });
-  assert.equal(channel(zero, 'direct_sale').computed_price_iqd, channel(zero, 'pre_order_air').computed_price_iqd, 'a premium of 0 is a real value');
-  assert.equal(channel(zero, 'direct_sale').direct_premium_iqd, 0);
+  const zero = priceSku({ ...input, target: T(200_000), extra: P(0) });
+  assert.equal(channel(zero, 'direct_sale').computed_price_iqd, channel(zero, 'pre_order_air').computed_price_iqd, 'an extra of 0 is a real value');
+  assert.equal(channel(zero, 'direct_sale').direct_sale_extra_iqd, 0);
   // A hand-built resolution with an amount the CHECKs refuse fails closed.
-  const bad = priceSku({ ...input, target: T(0), premium: P(-1000) });
-  assert.deepEqual(codes(bad, 'direct_sale'), ['DIRECT_PREMIUM_BLOCKED', 'TARGET_PROFIT_BLOCKED']);
+  const bad = priceSku({ ...input, target: T(0), extra: P(-1000) });
+  assert.deepEqual(codes(bad, 'direct_sale'), ['DIRECT_SALE_EXTRA_BLOCKED', 'TARGET_PROFIT_BLOCKED']);
   const tie: RuleResolution = { ...(T(250_000) as Extract<RuleResolution, { status: 'active' }>), tie: true };
-  const tied = priceSku({ ...input, target: tie, premium: P(0) });
+  const tied = priceSku({ ...input, target: tie, extra: P(0) });
   assert.equal(tied.ok, true, 'RULE_TIE is a warning');
   assert.deepEqual(tied.issues.map((i) => [i.code, i.severity]), [['RULE_TIE', 'warning']]);
   assert.equal(channel(tied, 'pre_order_air').target_profit_iqd, 250_000);
@@ -553,7 +553,7 @@ test('direct_sale needs the default profile; AMOUNT_TOO_LARGE; channels are de-d
     rates: RATES,
     channels: ['direct_sale', 'pre_order_air'],
     target: T(200_000),
-    premium: P(50_000),
+    extra: P(50_000),
   });
   assertWellFormed(noProfile);
   assert.deepEqual(codes(noProfile, 'direct_sale'), ['SHIPPING_PROFILE_MISSING']);
@@ -563,7 +563,7 @@ test('direct_sale needs the default profile; AMOUNT_TOO_LARGE; channels are de-d
     rates: RATES,
     channels: ['direct_sale', 'direct_sale'],
     target: T(200_000),
-    premium: P(50_000),
+    extra: P(50_000),
   });
   assert.equal(seaDirect.channels.length, 1);
   assert.equal(channel(seaDirect, 'direct_sale').shipping_basis, 'volume');
@@ -785,13 +785,13 @@ test('a SOURCE unresolved mark beats its own row\'s value (box included) but nev
   assert.deepEqual([shown?.effective, shown?.box, shown?.calculated], ['0.3', null, null]);
 });
 
-test('priceSku refuses swapped rule resolutions (a premium priced as the profit is a programming error)', () => {
+test('priceSku refuses swapped rule resolutions (an extra priced as the profit is a programming error)', () => {
   const chain = base({ supplier_cost: '500', supplier_currency: 'USD', shipping_weight_g: 1000, shipping_profile: 'CHINA_AIR' });
   const input = { chain, rates: RATES, channels: ['direct_sale', 'pre_order_air'] as SkuChannel[] };
-  assert.throws(() => priceSku({ ...input, target: P(50_000), premium: T(200_000) }), /PRICING_INVARIANT/);
-  assert.throws(() => priceSku({ ...input, target: T(200_000), premium: T(50_000) }), /PRICING_INVARIANT/);
-  assert.throws(() => priceSku({ ...input, target: { status: 'missing', kind: 'direct_premium', code: 'DIRECT_PREMIUM_MISSING' } }), /PRICING_INVARIANT/);
-  assert.equal(priceSku({ ...input, target: T(200_000), premium: P(50_000) }).ok, true);
+  assert.throws(() => priceSku({ ...input, target: P(50_000), extra: T(200_000) }), /PRICING_INVARIANT/);
+  assert.throws(() => priceSku({ ...input, target: T(200_000), extra: T(50_000) }), /PRICING_INVARIANT/);
+  assert.throws(() => priceSku({ ...input, target: { status: 'missing', kind: 'direct_sale_extra', code: 'DIRECT_SALE_EXTRA_MISSING' } }), /PRICING_INVARIANT/);
+  assert.equal(priceSku({ ...input, target: T(200_000), extra: P(50_000) }).ok, true);
 });
 
 test('the public price helpers: never a negative replacement, never a price below one step, never a float', () => {
@@ -819,7 +819,7 @@ test('bad caller data fails closed with the right code: a repeated option row, a
     rates: RATES,
     channels: SKU_CHANNELS,
     target: T(200_000),
-    premium: P(0),
+    extra: P(0),
   });
   assertWellFormed(twice);
   assert.deepEqual(twice.channels, [], 'never 260 USD: the same option value is not counted twice');

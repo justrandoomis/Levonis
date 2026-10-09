@@ -71,6 +71,16 @@ const AREAS: Record<string, readonly string[]> = {
     'shipping_cost_exact', 'replacement_exact', 'rounding_added_iqd', 'pricing_before_json', 'pricing_after_json',
     'summary_json', 'change_json', 'samples_json',
   ],
+  // FX-0 (FX plan §11, §4.5): "Direct Sale Extra" replaces "premium" in the
+  // pricing engine. The new names join the net…
+  FX0: ['direct_sale_extra_iqd', 'extra_rule_id', 'extra_rule_version', 'direct_sale_extra_unit_iqd', 'direct_sale_extra_snapshot'],
+  // …and every old name STAYS in it: a renamed field is private under both
+  // names (defence in depth), so an older client, a stale cache or a missed
+  // rename can never carry one unstripped.
+  FX0_OLD_NAMES_KEPT: [
+    'direct_sale_premium_iqd', 'direct_premium_iqd', 'premium_rule_id', 'direct_premium_unit_iqd', 'direct_premium_snapshot',
+    'premium_iqd', 'inherited_premium_iqd', 'premium_plan_json',
+  ],
 };
 
 /**
@@ -107,7 +117,8 @@ const PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
   reason_figures: 'a container: a reason code with its route and its figure, the figure under legacy_reason_iqd (FINANCIAL_FIELDS)',
   channel_mix: 'BOTH / DIRECT_ONLY / PREORDER_ONLY / NOT_SELLABLE — how a model sells',
   model_count: 'how many models a product has — a count',
-  base_route: 'the route name (air / sea / land) a premium is measured from',
+  base_route: 'the route name (air / sea / land) a Direct Sale Extra is measured from',
+  direct_sale_extra: 'a container: one derived Direct Sale Extra with its state, reasons and candidates, the amount under direct_sale_extra_iqd (FINANCIAL_FIELDS)',
   migration_state: 'the state code of one derived value (MIGRATED, CONFLICT, …)',
   roundtrip_ok: 'yes/no: the derived values give the old prices back',
   suggested_measures: 'a container: the public package measures, each under a FINANCIAL_FIELDS key',
@@ -123,7 +134,7 @@ const PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
  * NEVER private names (F18, security spec §4.1, critique A6): each is a public
  * or wallet field elsewhere, so stripping it would break those screens — and a
  * private value under one of them would slip through. A private column must
- * be named by what it is (`direct_premium_iqd`, not `amount_iqd`).
+ * be named by what it is (`direct_sale_extra_iqd`, not `amount_iqd`).
  */
 const FORBIDDEN = [
   'breakdown', 'rounding_iqd', 'pricing', 'valuation', 'exchange_rate', 'exchange_rate_snapshot', 'shipping_cost', 'amount_iqd',

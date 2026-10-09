@@ -4,7 +4,7 @@
  * The owner types a supplier cost and its currency (optionally one model,
  * measures, an additional cost per unit, and rates); E1's `priceSku` prices
  * every model × channel the store offers today with:
- *   - the minimum profit and premium the old prices carry (the legacy
+ *   - the minimum profit and Direct Sale Extra the old prices carry (the legacy
  *     placement, as rules — a value held for review stays held: no price);
  *   - the public package measures as suggestions, under the owner's measures;
  *   - the rate reference from the purchase screens (unconfirmed), under the
@@ -235,7 +235,7 @@ export function runWhatIf(evaluation: ProductEvaluation, req: WhatIfRequest, ref
           rates: central,
           channels,
           target: resolveRuleAt(evaluation.rules, 'target_profit', at),
-          premium: channels.includes('direct_sale') ? resolveRuleAt(evaluation.rules, 'direct_premium', at) : null,
+          extra: channels.includes('direct_sale') ? resolveRuleAt(evaluation.rules, 'direct_sale_extra', at) : null,
           allowUnconfirmedRates: true,
         })
       : null;

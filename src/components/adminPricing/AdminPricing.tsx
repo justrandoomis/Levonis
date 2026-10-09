@@ -7,7 +7,7 @@
  *   - every ordinary product with its status (worst first), the counts, a
  *     search and a status filter (PricingProducts);
  *   - one product: today's prices per model × channel with the old route fee
- *     and the old landed cost, the minimum profit and the direct-sale premium
+ *     and the old landed cost, the minimum profit and the Direct Sale Extra
  *     the old prices carry, conflicts, measures, typed member prices yes/no,
  *     the calculator and the rates it uses (ProductPricingSheet).
  *

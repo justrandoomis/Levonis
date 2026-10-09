@@ -169,11 +169,11 @@ test('Sorani wording: rules are «ڕێسا», never «یاسا» (law); rate uni
   }
 });
 
-test('the breakdown says a direct sale adds the premium after the rounding, and takes the step in the reader’s digits; the member chip says «يدوياً» (review finding 14)', () => {
-  const premium = { ar: /زيادة البيع المباشر/, en: /direct-sale premium/, ckb: /زیادەی فرۆشتنی ڕاستەوخۆ/ } as const;
+test('the breakdown says a direct sale adds the Direct Sale Extra after the rounding, and takes the step in the reader’s digits; the member chip says «يدوياً» (review finding 14)', () => {
+  const extra = { ar: /زيادة البيع المباشر/, en: /Direct Sale Extra/, ckb: /زیادەی فرۆشتنی ڕاستەوخۆ/ } as const;
   for (const lang of ['ar', 'en', 'ckb'] as const) {
     const how = PRICING_UI_STRINGS[lang].minimumKeptHow('١٬٠٠٠');
-    assert.match(how, premium[lang], lang);
+    assert.match(how, extra[lang], lang);
     assert.ok(how.includes('١٬٠٠٠'), `${lang}: the step is the caller's, written in the reader's digits`);
     assert.doesNotMatch(how, /1,000/, lang);
   }

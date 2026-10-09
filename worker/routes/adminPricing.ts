@@ -7,7 +7,7 @@
  *                                      preliminary §2.3 status and the counts
  *   GET  /products/:id                today's price per model × channel (prepaid
  *                                      and cash on delivery), the old landed cost,
- *                                      the minimum profit and premium derived by
+ *                                      the minimum profit and Direct Sale Extra derived by
  *                                      answer B, conflicts, measures known or
  *                                      missing, typed member prices (yes/no), and
  *                                      the rate reference

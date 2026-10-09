@@ -48,7 +48,7 @@ export const PRICING_ISSUE_CODES = [
   'FX_RATE_MISSING',
   'SHIPPING_RATE_MISSING',
   'TARGET_PROFIT_MISSING',
-  'DIRECT_PREMIUM_MISSING',
+  'DIRECT_SALE_EXTRA_MISSING',
   'INPUT_CONFLICT',
   'DELTA_WITHOUT_BASE',
   'CURRENCY_WITHOUT_AMOUNT',
@@ -69,15 +69,15 @@ export const PRICING_ISSUE_CODES = [
   'PINNED_BELOW_TARGET',
   'PRICING_CATEGORY_DIFFERS',
   'RULE_ORPHANED',
-  'PREMIUM_NOT_ON_STEP',
+  'DIRECT_SALE_EXTRA_NOT_ON_STEP',
   // v2 additions
   'TARGET_PROFIT_BLOCKED',
   'SHIPPING_FIELD_UNRESOLVED',
   'SKU_INPUTS_UNREVIEWED',
   'INPUT_ORPHANED',
   'MEASURE_FROM_PUBLIC_SPEC',
-  // v2 check (1)7: a BLOCKED premium rule has its own code (TARGET_PROFIT_BLOCKED names the target only)
-  'DIRECT_PREMIUM_BLOCKED',
+  // v2 check (1)7: a BLOCKED Direct Sale Extra rule has its own code (TARGET_PROFIT_BLOCKED names the target only)
+  'DIRECT_SALE_EXTRA_BLOCKED',
 ] as const;
 
 export type PricingIssueCode = (typeof PRICING_ISSUE_CODES)[number];
@@ -137,9 +137,9 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
     severity: 'error',
     label: { ar: 'الحد الأدنى للربح غير مضبوط', en: 'Minimum target profit is not set', ckb: 'کەمترین قازانجی مەبەست دانەنراوە' },
   },
-  DIRECT_PREMIUM_MISSING: {
+  DIRECT_SALE_EXTRA_MISSING: {
     severity: 'error',
-    label: { ar: 'زيادة البيع المباشر غير مضبوطة', en: 'Direct sale premium is not set', ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ دانەنراوە' },
+    label: { ar: 'زيادة البيع المباشر غير مضبوطة', en: 'Direct Sale Extra is not set', ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ دانەنراوە' },
   },
   INPUT_CONFLICT: {
     severity: 'error',
@@ -281,15 +281,15 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
     severity: 'warning',
     label: {
       ar: 'قاعدة ربح أو زيادة بيع مباشر تشير إلى قسم أو خيار أو تركيبة لم تعد موجودة؛ لا تُطبَّق',
-      en: 'A profit or premium rule points to a category, option or SKU that no longer exists; it is not applied',
-      ckb: 'ڕێسایەکی قازانج یان زیادە ئاماژە بە بەش، هەڵبژاردە یان SKU-یەک دەکات کە چیتر بوونی نییە؛ جێبەجێ ناکرێت',
+      en: 'A profit or Direct Sale Extra rule points to a category, option or SKU that no longer exists; it is not applied',
+      ckb: 'ڕێسایەکی قازانج یان زیادەی فرۆشتنی ڕاستەوخۆ ئاماژە بە بەش، هەڵبژاردە یان SKU-یەک دەکات کە چیتر بوونی نییە؛ جێبەجێ ناکرێت',
     },
   },
-  PREMIUM_NOT_ON_STEP: {
+  DIRECT_SALE_EXTRA_NOT_ON_STEP: {
     severity: 'error',
     label: {
       ar: 'يجب أن تكون زيادة البيع المباشر من مضاعفات خطوة التقريب (1,000 د.ع)',
-      en: 'The direct sale premium must be a multiple of the rounding step (1,000 IQD)',
+      en: 'The Direct Sale Extra must be a multiple of the rounding step (1,000 IQD)',
       ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ دەبێت چەندجارەی هەنگاوی خڕکردنەوە بێت (1,000 دینار)',
     },
   },
@@ -333,11 +333,11 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
       ckb: 'ئەم پێوانەیە لە تایبەتمەندییە گشتییەکانەوە هێنراوە و هێشتا پشتڕاستت نەکردووەتەوە',
     },
   },
-  DIRECT_PREMIUM_BLOCKED: {
+  DIRECT_SALE_EXTRA_BLOCKED: {
     severity: 'error',
     label: {
       ar: 'زيادة البيع المباشر موقوفة حتى تقرر',
-      en: 'The direct sale premium is on hold until you decide',
+      en: 'The Direct Sale Extra is on hold until you decide',
       ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ ڕاگیراوە تا تۆ بڕیار دەدەیت',
     },
   },

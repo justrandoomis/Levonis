@@ -9,7 +9,7 @@
  *
  * What is here:
  *   - the six product statuses of §2.3, worst first (`PRICING_MIGRATION_STATUSES`);
- *   - the states one derived minimum profit or premium can be in;
+ *   - the states one derived minimum profit or Direct Sale Extra can be in;
  *   - every reason code `packages/pricing/src/legacyTargets.ts` and the P1
  *     preview raise (tests/pricingMigrationLabels.test.ts holds the two lists
  *     equal), with its severity;
@@ -48,11 +48,11 @@ export const PRICING_MIGRATION_STATUS_LABELS: Readonly<Record<PricingMigrationSt
     en: 'Conflicting legacy data',
     ckb: 'ناکۆکی لە زانیارییە کۆنەکاندا',
   },
-  // A held direct-sale premium rolls up here too (master plan v2 check (1)7),
+  // A held Direct Sale Extra rolls up here too (master plan v2 check (1)7),
   // so the PRODUCT status names both values; one value's own state is below.
   TARGET_PROFIT_REVIEW_REQUIRED: {
     ar: 'الحد الأدنى للربح أو زيادة البيع المباشر يحتاج مراجعة',
-    en: 'Minimum profit or direct-sale premium needs review',
+    en: 'Minimum profit or Direct Sale Extra needs review',
     ckb: 'کەمترین قازانج یان زیادەی فرۆشتنی ڕاستەوخۆ پێویستی بە پێداچوونەوە هەیە',
   },
   NEEDS_MANUAL_REVIEW: {
@@ -96,12 +96,12 @@ export function worstMigrationStatus(
 
 // --------------------------------------------- one derived value's state
 
-/** The state of one derived minimum profit or direct-sale premium (master plan v2 §2.5). */
+/** The state of one derived minimum profit or Direct Sale Extra (master plan v2 §2.5). */
 export const LEGACY_VALUE_STATES = [
   'MIGRATED',
   'TARGET_PROFIT_UNRESOLVED',
   'TARGET_PROFIT_REVIEW_REQUIRED',
-  'DIRECT_PREMIUM_REVIEW_REQUIRED',
+  'DIRECT_SALE_EXTRA_REVIEW_REQUIRED',
   'NOT_APPLICABLE',
   'CONFLICT',
 ] as const;
@@ -123,9 +123,9 @@ export const LEGACY_VALUE_STATE_LABELS: Readonly<Record<LegacyValueState, Pricin
     en: 'Minimum target profit needs review',
     ckb: 'کەمترین قازانجی مەبەست پێویستی بە پێداچوونەوە هەیە',
   },
-  DIRECT_PREMIUM_REVIEW_REQUIRED: {
+  DIRECT_SALE_EXTRA_REVIEW_REQUIRED: {
     ar: 'زيادة البيع المباشر تحتاج مراجعة',
-    en: 'Direct-sale premium needs review',
+    en: 'Direct Sale Extra needs review',
     ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ پێویستی بە پێداچوونەوە هەیە',
   },
   NOT_APPLICABLE: {
@@ -220,15 +220,15 @@ export const LEGACY_REASONS = {
     severity: 'review',
     label: {
       ar: 'سعر البيع المباشر القديم أقل مما كان يدفعه الزبون في الطلب المسبق (السعر مع عمولة المسار). لن تُكتب زيادة سالبة؛ حدّد زيادة البيع المباشر بنفسك.',
-      en: 'The old direct-sale price is below what the customer paid for a pre-order (price plus route fee). No negative premium is written; set the direct-sale premium yourself.',
+      en: 'The old direct-sale price is below what the customer paid for a pre-order (price plus route fee). No negative extra is written; set the Direct Sale Extra yourself.',
       ckb: 'نرخی کۆنی فرۆشتنی ڕاستەوخۆ لەوە کەمترە کە کڕیار بۆ پێشداواکاری دەیدا (نرخ لەگەڵ کرێی ڕێگا). هیچ زیادەیەکی سالب نانووسرێت؛ خۆت زیادەی فرۆشتنی ڕاستەوخۆ دیاری بکە.',
     },
   },
-  LEGACY_PREMIUM_NOT_ON_STEP: {
+  LEGACY_DIRECT_SALE_EXTRA_NOT_ON_STEP: {
     severity: 'review',
     label: {
       ar: 'زيادة البيع المباشر المستخرجة ({iqd}) ليست من مضاعفات 1,000. اختر الأقرب الأدنى أو الأعلى أو حدّدها بنفسك.',
-      en: 'The extracted direct-sale premium ({iqd}) is not a multiple of 1,000. Choose the nearest lower or higher value, or set it yourself.',
+      en: 'The extracted Direct Sale Extra ({iqd}) is not a multiple of 1,000. Choose the nearest lower or higher value, or set it yourself.',
       ckb: 'زیادەی دەرهێنراوی فرۆشتنی ڕاستەوخۆ ({iqd}) چەندجارەی 1,000 نییە. نزیکترینی خوارتر یان سەرتر هەڵبژێرە، یان خۆت دیاری بکە.',
     },
   },
@@ -236,16 +236,16 @@ export const LEGACY_REASONS = {
     severity: 'review',
     label: {
       ar: 'للطلب المسبق أكثر من مسار؛ اختر المسار الأساسي الذي تُحسب منه زيادة البيع المباشر، فالسعر الجديد للبيع المباشر يُبنى على شحن ذلك المسار.',
-      en: "Pre-order has more than one route; choose the base route the direct-sale premium is measured from, because the new direct-sale price is built on that route's shipping.",
+      en: "Pre-order has more than one route; choose the base route the Direct Sale Extra is measured from, because the new direct-sale price is built on that route's shipping.",
       ckb: 'پێشداواکاری زیاتر لە یەک ڕێگای هەیە؛ ئەو ڕێگا بنەڕەتییە هەڵبژێرە کە زیادەی فرۆشتنی ڕاستەوخۆی لێوە حیساب دەکرێت، چونکە نرخی نوێی فرۆشتنی ڕاستەوخۆ لەسەر ناردنی ئەو ڕێگایە دادەنرێت.',
     },
   },
-  DIRECT_ONLY_PREMIUM_UNKNOWN: {
+  DIRECT_ONLY_EXTRA_UNKNOWN: {
     severity: 'review',
     label: {
       ar: 'هذا الاختيار يُباع مباشرة فقط ولا توجد زيادة بيع مباشر موحّدة للمنتج؛ حدّد الحد الأدنى للربح أو الزيادة بنفسك.',
-      en: 'This selection sells direct only and the product has no single direct-sale premium; set the minimum target profit or the premium yourself.',
-      ckb: 'ئەم هەڵبژاردنە تەنها ڕاستەوخۆ دەفرۆشرێت و بەرهەمەکە یەک زیادەی فرۆشتنی ڕاستەوخۆی نییە؛ خۆت کەمترین قازانجی مەبەست یان زیادەکە دیاری بکە.',
+      en: 'This selection sells direct only and the product has no single Direct Sale Extra; set the minimum target profit or the Direct Sale Extra yourself.',
+      ckb: 'ئەم هەڵبژاردنە تەنها ڕاستەوخۆ دەفرۆشرێت و بەرهەمەکە یەک زیادەی فرۆشتنی ڕاستەوخۆی نییە؛ خۆت کەمترین قازانجی مەبەست یان زیادەی فرۆشتنی ڕاستەوخۆ دیاری بکە.',
     },
   },
   PLACEMENT_INVARIANT_FAILED: {
@@ -296,11 +296,11 @@ export const LEGACY_REASONS = {
       ckb: 'کرێی کۆنی ڕێگا ({method}: {iqd}) بەشێک بوو لەوەی کڕیار دەیدا، بۆیە لە کەمترین قازانجی مەبەستدا حیساب کرا؛ لە کاتی گۆڕیندا دەکرێتە سفر، چونکە نرخی نوێ کرێی ناردنی تێدایە.',
     },
   },
-  PREMIUM_ZERO_DIRECT_ONLY: {
+  DIRECT_SALE_EXTRA_ZERO_DIRECT_ONLY: {
     severity: 'info',
     label: {
       ar: 'لا يوجد بيع بالطلب المسبق لهذا المنتج، فكل الربح القديم صار حداً أدنى للربح وزيادة البيع المباشر صفر.',
-      en: 'This product has no pre-order sale, so the whole old profit became the minimum target profit and the direct-sale premium is zero.',
+      en: 'This product has no pre-order sale, so the whole old profit became the minimum target profit and the Direct Sale Extra is zero.',
       ckb: 'ئەم بەرهەمە فرۆشتنی پێشداواکاری نییە، بۆیە هەموو قازانجی کۆن بوو بە کەمترین قازانجی مەبەست و زیادەی فرۆشتنی ڕاستەوخۆ سفرە.',
     },
   },
@@ -351,8 +351,8 @@ export const PRICING_MIGRATION_LABELS = {
   'I.ROUTE_FEE_INCLUDED': LEGACY_REASONS.ROUTE_FEE_INCLUDED.label,
   'R.TARGET_ROUTE_CONFLICT': LEGACY_REASONS.TARGET_ROUTE_CONFLICT.label,
   'R.LEGACY_DIRECT_BELOW_PREORDER': LEGACY_REASONS.LEGACY_DIRECT_BELOW_PREORDER.label,
-  'R.LEGACY_PREMIUM_NOT_ON_STEP': LEGACY_REASONS.LEGACY_PREMIUM_NOT_ON_STEP.label,
-  'I.PREMIUM_ZERO_DIRECT_ONLY': LEGACY_REASONS.PREMIUM_ZERO_DIRECT_ONLY.label,
+  'R.LEGACY_DIRECT_SALE_EXTRA_NOT_ON_STEP': LEGACY_REASONS.LEGACY_DIRECT_SALE_EXTRA_NOT_ON_STEP.label,
+  'I.DIRECT_SALE_EXTRA_ZERO_DIRECT_ONLY': LEGACY_REASONS.DIRECT_SALE_EXTRA_ZERO_DIRECT_ONLY.label,
   'R.COST_LESS_SPECIFIC_THAN_PRICE': LEGACY_REASONS.COST_LESS_SPECIFIC_THAN_PRICE.label,
   'R.PRODUCT_DIMENSIONS_ONLY': {
     ar: 'توجد أبعاد المنتج فقط — لا تُستخدم بديلاً عن أبعاد العبوة',
@@ -380,9 +380,9 @@ export const PRICING_MIGRATION_LABELS = {
     en: '⚠ {field} unresolved: {reason}',
     ckb: '⚠ {field} یەکلانەکراوەتەوە: {reason}',
   },
-  'L.PREMIUM_REVIEW': {
+  'L.DIRECT_SALE_EXTRA_REVIEW': {
     ar: '⚠ زيادة البيع المباشر تحتاج قرارك في {n} تركيبة',
-    en: '⚠ Direct-sale premium needs your decision for {n} SKUs',
+    en: '⚠ Direct Sale Extra needs your decision for {n} SKUs',
     ckb: '⚠ زیادەی فرۆشتنی ڕاستەوخۆ پێویستی بە بڕیاری تۆ هەیە بۆ {n} SKU',
   },
   'L.TARGET_MANUAL': {

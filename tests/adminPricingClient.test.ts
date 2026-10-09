@@ -335,7 +335,7 @@ const pricingModel = (over: Partial<PricingModel> = {}): PricingModel => ({
     },
   ],
   target: { migration_state: 'MIGRATED', target_profit_iqd: 47_000, reason_codes: [], reason_figures: [], candidates: [] },
-  premium: { migration_state: 'DIRECT_PREMIUM_REVIEW_REQUIRED', direct_premium_iqd: null, reason_codes: ['LEGACY_DIRECT_BELOW_PREORDER'], reason_figures: [], candidates: [] },
+  direct_sale_extra: { migration_state: 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED', direct_sale_extra_iqd: null, reason_codes: ['LEGACY_DIRECT_BELOW_PREORDER'], reason_figures: [], candidates: [] },
   roundtrip_ok: null,
   suggested_measures: {
     shipping_weight_g: null,

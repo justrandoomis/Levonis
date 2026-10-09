@@ -1,5 +1,5 @@
 /**
- * THE OWNER'S ANSWER B, APPLIED: the minimum profit and the direct-sale premium
+ * THE OWNER'S ANSWER B, APPLIED: the minimum profit and the Direct Sale Extra
  * each existing model carried in the old prices (master plan v2 §2.5, C38, C39;
  * owner answer of 2026-10-07; MVP plan §6 P1).
  *
@@ -13,18 +13,18 @@
  *   part of what the customer paid.
  * - Routes whose `T_r` differ are a CONFLICT with one candidate per route —
  *   never averaged.
- * - A direct-only product (no pre-order anywhere) has premium 0 and target
- *   `P_dir − C_dir` (C39). A pre-order-only model has no premium.
+ * - A direct-only product (no pre-order anywhere) has a Direct Sale Extra of 0
+ *   and target `P_dir − C_dir` (C39). A pre-order-only model has no extra.
  * - Nothing is clamped or guessed (§2.1 rule 6): no cost → UNRESOLVED; a paid
  *   price at or below the cost, a zero cost, a zero price, a price set more
- *   specifically than its cost, a negative or off-step premium → REVIEW, with
- *   the floor and the ceiling as candidates for an off-step premium.
+ *   specifically than its cost, a negative or off-step extra → REVIEW, with
+ *   the floor and the ceiling as candidates for an off-step extra.
  *
- * BASE ROUTE (§2.5). The premium is measured from the owner's base route, or
+ * BASE ROUTE (§2.5). The Direct Sale Extra is measured from the owner's base route, or
  * from the only route. A model with more than one route and no owner choice is
  * NO_BASE_ROUTE — even when every route charged the same, because the engine
  * builds the direct price on the base route's own shipping (MVP plan: direct =
- * pre(base route) + premium); the per-route premiums are its candidates.
+ * pre(base route) + extra); the per-route extras are its candidates.
  *
  * PLACEMENT. A value goes at product scope when every model that has one agrees
  * — otherwise each model gets its own option-scope value. A model whose value
@@ -108,7 +108,7 @@ export interface LegacyProductInput {
 
 export type LegacySaleMix = 'BOTH' | 'DIRECT_ONLY' | 'PREORDER_ONLY' | 'NOT_SELLABLE';
 export type LegacyTargetState = 'MIGRATED' | 'TARGET_PROFIT_UNRESOLVED' | 'TARGET_PROFIT_REVIEW_REQUIRED' | 'CONFLICT';
-export type LegacyPremiumState = 'MIGRATED' | 'DIRECT_PREMIUM_REVIEW_REQUIRED' | 'NOT_APPLICABLE' | 'CONFLICT';
+export type LegacyDirectSaleExtraState = 'MIGRATED' | 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED' | 'NOT_APPLICABLE' | 'CONFLICT';
 
 /** Every reason this module raises (labels: contracts `LEGACY_REASONS`). */
 export const LEGACY_TARGET_REASON_CODES = [
@@ -120,18 +120,18 @@ export const LEGACY_TARGET_REASON_CODES = [
   'TARGET_ROUTE_CONFLICT',
   'VARIANT_COST_CONFLICT',
   'LEGACY_DIRECT_BELOW_PREORDER',
-  'LEGACY_PREMIUM_NOT_ON_STEP',
+  'LEGACY_DIRECT_SALE_EXTRA_NOT_ON_STEP',
   'NO_BASE_ROUTE',
-  'DIRECT_ONLY_PREMIUM_UNKNOWN',
+  'DIRECT_ONLY_EXTRA_UNKNOWN',
   'PLACEMENT_INVARIANT_FAILED',
   'MODEL_NOT_SELLABLE',
   'CHANNEL_NOT_PRICED',
   'ROUTE_FEE_INCLUDED',
-  'PREMIUM_ZERO_DIRECT_ONLY',
+  'DIRECT_SALE_EXTRA_ZERO_DIRECT_ONLY',
 ] as const;
 export type LegacyTargetReasonCode = (typeof LEGACY_TARGET_REASON_CODES)[number];
 
-/** `ROUTE_FEE_INCLUDED` names its route and fee; `LEGACY_PREMIUM_NOT_ON_STEP` its premium. */
+/** `ROUTE_FEE_INCLUDED` names its route and fee; `LEGACY_DIRECT_SALE_EXTRA_NOT_ON_STEP` its extra. */
 export interface LegacyReason {
   code: LegacyTargetReasonCode;
   route?: PreorderRoute;
@@ -159,10 +159,10 @@ export interface LegacyModelResult {
   mix: LegacySaleMix;
   routes: LegacyRouteResult[];
   direct: { paid_iqd: number; cost_iqd: number | null } | null;
-  /** The route the premium is measured from (null when none decides it). */
+  /** The route the Direct Sale Extra is measured from (null when none decides it). */
   base_route: PreorderRoute | null;
   target: { state: LegacyTargetState; value_iqd: number | null; reasons: LegacyReason[]; candidates: LegacyCandidate[] };
-  premium: { state: LegacyPremiumState; value_iqd: number | null; reasons: LegacyReason[]; candidates: LegacyCandidate[] };
+  extra: { state: LegacyDirectSaleExtraState; value_iqd: number | null; reasons: LegacyReason[]; candidates: LegacyCandidate[] };
   /** null: nothing to check (no migrated value); otherwise whether the old prices come back. */
   roundtrip_ok: boolean | null;
 }
@@ -278,7 +278,7 @@ function deriveModel(model: LegacyModelInput, singleModel: boolean, baseChoice: 
     direct,
     base_route: null,
     target: { state: 'TARGET_PROFIT_UNRESOLVED', value_iqd: null, reasons: [], candidates: [] },
-    premium: { state: 'NOT_APPLICABLE', value_iqd: null, reasons: [], candidates: [] },
+    extra: { state: 'NOT_APPLICABLE', value_iqd: null, reasons: [], candidates: [] },
     roundtrip_ok: null,
     direct_cost_for_roundtrip: null,
     unpriced_hold: null,
@@ -291,7 +291,7 @@ function deriveModel(model: LegacyModelInput, singleModel: boolean, baseChoice: 
       // from, and nothing to inherit either — held for the owner.
       result.unpriced_hold = { direct: u.direct, preorder: u.routes.length > 0 };
       result.target = { state: 'TARGET_PROFIT_REVIEW_REQUIRED', value_iqd: null, reasons: [{ code: 'CHANNEL_NOT_PRICED' }], candidates: [] };
-      if (u.direct) result.premium = { state: 'DIRECT_PREMIUM_REVIEW_REQUIRED', value_iqd: null, reasons: [{ code: 'CHANNEL_NOT_PRICED' }], candidates: [] };
+      if (u.direct) result.extra = { state: 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED', value_iqd: null, reasons: [{ code: 'CHANNEL_NOT_PRICED' }], candidates: [] };
       return result;
     }
     result.target.reasons = [{ code: 'MODEL_NOT_SELLABLE' }];
@@ -331,7 +331,7 @@ function deriveModel(model: LegacyModelInput, singleModel: boolean, baseChoice: 
     result.target.candidates = result.target.state === 'MIGRATED' ? [] : candidates;
   }
 
-  // ---- the premium (BOTH)
+  // ---- the Direct Sale Extra (BOTH)
   if (mix === 'BOTH') {
     const d = model.direct!;
     const pDir = paidOf(d);
@@ -341,27 +341,27 @@ function deriveModel(model: LegacyModelInput, singleModel: boolean, baseChoice: 
     const chosen = baseChoice && routes.some((r) => r.route === baseChoice) ? baseChoice : undefined;
     const base = chosen ?? (routes.length === 1 ? routes[0]!.route : null);
     result.base_route = base;
-    const premiumCandidates = routeResults.map((r): LegacyCandidate => ({ kind: 'route', route: r.route, value_iqd: pDir - r.paid_iqd }));
+    const extraCandidates = routeResults.map((r): LegacyCandidate => ({ kind: 'route', route: r.route, value_iqd: pDir - r.paid_iqd }));
     if (!isWhole(pDir) || pDir <= 0) {
       reasons.push({ code: 'LEGACY_PRICE_ZERO' });
-      result.premium = { state: 'DIRECT_PREMIUM_REVIEW_REQUIRED', value_iqd: null, reasons, candidates: [] };
+      result.extra = { state: 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED', value_iqd: null, reasons, candidates: [] };
     } else if (result.target.state === 'CONFLICT') {
-      result.premium = { state: 'CONFLICT', value_iqd: null, reasons: [], candidates: premiumCandidates };
+      result.extra = { state: 'CONFLICT', value_iqd: null, reasons: [], candidates: extraCandidates };
     } else if (base === null) {
       reasons.push({ code: 'NO_BASE_ROUTE' });
-      result.premium = { state: 'DIRECT_PREMIUM_REVIEW_REQUIRED', value_iqd: null, reasons, candidates: premiumCandidates };
+      result.extra = { state: 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED', value_iqd: null, reasons, candidates: extraCandidates };
     } else {
       const baseRow = routeResults.find((r) => r.route === base)!;
       const p = pDir - baseRow.paid_iqd;
       result.direct_cost_for_roundtrip = baseRow.cost_iqd;
       if (p < 0) {
         reasons.push({ code: 'LEGACY_DIRECT_BELOW_PREORDER' });
-        result.premium = { state: 'DIRECT_PREMIUM_REVIEW_REQUIRED', value_iqd: null, reasons, candidates: [] };
+        result.extra = { state: 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED', value_iqd: null, reasons, candidates: [] };
       } else if (!isOnStep(p, ROUNDING_STEP_IQD)) {
-        reasons.push({ code: 'LEGACY_PREMIUM_NOT_ON_STEP', iqd: p });
+        reasons.push({ code: 'LEGACY_DIRECT_SALE_EXTRA_NOT_ON_STEP', iqd: p });
         const floor = p - (p % ROUNDING_STEP_IQD);
-        result.premium = {
-          state: 'DIRECT_PREMIUM_REVIEW_REQUIRED',
+        result.extra = {
+          state: 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED',
           value_iqd: null,
           reasons,
           candidates: [
@@ -370,31 +370,31 @@ function deriveModel(model: LegacyModelInput, singleModel: boolean, baseChoice: 
           ],
         };
       } else {
-        result.premium = { state: 'MIGRATED', value_iqd: p, reasons: [], candidates: [] };
+        result.extra = { state: 'MIGRATED', value_iqd: p, reasons: [], candidates: [] };
       }
     }
-    result.premium.reasons = sortReasons(result.premium.reasons);
+    result.extra.reasons = sortReasons(result.extra.reasons);
   }
   return result;
 }
 
 /** Direct-only models: target = P_dir − C_dir − P_eff (C39 for a direct-only product, where P_eff = 0). */
-function deriveDirectOnlyTarget(w: Working, model: LegacyModelInput, singleModel: boolean, premiumEff: number | null, directOnlyProduct: boolean): void {
+function deriveDirectOnlyTarget(w: Working, model: LegacyModelInput, singleModel: boolean, extraEff: number | null, directOnlyProduct: boolean): void {
   const d = model.direct!;
   const pDir = paidOf(d);
   const reasons: LegacyReason[] = [];
   if (directOnlyProduct) {
-    w.premium = { state: 'MIGRATED', value_iqd: 0, reasons: [{ code: 'PREMIUM_ZERO_DIRECT_ONLY' }], candidates: [] };
-  } else if (premiumEff === null) {
-    w.target = { state: 'TARGET_PROFIT_REVIEW_REQUIRED', value_iqd: null, reasons: [{ code: 'DIRECT_ONLY_PREMIUM_UNKNOWN' }], candidates: [] };
-    w.premium = { state: 'DIRECT_PREMIUM_REVIEW_REQUIRED', value_iqd: null, reasons: [{ code: 'DIRECT_ONLY_PREMIUM_UNKNOWN' }], candidates: [] };
+    w.extra = { state: 'MIGRATED', value_iqd: 0, reasons: [{ code: 'DIRECT_SALE_EXTRA_ZERO_DIRECT_ONLY' }], candidates: [] };
+  } else if (extraEff === null) {
+    w.target = { state: 'TARGET_PROFIT_REVIEW_REQUIRED', value_iqd: null, reasons: [{ code: 'DIRECT_ONLY_EXTRA_UNKNOWN' }], candidates: [] };
+    w.extra = { state: 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED', value_iqd: null, reasons: [{ code: 'DIRECT_ONLY_EXTRA_UNKNOWN' }], candidates: [] };
     return;
   } else {
-    w.premium = { state: 'MIGRATED', value_iqd: premiumEff, reasons: [], candidates: [] };
+    w.extra = { state: 'MIGRATED', value_iqd: extraEff, reasons: [], candidates: [] };
   }
-  // A direct fee (the product's scalar premium) is part of P_dir, so under C39
+  // A direct fee (the product's scalar `direct_surcharge_iqd`) is part of P_dir, so under C39
   // it is part of the old profit and stays in the target.
-  const p = directOnlyProduct ? 0 : (premiumEff as number);
+  const p = directOnlyProduct ? 0 : (extraEff as number);
   const g = pairGuards(pDir - p, d, singleModel);
   reasons.push(...g.reasons);
   const variantConflict = (model.variant_costs ?? []).some((v) => v !== d.cost_iqd);
@@ -446,7 +446,7 @@ function place(
 // --------------------------------------------------------------------- run
 
 /**
- * Derive the minimum profit and the direct-sale premium of every model of one
+ * Derive the minimum profit and the Direct Sale Extra of every model of one
  * product from what the store charges today (see the file header).
  */
 export function deriveLegacyTargets(input: LegacyProductInput): LegacyProductResult {
@@ -464,37 +464,37 @@ export function deriveLegacyTargets(input: LegacyProductInput): LegacyProductRes
     !work.some((w) => w.unpriced_hold?.preorder);
   // Held for its unpriced channels: a BLOCKED marker for BOTH rules (the profit's is placed below) —
   // what it will sell as is unknown until its channels price, so it inherits neither.
-  const unpricedPremium = work.filter((w) => w.unpriced_hold).map((w) => ({ option_id: w.option_id, value: null, blocked: true }));
+  const unpricedExtra = work.filter((w) => w.unpriced_hold).map((w) => ({ option_id: w.option_id, value: null, blocked: true }));
 
   const blockedFlags = new Set<string>();
   let rules: PricingRuleRow[] = [];
   // At most one pass per model: each failing round trip blocks one more model.
   for (let pass = 0; pass <= work.length; pass += 1) {
-    // Premium plan from the BOTH models first (LEG pass 2 reads it for mixed products).
-    const premiumModels = work
+    // The Direct Sale Extra plan from the BOTH models first (LEG pass 2 reads it for mixed products).
+    const extraModels = work
       .filter((w) => w.mix === 'BOTH')
       .map((w) => ({
         option_id: w.option_id,
-        value: w.premium.state === 'MIGRATED' ? w.premium.value_iqd : null,
-        blocked: w.premium.state !== 'MIGRATED' || blockedFlags.has(w.option_id),
+        value: w.extra.state === 'MIGRATED' ? w.extra.value_iqd : null,
+        blocked: w.extra.state !== 'MIGRATED' || blockedFlags.has(w.option_id),
       }));
-    const known = premiumModels.filter((m) => !m.blocked);
-    const productPremium = premiumModels.length && !premiumModels.some((m) => m.blocked) && new Set(known.map((m) => m.value)).size === 1 ? known[0]!.value : null;
+    const known = extraModels.filter((m) => !m.blocked);
+    const productExtra = extraModels.length && !extraModels.some((m) => m.blocked) && new Set(known.map((m) => m.value)).size === 1 ? known[0]!.value : null;
 
     for (const [i, w] of work.entries()) {
       if (w.mix === 'DIRECT_ONLY' && !blockedFlags.has(w.option_id)) {
-        deriveDirectOnlyTarget(w, input.models[i]!, singleModel, productPremium, directOnlyProduct);
+        deriveDirectOnlyTarget(w, input.models[i]!, singleModel, productExtra, directOnlyProduct);
       }
     }
 
     const directOnly = work.filter((w) => w.mix === 'DIRECT_ONLY');
-    const premiumRows = directOnlyProduct
-      ? place(input.product_id, 'direct_premium', directOnly.length ? [{ option_id: '', value: 0, blocked: false }, ...unpricedPremium] : [])
-      : place(input.product_id, 'direct_premium', [
-          ...premiumModels,
-          // A mixed product's direct-only model inherits the product premium, or is held.
-          ...directOnly.filter((w) => w.premium.state !== 'MIGRATED' || blockedFlags.has(w.option_id)).map((w) => ({ option_id: w.option_id, value: null, blocked: true })),
-          ...unpricedPremium,
+    const extraRows = directOnlyProduct
+      ? place(input.product_id, 'direct_sale_extra', directOnly.length ? [{ option_id: '', value: 0, blocked: false }, ...unpricedExtra] : [])
+      : place(input.product_id, 'direct_sale_extra', [
+          ...extraModels,
+          // A mixed product's direct-only model inherits the product's extra, or is held.
+          ...directOnly.filter((w) => w.extra.state !== 'MIGRATED' || blockedFlags.has(w.option_id)).map((w) => ({ option_id: w.option_id, value: null, blocked: true })),
+          ...unpricedExtra,
         ]);
     const targetRows = place(
       input.product_id,
@@ -508,7 +508,7 @@ export function deriveLegacyTargets(input: LegacyProductInput): LegacyProductRes
           blocked: w.target.state !== 'MIGRATED' || blockedFlags.has(w.option_id),
         }))
     );
-    rules = [...targetRows, ...premiumRows];
+    rules = [...targetRows, ...extraRows];
 
     // The round trip, through E1's own rule resolution and rounding.
     let failed: Working | null = null;
@@ -527,8 +527,8 @@ export function deriveLegacyTargets(input: LegacyProductInput): LegacyProductRes
       reasons: sortReasons([...failed.target.reasons, { code: 'PLACEMENT_INVARIANT_FAILED' }]),
       candidates: failed.target.value_iqd !== null ? [] : failed.target.candidates,
     };
-    if (failed.premium.state === 'MIGRATED' && failed.mix === 'BOTH') {
-      failed.premium = { state: 'DIRECT_PREMIUM_REVIEW_REQUIRED', value_iqd: null, reasons: [{ code: 'PLACEMENT_INVARIANT_FAILED' }], candidates: [] };
+    if (failed.extra.state === 'MIGRATED' && failed.mix === 'BOTH') {
+      failed.extra = { state: 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED', value_iqd: null, reasons: [{ code: 'PLACEMENT_INVARIANT_FAILED' }], candidates: [] };
     }
   }
 
@@ -556,9 +556,9 @@ function roundTrip(productId: string, w: Working, rules: readonly PricingRuleRow
     if (r.cost_iqd === null) return false;
     if (!within(ceilStep(r.cost_iqd + t.amount_iqd), r.paid_iqd)) return false;
   }
-  if (w.direct && w.premium.state === 'MIGRATED') {
-    const p = resolveRuleAt(rules, 'direct_premium', at);
-    if (p.status !== 'active' || p.amount_iqd !== w.premium.value_iqd) return false;
+  if (w.direct && w.extra.state === 'MIGRATED') {
+    const p = resolveRuleAt(rules, 'direct_sale_extra', at);
+    if (p.status !== 'active' || p.amount_iqd !== w.extra.value_iqd) return false;
     if (w.direct_cost_for_roundtrip === null) return false;
     if (!within(ceilStep(w.direct_cost_for_roundtrip + t.amount_iqd) + p.amount_iqd, w.direct.paid_iqd)) return false;
   }

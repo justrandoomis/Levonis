@@ -91,7 +91,7 @@ interface UiStrings {
   channelUnpriced: string;
   derivedHeading: string;
   minProfit: string;
-  premium: string;
+  directSaleExtra: string;
   baseRoute: string;
   candidates: string;
   candFloor: string;
@@ -198,7 +198,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     channelUnpriced: 'لا يمكن حساب السعر الحالي',
     derivedHeading: 'المستخرج من الأسعار القديمة',
     minProfit: 'الحد الأدنى للربح',
-    premium: 'زيادة البيع المباشر',
+    directSaleExtra: 'زيادة البيع المباشر',
     baseRoute: 'تُقاس من',
     candidates: 'القيم الممكنة',
     candFloor: 'الأقرب الأدنى',
@@ -302,7 +302,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     channelUnpriced: "Today's price cannot be calculated",
     derivedHeading: 'Taken from the old prices',
     minProfit: 'Minimum target profit',
-    premium: 'Direct-sale premium',
+    directSaleExtra: 'Direct Sale Extra',
     baseRoute: 'Measured from',
     candidates: 'Possible values',
     candFloor: 'Nearest lower',
@@ -342,7 +342,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     noChange: 'No change',
     notPriced: 'Cannot be priced yet',
     minimumKept: 'Minimum profit kept',
-    minimumKeptHow: (step) => `The new price covers the current replacement cost and the minimum profit, then rounds up to the next ${step}; a direct sale then adds the direct-sale premium on top.`,
+    minimumKeptHow: (step) => `The new price covers the current replacement cost and the minimum profit, then rounds up to the next ${step}; a direct sale then adds the Direct Sale Extra on top.`,
     breakdown: 'Breakdown',
     ratesUsed: 'Rates used',
     weightUsed: 'Weight used',
@@ -406,7 +406,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     channelUnpriced: 'نرخی ئێستا حیساب ناکرێت',
     derivedHeading: 'دەرهێنراو لە نرخە کۆنەکان',
     minProfit: 'کەمترین قازانجی مەبەست',
-    premium: 'زیادەی فرۆشتنی ڕاستەوخۆ',
+    directSaleExtra: 'زیادەی فرۆشتنی ڕاستەوخۆ',
     baseRoute: 'دەپێورێت لە',
     candidates: 'بەها گونجاوەکان',
     candFloor: 'نزیکترین بەهای خوارتر',

@@ -3,7 +3,7 @@
  *
  *   - the owner reads the overview (20 a page, the §2.3 counts), one product
  *     (today's prices per model × channel, prepaid and cash on delivery, the
- *     old landed cost, the derived minimum profit and premium, the rules named
+ *     old landed cost, the derived minimum profit and Direct Sale Extra, the rules named
  *     by kind, the measures, the rate reference) and runs the what-if, whose
  *     price is E1's exact maths on the owner's figures;
  *   - validation names fields, never values (UNKNOWN_FIELD, PRICING_INPUT_INVALID);
@@ -116,7 +116,7 @@ test('one product: today’s price per channel (prepaid and COD), the landed cos
   // Cash on delivery of the pre-order is priced as the direct sale (an enabled direct cell, V4).
   assert.deepEqual([byChannel.pre_order_land.today_cod_iqd, byChannel.pre_order_land.cod_priced_as_direct], [500_000, true]);
   assert.deepEqual([model!.target.migration_state, model!.target.target_profit_iqd], ['MIGRATED', 27_000]);
-  assert.deepEqual([model!.premium.migration_state, model!.premium.direct_premium_iqd], ['MIGRATED', 50_000]);
+  assert.deepEqual([model!.direct_sale_extra.migration_state, model!.direct_sale_extra.direct_sale_extra_iqd], ['MIGRATED', 50_000]);
   assert.equal(model!.base_route, 'land');
   assert.equal(model!.roundtrip_ok, true);
   assert.deepEqual(model!.suggested_measures, {
@@ -136,7 +136,7 @@ test('one product: today’s price per channel (prepaid and COD), the landed cos
   // The placement, named by kind.
   assert.deepEqual(body.legacy_rules, [
     { kind: 'target_profit', scope: 'product', scope_id: '', state: 'ACTIVE', source: 'LEGACY_MIGRATION', target_profit_iqd: 27_000 },
-    { kind: 'direct_premium', scope: 'product', scope_id: '', state: 'ACTIVE', source: 'LEGACY_MIGRATION', direct_premium_iqd: 50_000 },
+    { kind: 'direct_sale_extra', scope: 'product', scope_id: '', state: 'ACTIVE', source: 'LEGACY_MIGRATION', direct_sale_extra_iqd: 50_000 },
   ]);
   assert.equal(keysOf(body).has('amount_iqd'), false);
   // The rate reference: from the purchase profiles, never confirmed, no USD; CNY from the newer China profile.
@@ -215,8 +215,8 @@ test('what-if: E1’s exact price on the owner’s figures, next to today’s, w
     [843_000, 815_925, '815925', 27_000]
   );
   assert.deepEqual([ch.pre_order_land.today_prepaid_iqd, ch.pre_order_land.change_iqd], [450_000, 393_000]);
-  // Direct = the base profile's pre-order price + the 50,000 premium.
-  assert.deepEqual([ch.direct_sale.computed_price_iqd, ch.direct_sale.direct_premium_iqd, ch.direct_sale.change_iqd], [893_000, 50_000, 393_000]);
+  // Direct = the base profile's pre-order price + the 50,000 Direct Sale Extra.
+  assert.deepEqual([ch.direct_sale.computed_price_iqd, ch.direct_sale.direct_sale_extra_iqd, ch.direct_sale.change_iqd], [893_000, 50_000, 393_000]);
   assert.deepEqual(ch.pre_order_land.issue_codes, ['FX_RATE_UNCONFIRMED', 'SHIPPING_RATE_UNCONFIRMED']);
   assert.equal(keysOf(body).has('amount_iqd'), false);
 });

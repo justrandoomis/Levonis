@@ -1,6 +1,6 @@
 /**
  * MOST-SPECIFIC-WINS RULE RESOLUTION for the two owner rules of the engine:
- * the fixed IQD target profit and the direct-sale premium (owner decisions 3 and
+ * the fixed IQD target profit and the Direct Sale Extra (owner decisions 3 and
  * 4; master plan v2 §2.3, C34, C40).
  *
  * Walk, most specific first, one scope at a time:
@@ -9,7 +9,7 @@
  *
  * - `INHERIT` is treated as absent: the walk goes on to the next scope.
  * - `BLOCKED` STOPS the walk: the SKU gets TARGET_PROFIT_BLOCKED (or
- *   DIRECT_PREMIUM_BLOCKED) and no price. A less specific rule never stands in
+ *   DIRECT_SALE_EXTRA_BLOCKED) and no price. A less specific rule never stands in
  *   for one the owner (or the legacy migration) put on hold.
  * - A tie inside one scope (two option values of one SKU, in different groups,
  *   each carrying a rule) takes the MAXIMUM amount and reports RULE_TIE, so a
@@ -17,7 +17,7 @@
  *   ACTIVE ones (fail closed).
  * - Category rules match only the ancestors of the product's pinned pricing
  *   category (`product_pricing_state.rule_catalog_id`, [C2-A4]), nearest first.
- * - Nothing at any scope → TARGET_PROFIT_MISSING / DIRECT_PREMIUM_MISSING. There
+ * - Nothing at any scope → TARGET_PROFIT_MISSING / DIRECT_SALE_EXTRA_MISSING. There
  *   is no invented default ("ولا أريد اختراع نسبة ربح عامة").
  *
  * An ACTIVE row whose amount the 0179 CHECKs would refuse (a target ≤ 0, a
@@ -34,7 +34,7 @@
  */
 import { skuComboKey } from './skuChannel';
 
-export type PricingRuleKind = 'target_profit' | 'direct_premium';
+export type PricingRuleKind = 'target_profit' | 'direct_sale_extra';
 export type PricingRuleScope = 'global' | 'category' | 'product' | 'option' | 'color' | 'sku';
 export type PricingRuleState = 'ACTIVE' | 'BLOCKED' | 'INHERIT';
 export type PricingRuleSource = 'OWNER' | 'LEGACY_MIGRATION';
@@ -97,13 +97,13 @@ export type RuleResolution =
   | {
       status: 'blocked';
       kind: PricingRuleKind;
-      code: 'TARGET_PROFIT_BLOCKED' | 'DIRECT_PREMIUM_BLOCKED';
+      code: 'TARGET_PROFIT_BLOCKED' | 'DIRECT_SALE_EXTRA_BLOCKED';
       rule: RuleRef;
     }
   | {
       status: 'missing';
       kind: PricingRuleKind;
-      code: 'TARGET_PROFIT_MISSING' | 'DIRECT_PREMIUM_MISSING';
+      code: 'TARGET_PROFIT_MISSING' | 'DIRECT_SALE_EXTRA_MISSING';
     };
 
 const refOf = (row: PricingRuleRow): RuleRef => ({
@@ -115,7 +115,7 @@ const refOf = (row: PricingRuleRow): RuleRef => ({
   ...(row.source ? { source: row.source } : {}),
 });
 
-/** A valid ACTIVE amount: target > 0, premium ≥ 0, whole IQD, within the CHECK bound. */
+/** A valid ACTIVE amount: target > 0, Direct Sale Extra ≥ 0, whole IQD, within the CHECK bound. */
 export function isValidRuleAmount(kind: PricingRuleKind, amount: unknown): amount is number {
   return (
     typeof amount === 'number' &&
@@ -167,7 +167,7 @@ function decide(kind: PricingRuleKind, rows: readonly PricingRuleRow[]): RuleRes
     return {
       status: 'blocked',
       kind,
-      code: kind === 'target_profit' ? 'TARGET_PROFIT_BLOCKED' : 'DIRECT_PREMIUM_BLOCKED',
+      code: kind === 'target_profit' ? 'TARGET_PROFIT_BLOCKED' : 'DIRECT_SALE_EXTRA_BLOCKED',
       rule: refOf(first),
     };
   }
@@ -204,5 +204,5 @@ export function resolveRuleAt(rules: readonly PricingRuleRow[], kind: PricingRul
     const decided = decide(kind, rowsAt(rules, kind, scope, target, comboKey));
     if (decided) return decided;
   }
-  return { status: 'missing', kind, code: kind === 'target_profit' ? 'TARGET_PROFIT_MISSING' : 'DIRECT_PREMIUM_MISSING' };
+  return { status: 'missing', kind, code: kind === 'target_profit' ? 'TARGET_PROFIT_MISSING' : 'DIRECT_SALE_EXTRA_MISSING' };
 }

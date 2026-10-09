@@ -174,8 +174,10 @@ const code = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace
 
 // ------------------------------------------------------------ the wiring
 
-/** Cloudflare hands the handler one of these; nothing here reads its fields. */
-const cronEvent = () => ({ cron: '', scheduledTime: Date.now(), noRetry() {} }) as unknown as ScheduledEvent;
+/** Cloudflare hands the handler one of these. Its `cron` is the fifteen-minute
+ *  entry of wrangler.jsonc: scheduled() matches the string exactly and runs
+ *  nothing for one it does not know (tests/scheduledCronDispatch.test.ts). */
+const cronEvent = () => ({ cron: '*/15 * * * *', scheduledTime: Date.now(), noRetry() {} }) as unknown as ScheduledEvent;
 
 /**
  * An ExecutionContext that KEEPS what it is given.

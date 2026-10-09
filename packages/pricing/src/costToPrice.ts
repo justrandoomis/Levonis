@@ -9,7 +9,7 @@
  *     R             = ceil(R_exact);   supplier_cost_iqd = ceil(supplierExact)
  *     shipping_cost_iqd = R − supplier_cost_iqd − additional       [C2-M4]
  *     pre-order     = ceil_step(R_exact + T)     step 1,000 IQD    [LD4]
- *     direct        = pre-order(default profile) + P,  P % step = 0 else PREMIUM_NOT_ON_STEP [C2-M5]
+ *     direct        = pre-order(default profile) + P,  P % step = 0 else DIRECT_SALE_EXTRA_NOT_ON_STEP [C2-M5]
  *
  * So `price − R_exact ≥ T` ALWAYS (the owner's rule: rounding never takes profit
  * below target), every price is a multiple of the step, and the rounding adds
@@ -628,9 +628,9 @@ export interface ChannelPrice extends ReplacementCost {
   target_rule_id: string;
   target_rule_version: number;
   /** direct_sale only. */
-  direct_premium_iqd: number | null;
-  premium_rule_id: string | null;
-  premium_rule_version: number | null;
+  direct_sale_extra_iqd: number | null;
+  extra_rule_id: string | null;
+  extra_rule_version: number | null;
   rounding_step_iqd: number;
   /** ceil_step(R_exact + T) on this channel's profile (for direct_sale: the default profile). */
   preorder_base_iqd: number;
@@ -696,14 +696,14 @@ export function preorderPrice(replacement: ProcurementExact | number | bigint | 
   return price;
 }
 
-/** Direct price = pre-order base + premium. The premium must already be on the
- * step (PREMIUM_NOT_ON_STEP otherwise [C2-M5]) — it is never rounded silently —
+/** Direct price = pre-order base + Direct Sale Extra. The extra must already be on the
+ * step (DIRECT_SALE_EXTRA_NOT_ON_STEP otherwise [C2-M5]) — it is never rounded silently —
  * and the base is a real pre-order price: on the step and at least one step. */
-export function directPrice(preorderBaseIqd: number, premiumIqd: number, step: number = ROUNDING_STEP_IQD): number {
-  if (!Number.isSafeInteger(premiumIqd) || premiumIqd < 0) throw new RangeError('The premium must be a whole, non-negative number of IQD');
-  if (!isOnStep(premiumIqd, step)) throw new RangeError('PREMIUM_NOT_ON_STEP');
+export function directPrice(preorderBaseIqd: number, extraIqd: number, step: number = ROUNDING_STEP_IQD): number {
+  if (!Number.isSafeInteger(extraIqd) || extraIqd < 0) throw new RangeError('The Direct Sale Extra must be a whole, non-negative number of IQD');
+  if (!isOnStep(extraIqd, step)) throw new RangeError('DIRECT_SALE_EXTRA_NOT_ON_STEP');
   if (!isOnStep(preorderBaseIqd, step) || preorderBaseIqd < step) throw new RangeError('The pre-order base must be a positive multiple of the rounding step');
-  return toNumber(BigInt(preorderBaseIqd) + BigInt(premiumIqd), 'Price');
+  return toNumber(BigInt(preorderBaseIqd) + BigInt(extraIqd), 'Price');
 }
 
 interface CostComputation {
@@ -821,8 +821,8 @@ export interface PriceSkuInput {
   channels: readonly SkuChannel[];
   /** `resolveRuleAt(rules, 'target_profit', sku)`. */
   target: RuleResolution;
-  /** `resolveRuleAt(rules, 'direct_premium', sku)`; needed when direct_sale is enabled. */
-  premium?: RuleResolution | null;
+  /** `resolveRuleAt(rules, 'direct_sale_extra', sku)`; needed when direct_sale is enabled. */
+  extra?: RuleResolution | null;
   /** Default ROUNDING_STEP_IQD (1,000). */
   step?: number;
   /** Previews only: an unconfirmed central rate is a warning instead of an error [C2-M3]. */
@@ -845,14 +845,14 @@ export function priceSku(input: PriceSkuInput): SkuPricingResult {
     }
   };
   const { target } = input;
-  const premium = input.premium ?? null;
-  // Swapping the two resolutions would silently price on the premium as the profit.
+  const extra = input.extra ?? null;
+  // Swapping the two resolutions would silently price on the extra as the profit.
   invariant(target?.kind === 'target_profit', 'target is a target_profit resolution');
-  invariant(premium === null || premium.kind === 'direct_premium', 'premium is a direct_premium resolution');
+  invariant(extra === null || extra.kind === 'direct_sale_extra', 'extra is a direct_sale_extra resolution');
 
   if (target.status === 'active' && target.tie) warn({ code: 'RULE_TIE', rule_kind: 'target_profit', rule_id: target.rule.id });
-  if (wanted.includes('direct_sale') && premium?.status === 'active' && premium.tie)
-    warn({ code: 'RULE_TIE', rule_kind: 'direct_premium', rule_id: premium.rule.id });
+  if (wanted.includes('direct_sale') && extra?.status === 'active' && extra.tie)
+    warn({ code: 'RULE_TIE', rule_kind: 'direct_sale_extra', rule_id: extra.rule.id });
 
   const channels: ChannelPrice[] = [];
   for (const channel of wanted) {
@@ -862,14 +862,14 @@ export function priceSku(input: PriceSkuInput): SkuPricingResult {
     else if (!isValidRuleAmount('target_profit', target.amount_iqd))
       errors.push({ code: 'TARGET_PROFIT_BLOCKED', rule_kind: 'target_profit', rule_id: target.rule.id }); // fail closed
 
-    let premiumIqd: number | null = null;
+    let extraIqd: number | null = null;
     if (channel === 'direct_sale') {
-      if (!premium || premium.status === 'missing') errors.push({ code: 'DIRECT_PREMIUM_MISSING', rule_kind: 'direct_premium' });
-      else if (premium.status === 'blocked') errors.push({ code: premium.code, rule_kind: 'direct_premium', rule_id: premium.rule.id });
-      else if (!isValidRuleAmount('direct_premium', premium.amount_iqd))
-        errors.push({ code: 'DIRECT_PREMIUM_BLOCKED', rule_kind: 'direct_premium', rule_id: premium.rule.id }); // fail closed
-      else if (premium.amount_iqd % step !== 0) errors.push({ code: 'PREMIUM_NOT_ON_STEP', rule_kind: 'direct_premium', rule_id: premium.rule.id });
-      else premiumIqd = premium.amount_iqd;
+      if (!extra || extra.status === 'missing') errors.push({ code: 'DIRECT_SALE_EXTRA_MISSING', rule_kind: 'direct_sale_extra' });
+      else if (extra.status === 'blocked') errors.push({ code: extra.code, rule_kind: 'direct_sale_extra', rule_id: extra.rule.id });
+      else if (!isValidRuleAmount('direct_sale_extra', extra.amount_iqd))
+        errors.push({ code: 'DIRECT_SALE_EXTRA_BLOCKED', rule_kind: 'direct_sale_extra', rule_id: extra.rule.id }); // fail closed
+      else if (extra.amount_iqd % step !== 0) errors.push({ code: 'DIRECT_SALE_EXTRA_NOT_ON_STEP', rule_kind: 'direct_sale_extra', rule_id: extra.rule.id });
+      else extraIqd = extra.amount_iqd;
     }
 
     const profile = profileOfChannel(channel, inputs.shipping_profile?.value ?? null);
@@ -894,7 +894,7 @@ export function priceSku(input: PriceSkuInput): SkuPricingResult {
 
     const cost = computed.cost;
     const T = target.amount_iqd;
-    const P = premiumIqd ?? 0;
+    const P = extraIqd ?? 0;
     const base = preorderPrice(computed.exact, T, step);
     const price = base + P;
     if (!Number.isSafeInteger(price) || price > MAX_FINAL_PRICE_IQD) {
@@ -905,7 +905,7 @@ export function priceSku(input: PriceSkuInput): SkuPricingResult {
 
     // The owner's rules, asserted against the EXACT replacement cost.
     const margin = addProcurementExact(procurementExact(BigInt(price - P)), { num: -computed.exact.num, den: computed.exact.den });
-    invariant(compareProcurementExact(margin, procurementExact(BigInt(T))) >= 0, 'price − premium − R_exact ≥ target');
+    invariant(compareProcurementExact(margin, procurementExact(BigInt(T))) >= 0, 'price − extra − R_exact ≥ target');
     invariant(price % step === 0 && price >= step, 'price is a positive multiple of the step');
     invariant(rounding >= 0 && rounding < step, 'rounding adds less than one step');
     invariant(
@@ -919,9 +919,9 @@ export function priceSku(input: PriceSkuInput): SkuPricingResult {
       target_profit_iqd: T,
       target_rule_id: target.rule.id,
       target_rule_version: target.rule.version,
-      direct_premium_iqd: channel === 'direct_sale' ? P : null,
-      premium_rule_id: channel === 'direct_sale' && premium?.status === 'active' ? premium.rule.id : null,
-      premium_rule_version: channel === 'direct_sale' && premium?.status === 'active' ? premium.rule.version : null,
+      direct_sale_extra_iqd: channel === 'direct_sale' ? P : null,
+      extra_rule_id: channel === 'direct_sale' && extra?.status === 'active' ? extra.rule.id : null,
+      extra_rule_version: channel === 'direct_sale' && extra?.status === 'active' ? extra.rule.version : null,
       rounding_step_iqd: step,
       preorder_base_iqd: base,
       rounding_added_iqd: rounding,

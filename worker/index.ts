@@ -443,8 +443,8 @@ app.route('/api/admin/taxonomy', adminTaxonomyRoutes);
 app.route('/api/admin/inventory', adminInventoryRoutes);
 app.route('/api/admin/procurement', adminProcurementRoutes);
 // «التسعير والشحن» (pricing engine MVP, P1): the owner's read-only pricing
-// workspace — today's prices, the minimum profit and premium the old prices
-// carry, and the what-if calculator. Owner only at its own door
+// workspace — today's prices, the minimum profit and Direct Sale Extra the old
+// prices carry, and the what-if calculator. Owner only at its own door
 // (requireCostRead) and at the gateway (`admin:owner`); it writes nothing.
 app.route('/api/admin/pricing', adminPricingRoutes);
 app.route('/api/admin/stock-operations', adminStockOperationsRoutes);
@@ -1087,6 +1087,15 @@ export default {
   //     fifty-job bound makes remote — but it is not impossible, and the right
   //     fix if it ever matters is a claiming UPDATE in
   //     worker/lib/productDeletion.ts, not a lock here.
+  //
+  // EVERY CRON STRING IS MATCHED EXACTLY, AND AN UNKNOWN ONE RUNS NOTHING (FX
+  // plan F13). Cron triggers are Worker settings, not part of a version: after
+  // a dashboard rollback or `wrangler rollback` the triggers of the NEWER
+  // commit stay. Before this rule every string that was not the minute fell
+  // into the fifteen-minute jobs, so a later trigger (the FX `0 */6 * * *`)
+  // would have run them a second time on a rolled-back Worker. Each string
+  // here is one entry of wrangler.jsonc's `triggers.crons`, in all three
+  // environments (tests/scheduledCronDispatch.test.ts holds both sides).
   scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     configureEventBus(env);
     // Delivery itself awaits wage posting. This separate bounded recovery
@@ -1111,6 +1120,12 @@ export default {
           console.error('scheduled quick buy finalisation rejected:', error);
         })
       );
+      return;
+    }
+    if (_event.cron !== '*/15 * * * *') {
+      // A trigger this commit does not know: nothing runs. The string is a
+      // config value, never a private one.
+      console.warn('scheduled: unknown cron, nothing run:', JSON.stringify(_event.cron));
       return;
     }
     // Employment-date recalculation survives a closed admin tab. Each tick

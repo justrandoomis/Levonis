@@ -4,7 +4,7 @@
  * tests/costRouteClassification.test.ts).
  *
  * Every route is COST: today's price next to the old landed cost, the minimum
- * profit and the premium derived from them, the rate reference and the
+ * profit and the Direct Sale Extra derived from them, the rate reference and the
  * what-if's replacement cost. The router's door — requireAdmin, the rate
  * limit, then `requireCostRead` on `use('*')` above the first route
  * (tests/costPredicateUsage.test.ts) — refuses every caller but the verified

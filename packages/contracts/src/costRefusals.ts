@@ -173,10 +173,10 @@ export const COST_REFUSALS = {
     en: 'Your other changes were saved; prices were kept because the pricing engine manages them.',
     ckb: 'گۆڕانکارییەکانی ترت پاشەکەوت کران؛ نرخەکان وەک خۆیان مانەوە چونکە بزوێنەری نرخدانان بەڕێوەیان دەبات.',
   },
-  PREMIUM_NOT_ON_STEP: {
+  DIRECT_SALE_EXTRA_NOT_ON_STEP: {
     ar: 'يجب أن تكون زيادة البيع المباشر من مضاعفات 1,000 د.ع.',
-    en: 'The premium must be a multiple of 1,000 IQD.',
-    ckb: 'زیادەکە دەبێت چەندجارەی 1,000 دینار بێت.',
+    en: 'The Direct Sale Extra must be a multiple of 1,000 IQD.',
+    ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ دەبێت چەندجارەی 1,000 دینار بێت.',
   },
 
   // ---- engine runs (RUN §6) ------------------------------------------------

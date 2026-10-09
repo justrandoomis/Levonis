@@ -48,16 +48,16 @@ const TABLES: Record<string, Readonly<Record<string, PricingLabel>>> = {
   origins: PRICING_ORIGIN_LABELS,
 };
 
-test('the list holds every readiness code of master plan v2 §2.3 (v1, [C2], v2) plus DIRECT_PREMIUM_BLOCKED, once each', () => {
+test('the list holds every readiness code of master plan v2 §2.3 (v1, [C2], v2) plus DIRECT_SALE_EXTRA_BLOCKED, once each', () => {
   const v1 = [
     'SUPPLIER_COST_MISSING', 'SUPPLIER_CURRENCY_MISSING', 'SHIPPING_PROFILE_MISSING', 'WEIGHT_MISSING', 'CBM_MISSING',
-    'FX_RATE_MISSING', 'SHIPPING_RATE_MISSING', 'TARGET_PROFIT_MISSING', 'DIRECT_PREMIUM_MISSING', 'INPUT_CONFLICT',
+    'FX_RATE_MISSING', 'SHIPPING_RATE_MISSING', 'TARGET_PROFIT_MISSING', 'DIRECT_SALE_EXTRA_MISSING', 'INPUT_CONFLICT',
     'DELTA_WITHOUT_BASE', 'CURRENCY_WITHOUT_AMOUNT', 'CURRENCY_MISMATCH', 'NEGATIVE_SUPPLIER_COST', 'AMOUNT_TOO_LARGE',
     'RULE_TIE', 'SKU_GRID_TOO_LARGE', 'RELATIONS_REQUIRED', 'COMPOSITION_NOT_PRICEABLE', 'PRICE_INVALID', 'RESOLVER_MISMATCH',
   ];
-  const c2 = ['FX_RATE_UNCONFIRMED', 'SHIPPING_RATE_UNCONFIRMED', 'CHANNEL_INCOMPLETE', 'PRICE_DROP_REVIEW', 'PINNED_BELOW_TARGET', 'PRICING_CATEGORY_DIFFERS', 'RULE_ORPHANED', 'PREMIUM_NOT_ON_STEP'];
+  const c2 = ['FX_RATE_UNCONFIRMED', 'SHIPPING_RATE_UNCONFIRMED', 'CHANNEL_INCOMPLETE', 'PRICE_DROP_REVIEW', 'PINNED_BELOW_TARGET', 'PRICING_CATEGORY_DIFFERS', 'RULE_ORPHANED', 'DIRECT_SALE_EXTRA_NOT_ON_STEP'];
   const v2 = ['TARGET_PROFIT_BLOCKED', 'SHIPPING_FIELD_UNRESOLVED', 'SKU_INPUTS_UNREVIEWED', 'INPUT_ORPHANED', 'MEASURE_FROM_PUBLIC_SPEC'];
-  const check = ['DIRECT_PREMIUM_BLOCKED']; // master-plan-v2-check (1)7
+  const check = ['DIRECT_SALE_EXTRA_BLOCKED']; // master-plan-v2-check (1)7
   assert.deepEqual([...PRICING_ISSUE_CODES], [...v1, ...c2, ...v2, ...check]);
   assert.equal(new Set(PRICING_ISSUE_CODES).size, PRICING_ISSUE_CODES.length);
   assert.deepEqual(Object.keys(PRICING_ISSUES).sort(), [...PRICING_ISSUE_CODES].sort());
@@ -167,7 +167,7 @@ test('the label tables cover the engine vocabulary exactly', () => {
     'supplier_cost', 'supplier_cost_delta', 'supplier_currency', 'shipping_profile', 'pricing_weight_g', 'shipping_weight_g',
     'shipping_length_mm', 'shipping_width_mm', 'shipping_height_mm', 'manual_cbm', 'additional_cost_iqd',
     'fx_rate', 'supplier_cost_iqd', 'shipping_rate', 'effective_weight_g', 'shipping_cbm', 'effective_cbm', 'shipping_cost_iqd',
-    'replacement_exact', 'replacement_cost_iqd', 'target_profit_iqd', 'direct_premium_iqd', 'rounding_step_iqd', 'preorder_base_iqd',
+    'replacement_exact', 'replacement_cost_iqd', 'target_profit_iqd', 'direct_sale_extra_iqd', 'rounding_step_iqd', 'preorder_base_iqd',
     'computed_price_iqd', 'supplier_cost_exact', 'shipping_cost_exact', 'rounding_added_iqd',
   ];
   for (const c of columns) assert.ok(isPricingFieldName(c), c);

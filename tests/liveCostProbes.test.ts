@@ -89,7 +89,7 @@ test('s1.json: the cost routers refuse a stranger; the storefront answers carry 
   assert.deepEqual(products.requireIntegerKeys, ['price_iqd']);
   const keys = new RegExp(products.forbidKeys!, 'i');
   // Critique A9: the narrow regex missed these.
-  for (const k of ['cost_iqd', 'supplier_cost', 'replacement_cost_iqd', 'target_profit_iqd', 'margin_iqd', 'premium_rule_id', 'fx_rate', 'exchange_rate_used', 'shipping_rate', 'shipping_weight_g', 'shipping_cbm', 'rate_iqd', 'manual_cbm', 'effective_cbm', 'pricing_weight_g', 'pricing_revision', 'pricing_mode']) {
+  for (const k of ['cost_iqd', 'supplier_cost', 'replacement_cost_iqd', 'target_profit_iqd', 'margin_iqd', 'premium_rule_id', 'extra_rule_id', 'extra_rule_version', 'fx_rate', 'exchange_rate_used', 'shipping_rate', 'shipping_weight_g', 'shipping_cbm', 'rate_iqd', 'manual_cbm', 'effective_cbm', 'pricing_weight_g', 'pricing_revision', 'pricing_mode']) {
     assert.ok(keys.test(k), `the probe would miss ${k}`);
   }
   // …and must not trip on the public sale modes of a product page.
@@ -110,16 +110,16 @@ test('s1.json: the cost routers refuse a stranger; the storefront answers carry 
 
 const STOREFRONT = ['/api/products?limit=3', '/api/products/{slug}', '/api/public/v1/products/{slug}', '/api/home'];
 
-test('s1.json: a membership rule id passes every storefront probe; target_rule_id and premium_rule_id still fail', () => {
+test('s1.json: a membership rule id passes every storefront probe; target_rule_id, extra_rule_id and its old name premium_rule_id still fail', () => {
   for (const path of STOREFRONT) {
     const keys = new RegExp(probe(path)!.forbidKeys!, 'i');
     assert.equal(keys.test('rule_id'), false, `${path}: membership_preview.pro.rule_id is not a cost`);
-    for (const k of ['target_rule_id', 'premium_rule_id']) assert.ok(keys.test(k), `${path}: the probe would miss ${k}`);
+    for (const k of ['target_rule_id', 'extra_rule_id', 'premium_rule_id']) assert.ok(keys.test(k), `${path}: the probe would miss ${k}`);
   }
   const page = probe('/api/products/{slug}')!;
   const shown = { product: { slug: 'a1', price_iqd: 900000, membership_preview: { pro: { rule_id: 'mbr_rule_pro', price_iqd: 850000 }, prime: { rule_id: 'mbr_rule_prime', price_iqd: 880000 } } } };
   assert.deepEqual(judge(page, 200, JSON.stringify(shown)), []);
-  for (const k of ['target_rule_id', 'premium_rule_id']) {
+  for (const k of ['target_rule_id', 'extra_rule_id', 'premium_rule_id']) {
     const leak = { product: { slug: 'a1', price_iqd: 900000, pricing: { [k]: 'tr_1' } } };
     assert.match(judge(page, 200, JSON.stringify(leak)).join('\n'), new RegExp(`forbidden key ${k} \\(at product\\.pricing\\.${k}\\)`));
   }

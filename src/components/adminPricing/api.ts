@@ -6,7 +6,7 @@
  *   GET  /overview?page=N            the products, 20 a page, and the §2.3 counts
  *   GET  /products/:id               today's prices per model × channel, the old
  *                                    landed cost, the derived minimum profit and
- *                                    premium, measures, the rate reference
+ *                                    Direct Sale Extra, measures, the rate reference
  *   POST /products/:id/what-if       «كم سيصبح السعر؟» — computed on the SERVER
  *                                    by E1's exact maths; nothing is saved
  *
@@ -109,12 +109,12 @@ export interface PricingDerivedTarget {
   candidates: Array<{ kind: PricingCandidateKind; route: PricingRoute | null; target_profit_iqd: number }>;
 }
 
-export interface PricingDerivedPremium {
+export interface PricingDerivedDirectSaleExtra {
   migration_state: LegacyValueState;
-  direct_premium_iqd: number | null;
+  direct_sale_extra_iqd: number | null;
   reason_codes: string[];
   reason_figures: PricingReasonFigure[];
-  candidates: Array<{ kind: PricingCandidateKind; route: PricingRoute | null; direct_premium_iqd: number }>;
+  candidates: Array<{ kind: PricingCandidateKind; route: PricingRoute | null; direct_sale_extra_iqd: number }>;
 }
 
 export interface PricingSuggestedMeasures {
@@ -135,7 +135,7 @@ export interface PricingModel extends PricingNames {
   base_route: PricingRoute | null;
   channels: PricingChannelToday[];
   target: PricingDerivedTarget;
-  premium: PricingDerivedPremium;
+  direct_sale_extra: PricingDerivedDirectSaleExtra;
   /** null: nothing to check; otherwise whether the old prices come back from the values. */
   roundtrip_ok: boolean | null;
   suggested_measures: PricingSuggestedMeasures;
@@ -206,7 +206,7 @@ export interface PricingWhatIfChannel {
   shipping_cost_iqd: number | null;
   additional_cost_iqd: number | null;
   target_profit_iqd: number | null;
-  direct_premium_iqd: number | null;
+  direct_sale_extra_iqd: number | null;
   preorder_base_iqd: number | null;
   /** What rounding up to the 1,000 step added (≥ 0): the proof the minimum is kept. */
   rounding_added_iqd: number | null;

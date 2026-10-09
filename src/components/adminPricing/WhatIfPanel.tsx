@@ -150,8 +150,8 @@ function ResultChannel({ c, lang, s, currency }: { c: PricingWhatIfChannel; lang
             {row(fieldLabel('additional_cost_iqd', lang), c.additional_cost_iqd ? <Money iqd={c.additional_cost_iqd} /> : <span className="text-text-muted">{noAdditionalCostsText(lang).replace(/^ℹ\s*/, '')}</span>, 'add', !c.additional_cost_iqd)}
             {row(fieldLabel('replacement_cost_iqd', lang), <Money iqd={c.replacement_cost_iqd} className="font-semibold text-text-primary" />, 'rep')}
             {row(s.minProfit, <Money iqd={c.target_profit_iqd} />, 'min')}
-            {c.direct_premium_iqd !== null && row(s.premium, <Money iqd={c.direct_premium_iqd} />, 'prem')}
-            {c.direct_premium_iqd !== null && row(fieldLabel('preorder_base_iqd', lang), <Money iqd={c.preorder_base_iqd} />, 'base')}
+            {c.direct_sale_extra_iqd !== null && row(s.directSaleExtra, <Money iqd={c.direct_sale_extra_iqd} />, 'extra')}
+            {c.direct_sale_extra_iqd !== null && row(fieldLabel('preorder_base_iqd', lang), <Money iqd={c.preorder_base_iqd} />, 'base')}
             {row(fieldLabel('rounding_added_iqd', lang), <Money iqd={c.rounding_added_iqd} />, 'round')}
             {row(
               s.ratesUsed,

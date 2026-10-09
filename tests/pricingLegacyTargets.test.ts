@@ -6,7 +6,7 @@
  *   T_r = (item_r + fee_r) − C_r    P = P_dir − paid_base
  *
  * Pure vectors first (the B3 §29 example with a fee F, routes that disagree,
- * direct-only, pre-order-only, negative and off-step premiums, no cost, cost
+ * direct-only, pre-order-only, negative and off-step extras, no cost, cost
  * less specific than price, placement, the round trip, determinism), then the
  * census fixture: its counts, today's prices equal to the cart's own line for
  * every model × channel × payment, and the statuses the census predicts.
@@ -47,19 +47,19 @@ const route = (r: 'air' | 'sea' | 'land', item: number, fee: number, cost: numbe
 });
 const one = (model: LegacyModelInput, extra: Partial<Parameters<typeof deriveLegacyTargets>[0]> = {}) =>
   deriveLegacyTargets({ product_id: 'p', models: [model], ...extra });
-const ruleAt = (res: LegacyProductResult, kind: 'target_profit' | 'direct_premium', optionId: string) =>
+const ruleAt = (res: LegacyProductResult, kind: 'target_profit' | 'direct_sale_extra', optionId: string) =>
   resolveRuleAt(res.rules, kind, { product_id: res.product_id, option_value_ids: optionId ? [optionId] : [], color_id: null, ancestry: [] });
 
 // ------------------------------------------------------------- B3 §29 with a fee F
 
-test('B3 §29 with an air fee F: minimum profit = 915,000 + F − 765,000; premium = 965,000 − (915,000 + F)', () => {
+test('B3 §29 with an air fee F: minimum profit = 915,000 + F − 765,000; extra = 965,000 − (915,000 + F)', () => {
   for (const F of [0, 20_000, 50_000]) {
     const res = one({ option_id: 'combo', direct: obs(965_000, 0, 765_000, 'fulfillment'), routes: [route('air', 915_000, F, 765_000)] });
     const m = res.models[0]!;
     assert.equal(m.target.state, 'MIGRATED');
     assert.equal(m.target.value_iqd, 150_000 + F, `F = ${F}`);
-    assert.equal(m.premium.state, 'MIGRATED');
-    assert.equal(m.premium.value_iqd, 50_000 - F);
+    assert.equal(m.extra.state, 'MIGRATED');
+    assert.equal(m.extra.value_iqd, 50_000 - F);
     assert.equal(m.base_route, 'air');
     assert.equal(m.roundtrip_ok, true);
     // The fee is named as part of the old profit only when there is one.
@@ -70,21 +70,21 @@ test('B3 §29 with an air fee F: minimum profit = 915,000 + F − 765,000; premi
   }
 });
 
-test('B3 §29 with F above the 50,000 premium: the premium goes negative and is held — never written below zero', () => {
+test('B3 §29 with F above the 50,000 extra: the extra goes negative and is held — never written below zero', () => {
   const res = one({ option_id: 'combo', direct: obs(965_000, 0, 765_000), routes: [route('air', 915_000, 60_000, 765_000)] });
   const m = res.models[0]!;
   assert.equal(m.target.value_iqd, 210_000);
-  assert.equal(m.premium.state, 'DIRECT_PREMIUM_REVIEW_REQUIRED');
-  assert.equal(m.premium.value_iqd, null);
-  assert.deepEqual(m.premium.reasons.map((r) => r.code), ['LEGACY_DIRECT_BELOW_PREORDER']);
-  // A BLOCKED premium marker, so nothing inherits a premium for this model.
-  const p = ruleAt(res, 'direct_premium', 'combo');
+  assert.equal(m.extra.state, 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED');
+  assert.equal(m.extra.value_iqd, null);
+  assert.deepEqual(m.extra.reasons.map((r) => r.code), ['LEGACY_DIRECT_BELOW_PREORDER']);
+  // A BLOCKED extra marker, so nothing inherits an extra for this model.
+  const p = ruleAt(res, 'direct_sale_extra', 'combo');
   assert.equal(p.status, 'blocked');
 });
 
 // ------------------------------------------------------------- routes that disagree
 
-test('two routes with different fees → CONFLICT, one candidate per route, never averaged; the premium is in conflict too', () => {
+test('two routes with different fees → CONFLICT, one candidate per route, never averaged; the extra is in conflict too', () => {
   const res = one({
     option_id: 'o',
     direct: obs(1_000_000, 0, 700_000),
@@ -103,34 +103,34 @@ test('two routes with different fees → CONFLICT, one candidate per route, neve
   );
   // No average (220,000) anywhere.
   assert.ok(!JSON.stringify(res).includes('220000'));
-  assert.equal(m.premium.state, 'CONFLICT');
+  assert.equal(m.extra.state, 'CONFLICT');
   assert.equal(ruleAt(res, 'target_profit', 'o').status, 'blocked');
 });
 
-test('two routes at the same paid price: the profit migrates, but the premium still needs the owner’s base route (NO_BASE_ROUTE, §2.5) — never the first route by default', () => {
+test('two routes at the same paid price: the profit migrates, but the extra still needs the owner’s base route (NO_BASE_ROUTE, §2.5) — never the first route by default', () => {
   const model: LegacyModelInput = { option_id: 'o', direct: obs(960_000, 0, 700_000), routes: [route('air', 900_000, 10_000, 700_000), route('land', 900_000, 10_000, 700_000)] };
   const res = one(model);
   const m = res.models[0]!;
   assert.equal(m.target.state, 'MIGRATED');
   assert.equal(m.target.value_iqd, 210_000);
   // No silent «measured from: air»: the base route is the owner's to pick, because the
-  // engine builds the direct price on that route's own shipping (MVP plan: pre(base) + premium).
+  // engine builds the direct price on that route's own shipping (MVP plan: pre(base) + extra).
   assert.equal(m.base_route, null);
-  assert.equal(m.premium.state, 'DIRECT_PREMIUM_REVIEW_REQUIRED');
-  assert.equal(m.premium.value_iqd, null);
-  assert.deepEqual(m.premium.reasons.map((r) => r.code), ['NO_BASE_ROUTE']);
+  assert.equal(m.extra.state, 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED');
+  assert.equal(m.extra.value_iqd, null);
+  assert.deepEqual(m.extra.reasons.map((r) => r.code), ['NO_BASE_ROUTE']);
   // Both routes are offered as candidates — here they agree, so either choice gives 50,000.
-  assert.deepEqual(m.premium.candidates.map((c) => [c.route, c.value_iqd]), [['air', 50_000], ['land', 50_000]]);
-  assert.equal(ruleAt(res, 'direct_premium', 'o').status, 'blocked');
+  assert.deepEqual(m.extra.candidates.map((c) => [c.route, c.value_iqd]), [['air', 50_000], ['land', 50_000]]);
+  assert.equal(ruleAt(res, 'direct_sale_extra', 'o').status, 'blocked');
   // The owner's choice decides it.
   const chosen = one(model, { base_route: { o: 'air' } }).models[0]!;
-  assert.deepEqual([chosen.base_route, chosen.premium.state, chosen.premium.value_iqd, chosen.roundtrip_ok], ['air', 'MIGRATED', 50_000, true]);
+  assert.deepEqual([chosen.base_route, chosen.extra.state, chosen.extra.value_iqd, chosen.roundtrip_ok], ['air', 'MIGRATED', 50_000, true]);
   // One route is its own base: no choice needed.
   const single = one({ ...model, routes: [route('land', 900_000, 10_000, 700_000)] }).models[0]!;
-  assert.deepEqual([single.base_route, single.premium.state, single.premium.value_iqd], ['land', 'MIGRATED', 50_000]);
+  assert.deepEqual([single.base_route, single.extra.state, single.extra.value_iqd], ['land', 'MIGRATED', 50_000]);
 });
 
-test('the same old profit at different paid prices: the premium needs the owner’s base route (NO_BASE_ROUTE), then migrates', () => {
+test('the same old profit at different paid prices: the extra needs the owner’s base route (NO_BASE_ROUTE), then migrates', () => {
   const model: LegacyModelInput = {
     option_id: 'o',
     direct: obs(1_000_000, 0, 700_000),
@@ -139,18 +139,18 @@ test('the same old profit at different paid prices: the premium needs the owner�
   const held = one(model).models[0]!;
   assert.equal(held.target.state, 'MIGRATED');
   assert.equal(held.target.value_iqd, 200_000);
-  assert.equal(held.premium.state, 'DIRECT_PREMIUM_REVIEW_REQUIRED');
-  assert.deepEqual(held.premium.reasons.map((r) => r.code), ['NO_BASE_ROUTE']);
-  assert.deepEqual(held.premium.candidates.map((c) => [c.route, c.value_iqd]), [['air', 75_000], ['land', 85_000]]);
+  assert.equal(held.extra.state, 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED');
+  assert.deepEqual(held.extra.reasons.map((r) => r.code), ['NO_BASE_ROUTE']);
+  assert.deepEqual(held.extra.candidates.map((c) => [c.route, c.value_iqd]), [['air', 75_000], ['land', 85_000]]);
   const chosen = one(model, { base_route: { o: 'land' } }).models[0]!;
-  assert.equal(chosen.premium.state, 'MIGRATED');
-  assert.equal(chosen.premium.value_iqd, 85_000);
+  assert.equal(chosen.extra.state, 'MIGRATED');
+  assert.equal(chosen.extra.value_iqd, 85_000);
   assert.equal(chosen.roundtrip_ok, true);
 });
 
 // ------------------------------------------------------------- direct only, pre-order only
 
-test('direct-only product (C39): premium 0 at product scope, target = P_dir − C_dir, PREMIUM_ZERO_DIRECT_ONLY', () => {
+test('direct-only product (C39): extra 0 at product scope, target = P_dir − C_dir, DIRECT_SALE_EXTRA_ZERO_DIRECT_ONLY', () => {
   const res = deriveLegacyTargets({
     product_id: 'p',
     models: [
@@ -158,13 +158,13 @@ test('direct-only product (C39): premium 0 at product scope, target = P_dir − 
       { option_id: 'b', direct: obs(175_000, 0, 140_000), routes: [] },
     ],
   });
-  assert.deepEqual(res.models.map((m) => [m.mix, m.target.value_iqd, m.premium.value_iqd]), [
+  assert.deepEqual(res.models.map((m) => [m.mix, m.target.value_iqd, m.extra.value_iqd]), [
     ['DIRECT_ONLY', 30_000, 0],
     ['DIRECT_ONLY', 35_000, 0],
   ]);
-  assert.ok(res.models.every((m) => m.premium.reasons.some((r) => r.code === 'PREMIUM_ZERO_DIRECT_ONLY')));
-  const premium = res.rules.filter((r) => r.kind === 'direct_premium');
-  assert.deepEqual(premium.map((r) => [r.scope, r.amount_iqd, r.state]), [['product', 0, 'ACTIVE']]);
+  assert.ok(res.models.every((m) => m.extra.reasons.some((r) => r.code === 'DIRECT_SALE_EXTRA_ZERO_DIRECT_ONLY')));
+  const extra = res.rules.filter((r) => r.kind === 'direct_sale_extra');
+  assert.deepEqual(extra.map((r) => [r.scope, r.amount_iqd, r.state]), [['product', 0, 'ACTIVE']]);
   // Models disagree on the target: each is placed at option scope, none at product scope.
   assert.deepEqual(
     res.rules.filter((r) => r.kind === 'target_profit').map((r) => [r.scope, r.scope_id, r.amount_iqd]),
@@ -176,25 +176,25 @@ test('direct-only product (C39): premium 0 at product scope, target = P_dir − 
   assert.ok(res.models.every((m) => m.roundtrip_ok === true));
 });
 
-test('a direct fee (the product’s scalar premium) is part of the direct-only old profit', () => {
+test('a direct fee (the product’s scalar direct fee) is part of the direct-only old profit', () => {
   const m = one({ option_id: 'a', direct: obs(150_000, 20_000, 120_000), routes: [] }).models[0]!;
   assert.equal(m.target.value_iqd, 50_000);
 });
 
-test('pre-order-only: premium NOT_APPLICABLE and no premium rule', () => {
+test('pre-order-only: extra NOT_APPLICABLE and no extra rule', () => {
   const res = one({ option_id: 'a', direct: null, routes: [route('land', 500_000, 15_000, 400_000)] });
   const m = res.models[0]!;
   assert.equal(m.mix, 'PREORDER_ONLY');
   assert.equal(m.target.value_iqd, 115_000);
-  assert.equal(m.premium.state, 'NOT_APPLICABLE');
-  assert.equal(res.rules.filter((r) => r.kind === 'direct_premium').length, 0);
+  assert.equal(m.extra.state, 'NOT_APPLICABLE');
+  assert.equal(res.rules.filter((r) => r.kind === 'direct_sale_extra').length, 0);
 });
 
-test('a mixed product: a direct-only model inherits the product premium, or is held when there is none', () => {
+test('a mixed product: a direct-only model inherits the product extra, or is held when there is none', () => {
   const base = { option_id: 'both', direct: obs(560_000, 0, 400_000), routes: [route('land', 500_000, 10_000, 400_000)] };
   const res = deriveLegacyTargets({ product_id: 'p', models: [base, { option_id: 'direct', direct: obs(700_000, 0, 550_000), routes: [] }] });
   const [both, direct] = res.models;
-  assert.equal(both!.premium.value_iqd, 50_000);
+  assert.equal(both!.extra.value_iqd, 50_000);
   assert.equal(direct!.target.value_iqd, 700_000 - 550_000 - 50_000);
   assert.equal(direct!.roundtrip_ok, true);
   const held = deriveLegacyTargets({
@@ -202,21 +202,21 @@ test('a mixed product: a direct-only model inherits the product premium, or is h
     models: [{ ...base, routes: [route('land', 500_000, 80_000, 400_000)] }, { option_id: 'direct', direct: obs(700_000, 0, 550_000), routes: [] }],
   });
   assert.equal(held.models[1]!.target.state, 'TARGET_PROFIT_REVIEW_REQUIRED');
-  assert.deepEqual(held.models[1]!.target.reasons.map((r) => r.code), ['DIRECT_ONLY_PREMIUM_UNKNOWN']);
+  assert.deepEqual(held.models[1]!.target.reasons.map((r) => r.code), ['DIRECT_ONLY_EXTRA_UNKNOWN']);
 });
 
-// ------------------------------------------------------------- premiums off the step
+// ------------------------------------------------------------- extras off the step
 
-test('a premium off the 1,000 step is held, with the floor and the ceiling as candidates', () => {
+test('an extra off the 1,000 step is held, with the floor and the ceiling as candidates', () => {
   const m = one({ option_id: 'o', direct: obs(965_000, 0, 765_000), routes: [route('sea', 915_000, 4_500, 765_000)] }).models[0]!;
   assert.equal(m.target.value_iqd, 154_500);
-  assert.equal(m.premium.state, 'DIRECT_PREMIUM_REVIEW_REQUIRED');
-  assert.deepEqual(m.premium.reasons, [{ code: 'LEGACY_PREMIUM_NOT_ON_STEP', iqd: 45_500 }]);
-  assert.deepEqual(m.premium.candidates.map((c) => [c.kind, c.value_iqd]), [['floor', 45_000], ['ceiling', 46_000]]);
-  // A zero premium is a real value, not a missing one.
+  assert.equal(m.extra.state, 'DIRECT_SALE_EXTRA_REVIEW_REQUIRED');
+  assert.deepEqual(m.extra.reasons, [{ code: 'LEGACY_DIRECT_SALE_EXTRA_NOT_ON_STEP', iqd: 45_500 }]);
+  assert.deepEqual(m.extra.candidates.map((c) => [c.kind, c.value_iqd]), [['floor', 45_000], ['ceiling', 46_000]]);
+  // A zero extra is a real value, not a missing one.
   const zero = one({ option_id: 'o', direct: obs(915_000, 0, 765_000), routes: [route('sea', 915_000, 0, 765_000)] }).models[0]!;
-  assert.equal(zero.premium.state, 'MIGRATED');
-  assert.equal(zero.premium.value_iqd, 0);
+  assert.equal(zero.extra.state, 'MIGRATED');
+  assert.equal(zero.extra.value_iqd, 0);
 });
 
 // ------------------------------------------------------------- guards
@@ -278,18 +278,18 @@ test('a model offered but priced on no channel is HELD — BLOCKED markers for b
   const x = res.models[2]!;
   assert.equal(x.mix, 'NOT_SELLABLE');
   assert.deepEqual([x.target.state, x.target.reasons.map((r) => r.code)], ['TARGET_PROFIT_REVIEW_REQUIRED', ['CHANNEL_NOT_PRICED']]);
-  assert.deepEqual([x.premium.state, x.premium.reasons.map((r) => r.code)], ['DIRECT_PREMIUM_REVIEW_REQUIRED', ['CHANNEL_NOT_PRICED']]);
+  assert.deepEqual([x.extra.state, x.extra.reasons.map((r) => r.code)], ['DIRECT_SALE_EXTRA_REVIEW_REQUIRED', ['CHANNEL_NOT_PRICED']]);
   assert.deepEqual(res.rules.map((r) => [r.kind, r.scope, r.scope_id, r.state, r.amount_iqd]), [
     ['target_profit', 'product', '', 'ACTIVE', 210_000],
     ['target_profit', 'option', 'x', 'BLOCKED', null],
-    ['direct_premium', 'product', '', 'ACTIVE', 50_000],
-    ['direct_premium', 'option', 'x', 'BLOCKED', null],
+    ['direct_sale_extra', 'product', '', 'ACTIVE', 50_000],
+    ['direct_sale_extra', 'option', 'x', 'BLOCKED', null],
   ]);
   // Read back through E1: a and b take the product values, x inherits neither.
   assert.equal(ruleAt(res, 'target_profit', 'a').status, 'active');
   assert.equal(ruleAt(res, 'target_profit', 'x').status, 'blocked');
-  assert.equal(ruleAt(res, 'direct_premium', 'x').status, 'blocked');
-  // Pre-order only and unpriced: still blocked for both; its premium state says no direct sale.
+  assert.equal(ruleAt(res, 'direct_sale_extra', 'x').status, 'blocked');
+  // Pre-order only and unpriced: still blocked for both; its extra state says no direct sale.
   const pre = deriveLegacyTargets({
     product_id: 'p',
     models: [
@@ -297,9 +297,9 @@ test('a model offered but priced on no channel is HELD — BLOCKED markers for b
       { option_id: 'x', direct: null, routes: [], unpriced: { direct: false, routes: ['land'] } },
     ],
   });
-  assert.equal(pre.models[1]!.premium.state, 'NOT_APPLICABLE');
+  assert.equal(pre.models[1]!.extra.state, 'NOT_APPLICABLE');
   assert.equal(ruleAt(pre, 'target_profit', 'x').status, 'blocked');
-  assert.equal(ruleAt(pre, 'direct_premium', 'x').status, 'blocked');
+  assert.equal(ruleAt(pre, 'direct_sale_extra', 'x').status, 'blocked');
   // A direct-only product whose other model offers an unpriced pre-order route is not «direct only».
   const mixed = deriveLegacyTargets({
     product_id: 'p',
@@ -308,7 +308,7 @@ test('a model offered but priced on no channel is HELD — BLOCKED markers for b
       { option_id: 'x', direct: null, routes: [], unpriced: { direct: false, routes: ['sea'] } },
     ],
   });
-  assert.ok(!mixed.models[0]!.premium.reasons.some((r) => r.code === 'PREMIUM_ZERO_DIRECT_ONLY'));
+  assert.ok(!mixed.models[0]!.extra.reasons.some((r) => r.code === 'DIRECT_SALE_EXTRA_ZERO_DIRECT_ONLY'));
   assert.equal(ruleAt(mixed, 'target_profit', 'x').status, 'blocked');
 });
 
@@ -334,7 +334,7 @@ test('placement: product scope when every model agrees, option scope otherwise; 
   });
   assert.deepEqual(agree.rules.map((r) => [r.kind, r.scope, r.amount_iqd]), [
     ['target_profit', 'product', 210_000],
-    ['direct_premium', 'product', 50_000],
+    ['direct_sale_extra', 'product', 50_000],
   ]);
   // B3 §3: base 700/900 and Combo 800/1,050 → 200,000 and 250,000, each on its model.
   const b3 = deriveLegacyTargets({
@@ -371,7 +371,7 @@ test('the round trip, through E1: ceilStep(C_r + T) lands in [paid_r, paid_r + 9
         assert.equal(T, item + fee - cost);
         const price = ceilStep(cost + T);
         assert.ok(price >= item + fee && price <= item + fee + 999);
-        assert.ok(price + m.premium.value_iqd! >= direct && price + m.premium.value_iqd! <= direct + 999);
+        assert.ok(price + m.extra.value_iqd! >= direct && price + m.extra.value_iqd! <= direct + 999);
         checked += 1;
       }
     }
@@ -494,7 +494,7 @@ test('answer B on the census: every migrated value is item + fee − landed cost
   assert.ok(migrated >= 60, `only ${migrated} models migrated`);
 });
 
-test('the census statuses: no cost (h2c, h2d, x2d combo) → held; ams-2-pro → base route; direct-only → profile and premium 0; sea → CBM; r1 → no premium', async () => {
+test('the census statuses: no cost (h2c, h2d, x2d combo) → held; ams-2-pro → base route; direct-only → profile and extra 0; sea → CBM; r1 → no extra', async () => {
   const { bySlug, all } = await census();
   const get = (slug: string): ProductEvaluation => bySlug.get(slug)!;
   for (const slug of ['bambu-lab-h2c', 'bambu-lab-h2d', 'bambu-lab-x2d-combo-open-box-workshop-2026']) {
@@ -502,7 +502,7 @@ test('the census statuses: no cost (h2c, h2d, x2d combo) → held; ams-2-pro →
     assert.ok(get(slug).reason_codes.includes('MISSING_LEGACY_COST'), slug);
   }
   // ams-2-pro: air and land at the same paid price — the base route is the owner's (NO_BASE_ROUTE, edge case #20),
-  // and the held premium rolls up with the profit (check (1)7).
+  // and the held extra rolls up with the profit (check (1)7).
   const ams = get('bambu-lab-ams-2-pro');
   assert.deepEqual([ams.status, ams.routes, ams.reason_codes], ['TARGET_PROFIT_REVIEW_REQUIRED', ['air', 'land'], ['NO_BASE_ROUTE', 'SHIPPING_PROFILE_MISSING']]);
   assert.deepEqual([ams.models[0]!.legacy.base_route, ams.models[0]!.legacy.target.state, ams.models[0]!.legacy.target.value_iqd], [null, 'MIGRATED', 26_000]);
@@ -510,21 +510,21 @@ test('the census statuses: no cost (h2c, h2d, x2d combo) → held; ams-2-pro →
     const p = get(slug);
     assert.equal(p.mix, 'DIRECT_ONLY', slug);
     assert.ok(p.reason_codes.includes('SHIPPING_PROFILE_MISSING'), slug);
-    assert.ok(p.models.every((m) => m.legacy.premium.value_iqd === 0), slug);
-    assert.ok(p.info_codes.includes('PREMIUM_ZERO_DIRECT_ONLY'), slug);
+    assert.ok(p.models.every((m) => m.legacy.extra.value_iqd === 0), slug);
+    assert.ok(p.info_codes.includes('DIRECT_SALE_EXTRA_ZERO_DIRECT_ONLY'), slug);
   }
   const sea = all.filter((p) => p.routes.includes('sea') && p.doc.dimensions.package_depth_mm === null);
   assert.ok(sea.length >= 15);
   for (const p of sea) assert.ok(p.reason_codes.includes('CBM_MISSING'), p.doc.slug);
   const r1 = get('bambu-lab-r1-co2-laser');
   assert.equal(r1.mix, 'PREORDER_ONLY');
-  assert.ok(r1.models.every((m) => m.legacy.premium.state === 'NOT_APPLICABLE'));
+  assert.ok(r1.models.every((m) => m.legacy.extra.state === 'NOT_APPLICABLE'));
   // a1: a model priced on its own but costed by the product is held (critique-1 §28: "a1 likely has one").
   const a1 = get('bambu-lab-a1');
   assert.deepEqual(a1.models.map((m) => m.legacy.target.state), ['MIGRATED', 'TARGET_PROFIT_REVIEW_REQUIRED']);
   assert.equal(a1.models[1]!.option_id, legacyOptionId('bambu-lab-a1', 1));
-  // The spool's sea fee leaves a premium off the step.
-  assert.ok(get('bambu-reusable-spool').reason_codes.includes('LEGACY_PREMIUM_NOT_ON_STEP'));
+  // The spool's sea fee leaves an extra off the step.
+  assert.ok(get('bambu-reusable-spool').reason_codes.includes('LEGACY_DIRECT_SALE_EXTRA_NOT_ON_STEP'));
   // The U1 nozzle ships by air with no weight anywhere.
   assert.deepEqual(get('snapmaker-u1-hot-end-nozzle-hardened-steel').reason_codes, ['WEIGHT_MISSING']);
   // A clean product waits only for its supplier cost.
@@ -554,7 +554,7 @@ test('the census, one model broken (review finding): every channel of h2s model 
   assert.equal(m.legacy.target.state, 'TARGET_PROFIT_REVIEW_REQUIRED');
   const at = { product_id: h2s, option_value_ids: [broken], color_id: null, ancestry: [] };
   assert.equal(resolveRuleAt(p.rules, 'target_profit', at).status, 'blocked');
-  assert.equal(resolveRuleAt(p.rules, 'direct_premium', at).status, 'blocked');
+  assert.equal(resolveRuleAt(p.rules, 'direct_sale_extra', at).status, 'blocked');
   // The healthy models keep their product-scope values.
   const ok = { ...at, option_value_ids: [legacyOptionId('bambu-lab-h2s', 0)] };
   assert.equal(resolveRuleAt(p.rules, 'target_profit', ok).status, 'active');

@@ -105,7 +105,7 @@ test('the §6.2 rows the owner did not change are verbatim', () => {
     en: 'Complete — waiting for you to switch it to the new pricing',
     ckb: 'تەواوە — چاوەڕێیە تۆ بیگۆڕیت بۆ نرخدانانی نوێ',
   });
-  assert.equal(LEGACY_REASONS.LEGACY_PREMIUM_NOT_ON_STEP.label.en, 'The extracted direct-sale premium ({iqd}) is not a multiple of 1,000. Choose the nearest lower or higher value, or set it yourself.');
+  assert.equal(LEGACY_REASONS.LEGACY_DIRECT_SALE_EXTRA_NOT_ON_STEP.label.en, 'The extracted Direct Sale Extra ({iqd}) is not a multiple of 1,000. Choose the nearest lower or higher value, or set it yourself.');
   assert.equal(PRICING_MIGRATION_LABELS['L.NO_ADDITIONAL_COSTS'].ckb, 'ℹ هیچ تێچوویەکی زیادە تۆمار نەکراوە');
   assert.equal(PRICING_MIGRATION_LABELS['b.previewOnly'].en, 'Preview only — nothing changes in the store.');
 });
@@ -129,7 +129,7 @@ test('every reason the derivation raises has a label and a severity; migrationTe
     migrationText(LEGACY_REASONS.ROUTE_FEE_INCLUDED.label, 'en', { method: 'air', iqd: '25,000' }),
     'The old route fee (air: 25,000) was part of what the customer paid, so it counts in the minimum target profit; it is set to zero at the switch because the new price includes shipping.'
   );
-  assert.match(migrationText(LEGACY_REASONS.LEGACY_PREMIUM_NOT_ON_STEP.label, 'ckb', {}), /\(\{iqd\}\)/, 'an unfilled slot is left visible, never guessed');
+  assert.match(migrationText(LEGACY_REASONS.LEGACY_DIRECT_SALE_EXTRA_NOT_ON_STEP.label, 'ckb', {}), /\(\{iqd\}\)/, 'an unfilled slot is left visible, never guessed');
 });
 
 test('every code the preview answers on the census is labelled — a legacy reason here, or a readiness code in pricingIssues.ts', async () => {
@@ -143,7 +143,7 @@ test('every code the preview answers on the census is labelled — a legacy reas
   for (const p of all) {
     for (const c of [...p.reason_codes, ...p.info_codes]) codes.add(c);
     for (const m of p.models) {
-      for (const r of [...m.legacy.target.reasons, ...m.legacy.premium.reasons]) codes.add(r.code);
+      for (const r of [...m.legacy.target.reasons, ...m.legacy.extra.reasons]) codes.add(r.code);
       for (const x of m.missing) codes.add(x.code);
     }
   }
@@ -151,18 +151,18 @@ test('every code the preview answers on the census is labelled — a legacy reas
   assert.deepEqual([...codes].filter((c) => !isLegacyReasonCode(c) && !isPricingIssueCode(c)).sort(), []);
 });
 
-test('the PRODUCT status a held premium rolls up to names both values; one value’s own state names only its own (review finding 1)', () => {
-  // check (1)7: a held direct-sale premium rolls up to TARGET_PROFIT_REVIEW_REQUIRED, so the product chip must not
+test('the PRODUCT status a held Direct Sale Extra rolls up to names both values; one value’s own state names only its own (review finding 1)', () => {
+  // check (1)7: a held Direct Sale Extra rolls up to TARGET_PROFIT_REVIEW_REQUIRED, so the product chip must not
   // say only «the minimum profit needs review» above a minimum-profit card that reads «taken from the old prices».
   const product = PRICING_MIGRATION_STATUS_LABELS.TARGET_PROFIT_REVIEW_REQUIRED;
   assert.deepEqual(product, {
     ar: 'الحد الأدنى للربح أو زيادة البيع المباشر يحتاج مراجعة',
-    en: 'Minimum profit or direct-sale premium needs review',
+    en: 'Minimum profit or Direct Sale Extra needs review',
     ckb: 'کەمترین قازانج یان زیادەی فرۆشتنی ڕاستەوخۆ پێویستی بە پێداچوونەوە هەیە',
   });
   // The per-value labels are unchanged: each names its own value only.
   assert.equal(LEGACY_VALUE_STATE_LABELS.TARGET_PROFIT_REVIEW_REQUIRED.en, 'Minimum target profit needs review');
-  assert.equal(LEGACY_VALUE_STATE_LABELS.DIRECT_PREMIUM_REVIEW_REQUIRED.en, 'Direct-sale premium needs review');
+  assert.equal(LEGACY_VALUE_STATE_LABELS.DIRECT_SALE_EXTRA_REVIEW_REQUIRED.en, 'Direct Sale Extra needs review');
 });
 
 test('NO_BASE_ROUTE does not claim the routes charge different prices — it is raised for every model with more than one route and no owner choice (review finding M2)', () => {
@@ -172,14 +172,14 @@ test('NO_BASE_ROUTE does not claim the routes charge different prices — it is 
   assert.match(LEGACY_REASONS.NO_BASE_ROUTE.label.en, /^Pre-order has more than one route; choose the base route/);
 });
 
-test('one Arabic word for the direct-sale premium on every pricing screen: «زيادة البيع المباشر», never «علاوة» (review finding 4; DECISIONS rows 70, 90)', () => {
+test('one Arabic word for the Direct Sale Extra on every pricing screen: «زيادة البيع المباشر», never «علاوة» (review finding 4; DECISIONS rows 70, 90)', () => {
   const labels: Array<[string, string]> = [
     ...Object.entries(PRICING_ISSUES).map(([k, v]) => [`issue.${k}`, v.label.ar] as [string, string]),
     ...Object.entries(PRICING_FIELD_LABELS).map(([k, v]) => [`field.${k}`, (v as PricingLabel).ar] as [string, string]),
     ...ALL.map(([k, v]) => [k, v.ar] as [string, string]),
-    ['refusal.PREMIUM_NOT_ON_STEP', COST_REFUSALS.PREMIUM_NOT_ON_STEP.ar],
+    ['refusal.DIRECT_SALE_EXTRA_NOT_ON_STEP', COST_REFUSALS.DIRECT_SALE_EXTRA_NOT_ON_STEP.ar],
   ];
   for (const [key, ar] of labels) assert.doesNotMatch(ar, /علاوة/, `${key}: «${ar}»`);
-  assert.equal(PRICING_FIELD_LABELS.direct_premium_iqd.ar, 'زيادة البيع المباشر');
-  assert.equal(PRICING_ISSUES.DIRECT_PREMIUM_BLOCKED.label.ar, 'زيادة البيع المباشر موقوفة حتى تقرر');
+  assert.equal(PRICING_FIELD_LABELS.direct_sale_extra_iqd.ar, 'زيادة البيع المباشر');
+  assert.equal(PRICING_ISSUES.DIRECT_SALE_EXTRA_BLOCKED.label.ar, 'زيادة البيع المباشر موقوفة حتى تقرر');
 });

@@ -1,6 +1,6 @@
 /**
  * Most-specific-wins resolution of the owner's two pricing rules — the fixed IQD
- * target profit and the direct-sale premium (owner decisions 3 and 4; master plan
+ * target profit and the Direct Sale Extra (owner decisions 3 and 4; master plan
  * v2 §2.3, C34, C40; packages/pricing/src/ruleResolution.ts):
  *
  *     sku > color > option > product > category (nearest ancestor first) > global
@@ -111,10 +111,10 @@ test('INHERIT is treated as absent; BLOCKED stops the walk', () => {
   assert.equal(blocked.rule.id, 'held');
   // A more specific ACTIVE rule still decides above a BLOCKED one.
   assert.equal(amountOf(resolveRuleAt([rule('sku', 300_000), rule('product', null)], 'target_profit', TARGET)), 300_000);
-  // The premium kind has its own code.
-  const premium = resolveRuleAt([rule('product', null, { kind: 'direct_premium' })], 'direct_premium', TARGET);
-  assert.ok(premium.status === 'blocked');
-  assert.equal(premium.code, 'DIRECT_PREMIUM_BLOCKED');
+  // The Direct Sale Extra kind has its own code.
+  const extra = resolveRuleAt([rule('product', null, { kind: 'direct_sale_extra' })], 'direct_sale_extra', TARGET);
+  assert.ok(extra.status === 'blocked');
+  assert.equal(extra.code, 'DIRECT_SALE_EXTRA_BLOCKED');
 });
 
 test('a tie inside one scope takes the maximum and reports RULE_TIE; a BLOCKED rule in that scope wins', () => {
@@ -177,35 +177,35 @@ test('rules addressed elsewhere never apply: another product, another SKU, anoth
     rule('sku', 999_000, { scope_id: 'o:ov_standalone' }),
     rule('color', 999_000, { scope_id: 'col_black' }),
     rule('option', 999_000, { scope_id: 'ov_standalone' }),
-    rule('product', 50_000, { kind: 'direct_premium' }),
+    rule('product', 50_000, { kind: 'direct_sale_extra' }),
     rule('global', 100_000),
   ];
   assert.equal(amountOf(resolveRuleAt(rules, 'target_profit', TARGET)), 100_000);
-  assert.equal(amountOf(resolveRuleAt(rules, 'direct_premium', TARGET)), 50_000);
+  assert.equal(amountOf(resolveRuleAt(rules, 'direct_sale_extra', TARGET)), 50_000);
   // The product itself (combo '') is never matched by a SKU or colour rule.
   const productItself: RuleTarget = { product_id: PRODUCT, combo_key: '', option_value_ids: [], color_id: null, ancestry: [] };
   assert.equal(amountOf(resolveRuleAt([rule('sku', 1_000, { scope_id: '' }), rule('color', 2_000, { scope_id: '' }), rule('product', 3_000)], 'target_profit', productItself)), 3_000);
 });
 
-test('nothing anywhere → TARGET_PROFIT_MISSING / DIRECT_PREMIUM_MISSING (no invented default)', () => {
+test('nothing anywhere → TARGET_PROFIT_MISSING / DIRECT_SALE_EXTRA_MISSING (no invented default)', () => {
   const t = resolveRuleAt([], 'target_profit', TARGET);
   assert.deepEqual(t, { status: 'missing', kind: 'target_profit', code: 'TARGET_PROFIT_MISSING' });
-  const p = resolveRuleAt([rule('global', 100_000)], 'direct_premium', TARGET);
-  assert.deepEqual(p, { status: 'missing', kind: 'direct_premium', code: 'DIRECT_PREMIUM_MISSING' });
+  const p = resolveRuleAt([rule('global', 100_000)], 'direct_sale_extra', TARGET);
+  assert.deepEqual(p, { status: 'missing', kind: 'direct_sale_extra', code: 'DIRECT_SALE_EXTRA_MISSING' });
 });
 
-test('amounts: a premium of 0 is real; an ACTIVE amount the CHECKs refuse fails closed as BLOCKED, never falls back', () => {
-  const zero = resolveRuleAt([rule('product', 0, { kind: 'direct_premium' }), rule('global', 50_000, { kind: 'direct_premium' })], 'direct_premium', TARGET);
+test('amounts: an extra of 0 is real; an ACTIVE amount the CHECKs refuse fails closed as BLOCKED, never falls back', () => {
+  const zero = resolveRuleAt([rule('product', 0, { kind: 'direct_sale_extra' }), rule('global', 50_000, { kind: 'direct_sale_extra' })], 'direct_sale_extra', TARGET);
   assert.equal(amountOf(zero), 0);
   for (const bad of [0, -1, 1.5, MAX_RULE_AMOUNT_IQD + 1, Number.NaN]) {
     const got = resolveRuleAt([rule('product', bad), rule('global', 100_000)], 'target_profit', TARGET);
     assert.equal(got.status, 'blocked', `target ${bad}`);
   }
-  assert.equal(resolveRuleAt([rule('product', -1000, { kind: 'direct_premium' })], 'direct_premium', TARGET).status, 'blocked');
+  assert.equal(resolveRuleAt([rule('product', -1000, { kind: 'direct_sale_extra' })], 'direct_sale_extra', TARGET).status, 'blocked');
   assert.equal(resolveRuleAt([rule('product', null, { state: 'ACTIVE' })], 'target_profit', TARGET).status, 'blocked', 'ACTIVE without an amount');
   assert.equal(isValidRuleAmount('target_profit', 1), true);
   assert.equal(isValidRuleAmount('target_profit', 0), false);
-  assert.equal(isValidRuleAmount('direct_premium', 0), true);
+  assert.equal(isValidRuleAmount('direct_sale_extra', 0), true);
 });
 
 test('the deciding row is stamped with id, version, scope and source (dependency stamps of pricing_sku_costs)', () => {

@@ -11,7 +11,7 @@
  *     and every other key new to this router is in PRIVATE_NON_FINANCIAL with
  *     its reason (tests/financialFieldsUnion.test.ts walks these answers);
  *   - a rule is named by its kind — `{kind: 'target_profit', target_profit_iqd}`
- *     or `{kind: 'direct_premium', direct_premium_iqd}` — never `amount_iqd`;
+ *     or `{kind: 'direct_sale_extra', direct_sale_extra_iqd}` — never `amount_iqd`;
  *   - decimals stay exact TEXT; whole IQD stay integers.
  */
 import type { PricingRuleRow } from '@levonis/pricing/ruleResolution';
@@ -89,7 +89,7 @@ export function overviewDto(all: readonly ProductEvaluation[], page: number, typ
 
 const reasonCodes = (rs: readonly LegacyReason[]) => rs.map((r) => r.code);
 
-/** Reasons with their figures (`ROUTE_FEE_INCLUDED` route and fee, the off-step premium). */
+/** Reasons with their figures (`ROUTE_FEE_INCLUDED` route and fee, the off-step Direct Sale Extra). */
 const reasonsWithFigures = (rs: readonly LegacyReason[]) =>
   rs
     .filter((r) => r.route !== undefined || r.iqd !== undefined)
@@ -112,10 +112,10 @@ function channelDto(c: ChannelToday) {
 }
 
 const targetCandidates = (cs: readonly LegacyCandidate[]) => cs.map((c) => ({ kind: c.kind, route: c.route, target_profit_iqd: c.value_iqd }));
-const premiumCandidates = (cs: readonly LegacyCandidate[]) => cs.map((c) => ({ kind: c.kind, route: c.route, direct_premium_iqd: c.value_iqd }));
+const extraCandidates = (cs: readonly LegacyCandidate[]) => cs.map((c) => ({ kind: c.kind, route: c.route, direct_sale_extra_iqd: c.value_iqd }));
 
 function modelDto(m: ModelEvaluation) {
-  const { target, premium } = m.legacy;
+  const { target, extra } = m.legacy;
   return {
     option_id: m.option_id,
     ...names(m.option),
@@ -129,12 +129,12 @@ function modelDto(m: ModelEvaluation) {
       reason_figures: reasonsWithFigures(target.reasons),
       candidates: targetCandidates(target.candidates),
     },
-    premium: {
-      migration_state: premium.state,
-      direct_premium_iqd: premium.value_iqd,
-      reason_codes: reasonCodes(premium.reasons),
-      reason_figures: reasonsWithFigures(premium.reasons),
-      candidates: premiumCandidates(premium.candidates),
+    direct_sale_extra: {
+      migration_state: extra.state,
+      direct_sale_extra_iqd: extra.value_iqd,
+      reason_codes: reasonCodes(extra.reasons),
+      reason_figures: reasonsWithFigures(extra.reasons),
+      candidates: extraCandidates(extra.candidates),
     },
     roundtrip_ok: m.legacy.roundtrip_ok,
     suggested_measures: {
@@ -155,7 +155,7 @@ export function ruleDto(r: PricingRuleRow) {
   const base = { scope: r.scope, scope_id: r.scope_id, state: r.state, source: r.source ?? 'LEGACY_MIGRATION' };
   return r.kind === 'target_profit'
     ? { kind: 'target_profit' as const, ...base, target_profit_iqd: r.amount_iqd }
-    : { kind: 'direct_premium' as const, ...base, direct_premium_iqd: r.amount_iqd };
+    : { kind: 'direct_sale_extra' as const, ...base, direct_sale_extra_iqd: r.amount_iqd };
 }
 
 export function productDetailDto(p: ProductEvaluation, ref: RateReference) {
@@ -196,7 +196,7 @@ export function whatIfDto(r: WhatIfResult) {
         shipping_cost_iqd: c.price?.shipping_cost_iqd ?? null,
         additional_cost_iqd: c.price?.additional_cost_iqd ?? null,
         target_profit_iqd: c.price?.target_profit_iqd ?? null,
-        direct_premium_iqd: c.price?.direct_premium_iqd ?? null,
+        direct_sale_extra_iqd: c.price?.direct_sale_extra_iqd ?? null,
         preorder_base_iqd: c.price?.preorder_base_iqd ?? null,
         rounding_added_iqd: c.price?.rounding_added_iqd ?? null,
         shipping_profile: c.price?.shipping_profile ?? null,
