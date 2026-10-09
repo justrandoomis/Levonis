@@ -32,6 +32,7 @@ import { scanFeedback } from '../../scanner/feedback';
 import type { ScanRead } from '../../scanner/BarcodeScanner';
 import { serialStrings } from './strings';
 import { newOpId, overrideFor, serialRefusal, serialsApi, shortDate, type ReadPayload } from './serialsApi';
+import { formatNoteTexts, hasFormatNotes } from './formatNotes';
 import { WedgeTracker, isTerminator } from './wedge';
 import type { LinkResult, OverrideKind, ScanTarget } from './types';
 
@@ -140,7 +141,9 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
       // The light tap and the chime ride the server's answer, never the read.
       scanFeedback('added');
       onLinked(res, payload);
-      if (res.warnings.length === 0) closeTimer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
+      // A format note (owner decision 2: the brand's rule accepted it with a
+      // warning) is a warning too, and stays until «تم».
+      if (res.warnings.length === 0 && !hasFormatNotes(res)) closeTimer.current = window.setTimeout(onClose, CLOSE_AFTER_SUCCESS_MS);
     },
     [onClose, onLinked]
   );
@@ -172,6 +175,10 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
 
   const onRead = useCallback(
     (r: ScanRead) => {
+      // A lone box-shaped read goes as the code: the SERVER reads it by the
+      // line's rule (owner decision 2) — under Bambu Lab's it is a box number
+      // (its known device, else BOX_ONLY); under any other brand's it is the
+      // serial itself, linked with a warning.
       const code = r.productSn ?? r.boxSn ?? r.receipt ?? '';
       if (!code) return;
       void submit({ code, ean: r.ean, box_sn: r.productSn ? r.boxSn : null, source: 'camera' });
@@ -231,7 +238,7 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
   // the focus, so Enter / Space re-arms and a screen reader lands on the verdict.
   useEffect(() => {
     if (phase === 'refused' && !overrideOpen) afterFrame(() => scanAgainRef.current?.focus({ preventScroll: true }));
-    if (phase === 'done' && result && result.warnings.length > 0) afterFrame(() => doneRef.current?.focus({ preventScroll: true }));
+    if (phase === 'done' && result && (result.warnings.length > 0 || hasFormatNotes(result))) afterFrame(() => doneRef.current?.focus({ preventScroll: true }));
     if (phase === 'scan' && rescanCamera.current) {
       rescanCamera.current = false;
       afterFrame(() => useReaderRef.current?.focus({ preventScroll: true }));
@@ -350,7 +357,12 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
                   {s.warnings[w] ?? w}
                 </p>
               ))}
-              {result.warnings.length > 0 && (
+              {formatNoteTexts(result.format?.warnings, lang).map((line) => (
+                <p key={line} className="mt-1 text-[12px] text-warning" data-serial-format-note>
+                  {line}
+                </p>
+              ))}
+              {(result.warnings.length > 0 || hasFormatNotes(result)) && (
                 <button
                   ref={doneRef}
                   type="button"

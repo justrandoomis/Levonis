@@ -38,7 +38,7 @@ import { primeScannerAudio, scanFeedback, type ScanFeedback } from '../../scanne
 import type { ScanRead } from '../../scanner/BarcodeScanner';
 import ManualEntry from './ManualEntry';
 import LinkProductDialog, { type LinkTarget } from './LinkProductDialog';
-import { inventoryApi, problemText, refusalText, type InventoryRow, type InventoryStrings } from './model';
+import { inventoryApi, noteTexts, problemText, refusalText, type InventoryRow, type InventoryStrings } from './model';
 
 const BarcodeScanner = React.lazy(() => import('../../scanner/BarcodeScanner'));
 
@@ -62,6 +62,8 @@ interface SessionItem {
   hint: string | null;
   needsProduct: boolean;
   problem: string | null;
+  /** The brand's format rule's notes (owner decision 2), in the reader's language: amber on an added row. */
+  notes?: string[];
   /** A repeat of a serial this session already registered. */
   repeat?: boolean;
 }
@@ -123,6 +125,28 @@ export default function AddSerialsPanel({
   const [chosen, setChosen] = useState<{ id: string; name: string }>({ id: '', name: '' });
   const filingRef = useRef({ mode: filingMode, id: chosen.id });
   filingRef.current = { mode: filingMode, id: chosen.id };
+  /**
+   * OWNER DECISION 2 — the chosen product's serial format rule. A label read
+   * with ONLY a Bambu-box-shaped code is a box number under a Bambu rule
+   * (dropped, as before), but another brand's serial of that shape is the
+   * serial itself. Unknown (no product chosen, not loaded, an older server):
+   * the Bambu reading, today's.
+   */
+  const chosenBoxShape = useRef<'bambu' | 'none'>('bambu');
+  useEffect(() => {
+    chosenBoxShape.current = 'bambu';
+    if (filingMode !== 'chosen' || !chosen.id) return;
+    let live = true;
+    inventoryApi
+      .ruleFor(chosen.id)
+      .then((r) => {
+        if (live && r.installed) chosenBoxShape.current = r.public.box_sn_shape === 'none' ? 'none' : 'bambu';
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [filingMode, chosen.id]);
 
   const [items, setItems] = useState<SessionItem[]>([]);
   const itemsRef = useRef(items);
@@ -185,6 +209,7 @@ export default function AddSerialsPanel({
           hint: res.hint?.label ?? res.row?.model_hint ?? null,
           needsProduct: state === 'added' && !!res.needs_product,
           problem: res.problem ?? null,
+          notes: noteTexts(lang, res.warnings),
         });
         return toFeedback(state);
       } catch (e) {
@@ -197,7 +222,16 @@ export default function AddSerialsPanel({
 
   const onRead = useCallback(
     (read: ScanRead): ScanFeedback | Promise<ScanFeedback> => {
-      if (!read.productSn) return 'invalid';
+      if (!read.productSn) {
+        // A lone box-shaped read: the serial itself when the chosen product's
+        // rule does not name the Bambu box shape (owner decision 2) — the
+        // server judges it again under that rule.
+        const f = filingRef.current;
+        if (read.boxSn && f.mode === 'chosen' && f.id && chosenBoxShape.current === 'none') {
+          return register({ serial: read.boxSn, box_sn: '', ean: read.ean ?? '' });
+        }
+        return 'invalid';
+      }
       return register({ serial: read.productSn, box_sn: read.boxSn ?? '', ean: read.ean ?? '' });
     },
     [register]
@@ -334,6 +368,11 @@ export default function AddSerialsPanel({
             )}
             {(last.state === 'invalid' || last.state === 'error') && last.problem && (
               <p className="mt-0.5 text-[12px] text-[var(--ap-text-2)]">{problemText(t, lang, last.problem) ?? last.problem}</p>
+            )}
+            {last.notes && last.notes.length > 0 && (
+              <p className={`mt-0.5 text-[12px] ${last.state === 'added' ? 'text-[var(--ap-warning)]' : 'text-[var(--ap-text-2)]'}`} data-serial-format-note>
+                {last.notes.join(' ')}
+              </p>
             )}
             {last.state === 'added' && last.needsProduct && (
               <button

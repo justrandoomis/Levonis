@@ -34,6 +34,7 @@ import { decodeLuminance, rgbaToLuminance } from '../src/components/scanner/zxin
 import { CodeWindow, LABEL_REGIONS, cropLuminance } from '../src/components/scanner/decodeEngine';
 import { blank, code128Modules, drawModules, ean13Modules, type Luma } from './fixtures/barcodeImages';
 import { ROOT } from './fixtures/d1';
+import { looksLikeBoxSn } from '../src/components/adminOrders/serials/serialsApi';
 
 const SN = '03919D580607841';
 const BOX = 'B07119G5811000AB';
@@ -233,4 +234,17 @@ test('a printed prefix with only a space («SN 0391…») is stripped like «SN:
   assert.equal(classifyLabel([{ text: `SN ${SN}` }, { text: BOX }]).productSn, SN);
   // A separator is required: a serial that merely starts with S and N is kept whole.
   assert.deepEqual(classifyCode({ text: 'SN1234ABCD' }), { kind: 'serial', value: 'SN1234ABCD' });
+});
+
+test('a LONE code shaped like a Bambu box number (owner decision 2): a box SN under the Bambu reading, the serial itself under any other brand\'s rule', () => {
+  // The camera reads only one code: what it is depends on whose label it is.
+  assert.deepEqual(classifyLabel([{ text: BOX }]), { productSn: null, boxSn: BOX, ean: null, receipt: null }, 'the reader keeps today\'s reading');
+  assert.deepEqual(classifyCode({ text: BOX }, { boxShape: 'none' }), { kind: 'serial', value: BOX }, 'a Snapmaker / Creality / generic rule: the device');
+  assert.deepEqual(classifyCode({ text: BOX }, { boxShape: 'bambu' }), { kind: 'box_sn', value: BOX });
+  // Not every B-word is a box: a lone serial that does not have the shape is the serial under any rule.
+  assert.deepEqual(classifyCode({ text: 'BX1234567' }, { boxShape: 'bambu' }), { kind: 'serial', value: 'BX1234567' });
+  // The screens' own helper follows the slot's rule (src/components/adminOrders/serials/serialsApi.ts).
+  assert.equal(looksLikeBoxSn(BOX), true);
+  assert.equal(looksLikeBoxSn(`SN ${BOX}`, 'bambu'), true);
+  assert.equal(looksLikeBoxSn(BOX, 'none'), false, 'another brand: the reader moves on to the next unit');
 });

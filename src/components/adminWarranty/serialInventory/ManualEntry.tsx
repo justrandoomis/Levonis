@@ -19,7 +19,8 @@ import { Segmented } from '../../ui/Segmented';
 import { serialProblem } from '../../../../packages/catalog/src/deviceSerials';
 import { scanFeedback } from '../../scanner/feedback';
 import FilingFields, { EMPTY_FILING, type FilingState } from './FilingFields';
-import { inventoryApi, problemText, refusalText, type InventoryStrings, type PreviewOutcome, type PreviewResponse } from './model';
+import { inventoryApi, noteTexts, problemText, refusalText, type InventoryStrings, type PreviewOutcome, type PreviewResponse } from './model';
+import { serialStrings } from '../../adminOrders/serials/strings';
 
 type Mode = 'single' | 'bulk';
 
@@ -56,6 +57,8 @@ export default function ManualEntry({
   const [one, setOne] = useState({ serial: '', box_sn: '', ean: '' });
   const [oneBusy, setOneBusy] = useState(false);
   const [oneError, setOneError] = useState<string | null>(null);
+  // Owner decision 2: the brand's format rule accepted the serial with a note (amber).
+  const [oneNote, setOneNote] = useState<string | null>(null);
 
   // ---- list
   const [text, setTextRaw] = useState('');
@@ -79,6 +82,7 @@ export default function ManualEntry({
     }
     setOneBusy(true);
     setOneError(null);
+    setOneNote(null);
     try {
       // The camera's door: with no product chosen, the typed EAN or model
       // name files it («A1 Combo» → its one catalogue product), never «بلا منتج»
@@ -88,6 +92,7 @@ export default function ManualEntry({
         scanFeedback('added');
         const p = res.row?.product;
         toast.success(p ? t.addedUnder((lang === 'en' ? p.name || p.name_ar : p.name_ar || p.name) || p.id) : t.addedNoProduct);
+        setOneNote(noteTexts(lang, res.warnings).join(' ') || null);
         setOne({ serial: '', box_sn: '', ean: '' });
         onSaved();
       } else if (res.outcome === 'exists') {
@@ -96,7 +101,8 @@ export default function ManualEntry({
         setOneError(`${t.alreadyRegistered}${at}`);
       } else {
         scanFeedback('invalid');
-        setOneError((res.problem && problemText(t, lang, res.problem)) || t.notASerial);
+        const why = res.problem === 'SERIAL_FORMAT_MISMATCH' ? noteTexts(lang, res.warnings).join(' ') : '';
+        setOneError([(res.problem && problemText(t, lang, res.problem)) || t.notASerial, why].filter(Boolean).join(' — '));
       }
     } catch (err) {
       setOneError(refusalText(err, t, lang));
@@ -194,6 +200,11 @@ export default function ManualEntry({
               {oneError}
             </p>
           )}
+          {oneNote && !oneError && (
+            <p role="status" className="sm:col-span-2 text-[12.5px] text-[var(--ap-warning)]" data-serial-format-note>
+              <span className="font-semibold">{serialStrings(lang).formatTitle}:</span> {oneNote}
+            </p>
+          )}
           <button type="submit" className={`${T.btnPrimary} sm:col-span-2 min-h-[46px] w-full`} disabled={oneBusy || !one.serial.trim()}>
             <Plus className="w-4 h-4" aria-hidden />
             {oneBusy ? t.committing : t.addOne}
@@ -267,6 +278,11 @@ export default function ManualEntry({
                           {(r.problem || r.duplicate_of) && (
                             <span className="ms-2 text-[11.5px] text-[var(--ap-text-3)]">
                               {r.problem ? problemText(t, lang, r.problem) ?? r.problem : t.duplicateOf(r.duplicate_of as number)}
+                            </span>
+                          )}
+                          {r.warnings && r.warnings.length > 0 && (
+                            <span className={`block mt-1 text-[11.5px] ${r.problem ? 'text-[var(--ap-danger)]' : 'text-[var(--ap-warning)]'}`} data-serial-format-note>
+                              {noteTexts(lang, r.warnings).join(' ')}
                             </span>
                           )}
                         </td>

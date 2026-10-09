@@ -106,7 +106,10 @@ test('no auto-advance after a BOX SN — the device serial of that box comes nex
   assert.equal(looksLikeBoxSn('03919D580607841'), false);
   assert.equal(looksLikeBoxSn('6975337035185'), false, 'an EAN is not a box SN (the server refuses it outright)');
   const slots = read('src/components/adminOrders/serials/UnitSerialSlots.tsx');
-  assert.match(slots, /source !== 'relink' && !looksLikeBoxSn\(text\) \? nextEmpty\(key\) : null/, 'focus moves on only when the value is not a box SN');
+  // Owner decision 2: «a box SN» under the slot's own rule — the Bambu reading
+  // unless the product's brand names no box shape (then it is the serial).
+  assert.match(slots, /source !== 'relink' && !looksLikeBoxSn\(text, boxShape\) \? nextEmpty\(key\) : null/, 'focus moves on only when the value is not a box SN');
+  assert.match(slots, /const boxShape = slot\.rule\?\.box_sn_shape \?\? 'bambu';/, 'an older server (no rule) keeps the Bambu reading');
 });
 
 // ------------------------------------------------- owner exceptions (§11)

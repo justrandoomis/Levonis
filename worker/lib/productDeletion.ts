@@ -150,6 +150,12 @@ export const OWNED_TABLES: OwnedTable[] = [
   // the exact class of residue this registry exists to prevent. Tier-wide and
   // category rules carry no product_id and are untouched.
   { table: 'membership_benefit_rules', by: { column: 'product_id' } },
+  // A serial format rule SCOPED TO THIS PRODUCT (migration 0181, owner
+  // decision 2) is the product's own configuration, for the same reason as
+  // the benefit rule above: left behind, the next product to take this id
+  // would be judged by a format nobody wrote for it. Brand rules carry no
+  // product_id and are untouched; the rule's history stays in audit_log.
+  { table: 'serial_brand_rules', by: { sql: "scope = 'product' AND product_id = ?1" } },
   // ---- customer state that must not become a ghost -----------------------
   { table: 'favorites', by: { column: 'product_id' } },
   // Before `cart_items`, and by BOTH routes into it: a choice row can name this

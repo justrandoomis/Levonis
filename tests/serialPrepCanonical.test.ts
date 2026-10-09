@@ -18,6 +18,14 @@ import { world, order, op, SN, SN2, SN3, BOX, EAN, USERS } from './fixtures/seri
 import { adminOrderSerialRoutes } from '../worker/routes/adminOrderSerials';
 import { classifyScanInput, stripSerialPrefix } from '../worker/lib/serialAssignments';
 import { classifyCode } from '../packages/catalog/src/deviceSerials';
+import { GENERIC_RULE, LEGACY_RULE } from '../packages/catalog/src/serialRules';
+import { ruleFromRow, type RuleRow } from '../worker/lib/serialRules';
+
+/** The Bambu Lab rule exactly as migration 0181 seeds it (owner decision 2). */
+const bambuRule = () => {
+  const w = world();
+  return ruleFromRow(row<RuleRow>(w.raw, "SELECT * FROM serial_brand_rules WHERE id = 'sbr_bambu_lab'")!);
+};
 
 type W = ReturnType<typeof world>;
 const scanBody = (item: string, unit: number, code: string, extra: Record<string, unknown> = {}) => ({
@@ -65,15 +73,24 @@ test('H1 the pure rule: one device in every written form is one key; what is not
   assert.equal((classifyScanInput('SNOW12345678') as { norm: string }).norm, 'SNOW12345678');
   assert.equal(stripSerialPrefix('SN '), 'SN', 'a bare prefix is not stripped down to nothing');
 
-  for (const [code, problem, what] of NOT_A_DEVICE) {
-    const c = classifyScanInput(code);
-    if (problem === 'BOX_ONLY') {
-      assert.deepEqual(c, { kind: 'box_sn', box: BOX }, what);
-      assert.deepEqual(classifyScanInput(`SN ${BOX}`), { kind: 'box_sn', box: BOX }, 'a box SN behind the whitespace prefix is still a box SN');
-    } else {
-      assert.deepEqual(c, { kind: 'invalid', problem }, what);
+  // Owner decision 2: the box-number shape is a box SN only under a rule that
+  // names it — Bambu Lab's seed, and LEGACY_RULE (today's reading, before 0181).
+  // Every other value is judged the same under every rule.
+  const bambu = bambuRule();
+  for (const rule of [bambu, LEGACY_RULE, GENERIC_RULE]) {
+    for (const [code, problem, what] of NOT_A_DEVICE) {
+      const c = classifyScanInput(code, rule);
+      if (problem === 'BOX_ONLY' && rule === GENERIC_RULE) {
+        assert.deepEqual(c, { kind: 'serial', norm: BOX, raw: BOX }, `${what}: another brand's serial of that shape (generic rule)`);
+      } else if (problem === 'BOX_ONLY') {
+        assert.deepEqual(c, { kind: 'box_sn', box: BOX }, `${what} (${rule.id})`);
+        assert.deepEqual(classifyScanInput(`SN ${BOX}`, rule), { kind: 'box_sn', box: BOX }, 'a box SN behind the whitespace prefix is still a box SN');
+      } else {
+        assert.deepEqual(c, { kind: 'invalid', problem }, `${what} (${rule.id})`);
+      }
     }
   }
+  assert.deepEqual(classifyScanInput(BOX), { kind: 'box_sn', box: BOX }, 'no rule named: today\'s reading');
   assert.deepEqual(classifyScanInput(''), { kind: 'invalid', problem: 'SERIAL_EMPTY' });
   assert.deepEqual(classifyScanInput(null), { kind: 'invalid', problem: 'SERIAL_EMPTY' });
   assert.deepEqual(classifyScanInput({ toString: () => EAN }), { kind: 'invalid', problem: 'SERIAL_LOOKS_LIKE_EAN' }, 'whatever arrives is read as text');

@@ -172,8 +172,10 @@ type AdminTab =
  * (`?tab=wallet_requests&op=…`). Read once, for the first render only; anything
  * else opens the overview. Existing financial links without a parent tab
  * reopen finance, preserving their report section and date range.
+ * `?tab=products&edit=<id>` opens one product's editor — the link from
+ * «صيغ الأرقام التسلسلية» (owner decision 2) to a product with no brand.
  */
-const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'finance', 'inventory', 'earnings', 'pricing'];
+const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'finance', 'inventory', 'earnings', 'pricing', 'products'];
 
 function initialAdminTab(): AdminTab {
   try {

@@ -12,7 +12,12 @@
  *
  * Products: pA1 «Bambu Lab A1 Combo» and pX2D «Bambu Lab X2D Combo» filed
  * under a printer catalog; pAMS «Bambu Lab AMS Lite» under an AMS section of
- * the accessories; pPLA a filament.
+ * the accessories; pPLA a filament. The three Bambu products carry the
+ * Bambu Lab brand (`brd_bambu`, slug `bambu-lab`), and the migration's Bambu
+ * seed rule (0181, owner decision 2) is bound to it as the live database will
+ * be — so the Bambu box-number refusal and family check keep judging them.
+ * A database built before 0181 (`through`) has no rule table: every product
+ * is judged by today's rule there.
  */
 import type { DatabaseSync } from 'node:sqlite';
 import { readdirSync } from 'node:fs';
@@ -29,6 +34,7 @@ import { warrantyAdminRoutes } from '../../worker/routes/warranty';
 import { adminProductsRoutes } from '../../worker/routes/adminProducts';
 import { orderRoutes } from '../../worker/routes/orders';
 import { adminStockOperationsRoutes } from '../../worker/routes/adminStockOperations';
+import { adminSerialRulesRoutes } from '../../worker/routes/adminSerialRules';
 
 /**
  * The serial-scan migration's own file, found by NAME: it lands under
@@ -42,6 +48,19 @@ export const SERIAL_MIGRATION = (() => {
 })();
 /** The database one migration before it — what a deploy-ahead Worker runs against (`dbThrough`). */
 export const BEFORE_SERIALS = String(Number(SERIAL_MIGRATION.slice(0, 4)) - 1).padStart(4, '0');
+
+/**
+ * The serial-format-rules migration (owner decision 2), found by NAME for the
+ * same reason: it is 0181 on top of FX-1's 0179, and lands under whatever
+ * number is free if another migration lands first.
+ */
+export const RULES_MIGRATION = (() => {
+  const f = readdirSync(join(ROOT, 'migrations')).find((x) => /^\d{4}_serial_brand_rules\.sql$/.test(x));
+  if (!f) throw new Error('migrations/NNNN_serial_brand_rules.sql is missing');
+  return f;
+})();
+/** Every migration before it — the database a deploy-ahead Worker runs against before the rules land. */
+export const BEFORE_RULES = String(Number(RULES_MIGRATION.slice(0, 4)) - 1).padStart(4, '0');
 
 export const SN = '03919D580607841';
 export const SN2 = '03919D580607842';
@@ -68,14 +87,27 @@ export function seed(raw: DatabaseSync) {
       ('ct_acc', NULL, 'sp-acc', 'ملحقات', 'Accessories', 0),
       ('ct_ams', 'ct_acc', 'sp-ams', 'AMS', 'AMS', 0),
       ('ct_fil', 'ct_acc', 'sp-fil', 'خيوط', 'Filament', 0);
-    INSERT INTO products (id,slug,name,name_ar,price_iqd,ops_policy) VALUES
-      ('pA1','sp-a1','Bambu Lab A1 Combo','طابعة A1 كومبو',899000,'{}'),
-      ('pX2D','sp-x2d','Bambu Lab X2D Combo','طابعة X2D',2899000,'{}'),
-      ('pAMS','sp-ams-lite','Bambu Lab AMS Lite','AMS لايت',399000,'{}'),
-      ('pPLA','sp-pla','PLA spool','خيط PLA',25000,'{}');
+    INSERT INTO brands (id, slug, name_ar, name_en, name_ckb) VALUES ('brd_bambu','bambu-lab','بامبو لاب','Bambu Lab','بامبو لاب');
+    INSERT INTO products (id,slug,name,name_ar,price_iqd,ops_policy,brand_id) VALUES
+      ('pA1','sp-a1','Bambu Lab A1 Combo','طابعة A1 كومبو',899000,'{}','brd_bambu'),
+      ('pX2D','sp-x2d','Bambu Lab X2D Combo','طابعة X2D',2899000,'{}','brd_bambu'),
+      ('pAMS','sp-ams-lite','Bambu Lab AMS Lite','AMS لايت',399000,'{}','brd_bambu'),
+      ('pPLA','sp-pla','PLA spool','خيط PLA',25000,'{}',NULL);
     INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES
       ('pA1','ct_print',1), ('pX2D','ct_print',2), ('pAMS','ct_ams',1), ('pPLA','ct_fil',1);
   `);
+  bindBambuSeed(raw);
+}
+
+/**
+ * The 0181 seed binds itself to a `bambu-lab` brand that exists WHEN THE
+ * MIGRATION RUNS; a test database gets its brands afterwards, so this binds
+ * it the way the owner's one tap («اربطها بعلامة تجارية») would. A no-op on a
+ * database built before 0181.
+ */
+export function bindBambuSeed(raw: DatabaseSync, brandId = 'brd_bambu') {
+  const has = raw.prepare("SELECT 1 AS x FROM sqlite_master WHERE type='table' AND name='serial_brand_rules'").get();
+  if (has) raw.prepare("UPDATE serial_brand_rules SET brand_id = ? WHERE id = 'sbr_bambu_lab' AND brand_id IS NULL").run(brandId);
 }
 
 export interface LineSpec {
@@ -120,6 +152,8 @@ export function order(
 /** The routes the serial scan touches, mounted in worker/index.ts's order. */
 export function mountSerialWorld(a: Parameters<Parameters<typeof stubApp>[2]>[0]) {
   a.route('/api/admin/orders', adminOrderSerialRoutes);
+  // 0181 (owner decision 2): the serial format rules every door above judges by.
+  a.route('/api/admin/serial-rules', adminSerialRulesRoutes);
   a.route('/api/admin/taxonomy', adminTaxonomyRoutes);
   a.route('/api/admin/warranties', warrantyAdminRoutes);
   a.route('/api/admin/products-v2', adminProductsRoutes);

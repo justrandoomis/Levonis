@@ -56,6 +56,7 @@ import { miscRoutes } from './routes/misc';
 import { adminRoutes } from './routes/admin';
 import { adminOrderPriceRoutes, orderPriceRoutes } from './routes/orderPriceAdjust';
 import { adminOrderSerialRoutes } from './routes/adminOrderSerials';
+import { adminSerialRulesRoutes } from './routes/adminSerialRules';
 import { adminTradeInRoutes, tradeInRoutes } from './routes/tradeIn';
 import { adminProductsRoutes } from './routes/adminProducts';
 import { templateRoutes } from './routes/template';
@@ -364,6 +365,9 @@ app.route('/api/admin/orders', adminOrderPriceRoutes);
 // Serials at preparation (0178): scan / change / unlink / owner override per
 // physical unit of an order (worker/lib/serialAssignments.ts).
 app.route('/api/admin/orders', adminOrderSerialRoutes);
+// Serial formats by brand and product (0181, owner decision 2): the rules every
+// serial door judges by — read by every admin, written by the owner alone.
+app.route('/api/admin/serial-rules', adminSerialRulesRoutes);
 // «الاستبدال» (0143): a delivered LEVONIS device traded against a new one —
 // the customer's wizard and requests, and the admin's review and rules.
 app.route('/api/trade-in', tradeInRoutes);

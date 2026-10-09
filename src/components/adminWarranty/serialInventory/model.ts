@@ -6,6 +6,9 @@
 import { api, ApiError } from '../../../lib/api';
 import { REFUSAL_STRINGS } from '../../../lib/refusalStrings';
 import type { BulkRowProblem } from '../../../../packages/catalog/src/deviceSerials';
+import type { SerialRule } from '../../../../packages/catalog/src/serialRules';
+import { formatNoteTexts, type FormatNoteWire } from '../../adminOrders/serials/formatNotes';
+import type { SlotRule } from '../../adminOrders/serials/types';
 
 export const INVENTORY_BASE = '/api/devices/admin/serial-inventory';
 
@@ -22,7 +25,18 @@ export const INVENTORY_BASE = '/api/devices/admin/serial-inventory';
 export const PROBLEMS_CKB: Readonly<Partial<Record<BulkRowProblem, string>>> = {
   SERIAL_LOOKS_LIKE_EAN: 'ئەمە بارکۆدی بەرهەمە (EAN)، نەک ژمارەی زنجیرەیی',
   SERIAL_LOOKS_LIKE_BOX: 'ئەمە ژمارەی سندووقە (Box SN) — «Product SN» بنووسە',
+  // Owner decision 2: the brand's format rule is in «ڕەتکردنەوە» (enforce).
+  SERIAL_FORMAT_MISMATCH: 'لەگەڵ شێوازی ژمارەی ئەم براندە ناگونجێت',
 };
+
+/**
+ * A row's format notes (owner decision 2: the brand's rule accepted it with a
+ * warning, or — with SERIAL_FORMAT_MISMATCH — why it refused it), in the
+ * reader's language: Arabic, English or Sorani (the serial-scan words).
+ */
+export function noteTexts(lang: string, notes: ReadonlyArray<FormatNoteWire> | null | undefined): string[] {
+  return formatNoteTexts(notes, lang);
+}
 
 /** One bulk-add problem in the reader's language: the Sorani above when there is one, else the panel's table. */
 export function problemText(t: InventoryStrings, lang: string, problem: string): string | undefined {
@@ -71,6 +85,8 @@ export interface PreviewRow {
   box_sn: string;
   ean: string;
   problem: BulkRowProblem | null;
+  /** The format rule's notes on this row (owner decision 2); absent from an older server. */
+  warnings?: FormatNoteWire[];
   duplicate_of: number | null;
   outcome: PreviewOutcome;
   existing_status?: InventoryStatus;
@@ -90,6 +106,8 @@ export interface PreviewResponse {
   counts: PreviewCounts;
   product: { id: string; name: string; serialized: boolean } | null;
   max_lines: number;
+  /** The rule that judged the rows and how many it warned about (owner decision 2). */
+  format?: { rule: SlotRule; warned: number; by_code: Record<string, number> };
 }
 
 export interface CommitResponse {
@@ -117,6 +135,9 @@ export interface ScanResponse {
   hint?: { brand: string; model: string; label: string; model_code: string; source: string } | null;
   needs_product?: boolean;
   serialized?: boolean | null;
+  /** The format rule's notes (owner decision 2): on an added row, warnings; with SERIAL_FORMAT_MISMATCH, the reasons. */
+  warnings?: FormatNoteWire[];
+  rule?: SlotRule;
 }
 
 export interface ScanRowInput {
@@ -178,6 +199,11 @@ export const inventoryApi = {
     api.patch<{ row: InventoryRow }>(`${INVENTORY_BASE}/${encodeURIComponent(serialNorm)}`, patch),
   setVoid: (serialNorm: string, voided: boolean, reason: string) =>
     api.post<{ row: InventoryRow }>(`${INVENTORY_BASE}/${encodeURIComponent(serialNorm)}/${voided ? 'void' : 'restore'}`, { reason }),
+  /** The format rule that judges a product's serials (owner decision 2; /api/admin/serial-rules/resolve). */
+  ruleFor: (productId: string) =>
+    api.get<{ installed: boolean; rule: SerialRule; public: SlotRule }>(
+      `/api/admin/serial-rules/resolve?${new URLSearchParams({ product_id: productId }).toString()}`
+    ),
 };
 
 // ------------------------------------------------------------------ words
@@ -288,6 +314,7 @@ export const STR = {
       SERIAL_LOOKS_LIKE_RECEIPT: 'هذا رقم وصل ضمان',
       EAN_INVALID: 'EAN غير صحيح (رقم التحقق)',
       BOX_SN_INVALID: 'رقم العلبة غير صالح',
+      SERIAL_FORMAT_MISMATCH: 'لا يطابق صيغة أرقام هذه العلامة',
     } as Record<string, string>,
     scanStart: 'ابدأ المسح',
     scanIntro: 'وجّه الكاميرا إلى ملصق العلبة: يُقرأ باركود «Product SN» ومعه رقم العلبة وEAN إن ظهرا، ويبقى المنتج المختار لكل علبة. المسح متواصل — انتقل من علبة إلى التالية.',
@@ -475,6 +502,7 @@ export const STR = {
       SERIAL_LOOKS_LIKE_RECEIPT: 'this is a warranty receipt number',
       EAN_INVALID: 'EAN check digit is wrong',
       BOX_SN_INVALID: 'invalid box SN',
+      SERIAL_FORMAT_MISMATCH: 'does not match this brand’s serial format',
     } as Record<string, string>,
     scanStart: 'Start scanning',
     scanIntro: 'Point the camera at the box label: the “Product SN” barcode is read, with the box SN and EAN when visible, and the chosen product sticks for every box. Scanning is continuous — move from one box to the next.',

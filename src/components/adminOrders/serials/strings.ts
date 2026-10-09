@@ -209,6 +209,20 @@ export interface SerialStrings {
   usedSourceDefault: string;
   /** Beside the section's serial policy: what a used device that needs a serial asks of it. */
   sectionUsedHint: string;
+  // ---- serial formats by brand and product (owner decision 2) ------------
+  /** The heading over a format rule's notes (amber): the serial was accepted, or — under `enforce` — why it was not. */
+  formatTitle: string;
+  /** One note of the serial's format rule, by code (packages/catalog/src/serialRules.ts FormatNoteCode). */
+  formatNotes: {
+    LOOKS_LIKE_BAMBU_BOX: string;
+    /** The serial's length, and what the rule expects («15 / 18», «6–40»). */
+    LENGTH_UNEXPECTED: Fmt<[number, string]>;
+    PREFIX_UNKNOWN: string;
+    CHARS_UNEXPECTED: string;
+    /** The 1-based position that does not match. */
+    POSITION_UNEXPECTED: Fmt<[number]>;
+    LOOKS_LIKE_BOX: string;
+  };
 }
 
 const ar: SerialStrings = {
@@ -441,6 +455,15 @@ const ar: SerialStrings = {
   usedSourceSection: (n) => `سياسة القسم «${n}»`,
   usedSourceDefault: 'الافتراضي',
   sectionUsedHint: 'للأجهزة المستعملة التي تحتاج رقمًا تسلسليًا (مثل AMS) اجعل سياسة قسمها «مطلوب»؛ الملحقات العادية لا تحتاجه.',
+  formatTitle: 'تنبيه صيغة الرقم',
+  formatNotes: {
+    LOOKS_LIKE_BAMBU_BOX: 'يشبه رقم علبة Bambu Lab — تأكّد أنه الرقم التسلسلي للجهاز نفسه.',
+    LENGTH_UNEXPECTED: (len, expected) => `طول غير معتاد لهذه العلامة (${len} خانة؛ المعتاد ${expected}).`,
+    PREFIX_UNKNOWN: 'بادئة غير معروفة لهذه العلامة — تحقّق من الرقم.',
+    CHARS_UNEXPECTED: 'أحرف غير متوقعة لهذه العلامة.',
+    POSITION_UNEXPECTED: (at) => `الخانة ${at} لا تطابق صيغة هذه العلامة.`,
+    LOOKS_LIKE_BOX: 'هذا رقم علبة Bambu Lab، وصيغة هذه العلامة ترفضه رقمًا تسلسليًا.',
+  },
 };
 
 const en: SerialStrings = {
@@ -673,6 +696,15 @@ const en: SerialStrings = {
   usedSourceSection: (n) => `the “${n}” section policy`,
   usedSourceDefault: 'the default',
   sectionUsedHint: 'For used devices that need a serial (such as an AMS), set their section’s policy to “Required”; ordinary accessories do not need one.',
+  formatTitle: 'Serial format note',
+  formatNotes: {
+    LOOKS_LIKE_BAMBU_BOX: 'Looks like a Bambu Lab box number — make sure it is the device’s own serial.',
+    LENGTH_UNEXPECTED: (len, expected) => `Unusual length for this brand (${len} characters; expected ${expected}).`,
+    PREFIX_UNKNOWN: 'Unknown prefix for this brand — check the number.',
+    CHARS_UNEXPECTED: 'Unexpected characters for this brand.',
+    POSITION_UNEXPECTED: (at) => `Character ${at} does not match this brand’s format.`,
+    LOOKS_LIKE_BOX: 'This is a Bambu Lab box number, and this brand’s format refuses it as a serial.',
+  },
 };
 
 const ckb: SerialStrings = {
@@ -905,6 +937,15 @@ const ckb: SerialStrings = {
   usedSourceSection: (n) => `سیاسەتی بەشی «${n}»`,
   usedSourceDefault: 'بنەڕەت',
   sectionUsedHint: 'بۆ ئامێرە بەکارهاتووەکان کە ژمارەی زنجیرەییان پێویستە (وەک AMS)، سیاسەتی بەشەکەیان بکە بە «پێویستە»؛ پاشکۆ ئاساییەکان پێویستیان پێی نییە.',
+  formatTitle: 'تێبینی شێوازی ژمارە',
+  formatNotes: {
+    LOOKS_LIKE_BAMBU_BOX: 'لە ژمارەی سندووقی Bambu Lab دەچێت — دڵنیابە کە ژمارە زنجیرەیی خودی ئامێرەکەیە.',
+    LENGTH_UNEXPECTED: (len, expected) => `درێژییەکی نائاسایی بۆ ئەم براندە (${len} پیت؛ چاوەڕوانکراو ${expected}).`,
+    PREFIX_UNKNOWN: 'سەرەتایەکی نەناسراو بۆ ئەم براندە — ژمارەکە بپشکنە.',
+    CHARS_UNEXPECTED: 'پیتی چاوەڕواننەکراو بۆ ئەم براندە.',
+    POSITION_UNEXPECTED: (at) => `پیتی ژمارە ${at} لەگەڵ شێوازی ئەم براندە ناگونجێت.`,
+    LOOKS_LIKE_BOX: 'ئەمە ژمارەی سندووقی Bambu Lab ـە، و شێوازی ئەم براندە وەک ژمارەی زنجیرەیی ڕەتی دەکاتەوە.',
+  },
 };
 
 export const SERIAL_STRINGS: Record<Language, SerialStrings> = { ar, en, ckb };

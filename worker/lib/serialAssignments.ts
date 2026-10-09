@@ -55,7 +55,9 @@ import { resolveLabelProduct, serialStatusSql, type InventoryStatus } from './se
 import { serialAssignmentsInstalled, serializationContext, lineDevicePolicy } from './serialPolicy';
 import { carriedWindow, tradedInSql, unitIdentity, warrantySourceOf } from './deviceCustody';
 import { parseConditionDoc } from './condition';
-import { classifyCode, normalizeEan, normalizeSerial, serialModelHint, serialProblem } from '@levonis/catalog/deviceSerials';
+import { BOX_SN_RE, classifyCode, normalizeEan, normalizeSerial, serialProblem } from '@levonis/catalog/deviceSerials';
+import { LEGACY_RULE, effectiveBoxShape, evaluateSerial, familyCheckOn, ruleFamily, type FormatNote, type SerialRule } from '@levonis/catalog/serialRules';
+import { formatAudit, publicRule, ruleForOrderItem, rulesForProducts, type PublicRule } from './serialRules';
 
 export { serialAssignmentsInstalled } from './serialPolicy';
 
@@ -106,6 +108,17 @@ export const SERIAL_TEXT = {
   RETURN_UNIT_MISMATCH: 'هذه الوحدة ليست وحدة مفتوحة من هذا البند.',
   // Owner decision 3 (2026-10-09): a resold device carries its original warranty; nothing restarts it.
   WARRANTY_RESTART_RETIRED: 'لا يُعاد بدء الضمان أبدًا: يبقى الضمان الأصلي مع الرقم التسلسلي من تاريخ أول تسليم (قرار المالك).',
+  // Owner decision 2 (2026-10-09; migration 0181, worker/lib/serialRules.ts):
+  // the owner's serial formats per brand and per product. A rule in `enforce`
+  // refuses a serial its format does not match; every other mismatch is a
+  // warning. The owner-only screen's own refusals follow.
+  SERIAL_FORMAT_MISMATCH: 'الرقم التسلسلي لا يطابق صيغة الأرقام التي ضبطها المالك لهذه العلامة التجارية.',
+  SERIAL_RULE_INVALID: 'قاعدة الصيغة غير صالحة: {field}.',
+  SERIAL_RULE_CHANGED: 'غيّر أحدٌ هذه القاعدة قبلك؛ أُعيد تحميلها، فراجعها واحفظ مرة أخرى.',
+  SERIAL_RULE_EXISTS: 'لهذه العلامة التجارية أو لهذا المنتج قاعدة صيغة فعّالة — عدّلها بدل إنشاء قاعدة ثانية.',
+  SERIAL_RULE_NOT_FOUND: 'لم يُعثر على قاعدة الصيغة هذه.',
+  SERIAL_RULE_TARGET_UNKNOWN: 'العلامة التجارية أو المنتج المحدد غير موجود.',
+  SERIAL_RULES_NOT_INSTALLED: 'قواعد صيغ الأرقام التسلسلية لم تُفعّل على قاعدة البيانات بعد.',
 } as const;
 export type SerialCode = keyof typeof SERIAL_TEXT;
 
@@ -211,6 +224,8 @@ export interface LineFacts {
   ops_policy: string | null;
   p_name: string | null;
   p_name_ar: string | null;
+  /** The product's brand (owner decision 2: its serial format rule is the brand's unless the product has its own). */
+  brand_id?: string | null;
   /** The listing's condition (open box / used / refurbished) — its `new_product_id` names the device's own product (S12). */
   condition_doc?: string | null;
   bundle_parent_item_id: string | null;
@@ -245,7 +260,7 @@ export async function readOrderLines(db: D1Database, orderId: string): Promise<L
       `SELECT oi.id, oi.product_id, oi.qty, COALESCE(oi.name_snapshot,'') AS name_snapshot,
               COALESCE(oi.option_snapshot,'') AS option_snapshot, COALESCE(oi.option_value_ids,'[]') AS option_value_ids,
               COALESCE(oi.color_id,'') AS color_id, oi.warranty_snapshot, p.ops_policy, p.name AS p_name, p.name_ar AS p_name_ar,
-              p.condition_doc, oi.bundle_parent_item_id,
+              p.brand_id, p.condition_doc, oi.bundle_parent_item_id,
               EXISTS (SELECT 1 FROM order_items c WHERE c.bundle_parent_item_id = oi.id) AS is_bundle_parent
          FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
         WHERE oi.order_id = ? ORDER BY oi.rowid`
@@ -334,12 +349,18 @@ export function stripSerialPrefix(text: string): string {
   return String(text ?? '').replace(/^\s*(?:product\s*)?s\s*\/?\s*n(?:\s*[:：#]\s*|\s+)(?=\S)/i, '').trim();
 }
 
-/** Pure: what one scanned or typed value is. */
-export function classifyScanInput(code: unknown): ScanInput {
+/**
+ * Pure: what one scanned or typed value is, under the format rule of the
+ * product it is scanned for (owner decision 2). A value shaped like a Bambu
+ * box number is a BOX SN only under a rule that names that shape — Bambu
+ * Lab's, or LEGACY_RULE (today's reading, the default) before migration
+ * 0181; for every other brand it is the serial itself.
+ */
+export function classifyScanInput(code: unknown, rule: SerialRule = LEGACY_RULE): ScanInput {
   const text = stripSerialPrefix(String(code ?? '').slice(0, 200));
   // `classifyCode` with no barcode format: a valid GTIN of ANY length (EAN-8,
   // UPC-A, EAN-13, ITF-14) is a product code, never a device.
-  const c = classifyCode({ text });
+  const c = classifyCode({ text }, { boxShape: effectiveBoxShape(rule) });
   if (c.kind === 'receipt') return { kind: 'invalid', problem: 'SERIAL_LOOKS_LIKE_RECEIPT' };
   if (c.kind === 'ean') return { kind: 'invalid', problem: 'SERIAL_LOOKS_LIKE_EAN' };
   if (c.kind === 'unknown') return { kind: 'invalid', problem: serialProblem(text) ?? 'SERIAL_CHARS' };
@@ -361,16 +382,9 @@ const MODEL_TOKEN = /^[a-z]\d[a-z0-9]*$/;
 /** Words that make ANOTHER machine of a family; Combo / AMS / Lite are bundles, not machines. */
 const FAMILY_SPLIT = new Set(['mini', 'pro', 'max', 'plus', 'carbon', 'ultra', 'se']);
 
-/**
- * A serial whose prefix names one family (`serialModelHint`) filed on a line
- * whose product name states ANOTHER: 030 (A1 mini) on «A1 Combo», 039 (A1) on
- * «A1 mini» or «X2D Combo». Null when they agree or either side is unknown —
- * an unknown prefix or a name without a model code is not evidence.
- */
-export function serialFamilyConflict(serial: string, productNames: ReadonlyArray<string | null | undefined>): { serial_family: string; product_family: string } | null {
-  const hint = serialModelHint(serial);
-  if (!hint) return null;
-  const want = nameTokens(hint.model);
+/** One model name (the prefix's model or one of its aliases) against the product's names. */
+function modelConflict(modelName: string, productNames: ReadonlyArray<string | null | undefined>): { serial_family: string; product_family: string } | null {
+  const want = nameTokens(modelName);
   const model = want.find((t) => MODEL_TOKEN.test(t));
   if (!model) return null;
   for (const name of productNames) {
@@ -378,15 +392,45 @@ export function serialFamilyConflict(serial: string, productNames: ReadonlyArray
     const models = have.filter((t) => MODEL_TOKEN.test(t));
     if (!models.length) continue;
     const label = String(name ?? '').trim().slice(0, 80);
-    if (!models.includes(model)) return { serial_family: hint.model, product_family: label };
+    if (!models.includes(model)) return { serial_family: modelName, product_family: label };
     const splitWant = want.filter((t) => FAMILY_SPLIT.has(t));
     const splitHave = have.filter((t) => FAMILY_SPLIT.has(t));
     if (splitWant.some((t) => !have.includes(t)) || splitHave.some((t) => !want.includes(t))) {
-      return { serial_family: hint.model, product_family: label };
+      return { serial_family: modelName, product_family: label };
     }
     return null;
   }
   return null;
+}
+
+/**
+ * A serial whose prefix names one family filed on a line whose product name
+ * states ANOTHER: 030 (A1 mini) on «A1 Combo», 039 (A1) on «A1 mini» or «X2D
+ * Combo». Null when they agree or either side is unknown — an unknown prefix
+ * or a name without a model code is not evidence.
+ *
+ * THE RULE DECIDES (owner decision 2): only a rule with the family check on
+ * (Bambu Lab's) runs it, with that rule's prefixes; a prefix's ALIASES are
+ * the same model under another name — `00M` is «X1C» and «X1 Carbon», so a
+ * real X1C on a product named «… X1C» is no conflict. Every other brand's
+ * serial is never refused for its first characters. Without a rule:
+ * LEGACY_RULE, today's five prefixes.
+ */
+export function serialFamilyConflict(
+  serial: string,
+  productNames: ReadonlyArray<string | null | undefined>,
+  rule: SerialRule = LEGACY_RULE
+): { serial_family: string; product_family: string } | null {
+  if (!familyCheckOn(rule)) return null;
+  const hit = ruleFamily(normalizeSerial(serial), rule);
+  if (!hit) return null;
+  let first: { serial_family: string; product_family: string } | null = null;
+  for (const name of [hit.m, ...(hit.a ?? [])]) {
+    const c = modelConflict(name, productNames);
+    if (!c) return null;
+    first ??= c;
+  }
+  return first;
 }
 
 /**
@@ -395,10 +439,26 @@ export function serialFamilyConflict(serial: string, productNames: ReadonlyArray
  * value shaped like a box SN that the store already holds AS a device serial
  * is that device.
  */
-export async function canonicalSerial(db: D1Database, code: unknown): Promise<{ norm: string; raw: string; viaBox: boolean }> {
-  const c = classifyScanInput(code);
+export async function canonicalSerial(db: D1Database, code: unknown, rule: SerialRule): Promise<{ norm: string; raw: string; viaBox: boolean }> {
+  const c = classifyScanInput(code, rule);
   if (c.kind === 'invalid') throw refuse(400, 'SERIAL_INVALID', { problem: c.problem });
-  if (c.kind === 'serial') return { norm: c.norm, raw: c.raw, viaBox: false };
+  if (c.kind === 'serial') {
+    // Owner decision 2: under a rule that does not name the Bambu box shape, a
+    // value of that shape is the brand's own serial — unless the store
+    // already holds it as a device's BOX SN, which makes it that device, as
+    // it always did (one box read twice is one device, never a second asset).
+    if (effectiveBoxShape(rule) !== 'bambu' && BOX_SN_RE.test(c.norm)) {
+      const known = await db
+        .prepare(
+          `SELECT serial_norm, serial_raw, (serial_norm = ?1) AS own FROM serial_inventory
+            WHERE serial_norm = ?1 OR (box_sn = ?1 AND box_sn <> '') ORDER BY own DESC, created_at LIMIT 1`
+        )
+        .bind(c.norm)
+        .first<{ serial_norm: string; serial_raw: string; own: number }>();
+      if (known && Number(known.own) !== 1) return { norm: known.serial_norm, raw: known.serial_raw, viaBox: true };
+    }
+    return { norm: c.norm, raw: c.raw, viaBox: false };
+  }
   const asSerial = await db
     .prepare('SELECT serial_norm, serial_raw FROM serial_inventory WHERE serial_norm = ?')
     .bind(c.box)
@@ -410,6 +470,21 @@ export async function canonicalSerial(db: D1Database, code: unknown): Promise<{ 
     .first<{ serial_norm: string; serial_raw: string }>();
   if (byBox) return { norm: byBox.serial_norm, raw: byBox.serial_raw, viaBox: true };
   throw refuse(400, 'SERIAL_INVALID', { problem: 'BOX_ONLY' });
+}
+
+/**
+ * The format verdict of one canonical serial under its rule (owner decision
+ * 2): `enforce` throws 400 SERIAL_FORMAT_MISMATCH {rule_id, problems} —
+ * nothing is written — and anything else returns the warnings the door
+ * shows and audits. A box-number shape is never refused HERE: under a Bambu
+ * rule the canonicaliser already resolved it through the store, so a value of
+ * that shape at this point is a device the store holds as a serial.
+ */
+export function judgeFormat(norm: string, rule: SerialRule): FormatNote[] {
+  const verdict = evaluateSerial(norm, rule);
+  const refused = verdict.refuse.filter((n) => n.code !== 'LOOKS_LIKE_BOX');
+  if (refused.length) throw refuse(400, 'SERIAL_FORMAT_MISMATCH', { rule_id: rule.id, problems: refused });
+  return verdict.warnings;
 }
 
 /** The companion box SN of a label read, kept only when it really is one. */
@@ -631,6 +706,18 @@ export interface LinkResult {
   assignment_id: string;
   slot: SlotView;
   warnings: string[];
+  /**
+   * The serial format rule that judged this link and what it said (owner
+   * decision 2): its warnings are shown in amber and written into the
+   * `serial.linked` audit row. Null before migration 0181 and on a replay.
+   */
+  format: LinkFormat | null;
+}
+
+export interface LinkFormat {
+  rule_id: string;
+  rule_version: number;
+  warnings: FormatNote[];
 }
 
 type LiveRow = AssignmentRow & { o_status: string | null; o_remote: string; o_stage: string | null; o_shipping: string | null };
@@ -796,6 +883,8 @@ interface LinkPlan {
   allocationId: string | null;
   lotFence: boolean;
   warnings: string[];
+  /** The format rule's warnings on this serial (owner decision 2). */
+  format: FormatNote[];
 }
 
 /**
@@ -841,7 +930,16 @@ export function conditionNewProduct(line: Pick<LineFacts, 'condition_doc'> | nul
  * Run before the batch (for the message) and again after a failed batch (for
  * the honest reason) — one classifier, so the two can never disagree.
  */
-async function classifyLink(db: D1Database, ctx: LinkContext, req: LinkRequest, actor: SerialActor, norm: string, ean: string, boxSn: string): Promise<LinkPlan> {
+async function classifyLink(
+  db: D1Database,
+  ctx: LinkContext,
+  req: LinkRequest,
+  actor: SerialActor,
+  norm: string,
+  ean: string,
+  boxSn: string,
+  rule: SerialRule
+): Promise<LinkPlan> {
   const ov = req.override?.kind ?? null;
   const part = req.part ?? 'device';
   const partIndex = req.partIndex ?? 1;
@@ -902,11 +1000,16 @@ async function classifyLink(db: D1Database, ctx: LinkContext, req: LinkRequest, 
       throw refuse(400, 'SERIAL_OPTION_MISMATCH', { via: 'ean' });
     }
   }
+  // Owner decision 2 — the format rule of this product (its own, else its
+  // brand's, else the generic one). `enforce` refuses what it finds, nothing
+  // written; `warn` links and says so (the audit row carries the warnings).
+  const formatWarnings = judgeFormat(norm, rule);
   // M11/§17 serial model metadata: a known prefix family that the product's
-  // name contradicts. Not for an asset the owner already filed under this
-  // product — that filing IS the owner's answer.
+  // name contradicts — only under a rule with the family check on (Bambu
+  // Lab's), with its prefixes and their aliases. Not for an asset the owner
+  // already filed under this product — that filing IS the owner's answer.
   if (!(asset?.product_id && (asset.product_id === line.product_id || viaCondition)) && ov !== 'model_family') {
-    const conflict = serialFamilyConflict(norm, [line.p_name, line.p_name_ar, line.name_snapshot]);
+    const conflict = serialFamilyConflict(norm, [line.p_name, line.p_name_ar, line.name_snapshot], rule);
     if (conflict) throw refuse(400, 'SERIAL_MODEL_MISMATCH', { ...conflict });
   }
 
@@ -1081,6 +1184,7 @@ async function classifyLink(db: D1Database, ctx: LinkContext, req: LinkRequest, 
     allocationId,
     lotFence,
     warnings,
+    format: formatWarnings,
   };
 }
 
@@ -1119,8 +1223,11 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
   const partIndex = req.partIndex ?? 1;
   const key = `scan:${opId}`;
 
-  // §23 + H1: the one canonicaliser, then the companions of the same read.
-  const { norm, raw } = await canonicalSerial(db, req.code);
+  // §23 + H1: the one canonicaliser, then the companions of the same read —
+  // under the format rule of the line's product, read FIRST (owner decision
+  // 2): a box-shaped read is a box number only under a Bambu rule.
+  const rule = await ruleForOrderItem(db, req.orderId, req.orderItemId);
+  const { norm, raw } = await canonicalSerial(db, req.code, rule);
   const ean = normalizeEan(typeof req.ean === 'string' ? req.ean : '') || '';
   const boxSn = companionBox(req.boxSn);
 
@@ -1129,8 +1236,9 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
   if (replay) return replayAnswer(db, actor, replay, req, norm, part);
 
   const ctx = await readLinkContext(db, req, norm, boxSn);
-  const plan = await classifyLink(db, ctx, req, actor, norm, ean, boxSn);
+  const plan = await classifyLink(db, ctx, req, actor, norm, ean, boxSn, rule);
   if (plan.already) return answer(db, actor, plan.already, 'already', []);
+  const format = formatAudit(rule, plan.format);
   const order = ctx.order!;
   const line = ctx.line!;
   const lineVariant = ctx.variant?.variant_id ?? null;
@@ -1327,6 +1435,9 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
         prior_unit_id: plan.priorUnitId, previous_assignment: previous?.id ?? null,
         previous_order_id: previous?.order_ref ?? null, replaces_assignment: replaced?.id ?? null,
         override_kind: ov?.kind ?? null,
+        // Owner decision 2: which format rule judged the serial, at which
+        // version, and its warnings — in the SAME batch as the link.
+        ...(format ? { format } : {}),
       })
     ).statements
   );
@@ -1354,13 +1465,13 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
     if (!isLostRace(e) && !/UNIQUE constraint failed|CHECK constraint failed/.test(msg)) throw e;
     // Re-read and classify: the honest reason, or the same link already made.
     const fresh = await readLinkContext(db, req, norm, boxSn);
-    const second = await classifyLink(db, fresh, req, actor, norm, ean, boxSn);
+    const second = await classifyLink(db, fresh, req, actor, norm, ean, boxSn, rule);
     if (second.already) return answer(db, actor, second.already, 'already', []);
     throw refuse(409, 'SERIAL_RACE');
   }
   const created = Number(results[assetIndex]?.meta?.changes ?? 0) === 1;
   const row = await db.prepare(`SELECT ${ASSIGNMENT_COLS} FROM serial_assignments WHERE id = ?`).bind(id).first<AssignmentRow>();
-  return answer(db, actor, row!, created ? 'created' : 'existing', plan.warnings);
+  return answer(db, actor, row!, created ? 'created' : 'existing', plan.warnings, format ? { rule_id: format.rule_id, rule_version: format.rule_version, warnings: plan.format } : null);
 }
 
 async function replayAnswer(db: D1Database, actor: SerialActor, row: AssignmentRow, req: LinkRequest, norm: string, part: string): Promise<LinkResult> {
@@ -1371,7 +1482,14 @@ async function replayAnswer(db: D1Database, actor: SerialActor, row: AssignmentR
   return answer(db, actor, row, 'already', []);
 }
 
-async function answer(db: D1Database, actor: SerialActor, row: AssignmentRow, outcome: LinkResult['outcome'], warnings: string[]): Promise<LinkResult> {
+async function answer(
+  db: D1Database,
+  actor: SerialActor,
+  row: AssignmentRow,
+  outcome: LinkResult['outcome'],
+  warnings: string[],
+  format: LinkFormat | null = null
+): Promise<LinkResult> {
   const slot = await slotView(db, actor, row);
   return {
     success: true,
@@ -1381,6 +1499,7 @@ async function answer(db: D1Database, actor: SerialActor, row: AssignmentRow, ou
     assignment_id: row.id,
     slot,
     warnings,
+    format,
   };
 }
 
@@ -2144,7 +2263,10 @@ export async function returnedUnits(
   for (const raw of Array.isArray(input.serials) ? input.serials : []) {
     const text = String(raw ?? '').slice(0, 200);
     if (!text.trim()) continue;
-    const norm = await canonicalSerial(db, text).then((c) => c.norm, () => normalizeSerial(stripSerialPrefix(text)));
+    // Lenient on purpose, and with today's reading (LEGACY_RULE): a box
+    // number resolves to its device through the store, anything else is
+    // looked up as typed — a return names a device already on file.
+    const norm = await canonicalSerial(db, text, LEGACY_RULE).then((c) => c.norm, () => normalizeSerial(stripSerialPrefix(text)));
     if (norm) serials.push(norm);
   }
   if (serials.length) {
@@ -2376,6 +2498,8 @@ export interface OrderSerialsView {
       assignment: SlotView['assignment'];
       previous: null | { assignment_id: string; serial_display: string; serial_full?: string; released_at: string; reason: string; free: boolean };
       flags: string[];
+      /** The serial format rule of the slot's product (owner decision 2): how the screen reads a lone box-shaped read. */
+      rule: PublicRule;
     }
   >;
   missing: GateMissing[];
@@ -2387,7 +2511,7 @@ export async function orderSerialsView(env: Env, actor: SerialActor, orderId: st
   if (!(await serialAssignmentsInstalled(db))) return off;
   const { order, slots } = await serialRequiredSlots(db, orderId);
   if (!order) return { ...off, installed: true };
-  const [gate, liveRes, prevRes] = await Promise.all([
+  const [gate, liveRes, prevRes, rules] = await Promise.all([
     serialGateState(env, orderId),
     db.prepare(`SELECT ${ASSIGNMENT_COLS} FROM serial_assignments WHERE order_id = ? AND released_at IS NULL`).bind(orderId).all<AssignmentRow>(),
     db
@@ -2402,6 +2526,7 @@ export async function orderSerialsView(env: Env, actor: SerialActor, orderId: st
       )
       .bind(orderId)
       .all<{ id: string; order_item_id: string; unit_index: number; part: string; serial_norm: string; serial_raw: string; released_at: string; release_reason: string; taken: number }>(),
+    rulesForProducts(db, slots.map((s) => s.product_id)),
   ]);
   const live = liveRes.results ?? [];
   const prev = prevRes.results ?? [];
@@ -2457,6 +2582,7 @@ export async function orderSerialsView(env: Env, actor: SerialActor, orderId: st
         ? { assignment_id: p.id, serial_display: shown(p.serial_raw, actor), ...(actor.fullSerial ? { serial_full: p.serial_raw } : {}), released_at: p.released_at, reason: p.release_reason, free: Number(p.taken) !== 1 }
         : null,
       flags,
+      rule: publicRule(rules.get(String(s.product_id ?? '').trim()) ?? rules.get('') ?? LEGACY_RULE),
     });
   }
   const linked = out.filter((s) => s.assignment).length;

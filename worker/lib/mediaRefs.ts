@@ -766,6 +766,11 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'warranty_receipts.order_receipt_no': 'the order receipt number',
   'warranty_receipts.replaced_by_receipt_id': 'a warranty_receipts id',
   'warranty_receipts.replaces_receipt_id': 'a warranty_receipts id',
+  // 0181 (owner decision 2): a serial format rule's bounded JSON lists — lengths
+  // are integers, prefixes are {p, m, a} words, positions are {at, len, cls}.
+  'serial_brand_rules.lengths': 'exact serial lengths of a format rule (integers 6–40); never a path',
+  'serial_brand_rules.prefixes': 'serial prefixes and the model names they stand for; never a path',
+  'serial_brand_rules.positions': 'fixed character classes at serial positions; never a path',
 };
 
 /**

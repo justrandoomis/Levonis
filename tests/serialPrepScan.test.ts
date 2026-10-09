@@ -16,6 +16,7 @@ import {
   serialScanWindow,
   serialFamilyConflict,
 } from '../worker/lib/serialAssignments';
+import { ruleForProduct } from '../worker/lib/serialRules';
 import { DIRECT_STAGES, PREORDER_STAGES } from '../worker/lib/orderStages';
 
 const scanPath = (o: string) => `/api/admin/orders/${o}/serials/scan`;
@@ -195,6 +196,9 @@ test('§32.13/H1 one canonicaliser: manual typing, an EAN of any length, a recei
     ['012345678905', 'SERIAL_LOOKS_LIKE_EAN'], // UPC-A
     ['WR-2026-0905-001', 'SERIAL_LOOKS_LIKE_RECEIPT'],
     ['A1B2', 'SERIAL_TOO_SHORT'],
+    // A Bambu Lab product: its rule names the Bambu box shape (owner decision
+    // 2; tests/serialBrandRules.test.ts proves another brand's serial of
+    // that shape links with a warning).
     [BOX, 'BOX_ONLY'],
   ] as const) {
     const r = await scan(a, 'ORD-M', 'l1', 2, code);
@@ -269,9 +273,13 @@ test('§32.15 product mismatch: an asset filed under X2D never links to an A1 li
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM serial_assignments'), 0, 'nothing written');
   w.raw.exec(`INSERT INTO serial_inventory (serial_norm, serial_raw, product_id, ean, created_by) VALUES ('X2DLEARNT00001','X2DLEARNT00001','pX2D','${EAN}','boss')`);
   assert.equal((await json(await scan(w.as('adm'), 'ORD-P', 'l1', 1, SN2, { ean: EAN }))).code, 'SERIAL_PRODUCT_MISMATCH');
-  // §17 serial model metadata: prefix 030 is the A1 mini family, not an «A1 Combo».
-  assert.deepEqual(serialFamilyConflict('03000A123456789', ['Bambu Lab A1 Combo']), { serial_family: 'A1 mini', product_family: 'Bambu Lab A1 Combo' });
-  assert.equal(serialFamilyConflict(SN, ['Bambu Lab A1 Combo']), null);
+  // §17 serial model metadata: prefix 030 is the A1 mini family, not an «A1
+  // Combo» — under the rule of the product (owner decision 2: Bambu Lab's
+  // seed, bound to the fixture's brand), with its prefixes.
+  const bambu = await ruleForProduct(w.db, 'pA1');
+  assert.equal(bambu.id, 'sbr_bambu_lab');
+  assert.deepEqual(serialFamilyConflict('03000A123456789', ['Bambu Lab A1 Combo'], bambu), { serial_family: 'A1 mini', product_family: 'Bambu Lab A1 Combo' });
+  assert.equal(serialFamilyConflict(SN, ['Bambu Lab A1 Combo'], bambu), null);
   const fam = await json(await scan(w.as('adm'), 'ORD-P', 'l1', 1, '03000A123456789'));
   assert.equal(fam.code, 'SERIAL_MODEL_MISMATCH');
   const ownerOk = await post(w.as('boss'), '/api/admin/orders/ORD-P/serials/override', {

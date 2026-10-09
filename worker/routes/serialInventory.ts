@@ -43,7 +43,9 @@ import type { Context } from 'hono';
 import { audit } from '../lib/audit';
 import { maskedDetail, refuse as serialRefuse, serialActor, serialAssignmentsInstalled, serialStory, setWarrantyMode } from '../lib/serialAssignments';
 import { maskSerial } from '../lib/deviceOps';
-import { normalizeEan, normalizeSerial, buildBulkRow, BULK_MAX_LINES } from '@levonis/catalog/deviceSerials';
+import { normalizeEan, normalizeSerial, buildBulkRow, BULK_MAX_LINES, type BulkFields, type BulkRow } from '@levonis/catalog/deviceSerials';
+import { GENERIC_RULE, LEGACY_RULE, type FormatNote, type SerialRule } from '@levonis/catalog/serialRules';
+import { formatAudit, publicRule, ruleForProduct, serialRulesInstalled } from '../lib/serialRules';
 import {
   INVENTORY_STATUSES,
   applyPatch,
@@ -119,9 +121,32 @@ serialInventoryRoutes.get('/export', async (c) => {
   });
 });
 
+/**
+ * The rule a batch is judged by (owner decision 2): the format rule of the
+ * product it is filed under — read from the body's product id WITHOUT
+ * verifying it, so the refusals keep today's order (`verifyProductChoice`
+ * still answers an unknown product right after) — and the generic rule with
+ * no product. LEGACY_RULE before migration 0181.
+ */
+const batchRule = (db: D1Database, body: Record<string, unknown>) =>
+  ruleForProduct(db, typeof body.product_id === 'string' ? body.product_id : null);
+
+/** How many rows of a batch carry a format warning, and of which kind — for the answer and the audit. */
+function formatCounts(rows: ReadonlyArray<Pick<BulkRow, 'problem' | 'warnings'>>): { warned: number; by_code: Record<string, number> } {
+  const by: Record<string, number> = {};
+  let warned = 0;
+  for (const r of rows) {
+    if (r.problem || !r.warnings?.length) continue;
+    warned += 1;
+    for (const w of r.warnings) by[w.code] = (by[w.code] ?? 0) + 1;
+  }
+  return { warned, by_code: by };
+}
+
 serialInventoryRoutes.post('/preview', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const { rows, too_many } = candidateRows(body);
+  const rule = await batchRule(c.env.DB, body);
+  const { rows, too_many } = candidateRows(body, rule);
   if (too_many) throw badRequest(`At most ${BULK_MAX_LINES} serials at a time`, 'SERIAL_LIST_TOO_LONG', { max: BULK_MAX_LINES });
   const choice = await verifyProductChoice(c.env.DB, body.product_id, body.variant_id);
   const preview = await previewRows(c.env.DB, rows);
@@ -131,6 +156,8 @@ serialInventoryRoutes.post('/preview', async (c) => {
     counts: previewCounts(preview),
     product: choice.product_id ? { id: choice.product_id, name: choice.name, serialized: choice.serialized } : null,
     max_lines: BULK_MAX_LINES,
+    // Owner decision 2: the rule that judged the rows, and how many it warned about.
+    format: { rule: publicRule(rule), ...formatCounts(preview) },
   });
 });
 
@@ -139,7 +166,8 @@ serialInventoryRoutes.post('/commit', async (c) => {
   await requireSerialWrite(c.env, admin);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const source: InventorySource = body.source === 'scan' ? 'scan' : body.source === 'manual' ? 'manual' : 'bulk';
-  const { rows, too_many } = candidateRows(body);
+  const rule = await batchRule(c.env.DB, body);
+  const { rows, too_many } = candidateRows(body, rule);
   if (too_many) throw badRequest(`At most ${BULK_MAX_LINES} serials at a time`, 'SERIAL_LIST_TOO_LONG', { max: BULK_MAX_LINES });
   if (rows.length === 0) throw badRequest('The list is empty', 'SERIAL_LIST_EMPTY');
   const choice = await verifyProductChoice(c.env.DB, body.product_id, body.variant_id);
@@ -150,6 +178,8 @@ serialInventoryRoutes.post('/commit', async (c) => {
   if (result.attempted === 0 && counts.exists === 0) {
     throw badRequest('Nothing in this list can be added', 'SERIAL_NOTHING_TO_ADD', { counts });
   }
+  const warnedRows = preview.filter((r) => r.outcome === 'new' || r.outcome === 'new_assigned');
+  const formatDetail = formatAudit(rule, []);
   if (result.inserted > 0) {
     await audit(c.env.DB, admin.id, 'serial_inventory.add', 'serial_inventory', {
       source,
@@ -157,6 +187,8 @@ serialInventoryRoutes.post('/commit', async (c) => {
       product_id: choice.product_id,
       variant_id: choice.variant_id,
       serials: result.serials.slice(0, BULK_MAX_LINES),
+      // Owner decision 2: the rule that judged the batch and its warning counts.
+      ...(formatDetail ? { format: { rule_id: formatDetail.rule_id, rule_version: formatDetail.rule_version, ...formatCounts(warnedRows) } } : {}),
     });
   }
   return c.json({
@@ -165,7 +197,8 @@ serialInventoryRoutes.post('/commit', async (c) => {
     // Added by someone else between this commit's own preview and its insert.
     skipped_concurrent: result.attempted - result.inserted,
     counts,
-    rows: preview.map((r) => ({ line: r.line, serial_norm: r.serial_norm, outcome: r.outcome, problem: r.problem, duplicate_of: r.duplicate_of })),
+    rows: preview.map((r) => ({ line: r.line, serial_norm: r.serial_norm, outcome: r.outcome, problem: r.problem, duplicate_of: r.duplicate_of, warnings: r.warnings })),
+    format: { rule: publicRule(rule), ...formatCounts(warnedRows) },
   });
 });
 
@@ -196,16 +229,46 @@ serialInventoryRoutes.post('/scan', async (c) => {
   // «إدخال يدوي» registers its one serial through this same door (same
   // recognition, same verdict and sound) and is recorded as typed, not scanned.
   const source: InventorySource = body.source === 'manual' ? 'manual' : 'scan';
-  const row = buildBulkRow(1, { serial: s('serial'), box_sn: s('box_sn'), ean: s('ean'), model_code: s('model_code'), model_name: s('model_name') });
+  const fields: BulkFields = { serial: s('serial'), box_sn: s('box_sn'), ean: s('ean'), model_code: s('model_code'), model_name: s('model_name') };
+  // OWNER DECISION 2: THE PRODUCT FIRST, THEN THE VERDICT. A value shaped
+  // like a Bambu box number is a box number only under a Bambu rule, so the
+  // product — the admin's choice, else the label's own — is identified
+  // before the row is judged. Before migration 0181 the rule is today's for
+  // every product, and nothing is read for it.
+  let rule: SerialRule = LEGACY_RULE;
+  let identified: Awaited<ReturnType<typeof identifyLabel>> | null = null;
+  if (await serialRulesInstalled(c.env.DB)) {
+    const chosenId = typeof body.product_id === 'string' ? body.product_id.trim() : '';
+    if (chosenId) rule = await ruleForProduct(c.env.DB, chosenId);
+    else {
+      // The label's fields, normalised the one way (the generic reading never
+      // refuses a box shape, so a box-shaped serial still names its label).
+      const pre = buildBulkRow(1, fields, {}, GENERIC_RULE);
+      const hard = pre.problem && pre.problem !== 'EAN_INVALID' && pre.problem !== 'BOX_SN_INVALID';
+      if (!hard) {
+        identified = await identifyLabel(c.env.DB, { ean: pre.ean, model_code: pre.model_code, serial: pre.serial_norm, model_name: pre.model_name });
+        rule = await ruleForProduct(c.env.DB, identified.match?.product.id ?? null);
+      } else rule = GENERIC_RULE;
+    }
+  }
+  const row = buildBulkRow(1, fields, {}, rule);
   if (row.problem) {
-    return c.json({ success: true, outcome: 'invalid', problem: row.problem, serial_norm: row.serial_norm, row: null });
+    return c.json({
+      success: true,
+      outcome: 'invalid',
+      problem: row.problem,
+      serial_norm: row.serial_norm,
+      row: null,
+      ...(row.problem === 'SERIAL_FORMAT_MISMATCH' ? { warnings: row.warnings, rule: publicRule(rule) } : {}),
+    });
   }
   const before = await loadInventoryRow(c.env.DB, row.serial_norm);
   if (before) return c.json({ success: true, outcome: 'exists', row: inventoryRowPublic(before) });
 
   let choice = await verifyProductChoice(c.env.DB, body.product_id, body.variant_id);
   let via: string | null = choice.product_id ? 'chosen' : null;
-  const { match, hint } = await identifyLabel(c.env.DB, { ean: row.ean, model_code: row.model_code, serial: row.serial_norm, model_name: row.model_name });
+  const { match, hint } =
+    identified ?? (await identifyLabel(c.env.DB, { ean: row.ean, model_code: row.model_code, serial: row.serial_norm, model_name: row.model_name }));
   if (!choice.product_id && match) {
     choice = await verifyProductChoice(c.env.DB, match.product.id, match.variant_id);
     via = match.via;
@@ -225,6 +288,7 @@ serialInventoryRoutes.post('/scan', async (c) => {
     const now = await loadInventoryRow(c.env.DB, row.serial_norm);
     return c.json({ success: true, outcome: 'exists', row: now ? inventoryRowPublic(now) : null });
   }
+  const format = formatAudit(rule, row.warnings);
   await audit(c.env.DB, admin.id, 'serial_inventory.add', 'serial_inventory', {
     source,
     inserted: 1,
@@ -232,8 +296,11 @@ serialInventoryRoutes.post('/scan', async (c) => {
     variant_id: choice.variant_id,
     via,
     serials: [row.serial_norm],
+    // Owner decision 2: which format rule judged the serial, and its warnings.
+    ...(format ? { format } : {}),
   });
   const saved = await loadInventoryRow(c.env.DB, row.serial_norm);
+  const warnings: FormatNote[] = row.warnings;
   return c.json({
     success: true,
     outcome: preview.outcome === 'new_assigned' ? 'added_assigned' : 'added',
@@ -242,6 +309,8 @@ serialInventoryRoutes.post('/scan', async (c) => {
     hint,
     needs_product: !choice.product_id,
     serialized: choice.product_id ? choice.serialized : null,
+    warnings,
+    rule: publicRule(rule),
   });
 });
 

@@ -234,7 +234,18 @@ export default function AdminProducts() {
   const [brands, setBrands] = useState<Array<{ id: string; name_ar?: string; name?: string }>>([]);
   const [catalogs, setCatalogs] = useState<Array<{ id: string; name_ar?: string; name?: string }>>([]);
 
-  const [editing, setEditing] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
+  // `?tab=products&edit=<id>` opens that product's editor once — the link from
+  // «صيغ الأرقام التسلسلية»'s list of products that need a serial but have no
+  // brand (owner decision 2). Read for the first render only; closing the
+  // editor drops it from the address.
+  const [editing, setEditing] = useState<{ open: boolean; id: string | null }>(() => {
+    try {
+      const id = new URLSearchParams(window.location.search).get('edit') ?? '';
+      return /^[A-Za-z0-9_-]{1,80}$/.test(id) ? { open: true, id } : { open: false, id: null };
+    } catch {
+      return { open: false, id: null };
+    }
+  });
   const [importOpen, setImportOpen] = useState(false);
   const [importDirty, setImportDirty] = useState(false);
   // Quick Edit: which product's price grid is open, and whether it holds cells
@@ -506,7 +517,18 @@ export default function AdminProducts() {
       <Suspense fallback={<LazyFallback label={t.loading} />}>
         <ProductForm
           productId={editing.id}
-          onBack={() => setEditing({ open: false, id: null })}
+          onBack={() => {
+            setEditing({ open: false, id: null });
+            try {
+              const url = new URL(window.location.href);
+              if (url.searchParams.has('edit')) {
+                url.searchParams.delete('edit');
+                window.history.replaceState(window.history.state, '', url);
+              }
+            } catch {
+              /* the address is a courtesy */
+            }
+          }}
           onListChanged={() => reloadAll()}
         />
       </Suspense>

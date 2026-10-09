@@ -21,6 +21,8 @@
  * barcode directly under it.
  */
 
+import { BAMBU_BOX_SN_RE, LEGACY_RULE, effectiveBoxShape, evaluateSerial, ruleFamily, type BoxShape, type FormatNote, type SerialRule } from './serialRules';
+
 // ------------------------------------------------------------ normalisation
 
 /** Arabic-Indic and Extended (Persian) digits → ASCII, so a serial typed on an
@@ -69,9 +71,12 @@ export function isValidGtin(text: string): boolean {
 /**
  * A box / carton serial. Bambu Lab prints `B07119G5811000AB`: a `B`, at least
  * four digits, a letter, then more letters and digits. A device serial on the
- * same label (`03919D580607841`) starts with a digit.
+ * same label (`03919D580607841`) starts with a digit. It is a BAMBU shape
+ * (owner decision 2, 2026-10-09): only a rule that names the `bambu` box
+ * shape refuses it (./serialRules.ts); every other brand's serial of that
+ * shape is accepted with a warning.
  */
-export const BOX_SN_RE = /^B\d{4,}[A-Z][0-9A-Z]{3,}$/;
+export const BOX_SN_RE = BAMBU_BOX_SN_RE;
 
 export type SerialProblem =
   | 'SERIAL_EMPTY'
@@ -142,8 +147,14 @@ function stripSnPrefix(text: string): string {
   return text.replace(/^\s*(?:product\s*)?s\s*\/?\s*n(?:\s*[:：#]\s*|\s+)(?=\S)/i, '').trim();
 }
 
-/** What one decoded value is, on its own. */
-export function classifyCode(code: DecodedCode): { kind: CodeKind; value: string } {
+/**
+ * What one decoded value is, on its own. `boxShape` is the box classifier of
+ * the rule that judges this serial (./serialRules.ts `effectiveBoxShape`):
+ * 'bambu' — the default, today's reading — calls a Bambu-box-shaped value a
+ * box SN; 'none' (another brand, an `off` rule, the generic rule) calls it a
+ * serial.
+ */
+export function classifyCode(code: DecodedCode, opts: { boxShape?: BoxShape } = {}): { kind: CodeKind; value: string } {
   const text = String(code.text ?? '').trim();
   if (!text) return { kind: 'unknown', value: '' };
   if (looksLikeReceipt(text)) return { kind: 'receipt', value: text };
@@ -153,7 +164,7 @@ export function classifyCode(code: DecodedCode): { kind: CodeKind; value: string
   if (/^(ean|upc)/.test(fmt)) return { kind: 'unknown', value: text };
   const norm = normalizeSerial(stripSnPrefix(text));
   if (serialProblem(norm) !== null) return { kind: 'unknown', value: text };
-  if (BOX_SN_RE.test(norm)) return { kind: 'box_sn', value: norm };
+  if ((opts.boxShape ?? 'bambu') === 'bambu' && BOX_SN_RE.test(norm)) return { kind: 'box_sn', value: norm };
   return { kind: 'serial', value: norm };
 }
 
@@ -202,7 +213,7 @@ export function classifyLabel(codes: readonly DecodedCode[]): LabelRead {
 /** The most lines one bulk paste may carry (the server re-checks). */
 export const BULK_MAX_LINES = 1000;
 
-export type BulkRowProblem = SerialProblem | 'EAN_INVALID' | 'BOX_SN_INVALID' | 'SERIAL_LOOKS_LIKE_BOX';
+export type BulkRowProblem = SerialProblem | 'EAN_INVALID' | 'BOX_SN_INVALID' | 'SERIAL_LOOKS_LIKE_BOX' | 'SERIAL_FORMAT_MISMATCH';
 
 export interface BulkRow {
   /** 1-based line number in the pasted text. */
@@ -214,6 +225,12 @@ export interface BulkRow {
   box_sn: string;
   ean: string;
   problem: BulkRowProblem | null;
+  /**
+   * What the serial's format rule says (owner decision 2): warnings on an
+   * accepted row, shown in amber and counted in the audit — or, with
+   * `problem: 'SERIAL_FORMAT_MISMATCH'` under an `enforce` rule, the reasons.
+   */
+  warnings: FormatNote[];
   /** The earlier line carrying the same serial in this paste, or null. */
   duplicate_of: number | null;
 }
@@ -265,26 +282,39 @@ export interface BulkFields {
 /**
  * One candidate row, validated. Shared by the paste parser below and by the
  * scanner's list (which already has its fields separated), so a scanned row
- * and a pasted row are judged by the same rules.
+ * and a pasted row are judged by the same rules. `rule` is the serial format
+ * rule of the product the row is filed under (./serialRules.ts; the Worker
+ * resolves it): LEGACY_RULE — today's reading — when the caller names none.
  */
 export function buildBulkRow(
   line: number,
   fields: BulkFields,
-  defaults: { model_name?: string; model_code?: string } = {}
+  defaults: { model_name?: string; model_code?: string } = {},
+  rule: SerialRule = LEGACY_RULE
 ): BulkRow {
   const serialRaw = stripSnPrefix(String(fields.serial ?? '')).slice(0, 200);
   const ean = normalizeEan(fields.ean);
   const boxRaw = String(fields.box_sn ?? '').trim();
   const boxNorm = normalizeSerial(boxRaw);
   let problem: BulkRowProblem | null = serialProblem(serialRaw);
+  let warnings: FormatNote[] = [];
   // The same reading as every other door (serial-scan critique H1): a product
-  // barcode of ANY length (EAN-8, UPC-A, EAN-13, ITF-14) and a box SN are not
-  // device serials — filed as one, the device would get a second asset the
-  // moment its real Product SN is scanned.
+  // barcode of ANY length (EAN-8, UPC-A, EAN-13, ITF-14) is never a device
+  // serial, and neither is a box SN under a rule that names the Bambu box
+  // shape — filed as one, the device would get a second asset the moment its
+  // real Product SN is scanned. Under any other rule a value of that shape is
+  // the brand's own serial, accepted with a warning (owner decision 2).
   if (!problem) {
-    const kind = classifyCode({ text: serialRaw }).kind;
+    const kind = classifyCode({ text: serialRaw }, { boxShape: effectiveBoxShape(rule) }).kind;
     if (kind === 'ean') problem = 'SERIAL_LOOKS_LIKE_EAN';
     else if (kind === 'box_sn') problem = 'SERIAL_LOOKS_LIKE_BOX';
+  }
+  if (!problem) {
+    const verdict = evaluateSerial(normalizeSerial(serialRaw), rule);
+    if (verdict.refuse.length) {
+      problem = 'SERIAL_FORMAT_MISMATCH';
+      warnings = verdict.refuse;
+    } else warnings = verdict.warnings;
   }
   if (!problem && ean === null) problem = 'EAN_INVALID';
   if (!problem && boxRaw && (boxNorm.length < 4 || boxNorm.length > 60 || !/^[A-Z0-9]+$/.test(boxNorm))) problem = 'BOX_SN_INVALID';
@@ -297,6 +327,7 @@ export function buildBulkRow(
     box_sn: boxRaw ? boxNorm : '',
     ean: ean ?? '',
     problem,
+    warnings,
     duplicate_of: null,
   };
 }
@@ -329,7 +360,8 @@ export function markDuplicates(rows: BulkRow[]): BulkRow[] {
 export function parseSerialList(
   text: string,
   defaults: { model_name?: string; model_code?: string } = {},
-  maxLines = BULK_MAX_LINES
+  maxLines = BULK_MAX_LINES,
+  rule: SerialRule = LEGACY_RULE
 ): { rows: BulkRow[]; too_many: boolean } {
   const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
   let columns = DEFAULT_COLUMNS;
@@ -360,7 +392,8 @@ export function parseSerialList(
       buildBulkRow(
         i + 1,
         { serial: cell('serial'), model_name: cell('model_name'), model_code: cell('model_code'), box_sn: cell('box_sn'), ean: cell('ean') },
-        defaults
+        defaults,
+        rule
       )
     );
   }
@@ -385,6 +418,12 @@ export function parseSerialList(
  * family only ever fills the «الموديل» column when nothing better is known —
  * the product comes from the EAN (learned, or the known table below) or from
  * the owner's one tap on «ربط بمنتج».
+ *
+ * THE RULE DECIDES (owner decision 2, 2026-10-09). A serial's family is read
+ * from the prefixes of the rule that judges it (./serialRules.ts — Bambu
+ * Lab's 13 official prefixes, an alias on `00M` for «X1C»); this constant is
+ * only the DISPLAY FALLBACK for a serial whose product, and so whose rule, is
+ * not known — the five prefixes the shop has always shown.
  */
 const SERIAL_PREFIX_FAMILIES: ReadonlyArray<readonly [prefix: string, family: string]> = [
   ['039', 'A1'],
@@ -406,9 +445,20 @@ export interface ModelHint {
   source: 'ean' | 'serial_prefix';
 }
 
-/** The printer family a device serial belongs to, from its prefix; null when unknown. */
-export function serialModelHint(serial: string): ModelHint | null {
+/**
+ * The printer family a device serial belongs to, from its prefix; null when
+ * unknown. With `rule`, that rule's prefixes and brand name decide (a rule
+ * with no prefixes names no family); without one, the display fallback above.
+ */
+export function serialModelHint(serial: string, rule?: SerialRule | null): ModelHint | null {
   const norm = normalizeSerial(serial);
+  if (rule) {
+    if (!/^[0-9A-Z]+$/.test(norm)) return null;
+    const hit = ruleFamily(norm, rule);
+    if (!hit) return null;
+    const brand = rule.label || '';
+    return { brand, model: hit.m, label: brand ? `${brand} ${hit.m}` : hit.m, model_code: '', source: 'serial_prefix' };
+  }
   if (!/^[0-9A-Z]{15}$/.test(norm)) return null;
   const hit = SERIAL_PREFIX_FAMILIES.find(([prefix]) => norm.startsWith(prefix));
   if (!hit) return null;

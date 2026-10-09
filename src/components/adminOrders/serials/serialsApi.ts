@@ -9,6 +9,7 @@ import type { Language } from '../../../translations';
 import { classifyCode, normalizeSerial } from '../../../../packages/catalog/src/deviceSerials';
 import { dateLocale } from '../../orders/format';
 import { serialStrings } from './strings';
+import { formatNoteTexts, type FormatNoteWire } from './formatNotes';
 import type { LinkResult, LinkSource, OrderSerials, OverrideKind, UnlinkResult } from './types';
 
 const base = (orderId: string) => `/api/admin/orders/${encodeURIComponent(orderId)}/serials`;
@@ -127,6 +128,10 @@ export function serialRefusal(err: unknown, lang: Language | string): { text: st
   let detail: string | null = null;
   if (err.code === 'SERIAL_INVALID' && typeof d.problem === 'string') detail = s.problems[d.problem] ?? null;
   if (err.code === 'SERIAL_IN_USE_THIS_ORDER' && typeof d.unit_index === 'number') detail = s.inUseHere(d.unit_index);
+  // Owner decision 2: the brand's rule in `enforce` — what it found, in the reader's language.
+  if (err.code === 'SERIAL_FORMAT_MISMATCH' && Array.isArray(d.problems)) {
+    detail = formatNoteTexts(d.problems as FormatNoteWire[], l).join(' ') || null;
+  }
   return { text, detail };
 }
 
@@ -134,11 +139,14 @@ export function serialRefusal(err: unknown, lang: Language | string): { text: st
  * H1: never move focus on after a value that is a BOX SN — the next read is
  * almost always the product SN of the same box, and it belongs to THIS unit.
  * The server resolves a known box to its device, so the link may well have
- * succeeded; only the auto-advance is withheld.
+ * succeeded; only the auto-advance is withheld. `boxShape` is the slot's
+ * rule (owner decision 2): under a rule that does not name the Bambu box
+ * shape, a value of that shape is the device's own serial, and the reader
+ * moves on as after any serial.
  */
-export function looksLikeBoxSn(text: string): boolean {
+export function looksLikeBoxSn(text: string, boxShape: 'bambu' | 'none' = 'bambu'): boolean {
   const stripped = String(text ?? '').replace(/^\s*(?:product\s*)?s\s*\/?\s*n(?:\s*[:：#]\s*|\s+)(?=\S)/i, '');
-  return classifyCode({ text: stripped }).kind === 'box_sn';
+  return classifyCode({ text: stripped }, { boxShape }).kind === 'box_sn';
 }
 
 /**

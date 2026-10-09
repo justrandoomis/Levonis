@@ -24,6 +24,7 @@ import { openWarrantyDoc, popupBlockedMessage } from './printDoc';
 import UnitHistory from './UnitHistory';
 import UnitSerialSlots from '../adminOrders/serials/UnitSerialSlots';
 import { serialStrings } from '../adminOrders/serials/strings';
+import { formatNoteTexts, type LinkFormatWire } from '../adminOrders/serials/formatNotes';
 import type { OrderSerials } from '../adminOrders/serials/types';
 
 export interface WarrantyUnitRow {
@@ -242,6 +243,8 @@ export default function WarrantySection({
   const [data, setData] = useState<OrderWarrantyResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  // Owner decision 2: the brand's format rule accepted a serial with a note (amber, not an error).
+  const [formatNote, setFormatNote] = useState<string | null>(null);
   // A SET, not one string. Two device rows sit side by side and the owner
   // does use them in parallel; with a single value the second action cleared
   // the first one's in-flight flag, re-enabling a button whose request was
@@ -337,8 +340,10 @@ export default function WarrantySection({
     const key = `serial:${unit.id}`;
     setBusy(key, true);
     setErr(null);
+    setFormatNote(null);
+    const noteOf = (res: { format?: LinkFormatWire | null }) => setFormatNote(formatNoteTexts(res.format?.warnings, lang).join(' ') || null);
     try {
-      await api.post(`/api/devices/admin/units/${unit.id}/serial`, { serial });
+      noteOf(await api.post<{ format?: LinkFormatWire | null }>(`/api/devices/admin/units/${unit.id}/serial`, { serial }));
       await load();
     } catch (e) {
       // The device route asks for an explicit reassign + reason rather than
@@ -351,7 +356,7 @@ export default function WarrantySection({
           return;
         }
         try {
-          await api.post(`/api/devices/admin/units/${unit.id}/serial`, { serial, reassign: true, reason: reason.trim() });
+          noteOf(await api.post<{ format?: LinkFormatWire | null }>(`/api/devices/admin/units/${unit.id}/serial`, { serial, reassign: true, reason: reason.trim() }));
           await load();
         } catch (e2) {
           setErr(e2 instanceof ApiError ? apiRefusal(e2, rl, e2.message) : String(e2));
@@ -483,6 +488,11 @@ export default function WarrantySection({
       {err && (
         <div className="mb-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300" role="alert">
           {err}
+        </div>
+      )}
+      {formatNote && (
+        <div className="mb-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-300" role="status" data-serial-format-note>
+          <span className="font-semibold">{serialStrings(lang).formatTitle}:</span> {formatNote}
         </div>
       )}
 

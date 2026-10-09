@@ -1802,6 +1802,46 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'A warranty is never restarted: the original warranty stays with the serial from the first delivery date (owner decision).',
     ckb: 'گەرەنتی هەرگیز لە سەرەتاوە دەست پێناکاتەوە: گەرەنتییە ڕەسەنەکە لەگەڵ ژمارە زنجیرەییەکە لە ڕێکەوتی یەکەم گەیاندنەوە دەمێنێتەوە (بڕیاری خاوەن).',
   },
+  // ---- Serial formats by brand and product (owner decision 2, 2026-10-09) --
+  // A rule in `enforce` refuses a serial its format does not match (every
+  // other mismatch is a warning); the owner's «صيغ الأرقام التسلسلية» screen
+  // answers the rest. `{field}` arrives in `details.field` and the screen
+  // names it in the reader's language.
+  SERIAL_FORMAT_MISMATCH: {
+    ar: 'الرقم التسلسلي لا يطابق صيغة الأرقام التي ضبطها المالك لهذه العلامة التجارية.',
+    en: 'This serial does not match the serial format the owner set for this brand.',
+    ckb: 'ئەم ژمارە زنجیرەییە لەگەڵ ئەو شێوازەی خاوەن بۆ ئەم براندە دایناوە ناگونجێت.',
+  },
+  SERIAL_RULE_INVALID: {
+    ar: 'قاعدة الصيغة غير صالحة: {field}.',
+    en: 'The format rule is not valid: {field}.',
+    ckb: 'یاسای شێوازەکە دروست نییە: {field}.',
+  },
+  SERIAL_RULE_CHANGED: {
+    ar: 'غيّر أحدٌ هذه القاعدة قبلك؛ أُعيد تحميلها، فراجعها واحفظ مرة أخرى.',
+    en: 'Someone changed this rule before you; it has been reloaded — review it and save again.',
+    ckb: 'کەسێک پێش تۆ ئەم یاسایەی گۆڕی؛ دووبارە بارکرایەوە — پێیدا بچۆرەوە و دووبارە پاشەکەوتی بکە.',
+  },
+  SERIAL_RULE_EXISTS: {
+    ar: 'لهذه العلامة التجارية أو لهذا المنتج قاعدة صيغة فعّالة — عدّلها بدل إنشاء قاعدة ثانية.',
+    en: 'This brand or product already has an active format rule — edit it instead of creating a second one.',
+    ckb: 'ئەم براندە یان ئەم بەرهەمە پێشتر یاسایەکی شێوازی چالاکی هەیە — لە جیاتی دروستکردنی یاسایەکی دووەم، ئەو یاسایە دەستکاری بکە.',
+  },
+  SERIAL_RULE_NOT_FOUND: {
+    ar: 'لم يُعثر على قاعدة الصيغة هذه.',
+    en: 'This format rule was not found.',
+    ckb: 'ئەم یاسای شێوازە نەدۆزرایەوە.',
+  },
+  SERIAL_RULE_TARGET_UNKNOWN: {
+    ar: 'العلامة التجارية أو المنتج المحدد غير موجود.',
+    en: 'The chosen brand or product does not exist.',
+    ckb: 'براند یان بەرهەمی هەڵبژێردراو بوونی نییە.',
+  },
+  SERIAL_RULES_NOT_INSTALLED: {
+    ar: 'قواعد صيغ الأرقام التسلسلية لم تُفعّل على قاعدة البيانات بعد.',
+    en: 'Serial format rules are not enabled on the database yet.',
+    ckb: 'یاساکانی شێوازی ژمارەی زنجیرەیی هێشتا لەسەر بنکەدراوەکە چالاک نەکراون.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

@@ -44,6 +44,7 @@ import {
   type BulkRow,
   type ModelHint,
 } from '@levonis/catalog/deviceSerials';
+import { LEGACY_RULE, type SerialRule } from '@levonis/catalog/serialRules';
 import { serialAssignmentsInstalled, serializationContext, lineDevicePolicy } from './serialPolicy';
 import { tradedInSql } from './deviceCustody';
 
@@ -367,15 +368,21 @@ export interface CandidateInput {
   defaults?: { model_name?: unknown; model_code?: unknown };
 }
 
-/** The request body → validated candidate rows (paste text OR structured rows, never both). */
-export function candidateRows(body: CandidateInput): { rows: BulkRow[]; too_many: boolean } {
+/**
+ * The request body → validated candidate rows (paste text OR structured rows,
+ * never both), judged by `rule` — the serial format rule of the product the
+ * batch is filed under (owner decision 2; worker/lib/serialRules.ts): a
+ * Bambu-box-shaped value is refused only under a Bambu rule, and the rule's
+ * warnings ride on each row. LEGACY_RULE (today's reading) when none is named.
+ */
+export function candidateRows(body: CandidateInput, rule: SerialRule = LEGACY_RULE): { rows: BulkRow[]; too_many: boolean } {
   const defaults = {
     model_name: normalizeModelName(typeof body.defaults?.model_name === 'string' ? body.defaults.model_name : ''),
     model_code: normalizeModelCode(typeof body.defaults?.model_code === 'string' ? body.defaults.model_code : ''),
   };
   if (typeof body.text === 'string') {
     if (body.text.length > 200_000) throw badRequest('The list is too long', 'SERIAL_LIST_TOO_LONG');
-    return parseSerialList(body.text, defaults);
+    return parseSerialList(body.text, defaults, BULK_MAX_LINES, rule);
   }
   if (!Array.isArray(body.rows)) throw badRequest('Send `text` or `rows`', 'SERIAL_LIST_EMPTY');
   if (body.rows.length > BULK_MAX_LINES) return { rows: [], too_many: true };
@@ -383,7 +390,7 @@ export function candidateRows(body: CandidateInput): { rows: BulkRow[]; too_many
     const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
     const s = (k: string) => (typeof r[k] === 'string' ? (r[k] as string) : '');
     const fields: BulkFields = { serial: s('serial'), model_name: s('model_name'), model_code: s('model_code'), box_sn: s('box_sn'), ean: s('ean') };
-    return buildBulkRow(i + 1, fields, defaults);
+    return buildBulkRow(i + 1, fields, defaults, rule);
   });
   return { rows: markDuplicates(rows), too_many: false };
 }

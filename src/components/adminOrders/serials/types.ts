@@ -4,6 +4,8 @@
  * serialStory). No cost field ever travels here: a batch is an id, a
  * received date and a shelf.
  */
+import type { LinkFormatWire } from './formatNotes';
+
 export type WarrantyState = 'PENDING_DELIVERY' | 'ACTIVE' | 'EXPIRED' | 'NEEDS_CONFIG' | 'RETURNED' | 'CLOSED' | 'NOT_ACTIVATED';
 
 export type SerialStatus = 'in_stock' | 'reserved' | 'sold' | 'registered' | 'returned' | 'unavailable' | 'void';
@@ -38,6 +40,24 @@ export interface SerialSlotView {
   assignment: SlotAssignment | null;
   previous: null | { assignment_id?: string; serial_display: string; serial_full?: string; released_at: string; reason: string; free: boolean };
   flags: string[];
+  /**
+   * The serial format rule of the slot's product (owner decision 2;
+   * worker/lib/serialRules.ts publicRule). `box_sn_shape: 'bambu'` reads a
+   * Bambu-box-shaped value as a box number; under any other rule it is the
+   * serial itself. Absent from an older server: read as 'bambu' (today).
+   */
+  rule?: SlotRule;
+}
+
+export interface SlotRule {
+  id: string;
+  version: number;
+  scope: string;
+  label: string;
+  mode: 'off' | 'warn' | 'enforce';
+  box_sn_shape: 'none' | 'bambu';
+  family_check: boolean;
+  expected: string;
 }
 
 export interface GateMissing {
@@ -66,6 +86,8 @@ export interface LinkResult {
   assignment_id: string;
   slot: { order_item_id: string; unit_index: number; part: string; assignment: SlotAssignment | null };
   warnings: string[];
+  /** The format rule that judged the serial and its warnings (owner decision 2); null before 0181 and on a replay. */
+  format?: LinkFormatWire | null;
 }
 
 export interface UnlinkResult {

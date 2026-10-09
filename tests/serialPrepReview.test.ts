@@ -10,6 +10,8 @@ import { json, post, patch, put, get, row, all, count, failingD1, stubApp } from
 import { world, order, op, SN, SN2, SN3, BOX, USERS, mountSerialWorld, afterReadsOf } from './fixtures/serialPrep';
 import { returnedUnits, sweepUnactivatedSerials } from '../worker/lib/serialAssignments';
 import { buildBulkRow } from '../packages/catalog/src/deviceSerials';
+import { GENERIC_RULE } from '../packages/catalog/src/serialRules';
+import { ruleForProduct } from '../worker/lib/serialRules';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SERIAL_STRINGS } from '../src/components/adminOrders/serials/strings';
@@ -409,7 +411,17 @@ test('integrity #14: the return inspection reads serials through the one canonic
   }
   assert.equal(buildBulkRow(1, { serial: '036000291452' }).problem, 'SERIAL_LOOKS_LIKE_EAN', 'UPC-A');
   assert.equal(buildBulkRow(1, { serial: '96385074' }).problem, 'SERIAL_LOOKS_LIKE_EAN', 'EAN-8');
+  // A box SN is refused under a rule that names the Bambu box shape — Bambu
+  // Lab's seed, and today's (LEGACY_RULE, no rule named) — and accepted WITH
+  // A WARNING under every other brand's (owner decision 2).
+  const bambu = await ruleForProduct(w.db, 'pA1');
+  assert.equal(bambu.id, 'sbr_bambu_lab');
+  assert.equal(buildBulkRow(1, { serial: BOX }, {}, bambu).problem, 'SERIAL_LOOKS_LIKE_BOX');
   assert.equal(buildBulkRow(1, { serial: BOX }).problem, 'SERIAL_LOOKS_LIKE_BOX');
+  const generic = buildBulkRow(1, { serial: BOX }, {}, GENERIC_RULE);
+  assert.equal(generic.problem, null);
+  assert.deepEqual(generic.warnings, [{ code: 'LOOKS_LIKE_BAMBU_BOX' }]);
+  assert.equal(buildBulkRow(1, { serial: '036000291452' }, {}, GENERIC_RULE).problem, 'SERIAL_LOOKS_LIKE_EAN', 'a barcode is refused under every rule');
   assert.equal(buildBulkRow(1, { serial: `SN ${SN}` }).serial_norm, SN, 'the whitespace prefix');
   assert.equal(buildBulkRow(1, { serial: SN, box_sn: BOX }).problem, null, 'a box SN in its own column is welcome');
 });
@@ -485,7 +497,8 @@ test('UX #2/#3/#4/#5/#7/#8/#13: focus never falls to the page, a stale «go to u
   assert.match(slots, /toast\.info\(s\.queuedDropped/, '#5 and said, when it cannot be placed');
   assert.match(slots, /applyLink\(res, read, true\)/, '#7 the sheet\'s own verdict is not toasted twice');
   const sheet = src('src/components/adminOrders/serials/SerialScanSheet.tsx');
-  assert.match(sheet, /if \(res\.warnings\.length === 0\) closeTimer\.current = window\.setTimeout\(onClose/, '#7 a warning keeps the sheet open');
+  // Owner decision 2: a format rule's note is a warning too — it keeps the sheet open the same way.
+  assert.match(sheet, /if \(res\.warnings\.length === 0 && !hasFormatNotes\(res\)\) closeTimer\.current = window\.setTimeout\(onClose/, '#7 a warning keeps the sheet open');
   assert.match(sheet, /data-serial-done/);
   assert.match(sheet, /setOverrideOpen\(!!initialRefusal\)/, '#8 the exception opens in one tap');
   for (const ref of ['scanAgainRef', 'reasonRef', 'overrideBtnRef', 'useReaderRef', 'refocusTyped']) assert.ok(sheet.includes(`${ref}.current`), `#3 ${ref}`);

@@ -38,6 +38,7 @@ import Spinner from '../../ui/Spinner';
 import { primeScannerAudio, scanFeedback } from '../../scanner/feedback';
 import { serialStrings, type SerialStrings } from './strings';
 import { looksLikeBoxSn, newOpId, overrideFor, serialRefusal, serialsApi, shortDate, type ReadPayload } from './serialsApi';
+import { formatNoteTexts } from './formatNotes';
 import { WedgeTracker, isTerminator } from './wedge';
 import SerialScanSheet from './SerialScanSheet';
 import type { LinkResult, OrderSerials, ScanTarget, SerialSlotView, SlotAssignment } from './types';
@@ -173,11 +174,13 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
           description: res.slot.assignment?.serial_display,
         });
         for (const w of res.warnings) toast.info(s.warnings[w] ?? w, { id: `serial-${key}-${w}` });
+        // Owner decision 2: the brand's format rule accepted it with a note.
+        formatNoteTexts(res.format?.warnings, lang).forEach((line, i) => toast.info(line, { id: `serial-${key}-format-${i}` }));
       }
       refresh();
       return read;
     },
-    [onChanged, refresh, s, toast, l3]
+    [onChanged, refresh, s, toast, l3, lang]
   );
 
   /** The next empty unit after `key`, in screen order. */
@@ -212,12 +215,13 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
       applyLink(res, read);
       // A reader fills Unit 1, Unit 2, Unit 3 without a mouse — but never
       // advances past a box SN (the device serial of that box comes next).
-      const next = source !== 'relink' && !looksLikeBoxSn(text) ? nextEmpty(key) : null;
+      const boxShape = slot.rule?.box_sn_shape ?? 'bambu';
+      const next = source !== 'relink' && !looksLikeBoxSn(text, boxShape) ? nextEmpty(key) : null;
       const queued = queuedRead.current?.from === key ? queuedRead.current : null;
       if (queued) queuedRead.current = null;
       const nextSlot = next ? (serialsRef.current.slots ?? []).find((x) => slotKey(x) === next) ?? null : null;
       if (queued && nextSlot) follow = { slot: nextSlot, text: queued.text, source: queued.source };
-      else if (queued && !looksLikeBoxSn(text)) toast.info(s.queuedDropped, { id: `serial-queued-${key}` });
+      else if (queued && !looksLikeBoxSn(text, boxShape)) toast.info(s.queuedDropped, { id: `serial-queued-${key}` });
       // Otherwise the cursor stays on this unit (its field is gone now that
       // it is linked), so the keyboard never falls back to the page.
       afterPaint(() => (next ? inputs.current.get(next) : rows.current.get(key))?.focus({ preventScroll: !next }));

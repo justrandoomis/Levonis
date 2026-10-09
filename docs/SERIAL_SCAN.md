@@ -329,7 +329,8 @@ both policy controls.
 ## Known limits / owner questions
 
 - ANSWERED (owner decision 1, 2026-10-09; DECISIONS row 192): assistants see full serials everywhere, so the serial INVENTORY list, «أجهزة الطلبات» and the WARRANTY RECEIPTS are no longer exceptions — the serial page, the unit history and the receipt history now show assistants the whole serial too. ORDER NUMBERS were not part of the decision: the serial page and the serial histories keep them for `canMoveMoney` (option A), while the inventory list, «أجهزة الطلبات» and one receipt's own record (`GET /api/admin/warranties/:id`, its `receipt.order_id`) still show assistants the order number, as before this feature (the receipts are found by serial, phone or order). Hiding order numbers there too is one predicate if the owner wants it.
-- The inventory's bulk add now refuses a product barcode of any length and a box-SN-shaped value in the serial column (the same reading as the scan). A non-Bambu device whose real serial looks like a Bambu box SN (`B` + 4 digits + a letter …) can no longer be filed — say so if the shop sells such brands. The post-delivery and replacement doors read through the same canonicaliser (no `/ . _`, 6 characters at least).
+- The inventory's bulk add refuses a product barcode of any length in the serial column (the same reading as the scan). The post-delivery and replacement doors read through the same canonicaliser (no `/ . _`, 6 characters at least).
+- ANSWERED (owner decision 2, 2026-10-09; DECISIONS row 195; migration 0181): the shop sells other brands (Snapmaker — a Snapmaker product is live — Creality, Anycubic, ELEGOO), so the Bambu box-SN shape no longer refuses a serial on its own. Every door judges a serial by the FORMAT RULE of its product — the product's own rule, else its brand's (`products.brand_id`), else the generic rule (letters and digits, 6–40) — see «Serial formats by brand and product» below. Under Bambu Lab's rule a box-SN-shaped value is still refused (`BOX_ONLY` / `SERIAL_LOOKS_LIKE_BOX`) and the model-family check still runs; under any other rule it is the brand's serial, accepted with the warning `LOOKS_LIKE_BAMBU_BOX`. A product that needs a serial but has NO brand falls to the generic rule — the owner's screen lists those products so their brand is set.
 - The inventory panel has no Sorani table (pre-existing: Sorani readers get its Arabic). Its two new bulk problems (a product barcode, a box SN in the serial column) carry their own Sorani (`PROBLEMS_CKB` / `problemText` in `src/components/adminWarranty/serialInventory/model.ts`).
 
 - ANSWERED (owner decision 3, 2026-10-09; DECISIONS row 193): a trade-in does NOT close the unit — `warranty_closed_reason = 'traded_in'` is never written (the value stays in the CHECK list, unused). The traded-in state is DERIVED from `trade_in_requests` (status `completed`, scope not `ams_only`; `tradedInSql` in worker/lib/deviceCustody.ts), so trade-ins completed before the decision count too. Completion (whole / printer_only) revokes the trader's link and releases the activated binding as `traded_in` (`trade_in:<id>`), with `serial.traded_in` history, in the request's own fenced batch; the warranty dates, closure and receipt are never touched. Every customer door then treats the unit as the shop's (`/mine`, `/eligible`, `/register` by serial or receipt — the one non-enumerating answer, the trader included —, `/units/:id/register` and claims → 409 `DEVICE_NOT_WITH_CUSTOMER`, the support card); the inventory reads it `returned`; staff resell it without an exception (`classifyLink`), on the new product's listing or a condition listing of it (`condition_doc.new_product_id`, S12). `printer_only` is treated like `whole` (the serial is the printer's). The serial check at trade-in (plan S13) is NOT built: it would add a mandatory staff step the owner did not ask for. Review round: the request names the slot the customer bought, but the device in their hands may be a warranty REPLACEMENT of it (a new `unit_index` on the same line), so the traded-in state follows the replacement chain (`tradedInSql`, up to four replacements) and completion acts on the slot's live unit (`liveUnitOfSlot`); a device linked to ANOTHER account (passed on by its buyer) is refused at eligibility, at the request and at completion, also inside the completion batch (`TRADE_IN_LINKED_ELSEWHERE`); a sold-and-back device's intake lot link is history (the resale takes the line's own allocation, no lot refusal, no gate conflict); a resale whose delivery was undone and cancelled hands on the original warranty (`warrantySourceOf`); and the carried window written at delivery (S8) is taken back when its binding is released without activating (`headStartUndoStatements`, audited `device.window_restored`).
@@ -344,6 +345,62 @@ both policy controls.
 - ANSWERED (owner decision 4, 2026-10-09; DECISIONS row 192): a used / open-box / refurbished grade turns serial tracking on by itself for a printer only; every other graded product follows its section policy or the owner's own setting (§29 above). Products graded before the decision that already carry `serialized = true` are not changed; the owner may review them.
 - The TXT template carries no grade: its export writes no `condition_*` lines for a product, and an update through it writes `condition_doc` back to new (`{}`), un-grading a used listing (pre-existing; seen while testing decision 4, not changed here). Grade products through the form or the import sheet until it is fixed.
 
+## Serial formats by brand and product (owner decision 2, migration 0181)
+
+`serial_brand_rules` (Devices) holds the owner's rules, one ACTIVE rule per
+brand and per product (partial unique indexes). The format is restricted —
+never a pattern (`packages/catalog/src/serialRules.ts` `parseSerialRule`
+refuses unknown keys, out-of-range values and any pattern-looking string, and
+the evaluator builds no RegExp from data):
+
+| Field | Meaning |
+|---|---|
+| `mode` | `off` (no format check beyond the hard ones, and no box or family check) · `warn` (accept, warn on the screen, write the warning into the audit — the default) · `enforce` (refuse `SERIAL_FORMAT_MISMATCH {rule_id, problems}`, nothing written) |
+| `charset` | a NAME: `ALNUM`, `DIGITS`, `HEX` |
+| `min_len` / `max_len`, `lengths` | within 6–40; `lengths` (≤ 6) are exact lengths, empty = the range |
+| `prefixes`, `prefix_policy` | ≤ 64 `{p, m, a?}` matched with `startsWith`; an unknown prefix warns (`hint`) or counts as a mismatch (`known_only`) |
+| `positions` | ≤ 8 `{at, len, cls}` with `cls` `DIGIT` · `LETTER` · `ALNUM` or a literal |
+| `box_sn_shape` | `none` · `bambu` (the one box classifier in code) |
+| `family_check` | the model-family check from the prefix, with the prefix's aliases |
+
+Seeds (`INSERT OR IGNORE`, bound to the brand whose slug is `bambu-lab` /
+`snapmaker` or whose English name matches, else left unbound for one tap on
+the screen): **Bambu Lab** — 15 or 18 characters, Bambu's 13 printer
+prefixes (`00M` also answers to «X1 Carbon», so a real X1C is no model
+mismatch any more), the box refusal and the family check, `warn`;
+**Snapmaker** — the generic letters and digits 6–40 in `warn` (only the U1 is
+documented and its printed form is open; no format invented). Creality,
+Anycubic and ELEGOO have no row: the generic rule until the owner adds one —
+no code change.
+
+| Door | Rule read |
+|---|---|
+| Preparation scan, change, owner exception (`linkSerial`) | the line's product (`ruleForOrderItem`), BEFORE the serial is canonicalised; the format verdict in `classifyLink`; `serial.linked` carries `format {rule_id, rule_version, warnings}` in the same batch |
+| Post-delivery assign, replacement's new serial (`devices.ts`) | the unit's product (`ruleForUnit`); `format` in the audit and the answer |
+| Bulk Add `/preview`, `/commit` | the chosen product (unverified read, so the refusals keep their order), else generic; rows carry `warnings`; the commit audit counts them |
+| Inventory camera / manual `/scan` | the chosen product, else the label's own (`identifyLabel`), else generic — identified BEFORE the row is judged |
+| Return inspection | lenient, today's reading (a returned device is on file) |
+
+The hard checks stay for every brand. Before 0181 every reader answers
+`LEGACY_RULE` (today's behaviour exactly; the installed cache remembers only
+"true"). Screens: «صيغ الأرقام التسلسلية» beside the serial inventory
+(`SerialRulesTab`, its own ar/en/ckb table): a card per rule, a test box that
+runs the same evaluator before saving, the impact on that brand's inventory
+(`/dry-run`, at most 5,000 serials), «اربطها بعلامة تجارية», and the products
+that need a serial but have no brand, each linked to its editor
+(`/admin?tab=products&edit=<id>`). Format warnings are amber on the order
+slots, the camera sheet, the inventory camera, the manual entry and the bulk
+preview, in ar/en/ckb.
+
+| Route | Who |
+|---|---|
+| `GET /api/admin/serial-rules` | every admin — rules, brands with their serialized products, products with no brand, `installed` |
+| `GET /api/admin/serial-rules/resolve?product_id=` | every admin |
+| `POST /api/admin/serial-rules` | owner — `serial_rule.create` in the batch |
+| `PUT /api/admin/serial-rules/:id` | owner — `expected_version`; `serial_rule.update {from,to}` guarded by `changes() = 1`; 409 `SERIAL_RULE_CHANGED` |
+| `POST /api/admin/serial-rules/:id/deactivate` | owner — soft, `serial_rule.deactivate` |
+| `POST /api/admin/serial-rules/dry-run` | owner — read-only |
+
 ## Live checks after the deploy (read-only)
 
 ```sql
@@ -356,6 +413,12 @@ SELECT COUNT(*) FROM serial_assignments a JOIN orders o ON o.id = a.order_id WHE
 -- critique M7: keys stored before the normaliser's last rules (the scan treats them as the same device)
 SELECT serial_norm FROM device_serials WHERE serial_norm GLOB '*[^0-9A-Z]*';
 SELECT serial_norm FROM warranty_receipts WHERE status IN ('draft','active') AND serial_norm GLOB '*[^0-9A-Z]*';
+-- owner decision 2 (migration 0181): the seeds landed, bound or not, and one active rule per brand
+SELECT id, scope, brand_id, mode, box_sn_shape, family_check, version, active FROM serial_brand_rules ORDER BY scope, id;
+SELECT brand_id, COUNT(*) FROM serial_brand_rules WHERE scope = 'brand' AND active = 1 AND brand_id IS NOT NULL GROUP BY 1 HAVING COUNT(*) > 1;
+-- the brands the seeds look for (slug or English name), and the products that need a serial but have no
+-- brand (the owner's list on «صيغ الأرقام التسلسلية» shows the same; a Bambu printer among them falls to the generic rule)
+SELECT id, slug, name_en, active FROM brands ORDER BY active DESC, name_en;
 -- owner decision 4 (run BEFORE the push too): every non-printer section holding an AMS product, with its
 -- serial policy — each one still 'inherit' must be set to «مطلوب» or a used AMS graded there is not tracked
 SELECT c.id, c.name_ar, c.serial_policy, COUNT(DISTINCT p.id) AS products

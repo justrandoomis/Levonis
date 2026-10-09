@@ -21,6 +21,7 @@ import { Modal } from '../adminProducts/ui';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { openWarrantyDoc, popupBlockedMessage } from './printDoc';
+import { serialRulesStrings } from './serialInventory/serialRulesStrings';
 
 interface ReceiptRow {
   id: string;
@@ -163,9 +164,11 @@ const shortDate = (iso: string | null): string => (iso ? iso.slice(0, 10) : '—
 const SerialInventoryPanel = React.lazy(() => import('./serialInventory/SerialInventoryPanel'));
 // «الأجهزة والتسلسلات» (order units, warranty claims), merged into this tab.
 const AdminSerials = React.lazy(() => import('../AdminSerials'));
+// «صيغ الأرقام التسلسلية» (0181, owner decision 2) — beside the inventory, its own chunk.
+const SerialRulesTab = React.lazy(() => import('./serialInventory/SerialRulesTab'));
 
-type WarrantyView = 'receipts' | 'serials' | 'units' | 'claims';
-const VIEWS: readonly WarrantyView[] = ['receipts', 'serials', 'units', 'claims'];
+type WarrantyView = 'receipts' | 'serials' | 'serial_rules' | 'units' | 'claims';
+const VIEWS: readonly WarrantyView[] = ['receipts', 'serials', 'serial_rules', 'units', 'claims'];
 const VIEW_KEY = 'levonis.admin.warrantyView';
 
 /**
@@ -214,7 +217,9 @@ export default function AdminWarranties({ initialView }: { initialView?: Warrant
               ? label('وصولات الضمان', 'Warranty receipts')
               : v === 'serials'
                 ? label('الأرقام التسلسلية', 'Serial numbers')
-                : v === 'units'
+                : v === 'serial_rules'
+                  ? serialRulesStrings(lang).tabTitle
+                  : v === 'units'
                   ? label('أجهزة الطلبات', 'Order units')
                   : label('مطالبات الضمان', 'Warranty claims')}
           </button>
@@ -224,7 +229,7 @@ export default function AdminWarranties({ initialView }: { initialView?: Warrant
         <WarrantyReceipts />
       ) : (
         <React.Suspense fallback={<div className={`${T.surface} p-8 text-center text-[13px] text-[var(--ap-text-3)]`}>{label('جارٍ التحميل…', 'Loading…')}</div>}>
-          {view === 'serials' ? <SerialInventoryPanel /> : <AdminSerials view={view} />}
+          {view === 'serials' ? <SerialInventoryPanel /> : view === 'serial_rules' ? <SerialRulesTab /> : <AdminSerials view={view} />}
         </React.Suspense>
       )}
     </div>

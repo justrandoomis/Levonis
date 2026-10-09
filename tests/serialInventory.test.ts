@@ -530,6 +530,15 @@ test('the chosen product wins over the label, and a model name matches only its 
   assert.equal(serialModelHint('03919D580607841')?.model, 'A1');
   assert.equal(serialModelHint('01P00A351500123')?.model, 'P1S');
   assert.equal(serialModelHint('B29A99A660900950'), null, 'another brand, no guess');
+  // Owner decision 2: with the rule of the serial's product the hint is that
+  // rule's — Bambu Lab's 13 prefixes and its 18-character serials; a rule with
+  // no prefixes (another brand, the generic rule) names no family at all.
+  const { GENERIC_RULE } = await import('../packages/catalog/src/serialRules');
+  const bambu = { ...GENERIC_RULE, id: 'b', label: 'Bambu Lab', lengths: [15, 18], prefixes: [{ p: '039', m: 'A1' }, { p: '094', m: 'H2D' }] };
+  assert.equal(serialModelHint('094AB0123456789', bambu)?.label, 'Bambu Lab H2D');
+  assert.equal(serialModelHint('03919D580607841ABC', bambu)?.model, 'A1');
+  assert.equal(serialModelHint('B29A99A660900950', bambu), null);
+  assert.equal(serialModelHint('03919D580607841', GENERIC_RULE), null);
 });
 
 test('«إدخال يدوي» goes through the same door: recorded as typed, and a typed model name files the serial under its one product', async () => {

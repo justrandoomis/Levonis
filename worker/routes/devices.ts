@@ -109,7 +109,8 @@ import {
   type WarrantySnapshotLite,
 } from '../lib/deviceOps';
 import { linkFromInventory } from '../lib/serialInventory';
-import { canonicalSerial, maskedDetail, refuse as serialRefuse, serialActor, serialAssignmentsInstalled } from '../lib/serialAssignments';
+import { canonicalSerial, judgeFormat, maskedDetail, refuse as serialRefuse, serialActor, serialAssignmentsInstalled } from '../lib/serialAssignments';
+import { formatAudit, ruleForUnit } from '../lib/serialRules';
 import { lineDevicePolicy, serializationContext, serializedWriteVerdict } from '../lib/serialPolicy';
 import { auditStatements } from '../lib/audit';
 import { isOwner } from '../lib/adminScope';
@@ -1441,7 +1442,11 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
   const unitId = c.req.param('unitId');
   const body = await c.req.json().catch(() => ({}));
   str(body.serial, 'serial', { min: 1, max: 80 });
-  const { norm, raw: serialRaw } = await canonicalSerial(c.env.DB, body.serial);
+  // The format rule of the unit's product (owner decision 2): a box-shaped
+  // value is a box number only under a Bambu rule; any other brand's serial
+  // of that shape is the serial itself.
+  const rule = await ruleForUnit(c.env.DB, unitId);
+  const { norm, raw: serialRaw } = await canonicalSerial(c.env.DB, body.serial, rule);
   const reassign = body.reassign === true;
   const reason = str(body.reason, 'reason', { max: 500, required: false });
 
@@ -1466,6 +1471,10 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
   if (bySerial && bySerial.unit_id === unitId) {
     return c.json({ success: true, serial: bySerial.serial_raw, unchanged: true });
   }
+  // `enforce` refuses a serial its rule does not match (nothing written);
+  // `warn` assigns it and says so — on the screen and in the audit row.
+  const formatWarnings = judgeFormat(norm, rule);
+  const format = formatAudit(rule, formatWarnings);
   const owner = isOwner(c.env, admin);
   if (installed) {
     // A DELIVERED order's OPEN unit only (integrity review #5): a cancelled
@@ -1594,6 +1603,7 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
         detached_serial: byUnit && byUnit.serial_norm !== norm ? byUnit.serial_norm : null,
         detached_serial_raw: byUnit && byUnit.serial_norm !== norm ? byUnit.serial_raw : null,
         reason,
+        ...(format ? { format } : {}),
       })
     ).statements
   );
@@ -1607,7 +1617,7 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
     }
     throw e;
   }
-  return c.json({ success: true, serial: serialRaw });
+  return c.json({ success: true, serial: serialRaw, format: format ? { ...format, warnings: formatWarnings } : null });
 });
 
 // ------------------------------------------------------ delivery correction
@@ -1814,10 +1824,15 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
   // 2026-10-09; DECISIONS row 192). The replacement itself — a unit closed
   // and carried over with no serial — keeps the gate it always had.
   if (typedNewSerial) await requireSerialWrite(c.env, admin);
-  // 0178: the one canonicaliser, as at preparation (an EAN or a box SN is not a device).
-  const canonical = typedNewSerial ? await canonicalSerial(c.env.DB, typedNewSerial) : null;
+  // 0178: the one canonicaliser, as at preparation (an EAN or a box SN is not
+  // a device) — under the format rule of the replaced unit's product (owner
+  // decision 2): the replacement is the same product.
+  const rule = typedNewSerial ? await ruleForUnit(c.env.DB, unitId) : null;
+  const canonical = typedNewSerial && rule ? await canonicalSerial(c.env.DB, typedNewSerial, rule) : null;
   const newSerialRaw = canonical?.raw ?? '';
   const newSerialNorm = canonical?.norm ?? '';
+  const formatWarnings = canonical && rule ? judgeFormat(canonical.norm, rule) : [];
+  const format = canonical && rule ? formatAudit(rule, formatWarnings) : null;
   const installed = await serialAssignmentsInstalled(c.env.DB);
   const deliveredAt = body.delivered_at ? isoOrBad(body.delivered_at, 'delivered_at') : new Date().toISOString();
 
@@ -1969,11 +1984,13 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
     new_serial: newSerialNorm || null,
     revoked_registration: !!activeReg,
     warranty_rule: 'carried_original_end',
+    ...(format ? { format } : {}),
   });
   return c.json({
     success: true,
     new_unit_id: newUnitId,
     warranty_rule: 'carried_original_end',
+    format: format ? { ...format, warnings: formatWarnings } : null,
     note: 'The replacement carries the ORIGINAL warranty end date. The remaining-vs-new coverage rule after replacement is pending an owner decision (decision register) — no reset period is invented.',
   });
 });
