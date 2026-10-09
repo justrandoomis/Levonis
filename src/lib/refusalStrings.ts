@@ -1773,6 +1773,17 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This item is not part of this order.',
     ckb: 'ئەم بەرهەمە بەشێک نییە لەم داواکارییە.',
   },
+  // Owner decision 1 (2026-10-09; DECISIONS row 192): adding, changing or
+  // removing a serial follows the «الاستلام» operations permission
+  // (`requireSerialWrite`, worker/lib/operations.ts). Its own code, so the
+  // camera sheet, the inventory panel, «أجهزة الطلبات» and the order's warranty
+  // section say why — a retry cannot help — in the admin's language. The
+  // permission's name is the one the permissions panel shows.
+  SERIAL_WRITE_NOT_ALLOWED: {
+    ar: 'إضافة الأرقام التسلسلية وتغييرها وإزالتها تحتاج صلاحية «الاستلام»، وهي موقوفة لحسابك — اطلبها من المالك.',
+    en: 'Adding, changing or removing a serial number needs the “Receiving” permission, which is turned off for your account — ask the owner.',
+    ckb: 'زیادکردن، گۆڕین یان لابردنی ژمارەی زنجیرەیی پێویستی بە دەسەڵاتی «وەرگرتن» هەیە، کە بۆ هەژمارەکەت ڕاگیراوە — لە خاوەنی فرۆشگا داوای بکە.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

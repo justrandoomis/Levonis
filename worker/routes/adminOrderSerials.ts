@@ -15,8 +15,9 @@
  * WHO. Any admin may scan, change and unlink while the order is being
  * prepared, unless the owner revoked their `receive` operations capability
  * (worker/lib/operations.ts — the capability that already gates serial→lot
- * linking; `requireSerialWrite` on the doors that add a serial, the same rule
- * as the inventory's intake doors). Every admin sees the whole serial (owner
+ * linking; `requireSerialWrite` on scan, change and unlink, the same rule as
+ * the inventory's intake doors, refused as SERIAL_WRITE_NOT_ALLOWED in the
+ * admin's language). Every admin sees the whole serial (owner
  * decision 1, 2026-10-09). Every exception is the OWNER's (INITIAL_ADMIN_EMAIL): taking a
  * serial from another order, a delivered or unavailable device, outside the
  * window, a batch or model mismatch — each with a 5–500 character reason,
@@ -29,7 +30,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, int, str, oneOf } from '../lib/http';
-import { requireCapability, requireSerialWrite } from '../lib/operations';
+import { requireSerialWrite } from '../lib/operations';
 import {
   OVERRIDE_KINDS,
   linkSerial,
@@ -165,7 +166,9 @@ adminOrderSerialRoutes.post('/:id/serials/change', async (c) => {
 
 adminOrderSerialRoutes.post('/:id/serials/unlink', async (c) => {
   const user = c.get('user')!;
-  await requireCapability(c.env, user, 'receive');
+  // The same `receive` rule it always had, refused with the code the scan
+  // sheet translates (SERIAL_WRITE_NOT_ALLOWED) rather than an Arabic-only FORBIDDEN.
+  await requireSerialWrite(c.env, user);
   const b = await body(c);
   const res = await unlinkSerial(c.env, serialActor(c.env, user), {
     orderId: orderIdOf(c),

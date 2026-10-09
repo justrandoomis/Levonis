@@ -1714,6 +1714,11 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const reason = str(body.reason, 'reason', { min: 5, max: 500 });
   const typedNewSerial = str(body.new_serial, 'new_serial', { max: 80, required: false });
+  // Naming a NEW serial adds it (its asset row and an activated binding), so
+  // that half follows `receive` like every intake door (owner decision 1,
+  // 2026-10-09; DECISIONS row 192). The replacement itself — a unit closed
+  // and carried over with no serial — keeps the gate it always had.
+  if (typedNewSerial) await requireSerialWrite(c.env, admin);
   // 0178: the one canonicaliser, as at preparation (an EAN or a box SN is not a device).
   const canonical = typedNewSerial ? await canonicalSerial(c.env.DB, typedNewSerial) : null;
   const newSerialRaw = canonical?.raw ?? '';

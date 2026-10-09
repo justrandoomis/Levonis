@@ -188,11 +188,11 @@ export default function AddSerialsPanel({
         });
         return toFeedback(state);
       } catch (e) {
-        put({ ...base, state: 'error', problem: refusalText(e, t) });
+        put({ ...base, state: 'error', problem: refusalText(e, t, lang) });
         return 'invalid';
       }
     },
-    [put, t]
+    [put, t, lang]
   );
 
   const onRead = useCallback(

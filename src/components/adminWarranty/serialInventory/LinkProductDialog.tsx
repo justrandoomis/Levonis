@@ -12,6 +12,7 @@ import { AlertTriangle, Link2 } from 'lucide-react';
 import * as T from '../../adminProducts/theme';
 import { Overlay } from '../../ui/Overlay';
 import ProductPicker from '../../adminProducts/form/ProductPicker';
+import { useLanguage } from '../../../LanguageContext';
 import { inventoryApi, refusalText, type InventoryStrings } from './model';
 
 export interface LinkTarget {
@@ -36,6 +37,7 @@ export default function LinkProductDialog({
   onLinked: (result: { linked: number; productId: string; productName: string; ean: string }) => void;
 }) {
   const titleId = useId();
+  const { lang } = useLanguage();
   const [productId, setProductId] = useState('');
   const [productName, setProductName] = useState('');
   const [variantId, setVariantId] = useState('');
@@ -86,7 +88,7 @@ export default function LinkProductDialog({
         onLinked({ linked: 1, productId, productName, ean: '' });
       }
     } catch (e) {
-      setErr(refusalText(e, t));
+      setErr(refusalText(e, t, lang));
     } finally {
       setBusy(false);
     }

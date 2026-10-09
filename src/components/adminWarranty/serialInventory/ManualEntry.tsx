@@ -99,7 +99,7 @@ export default function ManualEntry({
         setOneError((res.problem && problemText(t, lang, res.problem)) || t.notASerial);
       }
     } catch (err) {
-      setOneError(refusalText(err, t));
+      setOneError(refusalText(err, t, lang));
     } finally {
       setOneBusy(false);
     }
@@ -114,7 +114,7 @@ export default function ManualEntry({
       setPreview(res);
       setPreviewFor(text);
     } catch (err) {
-      setBulkError(refusalText(err, t));
+      setBulkError(refusalText(err, t, lang));
       setPreview(null);
     } finally {
       setBulkBusy(null);
@@ -134,7 +134,7 @@ export default function ManualEntry({
       setPreviewFor('');
       onSaved();
     } catch (err) {
-      setBulkError(refusalText(err, t));
+      setBulkError(refusalText(err, t, lang));
     } finally {
       setBulkBusy(null);
     }

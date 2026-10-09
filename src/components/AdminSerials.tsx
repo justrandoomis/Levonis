@@ -5,6 +5,7 @@ import {
   MessageSquare, Send, ChevronDown, ChevronUp, PackageCheck, Unlink, X, Crown, History, ExternalLink,
 } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
+import { apiRefusal, refusalLang } from '../lib/refusalStrings';
 import { Overlay } from './ui/Overlay';
 import { dateLocale } from './orders/format';
 import UnitHistory from './adminWarranty/UnitHistory';
@@ -654,7 +655,9 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
         // in the window below.
         openPending({ kind: 'reassign', device, serial, detail: e.message });
       } else {
-        setUnitsError(e instanceof ApiError ? e.message : s.error);
+        // By code where the shared table has one (SERIAL_WRITE_NOT_ALLOWED
+        // when the owner turned «الاستلام» off): the server's sentence is Arabic only.
+        setUnitsError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : s.error);
       }
     } finally {
       setBusyUnit(null);
@@ -720,7 +723,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
       // is the prompt, not an error to swallow: arm the confirmation and let
       // the admin say it again on purpose.
       if (e instanceof ApiError && e.code === 'CONFIRM_SHORTER_REQUIRED') setPendingShorter(true);
-      setPendingError(e instanceof ApiError ? e.message : s.error);
+      setPendingError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : s.error);
     } finally {
       setPendingBusy(false);
       setBusyUnit(null);

@@ -10,9 +10,13 @@ export type SerialStatus = 'in_stock' | 'reserved' | 'sold' | 'registered' | 're
 
 export interface SlotAssignment {
   id: string;
-  /** Full for the owner and full-scope admins, masked for assistants. */
+  /**
+   * The whole serial for every admin since owner decision 1 (2026-10-09;
+   * DECISIONS row 192); a masked form is still rendered if the server ever
+   * sends one (its masking path stays as defence in depth).
+   */
   serial_display: string;
-  /** Present only when the viewer may see the whole serial. */
+  /** Present only when the viewer may see the whole serial — every admin today. */
   serial_full?: string;
   linked_at: string;
   linked_by: string;

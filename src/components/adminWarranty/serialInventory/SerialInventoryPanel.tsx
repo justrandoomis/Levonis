@@ -138,7 +138,7 @@ export default function SerialInventoryPanel() {
       setRows((r) => [...r, ...res.rows]);
       setCursor(res.next_cursor);
     } catch (e) {
-      toast.error(refusalText(e, t));
+      toast.error(refusalText(e, t, lang));
     } finally {
       setLoadingMore(false);
     }
@@ -169,7 +169,7 @@ export default function SerialInventoryPanel() {
       toast.success(voiding ? t.voided : t.restored);
       void load();
     } catch (e) {
-      toast.error(refusalText(e, t));
+      toast.error(refusalText(e, t, lang));
     }
   };
 

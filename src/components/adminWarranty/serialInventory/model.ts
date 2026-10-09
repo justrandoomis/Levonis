@@ -4,6 +4,7 @@
  * a Sorani-reading admin gets the Arabic, like every other admin panel.
  */
 import { api, ApiError } from '../../../lib/api';
+import { REFUSAL_STRINGS } from '../../../lib/refusalStrings';
 import type { BulkRowProblem } from '../../../../packages/catalog/src/deviceSerials';
 
 export const INVENTORY_BASE = '/api/devices/admin/serial-inventory';
@@ -560,8 +561,18 @@ export const STR = {
 
 export type InventoryStrings = typeof STR.ar;
 
-/** A refusal in the admin's language — by its stable code, never the raw server text. */
-export function refusalText(e: unknown, t: InventoryStrings): string {
-  if (e instanceof ApiError && e.code && t.refusal[e.code]) return t.refusal[e.code];
-  return t.genericError;
+/**
+ * A refusal in the admin's language — by its stable code, never the raw server
+ * text. The panel's own codes read from its table; a code the programme's
+ * table owns (src/lib/refusalStrings.ts — SERIAL_WRITE_NOT_ALLOWED when the
+ * owner turned «الاستلام» off, OWNER_ONLY on a serial with history) reads
+ * from there, Sorani included, so the admin learns WHY rather than "try
+ * again" for a refusal no retry can lift. `lang` defaults to the table's own.
+ */
+export function refusalText(e: unknown, t: InventoryStrings, lang?: string): string {
+  if (!(e instanceof ApiError) || !e.code) return t.genericError;
+  const shared = REFUSAL_STRINGS[e.code];
+  const l = lang === 'en' || lang === 'ckb' || lang === 'ar' ? lang : t === STR.en ? 'en' : 'ar';
+  if (shared && l === 'ckb') return shared.ckb;
+  return t.refusal[e.code] ?? (shared ? shared[l] : t.genericError);
 }

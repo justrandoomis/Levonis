@@ -31,6 +31,8 @@ import { gateRefusalOf } from '../src/components/adminOrders/serials/SerialGateR
 import { withSlot } from '../src/components/adminOrders/serials/UnitSerialSlots';
 import { eventLabel } from '../src/components/adminWarranty/serial/SerialDetail';
 import { gradedSerialAnswer } from '../src/components/adminProducts/form/ConditionSection';
+import { refusalText as inventoryRefusal, STR as INVENTORY_STR } from '../src/components/adminWarranty/serialInventory/model';
+import { SERIAL_WRITE_NOT_ALLOWED_TEXT } from '../worker/lib/operations';
 import { ApiError } from '../src/lib/api';
 import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
 
@@ -288,6 +290,36 @@ test('owner decision 4 on the product form: a graded listing says whether serial
   const cond = read('src/components/adminProducts/form/ConditionSection.tsx');
   assert.ok(cond.indexOf('data-graded-serial-tracking') > cond.indexOf('{condition && ('), 'the line sits inside the graded block');
   assert.match(read('src/components/adminTaxonomy/SectionsTab.tsx'), /\{ss\.sectionUsedHint\}/);
+});
+
+test('owner decision 1, review fixes: a revoked «الاستلام» is refused as SERIAL_WRITE_NOT_ALLOWED and every serial screen says why in three languages', () => {
+  const s = REFUSAL_STRINGS.SERIAL_WRITE_NOT_ALLOWED;
+  assert.ok(s, 'the shared table owns the code');
+  assert.equal(s.ar, SERIAL_WRITE_NOT_ALLOWED_TEXT, 'the Arabic is the server\'s own sentence');
+  assert.ok(s.ar.includes('«الاستلام»') && s.en.includes('“Receiving”') && s.ckb.includes('«وەرگرتن»'), 'each names the permission as its panel does');
+  assert.notEqual(s.ckb, s.ar);
+  assert.notEqual(s.en, s.ar);
+  assert.doesNotMatch(s.ckb, /[ةىيك]/, `no Arabic-only letter in the Sorani: «${s.ckb}»`);
+  assert.match(s.ckb, /[ڕڵێۆەڤگچپژ]/, 'the Sorani is Sorani');
+
+  // The inventory panel (scan, bulk add, link-EAN): by code, in the reader's language — never "try again".
+  const refused = new ApiError(403, SERIAL_WRITE_NOT_ALLOWED_TEXT, 'SERIAL_WRITE_NOT_ALLOWED');
+  assert.equal(inventoryRefusal(refused, INVENTORY_STR.ar, 'ar'), s.ar);
+  assert.equal(inventoryRefusal(refused, INVENTORY_STR.en, 'en'), s.en);
+  assert.equal(inventoryRefusal(refused, INVENTORY_STR.ar, 'ckb'), s.ckb, 'a Sorani admin reads Sorani');
+  assert.equal(inventoryRefusal(refused, INVENTORY_STR.en), s.en, 'no lang: the table\'s own language');
+  assert.equal(inventoryRefusal(new ApiError(400, 'x', 'SERIAL_LIST_EMPTY'), INVENTORY_STR.en, 'en'), INVENTORY_STR.en.refusal.SERIAL_LIST_EMPTY, 'the panel\'s own codes are unchanged');
+  assert.equal(inventoryRefusal(new ApiError(500, 'x', 'SOMETHING_ELSE'), INVENTORY_STR.en, 'en'), INVENTORY_STR.en.genericError);
+  for (const f of ['AddSerialsPanel.tsx', 'ManualEntry.tsx', 'LinkProductDialog.tsx']) {
+    const src = read(`src/components/adminWarranty/serialInventory/${f}`);
+    assert.doesNotMatch(src, /refusalText\((e|err|e2), t\)/, `${f}: every intake refusal passes the reader's language`);
+  }
+
+  // The camera sheet decodes by code through the shared table; «أجهزة الطلبات» and the order's warranty section too.
+  assert.match(read('src/components/adminOrders/serials/serialsApi.ts'), /refusalText\(err\.code, l, /);
+  const units = read('src/components/AdminSerials.tsx');
+  assert.equal((units.match(/apiRefusal\(e, refusalLang\(lang\), e\.message\)/g) ?? []).length, 2, 'the assign and the replace / reassign window');
+  assert.match(read('src/components/adminWarranty/WarrantySection.tsx'), /apiRefusal\(e, rl, e\.message\)/);
 });
 
 test('the scanner\'s Sorani is complete — no line spreads the Arabic any more (spec §5.8, DECISIONS row 183)', () => {

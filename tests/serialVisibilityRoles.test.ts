@@ -16,10 +16,13 @@
  *   mer  — a merchant; and an anonymous visitor
  *
  *   1. every admin reads the whole serial on every admin serial surface;
- *      order numbers on the serial page and in histories follow
- *      canMoveMoney (option A);
+ *      order numbers on the serial page and in every history follow
+ *      canMoveMoney (option A) — one receipt's own record keeps its
+ *      `order_id`, the documented exception (docs/SERIAL_SCAN.md);
  *   2. customers, merchants and visitors see what they saw before;
- *   3. adding a serial follows `receive`; edits keep their own gates;
+ *   3. adding, changing or removing a serial follows `receive`, refused as
+ *      SERIAL_WRITE_NOT_ALLOWED in three languages — a warranty replacement
+ *      that names a new serial included; edits keep their own gates;
  *   4. every exception stays the owner's, audited in its own batch;
  *   5. no cost reaches the newly unmasked roles;
  *   6. the predicate, and the static nets that keep a serial apart from cost.
@@ -37,6 +40,7 @@ import { ROOT } from './fixtures/d1';
 import { codeOf } from './fixtures/source';
 import { world, order, op, mountSerialWorld, USERS, SN, SN2, SN3, BOX } from './fixtures/serialPrep';
 import { OVERRIDE_KINDS } from '../worker/lib/serialAssignments';
+import { SERIAL_WRITE_NOT_ALLOWED_TEXT } from '../worker/lib/operations';
 import { maskSerial } from '../worker/lib/deviceOps';
 import { canSeeFullSerial, canMoveMoney, FINANCIAL_FIELDS } from '../worker/lib/adminScope';
 import { supportRoutes } from '../worker/routes/support';
@@ -77,7 +81,7 @@ const scanBody = (item: string, unit: number, code: string) => ({ order_item_id:
 
 // ====================================================================== 1
 
-test('decision 1 matrix: the owner, a full admin, an assistant, the preparer and support read the whole serial on every admin serial surface; order numbers follow canMoveMoney', async () => {
+test('decision 1 matrix: the owner, a full admin, an assistant, the preparer and support read the whole serial on every admin serial surface; order numbers on the serial page and in every history follow canMoveMoney', async () => {
   const w = world();
   const as = roles(w);
   order(w.raw, 'ORD-VIS', [{ id: 'l1', product: 'pA1', qty: 4 }]);
@@ -139,10 +143,15 @@ test('decision 1 matrix: the owner, a full admin, an assistant, the preparer and
     const hist = await json(await get(as(who), `/api/devices/admin/units/${unit.id}/history`));
     assert.deepEqual(hist.history[0].detail, { serial_norm: SN, detached_serial: SN5, order_id: money ? 'ORD-VIS' : null, reason: 'swap' }, tag);
 
-    // The receipt and its history.
+    // The receipt and its history. The history follows canMoveMoney; the
+    // receipt's OWN record keeps its order number for every admin — the
+    // documented exception (docs/SERIAL_SCAN.md, the assistants' answer:
+    // receipts are found by serial, phone or order), pinned here so a change
+    // to it is a decision, not a drift.
     const receipt = await json(await get(as(who), '/api/admin/warranties/wr_vis'));
     assert.equal(receipt.success, true, tag);
     assert.ok(JSON.stringify(receipt.receipt).includes(SN), `${tag}: the receipt's own serial`);
+    assert.equal(receipt.receipt.order_id, 'ORD-VIS', `${tag}: the receipt's own record names its order (documented exception)`);
     const replaced = (receipt.history as Array<{ action: string; detail: Record<string, unknown> }>).find((h) => h.action === 'warranty.replaced')!;
     assert.deepEqual(replaced.detail, { replaced_serial: SN5, new_serial: SN, order_id: money ? 'ORD-VIS' : null }, tag);
 
@@ -240,7 +249,7 @@ test('decision 1 leaves customers, merchants and visitors exactly where they wer
 
 // ====================================================================== 3
 
-test('decision 1 writes: adding a serial follows `receive` on every intake door; edits keep their gates; the owner is never refused', async () => {
+test('decision 1 writes: adding, changing or removing a serial follows `receive` on every door — refused as SERIAL_WRITE_NOT_ALLOWED; edits keep their gates; the owner is never refused', async () => {
   const w = world();
   const as = roles(w);
   w.raw.exec(`INSERT INTO ops_permissions (user_id, capability, allowed) VALUES ('boss','receive',0)`);
@@ -260,6 +269,11 @@ test('decision 1 writes: adding a serial follows `receive` on every intake door;
   for (const [path, body] of supDoors) {
     const r = await post(as('sup'), path, body);
     assert.equal(r.status, 403, `sup ${path}: ${await r.clone().text()}`);
+    // Its own code, so every serial screen can say why in the admin's
+    // language — not FORBIDDEN, which the inventory panel read as "try again".
+    const refused = await json(r);
+    assert.equal(refused.code, 'SERIAL_WRITE_NOT_ALLOWED', `sup ${path}`);
+    assert.equal(refused.error ?? refused.message, SERIAL_WRITE_NOT_ALLOWED_TEXT, `sup ${path}: the server's sentence`);
   }
   assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM serial_inventory WHERE serial_norm IN ('${SN2}','${SN3}')`), 0, 'nothing was added');
   assert.equal(row(w.raw, 'SELECT released_at FROM serial_assignments WHERE id = ?', linked.assignment_id)!.released_at, null, 'the link is intact');
@@ -294,8 +308,27 @@ test('decision 1 writes: adding a serial follows `receive` on every intake door;
   assert.ok(open, 'a delivered unit with no serial');
   const supAssign = await post(as('sup'), `/api/devices/admin/units/${open.id}/serial`, { serial: '03919D580607848' });
   assert.equal(supAssign.status, 403, await supAssign.clone().text());
+  assert.equal((await json(supAssign)).code, 'SERIAL_WRITE_NOT_ALLOWED');
   const prepAssign = await post(as('prep'), `/api/devices/admin/units/${open.id}/serial`, { serial: '03919D580607848' });
   assert.equal(prepAssign.status, 200, await prepAssign.clone().text());
+
+  // A warranty replacement that NAMES a new serial adds it (its asset row and
+  // an activated binding): that half follows `receive`. Support is refused it
+  // and nothing changes; the replacement itself, with no new serial, keeps the
+  // gate it always had; the preparer adds the serial through it.
+  const units = (w.raw.prepare("SELECT u.id FROM order_item_units u WHERE u.order_id = 'ORD-W' ORDER BY u.unit_index").all() as Array<{ id: string }>).map((u) => u.id);
+  const fresh = '03919D580607851';
+  const supReplace = await post(as('sup'), `/api/devices/admin/units/${units[0]}/replace`, { new_serial: fresh, reason: 'dead on arrival' });
+  assert.equal(supReplace.status, 403, await supReplace.clone().text());
+  assert.equal((await json(supReplace)).code, 'SERIAL_WRITE_NOT_ALLOWED');
+  assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM serial_inventory WHERE serial_norm = '${fresh}'`), 0, 'nothing was added');
+  assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM device_serials WHERE serial_norm = '${fresh}'`), 0);
+  assert.equal(row<{ r: string | null }>(w.raw, 'SELECT replaced_by_unit_id AS r FROM order_item_units WHERE id = ?', units[0])!.r, null, 'the unit was not replaced');
+  const supPlain = await post(as('sup'), `/api/devices/admin/units/${units[1]}/replace`, { reason: 'swapped at the counter' });
+  assert.equal(supPlain.status, 200, `a replacement with no new serial keeps its gate: ${await supPlain.clone().text()}`);
+  const prepReplace = await post(as('prep'), `/api/devices/admin/units/${units[0]}/replace`, { new_serial: fresh, reason: 'dead on arrival' });
+  assert.equal(prepReplace.status, 200, await prepReplace.clone().text());
+  assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM device_serials WHERE serial_norm = '${fresh}'`), 1, 'the preparer added it');
 
   // The owner, with `receive = 0` on their own row, is never locked out.
   order(w.raw, 'ORD-W2', [{ id: 'l2', product: 'pA1' }]);
@@ -397,8 +430,11 @@ test('decision 1 carries no cost: with a distinctive lot cost, no serial answer 
       ('${SN}','lotV','boss','2026-09-01T00:00:00.000Z'), ('${SN2}','lotV','boss','2026-09-01T00:00:00.000Z');
   `);
   const answers: Array<[string, string]> = [];
+  // Every kept answer is a 200: a refusal carries no cost by construction and
+  // would make the check below pass without reading the surface at all.
   const keep = async (label: string, res: Response) => {
     const text = await res.text();
+    assert.equal(res.status, 200, `${label}: ${text.slice(0, 300)}`);
     answers.push([label, text]);
     return text;
   };
@@ -412,9 +448,18 @@ test('decision 1 carries no cost: with a distinctive lot cost, no serial answer 
     const page = JSON.parse(await keep(`serial page (${who})`, await get(as(who), `/api/devices/admin/serial-inventory/${SN}`)));
     assert.equal(page.story.serial, SN, `${who} reads the serial whole`);
     assert.equal(page.story.lot?.id, 'lotV', `${who}: the story names its lot`);
-    await keep(`stock trace (${who})`, await get(as(who), `/api/admin/stock-operations/trace?serial=${SN}`));
+    if (who === 'sup') {
+      // The stock trace needs `receive`, which support does not hold: a
+      // refusal, and still nothing about the lot's cost in it.
+      const refused = await get(as(who), `/api/admin/stock-operations/trace?serial=${SN}`);
+      assert.equal(refused.status, 403, 'support reads no stock trace');
+      const text = await refused.text();
+      assert.ok(!text.includes(String(COST)), 'nor its cost');
+    } else {
+      await keep(`stock trace (${who})`, await get(as(who), `/api/admin/stock-operations/trace?serial=${SN}`));
+    }
   }
-  assert.ok(answers.length >= 14);
+  assert.equal(answers.length, 13);
   const privateKey = new RegExp(`"(${(FINANCIAL_FIELDS as readonly string[]).join('|')})"\\s*:\\s*(?!null)`);
   for (const [label, text] of answers) {
     assert.ok(!text.includes(String(COST)) && !text.includes(String(COST * 2)), `${label}: the lot's cost leaked`);
@@ -479,5 +524,13 @@ test('decision 1 static nets: serialActor reads canSeeFullSerial for the serial 
   const assign = devices.indexOf("deviceRoutes.post('/admin/units/:unitId/serial'");
   assert.match(devices.slice(assign, assign + 400), /await requireSerialWrite\(c\.env, admin\);/);
   const replace = devices.indexOf("deviceRoutes.post('/admin/units/:unitId/replace'");
-  assert.doesNotMatch(devices.slice(replace, replace + 600), /requireSerialWrite/, 'replacement is unchanged');
+  const replaceHead = devices.slice(replace, devices.indexOf('const unit = await', replace));
+  assert.match(replaceHead, /if \(typedNewSerial\) await requireSerialWrite\(c\.env, admin\);/, 'a replacement that names a new serial follows receive, before any read or write');
+  // The preparation unlink follows the same helper (same rule, translated refusal).
+  const prep = readFileSync(join(ROOT, 'worker/routes/adminOrderSerials.ts'), 'utf8');
+  for (const door of ['scan', 'change', 'unlink']) {
+    const at = prep.indexOf(`adminOrderSerialRoutes.post('/:id/serials/${door}'`);
+    assert.ok(at > 0, door);
+    assert.match(prep.slice(at, at + 400), /await requireSerialWrite\(c\.env, user\);/, `${door} follows receive`);
+  }
 });

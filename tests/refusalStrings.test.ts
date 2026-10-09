@@ -220,6 +220,9 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/lib/serialAssignments.ts',
     'worker/routes/adminOrderSerials.ts',
     'worker/routes/warranty.ts',
+    // Owner decision 1 (row 192): every serial write door refuses a revoked
+    // «الاستلام» with SERIAL_WRITE_NOT_ALLOWED (`requireSerialWrite`).
+    'worker/lib/operations.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

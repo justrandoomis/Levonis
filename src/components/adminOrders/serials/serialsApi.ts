@@ -44,8 +44,9 @@ export interface ReadPayload {
   source: LinkSource;
   /**
    * «أعد ربطه» (§30): the released binding whose serial to link again. The
-   * server reads the serial itself, so a viewer who only sees it masked (an
-   * assistant) can re-link it (UX review #16); `code` is then only a label.
+   * server reads the serial itself (UX review #16), so the screen never sends
+   * it back; `code` is then only a label. Every admin sees the whole serial
+   * since owner decision 1 (2026-10-09); a masked one would re-link the same way.
    */
   previous_assignment_id?: string;
 }

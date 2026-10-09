@@ -1,4 +1,4 @@
-import { badRequest, conflict, forbidden, unavailable } from './http';
+import { HttpError, badRequest, conflict, forbidden, unavailable } from './http';
 import { canViewCost, canWriteCost, isOwner } from './adminScope';
 import { costRefusal } from './costAccess';
 import type { Env, SessionUser } from './types';
@@ -43,7 +43,13 @@ export async function operationsInstalled(db: D1Database) {
     .prepare("SELECT 1 AS yes FROM sqlite_master WHERE type='table' AND name='purchase_orders'")
     .first());
 }
-export async function requireCapability(env: Env, user: SessionUser, capability: Capability) {
+export async function requireCapability(
+  env: Env,
+  user: SessionUser,
+  capability: Capability,
+  /** The refusal an operations capability answers with when `allowed = 0` (default: the generic FORBIDDEN). */
+  refusal: () => HttpError = () => forbidden('ليس لديك صلاحية لهذه العملية'),
+) {
   if (!(await operationsInstalled(env.DB)))
     throw unavailable(
       'تحديث عمليات المخزون والمالية لم يطبق على قاعدة البيانات بعد',
@@ -74,21 +80,30 @@ export async function requireCapability(env: Env, user: SessionUser, capability:
   )
     .bind(user.id, capability)
     .first<{ allowed: number }>();
-  if (permission?.allowed === 0) throw forbidden('ليس لديك صلاحية لهذه العملية');
+  if (permission?.allowed === 0) throw refusal();
 }
 
 /**
  * ADDING A SERIAL (owner decision 1, 2026-10-09; DECISIONS row 192). Every
- * door that adds a serial — the preparation scan, the inventory's commit,
- * scan and link-EAN, the post-delivery assign — follows the `receive`
- * operations capability, as the preparation doors already did: the owner
- * always passes, a missing row allows, `allowed = 0` refuses. No new
- * capability value (the CHECK of migration 0162 cannot be widened
- * additively). Sensitive edits and exceptions keep their own gates.
+ * admin door that adds a serial or rewrites a binding — the preparation scan,
+ * change and unlink, the inventory's commit, scan and link-EAN, the
+ * post-delivery assign, and a warranty replacement that names a new serial —
+ * follows the `receive` operations capability, as the preparation doors
+ * already did: the owner always passes, a missing row allows, `allowed = 0`
+ * refuses. No new capability value (the CHECK of migration 0162 cannot be
+ * widened additively). Sensitive edits and exceptions keep their own gates.
+ *
+ * The refusal has its own code, `SERIAL_WRITE_NOT_ALLOWED`, which every
+ * serial screen renders in the admin's language (src/lib/refusalStrings.ts):
+ * the generic FORBIDDEN carried one Arabic sentence and the inventory panel
+ * could only say "try again" — a retry that can never succeed.
  */
+export const SERIAL_WRITE_NOT_ALLOWED_TEXT =
+  'إضافة الأرقام التسلسلية وتغييرها وإزالتها تحتاج صلاحية «الاستلام»، وهي موقوفة لحسابك — اطلبها من المالك.';
 export async function requireSerialWrite(env: Env, user: SessionUser | null | undefined) {
-  if (!user || user.role !== 'admin') throw forbidden('ليس لديك صلاحية لهذه العملية');
-  await requireCapability(env, user, 'receive');
+  // Every caller sits behind requireAdmin; this is the door's own floor.
+  if (!user || user.role !== 'admin') throw forbidden();
+  await requireCapability(env, user, 'receive', () => new HttpError(403, SERIAL_WRITE_NOT_ALLOWED_TEXT, 'SERIAL_WRITE_NOT_ALLOWED'));
 }
 
 /** The capabilities that read or write cost: owner only (decision 2). */
