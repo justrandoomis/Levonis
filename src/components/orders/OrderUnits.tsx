@@ -32,7 +32,9 @@ const STRINGS = {
     needsConfig: 'مدة الضمان غير مُعدّة — تواصل مع الدعم',
     notDelivered: 'يبدأ الضمان عند التسليم',
     returned: 'أُعيد هذا الجهاز وأُغلق ضمانه',
-    tradedIn: (d: string, end: string) => `استُبدل في ${d} — يبقى ضمانه مع الجهاز حتى ${end}`,
+    // «استُبدل لدى Levonis (Trade-in)» — the device history's own words, never
+    // the bare «استُبدل» the warranty-replacement line below uses.
+    tradedIn: (d: string, end: string) => `استُبدل لدى Levonis (Trade-in) في ${d} — يبقى ضمانه مع الجهاز حتى ${end}`,
     register: 'تسجيل الضمان',
     registering: 'جارٍ التسجيل…',
     linkedMine: 'مرتبط بحسابك',
@@ -50,7 +52,7 @@ const STRINGS = {
     needsConfig: 'Coverage duration not configured — contact support',
     notDelivered: 'Coverage starts at delivery',
     returned: 'This device was returned and its warranty is closed',
-    tradedIn: (d: string, end: string) => `Traded in on ${d} — its warranty stays with the device until ${end}`,
+    tradedIn: (d: string, end: string) => `Traded in to Levonis on ${d} — its warranty stays with the device until ${end}`,
     register: 'Register warranty',
     registering: 'Registering…',
     linkedMine: 'Linked to your account',
@@ -68,7 +70,7 @@ const STRINGS = {
     needsConfig: 'ماوەی گەرەنتی ڕێکنەخراوە — پەیوەندی بە پشتگیری بکە',
     notDelivered: 'گەرەنتی لە کاتی گەیاندن دەست پێدەکات',
     returned: 'ئەم ئامێرە گەڕێنرایەوە و گەرەنتییەکەی داخرا',
-    tradedIn: (d: string, end: string) => `لە ${d} گۆڕدرایەوە — گەرەنتییەکەی لەگەڵ ئامێرەکە دەمێنێتەوە تا ${end}`,
+    tradedIn: (d: string, end: string) => `لە ${d} لای Levonis گۆڕدرایەوە (Trade-in) — گەرەنتییەکەی لەگەڵ ئامێرەکە دەمێنێتەوە تا ${end}`,
     register: 'تۆمارکردنی گەرەنتی',
     registering: 'تۆمارکردن…',
     linkedMine: 'بەستراوە بە هەژمارەکەت',
@@ -109,7 +111,8 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
         const coverage = u.traded_in_at
           ? { icon: <ShieldCheck className="w-3.5 h-3.5" aria-hidden />, cls: 'text-zinc-400', text: s.tradedIn(formatDate(u.traded_in_at, lang), formatDate(w.end_at, lang)) }
           : w.state === 'active'
-            ? { icon: <ShieldCheck className="w-3.5 h-3.5" aria-hidden />, cls: 'text-emerald-300', text: `${s.coveredUntil(formatDate(w.end_at, lang))}${w.remaining_days !== null ? ` · ${daysLeftLabel(w.remaining_days, lang)}` : ''}` }
+            ? // The end of the cover the days were counted to (the used-sale period once it outlasts the original).
+              { icon: <ShieldCheck className="w-3.5 h-3.5" aria-hidden />, cls: 'text-emerald-300', text: `${s.coveredUntil(formatDate(w.cover_end_at ?? w.end_at, lang))}${w.remaining_days !== null ? ` · ${daysLeftLabel(w.remaining_days, lang)}` : ''}` }
             : w.state === 'expired'
               ? { icon: <ShieldOff className="w-3.5 h-3.5" aria-hidden />, cls: 'text-red-300', text: s.expired(formatDate(w.end_at, lang)) }
               : w.state === 'needs_config'

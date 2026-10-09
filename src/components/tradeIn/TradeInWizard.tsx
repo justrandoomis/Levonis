@@ -46,6 +46,7 @@ import {
   missingPhotoAngles,
   warrantyTimeLeft,
 } from '../../../packages/pricing/src/tradeIn';
+import { timeLeftWords } from '../../../packages/pricing/src/warrantyTime';
 import {
   type ComponentInputs,
   type ComponentRole,
@@ -426,11 +427,11 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
                 label={L('المتبقي من الضمان', 'Warranty left')}
                 value={(() => {
                   // Owner decision 3: calendar months and days from the device's own
-                  // end date — «11 شهر و0 يوم», not a rounded-up 12 (display only).
+                  // end date — «11 شهرًا», not a rounded-up 12 (display only).
                   const left = warrantyTimeLeft(source.warranty_end_at, new Date().toISOString());
                   return left.months > 0 || left.days > 0
-                    ? loc(`${left.months} شهر و${left.days} يوم`, `${left.months} months ${left.days} days`, `${left.months} مانگ و ${left.days} ڕۆژ`)
-                    : L('منتهٍ', 'Expired');
+                    ? loc(timeLeftWords(left, 'ar'), timeLeftWords(left, 'en'), timeLeftWords(left, 'ckb'))
+                    : loc('منتهٍ', 'Expired', 'بەسەرچووە');
                 })()}
                 strong
               />
@@ -626,6 +627,9 @@ function DeviceStep({
         return loc('لم يُستلم بعد', 'Not delivered yet', 'هێشتا نەگەیەندراوە');
       case 'TRADE_IN_GIFT':
         return loc('وصلك هدية — الاستبدال للأجهزة المشتراة', 'A gift — trade-in is for devices you bought', 'دیارییە — گۆڕینەوە بۆ ئامێرە کڕدراوەکانە');
+      case 'TRADE_IN_LINKED_ELSEWHERE':
+        // Owner decision 3: the buyer passed the device on — its holder releases it first.
+        return loc('مربوط بحساب آخر — يُفكّ ربطه أولاً', 'Linked to another account — release it first', 'بە هەژمارێکی ترەوە بەستراوە — سەرەتا جیای بکەرەوە');
       default:
         return loc('غير متاح للاستبدال', 'Not available', 'بۆ گۆڕینەوە بەردەست نییە');
     }

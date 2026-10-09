@@ -39,8 +39,11 @@ export interface Device {
     /** The warranty carried from the device's first sale (absent from an older server). */
     carried?: boolean;
     origin_start_at?: string | null;
-    /** The used-sale cover of this sale, apart from the original warranty. */
+    /** The used-sale period of this sale, apart from the original warranty. */
     used_sale?: { months: number; start_at: string; end_at: string } | null;
+    /** Which cover `state` and `remaining_days` are about, and that cover's end (absent from an older server). */
+    covered_via?: 'original' | 'used_sale';
+    cover_end_at?: string | null;
   };
   /** Dates only: first delivery, trade-in or return, resale (absent from an older server). */
   history?: Array<{ kind: 'first' | 'traded_in' | 'returned' | 'resold' | (string & {}); at: string }>;
@@ -121,6 +124,9 @@ export interface ClaimDetail {
     warranty_end_at: string | null;
     state: string;
     remaining_days: number | null;
+    /** The cover in force and its end — the used-sale period once the original is over (absent from an older server). */
+    covered_via?: 'original' | 'used_sale';
+    cover_end_at?: string | null;
   } | null;
   messages: ClaimMessage[];
 }

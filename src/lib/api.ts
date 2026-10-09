@@ -1167,6 +1167,9 @@ export interface OrderUnitPublic {
     carried?: boolean;
     origin_start_at?: string | null;
     used_sale?: { months: number; start_at: string; end_at: string } | null;
+    /** Which cover `state` and `remaining_days` are about, and its end (absent from an older server). */
+    covered_via?: 'original' | 'used_sale';
+    cover_end_at?: string | null;
   };
   /** Whether the buyer holds it, another account does, or nobody yet. */
   linked: 'mine' | 'other' | 'none';

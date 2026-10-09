@@ -29,7 +29,7 @@ import { safeParse } from './types';
 import { addMonths } from './membershipOps';
 import { newId } from './crypto';
 import { anySectionSerialPolicy, serializationContext, lineDevicePolicy, serializedProductSql, serialAssignmentsInstalled } from './serialPolicy';
-import { carriedWindow, type PriorUnit } from './deviceCustody';
+import { carriedWindow, unitIdentity, warrantySourceOf, type PriorUnit } from './deviceCustody';
 
 // ---------------------------------------------------------------- policy
 
@@ -272,17 +272,8 @@ export async function createUnitsOnDelivery(
     const policy = lineDevicePolicy(it.ops_policy, it.product_id, policyCtx);
     if (!policy.serialized) continue;
     serializedItems++;
-    const snap = safeParse<WarrantySnapshotLite | null>(it.warranty_snapshot, null);
-    const cov = computeCoverage(policy.warranty_base_months, snap, deliveredAtIso);
+    const { cov, policyVersion } = ownUnitWindow(policy.warranty_base_months, it.warranty_snapshot, deliveredAtIso);
     const qty = Math.min(Math.max(Number(it.qty) || 0, 0), 500);
-    const policyVersion = JSON.stringify({
-      v: 1,
-      base: cov.base_months,
-      ext: cov.ext_months,
-      total: cov.total_months,
-      plan_id: snap?.plan_id ?? null,
-      plan_kind: snap?.duration_kind ?? null,
-    });
     for (let i = 1; i <= qty; i++) {
       planned++;
       const prior = carried.get(`${it.item_id}:${i}`);
@@ -335,9 +326,109 @@ export async function createUnitsOnDelivery(
 }
 
 /**
+ * A unit's OWN window — the one a sale that carries nothing gets: base and
+ * purchased extension from its delivery (computeCoverage), and the
+ * `policy_version` that records them. One definition for the delivery hook
+ * and for the head start taken back (`headStartUndoStatements`).
+ */
+export function ownUnitWindow(
+  baseMonths: number | null,
+  warrantySnapshot: unknown,
+  deliveredAtIso: string
+): { cov: CoverageCalc; policyVersion: string } {
+  const snap = safeParse<WarrantySnapshotLite | null>(warrantySnapshot, null);
+  const cov = computeCoverage(baseMonths, snap, deliveredAtIso);
+  const policyVersion = JSON.stringify({
+    v: 1,
+    base: cov.base_months,
+    ext: cov.ext_months,
+    total: cov.total_months,
+    plan_id: snap?.plan_id ?? null,
+    plan_kind: snap?.duration_kind ?? null,
+  });
+  return { cov, policyVersion };
+}
+
+/**
+ * THE HEAD START TAKEN BACK (owner decision 3, S8's undo). The delivery hook
+ * writes a resold device's carried window on the unit before activation
+ * confirms it. When the `carry` binding that justified it is released WITHOUT
+ * ever activating — unlinked by the owner after delivery, changed for another
+ * serial, or displaced by a serial typed on the delivered unit — that window
+ * belongs to a device the customer never got: the unit goes back to its own
+ * line's window (from its delivery, `ownUnitWindow`), audited.
+ *
+ * Only a unit that still carries FROM that binding's previous unit (or the
+ * unit its warranty was taken from, `warrantySourceOf`) is touched, only
+ * while it has no activated binding, and only in the batch that releases the
+ * binding: every statement is guarded on the binding being released by then
+ * and the unit's `policy_version` being exactly what was read. A device that
+ * does activate later carries again (A1 writes the window of ITS previous unit).
+ */
+export async function headStartUndoStatements(
+  db: D1Database,
+  binding: { id: string; order_item_id: string | null; unit_index: number; prior_unit_id: string | null; warranty_mode: string | null; activated_at: string | null },
+  actorId: string | null
+): Promise<D1PreparedStatement[]> {
+  if (!binding.prior_unit_id || binding.activated_at || !binding.order_item_id) return [];
+  if (binding.warranty_mode !== 'carry' && binding.warranty_mode !== 'restart') return [];
+  const unit = await db
+    .prepare(
+      `SELECT u.id, u.product_id, u.delivered_at, u.warranty_start_at, u.warranty_end_at, u.policy_version, oi.warranty_snapshot, p.ops_policy
+         FROM order_item_units u JOIN order_items oi ON oi.id = u.order_item_id LEFT JOIN products p ON p.id = u.product_id
+        WHERE u.order_item_id = ? AND u.unit_index = ?`
+    )
+    .bind(binding.order_item_id, binding.unit_index)
+    .first<{
+      id: string;
+      product_id: string | null;
+      delivered_at: string | null;
+      warranty_start_at: string | null;
+      warranty_end_at: string | null;
+      policy_version: string;
+      warranty_snapshot: string | null;
+      ops_policy: string | null;
+    }>();
+  if (!unit || !unit.delivered_at) return [];
+  const identity = unitIdentity(unit.policy_version);
+  if (!identity.carried || !identity.resale_of) return [];
+  const source = await warrantySourceOf(db, binding.prior_unit_id);
+  if (identity.resale_of !== binding.prior_unit_id && identity.resale_of !== source?.id) return [];
+  const policyCtx = await serializationContext(db, unit.product_id ? [unit.product_id] : []);
+  const policy = lineDevicePolicy(unit.ops_policy, unit.product_id, policyCtx);
+  const own = ownUnitWindow(policy.warranty_base_months, unit.warranty_snapshot, unit.delivered_at);
+  return [
+    db
+      .prepare(
+        `UPDATE order_item_units
+            SET warranty_base_months = ?1, warranty_ext_months = ?2, warranty_start_at = ?3, warranty_end_at = ?4, policy_version = ?5
+          WHERE id = ?6 AND policy_version = ?7
+            AND EXISTS (SELECT 1 FROM serial_assignments ra WHERE ra.id = ?8 AND ra.released_at IS NOT NULL AND ra.activated_at IS NULL)
+            AND NOT EXISTS (SELECT 1 FROM serial_assignments xa WHERE xa.unit_id = ?6 AND xa.released_at IS NULL AND xa.activated_at IS NOT NULL)`
+      )
+      .bind(own.cov.base_months, own.cov.ext_months, unit.delivered_at, own.cov.end_at, own.policyVersion, unit.id, unit.policy_version, binding.id),
+    db
+      .prepare(`INSERT INTO audit_log (actor_id, action, target, detail) SELECT ?, 'device.window_restored', ?, ? WHERE changes() = 1`)
+      .bind(
+        actorId,
+        unit.id,
+        JSON.stringify({
+          reason: 'carry_binding_released',
+          assignment_id: binding.id,
+          prior_unit_id: binding.prior_unit_id,
+          from: { start_at: unit.warranty_start_at, end_at: unit.warranty_end_at },
+          to: { start_at: unit.delivered_at, end_at: own.cov.end_at },
+        })
+      ),
+  ];
+}
+
+/**
  * The previous units the live, not-yet-activated `carry` bindings of this
- * order name, by slot (`order_item_id:unit_index`). Empty before migration
- * 0178 (deploy-ahead) and when nothing is carried. A legacy pending
+ * order name, by slot (`order_item_id:unit_index`) — each read through
+ * `warrantySourceOf`, so a resale whose delivery was undone and cancelled
+ * hands on the warranty IT carried, as activation does. Empty before
+ * migration 0178 (deploy-ahead) and when nothing is carried. A legacy pending
  * `restart` binding carries too: the owner retired restarting (decision 3).
  */
 async function carriedPriors(db: D1Database, orderId: string): Promise<Map<string, PriorUnit>> {
@@ -346,24 +437,16 @@ async function carriedPriors(db: D1Database, orderId: string): Promise<Map<strin
   try {
     const { results } = await db
       .prepare(
-        `SELECT a.order_item_id, a.unit_index, pu.id, pu.delivered_at, pu.warranty_start_at, pu.warranty_end_at,
-                pu.warranty_base_months, pu.warranty_ext_months, pu.policy_version
-           FROM serial_assignments a JOIN order_item_units pu ON pu.id = a.prior_unit_id
+        `SELECT a.order_item_id, a.unit_index, a.prior_unit_id
+           FROM serial_assignments a
           WHERE a.order_id = ? AND a.released_at IS NULL AND a.activated_at IS NULL AND a.part = 'device'
-            AND a.warranty_mode IN ('carry','restart')`
+            AND a.prior_unit_id IS NOT NULL AND a.warranty_mode IN ('carry','restart')`
       )
       .bind(orderId)
-      .all<PriorUnit & { order_item_id: string; unit_index: number }>();
+      .all<{ order_item_id: string; unit_index: number; prior_unit_id: string }>();
     for (const r of results ?? []) {
-      out.set(`${r.order_item_id}:${r.unit_index}`, {
-        id: r.id,
-        delivered_at: r.delivered_at,
-        warranty_start_at: r.warranty_start_at,
-        warranty_end_at: r.warranty_end_at,
-        warranty_base_months: r.warranty_base_months,
-        warranty_ext_months: Number(r.warranty_ext_months) || 0,
-        policy_version: r.policy_version,
-      });
+      const source = await warrantySourceOf(db, r.prior_unit_id);
+      if (source) out.set(`${r.order_item_id}:${r.unit_index}`, source);
     }
   } catch (e) {
     // A failed read costs only the head start: activation still carries the window.

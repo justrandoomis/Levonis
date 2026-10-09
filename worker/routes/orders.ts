@@ -5589,8 +5589,12 @@ orderRoutes.get('/:id/units', async (c) => {
         end_at: r.warranty_end_at,
         state: cov.state,
         remaining_days: cov.remaining_days,
+        // The cover the state and the days are about, and its end — the
+        // used-sale period once it outlasts the original (policy v4).
+        covered_via: cov.via,
+        cover_end_at: cov.end_at,
         // Owner decision 3: a resold device's warranty runs from its first
-        // delivery; a used-sale cover is shown apart from it.
+        // delivery; a used-sale period is shown apart from it.
         carried: identity.carried,
         origin_start_at: identity.origin_start_at,
         used_sale: identity.used_sale,

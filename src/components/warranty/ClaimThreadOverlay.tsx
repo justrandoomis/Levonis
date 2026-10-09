@@ -168,6 +168,13 @@ export function ClaimThreadOverlay({
               {s.deliveredAt}: {fmtDate(facts.delivered_at, lang)}
               {' · '}
               {s.warrantyEnd}: {fmtDate(facts.warranty_end_at, lang)}
+              {/* Covered by the used-sale period after the original warranty (policy v4): say until when. */}
+              {facts.covered_via === 'used_sale' && facts.cover_end_at ? (
+                <>
+                  {' · '}
+                  {s.usedSaleUntil(fmtDate(facts.cover_end_at, lang))}
+                </>
+              ) : null}
             </p>
           )}
         </div>

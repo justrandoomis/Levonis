@@ -23,6 +23,7 @@
  * functions format; the caller reads the stored order.
  */
 
+import { monthsWords } from '../../packages/pricing/src/warrantyTime';
 import { escapeHtml } from './emailTemplates';
 
 export type ReceiptLang = 'ar' | 'en';
@@ -81,6 +82,12 @@ export interface WarrantyUnit {
   months: number;
   starts_at: string | null;
   ends_at: string | null;
+  /**
+   * The used-sale period of a resale on a condition listing (warranty policy
+   * v4, the used-device clause): printed on its own line, never merged into
+   * the original window above it.
+   */
+  used_sale?: { months: number; end_at: string } | null;
 }
 
 export interface WarrantyReceiptData {
@@ -139,6 +146,7 @@ const COPY = {
     months: 'مدة الضمان (شهر)',
     from: 'يبدأ',
     to: 'ينتهي',
+    usedSale: 'مدة بيع المستعمل',
     noSerial: 'بلا رقم تسلسلي',
     terms: 'شروط الضمان',
     keepReceipt: 'احتفظ بهذا الوصل — الضمان لا يُعتمد بدونه',
@@ -180,6 +188,7 @@ const COPY = {
     months: 'Warranty (months)',
     from: 'Starts',
     to: 'Ends',
+    usedSale: 'Used-sale period',
     noSerial: 'No serial recorded',
     terms: 'Warranty terms',
     keepReceipt: 'Keep this receipt — warranty is not honoured without it',
@@ -374,6 +383,7 @@ export function renderWarrantyReceipt(
         kv(t.months, String(u.months)) +
         kv(t.from, u.starts_at ? shortDate(u.starts_at) : '') +
         kv(t.to, u.ends_at ? shortDate(u.ends_at) : '') +
+        (u.used_sale ? kv(t.usedSale, `${monthsWords(u.used_sale.months, lang)} → ${shortDate(u.used_sale.end_at)}`) : '') +
         `</div>`
     )
     .join('');

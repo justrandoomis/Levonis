@@ -1136,6 +1136,13 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This device came to you as a gift. Trade-in is for devices you bought from LEVONIS.',
     ckb: 'ئەم ئامێرە وەک دیاری پێت گەیشتووە. گۆڕینەوە بۆ ئەو ئامێرانەیە کە لە LEVONIS کڕیوتن.',
   },
+  // Owner decision 3 (2026-10-09): a trade-in takes the device from whoever
+  // holds it, so a device the buyer passed on is released by its holder first.
+  TRADE_IN_LINKED_ELSEWHERE: {
+    ar: 'هذا الجهاز مربوط بحساب آخر. يجب فكّ ربطه من ذلك الحساب قبل استبداله.',
+    en: 'This device is linked to another account. It must be released from that account before it can be traded in.',
+    ckb: 'ئەم ئامێرە بە هەژمارێکی ترەوە بەستراوە. پێش گۆڕینەوەی دەبێت لەو هەژمارە جیا بکرێتەوە.',
+  },
   TRADE_IN_SCOPE_UNAVAILABLE: {
     ar: 'لا يمكن استبدال هذا الجزء وحده لهذا الجهاز. اختر «الجهاز كاملاً».',
     en: 'This part cannot be traded on its own for this device. Choose “the whole device”.',

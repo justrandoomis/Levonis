@@ -31,7 +31,7 @@ import { api, ApiError, failureText } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { FAMILY_LABELS, OPTIONAL_PHOTO, REQUIRED_PHOTOS, STATUS_LABELS, TRADE_IN_FAMILIES, checklistOf, tradeInSettlement, type TradeInFamily, type TradeInStatus } from '../../../packages/pricing/src/tradeIn';
 import type { RequestView } from '../tradeIn/model';
-import { warrantyTimeLeft } from '../../../packages/pricing/src/warrantyTime';
+import { monthsWords, timeLeftWords, warrantyTimeLeft } from '../../../packages/pricing/src/warrantyTime';
 import RulesEditor from './RulesEditor';
 
 interface Row {
@@ -397,15 +397,23 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
                   <Fact k={L('تاريخ الاستلام', 'Received')} v={day(r.source.delivered_at, lang)} />
                   <Fact k={L('السعر المدفوع', 'Paid')} v={iqd(r.source.paid_iqd)} />
                   <Fact k={L('نهاية الضمان', 'Warranty ends')} v={day(r.source.warranty_end_at, lang)} />
-                  <Fact k={L('مدة الاستخدام', 'In use')} v={loc(`${r.estimate?.usage_months ?? 0} شهر`, `${r.estimate?.usage_months ?? 0} months`)} />
+                  {(() => {
+                    const used = r.estimate?.usage_months ?? 0;
+                    return <Fact k={loc('مدة الاستخدام', 'In use', 'ماوەی بەکارهێنان')} v={loc(monthsWords(used, 'ar'), monthsWords(used, 'en'), monthsWords(used, 'ckb'))} />;
+                  })()}
                   {(() => {
                     // Owner decision 3: what is left, in calendar months and days, from the
                     // device's own end date (the valuation keeps its own rounding — a money rule).
                     const left = warrantyTimeLeft(r.source.warranty_end_at, new Date().toISOString());
+                    const any = left.months > 0 || left.days > 0;
                     return (
                       <Fact
-                        k={L('المتبقي من الضمان', 'Warranty left')}
-                        v={loc(`${left.months} شهر و${left.days} يوم`, `${left.months} months ${left.days} days`, `${left.months} مانگ و ${left.days} ڕۆژ`)}
+                        k={loc('المتبقي من الضمان', 'Warranty left', 'گەرەنتیی ماوە')}
+                        v={
+                          any
+                            ? loc(timeLeftWords(left, 'ar'), timeLeftWords(left, 'en'), timeLeftWords(left, 'ckb'))
+                            : loc('منتهٍ', 'Expired', 'بەسەرچووە')
+                        }
                       />
                     );
                   })()}

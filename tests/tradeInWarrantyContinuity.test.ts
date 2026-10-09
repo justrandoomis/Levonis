@@ -230,7 +230,7 @@ test('an AMS-only trade-in leaves the printer with its owner: linked, listed, it
 
 // ============================================================ resale
 
-/** A used listing of the A1: graded `used`, one month of used-sale cover, a copy of pA1. */
+/** A used listing of the A1: graded `used`, one month of used-sale period, a copy of pA1. */
 function usedListing(w: W) {
   w.raw.exec(`
     INSERT INTO products (id, slug, name, name_ar, price_iqd, ops_policy, condition_doc)
@@ -281,8 +281,9 @@ test('resale under the used listing: no owner exception, the SAME warranty (star
   const wr = row<WarrantyReceiptRow>(w.raw, "SELECT * FROM warranty_receipts WHERE unit_id = ? AND status = 'active'", u2.id)!;
   assert.equal(wr.warranty_start_at, u1.warranty_start_at);
   assert.equal(wr.warranty_end_at, u1.warranty_end_at);
-  assert.match(wr.coverage_text, /تغطية بيع المستعمل: 1 شهر/);
-  assert.match(wr.coverage_text_en, /Used-sale cover: 1 month\(s\)/);
+  // The warranty policy's own term (version 4, the used-device clause), with its plural.
+  assert.match(wr.coverage_text, /مدة بيع المستعمل: شهر واحد حتى/);
+  assert.match(wr.coverage_text_en, /Used-sale period: 1 month until/);
   const view = publicView(wr, new Date().toISOString());
   assert.ok(view.days_remaining! >= 334 && view.days_remaining! <= 336, `true days remaining, not a fresh year: ${view.days_remaining}`);
 

@@ -6,7 +6,9 @@
  * its original start and end — never a new one, never from zero.
  *
  * THE TRADED-IN STATE IS DERIVED, NEVER WRITTEN. A unit was traded in when a
- * `trade_in_requests` row for its slot (order_item_id, unit_index) is
+ * `trade_in_requests` row for its slot (order_item_id, unit_index) — or for
+ * the slot of a unit it REPLACED under warranty, the device the customer
+ * actually handed over — is
  * `completed` with a scope other than `ams_only` (the AMS alone leaves the
  * printer with its owner; `printer_only` follows `whole`, because the
  * warranty follows the serial and the serial is the printer's). That covers
@@ -28,14 +30,68 @@ import { coverageState, unitTotalMonths, type CoverageState } from './deviceOps'
 import { parseConditionDoc } from './condition';
 
 /**
- * When the unit `alias` was traded in (the first completed request), or NULL.
- * A scalar SQL expression over `alias.order_item_id` / `alias.unit_index`.
+ * How many warranty replacements back a unit's slot is searched. A
+ * replacement unit (`replacement_of_unit_id`, devices.ts «replace») sits on
+ * the SAME order line under a new `unit_index` (MAX + 1), while the trade-in
+ * request names the slot the customer bought (1..qty). Four replacements of
+ * one device is far past anything the shop has seen; past it the slot simply
+ * stops matching (the unit reads as not traded in).
  */
-export const tradedInSql = (alias: string) =>
-  `(SELECT t.completed_at FROM trade_in_requests t
-     WHERE t.order_item_id = ${alias}.order_item_id AND t.unit_index = ${alias}.unit_index
+export const MAX_REPLACEMENT_HOPS = 4;
+
+/** The `unit_index` of the `hops`-th unit `alias` replaced, as a scalar SQL expression (NULL when there is none). */
+function replacedSlotSql(alias: string, hops: number): string {
+  const joins: string[] = [];
+  for (let i = 2; i <= hops; i++) joins.push(`JOIN order_item_units tir${i} ON tir${i}.id = tir${i - 1}.replacement_of_unit_id`);
+  return `(SELECT tir${hops}.unit_index FROM order_item_units tir1 ${joins.join(' ')} WHERE tir1.id = ${alias}.replacement_of_unit_id)`;
+}
+
+/**
+ * When the unit `alias` was traded in (the first completed request), or NULL.
+ * A scalar SQL expression over `alias.order_item_id` / `alias.unit_index` /
+ * `alias.replacement_of_unit_id`.
+ *
+ * The request names the SLOT the customer bought; the device in their hands
+ * may be a warranty replacement of that slot's unit (a new `unit_index` on
+ * the same line). So a request for the slot of `alias` — or of any unit
+ * `alias` replaced, up to MAX_REPLACEMENT_HOPS back — makes `alias` traded
+ * in: the live end of the chain is the device the customer handed over.
+ */
+export const tradedInSql = (alias: string) => {
+  const slots = [`${alias}.unit_index`];
+  for (let h = 1; h <= MAX_REPLACEMENT_HOPS; h++) slots.push(replacedSlotSql(alias, h));
+  return `(SELECT t.completed_at FROM trade_in_requests t
+     WHERE t.order_item_id = ${alias}.order_item_id AND t.unit_index IN (${slots.join(', ')})
        AND t.status = 'completed' AND t.scope <> 'ams_only'
      ORDER BY t.completed_at LIMIT 1)`;
+};
+
+/**
+ * The LIVE unit of a slot: the slot's own unit, or the end of its warranty-
+ * replacement chain (`replaced_by_unit_id`). This is the device a trade-in of
+ * that slot takes (owner decision 3): its link, its serial binding, its audit.
+ * Null when the slot has no unit.
+ */
+export async function liveUnitOfSlot<T extends { id: string; replaced_by_unit_id: string | null }>(
+  db: D1Database,
+  orderItemId: string,
+  unitIndex: number,
+  cols: string
+): Promise<T | null> {
+  let unit = await db
+    .prepare(`SELECT ${cols}, u.replaced_by_unit_id FROM order_item_units u WHERE u.order_item_id = ? AND u.unit_index = ?`)
+    .bind(orderItemId, unitIndex)
+    .first<T>();
+  for (let hop = 0; unit && unit.replaced_by_unit_id && hop < MAX_REPLACEMENT_HOPS; hop++) {
+    const next = await db
+      .prepare(`SELECT ${cols}, u.replaced_by_unit_id FROM order_item_units u WHERE u.id = ?`)
+      .bind(unit.replaced_by_unit_id)
+      .first<T>();
+    if (!next) break;
+    unit = next;
+  }
+  return unit ?? null;
+}
 
 /** unit id → traded-in date, for the units given; one query. */
 export async function tradedInMap(db: D1Database, unitIds: ReadonlyArray<string>): Promise<Map<string, string>> {
@@ -155,22 +211,103 @@ export function carriedWindow(
 
 /**
  * COVERED WHILE EITHER IS IN FORCE (policy v4, the used-device clause): the
- * original window first; when it is over, a used-sale cover that still runs
- * keeps the unit covered. A closed unit stays closed.
+ * original window first; when it is over — or when the used-sale period runs
+ * longer — a used-sale period that still runs keeps the unit covered. A
+ * closed unit stays closed. `via` names the cover the answer is about and
+ * `end_at` is THAT cover's end, so a screen draws the dates the remaining
+ * days were counted to (never the original end beside used-sale days).
  */
 export function unitCoverage(
   unit: { delivered_at: string | null; warranty_end_at: string | null; policy_version?: unknown },
   nowMs = Date.now(),
   closedAt: string | null = null
-): { state: CoverageState; remaining_days: number | null; via: 'original' | 'used_sale' } {
+): { state: CoverageState; remaining_days: number | null; via: 'original' | 'used_sale'; end_at: string | null } {
   const base = coverageState(unit.delivered_at, unit.warranty_end_at, nowMs, closedAt);
-  if (closedAt || base.state === 'not_delivered') return { ...base, via: 'original' };
+  const original = { ...base, via: 'original' as const, end_at: unit.warranty_end_at };
+  if (closedAt || base.state === 'not_delivered') return original;
   const used = unitIdentity(unit.policy_version).used_sale;
-  if (!used) return { ...base, via: 'original' };
+  if (!used) return original;
   const second = coverageState(used.start_at, used.end_at, nowMs);
-  if (second.state !== 'active') return { ...base, via: 'original' };
-  if (base.state === 'active' && (base.remaining_days ?? 0) >= (second.remaining_days ?? 0)) return { ...base, via: 'original' };
-  return { state: 'active', remaining_days: second.remaining_days, via: 'used_sale' };
+  if (second.state !== 'active') return original;
+  if (base.state === 'active' && (base.remaining_days ?? 0) >= (second.remaining_days ?? 0)) return original;
+  return { state: 'active', remaining_days: second.remaining_days, via: 'used_sale', end_at: used.end_at };
+}
+
+// ---------------------------------------------------------------- the warranty's start
+
+/**
+ * THE DAY THE WARRANTY RUNS FROM, for a unit whose custody (`history`) is
+ * already read. A unit that carries nothing runs from its own start. A
+ * carried one runs from the origin it names; a resale recorded before the
+ * origin was (`resale_of`, no `origin_start_at`) from the first delivery its
+ * custody reaches. A warranty REPLACEMENT carries the original window in its
+ * own start (devices.ts «replace» copies it), and its custody is only its
+ * own delivery — so it runs from its own start, never from that delivery.
+ */
+export function originStartFrom(
+  unit: { warranty_start_at: string | null; policy_version?: unknown },
+  history: ReadonlyArray<CustodyStep> | null | undefined
+): string | null {
+  const identity = unitIdentity(unit.policy_version);
+  if (!identity.carried) return unit.warranty_start_at;
+  if (identity.origin_start_at) return identity.origin_start_at;
+  if (identity.resale_of) return history?.find((h) => h.kind === 'first')?.at ?? unit.warranty_start_at;
+  return unit.warranty_start_at;
+}
+
+/** `originStartFrom` for units whose custody is not read yet: one custody walk, only for the older resales that need it. */
+export async function originStarts(
+  db: D1Database,
+  units: ReadonlyArray<{ id: string; delivered_at: string | null; warranty_start_at: string | null; policy_version?: unknown }>
+): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
+  const walk = units.filter((u) => {
+    const id = unitIdentity(u.policy_version);
+    return id.carried && !id.origin_start_at && !!id.resale_of;
+  });
+  const histories = walk.length ? await custodyHistory(db, walk) : new Map<string, CustodyStep[]>();
+  for (const u of units) out.set(u.id, originStartFrom(u, histories.get(u.id)));
+  return out;
+}
+
+/**
+ * THE UNIT A RESOLD DEVICE'S WARRANTY IS TAKEN FROM. Normally the previous
+ * unit itself. But a resale whose delivery was undone and whose order was
+ * then cancelled never happened for the device: its unit was closed
+ * `order_cancelled` and its own extension (bought on that cancelled line) was
+ * never sold. A device sold again from there carries the warranty that unit
+ * carried — its `resale_of` — never a fresh one (owner decision 3) and never
+ * the cancelled line's extension. Walks at most MAX_REPLACEMENT_HOPS such
+ * cancelled sales; a unit re-delivered since is the device's live sale.
+ */
+export async function warrantySourceOf(db: D1Database, priorUnitId: string): Promise<PriorUnit | null> {
+  let id: string | null = priorUnitId;
+  let found: PriorUnit | null = null;
+  for (let hop = 0; id && hop <= MAX_REPLACEMENT_HOPS; hop++) {
+    const row: (PriorUnit & { warranty_closed_reason: string | null; order_status: string | null }) | null = await db
+      .prepare(
+        `SELECT u.id, u.delivered_at, u.warranty_start_at, u.warranty_end_at, u.warranty_base_months, u.warranty_ext_months,
+                u.policy_version, u.warranty_closed_reason, o.status AS order_status
+           FROM order_item_units u LEFT JOIN orders o ON o.id = u.order_id WHERE u.id = ?`
+      )
+      .bind(id)
+      .first<PriorUnit & { warranty_closed_reason: string | null; order_status: string | null }>();
+    if (!row) break;
+    found = {
+      id: row.id,
+      delivered_at: row.delivered_at,
+      warranty_start_at: row.warranty_start_at,
+      warranty_end_at: row.warranty_end_at,
+      warranty_base_months: row.warranty_base_months,
+      warranty_ext_months: Number(row.warranty_ext_months) || 0,
+      policy_version: row.policy_version,
+    };
+    const identity = unitIdentity(row.policy_version);
+    const cancelledSale = row.warranty_closed_reason === 'order_cancelled' && row.order_status !== 'delivered';
+    if (!(cancelledSale && identity.carried && identity.resale_of)) break;
+    id = identity.resale_of;
+  }
+  return found;
 }
 
 // ---------------------------------------------------------------- history

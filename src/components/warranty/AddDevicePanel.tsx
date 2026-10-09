@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Barcode, Camera, LifeBuoy, Link2, Package, ScanLine } from 'lucide-react';
 import type { Language } from '../../translations';
 import { api, ApiError } from '../../lib/api';
+import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
 import { TabPanels, TabStrip } from '../ui/Tabs';
 import { Overlay } from '../ui/Overlay';
 import SafeImage from '../ui/SafeImage';
@@ -50,14 +51,17 @@ interface Notice {
   review?: string;
 }
 
-function registerErrorNotice(e: unknown, s: WarrantyStrings, tried = ''): Notice {
+function registerErrorNotice(e: unknown, s: WarrantyStrings, lang: Language, tried = ''): Notice {
   if (e instanceof ApiError) {
     if (e.status === 429) return { kind: 'error', text: s.rateLimited };
     if (e.status === 404 || e.code === 'SERIAL_NOT_FOUND_OR_IN_USE') {
       return { kind: 'error', text: s.notFound, hint: s.notFoundNext, review: tried || undefined };
     }
     if (e.code === 'LINKED_ELSEWHERE') return { kind: 'error', text: s.linkedElsewhere };
-    if (e.message) return { kind: 'error', text: e.message };
+    // By code in the reader's language (DEVICE_NOT_WITH_CUSTOMER: the device
+    // came back to Levonis since the list loaded); any other code keeps the
+    // server's own sentence.
+    if (e.message || e.code) return { kind: 'error', text: apiRefusal(e, refusalLang(lang), s.error) };
   }
   return { kind: 'error', text: s.error };
 }
@@ -119,7 +123,7 @@ export function AddDevicePanel({
       onLinked(res.device, res.already_registered);
       if (eligible) loadEligible();
     } catch (e) {
-      setNotice(registerErrorNotice(e, s, value));
+      setNotice(registerErrorNotice(e, s, lang, value));
     } finally {
       setBusy(false);
     }
@@ -136,7 +140,7 @@ export function AddDevicePanel({
       setNotice({ kind: 'ok', text: res.already_registered ? s.alreadyLinked : s.linkedOk });
       onLinked(res.device, res.already_registered);
     } catch (e) {
-      const n = registerErrorNotice(e, s);
+      const n = registerErrorNotice(e, s, lang);
       setRowErrors((r) => ({ ...r, [u.unit_id]: n.text }));
       if (e instanceof ApiError && e.code === 'LINKED_ELSEWHERE') {
         setEligible((list) => (list ? list.map((x) => (x.unit_id === u.unit_id ? { ...x, linked_elsewhere: true } : x)) : list));

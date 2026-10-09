@@ -172,10 +172,33 @@ export interface PublicWarrantyView {
   /** Present only when the document is not the live one, so a holder of a
    *  superseded receipt is told why rather than left guessing. */
   note: 'replaced' | 'void' | null;
+  /**
+   * The used-sale period of a resale on a condition listing (warranty policy
+   * v4, the used-device clause): shown apart from the original window, and
+   * the device is covered while EITHER runs — so a live receipt whose
+   * original window is over still verifies as covered until this ends.
+   * Months and dates only; null for any other device.
+   */
+  used_sale: { months: number; end_at: string } | null;
+  /** Which cover `status` and `days_remaining` are about. */
+  covered_via: 'original' | 'used_sale';
 }
 
-export function publicView(row: WarrantyReceiptRow, nowIso: string): PublicWarrantyView {
-  const status = effectiveStatus(row.status, row.warranty_end_at, nowIso);
+export function publicView(
+  row: WarrantyReceiptRow,
+  nowIso: string,
+  usedSale: { months: number; start_at: string; end_at: string } | null = null
+): PublicWarrantyView {
+  const own = effectiveStatus(row.status, row.warranty_end_at, nowIso);
+  // Only a LIVE receipt can be carried by the used-sale period: a void or a
+  // superseded paper says so whatever the device's covers are.
+  const nowMs = new Date(nowIso).getTime();
+  const usedRuns =
+    !!usedSale && (own === 'active' || own === 'expired') && Date.parse(usedSale.start_at) <= nowMs && Date.parse(usedSale.end_at) > nowMs;
+  const ownDays = own === 'active' ? daysRemaining(row.warranty_end_at, nowIso) : null;
+  const usedDays = usedRuns ? daysRemaining(usedSale!.end_at, nowIso) : null;
+  const viaUsed = usedRuns && (ownDays === null || (usedDays ?? 0) > ownDays);
+  const status: WarrantyStatus = viaUsed ? 'active' : own;
   const retailer = safeParse<Partial<WarrantyRetailer>>(row.retailer_json, {});
   return {
     receipt_no: row.receipt_no,
@@ -189,7 +212,7 @@ export function publicView(row: WarrantyReceiptRow, nowIso: string): PublicWarra
     warranty_type: row.warranty_type,
     warranty_type_en: row.warranty_type_en || row.warranty_type,
     purchase_date: row.purchase_date ?? null,
-    days_remaining: status === 'active' ? daysRemaining(row.warranty_end_at, nowIso) : null,
+    days_remaining: viaUsed ? usedDays : status === 'active' ? daysRemaining(row.warranty_end_at, nowIso) : null,
     retailer: {
       name: retailer.name ?? DEFAULT_WARRANTY_CONFIG.retailer.name,
       website: retailer.website ?? DEFAULT_WARRANTY_CONFIG.retailer.website,
@@ -197,6 +220,8 @@ export function publicView(row: WarrantyReceiptRow, nowIso: string): PublicWarra
       phone: retailer.phone ?? DEFAULT_WARRANTY_CONFIG.retailer.phone,
     },
     note: status === 'replaced' ? 'replaced' : status === 'void' ? 'void' : null,
+    used_sale: usedSale && (own === 'active' || own === 'expired') ? { months: usedSale.months, end_at: usedSale.end_at } : null,
+    covered_via: viaUsed ? 'used_sale' : 'original',
   };
 }
 

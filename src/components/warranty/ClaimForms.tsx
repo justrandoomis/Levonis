@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Paperclip, X } from 'lucide-react';
 import type { Language } from '../../translations';
 import { api, ApiError, newIdempotencyKey, uploadTimeoutMs } from '../../lib/api';
+import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
 import { Overlay } from '../ui/Overlay';
 import type { Attachment, Device } from './types';
 import { productName } from './types';
@@ -186,7 +187,10 @@ export function DeviceClaimOverlay({
       onSubmitted({ id: res.id, replay: res.replay === true });
       onClose();
     } catch (e2) {
-      setError(e2 instanceof ApiError ? e2.message : s.error);
+      // By code, in the reader's language (DEVICE_NOT_WITH_CUSTOMER, a device
+      // traded in since the list loaded, has its own ar/en/ckb sentence);
+      // any other code keeps the server's own sentence.
+      setError(e2 instanceof ApiError ? apiRefusal(e2, refusalLang(lang), s.error) : s.error);
     } finally {
       setBusy(false);
     }

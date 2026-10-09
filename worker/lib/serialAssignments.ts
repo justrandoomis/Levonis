@@ -50,10 +50,10 @@ import { canMoveMoney, canSeeFullSerial, isOwner } from './adminScope';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { comboKey } from './inventory';
 import { getSetting } from './settings';
-import { maskSerial, coverageState, type UnitRow } from './deviceOps';
+import { maskSerial, coverageState, headStartUndoStatements, type UnitRow } from './deviceOps';
 import { resolveLabelProduct, serialStatusSql, type InventoryStatus } from './serialInventory';
 import { serialAssignmentsInstalled, serializationContext, lineDevicePolicy } from './serialPolicy';
-import { carriedWindow, tradedInSql, unitIdentity } from './deviceCustody';
+import { carriedWindow, tradedInSql, unitIdentity, warrantySourceOf } from './deviceCustody';
 import { parseConditionDoc } from './condition';
 import { classifyCode, normalizeEan, normalizeSerial, serialModelHint, serialProblem } from '@levonis/catalog/deviceSerials';
 
@@ -813,6 +813,18 @@ export const openUnitSql = (u: string) =>
      AND EXISTS (SELECT 1 FROM orders ro WHERE ro.id = ${u}.order_id AND ro.status = 'delivered'))))`;
 const UNSELLABLE = (b: Binding | null) =>
   !!b && (!!b.replaced_by_unit_id || b.warranty_closed_reason === 'returned_unsellable' || b.warranty_closed_reason === 'replaced');
+/** A resale (its unit CARRIES a warranty) whose delivery was undone and whose order was then cancelled — not re-delivered. */
+const CANCELLED_RESALE = (b: Binding | null) =>
+  !!b && !b.replaced_by_unit_id && b.warranty_closed_reason === 'order_cancelled' && !REDELIVERED(b) && unitIdentity(b.policy_version).carried;
+/**
+ * A device that was SOLD and is Levonis's again: traded in (owner decision 3,
+ * derived), returned (its unit closed `returned`), or on a cancelled resale.
+ * Its intake lot link is the first sale's history (classifyLink).
+ */
+const SOLD_AND_BACK = (b: Binding | null) =>
+  !!b &&
+  !b.replaced_by_unit_id &&
+  (!!b.traded_in_at || b.warranty_closed_reason === 'returned' || b.warranty_closed_reason === 'traded_in' || CANCELLED_RESALE(b));
 
 /**
  * S12 (owner decision 3): the NEW product a condition listing (open box /
@@ -920,9 +932,16 @@ async function classifyLink(db: D1Database, ctx: LinkContext, req: LinkRequest, 
       throw refuse(409, 'SERIAL_IN_USE', actor.owner ? { order_id: pending.order_id ?? pending.order_ref } : {});
     }
   }
+  // A DEVICE SOLD BEFORE AND BACK WITH LEVONIS — traded in (owner decision
+  // 3), returned, or on a resale whose delivery was undone and cancelled —
+  // carries its intake link (`stock_serial_links`) only as HISTORY: the lot it
+  // was received in, and the order line it first went out on, are the first
+  // sale's. Its resale takes a unit from this line's own allocation like any
+  // free device, with no lot refusal and no owner exception.
+  const cameBack = SOLD_AND_BACK(ctx.binding);
   // The legacy serial→order-item link (stock_serial_links.order_item_id) on a
   // live order other than this one (critique-1 #7).
-  const sl = ctx.serialLot;
+  const sl = cameBack ? null : ctx.serialLot;
   if (sl?.order_item_id && sl.order_item_id !== line.id && sl.linked_order_status && sl.linked_order_status !== 'cancelled' && ov !== 'take_from_order') {
     throw refuse(409, 'SERIAL_IN_USE', {});
   }
@@ -984,6 +1003,15 @@ async function classifyLink(db: D1Database, ctx: LinkContext, req: LinkRequest, 
     // paid extension on the new line adds its months to that end (S6); it
     // never restarts the warranty (owner decision 3).
     priorUnitId = b.unit_id;
+    mode = 'carry';
+  } else if (CANCELLED_RESALE(b)) {
+    // A RESALE THAT NEVER HAPPENED: its delivery was undone and its order
+    // cancelled, so its unit closed `order_cancelled` — but that unit carried
+    // the device's original warranty. The next sale carries the same warranty
+    // (never a fresh one from today, owner decision 3); activation takes it
+    // from the unit the cancelled sale carried from (`warrantySourceOf`), so
+    // the cancelled line's own extension is never passed on.
+    priorUnitId = b!.unit_id;
     mode = 'carry';
   }
 
@@ -1159,7 +1187,10 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
           part: replaced.part, reason: 'changed', new_serial: norm,
         })
       ).statements,
-      ...undoAdoptionStatements(db, replaced, actor.id)
+      ...undoAdoptionStatements(db, replaced, actor.id),
+      // The changed binding's head start (S8) leaves with it; a new carry
+      // binding writes its own window when it activates.
+      ...(await headStartUndoStatements(db, replaced, actor.id))
     );
   }
   // Owner take_from_order (§10 exception): the other order's slot empties.
@@ -1450,7 +1481,10 @@ export async function unlinkSerial(
         unit_index: row.unit_index, part: row.part, reason, outside_window: !inWindow,
       })
     ).statements,
-    ...undoAdoptionStatements(db, row, actor.id)
+    ...undoAdoptionStatements(db, row, actor.id),
+    // A delivered unit born with this binding's carried window (S8) goes back
+    // to its own line's window: the device it described never activated.
+    ...(await headStartUndoStatements(db, row, actor.id))
   );
   try {
     await db.batch(stmts);
@@ -1732,19 +1766,24 @@ async function activateOne(db: D1Database, a: AssignmentRow, unitId: string, ord
       .bind(unitId)
       .first<{ warranty_ext_months: number | null; delivered_at: string | null; policy_version: string; condition_doc: string | null }>();
     const already = fresh ? unitIdentity(fresh.policy_version) : null;
-    if (fresh && !(already?.carried && already.resale_of === prior.id)) {
-      const win = carriedWindow(
-        {
-          id: prior.id,
-          delivered_at: prior.delivered_at,
-          warranty_start_at: prior.warranty_start_at,
-          warranty_end_at: prior.warranty_end_at ?? null,
-          warranty_base_months: prior.warranty_base_months,
-          warranty_ext_months: Number(prior.warranty_ext_months) || 0,
-          policy_version: prior.policy_version,
-        },
-        { ext_months: Number(fresh.warranty_ext_months) || 0, delivered_at: fresh.delivered_at, condition_doc: fresh.condition_doc }
-      );
+    // The warranty comes from the prior unit — or, past a resale whose
+    // delivery was undone and cancelled, from the unit THAT sale carried from
+    // (`warrantySourceOf`): never a fresh window, never a cancelled line's extension.
+    const source = (await warrantySourceOf(db, prior.id)) ?? {
+      id: prior.id,
+      delivered_at: prior.delivered_at,
+      warranty_start_at: prior.warranty_start_at,
+      warranty_end_at: prior.warranty_end_at ?? null,
+      warranty_base_months: prior.warranty_base_months,
+      warranty_ext_months: Number(prior.warranty_ext_months) || 0,
+      policy_version: prior.policy_version,
+    };
+    if (fresh && !(already?.carried && already.resale_of === source.id)) {
+      const win = carriedWindow(source, {
+        ext_months: Number(fresh.warranty_ext_months) || 0,
+        delivered_at: fresh.delivered_at,
+        condition_doc: fresh.condition_doc,
+      });
       stmts.push(
         db
           .prepare(
@@ -1970,13 +2009,13 @@ export async function serialGateState(env: Env, orderId: string): Promise<GateSt
   const appliesToOrder = setting.enabled && (!setting.since || Date.parse(order.created_at) >= Date.parse(setting.since));
   const { results: live } = await db
     .prepare(
-      `SELECT a.id, a.order_item_id, a.unit_index, a.lot_id, a.lot_source,
+      `SELECT a.id, a.order_item_id, a.unit_index, a.lot_id, a.lot_source, a.prior_unit_id,
               (SELECT sl.lot_id FROM stock_serial_links sl WHERE sl.serial_norm = a.serial_norm) AS linked_lot
          FROM serial_assignments a
         WHERE a.order_id = ? AND a.released_at IS NULL AND a.part = 'device'`
     )
     .bind(orderId)
-    .all<{ id: string; order_item_id: string; unit_index: number; lot_id: string | null; lot_source: string | null; linked_lot: string | null }>();
+    .all<{ id: string; order_item_id: string; unit_index: number; lot_id: string | null; lot_source: string | null; prior_unit_id: string | null; linked_lot: string | null }>();
   const have = new Set(live.map((a) => `${a.order_item_id}:${a.unit_index}`));
   const missing = slots.filter((s) => !have.has(`${s.order_item_id}:${s.unit_index}`)).map((s) => ({ order_item_id: s.order_item_id, unit_index: s.unit_index, part: s.part, product_name: s.product_name }));
   // M1: at dispatch, a serial whose OWN lot is no longer among the line's live
@@ -1986,7 +2025,9 @@ export async function serialGateState(env: Env, orderId: string): Promise<GateSt
   const lotConflicts: GateState['lot_conflicts'] = [];
   const lotsOf = new Map<string, LotFacts[]>();
   for (const a of live) {
-    const own = a.lot_source === 'serial_link' && a.lot_id ? a.lot_id : a.linked_lot;
+    // A device sold before (a resale names its previous unit) went out of its
+    // intake lot on its FIRST sale: that link is history, not this line's lot.
+    const own = a.lot_source === 'serial_link' && a.lot_id ? a.lot_id : a.prior_unit_id ? null : a.linked_lot;
     if (!own) continue;
     if (!lotsOf.has(a.order_item_id)) lotsOf.set(a.order_item_id, await lineLots(db, a.order_item_id));
     const lots = lotsOf.get(a.order_item_id)!;
@@ -2365,6 +2406,22 @@ export async function orderSerialsView(env: Env, actor: SerialActor, orderId: st
   const live = liveRes.results ?? [];
   const prev = prevRes.results ?? [];
   const delivered = order.status === 'delivered';
+  // The slots whose device is no longer the customer's: traded in to Levonis
+  // (owner decision 3 — its binding is released `traded_in` on purpose),
+  // returned or otherwise closed, or replaced under warranty. Such a slot has
+  // no live binding BECAUSE the device came back, not because it went out
+  // without a serial.
+  const backSlots = new Set<string>();
+  if (delivered) {
+    const { results: back } = await db
+      .prepare(
+        `SELECT u.order_item_id, u.unit_index FROM order_item_units u
+          WHERE u.order_id = ? AND (u.warranty_closed_at IS NOT NULL OR u.replaced_by_unit_id IS NOT NULL OR ${tradedInSql('u')} IS NOT NULL)`
+      )
+      .bind(orderId)
+      .all<{ order_item_id: string; unit_index: number }>();
+    for (const u of back ?? []) backSlots.add(`${u.order_item_id}:${u.unit_index}`);
+  }
   const stockReturned = new Set<string>();
   for (const itemId of new Set(slots.map((s) => s.order_item_id))) {
     const latest = await tryFirst(() =>
@@ -2389,7 +2446,7 @@ export async function orderSerialsView(env: Env, actor: SerialActor, orderId: st
       if (!lots.length) flags.push('ALLOCATION_MISSING');
     }
     if (row && delivered && !row.activated_at && Number(row.activation_attempts) > 0) flags.push('SERIAL_ACTIVATION_CONFLICT');
-    if (delivered && !row) flags.push('SERIAL_MISSING_AT_DELIVERY');
+    if (delivered && !row && !backSlots.has(`${s.order_item_id}:${s.unit_index}`)) flags.push('SERIAL_MISSING_AT_DELIVERY');
     // §30 / critique-1 #32: a re-opened order whose stock was returned and not
     // taken again (DECISIONS 184(15)) — a flag for the screen, never a gate.
     if (order.status !== 'cancelled' && order.status !== 'delivered' && stockReturned.has(s.order_item_id)) flags.push('STOCK_NOT_RETAKEN');

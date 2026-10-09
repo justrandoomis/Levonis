@@ -20,8 +20,9 @@ import { warrantyTimeLeft } from '../../../packages/pricing/src/warrantyTime';
  *
  * A RESOLD DEVICE (owner decision 3, 2026-10-09) carries its original
  * warranty: the line starts at its FIRST delivery and says so; a used-sale
- * cover is its own line, never folded into the original. What is left reads
- * in calendar months and days («11 months 0 days»), not rounded up.
+ * period is its own line, never folded into the original. What is left reads
+ * in calendar months and days («11 شهرًا و5 أيام», «11 months»), not rounded
+ * up, and always about the cover the server counted the days to.
  */
 export function CoverageBar({
   warranty,
@@ -39,11 +40,17 @@ export function CoverageBar({
   const state = warranty.state;
   const used = warranty.used_sale ?? null;
   const nowIso = new Date().toISOString();
-  // Covered by the used-sale period alone once the original warranty is over:
-  // the line then draws that period, so it is never a full bar reading «active».
-  const onUsedSale = state === 'active' && !!used && !!warranty.end_at && Date.parse(warranty.end_at) <= Date.now();
+  // THE COVER THE SERVER COUNTED THE DAYS TO (`covered_via`, policy v4): the
+  // used-sale period once it outlasts the original warranty — then the line,
+  // its end date and the time left all describe that period, never the
+  // original end beside used-sale days. An older server sends no `covered_via`:
+  // the used-sale period is drawn only once the original warranty is over.
+  const onUsedSale =
+    state === 'active' &&
+    !!used &&
+    (warranty.covered_via ? warranty.covered_via === 'used_sale' : !!warranty.end_at && Date.parse(warranty.end_at) <= Date.now());
   const startIso = onUsedSale ? used!.start_at : warranty.start_at ?? deliveredAt;
-  const endIso = onUsedSale ? used!.end_at : warranty.end_at;
+  const endIso = onUsedSale ? warranty.cover_end_at ?? used!.end_at : warranty.end_at;
   const continuesFrom = warranty.carried && warranty.origin_start_at ? warranty.origin_start_at : null;
 
   let fraction = 0;
@@ -84,7 +91,7 @@ export function CoverageBar({
         </span>
         {active && remaining !== null && (
           <span className="text-[12px] font-bold text-gold tabular-nums whitespace-nowrap shrink-0" data-warranty-left={`${left.months}m${left.days}d`}>
-            {left.months > 0 ? s.left(fmtInt(left.months, lang), fmtInt(left.days, lang)) : s.daysLeft(remaining, fmtInt(remaining, lang))}
+            {left.months > 0 ? s.left(left.months, left.days, (n) => fmtInt(n, lang)) : s.daysLeft(remaining, fmtInt(remaining, lang))}
           </span>
         )}
       </div>
@@ -139,14 +146,20 @@ export function CoverageBar({
       {continuesFrom && (
         <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-400 tabular-nums min-w-0" data-coverage-continues={continuesFrom}>
           <History aria-hidden="true" className="w-3 h-3 shrink-0 text-gold" />
-          <span className="truncate">{s.continuesFrom(fmtDate(continuesFrom, lang))}</span>
+          {/* When the line draws the used-sale period, the original warranty's
+              own end is said here, so it is never lost from the card. */}
+          <span className="truncate">
+            {onUsedSale
+              ? s.originalWindow(fmtDate(continuesFrom, lang), fmtDate(warranty.end_at, lang))
+              : s.continuesFrom(fmtDate(continuesFrom, lang))}
+          </span>
         </p>
       )}
 
       {used && (
         <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-400 tabular-nums min-w-0" data-coverage-used-sale={used.months}>
           <PackageCheck aria-hidden="true" className="w-3 h-3 shrink-0 text-gold" />
-          <span className="truncate">{s.usedSale(fmtInt(used.months, lang), fmtDate(used.end_at, lang))}</span>
+          <span className="truncate">{s.usedSale(used.months, fmtDate(used.end_at, lang), (n) => fmtInt(n, lang))}</span>
         </p>
       )}
 

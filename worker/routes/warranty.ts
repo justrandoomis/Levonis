@@ -28,7 +28,8 @@ import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { getSetting, setSetting } from '../lib/settings';
 import { normalizeSerial, unitTotalMonths, type UnitRow } from '../lib/deviceOps';
-import { custodyHistory, unitIdentity } from '../lib/deviceCustody';
+import { originStarts, unitIdentity, type UsedSaleCover } from '../lib/deviceCustody';
+import { monthsWords } from '../../packages/pricing/src/warrantyTime';
 import { maskedDetail, serialActor } from '../lib/serialAssignments';
 // The one definition of "a claim that is still open" lives with the claim
 // workflow that writes those stages; this screen must not grow a second one
@@ -191,11 +192,58 @@ warrantyPublicRoutes.get('/verify/:key', async (c) => {
       200
     );
   if (!row) return miss();
+  // A resale on a condition listing is covered while its original warranty
+  // OR its used-sale period runs (policy v4): the device's own record says
+  // which (dates only — nothing about who holds it).
+  const unitPv = row.unit_id
+    ? await c.env.DB.prepare('SELECT policy_version FROM order_item_units WHERE id = ?')
+        .bind(row.unit_id)
+        .first<{ policy_version: string | null }>()
+        .catch(() => null)
+    : null;
   // A draft has not been handed to anyone; it must not verify as a document.
-  const view = publicView(row, nowIso());
+  const view = publicView(row, nowIso(), unitIdentity(unitPv?.policy_version ?? null).used_sale);
   if (view.status === 'draft') return miss();
   return c.json({ success: true, found: true, warranty: view });
 });
+
+/**
+ * THE DAY A UNIT'S WARRANTY RUNS FROM, for the paper (owner decision 3): one
+ * rule for «generate», «reissue» and the screens (deviceCustody
+ * `originStartFrom`) — a resold device's first delivery, a warranty
+ * replacement's own stored start, any other unit's own start.
+ */
+async function originStartOfUnit(
+  db: D1Database,
+  unitId: string,
+  unit: { delivered_at?: unknown; warranty_start_at?: unknown; policy_version?: unknown }
+): Promise<string | null> {
+  const starts = await originStarts(db, [
+    {
+      id: unitId,
+      delivered_at: typeof unit.delivered_at === 'string' ? unit.delivered_at : null,
+      warranty_start_at: typeof unit.warranty_start_at === 'string' ? unit.warranty_start_at : null,
+      policy_version: unit.policy_version,
+    },
+  ]);
+  return starts.get(unitId) ?? null;
+}
+
+/**
+ * The coverage text a receipt prints: the configuration's, plus — for a
+ * resale on a condition listing — the used-sale period on its own line
+ * (policy v4, the used-device clause: shown separately, never merged). The
+ * receipt keeps an Arabic and an English text (no Sorani column on
+ * `warranty_receipts`); both use the policy's own term.
+ */
+function coverageTexts(cfg: { coverage_ar: string; coverage_en: string }, used: UsedSaleCover | null): { ar: string; en: string } {
+  if (!used) return { ar: cfg.coverage_ar, en: cfg.coverage_en };
+  const until = used.end_at.slice(0, 10);
+  return {
+    ar: `${cfg.coverage_ar}\nمدة بيع المستعمل: ${monthsWords(used.months, 'ar')} حتى ${until}`,
+    en: `${cfg.coverage_en}\nUsed-sale period: ${monthsWords(used.months, 'en')} until ${until}`,
+  };
+}
 
 // ========================================================== ADMIN ROUTES
 
@@ -550,13 +598,11 @@ warrantyAdminRoutes.post('/', async (c) => {
   const months = int(body.months, 'months', { min: 1, max: 240, def: unitTotalMonths(unitRow) ?? cfg.default_months });
   // A RESOLD device prints its ORIGINAL warranty (owner decision 3): the
   // first delivery its unit carries — or, for a resale recorded before the
-  // origin was, the first delivery its `resale_of` chain reaches.
+  // origin was, the first delivery its `resale_of` chain reaches. A warranty
+  // replacement prints its own stored start (the original device's), never
+  // the replacement's delivery (`originStarts`).
   const identity = unitIdentity(unit.policy_version);
-  let originStart = identity.carried ? identity.origin_start_at : null;
-  if (identity.carried && !originStart) {
-    const steps = (await custodyHistory(c.env.DB, [{ id: unitId, delivered_at: (unit.delivered_at as string | null) ?? null, policy_version: unit.policy_version }])).get(unitId) ?? [];
-    originStart = steps.find((st) => st.kind === 'first')?.at ?? null;
-  }
+  const originStart = (await originStartOfUnit(c.env.DB, unitId, unit)) ?? null;
   const startAt =
     optionalIso(body.warranty_start_at, 'warranty_start_at') ||
     String(originStart ?? unit.warranty_start_at ?? unit.delivered_at ?? unit.order_delivered_at ?? unit.order_created_at ?? nowIso());
@@ -602,11 +648,9 @@ warrantyAdminRoutes.post('/', async (c) => {
   const activate = body.activate !== false; // draft only when explicitly asked
   const id = newId('wr');
   const now = nowIso();
-  // The used-sale cover of a resale on a condition listing is printed beside
+  // The used-sale period of a resale on a condition listing is printed beside
   // the original warranty, never merged into it (policy v4, used-device clause).
-  const used = identity.used_sale;
-  const coverageAr = used ? `${cfg.coverage_ar}\nتغطية بيع المستعمل: ${used.months} شهر حتى ${used.end_at.slice(0, 10)}` : cfg.coverage_ar;
-  const coverageEn = used ? `${cfg.coverage_en}\nUsed-sale cover: ${used.months} month(s) until ${used.end_at.slice(0, 10)}` : cfg.coverage_en;
+  const { ar: coverageAr, en: coverageEn } = coverageTexts(cfg, identity.used_sale);
 
   // The number is allocated against the unique index: two admins pressing
   // Generate in the same second retry rather than share a number.
@@ -784,15 +828,20 @@ warrantyAdminRoutes.post('/:id/reissue', async (c) => {
   // mistake the admin came here to fix, so the DEVICE record is re-read and
   // its current values win. The old receipt keeps what it said, as it must.
   const device = await c.env.DB.prepare(
-    `SELECT u.warranty_start_at, u.warranty_end_at, s.serial_raw, s.serial_norm
+    `SELECT u.id, u.delivered_at, u.warranty_start_at, u.warranty_end_at, u.policy_version, s.serial_raw, s.serial_norm
        FROM order_item_units u LEFT JOIN device_serials s ON s.unit_id = u.id
       WHERE u.id = ?`
   )
     .bind(old.unit_id)
-    .first<{ warranty_start_at: string | null; warranty_end_at: string | null; serial_raw: string | null; serial_norm: string | null }>();
+    .first<{ id: string; delivered_at: string | null; warranty_start_at: string | null; warranty_end_at: string | null; policy_version: string | null; serial_raw: string | null; serial_norm: string | null }>();
   const serialRaw = device?.serial_raw || old.serial_raw;
   const serialNorm = device?.serial_norm || old.serial_norm;
-  const startAt = device?.warranty_start_at || old.warranty_start_at;
+  // The same start «generate» prints (owner decision 3): a resold device's
+  // first delivery, also for a resale recorded before its origin was.
+  const startAt = (device ? await originStartOfUnit(c.env.DB, device.id, device) : null) || device?.warranty_start_at || old.warranty_start_at;
+  // Fresh terms keep the used-sale line the device carries (policy v4): the
+  // configuration's coverage text alone would drop it from the new paper.
+  const refreshed = coverageTexts(cfg, device ? unitIdentity(device.policy_version).used_sale : null);
   const endAt = device?.warranty_end_at || old.warranty_end_at;
   const carried = {
     serial: serialRaw !== old.serial_raw,
@@ -837,13 +886,13 @@ warrantyAdminRoutes.post('/:id/reissue', async (c) => {
           body.purchase_price_iqd === undefined || body.purchase_price_iqd === null || body.purchase_price_iqd === ''
             ? old.purchase_price_iqd
             : int(body.purchase_price_iqd, 'purchase_price_iqd', { min: 0, max: 1_000_000_000 }),
-          refreshTerms ? cfg.coverage_ar : old.coverage_text,
+          refreshTerms ? refreshed.ar : old.coverage_text,
           refreshTerms ? JSON.stringify(cfg.terms) : old.terms_json,
           refreshTerms ? JSON.stringify(cfg.retailer) : old.retailer_json,
           admin.id,
           now,
           id,
-          refreshTerms ? cfg.coverage_en : old.coverage_text_en,
+          refreshTerms ? refreshed.en : old.coverage_text_en,
           serialNorm,
           serialRaw,
           startAt,

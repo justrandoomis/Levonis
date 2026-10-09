@@ -1,4 +1,5 @@
 import type { Language } from '../../translations';
+import { monthsWords, timeLeftWords } from '../../../packages/pricing/src/warrantyTime';
 
 /**
  * Every visible string on the warranty surface, in the three UI languages.
@@ -84,10 +85,18 @@ export interface WarrantyStrings {
   coverageSplit: (base: string, ext: string) => string;
   /** Owner decision 3 (2026-10-09): a resold device's warranty runs from its FIRST delivery, never from zero. */
   continuesFrom: (date: string) => string;
-  /** The used-sale cover of a resale on a used listing — shown apart from the original warranty. */
-  usedSale: (months: string, end: string) => string;
-  /** What is left of the warranty, in calendar months and then days. */
-  left: (months: string, days: string) => string;
+  /** The ORIGINAL warranty's window, said in full when the timeline draws the used-sale period instead. */
+  originalWindow: (start: string, end: string) => string;
+  /**
+   * The used-sale period of a resale on a used listing — shown apart from the
+   * original warranty, in the warranty policy's own term (version 4, the
+   * used-device clause). `months` chooses the plural; `fmt` writes the digits.
+   */
+  usedSale: (months: number, end: string, fmt: (n: number) => string) => string;
+  /** On a claim: the device is covered by its used-sale period until this date. */
+  usedSaleUntil: (end: string) => string;
+  /** What is left of the cover in force, in calendar months and then days (plural-aware). */
+  left: (months: number, days: number, fmt: (n: number) => string) => string;
   /** The device's custody, dates only: first delivery, trade-in or return, resale. */
   historyTitle: string;
   hFirst: string;
@@ -228,8 +237,10 @@ const ar: WarrantyStrings = {
   extendedBadge: 'ضمان ممدد',
   coverageSplit: (base, ext) => `${base} ضمان أساسي + ${ext} تمديد مدفوع`,
   continuesFrom: (d) => `يستمر من أول تسليم في ${d}`,
-  usedSale: (m, e) => `تغطية بيع المستعمل: ${m} شهر حتى ${e}`,
-  left: (m, d) => `المتبقي: ${m} شهر و${d} يوم`,
+  originalWindow: (st, e) => `الضمان الأصلي: من أول تسليم في ${st} حتى ${e}`,
+  usedSale: (m, e, f) => `مدة بيع المستعمل: ${monthsWords(m, 'ar', f)} حتى ${e}`,
+  usedSaleUntil: (e) => `مدة بيع المستعمل حتى ${e}`,
+  left: (m, d, f) => `المتبقي: ${timeLeftWords({ months: m, days: d }, 'ar', f)}`,
   historyTitle: 'سجلّ الجهاز',
   hFirst: 'أول تسليم',
   hTradedIn: 'استُبدل لدى Levonis',
@@ -370,8 +381,10 @@ const en: WarrantyStrings = {
   extendedBadge: 'Extended warranty',
   coverageSplit: (base, ext) => `${base} base warranty + ${ext} purchased extension`,
   continuesFrom: (d) => `Continues from the first delivery on ${d}`,
-  usedSale: (m, e) => `Used-sale cover: ${m} month(s) until ${e}`,
-  left: (m, d) => `${m} months ${d} days left`,
+  originalWindow: (st, e) => `Original warranty: from the first delivery on ${st} until ${e}`,
+  usedSale: (m, e, f) => `Used-sale period: ${monthsWords(m, 'en', f)} until ${e}`,
+  usedSaleUntil: (e) => `Used-sale period until ${e}`,
+  left: (m, d, f) => `${timeLeftWords({ months: m, days: d }, 'en', f)} left`,
   historyTitle: 'Device history',
   hFirst: 'First delivered',
   hTradedIn: 'Traded in to Levonis',
@@ -509,8 +522,10 @@ const ckb: WarrantyStrings = {
   extendedBadge: 'گەرەنتی درێژکراوە',
   coverageSplit: (base, ext) => `${base} گەرەنتی بنەڕەتی + ${ext} درێژکردنەوەی کڕدراو`,
   continuesFrom: (d) => `لە یەکەم گەیاندنەوە لە ${d} بەردەوامە`,
-  usedSale: (m, e) => `پاراستنی فرۆشتنی بەکارهاتوو: ${m} مانگ تا ${e}`,
-  left: (m, d) => `ماوە: ${m} مانگ و ${d} ڕۆژ`,
+  originalWindow: (st, e) => `گەرەنتیی ڕەسەن: لە یەکەم گەیاندنەوە لە ${st} تا ${e}`,
+  usedSale: (m, e, f) => `ماوەی فرۆشتنی بەکارهاتوو: ${monthsWords(m, 'ckb', f)} تا ${e}`,
+  usedSaleUntil: (e) => `ماوەی فرۆشتنی بەکارهاتوو تا ${e}`,
+  left: (m, d, f) => `ماوە: ${timeLeftWords({ months: m, days: d }, 'ckb', f)}`,
   historyTitle: 'مێژووی ئامێر',
   hFirst: 'یەکەم گەیاندن',
   hTradedIn: 'لای Levonis گۆڕدرایەوە',

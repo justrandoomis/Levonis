@@ -49,6 +49,7 @@ import { getSetting, getSettings, normalizePayoutMethods, normalizeSerialPrepGat
 import { validateWalletFreeDelivery } from '../lib/walletFreeDelivery';
 import { afterCatalogueWrite, afterSettingsWrite } from '../lib/edgePolicy';
 import type { CreateUnitsResult } from '../lib/deviceOps';
+import { originStarts, unitIdentity } from '../lib/deviceCustody';
 import { runOrderDeliveredEffects } from '../lib/orderDeliveredEffects';
 import { walletTxPublic } from '../lib/wallet';
 // The member detail reports a BNPL debt, and the sign convention for that sum
@@ -2869,8 +2870,8 @@ adminRoutes.get('/orders/:id/warranty-receipt', async (c) => {
   const id = c.req.param('id');
   const { data } = await receiptDataFor(c, id);
   const { results: units } = await c.env.DB.prepare(
-    `SELECT iu.unit_index, iu.warranty_base_months, iu.warranty_ext_months,
-            iu.warranty_start_at, iu.warranty_end_at, oi.name_snapshot, ds.serial_raw
+    `SELECT iu.id, iu.unit_index, iu.delivered_at, iu.warranty_base_months, iu.warranty_ext_months,
+            iu.warranty_start_at, iu.warranty_end_at, iu.policy_version, oi.name_snapshot, ds.serial_raw
        FROM order_item_units iu
        JOIN order_items oi ON oi.id = iu.order_item_id
        LEFT JOIN device_serials ds ON ds.unit_id = iu.id
@@ -2879,6 +2880,18 @@ adminRoutes.get('/orders/:id/warranty-receipt', async (c) => {
   ).bind(id).all<Record<string, unknown>>();
 
   const warranted = (units ?? []).filter((u) => (Number(u.warranty_base_months) || 0) + (Number(u.warranty_ext_months) || 0) > 0);
+  // Owner decision 3: a resold device's paper runs from its FIRST delivery
+  // (also for a resale recorded before its origin was), and a used-listing
+  // resale prints its used-sale period on its own line.
+  const starts = await originStarts(
+    c.env.DB,
+    warranted.map((u) => ({
+      id: String(u.id),
+      delivered_at: (u.delivered_at as string | null) ?? null,
+      warranty_start_at: (u.warranty_start_at as string | null) ?? null,
+      policy_version: u.policy_version,
+    }))
+  ).catch(() => new Map<string, string | null>());
   if (warranted.length === 0) {
     throw badRequest(
       'This order has no warranted device units yet — warranty starts at delivery, so there is nothing to print.',
@@ -2912,8 +2925,12 @@ adminRoutes.get('/orders/:id/warranty-receipt', async (c) => {
         serial: (u.serial_raw as string | null) ?? null,
         unit_index: Number(u.unit_index) || 0,
         months: (Number(u.warranty_base_months) || 0) + (Number(u.warranty_ext_months) || 0),
-        starts_at: (u.warranty_start_at as string | null) ?? null,
+        starts_at: starts.get(String(u.id)) ?? (u.warranty_start_at as string | null) ?? null,
         ends_at: (u.warranty_end_at as string | null) ?? null,
+        used_sale: (() => {
+          const used = unitIdentity(u.policy_version).used_sale;
+          return used ? { months: used.months, end_at: used.end_at } : null;
+        })(),
       })),
       // The owner's published warranty policy, not a paraphrase of it.
       terms: String(policy?.body ?? '').slice(0, 1200),

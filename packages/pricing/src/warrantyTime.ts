@@ -33,3 +33,49 @@ export function warrantyTimeLeft(endIso: string | null | undefined, nowIso: stri
   const days = Math.floor((end - plusMonths(now, months)) / DAY_MS);
   return { months, days };
 }
+
+// ------------------------------------------------------------------ words
+
+/** The three languages every warranty sentence is written in. */
+export type WarrantyLang = 'ar' | 'en' | 'ckb';
+
+/**
+ * «N months» as a person writes it. Arabic takes its singular, its dual and
+ * its two plurals (شهر واحد / شهران / N أشهر / N شهرًا); English its singular;
+ * Sorani keeps the noun singular after a number (N مانگ). `fmt` renders the
+ * digits (a screen may localise them); the plural is chosen on the number.
+ */
+export function monthsWords(n: number, lang: WarrantyLang, fmt: (n: number) => string = String): string {
+  const f = fmt(n);
+  if (lang === 'en') return n === 1 ? `${f} month` : `${f} months`;
+  if (lang === 'ckb') return `${f} مانگ`;
+  if (n === 1) return 'شهر واحد';
+  if (n === 2) return 'شهران';
+  if (n >= 3 && n <= 10) return `${f} أشهر`;
+  return `${f} شهرًا`;
+}
+
+/** «N days», the same way (يوم واحد / يومان / N أيام / N يومًا; N ڕۆژ). */
+export function daysWords(n: number, lang: WarrantyLang, fmt: (n: number) => string = String): string {
+  const f = fmt(n);
+  if (lang === 'en') return n === 1 ? `${f} day` : `${f} days`;
+  if (lang === 'ckb') return `${f} ڕۆژ`;
+  if (n === 1) return 'يوم واحد';
+  if (n === 2) return 'يومان';
+  if (n >= 3 && n <= 10) return `${f} أيام`;
+  return `${f} يومًا`;
+}
+
+/**
+ * What is left (`warrantyTimeLeft`) in words: months, then days — a part
+ * that is zero is left out («11 شهرًا», not «11 شهر و0 يوم»), and nothing
+ * left at all reads as zero days.
+ */
+export function timeLeftWords(left: { months: number; days: number }, lang: WarrantyLang, fmt: (n: number) => string = String): string {
+  const m = Math.max(0, Math.trunc(left.months));
+  const d = Math.max(0, Math.trunc(left.days));
+  if (m === 0) return daysWords(d, lang, fmt);
+  if (d === 0) return monthsWords(m, lang, fmt);
+  if (lang === 'en') return `${monthsWords(m, lang, fmt)} ${daysWords(d, lang, fmt)}`;
+  return `${monthsWords(m, lang, fmt)} و${lang === 'ckb' ? ' ' : ''}${daysWords(d, lang, fmt)}`;
+}

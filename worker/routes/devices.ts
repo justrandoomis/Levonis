@@ -97,6 +97,7 @@ import {
   createUnitsOnDelivery,
   sweepDeliveredOrdersWithoutUnits,
   recomputeUnitWindow,
+  headStartUndoStatements,
   unitTotalMonths,
   effectiveClaimStage,
   effectiveClaimStageSql,
@@ -113,7 +114,7 @@ import { lineDevicePolicy, serializationContext, serializedWriteVerdict } from '
 import { auditStatements } from '../lib/audit';
 import { isOwner } from '../lib/adminScope';
 import { fence, requireSerialWrite } from '../lib/operations';
-import { custodyHistory, tradedInSql, unitCoverage, unitIdentity, type CustodyStep } from '../lib/deviceCustody';
+import { custodyHistory, originStartFrom, tradedInSql, unitCoverage, unitIdentity, type CustodyStep } from '../lib/deviceCustody';
 import { isLostRace } from '../lib/gifts/fence';
 import { serialInventoryRoutes } from './serialInventory';
 import { catalogIndexFor } from '../lib/catalogPresentation';
@@ -209,10 +210,12 @@ function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string
   const cov = unitCoverage(row, Date.now(), row.warranty_closed_at ?? null);
   const identity = unitIdentity(row.policy_version);
   const history = opts.history ?? [];
-  // The FIRST delivery of the device: the origin a resold unit names, or —
-  // for a resale written before the origin was recorded — the first step of
-  // its custody, read through `resale_of` (owner decision 3).
-  const originStart = identity.carried ? identity.origin_start_at ?? history.find((h) => h.kind === 'first')?.at ?? null : null;
+  // The day the carried warranty runs from (owner decision 3): the origin a
+  // resold unit names; for a resale written before the origin was recorded,
+  // the first delivery its `resale_of` custody reaches; for a warranty
+  // REPLACEMENT, its own stored start (the original device's) — never the
+  // replacement's delivery (`originStartFrom`).
+  const originStart = identity.carried ? originStartFrom(row, history) : null;
   // The order belongs to the BUYER. A later holder (a transferred device) gets
   // the device and its coverage, never the buyer's order identifiers — the
   // orders routes would 404 them anyway, and an id is still a fact about
@@ -244,6 +247,11 @@ function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string
       ext_months: row.warranty_ext_months,
       state: cov.state,
       remaining_days: cov.remaining_days,
+      // Which cover the state and the days are about, and THAT cover's end:
+      // the used-sale period once it outlasts the original warranty (policy
+      // v4) — so a screen draws the dates the days were counted to.
+      covered_via: cov.via,
+      cover_end_at: cov.end_at,
       // Owner decision 3: the warranty this device carries from its first
       // sale (`carried`, from `origin_start_at`), and the used-sale cover of
       // this sale shown apart from it.
@@ -804,6 +812,10 @@ deviceRoutes.get('/claims/:id', async (c) => {
           warranty_end_at: unit.warranty_end_at,
           state: cov!.state,
           remaining_days: cov!.remaining_days,
+          // The cover in force and its end (the used-sale period once the
+          // original warranty is over — policy v4).
+          covered_via: cov!.via,
+          cover_end_at: cov!.end_at,
         }
       : null,
     messages: messages.map((m) => ({
@@ -939,6 +951,10 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
     warranty_end_at: unit.warranty_end_at,
     state: cov.state,
     remaining_days: cov.remaining_days,
+    // The cover in force and its end (policy v4): never «active» beside an
+    // end date already past without saying which cover is meant.
+    covered_via: cov.via,
+    cover_end_at: cov.end_at,
   };
 
   /**
@@ -1534,6 +1550,18 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
     );
   }
   if (installed) {
+    // A pending `carry` binding on this slot for ANOTHER device is displaced
+    // below without ever activating: the carried window the delivery hook
+    // wrote for it (S8, owner decision 3) leaves with it, and the unit goes
+    // back to its own line's window (`headStartUndoStatements`, guarded on
+    // the release landing in this same batch).
+    const pendingSlot = await c.env.DB.prepare(
+      `SELECT id, order_item_id, unit_index, prior_unit_id, warranty_mode, activated_at, serial_norm FROM serial_assignments
+        WHERE order_item_id = ? AND unit_index = ? AND part = 'device' AND released_at IS NULL AND activated_at IS NULL`
+    )
+      .bind(unit.order_item_id, unit.unit_index)
+      .first<{ id: string; order_item_id: string; unit_index: number; prior_unit_id: string | null; warranty_mode: string | null; activated_at: string | null; serial_norm: string }>();
+    const undoHeadStart = pendingSlot && pendingSlot.serial_norm !== norm ? await headStartUndoStatements(c.env.DB, pendingSlot, admin.id) : [];
     // The bindings this displaces (critique-1 #5): the unit's previous
     // serial and the serial's previous unit — released, never deleted.
     stmts.push(
@@ -1543,6 +1571,8 @@ deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
           WHERE released_at IS NULL AND (unit_id = ?3 OR (serial_norm = ?5 AND activated_at IS NOT NULL)
                 OR (order_item_id = ?6 AND unit_index = ?7 AND part = 'device'))`
       ).bind(now, admin.id, unitId, (reason || 'post-delivery entry').slice(0, 500), norm, unit.order_item_id, unit.unit_index),
+      // Right after the release, before this serial's own activated binding exists.
+      ...undoHeadStart,
       c.env.DB.prepare(
         `INSERT INTO serial_inventory (serial_norm, serial_raw, product_id, source, created_by, note)
          VALUES (?, ?, ?, 'manual', ?, '') ON CONFLICT(serial_norm) DO NOTHING`

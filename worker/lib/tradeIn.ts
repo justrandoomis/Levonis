@@ -90,6 +90,7 @@ import { parseOpsPolicy } from './deviceOps';
 import { addMonths } from './membershipOps';
 import { effectiveBaseMonths } from './warrantyPlans';
 import { serialAssignmentsInstalled } from './serialPolicy';
+import { MAX_REPLACEMENT_HOPS, liveUnitOfSlot } from './deviceCustody';
 import { benefitFallbackFor, pricingCtxForUser, quoteOptionValueIds, saleAvailability } from '../routes/products';
 import {
   DEFAULT_RULE_SETS,
@@ -145,6 +146,7 @@ export type TradeInCode =
   | 'TRADE_IN_INVALID_VALUE'
   | 'TRADE_IN_RULES_INVALID'
   | 'TRADE_IN_COUPON_MISMATCH'
+  | 'TRADE_IN_LINKED_ELSEWHERE'
   | 'TRADE_IN_STALE';
 
 export class TradeInError extends Error {
@@ -183,6 +185,7 @@ const MESSAGES: Record<TradeInCode, string> = {
   TRADE_IN_RULES_INVALID: 'Some rule values are invalid.',
   TRADE_IN_COUPON_MISMATCH: 'This trade-in credit applies only to its own new device, bought directly, by its owner.',
   TRADE_IN_STALE: 'The request changed while you were working on it. Refresh and try again.',
+  TRADE_IN_LINKED_ELSEWHERE: 'This device is linked to another account. It must be released from that account before it can be traded in.',
 };
 
 const STATUS_OF: Partial<Record<TradeInCode, 400 | 409>> = {
@@ -499,14 +502,14 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
   const idx = await catalogIndexFor(db);
   const itemIds = JSON.stringify(lines.map((l) => l.item_id));
   const productIds = JSON.stringify([...new Set(lines.map((l) => l.product_id))]);
-  const [units, receipts, claims, returns, values, rules] = await Promise.all([
+  const [units, receipts, claims, returns, values, rules, links] = await Promise.all([
     db
       .prepare(
-        `SELECT id, order_item_id, unit_index, delivered_at, warranty_end_at, warranty_base_months
+        `SELECT id, order_item_id, unit_index, delivered_at, warranty_end_at, warranty_base_months, replaced_by_unit_id
            FROM order_item_units WHERE order_item_id IN (SELECT value FROM json_each(?1))`
       )
       .bind(itemIds)
-      .all<{ id: string; order_item_id: string; unit_index: number; delivered_at: string | null; warranty_end_at: string | null }>(),
+      .all<{ id: string; order_item_id: string; unit_index: number; delivered_at: string | null; warranty_end_at: string | null; replaced_by_unit_id: string | null }>(),
     db
       .prepare(
         `SELECT order_item_id, unit_id, warranty_end_at FROM warranty_receipts
@@ -537,7 +540,29 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
       .bind(productIds)
       .all<OptionValueRow>(),
     loadRuleBook(db),
+    // Who holds each device now: its live account link (owner decision 3 —
+    // a trade-in takes the device from whoever holds it, so another
+    // account's link must be released first).
+    db
+      .prepare(
+        `SELECT r.unit_id, r.user_id FROM device_registrations r JOIN order_item_units u ON u.id = r.unit_id
+          WHERE u.order_item_id IN (SELECT value FROM json_each(?1)) AND r.revoked_at IS NULL`
+      )
+      .bind(itemIds)
+      .all<{ unit_id: string; user_id: string }>(),
   ]);
+  const holderOf = new Map((links.results ?? []).map((l) => [l.unit_id, l.user_id]));
+  const unitById = new Map((units.results ?? []).map((u) => [u.id, u]));
+  /** The slot's LIVE unit: its own, or the end of its warranty-replacement chain (deviceCustody `liveUnitOfSlot`). */
+  const liveOf = <U extends { replaced_by_unit_id: string | null }>(u: U | null): U | null => {
+    let cur = u;
+    for (let hop = 0; cur && cur.replaced_by_unit_id && hop < MAX_REPLACEMENT_HOPS; hop++) {
+      const next = unitById.get(cur.replaced_by_unit_id) as U | undefined;
+      if (!next) break;
+      cur = next;
+    }
+    return cur;
+  };
   // S14: a printer with no configured base still carries the 12-month default
   // (the same answer delivery wrote on its unit).
   const printers = await printerProductIds(db, lines.map((l) => l.product_id));
@@ -585,6 +610,13 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
         unit?.warranty_end_at ||
         receipt?.warranty_end_at ||
         (deliveredAt && opsMonths ? addMonths(deliveredAt, opsMonths) : null);
+      // The device in the customer's hands: a warranty replacement of this
+      // slot's unit when there was one. Linked to ANOTHER account (the buyer
+      // passed it on), it is not this customer's to trade in until that link
+      // is released — the completion would otherwise take it from them.
+      const live = liveOf(unit);
+      const holder = live ? holderOf.get(live.id) ?? null : null;
+      const linkedElsewhere = !!holder && holder !== userId;
       const unitClaims = (claims.results ?? []).filter((c) => c.order_item_id === line.item_id && c.unit_index === unitIndex);
       const claimedParts = new Set(unitClaims.map((c) => c.part));
       const ownOpen = unitClaims.find((c) => c.user_id === userId && !isTerminal(c.status) && c.status !== 'completed');
@@ -610,6 +642,8 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
         else if (returnSet.has(line.item_id)) reason = 'TRADE_IN_RETURN_OPEN';
         else if (unknownSplit && scope !== 'whole') reason = 'TRADE_IN_SCOPE_UNAVAILABLE';
         else if (roles.some((r) => claimedParts.has(r))) reason = 'TRADE_IN_ALREADY_CLAIMED';
+        // The AMS alone leaves the printer (and its link) where it is.
+        else if (linkedElsewhere && scope !== 'ams_only') reason = 'TRADE_IN_LINKED_ELSEWHERE';
         else if (components.reduce((s, c) => s + c.base_iqd, 0) < rules[components[0].family].min_base_iqd) reason = 'TRADE_IN_BELOW_MINIMUM';
         return { scope, available: reason === null, reason, components };
       });
@@ -1643,33 +1677,67 @@ export async function checkoutCredit(env: Env, req: RequestRow): Promise<{ code:
   return { code, order_id: null };
 }
 
+interface CustodyPlan {
+  unitId: string | null;
+  statements: D1PreparedStatement[];
+}
+
+/** The live unit of the request's slot and who else holds it, or null for an AMS-only trade-in. */
+async function custodyTarget(db: D1Database, req: RequestRow) {
+  if (req.scope === 'ams_only') return null;
+  const unit = await liveUnitOfSlot<{ id: string; replaced_by_unit_id: string | null; warranty_start_at: string | null; warranty_end_at: string | null }>(
+    db,
+    req.order_item_id,
+    req.unit_index,
+    'u.id, u.warranty_start_at, u.warranty_end_at'
+  );
+  if (!unit) return null;
+  const [serial, other] = await Promise.all([
+    db.prepare('SELECT serial_norm FROM device_serials WHERE unit_id = ?').bind(unit.id).first<{ serial_norm: string }>(),
+    db
+      .prepare('SELECT user_id FROM device_registrations WHERE unit_id = ? AND revoked_at IS NULL AND user_id <> ?')
+      .bind(unit.id, req.user_id)
+      .first<{ user_id: string }>(),
+  ]);
+  return { unit, serialNorm: serial?.serial_norm ?? null, linkedElsewhere: !!other };
+}
+
 /**
  * THE DEVICE LEAVES THE TRADER, ITS WARRANTY DOES NOT (owner decision 3,
  * 2026-10-09; DECISIONS row 193). For a `whole` or `printer_only` trade-in the
- * completion batch, behind the request's own fence:
+ * completion batch, behind the request's own fence, acts on the slot's LIVE
+ * unit — its own, or the warranty replacement the customer actually holds
+ * (`liveUnitOfSlot`):
+ *   - refuses (a second fence) while that device is linked to an account
+ *     other than the trader's — a buyer who passed the device on cannot take
+ *     it from its holder (TRADE_IN_LINKED_ELSEWHERE);
  *   - revokes the unit's live account link (the trader no longer holds it);
  *   - releases its activated serial binding as `traded_in`
  *     (`trade_in:<request id>`), so the serial is the shop's to sell again;
- *   - records `serial.traded_in` with the unit's dates.
+ *   - records `serial.traded_in` with the unit's dates and its own serial.
  * It NEVER touches `warranty_closed_at`, the warranty dates or the receipt:
  * the warranty stays with the serial and runs from the original delivery.
  * The traded-in state itself is derived from this request's `completed`
- * status (worker/lib/deviceCustody.ts) — nothing else marks the unit.
+ * status (worker/lib/deviceCustody.ts `tradedInSql`, which follows the same
+ * replacement chain) — nothing else marks the unit.
  * An `ams_only` trade-in leaves the device with the customer: nothing moves.
  */
-async function custodyStatements(env: Env, req: RequestRow, adminId: string, now: string): Promise<D1PreparedStatement[]> {
-  if (req.scope === 'ams_only') return [];
+async function custodyStatements(env: Env, req: RequestRow, adminId: string, now: string): Promise<CustodyPlan> {
   const db = env.DB;
-  const unit = await db
-    .prepare(
-      `SELECT u.id, u.warranty_start_at, u.warranty_end_at, d.serial_norm
-         FROM order_item_units u LEFT JOIN device_serials d ON d.unit_id = u.id
-        WHERE u.order_item_id = ? AND u.unit_index = ?`
-    )
-    .bind(req.order_item_id, req.unit_index)
-    .first<{ id: string; warranty_start_at: string | null; warranty_end_at: string | null; serial_norm: string | null }>();
-  if (!unit) return [];
+  const target = await custodyTarget(db, req);
+  if (!target) return { unitId: null, statements: [] };
+  if (target.linkedElsewhere) throw refuse('TRADE_IN_LINKED_ELSEWHERE');
+  const { unit } = target;
   const stmts: D1PreparedStatement[] = [
+    // The holder is still the trader (or nobody) INSIDE the write: a link
+    // another account made since the read aborts the whole completion.
+    db
+      .prepare(
+        `UPDATE trade_in_requests SET status = CASE WHEN NOT EXISTS (
+            SELECT 1 FROM device_registrations WHERE unit_id = ?2 AND revoked_at IS NULL AND user_id <> ?3) THEN status ELSE NULL END
+          WHERE id = ?1`
+      )
+      .bind(req.id, unit.id, req.user_id),
     db.prepare('UPDATE device_registrations SET revoked_at = ? WHERE unit_id = ? AND revoked_at IS NULL').bind(now, unit.id),
   ];
   if (await serialAssignmentsInstalled(db)) {
@@ -1684,7 +1752,7 @@ async function custodyStatements(env: Env, req: RequestRow, adminId: string, now
   }
   stmts.push(
     ...(
-      await auditStatements(db, adminId, 'serial.traded_in', unit.serial_norm || unit.id, {
+      await auditStatements(db, adminId, 'serial.traded_in', target.serialNorm || unit.id, {
         request_id: req.id,
         unit_id: unit.id,
         scope: req.scope,
@@ -1694,7 +1762,7 @@ async function custodyStatements(env: Env, req: RequestRow, adminId: string, now
       })
     ).statements
   );
-  return stmts;
+  return { unitId: unit.id, statements: stmts };
 }
 
 export async function completeRequest(env: Env, req: RequestRow, adminId: string): Promise<RequestRow> {
@@ -1727,10 +1795,14 @@ export async function completeRequest(env: Env, req: RequestRow, adminId: string
       }).stmt,
       ...(await auditStatements(db, adminId, 'trade_in.complete', req.id, { order_id: live?.order_id ?? null })).statements,
       // After the fence: a completion that lost its race moves no device.
-      ...custody,
+      ...custody.statements,
     ]);
   } catch (e) {
-    if (isAbort(e)) throw refuse('TRADE_IN_STALE');
+    if (isAbort(e)) {
+      // The honest reason: another account linked the device since the read.
+      if (custody.unitId && (await custodyTarget(db, req))?.linkedElsewhere) throw refuse('TRADE_IN_LINKED_ELSEWHERE');
+      throw refuse('TRADE_IN_STALE');
+    }
     throw e;
   }
   return (await loadRequest(db, req.id))!;

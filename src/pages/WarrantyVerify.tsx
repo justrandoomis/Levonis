@@ -16,6 +16,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ShieldCheck, ShieldX, ShieldAlert, Search, Loader2 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
+import { monthsWords } from '../../packages/pricing/src/warrantyTime';
 
 interface PublicWarranty {
   receipt_no: string;
@@ -31,6 +32,10 @@ interface PublicWarranty {
   days_remaining: number | null;
   retailer: { name: string; website: string; instagram: string; phone: string };
   note: 'replaced' | 'void' | null;
+  /** Warranty policy v4: a used-listing resale's own period, apart from the original window (absent from an older server). */
+  used_sale?: { months: number; end_at: string } | null;
+  /** Which cover `status` and `days_remaining` are about (absent from an older server). */
+  covered_via?: 'original' | 'used_sale';
 }
 
 const STR = {
@@ -56,10 +61,13 @@ const STR = {
     end: 'نهاية الضمان',
     purchase: 'تاريخ الشراء',
     daysLeft: (n: number) => `${n} يومًا متبقية`,
-    months: (n: number) => (n === 12 ? 'سنة واحدة' : n === 24 ? 'سنتان' : `${n} شهرًا`),
+    months: (n: number) => (n === 12 ? 'سنة واحدة' : n === 24 ? 'سنتان' : monthsWords(n, 'ar')),
     retailer: 'البائع المعتمد',
     privacy: 'هذه الصفحة تعرض حالة الضمان فقط. بيانات الزبون لا تُنشر هنا.',
     error: 'تعذّر التحقق الآن. حاول مرة أخرى بعد قليل.',
+    usedSale: 'مدة بيع المستعمل',
+    usedSaleValue: (n: number, d: string) => `${monthsWords(n, 'ar')} — حتى ${d}`,
+    viaUsedSale: 'ساري بمدة بيع المستعمل بعد انتهاء الضمان الأصلي',
   },
   en: {
     title: 'Warranty verification',
@@ -83,10 +91,43 @@ const STR = {
     end: 'Warranty end',
     purchase: 'Date of purchase',
     daysLeft: (n: number) => `${n} days remaining`,
-    months: (n: number) => (n === 12 ? '1 year' : n === 24 ? '2 years' : `${n} months`),
+    months: (n: number) => (n === 12 ? '1 year' : n === 24 ? '2 years' : monthsWords(n, 'en')),
     retailer: 'Authorized retailer',
     privacy: 'This page shows warranty status only. No customer details are published here.',
     error: 'Verification is unavailable right now. Please try again shortly.',
+    usedSale: 'Used-sale period',
+    usedSaleValue: (n: number, d: string) => `${monthsWords(n, 'en')} — until ${d}`,
+    viaUsedSale: 'Active through the used-sale period after the original warranty ended',
+  },
+  ckb: {
+    title: 'پشتڕاستکردنەوەی گەرەنتی',
+    lead: 'ژمارەی پسووڵەی گەرەنتی یان ژمارە زنجیرەیی ئامێرەکە بنووسە.',
+    placeholder: 'WR-2026-0902-001 یان ژمارە زنجیرەیی',
+    check: 'پشتڕاستکردنەوە',
+    checking: 'پشتڕاست دەکرێتەوە…',
+    covered: 'گەرەنتی کارایە',
+    expired: 'ماوەی گەرەنتی تەواو بووە',
+    voided: 'ئەم پسووڵەیە هەڵوەشێنراوەتەوە',
+    replaced: 'ئامێرەکە گۆڕدرا — گەرەنتییەکە گوازرایەوە بۆ پسووڵە نوێیەکە',
+    notFound: 'هیچ پسووڵەیەکی گەرەنتی بەم ژمارەیە نییە.',
+    notFoundHint: 'ژمارەکە لەگەڵ پسووڵە چاپکراوەکە بەراورد بکە، یان پەیوەندی بە پشتگیری بکە.',
+    receiptNo: 'ژمارەی پسووڵە',
+    product: 'بەرهەم',
+    model: 'مۆدێل',
+    serial: 'ژمارەی زنجیرەیی',
+    type: 'جۆری گەرەنتی',
+    period: 'ماوە',
+    start: 'دەستپێکی گەرەنتی',
+    end: 'کۆتایی گەرەنتی',
+    purchase: 'ڕێکەوتی کڕین',
+    daysLeft: (n: number) => `${n} ڕۆژ ماوە`,
+    months: (n: number) => (n === 12 ? 'یەک ساڵ' : n === 24 ? 'دوو ساڵ' : monthsWords(n, 'ckb')),
+    retailer: 'فرۆشیاری فەرمی',
+    privacy: 'ئەم پەڕەیە تەنها دۆخی گەرەنتی پیشان دەدات. زانیاریی کڕیار لێرە بڵاو ناکرێتەوە.',
+    error: 'ئێستا پشتڕاستکردنەوە بەردەست نییە. تکایە دوای کەمێک دووبارە هەوڵ بدەرەوە.',
+    usedSale: 'ماوەی فرۆشتنی بەکارهاتوو',
+    usedSaleValue: (n: number, d: string) => `${monthsWords(n, 'ckb')} — تا ${d}`,
+    viaUsedSale: 'دوای تەواوبوونی گەرەنتیی ڕەسەن، بە ماوەی فرۆشتنی بەکارهاتوو کارایە',
   },
 };
 
@@ -96,7 +137,8 @@ export default function WarrantyVerify() {
   const { receiptNo } = useParams<{ receiptNo: string }>();
   const navigate = useNavigate();
   const { lang, dir } = useLanguage();
-  const t = lang === 'en' ? STR.en : STR.ar;
+  // Sorani readers get Sorani (the page used to fall back to Arabic for them).
+  const t = lang === 'en' ? STR.en : lang === 'ckb' ? STR.ckb : STR.ar;
 
   const [query, setQuery] = useState(receiptNo ?? '');
   const [result, setResult] = useState<PublicWarranty | null>(null);
@@ -209,6 +251,9 @@ export default function WarrantyVerify() {
                 {result.status === 'active' && result.days_remaining !== null && (
                   <p className="text-sm opacity-90">{t.daysLeft(result.days_remaining)}</p>
                 )}
+                {result.status === 'active' && result.covered_via === 'used_sale' && (
+                  <p className="text-[12.5px] opacity-80" data-warranty-via="used_sale">{t.viaUsedSale}</p>
+                )}
               </div>
             </div>
 
@@ -223,6 +268,8 @@ export default function WarrantyVerify() {
                 [t.purchase, shortDate(result.purchase_date), true],
                 [t.start, shortDate(result.warranty_start_at), true],
                 [t.end, shortDate(result.warranty_end_at), true],
+                // Policy v4: the used-sale period on its own line, never merged into the window above.
+                [t.usedSale, result.used_sale ? t.usedSaleValue(result.used_sale.months, shortDate(result.used_sale.end_at)) : '', false],
               ] as const)
                 .filter(([, value]) => value && value !== '—')
                 .map(([label, value, ltr]) => (
