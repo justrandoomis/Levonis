@@ -557,6 +557,15 @@ export const COST_REFUSALS = {
     en: 'The price and exchange rate recorded on an order at purchase are fixed and never change.',
     ckb: 'ئەو نرخ و نرخی ئاڵوگۆڕەی لە کاتی کڕیندا لەسەر داواکارییەکە تۆمار کراون جێگیرن و هەرگیز ناگۆڕێن.',
   },
+  // ---- the procurement card's pricing (USD design §3.1, §5.4) ----
+  // A purchase feeds the product's current costs only once it is confirmed
+  // (ordered, partly or fully received) with a FINAL cost; details carry the
+  // reason code only ('status' | 'estimated' | 'no_lines'), never a value.
+  PRICING_PURCHASE_NOT_ELIGIBLE: {
+    ar: 'لا يمكن اعتماد هذا الشراء في التسعير: يجب أن يكون مؤكدًا وتكلفته نهائية.',
+    en: 'This purchase cannot be applied to pricing: it must be confirmed and its cost final.',
+    ckb: 'ناتوانرێت ئەم کڕینە لە نرخداناندا جێبەجێ بکرێت: دەبێت پشتڕاستکرابێتەوە و تێچووەکەی کۆتایی بێت.',
+  },
 } as const satisfies Record<string, CostRefusal>;
 
 export type CostRefusalCode = keyof typeof COST_REFUSALS;

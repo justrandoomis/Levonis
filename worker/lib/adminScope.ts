@@ -579,6 +579,18 @@ export const FINANCIAL_FIELDS = [
   'legacy_usd_iqd_rate',
   'actual_purchase_cost_iqd',
   'actual_additional_costs_iqd',
+  // -- the procurement card's pricing (USD design §5): the summary's cents, the direct-sale
+  // -- price beside it, the store price it is compared with, the document's own rate, the
+  // -- IQD-converted supplier cost's provenance and the card's current minimum profits.
+  'target_profit_cents',
+  'supplier_cost_cents',
+  'shipping_cost_cents',
+  'additional_cost_cents',
+  'direct_sale_price_iqd',
+  'store_price_iqd',
+  'document_rate',
+  'iqd_converted',
+  'minimum_profits',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

@@ -40,6 +40,10 @@ export const DESIGNED_ON_OLDER_DB: readonly DesignedRefusal[] = [
   // same 403 on both databases (the cost door comes first) and stays strict.
   { path: '/api/admin/pricing/rates', who: ['owner'], status: 503, code: 'PRICING_NOT_INSTALLED', migration: '0179_fx_rates.sql' },
   { path: '/api/admin/pricing/rates/history', who: ['owner'], status: 503, code: 'PRICING_NOT_INSTALLED', migration: '0179_fx_rates.sql' },
+  // The Inputs stage (USD design §3-§5): a product's stored pricing inputs and
+  // rules live only in 0181's engine tables.
+  { path: '/api/admin/pricing/products/p_a1/rules', who: ['owner'], status: 503, code: 'PRICING_NOT_INSTALLED', migration: '0181_pricing_engine_core.sql' },
+  { path: '/api/admin/pricing/products/p_a1/inputs', who: ['owner'], status: 503, code: 'PRICING_NOT_INSTALLED', migration: '0181_pricing_engine_core.sql' },
 ];
 
 /** The listed refusal for this user and path on a database migrated through `through` (e.g. '0176'), if any. */

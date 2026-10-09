@@ -1,4 +1,4 @@
-import { PROCUREMENT_CHARGE_BASES, type ProcurementChargeBasis } from '../../../packages/contracts/src/procurementCost';
+import { PROCUREMENT_CHARGE_BASES, looksLikeFreight, type ProcurementChargeBasis } from '../../../packages/contracts/src/procurementCost';
 
 /** One extra cost the buyer actually paid for this shipment — local delivery,
  * customs, transfer fees, packaging. Never the raw supplier price and never
@@ -16,6 +16,11 @@ export type ChargeDraft = {
   /** Selection keys this charge covers; null covers every line. */
   applies_to: string[] | null;
   review?: boolean;
+  /** Routed documents: the owner confirmed a freight-looking charge is not
+   * freight, so it feeds the pricing input «additional cost» too (USD design
+   * §3.3). Unset = the server's default: left out of pricing when the title
+   * looks like freight, counted otherwise. */
+  pricing_role?: 'additional';
 };
 
 export const newChargeDraft = (): ChargeDraft => ({ title: '', scope: 'shipment', amount_iqd: NaN, unit_amount_iqd: NaN, basis: 'quantity', applies_to: null });
@@ -36,6 +41,7 @@ export function chargeDraft(raw: unknown): ChargeDraft {
     basis: PROCUREMENT_CHARGE_BASES.includes(r.basis as ProcurementChargeBasis) ? (r.basis as ProcurementChargeBasis) : 'quantity',
     applies_to: keys.length ? keys : null,
     ...(r.review === true ? { review: true } : {}),
+    ...(r.pricing_role === 'additional' && looksLikeFreight(typeof r.title === 'string' ? r.title : '') ? { pricing_role: 'additional' as const } : {}),
   };
 }
 
@@ -47,6 +53,7 @@ export const chargeWire = (c: ChargeDraft) => ({
   amount_iqd: c.scope === 'shipment' ? c.amount_iqd : null,
   unit_amount_iqd: c.scope === 'unit' ? c.unit_amount_iqd : null,
   applies_to: c.applies_to,
+  ...(c.pricing_role ? { pricing_role: c.pricing_role } : {}),
 });
 
 /** Choosing a supplier route after typing manual charges: a manual «شحن» would
@@ -71,5 +78,6 @@ export function chargeProblems(c: ChargeDraft, keys: readonly string[], allocate
 }
 
 /** International freight is calculated from the route; a charge named like it
- * is worth a second look (local delivery is a separate, legitimate cost). */
-export const looksLikeFreight = (title: string) => /شحن(?!ة)|\b(?:freight|shipping)\b|بارکردن/i.test(title);
+ * is worth a second look. One regex for the editor and the server's default
+ * pricing role (packages/contracts/src/procurementCost.ts). */
+export { looksLikeFreight };

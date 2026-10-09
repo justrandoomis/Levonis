@@ -97,6 +97,18 @@ export type ProcurementCharge = {
 };
 export type ProcurementChargeLine = { key: string; qty: number; value: number; weight_g: number; volume_mm3: number };
 
+/** International freight is calculated from the route; a charge named like it
+ * is worth a second look (local delivery is a separate, legitimate cost). The
+ * Sorani covers the app's own freight word «گواستنەوە» and the pricing term
+ * «ناردن» (USD design §3.3). Shared by the purchase editor's hint and the
+ * server's default `pricing_role`: a freight-looking charge on a routed
+ * document is left out of pricing until the owner confirms it is not freight
+ * (a false positive costs one tap; a false negative would count freight twice). */
+export const looksLikeFreight = (title: string): boolean => /شحن(?!ة)|\b(?:freight|shipping)\b|بارکردن|گواستنەوە|ناردن/i.test(title);
+
+/** Which of a routed document's extra charges feed the pricing input «additional cost». */
+export type PurchaseChargePricingRole = 'additional' | 'excluded';
+
 export const procurementSelectionKey = (s: { product_id: string; scope: string; scope_id?: string | null }) =>
   `${s.product_id}:${s.scope}:${s.scope_id ?? ''}`;
 

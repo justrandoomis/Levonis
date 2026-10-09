@@ -1,0 +1,225 @@
+/**
+ * «التسعير بالدولار» IN THE PRODUCT FORM — THE OWNER'S OWN INPUTS FOR ONE
+ * PRODUCT AND ITS MODELS (USD design §3 "written by (a) the owner's form",
+ * §4, §5.2; owner brief 2026-10-09 §1-§7; the owner's request of the same day:
+ * the pricing and the shipping of a product are entered where the product is
+ * added or edited — its prices section and its options' prices — not only in
+ * the procurement card).
+ *
+ * Per scope (the product itself = `base`, each model = `option`): the supplier
+ * cost in its own currency (USD / EUR / CNY), the base shipping route, the
+ * packed weight (grams) or the packed volume (CBM), the additional cost per
+ * piece in IQD, and the two owner rules — the minimum profit in USD and the
+ * Direct Sale Extra in whole dinars on the 1,000 step. A colour or a variant
+ * is priced at its model's level until FX-7 (owner question Q4's default).
+ *
+ * Writes inputs and rules only — never a price (the engine's writer adopts and
+ * prices a product at the owner's completing save, decision 8). The answer
+ * carries each model's 4-cell bar, computed by E1 at the central rates of the
+ * versioned reader; the client never computes money.
+ *
+ * Validation is strict and names the FIELD, never its value: an unknown key is
+ * UNKNOWN_FIELD; a bad value is PRICING_INPUT_INVALID with `details.field`.
+ * Decimals are canonical TEXT (Arabic-Indic digits normalised); a JSON number
+ * is refused for a decimal, so no binary float reaches a price. A key left out
+ * keeps the stored value; `null` clears it (a model then inherits the
+ * product's value).
+ */
+import { MAX_ADDITIONAL_COST_IQD, MAX_WEIGHT_G, SUPPLIER_CURRENCIES, type SupplierCurrency } from '@levonis/pricing/costToPrice';
+import { SHIPPING_PROFILES, type ShippingProfile } from '@levonis/pricing/skuChannel';
+import type { PricingContext } from '../../routes/cart';
+import { positiveDecimal, strictBody } from '../fx/ownerActs';
+import { evaluateLegacy } from './legacy';
+import type { LoadedProduct } from './load';
+import type { PricingRates } from './rates';
+import { inputInvalid } from './whatIf';
+import { parseRuleWrites } from './ownerRules';
+import { mergedRules } from './fromPurchase';
+import { modelSummary } from './procurementPreview';
+import { ratesHeadDto, summaryDto } from './procurementDto';
+import { nextInputRow, ownerRow, ruleAt, type InputFields, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow } from './store';
+
+/** The fields the product form edits (pricing weight and box dimensions stay as stored). */
+export const FORM_INPUT_FIELDS = ['supplier_cost_amount', 'supplier_cost_currency', 'shipping_profile', 'shipping_weight_g', 'manual_cbm', 'additional_cost_iqd'] as const;
+type FormField = (typeof FORM_INPUT_FIELDS)[number];
+
+const MAX_SCOPES = 61;
+
+export const formOptionIds = (loaded: LoadedProduct): Set<string> =>
+  new Set(loaded.doc.options.filter((o) => o.active !== false && !o.merged_into).map((o) => o.id));
+
+function wholeOrNull(raw: unknown, field: string, min: number, max: number): number | null {
+  if (raw === null) return null;
+  if (typeof raw !== 'number' || !Number.isSafeInteger(raw) || raw < min || raw > max) throw inputInvalid(field);
+  return raw;
+}
+
+/** One scope's entry of the form → an input write (absent keys untouched, null clears). */
+function parseInputEntry(raw: unknown, i: number, optionIds: ReadonlySet<string>, stored: ProductPricingData): InputWrite {
+  const r = strictBody(raw, ['scope', 'scope_id', ...FORM_INPUT_FIELDS]);
+  const scope = r.scope;
+  if (scope !== 'base' && scope !== 'option') throw inputInvalid(`inputs[${i}].scope`);
+  const scopeId = scope === 'base' ? '' : typeof r.scope_id === 'string' ? r.scope_id : '';
+  if (scope === 'option' && !optionIds.has(scopeId)) throw inputInvalid(`inputs[${i}].scope_id`);
+  if (scope === 'base' && r.scope_id !== undefined && r.scope_id !== null && r.scope_id !== '') throw inputInvalid(`inputs[${i}].scope_id`);
+  const existing = ownerRow(stored.inputs, scope, scopeId);
+  const set: Partial<InputFields> = {};
+  const has = (k: FormField) => Object.prototype.hasOwnProperty.call(r, k) && r[k] !== undefined;
+  if (has('supplier_cost_amount')) {
+    const v = r.supplier_cost_amount;
+    set.supplier_cost_amount = v === null || v === '' ? null : positiveDecimal(v, 'supplier_cost_amount', 12, 6);
+  }
+  if (has('supplier_cost_currency')) {
+    const v = r.supplier_cost_currency;
+    if (v !== null && (typeof v !== 'string' || !(SUPPLIER_CURRENCIES as readonly string[]).includes(v))) throw inputInvalid('supplier_cost_currency');
+    set.supplier_cost_currency = (v as SupplierCurrency | null) ?? null;
+  }
+  if (has('shipping_profile')) {
+    const v = r.shipping_profile;
+    if (v !== null && (typeof v !== 'string' || !(SHIPPING_PROFILES as readonly string[]).includes(v))) throw inputInvalid('shipping_profile');
+    set.shipping_profile = (v as ShippingProfile | null) ?? null;
+  }
+  if (has('shipping_weight_g')) set.shipping_weight_g = wholeOrNull(r.shipping_weight_g, 'shipping_weight_g', 1, MAX_WEIGHT_G);
+  if (has('manual_cbm')) {
+    const v = r.manual_cbm;
+    const cbm = v === null || v === '' ? null : positiveDecimal(v, 'manual_cbm', 3, 9);
+    if (cbm !== null && cbm.length > 12) throw inputInvalid('manual_cbm');
+    set.manual_cbm = cbm;
+  }
+  if (has('additional_cost_iqd')) set.additional_cost_iqd = wholeOrNull(r.additional_cost_iqd, 'additional_cost_iqd', 0, MAX_ADDITIONAL_COST_IQD);
+
+  // A cleared supplier cost takes its currency with it, unless a stored difference still needs it (0181 CHECK).
+  if (set.supplier_cost_amount === null && !has('supplier_cost_currency') && (existing?.supplier_cost_delta ?? null) === null) set.supplier_cost_currency = null;
+  const w: InputWrite = { scope, scope_id: scopeId, existing, set, source_ref: 'owner' };
+  const next = nextInputRow(w);
+  if ((next.supplier_cost_amount !== null || next.supplier_cost_delta !== null) && next.supplier_cost_currency === null) throw inputInvalid('supplier_cost_currency');
+  return w;
+}
+
+export interface ProductInputsDraft {
+  inputs: InputWrite[];
+  rules: RuleWrite[];
+}
+
+/** Parse the form's `{inputs, rules}` (PUT and the preview alike). */
+export function parseProductInputs(body: Record<string, unknown>, loaded: LoadedProduct, stored: ProductPricingData): ProductInputsDraft {
+  const optionIds = formOptionIds(loaded);
+  const rawInputs = body.inputs ?? [];
+  if (!Array.isArray(rawInputs) || rawInputs.length > MAX_SCOPES) throw inputInvalid('inputs');
+  const seen = new Set<string>();
+  const inputs = rawInputs.map((raw, i) => {
+    const w = parseInputEntry(raw, i, optionIds, stored);
+    const key = `${w.scope}:${w.scope_id}`;
+    if (seen.has(key)) throw inputInvalid(`inputs[${i}]`);
+    seen.add(key);
+    return w;
+  });
+  const rawRules = body.rules ?? [];
+  if (!Array.isArray(rawRules)) throw inputInvalid('rules');
+  const rules = rawRules.length ? parseRuleWrites({ rules: rawRules }, loaded.id, optionIds, stored) : [];
+  return { inputs, rules };
+}
+
+/** The store's owner rows as they would be after the drafts (exactly the row a write leaves). */
+function draftInputs(stored: readonly StoredInputRow[], writes: readonly InputWrite[]): Array<Partial<StoredInputRow>> {
+  const rows: Array<Partial<StoredInputRow>> = stored.map((r) => ({ ...r }));
+  for (const w of writes) {
+    const scopeId = w.scope === 'base' ? '' : w.scope_id;
+    const at = rows.findIndex((r) => r.scope === w.scope && r.scope_id === scopeId && r.origin === 'MANUAL_OVERRIDE');
+    const next = nextInputRow(w);
+    const merged: Partial<StoredInputRow> = { ...(at >= 0 ? rows[at] : { scope: w.scope, scope_id: scopeId, origin: 'MANUAL_OVERRIDE' as const }), ...next };
+    if (at >= 0) rows[at] = merged;
+    else rows.push(merged);
+  }
+  return rows;
+}
+
+const formInputsOf = (row: Partial<StoredInputRow> | null | undefined) =>
+  row
+    ? {
+        supplier_cost_amount: row.supplier_cost_amount ?? null,
+        supplier_cost_currency: row.supplier_cost_currency ?? null,
+        supplier_input_mode: row.supplier_input_mode ?? null,
+        shipping_profile: row.shipping_profile ?? null,
+        shipping_weight_g: row.shipping_weight_g ?? null,
+        pricing_weight_g: row.pricing_weight_g ?? null,
+        manual_cbm: row.manual_cbm ?? null,
+        additional_cost_iqd: row.additional_cost_iqd ?? null,
+        source_ref: row.source_ref ?? '',
+      }
+    : null;
+
+/**
+ * The form's answer: every scope's stored (or drafted) inputs and rules, and
+ * every model's bar. Allowlisted field by field; owner only, private, no-store.
+ */
+export function productInputsAnswer(
+  loaded: LoadedProduct,
+  stored: ProductPricingData,
+  ctx: PricingContext,
+  rates: PricingRates | null,
+  draft: ProductInputsDraft = { inputs: [], rules: [] }
+) {
+  const pid = loaded.id;
+  const inputs = draftInputs(stored.inputs, draft.inputs);
+  const rules = mergedRules(stored, draft.rules);
+  const legacy = evaluateLegacy(pid, loaded.doc, loaded.view, ctx);
+  const engine = stored.state?.mode === 'engine';
+  const names = (o: { name_ar?: string; name_en?: string; name_ckb?: string } | null | undefined) => ({
+    name_ar: o?.name_ar ?? '',
+    name_en: o?.name_en ?? '',
+    name_ckb: o?.name_ckb ?? '',
+  });
+  const rowAt = (scope: 'base' | 'option', scopeId: string) =>
+    inputs.find((r) => r.scope === scope && (r.scope_id ?? '') === (scope === 'base' ? '' : scopeId) && r.origin === 'MANUAL_OVERRIDE') ?? null;
+  const scopeDto = (scope: 'base' | 'option', scopeId: string, label: ReturnType<typeof names>) => {
+    const ruleScope = scope === 'base' ? 'product' : 'option';
+    const target = ruleAt(rules, pid, 'target_profit', ruleScope, scopeId);
+    const extra = ruleAt(rules, pid, 'direct_sale_extra', ruleScope, scopeId);
+    return {
+      scope,
+      scope_id: scope === 'base' ? '' : scopeId,
+      ...label,
+      pricing_inputs: formInputsOf(rowAt(scope, scopeId)),
+      minimum_target_profit_usd: target?.state === 'ACTIVE' ? (target.amount_usd ?? null) : null,
+      target_profit_iqd: target?.state === 'ACTIVE' && !target.amount_usd ? (target.amount_iqd ?? null) : null,
+      target_profit_state: target?.state ?? null,
+      direct_sale_extra_iqd: extra?.state === 'ACTIVE' ? (extra.amount_iqd ?? null) : null,
+      direct_sale_extra_state: extra?.state ?? null,
+    };
+  };
+  const options = loaded.doc.options.filter((o) => o.active !== false && !o.merged_into);
+  const models = legacy.models.map((m) => {
+    const direct = m.channels.find((c) => c.ok && c.channel === 'direct_sale');
+    const first = direct ?? m.channels.find((c) => c.ok);
+    const summary = modelSummary({
+      productId: pid,
+      model: m,
+      inputs,
+      rules,
+      stored,
+      rates,
+      engine,
+      proposals: [],
+      supplierReplacedAt: (level) => draft.inputs.some((w) => w.scope === level && 'supplier_cost_amount' in w.set),
+      storePrice: first?.prepaid_iqd ?? null,
+      excludedCharges: [],
+      documentRate: null,
+    });
+    return {
+      option_id: m.option_id,
+      ...names(m.option),
+      sells_direct: !!direct,
+      pricing_summary: summaryDto(summary),
+    };
+  });
+  return {
+    success: true as const,
+    product_id: pid,
+    mode: engine ? ('engine' as const) : ('manual' as const),
+    inputs_seq: stored.state?.inputs_seq ?? 0,
+    rates: ratesHeadDto(rates),
+    scopes: [scopeDto('base', '', names(null)), ...options.map((o) => scopeDto('option', o.id, names(o)))],
+    models,
+  };
+}

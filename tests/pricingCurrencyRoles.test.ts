@@ -47,7 +47,15 @@ test('no accounting write path reads the central rates: only the FX module, the 
 
 test('the FX module is imported only by the cron, the pricing workspace, the public display rate, the profit page\'s rate history and the money-free edge seam', () => {
   const importers = worker.filter(({ f, src }) => !f.startsWith('worker/lib/fx/') && /from\s+['"][^'"]*\/fx\/[^'"]+['"]/.test(src)).map(({ f }) => f).sort();
-  assert.deepEqual(importers, ['worker/index.ts', 'worker/routes/adminFinanceWorkspace.ts', 'worker/routes/adminPricing.ts', 'worker/routes/adminProducts.ts', 'worker/routes/misc.ts', 'worker/routes/products.ts']);
+  // The engine's owner writes share the FX owner acts' strict body and decimal parsers, and the
+  // versioned rate reader the FX pairs' table probe (USD design §2.6, §4.2) — nothing else of FX.
+  const engine = importers.filter((f) => f.startsWith('worker/lib/pricingEngine/'));
+  for (const f of engine) {
+    const src = worker.find((w) => w.f === f)!.src;
+    const fx = [...src.matchAll(/from\s+['"]([^'"]*\/fx\/[^'"]+)['"]/g)].map((m) => m[1]);
+    assert.deepEqual(fx.filter((m) => m !== '../fx/ownerActs' && m !== '../fx/pairs'), [], f);
+  }
+  assert.deepEqual(importers.filter((f) => !engine.includes(f)), ['worker/index.ts', 'worker/routes/adminFinanceWorkspace.ts', 'worker/routes/adminPricing.ts', 'worker/routes/adminProducts.ts', 'worker/routes/misc.ts', 'worker/routes/products.ts']);
   // P-A (design §8): «الأرباح والتكاليف» reads the shop's USD/IQD AS IT WAS for its
   // display toggle and its promotion-rate suggestion — the ONE history reader,
   // nothing else of FX; it writes no rate and re-derives no dinar figure.

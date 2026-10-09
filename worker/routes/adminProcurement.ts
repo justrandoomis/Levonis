@@ -5,7 +5,7 @@ import { requireAdmin, badRequest, conflict, forbidden, notFound, str } from '..
 import { isOwner, projectForAdmin } from '../lib/adminScope';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { requireSelection, productSelections, type Selection } from '../lib/inventorySelection';
+import { requireSelection, productSelections } from '../lib/inventorySelection';
 import { planReceive, type IncomingRow } from '../lib/inventoryReceiving';
 import {
   baghdadDay,
@@ -20,7 +20,9 @@ import {
 import { parsePurchaseCsv } from '../lib/purchaseCsv';
 import { planPurchaseFunding, purchaseFundingSummary, receivePurchaseFunding, type FundedPurchaseLine } from '../lib/purchaseFunding';
 import { investorFinanceInstalled } from '../lib/investorFinance';
-import { packedMeasure, procurementAmount, procurementProfiles, profileRates, purchaseChargeShares, purchaseCharges, type PurchaseCharge } from '../lib/procurementCosts';
+import { packedMeasure, procurementProfiles, profileRates, type PurchaseCharge } from '../lib/procurementCosts';
+import { parseProcurementDraft } from '../lib/procurementDraft';
+import { engineColumnInstalled } from '../lib/engineInstalled';
 
 export const adminProcurementRoutes = new Hono<AppContext>();
 adminProcurementRoutes.use('*', requireAdmin);
@@ -66,7 +68,7 @@ async function commitPurchase(
   }
 }
 const bodyOf = async (c: Context<AppContext>) => await c.req.json<Record<string, unknown>>();
-type ChargeRow = { id: string; title: string; amount_iqd: number; basis: PurchaseCharge['basis']; scope: string | null; unit_amount_iqd: number | null; applies_to_json: string | null; allocation_json: string | null };
+type ChargeRow = { id: string; title: string; amount_iqd: number; basis: PurchaseCharge['basis']; scope: string | null; unit_amount_iqd: number | null; applies_to_json: string | null; allocation_json: string | null; pricing_role?: string | null };
 type ChargeShare = { line_id: string; amount_iqd: number };
 const json = <T,>(value: string | null): T | null => {
   if (!value) return null;
@@ -85,6 +87,8 @@ function chargeView(rows: ChargeRow[], items: Line[]) {
     unit_amount_iqd: r.unit_amount_iqd ?? null,
     applies_to: json<string[]>(r.applies_to_json),
     allocations: json<ChargeShare[]>(r.allocation_json),
+    // The double-freight guard's flag (0181): null on a manual document, an older row or database.
+    pricing_role: r.pricing_role === 'additional' || r.pricing_role === 'excluded' ? r.pricing_role : null,
   }));
   if (!charges.length || !items.length || charges.some((c) => c.allocations)) return charges;
   const lines = items.map((l) => ({ key: procurementSelectionKey({ product_id: l.product_id ?? '', scope: l.scope, scope_id: l.scope_id }), qty: l.qty_ordered, value: l.purchase_total_iqd ?? l.qty_ordered * l.purchase_unit_iqd, weight_g: l.weight_g, volume_mm3: l.volume_mm3 }));
@@ -332,96 +336,11 @@ async function planDocument(
   id: string,
   previous?: Purchase,
 ) {
-  const profileId = text(b.cost_profile_id, 30);
-  const profile = profileId ? (await procurementProfiles(db)).find(row => row.id === profileId) : undefined;
-  if (profileId && !profile) throw badRequest('مسار التوريد غير صحيح', 'INVALID_COST_PROFILE');
-  if (profile && (b.currency !== profile.currency || (b.shipping_basis != null && b.shipping_basis !== profile.shipping_basis)))
-    throw badRequest('عملة ومسار الشحن لا يتطابقان', 'COST_PROFILE_MISMATCH');
-  const profileVersion = profile ? whole(b.cost_profile_version, 'إصدار أسعار المسار', 1) : null;
-  if (profile && profile.version !== profileVersion)
-    throw conflict('تغيرت أسعار مسار التوريد؛ حدّث البيانات وأعد المحاولة', 'COST_PROFILE_CHANGED');
-  const shippingRate = profile ? profileRates(b).shipping_rate_iqd : null;
-  if (!profile && b.shipping_rate_iqd != null && b.shipping_rate_iqd !== '')
-    throw badRequest('اختر مسار التوريد لحساب الشحن تلقائياً', 'INVALID_COST_PROFILE');
-  const currency = text(b.currency, 8) || 'IQD';
-  if (!['IQD', 'USD', 'CNY', 'EUR'].includes(currency)) throw badRequest('Unsupported currency');
-  const rate = currency === 'IQD' ? 1 : decimal(b.exchange_rate, 'سعر الصرف', 0.000001);
+  // The lines and charges, parsed and computed exactly as the owner's pricing
+  // preview reads a draft (worker/lib/procurementDraft.ts).
+  const { profile, profileVersion, shippingRate, currency, rate, lines, charges, shares } = await parseProcurementDraft(db, b);
   const day = dateValue(b.purchase_day, baghdadDay());
-  const raw = Array.isArray(b.lines) ? b.lines : [];
-  if (raw.length < 1 || raw.length > 30) throw badRequest('أضف بين منتج واحد و30 منتجًا في الشحنة');
   const now = new Date().toISOString();
-  const lines: Array<{
-    sel: Selection;
-    qty: number;
-    unit: number;
-    total: number;
-    costMode: 'unit'|'total';
-    source: number;
-    sourceTotal: number | null;
-    weight: number;
-    volume: number;
-    invoiceQty: number;
-    selling: number | null;
-    charges: number;
-    autoShipping: number;
-    key: string;
-    incomingId: string;
-    lineId: string;
-  }> = [];
-  for (const v of raw) {
-    const r = v as Record<string, unknown>;
-    const sel = await requireSelection(db, text(r.product_id, 60), text(r.scope, 20), text(r.scope_id, 60));
-    if (profile && ((r.option_id != null && r.option_id !== '' && r.option_id !== sel.option_id) ||
-        (r.color_id != null && r.color_id !== '' && r.color_id !== sel.color_id)))
-      throw badRequest('اختر هوية المخزون المطابقة للخيار واللون؛ تكلفة الألوان المنفصلة تتطلب مخزون تركيبات', 'INVALID_SELECTION');
-    const qty = whole(r.qty_ordered, 'الكمية', 1, 100000);
-    const costMode=r.purchase_cost_mode==='total'?'total':'unit';
-    const entered=decimal(costMode==='total' ? (profile ? r.source_total_amount : r.source_total_amount??r.purchase_total_iqd) : (profile ? r.source_unit_amount : r.source_unit_amount??r.purchase_unit_iqd),'تكلفة الشراء الخام');
-    if(currency==='IQD')whole(entered,'تكلفة الشراء بالدينار');
-    const total = profile
-      ? procurementAmount(costMode === 'total' ? [entered, rate] : [entered, rate, qty])
-      : whole(Math.round(costMode === 'total' ? entered * rate : Math.round(entered * rate) * qty), 'إجمالي شراء البند');
-    const unit=Math.floor(total/qty),source=costMode==='total'?entered/qty:entered;
-    const weight = packedMeasure(r.weight_g ?? (profile ? sel.packed_weight_g ?? 0 : sel.weight_g), 'الوزن'),
-      volume = packedMeasure(r.volume_mm3 ?? (profile ? sel.packed_volume_mm3 ?? 0 : sel.volume_mm3), 'الحجم');
-    if (profile && (profile.shipping_basis === 'weight' ? weight : volume) <= 0)
-      throw badRequest('أدخل وزن الكرتون مع التغليف أو حجمه لجميع البنود', 'PACKED_MEASUREMENT_REQUIRED');
-    const autoShipping = profile ? procurementAmount([qty, profile.shipping_basis === 'weight' ? weight : volume, shippingRate!], profile.shipping_basis === 'weight' ? 1000 : 1e9) : 0;
-    lines.push({
-      sel,
-      qty,
-      unit,
-      total,
-      costMode,
-      source,
-      sourceTotal: costMode === 'total' ? entered : null,
-      weight,
-      volume,
-      invoiceQty: whole(r.invoiced_qty ?? qty, 'كمية الفاتورة', 0, 100000),
-      selling:
-        r.selling_price_iqd === null
-          ? null
-          : whole(r.selling_price_iqd ?? sel.selling_price_iqd, 'سعر البيع'),
-      charges: autoShipping,
-      autoShipping,
-      key: procurementSelectionKey(sel),
-      incomingId: newId('inc'),
-      lineId: newId('pol'),
-    });
-  }
-  // Extra costs are only what was typed for this document's own lines. Route
-  // freight above is already in l.charges; nothing here repeats it.
-  const charges = purchaseCharges(b.charges, lines.map((l) => l.key));
-  const shares = purchaseChargeShares(
-    charges,
-    lines.map((l) => ({ key: l.key, qty: l.qty, value: l.total, weight_g: l.weight, volume_mm3: l.volume })),
-    profile ? 'BAD_ALLOCATION' : 'ALLOCATION_BASIS_MISSING',
-  );
-  shares.forEach((row) => row.forEach((share, i) => (lines[i].charges += share)));
-  whole(
-    lines.reduce((n, l) => n + l.total + l.charges, 0),
-    'مجموع الشحنة',
-  );
   const supplier = text(b.supplier_id, 60) || null,
     warehouse = text(b.warehouse_id, 60) || null;
   if (
@@ -601,12 +520,21 @@ async function planDocument(
       VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(profile_id,product_id,scope,scope_id) DO UPDATE SET source_unit_amount=excluded.source_unit_amount,weight_g=excluded.weight_g,volume_mm3=excluded.volume_mm3,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
       .bind(profile.id, l.sel.product_id, l.sel.scope, l.sel.scope_id, l.costMode === 'total' ? exactProcurementUnitDefault(l.sourceTotal!, l.qty) : l.source, l.weight, l.volume, actor, now));
   }
+  // The double-freight guard's flag (0181, USD design §3.3) is named only when
+  // the column exists: on an older database the INSERT is byte-identical to
+  // today's (deploy-ahead, fit #9).
+  const withRole = charges.length > 0 && (await engineColumnInstalled(db, 'purchase_charges', 'pricing_role'));
   charges.forEach((charge, position) => {
     const allocations: ChargeShare[] = lines.flatMap((l, i) => !charge.applies_to || charge.applies_to.includes(l.key) ? [{ line_id: l.lineId, amount_iqd: shares[position][i] }] : []);
+    const values = [newId('pch'), id, charge.title, shares[position].reduce((a, b) => a + b, 0), charge.basis, charge.scope, charge.unit_amount_iqd, charge.applies_to ? JSON.stringify(charge.applies_to) : null, JSON.stringify(allocations), position];
     statements.push(
-      db
-        .prepare('INSERT INTO purchase_charges(id,purchase_id,title,amount_iqd,basis,scope,unit_amount_iqd,applies_to_json,allocation_json,position) VALUES (?,?,?,?,?,?,?,?,?,?)')
-        .bind(newId('pch'), id, charge.title, shares[position].reduce((a, b) => a + b, 0), charge.basis, charge.scope, charge.unit_amount_iqd, charge.applies_to ? JSON.stringify(charge.applies_to) : null, JSON.stringify(allocations), position),
+      withRole
+        ? db
+            .prepare('INSERT INTO purchase_charges(id,purchase_id,title,amount_iqd,basis,scope,unit_amount_iqd,applies_to_json,allocation_json,position,pricing_role) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+            .bind(...values, charge.pricing_role)
+        : db
+            .prepare('INSERT INTO purchase_charges(id,purchase_id,title,amount_iqd,basis,scope,unit_amount_iqd,applies_to_json,allocation_json,position) VALUES (?,?,?,?,?,?,?,?,?,?)')
+            .bind(...values),
     );
   });
   if(status==='ordered')statements.push(...await planPurchaseFunding(db,id,b.funding,plannedLines,actor));

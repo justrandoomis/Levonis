@@ -1,5 +1,5 @@
 import type { CostProfile, CostProfileId, ProcurementCharge, ProcurementChargeBasis, ProcurementChargeLine } from '../../packages/contracts/src/procurementCost';
-import { PROCUREMENT_CHARGE_BASES, allocateProcurementCharges, roundProcurementProduct } from '../../packages/contracts/src/procurementCost';
+import { PROCUREMENT_CHARGE_BASES, allocateProcurementCharges, looksLikeFreight, roundProcurementProduct, type PurchaseChargePricingRole } from '../../packages/contracts/src/procurementCost';
 import { badRequest } from './http';
 import { decimal, whole } from './operations';
 
@@ -32,11 +32,18 @@ export function profileRates(body: Record<string, unknown>) {
 }
 
 
-export type PurchaseCharge = ProcurementCharge & { title: string };
+export type PurchaseCharge = ProcurementCharge & { title: string; pricing_role: PurchaseChargePricingRole | null };
 /** Only what the buyer typed for this document's own lines. A charge without a
  * name, a positive amount, or lines of this shipment to cover is refused —
- * never saved as zero, guessed, or carried in from another purchase. */
-export function purchaseCharges(raw: unknown, keys: readonly string[]): PurchaseCharge[] {
+ * never saved as zero, guessed, or carried in from another purchase.
+ *
+ * THE DOUBLE-FREIGHT GUARD (USD design §3.3): on a ROUTED document each charge
+ * says whether it also feeds the pricing input «additional cost» — the route's
+ * freight already enters the price from the central shipping rate, so a charge
+ * that looks like freight defaults to 'excluded' until the owner confirms it is
+ * not freight ('additional'). A manual document's charges never feed (null).
+ * Accounting is unchanged: every charge still counts in the landed IQD. */
+export function purchaseCharges(raw: unknown, keys: readonly string[], routed = false): PurchaseCharge[] {
   const rows = Array.isArray(raw) ? raw : [];
   if (rows.length > 15) throw badRequest('أضف 15 تكلفة إضافية كحد أقصى', 'BAD_CHARGE');
   return rows.map((value) => {
@@ -57,7 +64,14 @@ export function purchaseCharges(raw: unknown, keys: readonly string[]): Purchase
         throw badRequest(`اختر البنود التي تشملها «${title}» من بنود هذه الشحنة`, 'BAD_CHARGE');
       appliesTo = keys.every((k) => chosen.includes(k)) ? null : chosen;
     }
-    return { title, scope, basis: basis as ProcurementChargeBasis, applies_to: appliesTo, amount_iqd: scope === 'unit' ? 0 : amount, unit_amount_iqd: scope === 'unit' ? amount : null };
+    if (r.pricing_role != null && r.pricing_role !== 'additional' && r.pricing_role !== 'excluded')
+      throw badRequest(`حدد هل تدخل «${title}» في التسعير`, 'BAD_CHARGE');
+    const pricing_role: PurchaseChargePricingRole | null = !routed
+      ? null
+      : r.pricing_role === 'additional' || r.pricing_role === 'excluded'
+        ? r.pricing_role
+        : looksLikeFreight(title) ? 'excluded' : 'additional';
+    return { title, scope, basis: basis as ProcurementChargeBasis, applies_to: appliesTo, amount_iqd: scope === 'unit' ? 0 : amount, unit_amount_iqd: scope === 'unit' ? amount : null, pricing_role };
   });
 }
 /** Server-side twin of the editor preview: the same allocator, so the shares

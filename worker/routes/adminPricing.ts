@@ -69,12 +69,40 @@ import {
   planManualSet,
   planReview,
   planSettings,
+  strictBody,
   type PlannedAct,
 } from '../lib/fx/ownerActs';
 import { listPricedProducts, loadPreviewContext, loadProducts, loadRateReference, type LoadedProduct } from '../lib/pricingEngine/load';
 import { evaluateProduct, evaluateProducts } from '../lib/pricingEngine/compute';
 import { overviewDto, productDetailDto, whatIfDto } from '../lib/pricingEngine/dto';
 import { inputInvalid, parseWhatIf, runWhatIf } from '../lib/pricingEngine/whatIf';
+import { engineCoreInstalled } from '../lib/engineInstalled';
+import { loadPricingRates, type PricingRates } from '../lib/pricingEngine/rates';
+import {
+  batchHead,
+  batchTail,
+  inputImage,
+  inputStatements,
+  inputWriteIsNoop,
+  loadProductPricing,
+  loadProductsPricing,
+  nextInputRow,
+  pricingAuditStatement,
+  ruleImage,
+  ruleStatements,
+  ruleWriteIsNoop,
+  type ProductPricingData,
+  type RuleWrite,
+} from '../lib/pricingEngine/store';
+import { MinimumProfitError, parseMinimumProfit, purchaseIneligibility, type MinimumProfitDraft, type PurchaseForPricing } from '../lib/pricingEngine/fromPurchase';
+import { lineSummary, previewProduct, type PreviewOptions, type ProductPreview } from '../lib/pricingEngine/procurementPreview';
+import { lineDto, productPreviewDto, ratesHeadDto, storedRulesDto } from '../lib/pricingEngine/procurementDto';
+import { legacyAcceptWrites, parseRuleWrites } from '../lib/pricingEngine/ownerRules';
+import { evaluateLegacy } from '../lib/pricingEngine/legacy';
+import { legacyHashOf } from '../lib/pricingEngine/legacyHash';
+import { parseProcurementDraft } from '../lib/procurementDraft';
+import { committedPurchaseForPricing, draftForPricing } from '../lib/pricingEngine/purchaseRead';
+import { parseProductInputs, productInputsAnswer } from '../lib/pricingEngine/productInputs';
 
 export const adminPricingRoutes = new Hono<AppContext>();
 
@@ -118,7 +146,9 @@ adminPricingRoutes.get('/products/:id', async (c) => {
   const db = c.env.DB;
   const loaded = await loadOne(db, c.req.param('id'));
   const [ctx, reference] = await Promise.all([loadPreviewContext(db), loadRateReference(db)]);
-  return c.json(productDetailDto(evaluateProduct(loaded, ctx, reference), reference));
+  const evaluation = evaluateProduct(loaded, ctx, reference);
+  // `legacy_hash` fences «قبول القيم المرحّلة» on the values shown here (POST …/targets/adopt).
+  return c.json({ ...productDetailDto(evaluation, reference), legacy_hash: await legacyHashOf(evaluation.rules) });
 });
 
 adminPricingRoutes.post('/products/:id/what-if', async (c) => {
@@ -354,3 +384,390 @@ adminPricingRoutes.put('/rates/shipping/:profile', async (c) => {
   }
   return ratesAnswer(c);
 });
+
+// ============================================================= Inputs: the current costs and the owner's rules
+//
+// USD design §2.6, §3, §4, §5, §6.3 (owner brief 2026-10-09). Behind the SAME
+// door as every route above (requireAdmin → limit → requireCostRead; every
+// write adds assertCostWrite). A database without migration 0181 answers 503
+// PRICING_NOT_INSTALLED. These routes write the product's INPUTS and RULES
+// only — never a price: the engine's writer adopts and prices a product at the
+// owner's completing save (decision 8).
+//
+//   POST /procurement/preview             the card's 4-cell summary per line, «تفاصيل», and the review preview
+//   POST /products/:id/apply-purchase     a confirmed purchase → the product's current costs + typed minimum profits
+//   GET  /products/:id/rules              the product's stored rules and its counter
+//   PUT  /products/:id/rules              the minimum profit (USD) and the Direct Sale Extra, per product / option
+//   POST /products/:id/targets/adopt      «قبول القيم المرحّلة»: the values the old prices carry, as migrated rows
+//   GET  /products/:id/inputs             the product form's «التسعير بالدولار»: inputs and rules per scope, each model's bar
+//   POST /products/:id/preview            the same answer for a draft {inputs, rules} — read only
+//   PUT  /products/:id/inputs             the product form's save: inputs and rules, one atomic batch
+
+const engineNotInstalled = () => new HttpError(503, serverMessage('PRICING_NOT_INSTALLED'), 'PRICING_NOT_INSTALLED');
+
+async function engineRates(db: D1Database): Promise<PricingRates> {
+  if (!(await engineCoreInstalled(db))) throw engineNotInstalled();
+  const rates = await loadPricingRates(db);
+  if (!rates) throw engineNotInstalled();
+  return rates;
+}
+
+const optionIdsOf = (loaded: LoadedProduct): Set<string> =>
+  new Set(loaded.doc.options.filter((o) => o.active !== false && !o.merged_into).map((o) => o.id));
+
+const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+function booleanMap(raw: unknown, field: string): Map<string, boolean> {
+  if (raw === undefined || raw === null) return new Map();
+  if (!isRecord(raw) || Object.keys(raw).length > 60) throw inputInvalid(field);
+  const out = new Map<string, boolean>();
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v !== 'boolean' || k.length > 80) throw inputInvalid(field);
+    out.set(k, v);
+  }
+  return out;
+}
+
+function stringList(raw: unknown, field: string, max = 60): string[] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.length > max || raw.some((k) => typeof k !== 'string' || k.length > 200)) throw inputInvalid(field);
+  return [...new Set(raw as string[])];
+}
+
+/** The owner's typed minimum profits, validated against each product's options (§4.1). */
+function minimumProfits(raw: unknown, loaded: ReadonlyMap<string, LoadedProduct>, onlyProduct?: string): Map<string, MinimumProfitDraft[]> {
+  const out = new Map<string, MinimumProfitDraft[]>();
+  if (raw === undefined || raw === null) return out;
+  if (!Array.isArray(raw) || raw.length > 60) throw inputInvalid('minimum_profits');
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const r = strictBody(item, onlyProduct ? ['scope', 'scope_id', 'amount_usd'] : ['product_id', 'scope', 'scope_id', 'amount_usd']);
+    const pid = onlyProduct ?? (typeof r.product_id === 'string' ? r.product_id : '');
+    const product = loaded.get(pid);
+    if (!product) throw inputInvalid('minimum_profits');
+    let draft: MinimumProfitDraft;
+    try {
+      draft = parseMinimumProfit(r, optionIdsOf(product));
+    } catch (e) {
+      if (e instanceof MinimumProfitError) throw inputInvalid(e.kind === 'amount' ? 'minimum_target_profit_usd' : 'minimum_profits');
+      throw e;
+    }
+    const key = `${pid}:${draft.scope}:${draft.scope_id}`;
+    if (seen.has(key)) throw inputInvalid('minimum_profits');
+    seen.add(key);
+    out.set(pid, [...(out.get(pid) ?? []), draft]);
+  }
+  return out;
+}
+
+/** Products whose prices this purchase was applied to (an apply audit row exists). */
+async function appliedProducts(db: D1Database, purchaseId: string | null): Promise<Set<string>> {
+  if (!purchaseId) return new Set();
+  const { results } = await db
+    .prepare("SELECT DISTINCT product_id FROM pricing_audit WHERE idempotency_key >= ? AND idempotency_key < ? AND product_id IS NOT NULL")
+    .bind(`apply:${purchaseId}:`, `apply:${purchaseId};`)
+    .all<{ product_id: string }>();
+  return new Set((results ?? []).map((r) => r.product_id));
+}
+
+/** The whole card: every line's summary and every product's preview, for a draft or a saved purchase. */
+async function procurementPreview(c: Context<AppContext>, purchase: PurchaseForPricing, pricingRaw: unknown, onlyProduct?: string) {
+  const db = c.env.DB;
+  const rates = await engineRates(db);
+  const pricing = strictBody(pricingRaw ?? {}, ['minimum_profits', 'manual_line_opt_in', 'use_purchase', 'prefer_purchase_values']);
+  const ids = [...new Set(purchase.lines.map((l) => l.product_id))].filter((id) => !onlyProduct || id === onlyProduct);
+  const [loaded, stored, ctx] = await Promise.all([loadProducts(db, ids), loadProductsPricing(db, ids), loadPreviewContext(db)]);
+  const opts: PreviewOptions = {
+    minimum_profits: minimumProfits(pricing.minimum_profits, loaded),
+    opt_in: new Set(stringList(pricing.manual_line_opt_in, 'manual_line_opt_in')),
+    use_purchase: booleanMap(pricing.use_purchase, 'use_purchase'),
+    prefer: booleanMap(pricing.prefer_purchase_values, 'prefer_purchase_values'),
+  };
+  const applied = await appliedProducts(db, purchase.purchase_id);
+  const products = [];
+  const previews = new Map<string, ProductPreview>();
+  for (const id of ids) {
+    const product = loaded.get(id);
+    if (!product || (product.doc.composition ?? '') !== '') continue;
+    const preview = await previewProduct(purchase, { loaded: product, stored: stored.get(id)! }, ctx, rates, opts);
+    previews.set(id, preview);
+    const cancelled = purchase.status === 'cancelled' && stored.get(id)!.inputs.some((r) => r.source_ref === `purchase:${purchase.purchase_id}`);
+    products.push(productPreviewDto(preview, { applied: applied.has(id), cancelled_source: cancelled, rules: stored.get(id)!.rules }));
+  }
+  const lines = purchase.lines
+    .filter((l) => previews.has(l.product_id))
+    .map((l) => lineDto(l, lineSummary(purchase, l, { loaded: loaded.get(l.product_id)!, stored: stored.get(l.product_id)! }, previews.get(l.product_id)!, rates)));
+  return { rates, products, lines, previews, stored, loaded };
+}
+
+adminPricingRoutes.post('/procurement/preview', async (c) => {
+  const body = strictBody(await jsonObject(c), ['draft', 'purchase_id', 'pricing']);
+  const db = c.env.DB;
+  await engineRates(db);
+  const purchaseId = typeof body.purchase_id === 'string' && /^[A-Za-z0-9_-]{8,60}$/.test(body.purchase_id) ? body.purchase_id : null;
+  if (body.purchase_id !== undefined && body.purchase_id !== null && purchaseId === null) throw inputInvalid('purchase_id');
+  let purchase: PurchaseForPricing | null;
+  if (body.draft !== undefined && body.draft !== null) {
+    if (!isRecord(body.draft)) throw inputInvalid('draft');
+    // The purchase POST's own parser (fit #20): the same validation and refusals as the save.
+    purchase = draftForPricing(await parseProcurementDraft(db, body.draft), body.draft, purchaseId);
+  } else {
+    if (!purchaseId) throw inputInvalid('purchase_id');
+    purchase = await committedPurchaseForPricing(db, purchaseId);
+    if (!purchase) throw notFound('Purchase not found');
+  }
+  const { rates, products, lines } = await procurementPreview(c, purchase, body.pricing);
+  return c.json({ success: true, rates: ratesHeadDto(rates), lines, products });
+});
+
+const APPLY_STATEMENT_CAP = 200;
+
+adminPricingRoutes.post('/products/:id/apply-purchase', async (c) => {
+  assertCostWrite(c);
+  const body = strictBody(await jsonObject(c), ['purchase_id', 'use_purchase', 'prefer_purchase_values', 'manual_line_opt_in', 'minimum_profits', 'preview_hash']);
+  const db = c.env.DB;
+  const rates = await engineRates(db);
+  if (rates.derived_stale) throw fxRefusal(409, 'FX_DERIVED_STALE');
+  const loaded = await loadOne(db, c.req.param('id'));
+  const pid = loaded.id;
+  if (typeof body.purchase_id !== 'string' || !/^[A-Za-z0-9_-]{8,60}$/.test(body.purchase_id)) throw inputInvalid('purchase_id');
+  if (typeof body.preview_hash !== 'string' || !/^[0-9a-f]{64}$/.test(body.preview_hash)) throw inputInvalid('preview_hash');
+  if (body.use_purchase !== undefined && typeof body.use_purchase !== 'boolean') throw inputInvalid('use_purchase');
+  if (body.prefer_purchase_values !== undefined && typeof body.prefer_purchase_values !== 'boolean') throw inputInvalid('prefer_purchase_values');
+  const purchase = await committedPurchaseForPricing(db, body.purchase_id);
+  if (!purchase) throw notFound('Purchase not found');
+  const usePurchase = body.use_purchase !== false;
+  const productLines = purchase.lines.filter((l) => l.product_id === pid);
+  const reason = productLines.length ? purchaseIneligibility({ status: purchase.status, cost_state: purchase.cost_state, lines: productLines }) : 'no_lines';
+  if (reason && (usePurchase || reason === 'no_lines'))
+    throw new HttpError(409, serverMessage('PRICING_PURCHASE_NOT_ELIGIBLE'), 'PRICING_PURCHASE_NOT_ELIGIBLE', { reason });
+  const pricing = {
+    minimum_profits: (Array.isArray(body.minimum_profits) ? body.minimum_profits : body.minimum_profits ?? []) as unknown[],
+    manual_line_opt_in: body.manual_line_opt_in,
+    use_purchase: { [pid]: usePurchase },
+    prefer_purchase_values: { [pid]: body.prefer_purchase_values === true },
+  };
+  // The minimum profits are this product's: each entry names its scope only.
+  const typed = minimumProfits(pricing.minimum_profits, new Map([[pid, loaded]]), pid);
+  const { previews, stored, products } = await procurementPreview(
+    c,
+    purchase,
+    { ...pricing, minimum_profits: (typed.get(pid) ?? []).map((d) => ({ product_id: pid, ...d })) },
+    pid
+  );
+  const preview = previews.get(pid);
+  const data = stored.get(pid);
+  if (!preview || !data) throw new HttpError(409, serverMessage('PRICING_PURCHASE_NOT_ELIGIBLE'), 'PRICING_PURCHASE_NOT_ELIGIBLE', { reason: 'no_lines' });
+  // A replay first (the same purchase, choices and values: never the purchase version, which a receive bumps).
+  const idempotencyKey = `apply:${purchase.purchase_id}:${pid}:${preview.derived_hash}`;
+  const replay = await db.prepare('SELECT 1 AS hit FROM pricing_audit WHERE idempotency_key = ?').bind(idempotencyKey).first<{ hit: number }>();
+  if (replay) return c.json({ success: true, already: true, product_id: pid, rows_changed: 0 });
+  if (preview.preview_hash !== body.preview_hash) {
+    throw new HttpError(409, serverMessage('PRICING_PREVIEW_STALE'), 'PRICING_PREVIEW_STALE', { preview: products.find((p) => p.product_id === pid) ?? null });
+  }
+
+  const actor = c.get('user')!.id;
+  const now = new Date().toISOString();
+  const inputWrites = preview.derived.entries.map((e) => ({ ...e.write, source_ref: `purchase:${purchase.purchase_id}` })).filter((w) => !inputWriteIsNoop(w));
+  const ruleWrites = preview.rule_writes.filter((w) => !ruleWriteIsNoop(w));
+  const audits: D1PreparedStatement[] = [
+    pricingAuditStatement(db, {
+      entity: 'product_write',
+      entity_key: `purchase:${purchase.purchase_id}`,
+      product_id: pid,
+      action: 'input_from_purchase',
+      summary: {
+        purchase_id: purchase.purchase_id,
+        derived_hash: preview.derived_hash,
+        use_purchase: usePurchase,
+        prefer_purchase_values: body.prefer_purchase_values === true,
+        line_ids: preview.derived.entries.flatMap((e) => e.line_ids),
+        inputs_changed: inputWrites.length,
+        rules_changed: ruleWrites.length,
+      },
+      idempotency_key: idempotencyKey,
+      actor,
+      now,
+    }),
+    ...inputWrites.map((w) => {
+      const next = nextInputRow(w);
+      return pricingAuditStatement(db, {
+        entity: 'input',
+        entity_key: `${w.scope}:${w.scope_id}`,
+        product_id: pid,
+        action: 'input_from_purchase',
+        before: inputImage(w.existing),
+        after: inputImage(next),
+        summary: { purchase_id: purchase.purchase_id, line_ids: preview.derived.entries.find((e) => e.write.scope === w.scope && e.write.scope_id === w.scope_id)?.line_ids ?? [] },
+        actor,
+        now,
+      });
+    }),
+    ...ruleWrites.map((w) =>
+      pricingAuditStatement(db, {
+        entity: 'rule',
+        entity_key: `${w.kind}:${w.scope}:${w.scope_id}`,
+        product_id: pid,
+        action: 'rule_set',
+        before: ruleImage(w.existing),
+        after: ruleImage(w.next),
+        summary: { purchase_id: purchase.purchase_id },
+        actor,
+        now,
+      })
+    ),
+  ];
+  const rowsChanged = inputWrites.length + ruleWrites.length;
+  const statements = [
+    ...batchHead(db, data, now),
+    ...inputStatements(db, pid, inputWrites, actor, now),
+    ...ruleStatements(db, pid, ruleWrites, actor, now),
+    ...audits,
+    ...(await auditStatements(db, actor, 'pricing.applied_from_purchase', pid, { product_id: pid, purchase_id: purchase.purchase_id, rows_changed: rowsChanged, entered: false })).statements,
+    ...batchTail(db, pid),
+  ];
+  if (statements.length > APPLY_STATEMENT_CAP) throw new HttpError(409, serverMessage('PRICING_SET_TOO_LARGE'), 'PRICING_SET_TOO_LARGE');
+  try {
+    await db.batch(statements);
+  } catch (e) {
+    if (isFenceMiss(e)) throw fxRefusal(409, 'PRICING_CHANGED');
+    if (/UNIQUE constraint failed: pricing_audit\.idempotency_key/i.test(e instanceof Error ? e.message : String(e)))
+      return c.json({ success: true, already: true, product_id: pid, rows_changed: 0 });
+    if (/UNIQUE constraint failed: ops_guards/i.test(e instanceof Error ? e.message : String(e))) throw fxRefusal(409, 'PRICING_CHANGED');
+    throw e;
+  }
+  return c.json({ success: true, already: false, product_id: pid, rows_changed: rowsChanged });
+});
+
+/** The product's stored rules (for the sheet and the card) and its counter. */
+adminPricingRoutes.get('/products/:id/rules', async (c) => {
+  const db = c.env.DB;
+  await engineRates(db);
+  const loaded = await loadOne(db, c.req.param('id'));
+  const data = await loadProductPricing(db, loaded.id);
+  return c.json(storedRulesDto(loaded.id, data.rules, data.state?.inputs_seq ?? 0));
+});
+
+adminPricingRoutes.put('/products/:id/rules', async (c) => {
+  assertCostWrite(c);
+  const body = strictBody(await jsonObject(c), ['rules', 'inputs_seq']);
+  const db = c.env.DB;
+  await engineRates(db);
+  const loaded = await loadOne(db, c.req.param('id'));
+  const pid = loaded.id;
+  const data = await loadProductPricing(db, pid);
+  if (body.inputs_seq !== undefined && body.inputs_seq !== null) {
+    if (typeof body.inputs_seq !== 'number' || !Number.isSafeInteger(body.inputs_seq) || body.inputs_seq < 0) throw inputInvalid('inputs_seq');
+    if (body.inputs_seq !== (data.state?.inputs_seq ?? 0)) throw fxRefusal(409, 'PRICING_CHANGED');
+  }
+  const writes = parseRuleWrites(body, pid, optionIdsOf(loaded), data).filter((w) => !ruleWriteIsNoop(w));
+  if (writes.length) await commitRuleWrites(c, data, writes, 'rule_set', 'pricing.rule.updated');
+  const after = await loadProductPricing(db, pid);
+  return c.json(storedRulesDto(pid, after.rules, after.state?.inputs_seq ?? 0));
+});
+
+/** The product form's «التسعير بالدولار» (worker/lib/pricingEngine/productInputs.ts). */
+async function productInputsContext(c: Context<AppContext>) {
+  const db = c.env.DB;
+  const rates = await engineRates(db);
+  const loaded = await loadOne(db, c.req.param('id') ?? '');
+  const [stored, ctx] = await Promise.all([loadProductPricing(db, loaded.id), loadPreviewContext(db)]);
+  return { db, rates, loaded, stored, ctx };
+}
+
+adminPricingRoutes.get('/products/:id/inputs', async (c) => {
+  const { rates, loaded, stored, ctx } = await productInputsContext(c);
+  return c.json(productInputsAnswer(loaded, stored, ctx, rates));
+});
+
+adminPricingRoutes.post('/products/:id/preview', async (c) => {
+  const body = strictBody(await jsonObject(c), ['draft']);
+  const { rates, loaded, stored, ctx } = await productInputsContext(c);
+  const draft = parseProductInputs(strictBody(body.draft ?? {}, ['inputs', 'rules']), loaded, stored);
+  return c.json(productInputsAnswer(loaded, stored, ctx, rates, draft));
+});
+
+const FORM_STATEMENT_CAP = 200;
+
+adminPricingRoutes.put('/products/:id/inputs', async (c) => {
+  assertCostWrite(c);
+  const body = strictBody(await jsonObject(c), ['inputs_seq', 'inputs', 'rules']);
+  const { db, rates, loaded, stored, ctx } = await productInputsContext(c);
+  if (rates.derived_stale) throw fxRefusal(409, 'FX_DERIVED_STALE');
+  const pid = loaded.id;
+  if (typeof body.inputs_seq !== 'number' || !Number.isSafeInteger(body.inputs_seq) || body.inputs_seq < 0) throw inputInvalid('inputs_seq');
+  // Fenced on what the owner looked at: a purchase applied or a second tab saved since is a fresh look.
+  if (body.inputs_seq !== (stored.state?.inputs_seq ?? 0)) throw fxRefusal(409, 'PRICING_CHANGED');
+  const draft = parseProductInputs(body, loaded, stored);
+  const inputWrites = draft.inputs.filter((w) => !inputWriteIsNoop(w));
+  const ruleWrites = draft.rules.filter((w) => !ruleWriteIsNoop(w));
+  if (inputWrites.length || ruleWrites.length) {
+    const actor = c.get('user')!.id;
+    const now = new Date().toISOString();
+    const statements = [
+      ...batchHead(db, stored, now),
+      ...inputStatements(db, pid, inputWrites, actor, now),
+      ...ruleStatements(db, pid, ruleWrites, actor, now),
+      ...inputWrites.map((w) =>
+        pricingAuditStatement(db, { entity: 'input', entity_key: `${w.scope}:${w.scope_id}`, product_id: pid, action: 'update', before: inputImage(w.existing), after: inputImage(nextInputRow(w)), summary: { source: 'product_form' }, actor, now })
+      ),
+      ...ruleWrites.map((w) =>
+        pricingAuditStatement(db, { entity: 'rule', entity_key: `${w.kind}:${w.scope}:${w.scope_id}`, product_id: pid, action: 'rule_set', before: ruleImage(w.existing), after: ruleImage(w.next), summary: { source: 'product_form' }, actor, now })
+      ),
+      ...(await auditStatements(db, actor, 'pricing.inputs.updated', pid, { product_id: pid, inputs_changed: inputWrites.length, rules_changed: ruleWrites.length, inputs_seq: stored.state?.inputs_seq ?? 0 })).statements,
+      ...batchTail(db, pid),
+    ];
+    if (statements.length > FORM_STATEMENT_CAP) throw new HttpError(409, serverMessage('PRICING_SET_TOO_LARGE'), 'PRICING_SET_TOO_LARGE');
+    try {
+      await db.batch(statements);
+    } catch (e) {
+      if (isFenceMiss(e) || /UNIQUE constraint failed: ops_guards/i.test(e instanceof Error ? e.message : String(e))) throw fxRefusal(409, 'PRICING_CHANGED');
+      throw e;
+    }
+  }
+  const after = await loadProductPricing(db, pid);
+  return c.json(productInputsAnswer(loaded, after, ctx, rates));
+});
+
+adminPricingRoutes.post('/products/:id/targets/adopt', async (c) => {
+  assertCostWrite(c);
+  const body = strictBody(await jsonObject(c), ['legacy_hash']);
+  const db = c.env.DB;
+  await engineRates(db);
+  const loaded = await loadOne(db, c.req.param('id'));
+  const pid = loaded.id;
+  if (typeof body.legacy_hash !== 'string' || !/^[0-9a-f]{64}$/.test(body.legacy_hash)) throw inputInvalid('legacy_hash');
+  const ctx = await loadPreviewContext(db);
+  const legacy = evaluateLegacy(pid, loaded.doc, loaded.view, ctx).legacy;
+  const hash = await legacyHashOf(legacy.rules);
+  // Fenced on the image the owner saw: a price edited since then is a fresh look.
+  if (hash !== body.legacy_hash) throw new HttpError(409, serverMessage('PRICING_PREVIEW_STALE'), 'PRICING_PREVIEW_STALE');
+  const data = await loadProductPricing(db, pid);
+  const writes = legacyAcceptWrites(pid, legacy.rules, data, `legacy:${hash.slice(0, 32)}`).filter((w) => !ruleWriteIsNoop(w));
+  if (writes.length) await commitRuleWrites(c, data, writes, 'legacy_accept', 'pricing.legacy.accepted');
+  const after = await loadProductPricing(db, pid);
+  return c.json(storedRulesDto(pid, after.rules, after.state?.inputs_seq ?? 0));
+});
+
+/** One rule batch: fences, token, state row, the rules, their pricing_audit rows and one audit_log row (ids and counts). */
+async function commitRuleWrites(c: Context<AppContext>, data: ProductPricingData, writes: RuleWrite[], action: 'rule_set' | 'legacy_accept', auditAction: string): Promise<void> {
+  const db = c.env.DB;
+  const actor = c.get('user')!.id;
+  const now = new Date().toISOString();
+  const pid = data.product_id;
+  const statements = [
+    ...batchHead(db, data, now),
+    ...ruleStatements(db, pid, writes, actor, now),
+    ...writes.map((w) =>
+      pricingAuditStatement(db, { entity: 'rule', entity_key: `${w.kind}:${w.scope}:${w.scope_id}`, product_id: pid, action, before: ruleImage(w.existing), after: ruleImage(w.next), actor, now })
+    ),
+    ...(await auditStatements(db, actor, auditAction, pid, { product_id: pid, rules_changed: writes.length, inputs_seq: data.state?.inputs_seq ?? 0 })).statements,
+    ...batchTail(db, pid),
+  ];
+  try {
+    await db.batch(statements);
+  } catch (e) {
+    if (isFenceMiss(e) || /UNIQUE constraint failed: ops_guards/i.test(e instanceof Error ? e.message : String(e))) throw fxRefusal(409, 'PRICING_CHANGED');
+    throw e;
+  }
+}

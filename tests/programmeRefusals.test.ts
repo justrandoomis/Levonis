@@ -139,6 +139,8 @@ const REQUIRED: Record<string, readonly string[]> = {
   // USD design §10 "Registries" (migration 0181): the engine core's database
   // refusals the onError map turns into a 409 (worker/lib/pricingDbRefusals.ts).
   'USD design §10 (0181)': ['PRICING_MODE_ENGINE_ONLY', 'ORDER_SNAPSHOT_IMMUTABLE'],
+  // USD design §3.1, §5.4: apply-purchase on a purchase that is not confirmed with a final cost.
+  'USD design §5.4 (Inputs)': ['PRICING_PURCHASE_NOT_ELIGIBLE'],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

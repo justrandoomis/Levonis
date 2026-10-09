@@ -83,6 +83,38 @@ export default {
           body: { version: 1, rate_iqd: '12000' },
           why: 'a central shipping rate in IQD per kg or per CBM',
         },
+        // The Inputs stage (USD design §3-§6.3; the owner's request of 2026-10-09:
+        // pricing and shipping entered in the product form). Inputs and rules only —
+        // never a price; each write with assertCostWrite.
+        'POST /procurement/preview': {
+          cls: 'cost_read',
+          why: 'the procurement card’s 4-cell summary, «تفاصيل» and the review preview: prices in memory, writes nothing; POST only for its body',
+        },
+        'POST /products/:id/apply-purchase': {
+          cls: 'cost_write',
+          why: 'a confirmed purchase → the product’s current costs and typed minimum profits (pricing_inputs, pricing_rules); never a price',
+        },
+        'GET /products/:id/rules': { cls: 'cost_read', why: 'the product’s stored minimum profit (USD) and Direct Sale Extra' },
+        'PUT /products/:id/rules': {
+          cls: 'cost_write',
+          body: { rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '100' }] },
+          why: 'the minimum profit in USD and the Direct Sale Extra per product / option',
+        },
+        'GET /products/:id/inputs': { cls: 'cost_read', why: 'the product form’s «التسعير بالدولار»: inputs and rules per scope, each model’s bar' },
+        'POST /products/:id/preview': {
+          cls: 'cost_read',
+          body: { draft: { rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '100' }] } },
+          why: 'the product form’s live preview of a draft: prices in memory, writes nothing; POST only for its body',
+        },
+        'PUT /products/:id/inputs': {
+          cls: 'cost_write',
+          body: { inputs_seq: 0, rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '100' }] },
+          why: 'the product form’s save: supplier cost, route, weight or CBM, extras and the two rules, one fenced batch; never a price',
+        },
+        'POST /products/:id/targets/adopt': {
+          cls: 'cost_write',
+          why: '«قبول القيم المرحّلة»: the values the old prices carry, stored as migrated rules (fenced on legacy_hash)',
+        },
       },
     },
   ],

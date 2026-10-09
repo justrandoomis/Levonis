@@ -865,6 +865,9 @@ export async function blockingReferences(db: DeletionDb, productId: string): Pro
  * outlives its product is recoverable (the job retries, the scanner reports it)
  * while a product that outlives a deleted file is a broken catalogue page.
  */
+/** 0181's private engine tables, reported together as `pricing_engine` (never by their own names). */
+const ENGINE_PRIVATE_TABLES: ReadonlySet<string> = new Set(['product_pricing_state', 'pricing_inputs', 'pricing_rules', 'pricing_sku_costs']);
+
 export async function deleteProductPermanently(
   db: DeletionDb,
   productId: string,
@@ -949,7 +952,11 @@ export async function deleteProductPermanently(
     const entry = ledger[i];
     if (!entry) return;
     const changes = Number((res as { meta?: { changes?: number } }).meta?.changes ?? 0);
-    if (entry.kind === 'delete') rows_deleted_by_table[entry.table] = (rows_deleted_by_table[entry.table] ?? 0) + changes;
+    // The engine's private tables are counted under one neutral name: their own
+    // names are FINANCIAL_FIELDS keys (`pricing_inputs`, `pricing_rules`), and
+    // this report reaches every admin who may delete a product.
+    const reported = entry.kind === 'delete' && ENGINE_PRIVATE_TABLES.has(entry.table) ? 'pricing_engine' : entry.table;
+    if (entry.kind === 'delete') rows_deleted_by_table[reported] = (rows_deleted_by_table[reported] ?? 0) + changes;
     else if (entry.kind === 'unlink') rows_unlinked_by_table[entry.table] = (rows_unlinked_by_table[entry.table] ?? 0) + changes;
   });
 
