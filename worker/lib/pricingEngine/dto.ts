@@ -49,20 +49,20 @@ export function productSummaryDto(p: ProductEvaluation) {
   };
 }
 
-/** The rate reference, by currency and by profile; never confirmed in P1. */
+/** The rate reference, by currency and by profile; a central rate (FX-1) is confirmed, a purchase-screen one never. */
 export function ratesDto(ref: RateReference) {
   return {
     fx_rates: SUPPLIER_CURRENCIES.map((currency) => ({
       currency,
       rate_iqd: ref.fx[currency].rate,
-      confirmed: false,
+      confirmed: ref.fx[currency].origin === 'central' && ref.fx[currency].rate !== null,
       rate_origin: ref.fx[currency].origin,
     })),
     shipping_rates: SHIPPING_PROFILES.map((profile) => ({
       profile,
       basis: PROFILE_BASIS[profile],
       rate_iqd: ref.shipping[profile].rate,
-      confirmed: false,
+      confirmed: ref.shipping[profile].origin === 'central' && ref.shipping[profile].rate !== null,
       rate_origin: ref.shipping[profile].origin,
     })),
   };

@@ -25,7 +25,7 @@ export default function RatesReference({ rates, lang, s, headingLevel = 3 }: { r
   // The banner above says every purchase rate is unconfirmed; a row carries a
   // chip only when it differs from that — a rate the owner typed for a
   // calculation. One cue per fact, not one per row.
-  const originChip = (origin: 'procurement_profiles' | 'what_if', _confirmed: boolean) =>
+  const originChip = (origin: 'central' | 'procurement_profiles' | 'what_if', _confirmed: boolean) =>
     origin === 'what_if' ? <StatusChip tone="info">{s.fromWhatIf}</StatusChip> : null;
 
   return (

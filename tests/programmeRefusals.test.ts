@@ -106,6 +106,25 @@ const REQUIRED: Record<string, readonly string[]> = {
   // A non-owner's catalog edit or product save that lost its in-batch answer
   // fence (worker/lib/serialPolicy.ts `serialAnswerFence`).
   'serial scan landing round 4 (R2)': ['SERIAL_FILING_CHANGED'],
+  // FX programme plan §8 "New refusal codes" (all of them land with FX-1, so
+  // no later FX push ships one in a single language), plus FX_RATE_NOT_SET:
+  // a pair the owner tries to confirm, turn off or keep as manual before any
+  // rate is in force.
+  'FX plan §8': [
+    'FX_REFRESH_IN_PROGRESS',
+    'FX_REVIEW_NOT_PENDING',
+    'FX_PAIR_MANUAL',
+    'FX_RATE_OUT_OF_BOUNDS',
+    'FX_RATE_NOT_SET',
+    'PRICING_FX_RATE_MISSING',
+    'FX_SNAPSHOT_IMMUTABLE',
+    'FX_REVIEW_STALE',
+    'FX_BOUNDS_EXCLUDE_EFFECTIVE',
+    'FX_DERIVED_STALE',
+    'PRICING_DELTA_CURRENCY_MISMATCH',
+    'PRICING_INPUT_REINSERT',
+    'BATCH_COST_IMMUTABLE',
+  ],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

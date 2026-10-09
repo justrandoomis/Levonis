@@ -30,6 +30,7 @@ import { trustedOrigin } from './lib/appOrigin';
 import { runDurableJobs } from './lib/jobs';
 import { drainStaffReconciliations } from './lib/financeStaffAccrual';
 import { drainOrderFinanceRecovery } from './lib/financeOrderRecovery';
+import { runFxScheduler } from './lib/fx/scheduler';
 import { authRoutes } from './routes/auth';
 import { productRoutes, homeRoutes } from './routes/products';
 import { cartRoutes } from './routes/cart';
@@ -1125,6 +1126,19 @@ export default {
       ctx.waitUntil(
         finalizeDueQuickBuySessions(env, ctx).catch((error) => {
           console.error('scheduled quick buy finalisation rejected:', error);
+        })
+      );
+      return;
+    }
+    // The exchange rates (FX programme plan §4, §5): every six hours, ONE
+    // scheduler for USD/IQD (IQWealth, every 6 or 12 hours, or off) and
+    // EUR/USD and CNY/USD (the ECB, once a day). Its due logic reads the
+    // cron's SCHEDULED time, so a late run never shifts the phase. It never
+    // throws; it writes rates, never a product price (repricing is FX-5).
+    if (jobs === 'fx') {
+      ctx.waitUntil(
+        runFxScheduler(env, { now: new Date(), scheduledTime: new Date(_event.scheduledTime) }, { trigger: 'cron' }).catch((error) => {
+          console.error('scheduled fx rejected:', error instanceof Error ? error.name : 'unknown');
         })
       );
       return;

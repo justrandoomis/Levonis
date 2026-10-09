@@ -21,6 +21,7 @@ import { sourceOf } from './fixtures/source';
 import { APEX, asD1, ctx, freshDb } from './fixtures/app';
 import { seedCostlyProduct } from './fixtures/costlyProduct';
 import { LIVE_PRODUCTS, seedLiveCatalog } from './fixtures/liveCatalog';
+import { FX_PUBLIC_RATE, FX_SENTINELS, seedFxSentinels } from './fixtures/fxSentinels';
 import worker from '../worker/index';
 // @ts-expect-error - plain ESM script shared with workflow 7, no types
 import * as probesScript from '../scripts/live-cost-probes.mjs';
@@ -32,6 +33,7 @@ interface Probe {
   forbidKeys?: string;
   forbidPattern?: string;
   requireIntegerKeys?: string[];
+  valuePatterns?: Record<string, string>;
 }
 const files = loadProbeFiles(join(ROOT, 'scripts/live-cost-probes.d')) as Array<{ file: string; spec: { probes: Probe[]; vars?: Record<string, { from: string; pick: string }> } }>;
 const s1 = files.find((f) => f.file === 's1.json')!;
@@ -181,6 +183,57 @@ test('pricing.json (MVP P1): the owner’s pricing workspace refuses a stranger 
   for (const p of pricing!.spec.probes) {
     const res = await worker.fetch(new Request(`https://${APEX}${p.path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
     assert.deepEqual(judge(p, res.status, await res.text()), [], p.path);
+  }
+});
+
+// ------------------------------------------------------------- fx.json (FX-1)
+
+test('judge: valuePatterns — text matching the pattern or null passes, an absent key passes, a number, an object or other text fails, and the failure never carries the value', () => {
+  const p: Probe = { path: '/x', status: [200], valuePatterns: { displayUsdRate: '^[0-9]{1,6}(\\.[0-9]{1,8})?$' } };
+  assert.deepEqual(judge(p, 200, JSON.stringify({ settings: { displayUsdRate: '1703.9167' } })), []);
+  assert.deepEqual(judge(p, 200, JSON.stringify({ settings: { displayUsdRate: null } })), []);
+  assert.deepEqual(judge(p, 200, JSON.stringify({ settings: {} })), []);
+  const asNumber = judge(p, 200, JSON.stringify({ settings: { displayUsdRate: 1703.9167 } })).join('\n');
+  assert.match(asNumber, /displayUsdRate \(at settings\.displayUsdRate\) is a number/);
+  assert.doesNotMatch(asNumber, /1703/, 'a failure line never carries the value');
+  assert.match(judge(p, 200, JSON.stringify({ settings: { displayUsdRate: { market: '1666' } } })).join('\n'), /is a object/);
+  const text = judge(p, 200, JSON.stringify({ settings: { displayUsdRate: '1,703.91' } })).join('\n');
+  assert.match(text, /does not match/);
+  assert.doesNotMatch(text, /1,703/);
+});
+
+test('fx.json (FX-1): the public settings and the home carry only the effective USD/IQD; the rates routes refuse a stranger — against the local Worker, with and without a rate', async () => {
+  const fx = files.find((f) => f.file === 'fx.json');
+  assert.ok(fx, 'scripts/live-cost-probes.d/fx.json exists');
+  const paths = fx!.spec.probes.map((p) => p.path);
+  for (const path of ['/api/settings/public', '/api/home', '/api/admin/pricing/rates', '/api/admin/pricing/rates/history']) assert.ok(paths.includes(path), path);
+  for (const p of fx!.spec.probes.filter((x) => x.path.startsWith('/api/admin/'))) assert.deepEqual(p.status, [401], p.path);
+  const pub = fx!.spec.probes.find((p) => p.path === '/api/settings/public')!;
+  assert.ok(pub.valuePatterns?.displayUsdRate, 'the public figure is held to decimal text or null');
+  // The regex catches every private FX name of the 0179 tables and the rates DTO…
+  const keys = new RegExp(pub.forbidKeys!, 'i');
+  for (const k of ['market_rate', 'market_buy', 'adjustment_iqd_per_usd', 'provider', 'pending_effective_rate', 'last_known_good_rate', 'anomaly_threshold_pct', 'drift_anchor_rate', 'bound_min', 'rejected_rate', 'official_rate', 'effective_rate', 'effective_rates_iqd', 'manual_rate', 'cross_rate', 'usd_iqd_rate', 'source_usd_per_eur', 'fx_usd_iqd_at_purchase', 'rate_iqd', 'supplier_cost_amount', 'current_supplier_cost_iqd']) {
+    assert.ok(keys.test(k), `the probe would miss ${k}`);
+  }
+  // …and not the public ones.
+  for (const k of ['displayUsdRate', 'exchangeRate', 'currency', 'price_iqd', 'margin_percent', 'setup_fee_iqd']) assert.equal(keys.test(k), false, k);
+
+  for (const withRate of [false, true]) {
+    const raw = freshDb();
+    raw.exec('PRAGMA foreign_keys = OFF;');
+    seedLiveCatalog(raw);
+    if (withRate) seedFxSentinels(raw);
+    const env = { DB: asD1(raw), STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
+    for (const p of fx!.spec.probes) {
+      const res = await worker.fetch(new Request(`https://${APEX}${p.path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
+      const text = await res.text();
+      assert.deepEqual(judge(p, res.status, text), [], `${p.path} (${withRate ? 'a rate' : 'no rate'})`);
+      if (p.path === '/api/settings/public' || p.path === '/api/home') {
+        // Not vacuous: the figure is there — the effective rate, or null before the first approval.
+        assert.equal(JSON.parse(text).settings.displayUsdRate, withRate ? FX_PUBLIC_RATE : null, p.path);
+        for (const v of FX_SENTINELS) assert.equal(text.includes(v), false, `${p.path} carries the private figure ${v}`);
+      }
+    }
   }
 });
 

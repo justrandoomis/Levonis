@@ -64,6 +64,9 @@ test('root workspaces and per-package manifests', () => {
 // themselves), so purity holds; the dependency is declared in the manifest.
 const PURE_PACKAGE_IMPORTS: Record<string, readonly string[]> = {
   'packages/pricing/src/costToPrice.ts': ['@levonis/contracts/procurementCost', '@levonis/contracts/pricingIssues'],
+  // The FX chain (FX programme plan §3, §36) converts with the same exact
+  // decimal arithmetic, never a float: the same edge, one module.
+  'packages/pricing/src/fxChain.ts': ['@levonis/contracts/procurementCost'],
 };
 
 test('the pricing engine maths declares its one contracts dependency', () => {

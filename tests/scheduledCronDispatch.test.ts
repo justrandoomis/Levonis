@@ -42,6 +42,7 @@ function fakeCtx() {
 const KNOWN: Readonly<Record<string, number>> = {
   '* * * * *': 2, // order finance recovery, Quick Buy finalisation
   '*/15 * * * *': 3, // staff reconciliation, durable jobs, upload-session sweep
+  '0 */6 * * *': 1, // the FX scheduler (FX-1), alone (tests/fxCron.test.ts pins what it runs)
 };
 
 /** Every `triggers.crons` array of wrangler.jsonc (default, staging, dark). */
@@ -63,6 +64,7 @@ test('the dispatch table scheduled() reads is exactly the strings this file know
   assert.deepEqual([...CRON_DISPATCH.keys()].sort(), Object.keys(KNOWN).sort());
   assert.equal(cronJobs('* * * * *'), 'minute');
   assert.equal(cronJobs('*/15 * * * *'), 'quarter_hour');
+  assert.equal(cronJobs('0 */6 * * *'), 'fx');
   // A Map, not an object: an inherited property name is not a cron it knows.
   for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) assert.equal(cronJobs(name), null, name);
 });
@@ -87,7 +89,8 @@ test('each known cron string runs its own jobs and nothing else', async () => {
 
 test('an unknown cron string runs nothing: no job, no database access, one warning (F13)', () => {
   const unknown = [
-    '0 */6 * * *', // the FX trigger a later commit adds: a rolled-back Worker ignores it
+    '0 */12 * * *', // a trigger a later commit might add: a rolled-back Worker ignores it
+    '0 */6 * * * ', // a near miss of the FX trigger
     '',
     '*/15 * * * * ', // near misses of the known strings: the match is exact
     ' * * * * *',

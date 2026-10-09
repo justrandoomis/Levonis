@@ -7,10 +7,11 @@
  * (`pricingContextFrom` over the same two settings), so "what a customer pays
  * today" on the owner's screen is the cart's own number, not a re-derivation.
  *
- * The rate reference is read live from `procurement_cost_profiles` with the
- * exact seeding rule migration 0179 will use (master plan v2 §3 0179 part 10):
- * EUR from Germany land, CNY from the more recently updated China profile, no
- * USD, a value out of range is missing — and every one of them UNCONFIRMED.
+ * The rate reference is the central rates the owner applied (FX-1, migration
+ * 0179) and, for one not set yet, the value read live from
+ * `procurement_cost_profiles` with the master plan v2 seeding rule: EUR from
+ * Germany land, CNY from the more recently updated China profile, no USD, a
+ * value out of range is missing — and every purchase-screen value UNCONFIRMED.
  *
  * Nothing here writes: every statement is a SELECT
  * (tests/pricingPreviewNoWrite.test.ts records them).
@@ -89,8 +90,12 @@ export async function loadProducts(db: D1Database, ids: readonly string[]): Prom
 
 // ------------------------------------------------------------ the rate reference
 
-/** Where a rate came from: the purchase profiles (P1), or the owner's what-if. */
-export type RateOrigin = 'procurement_profiles' | 'what_if';
+/**
+ * Where a rate came from: the central rates the owner applied (FX-1,
+ * `pricing_fx_rates` / `pricing_shipping_rates`), the purchase profiles (P1,
+ * and the fallback while a central rate is not set), or the owner's what-if.
+ */
+export type RateOrigin = 'central' | 'procurement_profiles' | 'what_if';
 
 export interface RateReferenceEntry {
   rate: string | null;
@@ -112,10 +117,38 @@ interface ProfileRow {
 const asText = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v : null);
 
 /**
- * The rates the purchase screens hold, as 0179 will seed them — and never
- * confirmed. A missing table (a database older than 0172) is all missing.
+ * THE RATE REFERENCE (FX plan §1 C1): each central rate the owner applied —
+ * `pricing_fx_rates` (IQD per USD, EUR = E×U, CNY = C×U) and
+ * `pricing_shipping_rates` — and, for a rate not set there yet (or on a
+ * database without migration 0179), the purchase screens' value. A central
+ * rate is applied or absent, so it counts as confirmed (critique L5).
  */
 export async function loadRateReference(db: D1Database): Promise<RateReference> {
+  const ref = await loadProcurementReference(db);
+  try {
+    const [fx, ship] = await Promise.all([
+      db.prepare('SELECT currency, rate_iqd FROM pricing_fx_rates').all<{ currency: string; rate_iqd: string | null }>(),
+      db.prepare('SELECT profile, rate_iqd FROM pricing_shipping_rates').all<{ profile: string; rate_iqd: string | null }>(),
+    ]);
+    for (const r of fx.results ?? []) {
+      const rate = asText(r.rate_iqd);
+      if (rate && (r.currency === 'USD' || r.currency === 'EUR' || r.currency === 'CNY')) ref.fx[r.currency] = { rate, origin: 'central' };
+    }
+    for (const r of ship.results ?? []) {
+      const rate = asText(r.rate_iqd);
+      if (rate && (r.profile === 'GERMANY_LAND' || r.profile === 'CHINA_AIR' || r.profile === 'CHINA_SEA')) ref.shipping[r.profile] = { rate, origin: 'central' };
+    }
+  } catch {
+    // No central rates (a database without 0179): the purchase screens' values stand.
+  }
+  return ref;
+}
+
+/**
+ * The rates the purchase screens hold — never confirmed. A missing table (a
+ * database older than 0172) is all missing.
+ */
+export async function loadProcurementReference(db: D1Database): Promise<RateReference> {
   const empty = (): RateReferenceEntry => ({ rate: null, origin: 'procurement_profiles' });
   const ref: RateReference = {
     fx: { USD: empty(), EUR: empty(), CNY: empty() },
@@ -157,9 +190,13 @@ export async function loadRateReference(db: D1Database): Promise<RateReference> 
   return ref;
 }
 
-/** The reference as E1's central rates: version 0, never confirmed (`allowUnconfirmedRates` previews only). */
+/**
+ * The reference as E1's central rates: version 0; a central rate is confirmed
+ * exactly when present (critique L5), a purchase-screen or what-if rate never
+ * is (`allowUnconfirmedRates` previews only).
+ */
 export function centralRatesOf(ref: RateReference): CentralRates {
-  const rate = (e: RateReferenceEntry): CentralRate => ({ rate: e.rate, version: 0, confirmed: false });
+  const rate = (e: RateReferenceEntry): CentralRate => ({ rate: e.rate, version: 0, confirmed: e.origin === 'central' && e.rate !== null });
   return {
     fx: { USD: rate(ref.fx.USD), EUR: rate(ref.fx.EUR), CNY: rate(ref.fx.CNY) },
     shipping: {

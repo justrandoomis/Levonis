@@ -32,8 +32,15 @@ export const CRON_EVERY_MINUTE = '* * * * *';
 /** The fifteen-minute tick: staff reconciliation, durable jobs, upload sweep. */
 export const CRON_EVERY_FIFTEEN_MINUTES = '*/15 * * * *';
 
+/**
+ * The six-hour tick (FX programme plan §4, §5): the one exchange-rate
+ * scheduler, IQWealth USD/IQD and the ECB's EUR/USD and CNY/USD. It runs that
+ * scheduler and nothing else; the fifteen-minute jobs never run on it.
+ */
+export const CRON_EVERY_SIX_HOURS = '0 */6 * * *';
+
 /** The job sets scheduled() runs, one per known cron string. */
-export type CronJobs = 'minute' | 'quarter_hour';
+export type CronJobs = 'minute' | 'quarter_hour' | 'fx';
 
 /**
  * The exact-match dispatch table. A Map, not an object literal: a cron string
@@ -42,6 +49,7 @@ export type CronJobs = 'minute' | 'quarter_hour';
 export const CRON_DISPATCH: ReadonlyMap<string, CronJobs> = new Map<string, CronJobs>([
   [CRON_EVERY_MINUTE, 'minute'],
   [CRON_EVERY_FIFTEEN_MINUTES, 'quarter_hour'],
+  [CRON_EVERY_SIX_HOURS, 'fx'],
 ]);
 
 /**

@@ -19,6 +19,7 @@ import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../
 import { ProductViewedV1 } from '@levonis/contracts/events/v1/ProductViewed';
 import { notFound, int, str } from '../lib/http';
 import { getSetting, getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
+import { getDisplayUsdRate } from '../lib/fx/displayRate';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { parseProductRow, projectPublic, projectAdmin } from '../lib/productModel';
 import type { ProductDoc } from '../lib/productModel';
@@ -4266,7 +4267,9 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
    */
   const ctxPromise = pricingCtx(c);
   const settingsPromise = getSettings(c.env.DB, PUBLIC_SETTING_KEYS);
-  const [settings, discounted, latest, openBoxRows, categories, brands, ctx] = await Promise.all([
+  // The display currency's rate (FX plan §8): the one public FX figure, in the first wave.
+  const displayRatePromise = getDisplayUsdRate(c.env.DB);
+  const [settings, discounted, latest, openBoxRows, categories, brands, ctx, displayUsdRate] = await Promise.all([
     settingsPromise,
     /**
      * THE DISCOUNTS STRIP SELECTED ON A RETIRED CONCEPT, so it was always empty.
@@ -4356,6 +4359,7 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
         LIMIT 12`
     ).all<Record<string, unknown>>(),
     ctxPromise,
+    displayRatePromise,
   ]);
   logServedByRegion(c, latest.meta);
 
@@ -4367,6 +4371,7 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
     ...raw,
     homeBanners: normalizeHomeBanners(raw.homeBanners),
     homeSectionItems: normalizeSectionItems(raw.homeSectionItems),
+    displayUsdRate,
   };
 
   // THE HOME CARDS PRICE FROM THE SAME PLACE THE CART DOES. Without the

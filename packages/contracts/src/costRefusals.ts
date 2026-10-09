@@ -457,6 +457,75 @@ export const COST_REFUSALS = {
     en: 'The sections, or the products filed under them, changed while saving, so nothing was saved. Reload the page and try again.',
     ckb: 'بەشەکان، یان ئەو بەرهەمانەی لەژێریاندا دانراون، لە کاتی پاشەکەوتکردندا گۆڕان، بۆیە هیچ پاشەکەوت نەکرا. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
   },
+
+  // ---- FX programme plan §8: the exchange rates (FX-1) and the codes the
+  // ---- later FX pushes raise (FX-2, FX-3), landed with their sentences now
+  // ---- so no push ships a refusal in one language.
+  FX_REFRESH_IN_PROGRESS: {
+    ar: 'يجري تحديث الأسعار الآن — أعد المحاولة بعد لحظات',
+    en: 'Rates are being refreshed right now — try again in a moment',
+    ckb: 'نرخەکان ئێستا نوێ دەکرێنەوە — دوای چەند چرکەیەک دووبارە هەوڵ بدەرەوە',
+  },
+  FX_REVIEW_NOT_PENDING: {
+    ar: 'لا يوجد سعر بانتظار المراجعة',
+    en: 'No rate is waiting for review',
+    ckb: 'هیچ نرخێک چاوەڕێی پێداچوونەوە نییە',
+  },
+  FX_PAIR_MANUAL: {
+    ar: 'هذا السعر يدوي؛ التحديث التلقائي لا يغيّره',
+    en: 'This rate is manual; automatic updates never change it',
+    ckb: 'ئەم نرخە دەستییە؛ نوێکردنەوەی خۆکار نایگۆڕێت',
+  },
+  FX_RATE_OUT_OF_BOUNDS: {
+    ar: 'السعر خارج الحدود المعقولة المضبوطة لهذا الزوج',
+    en: 'The rate is outside the plausible range set for this pair',
+    ckb: 'نرخەکە لە دەرەوەی ئەو مەودا گونجاوەیە کە بۆ ئەم جووتە دانراوە',
+  },
+  FX_RATE_NOT_SET: {
+    ar: 'لا يوجد سعر معتمد لهذا الزوج بعد — اعتمد سعرًا أو أدخل سعرًا يدويًا أولًا',
+    en: 'This pair has no effective rate yet — approve one or set a manual rate first',
+    ckb: 'هێشتا هیچ نرخێکی کارپێکراو بۆ ئەم جووتە نییە — سەرەتا نرخێک پەسەند بکە یان نرخێکی دەستی دابنێ',
+  },
+  PRICING_FX_RATE_MISSING: {
+    ar: 'لا يوجد سعر دولار معتمد بعد، فلا يمكن تحويل الدينار',
+    en: 'There is no effective USD rate yet, so dinars cannot be converted',
+    ckb: 'هێشتا نرخی کارپێکراوی دۆلار نییە، بۆیە دینار ناگۆڕدرێت',
+  },
+  FX_SNAPSHOT_IMMUTABLE: {
+    ar: 'لقطة التحويل من الدينار لا تتغير إلا بتعديل جديد منك',
+    en: 'The dinar conversion snapshot changes only with a new edit by you',
+    ckb: 'وێنەی گۆڕینی دینار تەنها بە دەستکارییەکی نوێی تۆ دەگۆڕێت',
+  },
+  FX_REVIEW_STALE: {
+    ar: 'هذا السعر المعلّق قديم — سيُعاد فحصه في التحديث القادم',
+    en: 'This pending rate is too old — it will be checked again at the next update',
+    ckb: 'ئەم نرخە چاوەڕوانکراوە کۆنە — لە نوێکردنەوەی داهاتوودا دووبارە دەپشکنرێتەوە',
+  },
+  FX_BOUNDS_EXCLUDE_EFFECTIVE: {
+    ar: 'الحدود الجديدة تستبعد السعر المعتمد أو المعلّق حاليًا',
+    en: 'The new bounds exclude the current effective or pending rate',
+    ckb: 'سنوورە نوێیەکان نرخی کارپێکراو یان چاوەڕوانکراوی ئێستا دەردەکەن',
+  },
+  FX_DERIVED_STALE: {
+    ar: 'تغيّر سعر صرف أثناء الحفظ — أعد المحاولة',
+    en: 'An exchange rate changed while saving — try again',
+    ckb: 'نرخێکی ئاڵوگۆڕ لە کاتی پاشەکەوتکردندا گۆڕا — دووبارە هەوڵ بدەرەوە',
+  },
+  PRICING_DELTA_CURRENCY_MISMATCH: {
+    ar: 'لا يمكن تغيير عملة التكلفة الأساسية وفروق الخيارات بعملة أخرى — عدّلها أولًا',
+    en: 'The base cost currency cannot change while option differences are in another currency — edit them first',
+    ckb: 'ناتوانرێت دراوی تێچووی بنەڕەتی بگۆڕدرێت لە کاتێکدا جیاوازیی هەڵبژاردنەکان بە دراوێکی ترن — سەرەتا ئەوان دەستکاری بکە',
+  },
+  PRICING_INPUT_REINSERT: {
+    ar: 'هذا الإدخال موجود؛ يُعدَّل ولا يُستبدل',
+    en: 'This input already exists; it is edited, never replaced',
+    ckb: 'ئەم داخڵکردنە هەیە؛ دەستکاری دەکرێت، نەک جێگۆڕکێ',
+  },
+  BATCH_COST_IMMUTABLE: {
+    ar: 'تكلفة الدفعة ثابتة ولا تتغير',
+    en: 'A batch cost is fixed and never changes',
+    ckb: 'تێچووی وەجبە جێگیرە و هەرگیز ناگۆڕێت',
+  },
 } as const satisfies Record<string, CostRefusal>;
 
 export type CostRefusalCode = keyof typeof COST_REFUSALS;

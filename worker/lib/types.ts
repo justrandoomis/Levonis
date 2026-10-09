@@ -27,6 +27,15 @@ export interface Env {
   EXTRA_ALLOWED_ORIGINS: string;
   // Optional secrets — features stay honestly disabled until configured.
   GEMINI_API_KEY?: string;
+  /**
+   * IQWealth's keyed API — the Iraqi parallel-market USD/IQD (FX programme plan
+   * §3, §6). A Worker SECRET set in the dashboard; workflow 7 never puts or
+   * deletes it (tests/workflowSecrets.test.ts). Read by ONE function,
+   * `iqwealthRequest` (worker/lib/fx/providers/iqwealth.ts), which checks its
+   * shape, sends it in the X-API-Key header to one fixed host and never logs or
+   * stores it. Without it the USD/IQD pair stays honestly NOT_CONFIGURED.
+   */
+  IRAQ_PARALLEL_FX_API_KEY?: string;
   EMAIL_API_KEY?: string; // e.g. a Resend API key, enables password-reset email
   EMAIL_FROM?: string;
   TELEGRAM_BOT_TOKEN?: string; // the CUSTOMER bot: linking, OTP, account messages

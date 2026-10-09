@@ -19,6 +19,12 @@
  *                       every occurrence must be an integer (critique G-36: a
  *                       probe that only says "no cost key" passes on an empty
  *                       body; the prices must actually be there)
+ *   valuePatterns       {"key": "regex"}: wherever the key appears, its value is
+ *                       null or a string matching the regex (FX plan §8: the
+ *                       one public FX figure, `displayUsdRate`, is decimal
+ *                       text or null — never a number, an object or a list).
+ *                       An absent key passes: a database without a rate.
+ *                       The failure names the key and the type, never the value
  *   vars                `{name}` placeholders, filled from an earlier anonymous
  *                       GET (a live slug, so no probe names a product by hand)
  *
@@ -113,6 +119,14 @@ export function judge(probe, status, text) {
     }
     if (seen === 0) failures.push(`required key ${name} is absent`);
     else if (bad > 0) failures.push(`${bad} of ${seen} ${name} value(s) are not integers`);
+  }
+  for (const [name, pattern] of Object.entries(probe.valuePatterns ?? {})) {
+    const re = new RegExp(pattern);
+    for (const { key, value, path } of walkKeys(body)) {
+      if (key !== name || value === null) continue;
+      if (typeof value !== 'string') failures.push(`${key} (at ${path}) is a ${Array.isArray(value) ? 'list' : typeof value}, expected text or null`);
+      else if (!re.test(value)) failures.push(`${key} (at ${path}) does not match /${pattern}/`);
+    }
   }
   return failures;
 }

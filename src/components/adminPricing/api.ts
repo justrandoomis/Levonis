@@ -147,7 +147,7 @@ export interface PricingFxRate {
   /** Exact decimal TEXT, or null when no rate is known (USD today). */
   rate_iqd: string | null;
   confirmed: boolean;
-  rate_origin: 'procurement_profiles' | 'what_if';
+  rate_origin: 'central' | 'procurement_profiles' | 'what_if';
 }
 
 export interface PricingShippingRate {
@@ -155,7 +155,7 @@ export interface PricingShippingRate {
   basis: 'weight' | 'volume';
   rate_iqd: string | null;
   confirmed: boolean;
-  rate_origin: 'procurement_profiles' | 'what_if';
+  rate_origin: 'central' | 'procurement_profiles' | 'what_if';
 }
 
 export interface PricingRates {

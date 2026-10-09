@@ -159,6 +159,20 @@ jobs:
           awk -F'\t' '$1 == "INITIAL_ADMIN_EMAIL" && $2 != "" { found = 1 } END { exit found ? 0 : 1 }' /tmp/vars.tsv \
             || { echo "::error::INITIAL_ADMIN_EMAIL is empty on the worker — the owner (the only account that may see cost) would be locked out. Set it before deploying. / متغير INITIAL_ADMIN_EMAIL فارغ؛ لن يستطيع المالك فتح أي شاشة تكلفة."; exit 1; }
 
+          # THE EXCHANGE-RATE KEY'S BINDING TYPE, NEVER ITS VALUE (FX programme
+          # plan §9 §3, critique L12). IQWealth's key must be a SECRET: a
+          # plain_text var is visible in the dashboard and is re-passed as
+          # --var on every deploy (vars.tsv above). Name and type only; this
+          # step never fails on it, and this workflow never puts or deletes it
+          # (tests/workflowSecrets.test.ts).
+          FX_KEY_TYPE=$(jq -r '[.result.bindings[] | select(.name == "IRAQ_PARALLEL_FX_API_KEY") | .type] | first // "absent"' /tmp/settings.json)
+          case "$FX_KEY_TYPE" in
+            secret_text) echo "IRAQ_PARALLEL_FX_API_KEY: secret_text (correct)" ;;
+            absent) echo "::notice::IRAQ_PARALLEL_FX_API_KEY: absent — USD/IQD stays NOT_CONFIGURED until the owner adds it as a secret. / المفتاح غير موجود؛ يبقى سعر الدولار غير مضبوط." ;;
+            plain_text) echo "::warning::IRAQ_PARALLEL_FX_API_KEY is a plain_text var: it is visible in the dashboard and re-sent on every deploy. Re-create it as a secret (Workers → levonis-staging → Settings → Variables and Secrets → type Secret). / المفتاح مخزّن كمتغير نصي ظاهر؛ أعد إنشاءه كسرّ." ;;
+            *) echo "::notice::IRAQ_PARALLEL_FX_API_KEY: binding type $FX_KEY_TYPE" ;;
+          esac
+
       - name: Resolve the staging database id into wrangler.jsonc
         id: db
         run: |

@@ -5,6 +5,7 @@ import { getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
 import { rateLimit } from '../lib/ratelimit';
 import { readSchemaStatus } from '../lib/schemaVersion';
 import { anonymousCached } from '../lib/edgePolicy';
+import { getDisplayUsdRate } from '../lib/fx/displayRate';
 
 export const miscRoutes = new Hono<AppContext>();
 
@@ -39,11 +40,17 @@ miscRoutes.get('/health', async (c) => {
  * Public storefront settings (no secrets, no internal keys). The same body for
  * every visitor — the request pipeline never loads a session for it and the
  * colo caches it under the anonymous policy (P2a); the settings PUT purges it.
+ *
+ * `displayUsdRate` (FX programme plan §8, §13): the shop's effective USD/IQD
+ * as decimal text — the ONE public FX figure, read beside the settings in the
+ * same wave — or null until the owner approves the first value (and on a
+ * database without migration 0179). Nothing else from FX is public. A changed
+ * rate purges this answer (worker/lib/fx/scheduler.ts, purgeCatalogueFromJob).
  */
 miscRoutes.get('/settings/public', (c) =>
   anonymousCached(c, {}, async () => {
-    const settings = await getSettings(c.env.DB, PUBLIC_SETTING_KEYS);
-    return c.json({ success: true, settings });
+    const [settings, displayUsdRate] = await Promise.all([getSettings(c.env.DB, PUBLIC_SETTING_KEYS), getDisplayUsdRate(c.env.DB)]);
+    return c.json({ success: true, settings: { ...settings, displayUsdRate } });
   })
 );
 

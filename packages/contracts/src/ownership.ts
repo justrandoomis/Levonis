@@ -66,6 +66,12 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'purchase_charges', 'purchase_receiving_notes', 'purchase_receiving_events', 'stock_counts', 'stock_count_lines',
     'inventory_suppliers', 'inventory_reorder_settings',
     'procurement_cost_profiles', 'procurement_selection_cost_defaults',
+    // 0179 (FX plan §4.1) — the central exchange rates and shipping rates the
+    // pricing engine reads, beside the purchase profiles they replace as the
+    // pricing source (procurement keeps its own actual rates, decision D12):
+    // the three source pairs, their append-only history, the effective IQD
+    // rates derived from them, and the owner's shipping rates in IQD.
+    'fx_rate_pairs', 'fx_rate_log', 'pricing_fx_rates', 'pricing_shipping_rates',
     'lot_cost_adjustments', 'lot_cost_adjustment_shares', 'inventory_lot_cost_versions', 'lot_count_events',
     // 0093 — «لكيتها بمكان أرخص». A customer's report that a competitor sells
     // this product for less, with OUR price frozen into the row at the moment

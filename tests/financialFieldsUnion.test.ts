@@ -81,6 +81,25 @@ const AREAS: Record<string, readonly string[]> = {
     'direct_sale_premium_iqd', 'direct_premium_iqd', 'premium_rule_id', 'direct_premium_unit_iqd', 'direct_premium_snapshot',
     'premium_iqd', 'inherited_premium_iqd', 'premium_plan_json',
   ],
+  // FX-1 (FX plan §4.5): the whole programme's FX names join the net in the
+  // first push, before most tables carry them — every exchange-rate figure of
+  // 0179, the owner's rates DTO, the previews and their hash, the current
+  // costs and the batch snapshot.
+  FX1: [
+    'supplier_cost_amount', 'supplier_cost_currency', 'supplier_input_mode', 'current_supplier_cost_usd_exact', 'current_supplier_cost_iqd',
+    'original_input_amount', 'original_input_currency', 'conversion_rate_snapshot', 'conversion_fx_version', 'canonical_supplier_cost_usd',
+    'converted_at', 'usd_iqd_rate', 'usd_fx_version', 'cross_rate', 'cross_fx_version', 'market_rate', 'market_buy', 'official_rate',
+    'source_usd_per_eur', 'source_cny_per_eur', 'manual_rate', 'effective_rate', 'effective_rates_iqd', 'last_known_good_rate',
+    'pending_market_rate', 'pending_effective_rate', 'adjustment_iqd_per_usd', 'drift_anchor_rate', 'rejected_rate', 'last_observed',
+    'preview_hash', 'supplier_cost_view', 'current_usd', 'current_iqd', 'rate_used', 'iqd_snapshot', 'procurement_suggestion',
+    'supplier_cost_mode', 'current_shipping_cost_iqd', 'current_additional_costs_iqd', 'supplier_cost_usd_at_purchase',
+    'usd_iqd_rate_at_purchase', 'eur_usd_rate_at_purchase', 'cny_usd_rate_at_purchase', 'historical_usd_equivalent',
+    'supplier_original_amount', 'supplier_original_currency', 'shipping_actual_unit_iqd', 'additional_cost_actual_unit_iqd',
+    'shipping_actual_iqd', 'additional_cost_actual_iqd', 'actual_landed_cost_iqd', 'fx_usd_iqd_at_purchase', 'fx_eur_usd_at_purchase',
+    'fx_cny_usd_at_purchase',
+    // the FX history rows' rate columns: before, after and the held candidate
+    'effective_before', 'effective_after', 'pending_rate',
+  ],
 };
 
 /**
@@ -131,6 +150,55 @@ const PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
 };
 
 /**
+ * FX-1 (FX plan §8, worker/lib/fx/dto.ts): the owner's rates panel and its
+ * history. Owner-only keys that carry no rate — a code, a state, a time, a
+ * count, a flag, a percentage threshold or a container — served only behind
+ * requireCostRead. Every rate of the same answers, the sanity bounds and the
+ * moves (an oracle on a held candidate) are in FINANCIAL_FIELDS.
+ */
+const FX_PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
+  pairs: 'a container: the three FX pairs, each rate under a FINANCIAL_FIELDS key',
+  key_configured: 'yes/no: the IQWealth key binding is set — never the key',
+  refresh_budget: 'a container: how many manual refreshes ran today and the daily limit — counts',
+  provider_budget: "a container: today's provider calls per pair and the cap — counts",
+  engine_products: 'how many products the engine prices — a count',
+  reprice_blocked: 'how many products a repricing could not reach — a count',
+  stale_products: 'how many products wait for a repricing — a count',
+  used_today: 'a count of calls or refreshes today',
+  cap: "the provider's daily call cap — a count",
+  pair: 'the pair code (USD_IQD / EUR_USD / CNY_USD)',
+  mode: 'AUTO / MANUAL — how a pair is kept',
+  interval_hours: 'how often the scheduler checks a pair (6 / 12 / 24) — hours',
+  fetch_status: "the last provider fetch's state code (OK / FAILED / STALE / INVALID)",
+  last_check_result: "the last check's result code (APPLIED / NO_CHANGE / REVIEW_HELD …)",
+  last_error_code: "the last refusal's CODE (TIMEOUT, KEY_REJECTED …) — never the provider's text",
+  failing_since: 'when the provider started failing — a time',
+  last_checked_at: 'when the pair was last checked — a time',
+  last_successful_at: 'when the provider last answered well — a time',
+  next_check_at: 'when the scheduler checks the pair next — a time',
+  effective_source: 'who set the rate in force (provider / manual / review_approved …) — never the rate',
+  effective_version: 'a version counter of the rate in force',
+  effective_applied_at: 'when the rate in force was applied — a time',
+  drift_anchor_at: 'when the drift anchor was last confirmed — a time',
+  owner_version: 'the optimistic-concurrency token of the owner acts (L3) — a counter',
+  anomaly_threshold_pct: "the owner's anomaly guard — a percentage, not a rate",
+  drift_threshold_pct: "the owner's slow-drift guard — a percentage, not a rate",
+  min_change_pct: "the owner's dead band — a percentage, not a rate",
+  pending: 'a container: the held candidate, its rates under FINANCIAL_FIELDS keys',
+  rejected: 'a container: the rejected candidate, its rate under rejected_rate (FINANCIAL_FIELDS)',
+  attribution: "a container: the provider's name and site, as its terms require",
+  basis: 'weight / volume — how a shipping profile is measured',
+  trigger_kind: 'cron / refresh / owner / back_to_auto — what started a history row',
+  rejected_at: 'when the owner rejected the held candidate — a time',
+  observed_at: 'when a held or observed candidate was seen — a time',
+  repriced_products: 'how many products a history row repriced — a count (FX-5 fills it)',
+  USD: 'a container: the dinar rate of the dollar, under rate_iqd (FINANCIAL_FIELDS)',
+  EUR: 'a container: the dinar rate of the euro, under rate_iqd (FINANCIAL_FIELDS)',
+  CNY: 'a container: the dinar rate of the yuan, under rate_iqd (FINANCIAL_FIELDS)',
+  USD_IQD: "a container: the USD/IQD provider's calls today and its cap — counts",
+};
+
+/**
  * NEVER private names (F18, security spec §4.1, critique A6): each is a public
  * or wallet field elsewhere, so stripping it would break those screens — and a
  * private value under one of them would slip through. A private column must
@@ -165,8 +233,10 @@ test('none of the forbidden names is in the list (F18)', () => {
 });
 
 test('a name is either in the net or registered as private-but-not-in-the-net, never both', () => {
-  assert.deepEqual(Object.keys(PRIVATE_NON_FINANCIAL).filter((k) => LIST.has(k)), []);
-  for (const [k, why] of Object.entries(PRIVATE_NON_FINANCIAL)) assert.ok(why.trim().length > 0, `${k} needs its reason`);
+  for (const dict of [PRIVATE_NON_FINANCIAL, FX_PRIVATE_NON_FINANCIAL]) {
+    assert.deepEqual(Object.keys(dict).filter((k) => LIST.has(k)), []);
+    for (const [k, why] of Object.entries(dict)) assert.ok(why.trim().length > 0, `${k} needs its reason`);
+  }
 });
 
 test('no duplicates, every name snake_case — the camelCase match is the stripper’s job', () => {
@@ -241,7 +311,7 @@ test('MVP P1: every key the pricing router answers is in FINANCIAL_FIELDS, in PR
     for (const name of readdirSync(dir)) {
       const p = join(dir, name);
       if (statSync(p).isDirectory()) {
-        if (name !== 'pricingEngine') collect(p);
+        if (name !== 'pricingEngine' && name !== 'fx') collect(p);
       } else if (p.endsWith('.ts') && name !== 'adminPricing.ts') files.push(p);
     }
   };
@@ -262,4 +332,84 @@ test('MVP P1: every key the pricing router answers is in FINANCIAL_FIELDS, in PR
   assert.equal(keys.has('amount_iqd'), false);
   // Every PRIVATE_NON_FINANCIAL name is really answered (no stale reason).
   assert.deepEqual(Object.keys(PRIVATE_NON_FINANCIAL).filter((k) => !keys.has(k)), []);
+});
+
+// ------------------------------------------------------------- the rates DTOs (FX-1)
+
+/**
+ * EVERY KEY THE RATES ROUTES ANSWER IS CLASSIFIED (FX plan §4.5, §8, §14.2
+ * S1): `GET /rates` with every container filled — a held candidate, a
+ * rejected one, a MANUAL pair with what a refresh observed — and the history
+ * of every event kind. A key new to the code base is in FINANCIAL_FIELDS or in
+ * FX_PRIVATE_NON_FINANCIAL with its reason; every money, rate or measure key
+ * is in the net; and the strip leaves no seeded figure in the answer.
+ */
+test('FX-1: every key the rates routes answer is in FINANCIAL_FIELDS, in FX_PRIVATE_NON_FINANCIAL, or shared vocabulary — and the strip leaves no rate', async () => {
+  const { readFileSync, readdirSync, statSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { ROOT } = await import('./fixtures/d1');
+  const { OWNER, asD1, freshDb, stubApp } = await import('./fixtures/app');
+  const { call } = await import('./fixtures/roleMatrix');
+  const { seedFxSentinels, FX_SENTINELS, FX_PUBLIC_RATE } = await import('./fixtures/fxSentinels');
+  const { adminPricingRoutes } = await import('../worker/routes/adminPricing');
+
+  const raw = freshDb();
+  seedFxSentinels(raw);
+  // CNY/USD kept by hand, with what a refresh observed (L14): last_observed is filled.
+  raw.exec(`UPDATE fx_rate_pairs SET mode='MANUAL', manual_rate='0.1412698', effective_source='manual' WHERE pair='CNY_USD';
+    INSERT INTO fx_rate_log (id, pair, event, trigger_kind, provider, market_rate, pending_rate, result, error_code, created_at)
+      VALUES ('fxl_s4', 'CNY_USD', 'observed', 'refresh', 'ecb', '0.1412698', '0.1412698', 'OBSERVED', NULL, '2026-10-08T12:30:00.000Z'),
+             ('fxl_s5', 'EUR_USD', 'failure', 'cron', 'ecb', NULL, NULL, 'FAILED', 'TIMEOUT', '2026-10-08T12:40:00.000Z');`);
+  const app = stubApp(asD1(raw), OWNER, (a) => a.route('/api/admin/pricing', adminPricingRoutes));
+  const keys = new Set<string>();
+  const answers: unknown[] = [];
+  const walk = (v: unknown) => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') {
+      for (const [k, x] of Object.entries(v)) {
+        keys.add(k);
+        walk(x);
+      }
+    }
+  };
+  for (const path of ['/api/admin/pricing/rates', '/api/admin/pricing/rates/history', '/api/admin/pricing/rates/history?pair=USD_IQD&limit=2']) {
+    const res = await call(app, 'GET', path);
+    assert.equal(res.status, 200, path);
+    answers.push(res.body);
+    walk(res.body);
+  }
+  const rates = answers[0] as { pairs: { pair: string; pending: unknown; rejected: unknown; last_observed: unknown }[] };
+  assert.ok(rates.pairs.find((p) => p.pair === 'USD_IQD')!.pending, 'the walk reached a held candidate');
+  assert.ok(rates.pairs.find((p) => p.pair === 'USD_IQD')!.rejected, 'the walk reached a rejected candidate');
+  assert.ok(rates.pairs.find((p) => p.pair === 'CNY_USD')!.last_observed, 'the walk reached what a refresh observed');
+  assert.ok(keys.size > 50, `only ${keys.size} keys walked`);
+
+  const files: string[] = [];
+  const collect = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) {
+        if (name !== 'pricingEngine' && name !== 'fx') collect(p);
+      } else if (p.endsWith('.ts') && name !== 'adminPricing.ts') files.push(p);
+    }
+  };
+  collect(join(ROOT, 'worker'));
+  const corpus = files.map((f) => readFileSync(f, 'utf8')).join('\n');
+  const shared = (k: string) => new RegExp(`(^|[^\\w$])${k}\\s*\\??:`, 'm').test(corpus) || new RegExp(`['"]${k}['"]\\s*:`).test(corpus);
+  // Not vacuous: the FX modules' own names are not "shared".
+  assert.equal(shared('key_configured'), false);
+  assert.equal(shared('effective_rates_iqd'), false);
+  const unclassified = [...keys].filter((k) => !LIST.has(k) && !(k in FX_PRIVATE_NON_FINANCIAL) && !shared(k)).sort();
+  assert.deepEqual(unclassified, [], 'add each to FINANCIAL_FIELDS (both copies) or to FX_PRIVATE_NON_FINANCIAL with its reason');
+  const MONEY = /_iqd$|_mm$|_g$|cbm|^fx_|_rate$|_rates$|_rates_iqd$|^supplier_|^replacement_|^shipping_|^landed_|^market_|^effective_rate|_before$|_after$|_pct$|_ppm$|^bound_/;
+  const PCT_SETTINGS = new Set(['anomaly_threshold_pct', 'drift_threshold_pct', 'min_change_pct']);
+  const unnetted = [...keys].filter((k) => MONEY.test(k) && !LIST.has(k) && !PCT_SETTINGS.has(k)).sort();
+  assert.deepEqual(unnetted, [], 'a money, rate or measure key outside FINANCIAL_FIELDS');
+  assert.equal(keys.has('effective_iqd'), false, 'never the staff-wage name (F14c)');
+  // Every FX_PRIVATE_NON_FINANCIAL name is really answered (no stale reason).
+  assert.deepEqual(Object.keys(FX_PRIVATE_NON_FINANCIAL).filter((k) => !keys.has(k)), []);
+  // The net, applied to the whole answer, leaves no seeded figure behind (S1):
+  // a figure under a generic key would survive the strip.
+  const stripped = JSON.stringify(stripFinancials(answers));
+  for (const v of [...FX_SENTINELS, FX_PUBLIC_RATE]) assert.equal(stripped.includes(v), false, `${v} survives the strip`);
 });

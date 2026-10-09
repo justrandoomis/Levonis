@@ -280,3 +280,40 @@ export function procurementExactText(value: ProcurementExact): string {
   const fraction = digits.slice(digits.length - places).replace(/0+$/, '');
   return `${negative ? '-' : ''}${whole}${fraction ? `.${fraction}` : ''}`;
 }
+
+/* ---------------------------------------------------------------------------
+ * FX plan §3 — division and rounding to a number of decimal places. A cross
+ * rate (USD ÷ CNY per EUR) and a dinar amount converted to dollars (I ÷ U) are
+ * quotients that need not terminate: 1.1186 / 7.4972 does not. Such a value is
+ * only ever passed to `floorToPlaces` or `ceilToPlaces`, whose results always
+ * terminate, so `procurementExactText` stays safe on what is stored.
+ * ------------------------------------------------------------------------- */
+
+/** The exact rational `a / b` (b ≠ 0). May not terminate: round it before storing it. */
+export function quotientProcurementExact(a: ProcurementExact, b: ProcurementExact): ProcurementExact {
+  if (b.num === 0n) throw new RangeError('Procurement division by zero');
+  return reduceExact(exactOf(a.num * b.den, a.den * b.num));
+}
+
+const placesScale = (places: number): bigint => {
+  if (!Number.isSafeInteger(places) || places < 0 || places > 30) throw new RangeError('Invalid number of decimal places');
+  return 10n ** BigInt(places);
+};
+
+/** The largest value ≤ x with at most `places` decimals (DOWN, toward −∞). Always terminates. */
+export function floorToPlaces(x: ProcurementExact, places: number): ProcurementExact {
+  const scale = placesScale(places);
+  const scaled = x.num * scale;
+  let q = scaled / x.den; // truncates toward zero
+  if (scaled % x.den !== 0n && scaled < 0n) q -= 1n;
+  return reduceExact({ num: q, den: scale });
+}
+
+/** The smallest value ≥ x with at most `places` decimals (UP, toward +∞). Always terminates. */
+export function ceilToPlaces(x: ProcurementExact, places: number): ProcurementExact {
+  const scale = placesScale(places);
+  const scaled = x.num * scale;
+  let q = scaled / x.den;
+  if (scaled % x.den !== 0n && scaled > 0n) q += 1n;
+  return reduceExact({ num: q, den: scale });
+}

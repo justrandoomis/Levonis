@@ -1,0 +1,39 @@
+{
+  "step": "FX-1 — exchange rates: the shop's effective USD/IQD is the one public FX figure (FX programme plan §8, §14.4)",
+  "probes": [
+    {
+      "path": "/api/settings/public",
+      "status": [
+        200
+      ],
+      "forbidKeys": "market|adjust|provider|pending|last_known|anomaly|drift|bound_(min|max)|rejected|official_rate|effective_rate|manual_rate|cross_rate|usd_iqd|eur_usd|cny_usd|source_(usd|cny)|iqwealth|fx_|rate_iqd|supplier|cost",
+      "forbidPattern": "iraqsm|IRAQ_PARALLEL_FX|ecb\\.europa",
+      "valuePatterns": {
+        "displayUsdRate": "^[0-9]{1,6}(\\.[0-9]{1,8})?$"
+      }
+    },
+    {
+      "path": "/api/home",
+      "status": [
+        200
+      ],
+      "forbidKeys": "market|adjust|provider|pending|last_known|anomaly|drift|bound_(min|max)|rejected|official_rate|effective_rate|manual_rate|cross_rate|usd_iqd|eur_usd|cny_usd|source_(usd|cny)|iqwealth|fx_|rate_iqd|supplier|cost",
+      "forbidPattern": "iraqsm|IRAQ_PARALLEL_FX|ecb\\.europa",
+      "valuePatterns": {
+        "displayUsdRate": "^[0-9]{1,6}(\\.[0-9]{1,8})?$"
+      }
+    },
+    {
+      "path": "/api/admin/pricing/rates",
+      "status": [
+        401
+      ]
+    },
+    {
+      "path": "/api/admin/pricing/rates/history",
+      "status": [
+        401
+      ]
+    }
+  ]
+}

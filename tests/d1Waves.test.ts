@@ -69,7 +69,8 @@ const CEILINGS: Array<{ path: string; host?: string; waves: [warm: number, cold:
   { path: '/api/home/sections', waves: [4, 4, 6], prepares: 22 },
   { path: '/api/products', waves: [2, 2, 5], prepares: 17 },
   { path: `/api/products/${LIVE_PRODUCTS[0].slug}`, waves: [2, 2, 5], prepares: 23 },
-  { path: '/api/settings/public', waves: [1, 1, 1], prepares: 1 },
+  // FX-1: the display rate (pricing_fx_rates USD) is read beside the settings, in the same wave.
+  { path: '/api/settings/public', waves: [1, 1, 1], prepares: 2 },
   { path: '/api/community/access', waves: [1, 1, 1], prepares: 1 },
   { path: '/api/storefront/resolve', host: HOST, waves: [5, 5, 5], prepares: 20 },
   { path: `/api/storefront/${SLUG}`, waves: [5, 5, 5], prepares: 20 },

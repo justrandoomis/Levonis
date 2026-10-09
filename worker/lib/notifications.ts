@@ -174,7 +174,15 @@ export type NotificationKind =
    * (`quick_buy_failed`, DECISIONS row 188 — no administrator in the loop).
    */
   | 'quick_buy_submitted'
-  | 'quick_buy_failed';
+  | 'quick_buy_failed'
+  /**
+   * «سعر صرف يحتاج انتباهك» (FX programme plan §12, migration 0179): to the
+   * VERIFIED OWNER only (worker/lib/fx/notify.ts) — an exchange rate waits for
+   * approval, a source has failed for a day, or the safety settings changed.
+   * It carries no figure (a test holds it to no digit at all), and it never
+   * goes to an admin Telegram topic, which assistants read.
+   */
+  | 'fx_attention';
 
 export interface NotificationInput {
   userId: string;

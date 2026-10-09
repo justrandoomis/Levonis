@@ -229,8 +229,10 @@
 
   // Delivered-order finance recovery runs each minute; delivery wages still
   // post synchronously. Other durable jobs retain their fifteen-minute tick.
-  // The scheduled handler is idempotent — overlapping runs are safe.
-  "triggers": { "crons": ["*/15 * * * *", "* * * * *"] },
+  // The exchange rates (FX programme plan §4) are checked every six hours.
+  // The scheduled handler is idempotent — overlapping runs are safe, and it
+  // matches each string exactly (an unknown one runs nothing).
+  "triggers": { "crons": ["*/15 * * * *", "* * * * *", "0 */6 * * *"] },
 
   "env": {
     // Staging: fully separate Worker + D1 + R2. Deployed to workers.dev,
@@ -302,7 +304,7 @@
         "EMAIL_ALLOWLIST_REQUIRED": "off"
       },
       "observability": { "enabled": true },
-      "triggers": { "crons": ["*/15 * * * *", "* * * * *"] }
+      "triggers": { "crons": ["*/15 * * * *", "* * * * *", "0 */6 * * *"] }
     },
 
     // ------------------------------------------------------------------ dark
@@ -416,7 +418,7 @@
       // of the G2 change set, not of a dark deploy. `pumpAfter` in `waitUntil`
       // delivers what a request just committed, so the dark end-to-end proof
       // does not wait for a tick.
-      "triggers": { "crons": ["*/15 * * * *", "* * * * *"] }
+      "triggers": { "crons": ["*/15 * * * *", "* * * * *", "0 */6 * * *"] }
     }
   }
 }

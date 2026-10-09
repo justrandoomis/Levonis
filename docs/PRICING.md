@@ -17,6 +17,59 @@ Unit tests pinning every rule: `tests/pricing.test.ts` (`npm run test:unit`).
   stored IQD prices and never existing orders (each order snapshots
   `exchange_rate` at creation).
 
+## Currency roles (FX programme, DECISIONS row 189)
+
+The FX programme (push FX-1, migration `0179_fx_rates.sql`) gives each
+currency one job. The wallet model above is unchanged.
+
+| Currency | Role | Where it lives |
+|---|---|---|
+| **USD** | The **pricing base**. A supplier cost entered in USD, EUR or CNY becomes one canonical current USD cost. | `packages/pricing/src/fxChain.ts` |
+| **EUR, CNY** | Supplier currencies only. Each stays in its source currency and is converted at today's rate whenever a price is computed. | `fx_rate_pairs` rows `EUR_USD`, `CNY_USD` |
+| **IQD** | The **accounting currency**: every price, order, lot, wallet figure and report. Inventory keeps the IQD actually paid and is never re-converted. | unchanged tables |
+
+**The chain (the final rule, FX plan §36).** SOURCE (USD / EUR / CNY) →
+CANONICAL CURRENT USD → CURRENT IQD (× the effective USD/IQD) → final price
+(the replacement cost plus the minimum target profit, rounded up to 1,000, plus
+the Direct Sale Extra). The pure maths is `fxChain.ts`; exact decimals
+throughout, never a float.
+
+**The rates.**
+
+- **USD/IQD**: the Iraqi parallel market, from IQWealth
+  (`GET https://iraqsm.com/api/v1/fx`, the Worker secret
+  `IRAQ_PARALLEL_FX_API_KEY`, read in one place:
+  `worker/lib/fx/providers/iqwealth.ts`). Automatic every 6 or 12 hours, or OFF
+  with a manual rate. The owner's signed adjustment (dinars per dollar) is
+  added on top.
+- **EUR/USD and CNY/USD**: the ECB daily reference rates, once a day. CNY/USD
+  = (USD per EUR) ÷ (CNY per EUR), rounded up at 10 places.
+- **EUR/IQD and CNY/IQD**: computed centrally in `pricing_fx_rates` whenever
+  either side changes, in the same batch (a trigger refuses a stale derived
+  row).
+- **The guard**: a rate waits for the owner's approval when it is the first
+  value, jumps more than 3% in one step, moves more than 3% within 24 hours,
+  or drifts more than 6% from the last confirmed rate. Moves below the dead
+  band (0.5% USD/IQD, 0.3% EUR and CNY) are ignored. A failing source keeps
+  the last known good rate; a rate is never 0.
+- **The wallet keeps its own rate**: `exchangeRate` (1,400, DECISIONS row 6)
+  stays the wallet's and escrow's rate. FX reads never touch it.
+- **Public**: only the effective USD/IQD, as `displayUsdRate` (decimal text or
+  `null`) in `/api/settings/public` and `/api/home`, for the display currency.
+  Every other FX figure is the verified owner's (`/api/admin/pricing/rates*`).
+- **FX-1 moves no price.** Repricing from a rate change is FX-5.
+
+**One scheduler, one cron.** `0 */6 * * *` runs `runFxScheduler`
+(`worker/lib/fx/scheduler.ts`); a pair is due by its interval measured from
+the run's `scheduledTime`. No provider is ever called from a customer request.
+
+**Rollback runbook (cron triggers).** Cron triggers are Worker settings, not
+part of a version. A workflow 7 redeploy of an older commit replaces them with
+that commit's list. A **dashboard rollback** or `wrangler rollback` does not:
+after one, run `npx wrangler triggers deploy --env staging` from the rollback
+target's checkout. (A target from P1 on ignores the 6-hour trigger anyway:
+`scheduled()` runs only the crons it knows.)
+
 ## The four price fields
 
 At **product**, **option** and **color** level:

@@ -407,6 +407,40 @@ async function catalogueSlugFromPath(c: Context<AppContext>): Promise<string | n
   }
 }
 
+/**
+ * THE SAME PURGE FROM A JOB, WITH NO REQUEST (FX programme plan §7.6, critique
+ * L4): the FX scheduler runs on the cron and has no Hono `Context`. It drops
+ * the root domain's and the `www.` host's entries, plus `origin` when a
+ * request made the change (an owner's rate act).
+ *
+ *   settings  the public display rate moved: `/api/settings/public`, `/api/home`
+ *             and `/api/home/sections` all carry it — the set
+ *             `pathsChangedBySetting('exchangeRate')` purges today
+ *   slugs     repriced products (FX-5): the catalogue paths and each product page
+ *
+ * When nothing changed, nothing is purged. Best effort, per colo, like every
+ * seam: elsewhere the anonymous answers age out within `s-maxage`.
+ */
+export async function purgeCatalogueFromJob(
+  env: AppContext['Bindings'],
+  slugs: readonly string[],
+  opts: { settings?: boolean; origin?: string } = {}
+): Promise<void> {
+  const paths = new Set<string>();
+  if (opts.settings) for (const p of pathsChangedBySetting('exchangeRate')) paths.add(p);
+  if (slugs.length) for (const p of cataloguePaths(slugs)) paths.add(p);
+  if (paths.size === 0) return;
+  forgetPricingInputs(env.DB);
+  const origins = new Set<string>();
+  const root = rootDomainFrom(env);
+  if (root) {
+    origins.add(`https://${root}`);
+    origins.add(`https://www.${root}`);
+  }
+  if (opts.origin) origins.add(opts.origin);
+  await Promise.all([...origins].map((o) => purgeAnonymousCache(o, [...paths])));
+}
+
 /** The print catalogue (materials, printers, accessories, the wizard's vocabulary). */
 export const PRINT_CATALOGUE_PATHS: readonly string[] = [
   '/api/print-quote/printers',

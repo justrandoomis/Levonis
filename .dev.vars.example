@@ -8,3 +8,9 @@
 # Optional: enables password-reset emails locally (Resend API key + sender).
 # EMAIL_API_KEY=
 # EMAIL_FROM=Levonis <noreply@example.com>
+
+# Optional: IQWealth's keyed API — the Iraqi parallel-market USD/IQD the FX
+# scheduler reads every 6 or 12 hours (FX programme plan §3). Without it the
+# USD/IQD pair stays NOT_CONFIGURED; nothing else needs it. Never commit a
+# real value; on the live Worker it is a dashboard SECRET.
+IRAQ_PARALLEL_FX_API_KEY=

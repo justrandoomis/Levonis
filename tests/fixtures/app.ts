@@ -18,6 +18,42 @@ import { resetPolicyCorpusMemo } from '../../worker/lib/policySync';
 export const APEX = 'levonis-iq.com';
 export const MERCHANT_HOST = 'somestore.levonis-iq.com';
 
+/**
+ * NO TEST EVER REACHES AN FX PROVIDER (FX programme plan §15). Every route
+ * test imports this file, so the global `fetch` is wrapped once here: a
+ * request to IQWealth (`iraqsm.com`) or the ECB is recorded in
+ * `providerFetch.attempts` and answered by `providerFetch.handler` when a test
+ * installs one — otherwise it fails like a dead network (the scheduler records
+ * NETWORK and keeps the last known good rate). Any other host is untouched.
+ */
+export const providerFetch: {
+  attempts: Array<{ url: string; headers: Record<string, string> }>;
+  handler: ((url: string, init?: RequestInit) => Promise<Response>) | null;
+} = { attempts: [], handler: null };
+const PROVIDER_HOST = /^(?:[a-z0-9-]+\.)*(?:iraqsm\.com|ecb\.europa\.eu)$/i;
+const realFetch = globalThis.fetch;
+if (!(realFetch as { __fxTripwire?: boolean }).__fxTripwire) {
+  const wrapped = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    let host = '';
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      /* not a URL: let fetch say so */
+    }
+    if (PROVIDER_HOST.test(host)) {
+      const headers: Record<string, string> = {};
+      new Headers(init?.headers).forEach((v, k) => (headers[k] = v));
+      providerFetch.attempts.push({ url, headers });
+      if (providerFetch.handler) return providerFetch.handler(url, init);
+      throw new TypeError('fetch failed');
+    }
+    return realFetch(input, init);
+  };
+  (wrapped as { __fxTripwire?: boolean }).__fxTripwire = true;
+  globalThis.fetch = wrapped as typeof fetch;
+}
+
 export function freshDb(): DatabaseSync {
   return dbThrough(null);
 }

@@ -692,6 +692,9 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   // 0177 — owner decision 2 (cost access and the security-event log).
   'admin_private_grants.grant_key': 'ids/codes/integers; no media (PRICING_PRIVATE_READ or PRICING_PRIVATE_WRITE)',
   'security_events.detail': 'ids/codes/integers; no media (allowlisted refusal context, never a body or a value)',
+  // 0179 — FX plan §4.1: the central rates. Enum words and timestamps only.
+  'pricing_shipping_rates.profile': 'a shipping profile name (GERMANY_LAND / CHINA_AIR / CHINA_SEA); no media',
+  'purchase_orders.fx_snapshot_at': 'a timestamp: when the purchase took its FX snapshot; no media',
   'quick_buy_actions.key': 'a request de-duplication token',
   'quick_buy_events.action_key': 'the de-duplication token of the change that wrote the row',
   'quick_buy_events.detail': 'a money or stock delta and its reason',

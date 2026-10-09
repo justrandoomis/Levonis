@@ -301,6 +301,30 @@ adminProcurementRoutes.get('/receiving/:id', async (c) => {
   return c.json({ success: true, purchase: receivingHead(head), lines: results ?? [] });
 });
 
+/**
+ * The purchase's FX snapshot (FX plan §17, L6): the effective USD/IQD, EUR/USD
+ * and CNY/USD of `fx_rate_pairs` at the moment it is first ordered, written
+ * once (`WHERE fx_snapshot_at IS NULL`). The rates are read here, not by a
+ * sub-select, so a database without 0179 is detected and the snapshot skipped
+ * instead of failing the purchase.
+ */
+async function fxSnapshotStatements(db: D1Database, id: string, now: string): Promise<D1PreparedStatement[]> {
+  let rates: Array<{ pair: string; effective_rate: string | null }>;
+  try {
+    rates = (await db.prepare('SELECT pair, effective_rate FROM fx_rate_pairs').all<{ pair: string; effective_rate: string | null }>()).results ?? [];
+  } catch {
+    return [];
+  }
+  const of = (pair: string) => rates.find((r) => r.pair === pair)?.effective_rate ?? null;
+  return [
+    db
+      .prepare(
+        'UPDATE purchase_orders SET fx_usd_iqd_at_purchase=?, fx_eur_usd_at_purchase=?, fx_cny_usd_at_purchase=?, fx_snapshot_at=? WHERE id=? AND fx_snapshot_at IS NULL',
+      )
+      .bind(of('USD_IQD'), of('EUR_USD'), of('CNY_USD'), now, id),
+  ];
+}
+
 async function planDocument(
   db: D1Database,
   b: Record<string, unknown>,
@@ -501,6 +525,13 @@ async function planDocument(
         .bind(...Object.values(row)),
     );
   }
+  // §17 groundwork (FX plan §4.1 part 5, critique L6): the FIRST time the
+  // document is confirmed 'ordered' it snapshots the CENTRAL effective rates
+  // (U, E, C) in a SEPARATE statement guarded on `fx_snapshot_at IS NULL` —
+  // never through `header` above, which rewrites every key on every save and
+  // would replace the purchase-time rates with today's. NULL is a rate not
+  // known then. Skipped on a database without migration 0179.
+  if (status === 'ordered') statements.push(...(await fxSnapshotStatements(db, id, now)));
   if (profile) {
     // A concurrent settings save must not be silently overwritten by an older
     // open purchase. The entire document/default transaction is fenced.
