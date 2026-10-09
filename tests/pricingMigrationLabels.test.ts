@@ -38,6 +38,7 @@ import { asD1, freshDb } from './fixtures/app';
 import { seedLegacyCatalogue, seedProfileRates } from './fixtures/legacyCatalogue';
 import { listPricedProducts, loadPreviewContext, loadRateReference } from '../worker/lib/pricingEngine/load';
 import { evaluateProducts } from '../worker/lib/pricingEngine/compute';
+import { PRICING_MIX_LABELS, PRICING_ROUTE_LABELS, PRICING_UI_STRINGS } from '../src/components/adminPricing/strings';
 
 const SORANI_ONLY = /[ڕڵێۆەڤگچپژ]/;
 const ARABIC_ONLY = /[ةىيك]/;
@@ -119,7 +120,7 @@ test('decision 8: a complete product is reviewed and saved, never switched — n
   assert.deepEqual(PRICING_MIGRATION_LABELS['s.READY_TO_SWITCH'], {
     ar: 'مكتمل — راجع الأسعار الجديدة واحفظ',
     en: 'Complete — review the new prices and save',
-    ckb: 'تەواوە — نرخە نوێیەکان ببینە و پاشەکەوتی بکە',
+    ckb: 'تەواوە — پێداچوونەوە بە نرخە نوێیەکاندا بکە و پاشەکەوتیان بکە',
   });
   assert.deepEqual(PRICING_MIGRATION_STATUS_LABELS.READY_TO_SWITCH, PRICING_MIGRATION_LABELS['s.READY_TO_SWITCH']);
   assert.deepEqual(PRICING_MIGRATION_LABELS['btn.saveAndApply'], {
@@ -130,12 +131,8 @@ test('decision 8: a complete product is reviewed and saved, never switched — n
   const keys = Object.keys(PRICING_MIGRATION_LABELS);
   assert.ok(!keys.includes('btn.switch'), 'the switch button is gone');
   assert.ok(!keys.some((k) => k.startsWith('gate.')), 'the first switch-on conditions are gone');
-  // Nothing the owner reads speaks of a switch or of switching on.
-  for (const [key, { ar, en, ckb }] of ALL) {
-    assert.doesNotMatch(en, /\bswitch/i, `${key}: «${en}»`);
-    assert.doesNotMatch(ar, /التحويل|تحويله|التشغيل الأول/, `${key}: «${ar}»`);
-    assert.doesNotMatch(ckb, /گۆڕین|بیگۆڕیت/, `${key}: «${ckb}»`);
-  }
+  // Nothing the owner reads speaks of a switch or of switching on — see the
+  // next test, which walks every string of the tab, not only these labels.
   assert.equal(
     LEGACY_REASONS.LEGACY_MEMBER_PRICE_DROPPED.label.en,
     'The typed membership price will not be used once you save the new prices; the general membership benefits apply.'
@@ -150,6 +147,74 @@ test('decision 8: a complete product is reviewed and saved, never switched — n
      COST_REFUSALS.PRICING_MEASURES_UNCONFIRMED.ckb.includes('پێش پاشەکەوتکردنی نرخە نوێیەکانی بەرهەمەکە')],
     [true, true, true]
   );
+});
+
+/**
+ * The words decision 8 retired. Arabic is compared without its marks, so
+ * «تحوّل» and «تحول» are the one word a reader sees; the Sorani covers the
+ * noun, the verb forms the old labels used and the old gate title.
+ */
+const bareArabic = (s: string) => s.replace(/[ً-ْـ]/g, '');
+const SWITCH_WORDS = {
+  en: /\bswitch/i,
+  ar: /تحويل|تحول|بوابة|التشغيل الأول/,
+  ckb: /گۆڕین|بیگۆڕیت|دەگۆڕیت|بگۆڕە|دەروازە|یەکەم دەستپێکردن/,
+} as const;
+
+/** Every string of «التسعير والشحن», as [key, {ar, en, ckb}] — the contracts' and the screen's own. */
+function everyStringOfTheTab(): Array<[string, PricingLabel]> {
+  const out: Array<[string, PricingLabel]> = [...ALL];
+  const text = (v: unknown) => (typeof v === 'function' ? String((v as (...a: unknown[]) => unknown)(7, 'EUR')) : String(v));
+  for (const key of Object.keys(PRICING_UI_STRINGS.ar)) {
+    const at = (lang: 'ar' | 'en' | 'ckb') => text((PRICING_UI_STRINGS[lang] as unknown as Record<string, unknown>)[key]);
+    out.push([`ui.${key}`, { ar: at('ar'), en: at('en'), ckb: at('ckb') }]);
+  }
+  for (const [k, v] of Object.entries(PRICING_MIX_LABELS)) out.push([`mix.${k}`, v]);
+  for (const [k, v] of Object.entries(PRICING_ROUTE_LABELS)) out.push([`route.${k}`, v]);
+  for (const [k, v] of Object.entries(PRICING_ISSUES)) out.push([`issue.${k}`, v.label]);
+  for (const [k, v] of Object.entries(PRICING_FIELD_LABELS)) out.push([`field.${k}`, v as PricingLabel]);
+  // The pricing refusals a save can answer. The two retired gate codes stay in
+  // the contract (it only grows) but are never raised, so no one reads them.
+  for (const [k, v] of Object.entries(COST_REFUSALS)) if (k.startsWith('PRICING_') && !k.startsWith('PRICING_GATE_')) out.push([`refusal.${k}`, v]);
+  return out;
+}
+
+test('decision 8 on the screen: no string of «التسعير والشحن» speaks of a switch, a switch-on or a gate (review finding, WP-POL)', () => {
+  // The guard is not vacuous: it refuses the wording the tab carried before this fix.
+  assert.match('Store prices change only when you switch a product to the new pricing', SWITCH_WORDS.en);
+  assert.match(bareArabic('تتغير أسعار المتجر فقط عندما تحوّل منتجاً إلى التسعير الجديد'), SWITCH_WORDS.ar);
+  assert.match(bareArabic('لن تُستخدم بعد التحويل'), SWITCH_WORDS.ar);
+  assert.match('شروط البوابة', SWITCH_WORDS.ar);
+  assert.match('کە بەرهەمێک دەگۆڕیت بۆ نرخدانانی نوێ', SWITCH_WORDS.ckb);
+  assert.match('دوای گۆڕین بەکارناهێنرێن', SWITCH_WORDS.ckb);
+
+  const all = everyStringOfTheTab();
+  assert.ok(all.length >= 180, `only ${all.length} strings`);
+  assert.ok(all.some(([k]) => k === 'ui.previewBody') && all.some(([k]) => k === 'ui.membersDropped'), 'the screen strings are not scanned');
+  for (const [key, { ar, en, ckb }] of all) {
+    assert.doesNotMatch(en, SWITCH_WORDS.en, `${key}: «${en}»`);
+    assert.doesNotMatch(bareArabic(ar), SWITCH_WORDS.ar, `${key}: «${ar}»`);
+    assert.doesNotMatch(ckb, SWITCH_WORDS.ckb, `${key}: «${ckb}»`);
+  }
+
+  // The banner on every visit and the note under typed member prices say what the contract's reasons say.
+  assert.deepEqual(
+    (['ar', 'en', 'ckb'] as const).map((l) => PRICING_UI_STRINGS[l].previewBody.split(/(?<=\.) /).pop()),
+    [
+      'تتغير أسعار المتجر فقط عندما تحفظ الأسعار الجديدة لمنتج، في تحديث لاحق.',
+      "Store prices change only when you save a product's new prices, in a later update.",
+      'نرخەکانی فرۆشگا تەنها ئەو کاتە دەگۆڕێن کە نرخە نوێیەکانی بەرهەمێک پاشەکەوت دەکەیت، لە نوێکردنەوەیەکی داهاتوودا.',
+    ]
+  );
+  assert.deepEqual(
+    { ar: PRICING_UI_STRINGS.ar.membersDropped, en: PRICING_UI_STRINGS.en.membersDropped, ckb: PRICING_UI_STRINGS.ckb.membersDropped },
+    {
+      ar: 'لن تُستخدم بعد حفظ الأسعار الجديدة؛ تُطبَّق مزايا العضوية العامة.',
+      en: 'They will not be used once you save the new prices; the general membership benefits apply.',
+      ckb: 'دوای پاشەکەوتکردنی نرخە نوێیەکان بەکارناهێنرێن؛ سوودە گشتییەکانی ئەندامێتی جێبەجێ دەکرێن.',
+    }
+  );
+  assert.ok(LEGACY_REASONS.LEGACY_MEMBER_PRICE_DROPPED.label.en.includes('once you save the new prices'));
 });
 
 test('the §2.3 statuses, worst first, and the worst of a set', () => {
@@ -221,7 +286,7 @@ test('one Arabic word for the Direct Sale Extra on every pricing screen: «زي�
     ...ALL.map(([k, v]) => [k, v.ar] as [string, string]),
     ['refusal.DIRECT_SALE_EXTRA_NOT_ON_STEP', COST_REFUSALS.DIRECT_SALE_EXTRA_NOT_ON_STEP.ar],
   ];
-  for (const [key, ar] of labels) assert.doesNotMatch(ar, /علاوة/, `${key}: «${ar}»`);
+  for (const [key, ar] of labels) assert.doesNotMatch(ar, /علاو[ةتا]/, `${key}: «${ar}»`);
   assert.equal(PRICING_FIELD_LABELS.direct_sale_extra_iqd.ar, 'زيادة البيع المباشر');
   assert.equal(PRICING_ISSUES.DIRECT_SALE_EXTRA_BLOCKED.label.ar, 'زيادة البيع المباشر موقوفة حتى تقرر');
 });

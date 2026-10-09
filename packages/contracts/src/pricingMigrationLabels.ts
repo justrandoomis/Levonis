@@ -75,7 +75,7 @@ export const PRICING_MIGRATION_STATUS_LABELS: Readonly<Record<PricingMigrationSt
   READY_TO_SWITCH: {
     ar: 'مكتمل — راجع الأسعار الجديدة واحفظ',
     en: 'Complete — review the new prices and save',
-    ckb: 'تەواوە — نرخە نوێیەکان ببینە و پاشەکەوتی بکە',
+    ckb: 'تەواوە — پێداچوونەوە بە نرخە نوێیەکاندا بکە و پاشەکەوتیان بکە',
   },
   READY: {
     ar: 'جاهز — يعمل بالتسعير الجديد',
