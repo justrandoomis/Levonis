@@ -1157,7 +1157,7 @@ function FulfillmentEditor({
           />
           {direct.enabled && (
             <div className="mt-2">
-              <Field ar="زيادة البيع المباشر" en="Direct increase" hint="تخص هذا الخيار فقط وتُضاف إلى سعره الأساسي">
+              <Field ar="زيادة البيع المباشر" en="Direct Sale Extra" hint="تخص هذا الخيار فقط وتُضاف إلى سعره الأساسي">
                 <Money
                   value={direct.regular_adjust_iqd ?? null}
                   onChange={(regular_adjust_iqd) =>

@@ -395,7 +395,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                       <Row label={loc('البضاعة', 'Merchandise', 'کاڵا')} value={formatIqd(fin.merchandise_iqd)} />
                       {fin.fees_iqd > 0 && (
                         <Row
-                          label={loc('رسوم (زيادة البيع المباشر/شحن مسبق/ضمان)', 'Fees (direct-sale surcharge / transport / warranty)', 'کرێ (زیادەی فرۆشتنی ڕاستەوخۆ/گواستنەوە/گەرەنتی)')}
+                          label={loc('رسوم (زيادة البيع المباشر/شحن مسبق/ضمان)', 'Fees (Direct Sale Extra / transport / warranty)', 'کرێ (زیادەی فرۆشتنی ڕاستەوخۆ/گواستنەوە/گەرەنتی)')}
                           value={formatIqd(fin.fees_iqd)}
                         />
                       )}

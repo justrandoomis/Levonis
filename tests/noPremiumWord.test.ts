@@ -12,9 +12,18 @@
  *     beside the new ones, and no OTHER premium name joins it;
  *   - one name in three languages, the same on the contracts and the screen.
  *
- * The membership tier PREMIUM, the legacy public fee `direct_surcharge_iqd`
- * and the customer policy texts are a different concept or owner text and
- * are deliberately out of scope (FX plan §11 "Deliberately not renamed").
+ * The membership tier PREMIUM and the legacy public fee `direct_surcharge_iqd`
+ * are a different concept and keep their names (FX plan §11 "Deliberately not
+ * renamed").
+ *
+ * THE CUSTOMER'S TEXT IS NO LONGER OUT OF SCOPE (owner decision 7,
+ * 2026-10-09; DECISIONS row 190). «علاوة» could be read as LEVO PREMIUM, so
+ * it left the policies too (purchase 6, faq 5, membership 5,
+ * price_protection 4), and the Arabic word is now banned in EVERY source file
+ * under src/, worker/ and packages/ — code, labels, comments and policy
+ * bodies alike. The English word stays allowed outside the engine files above
+ * because LEVO PREMIUM is a real tier name; in the policy corpus a lowercase
+ * "premium" is refused by tests/policyCorpus.test.ts instead.
  *
  * Run: node --import tsx --test tests/noPremiumWord.test.ts
  */
@@ -107,6 +116,34 @@ test('FINANCIAL_FIELDS keeps every old premium name beside its Direct Sale Extra
     for (const [old, twin] of Object.entries(OLD_TO_NEW)) if (twin) assert.ok(names.has(twin), `${label}: ${old} has no twin ${twin}`);
     assert.ok(names.has('extra_rule_version'), `${label}: extra_rule_version`);
   }
+});
+
+/** Every .ts / .tsx file under src/, worker/ and packages/ (none of them holds a node_modules). */
+function everySourceFile(): string[] {
+  const files: string[] = [];
+  for (const d of ['src', 'worker', 'packages']) {
+    assert.ok(existsSync(join(ROOT, d)), `${d} is gone: move the guard with it`);
+    walk(join(ROOT, d), files);
+  }
+  return files.filter((f) => !f.split(/[\\/]/).includes('node_modules'));
+}
+
+test('«علاوة» is in no source file at all — not in code, a label, a comment or a policy body (owner decision 7)', () => {
+  const files = everySourceFile();
+  assert.ok(files.length >= 1000, `only ${files.length} files scanned`);
+  // The scan must reach the policy corpus, the one place the word lived last.
+  for (const f of ['worker/lib/policies/purchase.ts', 'worker/lib/policies/membership.ts', 'worker/lib/policies/faq.ts', 'worker/lib/policies/price_protection.ts']) {
+    assert.ok(files.includes(join(ROOT, f)), `${f} is not scanned`);
+  }
+  const hits: string[] = [];
+  for (const file of files) {
+    readFileSync(file, 'utf8')
+      .split('\n')
+      .forEach((line, i) => {
+        if (/علاوة/.test(line)) hits.push(`${relative(ROOT, file)}:${i + 1}: ${line.trim().slice(0, 160)}`);
+      });
+  }
+  assert.deepEqual(hits, [], 'say «زيادة البيع المباشر» — the full term, never a bare «الزيادة»');
 });
 
 test('one name in three languages, the same on the contracts and on the owner screen', () => {

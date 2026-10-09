@@ -37,11 +37,30 @@ import type { PolicyDocument } from './types';
  *     so the clauses that carried them are published instead of withheld.
  *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
  *     by number, an article of this document that is itself withheld.
+ *
+ * VERSION 4 — WHY IT MOVED (owner, 2026-10-09, decision 7). The archive keeps
+ * version 3 byte for byte. 2.3 names what a direct sale adds the way purchase
+ * 6.3 now does: «زيادة البيع المباشر» / "Direct Sale Extra" (the Sorani
+ * already read «زیادەی فرۆشتنی ڕاستەوخۆ»). That rename is the whole change.
+ *
+ * WHY DECISION 6 IS NOT IN THIS VERSION. The owner also decided that a fall
+ * caused only by the exchange rate is not price protection, and that the
+ * comparison is on the product's base price in US dollars. The claim code
+ * cannot apply that yet: worker/routes/returns.ts compares dinar prices only,
+ * no order line stores a base dollar price or the rate it was computed at,
+ * and no product is engine-priced, so nothing can tell an exchange-rate move
+ * from a person's price change. A clause promising that exclusion would
+ * describe a rule the code does not enforce. So this version still says what
+ * the code does — 10.4 compares the dinar prices, and 5.5 already says a
+ * currency move does not change an order's price — and the decision-6 text
+ * is version 5, published in the same push as the code that applies it
+ * (DECISIONS row 191; tests/priceProtectionLegacyRule.test.ts pins today's
+ * rule so that 10.4 provably describes it).
  */
 export const price_protection: PolicyDocument = {
   key: 'price_protection',
-  version: 3,
-  effective_at: '2026-09-23',
+  version: 4,
+  effective_at: '2026-10-09',
   title: {
     ar: 'سياسة الأسعار وتغييرها وإلغاء الطلب',
     en: 'Pricing, Price Changes and Order Cancellation Policy',
@@ -77,7 +96,7 @@ export const price_protection: PolicyDocument = {
 عرض السعر على صفحة المنتج أو في السلة بيان لحظي بسعر ذلك الوقت، ولا يثبّت السعر إلى وقت لاحق، ولا يُنشئ حجزاً.
 
 ### 2.3 مكوّنات السعر
-يُبيَّن السعر على مكوّناته: قيمة البضاعة، وعمولة النقل أو علاوة البيع المباشر، ورسم الضمان الممتد، وأجرة التوصيل، وضريبة الدفع عند الاستلام، والخصومات والنقاط. ولا يُخلط بند بآخر.
+يُبيَّن السعر على مكوّناته: قيمة البضاعة، وعمولة النقل أو زيادة البيع المباشر، ورسم الضمان الممتد، وأجرة التوصيل، وضريبة الدفع عند الاستلام، والخصومات والنقاط. ولا يُخلط بند بآخر.
 
 ### 2.4 لقطة السعر على الطلب
 يُحفظ مع الطلب سعره ومزاياه كما كانت لحظة الشراء. وتغيير الأسعار أو الإعدادات أو نسب المزايا لاحقاً لا يُعيد حساب طلب سابق، صعوداً أو نزولاً.
@@ -334,7 +353,7 @@ Every price, fee and discount is computed on the server at the moment the order 
 Display of a price on the product page or in the cart is a momentary statement of the price at that time. It does not fix the price for a later moment and does not create a reservation.
 
 ### 2.3 The components of the price
-The price is stated by its components: the merchandise value, the transport commission or the direct-sale premium, the extended-warranty fee, the delivery fee, the cash-on-delivery tax, and discounts and points. No component is merged into another.
+The price is stated by its components: the merchandise value, the transport commission or the Direct Sale Extra, the extended-warranty fee, the delivery fee, the cash-on-delivery tax, and discounts and points. No component is merged into another.
 
 ### 2.4 The price snapshot on the order
 The order's price and benefits as at the moment of purchase are stored with it. Later changes to prices, settings or benefit rates do not recompute an earlier order, upwards or downwards.

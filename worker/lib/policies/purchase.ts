@@ -53,11 +53,25 @@ import type { PolicyDocument } from './types';
  * of every article that states the PREMIUM threshold changed, and a changed
  * text is a new version. PRO's own articles stand; while PRO is paused they
  * apply to nobody (membership 6.15).
+ *
+ * VERSION 6 — WHY IT MOVED (owner, 2026-10-09, decision 7). The archive keeps
+ * version 5 byte for byte. What a direct sale adds for immediate availability
+ * has one name, the same as on the pricing screens and in the code
+ * (`direct_sale_extra_iqd`): «زيادة البيع المباشر» / "Direct Sale Extra" /
+ * «زیادەی فرۆشتنی ڕاستەوخۆ». The Arabic word the owner retired (the one
+ * tests/noPremiumWord.test.ts bans everywhere) and the English "premium" left
+ * 3.3, 4.10 and 6.3, because a customer could read either as the LEVO PREMIUM
+ * membership. 6.3 now says so outright: the extra is not connected with
+ * LEVO PREMIUM, and only an active PRO is exempt from it
+ * (packages/pricing/src/pricing.ts). Always the full term, never a bare
+ * «الزيادة», which in price_protection 6.2 means a price increase. Wording
+ * only: no rule moved, and no consent document moved with it, so nobody is
+ * asked to accept anything again.
  */
 export const purchase: PolicyDocument = {
   key: 'purchase',
-  version: 5,
-  effective_at: '2026-09-27',
+  version: 6,
+  effective_at: '2026-10-09',
   title: {
     ar: 'سياسة الشراء',
     en: 'Purchase Policy',
@@ -130,7 +144,7 @@ export const purchase: PolicyDocument = {
 تُحتسب كل الأسعار والرسوم والخصومات على الخادم. أي سعر أو مجموع يرسله المتصفح يُهمل تماماً، والرقم المعتمد هو ما يحتسبه النظام لحظة إنشاء الطلب.
 
 ### 3.3 عرض السعر قبل التأكيد
-قبل إتمام الطلب يعرض النظام: قيمة البضاعة، ورسوم النقل أو علاوة البيع المباشر، ورسم الضمان الممتد إن اختير، وأجرة التوصيل، وضريبة الدفع عند الاستلام إن وُجدت، والخصومات والنقاط، والمبلغ المخصوم من المحفظة، والمبلغ المستحق عند التسليم. عرض السعر بيان حسابي لحظي وليس عقداً بذاته.
+قبل إتمام الطلب يعرض النظام: قيمة البضاعة، ورسوم النقل أو زيادة البيع المباشر، ورسم الضمان الممتد إن اختير، وأجرة التوصيل، وضريبة الدفع عند الاستلام إن وُجدت، والخصومات والنقاط، والمبلغ المخصوم من المحفظة، والمبلغ المستحق عند التسليم. عرض السعر بيان حسابي لحظي وليس عقداً بذاته.
 
 ### 3.4 إرسال الطلب إيجاب من الزبون
 إرسال الطلب إيجاب بالشراء من الزبون وفق السعر والشروط المعروضة له في تلك اللحظة، وليس قبولاً نهائياً من المتجر.
@@ -186,7 +200,7 @@ export const purchase: PolicyDocument = {
 قد يتعذر على المجهّز تأمين القطعة أو مواصفتها بعد الطلب. وفي هذه الحالة يُخيَّر الزبون بين البديل المتاح أو الانتظار أو إلغاء الطلب مع إعادة ما دفع كاملاً.
 
 ### 4.10 اختلاف التسعير بين المسارين
-سعر القطعة في الطلب المسبق يحمل عمولة النقل الخاصة بالمسار المختار، وسعرها في البيع المباشر قد يحمل علاوة التوفر الفوري. ولا يُجمع الاثنان على السطر الواحد أبداً.
+سعر القطعة في الطلب المسبق يحمل عمولة النقل الخاصة بالمسار المختار، وسعرها في البيع المباشر قد يحمل زيادة البيع المباشر مقابل التوفر الفوري. ولا يُجمع الاثنان على السطر الواحد أبداً.
 
 ## 5. الكميات والحدود
 
@@ -216,8 +230,8 @@ export const purchase: PolicyDocument = {
 ### 6.2 عمولة النقل في الطلب المسبق
 سعر سطر الطلب المسبق يشمل عمولة النقل الخاصة بالمسار المختار. وهي جزء من ثمن الخدمة لا من ثمن البضاعة، ولا تُسترد بمجرد تغيير رأي الزبون بعد الشراء.
 
-### 6.3 علاوة البيع المباشر
-قد يحمل سعر البيع المباشر علاوة مقابل التوفر الفوري. وعضو PRO الفعّال معفى من هذه العلاوة ومن عمولة النقل وفق شروط العضوية.
+### 6.3 زيادة البيع المباشر
+قد يحمل سعر البيع المباشر زيادة البيع المباشر مقابل التوفر الفوري، ولا صلة لها بعضوية LEVO PREMIUM. وعضو PRO الفعّال معفى من زيادة البيع المباشر ومن عمولة النقل وفق شروط العضوية.
 
 ### 6.4 رسم الضمان الممتد
 إذا اختار الزبون تمديد ضمان الطابعة أُضيف رسمه إلى سعر السطر. ولا يجوز شراء التمديد بعد إنشاء الطلب بأي حال، وتفصيل ذلك في سياسة الضمان.
@@ -470,7 +484,7 @@ Adding an item to the cart does not reserve it, does not fix its price and does 
 Every price, fee and discount is computed on the server. Any price or total sent by the browser is disregarded entirely, and the binding figure is the one the system computes at the moment the order is created.
 
 ### 3.3 The quote before confirmation
-Before the order is placed the system displays: the merchandise value, the transport commission or the direct-sale premium, the extended-warranty fee if selected, the delivery fee, the cash-on-delivery tax if any, discounts and points, the amount applied from the wallet, and the amount due on delivery. The quote is a momentary calculation, not a contract in itself.
+Before the order is placed the system displays: the merchandise value, the transport commission or the Direct Sale Extra, the extended-warranty fee if selected, the delivery fee, the cash-on-delivery tax if any, discounts and points, the amount applied from the wallet, and the amount due on delivery. The quote is a momentary calculation, not a contract in itself.
 
 ### 3.4 Placing an order is the customer's offer
 Placing an order is the customer's offer to buy on the price and terms displayed to them at that moment; it is not a final acceptance by the Store.
@@ -526,7 +540,7 @@ Choosing cash on delivery on a pre-order may change how the line is priced, but 
 The supplier may prove unable to secure the item or its specification after the order. In that case the customer is offered the available alternative, or to wait, or to cancel with a full return of what was paid.
 
 ### 4.10 The difference in pricing between the two routes
-The price of a pre-order line carries the transport commission of the chosen route, and the price of a direct sale may carry the premium for immediate availability. The two are never combined on the same line.
+The price of a pre-order line carries the transport commission of the chosen route, and the price of a direct sale may carry the Direct Sale Extra for immediate availability. The two are never combined on the same line.
 
 ## 5. Quantities and Limits
 
@@ -556,8 +570,8 @@ The system always separates the merchandise value from the fees. Points and disc
 ### 6.2 The transport commission on a pre-order
 The price of a pre-order line includes the transport commission of the chosen route. It is part of the price of the service and not of the goods, and it is not refunded merely because the customer changed their mind after purchase.
 
-### 6.3 The direct-sale premium
-A direct-sale price may carry a premium for immediate availability. An active PRO member is exempt from that premium and from the transport commission under the terms of the membership.
+### 6.3 The Direct Sale Extra
+A direct-sale price may carry the Direct Sale Extra for immediate availability; it is not connected with the LEVO PREMIUM membership. An active PRO member is exempt from the Direct Sale Extra and from the transport commission under the terms of the membership.
 
 ### 6.4 The extended-warranty fee
 If the customer selects an extension of a printer's warranty, its fee is added to the line price. The extension may not be bought after the order has been placed in any circumstance; the detail is in the Warranty Policy.
@@ -866,7 +880,7 @@ The approved contact point for complaints and enquiries is {{LEVONIS_SUPPORT_CON
 لەوانەیە دابینکەر نەتوانێت کاڵاکە یان تایبەتمەندییەکەی دوای داواکاری دابین بکات. لەو حاڵەتەدا کڕیار نێوان جێگرەوەی بەردەست، یان چاوەڕوانی، یان هەڵوەشاندنەوەی داواکاری بە گەڕاندنەوەی تەواوی ئەوەی داویەتی، هەڵدەبژێرێت.
 
 ### 4.10 جیاوازی نرخاندن لە نێوان دوو ڕێڕەودا
-نرخی دێڕی داواکاری پێشوەخت کۆمیسیۆنی گواستنەوەی ڕێڕەوی هەڵبژێردراو هەڵدەگرێت، و نرخی فرۆشتنی ڕاستەوخۆ لەوانەیە زیادەی بەردەستبوونی دەستبەجێ هەڵبگرێت. هەرگیز هەردووکیان لەسەر یەک دێڕ کۆناکرێنەوە.
+نرخی دێڕی داواکاری پێشوەخت کۆمیسیۆنی گواستنەوەی ڕێڕەوی هەڵبژێردراو هەڵدەگرێت، و نرخی فرۆشتنی ڕاستەوخۆ لەوانەیە زیادەی فرۆشتنی ڕاستەوخۆ هەڵبگرێت لە بەرامبەر بەردەستبوونی دەستبەجێ. هەرگیز هەردووکیان لەسەر یەک دێڕ کۆناکرێنەوە.
 
 ## 5. بڕەکان و سنوورەکان
 
@@ -897,7 +911,7 @@ The approved contact point for complaints and enquiries is {{LEVONIS_SUPPORT_CON
 نرخی دێڕی داواکاری پێشوەخت کۆمیسیۆنی گواستنەوەی ڕێڕەوی هەڵبژێردراو لەخۆ دەگرێت. بەشێکە لە نرخی خزمەتگوزارییەکە نەک لە نرخی کاڵاکە، و تەنها بەهۆی گۆڕانی بیری کڕیار دوای کڕین ناگەڕێتەوە.
 
 ### 6.3 زیادەی فرۆشتنی ڕاستەوخۆ
-لەوانەیە نرخی فرۆشتنی ڕاستەوخۆ زیادەیەک هەڵبگرێت لە بەرامبەر بەردەستبوونی دەستبەجێ. ئەندامی PRO ی چالاک لەم زیادەیە و لە کۆمیسیۆنی گواستنەوە بەخشراوە بەپێی مەرجەکانی ئەندامێتی.
+لەوانەیە نرخی فرۆشتنی ڕاستەوخۆ زیادەی فرۆشتنی ڕاستەوخۆ هەڵبگرێت لە بەرامبەر بەردەستبوونی دەستبەجێ، و هیچ پەیوەندییەکی بە ئەندامێتی LEVO PREMIUM ەوە نییە. ئەندامی PRO ی چالاک لە زیادەی فرۆشتنی ڕاستەوخۆ و لە کۆمیسیۆنی گواستنەوە بەخشراوە بەپێی مەرجەکانی ئەندامێتی.
 
 ### 6.4 کرێی گەرەنتی درێژکراوە
 ئەگەر کڕیار درێژکردنەوەی گەرەنتی چاپکەر هەڵبژارد، کرێیەکەی بۆ نرخی دێڕەکە زیاد دەکرێت. بە هیچ شێوەیەک ناکرێت درێژکردنەوەکە دوای دروستبوونی داواکاری بکڕدرێت، و وردەکارییەکەی لە سیاسەتی گەرەنتیدایە.

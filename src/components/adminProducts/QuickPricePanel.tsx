@@ -1053,7 +1053,7 @@ function QuickFulfillmentPanel({
                   />
                   {direct.enabled && (
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <FormField ar="الزيادة" en="Direct increase">
+                      <FormField ar="زيادة البيع المباشر" en="Direct Sale Extra">
                         <Money
                           value={direct.regular_adjust_iqd ?? null}
                           onChange={(regular_adjust_iqd) =>

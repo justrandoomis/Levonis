@@ -668,3 +668,76 @@ test('purchase 10.3 — be present or authorise a recipient — is published whi
   }
   assert.match(purchase.body.en, /### 10\.3 [^\n]*\n[^\n]*The absence of both is a failed delivery\./);
 });
+
+/**
+ * «زيادة البيع المباشر», NEVER «علاوة» — owner decision 7 (2026-10-09; DECISIONS
+ * row 190). The owner: never Premium or «علاوة», which a customer could read
+ * as the LEVO PREMIUM membership; use a clear name such as «زيادة البيع
+ * المباشر». The name is the one the pricing screens and the code
+ * (`direct_sale_extra_iqd`) already use, in all three languages, and it is
+ * always written WHOLE: a bare «الزيادة» / «زیادە» means a price increase
+ * elsewhere in the corpus (price_protection 6.2).
+ *
+ * Both corpora are scanned: the source, because a withheld clause returns of
+ * its own accord the day its fact is written in, and the published text,
+ * because ./facts.ts adds words of its own. "premium" is matched lowercase
+ * only, so the tier's own name, LEVO PREMIUM, still passes.
+ */
+const DIRECT_SALE_EXTRA = { ar: 'زيادة البيع المباشر', en: 'Direct Sale Extra', ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ' } as const;
+
+/** One article — its heading line and every line up to the next heading. */
+function articleOf(body: string, num: string): string {
+  const lines = body.split('\n');
+  const start = lines.findIndex((l) => l.startsWith(`### ${num} `));
+  assert.ok(start >= 0, `article ${num} is missing`);
+  let end = start + 1;
+  while (end < lines.length && !/^#{2,3} /.test(lines[end])) end++;
+  return lines.slice(start, end).join('\n');
+}
+
+test('no policy says «علاوة», a lowercase "premium" or the Sorani loanword — title and body, every language (decision 7)', () => {
+  for (const [label, corpus] of [['source', POLICY_SOURCE_DOCUMENTS], ['published', POLICY_DOCUMENTS]] as const) {
+    for (const doc of corpus) {
+      for (const lang of POLICY_LANGS) {
+        for (const [part, text] of [['title', doc.title[lang]], ['body', doc.body[lang]]] as const) {
+          assert.doesNotMatch(text, /علاوة/, `${label} ${doc.key}/${lang} ${part}: «علاوة»`);
+          assert.doesNotMatch(text, /premium/, `${label} ${doc.key}/${lang} ${part}: a lowercase "premium"`);
+          assert.doesNotMatch(text, /پریمیۆم|پرێمیۆم|پریمیەم/, `${label} ${doc.key}/${lang} ${part}: the Sorani loanword`);
+        }
+      }
+    }
+  }
+});
+
+test('every article that names what a direct sale adds names it «زيادة البيع المباشر» / "Direct Sale Extra" / «زیادەی فرۆشتنی ڕاستەوخۆ»', () => {
+  const ARTICLES: ReadonlyArray<[string, string]> = [
+    ['purchase', '3.3'],
+    ['purchase', '4.10'],
+    ['purchase', '6.3'],
+    ['faq', '12.7'],
+    ['membership', '7.1'],
+    ['membership', '7.4'],
+    ['price_protection', '2.3'],
+  ];
+  for (const [key, num] of ARTICLES) {
+    const doc = published(key);
+    for (const lang of POLICY_LANGS) {
+      assert.ok(
+        articleOf(doc.body[lang], num).includes(DIRECT_SALE_EXTRA[lang]),
+        `${key} ${num}/${lang} does not name «${DIRECT_SALE_EXTRA[lang]}»`
+      );
+    }
+  }
+  // The article whose title IS the name carries it whole, in every language.
+  const purchase = published('purchase');
+  assert.match(purchase.body.ar, new RegExp(`^### 6\\.3 ${DIRECT_SALE_EXTRA.ar}$`, 'm'));
+  assert.match(purchase.body.en, new RegExp(`^### 6\\.3 The ${DIRECT_SALE_EXTRA.en}$`, 'm'));
+  assert.match(purchase.body.ckb, new RegExp(`^### 6\\.3 ${DIRECT_SALE_EXTRA.ckb}$`, 'm'));
+  // …and says what the owner feared it would be confused with, it is not.
+  for (const lang of POLICY_LANGS) {
+    assert.ok(articleOf(purchase.body[lang], '6.3').includes('LEVO PREMIUM'), `purchase 6.3/${lang} no longer separates it from LEVO PREMIUM`);
+  }
+  // Real Sorani: its own words, never the Arabic pasted across (row 183).
+  assert.notEqual(articleOf(purchase.body.ckb, '6.3'), articleOf(purchase.body.ar, '6.3'));
+  assert.match(DIRECT_SALE_EXTRA.ckb, /[ێۆڕەڤ]/);
+});

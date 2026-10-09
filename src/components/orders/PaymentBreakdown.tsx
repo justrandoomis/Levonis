@@ -49,7 +49,7 @@ const STRINGS = {
     title: 'Payment summary',
     merchandise: 'Merchandise',
     fees: 'Availability, transport & warranty fees',
-    feeKinds: { direct: 'direct-sale surcharge', transport: 'transport commission', warranty: 'warranty' } as Record<FeeKind, string>,
+    feeKinds: { direct: 'Direct Sale Extra', transport: 'transport commission', warranty: 'warranty' } as Record<FeeKind, string>,
     feesOf: (kinds: string) => `Fees: ${kinds}`,
     coupon: 'Coupon',
     pointsUsed: 'Points used',
@@ -112,7 +112,7 @@ type FeeKind = 'direct' | 'transport' | 'warranty';
 
 /**
  * WHICH fees make up `fees_iqd`, read off the frozen line snapshots — so the
- * row can NAME them ("Fees: direct-sale surcharge · warranty") instead of one
+ * row can NAME them ("Fees: Direct Sale Extra · warranty") instead of one
  * label that fits every order. Only the kinds actually charged are named: a
  * PRO's waived commission or premium is not a fee the customer paid, and a
  * cash-on-delivery pre-order names the direct-sale surcharge, not the

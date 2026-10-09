@@ -53,11 +53,18 @@ import type { PolicyDocument } from './types';
  * byte for byte. 6.4 is the new check-in ladder (1, 2, … 7), 6.5 names PRO ×2
  * alone (PREMIUM's ×1.5 ended, 0145), and the new 6.8 states the earning rate,
  * one point per 1,000 dinars (0146) — the question 6.2 is asked about.
+ *
+ * VERSION 5 — WHY IT MOVED (owner, 2026-10-09, decision 7). The archive keeps
+ * version 4 byte for byte. 12.7 names what a direct sale adds the way purchase
+ * 4.10 and 6.3 now do: «زيادة البيع المباشر» / "Direct Sale Extra" (the
+ * Sorani already read «زیادەی فرۆشتنی ڕاستەوخۆ»). The retired Arabic word and
+ * the English "premium" are gone, so the answer cannot be read as the
+ * LEVO PREMIUM membership. Wording only.
  */
 export const faq: PolicyDocument = {
   key: 'faq',
-  version: 4,
-  effective_at: '2026-09-27',
+  version: 5,
+  effective_at: '2026-10-09',
   title: {
     ar: 'الأسئلة الشائعة',
     en: 'Frequently Asked Questions',
@@ -266,7 +273,7 @@ PRO ×2، ومن سواه ×1. ويُحسب لحظة قيد النقاط، لا 
 لأن السلة الواحدة تحمل بائعاً واحداً: إما متجر Levonis الرسمي وإما تاجراً واحداً من المجتمع. ولكل بائع وسائل دفعه وتسليمه ومسؤوليته ومدده، وخلطهم في سلة واحدة يجعل الطلب الواحد محكوماً بقواعد متعارضة. والحل أن تُتمّ الطلب الأول ثم تبدأ سلة جديدة. المرجع: وثيقة الشراء، المادة 4.7، وسياسة مجتمع ليفو، المادة 7.3.
 
 ### 12.7 ما الفرق بين البيع المباشر والطلب المسبق؟
-البيع المباشر بضاعة موجودة فعلاً وجاهزة للشحن، وسعرها يحمل علاوة البيع المباشر. والطلب المسبق بضاعة تُجلب بعد طلبك، فسعر بضاعتها أقل وتُضاف إليه عمولة نقل، ومدته أطول بطبيعته. ولا يُحوَّل طلب مسبق إلى بيع مباشر بعد تثبيته. المرجع: وثيقة الشراء، المواد 4.1 و4.2 و4.8 و4.10.
+البيع المباشر بضاعة موجودة فعلاً وجاهزة للشحن، وسعرها يحمل زيادة البيع المباشر. والطلب المسبق بضاعة تُجلب بعد طلبك، فسعر بضاعتها أقل وتُضاف إليه عمولة نقل، ومدته أطول بطبيعته. ولا يُحوَّل طلب مسبق إلى بيع مباشر بعد تثبيته. المرجع: وثيقة الشراء، المواد 4.1 و4.2 و4.8 و4.10.
 
 ### 12.8 لماذا يستغرق الشحن البحري كل هذه المدة؟
 لأن المسار البحري نفسه طويل: حجز الحاوية، ثم الإبحار، ثم التفريغ في الميناء، ثم التخليص الكمركي، ثم النقل البري إلى المخزن، ثم التوزيع. وكل محطة من هذه المحطات لها طابورها ولا يملك المتجر تقصيره. ولهذا يُعرض المسار الجوي والبري والبحري بمدد مختلفة وأسعار مختلفة، وتبقى المدد كلها تقديرية لا وعداً. المرجع: وثيقة التوصيل، المادتان 3.8 و3.9، ووثيقة الشراء، المادتان 4.3 و4.4.
@@ -489,7 +496,7 @@ Because in that path the seller is an independent merchant and not the Store, an
 Because one cart carries one seller: either the official Levonis store or one community merchant. Each seller has their own means of payment and delivery, their own liability and their own periods, and mixing them in one cart makes a single order subject to conflicting rules. The remedy is to complete the first order and then begin a new cart. Reference: the Purchase document, article 4.7, and the Levo Community Policy, article 7.3.
 
 ### 12.7 What is the difference between a direct sale and a pre-order?
-A direct sale is goods that actually exist and are ready to ship, and its price carries the direct-sale premium. A pre-order is goods brought in after your order, so the price of the goods is lower and a transport commission is added to it, and its period is by nature longer. A pre-order is not converted into a direct sale after it is committed. Reference: the Purchase document, articles 4.1, 4.2, 4.8 and 4.10.
+A direct sale is goods that actually exist and are ready to ship, and its price carries the Direct Sale Extra. A pre-order is goods brought in after your order, so the price of the goods is lower and a transport commission is added to it, and its period is by nature longer. A pre-order is not converted into a direct sale after it is committed. Reference: the Purchase document, articles 4.1, 4.2, 4.8 and 4.10.
 
 ### 12.8 Why does sea freight take all that time?
 Because the sea route itself is long: booking the container, then the voyage, then unloading at the port, then customs clearance, then land transport to the warehouse, then distribution. Each of these stages has its own queue, which the Store cannot shorten. That is why the air, land and sea routes are offered with different periods and different prices, and why all the periods remain estimates and not a promise. Reference: the Delivery document, articles 3.8 and 3.9, and the Purchase document, articles 4.3 and 4.4.

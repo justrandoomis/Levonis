@@ -20,8 +20,8 @@ import type { PolicyDocument } from './types';
  * know that it is not a different product.
  *
  * WHY CHAPTER 7 EXISTS AT ALL. `pricingTierContext` grants the PRO PURCHASE
- * benefits — PRO prices, the pre-order commission waiver, the direct-sale
- * premium waiver, the shipping waiver and priority — only at the single
+ * benefits — PRO prices, the pre-order commission waiver, the Direct Sale
+ * Extra waiver, the shipping waiver and priority — only at the single
  * approved default PRO address. That condition is invisible on a product card
  * and is the single most likely source of a "you promised me a price" dispute,
  * so it gets its own chapter rather than a parenthesis.
@@ -92,11 +92,19 @@ import type { PolicyDocument } from './types';
  *   * PRO IS PAUSED. 6.15 is the pause and the freeze: no PRO card is sold,
  *     every running one is frozen with its days kept (worker/lib/tierPause.ts),
  *     and meanwhile the member keeps what PREMIUM and PLUS give. 6.1 points at it.
+ *
+ * VERSION 5 — WHY IT MOVED (owner, 2026-10-09, decision 7). The archive keeps
+ * version 4 byte for byte. 7.1 and 7.4 name what a direct sale adds the way
+ * purchase 6.3 now does: «زيادة البيع المباشر» / "Direct Sale Extra" (the
+ * Sorani already read «زیادەی فرۆشتنی ڕاستەوخۆ»). In a document about the
+ * tiers above all, the retired Arabic word and the English "premium" beside
+ * LEVO PREMIUM read as one thing; they are two. Wording only: the PRO
+ * address condition itself did not move.
  */
 export const membership: PolicyDocument = {
   key: 'membership',
-  version: 4,
-  effective_at: '2026-09-27',
+  version: 5,
+  effective_at: '2026-10-09',
   title: {
     ar: 'سياسة العضويات',
     en: 'Memberships Policy',
@@ -304,7 +312,7 @@ export const membership: PolicyDocument = {
 ## 7. شرط العنوان الافتراضي المعتمد لمزايا الشراء في PRO
 
 ### 7.1 القاعدة
-مزايا الشراء الخاصة بـ PRO — وهي سعر PRO على البضاعة، وإعفاء عمولة النقل في الطلب المسبق، وإعفاء علاوة البيع المباشر، وإعفاء كلف التوصيل، وأولوية التوصيل — لا تكون نافذة إلا على طلب يُسعَّر لعنوان واحد بعينه هو العنوان الافتراضي المعتمد لحساب العضو.
+مزايا الشراء الخاصة بـ PRO — وهي سعر PRO على البضاعة، وإعفاء عمولة النقل في الطلب المسبق، وإعفاء زيادة البيع المباشر، وإعفاء كلف التوصيل، وأولوية التوصيل — لا تكون نافذة إلا على طلب يُسعَّر لعنوان واحد بعينه هو العنوان الافتراضي المعتمد لحساب العضو.
 
 ### 7.2 لماذا هذا الشرط
 لأن مزايا PRO وُضعت لشخص واحد في مكان معلوم، لا لعنوان يتبدل في كل طلب. وربطها بعنوان واحد معتمد هو ما يمنع تحويلها إلى أداة شراء بالجملة لإعادة البيع تحت اسم عضو واحد.
@@ -313,7 +321,7 @@ export const membership: PolicyDocument = {
 العنوان المعتمد هو العنوان المسجل في نظام المتجر بحالة معتمد لحساب العضو. وتُطابق المطابقة على الاسم والعنوان ورقم الهاتف، مع تجاوز فروق المسافات وحالة الأحرف وصيغ كتابة الرقم وحدها.
 
 ### 7.4 التسعير خارج العنوان المعتمد
-إذا كان الطلب مسعّراً لعنوان غير العنوان المعتمد، سُعِّر تسعيراً اعتيادياً بالكامل: بسعر الجمهور، وبعمولة النقل، وبعلاوة البيع المباشر، وبأجرة التوصيل، ودون أولوية توصيل.
+إذا كان الطلب مسعّراً لعنوان غير العنوان المعتمد، سُعِّر تسعيراً اعتيادياً بالكامل: بسعر الجمهور، وبعمولة النقل، وبزيادة البيع المباشر، وبأجرة التوصيل، ودون أولوية توصيل.
 
 ### 7.5 ما يراه العضو قبل اختيار العنوان
 في صفحة المنتج وفي السلة، قبل أن يختار العضو عنواناً، يُحكم على السعر بعنوانه الافتراضي. فمن كان عنوانه الافتراضي غير معتمد رأى السعر الاعتيادي في هذه الشاشات جميعاً، حتى لا يرى سعراً لا يُنفَّذ عند الباب.
@@ -723,7 +731,7 @@ The resumption is announced on the memberships page.
 ## 7. The approved default address condition for PRO purchase benefits
 
 ### 7.1 The rule
-The PRO purchase benefits — the PRO price on goods, the waiver of the pre-order transport commission, the waiver of the direct-sale premium, the waiver of delivery costs and delivery priority — are effective only on an order priced for one particular address: the approved default address of the member's account.
+The PRO purchase benefits — the PRO price on goods, the waiver of the pre-order transport commission, the waiver of the Direct Sale Extra, the waiver of delivery costs and delivery priority — are effective only on an order priced for one particular address: the approved default address of the member's account.
 
 ### 7.2 Why this condition exists
 Because the PRO benefits were made for one person at a known place, not for an address that changes with every order. Tying them to a single approved address is what prevents their becoming a wholesale-purchasing instrument for resale under one member's name.
@@ -732,7 +740,7 @@ Because the PRO benefits were made for one person at a known place, not for an a
 The approved address is the address recorded in the Store's system in the approved state for the member's account. Matching is made on the name, the address and the telephone number, disregarding differences of spacing, letter case and number formatting alone.
 
 ### 7.4 Pricing outside the approved address
-Where an order is priced for an address other than the approved one, it is priced entirely as ordinary: at the public price, with the transport commission, with the direct-sale premium, with the delivery charge, and without delivery priority.
+Where an order is priced for an address other than the approved one, it is priced entirely as ordinary: at the public price, with the transport commission, with the Direct Sale Extra, with the delivery charge, and without delivery priority.
 
 ### 7.5 What the member sees before choosing an address
 On the product page and in the cart, before the member has chosen an address, the price is judged against their default address. A member whose default address is not approved therefore sees the ordinary price on all of those screens, so that they are not shown a price that will not be honoured at the door.

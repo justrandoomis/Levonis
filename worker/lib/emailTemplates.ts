@@ -257,7 +257,7 @@ const COPY_EN: Copy = {
   unitPriceLabel: 'Unit price',
   lineTotalLabel: 'Total',
   transportFeeLabel: 'Transport commission (preorder)',
-  directFeeLabel: 'Direct-sale surcharge',
+  directFeeLabel: 'Direct Sale Extra',
   warrantyFeeLabel: 'Warranty extension fee',
   subtotalLabel: 'Items subtotal',
   deliveryLabel: 'Delivery fee',
