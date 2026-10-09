@@ -32,8 +32,10 @@
  *       adjustment is re-based onto today's (rate − then + now), so an
  *       adjustment change is never a market jump. FAILS CLOSED: a window
  *       longer than one read takes ('overflow') is held ANOMALY_24H; a window
- *       or r24 the statement budget did not let us read ('unread') applies
- *       nothing this tick — DEFERRED / FX_GUARD_UNREAD, no bell.
+ *       or r24 the statement budget did not let us read, or whose read
+ *       failed ('unread'), applies nothing this tick — DEFERRED /
+ *       FX_GUARD_UNREAD, no bell. A window rate whose time does not parse is
+ *       still measured.
  *   12  beyond D of the anchor → held, DRIFT.
  *   13  otherwise APPLIED (the anchor does not move).
  *
@@ -188,7 +190,7 @@ export interface WindowRate extends RateInForce {
 /**
  * The window as read: its rates (newest first), 'overflow' when it holds more
  * rows than one read takes (WINDOW_MAX_ROWS), or 'unread' when the statement
- * budget refused the read.
+ * budget refused the read or the read failed.
  */
 export type WindowRead = readonly WindowRate[] | 'overflow' | 'unread';
 
@@ -443,7 +445,10 @@ export function decide(row: FxPairRow, outcome: PairOutcome, ctx: DecisionContex
   const references: (string | null)[] = [confirmedInWindow || !r24 ? anchor : rebased(r24)];
   for (const w of window) {
     const at = Date.parse(w.at);
-    if (Number.isFinite(at) && at > since) references.push(rebased(w));
+    // A time that does not parse is still a rate of the window (the read only
+    // takes the last 24 hours): measured, never skipped — skipping would
+    // loosen the guard (fail closed; FX-1A review #8).
+    if (!Number.isFinite(at) || at > since) references.push(rebased(w));
   }
   // A reference that cannot be re-based (it would not stay above zero) is a hold too.
   if (references.some((ref) => ref === null || movesMoreThanPct(c, ref, T))) return holdUnlessRejected('ANOMALY_24H');

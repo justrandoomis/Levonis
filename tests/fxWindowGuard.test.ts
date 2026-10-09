@@ -15,8 +15,9 @@
  *   adjustment   +20 → +60 is not a market jump: the window's rates are
  *                re-based onto today's adjustment
  *   fail closed  a window longer than one read is held; a window or r24 the
- *                budget did not let the scheduler read applies nothing
- *                (DEFERRED / FX_GUARD_UNREAD, no bell)
+ *                budget did not let the scheduler read, or whose read threw,
+ *                applies nothing (DEFERRED / FX_GUARD_UNREAD, no bell) — for
+ *                that pair alone, the rest of the run commits
  *   drift        exactly 6% from the confirmed rate applies; 6.0001% is held
  *
  * Run: node --import tsx --test tests/fxWindowGuard.test.ts
@@ -25,6 +26,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, count, freshDb } from './fixtures/app';
+import { SqliteD1, type SqliteStatement } from './fixtures/d1';
 import { OWNER_ROW_SQL, applyRate, derivedOf, fxEnv, logsOf, market, ownerCommit, pairOf } from './fixtures/fx';
 import { runFxScheduler } from '../worker/lib/fx/scheduler';
 import { planReview, planSettings } from '../worker/lib/fx/ownerActs';
@@ -225,6 +227,68 @@ test('a window or r24 the budget did not let the scheduler read applies nothing:
   }
 });
 
+/** A database whose 24-hour reads of USD/IQD throw (`which` picks the r24 or the window read); every other statement is the real one. */
+class GuardReadFails extends SqliteD1 {
+  constructor(
+    raw: DatabaseSync,
+    private readonly which: RegExp
+  ) {
+    super(raw);
+  }
+  override prepare(sql: string): SqliteStatement {
+    const real = super.prepare(sql);
+    if (!this.which.test(sql)) return real;
+    const fail = async (): Promise<never> => {
+      throw new Error('D1_ERROR: 1680 1690');
+    };
+    return { bind: (...v: unknown[]) => (v[0] === 'USD_IQD' ? { first: fail, all: fail } : real.bind(...v)) } as unknown as SqliteStatement;
+  }
+}
+
+test('a 24-hour read that THROWS is recorded for that pair alone: DEFERRED / FX_GUARD_UNREAD, the lease released, the other pair of the run still committed, only the error name logged (FX-1A review #1)', async () => {
+  for (const [which, what] of [
+    [/created_at > \? AND effective_after IS NOT NULL/, 'the window read'],
+    [/created_at <= \? AND effective_after IS NOT NULL/, 'the r24 read'],
+  ] as const) {
+    const raw = world();
+    // EUR/USD tracks too, so the run claims two pairs.
+    raw.exec("UPDATE fx_rate_pairs SET mode = 'AUTO', manual_rate = NULL WHERE pair = 'EUR_USD'");
+    const before = { derived: derivedOf(raw).USD, logs: logsOf(raw, 'USD_IQD').length, bells: bells(raw) };
+    const m = market({ sell: 1690 });
+    m.state.at = at(0);
+    const errors: unknown[][] = [];
+    const orig = console.error;
+    console.error = (...a: unknown[]) => void errors.push(a);
+    let report;
+    try {
+      const env = fxEnv(raw, { DB: new GuardReadFails(raw, which) as unknown as D1Database });
+      report = await runFxScheduler(env, { now: new Date(at(0).getTime() + 60_000), scheduledTime: at(0) }, { trigger: 'cron', fetchImpl: m.f.fetch });
+    } finally {
+      console.error = orig;
+    }
+    assert.equal(report.skipped, undefined, `${what}: the run completed — ${JSON.stringify(report)}`);
+    assert.deepEqual(report.checked.find((c) => c.pair === 'USD_IQD'), { pair: 'USD_IQD', result: 'DEFERRED', code: 'FX_GUARD_UNREAD' }, what);
+    const row = usd(raw);
+    assert.equal(row.last_check_result, 'DEFERRED', what);
+    assert.equal(row.last_error_code, 'FX_GUARD_UNREAD', what);
+    assert.equal(row.effective_rate, '1680', `${what}: no automatic apply`);
+    assert.equal(row.lease_token, null, `${what}: the lease is released, not held for 120 s`);
+    assert.deepEqual(derivedOf(raw).USD, before.derived, `${what}: pricing_fx_rates unchanged`);
+    assert.deepEqual(
+      logsOf(raw, 'USD_IQD').slice(before.logs).map((l) => [l.event, l.result, l.error_code]),
+      [['deferred', 'DEFERRED', 'FX_GUARD_UNREAD']],
+      `${what}: one recorded row`
+    );
+    assert.equal(bells(raw), before.bells, `${what}: no bell`);
+    const eur = pairOf(raw, 'EUR_USD');
+    assert.ok(report.checked.some((c) => c.pair === 'EUR_USD'), `${what}: EUR/USD was decided in the same run`);
+    assert.equal(eur.lease_token, null, `${what}: EUR/USD committed`);
+    assert.ok(Date.parse(String(eur.last_checked_at)) >= at(0).getTime(), `${what}: EUR/USD checked this tick`);
+    assert.ok(errors.length >= 1, `${what}: the failure is logged`);
+    assert.doesNotMatch(JSON.stringify(errors), /1680|1690|D1_ERROR/, `${what}: the error's name only, never its message or a rate`);
+  }
+});
+
 test('decide() fails closed on its own: an absent or unread window, or an absent r24 outside a confirmation, never applies', async () => {
   const raw = world();
   const row = (await loadPairs(asD1(raw)))!.find((r) => r.pair === 'USD_IQD')!;
@@ -252,6 +316,12 @@ test('decide() fails closed on its own: an absent or unread window, or an absent
   const confirmed = { ...row, drift_anchor_at: at(-2).toISOString() };
   assert.equal(decide(confirmed, quote, { r24: {}, window: { USD_IQD: [] } }, clock, 'cron').result, 'APPLIED');
   assert.equal(decide(confirmed, quote, { r24: {}, window: {} }, clock, 'cron').result, 'DEFERRED');
+  // A window row whose time does not parse is measured, never skipped: 1,690 is +3.55% on the 1,632 it
+  // carries — held. Skipped, the tick applied (FX-1A review #8). A parsable row the same is held as well.
+  for (const when of ['not-a-time', '', at(-3).toISOString()]) {
+    const d = decide(row, quote, { r24, window: { USD_IQD: [{ rate: '1632', adj: '0', at: when }] } }, clock, 'cron');
+    assert.equal(`${d.result}/${d.code}`, 'REVIEW_HELD/ANOMALY_24H', JSON.stringify(when));
+  }
 });
 
 // ------------------------------------------------------------- the 6% drift

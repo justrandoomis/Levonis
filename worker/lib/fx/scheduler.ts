@@ -171,8 +171,12 @@ async function claimLease(
  *           with the adjustment it carried;
  *   window  every `effective_after` written after now − 24 h — at most
  *           WINDOW_MAX_ROWS; one more is 'overflow'.
- * FAIL CLOSED: a read the budget refuses leaves the pair 'unread' and its
- * decision applies nothing. (It used to fall back to the anchor silently.)
+ * FAIL CLOSED: a read the budget refuses, OR A READ THAT THROWS, leaves that
+ * pair 'unread' and its decision applies nothing — a recorded DEFERRED /
+ * FX_GUARD_UNREAD for that pair alone. (A budget refusal used to fall back to
+ * the anchor silently; a database error used to end the whole run unrecorded,
+ * every claimed pair's tick lost and the leases held — FX-1A review #1.) Only
+ * the error's NAME is logged.
  */
 async function loadDecisionContext(db: D1Database, claimed: readonly FxPairRow[], now: Date, budget: StatementBudget): Promise<DecisionContext> {
   const cutoff = iso(now.getTime() - R24_WINDOW_MS);
@@ -184,30 +188,41 @@ async function loadDecisionContext(db: D1Database, claimed: readonly FxPairRow[]
       window[row.pair] = 'unread';
       continue;
     }
-    const hit = await db
-      .prepare(
-        `SELECT effective_after, market_adjustment_iqd FROM fx_rate_log
-          WHERE pair = ? AND created_at <= ? AND effective_after IS NOT NULL
-          ORDER BY created_at DESC, rowid DESC LIMIT 1`
-      )
-      .bind(row.pair, cutoff)
-      .first<{ effective_after: string; market_adjustment_iqd: string | null }>();
-    r24[row.pair] = hit ? { rate: hit.effective_after, adj: hit.market_adjustment_iqd } : null;
+    try {
+      const hit = await db
+        .prepare(
+          `SELECT effective_after, market_adjustment_iqd FROM fx_rate_log
+            WHERE pair = ? AND created_at <= ? AND effective_after IS NOT NULL
+            ORDER BY created_at DESC, rowid DESC LIMIT 1`
+        )
+        .bind(row.pair, cutoff)
+        .first<{ effective_after: string; market_adjustment_iqd: string | null }>();
+      r24[row.pair] = hit ? { rate: hit.effective_after, adj: hit.market_adjustment_iqd } : null;
+    } catch (e) {
+      console.error('fx: 24-hour reference not read:', row.pair, e instanceof Error ? e.name : 'unknown');
+      window[row.pair] = 'unread';
+      continue;
+    }
     if (!budget.spend(1)) {
       window[row.pair] = 'unread';
       continue;
     }
-    const { results } = await db
-      .prepare(
-        `SELECT effective_after, market_adjustment_iqd, created_at FROM fx_rate_log
-          WHERE pair = ? AND created_at > ? AND effective_after IS NOT NULL
-          ORDER BY created_at DESC, rowid DESC LIMIT ?`
-      )
-      .bind(row.pair, cutoff, WINDOW_MAX_ROWS + 1)
-      .all<{ effective_after: string; market_adjustment_iqd: string | null; created_at: string }>();
-    const rows = results ?? [];
-    window[row.pair] =
-      rows.length > WINDOW_MAX_ROWS ? 'overflow' : rows.map((r) => ({ rate: r.effective_after, adj: r.market_adjustment_iqd, at: r.created_at }));
+    try {
+      const { results } = await db
+        .prepare(
+          `SELECT effective_after, market_adjustment_iqd, created_at FROM fx_rate_log
+            WHERE pair = ? AND created_at > ? AND effective_after IS NOT NULL
+            ORDER BY created_at DESC, rowid DESC LIMIT ?`
+        )
+        .bind(row.pair, cutoff, WINDOW_MAX_ROWS + 1)
+        .all<{ effective_after: string; market_adjustment_iqd: string | null; created_at: string }>();
+      const rows = results ?? [];
+      window[row.pair] =
+        rows.length > WINDOW_MAX_ROWS ? 'overflow' : rows.map((r) => ({ rate: r.effective_after, adj: r.market_adjustment_iqd, at: r.created_at }));
+    } catch (e) {
+      console.error('fx: 24-hour window not read:', row.pair, e instanceof Error ? e.name : 'unknown');
+      window[row.pair] = 'unread';
+    }
   }
   return { r24, window };
 }

@@ -74,9 +74,11 @@ throughout, never a float.
   from it. A USD/IQD reference written under another adjustment is re-based
   onto today's (`rate − then + now`), so an adjustment change is never a
   market jump. It **fails closed**: more than 200 rates in the window is held
-  `ANOMALY_24H`; a window the statement budget did not let the scheduler read
-  applies nothing that tick (`DEFERRED` / `FX_GUARD_UNREAD`, one log row, no
-  bell). Exactly 3% (or 6%) applies; above it is held. An adjustment moves
+  `ANOMALY_24H`; a window (or the rate of 24 hours ago) that the statement
+  budget did not let the scheduler read, or whose read failed, applies
+  nothing that tick for that pair alone (`DEFERRED` / `FX_GUARD_UNREAD`, one
+  log row, no bell; the run's other pairs still commit); a window rate whose
+  time does not parse is still measured. Exactly 3% (or 6%) applies; above it is held. An adjustment moves
   the Confirmed Rate by its own change and never re-bases it. A value the
   owner rejected is not held again for 24 hours, the rejection keeps the
   Confirmed Rate and the last known good, and it never stops an ordinary
