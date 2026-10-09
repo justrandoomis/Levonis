@@ -54,6 +54,14 @@ export interface OwnedTable {
  * parents) so the sequence is valid whether or not foreign keys are enforced.
  */
 export const OWNED_TABLES: OwnedTable[] = [
+  // ---- the pricing engine's state, FIRST (0181) ----------------------------
+  // An engine-priced product's option, fulfilment and transport rows are
+  // locked (ENGINE_MANAGED) and its inputs and rules guarded
+  // (PRICING_PREVIEW_REQUIRED) while `product_pricing_state.mode = 'engine'`
+  // and the product row exists. Deleting the state row first turns every one
+  // of those triggers off for the rest of THIS batch, so a deletion goes
+  // through exactly as for a manual product. Nothing else ever deletes it.
+  { table: 'product_pricing_state', by: { column: 'product_id' } },
   // ---- the relational product model -------------------------------------
   // Link rows first: they name a group, an option value AND a colour.
   {
@@ -136,6 +144,12 @@ export const OWNED_TABLES: OwnedTable[] = [
   // configuration. Actual purchase lines retain their independent snapshots.
   { table: 'procurement_selection_cost_defaults', by: { column: 'product_id' } },
   { table: 'price_history', by: { column: 'product_id' } },
+  // The pricing engine's private inputs, rules and computed costs (0181):
+  // the product's own configuration, worthless without it. Its append-only
+  // `pricing_audit` stays (FROZEN_HISTORY).
+  { table: 'pricing_inputs', by: { column: 'product_id' } },
+  { table: 'pricing_rules', by: { column: 'product_id' } },
+  { table: 'pricing_sku_costs', by: { column: 'product_id' } },
   // A competitor-price report (0093) is OWNED and not HISTORY, and the choice
   // is forced twice over. `product_id` is NOT NULL, so there is nothing to
   // clear — and clearing it would be wrong even if it were possible: the row's
@@ -287,6 +301,12 @@ export interface FrozenTable {
   table: string;
   columns: string[];
   why: string;
+  /**
+   * The column is nullable, but the table refuses EVERY update (an append-only
+   * audit whose BEFORE UPDATE trigger aborts), so it can never be cleared like
+   * a history link. The registry test checks the trigger exists.
+   */
+  appendOnly?: true;
 }
 
 export const FROZEN_HISTORY: FrozenTable[] = [
@@ -336,6 +356,15 @@ export const FROZEN_HISTORY: FrozenTable[] = [
       '0176. A Quick Buy line of a CLOSED session: every column is NOT NULL and the row carries its own snapshot ' +
       '(names, option and colour labels, SKU, price, image); the order it became has its own order_items. A line ' +
       'of an open or failed session is not history — it blocks the delete instead (BLOCKING_REFS).',
+  },
+  {
+    table: 'pricing_audit',
+    columns: ['product_id'],
+    appendOnly: true,
+    why:
+      '0181. The private, append-only record of every pricing change (rates, inputs, rules, adoptions, prices), ' +
+      'values included. Its UPDATE and DELETE triggers abort, so it is neither cleared nor deleted with the product; ' +
+      'product_id is NULL on the rows that name no product (a rate change).',
   },
 ];
 

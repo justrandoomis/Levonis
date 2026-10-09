@@ -17,8 +17,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { ROOT } from './fixtures/d1';
 
-/** The frozen tables (0179; FX-2 adds pricing_inputs, pricing_audit and the lot tables here). */
-export const FROZEN = ['fx_rate_pairs', 'fx_rate_log', 'pricing_fx_rates', 'pricing_shipping_rates'];
+/** The frozen tables: 0179's, and 0181's — the pricing inputs and rules, the pricing audit and the batch lots. */
+export const FROZEN = ['fx_rate_pairs', 'fx_rate_log', 'pricing_fx_rates', 'pricing_shipping_rates', 'pricing_inputs', 'pricing_rules', 'pricing_audit', 'inventory_lots'];
 
 function files(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {

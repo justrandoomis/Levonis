@@ -113,6 +113,14 @@ const AREAS: Record<string, readonly string[]> = {
     'final_price_cents', 'pricing_summary', 'legacy_amount_iqd', 'legacy_usd_iqd_rate', 'actual_purchase_cost_iqd',
     'actual_landed_cost_iqd', 'actual_additional_costs_iqd',
   ],
+  // USD procurement pricing (USD design §9; migration 0181): the minimum profit in
+  // USD, the USD chain's figures, the card's summary and the converted legacy minimum.
+  USD_PRICING: [
+    'minimum_target_profit_usd', 'target_profit_usd', 'target_profit_iqd_exact', 'amount_usd', 'current_total_cost_usd',
+    'supplier_cost_usd', 'shipping_cost_usd', 'additional_cost_usd', 'final_price_usd', 'current_total_cost_cents',
+    'final_price_cents', 'pricing_summary', 'legacy_amount_iqd', 'legacy_usd_iqd_rate', 'actual_purchase_cost_iqd',
+    'actual_additional_costs_iqd',
+  ],
 };
 
 /**

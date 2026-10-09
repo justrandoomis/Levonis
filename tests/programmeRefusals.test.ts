@@ -136,6 +136,9 @@ const REQUIRED: Record<string, readonly string[]> = {
   // Currency"): a promotion in another currency is booked at the rate actually
   // paid, never at the wallet's (fix F3, worker/routes/adminFinanceWorkspace.ts).
   'P-A fix F3': ['PROMOTION_RATE_REQUIRED'],
+  // USD design §10 "Registries" (migration 0181): the engine core's database
+  // refusals the onError map turns into a 409 (worker/lib/pricingDbRefusals.ts).
+  'USD design §10 (0181)': ['PRICING_MODE_ENGINE_ONLY', 'ORDER_SNAPSHOT_IMMUTABLE'],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

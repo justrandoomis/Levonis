@@ -72,6 +72,12 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // the three source pairs, their append-only history, the effective IQD
     // rates derived from them, and the owner's shipping rates in IQD.
     'fx_rate_pairs', 'fx_rate_log', 'pricing_fx_rates', 'pricing_shipping_rates',
+    // 0181 (FX plan §4.2, USD design §10) — the pricing engine's private
+    // tables: its control row, each product's engine state, the owner's
+    // inputs and rules, the computed costs per SKU and channel, and the
+    // append-only pricing audit. Catalogue owns them for the reason above:
+    // the writer is the act of pricing a catalogue product.
+    'pricing_engine_control', 'product_pricing_state', 'pricing_inputs', 'pricing_rules', 'pricing_sku_costs', 'pricing_audit',
     'lot_cost_adjustments', 'lot_cost_adjustment_shares', 'inventory_lot_cost_versions', 'lot_count_events',
     // 0093 — «لكيتها بمكان أرخص». A customer's report that a competitor sells
     // this product for less, with OUR price frozen into the row at the moment

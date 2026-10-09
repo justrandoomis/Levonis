@@ -151,6 +151,7 @@ import { configureEventBus } from './lib/eventBus';
 // The cron strings scheduled() knows live there, not here: see that module.
 import { cronJobs } from './lib/cronSchedules';
 import { safeErrorCode } from './lib/membershipBenefits';
+import { engineDbRefusal } from './lib/pricingDbRefusals';
 import { gatewayAssertion } from './entrypoints/gatewayAssertion';
 
 const app = new Hono<AppContext>();
@@ -968,6 +969,13 @@ app.onError((err, c) => {
       { success: false, error: err.message, code: err.code, ...(err.details ? { details: err.details } : {}) },
       err.status as 400
     );
+  }
+  // A pricing trigger's refusal (migration 0181: a lot cost, an engine-priced
+  // product's price, a mode flip, an order line's engine snapshot …) is a 409
+  // with its own trilingual code, never a generic 500 — and never its SQL.
+  const pricingRefusal = engineDbRefusal(err);
+  if (pricingRefusal) {
+    return c.json({ success: false, error: pricingRefusal.message, code: pricingRefusal.code }, 409);
   }
   // Detailed diagnostics stay server-side; clients get a safe generic error.
   console.error('Unhandled error', c.req.method, c.req.path, err);

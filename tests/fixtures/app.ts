@@ -14,6 +14,7 @@ import type { AppContext } from '../../worker/lib/types';
 import { HttpError, requireMainHost } from '../../worker/lib/http';
 import { classifyHost } from '../../worker/lib/hosts';
 import { resetPolicyCorpusMemo } from '../../worker/lib/policySync';
+import { engineDbRefusal } from '../../worker/lib/pricingDbRefusals';
 
 export const APEX = 'levonis-iq.com';
 export const MERCHANT_HOST = 'somestore.levonis-iq.com';
@@ -104,6 +105,27 @@ export const row = <T = Record<string, unknown>>(raw: DatabaseSync, sql: string,
 };
 export const all = <T = Record<string, unknown>>(raw: DatabaseSync, sql: string, ...params: unknown[]) =>
   (raw.prepare(sql).all(...(params as never[])) as object[]).map((r) => ({ ...r })) as T[];
+/**
+ * STAGING A LOT WHOSE COST OR RECEIVED QUANTITY IS ALREADY DIFFERENT.
+ *
+ * Migration 0181 makes a batch's cost immutable (`inventory_lot_cost_immutable`:
+ * live code only ever moves `qty_remaining`, and a correction is appended to
+ * `inventory_lot_cost_versions`). A few fixtures stage a scenario by rewriting
+ * a lot they just inserted; they run that setup through here, which lifts the
+ * guard for exactly those statements and puts it back verbatim. Never for the
+ * code under test.
+ */
+export function withoutLotCostLock(raw: DatabaseSync, sql: string): void {
+  const trigger = raw.prepare("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'inventory_lot_cost_immutable'").get() as { sql: string } | undefined;
+  if (!trigger) return void raw.exec(sql);
+  raw.exec('DROP TRIGGER inventory_lot_cost_immutable');
+  try {
+    raw.exec(sql);
+  } finally {
+    raw.exec(trigger.sql);
+  }
+}
+
 export const count = (raw: DatabaseSync, sql: string, ...params: unknown[]) =>
   (raw.prepare(sql).get(...(params as never[])) as { n: number }).n;
 
@@ -228,6 +250,8 @@ export function stubApp(
     if (err instanceof HttpError) {
       return c.json({ success: false, error: err.message, code: err.code, ...(err.details ? { details: err.details } : {}) }, err.status as 400);
     }
+    const pricingRefusal = engineDbRefusal(err);
+    if (pricingRefusal) return c.json({ success: false, error: pricingRefusal.message, code: pricingRefusal.code }, 409);
     return c.json({ success: false, error: 'Something went wrong. Please try again.', _debug: String(err) }, 500);
   });
   return a;

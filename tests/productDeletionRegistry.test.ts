@@ -113,9 +113,18 @@ test('a frozen-history column really is NOT NULL, which is the reason it is froz
   const db = schema();
   for (const f of FROZEN_HISTORY) {
     const cols = colsOf(db, f.table);
+    // An append-only table (0181 pricing_audit) is frozen because NO update is
+    // possible: its BEFORE UPDATE trigger aborts — proven here, not assumed.
+    const refusesUpdates =
+      f.appendOnly === true &&
+      (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?").all(f.table) as Array<{ sql: string }>).some((t) =>
+        /BEFORE\s+UPDATE\s+ON\s+\w+\s+BEGIN\s+SELECT\s+RAISE\(ABORT/i.test(t.sql)
+      );
+    if (f.appendOnly) assert.ok(refusesUpdates, `${f.table} is marked append-only but no trigger refuses its updates`);
     for (const c of f.columns) {
       const info = cols.find((x) => x.name === c);
       assert.ok(info, `${f.table}.${c} does not exist`);
+      if (refusesUpdates) continue;
       assert.equal(
         info!.notnull,
         1,

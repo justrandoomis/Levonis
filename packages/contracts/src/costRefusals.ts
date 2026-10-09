@@ -542,6 +542,21 @@ export const COST_REFUSALS = {
     en: 'A batch cost is fixed and never changes',
     ckb: 'تێچووی وەجبە جێگیرە و هەرگیز ناگۆڕێت',
   },
+  // ---- migration 0181: the engine core's database refusals (USD design §10) ----
+  // A product moves onto the engine (or back) only inside the owner's pricing
+  // save, which carries the mode token; any other write of the mode is refused.
+  PRICING_MODE_ENGINE_ONLY: {
+    ar: 'طريقة تسعير المنتج لا تتغير إلا بحفظ تسعيره من شاشة «التسعير والشحن».',
+    en: "A product's pricing mode changes only when its pricing is saved on the Pricing & Shipping screen.",
+    ckb: 'شێوازی نرخدانانی بەرهەم تەنها کاتێک دەگۆڕێت کە نرخدانانەکەی لە شاشەی «نرخدانان و ناردنی بەرهەم» پاشەکەوت بکرێت.',
+  },
+  // The engine price and exchange rate an order line was bought at (owner
+  // decision 6) are written once, with the line, and never changed.
+  ORDER_SNAPSHOT_IMMUTABLE: {
+    ar: 'السعر وسعر الصرف المسجَّلان على الطلب وقت الشراء ثابتان ولا يتغيران.',
+    en: 'The price and exchange rate recorded on an order at purchase are fixed and never change.',
+    ckb: 'ئەو نرخ و نرخی ئاڵوگۆڕەی لە کاتی کڕیندا لەسەر داواکارییەکە تۆمار کراون جێگیرن و هەرگیز ناگۆڕێن.',
+  },
 } as const satisfies Record<string, CostRefusal>;
 
 export type CostRefusalCode = keyof typeof COST_REFUSALS;

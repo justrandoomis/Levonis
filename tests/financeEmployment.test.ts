@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { all, count, failingD1, freshDb, get, json, patch, post, row, send, stubApp } from './fixtures/app';
+import { all, count, failingD1, freshDb, get, json, patch, post, row, send, stubApp, withoutLotCostLock } from './fixtures/app';
 import { adminFinancePeopleRoutes } from '../worker/routes/adminFinancePeople';
 import { adminFinanceOperationsRoutes } from '../worker/routes/adminFinanceOperations';
 import { financeEarningsRoutes } from '../worker/routes/financeEarnings';
@@ -609,7 +609,7 @@ test('a cutoff edit racing a committed archive cannot restore the stale active e
 test('a percentage recalculation cannot revive earnings after a competing cutoff has fully reconciled', { timeout: 20_000 }, async () => {
   const { raw, db, boss, self, order, staff, rule, drain, costs } = setup();
   await order('zero-profit-cutoff', '2026-09-21T10:00:00.000Z');
-  raw.exec(`UPDATE order_items SET cost_iqd=50000 WHERE order_id='zero-profit-cutoff';
+  withoutLotCostLock(raw, `UPDATE order_items SET cost_iqd=50000 WHERE order_id='zero-profit-cutoff';
     UPDATE inventory_lots SET unit_cost_iqd=50000 WHERE id='lot:zero-profit-cutoff';
     UPDATE order_item_inventory_allocations SET unit_cost_iqd=50000,cogs_iqd=50000 WHERE order_id='zero-profit-cutoff';`);
   const id = await staff(); await rule(id, { basis: 'profit_percent', amount: 1000 }); await drain(id);

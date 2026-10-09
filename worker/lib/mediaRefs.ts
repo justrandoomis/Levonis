@@ -695,6 +695,19 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   // 0179 — FX plan §4.1: the central rates. Enum words and timestamps only.
   'pricing_shipping_rates.profile': 'a shipping profile name (GERMANY_LAND / CHINA_AIR / CHINA_SEA); no media',
   'purchase_orders.fx_snapshot_at': 'a timestamp: when the purchase took its FX snapshot; no media',
+  // 0181 — the pricing engine core (FX plan §4.2, USD design §10): codes, ids, profile names, exact
+  // decimals and the private value JSON of the pricing audit; no media.
+  'pricing_inputs.shipping_profile': 'a shipping profile name (GERMANY_LAND / CHINA_AIR / CHINA_SEA); no media',
+  'pricing_inputs.unresolved_fields': 'pricing field names a legacy source left unresolved; no media',
+  'pricing_inputs.conversion_rate_snapshot': 'the USD/IQD an IQD supplier entry was converted at, a decimal; no media',
+  'pricing_sku_costs.combo_key': 'an SKU combination key (option and colour ids); no media',
+  'pricing_sku_costs.shipping_profile': 'a shipping profile name; no media',
+  'pricing_audit.entity_key': 'the id or code of what a pricing change touched; no media',
+  'pricing_audit.idempotency_key': 'a pricing write de-duplication token; no media',
+  'pricing_audit.pricing_before_json': 'private pricing values before a change (amounts, rates, ids); no media',
+  'pricing_audit.pricing_after_json': 'private pricing values after a change (amounts, rates, ids); no media',
+  'pricing_audit.summary_json': 'counts and codes of a pricing change; no media',
+  'order_items.engine_combo_key': 'the SKU combination key an engine price was bought at (owner decision 6); no media',
   'quick_buy_actions.key': 'a request de-duplication token',
   'quick_buy_events.action_key': 'the de-duplication token of the change that wrote the row',
   'quick_buy_events.detail': 'a money or stock delta and its reason',

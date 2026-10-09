@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshDb, asD1, stubApp, post, patch, put, get, json, row, count } from './fixtures/app';
+import { freshDb, asD1, stubApp, post, patch, put, get, json, row, count, withoutLotCostLock } from './fixtures/app';
 import { adminProcurementRoutes } from '../worker/routes/adminProcurement';
 import { adminStockOperationsRoutes } from '../worker/routes/adminStockOperations';
 import { previewWageChange, applyWageChange } from '../worker/lib/financeWageChanges';
@@ -594,7 +594,7 @@ test('return report reverses exact restored FIFO cost and no inventory cost for 
 test('different partial returns cannot restore a unit twice even when their plans race', async () => {
   const { raw, db } = setup();
   seedOrder(raw);
-  raw.exec("UPDATE inventory_lots SET qty_received=5,qty_remaining=3 WHERE id='order-lot'");
+  withoutLotCostLock(raw, "UPDATE inventory_lots SET qty_received=5,qty_remaining=3 WHERE id='order-lot'");
   const first = await planLotRestore(db, 'order', {
     lineIds: ['order-item'],
     qtyByLine: { 'order-item': 1 },

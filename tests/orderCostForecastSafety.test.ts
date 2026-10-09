@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { asD1, count, freshDb, get, json, row, stubApp } from './fixtures/app';
+import { asD1, count, freshDb, get, json, row, stubApp, withoutLotCostLock } from './fixtures/app';
 import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
 import { getOrderProfitBase, getOrderProfitBases } from '../worker/lib/orderProfit';
 import { enrichOrderCostProjections } from '../worker/lib/orderCostProjection';
@@ -83,7 +83,7 @@ test('unallocated unpriced or insufficient stock uses only the exact catalogue e
   assert.equal(detail.lines[0].cost_projection.source, 'current_catalogue');
   assert.equal(detail.projected_finance.cogs_iqd, 10000);
   assert.equal(detail.projected_finance.gross_profit_iqd, 8000);
-  x.raw.exec("UPDATE inventory_lots SET unit_cost_iqd=7000,cost_basis='opening' WHERE id='opening'");
+  withoutLotCostLock(x.raw, "UPDATE inventory_lots SET unit_cost_iqd=7000,cost_basis='opening' WHERE id='opening'");
   detail = await x.detail('queued');
   assert.equal(detail.lines[0].cost_projection.source, 'confirmed_lot');
   assert.equal(detail.lines[0].cost_projection.source_id, 'opening');

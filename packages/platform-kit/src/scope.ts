@@ -370,6 +370,9 @@ export const FINANCIAL_FIELDS = [
   'estimated_revenue_iqd',
   'today_rate',
   'rate_suggestion',
+  // -- USD procurement pricing (owner brief 2026-10-09, USD design §9; migration 0181): the minimum
+  // -- profit in USD, the USD chain's figures, the procurement card's summary and the converted
+  // -- legacy minimum. Private pricing values; none collides with a public name.
   'minimum_target_profit_usd',
   'target_profit_usd',
   'target_profit_iqd_exact',
